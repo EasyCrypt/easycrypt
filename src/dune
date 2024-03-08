@@ -9,7 +9,7 @@
  (name ecLib)
  (public_name easycrypt.ecLib)
  (modules :standard \ ec)
- (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith)
+ (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith bitwuzla)
 )
 
 (executable
@@ -17,7 +17,7 @@
  (name ec)
  (modules ec)
  (promote (until-clean))
- (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith ecLib))
+ (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith ecLib bitwuzla))
 
 (ocamllex ecLexer)
 

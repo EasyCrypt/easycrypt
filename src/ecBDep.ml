@@ -101,6 +101,14 @@ end = struct
     | None -> None
 end
 
+
+(* -------------------------------------------------------------------- *)
+let zpad (n: int) (r: C.reg)  = 
+  if List.length r < n then
+    List.append r (List.init (n - (List.length r)) (fun _ -> C.false_))
+  else r
+
+
 (* -------------------------------------------------------------------- *)
 type width = int
 
@@ -265,6 +273,7 @@ let compare_deps (d1: deps) (d2: deps) : bool =
     d1
     d2
 
+(* ------------------------------------------------------------------------------- *)
 let rec inputs_of_node : _ -> C.var Set.t =
   let cache : (int, C.var Set.t) Hashtbl.t = Hashtbl.create 0 in
   
@@ -285,19 +294,101 @@ let rec inputs_of_node : _ -> C.var Set.t =
 
   in fun n -> doit n
 
+(* ------------------------------------------------------------------------------- *)
 let inputs_of_reg (r : C.reg) : C.var Set.t =
   List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
 
-let circ_equiv (r1 : C.reg) (r2 : C.reg) : bool = 
-  if List.compare_lengths r1 r2 <> 0 then false 
-  else 
-    let d1 = C.deps r1 in 
-    let d2 = C.deps r2 in
-    if not (compare_deps d1 d2) then false
-    else 
+(* ------------------------------------------------------------------------------- *)
+let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (bound : int) : bool =
+  let module B = Bitwuzla.Once () in
+  let open B in
+  let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
+  let inps = Map.of_seq (List.to_seq inps) in
+  let env_ (v : C.var) = Option.map C.input (Map.find_opt v inps) in
+  let r1 = C.maps env_ r1 in
 
-      let inps = List.combine (inputs_of_reg r1 |> Set.to_list) (inputs_of_reg r2 |> Set.to_list) in
-      C.equivs inps r1 r2
+  let rec bvterm_of_node : C.node -> _ =
+    let cache = Hashtbl.create 0 in
+  
+    let rec doit (n : C.node) =
+      let mn = 
+        match Hashtbl.find_option cache (Int.abs n.id) with
+        | None ->
+          let mn = doit_r n.gate in
+          Hashtbl.add cache (Int.abs n.id) mn;
+          mn
+        | Some mn -> 
+          mn
+      in 
+        if 0 < n.id then mn else Term.Bv.lognot mn
+
+    and doit_r (n : C.node_r) = 
+      match n with
+      | False -> Term.Bv.zero (Sort.bv 1) 
+      | Input v -> let name = ("v" ^ (String.of_int (fst v)) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+      begin 
+        match Map.String.find_opt name !bvvars with
+        | None ->
+          bvvars := Map.String.add name (Term.const (Sort.bv 1) name) !bvvars;
+          Map.String.find name !bvvars 
+        | Some t -> t
+      end
+      | And (n1, n2) -> Term.Bv.logand (doit n1) (doit n2)
+
+    in fun n -> doit n
+  in 
+  
+  let bvterm_of_reg (r: C.reg) : _ =
+    Format.eprintf "Reg has %d nodes@." (List.length r);
+    List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
+  in 
+  let bvinpt1 = (bvterm_of_reg r1) in
+  let bvinpt2 = (bvterm_of_reg r2) in
+  let formula = Term.equal bvinpt1 bvinpt2 
+  in 
+ 
+  let inputs = Map.String.keys !bvvars |> List.of_enum |> Array.of_list in 
+  let inputs = Array.rev inputs in
+  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in
+  (*let lsB, msB = Array.take 8 inputs, Array.drop 8 inputs in*)
+  let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs)  
+  in
+  let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv 16) bound) 
+  in
+
+  begin
+    assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
+    (*assert' @@ Term.Bv.lognot formula;*)
+    let result = check_sat () in
+    if result = Unsat then
+    true else
+      begin
+        Format.eprintf "fc: %a@."     Term.pp (get_value bvinpt1 :> B.bv B.term);
+        Format.eprintf "block: %a@."  Term.pp (get_value bvinpt2 :> B.bv B.term);
+        Format.eprintf "inp: %a@."    Term.pp (get_value inp_bv :> B.bv B.term);
+        false
+      end
+  end
+
+
+(* ------------------------------------------------------------------------------- *)
+let circ_equiv (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool = 
+  let (r1, r2) = if List.compare_lengths r1 r2 < 0 then
+    (zpad (List.length r2) r1, r2) else
+    (r1, zpad (List.length r1) r2)
+  in
+
+  let d1 = C.deps r1 in 
+  let d2 = C.deps r2 in
+  if not (compare_deps d1 d2) then false
+
+  else  
+    let inp1 = (inputs_of_reg r1 |> Set.to_list) in
+    let inp2 = (inputs_of_reg r2 |> Set.to_list) in
+    let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in
+    if bitwuzla > 0 then 
+      circ_equiv_bitwuzla inps r1 r2 bitwuzla
+    else C.equivs inps r1 r2
 
 let bruteforce (r : C.reg) (vars : C.var list) : unit = 
   let rec doit (acc : bool list) (n : int) : unit =
@@ -310,17 +401,30 @@ let bruteforce (r : C.reg) (vars : C.var list) : unit =
   in doit [] (List.length vars)
 
 let bools_of_int (n : int) ~(size: int) : bool list =
-  List.init size (fun i -> ((n lsl i) land 1) <> 0) 
+  List.init size (fun i -> ((n lsr i) land 1) <> 0) 
 
 let bruteforce_equiv (r1 : C.reg) (r2 : C.reg) (range: int) : bool = 
+  
+  let (r1, r2) = if List.compare_lengths r1 r2 < 0 then
+    (zpad (List.length r2) r1, r2) else
+    (r1, zpad (List.length r1) r2)
+  in
+
   let eval (r : C.reg) (n: int) : int =
     let inp = inputs_of_reg r |> Set.to_list in
     let vals = bools_of_int n ~size:(List.length inp) in
     let env = List.combine inp vals |> List.to_seq |> Map.of_seq in
-    let eval = C.eval (fun x -> Map.find x env) in
-    List.map eval r |> C.uint_of_bools
+    (*let eval = C.eval (fun x -> Map.find x env) in
+    List.map eval r *)
+    let res = C.evals (fun x -> Map.find x env) r |> C.uint_of_bools in
+    res
   in
-  Enum.(--^) 0 range |> Enum.map (fun i -> (eval r1 i) = (eval r2 i)) |> Enum.fold (&&) true
+  Enum.(--^) 0 range 
+    |> Enum.map (fun i -> 
+        let res1 = (eval r1 i) in
+        let res2 = (eval r2 i) in
+        if res1 = res2 then true 
+        else (Format.eprintf "i: %d | r1: %d | r2: %d@." i res1 res2; false)) |> Enum.fold (&&) true
 
 (* -------------------------------------------------------------------- *)
 exception BDepError
@@ -376,27 +480,27 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     | (["Top"; "JWord"; "W32"], "to_uint") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (List.hd rs)
+        (List.hd rs |> zpad 256)
     | (["Top"; "JWord"; "W16"], "to_uint") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (List.hd rs)
+        (List.hd rs |> zpad 256)
     | (["Top"; "JWord"; "W8"], "to_uint") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (List.hd rs)
+        (List.hd rs |> zpad 256)
     | (["Top"; "JWord"; "W32"], "of_int") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 32)
+        (rs |> List.hd |> List.take 32 |> zpad 32)
     | (["Top"; "JWord"; "W16"], "of_int") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 16)
+        (rs |> List.hd |> List.take 16 |> zpad 16)
     | (["Top"; "JWord"; "W8"], "of_int") -> 
         fun rs ->
         assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 16)
+        (rs |> List.hd |> List.take 16 |> zpad 8)
     | (["Top"; "JWord"; "W32"], "*") 
     | (["Top"; "JWord"; "W16"], "*") -> 
         fun rs ->
@@ -411,7 +515,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.add a b |> snd
-    | (["Top"; "JWord"; "W32"], "[-]") ->
+(*    | (["Top"; "JWord"; "W32"], "[-]") ->
         fun rs -> begin
           match List.length rs with
           | 2 ->
@@ -419,7 +523,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
             let b = (rs |> List.tl |> List.hd) in
             C.sub_dropc a b
           | n -> Format.eprintf "Got %d args for sub" n; failwith "Wrong args"
-        end
+        end *)
     | (["Top"; "JWord"; "W32"], "`<<`") 
     | (["Top"; "JWord"; "W16"], "`<<`") -> 
         fun rs ->
@@ -468,8 +572,8 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     let (pth, pth2) = EcPath.toqsymbol pth in
     let () = List.iter (Format.eprintf "%s ") pth in
     let () = Format.eprintf "@.%s@.------------@." pth2 in
+    failwith "No unary yet"
 
-    C.reg ~size:0 ~name:0
   | Fapp _ as f_ -> 
     let (f, fs) = EcCoreFol.destr_app f in
     let fs_c = List.map (circuit_of_form env) fs in
@@ -548,9 +652,9 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
-(*  let () = Format.eprintf "len %d @." (List.length fc) in
+  let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  print_deps_alt ~name:"test_out" fc;*)
+  print_deps_alt ~name:"test_out" fc;
  
   (* Working with:
    op compress_alt (d: int, c: W16.t) : W16.t = (((c * ((W16.of_int 1) `<<` (W8.of_int d)) + (W16.of_int qh)) * (W16.of_int two_eight)) `>>` (W8.of_int 28)) `&` ((W16.of_int 1) `<<` (W8.of_int d)). 
@@ -723,11 +827,10 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
         (C.VarRange.contents deps)
       ) d) 
     circs) in
-    let () = assert (List.for_all (circ_equiv (List.hd circs)) (List.tl circs)) in
-    let () = assert (bruteforce_equiv (List.hd circs) fc b_bound) in
+    let () = assert (List.for_all (circ_equiv (List.hd circs) ~bitwuzla:0) (List.tl circs)) in 
+    let () = assert (circ_equiv fc (List.hd circs) ~bitwuzla:b_bound) in
     Format.eprintf "Success@."
   end 
-
 
 
   (*
