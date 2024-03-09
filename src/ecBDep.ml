@@ -339,7 +339,8 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
   in 
   
   let bvterm_of_reg (r: C.reg) : _ =
-    Format.eprintf "Reg has %d nodes@." (List.length r);
+    (* DEBUG PRINT 
+    Format.eprintf "Reg has %d nodes@." (List.length r); *)
     List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
   in 
   let bvinpt1 = (bvterm_of_reg r1) in
@@ -349,7 +350,8 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
  
   let inputs = Map.String.keys !bvvars |> List.of_enum |> Array.of_list in 
   let inputs = Array.rev inputs in
-  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in
+  (* DEBUG PRINT:
+  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in *)
   (*let lsB, msB = Array.take 8 inputs, Array.drop 8 inputs in*)
   let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs)  
   in
@@ -358,7 +360,6 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
 
   begin
     assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
-    (*assert' @@ Term.Bv.lognot formula;*)
     let result = check_sat () in
     if result = Unsat then
     true else
@@ -467,7 +468,8 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
         | (["Top"; "JWord"; "W16" ], "t") ->  16
         | (["Top"; "JWord"; "W8"  ], "t") ->   8
         | (["Top"; "Pervasive"], "int") -> 256
-        | (qs, q) -> List.iter (Format.eprintf "%s ") qs; Format.eprintf "@. %s@." q; raise BDepError
+(*      DEBUG PRINT V
+        | (qs, q) -> List.iter (Format.eprintf "%s ") qs; Format.eprintf "@. %s@." q; raise BDepError*)
         | _ -> raise BDepError
       end
 
@@ -475,83 +477,80 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
        raise BDepError in
 
   let trans_jops (pth: qsymbol) : C.reg list -> C.reg =
-    (* TODO: Check if we need regs to be of correct size or not *)
+    (* TODO: Check if we need regs to be of correct size or not (semi-done) *)
     match pth with
-    | (["Top"; "JWord"; "W32"], "to_uint") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (List.hd rs |> zpad 256)
-    | (["Top"; "JWord"; "W16"], "to_uint") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (List.hd rs |> zpad 256)
-    | (["Top"; "JWord"; "W8"], "to_uint") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (List.hd rs |> zpad 256)
+    | (["Top"; "JWord"; "W32"], "to_uint") 
+    | (["Top"; "JWord"; "W16"], "to_uint") 
+    | (["Top"; "JWord"; "W8"], "to_uint")  -> 
+        fun rs -> begin
+          match rs with
+          | [r] -> zpad 256 r
+          | _   -> raise BDepError (* check error type here *)
+        end
     | (["Top"; "JWord"; "W32"], "of_int") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 32 |> zpad 32)
+        fun rs -> begin
+          match rs with
+          | [r] -> r |> List.take 32 |> zpad 32
+          | _   -> raise BDepError
+        end
     | (["Top"; "JWord"; "W16"], "of_int") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 16 |> zpad 16)
+        fun rs -> begin
+          match rs with
+          | [r] -> r |> List.take 16 |> zpad 16
+          | _   -> raise BDepError
+        end
     | (["Top"; "JWord"; "W8"], "of_int") -> 
-        fun rs ->
-        assert (List.length rs = 1); 
-        (rs |> List.hd |> List.take 16 |> zpad 8)
+        fun rs -> begin
+          match rs with
+          | [r] -> r |> List.take 8 |> zpad 8
+          | _   -> raise BDepError
+        end
     | (["Top"; "JWord"; "W32"], "*") 
     | (["Top"; "JWord"; "W16"], "*") -> 
-        fun rs ->
-        assert (List.length rs = 2); 
-        let a = List.hd rs in 
-        let b = (rs |> List.tl |> List.hd) in
-        C.umull a b 
+        fun rs -> begin
+          match rs with
+          | [a; b] -> C.umull a b 
+          | _      -> raise BDepError
+        end
     | (["Top"; "JWord"; "W32"], "+") 
     | (["Top"; "JWord"; "W16"], "+") -> 
-        fun rs ->
-        assert (List.length rs = 2); 
-        let a = List.hd rs in 
-        let b = (rs |> List.tl |> List.hd) in
-        C.add a b |> snd
-(*    | (["Top"; "JWord"; "W32"], "[-]") ->
+        fun rs -> begin 
+          match rs with
+          | [a; b] -> C.add a b |> snd
+          | _      -> raise BDepError
+        end
+(*    | (["Top"; "JWord"; "W32"], "[-]") -> This should be subtraction, need to change path FIXME
         fun rs -> begin
-          match List.length rs with
-          | 2 ->
-            let a = List.hd rs in
-            let b = (rs |> List.tl |> List.hd) in
-            C.sub_dropc a b
-          | n -> Format.eprintf "Got %d args for sub" n; failwith "Wrong args"
+          match rs with
+          | [a; b] -> C.sub_dropc a b
+          | _      -> raise BDepError
         end *)
     | (["Top"; "JWord"; "W32"], "`<<`") 
     | (["Top"; "JWord"; "W16"], "`<<`") -> 
-        fun rs ->
-        assert (List.length rs = 2);
-        let a = List.hd rs in 
-        let b = (rs |> List.tl |> List.hd) in
-        C.shift ~side:`L ~sign:`L a b 
+        fun rs -> begin
+          match rs with
+          | [a; b] -> C.shift ~side:`L ~sign:`L a b 
+          | _ -> raise BDepError
+        end
     | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *)
     | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *)  
-        fun rs ->                           (* if we need to apply a mask                *)
-        assert (List.length rs = 2);
-        let a = List.hd rs in 
-        let b = (rs |> List.tl |> List.hd) in
-        C.shift ~side:`R ~sign:`L a b 
+        fun rs -> begin                     (* if we need to apply a mask                *) 
+          match rs with
+          | [a; b] -> C.shift ~side:`R ~sign:`L a b 
+          | _      -> raise BDepError
+        end
     | (["Top"; "JWord"; "W32"], "`&`") 
     | (["Top"; "JWord"; "W32"], "andw")  
     | (["Top"; "JWord"; "W16"], "`&`") 
     | (["Top"; "JWord"; "W16"], "andw") -> 
-        fun rs ->
-        assert (List.length rs = 2);
-        let a = List.hd rs in 
-        let b = (rs |> List.tl |> List.hd) in
-        C.land_ a b 
-
-
+        fun rs -> begin
+          match rs with
+          | [a; b] -> C.land_ a b 
+          | _      -> raise BDepError
+        end
     | _ -> List.iter (Format.eprintf "%s ") (fst pth);
-        Format.eprintf "%s@." (snd pth);
-        failwith "Operator not implemented yet?"
+        Format.eprintf "%s@.Not implemented yet@." (snd pth);
+        raise BDepError
   in
 
   match f.f_node with
@@ -574,7 +573,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     let () = Format.eprintf "@.%s@.------------@." pth2 in
     failwith "No unary yet"
 
-  | Fapp _ as f_ -> 
+  | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
     let fs_c = List.map (circuit_of_form env) fs in
     begin match f.f_node with
@@ -582,7 +581,6 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
           trans_jops (EcPath.toqsymbol pth) fs_c
       | _ -> failwith "Cant apply to non op"
     end 
-(*    let f = circuit_of_form env f in *)
   | Fquant (_, binds, f) -> 
       (* maybe add bindings to some env here? *)
       circuit_of_form env f (* FIXME *) 
@@ -593,9 +591,6 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
       | _ -> circuit_of_form env f 
       (* FIXME^: for testing, to allow easycrypt to ignore flags on Jasmin operators *) 
       end
-  | Fmatch _ -> failwith "fmatch"
-  | Flet _ -> failwith "flet"
-  | Fpvar _ -> failwith "fpvar"
   | _ -> failwith "Not yet implemented"
     
 (* V might not be necessary V *)
@@ -631,7 +626,7 @@ and int_of_form (env: env) (f: EcAst.form) : int =
 
   match f.f_node with
   | Fint z -> EcAst.BI.to_int z
-  | Fapp _ as f_ -> 
+  | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
     let fs_c = List.map (int_of_form env) fs in
     begin match f.f_node with
@@ -652,15 +647,25 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
+  (* DEBUG PRINTS FOR OP CIRCUIT
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  print_deps_alt ~name:"test_out" fc;
+  print_deps_alt ~name:"test_out" fc;*)
  
   (* Working with:
-   op compress_alt (d: int, c: W16.t) : W16.t = (((c * ((W16.of_int 1) `<<` (W8.of_int d)) + (W16.of_int qh)) * (W16.of_int two_eight)) `>>` (W8.of_int 28)) `&` ((W16.of_int 1) `<<` (W8.of_int d)). 
+    abbrev q = 3329.
+    abbrev qh = 1665.
+    abbrev d = 4.
+    abbrev mask = 15.
+    abbrev two_eight = 80635.
+    abbrev one32 = W32.of_int 1.
+    abbrev one16 = W16.of_int 1.
+
+    op compress_alt (c: W16.t) : W32.t =
+(((((W32.of_int (W16.to_uint c)) `<<` (W8.of_int d)) + (W32.of_int qh))
+  * (W32.of_int two_eight)) `>>` (W8.of_int 28))
+`&` (W32.of_int 15).
   *)
-
-
 
   let trans_int (p : path) : width =
     match EcPath.toqsymbol p with
@@ -741,7 +746,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
     (x.v_name, trans_wtype x.v_type) in
 
   let arguments = List.map trans_arg_ proc.f_sig.fs_anames in
-  let ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in
+  let ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in 
   let _locals = List.map trans_local pdef.f_locals in
 
   let body : bprgm = List.map trans_instr pdef.f_body.s_node in
@@ -756,53 +761,11 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
     CircEnv.empty arguments in
   let (cenv, circs) = circuit_from_bprgm cenv body in
 
-  (*
-   * TODO
-   *  1: generator the circuit C from the program `body`
-   *  2: compute the dependencies and infer sub-circuits C1...Cn
-   *  3: check equivalence between the different boolean functions C1...Cn
-   *  4: generate a circuit Pr encoding the pre-condition (partial)
-   *  5: generate a circuit Po encoding the post-condition
-   *  6: check that (Pri /\ Ci) => Poi by computation
-   *)
+(* PRINT PROC PROGRAM BODY
+  Format.eprintf "%a@." pp_bprgm body; *)
 
-  Format.eprintf "%a@." pp_bprgm body;
-
-  (*
-  print_deps_ric cenv "rp_0_0";
-  print_deps_ric cenv "rp_1_0";
-  print_deps_ric cenv "rp_2_0";
-  print_deps_ric cenv "rp_3_0";*)
-
-    (*
-  let process (r : symbol) : unit = 
-    let rs = Option.get (CircEnv.get_s cenv r) in
-    let rs = circ_dep_split rs in
-    let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
-    List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*(List.length r_)))) cenv r_) rs
-
-  in match ret_vars with
-  | Some vs ->
-      List.iter
-        process
-        (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)
-  | _ -> ()
-    *)
-
-  (*
-  match ret_vars with
-  | Some ((Var (v, _))::_) ->
-    let rs = Option.get (CircEnv.get_s cenv v) in
-    let rs = circ_dep_split rs |> List.hd in
-    let inputs = inputs_of_reg rs in
-    assert (bruteforce_equiv rs comp_circ 65536);
-    Format.eprintf "Success@.";
-    exit 0;
-    bruteforce rs (Set.to_list inputs)
-  | _ -> ()
-*)
-
-(*  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in *)
+(* COMPRESS CIRCUIT FROM SPEC LANGUAGE 
+  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in *)
   begin 
     let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
     let () = assert ((List.length circ) mod m = 0) in
@@ -812,12 +775,13 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
       | v -> (List.take n l)::(part (List.drop n l) n) in
     let circs = part circ m in
     (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
-    let () = 
+(*  let () = 
     List.iteri (fun i c ->
       Format.eprintf "@.%d: " i;
       print_deps ~name:"TEST_" cenv c) circs
-    in
+    in *)
     
+    (* TODO: refactor this? V*)
     let () = assert (List.for_all (fun c ->
       let d = C.deps c in
       List.for_all (fun (_, deps) -> 
@@ -833,7 +797,18 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   end 
 
 
+
   (*
+   * old_TODO
+   *  1: generator the circuit C from the program `body` -> Done
+   *  2: compute the dependencies and infer sub-circuits C1...Cn -> Done
+   *  3: check equivalence between the different boolean functions C1...Cn -> Done
+   *  4: generate a circuit Pr encoding the pre-condition (partial) -> ?
+   *  5: generate a circuit Po encoding the post-condition -> ?
+   *  6: check that (Pri /\ Ci) => Poi by computation -> ?
+   *)
+
+  (* Actual plan:
 
     Take {rp_0, rp_1, rp_2, rp_3} e.g, flatten it as one bit array
     partition into array of m-bit words 
@@ -852,9 +827,8 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   3) Join by each m bits -> Done
   4) Check that each block depends on (exactly) n bits -> Done
   5) Check that circuits are equivalent for each pair of blocks -> Done
-  6) Generate circuit for operator
-    -> 
-  7) Check it is equivalent to first block -> Done*
+  6) Generate circuit for operator -> Done
+  7) Check it is equivalent to first block -> Done (bruteforce and SMT)
 
   *)
 
