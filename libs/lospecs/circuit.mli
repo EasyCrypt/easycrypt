@@ -53,6 +53,8 @@ val lor_ : reg -> reg -> reg
 
 val land_ : reg -> reg -> reg
 
+val lxor_ : reg -> reg -> reg
+
 val ors : node list -> node
 
 val ands : node list -> node

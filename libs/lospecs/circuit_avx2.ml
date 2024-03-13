@@ -19,6 +19,8 @@ module type S = sig
   val vpmulhrs_16u16 : reg -> reg -> reg
   val vpsra_16u16 : reg -> int -> reg
   val vpsrl_16u16 : reg -> int -> reg
+  val vpsrl_4u64 : reg -> int -> reg
+  val vpsll_4u64 : reg -> int -> reg
   val vpackus_16u16 : reg -> reg -> reg
   val vpackss_16u16 : reg -> reg -> reg
   val vpshufb_256 : reg -> reg -> reg
@@ -28,6 +30,10 @@ module type S = sig
   val vpextracti128 : reg -> int -> reg
   val vpinserti128 : reg -> reg -> int -> reg
   val vpblend_16u16 : reg -> reg -> int -> reg
+  val vpslldq_256 : reg -> int -> reg
+  val vpsrldq_256 : reg -> int -> reg
+  val vpslldq_128 : reg -> int -> reg
+  val vpsrldq_128 : reg -> int -> reg
 end
 
 (* ==================================================================== *)
@@ -128,6 +134,42 @@ module FromSpec () : S = struct
 
   let vpsrl_16u16 (r : reg) (n : int) : reg =
     Circuit_spec.circuit_of_spec [r; Circuit.w8 n] vpsrl_16u16
+
+  (* ------------------------------------------------------------------ *)
+  let vpsrl_4u64 = List.assoc "VPSRL_4u64" specs
+
+  let vpsrl_4u64 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 n] vpsrl_4u64
+
+  (* ------------------------------------------------------------------ *)
+  let vpsll_4u64 = List.assoc "VPSLL_4u64" specs
+
+  let vpsll_4u64 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 n] vpsll_4u64
+
+  (* ------------------------------------------------------------------ *)
+  let vpslldq_256 = List.assoc "VPSLLDQ_256" specs
+
+  let vpslldq_256 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 (8 * n)] vpslldq_256
+
+  (* ------------------------------------------------------------------ *)
+  let vpsrldq_256 = List.assoc "VPSRLDQ_256" specs
+
+  let vpsrldq_256 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 (8 * n)] vpsrldq_256
+
+  (* ------------------------------------------------------------------ *)
+  let vpslldq_128 = List.assoc "VPSLLDQ_128" specs
+
+  let vpslldq_128 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 (8 * n)] vpslldq_128
+
+  (* ------------------------------------------------------------------ *)
+  let vpsrldq_128 = List.assoc "VPSRLDQ_128" specs
+
+  let vpsrldq_128 (r : reg) (n : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 (8 * n)] vpsrldq_128
 
   (* ------------------------------------------------------------------ *)
   let vpackus_16u16 = List.assoc "VPACKUS_16u16" specs

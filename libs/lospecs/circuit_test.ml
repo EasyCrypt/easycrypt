@@ -1158,4 +1158,50 @@ let poly_compress () =
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = poly_compress ()
+let shift () =
+  let module CAvx2 = Circuit_avx2.FromSpec () in
+
+  let i = 1 in
+
+  let h = C.reg ~size:128 ~name:0 in
+  let l = C.reg ~size:128 ~name:1 in
+
+  let f ((v, i) : C.var) =
+    match v with
+    | 0 -> false
+    | 1 -> true
+    | _ -> assert false in
+
+  let c1 =
+    let hl = l @ h in
+    let hli = CAvx2.vpsll_4u64 hl i in
+    let hl64i = CAvx2.vpsrl_4u64 hl (64 - i) in
+    let hl64il = CAvx2.vpslldq_256 hl64i 8 in
+    let hli = Circuit.lxor_ hli hl64il in
+    let l64ir = CAvx2.vpsrldq_128 (CAvx2.vpextracti128 hl64i 0) 8 in
+    let h = CAvx2.vpextracti128 hli 1 in
+    let h = Circuit.lxor_ h l64ir in
+    let l = CAvx2.vpextracti128 hli 0 in
+
+    l @ h in
+
+  let c2 =
+    Circuit.shift ~side:`L ~sign:`L (l @ h) (Circuit.w8 i) in
+
+  let v1 = Aig.evals f c1 in
+  let v2 = Aig.evals f c2 in
+
+  let v1 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v1) in
+  let v2 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v2) in
+
+  Format.eprintf "%a@."
+    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
+    v1;
+    Format.eprintf "%a@."
+    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
+    v2;
+
+  Format.eprintf "%b@." (List.for_all2 (==) c1 c2)
+
+(* -------------------------------------------------------------------- *)
+let () = shift ()
