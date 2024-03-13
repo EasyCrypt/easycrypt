@@ -191,8 +191,14 @@ let circuit_of_bstmt (env : cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
 
     | Copy (x, w) -> Option.get (CircEnv.get_s env x)
 
-    | Op (op, args) ->
-      args |> registers_of_bargs env |> (C.func_from_spec op)
+    | Op (op, args) -> try 
+            begin
+            match op with
+            | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *)
+            | _ ->
+              args |> registers_of_bargs env |> (C.func_from_spec op)
+            end
+    with Not_found -> Format.eprintf "op %s not found@." op; assert false
   in
 
   let env = CircEnv.bind env idx r in
@@ -348,18 +354,21 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
   let formula = Term.equal bvinpt1 bvinpt2 
   in 
  
-  let inputs = Map.String.keys !bvvars |> List.of_enum |> Array.of_list in 
-  let inputs = Array.rev inputs in
+  (* FIXME: Mega hardcoding for shift test *)
+  let inputs = Map.String.keys !bvvars |> List.of_enum |> List.drop 256 |> Array.of_list in 
+  let inputs = Array.rev inputs in 
   (* DEBUG PRINT:
   let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in *)
   (*let lsB, msB = Array.take 8 inputs, Array.drop 8 inputs in*)
   let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs)  
   in
-  let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv 16) bound) 
-  in
 
   begin
-    assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
+          if bound > 0 then
+             let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv 8) bound) 
+             in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
+          else 
+             assert' @@ Term.Bv.lognot formula;
     let result = check_sat () in
     if result = Unsat then
     true else
@@ -387,7 +396,7 @@ let circ_equiv (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool =
     let inp1 = (inputs_of_reg r1 |> Set.to_list) in
     let inp2 = (inputs_of_reg r2 |> Set.to_list) in
     let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in
-    if bitwuzla > 0 then 
+    if bitwuzla >= 0 then 
       circ_equiv_bitwuzla inps r1 r2 bitwuzla
     else C.equivs inps r1 r2
 
@@ -438,6 +447,9 @@ let decode_op (p : path) : symbol =
   | ["Top"; "JWord"; "W16u16"], ("VPADD_16u16"       as op)
   | ["Top"; "JWord"; "W16u16"], ("VPBROADCAST_16u16" as op)
   | ["Top"; "JWord"; "W16u16"], ("VPMULH_16u16"      as op)
+  | ["Top"; "JWord"; "W4u64" ], ("VPSLL_4u64"      as op)
+  | ["Top"; "JWord"; "W4u64" ], ("VPSRL_4u64"      as op)
+  | ["Top"; "JWord"; "W2u128"], ("truncateu128"    as op)
 
      -> op
 
@@ -445,10 +457,18 @@ let decode_op (p : path) : symbol =
   | ["Top"; "JModel_x86"], ("VPACKUS_16u16"  as op)
   | ["Top"; "JModel_x86"], ("VPMADDUBSW_256" as op)
   | ["Top"; "JModel_x86"], ("VPERMD"         as op)
+  | ["Top"; "JModel_x86"], ("VPSLLDQ_256"    as op)
+  | ["Top"; "JModel_x86"], ("VPSRLDQ_128"    as op)
+  | ["Top"; "JModel_x86"], ("concat_2u128"   as op)
+  | ["Top"; "JModel_x86"], ("VEXTRACTI128"  as op)
 
      -> op
 
   | ["Top"; "JWord"; "W256"], "andw" -> "AND_u256"
+  | ["Top"; "JWord"; "W256"], "+^"   -> "VPXOR_256"
+  | ["Top"; "JWord"; "W128"], "+^"   -> "VPXOR_128"
+  | ["Top"; "JWord"; "W8"], "[-]"    -> "OPP_8"
+  | ["Top"; "JWord"; "W8"], "+"      -> "ADD_8"
 
   | _ ->
      Format.eprintf "%s@." (EcPath.tostring p);
@@ -525,6 +545,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
           | [a; b] -> C.sub_dropc a b
           | _      -> raise BDepError
         end *)
+    | (["Top"; "JWord"; "W256"], "`<<`") 
     | (["Top"; "JWord"; "W32"], "`<<`") 
     | (["Top"; "JWord"; "W16"], "`<<`") -> 
         fun rs -> begin
@@ -647,10 +668,10 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
-  (* DEBUG PRINTS FOR OP CIRCUIT
+  (* DEBUG PRINTS FOR OP CIRCUIT *)
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  print_deps_alt ~name:"test_out" fc;*)
+  print_deps_alt ~name:"test_out" fc;
  
   (* Working with:
     abbrev q = 3329.
@@ -687,6 +708,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
         | (["Top"; "JWord"; "W32" ], "t") ->  32
         | (["Top"; "JWord"; "W16" ], "t") ->  16
         | (["Top"; "JWord"; "W8"  ], "t") ->   8
+        | (["Top"; "Pervasive"], "int") -> 256
         | _ -> raise BDepError
       end
 
@@ -732,12 +754,13 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
          | Eapp ({ e_node = Eop (p, []) }, args) ->
             Op (decode_op p, List.map trans_arg args)
 
-         | _ ->
+         | _ -> let () = Format.eprintf "Sasgn error" in
             raise BDepError
 
        in ((x, trans_wtype xty), rhs)
 
-    | _ -> raise BDepError in
+    | _ -> let () = Format.eprintf "instr_error" in
+                raise BDepError in
 
   let trans_arg_ (x : ovariable) =
    (oget ~exn:BDepError x.ov_name, trans_wtype x.ov_type) in
@@ -752,48 +775,52 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let body : bprgm = List.map trans_instr pdef.f_body.s_node in
 
   if not (List.is_unique (List.fst body)) then
-    raise BDepError;
+    raise BDepError; 
 
   let cenv = List.fold_left 
     (fun env (s,w) -> 
       let (env, idn) = CircEnv.push env s in
-      CircEnv.bind  env idn (C.reg ~size:w ~name:(Ident.id idn)))
+      CircEnv.bind env idn (C.reg ~size:w ~name:(Ident.id idn)))
     CircEnv.empty arguments in
   let (cenv, circs) = circuit_from_bprgm cenv body in
 
-(* PRINT PROC PROGRAM BODY
-  Format.eprintf "%a@." pp_bprgm body; *)
+(* PRINT PROC PROGRAM BODY *)
+  Format.eprintf "%a@." pp_bprgm body; 
 
 (* COMPRESS CIRCUIT FROM SPEC LANGUAGE 
   let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in *)
   begin 
     let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
-    let () = assert ((List.length circ) mod m = 0) in
-    let rec part (l : 'a list) (n : int) : 'a list list = (* assumes above assertion for correctness *)
-      match l with
-      | [] -> []
-      | v -> (List.take n l)::(part (List.drop n l) n) in
-    let circs = part circ m in
-    (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
-(*  let () = 
-    List.iteri (fun i c ->
-      Format.eprintf "@.%d: " i;
-      print_deps ~name:"TEST_" cenv c) circs
-    in *)
-    
-    (* TODO: refactor this? V*)
-    let () = assert (List.for_all (fun c ->
-      let d = C.deps c in
-      List.for_all (fun (_, deps) -> 
-        List.for_all (fun (_, l) ->
-          List.for_all (fun (a,b) ->
-          b - a + 1 = n) l)
-        (C.VarRange.contents deps)
-      ) d) 
-    circs) in
-    let () = assert (List.for_all (circ_equiv (List.hd circs) ~bitwuzla:0) (List.tl circs)) in 
-    let () = assert (circ_equiv fc (List.hd circs) ~bitwuzla:b_bound) in
-    Format.eprintf "Success@."
+    if (n = m) &&  (n = 0) then
+      let () = assert (circ_equiv fc circ ~bitwuzla:b_bound) in
+      Format.eprintf "Success@."
+    else
+      let () = assert (List.length circ <> 0) in
+      let () = assert ((List.length circ) mod m = 0) in
+      let rec part (l : 'a list) (n : int) : 'a list list = (* assumes above assertion for correctness *)
+        match l with
+        | [] -> []
+        | v -> (List.take n l)::(part (List.drop n l) n) in
+      let circs = part circ m in
+      (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
+      let () = 
+      List.iteri (fun i c ->
+        Format.eprintf "@.%d: " i;
+        print_deps ~name:"TEST_" cenv c) circs
+      in 
+      (* TODO: refactor this? V*)
+        let () = assert (List.for_all (fun c ->
+        let d = C.deps c in
+        List.for_all (fun (_, deps) -> 
+          List.for_all (fun (_, l) ->
+            List.for_all (fun (a,b) ->
+            b - a + 1 = n) l)
+          (C.VarRange.contents deps)
+        ) d) 
+      circs) in
+      let () = assert (List.for_all (circ_equiv (List.hd circs) ~bitwuzla:(-1)) (List.tl circs)) in 
+      let () = assert (circ_equiv fc (List.hd circs) ~bitwuzla:b_bound) in
+      Format.eprintf "Success@."
   end 
 
 

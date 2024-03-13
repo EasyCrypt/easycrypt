@@ -3,6 +3,9 @@
 AND_u256(a@256, b@256) -> @256 =
  and<256>(a, b) 
 
+ADD_8(a@8, b@8) -> @8 =
+ add<8>(a, b)
+
 # Intel intrinsic: _mm256_permutexvar_epi32
 VPERMD(widx@256, w@256) -> @256 =
   map<32, 8>(
@@ -182,10 +185,27 @@ VPUNPCKL_32u8(w1@256, w2@256) -> @256 =
 VPEXTRACTI128(w@256, i@8) -> @128 =
   w[@128|i[0]]
 
+VEXTRACTI128(w@256, i@8) -> @128 =
+  w[@128|i[0]]
+
 # Intel intrinsic: _mm256_inserti128_si256
 VPINSERTI128(w@256, m@128, i@8) -> @256 =
   w[@128|i[0] <- m]
 
+# XOR
+VPXOR_256(w1@256, w2@256) -> @256 =
+  xor<256>(w1, w2)
+
+VPXOR_128(w1@128, w2@128) -> @128 =
+  xor<128>(w1, w2)
+
+# FIXME
+concat_2u128(a@128, b@128) -> @256 =
+  concat<128>(b, a)
+
+# Add later
+truncateu128(w@256) -> @128 =
+  w[@128|0]
 
 ## Auxiliary stuff
 COMPRESS(w@16) -> @4 =
@@ -194,3 +214,4 @@ COMPRESS(w@16) -> @4 =
       sll<16>(w, 4), 
       1665)
   , 80635), 28)[@4|0]
+

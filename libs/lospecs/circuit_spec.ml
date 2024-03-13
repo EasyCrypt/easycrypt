@@ -116,6 +116,11 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
       let e2 = of_expr env e2 in
       Circuit.lor_ e1 e2
 
+    | EXor (_, (e1, e2)) ->
+      let e1 = of_expr env e1 in
+      let e2 = of_expr env e2 in
+      Circuit.lxor_ e1 e2
+
     | EAnd (_, (e1, e2)) ->
       let e1 = of_expr env e1 in
       let e2 = of_expr env e2 in

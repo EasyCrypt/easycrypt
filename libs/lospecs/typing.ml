@@ -137,6 +137,7 @@ module Sigs : sig
   val sub : sig_
   val and_ : sig_
   val or_ : sig_
+  val xor_ : sig_
   val umul : sig_
   val umullo : sig_
   val umulhi : sig_
@@ -294,6 +295,10 @@ end = struct
   let uge : sig_ =
     let mk = fun ws x y -> ECmp (as_seq1 ws, `U, `Ge, (x, y)) in
     binop ~ret:(fun _ -> 1) ~name:"uge" mk
+
+  let xor_ : sig_ =
+    let mk = fun ws x y -> EXor (as_seq1 ws, (x, y)) in
+    binop ~name:"xor" mk
 end
 
 (* -------------------------------------------------------------------- *)
@@ -314,6 +319,7 @@ let sigs : sig_ list = [
   Sigs.sub;
   Sigs.and_;
   Sigs.or_;
+  Sigs.xor_;
   Sigs.umul;
   Sigs.umullo;
   Sigs.umulhi;
