@@ -365,7 +365,7 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
 
   begin
           if bound > 0 then
-             let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv 8) bound) 
+             let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv (Array.length inputs)) bound) 
              in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
           else 
              assert' @@ Term.Bv.lognot formula;
