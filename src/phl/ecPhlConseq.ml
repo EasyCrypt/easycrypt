@@ -521,7 +521,6 @@ let t_cHoareS_conseq_nm  = gen_conseq_nm t_cHoareS_notmod  t_cHoareS_conseq
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
-
 (* -------------------------------------------------------------------- *)
 (* concavity (jenhsen) : E(f g2) <= f (E g2)
    {g1} c { g2} : E g2 <= g1
