@@ -92,7 +92,8 @@ clone import Subtype with
   op P  <- iscanon
 proof *.
 realize inhabited.
-smt(canonK).
+    exists (canon witness).
+    apply canonK.
 qed.
     
 type qT = sT.

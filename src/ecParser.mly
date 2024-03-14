@@ -309,7 +309,7 @@
         let pr =
           match k with
           | `Only ->
-	            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
+            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
           | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
           | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }
 
@@ -421,6 +421,10 @@
 %token CONGR
 %token CONSEQ
 %token CONST
+%token COQ
+%token CHECK
+%token EDIT
+%token FIX
 %token COST
 %token DEBUG
 %token DECLARE
@@ -679,6 +683,9 @@ _lident:
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
 | EXIT       { "exit"       }
+| CHECK      { "check"      }
+| EDIT       { "edit"       }
+| FIX        { "fix"        }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2928,6 +2935,9 @@ logtactic:
 | SMT pi=smt_info
    { Psmt pi }
 
+| COQ mode=coq_info name=loc(STRING) LPAREN dbmap=dbmap1* RPAREN
+    { Pcoq (mode, name, SMT.mk_smt_option [`WANTEDLEMMAS dbmap])}
+
 | SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
@@ -3913,6 +3923,11 @@ print:
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
 
+coq_info:
+|           { None }
+| CHECK    { Some EcProvers.Check }
+| EDIT      { Some EcProvers.Edit }
+| FIX       { Some EcProvers.Fix }
 
 smt_info:
 | li=smt_info1* { SMT.mk_smt_option li}

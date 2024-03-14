@@ -5,7 +5,7 @@
 
 (include_subdirs unqualified)
 
-(library 
+(library
  (name ecLib)
  (public_name easycrypt.ecLib)
  (modules :standard \ ec)

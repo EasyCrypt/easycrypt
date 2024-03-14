@@ -276,6 +276,11 @@ let is_prover_known name =
   try ignore (get_prover name); true with UnknownProver _ -> false
 
 (* -------------------------------------------------------------------- *)
+
+let get_w3_main = Config.main
+let get_w3_conf = Config.config
+let get_w3_env = Config.w3_env
+
 let get_w3_th dirname name =
   Env.read_theory (Config.w3_env ()) dirname name
 
@@ -351,6 +356,13 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type coq_mode =
+  | Check (* Check scripts *)
+  | Edit  (* Edit then check scripts *)
+  | Fix   (* Try to check script, then edit script on non-success *)
+
+(* -------------------------------------------------------------------- *)
+
 type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
