@@ -1,0 +1,2087 @@
+(* --- Require/Import Theories --- *)
+(* -- Built-in (i.e, standard library) -- *)
+require import AllCore List.
+
+(* -- Local -- *)
+require (*--*) DigitalSignatures.
+
+
+
+(* --- General --- *)
+(* -- Types -- *)
+(* Types for to-be-signed artifacts ('messages') and signatures, respectively *)
+type msg_t.
+type sig_t.
+
+(* Types for public/verification keys and secret/private/signing keys, respectively *)
+type pk_t.
+type sk_t.
+
+(* Types for input and output of the random oracle, respectively *)
+type in_t.
+type out_t.
+
+
+(* -- Clones and imports -- *)
+(* Definitions and properties for digital signatures (in the standard model) *)
+clone import DigitalSignatures as DSS with
+  type msg_t <- msg_t,
+  type sig_t <- sig_t,
+  type pk_t <- pk_t,
+  type sk_t <- sk_t
+  
+  proof *.
+
+
+(* -- Module types -- *)
+(* 
+  -
+  (Random) Oracles.
+  The definitions in this file only require regular random oracle that provide 
+  an initialization functionality (for when the oracle is stateful) and a 
+  query functionality. In particular, for the definitions in this file, the used 
+  random oracles are not required to be (re-)programmable. 
+  Nevertheless, for flexibility purposes, the utilized random oracles are compatible
+  with the random oracles considered in PROM.ec.
+  -
+*)
+(* 
+  Type for (random) oracles used in security games, 
+  exposing both the initialization functionality and the query functionality 
+*)
+module type Oracle_i = {
+  proc init() : unit
+  proc get(x : in_t) : out_t
+}.
+
+(* 
+  Type for (random) oracles used in schemes and given to adversaries, 
+  exposing only the query functionality
+*)
+module type Oracle = {
+  proc get(x : in_t) : out_t
+}.
+
+
+
+(* --- Stateless Signature Schemes --- *)
+theory StatelessROM.
+  (* -- Imports -- *)
+  (* Definitions and properties for stateless signature schemes (in the standard model) *)
+  import Stateless.
+  
+
+  (* -- General -- *)
+  (* Module type for stateless signature schemes that are defined w.r.t. a random oracle *)
+  module type Scheme_ROM(RO : Oracle) = {
+    include Scheme
+  }.
+  
+  
+  (* -- Correctness -- *)
+  (* 
+    Probabilistic program formalizing the correctness of stateless signature schemes
+    that are defined w.r.t. a random oracle
+  *)
+  module Correctness_ROM(RO : Oracle_i, S : Scheme_ROM) = {
+    proc main(m : msg_t) : bool = {
+      var is_valid : bool;
+      
+      RO.init();
+      
+      is_valid <@ Correctness(S(RO)).main(m); 
+      
+      return is_valid;
+    }
+  }.
+  
+  
+  (*
+    -- 
+    Key-Only Attacks (KOA).
+    Attacks in which the adversary is only given the public/verification key
+    -- 
+  *)
+  (*
+    - 
+    UnBreakability under Key-Only Attacks in the Random Oracle Model (UB-KOA-ROM). 
+    Given the public/verification key, the adversary is tasked with computing the
+    corresponding secret key
+    -
+  *)
+  (* Class of adversaries against UB-KOA-ROM *)
+  module type Adv_UBKOA_ROM(RO : Oracle) = {
+    include Adv_UBKOA 
+  }.
+  
+  (* UB-KOA-ROM game *)
+  module UB_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ UB_KOA(S(RO), A(RO)).main();
+      
+      return r;
+    }
+  }.
+  
+  
+  (* 
+    - 
+    Universal UnForgeability under Key-Only Attacks in the Random Oracle Model (UUF-KOA-ROM).
+    Given the public/verification key and an arbitrary message, the adversary is tasked 
+    with forging a signature for the given message
+    - 
+  *)
+  abstract theory UUFKOAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+    
+    (* Definitions related to UUF-KOA game (in the standard model) *)
+    clone import UUFKOA with
+      op dmsg <- dmsg
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+    
+    (* Class of adversaries against UUF-KOA-ROM *)
+    module type Adv_UUFKOA_ROM(RO : Oracle) = {
+      include Adv_UUFKOA
+    }.
+
+    (* UUF-KOA-ROM game *)
+    module UUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFKOA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_KOA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFKOAROM.
+  
+  
+  (*
+    - 
+    Selective UnForgeability under Key-Only Attacks in the Random Oracle Model (SUF-KOA-ROM).
+    After picking a message, the adversary is given the public/verification key and tasked
+    with forging a signature for the picked message
+    -
+  *)
+  (* Class of adversaries SUF-KOA-ROM *)
+  module type Adv_SUFKOA_ROM(RO : Oracle) = {
+    include Adv_SUFKOA 
+  }.
+
+  (* SUF-KOA-ROM game *)
+  module SUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ SUF_KOA(S(RO), A(RO)).main();
+
+      return r;
+    }
+  }.
+
+  
+  (*
+    -
+    Existential UnForgeability under Key-Only Attacks in the Random Oracle Model (EUF-KOA-ROM).
+    Given the public/verification key, the adversary is tasked with forging a signature
+    for any fresh message
+    -
+  *)
+  (* Class of adversaries against EUF-KOA-ROM *)
+  module type Adv_EUFKOA_ROM(RO : Oracle) = {
+    include Adv_EUFKOA  
+  }.
+
+  (* EUF-KOA-ROM game *)
+  module EUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ EUF_KOA(S(RO), A(RO)).main();
+
+      return r;
+    }
+  }.
+
+
+  (* 
+    -- 
+    Random-Message Attacks (RMA).
+    Attacks in which the adversary is given the public/verification key as well as 
+    the signatures for a set of random messages *known* to the adversary, but not *chosen* by 
+    the adversary
+    -- 
+  *)  
+  (* 
+    - 
+    UnBreakability under Random-Message Attacks in the Random Oracle Model (UB-RMA-ROM). 
+    Given the public/verification key and the signatures for a set of known random messages, 
+    the adversary is tasked with computing the secret key corresponding to the 
+    public/verification key
+    -
+  *)
+  abstract theory UBRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in UB-RMA-ROM game *)
+    const n_ubrma : { int | 0 <= n_ubrma } as ge0_nubrma.
+
+    (* Definitions related to UB-RMA game (in the standard model) *)
+    clone import UBRMA with
+      op dmsg <- dmsg,
+      op n_ubrma <- n_ubrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nubrma by exact: ge0_nubrma.
+      
+    (* Class of adversaries against UB-RMA-ROM *)
+    module type Adv_UBRMA_ROM(RO : Oracle) = {
+      include Adv_UBRMA
+    }.
+
+    (* UB-RMA-ROM game *)
+    module UB_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UBRMAROM.
+  
+  
+  (* 
+    - 
+    Universal UnForgeability under Random-Message Attacks in the Random Oracle Model (UUF-RMA-ROM).
+    Given the public/verification key, the signatures for a set of known random messages, 
+    and an arbitrary message, the adversary is tasked with forging a signature for 
+    the given (latter) message
+    -
+  *)
+  abstract theory UUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in UUF-RMA-ROM game *)
+    const n_uufrma : { int | 0 <= n_uufrma } as ge0_nuufrma.
+
+    (* Definitions related to UB-RMA game (in the standard model) *)
+    clone import UUFRMA with
+      op dmsg <- dmsg,
+      op n_uufrma <- n_uufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufrma by exact: ge0_nuufrma.
+    
+    
+    (* Class of adversaries against UUF-RMA-ROM *)
+    module type Adv_UUFRMA_ROM(RO : Oracle) = {
+      include Adv_UUFRMA
+    }.
+
+    (* UUF-RMA-ROM game *)
+    module UUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFRMAROM.
+
+
+  (*
+    -
+    Selective UnForgeability under Random-Message Attacks in the Random Oracle Model (SUF-RMA-ROM).
+    After picking a message, the adversary is given the public/verification key, 
+    the signatures for a set of known random messages, and an arbitrary message, and is tasked
+    with forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in SUF-RMA-ROM game *)
+    const n_sufrma : { int | 0 <= n_sufrma } as ge0_nsufrma.
+
+    (* Definitions related to SUF-RMA game (in the standard model) *)
+    clone import SUFRMA with
+      op dmsg <- dmsg,
+      op n_sufrma <- n_sufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nsufrma by exact: ge0_nsufrma.
+    
+    (* Class of adversaries against SUF-RMA-ROM *)
+    module type Adv_SUFRMA_ROM(RO : Oracle) = {
+      include Adv_SUFRMA
+    }.
+
+    (* SUF-RMA-ROM game *)
+    module SUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFRMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Random-Message Attacks in the Random Oracle Model (EUF-RMA-ROM)
+    Given the public/verification key and the signatures for a set of known random messages,
+    the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in EUF-RMA-ROM game *)
+    const n_eufrma : { int | 0 <= n_eufrma } as ge0_neufrma.
+    
+    (* Definitions related to EUF-RMA game (in the standard model) *)
+    clone import EUFRMA with
+      op dmsg <- dmsg,
+      op n_eufrma <- n_eufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_neufrma by exact: ge0_neufrma.
+
+    (* Class of adversaries against EUF-RMA-ROM *)
+    module type Adv_EUFRMA_ROM(RO : Oracle) = {
+      include Adv_EUFRMA
+    }.
+
+    (* EUF-RMA-ROM game *)
+    module EUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFRMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end EUFRMAROM.
+
+  
+  (*
+    -- 
+    Generic Chosen-Message Attacks (GCMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of messages *chosen*. Here, all messages are chosen
+    (1) non-adaptively; that is, before obtaining any of the signatures, and
+    (2) independently of the public key; that is, without knowing the public key
+        at the time of choosing the messages
+    --
+  *)  
+  (* 
+    - 
+    UnBreakability under Generic Chosen-Message Attacks in the Random Oracle Model (UB-GCMA-ROM). 
+    Given the public/verification key and the signatures for a set of messages chosen
+    non-adaptively and indepedently of the public key, the adversary is tasked with 
+    computing the secret key corresponding to the public/verification key
+    -
+  *)
+  abstract theory UBGCMAROM.
+    (* Number of messages the adversary obtains signatures for in UB-GCMA-ROM game *)
+    const n_ubgcma : { int | 0 <= n_ubgcma } as ge0_nubgcma.
+
+    (* Definitions related to UB-GCMA game (in the standard model) *)
+    clone import UBGCMA with
+      op n_ubgcma <- n_ubgcma
+      
+      proof *.
+      realize ge0_nubgcma by exact: ge0_nubgcma.
+
+    (* Class of adversaries against UB-CMA *)
+    module type Adv_UBGCMA_ROM(RO : Oracle) = {
+      include Adv_UBGCMA
+    }.
+
+    (* UB-GCMA-ROM game *)
+    module UB_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }    
+    }.
+  end UBGCMAROM.
+  
+  
+  (*
+    -
+    Universal UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (UUF-GCMA-ROM).
+    Given the public/verification key, the signatures for a set of messages chosen
+    non-adaptively and indepedently of the public key, and an arbitrary message, 
+    the adversary is tasked with forging a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFGCMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+  
+    (* Number of messages the adversary obtains signatures for in UUF-GCMA-ROM game *)
+    const n_uufgcma : { int | 0 <= n_uufgcma } as ge0_nuufgcma.
+
+    (* Definitions related to UUF-GCMA game (in the standard model) *)
+    clone import UUFGCMA with
+      op dmsg <- dmsg,
+      op n_uufgcma <- n_uufgcma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufgcma by exact: ge0_nuufgcma.
+      
+    (* Class of adversaries against UUF-GCMA-ROM *)
+    module type Adv_UUFGCMA_ROM(RO : Oracle) = {
+      include Adv_UUFGCMA
+    }.
+
+    (* UUF-GCMA-ROM game *)
+    module UUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }    
+    }.
+  end UUFGCMAROM.
+
+    
+  (* 
+    - 
+    Selective UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (SUF-GCMA-ROM).
+    After picking a message, the adversary is given the public/verification key and
+    the signatures for a set of messages chosen non-adaptively and indepedently 
+    of the public key, and is tasked with forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFGCMAROM.
+    (* Number of messages the adversary obtains signatures for in SUF-GCMA-ROM game *)
+    const n_sufgcma : { int | 0 <= n_sufgcma } as ge0_nsufgcma.
+
+    (* Definitions related to SUF-GCMA game (in the standard model) *)
+    clone import SUFGCMA with
+      op n_sufgcma <- n_sufgcma
+      
+      proof *.
+      realize ge0_nsufgcma by exact: ge0_nsufgcma.
+      
+    (* Class of adversaries against SUF-GCMA-ROM *)
+    module type Adv_SUFGCMA_ROM(RO : Oracle) = {
+      include Adv_SUFGCMA
+    }.
+
+    (* SUF-GCMA-ROM game *)
+    module SUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFGCMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (EUF-GCMA-ROM)
+    Given the public/verification key and the signatures for a set of messages 
+    chosen non-adaptively and indepedently of the public key, the adversary is tasked 
+    with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFGCMAROM.
+    (* Number of messages the adversary obtains signatures for in EUF-GCMA-ROM game *)
+    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_neufgcma.
+    
+    (* Definitions related to EUF-GCMA game (in the standard model) *)
+    clone import EUFGCMA with
+      op n_eufgcma <- n_eufgcma
+      
+      proof *.
+      realize ge0_neufgcma by exact: ge0_neufgcma.
+      
+    (* Class of adversaries against EUF-GCMA-ROM *)
+    module type Adv_EUFGCMA_ROM(RO : Oracle) = {
+      include Adv_EUFGCMA
+    }.
+
+    (* EUF-GCMA-ROM game *)
+    module EUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFGCMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }  
+    }.
+  end EUFGCMAROM.
+  
+  
+  (*
+    -- 
+    Non-Adaptive Chosen-Message Attacks (NACMA)/Directed Chosen-Message Attacks (DCMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of *chosen* messages. Here, all messages are chosen
+    non-adaptively; that is, before obtaining any of the signatures. However, the chosen
+    messages may depend on the public key; i.e., the adversary is given the public key
+    when asked to provide the messages
+    --
+  *) 
+  (* 
+    - 
+    UnBreakability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (UB-NACMA-ROM). 
+    Given the public/verification key and the signatures for a set of non-adaptively
+    chosen messages, the adversary is tasked with computing the secret key 
+    corresponding to the public/verification key
+    -
+  *)
+  abstract theory UBNACMAROM.
+    (* Number of messages the adversary obtains signatures for in UB-NACMA-ROM game *)
+    const n_ubnacma : { int | 0 <= n_ubnacma } as ge0_nubnacma.
+
+    (* Definitions related to UB-NACMA game (in the standard model) *)
+    clone import UBNACMA with
+      op n_ubnacma <- n_ubnacma
+      
+      proof *.
+      realize ge0_nubnacma by exact: ge0_nubnacma.
+      
+    (* Class of adversaries against UB-NACMA-ROM *)
+    module type Adv_UBNACMA_ROM(RO : Oracle) = {
+      include Adv_UBNACMA
+    }.
+
+    (* UB-NACMA-ROM game *)
+    module UB_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UBNACMAROM.
+  
+  
+  (*
+    - 
+    Universal UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (UUF-NACMA-ROM).
+    Given the public/verification key, the signatures for a set of non-adaptively
+    chosen messages, and an arbitrary message, the adversary is tasked with forging 
+    a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFNACMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+  
+    (* Number of messages the adversary obtains signatures for in UUF-NACMA-ROM-ROM game *)
+    const n_uufnacma : { int | 0 <= n_uufnacma } as ge0_nuufnacma.
+
+    (* Definitions related to UUF-NACMA game (in the standard model) *)
+    clone import UUFNACMA with
+      op dmsg <- dmsg,
+      op n_uufnacma <- n_uufnacma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufnacma by exact: ge0_nuufnacma.
+      
+    (* Class of adversaries against UUF-NACMA-ROM *)
+    module type Adv_UUFNACMA_ROM(RO : Oracle) = {
+      include Adv_UUFNACMA
+    }.
+
+    (* UUF-NACMA-ROM game *)
+    module UUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFNACMAROM.
+
+  
+  (* 
+    - 
+    Selective UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (SUF-NACMA-ROM).
+    After picking a message, the adversary is given the public/verification key and
+    the signatures for a set of non-adaptively chosen messages, and is tasked with 
+    forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFNACMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in SUF-NACMA-ROM game *)
+    const n_sufnacma : { int | 0 <= n_sufnacma } as ge0_nsufnacma.
+
+    (* Definitions related to SUF-NACMA game (in the standard model) *)
+    clone import SUFNACMA with
+      op dmsg <- dmsg,
+      op n_sufnacma <- n_sufnacma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nsufnacma by exact: ge0_nsufnacma.
+      
+    (* Class of adversaries against SUF-NACMA-ROM *)
+    module type Adv_SUFNACMA_ROM(RO : Oracle) = {
+      include Adv_SUFNACMA
+    }.
+
+    (* SUF-NACMA-ROM game *)
+    module SUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFNACMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (EUF-NACMA-ROM).
+    Given the public/verification key and the signatures for a set of non-adaptively
+    chosen messages the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFNACMAROM.
+    (* Number of messages the adversary obtains signatures for in EUF-NACMA-ROM game *)
+    const n_eufnacma : { int | 0 <= n_eufnacma } as ge0_neufnacma.
+
+    (* Definitions related to EUF-NACMA game (in the standard model) *)
+    clone import EUFNACMA with
+      op n_eufnacma <- n_eufnacma
+      
+      proof *.
+      realize ge0_neufnacma by exact: ge0_neufnacma.
+      
+    (* Class of adversaries against EUF-NACMA-ROM *)
+    module type Adv_EUFNACMA_ROM(RO : Oracle) = {
+      include Adv_EUFNACMA
+    }.
+
+    (* EUF-NACMA-ROM game *)
+    module EUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFNACMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }  
+    }.
+  end EUFNACMAROM.
+
+  
+  (*
+    -- 
+    (Adaptive) Chosen-Message Attacks (CMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of *chosen* messages. Here, all messages are chosen
+    adaptively and may depend on the public key; that is, the adversary 
+    (1) immediately receives a signature for a chosen message before choosing the 
+        subsequent message, and
+    (2) is given the public key when asked to provide the messages.
+    --
+  *)
+  (* - General - *)
+  (* 
+    Type for signing oracles used in (adaptive) CMA games, including procedures 
+    for initialization and auxiliary tasks 
+  *)
+  module type Oracle_CMA_ROM(RO : Oracle, S : Scheme) = {
+    proc init(sk_init : sk_t) : unit
+    proc sign(m : msg_t) : sig_t
+    proc fresh(m : msg_t) : bool
+    proc nr_queries() : int
+  }.
+
+  (* 
+    Type for signing oracles used in (adaptive) CMA games, only exposing the 
+    procedure for signing 
+  *)
+  module type SOracle_CMA_ROM = {
+    include SOracle_CMA
+  }.
+  
+  (* 
+    Default implementation of a signing oracle including procedures for 
+    initialization and auxiliary tasks 
+  *)
+  module (O_CMA_ROM_Default : Oracle_CMA_ROM) (RO : Oracle) (S : Scheme)  = {
+    include var O_CMA_Default(S)
+  }.
+  
+  
+  (* 
+    - 
+    UnBreakability under (Adaptive) Chosen-Message Attacks in the Random Oracle Model (UB-CMA-ROM). 
+    Given the public/verification key and the signatures for a set of adaptively
+    chosen messages, the adversary is tasked with computing the secret key 
+    corresponding to the public/verification key
+    -
+  *)
+  (* Class of adversaries against UB-CMA-ROM *)
+  module type Adv_UBCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc break(pk : pk_t) : sk_t
+  }.
+  
+  
+  (* UB-CMA-ROM game *)
+  module UB_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBCMA_ROM, O : Oracle_CMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ UB_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+  
+  
+  (*
+    - 
+    Universal UnForgeability under (Adaptive) Chosen-Message Attacks in the Random Oracle Model (UUF-CMA-ROM)
+    Given the public/verification key, the signatures for a set of adaptively
+    chosen messages, and an arbitrary message, the adversary is tasked with forging 
+    a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFCMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Definitions related to SUF-NACMA game (in the standard model) *)
+    clone import UUFCMA with
+      op dmsg <- dmsg
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+
+    (* Class of adversaries against UUF-CMA-ROM *)
+    module type Adv_UUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+      proc forge(pk : pk_t, m : msg_t) : sig_t
+    }.
+
+    (* UUF-CMA-ROM game *)
+    module UUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFCMA_ROM, O : Oracle_CMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme, the adversary, and the signing oracle
+        *)
+        r <@ UUF_CMA(S(RO), A(RO), O(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFCMAROM.
+
+    
+  (*
+    -
+    Selective UnForgeability under Chosen-Message Attacks in the Random Oracle Model (SUF-CMA-ROM).
+    After picking a message, the adversary is given the public/verification key 
+    and the signatures for a set of adaptively chosen messages, and is tasked with 
+    forging a signature for the picked message
+    -
+  *)
+  (* Class of adversaries against SUF-CMA-ROM *)
+  module type Adv_SUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc pick() : msg_t
+    proc forge(pk : pk_t) : sig_t
+  }.
+  
+  (* SUF-CMA-ROM game *)
+  module SUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFCMA_ROM, O : Oracle_CMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ SUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+    
+
+  (*
+    -
+    Existential UnForgeability under Chosen-Message Attacks in the Random Oracle Model (EUF-CMA-ROM)
+    Given the public/verification key and the signatures for a set of adaptively 
+    chosen messages, the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  (* Class of adversaries against EUF-CMA-ROM *)
+  module type Adv_EUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* EUF-CMA-ROM game *)
+  module EUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFCMA_ROM, O : Oracle_CMA_ROM, RO : Oracle_i) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ EUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+
+  
+  (*
+    - 
+    Strong Existential UnForgeability under Chosen-Message Attacks in the Random Oracle Model (SEUF-CMA-ROM).
+    Given the public/verification key and the signatures for a set of adaptively 
+    chosen messages, the adversary is tasked with forging a fresh signature for any message
+    -
+  *)
+  (* 
+    Type for signing oracles used in the SEUF-CMA-ROM game, including procedures 
+    for initialization and auxiliary tasks 
+  *)
+  module type Oracle_SEUFCMA_ROM(RO : Oracle, S : Scheme) = {
+    proc init(sk_init : sk_t) : unit
+    proc sign(m : msg_t) : sig_t
+    proc fresh(msig : msg_t * sig_t) : bool
+    proc nr_queries() : int
+  }.
+
+  (* 
+    Type for signing oracles used in the SEUF-CMA-ROM game, only exposing the 
+    procedure for signing 
+  *)
+  module type SOracle_SEUFCMA_ROM = {
+    include SOracle_SEUFCMA
+  }.
+  
+  (* 
+    Default implementation of a signing oracle including procedures for 
+    initialization and auxiliary tasks 
+  *)
+  module (O_SEUFCMA_ROM_Default : Oracle_SEUFCMA_ROM) (RO : Oracle) (S : Scheme) = {
+    include var O_SEUFCMA_Default(S)
+  }.
+
+  (* Class of adversaries against SEUF-CMA-ROM *)
+  module type Adv_SEUFCMA_ROM(RO : Oracle, O : SOracle_SEUFCMA) = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* SEUF-CMA-ROM game *)
+  module SEUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SEUFCMA_ROM, O : Oracle_SEUFCMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ SEUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+end StatelessROM.
+
+
+
+(* --- Key-Updating (Stateful) Signature Schemes --- *)
+theory KeyUpdatingROM.
+  (* -- Imports -- *)
+  (* Definitions and properties for key-updating signature schemes (in the standard model) *)
+  import KeyUpdating.
+  
+  
+  (* -- General -- *)
+  (* Module type for key-updating signature schemes *)
+  module type Scheme_ROM(RO : Oracle) = {
+    include Scheme
+  }.
+ 
+  
+  (* -- Correctness -- *)
+  abstract theory CorrectnessROM.
+    (* Maximum number of signatures for which the scheme should be correct *)
+    const n_corr : { int | 0 <= n_corr } as ge0_ncorr.
+    
+    (* Definitions related to correctness property (in the standard model) *)
+    clone import Correctness with
+      op n_corr <- n_corr
+      
+      proof *.
+      realize ge0_ncorr by exact: ge0_ncorr.
+    
+    (* Probabilistic program formalizing the correctness of key-updating signature schemes *)
+    module CorrectnessROM(RO : Oracle_i, S : Scheme_ROM) = {
+      proc main(ml : msg_t list) : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original probabilistic program, providing the
+          initialized (random) oracle to the scheme
+        *)
+        r <@ Correctness(S(RO)).main(ml);
+
+        return r;
+      }
+    }.
+  end CorrectnessROM.
+
+  
+    (*
+    -- 
+    Key-Only Attacks (KOA).
+    Attacks in which the adversary is only given the public/verification key
+    -- 
+  *)
+  (*
+    - 
+    UnBreakability under Key-Only Attacks in the Random Oracle Model (UB-KOA-ROM). 
+    Given the public/verification key, the adversary is tasked with computing the
+    corresponding secret key
+    -
+  *)
+  (* Class of adversaries against UB-KOA-ROM *)
+  module type Adv_UBKOA_ROM(RO : Oracle) = {
+    include Adv_UBKOA 
+  }.
+  
+  (* UB-KOA-ROM game *)
+  module UB_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ UB_KOA(S(RO), A(RO)).main();
+      
+      return r;
+    }
+  }.
+  
+  
+  (* 
+    - 
+    Universal UnForgeability under Key-Only Attacks in the Random Oracle Model (UUF-KOA-ROM).
+    Given the public/verification key and an arbitrary message, the adversary is tasked 
+    with forging a signature for the given message
+    - 
+  *)
+  abstract theory UUFKOAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+    
+    (* Definitions related to UUF-KOA game (in the standard model) *)
+    clone import UUFKOA with
+      op dmsg <- dmsg
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+    
+    (* Class of adversaries against UUF-KOA-ROM *)
+    module type Adv_UUFKOA_ROM(RO : Oracle) = {
+      include Adv_UUFKOA
+    }.
+
+    (* UUF-KOA-ROM game *)
+    module UUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFKOA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_KOA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFKOAROM.
+  
+  
+  (*
+    - 
+    Selective UnForgeability under Key-Only Attacks in the Random Oracle Model (SUF-KOA-ROM).
+    After picking a message, the adversary is given the public/verification key and tasked
+    with forging a signature for the picked message
+    -
+  *)
+  (* Class of adversaries SUF-KOA-ROM *)
+  module type Adv_SUFKOA_ROM(RO : Oracle) = {
+    include Adv_SUFKOA 
+  }.
+
+  (* SUF-KOA-ROM game *)
+  module SUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ SUF_KOA(S(RO), A(RO)).main();
+
+      return r;
+    }
+  }.
+
+  
+  (*
+    -
+    Existential UnForgeability under Key-Only Attacks in the Random Oracle Model (EUF-KOA-ROM).
+    Given the public/verification key, the adversary is tasked with forging a signature
+    for any fresh message
+    -
+  *)
+  (* Class of adversaries against EUF-KOA-ROM *)
+  module type Adv_EUFKOA_ROM(RO : Oracle) = {
+    include Adv_EUFKOA  
+  }.
+
+  (* EUF-KOA-ROM game *)
+  module EUF_KOA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFKOA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme and the adversary
+      *)
+      r <@ EUF_KOA(S(RO), A(RO)).main();
+
+      return r;
+    }
+  }.
+
+
+  (* 
+    -- 
+    Random-Message Attacks (RMA).
+    Attacks in which the adversary is given the public/verification key as well as 
+    the signatures for a set of random messages *known* to the adversary, but not *chosen* by 
+    the adversary
+    -- 
+  *)  
+  (* 
+    - 
+    UnBreakability under Random-Message Attacks in the Random Oracle Model (UB-RMA-ROM). 
+    Given the public/verification key and the signatures for a set of known random messages, 
+    the adversary is tasked with computing the secret key corresponding to the 
+    public/verification key
+    -
+  *)
+  abstract theory UBRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in UB-RMA-ROM game *)
+    const n_ubrma : { int | 0 <= n_ubrma } as ge0_nubrma.
+
+    (* Definitions related to UB-RMA game (in the standard model) *)
+    clone import UBRMA with
+      op dmsg <- dmsg,
+      op n_ubrma <- n_ubrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nubrma by exact: ge0_nubrma.
+      
+    (* Class of adversaries against UB-RMA-ROM *)
+    module type Adv_UBRMA_ROM(RO : Oracle) = {
+      include Adv_UBRMA
+    }.
+
+    (* UB-RMA-ROM game *)
+    module UB_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UBRMAROM.
+  
+  
+  (* 
+    - 
+    Universal UnForgeability under Random-Message Attacks in the Random Oracle Model (UUF-RMA-ROM).
+    Given the public/verification key, the signatures for a set of known random messages, 
+    and an arbitrary message, the adversary is tasked with forging a signature for 
+    the given (latter) message
+    -
+  *)
+  abstract theory UUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in UUF-RMA-ROM game *)
+    const n_uufrma : { int | 0 <= n_uufrma } as ge0_nuufrma.
+
+    (* Definitions related to UB-RMA game (in the standard model) *)
+    clone import UUFRMA with
+      op dmsg <- dmsg,
+      op n_uufrma <- n_uufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufrma by exact: ge0_nuufrma.
+    
+    
+    (* Class of adversaries against UUF-RMA-ROM *)
+    module type Adv_UUFRMA_ROM(RO : Oracle) = {
+      include Adv_UUFRMA
+    }.
+
+    (* UUF-RMA-ROM game *)
+    module UUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFRMAROM.
+
+
+  (*
+    -
+    Selective UnForgeability under Random-Message Attacks in the Random Oracle Model (SUF-RMA-ROM).
+    After picking a message, the adversary is given the public/verification key, 
+    the signatures for a set of known random messages, and an arbitrary message, and is tasked
+    with forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in SUF-RMA-ROM game *)
+    const n_sufrma : { int | 0 <= n_sufrma } as ge0_nsufrma.
+
+    (* Definitions related to SUF-RMA game (in the standard model) *)
+    clone import SUFRMA with
+      op dmsg <- dmsg,
+      op n_sufrma <- n_sufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nsufrma by exact: ge0_nsufrma.
+    
+    (* Class of adversaries against SUF-RMA-ROM *)
+    module type Adv_SUFRMA_ROM(RO : Oracle) = {
+      include Adv_SUFRMA
+    }.
+
+    (* SUF-RMA-ROM game *)
+    module SUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFRMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFRMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Random-Message Attacks in the Random Oracle Model (EUF-RMA-ROM)
+    Given the public/verification key and the signatures for a set of known random messages,
+    the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFRMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in EUF-RMA-ROM game *)
+    const n_eufrma : { int | 0 <= n_eufrma } as ge0_neufrma.
+    
+    (* Definitions related to EUF-RMA game (in the standard model) *)
+    clone import EUFRMA with
+      op dmsg <- dmsg,
+      op n_eufrma <- n_eufrma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_neufrma by exact: ge0_neufrma.
+
+    (* Class of adversaries against EUF-RMA-ROM *)
+    module type Adv_EUFRMA_ROM(RO : Oracle) = {
+      include Adv_EUFRMA
+    }.
+
+    (* EUF-RMA-ROM game *)
+    module EUF_RMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFRMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_RMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end EUFRMAROM.
+
+  
+  (*
+    -- 
+    Generic Chosen-Message Attacks (GCMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of messages *chosen*. Here, all messages are chosen
+    (1) non-adaptively; that is, before obtaining any of the signatures, and
+    (2) independently of the public key; that is, without knowing the public key
+        at the time of choosing the messages
+    --
+  *)  
+  (* 
+    - 
+    UnBreakability under Generic Chosen-Message Attacks in the Random Oracle Model (UB-GCMA-ROM). 
+    Given the public/verification key and the signatures for a set of messages chosen
+    non-adaptively and indepedently of the public key, the adversary is tasked with 
+    computing the secret key corresponding to the public/verification key
+    -
+  *)
+  abstract theory UBGCMAROM.
+    (* Number of messages the adversary obtains signatures for in UB-GCMA-ROM game *)
+    const n_ubgcma : { int | 0 <= n_ubgcma } as ge0_nubgcma.
+
+    (* Definitions related to UB-GCMA game (in the standard model) *)
+    clone import UBGCMA with
+      op n_ubgcma <- n_ubgcma
+      
+      proof *.
+      realize ge0_nubgcma by exact: ge0_nubgcma.
+
+    (* Class of adversaries against UB-CMA *)
+    module type Adv_UBGCMA_ROM(RO : Oracle) = {
+      include Adv_UBGCMA
+    }.
+
+    (* UB-GCMA-ROM game *)
+    module UB_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }    
+    }.
+  end UBGCMAROM.
+  
+  
+  (*
+    -
+    Universal UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (UUF-GCMA-ROM).
+    Given the public/verification key, the signatures for a set of messages chosen
+    non-adaptively and indepedently of the public key, and an arbitrary message, 
+    the adversary is tasked with forging a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFGCMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+  
+    (* Number of messages the adversary obtains signatures for in UUF-GCMA-ROM game *)
+    const n_uufgcma : { int | 0 <= n_uufgcma } as ge0_nuufgcma.
+
+    (* Definitions related to UUF-GCMA game (in the standard model) *)
+    clone import UUFGCMA with
+      op dmsg <- dmsg,
+      op n_uufgcma <- n_uufgcma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufgcma by exact: ge0_nuufgcma.
+      
+    (* Class of adversaries against UUF-GCMA-ROM *)
+    module type Adv_UUFGCMA_ROM(RO : Oracle) = {
+      include Adv_UUFGCMA
+    }.
+
+    (* UUF-GCMA-ROM game *)
+    module UUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }    
+    }.
+  end UUFGCMAROM.
+
+    
+  (* 
+    - 
+    Selective UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (SUF-GCMA-ROM).
+    After picking a message, the adversary is given the public/verification key and
+    the signatures for a set of messages chosen non-adaptively and indepedently 
+    of the public key, and is tasked with forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFGCMAROM.
+    (* Number of messages the adversary obtains signatures for in SUF-GCMA-ROM game *)
+    const n_sufgcma : { int | 0 <= n_sufgcma } as ge0_nsufgcma.
+
+    (* Definitions related to SUF-GCMA game (in the standard model) *)
+    clone import SUFGCMA with
+      op n_sufgcma <- n_sufgcma
+      
+      proof *.
+      realize ge0_nsufgcma by exact: ge0_nsufgcma.
+      
+    (* Class of adversaries against SUF-GCMA-ROM *)
+    module type Adv_SUFGCMA_ROM(RO : Oracle) = {
+      include Adv_SUFGCMA
+    }.
+
+    (* SUF-GCMA-ROM game *)
+    module SUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFGCMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFGCMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Generic Chosen-Message Attacks in the Random Oracle Model (EUF-GCMA-ROM)
+    Given the public/verification key and the signatures for a set of messages 
+    chosen non-adaptively and indepedently of the public key, the adversary is tasked 
+    with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFGCMAROM.
+    (* Number of messages the adversary obtains signatures for in EUF-GCMA-ROM game *)
+    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_neufgcma.
+    
+    (* Definitions related to EUF-GCMA game (in the standard model) *)
+    clone import EUFGCMA with
+      op n_eufgcma <- n_eufgcma
+      
+      proof *.
+      realize ge0_neufgcma by exact: ge0_neufgcma.
+      
+    (* Class of adversaries against EUF-GCMA-ROM *)
+    module type Adv_EUFGCMA_ROM(RO : Oracle) = {
+      include Adv_EUFGCMA
+    }.
+
+    (* EUF-GCMA-ROM game *)
+    module EUF_GCMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFGCMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_GCMA(S(RO), A(RO)).main();
+
+        return r;
+      }  
+    }.
+  end EUFGCMAROM.
+  
+  
+  (*
+    -- 
+    Non-Adaptive Chosen-Message Attacks (NACMA)/Directed Chosen-Message Attacks (DCMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of *chosen* messages. Here, all messages are chosen
+    non-adaptively; that is, before obtaining any of the signatures. However, the chosen
+    messages may depend on the public key; i.e., the adversary is given the public key
+    when asked to provide the messages
+    --
+  *) 
+  (* 
+    - 
+    UnBreakability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (UB-NACMA-ROM). 
+    Given the public/verification key and the signatures for a set of non-adaptively
+    chosen messages, the adversary is tasked with computing the secret key 
+    corresponding to the public/verification key
+    -
+  *)
+  abstract theory UBNACMAROM.
+    (* Number of messages the adversary obtains signatures for in UB-NACMA-ROM game *)
+    const n_ubnacma : { int | 0 <= n_ubnacma } as ge0_nubnacma.
+
+    (* Definitions related to UB-NACMA game (in the standard model) *)
+    clone import UBNACMA with
+      op n_ubnacma <- n_ubnacma
+      
+      proof *.
+      realize ge0_nubnacma by exact: ge0_nubnacma.
+      
+    (* Class of adversaries against UB-NACMA-ROM *)
+    module type Adv_UBNACMA_ROM(RO : Oracle) = {
+      include Adv_UBNACMA
+    }.
+
+    (* UB-NACMA-ROM game *)
+    module UB_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UB_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UBNACMAROM.
+  
+  
+  (*
+    - 
+    Universal UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (UUF-NACMA-ROM).
+    Given the public/verification key, the signatures for a set of non-adaptively
+    chosen messages, and an arbitrary message, the adversary is tasked with forging 
+    a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFNACMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+  
+    (* Number of messages the adversary obtains signatures for in UUF-NACMA-ROM-ROM game *)
+    const n_uufnacma : { int | 0 <= n_uufnacma } as ge0_nuufnacma.
+
+    (* Definitions related to UUF-NACMA game (in the standard model) *)
+    clone import UUFNACMA with
+      op dmsg <- dmsg,
+      op n_uufnacma <- n_uufnacma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nuufnacma by exact: ge0_nuufnacma.
+      
+    (* Class of adversaries against UUF-NACMA-ROM *)
+    module type Adv_UUFNACMA_ROM(RO : Oracle) = {
+      include Adv_UUFNACMA
+    }.
+
+    (* UUF-NACMA-ROM game *)
+    module UUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ UUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFNACMAROM.
+
+  
+  (* 
+    - 
+    Selective UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (SUF-NACMA-ROM).
+    After picking a message, the adversary is given the public/verification key and
+    the signatures for a set of non-adaptively chosen messages, and is tasked with 
+    forging a signature for the picked message
+    -
+  *)
+  abstract theory SUFNACMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Number of messages the adversary obtains signatures for in SUF-NACMA-ROM game *)
+    const n_sufnacma : { int | 0 <= n_sufnacma } as ge0_nsufnacma.
+
+    (* Definitions related to SUF-NACMA game (in the standard model) *)
+    clone import SUFNACMA with
+      op dmsg <- dmsg,
+      op n_sufnacma <- n_sufnacma
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+      realize ge0_nsufnacma by exact: ge0_nsufnacma.
+      
+    (* Class of adversaries against SUF-NACMA-ROM *)
+    module type Adv_SUFNACMA_ROM(RO : Oracle) = {
+      include Adv_SUFNACMA
+    }.
+
+    (* SUF-NACMA-ROM game *)
+    module SUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFNACMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ SUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }
+    }.
+  end SUFNACMAROM.
+  
+  
+  (*
+    -
+    Existential UnForgeability under Non-Adaptive Chosen-Message Attacks in the Random Oracle Model (EUF-NACMA-ROM).
+    Given the public/verification key and the signatures for a set of non-adaptively
+    chosen messages the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  abstract theory EUFNACMAROM.
+    (* Number of messages the adversary obtains signatures for in EUF-NACMA-ROM game *)
+    const n_eufnacma : { int | 0 <= n_eufnacma } as ge0_neufnacma.
+
+    (* Definitions related to EUF-NACMA game (in the standard model) *)
+    clone import EUFNACMA with
+      op n_eufnacma <- n_eufnacma
+      
+      proof *.
+      realize ge0_neufnacma by exact: ge0_neufnacma.
+      
+    (* Class of adversaries against EUF-NACMA-ROM *)
+    module type Adv_EUFNACMA_ROM(RO : Oracle) = {
+      include Adv_EUFNACMA
+    }.
+
+    (* EUF-NACMA-ROM game *)
+    module EUF_NACMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFNACMA_ROM) = {   
+      proc main() : bool = {
+        var r : bool;
+
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme and the adversary
+        *)
+        r <@ EUF_NACMA(S(RO), A(RO)).main();
+
+        return r;
+      }  
+    }.
+  end EUFNACMAROM.
+
+  
+  (*
+    -- 
+    (Adaptive) Chosen-Message Attacks (CMA).
+    Attacks in which the adversary is given the public/verification key as well as
+    the signatures for a set of *chosen* messages. Here, all messages are chosen
+    adaptively and may depend on the public key; that is, the adversary 
+    (1) immediately receives a signature for a chosen message before choosing the 
+        subsequent message, and
+    (2) is given the public key when asked to provide the messages.
+    --
+  *)
+  (* - General - *)
+  (* 
+    Type for signing oracles used in (adaptive) CMA games, including procedures 
+    for initialization and auxiliary tasks 
+  *)
+  module type Oracle_CMA_ROM(RO : Oracle, S : Scheme) = {
+    proc init(sk_init : sk_t) : unit
+    proc sign(m : msg_t) : sig_t
+    proc fresh(m : msg_t) : bool
+    proc nr_queries() : int
+  }.
+
+  (* 
+    Type for signing oracles used in (adaptive) CMA games, only exposing the 
+    procedure for signing 
+  *)
+  module type SOracle_CMA_ROM = {
+    include SOracle_CMA
+  }.
+  
+  (* 
+    Default implementation of a signing oracle including procedures for 
+    initialization and auxiliary tasks 
+  *)
+  module (O_CMA_ROM_Default : Oracle_CMA_ROM) (RO : Oracle) (S : Scheme)  = {
+    include var O_CMA_Default(S)
+  }.
+  
+  
+  (* 
+    - 
+    UnBreakability under (Adaptive) Chosen-Message Attacks in the Random Oracle Model (UB-CMA-ROM). 
+    Given the public/verification key and the signatures for a set of adaptively
+    chosen messages, the adversary is tasked with computing the secret key 
+    corresponding to the public/verification key
+    -
+  *)
+  (* Class of adversaries against UB-CMA-ROM *)
+  module type Adv_UBCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc break(pk : pk_t) : sk_t
+  }.
+  
+  
+  (* UB-CMA-ROM game *)
+  module UB_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UBCMA_ROM, O : Oracle_CMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ UB_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+  
+  
+  (*
+    - 
+    Universal UnForgeability under (Adaptive) Chosen-Message Attacks in the Random Oracle Model (UUF-CMA-ROM)
+    Given the public/verification key, the signatures for a set of adaptively
+    chosen messages, and an arbitrary message, the adversary is tasked with forging 
+    a signature for the given (latter) message
+    -
+  *)
+  abstract theory UUFCMAROM.
+    (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
+    op [lossless] dmsg : msg_t distr.
+
+    (* Definitions related to SUF-NACMA game (in the standard model) *)
+    clone import UUFCMA with
+      op dmsg <- dmsg
+      
+      proof *.
+      realize dmsg_ll by exact: dmsg_ll.
+
+    (* Class of adversaries against UUF-CMA-ROM *)
+    module type Adv_UUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+      proc forge(pk : pk_t, m : msg_t) : sig_t
+    }.
+
+    (* UUF-CMA-ROM game *)
+    module UUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_UUFCMA_ROM, O : Oracle_CMA_ROM) = {
+      proc main() : bool = {
+        var r : bool;
+      
+        (* Initialize random oracle *)
+        RO.init();
+
+        (* 
+          Execute the original security game, providing the
+          initialized (random) oracle to the scheme, the adversary, and the signing oracle
+        *)
+        r <@ UUF_CMA(S(RO), A(RO), O(RO)).main();
+
+        return r;
+      }
+    }.
+  end UUFCMAROM.
+
+    
+  (*
+    -
+    Selective UnForgeability under Chosen-Message Attacks in the Random Oracle Model (SUF-CMA-ROM).
+    After picking a message, the adversary is given the public/verification key 
+    and the signatures for a set of adaptively chosen messages, and is tasked with 
+    forging a signature for the picked message
+    -
+  *)
+  (* Class of adversaries against SUF-CMA-ROM *)
+  module type Adv_SUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc pick() : msg_t
+    proc forge(pk : pk_t) : sig_t
+  }.
+  
+  (* SUF-CMA-ROM game *)
+  module SUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SUFCMA_ROM, O : Oracle_CMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ SUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+    
+
+  (*
+    -
+    Existential UnForgeability under Chosen-Message Attacks in the Random Oracle Model (EUF-CMA-ROM)
+    Given the public/verification key and the signatures for a set of adaptively 
+    chosen messages, the adversary is tasked with forging a signature for any fresh message
+    -
+  *)
+  (* Class of adversaries against EUF-CMA-ROM *)
+  module type Adv_EUFCMA_ROM(RO : Oracle, O : SOracle_CMA_ROM) = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* EUF-CMA-ROM game *)
+  module EUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_EUFCMA_ROM, O : Oracle_CMA_ROM, RO : Oracle_i) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ EUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+
+  
+  (*
+    - 
+    Strong Existential UnForgeability under Chosen-Message Attacks in the Random Oracle Model (SEUF-CMA-ROM).
+    Given the public/verification key and the signatures for a set of adaptively 
+    chosen messages, the adversary is tasked with forging a fresh signature for any message
+    -
+  *)
+  (* 
+    Type for signing oracles used in the SEUF-CMA-ROM game, including procedures 
+    for initialization and auxiliary tasks 
+  *)
+  module type Oracle_SEUFCMA_ROM(RO : Oracle, S : Scheme) = {
+    proc init(sk_init : sk_t) : unit
+    proc sign(m : msg_t) : sig_t
+    proc fresh(msig : msg_t * sig_t) : bool
+    proc nr_queries() : int
+  }.
+
+  (* 
+    Type for signing oracles used in the SEUF-CMA-ROM game, only exposing the 
+    procedure for signing 
+  *)
+  module type SOracle_SEUFCMA_ROM = {
+    include SOracle_SEUFCMA
+  }.
+  
+  (* 
+    Default implementation of a signing oracle including procedures for 
+    initialization and auxiliary tasks 
+  *)
+  module (O_SEUFCMA_ROM_Default : Oracle_SEUFCMA_ROM) (RO : Oracle) (S : Scheme) = {
+    include var O_SEUFCMA_Default(S)
+  }.
+
+  (* Class of adversaries against SEUF-CMA-ROM *)
+  module type Adv_SEUFCMA_ROM(RO : Oracle, O : SOracle_SEUFCMA) = {
+    proc forge(pk : pk_t) : msg_t * sig_t
+  }.
+
+  (* SEUF-CMA-ROM game *)
+  module SEUF_CMA_ROM(RO : Oracle_i, S : Scheme_ROM, A : Adv_SEUFCMA_ROM, O : Oracle_SEUFCMA_ROM) = {
+    proc main() : bool = {
+      var r : bool;
+      
+      (* Initialize random oracle *)
+      RO.init();
+      
+      (* 
+        Execute the original security game, providing the
+        initialized (random) oracle to the scheme, the adversary, and the signing oracle
+      *)
+      r <@ SEUF_CMA(S(RO), A(RO), O(RO)).main();
+      
+      return r;
+    }
+  }.
+end KeyUpdatingROM.
