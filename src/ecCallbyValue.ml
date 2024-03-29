@@ -323,8 +323,7 @@ and app_red st f1 args =
     f_app f1 args.stack args.resty
 
 and reduce_user_delta st f1 p tys args =
-  let f2 =
-    f_app f1 args.stack args.resty in
+  let f2 = f_app f1 args.stack args.resty in
 
   match reduce_user_with_exn st f2 with
   | f -> f
@@ -383,8 +382,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let rfn = f_app fn (List.take (List.length fnargs - 1) fnargs) f.f_ty in
     cbv st s rfn args
 
-  | Fquant (Llambda, b, f1) ->
-    betared st s b f1 args
+  | Fquant (Llambda, b, f1) when not (Args.isempty args) ->
+    cbv_init st Subst.subst_id (betared st s b f1 args)
+
+  | Fquant (Llambda, _, _) ->
+    assert (Args.isempty args);
+    Subst.subst s f
 
   | Fif (f, f1, f2) ->
     if st.st_ri.iota then
