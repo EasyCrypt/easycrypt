@@ -40,7 +40,6 @@ val freshen_type : (ty_params * ty) -> (ty_params * ty)
 (* -------------------------------------------------------------------- *)
 val subst_theory  : subst -> theory -> theory
 val subst_ax      : subst -> axiom -> axiom
-val subst_schema  : subst -> ax_schema -> ax_schema
 val subst_op      : subst -> operator -> operator
 val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_tc      : subst -> typeclass -> typeclass

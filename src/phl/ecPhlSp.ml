@@ -14,14 +14,12 @@ open EcLowPhlGoal
  *   - assoc: a set of pairs (x,e) such that x=e holds
  *            for instance after an assignment x <- e
  *   - pre: the actual precondition (progressively weakened)
- *   - cost: the cost of evaluating the statements up-to the current point.
  *
  * After an assignment of the form x <- e the four elements are updated:
  *   1) a new fresh local x' is added to the list of existential binders
  *   2) (x, e) is added to the assoc list, and every other (y,d) is replaced
  *      by (y[x->x'], d[x->x'])
  *   3) pre is replaced by pre[x->x']
- *   4) cost is replaced by cost + expr_cost(e)
  *
  *  The simplification of this version comes from two tricks:
  *
@@ -165,26 +163,25 @@ module LowInternal = struct
     EcFol.f_exists_simpl (List.map (snd_map (fun t -> GTty t)) bds) pre
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_stmt (memenv : EcMemory.memenv) env (bds, assoc, pre, cost) stmt =
+  let rec sp_stmt (memenv : EcMemory.memenv) env (bds, assoc, pre) stmt =
     match stmt with
     | [] ->
-        ([], (bds, assoc, pre, cost))
+        ([], (bds, assoc, pre))
 
     | i :: is ->
         try
-          let bds, assoc, pre, cost =
-            sp_instr memenv env (bds, assoc, pre) cost i in
-          sp_stmt memenv env (bds,assoc,pre,cost) is
+          let bds, assoc, pre =
+            sp_instr memenv env (bds, assoc, pre) i in
+          sp_stmt memenv env (bds, assoc, pre) is
         with No_sp ->
-          (stmt, (bds, assoc, pre, cost))
+          (stmt, (bds, assoc, pre))
 
-  and sp_instr (memenv : EcMemory.memenv) env (bds,assoc,pre) cost instr =
+  and sp_instr (memenv : EcMemory.memenv) env (bds,assoc,pre) instr =
     match instr.i_node with
     | Sasgn (lv, e) ->
       let bds, assoc, pre = sp_asgn memenv env lv e (bds, assoc, pre) in
-      let cost = f_xadd cost (EcCHoare.cost_of_expr_any memenv e) in
 
-      bds, assoc, pre, cost
+      bds, assoc, pre
 
     | Sif (e, s1, s2) ->
       let e_form = EcFol.form_of_expr (EcMemory.memory memenv) e in
@@ -192,27 +189,22 @@ module LowInternal = struct
         build_sp memenv bds assoc (f_and_simpl e_form pre) in
       let pre_f  =
         build_sp memenv bds assoc (f_and_simpl (f_not e_form) pre) in
-      let stmt_t, (bds_t, assoc_t, pre_t, cost_t) =
-        sp_stmt memenv env (bds, assoc, pre_t, f_x0) s1.s_node in
-      let stmt_f, (bds_f, assoc_f, pre_f, cost_f) =
-        sp_stmt memenv env (bds, assoc, pre_f, f_x0) s2.s_node in
+      let stmt_t, (bds_t, assoc_t, pre_t) =
+        sp_stmt memenv env (bds, assoc, pre_t) s1.s_node in
+      let stmt_f, (bds_f, assoc_f, pre_f) =
+        sp_stmt memenv env (bds, assoc, pre_f) s2.s_node in
       if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
-      let cost =
-        f_xadd cost
-          (f_xadd
-             (EcCHoare.cost_of_expr_any memenv e)
-             (f_xadd cost_t cost_f)) in
-      ([], [], f_or_simpl sp_t sp_f, cost)
+      ([], [], f_or_simpl sp_t sp_f)
 
     | _ -> raise No_sp
 
   let sp_stmt (memenv : EcMemory.memenv) env stmt f =
-    let stmt, (bds, assoc, pre, cost) =
-      sp_stmt memenv env ([], [], f, f_x0) stmt in
+    let stmt, (bds, assoc, pre) =
+      sp_stmt memenv env ([], [], f) stmt in
     let pre = build_sp memenv bds assoc pre in
-    stmt, pre, cost
+    stmt, pre
 end
 
 (* -------------------------------------------------------------------- *)
@@ -249,30 +241,16 @@ let t_sp_side pos tc =
   | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true pos hs.hs_s in
-      let stmt1, hs_pr, _ =
-        LI.sp_stmt hs.hs_m env stmt1 hs.hs_pr in
+      let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 hs.hs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
-
-  | FcHoareS chs, (None | Some (Single _)) ->
-    let pos = pos |> omap as_single in
-    let stmt1, stmt2 = o_split ~rev:true pos chs.chs_s in
-    let stmt1, chs_pr, sp_cost =
-      LI.sp_stmt chs.chs_m env stmt1 chs.chs_pr in
-    check_sp_progress pos stmt1;
-    let cond, cost = EcCHoare.cost_sub_self chs.chs_co sp_cost in
-    let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2);
-                                        chs_pr;
-                                        chs_co = cost } in
-    FApi.xmutate1 tc `Sp [cond; subgoal]
 
   | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true pos bhs.bhs_s in
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
-      let stmt1, bhs_pr, _ =
-        LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
+      let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_bdHoareS_r {bhs with bhs_s = stmt (stmt1@stmt2); bhs_pr; } in
       FApi.xmutate1 tc `Sp [subgoal]
@@ -286,10 +264,8 @@ let t_sp_side pos tc =
       let stmtR1, stmtR2 = o_split ~rev:true posR es.es_sr in
 
       let         es_pr = es.es_pr in
-      let stmtL1, es_pr, _ =
-        LI.sp_stmt es.es_ml env stmtL1 es_pr in
-      let stmtR1, es_pr, _ =
-        LI.sp_stmt es.es_mr env stmtR1 es_pr in
+      let stmtL1, es_pr = LI.sp_stmt es.es_ml env stmtL1 es_pr in
+      let stmtR1, es_pr = LI.sp_stmt es.es_mr env stmtR1 es_pr in
 
       check_sp_progress ~side:`Left  pos stmtL1;
       check_sp_progress ~side:`Right pos stmtR1;
@@ -302,11 +278,14 @@ let t_sp_side pos tc =
 
       FApi.xmutate1 tc `Sp [subgoal]
 
-  | _, Some (Single _) -> tc_error_noXhl ~kinds:[`Hoare `Stmt;
-                                                 `CHoare `Stmt;
-                                                 `PHoare `Stmt] !!tc
-  | _, Some (Double _) -> tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
-  | _, None            -> tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+  | _, Some (Single _) ->
+      tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
+
+  | _, Some (Double _) ->
+      tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
+
+  | _, None ->
+      tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
 
 (* -------------------------------------------------------------------- *)
 let t_sp = FApi.t_low1 "sp" t_sp_side

@@ -17,7 +17,6 @@ val wp_equiv_rnd      : (mkbij_t pair) option -> backward
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_rnd   : backward
-val t_choare_rnd  : chl_infos_t -> backward
 val t_bdhoare_rnd : bhl_infos_t -> backward
 val t_equiv_rnd   : ?pos:semrndpos -> oside -> (mkbij_t option) pair -> backward
 

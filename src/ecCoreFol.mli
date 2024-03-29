@@ -31,17 +31,9 @@ type sHoareF  = EcAst.sHoareF
 type sHoareS  = EcAst.sHoareS
 type eHoareF  = EcAst.eHoareF
 type eHoareS  = EcAst.eHoareS
-type cHoareF  = EcAst.cHoareF
-type cHoareS  = EcAst.cHoareS
 type bdHoareF = EcAst.bdHoareF
 type bdHoareS = EcAst.bdHoareS
 type pr       = EcAst.pr
-type coe      = EcAst.coe
-type cost     = EcAst.cost
-(* Call with cost at most [cb_cost], called at mist [cb_called].
-   [cb_cost] is here to properly handle substsitution when instantiating an
-   abstract module by a concrete one. *)
-type call_bound  = EcAst.call_bound
 
 type module_type = EcAst.module_type
 
@@ -127,16 +119,6 @@ val f_hoareS_r : sHoareS -> form
 val f_hoareF : form -> xpath -> form -> form
 val f_hoareS : memenv -> form -> stmt -> form -> form
 
-(* soft-constructors - cost hoare *)
-val cost_r : form -> call_bound EcPath.Mx.t -> cost
-val call_bound_r : form -> form -> call_bound
-
-val f_cHoareF_r : cHoareF -> form
-val f_cHoareS_r : cHoareS -> form
-
-val f_cHoareF : form -> xpath -> form -> cost -> form
-val f_cHoareS : memenv -> form -> stmt -> form -> cost -> form
-
 (* soft-constructors - expected hoare *)
 val f_eHoareF_r : eHoareF -> form
 val f_eHoareS_r : eHoareS -> form
@@ -163,10 +145,6 @@ val f_equivF_r : equivF -> form
 (* soft-constructors - eager *)
 val f_eagerF_r : eagerF -> form
 val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
-
-(* soft-constructors - Coe *)
-val f_coe_r : coe -> form
-val f_coe   : form -> memenv -> expr -> form
 
 (* soft-constructors - Pr *)
 val f_pr_r : pr -> form
@@ -237,8 +215,6 @@ val f_xopp  : form -> form
 val f_xadd  : form -> form -> form
 val f_xmul  : form -> form -> form
 val f_xmuli : form -> form -> form
-val f_xle   : form -> form -> form
-val f_xmax  : form -> form -> form
 
 val f_x0 : form
 val f_x1 : form
@@ -292,13 +268,10 @@ val destr_equivS    : form -> equivS
 val destr_eagerF    : form -> eagerF
 val destr_hoareF    : form -> sHoareF
 val destr_hoareS    : form -> sHoareS
-val destr_cHoareF   : form -> cHoareF
-val destr_cHoareS   : form -> cHoareS
 val destr_eHoareF   : form -> eHoareF
 val destr_eHoareS   : form -> eHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
-val destr_coe       : form -> coe
 val destr_pr        : form -> pr
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
@@ -331,11 +304,8 @@ val is_hoareF    : form -> bool
 val is_hoareS    : form -> bool
 val is_eHoareF   : form -> bool
 val is_eHoareS   : form -> bool
-val is_cHoareF   : form -> bool
-val is_cHoareS   : form -> bool
 val is_bdHoareF  : form -> bool
 val is_bdHoareS  : form -> bool
-val is_coe       : form -> bool
 val is_pr        : form -> bool
 val is_eq_or_iff : form -> bool
 

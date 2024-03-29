@@ -100,17 +100,10 @@ module CI_xint = struct
   let p_xmul   = mk_Xint "xmul"
   let p_is_inf = mk_Xint "is_inf"
   let p_is_int = mk_Xint "is_int"
-
-  let p_choaretac = EcPath.pqname p_top "CHoareTactic"
-
-  let p_xle     = EcPath.pqname p_choaretac "xle"
-  let p_xmax    = EcPath.pqname p_choaretac "xmax"
-  let p_bigxint = EcPath.pqname p_choaretac "Bigxint"
-  let p_big     = EcPath.pqname p_bigxint "big"
 end
 
+(* -------------------------------------------------------------------- *)
 module CI_Xreal = struct
-
   let i_Xreal  = "Xreal"
   let p_Xreal  = EcPath.pqname p_top i_Xreal
   let _Xreal   = fun x -> EcPath.pqname p_Xreal x

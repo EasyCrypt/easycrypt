@@ -579,29 +579,6 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
       end
 
-      | FcHoareF hf1, FcHoareF hf2 -> begin
-          let x2 = Fsubst.x_subst subst hf2.chf_f in
-
-          if not (EcReduction.EqTest.for_xp env hf1.chf_f x2) then
-            failure ();
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-
-          let calls2 = EcPath.Mx.translate (Fsubst.x_subst subst) hf2.chf_co.c_calls in
-
-          EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
-              match cb1, cb2 with
-              | None, None -> assert false
-              | None, Some _ | Some _, None -> failure ()
-              | Some cb1, Some cb2 ->
-                List.iter2 (doit env (subst, mxs))
-                  [cb1.cb_cost; cb1.cb_called]
-                  [cb2.cb_cost; cb2.cb_called]
-            ) hf1.chf_co.c_calls calls2 ();
-          List.iter2 (doit env (subst, mxs))
-            [hf1.chf_pr; hf1.chf_po; hf1.chf_co.c_self]
-            [hf2.chf_pr; hf2.chf_po; hf2.chf_co.c_self];
-        end
-
       | FequivF hf1, FequivF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.ef_fl hf2.ef_fl) then
             failure ();
@@ -874,20 +851,6 @@ module FPosition = struct
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
 
-          | FcHoareF chs ->
-            let subctxt = Sid.add EcFol.mhr ctxt in
-            let calls =
-              List.map (fun (_,cb) -> ctxt,cb.cb_called)
-                (EcPath.Mx.bindings chs.chf_co.c_calls) in
-            doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
-                                    (subctxt, chs.chf_po) ::
-                                    (ctxt, chs.chf_co.c_self) ::
-                                    calls))
-
-          | Fcoe coe ->
-            let subctxt = Sid.add (fst coe.coe_mem) ctxt in
-            doit pos (`WithSubCtxt [subctxt, coe.coe_pre])
-
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
@@ -1043,28 +1006,6 @@ module FPosition = struct
               in
               f_eHoareF_r { hf with ehf_pr; ehf_po; }
 
-          | FcHoareF chf ->
-            let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
-                               |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
-                                                           cb.cb_called))
-                               |> List.split in
-            let sub = doit p (chf.chf_pr ::
-                              chf.chf_po ::
-                              chf.chf_co.c_self ::
-                              calls) in
-            begin match sub with
-              | chf_pr :: chf_po :: c_self :: calls ->
-                let c_calls = List.fold_left2 (fun acc (f,cb_cost) cb_called ->
-                    EcPath.Mx.change
-                      (fun old ->
-                         assert (old = None);
-                         Some (call_bound_r cb_cost cb_called)) f acc
-                  ) EcPath.Mx.empty fkeys calls in
-                let cost = cost_r c_self c_calls in
-                f_cHoareF_r { chf with chf_pr; chf_po;
-                                       chf_co = cost; }
-              | _ -> assert false end
-
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
@@ -1074,14 +1015,8 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
-          | Fcoe coe ->
-              let sub = doit p [coe.coe_pre] in
-              let pre = as_seq1 sub in
-              f_coe_r { coe with coe_pre = pre }
-
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition
-          | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition

@@ -148,44 +148,6 @@ let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
-type sc_params = (EcIdent.t * ty) list
-
-type pr_params = EcIdent.t list (* type bool *)
-
-type ax_schema = {
-  axs_tparams : ty_params;
-  axs_pparams : pr_params; (* variables for predicate *)
-  axs_params  : sc_params; (* variables representing expression *)
-  axs_loca    : locality;
-  axs_spec    : EcCoreFol.form;
-}
-
-let sc_instantiate
-    ty_params pr_params sc_params
-    ty_args memtype (pr_args : mem_pr list) sc_args f =
-  let fs = CS.Tvar.init (List.map fst ty_params) ty_args in
-
-  (* We substitute the predicate variables. *)
-  let preds = List.map2 (fun (mem,p) id ->
-      id, (mem,p)) pr_args pr_params in
-  let mpreds = EcIdent.Mid.of_list preds in
-
-  let exprs =
-    List.map2 (fun e (id,_ty) ->
-        id, e
-      ) sc_args sc_params in
-  let mexpr = EcIdent.Mid.of_list exprs in
-
-  let sci =
-    CS.{ sc_memtype = memtype;
-         sc_mempred = mpreds;
-         sc_expr    = mexpr; } in
-
-  let fs = CS.Fsubst.f_subst_init ~tv:fs ~schema:sci () in
-
-  CS.Fsubst.f_subst fs f
-
-(* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
 
 let is_oper op =

@@ -22,8 +22,6 @@ let mk_lmt lmt_name lmt_decl lmt_proj =
     lmt_n  = List.length lmt_decl;
   }
 
-(* [Lmt_schema] if for an axiom schema, and is instantiated to a concrete
-   memory type when the axiom schema is.  *)
 type memtype = EcAst.memtype
 
 let lmt_hash = EcAst.lmt_hash
@@ -36,10 +34,8 @@ let mt_equal_gen = EcAst.mt_equal_gen
 
 let mt_equal = EcAst.mt_equal
 
-let mt_iter_ty f mt = match mt with
-  | Lmt_schema -> ()
-  | Lmt_concrete mt ->
-    oiter (fun lmt -> List.iter (fun v -> f v.ov_type) lmt.lmt_decl) mt
+let mt_iter_ty f (Lmt_concrete mt) =
+  oiter (fun lmt -> List.iter (fun v -> f v.ov_type) lmt.lmt_decl) mt
 
 (* -------------------------------------------------------------------- *)
 type memenv = EcAst.memenv
@@ -62,30 +58,24 @@ let empty_local_mt ~witharg =
 let empty_local ~witharg (me : memory) =
   me, empty_local_mt ~witharg
 
-let schema_mt = Lmt_schema
-let schema (me:memory) = me, schema_mt
-
 let abstract_mt = Lmt_concrete None
 let abstract (me:memory) = me, abstract_mt
 
-let is_schema = function Lmt_schema -> true | _ -> false
-
 (* -------------------------------------------------------------------- *)
-
 let is_bound_lmt x lmt =
   Some x = lmt.lmt_name || Msym.mem x lmt.lmt_proj
 
-let is_bound x mt =
+let is_bound x (Lmt_concrete mt) =
   match mt with
-  | Lmt_schema -> false
-  | Lmt_concrete None -> false
-  | Lmt_concrete (Some lmt) -> is_bound_lmt x lmt
+  | None -> false
+  | Some lmt -> is_bound_lmt x lmt
 
-let lookup (x : symbol) (mt : memtype) : (variable * proj_arg option * int option) option =
+let lookup (x : symbol) (Lmt_concrete mt : memtype)
+  : (variable * proj_arg option * int option) option
+=
   match mt with
-  | Lmt_schema        -> None
-  | Lmt_concrete None -> None
-  | Lmt_concrete (Some lmt) ->
+  | None -> None
+  | Some lmt ->
     if lmt.lmt_name = Some x then
       Some ({v_name = x; v_type = lmt.lmt_ty}, None, None)
     else
@@ -124,18 +114,18 @@ let bindall_lmt (vs : ovariable list) lmt =
   let mt_proj = List.fold_lefti add_proj lmt.lmt_proj vs in
   mk_lmt lmt.lmt_name mt_decl mt_proj
 
-let bindall_mt (vs : ovariable list) (mt : memtype) : memtype =
+let bindall_mt (vs : ovariable list) (Lmt_concrete mt : memtype) : memtype =
   match mt with
-  | Lmt_schema | Lmt_concrete None -> assert false
-  | Lmt_concrete (Some lmt) -> Lmt_concrete (Some (bindall_lmt vs lmt))
+  | None -> assert false
+  | Some lmt -> Lmt_concrete (Some (bindall_lmt vs lmt))
 
 let bindall (vs : ovariable list) ((m,mt) : memenv) : memenv =
   m, bindall_mt vs mt
 
-let bindall_fresh (vs : ovariable list) ((m,mt) : memenv) =
+let bindall_fresh (vs : ovariable list) ((m, Lmt_concrete mt) : memenv) =
   match mt with
-  | Lmt_schema | Lmt_concrete None -> assert false
-  | Lmt_concrete (Some lmt) ->
+  | None -> assert false
+  | Some lmt ->
     let is_bound x m = Some x = lmt.lmt_name || Msym.mem x m in
     let fresh_pv m v =
       match v.ov_name with
@@ -159,12 +149,10 @@ let bind_fresh v me =
   me, as_seq1 vs
 
 (* -------------------------------------------------------------------- *)
-
-let mt_subst st o =
+let mt_subst st ((Lmt_concrete o) as arg) =
   match o with
-  | Lmt_schema -> o
-  | Lmt_concrete None -> o
-  | Lmt_concrete (Some mt) ->
+  | None -> arg
+  | Some mt ->
     let decl = mt.lmt_decl in
     let decl' =
       if st == identity then decl
@@ -172,7 +160,8 @@ let mt_subst st o =
         List.Smart.map (fun vty ->
             let ty' = st vty.ov_type in
             if ty_equal vty.ov_type ty' then vty else {vty with ov_type = ty'}) decl in
-    if decl == decl' then o
+    if decl ==(*phy*) decl' then
+      arg
     else
       let lmt = mk_lmt
           mt.lmt_name decl' (Msym.map (fun (i,ty) -> i, st ty) mt.lmt_proj) in
@@ -185,11 +174,10 @@ let me_subst sm st (m,mt as me) =
     (m', mt')
 
 (* -------------------------------------------------------------------- *)
-let for_printing mt =
+let for_printing (Lmt_concrete mt) =
   match mt with
-  | Lmt_schema -> None
-  | Lmt_concrete None -> None
-  | Lmt_concrete (Some mt) -> Some (mt.lmt_name, mt.lmt_decl)
+  | None -> None
+  | Some mt -> Some (mt.lmt_name, mt.lmt_decl)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_list sep pp fmt xs =
@@ -199,11 +187,10 @@ let rec pp_list sep pp fmt xs =
     | [x]     -> Format.fprintf fmt "%a" pp x
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
-let dump_memtype mt =
+let dump_memtype (Lmt_concrete mt) =
   match mt with
-  | Lmt_schema        -> "schema"
-  | Lmt_concrete None -> "abstract"
-  | Lmt_concrete (Some mt) ->
+  | None -> "abstract"
+  | Some mt ->
     let pp_vd fmt v =
       Format.fprintf fmt "@[%s: %s@]"
         (odfl "_" v.ov_name)
@@ -212,28 +199,24 @@ let dump_memtype mt =
     Format.asprintf "@[{@[%a@]}@]" (pp_list ",@ " pp_vd) mt.lmt_decl
 
 (* -------------------------------------------------------------------- *)
-let get_name s p (_,mt) =
+let get_name s p (_, Lmt_concrete mt) =
   match mt with
-  | Lmt_schema        -> None
-  | Lmt_concrete None -> None
-  | Lmt_concrete (Some mt) ->
-    match p with
-    | None -> Some s
-    | Some i ->
-      if Some s = mt.lmt_name then
-        omap fst (List.find_opt (fun (_,(i',_)) -> i = i') (Msym.bindings mt.lmt_proj))
-      else
-        None
+  | None -> None
+  | Some mt -> begin
+      match p with
+      | None -> Some s
+      | Some i ->
+        if Some s = mt.lmt_name then
+          omap fst (List.find_opt (fun (_,(i',_)) -> i = i') (Msym.bindings mt.lmt_proj))
+        else
+          None
+    end
 
 (* -------------------------------------------------------------------- *)
-
-let local_type mt =
+let local_type (Lmt_concrete mt) =
   match mt with
-  | Lmt_schema -> assert false
-  | Lmt_concrete None -> None
-  | Lmt_concrete (Some mt) -> Some (ttuple (List.map ov_type mt.lmt_decl))
+  | None -> None
+  | Some mt -> Some (ttuple (List.map ov_type mt.lmt_decl))
 
-let has_locals mt = match mt with
-  | Lmt_concrete (Some _) -> true
-  | Lmt_concrete None -> false
-  | Lmt_schema -> assert false
+let has_locals (Lmt_concrete mt) =
+  Option.is_some mt

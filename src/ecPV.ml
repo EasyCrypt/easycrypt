@@ -178,14 +178,11 @@ module PVM = struct
         check_binding (fst es.es_ml) s;
         check_binding (fst es.es_mr) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FcHoareF _ | FbdHoareF _ ->
+      | FhoareF _ | FbdHoareF _ ->
         check_binding EcFol.mhr s;
         EcFol.f_map (fun ty -> ty) aux f
       | FhoareS hs ->
         check_binding (fst hs.hs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FcHoareS hs ->
-        check_binding (fst hs.chs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
       | FbdHoareS hs ->
         check_binding (fst hs.bhs_m) s;
@@ -200,14 +197,6 @@ module PVM = struct
         f_quant q b f1
 
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
-
-  let subst_cost env s c =
-    let cb_subst cb =
-      call_bound_r (subst env s cb.cb_cost) (subst env s cb.cb_called) in
-
-    let c_self  = subst env s c.c_self
-    and c_calls = Mx.map cb_subst c.c_calls in
-    cost_r c_self c_calls
 
   let subst1 env pv m f =
     let s = add env pv m f empty in
@@ -350,14 +339,6 @@ module PV = struct
       | FeHoareS hs ->
           in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
 
-      | FcHoareF chf ->
-          let fv = in_mem_scope env fv [mhr] [chf.chf_pr; chf.chf_po] in
-          fv_cost env fv chf.chf_co
-
-      | FcHoareS chs ->
-          let fv = in_mem_scope env fv [fst chs.chs_m] [chs.chs_pr; chs.chs_po] in
-          fv_cost env fv chs.chs_co
-
       | FbdHoareF bhf ->
           in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
 
@@ -374,11 +355,6 @@ module PV = struct
       | FeagerF eg ->
           in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
 
-      | Fcoe coe ->
-          let m = fst coe.coe_mem in
-          let e = form_of_expr m coe.coe_e in
-          in_mem_scope env fv [m; m] [coe.coe_pre; e]
-
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in
           in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
@@ -387,12 +363,6 @@ module PV = struct
       if   List.exists (EcIdent.id_equal m) mems
       then fv
       else List.fold_left (aux env) fv fs
-
-    and fv_cost env fv cost =
-      Mx.fold (fun _ cb fv ->
-          let fv = aux env fv cb.cb_cost in
-          aux env fv cb.cb_called)
-        cost.c_calls (aux env fv cost.c_self)
 
     in aux env empty f
 

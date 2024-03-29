@@ -1,4 +1,4 @@
-require import AllCore StdRing StdOrder Distr List FSet CHoareTactic Group.
+require import AllCore StdRing StdOrder Distr List FSet Group.
 (*---*) import RField RealOrder.
 
 clone CyclicGroup as G.
@@ -173,36 +173,6 @@ theory List_CDH.
       smt (size_undup).
     qed.
   end section.
-
-  abstract theory Cost.
-
-    op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
-
-    schema cost_duniform `{P} {s : group list} :
-       cost [P /\ size s <= n : duniform s] <= cost [P : s] + N cduniform_n.
-
-    lemma ex_reduction (cs:int) (A<:Adversary) &m :
-      choare[A.solve : true ==> 0 < size res <= n] time [N cs] =>
-      exists (B <:CDH.Adversary [solve : `{N(cduniform_n + cs)} ] {+A}),
-      Pr[LCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res].
-    proof.
-      move=> hcA;exists (CDH_from_LCDH(A));split; last first.
-      + have /= h1 := Reduction A &m.
-        rewrite -ler_pdivr_mull; smt(lt_fromint gt0_n).
-      proc => //.
-      instantiate /= h := (cost_duniform {gx, gy, x : group, s : group list}
-                        `(true) s).
-      rnd (size s <= n).
-      + by apply: (is_int_le _ _ h).
-      call hcA; skip => />; split.
-      + move=> *; apply duniform_ll;rewrite -size_eq0 /#.
-      move: h; pose t :=
-        cost(&hr: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
-      by case: t => // ? /#.
-    qed.
-
-  end Cost.
-
 end List_CDH.
 
 (** Set version of the Computational Diffie-Hellman problem **)
@@ -244,9 +214,6 @@ theory Set_CDH.
   (** Naive reduction to CDH **)
   section.
     declare module A <: Adversary.
-
-    (* FIXME: schemas cannot be declared in sections *)
-    (* local clone List_CDH as LCDH with op n <- n. *)
 
     lemma Reduction &m:
       1%r / n%r * Pr[SCDH(A).main() @ &m: res]

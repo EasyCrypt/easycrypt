@@ -32,13 +32,8 @@ val memtype  : memenv -> memtype
 val empty_local    : witharg:bool -> memory -> memenv
 val empty_local_mt : witharg:bool -> memtype
 
-val schema    : memory -> memenv
-val schema_mt : memtype
-
 val abstract    : memory -> memenv
 val abstract_mt : memtype
-
-val is_schema : memtype -> bool
 
 exception DuplicatedMemoryBinding of symbol
 

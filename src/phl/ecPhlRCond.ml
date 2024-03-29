@@ -39,7 +39,6 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-
   let t_ehoare_rcond_r b at_pos tc =
     let hs = tc1_as_ehoareS tc in
     let m  = EcMemory.memory hs.ehs_m in
@@ -52,23 +51,6 @@ module Low = struct
     let concl1  = f_hoareS hs.ehs_m pre hd e in
     let concl2  = f_eHoareS_r { hs with ehs_s = s } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_choare_rcond_r b at_pos c tc =
-    let c = EcUtils.odfl f_true c in
-
-    let chs = tc1_as_choareS tc in
-    let m  = EcMemory.memory chs.chs_m in
-    let hd,e_expr,e,s = gen_rcond !!tc b m at_pos chs.chs_s in
-    let cond, cost =
-      EcCHoare.cost_sub_self
-        chs.chs_co
-        (EcCHoare.cost_of_expr c chs.chs_m e_expr) in
-    let concl1  =
-      f_hoareS chs.chs_m chs.chs_pr hd (f_and_simpl c e) in
-    let concl2  = f_cHoareS_r { chs with chs_s = s;
-                                         chs_co = cost; } in
-    FApi.xmutate1 tc `RCond [concl1; cond; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_rcond_r b at_pos tc =
@@ -102,38 +84,26 @@ module Low = struct
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
   let t_ehoare_rcond  = FApi.t_low2 "ehoare-rcond"  t_ehoare_rcond_r
-  let t_choare_rcond  = FApi.t_low3 "choare-rcond"  t_choare_rcond_r
   let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
   let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
 end
 
 (* -------------------------------------------------------------------- *)
-let t_rcond side b at_pos c tc =
+let t_rcond side b at_pos tc =
   let concl = FApi.tc1_goal tc in
-
-  let check_none () = if c <> None then
-      tc_error !!tc "optional cost is only for choare judgements" in
 
   match side with
   | None when is_bdHoareS concl ->
-    check_none (); Low.t_bdhoare_rcond b at_pos tc
-  | None when is_cHoareS concl  -> Low.t_choare_rcond b at_pos c tc
+    Low.t_bdhoare_rcond b at_pos tc
   | None when is_hoareS concl ->
-    check_none (); Low.t_hoare_rcond b at_pos tc
+    Low.t_hoare_rcond b at_pos tc
   | None ->
-    check_none (); Low.t_ehoare_rcond b at_pos tc
-
+    Low.t_ehoare_rcond b at_pos tc
   | Some side ->
-    check_none (); Low.t_equiv_rcond side b at_pos tc
+    Low.t_equiv_rcond side b at_pos tc
 
-let process_rcond side b at_pos c tc =
-  let c =
-    EcUtils.omap
-      (fun c ->
-         snd (EcProofTyping.tc1_process_Xhl_formula tc c))
-      c in
-
-  t_rcond side b at_pos c tc
+let process_rcond side b at_pos tc =
+  t_rcond side b at_pos tc
 
 (* -------------------------------------------------------------------- *)
 module LowMatch = struct
@@ -213,17 +183,12 @@ module LowMatch = struct
         (EcPV.e_read env e)
         (EcPV.PV.union (EcPV.s_read env hd) (EcPV.s_write env hd)) in
 
-    (* If frame is false, we do not know how to create a cost. Use sp first. *)
-    let epr, asgn, cost_opt =
+    let epr, asgn =
     if frame then begin
       let vars = List.map (fun (pv, ty) -> f_pvar pv ty (fst me)) pvs in
       let epr = f_op cname (List.snd tyinst) f.f_ty in
       let epr = f_app epr vars f.f_ty in
-
-      Some (f_eq f epr),
-      [],
-      Some (fun pre -> f_xadd (EcCHoare.cost_of_expr pre me e) f_x1)
-
+      Some (f_eq f epr), []
     end else begin
       let asgn =
         EcModules.lv_of_list pvs |> omap (fun lv ->
@@ -234,16 +199,15 @@ module LowMatch = struct
           let proj = e_app proj [e] (toption rty) in
           let proj = e_oget proj rty in
           i_asgn (lv, proj)) in
-
-      None, otolist asgn, None
+      None, otolist asgn
     end in
 
-    (epr, hd, po1, cost_opt), (me, stmt (hd.s_node @ asgn @ (s_subst subst s).s_node @ tl))
+    (epr, hd, po1), (me, stmt (hd.s_node @ asgn @ (s_subst subst s).s_node @ tl))
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_hoareS tc in
-    let (epr, hd, po1, _), (me, full) =
+    let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
 
     let pr = ofold f_and hs.hs_pr epr in
@@ -256,7 +220,7 @@ module LowMatch = struct
   (* ------------------------------------------------------------------ *)
   let t_ehoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_ehoareS tc in
-    let (epr, hd, po1, _), (me, full) =
+    let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
 
     let pr = ofold f_and hs.ehs_pr epr in
@@ -269,7 +233,7 @@ module LowMatch = struct
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_rcond_match_r c at_pos tc =
     let bhs = tc1_as_bdhoareS tc in
-    let (epr, hd, po1, _), (me, full) =
+    let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
 
     let pr = ofold f_and bhs.bhs_pr epr in
@@ -280,31 +244,6 @@ module LowMatch = struct
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_choare_rcond_match_r c at_pos tc =
-    let chs = tc1_as_choareS tc in
-    let (epr, hd, po1, cost_opt), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c chs.chs_m at_pos chs.chs_s in
-
-    match cost_opt with
-    | None ->
-      tc_error !!tc "choare match: the matched expression must be \
-                     independent of the head statement (maybe use sp first?)."
-    | Some lam_cost ->
-      let cond, cost =
-        EcCHoare.cost_sub_self chs.chs_co (lam_cost chs.chs_pr) in
-
-      let pr = ofold f_and chs.chs_pr epr in
-
-      let concl1 = f_hoareS chs.chs_m chs.chs_pr hd po1 in
-      (* [full] must not contain any new assignments here! *)
-      let concl2 = f_cHoareS_r { chs with chs_pr = pr;
-                                          chs_m = me;
-                                          chs_s = full;
-                                          chs_co = cost} in
-
-      FApi.xmutate1 tc `RCondMatch [concl1; cond; concl2]
-
-  (* ------------------------------------------------------------------ *)
   let t_equiv_rcond_match_r side c at_pos tc =
     let es = tc1_as_equivS tc in
 
@@ -313,7 +252,7 @@ module LowMatch = struct
       | `Left  -> es.es_ml, es.es_mr, es.es_sl
       | `Right -> es.es_mr, es.es_ml, es.es_sr in
 
-    let (epr, hd, po1, _), (me, full) =
+    let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c (EcFol.mhr, snd m) at_pos s in
 
     let mo'  = EcIdent.create "&m" in
@@ -357,9 +296,6 @@ module LowMatch = struct
   let t_bdhoare_rcond_match =
     FApi.t_low2 "hoare-rcond-match" t_bdhoare_rcond_match_r
 
-  let t_choare_rcond_match =
-    FApi.t_low2 "hoare-rcond-match" t_choare_rcond_match_r
-
   let t_equiv_rcond_match =
     FApi.t_low3 "hoare-rcond-match" t_equiv_rcond_match_r
 end
@@ -370,7 +306,6 @@ let t_rcond_match side c at_pos tc =
 
   match side with
   | None when is_bdHoareS concl -> LowMatch.t_bdhoare_rcond_match c at_pos tc
-  | None when is_cHoareS concl -> LowMatch.t_choare_rcond_match c at_pos tc
   | None when is_eHoareS concl -> LowMatch.t_ehoare_rcond_match c at_pos tc
   | None -> LowMatch.t_hoare_rcond_match c at_pos tc
   | Some side -> LowMatch.t_equiv_rcond_match side c at_pos tc

@@ -73,8 +73,6 @@ module PVM : sig
 
   val subst      : env -> subst -> form  -> form
 
-  val subst_cost : env -> subst -> cost  -> cost
-
   val subst1     : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 

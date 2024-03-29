@@ -695,10 +695,8 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fpr pr        -> trans_pr env pr
 
-  | Fcoe _
   | FeagerF _
   | FhoareF  _  | FhoareS   _
-  | FcHoareF  _ | FcHoareS   _
   | FeHoareF   _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
@@ -1398,12 +1396,10 @@ module Frequency = struct
       | Fproj    (e, _)       -> doit e
 
       | FhoareF _   | FhoareS _
-      | FcHoareF _  | FcHoareS _
       | FeHoareF _ | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF _   | FequivS _
-      | FeagerF _
-      | Fcoe _ -> ()
+      | FeagerF _ -> ()
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;

@@ -37,26 +37,6 @@ end = struct
 
     let pp_type fmt ty = EcPrinting.pp_type ppe0 fmt ty in
 
-    let pp_cost ppe fmt c =
-        EcPrinting.pp_form ppe fmt c in
-
-    let pp_self ppe mode fmt (iself,oself) =
-      Format.fprintf fmt
-        "@[<v>self cost:@;  @[%a@]@; cannot be shown \
-         to be %s:@;  @[%a@]@]"
-        (pp_cost ppe) iself
-        (match mode with `Eq -> "equal to" | `Sub -> "upper-bounded by")
-        (pp_cost ppe) oself in
-
-    let pp_diff ppe mode fmt (f,(ic,oc)) =
-      Format.fprintf fmt
-        "@[<v>the maximal number of calls to %a:@;  @[%a@]@; cannot be shown \
-         to be %s:@;  @[%a@]@]"
-        (EcPrinting.pp_funname ppe) f
-        (pp_cost ppe) ic
-        (match mode with `Eq -> "equal to" | `Sub -> "upper-bounded by")
-        (pp_cost ppe) oc in
-
     match error with
     | MF_targs (ex, got) ->
         msg "its argument has type %a instead of %a"
@@ -87,39 +67,6 @@ end = struct
             (if has_allowed then ",@ " else "")
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
             (Sx.ntr_elements notallowed)
-
-    | MF_compl (env, `Sub (self,diffs)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let pp_self_sep fmt = function
-        | None -> ()
-        | Some self ->
-          if Mx.is_empty diffs then
-            pp_self ppe `Sub fmt self
-          else
-            Format.fprintf fmt "%a@;" (pp_self ppe `Sub) self in
-      Format.fprintf fmt "@[<v>%a%a@]"
-        pp_self_sep self
-        (EcPrinting.pp_list "@;" (pp_diff ppe `Sub))
-        (Mx.bindings diffs)
-
-    | MF_compl (env, `Eq (self,diffs)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let pp_self_sep fmt = function
-        | None -> ()
-        | Some self ->
-          if Mx.is_empty diffs then
-            pp_self ppe `Sub fmt self
-          else
-            Format.fprintf fmt "%a@;" (pp_self ppe `Eq) self in
-
-      Format.fprintf fmt "@[<v>%a%a@]"
-        pp_self_sep self
-        (EcPrinting.pp_list "@;" (pp_diff ppe `Eq))
-        (Mx.bindings diffs)
-
-    | MF_unbounded ->
-      msg "the function does not satisfy the required complexity restriction \
-          (at least, it cannot be infered from its type)"
 
   let pp_restr_err_aux env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -549,14 +496,6 @@ end = struct
 
     | MissingMemType ->
         msg "memory type missing"
-
-    | SchemaVariableReBinded id ->
-        msg "the schema variable %a has been rebinded"
-            EcIdent.pp_ident id
-
-    | SchemaMemBinderBelowCost ->
-      msg "predicates binding memories are not allowed below a cost statement \
-           in a schema"
 
     | ModuleNotAbstract m ->
       msg "the module %s is not abstract" m

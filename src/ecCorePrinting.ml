@@ -53,7 +53,6 @@ module type PrinterAPI = sig
   val pp_type    : PPEnv.t -> ty pp
   val pp_tyname  : PPEnv.t -> path pp
   val pp_axname  : PPEnv.t -> path pp
-  val pp_scname  : PPEnv.t -> path pp
   val pp_tcname  : PPEnv.t -> path pp
   val pp_thname  : PPEnv.t -> path pp
 
@@ -68,7 +67,6 @@ module type PrinterAPI = sig
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
   val pp_added_op    : PPEnv.t -> operator pp
   val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
-  val pp_schema      : ?long:bool -> PPEnv.t -> (path * ax_schema ) pp
   val pp_theory      : PPEnv.t -> (path * ctheory                 ) pp
   val pp_restr_s     :            (bool                           ) pp
   val pp_restr       : PPEnv.t -> (mod_restr                      ) pp
@@ -81,11 +79,9 @@ module type PrinterAPI = sig
 
   (* ------------------------------------------------------------------ *)
   val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> sHoareS  pp
-  val pp_choareS  : PPEnv.t -> ?prpo:prpo_display -> cHoareS  pp
   val pp_bdhoareS : PPEnv.t -> ?prpo:prpo_display -> bdHoareS pp
   val pp_equivS   : PPEnv.t -> ?prpo:prpo_display -> equivS  pp
 
-  val pp_cost  : PPEnv.t -> cost pp
   val pp_stmt  : ?lineno:bool -> PPEnv.t -> stmt pp
   val pp_instr : PPEnv.t -> instr pp
 
@@ -106,7 +102,6 @@ module type PrinterAPI = sig
     val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
-    val pr_sc  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_rw  : Format.formatter -> EcEnv.env -> qsymbol -> unit
