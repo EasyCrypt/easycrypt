@@ -29,7 +29,6 @@ val f_subst_init :
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
     -> ?esloc:expr Mid.t
-    -> ?schema:sc_instanciate
     -> unit
     -> f_subst
 
@@ -72,7 +71,6 @@ module Fsubst : sig
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
     -> ?esloc:expr Mid.t
-    -> ?schema:sc_instanciate
     -> unit -> f_subst
 
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst

@@ -5,7 +5,6 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_while      : form -> backward
-val t_choare_while     : form -> form -> form -> cost -> backward
 val t_bdhoare_while    : form -> form -> backward
 val t_equiv_while_disj : side -> form -> form -> backward
 val t_equiv_while      : form -> backward

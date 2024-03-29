@@ -601,38 +601,7 @@ by rewrite StdBigop.Bigreal.Num.Domain.mul0r StdOrder.RealOrder.ltr01.
 qed.
 
 hint exact random : dt_fu dt_ll dt_funi.
-
-abstract theory Cost.
-  op cdt : {int | 0 <= cdt } as ge0_cdt.
-  schema cost_dt `{P}: cost [P: dt] = N cdt.
-  hint simplify cost_dt.
-end Cost.
-
 end FDistr.
-
-abstract theory Cost.
-  op cgpow : int.
-  op cgmul: int.
-  op cgdiv: int.
-  op cgeq : int.
-  axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
-
-  schema cost_gen `{P} : cost [P:g] = '0.
-
-  schema cost_pow `{P} {g:group, x:exp} :
-    cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
-
-  schema cost_gmul `{P} {g1 g2:group} :
-    cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
-
-  schema cost_geq  `{P} {g1 g2:group} :
-    cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
-
-  schema cost_gdiv `{P} {g1 g2:group} :
-    cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
-
-  hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
-end Cost.
 
 end PowZMod.
 

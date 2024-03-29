@@ -273,68 +273,37 @@ let ur_inter union inter ur1 ur2 =
 module PreOI : sig
   type t = EcAst.oracle_info
 
-  val hash : t -> int
-  val equal : (form -> form -> bool) -> t -> t -> bool
+  val equal : t -> t -> bool
 
-  val cost_self : t -> [`Bounded of form | `Unbounded]
-  val cost : t -> xpath -> [`Bounded of form| `Zero | `Unbounded]
-  val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
-  val costs : t -> [`Bounded of form * form Mx.t | `Unbounded]
+  val hash : t -> int
 
   val allowed : t -> xpath list
+
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> [`Bounded of form * form Mx.t | `Unbounded] -> t
+  val mk : xpath list -> t
+
   val filter : (xpath -> bool) -> t -> t
 end = struct
-  (* Oracle information of a procedure [M.f]:
-   * - oi_calls : list of oracles that can be called by [M.f].
-   * - oi_in    : true if equality of globals is required to ensure
-   * equality of result and globals (in the post).
-   * - oi_costs : self cost, plus a mapping from oracles to the number of time
-   * that they can be called by [M.f]. Missing entries are can be called
-   * zero times. No restrictio of [None]
-   *
-   * Remark: there is redundancy between oi_calls and oi_costs. *)
   type t = EcAst.oracle_info
 
-  let allowed oi = oi.oi_calls
+  let equal =
+    EcAst.oi_equal
 
-  let allowed_s oi = allowed oi |> Sx.of_list
+  let hash =
+    EcAst.oi_hash
 
-  let cost_self (oi : t) =
-    omap_dfl (fun (self,_) -> `Bounded self) `Unbounded oi.oi_costs
+  let allowed oi =
+    oi.oi_calls
 
-  let cost (oi : t) (x : xpath) =
-    omap_dfl (fun (_,oi) ->
-        let c = Mx.find_opt x oi in
-        omap_dfl (fun c -> `Bounded c) `Zero c)
-      `Unbounded oi.oi_costs
+  let allowed_s oi =
+    allowed oi |> Sx.of_list
 
-  let cost_calls oi = omap_dfl (fun (_,x) -> `Bounded x) `Unbounded oi.oi_costs
-
-  let costs oi = omap_dfl (fun x -> `Bounded x) `Unbounded oi.oi_costs
-
-  let mk oi_calls oi_costs = match oi_costs with
-    | `Bounded oi_costs ->
-      { oi_calls; oi_costs = Some (oi_costs) ; }
-    | `Unbounded ->
-      { oi_calls; oi_costs = None; }
-
-  (* let change_calls oi calls =
-   *   mk calls oi.oi_in
-   *     (Mx.filter (fun x _ -> List.mem x calls) oi.oi_costs) *)
+  let mk oi_calls =
+    { oi_calls }
 
   let filter f oi =
-    let costs = match oi.oi_costs with
-      | Some (self,costs) -> `Bounded (self, Mx.filter (fun x _ -> f x) costs)
-      | None -> `Unbounded in
-    mk (List.filter f oi.oi_calls) costs
-
-  let equal = EcAst.oi_equal
-
-  let hash = EcAst.oi_hash
-
+    mk (List.filter f oi.oi_calls)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -347,12 +316,8 @@ type mod_restr = EcAst.mod_restr
 let mr_equal = EcAst.mr_equal
 let mr_hash  = EcAst.mr_hash
 
-let has_compl_restriction mr =
-  Msym.exists (fun _ oi -> (PreOI.costs oi) <> `Unbounded) mr.mr_oinfos
-
 let mr_is_empty mr =
-     not (has_compl_restriction mr)
-  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) mr.mr_oinfos
+  Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) mr.mr_oinfos
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold

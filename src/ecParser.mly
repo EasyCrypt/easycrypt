@@ -81,11 +81,10 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom  ?(nosmt = false) ~locality (x, ty, pv, scv, vd, f) k =
+  let mk_axiom  ?(nosmt = false) ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
       pa_pvars   = pv;
-      pa_scvars  = scv;
       pa_vars     = vd;
       pa_formula  = f;
       pa_kind     = k;
@@ -97,8 +96,7 @@
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true; puser = true;
-	pcost = false; }
+        pmodpath = true; puser = true; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -113,16 +111,14 @@
         | `Logic   -> { acc with plogic   = true }
         | `ModPath -> { acc with pmodpath = true }
         | `User    -> { acc with puser    = true }
-	| `Cost    -> { acc with pcost    = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false;
-	    pcost = false; } l
+            pmodpath = false; puser = false; } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User; `Cost]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -411,7 +407,6 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CHOARE
 %token CLASS
 %token CLEAR
 %token CLONE
@@ -421,7 +416,6 @@
 %token CONGR
 %token CONSEQ
 %token CONST
-%token COST
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -480,7 +474,6 @@
 %token INLINE
 %token INTERLEAVE
 %token INSTANCE
-%token INSTANTIATE
 %token IOTA
 %token IS
 %token KILL
@@ -553,7 +546,6 @@
 %token RPBRACE
 %token RRARROW
 %token RWNORMAL
-%token SCHEMA
 %token SEARCH
 %token SECTION
 %token SELF
@@ -588,7 +580,6 @@
 %token THEN
 %token THEORY
 %token TICKBRACE
-%token TICKPAREN
 %token TICKPIPE
 %token TILD
 %token TIME
@@ -705,13 +696,6 @@ _lident:
 | x=loc(_ident) { x }
 
 %inline uint: n=UINT { n }
-
-bdmident_:
-| x=mident   { Some x }
-| UNDERSCORE { None }
-
-%inline bdmident:
-| x=loc(bdmident_) { x }
 
 %inline word:
 | n=loc(UINT) {
@@ -1098,19 +1082,6 @@ ptybindings_opdecl:
     { (List.flatten x, Some (List.flatten y)) }
 
 (* -------------------------------------------------------------------- *)
-sc_var_ty:
-| x=ident+ COLON ty=loc(type_exp)
-    { (x,ty) }
-
-sc_ptybinding1:
-| LBRACE bds=plist1(sc_var_ty, COMMA) RBRACE
-    { bds }
-
-sc_ptybindings_decl:
-| x=sc_ptybinding1+
-    { List.flatten x }
-
-(* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
 
 %inline sform_r(P): x=loc(sform_u(P)) { x }
@@ -1127,14 +1098,6 @@ sc_ptybindings_decl:
 
 orcl_time(P):
  | m=uident DOT f=lident COLON c=form_r(P) { (m,f, c) }
-
-cost_calls(P,S):
-| calls=rlist1(orcl_time(P), S) { calls }
-
-costs(P):
-| LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
-| LBRACKET c=form_r(P) SEMICOLON calls=cost_calls(P,SEMICOLON) RBRACKET
-                                      {PC_costs(c,calls)}
 
 qident_or_res_or_glob:
 | x=qident
@@ -1346,10 +1309,6 @@ form_u(P):
 
 | PHOARE pb=phoare_body(P) { pb }
 
-| CHOARE pb=choare_body(P) { pb }
-
-| COST pb=coe_body(P)      { pb }
-
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
 
@@ -1396,28 +1355,6 @@ phoare_body(P):
     cmp=hoare_bd_cmp bd=sform_r(P)
   { PFBDhoareF (pre, mp, post, cmp, bd) }
 
-choare_body(P):
-| LBRACKET mp=loc(fident) COLON
-    pre=form_r(P) LONGARROW post=form_r(P)
-  RBRACKET
-  TIME
-  c=costs(P)
-  { PFChoareF (pre, mp, post, c) }
-| LBRACKET mp=loc(fident) RBRACKET
-  TIME
-  c=costs(P)
-  { PFChoareFT (mp, c) }
-
-coe_ty:
-| COLON ty=loc(type_exp) { ty}
-
-coe_body(P):
-| LBRACKET o=loc(empty) f=form_r(P) COLON e=expr ty=coe_ty? RBRACKET
-    { PFCoe (mk_loc (loc o) None, None, f, e, ty) }
-| LPAREN m=bdmident COLON mt=memtype RPAREN LBRACKET f=form_r(P)
-  COLON e=expr ty=coe_ty? RBRACKET
-    { PFCoe (m, Some mt, f, e, ty) }
-
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -1440,7 +1377,6 @@ pgtybinding1:
 
 | LPAREN pn=mident COLON mt=memtype RPAREN
     { [[mk_loc (loc pn) (Some pn)], PGTY_Mem (Some mt)] }
-
 
 pgtybindings:
 | x=pgtybinding1+ { List.flatten x }
@@ -1615,10 +1551,7 @@ fun_def_body:
 
 fun_decl:
 | x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
-    { let frestr = { pmre_name  = x;
-		     pmre_orcls = None;
-		     pmre_compl = None;	} in
-
+    { let frestr = { pmre_name = x; pmre_orcls = None; } in
       { pfd_name     = x;
         pfd_tyargs   = pd;
         pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
@@ -1709,53 +1642,21 @@ oracle_restr:
   | LBRACE ol=rlist0(qident_inparam,COMMA) RBRACE { ol }
 
 (* -------------------------------------------------------------------- *)
-(* Complexity restrictions *)
-compl_el:
-| o=qident_inparam COLON c=form_r(none) { (o, c) }
-
-compl_restr:
-| TICKBRACE self=form_r(none) RBRACE
-    { PCompl (self,[]) }
-| TICKBRACE self=form_r(none) COMMA c=rlist1(compl_el,COMMA) RBRACE
-    { PCompl (self,c) }
-
-(* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
-fun_restr:
-  | orcl=oracle_restr cl=compl_restr
-    { (Some  orcl, Some cl) }
-
-  | cl=compl_restr orcl=oracle_restr
-    { (Some  orcl, Some cl) }
-
-  | orcl=oracle_restr
-    { (Some orcl, None) }
-
-  | cl=compl_restr
-    { (None, Some cl) }
-
 mod_restr_el:
-  | f=lident COLON fr=fun_restr
-    { let orcl, cmpl = fr in
-      { pmre_name = f;
-	pmre_orcls = orcl;
-	pmre_compl = cmpl; } }
+  | f=lident COLON orcls=option(oracle_restr)
+    { { pmre_name = f; pmre_orcls = orcls; } }
 
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr;
-	pmr_procs = [] } }
+    { { pmr_mem = mr; pmr_procs = [] } }
   | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = [];
-	pmr_procs = l } }
+    { { pmr_mem = []; pmr_procs = l } }
   | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = mr;
-	pmr_procs = l } }
+    { { pmr_mem = mr;	pmr_procs = l } }
   | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr;
-	pmr_procs = l } }
-
+    { { pmr_mem = mr;	pmr_procs = l } }
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -1794,20 +1695,16 @@ sig_param:
 
 signature_item:
 | INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?
-    { let qs = omap (List.map (fun x -> { inp_in_params = false;
-					  inp_qident    = x;     })) qs in
-      `Include (i, xs, qs) }
-| PROC x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
-    { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_name  = x;
-		     pmre_orcls = orcl;
-		     pmre_compl = compl; } in
+    { let qs = qs |> omap (List.map (fun x ->
+        { inp_in_params = false; inp_qident = x;  }))
+      in `Include (i, xs, qs) }
 
-      `FunctionDecl
-          { pfd_name     = x;
-            pfd_tyargs   = pd;
-            pfd_tyresult = ty;
-            pfd_uses     = frestr; } }
+| PROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
+    { `FunctionDecl
+         { pfd_name     = x;
+           pfd_tyargs   = pd;
+           pfd_tyresult = ty;
+           pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
 
 (* -------------------------------------------------------------------- *)
 %inline locality:
@@ -2150,10 +2047,9 @@ lemma_decl:
 | x=ident
   tyvars=tyvars_decl?
   predvars=mempred_binding?
-  scvars=sc_ptybindings_decl?
   pd=pgtybindings?
   COLON f=form
-    { x,tyvars,predvars,scvars,pd,f }
+    { (x, tyvars, predvars, pd, f) }
 
 nosmt:
 | NOSMT { true  }
@@ -2168,9 +2064,6 @@ axiom:
 | l=locality AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
     { mk_axiom ~locality:l ~nosmt:o d (PAxiom (odfl [] ids)) }
 
-| l=locality SCHEMA o=nosmt d=lemma_decl
-    { mk_axiom ~locality:l ~nosmt:o d PSchema }
-
 | l=locality LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~locality:l ~nosmt:o d ao }
 
@@ -2178,8 +2071,7 @@ axiom:
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
-| l=locality CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
-    { mk_axiom ~locality:l (x, None, None, None, pd, p) ao }
+    { mk_axiom ~locality:l (x, None, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }
@@ -2550,26 +2442,6 @@ pcutdef:
 | LPAREN cd=pcutdef1 RPAREN { cd }
 
 (* ------------------------------------------------------------------ *)
-pmempred_arg:
-| TICKPAREN m=bdmident COLON f=form RPAREN { (m,f) }
-| TICKPAREN m=loc(empty) f=form RPAREN { (mk_loc (loc m) None,f) }
-
-pmempred_args:
-| l=pmempred_arg* { l }
-
-pcutdef_schema1:
-| p=qident tvi=tvars_app? mt=memtype pargs=loc(pmempred_args)
-  exprs=loc(sexpr*)
-    { { ptcds_name  = p;
-        ptcds_tys   = tvi;
-        ptcds_mt    = mt;
-        ptcds_mps   = pargs;
-        ptcds_exprs = exprs; } }
-
-pcutdef_schema:
-| LPAREN cd=pcutdef_schema1 RPAREN { cd }
-
-(* ------------------------------------------------------------------ *)
 %inline rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
@@ -2686,7 +2558,6 @@ simplify_arg:
 | ETA              { `Eta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
-| COST             { `ModPath }
 
 simplify:
 | l=simplify_arg+     { l }
@@ -2712,27 +2583,12 @@ conseq:
 conseq_xt:
 | c=conseq                                     { c, None }
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
-| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
-                                               { (None, None),
-						 Some (CQI_bd (cmp, bd)) }
-| c=conseq   COLON TIME co=costs(none)         { c, Some (CQI_c co) }
-| UNDERSCORE COLON TIME co=costs(none)         { (None, None), Some (CQI_c co) }
+| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform  { (None, None), Some (CQI_bd (cmp, bd)) }
 
-
-ci_cost_el:
-| o=loc(fident) x=ident? COLON co=costs(none) {o, x, co}
-
-abs_call_info:
-| TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET { xc }
 
 call_info:
-| f1=form LONGARROW f2=form          { CI_spec (f1, f2, None) }
-| f1=form LONGARROW f2=form TIME co=costs(none)
-                                     { CI_spec (f1, f2, Some co) }
-| f=form                             { CI_inv  (f, None) }
-| f=form TIME co=costs(none)         { CI_inv  (f, Some (`Std co)) }
-| f=form SEMICOLON inf=abs_call_info     { let info = `CostAbs inf in
-                                       CI_inv  (f, Some info) }
+| f1=form LONGARROW f2=form          { CI_spec (f1, f2) }
+| f=form                             { CI_inv  f }
 | bad=form COMMA p=form              { CI_upto (bad,p,None) }
 | bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
 
@@ -2803,9 +2659,6 @@ while_tac_info:
 
 | inv=sform vrnt=sform k=sform eps=sform
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Bd (k, eps)); } }
-
-| inv=sform vrnt=sform k=sform TIME co=costs(none)
-    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Cost (k, co)); } }
 
 async_while_tac_info:
 | LBRACKET t1=expr COMMA f1=form RBRACKET
@@ -2891,9 +2744,6 @@ app_bd_info:
 
 | f=sform
     { PAppSingle f }
-
-| TIME co=costs(none)
-    { PAppCost co }
 
 | f=prod_form g=prod_form s=sform?
     { PAppMult (s, fst f, snd f, fst g, snd g) }
@@ -3022,9 +2872,6 @@ logtactic:
 | HAVE ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
-| INSTANTIATE ip=loc(intro_pattern)* CEQ fp=pcutdef_schema
-   { Pcutdef_sc (ip, fp) }
-
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
 
@@ -3069,9 +2916,6 @@ form_or_double_form:
 
 | LPAREN UNDERSCORE? COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
-
-%inline if_cost_option:
-| CEQ f=sform    {f}
 
 %inline if_option:
 | s=option(side)
@@ -3131,10 +2975,7 @@ phltactic:
    { Pfun `Def }
 
 | PROC f=sform
-   { Pfun (`Abs (f, None)) }
-
-| PROC f=sform COLON inf=abs_call_info
-   { Pfun (`Abs (f, Some inf)) }
+   { Pfun (`Abs f) }
 
 | PROC bad=sform p=sform q=sform?
    { Pfun (`Upto (bad, p, q)) }
@@ -3146,10 +2987,7 @@ phltactic:
    { Papp (s, d, pos, p, f) }
 
 | WP n=s_codepos1?
-   { Pwp (n, None) }
-
-| WP n=s_codepos1? CEQ f=sform
-   { Pwp (n, Some f) }
+   { Pwp n }
 
 | SP n=s_codepos1?
     { Psp n }
@@ -3169,11 +3007,11 @@ phltactic:
 | CALL SLASH fc=sform info=gpterm(call_info)
     { Pcallconcave (fc,info) }
 
-| RCONDT s=side? i=codepos1 cost=option(if_cost_option)
-    { Prcond (s, true, i, cost) }
+| RCONDT s=side? i=codepos1
+    { Prcond (s, true, i) }
 
-| RCONDF s=side? i=codepos1 cost=option(if_cost_option)
-    { Prcond (s, false, i, cost) }
+| RCONDF s=side? i=codepos1
+    { Prcond (s, false, i) }
 
 | MATCH c=oident s=side? i=codepos1
     { Prmatch (s, unloc c, i) }
@@ -3905,7 +3743,6 @@ print:
 | PRED        qs=qoident         { Pr_pr   qs            }
 | AXIOM       qs=qident          { Pr_ax   qs            }
 | LEMMA       qs=qident          { Pr_ax   qs            }
-| SCHEMA      qs=qident          { Pr_sc   qs            }
 | MODULE      qs=qident          { Pr_mod  qs            }
 | MODULE TYPE qs=qident          { Pr_mty  qs            }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs            }

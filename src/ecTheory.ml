@@ -28,7 +28,6 @@ and theory_item_r =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
-  | Th_schema    of (symbol * ax_schema)
   | Th_modtype   of (symbol * top_module_sig)
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
@@ -56,7 +55,6 @@ and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
-  | Cost of EcMemory.memenv * rule_pattern * rule_pattern (* memenv, pre, expr *)
   | Int  of EcBigInt.zint
   | Var  of EcIdent.t
 
@@ -66,8 +64,6 @@ and top_rule_pattern =
 and rule = {
   rl_tyd   : EcDecl.ty_params;
   rl_vars  : (EcIdent.t * EcTypes.ty) list;
-  rl_evars : (EcIdent.t * EcTypes.ty) list;
-  rl_pvars : EcIdent.t list;
   rl_cond  : EcCoreFol.form list;
   rl_ptn   : rule_pattern;
   rl_tg    : EcCoreFol.form;
@@ -77,7 +73,6 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
-  ur_mode   : [`Ax | `Sc];
 }
 
 let mkitem (import : import) (item : theory_item_r) =

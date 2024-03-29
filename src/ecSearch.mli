@@ -13,8 +13,7 @@ type search = [
   | `ByOr      of search list
 ]
 
-type search_result =
-  (path * [`Axiom of EcDecl.axiom | `Schema of EcDecl.ax_schema]) list
+type search_result = (path * EcDecl.axiom) list
 
 val search : EcEnv.env -> search list -> search_result
 

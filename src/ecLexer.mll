@@ -59,8 +59,6 @@
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "ehoare"      , EHOARE     ;        (* KW: prog *)
-    "choare"      , CHOARE     ;        (* KW: prog *)
-    "cost"        , COST       ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)
@@ -166,7 +164,6 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
-    "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
@@ -198,7 +195,6 @@
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
-    "instantiate" , INSTANTIATE;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
     "locate"      , LOCATE     ;        (* KW: global *)
@@ -408,7 +404,6 @@ rule main = parse
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
   | "`{"  { [TICKBRACE ] }
-  | "`("  { [TICKPAREN ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }

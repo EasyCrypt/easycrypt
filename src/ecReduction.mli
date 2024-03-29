@@ -43,9 +43,7 @@ module User : sig
 
   type error =
     | MissingVarInLhs   of EcIdent.t
-    | MissingEVarInLhs  of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
-    | MissingPVarInLhs  of EcIdent.t
     | NotAnEq
     | NotFirstOrder
     | RuleDependsOnMemOrModule
@@ -55,7 +53,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : opts:options -> prio:int -> EcEnv.env -> [`Ax | `Sc] -> EcPath.path -> rule
+  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
 end
 
 (* -------------------------------------------------------------------- *)
@@ -72,7 +70,6 @@ type reduction_info = {
   logic   : rlogic_info;       (* perform logical simplification *)
   modpath : bool;              (* reduce module path *)
   user    : bool;              (* reduce user defined rules *)
-  cost    : bool;              (* reduce trivial cost statements *)
 }
 
 and deltap      = [EcEnv.Op.redmode | `No]
@@ -91,8 +88,6 @@ val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
-val reduce_cost : reduction_info -> env -> coe -> form
-
 val reduce_user_gen :
   (EcFol.form -> EcFol.form) ->
   reduction_info ->
@@ -107,9 +102,8 @@ val check_bindings :
   exn -> EcDecl.ty_params -> EcEnv.env -> EcSubst.subst ->
   (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
   EcEnv.env * EcSubst.subst
+
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
 
 val xconv : xconv -> LDecl.hyps -> form -> form -> bool
-
-(* -------------------------------------------------------------------- *)

@@ -80,8 +80,7 @@ let t_equiv_ppr   = FApi.t_low3 "equiv-ppr"   t_equiv_ppr_r
 let process_ppr info tc =
   match info with
   | None ->
-    (* Remark: the tactic bypr cannot be used for cost goals. *)
-    t_hF_or_chF_or_bhF_or_eF ~th:t_hoare_ppr ~tbh:t_bdhoare_ppr tc
+    t_hF_or_bhF_or_eF ~th:t_hoare_ppr ~tbh:t_bdhoare_ppr tc
 
   | Some (phi1, phi2) ->
       let hyps = FApi.tc1_hyps tc in

@@ -30,7 +30,6 @@ type f_subst = {
   fs_loc     : form Mid.t;
   fs_eloc    : expr Mid.t;
   fs_mem     : EcIdent.t Mid.t;
-  fs_schema  : sc_instanciate option;
   (* free variables in the codom of the substitution *)
   fs_fv      : int Mid.t;
 }
@@ -60,18 +59,11 @@ let f_subst_init
       ?(tu=Muid.empty)
       ?(tv=Mid.empty)
       ?(esloc=Mid.empty)
-      ?schema
       () =
   let fv = Mid.empty in
   let fv = Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu fv in
   let fv = fv_Mid ty_fv tv fv in
   let fv = fv_Mid e_fv esloc fv in
-  let fv =
-    ofold (fun sc s ->
-        let fv = fv_union s (mt_fv sc.sc_memtype) in
-        let fv = fv_Mid e_fv sc.sc_expr fv in
-        fv_Mid (fun (m,f) -> Mid.remove m (f_fv f)) sc.sc_mempred fv)
-      fv schema in
 
   {
     fs_freshen  = freshen;
@@ -82,7 +74,6 @@ let f_subst_init
     fs_loc      = Mid.empty;
     fs_eloc     = esloc;
     fs_mem      = Mid.empty;
-    fs_schema   = schema;
     fs_fv       = fv;
   }
 
@@ -363,7 +354,6 @@ module Fsubst = struct
     && Mid.is_empty   s.fs_loc
     && Mid.is_empty   s.fs_mem
     && Mid.is_empty   s.fs_eloc
-    && s.fs_schema = None
 
   (* ------------------------------------------------------------------ *)
   let has_mem (s : f_subst) (x : ident) : bool =
@@ -486,22 +476,6 @@ module Fsubst = struct
       let hs_po   = f_subst ~tx s hs.ehs_po in
       f_eHoareS hs_m hs_pr hs_s hs_po
 
-    | FcHoareF hf ->
-      let hf_f  = x_subst s hf.chf_f in
-      let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.chf_pr in
-      let hf_po = f_subst ~tx s hf.chf_po in
-      let hf_co = cost_subst ~tx s hf.chf_co in
-      f_cHoareF hf_pr hf_f hf_po hf_co
-
-    | FcHoareS hs ->
-      let hs_s    = s_subst s hs.chs_s in
-      let s, hs_m = add_me_binding s hs.chs_m in
-      let hs_pr   = f_subst ~tx s hs.chs_pr in
-      let hs_po   = f_subst ~tx s hs.chs_po in
-      let hs_co   = cost_subst ~tx s hs.chs_co in
-      f_cHoareS hs_m hs_pr hs_s hs_po hs_co
-
     | FbdHoareF hf ->
       let hf_f  = x_subst s hf.bhf_f in
       let s     = f_rem_mem s mhr in
@@ -547,34 +521,6 @@ module Fsubst = struct
       let eg_po = f_subst ~tx s eg.eg_po in
       f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
-    | Fcoe coe ->
-      if EcMemory.is_schema (snd coe.coe_mem) && Option.is_some s.fs_schema then
-        let m' = refresh s (fst coe.coe_mem) in
-        (* We instanciate the schema *)
-        let sc = oget s.fs_schema in
-        let me' = m', sc.sc_memtype in
-        (* We add the memory in the subst *)
-        let s = f_bind_mem s (fst coe.coe_mem) m' in
-        (* We add the predicates in the subst *)
-        let doit id (m, p) s =
-          let fs_mem = f_bind_mem f_subst_id m m' in
-          let p = f_subst ~tx:(fun ~before:_ ~after -> after) fs_mem p in
-          f_bind_local s id p in
-        (* FIXME:                                      why None ? *)
-        let s   = Mid.fold doit sc.sc_mempred {s with fs_schema = None } in
-        (* We add the expressions in the subst *)
-        let s   = bind_elocals s sc.sc_expr in
-        let s   = Mid.fold (fun id e s ->
-                      f_bind_local s id (form_of_expr m' e)) sc.sc_expr s in
-        let pr' = f_subst ~tx s coe.coe_pre in
-        let e'  = e_subst s coe.coe_e in
-        f_coe pr' me' e'
-      else
-        let s, me' = add_me_binding s coe.coe_mem in
-        let pr' = f_subst ~tx s coe.coe_pre in
-        let e'  = e_subst s coe.coe_e in
-        f_coe pr' me' e'
-
     | Fpr pr ->
       let pr_mem   = m_subst s pr.pr_mem in
       let pr_fun   = x_subst s pr.pr_fun in
@@ -588,32 +534,18 @@ module Fsubst = struct
       f_map (ty_subst s) (f_subst ~tx s) fp)
 
   (* ------------------------------------------------------------------ *)
-  and oi_subst ~(tx : tx) (s : f_subst) (oi : PreOI.t) : PreOI.t =
-    let costs = match PreOI.costs oi with
-      | `Unbounded -> `Unbounded
-      | `Bounded (self,calls) ->
-        let calls = EcPath.Mx.fold (fun x a calls ->
-            EcPath.Mx.change
-              (fun old -> assert (old = None); Some (f_subst ~tx s a))
-              (x_subst s x)
-              calls
-          ) calls EcPath.Mx.empty in
-        let self = f_subst ~tx s self in
-        `Bounded (self,calls) in
-
-    PreOI.mk
-      (List.map (x_subst s) (PreOI.allowed oi))
-      costs
+  and oi_subst (s : f_subst) (oi : PreOI.t) : PreOI.t =
+    PreOI.mk (List.map (x_subst s) (PreOI.allowed oi))
 
   (* ------------------------------------------------------------------ *)
-  and mr_subst ~(tx : tx) (s : f_subst) (mr : mod_restr) : mod_restr =
+  and mr_subst (s : f_subst) (mr : mod_restr) : mod_restr =
     let sx = x_subst s in
     let sm = EcPath.m_subst_abs s.fs_mod in
     { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
           Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
       mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
           Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
-      mr_oinfos = EcSymbols.Msym.map (oi_subst ~tx s) mr.mr_oinfos; }
+      mr_oinfos = EcSymbols.Msym.map (oi_subst s) mr.mr_oinfos; }
 
   (* ------------------------------------------------------------------ *)
   and mp_subst (s : f_subst) (mp : mpath) : mpath =
@@ -631,7 +563,7 @@ module Fsubst = struct
     in
     let mt_name   = mty.mt_name in
     let mt_args   = List.map (mp_subst s) mty.mt_args in
-    let mt_restr  = mr_subst ~tx s mty.mt_restr in
+    let mt_restr  = mr_subst s mty.mt_restr in
     { mt_params; mt_name; mt_args; mt_restr; }
 
   (* ------------------------------------------------------------------ *)
@@ -686,32 +618,6 @@ module Fsubst = struct
       let s = f_bind_mem s x x' in
       (s, (x', mt'))
 
-  (* When substituting a abstract module (i.e. a mident) by a concrete one,
-   * we move the module cost from [c_calls] to [c_self].
-   *)
-  (* ------------------------------------------------------------------ *)
-  and cost_subst ~(tx : tx) (s : f_subst) (cost : cost) : cost =
-    let c_self = f_subst ~tx s cost.c_self
-    and self', c_calls = EcPath.Mx.fold (fun x cb (self',calls) ->
-        let x' = x_subst s x in
-        let cb_cost'   = f_subst ~tx s cb.cb_cost in
-        let cb_called' = f_subst ~tx s cb.cb_called in
-        match x'.x_top.m_top with
-        | `Local _ ->
-          let cb' = { cb_cost   = cb_cost';
-                      cb_called = cb_called'; } in
-          ( self',
-            EcPath.Mx.change
-              (fun old -> assert (old  = None); Some cb')
-              x' calls )
-        | `Concrete _ ->
-          (* TODO: A: better simplification*)
-          ( f_xadd_simpl self' (f_xmuli_simpl cb_called' cb_cost'), calls)
-      ) cost.c_calls (f_x0, EcPath.Mx.empty) in
-
-    let c_self = f_xadd_simpl c_self self' in
-    cost_r c_self c_calls
-
   (* ------------------------------------------------------------------ *)
   (* Wrapper functions                                                  *)
   (* ------------------------------------------------------------------ *)
@@ -738,9 +644,9 @@ module Fsubst = struct
   let s_subst = s_subst
 
   let gty_subst = gty_subst ~tx:(fun ~before:_ ~after:f -> f)
-  let mr_subst = mr_subst ~tx:(fun ~before:_ ~after:f -> f)
+  let mr_subst = mr_subst
   let mty_subst = mty_subst ~tx:(fun ~before:_ ~after:f -> f)
-  let oi_subst  = oi_subst ~tx:(fun ~before:_ ~after:f -> f)
+  let oi_subst  = oi_subst
 
   (* ------------------------------------------------------------------ *)
   let f_subst_local (x : ident) (t : form) : form -> form =

@@ -714,14 +714,6 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
   in (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
-and replay_scd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, sc) =
-  let subst, x = rename ove subst (`Lemma, x) in
-  let sc = EcSubst.subst_schema subst sc in
-  let item = Th_schema (x, sc) in
-  let scope = ove.ovre_hooks.hadd_item scope import item in
-  (subst, ops, proofs, scope)
-
-(* -------------------------------------------------------------------- *)
 and replay_modtype
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, modty)
 =
@@ -863,22 +855,14 @@ and replay_reduction
 
     let p = EcSubst.subst_path subst p in
 
-    (* TODO: A: schema are not replayed for now, but reduction rules can use a
-       schema. Fix this. *)
     let rule =
       obind (fun rule ->
         let env = EcSection.env (ove.ovre_hooks.henv scope) in
 
         try
-          if not (
-            match opts.ur_mode with
-            | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
-            | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
-          ) then raise Removed;
-
-          Some (EcReduction.User.compile
-                  ~opts ~prio:rule.rl_prio
-                  env opts.ur_mode p)
+          if not (is_some (EcEnv.Ax.by_path_opt p env)) then
+            raise Removed;
+          Some (EcReduction.User.compile ~opts ~prio:rule.rl_prio env p)
         with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
@@ -990,9 +974,6 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (item.ti_import, x, ax)
-
-  | Th_schema (x, schema) ->
-     replay_scd ove (subst, ops, proofs, scope) (item.ti_import, x, schema)
 
   | Th_modtype (x, modty) ->
      replay_modtype ove (subst, ops, proofs, scope) (item.ti_import, x, modty)

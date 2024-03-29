@@ -79,7 +79,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
     match (FApi.tc1_goal tc).f_node with
-    | FbdHoareS _ | FcHoareS _ | FhoareS _ | FeHoareS _ when not opts.cod_ambient ->
+    | FbdHoareS _ | FhoareS _ | FeHoareS _ when not opts.cod_ambient ->
         let _, fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 
@@ -142,7 +142,6 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
     | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
     | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
-    | Pcutdef_sc (ip, f)  -> process_cutdef_sc ttenv (ip, f)
     | Pmove pr            -> process_move pr.pr_view pr.pr_rev
     | Pclear l            -> process_clear l
     | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
@@ -168,14 +167,14 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
     | Pfun `Def                 -> EcPhlFun.process_fun_def
-    | Pfun (`Abs (f,p_inv_inf)) -> EcPhlFun.process_fun_abs f p_inv_inf
+    | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp info                 -> EcPhlApp.process_app info
-    | Pwp (wp,cost_pre)         -> EcPhlWp.process_wp wp cost_pre
+    | Pwp wp                    -> EcPhlWp.process_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
-    | Prcond (side, b, i, c)    -> EcPhlRCond.process_rcond side b i c
+    | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
     | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
     | Pcond info                -> EcPhlHiCond.process_cond info
     | Pmatch infos              -> EcPhlHiCond.process_match infos
