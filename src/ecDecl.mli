@@ -41,6 +41,14 @@ val abs_tydecl : ?resolve:bool -> ?tc:Sp.t -> ?params:ty_pctor -> locality -> ty
 val ty_instanciate : ty_params -> ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
+type stydecl = {
+  styd_tyargs : ty_params;
+  styd_args   : (EcIdent.t * EcTypes.ty) list;
+  styd_base   : EcIdent.t * EcTypes.ty;
+  styd_pred   : EcCoreFol.form;
+}
+
+(* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
 
 type operator_kind =

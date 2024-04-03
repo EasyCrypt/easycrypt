@@ -859,6 +859,14 @@ and replay_reduction
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_styd
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, styd)
+=
+  let styd = EcSubst.subst_stydecl subst styd in
+  let scope = ove.ovre_hooks.hadd_item scope import (Th_subtype (x, styd)) in
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay_typeclass
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, tc)
 =
@@ -948,6 +956,10 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   match item.ti_item with
   | Th_type (x, otyd) ->
      replay_tyd ove (subst, ops, proofs, scope) (item.ti_import, x, otyd)
+
+  (* TODO: SUBTYPE: allow for subtype overriding *)
+  | Th_subtype (x, styd) ->
+      replay_styd ove (subst, ops, proofs, scope) (item.ti_import, x, styd)
 
   | Th_operator (x, ({ op_kind = OB_oper _ } as oopd)) ->
      replay_opd ove (subst, ops, proofs, scope) (item.ti_import, x, oopd)

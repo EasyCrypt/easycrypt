@@ -232,11 +232,13 @@ type matchfix_t =  {
 }
 
 (* -------------------------------------------------------------------- *)
+(* TODO: SUBTYPE: check if we need more here *)
 let trans_matchfix
   ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, pty, pbs)
 =
-  let codom     = TT.transty TT.tp_relax env ue pty in
-  let env, args = TT.trans_binding env ue bd in
+  let (codom, _opred) = TT.transsty TT.tp_relax env ue pty in
+  let env, args = TT.trans_sbinding env ue bd in
+  let args = List.fst args in
   let ty        = EcTypes.toarrow (List.map snd args) codom in
   let opname    = EcIdent.create name in
   let env       = EcEnv.Var.bind_local opname ty env in

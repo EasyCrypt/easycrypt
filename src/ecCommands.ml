@@ -263,6 +263,7 @@ let process_pr fmt scope p =
 
   match p with
   | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   (unloc qs)
+  | Pr_sty  qs -> EcPrinting.ObjectInfo.pr_sty  fmt env   (unloc qs)
   | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
   | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
@@ -380,6 +381,13 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
 (* -------------------------------------------------------------------- *)
 and process_types (scope : EcScope.scope) tyds =
   List.fold_left process_type scope tyds
+
+(* -------------------------------------------------------------------- *)
+and process_subtype (scope : EcScope.scope) (psty : pstydecl located) =
+  EcScope.check_state `InTop "subtype" scope;
+  let scope = EcScope.Ty.add_sub scope psty in
+  EcScope.notify scope `Info "added subtype `%s'" (unloc psty.pl_desc.pstyd_name);
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
@@ -713,6 +721,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
     match
       match g.pl_desc with
       | Gtype        t    -> `Fct   (fun scope -> process_types      scope  (List.map (mk_loc loc) t))
+      | Gsubtype     t    -> `Fct   (fun scope -> process_subtype    scope  (mk_loc loc t))
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)

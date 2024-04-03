@@ -23,6 +23,7 @@ val empty : subst
 val is_empty : subst -> bool
 
 (* -------------------------------------------------------------------- *)
+val add_tyvars   : subst -> EcIdent.t list -> ty list -> subst
 val add_module   : subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
 val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
@@ -32,6 +33,7 @@ val add_moddef   : subst -> src:path -> dst:mpath -> subst (* Only concrete modu
 val add_memory   : subst -> EcIdent.t -> EcIdent.t -> subst
 
 val add_flocal : subst -> EcIdent.t -> form -> subst
+val add_flocals : subst -> EcIdent.t list -> form list -> subst
 val add_elocals : subst -> EcIdent.t list -> expr list -> subst
 val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 
@@ -43,6 +45,7 @@ val subst_theory  : subst -> theory -> theory
 val subst_ax      : subst -> axiom -> axiom
 val subst_op      : subst -> operator -> operator
 val subst_tydecl  : subst -> tydecl -> tydecl
+val subst_stydecl : subst -> stydecl -> stydecl
 val subst_tc      : subst -> typeclass -> typeclass
 val subst_theory  : subst -> theory -> theory
 val subst_branches : subst -> opbranches -> opbranches

@@ -3481,3 +3481,59 @@ let get_field (typ, ty) env =
         (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
+
+(* -------------------------------------------------------------------- *)
+let transsty tp env ue sty =
+  match unloc sty with
+  | PSTty ty -> transty tp env ue ty, None
+  | PSTsub ({pl_desc = name}, tyargs, args) -> begin
+    match EcEnv.Subtype.lookup_opt name env with
+    | None ->
+      tyerror sty.pl_loc env (UnknownTypeName name)
+    | Some (_, stydecl) ->
+      let ntyargs = List.length tyargs in
+      let entyargs = List.length stydecl.styd_tyargs in
+      let nargs = List.length args in
+      let enargs = List.length stydecl.styd_args in
+
+      if ntyargs <> entyargs then
+        tyerror sty.pl_loc env (InvalidTypeAppl (name, entyargs, ntyargs));
+
+      if nargs <> enargs then
+        tyerror sty.pl_loc env (InvalidTypeAppl (name, enargs, nargs));
+
+      let tyargs = transtys tp env ue tyargs in
+      let binds = stydecl.styd_args in
+      let args = List.map2 (fun arg (_, ty) -> trans_form_or_pattern env ue arg (Some ty)) args binds in
+
+      let w, base_ty = stydecl.styd_base in
+      let fvs = EcTypes.Tvar.fv base_ty in
+      let subst = EcSubst.add_tyvars EcSubst.empty (Sid.elements fvs) tyargs in
+      let subst = EcSubst.add_flocals subst (List.fst binds) args in
+
+      let base_ty = EcSubst.subst_ty subst base_ty in
+      let pred = EcSubst.subst_form subst stydecl.styd_pred in
+      base_ty, Some (w, pred)
+  end
+
+let trans_sbinding env ue bd =
+  let trans_bd1 env (xs, psty) =
+    let ty, opred = transsty tp_relax env ue psty in
+
+    let xs =
+      List.map
+      (fun x ->
+        let id = ident_of_osymbol (unloc x) in
+        match opred with
+        | None -> (id, ty), None
+        | Some (w, pred) ->
+          let subst = EcSubst.rename_flocal EcSubst.empty w id ty in
+          (id, ty), Some (EcSubst.subst_form subst pred)
+      )
+      xs
+    in
+    let env = EcEnv.Var.bind_locals (List.fst xs) env in
+    env, xs in
+  let env, bd = List.map_fold trans_bd1 env bd in
+  let bd = List.flatten bd in
+  env, bd

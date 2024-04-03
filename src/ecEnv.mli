@@ -365,6 +365,20 @@ end
 val ty_hnorm : ty -> env -> ty
 
 (* -------------------------------------------------------------------- *)
+module Subtype : sig
+  type t = EcDecl.stydecl
+
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
+
+  val add  : path -> env -> env
+  val bind : ?import:import -> symbol -> t -> env -> env
+end
+
+(* -------------------------------------------------------------------- *)
 module Algebra : sig
   val add_ring  : ty -> EcDecl.ring -> is_local -> env -> env
   val add_field : ty -> EcDecl.field -> is_local -> env -> env

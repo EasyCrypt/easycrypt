@@ -579,6 +579,7 @@
 %token SPLITWHILE
 %token STAR
 %token SUBST
+%token SUBTYPE
 %token SUFF
 %token SWAP
 %token SYMMETRY
@@ -1066,12 +1067,26 @@ pty_varty:
 | x=bdident+ COLON ty=loc(type_exp)
    { (x, ty) }
 
+psty_varty:
+| x=loc(bdident+)
+   { (unloc x, mk_loc (loc x) (PSTty (mk_loc (loc x) PTunivar))) }
+
+| x=bdident+ COLON sty=loc(subtype_exp)
+   { (x, sty) }
+
 %inline ptybinding1:
 | LPAREN bds=plist1(pty_varty, COMMA) RPAREN
     { bds }
 
 | x=loc(bdident)
    { [[unloc x], mk_loc (loc x) PTunivar] }
+
+%inline pstybinding1:
+| LPAREN bds=plist1(psty_varty, COMMA) RPAREN
+    { bds }
+
+| x=loc(bdident)
+   { [[unloc x], mk_loc (loc x) (PSTty (mk_loc (loc x) PTunivar))] }
 
 ptybindings:
 | x=ptybinding1+
@@ -1084,13 +1099,12 @@ ptybindings_decl:
 | x=ptybinding1+
     { List.flatten x }
 
-ptybindings_opdecl:
-| x=ptybinding1+
+pstybindings_opdecl:
+| x=pstybinding1+
     { (List.flatten x, None) }
 
-| x=ptybinding1* SLASH y=ptybinding1*
+| x=pstybinding1* SLASH y=pstybinding1*
     { (List.flatten x, Some (List.flatten y)) }
-
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
 
@@ -1768,6 +1782,24 @@ typedecl:
     { [mk_tydecl ~locality td (PTYD_Datatype te)] }
 
 (* -------------------------------------------------------------------- *)
+(* Subtypes                                                             *)
+
+%inline subtype_args:
+| LTCOLON bds=plist1(pty_varty, COMMA) GT { bds }
+
+subtypedecl:
+| SUBTYPE tyargs=typarams x=ident args=subtype_args EQ
+  LBRACE w=ident COLON bt=loc(type_exp) PIPE pred=form RBRACE
+  { { pstyd_name = x; pstyd_tyargs = tyargs; pstyd_args = args;
+      pstyd_base = (w, bt); pstyd_pred = pred } }
+
+(* TODO: SUBTYPE: ideally we want `form` not `sform` for fs *)
+subtype_exp:
+| ty=loc(type_exp) { PSTty ty }
+| LBRACE tyargs=type_args x=qident LTCOLON fs=plist0(sform, COMMA) GT RBRACE
+  { PSTsub (x, tyargs, fs) }
+
+(* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
 | loca=is_local TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
@@ -1855,12 +1887,14 @@ op_or_const:
 
 operator:
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
-    sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=pstybindings_opdecl?
+    sty=prefix(COLON, loc(subtype_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
-    let sty  = sty |> ofdfl (fun () ->
-      mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
+    let lc = (b |> omap (loc |- fst) |> odfl gloc) in
+    let sty  = sty |> ofdfl (fun () -> 
+        mk_loc lc (PSTty (mk_loc lc PTunivar)))
+    in
 
     { po_kind     = k;
       po_name     = List.hd x;
@@ -1873,8 +1907,8 @@ operator:
       po_locality = locality; } }
 
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
-    COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=pstybindings_opdecl?
+    COLON LBRACE sty=loc(subtype_exp) PIPE reft=form RBRACE AS rname=ident
 
   { { po_kind     = k;
       po_name     = List.hd x;
@@ -3847,6 +3881,7 @@ global_action:
 | mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
+| subtypedecl      { Gsubtype     $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }

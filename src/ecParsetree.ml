@@ -211,8 +211,14 @@ and pmemtype    = pmemtype_el list
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
 
-and pgscbinding  = psymbol list * pty
-and pgscbindings = pgscbinding list
+and psty_r =
+  | PSTsub of pqsymbol * pty list * pformula list
+  | PSTty of pty
+
+and psty = psty_r located
+
+and pstybinding  = osymbol list * psty
+and pstybindings = pstybinding list
 
 and pgty =
 | PGTY_Type  of pty
@@ -363,14 +369,23 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+type pstydecl = {
+  pstyd_name   : psymbol;
+  pstyd_tyargs : ptyparams;
+  pstyd_args   : ptybindings;
+  pstyd_base   : psymbol * pty;
+  pstyd_pred   : pformula;
+}
+
+(* -------------------------------------------------------------------- *)
 type ptyvardecls =
   (psymbol * pqsymbol list) list
 
 type pop_def =
-  | PO_abstr of pty
-  | PO_concr of pty * pformula
-  | PO_case  of pty * pop_branch list
-  | PO_reft  of pty * (psymbol * pformula)
+  | PO_abstr of psty
+  | PO_concr of psty * pformula
+  | PO_case  of psty * pop_branch list
+  | PO_reft  of psty * (psymbol * pformula)
 
 and pop_branch = {
   pop_patterns : pop_pattern list;
@@ -388,7 +403,7 @@ type poperator = {
   po_aliases: psymbol list;
   po_tags   : psymbol list;
   po_tyvars : ptyvardecls option;
-  po_args   : ptybindings * ptybindings option;
+  po_args   : pstybindings * pstybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
   po_locality : locality;
@@ -1094,6 +1109,7 @@ type cnst_decl = (psymbol list * pty) * pexpr option
 type pprint =
   | Pr_any  of pqsymbol
   | Pr_ty   of pqsymbol
+  | Pr_sty  of pqsymbol
   | Pr_op   of pqsymbol
   | Pr_th   of pqsymbol
   | Pr_pr   of pqsymbol
@@ -1238,6 +1254,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gsubtype     of pstydecl
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

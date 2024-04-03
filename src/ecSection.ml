@@ -794,6 +794,10 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let to_gen = add_declared_ty to_gen path tydecl in
     to_gen, None
 
+(* TODO: SUBTYPE: generalizing subtypes *)
+let generalize_stydecl to_gen _prefix (_name, _sty) =
+  to_gen, None
+
 let generalize_opdecl to_gen prefix (name, operator) =
   let path = pqname prefix name in
   match operator.op_loca with
@@ -1035,6 +1039,8 @@ let rec set_local_item item =
   let lcitem =
     match item.ti_item with
     | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_local ty.tyd_loca })
+    (* TODO: SUBTYPE: local of subtypes *)
+    | Th_subtype     (s,sty) -> Th_subtype   (s, sty)
     | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_local op.op_loca   })
     | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_local ax.ax_loca   })
     | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_local ms.tms_loca  })
@@ -1098,6 +1104,7 @@ let check_polymorph scenv who typarams =
 
 let check_abstract = check "should be abstract"
 
+(* TODO: SUBTYPE: locality of subtypes *)
 type can_depend = {
     d_ty    : locality list;
     d_op    : locality list;
@@ -1161,6 +1168,8 @@ let check_tyd scenv prefix name tyd =
       } in
     on_tydecl (cb scenv from cd) tyd
 
+(* TODO: SUBTYPE: locality of subtypes *)
+let check_styd _ _ _ _ = ()
 (*
 let cb_glob scenv (who:cbarg) =
   match who with
@@ -1338,6 +1347,7 @@ let add_item_ (item : theory_item) (scenv:scenv) =
   let env =
     match item.ti_item with
     | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
+    | Th_subtype (s, styd) -> EcEnv.Subtype.bind s styd env
     | Th_operator (s,op) -> EcEnv.Op.bind s op env
     | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
     | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
@@ -1364,6 +1374,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
   let to_gen, item =
     match th_item.ti_item with
     | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
+    | Th_subtype stydecl -> generalize_stydecl to_gen prefix stydecl
     | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
     | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
     | Th_modtype ms      -> generalize_modtype to_gen ms
@@ -1480,6 +1491,7 @@ let check_item scenv item =
   let prefix = EcEnv.root scenv.sc_env in
   match item.ti_item with
   | Th_type     (s,tyd) -> check_tyd scenv prefix s tyd
+  | Th_subtype (s,styd) -> check_styd scenv prefix s styd
   | Th_operator  (s,op) -> check_op  scenv prefix s op
   | Th_axiom    (s, ax) -> check_ax  scenv prefix s ax
   | Th_modtype  (s, ms) -> check_modtype scenv prefix s ms

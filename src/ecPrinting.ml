@@ -1000,11 +1000,11 @@ let pp_opapp
       fun () ->
         match es with
         | [] ->
-            pp_opname fmt (nm, opname)
+            pp_opname_with_tvi ppe fmt (nm, opname, Some tvi)
 
         | _  ->
-            let pp_subs = ((fun _ _ -> pp_opname), pp_sub) in
-            let pp fmt () = pp_app ppe pp_subs outer fmt (([], opname), es) in
+            let pp_subs = ((fun ppe _ -> pp_opname_with_tvi ppe), pp_sub) in
+            let pp fmt () = pp_app ppe pp_subs outer fmt (([], opname, Some tvi), es) in
             maybe_paren outer (inm, max_op_prec) pp fmt ()
 
   and try_pp_as_uniop () =
@@ -2100,6 +2100,35 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
             (pp_list ";@ " pp_field) fields
   in
     Format.fprintf fmt "@[%a%t%t.@]" pp_locality tyd.tyd_loca pp_prelude pp_body
+
+(* -------------------------------------------------------------------- *)
+let pp_subtypedecl (ppe : PPEnv.t) fmt (x, (styd : stydecl)) =
+  let name = P.basename x in
+
+  let ppe = PPEnv.add_locals ppe (List.map fst styd.styd_tyargs) in
+  let pp_tvars fmt =
+    match List.map fst styd.styd_tyargs with
+    | [] ->
+        Format.fprintf fmt ""
+
+    | [tx] ->
+        Format.fprintf fmt "%a" (pp_tyvar ppe) tx
+
+    | txs ->
+        Format.fprintf fmt "%a"
+          (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs
+  in
+
+  let (subppe, pp_args) = pp_locbinds ppe styd.styd_args in
+  let w, bty = styd.styd_base in
+  let subsubppe = PPEnv.add_local subppe w in
+  let pp fmt =
+    Format.fprintf fmt "%a : %a"
+    (pp_local subsubppe) w (pp_type subppe) bty
+  in
+
+  let pp_body fmt = Format.fprintf fmt " =@ { %t | %a }" pp (pp_form subsubppe) styd.styd_pred in
+  Format.fprintf fmt "@[subtype %t %s %t%t.@]" pp_tvars name pp_args pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
@@ -3274,6 +3303,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
   | EcTheory.Th_type (id, ty) ->
       pp_typedecl ppe fmt (EcPath.pqname p id,ty)
 
+  | EcTheory.Th_subtype (id, sty) ->
+      pp_subtypedecl ppe fmt (EcPath.pqname p id, sty)
+
   | EcTheory.Th_operator (id, op) ->
       pp_opdecl ppe fmt (EcPath.pqname p id, op)
 
@@ -3424,6 +3456,14 @@ module ObjectInfo = struct
   let pr_ty = pr_gen pr_ty_r
 
   (* ------------------------------------------------------------------ *)
+  let pr_sty_r =
+    { od_name    = "subtype declarations";
+      od_lookup  = EcEnv.Subtype.lookup;
+      od_printer = pp_subtypedecl; }
+
+  let pr_sty = pr_gen pr_sty_r
+
+  (* ------------------------------------------------------------------ *)
   let pr_op_r =
     let get_ops qs env =
       let l = EcEnv.Op.all ~name:qs env in
@@ -3510,6 +3550,7 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
     let printers = [pr_gen_r ~prcat:true pr_ty_r ;
+                    pr_gen_r ~prcat:true pr_sty_r;
                     pr_gen_r ~prcat:true pr_op_r ;
                     pr_gen_r ~prcat:true pr_th_r ;
                     pr_gen_r ~prcat:true pr_ax_r ;

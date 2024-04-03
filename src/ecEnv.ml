@@ -86,6 +86,7 @@ type mc = {
   mc_modules    : (ipath * (module_expr * locality option)) MMsym.t;
   mc_modsigs    : (ipath * top_module_sig) MMsym.t;
   mc_tydecls    : (ipath * EcDecl.tydecl) MMsym.t;
+  mc_stydecls   : (ipath * EcDecl.stydecl) MMsym.t;
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
@@ -266,6 +267,7 @@ let empty_mc params = {
   mc_modules    = MMsym.empty;
   mc_modsigs    = MMsym.empty;
   mc_tydecls    = MMsym.empty;
+  mc_stydecls   = MMsym.empty;
   mc_operators  = MMsym.empty;
   mc_axioms     = MMsym.empty;
   mc_theories   = MMsym.empty;
@@ -502,6 +504,7 @@ module MC = struct
     | IPPath  p -> p
 
   let _downpath_for_tydecl    = _downpath_for_th
+  let _downpath_for_stydecl   = _downpath_for_th
   let _downpath_for_modsig    = _downpath_for_th
   let _downpath_for_operator  = _downpath_for_th
   let _downpath_for_axiom     = _downpath_for_th
@@ -862,6 +865,25 @@ module MC = struct
     import (_up_tydecl true) (IPPath p) tyd env
 
   (* -------------------------------------------------------------------- *)
+  let lookup_stydecl qnx env =
+    match lookup (fun mc -> mc.mc_stydecls) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_stydecl env p args, obj)
+
+  let lookup_stydecls qnx env =
+    List.map
+      (fun (p, (args, obj)) -> (_downpath_for_stydecl env p args, obj))
+      (lookup_all (fun mc -> mc.mc_stydecls) qnx env)
+
+  let _up_stydecl candup mc x obj =
+    if not candup && MMsym.last x mc.mc_stydecls <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_stydecls = MMsym.add x obj mc.mc_stydecls }
+
+  let import_stydecl p ax env =
+    import (_up_stydecl true) (IPPath p) ax env
+
+  (* -------------------------------------------------------------------- *)
   let lookup_modty qnx env =
     match lookup (fun mc -> mc.mc_modsigs) qnx env with
     | None -> lookup_error (`QSymbol qnx)
@@ -1072,6 +1094,9 @@ module MC = struct
       | Th_type (xtydecl, tydecl) ->
           (add2mc _up_tydecl xtydecl tydecl mc, None)
 
+      | Th_subtype (xstydecl, stydecl) ->
+          (add2mc _up_stydecl xstydecl stydecl mc, None)
+
       | Th_operator (xop, op) ->
           (add2mc _up_operator xop op mc, None)
 
@@ -1178,6 +1203,9 @@ module MC = struct
 
   and bind_tydecl x tyd env =
     bind _up_tydecl x tyd env
+
+  and bind_stydecl x tyd env =
+    bind _up_stydecl x tyd env
 
   and bind_typeclass x tc env =
     bind _up_typeclass x tc env
@@ -2586,6 +2614,39 @@ end
 let ty_hnorm = Ty.ty_hnorm
 
 (* -------------------------------------------------------------------- *)
+module Subtype = struct
+  type t = EcDecl.stydecl
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_stydecls) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_stydecl p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_stydecl qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let bind ?(import = import0) name sty env =
+    let env = if import.im_immediate then MC.bind_stydecl name sty env else env in
+    { env with env_item =
+        mkitem import (Th_subtype (name, sty)) :: env.env_item }
+end
+
+(* -------------------------------------------------------------------- *)
 module Op = struct
   type t = EcDecl.operator
 
@@ -3017,6 +3078,9 @@ module Theory = struct
             if   ty.tyd_resolve
             then MC.import_tydecl (xpath x) ty env
             else env
+
+        | Th_subtype (x, sty) ->
+           MC.import_stydecl (xpath x) sty env
 
         | Th_operator (x, op) ->
             MC.import_operator (xpath x) op env

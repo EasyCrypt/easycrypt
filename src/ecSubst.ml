@@ -887,6 +887,16 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
     tyd_loca    = tyd.tyd_loca; }
 
 (* -------------------------------------------------------------------- *)
+let subst_stydecl (s : subst) (styd : stydecl) =
+  let s, tyargs = fresh_tparams s styd.styd_tyargs in
+
+  { styd_tyargs = tyargs;
+    styd_args = List.map (snd_map <| (subst_ty s)) styd.styd_args;
+    styd_base = snd_map (subst_ty s) styd.styd_base;
+    styd_pred = subst_form s styd.styd_pred;
+  }
+
+(* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
   match kind with
   | OB_oper (Some body) ->
@@ -1039,6 +1049,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   match item with
   | Th_type (x, tydecl) ->
       Th_type (x, subst_tydecl s tydecl)
+
+  | Th_subtype (x, stydecl) ->
+      Th_subtype (x, subst_stydecl s stydecl)
 
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)

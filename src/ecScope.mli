@@ -118,6 +118,8 @@ end
 module Ty : sig
   val add : scope -> ptydecl located -> scope
 
+  val add_sub : scope -> pstydecl located -> scope
+
   val add_class    : scope -> ptypeclass located -> scope
   val add_instance : ?import:EcTheory.import -> scope -> Ax.proofmode -> ptycinstance located -> scope
 end

@@ -1092,22 +1092,42 @@ module Op = struct
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
+    let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
       match op.po_def with
       | PO_abstr pty ->
-          let codom = TT.transty TT.tp_relax eenv ue pty in
-          let xs    = snd (TT.trans_binding eenv ue args) in
-          (EcTypes.toarrow (List.map snd xs) codom, `Abstract, [])
+          let eenv, xs = TT.trans_sbinding eenv ue args in
+          let (codom, opred) = TT.transsty TT.tp_relax eenv ue pty in
+          let opty = EcTypes.toarrow (List.map snd (List.fst xs)) codom in
+          begin match opred with
+          | Some (w, pred) ->
+            let ax = (EcCoreFol.f_imps (List.filter_map (fun x -> x) (List.snd xs)) pred) in
+            let opfm = EcCoreFol.f_op opname [] codom in
+            let reft = EcSubst.subst_form (EcSubst.add_flocal EcSubst.empty w opfm) ax in
+            let ax_name = unloc op.po_name ^ "_spec" in
+            (opty, `Abstract, [(mk_loc loc ax_name, List.fst xs, reft, codom)])
+          | None ->
+            (opty, `Abstract, [])
+          end
 
       | PO_concr (pty, pf) ->
-          let codom   = TT.transty TT.tp_relax eenv ue pty in
-          let env, xs = TT.trans_binding eenv ue args in
-          let body    = TT.trans_form env ue pf codom in
-          let lam     = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) body in
-          (lam.f_ty, `Plain lam, [])
+          let eenv, xs = TT.trans_sbinding eenv ue args in
+          let (codom, opred) = TT.transsty TT.tp_relax eenv ue pty in
+          let body = TT.trans_form eenv ue pf codom in
+          let lam  = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) (List.fst xs)) body in
+          begin match opred with
+          | Some (w, pred) ->
+            let ax = (EcCoreFol.f_imps (List.filter_map (fun x -> x) (List.snd xs)) pred) in
+            let opfm = EcCoreFol.f_op opname [] codom in
+            let reft = EcSubst.subst_form (EcSubst.add_flocal EcSubst.empty w opfm) ax in
+            let ax_name = unloc op.po_name ^ "_spec" in
+            (lam.f_ty, `Plain lam, [(mk_loc loc ax_name, List.fst xs, reft, codom)])
+          | None ->
+            (lam.f_ty, `Plain lam, [])
+          end
 
       | PO_case (pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
@@ -1117,8 +1137,9 @@ module Op = struct
 
       | PO_reft (pty, (rname, reft)) ->
           let env      = env scope in
-          let codom    = TT.transty TT.tp_relax eenv ue pty in
-          let _env, xs = TT.trans_binding eenv ue args in
+          let eenv, xs = TT.trans_sbinding eenv ue args in
+          let (codom, _opred) = TT.transsty TT.tp_relax eenv ue pty in
+          let xs = List.fst xs in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
           let opabs    = EcDecl.mk_op ~opaque:optransparent [] codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
@@ -1160,7 +1181,6 @@ module Op = struct
       | (_, None) -> None in
 
     let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ty body lc in
-    let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in
@@ -1197,17 +1217,15 @@ module Op = struct
     let scope =
       List.fold_left (fun scope (rname, xs, ax, codom) ->
           let ax =
-            let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
+            let opargs  = List.map (fun (x, xty) -> f_local x xty) xs in
             let opapp   = List.map (tvar |- fst) tparams in
-            let opapp   = e_app (e_op opname opapp ty) opargs codom in
+            let opapp   = f_app (f_op opname opapp ty) opargs codom in
 
-            let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
+            let subst   = EcSubst.add_pddef EcSubst.empty opname ([], opapp) in
             let ax      = EcSubst.subst_form subst ax in
             let ax      = f_forall (List.map (snd_map gtty) xs) ax in
 
-            let uidmap  = EcUnify.UniEnv.close ue in
-            let subst   = Tuni.subst uidmap in
-            let ax      = Fsubst.f_subst subst ax in
+            let ax      = fs ax in
 
             ax
           in
@@ -1557,8 +1575,9 @@ module Ty = struct
     let pname = EcPath.pqname (EcEnv.root (env scope)) x.pl_desc in
 
     if    EcEnv.Ty       .by_path_opt pname (env scope) <> None
+       || EcEnv.Subtype  .by_path_opt pname (env scope) <> None
        || EcEnv.TypeClass.by_path_opt pname (env scope) <> None then
-      hierror ~loc:x.pl_loc "duplicated type/type-class name `%s'" x.pl_desc
+      hierror ~loc:x.pl_loc "duplicated type/subtype/type-class name `%s'" x.pl_desc
 
   (* ------------------------------------------------------------------ *)
   let bind ?(import = EcTheory.import0) (scope : scope) ((x, tydecl) : (_ * tydecl)) =
@@ -1605,6 +1624,36 @@ module Ty = struct
     in
 
     bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; tyd_resolve = true; })
+
+  (* ------------------------------------------------------------------ *)
+  let bind_sub ?(import = EcTheory.import0) (scope : scope) (x, sty) =
+    assert (scope.sc_pr_uc = None);
+    let item = EcTheory.mkitem import (EcTheory.Th_subtype(x, sty)) in
+    { scope with sc_env = EcSection.add_item item scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  let add_sub (scope : scope) (styd : pstydecl located) =
+    let loc = loc styd in
+
+    let { pstyd_name = name; pstyd_tyargs = tyargs;
+          pstyd_base = (w, bty); pstyd_pred = pred; pstyd_args = args } = unloc styd in
+
+    check_name_available scope name;
+    let env = env scope in
+    let ue = TT.transtyvars env (loc, Some tyargs) in
+    let env, styd_args = TT.trans_binding env ue args in
+
+    let bty = transty tp_relax env ue bty in
+    let w = EcIdent.create (unloc w) in
+    let env = EcEnv.Var.bind_local w bty env in
+    let styd_pred = TT.trans_prop env ue pred in
+    let styd_tyargs = EcUnify.UniEnv.tparams ue in
+
+    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let styd_pred = Fsubst.f_subst ts styd_pred in
+
+    let sty = { styd_tyargs; styd_args; styd_base = (w, bty); styd_pred } in
+    bind_sub scope (unloc name, sty)
 
   (* ------------------------------------------------------------------ *)
   let bindclass ?(import = EcTheory.import0) (scope : scope) (x, tc) =

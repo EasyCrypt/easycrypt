@@ -192,6 +192,8 @@ val transtys :
 
 val transtvi : env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
 
+val transsty : typolicy -> env -> EcUnify.unienv -> psty -> ty * (EcIdent.t * EcCoreFol.form) option
+
 (* -------------------------------------------------------------------- *)
 val trans_binding : env -> EcUnify.unienv -> ptybindings ->
   env * (EcIdent.t * EcTypes.ty) list
@@ -199,6 +201,8 @@ val trans_binding : env -> EcUnify.unienv -> ptybindings ->
 val trans_gbinding : env -> EcUnify.unienv -> pgtybindings ->
   env * (EcIdent.t * EcFol.gty) list
 
+val trans_sbinding : env -> EcUnify.unienv -> pstybindings ->
+  env * ((EcIdent.t * EcTypes.ty) * EcCoreFol.form option) list
 (* -------------------------------------------------------------------- *)
 val transexp :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty

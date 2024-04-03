@@ -196,6 +196,7 @@
     "abstract"    , ABSTRACT   ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
+    "subtype"     , SUBTYPE    ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)

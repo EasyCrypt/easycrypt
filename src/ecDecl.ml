@@ -68,6 +68,14 @@ let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
+type stydecl = {
+  styd_tyargs : ty_params;
+  styd_args   : (EcIdent.t * EcTypes.ty) list;
+  styd_base   : EcIdent.t * EcTypes.ty;
+  styd_pred   : EcCoreFol.form;
+}
+
+(* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
 
 type operator_kind =

@@ -53,5 +53,5 @@ val trans_matchfix :
   -> EcEnv.env
   -> EcUnify.unienv
   -> psymbol
-  -> ptybindings * pty * pop_branch list
+  -> pstybindings * psty * pop_branch list
   -> EcTypes.ty * matchfix_t

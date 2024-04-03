@@ -397,6 +397,9 @@ end = struct
          let ovrd = (ovrd, mode) in
          ty_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
+      (* TODO: SUBTYPE: allow subtype overriding *)
+      | Th_subtype _ -> (proofs, evc)
+
       | Th_operator (x, ({ op_kind = OB_oper _ })) ->
          let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
          let ovrd = (ovrd, mode) in

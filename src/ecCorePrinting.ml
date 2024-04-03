@@ -65,6 +65,7 @@ module type PrinterAPI = sig
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
+  val pp_subtypedecl : PPEnv.t -> (path * stydecl                 ) pp
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
   val pp_added_op    : PPEnv.t -> operator pp
   val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
@@ -98,6 +99,7 @@ module type PrinterAPI = sig
     type db = [`Rewrite of qsymbol | `Solve of symbol]
 
     val pr_ty  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+    val pr_sty : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
     val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
