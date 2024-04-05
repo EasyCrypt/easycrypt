@@ -10,14 +10,9 @@ module Mid = EcIdent.Mid
 include EcCoreModules
 
 (* -------------------------------------------------------------------- *)
-(* Instantiation of EcCoreModules.PreOI on EcCoreFol.form. *)
-module OI = struct
-  include PreOI
-  let equal = PreOI.equal f_equal
-end
+module OI = PreOI
 
 (* -------------------------------------------------------------------- *)
-
 let mr_empty = {
   mr_xpaths = ur_empty EcPath.Sx.empty;
   mr_mpaths = ur_empty EcPath.Sm.empty;
@@ -47,10 +42,8 @@ let oicalls_filter restr f filter =
 
 let change_oicalls restr f ocalls =
   let oi = match Msym.find f restr.mr_oinfos with
-    | oi ->
-      let filter x = List.mem x ocalls in
-      OI.filter filter oi
-    | exception Not_found -> OI.mk ocalls `Unbounded in
+    | oi -> OI.filter (fun x -> List.mem x ocalls) oi
+    | exception Not_found -> OI.mk ocalls in
   add_oinfo restr f oi
 
 (* -------------------------------------------------------------------- *)

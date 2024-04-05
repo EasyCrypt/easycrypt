@@ -121,10 +121,8 @@ and stmt = private {
   s_tag  : int;
 }
 
-(* -------------------------------------------------------------------- *)
 and oracle_info = {
   oi_calls : xpath list;
-  oi_costs : (form * form Mx.t) option;
 }
 
 and mod_restr = {
@@ -154,11 +152,8 @@ and local_memtype = {
   lmt_n    : int;                (* List.length mt_decl *)
 }
 
-(* [Lmt_schema] if for an axiom schema, and is instantiated to a concrete
-   memory type when the axiom schema is.  *)
 and memtype =
   | Lmt_concrete of local_memtype option
-  | Lmt_schema
 
 and memenv = memory * memtype
 
@@ -195,9 +190,6 @@ and f_node =
   | FhoareF of sHoareF (* $hr / $hr *)
   | FhoareS of sHoareS
 
-  | FcHoareF of cHoareF (* $hr / $hr *)
-  | FcHoareS of cHoareS
-
   | FbdHoareF of bdHoareF (* $hr / $hr *)
   | FbdHoareS of bdHoareS
 
@@ -208,8 +200,6 @@ and f_node =
   | FequivS of equivS
 
   | FeagerF of eagerF
-
-  | Fcoe of coe
 
   | Fpr of pr (* hr *)
 
@@ -263,20 +253,6 @@ and eHoareS = {
   ehs_po  : form;
 }
 
-and cHoareF = {
-  chf_pr : form;
-  chf_f  : EcPath.xpath;
-  chf_po : form;
-  chf_co : cost;
-}
-
-and cHoareS = {
-  chs_m  : memenv;
-  chs_pr : form;
-  chs_s  : stmt;
-  chs_po : form;
-  chs_co : cost; }
-
 and bdHoareF = {
   bhf_pr  : form;
   bhf_f   : EcPath.xpath;
@@ -299,27 +275,6 @@ and pr = {
   pr_fun   : EcPath.xpath;
   pr_args  : form;
   pr_event : form;
-}
-
-and coe = {
-  coe_pre : form;
-  coe_mem : memenv;
-  coe_e   : expr;
-}
-
-(* Invariant: keys of c_calls are functions of local modules,
-   with no arguments. *)
-and cost = {
-  c_self  : form;    (* of type xint *)
-  c_calls : call_bound EcPath.Mx.t;
-}
-
-(* Call with cost at most [cb_cost], called at mist [cb_called].
-   [cb_cost] is here to properly handle substsitution when instantiating an
-   abstract module by a concrete one. *)
-and call_bound = {
-  cb_cost  : form;   (* of type xint *)
-  cb_called : form;  (* of type int  *)
 }
 
 type 'a equality = 'a -> 'a -> bool
@@ -392,9 +347,8 @@ val f_hash  : form hash
 val f_fv    : form fv
 
 (* -------------------------------------------------------------------- *)
-
-val oi_equal : form equality -> oracle_info equality
-val oi_hash : oracle_info hash
+val oi_equal : oracle_info equality
+val oi_hash  : oracle_info hash
 
 (* -------------------------------------------------------------------- *)
 val hcmp_hash : hoarecmp hash
@@ -419,6 +373,8 @@ val mr_fv    : mod_restr fv
 
 val mty_equal : module_type equality
 val mty_hash  : module_type hash
+
+val mr_tostring : mod_restr -> string
 
 (* -------------------------------------------------------------------- *)
 val lmt_equal : ty equality -> local_memtype equality
@@ -454,12 +410,6 @@ val s_hash    : stmt hash
 val s_fv      : stmt fv
 
 (*-------------------------------------------------------------------- *)
-val call_bound_equal : call_bound equality
-val call_bound_hash  : call_bound hash
-
-val cost_equal : cost equality
-val cost_hash  : cost hash
-
 val hf_equal  : sHoareF equality
 val hf_hash   : sHoareF hash
 
@@ -471,12 +421,6 @@ val ehf_hash  : eHoareF hash
 
 val ehs_equal : eHoareS equality
 val ehs_hash  : eHoareS hash
-
-val chf_equal : cHoareF equality
-val chf_hash  : cHoareF hash
-
-val chs_equal : cHoareS equality
-val chs_hash  : cHoareS hash
 
 val bhf_equal : bdHoareF equality
 val bhf_hash  : bdHoareF hash
@@ -492,9 +436,6 @@ val es_hash   : equivS hash
 
 val egf_equal : eagerF equality
 val eg_hash   : eagerF hash
-
-val coe_equal : coe equality
-val coe_hash  : coe hash
 
 val pr_equal  : pr equality
 val pr_hash   : pr hash

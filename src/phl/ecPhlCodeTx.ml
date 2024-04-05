@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcAst
 open EcTypes
 open EcModules
@@ -74,9 +75,7 @@ let t_kill_r side cpos olen tc =
   in
 
   let tr = fun side -> `Kill (side, cpos, olen) in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_zip kill_stmt) tc
+  t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) tc
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
@@ -107,9 +106,7 @@ let alias_stmt env id (pf, _) me i =
 let t_alias_r side cpos id g =
   let env = FApi.tc1_env g in
   let tr = fun side -> `Alias (side, cpos) in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_fold (alias_stmt env id)) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt env id)) g
 
 (* -------------------------------------------------------------------- *)
 let set_stmt (fresh, id) e =
@@ -136,9 +133,7 @@ let set_stmt (fresh, id) e =
 
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+  t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt (pf, hyps) me olen zpr =
@@ -209,9 +204,7 @@ let cfold_stmt (pf, hyps) me olen zpr =
 let t_cfold_r side cpos olen g =
   let tr = fun side -> `Fold (side, cpos, olen) in
   let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_zip cb) g
+  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r
@@ -273,10 +266,6 @@ let process_weakmem (side, id, params) tc =
       let me = bind hs.bhs_m in
       f_bdHoareS_r { hs with bhs_m = me }
 
-    | FcHoareS hs ->
-      let me = bind hs.chs_m in
-      f_cHoareS_r { hs with chs_m = me }
-
     | FequivS es ->
       let do_side side es =
         let es_ml, es_mr = if side = `Left then bind es.es_ml, es.es_mr else es.es_ml, bind es.es_mr in
@@ -289,7 +278,47 @@ let process_weakmem (side, id, params) tc =
       f_equivS_r es
 
     | _ ->
-      tc_error ~loc:id.pl_loc !!tc "the hypothesis need to be a hoare/choare/phoare/ehoare/equiv on statement"
+      tc_error ~loc:id.pl_loc !!tc
+        "the hypothesis need to be a hoare/phoare/ehoare/equiv on statement"
   in
   let concl = f_imp h (FApi.tc1_goal tc) in
   FApi.xmutate1 tc `WeakenMem [concl]
+
+(* -------------------------------------------------------------------- *)
+let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
+  let (env, _, concl) = FApi.tc1_eflat tc in
+
+  let change (i : instr) =
+    if not (is_asgn i) then
+      tc_error !!tc "the code position should target an assignment";
+
+    let lv, e = destr_asgn i in
+
+    let pvl = EcPV.lp_write env lv in
+    let pve = EcPV.e_read env e in
+    let lv  = lv_to_list lv in
+
+    if not (EcPV.PV.indep env pvl pve) then
+      assert false;
+
+    let e =
+      match lv, e.e_node with
+      | [_], _         -> [e]
+      | _  , Etuple es -> es
+      | _  ,_          -> assert false in
+
+    let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
+
+    ([], s)
+  in
+
+  let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
+
+  if not (EcLowPhlGoal.is_program_logic concl kinds) then
+    assert false;
+
+  let s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let goals, s = EcMatching.Zipper.map pos change s in
+  let concl = EcLowPhlGoal.hl_set_stmt side concl s in
+
+  FApi.xmutate1 tc `ProcCase (goals @ [concl])

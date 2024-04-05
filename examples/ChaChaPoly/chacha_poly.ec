@@ -1130,8 +1130,7 @@ section PROOFS.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       + by proc; auto.
       by auto; conseq (_: ={RO.m}) => //; sim.
-    transitivity*{1} { r <@ G3(GenChaChaPoly(OCC(IFinRO))).main(); } => //;1:smt().
-    + by symmetry; call (CCP_OCCP IFinRO G3).
+    rewrite equiv[{1} 1 -(CCP_OCCP IFinRO G3)].
     inline *; sim (_: ={Mem.lc, Mem.log, Mem.k} /\ OCC.gs{1} = RO.m{2}).
     proc; inline *;auto.
   qed.

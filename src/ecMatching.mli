@@ -58,7 +58,7 @@ module Zipper : sig
 
   type ('a, 'state) folder = 'a -> 'state -> instr -> 'state * instr list
 
-  (* [fold cl cpos f state s] create the zipper for [s] at [cpos], and apply
+  (* [fold v cpos f state s] create the zipper for [s] at [cpos], and apply
    * [f] to it, along with [v] and the state [state]. [f] must return the
    * new [state] and a new [zipper]. These last are directly returned.
    *
@@ -66,6 +66,12 @@ module Zipper : sig
    * raised by [f].
    *)
   val fold : 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
+
+  (* [map cpos f s] is a special case of [fold] where the state and the
+   * out-of-band data are absent
+   *)
+  val map : codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
+
 end
 
 (* -------------------------------------------------------------------- *)

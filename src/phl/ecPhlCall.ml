@@ -157,43 +157,6 @@ let t_ehoare_call_concave f fpre fpost tc =
   FApi.t_sub [t_call; t_id] tcenv
 
 (* -------------------------------------------------------------------- *)
-let t_choare_call fpre fpost fcost tc =
-  let env = FApi.tc1_env tc in
-  let chs = tc1_as_choareS tc in
-  let (lp,f,args),s = tc1_last_call tc chs.chs_s in
-  let m = EcMemory.memory chs.chs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
-  (* The function satisfies the specification *)
-  let f_concl = f_cHoareF fpre f fpost fcost in
-  (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres chs.chs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
-
-  (* The cost of the remaining code must be bounded by the cost of the
-     conclusion [chs.chs_co], minus the cost of the call [fcost], and minus
-     the cost of the arguments' evaluation.
-     Remark: the cost of the evaluation of the return is accounted for in
-     [fcost]. *)
-  let args_cost = List.fold_left (fun cost e ->
-      f_xadd cost (EcCHoare.cost_of_expr_any chs.chs_m e)
-    ) f_x0 args in
-  let cond1, cost = EcCHoare.cost_sub env chs.chs_co fcost in
-  let cond2, cost = EcCHoare.cost_sub_self cost args_cost in
-  let concl = f_cHoareS_r { chs with chs_s = s;
-                                     chs_po = post;
-                                     chs_co = cost } in
-
-  FApi.xmutate1 tc `HlCall [f_concl; cond1; cond2; concl]
-
-(* -------------------------------------------------------------------- *)
 let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
   let msg =
     "optional bound parameter not allowed for upper-bounded judgements" in
@@ -353,12 +316,6 @@ let t_call side ax tc =
         call_error env tc hf.ehf_f f;
       t_ehoare_call hf.ehf_pr hf.ehf_po tc
 
-  | FcHoareF chf, FcHoareS chs ->
-      let (_, f, _), _ = tc1_last_call tc chs.chs_s in
-      if not (EcEnv.NormMp.x_equal env chf.chf_f f) then
-        call_error env tc chf.chf_f f;
-      t_choare_call chf.chf_pr chf.chf_po chf.chf_co tc
-
   | FbdHoareF hf, FbdHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
       if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
@@ -428,53 +385,36 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
         f_equivF pre fl fr post
 
 let process_call side info tc =
-  let process_spec tc side cost =
+  let process_spec tc side =
     let (hyps, concl) = FApi.tc1_flat tc in
-      match concl.f_node, side, cost with
-      | FhoareS hs, None, None ->
+      match concl.f_node, side with
+      | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, tbool, fun pre post -> f_hoareF pre f post)
 
-      | FcHoareS chs, None, Some cost ->
-          let (_,f,_),_ = tc1_last_call tc chs.chs_s in
-          let penv, qenv = LDecl.hoareF f hyps in
-
-          let cost  = TTC.tc1_process_cost tc [] cost in
-
-          (penv, qenv, tbool, fun pre post -> f_cHoareF pre f post cost)
-
-      | FbdHoareS bhs, None, None ->
+      | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, tbool, fun pre post ->
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
 
-      | FeHoareS hs, None, None ->
+      | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
 
-      | FbdHoareS _, Some _, _
-      | FhoareS  _, Some _, _
-      | FcHoareS  _, Some _, _ ->
+      | FbdHoareS _, Some _
+      | FhoareS  _, Some _ ->
           tc_error !!tc "side can only be given for prhl judgements"
 
-      | FbdHoareS _, _, Some _
-      | FhoareS  _, _, Some _
-      | FequivS   _, _, Some _->
-          tc_error !!tc "cost can only be given for choare judgements"
-
-      | FcHoareS _, None, None ->
-            tc_error !!tc "a cost must be given for choare judgements"
-
-      | FequivS es, None, None ->
+      | FequivS es, None ->
           let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
           let penv, qenv = LDecl.equivF fl fr hyps in
           (penv, qenv, tbool, fun pre post -> f_equivF pre fl fr post)
 
-      | FequivS es, Some side, None ->
+      | FequivS es, Some side ->
           let fstmt = sideif side es.es_sl es.es_sr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF f hyps in
@@ -486,69 +426,29 @@ let process_call side info tc =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
-    let check_none inv_info =
-      if not (is_none inv_info) then
-        tc_error !!tc "can supply additional information for call with an \
-                       invariant only if the conclusion is a choare" in
-
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv inv_info ->
-            check_none inv_info;
-            f_hoareF inv f inv)
+        (penv, tbool, fun inv -> f_hoareF inv f inv)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, fun inv inv_info ->
-            check_none inv_info;
-            f_eHoareF inv f inv)
-
-    | FcHoareS chs ->
-      let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
-      let penv = LDecl.inv_memenv1 hyps in
-      (penv, tbool, fun inv inv_info ->
-          let inv_info = odfl (`CostAbs []) inv_info in
-          match inv_info with
-          | `Std c ->
-            let env = FApi.tc1_env tc in
-            if NormMp.is_abstract_fun f env then
-              tc_error !!tc "the procedure %a is abstract: costs information \
-                             must be supplied for its oracles (and optionally, \
-                             variants)."
-                (EcPrinting.pp_funname (EcPrinting.PPEnv.ofenv env)) f;
-
-            f_cHoareF inv f inv c
-
-          | `CostAbs inv_inf ->
-            let env = FApi.tc1_env tc in
-            if not @@ NormMp.is_abstract_fun f env then
-              tc_error !!tc "the procedure %a is not abstract: only a cost must \
-                             be supplied."
-                (EcPrinting.pp_funname (EcPrinting.PPEnv.ofenv env)) f;
-
-            let pre, post, cost, _ =
-              EcPhlFun.FunAbsLow.choareF_abs_spec !!tc env f inv inv_inf in
-            f_cHoareF pre f post cost)
+        (penv, txreal, fun inv -> f_eHoareF inv f inv)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      (penv, tbool, fun inv inv_info ->
-          check_none inv_info;
-         bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
+      (penv, tbool, fun inv -> bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
 
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, tbool, fun inv inv_info ->
-          check_none inv_info;
-          mk_inv_spec !!tc env inv fl fr)
+      (penv, tbool, fun inv -> mk_inv_spec !!tc env inv fl fr)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
@@ -579,33 +479,20 @@ let process_call side info tc =
 
   let subtactic = ref t_id in
 
-  let process_inv_inf tc hyps ty inv inv_inf =
-    match inv_inf with
-    | None ->
-      let inv = TTC.pf_process_form !!tc hyps ty inv in
-      inv, None
-    | Some (`Std c) ->
-      let inv = TTC.pf_process_form !!tc hyps tbool inv in
-      inv, Some (`Std (TTC.pf_process_cost !!tc hyps [] c))
-    | Some (`CostAbs aii) ->
-      let inv, abs_inv_inf =
-        EcPhlFun.process_inv_pabs_inv_finfo tc inv aii in
-      inv, Some (`CostAbs abs_inv_inf) in
-
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post, ocost) ->
-      let penv,qenv,ty,fmake = process_spec tc side ocost in
+    | CI_spec (pre, post) ->
+      let penv,qenv,ty,fmake = process_spec tc side in
       let pre  = TTC.pf_process_form !!tc penv ty pre  in
       let post = TTC.pf_process_form !!tc qenv ty post in
       fmake pre post
 
-    | CI_inv (inv, inv_inf) ->
-      let env, ty, fmake = process_inv tc side in
-      let inv, inv_inf = process_inv_inf tc env ty inv inv_inf in
+    | CI_inv inv ->
+      let hyps, ty, fmake = process_inv tc side in
+      let inv = TTC.pf_process_form !!tc hyps ty inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv inv_inf tc));
-      fmake inv inv_inf
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+      fmake inv
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in
@@ -631,23 +518,16 @@ let process_call side info tc =
       tc_error !!tc "cannot infer all placeholders";
     PT.concretize pt in
 
-  let ts =
-    match (FApi.tc1_goal tc).f_node with
-    | FcHoareS _ ->
-      [ (fun x -> t_trivial x); t_trivial; t_id]
-    | _ -> [t_id]
-  in
-
   FApi.t_seqsub
     (t_call side ax)
-    ( FApi.t_seqs
-        [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-         !subtactic; t_trivial] :: ts)
+    [FApi.t_seqs
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+        !subtactic; t_trivial];
+     t_id]
     tc
 
-
+(* -------------------------------------------------------------------- *)
 let process_call_concave (fc, info) tc =
-
   let fc =
     let (hyps, concl) = FApi.tc1_flat tc in
     match concl.f_node  with
@@ -681,17 +561,17 @@ let process_call_concave (fc, info) tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post, None) ->
+    | CI_spec (pre, post) ->
       let penv,qenv,ty,fmake = process_spec tc in
       let pre  = TTC.pf_process_form !!tc penv ty pre  in
       let post = TTC.pf_process_form !!tc qenv ty post in
       fmake pre post
 
-    | CI_inv (inv, None) ->
+    | CI_inv inv ->
       let env, ty, fmake = process_inv tc in
       let inv = TTC.pf_process_form !!tc env ty inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv None tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
       fmake inv
 
     | _ ->

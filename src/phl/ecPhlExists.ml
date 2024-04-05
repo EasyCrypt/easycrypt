@@ -110,8 +110,6 @@ let process_exists_intro ~(elim : bool) fs tc =
     match concl.f_node with
     | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
     | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FcHoareF hf -> fst (LDecl.hoareF hf.chf_f hyps)
-    | FcHoareS hs -> LDecl.push_active hs.chs_m hyps
     | FeHoareF hf -> fst (LDecl.hoareF hf.ehf_f hyps)
     | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
     | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)

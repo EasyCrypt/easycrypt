@@ -71,6 +71,14 @@ module Sp = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Mop = Map.Make(struct
+  type t = path option
+
+  let compare (p1 : path option) (p2 : path option) =
+    ocompare p_compare p1 p2
+end)
+
+(* -------------------------------------------------------------------- *)
 let mk_path node =
   Hspath.hashcons { p_node = node; p_tag = -1; }
 

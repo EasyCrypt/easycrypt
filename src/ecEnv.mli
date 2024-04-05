@@ -5,6 +5,7 @@ open EcTypes
 open EcMemory
 open EcDecl
 open EcCoreFol
+open EcCoreSubst
 open EcModules
 open EcTheory
 
@@ -168,31 +169,6 @@ module Ax : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Schema : sig
-  type t = ax_schema
-
-  val by_path     : path -> env -> t
-  val by_path_opt : path -> env -> t option
-  val lookup      : qsymbol -> env -> path * t
-  val lookup_opt  : qsymbol -> env -> (path * t) option
-  val lookup_path : qsymbol -> env -> path
-
-  val add  : path -> env -> env
-  val bind : ?import:EcTheory.import -> symbol -> ax_schema -> env -> env
-
-  val iter : ?name:qsymbol -> (path -> ax_schema -> unit) -> env -> unit
-
-  val all :
-    ?check:(path -> ax_schema -> bool) -> ?name:qsymbol -> env -> (path * t) list
-
-  val instanciate :
-    path ->
-    EcTypes.ty list -> EcMemory.memtype ->
-    mem_pr list -> EcTypes.expr list ->
-    env -> form
-end
-
-(* -------------------------------------------------------------------- *)
 module Mod : sig
   type t   = top_module_expr
   type lkt = module_expr * locality option
@@ -341,7 +317,7 @@ module Op : sig
 
   type notation = ty_params * EcDecl.notation
 
-  val get_notations : env -> (path * notation) list
+  val get_notations : head:path option -> env -> (path * notation) list
 
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
@@ -420,11 +396,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
   type rule   = EcTheory.rule
-  type topsym = [
-    | `Path of path
-    | `Tuple
-    | `Cost of [`Path of path | `Tuple]
-  ]
+  type topsym = [ `Path of path | `Tuple ]
 
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env

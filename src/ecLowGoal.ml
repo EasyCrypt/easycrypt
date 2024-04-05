@@ -135,10 +135,6 @@ module LowApply = struct
         let env = LDecl.toenv (hyps_of_ckenv tc) in
         (pt, EcEnv.Ax.instanciate p tys env)
 
-    | PTSchema (p, tys, mt, mps, es) ->
-      let env = LDecl.toenv (hyps_of_ckenv tc) in
-      (pt, EcEnv.Schema.instanciate p tys mt mps es env)
-
   (* ------------------------------------------------------------------ *)
   and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
@@ -154,7 +150,7 @@ module LowApply = struct
 
     and check_arg (sbt, ax) arg =
       let check_binder (x, xty) f =
-        let xty = Fsubst.subst_gty sbt xty in
+        let xty = Fsubst.gty_subst sbt xty in
 
         match xty, arg with
         | GTty xty, PAFormula arg ->
@@ -168,14 +164,7 @@ module LowApply = struct
         | GTmodty emt, PAModule (mp, mt) -> begin
           (* FIXME: poor API ==> poor error recovery *)
           try
-            let obl = EcTyping.check_modtype env mp mt emt in
-
-            let f = match obl with
-              | `Ok ->  f
-              | `ProofObligation obl ->
-                if mode = `Elim then f_imps obl f
-                else f_and (f_ands obl) f
-            in
+            EcTyping.check_modtype env mp mt emt;
             (EcFol.f_bind_mod sbt x mp env, f)
           with _ -> raise InvalidProofTerm
         end
@@ -457,7 +446,7 @@ end
 (* -------------------------------------------------------------------- *)
 let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
   let add_local hyps id sbt x gty =
-    let gty = Fsubst.subst_gty sbt gty in
+    let gty = Fsubst.gty_subst sbt gty in
     let id  = tg_map (function
       | Some id -> id
       | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)) id
@@ -502,7 +491,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         let id = tg_map (function
           | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)
           | Some id -> id) id in
-        let xty  = ty_subst sbt.fs_ty xty in
+        let xty  = ty_subst sbt xty in
         let xe   = Fsubst.f_subst sbt xe in
         let sbt  = Fsubst.f_bind_rename sbt x (tg_val id) xty in
         let hyps = add_ld id (LD_var (xty, Some xe)) hyps in
@@ -627,7 +616,7 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
       (EcPrinting.pp_form ppe) ax
       (EcPrinting.pp_form ppe) concl;
     *)
-    raise InvalidGoalShape;
+    raise InvalidGoalShape
   end;
 
   FApi.close tc (VApply pt)
@@ -1864,7 +1853,7 @@ let t_subst_x ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc
         else `Pre  (id, lk)
 
     | LD_mem    _ -> `Pre (id, lk)
-    | LD_modty  _ -> `Pre (id, lk) (* TODO: subst cost *)
+    | LD_modty  _ -> `Pre (id, lk)
     | LD_abs_st _ -> `Pre (id, lk)
   in
 

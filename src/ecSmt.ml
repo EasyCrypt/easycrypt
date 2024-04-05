@@ -695,10 +695,8 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fpr pr        -> trans_pr env pr
 
-  | Fcoe _
   | FeagerF _
   | FhoareF  _  | FhoareS   _
-  | FcHoareF  _ | FcHoareS   _
   | FeHoareF   _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
@@ -1029,7 +1027,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun (tv,_) -> not (Mid.mem tv (Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun (tv,_) -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
   let textra =
     List.map (fun (tv,_) -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in
@@ -1399,12 +1397,10 @@ module Frequency = struct
       | Fproj    (e, _)       -> doit e
 
       | FhoareF _   | FhoareS _
-      | FcHoareF _  | FcHoareS _
       | FeHoareF _ | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF _   | FequivS _
-      | FeagerF _
-      | Fcoe _ -> ()
+      | FeagerF _ -> ()
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;

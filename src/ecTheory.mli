@@ -24,7 +24,6 @@ and theory_item_r =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
-  | Th_schema    of (symbol * ax_schema)
   | Th_modtype   of (symbol * top_module_sig)
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
@@ -56,10 +55,8 @@ and tcinstance = [
 
 and thmode = [ `Abstract | `Concrete ]
 
-(* For cost judgement, we have higher-order pattern. *)
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
-  | Cost of EcMemory.memenv * rule_pattern * rule_pattern (* memenv, pre, expr *)
   | Int  of EcBigInt.zint
   | Var  of EcIdent.t
 
@@ -69,8 +66,6 @@ and top_rule_pattern =
 and rule = {
   rl_tyd   : EcDecl.ty_params;
   rl_vars  : (EcIdent.t * EcTypes.ty) list;
-  rl_evars : (EcIdent.t * EcTypes.ty) list; (* For schemata *)
-  rl_pvars : EcIdent.t list;                (* For schemata *)
   rl_cond  : EcCoreFol.form list;
   rl_ptn   : rule_pattern;
   rl_tg    : EcCoreFol.form;
@@ -80,7 +75,6 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
-  ur_mode   : [`Ax | `Sc];
 }
 val mkitem : import -> theory_item_r -> theory_item
 

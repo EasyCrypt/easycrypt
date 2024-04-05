@@ -183,17 +183,29 @@ following [these instructions](https://nixos.org/manual/nix/stable/#chap-install
 Then, at the root of the EasyCrypt source tree, type:
 
     ```
-    $> nix-shell
+    $> make nix-build
     ```
-    
-These should install all the required dependencies. From there, simply
-run:
+
+Once completed, you will find the EasyCrypt binary in `result/bin`.
+
+You can also run
 
     ```
-    $> make
+    $> make nix-build-with-provers
     ```
-    
-to compile EasyCrypt.
+
+to install EasyCrypt along with a set of provers.
+
+
+For getting a development environment, you can run:
+
+    ```
+    $> make nix-develop
+    ```
+
+These will install all the required dependencies, a set of provers and
+will then drop you into a shell. From there, simply run `make` to
+compile EasyCrypt.
 
 Note on Prover Versions
 --------------------------------------------------------------------

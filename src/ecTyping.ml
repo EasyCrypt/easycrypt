@@ -39,10 +39,6 @@ type mismatch_funsig =
 | MF_targs     of ty * ty                               (* expected, got *)
 | MF_tres      of ty * ty                               (* expected, got *)
 | MF_restr     of EcEnv.env * Sx.t mismatch_sets
-| MF_compl     of EcEnv.env *
-                  ((form * form) option
-                   * (form * form) Mx.t) suboreq
-| MF_unbounded
 
 type restr_failure = Sx.t * Sm.t
 
@@ -171,8 +167,6 @@ type tyerror =
 | NoWP
 | FilterMatchFailure
 | MissingMemType
-| SchemaVariableReBinded of EcIdent.t
-| SchemaMemBinderBelowCost
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
@@ -469,7 +463,7 @@ let tysig_item_name = function
   | Tys_function f -> f.fs_name
 
 (* Check that the oracle information of two procedures are compatible. *)
-let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
+let check_item_compatible env mode (fin,oin) (fout,oout) =
   assert (fin.fs_name = fout.fs_name);
 
   let check_item_err err =
@@ -493,77 +487,16 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
 
   let icalls = norm_allowed oin in
   let ocalls = norm_allowed oout in
-  let () = match mode with
-    | `Sub ->
-      if not (Sx.subset icalls ocalls) then
-        let sx = Sx.diff icalls ocalls in
-        check_item_err (MF_restr(env, `Sub sx))
-    | `Eq  ->
-      if not (Sx.equal icalls ocalls) then
-        check_item_err (MF_restr(env, `Eq(ocalls, icalls))) in
 
-  let norm_costs = function
-    | `Unbounded -> `Unbounded
-    | `Bounded (self,calls) ->
-      let calls = Mx.map (EcEnv.NormMp.norm_form env) calls in
-      let self  = EcEnv.NormMp.norm_form env self in
-      `Bounded (self,calls) in
+  match mode with
+  | `Sub ->
+    if not (Sx.subset icalls ocalls) then
+      let sx = Sx.diff icalls ocalls in
+      check_item_err (MF_restr(env, `Sub sx))
 
-  (* We check complexity compatibility. *)
-  let icosts, ocosts = norm_costs (OI.costs oin),
-                       norm_costs (OI.costs oout) in
-
-  if proof_obl then ()
-  else match mode with
-   | `Sub ->
-     begin match icosts, ocosts with
-     | `Unbounded, `Unbounded | `Bounded _, `Unbounded -> ()
-     | `Unbounded, `Bounded _ ->
-
-       check_item_err MF_unbounded
-
-     | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
-
-       (* We check costs for other procedures. *)
-       let diff = Mx.fold2_union (fun f ic oc acc ->
-         let ic = odfl f_i0 ic in
-         let oc = odfl f_i0 oc in
-         if EcReduction.is_conv (EcEnv.LDecl.init env []) ic oc then acc
-         else Mx.add f (ic, oc) acc
-       ) icalls ocalls Mx.empty in
-
-       let self_sub =
-         if  EcReduction.is_conv (EcEnv.LDecl.init env []) iself oself then None
-         else Some (iself, oself) in
-
-       if not (Mx.is_empty diff) || self_sub <> None then
-         check_item_err (MF_compl(env, `Sub(self_sub, diff))) end
-
-   | `Eq  ->
-     begin match icosts, ocosts with
-     | `Unbounded, `Unbounded -> ()
-
-     | `Bounded _, `Unbounded
-       | `Unbounded, `Bounded _ ->
-       check_item_err MF_unbounded
-
-     | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
-
-       (* We check costs for other procedures. *)
-       let diff = Mx.fold2_union (fun f ic oc acc ->
-         let ic = odfl f_i0 ic in
-         let oc = odfl f_i0 oc in
-         if  EcReduction.is_conv (EcEnv.LDecl.init env []) ic oc then acc
-         else Mx.add f (ic, oc) acc
-       ) icalls ocalls Mx.empty in
-
-       let self_sub =
-         if  EcReduction.is_conv (EcEnv.LDecl.init env []) iself oself then None
-         else Some (iself, oself) in
-
-       if not (Mx.is_empty diff) || self_sub <> None then
-         check_item_err (MF_compl(env, `Eq(self_sub, diff))) end
-
+  | `Eq  ->
+    if not (Sx.equal icalls ocalls) then
+      check_item_err (MF_restr(env, `Eq(ocalls, icalls)))
 
 (* -------------------------------------------------------------------- *)
 exception RestrErr of mismatch_restr
@@ -809,7 +742,7 @@ let check_mem_restr_fun env xp restr =
 
 (* -------------------------------------------------------------------- *)
 let rec check_sig_cnv
-    ~proof_obl mode env sym_in (sin:module_sig) (sout:module_sig) =
+    mode env sym_in (sin:module_sig) (sout:module_sig) =
   (* Check parameters for compatibility. Parameters names may be
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
@@ -858,7 +791,7 @@ let rec check_sig_cnv
       let oin = EcSymbols.Msym.find fin.fs_name sin.mis_restr.mr_oinfos in
       let oout =
         EcSymbols.Msym.find fout.fs_name rout.mr_oinfos in
-      check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout)
+      check_item_compatible env mode (fin,oin) (fout,oout)
   in
   List.iter check_for_item bout;
 
@@ -883,121 +816,11 @@ and check_modtype_cnv
   let sin = EcEnv.ModTy.sig_of_mt env tyin in
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv
-    ~proof_obl:false mode env (EcPath.basename tyin.mt_name) sin sout
+    mode env (EcPath.basename tyin.mt_name) sin sout
 
-let check_sig_mt_cnv ?(proof_obl=false) env sym_in sin tyout =
+let check_sig_mt_cnv env sym_in sin tyout =
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv ~proof_obl `Sub env sym_in sin sout
-
-(* -------------------------------------------------------------------- *)
-(* Sub-typing proof obligation for oracle complexity restrictions,
-   where [mp_in] must verify [mt].
-   Precondition: [mp_in] and [mt] types must be compatible. *)
-let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form list =
-  let mt_sig = EcEnv.ModTy.sig_of_mt env mt in
-
-  (* All procedures for which a proof obligation must be checked. *)
-  let mt_procs =
-    List.map (fun (Tys_function fs) -> fs.fs_name) mt_sig.mis_body in
-
-  (* Environement where [mt]'s parameters are binded. *)
-  let env_mt = List.fold_left (fun env (id, mt_param) ->
-      EcEnv.Mod.bind_local id mt_param env
-    ) env mt.mt_params in
-
-  let ints, s_params = List.map_fold (fun ints (id, param_mt) ->
-      let param_restr = param_mt.mt_restr in
-      let param_ms = EcEnv.ModTy.sig_of_mt env_mt param_mt in
-
-      let mk_ident () =
-        let name = "k" ^ String.sub (EcPath.basename param_mt.mt_name) 0 1 in
-        EcIdent.create name in
-
-      (* If [mt] has parameters with no self complexity, quantify over the
-         parameters' complexity. *)
-      let param_restr', ints =
-        List.fold_left (fun (param_restr', ints) (Tys_function fn) ->
-            let oi = Msym.find fn.fs_name param_restr.mr_oinfos in
-            match OI.cost_self oi with
-            | `Bounded _ -> (param_restr', ints)
-            | `Unbounded ->
-              let k_id = mk_ident () in
-              let k = f_N (f_local k_id tint) in
-              let oi' = OI.mk (OI.allowed oi) (`Bounded (k,Mx.empty)) in
-              let param_restr' = add_oinfo param_restr' fn.fs_name oi' in
-              (param_restr', k_id :: ints)
-          ) (param_restr,ints) param_ms.mis_body in
-
-      let param_mt = { param_mt with mt_restr = param_restr' } in
-
-      ints, (id, (EcIdent.fresh id, param_mt))
-    ) [] mt.mt_params in
-
-  (* Bindings for the proof obligation formula. *)
-  let mbindings =
-    List.map (fun (_, (fid, param_mt)) ->
-      fid, GTmodty param_mt
-    ) s_params in
-  let ibindings =
-    List.map (fun k ->
-      k, GTty tint
-      ) ints in
-
-  (* Application of [mp_in] to fresh module idents. *)
-  let mp_in_app =
-    EcPath.m_apply mp_in (List.map (fun (id,_) -> EcPath.mident id) mbindings) in
-
-  (* Compute the choare hypothesis for [mp_in_app]'s procedure [fn]. *)
-  let mk_hyp fn =
-    (* xpath of the function after substitution. *)
-    let xfn = EcPath.xpath mp_in_app fn in
-    (* oracle path (i.e. with empty module arguments) of [fn] in [mp_in]. *)
-    let xfn_in_mi = EcPath.xpath mp_in fn in
-
-    (* Oracle restriction on [fn] in [mt]. *)
-    let oi = EcSymbols.Msym.find fn mt.mt_restr.mr_oinfos in
-
-    match OI.costs oi with
-    | `Unbounded -> (xfn_in_mi, f_true)
-    | `Bounded (c_self,costs) ->
-
-      let c_calls = Mx.fold (fun o obd c_calls ->
-          (* We compute the name of the procedure, seen as an oracle of
-             [mp_in_app]. That is, if [o] is a parameter of [mp_in], then
-             we use the fresh mident. *)
-          let omod, ofun = EcPath.mget_ident o.x_top, o.x_sub in
-          let omod, orestr = match List.assoc_opt omod s_params with
-            | None ->
-              let orestr = EcEnv.NormMp.get_restr env (EcPath.mident omod) in
-              omod, orestr
-            | Some (m,mt) -> m, mt.mt_restr in
-          let o = EcPath.xpath (EcPath.mident omod) ofun in
-
-          let oself = match OI.cost_self (Msym.find ofun orestr.mr_oinfos) with
-            | `Bounded self -> self
-            | `Unbounded ->
-              let err = `FunCanCallUnboundedOracle (fn, o) in
-              tymod_cnv_failure (E_TyModCnv_MismatchRestr (sym,err)) in
-          let cb = call_bound_r oself obd in
-
-          Mx.add o cb c_calls
-        ) costs Mx.empty in
-
-      let cost = cost_r c_self c_calls in
-      let choare = f_cHoareF f_true xfn f_true cost in
-      (xfn_in_mi, choare) in
-
-  let hyps_assoc = List.map mk_hyp mt_procs in
-
-  let hyps = List.map snd hyps_assoc in
-
-  let bindings = ibindings @ mbindings in
-  let doit hyp =
-    let pos (id,_) = f_int_le f_i0 (f_local id tint) in
-    f_forall bindings
-      (f_imps (List.map pos ibindings) hyp) in
-
-  List.map doit hyps
+  check_sig_cnv `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
 let check_modtype env mp mt i =
@@ -1009,11 +832,7 @@ let check_modtype env mp mt i =
     | `Local id -> id.EcIdent.id_symb
     | `Concrete (p,_) -> EcPath.basename p in
 
-  try check_sig_mt_cnv ~proof_obl:false env sym mt i; `Ok with
-  | TymodCnvFailure _ when EcModules.has_compl_restriction i.mt_restr ->
-    check_sig_mt_cnv ~proof_obl:true env sym mt i;
-    let obl = restr_proof_obligation env mp sym i in
-    `ProofObligation obl
+  check_sig_mt_cnv env sym mt i
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
@@ -1604,9 +1423,8 @@ let expr_of_opselect
              let xs = List.map (fst_map EcIdent.fresh) xs in
              ((args @ List.map (curry e_local) xs, []), xs) in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
-         let subst = { EcTypes.e_subst_id with es_freshen = true; } in
-         let subst = { subst with es_loc = Mid.of_list lcmap; } in
-         let body  = EcTypes.e_subst subst body in
+         let subst = f_subst_init ~freshen:true ~esloc:(Mid.of_list lcmap) () in
+         let body  = e_subst subst body in
          (e_lam elam body, args)
 
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
@@ -1908,15 +1726,7 @@ let trans_oracle (env : EcEnv.env) (m,f) =
   if not fmem then
     tyerror (loc f) env (UnknownFunName ([unloc m],unloc f));
 
-  let restr = EcEnv.NormMp.get_restr env mpath in
-  let oi = Msym.find (unloc f) restr.mr_oinfos in
-  let self = match OI.cost_self oi with
-    | `Unbounded ->
-      let loc = EcLocation.merge (loc m) (loc f) in
-      tyerror loc env (ProcedureUnbounded (unloc m, unloc f))
-    | `Bounded self -> self in
-
-  EcPath.xpath mpath (unloc f), self
+  EcPath.xpath mpath (unloc f)
 
 (* -------------------------------------------------------------------- *)
 let trans_topmsymbol env gp =
@@ -2072,13 +1882,9 @@ let top_is_mem_binding pf = match pf with
   | PFeagerF   _
   | PFprob     _
   | PFBDhoareF _
-  | PFChoareF  _
-  | PFehoareF  _
-  | PFCoe      _ -> true
+  | PFehoareF  _ -> true
 
   | PFhole -> true
-
-  | PFChoareFT _ -> false
 
   | PFmatch   _
   | PFcast    _
@@ -2223,45 +2029,7 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
         pfd_uses
 
 (* -------------------------------------------------------------------- *)
-(* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
-(* If [r_compl] is None, there are no restrictions *)
-let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
-  let trans_closed_form form ty =
-    let ue = EcUnify.UniEnv.create None in
-    let tform = trans_form env ue form ty in
-    let subs = try EcUnify.UniEnv.close ue with
-      | EcUnify.UninstanciateUni ->
-        tyerror (loc form) env FreeTypeVariables in
-    let sty = { ty_subst_id with ts_u = subs } in
-    let fs = EcFol.Fsubst.f_subst_init ~sty:sty () in
-    EcFol.Fsubst.f_subst fs tform in
-
-  match r_compl with
-  | None -> `Unbounded
-  | Some (PCompl (self, restr_elems)) ->
-    let calls =
-      List.map (fun (name, form) ->
-          let s_env = if name.inp_in_params then env_in else env in
-          let qname = name.inp_qident in
-
-          let f = fst (lookup_fun s_env qname)
-                  |> NormMp.norm_xfun env in
-          let p = f.EcPath.x_top in
-          if not (Sm.mem p params) then
-            tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
-
-          let tform = trans_closed_form form EcTypes.tint in
-
-          (f, tform)
-        ) restr_elems in
-    let m_calls = Mx.of_list calls in
-    (* Sanity check *)
-    assert (List.length calls = Mx.cardinal m_calls);
-
-    let self = trans_closed_form self EcTypes.txint in
-    `Bounded (self,m_calls)
-
-(* Oracles and complexity restrictions for a function.
+(* Oracles restrictions for a function.
  * - [params] must be the set of parameters on the module being typed.
  * - [env] is the environment the restriction is being typed on.
  * - [env_in] is [env] where the module parameters [params] are binded.
@@ -2271,31 +2039,19 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
  * 'forall (A <: T) (B <: S {some restriction)), ...'
  * Here, the parameter of the functor [S] are not binded in [env], but must be
  * binded in [env_in]. *)
-and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
+let rec trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
-  let c_compl = trans_restr_compl env env_in params r_el.pmre_compl in
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
-
-  let get_calls = function
-    | `Bounded (_,calls) -> Mx.bindings calls
-    | `Unbounded -> [] in
-
-  (* We add to [r_orcls] elements of [c_calls], if necessary. *)
-  let r_orcls = r_orcls @
-                (get_calls c_compl
-                  |> List.filter_map (fun (f,_) ->
-                     if List.mem f r_orcls then None else Some f)) in
-
-  ( name, c_compl, r_orcls )
+  (name, r_orcls)
 
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 and transmod_restr env env_in (params : Sm.t) (mr : pmod_restr) =
   let r_mem = trans_restr_mem env mr.pmr_mem in
 
   let r_procs = List.fold_left (fun r_procs r_elem ->
-      let name, c_compl, r_orcls =
+      let name, r_orcls =
         trans_restr_fun env env_in params r_elem in
-      Msym.add name (OI.mk r_orcls c_compl) r_procs
+      Msym.add name (OI.mk r_orcls) r_procs
     ) Msym.empty mr.pmr_procs in
 
   { mr_xpaths = fst r_mem;
@@ -2390,11 +2146,11 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      let rname, compl, calls = trans_restr_fun env env sa f.pfd_uses in
+      let rname, calls = trans_restr_fun env env sa f.pfd_uses in
 
       assert (rname = name.pl_desc);
 
-      let oi = OI.mk calls compl in
+      let oi = OI.mk calls in
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = ttuple (List.map ov_type tyargs);
@@ -2641,7 +2397,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       if not (UE.closed ue) then
         tyerror st.pl_loc env (OnlyMonoTypeAllowed None);
 
-      let clsubst = { EcTypes.e_subst_id with es_ty = ts } in
+      let clsubst = ts in
       let stmt    = s_subst clsubst stmt
       and result  = result |> omap (e_subst clsubst) in
       let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
@@ -2831,7 +2587,7 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
     | `Tuple  -> [LvTuple pl]
   in
 
-  let clsubst = { EcTypes.e_subst_id with es_ty = subst_uni } in
+  let clsubst = subst_uni in
   let init    = e_subst clsubst init in
 
     List.map (fun lv -> i_asgn (lv, init)) pl
@@ -3063,23 +2819,11 @@ and trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-and trans_form_or_pattern
-    env ?mv ?ps
-    ~(schema_mpreds:EcIdent.t list option)
-    ~(schema_mt:sc_params option)
-    ue pf tt =
+and trans_form_or_pattern env ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
-  let rec transf_r opsc incost env f =
-    let transf = transf_r opsc incost in
-
-    (* If we are below a cost statement, are typing a memory binder, and
-       have memory predicates, we return an error to avoid shadowing issues
-       when substituting the memory predicates later. *)
-    if incost &&
-       top_is_mem_binding f.pl_desc &&
-       (schema_mpreds <> None || schema_mpreds <> Some []) then
-      tyerror f.pl_loc env SchemaMemBinderBelowCost;
+  let rec transf_r opsc env f =
+    let transf = transf_r opsc in
 
     match f.pl_desc with
     | PFhole -> begin
@@ -3291,7 +3035,7 @@ and trans_form_or_pattern
 
     | PFscope (popsc, f) ->
         let opsc = lookup_scope env popsc in
-          transf_r (Some opsc) incost env f
+          transf_r (Some opsc) env f
 
     | PFglob gp ->
         let mp = fst (trans_msymbol env gp) in
@@ -3622,40 +3366,6 @@ and trans_form_or_pattern
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
           f_bdHoareF pre' fpath post' hcmp bd'
 
-    | PFChoareF _ | PFChoareFT _ ->
-      EcCHoare.check_loaded env;
-      let trans_choaref pre' post' fpath self calls =
-        let self'  = transf env self in
-        let calls' = List.map (fun (m,fn,c) ->
-            let fn, fn_self = trans_oracle env (m,fn) in
-            let f_c = transf env c in
-            fn, call_bound_r fn_self f_c
-          ) calls in
-        unify_or_fail env  ue self.pl_loc ~expct:txint  self'.f_ty;
-        List.iter2 (fun (_,cb') (_,_,c) ->
-            unify_or_fail env ue c.pl_loc ~expct:tint cb'.cb_called.f_ty
-          ) calls' calls;
-        let cost' = cost_r self' (Mx.of_list calls') in
-        (* Sanity check *)
-        assert (List.length calls' = Mx.cardinal cost'.c_calls);
-        f_cHoareF pre' fpath post' cost' in
-
-      begin match f.pl_desc with
-        | PFChoareFT (gp, PC_costs (self, calls)) ->
-          let fpath = trans_gamepath env gp in
-          trans_choaref f_true f_true fpath self calls
-
-        | PFChoareF (pre, gp, post, PC_costs (self, calls)) ->
-          let fpath = trans_gamepath env gp in
-          let penv, qenv = EcEnv.Fun.hoareF fpath env in
-          let pre'   = transf penv pre in
-          let post'  = transf qenv post in
-          unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
-          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-
-          trans_choaref pre' post' fpath self calls
-        | _ -> assert false end
-
     | PFlsless gp ->
         let fpath = trans_gamepath env gp in
           f_losslessF fpath
@@ -3682,69 +3392,9 @@ and trans_form_or_pattern
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF pre' s1 fpath1 fpath2 s2 post'
 
-    | PFCoe (mem, pmemtype, form, expr, oty) ->
-      let mem = omap_dfl (fun m ->
-          EcIdent.create (unloc m)) EcCoreFol.mhr (unloc mem) in
-
-      match pmemtype, schema_mt with
-      | None, None ->
-        tyerror f.pl_loc env MissingMemType
-
-      | None, Some schema_mt ->        (* Schema local memtype case *)
-        let env =
-          if incost then env    (* already binded *)
-          else try
-              let env = match schema_mpreds with
-                | Some mpreds ->
-                  let mpreds =
-                    List.map (fun id -> id, tbool) mpreds in
-                  EcEnv.Var.bind_locals ~uniq:true mpreds env
-                | None -> env in
-
-              EcEnv.Var.bind_locals ~uniq:true schema_mt env
-            with
-            | EcEnv.Var.DuplicatedLocalBinding n ->
-              tyerror f.pl_loc env (SchemaVariableReBinded n) in
-
-        let memenv = EcMemory.schema mem in
-
-        let fenv = EcEnv.Memory.push_active memenv env in
-        let form' = transf_r opsc true fenv form in
-        unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
-
-        (* `InProc, because we want to look for variables declared in [memenv] *)
-        let expr', ety = transexp fenv `InProc ue expr in
-
-        begin match oty with
-          | None -> ()
-          | Some pty ->
-            let ty = transty tp_relax fenv ue pty in
-            unify_or_fail fenv ue (loc pty) ~expct:ty ety;
-        end;
-
-        f_coe form' memenv expr'
-
-      | Some mt, _ ->           (* Concrete local memtype case *)
-        let memenv = mem, trans_memtype env ue mt in
-
-        let fenv = EcEnv.Memory.push_active memenv env in
-        let form' = transf fenv form in
-        unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
-
-        (* `InProc, because we want to look for variables declared in [memenv] *)
-        let expr',ety = transexp fenv `InProc ue expr in
-
-        begin match oty with
-          | None -> ()
-          | Some pty ->
-            let ty = transty tp_relax fenv ue pty in
-            unify_or_fail fenv ue (loc pty) ~expct:ty ety;
-        end;
-
-        f_coe form' memenv expr'
   in
 
-  let f = transf_r None false env pf in
+  let f = transf_r None env pf in
   tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
   f
 
@@ -3778,22 +3428,20 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
   List.fold_left add_decl mt pmemtype
 
 (* -------------------------------------------------------------------- *)
-and trans_form_opt env ?mv ?schema_mpreds ?schema_mt ue pf oty =
-  trans_form_or_pattern env ?mv ~schema_mpreds ~schema_mt ue pf oty
+and trans_form_opt env ?mv ue pf oty =
+  trans_form_or_pattern env ?mv ue pf oty
 
 (* -------------------------------------------------------------------- *)
-and trans_form env ?mv ?schema_mpreds ?schema_mt ue pf ty =
-  trans_form_opt
-    env ?mv ?schema_mpreds ?schema_mt
-    ue pf (Some ty)
+and trans_form env ?mv ue pf ty =
+  trans_form_opt env ?mv ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-and trans_prop env ?mv ?schema_mpreds ?schema_mt ue pf =
-  trans_form env ?mv ?schema_mpreds ?schema_mt ue pf tbool
+and trans_prop env ?mv ue pf =
+  trans_form env ?mv ue pf tbool
 
 (* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =
-  trans_form_or_pattern env ~ps ~schema_mpreds:None ~schema_mt:None ue pf None
+  trans_form_or_pattern env ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

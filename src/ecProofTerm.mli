@@ -89,8 +89,6 @@ val tc1_process_full_closed_pterm_cut
  : prcut:('a -> form) -> tcenv1 -> 'a gppterm -> proofterm * form
 val tc1_process_full_closed_pterm
   : tcenv1 -> ppterm -> proofterm * form
-val tc1_process_sc_instantiation
- : tcenv1 -> pcutdef_schema -> proofterm * form
 
 (* Proof-terms manipulation *)
 val check_pterm_arg :

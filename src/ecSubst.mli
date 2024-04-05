@@ -25,6 +25,7 @@ val is_empty : subst -> bool
 val add_module   : subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
 val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
+val add_tyvar    : subst -> EcIdent.t -> ty -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
 val add_moddef   : subst -> src:path -> dst:path -> subst
@@ -40,7 +41,6 @@ val freshen_type : (ty_params * ty) -> (ty_params * ty)
 (* -------------------------------------------------------------------- *)
 val subst_theory  : subst -> theory -> theory
 val subst_ax      : subst -> axiom -> axiom
-val subst_schema  : subst -> ax_schema -> ax_schema
 val subst_op      : subst -> operator -> operator
 val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_tc      : subst -> tc_decl -> tc_decl

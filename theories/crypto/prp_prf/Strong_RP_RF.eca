@@ -519,10 +519,11 @@ section PRPi_PRPi'_Indirect.
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
   proc.
-  rewrite equiv [{1} ll_direct_indirect_eq ((), fun _ => X) r ((), fun _ => X) r]. 
-  + smt(uD_uf_fu).
-  sp; seq 1 1: ((X0 = fun _ => X){1} /\ ={X} /\ r0{1} = r{2}); auto=> />.
-  by if; auto=> /#.
+  outline {1} [1] { r <@ S.direct((), fun _ => X); }.
+  rewrite equiv[{1} 1 ll_direct_indirect_eq ((), fun _ => X :@ r)].
+  + auto=> />; exact dD_ll.
+  inline S.indirect.
+  by sp; seq 1 1 : (#pre /\ r0{1} = r{2}); auto; if; auto.
   qed.
 
   (* The rest is easy *)

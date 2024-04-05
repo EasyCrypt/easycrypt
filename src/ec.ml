@@ -38,6 +38,8 @@ type pconfig = {
 }
 
 let print_config config =
+  let (module Sites) = EcRelocate.sites in
+
   (* Print git-hash *)
   Format.eprintf "git-hash: %s@\n%!" EcVersion.hash;
 
@@ -92,6 +94,9 @@ let print_config config =
       (String.concat ", " (List.map string_of_prover provers))
   end;
 
+  (* Command path *)
+  Format.eprintf "Commands PATH: %s@\n%!" Sites.commands;
+
   (* Print system PATH *)
   Format.eprintf "System PATH:@\n%!";
   List.iter
@@ -105,7 +110,7 @@ let main () =
    * disallows Why3 server to detect external provers completion      *)
   let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
 
-  let theories = EcRelocate.Sites.theories in
+  let (module Sites) = EcRelocate.sites in
 
   (* Parse command line arguments *)
   let conffile, options =
@@ -190,7 +195,7 @@ let main () =
           | Some root ->
               List.fold_left Filename.concat root ["scripts"; "testing"]
           | None ->
-              EcRelocate.resource ["commands"] in
+              Sites.commands in
         let cmd  = Filename.concat root "runtest" in
         let args =
             [
@@ -219,7 +224,7 @@ let main () =
         let pwd = Sys.getcwd () in
         Sys.chdir (
           List.fold_left Filename.concat
-            (List.hd EcRelocate.Sites.theories)
+            (List.hd Sites.theories)
             (List.init 3 (fun _ -> ".."))
         ); Some pwd
 
@@ -263,7 +268,7 @@ let main () =
       EcCommands.addidir ~namespace:`System (Filename.concat theory "prelude");
       if not ldropts.ldro_boot then
         EcCommands.addidir ~namespace:`System ~recursive:true theory
-    ) theories;
+    ) Sites.theories;
     List.iter (fun (onm, name, isrec) ->
         EcCommands.addidir
           ?namespace:(omap (fun nm -> `Named nm) onm)

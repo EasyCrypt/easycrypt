@@ -333,16 +333,14 @@ pose F := (fun x => (mk (fun r => Pr [A.guess(x) @ &m : res = r]))).
 have -> : Pr[Sample(A).main(d') @ &m : res] = 
           Pr[SampleDep.sample(d',F) @ &m : res].
   byequiv => //; proc. 
-  seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}). 
-    by rnd; skip; smt(). (* rnd; auto raises anomaly *)
-  transitivity{2} {u <@ S.sample(du t); } 
-    ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2} ==> r{1} = u{2}) 
-    (={du,t} ==> ={u}); 1,2: smt(); 2: by inline*;auto.
+  seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}).
+  + by auto.
+  outline {2} [1] u <@ S.sample. 
   call (: d{2} = (F x){1} /\ (glob A){1} = (glob A){m} ==> ={res}).
   bypr (res{1}) (res{2}); 1:smt(). 
   move => &1 &2 a [-> eq_globA]; rewrite sampleE -(adv_mu1 A). 
   byequiv (: ={x,glob A} ==> ={res}) => //; 1: by sim. 
-  by move: F => F; auto. (* abstracting over F avoids anomaly *)
+  by auto.
 have -> : Pr[SampleDep.sample(d', F) @ &m : res] = 
           Pr[SampleDLet.sample(d', F) @ &m : res].
   byequiv => //; conseq SampleDepDLet. by move: F; auto.
@@ -542,8 +540,9 @@ have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
 eager proc H (={glob Var}) => //; 2: by sim.
     proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
 proc.
-rewrite equiv [{1} eq_main_O1e_O1l (d) r (d) r].
-+ inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto => />.
+outline {1} [1-2] r <@ Game(A, O1e).main.
++ by inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto.
+rewrite equiv[{1} 1 eq_main_O1e_O1l].
 inline*. 
 seq 8 5 : (r0{1} = r{2} /\ Var.d{1} = d'); last by if{1}; auto => />.
 conseq (_ : _ ==> Count.n{1} <= 1 /\ Count.n{2} <= 1 => 

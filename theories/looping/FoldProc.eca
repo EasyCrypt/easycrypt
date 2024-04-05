@@ -68,7 +68,8 @@ section.
             ={glob O', t1, t2} ==> ={glob O'}.
   proof.
   proc.
-  rewrite equiv [{1} fold_swap12 (O'.s, t1, t2) O'.s (O'.s, t1, t2) O'.s]; inline*; sim.
+  outline {1} [1-2] { O'.s <@ Fold(O).fold_12(O'.s, t1, t2); }.
+  by rewrite equiv[{1} 1 fold_swap12]; inline*; sim.
   qed.
 
   equiv fold_perm : Fold(O).fold ~ Fold(O).fold :

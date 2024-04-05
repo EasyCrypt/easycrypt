@@ -206,9 +206,6 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
-  | PFChoareF  of pformula * pgamepath * pformula * pcost
-  | PFChoareFT of pgamepath * pcost
-  | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
@@ -242,11 +239,6 @@ and pfrange = [
 
 and pfindex = [ `Index of int | `Match of pformula * int option]
 
-and pcost_call  = psymbol * psymbol * pformula
-and pcost_calls = pcost_call list
-
-and pcost  = PC_costs of pformula * pcost_calls
-
 (* if [pmty_mem] is [None], there are no user-supplied restriction, which is
    different from the user supplying an empty restriction.
    In the former case, we keep the restriction we obtain by type-checking,
@@ -263,12 +255,9 @@ and qident_inparam = { inp_in_params : bool;
 
 and poracles = qident_inparam list
 
-and pcompl = PCompl of pformula * (qident_inparam * pformula) list
-
 and pmod_restr_el = {
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
-  pmre_compl : pcompl option;    (* None means no restriction *)
 }
 
 and pmod_restr = {
@@ -486,14 +475,6 @@ type pcutdef = {
 (* λ mem → formula *)
 type pmpred_args = (osymbol * pformula) list
 
-type pcutdef_schema = {
-  ptcds_name  : pqsymbol;
-  ptcds_tys   : ptyannot option;
-  ptcds_mt    : pmemtype;
-  ptcds_mps   : pmpred_args located;
-  ptcds_exprs : pexpr list located;
-}
-
 (* -------------------------------------------------------------------- *)
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
@@ -505,7 +486,6 @@ type preduction = {
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
-  pcost    : bool;                      (* reduce trivial cost statements *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -533,24 +513,14 @@ type pipattern =
 
 and pspattern = unit
 
-type poracles_cost = (pgamepath * psymbol option * pcost) list
-
-(* For cost judgement with abstract calls.
-   ci_oracles : list of pairs of oracles and their costs.
-   ci_vrnts   : list of pairs of oracles and their increasing quantity. *)
-type p_abs_inv_inf = poracles_cost
-
-type p_call_inv_info = [` Std of pcost | `CostAbs of p_abs_inv_inf ]
-
 type call_info =
-  | CI_spec of (pformula * pformula * pcost option)
-  | CI_inv of pformula * p_call_inv_info option
+  | CI_spec of (pformula * pformula)
+  | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
 type p_app_xt_info =
   | PAppNone
   | PAppSingle of pformula
-  | PAppCost   of pcost
   | PAppMult   of (pformula option) tuple5
 
 type ('a, 'b, 'c) rnd_tac_info =
@@ -623,7 +593,7 @@ type bdh_split =
 type fun_info = [
   | `Def
   | `Code
-  | `Abs  of pformula * p_abs_inv_inf option
+  | `Abs  of pformula
   | `Upto of pformula * pformula * pformula option
 ]
 
@@ -642,7 +612,7 @@ type pcond_info = [
 type while_info = {
   wh_inv  : pformula;
   wh_vrnt : pformula option;
-  wh_bds  : [`Bd of pformula pair | `Cost of pformula * pcost ] option;
+  wh_bds  : [`Bd of pformula pair] option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -693,10 +663,10 @@ type fel_info = {
 }
 
 (* -------------------------------------------------------------------- *)
-type deno_ppterm   = (pformula option pair) gppterm
+type deno_ppterm = (pformula option pair) gppterm
+
 type conseq_info =
   | CQI_bd of phoarecmp option * pformula
-  | CQI_c  of pcost
 
 type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
 
@@ -705,6 +675,15 @@ type sim_info = {
   sim_pos  : codepos1 pair option;
   sim_hint : (pgamepath option pair * pformula) list * pformula option;
   sim_eqs  : pformula option
+}
+
+(* -------------------------------------------------------------------- *)
+type rw_eqv_info = {
+  rw_eqv_side  : side;
+  rw_eqv_dir   : [`LtoR | `RtoL];
+  rw_eqv_pos   : codepos1;
+  rw_eqv_lemma : ppterm;
+  rw_eqv_proc  : (pexpr list located * pexpr option) option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -726,7 +705,7 @@ type phltactic =
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of docodepos1 * pformula option
+  | Pwp            of docodepos1
   | Psp            of docodepos1
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
@@ -736,7 +715,7 @@ type phltactic =
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Pcallconcave   of (pformula * call_info gppterm)
-  | Prcond         of (oside * bool * codepos1 * pformula option)
+  | Prcond         of (oside * bool * codepos1)
   | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
   | Pmatch         of matchmode
@@ -746,6 +725,7 @@ type phltactic =
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
+  | Pasgncase      of (oside * codepos)
   | Prnd           of oside * semrndpos option * rnd_tac_info_f
   | Prndsem        of bool * oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
@@ -766,8 +746,10 @@ type phltactic =
   | Pprbounded
   | Psim           of crushmode option* sim_info
   | Ptrans_stmt    of trans_info
+  | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
+  | Pprocchange    of side option * codepos * pformula
 
     (* Eager *)
   | Peager_seq       of (eager_info * codepos1 pair * pformula)
@@ -858,7 +840,6 @@ and rwarg1 =
   | RWSmt    of (bool * pprover_infos)
   | RWApp    of ppterm
   | RWTactic of rwtactic
-  | RWEquiv  of (side * pqsymbol * (pexpr list located * pexpr) * (pexpr list located * pexpr))
 
 and rwoptions = rwside * trepeat option * rwocc * pformula option
 and rwside    = [`LtoR | `RtoL]
@@ -971,7 +952,6 @@ type logtactic =
   | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
-  | Pcutdef_sc  of (intropattern * pcutdef_schema)
   | Pmove       of prevertv
   | Pclear      of psymbol list
   | Prewrite    of (rwarg list * osymbol_r)
@@ -1038,7 +1018,6 @@ and pcut =
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =
-| PSchema
 | PAxiom of psymbol list
 | PLemma of ptactics option option
 
@@ -1046,7 +1025,6 @@ type mempred_binding = PT_MemPred of psymbol list
 
 type paxiom = {
   pa_name     : psymbol;
-  pa_scvars   : pgscbindings option;
   pa_pvars    : mempred_binding option;
   pa_tyvars   : ptyparams option;
   pa_vars     : pgtybindings option;
@@ -1122,7 +1100,6 @@ type pprint =
   | Pr_th   of pqsymbol
   | Pr_pr   of pqsymbol
   | Pr_ax   of pqsymbol
-  | Pr_sc   of pqsymbol
   | Pr_mod  of pqsymbol
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
@@ -1182,7 +1159,6 @@ and theory_override =
 | PTHO_Op     of op_override
 | PTHO_Pred   of pr_override
 | PTHO_Axiom  of ax_override
-| PTHO_Module of me_override
 | PTHO_ModTyp of mt_override
 | PTHO_Theory of th_override
 

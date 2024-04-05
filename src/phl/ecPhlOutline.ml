@@ -270,8 +270,9 @@ let process_outline info tc =
                let subenv = EcEnv.Memory.push_active mem env in
                let ue = EcUnify.UniEnv.create (Some []) in
                let res = EcTyping.transexpcast subenv `InProc ue e.e_ty r in
-               let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
-               let es = e_subst { e_subst_id with es_ty = ts } in
+               let tu = EcUnify.UniEnv.close ue in
+               let sty = f_subst_init ~tu () in
+               let es = e_subst sty in
                Some (lv_of_expr (es res))
              with EcUnify.UninstanciateUni ->
                EcTyping.tyerror loc env EcTyping.FreeTypeVariables

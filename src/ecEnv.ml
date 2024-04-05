@@ -5,6 +5,7 @@ open EcPath
 open EcAst
 open EcTypes
 open EcCoreFol
+open EcCoreSubst
 open EcMemory
 open EcDecl
 open EcModules
@@ -86,7 +87,6 @@ type mc = {
   mc_tydecls    : (ipath * EcDecl.tydecl) MMsym.t;
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
-  mc_schemas    : (ipath * EcDecl.ax_schema) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
   mc_typeclasses: (ipath * tc_decl) MMsym.t;
   mc_rwbase     : (ipath * path) MMsym.t;
@@ -116,24 +116,17 @@ type env_norm = {
 type red_topsym = [
   | `Path of path
   | `Tuple
-  | `Cost of [`Path of path | `Tuple]
 ]
 
 module Mrd = EcMaps.Map.Make(struct
   type t = red_topsym
 
-  let rec compare (p1 : t) (p2 : t) =
+  let compare (p1 : t) (p2 : t) =
     match p1, p2 with
     | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
     | `Tuple  , `Tuple   ->  0
-    | `Cost p1, `Cost p2 ->
-      compare (p1 :> red_topsym) (p2 :> red_topsym)
-    | `Tuple  , `Path _
-    | `Cost _ , `Path _
-    | `Cost _ , `Tuple   -> -1
-    | `Path _ , `Tuple
-    | `Path _ , `Cost _
-    | `Tuple  , `Cost _  ->  1
+    | `Tuple  , `Path _  -> -1
+    | `Path _ , `Tuple   ->  1
 end)
 
 (* -------------------------------------------------------------------- *)
@@ -171,9 +164,7 @@ end = struct
     }
 end
 
-
 (* -------------------------------------------------------------------- *)
-
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -189,7 +180,7 @@ type preenv = {
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
   env_redbase  : mredinfo;
-  env_ntbase   : (path * env_notation) list;
+  env_ntbase   : ntbase Mop.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
@@ -213,6 +204,8 @@ and redinfo =
 and mredinfo = redinfo Mrd.t
 
 and env_notation = ty_params * EcDecl.notation
+
+and ntbase = (path * env_notation) list
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -261,7 +254,6 @@ let empty_mc params = {
   mc_tydecls    = MMsym.empty;
   mc_operators  = MMsym.empty;
   mc_axioms     = MMsym.empty;
-  mc_schemas    = MMsym.empty;
   mc_theories   = MMsym.empty;
   mc_variables  = MMsym.empty;
   mc_functions  = MMsym.empty;
@@ -301,7 +293,7 @@ let empty gstate =
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
     env_redbase  = Mrd.empty;
-    env_ntbase   = [];
+    env_ntbase   = Mop.empty;
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; }
@@ -498,7 +490,6 @@ module MC = struct
   let _downpath_for_modsig    = _downpath_for_th
   let _downpath_for_operator  = _downpath_for_th
   let _downpath_for_axiom     = _downpath_for_th
-  let _downpath_for_schema    = _downpath_for_th
   let _downpath_for_typeclass = _downpath_for_th
   let _downpath_for_rwbase    = _downpath_for_th
 
@@ -690,25 +681,6 @@ module MC = struct
 
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
-
-  (* -------------------------------------------------------------------- *)
-  let lookup_schema qnx env =
-    match lookup (fun mc -> mc.mc_schemas) qnx env with
-    | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_schema env p args, obj)
-
-  let lookup_schemas qnx env =
-    List.map
-      (fun (p, (args, obj)) -> (_downpath_for_schema env p args, obj))
-      (lookup_all (fun mc -> mc.mc_schemas) qnx env)
-
-  let _up_schema candup mc x obj =
-    if not candup && MMsym.last x mc.mc_schemas <> None then
-      raise (DuplicatedBinding x);
-    { mc with mc_schemas = MMsym.add x obj mc.mc_schemas }
-
-  let import_schema p sc env =
-    import (_up_schema true) (IPPath p) sc env
 
   (* -------------------------------------------------------------------- *)
   let lookup_operator qnx env =
@@ -1095,9 +1067,6 @@ module MC = struct
       | Th_axiom (xax, ax) ->
           (add2mc _up_axiom xax ax mc, None)
 
-      | Th_schema (x, schema) ->
-          (add2mc _up_schema x schema mc, None)
-
       | Th_modtype (xmodty, modty) ->
           (add2mc _up_modty xmodty modty mc, None)
 
@@ -1189,9 +1158,6 @@ module MC = struct
 
   and bind_axiom x ax env =
     bind _up_axiom x ax env
-
-  and bind_schema x ax env =
-    bind _up_schema x ax env
 
   and bind_operator x op env =
     bind _up_operator x op env
@@ -1475,11 +1441,9 @@ module Reduction = struct
 
     let p =
       match rule.rl_ptn with
-      | Rule (`Op p, _)               -> `Path (fst p)
-      | Rule (`Tuple, _)              -> `Tuple
-      | Cost (_, _, Rule (`Op p, _))  -> `Cost (`Path (fst p))
-      | Cost (_, _, Rule (`Tuple, _)) -> `Cost `Tuple
-      | Cost _ | Var _ | Int _        -> assert false in
+      | Rule (`Op p, _)   -> `Path (fst p)
+      | Rule (`Tuple, _) -> `Tuple
+      | Var _ | Int _    -> assert false in
 
     Mrd.change (fun rls ->
       let { ri_priomap } =
@@ -1947,7 +1911,6 @@ module Mod = struct
 
   and vars_item mp xs = function
     | MI_Module me  -> vars_me mp xs me
-    (* FIXME:MERGE-COST *)
     | MI_Variable v -> Sx.add (EcPath.xpath mp v.v_name) xs
     | MI_Function _ -> xs
 
@@ -2401,7 +2364,7 @@ module NormMp = struct
             Sm.mem ftop mparams in
           let calls = List.filter filter (EcPath.Sx.elements all_calls) in
 
-          Msym.add f.f_name (OI.mk calls `Unbounded) oi in
+          Msym.add f.f_name (OI.mk calls) oi in
 
       let oi = List.fold_left comp_oi Msym.empty me.me_comps in
 
@@ -2427,10 +2390,10 @@ module NormMp = struct
     let me, _ = Mod.by_mpath mp env in
     get_restr_me env me mp
 
-  let equal_restr (f_equiv : form -> form -> bool) env r1 r2 =
+  let equal_restr env r1 r2 =
     let us1,us2 = restr_use env r1, restr_use env r2 in
     ur_equal use_equal us1 us2
-    && Msym.equal (PreOI.equal f_equiv) r1.mr_oinfos r2.mr_oinfos
+    && Msym.equal PreOI.equal r1.mr_oinfos r2.mr_oinfos
 
 
   let sig_of_mp env mp =
@@ -2490,22 +2453,6 @@ module NormMp = struct
           if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
           f_hoareF pre' p' post'
 
-        | FcHoareF chf ->
-          let pre' = aux chf.chf_pr and p' = norm_xfun env chf.chf_f
-          and post' = aux chf.chf_po in
-          let c_self' = aux chf.chf_co.c_self in
-          let c_calls' = Mx.fold (fun f c calls ->
-              let f' = f        (* not normalized. *)
-              and c' = call_bound_r (aux c.cb_cost) (aux c.cb_called) in
-              Mx.change (fun old -> assert (old = None); Some c') f' calls
-            ) chf.chf_co.c_calls Mx.empty in
-          if chf.chf_pr == pre' && chf.chf_f == p' &&
-             chf.chf_po == post' && chf.chf_co.c_self == c_self' &&
-             Mx.equal (fun a b -> a == b) chf.chf_co.c_calls c_calls'
-          then f else
-            let calls' = cost_r c_self' c_calls' in
-            f_cHoareF pre' p' post' calls'
-
         (* TODO: missing cases: FbdHoareF and every F*HoareS *)
 
         | FequivF ef ->
@@ -2514,13 +2461,6 @@ module NormMp = struct
           if ef.ef_pr == pre' && ef.ef_fl == l' &&
             ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post'
-
-        | Fcoe coe ->
-          let coe' = {
-            coe_mem  = coe.coe_mem;
-            coe_pre  = aux coe.coe_pre;
-            coe_e    = coe.coe_e;
-          } in f_coe_r coe'
 
         | Fpr pr ->
           let pr' = {
@@ -2555,9 +2495,6 @@ module NormMp = struct
 
   let norm_ax env ax =
     { ax with ax_spec = norm_form env ax.ax_spec }
-
-  let norm_sc env sc =
-    { sc with axs_spec = norm_form env sc.axs_spec }
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -2623,9 +2560,6 @@ module ModTy = struct
     if List.length mty1.mt_args <> List.length mty2.mt_args then
       raise ModTypeNotEquiv;
 
-    if not (NormMp.equal_restr f_equiv env mty1.mt_restr mty2.mt_restr) then
-      raise ModTypeNotEquiv;
-
     let subst =
       List.fold_left2
         (fun subst (x1, p1) (x2, p2) ->
@@ -2636,12 +2570,19 @@ module ModTy = struct
         EcSubst.empty mty1.mt_params mty2.mt_params
     in
 
+    let mr1 = EcSubst.subst_mod_restr subst mty1.mt_restr in
+    let mr2 = EcSubst.subst_mod_restr subst mty2.mt_restr in
+
+    if not (NormMp.equal_restr env mr1 mr2) then begin
+      raise ModTypeNotEquiv
+    end;
+
     if not (
          List.all2
            (fun m1 m2 ->
-             let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
-             let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
-               EcPath.m_equal m1 m2)
+              let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
+              let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
+              EcPath.m_equal m1 m2)
             mty1.mt_args mty2.mt_args) then
       raise ModTypeNotEquiv
 
@@ -2710,8 +2651,8 @@ module Ty = struct
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = `Concrete body } as tyd) ->
-        EcTypes.Tvar.subst
-          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+        Tvar.subst
+          (Tvar.init (List.map fst tyd.tyd_params) args)
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2828,19 +2769,33 @@ module Op = struct
   let lookup_path name env =
     fst (lookup name env)
 
-  let bind ?(import = import0) name op env =
-    let env = if import.im_immediate then MC.bind_operator name op env else env in
-    let op  = NormMp.norm_op env op in
+  let update_ntbase path (name, op) base =
     let nt  =
       match op.op_kind with
-      | OB_nott nt ->
-         Some (EcPath.pqname (root env) name, (op.op_tparams, nt))
+      | OB_nott nt -> begin
+        let head =
+          match nt.ont_body.e_node with
+          | Eapp ({ e_node = Eop (p, _)}, _) | Eop (p, _) -> Some p
+          | _ -> None
+        in
+        Some (head, (EcPath.pqname path name, (op.op_tparams, nt)))
+      end
       | _ -> None
     in
 
+    ofold
+      (fun (hd, nt) nts ->
+        Mop.change (fun nts -> Some (nt :: odfl [] nts)) hd nts)
+      base nt
+
+  let bind ?(import = import0) name op env =
+    let env = if import.im_immediate then MC.bind_operator name op env else env in
+    let op  = NormMp.norm_op env op in
+    let env_ntbase = update_ntbase (root env) (name, op) env.env_ntbase in
+
     { env with
-        env_ntbase = ofold List.cons env.env_ntbase nt;
-        env_item   = mkitem import (Th_operator (name, op)) :: env.env_item; }
+        env_ntbase;
+        env_item = mkitem import (Th_operator (name, op)) :: env.env_item; }
 
   let rebind name op env =
     MC.bind_operator name op env
@@ -2875,8 +2830,9 @@ module Op = struct
 
   let reduce ?mode ?nargs env p tys =
     let op, f = core_reduce ?mode ?nargs env p in
-    EcCoreFol.Fsubst.subst_tvar
-      (EcTypes.Tvar.init (List.map fst op.op_tparams) (List.fst tys)) f
+    Tvar.f_subst ~freshen:true
+      (List.map fst op.op_tparams)
+      (List.fst tys) (* FIXME:TC *) f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2926,8 +2882,8 @@ module Op = struct
 
   type notation = env_notation
 
-  let get_notations env =
-    env.env_ntbase
+  let get_notations ~(head : path option) (env : env) =
+    Mop.find_def [] head env.env_ntbase
 
   let iter ?name f (env : env) =
     gen_iter (fun mc -> mc.mc_operators) MC.lookup_operators ?name f env
@@ -2974,8 +2930,7 @@ module Ax = struct
   let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
+        Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -2983,83 +2938,6 @@ module Ax = struct
 
   let all ?check ?name (env : env) =
     gen_all (fun mc -> mc.mc_axioms) MC.lookup_axioms ?check ?name env
-end
-
-
-(* -------------------------------------------------------------------- *)
-module Schema = struct
-  type t = ax_schema
-
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_schemas) (IPPath p) env)
-
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
-    | None -> lookup_error (`Path p)
-    | Some obj -> obj
-
-  let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_schema p obj env
-
-  let lookup qname (env : env) =
-    MC.lookup_schema qname env
-
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
-
-  let lookup_path name env =
-    fst (lookup name env)
-
-  let bind ?(import = import0) name ax env =
-    let ax = NormMp.norm_sc env ax in
-    let env = MC.bind_schema name ax env in
-    { env with env_item = mkitem import (Th_schema (name, ax)) :: env.env_item }
-
-  let rebind name ax env =
-    MC.bind_schema name ax env
-
-  let instanciate p tys (mt : EcMemory.memtype) ps es env =
-    match by_path_opt p env with
-    | Some ({ axs_spec = f } as sc) ->
-      EcDecl.sc_instantiate
-        sc.axs_tparams sc.axs_pparams sc.axs_params
-        tys mt ps es f
-
-    | _ -> raise (LookupFailure (`Path p))
-
-  let iter ?name f (env : env) =
-    match name with
-    | Some name ->
-      let scs = MC.lookup_schemas name env in
-      List.iter (fun (p,sc) -> f p sc) scs
-
-    | None ->
-        Mip.iter
-          (fun _ mc -> MMsym.iter
-            (fun _ (ip, sc) ->
-              match ip with IPPath p -> f p sc | _ -> ())
-            mc.mc_schemas)
-          env.env_comps
-
-  let all ?(check = fun _ _ -> true) ?name (env : env) =
-    match name with
-    | Some name ->
-        let scs = MC.lookup_schemas name env in
-        List.filter (fun (p, sc) -> check p sc) scs
-
-    | None ->
-        Mip.fold (fun _ mc aout ->
-          MMsym.fold (fun _ schemas aout ->
-            List.fold_right (fun (ip, sc) aout ->
-              match ip with
-              | IPPath p -> if check p sc then (p, sc) :: aout else aout
-              | _ -> aout)
-              schemas aout)
-            mc.mc_schemas aout)
-          env.env_comps []
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3210,8 +3088,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_nt_th =
     let for1 path base = function
-      | Th_operator (x, ({ op_kind = OB_nott nt } as op)) ->
-         Some ((EcPath.pqname path x, (op.op_tparams, nt)) :: base)
+      | Th_operator (x, ({ op_kind = OB_nott _ } as op)) ->
+        Some (Op.update_ntbase path (x, op) base)
       | _ -> None
 
     in bind_base_th for1
@@ -3279,9 +3157,6 @@ module Theory = struct
             if   ax.ax_visibility <> `Hidden
             then MC.import_axiom (xpath x) ax env
             else env
-
-        | Th_schema (x, schema) ->
-            MC.import_schema (xpath x) schema env
 
         | Th_modtype (x, mty) ->
             MC.import_modty (xpath x) mty env
@@ -3510,14 +3385,14 @@ module LDecl = struct
   let ld_subst s ld =
     match ld with
     | LD_var (ty, body) ->
-        LD_var (ty_subst s.fs_ty ty, body |> omap (Fsubst.f_subst s))
+        LD_var (ty_subst s ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_subst (ty_subst s.fs_ty) mt
+        let mt = EcMemory.mt_subst (ty_subst s) mt
         in LD_mem mt
 
     | LD_modty p ->
-        let p = gty_as_mod (Fsubst.subst_gty s (GTmodty p))
+        let p = gty_as_mod (Fsubst.gty_subst s (GTmodty p))
         in LD_modty p
 
     | LD_hyp f ->

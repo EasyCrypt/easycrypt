@@ -32,7 +32,6 @@ val s_equal   : stmt -> stmt -> bool
 val s_compare : stmt -> stmt -> int
 val s_hash    : stmt -> int
 val s_fv      : stmt -> int EcIdent.Mid.t
-val s_subst   : e_subst -> stmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 val i_asgn     : lvalue * expr -> instr
@@ -104,23 +103,20 @@ val ur_union :
   'a use_restr -> 'a use_restr -> 'a use_restr
 
 (* -------------------------------------------------------------------- *)
-(* Oracle information of a procedure [M.f]. *)
 module PreOI : sig
   type t = EcAst.oracle_info
 
   val hash : t -> int
-  val equal : (EcAst.form -> EcAst.form -> bool) -> t -> t -> bool
 
-  val cost_self : t -> [`Bounded of EcAst.form | `Unbounded]
-  val cost : t -> xpath -> [`Bounded of EcAst.form | `Zero | `Unbounded]
-  val cost_calls : t -> [`Bounded of EcAst.form Mx.t | `Unbounded]
-  val costs : t -> [`Bounded of EcAst.form * EcAst.form Mx.t | `Unbounded]
+  val equal : t -> t -> bool
 
   val allowed : t -> xpath list
+
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> [`Bounded of EcAst.form * EcAst.form Mx.t | `Unbounded] -> t
   val filter : (xpath -> bool) -> t -> t
+
+  val mk : xpath list -> t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -136,8 +132,6 @@ val mr_equal :
   bool
 
 val mr_hash : mod_restr -> int
-
-val has_compl_restriction : mod_restr -> bool
 
 val mr_is_empty : mod_restr -> bool
 
