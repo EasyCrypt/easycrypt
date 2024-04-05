@@ -6,7 +6,7 @@ import asyncio
 import collections
 import contextlib as clib
 import curses
-import datetime
+from   datetime import datetime, timezone
 import fnmatch
 import glob
 import itertools
@@ -730,7 +730,7 @@ async def _run_all(options, allscripts, listener : Listener):
                             error = line[1:].decode('utf-8').strip()
                             if not error:
                                 continue
-                            if (m := re.search('^(\S+)\s+(.+)$', error)):
+                            if (m := re.search(r'^(\S+)\s+(.+)$', error)):
                                 code, error = m.group(1), m.group(2)
                             else:
                                 code = None
@@ -825,7 +825,7 @@ async def _main():
     mainconfig = Object()
 
     mainconfig.hostname  = socket.gethostname()
-    mainconfig.timestamp = datetime.datetime.utcnow()
+    mainconfig.timestamp = datetime.now(timezone.utc)
 
     options = _options()
 
