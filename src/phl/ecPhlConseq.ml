@@ -947,7 +947,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
               t_bdHoareS_conseq_conj ~add:false hs2.hs_po post1 @+ [
                 t_hoareS_conseq pre hs2.hs_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
-                    {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
+                    (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_apply_hyp hh];
@@ -1018,7 +1018,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
               t_bdHoareF_conseq_conj ~add:false hs2.hf_po post1 @+ [
                 t_hoareF_conseq pre hs2.hf_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
-                    {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
+                    (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_apply_hyp hh];
