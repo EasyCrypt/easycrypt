@@ -2430,7 +2430,7 @@ gpoterm(F):
    { mk_pterm (fst hd) (snd hd) args }
 
 %inline pterm:
-| pt=gpoterm(form) { pt }
+| pt=gpoterm(form_h) { pt }
 
 (* ------------------------------------------------------------------ *)
 pcutdef1:

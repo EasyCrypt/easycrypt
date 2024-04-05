@@ -812,6 +812,25 @@ let process_rewrite1_r ttenv ?target ri tc =
               process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
           end
 
+        | { fp_head = FPCut (Some f); fp_args = []; }
+        ->
+          let ps = ref Mid.empty in
+
+          let f =
+            EcTyping.trans_pattern
+              (LDecl.toenv ptenv.pte_hy) ps ptenv.pte_ue
+              f
+          in
+
+          !ps |> Mid.iter (fun x _ ->
+            ptenv.pte_ev := MEV.add x `Form !(ptenv.pte_ev)
+          );
+
+          let pt = PTApply { pt_head = PTCut f; pt_args = []; } in
+          let pt = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = f; } in
+
+          process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
+
         | _ ->
           let pt = PT.process_full_pterm ~implicits ptenv pt in
           process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
