@@ -33,13 +33,13 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
-  runo_provers   : string list option;
+  runo_provers   : prv_options;
 }
 
 and prv_options = {
-  prvo_maxjobs    : int;
-  prvo_timeout    : int;
-  prvo_cpufactor  : int;
+  prvo_maxjobs    : int option;
+  prvo_timeout    : int option;
+  prvo_cpufactor  : int option;
   prvo_provers    : string list option;
   prvo_pragmas    : string list;
   prvo_ppwidth    : int option;
@@ -346,7 +346,8 @@ let specs = {
     ("config", "Print EasyCrypt configuration", []);
 
     ("runtest", "Run a test-suite", [
-      `Spec ("p", `String, "Add a prover to the set of provers");
+      `Group "loader";
+      `Group "provers";
     ]);
 
     ("why3config", "Configure why3", []);
@@ -429,7 +430,7 @@ let dirs_of_env =
   | s -> parse_ecpath s
 
 (* -------------------------------------------------------------------- *)
-let ldr_options_of_values ?(ini = []) values =
+let ldr_options_of_values ~env ?(ini = []) values =
   if get_flag "boot" values then
     { ldro_idirs = []; ldro_boot = true; }
   else
@@ -437,18 +438,18 @@ let ldr_options_of_values ?(ini = []) values =
       (nm, x, fl) in
 
     let idirs   = Ini.get_all_idirs ini in
-    let idirs   = idirs @ dirs_of_env "EC_IDIRS" in
+    let idirs   = idirs @ (if env then dirs_of_env "EC_IDIRS" else []) in
     let idirs   = List.map (add_rec false) idirs in
     let idirs_I = List.map (add_rec false) (List.map parse_idir (get_strings "I" values)) in
     let rdirs   = Ini.get_all_rdirs ini in
-    let rdirs   = rdirs @ dirs_of_env "EC_RDIRS" in
+    let rdirs   = rdirs @ (if env then dirs_of_env "EC_RDIRS" else []) in
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
     { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
       ldro_boot  = false; }
 
-let glb_options_of_values ini values =
+let glb_options_of_values ~env ini values =
   let why3 =
     match get_string "why3" values with
     | None -> Ini.get_all_why3 ini
@@ -459,7 +460,7 @@ let glb_options_of_values ini values =
   { o_why3     = why3;
     o_reloc    = get_flag "reloc" values;
     o_ovrevict = ovrevict @ (get_strings "no-evict" values);
-    o_loader   = ldr_options_of_values ~ini values; }
+    o_loader   = ldr_options_of_values ~env ~ini values; }
 
 let prv_options_of_values ini values =
   let provers =
@@ -467,19 +468,19 @@ let prv_options_of_values ini values =
       (Ini.get_all_provers ini) @ (get_strings "p" values)
     in match provers with [] -> None | provers -> Some provers
   in
-    { prvo_maxjobs   = odfl 4 (get_int "max-provers" values);
+    { prvo_maxjobs   = get_int "max-provers" values;
       prvo_timeout   = begin
         match get_int "timeout" values with
-        | None -> odfl 3 (Ini.get_all_timeout ini)
-        | Some i -> i
+        | None -> Ini.get_all_timeout ini
+        | Some _ as i -> i
       end;
-      prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
+      prvo_cpufactor = get_int "cpu-factor" values;
       prvo_provers   = provers;
       prvo_pragmas   = get_string_list "pragmas" values;
       prvo_ppwidth   = begin
         match get_int "pp-width" values with
         | None -> Ini.get_all_ppwidth ini
-        | Some i -> Some i
+        | Some _ as i -> i
       end;
       prvo_checkall   = get_flag "check-all" values;
       prvo_profile    = get_flag "profile" values;
@@ -499,24 +500,22 @@ let cmp_options_of_values ini values input =
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values; }
 
-let runtest_options_of_values values (input, scenarios) =
+let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
     runo_scenarios = scenarios;
-    runo_provers   =
-      match get_strings "p" values with
-      | [] -> None | provers -> Some provers }
+    runo_provers   = prv_options_of_values ini values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
   let (command, values, anons) = parse specs argv in
-  let command, ini =
+  let command, ini, env =
     match command with
     | "compile" -> begin
         match anons with
         | [input] ->
            let ini = getini (Some input) in
            let cmd = `Compile (cmp_options_of_values ini values input) in
-           (cmd, ini)
+           (cmd, ini, true)
 
         | _ ->
            raise (Arg.Bad "this command takes a single argument")
@@ -529,7 +528,7 @@ let parse getini argv =
         let ini = getini None in
         let cmd = `Cli (cli_options_of_values ini values) in
 
-        (cmd, ini)
+        (cmd, ini, true)
 
     | "config" ->
         if not (List.is_empty anons) then
@@ -538,15 +537,19 @@ let parse getini argv =
         let ini = getini None in
         let cmd = `Config in
 
-        (cmd, ini)
+        (cmd, ini, true)
 
     | "runtest" -> begin
         match anons with
         | input :: scenarios ->
-           let ini = getini None in
-           let cmd = `Runtest (runtest_options_of_values values (input, scenarios)) in
-
-           (cmd, ini)
+           (* We don't read the INI file: this command will pass back the CLI
+            * options to the runtest script. Reading the INI file would leak
+            * the ini configuration to the CLI arguments.
+            *
+            * The same holds for the environment. *)
+           let cmd =
+             `Runtest (runtest_options_of_values [] values (input, scenarios))
+           in (cmd, [], false)
 
         | _ ->
            raise (Arg.Bad "this command expects at least one positional argument")
@@ -559,12 +562,12 @@ let parse getini argv =
         let ini = getini None in
         let cmd = `Why3Config in
 
-        (cmd, ini)
+        (cmd, ini, true)
 
     | _ -> assert false
 
   in {
-    o_options = glb_options_of_values ini values;
+    o_options = glb_options_of_values ~env ini values;
     o_command = command;
   }
 

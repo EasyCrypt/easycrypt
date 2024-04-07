@@ -197,16 +197,101 @@ let main () =
           | None ->
               Sites.commands in
         let cmd  = Filename.concat root "runtest" in
+
+        let ecargs =
+          let maxjobs =
+            input.runo_provers.prvo_maxjobs
+            |> omap (fun i -> ["-max-provers"; string_of_int i])
+            |> odfl [] in
+
+          let timeout =
+            input.runo_provers.prvo_timeout
+            |> omap (fun i -> ["-timeout"; string_of_int i])
+            |> odfl [] in
+
+          let cpufactor =
+            input.runo_provers.prvo_cpufactor
+            |> omap (fun i -> ["-cpu-factor"; string_of_int i])
+            |> odfl [] in
+
+          let ppwidth =
+            input.runo_provers.prvo_ppwidth
+            |> omap (fun i -> ["-pp-width"; string_of_int i])
+            |> odfl [] in
+
+          let provers =
+            odfl [] input.runo_provers.prvo_provers
+            |> List.map (fun prover -> ["-p"; prover])
+            |> List.flatten in
+
+          let pragmas =
+            input.runo_provers.prvo_pragmas
+            |> List.map (fun pragmas -> ["-pragmas"; pragmas])
+            |> List.flatten  in
+
+          let checkall =
+            if input.runo_provers.prvo_checkall then
+              ["-check-all"]
+            else [] in
+
+          let profile =
+            if input.runo_provers.prvo_profile then
+              ["-profile"]
+            else [] in
+
+          let iterate =
+            if input.runo_provers.prvo_iterate then
+              ["-iterate"]
+            else [] in
+
+          let why3srv =
+            input.runo_provers.prvo_why3server
+            |> omap (fun server -> ["-server"; server])
+            |> odfl [] in
+
+          let why3 =
+            options.o_options.o_why3
+            |> omap (fun why3 -> ["-why3"; why3])
+            |> odfl [] in
+
+          let reloc =
+            if options.o_options.o_reloc then
+              ["-reloc"]
+            else [] in
+
+          let noevict =
+            options.o_options.o_ovrevict
+            |> List.map (fun p -> ["-no-evict"; p])
+            |> List.flatten in
+
+          let boot =
+            if options.o_options.o_loader.ldro_boot then
+              ["-boot"]
+            else [] in
+
+          let idirs =
+            options.o_options.o_loader.ldro_idirs
+            |> List.map (fun (pfx, name, rec_) ->
+                 let pfx = odfl "" (omap (fun pfx -> pfx ^ ":") pfx) in
+                 let opt = if rec_ then "-R" else "-I" in
+                 [opt; pfx ^ name])
+            |> List.flatten in
+
+
+          List.flatten [
+            maxjobs; timeout; cpufactor; ppwidth;
+            provers; pragmas; checkall ; profile;
+            iterate; why3srv; why3     ; reloc  ;
+            noevict; boot   ; idirs    ;
+          ]
+        in
+
         let args =
             [
               "runtest";
               Format.sprintf "--bin=%s" Sys.executable_name;
             ]
-          @ (List.flatten
-               (List.map
-                  (fun x -> ["-p"; x])
-                  (odfl [] input.runo_provers)))
-          @ (otolist (omap (Format.sprintf "--why3=%s") options.o_options.o_why3))
+          @ List.map (Format.sprintf "--bin-args=%s") ecargs
           @ [input.runo_input]
           @ input.runo_scenarios
         in
@@ -451,9 +536,9 @@ let main () =
             (* Initialize global scope *)
             let checkmode = {
               EcCommands.cm_checkall  = prvopts.prvo_checkall;
-              EcCommands.cm_timeout   = prvopts.prvo_timeout;
-              EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
-              EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
+              EcCommands.cm_timeout   = odfl 3 (prvopts.prvo_timeout);
+              EcCommands.cm_cpufactor = odfl 1 (prvopts.prvo_cpufactor);
+              EcCommands.cm_nprovers  = odfl 4 (prvopts.prvo_maxjobs);
               EcCommands.cm_provers   = prvopts.prvo_provers;
               EcCommands.cm_profile   = prvopts.prvo_profile;
               EcCommands.cm_iterate   = prvopts.prvo_iterate;
