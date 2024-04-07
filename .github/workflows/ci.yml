@@ -35,7 +35,7 @@ jobs:
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: opam exec -- make
 
   compile-nix:
     name: EasyCrypt compilation (nix)
@@ -78,15 +78,15 @@ jobs:
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: opam exec -- make
     - name: Detect SMT provers
       run: |
         rm -f ~/.why3.conf
-        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
+        opam exec -- ./ec.native why3config -why3 ~/.why3.conf
     - name: Compile Library (${{ matrix.target }})
       env:
         TARGET: ${{ matrix.target }}
-      run: opam config exec -- make $TARGET
+      run: opam exec -- make $TARGET
     - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()
@@ -105,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin', '-p Z3@4.8 -p Alt-Ergo@2.4' ] ]
+        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
     steps:
     - uses: actions/checkout@v3
       with:
@@ -120,14 +120,14 @@ jobs:
         opam pin add -n easycrypt easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
-      run: opam config exec -- make -C easycrypt build install
+      run: opam exec -- make -C easycrypt build install
     - name: Detect SMT provers
       run: |
         rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
-        opam config exec -- easycrypt why3config
+        opam exec -- easycrypt why3config
     - name: Compile project
       working-directory: project/${{ matrix.target[2] }}
-      run: opam config exec -- ec-runtest ${{ matrix.target[5] }} ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+      run: opam exec -- easycrypt runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
     - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()

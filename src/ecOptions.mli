@@ -29,13 +29,13 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
-  runo_provers   : string list option;
+  runo_provers   : prv_options;
 }
 
 and prv_options = {
-  prvo_maxjobs    : int;
-  prvo_timeout    : int;
-  prvo_cpufactor  : int;
+  prvo_maxjobs    : int option;
+  prvo_timeout    : int option;
+  prvo_cpufactor  : int option;
   prvo_provers    : string list option;
   prvo_pragmas    : string list;
   prvo_ppwidth    : int option;
