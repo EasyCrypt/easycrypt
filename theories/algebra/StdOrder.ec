@@ -65,7 +65,7 @@ qed.
 
 lemma signVzE (z : int) : `|z| = (signz z) * z.
 proof.
-rewrite {3}(signzE) mulrA /signz; case: (z = 0).
+rewrite {3}[z](signzE) mulrA /signz; case: (z = 0).
   by move=> ->; rewrite normr0.
 move=> nz_0; rewrite b2i1 /= -{1}(mul1r `|z|); congr.
 rewrite -exprD_nneg ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.

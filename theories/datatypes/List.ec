@@ -894,10 +894,10 @@ lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim: s n=>/#. qed.
 
 lemma mem_drop n (s:'a list) x: mem (drop n s) x => mem s x.
-proof. by rewrite -{2}(cat_take_drop n) mem_cat=>->. qed.
+proof. by rewrite -{2}[s](cat_take_drop n) mem_cat=>->. qed.
 
 lemma mem_take n (s:'a list) x: mem (take n s) x => mem s x.
-proof. by rewrite -{2}(cat_take_drop n) mem_cat=>->. qed.
+proof. by rewrite -{2}[s](cat_take_drop n) mem_cat=>->. qed.
 
 lemma nth_drop (x0 : 'a) n s i:
   0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).

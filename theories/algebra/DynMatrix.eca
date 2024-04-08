@@ -1324,8 +1324,7 @@ proof. by rewrite mulmxvE colmxc /= mulmxm0 col_matrixc. qed.
 
 lemma mulmx1v (v : vector): onem (size v) *^ v = v.
 proof.
-rewrite -{3}colK mulmxvE.
-congr.
+rewrite -{3}[v]colK mulmxvE; congr.
 have ->: size v = rows (colmx v) by done.
 by rewrite mul1mx.
 qed.
@@ -1379,7 +1378,7 @@ lemma mulvmxA (v : vector) (m1 m2 : matrix) :
 proof. rewrite -(trmxK (m1 * m2)) trmxM mulvmxT -mulmxvA /#. qed.
 
 lemma mulv0mx (m : matrix): zerov (rows m) ^* m = zerov (cols m).
-proof. by rewrite -mulmxTv -{2}trmxK rows_tr mulmxv0 -cols_tr trmxK. qed.
+proof. by rewrite -mulmxTv -{2}[m]trmxK rows_tr mulmxv0 -cols_tr trmxK. qed.
 
 lemma rowmx_mulvmx (v : vector) (m : matrix) : 
   rowmx (v ^* m) = rowmx v * m.
