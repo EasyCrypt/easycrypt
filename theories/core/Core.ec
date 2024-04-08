@@ -138,7 +138,7 @@ proof. by move=> can_fg; apply inj_eq; apply (can_inj f g). qed.
 
 lemma nosmt can2_eq (f : 'a -> 'b) g:
   cancel f g => cancel g f => forall x y, (f x = y) <=> (x = g y).
-proof. by move=> fK gK x y; rewrite -{1}gK; apply (can_eq f g). qed.
+proof. by move=> fK gK x y; rewrite -{1}[y]gK; apply (can_eq f g). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt inj_idfun: injective (idfun<:'a>).
@@ -181,7 +181,7 @@ lemma nosmt bij_can_sym (f:'b -> 'a) f':
 proof.
 move=> bij_f; have /bij_inj inj_f := bij_f.
 split=> fK; 1: by apply/inj_can_sym.
-by case: bij_f=> h [_ hK] x; rewrite -hK fK.
+by case: bij_f=> h [_ hK] x; rewrite -[x]hK fK.
 qed.
 
 lemma nosmt bij_can_eq (f:'b -> 'a) f' f'':
@@ -313,4 +313,3 @@ rewrite -negb_exists; case: (exists x, P x) => /=.
 - by move/choicebP=> /(_ x0) ?; apply.
 - by rewrite negb_exists => /choiceb_dfl ->.
 qed.
-

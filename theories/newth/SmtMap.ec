@@ -279,7 +279,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt set_get_eq ['a 'b] (m : ('a, 'b) fmap, x : 'a, y : 'b) :
   m.[x] = Some y => m.[x <- y] = m.
-proof. by move=> mxE; rewrite -{2}(set_get _ x) ?domE // mxE. qed.
+proof. by move=> mxE; rewrite -{2}[m](set_get _ x) ?domE // mxE. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_set ['a 'b] (m : ('a, 'b) fmap) x b y :

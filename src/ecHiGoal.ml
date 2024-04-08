@@ -334,7 +334,7 @@ module LowRewrite = struct
            let prw, _ =
              try
                PT.pf_find_occurence_lazy
-                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp;
+                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp
              with PT.FindOccFailure `MatchFailure ->
                  raise (RewriteError LRW_RPatternNoMatch) in
 
@@ -370,7 +370,7 @@ module LowRewrite = struct
 
       | (pt, mode, (f1, f2)) :: pts ->
            try  for1 (pt, mode, (f1, f2))
-           with RewriteError (LRW_NothingToRewrite | LRW_IdRewriting) ->
+           with RewriteError _ ->
              do_first pts
     in
 

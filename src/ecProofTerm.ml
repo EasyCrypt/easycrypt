@@ -274,7 +274,7 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
   try
     let (ue, ev) =
       EcMatching.f_match_core mode pt.pte_hy
-        (pt.pte_ue, !(pt.pte_ev)) ~ptn subject
+        (pt.pte_ue, !(pt.pte_ev)) ptn subject
     in
       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue;
       pt.pte_ev := ev
@@ -301,7 +301,12 @@ let pf_find_occurence
 
   let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
 
-  let na = List.length (snd (EcFol.destr_app ptn)) in
+  let na =
+    match EcFol.destr_app ptn with
+    | { f_node = Flocal x }, _
+        when EcMatching.MEV.mem x `Form !(pt.pte_ev)
+      -> max_int
+    | _, args -> List.length args in
 
   let kmatch key tp =
     match key, (fst (destr_app tp)).f_node with

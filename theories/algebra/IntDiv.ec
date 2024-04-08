@@ -697,7 +697,7 @@ wlog: a b / (`|a| <= `|b|) => [wlog|le_ab nz_ab].
   + by exists z; do! split => //; move=> *; apply: h.
 case: (a = 0) => [->>|]; 1: (exists `|b|; do! split=> //).
 + by rewrite dvdz0.
-+ by rewrite {2}signzE dvdz_mull dvdzz.
++ by rewrite {2}[b]signzE dvdz_mull dvdzz.
 + by move=> x _ xDb; rewrite (ler_trans `|x|) 1:ler_norm dvdz_le.
 move=> nz_a; have nz_b : b <> 0.
 + by apply: contraL le_ab => ->; rewrite normr0 lerNgt /= normr_gt0.
@@ -789,7 +789,7 @@ proof.
 case: (a = 0) => [->//=|nz_a].
 apply/eq_sym/gcd_uniq => //=; first by rewrite normr_ge0.
 + by rewrite dvdz0.
-+ by rewrite {2}signzE dvdz_mull dvdzz.
++ by rewrite {2}[a]signzE dvdz_mull dvdzz.
 + by move=> x _ xDa; rewrite &(ler_trans `|x|) 1:ler_norm dvdz_le.
 qed.
 
