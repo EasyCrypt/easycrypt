@@ -95,9 +95,25 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
+  fetch-external-matrix:
+    name: Fetch EasyCrypt External Projects Matrix
+    needs: [pre_job, compile-opam]
+    if: needs.pre_job.outputs.should_skip != 'true'
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: 'easycrypt'
+    - id: set-matrix
+      run: |
+        JSON=$(jq -c . < easycrypt/.github/workflows/external.json)
+        echo "::set-output name=matrix::${JSON}"
+
   external:
     name: Check EasyCrypt External Projects
-    needs: [pre_job, compile-opam]
+    needs: [fetch-external-matrix]
     if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
@@ -105,15 +121,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+        target: ${{fromJson(needs.fetch-external-matrix.outputs.matrix)}}
     steps:
     - uses: actions/checkout@v3
       with:
-        path: 'easycrypt'
+        path: easycrypt
     - uses: actions/checkout@v3
       with:
-        path: 'project'
-        repository: ${{ matrix.target[1] }}
+        path: project/${{ matrix.target.name }}
+        repository: ${{ matrix.target.repository }}
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
@@ -126,13 +142,17 @@ jobs:
         rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
         opam exec -- easycrypt why3config
     - name: Compile project
-      working-directory: project/${{ matrix.target[2] }}
-      run: opam exec -- easycrypt runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+      working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
+      run: |
+        opam exec -- easycrypt runtest  \
+          ${{ matrix.target.options  }} \
+          ${{ matrix.target.config   }} \
+          ${{ matrix.target.scenario }}
     - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()
       with:
-        name: report.log (${{ matrix.target[0] }})
+        name: report.log (${{ matrix.target.name }})
         path: report.log
         if-no-files-found: ignore
 
