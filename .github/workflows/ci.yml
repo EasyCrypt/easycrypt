@@ -1,6 +1,6 @@
 name: EasyCrypt compilation & check
 
-on: [push,pull_request]
+on: [push,pull_request,merge_group]
 
 env:
   HOME: /home/charlie
