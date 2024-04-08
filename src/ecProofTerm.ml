@@ -131,16 +131,24 @@ let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
   | PASub     pt       -> PASub (pt |> omap (concretize_e_pt cptenv))
 
 
-and concretize_e_head (CPTEnv subst) head =
+and concretize_e_head ((CPTEnv subst) as cptenv) head =
   match head with
   | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
   | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
-and concretize_e_pt cptenv { pt_head; pt_args } =
-  { pt_head = concretize_e_head cptenv pt_head;
-    pt_args = List.map (concretize_e_arg cptenv) pt_args; }
+and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
+  match pt with
+  | PTApply { pt_head; pt_args } ->
+    PTApply {
+      pt_head = concretize_e_head cptenv pt_head;
+      pt_args = List.map (concretize_e_arg cptenv) pt_args;
+    }
+
+  | PTQuant ((x, ty), pt) ->    (* FIXME: what to do with the binding? *)
+    PTQuant ((x, Fsubst.gty_subst subst ty), concretize_e_pt cptenv pt)
 
 (* -------------------------------------------------------------------- *)
 let concretize_form pe f =
@@ -170,7 +178,7 @@ let pt_of_hyp pf hyps x =
   let ax    = LDecl.hyp_by_id x hyps in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
+    ptev_pt  = ptlocal x;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -178,7 +186,7 @@ let pt_of_hyp_r ptenv x =
   let ax = LDecl.hyp_by_id x ptenv.pte_hy in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
+    ptev_pt  = ptlocal x;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -187,7 +195,7 @@ let pt_of_global pf hyps p tys =
   let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_pt  = ptglobal ~tys p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -196,7 +204,7 @@ let pt_of_global_r ptenv p tys =
   let ax  = EcEnv.Ax.instanciate p tys env in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_pt  = ptglobal ~tys p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -204,7 +212,7 @@ let pt_of_handle_r ptenv hd =
   let g = FApi.get_pregoal_by_id hd ptenv.pte_pe in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTHandle hd; pt_args = []; };
+    ptev_pt  = pthandle hd;
     ptev_ax  = g.g_concl; }
 
 (* -------------------------------------------------------------------- *)
@@ -219,7 +227,7 @@ let pt_of_uglobal_r ptenv p =
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, typ); pt_args = []; };
+    ptev_pt  = ptglobal ~tys:typ p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -514,7 +522,7 @@ let process_pterm_cut ~prcut pe pt =
     | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
   in
 
-  let pt = { pt_head = pt; pt_args = []; } in
+  let pt = PTApply { pt_head = pt; pt_args = []; } in
 
   { ptev_env = pe; ptev_pt = pt; ptev_ax = ax; }
 
@@ -528,9 +536,8 @@ let process_pterm pe pt =
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =
-  let pt = { pt_head = PTCut f; pt_args = []; } in
-  let pt = { ptev_env = pe; ptev_pt = pt; ptev_ax = f; } in
-    { ptea_env = pe; ptea_arg = PVASub pt; }
+  let pt = { ptev_env = pe; ptev_pt = ptcut f; ptev_ax = f; } in
+  { ptea_env = pe; ptea_arg = PVASub pt; }
 
 (* ------------------------------------------------------------------ *)
 and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
@@ -748,8 +755,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
              check_pterm_oarg ?loc pe (x, xty) f oarg
       in
 
-      let rawargs = rawpt.pt_args @ [newarg] in
-      { pt with ptev_ax = newax; ptev_pt = { rawpt with pt_args = rawargs } }
+      { pt with ptev_ax = newax; ptev_pt = ptapply rawpt [newarg]; }
 
 (* -------------------------------------------------------------------- *)
 and apply_pterm_to_arg ?loc pt arg =
@@ -797,7 +803,7 @@ and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =
         match PT.destruct_product ~reduce:false env.pte_hy pe.ptev_ax with
         | Some (`Forall (x, xty, f)) ->
             let (newax, newarg) = check_pterm_oarg env (x, xty) f None in
-            let pt = { pt with pt_args = pt.pt_args @ [newarg] } in
+            let pt = ptapply pt [newarg] in
             let pe = { pe with ptev_ax = newax; ptev_pt = pt } in
             process_implicits ip pe
         | _ -> ((b :: ip), pe)

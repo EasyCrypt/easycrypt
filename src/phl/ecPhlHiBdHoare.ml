@@ -48,7 +48,7 @@ let process_bdhoare_split info tc =
 
       let t_conseq po lemma tactic =
         let rwtt tc =
-          let pt = { pt_head = PTGlobal (lemma, []); pt_args = []; } in
+          let pt = ptglobal ~tys:[] lemma in
 
           let rwtt = [
             EcLowGoal.t_intros_i [EcIdent.create "_"];

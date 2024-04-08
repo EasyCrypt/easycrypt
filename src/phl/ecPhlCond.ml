@@ -89,9 +89,10 @@ let rec t_equiv_cond side tc =
       let hiff,m1,m2,h,h1,h2 = as_seq6 fresh in
 
       let t_aux =
-        let rwpt = { pt_head = PTLocal hiff;
-                     pt_args = [PAMemory m1; PAMemory m2; PASub None]; } in
-
+        let rwpt =
+          EcCoreGoal.ptlocal
+            ~args:[PAMemory m1; PAMemory m2; PASub None]
+            hiff in
 
         FApi.t_seqs [t_intros_i [m1]    ; EcPhlSkip.t_skip;
                      t_intros_i [m2; h] ; t_elim_hyp h;
