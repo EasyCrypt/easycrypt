@@ -567,3 +567,25 @@ lemma nosmt big_int_recr_cond (n m : int) P F: m <= n =>
   bigi P F m (n+1) =
     bigi P F m n + (if P n then F n else idm).
 proof. by move=> lemn; rewrite !(@big_mkcond P) big_int_recr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt bigi_split_odd_even (n : int) (F : int -> t) : 0 <= n =>
+    bigi predT (fun i => F (2 * i) + F (2 * i + 1)) 0 n
+  = bigi predT F 0 (2 * n).
+proof.
+move=> ge0_n; rewrite big_split; pose rg := range 0 n.
+rewrite -(@big_mapT (fun i => 2 * i)).
+rewrite -(@big_mapT (fun i => 2 * i + 1)).
+rewrite -big_cat &(eq_big_perm) &(uniq_perm_eq) 2:&(range_uniq).
+- rewrite cat_uniq !map_inj_in_uniq /= ~-1:/# range_uniq /=.
+  apply/hasPn => _ /mapP[y] /= [_ ->].
+  by apply/negP; case/mapP=> ? [_] /#.
+move=> x; split.
+- rewrite mem_cat; case=> /mapP[y] /=;
+    case=> /mem_range y_rg -> {x}; apply/mem_range;
+    by smt().
+move/mem_range => x_rg; rewrite mem_cat.
+have: forall (i : int), exists j, i = 2 * j \/ i = 2 * j + 1 by smt().
+- case/(_ x) => y [] ->>; [left | right]; apply/mapP=> /=;
+    by exists y; (split; first apply/mem_range); smt().
+qed.
