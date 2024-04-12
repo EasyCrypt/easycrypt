@@ -126,10 +126,11 @@ jobs:
     - uses: actions/checkout@v3
       with:
         path: easycrypt
-    - uses: actions/checkout@v3
-      with:
-        path: project/${{ matrix.target.name }}
-        repository: ${{ matrix.target.repository }}
+    - name: Checkout External Project
+      run: |
+        git clone -b ${{ matrix.target.branch }} \
+          ${{ matrix.target.repository }} \
+          project/${{ matrix.target.name }}
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
