@@ -18,4 +18,15 @@
   , "scenario"   : "sponge"
   , "options"    : "-pragmas Proofs:weak"
   }
+
+  ,
+
+  { "name"       : "ml-kem"
+  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem" 
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "mlkem"
+  , "options"    : "-pragmas Proofs:weak"
+  }
 ]
