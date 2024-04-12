@@ -1,6 +1,7 @@
 [
   { "name"       : "jasmin-eclib"
-  , "repository" : "jasmin-lang/jasmin"
+  , "repository" : "https://github.com/jasmin-lang/jasmin"
+  , "branch"     : "main"
   , "subdir"     : "eclib"
   , "config"     : "tests.config"
   , "scenario"   : "jasmin"
