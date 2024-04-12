@@ -128,7 +128,8 @@ jobs:
         path: easycrypt
     - name: Checkout External Project
       run: |
-        git clone -b ${{ matrix.target.branch }} \
+        git clone --recurse-submodules \
+          -b ${{ matrix.target.branch }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
     - name: Update OPAM & EasyCrypt dependencies
