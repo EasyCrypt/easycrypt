@@ -7,4 +7,15 @@
   , "scenario"   : "jasmin"
   , "options"    : ""
   }
+
+  ,
+
+  { "name"       : "sha3"
+  , "repository" : "https://gitlab.com/easycrypt/sha3"
+  , "branch"     : "next"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "sponge"
+  , "options"    : "-pragmas Proofs:weak"
+  }
 ]
