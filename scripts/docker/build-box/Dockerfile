@@ -15,7 +15,7 @@ RUN \
 
 RUN \
 	version=1.8 && \
-	wget -O cvc4 https://github.com/cvc5/cvc5/releases/download/${version}/cvc4-${version}-x86_64-linux-opt && \
+	wget -O cvc4 https://github.com/CVC4/CVC4-archived/releases/download/${version}/cvc4-${version}-x86_64-linux-opt && \
 	sudo install -m 0755 cvc4 /usr/local/bin/cvc4-${version} && \
 	rm -f cvc4
 
