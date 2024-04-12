@@ -109,7 +109,7 @@ jobs:
     - id: set-matrix
       run: |
         JSON=$(jq -c . < easycrypt/.github/workflows/external.json)
-        echo "::set-output name=matrix::${JSON}"
+        echo "matrix=${JSON}" >> $GITHUB_OUTPUT
 
   external:
     name: Check EasyCrypt External Projects
