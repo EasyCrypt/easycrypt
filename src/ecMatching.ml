@@ -436,7 +436,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         && (EV.get ho !ev.evm_form = Some `Unset)
         && not (List.is_empty args)
         && List.for_all iscvar args
-      then
+      then begin
         let oargs = List.map destr_local args in
 
         if not (List.is_unique ~eq:id_equal oargs) then
@@ -469,7 +469,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         let sbj = f_lambda bindings sbj in
 
         ev := { !ev with evm_form = EV.set ho sbj !ev.evm_form }
-      else
+      end else
         failure ()
     in
 
@@ -602,11 +602,19 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         if not opts.fm_horder then
           failure ();
 
-        match destr_app f1 with
-        | { f_node = Flocal ho; f_ty = hoty }, args when not (List.is_empty args) ->
-          ho_match (ho, args, hoty) f2
-        | _ ->
-          failure ()
+        let doit (f1 : form) (f2 : form) =
+          match destr_app f1 with
+          | { f_node = Flocal ho; f_ty = hoty }, args
+              when not (List.is_empty args)
+            ->
+            ho_match (ho, args, hoty) f2
+          | _ ->
+            failure ()
+        in
+
+        try
+          doit f1 f2
+        with MatchFailure -> doit f2 f1
       in
 
       let try_delta () =
