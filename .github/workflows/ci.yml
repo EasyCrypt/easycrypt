@@ -158,9 +158,20 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
+  external-status:
+    name: Check EasyCrypt External Projects (set-status)
+    if: always()
+    needs: [external]
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: re-actors/alls-green@release/v1
+      with:
+        jobs: ${{ toJSON(needs) }}
+        allowed-skips: external
+
   notification:
     name: Notification
-    needs: [compile-opam, compile-nix, check, external]
+    needs: [compile-opam, compile-nix, check, external, external-status]
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
