@@ -301,12 +301,15 @@ let pf_find_occurence
 
   let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
 
-  let na =
+  let na = List.length (snd (EcFol.destr_app ptn)) in
+  let ho =
     match EcFol.destr_app ptn with
     | { f_node = Flocal x }, _
         when EcMatching.MEV.mem x `Form !(pt.pte_ev)
-      -> max_int
-    | _, args -> List.length args in
+      -> true
+
+    | _, _ -> false
+  in
 
   let kmatch key tp =
     match key, (fst (destr_app tp)).f_node with
@@ -340,21 +343,24 @@ let pf_find_occurence
   let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
 
-    let tp =
+    let tps =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->
           let (a1, a2) = List.takedrop na hargs in
-            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
-      | _ -> tp
+          let tp' = f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty) in
+          if ho then [tp; tp'] else [tp']
+      | _ -> [tp]
     in
 
     try
-      if not (Mid.set_disjoint bds tp.f_fv) then
-        `Continue
-      else begin
-        pf_form_match ~mode pt ~ptn tp;
-        raise (E.MatchFound tp)
-      end
+      tps |> List.iter (fun tp ->
+        if Mid.set_disjoint bds tp.f_fv then begin
+          try
+            pf_form_match ~mode pt ~ptn tp;
+            raise (E.MatchFound tp)
+          with EcMatching.MatchFailure -> ()
+      end);
+      raise EcMatching.MatchFailure
     with EcMatching.MatchFailure -> `Continue
   in
 
