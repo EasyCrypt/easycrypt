@@ -223,7 +223,7 @@ let process_unroll_for side cpos tc =
 
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
-  let c    = EcLowPhlGoal.tc1_get_stmt side tc in
+  let _, c = EcLowPhlGoal.tc1_get_stmt side tc in
   let z    = Zpr.zipper_of_cpos cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 

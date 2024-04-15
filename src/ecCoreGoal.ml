@@ -887,6 +887,10 @@ let (!$) = FApi.tc_penv
 let (!@) = FApi.tcenv_of_tcenv1
 
 (* -------------------------------------------------------------------- *)
+let (let+) (type a) (x : tcenv) (f : tcenv1 -> a) : a =
+  f (FApi.as_tcenv1 x)
+
+(* -------------------------------------------------------------------- *)
 module RApi = struct
   type rproofenv = proofenv ref
   type rtcenv    = tcenv    ref
