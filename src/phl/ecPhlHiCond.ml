@@ -37,4 +37,7 @@ let process_cond info tc =
 
 (* -------------------------------------------------------------------- *)
 let process_match infos tc =
-  t_hS_or_bhS_or_eS ~th:(t_hoare_match) ~te:(t_equiv_match infos) tc
+  t_hS_or_bhS_or_eS
+    ~th:t_hoare_match
+    ~tbh:t_bdhoare_match
+    ~te:(t_equiv_match infos) tc

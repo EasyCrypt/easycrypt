@@ -551,6 +551,10 @@ let t_intros_n ?(clear = false) (n : int) (tc : tcenv1) =
   if clear then FApi.t_first (t_clears xs) tc else tc
 
 (* -------------------------------------------------------------------- *)
+let t_intros_n_x (n : int) (tc : tcenv1) =
+  t_intros_x (EcUtils.List.make n (notag None)) tc
+
+(* -------------------------------------------------------------------- *)
 let t_intro_i_x (id : EcIdent.t option) (tc : tcenv1) =
   snd_map EcUtils.as_seq1 (t_intros_x [notag id] tc)
 
