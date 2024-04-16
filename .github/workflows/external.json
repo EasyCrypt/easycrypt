@@ -22,7 +22,7 @@
   ,
 
   { "name"       : "ml-kem"
-  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem" 
+  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem"
   , "branch"     : "master"
   , "subdir"     : "."
   , "config"     : "config/tests.config"
