@@ -29,4 +29,15 @@
   , "scenario"   : "mlkem"
   , "options"    : "-pragmas Proofs:weak"
   }
+
+  ,
+
+  { "name"       : "cryptobox"
+  , "repository" : "https://gitlab.com/fdupress/ec-cryptobox"
+  , "branch"     : "next"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "cryptobox"
+  , "options"    : "-pragmas Proofs:weak"
+  }
 ]
