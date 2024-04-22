@@ -147,6 +147,7 @@ jobs:
       working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
       run: |
         opam exec -- easycrypt runtest  \
+          -report report.log            \
           ${{ matrix.target.options  }} \
           ${{ matrix.target.config   }} \
           ${{ matrix.target.scenario }}
@@ -155,7 +156,7 @@ jobs:
       if: always()
       with:
         name: report.log (${{ matrix.target.name }})
-        path: report.log
+        path: $(realpath project/${{ matrix.target.name }}/${{ matrix.target.subdir }})/report.log
         if-no-files-found: ignore
 
   external-status:
