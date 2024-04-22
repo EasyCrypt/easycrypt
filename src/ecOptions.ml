@@ -33,6 +33,7 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_report    : string option;
   runo_provers   : prv_options;
 }
 
@@ -348,6 +349,7 @@ let specs = {
     ("runtest", "Run a test-suite", [
       `Group "loader";
       `Group "provers";
+      `Spec  ("report", `String, "dump result to <report>");
     ]);
 
     ("why3config", "Configure why3", []);
@@ -503,6 +505,7 @@ let cmp_options_of_values ini values input =
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
     runo_scenarios = scenarios;
+    runo_report    = get_string "report" values;
     runo_provers   = prv_options_of_values ini values; }
 
 (* -------------------------------------------------------------------- *)

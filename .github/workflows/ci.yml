@@ -147,15 +147,20 @@ jobs:
       working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
       run: |
         opam exec -- easycrypt runtest  \
+          -report report.log            \
           ${{ matrix.target.options  }} \
           ${{ matrix.target.config   }} \
           ${{ matrix.target.scenario }}
+    - name: Compute real-path to report.log
+      if: always()
+      run: |
+        echo "report=$(realpath project/${{ matrix.target.name }}/${{ matrix.target.subdir }})/report.log" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v4
       name: Upload report.log
       if: always()
       with:
         name: report.log (${{ matrix.target.name }})
-        path: report.log
+        path: ${{ env.report }}
         if-no-files-found: ignore
 
   external-status:
