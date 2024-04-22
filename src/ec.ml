@@ -291,6 +291,11 @@ let main () =
               "runtest";
               Format.sprintf "--bin=%s" Sys.executable_name;
             ]
+          @ Option.to_list (
+              Option.map
+                (Format.sprintf "--report=%s")
+                input.runo_report
+            )
           @ List.map (Format.sprintf "--bin-args=%s") ecargs
           @ [input.runo_input]
           @ input.runo_scenarios
