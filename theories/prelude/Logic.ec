@@ -640,8 +640,9 @@ axiom choicebP ['a] (P : 'a -> bool) (x0 : 'a):
 axiom choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
   (forall x, !P x) => choiceb P x0 = x0.
 
-axiom nosmt eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
+lemma nosmt eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
   (forall x, P x <=> Q x) => choiceb P x0 = choiceb Q x0.
+proof. smt(fun_ext). qed.
 
 axiom nosmt choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
   (exists x, P x) => choiceb P x0 = choiceb P x1.
