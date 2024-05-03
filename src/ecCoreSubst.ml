@@ -197,6 +197,7 @@ let refresh (s : f_subst) (x : ident) : ident =
 let add_elocal (s : f_subst) ((x, t) as xt : ebinding) : f_subst * ebinding =
   let x' = refresh s x in
   let t' = ty_subst s t in
+  let s = f_rem_local s x in
   if   x == x' && t == t'
   then (s, xt)
   else (bind_elocal s x (e_local x' t'), (x', t'))
@@ -363,6 +364,7 @@ module Fsubst = struct
   let add_local (s : f_subst) ((x, t) as xt : ebinding) : f_subst * ebinding =
     let x' = refresh s x in
     let t' = ty_subst s t in
+    let s  = f_rem_local s x in
     if   x == x' && t == t'
     then (s, xt)
     else (f_bind_rename s x x' t', (x', t'))
