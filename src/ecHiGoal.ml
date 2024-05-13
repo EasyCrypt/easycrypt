@@ -335,7 +335,7 @@ module LowRewrite = struct
            let prw, _ =
              try
                PT.pf_find_occurence_lazy
-                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp;
+                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp
              with PT.FindOccFailure `MatchFailure ->
                  raise (RewriteError LRW_RPatternNoMatch) in
 
@@ -371,7 +371,7 @@ module LowRewrite = struct
 
       | (pt, mode, (f1, f2)) :: pts ->
            try  for1 (pt, mode, (f1, f2))
-           with RewriteError (LRW_NothingToRewrite | LRW_IdRewriting) ->
+           with RewriteError _ ->
              do_first pts
     in
 
@@ -507,7 +507,7 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
       tc_error !!tc "cannot infer all variables";
 
     let pt = fst (PT.concretize pte) in
-    let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
+    let pt = EcCoreGoal.ptapply pt [palocal hyp] in
     let cutf = PT.concretize_form pte.PT.ptev_env cutf in
 
     FApi.t_last
@@ -534,7 +534,7 @@ let process_apply_top tc =
 
      try
        EcLowGoal.t_intros_i_seq ~clear:true [h]
-         (EcLowGoal.Apply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+         (EcLowGoal.Apply.t_apply_bwd (ptlocal h) )
          tc
      with (EcLowGoal.Apply.NoInstance _) as err ->
        tc_error_exn !!tc err
@@ -801,17 +801,38 @@ let process_rewrite1_r ttenv ?target ri tc =
           let pt     = PT.process_full_pterm ~implicits ptenv pt
           in
 
-          if    is_ptglobal pt.PT.ptev_pt.pt_head
-             && List.is_empty pt.PT.ptev_pt.pt_args
-          then begin
-            let ls = EcEnv.Ax.all ~name:(unloc p) env in
+          begin
+            match pt.ptev_pt with
+            | PTApply { pt_head = PTGlobal _; pt_args = [] } ->
+              let ls = EcEnv.Ax.all ~name:(unloc p) env in
 
-            let do1 (lemma, _) tc =
-              let pt = PT.pt_of_uglobal_r (PT.copy ptenv0) lemma in
+              let do1 (lemma, _) tc =
+                let pt = PT.pt_of_uglobal_r (PT.copy ptenv0) lemma in
                 process_rewrite1_core ~mode ?target (theside, prw, o) pt tc in
               t_ors (List.map do1 ls) tc
-          end else
-            process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
+
+            | _ ->
+              process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
+          end
+
+        | { fp_head = FPCut (Some f); fp_args = []; }
+        ->
+          let ps = ref Mid.empty in
+
+          let f =
+            EcTyping.trans_pattern
+              (LDecl.toenv ptenv.pte_hy) ps ptenv.pte_ue
+              f
+          in
+
+          !ps |> Mid.iter (fun x _ ->
+            ptenv.pte_ev := MEV.add x `Form !(ptenv.pte_ev)
+          );
+
+          let pt = PTApply { pt_head = PTCut f; pt_args = []; } in
+          let pt = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = f; } in
+
+          process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
 
         | _ ->
           let pt = PT.process_full_pterm ~implicits ptenv pt in
@@ -1047,7 +1068,7 @@ let process_view1 pe tc =
                   in (f1, Some v)
 
                 with E.Bailout -> (f1, None)
-              ) f1 pe.PT.ptev_pt.pt_args)
+              ) f1 (get_pt_top_args pe.PT.ptev_pt))
             in
 
             let regen = List.pmap (fun x -> x) regen in
@@ -1072,12 +1093,12 @@ let process_view1 pe tc =
         let tc     = t_intros_i_1 [top] tc in
         let hyps   = tc1_hyps tc in
         let pte    = PT.tc1_process_full_pterm tc pe in
-        let inargs = List.length pte.PT.ptev_pt.pt_args in
+        let inargs = List.length (get_pt_top_args pte.PT.ptev_pt) in
 
         let (pte, ids, cutf, view) = instantiate f1 [] pte in
 
         let evm  = !(pte.PT.ptev_env.PT.pte_ev) in
-        let args = List.drop inargs pte.PT.ptev_pt.pt_args in
+        let args = List.drop inargs (get_pt_top_args pte.PT.ptev_pt) in
         let args = List.combine (List.rev ids) args in
 
         let ids =
@@ -1681,7 +1702,7 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
                 f_imps [f_eq p (f_local name p.f_ty)] newconcl
             else newconcl in
           let newconcl = f_forall [(name, GTty p.f_ty)] newconcl in
-          let pt = { pt_head = PTCut newconcl; pt_args = [PAFormula p]; } in
+          let pt = ptcut ~args:[PAFormula p] newconcl in
 
           EcLowGoal.t_apply pt tc
 

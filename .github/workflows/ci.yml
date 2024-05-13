@@ -1,6 +1,6 @@
 name: EasyCrypt compilation & check
 
-on: [push,pull_request]
+on: [push,pull_request,merge_group]
 
 env:
   HOME: /home/charlie
@@ -28,14 +28,14 @@ jobs:
     container:
       image: ghcr.io/easycrypt/ec-build-box
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: opam exec -- make
 
   compile-nix:
     name: EasyCrypt compilation (nix)
@@ -45,13 +45,13 @@ jobs:
       HOME: /home/runner
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup Nix
-      uses: cachix/install-nix-action@v20
+      uses: cachix/install-nix-action@v26
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Setup Cachix
-      uses: cachix/cachix-action@v12
+      uses: cachix/cachix-action@v14
       with:
         name: formosa-crypto
         authToken: '${{ secrets.CACHIX_WRITE_TOKEN }}'
@@ -71,23 +71,23 @@ jobs:
       matrix:
         target: [unit, stdlib, examples]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: opam exec -- make
     - name: Detect SMT provers
       run: |
         rm -f ~/.why3.conf
-        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
+        opam exec -- ./ec.native why3config -why3 ~/.why3.conf
     - name: Compile Library (${{ matrix.target }})
       env:
         TARGET: ${{ matrix.target }}
-      run: opam config exec -- make $TARGET
-    - uses: actions/upload-artifact@v3
+      run: opam exec -- make $TARGET
+    - uses: actions/upload-artifact@v4
       name: Upload report.log
       if: always()
       with:
@@ -95,9 +95,25 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
+  fetch-external-matrix:
+    name: Fetch EasyCrypt External Projects Matrix
+    needs: [pre_job, compile-opam]
+    if: needs.pre_job.outputs.should_skip != 'true'
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: 'easycrypt'
+    - id: set-matrix
+      run: |
+        JSON=$(jq -c . < easycrypt/.github/workflows/external.json)
+        echo "matrix=${JSON}" >> $GITHUB_OUTPUT
+
   external:
     name: Check EasyCrypt External Projects
-    needs: [pre_job, compile-opam]
+    needs: [fetch-external-matrix]
     if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
@@ -105,40 +121,62 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin', '-p Z3@4.8 -p Alt-Ergo@2.4' ] ]
+        target: ${{fromJson(needs.fetch-external-matrix.outputs.matrix)}}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
-        path: 'easycrypt'
-    - uses: actions/checkout@v3
-      with:
-        path: 'project'
-        repository: ${{ matrix.target[1] }}
+        path: easycrypt
+    - name: Checkout External Project
+      run: |
+        git clone --recurse-submodules \
+          -b ${{ matrix.target.branch }} \
+          ${{ matrix.target.repository }} \
+          project/${{ matrix.target.name }}
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
         opam pin add -n easycrypt easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
-      run: opam config exec -- make -C easycrypt build install
+      run: opam exec -- make -C easycrypt build install
     - name: Detect SMT provers
       run: |
         rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
-        opam config exec -- easycrypt why3config
+        opam exec -- easycrypt why3config
     - name: Compile project
-      working-directory: project/${{ matrix.target[2] }}
-      run: opam config exec -- ec-runtest ${{ matrix.target[5] }} ${{ matrix.target[3] }} ${{ matrix.target[4] }}
-    - uses: actions/upload-artifact@v3
+      working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
+      run: |
+        opam exec -- easycrypt runtest  \
+          -report report.log            \
+          ${{ matrix.target.options  }} \
+          ${{ matrix.target.config   }} \
+          ${{ matrix.target.scenario }}
+    - name: Compute real-path to report.log
+      if: always()
+      run: |
+        echo "report=$(realpath project/${{ matrix.target.name }}/${{ matrix.target.subdir }})/report.log" >> $GITHUB_ENV
+    - uses: actions/upload-artifact@v4
       name: Upload report.log
       if: always()
       with:
-        name: report.log (${{ matrix.target[0] }})
-        path: report.log
+        name: report.log (${{ matrix.target.name }})
+        path: ${{ env.report }}
         if-no-files-found: ignore
+
+  external-status:
+    name: Check EasyCrypt External Projects (set-status)
+    if: always()
+    needs: [external]
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: re-actors/alls-green@release/v1
+      with:
+        jobs: ${{ toJSON(needs) }}
+        allowed-skips: external
 
   notification:
     name: Notification
-    needs: [compile-opam, compile-nix, check, external]
+    needs: [compile-opam, compile-nix, check, external, external-status]
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

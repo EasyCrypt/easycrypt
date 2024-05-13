@@ -53,7 +53,7 @@ let match_ (env : EcEnv.env) (search : search list) f =
           in
 
           try
-            ignore (EcMatching.f_match_core mode hyps (ue, ev) ~ptn tp);
+            ignore (EcMatching.f_match_core mode hyps (ue, ev) ptn tp);
             raise E.MatchFound
           with EcMatching.MatchFailure ->
             `Continue

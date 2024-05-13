@@ -9,9 +9,11 @@ ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo@2.4 Z3@4.12 CVC5@1.0
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
-CHECK     += --bin=./ec.native --bin-args="$(ECARGS)"
-CHECK     += --bin-args="$(ECPROVERS:%=-p %)"
-CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
+CHECK     += --bin=./ec.native
+CHECK     += --jobs="$(ECJOBS)"
+CHECK     += $(foreach prover,$(ECPROVERS),--bin-args=-p --bin-args="$(prover)")
+CHECK     += --bin-args=-timeout --bin-args="$(ECTOUT)"
+CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
 

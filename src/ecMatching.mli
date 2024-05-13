@@ -141,7 +141,7 @@ val f_match_core :
      fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
-  -> ptn:form
+  -> form
   -> form
   -> unienv * mevmap
 
@@ -149,7 +149,7 @@ val f_match :
      fmoptions
   -> EcEnv.LDecl.hyps
   -> unienv * mevmap
-  -> ptn:form
+  -> form
   -> form
   -> unienv * (ty Muid.t) * mevmap
 
@@ -166,6 +166,8 @@ module FPosition : sig
   val empty : ptnpos
 
   val is_empty : ptnpos -> bool
+
+  val reroot : int list -> ptnpos -> ptnpos
 
   val tostring : ptnpos -> string
 

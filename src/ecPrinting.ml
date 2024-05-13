@@ -1622,7 +1622,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
       try
         let (ue, ev) =
-          EcMatching.f_match_core fmnotation hy (ue, ev) ~ptn:bd f
+          EcMatching.f_match_core fmnotation hy (ue, ev) bd f
         in
 
         if not (EcMatching.can_concretize ev ue) then

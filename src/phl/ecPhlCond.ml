@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
-open EcModules
 open EcFol
 open EcEnv
 
@@ -89,9 +88,10 @@ let rec t_equiv_cond side tc =
       let hiff,m1,m2,h,h1,h2 = as_seq6 fresh in
 
       let t_aux =
-        let rwpt = { pt_head = PTLocal hiff;
-                     pt_args = [PAMemory m1; PAMemory m2; PASub None]; } in
-
+        let rwpt =
+          EcCoreGoal.ptlocal
+            ~args:[PAMemory m1; PAMemory m2; PASub None]
+            hiff in
 
         FApi.t_seqs [t_intros_i [m1]    ; EcPhlSkip.t_skip;
                      t_intros_i [m2; h] ; t_elim_hyp h;
@@ -113,86 +113,95 @@ let rec t_equiv_cond side tc =
           tc
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_match tc =
-  let hyps = FApi.tc1_hyps tc in
-  let env  = LDecl.toenv hyps in
-  let hs   = tc1_as_hoareS tc in
+module LowMatchInternal : sig
+  val t_gen_match : side option -> FApi.backward
+end = struct
+  let t_gen_match (side : side option) (tc : tcenv1) : tcenv =
+    let hyps   = FApi.tc1_hyps tc in
+    let env    = LDecl.toenv hyps in
+    let me, st = EcLowPhlGoal.tc1_get_stmt side tc in
 
-  let me, st = hs.hs_m, hs.hs_s in
+    let (e, _), _ = tc1_first_match tc st in
+    let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+    let indt = oget (EcDecl.tydecl_as_datatype indt) in
+    let f = form_of_expr (EcMemory.memory me) e in
 
-  let sets st = { hs with hs_s = st } in
+    let onsub (i : int) (tc : tcenv1) =
+      let cname, cargs = List.nth indt.tydt_ctors i in
+      let cargs = List.length cargs in
 
-  let (e, bs), tl = tc1_first_match tc st in
-  let indp, indt, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-  let indt = oget (EcDecl.tydecl_as_datatype indt) in
-  let f = form_of_expr (EcMemory.memory me) e in
+      let tc, names = t_intros_n_x cargs tc in
+      let tc = FApi.as_tcenv1 tc in
 
-  let do1 ((ids, b), (cname, _)) =
-    let subst, lvars =
-      add_elocals Fsubst.f_subst_id ids in
+      let discharge (tc : tcenv1) =
+        let+ tc =
+          if   Option.is_some side
+          then EcLowGoal.t_intros_n 1 tc
+          else t_id tc
+        in
 
-    let cop = EcPath.pqoname (EcPath.prefix indp) cname in
-    let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
-    let cop =
-      let args = List.map (curry f_local) lvars in
-      f_app cop args f.f_ty in
-    let cop = f_eq f cop in
+        let+ tc = EcPhlSkip.t_skip tc in
+        let+ tc = EcLowGoal.t_intro_s `Fresh tc in
+        let+ tc = EcLowGoal.t_elim_and tc in
 
-    f_forall
-      (List.map (snd_map gtty) lvars)
-      (f_hoareS_r
-         { (sets (stmt ((s_subst subst b).s_node @ tl.s_node)))
-             with hs_pr = f_and_simpl cop hs.hs_pr })
+        let e = EcEnv.LDecl.fresh_id (FApi.tc1_hyps tc) "e" in
 
-  in
+        let+ tc = EcLowGoal.t_intros_i [e] tc in
+        let+ tc = EcLowGoal.t_intros_n ~clear:true 1 tc in
 
-  let concl = List.map do1 (List.combine bs indt.EcDecl.tydt_ctors) in
+        let+ tc =
+          let hyps = FApi.tc1_hyps tc in
+          let args =
+            List.map
+              (fun x ->
+                 let ty = EcEnv.LDecl.var_by_id x hyps in
+                 PAFormula (f_local x ty))
+              names in
+          EcLowGoal.t_exists_intro_s args tc in
 
-  FApi.xmutate1 tc `Match concl
+        let+ tc = EcLowGoal.t_symmetry tc in
+        let+ tc = EcLowGoal.t_apply_hyp e ~args:[] ~sk:0 tc in
+
+        t_id tc
+      in
+
+      let clean (tc : tcenv1) =
+        let pre = oget (EcLowPhlGoal.get_pre (FApi.tc1_goal tc)) in
+        let post = oget (EcLowPhlGoal.get_post (FApi.tc1_goal tc)) in
+        let eq, _, pre = destr_and3 pre in
+        let tc = EcPhlConseq.t_conseq (f_and eq pre) post tc in
+
+        FApi.t_onall
+          (EcLowGoal.t_clears names)
+          (FApi.t_firsts (EcLowGoal.t_trivial ~keep:false) 2 tc)
+      in
+
+      tc
+        |> EcPhlRCond.t_rcond_match side cname (Zpr.cpos 1)
+        @+ [discharge; clean]
+    in
+
+    let tc = FApi.as_tcenv1 (EcPhlExists.t_hr_exists_intro [f] tc) in
+    let tc = FApi.as_tcenv1 (EcPhlExists.t_hr_exists_elim_r ~bound:1 tc) in
+    let tc = EcLowGoal.t_elimT_ind `Case tc in
+
+    FApi.t_onalli onsub tc
+end
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_match s tc =
-  let hyps = FApi.tc1_hyps tc in
-  let env  = LDecl.toenv hyps in
-  let es   = tc1_as_equivS tc in
+let t_hoare_match (tc : tcenv1) : tcenv =
+  let _ : sHoareS = tc1_as_hoareS tc in
+  LowMatchInternal.t_gen_match None tc
 
-  let me, st =
-    match s with
-    | `Left  -> es.es_ml, es.es_sl
-    | `Right -> es.es_mr, es.es_sr in
+(* -------------------------------------------------------------------- *)
+let t_bdhoare_match (tc : tcenv1) : tcenv =
+  let _ : bdHoareS = tc1_as_bdhoareS tc in
+  LowMatchInternal.t_gen_match None tc
 
-  let sets st =
-    match s with
-    | `Left  -> { es with es_sl = st; }
-    | `Right -> { es with es_sr = st; } in
-
-  let (e, bs), tl = tc1_first_match tc st in
-  let indp, indt, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-  let indt = oget (EcDecl.tydecl_as_datatype indt) in
-  let f = form_of_expr (EcMemory.memory me) e in
-
-  let do1 ((ids, b), (cname, _)) =
-    let subst, lvars =
-      add_elocals Fsubst.f_subst_id ids in
-
-    let cop = EcPath.pqoname (EcPath.prefix indp) cname in
-    let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
-    let cop =
-      let args = List.map (curry f_local) lvars in
-      f_app cop args f.f_ty in
-    let cop = f_eq f cop in
-
-    f_forall
-      (List.map (snd_map gtty) lvars)
-      (f_equivS_r
-         { (sets (stmt ((s_subst subst b).s_node @ tl.s_node)))
-             with es_pr = f_and_simpl cop es.es_pr })
-
-  in
-
-  let concl = List.map do1 (List.combine bs indt.EcDecl.tydt_ctors) in
-
-  FApi.xmutate1 tc (`Match s) concl
+(* -------------------------------------------------------------------- *)
+let t_equiv_match (s : side) (tc : tcenv1) : tcenv =
+  let _ : equivS = tc1_as_equivS tc in
+  LowMatchInternal.t_gen_match (Some s) tc
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_match_same_constr tc =

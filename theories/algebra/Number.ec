@@ -18,7 +18,7 @@ proof. by move=> + x y - ->. qed.
 lemma monoLR ['a 'b] f g (aR : 'a rel) (rR : 'b rel) :
   cancel g f => mono2 f aR rR => forall x y,
     rR (f x) y <=> aR x (g y).
-proof. by move=> can_gf mf x y; rewrite -{1}can_gf mf. qed.
+proof. by move=> can_gf mf x y; rewrite -{1}[y]can_gf mf. qed.
 
 lemma monoRL ['a 'b] f g (aR : 'a rel) (rR : 'b rel) :
   cancel g f => mono2 f aR rR => forall x y,
