@@ -35,6 +35,7 @@ and run_option = {
   runo_scenarios : string list;
   runo_report    : string option;
   runo_provers   : prv_options;
+  runo_jobs      : int option;
 }
 
 and prv_options = {
@@ -350,6 +351,7 @@ let specs = {
       `Group "loader";
       `Group "provers";
       `Spec  ("report", `String, "dump result to <report>");
+      `Spec  ("jobs", `Int, "number of parallel jobs to run");
     ]);
 
     ("why3config", "Configure why3", []);
@@ -368,7 +370,6 @@ let specs = {
       `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
       `Spec ("server"     , `String, "Connect to an external Why3 server");
     ]);
-
 
     ("loader", "Options related to loader", [
       `Spec ("I"   , `String, "Add <dir> to the list of include directories");
@@ -506,7 +507,8 @@ let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
     runo_scenarios = scenarios;
     runo_report    = get_string "report" values;
-    runo_provers   = prv_options_of_values ini values; }
+    runo_provers   = prv_options_of_values ini values;
+    runo_jobs      = get_int "jobs" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
