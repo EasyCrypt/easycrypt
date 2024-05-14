@@ -296,6 +296,11 @@ let main () =
                 (Format.sprintf "--report=%s")
                 input.runo_report
             )
+          @ Option.to_list (
+              Option.map
+                (Format.sprintf "--jobs=%d")
+                input.runo_jobs
+            )
           @ List.map (Format.sprintf "--bin-args=%s") ecargs
           @ [input.runo_input]
           @ input.runo_scenarios
