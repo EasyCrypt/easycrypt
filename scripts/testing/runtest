@@ -803,7 +803,7 @@ async def _main():
     allscripts = Gather.gatherall(options.scenarios, options.targets)
 
     listener = None
-    if sys.stdout.isatty:
+    if sys.stdout.isatty():
         try:
             listener = TermListener(allscripts)
         except curses.error:
