@@ -36,11 +36,11 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : symbol option;
-  puc_mode   : bool option;
-  puc_jdg    : proof_state;
-  puc_flags  : pucflags;
-  puc_crt    : EcDecl.axiom;
+  puc_name    : symbol option;
+  puc_started : bool;
+  puc_jdg     : proof_state;
+  puc_flags   : pucflags;
+  puc_crt     : EcDecl.axiom;
 }
 
 and proof_ctxt =
@@ -100,13 +100,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ax : sig
-  type mode = [`WeakCheck | `Check | `Report]
+  type proofmode = [`WeakCheck | `Check | `Report]
 
-  val add     : scope -> mode -> paxiom located -> symbol option * scope
+  val add     : scope -> proofmode -> paxiom located -> symbol option * scope
   val save    : scope -> string option * scope
   val admit   : scope -> string option * scope
   val abort   : scope -> scope
-  val realize : scope -> mode -> prealize located -> symbol option * scope
+  val realize : scope -> proofmode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -114,7 +114,7 @@ module Ty : sig
   val add : scope -> ptydecl located -> scope
 
   val add_class    : scope -> ptypeclass located -> scope
-  val add_instance : ?import:EcTheory.import -> scope -> Ax.mode -> ptycinstance located -> scope
+  val add_instance : ?import:EcTheory.import -> scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -178,9 +178,10 @@ module Tactics : sig
   open EcCoreGoal
 
   type prinfos = proofenv * (handle * handle list)
+  type proofmode = Ax.proofmode
 
-  val process : scope -> Ax.mode -> ptactic list -> prinfos option * scope
-  val proof   : scope -> Ax.mode -> bool -> scope
+  val process : scope -> proofmode -> ptactic list -> prinfos option * scope
+  val proof   : scope -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -230,7 +231,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Cloning : sig
-  val clone : scope -> Ax.mode -> theory_cloning -> scope
+  val clone : scope -> Ax.proofmode -> theory_cloning -> scope
 end
 
 (* -------------------------------------------------------------------- *)

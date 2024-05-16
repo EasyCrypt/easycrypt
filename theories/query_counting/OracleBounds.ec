@@ -45,7 +45,7 @@ section.
   declare module O <: Oracle {-Count}.
 
   lemma CountO_fL: islossless O.f => islossless Count(O).f.
-  proof strict.
+  proof.
   by move=> O_fL; proc;
      call O_fL;
      inline Counter.incr; wp.
@@ -54,7 +54,7 @@ section.
   lemma CountO_fC ci:
     islossless O.f =>
     phoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
-  proof strict.
+  proof.
   by move=> O_fL; proc;
      call O_fL;
      inline Counter.incr; wp.
@@ -64,13 +64,13 @@ section.
     Count(O).f ~ Count(O).f:
       ={Counter.c, x, glob O} /\ Counter.c{1} = ci ==>
       ={Counter.c, res, glob O} /\ Counter.c{1} = ci + 1.
-  proof strict.
+  proof.
   by proc; inline Counter.incr;
      call (_: true); wp.
   qed.
 
   equiv CountO_O: Count(O).f ~ O.f: ={glob O, x} ==> ={glob O, res}.
-  proof strict.
+  proof.
   by proc*; inline Count(O).f Counter.incr; wp;
      call (_: true); wp.
   qed.
@@ -105,7 +105,7 @@ section.
   lemma IND_CountO_O &m (P: glob O -> glob A -> bool):
     Pr[IND(Count(O),A).main() @ &m: res /\ P (glob O) (glob A)] =
       Pr[IND(O,A).main() @ &m: res /\ P (glob O) (glob A)].
-  proof strict.
+  proof.
   byequiv (_: ={glob A, glob O} ==> ={glob O, glob A, res})=> //; proc.
   call (_: ={glob O});
     first by proc*; inline Count(O).f Counter.incr; wp;
@@ -142,7 +142,7 @@ theory EnfPen.
 
     lemma enf_implies_pen &m:
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <= Pr[IND(Enforce(Count(O)),A).main() @ &m: res].
-    proof strict.
+    proof.
     byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt().
     symmetry; proc.
     call (_: !Counter.c <= bound, ={glob Counter, glob O}, Counter.c{1} <= bound).
@@ -192,7 +192,7 @@ theory PenBnd.
     lemma pen_implies_bnd &m:
       Pr[IND(Count(O),A).main() @ &m: res] =
         Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound].
-    proof strict.
+    proof.
     by byequiv (_: ={glob O, glob A} ==> ={Counter.c, res} /\ Counter.c{1} <= bound)=> //;
        proc; call A_distinguishC_E;
        inline Counter.init; wp.
@@ -230,7 +230,7 @@ theory BndPen.
     (* The adversary we build is bounded in both senses used above (for sanity) *)
     lemma enforcedAdv_bounded:
       phoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
-    proof strict.
+    proof.
       proc (Counter.c <= bound)=> //; first by smt(leq0_bound).
         by apply A_distinguishL.
       by proc; sp; if;
@@ -242,7 +242,7 @@ theory BndPen.
       EnforcedAdv(A,Count(O)).distinguish ~ EnforcedAdv(A,Count(O)).distinguish:
         ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
         ={glob A, glob O, res, Counter.c} /\ Counter.c{1} <= bound.
-    proof strict.
+    proof.
     proc (={glob O, Counter.c} /\ Counter.c{1} <= bound)=> //; first smt(leq0_bound).
     proc; sp; if=> //; inline Count(O).f Counter.incr; wp; call (_: true); wp; skip; smt().
     qed.
@@ -251,7 +251,7 @@ theory BndPen.
     lemma bnd_implied_pen &m:
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <=
        Pr[IND(Count(O),EnforcedAdv(A)).main() @ &m: res].
-    proof strict.
+    proof.
     byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt().
     symmetry; proc.
     call (_: bound < Counter.c, ={glob Counter, glob Enforce, glob O}).
