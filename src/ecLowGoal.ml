@@ -2411,13 +2411,13 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 (* -------------------------------------------------------------------- *)
 let t_smt ~(mode:smtmode) pi tc =
   let error () =
     match mode with
-    | `Standard ->
+    | `Sloppy ->
         tc_error !!tc ~catchable:true  "cannot prove goal"
     | `Strict ->
         tc_error !!tc ~catchable:false "cannot prove goal (strict)"

@@ -494,8 +494,8 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t  -> snd (EcScope.Tactics.process scope mode t)
-  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
+  | `Actual t -> snd (EcScope.Tactics.process scope mode t)
+  | `Proof    -> EcScope.Tactics.proof scope
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) ed =
@@ -524,17 +524,10 @@ and process_proverinfo scope pi =
 
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
-  let pragma_check mode =
-    match EcScope.goal scope with
-    | Some { EcScope.puc_mode = Some false } ->
-        EcScope.hierror "pragma [Proofs:*] in non-strict proof script";
-    | _ -> pragma_check mode
-  in
-
   match unloc opt with
-  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
-  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
-  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
+  | x when x = Pragmas.Proofs.weak    -> pragma_check `WeakCheck
+  | x when x = Pragmas.Proofs.check   -> pragma_check `Check
+  | x when x = Pragmas.Proofs.report  -> pragma_check `Report
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
