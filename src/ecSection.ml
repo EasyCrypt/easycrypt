@@ -53,7 +53,7 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Typeclass p ->
       Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tyname ppe) p
   | `Instance tci ->
-    match tci with
+    match tci.tci_instance with
     | `Ring _ -> Format.fprintf fmt "ring instance"
     | `Field _ -> Format.fprintf fmt "field instance"
     | `General _ -> Format.fprintf fmt "instance"
@@ -107,8 +107,24 @@ let rec on_ty (cb : cb) (ty : ty) =
   | Tvar    _        -> ()
   | Tglob   _        -> ()
   | Ttuple tys       -> List.iter (on_ty cb) tys
-  | Tconstr (p, tys) -> cb (`Type p); List.iter (on_ty cb) tys
+  | Tconstr (p, tys) -> cb (`Type p); List.iter (on_etyarg cb) tys
   | Tfun (ty1, ty2)  -> List.iter (on_ty cb) [ty1; ty2]
+
+and on_etyarg cb ((ty, tcw) : etyarg) =
+  on_ty cb ty;
+  List.iter (on_tcwitness cb) tcw
+
+and on_tcwitness cb (tcw : tcwitness) =
+  match tcw with
+  | TCIConcrete { path; etyargs } ->
+    List.iter (on_etyarg cb) etyargs;
+    cb (`Type path)                  (* FIXME:TC *)
+ 
+  | TCIAbstract { support = `Abs path } ->
+    cb (`Type path)
+
+  | TCIAbstract { support = `Var _ | `Univar _ } ->
+    ()
 
 let on_pv (cb : cb) (pv : prog_var)=
   match pv with
@@ -126,14 +142,6 @@ let on_binding (cb : cb) ((_, ty) : (EcIdent.t * ty)) =
 
 let on_bindings (cb : cb) (bds : (EcIdent.t * ty) list) =
   List.iter (on_binding cb) bds
-
-let rec on_etyarg cb ((ty, tcw) : etyarg) =
-  on_ty cb ty;
-  List.iter (on_tcwitness cb) tcw
-
-and on_tcwitness cb ((args, p) : tcwitness) =
-  List.iter (on_etyarg cb) args;
-  cb (`Type p)                  (* FIXME:TC *)
 
 let rec on_expr (cb : cb) (e : expr) =
   let cbrec = on_expr cb in
@@ -367,7 +375,7 @@ and on_oi (cb : cb) (oi : OI.t) =
 (* -------------------------------------------------------------------- *)
 let on_typeclass cb tc =
   cb (`Typeclass tc.tc_name);
-  List.iter (on_ty cb) tc.tc_args
+  List.iter (on_etyarg cb) tc.tc_args
 
 let on_typeclasses cb tcs =
   List.iter (on_typeclass cb) tcs
@@ -464,18 +472,18 @@ let on_field cb f =
   let on_p p = cb (`Op p) in
   on_p f.f_inv; oiter on_p f.f_div
 
-let on_instance cb ty tci =
-  on_typarams cb (fst ty);
-  on_ty cb (snd ty);
+let on_instance cb tci =
+  on_typarams cb tci.tci_params;
+  on_ty cb tci.tci_type;
   (* FIXME section: ring/field use type class that do not exists *)
-  match tci with
+  match tci.tci_instance with
   | `Ring  r -> on_ring  cb r
   | `Field f -> on_field cb f
 
   | `General (tci, syms) ->
      on_typeclass cb tci;
      Option.iter
-       (Mstr.iter (fun _ (p, tys) -> cb (`Op p); List.iter (on_ty cb) tys))
+       (Mstr.iter (fun _ (p, tys) -> cb (`Op p); List.iter (on_etyarg cb) tys))
        syms
 
 (* -------------------------------------------------------------------- *)
@@ -1003,11 +1011,11 @@ let generalize_export to_gen (p,lc) =
   if lc = `Local || to_clear to_gen (`Th p) then to_gen, None
   else to_gen, Some (Th_export (p,lc))
 
-let generalize_instance to_gen (ty,tci, lc) =
-  if lc = `Local then to_gen, None
-  (* FIXME: be sure that we have no dep to declare or local,
+let generalize_instance to_gen (x, tci) =
+  if tci.tci_local = `Local then to_gen, None
+  (* FIXME:TC be sure that we have no dep to declare or local,
      or fix this code *)
-  else to_gen, Some (Th_instance (ty,tci,lc))
+  else to_gen, Some (Th_instance (x, tci))
 
 let generalize_baserw to_gen prefix (s,lc) =
   if lc = `Local then
@@ -1041,7 +1049,7 @@ let rec generalize_th_item to_gen prefix th_item =
     | Th_module me       -> generalize_module  to_gen me
     | Th_theory cth      -> generalize_ctheory to_gen prefix cth
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
-    | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
+    | Th_instance (x,tci)-> generalize_instance to_gen (x,tci)
     | Th_typeclass _     -> assert false
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
@@ -1133,7 +1141,7 @@ let rec set_local_item item =
     | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_local tc.tc_loca   })
     | Th_theory      (s, th) -> Th_theory    (s, set_local_th th)
     | Th_export       (p,lc) -> Th_export    (p, set_local lc)
-    | Th_instance (ty,ti,lc) -> Th_instance  (ty,ti, set_local lc)
+    | Th_instance    (x,tci) -> Th_instance  (x, { tci with tci_local = set_local tci.tci_local })
     | Th_baserw       (s,lc) -> Th_baserw    (s, set_local lc)
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
@@ -1390,18 +1398,18 @@ let check_tcdecl scenv prefix name tc =
   else
     on_tcdecl (cb scenv from cd_glob) tc
 
-let check_instance scenv ty tci lc =
-  let from = (lc :> locality), `Instance tci in
-  if lc = `Local then check_section scenv from
+let check_instance scenv tci =
+  let from = (tci.tci_local, `Instance tci) in
+  if tci.tci_local = `Local then check_section scenv from
   else
     if scenv.sc_insec then
-      match tci with
+      match tci.tci_instance with
       | `Ring _ | `Field _ ->
-          on_instance (cb scenv from cd_glob) ty tci
+          on_instance (cb scenv from cd_glob) tci
 
       | `General _ ->
           let cd = { cd_glob with d_ty = [`Declare; `Global]; } in
-          on_instance (cb scenv from cd) ty tci
+          on_instance (cb scenv from cd) tci
 
 (* -----------------------------------------------------------*)
 type checked_ctheory = ctheory
@@ -1433,19 +1441,19 @@ let add_item_ (item : theory_item) (scenv:scenv) =
   let env = scenv.sc_env in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op) -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
-    | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
-    | Th_theory (s, cth) -> EcEnv.Theory.bind s cth env
-    | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
-    | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
-    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
+    | Th_type      (s,tyd) -> EcEnv.Ty.bind s tyd env
+    | Th_operator   (s,op) -> EcEnv.Op.bind s op env
+    | Th_axiom     (s, ax) -> EcEnv.Ax.bind s ax env
+    | Th_modtype   (s, ms) -> EcEnv.ModTy.bind s ms env
+    | Th_module         me -> EcEnv.Mod.bind me.tme_expr.me_name me env
+    | Th_typeclass  (s,tc) -> EcEnv.TypeClass.bind s tc env
+    | Th_theory   (s, cth) -> EcEnv.Theory.bind s cth env
+    | Th_export    (p, lc) -> EcEnv.Theory.export p lc env
+    | Th_instance (x, tci) -> EcEnv.TcInstance.bind x tci env
+    | Th_baserw     (s,lc) -> EcEnv.BaseRw.add s lc env
+    | Th_addrw (p, ps, lc) -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
-    | Th_reduction r     -> EcEnv.Reduction.add r env
+    | Th_reduction       r -> EcEnv.Reduction.add r env
   in
   { scenv with
     sc_env = env;
@@ -1483,7 +1491,7 @@ let check_item scenv item =
   | Th_module        me -> check_module  scenv prefix me
   | Th_typeclass (s,tc) -> check_tcdecl  scenv prefix s tc
   | Th_export   (_, lc) -> assert (lc = `Global || scenv.sc_insec);
-  | Th_instance  (ty,tci,lc) -> check_instance scenv ty tci lc
+  | Th_instance(_, tci) -> check_instance scenv tci
   | Th_baserw (_,lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local base rewrite can only be declared inside section";

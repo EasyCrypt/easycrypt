@@ -8,7 +8,7 @@ open EcCoreFol
 (* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_name : EcPath.path;
-  tc_args : ty list;
+  tc_args : etyarg list;
 }
 
 type ty_param  = EcIdent.t * typeclass list
@@ -42,7 +42,9 @@ val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list)
 
 val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> locality -> tydecl
 
-val ty_instanciate : ty_params -> ty list -> ty -> ty
+val etyargs_of_tparams : ty_params -> etyarg list
+
+val ty_instanciate : ty_params -> etyarg list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -150,15 +152,6 @@ and ax_visibility = [`Visible | `NoSmt | `Hidden]
 (* -------------------------------------------------------------------- *)
 val is_axiom  : axiom_kind -> bool
 val is_lemma  : axiom_kind -> bool
-
-(* -------------------------------------------------------------------- *)
-val axiomatized_op :
-     ?nargs: int
-  -> ?nosmt:bool
-  -> EcPath.path
-  -> (ty_params * form)
-  -> locality
-  -> axiom
 
 (* -------------------------------------------------------------------- *)
 type tc_decl = {

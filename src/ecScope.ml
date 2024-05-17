@@ -1085,6 +1085,33 @@ module Op = struct
     let item = EcTheory.mkitem import (EcTheory.Th_operator (x, op)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env; }
 
+  (* -------------------------------------------------------------------- *)
+  let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
+    let axpm, axbd =
+      let subst, axpm = EcSubst.fresh_tparams EcSubst.empty tparams in
+      (axpm, EcSubst.subst_form subst axbd)
+    in
+
+    let args, axbd =
+      match axbd.f_node with
+      | Fquant (Llambda, bds, axbd) ->
+          let bds, flam = List.split_at nargs bds in
+          (bds, f_lambda flam axbd)
+      | _ -> [], axbd
+    in
+
+    let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
+    let opty   = toarrow (List.map f_ty opargs) axbd.EcAst.f_ty in
+    let op     = f_op_tc path (etyargs_of_tparams axpm) opty in
+    let op     = f_app op opargs axbd.f_ty in
+    let axspec = f_forall args (f_eq op axbd) in
+
+    { ax_tparams    = axpm;
+      ax_spec       = axspec;
+      ax_kind       = `Axiom (Ssym.empty, false);
+      ax_loca       = lc;
+      ax_visibility = if nosmt then `NoSmt else `Visible; }
+
   let add (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
@@ -1193,7 +1220,7 @@ module Op = struct
               let axop  =
                 let nosmt = op.po_nosmt in
                 let nargs = List.sum (List.map (List.length |- fst) args) in
-                  EcDecl.axiomatized_op ~nargs ~nosmt path (tyop.op_tparams, bd) lc in
+                  axiomatized_op ~nargs ~nosmt path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope (unloc ax, axop)
@@ -1220,11 +1247,10 @@ module Op = struct
             ax
           in
 
-          let ax, axpm =
-            let bdpm = List.map fst tparams in
-            let axpm = List.map EcIdent.fresh bdpm in
-              (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
-               List.combine axpm (List.map snd tparams)) in
+          let axpm, ax =
+            let subst, tparams = EcSubst.fresh_tparams EcSubst.empty tparams in
+            (tparams, EcSubst.subst_form subst ax) in
+
           let ax =
             { ax_tparams    = axpm;
               ax_spec       = ax;
@@ -1241,11 +1267,11 @@ module Op = struct
           hierror ~loc
             "multiple names are only allowed for non-refined abstract operators";
         let addnew scope name =
-          let nparams = List.map (fst_map EcIdent.fresh) tparams in
-          let subst = Tvar.init
-            (List.map fst tparams)
-            (List.map (tvar |- fst) nparams) in
-          let rop = EcDecl.mk_op ~opaque:false nparams (Tvar.subst subst ty) None lc in
+          let subst, nparams =
+            EcSubst.fresh_tparams EcSubst.empty tparams in
+          let rop =
+            EcDecl.mk_op ~opaque:false
+            nparams (EcSubst.subst_ty subst ty) None lc in
           bind scope (unloc name, rop)
         in List.fold_left addnew scope op.po_aliases
 
@@ -1260,10 +1286,18 @@ module Op = struct
       if not (EcAlgTactic.is_module_loaded (env scope)) then
         hierror "for tag %s, load Distr first" tag;
 
-      let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
-      let nparams  = List.map (EcIdent.fresh |- fst) tyop.op_tparams in (* FIXME: TC *)
-      let subst    = Tvar.init (List.fst tyop.op_tparams) (List.map tvar nparams) in
-      let ty       = Tvar.subst subst tyop.op_ty in
+      let subst, nparams =
+        EcSubst.fresh_tparams EcSubst.empty tyop.op_tparams in
+      let oppath = EcPath.pqname (path scope) (unloc op.po_name) in
+      let optyargs =
+        let mktcw (a : EcIdent.t) (i : int) =
+          TCIAbstract { support = `Var a; offset = i; }
+        in
+          List.map
+            (fun (a, tcs) -> (tvar a, List.mapi (fun i _ -> mktcw a i) tcs))
+            nparams
+      in
+      let ty = EcSubst.subst_ty subst tyop.op_ty in
       let aty, rty = EcTypes.tyfun_flat ty in
 
       let dty =
@@ -1273,13 +1307,13 @@ module Op = struct
       in
 
       let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
-      let ax  = EcFol.f_op oppath (List.map tvar nparams) ty in
+      let ax  = EcFol.f_op_tc oppath optyargs ty in
       let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
       let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams    = List.map (fun ty -> (ty, [])) nparams;
+        { ax_tparams    = nparams;
           ax_spec       = ax;
           ax_kind       = `Axiom (Ssym.empty, false);
           ax_loca       = lc;
@@ -1610,11 +1644,6 @@ module Ty = struct
         let ue = TT.transtyvars env (loc, Some args) in
         let tcs = List.map (TT.transtc env ue) tcs in
         let tp = EcUnify.UniEnv.tparams ue in
-
-        begin match tp, tcs with
-          | [(x, [])], [{ tc_args = [ty] }] ->
-            Format.eprintf "[W]%s %s@." (EcIdent.tostring x) (EcTypes.dump_ty ty)
-          | _ -> () end;
         tp, `Abstract tcs
 
       | PTYD_Alias bd ->
@@ -1714,6 +1743,7 @@ module Ty = struct
           hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
+        let tvi = List.map (fun ty -> (Some ty, None)) tvi in
         let selected =
           EcUnify.select_op ~filter:(fun _ -> EcDecl.is_oper)
             (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
@@ -1721,16 +1751,15 @@ module Ty = struct
         let op =
           match selected with
           | [] -> hierror ~loc:op.pl_loc "unknown operator"
-          | op1::op2::_ ->
+          | op1 :: op2 :: _ ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
                 (EcPath.tostring (fst (proj4_1 op1)))
                 (EcPath.tostring (fst (proj4_1 op2)))
           | [((p, opparams), opty, subue, _)] ->
               let subst    = Tuni.subst (EcUnify.UniEnv.assubst subue) in
-              let subst    = ty_subst subst in
-              let opty     = subst opty in
-              let opparams = List.map subst opparams in
+              let opty     = ty_subst subst opty in
+              let opparams = List.map (etyarg_subst subst) opparams in
               ((p, opparams), opty)
 
         in
@@ -1816,15 +1845,7 @@ module Ty = struct
       interactive
 
   (* ------------------------------------------------------------------ *)
-  (* FIXME section: those path does not exists ...
-     futhermode Ring.ZModule is an abstract theory *)
-  let p_zmod    = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "ZModule"], "zmodule")
-  let p_ring    = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "ComRing"], "ring"   )
-  let p_idomain = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "IDomain"], "idomain")
-  let p_field   = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "Field"  ], "field"  )
-
-  (* ------------------------------------------------------------------ *)
-  let get_ring_field_op (name : string) (symbols : (path * ty list) Mstr.t) =
+  let get_ring_field_op (name : string) (symbols : (path * etyarg list) Mstr.t) =
     Option.map
       (fun (p, tys) -> assert (List.is_empty tys); p)
       (Mstr.find_opt name symbols)
@@ -1868,22 +1889,18 @@ module Ty = struct
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
-    let add env p =
-      let item = { tc_name = p; tc_args = []; } in
-      let item = EcTheory.Th_instance (ty, `General (item, None), tci.pti_loca) in
+    let instance = EcTheory.
+      { tci_params   = fst ty
+      ; tci_type     = snd ty
+      ; tci_instance = `Ring cr
+      ; tci_local    = (tci.pti_loca :> locality) } in
+
+    let scope =
+      let item = EcTheory.Th_instance (None, instance) in
       let item = EcTheory.mkitem import item in
-      EcSection.add_item item env in
+      { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
-    let scope   =
-      { scope with sc_env =
-          List.fold_left add
-            (let item =
-               EcTheory.Th_instance (([], snd ty), `Ring cr, tci.pti_loca) in
-             let item = EcTheory.mkitem import item in
-             EcSection.add_item item scope.sc_env)
-            [p_zmod; p_ring; p_idomain] }
-
-    in Ax.add_defer scope inter
+    Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
@@ -1915,28 +1932,24 @@ module Ty = struct
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
 
-    let add env p =
-      let item = { tc_name = p; tc_args = [] } in
-      let item = EcTheory.Th_instance(ty, `General (item, None), tci.pti_loca) in
+    let instance = EcTheory.
+      { tci_params   = fst ty
+      ; tci_type     = snd ty
+      ; tci_instance = `Field cr
+      ; tci_local    = (tci.pti_loca :> locality) } in
+
+    let scope =
+      let item = EcTheory.Th_instance (None, instance) in
       let item = EcTheory.mkitem import item in
-      EcSection.add_item item env in
-
-    let scope   =
-      { scope with
-        sc_env =
-          List.fold_left add
-            (let item =
-               EcTheory.Th_instance (([], snd ty), `Field cr, tci.pti_loca) in
-             let item = EcTheory.mkitem import item in
-              EcSection.add_item item scope.sc_env)
-            [p_zmod; p_ring; p_idomain; p_field] }
-
-    in Ax.add_defer scope inter
+      { scope with sc_env = EcSection.add_item item scope.sc_env } in
+  
+    Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
-  let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = EcSubst.empty in
-    let subst = EcSubst.add_tydef subst tcp.tc_name ([], snd ty) in
+  let symbols_of_tc (_env : EcEnv.env) ((tparams, ty) : ty_params * ty) (tcp, tc) =
+    let subst, tparams = EcSubst.fresh_tparams EcSubst.empty tparams in
+    let ty = EcSubst.subst_ty subst ty in
+    let subst = EcSubst.add_tydef subst tcp.tc_name (List.fst tparams, ty) in
     let subst =
       List.fold_left
         (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
@@ -1947,8 +1960,6 @@ module Ty = struct
       tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
-  (*TODOTC: we have to consider the operators of the parent typeclass instance, and also the types.
-    How can I find this instance?*)
   let add_generic_instance
     ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
   =
@@ -1968,21 +1979,7 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
-(*
-    let prti =
-      Option.map
-        (fun prt ->
-          let ue = EcUnify.UniEnv.create (Some typarams) in
-          if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
-            hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name);
-          let oprti = EcEnv.TypeClass.get_instance (env scope) prt in
-          match oprti with
-          | Some prti -> prti
-          | _ -> hierror "instance of `%s' was said to be in the env, but was not found" (EcPath.tostring tcp.tc_name) )
-        tc.tc_prt in
-*)
-
-    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in (* FIXME: TC *)
+    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
     let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
 
@@ -1993,40 +1990,17 @@ module Ty = struct
         (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
         subst (List.combine (List.fst tc.tc_tparams) tcp.tc_args) in
 
-(*
-          let vsubst =
-            ofold
-              (fun tcp_prt vs ->
-                let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
-                List.combine (List.fst tc_prt.tc_tparams) tcp_prt.tc_args @ vs)
-              vsubst tc.tc_prt in
-*)
-
     let subst =
       List.fold_left
         (fun subst (opname, ty) ->
           let oppath, optys = Mstr.find (EcIdent.name opname) symbols in
           let op =
-            EcFol.f_op
+            EcFol.f_op_tc
               oppath
-              (List.map (EcSubst.subst_ty subst) optys)
+              (List.map (EcSubst.subst_etyarg subst) optys)
               (EcSubst.subst_ty subst ty)
           in EcSubst.add_flocal subst opname op)
         subst tc.tc_ops in
-
-(*
-    let subst =
-      ofold
-        (fun tcp_prt s ->
-          let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
-          List.fold_left
-            (fun subst (opname, ty) ->
-            let oppath = Mstr.find (EcIdent.name opname) symbols in
-            let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
-            EcFol.Fsubst.f_bind_local subst opname op)
-          s tc_prt.tc_ops)
-        subst tc.tc_prt in
-*)
 
     let axioms =
       List.map
@@ -2037,12 +2011,16 @@ module Ty = struct
     let lc    = (tci.pti_loca :> locality) in
     let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
-    let add env =
-      let item = EcTheory.Th_instance (ty, `General (tcp, Some symbols), tci.pti_loca) in
-      let item = EcTheory.mkitem import item in
-      EcSection.add_item item env in
+    let instance = EcTheory.
+      { tci_params   = fst ty
+      ; tci_type     = snd ty
+      ; tci_instance = `General (tcp, Some symbols)
+      ; tci_local    = lc } in
 
-    let scope = { scope with sc_env = add scope.sc_env } in
+    let scope =
+      let item = EcTheory.Th_instance (None, instance) in (* FIXME *)
+      let item = EcTheory.mkitem import item in
+      { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
     Ax.add_defer scope inter
 
@@ -2427,8 +2405,8 @@ module Search = struct
                     let ps  = ref Mid.empty in
                     let ue  = EcUnify.UniEnv.create None in
                     let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
-                    let tip = f_subst_init ~tv:tip () in
-                    let es = e_subst tip in
+                    let tip = f_subst_init ~tv:tip.subst () in
+                    let es  = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
                     let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in

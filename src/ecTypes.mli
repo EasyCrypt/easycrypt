@@ -1,4 +1,6 @@
 (* -------------------------------------------------------------------- *)
+
+open EcAst
 open EcBigInt
 open EcMaps
 open EcSymbols
@@ -27,13 +29,14 @@ val dump_ty : ty -> string
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int
 
-val tuni    : EcUid.uid -> ty
-val tvar    : EcIdent.t -> ty
-val ttuple  : ty list -> ty
-val tconstr : EcPath.path -> ty list -> ty
-val tfun    : ty -> ty -> ty
-val tglob   : EcIdent.t -> ty
-val tpred   : ty -> ty
+val tuni       : EcUid.uid -> ty
+val tvar       : EcIdent.t -> ty
+val ttuple     : ty list -> ty
+val tconstr    : EcPath.path -> ty list -> ty
+val tconstr_tc : EcPath.path -> EcAst.etyarg list -> ty
+val tfun       : ty -> ty -> ty
+val tglob      : EcIdent.t -> ty
+val tpred      : ty -> ty
 
 val ty_fv_and_tvar : ty -> int Mid.t
 
@@ -65,18 +68,29 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 module Tvar : sig
-  val fv      : ty -> Sid.t
+  val fv : ty -> Sid.t
 end
 
 (* -------------------------------------------------------------------- *)
 (* [map f t] applies [f] on strict subterms of [t] (not recursive) *)
 val ty_map : (ty -> ty) -> ty -> ty
+val etyarg_map : (ty -> ty) -> etyarg -> etyarg
+val tcw_map : (ty -> ty) -> tcwitness -> tcwitness
 
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val ty_sub_exists : (ty -> bool) -> ty -> bool
+val etyarg_sub_exists : (ty -> bool) -> etyarg -> bool
+val tcw_sub_exists : (ty -> bool) -> tcwitness -> bool
 
+(* -------------------------------------------------------------------- *)
 val ty_fold : ('a -> ty -> 'a) -> 'a -> ty -> 'a
+val etyarg_fold : ('a -> ty -> 'a) -> 'a -> etyarg -> 'a
+val tcw_fold : ('a -> ty -> 'a) -> 'a -> tcwitness -> 'a
+
+(* -------------------------------------------------------------------- *)
 val ty_iter : (ty -> unit) -> ty -> unit
+val etyarg_iter : (ty -> unit) -> etyarg -> unit
+val tcw_iter : (ty -> unit) -> tcwitness -> unit
 
 (* -------------------------------------------------------------------- *)
 val symbol_of_ty   : ty -> string
@@ -164,7 +178,6 @@ val etyarg_fv    : etyarg -> int Mid.t
 val etyargs_fv   : etyarg list -> int Mid.t
 val etyarg_hash  : etyarg -> int
 val etyarg_equal : etyarg -> etyarg -> bool
-val etyarg_map   : (ty -> ty) -> etyarg -> etyarg
 
 (* -------------------------------------------------------------------- *)
 type tcwitness = EcAst.tcwitness
@@ -230,8 +243,7 @@ val split_args : expr -> expr * expr list
 
 (* -------------------------------------------------------------------- *)
 val e_map :
-     (ty   -> ty  ) (* 1-subtype op. *)
-  -> (expr -> expr) (* 1-subexpr op. *)
+     (expr -> expr) (* 1-subexpr op. *)
   -> expr
   -> expr
 

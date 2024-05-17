@@ -20,7 +20,7 @@ exception TransPredError of EcLocation.t * EcEnv.env * tperror
 let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
+let close_pr_body (uni : etyarg EcUid.Muid.t) (body : prbody) =
   let fsubst = EcFol.Fsubst.f_subst_init ~tu:uni () in
   let tsubst = ty_subst fsubst in
 
@@ -77,10 +77,9 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   if not (EcUnify.UniEnv.closed ue) then
     tperror loc env TPE_TyNotClosed;
 
-  let uidmap     = EcUnify.UniEnv.assubst ue in
+  let uidmap  = EcUnify.UniEnv.assubst ue in
   let tparams = EcUnify.UniEnv.tparams ue in
   let body    = body |> omap (close_pr_body uidmap) in
-
   let dom     = Tuni.subst_dom uidmap dom in
 
   EcDecl.mk_pred ~opaque:false tparams dom body pr.pp_locality

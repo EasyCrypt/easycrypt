@@ -675,8 +675,13 @@ let t_hyp (x : EcIdent.t) tc =
   t_apply_hyp x ~args:[] ~sk:0 tc
 
 (* -------------------------------------------------------------------- *)
+let t_apply_s_tc (p : path) (etys : etyarg list) ?args ?sk tc =
+  tt_apply_s p etys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
 let t_apply_s (p : path) (tys : ty list) ?args ?sk tc =
-  tt_apply_s p tys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+  let etys = List.map (fun ty -> (ty, [])) tys in
+  tt_apply_s p etys ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
 let t_apply_hd (hd : handle) ?args ?sk tc =
@@ -1434,8 +1439,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
 
          | _ -> raise InvalidGoalShape in
 
-       (* FIXME:TC *)
-       t_apply_s p (List.fst tv) ~args:(args @ [f2]) ~sk tc
+       t_apply_s_tc p tv ~args:(args @ [f2]) ~sk tc
 
     | _ -> raise TTC.NoMatch
 
@@ -1515,8 +1519,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
     | None -> raise InvalidGoalShape
     | Some (x, sk) ->
        let p = EcInductive.prind_introsc_path p x in
-       (* FIXME:TC *)
-       t_apply_s p (List.fst tv) ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
 
   in t_lazy_match ?reduce t_split_r tc
 
@@ -1536,12 +1539,10 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
     match EcInductive.prind_is_iso_ors pri with
     | Some ((x, sk), _) when side = `Left ->
        let p = EcInductive.prind_introsc_path p x in
-       (* FIXME:TC *)
-       t_apply_s p (List.fst tv) ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
     | Some (_, (x, sk)) when side = `Right ->
        let p = EcInductive.prind_introsc_path p x in
-       (* FIXME:TC *)
-       t_apply_s p (List.fst tv) ~args ~sk tc
+       t_apply_s_tc p tv ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
   in t_lazy_match ?reduce t_split_r tc
@@ -2162,7 +2163,6 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
   in entry tc
 
 (* -------------------------------------------------------------------- *)
-
 let pp_tc tc =
   let pr = proofenv_of_proof (proof_of_tcenv tc) in
   let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in

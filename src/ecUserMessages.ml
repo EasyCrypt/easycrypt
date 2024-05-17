@@ -366,7 +366,7 @@ end = struct
 
         let pp_op fmt ((op, inst), subue) =
           let uidmap = EcUnify.UniEnv.assubst subue in
-          let inst = Tuni.subst_dom uidmap inst in
+          let inst = Tuni.subst_dom uidmap (List.fst inst) in
 
           begin match inst with
           | [] ->

@@ -89,6 +89,7 @@ type mc = {
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
   mc_typeclasses: (ipath * tc_decl) MMsym.t;
+  mc_tcinstances: (ipath * tcinstance) MMsym.t;
   mc_rwbase     : (ipath * path) MMsym.t;
   mc_components : ipath MMsym.t;
 }
@@ -175,8 +176,7 @@ type preenv = {
   env_memories : EcMemory.memtype Mmem.t;
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcModules.abs_uses Mid.t;
-  env_tci      : ((ty_params * ty) * tcinstance) list;
-  env_tc       : tc_decl list;
+  env_tci      : (path option * tcinstance) list;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
   env_redbase  : mredinfo;
@@ -258,6 +258,7 @@ let empty_mc params = {
   mc_variables  = MMsym.empty;
   mc_functions  = MMsym.empty;
   mc_typeclasses= MMsym.empty;
+  mc_tcinstances= MMsym.empty;
   mc_rwbase     = MMsym.empty;
   mc_components = MMsym.empty;
 }
@@ -289,7 +290,6 @@ let empty gstate =
     env_actmem   = None;
     env_abs_st   = Mid.empty;
     env_tci      = [];
-    env_tc       = [];
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
     env_redbase  = Mrd.empty;
@@ -486,12 +486,13 @@ module MC = struct
     | IPIdent _ -> assert false
     | IPPath  p -> p
 
-  let _downpath_for_tydecl    = _downpath_for_th
-  let _downpath_for_modsig    = _downpath_for_th
-  let _downpath_for_operator  = _downpath_for_th
-  let _downpath_for_axiom     = _downpath_for_th
-  let _downpath_for_typeclass = _downpath_for_th
-  let _downpath_for_rwbase    = _downpath_for_th
+  let _downpath_for_tydecl     = _downpath_for_th
+  let _downpath_for_modsig     = _downpath_for_th
+  let _downpath_for_operator   = _downpath_for_th
+  let _downpath_for_axiom      = _downpath_for_th
+  let _downpath_for_typeclass  = _downpath_for_th
+  let _downpath_for_tcinstance = _downpath_for_th
+  let _downpath_for_rwbase     = _downpath_for_th
 
   (* ------------------------------------------------------------------ *)
   let _params_of_path p env =
@@ -883,7 +884,7 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
-          let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
+          let tcargs = etyargs_of_tparams tc.tc_tparams in
           let opargs = (self, [{tc_name = mypath; tc_args = tcargs;}]) in
           let opargs = tc.tc_tparams @ [opargs] in
           let opdecl = OP_TC (mypath, opname) in
@@ -905,7 +906,7 @@ module MC = struct
       let axioms =
         List.map
           (fun (x, ax) ->
-            let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
+            let tcargs = etyargs_of_tparams tc.tc_tparams in
             let axargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
             let axargs = tc.tc_tparams @ [axargs] in
             let ax = EcSubst.subst_form fsubst ax in
@@ -932,6 +933,20 @@ module MC = struct
 
   let import_typeclass p ax env =
     import (_up_typeclass true) (IPPath p) ax env
+
+  (* -------------------------------------------------------------------- *)
+  let lookup_tcinstance qnx env =
+    match lookup (fun mc -> mc.mc_tcinstances) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_tcinstance env p args, obj)
+
+  let _up_tcinstance candup mc x obj=
+    if not candup && MMsym.last x mc.mc_tcinstances <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_tcinstances = MMsym.add x obj mc.mc_tcinstances }
+
+  let import_tcinstance p tci env =
+    import (_up_tcinstance true) (IPPath p) tci env
 
   (* -------------------------------------------------------------------- *)
   let lookup_rwbase qnx env =
@@ -1088,11 +1103,17 @@ module MC = struct
       | Th_typeclass (x, tc) ->
           (add2mc _up_typeclass x tc mc, None)
 
+      | Th_instance (x, tci) ->
+          let mc =
+            x |> Option.fold
+              ~none:mc
+              ~some:(fun x -> add2mc _up_tcinstance x tci mc)
+          in (mc, None)
+
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | Th_export _ | Th_addrw _ | Th_instance _
-      | Th_auto   _ | Th_reduction _ ->
+      | Th_export _ | Th_addrw _ | Th_auto   _ | Th_reduction _ ->
           (mc, None)
     in
 
@@ -1170,6 +1191,9 @@ module MC = struct
 
   and bind_typeclass x tc env =
     bind _up_typeclass x tc env
+
+  and bind_tcinstance x tci env =
+    bind _up_tcinstance x tci env
 
   and bind_rwbase x p env =
     bind _up_rwbase x p env
@@ -1340,43 +1364,77 @@ module TypeClass = struct
     | Some obj -> obj
 
   let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_typeclass p obj env
+    MC.import_typeclass p (by_path p env) env
 
-  let rebind name tc env =
-    let env = MC.bind_typeclass name tc env in
-    { env with env_tc = tc :: env.env_tc }
+  let rebind (name : symbol) (tc : t) (env : env) =
+    MC.bind_typeclass name tc env
 
-  let bind ?(import = import0) name tc env =
+  let bind ?(import = import0) (name : symbol) (tc : t) (env : env) =
     let env = if import.im_immediate then rebind name tc env else env in
     { env with
         env_item = mkitem import (Th_typeclass (name, tc)) :: env.env_item }
 
-  let lookup qname (env : env) =
+  let lookup (qname : qsymbol) (env : env) =
     MC.lookup_typeclass qname env
 
-  let lookup_opt name env =
+  let lookup_opt (name : qsymbol) (env : env) =
     try_lf (fun () -> lookup name env)
 
-  let lookup_path name env =
+  let lookup_path (name : qsymbol) (env : env) =
+    fst (lookup name env)
+end
+
+(* ------------------------------------------------------------------ *)
+module TcInstance = struct
+  type t = tcinstance
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_tcinstances) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    MC.import_tcinstance p (by_path p env) env
+
+  let bind_instance (path : path option) (tci : t) (env : _) =
+    (path, tci) :: env
+
+  let rebind (name : symbol option) (tci : t) (env : env) =
+    let env =
+      name |> Option.fold ~none:env ~some:(fun name ->
+        MC.bind_tcinstance name tci env)
+    in
+      let path =
+        Option.map
+          (fun name -> EcPath.pqname (root env) name)
+          name
+      in { env with env_tci = bind_instance path tci env.env_tci }
+
+  let bind ?(import = import0) (name : symbol option) (tci : t) (env : env) =
+    let env =
+      if import.im_immediate then rebind name tci env else env in
+    { env with
+        env_item = mkitem import (Th_instance (name, tci)) :: env.env_item }
+
+  let lookup qname (env : env) =
+    MC.lookup_tcinstance qname env
+
+  let lookup_opt (name : qsymbol) (env : env) =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path (name : qsymbol) (env : env) =
     fst (lookup name env)
 
-  let get_typeclasses (env : env) =
-    env.env_tc
+  let get_instances (env : env) =
+    env.env_tci
 
-  let bind_instance (ty : ty_params * ty) (cr : tcinstance) tci =
-    (ty, cr) :: tci
-
-  let add_instance ?(import = import0) ty cr lc env =
-    let env =
-      if import.im_immediate then
-        { env with env_tci = bind_instance ty cr env.env_tci }
-      else env in
-    { env with
-        env_tci  = bind_instance ty cr env.env_tci;
-        env_item = mkitem import (Th_instance (ty, cr, lc)) :: env.env_item; }
-
-  let get_instances env = env.env_tci
+  let get_all (env : env) : (path option * t) list =
+    env.env_tci
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2632,7 +2690,7 @@ module Ty = struct
 
   let add (p : EcPath.path) (env : env) =
     let obj = by_path p env in
-      MC.import_tydecl p obj env
+    MC.import_tydecl p obj env
 
   let lookup qname (env : env) =
     MC.lookup_tydecl qname env
@@ -2648,11 +2706,11 @@ module Ty = struct
     | Some { tyd_type = `Concrete _ } -> true
     | _ -> false
 
-  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
+  let unfold (name : EcPath.path) (args : etyarg list) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = `Concrete body } as tyd) ->
         Tvar.subst
-          (Tvar.init (List.map fst tyd.tyd_params) args)
+          (Tvar.init (List.combine (List.fst tyd.tyd_params) args))
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2661,12 +2719,10 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
-
   let rec ty_hnorm (ty : ty) (env : env) =
     match ty.ty_node with
     | Tconstr (p, tys) when defined p env -> ty_hnorm (unfold p tys env) env
     | _ -> ty
-
 
   let rec decompose_fun (ty : ty) (env : env) : dom * ty =
     match (hnorm ty env).ty_node with
@@ -2705,31 +2761,13 @@ module Ty = struct
     | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
     | _ -> None
 
-  let rebind name ty env =
-    let env = MC.bind_tydecl name ty env in
-
-    match ty.tyd_type with
-    | `Abstract tcs ->
-      (* FIXME: TC: refresh? *)
-        let myty =
-          let myp  = EcPath.pqname (root env) name in
-          let myty = EcTypes.tconstr myp (List.map (tvar |- fst) ty.tyd_params) in
-          (ty.tyd_params, myty) in
-        let env_tci =
-          List.fold
-            (fun inst (tc : typeclass) ->
-               TypeClass.bind_instance myty (`General (tc, None)) inst) (* FIXME: TC *)
-            env.env_tci tcs
-        in
-          { env with env_tci }
-
-    | _ -> env
+  let rebind (name : symbol) (tyd : t) (env : env) =
+    MC.bind_tydecl name tyd env
 
   let bind ?(import = import0) name ty env =
     let env = if import.im_immediate then rebind name ty env else env in
     { env with env_item =
         mkitem import (Th_type (name, ty)) :: env.env_item }
-
 
   let iter ?name f (env : env) =
     gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
@@ -2829,10 +2867,10 @@ module Op = struct
     else false
 
   let reduce ?mode ?nargs env p tys =
-    let op, f = core_reduce ?mode ?nargs env p in
+    let op, form = core_reduce ?mode ?nargs env p in
     Tvar.f_subst ~freshen:true
-      (List.map fst op.op_tparams)
-      (List.fst tys) (* FIXME:TC *) f
+      (List.combine (List.fst op.op_tparams) tys)
+      form
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2930,7 +2968,7 @@ module Ax = struct
   let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f
+        Tvar.f_subst ~freshen:true (List.combine (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -2938,22 +2976,6 @@ module Ax = struct
 
   let all ?check ?name (env : env) =
     gen_all (fun mc -> mc.mc_axioms) MC.lookup_axioms ?check ?name env
-end
-
-(* -------------------------------------------------------------------- *)
-module Algebra = struct
-  let bind_ring ty cr env =
-    assert (Mid.is_empty ty.ty_fv);
-    { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Ring cr) env.env_tci }
-
-  let bind_field ty cr env =
-    assert (Mid.is_empty ty.ty_fv);
-    { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Field cr) env.env_tci }
-
-  let add_ring  ty cr lc env = TypeClass.add_instance ([], ty) (`Ring  cr) lc env
-  let add_field ty cr lc env = TypeClass.add_instance ([], ty) (`Field cr) lc env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3006,26 +3028,11 @@ module Theory = struct
     let xpath x = EcPath.pqname path x in
 
     match item.ti_item with
-    | Th_instance (ty, k, _) ->
-        TypeClass.bind_instance ty k inst
+    | Th_instance (name, tci) ->
+        TcInstance.bind_instance (Option.map xpath name) tci inst
 
     | Th_theory (x, cth) when cth.cth_mode = `Concrete ->
         bind_instance_th (xpath x) inst cth.cth_items
-
-    | Th_type (x, tyd) -> begin
-        match tyd.tyd_type with
-        | `Abstract tcs ->      (* FIXME:TC this code is a duplicate *)
-            let myty =
-              let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
-              (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
-            in
-              List.fold
-                (fun inst tc ->
-                  TypeClass.bind_instance myty (`General (tc, None)) inst)
-                inst tcs
-
-        | _ -> inst
-    end
 
     | _ -> inst
 
@@ -3120,13 +3127,12 @@ module Theory = struct
     | _, `Concrete ->
         let thname      = EcPath.pqname (root env) name in
         let env_tci     = bind_instance_th thname env.env_tci items in
-        let env_tc      = bind_tc_th thname env.env_tc items in
         let env_rwbase  = bind_br_th thname env.env_rwbase items in
         let env_atbase  = bind_at_th thname env.env_atbase items in
         let env_ntbase  = bind_nt_th thname env.env_ntbase items in
         let env_redbase = bind_rd_th thname env.env_redbase items in
         let env =
-          { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; env_redbase; }
+          { env with env_tci; env_rwbase; env_atbase; env_ntbase; env_redbase; }
         in
         add_restr_th thname env items
 
@@ -3308,7 +3314,6 @@ module Theory = struct
     | `Concrete ->
       { env with
           env_tci     = bind_instance_th thpath env.env_tci cth.cth_items;
-          env_tc      = bind_tc_th thpath env.env_tc cth.cth_items;
           env_rwbase  = bind_br_th thpath env.env_rwbase cth.cth_items;
           env_atbase  = bind_at_th thpath env.env_atbase cth.cth_items;
           env_ntbase  = bind_nt_th thpath env.env_ntbase cth.cth_items;

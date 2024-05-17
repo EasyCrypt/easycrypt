@@ -472,6 +472,17 @@ module List = struct
     | None   -> failwith "List.last"
     | Some x -> x
 
+  let betail =
+    let rec aux (acc : 'a list) (s : 'a list) =
+      match s, acc with
+      | [], [] ->
+        failwith "List.betail"
+      | [], v :: vs->
+        List.rev vs, v
+      | x :: xs, _ ->
+        aux (x :: acc) xs
+    in fun s -> aux [] s
+
   let mbfilter (p : 'a -> bool) (s : 'a list) =
     match s with [] | [_] -> s | _ -> List.filter p s
 

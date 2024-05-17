@@ -49,9 +49,27 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * etyarg list
   | Tfun    of ty * ty
 
+(* -------------------------------------------------------------------- *)
+and etyarg = ty * tcwitness list
+
+and tcwitness =
+  | TCIConcrete of {
+      path: EcPath.path;
+      etyargs: (ty * tcwitness list) list;
+  }
+
+  | TCIAbstract of {
+      support: [
+        | `Var    of EcIdent.t
+        | `Univar of EcUid.uid
+        | `Abs    of EcPath.path
+      ];
+      offset: int;
+  }
+  
 (* -------------------------------------------------------------------- *)
 and ovariable = {
   ov_name : EcSymbols.symbol option;
@@ -88,10 +106,8 @@ and expr_node =
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
-and etyarg    = ty * tcwitness list
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
-and tcwitness = (ty * tcwitness list) list * EcPath.path
 
 (* -------------------------------------------------------------------- *)
 and lvalue =

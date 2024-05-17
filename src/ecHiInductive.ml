@@ -137,7 +137,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       match tdecl.tyd_type with
       | `Abstract _ ->
-          List.exists isempty (targs)
+          List.exists isempty (List.fst targs) (* FIXME:TC *)
 
       | `Concrete ty ->
           isempty_1 [tyinst () ty]
@@ -315,8 +315,8 @@ let trans_matchfix
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
               let ctorty =
-                let tvi = Some (EcUnify.TVIunamed tvi) in
-                  fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+                let tvi = Some (EcUnify.tvi_unamed tvi) in
+                fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
               let pty = EcUnify.UniEnv.fresh ue in
 
               (try  EcUnify.unify env ue (toarrow ctorty pty) opty

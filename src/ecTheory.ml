@@ -33,7 +33,7 @@ and theory_item_r =
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
   | Th_export    of EcPath.path * is_local
-  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
+  | Th_instance  of (symbol option * tcinstance)
   | Th_typeclass of (symbol * tc_decl)
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
@@ -51,10 +51,17 @@ and ctheory = {
   cth_source : thsource option;
 }
 
-and tcinstance = [
+and tcinstance = {
+  tci_params   : ty_params;
+  tci_type     : ty;
+  tci_instance : tcibody;
+  tci_local    : locality;
+}
+
+and tcibody = [
   | `Ring    of ring
   | `Field   of field
-  | `General of typeclass * ((path * ty list) Mstr.t) option
+  | `General of typeclass * ((path * etyarg list) Mstr.t) option
 ]
 
 and thmode = [ `Abstract | `Concrete ]

@@ -86,7 +86,7 @@ val nodelta      : reduction_info
 val delta        : reduction_info
 
 val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
-val reduce_tc : ?params:(ident * EcDecl.typeclass list) list -> env -> path -> ty list -> form option
+val reduce_tc    : env -> path -> etyarg list -> form option
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form

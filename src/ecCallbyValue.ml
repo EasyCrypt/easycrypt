@@ -295,9 +295,10 @@ and app_red st f1 args =
 
       let body = EcFol.form_of_expr EcFol.mhr body in
       let body =
-        Tvar.f_subst ~freshen:true
-          (List.map fst op.EcDecl.op_tparams)
-          (List.fst tys) (* FIXME:TC *) body in
+        Tvar.f_subst
+          ~freshen:true
+          (List.combine (List.fst op.EcDecl.op_tparams) tys)
+          body in
 
       cbv st subst body (Args.create ty eargs)
     with E.NoCtor ->
@@ -324,10 +325,7 @@ and reduce_user_delta st f1 p tys args =
       cbv st Subst.subst_id f args
     | _ ->
        if st.st_ri.delta_tc then
-         match EcReduction.reduce_tc
-                 ~params:(LDecl.tohyps st.st_hyps).h_tvar
-                 st.st_env p (List.fst tys) (* FIXME: TC *)
-         with
+         match EcReduction.reduce_tc st.st_env p tys with
          | None -> f2
          | Some f -> cbv st Subst.subst_id f args
        else f2

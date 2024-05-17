@@ -175,7 +175,7 @@ let tc1_process_Xhl_formula_xreal tc pf =
 
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
-(* FIXME: TC HOOK - check parameter constraints                       *)
+(* FIXME:TC HOOK - check parameter constraints                        *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) typ tvi =
   match tvi with

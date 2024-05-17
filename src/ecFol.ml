@@ -179,8 +179,7 @@ let f_mu_x    f1 f2 =
 
 let proj_distr_ty env ty =
    match (EcEnv.Ty.hnorm ty env).ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  ->
-    List.hd lty
+  | Tconstr(_, [lty, []]) -> lty
   | _ -> assert false
 
 let f_mu env f1 f2 =

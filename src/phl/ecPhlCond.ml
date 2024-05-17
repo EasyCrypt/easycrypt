@@ -226,8 +226,8 @@ let t_equiv_match_same_constr tc =
     let bhl  = List.map (fst_map EcIdent.fresh) cl in
     let bhr  = List.map (fst_map EcIdent.fresh) cr in
     let cop  = EcPath.pqoname (EcPath.prefix pl) c in
-    let copl = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
-    let copr = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+    let copl = f_op_tc cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr = f_op_tc cop tyr (toarrow (List.snd cr) fr.f_ty) in
 
     let lhs = f_eq fl (f_app copl (List.map (curry f_local) bhl) fl.f_ty) in
     let lhs = f_exists (List.map (snd_map gtty) bhl) lhs in
@@ -242,8 +242,8 @@ let t_equiv_match_same_constr tc =
     let sb, bhl = add_elocals sb cl in
     let sb, bhr = add_elocals sb cr in
     let cop     = EcPath.pqoname (EcPath.prefix pl) c in
-    let copl    = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
-    let copr    = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+    let copl    = f_op_tc cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr    = f_op_tc cop tyr (toarrow (List.snd cr) fr.f_ty) in
     let pre     = f_ands_simpl
       [ f_eq fl (f_app copl (List.map (curry f_local) bhl) fl.f_ty);
         f_eq fr (f_app copr (List.map (curry f_local) bhr) fr.f_ty) ]
@@ -305,8 +305,8 @@ let t_equiv_match_eq tc =
         sb cl cr in
 
     let cop    = EcPath.pqoname (EcPath.prefix pl) c in
-    let copl   = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
-    let copr   = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+    let copl   = f_op_tc cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr   = f_op_tc cop tyr (toarrow (List.snd cr) fr.f_ty) in
     let pre    = f_ands_simpl
       [ f_eq fl (f_app copl (List.map (curry f_local) bh) fl.f_ty);
         f_eq fr (f_app copr (List.map (curry f_local) bh) fr.f_ty) ]

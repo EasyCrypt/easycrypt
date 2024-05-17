@@ -107,7 +107,7 @@ module Mpv = struct
   let rec esubst env (s : esubst) e =
     match e.e_node with
     | Evar pv -> (try find env pv s with Not_found -> e)
-    | _ -> EcTypes.e_map (fun ty -> ty) (esubst env s) e
+    | _ -> EcTypes.e_map (esubst env s) e
 
   let rec isubst env (s : esubst) (i : instr) =
     let esubst = esubst env s in
@@ -173,30 +173,30 @@ module PVM = struct
       | FequivF _ ->
         check_binding EcFol.mleft s;
         check_binding EcFol.mright s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FequivS es ->
         check_binding (fst es.es_ml) s;
         check_binding (fst es.es_mr) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FhoareF _ | FbdHoareF _ ->
         check_binding EcFol.mhr s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FhoareS hs ->
         check_binding (fst hs.hs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FbdHoareS hs ->
         check_binding (fst hs.bhs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | Fpr pr ->
         check_binding pr.pr_mem s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | Fquant(q,b,f1) ->
         let f1 =
           if has_mod b then subst (Mod.add_mod_binding b env) s f1
           else aux f1 in
         f_quant q b f1
 
-      | _ -> EcFol.f_map (fun ty -> ty) aux f)
+      | _ -> EcFol.f_map aux f)
 
   let subst1 env pv m f =
     let s = add env pv m f empty in

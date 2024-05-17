@@ -38,15 +38,15 @@ let datatype_proj_path (p : EP.path) (x : symbol) =
 
 (* -------------------------------------------------------------------- *)
 let indsc_of_record (rc : record) =
-  let targs  = List.map (tvar |- fst) rc.rc_tparams in
-  let recty  = tconstr rc.rc_path targs in
+  let targs  = etyargs_of_tparams rc.rc_tparams in
+  let recty  = tconstr_tc rc.rc_path targs in
   let recx   = fresh_id_of_ty recty in
   let recfm  = FL.f_local recx recty in
   let predty = tfun recty tbool in
   let predx  = EcIdent.create "P" in
   let pred   = FL.f_local predx predty in
   let ctor   = record_ctor_path rc.rc_path in
-  let ctor   = FL.f_op ctor targs (toarrow (List.map snd rc.rc_fields) recty) in
+  let ctor   = FL.f_op_tc ctor targs (toarrow (List.map snd rc.rc_fields) recty) in
   let prem   =
     let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) rc.rc_fields in
     let vars = List.map (fun (x, xty) -> FL.f_local x xty) ids in
@@ -104,7 +104,9 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     end
 
     | Tconstr (p', ts)  ->
-        if List.exists (occurs p) ts then raise NonPositive;
+        (* FIXME:TC *)
+        if List.exists (EcTypes.etyarg_sub_exists (occurs p)) ts then
+          raise NonPositive;
         if not (EcPath.p_equal p p') then None else
           Some (FL.f_app pred [fac] tbool)
 
@@ -115,11 +117,11 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
             |> omap (FL.f_forall [x, GTty ty1])
 
   and schemec mode (targs, p) pred (ctor, tys) =
-    let indty = tconstr p (List.map tvar targs) in
+    let indty = tconstr_tc p targs in
     let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
     let cargs = List.map (fun (x, xty) -> FL.f_local x xty) xs in
     let ctor  = EcPath.pqoname (EcPath.prefix tpath) ctor in
-    let ctor  = FL.f_op ctor (List.map tvar targs) (toarrow tys indty) in
+    let ctor  = FL.f_op_tc ctor targs (toarrow tys indty) in
     let form  = FL.f_app pred [FL.f_app ctor cargs indty] tbool in
     let form  =
       match mode with
@@ -139,7 +141,7 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
       form
 
   and scheme mode (targs, p) ctors =
-    let indty  = tconstr p (List.map tvar targs) in
+    let indty  = tconstr_tc p targs in
     let indx   = fresh_id_of_ty indty in
     let indfm  = FL.f_local indx indty in
     let predty = tfun indty tbool in
@@ -157,7 +159,7 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     | Tconstr (p', _) when EcPath.p_equal p p' -> true
     | _ -> EcTypes.ty_sub_exists (occurs p) t
 
-  in scheme mode (List.map fst dt.dt_tparams, tpath) dt.dt_ctors
+  in scheme mode (etyargs_of_tparams dt.dt_tparams, tpath) dt.dt_ctors
 
 (* -------------------------------------------------------------------- *)
 let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =

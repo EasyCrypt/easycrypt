@@ -61,9 +61,27 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * etyarg list
   | Tfun    of ty * ty
 
+(* -------------------------------------------------------------------- *)
+and etyarg    = ty * tcwitness list
+
+and tcwitness =
+  | TCIConcrete of {
+      path: EcPath.path;
+      etyargs: (ty * tcwitness list) list;
+  }
+
+  | TCIAbstract of {
+      support: [
+        | `Var    of EcIdent.t
+        | `Univar of EcUid.uid
+        | `Abs    of EcPath.path
+      ];
+      offset: int;
+  }
+  
 (* -------------------------------------------------------------------- *)
 and ovariable = {
   ov_name : EcSymbols.symbol option;
@@ -100,10 +118,8 @@ and expr_node =
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
-and etyarg    = ty * tcwitness list
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
-and tcwitness = (ty * tcwitness list) list * EcPath.path
 
 (* -------------------------------------------------------------------- *)
 and lvalue =
@@ -365,10 +381,15 @@ let lp_fv = function
         Sid.empty ids
 
 (* -------------------------------------------------------------------- *)
-let rec tcw_fv ((ws, _) : tcwitness) =
-  List.fold_left
-    (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
-    Mid.empty ws
+let rec tcw_fv (tcw : tcwitness) =
+  match tcw with
+  | TCIConcrete { etyargs } ->
+    List.fold_left
+      (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
+      Mid.empty etyargs
+
+  | TCIAbstract _ ->
+    Mid.empty (* FIXME:TC *)
 
 and tcws_fv (tcws : tcwitness list) =
   List.fold_left
@@ -384,18 +405,53 @@ let etyargs_fv (tyargs : etyarg list) =
     Mid.empty tyargs
 
 (* -------------------------------------------------------------------- *)
-let rec tcw_equal ((tcw1, p1) : tcwitness) ((tcw2, p2) : tcwitness) =
-  EcPath.p_equal p1 p2 && List.all2 etyarg_equal tcw1 tcw2
+let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
+  match tcw1, tcw2 with
+  | TCIConcrete tcw1, TCIConcrete tcw2 ->
+       EcPath.p_equal tcw1.path tcw2.path
+    && List.all2 etyarg_equal tcw1.etyargs tcw2.etyargs
+
+  | TCIAbstract { support = support1; offset = o1; }
+  , TCIAbstract { support = support2; offset = o2; }
+  ->
+    let tyvar_eq () =
+      match support1, support2 with
+      | `Var x1, `Var x2 ->
+        EcIdent.id_equal x1 x2
+      | `Univar u1, `Univar u2 ->
+        uid_equal u1 u2
+      | `Abs p1, `Abs p2 ->
+        EcPath.p_equal p1 p2
+      | _, _ -> false
+
+      in o1 = o2 && tyvar_eq ()
+
+  | _, _ ->
+    false
 
 and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
   ty_equal ty1 ty2 && List.all2 tcw_equal tcws1 tcws2
 
 (* -------------------------------------------------------------------- *)
-let rec tcw_hash ((tcw, p) : tcwitness) =
-  Why3.Hashcons.combine_list etyarg_hash (p_hash p) tcw
+let rec tcw_hash (tcw : tcwitness) =
+  match tcw with
+  | TCIConcrete tcw ->
+    Why3.Hashcons.combine_list
+      etyarg_hash
+      (p_hash tcw.path)
+      tcw.etyargs
 
-and etyarg_hash ((ty, tcws) : etyarg) =
-  Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws
+  | TCIAbstract { support = `Var tyvar; offset } ->
+    Why3.Hashcons.combine (EcIdent.id_hash tyvar) offset
+
+  | TCIAbstract { support = `Univar uni; offset } ->
+    Why3.Hashcons.combine (Hashtbl.hash uni) offset
+  
+  | TCIAbstract { support = `Abs p; offset } ->
+    Why3.Hashcons.combine (EcPath.p_hash p) offset
+
+  and etyarg_hash ((ty, tcws) : etyarg) =
+    Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws
 
 (* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : expr -> expr -> bool)
@@ -447,7 +503,6 @@ let i_fv i    = i.i_fv
 let s_equal   = ((==) : stmt -> stmt -> bool)
 let s_hash    = fun s -> s.s_tag
 let s_fv      = fun s -> s.s_fv
-
 
 (*-------------------------------------------------------------------- *)
 let qt_equal : quantif -> quantif -> bool = (==)
@@ -836,7 +891,7 @@ module Hsty = Why3.Hashcons.Make (struct
         List.all2 ty_equal lt1 lt2
 
     | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+        EcPath.p_equal p1 p2 && List.all2 etyarg_equal lt1 lt2
 
     | Tfun (d1, c1), Tfun (d2, c2)->
         ty_equal d1 d2 && ty_equal c1 c2
@@ -849,7 +904,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar u        -> u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list etyarg_hash p.p_tag tl
     | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
 
   let fv ty =
@@ -861,7 +916,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
-    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
+    | Tconstr (_, tys) -> union etyarg_fv tys
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
 
   let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
@@ -982,7 +1037,27 @@ module Hexpr = Why3.Hashcons.Make (struct
 end)
 
 (* -------------------------------------------------------------------- *)
-let mk_expr e ty =
+let normalize_enode (node : expr_node) : expr_node =
+  match node with
+  | Equant (_, [], body) ->
+    body.e_node
+
+  | Equant (q1, bds1, { e_node = Equant (q2, bds2, body) })
+      when q1 = q2
+    -> Equant (q1, bds1 @ bds2, body)
+
+  | Eapp (hd, []) ->
+    hd.e_node
+
+  | Eapp ({ e_node = Eapp (hd, args1) }, args2) ->
+    Eapp (hd, args1 @ args2)
+
+  | _ ->
+    node
+
+(* -------------------------------------------------------------------- *)
+let mk_expr (e : expr_node) (ty : ty) =
+  let e = normalize_enode e in
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
 (* -------------------------------------------------------------------- *)
@@ -1184,7 +1259,28 @@ module Hsform = Why3.Hashcons.Make (struct
       { f with f_tag = n; f_fv = fv; }
 end)
 
-let mk_form node ty =
+(* -------------------------------------------------------------------- *)
+let normalize_fnode (node : f_node) : f_node =
+  match node with
+  | Fquant (_, [], body) ->
+    body.f_node
+
+  | Fquant (q1, bds1, { f_node = Fquant (q2, bds2, body) })
+      when q1 = q2
+    -> Fquant (q1, bds1 @ bds2, body)
+
+  | Fapp (hd, []) ->
+    hd.f_node
+
+  | Fapp ({ f_node = Fapp (hd, args1)}, args2) ->
+    Fapp (hd, args1 @ args2)
+
+  | _ ->
+    node
+
+(* -------------------------------------------------------------------- *)
+let mk_form (node : f_node) (ty : ty) =
+  let node = normalize_fnode (node) in
   let aout =
     Hsform.hashcons
       { f_node = node;

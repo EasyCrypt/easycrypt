@@ -156,15 +156,7 @@ let f_op x tyargs ty =
   f_op_tc x (List.map (fun ty -> (ty, [])) tyargs) ty
 
 let f_app f args ty =
-  let f, args' =
-    match f.f_node with
-    | Fapp (f, args') -> (f, args')
-    | _ -> (f, [])
-  in let args' = args' @ args in
-
-  if List.is_empty args' then begin
-    (*if ty_equal ty f.f_ty then f else mk_form f.f_node ty *) f
-  end else mk_form (Fapp (f, args')) ty
+  mk_form (Fapp (f, args)) ty
 
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
@@ -189,18 +181,18 @@ let f_tuple args =
   | [x] -> x
   | _   -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
+(* -------------------------------------------------------------------- *)
 let f_quant q b f =
-  if List.is_empty b then f else
-    let (q, b, f) =
-      match f.f_node with
-      | Fquant(q',b',f') when q = q' -> (q, b@b', f')
-      | _ -> q, b , f in
-    let ty =
-      if   q = Llambda
-      then toarrow (List.map (fun (_,gty) -> gty_as_ty gty) b) f.f_ty
-      else tbool in
+  let ty =
+    match q with
+    | Llambda ->
+      let dom =
+        List.map (fun (_, gty) -> gty_as_ty gty) b
+      in toarrow dom f.f_ty
 
-    mk_form (Fquant (q, b, f)) ty
+    | _ -> tbool in
+
+  mk_form (Fquant (q, b, f)) ty
 
 let f_proj   f  i  ty = mk_form (Fproj(f, i)) ty
 let f_if     f1 f2 f3 = mk_form (Fif (f1, f2, f3)) f2.f_ty
@@ -391,115 +383,88 @@ let f_some ({ f_ty = ty } as f : form) : form =
   f_app op [f] (toption ty)
 
 (* -------------------------------------------------------------------- *)
-let f_map gt g fp =
+let f_map (g : form -> form) (fp : form) : form =
   match fp.f_node with
+  | Fint   _ -> fp
+  | Fglob  _ -> fp
+  | Flocal _ -> fp
+  | Fpvar  _ -> fp
+  | Fop    _ -> fp
+
   | Fquant(q, b, f) ->
-      let map_gty ((x, gty) as b1) =
-        let gty' =
-          match gty with
-          | GTty ty ->
-              let ty' = gt ty in if ty == ty' then gty else GTty ty'
-          | _ -> gty
-        in
-          if gty == gty' then b1 else (x, gty')
-      in
-
-      let b' = List.Smart.map map_gty b in
-      let f' = g f in
-
-      f_quant q b' f'
-
-  | Fint  _ -> fp
-  | Fglob _ -> fp
+    f_quant q b (g f)
 
   | Fif (f1, f2, f3) ->
-      f_if (g f1) (g f2) (g f3)
+    f_if (g f1) (g f2) (g f3)
 
   | Fmatch (b, fs, ty) ->
-      f_match (g b) (List.map g fs) (gt ty)
+    f_match (g b) (List.map g fs) ty
 
   | Flet (lp, f1, f2) ->
-      f_let lp (g f1) (g f2)
+    f_let lp (g f1) (g f2)
 
-  | Flocal id ->
-      let ty' = gt fp.f_ty in
-        f_local id ty'
-
-  | Fpvar (id, s) ->
-      let ty' = gt fp.f_ty in
-        f_pvar id ty' s
-
-  | Fop (p, tyargs) ->
-      let tyargs' = List.Smart.map (etyarg_map gt) tyargs in
-      let ty'     = gt fp.f_ty in
-        f_op_tc p tyargs' ty'
-
-  | Fapp (f, fs) ->
-      let f'  = g f in
-      let fs' = List.Smart.map g fs in
-      let ty' = gt fp.f_ty in
-        f_app f' fs' ty'
+  | Fapp (hd, args) ->
+    let hd   = g hd in
+    let args = List.Smart.map g args in
+    f_app hd args fp.f_ty
 
   | Ftuple fs ->
-      let fs' = List.Smart.map g fs in
-        f_tuple fs'
+    f_tuple (List.Smart.map g fs)
 
   | Fproj (f, i) ->
-      let f'  = g f in
-      let ty' = gt fp.f_ty in
-        f_proj f' i ty'
+    f_proj (g f) i fp.f_ty
 
   | FhoareF hf ->
-      let pr' = g hf.hf_pr in
-      let po' = g hf.hf_po in
-        f_hoareF_r { hf with hf_pr = pr'; hf_po = po'; }
+    let pr' = g hf.hf_pr in
+    let po' = g hf.hf_po in
+    f_hoareF_r { hf with hf_pr = pr'; hf_po = po'; }
 
   | FhoareS hs ->
-      let pr' = g hs.hs_pr in
-      let po' = g hs.hs_po in
-        f_hoareS_r { hs with hs_pr = pr'; hs_po = po'; }
+    let pr' = g hs.hs_pr in
+    let po' = g hs.hs_po in
+    f_hoareS_r { hs with hs_pr = pr'; hs_po = po'; }
 
   | FeHoareF hf ->
-      let pr' = g hf.ehf_pr  in
-      let po' = g hf.ehf_po  in
-      f_eHoareF_r { hf with ehf_pr = pr'; ehf_po = po' }
+    let pr' = g hf.ehf_pr  in
+    let po' = g hf.ehf_po  in
+    f_eHoareF_r { hf with ehf_pr = pr'; ehf_po = po' }
 
   | FeHoareS hs ->
-      let pr' = g hs.ehs_pr  in
-      let po' = g hs.ehs_po  in
-        f_eHoareS_r { hs with ehs_pr = pr'; ehs_po = po'; }
+    let pr' = g hs.ehs_pr  in
+    let po' = g hs.ehs_po  in
+    f_eHoareS_r { hs with ehs_pr = pr'; ehs_po = po'; }
 
   | FbdHoareF bhf ->
-      let pr' = g bhf.bhf_pr in
-      let po' = g bhf.bhf_po in
-      let bd' = g bhf.bhf_bd in
-        f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
+    let pr' = g bhf.bhf_pr in
+    let po' = g bhf.bhf_po in
+    let bd' = g bhf.bhf_bd in
+    f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
 
   | FbdHoareS bhs ->
-      let pr' = g bhs.bhs_pr in
-      let po' = g bhs.bhs_po in
-      let bd' = g bhs.bhs_bd in
-        f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
+    let pr' = g bhs.bhs_pr in
+    let po' = g bhs.bhs_po in
+    let bd' = g bhs.bhs_bd in
+    f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
 
   | FequivF ef ->
-      let pr' = g ef.ef_pr in
-      let po' = g ef.ef_po in
-        f_equivF_r { ef with ef_pr = pr'; ef_po = po'; }
+    let pr' = g ef.ef_pr in
+    let po' = g ef.ef_po in
+    f_equivF_r { ef with ef_pr = pr'; ef_po = po'; }
 
   | FequivS es ->
-      let pr' = g es.es_pr in
-      let po' = g es.es_po in
-        f_equivS_r { es with es_pr = pr'; es_po = po'; }
+    let pr' = g es.es_pr in
+    let po' = g es.es_po in
+    f_equivS_r { es with es_pr = pr'; es_po = po'; }
 
   | FeagerF eg ->
-      let pr' = g eg.eg_pr in
-      let po' = g eg.eg_po in
-        f_eagerF_r { eg with eg_pr = pr'; eg_po = po'; }
+    let pr' = g eg.eg_pr in
+    let po' = g eg.eg_po in
+    f_eagerF_r { eg with eg_pr = pr'; eg_po = po'; }
 
   | Fpr pr ->
-      let args' = g pr.pr_args in
-      let ev'   = g pr.pr_event in
-      f_pr_r { pr with pr_args = args'; pr_event = ev'; }
+    let args' = g pr.pr_args in
+    let ev'   = g pr.pr_event in
+    f_pr_r { pr with pr_args = args'; pr_event = ev'; }
 
 (* -------------------------------------------------------------------- *)
 let f_iter g f =

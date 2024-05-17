@@ -119,8 +119,8 @@ let concretize_e_form_gen (CPTEnv subst) ids f =
   f_forall ids f
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form cptenv f =
-   concretize_e_form_gen cptenv [] f
+let concretize_e_form (CPTEnv subst) f =
+  Fsubst.f_subst subst f
 
 (* -------------------------------------------------------------------- *)
 let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
@@ -136,7 +136,7 @@ and concretize_e_head ((CPTEnv subst) as cptenv) head =
   | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (etyarg_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
 and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
@@ -190,22 +190,30 @@ let pt_of_hyp_r ptenv x =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
-let pt_of_global pf hyps p tys =
+let pt_of_global_tc pf hyps p etyargs =
   let ptenv = ptenv_of_penv hyps pf in
-  let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
+  let ax    = EcEnv.Ax.instanciate p etyargs (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys p;
+    ptev_pt  = ptglobal ~tys:etyargs p;
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
+let pt_of_global pf hyps p tys =
+  pt_of_global_tc pf hyps p (List.map (fun ty -> (ty, [])) tys)
+
+(* -------------------------------------------------------------------- *)
+let pt_of_global_tc_r ptenv p etyargs =
+  let env = LDecl.toenv ptenv.pte_hy in
+  let ax  = EcEnv.Ax.instanciate p etyargs env in
+
+  { ptev_env = ptenv;
+    ptev_pt  = ptglobal ~tys:etyargs p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
 let pt_of_global_r ptenv p tys =
-  let env = LDecl.toenv ptenv.pte_hy in
-  let ax  = EcEnv.Ax.instanciate p tys env in
-
-  { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys p;
-    ptev_ax  = ax; }
+  pt_of_global_tc_r ptenv p (List.map (fun ty -> (ty, [])) tys)
 
 (* -------------------------------------------------------------------- *)
 let pt_of_handle_r ptenv hd =
@@ -221,13 +229,11 @@ let pt_of_uglobal_r ptenv p =
   let ax      = oget (EcEnv.Ax.by_path_opt p env) in
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
-  (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
-  let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+  let ax  = Fsubst.f_subst_tvar ~freshen:true fs.subst ax in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys:typ p;
+    ptev_pt  = ptglobal ~tys:fs.args p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -263,7 +269,7 @@ let pattern_form ?name hyps ~ptn subject =
       (fun aux f ->
         if   EcReduction.is_alpha_eq hyps f ptn
         then fx
-        else f_map (fun ty -> ty) aux f)
+        else f_map aux f)
       subject
   in (x, body)
 
@@ -511,12 +517,10 @@ let process_named_pterm pe (tvi, fp) =
 
   PT.pf_check_tvi pe.pte_pe typ tvi;
 
-  (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+  let ax  = Fsubst.f_subst_tvar ~freshen:false fs.subst ax in
 
-  (p, (typ, ax))
+  (p, (fs.args, ax))
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -904,7 +908,7 @@ let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ppterm) =
 (* -------------------------------------------------------------------- *)
 type prept = [
   | `Hy   of EcIdent.t
-  | `G    of EcPath.path * ty list
+  | `G    of EcPath.path * etyarg list
   | `UG   of EcPath.path
   | `HD   of handle
   | `App  of prept * prept_arg list
@@ -924,8 +928,8 @@ let pt_of_prept tc (pt : prept) =
 
   let rec build_pt = function
     | `Hy  id         -> pt_of_hyp_r ptenv id
-    | `G   (p, tys)   -> pt_of_global_r ptenv p tys
-    | `UG  p          -> pt_of_global_r ptenv p []
+    | `G   (p, tys)   -> pt_of_global_tc_r ptenv p tys
+    | `UG  p          -> pt_of_global_tc_r ptenv p []
     | `HD  hd         -> pt_of_handle_r ptenv hd
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
 

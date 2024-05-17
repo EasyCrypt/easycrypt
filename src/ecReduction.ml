@@ -665,27 +665,46 @@ let reduce_op ri env nargs p tys =
        Op.reduce ~mode ~nargs env p tys
      with NotReducible -> raise nohead
 
-let reduce_tc ?params env p tys =
+let reduce_tc (env : EcEnv.env) (p : path) (tys : etyarg list) =
   if not (EcEnv.Op.is_tc_op env p) then None else
 
-  let tys = List.rev tys in
-  let tcty, tys = List.hd tys, List.rev (List.tl tys) in
-  let (tcp, opname) = EcDecl.operator_as_tc (EcEnv.Op.by_path p env) in
-  let ue = EcUnify.UniEnv.create params in
-  let syms = oget (EcUnify.hastc env ue tcty { tc_name = tcp; tc_args = tys }) in
+  (* Last type application if the TC parameter. We extract the type-class  *
+   * information from the witness.                                         *)
+  let _, (_, tcw) = List.betail tys in
+  let tcw = as_seq1 tcw in
 
-  match syms with None -> None | Some syms ->
+  match tcw with
+  | TCIAbstract _ ->
+    None
+  
+  | TCIConcrete { path = tcipath; etyargs = tciargs; } ->
+    let tci = oget (EcEnv.TcInstance.by_path_opt tcipath env) in
 
-  let optg, opargs = EcMaps.Mstr.find opname syms in
-  let opargs = List.map (ty_subst (Tuni.subst (EcUnify.UniEnv.assubst ue))) opargs in
-  let optg_decl = EcEnv.Op.by_path optg env in
-  let tysubst = Tvar.init (List.fst optg_decl.op_tparams) opargs in
+    match tci.tci_instance with
+    | `General (_, Some syms) ->
+      let subst =
+        List.fold_left
+          (fun subst (a, ety) ->
+            let ety = EcSubst.subst_etyarg subst ety in
+            EcSubst.add_tyvar subst a ety)
+          EcSubst.empty
+          (List.combine (List.fst tci.tci_params) tciargs)
+      in
 
-  Some (EcFol.f_op optg opargs (Tvar.subst tysubst optg_decl.op_ty))
+      let (_, opname) = EcDecl.operator_as_tc (EcEnv.Op.by_path p env) in
+      let optg, opargs = EcMaps.Mstr.find opname syms in
+      let opargs = List.map (EcSubst.subst_etyarg subst) opargs in
+      let optg_decl = EcEnv.Op.by_path optg env in
+      let tysubst = Tvar.init (List.combine (List.fst optg_decl.op_tparams) opargs) in
+    
+      Some (EcFol.f_op_tc optg opargs (Tvar.subst tysubst optg_decl.op_ty))
+    
+    | _ ->
+      None
 
-let may_reduce_tc ri ?params env p tys =
+let may_reduce_tc (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyarg list) =
   if ri.delta_tc then
-    oget ~exn:nohead (reduce_tc ?params env p tys)
+    oget ~exn:nohead (reduce_tc env p tys)
   else
     raise nohead
 
@@ -730,8 +749,8 @@ let reduce_user_gen simplify ri env hyps f =
   oget ~exn:needsubterm (List.Exceptionless.find_map (fun rule ->
 
     try
-      let ue    = EcUnify.UniEnv.create None in
-      let tvi   = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
+      let ue  = EcUnify.UniEnv.create None in
+      let tvi = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
 
       let check_alpha_eq f f' =
         if not (is_alpha_eq hyps f f') then raise NotReducible
@@ -749,8 +768,7 @@ let reduce_user_gen simplify ri env hyps f =
         | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          let tys' = List.map (Tvar.subst tvi) tys' in
-
+          let tys' = List.map (Tvar.subst tvi.subst) tys' in
           let tys  = List.fst tys  in (* FIXME:TC *)
 
           begin
@@ -783,7 +801,7 @@ let reduce_user_gen simplify ri env hyps f =
         let subst   = ts in
         let subst   =
           Mid.fold (fun x f s -> Fsubst.f_bind_local s x f) !pv subst in
-        Fsubst.f_subst subst (Fsubst.f_subst_tvar ~freshen:true tvi f)
+        Fsubst.f_subst subst (Fsubst.f_subst_tvar ~freshen:true tvi.subst f)
       in
 
       List.iter (fun cond ->
@@ -875,10 +893,10 @@ let reduce_logic ri env hyps f p args =
   check_reduced hyps needsubterm f f'
 
 (* -------------------------------------------------------------------- *)
-let reduce_delta ri env hyps f =
+let reduce_delta ri env f =
   match f.f_node with
   | Fop (p, tys) when ri.delta_tc && EcEnv.Op.is_tc_op env p ->
-     may_reduce_tc ri ~params:(LDecl.tohyps hyps).h_tvar env p (List.fst tys) (* FIXME: TC *)
+     may_reduce_tc ri env p tys
 
   | Fop (p, tys) when ri.delta_p p <> `No ->
       reduce_op ri env 0 p tys
@@ -1026,8 +1044,9 @@ let reduce_head simplify ri env hyps f =
       (* FIXME subst-refact can we do both subst in once *)
       let body =
         Tvar.f_subst ~freshen:true
-          (List.map fst op.EcDecl.op_tparams)
-          (List.fst tys) (* FIXME:TC *) body in
+          (List.combine
+            (List.map fst op.EcDecl.op_tparams)
+            tys) body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1044,14 +1063,14 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> reduce_delta ri env hyps f
+  | Fop _ -> reduce_delta ri env f
 
   | Fapp({ f_node = Fop(p,_); }, args) -> begin
       try  reduce_logic ri env hyps f p args
       with NotRed kind1 ->
         try  reduce_user_gen simplify ri env hyps f
         with NotRed kind2 ->
-          if kind1 = NoHead && kind2 = NoHead then reduce_delta ri env hyps f
+          if kind1 = NoHead && kind2 = NoHead then reduce_delta ri env f
           else raise needsubterm
     end
 
@@ -1144,7 +1163,7 @@ and reduce_head_top_force ri env onhead f =
     | f ->
       if onhead then reduce_head_top ri env ~onhead f else f
     | exception (NotRed _) ->
-      try reduce_delta ri.ri env ri.hyps f
+      try reduce_delta ri.ri env f
       with NotRed _ -> RedTbl.set_norm ri.redtbl f; raise nohead
   end
 
@@ -1206,36 +1225,36 @@ let rec simplify ri env f =
   match f.f_node with
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_hoareF_r { hf with hf_f })
+      f_map (simplify ri env) (f_hoareF_r { hf with hf_f })
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_eHoareF_r { hf with ehf_f })
+      f_map (simplify ri env) (f_eHoareF_r { hf with ehf_f })
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
+      f_map (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
-      f_map (fun ty -> ty) (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
+      f_map (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
       let eg_fr = EcEnv.NormMp.norm_xfun env eg.eg_fr in
-      f_map (fun ty -> ty) (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
+      f_map (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
 
   | Fpr pr when ri.ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun env pr.pr_fun in
-      f_map (fun ty -> ty) (simplify ri env) (f_pr_r { pr with pr_fun })
+      f_map (simplify ri env) (f_pr_r { pr with pr_fun })
 
   | Fquant (q, bd, f) ->
     let env = Mod.add_mod_binding bd env in
     f_quant q bd (simplify ri env f)
 
   | _ ->
-    f_map (fun ty -> ty) (simplify ri env) f
+    f_map (simplify ri env) f
 
 let simplify ri hyps f =
   let ri, env = init_redinfo ri hyps in
@@ -1329,6 +1348,9 @@ let zpop ri side f hd =
 let rec conv ri env f1 f2 stk =
   if f_equal f1 f2 then conv_next ri env f1 stk else
   match f1.f_node, f2.f_node with
+  | Flocal x, Flocal y when EcIdent.id_equal x y ->
+    true
+
   | Fquant (q1, bd1, f1'), Fquant(q2,bd2,f2') ->
     if q1 <> q2 then force_head_sub ri env f1 f2 stk
     else

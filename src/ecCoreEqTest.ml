@@ -37,7 +37,7 @@ and for_type_r env t1 t2 =
   | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
       if
            List.length lt1 = List.length lt2
-        && List.all2 (for_type env) lt1 lt2
+        && List.all2 (for_etyarg env) lt1 lt2
       then true
       else
         if   Ty.defined p1 env
@@ -53,16 +53,34 @@ and for_type_r env t1 t2 =
   | _, _ -> false
 
 (* -------------------------------------------------------------------- *)
-let rec for_etyarg env ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
+and for_etyarg env ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
   for_type env ty1 ty2 && for_tcws env tcws1 tcws2
 
 and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
      List.length tyargs1 = List.length tyargs2
   && List.for_all2 (for_etyarg env) tyargs1 tyargs2
 
-and for_tcw env ((tyargs1, p1) : tcwitness) ((tyargs2, p2) : tcwitness) =
-  EcPath.p_equal p1 p2 && for_etyargs env tyargs1 tyargs2
+and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
+  match tcw1, tcw2 with
+  | TCIConcrete tcw1, TCIConcrete tcw2 ->
+       EcPath.p_equal tcw1.path tcw2.path
+    && for_etyargs env tcw1.etyargs tcw2.etyargs
 
+  | TCIAbstract { support = `Var v1; offset = o1 },
+    TCIAbstract { support = `Var v2; offset = o2 } ->
+    EcIdent.id_equal v1 v2 && o1 = o2
+
+  | TCIAbstract { support = `Univar v1; offset = o1 },
+    TCIAbstract { support = `Univar v2; offset = o2 } ->
+    EcUid.uid_equal v1 v2 && o1 = o2
+
+  | TCIAbstract { support = `Abs p1; offset = o1 },
+    TCIAbstract { support = `Abs p2; offset = o2 } ->
+    EcPath.p_equal p1 p2 && o1 = o2
+
+  | _, _ ->
+    false
+    
 and for_tcws env (tcws1 : tcwitness list) (tcws2 : tcwitness list) =
     List.length tcws1 = List.length tcws2
  && List.for_all2 (for_tcw env) tcws1 tcws2

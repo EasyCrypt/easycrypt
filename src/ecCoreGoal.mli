@@ -53,7 +53,7 @@ and pt_head =
 | PTCut    of EcFol.form
 | PTHandle of handle
 | PTLocal  of EcIdent.t
-| PTGlobal of EcPath.path * (ty list)
+| PTGlobal of EcPath.path * etyarg list
 | PTTerm   of proofterm
 
 and pt_arg =
@@ -80,12 +80,12 @@ val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
 
 (* -------------------------------------------------------------------- *)
-val paglobal  : ?args:pt_arg list -> tys:ty list -> EcPath.path -> pt_arg
+val paglobal  : ?args:pt_arg list -> tys:etyarg list -> EcPath.path -> pt_arg
 val palocal   : ?args:pt_arg list -> EcIdent.t -> pt_arg
 val pahandle  : ?args:pt_arg list -> handle -> pt_arg
 
 (* -------------------------------------------------------------------- *)
-val ptglobal  : ?args:pt_arg list -> tys:ty list -> EcPath.path -> proofterm
+val ptglobal  : ?args:pt_arg list -> tys:etyarg list -> EcPath.path -> proofterm
 val ptlocal   : ?args:pt_arg list -> EcIdent.t -> proofterm
 val pthandle  : ?args:pt_arg list -> handle -> proofterm
 val ptcut     : ?args:pt_arg list -> EcFol.form -> proofterm

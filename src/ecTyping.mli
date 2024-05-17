@@ -16,7 +16,7 @@ val  wp : wp option ref
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcTypes.etyarg list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
@@ -25,7 +25,7 @@ type opmatch = [
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
 
-type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
+type 'a suboreq = [`Eq of 'a | `Sub of 'a ]
 
 type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)

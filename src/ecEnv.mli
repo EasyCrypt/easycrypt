@@ -165,7 +165,7 @@ module Ax : sig
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
-  val instanciate : path -> EcTypes.ty list -> env -> form
+  val instanciate : path -> etyarg list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -337,16 +337,15 @@ module Ty : sig
   val bind : ?import:import -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
-  val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
-  val hnorm   : EcTypes.ty -> env -> EcTypes.ty
-  val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
+  val unfold  : path -> etyarg list -> env -> ty
+  val hnorm   : ty -> env -> ty
+  val decompose_fun : ty -> env -> EcTypes.dom * ty
 
   val get_top_decl :
-    EcTypes.ty -> env -> (path * EcDecl.tydecl * EcTypes.ty list) option
-
+    EcTypes.ty -> env -> (path * EcDecl.tydecl * etyarg list) option
 
   val scheme_of_ty :
-    [`Ind | `Case] -> EcTypes.ty -> env -> (path * EcTypes.ty list) option
+    [`Ind | `Case] -> EcTypes.ty -> env -> (path * etyarg list) option
 
   val signature : env -> ty -> ty list * ty
 
@@ -355,12 +354,6 @@ module Ty : sig
 end
 
 val ty_hnorm : ty -> env -> ty
-
-(* -------------------------------------------------------------------- *)
-module Algebra : sig
-  val add_ring  : ty -> EcDecl.ring -> is_local -> env -> env
-  val add_field : ty -> EcDecl.field -> is_local -> env -> env
-end
 
 (* -------------------------------------------------------------------- *)
 module TypeClass : sig
@@ -374,11 +367,22 @@ module TypeClass : sig
   val lookup      : qsymbol -> env -> path * t
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
+end
 
-  val get_typeclasses : env -> t list
+(* -------------------------------------------------------------------- *)
+module TcInstance : sig
+  type t = tcinstance
 
-  val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
-  val get_instances : env -> ((ty_params * ty) * tcinstance) list
+  val add  : path -> env -> env
+  val bind : ?import:import -> symbol option -> t -> env -> env
+
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
+
+  val get_all : env -> (path option * t) list
 end
 
 (* -------------------------------------------------------------------- *)

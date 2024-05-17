@@ -12,7 +12,7 @@ module CS   = EcCoreSubst
 (* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_name : EcPath.path;
-  tc_args : ty list;
+  tc_args : etyarg list;
 }
 
 type ty_param  = EcIdent.t * typeclass list
@@ -70,8 +70,16 @@ let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
     tyd_loca    = lc; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init (List.map fst params) args in
+let etyargs_of_tparams (tps : ty_params) : etyarg list =
+  List.map (fun (a, tcs) ->
+    let ety =
+      List.mapi (fun offset _ -> TCIAbstract { support = `Var a; offset }) tcs
+    in (tvar a, ety)
+  ) tps
+
+(* -------------------------------------------------------------------- *)
+let ty_instanciate (params : ty_params) (args : etyarg list) (ty : ty) =
+  let subst = CS.Tvar.init (List.combine (List.map fst params) args) in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -261,35 +269,6 @@ let operator_as_tc (op : operator) =
   match op.op_kind with
   | OB_oper (Some OP_TC (tcpath, name)) -> (tcpath, name)
   | _ -> assert false
-
-(* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
-  let axbd, axpm =
-    let bdpm = List.map fst tparams in
-    let axpm = List.map EcIdent.fresh bdpm in
-      (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
-       List.combine axpm (List.map snd tparams))
-  in
-
-  let args, axbd =
-    match axbd.f_node with
-    | Fquant (Llambda, bds, axbd) ->
-        let bds, flam = List.split_at nargs bds in
-        (bds, f_lambda flam axbd)
-    | _ -> [], axbd
-  in
-
-  let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
-  let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
-  let op     = f_app op opargs axbd.f_ty in
-  let axspec = f_forall args (f_eq op axbd) in
-
-  { ax_tparams    = axpm;
-    ax_spec       = axspec;
-    ax_kind       = `Axiom (Ssym.empty, false);
-    ax_loca       = lc;
-    ax_visibility = if nosmt then `NoSmt else `Visible; }
 
 (* -------------------------------------------------------------------- *)
 type tc_decl = {
