@@ -27,7 +27,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "mlkem"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : "-pragmas Proofs:weak -jobs 1"
   }
 
   ,
