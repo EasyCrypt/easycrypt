@@ -574,7 +574,6 @@
 %token SPLIT
 %token SPLITWHILE
 %token STAR
-%token STRICT
 %token SUBST
 %token SUFF
 %token SWAP
@@ -666,7 +665,6 @@ _lident:
 | LEFT       { "left"       }
 | RIGHT      { "right"      }
 | SOLVE      { "solve"      }
-| STRICT     { "strict"     }
 | WLOG       { "wlog"       }
 | EXLIM      { "exlim"      }
 | ECALL      { "ecall"      }
@@ -3528,27 +3526,8 @@ toptactic:
 |       t=tactics { t }
 
 tactics_or_prf:
-| t=toptactic  { `Actual t    }
-| p=proof      { `Proof  p    }
-
-proof:
-| PROOF modes=proofmode1* {
-    let seen = Hashtbl.create 0 in
-      List.fold_left
-        (fun pmodes (mode, flag) ->
-           if Hashtbl.mem seen mode then
-             parse_error mode.pl_loc (Some "duplicated flag");
-           Hashtbl.add seen mode ();
-           match unloc mode with
-           | `Strict -> { pmodes with pm_strict = flag; })
-        { pm_strict = true; } modes
-  }
-
-proofmode1:
-| b=boption(MINUS) pm=loc(proofmodename) { (pm, not b) }
-
-proofmodename:
-| STRICT { `Strict }
+| t=toptactic  { `Actual t }
+| PROOF        { `Proof    }
 
 (* -------------------------------------------------------------------- *)
 tcd_toptactic:

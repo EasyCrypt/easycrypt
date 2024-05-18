@@ -40,4 +40,15 @@
   , "scenario"   : "cryptobox"
   , "options"    : "-pragmas Proofs:weak"
   }
+
+  ,
+
+  { "name"       : "xsalsa20"
+  , "repository" : "https://gitlab.com/fdupress/ec-xsalsa"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xsalsa"
+  , "options"    : "-pragmas Proofs:weak"
+  }
 ]

@@ -291,11 +291,11 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : symbol option;
-  puc_mode   : bool option;
-  puc_jdg    : proof_state;
-  puc_flags  : pucflags;
-  puc_crt    : EcDecl.axiom;
+  puc_name    : symbol option;
+  puc_started : bool;
+  puc_jdg     : proof_state;
+  puc_flags   : pucflags;
+  puc_crt     : EcDecl.axiom;
 }
 
 and proof_ctxt =
@@ -677,39 +677,33 @@ module Tactics = struct
   type prinfos =
     EcCoreGoal.proofenv * (EcCoreGoal.handle * EcCoreGoal.handle list)
 
+  type proofmode = [`WeakCheck | `Check | `Report]
+
   let pi scope pi = Prover.do_prover_info scope pi
 
-  let proof (scope : scope) mode (strict : bool) =
+  let proof (scope : scope) =
     check_state `InActiveProof "proof script" scope;
 
     match (oget scope.sc_pr_uc).puc_active with
     | None -> hierror "no active lemmas"
     | Some (pac, pct) ->
       let pac =
-        match pac.puc_mode with
-        | None when not strict && mode = `WeakCheck -> begin
-            match pac.puc_jdg with
-            | PSNoCheck -> { pac with puc_mode = Some false; }
-            | PSCheck _ ->
-                let pac = { pac with puc_jdg = PSNoCheck } in
-                  { pac with puc_mode = Some false; }
-        end
-
-        | None   -> { pac with puc_mode = Some strict }
-        | Some _ -> hierror "[proof] can only be used at beginning of a proof script"
+        if pac.puc_started then
+          hierror "[proof] can only be used at beginning of a proof script";
+        { pac with puc_started = true }
       in
         { scope with sc_pr_uc =
             Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct); } }
 
-  let process_r ?reloc mark mode (scope : scope) (tac : ptactic list) =
+  let process_r ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
       match (oget scope.sc_pr_uc).puc_active with
       | None -> hierror "no active lemma"
       | Some (pac, _) ->
-          if   mark && pac.puc_mode = None
-          then proof scope mode true
+          if   mark && not pac.puc_started
+          then proof scope
           else scope
     in
 
@@ -724,16 +718,10 @@ module Tactics = struct
         let module TTC = EcHiTacticals in
 
         let htmode =
-          match pac.puc_mode, mode with
-          | Some true , `WeakCheck -> `Admit
-          | _         , `WeakCheck ->
-               hierror "cannot weak-check a non-strict proof script"
-          | Some true , `Check     -> `Strict
-          | Some false, `Check     -> `Standard
-          | None      , `Check     -> `Strict
-          | Some true , `Report    -> `Report
-          | Some false, `Report    -> `Standard
-          | None      , `Report    -> `Report
+          match mode with
+          | `WeakCheck -> `Admit
+          | `Check     -> `Strict
+          | `Report    -> `Report
         in
 
         let ttenv = {
@@ -816,7 +804,7 @@ module Ax = struct
 
   module TT = EcTyping
 
-  type mode = [`WeakCheck | `Check | `Report]
+  type proofmode = Tactics.proofmode
 
   (* ------------------------------------------------------------------ *)
   let bind ?(import = EcTheory.import0) (scope : scope) ((x, ax) : _ * axiom) =
@@ -835,19 +823,21 @@ module Ax = struct
           PSCheck proof
     in
     let puc =
-      { puc_active = Some ({
-          puc_name  = name;
-          puc_mode  = None;
-          puc_jdg   = puc;
-          puc_flags = axflags;
-          puc_crt   = axd; }, ctxt);
-        puc_cont = cont;
-        puc_init = scope.sc_env; }
+      let active =        
+        { puc_name    = name
+        ; puc_started = false
+        ; puc_jdg     = puc
+        ; puc_flags   = axflags
+        ; puc_crt     = axd }
+      in
+        { puc_active    = Some (active, ctxt);
+          puc_cont      = cont;
+          puc_init      = scope.sc_env; }
     in
       { scope with sc_pr_uc = Some puc }
 
   (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) (mode : mode) (ax : paxiom located) =
+  let rec add_r (scope : scope) (mode : proofmode) (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let env = env scope in
@@ -995,7 +985,7 @@ module Ax = struct
       tintro |> ofold
         (fun t sc -> snd (Tactics.process1_r false `Check sc t))
         scope in
-    let scope = Tactics.proof scope mode (if tc = None then true else false) in
+    let scope = Tactics.proof scope in
 
     let tc =
       match tc with
@@ -1027,11 +1017,11 @@ module Ax = struct
     snd (save_r ~mode:`Abort scope)
 
   (* ------------------------------------------------------------------ *)
-  let add (scope : scope) (mode : mode) (ax : paxiom located) =
+  let add (scope : scope) (mode : proofmode) (ax : paxiom located) =
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
-  let realize (scope : scope) (mode : mode) (rl : prealize located) =
+  let realize (scope : scope) (mode : proofmode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
@@ -1838,7 +1828,7 @@ module Ty = struct
 
           let escope = scope in
           let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope in
           let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save_r escope))
         axs;
@@ -2365,7 +2355,7 @@ module Cloning = struct
 
           let escope = { scope with sc_env = axc.C.axc_env; } in
           let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope in
           let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save_r escope); None)
       proofs

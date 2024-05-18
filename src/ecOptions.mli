@@ -31,6 +31,7 @@ and run_option = {
   runo_scenarios : string list;
   runo_report    : string option;
   runo_provers   : prv_options;
+  runo_jobs      : int option;
 }
 
 and prv_options = {
