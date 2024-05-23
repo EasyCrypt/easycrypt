@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcAst
 open EcEnv
 open EcDecl
 open EcPath
@@ -235,7 +236,7 @@ val trans_memtype :
 
 (* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
-  env -> module_type -> pmod_restr option -> module_type
+  env -> module_type -> pmod_restr option -> mty_mr
 
 val transmodsig  : env -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
@@ -262,7 +263,7 @@ val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
 val check_modtype :
-  env -> mpath -> module_sig -> module_type -> unit
+  env -> mpath -> module_sig -> mty_mr -> unit
 
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option

@@ -124,17 +124,17 @@ and oracle_info = {
   oi_calls : xpath list;
 }
 
+and oracle_infos = oracle_info Msym.t
+
 and mod_restr = {
   mr_xpaths : mr_xpaths;
   mr_mpaths : mr_mpaths;
-  mr_oinfos : oracle_info Msym.t;
 }
 
 and module_type = {
   mt_params : (EcIdent.t * module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
-  mt_restr  : mod_restr;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -159,9 +159,11 @@ and memenv = memory * memtype
 (* -------------------------------------------------------------------- *)
 and gty =
   | GTty    of ty
-  | GTmodty of module_type
+  | GTmodty of mty_mr
   | GTmem   of memtype
 
+and mty_mr = module_type * mod_restr  
+  
 and binding  = (EcIdent.t * gty)
 and bindings = binding list
 
@@ -361,6 +363,11 @@ val mr_fv    : mod_restr fv
 
 val mty_equal : module_type equality
 val mty_hash  : module_type hash
+val mty_fv    : module_type fv
+
+val mty_mr_equal : mty_mr equality
+val mty_mr_hash  : mty_mr hash
+val mty_mr_fv    : mty_mr fv
 
 val mr_tostring : mod_restr -> string
 

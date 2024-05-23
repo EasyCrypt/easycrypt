@@ -287,24 +287,22 @@ and on_restr (cb : cb) (restr : mod_restr) =
   Sx.iter (on_xp cb) restr.mr_xpaths.ur_neg;
   oiter (Sx.iter (on_xp cb)) restr.mr_xpaths.ur_pos;
   Sm.iter (on_mp cb) restr.mr_mpaths.ur_neg;
-  oiter (Sm.iter (on_mp cb)) restr.mr_mpaths.ur_pos;
-  Msym.iter (fun _ oi -> on_oi cb oi) restr.mr_oinfos
+  oiter (Sm.iter (on_mp cb)) restr.mr_mpaths.ur_pos
 
-and on_modty cb mty =
+and on_modty cb (mty : module_type) =
   cb (`ModuleType mty.mt_name);
   List.iter (fun (_, mty) -> on_modty cb mty) mty.mt_params;
-  List.iter (on_mp cb) mty.mt_args;
-  on_restr cb mty.mt_restr
+  List.iter (on_mp cb) mty.mt_args
 
-and on_mdecl (cb : cb) (mty : module_type) =
-  on_modty cb mty
+and on_mty_mr (cb : cb) ((mty, mr) : mty_mr) =
+  on_modty cb mty; on_restr cb mr
 
 and on_gbinding (cb : cb) (b : gty) =
   match b with
   | EcAst.GTty ty ->
       on_ty cb ty
   | EcAst.GTmodty mty ->
-      on_mdecl cb mty
+      on_mty_mr cb mty
   | EcAst.GTmem m ->
       on_memtype cb m
 
@@ -315,7 +313,7 @@ and on_module (cb : cb) (me : module_expr) =
   match me.me_body with
   | ME_Alias (_, mp)  -> on_mp cb mp
   | ME_Structure st   -> on_mstruct cb st
-  | ME_Decl mty       -> on_mdecl cb mty
+  | ME_Decl mty       -> on_mty_mr cb mty
 
 and on_mstruct (cb : cb) (st : module_structure) =
   List.iter (on_mpath_mstruct1 cb) st.ms_body
@@ -434,7 +432,8 @@ let on_modsig (cb:cb) (ms:module_sig) =
   List.iter (fun (Tys_function fs) ->
       on_ty cb fs.fs_arg;
       List.iter (fun x -> on_ty cb x.ov_type) fs.fs_anames;
-      on_ty cb fs.fs_ret;) ms.mis_body
+      on_ty cb fs.fs_ret;) ms.mis_body;
+  Msym.iter (fun _ oi -> on_oi cb oi) ms.mis_oinfos
 
 let on_ring cb r =
   on_ty cb r.r_type;
@@ -479,7 +478,7 @@ type scenv = {
 
 and sc_item =
   | SC_th_item  of EcTheory.theory_item
-  | SC_decl_mod of EcIdent.t * module_type
+  | SC_decl_mod of EcIdent.t * mty_mr
 
 and sc_items =
   sc_item list
@@ -618,21 +617,14 @@ let add_declared_op to_gen path opdecl =
     in aux e.e_fv e
 
 let rec gty_fv_and_tvar : gty -> int Mid.t = function
-  | GTty ty -> EcTypes.ty_fv_and_tvar ty
-  | GTmodty { mt_restr = restr } ->
-    (* mr_oinfos *)
-    let fv =
-      EcSymbols.Msym.fold (fun _ oi fv ->
-        List.fold_left EcPath.x_fv fv (PreOI.allowed oi)
-      ) restr.mr_oinfos Mid.empty
-    in
+  | GTty ty ->
+    EcTypes.ty_fv_and_tvar ty
 
-    EcIdent.fv_union fv
-      (EcIdent.fv_union
-         (mr_xpaths_fv restr.mr_xpaths)
-         (mr_mpaths_fv restr.mr_mpaths))
+  | GTmodty mty ->
+    EcAst.mty_mr_fv mty
 
-  | GTmem mt -> EcMemory.mt_fv mt
+  | GTmem mt ->
+    EcMemory.mt_fv mt
 
 and fv_and_tvar_f f =
   let fv = ref f.f_fv in
@@ -643,6 +635,9 @@ and fv_and_tvar_f f =
     | Fquant(_, d, f) ->
       fv := List.fold_left (fun fv (_,gty) -> EcIdent.fv_union fv (gty_fv_and_tvar gty)) !fv d;
       aux f
+    | Fmatch (b, bs, ty) ->
+      fv := EcIdent.fv_union (tvar_fv ty) !fv;
+      List.iter aux (b :: bs)
     | _ -> EcFol.f_iter aux f
   in
   aux f; !fv
@@ -1495,7 +1490,7 @@ let add_decl_mod id mt scenv =
       d_tc    = [`Global];
     } in
     let from = `Declare, `Module (mpath_abs id []) in
-    on_modty (cb scenv from cd) mt;
+    on_mty_mr (cb scenv from cd) mt;
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
