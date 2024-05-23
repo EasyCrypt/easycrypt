@@ -367,8 +367,8 @@ let mk_tglob genv m =
 (* -------------------------------------------------------------------- *)
 let rec trans_ty ((genv, lenv) as env) ty =
   match ty.ty_node with
-  | Tglob   mp ->
-    mk_tglob genv mp
+  | Tglob   _mp ->
+    (assert false; (* mk_tglob genv mp)  *))
   | Tunivar _ -> assert false
   | Tvar    x -> trans_tv lenv x
 
@@ -849,6 +849,9 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
     WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
+and trans_glob _ _ _ = assert false
+
+(*
 and trans_glob ((genv, _) as env) m mem =
   let wmem = trans_mem env ~forglobal:true mem in
   let w3op =
@@ -866,6 +869,7 @@ and trans_glob ((genv, _) as env) m mem =
        Hid.add genv.te_lc m w3op;
        w3op
   in apply_wop genv w3op [] [wmem]
+    *)
 
 (* -------------------------------------------------------------------- *)
 and trans_mem (genv,lenv) ~forglobal mem =

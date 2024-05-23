@@ -4,6 +4,7 @@ open EcPath
 open EcMaps
 open EcSymbols
 open EcLocation
+open EcCoreMemRestr
 open EcParsetree
 open EcAst
 open EcTypes
@@ -41,15 +42,11 @@ type mismatch_funsig =
 | MF_tres      of ty * ty                               (* expected, got *)
 | MF_restr     of EcEnv.env * Sx.t mismatch_sets
 
-type restr_failure = Sx.t * Sm.t
-
-type restr_eq_failure = Sx.t * Sm.t * Sx.t * Sm.t
+type restr_failure = mem_restr * mem_restr
 
 type mismatch_restr = [
   | `Sub    of restr_failure          (* Should not be allowed *)
-  | `RevSub of restr_failure option   (* Should be allowed. None is everybody *)
-  | `Eq     of restr_eq_failure       (* Should be equal *)
-  | `FunCanCallUnboundedOracle of symbol * EcPath.xpath
+  | `Eq     of restr_failure       (* Should be equal *)
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -226,10 +223,10 @@ let e_inuse =
     fun e -> inuse Sx.empty e
 
 (* -------------------------------------------------------------------- *)
-let empty_uses : uses = mk_uses [] Sx.empty Sx.empty
+let empty_uses : uses = mk_uses Sx.empty Sx.empty Sx.empty
 
 let add_call (u : uses) p : uses =
-  mk_uses (p::u.us_calls) u.us_reads u.us_writes
+  mk_uses (Sx.add p u.us_calls) u.us_reads u.us_writes
 
 let add_read (u : uses) p : uses =
   if is_glob p then
@@ -547,222 +544,15 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
 (* -------------------------------------------------------------------- *)
 exception RestrErr of mismatch_restr
 
-let re_perror x = raise @@ RestrErr (`Sub x)
-
-let re_eq_perror x = raise @@ RestrErr (`Eq x)
-
-(* Unify the two restriction errors, if any. *)
-let to_eq_error e e' =
-  match e, e' with
-  | None, None -> ()
-  | Some (sx,sm), None ->
-    re_eq_perror (sx,sm, Sx.empty, Sm.empty)
-  | None, Some (sx,sm) ->
-    re_eq_perror (Sx.empty, Sm.empty, sx, sm)
-  | Some (sx,sm), Some (sx',sm') ->
-    re_eq_perror (sx, sm, sx', sm')
-
-let to_unit_map sx = Mx.map (fun _ -> ()) sx
-
-let to_sm sid =
-  EcIdent.Sid.fold (fun m sm -> Sm.add (EcPath.mident m) sm) sid Sm.empty
-
-let support env (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-  let memo : Sx.t EcIdent.Hid.t = EcIdent.Hid.create 16 in
-
-  let rec ur_support (supp : Sx.t) ur =
-    let supp = EcUtils.omap_dfl (use_support supp) supp ur.ur_pos in
-    use_support supp ur.ur_neg
-
-  and use_support (supp : Sx.t) (use : EcEnv.use) =
-    let supp = Mx.fold (fun x _ supp -> Sx.add x supp) use.EcEnv.us_pv supp in
-    EcIdent.Sid.fold (fun m supp ->
-        mident_support supp m
-      ) use.EcEnv.us_gl supp
-
-  and mident_support (supp : Sx.t) m =
-    try EcIdent.Hid.find memo m with
-    | Not_found ->
-      let mp = EcPath.mident m in
-      let ur  = NormMp.get_restr_use env mp in
-      let supp = ur_support supp ur in
-      EcIdent.Hid.add memo m supp;
-      supp in
-
-  let supp = EcUtils.omap_dfl (use_support Sx.empty) Sx.empty pr in
-  ur_support supp r
-
-(* Is [x] allowed in a positive restriction [pr]. *)
-let rec p_allowed env (x : EcPath.xpath) (pr : EcEnv.use option) =
-  match pr with
-  | None -> true
-  | Some pr ->
-    Mx.mem x pr.EcEnv.us_pv
-    || EcIdent.Sid.exists (allowed_m env x) pr.EcEnv.us_gl
-
-(* Is [x] allowed in an abstract module [m] *)
-and allowed_m env (x : EcPath.xpath) (m : EcIdent.t) =
-  let mp = EcPath.mident m in
-  let r  = NormMp.get_restr_use env mp in
-  allowed env x r
-
-(* Is [x] allowed in a positive and negative restriction [r]. *)
-and allowed env (x : EcPath.xpath) (r : EcEnv.use use_restr) =
-  (* [x] is allowed in [r] iff:
-     - [x] is directly allowed
-     - [x] is allowed in a module allowed in [r] *)
-  (p_allowed env x r.ur_pos && not (p_allowed env x (Some r.ur_neg)))
-
-(* Are all elements of [sx] allowed in the positive and negative
-   restriciton [r]. *)
-let all_allowed env (sx : 'a EcPath.Mx.t) (r : EcEnv.use use_restr) =
-  let allow x = allowed env x r in
-  let not_allowed = Mx.filter (fun x _ -> not @@ allow x) sx
-                    |> to_unit_map in
-  if not @@ Mx.is_empty not_allowed then
-    re_perror (not_allowed, Sm.empty)
-
-(* Are all elements of [sx] allowed in the union of the positive restriction [pr]
-   and the positive and negative restriction [r]. *)
-let all_allowed_gen env (sx : 'a EcPath.Mx.t)
-    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-  let allow x = p_allowed env x pr || allowed env x r in
-  let not_allowed = Mx.filter (fun x _ -> not @@ allow x) sx
-                    |> to_unit_map in
-  if not @@ Mx.is_empty not_allowed then
-    re_perror (not_allowed, Sm.empty)
-
-(* Are all elements of [sx] allowed in the positive restriciton [pr]. *)
-let all_allowed_p env (sx : 'a EcPath.Mx.t) (pr : EcEnv.use option) =
-  all_allowed env sx { ur_pos = pr; ur_neg = EcEnv.use_empty }
-
-
-(* Are all variables allowed in the union of the positive restriction [pr]
-   and the positive and negative restriction [r].
-   I.e. is [pr] union [r] forbidding nothing.
-   Remark: we cannot compute directly the union of [pr] and [r], because
-   A union (B \ C) <> (A union B) \ C *)
-let rec everything_allowed env
-    (pr : EcEnv.use option) (r : EcEnv.use use_restr) : unit =
-  match pr, r.ur_pos with
-  | None, _ -> ()
-  | Some pr, Some rup when EcIdent.Sid.is_empty pr.EcEnv.us_gl
-                        && EcIdent.Sid.is_empty rup.EcEnv.us_gl ->
-    raise @@ RestrErr (`RevSub None)
-
-  | Some _, Some _ ->
-    (* We check whether everybody in the support of [pr] and [r] is allowed,
-       and whether a dummy variable (which stands for everybody else) is
-       allowed. *)
-    let supp = support env pr r in
-    let dum =
-      let mdum = EcPath.mpath_abs (EcIdent.create "__dummy_ecTyping__") [] in
-      EcPath.xpath mdum "__dummy_ecTyping_s__" in
-    (* Sanity check: [dum] must be fresh. *)
-    assert (not @@ Sx.mem dum supp);
-    let supp = Sx.add dum supp in
-
-    all_allowed_gen env supp pr r;
-
-  | Some pr, None ->
-    (* In that case, we need [r.ur_neg] to forbid only variables that are
-       allowed in [pr], i.e. we require that:
-       [r.ur_neg] subset [pr] *)
-    try
-      all_allowed_p env r.ur_neg.EcEnv.us_pv (Some pr);
-      all_mod_allowed env
-        r.ur_neg.EcEnv.us_gl (Some pr) (EcModules.ur_full EcEnv.use_empty)
-    with RestrErr (`Sub e) -> raise @@ RestrErr (`RevSub (Some e))
-
-(* Are all elements of [sm] allowed the union of the positive restriction
-   [pr] and the positive and negative restriction [r]. *)
-and all_mod_allowed env (sm : EcIdent.Sid.t)
-    (pr : EcEnv.use option) (r : EcEnv.use use_restr) : unit =
-
-  let allow m = mod_allowed env m pr r in
-  let not_allowed = EcIdent.Sid.filter (fun m -> not @@ allow m) sm
-                    |> to_sm in
-  if not @@ Sm.is_empty not_allowed then
-    re_perror (Sx.empty, not_allowed)
-
-(* Is [m] directly allowed. This is sound but not complete (hence a negative
-   answer does not mean that [m] is forbidden). *)
-and direct_mod_allowed
-    (m : EcIdent.t) (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-  match pr with
-  | None -> true
-  | Some pr ->
-    if EcIdent.Sid.mem m pr.EcEnv.us_gl
-    then true
-    else if EcIdent.Sid.is_empty r.ur_neg.EcEnv.us_gl
-         && Mx.is_empty r.ur_neg.EcEnv.us_pv
-    then match r.ur_pos with
-      | None -> true
-      | Some rur -> EcIdent.Sid.mem m rur.EcEnv.us_gl
-    else false
-
-(* Is [m] allowed in the union of the positive restriction [pr] and the
-   positive and negative restriction [r]. *)
-and mod_allowed env
-    (m : EcIdent.t) (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-
-  if direct_mod_allowed m pr r
-  then true
-  else
-    let mp = EcPath.mident m in
-    let rm  = NormMp.get_restr_use env mp in
-
-    try ur_allowed env rm pr r; true with
-      RestrErr _ -> false
-
-(* Is [ur] allowed in the union of the positive restriction [pr] and the
-   positive and negative restriction [r]. *)
-and ur_allowed env
-    (ur : EcEnv.use use_restr)
-    (pr : EcEnv.use option) (r : EcEnv.use use_restr) : unit =
-  let pr' = match pr with
-    | None -> None
-    | Some pr -> some @@ EcEnv.use_union pr ur.ur_neg in
-
-  use_allowed env ur.ur_pos pr' r
-
-(* Is [use] allowed in the union of the positive restriction [pr] and the
-   positive and negative restriction [r]. *)
-and use_allowed env
-    (use : EcEnv.use option)
-    (pr : EcEnv.use option) (r : EcEnv.use use_restr) : unit =
-  (* We have two cases, depending on whether [use] is everybody or not. *)
-  match use with
-  | None -> everything_allowed env pr r
-
-  | Some urm ->
-    all_allowed_gen env urm.EcEnv.us_pv pr r;
-    all_mod_allowed env urm.EcEnv.us_gl pr r
-
-(* This only checks the memory restrictions. *)
-let _check_mem_restr env (use : EcEnv.use) (restr : mod_restr) =
-  let r : EcEnv.use use_restr = NormMp.restr_use env restr in
-  use_allowed env (Some use) (Some EcEnv.use_empty) r
-
 (* Check if [mr1] is a a subset of [mr2]. *)
-let _check_mem_restr_sub env (mr1 : mod_restr) (mr2 : mod_restr) =
-  let r1 = NormMp.restr_use env mr1 in
-  let r2 = NormMp.restr_use env mr2 in
-  ur_allowed env r1 (Some EcEnv.use_empty) r2
+let _check_mem_restr_sub env (mr1 : mem_restr) (mr2 : mem_restr) =
+  if not (EcMemRestr.subset env mr1 mr2) then
+    raise (RestrErr (`Sub(mr1, mr2)))
 
 (* Check if [mr1] is equal to [mr2]. *)
-let _check_mem_restr_eq env (mr1 : mod_restr) (mr2 : mod_restr) =
-  let r1 = NormMp.restr_use env mr1 in
-  let r2 = NormMp.restr_use env mr2 in
-
-  let e1 = match ur_allowed env r1 (Some EcEnv.use_empty) r2 with
-    | exception (RestrErr (`Sub e1)) -> Some e1
-    | () -> None
-  and e2 = match ur_allowed env r2 (Some EcEnv.use_empty) r1 with
-    | exception (RestrErr (`Sub e2)) -> Some e2
-    | () -> None in
-
-    to_eq_error e1 e2
+let _check_mem_restr_eq env (mr1 : mem_restr) (mr2 : mem_restr) =
+  if not (EcMemRestr.equal env mr1 mr2) then
+    raise (RestrErr (`Eq(mr1, mr2)))
 
 let check_mem_restr_mode mode env sym mr1 mr2 =
   try match mode with
@@ -775,16 +565,14 @@ let recast env who f =
   try f () with
   | RestrErr (`Eq _) -> assert false
   | RestrErr (`Sub e) -> re (`Sub e)
-  | RestrErr (`RevSub e) -> re (`RevSub e)
 
 (* This only checks the memory restrictions. *)
-let check_mem_restr env mp (use : EcEnv.use) (restr : mod_restr) =
-  recast env (RW_mod mp) (fun () -> _check_mem_restr env use restr)
+let check_mem_restr env mp (use : mem_restr) (restr : mem_restr) =
+  recast env (RW_mod mp) (fun () -> _check_mem_restr_sub env use restr)
 
-(* This only checks the memory restrictions. *)
 let check_mem_restr_fun env xp restr =
-  let use = NormMp.fun_use env xp in
-  recast env (RW_fun xp) (fun () ->_check_mem_restr env use restr)
+  let mr = EcMemRestr.fun_uses_mr env xp in
+  recast env (RW_fun xp) (fun () ->_check_mem_restr_sub env mr restr)
 
 (* -------------------------------------------------------------------- *)
 let rec check_sig_cnv
@@ -863,7 +651,7 @@ let check_sig_mt_cnv (env : EcEnv.env) (sin : module_sig) (tyout : module_type) 
 
 (* -------------------------------------------------------------------- *)
 let check_modtype (env : EcEnv.env) (mp : mpath) (ms : module_sig) ((mty, mr) : mty_mr) =
-  let use = NormMp.mod_use env mp in
+  let use = EcMemRestr.module_uses_mr env mp (Some mty) in
   check_mem_restr env mp use mr;
   check_sig_mt_cnv env ms mty
 
@@ -985,6 +773,55 @@ let trans_msymbol env msymb =
   (m,mt)
 
 (* -------------------------------------------------------------------- *)
+let trans_gamepath (env : EcEnv.env) gp =
+  let loc = gp.pl_loc in
+
+  let modsymb = List.map (unloc -| fst) (fst (unloc gp))
+  and funsymb = unloc (snd (unloc gp)) in
+  let xp =
+    match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
+    | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
+    | Some (xp,_) -> xp
+  in
+    match modsymb with
+    | [] -> xp
+    | _ ->
+      let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
+        if _sig.miss_params <> [] then
+          tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
+        EcPath.xpath mpath funsymb
+
+(* -------------------------------------------------------------------- *)
+let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
+  match EcEnv.ModTy.lookup_opt (unloc name) env with
+  | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
+  | Some x -> x
+
+let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
+  let (p, { tms_sig = sig_ }) = lookup_module_type env modty in
+  let modty = {                         (* eta-normal form *)
+    mt_params = sig_.mis_params;
+    mt_name   = p;
+    mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
+  } in
+    (modty, sig_)
+
+(* -------------------------------------------------------------------- *)
+
+let trans_fun_or_var_ff env (gp: pgamepath) : functor_fun =
+  let f = trans_gamepath env gp in
+  EcCoreMemRestr.functor_fun [] f
+
+let trans_pfunctor_fun env (pf : pfunctor_fun) : functor_fun =
+  let margs =
+    List.map (fun (x, i) ->
+      (EcIdent.create (unloc x), fst (transmodtype env i)))
+      pf.pff_params
+  in
+  let env = EcEnv.Mod.bind_params margs env in
+  trans_fun_or_var_ff env pf.pff_xp
+
+(* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
   | PTunivar ->
@@ -1033,9 +870,11 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
       let tyargs = transtys tp env ue tyargs in
       tconstr p tyargs
     end
-  | PTglob gp ->
-    let m,_ = trans_msymbol env gp in
-    EcEnv.NormMp.norm_tglob env m
+  | PTglob (FM_ff pf) -> tglob (trans_pfunctor_fun env pf)
+  | PTglob (FM_FunOrVar gp) -> tglob (trans_fun_or_var_ff env gp)
+  | PTglob (FM_Mod m) ->
+      let mp, _ = trans_msymbol env m in
+      EcMemRestr.module_uses_ty env mp None
 
 and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
@@ -1395,11 +1234,6 @@ let var_or_proj fvar fproj pv ty =
   | `Proj(pv, ap) -> fproj (fvar pv ap.arg_ty) ap.arg_pos ty
 
 (* -------------------------------------------------------------------- *)
-let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
-  match EcEnv.ModTy.lookup_opt (unloc name) env with
-  | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
-  | Some x -> x
-
 let lookup_fun env name =
   try
     EcEnv.Fun.lookup name.pl_desc env
@@ -1407,14 +1241,6 @@ let lookup_fun env name =
     tyerror name.pl_loc env (UnknownFunName name.pl_desc)
 
 (* -------------------------------------------------------------------- *)
-let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
-  let (p, { tms_sig = sig_ }) = lookup_module_type env modty in
-  let modty = {                         (* eta-normal form *)
-    mt_params = sig_.mis_params;
-    mt_name   = p;
-    mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
-  } in
-    (modty, sig_)
 
 let transcall transexp env ue loc fsig args =
   let targ = fsig.fs_arg in
@@ -1450,25 +1276,6 @@ let transcall transexp env ue loc fsig args =
 
   in
     (args, fsig.fs_ret)
-
-(* -------------------------------------------------------------------- *)
-let trans_gamepath (env : EcEnv.env) gp =
-  let loc = gp.pl_loc in
-
-  let modsymb = List.map (unloc -| fst) (fst (unloc gp))
-  and funsymb = unloc (snd (unloc gp)) in
-  let xp =
-    match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
-    | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
-    | Some (xp,_) -> xp
-  in
-    match modsymb with
-    | [] -> xp
-    | _ ->
-      let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
-        if _sig.miss_params <> [] then
-          tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-        EcPath.xpath mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let trans_oracle (env : EcEnv.env) (m,f) =
@@ -1681,79 +1488,39 @@ let top_is_mem_binding pf = match pf with
   | PFscope   _ -> false
 
 
-let f_or_mod_ident_loc : f_or_mod_ident -> EcLocation.t = function
-  | FM_FunOrVar x -> loc x
-  | FM_Mod      x -> loc x
-
 (* -------------------------------------------------------------------- *)
-let trans_restr_mem env (r_mem : pmod_restr_mem) =
 
-  let neg_started = ref false in
+let trans_pv env { pl_desc = x; pl_loc = loc } =
+  let side = EcEnv.Memory.get_active env in
+  match EcEnv.Var.lookup_progvar_opt ?side x env with
+  | None -> tyerror loc env (UnknownModVar x)
+  | Some(pv,xty) ->
+    match pv with
+    | `Var pv -> pv, xty
+    | `Proj _ -> assert false
 
-  (* If there is one positive restriction, then we do not have +all mem *)
-  let m_add_pos loc mr x =
-    if !neg_started then tyerror loc env PositiveShouldBeBeforeNegative;
-    let ur_pos =
-      match mr.ur_pos with
-      | None    -> Some(Sx.empty, Sm.singleton x)
-      | Some (sx, sm) -> Some(sx, Sm.add x sm) in
-    { mr with ur_pos } in
+let trans_fun_or_var_mr env gp =
+  match pgamepath_to_pqsymbol gp with
+  | None -> GlobFun (trans_fun_or_var_ff env gp)
+  | Some pv ->
+      try Var (get_glob (fst (trans_pv env pv)))
+      with TyError (_, _, UnknownModVar _) ->
+        GlobFun (trans_fun_or_var_ff env gp)
 
-  let x_add_pos loc mr x =
-    if !neg_started then tyerror loc env PositiveShouldBeBeforeNegative;
-    let ur_pos =
-      match mr.ur_pos with
-      | None    -> Some (Sx.singleton x, Sm.empty)
-      | Some (sx, sm) -> Some(Sx.add x sx, sm) in
-    { mr with ur_pos } in
+let rec trans_mem_restr env (r_mem : pmem_restr) =
+  match r_mem with
+  | PMempty -> mr_empty
+  | PMall   -> mr_full
+  | PMvar (FM_ff pf) -> GlobFun (trans_pfunctor_fun env pf)
+  | PMvar (FM_FunOrVar gp) -> trans_fun_or_var_mr env gp
+  | PMvar (FM_Mod m) ->
+      let mp, _ = trans_msymbol env m in
+      EcMemRestr.module_uses_mr env mp None
 
-  let m_add_neg mr x =
-    neg_started := true;
-    let ur_neg =
-      let (sx, sm) = mr.ur_neg in
-      sx, Sm.add x sm in
-    { mr with ur_neg } in
+  | PMunion (m1, m2) -> mr_union (trans_mem_restr env m1) (trans_mem_restr env m2)
+  | PMinter (m1, m2) -> mr_inter (trans_mem_restr env m1) (trans_mem_restr env m2)
+  | PMdiff  (m1, m2) -> mr_diff  (trans_mem_restr env m1) (trans_mem_restr env m2)
 
-  let x_add_neg mr x =
-    neg_started := true;
-    let ur_neg =
-      let (sx, sm) = mr.ur_neg in
-      Sx.add x sx, sm in
-    { mr with ur_neg } in
-
-  List.fold_left (fun mr el ->
-      let x = match el with PMPlus x | PMMinus x | PMDefault x -> x in
-      let xloc = f_or_mod_ident_loc x in
-      let sign = match el with
-        | PMPlus _    -> `Plus
-        | PMMinus _   -> `Minus
-        | PMDefault _ ->
-          if EcGState.get_old_mem_restr (EcEnv.gstate env) then
-            `Minus
-          else
-            tyerror xloc env NoDefaultMemRestr
-      in
-
-      match x with
-      | FM_Mod m ->
-        let m = trans_topmsymbol env m in
-        if sign = `Plus
-        then m_add_pos xloc mr m
-        else m_add_neg mr m
-
-      | FM_FunOrVar vf ->
-        match pgamepath_to_pqsymbol vf with
-        | None -> tyerror (loc vf) env InvalidVar
-        | Some v ->
-          let xp = match EcEnv.Var.lookup_progvar_opt (unloc v) env with
-            | None -> tyerror (loc vf) env (UnknownModVar (unloc v))
-            | Some (`Var pv,_) when is_glob pv -> get_glob pv
-            | Some _ -> assert false in
-          if sign = `Plus
-          then x_add_pos xloc mr xp
-          else x_add_neg mr xp )
-    mr_empty
-    r_mem
 
 (* -------------------------------------------------------------------- *)
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
@@ -1797,18 +1564,14 @@ let rec trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
   (name, r_orcls)
 
-(* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
-and transmod_restr env (mr : pmod_restr) =
-  trans_restr_mem env mr.pmr_mem
-
 (* -------------------------------------------------------------------- *)
 (* Return the module type updated with some restriction.
  * Remark: the module type has not been entered. *)
-and trans_restr_for_modty env (modty : module_type) (pmr : pmod_restr option) =
+and trans_restr_for_modty env (modty : module_type) (pmr : pmem_restr option) =
   let mr =
     match pmr with
-    | None -> mr_empty
-    | Some pmr -> transmod_restr env pmr in
+    | None -> mr_full
+    | Some pmr -> trans_mem_restr env pmr in
   (modty, mr)
 
 (* -------------------------------------------------------------------- *)
@@ -2310,7 +2073,7 @@ and get_oi_calls env (params, items) =
           let fun_ = EcEnv.Fun.by_xpath f env in
           match fun_.f_def with
           | FBalias _ -> assert false
-          | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
+          | FBdef def -> Sx.fold (fun f c -> f_call c f) c def.f_uses.us_calls
           | FBabs oi  ->
             List.fold_left f_call c (OI.allowed oi) in
 
@@ -2318,7 +2081,7 @@ and get_oi_calls env (params, items) =
         match f.f_def with
         | FBalias f -> f_call EcPath.Sx.empty f
         | FBdef def ->
-          List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
+          Sx.fold (fun f c -> f_call c f) EcPath.Sx.empty def.f_uses.us_calls
         | FBabs oi ->
           List.fold_left f_call EcPath.Sx.empty (OI.allowed oi) in
       let filter f =
@@ -2757,14 +2520,6 @@ and transinstr
       [ i_assert e ]
 
 (* -------------------------------------------------------------------- *)
-and trans_pv env { pl_desc = x; pl_loc = loc } =
-  let side = EcEnv.Memory.get_active env in
-  match EcEnv.Var.lookup_progvar_opt ?side x env with
-  | None -> tyerror loc env (UnknownModVar x)
-  | Some(pv,xty) ->
-    match pv with
-    | `Var pv -> pv, xty
-    | `Proj _ -> assert false
 
 and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue.pl_desc with
@@ -3072,17 +2827,20 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let opsc = lookup_scope env popsc in
           transf_r (Some opsc) env f
 
-    | PFglob gp ->
-        if mode <> `Form then
-          tyerror f.pl_loc env (NotAnExpression `Glob);
-
-        let mp = fst (trans_msymbol env gp) in
+    | PFglob g ->
+      begin
         let me =
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
         in PFS.set_memused state;
-           EcEnv.NormMp.norm_glob env me mp
+        match g with
+        | FM_ff pf -> f_glob (trans_pfunctor_fun env pf) me
+        | FM_FunOrVar gp -> f_glob (trans_fun_or_var_ff env gp) me
+        | FM_Mod m ->
+            let mp, _ = trans_msymbol env m in
+            EcMemRestr.module_uses_form env mp None me
+      end
 
     | PFint n ->
         f_int n
@@ -3178,27 +2936,22 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                 f_eq x1 x2
 
           | GVglob (gp, ex) ->
-              let (m, _) = trans_msymbol env gp in
+
               let ex = List.map (trans_pv env) ex in
 
-              let filter_pv (xp, _) =
+              let filter_pv xp =
                 let xp = pv_glob xp in
                 let for1 (ex1, _) = not (EcEnv.NormMp.pv_equal env xp ex1) in
                 List.for_all for1 ex in
 
+              let (m, _) = trans_msymbol env gp in
+
+
               let create mem =
-                if List.is_empty ex then
-                  EcEnv.NormMp.norm_glob env mem m
-                else
-
-                let use = EcEnv.NormMp.mod_use env m in
-                let gl  = Sid.elements use.us_gl in
-                let pv  = List.filter filter_pv (Mx.bindings use.us_pv) in
-                let res =
-                    List.map (fun mid -> f_glob mid mem) gl
-                  @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
-
-                f_tuple res in
+                let params, uses = EcMemRestr.module_uses env m None in
+                let uses = {uses with us_reads = Sx.filter filter_pv uses.us_reads;
+                                      us_writes = Sx.filter filter_pv uses.us_writes } in
+                EcMemRestr.Uses.to_form env params uses mem in
 
               let x1 = create EcFol.mleft  in
               let x2 = create EcFol.mright in
@@ -3545,10 +3298,7 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
     let xs = List.map2 (fun x ty ->
         {v_name = x.pl_desc; v_type = ty}, x.pl_loc) xs xsvars in
 
-    let mt = fundef_add_symbol_mt env memtype xs in
-    (* REM *)
-    Format.eprintf "dump: %s@." (EcMemory.dump_memtype mt);
-    mt
+    fundef_add_symbol_mt env memtype xs
   in
 
   List.fold_left add_decl mt pmemtype

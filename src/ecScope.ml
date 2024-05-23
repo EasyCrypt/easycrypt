@@ -1475,6 +1475,29 @@ end
 module Mod = struct
   module TT = EcTyping
 
+  let add_local_restr env path m =
+    let _mpath = EcPath.pqname path m.me_name in
+    match m.me_body with
+    | ME_Alias _ | ME_Decl _ -> env
+    | ME_Structure _ -> env
+    (*
+      (* We keep only the internal part, i.e the inner global variables *)
+      (* TODO : using mod_use here to compute the set of inner global
+         variables is inefficient, change this algo *)
+      let mp = EcPath.mpath_crt mpath [] None in
+      let use = EcEnv.NormMp.mod_use env mp in
+      let rx =
+        let add x _ rx =
+          if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
+            Sx.add x rx
+          else rx in
+        Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
+      EcEnv.Mod.add_restr_to_locals
+        { (ur_empty Sx.empty) with ur_neg = rx }
+        (ur_empty Sm.empty)
+        env
+      *)
+
   let bind ?(import = EcTheory.import0) (scope : scope) (m : top_module_expr) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem import (EcTheory.Th_module m) in

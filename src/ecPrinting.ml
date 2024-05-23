@@ -322,7 +322,6 @@ module PPEnv = struct
           match EcEnv.Var.lookup_local_opt name ppe.ppe_env with
           | Some (id, _) when EcIdent.id_equal id x -> name
           | _ -> EcIdent.name x
-
   let tyvar (ppe : t) x =
     match Mid.find_opt x ppe.ppe_locals with
     | None   -> EcIdent.tostring x
@@ -741,7 +740,8 @@ let rec pp_type_r
   (ty    : ty)
 =
   match ty.ty_node with
-  | Tglob m -> Format.fprintf fmt "(glob %a)" EcIdent.pp_ident m
+  | Tglob m ->
+     Format.fprintf fmt "(glob %s)" (EcPath.x_tostring m.ff_xp)
 
   | Tunivar x -> pp_tyunivar ppe fmt x
   | Tvar    x -> pp_tyvar ppe fmt x
@@ -1536,16 +1536,18 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
       if pv1 = pv2 then Some (`Var pv1) else None
 
-    | SFeq ({ f_node = Fglob (x1, me1) },
-            { f_node = Fglob (x2, me2) })
+    | SFeq ({ f_node = Fglob (_x1, me1) },
+            { f_node = Fglob (_x2, me2) })
         when (EcMemory.mem_equal me1 EcFol.mleft )
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
-
+      assert false
+        (*
       let pv1 = (PPEnv.mod_symb ppe (EcPath.mident x1)) in
       let pv2 = (PPEnv.mod_symb ppe (EcPath.mident x2)) in
 
       if pv1 = pv2 then Some (`Glob pv1) else None
+          *)
 
     | SFeq ({ f_node = Fproj (f1, i1); f_ty = ty1 },
             { f_node = Fproj (f2, i2); f_ty = ty2 }) -> begin
@@ -1809,13 +1811,13 @@ and pp_form_core_r
         default false
     end
 
-  | Fglob (mp, i) -> begin
+  | Fglob (ff, i) -> begin
     match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
-        Format.fprintf fmt "(glob %a)" (pp_topmod ppe) (EcPath.mident mp)
+        Format.fprintf fmt "(glob %s)" (EcPath.x_tostring ff.ff_xp)
     | _ ->
         let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) (EcPath.mident mp) (pp_mem ppe) i
+        Format.fprintf fmt "(glob %s){%a}" (EcPath.x_tostring ff.ff_xp) (pp_mem ppe) i
     end
 
   | Fquant (q, bd, f) ->
@@ -2023,6 +2025,16 @@ and pp_orclinfos ppe fmt ois =
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
+  match mr with
+  | Empty -> Format.fprintf fmt "Empty"
+  | All -> Format.fprintf fmt "All"
+  | Var x -> Format.fprintf fmt "Var (%a)" (pp_pv ppe) (pv_glob x)
+  | GlobFun ff -> Format.fprintf fmt "GlobFun (%a)" (pp_pv ppe) (pv_glob ff.ff_xp)
+  | Inter (l, r) -> Format.fprintf fmt "Inter (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+  | Union (l, r) -> Format.fprintf fmt "Union (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+  | Diff (l, r) -> Format.fprintf fmt "Diff (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+
+  (*
   let pp_rx sign fmt rx =
     Format.fprintf fmt "%a%a" pp_restr_s sign (pp_pv ppe) (pv_glob rx) in
 
@@ -2049,14 +2061,15 @@ and pp_mem_restr ppe fmt mr =
 
     Format.fprintf fmt "@[<h>{%a}@]" (pp_hlist ",@ ") toprint
   end
+      *)
 
 (* -------------------------------------------------------------------- *)
 (* Use in an hv box. *)
 and pp_mty_mr ppe fmt (mty, mr) =
-  Format.fprintf fmt "@[<hv 2>%a%a@]"
+  Format.fprintf fmt "@[<hv 2>%a{%a}@]"
     (pp_modtype1 ppe) mty
     (pp_mem_restr ppe) mr
-
+  
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
   Format.fprintf fmt "@[<hv 2>%a@]" (pp_modtype1 ppe) mty

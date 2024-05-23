@@ -14,10 +14,6 @@ include EcCoreFol
 include EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-let f_bind_mod s x mp env =
-  Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
-
-(* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   let f_pvlocs ty vs m =
     let arg = f_pvarg ty m in
@@ -36,10 +32,8 @@ let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
 let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
-let f_eqglob mp1 m1 mp2 m2 =
-  let mp1 = EcPath.mget_ident mp1 in
-  let mp2 = EcPath.mget_ident mp2 in
-  f_eq (f_glob mp1 m1) (f_glob mp2 m2)
+let f_eqglob ff1 m1 ff2 m2 =
+  f_eq (f_glob ff1 m1) (f_glob ff2 m2)
 
 (* -------------------------------------------------------------------- *)
 let f_op_real_of_int = (* CORELIB *)
@@ -826,7 +820,7 @@ type sform =
   | SFint   of BI.zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcIdent.t * memory
+  | SFglob  of functor_fun * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -1092,44 +1086,3 @@ let rec one_sided_vs mem fp =
 
   | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
   | _ -> []
-
-let rec dump_f f =
-  let dump_quant q =
-    match q with
-    | Lforall -> "ALL"
-    | Lexists -> "EXI"
-    | Llambda -> "LAM"
-  in
-
-  match f.f_node with
-  | Fquant (q, bs, f) -> dump_quant q ^ " ( " ^ String.concat ", " (List.map EcIdent.tostring (List.fst bs)) ^ " )" ^ "." ^ dump_f f (* of quantif * bindings * form *)
-  | Fif    (c, t, f) -> "IF " ^ dump_f c ^ " THEN " ^ dump_f t ^ " ELSE " ^ dump_f f
-  | Fmatch _ -> "MATCH"
-  | Flet   (_, f, g) -> "LET _ = " ^ dump_f f ^ " IN " ^ dump_f g
-  | Fint    x -> BI.to_string x
-  | Flocal  x -> EcIdent.tostring x
-  | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fop     (p, _) -> EcPath.tostring p
-  | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
-  | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
-  | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x
-  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
-  | FhoareF _ -> "HoareF"
-  | FhoareS _ -> "HoareS"
-  | FbdHoareF _ -> "bdHoareF"
-  | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
-     "bdHoareS [ ME = " ^ EcIdent.tostring m
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
-     ^ "; BD = " ^ dump_f bd ^ "]"
-  | FeHoareS _ -> "eHoareS"
-  | FeHoareF _ -> "eHoareF"
-  | FequivF _ -> "equivF"
-  | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
-     "equivS [ ML = " ^ EcIdent.tostring ml
-     ^ "; MR = " ^ EcIdent.tostring mr
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
-     ^ "]"
-  | FeagerF _ -> "eagerF"

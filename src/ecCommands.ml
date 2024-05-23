@@ -203,29 +203,42 @@ let process_locate scope x =
 module HiPrinting = struct
   (* ------------------------------------------------------------------ *)
   let pr_glob fmt env pm =
+    match pm with
+    | FM_ff _ -> failwith "implement."
+    | FM_FunOrVar _ -> failwith "implement."
+    | FM_Mod pm -> begin
     let ppe = EcPrinting.PPEnv.ofenv env in
     let (p, _) = EcTyping.trans_msymbol env pm in
-    let us = EcEnv.NormMp.mod_use env p in
-    let (globs, pv) = EcEnv.NormMp.flatten_use us in
+    let _fp, us = EcMemRestr.module_uses env p None in
 
-    Format.fprintf fmt "Globals [# = %d]:@."
-      (Sid.cardinal us.EcEnv.us_gl);
-    List.iter (fun id ->
-      Format.fprintf fmt "  %s@." (EcIdent.name id))
-      globs;
-
-    Format.fprintf fmt "@.";
-
-    Format.fprintf fmt "Prog. variables [# = %d]:@."
-      (Mx.cardinal us.EcEnv.us_pv);
-    List.iter (fun (xp, _) ->
+    Format.fprintf fmt "Calls [# = %d]:@."
+      (EcPath.Sx.cardinal us.us_calls);
+    EcPath.Sx.iter (fun xp -> 
+      Format.fprintf fmt "  @[%a@]@."
+        (EcPrinting.pp_funname ppe) xp
+      )
+      us.us_calls;
+    Format.fprintf fmt "Reads [# = %d]:@."
+      (EcPath.Sx.cardinal us.us_reads);
+    EcPath.Sx.iter (fun xp -> 
       let pv = EcTypes.pv_glob xp in
       let ty = EcEnv.Var.by_xpath xp env in
       Format.fprintf fmt "  @[%a : %a@]@."
         (EcPrinting.pp_pv ppe) pv
-        (EcPrinting.pp_type ppe) ty)
-      pv
-
+        (EcPrinting.pp_type ppe) ty
+      )
+      us.us_reads;
+    Format.fprintf fmt "Writes [# = %d]:@."
+      (EcPath.Sx.cardinal us.us_writes);
+    EcPath.Sx.iter (fun xp -> 
+      let pv = EcTypes.pv_glob xp in
+      let ty = EcEnv.Var.by_xpath xp env in
+      Format.fprintf fmt "  @[%a : %a@]@."
+        (EcPrinting.pp_pv ppe) pv
+        (EcPrinting.pp_type ppe) ty
+      )
+      us.us_writes
+      end
 
   (* ------------------------------------------------------------------ *)
   let pr_goal fmt scope n =

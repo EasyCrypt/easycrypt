@@ -174,7 +174,7 @@ module LowApply = struct
           (* FIXME: poor API ==> poor error recovery *)
           try
             EcTyping.check_modtype env mp mt emt;
-            (EcFol.f_bind_mod sbt x mp env, f)
+            (Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm
         end
 
@@ -1740,7 +1740,7 @@ let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 type vsubst = [
   | `Local of EcIdent.t
-  | `Glob  of EcIdent.t * EcMemory.memory
+  | `Glob  of EcAst.functor_fun * EcMemory.memory
   | `PVar  of EcTypes.prog_var * EcMemory.memory
 ]
 
@@ -1786,10 +1786,12 @@ module LowSubst = struct
 
     (* Substitution of globs *)
     | Fglob (mp, m), None when kind.sk_glob -> Some (`Glob (mp, m))
-    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob ->
+    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob -> assert false
+      (*
         if   EcIdent.id_equal mp mp'
         then Some (`Glob (mp, m))
         else None
+        *)
 
     | _, _ -> None
 
@@ -1838,10 +1840,13 @@ module LowSubst = struct
         if EcPV.PV.mem_pv env pv fv then None else Some aout
 
       (* Substitution of globs *)
-      | Some ((_, `Glob (mp, m), f) as aout) ->
+      | Some ((_, `Glob (mp, m), f) as aout) -> assert false
+        (*
         let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
-        if EcPV.PV.mem_glob env (EcPath.mident mp) fv then None else Some aout in
+        if EcPV.PV.mem_glob env (EcPath.mident mp) fv then None else Some aout
+          *)
+            in
     match aout with
     | None -> None
     | Some(side,v,f) ->
@@ -1872,8 +1877,8 @@ module LowSubst = struct
         let check _tg = true in
         (subst f, check)
 
-    | `Glob (mp, m) ->
-        let subst f = EcPV.PVM.subst env (EcPV.PVM.add_glob env (EcPath.mident mp) m f EcPV.PVM.empty) in
+    | `Glob (_ff, _m) ->
+        let subst _f = EcPV.PVM.subst env EcPV.PVM.empty in (* (EcPV.PVM.add_glob env (EcPath.mident mp) m f EcPV.PVM.empty) in *)
         (* FIXME *)
         let check _tg = true in
         (subst f, check)

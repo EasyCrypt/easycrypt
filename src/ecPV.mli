@@ -34,12 +34,6 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
-  val check_npv_mp :
-    env -> xpath -> mpath -> use use_restr -> unit
-
-  val check_mp_mp :
-    env -> mpath -> use use_restr -> mpath -> use use_restr -> unit
-
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 
   val check_glob : env -> mpath -> ('a,'b) t -> unit

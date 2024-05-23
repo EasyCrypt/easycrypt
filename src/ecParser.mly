@@ -778,14 +778,13 @@ mod_ident1:
 | x=lident { ([], x) }
 
 f_or_mod_ident:
-| nm=mod_qident DOT x=lident
-    { let fv = mk_loc (EcLocation.make $startpos(nm) $endpos(x)) (nm, x) in
-      FM_FunOrVar fv }
-| x=lident
-    { let fv = mk_loc (EcLocation.make $startpos(x) $endpos(x)) ([], x) in
-      FM_FunOrVar fv}
+| LBRACE UNDERSCORE IMPL f=loc(fident) RBRACE
+{ FM_ff {pff_params = []; pff_xp = f } }
+| LBRACE p=mod_params IMPL f=loc(fident) RBRACE
+    { FM_ff {pff_params = p; pff_xp = f } }
+| f=loc(fident)
+    { FM_FunOrVar f }
 | m=loc(mod_qident) { FM_Mod m }
-
 
 inlinesubpat:
 | m=rlist1(uident, DOT) { m, None }
@@ -1114,7 +1113,7 @@ sform_u(P):
       PFapp(mk_loc op.pl_loc id, [e1; e2]) }
 
 form_u(P):
-| GLOB mp=loc(mod_qident) { PFglob mp }
+| GLOB mp=f_or_mod_ident { PFglob mp }
 
 | e=sform_u(P) { e }
 
@@ -1248,7 +1247,7 @@ simpl_type_exp:
 | x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
-| GLOB m=loc(mod_qident)      { PTglob m       }
+| GLOB m=f_or_mod_ident       { PTglob m       }
 | LPAREN ty=type_exp RPAREN   { ty             }
 
 type_args:
@@ -1512,13 +1511,21 @@ mod_params:
 (* -------------------------------------------------------------------- *)
 (* Memory restrictions *)
 
-mem_restr_el:
-  | PLUS  el=f_or_mod_ident { PMPlus el }
-  | MINUS el=f_or_mod_ident { PMMinus el }
-  |       el=f_or_mod_ident { PMDefault el }
-
 mem_restr:
-  | ol=rlist0(mem_restr_el,COMMA) { ol }
+| i=loc(UINT) {
+   if BI.equal (unloc i) BI.zero then PMempty
+   else parse_error (loc i) (Some "Only 0 is accepted")
+  }
+
+| STAR                            { PMall      }
+| el=f_or_mod_ident               { PMvar el       }
+| s1=mem_restr PLUS  s2=mem_restr { PMunion(s1,s2) }
+| s1=mem_restr MINUS s2=mem_restr { PMdiff (s1,s2) }
+| s1=mem_restr HAT   s2=mem_restr { PMinter(s1,s2) }
+| LPAREN s=mem_restr RPAREN       { s              }
+
+| PLUS  el=mem_restr          { el }
+| MINUS el=mem_restr          { PMdiff (PMall, el) }
 
 (* -------------------------------------------------------------------- *)
 (* qident optionally taken in a (implicit) module parameters. *)
@@ -1538,7 +1545,7 @@ oracle_restr:
 
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr } }
+    { mr }
 
 
 (* -------------------------------------------------------------------- *)
@@ -3673,7 +3680,7 @@ print:
 | LEMMA       qs=qident          { Pr_ax   qs            }
 | MODULE      qs=qident          { Pr_mod  qs            }
 | MODULE TYPE qs=qident          { Pr_mty  qs            }
-| GLOB        qs=loc(mod_qident) { Pr_glob qs            }
+| GLOB        qs=f_or_mod_ident  { Pr_glob qs            }
 | GOAL        n=sword            { Pr_goal n             }
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }

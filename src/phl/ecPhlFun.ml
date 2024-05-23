@@ -24,11 +24,15 @@ module TTC = EcProofTyping
  * See [ospec] in [equivF_abs_spec / equivF_abs_upto] *)
 
 (* -------------------------------------------------------------------- *)
-let check_oracle_use (_pf : proofenv) env adv o =
-  let restr = { mr_empty with ur_neg = Sx.empty, Sm.singleton adv } in
+let check_oracle_use (_pf : proofenv) env adv o = assert false
+(*
+  let restr = mr_diff mr_full { mr_empty with
+                mr_mpaths = { mr_empty.mr_mpaths with
+                              ur_neg = Sm.singleton adv; }} in
 
   (* This only checks the memory restrictions. *)
   EcTyping.check_mem_restr_fun env o restr
+  *)
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then
@@ -39,8 +43,11 @@ let check_concrete pf env f =
         (EcPrinting.pp_funname ppe) f)
 
 (* -------------------------------------------------------------------- *)
-let lossless_hyps env top sub =
-  let clear_to_top = { mr_empty with ur_neg = Sx.empty, Sm.singleton top } in
+let lossless_hyps env top sub = assert false
+(*
+  let clear_to_top =
+    let mr_mpaths = { (ur_empty Sm.empty) with ur_neg = Sm.singleton top } in
+    { mr_xpaths = ur_empty Sx.empty; mr_mpaths = mr_mpaths } in
 
   let sig_ = EcEnv.NormMp.sig_of_mp env top in
   let bd =
@@ -58,6 +65,7 @@ let lossless_hyps env top sub =
   in
   let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl)
+  *)
 
 (* -------------------------------------------------------------------- *)
 let subst_pre env fs (m : memory) s =
@@ -197,7 +205,7 @@ module FunAbsLow = struct
     let fvr = PV.fv env mr inv in
     PV.check_depend env fvl topl;
     PV.check_depend env fvr topr;
-    let eqglob = f_eqglob topl ml topr mr in
+    let eqglob = assert false in (* f_eqglob topl ml topr mr in *)
 
     let ospec o_l o_r =
       let use =
@@ -308,7 +316,7 @@ module UpToLow = struct
     PV.check_depend env fvr topr;
 
     (* FIXME: check there is only global variable *)
-    let eqglob = f_eqglob topl ml topr mr in
+    let eqglob = assert false in (* f_eqglob topl ml topr mr in *)
 
     let ospec o_l o_r =
       check_oracle_use pf env topl o_l;

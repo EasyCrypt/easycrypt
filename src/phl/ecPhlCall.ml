@@ -354,7 +354,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
   | true ->
     let (topl, _, _, sigl),
       (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-    let eqglob = f_eqglob topl mleft topr mright in
+    let eqglob = assert false in (* f_eqglob topl mleft topr mright in *)
     let lpre = [eqglob;inv] in
     let eq_params =
       f_eqparams
@@ -464,7 +464,7 @@ let process_call side info tc =
         let (topl,fl,_,sigl),
             (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
         let bad2 = Fsubst.f_subst_mem mhr mright bad in
-        let eqglob = f_eqglob topl mleft topr mright in
+        let eqglob = assert false in (* f_eqglob topl mleft topr mright in *)
         let lpre = [eqglob;invP] in
         let eq_params =
           f_eqparams

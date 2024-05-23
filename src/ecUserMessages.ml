@@ -69,8 +69,12 @@ end = struct
             (Sx.ntr_elements notallowed)
 
   let pp_restr_err_aux env fmt error =
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let (ml, mr) = match error with | `Sub (ml, mr) -> ml, mr | _ -> assert false in
     let msg x = Format.fprintf fmt x in
-
+    msg "has access to %a, this conflicts with the restriction %a" (EcPrinting.pp_mem_restr ppe) ml (EcPrinting.pp_mem_restr ppe) mr
+    (*
+    let msg x = Format.fprintf fmt x in
     let ppe = EcPrinting.PPEnv.ofenv env in
     let pp_v fmt xp =
       Format.fprintf fmt "%a"
@@ -91,24 +95,6 @@ end = struct
 
     | `Sub (xs,ms) ->
       msg "is not allowed to use the variable(s)@ %a@ \
-           and the module(s)@ %a"
-        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xs)
-        (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements ms)
-
-    | `RevSub None ->
-      msg "must be unrestricted"
-
-    | `RevSub (Some (xs,ms)) when Sm.is_empty ms ->
-      msg "must be allowed to use the variable(s)@ %a"
-        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xs)
-
-    | `RevSub (Some (xs,ms)) when Sx.is_empty xs ->
-      msg "must be allowed to use the modules(s)@ %a"
-        (EcPrinting.pp_list " and@ " pp_m)
-        (Sm.ntr_elements ms)
-
-    | `RevSub (Some (xs,ms)) ->
-      msg "must be allowed to use the variable(s)@ %a@ \
            and the module(s)@ %a"
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xs)
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements ms)
@@ -134,13 +120,7 @@ end = struct
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements ml)
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements mr)
-
-    | `FunCanCallUnboundedOracle (fn,o) ->
-      msg "proof obligation cannot be met, because procedure \
-           %s can call oracle %a, which has an \
-           unbounded self complexity.@."
-        fn (EcPrinting.pp_funname ppe) o
-
+*)
   let rec pp_cnv_failure env fmt error =
     let msg x = Format.fprintf fmt x in
 
@@ -947,7 +927,7 @@ let pp fmt exn =
       CloneError.pp_clone_error env fmt e
 
   | EcCoreGoal.TcError error ->
-      pp_tc_error fmt error
+    pp_tc_error fmt error
 
   | EcParsetree.ParseError (_loc, msg) ->
       pp_parse_error fmt msg

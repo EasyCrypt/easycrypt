@@ -187,17 +187,6 @@ let rec pp_list sep pp fmt xs =
     | [x]     -> Format.fprintf fmt "%a" pp x
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
-let dump_memtype (Lmt_concrete mt) =
-  match mt with
-  | None -> "abstract"
-  | Some mt ->
-    let pp_vd fmt v =
-      Format.fprintf fmt "@[%s: %s@]"
-        (odfl "_" v.ov_name)
-        (EcTypes.dump_ty v.ov_type)
-    in
-    Format.asprintf "@[{@[%a@]}@]" (pp_list ",@ " pp_vd) mt.lmt_decl
-
 (* -------------------------------------------------------------------- *)
 let get_name s p (_, Lmt_concrete mt) =
   match mt with

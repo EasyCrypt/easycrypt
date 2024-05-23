@@ -695,6 +695,11 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
 
   match xty with
   | GTty xty -> begin
+      let xty = 
+        match xty.ty_node with
+        | Tglob ff -> EcMemRestr.ff_norm_ty env ff
+        | _ -> xty
+      in
       match dfl_arg_for_value pe arg with
       | PVAFormula arg -> begin
         try
@@ -722,9 +727,10 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       | PVAModule (mp, mt) -> begin
           try
             EcTyping.check_modtype env mp mt emt;
-            let ms = EcFol.f_bind_mod Fsubst.f_subst_id x mp env in
+            let ms = Fsubst.f_bind_mod Fsubst.f_subst_id x mp in
             let f = Fsubst.f_subst ms f in
-          (f, PAModule (mp, mt))
+            (* let f = EcMemRestr.norm_globs_restrs env f in *)
+            (f, PAModule (mp, mt))
         with
         | EcTyping.RestrictionError (_, e) ->
             tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)

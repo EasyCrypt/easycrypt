@@ -92,9 +92,9 @@ let t_equivS_trans_eq side s tc =
   let fv_po  = EcPV.PV.fv env (fst m) es.es_po in
   let fv_r = EcPV.s_read env c in
   let mk_eqs fv =
-    let vfv, gfv = EcPV.PV.elements fv in
+    let vfv, _gfv = EcPV.PV.elements fv in
     let veq = List.map (fun (x,ty) -> f_eq (f_pvar x ty mleft) (f_pvar x ty mright)) vfv in
-    let geq = List.map (fun mp -> f_eqglob mp mleft mp mright) gfv in
+    let geq = assert false in (* List.map (fun mp -> f_eqglob mp mleft mp mright) gfv in *)
     f_ands (veq @ geq) in
   let pre = mk_eqs (EcPV.PV.union (EcPV.PV.union fv_pr fv_po) fv_r) in
   let pre = f_and pre (odfl f_true mem_pre) in

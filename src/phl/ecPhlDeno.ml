@@ -414,7 +414,7 @@ let process_pre tc hyps prl prr pre post =
     let dopv m mi x ty =
       if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi)) in
 
-    let doglob m mi g = push (f_eq (NormMp.norm_glob env m g) (NormMp.norm_glob env mi g)) in
+    let doglob m mi g = assert false in (* push (f_eq (NormMp.norm_glob env m g) (NormMp.norm_glob env mi g)) in *)
     let dof f a m mi =
       try
         let fv = PV.remove env pv_res (PV.fv env m post) in

@@ -187,7 +187,7 @@ let t_conseq pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let mk_bind_pvar m (id,_) (x, ty) = id, f_pvar x ty m
-let mk_bind_glob env m (id,_) x = id, NormMp.norm_glob env m x
+let mk_bind_glob env m (id,_) x = assert false (* id, NormMp.norm_glob env m x *)
 let mk_bind_pvars m (bd1,bd2) = List.map2 (mk_bind_pvar m) bd1 bd2
 let mk_bind_globs env m (bd1,bd2) = List.map2 (mk_bind_glob env m) bd1 bd2
 

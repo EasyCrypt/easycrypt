@@ -246,46 +246,6 @@ let get_expression_of_instruction (i : instr) : (_ * instr_with_expr * _) option
   | _                  -> None
 
 (* -------------------------------------------------------------------- *)
-type 'a use_restr = 'a EcAst.use_restr
-
-let ur_app f a =
-  { ur_pos = (omap f) a.ur_pos;
-    ur_neg = f a.ur_neg; }
-
-(* Nothing is restricted. *)
-let ur_empty emp = { ur_pos = None; ur_neg = emp; }
-
-(* Everything is restricted. *)
-let ur_full emp = { ur_pos = Some emp; ur_neg = emp; }
-
-let ur_pos_subset subset ur1 ur2 = match ur1,ur2 with
-  | _, None -> true             (* Indeed, [None] means everybody. *)
-  | None, Some _ -> false
-  | Some s1, Some s2 -> subset s1 s2
-
-let ur_equal = EcAst.ur_equal
-
-(* Union for negative restrictions, intersection for positive ones.
-   [None] stands for everybody. *)
-let ur_union union inter ur1 ur2 =
-  let ur_pos = match ur1.ur_pos, ur2.ur_pos with
-    | None, None -> None
-    | None, Some s | Some s, None -> Some s
-    | Some s1, Some s2 -> some @@ inter s1 s2 in
-
-  { ur_pos = ur_pos;
-    ur_neg = union ur1.ur_neg ur2.ur_neg; }
-
-(* Converse of ur_union. *)
-let ur_inter union inter ur1 ur2 =
-  let ur_pos = match ur1.ur_pos, ur2.ur_pos with
-    | None, _ | _, None -> None
-    | Some s1, Some s2 -> some @@ union s1 s2 in
-
-  { ur_pos = ur_pos;
-    ur_neg = inter ur1.ur_neg ur2.ur_neg; }
-
-(* -------------------------------------------------------------------- *)
 (* Oracle information of a procedure [M.f]. *)
 module PreOI : sig
   type t = EcAst.oracle_info
@@ -324,33 +284,8 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type mr_xpaths = EcAst.mr_xpaths
-
-type mr_mpaths = EcAst.mr_mpaths
-
-type mod_restr = EcAst.mod_restr
-
-let mr_equal = EcAst.mr_equal
-let mr_hash  = EcAst.mr_hash
-
 let ois_is_empty (ois : oracle_infos) =
   Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) ois
-
-let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
-  EcPath.Sx.fold
-    (fun xp fv -> EcPath.x_fv fv xp)
-    (Sx.union
-       m.ur_neg
-       (EcUtils.odfl Sx.empty m.ur_pos))
-    EcIdent.Mid.empty
-
-let mr_mpaths_fv (m : mr_mpaths) : int Mid.t =
-  EcPath.Sm.fold
-    (fun mp fv -> EcPath.m_fv fv mp)
-    (Sm.union
-       m.ur_neg
-       (EcUtils.odfl Sm.empty m.ur_pos))
-    EcIdent.Mid.empty
 
 (* -------------------------------------------------------------------- *)
 type funsig = {
@@ -412,7 +347,7 @@ let sig_smpl_sig_coincide msig smpl_sig =
 
 (* -------------------------------------------------------------------- *)
 type uses = {
-  us_calls  : xpath list;
+  us_calls  : Sx.t;
   us_reads  : Sx.t;
   us_writes : Sx.t;
 }
@@ -495,8 +430,6 @@ type top_module_expr = {
 }
 
 (* -------------------------------------------------------------------- *)
-let ur_hash = EcAst.ur_hash
-
 let mty_hash = EcAst.mty_hash
 let mty_equal = EcAst.mty_equal
 

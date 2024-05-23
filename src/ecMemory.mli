@@ -64,8 +64,6 @@ val me_subst : memory EcIdent.Mid.t -> (ty -> ty) -> memenv -> memenv
 (* -------------------------------------------------------------------- *)
 val for_printing : memtype -> (symbol option * ovariable list) option
 
-val dump_memtype : memtype -> string
-
 (* -------------------------------------------------------------------- *)
 val local_type : memtype -> ty option
 val has_locals : memtype -> bool

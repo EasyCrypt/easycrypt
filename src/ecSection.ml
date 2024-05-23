@@ -283,10 +283,19 @@ let rec on_form (cb : cb) (f : EcFol.form) =
   in
     on_ty cb f.EcAst.f_ty; fornode ()
 
-and on_restr (cb : cb) (restr : mod_restr) =
-  let doit (xs, ms) = Sx.iter (on_xp cb) xs; Sm.iter (on_mp cb) ms in
-  oiter doit restr.ur_pos;
-  doit restr.ur_neg
+and on_functor_fun (cb : cb) ff =
+  on_xp cb ff.ff_xp;
+  List.iter (fun (_, mty) -> on_modty cb mty) ff.ff_params
+
+and on_restr (cb : cb) restr =
+  match restr with
+  | Empty -> ()
+  | All -> ()
+  | Var p -> on_xp cb p
+  | GlobFun ff -> on_functor_fun cb ff
+  | Union (l, r) -> on_restr cb l; on_restr cb r
+  | Inter (l, r) -> on_restr cb l; on_restr cb r
+  | Diff (l, r) -> on_restr cb l; on_restr cb r
 
 and on_modty cb (mty : module_type) =
   cb (`ModuleType mty.mt_name);
@@ -344,9 +353,9 @@ and on_fun_def (cb : cb) (fdef : function_def) =
   on_uses cb fdef.f_uses
 
 and on_uses (cb : cb) (uses : uses) =
-  List.iter (on_xp cb) uses.us_calls;
-  Sx.iter   (on_xp cb) uses.us_reads;
-  Sx.iter   (on_xp cb) uses.us_writes
+  Sx.iter (on_xp cb) uses.us_calls;
+  Sx.iter (on_xp cb) uses.us_reads;
+  Sx.iter (on_xp cb) uses.us_writes
 
 and on_oi (cb : cb) (oi : OI.t) =
   List.iter (on_xp cb) (OI.allowed oi)

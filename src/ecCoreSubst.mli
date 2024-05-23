@@ -8,13 +8,6 @@ open EcCoreModules
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type sc_instanciate = {
-  sc_memtype : memtype;
-  sc_mempred : mem_pr Mid.t;
-  sc_expr    : expr Mid.t;
-}
-
-(* -------------------------------------------------------------------- *)
 type f_subst
 
 type 'a substitute = f_subst -> 'a -> 'a
@@ -76,7 +69,7 @@ module Fsubst : sig
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst
   val f_bind_mem    : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
   val f_bind_absmod : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> (EcIdent.t -> form) -> f_subst
+  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
   val f_bind_rename : f_subst -> EcIdent.t -> EcIdent.t -> ty -> f_subst
 
   val has_mem : f_subst -> EcAst.memory -> bool
@@ -102,9 +95,10 @@ module Fsubst : sig
   val e_subst      : expr        substitute
   val me_subst     : memenv      substitute
   val m_subst      : EcIdent.t   substitute
-  val mr_subst     : mod_restr   substitute
+  val mr_subst     : mem_restr   substitute
   val mty_subst    : module_type substitute
   val mty_mr_subst : mty_mr substitute
   val oi_subst     : PreOI.t     substitute
+  val ff_subst     : functor_fun substitute
   val gty_subst    : gty         substitute
 end

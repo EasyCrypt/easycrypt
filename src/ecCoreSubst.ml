@@ -9,24 +9,11 @@ open EcCoreFol
 open EcCoreModules
 
 (* -------------------------------------------------------------------- *)
-type mod_extra = {
-  mex_tglob : ty;
-  mex_glob  : memory -> form;
-}
-
-type sc_instanciate = {
-  sc_memtype : memtype;
-  sc_mempred : mem_pr Mid.t;
-  sc_expr    : expr Mid.t;
-}
-
-(* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
   fs_u       : ty Muid.t;
   fs_v       : ty Mid.t;
   fs_mod     : EcPath.mpath Mid.t;
-  fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
   fs_eloc    : expr Mid.t;
   fs_mem     : EcIdent.t Mid.t;
@@ -39,13 +26,6 @@ type 'a substitute = f_subst -> 'a -> 'a
 type tx = before:form -> after:form -> form
 type 'a tx_substitute = ?tx:tx -> 'a substitute
 type 'a subst_binder = f_subst -> 'a -> f_subst * 'a
-
-(* -------------------------------------------------------------------- *)
-let mex_fv (mp : mpath) (ex : mod_extra) : uid Mid.t =
-  let m = EcIdent.create "m" in
-  fv_union
-    (m_fv (ty_fv ex.mex_tglob) mp)
-    (Mid.remove m (f_fv (ex.mex_glob m)))
 
 (* -------------------------------------------------------------------- *)
 let fv_Mid (type a)
@@ -70,7 +50,6 @@ let f_subst_init
     fs_u        = tu;
     fs_v        = tv;
     fs_mod      = Mid.empty;
-    fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
     fs_eloc     = esloc;
     fs_mem      = Mid.empty;
@@ -106,29 +85,18 @@ let f_bind_mem (s : f_subst) (m1 : memory) (m2 : memory) : f_subst =
   { s with fs_mem; fs_fv; }
 
 (* -------------------------------------------------------------------- *)
-let bind_mod (s : f_subst) (x : ident) (mp : mpath) (ex : mod_extra) : f_subst =
+let bind_mod (s : f_subst) (x : ident) (mp : mpath) : f_subst =
   { s with
       fs_mod   = Mid.add x mp s.fs_mod;
-      fs_modex = Mid.add x ex s.fs_modex;
-      fs_fv    = fv_union (mex_fv mp ex) s.fs_fv; }
+      fs_fv    = EcPath.m_fv s.fs_fv mp; }
 
 (* -------------------------------------------------------------------- *)
 let f_bind_absmod (s : f_subst) (m1 : ident) (m2 : ident) : f_subst =
-  bind_mod
-    s m1 (EcPath.mident m2)
-    { mex_tglob = tglob m2; mex_glob = (fun m -> f_glob m2 m); }
+  bind_mod s m1 (EcPath.mident m2)
 
 (* -------------------------------------------------------------------- *)
-let f_bind_mod (s : f_subst) (x : ident) (mp : mpath) (norm_mod : memory -> form) : f_subst =
-  match EcPath.mget_ident_opt mp with
-  | None ->
-    let ex = {
-      mex_tglob = (norm_mod mhr).f_ty;
-      mex_glob  = norm_mod;
-    } in
-     bind_mod s x mp ex
-  | Some id ->
-    f_bind_absmod s x id
+let f_bind_mod (s : f_subst) (x : ident) (mp : mpath) : f_subst =
+  bind_mod s x mp
 
 (* -------------------------------------------------------------------- *)
 let f_bind_rename s xfrom xto ty =
@@ -152,8 +120,8 @@ let f_rem_mem (s : f_subst) (m : memory) : f_subst =
 (* -------------------------------------------------------------------- *)
 let f_rem_mod (s : f_subst) (x : ident) : f_subst =
   { s with
-    fs_mod   = Mid.remove x s.fs_mod;
-    fs_modex = Mid.remove x s.fs_modex; }
+    fs_mod   = Mid.remove x s.fs_mod; }
+
 
 (* -------------------------------------------------------------------- *)
 let is_ty_subst_id (s : f_subst) : bool =
@@ -162,12 +130,31 @@ let is_ty_subst_id (s : f_subst) : bool =
   && Mid.is_empty s.fs_v
 
 (* -------------------------------------------------------------------- *)
+let x_subst (s : f_subst) (x : xpath) : xpath =
+  EcPath.x_subst_abs s.fs_mod x
+
+(* ------------------------------------------------------------------ *)
+let mp_subst (s : f_subst) (mp : mpath) : mpath =
+  EcPath.m_subst_abs s.fs_mod mp
+
+(* -------------------------------------------------------------------- *)
+let is_subst_id (s : f_subst) : bool =
+     s.fs_freshen = false
+  && is_ty_subst_id s
+  && Mid.is_empty   s.fs_loc
+  && Mid.is_empty   s.fs_mem
+  && Mid.is_empty   s.fs_eloc
+
+(* -------------------------------------------------------------------- *)
+let refresh (s : f_subst) (x : ident) : ident =
+  if s.fs_freshen || Mid.mem x s.fs_fv then
+    EcIdent.fresh x
+  else x
+
+(* -------------------------------------------------------------------- *)
 let rec ty_subst (s : f_subst) (ty : ty) : ty =
   match ty.ty_node with
-  | Tglob m ->
-       Mid.find_opt m s.fs_modex
-    |> Option.map (fun ex -> ex.mex_tglob)
-    |> Option.value ~default:ty
+  | Tglob ff -> tglob (ff_subst s ff)
   | Tunivar id ->
        Muid.find_opt id s.fs_u
     |> Option.map (ty_subst s)
@@ -176,6 +163,86 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
     Mid.find_def ty id s.fs_v
   | _ ->
     ty_map (ty_subst s) ty
+
+(* ------------------------------------------------------------------ *)
+and mr_subst (s : f_subst) (mr : mem_restr) : mem_restr =
+  match mr with
+  | Empty | All -> mr
+  | Var x -> Var(x_subst s x)
+  | GlobFun ff -> GlobFun (ff_subst s ff)
+  | Union(s1,s2) -> Union(mr_subst s s1, mr_subst s s2)
+  | Inter(s1,s2) -> Inter(mr_subst s s1, mr_subst s s2)
+  | Diff(s1,s2)  -> Diff(mr_subst  s s1, mr_subst s s2)
+
+(* ------------------------------------------------------------------ *)
+and ff_subst (s : f_subst) ff : functor_fun =
+  let s, ff_params = add_mod_params s ff.ff_params in
+  let ff_xp = x_subst s ff.ff_xp in
+  { ff_params; ff_xp }
+
+(* ------------------------------------------------------------------ *)
+and mty_subst (s : f_subst) (mty : module_type) : module_type =
+  let s, mt_params = add_mod_params s mty.mt_params in
+  let mt_name = mty.mt_name in
+  let mt_args = List.map (mp_subst s) mty.mt_args in
+  { mt_params; mt_name; mt_args; }
+
+(* ------------------------------------------------------------------ *)
+and mty_mr_subst (s : f_subst) ((mty, mr) : mty_mr) : mty_mr =
+  mty_subst s mty, mr_subst s mr
+
+(* ------------------------------------------------------------------ *)
+and gty_subst (s : f_subst) (gty : gty) : gty =
+  if is_subst_id s then gty else
+
+  match gty with
+  | GTty ty ->
+    let ty' = ty_subst s ty in
+    if ty == ty' then gty else GTty ty'
+
+  | GTmodty p ->
+    let p' = mty_mr_subst s p in
+    if p == p' then gty else GTmodty p'
+
+  | GTmem mt ->
+    let mt' = EcMemory.mt_subst (ty_subst s) mt in
+    if mt == mt' then gty else GTmem mt'
+
+(* ------------------------------------------------------------------ *)
+and add_binding (s : f_subst) ((x, gty) as xt : binding) : f_subst * binding =
+  let gty' = gty_subst s gty in
+  let x'   = refresh s x in
+
+  if x == x' && gty == gty' then
+    let s = match gty with
+      | GTty    _ -> f_rem_local s x
+      | GTmodty _ -> f_rem_mod   s x
+      | GTmem   _ -> f_rem_mem   s x
+    in
+      (s, xt)
+  else
+    let s = match gty' with
+      | GTty   ty -> f_bind_rename s x x' ty
+      | GTmodty _ -> f_bind_absmod s x x'
+      | GTmem   _ -> f_bind_mem s x x'
+    in
+      (s, (x', gty'))
+
+(* ------------------------------------------------------------------ *)
+and add_bindings (s : f_subst) : bindings -> f_subst * bindings =
+  List.map_fold add_binding s
+
+(* ------------------------------------------------------------------ *)
+and add_mod_params (s : f_subst) (params : _) =
+  (* We rely on add_bindings, hence the injection of parameters as
+   * bindings. We use the mr_full restriction set. Any other choice
+   * would have been equivalent as this set is not used by
+   * the function add_bindings. *)
+  let s, params =
+    add_bindings s
+      (List.map (fun (x, mty) -> (x, GTmodty (mty, Empty))) params) in
+  let params = List.map (fun (x, gty) -> x, fst (as_modty gty)) params in
+  s, params
 
 (* -------------------------------------------------------------------- *)
 let ty_subst (s : f_subst) : ty -> ty =
@@ -188,12 +255,6 @@ let is_e_subst_id (s : f_subst) =
   && Mid.is_empty s.fs_eloc
 
 (* -------------------------------------------------------------------- *)
-let refresh (s : f_subst) (x : ident) : ident =
-  if s.fs_freshen || Mid.mem x s.fs_fv then
-    EcIdent.fresh x
-  else x
-
-(* -------------------------------------------------------------------- *)
 let add_elocal (s : f_subst) ((x, t) as xt : ebinding) : f_subst * ebinding =
   let x' = refresh s x in
   let t' = ty_subst s t in
@@ -204,10 +265,6 @@ let add_elocal (s : f_subst) ((x, t) as xt : ebinding) : f_subst * ebinding =
 
 (* -------------------------------------------------------------------- *)
 let add_elocals = List.Smart.map_fold add_elocal
-
-(* -------------------------------------------------------------------- *)
-let x_subst (s : f_subst) (x : xpath) : xpath =
-  EcPath.x_subst_abs s.fs_mod x
 
 (* -------------------------------------------------------------------- *)
 let pv_subst (s : f_subst) (pv : prog_var) : prog_var =
@@ -349,12 +406,7 @@ let s_subst (s : f_subst) : stmt -> stmt =
 
 (* -------------------------------------------------------------------- *)
 module Fsubst = struct
-  let is_subst_id (s : f_subst) : bool =
-       s.fs_freshen = false
-    && is_ty_subst_id s
-    && Mid.is_empty   s.fs_loc
-    && Mid.is_empty   s.fs_mem
-    && Mid.is_empty   s.fs_eloc
+  let is_subst_id = is_subst_id
 
   (* ------------------------------------------------------------------ *)
   let has_mem (s : f_subst) (x : ident) : bool =
@@ -443,12 +495,10 @@ module Fsubst = struct
       let ty' = ty_subst s fp.f_ty in
       f_pvar pv' ty' m'
 
-    | Fglob (mid, m) ->
+    | Fglob (ff, m) ->
       let m'  = m_subst s m in
-      begin match Mid.find_opt mid s.fs_mod with
-      | None -> f_glob mid m'
-      | Some _ -> (Mid.find mid s.fs_modex).mex_glob m'
-      end
+      let ff' = ff_subst s ff in
+      f_glob ff' m'
 
     | FhoareF hf ->
       let hf_f  = x_subst s hf.hf_f in
@@ -540,81 +590,6 @@ module Fsubst = struct
     PreOI.mk (List.map (x_subst s) (PreOI.allowed oi))
 
   (* ------------------------------------------------------------------ *)
-  and mr_subst (s : f_subst) (mr : mod_restr) : mod_restr =
-    let sx = x_subst s in
-    let sm = EcPath.m_subst_abs s.fs_mod in
-    let subst_ (xs, ms) = (Sx.map sx xs, Sm.map sm ms) in
-    ur_app subst_ mr
-
-  (* ------------------------------------------------------------------ *)
-  and mp_subst (s : f_subst) (mp : mpath) : mpath =
-    EcPath.m_subst_abs s.fs_mod mp
-
-  (* ------------------------------------------------------------------ *)
-  and mty_subst (s : f_subst) (mty : module_type) : module_type =
-    let s, mt_params = add_mod_params s mty.mt_params in
-    let mt_name = mty.mt_name in
-    let mt_args = List.map (mp_subst s) mty.mt_args in
-    { mt_params; mt_name; mt_args; }
-
-  (* ------------------------------------------------------------------ *)
-  and mty_mr_subst (s : f_subst) ((mty, mr) : mty_mr) : mty_mr =
-    mty_subst s mty, mr_subst s mr
-
-  (* ------------------------------------------------------------------ *)
-  and gty_subst (s : f_subst) (gty : gty) : gty =
-    if is_subst_id s then gty else
-
-    match gty with
-    | GTty ty ->
-      let ty' = ty_subst s ty in
-      if ty == ty' then gty else GTty ty'
-
-    | GTmodty p ->
-      let p' = mty_mr_subst s p in
-      if p == p' then gty else GTmodty p'
-
-    | GTmem mt ->
-      let mt' = EcMemory.mt_subst (ty_subst s) mt in
-      if mt == mt' then gty else GTmem mt'
-
-  (* ------------------------------------------------------------------ *)
-  and add_binding (s : f_subst) ((x, gty) as xt : binding) : f_subst * binding =
-    let gty' = gty_subst s gty in
-    let x'   = refresh s x in
-
-    if x == x' && gty == gty' then
-      let s = match gty with
-        | GTty    _ -> f_rem_local s x
-        | GTmodty _ -> f_rem_mod   s x
-        | GTmem   _ -> f_rem_mem   s x
-      in
-        (s, xt)
-    else
-      let s = match gty' with
-        | GTty   ty -> f_bind_rename s x x' ty
-        | GTmodty _ -> f_bind_absmod s x x'
-        | GTmem   _ -> f_bind_mem s x x'
-      in
-        (s, (x', gty'))
-
-  (* ------------------------------------------------------------------ *)
-  and add_bindings (s : f_subst) : bindings -> f_subst * bindings =
-    List.map_fold add_binding s
-
-  (* ------------------------------------------------------------------ *)
-  and add_mod_params (s : f_subst) (params : _) =
-    (* We rely on add_bindings, hence the injection of parameters as
-     * bindings. We use the mr_full restriction set. Any other choice
-     * would have been equivalent as this set is not used by
-     * the function add_bindings. *)
-    let s, params =
-      add_bindings s
-        (List.map (fun (x, mty) -> (x, GTmodty (mty, EcModules.mr_full))) params) in
-    let params = List.map (fun (x, gty) -> x, fst (as_modty gty)) params in
-    s, params
-
-  (* ------------------------------------------------------------------ *)
   and add_me_binding (s : f_subst) ((x, mt) as me : memenv) : f_subst * memenv =
     let mt' = EcMemory.mt_subst (ty_subst s) mt in
     let x'  = refresh s x in
@@ -629,6 +604,7 @@ module Fsubst = struct
   (* Wrapper functions                                                  *)
   (* ------------------------------------------------------------------ *)
   let x_subst = x_subst
+  let mp_subst = mp_subst
   let pv_subst = pv_subst
 
   let f_subst_init  = f_subst_init
@@ -655,6 +631,8 @@ module Fsubst = struct
   let mty_subst = mty_subst
   let oi_subst  = oi_subst
   let mty_mr_subst = mty_mr_subst
+
+  let ff_subst = ff_subst
 
   (* ------------------------------------------------------------------ *)
   let f_subst_local (x : ident) (t : form) : form -> form =

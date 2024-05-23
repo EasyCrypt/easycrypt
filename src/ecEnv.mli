@@ -221,39 +221,20 @@ module ModTy : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type use = {
-  us_pv : ty EcPath.Mx.t;
-  us_gl : EcIdent.Sid.t;
-}
-
-val use_empty : use
-val use_union : use -> use -> use
 
 module NormMp : sig
   val norm_mpath    : env -> mpath -> mpath
   val norm_xfun     : env -> xpath -> xpath
+  val norm_xpv      : env -> xpath -> xpath
   val norm_pvar     : env -> EcTypes.prog_var -> EcTypes.prog_var
-  val mod_use       : env -> mpath -> use
-  val fun_use       : env -> xpath -> use
-  val restr_use     : env -> mod_restr -> use use_restr
-  val get_restr_use : env -> mpath -> use use_restr
 
   val sig_of_mp     : env -> mpath -> module_sig
-
-  (* Return [true] if [x] is forbidden in [restr]. *)
-  val use_mem_xp    : xpath -> use use_restr -> bool
-  val use_mem_gl    : mpath -> use use_restr -> bool
-
-  val flatten_use : use -> EcIdent.t list * (xpath * ty) list
-
-  val norm_glob     : env -> EcMemory.memory -> mpath -> form
-  val norm_tglob    : env -> mpath -> EcTypes.ty
 
   val is_abstract_fun : xpath -> env -> bool
   val x_equal         : env -> xpath -> xpath -> bool
   val pv_equal        : env -> EcTypes.prog_var -> EcTypes.prog_var -> bool
 
-  val mod_type_equiv : env -> mty_mr -> mty_mr -> bool
+  val module_type_equiv : env -> module_type -> module_type -> bool
 end
 
 (* -------------------------------------------------------------------- *)

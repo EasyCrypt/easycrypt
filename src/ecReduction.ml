@@ -37,7 +37,22 @@ module EqTest_base = struct
     | Tfun (t1, t2), Tfun (t1', t2') ->
         for_type env t1 t1' && for_type env t2 t2'
 
-    | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
+    | Tglob ff1, Tglob ff2 -> EcMemRestr.ff_alpha_equal ff1 ff2
+
+    | Tglob ff, _ -> 
+      let t1' = EcMemRestr.ff_norm_ty env ff in
+      (* NOTE: This check prevents non-termination in the recursive call *)
+      if ty_equal t1 t1' then
+        false
+      else
+        for_type env t1' t2
+
+    | _, Tglob ff ->
+      let t2' = EcMemRestr.ff_norm_ty env ff in
+      if ty_equal t2 t2' then
+        false
+      else
+        for_type env t1 t2'
 
     | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
         if
@@ -425,9 +440,10 @@ let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
-  | GTmodty mty1, GTmodty mty2 ->
-    ensure (NormMp.mod_type_equiv env mty1 mty2);
-    let env = Mod.bind_local x1 mty1 env in
+  | GTmodty (mty1, mr1), GTmodty (mty2, mr2) ->
+    ensure (EcEnv.NormMp.module_type_equiv env mty1 mty2);
+    ensure (EcMemRestr.equal env mr1 mr2);
+    let env = Mod.bind_local x1 (mty1, mr1) env in
     let subst =
       if   id_equal x1 x2
       then subst
@@ -478,9 +494,9 @@ let is_alpha_eq hyps f1 f2 =
     let pv2 = Fsubst.pv_subst subst pv2 in
     ensure (EqTest_i.for_pv env pv1 pv2) in
 
-  let check_mod subst m1 m2 =
-    let m2 = EcPath.mget_ident (Fsubst.mp_subst subst (EcPath.mident m2)) in
-    ensure (EcIdent.id_equal m1 m2) in
+  let check_functor_fun subst ff1 ff2 =
+    let ff2 = (Fsubst.ff_subst subst ff2) in
+    ensure (EcMemRestr.ff_alpha_equal ff1 ff2) in
 
   let check_xp env subst xp1 xp2 =
     let xp2 = Fsubst.x_subst subst xp2 in
@@ -523,9 +539,9 @@ let is_alpha_eq hyps f1 f2 =
       check_mem subst m1 m2;
       check_pv env subst p1 p2
 
-    | Fglob(m1,mem1), Fglob(m2,mem2) ->
+    | Fglob(ff1,mem1), Fglob(ff2,mem2) ->
       check_mem subst mem1 mem2;
-      check_mod subst m1 m2
+      check_functor_fun subst ff1 ff2
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
       List.iter2 (check_ty env subst) ty1 ty2
@@ -1053,7 +1069,13 @@ let reduce_head simplify ri env hyps f =
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
     (* μ-reduction *)
-  | Fglob (_, _) when ri.modpath -> raise nohead
+  | Fglob (ff, m) when ri.modpath ->
+      let env' = Mod.bind_params ff.ff_params env in
+      let f = NormMp.norm_xfun env' ff.ff_xp in
+      begin match (Fun.by_xpath f env').f_def with
+      | FBdef _ -> EcMemRestr.ff_norm env ff m
+      | _ -> raise nohead
+      end
 
     (* μ-reduction *)
   | Fpvar (pv, m) when ri.modpath ->
@@ -1446,9 +1468,9 @@ let rec conv ri env f1 f2 stk =
       when EcEnv.NormMp.pv_equal env pv1 pv2 && EcMemory.mem_equal m1 m2 ->
       conv_next ri env f1 stk
 
-  | Fglob (m1, mem1), Fglob (m2, mem2)
+  | Fglob (ff1, mem1), Fglob (ff2, mem2)
       when
-        EcIdent.id_equal m1 m2
+        EcMemRestr.ff_alpha_equal ff1 ff2
         && EcMemory.mem_equal mem1 mem2 ->
       conv_next ri env f1 stk
 
@@ -1815,9 +1837,10 @@ let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
-  | GTmodty p1, GTmodty p2 ->
-    ensure (NormMp.mod_type_equiv env p1 p2);
-    Mod.bind_local x1 p1 env,
+  | GTmodty (mty1, mr1), GTmodty (mty2, mr2) ->
+    ensure (EcEnv.NormMp.module_type_equiv env mty1 mty2);
+    ensure (EcMemRestr.equal env mr1 mr2);
+    Mod.bind_local x1 (mty1, mr1) env,
     if id_equal x1 x2 then subst
     else EcSubst.add_module subst x2 (mident x1)
 

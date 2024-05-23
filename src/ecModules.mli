@@ -27,13 +27,6 @@ end
 (* Careful, the available oracles are empty in both                     *)
 (* [mr_empty] and [mr_full].                                            *)
 
-val mr_empty : mod_restr
-
-val mr_full  : mod_restr
-
-val mr_add_restr :
-  mod_restr -> mod_restr -> mod_restr
-
 val change_oicalls : oracle_infos -> string -> xpath list -> oracle_infos
 
 val oicalls_filter : oracle_infos -> string -> (xpath -> bool) -> oracle_infos

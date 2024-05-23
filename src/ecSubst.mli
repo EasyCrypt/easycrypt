@@ -60,7 +60,7 @@ val subst_modtype      : subst -> module_type -> module_type
 val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_sig
 val subst_top_modsig   : subst -> top_module_sig -> top_module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
-val subst_mod_restr    : subst -> mod_restr -> mod_restr
+val subst_mem_restr    : subst -> mem_restr -> mem_restr
 val subst_oracle_infos : subst -> oracle_infos -> oracle_infos
 
 (* -------------------------------------------------------------------- *)

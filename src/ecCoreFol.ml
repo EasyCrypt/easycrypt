@@ -36,8 +36,6 @@ type pr       = EcAst.pr
 
 type module_type = EcAst.module_type
 
-type mod_restr = EcAst.mod_restr
-
 (*-------------------------------------------------------------------- *)
 let mhr    = EcAst.mhr
 let mleft  = EcAst.mleft

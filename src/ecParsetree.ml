@@ -62,6 +62,20 @@ type pcodeoffset1 = [
 ]
 (* -------------------------------------------------------------------- *)
 
+type pmodule_type = pqsymbol
+
+type pmodule_params = (psymbol * pmodule_type) list
+
+type pfunctor_fun =
+  { pff_params : pmodule_params;
+    pff_xp : pgamepath }
+
+type f_or_mod_ident =
+  | FM_ff of pfunctor_fun
+  | FM_FunOrVar of pgamepath
+  | FM_Mod of pmsymbol located
+
+(* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
   | PTtuple  of pty list
@@ -69,7 +83,7 @@ type pty_r =
   | PTvar    of psymbol
   | PTapp    of pqsymbol * pty list
   | PTfun    of pty * pty
-  | PTglob   of pmsymbol located
+  | PTglob   of f_or_mod_ident
 and pty = pty_r located
 
 type ptyannot_r =
@@ -103,7 +117,16 @@ type is_local = [ `Local | `Global]
 type locality = [`Declare | `Local | `Global]
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type = pqsymbol
+(* A memory restricition.                                               *)
+type pmem_restr =
+  | PMempty
+  | PMall
+  | PMvar     of f_or_mod_ident
+  | PMunion   of pmem_restr * pmem_restr
+  | PMinter   of pmem_restr * pmem_restr
+  | PMdiff    of pmem_restr * pmem_restr
+
+(* -------------------------------------------------------------------- *)
 
 type ptyparams = (psymbol * pqsymbol list) list
 type ptydname  = (ptyparams * psymbol) located
@@ -124,20 +147,6 @@ and ptydbody =
 and pdatatype = (psymbol * pty list) list
 
 and precord = (psymbol * pty) list
-
-(* -------------------------------------------------------------------- *)
-type f_or_mod_ident =
-  | FM_FunOrVar of pgamepath
-  | FM_Mod of pmsymbol located
-
-
-type pmod_restr_mem_el =
-  | PMPlus    of f_or_mod_ident
-  | PMMinus   of f_or_mod_ident
-  | PMDefault of f_or_mod_ident
-
-(* A memory restricition. *)
-type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
 type pmemory   = psymbol
@@ -200,7 +209,7 @@ and pformula_r =
   | PFrecord  of pformula option * pformula rfield list
   | PFproj    of pformula * pqsymbol
   | PFproji   of pformula * int
-  | PFglob    of pmsymbol located
+  | PFglob    of f_or_mod_ident
   | PFeqveq   of glob_or_var list * (pmsymbol pair) option
   | PFeqf     of pformula list
   | PFlsless  of pgamepath
@@ -252,7 +261,7 @@ and pfindex = [ `Index of int | `Match of pformula * int option]
    empty restriction.  *)
 and pmodule_type_restr =
   { pmty_pq  : pqsymbol;
-    pmty_mem : pmod_restr option; }
+    pmty_mem : pmem_restr option; }
 
 (* -------------------------------------------------------------------- *)
 (* qident optionally taken in a (implicit) module parameters. *)
@@ -262,13 +271,9 @@ and qident_inparam = { inp_in_params : bool;
 and poracles = qident_inparam list
 
 and pmod_restr_el = {
-	pmre_name  : psymbol;
+  pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
 }
-
-and pmod_restr = {
-  pmr_mem   : pmod_restr_mem;
- }
 
 (* -------------------------------------------------------------------- *)
 and pmodule_sig =
@@ -325,8 +330,6 @@ and pmodule_header =
   | Pmh_ident  of psymbol
   | Pmh_params of (pmodule_header * pmodule_params) located
   | Pmh_cast   of pmodule_header * pqsymbol list
-
-and pmodule_params = (psymbol * pmodule_type) list
 
 and pmodule_expr_r =
   | Pm_ident  of pmsymbol
@@ -1134,7 +1137,7 @@ type pprint =
   | Pr_ax   of pqsymbol
   | Pr_mod  of pqsymbol
   | Pr_mty  of pqsymbol
-  | Pr_glob of pmsymbol located
+  | Pr_glob of f_or_mod_ident
   | Pr_goal of int
   | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
   | Pr_axioms

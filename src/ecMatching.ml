@@ -449,10 +449,10 @@ module MEV = struct
     let v = EV.fold (fun x k v -> f x (`Mod  k) v) m.evm_mod  v in
     v
 
-  let assubst ue ev env =
+  let assubst ue ev _env =
     let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
-    let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
+    let subst = EV.fold (fun _x _mp _s -> assert false) ev.evm_mod subst in
     let seen  = ref Sid.empty in
 
     let rec for_ident x binding subst =
@@ -654,10 +654,13 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fint i1, Fint i2 ->
           if not (EcBigInt.equal i1 i2) then failure ();
 
-      | Fglob (mp1, me1), Fglob (mp2, me2) ->
+      | Fglob _, Fglob _ ->
+          assert false;
+        (*
             if not (EcIdent.id_equal mp1 mp2) then
               failure ();
             doit_mem env mxs me1 me2
+          *)
 
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then
@@ -844,7 +847,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             in (env, subst)
 
         | GTmodty p1, GTmodty p2 ->
-            if not (NormMp.mod_type_equiv env p1 p2) then
+            if not (NormMp.module_type_equiv env (fst p1) (fst p2)) then
               raise MatchFailure;
 
             let subst =

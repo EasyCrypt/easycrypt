@@ -27,17 +27,6 @@ type quantif =
 type hoarecmp = FHle | FHeq | FHge
 
 (* -------------------------------------------------------------------- *)
-
-type 'a use_restr = {
-  ur_pos : 'a option;   (* If not None, can use only element in this set. *)
-  ur_neg : 'a;          (* Cannot use element in this set. *)
-}
-
-type mr_xpaths = EcPath.Sx.t use_restr
-
-type mr_mpaths = EcPath.Sm.t use_restr
-
-(* -------------------------------------------------------------------- *)
 type ty = private {
   ty_node : ty_node;
   ty_fv   : int Mid.t; (* only ident appearing in path *)
@@ -45,7 +34,7 @@ type ty = private {
 }
 
 and ty_node =
-  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
+  | Tglob   of functor_fun (* Globals use by f *)
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
@@ -126,7 +115,21 @@ and oracle_info = {
 
 and oracle_infos = oracle_info Msym.t
 
-and mod_restr = (EcPath.Sx.t * EcPath.Sm.t) use_restr
+and functor_params = (EcIdent.t * module_type) list
+
+and functor_fun = {
+  ff_params : functor_params;
+  ff_xp     : xpath;                (* The xpath is fully applied *)
+}
+
+and mem_restr =
+  | Empty
+  | All                       (* All global variables *)
+  | Var     of xpath          (* A global variable  *)
+  | GlobFun of functor_fun    (* Global variables used by a function *)
+  | Union   of mem_restr * mem_restr
+  | Inter   of mem_restr * mem_restr
+  | Diff    of mem_restr * mem_restr
 
 and module_type = {
   mt_params : (EcIdent.t * module_type) list;
@@ -159,7 +162,7 @@ and gty =
   | GTmodty of mty_mr
   | GTmem   of memtype
 
-and mty_mr = module_type * mod_restr
+and mty_mr = module_type * mem_restr
 
 and binding  = (EcIdent.t * gty)
 and bindings = binding list
@@ -179,7 +182,7 @@ and f_node =
   | Fint    of BI.zint
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
-  | Fglob   of EcIdent.t * memory
+  | Fglob   of functor_fun * memory
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
@@ -345,18 +348,9 @@ val ov_equal : ovariable equality
 val ov_hash  : ovariable hash
 
 (* -------------------------------------------------------------------- *)
-val ur_equal : 'a equality -> 'a use_restr equality
-val ur_hash  : ('a -> 'b list) -> 'b hash -> 'a use_restr hash
-
-val mr_xpaths : mod_restr -> mr_xpaths
-val mr_mpaths : mod_restr -> mr_mpaths
-
-val mr_xpaths_fv : mr_xpaths fv
-val mr_mpaths_fv : mr_mpaths fv
-
-val mr_equal : mod_restr equality
-val mr_hash  : mod_restr hash
-val mr_fv    : mod_restr fv
+val mr_equal : mem_restr equality
+val mr_hash  : mem_restr hash
+val mr_fv    : mem_restr fv
 
 val mty_equal : module_type equality
 val mty_hash  : module_type hash

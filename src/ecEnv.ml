@@ -3,6 +3,7 @@ open EcUtils
 open EcSymbols
 open EcPath
 open EcAst
+open EcCoreMemRestr
 open EcTypes
 open EcCoreFol
 open EcCoreSubst
@@ -94,23 +95,10 @@ type mc = {
   mc_components : ipath MMsym.t;
 }
 
-type use = {
-  us_pv : ty Mx.t;
-  us_gl : Sid.t;
-}
-
-let use_union us1 us2 =
-  { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
-    us_gl = Sid.union us1.us_gl us2.us_gl; }
-
-let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; }
-
 type env_norm = {
   norm_mp       : EcPath.mpath Mm.t;
   norm_xpv      : EcPath.xpath Mx.t;   (* for global program variable *)
   norm_xfun     : EcPath.xpath Mx.t;   (* for fun and local program variable *)
-  mod_use       : use Mm.t;
-  get_restr_use : (use EcModules.use_restr) Mm.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -285,8 +273,7 @@ let empty_norm_cache =
   { norm_mp   = Mm.empty;
     norm_xpv  = Mx.empty;
     norm_xfun = Mx.empty;
-    mod_use   = Mm.empty;
-    get_restr_use = Mm.empty; }
+  }
 
 (* -------------------------------------------------------------------- *)
 let empty gstate =
@@ -1853,7 +1840,8 @@ module Mod = struct
         (fun s (x, _) a -> EcSubst.add_module s x a)
         EcSubst.empty params args
     in
-      f s o
+
+    f s o
 
   let clearparams n params =
     let _, remaining = List.takedrop n params in
@@ -1935,14 +1923,14 @@ module Mod = struct
   let lookup_path name env =
     fst (lookup name env)
 
-  let add_xs_to_declared xs env =
+ (* Add restruction to declared abstract module *)
+  let add_mem_restr_to_declared mr env =
     let update_id id mods =
       let update me =
         match me.me_body with
-        | ME_Decl (mty, mr) ->
-          let mr =
-            mr_add_restr mr (ur_empty (xs, Sm.empty)) in
-          { me with me_body = ME_Decl (mty, mr) }
+        | ME_Decl (mty, mr') ->
+          let mr' = mr_diff mr' mr in
+          { me with me_body = ME_Decl (mty, mr') }
         | _ -> me
       in
       MMsym.map_at
@@ -1957,10 +1945,11 @@ module Mod = struct
               with mc_modules =
         Sid.fold update_id env.env_modlcs
           env.env_current.mc_modules; } in
-    let en = !(env.env_norm) in
-    let norm = { en with get_restr_use = Mm.empty } in
+    let norm = !(env.env_norm) in
     { env with env_current = envc;
       env_norm = ref norm; }
+
+  let add_xs_to_declared xs env = add_mem_restr_to_declared (mr_globals xs) env
 
   let rec vars_me mp xs me =
     vars_mb (EcPath.mqname mp me.me_name) xs me.me_body
@@ -2267,149 +2256,6 @@ module NormMp = struct
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
 
-  let use_equal us1 us2 =
-    Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
-      Sid.equal us1.us_gl us2.us_gl
-
-  let mem_xp x us = Mx.mem x us.us_pv
-
-  (* Return [true] if [x] is forbidden in [restr]. *)
-  let use_mem_xp x (restr : use use_restr) =
-    let bneg = mem_xp x restr.ur_neg
-    and bpos = match restr.ur_pos with
-      | None -> false
-      | Some sp -> not (mem_xp x sp) in
-    bneg || bpos
-
-  let mem_gl mp us =
-    assert (mp.m_args = []);
-    match mp.m_top with
-    | `Local id -> Sid.mem id us.us_gl
-    | _ -> assert false
-
-  let use_mem_gl m restr =
-    let bneg = mem_gl m restr.ur_neg
-    and bpos = match restr.ur_pos with
-      | None -> false
-      | Some sp -> not (mem_gl m sp) in
-    bneg || bpos
-
-  let add_var env xp us =
-    let xp = xp_glob xp in
-    let xp = norm_xpv env xp in
-    let ty = Var.by_xpath xp env in
-    { us with us_pv = Mx.add xp ty us.us_pv }
-
-  let add_glob id us =
-    { us with us_gl = Sid.add id us.us_gl }
-
-  let add_glob_except rm id us =
-    if Sid.mem id rm then us else add_glob id us
-
-  let gen_fun_use env fdone rm =
-    let rec fun_use us f =
-      let f = norm_xfun env f in
-      if Mx.mem f !fdone then us
-      else
-        let f1 = Fun.by_xpath f env in
-        fdone := Sx.add f !fdone;
-        match f1.f_def with
-        | FBdef fdef ->
-          let f_uses = fdef.f_uses in
-          let vars = Sx.union f_uses.us_reads f_uses.us_writes in
-          let us = Sx.fold (add_var env) vars us in
-          List.fold_left fun_use us f_uses.us_calls
-
-        | FBabs oi ->
-            let id =
-              match f.x_top.m_top with
-              | `Local id -> id
-              | _ -> assert false in
-            let us = add_glob_except rm id us in
-            List.fold_left fun_use us (OI.allowed oi)
-
-        | FBalias _ -> assert false in
-    fun_use
-
-  let fun_use env xp =
-    gen_fun_use env (ref Sx.empty) Sid.empty use_empty xp
-
-  (* The four functions below are used in mod_use_top and item_use. *)
-  let rec mod_use env rm fdone us mp =
-    let mp = norm_mpath env mp in
-    let me, _ = Mod.by_mpath mp env in
-    assert (me.me_params = []);
-    body_use env rm fdone mp us me.me_comps me.me_body
-
-  and item_use env rm fdone mp us item =
-    match item with
-    | MI_Module me -> mod_use env rm fdone us (EcPath.mqname mp me.me_name)
-    | MI_Variable v -> add_var env (xpath mp v.v_name) us
-    | MI_Function f -> fun_use_aux env rm fdone us (xpath mp f.f_name)
-
-  and body_use env rm fdone mp us comps body =
-    match body with
-    | ME_Alias _ -> assert false
-    | ME_Decl _ ->
-      let id = match mp.m_top with `Local id -> id | _ -> assert false in
-      let us = add_glob_except rm id us in
-      List.fold_left (item_use env rm fdone mp) us comps
-    | ME_Structure ms ->
-      List.fold_left (item_use env rm fdone mp) us ms.ms_body
-
-  and fun_use_aux env rm fdone us f =
-    gen_fun_use env fdone rm us f
-
-  let mod_use_top env mp =
-    let mp = norm_mpath env mp in
-    let me, _ = Mod.by_mpath mp env in
-    let params = me.me_params in
-    let rm =
-      List.fold_left (fun rm (id,_) -> Sid.add id rm) Sid.empty params in
-    let env' = Mod.bind_params params env in
-
-    let mp' =
-      EcPath.m_apply mp (List.map (fun (id,_) -> EcPath.mident id) params) in
-
-    let fdone = ref Sx.empty in
-
-    mod_use env' rm fdone use_empty mp'
-
-  let mod_use env mp =
-    try Mm.find mp !(env.env_norm).mod_use with Not_found ->
-      let res = mod_use_top env mp in
-      let en = !(env.env_norm) in
-      env.env_norm := { en with mod_use = Mm.add mp res en.mod_use };
-      res
-
-  let item_use env mp item =
-    item_use env Sid.empty (ref Sx.empty) mp use_empty item
-
-  let restr_use env (mr : mod_restr) =
-    let get_use (sx, sm) =
-      Sx.fold (fun xp r -> add_var env xp r) sx use_empty
-      |> Sm.fold (fun mp r -> use_union r (mod_use env mp)) sm in
-
-    { ur_pos = omap get_use mr.ur_pos;
-      ur_neg = get_use mr.ur_neg; }
-
-  let get_restr_use env mp =
-    try
-      Mm.find mp !(env.env_norm).get_restr_use
-    with Not_found ->
-      let res =
-        match (fst (Mod.by_mpath mp env)).me_body with
-        | EcModules.ME_Decl (_, mr) -> restr_use env mr
-        | _ -> assert false in
-      let en = !(env.env_norm) in
-      env.env_norm := { en with
-        get_restr_use = Mm.add mp res en.get_restr_use };
-      res
-
-  let equal_restr env (r1 : mod_restr) (r2 : mod_restr) =
-    let us1,us2 = restr_use env r1, restr_use env r2 in
-    ur_equal use_equal us1 us2
-
   let sig_of_mp (env : env) (mp : mpath) : module_sig =
     let mp = norm_mpath env mp in
     let me, _ = Mod.by_mpath mp env in
@@ -2426,29 +2272,6 @@ module NormMp = struct
       if   x_equal p xp then pv
       else EcTypes.pv_glob p
 
-  let flatten_use (us : use) =
-    let globs = Sid.elements us.us_gl in
-    let globs = List.sort EcIdent.id_ntr_compare globs in
-
-    let pv = Mx.bindings us.us_pv in
-    let pv = List.sort (fun (xp1, _) (xp2, _) -> x_ntr_compare xp1 xp2) pv in
-
-    (globs, pv)
-
-  let globals env m mp =
-    let us = mod_use env mp in
-
-    let globs, pv = flatten_use us in
-    let globs = List.map (fun id -> f_glob id m) globs in
-    let pv = List.map (fun (xp, ty) -> f_pvar (pv_glob xp) ty m) pv in
-
-    f_tuple (globs @ pv)
-
-  let norm_glob env m mp = globals env m mp
-
-  let norm_tglob env mp =
-    let g = (norm_glob env mhr mp) in
-    g.f_ty
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -2493,11 +2316,10 @@ module NormMp = struct
     then
       raise ModTypeNotEquiv
 
-  let mod_type_equiv env ((mty1, mr1) : mty_mr) ((mty2, mr2) : mty_mr) =
-    try
-      mod_type_equiv env mty1 mty2;
-      equal_restr env mr1 mr2
+  let module_type_equiv (env : env) (mty1 : module_type) (mty2 : module_type) =
+    try mod_type_equiv env mty1 mty2; true
     with ModTypeNotEquiv -> false
+
 end
 
 (* -------------------------------------------------------------------- *)

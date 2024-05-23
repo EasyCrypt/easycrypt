@@ -13,16 +13,6 @@ include EcCoreModules
 module OI = PreOI
 
 (* -------------------------------------------------------------------- *)
-(* Nothing is restricted. *)
-let mr_empty = ur_empty (Sx.empty, Sm.empty)
-
-(* Everything is restricted. *)
-let mr_full = ur_full (Sx.empty, Sm.empty)
-
-let mr_add_restr mr (r : mod_restr) =
-  let union (x1,m1) (x2,m2) = (Sx.union x1 x2, Sm.union m1 m2) in
-  let inter (x1,m1) (x2,m2) = (Sx.inter x1 x2, Sm.inter m1 m2) in
-  ur_union union inter mr r
 
 let change_oinfo (ois : oracle_infos) (f : symbol) (oi : oracle_info) =
   Msym.add f oi ois

@@ -38,8 +38,6 @@ type pr       = EcAst.pr
 
 type module_type = EcAst.module_type
 
-type mod_restr = EcAst.mod_restr
-
 (* -------------------------------------------------------------------- *)
 val gtty    : EcTypes.ty -> gty
 val gtmodty : mty_mr -> gty
@@ -58,8 +56,8 @@ val gty_fv    : gty -> int Mid.t
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int
 
-val mr_equal : mod_restr -> mod_restr -> bool
-val mr_hash  : mod_restr -> int
+val mr_equal : mem_restr -> mem_restr -> bool
+val mr_hash  : mem_restr -> int
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
@@ -95,7 +93,7 @@ val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_pvarg : EcTypes.ty -> memory -> form
 val f_pvloc : variable -> memory -> form
-val f_glob  : EcIdent.t -> memory -> form
+val f_glob  : functor_fun -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
 val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
@@ -287,7 +285,7 @@ val destr_pr        : form -> pr
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
 
-val destr_glob      : form -> EcIdent.t        * memory
+val destr_glob      : form -> functor_fun        * memory
 val destr_pvar      : form -> EcTypes.prog_var * memory
 
 (* -------------------------------------------------------------------- *)

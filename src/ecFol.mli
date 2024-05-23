@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcPath
+open EcAst
 open EcTypes
 open EcMemory
 
@@ -8,9 +9,6 @@ open EcMemory
 include module type of struct include EcCoreFol end
 
 include module type of struct include EcCoreSubst end
-
-(* -------------------------------------------------------------------- *)
-val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
 
 (* -------------------------------------------------------------------- *)
 val f_losslessF: xpath -> form
@@ -26,8 +24,8 @@ val f_eqres:
   -> form
 
 val f_eqglob:
-     mpath -> memory
-  -> mpath -> memory
+     functor_fun -> memory
+  -> functor_fun -> memory
   -> form
 
 (* soft-constructors - ordering *)
@@ -195,7 +193,7 @@ type sform =
   | SFint   of zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcIdent.t * memory
+  | SFglob  of functor_fun * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -245,6 +243,3 @@ module DestrReal : sig
   val div : form -> form * form
   val abs : form -> form
 end
-
-(* -------------------------------------------------------------------- *)
-val dump_f : form -> string

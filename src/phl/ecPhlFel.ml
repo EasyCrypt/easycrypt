@@ -69,7 +69,8 @@ let rec callable_oracles_f env modv os f =
       (callable_oracles_f env modv)
       os (EcPath.Sx.elements called_fs)
 
-  | FBdef fdef ->
+  | FBdef fdef -> assert false
+  (*
       let called_fs =
         List.fold_left
           (fun s o ->
@@ -86,6 +87,7 @@ let rec callable_oracles_f env modv os f =
           os (EcPath.Sx.elements called_fs)
       else
         EcPath.Sx.add f os
+  *)
 
 and callable_oracles_s env modv os s =
   callable_oracles_is env modv os s.s_node
@@ -176,7 +178,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let mi = pr.pr_mem in
     let f_xeq (x,ty) = f_eq (f_pvar x ty mh) (f_pvar x ty mi) in
     let eqxs = List.map f_xeq xs in
-    let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
+    let eqgs = assert false in (* List.map (fun m -> f_eqglob m mh m mi) gs in *)
     let eqparams =
       let vs = fsig.fs_anames in
       let var_of_ovar ov = { v_name = oget ov.ov_name; v_type = ov.ov_type } in

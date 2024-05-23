@@ -3,6 +3,7 @@ open EcBigInt
 open EcMaps
 open EcSymbols
 open EcIdent
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: section: move me *)
@@ -22,8 +23,6 @@ module Hty : EcMaps.EHashtbl.S with type key = ty
 
 type dom = ty list
 
-val dump_ty : ty -> string
-
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int
 
@@ -32,7 +31,7 @@ val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
-val tglob   : EcIdent.t -> ty
+val tglob   : functor_fun -> ty
 val tpred   : ty -> ty
 
 val ty_fv_and_tvar : ty -> int Mid.t
