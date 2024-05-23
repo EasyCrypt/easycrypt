@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcPath
+open EcAst
 open EcMaps
 open EcIdent
 open EcTypes
@@ -41,12 +42,12 @@ type mod_restr = EcAst.mod_restr
 
 (* -------------------------------------------------------------------- *)
 val gtty    : EcTypes.ty -> gty
-val gtmodty : module_type -> gty
+val gtmodty : mty_mr -> gty
 val gtmem   : EcMemory.memtype -> gty
 
 (* -------------------------------------------------------------------- *)
 val as_gtty  : gty -> EcTypes.ty
-val as_modty : gty -> module_type
+val as_modty : gty -> mty_mr
 val as_mem   : gty -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
@@ -86,7 +87,7 @@ val form_forall: (form -> bool) -> form -> bool
 (* -------------------------------------------------------------------- *)
 val gty_as_ty  : gty -> EcTypes.ty
 val gty_as_mem : gty -> EcMemory.memtype
-val gty_as_mod : gty -> module_type
+val gty_as_mod : gty -> mty_mr
 val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 
 (* soft-constructors - common leaves *)

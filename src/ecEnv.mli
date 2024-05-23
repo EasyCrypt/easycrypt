@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcPath
 open EcSymbols
+open EcAst
 open EcTypes
 open EcMemory
 open EcDecl
@@ -186,9 +187,11 @@ module Mod : sig
   val bind  : ?import:import -> symbol -> t -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
 
-  val bind_local    : EcIdent.t -> module_type -> env -> env
-  val bind_locals   : (EcIdent.t * module_type) list -> env -> env
-  val declare_local : EcIdent.t -> module_type -> env -> env
+  val bind_local    : EcIdent.t -> mty_mr -> env -> env
+  val bind_locals   : (EcIdent.t * mty_mr) list -> env -> env
+  val bind_param    : EcIdent.t -> module_type -> env -> env
+  val bind_params   : (EcIdent.t * module_type) list -> env -> env
+  val declare_local : EcIdent.t -> mty_mr -> env -> env
   val is_declared   : EcIdent.t -> env -> bool
 
   val add_restr_to_locals : Sx.t use_restr -> Sm.t use_restr -> env -> env
@@ -216,10 +219,7 @@ module ModTy : sig
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> t -> env -> env
 
-  val mod_type_equiv :
-    (form -> form -> bool) -> env -> module_type -> module_type -> bool
-  val has_mod_type : env -> module_type list -> module_type -> bool
-  val sig_of_mt :  env -> module_type -> module_sig
+  val sig_of_mt : env -> module_type -> module_sig
 end
 
 (* -------------------------------------------------------------------- *)
@@ -240,8 +240,6 @@ module NormMp : sig
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
   val get_restr_use : env -> mpath -> use use_restr
-  val get_restr_me  : env -> module_expr -> mpath -> mod_restr
-  val get_restr     : env -> mpath -> mod_restr
 
   val sig_of_mp     : env -> mpath -> module_sig
 
@@ -255,6 +253,8 @@ module NormMp : sig
   val is_abstract_fun : xpath -> env -> bool
   val x_equal         : env -> xpath -> xpath -> bool
   val pv_equal        : env -> EcTypes.prog_var -> EcTypes.prog_var -> bool
+
+  val mod_type_equiv : env -> mty_mr -> mty_mr -> bool
 end
 
 (* -------------------------------------------------------------------- *)

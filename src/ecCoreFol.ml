@@ -74,7 +74,7 @@ let gty_fv = EcAst.gty_fv
 let gtty (ty : EcTypes.ty) =
   GTty ty
 
-let gtmodty (mt : module_type) =
+let gtmodty (mt : mty_mr) =
   GTmodty mt
 
 let gtmem (mt : EcMemory.memtype) =

@@ -717,11 +717,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             in (env, subst)
 
         | GTmodty p1, GTmodty p2 ->
-          let f_equiv f1 f2 =
-            try doit env (subst, mxs) f1 f2; true
-            with MatchFailure -> false in
-
-            if not (ModTy.mod_type_equiv f_equiv env p1 p2) then
+            if not (NormMp.mod_type_equiv env p1 p2) then
               raise MatchFailure;
 
             let subst =

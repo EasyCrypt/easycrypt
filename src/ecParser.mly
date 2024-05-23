@@ -1642,19 +1642,10 @@ oracle_restr:
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
-mod_restr_el:
-  | f=lident COLON orcls=option(oracle_restr)
-    { { pmre_name = f; pmre_orcls = orcls; } }
-
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr; pmr_procs = [] } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = []; pmr_procs = l } }
-  | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = mr;	pmr_procs = l } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr;	pmr_procs = l } }
+    { { pmr_mem = mr } }
+
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -1670,11 +1661,11 @@ mod_restr:
     { { pmty_pq = x; pmty_mem = Some mr; } }
 
 sig_def:
-| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* mr=mod_restr? EQ i=sig_body
+| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* EQ i=sig_body
     { let pi_sig =
         Pmty_struct { pmsig_params = List.flatten args;
                       pmsig_body   = i;
-			                pmsig_restr  = mr; } in
+			               } in
       { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; } }
 
 sig_body:

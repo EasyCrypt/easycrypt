@@ -413,7 +413,7 @@ module Fsubst = struct
   let rec f_subst ~(tx : tx) (s : f_subst) (fp : form) : form =
     tx ~before:fp ~after:(match fp.f_node with
     | Fquant (q, b, f) ->
-      let s, b' = add_bindings ~tx s b in
+      let s, b' = add_bindings s b in
       let f' = f_subst ~tx s f in
       f_quant q b' f'
 
@@ -546,30 +546,25 @@ module Fsubst = struct
     { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
           Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
       mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
-          Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
-      mr_oinfos = EcSymbols.Msym.map (oi_subst s) mr.mr_oinfos; }
-
+          Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths; }
+  
   (* ------------------------------------------------------------------ *)
   and mp_subst (s : f_subst) (mp : mpath) : mpath =
     EcPath.m_subst_abs s.fs_mod mp
 
   (* ------------------------------------------------------------------ *)
-  and mty_subst ~(tx : tx) (s : f_subst) (mty : module_type) : module_type =
-    let s, mt_params =
-      let s, b =
-        add_bindings
-          ~tx s
-          (List.map (fun (x, mty) -> (x, GTmodty mty)) mty.mt_params) in
-      let b = List.map (fun (x, gty) -> x, as_modty gty) b in
-      s, b
-    in
-    let mt_name   = mty.mt_name in
-    let mt_args   = List.map (mp_subst s) mty.mt_args in
-    let mt_restr  = mr_subst s mty.mt_restr in
-    { mt_params; mt_name; mt_args; mt_restr; }
+  and mty_subst (s : f_subst) (mty : module_type) : module_type =
+    let s, mt_params = add_mod_params s mty.mt_params in
+    let mt_name = mty.mt_name in
+    let mt_args = List.map (mp_subst s) mty.mt_args in
+    { mt_params; mt_name; mt_args; }
 
   (* ------------------------------------------------------------------ *)
-  and gty_subst ~(tx : tx) (s : f_subst) (gty : gty) : gty =
+  and mty_mr_subst (s : f_subst) ((mty, mr) : mty_mr) : mty_mr =
+    mty_subst s mty, mr_subst s mr
+
+  (* ------------------------------------------------------------------ *)
+  and gty_subst (s : f_subst) (gty : gty) : gty =
     if is_subst_id s then gty else
 
     match gty with
@@ -578,7 +573,7 @@ module Fsubst = struct
       if ty == ty' then gty else GTty ty'
 
     | GTmodty p ->
-      let p' = mty_subst ~tx s p in
+      let p' = mty_mr_subst s p in
       if p == p' then gty else GTmodty p'
 
     | GTmem mt ->
@@ -586,8 +581,8 @@ module Fsubst = struct
       if mt == mt' then gty else GTmem mt'
 
   (* ------------------------------------------------------------------ *)
-  and add_binding ~(tx : tx) (s : f_subst) ((x, gty) as xt : binding) : f_subst * binding =
-    let gty' = gty_subst ~tx s gty in
+  and add_binding (s : f_subst) ((x, gty) as xt : binding) : f_subst * binding =
+    let gty' = gty_subst s gty in
     let x'   = refresh s x in
 
     if x == x' && gty == gty' then
@@ -606,8 +601,20 @@ module Fsubst = struct
         (s, (x', gty'))
 
   (* ------------------------------------------------------------------ *)
-  and add_bindings ~(tx : tx) : f_subst -> bindings -> f_subst * bindings =
-    List.map_fold (add_binding ~tx)
+  and add_bindings (s : f_subst) : bindings -> f_subst * bindings =
+    List.map_fold add_binding s
+
+  (* ------------------------------------------------------------------ *)
+  and add_mod_params (s : f_subst) (params : _) =
+    (* We rely on add_bindings, hence the injection of parameters as
+     * bindings. We use the mr_full restriction set. Any other choice
+     * would have been equivalent as this set is not used by
+     * the function add_bindings. *)
+    let s, params =
+      add_bindings s
+        (List.map (fun (x, mty) -> (x, GTmodty (mty, EcModules.mr_full))) params) in
+    let params = List.map (fun (x, gty) -> x, fst (as_modty gty)) params in
+    s, params
 
   (* ------------------------------------------------------------------ *)
   and add_me_binding (s : f_subst) ((x, mt) as me : memenv) : f_subst * memenv =
@@ -635,8 +642,8 @@ module Fsubst = struct
   let f_bind_mod    = f_bind_mod
   let f_bind_rename = f_bind_rename
 
-  let add_binding  = add_binding ~tx:(fun ~before:_ ~after:f -> f)
-  let add_bindings = add_bindings ~tx:(fun ~before:_ ~after:f -> f)
+  let add_binding  = add_binding
+  let add_bindings = add_bindings
 
   (* ------------------------------------------------------------------ *)
   let f_subst ?(tx = fun ~before:_ ~after:f -> f) s =
@@ -645,10 +652,11 @@ module Fsubst = struct
   let e_subst = e_subst
   let s_subst = s_subst
 
-  let gty_subst = gty_subst ~tx:(fun ~before:_ ~after:f -> f)
+  let gty_subst = gty_subst
   let mr_subst = mr_subst
-  let mty_subst = mty_subst ~tx:(fun ~before:_ ~after:f -> f)
+  let mty_subst = mty_subst
   let oi_subst  = oi_subst
+  let mty_mr_subst = mty_mr_subst 
 
   (* ------------------------------------------------------------------ *)
   let f_subst_local (x : ident) (t : form) : form -> form =

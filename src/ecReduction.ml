@@ -254,8 +254,8 @@ end) = struct
   (* -------------------------------------------------------------------- *)
   let add_modules env p1 p2 : EcEnv.env * EcSubst.subst =
     List.fold_left2 (fun (env, s) (id1,_) (id2,mt) ->
-        let env = EcEnv.Mod.bind_local id2 mt env in
-        env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty) p1 p2
+      let env = EcEnv.Mod.bind_param id2 mt env in
+      env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty) p1 p2
 
   (* ------------------------------------------------------------------ *)
   let rec for_module_type env ~norm (mt1:module_type) (mt2:module_type) =
@@ -419,18 +419,20 @@ let check_lpattern env subst lp1 lp2 =
 let check_memtype env mt1 mt2 =
   ensure (EcMemory.mt_equal_gen (EqTest_i.for_type env) mt1 mt2)
 
-let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
+let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   let gty2 = Fsubst.gty_subst subst gty2 in
   match gty1, gty2 with
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
-  | GTmodty p1, GTmodty p2 ->
-    let test f1 f2 = test env subst f1 f2 in
-    ensure (ModTy.mod_type_equiv test env p1 p2);
-    Mod.bind_local x1 p1 env,
-    if id_equal x1 x2 then subst
-    else Fsubst.f_bind_absmod subst x2 x1
+  | GTmodty mty1, GTmodty mty2 ->
+    ensure (NormMp.mod_type_equiv env mty1 mty2);
+    let env = Mod.bind_local x1 mty1 env in
+    let subst =
+      if   id_equal x1 x2
+      then subst
+      else Fsubst.f_bind_absmod subst x2 x1
+    in env, subst
 
   | GTmem me1, GTmem me2  ->
     check_memtype env me1 me2;
@@ -439,8 +441,8 @@ let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
     else Fsubst.f_bind_mem subst x2 x1
   | _, _ -> raise NotConv
 
-let check_bindings test env subst bd1 bd2 =
-    List.fold_left2 (check_binding test) (env,subst) bd1 bd2
+let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2
 
 let check_me_binding env subst (x1,mt1) (x2,mt2) =
   check_memtype env mt1 mt2;
@@ -495,7 +497,7 @@ let is_alpha_eq hyps f1 f2 =
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when
         q1 = q2 && List.length bd1 = List.length bd2 ->
 
-      let env, subst = check_bindings test env subst bd1 bd2 in
+      let env, subst = check_bindings env subst bd1 bd2 in
       aux env subst f1' f2'
 
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
@@ -1491,16 +1493,11 @@ let rec conv ri env f1 f2 stk =
 
   | _, _ -> force_head ri env f1 f2 stk
 
-and check_bindings_conv ri env q bd1 bd2 f1 f2 =
-  let test env subst f1 f2 =
-    let f2 = Fsubst.f_subst subst f2 in
-    conv ri env f1 f2 []
-  in
-
+and check_bindings_conv (_ri : redinfo) env q bd1 bd2 f1 f2 =
   let rec aux es bd bd1 bd2 =
     match bd1, bd2 with
     | b1::bd1', b2::bd2' ->
-      begin match check_binding test es b1 b2 with
+      begin match check_binding es b1 b2 with
       | es -> aux es (b1::bd) bd1' bd2'
       | exception NotConv -> es, bd, bd1, bd2
       end
@@ -1777,15 +1774,14 @@ let add_local (env, subst) (x1, ty1) (x2, ty2) =
   if id_equal x1 x2 then subst
   else EcSubst.rename_flocal subst x2 x1 ty1
 
-let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
+let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   let gty2 = EcSubst.subst_gty subst gty2 in
   match gty1, gty2 with
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
   | GTmodty p1, GTmodty p2 ->
-    let test f1 f2 = test env subst f1 f2 in
-    ensure (ModTy.mod_type_equiv test env p1 p2);
+    ensure (NormMp.mod_type_equiv env p1 p2);
     Mod.bind_local x1 p1 env,
     if id_equal x1 x2 then subst
     else EcSubst.add_module subst x2 (mident x1)
@@ -1797,13 +1793,9 @@ let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
     else EcSubst.add_memory subst x2 x1
   | _, _ -> raise NotConv
 
-let check_bindings test env subst bd1 bd2 =
-    List.fold_left2 (check_binding test) (env,subst) bd1 bd2
+let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2
 
-let check_bindings exn tparams env s bd1 bd2 =
-  let test env s f1 f2 =
-    let f2 = EcSubst.subst_form s f2 in
-    is_conv (LDecl.init env tparams) f1 f2
-  in
-  try check_bindings test env s bd1 bd2
+let check_bindings exn env s bd1 bd2 =
+  try check_bindings env s bd1 bd2
   with NotConv -> raise exn

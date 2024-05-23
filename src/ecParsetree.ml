@@ -260,7 +260,6 @@ and pmod_restr_el = {
 
 and pmod_restr = {
   pmr_mem   : pmod_restr_mem;
-	pmr_procs : pmod_restr_el list;
  }
 
 (* -------------------------------------------------------------------- *)
@@ -270,7 +269,6 @@ and pmodule_sig =
 and pmodule_sig_struct = {
   pmsig_params : (psymbol * pmodule_type) list;
   pmsig_body   : pmodule_sig_struct_body;
-  pmsig_restr  : pmod_restr option;
 }
 
 and pmodule_sig_struct_body = pmodule_sig_item list
