@@ -301,7 +301,9 @@ let main () =
                 (Format.sprintf "--jobs=%d")
                 input.runo_jobs
             )
-          @ List.map (Format.sprintf "--bin-args=%s") ecargs
+          @ List.map
+              (Format.sprintf "--bin-args=%s")
+              (ecargs @ input.runo_rawargs)
           @ [input.runo_input]
           @ input.runo_scenarios
         in

@@ -37,6 +37,7 @@ and run_option = {
   runo_report    : string option;
   runo_provers   : prv_options;
   runo_jobs      : int option;
+  runo_rawargs   : string list;
 }
 
 and prv_options = {
@@ -354,6 +355,7 @@ let specs = {
       `Group "provers";
       `Spec  ("report", `String, "dump result to <report>");
       `Spec  ("jobs", `Int, "number of parallel jobs to run");
+      `Spec  ("raw-args", `String, "<internal>");
     ]);
 
     ("why3config", "Configure why3", []);
@@ -511,7 +513,8 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_scenarios = scenarios;
     runo_report    = get_string "report" values;
     runo_provers   = prv_options_of_values ini values;
-    runo_jobs      = get_int "jobs" values; }
+    runo_jobs      = get_int "jobs" values;
+    runo_rawargs   = get_strings "raw-args" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
