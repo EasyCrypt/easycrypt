@@ -531,8 +531,6 @@ MARKS = {
         ('✓', CurseWrapper.COLOR_GREEN),
     -signal.SIGINT:
         ('ϟ', CurseWrapper.COLOR_YELLOW),
-    -signal.SIGTERM:
-        ('ϟ', CurseWrapper.COLOR_YELLOW),
     None:
         ('✗', CurseWrapper.COLOR_RED),
 }
@@ -705,7 +703,20 @@ async def _run_all(options, allscripts, listener : Listener):
                     status = await asyncio.wait_for(proc.wait(), 2.0)
 
                 except asyncio.TimeoutError:
-                    proc.kill(); status = await proc.wait()
+                    listener.error(
+                        handle, 'critical',
+                        'Timeout in wait() -- killing process'
+                    )
+                    proc.kill()
+                    status = await proc.wait()
+
+                if status < 0:
+                    procsig = -status
+                    if procsig != signal.SIGINT:
+                        listener.error(
+                            handle, 'critical',
+                            f'Killed (signal = {signal.Signals(procsig).name})'
+                        )
 
                 success = (bool(status) != bool(config.isvalid))
 
