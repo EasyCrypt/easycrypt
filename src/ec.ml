@@ -378,7 +378,18 @@ let main () =
   begin let open EcUserMessages in register () end;
 
   (* Initialize I/O + interaction module *)
-  let (prvopts, input, terminal, interactive, eco) =
+  let module State = struct
+    type t = {
+      prvopts     : prv_options;
+      input       : string option;
+      terminal    : T.terminal lazy_t;
+      interactive : bool;
+      eco         : bool;
+      gccompact   : int option;
+    }
+  end in
+
+  let state : State.t =
     match options.o_command with
     | `Config ->
         let config = {
@@ -422,7 +433,15 @@ let main () =
           then lazy (T.from_emacs ())
           else lazy (T.from_tty ())
 
-        in (cliopts.clio_provers, None, terminal, true, false)
+        in
+
+        { prvopts     = cliopts.clio_provers
+        ; input       = None
+        ; terminal    = terminal
+        ; interactive = true
+        ; eco         = false
+        ; gccompact   = None }
+
     end
 
     | `Compile cmpopts -> begin
@@ -442,8 +461,13 @@ let main () =
         let terminal =
           lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
-          ({cmpopts.cmpo_provers with prvo_iterate = true},
-           Some name, terminal, false, cmpopts.cmpo_noeco)
+
+        { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = cmpopts.cmpo_noeco
+        ; gccompact   = cmpopts.cmpo_compact }
 
       end
 
@@ -452,7 +476,7 @@ let main () =
         assert false
   in
 
-  (match input with
+  (match state.input with
    | Some input -> EcCommands.addidir (Filename.dirname input)
    | None ->
        match relocdir with
@@ -462,7 +486,7 @@ let main () =
   (* Check if the .eco is up-to-date and exit if so *)
   oiter
     (fun input -> if EcCommands.check_eco input then exit 0)
-    input;
+    state.input;
 
   let finalize_input input scope =
     match input with
@@ -512,13 +536,13 @@ let main () =
     | _ -> fun _ _ -> () in
 
   (* Instantiate terminal *)
-  let lazy terminal = terminal in
+  let lazy terminal = state.terminal in
 
   (* Initialize PRNG *)
   Random.self_init ();
 
   (* Connect to external Why3 server if requested *)
-  prvopts.prvo_why3server |> oiter (fun server ->
+  state.prvopts.prvo_why3server |> oiter (fun server ->
     try
       Why3.Prove_client.connect_external server
     with Why3.Prove_client.ConnectionError e ->
@@ -534,6 +558,7 @@ let main () =
 
     (* Interaction loop *)
     let first = ref `Init in
+    let cmdcounter = ref 0 in
 
     while true do
       let terminate = ref false in
@@ -545,19 +570,19 @@ let main () =
 
             (* Initialize global scope *)
             let checkmode = {
-              EcCommands.cm_checkall  = prvopts.prvo_checkall;
-              EcCommands.cm_timeout   = odfl 3 (prvopts.prvo_timeout);
-              EcCommands.cm_cpufactor = odfl 1 (prvopts.prvo_cpufactor);
-              EcCommands.cm_nprovers  = odfl 4 (prvopts.prvo_maxjobs);
-              EcCommands.cm_provers   = prvopts.prvo_provers;
-              EcCommands.cm_profile   = prvopts.prvo_profile;
-              EcCommands.cm_iterate   = prvopts.prvo_iterate;
+              EcCommands.cm_checkall  = state.prvopts.prvo_checkall;
+              EcCommands.cm_timeout   = odfl 3 (state.prvopts.prvo_timeout);
+              EcCommands.cm_cpufactor = odfl 1 (state.prvopts.prvo_cpufactor);
+              EcCommands.cm_nprovers  = odfl 4 (state.prvopts.prvo_maxjobs);
+              EcCommands.cm_provers   = state.prvopts.prvo_provers;
+              EcCommands.cm_profile   = state.prvopts.prvo_profile;
+              EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
             EcCommands.initialize ~restart
-              ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
+              ~undo:state.interactive ~boot:ldropts.ldro_boot ~checkmode;
             (try
-               List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+               List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
@@ -569,7 +594,7 @@ let main () =
             oiter (fun ppwidth ->
               let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
               EcGState.setvalue "PP:width" (`Int ppwidth) gs)
-              prvopts.prvo_ppwidth;
+              state.prvopts.prvo_ppwidth;
             first := `Loop
 
         | `Loop -> ()
@@ -624,10 +649,19 @@ let main () =
               terminate := true
         end;
         T.finish `ST_Ok terminal;
+
+        state.gccompact |> Option.iter (fun i ->
+          incr cmdcounter;
+          if i = !cmdcounter then begin
+            cmdcounter := 0;
+            Gc.compact ()
+          end
+        );
+
         if !terminate then begin
             T.finalize terminal;
-            if not eco then
-              finalize_input input (EcCommands.current ());
+            if not state.eco then
+              finalize_input state.input (EcCommands.current ());
             exit 0
           end;
       with
