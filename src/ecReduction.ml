@@ -857,6 +857,14 @@ let reduce_logic ri env hyps f p args =
           then f_false
           else f_ands (List.map2 f_eq args1 args2)
 
+        | (Fop (p1, tys1), args1), (Fop (p2, tys2), args2)
+            when    EcPath.p_equal p1 p2
+                 && EcEnv.Op.is_record_ctor env p1
+                 && EcEnv.Op.is_record_ctor env p2
+                 && List.for_all2 (EqTest_i.for_type env) tys1 tys2 ->
+
+            f_ands (List.map2 f_eq args1 args2)
+
         | (_, []), (_, [])
             when EqTest_i.for_type env f1.f_ty EcTypes.tunit
                  && EqTest_i.for_type env f2.f_ty EcTypes.tunit ->
