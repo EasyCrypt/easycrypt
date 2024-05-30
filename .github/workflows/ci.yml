@@ -10,7 +10,7 @@ env:
 jobs:
   pre_job:
     name: Check for Duplicates Jobs
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
@@ -24,7 +24,7 @@ jobs:
     name: EasyCrypt compilation (opam)
     needs: pre_job
     if: needs.pre_job.outputs.should_skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container:
       image: ghcr.io/easycrypt/ec-build-box
     steps:
@@ -43,7 +43,7 @@ jobs:
     if: needs.pre_job.outputs.should_skip != 'true'
     env:
       HOME: /home/runner
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - uses: actions/checkout@v4
     - name: Setup Nix
@@ -63,7 +63,7 @@ jobs:
     name: Check EasyCrypt Libraries
     needs: [pre_job, compile-opam]
     if: needs.pre_job.outputs.should_skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container:
       image: ghcr.io/easycrypt/ec-build-box
     strategy:
@@ -99,7 +99,7 @@ jobs:
     name: Fetch EasyCrypt External Projects Matrix
     needs: [pre_job, compile-opam]
     if: needs.pre_job.outputs.should_skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -115,7 +115,7 @@ jobs:
     name: Check EasyCrypt External Projects
     needs: [fetch-external-matrix]
     if: needs.pre_job.outputs.should_skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container:
       image: ghcr.io/easycrypt/ec-build-box
     strategy:
@@ -170,7 +170,7 @@ jobs:
     name: Check EasyCrypt External Projects (set-status)
     if: always()
     needs: [external]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - uses: re-actors/alls-green@release/v1
       with:
@@ -183,7 +183,7 @@ jobs:
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - uses: technote-space/workflow-conclusion-action@v3
     - uses: zulip/github-actions-zulip/send-message@v1
