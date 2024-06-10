@@ -9,9 +9,12 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 let get_expression_of_instruction (i : instr) =
   match i.i_node with
-  | Sasgn (lv, e) -> Some (e, (fun e -> i_asgn (lv, e)))
-  | Srnd  (lv, e) -> Some (e, (fun e -> i_rnd  (lv, e)))
-  | _             -> None
+  | Sasgn  (lv, e)     -> Some (e, (fun e -> i_asgn  (lv, e)))
+  | Srnd   (lv, e)     -> Some (e, (fun e -> i_rnd   (lv, e)))
+  | Sif    (e, s1, s2) -> Some (e, (fun e -> i_if    (e, s1, s2)))
+  | Swhile (e, s)      -> Some (e, (fun e -> i_while (e, s)))
+  | Smatch (e, bs)     -> Some (e, (fun e -> i_match (e, bs)))
+  | _                  -> None
 
 (* -------------------------------------------------------------------- *)
 let t_change
