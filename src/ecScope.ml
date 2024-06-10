@@ -355,6 +355,12 @@ and docitem =
 and itemkind = [`Type | `Operator | `Axiom | `ModuleType | `Module | `Theory]
 
 (* -------------------------------------------------------------------- *)
+let get_gdocstrings (sc : scope) : string list =
+  sc.sc_globdoc
+
+let get_ldocentities (sc : scope) : docentity list =
+  sc.sc_locdoc.docentities
+
 (* let extend_globdoc (sc : scope) (doc : string) : scope =
   { sc with sc_globdoc = sc.sc_globdoc @ [doc] } *)
 

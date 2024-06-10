@@ -1,28 +1,66 @@
-let write_line (outc : out_channel) (line : string) (indentation : int) : unit =
-  output_string outc ((String.concat "" (List.init indentation (fun _ -> "\t"))) ^ line ^ "\n")
+open Tyxml.Html
 
-let write_html_head (outc : out_channel) (fn: string) (kind : EcLoader.kind) : unit =
-  let thk = 
-    match kind with
-    | `Ec -> "Theory"
-    | `EcA -> "Abstract Theory"
-  in
-  write_line outc "<head>" 1;
-  write_line outc "<title>" 2;
-  write_line outc (Printf.sprintf "%s %s" thk fn) 3;
-  write_line outc "</title>" 2;
-  write_line outc "</head>" 1
+open EcScope
+
+let thkind_str (kind : EcLoader.kind) : string =
+  match kind with
+  | `Ec -> "Theory"
+  | `EcA -> "Abstract Theory" 
+
+let itemkind_str_pl (ik : itemkind) : string =
+  match ik with
+  | `Type -> "Types"
+  | `Operator -> "Operator"
+  | `Axiom -> "Axioms"
+  | `ModuleType -> "Module Types"
+  | `Module -> "Modules"
+  | `Theory -> "Theories"
+
+let c_title (fn: string) (kind : EcLoader.kind) : [> Html_types.title] elt =
+  title (txt (thkind_str kind ^ " " ^ fn))
+
+let c_metadata (metadata : string list) = ()
+
+let c_head (metadata : string list option) (fn : string) (kind : EcLoader.kind) : [> Html_types.head] elt =
+  head (c_title fn kind) []
+
+let c_section_global (fn : string) (kind : EcLoader.kind) (gdoc : string list) =
+    div [
+      h1 [txt (thkind_str kind ^ " " ^ fn)]
+    ] 
+    ::
+    match gdoc with
+    | [] -> []
+    | _ -> [div (List.map (fun s -> p [txt s]) gdoc)]
   
-let write_section_global (outc : out_channel) (fn : string) (globdoc : string list) = ()
+let c_section_local_itemkind (lents_ik : EcScope.docentity list) =
+  [p [txt "test"]]
 
-let write_html_body (outc : out_channel) (fn : string) (scope : EcScope.scope) : unit =
-  write_line outc "<body>" 1;
-  (* 
-  write_section_global outc fn scope.sc_locdoc;
-  write_section_types outc fn 
-  write 
-  *)
-  write_line outc "</body>" 1
+let c_section_local (lents : EcScope.docentity list) =
+  let iks = [`Type; `Operator; `Axiom; `ModuleType; `Module; `Theory] in
+  List.concat 
+    (List.map (fun ik -> 
+      let lents_ik = List.filter (fun ent -> 
+        match ent with
+        | ItemDoc (_, di) -> fst di = ik
+        | SubDoc _ -> false) lents
+      in
+      match lents_ik with
+      | [] -> []
+      | _ ->  [
+                div [h2 [txt (itemkind_str_pl ik)]];
+                div (c_section_local_itemkind lents_ik)
+              ]) 
+    iks)
+
+let c_body (fn : string) (kind : EcLoader.kind) (scope : EcScope.scope) : [> Html_types.body] elt =
+  let gsec = c_section_global fn kind (get_gdocstrings scope) in
+  let lsec = c_section_local (get_ldocentities scope) in
+  body (List.concat [gsec; lsec])
+
+
+let c_page (metadata : string list option) (fn : string) (kind : EcLoader.kind) (scope : EcScope.scope) : [> Html_types.html] elt =
+    html (c_head metadata fn kind) (c_body fn kind scope)
 
 (* input = input name, scope contains all documentation items *)
 let generate_html (fname : string option) (scope : EcScope.scope) : unit =
@@ -33,17 +71,12 @@ let generate_html (fname : string option) (scope : EcScope.scope) : unit =
         with EcLoader.BadExtension _ -> assert false 
       in
 
-      let hn = (Filename.remove_extension fn) ^ ".html" in
+      let fnne = Filename.remove_extension fn in
+      let hn = fnne ^ ".html" in
       
-      let outc = open_out hn in
-      
-      write_line outc "<html>" 0;
-
-      write_html_head outc fn kind;
-      write_html_body outc fn scope;
-      
-      write_line outc "</html>" 0;
-
-      close_out outc;
+      let file = open_out hn in
+      let fmt = Format.formatter_of_out_channel file in
+        pp () fmt (c_page None fnne kind scope);
+        close_out file;
 
   | None -> ()

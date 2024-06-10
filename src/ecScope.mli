@@ -54,8 +54,23 @@ and pucflags = {
   puc_local      : bool;
 }
 
+type docentity =
+  | ItemDoc   of string list * docitem
+  | SubDoc    of docentity list
+
+and docitem =
+  itemkind * string list (* raw definition *)
+
+and itemkind = [`Type | `Operator | `Axiom | `ModuleType | `Module | `Theory]
+
+
 (* -------------------------------------------------------------------- *)
 val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
+
+(* -------------------------------------------------------------------- *)
+val get_gdocstrings : scope -> string list
+val get_ldocentities : scope -> docentity list
+
 
 (* -------------------------------------------------------------------- *)
 val empty  : EcGState.gstate -> scope
