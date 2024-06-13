@@ -3535,27 +3535,6 @@ tactics_or_prf:
 | PROOF        { `Proof    }
 
 (* -------------------------------------------------------------------- *)
-tcd_toptactic:
-| t=toptactic {
-    let l1 = $startpos(t) in
-    let l2 = $endpos(t) in
-
-    if l1.L.pos_fname <> l2.L.pos_fname then
-      parse_error
-        (EcLocation.make $startpos $endpos)
-        (Some "<dump> command cannot span multiple files");
-    ((l1.L.pos_fname, (l1.L.pos_cnum, l2.L.pos_cnum)), t)
-  }
-
-tactic_dump:
-| DUMP aout=STRING wd=word? t=paren(tcd_toptactic)
-  {  let infos = {
-      tcd_source = fst t;
-      tcd_width  = wd;
-      tcd_output = aout;
-    } in (infos, snd t) }
-
-(* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
 theory_clone:
@@ -3847,7 +3826,6 @@ global_action:
 | reduction        { Greduction   $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
-| tactic_dump      { Gtcdump      $1 }
 | x=loc(realize)   { Grealize     x  }
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }

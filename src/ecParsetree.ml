@@ -1200,13 +1200,6 @@ type proofmode = {
 }
 
 (* -------------------------------------------------------------------- *)
-type tcdump = {
-  tcd_source : string * (int * int);
-  tcd_width  : int option;
-  tcd_output : string;
-}
-
-(* -------------------------------------------------------------------- *)
 type save = [ `Qed | `Admit | `Abort ]
 
 (* -------------------------------------------------------------------- *)
@@ -1261,7 +1254,6 @@ type global_action =
   | GsctClose    of osymbol_r
   | Grealize     of prealize located
   | Gtactics     of [`Proof | `Actual of ptactic list]
-  | Gtcdump      of (tcdump * ptactic list)
   | Gprover_info of pprover_infos
   | Gsave        of save located
   | Gpragma      of psymbol

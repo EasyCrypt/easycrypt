@@ -573,58 +573,6 @@ and process_dump_why3 scope filename =
   EcScope.dump_why3 scope filename; scope
 
 (* -------------------------------------------------------------------- *)
-and process_dump scope (source, tc) =
-  let open EcCoreGoal in
-
-  let input, (p1, p2) = source.tcd_source in
-
-  let goals, scope  =
-    let mode = (Pragma.get ()).pm_check in
-     EcScope.Tactics.process scope mode tc
-  in
-
-  let wrerror fname =
-    EcScope.notify scope `Warning "cannot write `%s'" fname in
-
-  let tactic =
-    try  File.read_from_file ~offset:p1 ~length:(p2-p1) input
-    with Invalid_argument _ -> "(* failed to read back script *)" in
-  let tactic = Printf.sprintf "%s.\n" (String.strip tactic) in
-
-  let ecfname = Printf.sprintf "%s.ec" source.tcd_output in
-
-  (try  File.write_to_file ~output:ecfname tactic
-   with Invalid_argument _ -> wrerror ecfname);
-
-  goals |> oiter (fun (penv, (hd, hds)) ->
-    let goals =
-      List.map
-        (fun hd -> EcCoreGoal.FApi.get_pregoal_by_id hd penv)
-        (hd :: hds) in
-
-    List.iteri (fun i { g_hyps = hyps; g_concl = concl; } ->
-        let ecfname = Printf.sprintf "%s.%d.ec" source.tcd_output i in
-
-        try
-          let output  = open_out_bin ecfname in
-
-          try_finally
-            (fun () ->
-              let fbuf = Format.formatter_of_out_channel output in
-              let ppe  = EcPrinting.PPEnv.ofenv (EcEnv.LDecl.toenv hyps) in
-
-              source.tcd_width |> oiter (Format.pp_set_margin fbuf);
-
-              Format.fprintf fbuf "%a@?"
-                (EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo)
-                ((EcEnv.LDecl.tohyps hyps, concl), `One (-1)))
-            (fun () -> close_out output)
-        with Sys_error _ -> wrerror ecfname)
-      goals);
-
-  scope
-
-(* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -656,7 +604,6 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
-      | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
       | Gsave        ed   -> `Fct   (fun scope -> process_save       scope  ed)
