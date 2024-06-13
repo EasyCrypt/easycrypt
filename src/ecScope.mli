@@ -56,7 +56,7 @@ and pucflags = {
 
 type docentity =
   | ItemDoc   of string list * docitem
-  | SubDoc    of docentity list
+  | SubDoc    of (string list * docitem) * docentity list
 
 and docitem =
   mode * itemkind * string * string list (* dec/reg, kind, name, src *)

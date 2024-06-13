@@ -17,15 +17,12 @@ let itemkind_str_pl (ik : itemkind) : string =
   | `Module -> "Modules"
   | `Theory -> "Theories"
 
-let c_title (fn: string) (kind : EcLoader.kind) : [> Html_types.title] elt =
-  title (txt (thkind_str kind ^ " " ^ fn))
-
 let c_metadata (metadata : string list) = ()
 
-let c_head (metadata : string list option) (fn : string) (kind : EcLoader.kind) : [> Html_types.head] elt =
-  head (c_title fn kind) []
+let c_head ?(metadata : string list option) (tstr : string) : [> Html_types.head] elt =
+  head (title (txt tstr)) []
 
-let c_section_intro (fn : string) (kind : EcLoader.kind) (gdoc : string list) =
+let c_section_intro (gdoc : string list) =
   match gdoc with
   | [] -> []
   | _ ->  [
@@ -57,7 +54,7 @@ let c_section_main_itemkind (lents_ik : EcScope.docentity list) =
     ul (List.map (fun lent_ik -> c_section_main_itemkind_li lent_ik) lents_ik)
   ]
 
-let c_section_main (lents : EcScope.docentity list) =
+let c_section_main (dp : string) (lents : EcScope.docentity list) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   List.concat 
     (List.map (fun ik -> 
@@ -76,18 +73,27 @@ let c_section_main (lents : EcScope.docentity list) =
               ]) 
     iks)
 
-let c_body (fn : string) (kind : EcLoader.kind) (scope : EcScope.scope) : [> Html_types.body] elt =
-  let page_heading = h1 [txt (thkind_str kind ^ " " ^ fn)] in
-  let intro = c_section_intro fn kind (get_gdocstrings scope) in
-  let main = c_section_main (get_ldocentities scope) in
-  body (page_heading :: intro @ main)
+let c_body ?(supth : string option) (dn : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.body] elt =
+  let page_heading = h1 [txt tstr] ::  
+    match supth with
+    | None -> []
+    | Some sup -> [h5 [txt ("Subtheory of " ^ sup)]] (* TODO: Link to supertheory file *)
+  in
+  let intro = c_section_intro gdoc in
+  let main = c_section_main dn ldocents in
+  body (page_heading @ intro @ main)
 
-let c_page (metadata : string list option) (fn : string) (kind : EcLoader.kind) (scope : EcScope.scope) : [> Html_types.html] elt =
-    html (c_head metadata fn kind) (c_body fn kind scope)
+let c_page ?(metadata : string list option) ?(supth : string option) (dp : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.html] elt =
+    html (c_head ?metadata tstr) (c_body ?supth dp tstr gdoc ldocents)
 
-let emit_page (fnne : string) (kind : EcLoader.kind) = ()
+let emit_page ?(metadata : string list option) ?(supth : string option) (dp : string) (fn : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) =
+  let wp = Filename.concat dp fn ^ ".html" in      
+  let file = open_out wp in
+  let fmt = Format.formatter_of_out_channel file in
+    pp () fmt (c_page ?metadata ?supth dp tstr gdoc ldocents);
+    close_out file
+
 (* input = input name, scope contains all documentation items *)
-
 let generate_html (fname : string option) (scope : EcScope.scope) : unit =
   match fname with
   | Some fn ->
@@ -95,15 +101,10 @@ let generate_html (fname : string option) (scope : EcScope.scope) : unit =
         try  EcLoader.getkind (Filename.extension fn)
         with EcLoader.BadExtension _ -> assert false 
       in
-
+      let dp, fn = Filename.dirname fn, Filename.basename fn in
       let fnne = Filename.remove_extension fn in
-      let hn = fnne ^ ".html" in
-      
-      let file = open_out hn in
-      let fmt = Format.formatter_of_out_channel file in
-        pp () fmt (c_page None fnne kind scope);
-        close_out file;
-
+      let tstr = thkind_str kind  ^ " " ^ fnne in
+      emit_page dp fnne tstr (get_gdocstrings scope) (get_ldocentities scope)
   | None -> ()
 
 (* let generate_html (fname : string option) (scope : EcScope.scope) : unit =

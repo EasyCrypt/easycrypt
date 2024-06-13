@@ -341,6 +341,7 @@ type scope = {
 
 and docstate = {
   docentities  : docentity list;
+  subdocentbl  : docentity list;
   docstringbl  : string list;
   srcstringbl  : string list;
   currentname  : string option;
@@ -351,7 +352,7 @@ and docstate = {
 
 and docentity =
   | ItemDoc   of string list * docitem
-  | SubDoc    of docentity list
+  | SubDoc    of (string list * docitem) * docentity list
 
 and docitem =
   mode * itemkind * string * string list (* dec/reg, kind, name, src *)
@@ -372,7 +373,8 @@ let get_ldocentities (sc : scope) : docentity list =
 
 module DocState = struct
   let empty : docstate =
-    { docentities = []; 
+    { docentities = [];
+      subdocentbl = []; 
       docstringbl = []; 
       srcstringbl = [];
       currentname = None;
@@ -424,17 +426,20 @@ module DocState = struct
         state
     in
     reinitialize_process state
+  
 
   let add_sub (state : docstate) (substate : docstate) : docstate =
     let state =
       if state.currentproc
       then
-        add_entity state (SubDoc (substate.docentities))
+        add_entity state (SubDoc ((state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)), 
+                                 (substate.docentities)))
       else
         state
     in
     reinitialize_process state
-end
+
+  end
 
 (* -------------------------------------------------------------------- *)
 let empty (gstate : EcGState.gstate) =
@@ -2201,7 +2206,7 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcSection.add_th ~import:EcTheory.import0 x cth scope.sc_env;
-        sc_locdoc = DocState.add_item scope.sc_locdoc}
+        (* sc_locdoc = DocState.add_item scope.sc_locdoc *) }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
