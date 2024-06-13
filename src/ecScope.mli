@@ -59,10 +59,11 @@ type docentity =
   | SubDoc    of docentity list
 
 and docitem =
-  itemkind * string list (* raw definition *)
+  mode * itemkind * string * string list (* dec/reg, kind, name, src *)
 
-and itemkind = [`Type | `Operator | `Axiom | `ModuleType | `Module | `Theory]
+and itemkind = [`Type | `Operator | `Axiom | `Lemma | `ModuleType | `Module | `Theory]
 
+and mode = [`Abstract | `Specific]
 
 (* -------------------------------------------------------------------- *)
 val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a

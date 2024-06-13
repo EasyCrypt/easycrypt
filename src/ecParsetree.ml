@@ -374,6 +374,12 @@ let rec pf_ident ?(raw = false) f =
   | PFtuple [f] when not raw -> pf_ident ~raw f
   | _ -> None
 
+  let rec pcmhd_ident (pcmhd : pmodule_header) : psymbol =
+    match pcmhd with
+    | Pmh_ident nm -> nm
+    | Pmh_params x -> pcmhd_ident (fst (unloc x))
+    | Pmh_cast (pmh, _) -> pcmhd_ident pmh
+    
 (* -------------------------------------------------------------------- *)
 type ptyvardecls =
   (psymbol * pqsymbol list) list
