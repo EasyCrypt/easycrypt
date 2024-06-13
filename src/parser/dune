@@ -1,0 +1,12 @@
+(menhir
+ (modules
+    ecParserPrelude
+    ecParserTokens
+    ecParserIdents
+    ecParserExpressions
+    ecParserFormulas
+    ecParserTactics
+    ecParserCloning
+    ecParser)
+ (merge_into ecParser)
+ (flags --table --explain))

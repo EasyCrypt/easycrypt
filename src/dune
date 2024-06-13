@@ -24,7 +24,3 @@
  (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith ecLib))
 
 (ocamllex ecLexer)
-
-(menhir
- (modules ecParser)
- (flags --table --explain))
