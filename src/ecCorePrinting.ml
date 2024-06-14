@@ -112,6 +112,8 @@ module type PrinterAPI = sig
   val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
 
+  val pp_goal1 : PPEnv.t -> (EcBaseLogic.hyps * form) pp
+
   (* ------------------------------------------------------------------ *)
   val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
 

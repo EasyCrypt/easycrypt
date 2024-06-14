@@ -36,6 +36,7 @@ val initialize  :
 
 val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
+val notify      : EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
 val process_internal :
@@ -60,6 +61,7 @@ val doc_comment : [`Global | `Item] * string -> unit
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
+val pp_all_goals : unit -> string list
 
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit

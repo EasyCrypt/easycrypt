@@ -407,15 +407,36 @@ let main () =
   (* Initialize I/O + interaction module *)
   let module State = struct
     type t = {
-      prvopts     : prv_options;
-      input       : string option;
-      terminal    : T.terminal lazy_t;
-      interactive : bool;
-      eco         : bool;
-      gccompact   : int option;
-      docgen      : bool;
-      outdirp     : string option;
+      (*---*) prvopts     : prv_options;
+      (*---*) input       : string option;
+      (*---*) terminal    : T.terminal lazy_t;
+      (*---*) interactive : bool;
+      (*---*) eco         : bool;
+      (*---*) gccompact   : int option;
+      (*---*) docgen      : bool;
+      (*---*) outdirp     : string option;
+      mutable trace       : trace1 list option;
     }
+
+    and trace1 =
+      { position : int
+      ; goals    : string list option
+      ; messages : (EcGState.loglevel * string) list }
+
+    module Trace = struct
+      let trace0 : trace1 =
+        { position = 0; goals = None; messages = []; }
+
+      let push1_message (trace1 : trace1) (msg, lvl) : trace1 =
+        { trace1 with messages = (msg, lvl) :: trace1.messages }
+
+      let push_message (trace : trace1 list) msg =
+        match trace with
+        | [] ->
+          [push1_message trace0 msg] 
+        | trace1 :: trace ->
+          push1_message trace1 msg :: trace
+    end
   end in
 
   let state : State.t =
@@ -471,7 +492,8 @@ let main () =
         ; eco         = false
         ; gccompact   = None
         ; docgen      = false
-        ; outdirp     = None }
+        ; outdirp     = None
+        ; trace       = None }
 
     end
 
@@ -493,6 +515,11 @@ let main () =
           lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
 
+        let trace0 =
+          if cmpopts.cmpo_trace then
+            Some [State.{ position = 0; goals = None; messages = [] }]
+          else None in
+
         { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
         ; input       = Some name
         ; terminal    = terminal
@@ -500,7 +527,8 @@ let main () =
         ; eco         = cmpopts.cmpo_noeco
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
-        ; outdirp     = None }
+        ; outdirp     = None
+        ; trace       = trace0 }
 
       end
 
@@ -543,7 +571,8 @@ let main () =
         ; eco         = true
         ; gccompact   = None
         ; docgen      = true
-        ; outdirp     = docopts.doco_outdirp }
+        ; outdirp     = docopts.doco_outdirp
+        ; trace       = None }
       end
 
   in
@@ -571,7 +600,20 @@ let main () =
 
         assert (nameo <> input);
 
-        let eco = EcEco.{
+        let eco =
+          let mktrace (trace : State.trace1 list) : EcEco.ecotrace =
+            let mktrace1 (trace1 : State.trace1) : int * EcEco.ecotrace1 =
+              let goals = Option.value ~default:[] trace1.goals in
+              let messages =
+                let for1 (lvl, msg) =
+                  Format.sprintf "%s: %s"
+                    (EcGState.string_of_loglevel lvl)
+                    msg in
+                String.concat "\n" (List.rev_map for1 trace1.messages) in
+              (trace1.position, EcEco.{ goals; messages; })
+            in List.rev_map mktrace1 trace in 
+
+          EcEco.{
             eco_root    = EcEco.{
               eco_digest  = Digest.file input;
               eco_kind    = kind;
@@ -584,6 +626,7 @@ let main () =
                      eco_kind   = x.rqd_kind;
                    } in (x.rqd_name, (ecr, x.rqd_direct)))
                 (EcScope.Theory.required scope));
+            eco_trace = Option.map mktrace state.trace;
         } in
 
         let out = open_out nameo in
@@ -665,7 +708,10 @@ let main () =
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
             let notifier (lvl : EcGState.loglevel) (lazy msg) =
-              T.notice ~immediate:true lvl msg terminal
+              state.trace <- state.trace |> Option.map (fun trace ->
+                State.Trace.push_message trace (lvl, msg)
+              );
+              T.notice ~immediate:true lvl msg terminal;
             in
 
             EcCommands.addnotifier notifier;
@@ -694,8 +740,25 @@ let main () =
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
+
+                     state.trace <- state.trace |> Option.map (fun trace ->
+                      { State.Trace.trace0 with position = loc.loc_echar } :: trace
+                     );
+
                      try
                        let tdelta = EcCommands.process ~src ~timed ~break p.EP.gl_action in
+
+                       state.trace <- state.trace |> Option.map (fun trace ->
+                        match trace with
+                        | [] -> assert false
+                        | trace1 :: trace ->
+                          assert (Option.is_none trace1.State.goals);
+                          let goals = EcCommands.pp_all_goals () in
+                          let goals = if List.is_empty goals then None else Some goals in
+                          let trace1 = { trace1 with goals } in
+                          trace1 :: trace
+                       );
+
                        if p.EP.gl_fail then begin
                          ignore_fail := true;
                          raise (EcScope.HiScopeError (None, "this command is expected to fail"))
@@ -713,10 +776,10 @@ let main () =
                          raise (EcScope.toperror_of_exn ~gloc:loc e)
                        end;
                        if T.interactive terminal then begin
-                         let error =
-                           Format.asprintf
-                             "The following error has been ignored:@.@.@%a"
-                             EcPException.exn_printer e in
+                        let error =
+                          Format.asprintf
+                            "The following error has been ignored:@.@.@%a"
+                            EcPException.exn_printer e in
                          T.notice ~immediate:true `Info error terminal
                        end
                    end)
