@@ -3315,6 +3315,10 @@ let pp_goal (ppe : PPEnv.t) (prpo : prpo_display) fmt (g, extra) =
         gs
 
 (* -------------------------------------------------------------------- *)
+let pp_goal1 (ppe : PPEnv.t) (fmt : Format.formatter) (g : EcBaseLogic.hyps * form) =
+  PPGoal.pp_goal1 ppe fmt g
+
+(* -------------------------------------------------------------------- *)
 let pp_ovdecl ppe fmt ov =
   Format.fprintf fmt "%s : %a" (odfl "_" ov.ov_name) (pp_type ppe) ov.ov_type
 
