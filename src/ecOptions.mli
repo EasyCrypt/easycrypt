@@ -21,6 +21,7 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
+  cmpo_trace   : bool;
 }
 
 and cli_option = {

@@ -913,6 +913,11 @@ let addnotifier (notifier : notifier) =
   ignore (EcGState.add_notifier notifier gstate)
 
 (* -------------------------------------------------------------------- *)
+let notify (level : EcGState.loglevel) fmt =
+  assert (EcUtils.is_some !context);
+  EcScope.notify (oget !context).ct_root level fmt
+
+(* -------------------------------------------------------------------- *)
 let current () =
   (oget !context).ct_current
 
@@ -1017,7 +1022,36 @@ let pp_current_goal ?(all = false) stream =
       end
   end
 
+(* -------------------------------------------------------------------- *)
 let pp_maybe_current_goal stream =
   match (Pragma.get ()).pm_verbose with
   | true  -> pp_current_goal ~all:(Pragma.get ()).pm_g_prall stream
   | false -> ()
+
+(* -------------------------------------------------------------------- *)
+let pp_all_goals () =
+  let scope = current () in
+
+  match S.xgoal scope with
+  | Some { S.puc_active = Some ({ puc_jdg = S.PSCheck pf }, _) } -> begin
+    match EcCoreGoal.opened pf with
+    | None ->
+      []
+
+    | Some _ ->
+      let get_hc { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } =
+        (EcEnv.LDecl.tohyps g_hyps, g_concl)
+      in
+
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      let goals = List.map get_hc (EcCoreGoal.all_opened pf) in
+
+      List.map (fun goal ->
+        let buffer = Buffer.create 0 in
+        Format.fprintf
+          (Format.formatter_of_buffer buffer)
+          "%a@?" (EcPrinting.pp_goal1 ppe) goal;
+        Buffer.contents buffer) goals
+  end
+
+  | _ -> []
