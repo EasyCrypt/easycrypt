@@ -2,6 +2,11 @@ open Tyxml.Html
 
 open EcScope
 
+let c_filename ?(ext : string option) (nms : string list) =
+  match ext with
+  | None -> String.concat ">" nms 
+  | Some ext -> String.concat ">" nms ^ ext
+  
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
   | `Ec -> "Theory"
@@ -29,7 +34,7 @@ let c_section_intro (gdoc : string list) =
             ]
           ]
   
-let c_section_main_itemkind_li (lent_ik : EcScope.docentity) =
+let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) =
   match lent_ik with
   | SubDoc ((doc, (_, ik, nm, _)), _) -> 
     begin
@@ -39,9 +44,14 @@ let c_section_main_itemkind_li (lent_ik : EcScope.docentity) =
             if doc = [] then "", []
             else if List.length doc = 1 then List.hd doc, []
             else List.hd doc, List.tl doc
-          in 
+          in
+          let hn =
+            match supthf with
+            | None -> c_filename ?ext:(Some ".html") [th; nm]
+            | Some supf -> c_filename ?ext:(Some ".html") [supf; th; nm]
+          in
           li ([
-            div [txt nm]; 
+            div [a ~a:[a_href (Xml.uri_of_string hn)] [txt nm]]; 
             div [p [txt hdoc]]
           ] @ (if tdoc <> []
                then [details (summary [])
@@ -67,26 +77,26 @@ let c_section_main_itemkind_li (lent_ik : EcScope.docentity) =
                        @ [div [txt "Source:"; pre [code [txt psrc]]]])
             ]
 
-let c_section_main_itemkind (lents_ik : EcScope.docentity list) =
+let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) =
   [
-    ul (List.map (fun lent_ik -> c_section_main_itemkind_li lent_ik) lents_ik)
+    ul (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik) lents_ik)
   ]
 
-let c_section_main (lents : EcScope.docentity list) =
+let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   List.concat 
     (List.map (fun ik -> 
       let lents_ik = List.filter (fun ent -> 
         match ent with
-        | ItemDoc (_, (_, ikp, _, _)) -> ikp = ik
-        | SubDoc ((_, (_, ikp, _, _)), _) -> ikp = ik) lents
+        | ItemDoc (_, (md, ikp, _, _)) -> md = `Specific && ikp = ik
+        | SubDoc ((_, (md, ikp, _, _)), _) -> ikp = ik) lents
       in
       match lents_ik with
       | [] -> []
       | _ ->  [
                 section ~a:[a_title (itemkind_str_pl ik)] [
                   h2 [txt (itemkind_str_pl ik)];
-                  div (c_section_main_itemkind lents_ik)
+                  div (c_section_main_itemkind ?supthf th lents_ik)
                 ]
               ]
       ) 
@@ -96,10 +106,19 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
   let page_heading = h1 [txt tstr] ::  
     match supths with
     | None -> []
-    | Some sup -> [h5 [txt ("Subtheory of " ^ sup)]] (* TODO: Link to supertheory file *)
+    | Some sup ->
+          match supthf with
+          | None -> assert false
+          | Some supf ->  
+              [
+                h5 [
+                  txt ("Subtheory of ");
+                  a ~a:[a_href (Xml.uri_of_string (supf ^ ".html"))] [txt sup]
+                ]
+              ]
   in
   let intro = c_section_intro gdoc in
-  let main = c_section_main ldocents in
+  let main = c_section_main ?supthf th ldocents in
   body (page_heading @ intro @ main)
 
 let c_page ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.html] elt =
@@ -126,9 +145,9 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
              let stsupf = 
                 match supthf with
                 | None -> th
-                | Some supf -> supf ^ "@" ^ th
+                | Some supf -> c_filename [supf; th]
              in
-             let stf = stsupf ^ "@" ^ sth in
+             let stf = c_filename [stsupf; sth] in
               (stf, c_page ?supths:(Some th) ?supthf:(Some stsupf) sth ststr sgdoc sldocents)
               :: c_subpages ?supths:(Some th) ?supthf:(Some stsupf) sth sldocents 
               @ c_subpages ?supths ?supthf th docents'
