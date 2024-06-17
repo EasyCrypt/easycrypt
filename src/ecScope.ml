@@ -812,6 +812,8 @@ module Tactics = struct
 
   let process_r ?(src : string option) ?reloc mark mode (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
+    
+    (* if src = None then assert false; *)
 
     let scope =
       match (oget scope.sc_pr_uc).puc_active with

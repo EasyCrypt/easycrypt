@@ -1,0 +1,168 @@
+/* General Styling */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+h1, h2 {
+  color: #444;
+}
+
+p, pre {
+  margin: 0.5em 0;
+}
+
+a {
+  text-decoration: none;
+  color: #0066cc;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Sidebar Styling */
+.sidebar {
+  width: 200px;
+  background-color: #2c3e50;
+  color: #ecf0f1;
+  position: fixed;
+  height: 100%;
+  overflow: auto;
+}
+
+.sidebar-title {
+  padding: 20px;
+  color: #ecf0f1;
+  background-color: #34495e;
+  margin-bottom: 20px;
+}
+
+.sidebar-title h2 {
+  font-size: 1.5em;
+  margin-bottom: 5px;
+  color: #ecf0f1;
+}
+
+.sidebar-title .sidebar-title-theory {
+  font-size: 1.2em;
+  color: #3498db;
+}
+
+.sidebar-elems {
+  padding: 20px;
+}
+
+.sidebar-section-list {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar-section-list li {
+  margin: 15px 0;
+}
+
+.sidebar-section-list li a {
+  color: #ecf0f1;
+  font-weight: bold;
+}
+
+/* Main Content Styling */
+main {
+  margin-left: 220px;
+  padding: 20px;
+  max-width: 960px;
+}
+
+.page-heading-container {
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 5px;
+  margin-bottom: 20px;
+}
+
+.page-heading-container .page-heading {
+  margin-block-end: 5px;
+}
+
+.page-heading-container .page-subheading {
+  margin-block-start: 0px;
+  margin-block-end: 5px;
+  font-size: 1.2em;
+}
+
+/* Section Styling */
+.item-section {
+  margin-bottom: 40px;
+}
+
+.section-heading {
+  color: #34495e;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+/* Item List Styling */
+.item-list {
+  list-style: none;
+  padding: 0;
+}
+
+.item-entry {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.item-name-desc-container {
+  display: flex;
+  align-items: flex-start;
+}
+
+.item-name {
+  width: 200px;
+  font-weight: bold;
+  color: #2980b9;
+}
+
+.item-basic-desc {
+  flex: 1;
+  margin-left: 10px;
+}
+
+.item-details {
+  margin-left: 210px;
+  margin-top: 10px;
+}
+
+.item-details summary {
+  cursor: pointer;
+  color: #3498db;
+  font-weight: bold;
+}
+
+.item-details summary:hover {
+  text-decoration: underline;
+}
+
+.item-details-par {
+  margin-top: 10px;
+}
+
+/* Code Block Styling */
+pre.source {
+  background-color: #ecf0f1;
+  border: 1px solid #bdc3c7;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* Introduction Section Styling */
+.intro-section {
+  margin-bottom: 40px;
+}
