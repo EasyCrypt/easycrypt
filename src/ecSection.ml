@@ -459,7 +459,6 @@ let on_instance cb ty tci =
     cb (`Typeclass p)
 
 (* -------------------------------------------------------------------- *)
-
 type sc_name =
   | Th of symbol * is_local * thmode
   | Sc of symbol option
@@ -477,6 +476,7 @@ type scenv = {
 
 and sc_item =
   | SC_th_item  of EcTheory.theory_item
+  | SC_th       of EcEnv.Theory.compiled_theory
   | SC_decl_mod of EcIdent.t * mty_mr
 
 and sc_items =
@@ -523,13 +523,12 @@ type to_clear =
     lc_axioms    : Sp.t;
     lc_baserw    : Sp.t; }
 
-type to_gen = {
-    tg_env    : EcEnv.env;
+type to_gen =
+  { tg_env     : scenv;
     tg_params  : (EcIdent.t * Sp.t) list;
-    tg_binds  : bind list;
-    tg_subst : EcSubst.subst;
-    tg_clear : to_clear;
-  }
+    tg_binds   : bind list;
+    tg_subst   : EcSubst.subst;
+    tg_clear   : to_clear; }
 
 and bind =
   | Binding of binding
@@ -993,89 +992,6 @@ let generalize_auto to_gen (n,s,ps,lc) =
     if ps = [] then to_gen, None
     else to_gen, Some (Th_auto (n,s,ps,lc))
 
-let rec generalize_th_item to_gen prefix th_item =
-  let togen, item =
-    match th_item.ti_item with
-    | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
-    | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
-    | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
-    | Th_modtype ms      -> generalize_modtype to_gen ms
-    | Th_module me       -> generalize_module  to_gen me
-    | Th_theory cth      -> generalize_ctheory to_gen prefix cth
-    | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
-    | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
-    | Th_typeclass _     -> assert false
-    | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
-    | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
-    | Th_reduction rl    -> generalize_reduction to_gen rl
-    | Th_auto hints      -> generalize_auto to_gen hints
-
-  in
-
-  let item =
-    Option.map
-      (fun item -> { ti_import = th_item.ti_import; ti_item = item; })
-      item
-
-  in togen, item
-
-and generalize_ctheory to_gen prefix (name, cth) =
-  let path = pqname prefix name in
-  if cth.cth_mode = `Abstract && cth.cth_loca = `Local then
-    add_clear to_gen (`Th path), None
-  else
-    let to_gen, cth_items =
-      generalize_ctheory_struct to_gen path cth.cth_items in
-    if cth_items = [] then
-      add_clear to_gen (`Th path), None
-    else
-      let cth_source =
-        match cth.cth_source with
-        | Some s when to_clear to_gen (`Th s.ths_base) -> None
-        | x -> x in
-
-      let cth = { cth with cth_items; cth_loca = `Global; cth_source } in
-      to_gen, Some (Th_theory (name, cth))
-
-and generalize_ctheory_struct to_gen prefix cth_struct =
-  match cth_struct with
-  | [] -> to_gen, []
-  | item::items ->
-    let to_gen, item = generalize_th_item to_gen prefix item in
-    let to_gen, items =
-      generalize_ctheory_struct to_gen prefix items in
-    match item with
-    | None -> to_gen, items
-    | Some item -> to_gen, item :: items
-
-let generalize_lc_item to_gen prefix item =
-  match item with
-  | SC_decl_mod (id, modty) ->
-    let to_gen = add_declared_mod to_gen id modty in
-    to_gen, None
-  | SC_th_item th_item ->
-    generalize_th_item to_gen prefix th_item
-
-let rec generalize_lc_items to_gen prefix items =
-  match items with
-  | [] -> []
-  | item::items ->
-    let to_gen, item = generalize_lc_item to_gen prefix item in
-    let items = generalize_lc_items to_gen prefix items in
-    match item with
-    | None -> items
-    | Some item -> item :: items
-
-let generalize_lc_items scenv =
-  let to_gen = {
-      tg_env    = scenv.sc_env;
-      tg_params = [];
-      tg_binds  = [];
-      tg_subst  = EcSubst.empty;
-      tg_clear  = empty_locals;
-    } in
-  generalize_lc_items to_gen (EcEnv.root scenv.sc_env) (List.rev scenv.sc_items)
-
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
 
@@ -1364,9 +1280,6 @@ let check_instance scenv ty tci lc =
         on_instance (cb scenv from cd) ty tci
 
 (* -----------------------------------------------------------*)
-type checked_ctheory = ctheory
-
-(* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
   if not scenv.sc_insec && lc = `Local then
      hierror "can not start a local theory outside of a section";
@@ -1399,22 +1312,121 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
     | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
     | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
-    | Th_theory (s, cth) -> EcEnv.Theory.bind s cth env
     | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
     | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
     | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
+    | _                  -> assert false
   in
   { scenv with
     sc_env = env;
     sc_items = SC_th_item item :: scenv.sc_items}
 
-let add_th ~import (name : symbol) (cth : checked_ctheory) scenv =
-  let item = mkitem import (EcTheory.Th_theory (name, cth)) in
-  add_item_ item scenv
+let add_th ~import (cth : EcEnv.Theory.compiled_theory) scenv =
+  let env = EcEnv.Theory.bind ~import cth scenv.sc_env in
+  { scenv with sc_env = env; sc_items = SC_th cth :: scenv.sc_items; }
 
+(* -----------------------------------------------------------*)
+let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_item) =
+  let to_gen, item =
+    match th_item.ti_item with
+    | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
+    | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
+    | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
+    | Th_modtype ms      -> generalize_modtype to_gen ms
+    | Th_module me       -> generalize_module  to_gen me
+    | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
+    | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
+    | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
+    | Th_typeclass _     -> assert false
+    | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
+    | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
+    | Th_reduction rl    -> generalize_reduction to_gen rl
+    | Th_auto hints      -> generalize_auto to_gen hints
+
+  in
+
+  let scenv =
+    item |> Option.fold ~none:to_gen.tg_env ~some:(fun item ->
+      let item = { ti_import = th_item.ti_import; ti_item = item; } in
+      add_item_ item to_gen.tg_env
+    )
+  in
+
+  { to_gen with tg_env = scenv }
+
+and generalize_ctheory
+  (genenv      : to_gen)
+  (prefix      : path)
+  ((name, cth) : symbol * ctheory)
+: to_gen
+=
+  let path = pqname prefix name in
+
+  if cth.cth_mode = `Abstract && cth.cth_loca = `Local then
+    add_clear genenv (`Th path)
+  else
+    let compiled =
+      let genenv =
+        let scenv =
+          enter_theory
+            name `Global cth.cth_mode
+            genenv.tg_env
+        in
+        { genenv with tg_env = scenv }
+      in
+
+      let genenv =
+        List.fold_left (fun genenv item ->
+          generalize_th_item genenv path item
+        ) genenv cth.cth_items in
+
+      let _, compiled, _ = exit_theory genenv.tg_env in
+
+      compiled
+    in        
+
+    match compiled with
+    | None ->
+      genenv
+    | Some compiled when List.is_empty compiled.ctheory.cth_items ->
+      genenv
+    | Some compiled ->
+      let scenv = add_th ~import:import0 compiled genenv.tg_env in
+      { genenv with tg_env = scenv; }
+
+and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
+  match item with
+  | SC_decl_mod (id, modty) ->
+    add_declared_mod genenv id modty
+  | SC_th_item th_item ->
+    generalize_th_item genenv prefix th_item
+  | SC_th cth ->
+    generalize_ctheory genenv prefix (cth.name, cth.ctheory)
+
+and generalize_lc_items (genenv : to_gen) (prefix : path) (items : sc_item list) =
+  List.fold_left
+    (fun genenv item ->
+      generalize_lc_item genenv prefix item)
+    genenv items
+
+let genenv_of_scenv (scenv : scenv) : to_gen =
+  { tg_env    = Option.get (scenv.sc_top)
+  ; tg_params = []
+  ; tg_binds  = []
+  ; tg_subst  = EcSubst.empty
+  ; tg_clear  = empty_locals } 
+
+let generalize_lc_items scenv  =
+  let togen =
+    generalize_lc_items
+      (genenv_of_scenv scenv)
+      (EcEnv.root scenv.sc_env)
+      (List.rev scenv.sc_items)
+  in togen.tg_env
+  
 (* -----------------------------------------------------------*)
 let import p scenv =
   { scenv with sc_env = EcEnv.Theory.import p scenv.sc_env }
@@ -1423,10 +1435,10 @@ let import_vars m scenv =
   { scenv with
     sc_env = EcEnv.Mod.import_vars scenv.sc_env m }
 
-let require x cth scenv =
+let require (cth : EcEnv.Theory.compiled_theory) (scenv : scenv) =
   (* FIXME section *)
   if scenv.sc_insec then hierror "cannot use `require' in sections";
-  { scenv with sc_env = EcEnv.Theory.require x cth scenv.sc_env }
+  { scenv with sc_env = EcEnv.Theory.require cth scenv.sc_env }
 
 let astop scenv =
   if scenv.sc_insec then hierror "can not require inside a section";
@@ -1504,14 +1516,14 @@ let enter_section (name : symbol option) (scenv : scenv) =
     sc_abstr = false;
     sc_items = []; }
 
-let exit_section (name : symbol option) (scenv:scenv) =
+let exit_section (name : symbol option) (scenv : scenv) =
   match scenv.sc_name with
-  | Top  -> hierror "no section to close"
-  | Th _ -> hierror "cannot close a section containing pending theories"
+  | Top  ->
+    hierror "no section to close"
+  | Th _ ->
+    hierror "cannot close a section containing pending theories"
   | Sc sname ->
     let get = odfl "<empty>" in
     if sname <> name then
       hierror "expecting [%s], not [%s]" (get sname) (get name);
-    let items = generalize_lc_items scenv in
-    let scenv = oget scenv.sc_top in
-    add_items items scenv
+    generalize_lc_items scenv

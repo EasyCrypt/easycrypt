@@ -325,7 +325,7 @@ type prelude = {
   pr_required : required;
 }
 
-type thloaded = EcSection.checked_ctheory
+type thloaded = EcEnv.Theory.compiled_theory
 
 type scope = {
   sc_name     : (symbol * EcTheory.thmode);
@@ -1980,10 +1980,10 @@ module Theory = struct
   exception TopScope
 
   (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) (x, cth) =
+  let bind (scope : scope) (cth : thloaded) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_env = EcSection.add_th ~import:EcTheory.import0 x cth scope.sc_env }
+        sc_env = EcSection.add_th ~import:EcTheory.import0 cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
@@ -2017,7 +2017,7 @@ module Theory = struct
       match Msym.find_opt id.rqd_name scope.sc_loaded with
       | Some (rth, ids) ->
           let scope = List.fold_right require_loaded ids scope in
-          let env   = EcSection.require id.rqd_name rth scope.sc_env in
+          let env   = EcSection.require rth scope.sc_env in
             { scope with
                 sc_env      = env;
                 sc_required = id :: scope.sc_required; }
@@ -2067,7 +2067,7 @@ module Theory = struct
     let cth = exit_r ~pempty (add_clears clears scope) in
     let ((cth, required), (name, _), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
-    let scope = ofold (fun cth scope -> bind scope (name, cth)) scope cth in
+    let scope = ofold (fun cth scope -> bind scope cth) scope cth in
     (name, scope)
 
   (* ------------------------------------------------------------------ *)

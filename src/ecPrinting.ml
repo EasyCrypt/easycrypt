@@ -48,6 +48,10 @@ module PPEnv = struct
       ppe_fb     = Sp.empty;
       ppe_width  = max 20 width; }
 
+  let enter_theory (ppe : t) (p : EcPath.path) =
+    let ppe_env = EcEnv.Theory.env_of_theory p ppe.ppe_env in
+    { ppe with ppe_env }
+
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
     | None   -> ppe
@@ -2028,6 +2032,7 @@ let pp_sform ppe fmt f =
 
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
+  let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
   let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
 
@@ -2282,6 +2287,8 @@ let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
+  let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
+
   let pp_name fmt x =
     if long then
       let qs = PPEnv.op_symb ppe x None in
@@ -2313,7 +2320,6 @@ let pp_added_op (ppe : PPEnv.t) fmt op =
 (* -------------------------------------------------------------------- *)
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
   pp_opname fmt (PPEnv.op_symb ppe p None)
-
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function
@@ -3221,6 +3227,7 @@ let pp_top_modexp ppe fmt (p, me) =
   pp_modexp_lc ppe fmt (mp, (me.tme_expr, Some me.tme_loca))
 
 let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
+  let ppe = PPEnv.enter_theory ppe path in
   let basename = EcPath.basename path in
   let pp_clone fmt thsrc =
     thsrc |> oiter (fun EcTheory.{ ths_base } ->
