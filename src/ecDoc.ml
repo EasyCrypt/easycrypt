@@ -4,8 +4,8 @@ open EcScope
 
 let c_filename ?(ext : string option) (nms : string list) =
   match ext with
-  | None -> String.concat ">" nms 
-  | Some ext -> String.concat ">" nms ^ ext
+  | None -> String.concat "!" nms 
+  | Some ext -> String.concat "!" nms ^ ext
   
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
@@ -29,14 +29,15 @@ let c_section_intro (gdoc : string list) =
   match gdoc with
   | [] -> []
   | _ ->  [
-            section ~a:[a_title "Introduction"] [
+            let ids = "Introduction" in
+            section ~a:[a_id ids; a_title ids] [
               div (List.map (fun s -> p [txt s]) gdoc)
             ]
           ]
   
 let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) =
   match lent_ik with
-  | SubDoc ((doc, (_, ik, nm, _)), _) -> 
+  | SubDoc ((doc, (_, ik, subth, _)), _) -> 
     begin
       match ik with
       | `Theory -> 
@@ -46,12 +47,12 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
             else List.hd doc, List.tl doc
           in
           let hn =
-            match supthf with
-            | None -> c_filename ?ext:(Some ".html") [th; nm]
-            | Some supf -> c_filename ?ext:(Some ".html") [supf; th; nm]
+           match supthf with
+           | None -> c_filename ?ext:(Some ".html") [th; subth]
+           | Some supf -> c_filename ?ext:(Some ".html") [supf; th; subth]
           in
-          li ([
-            div [a ~a:[a_href (Xml.uri_of_string hn)] [txt nm]]; 
+          li ~a:[a_id (itemkind_str_pl ik ^ subth)] ([
+            div [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
             div [p [txt hdoc]]
           ] @ (if tdoc <> []
                then [details (summary [])
@@ -94,8 +95,9 @@ let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.doce
       match lents_ik with
       | [] -> []
       | _ ->  [
-                section ~a:[a_title (itemkind_str_pl ik)] [
-                  h2 [txt (itemkind_str_pl ik)];
+                let iks = itemkind_str_pl ik in
+                section ~a:[a_id iks; a_title iks] [
+                  h2 [txt iks];
                   div (c_section_main_itemkind ?supthf th lents_ik)
                 ]
               ]
@@ -113,7 +115,7 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
               [
                 h5 [
                   txt ("Subtheory of ");
-                  a ~a:[a_href (Xml.uri_of_string (supf ^ ".html"))] [txt sup]
+                  a ~a:[a_href (Xml.uri_of_string (supf ^ ".html" ^ "#" ^ itemkind_str_pl `Theory ^ th))] [txt sup]
                 ]
               ]
   in
