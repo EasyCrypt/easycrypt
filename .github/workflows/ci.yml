@@ -29,9 +29,8 @@ jobs:
       image: ghcr.io/easycrypt/ec-build-box
     steps:
     - uses: actions/checkout@v4
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
@@ -72,9 +71,8 @@ jobs:
         target: [unit, stdlib, examples]
     steps:
     - uses: actions/checkout@v4
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
@@ -132,9 +130,8 @@ jobs:
           -b ${{ matrix.target.branch }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
