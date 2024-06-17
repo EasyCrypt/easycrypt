@@ -21,17 +21,6 @@
 
   ,
 
-  { "name"       : "ml-kem"
-  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem"
-  , "branch"     : "master"
-  , "subdir"     : "."
-  , "config"     : "config/tests.config"
-  , "scenario"   : "mlkem"
-  , "options"    : "-pragmas Proofs:weak"
-  }
-
-  ,
-
   { "name"       : "cryptobox"
   , "repository" : "https://gitlab.com/fdupress/ec-cryptobox"
   , "branch"     : "next"
