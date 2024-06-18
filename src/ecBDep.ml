@@ -345,8 +345,8 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
   in 
   
   let bvterm_of_reg (r: C.reg) : _ =
-    (* DEBUG PRINT 
-    Format.eprintf "Reg has %d nodes@." (List.length r); *)
+    (* DEBUG PRINT *)
+    Format.eprintf "Reg has %d nodes@." (List.length r);
     List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
   in 
   let bvinpt1 = (bvterm_of_reg r1) in
@@ -355,10 +355,11 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
   in 
  
   (* FIXME: Mega hardcoding for shift test *)
-  let inputs = Map.String.keys !bvvars |> List.of_enum |> List.drop 256 |> Array.of_list in 
+  let () = Format.eprintf "bvvars has %d entries@." (List.length @@ List.of_enum @@ Map.String.keys !bvvars) in
+  let inputs = Map.String.keys !bvvars |> List.of_enum |> Array.of_list in 
   let inputs = Array.rev inputs in 
-  (* DEBUG PRINT:
-  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in *)
+  (* DEBUG PRINT: *)
+  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in 
   (*let lsB, msB = Array.take 8 inputs, Array.drop 8 inputs in*)
   let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs)  
   in
