@@ -15,6 +15,7 @@ module Env : sig
   val get_reverse_opt : env -> int -> string option
   val input_of_var : env -> Aig.var -> input
   val var_of_input : env -> input -> Aig.var
+  val empty: env
 
 end = struct
   type env = {
@@ -25,6 +26,11 @@ end = struct
   let fresh = 
     let counter = ref 0 in
     fun () -> incr counter; !counter 
+
+  let empty = {
+      forward = Map.empty;
+      reverse = Map.empty;
+    }
 
   let id (env: env) (s: string) =
     match Map.find_opt s env.forward with

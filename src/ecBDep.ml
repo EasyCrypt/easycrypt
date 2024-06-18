@@ -21,6 +21,10 @@ module C = struct
   include Lospecs.Circuit_spec
 end
 
+module HL = struct
+  include Lospecs.HLAig
+end
+
 (* -------------------------------------------------------------------- *)
 module IdentMap = Lospecs.Ast.IdentMap
 module Ident = Lospecs.Ast.Ident
@@ -32,14 +36,14 @@ type deps = ((int * int) * int C.VarRange.t) list
 module CircEnv : sig
   type env
 
-  val empty : env
-  val lookup : env -> symbol -> ident option
-  val lookup_id : env -> int -> ident option
-  val push : env -> symbol -> env * ident
-  val bind : env -> ident -> C.reg -> env
-  val get : env -> ident -> C.reg option
-  val bind_s : env -> symbol -> C.reg -> env
-  val get_s : env -> symbol -> C.reg option
+  val empty     : env
+  val lookup    : env -> symbol -> ident option
+  val lookup_id : env -> int    -> ident option
+  val push      : env -> symbol -> env * ident
+  val bind      : env -> ident  -> C.reg -> env
+  val get       : env -> ident  -> C.reg option
+  val bind_s    : env -> symbol -> C.reg -> env
+  val get_s     : env -> symbol -> C.reg option
 end = struct
   type env = { vars : (symbol, ident) Map.t;
                bindings : C.reg IdentMap.t;
@@ -305,7 +309,11 @@ let inputs_of_reg (r : C.reg) : C.var Set.t =
   List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
 
 (* ------------------------------------------------------------------------------- *)
-let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (bound : int) : bool =
+(* this needs cleanup and refactoring 
+  Make the translation to SMT more conscious of semantics
+  and of definitions on the upper level (variable and such)
+*)
+let circ_equiv_bitwuzla (hlenv: HL.env) (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (bound : int) : bool =
   let module B = Bitwuzla.Once () in
   let open B in
   let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
@@ -331,7 +339,7 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
     and doit_r (n : C.node_r) = 
       match n with
       | False -> Term.Bv.zero (Sort.bv 1) 
-      | Input v -> let name = ("v" ^ (String.of_int (fst v)) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+      | Input v -> let name = ("BV_" ^ (HL.Env.get_reverse hlenv (fst v)) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
       begin 
         match Map.String.find_opt name !bvvars with
         | None ->
@@ -383,7 +391,7 @@ let circ_equiv_bitwuzla (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (
 
 
 (* ------------------------------------------------------------------------------- *)
-let circ_equiv (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool = 
+let circ_equiv (hlenv: HL.env) (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool = 
   let (r1, r2) = if List.compare_lengths r1 r2 < 0 then
     (zpad (List.length r2) r1, r2) else
     (r1, zpad (List.length r1) r2)
@@ -398,7 +406,9 @@ let circ_equiv (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool =
     let inp2 = (inputs_of_reg r2 |> Set.to_list) in
     let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in
     if bitwuzla >= 0 then 
-      circ_equiv_bitwuzla inps r1 r2 bitwuzla
+      let () = Format.eprintf "inp1: @."; List.iter (fun (a,b) -> Format.eprintf "%s.(%d)@." (HL.Env.get_reverse hlenv a) b) inp1 in
+      let () = Format.eprintf "inp2: "; List.iter (fun (a,b) -> Format.eprintf "%s.(%d)@." (HL.Env.get_reverse hlenv a) b) inp2 in
+      circ_equiv_bitwuzla hlenv inps r1 r2 bitwuzla
     else C.equivs inps r1 r2
 
 let bruteforce (r : C.reg) (vars : C.var list) : unit = 
@@ -477,7 +487,7 @@ let decode_op (p : path) : symbol =
 
 
 
-let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
+let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C.reg =
   let trans_wtype (ty : ty) : width =
     match (EcEnv.Ty.hnorm ty env).ty_node with
     | Tconstr (p, []) -> begin
@@ -577,17 +587,17 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
 
   match f.f_node with
   (* hardcoding size for now FIXME *)
-  | Fint z -> C.of_bigint ~size:256 (EcAst.BI.to_zt z) 
+  | Fint z -> hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z)
   | Fif (c_f, t_f, f_f) -> 
-      let c_c = circuit_of_form env c_f in
-      let t_c = circuit_of_form env t_f in
-      let f_c = circuit_of_form env f_f in
+      let hlenv, c_c = circuit_of_form hlenv env c_f in
+      let hlenv, t_c = circuit_of_form hlenv env t_f in
+      let hlenv, f_c = circuit_of_form hlenv env f_f in
       let () = assert (List.length c_c = 1) in
       let c_c = List.hd c_c in
-      C.mux2_reg f_c t_c c_c
+      hlenv, C.mux2_reg f_c t_c c_c
   (* hardcoding size for now FIXME *)
   | Flocal idn -> 
-      C.reg ~size:(trans_wtype f.f_ty) ~name:idn.id_tag 
+      HL.reg hlenv ~size:(trans_wtype f.f_ty) ~name:idn.id_symb 
       (* TODO: Check name after *)
   | Fop (pth, _) -> 
     let (pth, pth2) = EcPath.toqsymbol pth in
@@ -597,68 +607,24 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
 
   | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
-    let fs_c = List.map (circuit_of_form env) fs in
+    let hlenv, fs_c = List.fold_left_map (fun hlenv -> circuit_of_form hlenv env) hlenv fs in
     begin match f.f_node with
       | Fop (pth, _) ->
-          trans_jops (EcPath.toqsymbol pth) fs_c
+          hlenv, trans_jops (EcPath.toqsymbol pth) fs_c
       | _ -> failwith "Cant apply to non op"
     end 
   | Fquant (_, binds, f) -> 
       (* maybe add bindings to some env here? *)
-      circuit_of_form env f (* FIXME *) 
+      circuit_of_form hlenv env f (* FIXME *) 
   | Fproj (f, i) ->
       begin match f.f_node with
       | Ftuple tp ->
-        circuit_of_form env (tp |> List.drop (i-1) |> List.hd)
-      | _ -> circuit_of_form env f 
+        circuit_of_form hlenv env (tp |> List.drop (i-1) |> List.hd)
+      | _ -> circuit_of_form hlenv env f 
       (* FIXME^: for testing, to allow easycrypt to ignore flags on Jasmin operators *) 
       end
   | _ -> failwith "Not yet implemented"
     
-(* V might not be necessary V *)
-and int_of_form (env: env) (f: EcAst.form) : int =
-  let trans_jops (pth: qsymbol) : int list -> int =
-    match pth with
-    | (["Top"; "JWord"; "W16"], "of_int") -> 
-        (fun rs -> assert (List.length rs = 1); 
-        (List.hd rs) land ((1 lsl 16) - 1))
-    | (["Top"; "JWord"; "W8"], "of_int") -> 
-        (fun rs -> assert (List.length rs = 1); 
-        (List.hd rs) land ((1 lsl 8) - 1))
-    | (["Top"; "JWord"; "W16"], "*") -> 
-        (fun rs -> assert (List.length rs = 2); 
-        let a = List.hd rs in
-        let b = rs |> List.tl |> List.hd in
-        (a * b) land ((1 lsl 16) - 1))
-    | (["Top"; "JWord"; "W16"], "+") -> 
-        (fun rs -> assert (List.length rs = 2); 
-        let a = List.hd rs in
-        let b = rs |> List.tl |> List.hd in
-        (a + b) land ((1 lsl 16) - 1))
-    | (["Top"; "JWord"; "W16"], "`<<`") ->
-        (fun rs -> assert (List.length rs = 2); 
-        let a = List.hd rs in
-        let b = rs |> List.tl |> List.hd in
-        (a lsl (b mod 16)) land ((1 lsl 16) - 1))
-        
-    | _ -> List.iter (Format.eprintf "%s ") (fst pth);
-        Format.eprintf "%s@." (snd pth);
-        failwith "Operator not implemented yet?"
-  in
-
-  match f.f_node with
-  | Fint z -> EcAst.BI.to_int z
-  | Fapp _ -> 
-    let (f, fs) = EcCoreFol.destr_app f in
-    let fs_c = List.map (int_of_form env) fs in
-    begin match f.f_node with
-      | Fop (pth, _) ->
-          trans_jops (EcPath.toqsymbol pth) fs_c
-      | _ -> failwith "Cant apply to non op"
-    end 
-
-  | _ -> failwith "Form cannot be converted to int"
-
 (* -------------------------------------------------------------------- *)
 let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) (b_bound: int) : unit =
   let proc = EcTyping.trans_gamepath env p in
@@ -668,27 +634,14 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
-  let fc = circuit_of_form env f in
+  let hlenv, fc = circuit_of_form HL.Env.empty env f in
+  (* let () = Format.eprintf "%a" (HL.pp_node hlenv) (List.hd fc) in *)
   (* DEBUG PRINTS FOR OP CIRCUIT *)
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
   print_deps_alt ~name:"test_out" fc;
  
-  (* Working with:
-    abbrev q = 3329.
-    abbrev qh = 1665.
-    abbrev d = 4.
-    abbrev mask = 15.
-    abbrev two_eight = 80635.
-    abbrev one32 = W32.of_int 1.
-    abbrev one16 = W16.of_int 1.
-
-    op compress_alt (c: W16.t) : W32.t =
-(((((W32.of_int (W16.to_uint c)) `<<` (W8.of_int d)) + (W32.of_int qh))
-  * (W32.of_int two_eight)) `>>` (W8.of_int 28))
-`&` (W32.of_int 15).
-  *)
-
+  (* refactor this maybe? *)
   let trans_int (p : path) : width =
     match EcPath.toqsymbol p with
     | (["Top"; "JWord"; "W256"], "of_int") -> 256
@@ -778,11 +731,12 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   if not (List.is_unique (List.fst body)) then
     raise BDepError; 
 
-  let cenv = List.fold_left 
-    (fun env (s,w) -> 
+  let (cenv, hlenv) = List.fold_left 
+    (fun (env, hlenv) (s,w) -> 
       let (env, idn) = CircEnv.push env s in
-      CircEnv.bind env idn (C.reg ~size:w ~name:(Ident.id idn)))
-    CircEnv.empty arguments in
+      let (hlenv, r) = (HL.reg hlenv ~size:w ~name:(Ident.name idn)) in 
+      CircEnv.bind env idn r, hlenv)
+    (CircEnv.empty, hlenv) arguments in
   let (cenv, circs) = circuit_from_bprgm cenv body in
 
 (* PRINT PROC PROGRAM BODY *)
@@ -793,7 +747,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   begin 
     let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
     if (n = m) &&  (n = 0) then
-      let () = assert (circ_equiv fc circ ~bitwuzla:b_bound) in
+      let () = assert (circ_equiv hlenv fc circ ~bitwuzla:b_bound) in
       Format.eprintf "Success@."
     else
       let () = assert (List.length circ <> 0) in
@@ -804,11 +758,11 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
         | v -> (List.take n l)::(part (List.drop n l) n) in
       let circs = part circ m in
       (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
-      let () = 
-      List.iteri (fun i c ->
-        Format.eprintf "@.%d: " i;
-        print_deps ~name:"TEST_" cenv c) circs
-      in 
+      (* let () = *) 
+      (* List.iteri (fun i c -> *)
+        (* Format.eprintf "@.%d: " i; *)
+        (* print_deps ~name:"TEST_" cenv c) circs *)
+      (* in *) 
       (* TODO: refactor this? V*)
         let () = assert (List.for_all (fun c ->
         let d = C.deps c in
@@ -819,8 +773,8 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
           (C.VarRange.contents deps)
         ) d) 
       circs) in
-      let () = assert (List.for_all (circ_equiv (List.hd circs) ~bitwuzla:(-1)) (List.tl circs)) in 
-      let () = assert (circ_equiv fc (List.hd circs) ~bitwuzla:b_bound) in
+      let () = assert (List.for_all (circ_equiv hlenv (List.hd circs) ~bitwuzla:(-1)) (List.tl circs)) in 
+      let () = assert (circ_equiv hlenv fc (List.hd circs) ~bitwuzla:b_bound) in
       Format.eprintf "Success@."
   end 
 
