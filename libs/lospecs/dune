@@ -14,7 +14,7 @@
   (language cxx)
   (flags :standard -std=c++17 -mavx -mavx2)
   (names avx2_runtime))
- (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime))
+ (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime bitwuzla))
 
 (executable
  (name lospecs_test)

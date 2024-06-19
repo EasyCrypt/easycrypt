@@ -107,13 +107,6 @@ end
 
 
 (* -------------------------------------------------------------------- *)
-let zpad (n: int) (r: C.reg)  = 
-  if List.length r < n then
-    List.append r (List.init (n - (List.length r)) (fun _ -> C.false_))
-  else r
-
-
-(* -------------------------------------------------------------------- *)
 type width = int
 
 type bprgm =
@@ -214,55 +207,56 @@ let circuit_from_bprgm (env: cp_env) (prg : bprgm) =
   List.fold_left_map circuit_of_bstmt env prg
 
 (* -------------------------------------------------------------------- *)
-let print_deps ~name (env : cp_env) (r : C.reg)  =
-  let deps = C.deps r in
+(* let print_deps ~name (env : cp_env) (r : C.reg)  = *)
+  (* let deps = C.deps r in *)
 
-  List.iter (fun ((lo, hi), deps) ->
-    let vs =
-         Enum.(--) lo hi
-      |> Enum.fold (fun vs i ->
-           let name = Format.sprintf "%s_%03d" name (i / 256) in
-           C.VarRange.push vs (name, i mod 256)
-         ) C.VarRange.empty in
+  (* List.iter (fun ((lo, hi), deps) -> *)
+    (* let vs = *)
+         (* Enum.(--) lo hi *)
+      (* |> Enum.fold (fun vs i -> *)
+           (* let name = Format.sprintf "%s_%03d" name (i / 256) in *)
+           (* C.VarRange.push vs (name, i mod 256) *)
+         (* ) C.VarRange.empty in *)
 
-    Format.eprintf "%a: %a@."
-      (C.VarRange.pp Format.pp_print_string) vs
-      (C.VarRange.pp
-         (fun fmt i ->
-            let name = Ident.name (Option.get (CircEnv.lookup_id env i)) in
-            Format.fprintf fmt "%s" name))
-      deps
-  ) deps
+    (* Format.eprintf "%a: %a@." *)
+      (* (C.VarRange.pp Format.pp_print_string) vs *)
+      (* (C.VarRange.pp *)
+         (* (fun fmt i -> *)
+            (* let name = Ident.name (Option.get (CircEnv.lookup_id env i)) in *)
+            (* Format.fprintf fmt "%s" name)) *)
+      (* deps *)
+  (* ) deps *)
 
 
 (* FIXME: TEMPORARY DEV FUNCTION, TO BE DELETED *)
-let print_deps_alt ~name (r : C.reg)  =
-  let deps = C.deps r in
+(* let print_deps_alt ~name (r : C.reg)  = *)
+  (* let deps = C.deps r in *)
 
-  List.iter (fun ((lo, hi), deps) ->
-    let vs =
-         Enum.(--) lo hi
-      |> Enum.fold (fun vs i ->
-           let name = Format.sprintf "%s_%03d" name (i / 256) in
-           C.VarRange.push vs (name, i mod 256)
-         ) C.VarRange.empty in
+  (* List.iter (fun ((lo, hi), deps) -> *)
+    (* let vs = *)
+         (* Enum.(--) lo hi *)
+      (* |> Enum.fold (fun vs i -> *)
+           (* let name = Format.sprintf "%s_%03d" name (i / 256) in *)
+           (* C.VarRange.push vs (name, i mod 256) *)
+         (* ) C.VarRange.empty in *)
 
-    Format.eprintf "%a: %a@."
-      (C.VarRange.pp Format.pp_print_string) vs
-      (C.VarRange.pp
-         (fun fmt i ->
-            Format.fprintf fmt "%d" i))
-      deps
-  ) deps
+    (* Format.eprintf "%a: %a@." *)
+      (* (C.VarRange.pp Format.pp_print_string) vs *)
+      (* (C.VarRange.pp *)
+         (* (fun fmt i -> *)
+            (* Format.fprintf fmt "%d" i)) *)
+      (* deps *)
+  (* ) deps *)
 
 
-
-(* -------------------------------------------------------------------- *)
-let print_deps_ric (env : cp_env) (r : string) =
-  let circ = Option.get (CircEnv.get_s env r) in
-  print_deps env circ ~name:r
 
 (* -------------------------------------------------------------------- *)
+(* let print_deps_ric (env : cp_env) (r : string) = *)
+  (* let circ = Option.get (CircEnv.get_s env r) in *)
+  (* print_deps env circ ~name:r *)
+
+(* -------------------------------------------------------------------- *)
+(* ?? *)
 let circ_dep_split (r : C.reg) : C.reg list =
   let deps = C.deps r in
 
@@ -270,183 +264,11 @@ let circ_dep_split (r : C.reg) : C.reg list =
     swap (List.split_nth (hi - lo + 1) acc)
   ) r deps |> snd
 
-let compare_deps (d1: deps) (d2: deps) : bool =
-  List.for_all2 (fun ((lo1, hi1), deps1) ((lo2, hi2), deps2) ->
-    (hi1 - lo1 = hi2 - lo2) && 
-    (List.for_all2 (fun (_, l1) (_, l2) -> 
-      List.for_all2 
-        (fun (a1, b1) (a2, b2) -> b1 - a1 = b2 - a2) 
-        l1 
-        l2) 
-      (C.VarRange.contents deps1)
-      (C.VarRange.contents deps1)))
-    d1
-    d2
-
-(* ------------------------------------------------------------------------------- *)
-let rec inputs_of_node : _ -> C.var Set.t =
-  let cache : (int, C.var Set.t) Hashtbl.t = Hashtbl.create 0 in
-  
-  let rec doit (n : C.node) : C.var Set.t =
-    match Hashtbl.find_option cache (Int.abs n.id) with
-    | None ->
-      let mn = doit_r n.gate in
-      Hashtbl.add cache (Int.abs n.id) mn;
-      mn
-    | Some mn -> 
-      mn
-
-  and doit_r (n : C.node_r) = 
-    match n with
-    | False -> Set.empty
-    | Input v -> Set.singleton v
-    | And (n1, n2) -> Set.union (doit n1) (doit n2)
-
-  in fun n -> doit n
-
-(* ------------------------------------------------------------------------------- *)
-let inputs_of_reg (r : C.reg) : C.var Set.t =
-  List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
-
 (* ------------------------------------------------------------------------------- *)
 (* this needs cleanup and refactoring 
   Make the translation to SMT more conscious of semantics
   and of definitions on the upper level (variable and such)
 *)
-let circ_equiv_bitwuzla (hlenv: HL.env) (inps: (C.var * C.var) list) (r1 : C.reg) (r2 : C.reg) (bound : int) : bool =
-  let module B = Bitwuzla.Once () in
-  let open B in
-  let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
-  let inps = Map.of_seq (List.to_seq inps) in
-  let env_ (v : C.var) = Option.map C.input (Map.find_opt v inps) in
-  let r1 = C.maps env_ r1 in
-
-  let rec bvterm_of_node : C.node -> _ =
-    let cache = Hashtbl.create 0 in
-  
-    let rec doit (n : C.node) =
-      let mn = 
-        match Hashtbl.find_option cache (Int.abs n.id) with
-        | None ->
-          let mn = doit_r n.gate in
-          Hashtbl.add cache (Int.abs n.id) mn;
-          mn
-        | Some mn -> 
-          mn
-      in 
-        if 0 < n.id then mn else Term.Bv.lognot mn
-
-    and doit_r (n : C.node_r) = 
-      match n with
-      | False -> Term.Bv.zero (Sort.bv 1) 
-      | Input v -> let name = ("BV_" ^ (HL.Env.get_reverse hlenv (fst v)) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
-      begin 
-        match Map.String.find_opt name !bvvars with
-        | None ->
-          bvvars := Map.String.add name (Term.const (Sort.bv 1) name) !bvvars;
-          Map.String.find name !bvvars 
-        | Some t -> t
-      end
-      | And (n1, n2) -> Term.Bv.logand (doit n1) (doit n2)
-
-    in fun n -> doit n
-  in 
-  
-  let bvterm_of_reg (r: C.reg) : _ =
-    (* DEBUG PRINT *)
-    Format.eprintf "Reg has %d nodes@." (List.length r);
-    List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
-  in 
-  let bvinpt1 = (bvterm_of_reg r1) in
-  let bvinpt2 = (bvterm_of_reg r2) in
-  let formula = Term.equal bvinpt1 bvinpt2 
-  in 
- 
-  (* FIXME: Mega hardcoding for shift test *)
-  let () = Format.eprintf "bvvars has %d entries@." (List.length @@ List.of_enum @@ Map.String.keys !bvvars) in
-  let inputs = Map.String.keys !bvvars |> List.of_enum |> Array.of_list in 
-  let inputs = Array.rev inputs in 
-  (* DEBUG PRINT: *)
-  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in 
-  (*let lsB, msB = Array.take 8 inputs, Array.drop 8 inputs in*)
-  let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs)  
-  in
-
-  begin
-          if bound > 0 then
-             let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv (Array.length inputs)) bound) 
-             in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
-          else 
-             assert' @@ Term.Bv.lognot formula;
-    let result = check_sat () in
-    if result = Unsat then
-    true else
-      begin
-        Format.eprintf "fc: %a@."     Term.pp (get_value bvinpt1 :> B.bv B.term);
-        Format.eprintf "block: %a@."  Term.pp (get_value bvinpt2 :> B.bv B.term);
-        Format.eprintf "inp: %a@."    Term.pp (get_value inp_bv :> B.bv B.term);
-        false
-      end
-  end
-
-
-(* ------------------------------------------------------------------------------- *)
-let circ_equiv (hlenv: HL.env) (r1 : C.reg) (r2 : C.reg) ~(bitwuzla: int) : bool = 
-  let (r1, r2) = if List.compare_lengths r1 r2 < 0 then
-    (zpad (List.length r2) r1, r2) else
-    (r1, zpad (List.length r1) r2)
-  in
-
-  let d1 = C.deps r1 in 
-  let d2 = C.deps r2 in
-  if not (compare_deps d1 d2) then false
-
-  else  
-    let inp1 = (inputs_of_reg r1 |> Set.to_list) in
-    let inp2 = (inputs_of_reg r2 |> Set.to_list) in
-    let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in
-    if bitwuzla >= 0 then 
-      let () = Format.eprintf "inp1: @."; List.iter (fun (a,b) -> Format.eprintf "%s.(%d)@." (HL.Env.get_reverse hlenv a) b) inp1 in
-      let () = Format.eprintf "inp2: "; List.iter (fun (a,b) -> Format.eprintf "%s.(%d)@." (HL.Env.get_reverse hlenv a) b) inp2 in
-      circ_equiv_bitwuzla hlenv inps r1 r2 bitwuzla
-    else C.equivs inps r1 r2
-
-let bruteforce (r : C.reg) (vars : C.var list) : unit = 
-  let rec doit (acc : bool list) (n : int) : unit =
-    match n with
-    | 0 -> let eval = ((List.combine vars acc) |> List.to_seq |> Map.of_seq) in
-           let eval = C.eval (fun x -> Map.find x eval) in 
-           List.map eval r |> C.uint_of_bools |> Format.eprintf "@.@.ERROR: -> %d: %d@." (C.uint_of_bools acc) 
-    | n -> doit (false::acc) (n-1); doit (true::acc) (n-1)
-
-  in doit [] (List.length vars)
-
-let bools_of_int (n : int) ~(size: int) : bool list =
-  List.init size (fun i -> ((n lsr i) land 1) <> 0) 
-
-let bruteforce_equiv (r1 : C.reg) (r2 : C.reg) (range: int) : bool = 
-  
-  let (r1, r2) = if List.compare_lengths r1 r2 < 0 then
-    (zpad (List.length r2) r1, r2) else
-    (r1, zpad (List.length r1) r2)
-  in
-
-  let eval (r : C.reg) (n: int) : int =
-    let inp = inputs_of_reg r |> Set.to_list in
-    let vals = bools_of_int n ~size:(List.length inp) in
-    let env = List.combine inp vals |> List.to_seq |> Map.of_seq in
-    (*let eval = C.eval (fun x -> Map.find x env) in
-    List.map eval r *)
-    let res = C.evals (fun x -> Map.find x env) r |> C.uint_of_bools in
-    res
-  in
-  Enum.(--^) 0 range 
-    |> Enum.map (fun i -> 
-        let res1 = (eval r1 i) in
-        let res2 = (eval r2 i) in
-        if res1 = res2 then true 
-        else (Format.eprintf "i: %d | r1: %d | r2: %d@." i res1 res2; false)) |> Enum.fold (&&) true
-
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -515,25 +337,25 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
     | (["Top"; "JWord"; "W8"], "to_uint")  -> 
         fun rs -> begin
           match rs with
-          | [r] -> zpad 256 r
+          | [r] -> HL.zpad 256 r
           | _   -> raise BDepError (* check error type here *)
         end
     | (["Top"; "JWord"; "W32"], "of_int") -> 
         fun rs -> begin
           match rs with
-          | [r] -> r |> List.take 32 |> zpad 32
+          | [r] -> r |> List.take 32 |> HL.zpad 32
           | _   -> raise BDepError
         end
     | (["Top"; "JWord"; "W16"], "of_int") -> 
         fun rs -> begin
           match rs with
-          | [r] -> r |> List.take 16 |> zpad 16
+          | [r] -> r |> List.take 16 |> HL.zpad 16
           | _   -> raise BDepError
         end
     | (["Top"; "JWord"; "W8"], "of_int") -> 
         fun rs -> begin
           match rs with
-          | [r] -> r |> List.take 8 |> zpad 8
+          | [r] -> r |> List.take 8 |> HL.zpad 8
           | _   -> raise BDepError
         end
     | (["Top"; "JWord"; "W32"], "*") 
@@ -635,11 +457,12 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let hlenv, fc = circuit_of_form HL.Env.empty env f in
+  let fc = List.take 4 fc in
   (* let () = Format.eprintf "%a" (HL.pp_node hlenv) (List.hd fc) in *)
   (* DEBUG PRINTS FOR OP CIRCUIT *)
   let () = Format.eprintf "len %d @." (List.length fc) in
-  let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  print_deps_alt ~name:"test_out" fc;
+  let () = HL.inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
+  let () = Format.eprintf "%a@." HL.pp_deps (HL.deps hlenv fc |> Array.to_list) in
  
   (* refactor this maybe? *)
   let trans_int (p : path) : width =
@@ -747,7 +570,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   begin 
     let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
     if (n = m) &&  (n = 0) then
-      let () = assert (circ_equiv hlenv fc circ ~bitwuzla:b_bound) in
+      let () = assert (HL.circ_equiv hlenv fc circ) in
       Format.eprintf "Success@."
     else
       let () = assert (List.length circ <> 0) in
@@ -757,24 +580,14 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
         | [] -> []
         | v -> (List.take n l)::(part (List.drop n l) n) in
       let circs = part circ m in
-      (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
-      (* let () = *) 
-      (* List.iteri (fun i c -> *)
-        (* Format.eprintf "@.%d: " i; *)
-        (* print_deps ~name:"TEST_" cenv c) circs *)
-      (* in *) 
-      (* TODO: refactor this? V*)
-        let () = assert (List.for_all (fun c ->
-        let d = C.deps c in
-        List.for_all (fun (_, deps) -> 
-          List.for_all (fun (_, l) ->
-            List.for_all (fun (a,b) ->
-            b - a + 1 = n) l)
-          (C.VarRange.contents deps)
-        ) d) 
-      circs) in
-      let () = assert (List.for_all (circ_equiv hlenv (List.hd circs) ~bitwuzla:(-1)) (List.tl circs)) in 
-      let () = assert (circ_equiv hlenv fc (List.hd circs) ~bitwuzla:b_bound) in
+      begin
+        Format.eprintf "Proc circuit block sizes: ";
+        List.iter (fun a -> Format.eprintf "%d " @@ List.length a) circs;
+        Format.eprintf "@.Op circ size: %d@." (List.length fc)
+      end;
+      (* ADD CHECK THAT CIRCUIT HAS THE CORRECT DEPENDENCY NUMBERS *)
+      let () = assert (List.for_all (HL.circ_equiv hlenv (List.hd circs)) (List.tl circs)) in 
+      let () = assert (HL.circ_equiv_bitwuzla hlenv (List.hd circs) fc (("c", 0, 16), 3329)) in
       Format.eprintf "Success@."
   end 
 
