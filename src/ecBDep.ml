@@ -164,6 +164,15 @@ let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
+
+
+let trans_wtype (env: env) (ty : ty) : width =
+  match EcEnv.Circ.lookup_bitstring env ty with
+  | Some w -> w 
+  | None -> Format.eprintf "No size binding for type: %a@."
+    (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty;
+    assert false
+
 (* -------------------------------------------------------------------- *)
 let register_of_barg (env : cp_env) (arg : barg) : C.reg =
   match arg with
@@ -273,139 +282,103 @@ let circ_dep_split (r : C.reg) : C.reg list =
 exception BDepError
 
 (* -------------------------------------------------------------------- *)
-let decode_op (p : path) : symbol =
-  match EcPath.toqsymbol p with
-  | ["Top"; "JWord"; "W16u16"], ("VPSUB_16u16"       as op)
-  | ["Top"; "JWord"; "W16u16"], ("VPSRA_16u16"       as op)
-  | ["Top"; "JWord"; "W16u16"], ("VPADD_16u16"       as op)
-  | ["Top"; "JWord"; "W16u16"], ("VPBROADCAST_16u16" as op)
-  | ["Top"; "JWord"; "W16u16"], ("VPMULH_16u16"      as op)
-  | ["Top"; "JWord"; "W4u64" ], ("VPSLL_4u64"      as op)
-  | ["Top"; "JWord"; "W4u64" ], ("VPSRL_4u64"      as op)
-  | ["Top"; "JWord"; "W2u128"], ("truncateu128"    as op)
-
-     -> op
-
-  | ["Top"; "JModel_x86"], ("VPMULHRS_16u16" as op)
-  | ["Top"; "JModel_x86"], ("VPACKUS_16u16"  as op)
-  | ["Top"; "JModel_x86"], ("VPMADDUBSW_256" as op)
-  | ["Top"; "JModel_x86"], ("VPERMD"         as op)
-  | ["Top"; "JModel_x86"], ("VPSLLDQ_256"    as op)
-  | ["Top"; "JModel_x86"], ("VPSRLDQ_128"    as op)
-  | ["Top"; "JModel_x86"], ("concat_2u128"   as op)
-  | ["Top"; "JModel_x86"], ("VEXTRACTI128"  as op)
-
-     -> op
-
-  | ["Top"; "JWord"; "W256"], "andw" -> "AND_u256"
-  | ["Top"; "JWord"; "W256"], "+^"   -> "VPXOR_256"
-  | ["Top"; "JWord"; "W128"], "+^"   -> "VPXOR_128"
-  | ["Top"; "JWord"; "W8"], "[-]"    -> "OPP_8"
-  | ["Top"; "JWord"; "W8"], "+"      -> "ADD_8"
-
-  | _ ->
-     Format.eprintf "%s@." (EcPath.tostring p);
-     raise BDepError
-
+let decode_op (env: env) (p : path) : symbol =
+  match EcEnv.Circ.lookup_circuit_path env p with
+  | Some s -> s
+  | None -> Format.eprintf "No operator for path: %s@."
+    (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
+    assert false 
 
 
 let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C.reg =
-  let trans_wtype (ty : ty) : width =
-    match (EcEnv.Ty.hnorm ty env).ty_node with
-    | Tconstr (p, []) -> begin
-        match EcPath.toqsymbol p with
-        | (["Top"; "JWord"; "W256"], "t") -> 256
-        | (["Top"; "JWord"; "W128"], "t") -> 128
-        | (["Top"; "JWord"; "W64" ], "t") ->  64
-        | (["Top"; "JWord"; "W32" ], "t") ->  32
-        | (["Top"; "JWord"; "W16" ], "t") ->  16
-        | (["Top"; "JWord"; "W8"  ], "t") ->   8
-        | (["Top"; "Pervasive"], "int") -> 256
-(*      DEBUG PRINT V
-        | (qs, q) -> List.iter (Format.eprintf "%s ") qs; Format.eprintf "@. %s@." q; raise BDepError*)
-        | _ -> raise BDepError
-      end
 
-    | _ ->
-       raise BDepError in
-
-  let trans_jops (pth: qsymbol) : C.reg list -> C.reg =
-    (* TODO: Check if we need regs to be of correct size or not (semi-done) *)
-    match pth with
-    | (["Top"; "JWord"; "W32"], "to_uint") 
-    | (["Top"; "JWord"; "W16"], "to_uint") 
-    | (["Top"; "JWord"; "W8"], "to_uint")  -> 
-        fun rs -> begin
-          match rs with
-          | [r] -> HL.zpad 256 r
-          | _   -> raise BDepError (* check error type here *)
-        end
-    | (["Top"; "JWord"; "W32"], "of_int") -> 
-        fun rs -> begin
-          match rs with
-          | [r] -> r |> List.take 32 |> HL.zpad 32
-          | _   -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W16"], "of_int") -> 
-        fun rs -> begin
-          match rs with
-          | [r] -> r |> List.take 16 |> HL.zpad 16
-          | _   -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W8"], "of_int") -> 
-        fun rs -> begin
-          match rs with
-          | [r] -> r |> List.take 8 |> HL.zpad 8
-          | _   -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W32"], "*") 
-    | (["Top"; "JWord"; "W16"], "*") -> 
-        fun rs -> begin
-          match rs with
-          | [a; b] -> C.umull a b 
-          | _      -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W32"], "+") 
-    | (["Top"; "JWord"; "W16"], "+") -> 
-        fun rs -> begin 
-          match rs with
-          | [a; b] -> C.add a b |> snd
-          | _      -> raise BDepError
-        end
-(*    | (["Top"; "JWord"; "W32"], "[-]") -> This should be subtraction, need to change path FIXME
-        fun rs -> begin
-          match rs with
-          | [a; b] -> C.sub_dropc a b
-          | _      -> raise BDepError
-        end *)
-    | (["Top"; "JWord"; "W256"], "`<<`") 
-    | (["Top"; "JWord"; "W32"], "`<<`") 
-    | (["Top"; "JWord"; "W16"], "`<<`") -> 
-        fun rs -> begin
-          match rs with
-          | [a; b] -> C.shift ~side:`L ~sign:`L a b 
-          | _ -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *)
-    | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *)  
-        fun rs -> begin                     (* if we need to apply a mask                *) 
-          match rs with
-          | [a; b] -> C.shift ~side:`R ~sign:`L a b 
-          | _      -> raise BDepError
-        end
-    | (["Top"; "JWord"; "W32"], "`&`") 
-    | (["Top"; "JWord"; "W32"], "andw")  
-    | (["Top"; "JWord"; "W16"], "`&`") 
-    | (["Top"; "JWord"; "W16"], "andw") -> 
-        fun rs -> begin
-          match rs with
-          | [a; b] -> C.land_ a b 
-          | _      -> raise BDepError
-        end
-    | _ -> List.iter (Format.eprintf "%s ") (fst pth);
-        Format.eprintf "%s@.Not implemented yet@." (snd pth);
-        raise BDepError
+  let trans_jops (p: path) : C.reg list -> C.reg =
+    match EcEnv.Circ.lookup_circuit_path env p with
+    | Some op ->
+      C.func_from_spec op
+    | None -> Format.eprintf "No operator for path: %s@."
+      (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b)
+      ;
+    assert false 
   in
+      
+  (* let trans_jops (pth: qsymbol) : C.reg list -> C.reg = *)
+    (* TODO: Check if we need regs to be of correct size or not (semi-done) *)
+    (* match pth with *)
+    (* | (["Top"; "JWord"; "W32"], "to_uint") *) 
+    (* | (["Top"; "JWord"; "W16"], "to_uint") *) 
+    (* | (["Top"; "JWord"; "W8"], "to_uint")  -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [r] -> HL.zpad 256 r *)
+          (* | _   -> raise BDepError (* check error type here *) *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W32"], "of_int") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [r] -> r |> List.take 32 |> HL.zpad 32 *)
+          (* | _   -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W16"], "of_int") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [r] -> r |> List.take 16 |> HL.zpad 16 *)
+          (* | _   -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W8"], "of_int") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [r] -> r |> List.take 8 |> HL.zpad 8 *)
+          (* | _   -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W32"], "*") *) 
+    (* | (["Top"; "JWord"; "W16"], "*") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [a; b] -> C.umull a b *) 
+          (* | _      -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W32"], "+") *) 
+    (* | (["Top"; "JWord"; "W16"], "+") -> *) 
+        (* fun rs -> begin *) 
+          (* match rs with *)
+          (* | [a; b] -> C.add a b |> snd *)
+          (* | _      -> raise BDepError *)
+        (* end *)
+(* (*    | (["Top"; "JWord"; "W32"], "[-]") -> This should be subtraction, need to change path FIXME *)
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [a; b] -> C.sub_dropc a b *)
+          (* | _      -> raise BDepError *)
+        (* end *) *)
+    (* | (["Top"; "JWord"; "W256"], "`<<`") *) 
+    (* | (["Top"; "JWord"; "W32"], "`<<`") *) 
+    (* | (["Top"; "JWord"; "W16"], "`<<`") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [a; b] -> C.shift ~side:`L ~sign:`L a b *) 
+          (* | _ -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *) *)
+    (* | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *) *)  
+        (* fun rs -> begin                     (* if we need to apply a mask                *) *) 
+          (* match rs with *)
+          (* | [a; b] -> C.shift ~side:`R ~sign:`L a b *) 
+          (* | _      -> raise BDepError *)
+        (* end *)
+    (* | (["Top"; "JWord"; "W32"], "`&`") *) 
+    (* | (["Top"; "JWord"; "W32"], "andw") *)  
+    (* | (["Top"; "JWord"; "W16"], "`&`") *) 
+    (* | (["Top"; "JWord"; "W16"], "andw") -> *) 
+        (* fun rs -> begin *)
+          (* match rs with *)
+          (* | [a; b] -> C.land_ a b *) 
+          (* | _      -> raise BDepError *)
+        (* end *)
+    (* | _ -> List.iter (Format.eprintf "%s ") (fst pth); *)
+        (* Format.eprintf "%s@.Not implemented yet@." (snd pth); *)
+        (* raise BDepError *)
+  (* in *)
 
   match f.f_node with
   (* hardcoding size for now FIXME *)
@@ -419,7 +392,7 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
       hlenv, C.mux2_reg f_c t_c c_c
   (* hardcoding size for now FIXME *)
   | Flocal idn -> 
-      HL.reg hlenv ~size:(trans_wtype f.f_ty) ~name:idn.id_symb 
+      HL.reg hlenv ~size:(trans_wtype env f.f_ty) ~name:idn.id_symb 
       (* TODO: Check name after *)
   | Fop (pth, _) -> 
     let (pth, pth2) = EcPath.toqsymbol pth in
@@ -432,7 +405,7 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
     let hlenv, fs_c = List.fold_left_map (fun hlenv -> circuit_of_form hlenv env) hlenv fs in
     begin match f.f_node with
       | Fop (pth, _) ->
-          hlenv, trans_jops (EcPath.toqsymbol pth) fs_c
+          hlenv, trans_jops pth fs_c
       | _ -> failwith "Cant apply to non op"
     end 
   | Fquant (_, binds, f) -> 
@@ -448,7 +421,7 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
   | _ -> failwith "Not yet implemented"
     
 (* -------------------------------------------------------------------- *)
-let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) (b_bound: int) : unit =
+let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) (condition: psymbol) : unit =
   let proc = EcTyping.trans_gamepath env p in
   let proc = EcEnv.Fun.by_xpath proc env in
   let pdef = match proc.f_def with FBdef def -> def | _ -> assert false in
@@ -463,6 +436,15 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = HL.inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
   let () = Format.eprintf "%a@." HL.pp_deps (HL.deps hlenv fc |> Array.to_list) in
+
+  
+  let condition = EcEnv.Op.lookup ([], condition.pl_desc) env |> snd in
+  let condition = match condition.op_kind with
+  | OB_oper (Some (OP_Plain (condition, _))) -> condition
+  | _ -> failwith "Invalid operator type" in
+  let hlenv, condition = circuit_of_form hlenv env condition in
+  let () = Format.eprintf "Condition output size: %d@." (List.length condition) in
+  let condition = List.hd condition in 
  
   (* refactor this maybe? *)
   let trans_int (p : path) : width =
@@ -475,27 +457,10 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
     | (["Top"; "JWord"; "W8"  ], "of_int") ->   8
     | _ -> raise BDepError in
 
-  let trans_wtype (ty : ty) : width =
-    match (EcEnv.Ty.hnorm ty env).ty_node with
-    | Tconstr (p, []) -> begin
-        match EcPath.toqsymbol p with
-        | (["Top"; "JWord"; "W256"], "t") -> 256
-        | (["Top"; "JWord"; "W128"], "t") -> 128
-        | (["Top"; "JWord"; "W64" ], "t") ->  64
-        | (["Top"; "JWord"; "W32" ], "t") ->  32
-        | (["Top"; "JWord"; "W16" ], "t") ->  16
-        | (["Top"; "JWord"; "W8"  ], "t") ->   8
-        | (["Top"; "Pervasive"], "int") -> 256
-        | _ -> raise BDepError
-      end
-
-    | _ ->
-       raise BDepError in
-
   let trans_arg (e : expr) : barg =
     match e.e_node with
     | Evar (PVloc y) ->
-       Var (y, trans_wtype e.e_ty)
+       Var (y, trans_wtype env e.e_ty)
 
     | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
       Const (trans_int p, i)
@@ -510,7 +475,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let rec trans_ret (e : expr) : barg list =
     match e.e_node with
     | Evar (PVloc y) ->
-        [Var (y, trans_wtype e.e_ty)]
+        [Var (y, trans_wtype env e.e_ty)]
     | Etuple es ->
         List.fold_left (fun acc x -> List.append (trans_ret x) acc) [] es
     | _ -> failwith "Not valid return type"
@@ -523,27 +488,27 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
        let rhs =
          match e.e_node with
          | Evar (PVloc y) ->
-            Copy (y, trans_wtype e.e_ty)
+            Copy (y, trans_wtype env e.e_ty)
 
          | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
             Const (trans_int p, i)
 
          | Eapp ({ e_node = Eop (p, []) }, args) ->
-            Op (decode_op p, List.map trans_arg args)
+            Op (decode_op env p, List.map trans_arg args)
 
          | _ -> let () = Format.eprintf "Sasgn error" in
             raise BDepError
 
-       in ((x, trans_wtype xty), rhs)
+       in ((x, trans_wtype env xty), rhs)
 
     | _ -> let () = Format.eprintf "instr_error" in
                 raise BDepError in
 
   let trans_arg_ (x : ovariable) =
-   (oget ~exn:BDepError x.ov_name, trans_wtype x.ov_type) in
+   (oget ~exn:BDepError x.ov_name, trans_wtype env x.ov_type) in
 
   let trans_local (x : variable) =
-    (x.v_name, trans_wtype x.v_type) in
+    (x.v_name, trans_wtype env x.v_type) in
 
   let arguments = List.map trans_arg_ proc.f_sig.fs_anames in
   let ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in 
@@ -587,7 +552,9 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
       end;
       (* ADD CHECK THAT CIRCUIT HAS THE CORRECT DEPENDENCY NUMBERS *)
       let () = assert (List.for_all (HL.circ_equiv hlenv (List.hd circs)) (List.tl circs)) in 
-      let () = assert (HL.circ_equiv_bitwuzla hlenv (List.hd circs) fc (("c", 0, 16), 3329)) in
+      let () = List.iteri (fun i r -> Format.eprintf "Op[%d] deps: %a@." i HL.pp_dep (HL.dep hlenv r)) fc in
+      let () = Format.eprintf "Cond deps: %a@." HL.pp_dep (HL.dep hlenv condition)  in
+      let () = assert (HL.circ_equiv_bitwuzla hlenv (List.hd circs) fc condition) in
       Format.eprintf "Success@."
   end 
 

@@ -523,3 +523,14 @@ module LDecl : sig
 end
 
 val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
+
+
+module Circ : sig
+  val bind_bitstring : env -> path -> int -> env
+  val bind_circuit   : env -> path -> string -> env
+  val lookup_bitstring : env -> ty -> int option
+  val lookup_circuit : env -> qsymbol -> string option
+  val lookup_bitstring_path : env -> path -> int option
+  val lookup_circuit_path : env -> path -> string option
+
+end 

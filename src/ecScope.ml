@@ -2503,3 +2503,26 @@ module Search = struct
 
     notify scope `Info "%s" (Buffer.contents buffer)
 end
+
+module Circ : sig 
+  val add_bitstring : scope -> pty -> int -> scope
+  val add_circuit : scope -> pqsymbol -> string -> scope
+
+end = struct
+  let add_bitstring (sc: scope) (t: pty) (n: int) : scope = 
+    let env = (env sc) in
+    let ue = EcTyping.transtyvars env (t.pl_loc, None) in
+    let t = EcTyping.transty tp_tydecl env ue t in
+    match t.ty_node with
+    | Tconstr (p, []) -> 
+      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (p, n)) in
+      {sc with sc_env = EcSection.add_item item sc.sc_env }
+    | _ -> assert false
+  
+  let add_circuit (sc: scope) (o: pqsymbol) (c: string) : scope =
+    let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
+    {sc with sc_env = EcSection.add_item item sc.sc_env }
+    
+
+end                                                                                                                                     

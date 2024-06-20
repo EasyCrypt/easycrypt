@@ -168,6 +168,9 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "bdep"        , BDEP       ;        (* KW: global *)
+    "bind"        , BIND       ;        (* KW: global *)
+    "circuit"     , CIRCUIT    ;        (* KW: global *)
+    "bitstring"   , BITSTRING  ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)

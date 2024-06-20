@@ -1201,6 +1201,8 @@ let rec set_local_item item =
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
     | Th_auto     (i,s,p,lc) -> Th_auto      (i, s, p, set_local lc)
+    | Th_bitstring _  -> item.ti_item
+    | Th_circuit _ -> item.ti_item
 
   in { item with ti_item = lcitem }
 
@@ -1546,6 +1548,8 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
+    | Th_bitstring (t, n) -> EcEnv.Circ.bind_bitstring env t n
+    | Th_circuit (o, c) -> EcEnv.Circ.bind_circuit env o c
   in
   { scenv with
     sc_env = env;
@@ -1596,6 +1600,7 @@ let check_item scenv item =
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
   | Th_theory  _   -> assert false
+  | Th_bitstring _ | Th_circuit _ -> ()
 
 let rec add_item (item : theory_item) (scenv : scenv) =
   let item = if scenv.sc_loca = `Local then set_local_item item else item in

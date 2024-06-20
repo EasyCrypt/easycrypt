@@ -400,6 +400,8 @@
 %token BACKSLASH
 %token BDEP
 %token BETA
+%token BITSTRING
+%token BIND
 %token BY
 %token BYEQUIV
 %token BYPHOARE
@@ -408,6 +410,7 @@
 %token BYUPTO
 %token CALL
 %token CASE
+%token CIRCUIT
 %token CBV
 %token CEQ
 %token CFOLD
@@ -4035,8 +4038,14 @@ global_action:
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
-| BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET b=uint
-    { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, (BI.to_int b)) }
+| BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET pc=oident
+  { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, pc) }
+
+| BIND BITSTRING t=loc(simpl_type_exp) n=uint
+  { Gbbitstring (t, (BI.to_int n)) }
+  
+| BIND CIRCUIT o=qoident c=STRING
+  { Gbcircuit (o, c) }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }

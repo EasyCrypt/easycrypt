@@ -635,8 +635,14 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_bdep (scope : EcScope.scope) ((p, f, n, m, vs, b) : pgamepath * psymbol * int * int * (string list) * int) =
-  EcBDep.bdep (EcScope.env scope) p f n m vs b
+and process_bdep (scope : EcScope.scope) ((p, f, n, m, vs, pcond) : pgamepath * psymbol * int * int * (string list) * psymbol) =
+  EcBDep.bdep (EcScope.env scope) p f n m vs pcond
+
+and process_bind_bitstring (scope : EcScope.scope) (t: pty) (n: int) =
+  EcScope.Circ.add_bitstring scope t n
+ 
+and process_bind_circuit (scope : EcScope.scope) (o: pqsymbol) (c: string) =
+  EcScope.Circ.add_circuit scope o c
 
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
@@ -681,6 +687,8 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
       | Gbdep        (proc, f, n, m, vs, b) -> `State (fun scope -> process_bdep scope (proc, f, n, m, vs, b))
+      | Gbbitstring  (t, n) -> `Fct (fun scope -> process_bind_bitstring scope t n )
+      | Gbcircuit (o, c) -> `Fct (fun scope -> process_bind_circuit scope o c)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

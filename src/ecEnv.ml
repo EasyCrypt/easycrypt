@@ -175,6 +175,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 
+type circ_env = {
+  bitstrings: int Mp.t;
+  circuits: string Mp.t;
+}
+
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -194,6 +199,7 @@ type preenv = {
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
+  env_circ     : circ_env;
 }
 
 and escope = {
@@ -311,7 +317,8 @@ let empty gstate =
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
-    env_norm     = ref empty_norm_cache; }
+    env_norm     = ref empty_norm_cache; 
+    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; }}
 
 (* -------------------------------------------------------------------- *)
 let copy (env : env) =
@@ -3780,3 +3787,40 @@ end
 
 
 let pp_debug_form = ref (fun _env _fmt _f -> assert false)
+
+
+module Circ : sig
+  val bind_bitstring : env -> path -> int -> env
+  val bind_circuit   : env -> path -> string -> env
+  val lookup_bitstring : env -> ty -> int option
+  val lookup_circuit : env -> qsymbol -> string option
+  val lookup_bitstring_path : env -> path -> int option
+  val lookup_circuit_path : env -> path -> string option
+
+end = struct
+
+  let bind_bitstring (env: env) (ty: path) (n: int) : env = 
+    {env with env_circ =
+      {env.env_circ with bitstrings = Mp.add ty n env.env_circ.bitstrings}}
+
+    
+  let bind_circuit (env: env) (k: path) (v: string) : env = 
+    {env with env_circ = 
+      {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
+
+  let lookup_bitstring_path (env: env) (ty: path) : int option = 
+    Mp.find_opt ty env.env_circ.bitstrings
+  
+  let lookup_circuit_path (env: env) (v: path) : string option = 
+    Mp.find_opt v env.env_circ.circuits
+
+  let lookup_bitstring (env: env) (ty: ty) : int option =
+    match ty.ty_node with
+    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | _ -> assert false
+
+  let lookup_circuit (env: env) (o: qsymbol) : string option =
+    let p, _o = Op.lookup o env in
+    lookup_circuit_path env p
+  
+end

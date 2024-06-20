@@ -238,3 +238,9 @@ module Search : sig
   val search : scope -> pformula list -> unit
   val locate : scope -> pqsymbol -> unit
 end
+
+module Circ : sig 
+  val add_bitstring : scope -> pty -> int -> scope
+  val add_circuit : scope -> pqsymbol -> string -> scope
+
+end

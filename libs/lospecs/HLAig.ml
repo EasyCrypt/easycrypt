@@ -309,7 +309,7 @@ let single_var_equiv_precheck (env: env) (r1: reg) (r2: reg) : bool =
   (* FIXME: find some better way of doing this *)
 
 
-let circ_equiv_bitwuzla (env: env) (r1 : Aig.reg) (r2 : Aig.reg) ((bvar, bstart, bwidth), bound : (string * int * int) * int) : bool =
+let circ_equiv_bitwuzla (env: env) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
   let module B = Bitwuzla.Once () in
   let open B in
   let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
@@ -362,34 +362,35 @@ let circ_equiv_bitwuzla (env: env) (r1 : Aig.reg) (r2 : Aig.reg) ((bvar, bstart,
 
   let bvinpt1 = (bvterm_of_reg r1) in
   let bvinpt2 = (bvterm_of_reg r2) in
-  let formula = Term.equal bvinpt1 bvinpt2 
-  in 
+  let formula = Term.equal bvinpt1 bvinpt2 in
+  let pcond = (bvterm_of_node pcond) in
  
   (* FIXME: Mega hardcoding for shift test *)
-  let () = Format.eprintf "bvvars has %d entries@." (List.length @@ List.of_enum @@ Map.String.keys !bvvars) in
-  let inputs = Array.init bwidth (fun i ->
-    ("BV_" ^ (bvar) ^ "_" ^ (Printf.sprintf "%X" (i+bstart)))) in
-  let inputs = Array.rev inputs in 
+  (* let () = Format.eprintf "bvvars has %d entries@." (List.length @@ List.of_enum @@ Map.String.keys !bvvars) in *)
+  (* let inputs = Array.init bwidth (fun i -> *)
+    (* ("BV_" ^ (bvar) ^ "_" ^ (Printf.sprintf "%X" (i+bstart)))) in *)
+  (* let inputs = Array.rev inputs in *) 
   (* DEBUG PRINT: *)
-  let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in
-  let () = Format.eprintf "BVVARS: "; Enum.iter (Format.eprintf "%s@.") @@ Map.String.keys !bvvars;
-  Format.eprintf "@."
-  in
-  let lsB, msB = Array.head inputs 8, Array.tail inputs 8 in
-  let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs) in
+  (* let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in *)
+  (* let () = Format.eprintf "BVVARS: "; Enum.iter (Format.eprintf "%s@.") @@ Map.String.keys !bvvars; *)
+  (* Format.eprintf "@." *)
+  (* in *)
+  (* let lsB, msB = Array.head inputs 8, Array.tail inputs 8 in *)
+  (* let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs) in *)
 
   begin
-    if bound > 0 then
-      let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv (Array.length inputs)) bound) 
-      in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula);
-    else 
-      assert' @@ Term.Bv.lognot formula;
+    (* if bound > 0 then *)
+      (* let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv (Array.length inputs)) bound) *) 
+      (* in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula); *)
+    (* else *) 
+      (* assert' @@ Term.Bv.lognot formula; *)
+    assert' @@ Term.Bv.logand pcond (Term.Bv.lognot formula);
     let result = check_sat () in
     if result = Unsat then true 
     else begin
       Format.eprintf "fc: %a@."     Term.pp (get_value bvinpt1 :> B.bv B.term);
       Format.eprintf "block: %a@."  Term.pp (get_value bvinpt2 :> B.bv B.term);
-      Format.eprintf "inp: %a@."    Term.pp (get_value inp_bv :> B.bv B.term);
+      (* Format.eprintf "inp: %a@."    Term.pp (get_value inp_bv :> B.bv B.term); *)
       false
     end
   end

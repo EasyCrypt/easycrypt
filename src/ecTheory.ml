@@ -39,6 +39,8 @@ and theory_item_r =
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of (int * symbol option * path list * is_local)
+  | Th_bitstring of (path * int)
+  | Th_circuit   of (path * string)
 
 and thsource = {
   ths_base : EcPath.path;
