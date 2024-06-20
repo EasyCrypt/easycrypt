@@ -68,6 +68,11 @@ val attop  : scope -> bool
 val goal   : scope -> proof_auc option
 val xgoal  : scope -> proof_uc option
 
+(* Creates a scope that is identical to the supplied one except
+ * that the environment and required theories are reset to the ones
+ * from the prelude. *)
+val for_loading : scope -> scope
+
 type topmode = [`InProof | `InActiveProof | `InTop]
 
 val check_state : topmode -> string -> scope -> unit
@@ -134,6 +139,10 @@ module Theory : sig
   open EcTheory
 
   exception TopScope
+
+  (* [update_with_required dst src] updates [dst] with the required
+   * theories of [src] *)
+  val update_with_required : dst:scope -> src:scope -> scope
 
   (* [enter scope mode name] start a theory in scope [scope] with
    * name [name] and mode (abstract/concrete) [mode]. *)
@@ -210,6 +219,12 @@ module Prover : sig
   val set_default : scope -> smt_options -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
+
+  val pprover_infos_to_prover_infos :
+       EcEnv.env
+    -> EcProvers.prover_infos
+    -> pprover_infos
+    -> EcProvers.prover_infos
 end
 
 (* -------------------------------------------------------------------- *)

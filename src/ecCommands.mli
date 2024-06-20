@@ -5,6 +5,9 @@ open EcLocation
 exception Restart
 
 (* -------------------------------------------------------------------- *)
+type loader
+
+val loader   : loader
 val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (EcLoader.namespace option * string) list
 
@@ -21,6 +24,8 @@ type checkmode = {
   cm_iterate  : bool;
 }
 
+val initial : checkmode:checkmode -> boot:bool -> EcScope.scope
+
 val initialize  :
      restart:bool
   -> undo:bool
@@ -30,6 +35,13 @@ val initialize  :
 
 val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
+
+(* -------------------------------------------------------------------- *)
+val process_internal :
+     loader
+  -> EcScope.scope
+  -> EcParsetree.global_action located
+  -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
 val process : ?timed:bool -> ?break:bool ->

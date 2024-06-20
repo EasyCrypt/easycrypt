@@ -189,6 +189,9 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type loader = Loader.loader
+
+(* -------------------------------------------------------------------- *)
 let process_search scope qs =
   EcScope.Search.search scope qs
 
@@ -441,7 +444,10 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
-          let commands = List.fold_left (process_internal subld) iscope commands in
+          let commands =
+            List.fold_left 
+              (fun scope g -> process_internal subld scope g.gl_action)
+              iscope commands in
           commands)
         (fun () -> Pragma.set i_pragma)
       in
@@ -673,9 +679,14 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_internal ld scope g =
-  try  odfl scope (process ld scope g.gl_action)
-  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc g.gl_action) e)
+and process_internal
+  (ld     : Loader.loader)
+  (scope  : EcScope.scope)
+  (action : global_action located)
+  : EcScope.scope
+=
+  try  odfl scope (process ld scope action)
+  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc action) e)
 
 (* -------------------------------------------------------------------- *)
 let loader = Loader.create ()
