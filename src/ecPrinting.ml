@@ -818,13 +818,9 @@ let pp_match_form (ppe : PPEnv.t) pp_sub outer fmt (b, bs) =
       | [] ->
           Format.fprintf fmt "| %a" pp_opname ([], name)
 
-      | [x] ->
-          Format.fprintf fmt "| %a %a"
-            pp_opname ([], name) (pp_local ppe) x
-
       | _ ->
-          Format.fprintf fmt "| %a (%a)" pp_opname ([], name)
-            (pp_list ", " (pp_local ppe)) xs
+          Format.fprintf fmt "| %a %a" pp_opname ([], name)
+            (pp_list " " (pp_local ppe)) xs
       end;
 
       Format.fprintf fmt " => %a"
