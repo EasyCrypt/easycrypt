@@ -606,10 +606,10 @@ module Prover = struct
     }
 
   (* -------------------------------------------------------------------- *)
-  let mk_prover_info scope (options : smt_options) =
+  let mk_prover_info_from_dft (dft : EcProvers.prover_infos)
+      (options : smt_options) : EcProvers.prover_infos =
     let open EcProvers in
 
-    let dft          = Prover_info.get scope.sc_options in
     let gn_debug     = odfl dft.gn_debug options.gn_debug in
     let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
@@ -638,9 +638,21 @@ module Prover = struct
       gn_debug   ; }
 
   (* -------------------------------------------------------------------- *)
+  let mk_prover_info scope (options : smt_options) =
+    let dft = Prover_info.get scope.sc_options in
+    mk_prover_info_from_dft dft options
+
+  (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =
     let options = process_prover_option (env scope) ppr in
     mk_prover_info scope options
+
+  (* -------------------------------------------------------------------- *)
+  let pprover_infos_to_prover_infos
+      (env : EcEnv.env) (dft : EcProvers.prover_infos)
+      (ppr : pprover_infos) : EcProvers.prover_infos =
+    let options = process_prover_option env ppr in
+    mk_prover_info_from_dft dft options
 
   (* -------------------------------------------------------------------- *)
   let process scope ppr =
@@ -823,7 +835,7 @@ module Ax = struct
           PSCheck proof
     in
     let puc =
-      let active =        
+      let active =
         { puc_name    = name
         ; puc_started = false
         ; puc_jdg     = puc
@@ -2032,6 +2044,16 @@ module Theory = struct
                 sc_required = id :: scope.sc_required; }
 
       | None -> assert false
+
+  (* ------------------------------------------------------------------ *)
+  let update_with_required ~(dst : scope) ~(src : scope) =
+    let dst =
+      let sc_loaded =
+        Msym.union
+          (fun _ x y -> assert (x ==(*phy*) y); Some x)
+          dst.sc_loaded src.sc_loaded
+      in { dst with sc_loaded }
+    in List.fold_right require_loaded src.sc_required dst
 
   (* ------------------------------------------------------------------ *)
   let add_clears clears scope =
