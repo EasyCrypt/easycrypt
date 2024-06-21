@@ -95,8 +95,7 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
-    needs: [pre_job, compile-opam]
-    if: needs.pre_job.outputs.should_skip != 'true'
+    needs: [pre_job]
     runs-on: ubuntu-20.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -111,7 +110,7 @@ jobs:
 
   external:
     name: Check EasyCrypt External Projects
-    needs: [fetch-external-matrix]
+    needs: [pre_job, compile-opam, fetch-external-matrix]
     if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
