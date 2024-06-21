@@ -174,9 +174,14 @@ end
 
 
 (* -------------------------------------------------------------------- *)
-
+type bitstring = {
+  to_bits: path;
+  from_bits: path;
+  size: int;
+}
+  
 type circ_env = {
-  bitstrings: int Mp.t;
+  bitstrings: bitstring Mp.t;
   circuits: string Mp.t;
 }
 
@@ -3790,33 +3795,44 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 
 
 module Circ : sig
-  val bind_bitstring : env -> path -> int -> env
+  val bind_bitstring : env -> path -> path -> path -> int -> env
   val bind_circuit   : env -> path -> string -> env
-  val lookup_bitstring : env -> ty -> int option
+  val lookup_bitstring : env -> ty -> bitstring option
+  val lookup_bitstring_path: env -> path -> bitstring option
+  val lookup_bitstring_size : env -> ty -> int option
   val lookup_circuit : env -> qsymbol -> string option
-  val lookup_bitstring_path : env -> path -> int option
+  val lookup_bitstring_size_path : env -> path -> int option
   val lookup_circuit_path : env -> path -> string option
 
 end = struct
 
-  let bind_bitstring (env: env) (ty: path) (n: int) : env = 
+  let bind_bitstring (env: env) (tb: path) (fb:path) (ty: path) (n: int) : env = 
     {env with env_circ =
-      {env.env_circ with bitstrings = Mp.add ty n env.env_circ.bitstrings}}
-
+      {env.env_circ with bitstrings = Mp.add ty {to_bits=tb;from_bits=fb;size=n} env.env_circ.bitstrings}}
     
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     {env with env_circ = 
       {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
 
-  let lookup_bitstring_path (env: env) (ty: path) : int option = 
-    Mp.find_opt ty env.env_circ.bitstrings
+  let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
+    Mp.find_opt k env.env_circ.bitstrings
+
+  let lookup_bitstring (env: env) (ty:ty) : bitstring option =
+    match ty.ty_node with
+    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | _ -> assert false
+    
+  let lookup_bitstring_size_path (env: env) (ty: path) : int option = 
+    match Mp.find_opt ty env.env_circ.bitstrings with
+    | Some {size=sz;_} -> Some sz
+    | None -> None
   
   let lookup_circuit_path (env: env) (v: path) : string option = 
     Mp.find_opt v env.env_circ.circuits
 
-  let lookup_bitstring (env: env) (ty: ty) : int option =
+  let lookup_bitstring_size (env: env) (ty: ty) : int option =
     match ty.ty_node with
-    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | Tconstr (p, []) -> lookup_bitstring_size_path env p
     | _ -> assert false
 
   let lookup_circuit (env: env) (o: qsymbol) : string option =

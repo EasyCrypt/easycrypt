@@ -7,6 +7,9 @@ open EcParsetree
 open EcEnv
 open EcTypes
 open EcModules
+open EcCoreGoal
+open EcAst
+open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -121,7 +124,7 @@ and vsymbol =
 and brhs =
   | Const of width * zint
   | Copy  of vsymbol
-  | Op    of symbol * bargs
+  | Op    of path * bargs
 
 and barg =
   | Const of width * zint
@@ -150,8 +153,8 @@ let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
      Format.fprintf fmt "%s@%d" x w
 
   | Op (op, args) ->
-     Format.fprintf fmt "%s%a"
-       op
+     Format.fprintf fmt "%a%a"
+       EcPrinting.pp_path op
        (Format.pp_print_list
           (fun fmt a -> Format.fprintf fmt "@ %a" pp_barg a))
        args
@@ -164,10 +167,8 @@ let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
-
-
 let trans_wtype (env: env) (ty : ty) : width =
-  match EcEnv.Circ.lookup_bitstring env ty with
+  match EcEnv.Circ.lookup_bitstring_size env ty with
   | Some w -> w 
   | None -> Format.eprintf "No size binding for type: %a@."
     (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty;
@@ -185,35 +186,6 @@ let register_of_barg (env : cp_env) (arg : barg) : C.reg =
 (* -------------------------------------------------------------------- *)
 let registers_of_bargs (env : cp_env) (args : bargs) : C.reg list =
   List.map (register_of_barg env) args
-
-(* -------------------------------------------------------------------- *)
-let circuit_of_bstmt (env : cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
-  let (env, idx) = CircEnv.push env v in
-
-  let r =
-    match rhs with
-    | Const (w, i) ->
-      C.of_bigint ~size:w (EcBigInt.to_zt i)
-
-    | Copy (x, w) -> Option.get (CircEnv.get_s env x)
-
-    | Op (op, args) -> try 
-            begin
-            match op with
-            | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *)
-            | _ ->
-              args |> registers_of_bargs env |> (C.func_from_spec op)
-            end
-    with Not_found -> Format.eprintf "op %s not found@." op; assert false
-  in
-
-  let env = CircEnv.bind env idx r in
-
-  (env, r)
-
-(* -------------------------------------------------------------------- *)
-let circuit_from_bprgm (env: cp_env) (prg : bprgm) =
-  List.fold_left_map circuit_of_bstmt env prg
 
 (* -------------------------------------------------------------------- *)
 (* let print_deps ~name (env : cp_env) (r : C.reg)  = *)
@@ -282,104 +254,41 @@ let circ_dep_split (r : C.reg) : C.reg list =
 exception BDepError
 
 (* -------------------------------------------------------------------- *)
-let decode_op (env: env) (p : path) : symbol =
+let circuit_of_path (env: env) (p : path) : C.reg list -> C.reg  =
+  (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
   match EcEnv.Circ.lookup_circuit_path env p with
-  | Some s -> s
+  | Some op -> C.func_from_spec op
   | None -> Format.eprintf "No operator for path: %s@."
     (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
     assert false 
 
 
-let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C.reg =
+(* -------------------------------------------------------------------- *)
+let circuit_of_bstmt (env : env) (cenv: cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
+  let (cenv, idx) = CircEnv.push cenv v in
 
-  let trans_jops (p: path) : C.reg list -> C.reg =
-    match EcEnv.Circ.lookup_circuit_path env p with
-    | Some op ->
-      C.func_from_spec op
-    | None -> Format.eprintf "No operator for path: %s@."
-      (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b)
-      ;
-    assert false 
+  let r =
+    match rhs with
+    | Const (w, i) ->
+      C.of_bigint ~size:w (EcBigInt.to_zt i)
+
+    | Copy (x, w) -> Option.get (CircEnv.get_s cenv x)
+
+    | Op (op, args) -> try 
+      args |> registers_of_bargs cenv |> circuit_of_path env op 
+      with Not_found -> Format.eprintf "op %a not found@." EcPrinting.pp_path op; assert false
   in
-      
-  (* let trans_jops (pth: qsymbol) : C.reg list -> C.reg = *)
-    (* TODO: Check if we need regs to be of correct size or not (semi-done) *)
-    (* match pth with *)
-    (* | (["Top"; "JWord"; "W32"], "to_uint") *) 
-    (* | (["Top"; "JWord"; "W16"], "to_uint") *) 
-    (* | (["Top"; "JWord"; "W8"], "to_uint")  -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [r] -> HL.zpad 256 r *)
-          (* | _   -> raise BDepError (* check error type here *) *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W32"], "of_int") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [r] -> r |> List.take 32 |> HL.zpad 32 *)
-          (* | _   -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W16"], "of_int") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [r] -> r |> List.take 16 |> HL.zpad 16 *)
-          (* | _   -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W8"], "of_int") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [r] -> r |> List.take 8 |> HL.zpad 8 *)
-          (* | _   -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W32"], "*") *) 
-    (* | (["Top"; "JWord"; "W16"], "*") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [a; b] -> C.umull a b *) 
-          (* | _      -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W32"], "+") *) 
-    (* | (["Top"; "JWord"; "W16"], "+") -> *) 
-        (* fun rs -> begin *) 
-          (* match rs with *)
-          (* | [a; b] -> C.add a b |> snd *)
-          (* | _      -> raise BDepError *)
-        (* end *)
-(* (*    | (["Top"; "JWord"; "W32"], "[-]") -> This should be subtraction, need to change path FIXME *)
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [a; b] -> C.sub_dropc a b *)
-          (* | _      -> raise BDepError *)
-        (* end *) *)
-    (* | (["Top"; "JWord"; "W256"], "`<<`") *) 
-    (* | (["Top"; "JWord"; "W32"], "`<<`") *) 
-    (* | (["Top"; "JWord"; "W16"], "`<<`") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [a; b] -> C.shift ~side:`L ~sign:`L a b *) 
-          (* | _ -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *) *)
-    (* | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *) *)  
-        (* fun rs -> begin                     (* if we need to apply a mask                *) *) 
-          (* match rs with *)
-          (* | [a; b] -> C.shift ~side:`R ~sign:`L a b *) 
-          (* | _      -> raise BDepError *)
-        (* end *)
-    (* | (["Top"; "JWord"; "W32"], "`&`") *) 
-    (* | (["Top"; "JWord"; "W32"], "andw") *)  
-    (* | (["Top"; "JWord"; "W16"], "`&`") *) 
-    (* | (["Top"; "JWord"; "W16"], "andw") -> *) 
-        (* fun rs -> begin *)
-          (* match rs with *)
-          (* | [a; b] -> C.land_ a b *) 
-          (* | _      -> raise BDepError *)
-        (* end *)
-    (* | _ -> List.iter (Format.eprintf "%s ") (fst pth); *)
-        (* Format.eprintf "%s@.Not implemented yet@." (snd pth); *)
-        (* raise BDepError *)
-  (* in *)
 
+  let cenv = CircEnv.bind cenv idx r in
+
+  (cenv, r)
+
+(* -------------------------------------------------------------------- *)
+let circuit_from_bprgm (env: env) (cenv: cp_env) (prg : bprgm) =
+  List.fold_left_map (circuit_of_bstmt env) cenv prg
+
+
+let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C.reg =
   match f.f_node with
   (* hardcoding size for now FIXME *)
   | Fint z -> hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z)
@@ -402,10 +311,22 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
 
   | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
-    let hlenv, fs_c = List.fold_left_map (fun hlenv -> circuit_of_form hlenv env) hlenv fs in
     begin match f.f_node with
       | Fop (pth, _) ->
-          hlenv, trans_jops pth fs_c
+        begin match (EcPath.toqsymbol pth) with
+        | _, "bits" -> begin match fs with
+          | a::{f_node=Fint k;_}::{f_node=Fint i; _}::[] -> 
+            let k = BI.to_int k in
+            let i = BI.to_int i in
+            let hlenv, a = circuit_of_form hlenv env a in
+            hlenv, a |> List.drop k |> List.take i
+          | _ -> failwith "Bits should be called with (word -> int -> int)"
+        end
+        | _ ->
+          let hlenv, fs_c = List.fold_left_map 
+            (fun hlenv -> circuit_of_form hlenv env) hlenv fs 
+          in hlenv, circuit_of_path env pth fs_c
+        end
       | _ -> failwith "Cant apply to non op"
     end 
   | Fquant (_, binds, f) -> 
@@ -421,16 +342,13 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
   | _ -> failwith "Not yet implemented"
     
 (* -------------------------------------------------------------------- *)
-let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) (condition: psymbol) : unit =
-  let proc = EcTyping.trans_gamepath env p in
-  let proc = EcEnv.Fun.by_xpath proc env in
-  let pdef = match proc.f_def with FBdef def -> def | _ -> assert false in
+let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (outvs : variable list) (m : int) (pcond: psymbol) : unit =
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let hlenv, fc = circuit_of_form HL.Env.empty env f in
-  let fc = List.take 4 fc in
+  (* let fc = List.take 4 fc in (* FIXME: this needs to be removed *) *)
   (* let () = Format.eprintf "%a" (HL.pp_node hlenv) (List.hd fc) in *)
   (* DEBUG PRINTS FOR OP CIRCUIT *)
   let () = Format.eprintf "len %d @." (List.length fc) in
@@ -438,7 +356,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let () = Format.eprintf "%a@." HL.pp_deps (HL.deps hlenv fc |> Array.to_list) in
 
   
-  let condition = EcEnv.Op.lookup ([], condition.pl_desc) env |> snd in
+  let condition = EcEnv.Op.lookup ([], pcond.pl_desc) env |> snd in
   let condition = match condition.op_kind with
   | OB_oper (Some (OP_Plain (condition, _))) -> condition
   | _ -> failwith "Invalid operator type" in
@@ -479,7 +397,6 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
     | Etuple es ->
         List.fold_left (fun acc x -> List.append (trans_ret x) acc) [] es
     | _ -> failwith "Not valid return type"
-
   in
 
   let trans_instr (i : instr) : bstmt =
@@ -494,7 +411,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
             Const (trans_int p, i)
 
          | Eapp ({ e_node = Eop (p, []) }, args) ->
-            Op (decode_op env p, List.map trans_arg args)
+            Op (p, List.map trans_arg args)
 
          | _ -> let () = Format.eprintf "Sasgn error" in
             raise BDepError
@@ -504,28 +421,26 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
     | _ -> let () = Format.eprintf "instr_error" in
                 raise BDepError in
 
-  let trans_arg_ (x : ovariable) =
-   (oget ~exn:BDepError x.ov_name, trans_wtype env x.ov_type) in
+  let arg_of_variable (v : variable) =
+   (v.v_name, trans_wtype env v.v_type) in
 
   let trans_local (x : variable) =
     (x.v_name, trans_wtype env x.v_type) in
 
-  let arguments = List.map trans_arg_ proc.f_sig.fs_anames in
-  let ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in 
-  let _locals = List.map trans_local pdef.f_locals in
-
-  let body : bprgm = List.map trans_instr pdef.f_body.s_node in
+  let body : bprgm = List.map trans_instr proc.s_node in
 
   if not (List.is_unique (List.fst body)) then
     raise BDepError; 
 
+  let arguments = "" in
+
   let (cenv, hlenv) = List.fold_left 
-    (fun (env, hlenv) (s,w) -> 
-      let (env, idn) = CircEnv.push env s in
+    (fun (cenv, hlenv) (s,w) -> 
+      let (cenv, idn) = CircEnv.push cenv s in
       let (hlenv, r) = (HL.reg hlenv ~size:w ~name:(Ident.name idn)) in 
-      CircEnv.bind env idn r, hlenv)
-    (CircEnv.empty, hlenv) arguments in
-  let (cenv, circs) = circuit_from_bprgm cenv body in
+      CircEnv.bind cenv idn r, hlenv)
+    (CircEnv.empty, hlenv) (List.map arg_of_variable invs) in
+  let (cenv, circs) = circuit_from_bprgm env cenv body in
 
 (* PRINT PROC PROGRAM BODY *)
   Format.eprintf "%a@." pp_bprgm body; 
@@ -533,7 +448,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
 (* COMPRESS CIRCUIT FROM SPEC LANGUAGE 
   let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in *)
   begin 
-    let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
+    let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) (List.map (fun v -> v.v_name) outvs) |> List.flatten in
     if (n = m) &&  (n = 0) then
       let () = assert (HL.circ_equiv hlenv fc circ) in
       Format.eprintf "Success@."
@@ -559,39 +474,95 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   end 
 
 
+let bdep_xpath (env : env) (p : xpath) (f: psymbol) (n : int) (m : int) (vs : string list) (pcond: psymbol) : unit =
+  let trans_arg_ (x : ovariable) =
+   (oget ~exn:BDepError x.ov_name, trans_wtype env x.ov_type) 
+  in
+  let rec trans_ret (e : expr) : barg list =
+    match e.e_node with
+    | Evar (PVloc y) ->
+        [Var (y, trans_wtype env e.e_ty)]
+    | Etuple es ->
+        List.fold_left (fun acc x -> List.append (trans_ret x) acc) [] es
+    | _ -> failwith "Not valid return type"
+  in
+  let trans_local (x : variable) =
+    (x.v_name, trans_wtype env x.v_type) 
+  in
 
-  (*
-   * old_TODO
-   *  1: generator the circuit C from the program `body` -> Done
-   *  2: compute the dependencies and infer sub-circuits C1...Cn -> Done
-   *  3: check equivalence between the different boolean functions C1...Cn -> Done
-   *  4: generate a circuit Pr encoding the pre-condition (partial) -> ?
-   *  5: generate a circuit Po encoding the post-condition -> ?
-   *  6: check that (Pri /\ Ci) => Poi by computation -> ?
-   *)
+  let proc = EcEnv.Fun.by_xpath p env in
+  let pdef = match proc.f_def with FBdef def -> def | _ -> assert false in
+  let arguments = List.map 
+    (fun {ov_name=name; ov_type=ty} -> {v_name= Option.get name; v_type= ty}) 
+    (* FIXME: Add better handling for possible error when converting from ovar to var *)
+    proc.f_sig.fs_anames 
+  in
+  let vs = List.map (fun v -> {v_name=v; v_type=tint}) vs in (* FIXME: add actual typing for vs *)
+  let _ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in 
+  let _locals = List.map trans_local pdef.f_locals in
+  bdep env pdef.f_body f arguments n vs m pcond
 
-  (* Actual plan:
+    
+let t_bdep (outvs: symbol list) (n: int) (m: int) (op: psymbol) (pcond: psymbol) (tc : tcenv1)=
+  (* Run bdep and check that is works FIXME *)
+  let () = match (FApi.tc1_goal tc).f_node with
+  | FhoareF sH -> bdep_xpath (FApi.tc1_env tc) sH.hf_f op n m outvs pcond
+  | FhoareS _ -> assert false 
+  | FcHoareF _ -> assert false
+  | FcHoareS _ -> assert false 
+  | FbdHoareF _ -> assert false
+  | FbdHoareS _ -> assert false 
+  | FeHoareF _ -> assert false
+  | FeHoareS _ -> assert false 
+  | _ -> assert false 
+  in
+  FApi.close (!@ tc) VBdep
+  
+let process_bdep 
+  ((inpvs, n): string list * int) 
+  ((outvs, m): string list * int) 
+  (op: psymbol) 
+  (pcond: psymbol) 
+  (tc: tcenv1) 
+=
+  let env = FApi.tc1_env tc in
+  let get_var (v: symbol) (m: memenv) : variable =
+    match EcMemory.lookup_me v m with
+    | Some (v, None, _) -> v
+    | _ -> assert false
+  in
+  (* TODO: add a typesafe interface to build formulas and refactor this *)
+  let w2bits (ty: ty) : form = 
+    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {to_bits=tb; _} -> tb
+    | _ -> assert false
+    in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
+    f_op tb [] tbo.op_ty 
+  in
+  let bits2w (ty: ty) : form = 
+    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {from_bits=fb; _} -> fb
+    | _ -> assert false
+    in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
+    f_op fb [] fbo.op_ty 
+  in
 
-    Take {rp_0, rp_1, rp_2, rp_3} e.g, flatten it as one bit array
-    partition into array of m-bit words 
-    these can be computed each from m-bit input words
-    by operator f
+  let hr = EcLowPhlGoal.tc1_as_hoareS tc in
 
-    Args to bdep: {rp_0, ..., rp_3} as a list
-                  n -> input words size
-                  m -> output word size
-                  f : `W n => `W m -> operator
+  let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
+  let pinpvs = f_true in
+  let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
+  let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
+  let poutvs = List.map (fun v -> EcCoreFol.f_app (w2bits v.f_ty) [v]) poutvs in
+  let poutvs = List.reduce (fun v1 v2 -> f_app ECcons [v1; v2]) (List.rev poutvs) in
+  let poutvs = f_app flatten poutvs in
+  let poutvs = f_app aggregate poutvs (f_int m) in
+  let poutvs = f_app ECmap bits2w poutvs in 
 
-    Args -> Semi done -> Need to check type still
+  let pinpvs = f_app ECmap (op) in
+  let post = f_eq poutvs pinvs in
 
-  1) Circuit from procedure -> done
-  2) Flatten array of the variables we want -> Done
-  3) Join by each m bits -> Done
-  4) Check that each block depends on (exactly) n bits -> Done
-  5) Check that circuits are equivalent for each pair of blocks -> Done
-  6) Generate circuit for operator -> Done
-  7) Check it is equivalent to first block -> Done (bruteforce and SMT)
-
-  *)
-
-
+  let env, hyps, concl = FApi.tc1_eflat tc in
+  let pre = EcCoreFol.f_false in
+  let tc = EcPhlConseq.t_conseq pre post tc in
+  FApi.t_last (t_bdep outvs n m op pcond) tc

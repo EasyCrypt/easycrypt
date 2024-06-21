@@ -3406,6 +3406,9 @@ phltactic:
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
+| BDEP LBRACKET inpvs=plist0(STRING, SEMICOLON) RBRACKET n=uint LBRACKET outvs=plist0(STRING, SEMICOLON) RBRACKET m=uint o=oident pc=oident
+    { Pbdep ((inpvs, (BI.to_int n)), (outvs, (BI.to_int m)), o, pc) }
+
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
     { BDH_split_bop (b1,b2,b3) }
@@ -4041,8 +4044,8 @@ global_action:
 | BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET pc=oident
   { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, pc) }
 
-| BIND BITSTRING t=loc(simpl_type_exp) n=uint
-  { Gbbitstring (t, (BI.to_int n)) }
+| BIND BITSTRING tb=qoident fb=qoident t=loc(simpl_type_exp) n=uint
+  { Gbbitstring (tb, fb, t, (BI.to_int n)) }
   
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }

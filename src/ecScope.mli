@@ -240,7 +240,7 @@ module Search : sig
 end
 
 module Circ : sig 
-  val add_bitstring : scope -> pty -> int -> scope
+  val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
   val add_circuit : scope -> pqsymbol -> string -> scope
 
 end

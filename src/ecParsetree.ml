@@ -796,6 +796,9 @@ type phltactic =
   | Pauto
   | Plossless
 
+    (* Map-reduce *)
+  | Pbdep of ((string list) * int) * ((string list) * int) * psymbol * psymbol
+
     (* Program rewriting *)
   | Prwprgm of rwprgm
 
@@ -1309,7 +1312,7 @@ type global_action =
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
   | Gbdep        of pgamepath * psymbol * int * int * (string list) * psymbol
-  | Gbbitstring  of pty * int
+  | Gbbitstring  of pqsymbol * pqsymbol * pty * int
   | Gbcircuit    of pqsymbol * string
 
 type global = {

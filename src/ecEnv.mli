@@ -15,6 +15,11 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
+type bitstring = { (* FIXME: maybe move this later? *)
+  to_bits : path;
+  from_bits : path;
+  size : int;
+}
 type env
 type scope = [
   | `Theory
@@ -526,11 +531,13 @@ val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
 
 
 module Circ : sig
-  val bind_bitstring : env -> path -> int -> env
+  val bind_bitstring : env -> path -> path -> path -> int -> env
   val bind_circuit   : env -> path -> string -> env
-  val lookup_bitstring : env -> ty -> int option
+  val lookup_bitstring : env -> ty -> bitstring option
+  val lookup_bitstring_path: env -> path -> bitstring option
+  val lookup_bitstring_size : env -> ty -> int option
   val lookup_circuit : env -> qsymbol -> string option
-  val lookup_bitstring_path : env -> path -> int option
+  val lookup_bitstring_size_path : env -> path -> int option
   val lookup_circuit_path : env -> path -> string option
 
 end 

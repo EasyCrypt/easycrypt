@@ -2505,17 +2505,21 @@ module Search = struct
 end
 
 module Circ : sig 
-  val add_bitstring : scope -> pty -> int -> scope
+  val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
   val add_circuit : scope -> pqsymbol -> string -> scope
 
 end = struct
-  let add_bitstring (sc: scope) (t: pty) (n: int) : scope = 
+  let add_bitstring (sc: scope) (tb: pqsymbol) (fb: pqsymbol) (t: pty) (n: int) : scope = 
     let env = (env sc) in
+
+    let tbp, _tbo = EcEnv.Op.lookup tb.pl_desc env in
+    let fbp, _fbo = EcEnv.Op.lookup fb.pl_desc env in
+    
     let ue = EcTyping.transtyvars env (t.pl_loc, None) in
     let t = EcTyping.transty tp_tydecl env ue t in
     match t.ty_node with
     | Tconstr (p, []) -> 
-      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (p, n)) in
+      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in
       {sc with sc_env = EcSection.add_item item sc.sc_env }
     | _ -> assert false
   

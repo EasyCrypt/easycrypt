@@ -124,6 +124,7 @@ and validation =
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 | VShuffle of ident list             (* goal shuffling *)
+| VBdep                              (* map-reduce *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
