@@ -214,6 +214,7 @@
     "dump"        , DUMP       ;        (* KW: global *)
     "remove"      , REMOVE     ;        (* KW: global *)
     "exit"        , EXIT       ;        (* KW: global *)
+    "eval"        , EVAL       ;        (* KW: global *)
 
     "fail"        , FAIL       ;        (* KW: internal *)
     "time"        , TIME       ;        (* KW: internal *)
