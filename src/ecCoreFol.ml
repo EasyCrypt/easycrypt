@@ -225,7 +225,9 @@ let f_append a b ty = f_app (fop_append ty) [a; b] (tlist ty)
 let f_cons a b ty = f_app (fop_cons ty) [a; b] (tlist ty)
 let f_flatten a ty = f_app (fop_flatten ty) [a] (tlist ty)
 let f_lmap f a ty1 ty2 = f_app (fop_lmap ty1 ty2) [f;a] (tlist ty2)
-let f_chunk a (n: int) ty = f_app (fop_chunk ty) [mk_form (Fint (BI.of_int n)) tint; a] (tlist @@ tlist ty)
+let f_chunk a (n: int) ty2 = 
+  let ty = tfrom_tlist a.f_ty in
+  f_app (fop_chunk ty) [mk_form (Fint (BI.of_int n)) tint; a] (tlist @@ tlist ty)
 let f_all f a ty = f_app (fop_all ty) [f; a] tbool
 
 (* -------------------------------------------------------------------- *)

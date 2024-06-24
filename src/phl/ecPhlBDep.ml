@@ -565,9 +565,12 @@ let process_bdep
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = List.map (fun v -> EcCoreFol.f_app (w2bits v.f_ty) [v] (tlist tbool)) poutvs in
   let poutvs = List.rev poutvs in
+  (* let poutvs = List.fold_right (fun v1 v2 -> EcFol.f_cons_safe env v1 v2) (List.rev poutvs) (fop_empty @@ tlist (List.hd poutvs).f_ty)  in *)
   let poutvs = List.fold_right (fun v1 v2 -> f_cons v1 v2 (v1.f_ty)) (List.rev poutvs) (fop_empty @@ tlist (List.hd poutvs).f_ty)  in
   let () = Format.eprintf "poutvs type before flatten %a@." pp_type poutvs.f_ty in
-  let poutvs = f_flatten poutvs (tfrom_tlist @@ tfrom_tlist poutvs.f_ty) in
+  let poutvs = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_flatten [poutvs] in
+  let () = Format.eprintf "poutvs type after flatten %a@." pp_type poutvs.f_ty in
+  (* let poutvs = f_flatten poutvs (tfrom_tlist @@ tfrom_tlist poutvs.f_ty) in *)
   let poutvs = f_chunk poutvs m (tfrom_tlist poutvs.f_ty) in
   (* let poutvs = (let t1, t2 = tfrom_tfun2 (bits2w outbty).f_ty in f_lmap (bits2w t1) poutvs t1 t2) in *)
 

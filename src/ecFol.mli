@@ -259,3 +259,6 @@ val cost_app      : cost -> form list -> cost
 val cost_flatten  : cost -> form *)
 
 val dump_f : form -> string
+
+val f_append_safe : EcEnv.env -> form -> form -> form
+val f_cons_safe : EcEnv.env -> form -> form -> form
