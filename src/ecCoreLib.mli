@@ -49,6 +49,25 @@ module CI_Option : sig
   val p_oget   : path
 end
 
+
+(*-------------------------------------------------------------------- *)
+module CI_List : sig
+  val i_List    : symbol
+  val p_List    : path
+  val p_list    : path
+  
+  val p_empty   : path
+  val p_cons    : path
+  val p_head    : path
+  val p_behead  : path
+  val p_tail    : path
+  val p_append  : path
+  val p_flatten : path
+  val p_lmap    : path
+  val p_chunk   : path
+  val p_all     : path
+  end
+
 (*-------------------------------------------------------------------- *)
 module CI_Bool : sig
   val i_Bool : symbol

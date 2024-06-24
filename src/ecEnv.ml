@@ -3820,7 +3820,15 @@ end = struct
   let lookup_bitstring (env: env) (ty:ty) : bitstring option =
     match ty.ty_node with
     | Tconstr (p, []) -> lookup_bitstring_path env p
-    | _ -> assert false
+    | _ -> None
+    (* | Tglob   id  -> Format.eprintf "Unknown bitstring type (Tglob)@."; assert false *) 
+    (* | Tunivar uid -> Format.eprintf "Unknown bitstring type (Tunivar) id: %d@." uid; assert false *) 
+    (* | Tvar    var -> Format.eprintf "Unknown bitstring type (Tvar)."; assert false *)
+    (* | Ttuple  tys -> Format.eprintf "Unknown bitstring type (Ttuple)@."; assert false *) 
+    (* | Tconstr (pth, tys) -> let h, t = EcPath.toqsymbol pth in *)
+      (* Format.eprintf "Unknown bitstring type (Tconst w/ type params) %s" *) 
+      (* (List.fold_right (fun a b -> a ^ "." ^ b) h t); assert false *) 
+    (* | Tfun    (ty1, ty2) -> Format.eprintf "Unknown bitstring type (Tfun)@."; assert false *) 
     
   let lookup_bitstring_size_path (env: env) (ty: path) : int option = 
     match Mp.find_opt ty env.env_circ.bitstrings with

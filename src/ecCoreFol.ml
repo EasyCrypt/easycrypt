@@ -203,6 +203,32 @@ let f_false  = f_op EcCoreLib.CI_Bool.p_false [] tbool
 let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
+(* TODO: check types here *)
+let ty_ftlist1 ty = toarrow (List.make 1 ty) (tlist ty)
+let ty_ftlist2 ty = toarrow ([ty; (tlist ty)]) (tlist ty)
+let ty_flist1 ty = toarrow (List.make 1 (tlist ty)) (tlist ty)
+let ty_flist2 ty = toarrow (List.make 2 (tlist ty)) (tlist ty)
+let ty_fllist ty = toarrow (List.make 1 (tlist @@ tlist ty)) (tlist ty)
+let ty_lmap ty1 ty2 = toarrow ([toarrow [ty1] ty2; tlist ty1]) (tlist ty2) 
+let ty_chunk ty = toarrow [tint; tlist ty] (tlist @@ tlist ty)
+let ty_all ty = toarrow [(toarrow [ty] tbool); tlist ty] tbool
+
+let fop_empty ty = f_op EcCoreLib.CI_List.p_empty [] (tlist ty)
+let fop_cons ty = f_op EcCoreLib.CI_List.p_cons [ty] (ty_ftlist2 ty)
+let fop_append ty = f_op EcCoreLib.CI_List.p_append [ty] (ty_flist2 ty)
+let fop_flatten ty = f_op EcCoreLib.CI_List.p_flatten [ty] (ty_fllist ty)
+let fop_lmap ty1 ty2 = f_op EcCoreLib.CI_List.p_lmap [ty2; ty1] (ty_lmap ty1 ty2)
+let fop_chunk ty = f_op EcCoreLib.CI_List.p_chunk [ty] (ty_chunk ty)
+let fop_all ty = f_op EcCoreLib.CI_List.p_all [ty] (ty_all ty)
+
+let f_append a b ty = f_app (fop_append ty) [a; b] (tlist ty)
+let f_cons a b ty = f_app (fop_cons ty) [a; b] (tlist ty)
+let f_flatten a ty = f_app (fop_flatten ty) [a] (tlist ty)
+let f_lmap f a ty1 ty2 = f_app (fop_lmap ty1 ty2) [f;a] (tlist ty2)
+let f_chunk a (n: int) ty = f_app (fop_chunk ty) [mk_form (Fint (BI.of_int n)) tint; a] (tlist @@ tlist ty)
+let f_all f a ty = f_app (fop_all ty) [f; a] tbool
+
+(* -------------------------------------------------------------------- *)
 let f_tuple args =
   match args with
   | []  -> f_tt

@@ -172,6 +172,32 @@ val f_coe   : form -> memenv -> expr -> form
 val f_pr_r : pr -> form
 val f_pr   : memory -> xpath -> form -> form -> form
 
+(* FIXME: Check this V *)
+
+val ty_ftlist1 : ty -> ty
+val ty_ftlist2 : ty -> ty
+val ty_flist1  : ty -> ty
+val ty_flist2  : ty -> ty
+val ty_lmap    : ty -> ty -> ty
+val ty_chunk   : ty -> ty
+val ty_all     : ty -> ty
+
+val fop_empty   : ty -> form
+val fop_cons    : ty -> form
+val fop_append  : ty -> form
+val fop_flatten : ty -> form
+val fop_lmap    : ty -> ty -> form
+val fop_chunk   : ty -> form
+val fop_all     : ty -> form
+
+val f_append  : form -> form -> ty -> form
+val f_cons    : form -> form -> ty -> form
+val f_flatten : form -> ty -> form 
+val f_lmap    : form -> form -> ty -> ty -> form
+val f_chunk   : form -> int -> ty -> form
+val f_all     : form -> form -> ty -> form
+
+
 (* soft-constructors - unit *)
 val f_tt : form
 
