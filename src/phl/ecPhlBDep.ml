@@ -527,10 +527,11 @@ let process_bdep
 =
 
   let env = FApi.tc1_env tc in
+  let f_app_safe = EcTypesafeFol.f_app_safe in
+
 
   (* DEBUG SECTION *)
   let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
-
   
   let get_var (v: symbol) (m: memenv) : variable =
     match EcMemory.lookup_me v m with
@@ -542,14 +543,30 @@ let process_bdep
   let inpbty, outbty = tfrom_tfun2 oop.op_ty in
   
   (* TODO: add a typesafe interface to build formulas and refactor this *)
-  let w2bits (ty: ty) : form = 
+  let w2bits (ty: ty) (arg: form) : form = 
     let tb = match EcEnv.Circ.lookup_bitstring env ty with
     | Some {to_bits=tb; _} -> tb
     | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in EcTypesafeFol.f_app_safe env tb [arg]
+    (* in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in *)
+    (* f_op tb [] tbo.op_ty *) 
+  in
+  let bits2w (ty: ty) (arg: form) : form = 
+    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {from_bits=fb; _} -> fb
+    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in EcTypesafeFol.f_app_safe env fb [arg]
+    (* in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in *)
+    (* f_op fb [] fbo.op_ty *) 
+  in
+  let w2bits_op (ty: ty) : form = 
+    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {to_bits=tb; _} -> tb
+    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
     f_op tb [] tbo.op_ty 
   in
-  let bits2w (ty: ty) : form = 
+  let bits2w_op (ty: ty) : form = 
     let fb = match EcEnv.Circ.lookup_bitstring env ty with
     | Some {from_bits=fb; _} -> fb
     | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
@@ -559,51 +576,29 @@ let process_bdep
 
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
 
-  (* REFACTOR EVERYTHING HERE *)
   (* ------------------------------------------------------------------ *)
   let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
-  let poutvs = List.map (fun v -> EcCoreFol.f_app (w2bits v.f_ty) [v] (tlist tbool)) poutvs in
+  let poutvs = List.map (w2bits (List.hd poutvs).f_ty) poutvs in
   let poutvs = List.rev poutvs in
-  (* let poutvs = List.fold_right (fun v1 v2 -> EcFol.f_cons_safe env v1 v2) (List.rev poutvs) (fop_empty @@ tlist (List.hd poutvs).f_ty)  in *)
-  let poutvs = List.fold_right (fun v1 v2 -> f_cons v1 v2 (v1.f_ty)) (List.rev poutvs) (fop_empty @@ tlist (List.hd poutvs).f_ty)  in
-  let () = Format.eprintf "poutvs type before flatten %a@." pp_type poutvs.f_ty in
-  let poutvs = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_flatten [poutvs] in
-  let () = Format.eprintf "poutvs type after flatten %a@." pp_type poutvs.f_ty in
-  (* let poutvs = f_flatten poutvs (tfrom_tlist @@ tfrom_tlist poutvs.f_ty) in *)
-  let poutvs = f_chunk poutvs m (tfrom_tlist poutvs.f_ty) in
-  (* let poutvs = (let t1, t2 = tfrom_tfun2 (bits2w outbty).f_ty in f_lmap (bits2w t1) poutvs t1 t2) in *)
+  let poutvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
+  let poutvs = f_app_safe env EcCoreLib.CI_List.p_flatten [poutvs] in
+  let poutvs = f_app_safe env (EcCoreLib.CI_List.p_chunk) [f_int (BI.of_int m); poutvs] in
 
   
   let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
   let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
-  let pinpvs = List.map (fun v -> EcCoreFol.f_app (w2bits v.f_ty) [v] (tlist tbool)) pinpvs in
+  let pinpvs = List.map (w2bits (List.hd pinpvs).f_ty) pinpvs in
   let pinpvs = List.rev pinpvs in
-  let pinpvs = List.fold_right (fun v1 v2 -> f_cons v1 v2 (v1.f_ty)) (List.rev pinpvs) (fop_empty @@ tlist (List.hd pinpvs).f_ty) in
-  let () = Format.eprintf "pinpvs type before flatten %a@." pp_type pinpvs.f_ty in
-  let pinpvs = f_flatten pinpvs (tfrom_tlist @@ tfrom_tlist pinpvs.f_ty) in
-  let () = Format.eprintf "type for chunk %a@." pp_type (tfrom_tlist pinpvs.f_ty) in
-  let pinpvs = f_chunk pinpvs n (tfrom_tlist pinpvs.f_ty) in
-  let () = Format.eprintf "pinpvs type after chunk %a@." pp_type pinpvs.f_ty in
-  let pinpvs = (let t1, t2 = tfrom_tfun2 (bits2w inpbty).f_ty in 
-    Format.eprintf "t1: %a | t2: %a@." pp_type t1 pp_type t2;
-    f_lmap (bits2w inpbty) pinpvs t1 t2) in
-  let () = Format.eprintf "pinpbty: %a@." pp_type pinpvs.f_ty in
-  let pinpvs_post = begin
-    let () = Format.eprintf "inpbty: %a, outbty: %a@." pp_type inpbty pp_type outbty in
-    let op_ty = (toarrow [inpbty] outbty) in
-    f_lmap (f_op pop [] op_ty) pinpvs inpbty outbty
-    end 
-  in
-  let () = Format.eprintf "pinpvs_post type: %a@." pp_type pinpvs_post.f_ty in
+  let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
+  let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in
+  let pinpvs = f_app_safe env EcCoreLib.CI_List.p_chunk [f_int (BI.of_int n); pinpvs] in
+  let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_lmap [(bits2w_op inpbty); pinpvs] in
+  let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_lmap [(f_op pop [] oop.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinpvs_post poutvs in
-  let pre = begin
-    let op_ty = (toarrow [inpbty] tbool) in
-    f_all (f_op ppcond [] op_ty) pinpvs inpbty
-    end 
-  in
+  let pre = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_all [(f_op ppcond [] opcond.op_ty); pinpvs] in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_conseq pre post tc in
