@@ -217,7 +217,7 @@ let fop_empty ty = f_op EcCoreLib.CI_List.p_empty [] (tlist ty)
 let fop_cons ty = f_op EcCoreLib.CI_List.p_cons [ty] (ty_ftlist2 ty)
 let fop_append ty = f_op EcCoreLib.CI_List.p_append [ty] (ty_flist2 ty)
 let fop_flatten ty = f_op EcCoreLib.CI_List.p_flatten [ty] (ty_fllist ty)
-let fop_lmap ty1 ty2 = f_op EcCoreLib.CI_List.p_lmap [ty2; ty1] (ty_lmap ty1 ty2)
+let fop_lmap ty1 ty2 = f_op EcCoreLib.CI_List.p_map [ty2; ty1] (ty_lmap ty1 ty2)
 let fop_chunk ty = f_op EcCoreLib.CI_List.p_chunk [ty] (ty_chunk ty)
 let fop_all ty = f_op EcCoreLib.CI_List.p_all [ty] (ty_all ty)
 

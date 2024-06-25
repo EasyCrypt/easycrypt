@@ -62,7 +62,7 @@ module CI_List = struct
   let p_tail = p_behead
   let p_append = _List "++"
   let p_flatten = EcPath.pqname p_List "flatten"
-  let p_lmap = _List "map"
+  let p_map = _List "map"
   let p_chunk = EcPath.pqname (EcPath.pqname (EcPath.pqname p_top "BitEncoding") "BitChunking") "chunk"
   let p_all = _List "all"
 end

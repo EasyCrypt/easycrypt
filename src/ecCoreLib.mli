@@ -63,7 +63,7 @@ module CI_List : sig
   val p_tail    : path
   val p_append  : path
   val p_flatten : path
-  val p_lmap    : path
+  val p_map    : path
   val p_chunk   : path
   val p_all     : path
   end

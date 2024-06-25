@@ -593,8 +593,8 @@ let process_bdep
   let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_chunk [f_int (BI.of_int n); pinpvs] in
-  let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_lmap [(bits2w_op inpbty); pinpvs] in
-  let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_lmap [(f_op pop [] oop.op_ty); pinpvs] in
+  let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(bits2w_op inpbty); pinpvs] in
+  let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(f_op pop [] oop.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinpvs_post poutvs in
