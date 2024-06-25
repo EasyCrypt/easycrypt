@@ -6,6 +6,7 @@ open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcReduction
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -141,68 +142,88 @@ let t_set_r side cpos (fresh, id) e tc =
     cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
-let cfold_stmt (pf, hyps) me olen zpr =
+let cfold_stmt ?(full=true) (pf, hyps) me olen zpr =
   let env = LDecl.toenv hyps in
 
-  let (asgn, i, tl) =
-    match zpr.Zpr.z_tail with
-    | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
-      let asgn =
-        match lv with
-        | LvVar (x, ty) -> [(x, ty, e)]
-        | LvTuple xs -> begin
-            match e.e_node with
-            | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
-            | _ -> assert false
-        end
-      in
-        (asgn, i, tl)
-    end
+  let rec doit (olen: int option) (acc: instr list) (insts: instr list) : instr list =
+    let (asgn, i, tl) =
+      match insts with
+      | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
+        let asgn =
+          match lv with
+          | LvVar (x, ty) -> [(x, ty, e)]
+          | LvTuple xs -> begin
+              match e.e_node with
+              | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
+              | _ -> assert false
+          end
+        in
+          (asgn, i, tl)
+      end
 
-    | _ ->
-        tc_error pf "cannot find a left-value assignment at given position"
+      | _ -> 
+          tc_error pf "cannot find a left-value assignment at given position"
+    in
+
+    (* Check that we are assigning to local variables only *)
+    List.iter
+      (fun (x, _, _) ->
+        if is_glob x then
+          tc_error pf "left-values must be local variables")
+      asgn;
+
+    (* Check that we are assigning an expression that we can evaluate to a constant  *)
+    List.iter
+      (fun (_, _, e) ->
+          if e_fv e <> Mid.empty || e_read env e <> PV.empty then
+            tc_error pf "right-values are not closed expression")
+      asgn;
+
+    let asg = List.fold_left
+                (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
+                EcPV.PV.empty asgn
+    in
+
+  
+    let subst =
+      List.fold_left
+        (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
+        Mpv.empty asgn
+    in
+
+    let (tl1, tl2) =
+      let p inst = PV.indep env (i_write env inst) asg in
+      match olen with
+      | None -> let p inst = PV.indep env (i_write env inst) asg in
+        EcUtils.List.takedrop_while p tl
+      
+      | Some olen ->
+          if List.length tl < olen then
+            tc_error pf "expecting at least %d instructions after assignment" olen;
+          let tl1, tl2 = List.takedrop olen tl in
+          let tl11, tl12 = EcUtils.List.takedrop_while p tl1 in
+          let wrs = is_write env tl11 in
+
+          if not (EcPV.PV.indep env wrs asg) then
+            tc_error pf "cannot cfold non read-only local variables"
+          else tl11, tl12 @ tl2
+    in
+
+    let tl1 = Mpv.issubst env subst tl1 in
+
+    match tl2 with
+    | [] -> acc @ tl1 @ [i]
+    | inst::tl2 -> 
+      if (Option.is_some olen) && ((Option.get olen) = List.length tl1) then
+      acc @ tl1 @ [i] @ tl2
+      else let tl2 = (Mpv.isubst env subst inst)::tl2 in 
+      if full then
+        doit (Option.map (fun a -> a - List.length tl1) olen) (acc @ tl1) tl2
+      else acc @ tl1 @ tl2
   in
-
-  let (tl1, tl2) =
-    match olen with
-    | None      -> (tl, [])
-    | Some olen ->
-        if List.length tl < olen then
-          tc_error pf "expecting at least %d instructions after assignment" olen;
-        List.takedrop olen tl
-  in
-
-  List.iter
-    (fun (x, _, _) ->
-      if is_glob x then
-        tc_error pf "left-values must be local variables")
-    asgn;
-
-  List.iter
-    (fun (_, _, e) ->
-        if e_fv e <> Mid.empty || e_read env e <> PV.empty then
-          tc_error pf "right-values are not closed expression")
-    asgn;
-
-  let wrs = is_write env tl1 in
-  let asg = List.fold_left
-              (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
-              EcPV.PV.empty asgn
-  in
-
-  if not (EcPV.PV.indep env wrs asg) then
-    tc_error pf "cannot cfold non read-only local variables";
-
-  let subst =
-    List.fold_left
-      (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
-      Mpv.empty asgn
-  in
-
-  let tl1 = Mpv.issubst env subst tl1 in
 
   let zpr =
-    { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
+    { zpr with Zpr.z_tail = doit olen [] Zpr.(zpr.z_tail) }
   in
     (me, zpr, [])
 

@@ -589,6 +589,23 @@ module List = struct
 
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
+
+  let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
+    let rec doit (acc: 'a list) (xs : 'a list) =
+    match xs with
+    | [] -> (List.rev acc, [])
+    | x::xs -> if p x then doit (x::acc) xs else (List.rev acc, x::xs)
+    in doit [] xs
+
+  let fold_left_map_while (f: 'a -> 'b -> 'a * 'c) (p: 'a -> 'b -> bool) (acc: 'a) (xs: 'b list) : 'a * 'c list =
+    let rec doit acc lacc = function
+    | [] -> acc, rev lacc
+    | x :: xs -> if p acc x then
+      let acc, x = f acc x in
+      doit acc (x :: lacc) xs
+      else acc, rev lacc @ (x :: xs) in
+    doit acc [] xs
+
 end
 
 (* -------------------------------------------------------------------- *)
