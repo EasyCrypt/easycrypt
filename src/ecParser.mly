@@ -81,6 +81,9 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
+  let arr_of_vars (v : string) (i : int) : string list = 
+    List.init i (fun i -> v ^ "_" ^ (string_of_int i))
+
   let mk_axiom  ?(nosmt = false) ~locality (x, ty, pv, scv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
@@ -3408,6 +3411,9 @@ phltactic:
 
 | BDEP LBRACKET inpvs=plist0(STRING, SEMICOLON) RBRACKET n=uint LBRACKET outvs=plist0(STRING, SEMICOLON) RBRACKET m=uint o=oident pc=oident
     { Pbdep ((inpvs, (BI.to_int n)), (outvs, (BI.to_int m)), o, pc) }
+
+| BDEP LBRACKET inpv=STRING COLON inpw=uint RBRACKET n=uint LBRACKET outv=STRING COLON outw=uint RBRACKET m=uint o=oident pc=oident
+    { Pbdep ((arr_of_vars inpv (BI.to_int inpw), (BI.to_int n)), (arr_of_vars outv (BI.to_int outw), (BI.to_int m)), o, pc) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

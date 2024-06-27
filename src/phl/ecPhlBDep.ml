@@ -125,6 +125,7 @@ and brhs =
   | Const of width * zint
   | Copy  of vsymbol
   | Op    of path * bargs
+  | Nop
 
 and barg =
   | Const of width * zint
@@ -158,6 +159,7 @@ let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
        (Format.pp_print_list
           (fun fmt a -> Format.fprintf fmt "@ %a" pp_barg a))
        args
+  | Nop -> ()
 
 (* -------------------------------------------------------------------- *)
 let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
@@ -274,9 +276,12 @@ let circuit_of_bstmt (env : env) (cenv: cp_env) (((v, s), rhs) : bstmt) : cp_env
 
     | Copy (x, w) -> Option.get (CircEnv.get_s cenv x)
 
-    | Op (op, args) -> try 
+    | Op (op, args) -> begin try 
       args |> registers_of_bargs cenv |> circuit_of_path env op 
       with Not_found -> Format.eprintf "op %a not found@." EcPrinting.pp_path op; assert false
+      end
+
+    | Nop -> failwith "Nop should have been discarded already"
   in
 
   let cenv = CircEnv.bind cenv idx r in
@@ -289,6 +294,12 @@ let circuit_from_bprgm (env: env) (cenv: cp_env) (prg : bprgm) =
 
 
 let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C.reg =
+  let unary (p: path) : C.reg =
+  match (EcPath.toqsymbol p) with
+  | ["Top"; "Pervasive"], "true" -> [C.true_]
+  | q -> Format.eprintf "Non registered unary operator: %s@." (EcSymbols.string_of_qsymbol q); assert false
+  in
+  
   match f.f_node with
   (* hardcoding size for now FIXME *)
   | Fint z -> hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z)
@@ -303,11 +314,8 @@ let rec circuit_of_form (hlenv: HL.env) (env: env) (f : EcAst.form) : HL.env * C
   | Flocal idn -> 
       HL.reg hlenv ~size:(trans_wtype env f.f_ty) ~name:idn.id_symb 
       (* TODO: Check name after *)
-  | Fop (pth, _) -> 
-    let (pth, pth2) = EcPath.toqsymbol pth in
-    let () = List.iter (Format.eprintf "%s ") pth in
-    let () = Format.eprintf "@.%s@.------------@." pth2 in
-    failwith "No unary yet"
+  | Fop (pth, _) ->  
+    (hlenv, unary pth)
 
   | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
@@ -413,7 +421,17 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
          | Eapp ({ e_node = Eop (p, []) }, args) ->
             Op (p, List.map trans_arg args)
 
-         | _ -> let () = Format.eprintf "Sasgn error" in
+         | Eop (pth, _) ->
+            match (EcPath.toqsymbol pth) with
+            | ["Top"; "Pervasive"], "witness" ->
+            Format.eprintf "Don't forget to add the safety check (o )(o )@.";
+            Nop
+            | _ -> let () = Format.eprintf "Sasgn error on : %a@." 
+            (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e in
+            raise BDepError
+
+         | _ -> let () = Format.eprintf "Sasgn error on : %a@." 
+            (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e in
             raise BDepError
 
        in ((x, trans_wtype env xty), rhs)
@@ -427,7 +445,12 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
   let trans_local (x : variable) =
     (x.v_name, trans_wtype env x.v_type) in
 
-  let body : bprgm = List.map trans_instr proc.s_node in
+  let is_op (b: bstmt) : bool = 
+  match b with
+  | (_, Nop) -> false
+  | _ -> true
+  in
+  let body : bprgm = List.map trans_instr proc.s_node |> List.filter is_op in
 
   if not (List.is_unique (List.fst body)) then
     raise BDepError; 
@@ -502,6 +525,137 @@ let bdep_xpath (env : env) (p : xpath) (f: psymbol) (n : int) (m : int) (vs : st
   let _locals = List.map trans_local pdef.f_locals in
   bdep env pdef.f_body f arguments n vs m pcond
 
+(* ----------------------------------------------------------------------- *)
+(* FIXME: standardize this, maybe move to common EC lib *)
+let destruct_array_get (env: env) (f: form) : form * form =
+  match f.f_node with 
+  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_ty=t_int} as i]) when ((EcPath.toqsymbol p |> snd) = "_.[_]") ->
+    arr, i
+  | _ -> raise (DestrError "Not an array get")
+
+let destruct_array_set (env: env) (f: form) : form * BI.zint * form =
+  match f.f_node with 
+  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_node=Fint i; f_ty=t_int}; v]) when ((EcPath.toqsymbol p |> snd) = "_.[_<-_]") ->
+    arr, i, v
+  | _ -> raise (DestrError "Not an array set (with fixed index)")
+  
+let destruct_nested_array_set (env: env) (f: form) : form * (BI.zint * form) list = 
+  let rec doit acc f =
+    try
+      let arr, i, v = destruct_array_set env f in
+      doit ((i, v)::acc) arr
+    with
+      | DestrError _ -> f, acc
+  in
+  let arr, i, v = destruct_array_set env f in
+  doit [(i,v)] arr
+
+type init_variant =
+| INIT
+| MAP
+
+let destruct_array_init (f: form) : form = 
+  let p = function
+  | _, "init" -> true
+  | _ -> false in
+  let p pth = p (EcPath.toqsymbol pth) in
+  destr_app1 ~name:"init" p f
+
+
+let destruct_arr_chnk_init (f: form) : form * form * form * init_variant =
+  let fn = destruct_array_init f in
+  match fn.f_node with
+  | Fquant _ -> let binds, fb = destr_lambda fn in
+    begin
+    match fb.f_node with
+    (* map variant *)    
+    | Fapp (f, [{f_node=Fapp (chnk, [arr;_i])}]) -> (f, chnk, arr, MAP) 
+    (* init variant *)
+    | Fapp (f, [{f_node=Fapp (chnk, [arr;_i])}; {f_ty=tint}]) -> (f, chnk, arr, INIT)
+    | _ -> failwith "Unsupported form of init body"
+    end
+  | _ -> failwith "Only lambda init supported"
+
+let chunk_access (env: env) (f: path) (idx: zint) : zint Set.t =
+  let o = EcEnv.Op.by_path f env in
+  let fb = match o.op_kind with
+  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | _ -> failwith "Unknown op type"
+  in
+  let i, fb = match fb.f_node with
+  | Fquant (_, [arr; (i, i_ty)], f) -> 
+    (i, f)
+  | _ -> failwith "Wrong form for chunk"
+  in
+  let subst = EcSubst.add_flocal EcSubst.empty i (f_int idx) in
+  let eval_form = 
+    fun f -> (EcReduction.simplify EcReduction.full_red (EcEnv.LDecl.init env []) 
+    (EcSubst.subst_form subst f)
+    |> destr_int
+  ) in
+  match fb.f_node with
+  | Ftuple fs -> List.fold_left (fun acc i -> 
+    let i = (destruct_array_get env i |> snd) in
+    let i = eval_form i in
+    Set.add i acc) Set.empty fs
+  | _ -> failwith "Chunk should return tuple"
+
+let const_index_accesses_from_form (env: env) (f: form) : zint Set.t =
+  let rec doit (f: form) =
+  begin
+    let res = try
+      let arr, i = destruct_array_get env f in
+      let i = destr_int i in
+      Set.singleton i
+    with 
+    | DestrError e when e = "destr_int" ->
+      failwith "Non-constant array access"
+    | DestrError e -> 
+      (* Improve this later *)
+      match f.f_node with
+      | Fint _ -> Set.empty
+      | Fop _ -> Set.empty
+      | Fproj (f, _) -> doit f
+      | Ftuple args 
+      | Fapp (_, args) -> List.fold_left (Set.union) Set.empty (List.map doit args)
+      | _ -> Format.eprintf "%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f; 
+        failwith "Uncaught case for const idx array access"
+    in res
+  end 
+  in doit f
+
+(* ----------------------------------------------------------------------- *)
+let auto_init (env: env) (f: form) =
+  let arr_f, init_f = destr_eq f in
+  let arr, asgns = try
+    destruct_nested_array_set env arr_f
+    with
+    | DestrError _ -> Format.eprintf "arr: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) arr_f;
+      raise (DestrError "Not an array on left side") (* FIXME: improve error handling *)
+  in 
+  let f, chnk, arr, init_var = destruct_arr_chnk_init init_f in
+  assert (List.is_unique ~eq:BI.equal (List.fst asgns));
+  let chnk, _tys = destr_op chnk in
+  (* TODO: Replace above by sort (order-preserving) + unique pass ?*)
+  List.iter (fun (i, f) -> 
+    let chunk = chunk_access env chnk i in
+    let arr = const_index_accesses_from_form env f in
+    assert(Set.subset arr chunk)) asgns;
+  let rs_b = destruct_array_init init_f in
+  match destr_lambda rs_b with
+  | ([(i, i_ty)], rs_f) -> 
+  let eval_rs (idx: zint) = 
+    let subst = EcSubst.add_flocal (EcSubst.empty) i (f_int idx) in
+    EcSubst.subst_form subst rs_f
+  in
+  List.map (fun (idx, f) -> f_eq f (eval_rs idx)) asgns |> List.fold_left (fun a b -> EcTypesafeFol.f_app_safe env (EcEnv.Op.lookup_path ([], "/\\") env) [a;b]) (f_true)
+  | _ -> assert false
+  
+  
+  
+  (* Right side checks TODO *)
+  (* Array safety checks TODO *)
+  
     
 let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: psymbol) (pcond: psymbol) (tc : tcenv1)=
   (* Run bdep and check that is works FIXME *)
@@ -514,7 +668,7 @@ let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: 
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
   | FeHoareS _ -> assert false 
-  | _ -> assert false 
+  | _ -> assert false
   in
   FApi.close (!@ tc) VBdep
   
@@ -528,6 +682,11 @@ let process_bdep
 
   let env = FApi.tc1_env tc in
   let f_app_safe = EcTypesafeFol.f_app_safe in
+
+  if true then
+  let pt = auto_init (FApi.tc1_env tc) (FApi.tc1_goal tc) in
+  FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcLowGoal.t_cut pt tc) 
+  else
 
 
   (* DEBUG SECTION *)
@@ -592,8 +751,13 @@ let process_bdep
   let pinpvs = List.rev pinpvs in
   let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in
+  let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_chunk [f_int (BI.of_int n); pinpvs] in
-  let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(bits2w_op inpbty); pinpvs] in
+  let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
+  let b2w = (bits2w_op inpbty) in
+  let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
+  let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [b2w; pinpvs] in
+  let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
   let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(f_op pop [] oop.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
@@ -602,4 +766,4 @@ let process_bdep
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_conseq pre post tc in
-  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc
+  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 

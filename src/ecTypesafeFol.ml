@@ -24,6 +24,8 @@ type ty       = EcTypes.ty
 
 let (%) f g = fun x -> f (g x)
 
+exception InsufficientArguments
+
 let tfrom_tlist ty =
   let p_list = EcCoreLib.CI_List.p_list in
   match ty.ty_node with
@@ -92,18 +94,34 @@ let open_oper_ue op ue =
   let ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
   (tys, open_oper op tys)
 
-let f_app_safe (env: EcEnv.env) (f: EcPath.path) (args: form list) =
+let f_app_safe ?(full=true) (env: EcEnv.env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
   let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
   let tvars,(newt,f_kind) = open_oper_ue o_f ue in
   let rty = UE.fresh ue in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
-  EcUnify.unify env ue fty newt;
+  let () = begin
+  try
+  (EcUnify.unify env ue fty newt)
+  with 
+  | UnificationFailure (`TcCtt (ty, sp)) -> raise (UnificationFailure (`TcCtt (ty, sp)))
+  | UnificationFailure (`TyUni (ty1, ty2)) -> 
+    let pp_type = (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) in
+    Format.eprintf "Failed to unify types (%a, %a) in call to %s@." pp_type ty1 pp_type ty2 
+    (let h,t = EcPath.toqsymbol f in List.fold_right (fun a b -> a ^ "." ^ b) h t); 
+    raise (UnificationFailure (`TyUni (ty1, ty2)))
+  end 
+  in
   let uidmap = UE.assubst ue in
   let subst = Tuni.subst uidmap in
   let rty = ty_subst subst rty in
   let newt = ty_subst subst newt in
   let op = f_op p_f tvars newt in
+  if full then
+  match rty.ty_node with
+  | Tfun _ -> raise InsufficientArguments
+  | _ -> f_app op args rty
+  else
   f_app op args rty
   
   

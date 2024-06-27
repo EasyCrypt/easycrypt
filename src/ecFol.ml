@@ -1136,6 +1136,3 @@ let rec dump_f f =
   | FeagerF _ -> "eagerF"
   | Fcoe _ -> "Fcoe"
 
-
-let f_append_safe env a b = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_append [a;b]
-let f_cons_safe env a b = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_cons [a;b]

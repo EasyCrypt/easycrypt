@@ -284,7 +284,7 @@ let process_unroll_for side cpos tc =
       match sform_of_form (simplify full_red hyps cond) with
       | SFtrue  -> true
       | SFfalse -> false
-      | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in
+      | _       -> Format.eprintf "condition after simplify: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) (simplify full_red hyps cond); tc_error !!tc "while loop condition does not reduce to a constant" in
 
   let rec eval_cond z0 =
     if test_cond z0 then z0 :: eval_cond (incrz z0) else [z0] in
