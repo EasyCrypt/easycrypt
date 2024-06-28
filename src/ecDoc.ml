@@ -30,8 +30,9 @@ let c_section_intro (gdoc : string list) =
   | [] -> []
   | _ ->  [
             let ids = "Introduction" in
-            section ~a:[a_id ids; a_title ids] [
-              div (List.map (fun s -> p [txt s]) gdoc)
+            section ~a:[a_id ids; a_title ids; a_class ["intro-section"]] [
+              div ~a:[a_class ["intro-text-container"]] 
+                  (List.map (fun s -> p ~a:[a_class ["intro-text-par"]] [txt s]) gdoc)
             ]
           ]
   
@@ -51,12 +52,12 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
            | None -> c_filename ?ext:(Some ".html") [th; subth]
            | Some supf -> c_filename ?ext:(Some ".html") [supf; th; subth]
           in
-          li ~a:[a_id (itemkind_str_pl ik ^ subth)] ([
-            div [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
-            div [p [txt hdoc]]
+          li ~a:[a_id (itemkind_str_pl ik ^ subth); a_class ["item-entry"]] ([
+            div ~a:[a_class ["item-name"]] [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
+            div ~a:[a_class ["item-basic-desc"]] [txt hdoc]
           ] @ (if tdoc <> []
-               then [details (summary [])
-                             (List.map (fun d -> p [txt d]) tdoc)]
+               then [details ~a:[a_class ["item-details"]] (summary [])
+                             (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc)]
                else []))
       | _ -> assert false
     end
@@ -70,17 +71,19 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
               else if List.length doc = 1 then List.hd doc, []
               else List.hd doc, List.tl doc
             in
-            li [
-              div [txt nm]; 
-              div [p [txt hdoc]]; 
-              details (summary [])
-                      (List.map (fun d -> p [txt d]) tdoc 
-                       @ [div [txt "Source:"; pre [code [txt psrc]]]])
+            li ~a:[a_class ["item-entry"]] [
+              div ~a:[a_class ["item-name"]] [txt nm]; 
+              div ~a:[a_class ["item-basic-desc"]] [txt hdoc]; 
+              details ~a:[a_class ["item-details"]] (summary [])
+                      (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc 
+                       @ [div ~a:[a_class ["source-container"]] 
+                              [txt "Source:"; pre ~a:[a_class ["source"]] [txt psrc]]])
             ]
 
 let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) =
   [
-    ul (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik) lents_ik)
+    ul ~a:[a_class ["item-list"]] 
+      (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik) lents_ik)
   ]
 
 let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) =
@@ -96,16 +99,16 @@ let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.doce
       | [] -> []
       | _ ->  [
                 let iks = itemkind_str_pl ik in
-                section ~a:[a_id iks; a_title iks] [
-                  h2 [txt iks];
-                  div (c_section_main_itemkind ?supthf th lents_ik)
+                section ~a:[a_id iks; a_title iks; a_class ["item-section"]] [
+                  h2 ~a:[a_class ["section-heading"]] [txt iks];
+                  div ~a:[a_class ["item-list-container"]] (c_section_main_itemkind ?supthf th lents_ik)
                 ]
               ]
       ) 
     iks)
 
 let c_body ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.body] elt =
-  let page_heading = h1 [txt tstr] ::  
+  let page_heading = h1 ~a:[a_class ["page-heading"]] [txt tstr] ::  
     match supths with
     | None -> []
     | Some sup ->
@@ -113,7 +116,7 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
           | None -> assert false
           | Some supf ->  
               [
-                h5 [
+                h2 ~a:[a_class ["page-subheading"]] [
                   txt ("Subtheory of ");
                   a ~a:[a_href (Xml.uri_of_string (supf ^ ".html" ^ "#" ^ itemkind_str_pl `Theory ^ th))] [txt sup]
                 ]
