@@ -23,6 +23,14 @@ module Version : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
+type coq_mode =
+  | Check (* Check scripts *)
+  | Edit  (* Edit then check scripts *)
+  | Fix   (* Try to check script, then edit script on non-success *)
+
+(* -------------------------------------------------------------------- *)
+
 type prover_eviction = [
   | `Inconsistent
 ]
@@ -76,3 +84,7 @@ type notify = EcGState.loglevel -> string Lazy.t -> unit
 
 val execute_task : ?notify:notify -> prover_infos -> Why3.Task.task -> bool option
 val get_w3_th : string list -> string -> Why3.Theory.theory
+
+val get_w3_main : unit -> Why3.Whyconf.main
+val get_w3_env : unit -> Why3.Env.env
+val get_w3_conf : unit -> Why3.Whyconf.config

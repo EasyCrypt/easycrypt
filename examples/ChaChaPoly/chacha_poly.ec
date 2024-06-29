@@ -1265,8 +1265,10 @@ qed.
 lemma filter_test_poly_in n lc r amt : 
   test_poly_in n lc r amt = test_poly_in n (filter (fun c:ciphertext => c.`1 = n) lc) r amt.
 proof.
-move:amt=> [] a m t; rewrite/test_poly_in /=; case: (valid_topol a m) => //= *.
-smt(filter_predI). 
+  move:amt=> [] a m t; rewrite/test_poly_in /=; case: (valid_topol a m) => //= *.
+  rewrite - filter_predI.
+  rewrite /predI.
+  smt().
 qed.
 
 
@@ -1442,7 +1444,8 @@ section PROOFS.
       have := StdOrder.IntOrder.mulr_ge0 (C.max_counter - i{2}) block_size.
       smt (ge0_block_size).
     wp; skip=> &1 &2 [#] //= 4!->> h1 h2 h3 2!<<- //=.
-    rewrite size_map //=; do!split; smt (max_cipher_size_ok).
+    rewrite size_map //=; do ! split;
+    [smt (max_cipher_size_ok)| smt ()| smt () | smt ()| smt()].
   qed.
 
   local lemma step3 &m:  
@@ -1693,7 +1696,11 @@ section PROOFS.
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
           move => &hr; elim (p2{hr}) => //. 
           clear &hr.
-          smt (size_drop size_eq0 gt0_block_size).
+          move => x2 l h1 [h2 h3].
+          clear h1 h2.
+          rewrite size_drop.
+          smt (gt0_block_size).
+          smt (gt0_block_size size_ge0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
       + by move=> &2 _; islossless.
@@ -2488,7 +2495,7 @@ section PROOFS.
   swap 3 1; swap [4..6] 12; wp -10 -10=> /=.
   swap 4 4; wp -1 -1.
   conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); [2:sim=> /> /#].
-  move=> /> &1 &2 *; do ! split => />.
+  move=> /> &1 &2 ????????????????? t. do ! split => />.
   - smt().  
   - smt().  
   - rewrite size_cat !size_map make_lbad1_size_cons3 //= /#.
@@ -2500,8 +2507,12 @@ section PROOFS.
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(List.mem_filter mem_cat mapP).
-  qed.
+  move => [] h. smt(List.mem_filter mem_cat mapP).
+  move => h1.
+  exists (t,t);split;[|auto].
+  apply mem_cat; right; apply mapP.
+  exists t; split; [apply h1 | auto].
+qed.
 
   local clone EventPartitioning as EP with 
     type input <- unit,
