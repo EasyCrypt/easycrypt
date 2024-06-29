@@ -527,15 +527,25 @@ let bdep_xpath (env : env) (p : xpath) (f: psymbol) (n : int) (m : int) (vs : st
 
 (* ----------------------------------------------------------------------- *)
 (* FIXME: standardize this, maybe move to common EC lib *)
+let op_is_arr_get (p: path) : bool =
+  match (EcPath.toqsymbol p) with
+  | ["Top"; thr; _], "_.[_]" when String.starts_with thr "Array" -> true
+  | _ -> false
+  
+let op_is_arr_set (p: path) : bool =
+  match (EcPath.toqsymbol p) with
+  | ["Top"; thr; _], "_.[_<-_]" when String.starts_with thr "Array"  -> true
+  | _ -> false
+
 let destruct_array_get (env: env) (f: form) : form * form =
   match f.f_node with 
-  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_ty=t_int} as i]) when ((EcPath.toqsymbol p |> snd) = "_.[_]") ->
+  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_ty=t_int} as i]) when op_is_arr_get p ->
     arr, i
   | _ -> raise (DestrError "Not an array get")
 
 let destruct_array_set (env: env) (f: form) : form * BI.zint * form =
   match f.f_node with 
-  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_node=Fint i; f_ty=t_int}; v]) when ((EcPath.toqsymbol p |> snd) = "_.[_<-_]") ->
+  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_node=Fint i; f_ty=t_int}; v]) when op_is_arr_set p ->
     arr, i, v
   | _ -> raise (DestrError "Not an array set (with fixed index)")
   
@@ -598,6 +608,10 @@ let chunk_access (env: env) (f: path) (idx: zint) : zint Set.t =
     let i = (destruct_array_get env i |> snd) in
     let i = eval_form i in
     Set.add i acc) Set.empty fs
+  | Fapp _ -> let i = fb in (* FIXME: write better code here *)
+    let i = (destruct_array_get env i |> snd) in
+    let i = eval_form i in
+    Set.singleton i
   | _ -> failwith "Chunk should return tuple"
 
 let const_index_accesses_from_form (env: env) (f: form) : zint Set.t =
@@ -618,6 +632,15 @@ let const_index_accesses_from_form (env: env) (f: form) : zint Set.t =
       | Fproj (f, _) -> doit f
       | Ftuple args 
       | Fapp (_, args) -> List.fold_left (Set.union) Set.empty (List.map doit args)
+      | Fif (cond, ft, ff) -> let ca = doit cond in
+        let ta = doit ft in
+        let tf = doit ff in
+        if (Set.equal ta tf) then Set.union ca ta 
+        else begin match (EcReduction.simplify EcReduction.full_red (LDecl.init env []) cond).f_node with
+        | Fop (p, _) when p = EcCoreLib.CI_Bool.p_true -> Set.union ca ta
+        | Fop (p, _) when p = EcCoreLib.CI_Bool.p_false -> Set.union ca tf
+        | _ -> failwith "Non-closed if condition with different array accesses in branches"
+        end      
       | _ -> Format.eprintf "%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f; 
         failwith "Uncaught case for const idx array access"
     in res
@@ -640,7 +663,15 @@ let auto_init (env: env) (f: form) =
   List.iter (fun (i, f) -> 
     let chunk = chunk_access env chnk i in
     let arr = const_index_accesses_from_form env f in
-    assert(Set.subset arr chunk)) asgns;
+    if not (Set.subset arr chunk) then
+    begin
+     Format.eprintf "arr accesses: @.";
+     Set.iter (Format.eprintf "%s ") (Set.map BI.to_string arr);
+     Format.eprintf "chunk accesses: @.";
+     Set.iter (Format.eprintf "%s ") (Set.map BI.to_string chunk);
+     Format.eprintf "@."
+    end;
+     assert(Set.subset arr chunk)) asgns;
   let rs_b = destruct_array_init init_f in
   match destr_lambda rs_b with
   | ([(i, i_ty)], rs_f) -> 
