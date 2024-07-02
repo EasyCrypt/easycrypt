@@ -36,6 +36,7 @@ type ident = Ident.ident
 type deps = ((int * int) * int C.VarRange.t) list
 
 (* -------------------------------------------------------------------- *)
+(* Should be merged with usual EcEnv TODO *)
 module CircEnv : sig
   type env
 
@@ -190,55 +191,6 @@ let registers_of_bargs (env : cp_env) (args : bargs) : C.reg list =
   List.map (register_of_barg env) args
 
 (* -------------------------------------------------------------------- *)
-(* let print_deps ~name (env : cp_env) (r : C.reg)  = *)
-  (* let deps = C.deps r in *)
-
-  (* List.iter (fun ((lo, hi), deps) -> *)
-    (* let vs = *)
-         (* Enum.(--) lo hi *)
-      (* |> Enum.fold (fun vs i -> *)
-           (* let name = Format.sprintf "%s_%03d" name (i / 256) in *)
-           (* C.VarRange.push vs (name, i mod 256) *)
-         (* ) C.VarRange.empty in *)
-
-    (* Format.eprintf "%a: %a@." *)
-      (* (C.VarRange.pp Format.pp_print_string) vs *)
-      (* (C.VarRange.pp *)
-         (* (fun fmt i -> *)
-            (* let name = Ident.name (Option.get (CircEnv.lookup_id env i)) in *)
-            (* Format.fprintf fmt "%s" name)) *)
-      (* deps *)
-  (* ) deps *)
-
-
-(* FIXME: TEMPORARY DEV FUNCTION, TO BE DELETED *)
-(* let print_deps_alt ~name (r : C.reg)  = *)
-  (* let deps = C.deps r in *)
-
-  (* List.iter (fun ((lo, hi), deps) -> *)
-    (* let vs = *)
-         (* Enum.(--) lo hi *)
-      (* |> Enum.fold (fun vs i -> *)
-           (* let name = Format.sprintf "%s_%03d" name (i / 256) in *)
-           (* C.VarRange.push vs (name, i mod 256) *)
-         (* ) C.VarRange.empty in *)
-
-    (* Format.eprintf "%a: %a@." *)
-      (* (C.VarRange.pp Format.pp_print_string) vs *)
-      (* (C.VarRange.pp *)
-         (* (fun fmt i -> *)
-            (* Format.fprintf fmt "%d" i)) *)
-      (* deps *)
-  (* ) deps *)
-
-
-
-(* -------------------------------------------------------------------- *)
-(* let print_deps_ric (env : cp_env) (r : string) = *)
-  (* let circ = Option.get (CircEnv.get_s env r) in *)
-  (* print_deps env circ ~name:r *)
-
-(* -------------------------------------------------------------------- *)
 (* ?? *)
 let circ_dep_split (r : C.reg) : C.reg list =
   let deps = C.deps r in
@@ -248,10 +200,7 @@ let circ_dep_split (r : C.reg) : C.reg list =
   ) r deps |> snd
 
 (* ------------------------------------------------------------------------------- *)
-(* this needs cleanup and refactoring 
-  Make the translation to SMT more conscious of semantics
-  and of definitions on the upper level (variable and such)
-*)
+(* Needs better integration with EC  *)
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -715,8 +664,14 @@ let process_bdep
   let f_app_safe = EcTypesafeFol.f_app_safe in
 
   if true then
-  let pt = auto_init (FApi.tc1_env tc) (FApi.tc1_goal tc) in
+  begin
+  if true then
+  let smt = EcBitvector.bitvector_to_smtlib env (FApi.tc1_goal tc) in
+  Format.eprintf "%s@." smt; assert false
+  else
+  let pt = auto_init env (FApi.tc1_goal tc) in
   FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcLowGoal.t_cut pt tc) 
+  end
   else
 
 

@@ -4056,6 +4056,9 @@ global_action:
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }
 
+| BIND BDEP t=qoident
+  { Gtest t }
+
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }
 | PRAGMA MINUS x=pragma { Goption (x, `Bool false) }

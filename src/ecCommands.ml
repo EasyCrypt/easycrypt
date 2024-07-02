@@ -646,6 +646,15 @@ and process_bind_bitstring (scope : EcScope.scope) (tb: pqsymbol) (fb: pqsymbol)
 and process_bind_circuit (scope : EcScope.scope) (o: pqsymbol) (c: string) =
   EcScope.Circ.add_circuit scope o c
 
+and process_test (scope: EcScope.scope ) (q: pqsymbol) =
+  let env = EcScope.env scope in
+  let p, op = EcEnv.Op.lookup q.pl_desc env in
+  let f = match op.op_kind with
+  | OB_oper (Some (OP_Plain (f, _))) -> f 
+  | _ -> failwith "Unsupported op for SMTLib"
+  in
+  Format.eprintf "SMTLIB: @.%s@." @@ EcBitvector.bitvector_to_smtlib (EcScope.env scope) f
+
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
@@ -691,6 +700,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gbdep        (proc, f, n, m, vs, b) -> `State (fun scope -> process_bdep scope (proc, f, n, m, vs, b))
       | Gbbitstring  (tb, fb, t, n) -> `Fct (fun scope -> process_bind_bitstring scope tb fb t n )
       | Gbcircuit (o, c) -> `Fct (fun scope -> process_bind_circuit scope o c)
+      | Gtest p -> `State (fun scope -> process_test scope p)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

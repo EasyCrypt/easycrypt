@@ -66,10 +66,10 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
-let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
+let tunit      = tconstr EcCoreLib.CI_Unit.p_unit    []
+let tbool      = tconstr EcCoreLib.CI_Bool.p_bool    []
+let tint       = tconstr EcCoreLib.CI_Int.p_int     []
+let txint      = tconstr EcCoreLib.CI_xint.p_xint    []
 
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
 let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
