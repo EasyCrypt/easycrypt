@@ -1819,7 +1819,7 @@ module Mod = struct
       | _  ->
         let me_params = clearparams (List.length args) me.me_params in
 
-        let me_oinfos =       
+        let me_oinfos =
           let keep = List.map (EcPath.mident |- fst) me_params in
           let keep = Sm.of_list keep in
           Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) me.me_oinfos in
@@ -1893,7 +1893,7 @@ module Mod = struct
         match me.me_body with
         | ME_Decl (mty, mr) ->
           let mr =
-            mr_add_restr mr (ur_empty xs) (ur_empty Sm.empty) in
+            mr_add_restr mr (ur_empty (xs, Sm.empty)) in
           { me with me_body = ME_Decl (mty, mr) }
         | _ -> me
       in
@@ -1983,34 +1983,6 @@ module Mod = struct
   let declare_local id modty env =
     { (bind_local id modty env) with
         env_modlcs = Sid.add id env.env_modlcs; }
-
-  let add_restr_to_locals (rx : Sx.t use_restr) (rm : Sm.t use_restr) env =
-
-    let update_id id mods =
-      let update me =
-        match me.me_body with
-        | ME_Decl (mty, mr) ->
-          let mr = mr_add_restr mr rx rm in
-          { me with me_body = ME_Decl (mty, mr) }
-        | _ -> me
-      in
-      MMsym.map_at
-        (List.map
-           (fun (ip, (me, lc)) ->
-             if   ip = IPIdent (id, None)
-             then (ip, (update me, lc))
-             else (ip, (me, lc))))
-        (EcIdent.name id) mods
-    in
-    let envc =
-      let mc_modules =
-        Sid.fold update_id env.env_modlcs
-          env.env_current.mc_modules
-      in { env.env_current with mc_modules } in
-    let en = !(env.env_norm) in
-    let norm = { en with get_restr_use = Mm.empty } in
-    { env with env_current = envc;
-      env_norm = ref norm; }
 
   let is_declared id env = Sid.mem id env.env_modlcs
 
@@ -2366,18 +2338,12 @@ module NormMp = struct
     item_use env Sid.empty (ref Sx.empty) mp use_empty item
 
   let restr_use env (mr : mod_restr) =
-    let get_use sx sm =
+    let get_use (sx, sm) =
       Sx.fold (fun xp r -> add_var env xp r) sx use_empty
       |> Sm.fold (fun mp r -> use_union r (mod_use env mp)) sm in
 
-    (* If any of the two positive restrictions is [None], then anything is
-       allowed. *)
-    let ur_pos = match mr.mr_xpaths.ur_pos, mr.mr_mpaths.ur_pos with
-      | None, _ | _, None -> None
-      | Some sx, Some sm -> some @@ get_use sx sm in
-
-    { ur_pos = ur_pos;
-      ur_neg = get_use mr.mr_xpaths.ur_neg mr.mr_mpaths.ur_neg; }
+    { ur_pos = omap get_use mr.ur_pos;
+      ur_neg = get_use mr.ur_neg; }
 
   let get_restr_use env mp =
     try

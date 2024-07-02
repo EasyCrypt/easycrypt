@@ -284,10 +284,9 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     on_ty cb f.EcAst.f_ty; fornode ()
 
 and on_restr (cb : cb) (restr : mod_restr) =
-  Sx.iter (on_xp cb) restr.mr_xpaths.ur_neg;
-  oiter (Sx.iter (on_xp cb)) restr.mr_xpaths.ur_pos;
-  Sm.iter (on_mp cb) restr.mr_mpaths.ur_neg;
-  oiter (Sm.iter (on_mp cb)) restr.mr_mpaths.ur_pos
+  let doit (xs, ms) = Sx.iter (on_xp cb) xs; Sm.iter (on_mp cb) ms in
+  oiter doit restr.ur_pos;
+  doit restr.ur_neg
 
 and on_modty cb (mty : module_type) =
   cb (`ModuleType mty.mt_name);

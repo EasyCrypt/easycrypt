@@ -32,7 +32,7 @@ val mr_empty : mod_restr
 val mr_full  : mod_restr
 
 val mr_add_restr :
-  mod_restr -> Sx.t use_restr -> Sm.t use_restr -> mod_restr
+  mod_restr -> mod_restr -> mod_restr
 
 val change_oicalls : oracle_infos -> string -> xpath list -> oracle_infos
 

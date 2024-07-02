@@ -1883,11 +1883,10 @@ and pp_mem_restr ppe fmt mr =
     if b then Format.fprintf fmt "%s" all_mem_sym else () in
 
   let xpos_emp =
-    EcPath.Sx.is_empty (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos) in
+    EcPath.Sx.is_empty (odfl EcPath.Sx.empty (mr_xpaths mr).ur_pos) in
   let mpos_emp =
-    (EcPath.Sm.is_empty (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)) in
-  let all_mem =
-    mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
+    EcPath.Sm.is_empty (odfl EcPath.Sm.empty (mr_mpaths mr).ur_pos) in
+  let all_mem = mr.ur_pos = None in
 
   let printed = ref (all_mem) in
   let pp_sep fmt b =
@@ -1896,19 +1895,19 @@ and pp_mem_restr ppe fmt mr =
     if b' then Format.fprintf fmt ",@ " else () in
 
   if all_mem &&
-     EcPath.Sm.is_empty mr.mr_mpaths.ur_neg &&
-     EcPath.Sx.is_empty mr.mr_xpaths.ur_neg
+     EcPath.Sm.is_empty (mr_mpaths mr).ur_neg &&
+     EcPath.Sx.is_empty (mr_xpaths mr).ur_neg
   then ()
   else Format.fprintf fmt "@[<h>{%a%a%a%a%a%a%a%a%a}@]@ "
       pp_top (all_mem)
       pp_sep xpos_emp
-      (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
+      (pp_rx true) (odfl EcPath.Sx.empty (mr_xpaths mr).ur_pos)
       pp_sep mpos_emp
-      (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
-      pp_sep (EcPath.Sx.is_empty mr.mr_xpaths.ur_neg)
-      (pp_rx false) mr.mr_xpaths.ur_neg
-      pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
-      (pp_r false) mr.mr_mpaths.ur_neg
+      (pp_r true) (odfl EcPath.Sm.empty (mr_mpaths mr).ur_pos)
+      pp_sep (EcPath.Sx.is_empty (mr_xpaths mr).ur_neg)
+      (pp_rx false) (mr_xpaths mr).ur_neg
+      pp_sep (EcPath.Sm.is_empty (mr_mpaths mr).ur_neg)
+      (pp_r false) (mr_mpaths mr).ur_neg
 
 (* -------------------------------------------------------------------- *)
 (* Use in an hv box. *)
@@ -1916,7 +1915,7 @@ and pp_mty_mr ppe fmt (mty, mr) =
   Format.fprintf fmt "@[<hv 2>%a%a@]"
     (pp_modtype1 ppe) mty
     (pp_mem_restr ppe) mr
-  
+
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
   Format.fprintf fmt "@[<hv 2>%a@]" (pp_modtype1 ppe) mty

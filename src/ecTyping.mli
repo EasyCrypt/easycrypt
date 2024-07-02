@@ -164,6 +164,7 @@ type tyerror =
 | LvMapOnNonAssign
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
+| PositiveShouldBeBeforeNegative
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -246,7 +247,7 @@ val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
 val trans_oracle     : env -> psymbol * psymbol -> xpath
-val trans_restr_mem  : env -> pmod_restr_mem -> Sx.t use_restr * Sm.t use_restr
+val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 
 val trans_args :
      EcEnv.env
