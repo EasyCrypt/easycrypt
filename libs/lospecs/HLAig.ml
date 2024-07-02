@@ -2,14 +2,14 @@ type node = Aig.node
 type reg = Aig.reg
 
 type input = string * int
-type tdeps = (string, int Set.t) Map.t
+type tdeps = (int, int Set.t) Map.t
 type tdblock = (int * tdeps)
 
 module Hashtbl = Batteries.Hashtbl
 
 module Env : sig
   type env
-  
+
   val id : env -> string -> env * int
   val get : env -> string -> int
   val get_opt : env -> string -> int option
@@ -18,6 +18,7 @@ module Env : sig
   val input_of_var : env -> Aig.var -> input
   val var_of_input : env -> input -> Aig.var
   val empty: env
+  val namer_of_env : env -> (int -> string)
 
 end = struct
   type env = {
@@ -63,6 +64,9 @@ end = struct
 
   let var_of_input (env: env) ((s, i): input) =
     (get env s, i)
+
+  let namer_of_env (env: env) : int -> string =
+    fun i -> get_reverse env i
 end
 
 type env = Env.env
@@ -78,6 +82,16 @@ let input (env: env) ((s,i) : input) =
 let reg (env: env) ~(size : int) ~(name : string) : env * reg =
   let (env, id) = Env.id env name in
   (env, Circuit.reg ~size:size ~name:id)
+
+(* Checks that variable v does not appear in the circuit  *)
+let check_sub (env: env) (v: string) (circ: reg) : bool =
+  let rec doit (c: node) : bool = 
+    match c.gate with
+    | False -> true
+    | And (n1, n2) -> (doit n1) && (doit n2)
+    | Input (c, i) -> (Env.get_reverse env c) <> v
+  in
+  List.for_all doit circ
 
 (* ------------------------------------------------------------------------------- *)
 (* FIXME: CHECK THIS *)
@@ -174,7 +188,7 @@ let evals (env: env) (aenv : input -> bool) =
   aenv @@ Env.input_of_var env var
   in Aig.evals aenv 
 
-let rec dep (env: env) : _ -> tdeps = 
+let rec dep : _ -> tdeps = 
   let cache : (int, tdeps) Hashtbl.t = Hashtbl.create 0 in
 
   let rec doit (n: Aig.node) : tdeps = 
@@ -188,13 +202,13 @@ let rec dep (env: env) : _ -> tdeps =
   and doit_r (n: Aig.node_r) =
     match n with
     | False -> Map.empty
-    | Input v -> Map.add (Env.get_reverse env (fst v)) (Set.add (snd v) (Set.empty)) Map.empty
+    | Input (v, i) -> Map.add v (Set.add i (Set.empty)) Map.empty
     | And (n1, n2) -> Map.union_stdlib (fun k s1 s2 -> Some (Set.union s1 s2)) (doit n1) (doit n2)
 
   in fun n -> doit n
 
-let deps (env: env) (n: reg) : tdeps array = 
-  List.map (dep env) n |> Array.of_list
+let deps (n: reg) : tdeps array = 
+  List.map dep n |> Array.of_list
 
 let block_deps (d: tdeps array) : tdblock list =
   let drop_while_count (f: 'a -> bool) (l: 'a list) : int * ('a list) =
@@ -256,7 +270,7 @@ let collapse_blocks (d: tdblock list) : tdblock option =
     (Some h) t
 
 (* -------------------------------------------------------------------- *)
-let rec pp_node (env: env) (fmt : Format.formatter) (n : node) =
+let rec pp_node ?(namer=string_of_int) (env: env) (fmt : Format.formatter) (n : node) =
   match n with
   | { gate = False; id } when 0 < id ->
     Format.fprintf fmt "⊥"
@@ -264,8 +278,8 @@ let rec pp_node (env: env) (fmt : Format.formatter) (n : node) =
   | { gate = False; } ->
     Format.fprintf fmt "⊤"
 
-  | { gate = Input var; id; } ->
-    let (s, i) = Env.input_of_var env var in
+  | { gate = Input (v, i); id; } ->
+    let s = namer v in
     Format.fprintf fmt "%s%s#%0.4x"
       (if 0 < id then "" else "¬") s i
 
@@ -275,19 +289,19 @@ let rec pp_node (env: env) (fmt : Format.formatter) (n : node) =
   | { gate = And (n1, n2); } ->
     Format.fprintf fmt "¬((%a) ∧ (%a))" (pp_node env) n1 (pp_node env) n2
 
-let pp_dep (fmt : Format.formatter) (d: tdeps) : unit =
+let pp_dep ?(namer = string_of_int) (fmt : Format.formatter) (d: tdeps) : unit =
   let print_set fmt s = Set.iter (Format.fprintf fmt "%d ") s in
-  Map.iter (fun name ints -> Format.fprintf fmt "%s: %a" name print_set ints) d
+  Map.iter (fun id ints -> Format.fprintf fmt "%s: %a@." (namer id) print_set ints) d
 
-let pp_deps (fmt: Format.formatter) (ds: tdeps list) : unit = 
-  List.iter (pp_dep fmt) ds
+let pp_deps ?(namer = string_of_int) (fmt: Format.formatter) (ds: tdeps list) : unit = 
+  List.iteri (fun i d -> Format.fprintf fmt "Output #%d:@.%a@." i (pp_dep ~namer) d) ds
 
-let pp_bdep ?(start_index = 0) ?(name="") (fmt: Format.formatter) ((n, d): tdblock) : unit =
-  Format.fprintf fmt "[%d-%d]%s:@." start_index (start_index+n-1) name;
-  pp_dep fmt d
+let pp_bdep ?(start_index = 0) ?(oname="") ?(namer=string_of_int) (fmt: Format.formatter) ((n, d): tdblock) : unit =
+  Format.fprintf fmt "[%d-%d]%s:@." start_index (start_index+n-1) oname;
+  pp_dep ~namer fmt d
 
-let pp_bdeps ?(name="") (fmt: Format.formatter) (bs: tdblock list) : unit =
-  List.fold_left (fun acc (n,d) -> (pp_bdep ~start_index:acc ~name:name fmt (n,d)); acc + n) 0 bs |> ignore
+let pp_bdeps ?(oname="") ?(namer=string_of_int) (fmt: Format.formatter) (bs: tdblock list) : unit =
+  List.fold_left (fun acc (n,d) -> (pp_bdep ~start_index:acc ~oname ~namer fmt (n,d)); acc + n) 0 bs |> ignore
 
 (* -------------------------------------------------------------------- *)
 let zpad (n: int) (r: Aig.reg)  = 
@@ -301,27 +315,27 @@ let single_var_equiv_precheck (env: env) (r1: reg) (r2: reg) : bool =
     (r1, zpad (List.length r1) r2)
   in
 
-  let d1 = deps env r1 |> Array.to_list |> tdblock_of_tdeps in 
-  let d2 = deps env r2 |> Array.to_list |> tdblock_of_tdeps in
+  let d1 = deps r1 |> Array.to_list |> tdblock_of_tdeps in 
+  let d2 = deps r2 |> Array.to_list |> tdblock_of_tdeps in
   if not (compare_tdblocks d1 d2) 
   then false
   else true 
   (* FIXME: find some better way of doing this *)
 
 
-let circ_equiv_bitwuzla (env: env) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
+let circ_equiv_bitwuzla (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
   let module B = Bitwuzla.Once () in
   let open B in
   let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
-  assert (single_var_equiv_precheck env r1 r2);
-  Format.eprintf "%a@." (pp_deps) (deps env r1 |> Array.to_list);
-  Format.eprintf "%a@." (pp_deps) (deps env r2 |> Array.to_list);
-  let inp1 = inputs_of_reg r1 |> Set.to_list in
-  let inp2 = inputs_of_reg r2 |> Set.to_list in
-  let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in
-  let inps = Map.of_seq (List.to_seq inps) in
-  let env_ (v : Aig.var) = Option.map Aig.input (Map.find_opt v inps) in
-  let r1 = (Aig.maps env_ r1) in
+  (* assert (single_var_equiv_precheck env r1 r2); *)
+  Format.eprintf "%a@." (fun fmt -> pp_deps fmt) (deps r1 |> Array.to_list);
+  Format.eprintf "%a@." (fun fmt -> pp_deps fmt) (deps r2 |> Array.to_list);
+  (* let inp1 = inputs_of_reg r1 |> Set.to_list in *)
+  (* let inp2 = inputs_of_reg r2 |> Set.to_list in *)
+  (* let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in *)
+  (* let inps = Map.of_seq (List.to_seq inps) in *)
+  (* let env_ (v : Aig.var) = Option.map Aig.input (Map.find_opt v inps) in *)
+  (* let r1 = (Aig.maps env_ r1) in *)
 
   let rec bvterm_of_node : Aig.node -> _ =
     let cache = Hashtbl.create 0 in
@@ -341,7 +355,7 @@ let circ_equiv_bitwuzla (env: env) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.no
     and doit_r (n : Aig.node_r) = 
       match n with
       | False -> Term.Bv.zero (Sort.bv 1) 
-      | Input v -> let name = ("BV_" ^ (Env.get_reverse env (fst v)) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+      | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
       begin 
         match Map.String.find_opt name !bvvars with
         | None ->

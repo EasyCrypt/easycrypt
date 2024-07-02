@@ -3841,7 +3841,7 @@ end = struct
   let lookup_bitstring_size (env: env) (ty: ty) : int option =
     match ty.ty_node with
     | Tconstr (p, []) -> lookup_bitstring_size_path env p
-    | _ -> assert false
+    | _ -> None
 
   let lookup_circuit (env: env) (o: qsymbol) : string option =
     let p, _o = Op.lookup o env in

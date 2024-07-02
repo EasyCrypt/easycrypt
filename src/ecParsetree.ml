@@ -1314,7 +1314,7 @@ type global_action =
   | Gbdep        of pgamepath * psymbol * int * int * (string list) * psymbol
   | Gbbitstring  of pqsymbol * pqsymbol * pty * int
   | Gbcircuit    of pqsymbol * string
-  | Gtest        of pqsymbol
+  | Gtest        of pqsymbol * pqsymbol
 
 type global = {
   gl_action : global_action located;

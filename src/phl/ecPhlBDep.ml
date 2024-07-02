@@ -310,7 +310,7 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
   (* DEBUG PRINTS FOR OP CIRCUIT *)
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = HL.inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  let () = Format.eprintf "%a@." HL.pp_deps (HL.deps hlenv fc |> Array.to_list) in
+  let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc |> Array.to_list) in
 
   
   let condition = EcEnv.Op.lookup ([], pcond.pl_desc) env |> snd in
@@ -439,9 +439,10 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
       end;
       (* ADD CHECK THAT CIRCUIT HAS THE CORRECT DEPENDENCY NUMBERS *)
       let () = assert (List.for_all (HL.circ_equiv hlenv (List.hd circs)) (List.tl circs)) in 
-      let () = List.iteri (fun i r -> Format.eprintf "Op[%d] deps: %a@." i HL.pp_dep (HL.dep hlenv r)) fc in
-      let () = Format.eprintf "Cond deps: %a@." HL.pp_dep (HL.dep hlenv condition)  in
-      let () = assert (HL.circ_equiv_bitwuzla hlenv (List.hd circs) fc condition) in
+      let () = List.iteri (fun i r -> Format.eprintf "Op[%d] deps: %a@." i (fun fmt -> HL.pp_dep fmt) (HL.dep r)) fc in
+      let () = Format.eprintf "Cond deps: %a@." (fun fmt -> HL.pp_dep fmt) (HL.dep condition)  in
+      (* let () = assert (HL.circ_equiv_bitwuzla hlenv (List.hd circs) fc condition) in *)
+      let () = assert (HL.circ_equiv_bitwuzla (List.hd circs) fc condition) in
       Format.eprintf "Success@."
   end 
 
@@ -664,14 +665,8 @@ let process_bdep
   let f_app_safe = EcTypesafeFol.f_app_safe in
 
   if true then
-  begin
-  if true then
-  let smt = EcBitvector.bitvector_to_smtlib env (FApi.tc1_goal tc) in
-  Format.eprintf "%s@." smt; assert false
-  else
   let pt = auto_init env (FApi.tc1_goal tc) in
   FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcLowGoal.t_cut pt tc) 
-  end
   else
 
 
