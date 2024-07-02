@@ -644,13 +644,8 @@ and subst_oracle_infos (s : subst) (ois : oracle_infos) =
 
     (* -------------------------------------------------------------------- *)
 and subst_mod_restr (s : subst) (mr : mod_restr) =
-  let rx = ur_app (fun set -> EcPath.Sx.fold (fun x r ->
-      EcPath.Sx.add (subst_xpath s x) r
-    ) set EcPath.Sx.empty) mr.mr_xpaths in
-  let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
-      EcPath.Sm.add (subst_mpath s x) r
-    ) set EcPath.Sm.empty) mr.mr_mpaths in
-  { mr_xpaths = rx; mr_mpaths = r; }
+  let subst_ (xs, ms) = Sx.map (subst_xpath s) xs, Sm.map (subst_mpath s) ms in
+  ur_app subst_ mr
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body_item (s : subst) (item : module_sig_body_item) =

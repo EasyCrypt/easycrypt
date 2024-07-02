@@ -40,15 +40,7 @@ type 'a use_restr = {
 }
 
 type mr_xpaths = EcPath.Sx.t use_restr
-
 type mr_mpaths = EcPath.Sm.t use_restr
-
-(* -------------------------------------------------------------------- *)
-let ur_tostring (type a) (pp : a -> string) (mu : a use_restr) : string =
-  let pos = Option.value ~default:"<none>" (Option.map pp mu.ur_pos) in
-  let neg = pp mu.ur_neg in
-
-  Format.sprintf "{%s, %s}" pos neg
 
 (* -------------------------------------------------------------------- *)
 type ty = {
@@ -140,10 +132,7 @@ and oracle_info = {
 
 and oracle_infos = oracle_info Msym.t
 
-and mod_restr = {
-  mr_xpaths : mr_xpaths;
-  mr_mpaths : mr_mpaths;
-}
+and mod_restr = (EcPath.Sx.t * EcPath.Sm.t) use_restr
 
 and module_type = {
   mt_params : (EcIdent.t * module_type) list;
@@ -461,6 +450,15 @@ let v_equal vd1 vd2 =
   ty_equal vd1.v_type vd2.v_type
 
 (* -------------------------------------------------------------------- *)
+
+let mr_xpaths (mr : mod_restr) : mr_xpaths =
+  { ur_pos = omap fst mr.ur_pos;
+    ur_neg = fst mr.ur_neg; }
+
+let mr_mpaths (mr : mod_restr) : mr_mpaths =
+  { ur_pos = omap snd  mr.ur_pos;
+    ur_neg = snd mr.ur_neg; }
+
 let ur_equal (equal : 'a -> 'a -> bool) ur1 ur2 =
   equal ur1.ur_neg ur2.ur_neg
   && (opt_equal equal) ur1.ur_pos ur2.ur_pos
@@ -474,8 +472,8 @@ let ur_hash elems el_hash ur =
        (elems ur.ur_neg))
 
 let mr_equal mr1 mr2 =
-  ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
-  && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
+  let eq (x1,m1) (x2,m2) = Sx.equal x1 x2 && Sm.equal m1 m2 in
+  ur_equal eq mr1 mr2
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold
@@ -495,13 +493,13 @@ let mr_mpaths_fv (m : mr_mpaths) : int Mid.t =
 
 let mr_fv (mr : mod_restr) : int Mid.t =
   fv_union
-    (mr_xpaths_fv mr.mr_xpaths)
-    (mr_mpaths_fv mr.mr_mpaths)
+    (mr_xpaths_fv (mr_xpaths mr))
+    (mr_mpaths_fv (mr_mpaths mr))
 
 let mr_hash (mr : mod_restr) =
   Why3.Hashcons.combine
-    (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash mr.mr_xpaths)
-    (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash mr.mr_mpaths)
+    (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash (mr_xpaths mr))
+    (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash (mr_mpaths mr))
 
 let mty_hash (mty : module_type) =
   Why3.Hashcons.combine2
@@ -531,30 +529,9 @@ let mty_mr_equal ((mty1, mr1) : mty_mr) ((mty2, mr2) : mty_mr) =
 
 let mty_mr_hash ((mty, mr) : mty_mr) =
   Why3.Hashcons.combine (mty_hash mty) (mr_hash mr)
-  
+
 let mty_mr_fv ((mty, mr) : mty_mr) =
   fv_union (mty_fv mty) (mr_fv mr)
-  
-(* -------------------------------------------------------------------- *)
-let oi_tostring (oi : oracle_info) : string =
-  let calls = List.map EcPath.x_tostring oi.oi_calls in
-  Format.sprintf "{calls = %s}" (String.concat ", " calls)
-
-(* -------------------------------------------------------------------- *)
-let mr_tostring (mr : mod_restr) : string =
-  let xp =
-    let pp (xps : Sx.t) =
-      String.concat ", " (List.map EcPath.x_tostring (Sx.elements xps))
-    in ur_tostring pp mr.mr_xpaths
-  in
-
-  let mp =
-    let pp (mps : Sm.t) =
-      String.concat ", " (List.map EcPath.m_tostring (Sm.elements mps))
-    in ur_tostring pp mr.mr_mpaths
-  in
-
-  Format.sprintf "{%s, %s}" xp mp
 
 (* -------------------------------------------------------------------- *)
 let lmt_hash lmem =

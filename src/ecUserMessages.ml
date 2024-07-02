@@ -516,6 +516,9 @@ end = struct
              if you meant to call procedure `%a', assign its result using `<@' rather than `<-'"
             pp_qsymbol q
 
+    | PositiveShouldBeBeforeNegative ->
+        msg "positive restriction are only allowed before negative restriction"
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
