@@ -25,9 +25,7 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let check_oracle_use (_pf : proofenv) env adv o =
-  let restr = { mr_empty with
-                mr_mpaths = { mr_empty.mr_mpaths with
-                              ur_neg = Sm.singleton adv; }} in
+  let restr = { mr_empty with ur_neg = Sx.empty, Sm.singleton adv } in
 
   (* This only checks the memory restrictions. *)
   EcTyping.check_mem_restr_fun env o restr
@@ -42,9 +40,7 @@ let check_concrete pf env f =
 
 (* -------------------------------------------------------------------- *)
 let lossless_hyps env top sub =
-  let clear_to_top =
-    let mr_mpaths = { (ur_empty Sm.empty) with ur_neg = Sm.singleton top } in
-    { mr_xpaths = ur_empty Sx.empty; mr_mpaths = mr_mpaths } in
+  let clear_to_top = { mr_empty with ur_neg = Sx.empty, Sm.singleton top } in
 
   let sig_ = EcEnv.NormMp.sig_of_mp env top in
   let bd =

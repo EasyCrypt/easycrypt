@@ -235,7 +235,7 @@ let ur_app f a =
   { ur_pos = (omap f) a.ur_pos;
     ur_neg = f a.ur_neg; }
 
-(* Noting is restricted. *)
+(* Nothing is restricted. *)
 let ur_empty emp = { ur_pos = None; ur_neg = emp; }
 
 (* Everything is restricted. *)

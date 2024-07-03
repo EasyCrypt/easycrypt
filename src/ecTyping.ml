@@ -172,6 +172,7 @@ type tyerror =
 | LvMapOnNonAssign
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
+| PositiveShouldBeBeforeNegative
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -1882,47 +1883,59 @@ let f_or_mod_ident_loc : f_or_mod_ident -> EcLocation.t = function
 
 (* -------------------------------------------------------------------- *)
 let trans_restr_mem env (r_mem : pmod_restr_mem) =
-  let r_empty = ur_empty Sx.empty, ur_empty Sm.empty in
+
+  let neg_started = ref false in
 
   (* If there is one positive restriction, then we do not have +all mem *)
-  let m_add_pos urx urm x = match urm.ur_pos with
-    | None    ->
-      assert (urx.ur_pos = None);
-      { urx with ur_pos = Sx.empty |> some },
-      { urm with ur_pos = Sm.singleton x |> some }
-    | Some sm ->
-      assert (urx.ur_pos <> None);
-      urx, { urm with ur_pos = Sm.add x sm    |> some } in
+  let m_add_pos loc mr x =
+    if !neg_started then tyerror loc env PositiveShouldBeBeforeNegative;
+    let ur_pos =
+      match mr.ur_pos with
+      | None    -> Some(Sx.empty, Sm.singleton x)
+      | Some (sx, sm) -> Some(sx, Sm.add x sm) in
+    { mr with ur_pos } in
 
-  let x_add_pos urx urm x = match urx.ur_pos with
-    | None    ->
-      assert (urm.ur_pos = None);
-      { urx with ur_pos = Sx.singleton x |> some },
-      { urm with ur_pos = Sm.empty |> some }
-    | Some sm ->
-      assert (urm.ur_pos <> None);
-      { urx with ur_pos = Sx.add x sm    |> some }, urm in
+  let x_add_pos loc mr x =
+    if !neg_started then tyerror loc env PositiveShouldBeBeforeNegative;
+    let ur_pos =
+      match mr.ur_pos with
+      | None    -> Some (Sx.singleton x, Sm.empty)
+      | Some (sx, sm) -> Some(Sx.add x sx, sm) in
+    { mr with ur_pos } in
 
-  let m_add_neg ur x = { ur with ur_neg = Sm.add x ur.ur_neg } in
-  let x_add_neg ur x = { ur with ur_neg = Sx.add x ur.ur_neg } in
+  let m_add_neg mr x =
+    neg_started := true;
+    let ur_neg =
+      let (sx, sm) = mr.ur_neg in
+      sx, Sm.add x sm in
+    { mr with ur_neg } in
 
-  List.fold_left (fun (mem_x, mem_m) el ->
-      let sign,el = match el with
-        | PMPlus x    -> `Plus, x
-        | PMMinus x   -> `Minus, x
-        | PMDefault x ->
+  let x_add_neg mr x =
+    neg_started := true;
+    let ur_neg =
+      let (sx, sm) = mr.ur_neg in
+      Sx.add x sx, sm in
+    { mr with ur_neg } in
+
+  List.fold_left (fun mr el ->
+      let x = match el with PMPlus x | PMMinus x | PMDefault x -> x in
+      let xloc = f_or_mod_ident_loc x in
+      let sign = match el with
+        | PMPlus _    -> `Plus
+        | PMMinus _   -> `Minus
+        | PMDefault _ ->
           if EcGState.get_old_mem_restr (EcEnv.gstate env) then
-            `Minus, x
+            `Minus
           else
-            tyerror (f_or_mod_ident_loc x) env NoDefaultMemRestr
+            tyerror xloc env NoDefaultMemRestr
       in
 
-      match el with
+      match x with
       | FM_Mod m ->
         let m = trans_topmsymbol env m in
         if sign = `Plus
-        then m_add_pos mem_x mem_m m
-        else (mem_x, m_add_neg mem_m m)
+        then m_add_pos xloc mr m
+        else m_add_neg mr m
 
       | FM_FunOrVar vf ->
         match pgamepath_to_pqsymbol vf with
@@ -1933,9 +1946,9 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
             | Some (`Var pv,_) when is_glob pv -> get_glob pv
             | Some _ -> assert false in
           if sign = `Plus
-          then x_add_pos mem_x mem_m xp
-          else (x_add_neg mem_x xp, mem_m))
-    r_empty
+          then x_add_pos xloc mr xp
+          else x_add_neg mr xp )
+    mr_empty
     r_mem
 
 (* -------------------------------------------------------------------- *)
@@ -1982,9 +1995,7 @@ let rec trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
 
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 and transmod_restr env (mr : pmod_restr) =
-  let r_mem = trans_restr_mem env mr.pmr_mem in
-  { mr_xpaths = fst r_mem;
-    mr_mpaths = snd r_mem; }
+  trans_restr_mem env mr.pmr_mem
 
 (* -------------------------------------------------------------------- *)
 (* Return the module type updated with some restriction.
@@ -2248,7 +2259,7 @@ and get_oi_calls env (params, items) =
       Msym.add f.f_name (OI.mk calls) oi in
 
   List.fold_left comp_oi Msym.empty items
-  
+
 (* -------------------------------------------------------------------- *)
 and transstruct
     ~attop (env : EcEnv.env) (x : symbol)

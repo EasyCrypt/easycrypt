@@ -543,11 +543,9 @@ module Fsubst = struct
   and mr_subst (s : f_subst) (mr : mod_restr) : mod_restr =
     let sx = x_subst s in
     let sm = EcPath.m_subst_abs s.fs_mod in
-    { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
-          Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
-      mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
-          Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths; }
-  
+    let subst_ (xs, ms) = (Sx.map sx xs, Sm.map sm ms) in
+    ur_app subst_ mr
+
   (* ------------------------------------------------------------------ *)
   and mp_subst (s : f_subst) (mp : mpath) : mpath =
     EcPath.m_subst_abs s.fs_mod mp
@@ -656,7 +654,7 @@ module Fsubst = struct
   let mr_subst = mr_subst
   let mty_subst = mty_subst
   let oi_subst  = oi_subst
-  let mty_mr_subst = mty_mr_subst 
+  let mty_mr_subst = mty_mr_subst
 
   (* ------------------------------------------------------------------ *)
   let f_subst_local (x : ident) (t : form) : form -> form =

@@ -126,10 +126,7 @@ and oracle_info = {
 
 and oracle_infos = oracle_info Msym.t
 
-and mod_restr = {
-  mr_xpaths : mr_xpaths;
-  mr_mpaths : mr_mpaths;
-}
+and mod_restr = (EcPath.Sx.t * EcPath.Sm.t) use_restr
 
 and module_type = {
   mt_params : (EcIdent.t * module_type) list;
@@ -162,8 +159,8 @@ and gty =
   | GTmodty of mty_mr
   | GTmem   of memtype
 
-and mty_mr = module_type * mod_restr  
-  
+and mty_mr = module_type * mod_restr
+
 and binding  = (EcIdent.t * gty)
 and bindings = binding list
 
@@ -354,6 +351,9 @@ val v_hash : variable hash
 val ur_equal : 'a equality -> 'a use_restr equality
 val ur_hash  : ('a -> 'b list) -> 'b hash -> 'a use_restr hash
 
+val mr_xpaths : mod_restr -> mr_xpaths
+val mr_mpaths : mod_restr -> mr_mpaths
+
 val mr_xpaths_fv : mr_xpaths fv
 val mr_mpaths_fv : mr_mpaths fv
 
@@ -368,8 +368,6 @@ val mty_fv    : module_type fv
 val mty_mr_equal : mty_mr equality
 val mty_mr_hash  : mty_mr hash
 val mty_mr_fv    : mty_mr fv
-
-val mr_tostring : mod_restr -> string
 
 (* -------------------------------------------------------------------- *)
 val lmt_equal : ty equality -> local_memtype equality

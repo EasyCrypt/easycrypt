@@ -13,19 +13,16 @@ include EcCoreModules
 module OI = PreOI
 
 (* -------------------------------------------------------------------- *)
-let mr_empty = {
-  mr_xpaths = ur_empty EcPath.Sx.empty;
-  mr_mpaths = ur_empty EcPath.Sm.empty;
-}
+(* Nothing is restricted. *)
+let mr_empty = ur_empty (Sx.empty, Sm.empty)
 
-let mr_full = {
-  mr_xpaths = ur_full EcPath.Sx.empty;
-  mr_mpaths = ur_full EcPath.Sm.empty;
-}
+(* Everything is restricted. *)
+let mr_full = ur_full (Sx.empty, Sm.empty)
 
-let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
-  { mr_xpaths = ur_union Sx.union Sx.inter mr.mr_xpaths rx;
-    mr_mpaths = ur_union Sm.union Sm.inter mr.mr_mpaths rm; }
+let mr_add_restr mr (r : mod_restr) =
+  let union (x1,m1) (x2,m2) = (Sx.union x1 x2, Sm.union m1 m2) in
+  let inter (x1,m1) (x2,m2) = (Sx.inter x1 x2, Sm.inter m1 m2) in
+  ur_union union inter mr r
 
 let change_oinfo (ois : oracle_infos) (f : symbol) (oi : oracle_info) =
   Msym.add f oi ois
