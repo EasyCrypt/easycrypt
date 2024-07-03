@@ -13,7 +13,7 @@ include EcCoreModules
 module OI = PreOI
 
 (* -------------------------------------------------------------------- *)
-(* Noting is restricted. *)
+(* Nothing is restricted. *)
 let mr_empty = ur_empty (Sx.empty, Sm.empty)
 
 (* Everything is restricted. *)
