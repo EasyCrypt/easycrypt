@@ -71,6 +71,16 @@ end
 
 type env = Env.env
 
+let of_int (i:int) : reg = 
+  (* Number of bits the integer occupies *)
+  let rec log2up (i: int) : int = 
+  match i with
+  | 0 | 1 -> 1
+  | _ -> 1 + log2up (i/2) 
+  in
+  Circuit.of_int ~size:(log2up i) i
+
+
 (* -------------------------------------------------------------------- *)
 let input (env: env) ((s,i) : input) =
   let (env, v) = 
@@ -374,8 +384,10 @@ let circ_equiv_bitwuzla (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool 
     List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
   in 
 
-  let bvinpt1 = (bvterm_of_reg r1) in
-  let bvinpt2 = (bvterm_of_reg r2) in
+  assert (List.length r1 = 1);
+  let bvinpt1 = (bvterm_of_node (List.hd r1)) in
+  assert (List.length r2 = 1);
+  let bvinpt2 = (bvterm_of_node (List.hd r2)) in
   let formula = Term.equal bvinpt1 bvinpt2 in
   let pcond = (bvterm_of_node pcond) in
  

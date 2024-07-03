@@ -137,6 +137,10 @@ let xor (n1 : node) (n2 : node) : node =
   let n = nand n1 n2 in nand (nand n1 n) (nand n2 n)
 
 (* -------------------------------------------------------------------- *)
+let xnor (n1 : node) (n2 : node) : node =
+  neg (xor n1 n2)
+
+(* -------------------------------------------------------------------- *)
 let get_bit (b : bytes) (i : int) =
   Char.code (Bytes.get b (i / 8)) lsr (i mod 8) land 0b1 <> 0
 

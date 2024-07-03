@@ -10,6 +10,8 @@ open EcModules
 open EcCoreGoal
 open EcAst
 open EcCoreFol
+open EcIdent
+open EcCircuits
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -126,7 +128,6 @@ and brhs =
   | Const of width * zint
   | Copy  of vsymbol
   | Op    of path * bargs
-  | Nop
 
 and barg =
   | Const of width * zint
@@ -160,7 +161,6 @@ let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
        (Format.pp_print_list
           (fun fmt a -> Format.fprintf fmt "@ %a" pp_barg a))
        args
-  | Nop -> ()
 
 (* -------------------------------------------------------------------- *)
 let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
@@ -229,8 +229,6 @@ let circuit_of_bstmt (env : env) (cenv: cp_env) (((v, s), rhs) : bstmt) : cp_env
       args |> registers_of_bargs cenv |> circuit_of_path env op 
       with Not_found -> Format.eprintf "op %a not found@." EcPrinting.pp_path op; assert false
       end
-
-    | Nop -> failwith "Nop should have been discarded already"
   in
 
   let cenv = CircEnv.bind cenv idx r in
@@ -370,15 +368,6 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
          | Eapp ({ e_node = Eop (p, []) }, args) ->
             Op (p, List.map trans_arg args)
 
-         | Eop (pth, _) ->
-            match (EcPath.toqsymbol pth) with
-            | ["Top"; "Pervasive"], "witness" ->
-            Format.eprintf "Don't forget to add the safety check (o )(o )@.";
-            Nop
-            | _ -> let () = Format.eprintf "Sasgn error on : %a@." 
-            (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e in
-            raise BDepError
-
          | _ -> let () = Format.eprintf "Sasgn error on : %a@." 
             (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e in
             raise BDepError
@@ -394,12 +383,7 @@ let bdep (env : env) (proc: stmt) (f: psymbol) (invs: variable list) (n : int) (
   let trans_local (x : variable) =
     (x.v_name, trans_wtype env x.v_type) in
 
-  let is_op (b: bstmt) : bool = 
-  match b with
-  | (_, Nop) -> false
-  | _ -> true
-  in
-  let body : bprgm = List.map trans_instr proc.s_node |> List.filter is_op in
+  let body : bprgm = List.map trans_instr proc.s_node in
 
   if not (List.is_unique (List.fst body)) then
     raise BDepError; 
@@ -637,12 +621,57 @@ let auto_init (env: env) (f: form) =
   (* Right side checks TODO *)
   (* Array safety checks TODO *)
   
+
+
+let bdep2 (env : env) (proc: stmt) (mem: memory) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: form) (pcond: psymbol) : unit =
+  let cache : (symbol, EcCircuits.circuit) Map.t = Map.empty in
+
+  let inps = List.map (fun x -> (create x.v_name, width_of_type env x.v_type)) invs in
+  let cache = List.fold_left 
+    (fun cache (idn, w) -> 
+      Map.add 
+        idn.id_symb 
+        { circ=C.reg ~size:w ~name:(tag idn); 
+          inps=[(idn, w)]} 
+        cache) 
+    cache inps 
+  in
+  
+  let doit cache inst : _ = 
+    try
+    match inst.i_node with
+    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> EcCircuits.circuit_of_form ~pstate:cache env) cache
+    | _ -> failwith "Case not implemented yet"
+    with 
+    | e -> Format.eprintf "BDep failed on instr: %a@.Exception thrown: %s@."
+        (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
+        (Printexc.to_string e); raise BDepError
+  in
+
+  let cache = List.fold_left doit cache proc.s_node in
+  let post_c = EcCircuits.circuit_of_form ~pstate:cache env f in
+  List.iter (fun fc ->
+  let namer = fun id -> 
+    List.find_opt (fun inp -> tag (fst inp) = id) fc.inps 
+    |> Option.map fst |> Option.map name |> Option.default (string_of_int id) in
+  let () = Format.eprintf "Out len: %d @." (List.length fc.circ) in
+  let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%s %d@." (fst x |> namer) (snd x)) in
+  let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps ~namer fmt) (HL.deps fc.circ |> Array.to_list) in
+  let () = Format.eprintf "Args for circuit: "; 
+            List.iter (fun (idn, w) -> Format.eprintf "(%s, %d) " idn.id_symb w) fc.inps;
+            Format.eprintf "@." in
+  ()) [post_c];
+
+
+  if EcCircuits.circ_check post_c then (Format.eprintf "Success"; raise BDepError) else 
+  raise BDepError
+  
     
 let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: psymbol) (pcond: psymbol) (tc : tcenv1)=
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> bdep_xpath (FApi.tc1_env tc) sH.hf_f op n m (List.map (fun v-> v.v_name) outvs) pcond
-  | FhoareS sF -> bdep (FApi.tc1_env tc) sF.hs_s op inpvs n outvs m pcond
+  | FhoareS sF -> bdep2 (FApi.tc1_env tc) sF.hs_s (fst sF.hs_m) (inpvs, n) (outvs, m) sF.hs_po pcond
   | FcHoareF _ -> assert false
   | FcHoareS _ -> assert false 
   | FbdHoareF _ -> assert false
@@ -664,7 +693,7 @@ let process_bdep
   let env = FApi.tc1_env tc in
   let f_app_safe = EcTypesafeFol.f_app_safe in
 
-  if true then
+  if false then
   let pt = auto_init env (FApi.tc1_goal tc) in
   FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcLowGoal.t_cut pt tc) 
   else
@@ -676,7 +705,7 @@ let process_bdep
   let get_var (v: symbol) (m: memenv) : variable =
     match EcMemory.lookup_me v m with
     | Some (v, None, _) -> v
-    | _ -> assert false
+    | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false
   in
   let pop, oop = EcEnv.Op.lookup ([], op.pl_desc) env in
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
@@ -746,5 +775,5 @@ let process_bdep
   let pre = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_all [(f_op ppcond [] opcond.op_ty); pinpvs] in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
-  let tc = EcPhlConseq.t_conseq pre post tc in
-  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
+  (* let tc = EcPhlConseq.t_conseq pre post tc in *)
+  FApi.t_last (t_bdep outvs n inpvs m op pcond) (!@ tc) 

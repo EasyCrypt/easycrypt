@@ -60,6 +60,14 @@ module BaseOps = struct
   let is_baseop (p: path) : bool = 
     match (EcPath.toqsymbol p) with
     | ["Top"; "JWord"; _], _ -> true
+
+    (* AdHoc for barrett FIXME: remove later *)
+    | _, "sext16_32" -> true
+    | _, "uext16_32" -> true
+    | _, "sar_32_26" -> true
+    | _, "truncate32_16" -> true
+    | _, "eqmod64q" -> true
+    
     | _ -> false
 
   let circuit_of_baseop (p: path) : circuit = 
@@ -72,16 +80,32 @@ module BaseOps = struct
       | "W32" -> 32 
       | "W16" -> 16 
       | "W8" -> 8 
-      | _ -> assert false
+      | _ -> Format.eprintf "Unknown size for path %s@." (EcSymbols.string_of_qsymbol qpath); assert false
       in 
 
     begin match op with
+    (* Arithmetic: *)
     | "+" ->
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]}
+
+    | "*" -> (* Unsigned low word mul *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = C.umull c1 c2; inps = [(id1, size); (id2, size)]}
+
+    | "[-]" ->
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = C.opp c1; inps = [(id1, size)]}
+
+
+    (* Comparisons: *)
     | "\\ule" -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
@@ -94,20 +118,65 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = [C.ugt c2 c1]; inps=[(id1, size); (id2, size)]}
+    
+    (* Conversions *)
+    | "of_int" ->
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = c1; inps = [(id1, 256)]} (* FIXME: Assumes integeres are 256 bits *)
+
+    
     | _ -> Format.eprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath); assert false
     end
+  (* AdHoc stuff for barrett example FIXME: remove later *)
+  | _, "sext16_32" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    {circ = C.sextend ~size:32 c1; inps = [(id1, 16)]}
+
+    | _, "uext16_32" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    {circ = C.uextend ~size:32 c1; inps = [(id1, 16)]}
+  
+  | _, "sar_32_26" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:32 ~name:id1.id_tag in
+    {circ = C.arshift ~offset:26 c1; inps = [(id1, 32)]}
+
+  | _, "truncate32_16" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    { circ = c1; inps=[(id1, 32)]}
+
+  | _, "eqmod64q" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:16 ~name:id2.id_tag in
+    let q = C.of_int ~size:16 3329 in
+    let dc = C.sub_dropc c1 c2 in
+    (* let dc = C.smod dc q in *)
+    (* let dc = C.ugt (C.of_int ~size:16 1) dc in *)
+    let dp_modq = C.rem dc q in
+    let dm_modq = C.rem (C.opp dc) q in
+    let dp_modqt = C.ugt (C.of_int ~size:16 1) dp_modq in
+    let dm_modqt = C.ugt (C.of_int ~size:16 1) dm_modq in
+    {circ = [C.or_ dp_modqt dm_modqt]; inps = [(id1, 16); (id2, 16)]}
+  
   | _ -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
 (* Basis for hardcoded circuit gen *)
-let circuit_of_path (env: env) (p : path) : C.reg list -> C.reg  =
+let circuit_from_spec (env: env) (p : path) : C.reg list -> C.reg  =
   (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
   match EcEnv.Circ.lookup_circuit_path env p with
   | Some op -> C.func_from_spec op
   | None -> Format.eprintf "No operator for path: %s@."
     (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
     assert false 
+
 
 let width_of_type (env: env) (t: ty) : int =
   match EcEnv.Circ.lookup_bitstring_size env t with
@@ -133,7 +202,16 @@ let apply_args (c: circuit) (vs: circuit list) : circuit =
   assert (List.compare_lengths c.inps vs >= 0);
   let new_circs, new_inps = List.map (fun c -> (c.circ, c.inps)) vs |> List.split in
   let apply_inps, old_inps = List.takedrop (List.length vs) c.inps in
-  assert (List.for_all2 (fun a b -> (snd a) = List.length b) apply_inps new_circs);
+  
+  let () =
+  try
+    assert (List.for_all2 (fun a b -> (snd a) = List.length b) apply_inps new_circs)
+  with
+  | Assert_failure _ -> Format.eprintf "Apply arg size mismatch: ";
+    List.iter2 (fun a b -> Format.eprintf "(%d, %d) " (snd a) (List.length b)) apply_inps new_circs;
+    assert false
+  in
+  
   let new_c = applys c.circ (List.map2 (fun a b -> (fst a, b)) apply_inps new_circs) in
   {circ = new_c; inps = (List.flatten new_inps) @ old_inps}
 
@@ -167,17 +245,21 @@ let circ_equiv (f: circuit) (g: circuit) : bool =
     HL.circ_equiv_bitwuzla f2.circ g2.circ C.true_
   end
   
+let circ_check (f: circuit) : bool =
+  assert (List.length f.circ = 1);
+  HL.circ_equiv_bitwuzla f.circ [C.true_] C.true_
 
 (* Vars = bindings in scope (maybe we have some other way of doing this? *)
 
-let circuit_of_form (env: env) (f : EcAst.form) : circuit =
+let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (f : EcAst.form) : circuit =
   let vars : (ident * int) list = [] in
   let cache : (ident, circuit) Map.t = Map.empty in
   
   let rec doit (cache: (ident, circuit) Map.t) (vars: (ident * int) list) (env: env) (f: form) :  _ * circuit = 
     match f.f_node with
     (* hardcoding size for now FIXME *)
-    | Fint z -> failwith "Add logic to deal with ints (maybe force conversion?)"
+    | Fint z -> env, {circ = C.of_bigint ~size:256 (to_zt z); inps = []}
+      (* failwith "Add logic to deal with ints (maybe force conversion?)" *)
       (* hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z) *)
     | Fif (c_f, t_f, f_f) -> 
         let env, c_c = doit cache vars env c_f in
@@ -252,13 +334,31 @@ let circuit_of_form (env: env) (f : EcAst.form) : circuit =
       | LTuple  symbs -> assert false
       | LRecord (pth, osymbs) -> assert false
       end
-    | Fpvar   (pv, mem) -> assert false
+    | Fpvar   (pv, mem) -> 
+      let v = match pv with
+      | PVloc v -> v
+      | _ -> failwith "No global vars yet"
+      in
+      let res = match Map.find_opt v pstate with
+        | Some circ -> circ
+        | None -> failwith ("No value for var " ^ v)
+      in env, res
     | Fglob   (id, mem) -> assert false
     | Ftuple  comps -> assert false
     | _ -> failwith "Not yet implemented"
   in 
   let env, f_c = doit cache vars env f in
   f_c
+
+
+let circuit_of_path (env: env) (p: path) : circuit =
+  let f = EcEnv.Op.by_path p env in
+  let f = match f.op_kind with
+  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | _ -> failwith "Invalid operator type"
+  in
+  circuit_of_form env f
+
     
 (* -------------------------------------------------------------------- *)
 (* WIP *)

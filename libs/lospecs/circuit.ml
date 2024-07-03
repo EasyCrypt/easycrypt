@@ -155,7 +155,11 @@ let lor_ (r1 : reg) (r2 : reg) : reg =
 let lxor_ (r1 : reg) (r2 : reg) : reg =
   List.map2 xor r1 r2
 
-  (* -------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
+let lxnor_ (r1 : reg) (r2 : reg) : reg =
+  List.map2 xnor r1 r2
+
+(* -------------------------------------------------------------------- *)
 let land_ (r1 : reg) (r2 : reg) : reg =
   List.map2 and_ r1 r2
 
@@ -498,3 +502,55 @@ let sgt (r1 : reg) (r2 : reg) : node =
 (* -------------------------------------------------------------------- *)
 let sge (r1 : reg) (r2 : reg) : node =
   sgte Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let udiv_ (a : reg) (b : reg) : reg * reg =
+  assert (List.length a >= List.length b);
+
+  let n = List.length b in
+
+  let pu (a : node) (b : node) (cin : node) : node * (node -> node) =
+    let cout, s = fulladder cin (neg b) a in
+    let out (cc : node) = mux2 a s cc in
+    (cout, out)
+  in
+
+  let create_line (i : int) (d : node) (a : reg) : node * reg =
+    let a = d :: (if i = n then a else snd (split_msb a)) in
+    let b = if i < n then b else b @ [Aig.false_] in
+
+    let c, pus =
+      List.fold_left_map
+        (fun c (a, b) -> pu a b c)
+        Aig.true_ (List.combine a b)
+    in (c, List.map (fun pu -> pu c) pus)
+  in
+
+  let q, r =
+    List.fold_lefti (fun (q, a) i d ->
+      let q', a = create_line i d a in (q' :: q, a)
+    ) ([], List.make n false_) (List.rev a)
+  in
+
+  (q, snd (split_msb r))
+
+let udiv (a: reg) (b: reg) : reg =
+  fst (udiv_ a b)
+
+let rem (a: reg) (b: reg) : reg =
+  snd (udiv_ a b)
+
+(* (bvsmod s t) abbreviates *)
+  (* (let (?msb_s (extract[|m-1|:|m-1|] s)) *)
+  (* (let (?msb_t (extract[|m-1|:|m-1|] t)) *)
+  (* (ite (and (= ?msb_s bit0) (= ?msb_t bit0)) *)
+       (* (bvurem s t) *)
+  (* (ite (and (= ?msb_s bit1) (= ?msb_t bit0)) *)
+       (* (bvadd (bvneg (bvurem (bvneg s) t)) t) *)
+  (* (ite (and (= ?msb_s bit0) (= ?msb_t bit1)) *)
+       (* (bvadd (bvurem s (bvneg t)) t) *)
+       (* (bvneg (bvurem (bvneg s) (bvneg t))))))) *)
+       
+(* Implicit extend *)
+let smod (a: reg) (b: reg) : reg =  
+  assert false

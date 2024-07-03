@@ -55,6 +55,8 @@ val land_ : reg -> reg -> reg
 
 val lxor_ : reg -> reg -> reg
 
+val lxnor_ : reg -> reg -> reg
+
 val ors : node list -> node
 
 val ands : node list -> node
@@ -127,3 +129,11 @@ val sge : reg -> reg -> node
 
 (* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg
+
+val udiv_ : reg -> reg -> reg * reg
+
+val udiv : reg -> reg -> reg
+
+val rem : reg -> reg -> reg
+
+val smod : reg -> reg -> reg
