@@ -64,7 +64,7 @@ module BaseOps = struct
 
   let circuit_of_baseop (p: path) : circuit = 
     match (EcPath.toqsymbol p) with
-    | ["Top"; "JWord"; sz], "+" -> 
+    | (["Top"; "JWord"; sz], op) as qpath -> 
       let size = match sz with
       | "W256" -> 256
       | "W128" -> 128 
@@ -74,12 +74,29 @@ module BaseOps = struct
       | "W8" -> 8 
       | _ -> assert false
       in 
+
+    begin match op with
+    | "+" ->
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]}
-    | _ -> assert false
+    | "\\ule" -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = [C.uge c2 c1]; inps=[(id1, size); (id2, size)]}
+    | "\\ult" -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = [C.ugt c2 c1]; inps=[(id1, size); (id2, size)]}
+    | _ -> Format.eprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath); assert false
+    end
+  | _ -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -113,12 +130,16 @@ let applys (c: C.reg) (vs: (ident * C.reg) list) : C.reg =
 
 (* FIXME: check in what order to put the args *)
 let apply_args (c: circuit) (vs: circuit list) : circuit = 
-  assert (List.length c.inps <= List.length vs);
+  assert (List.compare_lengths c.inps vs >= 0);
   let new_circs, new_inps = List.map (fun c -> (c.circ, c.inps)) vs |> List.split in
   let apply_inps, old_inps = List.takedrop (List.length vs) c.inps in
   assert (List.for_all2 (fun a b -> (snd a) = List.length b) apply_inps new_circs);
   let new_c = applys c.circ (List.map2 (fun a b -> (fst a, b)) apply_inps new_circs) in
   {circ = new_c; inps = (List.flatten new_inps) @ old_inps}
+
+let apply_args_strict (c: circuit) (vs: circuit list) : circuit =
+  assert (List.compare_lengths c.inps vs = 0);
+  apply_args c vs
 
 let apply_arg (c: circuit) (v: C.reg) : circuit =
   match c.inps with
@@ -164,10 +185,9 @@ let circuit_of_form (env: env) (f : EcAst.form) : circuit =
         let env, f_c = doit cache vars env f_f in
         let () = assert (List.length c_c.circ = 1) in
         let c_c = List.hd c_c.circ in
-        failwith "Fix if input merging"
-        (* env, { *)
-        (* circ = C.mux2_reg f_c.circ t_c.circ c_c; *)
-        (* inps = List.rev vars; } *)
+        env, {
+        circ = C.mux2_reg f_c.circ t_c.circ c_c;
+        inps = List.rev vars; }
       (* Assumes no quantifier bindings/new inputs within if *)
     (* hardcoding size for now FIXME *)
     | Flocal idn -> 
