@@ -357,8 +357,7 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
-    let subst = Fsubst.f_subst_init ~sty:tysubst () in
+    let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
     let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
@@ -410,7 +409,7 @@ let fmnotation = {
 
 (* -------------------------------------------------------------------- *)
 (* Rigid unification *)
-let f_match_core opts hyps (ue, ev) ~ptn subject =
+let f_match_core opts hyps (ue, ev) f1 f2 =
   let ue  = EcUnify.UniEnv.copy ue in
   let ev  = ref ev in
 
@@ -425,7 +424,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
     | false -> EcReduction.is_alpha_eq hyps
   in
 
-  let rec doit env ((subst, mxs) as ilc) ptn subject =
+  let rec doit env ((subst, mxs) as ilc) f1 f2 =
     let failure =
       let oue, oev = (EcUnify.UniEnv.copy ue, !ev) in
       fun () ->
@@ -433,117 +432,104 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
         raise MatchFailure
     in
 
-    let default () =
-      let subject = Fsubst.f_subst subst subject in
-      let ptn = Fsubst.f_subst (MEV.assubst ue !ev env) ptn in
-      if not (conv ptn subject) then failure ()
+    let norm (f : form) =
+      let f = Fsubst.f_subst subst f in
+      let f = Fsubst.f_subst (MEV.assubst ue !ev env) f in
+      f
+    in
+
+    let var_form_match ((x, xty) : ident * ty) (f : form) =
+      match EV.get x !ev.evm_form with
+      | None ->
+        failure ()
+
+      | Some `Unset ->
+        let f = norm f in
+
+        if not (Mid.set_disjoint mxs f.f_fv) then
+          failure ();
+        begin
+          try  EcUnify.unify env ue xty f.f_ty
+          with EcUnify.UnificationFailure _ -> failure ();
+        end;
+        ev := { !ev with evm_form = EV.set x f !ev.evm_form }
+
+      | Some (`Set a) -> begin
+          let f = norm f in
+
+          if not (conv f a) then
+            doit env ilc a f
+          else
+            try  EcUnify.unify env ue xty f.f_ty
+            with EcUnify.UnificationFailure _ -> failure ()
+        end
+    in
+
+    let ho_match (ho, args, hoty) (sbj : form) =
+      if
+           not (Mid.mem ho mxs)
+        && (EV.get ho !ev.evm_form = Some `Unset)
+        && not (List.is_empty args)
+        && List.for_all iscvar args
+      then begin
+        let oargs = List.map destr_local args in
+
+        if not (List.is_unique ~eq:id_equal oargs) then
+          failure ();
+
+        let xsubst, bindings =
+          List.map_fold
+            (fun xsubst x ->
+               let x, xty = (destr_local x, x.f_ty) in
+               let nx = EcIdent.fresh x in
+               let xsubst =
+                 Mid.find_opt x mxs
+                 |> omap (fun y -> Fsubst.f_bind_rename xsubst y nx xty)
+                 |> odfl xsubst
+               in (xsubst, (nx, GTty xty)))
+            Fsubst.f_subst_id args in
+
+        let sbj = norm (Fsubst.f_subst xsubst sbj) in
+
+        if not (Mid.set_disjoint mxs sbj.f_fv) then
+          failure ();
+
+        begin
+          let fty = toarrow (List.map f_ty args) sbj.f_ty in
+
+          try  EcUnify.unify env ue hoty fty
+          with EcUnify.UnificationFailure _ -> failure ();
+        end;
+
+        let sbj = f_lambda bindings sbj in
+
+        ev := { !ev with evm_form = EV.set ho sbj !ev.evm_form }
+      end else
+        failure ()
     in
 
     try
-      match ptn.f_node, subject.f_node with
+      match f1.f_node, f2.f_node with
       | Flocal x1, Flocal x2 when Mid.mem x1 mxs -> begin
           if not (id_equal (oget (Mid.find_opt x1 mxs)) x2) then
             failure ();
-          try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+          try  EcUnify.unify env ue f1.f_ty f2.f_ty
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
       | Flocal x1, Flocal x2 when id_equal x1 x2 -> begin
-          try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+          try  EcUnify.unify env ue f1.f_ty f2.f_ty
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
-      | Flocal x, _ -> begin
-          match EV.get x !ev.evm_form with
-          | None ->
-            (* TODO: bug? why not failure ()?*)
-              raise MatchFailure
+      | Flocal x, _ ->
+          var_form_match (x, f1.f_ty) f2
 
-          | Some `Unset ->
-              let ssbj = Fsubst.f_subst subst subject in
-              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) ssbj in
-              if not (Mid.set_disjoint mxs ssbj.f_fv) then
-                (* TODO: bug? why not failure ()?*)
-                raise MatchFailure;
-              begin
-                try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-                with EcUnify.UnificationFailure _ -> failure ();
-              end;
-              ev := { !ev with evm_form = EV.set x ssbj !ev.evm_form }
+      | _, Flocal y ->
+          var_form_match (y, f2.f_ty) f1
 
-          | Some (`Set a) -> begin
-              let ssbj = Fsubst.f_subst subst subject in
-
-              if not (conv ssbj a) then
-                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) subject in
-                if not (conv ssbj a) then
-                  doit env ilc a ssbj
-                else
-                  try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-                  with EcUnify.UnificationFailure _ -> failure ()
-              else
-                try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-                with EcUnify.UnificationFailure _ -> failure ()
-          end
-      end
-
-      | Fapp (f1, fs1), _ -> begin
-        try
-          match subject.f_node with
-          | Fapp (f2, fs2) -> begin
-              try  doit_args env ilc (f1::fs1) (f2::fs2)
-              with MatchFailure when opts.fm_conv  ->
-                let rptn = f_betared ptn in
-                if   (ptn.f_tag <> rptn.f_tag)
-                then doit env ilc rptn subject
-                else failure ()
-          end
-          | _ -> failure ()
-
-        with MatchFailure when opts.fm_horder ->
-          match f1.f_node with
-          | Flocal f when
-                  not (Mid.mem f mxs)
-               && (EV.get f !ev.evm_form = Some `Unset)
-               && List.for_all iscvar fs1
-            ->
-
-            let oargs = List.map destr_local fs1 in
-
-            if not (List.is_unique ~eq:id_equal oargs) then
-              failure ();
-
-            let xsubst, bindings =
-              List.map_fold
-                (fun xsubst x ->
-                   let x, xty = (destr_local x, x.f_ty) in
-                   let nx = EcIdent.fresh x in
-                   let xsubst =
-                     Mid.find_opt x mxs
-                       |> omap (fun y -> Fsubst.f_bind_rename xsubst y nx xty)
-                       |> odfl xsubst
-                   in (xsubst, (nx, GTty xty)))
-                Fsubst.f_subst_id fs1 in
-
-            let ssbj = Fsubst.f_subst xsubst subject in
-            let ssbj = Fsubst.f_subst  subst ssbj in
-
-            if not (Mid.set_disjoint mxs ssbj.f_fv) then
-              failure ();
-
-            begin
-              let fty = toarrow (List.map f_ty fs1) ssbj.f_ty in
-
-              try  EcUnify.unify env ue f1.f_ty fty
-              with EcUnify.UnificationFailure _ -> failure ();
-            end;
-
-            let ssbj = f_lambda bindings ssbj in
-
-            ev := { !ev with evm_form = EV.set f ssbj !ev.evm_form }
-
-          | _ -> default ()
-      end
+      | Fapp (f1, fs1), Fapp (f2, fs2) ->
+          doit_args env ilc (f1::fs1) (f2::fs2)
 
       | Fquant (b1, q1, f1), Fquant (b2, q2, f2) when b1 = b2 ->
           let n1, n2 = List.length q1, List.length q2 in
@@ -615,29 +601,6 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
       end
 
-      | FcHoareF hf1, FcHoareF hf2 -> begin
-          let x2 = EcFol.Fsubst.subst_xpath subst hf2.chf_f in
-
-          if not (EcReduction.EqTest.for_xp env hf1.chf_f x2) then
-            failure ();
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-
-          let calls2 = EcPath.Mx.translate (EcFol.Fsubst.subst_xpath subst) hf2.chf_co.c_calls in
-
-          EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
-              match cb1, cb2 with
-              | None, None -> assert false
-              | None, Some _ | Some _, None -> failure ()
-              | Some cb1, Some cb2 ->
-                List.iter2 (doit env (subst, mxs))
-                  [cb1.cb_cost; cb1.cb_called]
-                  [cb2.cb_cost; cb2.cb_called]
-            ) hf1.chf_co.c_calls calls2 ();
-          List.iter2 (doit env (subst, mxs))
-            [hf1.chf_pr; hf1.chf_po; hf1.chf_co.c_self]
-            [hf2.chf_pr; hf2.chf_po; hf2.chf_co.c_self];
-        end
-
       | FequivF hf1, FequivF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.ef_fl hf2.ef_fl) then
             failure ();
@@ -659,43 +622,68 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           doit env (subst, mxs) pr1.pr_event pr2.pr_event;
       end
 
-      | _, _ -> default ()
-
-    with MatchFailure when opts.fm_delta ->
-      match fst_map f_node (destr_app ptn),
-            fst_map f_node (destr_app subject)
-      with
-      | (Fop (op1, tys1), args1), (Fop (op2, tys2), args2) -> begin
-(*          try
-            if not (EcPath.p_equal op1 op2) then
-              failure ();
-            try
-              List.iter2 (EcUnify.unify env ue) tys1 tys2;
-              doit_args env ilc args1 args2
-            with EcUnify.UnificationFailure _ -> failure ()
-          with MatchFailure -> *)
-(* Benj: Fixme user reduction ... *)
-            if EcEnv.Op.reducible env op1 then
-              doit_reduce env ((doit env ilc)^~ subject) ptn.f_ty op1 tys1 args1
-            else if EcEnv.Op.reducible env op2 then
-              doit_reduce env (doit env ilc ptn) subject.f_ty op2 tys2 args2
-            else
-              failure ()
-      end
-
-      | (Flocal x1, args1), _ when LDecl.can_unfold x1 hyps ->
-          doit_lreduce env ((doit env ilc)^~ subject) ptn.f_ty x1 args1
-
-      | _, (Flocal x2, args2) when LDecl.can_unfold x2 hyps ->
-          doit_lreduce env (doit env ilc ptn) subject.f_ty x2 args2
-
-      | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
-          doit_reduce env ((doit env ilc)^~ subject) ptn.f_ty op1 tys1 args1
-
-      | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
-          doit_reduce env (doit env ilc ptn) subject.f_ty op2 tys2 args2
-
       | _, _ -> failure ()
+
+    with MatchFailure ->
+      let try_betared () =
+        let f1' = f_betared f1 in
+        let f2' = f_betared f2 in
+
+        if f1 == (*phy*) f1' && f2 ==(*phy*) f2' then
+          failure ();
+        doit env (subst, mxs) f1' f2' in
+
+      let try_horder () =
+        if not opts.fm_horder then
+          failure ();
+
+        let doit (f1 : form) (f2 : form) =
+          match destr_app f1 with
+          | { f_node = Flocal ho; f_ty = hoty }, args
+              when not (List.is_empty args)
+            ->
+            ho_match (ho, args, hoty) f2
+          | _ ->
+            failure ()
+        in
+
+        try
+          doit f1 f2
+        with MatchFailure -> doit f2 f1
+      in
+
+      let try_delta () =
+        if not opts.fm_delta then
+          failure ();
+
+        match fst_map f_node (destr_app f1),
+              fst_map f_node (destr_app f2)
+        with
+        | (Flocal x1, args1), _ when LDecl.can_unfold x1 hyps ->
+            doit_lreduce env ((doit env ilc)^~ f2) f1.f_ty x1 args1
+
+        | _, (Flocal x2, args2) when LDecl.can_unfold x2 hyps ->
+            doit_lreduce env (doit env ilc f1) f2.f_ty x2 args2
+
+        | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
+            doit_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
+
+        | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
+            doit_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
+
+        | _, _ -> failure ()
+
+    in
+
+    let default () =
+      if not (conv (norm f1) (norm f2)) then
+        failure ()
+    in
+      List.find_map_opt
+        (fun doit ->
+           try Some (doit ()) with MatchFailure -> None)
+        [try_betared; try_horder; try_delta; default]
+      |> oget ~exn:MatchFailure
 
   and doit_args env ilc fs1 fs2 =
     if List.length fs1 <> List.length fs2 then
@@ -731,7 +719,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
-      let gty2 = Fsubst.subst_gty subst gty2 in
+      let gty2 = Fsubst.gty_subst subst gty2 in
 
       assert (not (Mid.mem x1 mxs) && not (Mid.mem x2 mxs));
 
@@ -764,15 +752,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             in (env, subst)
 
         | GTmodty p1, GTmodty p2 ->
-          let f_equiv f1 f2 =
-            try doit env (subst, mxs) f1 f2; true with
-            | MatchFailure ->
-                Format.eprintf "match failure:@\n%a@\n%a@."
-                  (!EcEnv.pp_debug_form env) f1
-                  (!EcEnv.pp_debug_form env) f2;
-                false in
-
-            if not (ModTy.mod_type_equiv f_equiv env p1 p2) then
+            if not (NormMp.mod_type_equiv env p1 p2) then
               raise MatchFailure;
 
             let subst =
@@ -791,11 +771,11 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       List.fold_left2 doit_binding (env, subst, mxs) q1 q2
 
   in
-    doit (EcEnv.LDecl.toenv hyps) (Fsubst.f_subst_id, Mid.empty) ptn subject;
+    doit (EcEnv.LDecl.toenv hyps) (Fsubst.f_subst_id, Mid.empty) f1 f2;
     (ue, !ev)
 
-let f_match opts hyps (ue, ev) ~ptn subject =
-  let (ue, ev) = f_match_core opts hyps (ue, ev) ~ptn subject in
+let f_match opts hyps (ue, ev) f1 f2 =
+  let (ue, ev) = f_match_core opts hyps (ue, ev) f1 f2 in
     if not (MEV.filled ev) then
       raise MatchFailure;
     let clue =
@@ -805,8 +785,10 @@ let f_match opts hyps (ue, ev) ~ptn subject =
       (ue, clue, ev)
 
 (* -------------------------------------------------------------------- *)
-type ptnpos = [`Select of int | `Sub of ptnpos] Mint.t
-type occ    = [`Inclusive | `Exclusive] * Sint.t
+type ptnpos1 = [`Select of int | `Sub of ptnpos]
+and  ptnpos  = ptnpos1 Mint.t
+
+type occ = [`Inclusive | `Exclusive] * Sint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -909,20 +891,6 @@ module FPosition = struct
 
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
-
-          | FcHoareF chs ->
-            let subctxt = Sid.add EcFol.mhr ctxt in
-            let calls =
-              List.map (fun (_,cb) -> ctxt,cb.cb_called)
-                (EcPath.Mx.bindings chs.chf_co.c_calls) in
-            doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
-                                    (subctxt, chs.chf_po) ::
-                                    (ctxt, chs.chf_co.c_self) ::
-                                    calls))
-
-          | Fcoe coe ->
-            let subctxt = Sid.add (fst coe.coe_mem) ctxt in
-            doit pos (`WithSubCtxt [subctxt, coe.coe_pre])
 
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
@@ -1079,28 +1047,6 @@ module FPosition = struct
               in
               f_eHoareF_r { hf with ehf_pr; ehf_po; }
 
-          | FcHoareF chf ->
-            let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
-                               |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
-                                                           cb.cb_called))
-                               |> List.split in
-            let sub = doit p (chf.chf_pr ::
-                              chf.chf_po ::
-                              chf.chf_co.c_self ::
-                              calls) in
-            begin match sub with
-              | chf_pr :: chf_po :: c_self :: calls ->
-                let c_calls = List.fold_left2 (fun acc (f,cb_cost) cb_called ->
-                    EcPath.Mx.change
-                      (fun old ->
-                         assert (old = None);
-                         Some (call_bound_r cb_cost cb_called)) f acc
-                  ) EcPath.Mx.empty fkeys calls in
-                let cost = cost_r c_self c_calls in
-                f_cHoareF_r { chf with chf_pr; chf_po;
-                                       chf_co = cost; }
-              | _ -> assert false end
-
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
@@ -1110,14 +1056,8 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
-          | Fcoe coe ->
-              let sub = doit p [coe.coe_pre] in
-              let pre = as_seq1 sub in
-              f_coe_r { coe with coe_pre = pre }
-
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition
-          | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
@@ -1137,6 +1077,19 @@ module FPosition = struct
 
     in
       as_seq1 (doit p [f])
+
+  (* ------------------------------------------------------------------ *)
+  let reroot (root : int list) (p : ptnpos) =
+    if Mint.is_empty p then
+      Mint.empty
+    else begin
+      assert (Mint.mem 0 p && Mint.cardinal p = 1);
+      Mint.singleton 0 (
+        List.fold_right
+          (fun i (p : ptnpos1) -> (`Sub (Mint.singleton i p) :> ptnpos1))
+          root (Mint.find 0 p)
+      )
+    end
 
   (* ------------------------------------------------------------------ *)
   let topattern ?x (p : ptnpos) (f : form) =

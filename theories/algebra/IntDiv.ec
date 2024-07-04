@@ -249,6 +249,13 @@ lemma nosmt divzE m d : m %/ d * d = m - m %% d.
 proof. by rewrite modzE; ring. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma modz2 (a : int) : a %% 2 = b2i (odd a).
+proof.
+have eq_a_mod_2: (a %% 2 = 0) \/ (a %% 2 = 1) by smt(modz_ge0 ltz_pmod).
+by case: (odd a) => [/oddP|/oddPn ->//]; case: eq_a_mod_2 => ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt divzMDl q m d : d <> 0 => (q * d + m) %/ d = q + (m %/ d).
 proof.
 move=> nz_d; have [+ /(_ nz_d) lt_md] - {1}-> := edivzP m d.
@@ -379,6 +386,8 @@ proof. by rewrite dvdzE modz0. qed.
 lemma nosmt dvd1z m : 1 %| m.
 proof. by rewrite dvdzE modz1. qed.
 
+hint exact : dvd1z.
+
 lemma nosmt dvdz1 d : d %| 1 <=> `|d| = 1.
 proof.                        (* FIXME: test-case for case analysis *)
 move: d; have wlog: forall d, 0 <= d => d %| 1 <=> `|d| = 1; first last.
@@ -430,6 +439,12 @@ qed.
 lemma nosmt dvdn_le m n : 0 < n => m %| n => m <= n.
 proof. smt(dvdz_le). qed.
 
+lemma dvdz_oddr (a b : int) : odd b => a %| b => odd a.
+proof. by move=> odd_b /dvdzP[q ->>]; rewrite oddM /# in odd_b. qed.
+
+lemma dvdz_norml (a b : int) : (`|a| %| b) <=> (a %| b).
+proof. by rewrite /(%|) modz_abs. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt dvdzD d m1 m2 : d %| m1 => d %| m2 => d %| (m1 + m2).
 proof.
@@ -459,7 +474,7 @@ proof. by rewrite -modzDml=> /dvdzE ->. qed.
 lemma nosmt dvdz_modzDr (m n d : int) : d %| n => (m + n) %% d = m %% d.
 proof. by rewrite -modzDmr=> /dvdzE ->. qed.
 
-lemma nosmt eqz_mod_dvd a b c : (a %| (b - c)) <=> (b %% a = c %% a).
+lemma nosmt eqz_mod_dvd (a b c : int) : (a %| (b - c)) <=> (b %% a = c %% a).
 proof.
 rewrite dvdzE; split=> heq.
 - by rewrite -(subrK b c) -modzDml heq.
@@ -654,6 +669,21 @@ by rewrite exprD_nneg 1:subr_ge0 // mulzK // expf_eq0 (@gtr_eqF x).
 qed.
 
 (* ==================================================================== *)
+lemma oddW (a : int) : odd a => exists a', a = 2 * a' + 1.
+proof.
+move/oddP=> nz_mod2; exists (a %/ 2).
+rewrite mulrC divzE (_ : a %% 2 = 1) //.
+suff: 0 <= a %% 2 < 2 by smt().
+by rewrite modz_ge0 // ltz_pmod.
+qed.
+
+lemma oddWn (a : int) : !odd a => exists a', a = 2 * a'.
+proof.
+move/oddPn=> z_mod2; exists (a %/ 2).
+by rewrite mulrC divzE z_mod2.
+qed.
+
+(* ==================================================================== *)
 op gcd_spec a b = fun z =>
      (0 <= z /\ z %| a /\ z %| b)
   /\ (forall x, x %| a => x %| b => x <= z).
@@ -667,7 +697,7 @@ wlog: a b / (`|a| <= `|b|) => [wlog|le_ab nz_ab].
   + by exists z; do! split => //; move=> *; apply: h.
 case: (a = 0) => [->>|]; 1: (exists `|b|; do! split=> //).
 + by rewrite dvdz0.
-+ by rewrite {2}signzE dvdz_mull dvdzz.
++ by rewrite {2}[b]signzE dvdz_mull dvdzz.
 + by move=> x _ xDb; rewrite (ler_trans `|x|) 1:ler_norm dvdz_le.
 move=> nz_a; have nz_b : b <> 0.
 + by apply: contraL le_ab => ->; rewrite normr0 lerNgt /= normr_gt0.
@@ -759,7 +789,7 @@ proof.
 case: (a = 0) => [->//=|nz_a].
 apply/eq_sym/gcd_uniq => //=; first by rewrite normr_ge0.
 + by rewrite dvdz0.
-+ by rewrite {2}signzE dvdz_mull dvdzz.
++ by rewrite {2}[a]signzE dvdz_mull dvdzz.
 + by move=> x _ xDa; rewrite &(ler_trans `|x|) 1:ler_norm dvdz_le.
 qed.
 
@@ -770,9 +800,8 @@ hint simplify gcd0z, gcdz0.
 
 lemma gcd1z a : gcd 1 a = 1.
 proof.
-apply/eq_sym/gcd_uniq => //.
-+ by rewrite dvdzz. + by rewrite dvd1z.
-+ by move=> x; rewrite dvdz1 => <- _; rewrite ler_norm.
+apply/eq_sym/gcd_uniq => // x.
+by rewrite dvdz1 => <- _; rewrite ler_norm.
 qed.
 
 lemma gcdz1 a : gcd a 1 = 1.
@@ -888,12 +917,177 @@ qed.
 lemma mulz_gcdl a b c : gcd b c * `|a| = gcd (b * a) (c * a).
 proof. by rewrite mulrC mulz_gcdr ![a * _]mulrC. qed.
 
+
+(* ==================================================================== *)
+abbrev [-printing] eqm m a b = a %% m = b %% m.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmodE (m a b : int) :
+  eqm m a b <=> (m %| (b - a)).
+proof. by rewrite eqz_mod_dvd /#. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmodP (m a b : int) :
+  eqm m a b <=> (exists c, b - a = c * m).
+proof. by rewrite eqmodE dvdzP. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_refl (m a : int) : eqm m a a.
+proof. by done. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmC (m a b : int) : eqm m a b => eqm m b a.
+proof. by move/eq_sym. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqm_trans (m b a c : int) : eqm m a b => eqm m b c => eqm m a c.
+proof. by move=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmN (m a b : int) : eqm m a b => eqm m (-a) (-b).
+proof.
+case/eqmodP=> [k eq]; apply/eqmodP; exists (-k).
+by rewrite -opprD eq mulNr.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmD (m a1 b1 a2 b2 : int) :
+  eqm m a1 b1 => eqm m a2 b2 => eqm m (a1 + a2) (b1 + b2).
+proof.
+move=> /eqmodP[k1 eq1] /eqmodP[k2 eq2]; apply/eqmodP.
+by exists (k1 + k2); rewrite subrACA !(eq1, eq2) -mulrDl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmB (m a1 b1 a2 b2 : int) :
+  eqm m a1 b1 => eqm m a2 b2 => eqm m (a1 - a2) (b1 - b2).
+proof. by move=> *; apply/eqmD => //; apply/eqmN. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmM (m a1 b1 a2 b2 : int) :
+  eqm m a1 b1 => eqm m a2 b2 => eqm m (a1 * a2) (b1 * b2).
+proof.
+by move=> eq1 eq2; rewrite -modzMml -modzMmr eq1 eq2 modzMml modzMmr.
+qed.
+
 (* ==================================================================== *)
 op coprime a b = gcd a b = 1.
 
-lemma Bezout (a b : int) : coprime a b =>
+(* -------------------------------------------------------------------- *)
+lemma nosmt Bezout (a b : int) : coprime a b =>
   exists u v, u * a + v * b = 1.
 proof. by move=> @/coprime <-; apply: Bachet_Bezout. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss (a b c : int) : a %| (b * c) => coprime a b => a %| c.
+proof.
+move=> a_div_bc eq1_gcd_ab; suff: a %| gcd (a * c) (b * c).
+- by rewrite -mulz_gcdl eq1_gcd_ab /= dvdz_normr.
+by apply: dvdz_gcd => //; apply/dvdz_mulr/dvdzz.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprimeP (a b : int) :
+  coprime a b <=> exists u v, u * a + v * b = 1.
+proof.
+split; [exact/Bezout | case=> u v eq @/coprime].
+apply/eq_sym/gcd_uniq; ~-1: move=> //#.
+move=> x dvd_xa dvd_xb; have: x %| (u * a + v * b).
+- by rewrite dvdzD ?dvdz_mull.
+by rewrite eq => /dvdz1 /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma coprime_sym (a b : int) : coprime a b <=> coprime b a.
+proof. by rewrite /coprime gcdC. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma coprime_modl (a b : int) : coprime (a %% b) b = coprime a b.
+proof. by rewrite /coprime gcd_modl. qed.
+
+lemma coprime_modr (a b : int) : coprime a (b %% a) = coprime a b.
+proof. by rewrite /coprime gcd_modr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma coprime1z (a : int) : coprime 1 a.
+proof. done. qed.
+
+hint exact : coprime1z.
+
+(* -------------------------------------------------------------------- *)
+lemma coprimez1 (a : int) : coprime a 1.
+proof. done. qed.
+
+hint exact : coprime1z.
+
+(* -------------------------------------------------------------------- *)
+lemma coprime2z (a : int) : coprime 2 a <=> odd a.
+proof. by rewrite -coprime_modr modz2; case: (odd a). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma coprimez2 (a : int) : coprime a 2 <=> odd a.
+proof. by rewrite coprime_sym coprime2z. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprimeSz (a : int) : coprime (a + 1) a.
+proof. rewrite addrC -coprime_modl (modzDr 1) coprime_modl coprime1z. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprimezS (a : int) : coprime a (a + 1).
+proof. by rewrite coprime_sym coprimeSz. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt modz_coprime k m : (exists u, (k * u) %% m = 1) => coprime k m.
+proof.
+case=> u eq; have nz_k: k <> 0.
+- by apply: contraL eq => -> /=; rewrite mod0z.
+apply/coprimeP; exists u (-(k * u %/ m)).
+by rewrite mulrC mulNr divzE eq #ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss_dvdr (a b c : int) : coprime a b => (a %| b * c) <=> (a %| c).
+proof. by move=> cop_a_b; split; [move/Gauss; apply | apply: dvdz_mull]. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss_dvdl (a b c : int) : coprime a c => (a %| b * c) <=> (a %| b).
+proof. by move=> ?; rewrite mulrC; apply: Gauss_dvdr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss_gcdr (c a b : int) : coprime c a => gcd c (a * b) = gcd c b.
+proof.
+case: ((c, a * b) = (0, 0)) => [[] -> //#|nz_c].
+move=> cop_c_a; apply/eq_sym/gcd_uniq => //.
+- by apply/dvdz_mull/dvdz_gcdr.
+move=> x dvd_x_c dvd_x_aMb; apply: gcd_max; ~-1: move=> //#.
+suff: coprime x a by move/Gauss_dvdr; apply.
+case/coprimeP: cop_c_a => u v eq; apply/coprimeP.
+by case/dvdzP: dvd_x_c => q ->>; exists (u * q) v; ring eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss_gcdl (c a b : int) : coprime c b => gcd c (a * b) = gcd c a.
+proof. by move=> ?; rewrite mulrC &(Gauss_gcdr). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprimeMr (c a b : int) : coprime c (a * b) <=> (coprime c a /\ coprime c b).
+proof.
+case: (coprime c a) => /= cop_c_a; first by rewrite /coprime Gauss_gcdr.
+apply: contra cop_c_a => /coprimeP [u v] eq; apply/coprimeP.
+by exists u (v * b); ring eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprimeMl (c a b : int) : coprime (a * b) c <=> (coprime a c /\ coprime b c).
+proof. by rewrite coprime_sym coprimeMr ![coprime c _]coprime_sym. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprime_dvdl (a b c : int) : a %| b => coprime b c => coprime a c.
+proof. by case/dvdzP=> q -> /coprimeMl. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt coprime_dvdr (a b c : int) : a %| b => coprime c b => coprime c a.
+proof. by rewrite !(coprime_sym c); apply: coprime_dvdl. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modinv p a : coprime p a => exists b, p %| (a * b - 1)%Int.
@@ -913,6 +1107,22 @@ by exists b=> /=; rewrite h modzMDr modz_small // /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eqmV (m c : int) : 1 < m => coprime m c => eqm m (c * invm c m) 1.
+proof. by move=> gt1_m cop_m_c; rewrite (pmod_small 1 m) // &(invmP). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmZI (m a b c : int) :
+  1 < m => coprime m c => eqm m (c * a) (c * b) => eqm m a b.
+proof.
+move=> gt1_m cop_m_c eq1; have eq2 := eqm_refl m (invm c m).
+have := eqmM _ _ _ _ _ eq1 eq2; rewrite ![(_ * _)%Int * (invm _ _)]mulrAC.
+move=> {eq1 eq2} eq; apply: (eqm_trans _ (c * invm c m * a)).
+- by rewrite -{1}[a]mul1r; apply: eqmM => //; apply/eqmC/eqmV.
+- apply: (eqm_trans _ _ _ _ eq); rewrite -{2}[b]mul1r.
+  by apply: eqmM => //; apply/eqmV.
+qed.
+
+(* ==================================================================== *)
 op prime a = 1 < a /\ (forall q, q %| a => `|q| = 1 \/ `|q| = a).
 
 lemma gt1_prime p : prime p => 1 < p.
@@ -929,6 +1139,15 @@ case: pm_p => gt1_p /(_ _ h) => {h}; rewrite ger0_norm ?ge0_gcd.
 case=> // /eq_sym pE; have: p %| a  by rewrite {1}pE dvdz_gcdr.
 by rewrite dvdzE nz_a.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma prime2 : prime 2.
+proof.
+split=> // q dvd_q2; have := dvdz_le _ _ _ dvd_q2 => //.
+by case: (q = 0) => [->>|/#]; rewrite dvd0z in dvd_q2.
+qed.
+
+hint exact : prime2.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modinv_prime p : prime p =>
@@ -954,11 +1173,13 @@ by move=> /(_ a nz_a); apply/invmP.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt Gauss (a b c : int) : a %| (b * c) => coprime a b => a %| c.
+lemma uniq_invm (m a v1 v2 : int): 1 < m =>
+  a * v1 %% m = 1 => a * v2 %% m = 1 => v1 %% m = v2 %% m.
 proof.
-move=> a_div_bc eq1_gcd_ab; suff: a %| gcd (a * c) (b * c).
-- by rewrite -mulz_gcdl eq1_gcd_ab /= dvdz_normr.
-by apply: dvdz_gcd => //; apply/dvdz_mulr/dvdzz.
+move=> gt1_m; case: (a = 0) => [->/=|nz_a]; first by rewrite mod0z.
+move=> ^eq1 + ^eq2 + - <- /eqmC.
+have := eqmZI m v1 v2 a _ _ => //.
+by apply/coprime_sym/modz_coprime; exists v1.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -982,7 +1203,7 @@ case: (ih dvd_ih prime_a) => y [y_in_s dvd_a_Fy].
 by exists y; split=> //; rewrite in_cons y_in_s.
 qed.
 
-(* -------------------------------------------------------------------- *)
+(* ==================================================================== *)
 lemma sumidE n : 0 <= n =>
   sumid 0 n = (n * (n - 1)) %/ 2.
 proof. by move/Bigint.sumidE_r=> <-; rewrite mulKz. qed.

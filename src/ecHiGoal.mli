@@ -10,7 +10,7 @@ open EcProofTerm
 (* -------------------------------------------------------------------- *)
 type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
+  tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
@@ -22,7 +22,6 @@ type engine  = ptactic_core -> backward
 (* -------------------------------------------------------------------- *)
 type cut_t       = intropattern * pformula * (ptactics located) option
 type cutdef_t    = intropattern * pcutdef
-type cutdef_sc_t = intropattern * pcutdef_schema
 type apply_t     = EcParsetree.apply_info
 type focus_t     = EcParsetree.tfocus
 type cutmode     = [`Have | `Suff]
@@ -80,7 +79,6 @@ val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
 val process_cutdef      : ttenv -> cutdef_t -> backward
-val process_cutdef_sc   : ttenv -> cutdef_sc_t -> backward
 val process_left        : backward
 val process_right       : backward
 val process_split       : backward

@@ -153,19 +153,15 @@ section PROOFS.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
     seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      transitivity*{2} { (r,r0) <@ S.sample2(sampleto1 x0, sampleto2 x1); } => //.
-      move => />; smt().
-      + transitivity*{2} { (r,r0) <@ S.sample(sampleto1 x0, sampleto2 x1); } => //.
-        move => />; smt(). 
-        + inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
-          + by move=> ??; rewrite ofpairK. 
-          move=> _; split.
-          + move=> [t1 t2]?; rewrite sample_spec dmap1E; congr; apply fun_ext => p. 
-            by rewrite /pred1 /(\o) (can_eq _ _ ofpairK).
-          move=> _ t; rewrite sample_spec supp_dmap => -[[t1 t2] []] + ->>.
-          by rewrite topairK ofpairK => ->.
-        by call sample_sample2; auto.
-      by inline *; auto => />.
+      outline {2} [1-2] (r, r0) <@ S.sample2.
+      rewrite equiv[{2} 1 -sample_sample2].
+      inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
+      + by move=> ??; rewrite ofpairK. 
+      move=> _; split.
+      + move=> [t1 t2]?; rewrite sample_spec dmap1E; congr; apply fun_ext => p. 
+        by rewrite /pred1 /(\o) (can_eq _ _ ofpairK).
+      move=> _ t; rewrite sample_spec supp_dmap => -[[t1 t2] []] + ->>.
+      by rewrite topairK ofpairK => ->.
     by auto => />; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
   qed.
 
@@ -185,8 +181,9 @@ section PROOFS.
        smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE ofpairK topairK).
     + by proc; inline *; auto; smt (map_rem rem_merge mem_map mem_pair_map mem_rem).
     + proc *.
-      alias{1} 1 y = witness <:to>; alias{2} 1 y = witness <:to>.
-      rewrite equiv [{1} RO_get (x) y (x) y].
+      inline {1} 1.
+      outline {2} [1] { RO_Pair(I1.RO, I2.RO).get(x); }.
+      by call RO_get; auto.
     inline *; auto => />.
     have hn := o_pair_none <: from, to1, to2>. 
     by rewrite /pair_map merge_empty // map_empty /= => ?; rewrite !mem_empty.

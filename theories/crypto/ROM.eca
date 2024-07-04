@@ -263,9 +263,11 @@ proof.
 have eq_RO_LRO': equiv[Exp'(H.RO).main ~ Exp'(H.LRO).main: ={glob D, arg} ==> ={res}].
 + by proc; call (FullEager.RO_LRO_D D' dout_ll); inline*; auto.
 proc*.
-rewrite equiv [{1} eq_LRO_RO (x) r (x) r]; [by sim|wp].
-rewrite equiv [{2} eq_ERO_RO (x) r0 (x) r1]; 1: by sim.
-by rewrite equiv [{1} eq_RO_LRO' (x) r1 (x) r1]; sim.
+rewrite equiv[{1} 1 eq_LRO_RO].
+rewrite equiv[{2} 1 eq_ERO_RO].
+outline {2} [1] { r <@ MainD(D', RO).distinguish(x); }.
+rewrite equiv[{2} 1 (FullEager.RO_LRO D' dout_ll)].
+by sim.
 qed.
 
 end section.

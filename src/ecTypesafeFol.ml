@@ -1,8 +1,6 @@
 open EcUtils
-open EcIdent
 open EcAst
 open EcTypes
-open EcCoreModules
 open EcCoreFol
 open EcUnify
 open EcSubst
@@ -15,8 +13,6 @@ module Sp = EcPath.Sp
 module Sm = EcPath.Sm
 module Sx = EcPath.Sx
 module UE = EcUnify.UniEnv
-
-open EcBigInt.Notations
 
 type form     = EcAst.form
 type f_node   = EcAst.f_node
@@ -113,9 +109,9 @@ let f_app_safe ?(full=true) (env: EcEnv.env) (f: EcPath.path) (args: form list) 
   end 
   in
   let uidmap = UE.assubst ue in
-  let subst = Tuni.subst uidmap in
-  let rty = ty_subst subst rty in
-  let newt = ty_subst subst newt in
+  let subst = EcCoreSubst.Tuni.subst uidmap in
+  let rty = EcCoreSubst.ty_subst subst rty in
+  let newt = EcCoreSubst.ty_subst subst newt in
   let op = f_op p_f tvars newt in
   if full then
   match rty.ty_node with

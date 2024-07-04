@@ -115,7 +115,7 @@ let concretize_env pe =
 (* -------------------------------------------------------------------- *)
 let concretize_e_form_gen (CPTEnv subst) ids f =
   let f = Fsubst.f_subst subst f in
-  let ids = List.map (snd_map (Fsubst.subst_gty subst)) ids in
+  let ids = List.map (snd_map (Fsubst.gty_subst subst)) ids in
   f_forall ids f
 
 (* -------------------------------------------------------------------- *)
@@ -126,22 +126,29 @@ let concretize_e_form cptenv f =
 let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
   match arg with
   | PAFormula f        -> PAFormula (Fsubst.f_subst subst f)
-  | PAMemory  m        -> PAMemory (Mid.find_def m m subst.fs_mem)
+  | PAMemory  m        -> PAMemory (Fsubst.m_subst subst m)
   | PAModule  (mp, ms) -> PAModule (mp, ms)
   | PASub     pt       -> PASub (pt |> omap (concretize_e_pt cptenv))
 
 
-and concretize_e_head (CPTEnv subst) head =
+and concretize_e_head ((CPTEnv subst) as cptenv) head =
   match head with
   | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst.fs_ty) tys)
-  | PTSchema _ -> assert false
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
-and concretize_e_pt cptenv { pt_head; pt_args } =
-  { pt_head = concretize_e_head cptenv pt_head;
-    pt_args = List.map (concretize_e_arg cptenv) pt_args; }
+and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
+  match pt with
+  | PTApply { pt_head; pt_args } ->
+    PTApply {
+      pt_head = concretize_e_head cptenv pt_head;
+      pt_args = List.map (concretize_e_arg cptenv) pt_args;
+    }
+
+  | PTQuant ((x, ty), pt) ->    (* FIXME: what to do with the binding? *)
+    PTQuant ((x, Fsubst.gty_subst subst ty), concretize_e_pt cptenv pt)
 
 (* -------------------------------------------------------------------- *)
 let concretize_form pe f =
@@ -171,7 +178,7 @@ let pt_of_hyp pf hyps x =
   let ax    = LDecl.hyp_by_id x hyps in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
+    ptev_pt  = ptlocal x;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -179,7 +186,7 @@ let pt_of_hyp_r ptenv x =
   let ax = LDecl.hyp_by_id x ptenv.pte_hy in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
+    ptev_pt  = ptlocal x;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -188,7 +195,7 @@ let pt_of_global pf hyps p tys =
   let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_pt  = ptglobal ~tys p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -197,7 +204,7 @@ let pt_of_global_r ptenv p tys =
   let ax  = EcEnv.Ax.instanciate p tys env in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_pt  = ptglobal ~tys p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -205,7 +212,7 @@ let pt_of_handle_r ptenv hd =
   let g = FApi.get_pregoal_by_id hd ptenv.pte_pe in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTHandle hd; pt_args = []; };
+    ptev_pt  = pthandle hd;
     ptev_ax  = g.g_concl; }
 
 (* -------------------------------------------------------------------- *)
@@ -216,11 +223,11 @@ let pt_of_uglobal_r ptenv p =
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
-  let ax  = Fsubst.subst_tvar fs ax in
+  let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
   { ptev_env = ptenv;
-    ptev_pt  = { pt_head = PTGlobal (p, typ); pt_args = []; };
+    ptev_pt  = ptglobal ~tys:typ p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -267,7 +274,7 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
   try
     let (ue, ev) =
       EcMatching.f_match_core mode pt.pte_hy
-        (pt.pte_ue, !(pt.pte_ev)) ~ptn subject
+        (pt.pte_ue, !(pt.pte_ev)) ptn subject
     in
       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue;
       pt.pte_ev := ev
@@ -295,6 +302,14 @@ let pf_find_occurence
   let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
+  let ho =
+    match EcFol.destr_app ptn with
+    | { f_node = Flocal x }, _
+        when EcMatching.MEV.mem x `Form !(pt.pte_ev)
+      -> true
+
+    | _, _ -> false
+  in
 
   let kmatch key tp =
     match key, (fst (destr_app tp)).f_node with
@@ -328,21 +343,24 @@ let pf_find_occurence
   let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
 
-    let tp =
+    let tps =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->
           let (a1, a2) = List.takedrop na hargs in
-            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
-      | _ -> tp
+          let tp' = f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty) in
+          if ho then [tp; tp'] else [tp']
+      | _ -> [tp]
     in
 
     try
-      if not (Mid.set_disjoint bds tp.f_fv) then
-        `Continue
-      else begin
-        pf_form_match ~mode pt ~ptn tp;
-        raise (E.MatchFound tp)
-      end
+      tps |> List.iter (fun tp ->
+        if Mid.set_disjoint bds tp.f_fv then begin
+          try
+            pf_form_match ~mode pt ~ptn tp;
+            raise (E.MatchFound tp)
+          with EcMatching.MatchFailure -> ()
+      end);
+      raise EcMatching.MatchFailure
     with EcMatching.MatchFailure -> `Continue
   in
 
@@ -495,134 +513,10 @@ let process_named_pterm pe (tvi, fp) =
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let ax  = Fsubst.subst_tvar fs ax in
+  let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
   (p, (typ, ax))
-
-(* -------------------------------------------------------------------- *)
-let process_named_schema pe (tvi, sn) =
-  let env = LDecl.toenv pe.pte_hy in
-
-  let p, sc =
-    match EcEnv.Schema.lookup_opt (unloc sn) (LDecl.toenv pe.pte_hy) with
-    | Some (p,sc) -> p, sc
-    | None -> tc_lookup_error pe.pte_pe `Schema (unloc sn) in
-
-  let typ = sc.EcDecl.axs_tparams in
-
-  let tvi =
-    Exn.recast_pe pe.pte_pe pe.pte_hy
-      (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi) in
-
-  PT.pf_check_tvi pe.pte_pe typ tvi;
-
-  (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let sty = { ty_subst_id with ts_v = fs } in
-
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
-
-  let e_params =
-    List.map (fun (id, ty) ->
-        id, EcTypes.ty_subst sty ty) sc.EcDecl.axs_params in
-
-  (* When substituting in a schema's formula, we have to rebind the schema's
-     expression variables. *)
-  let rebind =
-    List.map (fun (id,ty) ->
-        id, EcTypes.e_local id ty
-      ) e_params
-    |> Mid.of_list in
-  let sc_i =
-    Fsubst.subst_tvar
-      ~es_loc:rebind
-      fs sc.EcDecl.axs_spec in
-
-  (p, typ, sc.EcDecl.axs_pparams, e_params, sc_i)
-
-(* -------------------------------------------------------------------- *)
-let process_sc_instantiation pe inst =
-  let env = LDecl.toenv pe.pte_hy in
-
-  let ue = EcUnify.UniEnv.create None in
-  let pe = { pe with pte_ue = ue } in
-
-  let p, typ, p_params, e_params, sc_i =
-    process_named_schema pe (inst.ptcds_tys, inst.ptcds_name) in
-  let ppargs = inst.ptcds_mps in
-  let pexprs = inst.ptcds_exprs in
-
-  let check_length s params args =
-    if List.length params <> List.length (unloc args) then
-      tc_error pe.pte_pe ~loc:(loc args)
-        "wrong number of %s arguments: expected %d, got %d" s
-        (List.length params)
-        (List.length (unloc args)) in
-
-  check_length "predicate" p_params ppargs;
-  check_length "expression" e_params pexprs;
-
-  (* We type, in order, the memtype, memory predicates and expressions *)
-  let memtype = EcTyping.trans_memtype env pe.pte_ue inst.ptcds_mt in
-  let memenv = EcCoreFol.mhr, memtype in
-
-  (* The environment for expression arguments typing. *)
-  let e_env = EcEnv.Memory.push_active memenv env in
-
-  let mpreds = List.map2 (fun (mem, pform) id ->
-      (* default to mhr if no memory is given *)
-      let mem = omap_dfl (fun m -> EcIdent.create (unloc m)) mhr (unloc mem) in
-      let memenv = mem, memtype in
-      let env = EcEnv.Memory.push_active memenv env in
-      let f = EcTyping.trans_form env pe.pte_ue pform tbool in
-      id, (mem, f)
-    ) (unloc ppargs) p_params in
-
-  let exprs = List.map2 (fun pexpr (id, ty_expected) ->
-      (* `InProc, because we want to look for variables declared in [memenv] *)
-      id, EcTyping.transexpcast e_env `InProc pe.pte_ue ty_expected pexpr
-    ) (unloc pexprs) e_params in
-
-  (* We close the unification environment, and substitute in all infered args. *)
-  if not (EcUnify.UniEnv.closed pe.pte_ue) then
-    assert false;
-
-  let uidmap = EcUnify.UniEnv.assubst pe.pte_ue in
-  let ts = Tuni.subst uidmap in
-  let es = e_subst { e_subst_id with es_ty = ts } in
-
-  let typ = List.map (ty_subst ts) typ in
-  let memtype = EcMemory.mt_subst (ty_subst ts) memtype in
-  let mpreds = List.map (fun (id, (m,p)) ->
-      let fs = Fsubst.f_subst_init ~sty:ts () in
-      let p = Fsubst.f_subst fs p in
-      id, (m,p)) mpreds in
-  let exprs = List.map (fun (id, e) -> id, es e) exprs in
-
-  (* We instantiate the schema. *)
-  (* FIXME: instantiating and substituting in schema is ugly. *)
-  (* For cost judgement, we also need to substitue the expression variables
-     in the precondition. *)
-  let tx f_old f_new = match f_old.f_node, f_new.f_node with
-    | Fcoe coe_old, Fcoe coe_new when EcMemory.is_schema (snd coe_old.coe_mem) ->
-      let fs =
-        List.fold_left (fun s (id,e) ->
-            let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
-            Fsubst.f_bind_local s id f)
-          (Fsubst.f_subst_init ()) exprs in
-
-      EcCoreFol.f_coe_r { coe_new with
-                          coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
-    | _ -> f_new in
-
-  let fs =
-    Fsubst.f_subst_init ~sty:ts
-      ~esloc:(Mid.of_list exprs)
-      ~mempred:(Mid.of_list mpreds)
-      ~mt:memtype () in
-
-  (p, typ, memtype, mpreds, exprs, Fsubst.f_subst ~tx fs sc_i)
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -639,7 +533,7 @@ let process_pterm_cut ~prcut pe pt =
     | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
   in
 
-  let pt = { pt_head = pt; pt_args = []; } in
+  let pt = PTApply { pt_head = pt; pt_args = []; } in
 
   { ptev_env = pe; ptev_pt = pt; ptev_ax = ax; }
 
@@ -653,9 +547,8 @@ let process_pterm pe pt =
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =
-  let pt = { pt_head = PTCut f; pt_args = []; } in
-  let pt = { ptev_env = pe; ptev_pt = pt; ptev_ax = f; } in
-    { ptea_env = pe; ptea_arg = PVASub pt; }
+  let pt = { ptev_env = pe; ptev_pt = ptcut f; ptev_ax = f; } in
+  { ptea_env = pe; ptea_arg = PVASub pt; }
 
 (* ------------------------------------------------------------------ *)
 and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
@@ -824,17 +717,13 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       match dfl_arg_for_mod pe arg with
       | PVAModule (mp, mt) -> begin
           try
-            let obl = EcTyping.check_modtype env mp mt emt in
+            EcTyping.check_modtype env mp mt emt;
             let ms = EcFol.f_bind_mod Fsubst.f_subst_id x mp env in
             let f = Fsubst.f_subst ms f in
-            let f = match obl with
-              | `Ok ->  f
-              | `ProofObligation obl -> f_imps obl f in
-
           (f, PAModule (mp, mt))
         with
         | EcTyping.RestrictionError (_, e) ->
-          tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)
+            tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)
         | EcTyping.TymodCnvFailure e ->
             tc_pterm_apperror ?loc pe (AE_InvalidArgMod e)
       end
@@ -877,8 +766,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
              check_pterm_oarg ?loc pe (x, xty) f oarg
       in
 
-      let rawargs = rawpt.pt_args @ [newarg] in
-      { pt with ptev_ax = newax; ptev_pt = { rawpt with pt_args = rawargs } }
+      { pt with ptev_ax = newax; ptev_pt = ptapply rawpt [newarg]; }
 
 (* -------------------------------------------------------------------- *)
 and apply_pterm_to_arg ?loc pt arg =
@@ -903,7 +791,7 @@ and apply_pterm_to_local ?loc pt id =
   | LD_var (ty, _) ->
       apply_pterm_to_arg_r ?loc pt (PVAFormula (f_local id ty))
 
-  | LD_modty mty ->
+  | LD_modty (mty, _) ->
       let env  = LDecl.toenv pt.ptev_env.pte_hy in
       let msig = EcEnv.ModTy.sig_of_mt env mty in
       apply_pterm_to_arg_r ?loc pt (PVAModule (EcPath.mident id, msig))
@@ -926,7 +814,7 @@ and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =
         match PT.destruct_product ~reduce:false env.pte_hy pe.ptev_ax with
         | Some (`Forall (x, xty, f)) ->
             let (newax, newarg) = check_pterm_oarg env (x, xty) f None in
-            let pt = { pt with pt_args = pt.pt_args @ [newarg] } in
+            let pt = ptapply pt [newarg] in
             let pe = { pe with ptev_ax = newax; ptev_pt = pt } in
             process_implicits ip pe
         | _ -> ((b :: ip), pe)
@@ -1000,18 +888,6 @@ let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_pterm ?implicits (ptenv_of_penv hyps pe) ff
-
-(* -------------------------------------------------------------------- *)
-let tc1_process_sc_instantiation (tc : tcenv1) (inst : pcutdef_schema) =
-  let pe   = FApi.tc1_penv tc in
-  let hyps = FApi.tc1_hyps tc in
-  let p, types, memtype, mpreds, exprs, f =
-    process_sc_instantiation (ptenv_of_penv hyps pe) inst in
-  let pt = { pt_head = PTSchema (p, types, memtype,
-                                 List.map snd mpreds,
-                                 List.map snd exprs);
-             pt_args = []; } in
-  pt, f
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =

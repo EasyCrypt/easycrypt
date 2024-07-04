@@ -340,8 +340,10 @@ abstract theory Program.
     rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
     rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
     wp; rnd.
-    rewrite equiv [{1} ih (n - 1) rs (n - 1) l].
-    by wp; while (i0{1} = i{2} /\ l0{1} = l{2} /\ n0{1} = n{2} - 1); auto; smt().
+    outline {1} [1] rs <@ Sample.sample.
+    rewrite equiv[{1} 1 ih].
+    inline.
+    by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().
   qed.
 
   equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={n} ==> ={res}.
@@ -357,11 +359,7 @@ abstract theory Program.
           rewrite !dlist1E // (size_rev r)=> ?;congr;apply eq_big_perm.
           by apply perm_eqP=> ?;rewrite count_rev. smt(dlist_rev).
       smt(revK dlist_rev).
-    transitivity{1} { r <@ Loop.sample(n);
-                      r <- rev r;          }
-                    (={n} ==> ={r})
-                    (={n} ==> ={r})=> //=; 1:smt().
-      by wp; call Sample_Loop_eq.
+    rewrite equiv[{1} 1 Sample_Loop_eq].
     inline *; wp; while (={i, n0} /\ rev l{1} = l{2}); auto => />.
     smt(rev_cons cats1).
   qed.

@@ -115,9 +115,7 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 let t_fission_r side cpos infos g =
   let tr = fun side -> `LoopFission (side, cpos, infos) in
   let cb = fun cenv _ me zpr -> fission_stmt infos cenv me zpr in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_zip cb) g
+  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 let t_fission = FApi.t_low3 "loop-fission" t_fission_r
 
@@ -172,9 +170,7 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 let t_fusion_r side cpos infos g =
   let tr = fun side -> `LoopFusion (side, cpos, infos) in
   let cb = fun cenv _ me zpr -> fusion_stmt infos cenv me zpr in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_zip cb) g
+  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 let t_fusion = FApi.t_low3 "loop-fusion" t_fusion_r
 
@@ -186,9 +182,7 @@ let unroll_stmt (pf, _) me i =
 
 let t_unroll_r side cpos g =
   let tr = fun side -> `LoopUnraoll (side, cpos) in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_fold unroll_stmt) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold unroll_stmt) g
 
 let t_unroll = FApi.t_low2 "loop-unroll" t_unroll_r
 
@@ -205,9 +199,7 @@ let splitwhile_stmt b (pf, _) me i =
 
 let t_splitwhile_r b side cpos g =
   let tr = fun side -> `SplitWhile (b, side, cpos) in
-  t_code_transform side
-    ~bdhoare:true ~choare:None
-    cpos tr (t_fold (splitwhile_stmt b)) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold (splitwhile_stmt b)) g
 
 let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
@@ -237,7 +229,6 @@ let process_unroll_for side cpos tc =
     tc_error !!tc "cannot use deep code position";
 
   let cpos = EcTyping.trans_codepos env cpos in
-
   let z    = Zpr.zipper_of_cpos env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
@@ -306,7 +297,7 @@ let process_unroll_for side cpos tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) (Zpr.cpos pos) None) @+
+      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;

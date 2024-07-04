@@ -135,9 +135,9 @@ module LowApply = struct
         let env = LDecl.toenv (hyps_of_ckenv tc) in
         (pt, EcEnv.Ax.instanciate p tys env)
 
-    | PTSchema (p, tys, mt, mps, es) ->
-      let env = LDecl.toenv (hyps_of_ckenv tc) in
-      (pt, EcEnv.Schema.instanciate p tys mt mps es env)
+    | PTTerm pt ->
+      let pt, ax = check `Elim pt tc in
+      (PTTerm pt, ax)
 
   (* ------------------------------------------------------------------ *)
   and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
@@ -154,7 +154,7 @@ module LowApply = struct
 
     and check_arg (sbt, ax) arg =
       let check_binder (x, xty) f =
-        let xty = Fsubst.subst_gty sbt xty in
+        let xty = Fsubst.gty_subst sbt xty in
 
         match xty, arg with
         | GTty xty, PAFormula arg ->
@@ -168,14 +168,7 @@ module LowApply = struct
         | GTmodty emt, PAModule (mp, mt) -> begin
           (* FIXME: poor API ==> poor error recovery *)
           try
-            let obl = EcTyping.check_modtype env mp mt emt in
-
-            let f = match obl with
-              | `Ok ->  f
-              | `ProofObligation obl ->
-                if mode = `Elim then f_imps obl f
-                else f_and (f_ands obl) f
-            in
+            EcTyping.check_modtype env mp mt emt;
             (EcFol.f_bind_mod sbt x mp env, f)
           with _ -> raise InvalidProofTerm
         end
@@ -190,7 +183,7 @@ module LowApply = struct
               let f1    = Fsubst.f_subst sbt f1 in
               let subpt =
                 match subpt with
-                | None       -> { pt_head = PTCut f1; pt_args = []; }
+                | None       -> EcCoreGoal.ptcut f1
                 | Some subpt -> subpt
               in
               let subpt, subax = check mode subpt tc in
@@ -217,10 +210,19 @@ module LowApply = struct
       end
     in
 
-    let (nhd, ax) = check_pthead pt.pt_head tc in
-    let ax, nargs = check_args (Fsubst.f_subst_id, ax, []) pt.pt_args in
+    match pt with
+    | PTApply pt ->
+      let (nhd, ax) = check_pthead pt.pt_head tc in
+      let ax, nargs = check_args (Fsubst.f_subst_id, ax, []) pt.pt_args in
+      (PTApply { pt_head = nhd; pt_args = nargs }, ax)
 
-    ({ pt_head = nhd; pt_args = nargs }, ax)
+    | PTQuant (bd, pt) -> begin
+        match mode with
+        | `Intro -> raise InvalidProofTerm
+        | `Elim  ->
+          let pt, ax = check `Elim pt tc in
+          (PTQuant (bd, pt), f_forall [bd] ax)
+      end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -457,7 +459,7 @@ end
 (* -------------------------------------------------------------------- *)
 let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
   let add_local hyps id sbt x gty =
-    let gty = Fsubst.subst_gty sbt gty in
+    let gty = Fsubst.gty_subst sbt gty in
     let id  = tg_map (function
       | Some id -> id
       | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)) id
@@ -502,7 +504,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         let id = tg_map (function
           | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)
           | Some id -> id) id in
-        let xty  = ty_subst sbt.fs_ty xty in
+        let xty  = ty_subst sbt xty in
         let xe   = Fsubst.f_subst sbt xe in
         let sbt  = Fsubst.f_bind_rename sbt x (tg_val id) xty in
         let hyps = add_ld id (LD_var (xty, Some xe)) hyps in
@@ -547,6 +549,10 @@ type inames = [`Symbol of symbol list | `Ident of EcIdent.t list]
 let t_intros_n ?(clear = false) (n : int) (tc : tcenv1) =
   let tc, xs = t_intros_x (EcUtils.List.make n (notag None)) tc in
   if clear then FApi.t_first (t_clears xs) tc else tc
+
+(* -------------------------------------------------------------------- *)
+let t_intros_n_x (n : int) (tc : tcenv1) =
+  t_intros_x (EcUtils.List.make n (notag None)) tc
 
 (* -------------------------------------------------------------------- *)
 let t_intro_i_x (id : EcIdent.t option) (tc : tcenv1) =
@@ -627,7 +633,7 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
       (EcPrinting.pp_form ppe) ax
       (EcPrinting.pp_form ppe) concl;
     *)
-    raise InvalidGoalShape;
+    raise InvalidGoalShape
   end;
 
   FApi.close tc (VApply pt)
@@ -636,7 +642,7 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
 let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
   let pt =
     let args = (List.map paformula args) @ (List.make sk (PASub None)) in
-    { pt_head = PTLocal x; pt_args = args; } in
+    ptlocal ~args x in
 
   tt_apply pt tc
 
@@ -644,7 +650,7 @@ let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
 let tt_apply_s (p : path) tys ?(args = []) ?(sk = 0) tc =
   let pt =
     let args = (List.map paformula args) @ (List.make sk (PASub None)) in
-    { pt_head = PTGlobal (p, tys); pt_args = args; } in
+    ptglobal ~args ~tys p in
 
   tt_apply pt tc
 
@@ -652,7 +658,7 @@ let tt_apply_s (p : path) tys ?(args = []) ?(sk = 0) tc =
 let tt_apply_hd (hd : handle) ?(args = []) ?(sk = 0) tc =
   let pt =
     let args = (List.map paformula args) @ (List.make sk (PASub None)) in
-    { pt_head = PTHandle hd; pt_args = args; } in
+    pthandle ~args hd in
 
   tt_apply pt tc
 
@@ -851,7 +857,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
         | `LetIn  (x, _, f) -> f_let1 x f ff)
       (Fsubst.f_subst s concl) bds in
 
-  let pt = { pt_head = PTCut ff; pt_args = List.rev args; } in
+  let pt = ptcut ~args:(List.rev args) ff in
   let tc = t_apply pt tc in
   let ct = fun tc -> tc
     |> t_clears1 ~leniant:true  cltry
@@ -966,8 +972,7 @@ let t_transitivity ?reduce f2 (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let t_exists_intro_s (args : pt_arg list) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
-  let pt = { pt_head = PTHandle (FApi.tc1_handle tc);
-             pt_args = args; } in
+  let pt = pthandle ~args (FApi.tc1_handle tc) in
   let ax = snd (LowApply.check `Intro pt (`Hyps (hyps, !!tc))) in
   FApi.xmutate1 tc (`Exists args) [ax]
 
@@ -1296,14 +1301,14 @@ let t_elimT_form (ind : proofterm) ?(sk = 0) (f : form) (tc : tcenv1) =
   let args =
     (PAFormula pf :: (List.make aa1 (PASub None)) @
      PAFormula  f :: (List.make (aa2+aa3) (PASub None))) in
-  let pt   = { ind with pt_args = ind.pt_args @ args; } in
+  let pt   = ptapply ind args in
 
   (* FIXME: put first goal last *)
   FApi.t_focus (t_apply pt) tc
 
 (* -------------------------------------------------------------------- *)
 let t_elimT_form_global p ?(typ = []) ?sk f tc =
-  let pt = { pt_head = PTGlobal (p, typ); pt_args = []; } in
+  let pt = ptglobal ~tys:typ p in
   t_elimT_form pt f ?sk tc
 
 (* -------------------------------------------------------------------- *)
@@ -1343,30 +1348,26 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
 
       match EcEnv.Ty.scheme_of_ty mode ty env with
       | Some (p, typ) ->
-          let pt = { pt_head = PTGlobal (p, typ); pt_args = []; } in
-          (tc, pt, 0)
+          let pt = ptglobal ~tys:typ p in (tc, pt, 0)
 
       | None ->
           match (EcEnv.ty_hnorm ty env).ty_node with
           | Ttuple tys ->
               let indtc  = pf_gen_tuple_elim ~witheq:false tys hyps in
               let tc, hd = FApi.bwd1_of_fwd indtc tc in
-              let pt     = { pt_head = PTHandle hd; pt_args = []; } in
+              let pt     = pthandle hd in
               (tc, pt, 0)
 
           | _ when EcReduction.EqTest.for_type env tunit ty ->
-              let pt = { pt_head = PTGlobal (LG.p_unit_elim, []);
-                         pt_args = []; } in
+              let pt = ptglobal ~tys:[] LG.p_unit_elim in
               (tc, pt, 0)
 
           | _ when EcReduction.EqTest.for_type env tint ty ->
-              let pt = { pt_head = PTGlobal (EcCoreLib.CI_Int.p_int_elim, []);
-                         pt_args = []; } in
+              let pt = ptglobal ~tys:[] EcCoreLib.CI_Int.p_int_elim in
               (tc, pt, 1)
 
           | _ when EcReduction.EqTest.for_type env tbool ty ->
-              let pt = { pt_head = PTGlobal (LG.p_bool_elim, []);
-                         pt_args = []; } in
+              let pt = ptglobal ~tys:[] LG.p_bool_elim in
               (tc, pt, 0)
 
           | _ -> raise InvalidGoalShape
@@ -1410,7 +1411,7 @@ let t_case fp tc = t_elimT_form_global LG.p_case_eq_bool fp tc
 let t_elim_hyp h tc =
   (* FIXME: exception? *)
   let f  = LDecl.hyp_by_id h (FApi.tc1_hyps tc) in
-  let pt = { pt_head = PTLocal h; pt_args = []; } in
+  let pt = ptlocal h in
   FApi.t_seq (t_cutdef pt f) t_elim tc
 
 (* -------------------------------------------------------------------- *)
@@ -1594,6 +1595,7 @@ let t_rewrite
     | None     -> FPosition.select_form ?keyed ?xconv hyps None left tgfp
     | Some pos -> pos in
 
+
   let tgfp =
     try  FPosition.map npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
@@ -1620,8 +1622,7 @@ let t_rewrite
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
-  let pt = { pt_head = PTLocal id; pt_args = []; } in
-  t_rewrite ?xconv ?mode ?donot pt pos tc
+  t_rewrite ?xconv ?mode ?donot (ptlocal id) pos tc
 
 (* -------------------------------------------------------------------- *)
 type vsubst = [
@@ -1860,7 +1861,7 @@ let t_subst_x ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc
         else `Pre  (id, lk)
 
     | LD_mem    _ -> `Pre (id, lk)
-    | LD_modty  _ -> `Pre (id, lk) (* TODO: subst cost *)
+    | LD_modty  _ -> `Pre (id, lk)
     | LD_abs_st _ -> `Pre (id, lk)
   in
 
@@ -2107,7 +2108,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     | SFlet (LTuple fs, f1, _) ->
       let tys    = List.map snd fs in
       let tc, hd = FApi.bwd1_of_fwd (pf_gen_tuple_elim tys hyps) tc in
-      let pt     = { pt_head = PTHandle hd; pt_args = []; } in
+      let pt     = pthandle hd in
       FApi.t_seq (t_elimT_form pt f1) aux0 tc
 
     | SFimp (_, _) -> begin
@@ -2214,7 +2215,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
       (* FIXME : does t_elimT_form change the hyps ? *)
       let tys    = List.map snd fs in
       let tc, hd = FApi.bwd1_of_fwd (pf_gen_tuple_elim tys hyps) tc in
-      let pt     = { pt_head = PTHandle hd; pt_args = []; } in
+      let pt     = pthandle hd in
       FApi.t_seq (t_elimT_form pt f1) (aux0 st) tc
 
     | SFimp (_, _) -> begin
@@ -2259,7 +2260,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
        | _ :: _ ->
        let concl = f_ands (List.map (fun g -> g.g_concl) cl)  in
        let tc, hd = FApi.newgoal tc ~hyps:hyps0 concl in
-       let pt = { pt_head = PTHandle hd; pt_args = []; } in
+       let pt = pthandle hd in
        let rec t_final n tc =
          if n = 1 then (t_intros_n 1 @! t_assumption `Alpha) tc
          else FApi.t_seqs [t_elim_and; t_intros_n 1; t_final (n-1)] tc in
@@ -2410,13 +2411,13 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 (* -------------------------------------------------------------------- *)
 let t_smt ~(mode:smtmode) pi tc =
   let error () =
     match mode with
-    | `Standard ->
+    | `Sloppy ->
         tc_error !!tc ~catchable:true  "cannot prove goal"
     | `Strict ->
         tc_error !!tc ~catchable:false "cannot prove goal (strict)"

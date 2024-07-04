@@ -158,72 +158,6 @@ let is_match  = _is_of_get get_match
 let is_assert = _is_of_get get_assert
 
 (* -------------------------------------------------------------------- *)
-let rec s_subst_top (s : EcTypes.e_subst) =
-  let e_subst = EcTypes.e_subst s in
-
-  if e_subst == identity then identity else
-
-  let pvt_subst (pv,ty as p) =
-    let pv' = EcTypes.pv_subst (EcPath.x_subst_abs s.es_ty.ts_cmod) pv in
-    let ty' = EcTypes.ty_subst s.EcTypes.es_ty ty in
-
-    if pv == pv' && ty == ty' then p else (pv', ty') in
-
-  let lv_subst lv =
-    match lv with
-    | LvVar pvt ->
-        LvVar (pvt_subst pvt)
-
-    | LvTuple pvs ->
-        let pvs' = List.Smart.map pvt_subst pvs in
-        LvTuple pvs'
-
-  in
-
-  let rec i_subst i =
-    match i.i_node with
-    | Sasgn (lv, e) ->
-        i_asgn (lv_subst lv, e_subst e)
-
-    | Srnd (lv, e) ->
-        i_rnd (lv_subst lv, e_subst e)
-
-    | Scall (olv, mp, args) ->
-        let olv'  = olv |> OSmart.omap lv_subst in
-        let mp'   = EcPath.x_subst_abs s.es_ty.ts_cmod mp in
-        let args' = List.Smart.map e_subst args in
-
-        i_call (olv', mp', args')
-
-    | Sif (e, s1, s2) ->
-        i_if (e_subst e, s_subst s1, s_subst s2)
-
-    | Swhile(e, b) ->
-        i_while (e_subst e, s_subst b)
-
-    | Smatch (e, b) ->
-        let forb ((xs, subs) as b1) =
-          let s, xs' = EcTypes.add_locals s xs in
-          let subs'  = s_subst_top s subs in
-          if xs == xs' && subs == subs' then b1 else (xs', subs')
-        in
-
-        i_match (e_subst e, List.Smart.map forb b)
-
-    | Sassert e ->
-        i_assert (e_subst e)
-
-    | Sabstract _ ->
-        i
-
-  and s_subst s =
-    stmt (List.Smart.map i_subst s.s_node)
-
-  in s_subst
-
-let s_subst = s_subst_top
-
-(* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
   let e_pv e =
     let rec e_pv sid e =
@@ -301,7 +235,7 @@ let ur_app f a =
   { ur_pos = (omap f) a.ur_pos;
     ur_neg = f a.ur_neg; }
 
-(* Noting is restricted. *)
+(* Nothing is restricted. *)
 let ur_empty emp = { ur_pos = None; ur_neg = emp; }
 
 (* Everything is restricted. *)
@@ -339,68 +273,37 @@ let ur_inter union inter ur1 ur2 =
 module PreOI : sig
   type t = EcAst.oracle_info
 
-  val hash : t -> int
-  val equal : (form -> form -> bool) -> t -> t -> bool
+  val equal : t -> t -> bool
 
-  val cost_self : t -> [`Bounded of form | `Unbounded]
-  val cost : t -> xpath -> [`Bounded of form| `Zero | `Unbounded]
-  val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
-  val costs : t -> [`Bounded of form * form Mx.t | `Unbounded]
+  val hash : t -> int
 
   val allowed : t -> xpath list
+
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> [`Bounded of form * form Mx.t | `Unbounded] -> t
+  val mk : xpath list -> t
+
   val filter : (xpath -> bool) -> t -> t
 end = struct
-  (* Oracle information of a procedure [M.f]:
-   * - oi_calls : list of oracles that can be called by [M.f].
-   * - oi_in    : true if equality of globals is required to ensure
-   * equality of result and globals (in the post).
-   * - oi_costs : self cost, plus a mapping from oracles to the number of time
-   * that they can be called by [M.f]. Missing entries are can be called
-   * zero times. No restrictio of [None]
-   *
-   * Remark: there is redundancy between oi_calls and oi_costs. *)
   type t = EcAst.oracle_info
 
-  let allowed oi = oi.oi_calls
+  let equal =
+    EcAst.oi_equal
 
-  let allowed_s oi = allowed oi |> Sx.of_list
+  let hash =
+    EcAst.oi_hash
 
-  let cost_self (oi : t) =
-    omap_dfl (fun (self,_) -> `Bounded self) `Unbounded oi.oi_costs
+  let allowed oi =
+    oi.oi_calls
 
-  let cost (oi : t) (x : xpath) =
-    omap_dfl (fun (_,oi) ->
-        let c = Mx.find_opt x oi in
-        omap_dfl (fun c -> `Bounded c) `Zero c)
-      `Unbounded oi.oi_costs
+  let allowed_s oi =
+    allowed oi |> Sx.of_list
 
-  let cost_calls oi = omap_dfl (fun (_,x) -> `Bounded x) `Unbounded oi.oi_costs
-
-  let costs oi = omap_dfl (fun x -> `Bounded x) `Unbounded oi.oi_costs
-
-  let mk oi_calls oi_costs = match oi_costs with
-    | `Bounded oi_costs ->
-      { oi_calls; oi_costs = Some (oi_costs) ; }
-    | `Unbounded ->
-      { oi_calls; oi_costs = None; }
-
-  (* let change_calls oi calls =
-   *   mk calls oi.oi_in
-   *     (Mx.filter (fun x _ -> List.mem x calls) oi.oi_costs) *)
+  let mk oi_calls =
+    { oi_calls }
 
   let filter f oi =
-    let costs = match oi.oi_costs with
-      | Some (self,costs) -> `Bounded (self, Mx.filter (fun x _ -> f x) costs)
-      | None -> `Unbounded in
-    mk (List.filter f oi.oi_calls) costs
-
-  let equal = EcAst.oi_equal
-
-  let hash = EcAst.oi_hash
-
+    mk (List.filter f oi.oi_calls)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -413,12 +316,8 @@ type mod_restr = EcAst.mod_restr
 let mr_equal = EcAst.mr_equal
 let mr_hash  = EcAst.mr_hash
 
-let has_compl_restriction mr =
-  Msym.exists (fun _ oi -> (PreOI.costs oi) <> `Unbounded) mr.mr_oinfos
-
-let mr_is_empty mr =
-     not (has_compl_restriction mr)
-  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) mr.mr_oinfos
+let ois_is_empty (ois : oracle_infos) =
+  Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) ois
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold
@@ -460,7 +359,7 @@ type module_sig_body = module_sig_body_item list
 type module_sig = {
   mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : mod_restr;
+  mis_oinfos : oracle_infos;
 }
 
 type top_module_sig = {
@@ -548,20 +447,17 @@ type abs_uses = {
 
 type module_expr = {
   me_name     : symbol;
+  me_params   : (EcIdent.t * module_type) list;
   me_body     : module_body;
   me_comps    : module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * module_type) list;
+  me_oinfos   : oracle_infos;
 }
 
-(* Invariant:
-   In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
-   be fully applied. Therefore, we must have:
-   [List.length mp.mt_params = List.length mp.mt_args]  *)
 and module_body =
   | ME_Alias       of int * EcPath.mpath
   | ME_Structure   of module_structure       (* Concrete modules. *)
-  | ME_Decl        of module_type         (* Abstract modules. *)
+  | ME_Decl        of mty_mr                 (* Abstract modules. *)
 
 and module_structure = {
   ms_body      : module_item list;

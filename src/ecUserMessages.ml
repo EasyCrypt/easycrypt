@@ -4,6 +4,7 @@ open EcUid
 open EcPath
 open EcUtils
 open EcTypes
+open EcCoreSubst
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
@@ -36,26 +37,6 @@ end = struct
 
     let pp_type fmt ty = EcPrinting.pp_type ppe0 fmt ty in
 
-    let pp_cost ppe fmt c =
-        EcPrinting.pp_form ppe fmt c in
-
-    let pp_self ppe mode fmt (iself,oself) =
-      Format.fprintf fmt
-        "@[<v>self cost:@;  @[%a@]@; cannot be shown \
-         to be %s:@;  @[%a@]@]"
-        (pp_cost ppe) iself
-        (match mode with `Eq -> "equal to" | `Sub -> "upper-bounded by")
-        (pp_cost ppe) oself in
-
-    let pp_diff ppe mode fmt (f,(ic,oc)) =
-      Format.fprintf fmt
-        "@[<v>the maximal number of calls to %a:@;  @[%a@]@; cannot be shown \
-         to be %s:@;  @[%a@]@]"
-        (EcPrinting.pp_funname ppe) f
-        (pp_cost ppe) ic
-        (match mode with `Eq -> "equal to" | `Sub -> "upper-bounded by")
-        (pp_cost ppe) oc in
-
     match error with
     | MF_targs (ex, got) ->
         msg "its argument has type %a instead of %a"
@@ -86,39 +67,6 @@ end = struct
             (if has_allowed then ",@ " else "")
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
             (Sx.ntr_elements notallowed)
-
-    | MF_compl (env, `Sub (self,diffs)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let pp_self_sep fmt = function
-        | None -> ()
-        | Some self ->
-          if Mx.is_empty diffs then
-            pp_self ppe `Sub fmt self
-          else
-            Format.fprintf fmt "%a@;" (pp_self ppe `Sub) self in
-      Format.fprintf fmt "@[<v>%a%a@]"
-        pp_self_sep self
-        (EcPrinting.pp_list "@;" (pp_diff ppe `Sub))
-        (Mx.bindings diffs)
-
-    | MF_compl (env, `Eq (self,diffs)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let pp_self_sep fmt = function
-        | None -> ()
-        | Some self ->
-          if Mx.is_empty diffs then
-            pp_self ppe `Sub fmt self
-          else
-            Format.fprintf fmt "%a@;" (pp_self ppe `Eq) self in
-
-      Format.fprintf fmt "@[<v>%a%a@]"
-        pp_self_sep self
-        (EcPrinting.pp_list "@;" (pp_diff ppe `Eq))
-        (Mx.bindings diffs)
-
-    | MF_unbounded ->
-      msg "the function does not satisfy the required complexity restriction \
-          (at least, it cannot be infered from its type)"
 
   let pp_restr_err_aux env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -399,7 +347,7 @@ end = struct
         List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys
 
     | MultipleOpMatch (name, tys, matches) -> begin
-        let uvars = List.map EcTypes.Tuni.univars tys in
+        let uvars = List.map Tuni.univars tys in
         let uvars = List.fold_left Suid.union Suid.empty uvars in
 
         begin match tys with
@@ -430,7 +378,7 @@ end = struct
               (EcPrinting.pp_list ",@ " pp_type) inst
           end;
 
-          let myuvars = List.map EcTypes.Tuni.univars inst in
+          let myuvars = List.map Tuni.univars inst in
           let myuvars = List.fold_left Suid.union uvars myuvars in
           let myuvars = Suid.elements myuvars in
 
@@ -549,14 +497,6 @@ end = struct
     | MissingMemType ->
         msg "memory type missing"
 
-    | SchemaVariableReBinded id ->
-        msg "the schema variable %a has been rebinded"
-            EcIdent.pp_ident id
-
-    | SchemaMemBinderBelowCost ->
-      msg "predicates binding memories are not allowed below a cost statement \
-           in a schema"
-
     | ModuleNotAbstract m ->
       msg "the module %s is not abstract" m
 
@@ -575,6 +515,9 @@ end = struct
         msg "the right-hand side of this assignment cannot be typed as an expression;
              if you meant to call procedure `%a', assign its result using `<@' rather than `<-'"
             pp_qsymbol q
+
+    | PositiveShouldBeBeforeNegative ->
+        msg "positive restriction are only allowed before negative restriction"
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -702,7 +645,6 @@ end = struct
     | OVK_Abbrev    -> "abbreviation"
     | OVK_Theory    -> "theory"
     | OVK_Lemma     -> "lemma/axiom"
-    | OVK_ModExpr   -> "module"
     | OVK_ModType   -> "module type"
 
   let pp_incompatible env fmt = function
@@ -733,6 +675,10 @@ end = struct
     | CE_UnkOverride (kd, x) ->
         msg "unknown %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_ThyOverride x ->
+        msg "Cannot override theory `%s`: contains module"
+          (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
         msg "unknown abbreviation: `%s'" (string_of_qsymbol x)

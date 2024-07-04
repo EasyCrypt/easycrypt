@@ -894,10 +894,10 @@ lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim: s n=>/#. qed.
 
 lemma mem_drop n (s:'a list) x: mem (drop n s) x => mem s x.
-proof. by rewrite -{2}(cat_take_drop n) mem_cat=>->. qed.
+proof. by rewrite -{2}[s](cat_take_drop n) mem_cat=>->. qed.
 
 lemma mem_take n (s:'a list) x: mem (take n s) x => mem s x.
-proof. by rewrite -{2}(cat_take_drop n) mem_cat=>->. qed.
+proof. by rewrite -{2}[s](cat_take_drop n) mem_cat=>->. qed.
 
 lemma nth_drop (x0 : 'a) n s i:
   0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
@@ -3691,19 +3691,3 @@ move=> uq_xs; apply: uniq_flatten_map => /=.
   by case/hasP => ys [#] /alltuplesP[+ _] /alltuplesP[+ _] - -> /#.
 - by apply: range_uniq.
 qed.
-
-(* -------------------------------------------------------------------- *)
-(*                          Cost on list                                *)
-(* -------------------------------------------------------------------- *)
-abstract theory Cost.
-  schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + '1.
-  hint simplify cost_eqnil.
-  
-  schema cost_drop ['a] `{P} {l: 'a list} : 
-    cost [P: drop 1 l] = cost [P: l] + '1.
-
-  schema cost_head ['a] `{P} {w:'a, l:'a list} : 
-    cost [P:head w l] = cost[P:w] + cost[P:l] + '1.
-
-  hint simplify cost_drop, cost_head.
-end Cost.

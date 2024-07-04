@@ -5,11 +5,15 @@
 
 (include_subdirs unqualified)
 
+(generate_sites_module
+ (module ecDuneSites)
+ (sites easycrypt))
+
 (library 
  (name ecLib)
  (public_name easycrypt.ecLib)
  (modules :standard \ ec)
- (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith bitwuzla)
+ (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith lospecs)
 )
 
 (executable
@@ -17,7 +21,7 @@
  (name ec)
  (modules ec)
  (promote (until-clean))
- (libraries batteries camlp-streams dune-build-info lospecs inifiles why3 yojson zarith ecLib bitwuzla))
+ (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith ecLib))
 
 (ocamllex ecLexer)
 

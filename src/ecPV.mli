@@ -74,8 +74,6 @@ module PVM : sig
 
   val subst      : env -> subst -> form  -> form
 
-  val subst_cost : env -> subst -> cost  -> cost
-
   val subst1     : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
@@ -132,6 +130,7 @@ val f_read_r   : xpath      pvaccess
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
 
+val lp_write :                 lvalue     pvaccess0
 val i_write  : ?except:Sx.t -> instr      pvaccess0
 val is_write : ?except:Sx.t -> instr list pvaccess0
 val s_write  : ?except:Sx.t -> stmt       pvaccess0

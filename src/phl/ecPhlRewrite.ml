@@ -2,51 +2,81 @@
 open EcParsetree
 open EcAst
 open EcCoreGoal
+open EcEnv
 open EcModules
 open EcFol
 
 (* -------------------------------------------------------------------- *)
 let get_expression_of_instruction (i : instr) =
   match i.i_node with
-  | Sasgn (lv, e) -> (e, (fun e -> i_asgn (lv, e)))
-  | Srnd  (lv, e) -> (e, (fun e -> i_rnd  (lv, e)))
-  | _             -> assert false
+  | Sasgn  (lv, e)     -> Some (e, (fun e -> i_asgn  (lv, e)))
+  | Srnd   (lv, e)     -> Some (e, (fun e -> i_rnd   (lv, e)))
+  | Sif    (e, s1, s2) -> Some (e, (fun e -> i_if    (e, s1, s2)))
+  | Swhile (e, s)      -> Some (e, (fun e -> i_while (e, s)))
+  | Smatch (e, bs)     -> Some (e, (fun e -> i_match (e, bs)))
+  | _                  -> None
 
 (* -------------------------------------------------------------------- *)
-let process_change
+let t_change
     (side : side option)
     (pos  : pcodepos)
-    (form : pformula)
+    (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =
-  let env, _, concl = FApi.tc1_eflat tc in
+  let env, hyps, concl = FApi.tc1_eflat tc in
 
-  let change (i : instr) =
-    let (e, mk) = get_expression_of_instruction i in
-    let m, e' = EcProofTyping.tc1_process_Xhl_form ?side tc e.e_ty form in
+  let change (m : memenv) (i : instr) =
+    let e, mk =
+      EcUtils.ofdfl
+        (fun () ->
+           tc_error !!tc
+             "targeted instruction should be \
+             an assignment or random sampling")
+        (get_expression_of_instruction i)
+    in
+
+    let data, e' = expr e (hyps, m) in
     let mid = EcMemory.memory m in
-    let e' = expr_of_form mid e' in
 
     let f  = form_of_expr mid e in
     let f' = form_of_expr mid e' in
 
-    ([f_forall_mems [m] (f_eq f f')], [mk e'])
+    (data, [f_forall_mems [m] (f_eq f f')]), [mk e']
   in
 
   let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
 
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
-    assert false;
+    tc_error !!tc
+      "conclusion should be a program logic \
+      (hoare | ehoare | phoare | equiv)";
 
   let m, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
   let pos =
     let env = EcEnv.Memory.push_active m env in    
     EcTyping.trans_codepos env pos
   in
-  let goals, s = EcMatching.Zipper.map env pos change s in
+  let (data, goals), s = EcMatching.Zipper.map env pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
-  FApi.xmutate1 tc `ProcChange (goals @ [concl])
+  data, FApi.xmutate1 tc `ProcChange (goals @ [concl])
+
+(* -------------------------------------------------------------------- *)
+let process_change
+    (side : side option)
+    (pos  : pcodepos)
+    (form : pexpr)
+    (tc   : tcenv1)
+=
+  let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
+    let hyps = LDecl.push_active m hyps in
+    let e =
+      EcProofTyping.pf_process_exp
+        !!tc hyps `InProc (Some e.e_ty) form
+    in (), e
+  in
+
+  let (), tc = t_change side pos expr tc in tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite
@@ -55,45 +85,59 @@ let process_rewrite
     (pt   : ppterm)
     (tc   : tcenv1)
 =
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  let hyps = FApi.tc1_hyps tc in
   let ptenv = EcProofTerm.ptenv_of_penv hyps !!tc in
   let pt = EcProofTerm.process_full_pterm ptenv pt in
 
   let pts = EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
 
-  let change (i : instr) =
-    let e, mk = get_expression_of_instruction i in
-    let e = form_of_expr mhr e in
+  let change (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
+    let e = form_of_expr (fst m) e in
 
-    let try1 (pt, _, (f1, f2)) =
-      let subf, occmode =
-        EcProofTerm.pf_find_occurence_lazy pt.EcProofTerm.ptev_env ~ptn:f1 e in
+    let try1 (pt, mode, (f1, f2)) =
+      try
+        let subf, occmode =
+          EcProofTerm.pf_find_occurence_lazy
+            pt.EcProofTerm.ptev_env ~ptn:f1 e
+        in
 
-      let f2 = EcProofTerm.concretize_form pt.EcProofTerm.ptev_env f2 in
-      let cpos =
-        EcMatching.FPosition.select_form
-          ~xconv:`AlphaEq ~keyed:occmode.k_keyed
-          hyps None subf e in
+        assert (EcProofTerm.can_concretize pt.ptev_env);
 
-      let e = EcMatching.FPosition.map cpos (fun _ -> f2) e in
+        let f2 = EcProofTerm.concretize_form pt.ptev_env f2 in
+        let pt, _ = EcProofTerm.concretize pt in
 
-      Some e in
+        let cpos =
+          EcMatching.FPosition.select_form
+            ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+            hyps None subf e in
 
-    let e = Option.get (List.find_map try1 pts) in
-    ([], [mk (expr_of_form mhr e)])
+        let e = EcMatching.FPosition.map cpos (fun _ -> f2) e in
+
+        Some ((pt, mode, cpos), e)
+
+      with EcProofTerm.FindOccFailure _ ->
+        None
+
+    in
+
+    let data, e =
+      EcUtils.ofdfl
+        (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
+        (List.find_map try1 pts) in
+
+    (m, data), expr_of_form mhr e
   in
 
-  let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
+  let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
 
-  if not (EcLowPhlGoal.is_program_logic concl kinds) then
-    assert false;
+  let cpos = EcMatching.FPosition.reroot [1] cpos in
 
-  let m, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
-  let pos =
-    let env = EcEnv.Memory.push_active m env in
-    EcTyping.trans_codepos env pos
+  let discharge (tc : tcenv1) =
+    let tc = EcLowGoal.t_intros_i_1 [fst m] tc in
+    FApi.t_seq
+      (EcLowGoal.t_rewrite ~mode pt (`LtoR, Some cpos))
+      EcLowGoal.t_reflex
+      tc
   in
-  let goals, s = EcMatching.Zipper.map env pos change s in
-  let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
-  FApi.xmutate1 tc `ProcRewrite (goals @ [concl])
+  FApi.t_first discharge tc

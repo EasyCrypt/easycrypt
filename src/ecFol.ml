@@ -11,9 +11,11 @@ module CI = EcCoreLib
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol
+include EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-let f_bind_mod s x mp env = Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
+let f_bind_mod s x mp env =
+  Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
@@ -590,7 +592,8 @@ let rec f_app_simpl f args ty =
   f_betared (f_app f args ty)
 
 and f_betared f =
-  let tx fo fp = if f_equal fo fp || can_betared fo then fp else f_betared fp in
+  let tx ~before:fo ~after:fp =
+    if f_equal fo fp || can_betared fo then fp else f_betared fp in
 
   match f.f_node with
   | Fapp ({ f_node = Fquant (Llambda, bds, body)}, args) ->
@@ -843,8 +846,6 @@ type sform =
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
-  | SFcHoareF  of cHoareF
-  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -885,8 +886,6 @@ let rec sform_of_form fp =
 
   | FhoareF  hf -> SFhoareF  hf
   | FhoareS  hs -> SFhoareS  hs
-  | FcHoareF  hf -> SFcHoareF  hf
-  | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
@@ -1116,8 +1115,6 @@ let rec dump_f f =
   | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
   | FhoareF _ -> "HoareF"
   | FhoareS _ -> "HoareS"
-  | FcHoareF _ -> "cHoareF"
-  | FcHoareS _ -> "cHoareS"
   | FbdHoareF _ -> "bdHoareF"
   | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
      "bdHoareS [ ME = " ^ EcIdent.tostring m
@@ -1134,5 +1131,3 @@ let rec dump_f f =
      ^ "; PO = " ^ dump_f po
      ^ "]"
   | FeagerF _ -> "eagerF"
-  | Fcoe _ -> "Fcoe"
-

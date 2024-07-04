@@ -48,6 +48,9 @@ module Sp : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Mop : Map.S with type key = path option
+
+(* -------------------------------------------------------------------- *)
 type mpath = private {
   m_top  : mpath_top;
   m_args : mpath list;

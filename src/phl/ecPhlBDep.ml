@@ -672,8 +672,6 @@ let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: 
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> bdep_xpath (FApi.tc1_env tc) sH.hf_f op n m (List.map (fun v-> v.v_name) outvs) pcond
   | FhoareS sF -> bdep2 (FApi.tc1_env tc) sF.hs_s (fst sF.hs_m) (inpvs, n) (outvs, m) sF.hs_po pcond
-  | FcHoareF _ -> assert false
-  | FcHoareS _ -> assert false 
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false

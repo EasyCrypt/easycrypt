@@ -1,6 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcPath
+open EcParsetree
 open EcAst
+open EcMatching.Position
 open EcTypes
 open EcModules
 open EcFol
@@ -12,6 +15,16 @@ open EcLowGoal
 open EcLowPhlGoal
 
 module TTC = EcProofTyping
+
+(* -------------------------------------------------------------------- *)
+type sim_info = {
+  sim_pos  : codepos1 pair option;
+  sim_hint : (xpath option * xpath option * EcPV.Mpv2.t) list * form option;
+  sim_eqs  : EcPV.Mpv2.t option;
+}
+
+let empty_sim_info : sim_info =
+  { sim_pos = None; sim_hint = ([], None); sim_eqs = None; }
 
 (* -------------------------------------------------------------------- *)
 let extend_body fsig body =
@@ -390,52 +403,57 @@ let t_eqobs_inF_r sim eqo tc =
 let t_eqobs_inF = FApi.t_low2 "eqobs-in" t_eqobs_inF_r
 
 (* -------------------------------------------------------------------- *)
-let process_eqs env tc f =
-   try
-      Mpv2.of_form env mleft mright f
-   with Not_found ->
-     tc_error_lazy !!tc (fun fmt ->
-       let ppe = EcPrinting.PPEnv.ofenv env in
-       Format.fprintf fmt
-         "cannot recognize %a as a set of equalities"
-         (EcPrinting.pp_form ppe) f)
+let process_eqs (pe : proofenv) (env : env) (f : form) =
+  try
+    Mpv2.of_form env mleft mright f
+  with Not_found ->
+    tc_error_lazy pe (fun fmt ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt
+        "cannot recognize %a as a set of equalities"
+        (EcPrinting.pp_form ppe) f)
 
 (* -------------------------------------------------------------------- *)
-let process_hint tc hyps (feqs, inv) =
+let process_hint (pe : proofenv) (hyps : LDecl.hyps) (feqs, inv : _ * _) =
   let env = LDecl.toenv hyps in
   let ienv = LDecl.inv_memenv hyps in
-  let doinv pf = TTC.pf_process_form !!tc ienv tbool pf in
-  let doeq pf = process_eqs env tc (doinv pf) in
+  let doinv pf = TTC.pf_process_form pe ienv tbool pf in
+  let doeq pf = process_eqs pe env (doinv pf) in
   let dof g = omap (EcTyping.trans_gamepath env) g in
   let geqs =
-    List.map (fun ((f1,f2),geq) -> dof f1, dof f2, doeq geq)
+    List.map
+      (fun ((f1, f2), geq) -> dof f1, dof f2, doeq geq)
       feqs in
-  let ginv = odfl f_true (omap doinv inv) in
+  let ginv = omap doinv inv in
   geqs, ginv
 
 (* -------------------------------------------------------------------- *)
-let process_eqobs_inS info tc =
+let pre_eqobs (cm : crushmode) (tc : tcenv1) =
+  let dt, ts = EcHiGoal.process_crushmode cm in
+  EcPhlConseq.t_conseqauto ~delta:dt ?tsolve:ts tc
+
+(* -------------------------------------------------------------------- *)
+let t_eqobs_inS_ (info : sim_info) (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let spec, inv = info.sim_hint in
+  let inv = odfl f_true inv in
+
   let eqo =
-    match info.EcParsetree.sim_eqs with
-    | Some pf ->
-      process_eqs env tc (TTC.tc1_process_prhl_formula tc pf)
-    | None ->
-      try Mpv2.needed_eq env mleft mright es.es_po
+    match info.sim_eqs with Some eqo -> eqo | None ->
+      try  Mpv2.needed_eq env mleft mright es.es_po
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
-  let post = Mpv2.to_form mleft mright eqo inv in
+  
   let sim = init_sim env spec inv in
+  let post = Mpv2.to_form mleft mright eqo inv in
+
   let t_main tc =
-    match info.EcParsetree.sim_pos with
+    match info.sim_pos with
     | None ->
       FApi.t_last
         (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_trivial))
         (t_eqobs_inS sim eqo tc)
-    | Some(p1,p2) ->
-      let p1 = EcTyping.trans_codepos1 env p1 in
-      let p2 = EcTyping.trans_codepos1 env p2 in
+    | Some (p1, p2) ->
       let _,sl2 = s_split env p1 es.es_sl in
       let _,sr2 = s_split env p2 es.es_sr in
       let _, eqi =
@@ -450,49 +468,98 @@ let process_eqobs_inS info tc =
       ]) tc in
   (EcPhlConseq.t_equivS_conseq es.es_pr post @+
     [t_trivial;
-     t_trivial;
-     t_main]) tc
+      t_trivial;
+      t_main]) tc
+  
+(* -------------------------------------------------------------------- *)
+let t_eqobs_inS (cm : crushmode option) (info : sim_info) (tc : tcenv1) =
+  FApi.t_last (t_eqobs_inS_ info) ((omap pre_eqobs cm |> odfl t_id) tc)
 
 (* -------------------------------------------------------------------- *)
-let process_eqobs_inF info tc =
-  if info.EcParsetree.sim_pos <> None then
-    tc_error !!tc "no positions excepted";
+let process_eqobs_inS (cm : crushmode option) (info : psim_info) (tc : tcenv1) =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let sim_hint = process_hint !!tc hyps info.psim_hint in
+  let sim_eqs =
+    let process pf =
+      process_eqs !!tc env (TTC.tc1_process_prhl_formula tc pf)
+    in Option.map process info.psim_eqs in
+  let sim_pos =
+    info.psim_pos
+    |> Option.map (pair_map (EcTyping.trans_codepos1 env))
+  in
+
+  let info = { sim_pos; sim_hint; sim_eqs; } in
+
+  t_eqobs_inS cm info tc
+
+(* -------------------------------------------------------------------- *)
+let t_eqobs_inF_ (info : sim_info) (tc : tcenv1) =
+  assert (Option.is_none info.sim_pos);  
+
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
   let fl = ef.ef_fl and fr = ef.ef_fr in
+
+  let spec, inv = info.sim_hint in
+  let inv = odfl f_true inv in
+
   let eqo =
-    match info.EcParsetree.sim_eqs with
-    | Some pf ->
-      let _,(ml,mr) = Fun.equivF_memenv fl fr env in
-      let hyps = LDecl.push_all [ml;mr] hyps in
-      process_eqs env tc (TTC.pf_process_form !!tc hyps tbool pf)
-    | None ->
+    match info.sim_eqs with Some eqo -> eqo | None ->
       try Mpv2.needed_eq env mleft mright ef.ef_po
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
+
   let eqo = Mpv2.remove env pv_res pv_res eqo in
+
   let sim = init_sim env spec inv in
   let _, eqi =
     try f_eqobs_in fl fr sim eqo
     with EqObsInError -> tc_error !!tc "not able to process" in
   let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
+
   (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
     t_trivial;
     t_trivial;
      t_eqobs_inF sim eqo]) tc
 
 (* -------------------------------------------------------------------- *)
-let process_eqobs_in cm info tc =
-  let prett cm tc =
-    let dt, ts = EcHiGoal.process_crushmode cm in
-      EcPhlConseq.t_conseqauto ~delta:dt ?tsolve:ts tc in
+let t_eqobs_inF (cm : crushmode option) (info : sim_info) (tc : tcenv1) =
+  FApi.t_last (t_eqobs_inF_ info) ((omap pre_eqobs cm |> odfl t_id) tc)
 
-  let tt tc =
-    let concl = FApi.tc1_goal tc in
-    match concl.f_node with
-    | FequivF _ -> process_eqobs_inF info tc
-    | FequivS _ -> process_eqobs_inS info tc
-    | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
-  in
+(* -------------------------------------------------------------------- *)
+let process_eqobs_inF (cm : crushmode option) (info : psim_info) (tc : tcenv1) =
+  if Option.is_some info.psim_pos then
+    tc_error !!tc "no positions excepted";
 
-  FApi.t_last tt ((omap prett cm |> odfl t_id) tc)
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let ef = tc1_as_equivF tc in
+  let sim_hint = process_hint !!tc hyps info.psim_hint in
+  let fl = ef.ef_fl and fr = ef.ef_fr in
+  let sim_eqs =
+    let process pf =
+      let _,(ml,mr) = Fun.equivF_memenv fl fr env in
+      let hyps = LDecl.push_all [ml; mr] hyps in
+      process_eqs !!tc env (TTC.pf_process_form !!tc hyps tbool pf)
+    in Option.map process info.psim_eqs in
+  
+  let info = { sim_pos = None; sim_hint; sim_eqs; } in
+
+  t_eqobs_inF cm info tc
+
+(* -------------------------------------------------------------------- *)
+let process_eqobs_in (cm : crushmode option) (info : psim_info) (tc : tcenv1) =
+  let concl = FApi.tc1_goal tc in
+  match concl.f_node with
+  | FequivF _ -> process_eqobs_inF cm info tc
+  | FequivS _ -> process_eqobs_inS cm info tc
+  | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
+
+(* -------------------------------------------------------------------- *)
+let t_eqobs_in_r (cm : crushmode option) (info : sim_info) (tc : tcenv1) =
+  let concl = FApi.tc1_goal tc in
+  match concl.f_node with
+  | FequivF _ -> t_eqobs_inF cm info tc
+  | FequivS _ -> t_eqobs_inS cm info tc
+  | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
+
+(* -------------------------------------------------------------------- *)
+let t_eqobs_in = FApi.t_low2 "eqobs-in" t_eqobs_in_r

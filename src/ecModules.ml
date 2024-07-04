@@ -10,48 +10,34 @@ module Mid = EcIdent.Mid
 include EcCoreModules
 
 (* -------------------------------------------------------------------- *)
-(* Instantiation of EcCoreModules.PreOI on EcCoreFol.form. *)
-module OI = struct
-  include PreOI
-  let equal = PreOI.equal f_equal
-end
+module OI = PreOI
 
 (* -------------------------------------------------------------------- *)
+(* Nothing is restricted. *)
+let mr_empty = ur_empty (Sx.empty, Sm.empty)
 
-let mr_empty = {
-  mr_xpaths = ur_empty EcPath.Sx.empty;
-  mr_mpaths = ur_empty EcPath.Sm.empty;
-  mr_oinfos = Msym.empty;
-}
+(* Everything is restricted. *)
+let mr_full = ur_full (Sx.empty, Sm.empty)
 
-let mr_full = {
-  mr_xpaths = ur_full EcPath.Sx.empty;
-  mr_mpaths = ur_full EcPath.Sm.empty;
-  mr_oinfos = Msym.empty;
-}
+let mr_add_restr mr (r : mod_restr) =
+  let union (x1,m1) (x2,m2) = (Sx.union x1 x2, Sm.union m1 m2) in
+  let inter (x1,m1) (x2,m2) = (Sx.inter x1 x2, Sm.inter m1 m2) in
+  ur_union union inter mr r
 
-let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
-  { mr_xpaths = ur_union Sx.union Sx.inter mr.mr_xpaths rx;
-    mr_mpaths = ur_union Sm.union Sm.inter mr.mr_mpaths rm;
-    mr_oinfos = mr.mr_oinfos; }
+let change_oinfo (ois : oracle_infos) (f : symbol) (oi : oracle_info) =
+  Msym.add f oi ois
 
-let change_oinfo restr f oi =
-  { restr with mr_oinfos = Msym.add f oi restr.mr_oinfos }
+let oicalls_filter (ois : oracle_infos) (f : symbol) (filter : xpath -> bool) =
+  match Msym.find f ois with
+  | oi -> change_oinfo ois f (OI.filter filter oi)
+  | exception Not_found -> ois
 
-let add_oinfo restr f oi = change_oinfo restr f oi
-
-let oicalls_filter restr f filter =
-  match Msym.find f restr.mr_oinfos with
-  | oi -> change_oinfo restr f (OI.filter filter oi)
-  | exception Not_found -> restr
-
-let change_oicalls restr f ocalls =
-  let oi = match Msym.find f restr.mr_oinfos with
-    | oi ->
-      let filter x = List.mem x ocalls in
-      OI.filter filter oi
-    | exception Not_found -> OI.mk ocalls `Unbounded in
-  add_oinfo restr f oi
+let change_oicalls (ois : oracle_infos) (f : symbol) (ocalls : xpath list) =
+  let oi =
+    match Msym.find f ois with
+    | oi -> OI.filter (fun x -> List.mem x ocalls) oi
+    | exception Not_found -> OI.mk ocalls
+  in change_oinfo ois f oi
 
 (* -------------------------------------------------------------------- *)
 let mty_hash  = EcCoreFol.mty_hash

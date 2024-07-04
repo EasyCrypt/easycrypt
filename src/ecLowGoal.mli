@@ -254,6 +254,7 @@ val t_intros_sx_seq : inames -> (ident list -> FApi.backward) -> FApi.backward
 val t_intros_s_seq  : inames -> FApi.backward -> FApi.backward
 
 val t_intros_n : ?clear:bool -> int -> FApi.backward
+val t_intros_n_x : int -> tcenv1 -> tcenv * ident list
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
@@ -316,7 +317,7 @@ val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 val t_congr : form pair -> form pair list * ty -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 

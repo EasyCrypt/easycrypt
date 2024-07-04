@@ -6,7 +6,7 @@ import asyncio
 import collections
 import contextlib as clib
 import curses
-import datetime
+from   datetime import datetime, timezone
 import fnmatch
 import glob
 import itertools
@@ -93,14 +93,6 @@ def _options():
         help    = 'append ARGS to EasyCrypt command (cumulative)')
 
     parser.add_option(
-        '', '--timeout',
-        action  = 'store',
-        default = None,
-        metavar = 'TIMEOUT',
-        type    = 'int',
-        help    = 'set the timeout option to pass to EasyCrypt')
-
-    parser.add_option(
         '', '--jobs',
         action  = 'store',
         default = None,
@@ -115,20 +107,6 @@ def _options():
         help    = 'add timing statistics')
 
     parser.add_option(
-        '-p', '--provers',
-        action  = 'append',
-        metavar = 'PROVERS',
-        default = None,
-        help    = 'Add a prover to the set of activated provers')
-
-    parser.add_option(
-        '', '--why3',
-        action  = 'store',
-        metavar = 'WHY3',
-        default = None,
-        help    = 'Why3 configuration file')
-
-    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -140,20 +118,13 @@ def _options():
     if len(args) < 1:
         parser.error('this program takes at least one argument')
 
-    if cmdopt.timeout is not None:
-        if cmdopt.timeout <= 0:
-            parser.error('timeout must be positive')
-
     if cmdopt.jobs is not None:
         if cmdopt.jobs < 0:
             parser.error('jobs must be non-negative')
 
     options = Object(scenarios = dict())
-    options.timeout  = cmdopt.timeout
     options.timing   = cmdopt.timing
-    options.why3     = cmdopt.why3
     options.jobs     = cmdopt.jobs
-    options.provers  = cmdopt.provers
     options.report   = cmdopt.report
 
     defaults = dict(
@@ -189,8 +160,7 @@ def _options():
         options.report = config.get('default', 'report', fallback = None)
 
     if cmdopt.bin_args:
-        options.args.extend(itertools.chain.from_iterable( \
-          x.split() for x in cmdopt.bin_args))
+        options.args.extend(cmdopt.bin_args)
 
     def _parse_timeout(x):
         m = re.search(r'^(.*):(\d+)$', x)
@@ -561,8 +531,6 @@ MARKS = {
         ('✓', CurseWrapper.COLOR_GREEN),
     -signal.SIGINT:
         ('ϟ', CurseWrapper.COLOR_YELLOW),
-    -signal.SIGTERM:
-        ('ϟ', CurseWrapper.COLOR_YELLOW),
     None:
         ('✗', CurseWrapper.COLOR_RED),
 }
@@ -695,13 +663,6 @@ async def _run_all(options, allscripts, listener : Listener):
     async def runcheck(config):
         async with semaphore:
             command = [options.bin] + options.args + config.args
-            if options.timeout:
-                command.extend(['-timeout', str(options.timeout)])
-            if options.provers:
-                for prover in options.provers:
-                    command.extend(['-p', prover])
-            if options.why3:
-                command.extend(['-why3', options.why3])
             if options.timing:
                 tfilename = os.path.join(
                     TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
@@ -730,7 +691,7 @@ async def _run_all(options, allscripts, listener : Listener):
                             error = line[1:].decode('utf-8').strip()
                             if not error:
                                 continue
-                            if (m := re.search('^(\S+)\s+(.+)$', error)):
+                            if (m := re.search(r'^(\S+)\s+(.+)$', error)):
                                 code, error = m.group(1), m.group(2)
                             else:
                                 code = None
@@ -742,7 +703,20 @@ async def _run_all(options, allscripts, listener : Listener):
                     status = await asyncio.wait_for(proc.wait(), 2.0)
 
                 except asyncio.TimeoutError:
-                    proc.kill(); status = await proc.wait()
+                    listener.error(
+                        handle, 'critical',
+                        'Timeout in wait() -- killing process'
+                    )
+                    proc.kill()
+                    status = await proc.wait()
+
+                if status < 0:
+                    procsig = -status
+                    if procsig != signal.SIGINT:
+                        listener.error(
+                            handle, 'critical',
+                            f'Killed (signal = {signal.Signals(procsig).name})'
+                        )
 
                 success = (bool(status) != bool(config.isvalid))
 
@@ -825,7 +799,7 @@ async def _main():
     mainconfig = Object()
 
     mainconfig.hostname  = socket.gethostname()
-    mainconfig.timestamp = datetime.datetime.utcnow()
+    mainconfig.timestamp = datetime.now(timezone.utc)
 
     options = _options()
 
@@ -840,7 +814,7 @@ async def _main():
     allscripts = Gather.gatherall(options.scenarios, options.targets)
 
     listener = None
-    if sys.stdout.isatty:
+    if sys.stdout.isatty():
         try:
             listener = TermListener(allscripts)
         except curses.error:

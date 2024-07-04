@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcAst
 open EcEnv
 open EcDecl
 open EcPath
@@ -32,10 +33,6 @@ type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
-| MF_compl     of EcEnv.env *
-                  ((form * form) option
-                   * (form * form) Mx.t) suboreq
-| MF_unbounded
 
 type restr_failure = Sx.t * Sm.t
 
@@ -163,13 +160,12 @@ type tyerror =
 | NoWP
 | FilterMatchFailure
 | MissingMemType
-| SchemaVariableReBinded of EcIdent.t
-| SchemaMemBinderBelowCost
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
+| PositiveShouldBeBeforeNegative
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -234,22 +230,13 @@ type metavs = EcFol.form Msym.t
 val transmem : env -> EcSymbols.symbol located -> EcIdent.t
 
 val trans_form_opt :
-  env -> ?mv:metavs ->
-  ?schema_mpreds:(EcIdent.t list) ->
-  ?schema_mt:sc_params ->
-  EcUnify.unienv -> pformula -> ty option -> EcFol.form
+  env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
 
 val trans_form     :
-  env -> ?mv:metavs ->
-  ?schema_mpreds:(EcIdent.t list) ->
-  ?schema_mt:sc_params ->
-  EcUnify.unienv -> pformula -> ty -> EcFol.form
+  env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 
 val trans_prop     :
-  env -> ?mv:metavs ->
-  ?schema_mpreds:(EcIdent.t list) ->
-  ?schema_mt:sc_params ->
-  EcUnify.unienv -> pformula -> EcFol.form
+  env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.form
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
@@ -259,7 +246,7 @@ val trans_memtype :
 
 (* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
-  env -> module_type -> pmod_restr option -> module_type
+  env -> module_type -> pmod_restr option -> mty_mr
 
 val transmodsig  : env -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
@@ -268,8 +255,8 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
-val trans_oracle     : env -> psymbol * psymbol -> xpath * form
-val trans_restr_mem : env -> pmod_restr_mem -> Sx.t use_restr * Sm.t use_restr
+val trans_oracle     : env -> psymbol * psymbol -> xpath
+val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 
 val trans_args :
      EcEnv.env
@@ -285,8 +272,7 @@ val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
 val check_modtype :
-  env -> mpath -> module_sig -> module_type ->
-  [> `Ok | `ProofObligation of EcFol.form list ]
+  env -> mpath -> module_sig -> mty_mr -> unit
 
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option

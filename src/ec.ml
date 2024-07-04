@@ -38,6 +38,8 @@ type pconfig = {
 }
 
 let print_config config =
+  let (module Sites) = EcRelocate.sites in
+
   (* Print git-hash *)
   Format.eprintf "git-hash: %s@\n%!" EcVersion.hash;
 
@@ -92,6 +94,9 @@ let print_config config =
       (String.concat ", " (List.map string_of_prover provers))
   end;
 
+  (* Command path *)
+  Format.eprintf "Commands PATH: %s@\n%!" Sites.commands;
+
   (* Print system PATH *)
   Format.eprintf "System PATH:@\n%!";
   List.iter
@@ -105,7 +110,7 @@ let main () =
    * disallows Why3 server to detect external provers completion      *)
   let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
 
-  let theories = EcRelocate.Sites.theories in
+  let (module Sites) = EcRelocate.sites in
 
   (* Parse command line arguments *)
   let conffile, options =
@@ -190,18 +195,115 @@ let main () =
           | Some root ->
               List.fold_left Filename.concat root ["scripts"; "testing"]
           | None ->
-              EcRelocate.resource ["commands"] in
+              Sites.commands in
         let cmd  = Filename.concat root "runtest" in
+
+        let ecargs =
+          let maxjobs =
+            input.runo_provers.prvo_maxjobs
+            |> omap (fun i -> ["-max-provers"; string_of_int i])
+            |> odfl [] in
+
+          let timeout =
+            input.runo_provers.prvo_timeout
+            |> omap (fun i -> ["-timeout"; string_of_int i])
+            |> odfl [] in
+
+          let cpufactor =
+            input.runo_provers.prvo_cpufactor
+            |> omap (fun i -> ["-cpu-factor"; string_of_int i])
+            |> odfl [] in
+
+          let ppwidth =
+            input.runo_provers.prvo_ppwidth
+            |> omap (fun i -> ["-pp-width"; string_of_int i])
+            |> odfl [] in
+
+          let provers =
+            odfl [] input.runo_provers.prvo_provers
+            |> List.map (fun prover -> ["-p"; prover])
+            |> List.flatten in
+
+          let pragmas =
+            input.runo_provers.prvo_pragmas
+            |> List.map (fun pragmas -> ["-pragmas"; pragmas])
+            |> List.flatten  in
+
+          let checkall =
+            if input.runo_provers.prvo_checkall then
+              ["-check-all"]
+            else [] in
+
+          let profile =
+            if input.runo_provers.prvo_profile then
+              ["-profile"]
+            else [] in
+
+          let iterate =
+            if input.runo_provers.prvo_iterate then
+              ["-iterate"]
+            else [] in
+
+          let why3srv =
+            input.runo_provers.prvo_why3server
+            |> omap (fun server -> ["-server"; server])
+            |> odfl [] in
+
+          let why3 =
+            options.o_options.o_why3
+            |> omap (fun why3 -> ["-why3"; why3])
+            |> odfl [] in
+
+          let reloc =
+            if options.o_options.o_reloc then
+              ["-reloc"]
+            else [] in
+
+          let noevict =
+            options.o_options.o_ovrevict
+            |> List.map (fun p -> ["-no-evict"; p])
+            |> List.flatten in
+
+          let boot =
+            if options.o_options.o_loader.ldro_boot then
+              ["-boot"]
+            else [] in
+
+          let idirs =
+            options.o_options.o_loader.ldro_idirs
+            |> List.map (fun (pfx, name, rec_) ->
+                 let pfx = odfl "" (omap (fun pfx -> pfx ^ ":") pfx) in
+                 let opt = if rec_ then "-R" else "-I" in
+                 [opt; pfx ^ name])
+            |> List.flatten in
+
+
+          List.flatten [
+            maxjobs; timeout; cpufactor; ppwidth;
+            provers; pragmas; checkall ; profile;
+            iterate; why3srv; why3     ; reloc  ;
+            noevict; boot   ; idirs    ;
+          ]
+        in
+
         let args =
             [
               "runtest";
               Format.sprintf "--bin=%s" Sys.executable_name;
             ]
-          @ (List.flatten
-               (List.map
-                  (fun x -> ["-p"; x])
-                  (odfl [] input.runo_provers)))
-          @ (otolist (omap (Format.sprintf "--why3=%s") options.o_options.o_why3))
+          @ Option.to_list (
+              Option.map
+                (Format.sprintf "--report=%s")
+                input.runo_report
+            )
+          @ Option.to_list (
+              Option.map
+                (Format.sprintf "--jobs=%d")
+                input.runo_jobs
+            )
+          @ List.map
+              (Format.sprintf "--bin-args=%s")
+              (ecargs @ input.runo_rawargs)
           @ [input.runo_input]
           @ input.runo_scenarios
         in
@@ -219,7 +321,7 @@ let main () =
         let pwd = Sys.getcwd () in
         Sys.chdir (
           List.fold_left Filename.concat
-            (List.hd EcRelocate.Sites.theories)
+            (List.hd Sites.theories)
             (List.init 3 (fun _ -> ".."))
         ); Some pwd
 
@@ -263,7 +365,7 @@ let main () =
       EcCommands.addidir ~namespace:`System (Filename.concat theory "prelude");
       if not ldropts.ldro_boot then
         EcCommands.addidir ~namespace:`System ~recursive:true theory
-    ) theories;
+    ) Sites.theories;
     List.iter (fun (onm, name, isrec) ->
         EcCommands.addidir
           ?namespace:(omap (fun nm -> `Named nm) onm)
@@ -278,7 +380,18 @@ let main () =
   begin let open EcUserMessages in register () end;
 
   (* Initialize I/O + interaction module *)
-  let (prvopts, input, terminal, interactive, eco) =
+  let module State = struct
+    type t = {
+      prvopts     : prv_options;
+      input       : string option;
+      terminal    : T.terminal lazy_t;
+      interactive : bool;
+      eco         : bool;
+      gccompact   : int option;
+    }
+  end in
+
+  let state : State.t =
     match options.o_command with
     | `Config ->
         let config = {
@@ -322,7 +435,15 @@ let main () =
           then lazy (T.from_emacs ())
           else lazy (T.from_tty ())
 
-        in (cliopts.clio_provers, None, terminal, true, false)
+        in
+
+        { prvopts     = cliopts.clio_provers
+        ; input       = None
+        ; terminal    = terminal
+        ; interactive = true
+        ; eco         = false
+        ; gccompact   = None }
+
     end
 
     | `Compile cmpopts -> begin
@@ -342,8 +463,13 @@ let main () =
         let terminal =
           lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
-          ({cmpopts.cmpo_provers with prvo_iterate = true},
-           Some name, terminal, false, cmpopts.cmpo_noeco)
+
+        { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = cmpopts.cmpo_noeco
+        ; gccompact   = cmpopts.cmpo_compact }
 
       end
 
@@ -352,7 +478,7 @@ let main () =
         assert false
   in
 
-  (match input with
+  (match state.input with
    | Some input -> EcCommands.addidir (Filename.dirname input)
    | None ->
        match relocdir with
@@ -362,7 +488,7 @@ let main () =
   (* Check if the .eco is up-to-date and exit if so *)
   oiter
     (fun input -> if EcCommands.check_eco input then exit 0)
-    input;
+    state.input;
 
   let finalize_input input scope =
     match input with
@@ -412,13 +538,13 @@ let main () =
     | _ -> fun _ _ -> () in
 
   (* Instantiate terminal *)
-  let lazy terminal = terminal in
+  let lazy terminal = state.terminal in
 
   (* Initialize PRNG *)
   Random.self_init ();
 
   (* Connect to external Why3 server if requested *)
-  prvopts.prvo_why3server |> oiter (fun server ->
+  state.prvopts.prvo_why3server |> oiter (fun server ->
     try
       Why3.Prove_client.connect_external server
     with Why3.Prove_client.ConnectionError e ->
@@ -434,6 +560,7 @@ let main () =
 
     (* Interaction loop *)
     let first = ref `Init in
+    let cmdcounter = ref 0 in
 
     while true do
       let terminate = ref false in
@@ -445,19 +572,19 @@ let main () =
 
             (* Initialize global scope *)
             let checkmode = {
-              EcCommands.cm_checkall  = prvopts.prvo_checkall;
-              EcCommands.cm_timeout   = prvopts.prvo_timeout;
-              EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
-              EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
-              EcCommands.cm_provers   = prvopts.prvo_provers;
-              EcCommands.cm_profile   = prvopts.prvo_profile;
-              EcCommands.cm_iterate   = prvopts.prvo_iterate;
+              EcCommands.cm_checkall  = state.prvopts.prvo_checkall;
+              EcCommands.cm_timeout   = odfl 3 (state.prvopts.prvo_timeout);
+              EcCommands.cm_cpufactor = odfl 1 (state.prvopts.prvo_cpufactor);
+              EcCommands.cm_nprovers  = odfl 4 (state.prvopts.prvo_maxjobs);
+              EcCommands.cm_provers   = state.prvopts.prvo_provers;
+              EcCommands.cm_profile   = state.prvopts.prvo_profile;
+              EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
             EcCommands.initialize ~restart
-              ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
+              ~undo:state.interactive ~boot:ldropts.ldro_boot ~checkmode;
             (try
-               List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+               List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
@@ -469,7 +596,7 @@ let main () =
             oiter (fun ppwidth ->
               let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
               EcGState.setvalue "PP:width" (`Int ppwidth) gs)
-              prvopts.prvo_ppwidth;
+              state.prvopts.prvo_ppwidth;
             first := `Loop
 
         | `Loop -> ()
@@ -524,10 +651,19 @@ let main () =
               terminate := true
         end;
         T.finish `ST_Ok terminal;
+
+        state.gccompact |> Option.iter (fun i ->
+          incr cmdcounter;
+          if i = !cmdcounter then begin
+            cmdcounter := 0;
+            Gc.compact ()
+          end
+        );
+
         if !terminate then begin
             T.finalize terminal;
-            if not eco then
-              finalize_input input (EcCommands.current ());
+            if not state.eco then
+              finalize_input state.input (EcCommands.current ());
             exit 0
           end;
       with

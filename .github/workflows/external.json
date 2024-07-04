@@ -1,0 +1,43 @@
+[
+  { "name"       : "jasmin-eclib"
+  , "repository" : "https://github.com/jasmin-lang/jasmin"
+  , "branch"     : "main"
+  , "subdir"     : "eclib"
+  , "config"     : "tests.config"
+  , "scenario"   : "jasmin"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "sha3"
+  , "repository" : "https://gitlab.com/easycrypt/sha3"
+  , "branch"     : "next"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "sponge"
+  , "options"    : "-pragmas Proofs:weak"
+  }
+
+  ,
+
+  { "name"       : "cryptobox"
+  , "repository" : "https://gitlab.com/fdupress/ec-cryptobox"
+  , "branch"     : "next"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "cryptobox"
+  , "options"    : "-pragmas Proofs:weak"
+  }
+
+  ,
+
+  { "name"       : "xsalsa20"
+  , "repository" : "https://gitlab.com/fdupress/ec-xsalsa"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xsalsa"
+  , "options"    : "-pragmas Proofs:weak"
+  }
+]

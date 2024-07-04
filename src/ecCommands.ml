@@ -189,6 +189,9 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type loader = Loader.loader
+
+(* -------------------------------------------------------------------- *)
 let process_search scope qs =
   EcScope.Search.search scope qs
 
@@ -263,7 +266,6 @@ let process_pr fmt scope p =
   | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
   | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
-  | Pr_sc   qs -> EcPrinting.ObjectInfo.pr_sc   fmt env   (unloc qs)
   | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
   | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
   | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
@@ -374,14 +376,12 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  (* TODO: A: aybe rename, as this now also adds schemata. *)
   let (name, scope) = EcScope.Ax.add scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
          | PAxiom _ -> EcScope.notify scope `Info "added axiom: `%s'" x
-         | PLemma _ -> EcScope.notify scope `Info "added lemma: `%s'" x
-         | PSchema  -> EcScope.notify scope `Info "added schema: `%s'" x);
+         | PLemma _ -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -444,7 +444,10 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
-          let commands = List.fold_left (process_internal subld) iscope commands in
+          let commands =
+            List.fold_left 
+              (fun scope g -> process_internal subld scope g.gl_action)
+              iscope commands in
           commands)
         (fun () -> Pragma.set i_pragma)
       in
@@ -497,8 +500,8 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t  -> snd (EcScope.Tactics.process scope mode t)
-  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
+  | `Actual t -> snd (EcScope.Tactics.process scope mode t)
+  | `Proof    -> EcScope.Tactics.proof scope
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) ed =
@@ -527,17 +530,10 @@ and process_proverinfo scope pi =
 
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
-  let pragma_check mode =
-    match EcScope.goal scope with
-    | Some { EcScope.puc_mode = Some false } ->
-        EcScope.hierror "pragma [Proofs:*] in non-strict proof script";
-    | _ -> pragma_check mode
-  in
-
   match unloc opt with
-  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
-  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
-  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
+  | x when x = Pragmas.Proofs.weak    -> pragma_check `WeakCheck
+  | x when x = Pragmas.Proofs.check   -> pragma_check `Check
+  | x when x = Pragmas.Proofs.report  -> pragma_check `Report
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
@@ -703,9 +699,14 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_internal ld scope g =
-  try  odfl scope (process ld scope g.gl_action)
-  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc g.gl_action) e)
+and process_internal
+  (ld     : Loader.loader)
+  (scope  : EcScope.scope)
+  (action : global_action located)
+  : EcScope.scope
+=
+  try  odfl scope (process ld scope action)
+  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc action) e)
 
 (* -------------------------------------------------------------------- *)
 let loader = Loader.create ()

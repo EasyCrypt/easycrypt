@@ -29,7 +29,7 @@ module LG  = EcCoreLib.CI_Logic
 (* -------------------------------------------------------------------- *)
 type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
+  tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
@@ -109,7 +109,7 @@ let process_simplify_info ri (tc : tcenv1) =
   let delta_p, delta_h =
     ri.pdelta
       |> omap (List.fold_left do1 (Sp.empty, Sid.empty))
-      |> omap (fun (x, y) -> (fun p -> if Sp.mem p x then `Force else `No), (Sid.mem^~ y))
+      |> omap (fun (x, y) -> (fun p -> if Sp.mem p x then `Force else `IfApplied), (Sid.mem^~ y))
       |> odfl ((fun _ -> `IfTransparent), predT)
   in
 
@@ -123,7 +123,6 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
-    EcReduction.cost    = ri.pcost;
   }
 
 (*-------------------------------------------------------------------- *)
@@ -142,7 +141,7 @@ let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
   | `Admit ->
       t_admit tc
 
-  | (`Standard | `Strict) as mode ->
+  | (`Sloppy | `Strict) as mode ->
       t_seq (t_simplify ~delta:`No) (t_smt ~mode pi) tc
 
   | `Report ->
@@ -335,7 +334,7 @@ module LowRewrite = struct
            let prw, _ =
              try
                PT.pf_find_occurence_lazy
-                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp;
+                 pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp
              with PT.FindOccFailure `MatchFailure ->
                  raise (RewriteError LRW_RPatternNoMatch) in
 
@@ -371,7 +370,7 @@ module LowRewrite = struct
 
       | (pt, mode, (f1, f2)) :: pts ->
            try  for1 (pt, mode, (f1, f2))
-           with RewriteError (LRW_NothingToRewrite | LRW_IdRewriting) ->
+           with RewriteError _ ->
              do_first pts
     in
 
@@ -507,7 +506,7 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
       tc_error !!tc "cannot infer all variables";
 
     let pt = fst (PT.concretize pte) in
-    let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
+    let pt = EcCoreGoal.ptapply pt [palocal hyp] in
     let cutf = PT.concretize_form pte.PT.ptev_env cutf in
 
     FApi.t_last
@@ -534,7 +533,7 @@ let process_apply_top tc =
 
      try
        EcLowGoal.t_intros_i_seq ~clear:true [h]
-         (EcLowGoal.Apply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+         (EcLowGoal.Apply.t_apply_bwd (ptlocal h) )
          tc
      with (EcLowGoal.Apply.NoInstance _) as err ->
        tc_error_exn !!tc err
@@ -674,8 +673,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
               (* FIXME: TC HOOK *)
-              let subst = EcTypes.Tvar.init (List.map fst tparams) tvi in
-              let body  = EcFol.Fsubst.subst_tvar subst body in
+              let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body
@@ -698,8 +696,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   | `RtoL ->
     let fp =
       (* FIXME: TC HOOK *)
-      let subst = EcTypes.Tvar.init (List.map fst tparams) tvi in
-      let body  = EcFol.Fsubst.subst_tvar subst body in
+      let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
       let fp    = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
         with EcEnv.NotReducible -> fp
@@ -801,17 +798,38 @@ let process_rewrite1_r ttenv ?target ri tc =
           let pt     = PT.process_full_pterm ~implicits ptenv pt
           in
 
-          if    is_ptglobal pt.PT.ptev_pt.pt_head
-             && List.is_empty pt.PT.ptev_pt.pt_args
-          then begin
-            let ls = EcEnv.Ax.all ~name:(unloc p) env in
+          begin
+            match pt.ptev_pt with
+            | PTApply { pt_head = PTGlobal _; pt_args = [] } ->
+              let ls = EcEnv.Ax.all ~name:(unloc p) env in
 
-            let do1 (lemma, _) tc =
-              let pt = PT.pt_of_uglobal_r (PT.copy ptenv0) lemma in
+              let do1 (lemma, _) tc =
+                let pt = PT.pt_of_uglobal_r (PT.copy ptenv0) lemma in
                 process_rewrite1_core ~mode ?target (theside, prw, o) pt tc in
               t_ors (List.map do1 ls) tc
-          end else
-            process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
+
+            | _ ->
+              process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
+          end
+
+        | { fp_head = FPCut (Some f); fp_args = []; }
+        ->
+          let ps = ref Mid.empty in
+
+          let f =
+            EcTyping.trans_pattern
+              (LDecl.toenv ptenv.pte_hy) ps ptenv.pte_ue
+              f
+          in
+
+          !ps |> Mid.iter (fun x _ ->
+            ptenv.pte_ev := MEV.add x `Form !(ptenv.pte_ev)
+          );
+
+          let pt = PTApply { pt_head = PTCut f; pt_args = []; } in
+          let pt = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = f; } in
+
+          process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
 
         | _ ->
           let pt = PT.process_full_pterm ~implicits ptenv pt in
@@ -856,192 +874,6 @@ let process_rewrite1_r ttenv ?target ri tc =
 
   | RWTactic `Field ->
       process_algebra `Solve `Field [] tc
-
-  | RWEquiv (side, name, (argsl, resl), (argsr, resr)) ->
-      (* Check which direction we wish to go in *)
-      let tc = match side with
-        | `Left  -> tc
-        | `Right -> as_tcenv1 (EcPhlSym.t_equiv_sym tc)
-      in
-
-      (* Extract the context *)
-      let env, hyps, goal = FApi.tc1_eflat tc in
-      let goal = EcFol.destr_equivS goal in
-
-      (* Get the symbol of name and retrieve it's equiv *)
-      let sym_of_name = string_of_qsymbol (unloc name) in
-      let equiv =
-        let f =
-          (* Check if the name is in the local context *)
-          if LDecl.hyp_exists sym_of_name hyps then
-            let _, f = LDecl.hyp_by_name sym_of_name hyps in
-            f
-          else
-            let _, lem = EcEnv.Ax.lookup (unloc name) env in
-            assert (List.is_empty lem.ax_tparams);
-            lem.ax_spec
-        in
-        (* TODO: how do we handle errors? *)
-        try EcFol.destr_equivF f with
-          | DestrError _ -> raise (LowRewrite.RewriteError LRW_NothingToRewrite)
-      in
-      (* Type our res and args in the given memory *)
-      let sided_env m (p : EcModules.function_) args res =
-        let subenv = EcEnv.Memory.push_active m env in
-        let ue = EcUnify.UniEnv.create (Some []) in
-
-        let args, ret_ty =
-          EcTyping.trans_args subenv ue (loc args) p.f_sig (unloc args) in
-        let res =
-          EcTyping.transexpcast subenv `InProc ue ret_ty res in
-
-        let subs = try EcUnify.UniEnv.close ue with
-          | EcUnify.UninstanciateUni ->
-            EcTyping.tyerror ri.pl_loc env EcTyping.FreeTypeVariables in
-
-        let sty = { ty_subst_id with ts_u = subs } in
-        let es = e_subst { e_subst_id with es_ty = sty } in
-        (List.map es args, es res)
-      in
-
-      (* Construct a left value from an expression *)
-      let lv res =
-        let as_pvar e =
-          match e.e_node with
-          | Evar pv -> (pv, e_ty e)
-          | _ -> assert false in
-
-        match res.e_node with
-        | Evar pv ->
-          LvVar (pv, e_ty res)
-        | Etuple pvs ->
-          LvTuple (List.map as_pvar pvs)
-        | _ -> assert false
-      in
-
-      let meml = goal.es_ml in
-      let procl = EcEnv.Fun.by_xpath equiv.ef_fl env in
-      let argsl, resl = sided_env meml procl argsl resl in
-      let lvl = lv resl in
-
-      let memr = goal.es_mr in
-      let procr = EcEnv.Fun.by_xpath equiv.ef_fr env in
-      let argsr, resr = sided_env memr procr argsr resr in
-      let lvr = lv resr in
-
-      (* Construct minimal pre/post conditions for the new intermediate memory *)
-      (* Note: this only allows overwriting existing memories instead of creating new ones *)
-      let prpo ml mr args =
-        (* Extract the conjuncts of the pre-condition that are specific to the left memory *)
-        let ml_pr = split_sided ml goal.es_pr in
-        let ml_pr = odfl f_true ml_pr in
-
-        let eq_args =
-          f_eq
-            (EcFol.form_of_expr ml (e_tuple args))
-            (EcFol.form_of_expr mr (e_tuple args)) in
-
-        (* Extract all used variables from the pre/post conditions *)
-        let eqs_pr = EcFol.one_sided_vs ml (f_and goal.es_pr eq_args) in
-        let eqs_po = EcFol.one_sided_vs ml goal.es_po in
-
-        (* Construct equalities between variables in the left memory and the intermediate memory *)
-        let eqs_pr = List.unique (eqs_pr @ eqs_po) in
-        let eqs_pr = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_pr in
-        let eqs_pr = f_ands eqs_pr in
-
-        let eqs_po = List.unique eqs_po in
-        let eqs_po = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_po in
-        let eqs_po = f_ands eqs_po in
-
-        f_and eqs_pr (f_and eq_args ml_pr) , eqs_po
-      in
-
-      (* Construct the proc calls that we want in each transitivity *)
-      let progl = EcModules.s_call (Some lvl, equiv.ef_fl, argsl) in
-      let progr = EcModules.s_call (Some lvr, equiv.ef_fr, argsr) in
-
-      (* Here we build the chain of transitivity calls, and discharge intermediate goals when possible*)
-      let tc =
-        EcPhlTrans.t_equivS_trans
-           (EcMemory.memtype meml, progl)
-           (prpo (EcMemory.memory meml) mright argsl)
-           (goal.es_pr, goal.es_po)
-           tc in
-      let p = process_tfocus tc (Some [Some 4,Some 4], None) in
-      let tc =
-        t_onselect
-          p
-          (EcPhlTrans.t_equivS_trans
-             (EcMemory.memtype memr, progr)
-             (goal.es_pr, goal.es_po)
-             (prpo (EcMemory.memory memr) mleft argsr))
-          tc in
-
-      (* Two more goals (1 and 4) can be solved in general (with the same proof):
-          - by move=> &1 &2 H; exists var1{1} var2{1} ... varn{1}; move: H => //.
-          for 4 we use {2}.
-      *)
-      let tc =
-        let ongoal (b : bool) (tc : tcenv1) =
-          let pl = EcIdent.create "&p1" in
-          let pr = EcIdent.create "&p2" in
-          let h  = EcIdent.create "__" in
-          let tc = t_intros_i_1 [pl; pr; h] tc in
-
-          let mem, p = if b then (meml, pl) else (memr, pr) in
-
-          let goal = FApi.tc1_goal tc in
-
-          let tc =
-            if EcFol.is_exists goal then
-              (* Pairing up the correct variables for the exists intro *)
-              let vs, fm = EcFol.destr_exists (FApi.tc1_goal tc) in
-              let eqsprfm, _ =
-                let l, r = EcFol.destr_and fm in
-                if b then l, r else r, l
-              in
-              let eqsfm, _ = destr_and eqsprfm in
-              let eqsfm = destr_ands ~deep:false eqsfm in
-              let eqsmp = List.map destr_eq eqsfm in
-              let eqsmp = List.map (fst_map destr_local) eqsmp in
-              let exvs = List.map (fun v -> List.assoc v eqsmp) (List.fst vs) in
-              let exvs = List.map (Fsubst.f_subst_mem (EcMemory.memory mem) p) exvs in
-
-              FApi.as_tcenv1 (t_exists_intro_s (List.map paformula exvs) tc)
-            else
-              tc
-          in
-
-          t_generalize_hyp ?clear:(Some `Yes) h tc
-        in
-
-        t_onselecti
-          (fun _ -> true)
-          (function 0 -> ongoal true | 3 -> ongoal false | _ -> t_id)
-          tc
-      in
-
-      let p = process_tfocus tc (Some [Some 6,Some 6], None) in
-      let pterm =
-        { fp_mode = `Implicit;
-          fp_head = FPNamed (name, None);
-          fp_args = []; } in
-      let tc =
-        t_onselect
-          p
-          (t_seq (EcPhlCall.process_call None pterm) EcPhlAuto.t_auto)
-          tc in
-
-      let p = process_tfocus tc (Some [Some 3, Some 3; Some (-1), Some (-1)], None) in
-      let tc =
-        t_onselect
-          p
-          (t_seq (EcPhlInline.process_inline (`ByName (None, None, ([], None)))) ((t_try (t_seq EcPhlAuto.t_auto process_done))))
-          tc
-      in
-
-      t_onall process_trivial tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 ttenv ?target ri tc =
@@ -1221,7 +1053,7 @@ let process_view1 pe tc =
 
                         let y, yty =
                           let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
-                          snd_map (ty_subst subst.fs_ty) (oget pre) in
+                          snd_map (ty_subst subst) (oget pre) in
                         let fy = EcIdent.fresh y in
 
                         pe.PT.ptev_env.pte_ev := MEV.set
@@ -1233,7 +1065,7 @@ let process_view1 pe tc =
                   in (f1, Some v)
 
                 with E.Bailout -> (f1, None)
-              ) f1 pe.PT.ptev_pt.pt_args)
+              ) f1 (get_pt_top_args pe.PT.ptev_pt))
             in
 
             let regen = List.pmap (fun x -> x) regen in
@@ -1258,12 +1090,12 @@ let process_view1 pe tc =
         let tc     = t_intros_i_1 [top] tc in
         let hyps   = tc1_hyps tc in
         let pte    = PT.tc1_process_full_pterm tc pe in
-        let inargs = List.length pte.PT.ptev_pt.pt_args in
+        let inargs = List.length (get_pt_top_args pte.PT.ptev_pt) in
 
         let (pte, ids, cutf, view) = instantiate f1 [] pte in
 
         let evm  = !(pte.PT.ptev_env.PT.pte_ev) in
-        let args = List.drop inargs pte.PT.ptev_pt.pt_args in
+        let args = List.drop inargs (get_pt_top_args pte.PT.ptev_pt) in
         let args = List.combine (List.rev ids) args in
 
         let ids =
@@ -1864,7 +1696,7 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
                 f_imps [f_eq p (f_local name p.f_ty)] newconcl
             else newconcl in
           let newconcl = f_forall [(name, GTty p.f_ty)] newconcl in
-          let pt = { pt_head = PTCut newconcl; pt_args = [PAFormula p]; } in
+          let pt = ptcut ~args:[PAFormula p] newconcl in
 
           EcLowGoal.t_apply pt tc
 
@@ -2108,16 +1940,6 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   FApi.t_sub
     [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
-
-(* -------------------------------------------------------------------- *)
-type cutdef_sc_t = intropattern * pcutdef_schema
-
-let process_cutdef_sc ttenv (ip, inst) (tc : tcenv1) =
-  let pt,sc_i = PT.tc1_process_sc_instantiation tc inst in
-
-  FApi.t_sub
-    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
-    (t_cut sc_i tc)
 
 (* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =

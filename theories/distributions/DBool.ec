@@ -203,12 +203,3 @@ apply; rewrite -(dbfunE_mem_uniq _ (undup _)) // ?undup_uniq.
 qed.
 
 end MUniFinFunBiased.
-
-
-(* -------------------------------------------------------------------- *)
-abstract theory Cost.
-  op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
-  
-  schema cost_dbool `{P} : cost [P: dbool] = N cdbool.
-  hint simplify cost_dbool.
-end Cost.
