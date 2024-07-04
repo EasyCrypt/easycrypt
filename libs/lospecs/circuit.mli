@@ -38,6 +38,8 @@ val mux2_reg : reg -> reg -> node -> reg
 
 val mux_reg : (node * reg) list -> reg -> reg
 
+val ite : node -> reg -> reg -> reg
+
 (* ==================================================================== *)
 val reg : size:int -> name:int -> reg
 
@@ -134,6 +136,6 @@ val udiv_ : reg -> reg -> reg * reg
 
 val udiv : reg -> reg -> reg
 
-val rem : reg -> reg -> reg
+val urem : reg -> reg -> reg
 
 val smod : reg -> reg -> reg

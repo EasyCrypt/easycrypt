@@ -219,6 +219,10 @@ let mux_reg (cr : (node * reg) list) (r : reg) : reg =
   List.fold_right (fun (c, r) s -> mux2_reg s r c) cr r
 
 (* -------------------------------------------------------------------- *)
+let ite (c: node) (t: reg) (f: reg) : reg =
+  mux2_reg f t c
+
+(* -------------------------------------------------------------------- *)
 let c_rshift ~(offset : int) ~(sign : node) (c : node) (r : reg) =
   let l = List.length r in
   let s = List.drop offset r @ List.make (min offset l) sign in
@@ -537,8 +541,11 @@ let udiv_ (a : reg) (b : reg) : reg * reg =
 let udiv (a: reg) (b: reg) : reg =
   fst (udiv_ a b)
 
-let rem (a: reg) (b: reg) : reg =
-  snd (udiv_ a b)
+let urem (a: reg) (b: reg) : reg =
+  let b_zero = ugt (of_int ~size:(List.length b) 1) b in
+  let b_gt_a = ugt b a in
+  let res = snd (udiv_ a b) in
+  ite (or_ b_zero b_gt_a) a @@ (uextend ~size:(List.length a) res)
 
 (* (bvsmod s t) abbreviates *)
   (* (let (?msb_s (extract[|m-1|:|m-1|] s)) *)
@@ -552,5 +559,16 @@ let rem (a: reg) (b: reg) : reg =
        (* (bvneg (bvurem (bvneg s) (bvneg t))))))) *)
        
 (* Implicit extend *)
-let smod (a: reg) (b: reg) : reg =  
-  assert false
+let smod (s: reg) (t: reg) : reg =  
+  let msb_s,_ = split_msb s in
+  let msb_t,_ = split_msb t in
+  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
+    (urem s t)
+  (ite (and_ (xnor msb_s true_) (xnor msb_t false_))
+    (add_dropc (opp (urem (opp s) t)) t)
+  (ite (and_ (xnor msb_s false_) (xnor msb_t true_))
+    (add_dropc (urem s (opp t)) t)
+    (opp (urem (opp s) (opp t)))
+  ))
+  
+  

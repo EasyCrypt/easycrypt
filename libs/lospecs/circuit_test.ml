@@ -1203,5 +1203,57 @@ let shift () =
 
   Format.eprintf "%b@." (List.for_all2 (==) c1 c2)
 
+  
+
+
 (* -------------------------------------------------------------------- *)
-let () = shift ()
+let test_mod () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if y = 0 then x else
+      x mod y
+    in
+
+    { name = (Format.sprintf "mod<%d>" size)
+    ; args = List.make 2 (size, `U)
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.urem x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+  
+
+
+(* -------------------------------------------------------------------- *)
+let test_smod () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if y = 0 then
+        x
+      else if (x >= 0 && y >= 0) then
+        x mod y
+      else if (x < 0 && y >= 0) then
+          (y - ((-x) mod y))
+      else if (x >= 0 && y < 0) then
+         (x mod (-y)) + y
+      else 
+        -((-x) mod (-y))
+      in
+
+    { name = (Format.sprintf "smod<%d>" size)
+    ; args = List.make 2 (size, `S)
+    ; out  = `S
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.smod x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+  
+
+(* -------------------------------------------------------------------- *)
+let () = test_smod ()
