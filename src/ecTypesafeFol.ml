@@ -44,24 +44,10 @@ let unroll_ftype (ty:ty) : ty list * ty =
 
 let ty_var_from_ty (ty:ty) : ty list =
   match ty.ty_node with
-  
   | Tconstr (_, args) -> args
   | _ -> assert false (* FIXME: how to handle this case ? *)
 
 (* Returned list is (tyvar, ty) *)
-let rec match_ty_tyargs (ty: ty) (tyargs: ty) : (ty * ty) list = 
-  match (ty.ty_node, tyargs.ty_node) with
-  | (Tconstr (p1, args1), Tconstr (p2, args2)) when p1 = p2 && (List.compare_lengths args1 args2 = 0) ->
-    List.flatten @@ List.map2 match_ty_tyargs args1 args2
-  | (Ttuple args1, Ttuple args2) when (List.compare_lengths args1 args2 = 0) -> 
-    List.flatten @@ List.map2 match_ty_tyargs args1 args2
-  | (Tfun (ty11, ty12), Tfun (ty21, ty22)) ->
-    (match_ty_tyargs ty11 ty21) @ (match_ty_tyargs ty12 ty22)
-  | (_, Tvar _) -> [(ty, tyargs)]
-  | (_, Tunivar _) -> [(ty, tyargs)]
-  | _ -> assert false
-
-
 let rec match_ty_tyargs (ty: ty) (tyargs: ty) : (ty * ty) list = 
   match (ty.ty_node, tyargs.ty_node) with
   | (Tconstr (p1, args1), Tconstr (p2, args2)) when p1 = p2 && (List.compare_lengths args1 args2 = 0) ->

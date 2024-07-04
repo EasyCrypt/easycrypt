@@ -137,107 +137,6 @@ let t_set_r side cpos (fresh, id) e tc =
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
-let subst_array env (me: memenv) (insts) : memenv * instr list =
-  let cache : (prog_var, prog_var array * ty) Map.t = Map.empty in
-
-  let size_of_array (arr_e: expr) = match arr_e.e_ty.ty_node with
-  | Tconstr (p, _) -> begin match (EcPath.toqsymbol p) with
-    | ["Top"; "Array256"; _], _ -> Some 256
-    | ["Top"; "Array32"; _], _ -> Some 32
-    | _, "ipoly" -> Some 256
-    | h,t -> Format.eprintf "Unknown array type %s@." (List.fold_right (fun a b -> a ^ "." ^ b) h t);
-      assert false
-    end
-  | _ -> None
-  in
-  let is_arr_read (e: expr) : bool =
-  match e.e_node with
-  | Eop (p, _) -> begin 
-    match (EcPath.toqsymbol p) with
-    | _, "_.[_]" -> true
-    | _ -> Format.eprintf "Unknown arr read %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
-  end 
-  | _ -> false 
-  in
-  let is_arr_write (e: expr) : bool =
-  match e.e_node with
-  | Eop (p, _) -> begin 
-    match (EcPath.toqsymbol p) with
-    | _, "_.[_<-_]" -> true
-    | _ -> Format.eprintf "Unknown arr write %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
-  end 
-  | _ -> false 
-  in
-  
-  let vars_of_array (arr_e : expr) : prog_var array option =
-    let name_from_array (arr_e : expr) : string = 
-      match arr_e.e_node with
-      | Evar (PVloc v) -> v
-      | _ -> assert false
-    in
-    let name = name_from_array arr_e in
-    match size_of_array arr_e with
-    | None -> assert false
-    | Some size -> Some ( 
-      Array.init size (fun i -> 
-        pv_loc @@ name ^ "_" ^ (string_of_int i)))
-  in
-  let array_of_vars (ty:ty) (vars: prog_var array) : expr =
-    let vars = Array.map (fun v -> e_var v ty) vars in
-    let vars = Array.map (form_of_expr (fst me)) vars in
-    let arr = Array.fold_left 
-      (fun acc v -> EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_cons [v; acc]) 
-      (fop_empty ty)
-      (Array.rev vars)
-    in 
-    let () = Format.eprintf "type of list :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
-    let p_of_list, o_of_list = EcEnv.Op.lookup (["Array" ^ (string_of_int @@ Array.length vars)], "of_list") env in
-    let arr = EcTypesafeFol.f_app_safe env p_of_list [Array.get vars 0; arr] in
-    let () = Format.eprintf "type of arr :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
-    expr_of_form (fst me) arr
-
-  in
-  let rec subst_expr cache (e: expr) =
-  match e.e_node with
-  | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node=Eint idx}]) when is_arr_read op -> 
-    begin match Map.find_opt arr_v cache with
-    | Some (vars, ty) -> (cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty) 
-    | None -> let vars = vars_of_array arr_e |> Option.get in
-      (Map.add arr_v (vars, e.e_ty) cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty)
-    end
-  | Eapp (op, args) -> let cache, args = List.fold_left_map (fun cache e -> subst_expr cache e) cache args in
-    (cache, e_app op args e.e_ty)
-  | _ -> (cache, e)
-  in
-
-  let subst_instr cache (i: instr) = 
-  match i.i_node with
-  | Sasgn (lv, e) -> begin match e.e_node with
-    | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node = Eint idx}; v]) 
-      when is_arr_write op -> let cache, v = subst_expr cache v in
-      let cache, var = match Map.find_opt arr_v cache with
-      | Some (vars, ty) -> (cache, Array.get vars (BI.to_int idx))
-      | None -> let vars = vars_of_array arr_e |> Option.get in
-        (Map.add arr_v (vars, v.e_ty) cache, Array.get vars (BI.to_int idx)) in
-      (cache, i_asgn (LvVar (var, v.e_ty), v))
-    | Eapp _ -> let cache, e = subst_expr cache e in 
-      (cache, i_asgn (lv, e))
-    | _ -> (cache, i)
-    end
-  | _ -> (cache, i)
-  in
-  let cache, insts = List.fold_left_map subst_instr cache insts in
-  let arr_defs = Map.to_seq cache 
-    |> List.of_seq 
-    |> List.map (fun (arr, (vars, ty)) -> i_asgn (LvVar (arr, ty), array_of_vars ty vars))
-  in 
-  let me = Map.fold (fun (vars, ty) me -> 
-    let vars = Array.map (fun v -> match v with | PVloc v -> {ov_name = Some v; ov_type=ty} | _ -> assert false ) vars in
-    EcMemory.bindall (Array.to_list vars) me) cache me in
-  (me, insts @ arr_defs)
-  
-  
-(* -------------------------------------------------------------------- *)
 let cfold_stmt ?(simplify=true) ?(full=true) (pf, hyps) (me: memenv) olen zpr =
   let env = LDecl.toenv hyps in
 
@@ -287,48 +186,55 @@ let cfold_stmt ?(simplify=true) ?(full=true) (pf, hyps) (me: memenv) olen zpr =
         Mpv.empty asgn
     in
 
-    let (tl1, tl2) =
-      let p inst = PV.indep env (i_write env inst) asg in
-      match olen with
-      | None -> let p inst = PV.indep env (i_write env inst) asg in
-        EcUtils.List.takedrop_while p tl
-      
-      | Some olen ->
-          if List.length tl < olen then
-            tc_error pf "expecting at least %d instructions after assignment" olen;
-          let tl1, tl2 = List.takedrop olen tl in
-          let tl11, tl12 = EcUtils.List.takedrop_while p tl1 in
-          let wrs = is_write env tl11 in
+    
+    let do_subst = Mpv.isubst env subst in
+    let do_substs = Mpv.issubst env subst in
 
-          if not (EcPV.PV.indep env wrs asg) then
-            tc_error pf "cannot cfold non read-only local variables"
-          else tl11, tl12 @ tl2
-    in
-
-    let tl1 = Mpv.issubst env subst tl1 in
-
-    (* TEST CODE REMOVE LATER *)
+    (* TEST CODE REMOVE LATER *) 
     let simpl (inst: instr) : instr =
       match inst.i_node with
       | Sasgn (l, e) -> i_asgn (l, (expr_of_form (fst me) (EcReduction.simplify EcReduction.nodelta hyps (form_of_expr (fst me) e))))
       | _ -> inst
     in
-    let tl1 = if simplify then List.map simpl tl1 else tl1 in
+    let do_simpl tl1 = if simplify then List.map simpl tl1 else tl1 in
     let i = if simplify then simpl i else i in
     (* TEST CODE REMOVE LATER *)
 
-    match tl2 with
-    | [] -> acc @ tl1 @ [i] 
-    | inst::tl2 -> 
-      if (Option.is_some olen) && ((Option.get olen) = List.length tl1) then
-      acc @ tl1 @ [i] @ tl2
-      else let tl2 = (Mpv.isubst env subst inst)::tl2 in 
-      if full then
-        doit (Option.map (fun a -> a - List.length tl1) olen) (acc @ tl1) tl2
-      else acc @ tl1 @ tl2
+    
+    let p inst = PV.indep env (i_write env inst) asg in
+    match olen with
+    | None -> let p inst = PV.indep env (i_write env inst) asg in
+      let tl1, tl2 = EcUtils.List.takedrop_while p tl in
+      let tl1 = tl1 |> do_substs |> do_simpl in
+      begin match tl2 with
+      | [] -> acc @ tl1 @ [i]
+      | inst::tl2 -> let tl2 = (Mpv.isubst env subst inst)::tl2 in 
+        doit None (acc @ tl1) tl2
+      end
+    
+    | Some olen ->
+      if List.length tl < olen then
+        tc_error pf "expecting at least %d instructions after assignment" olen;
+      let tl1, tl2 = List.takedrop olen tl in
+      begin match (List.for_all p tl1) with
+      | true -> 
+        let tl1 = do_simpl @@ do_substs tl1 in
+        acc @ tl1 @ [i] @ tl2
+      | false -> 
+        let tl11, tl12 = EcUtils.List.takedrop_while p tl1 in
+        let tl1, tl2 = tl11, tl12 @ tl2 in
+        let tl1 = do_simpl @@ do_substs tl1 in
+        let olen_rem = olen - (List.length tl1 + 1) in
+        doit (Some olen_rem) (acc @ tl1) @@ (do_subst (List.hd tl2))::(List.tl tl2)
+      end
+
+      (* might be superfluous FIXME *)
+      (* if not (EcPV.PV.indep env wrs asg) then *)
+        (* tc_error pf "cannot cfold non read-only local variables" *)
+      (* else *) 
+         
   in
   let insts = doit olen [] Zpr.(zpr.z_tail) in
-  let me, insts = subst_array env me insts in
 
   let zpr =
     { zpr with Zpr.z_tail = insts }
@@ -460,3 +366,110 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
+
+
+(* -------------------------------------------------------------------- *)
+(*             Start of Code Cryogenic Vault:                           *)
+(* -------------------------------------------------------------------- *)
+let subst_array env (me: memenv) (insts) : memenv * instr list =
+  let cache : (prog_var, prog_var array * ty) Map.t = Map.empty in
+
+  let size_of_array (arr_e: expr) = match arr_e.e_ty.ty_node with
+  | Tconstr (p, _) -> begin match (EcPath.toqsymbol p) with
+    | ["Top"; "Array256"; _], _ -> Some 256
+    | ["Top"; "Array32"; _], _ -> Some 32
+    | _, "ipoly" -> Some 256
+    | h,t -> Format.eprintf "Unknown array type %s@." (List.fold_right (fun a b -> a ^ "." ^ b) h t);
+      assert false
+    end
+  | _ -> None
+  in
+  let is_arr_read (e: expr) : bool =
+  match e.e_node with
+  | Eop (p, _) -> begin 
+    match (EcPath.toqsymbol p) with
+    | _, "_.[_]" -> true
+    | _ -> Format.eprintf "Unknown arr read %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
+  end 
+  | _ -> false 
+  in
+  let is_arr_write (e: expr) : bool =
+  match e.e_node with
+  | Eop (p, _) -> begin 
+    match (EcPath.toqsymbol p) with
+    | _, "_.[_<-_]" -> true
+    | _ -> Format.eprintf "Unknown arr write %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
+  end 
+  | _ -> false 
+  in
+  
+  let vars_of_array (arr_e : expr) : prog_var array option =
+    let name_from_array (arr_e : expr) : string = 
+      match arr_e.e_node with
+      | Evar (PVloc v) -> v
+      | _ -> assert false
+    in
+    let name = name_from_array arr_e in
+    match size_of_array arr_e with
+    | None -> assert false
+    | Some size -> Some ( 
+      Array.init size (fun i -> 
+        pv_loc @@ name ^ "_" ^ (string_of_int i)))
+  in
+  let array_of_vars (ty:ty) (vars: prog_var array) : expr =
+    let vars = Array.map (fun v -> e_var v ty) vars in
+    let vars = Array.map (form_of_expr (fst me)) vars in
+    let arr = Array.fold_left 
+      (fun acc v -> EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_cons [v; acc]) 
+      (fop_empty ty)
+      (Array.rev vars)
+    in 
+    let () = Format.eprintf "type of list :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
+    let p_of_list, o_of_list = EcEnv.Op.lookup (["Array" ^ (string_of_int @@ Array.length vars)], "of_list") env in
+    let arr = EcTypesafeFol.f_app_safe env p_of_list [Array.get vars 0; arr] in
+    let () = Format.eprintf "type of arr :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
+    expr_of_form (fst me) arr
+
+  in
+  let rec subst_expr cache (e: expr) =
+  match e.e_node with
+  | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node=Eint idx}]) when is_arr_read op -> 
+    begin match Map.find_opt arr_v cache with
+    | Some (vars, ty) -> (cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty) 
+    | None -> let vars = vars_of_array arr_e |> Option.get in
+      (Map.add arr_v (vars, e.e_ty) cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty)
+    end
+  | Eapp (op, args) -> let cache, args = List.fold_left_map (fun cache e -> subst_expr cache e) cache args in
+    (cache, e_app op args e.e_ty)
+  | _ -> (cache, e)
+  in
+
+  let subst_instr cache (i: instr) = 
+  match i.i_node with
+  | Sasgn (lv, e) -> begin match e.e_node with
+    | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node = Eint idx}; v]) 
+      when is_arr_write op -> let cache, v = subst_expr cache v in
+      let cache, var = match Map.find_opt arr_v cache with
+      | Some (vars, ty) -> (cache, Array.get vars (BI.to_int idx))
+      | None -> let vars = vars_of_array arr_e |> Option.get in
+        (Map.add arr_v (vars, v.e_ty) cache, Array.get vars (BI.to_int idx)) in
+      (cache, i_asgn (LvVar (var, v.e_ty), v))
+    | Eapp _ -> let cache, e = subst_expr cache e in 
+      (cache, i_asgn (lv, e))
+    | _ -> (cache, i)
+    end
+  | _ -> (cache, i)
+  in
+  let cache, insts = List.fold_left_map subst_instr cache insts in
+  let arr_defs = Map.to_seq cache 
+    |> List.of_seq 
+    |> List.map (fun (arr, (vars, ty)) -> i_asgn (LvVar (arr, ty), array_of_vars ty vars))
+  in 
+  let me = Map.fold (fun (vars, ty) me -> 
+    let vars = Array.map (fun v -> match v with | PVloc v -> {ov_name = Some v; ov_type=ty} | _ -> assert false ) vars in
+    EcMemory.bindall (Array.to_list vars) me) cache me in
+  (me, insts @ arr_defs)
+  
+(* -------------------------------------------------------------------- *)
+(*               End of Code Cryogenic Vault:                           *)
+(* -------------------------------------------------------------------- *)

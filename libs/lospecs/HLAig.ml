@@ -7,6 +7,219 @@ type tdblock = (int * tdeps)
 
 module Hashtbl = Batteries.Hashtbl
 
+module type SMTInstance = sig
+  type bvterm
+
+  exception SMTError
+ 
+  (* Expected params: sort, value *)
+  val bvterm_of_int : int -> int -> bvterm
+
+  (* Expected params: sort, name *)
+  val bvterm_of_name : int -> string -> bvterm
+
+  (* argument must be of size 1, assert it true *)
+  (* Should affect internal state of SMT *)
+  val assert' : bvterm -> unit
+
+  (* Check satisfiability of current asserts *)
+  val check_sat : unit -> bool 
+
+  (* equality over bitvectors, res is a size 1 bitvector *)
+  val bvterm_equal : bvterm -> bvterm -> bvterm
+
+  (* bvterm concat, res sort is sum of sorts *)
+  val bvterm_concat : bvterm -> bvterm -> bvterm
+
+  (* bvand *)
+  val lognot : bvterm -> bvterm
+
+  (* bvnot *)
+  val logand : bvterm -> bvterm -> bvterm
+
+  val get_value : bvterm -> bvterm
+
+  val pp_term : Format.formatter -> bvterm -> unit
+end
+
+module type SMTInterface = sig
+  val circ_equiv : reg -> reg -> node -> bool
+
+  val circ_sat : node -> bool
+
+  val circ_taut : node -> bool
+end
+
+(* TODO Add model printing for circ_sat and circ_taut *)
+(* Assumes circuit inputs have already been appropriately renamed *)
+module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
+  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
+    assert ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0));
+    let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
+
+    let rec bvterm_of_node : Aig.node -> SMT.bvterm =
+      let cache = Hashtbl.create 0 in
+  
+      let rec doit (n : Aig.node) =
+        let mn = 
+          match Hashtbl.find_option cache (Int.abs n.id) with
+          | None ->
+            let mn = doit_r n.gate in
+            Hashtbl.add cache (Int.abs n.id) mn;
+            mn
+          | Some mn -> 
+            mn
+        in 
+          if 0 < n.id then mn else SMT.lognot mn
+
+      and doit_r (n : Aig.node_r) = 
+        match n with
+        | False -> SMT.bvterm_of_int 1 0 
+        | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+        begin 
+          match Map.String.find_opt name !bvvars with
+          | None ->
+            bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
+            Map.String.find name !bvvars 
+          | Some t -> t
+        end
+        | And (n1, n2) -> SMT.logand (doit n1) (doit n2)
+
+      in fun n -> doit n
+    in 
+  
+    let bvterm_of_reg (r: Aig.reg) : _ =
+      List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Array.reduce (SMT.bvterm_concat)
+    in 
+
+    let bvinpt1 = (bvterm_of_reg r1) in
+    let bvinpt2 = (bvterm_of_reg r2) in
+    let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
+    let pcond = (bvterm_of_node pcond) in
+ 
+
+    begin
+      SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
+      if SMT.check_sat () = false then true 
+      else begin
+        Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1);
+        Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
+        false
+      end
+    end
+
+
+  let circ_sat (n : Aig.node)  : bool =
+    let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
+
+    let rec bvterm_of_node : Aig.node -> SMT.bvterm =
+      let cache = Hashtbl.create 0 in
+  
+      let rec doit (n : Aig.node) =
+        let mn = 
+          match Hashtbl.find_option cache (Int.abs n.id) with
+          | None ->
+            let mn = doit_r n.gate in
+            Hashtbl.add cache (Int.abs n.id) mn;
+            mn
+          | Some mn -> 
+            mn
+        in 
+          if 0 < n.id then mn else SMT.lognot mn
+
+      and doit_r (n : Aig.node_r) = 
+        match n with
+        | False -> SMT.bvterm_of_int 1 0 
+        | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+        begin 
+          match Map.String.find_opt name !bvvars with
+          | None ->
+            bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars;
+            Map.String.find name !bvvars 
+          | Some t -> t
+        end
+        | And (n1, n2) -> SMT.logand (doit n1) (doit n2)
+
+      in fun n -> doit n
+    in 
+  
+    let form = bvterm_of_node n in 
+
+    begin
+      SMT.assert' @@ form;
+      if SMT.check_sat () = true then 
+      begin
+        (* Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1); *)
+        (* Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2); *)
+        true 
+      end
+      else false
+    end
+  
+  let circ_taut (n: Aig.node) : bool =
+    not @@ circ_sat (Aig.neg n)
+
+end
+
+
+let makeBWZinstance () : (module SMTInstance) = 
+  let module B = Bitwuzla.Once () in
+  let open B in
+  
+  (module struct
+  type bvterm = Term.Bv.t 
+
+  exception SMTError
+  
+  let bvterm_of_int (sort: int) (v: int) : bvterm =
+    Term.Bv.of_int (Sort.bv sort) v
+  
+
+  let bvterm_of_name (sort: int) (name: string) : bvterm =
+    Term.const (Sort.bv sort) name
+  
+
+  let assert' (f: bvterm) : unit =
+    assert' f
+  
+
+  let check_sat () : bool =
+    match check_sat () with
+    | Sat -> true
+    | Unsat -> false
+    | Unknown -> raise SMTError
+   
+
+  let bvterm_equal (bv1: bvterm) (bv2: bvterm) : bvterm =
+    Term.equal bv1 bv2
+  
+
+  let bvterm_concat (bv1: bvterm) (bv2: bvterm) : bvterm =
+    Term.Bv.concat [|bv1; bv2|]
+  
+
+  let lognot (bv: bvterm) : bvterm =
+    Term.Bv.lognot bv
+  
+
+  let logand (bv1: bvterm) (bv2: bvterm) : bvterm =
+    Term.Bv.logand bv1 bv2
+  
+
+  let get_value (bv: bvterm) : bvterm =
+    (get_value bv :> bvterm)
+  
+
+  let pp_term (fmt: Format.formatter) (bv: bvterm) : unit =
+    Term.pp fmt bv
+
+  end : SMTInstance)
+
+
+let makeBWZinterface () : (module SMTInterface) =
+  (module MakeSMTInterface ((val makeBWZinstance () : SMTInstance)))
+
+
 module Env : sig
   type env
 
@@ -332,94 +545,6 @@ let single_var_equiv_precheck (env: env) (r1: reg) (r2: reg) : bool =
   else true 
   (* FIXME: find some better way of doing this *)
 
-
-let circ_equiv_bitwuzla (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
-  let module B = Bitwuzla.Once () in
-  let open B in
-  let bvvars : B.bv B.term Map.String.t ref = ref Map.String.empty in
-  (* assert (single_var_equiv_precheck env r1 r2); *)
-  Format.eprintf "%a@." (fun fmt -> pp_deps fmt) (deps r1 |> Array.to_list);
-  Format.eprintf "%a@." (fun fmt -> pp_deps fmt) (deps r2 |> Array.to_list);
-  (* let inp1 = inputs_of_reg r1 |> Set.to_list in *)
-  (* let inp2 = inputs_of_reg r2 |> Set.to_list in *)
-  (* let inps = List.combine (List.take (List.length inp2) inp1) (List.take (List.length inp1) inp2) in *)
-  (* let inps = Map.of_seq (List.to_seq inps) in *)
-  (* let env_ (v : Aig.var) = Option.map Aig.input (Map.find_opt v inps) in *)
-  (* let r1 = (Aig.maps env_ r1) in *)
-
-  let rec bvterm_of_node : Aig.node -> _ =
-    let cache = Hashtbl.create 0 in
-  
-    let rec doit (n : Aig.node) =
-      let mn = 
-        match Hashtbl.find_option cache (Int.abs n.id) with
-        | None ->
-          let mn = doit_r n.gate in
-          Hashtbl.add cache (Int.abs n.id) mn;
-          mn
-        | Some mn -> 
-          mn
-      in 
-        if 0 < n.id then mn else Term.Bv.lognot mn
-
-    and doit_r (n : Aig.node_r) = 
-      match n with
-      | False -> Term.Bv.zero (Sort.bv 1) 
-      | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
-      begin 
-        match Map.String.find_opt name !bvvars with
-        | None ->
-          bvvars := Map.String.add name (Term.const (Sort.bv 1) name) !bvvars;
-          Map.String.find name !bvvars 
-        | Some t -> t
-      end
-      | And (n1, n2) -> Term.Bv.logand (doit n1) (doit n2)
-
-    in fun n -> doit n
-  in 
-  
-  let bvterm_of_reg (r: Aig.reg) : _ =
-    (* DEBUG PRINT *)
-    Format.eprintf "Reg has %d nodes@." (List.length r);
-    List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Term.Bv.concat
-  in 
-
-  assert (List.length r1 = 1);
-  let bvinpt1 = (bvterm_of_node (List.hd r1)) in
-  assert (List.length r2 = 1);
-  let bvinpt2 = (bvterm_of_node (List.hd r2)) in
-  let formula = Term.equal bvinpt1 bvinpt2 in
-  let pcond = (bvterm_of_node pcond) in
- 
-  (* FIXME: Mega hardcoding for shift test *)
-  (* let () = Format.eprintf "bvvars has %d entries@." (List.length @@ List.of_enum @@ Map.String.keys !bvvars) in *)
-  (* let inputs = Array.init bwidth (fun i -> *)
-    (* ("BV_" ^ (bvar) ^ "_" ^ (Printf.sprintf "%X" (i+bstart)))) in *)
-  (* let inputs = Array.rev inputs in *) 
-  (* DEBUG PRINT: *)
-  (* let () = Array.iter (fun v -> Format.eprintf "key: %s@." v) inputs in *)
-  (* let () = Format.eprintf "BVVARS: "; Enum.iter (Format.eprintf "%s@.") @@ Map.String.keys !bvvars; *)
-  (* Format.eprintf "@." *)
-  (* in *)
-  (* let lsB, msB = Array.head inputs 8, Array.tail inputs 8 in *)
-  (* let inp_bv = Term.Bv.concat (Array.map (fun v -> Map.String.find v !bvvars) inputs) in *)
-
-  begin
-    (* if bound > 0 then *)
-      (* let precond = Term.Bv.ult inp_bv (Term.Bv.of_int (Sort.bv (Array.length inputs)) bound) *) 
-      (* in assert' @@ Term.Bv.logand precond (Term.Bv.lognot formula); *)
-    (* else *) 
-      (* assert' @@ Term.Bv.lognot formula; *)
-    assert' @@ Term.Bv.logand pcond (Term.Bv.lognot formula);
-    let result = check_sat () in
-    if result = Unsat then true 
-    else begin
-      Format.eprintf "fc: %a@."     Term.pp (get_value bvinpt1 :> B.bv B.term);
-      Format.eprintf "block: %a@."  Term.pp (get_value bvinpt2 :> B.bv B.term);
-      (* Format.eprintf "inp: %a@."    Term.pp (get_value inp_bv :> B.bv B.term); *)
-      false
-    end
-  end
 
 
 (* ------------------------------------------------------------------------------- *)

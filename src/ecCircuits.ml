@@ -36,6 +36,10 @@ type circuit = {
   inps: (ident * int) list
 }
 
+let inputs_equal (f: circuit) (g: circuit) : bool = 
+  (List.compare_lengths f.inps g.inps = 0) && 
+  (List.for_all2 (=) (List.snd f.inps) (List.snd g.inps))
+
 (* -------------------------------------------------------------------- *)
 (* ?? *)
 let circ_dep_split (r : C.reg) : C.reg list =
@@ -45,7 +49,6 @@ let circ_dep_split (r : C.reg) : C.reg list =
     swap (List.split_nth (hi - lo + 1) acc)
   ) r deps |> snd
 
-  
 
 (* ------------------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -208,9 +211,12 @@ let apply_args (c: circuit) (vs: circuit list) : circuit =
     List.iter2 (fun a b -> Format.eprintf "(%d, %d) " (snd a) (List.length b)) apply_inps new_circs;
     assert false
   in
+
+  (* Tentative : *)
+  let new_inps = List.flatten new_inps |> List.unique_hash in
   
   let new_c = applys c.circ (List.map2 (fun a b -> (fst a, b)) apply_inps new_circs) in
-  {circ = new_c; inps = (List.flatten new_inps) @ old_inps}
+  {circ = new_c; inps = new_inps @ old_inps}
 
 let apply_args_strict (c: circuit) (vs: circuit list) : circuit =
   assert (List.compare_lengths c.inps vs = 0);
@@ -230,21 +236,29 @@ let apply_arg (c: circuit) (v: C.reg) : circuit =
   | [] -> Format.eprintf "Can't apply to circuit with no arguments@."; raise BDepError
 
 
-let circ_equiv (f: circuit) (g: circuit) : bool = 
-  ((List.compare_lengths f.inps g.inps) = 0) &&
-  List.for_all2 (fun a b -> snd a = snd b) f.inps g.inps &&
+let circ_equiv (f: circuit) (g: circuit) (pcond: circuit) : bool = 
+  let module B = (val HL.makeBWZinterface ()) in
+  inputs_equal f g &&
+  inputs_equal f pcond &&
   begin
     let new_inps = List.mapi (fun i (_, w) -> 
       let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in
       {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in
     let f2 = apply_args f new_inps in
     let g2 = apply_args g new_inps in
-    HL.circ_equiv_bitwuzla f2.circ g2.circ C.true_
+    let pcond2 = apply_args pcond new_inps in
+    B.circ_equiv f2.circ g2.circ (List.hd pcond2.circ)
   end
   
 let circ_check (f: circuit) : bool =
   assert (List.length f.circ = 1);
-  HL.circ_equiv_bitwuzla f.circ [C.true_] C.true_
+  let module B = (val HL.makeBWZinterface ()) in
+  B.circ_taut (List.hd f.circ)
+
+let circ_sat (f: circuit) : bool = 
+  assert (List.length f.circ = 1);
+  let module B = (val HL.makeBWZinterface ()) in
+  B.circ_sat (List.hd f.circ)
 
 (* Vars = bindings in scope (maybe we have some other way of doing this? *)
 
@@ -384,4 +398,4 @@ let process_op (env : env) (f: pqsymbol) (f2: pqsymbol) : unit =
   let () = Format.eprintf "Args for circuit: "; 
             List.iter (fun (idn, w) -> Format.eprintf "(%s, %d) " idn.id_symb w) fc.inps;
             Format.eprintf "@." in
-  Format.eprintf "Circuits: %s@." (if circ_equiv fc fc2 then "Equiv" else "Not equiv")
+  Format.eprintf "Circuits: %s@." (if circ_equiv fc fc2 {circ=[C.true_];inps=fc.inps} then "Equiv" else "Not equiv")
