@@ -492,12 +492,53 @@ let sgte (eq : node) (r1 : reg) (r2 : reg) : node =
     ~k11:(ugte eq r1 r2)
 
 (* -------------------------------------------------------------------- *)
+let bvueq (r1: reg) (r2: reg) : node = 
+  let n1 = List.length r1 in
+  let n2 = List.length r2 in
+  let n = max n1 n2 in
+  let r1 = uextend ~size:n r1 in
+  let r2 = uextend ~size:n r2 in
+
+  List.fold_left2 (fun ct c1 c2 ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.false_
+      ~k11:ct
+  ) Aig.true_ r1 r2
+  
+(* -------------------------------------------------------------------- *)
+let bvseq (r1: reg) (r2: reg) : node = 
+  let n1 = List.length r1 in
+  let n2 = List.length r2 in
+  let n = max n1 n2 in
+  let r1 = sextend ~size:n r1 in
+  let r2 = sextend ~size:n r2 in
+
+  List.fold_left2 (fun ct c1 c2 ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.false_
+      ~k11:ct
+  ) Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
 let ugt (r1 : reg) (r2 : reg) : node =
   ugte Aig.false_ r1 r2
 
 (* -------------------------------------------------------------------- *)
 let uge (r1 : reg) (r2 : reg) : node =
   ugte Aig.true_ r1 r2
+
+
+(* -------------------------------------------------------------------- *)
+let ult (r1: reg) (r2 : reg) : node =
+  ugt r2 r1
+
+(* -------------------------------------------------------------------- *)
+let ule (r1 : reg) (r2 : reg) : node =
+  uge r2 r1
 
 (* -------------------------------------------------------------------- *)
 let sgt (r1 : reg) (r2 : reg) : node =
@@ -506,6 +547,14 @@ let sgt (r1 : reg) (r2 : reg) : node =
 (* -------------------------------------------------------------------- *)
 let sge (r1 : reg) (r2 : reg) : node =
   sgte Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let slt (r1: reg) (r2 : reg) : node =
+  sgt r2 r1
+
+(* -------------------------------------------------------------------- *)
+let sle (r1 : reg) (r2 : reg) : node =
+  sge r2 r1
 
 (* -------------------------------------------------------------------- *)
 let udiv_ (a : reg) (b : reg) : reg * reg =
@@ -538,6 +587,10 @@ let udiv_ (a : reg) (b : reg) : reg * reg =
 
   (q, snd (split_msb r))
 
+let bvabs (a: reg) : reg =
+  let msb_a, _ = split_msb a in
+  ite (msb_a) (opp a) a
+
 let udiv (a: reg) (b: reg) : reg =
   fst (udiv_ a b)
 
@@ -547,28 +600,38 @@ let urem (a: reg) (b: reg) : reg =
   let res = snd (udiv_ a b) in
   ite (or_ b_zero b_gt_a) a @@ (uextend ~size:(List.length a) res)
 
-(* (bvsmod s t) abbreviates *)
-  (* (let (?msb_s (extract[|m-1|:|m-1|] s)) *)
-  (* (let (?msb_t (extract[|m-1|:|m-1|] t)) *)
-  (* (ite (and (= ?msb_s bit0) (= ?msb_t bit0)) *)
-       (* (bvurem s t) *)
-  (* (ite (and (= ?msb_s bit1) (= ?msb_t bit0)) *)
-       (* (bvadd (bvneg (bvurem (bvneg s) t)) t) *)
-  (* (ite (and (= ?msb_s bit0) (= ?msb_t bit1)) *)
-       (* (bvadd (bvurem s (bvneg t)) t) *)
-       (* (bvneg (bvurem (bvneg s) (bvneg t))))))) *)
+(*
+    (bvsmod s t) abbreviates
+      (let ((?msb_s ((_ extract |m-1| |m-1|) s))
+            (?msb_t ((_ extract |m-1| |m-1|) t)))
+        (let ((abs_s (ite (= ?msb_s #b0) s (bvneg s)))
+              (abs_t (ite (= ?msb_t #b0) t (bvneg t))))
+          (let ((u (bvurem abs_s abs_t)))
+            (ite (= u (_ bv0 m))
+                 u
+            (ite (and (= ?msb_s #b0) (= ?msb_t #b0))
+                 u
+            (ite (and (= ?msb_s #b1) (= ?msb_t #b0))
+                 (bvadd (bvneg u) t)
+            (ite (and (= ?msb_s #b0) (= ?msb_t #b1))
+                 (bvadd u t)
+                 (bvneg u))))))))
+*)
        
 (* Implicit extend *)
 let smod (s: reg) (t: reg) : reg =  
   let msb_s,_ = split_msb s in
   let msb_t,_ = split_msb t in
+  let u = urem (bvabs s) (bvabs t) in
+  ite (bvueq u @@ of_int ~size:(List.length u) 0) 
+    u @@
   ite (and_ (xnor msb_s false_) (xnor msb_t false_))
-    (urem s t)
+    u
   (ite (and_ (xnor msb_s true_) (xnor msb_t false_))
-    (add_dropc (opp (urem (opp s) t)) t)
+    (add_dropc (opp u) t)
   (ite (and_ (xnor msb_s false_) (xnor msb_t true_))
-    (add_dropc (urem s (opp t)) t)
-    (opp (urem (opp s) (opp t)))
+    (add_dropc u t)
+    (opp u)
   ))
   
   

@@ -129,6 +129,10 @@ val sgt : reg -> reg -> node
 
 val sge : reg -> reg -> node
 
+val bvueq : reg -> reg -> node
+
+val bvseq : reg -> reg -> node
+
 (* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg
 

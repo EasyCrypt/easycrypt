@@ -663,7 +663,7 @@ let bdep2 (env : env) (proc: stmt) (mem: memory) ((invs, n): variable list * int
   ()) [post_c];
 
 
-  if EcCircuits.circ_check post_c then (Format.eprintf "Success"; raise BDepError) else 
+  if EcCircuits.circ_check post_c then (Format.eprintf "Success") else 
   raise BDepError
   
     

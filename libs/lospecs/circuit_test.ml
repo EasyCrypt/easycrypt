@@ -755,6 +755,133 @@ let test_inserti128 () =
 
 
 (* -------------------------------------------------------------------- *)
+let shift () =
+  let module CAvx2 = Circuit_avx2.FromSpec () in
+
+  let i = 1 in
+
+  let h = C.reg ~size:128 ~name:0 in
+  let l = C.reg ~size:128 ~name:1 in
+
+  let f ((v, i) : C.var) =
+    match v with
+    | 0 -> false
+    | 1 -> true
+    | _ -> assert false in
+
+  let c1 =
+    let hl = l @ h in
+    let hli = CAvx2.vpsll_4u64 hl i in
+    let hl64i = CAvx2.vpsrl_4u64 hl (64 - i) in
+    let hl64il = CAvx2.vpslldq_256 hl64i 8 in
+    let hli = Circuit.lxor_ hli hl64il in
+    let l64ir = CAvx2.vpsrldq_128 (CAvx2.vpextracti128 hl64i 0) 8 in
+    let h = CAvx2.vpextracti128 hli 1 in
+    let h = Circuit.lxor_ h l64ir in
+    let l = CAvx2.vpextracti128 hli 0 in
+
+    l @ h in
+
+  let c2 =
+    Circuit.shift ~side:`L ~sign:`L (l @ h) (Circuit.w8 i) in
+
+  let v1 = Aig.evals f c1 in
+  let v2 = Aig.evals f c2 in
+
+  let v1 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v1) in
+  let v2 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v2) in
+
+  Format.eprintf "%a@."
+    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
+    v1;
+    Format.eprintf "%a@."
+    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
+    v2;
+
+  Format.eprintf "%b@." (List.for_all2 (==) c1 c2)
+
+  
+
+
+(* -------------------------------------------------------------------- *)
+let test_bvueq () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if x = y then 1 else 0
+    in
+
+    { name = (Format.sprintf "bvueq<%d>" size)
+    ; args = List.make 2 (size, `U)
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in [C.bvueq x y])
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+  
+(* -------------------------------------------------------------------- *)
+let test_bvseq () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if x = y then 1 else 0
+    in
+
+    { name = (Format.sprintf "bvseq<%d>" size)
+    ; args = List.make 2 (size, `S)
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in [C.bvseq x y])
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+  
+
+(* -------------------------------------------------------------------- *)
+let test_mod () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if y = 0 then x else
+      x mod y
+    in
+
+    { name = (Format.sprintf "mod<%d>" size)
+    ; args = List.make 2 (size, `U)
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.urem x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+
+(* -------------------------------------------------------------------- *)
+let test_smod () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      if y = 0 then x else
+      let u = x mod y in
+      if u < 0 then y + u else u
+    in
+
+    { name = (Format.sprintf "smod<%d>" size)
+    ; args = List.make 2 (size, `S)
+    ; out  = `S
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.smod x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+  
+
+
+(* -------------------------------------------------------------------- *)
 let tests = [
   ("opp" , test_opp );
   ("incr", test_incr);
@@ -781,6 +908,12 @@ let tests = [
 
   ("uextend", test_uextend);
   ("sextend", test_sextend);
+
+  ("smod", test_smod);
+  ("mod", test_mod);
+
+  ("bvueq", test_bvueq);
+  ("bvseq", test_bvseq);
 
   ("vpadd_16u16"      , test_vpadd_16u16      );
   ("vpadd_32u8"       , test_vpadd_32u8       );
@@ -1157,103 +1290,7 @@ let poly_compress () =
       deps
   ) deps
 
-(* -------------------------------------------------------------------- *)
-let shift () =
-  let module CAvx2 = Circuit_avx2.FromSpec () in
-
-  let i = 1 in
-
-  let h = C.reg ~size:128 ~name:0 in
-  let l = C.reg ~size:128 ~name:1 in
-
-  let f ((v, i) : C.var) =
-    match v with
-    | 0 -> false
-    | 1 -> true
-    | _ -> assert false in
-
-  let c1 =
-    let hl = l @ h in
-    let hli = CAvx2.vpsll_4u64 hl i in
-    let hl64i = CAvx2.vpsrl_4u64 hl (64 - i) in
-    let hl64il = CAvx2.vpslldq_256 hl64i 8 in
-    let hli = Circuit.lxor_ hli hl64il in
-    let l64ir = CAvx2.vpsrldq_128 (CAvx2.vpextracti128 hl64i 0) 8 in
-    let h = CAvx2.vpextracti128 hli 1 in
-    let h = Circuit.lxor_ h l64ir in
-    let l = CAvx2.vpextracti128 hli 0 in
-
-    l @ h in
-
-  let c2 =
-    Circuit.shift ~side:`L ~sign:`L (l @ h) (Circuit.w8 i) in
-
-  let v1 = Aig.evals f c1 in
-  let v2 = Aig.evals f c2 in
-
-  let v1 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v1) in
-  let v2 = Avx2.M256.of_bytes ~endianess:`Little (Circuit.bytes_of_bools v2) in
-
-  Format.eprintf "%a@."
-    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
-    v1;
-    Format.eprintf "%a@."
-    (Avx2.M256.pp ~size:`U64 ~endianess:`Big)
-    v2;
-
-  Format.eprintf "%b@." (List.for_all2 (==) c1 c2)
-
-  
-
 
 (* -------------------------------------------------------------------- *)
-let test_mod () =
-  let op (size : int) : op =
-    let module M = (val Word.sword ~size) in
-
-    let sim (x : int) (y : int) : int =
-      if y = 0 then x else
-      x mod y
-    in
-
-    { name = (Format.sprintf "mod<%d>" size)
-    ; args = List.make 2 (size, `U)
-    ; out  = `U
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.urem x y)
-    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
-    }
-
-  in test (op 9)
-  
-
-
-(* -------------------------------------------------------------------- *)
-let test_smod () =
-  let op (size : int) : op =
-    let module M = (val Word.sword ~size) in
-
-    let sim (x : int) (y : int) : int =
-      if y = 0 then
-        x
-      else if (x >= 0 && y >= 0) then
-        x mod y
-      else if (x < 0 && y >= 0) then
-          (y - ((-x) mod y))
-      else if (x >= 0 && y < 0) then
-         (x mod (-y)) + y
-      else 
-        -((-x) mod (-y))
-      in
-
-    { name = (Format.sprintf "smod<%d>" size)
-    ; args = List.make 2 (size, `S)
-    ; out  = `S
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.smod x y)
-    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
-    }
-
-  in test (op 9)
-  
-
-(* -------------------------------------------------------------------- *)
+(* let () = main () *)
 let () = test_smod ()

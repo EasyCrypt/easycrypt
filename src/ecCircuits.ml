@@ -67,6 +67,11 @@ module BaseOps = struct
     | _, "sar_32_26" -> true
     | _, "truncate32_16" -> true
     | _, "eqmod64q" -> true
+    | _, "bvueq" -> true
+    | _, "bvseq" -> true
+    | _, "/\\" -> true
+    | _, "||" -> true
+    | _, "true" -> true
     
     | _ -> false
 
@@ -118,6 +123,19 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = [C.ugt c2 c1]; inps=[(id1, size); (id2, size)]}
+    (* Comparisons: *)
+    | "\\sle" -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = [C.sge c2 c1]; inps=[(id1, size); (id2, size)]}
+    | "\\slt" -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = [C.sgt c2 c1]; inps=[(id1, size); (id2, size)]}
     
     (* Conversions *)
     | "of_int" ->
@@ -149,20 +167,57 @@ module BaseOps = struct
     let c1 = C.reg ~size:16 ~name:id1.id_tag in
     { circ = c1; inps=[(id1, 32)]}
 
+  
+  | _, "bvueq" -> (* FIXME: remove hardcoded size *)
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:16 ~name:id2.id_tag in
+    {circ = [C.bvueq c1 c2]; inps = [(id1, 16); (id2, 16)]}
+  
+  | _, "bvseq" -> (* FIXME: remove hardcoded size *)
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:32 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:32 ~name:id2.id_tag in
+    {circ = [C.bvseq c1 c2]; inps = [(id1, 32); (id2, 32)]}
+
+  | _, "/\\" -> (* FIXME: remove hardcoded size *)
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:1 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:1 ~name:id2.id_tag in
+    {circ = C.land_ c1 c2; inps = [(id1, 1); (id2, 1)]}
+
+  | _, "||" -> (* FIXME: remove hardcoded size *)
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:1 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:1 ~name:id2.id_tag in
+    {circ = C.lor_ c1 c2; inps = [(id1, 1); (id2, 1)]}
+
+  | _, "true" ->
+    {circ = [C.true_]; inps = []}
+
   | _, "eqmod64q" ->
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:16 ~name:id1.id_tag in
     let id2 = EcIdent.create temp_symbol in
     let c2 = C.reg ~size:16 ~name:id2.id_tag in
-    let q = C.of_int ~size:16 3329 in
+    let c1 = C.sextend ~size:64 c1 in
+    let c2 = C.sextend ~size:64 c2 in
+    let q = C.of_int ~size:64 3329 in
+    let c1 = C.smod c1 q in
+    let c2 = C.smod c2 q in
     let dc = C.sub_dropc c1 c2 in
     (* let dc = C.smod dc q in *)
-    (* let dc = C.ugt (C.of_int ~size:16 1) dc in *)
-    let dp_modq = C.rem dc q in
-    let dm_modq = C.rem (C.opp dc) q in
-    let dp_modqt = C.ugt (C.of_int ~size:16 1) dp_modq in
-    let dm_modqt = C.ugt (C.of_int ~size:16 1) dm_modq in
-    {circ = [C.or_ dp_modqt dm_modqt]; inps = [(id1, 16); (id2, 16)]}
+    let dc = C.ugt (C.of_int ~size:64 1) dc in
+    (* let dp_modq = C.urem dc q in *)
+    (* let dm_modq = C.urem (C.opp dc) q in *)
+    (* let dp_modqt = C.ugt (C.of_int ~size:16 1) dp_modq in *)
+    (* let dm_modqt = C.ugt (C.of_int ~size:16 1) dm_modq in *)
+    (* let dc = C.or_ dp_modqt dm_modqt in *)
+    {circ = [dc]; inps = [(id1, 16); (id2, 16)]}
   
   | _ -> assert false
 end
@@ -308,7 +363,7 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain (f, _))) -> f
-        | _ -> failwith "Unsupported op kind"
+        | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
         in doit cache vars env f
       (* (hlenv, nullary pth) *)
 

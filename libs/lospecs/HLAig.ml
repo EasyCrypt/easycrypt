@@ -130,7 +130,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       and doit_r (n : Aig.node_r) = 
         match n with
         | False -> SMT.bvterm_of_int 1 0 
-        | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v))) in
+        | Input v -> let name = ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%05X" (snd v))) in
         begin 
           match Map.String.find_opt name !bvvars with
           | None ->
@@ -149,6 +149,12 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       SMT.assert' @@ form;
       if SMT.check_sat () = true then 
       begin
+        let terms = Map.String.to_seq !bvvars in
+        let terms = List.of_seq terms |> List.sort (fun a b -> compare (fst a) (fst b))
+        |> List.map (fun a -> snd a) in
+        let term = List.reduce SMT.bvterm_concat terms in
+        Format.eprintf "input: %a@."     SMT.pp_term (SMT.get_value term);
+        
         (* Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1); *)
         (* Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2); *)
         true 
