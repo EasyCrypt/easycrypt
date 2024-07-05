@@ -2901,7 +2901,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let env_of_theory (p : EcPath.path) (env : env) =
-    if EcPath.isprefix p env.env_scope.ec_path then
+    if EcPath.isprefix ~prefix:p ~path:env.env_scope.ec_path then
       env
     else
       Option.get (Mp.find_opt p env.env_thenvs)
@@ -3211,7 +3211,7 @@ module Theory = struct
 
       let compiled =
         Mp.filter
-          (fun path _ -> EcPath.isprefix path root)
+          (fun path _ -> EcPath.isprefix ~prefix:root ~path)
           env.env_thenvs in
       let compiled = Mp.add env.env_scope.ec_path env compiled in
 

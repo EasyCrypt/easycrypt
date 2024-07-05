@@ -132,18 +132,19 @@ let prefix p =
   | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
-let rec getprefix_r acc p q =
-  match p_equal p q with
-  | true  -> Some acc
-  | false ->
-      match q.p_node with
-      | Psymbol _     -> None
-      | Pqname (q, x) -> getprefix_r (x::acc) p q
+let remprefix ~(prefix : path) =
+  let rec doit (acc : symbol list) (path : path) =
+    if p_equal prefix path then
+      Some acc
+    else
+      match path.p_node with
+      | Psymbol _ -> None
+      | Pqname (path, x) -> doit (x :: acc) path in
 
-let getprefix p q = getprefix_r [] p q
+  fun ~(path : path) -> doit [] path
 
-let isprefix p q =
-  match getprefix p q with
+let isprefix ~(prefix : path) ~(path : path) =
+  match remprefix ~prefix ~path with
   | None   -> false
   | Some _ -> true
 
