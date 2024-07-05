@@ -890,7 +890,7 @@ and replay_instance
   let module E = struct exception InvInstPath end in
 
   let forpath (p : EcPath.path) =
-    match EcPath.getprefix opath p |> omap List.rev with
+    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
     | None | Some [] -> None
     | Some (x::px) ->
         let q = EcPath.fromqsymbol (List.rev px, x) in
