@@ -634,7 +634,8 @@ and process_dump scope (source, tc) =
 and process_bdep (scope : EcScope.scope) ((p, f, n, m, vs, pcond) : pgamepath * psymbol * int * int * (string list) * psymbol) =
   let env = EcScope.env scope in
   let p = EcTyping.trans_gamepath env p in
-  EcPhlBDep.bdep_xpath (EcScope.env scope) p f n m vs pcond
+  assert false
+  (* EcPhlBDep.bdep_xpath (EcScope.env scope) p f n m vs pcond *)
 
 and process_bind_bitstring (scope : EcScope.scope) (tb: pqsymbol) (fb: pqsymbol) (t: pty) (n: int) =
   EcScope.Circ.add_bitstring scope tb fb t n

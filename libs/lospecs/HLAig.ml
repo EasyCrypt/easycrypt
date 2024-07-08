@@ -466,10 +466,20 @@ let split_deps (n: int) (d: tdeps array) : tdblock list =
   let combine (d: tdeps list) : tdeps =
     List.reduce merge_deps d
   in
-  let rec aggregate (d: tdeps array) : tdblock list =
-    (n, combine (Array.head d n |> Array.to_list))::(aggregate (Array.tail d n))
+  let rec aggregate (acc: tdblock list) (d: tdeps array) : tdblock list =
+    match d with
+    | [| |] -> acc
+    | _ -> (aggregate ((n, combine (Array.head d n |> Array.to_list))::acc) (Array.tail d n))
   in
-  aggregate d
+  List.rev @@ aggregate [] d
+
+let check_dep_width ?(eq=false) (n: int) (d: tdeps) : bool =
+  Map.fold (fun s acc -> let m = (Set.cardinal s) in
+    if eq then
+      acc && (n = m)
+    else
+      acc && (m <= n)
+    ) d true
 
 (* maybe optimize this? *)
 let tdblock_of_tdeps (d: tdeps list) : tdblock =

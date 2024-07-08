@@ -29,6 +29,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type width = int
+type deps = ((int * int) * int C.VarRange.t) list
 
 (* FIXME: make inps be variables *)
 type circuit = {
@@ -36,30 +37,141 @@ type circuit = {
   inps: (ident * int) list
 }
 
+(* Maybe rename to sig_equals? *)
 let inputs_equal (f: circuit) (g: circuit) : bool = 
   (List.compare_lengths f.inps g.inps = 0) && 
   (List.for_all2 (=) (List.snd f.inps) (List.snd g.inps))
 
-(* -------------------------------------------------------------------- *)
-(* ?? *)
-let circ_dep_split (r : C.reg) : C.reg list =
-  let deps = C.deps r in
-
-  List.fold_left_map (fun acc ((lo, hi), _) ->
-    swap (List.split_nth (hi - lo + 1) acc)
-  ) r deps |> snd
-
 
 (* ------------------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
-exception BDepError
+exception CircError
 
+let width_of_type (env: env) (t: ty) : int =
+  match EcEnv.Circ.lookup_bitstring_size env t with
+  | Some w -> w
+  | None -> Format.eprintf "No bitvector binding for type %a@."
+  (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t; raise CircError
+
+let circuit_aggregate (c: circuit list) : circuit =
+  try
+    assert (List.for_all (fun circ -> circ.inps = (List.hd c).inps) c);
+    {circ = List.flatten (List.map (fun circ -> circ.circ) c); inps=(List.hd c).inps}
+  with
+    | Assert_failure _ -> Format.eprintf "Bad circuit inputs: @.";
+      List.iter (fun c -> List.iter 
+      (fun (id, w) -> Format.eprintf "((%d, %s), %d) " id.id_tag id.id_symb w) c.inps;
+      Format.eprintf "@.") c;
+      raise CircError
+
+(* Concatenates two circuits and their inputs 
+   Strict mode: input variables must be the same, sizes are concat
+   Non-strict : input variables may be different, coinciding ones
+                are concat, order is first arg inps then second
+*)
+(* NON-TESTED FIXME *)
+let circuit_merge ?(strict=true) (c: circuit) (d: circuit) : circuit =
+  let inps = List.map 
+    (fun (id, w) -> 
+    let w2 = List.find_opt (fun v -> (fst v)=id) d.inps 
+      |> Option.map snd |> Option.default 0 in (id, w + w2)
+    ) c.inps in
+  let inps = inps @ (List.filter (fun (id, w) -> List.mem id (List.fst inps)) d.inps) in
+  {circ=c.circ @ d.circ; inps}
+
+let circuit_concat ?(n:int option) (c: circuit list) : circuit =
+  let temp_name = "concat_input" in
+  let () = match n with
+  | None -> ()
+  | Some n -> assert (List.for_all (fun c -> List.for_all (fun a -> snd a = n) c.inps) c)
+  in
+  let size = List.fold_left (fun acc c -> List.fold_left (+) acc (List.snd c.inps)) 0 c in
+  let id = create temp_name in
+  (* let new_inp = C.reg ~size ~name:id.id_tag in *)
+  let old_inps = List.map (fun c -> c.inps) c |> List.flatten in
+  let map_, sz = List.fold_left (fun (map_, i) (id_, w) -> 
+    List.init w (fun j -> ((id_.id_tag, j), C.input (id.id_tag, i+j))) |>
+    List.fold_left (fun map_ (k, v) -> Map.add k v map_) map_, i+w
+  ) (Map.empty, 0) old_inps in
+  assert (size = sz); (* Probably superfluous *)
+  let map_ = fun x -> Map.find_opt x map_ in
+  let circ = List.flatten @@ List.map (fun c -> c.circ) c in
+  let circ = C.maps map_ circ in
+  {circ; inps=[(id,size)]}
+
+let input_of_tdep (n: int) (bs: int Set.t) : _ * (ident * int) = 
+  let temp_symbol = "tdep_ident" in
+  let m = Set.cardinal bs in
+  let id = create temp_symbol in
+  let map_ = Set.to_seq bs |> List.of_seq in
+  let map_ = List.map (fun a -> (n, a)) map_ in
+  let map_ = List.combine map_ (List.init m (fun i -> C.input (id.id_tag, i))) in
+  let map_ = Map.of_seq (List.to_seq map_) in
+  map_, (id, m)
+  
+let inputs_of_tdep (td: HL.tdeps) :  _ * (ident * int) list =
+  Map.foldi (fun n bs (map_, inps) -> let map_2, inp = input_of_tdep n bs in
+    (Map.union map_ map_2, inp::inps)) td (Map.empty, [])   
+
+(* This takes a circuit with big output and input and returns the split one *)
+let circuit_block_split (in_size: int) (out_size: int) (c: circuit) : circuit list =
+  let deps = HL.deps c.circ in
+  let bdeps = HL.split_deps out_size deps in
+  assert (List.for_all (HL.check_dep_width in_size) (List.snd bdeps));
+  assert ((List.fold_left (+) 0 (List.snd c.inps)) mod in_size = 0);
+
+  let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg =
+    let res, c = List.takedrop (fst db) c in
+    let map_, inps = inputs_of_tdep (snd db) in
+    let res = C.maps (fun a -> Map.find_opt a map_) res in
+    {circ = res; inps}, c
+  in
+  let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in
+    (r::cs, c)) ([],c.circ) bdeps in
+  assert (List.length c = 0);
+  cs
+
+(* -------------------------------------------------------------------- *)
+(* Basis for hardcoded circuit gen *)
+let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
+  (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
+  match EcEnv.Circ.lookup_circuit_path env p with
+  | Some op -> C.func_from_spec op
+  | None -> Format.eprintf "No operator for path: %s@."
+    (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
+    assert false 
+
+
+
+let circuit_from_spec (env: env) (p : path) : circuit = 
+  let temp_name = "spec_input" in
+  let circ = circuit_from_spec_ env p in
+  let op = EcEnv.Op.by_path p env in
+
+  let rec unroll_fty_rev (acc: ty list) (ty: ty) : ty list =
+    try 
+      let a, b = EcTypes.tfrom_tfun2 ty in
+      (unroll_fty_rev (a::acc) b)
+    with
+    | Assert_failure _ -> ty::acc
+  in
+
+  let argtys = unroll_fty_rev [] op.op_ty |> List.tl |> List.rev in
+  let cinps, inps = List.map (fun ty -> 
+    let id = EcIdent.create temp_name in
+    let size = width_of_type env ty in
+    (C.reg ~name:id.id_tag ~size, (id, size))
+    ) argtys|> List.split in
+  {circ = circ cinps; inps}
+    
+  
 module BaseOps = struct
   let temp_symbol = "temp_circ_input"
   
   let is_baseop (p: path) : bool = 
     match (EcPath.toqsymbol p) with
     | ["Top"; "JWord"; _], _ -> true
+    | ["Top"; "JModel_x86"], _ -> true
 
     (* AdHoc for barrett FIXME: remove later *)
     | _, "sext16_32" -> true
@@ -85,6 +197,7 @@ module BaseOps = struct
       | "W32" -> 32 
       | "W16" -> 16 
       | "W8" -> 8 
+      | "W16u16" -> 256
       | _ -> Format.eprintf "Unknown size for path %s@." (EcSymbols.string_of_qsymbol qpath); assert false
       in 
 
@@ -108,6 +221,28 @@ module BaseOps = struct
       let id1 = EcIdent.create temp_symbol in
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = C.opp c1; inps = [(id1, size)]}
+
+    (* Bitwise operations *)
+    | "andw" -> (* Unsigned low word mul *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = C.land_ c1 c2; inps = [(id1, size); (id2, size)]}
+
+    | "`>>`" -> (* Unsigned low word mul *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size:8 ~name:id2.id_tag in
+      {circ = C.shift ~side:`R ~sign:`L c1 c2; inps = [(id1, size); (id2, 8)]}
+
+    | "`<<`" -> (* Unsigned low word mul *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size:8 ~name:id2.id_tag in
+      {circ = C.shift ~side:`L ~sign:`L c1 c2; inps = [(id1, size); (id2, 8)]}
 
 
     (* Comparisons: *)
@@ -142,9 +277,14 @@ module BaseOps = struct
       let id1 = EcIdent.create temp_symbol in
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = c1; inps = [(id1, 256)]} (* FIXME: Assumes integeres are 256 bits *)
+    
+    | "to_uint" ->
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = C.uextend ~size:256 c1; inps = [(id1, size)]} (* FIXME: Assumes integeres are 256 bits *)
 
     
-    | _ -> Format.eprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath); assert false
+    | _ -> Format.eprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath); raise CircError
     end
   (* AdHoc stuff for barrett example FIXME: remove later *)
   | _, "sext16_32" ->
@@ -219,25 +359,9 @@ module BaseOps = struct
     (* let dc = C.or_ dp_modqt dm_modqt in *)
     {circ = [dc]; inps = [(id1, 16); (id2, 16)]}
   
-  | _ -> assert false
+  | _ -> raise CircError
 end
 
-(* -------------------------------------------------------------------- *)
-(* Basis for hardcoded circuit gen *)
-let circuit_from_spec (env: env) (p : path) : C.reg list -> C.reg  =
-  (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
-  match EcEnv.Circ.lookup_circuit_path env p with
-  | Some op -> C.func_from_spec op
-  | None -> Format.eprintf "No operator for path: %s@."
-    (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
-    assert false 
-
-
-let width_of_type (env: env) (t: ty) : int =
-  match EcEnv.Circ.lookup_bitstring_size env t with
-  | Some w -> w
-  | None -> Format.eprintf "No bitvector binding for type %a@."
-  (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t; raise BDepError
 
 let apply (c: C.reg) (idn: ident) (v: C.reg) : C.reg = 
   let map_ = fun (id, i) -> 
@@ -286,13 +410,12 @@ let apply_arg (c: circuit) (v: C.reg) : circuit =
     with 
     | Assert_failure _ -> 
       Format.eprintf "Input width %d does not match argument width %d@." (List.length v) w;
-      raise BDepError 
+      raise CircError 
     end
-  | [] -> Format.eprintf "Can't apply to circuit with no arguments@."; raise BDepError
+  | [] -> Format.eprintf "Can't apply to circuit with no arguments@."; raise CircError
 
 
 let circ_equiv (f: circuit) (g: circuit) (pcond: circuit) : bool = 
-  let module B = (val HL.makeBWZinterface ()) in
   inputs_equal f g &&
   inputs_equal f pcond &&
   begin
@@ -302,6 +425,8 @@ let circ_equiv (f: circuit) (g: circuit) (pcond: circuit) : bool =
     let f2 = apply_args f new_inps in
     let g2 = apply_args g new_inps in
     let pcond2 = apply_args pcond new_inps in
+    (List.for_all2 (==) f2.circ g2.circ) ||
+    let module B = (val HL.makeBWZinterface ()) in
     B.circ_equiv f2.circ g2.circ (List.hd pcond2.circ)
   end
   
@@ -352,14 +477,17 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (
         | Assert_failure _ -> 
           Format.eprintf "Var binding size %d for %s does not match size of form type %d@."
           (List.find (fun a -> (fst a) = idn) vars |> snd) idn.id_symb (width_of_type env f.f_ty);
-           raise BDepError
-        | Not_found -> Format.eprintf "Var binding not found for %s@." idn.id_symb; raise BDepError
+           raise CircError
+        | Not_found -> Format.eprintf "Var binding not found for %s@." idn.id_symb; raise CircError
       end
         (* HL.reg hlenv ~size:(width_of_type env f.f_ty) ~name:idn.id_symb *) 
         (* TODO: Check name after *)
     | Fop (pth, _) -> 
       if BaseOps.is_baseop pth then
-        env, BaseOps.circuit_of_baseop pth
+        try
+          env, BaseOps.circuit_of_baseop pth
+        with
+        | CircError -> env, circuit_from_spec env pth
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain (f, _))) -> f
@@ -424,6 +552,23 @@ let circuit_of_path (env: env) (p: path) : circuit =
   | _ -> failwith "Invalid operator type"
   in
   circuit_of_form env f
+
+let input_of_variable (env:env) (v: variable) : circuit =
+  let size = width_of_type env v.v_type in
+  let inp = (create v.v_name, size) in
+  let c = C.reg ~size ~name:(fst inp).id_tag in
+  {circ = c; inps=[inp]}
+  
+
+let process_instr (env:env) (mem: memory) (cache: _) (inst: instr) =
+    try
+    match inst.i_node with
+    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate:cache env) cache
+    | _ -> failwith "Case not implemented yet"
+    with 
+    | e -> Format.eprintf "BDep failed on instr: %a@.Exception thrown: %s@."
+        (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
+        (Printexc.to_string e); raise CircError
 
     
 (* -------------------------------------------------------------------- *)
