@@ -293,6 +293,80 @@ let process_print scope p =
   process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
+let process_print_ax (scope : EcScope.scope) =
+  let env = EcScope.env scope in
+  let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
+
+  let module Trie : sig
+    type ('a, 'b) t
+
+    val empty : ('a, 'b) t
+    val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
+    val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
+  end = struct
+    module Map = BatMap
+
+    type ('a, 'b) t =
+      { children : ('a, ('a, 'b) t) Map.t
+      ; value    : 'b list }
+
+    let empty : ('a, 'b) t =
+      { value = []; children = Map.empty; }
+
+    let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
+      let rec doit (path : 'a list) (t : ('a, 'b) t) =
+        match path with
+        | [] ->
+          { t with value = value :: t.value }
+        | v :: path ->
+          let children =
+            t.children |> Map.update_stdlib v (fun children ->
+              let subtrie = Option.value ~default:empty children in
+              Some (doit path subtrie)
+            )
+          in { t with children }
+      in doit path t
+
+    let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
+      let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
+        if not (List.is_empty t.value) then
+          f prefix t.value;
+        Map.iter (fun k v -> doit (k :: prefix) v) t.children
+      in
+      
+      doit [] t
+  end in
+
+  let ax =
+    List.fold_left (fun axs ((p, _) as ax) ->
+      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) ax axs
+    ) Trie.empty ax in
+
+  let ppe0 = EcPrinting.PPEnv.ofenv env in
+  let buffer = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buffer in
+
+  Trie.iter (fun prefix axs ->
+    let thpath =
+      match prefix with
+      | [] -> assert false
+      | name :: prefix -> (List.rev prefix, name) in
+
+    let thpath = EcPath.fromqsymbol thpath in
+
+    let ppe = EcPrinting.PPEnv.enter_theory ppe0 thpath in
+
+    Format.fprintf fmt
+      "@.========== %a ==========@.@." (EcPrinting.pp_thname ppe0) thpath;
+
+    List.iter (fun ax ->
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) ax
+    ) axs
+  ) ax;
+
+  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
+
+(* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset | `Restart]
 
 (* -------------------------------------------------------------------- *)
@@ -659,6 +733,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gpaxiom           -> `Fct   (fun scope -> process_print_ax   scope; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
