@@ -16,6 +16,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_compact : int option;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
@@ -29,7 +30,10 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_report    : string option;
   runo_provers   : prv_options;
+  runo_jobs      : int option;
+  runo_rawargs   : string list;
 }
 
 and prv_options = {

@@ -291,11 +291,11 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : symbol option;
-  puc_mode   : bool option;
-  puc_jdg    : proof_state;
-  puc_flags  : pucflags;
-  puc_crt    : EcDecl.axiom;
+  puc_name    : symbol option;
+  puc_started : bool;
+  puc_jdg     : proof_state;
+  puc_flags   : pucflags;
+  puc_crt     : EcDecl.axiom;
 }
 
 and proof_ctxt =
@@ -325,7 +325,7 @@ type prelude = {
   pr_required : required;
 }
 
-type thloaded = EcSection.checked_ctheory
+type thloaded = EcEnv.Theory.compiled_theory
 
 type scope = {
   sc_name     : (symbol * EcTheory.thmode);
@@ -606,10 +606,10 @@ module Prover = struct
     }
 
   (* -------------------------------------------------------------------- *)
-  let mk_prover_info scope (options : smt_options) =
+  let mk_prover_info_from_dft (dft : EcProvers.prover_infos)
+      (options : smt_options) : EcProvers.prover_infos =
     let open EcProvers in
 
-    let dft          = Prover_info.get scope.sc_options in
     let gn_debug     = odfl dft.gn_debug options.gn_debug in
     let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
@@ -638,9 +638,21 @@ module Prover = struct
       gn_debug   ; }
 
   (* -------------------------------------------------------------------- *)
+  let mk_prover_info scope (options : smt_options) =
+    let dft = Prover_info.get scope.sc_options in
+    mk_prover_info_from_dft dft options
+
+  (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =
     let options = process_prover_option (env scope) ppr in
     mk_prover_info scope options
+
+  (* -------------------------------------------------------------------- *)
+  let pprover_infos_to_prover_infos
+      (env : EcEnv.env) (dft : EcProvers.prover_infos)
+      (ppr : pprover_infos) : EcProvers.prover_infos =
+    let options = process_prover_option env ppr in
+    mk_prover_info_from_dft dft options
 
   (* -------------------------------------------------------------------- *)
   let process scope ppr =
@@ -677,39 +689,33 @@ module Tactics = struct
   type prinfos =
     EcCoreGoal.proofenv * (EcCoreGoal.handle * EcCoreGoal.handle list)
 
+  type proofmode = [`WeakCheck | `Check | `Report]
+
   let pi scope pi = Prover.do_prover_info scope pi
 
-  let proof (scope : scope) mode (strict : bool) =
+  let proof (scope : scope) =
     check_state `InActiveProof "proof script" scope;
 
     match (oget scope.sc_pr_uc).puc_active with
     | None -> hierror "no active lemmas"
     | Some (pac, pct) ->
       let pac =
-        match pac.puc_mode with
-        | None when not strict && mode = `WeakCheck -> begin
-            match pac.puc_jdg with
-            | PSNoCheck -> { pac with puc_mode = Some false; }
-            | PSCheck _ ->
-                let pac = { pac with puc_jdg = PSNoCheck } in
-                  { pac with puc_mode = Some false; }
-        end
-
-        | None   -> { pac with puc_mode = Some strict }
-        | Some _ -> hierror "[proof] can only be used at beginning of a proof script"
+        if pac.puc_started then
+          hierror "[proof] can only be used at beginning of a proof script";
+        { pac with puc_started = true }
       in
         { scope with sc_pr_uc =
             Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct); } }
 
-  let process_r ?reloc mark mode (scope : scope) (tac : ptactic list) =
+  let process_r ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
       match (oget scope.sc_pr_uc).puc_active with
       | None -> hierror "no active lemma"
       | Some (pac, _) ->
-          if   mark && pac.puc_mode = None
-          then proof scope mode true
+          if   mark && not pac.puc_started
+          then proof scope
           else scope
     in
 
@@ -724,16 +730,10 @@ module Tactics = struct
         let module TTC = EcHiTacticals in
 
         let htmode =
-          match pac.puc_mode, mode with
-          | Some true , `WeakCheck -> `Admit
-          | _         , `WeakCheck ->
-               hierror "cannot weak-check a non-strict proof script"
-          | Some true , `Check     -> `Strict
-          | Some false, `Check     -> `Standard
-          | None      , `Check     -> `Strict
-          | Some true , `Report    -> `Report
-          | Some false, `Report    -> `Standard
-          | None      , `Report    -> `Report
+          match mode with
+          | `WeakCheck -> `Admit
+          | `Check     -> `Strict
+          | `Report    -> `Report
         in
 
         let ttenv = {
@@ -816,7 +816,7 @@ module Ax = struct
 
   module TT = EcTyping
 
-  type mode = [`WeakCheck | `Check | `Report]
+  type proofmode = Tactics.proofmode
 
   (* ------------------------------------------------------------------ *)
   let bind ?(import = EcTheory.import0) (scope : scope) ((x, ax) : _ * axiom) =
@@ -835,19 +835,21 @@ module Ax = struct
           PSCheck proof
     in
     let puc =
-      { puc_active = Some ({
-          puc_name  = name;
-          puc_mode  = None;
-          puc_jdg   = puc;
-          puc_flags = axflags;
-          puc_crt   = axd; }, ctxt);
-        puc_cont = cont;
-        puc_init = scope.sc_env; }
+      let active =
+        { puc_name    = name
+        ; puc_started = false
+        ; puc_jdg     = puc
+        ; puc_flags   = axflags
+        ; puc_crt     = axd }
+      in
+        { puc_active    = Some (active, ctxt);
+          puc_cont      = cont;
+          puc_init      = scope.sc_env; }
     in
       { scope with sc_pr_uc = Some puc }
 
   (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) (mode : mode) (ax : paxiom located) =
+  let rec add_r (scope : scope) (mode : proofmode) (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let env = env scope in
@@ -995,7 +997,7 @@ module Ax = struct
       tintro |> ofold
         (fun t sc -> snd (Tactics.process1_r false `Check sc t))
         scope in
-    let scope = Tactics.proof scope mode (if tc = None then true else false) in
+    let scope = Tactics.proof scope in
 
     let tc =
       match tc with
@@ -1027,11 +1029,11 @@ module Ax = struct
     snd (save_r ~mode:`Abort scope)
 
   (* ------------------------------------------------------------------ *)
-  let add (scope : scope) (mode : mode) (ax : paxiom located) =
+  let add (scope : scope) (mode : proofmode) (ax : paxiom located) =
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
-  let realize (scope : scope) (mode : mode) (rl : prealize located) =
+  let realize (scope : scope) (mode : proofmode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
@@ -1479,27 +1481,6 @@ end
 module Mod = struct
   module TT = EcTyping
 
-  let add_local_restr env path m =
-    let mpath = EcPath.pqname path m.me_name in
-    match m.me_body with
-    | ME_Alias _ | ME_Decl _ -> env
-    | ME_Structure _ ->
-      (* We keep only the internal part, i.e the inner global variables *)
-      (* TODO : using mod_use here to compute the set of inner global
-         variables is inefficient, change this algo *)
-      let mp = EcPath.mpath_crt mpath [] None in
-      let use = EcEnv.NormMp.mod_use env mp in
-      let rx =
-        let add x _ rx =
-          if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
-            Sx.add x rx
-          else rx in
-        Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
-      EcEnv.Mod.add_restr_to_locals
-        { (ur_empty Sx.empty) with ur_neg = rx }
-        (ur_empty Sm.empty)
-        env
-
   let bind ?(import = EcTheory.import0) (scope : scope) (m : top_module_expr) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem import (EcTheory.Th_module m) in
@@ -1808,7 +1789,7 @@ module Ty = struct
 
           let escope = scope in
           let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope in
           let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save_r escope))
         axs;
@@ -1999,10 +1980,10 @@ module Theory = struct
   exception TopScope
 
   (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) (x, cth) =
+  let bind (scope : scope) (cth : thloaded) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_env = EcSection.add_th ~import:EcTheory.import0 x cth scope.sc_env }
+        sc_env = EcSection.add_th ~import:EcTheory.import0 cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
@@ -2036,12 +2017,22 @@ module Theory = struct
       match Msym.find_opt id.rqd_name scope.sc_loaded with
       | Some (rth, ids) ->
           let scope = List.fold_right require_loaded ids scope in
-          let env   = EcSection.require id.rqd_name rth scope.sc_env in
+          let env   = EcSection.require rth scope.sc_env in
             { scope with
                 sc_env      = env;
                 sc_required = id :: scope.sc_required; }
 
       | None -> assert false
+
+  (* ------------------------------------------------------------------ *)
+  let update_with_required ~(dst : scope) ~(src : scope) =
+    let dst =
+      let sc_loaded =
+        Msym.union
+          (fun _ x y -> assert (x ==(*phy*) y); Some x)
+          dst.sc_loaded src.sc_loaded
+      in { dst with sc_loaded }
+    in List.fold_right require_loaded src.sc_required dst
 
   (* ------------------------------------------------------------------ *)
   let add_clears clears scope =
@@ -2076,7 +2067,7 @@ module Theory = struct
     let cth = exit_r ~pempty (add_clears clears scope) in
     let ((cth, required), (name, _), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
-    let scope = ofold (fun cth scope -> bind scope (name, cth)) scope cth in
+    let scope = ofold (fun cth scope -> bind scope cth) scope cth in
     (name, scope)
 
   (* ------------------------------------------------------------------ *)
@@ -2298,7 +2289,7 @@ module Cloning = struct
 
           let escope = { scope with sc_env = axc.C.axc_env; } in
           let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope in
           let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save_r escope); None)
       proofs

@@ -235,7 +235,7 @@ let ur_app f a =
   { ur_pos = (omap f) a.ur_pos;
     ur_neg = f a.ur_neg; }
 
-(* Noting is restricted. *)
+(* Nothing is restricted. *)
 let ur_empty emp = { ur_pos = None; ur_neg = emp; }
 
 (* Everything is restricted. *)
@@ -316,8 +316,8 @@ type mod_restr = EcAst.mod_restr
 let mr_equal = EcAst.mr_equal
 let mr_hash  = EcAst.mr_hash
 
-let mr_is_empty mr =
-  Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) mr.mr_oinfos
+let ois_is_empty (ois : oracle_infos) =
+  Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) ois
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold
@@ -359,7 +359,7 @@ type module_sig_body = module_sig_body_item list
 type module_sig = {
   mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : mod_restr;
+  mis_oinfos : oracle_infos;
 }
 
 type top_module_sig = {
@@ -447,20 +447,17 @@ type abs_uses = {
 
 type module_expr = {
   me_name     : symbol;
+  me_params   : (EcIdent.t * module_type) list;
   me_body     : module_body;
   me_comps    : module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * module_type) list;
+  me_oinfos   : oracle_infos;
 }
 
-(* Invariant:
-   In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
-   be fully applied. Therefore, we must have:
-   [List.length mp.mt_params = List.length mp.mt_args]  *)
 and module_body =
   | ME_Alias       of int * EcPath.mpath
   | ME_Structure   of module_structure       (* Concrete modules. *)
-  | ME_Decl        of module_type         (* Abstract modules. *)
+  | ME_Decl        of mty_mr                 (* Abstract modules. *)
 
 and module_structure = {
   ms_body      : module_item list;

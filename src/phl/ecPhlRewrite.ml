@@ -9,9 +9,12 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 let get_expression_of_instruction (i : instr) =
   match i.i_node with
-  | Sasgn (lv, e) -> Some (e, (fun e -> i_asgn (lv, e)))
-  | Srnd  (lv, e) -> Some (e, (fun e -> i_rnd  (lv, e)))
-  | _             -> None
+  | Sasgn  (lv, e)     -> Some (e, (fun e -> i_asgn  (lv, e)))
+  | Srnd   (lv, e)     -> Some (e, (fun e -> i_rnd   (lv, e)))
+  | Sif    (e, s1, s2) -> Some (e, (fun e -> i_if    (e, s1, s2)))
+  | Swhile (e, s)      -> Some (e, (fun e -> i_while (e, s)))
+  | Smatch (e, bs)     -> Some (e, (fun e -> i_match (e, bs)))
+  | _                  -> None
 
 (* -------------------------------------------------------------------- *)
 let t_change
@@ -22,7 +25,7 @@ let t_change
 =
   let hyps, concl = FApi.tc1_flat tc in
 
-  let change (i : instr) =
+  let change (m : memenv) (i : instr) =
     let e, mk =
       EcUtils.ofdfl
         (fun () ->
@@ -32,7 +35,6 @@ let t_change
         (get_expression_of_instruction i)
     in
 
-    let m, _ = EcFol.destr_programS side concl in
     let data, e' = expr e (hyps, m) in
     let mid = EcMemory.memory m in
 
@@ -49,8 +51,8 @@ let t_change
       "conclusion should be a program logic \
       (hoare | ehoare | phoare | equiv)";
 
-  let s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let (data, goals), s = EcMatching.Zipper.map pos change s in
+  let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let (data, goals), s = EcMatching.Zipper.map pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   data, FApi.xmutate1 tc `ProcChange (goals @ [concl])

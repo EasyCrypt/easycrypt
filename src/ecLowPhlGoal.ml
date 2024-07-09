@@ -192,13 +192,13 @@ let is_program_logic (f : form) (ks : hlkind list) =
 let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
-  | None, FhoareS hs -> hs.hs_s
-  | None, FeHoareS hs -> hs.ehs_s
-  | None, FbdHoareS hs -> hs.bhs_s
+  | None, FhoareS hs -> hs.hs_m, hs.hs_s
+  | None, FeHoareS hs -> hs.ehs_m, hs.ehs_s
+  | None, FbdHoareS hs -> hs.bhs_m, hs.bhs_s
   | Some _ , (FhoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
-  | Some `Left, FequivS es   -> es.es_sl
-  | Some `Right, FequivS es  -> es.es_sr
+  | Some `Left, FequivS es   -> es.es_ml, es.es_sl
+  | Some `Right, FequivS es  -> es.es_mr, es.es_sr
   | None, FequivS _ ->
       tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
   | _            ->

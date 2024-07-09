@@ -68,8 +68,6 @@ module type PrinterAPI = sig
   val pp_added_op    : PPEnv.t -> operator pp
   val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
   val pp_theory      : PPEnv.t -> (path * ctheory                 ) pp
-  val pp_restr_s     :            (bool                           ) pp
-  val pp_restr       : PPEnv.t -> (mod_restr                      ) pp
   val pp_modtype1    : PPEnv.t -> (module_type                    ) pp
   val pp_modtype     : PPEnv.t -> (module_type                    ) pp
   val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
@@ -109,12 +107,6 @@ module type PrinterAPI = sig
     val pr_db  : Format.formatter -> EcEnv.env -> db -> unit
     val pr_any : Format.formatter -> EcEnv.env -> qsymbol -> unit
   end
-
-  (* ------------------------------------------------------------------ *)
-  val pp_use : PPEnv.t -> Format.formatter -> EcEnv.use -> unit
-  val pp_use_restr :
-    EcEnv.env -> print_abstract:bool ->
-    Format.formatter -> EcEnv.use EcModules.use_restr -> unit
 end
 
 (* ==================================================================== *)

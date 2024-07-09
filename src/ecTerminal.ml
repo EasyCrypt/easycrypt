@@ -184,9 +184,10 @@ class from_channel
           | Some (mem, unu, btick) when btick > tick-20 ->
              (mem, unu)
           | _ ->
-             let mem = (Gc.stat ()).Gc.live_words in
+             let stats = Gc.stat () in
+             let mem = stats.Gc.live_words in
              let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
-             let unu = (Gc.stat ()).Gc.fragments  in
+             let unu = stats.Gc.fragments in
              let unu = (float_of_int unu) *. (float_of_int (Sys.word_size / 8)) in
              gc <- Some (mem, unu, tick); (mem, unu)
         in

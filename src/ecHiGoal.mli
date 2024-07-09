@@ -10,7 +10,7 @@ open EcProofTerm
 (* -------------------------------------------------------------------- *)
 type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
+  tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;

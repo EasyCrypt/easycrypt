@@ -551,6 +551,10 @@ let t_intros_n ?(clear = false) (n : int) (tc : tcenv1) =
   if clear then FApi.t_first (t_clears xs) tc else tc
 
 (* -------------------------------------------------------------------- *)
+let t_intros_n_x (n : int) (tc : tcenv1) =
+  t_intros_x (EcUtils.List.make n (notag None)) tc
+
+(* -------------------------------------------------------------------- *)
 let t_intro_i_x (id : EcIdent.t option) (tc : tcenv1) =
   snd_map EcUtils.as_seq1 (t_intros_x [notag id] tc)
 
@@ -2407,13 +2411,13 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 (* -------------------------------------------------------------------- *)
 let t_smt ~(mode:smtmode) pi tc =
   let error () =
     match mode with
-    | `Standard ->
+    | `Sloppy ->
         tc_error !!tc ~catchable:true  "cannot prove goal"
     | `Strict ->
         tc_error !!tc ~catchable:false "cannot prove goal (strict)"

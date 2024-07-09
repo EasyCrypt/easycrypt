@@ -577,7 +577,6 @@
 %token SPLIT
 %token SPLITWHILE
 %token STAR
-%token STRICT
 %token SUBST
 %token SUFF
 %token SWAP
@@ -669,7 +668,6 @@ _lident:
 | LEFT       { "left"       }
 | RIGHT      { "right"      }
 | SOLVE      { "solve"      }
-| STRICT     { "strict"     }
 | WLOG       { "wlog"       }
 | EXLIM      { "exlim"      }
 | ECALL      { "ecall"      }
@@ -1652,19 +1650,10 @@ oracle_restr:
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
-mod_restr_el:
-  | f=lident COLON orcls=option(oracle_restr)
-    { { pmre_name = f; pmre_orcls = orcls; } }
-
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr; pmr_procs = [] } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = []; pmr_procs = l } }
-  | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = mr;	pmr_procs = l } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr;	pmr_procs = l } }
+    { { pmr_mem = mr } }
+
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -1680,11 +1669,11 @@ mod_restr:
     { { pmty_pq = x; pmty_mem = Some mr; } }
 
 sig_def:
-| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* mr=mod_restr? EQ i=sig_body
+| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* EQ i=sig_body
     { let pi_sig =
         Pmty_struct { pmsig_params = List.flatten args;
                       pmsig_body   = i;
-			                pmsig_restr  = mr; } in
+			               } in
       { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; } }
 
 sig_body:
@@ -3544,27 +3533,8 @@ toptactic:
 |       t=tactics { t }
 
 tactics_or_prf:
-| t=toptactic  { `Actual t    }
-| p=proof      { `Proof  p    }
-
-proof:
-| PROOF modes=proofmode1* {
-    let seen = Hashtbl.create 0 in
-      List.fold_left
-        (fun pmodes (mode, flag) ->
-           if Hashtbl.mem seen mode then
-             parse_error mode.pl_loc (Some "duplicated flag");
-           Hashtbl.add seen mode ();
-           match unloc mode with
-           | `Strict -> { pmodes with pm_strict = flag; })
-        { pm_strict = true; } modes
-  }
-
-proofmode1:
-| b=boption(MINUS) pm=loc(proofmodename) { (pm, not b) }
-
-proofmodename:
-| STRICT { `Strict }
+| t=toptactic  { `Actual t }
+| PROOF        { `Proof    }
 
 (* -------------------------------------------------------------------- *)
 tcd_toptactic:

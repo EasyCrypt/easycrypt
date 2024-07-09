@@ -99,8 +99,8 @@ val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 val check_bindings :
-  exn -> EcDecl.ty_params -> EcEnv.env -> EcSubst.subst ->
-  (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
+  exn -> EcEnv.env -> EcSubst.subst ->
+  bindings -> bindings ->
   EcEnv.env * EcSubst.subst
 
 (* -------------------------------------------------------------------- *)

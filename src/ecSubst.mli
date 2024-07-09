@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
+open EcAst
 open EcModules
 open EcTypes
 open EcTheory
@@ -60,6 +61,7 @@ val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_s
 val subst_top_modsig   : subst -> top_module_sig -> top_module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
 val subst_mod_restr    : subst -> mod_restr -> mod_restr
+val subst_oracle_infos : subst -> oracle_infos -> oracle_infos
 
 (* -------------------------------------------------------------------- *)
 val subst_gty   : subst -> gty -> gty

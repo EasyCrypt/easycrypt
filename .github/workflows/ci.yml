@@ -29,9 +29,8 @@ jobs:
       image: ghcr.io/easycrypt/ec-build-box
     steps:
     - uses: actions/checkout@v4
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
@@ -72,9 +71,8 @@ jobs:
         target: [unit, stdlib, examples]
     steps:
     - uses: actions/checkout@v4
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
@@ -97,8 +95,7 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
-    needs: [pre_job, compile-opam]
-    if: needs.pre_job.outputs.should_skip != 'true'
+    needs: [pre_job]
     runs-on: ubuntu-20.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -113,7 +110,7 @@ jobs:
 
   external:
     name: Check EasyCrypt External Projects
-    needs: [fetch-external-matrix]
+    needs: [pre_job, compile-opam, fetch-external-matrix]
     if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
@@ -132,9 +129,8 @@ jobs:
           -b ${{ matrix.target.branch }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
-    - name: Update OPAM & EasyCrypt dependencies
+    - name: Install EasyCrypt dependencies
       run: |
-        opam update
         opam pin add -n easycrypt easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
@@ -147,20 +143,36 @@ jobs:
       working-directory: project/${{ matrix.target.name }}/${{ matrix.target.subdir }}
       run: |
         opam exec -- easycrypt runtest  \
+          -report report.log            \
           ${{ matrix.target.options  }} \
           ${{ matrix.target.config   }} \
           ${{ matrix.target.scenario }}
+    - name: Compute real-path to report.log
+      if: always()
+      run: |
+        echo "report=$(realpath project/${{ matrix.target.name }}/${{ matrix.target.subdir }})/report.log" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v4
       name: Upload report.log
       if: always()
       with:
         name: report.log (${{ matrix.target.name }})
-        path: report.log
+        path: ${{ env.report }}
         if-no-files-found: ignore
+
+  external-status:
+    name: Check EasyCrypt External Projects (set-status)
+    if: always()
+    needs: [external]
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: re-actors/alls-green@release/v1
+      with:
+        jobs: ${{ toJSON(needs) }}
+        allowed-skips: external
 
   notification:
     name: Notification
-    needs: [compile-opam, compile-nix, check, external]
+    needs: [compile-opam, compile-nix, check, external, external-status]
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

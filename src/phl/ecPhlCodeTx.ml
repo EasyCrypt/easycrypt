@@ -317,7 +317,7 @@ let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
     assert false;
 
-  let s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
   let goals, s = EcMatching.Zipper.map pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 

@@ -117,7 +117,7 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
 and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   if ttenv.tt_smtmode <> `Strict then
     tc_error !!tc "try! can only be used in strict proof mode";
-  let ttenv = { ttenv with tt_smtmode = `Standard } in
+  let ttenv = { ttenv with tt_smtmode = `Sloppy } in
   process1_try ttenv t tc
 
 (* -------------------------------------------------------------------- *)

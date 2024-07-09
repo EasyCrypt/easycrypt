@@ -94,16 +94,17 @@ module Fsubst : sig
   val add_binding  : binding subst_binder
   val add_bindings : bindings subst_binder
 
-  val lp_subst  : lpattern    subst_binder
-  val mp_subst  : mpath       substitute
-  val x_subst   : xpath       substitute
-  val pv_subst  : prog_var    substitute
-  val s_subst   : stmt        substitute
-  val e_subst   : expr        substitute
-  val me_subst  : memenv      substitute
-  val m_subst   : EcIdent.t   substitute
-  val mr_subst  : mod_restr   substitute
-  val mty_subst : module_type substitute
-  val oi_subst  : PreOI.t     substitute
-  val gty_subst : gty         substitute
+  val lp_subst     : lpattern    subst_binder
+  val mp_subst     : mpath       substitute
+  val x_subst      : xpath       substitute
+  val pv_subst     : prog_var    substitute
+  val s_subst      : stmt        substitute
+  val e_subst      : expr        substitute
+  val me_subst     : memenv      substitute
+  val m_subst      : EcIdent.t   substitute
+  val mr_subst     : mod_restr   substitute
+  val mty_subst    : module_type substitute
+  val mty_mr_subst : mty_mr substitute
+  val oi_subst     : PreOI.t     substitute
+  val gty_subst    : gty         substitute
 end

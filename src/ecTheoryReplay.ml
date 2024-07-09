@@ -212,7 +212,7 @@ and ind_compatible exn env pi1 pi2 =
 
 and prctor_compatible exn env s prc1 prc2 =
   error_body exn (EcSymbols.sym_equal prc1.prc_ctor prc2.prc_ctor);
-  let env, s = EcReduction.check_bindings exn [] env s prc1.prc_bds prc2.prc_bds in
+  let env, s = EcReduction.check_bindings exn env s prc1.prc_bds prc2.prc_bds in
   error_body exn (List.length prc1.prc_spec = List.length prc2.prc_spec);
   let doit f1 f2 =
     error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcSubst.subst_form s f2)) in
@@ -890,7 +890,7 @@ and replay_instance
   let module E = struct exception InvInstPath end in
 
   let forpath (p : EcPath.path) =
-    match EcPath.getprefix opath p |> omap List.rev with
+    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
     | None | Some [] -> None
     | Some (x::px) ->
         let q = EcPath.fromqsymbol (List.rev px, x) in

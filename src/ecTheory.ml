@@ -79,10 +79,10 @@ let mkitem (import : import) (item : theory_item_r) =
   { ti_import = import; ti_item = item; }
 
 (* -------------------------------------------------------------------- *)
-let module_comps_of_module_sig_comps (comps : module_sig_body) restr =
+let module_comps_of_module_sig_comps (comps : module_sig_body) (ois : oracle_infos) =
   let onitem = function
     | Tys_function funsig ->
-      let oi = Msym.find funsig.fs_name restr.mr_oinfos in
+      let oi = Msym.find funsig.fs_name ois in
         MI_Function {
           f_name = funsig.fs_name;
           f_sig  = funsig;
@@ -92,13 +92,15 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) restr =
     List.map onitem comps
 
 (* -------------------------------------------------------------------- *)
-let module_expr_of_module_sig name mp tymod =
+let module_expr_of_module_sig (name : EcIdent.t) ((mty, mr) : mty_mr) (sig_ : module_sig) =
   (* Abstract modules must be fully applied. *)
-  assert (List.length mp.mt_params = List.length mp.mt_args);
+  assert (List.length mty.mt_params = List.length mty.mt_args);
 
-  let tycomps = module_comps_of_module_sig_comps tymod.mis_body mp.mt_restr in
-    { me_name     = EcIdent.name name;
-      me_body     = ME_Decl mp;
-      me_comps    = tycomps;
-      me_sig_body = tymod.mis_body;
-      me_params   = tymod.mis_params ; }
+  let tycomps = module_comps_of_module_sig_comps sig_.mis_body sig_.mis_oinfos in
+
+  { me_name     = EcIdent.name name;
+    me_params   = sig_.mis_params ;
+    me_body     = ME_Decl (mty, mr);
+    me_comps    = tycomps;
+    me_sig_body = sig_.mis_body;
+    me_oinfos   = sig_.mis_oinfos; }
