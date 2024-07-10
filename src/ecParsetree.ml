@@ -777,6 +777,7 @@ type phltactic =
 
     (* Map-reduce *)
   | Pbdep of ((string list) * int) * ((string list) * int) * psymbol * psymbol
+  | Pcirc
 
     (* Program rewriting *)
   | Prwprgm of rwprgm

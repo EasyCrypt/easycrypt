@@ -33,24 +33,21 @@ end
 
 exception BDepError
 (* -------------------------------------------------------------------- *)
-let bdep (env : env) (mem: memory) (proc: stmt) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: psymbol) (pcond: psymbol) : unit =
+let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: psymbol) (pcond: psymbol) : unit =
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = EcCircuits.circuit_of_form env f in
-  let () = Format.eprintf "len %d @." (List.length fc.circ) in
-  let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in
-
-  
+  (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
+  (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
+  (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
   let pcondc = EcEnv.Op.lookup ([], pcond.pl_desc) env |> snd in
   let pcondc = match pcondc.op_kind with
   | OB_oper (Some (OP_Plain (pcondc, _))) -> pcondc
   | _ -> failwith "Invalid operator type" in
   let pcondc = EcCircuits.circuit_of_form env pcondc in
-  let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in
-  
+  (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
   
   let cache : (symbol, EcCircuits.circuit) Map.t = Map.empty in
 
@@ -64,52 +61,118 @@ let bdep (env : env) (mem: memory) (proc: stmt) ((invs, n): variable list * int)
 
   begin 
     let circs = List.map (fun v -> Option.get (Map.find_opt v cache)) (List.map (fun v -> v.v_name) outvs) in
+    (* let () = List.iteri (fun i circ -> *)
+    (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
+    (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
+      (* Format.eprintf "rp_%d_0 circuit blocks: " i; *)
+    (* Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps *)
+      (* ) circs in *)
     let circ = circuit_concat circs in
-    let bdeps = HL.deps circ.circ |> HL.block_deps in
-      Format.eprintf "Proc circuit blocks: ";
-    let () = Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps fmt b) bdeps in
+
+    (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
+    (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
+      (* Format.eprintf "Proc circuit blocks: "; *)
+    (* let () = Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps in *)
+
     let circs = circuit_block_split n m circ in
-    let () = assert (List.for_all (fun c -> circ_equiv (List.hd circs) c pcondc) (List.tl circs)) in 
+
+    let () = assert (List.for_all (fun c -> circ_equiv (List.hd circs) c (Some pcondc)) (List.tl circs)) in 
     let circ = List.hd circs in
-    let () = assert (circ_equiv {circ with circ=C.uextend ~size:(List.length fc.circ) circ.circ} fc pcondc) in
+
+    let () = assert (circ_equiv {circ with circ=C.uextend ~size:(List.length fc.circ) circ.circ} fc (Some pcondc)) in
     Format.eprintf "Success@."
   end 
 
 
 
-let bdep2 (env : env) (mem: memory) (proc: stmt) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: form) (pcond: psymbol) : unit =
-  let cache : (symbol, EcCircuits.circuit) Map.t = Map.empty in
+(* FIXME UNTESTED *)
+let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
+  let pstate : (symbol, EcCircuits.circuit) Map.t = Map.empty in
 
-  let inps = List.map (EcCircuits.input_of_variable env) invs in
-  let cache = List.fold_left 
-    (fun cache inp -> Map.add (List.hd inp.inps |> fst).id_symb inp cache)
-    cache inps 
+  let inps = match me with
+  | Lmt_concrete (Some lmt) -> lmt.lmt_decl 
+    |> List.filter_map (fun ov -> if Option.is_none ov.ov_name then None
+                                  else Some {v_name = Option.get ov.ov_name; v_type=ov.ov_type})
+  | _ -> assert false
   in
+
+  let inps = List.map (EcCircuits.input_of_variable env) inps in
+  let pstate = List.fold_left 
+    (fun pstate inp -> Map.add (List.hd inp.inps |> fst).id_symb inp pstate)
+    pstate inps 
+  in
+
   
-  let cache = List.fold_left (EcCircuits.process_instr env mem) cache proc.s_node in
-  let post_c = EcCircuits.circuit_of_form ~pstate:cache env f in
-  List.iter (fun fc ->
-  let namer = fun id -> 
-    List.find_opt (fun inp -> tag (fst inp) = id) fc.inps 
-    |> Option.map fst |> Option.map name |> Option.default (string_of_int id) in
-  let () = Format.eprintf "Out len: %d @." (List.length fc.circ) in
-  let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%s %d@." (fst x |> namer) (snd x)) in
-  let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps ~namer fmt) (HL.deps fc.circ |> Array.to_list) in
-  let () = Format.eprintf "Args for circuit: "; 
-            List.iter (fun (idn, w) -> Format.eprintf "(%s, %d) " idn.id_symb w) fc.inps;
-            Format.eprintf "@." in
-  ()) [post_c];
+  let pre_c = circuit_of_form ~pstate ~cache env pre in
+  let pstate = List.fold_left (EcCircuits.process_instr env mem ~cache) pstate proc.s_node in
+  let post_c = EcCircuits.circuit_of_form ~pstate ~cache env post in
+  
+  (* DEBUG PRINTS *)
+  (* List.iter (fun fc -> *)
+  (* let namer = fun id -> *) 
+    (* List.find_opt (fun inp -> tag (fst inp) = id) fc.inps *) 
+    (* |> Option.map fst |> Option.map name |> Option.default (string_of_int id) in *)
+  (* let () = Format.eprintf "Out len: %d @." (List.length fc.circ) in *)
+  (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%s %d@." (fst x |> namer) (snd x)) in *)
+  (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps ~namer fmt) (HL.deps fc.circ |> Array.to_list) in *)
+  (* let () = Format.eprintf "Args for circuit: "; *) 
+            (* List.iter (fun (idn, w) -> Format.eprintf "(%s, %d) " idn.id_symb w) fc.inps; *)
+            (* Format.eprintf "@." in *)
+  (* ()) [post_c]; *)
 
-
-  if EcCircuits.circ_check post_c then (Format.eprintf "Success") else 
+  if EcCircuits.circ_check post_c (Some pre_c) then (Format.eprintf "Success") else 
   raise BDepError
   
+(* FIXME UNTESTED *)
+let circ_goal (env: env) (cache: _) (f: form) : unit = 
+  
+  let f_c = circuit_of_form ~cache env f in
+  begin
+  assert (EcCircuits.circ_check f_c None);
+  end
+
+let t_circ (tc: tcenv1) : tcenv =
+  let hyps = LDecl.tohyps (FApi.tc1_hyps tc) in
+  let vs = List.filter_map (function 
+    | id, EcBaseLogic.LD_var (ty, _) -> 
+      begin try
+      let sz = width_of_type (FApi.tc1_env tc) ty in
+    Some (id, {circ=C.reg ~name:id.id_tag ~size:sz; inps=[(id, sz)]})
+      with CircError _ -> None
+      end
+    | _ -> None
+    ) hyps.h_local in
+  let cache = Map.of_seq @@ List.to_seq vs in
+  
+  
+  let f = (FApi.tc1_goal tc) in
+  let () = match f.f_node with
+  | FhoareF sH -> assert false
+  | FhoareS sF -> circ_hoare (FApi.tc1_env tc) cache sF.hs_m sF.hs_pr sF.hs_s sF.hs_po
+  
+  | FbdHoareF _ -> assert false
+  | FbdHoareS _ -> assert false
+
+  | FeHoareF _ -> assert false
+  | FeHoareS _ -> assert false
+
+  | FequivF _ -> assert false
+  | FequivS _ -> assert false
+
+  | FeagerF _ -> assert false
+
+  | Fpr _ -> assert false
+  | _ when f.f_ty = tbool -> circ_goal (FApi.tc1_env tc) cache f
+  | _ -> Format.eprintf "f has type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv (FApi.tc1_env tc))) f.f_ty;
+    raise BDepError
+  in
+  FApi.close (!@ tc) VBdep
     
 let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: psymbol) (pcond: psymbol) (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
-  | FhoareS sF -> bdep (FApi.tc1_env tc) (fst sF.hs_m) sF.hs_s (inpvs, n) (outvs, m) op pcond
+  | FhoareS sF -> mapreduce (FApi.tc1_env tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -130,7 +193,7 @@ let process_bdep
   let f_app_safe = EcTypesafeFol.f_app_safe in
 
   (* DEBUG SECTION *)
-  let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  (* let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in *)
   
   let get_var (v: symbol) (m: memenv) : variable =
     match EcMemory.lookup_me v m with
@@ -141,22 +204,18 @@ let process_bdep
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
   let inpbty, outbty = tfrom_tfun2 oop.op_ty in
   
-  (* TODO: add a typesafe interface to build formulas and refactor this *)
+  (* Refactor this *)
   let w2bits (ty: ty) (arg: form) : form = 
     let tb = match EcEnv.Circ.lookup_bitstring env ty with
     | Some {to_bits=tb; _} -> tb
     | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in EcTypesafeFol.f_app_safe env tb [arg]
-    (* in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in *)
-    (* f_op tb [] tbo.op_ty *) 
   in
   let bits2w (ty: ty) (arg: form) : form = 
     let fb = match EcEnv.Circ.lookup_bitstring env ty with
     | Some {from_bits=fb; _} -> fb
     | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in EcTypesafeFol.f_app_safe env fb [arg]
-    (* in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in *)
-    (* f_op fb [] fbo.op_ty *) 
   in
   let w2bits_op (ty: ty) : form = 
     let tb = match EcEnv.Circ.lookup_bitstring env ty with
@@ -185,26 +244,27 @@ let process_bdep
   let poutvs = f_app_safe env (EcCoreLib.CI_List.p_chunk) [f_int (BI.of_int m); poutvs] in
 
   
+  (* ------------------------------------------------------------------ *)
   let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
   let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
   let pinpvs = List.map (w2bits (List.hd pinpvs).f_ty) pinpvs in
   let pinpvs = List.rev pinpvs in
   let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in
-  let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
+  (* let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in *)
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_chunk [f_int (BI.of_int n); pinpvs] in
-  let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
+  (* let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in *)
   let b2w = (bits2w_op inpbty) in
-  let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
+  (* let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in *)
   let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [b2w; pinpvs] in
-  let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
+  (* let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in *)
   let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(f_op pop [] oop.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinpvs_post poutvs in
   let pre = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_all [(f_op ppcond [] opcond.op_ty); pinpvs] in
 
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_conseq pre post tc in
   FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
 

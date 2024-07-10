@@ -3252,6 +3252,9 @@ phltactic:
 | BDEP LBRACKET inpv=STRING COLON inpw=uint RBRACKET n=uint LBRACKET outv=STRING COLON outw=uint RBRACKET m=uint o=oident pc=oident
     { Pbdep ((arr_of_vars inpv (BI.to_int inpw), (BI.to_int n)), (arr_of_vars outv (BI.to_int outw), (BI.to_int m)), o, pc) }
 
+| BDEP BITSTRING
+    { Pcirc }
+
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
     { BDH_split_bop (b1,b2,b3) }

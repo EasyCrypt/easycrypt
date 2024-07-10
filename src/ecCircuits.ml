@@ -45,24 +45,26 @@ let inputs_equal (f: circuit) (g: circuit) : bool =
 
 (* ------------------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
-exception CircError
+exception CircError of string
 
 let width_of_type (env: env) (t: ty) : int =
   match EcEnv.Circ.lookup_bitstring_size env t with
   | Some w -> w
-  | None -> Format.eprintf "No bitvector binding for type %a@."
-  (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t; raise CircError
+  | None -> let err = Format.asprintf "No bitvector binding for type %a@."
+  (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
+  raise (CircError err)
 
 let circuit_aggregate (c: circuit list) : circuit =
   try
     assert (List.for_all (fun circ -> circ.inps = (List.hd c).inps) c);
     {circ = List.flatten (List.map (fun circ -> circ.circ) c); inps=(List.hd c).inps}
   with
-    | Assert_failure _ -> Format.eprintf "Bad circuit inputs: @.";
-      List.iter (fun c -> List.iter 
-      (fun (id, w) -> Format.eprintf "((%d, %s), %d) " id.id_tag id.id_symb w) c.inps;
-      Format.eprintf "@.") c;
-      raise CircError
+    | Assert_failure _ -> 
+      let err = Format.asprintf "Bad circuit inputs: @." ^
+      (List.reduce (^) @@ List.map (fun c -> List.reduce (^) @@ List.map
+      (fun (id, w) -> Format.asprintf "((%d, %s), %d) " id.id_tag id.id_symb w) c.inps) c) ^
+      "\n" in
+      raise @@ CircError err
 
 (* Concatenates two circuits and their inputs 
    Strict mode: input variables must be the same, sizes are concat
@@ -182,8 +184,14 @@ module BaseOps = struct
     | _, "bvueq" -> true
     | _, "bvseq" -> true
     | _, "/\\" -> true
+    | _, "&&" -> true
+    | _, "\\/" -> true
     | _, "||" -> true
+    | _, "[!]" -> true
+    | _, "=>" -> true
+    | _, "<=>" -> true
     | _, "true" -> true
+    | _, "false" -> true
     
     | _ -> false
 
@@ -284,7 +292,9 @@ module BaseOps = struct
       {circ = C.uextend ~size:256 c1; inps = [(id1, size)]} (* FIXME: Assumes integeres are 256 bits *)
 
     
-    | _ -> Format.eprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath); raise CircError
+    | _ -> 
+      let err = Format.asprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath) in
+      raise @@ CircError err
     end
   (* AdHoc stuff for barrett example FIXME: remove later *)
   | _, "sext16_32" ->
@@ -322,6 +332,13 @@ module BaseOps = struct
     let c2 = C.reg ~size:32 ~name:id2.id_tag in
     {circ = [C.bvseq c1 c2]; inps = [(id1, 32); (id2, 32)]}
 
+  
+  | _,"[!]" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:1 ~name:id1.id_tag in
+    {circ = C.lnot_ c1; inps = [(id1, 1)]}
+
+  | _, "&&"
   | _, "/\\" -> (* FIXME: remove hardcoded size *)
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:1 ~name:id1.id_tag in
@@ -329,6 +346,7 @@ module BaseOps = struct
     let c2 = C.reg ~size:1 ~name:id2.id_tag in
     {circ = C.land_ c1 c2; inps = [(id1, 1); (id2, 1)]}
 
+  | _, "\\/"
   | _, "||" -> (* FIXME: remove hardcoded size *)
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:1 ~name:id1.id_tag in
@@ -336,8 +354,25 @@ module BaseOps = struct
     let c2 = C.reg ~size:1 ~name:id2.id_tag in
     {circ = C.lor_ c1 c2; inps = [(id1, 1); (id2, 1)]}
 
+  | _, "=>" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:1 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:1 ~name:id2.id_tag in
+    {circ = C.lor_ (C.lnot_ c1) c2; inps = [(id1, 1); (id2, 1)]}
+  
+  | _, "<=>" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:1 ~name:id1.id_tag in
+    let id2 = EcIdent.create temp_symbol in
+    let c2 = C.reg ~size:1 ~name:id2.id_tag in
+    {circ = C.lxnor_ c1 c2; inps = [(id1, 1); (id2, 1)]}
+    
   | _, "true" ->
     {circ = [C.true_]; inps = []}
+
+  | _, "false" ->
+    {circ = [C.false_]; inps = []}
 
   | _, "eqmod64q" ->
     let id1 = EcIdent.create temp_symbol in
@@ -359,9 +394,8 @@ module BaseOps = struct
     (* let dc = C.or_ dp_modqt dm_modqt in *)
     {circ = [dc]; inps = [(id1, 16); (id2, 16)]}
   
-  | _ -> raise CircError
+  | _ -> raise @@ CircError "Failed to generate op"
 end
-
 
 let apply (c: C.reg) (idn: ident) (v: C.reg) : C.reg = 
   let map_ = fun (id, i) -> 
@@ -369,12 +403,14 @@ let apply (c: C.reg) (idn: ident) (v: C.reg) : C.reg =
     else None
   in C.maps map_ c
 
+
 let applys (c: C.reg) (vs: (ident * C.reg) list) : C.reg =
   let map_ = fun (id, i) -> 
     let vo = List.find_opt (fun (idn, _) -> id = tag idn) vs in
     let vo = Option.map snd vo in
     Option.bind vo (fun v -> List.nth_opt v i)
-  in C.maps map_ c
+  in C.maps map_ c 
+  
 
 (* FIXME: check in what order to put the args *)
 let apply_args (c: circuit) (vs: circuit list) : circuit = 
@@ -409,42 +445,68 @@ let apply_arg (c: circuit) (v: C.reg) : circuit =
       { circ = apply c.circ idn v; inps }
     with 
     | Assert_failure _ -> 
-      Format.eprintf "Input width %d does not match argument width %d@." (List.length v) w;
-      raise CircError 
+      let err = Format.asprintf "Input width %d does not match argument width %d@." (List.length v) w in
+      raise @@ CircError err
     end
-  | [] -> Format.eprintf "Can't apply to circuit with no arguments@."; raise CircError
+  | [] -> let err = Format.asprintf "Can't apply to circuit with no arguments@." in
+     raise @@ CircError err
 
 
-let circ_equiv (f: circuit) (g: circuit) (pcond: circuit) : bool = 
+let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
+  let pcond = match pcond with
+  | Some pcond -> pcond
+  | None -> {circ = [C.true_]; inps = f.inps}
+  in
   inputs_equal f g &&
   inputs_equal f pcond &&
   begin
-    let new_inps = List.mapi (fun i (_, w) -> 
-      let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in
+    (* let new_inps = List.mapi (fun i (_, w) -> *) 
+      (* let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in *)
+      (* {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in *)
+    let new_inps = List.map (fun (id, w) ->
       {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in
-    let f2 = apply_args f new_inps in
+    (* let f2 = apply_args f new_inps in *)
     let g2 = apply_args g new_inps in
     let pcond2 = apply_args pcond new_inps in
-    (List.for_all2 (==) f2.circ g2.circ) ||
+    (List.for_all2 (==) f.circ g2.circ) ||
     let module B = (val HL.makeBWZinterface ()) in
-    B.circ_equiv f2.circ g2.circ (List.hd pcond2.circ)
+    B.circ_equiv f.circ g2.circ (List.hd pcond2.circ)
   end
   
-let circ_check (f: circuit) : bool =
+let circ_check (f: circuit) (pcond: circuit option) : bool =
   assert (List.length f.circ = 1);
   let module B = (val HL.makeBWZinterface ()) in
-  B.circ_taut (List.hd f.circ)
+  let f = match f with
+  | {circ=[f]; _} -> f
+  | _ -> raise @@ CircError "Form should only output one bit (bool)"
+  in
+  match pcond with
+  | None -> B.circ_taut f
+  | Some {circ=[pcond];_} -> not @@ B.circ_sat @@ (C.and_ pcond (C.neg f))
+  | _ -> raise @@ CircError "Precondition should output one bit (bool)"
 
-let circ_sat (f: circuit) : bool = 
+let circ_sat (f: circuit) (pcond: circuit option): bool = 
   assert (List.length f.circ = 1);
   let module B = (val HL.makeBWZinterface ()) in
-  B.circ_sat (List.hd f.circ)
+  let f = match f with
+  | {circ=[f]; _} -> f
+  | _ -> raise @@ CircError "Form should only output one bit (bool)"
+  in
+  match pcond with
+  | Some {circ=[pcond]; _} -> B.circ_sat (C.and_ pcond f)
+  | None -> B.circ_sat f
+  | _ -> raise @@ CircError "pcond should only output one bit (bool)"
+  
 
 (* Vars = bindings in scope (maybe we have some other way of doing this? *)
 
-let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (f : EcAst.form) : circuit =
+(* Refactor this later *)
+let op_cache = ref Mp.empty
+
+(* TODO: simplify args and unify dealing with cache / vars *)
+let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) ?(cache=Map.empty)(env: env) (f : EcAst.form) : circuit =
   let vars : (ident * int) list = [] in
-  let cache : (ident, circuit) Map.t = Map.empty in
+  let cache : (ident, circuit) Map.t = cache in
   
   let rec doit (cache: (ident, circuit) Map.t) (vars: (ident * int) list) (env: env) (f: form) :  _ * circuit = 
     match f.f_node with
@@ -475,26 +537,41 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (
         }
         with
         | Assert_failure _ -> 
-          Format.eprintf "Var binding size %d for %s does not match size of form type %d@."
-          (List.find (fun a -> (fst a) = idn) vars |> snd) idn.id_symb (width_of_type env f.f_ty);
-           raise CircError
-        | Not_found -> Format.eprintf "Var binding not found for %s@." idn.id_symb; raise CircError
+          let err = Format.asprintf "Var binding size %d for %s does not match size of form type %d@."
+          (List.find (fun a -> (fst a) = idn) vars |> snd) idn.id_symb (width_of_type env f.f_ty) in
+           raise @@ CircError err
+        | Not_found -> let err = Format.asprintf "Var binding not found for %s@." idn.id_symb in 
+          raise @@ CircError err
       end
         (* HL.reg hlenv ~size:(width_of_type env f.f_ty) ~name:idn.id_symb *) 
         (* TODO: Check name after *)
     | Fop (pth, _) -> 
+      begin
+      match Mp.find_opt pth !op_cache with
+      | Some op -> 
+        (* Format.eprintf "Using cached op: %s@." (EcPath.tostring pth); *)
+        env, op
+      | None -> 
+        (* Format.eprintf "No cache for op: %s@." (EcPath.tostring pth); *)
       if BaseOps.is_baseop pth then
         try
-          env, BaseOps.circuit_of_baseop pth
+          let circ = BaseOps.circuit_of_baseop pth in
+          op_cache := Mp.add pth circ !op_cache;
+          env, circ 
         with
-        | CircError -> env, circuit_from_spec env pth
+        | CircError err -> 
+          let circ = circuit_from_spec env pth in
+          op_cache := Mp.add pth circ !op_cache;
+          env, circ
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain (f, _))) -> f
         | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
-        in doit cache vars env f
-      (* (hlenv, nullary pth) *)
-
+        in 
+        let env, circ = doit cache vars env f in
+        op_cache := Mp.add pth circ !op_cache;
+        env, circ
+    end
     | Fapp _ -> 
       (* Check processing order of args and f FIXME *)
       let (f, fs) = EcCoreFol.destr_app f in
@@ -540,6 +617,7 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) (env: env) (
     | Fglob   (id, mem) -> assert false
     | Ftuple  comps -> assert false
     | _ -> failwith "Not yet implemented"
+
   in 
   let env, f_c = doit cache vars env f in
   f_c
@@ -560,16 +638,24 @@ let input_of_variable (env:env) (v: variable) : circuit =
   {circ = c; inps=[inp]}
   
 
-let process_instr (env:env) (mem: memory) (cache: _) (inst: instr) =
+let process_instr (env:env) (mem: memory) ?(cache: _ = Map.empty) (pstate: _) (inst: instr) =
     try
     match inst.i_node with
-    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate:cache env) cache
+    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache env) pstate
     | _ -> failwith "Case not implemented yet"
     with 
-    | e -> Format.eprintf "BDep failed on instr: %a@.Exception thrown: %s@."
+    | e -> let err = Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@."
         (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
-        (Printexc.to_string e); raise CircError
+        (Printexc.to_string e) in 
+        raise @@ CircError err
 
+let insts_equiv (env: env) (mem: memory) (cache: _) (insts_left: instr list) (insts_right: instr list): bool =
+  let cache_left = List.fold_left (process_instr env mem) cache insts_left in
+  let cache_right = List.fold_left (process_instr env mem) cache insts_right in
+  if Map.keys cache_left != Map.keys cache_right then
+    false
+  else
+    Map.foldi (fun var circ bacc -> bacc && (circ_equiv circ (Map.find var cache_right) None)) cache_left true
     
 (* -------------------------------------------------------------------- *)
 (* WIP *)
@@ -598,4 +684,4 @@ let process_op (env : env) (f: pqsymbol) (f2: pqsymbol) : unit =
   let () = Format.eprintf "Args for circuit: "; 
             List.iter (fun (idn, w) -> Format.eprintf "(%s, %d) " idn.id_symb w) fc.inps;
             Format.eprintf "@." in
-  Format.eprintf "Circuits: %s@." (if circ_equiv fc fc2 {circ=[C.true_];inps=fc.inps} then "Equiv" else "Not equiv")
+  Format.eprintf "Circuits: %s@." (if circ_equiv fc fc2 None then "Equiv" else "Not equiv")
