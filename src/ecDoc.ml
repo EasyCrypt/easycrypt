@@ -1,17 +1,28 @@
+(* -------------------------------------------------------------------- *)
 open Tyxml.Html
 
 open EcScope
 
+(* -------------------------------------------------------------------- *)
+let styles_file : string = 
+  Filename.concat EcRelocate.Sites.doc "styles.css"
+
+let stdlib_doc_root : string =
+  ""
+
+(* -------------------------------------------------------------------- *)
 let c_filename ?(ext : string option) (nms : string list) =
   match ext with
   | None -> String.concat "!" nms 
   | Some ext -> String.concat "!" nms ^ ext
-  
+
+(* -------------------------------------------------------------------- *)
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
   | `Ec -> "Theory"
   | `EcA -> "Abstract Theory" 
 
+(* -------------------------------------------------------------------- *)
 let itemkind_str_pl (ik : itemkind) : string =
   match ik with
   | `Type -> "Types"
@@ -22,9 +33,72 @@ let itemkind_str_pl (ik : itemkind) : string =
   | `Module -> "Modules"
   | `Theory -> "Theories"
 
-let c_head (tstr : string) : [> Html_types.head] elt =
-  head (title (txt tstr)) [link ~rel:[`Stylesheet] ~href:"styles.css" ()]
 
+(* -------------------------------------------------------------------- *)
+let md_pre_format ~(kind : string) (s : string) =
+  pre [txt s]
+
+let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing elt = 
+  let il_format = Str.regexp "^>\\([^|]+\\)|\\([^|]+\\)$" in
+  if Str.string_match il_format hr.href_target 0 then
+    let tkind = Str.matched_group 1 hr.href_target in
+    let tname = Str.matched_group 2 hr.href_target in
+    (*
+    let tscope : string option = assert false in
+    let env = 
+      match tscope with 
+        | None -> env
+        | Some tscope -> 
+            let tscope = EcSymbols.qsymbol_of_string tscope in
+            let tscope = EcEnv.Theory.lookup_path ~mode:`All tscope in
+            EcEnv.Theory.env_of_theory tscope env (* Merge with main to have this *)
+    in
+    *) 
+    let tqs = EcSymbols.qsymbol_of_string tname in
+    let ikstr, path =
+      match tkind with 
+      | "Ty" | "Type" -> itemkind_str_pl `Type, EcEnv.Ty.lookup_path tqs env
+      | "Op" | "Operator" -> itemkind_str_pl `Operator, EcEnv.Op.lookup_path tqs env 
+      | "Ax" | "Axiom" -> itemkind_str_pl `Axiom, EcEnv.Ax.lookup_path tqs env
+      | "Lem" | "Lemma" -> itemkind_str_pl `Lemma, EcEnv.Ax.lookup_path tqs env
+      | "ModTy" | "ModuleType" -> itemkind_str_pl `ModuleType, EcEnv.ModTy.lookup_path tqs env
+      | "Mod" | "Module" -> 
+        itemkind_str_pl `Module, 
+        begin
+          match (EcEnv.Mod.lookup_path tqs env).m_top with
+          | `Concrete (p, None) -> p
+          | `Concrete (_, Some _) -> raise (failwith "Linking to sub-modules not supported.")
+          | `Local _ -> raise (failwith "Linking to local/declared modules not supported.")
+        end
+      | "Th" | "Theory" -> itemkind_str_pl `Theory, EcEnv.Theory.lookup_path ~mode:(`All) tqs env
+      | _ -> raise (failwith "Invalid item/entity kind.")
+    in
+      Printf.eprintf "Root Path: %s\n" (EcPath.tostring (EcEnv.root env));
+      Printf.eprintf "QSymbol: %s\t Path: %s\n" (EcSymbols.string_of_qsymbol tqs) (EcPath.tostring path); 
+    let nm = "DocGen" in 
+    let il = nm ^ ".html" ^ "#" ^ ikstr ^ tname in
+    a ~a:[a_href (uri_of_string il)] [txt hr.href_desc]
+  else 
+    a ~a:[a_href (uri_of_string hr.href_target)] [txt hr.href_desc]
+
+let md_img_format (ir : Markdown.img_ref) =
+  raise (failwith "Image embedding not supported.")
+
+let c_markdown (input : string) (env : EcEnv.env) =
+  let input = Markdown.parse_text input in
+
+  MarkdownHTML.to_html
+    ~render_pre:md_pre_format
+    ~render_link:(md_href_format env)
+    ~render_img:md_img_format
+    input
+
+
+(* -------------------------------------------------------------------- *)
+let c_head (tstr : string) : [> Html_types.head] elt =
+  head (title (txt tstr)) [link ~rel:[`Stylesheet] ~href:styles_file ()]
+
+(* -------------------------------------------------------------------- *)
 let c_sidebar (th : string) (lents : EcScope.docentity list) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   let iksin = 
@@ -50,18 +124,20 @@ let c_sidebar (th : string) (lents : EcScope.docentity list) =
           ]
         ]
   
-let c_section_intro (gdoc : string list) =
+(* -------------------------------------------------------------------- *)
+let c_section_intro (gdoc : string list) (env : EcEnv.env) =
   match gdoc with
   | [] -> []
   | _ ->  [
             let ids = "Introduction" in
             section ~a:[a_id ids; a_title ids; a_class ["intro-section"]] [
               div ~a:[a_class ["intro-text-container"]] 
-                  (List.map (fun s -> p ~a:[a_class ["intro-text-par"]] [txt s]) gdoc)
+                  (List.map (fun s -> div ~a:[a_class ["item-details-par"]] (c_markdown s env)) gdoc)
             ]
           ]
   
-let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) =
+(* -------------------------------------------------------------------- *)
+let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) (env : EcEnv.env) =
   match lent_ik with
   | SubDoc ((doc, (_, ik, subth, _)), _) -> 
     begin
@@ -74,17 +150,17 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
           in
           let hn =
            match supthf with
-           | None -> c_filename ?ext:(Some ".html") [th; subth]
-           | Some supf -> c_filename ?ext:(Some ".html") [supf; th; subth]
+           | None -> c_filename ~ext:(".html") [th; subth]
+           | Some supf -> c_filename ~ext:(".html") [supf; th; subth]
           in
           li ~a:[a_id (itemkind_str_pl ik ^ subth); a_class ["item-entry"]] ([
             div ~a:[a_class ["item-name-desc-container"]] [  
               div ~a:[a_class ["item-name"]] [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
-              div ~a:[a_class ["item-basic-desc"]] [txt hdoc]
+              div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc env)
             ]
           ] @ (if tdoc <> []
                then [details ~a:[a_class ["item-details"]] (summary [])
-                             (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc)]
+                             (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d env)) tdoc)]
                else []))
       | _ -> assert false
     end
@@ -98,24 +174,26 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
               else if List.length doc = 1 then List.hd doc, []
               else List.hd doc, List.tl doc
             in
-            li ~a:[a_class ["item-entry"]] [
+            li ~a:[a_id (itemkind_str_pl ik ^ nm) ; a_class ["item-entry"]] [
               div ~a:[a_class ["item-name-desc-container"]] [
                 div ~a:[a_class ["item-name"]] [txt nm]; 
-                div ~a:[a_class ["item-basic-desc"]] [txt hdoc]
+                div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc env)
               ]; 
               details ~a:[a_class ["item-details"]] (summary [])
-                      (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc 
+                      (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d env)) tdoc 
                        @ [div ~a:[a_class ["source-container"]] 
                               [txt "Source:"; pre ~a:[a_class ["source"]] [txt psrc]]])
             ]
 
-let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) =
+(* -------------------------------------------------------------------- *)
+let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) (env : EcEnv.env) =
   [
     ul ~a:[a_class ["item-list"]] 
-      (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik) lents_ik)
+      (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik env) lents_ik)
   ]
 
-let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) =
+(* -------------------------------------------------------------------- *)
+let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) (env : EcEnv.env) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   List.concat 
     (List.map (fun ik -> 
@@ -130,13 +208,13 @@ let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.doce
                 let iks = itemkind_str_pl ik in
                 section ~a:[a_id iks; a_title iks; a_class ["item-section"]] [
                   h2 ~a:[a_class ["section-heading"]] [txt iks];
-                  div ~a:[a_class ["item-list-container"]] (c_section_main_itemkind ?supthf th lents_ik)
+                  div ~a:[a_class ["item-list-container"]] (c_section_main_itemkind ?supthf th lents_ik env)
                 ]
               ]
       ) 
     iks)
 
-let c_body ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.body] elt =
+let c_body ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.body] elt =
   let sidebar = c_sidebar th ldocents in
   let page_heading = 
     div ~a:[a_class ["page-heading-container"]]
@@ -155,23 +233,25 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
                     ]
                   ])
   in
-  let sec_intro = c_section_intro gdoc in
-  let sec_main = c_section_main ?supthf th ldocents in
+  let sec_intro = c_section_intro gdoc env in
+  let sec_main = c_section_main ?supthf th ldocents env in
   body (sidebar :: [main (page_heading :: sec_intro @ sec_main)])
 
-let c_page ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.html] elt =
-    html (c_head tstr) (c_body ?supths ?supthf th tstr gdoc ldocents)
+(* -------------------------------------------------------------------- *)
+let c_page ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.html] elt =
+    html (c_head tstr) (c_body ?supths ?supthf th tstr gdoc ldocents env)
 
+(* -------------------------------------------------------------------- *)
 let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
   let wp = Filename.concat dp fn ^ ".html" in
-  (* let s = Format.asprintf "%a" (Tyxml.Html.pp ()) page in *)
   let file = open_out wp in
   let fmt = Format.formatter_of_out_channel file in
     pp () fmt page;
     Format.fprintf fmt "@.";
     close_out file
 
-let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) =
+(* -------------------------------------------------------------------- *)
+let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) =
   let rec c_subpages ?supths ?supthf th docents =
     match docents with 
     | [] -> []
@@ -186,14 +266,15 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
                 | Some supf -> c_filename [supf; th]
              in
              let stf = c_filename [stsupf; sth] in
-              (stf, c_page ?supths:(Some th) ?supthf:(Some stsupf) sth ststr sgdoc sldocents)
-              :: c_subpages ?supths:(Some th) ?supthf:(Some stsupf) sth sldocents 
+              (stf, c_page ~supths:th ~supthf:stsupf sth ststr sgdoc sldocents env)
+              :: c_subpages ~supths:th ~supthf:stsupf sth sldocents 
               @ c_subpages ?supths ?supthf th docents'
   in
   let spgs = c_subpages th ldocents in
   List.iter (fun fnpg -> emit_page dp (fst fnpg) (snd fnpg)) spgs;
-  emit_page dp th (c_page th tstr gdoc ldocents)
+  emit_page dp th (c_page th tstr gdoc ldocents env)
 
+(* -------------------------------------------------------------------- *)
 (* input = input name, scope contains all documentation items *)
 let generate_html (fname : string option) (scope : EcScope.scope) : unit =
   match fname with
@@ -206,7 +287,7 @@ let generate_html (fname : string option) (scope : EcScope.scope) : unit =
       let th = Filename.remove_extension fn in
       let tstr = thkind_str kind  ^ " " ^ th in
       begin
-        try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) with
+        try emit_pages dp th tstr (get_gdocstrings scope) (get_ldocentities scope) (env scope) with
         | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex
       end
   | None -> ()
