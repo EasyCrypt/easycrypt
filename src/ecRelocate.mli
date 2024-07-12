@@ -3,4 +3,5 @@ val resource : string list -> string
 
 module Sites : sig
   val theories : string list
+  val doc : string
 end

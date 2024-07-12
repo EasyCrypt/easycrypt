@@ -1,8 +1,12 @@
-(dirs src theories examples scripts)
+(dirs src theories examples scripts resources)
 
 (install
   (section (site (easycrypt commands)))
   (files (scripts/testing/runtest as runtest)))
+
+(install
+  (section (site (easycrypt doc)))
+  (files (resources/styles/styles.css as styles.css)))
 
 (install
   (section (bin))
