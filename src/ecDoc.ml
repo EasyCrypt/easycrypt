@@ -1,17 +1,31 @@
+(* -------------------------------------------------------------------- *)
 open Tyxml.Html
 
 open EcScope
 
+(* -------------------------------------------------------------------- *)
+let markdown (input : string) =
+  let input = Markdown.parse_text input in
+
+  MarkdownHTML.to_html
+    ~render_pre:(fun ~kind _ -> assert false)
+    ~render_link:(fun _ -> assert false)
+    ~render_img:(fun _ -> assert false)
+    input
+
+(* -------------------------------------------------------------------- *)
 let c_filename ?(ext : string option) (nms : string list) =
   match ext with
   | None -> String.concat "!" nms 
   | Some ext -> String.concat "!" nms ^ ext
   
+(* -------------------------------------------------------------------- *)
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
   | `Ec -> "Theory"
   | `EcA -> "Abstract Theory" 
 
+(* -------------------------------------------------------------------- *)
 let itemkind_str_pl (ik : itemkind) : string =
   match ik with
   | `Type -> "Types"
@@ -22,9 +36,11 @@ let itemkind_str_pl (ik : itemkind) : string =
   | `Module -> "Modules"
   | `Theory -> "Theories"
 
+(* -------------------------------------------------------------------- *)
 let c_head (tstr : string) : [> Html_types.head] elt =
   head (title (txt tstr)) [link ~rel:[`Stylesheet] ~href:"styles.css" ()]
 
+(* -------------------------------------------------------------------- *)
 let c_sidebar (th : string) (lents : EcScope.docentity list) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   let iksin = 
@@ -50,6 +66,7 @@ let c_sidebar (th : string) (lents : EcScope.docentity list) =
           ]
         ]
   
+(* -------------------------------------------------------------------- *)
 let c_section_intro (gdoc : string list) =
   match gdoc with
   | [] -> []
@@ -61,6 +78,7 @@ let c_section_intro (gdoc : string list) =
             ]
           ]
   
+(* -------------------------------------------------------------------- *)
 let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) =
   match lent_ik with
   | SubDoc ((doc, (_, ik, subth, _)), _) -> 
@@ -80,7 +98,7 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
           li ~a:[a_id (itemkind_str_pl ik ^ subth); a_class ["item-entry"]] ([
             div ~a:[a_class ["item-name-desc-container"]] [  
               div ~a:[a_class ["item-name"]] [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
-              div ~a:[a_class ["item-basic-desc"]] [txt hdoc]
+              div ~a:[a_class ["item-basic-desc"]] (markdown hdoc)
             ]
           ] @ (if tdoc <> []
                then [details ~a:[a_class ["item-details"]] (summary [])
@@ -109,12 +127,14 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
                               [txt "Source:"; pre ~a:[a_class ["source"]] [txt psrc]]])
             ]
 
+(* -------------------------------------------------------------------- *)
 let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) =
   [
     ul ~a:[a_class ["item-list"]] 
       (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik) lents_ik)
   ]
 
+(* -------------------------------------------------------------------- *)
 let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   List.concat 
@@ -159,9 +179,11 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
   let sec_main = c_section_main ?supthf th ldocents in
   body (sidebar :: [main (page_heading :: sec_intro @ sec_main)])
 
+(* -------------------------------------------------------------------- *)
 let c_page ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) : [> Html_types.html] elt =
     html (c_head tstr) (c_body ?supths ?supthf th tstr gdoc ldocents)
 
+(* -------------------------------------------------------------------- *)
 let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
   let wp = Filename.concat dp fn ^ ".html" in
   (* let s = Format.asprintf "%a" (Tyxml.Html.pp ()) page in *)
@@ -171,6 +193,7 @@ let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
     Format.fprintf fmt "@.";
     close_out file
 
+(* -------------------------------------------------------------------- *)
 let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) =
   let rec c_subpages ?supths ?supthf th docents =
     match docents with 
@@ -194,6 +217,7 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
   List.iter (fun fnpg -> emit_page dp (fst fnpg) (snd fnpg)) spgs;
   emit_page dp th (c_page th tstr gdoc ldocents)
 
+(* -------------------------------------------------------------------- *)
 (* input = input name, scope contains all documentation items *)
 let generate_html (fname : string option) (scope : EcScope.scope) : unit =
   match fname with
