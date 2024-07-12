@@ -808,7 +808,10 @@ module Tactics = struct
       in
         { scope with 
             sc_pr_uc = Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct) };
-            sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "proof." src); }
+            sc_locdoc = 
+            match src with 
+            | Some src -> DocState.push_srcbl scope.sc_locdoc src
+            | None -> scope.sc_locdoc; }
 
   let process_r ?(src : string option) ?reloc mark mode (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
@@ -872,7 +875,10 @@ module Tactics = struct
         let puc = { puc with puc_active = Some (pac, pct); } in
         let scope = { scope with 
                         sc_pr_uc = Some puc;
-                        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "tactic" src); } in
+                        sc_locdoc = 
+                          match src with 
+                          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+                          | None -> scope.sc_locdoc; } in
         Some (penv, hds), scope
 
   let process1_r mark mode scope t =
@@ -1183,7 +1189,10 @@ module Ax = struct
     
     let scope = 
       { scope with
-          sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "qed." src);}
+          sc_locdoc = 
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
     in
     save_r ~mode:`Save scope
 
@@ -1193,7 +1202,10 @@ module Ax = struct
 
     let scope = 
       { scope with
-          sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "admit." src);}
+          sc_locdoc = 
+            match src with 
+            | Some src -> DocState.push_srcbl scope.sc_locdoc src
+            | None -> scope.sc_locdoc; }
     in
 
     save_r ~mode:`Admit scope
@@ -1204,7 +1216,10 @@ module Ax = struct
 
     let scope = 
       { scope with
-          sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "abort." src);}
+          sc_locdoc = 
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
     in
 
     snd (save_r ~mode:`Abort scope)
@@ -1227,7 +1242,10 @@ module Ax = struct
     in
     let scope =
       { scope with 
-          sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "axiom/lemma" src) } 
+          sc_locdoc = 
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; } 
     in 
     add_r scope mode ax
 
@@ -1305,7 +1323,10 @@ module Op = struct
     in
     let scope = {
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "operator" src) } 
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; } 
     in
 
     let op = op.pl_desc and loc = op.pl_loc in
@@ -1552,7 +1573,10 @@ module Op = struct
     in
     let scope = { 
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "semanticoperator" src) }
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
     in 
 
     let op = unloc op in
@@ -1613,7 +1637,10 @@ module Pred = struct
     in
     let scope = { 
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "predicate" src) }
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  }
     in 
 
     let typr  = EcHiPredicates.trans_preddecl (env scope) pr in
@@ -1683,7 +1710,10 @@ module Mod = struct
     in
     let scope = {
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "module" src) } 
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  } 
     in
   
     let m = TT.transmod (env scope) ~attop:true ptm in
@@ -1755,7 +1785,10 @@ module ModType = struct
     in
     let scope = {
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "moduletype" src) } 
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  } 
     in
     let tysig = EcTyping.transmodsig (env scope) intf in
     bind scope (unloc intf.pi_name, tysig)
@@ -1799,7 +1832,10 @@ module Ty = struct
     in
     let scope = {
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "type" src) } 
+        sc_locdoc =
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  } 
     in
 
     let loc = loc tyd in
@@ -2242,7 +2278,10 @@ module Theory = struct
     in
     let scope = {
       scope with 
-        sc_locdoc = DocState.push_srcbl scope.sc_locdoc (odfl "theory" src) } 
+        sc_locdoc = 
+          match src with 
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; } 
     in
     subscope scope mode name
 

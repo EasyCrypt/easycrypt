@@ -4,6 +4,11 @@ open Tyxml.Html
 open EcScope
 
 (* -------------------------------------------------------------------- *)
+let styles_file : string = 
+  Filename.concat EcRelocate.Sites.doc "styles.css"
+
+
+(* -------------------------------------------------------------------- *)
 let markdown (input : string) =
   let input = Markdown.parse_text input in
 
@@ -38,7 +43,7 @@ let itemkind_str_pl (ik : itemkind) : string =
 
 (* -------------------------------------------------------------------- *)
 let c_head (tstr : string) : [> Html_types.head] elt =
-  head (title (txt tstr)) [link ~rel:[`Stylesheet] ~href:"styles.css" ()]
+  head (title (txt tstr)) [link ~rel:[`Stylesheet] ~href:styles_file ()]
 
 (* -------------------------------------------------------------------- *)
 let c_sidebar (th : string) (lents : EcScope.docentity list) =
@@ -74,7 +79,7 @@ let c_section_intro (gdoc : string list) =
             let ids = "Introduction" in
             section ~a:[a_id ids; a_title ids; a_class ["intro-section"]] [
               div ~a:[a_class ["intro-text-container"]] 
-                  (List.map (fun s -> p ~a:[a_class ["intro-text-par"]] [txt s]) gdoc)
+                  (List.map (fun s -> div ~a:[a_class ["item-details-par"]] (markdown s)) gdoc)
             ]
           ]
   
@@ -102,7 +107,7 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
             ]
           ] @ (if tdoc <> []
                then [details ~a:[a_class ["item-details"]] (summary [])
-                             (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc)]
+                             (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (markdown d)) tdoc)]
                else []))
       | _ -> assert false
     end
@@ -116,13 +121,13 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
               else if List.length doc = 1 then List.hd doc, []
               else List.hd doc, List.tl doc
             in
-            li ~a:[a_class ["item-entry"]] [
+            li ~a:[a_id (itemkind_str_pl ik ^ nm) ; a_class ["item-entry"]] [
               div ~a:[a_class ["item-name-desc-container"]] [
                 div ~a:[a_class ["item-name"]] [txt nm]; 
-                div ~a:[a_class ["item-basic-desc"]] [txt hdoc]
+                div ~a:[a_class ["item-basic-desc"]] (markdown hdoc)
               ]; 
               details ~a:[a_class ["item-details"]] (summary [])
-                      (List.map (fun d -> p ~a:[a_class ["item-details-par"]] [txt d]) tdoc 
+                      (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (markdown d)) tdoc 
                        @ [div ~a:[a_class ["source-container"]] 
                               [txt "Source:"; pre ~a:[a_class ["source"]] [txt psrc]]])
             ]
@@ -186,7 +191,6 @@ let c_page ?(supths : string option) ?(supthf : string option) (th : string) (ts
 (* -------------------------------------------------------------------- *)
 let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
   let wp = Filename.concat dp fn ^ ".html" in
-  (* let s = Format.asprintf "%a" (Tyxml.Html.pp ()) page in *)
   let file = open_out wp in
   let fmt = Format.formatter_of_out_channel file in
     pp () fmt page;
