@@ -1391,7 +1391,7 @@ by move=> b1 b2 _ /=; apply/iscpl_dunit.
 qed.
 
 (* -------------------------------------------------------------------- *)
-abbrev dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
+abbrev [-printing] dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
   fun d => dmap d F.
 
 (* -------------------------------------------------------------------- *)
