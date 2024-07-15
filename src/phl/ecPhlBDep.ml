@@ -87,21 +87,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
 
 (* FIXME UNTESTED *)
 let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
-  let pstate : (symbol, EcCircuits.circuit) Map.t = Map.empty in
-
-  let inps = match me with
-  | Lmt_concrete (Some lmt) -> lmt.lmt_decl 
-    |> List.filter_map (fun ov -> if Option.is_none ov.ov_name then None
-                                  else Some {v_name = Option.get ov.ov_name; v_type=ov.ov_type})
-  | _ -> assert false
-  in
-
-  let inps = List.map (EcCircuits.input_of_variable env) inps in
-  let pstate = List.fold_left 
-    (fun pstate inp -> Map.add (List.hd inp.inps |> fst).id_symb inp pstate)
-    pstate inps 
-  in
-
+  let pstate = EcCircuits.pstate_of_memtype env me in
   
   let pre_c = circuit_of_form ~pstate ~cache env pre in
   let pstate = List.fold_left (EcCircuits.process_instr env mem ~cache) pstate proc.s_node in

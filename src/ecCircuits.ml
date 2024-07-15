@@ -42,8 +42,31 @@ let inputs_equal (f: circuit) (g: circuit) : bool =
   (List.compare_lengths f.inps g.inps = 0) && 
   (List.for_all2 (=) (List.snd f.inps) (List.snd g.inps))
 
+let merge_inps (f: circuit) (g: circuit) : (circuit * circuit) option =
+  let f_inps = Map.of_seq (List.to_seq f.inps) in
+  let g_inps = Map.of_seq (List.to_seq g.inps) in
+  try 
+    let ret  = Map.union_stdlib (fun k a b -> assert (a = b); Some a) f_inps g_inps in
+    let inps = Map.to_seq ret |> List.of_seq in
+    Some ({f with inps = inps}, {g with inps = inps})
+  with 
+  | Assert_failure _ -> None
 
-(* ------------------------------------------------------------------------------- *)
+let merge_inps3 (f: circuit) (g: circuit) (pcond: circuit) : (circuit * circuit * circuit) option =
+  let f_inps = Map.of_seq (List.to_seq f.inps) in
+  let g_inps = Map.of_seq (List.to_seq g.inps) in
+  let pcond_inps = Map.of_seq (List.to_seq pcond.inps) in
+  try 
+    let ret  = Map.union_stdlib (fun k a b -> assert (a = b); Some a) f_inps g_inps in
+    let ret  = Map.union_stdlib (fun k a b -> assert (a = b); Some a) ret pcond_inps in
+    let inps = Map.to_seq ret |> List.of_seq in
+    Some ({f with inps}, {g with inps}, {pcond with inps})
+  with 
+  | Assert_failure _ -> None
+
+let inputs_consistent (f: circuit) (g:circuit) : bool = 
+  Option.is_some (merge_inps f g)
+    
 (* -------------------------------------------------------------------- *)
 exception CircError of string
 
@@ -114,6 +137,8 @@ let input_of_tdep (n: int) (bs: int Set.t) : _ * (ident * int) =
 let inputs_of_tdep (td: HL.tdeps) :  _ * (ident * int) list =
   Map.foldi (fun n bs (map_, inps) -> let map_2, inp = input_of_tdep n bs in
     (Map.union map_ map_2, inp::inps)) td (Map.empty, [])   
+
+  
 
 (* This takes a circuit with big output and input and returns the split one *)
 let circuit_block_split (in_size: int) (out_size: int) (c: circuit) : circuit list =
@@ -457,9 +482,13 @@ let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool =
   | Some pcond -> pcond
   | None -> {circ = [C.true_]; inps = f.inps}
   in
-  inputs_equal f g &&
-  inputs_equal f pcond &&
+  (* inputs_equal f g && *)
+  (* inputs_equal f pcond && *)
+  let cs = merge_inps3 f g pcond in
+  Option.is_some cs && 
   begin
+    let f, g, pcond = cs |> Option.get in
+    let f, pcond = merge_inps f pcond |> Option.get in
     (* let new_inps = List.mapi (fun i (_, w) -> *) 
       (* let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in *)
       (* {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in *)
@@ -638,6 +667,21 @@ let input_of_variable (env:env) (v: variable) : circuit =
   {circ = c; inps=[inp]}
   
 
+let pstate_of_memtype ?(pstate = Map.empty) (env: env) (mt: memtype) =
+  let inps = match mt with
+  | Lmt_concrete (Some lmt) -> lmt.lmt_decl 
+    |> List.filter_map (fun ov -> if Option.is_none ov.ov_name then None
+                                  else Some {v_name = Option.get ov.ov_name; v_type=ov.ov_type})
+  | _ -> assert false
+  in
+
+  let inps = List.map (input_of_variable env) inps in
+  let pstate = List.fold_left 
+    (fun pstate inp -> Map.add (List.hd inp.inps |> fst).id_symb inp pstate)
+    pstate inps 
+  in pstate
+
+
 let process_instr (env:env) (mem: memory) ?(cache: _ = Map.empty) (pstate: _) (inst: instr) =
     try
     match inst.i_node with
@@ -649,13 +693,22 @@ let process_instr (env:env) (mem: memory) ?(cache: _ = Map.empty) (pstate: _) (i
         (Printexc.to_string e) in 
         raise @@ CircError err
 
-let insts_equiv (env: env) (mem: memory) (cache: _) (insts_left: instr list) (insts_right: instr list): bool =
-  let cache_left = List.fold_left (process_instr env mem) cache insts_left in
-  let cache_right = List.fold_left (process_instr env mem) cache insts_right in
-  if Map.keys cache_left != Map.keys cache_right then
-    false
-  else
-    Map.foldi (fun var circ bacc -> bacc && (circ_equiv circ (Map.find var cache_right) None)) cache_left true
+let insts_equiv (env: env) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_left: instr list) (insts_right: instr list): bool =
+  let pstate = pstate_of_memtype ~pstate env mt in
+  let pstate_left = List.fold_left (process_instr env mem) pstate insts_left in
+  let pstate_right = List.fold_left (process_instr env mem) pstate insts_right in
+  (* Maybe this not needed? *)
+
+  (* if (Map.keys pstate_left |> Set.of_enum) != (Map.keys pstate_right |> Set.of_enum) then *)
+    (* begin *)
+    (* Format.eprintf "Left: @."; *)
+    (* Map.iter (fun k _ -> Format.eprintf "%s@." k) pstate_left; *)
+    (* Format.eprintf "Right: @."; *)
+    (* Map.iter (fun k _ -> Format.eprintf "%s@." k) pstate_right; *)
+    (* false *)
+    (* end *)
+  (* else *)
+    Map.foldi (fun var circ bacc -> bacc && (circ_equiv circ (Map.find var pstate_right) None)) pstate_left true
     
 (* -------------------------------------------------------------------- *)
 (* WIP *)

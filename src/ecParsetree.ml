@@ -784,6 +784,7 @@ type phltactic =
 
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
+  | `Change   of pcodepos * int * pstmt
 ]
 
 (* -------------------------------------------------------------------- *)

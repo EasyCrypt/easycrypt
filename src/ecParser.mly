@@ -397,6 +397,7 @@
 %token AXIOMATIZED
 %token BACKS
 %token BACKSLASH
+%token BCHANGE
 %token BDEP
 %token BETA
 %token BITSTRING
@@ -3242,6 +3243,9 @@ phltactic:
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, f) }
+    
+| BCHANGE o=codepos PLUS w=word s=brace(stmt)
+    { Prwprgm (`Change (o, w, s)) }
 
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
