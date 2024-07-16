@@ -574,7 +574,7 @@ qed.
 (* well-founded recursion operator - smt solvers treat as black box,
    but can use wf_recur lemma *)
 
-op nosmt wf_recur
+op wf_recur
    (wfr : 'a rel, def : 'b, wfrd : ('a, 'b) wf_rec_def) : 'a -> 'b =
   grel_to_fun def (wfc_least wfr def wfrd).
 

@@ -183,7 +183,7 @@ proof. by rewrite lastI -!cats1 belast_cat. qed.
 (* -------------------------------------------------------------------- *)
 (*                   rcons / induction principle                        *)
 (* -------------------------------------------------------------------- *)
-lemma nosmt last_ind (p : 'a list -> bool):
+lemma last_ind (p : 'a list -> bool):
   p [] => (forall s x, p s => p (rcons s x)) => forall s, p s.
 proof.
   move=> Hnil Hlast s; rewrite -(cat0s s).
@@ -756,14 +756,14 @@ proof.
   by move: h; rewrite /pred1 => {2}<-.
 qed.
 
-lemma nosmt onth_index ['a] (x : 'a) xs:
+lemma onth_index ['a] (x : 'a) xs:
   x \in xs => onth xs (index x xs) = Some x.
 proof.
 move=> x_in_xs; rewrite (onth_nth witness).
 + by rewrite index_mem index_ge0. + by rewrite nth_index.
 qed.
 
-lemma nosmt onth_mem ['a] (x : 'a) xs:
+lemma onth_mem ['a] (x : 'a) xs:
   x \in xs => exists n, onth xs n = Some x.
 proof. by move/onth_index=> <-; exists (index x xs). qed.
 
@@ -1818,7 +1818,7 @@ proof.
 by move=> inj_f s1 s2; apply/(@in_inj_map _ predT); try apply/all_predT.
 qed.
 
-lemma nosmt onth_map_some ['a 'b] (f : 'a->'b) (xs : 'a list) n v:
+lemma onth_map_some ['a 'b] (f : 'a->'b) (xs : 'a list) n v:
  onth (map f xs) n = Some v <=> exists y, onth xs n = Some y /\ v = f y.
 proof.
 by elim: xs n => //= x xs ih n; case: (n = 0) => _; [smt() | apply/ih].
@@ -2154,7 +2154,7 @@ theory Iota.
   by rewrite (_ : max 0 k = k) 1:/# // ltzz /= drop0.
   qed.
 
-  lemma nosmt onth_iota_some start sz n x:
+  lemma onth_iota_some start sz n x:
     onth (iota_ start sz) n = Some x <=> 0 <= n < sz /\ x = start + n.
   proof. split.
   + by move/onth_some; rewrite size_iota => -[h]; rewrite nth_iota /#.
@@ -2355,7 +2355,7 @@ proof.
   by rewrite assoc_cons => ->.
 qed.
 
-lemma nosmt assocTP ['a 'b] (xs : ('a * 'b) list) k :
+lemma assocTP ['a 'b] (xs : ('a * 'b) list) k :
   assoc xs k <> None <=> k \in map fst xs.
 proof.
 by split=> h; have := assocP xs k; rewrite h //= => -[b [_ ->]].
@@ -2400,7 +2400,7 @@ elim: xs => // [[k' v] xs] ih /= [<<- /=|]; 1: by rewrite assoc_cons.
 by rewrite !assoc_cons /= => /ih {ih}ih; case: (k = k').
 qed.
 
-lemma nosmt assoc_some_onth_mem ['a 'b] (xs : ('a * 'b) list) (k : 'a) (v : 'b):
+lemma assoc_some_onth_mem ['a 'b] (xs : ('a * 'b) list) (k : 'a) (v : 'b):
  assoc xs k = Some v => (exists n, onth xs n = Some (k, v)).
 proof. by move/assoc_some => /onth_mem. qed.
 
@@ -2751,7 +2751,7 @@ proof.
   by rewrite flatten_cons count_cat /sumz /= ih.
 qed.
 
-lemma nosmt perm_undup_count (s : 'a list) :
+lemma perm_undup_count (s : 'a list) :
   perm_eq
     (flatten (map (fun x => nseq (count (pred1 x) s) x) (undup s)))
     s.
@@ -2806,7 +2806,7 @@ have ->> //: x = x'; apply: hasn => //; first by rewrite xpin.
 by rewrite hasP; exists a.
 qed.
 
-lemma nosmt uniq_flatten_map (f : 'a -> 'b list) s:
+lemma uniq_flatten_map (f : 'a -> 'b list) s:
   (forall x, uniq (f x)) =>
   (forall x y, mem s x => mem s y => has (mem (f x)) (f y) => x = y) =>
   uniq s => uniq (flatten (map f s)).
@@ -2830,7 +2830,7 @@ rewrite (_ : max 0 k = k) 1:/#  //; elim: k ge0_k => [|k ge0_k ih].
 by rewrite nseqS // flatten_cons count_cat /#.
 qed.
 
-lemma nosmt perm_eq_pair ['a 'b] (s : ('a * 'b) list) : uniq s => perm_eq s
+lemma perm_eq_pair ['a 'b] (s : ('a * 'b) list) : uniq s => perm_eq s
   (flatten
      (map (fun a => filter (fun xy : _ * _ => xy.`1 = a) s)
           (undup (map fst s)))).
@@ -3122,15 +3122,15 @@ proof.
 by elim: xs ys => [|x0 xs ih] [|y0 ys] //=; case=> [|/ih] [] 2!->.
 qed.
 
-lemma nosmt mem_zip_fst ['a 'b] (xs : 'a list) (ys : 'b list) xy:
+lemma mem_zip_fst ['a 'b] (xs : 'a list) (ys : 'b list) xy:
   xy \in zip xs ys => fst xy \in xs.
 proof. by case: xy => [x y]; move/mem_zip. qed.
 
-lemma nosmt mem_zip_snd ['a 'b] (xs : 'a list) (ys : 'b list) xy:
+lemma mem_zip_snd ['a 'b] (xs : 'a list) (ys : 'b list) xy:
   xy \in zip xs ys => snd xy \in ys.
 proof. by case: xy => [x y]; move/mem_zip. qed.
 
-lemma nosmt mem_zip_nseqL ['a 'b] x y (ys : 'b list) :
+lemma mem_zip_nseqL ['a 'b] x y (ys : 'b list) :
   y \in ys => (x, y) \in zip<:'a, 'b> (nseq (size ys) x) ys.
 proof.
 elim: ys => [|y' ys ih] //= -[->|/ih] /=.
@@ -3176,11 +3176,11 @@ lemma map_snd_zip ['a, 'b1, 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
  size xs = size ys => map (g \o snd) (zip xs ys) = map g ys.
 proof. by move => eq_sz; rewrite map_comp unzip2_zip // eq_sz. qed.
 
-lemma nosmt zip_map_proj ['a, 'b, 'c] (f : 'a -> 'b * 'c) xs:
+lemma zip_map_proj ['a, 'b, 'c] (f : 'a -> 'b * 'c) xs:
   zip (map (fst \o f) xs) (map (snd \o f) xs) = map f xs.
 proof. by elim: xs => // x xs ih @/(\o) /=; rewrite ih /=; case: (f x). qed.
 
-lemma nosmt onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
+lemma onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
       onth (zip xs ys) n = Some xy
   <=> (onth xs n = Some (fst xy)) /\ (onth ys n = Some (snd xy)).
 proof.
@@ -3188,7 +3188,7 @@ elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
 by case: (n = 0) => // _; apply/ih.
 qed.
 
-lemma nosmt eq_keys_amap ['a, 'b1, 'b2, 'c]
+lemma eq_keys_amap ['a, 'b1, 'b2, 'c]
   (f : 'a -> 'b1 -> 'c) (g : 'a -> 'b2 -> 'c) xs ys
 : amap f xs = amap g ys => unzip1 xs = unzip1 ys.
 proof. move=> eq_amap.
@@ -3204,7 +3204,7 @@ elim: xs => /= [|[k' v'] xs ih]; 1: by rewrite !assoc_nil.
 by rewrite !assoc_cons /=; case: (k = k').
 qed.
 
-lemma nosmt map_zip_nth ['a, 'b, 'c] dk dv (f: 'a * 'b -> 'c) ks vs:
+lemma map_zip_nth ['a, 'b, 'c] dk dv (f: 'a * 'b -> 'c) ks vs:
  size ks = size vs => map f (zip ks vs)
    = map (fun i => f (nth dk ks i, nth dv vs i)) (range 0 (size ks)).
 proof.
@@ -3344,7 +3344,7 @@ theory InsertSort.
     with s = []      => []
     with s = x :: s' => insert e x (sort e s').
 
-  lemma nosmt perm_insert (e : 'a -> 'a -> bool) x s:
+  lemma perm_insert (e : 'a -> 'a -> bool) x s:
     perm_eq (x :: s) (insert e x s).
   proof.
     elim: s => //= y s IHs; case: (e x y) => exy.
@@ -3352,13 +3352,13 @@ theory InsertSort.
     by rewrite perm_consCA perm_cons.
   qed.
 
-  lemma nosmt perm_sort (e : 'a -> 'a -> bool) s: perm_eq (sort e s) s.
+  lemma perm_sort (e : 'a -> 'a -> bool) s: perm_eq (sort e s) s.
   proof.
     elim: s=> //= x s IHs; have h := perm_insert e x (sort e s).
     by apply perm_eqlE in h; rewrite -h perm_cons => {h}.
   qed.
 
-  lemma nosmt sorted_insert (e : 'a -> 'a -> bool) x s:
+  lemma sorted_insert (e : 'a -> 'a -> bool) x s:
        (forall x y, e x y \/ e y x)
     => sorted e s => sorted e (insert e x s).
   proof.
@@ -3368,7 +3368,7 @@ theory InsertSort.
     by move=> Nexz; rewrite eyz /= IHs.
   qed.
 
-  lemma nosmt sort_sorted (e : 'a -> 'a -> bool) (s : 'a list):
+  lemma sort_sorted (e : 'a -> 'a -> bool) (s : 'a list):
      (forall x y, e x y \/ e y x) => sorted e (sort e s).
   proof. by move=> e_ltgt; elim: s => //= x s IHs; apply sorted_insert. qed.
 end InsertSort.
@@ -3523,11 +3523,11 @@ declare type t.
 (* get max relative to this transitive and strongly connective relation *)
 declare op rel: t -> t -> bool.
 
-declare axiom nosmt rel_trans: transitive rel. 
+declare axiom rel_trans: transitive rel. 
 
-declare axiom nosmt rel_conn (a b: t): rel a b \/ rel b a.
+declare axiom rel_conn (a b: t): rel a b \/ rel b a.
 
-lemma nosmt rel_refl: reflexive rel by move => x; elim (rel_conn x x).
+lemma rel_refl: reflexive rel by move => x; elim (rel_conn x x).
 
 (* returns the greater of x and a maximal element in the list *)
 op listmax_bounded (x: t) (xs: t list): t =
@@ -3539,7 +3539,7 @@ op listmax (dfl: t) (xs: t list): t =
   with xs = [] => dfl
   with xs = x::xs' => listmax_bounded x xs'.
 
-lemma nosmt listmax_gt_in (dfl: t) (xs: t list): forall x, x \in xs => rel x (listmax dfl xs).
+lemma listmax_gt_in (dfl: t) (xs: t list): forall x, x \in xs => rel x (listmax dfl xs).
 proof.
 case xs => [x| x xs]; 1: by rewrite in_nil.
 move: x; elim xs => /= [x y ->| x xs indH y z]; 1: exact rel_refl.
@@ -3553,7 +3553,7 @@ elim => [->| z_in_xs].
 - by apply indH; right.
 qed.
 
-lemma nosmt listmax_in (dfl: t) (xs: t list): size xs <> 0 => listmax dfl xs \in xs.
+lemma listmax_in (dfl: t) (xs: t list): size xs <> 0 => listmax dfl xs \in xs.
 proof.
 case xs => [//|x xs _ /=].
 move: x; elim xs => // x xs indH y /=.

@@ -24,14 +24,14 @@ import WordN.
 op wordn (n : int) : t list list =
   foldl (fun s i => cross enum s) [[]] (iota_ 0 n).
 
-lemma nosmt wordn0 n : n <= 0 => wordn n = [[]].
+lemma wordn0 n : n <= 0 => wordn n = [[]].
 proof. by move=> le0_n; rewrite /wordn iota0. qed.
 
-lemma nosmt wordnS n : 0 <= n => wordn (n + 1) = cross enum (wordn n).
+lemma wordnS n : 0 <= n => wordn (n + 1) = cross enum (wordn n).
 proof. by move=> geo_0; rewrite /wordn iotaSr //= -cats1 foldl_cat. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt wordn_size i : all (fun x => size x = max 0 i) (wordn i).
+lemma wordn_size i : all (fun x => size x = max 0 i) (wordn i).
 proof.
 apply/allP=> w; case: (lezWP 0 i); last first.
   by move=> _ le0_i; rewrite wordn0 // mem_seq1 ?ler_maxl.
@@ -42,7 +42,7 @@ by case=> x [_ /mapP] [s [/ih h ->]] /=; rewrite h addzC.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt size_wordn i : size (wordn i) = card ^ (max 0 i).
+lemma size_wordn i : size (wordn i) = card ^ (max 0 i).
 proof.
 case: (lezWP 0 i)=> [le|_ le]; last first.
   by rewrite ler_maxl ?wordn0 //= expr0.
@@ -56,7 +56,7 @@ by rewrite Bigint.big_constz count_predT -/card mulzC exprS.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt wordnP i s : mem (wordn i) s <=> size s = max 0 i.
+lemma wordnP i s : mem (wordn i) s <=> size s = max 0 i.
 proof.
 split; first by move: s; apply/allP/wordn_size.
 case: (lezWP 0 i)=> [ge0_i|_ le0_i]; last first.
@@ -82,7 +82,7 @@ by case/mapP=> t2 /= [_ [->]].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt word_spec i (s : t list) : size s = max 0 i =>
+lemma word_spec i (s : t list) : size s = max 0 i =>
   count (pred1 s) (wordn i) = 1.
 proof.
 by rewrite -wordnP => swi; rewrite count_uniq_mem ?uniq_wordn swi.
@@ -93,7 +93,7 @@ lemma in_wordn_size i (s : t list) : mem (wordn i) s => size s = max 0 i.
 proof. by rewrite wordnP. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt word_spec_cat i j : 0 <= i => 0 <= j =>
+lemma word_spec_cat i j : 0 <= i => 0 <= j =>
   perm_eq (wordn (i + j)) (allpairs (++) (wordn i) (wordn j)).
 proof.
 move=> ge0_i ge0_j; apply/uniq_perm_eq; first by apply/uniq_wordn.

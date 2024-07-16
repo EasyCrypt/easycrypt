@@ -119,7 +119,7 @@ module PRPi'(S:Sample_t) = {
 (* FIXME: cleanup *)
 
 (* FIXME: Duplicate lemmas with RP_RF *)
-lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
+lemma notin_supportIP (P : 'a -> bool) (d : 'a distr):
   (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
 proof.
 rewrite (mu_split _ predT P) /predI /predT /predC /=.

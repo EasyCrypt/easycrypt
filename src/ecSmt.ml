@@ -1073,11 +1073,11 @@ and create_op ?(body = false) (genv : tenv) p =
                      WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
     let decl =
       match body, op.op_kind with
-      | true, OB_oper (Some (OP_Plain (body, false))) ->
+      | true, OB_oper (Some (OP_Plain body)) ->
           let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
+      | true, OB_oper (Some (OP_Fix body)) ->
         OneShot.now register;
         let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
@@ -1430,9 +1430,9 @@ module Frequency = struct
     match EcEnv.Op.by_path_opt p env with
     | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
       r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain (f, false))) } ->
+    | Some {op_kind = OB_oper (Some (OP_Plain f)) } ->
       r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
+    | Some {op_kind = OB_oper (Some (OP_Fix e)) } ->
       let rec aux rs = function
         | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
         | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs

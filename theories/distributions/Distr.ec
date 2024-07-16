@@ -1011,7 +1011,7 @@ move => wF; rewrite !dletE (@eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
 by rewrite sumZ -weightE.
 qed.
 
-lemma nosmt weight_dlet (d:'a distr) (F:'a -> 'b distr) :
+lemma weight_dlet (d:'a distr) (F:'a -> 'b distr) :
   weight (dlet d F) <= weight d.
 proof.
 rewrite dletE weightE; apply RealSeries.ler_sum; first last.
@@ -1020,7 +1020,7 @@ rewrite dletE weightE; apply RealSeries.ler_sum; first last.
 by move => x /=; rewrite ler_pimulr ?ge0_mu ?le1_mu.
 qed.
 
-lemma nosmt supp_dlet (d : 'a distr) (F : 'a -> 'b distr) (b : 'b) :
+lemma supp_dlet (d : 'a distr) (F : 'a -> 'b distr) (b : 'b) :
   b \in (dlet d F) <=> exists a, a \in d /\ b \in (F a).
 proof.
 rewrite supportP dlet1E sump_eq0P /=.
@@ -1031,14 +1031,14 @@ rewrite negb_forall /=; apply/exists_iff=> /= x.
 by rewrite !supportP mulf_eq0 negb_or.
 qed.
 
-lemma nosmt dlet_d_unit (d:'a distr) : dlet d MUnit.dunit = d.
+lemma dlet_d_unit (d:'a distr) : dlet d MUnit.dunit = d.
 proof.
 apply/eq_distr=> x; rewrite dlet1E /= (@sumE_fin _ [x]) //=.
 + by move=> x0; rewrite MUnit.dunit1E /=; case (x0 = x).
 + by rewrite big_consT big_nil /= MUnit.dunit1E.
 qed.
 
-lemma nosmt dlet_unit (F:'a -> 'b distr) a : dlet (MUnit.dunit a) F = F a.
+lemma dlet_unit (F:'a -> 'b distr) a : dlet (MUnit.dunit a) F = F a.
 proof.
 apply/eq_distr=> x; rewrite dlet1E /= (@sumE_fin _ [a]) //=.
 + by move=> a0; rewrite MUnit.dunit1E (@eq_sym a); case (a0 = a).
@@ -1163,7 +1163,7 @@ move=> a ad @/(\o) @/pred1; apply/eq_iff; split; last exact: canLR.
 by move=> faE; move/can_gf: ad; rewrite faE.
 qed.
 
-lemma nosmt in_dmap1E_can (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
+lemma in_dmap1E_can (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
   f (g x) = x =>
   (forall (y: 'a), y \in d => f y = x => y = g x) => 
   mu1 (dmap d f) x = mu1 d (g x). 

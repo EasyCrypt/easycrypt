@@ -891,7 +891,7 @@ module Ax = struct
            ax_spec       = concl;
            ax_kind       = kind;
            ax_loca       = ax.pa_locality;
-           ax_visibility = if ax.pa_nosmt then `NoSmt else `Visible; }
+           ax_visibility = `Visible; }
     in
 
     match ax.pa_kind with
@@ -1129,18 +1129,6 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc "this operator type contains free type variables";
 
-    let nosmt = op.po_nosmt in
-
-    if nosmt &&
-       (match body with
-        | `Plain _  -> false
-        | `Fix _    -> false
-        | `Abstract ->
-            match refts with
-            | [] -> true
-            | _  -> false) then
-      hierror ~loc ("[nosmt] is not supported for pure abstract operators");
-
     let uidmap  = EcUnify.UniEnv.close ue in
     let ts      = Tuni.subst uidmap in
     let fs      = Fsubst.f_subst ts in
@@ -1149,14 +1137,13 @@ module Op = struct
     let body    =
       match body with
       | `Abstract -> None
-      | `Plain e  -> Some (OP_Plain (fs e, nosmt))
+      | `Plain e  -> Some (OP_Plain (fs e))
       | `Fix opfx ->
           Some (OP_Fix {
             opf_args     = opfx.EHI.mf_args;
             opf_resty    = opfx.EHI.mf_codom;
             opf_struct   = (opfx.EHI.mf_recs, List.length opfx.EHI.mf_args);
             opf_branches = opfx.EHI.mf_branches;
-            opf_nosmt    = nosmt;
           })
 
     in
@@ -1190,12 +1177,11 @@ module Op = struct
       | None    -> bind scope (unloc op.po_name, tyop)
       | Some ax -> begin
           match tyop.op_kind with
-          | OB_oper (Some (OP_Plain (bd, _))) ->
+          | OB_oper (Some (OP_Plain bd)) ->
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
-                let nosmt = op.po_nosmt in
                 let nargs = List.sum (List.map (List.length |- fst) args) in
-                  EcDecl.axiomatized_op ~nargs ~nosmt path (tyop.op_tparams, bd) lc in
+                  EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope (unloc ax, axop)
@@ -1232,7 +1218,7 @@ module Op = struct
               ax_spec       = ax;
               ax_kind       = `Axiom (Ssym.empty, false);
               ax_loca       = lc;
-              ax_visibility = if nosmt then `NoSmt else `Visible; }
+              ax_visibility = `Visible; }
           in Ax.bind scope (unloc rname, ax))
         scope refts
     in
@@ -1357,7 +1343,7 @@ module Op = struct
     let opdecl = EcDecl.{
       op_tparams  = [];
       op_ty       = aout.f_ty;
-      op_kind     = OB_oper (Some (OP_Plain (aout, false)));
+      op_kind     = OB_oper (Some (OP_Plain aout));
       op_loca     = op.ppo_locality;
       op_opaque   = false;
       op_clinline = false;

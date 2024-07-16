@@ -49,7 +49,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcCoreFol.form * bool (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -65,7 +65,6 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
-  opf_nosmt    : bool;
 }
 
 and opbranches =

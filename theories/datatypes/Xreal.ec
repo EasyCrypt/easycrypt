@@ -25,16 +25,16 @@ abstract theory MonoidD.
   axiom one_neq0 : one <> zero.
   axiom mulmDl    : left_distributive ( * ) (+).
 
-  lemma nosmt mulmACA: interchange ( * ) ( * ).
+  lemma mulmACA: interchange ( * ) ( * ).
   proof. by move=> x y z t; rewrite -!mulmA (mulmCA y). qed.
 
-  lemma nosmt mulmDr: right_distributive ( * ) (+).
+  lemma mulmDr: right_distributive ( * ) (+).
   proof. by move=> x y z; rewrite mulmC mulmDl !(@mulmC _ x). qed.
 
-  lemma nosmt addm0_simpl x : x + zero = x by apply addm0.
-  lemma nosmt add0m_simpl x : zero + x = x by apply add0m.
-  lemma nosmt mul1m_simpl x : one * x = x by apply mul1m.
-  lemma nosmt mulm1_simpl x : x * one = x by apply mulm1.
+  lemma addm0_simpl x : x + zero = x by apply addm0.
+  lemma add0m_simpl x : zero + x = x by apply add0m.
+  lemma mul1m_simpl x : one * x = x by apply mul1m.
+  lemma mulm1_simpl x : x * one = x by apply mulm1.
 
   hint simplify addm0_simpl, add0m_simpl, mul1m_simpl, mulm1_simpl.
 
@@ -48,14 +48,14 @@ abstract theory MonoidDI.
   lemma addIm: left_injective (+).
   proof. by move=> x y z; rewrite !(addmC _ x) => /addmI. qed.
 
-  lemma nosmt mul0m: left_zero zero ( * ).
+  lemma mul0m: left_zero zero ( * ).
   proof. by move=> x; apply: (@addIm (one * x)); rewrite -mulmDl !add0m mul1m. qed.
 
-  lemma nosmt mulm0: right_zero zero ( * ).
+  lemma mulm0: right_zero zero ( * ).
   proof. by move=> x; rewrite mulmC mul0m. qed.
 
-  lemma nosmt mul0m_simpl x : zero * x = zero by apply mul0m.
-  lemma nosmt mulm0_simpl x : x * zero = zero by apply mulm0.
+  lemma mul0m_simpl x : zero * x = zero by apply mul0m.
+  lemma mulm0_simpl x : x * zero = zero by apply mulm0.
   hint simplify mul0m_simpl, mulm0_simpl.
 
 end MonoidDI.
@@ -356,7 +356,7 @@ lemma xler_pmul2l (x:realp) : 0%rp < x =>
   rp x * y <= rp x * z <=> y <= z.
 proof. move=> hx y z; case: z => // z; case: y => // y; smt(to_realP). qed.
 
-lemma nosmt xler_wpmul2l (x : realp) (y z : xreal) :
+lemma xler_wpmul2l (x : realp) (y z : xreal) :
   y <= z => x%xr * y <= x%xr * z.
 proof. case: z => // z; case: y => // y; smt(to_realP). qed.
 
@@ -365,7 +365,7 @@ lemma xler_pmul2r (x:realp) : 0%rp < x =>
   y * rp x <= z * rp x <=> y <= z.
 proof. move=> hx y z; case: z => // z; case: y => // y; smt(to_realP). qed.
 
-lemma nosmt xler_wpmul2r (x : realp) (y z : xreal) :
+lemma xler_wpmul2r (x : realp) (y z : xreal) :
   y <= z => y * x%xr <= z * x%xr.
 proof. case: z => // z; case: y => // y; smt(to_realP). qed.
 

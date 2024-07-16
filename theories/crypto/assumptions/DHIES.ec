@@ -73,7 +73,7 @@ theory DHIES.
                               amap (fun pk k =>
                                    (g ^ x, k)) (zip pkl ks))).
 
-  lemma nosmt mencDHIES_menc pkl (kk : (Pk * (group * K)) list) tag ptxt :
+  lemma mencDHIES_menc pkl (kk : (Pk * (group * K)) list) tag ptxt :
     pkl = map (snd \o snd) kk =>
     menc pkl tag ptxt = dmap (mencDHIES tag ptxt kk) (List.map (snd \o snd)).
   proof.
@@ -189,7 +189,7 @@ theory DHIES.
   with type t1 <- Cph,
        type t2 <- Pk * (group * Cph).
 
-  lemma nosmt mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
+  lemma mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
   proof.
   proc.
   outline {1} [1] { mcph <@ MEncDHIES_loop.S.sample(encDHIES tag ptxt, kks); }.
@@ -221,7 +221,7 @@ theory DHIES.
   with type t1 <- K list,
        type t2 <- (Pk * (group * K)) list.
 
-  lemma nosmt mrndkeys_def : equiv [MEnc.mrndkeys1 ~ MEnc.mrndkeys2: ={pkl} ==> ={res}].
+  lemma mrndkeys_def : equiv [MEnc.mrndkeys1 ~ MEnc.mrndkeys2: ={pkl} ==> ={res}].
   proof.
   proc.
   outline {2} [2-3] { keys <@ MRnd_map.S.map(
@@ -249,7 +249,7 @@ theory DHIES.
   with type t <- (Pk * (group * K)) list,
        type u <- (Pk * (group * Cph)) list.
 
-  lemma nosmt mencrypt_def1: equiv [MEnc.mencrypt ~ Scheme.mencrypt: ={mpk, tag, ptxt} ==> ={res}].
+  lemma mencrypt_def1: equiv [MEnc.mencrypt ~ Scheme.mencrypt: ={mpk, tag, ptxt} ==> ={res}].
   proof.
   symmetry; proc.
   outline {1} [1] { cph <@ MEncrypt_map.S.sample(
@@ -277,7 +277,7 @@ theory DHIES.
        type t2 <- (Pk * (group * Cph)).
 
   (* we axiomatize operators based on the above module *)
-  lemma nosmt gendef: equiv [DHIES.gen ~ Scheme.gen : true ==>  ={res}].
+  lemma gendef: equiv [DHIES.gen ~ Scheme.gen : true ==>  ={res}].
   proof.
   proc; wp; rnd (fun x => (x, g ^ x)) (fun (x : exp * group)=> x.` 1); skip; progress.
     by move: H; rewrite /genDH supp_dmap; move => [x [Hx ->]].
@@ -288,7 +288,7 @@ theory DHIES.
   by rewrite /genDH supp_dmap; exists yL; split.
   qed.
 
-  lemma nosmt mencryptdef: equiv [DHIES.mencrypt ~ Scheme.mencrypt : ={mpk, tag, ptxt} ==> ={res}].
+  lemma mencryptdef: equiv [DHIES.mencrypt ~ Scheme.mencrypt : ={mpk, tag, ptxt} ==> ={res}].
   proof.
   proc*.
   rewrite equiv[{2} 1 -mencrypt_def1].
@@ -304,7 +304,7 @@ theory DHIES.
   by inline*; auto.
   qed.
 
-  lemma nosmt decryptdef: equiv [DHIES.decrypt ~ Scheme.decrypt : ={sk, tag, ctxt} ==>  ={res}].
+  lemma decryptdef: equiv [DHIES.decrypt ~ Scheme.decrypt : ={sk, tag, ctxt} ==>  ={res}].
   proof. by proc; wp; skip. qed.
 
 (** FIRST HOP: MULTIPLE ORACLE DIFFIE HELLMAN ASSUMPTION *****)
@@ -387,7 +387,7 @@ module Adv1(A : MRPKE_Adv, O : ODH_OrclT) = {
    }
 }.
 
-lemma nosmt L1 ['a,'b,'c,'d] (f: 'a->'b->('c*'d)) (s: 'a fset) (l: 'b list):
+lemma L1 ['a,'b,'c,'d] (f: 'a->'b->('c*'d)) (s: 'a fset) (l: 'b list):
  size l = size (elems s) =>
  amap f (zip (elems s) l)
  =
@@ -415,7 +415,7 @@ move=> /mapP [x [Hx //=]] [<<- [? ->]].
 by rewrite SmtMap.ofassoc_get.
 qed.
 
-lemma nosmt mem_mencDHIES cphs tag ptxt kk:
+lemma mem_mencDHIES cphs tag ptxt kk:
  cphs \in mencDHIES tag ptxt kk =>
  amap (fun k => fst) cphs
  = amap (fun k => fst) kk.
@@ -426,7 +426,7 @@ apply eq_in_map; rewrite /(\o) /= => *.
 by move: (H _ H0) => /=; rewrite supp_dmap; move=> [y [Hy1 /= ->]].
 qed.
 
-lemma nosmt ephmem_foldenc pk t c pks tag ptxt mctxt kk:
+lemma ephmem_foldenc pk t c pks tag ptxt mctxt kk:
  (pk \in map fst kk)%List =>
  mctxt \in mencDHIES tag ptxt kk =>
  (pk,t,c) \in fold_encs pks tag (SmtMap.ofassoc mctxt) =>
@@ -775,7 +775,7 @@ module Adv2(A : MRPKE_Adv, O : AEADmul_OraclesT) = {
    }
 }.
 
-lemma nosmt mem_fold_encs pk tag x pks l:
+lemma mem_fold_encs pk tag x pks l:
  pk \in elems pks =>
  assoc (zip (elems pks) l) pk = Some x =>
  (pk, tag, x) \in fold_encs pks tag (SmtMap.ofassoc (zip (elems pks) l)).
@@ -787,7 +787,7 @@ have ->: (pk,tag,x)
 rewrite mem_map // => a b; smt().
 qed.
 
-lemma nosmt map_iota ['a, 'b] d (f: 'a -> 'b) (l: 'a list):
+lemma map_iota ['a, 'b] d (f: 'a -> 'b) (l: 'a list):
  map f l = map (fun k=> f (nth d l k)) (iota_ 0 (size l)).
 proof.
 elim: l => //=.
