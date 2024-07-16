@@ -775,7 +775,8 @@ module MC = struct
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-            let cop = mk_op ~opaque:false (fst aty) (snd aty)
+            let cop = mk_op
+                        ~opaque:optransparent (fst aty) (snd aty)
                         (Some (OP_Constr (mypath, i))) loca in
             let cop = (ipath c, cop) in
               (c, cop)
@@ -819,7 +820,7 @@ module MC = struct
             let for1 i (f, aty) =
               let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-              let fop = mk_op ~opaque:false (fst aty) (snd aty)
+              let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
               let fop = (ipath f, fop) in
                 (f, fop)
@@ -841,7 +842,7 @@ module MC = struct
           let stop   =
             let stty = toarrow (List.map snd fields) (tconstr mypath params) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
-              mk_op ~opaque:false (fst stty) (snd stty) (Some (OP_Record mypath)) loca
+              mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in
 
           let mc =
@@ -896,7 +897,7 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
-            mk_op ~opaque:false [(self, Sp.singleton mypath)]
+            mk_op ~opaque:optransparent [(self, Sp.singleton mypath)]
               optype (Some OP_TC) loca
           in (opid, xpath opname, optype, opdecl)
         in
@@ -2710,7 +2711,7 @@ module Op = struct
           match mode with
           | `Force ->
              f
-          | `IfTransparent when not op.op_opaque ->
+          | `IfTransparent when not op.op_opaque.reduction ->
              f
           | `IfApplied when nargs >= odfl max_int op.op_unfold ->
              f

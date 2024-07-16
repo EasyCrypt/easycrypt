@@ -1119,7 +1119,7 @@ module Op = struct
           let codom    = TT.transty TT.tp_relax eenv ue pty in
           let _env, xs = TT.trans_binding eenv ue args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
-          let opabs    = EcDecl.mk_op ~opaque:false [] codom None lc in
+          let opabs    = EcDecl.mk_op ~opaque:optransparent [] codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
@@ -1149,7 +1149,10 @@ module Op = struct
     in
 
     let tags   = Sstr.of_list (List.map unloc op.po_tags) in
-    let opaque = Sstr.mem "opaque" tags in
+    let opaque = {
+      smt       = Sstr.mem "smt_opaque" tags;
+      reduction = Sstr.mem "opaque" tags
+    } in
     let unfold =
       match op.po_args with
       | (a, Some _) -> Some (List.length a)
@@ -1182,7 +1185,7 @@ module Op = struct
               let axop  =
                 let nargs = List.sum (List.map (List.length |- fst) args) in
                   EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
-              let tyop  = { tyop with op_opaque = true; } in
+              let tyop  = { tyop with op_opaque = { reduction = true; smt = false; }} in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope (unloc ax, axop)
 
@@ -1233,7 +1236,7 @@ module Op = struct
           let subst = Tvar.init
             (List.map fst tparams)
             (List.map (tvar |- fst) nparams) in
-          let rop = EcDecl.mk_op ~opaque:false nparams (Tvar.subst subst ty) None lc in
+          let rop = EcDecl.mk_op ~opaque:optransparent nparams (Tvar.subst subst ty) None lc in
           bind scope (unloc name, rop)
         in List.fold_left addnew scope op.po_aliases
 
@@ -1345,7 +1348,7 @@ module Op = struct
       op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain aout));
       op_loca     = op.ppo_locality;
-      op_opaque   = false;
+      op_opaque   = optransparent;
       op_clinline = false;
       op_unfold   = None;
     } in

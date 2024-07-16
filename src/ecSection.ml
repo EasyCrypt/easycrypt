@@ -812,7 +812,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
                        e_op path args opty) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
-        tg_subst, mk_op ~opaque:false tparams opty None `Global
+        tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
 
       | OB_pred None ->
         let fv = ty_fv_and_tvar operator.op_ty in
@@ -824,7 +824,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
                        f_op path args opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
-        tg_subst, mk_op ~opaque:false tparams opty None `Global
+        tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
 
       | OB_oper (Some body) ->
         let fv = op_body_fv body operator.op_ty in
@@ -860,7 +860,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
                 opf_branches = EcSubst.subst_branches subst opfix.opf_branches;
               }
         in
-        let operator = mk_op ~opaque:false tparams opty (Some body) `Global in
+        let operator =
+          mk_op ~opaque:operator.op_opaque tparams opty (Some body) `Global in
         tg_subst, operator
 
       | OB_pred (Some body) ->
@@ -890,7 +891,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           { op_tparams; op_ty;
             op_kind     = OB_pred (Some body);
             op_loca     = `Global;
-            op_opaque   = false;
+            op_opaque   = operator.op_opaque;
             op_clinline = operator.op_clinline;
             op_unfold   = operator.op_unfold; } in
         tg_subst, operator
@@ -906,7 +907,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           { op_tparams; op_ty;
             op_kind     = OB_nott nott;
             op_loca     = `Global;
-            op_opaque   = false;
+            op_opaque   = operator.op_opaque;
             op_clinline = operator.op_clinline;
             op_unfold   = operator.op_unfold; }
     in
