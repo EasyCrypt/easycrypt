@@ -460,7 +460,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               let tparams = EcUnify.UniEnv.tparams ue in
               let newop   =
                 mk_op
-                  ~opaque:false ~clinline:(opmode <> `Alias)
+                  ~opaque:optransparent ~clinline:(opmode <> `Alias)
                   tparams ty (Some (OP_Plain body)) refop.op_loca in
               (newop, body)
 

@@ -184,7 +184,7 @@ let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
     let body = f_lambda [thv, GTty thety] body in
 
     let op = Some (OP_Plain body) in
-    let op = mk_op ~opaque:false tparams body.f_ty op `Global in (* FIXME *)
+    let op = mk_op ~opaque:optransparent tparams body.f_ty op `Global in (* FIXME *)
 
     (cname, op) in
 
