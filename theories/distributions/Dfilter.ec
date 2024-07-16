@@ -29,23 +29,23 @@ lemma dfilter1E d (P:'a -> bool) (x:'a):
   mu1 (dfilter d P) x = if P x then 0%r else mu1 d x.
 proof. by rewrite muK 1:isdistr_mfilter 1:isdistr_mu1. qed.
 
-lemma nosmt dfilter1E_notin (d : 'a distr) P x:
+lemma dfilter1E_notin (d : 'a distr) P x:
   !P x => mu1 (dfilter d P) x = mu1 d x.
 proof. by rewrite dfilter1E=> ->. qed.
 
-lemma nosmt dfilter1E_in d P (x:'a):
+lemma dfilter1E_in d P (x:'a):
   P x => mu1 (dfilter d P) x = 0%r.
 proof. by rewrite dfilter1E => ->. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt dfilterE (d : 'a distr) P E:
+lemma dfilterE (d : 'a distr) P E:
   mu (dfilter d P) E = mu d (predI E (predC (P))).
 proof.
 rewrite !muE; apply/RealSeries.eq_sum=> x /=.
 by rewrite dfilter1E /predI /predC; case: (P x).
 qed.
 
-lemma nosmt dfilterE_subset (d : 'a distr) P E:
+lemma dfilterE_subset (d : 'a distr) P E:
   (forall x, E x => P x) =>
   mu (dfilter d P) E = 0%r.
 proof.
@@ -54,7 +54,7 @@ rewrite (@mu_eq _ _ pred0) 2:mu0 // => x @/pred0 /=.
 by rewrite neqF negb_and /= -implybE; exact/E_subset_P.
 qed.
 
-lemma nosmt dfilterE_indep (d : 'a distr) P E:
+lemma dfilterE_indep (d : 'a distr) P E:
   (forall x, !(E x /\ P x)) =>
   mu (dfilter d P) E = mu d E.
 proof.

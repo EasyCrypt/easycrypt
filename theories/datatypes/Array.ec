@@ -7,18 +7,18 @@ type 'a array.
 op mkarray : 'a list -> 'a array.
 op ofarray : 'a array -> 'a list.
 
-axiom nosmt mkarrayK : cancel ofarray<:'a> mkarray.
-axiom nosmt ofarrayK : cancel mkarray<:'a> ofarray.
+axiom mkarrayK : cancel ofarray<:'a> mkarray.
+axiom ofarrayK : cancel mkarray<:'a> ofarray.
 
-lemma nosmt arrayW (P : 'a array -> bool):
+lemma arrayW (P : 'a array -> bool):
      (forall s, P (mkarray s))
   => forall n, P n.
 proof. by move=> ih n; rewrite -mkarrayK; apply/ih. qed.
 
-lemma nosmt mkarray_inj: injective mkarray<:'a>.
+lemma mkarray_inj: injective mkarray<:'a>.
 proof. by apply/(can_inj _ _ ofarrayK). qed.
 
-lemma nosmt ofarray_inj: injective ofarray<:'a>.
+lemma ofarray_inj: injective ofarray<:'a>.
 proof. by apply/(can_inj _ _ mkarrayK). qed.
 
 (* -------------------------------------------------------------------- *)
@@ -41,15 +41,15 @@ proof. by rewrite sizeE ofarrayK. qed.
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: name scheme copied from List.nth. It looks ridiculous. *)
-lemma nosmt get_neg (arr : 'a array) (i : int):
+lemma get_neg (arr : 'a array) (i : int):
   i < 0 => arr.[i] = witness.
 proof. by rewrite getE; apply/nth_neg. qed.
 
-lemma nosmt get_default (arr : 'a array) (i : int):
+lemma get_default (arr : 'a array) (i : int):
   size arr <= i => arr.[i] = witness.
 proof. rewrite getE sizeE; apply/nth_default. qed.
 
-lemma nosmt arrayP (arr1 arr2 : 'a array):
+lemma arrayP (arr1 arr2 : 'a array):
   arr1 = arr2 <=>
   (size arr1 = size arr2
    /\ (forall i, 0 <= i < size arr1 => arr1.[i] = arr2.[i])).
@@ -59,7 +59,7 @@ apply/ofarray_inj/(eq_from_nth witness)=> [|i]; rewrite -!sizeE//.
 + by rewrite -!getE=> /eq_get.
 qed.
 
-lemma nosmt eq_from_get (arr1 arr2 : 'a array):
+lemma eq_from_get (arr1 arr2 : 'a array):
   size arr1 = size arr2 =>
   (forall i, 0 <= i < size arr1 => arr1.[i] = arr2.[i]) =>
   arr1 = arr2.

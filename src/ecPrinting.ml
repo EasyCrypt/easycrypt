@@ -2172,21 +2172,12 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
-  let pp_nosmt fmt =
-    let b =
-      match op with
-      | None -> false
-      | Some (OP_Plain (_, b)) -> b
-      | Some (OP_Fix { opf_nosmt = b }) -> b
-      | _ -> false
-    in if b then Format.fprintf fmt "@ nosmt" else () in
-
   let pp_body fmt =
     match op with
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some (OP_Plain (f, _)) ->
+    | Some (OP_Plain f) ->
         let ((subppe, pp_vds), f, has_vds) =
           let (vds, f) =
             match f.f_node with
@@ -2259,11 +2250,11 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   in
 
   match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op%t %a %t.@]"
-      pp_nosmt pp_opname ([], basename) pp_body
+  | [] -> Format.fprintf fmt "@[<hov 2>op%a %t.@]"
+      pp_opname ([], basename) pp_body
   | _  ->
-      Format.fprintf fmt "@[<hov 2>op%t %a %a %t.@]"
-        pp_nosmt pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
+        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =

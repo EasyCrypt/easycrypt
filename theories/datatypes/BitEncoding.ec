@@ -38,7 +38,7 @@ proof.
   by rewrite nseqS // bs2int_cons /b2i => ->.
 qed.
 
-lemma nosmt bs2int_rcons b (s : bool list):
+lemma bs2int_rcons b (s : bool list):
   bs2int (rcons s b) = (bs2int s) + 2^(size s) * (b2i b).
 proof.
 rewrite /bs2int size_rcons BIA.big_int_recr ?size_ge0 //=.
@@ -73,7 +73,7 @@ proof.
   by apply/ltzS/ltr_subl_addr/ltr_subr_addr; move/mem_range: HK_range.
 qed.
 
-lemma nosmt int2bsS N i : 0 <= N =>
+lemma int2bsS N i : 0 <= N =>
   int2bs (N + 1) i = rcons (int2bs N i) ((i %/ 2^N) %% 2 <> 0).
 proof. by apply/mkseqS. qed.
 
@@ -117,7 +117,7 @@ proof.
   by rewrite -{1}(mul1r (2 ^ K)) -mulNr mulzK //=; apply/gtr_eqF/expr_gt0.
 qed.
 
-lemma nosmt bs2int_eq N i j: 0 <= i => 0 <= j => i %% 2^N = j %% 2^N =>
+lemma bs2int_eq N i j: 0 <= i => 0 <= j => i %% 2^N = j %% 2^N =>
   int2bs N i = int2bs N j.
 proof.
 move=> ge0_i ge0_j eq; apply/eq_in_mkseq=> k [ge0_k lt_kN] /=.
@@ -554,14 +554,14 @@ theory BitChunking.
 op chunk r (bs : 'a list) =
   mkseq (fun i => take r (drop (r * i)%Int bs)) (size bs %/ r).
 
-lemma nosmt chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
+lemma chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.
 move/ler_eqVlt=> [->|gt0_r] @/chunk; 1: by rewrite mkseq0.
 rewrite mkseq0_le // -oppr_ge0 -divzN.
 by rewrite divz_ge0 ?size_ge0 oppr_gt0.
 qed.
 
-lemma nosmt nth_flatten x0 n (bs : 'a list list) i :
+lemma nth_flatten x0 n (bs : 'a list list) i :
      all (fun s => size s = n) bs
   => nth x0 (flatten bs) i = nth x0 (nth [] bs (i %/ n)) (i %% n).
 proof.

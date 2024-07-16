@@ -2704,7 +2704,7 @@ module Op = struct
     let op = oget (by_path_opt p env) in
 
     match op.op_kind with
-    | OB_oper (Some (OP_Plain (f, _)))
+    | OB_oper (Some (OP_Plain f))
     | OB_pred (Some (PR_Plain f)) -> begin
         let f =
           match mode with
