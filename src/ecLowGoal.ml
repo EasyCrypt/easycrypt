@@ -2440,7 +2440,7 @@ let t_smt ~(mode:smtmode) pi tc =
 let t_coq ~loc ~name ~(mode:smtmode) coqmode pi tc =
   let error () =
     match mode with
-    | `Standard ->
+    | `Sloppy ->
         tc_error !!tc ~catchable:true  "cannot prove goal"
     | `Strict ->
         tc_error !!tc ~catchable:false "cannot prove goal (strict)"

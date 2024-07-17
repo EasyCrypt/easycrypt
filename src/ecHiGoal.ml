@@ -156,7 +156,7 @@ let process_coq ~loc ~name (ttenv : ttenv) coqmode  pi (tc : tcenv1) =
   | `Admit ->
     t_admit tc
 
-  | (`Standard | `Strict) as mode ->
+  | (`Sloppy | `Strict) as mode ->
     t_seq (t_simplify ~delta:`No) (t_coq ~loc ~name ~mode coqmode pi) tc
 
   | `Report ->
