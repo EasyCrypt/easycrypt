@@ -24,20 +24,11 @@ let get_to_gens fs =
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
-let t_hr_exists_elim_r ?bound tc =
+let t_hr_exists_elim_r ?(bound : int option) (tc : tcenv1) =
   let pre = tc1_get_pre tc in
   let bd, pre =
-    try  destr_exists_prenex pre
+    try  destr_exists_prenex ?bound pre
     with DestrError _ -> [], pre in
-  let bd, pre =
-    bound
-      |> omap (fun bound ->
-             let bound = min bound (List.length bd) in
-             let bd1, bd2 = List.takedrop bound bd in
-
-             (bd1, f_exists bd2 pre))
-      |? (bd, pre) in
-
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
 
