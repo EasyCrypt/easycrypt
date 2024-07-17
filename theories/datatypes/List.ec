@@ -3472,7 +3472,11 @@ theory InsertSort.
   proof. by move=> e_ltgt; elim: s => //= x s IHs; apply sorted_insert. qed.
 end InsertSort.
 
-op sort (e : 'a -> 'a -> bool) s = InsertSort.sort e s axiomatized by sortE.
+op [opaque] sort (e : 'a -> 'a -> bool) s = InsertSort.sort e s.
+
+lemma sortE ['a] (e : 'a -> 'a -> bool) s :
+  sort e s = InsertSort.sort e s.
+proof. by rewrite /sort. qed.
 
 lemma perm_sort e (s : 'a list): perm_eq (sort e s) s.
 proof. by rewrite sortE /=; apply InsertSort.perm_sort. qed.
