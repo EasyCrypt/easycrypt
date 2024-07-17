@@ -376,6 +376,16 @@ lemma if_same b (vT : 'a) :
   (if b then vT else vT) = vT
 by [].
 
+(* -------------------------------------------------------------------- *)
+lemma iftrue ['a] (b : bool) (x y : 'a) :
+  b => (if b then x else y) = x.
+proof. by move=> ->. qed.
+
+lemma iffalse ['a] (b : bool) (x y : 'a) :
+  !b => (if b then x else y) = y.
+proof. by move=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma  if_neg b (vT vF : 'a) :
   (if !b then vT else vF) = if b then vF else vT
 by smt().
