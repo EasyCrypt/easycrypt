@@ -729,7 +729,7 @@ module MC = struct
       let axp  = EcPath.prefix (Lazy.force mypath) in
       let axp  = IPPath (EcPath.pqoname axp name) in
       let ax   =
-        { ax_kind       = `Axiom (Ssym.empty, false);
+        { ax_kind       = `Lemma;
           ax_tparams    = tv;
           ax_spec       = cl;
           ax_loca       = (snd obj).op_loca;
@@ -787,7 +787,7 @@ module MC = struct
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams    = tyd.tyd_params;
                            ax_spec       = scheme;
-                           ax_kind       = `Axiom (Ssym.empty, false);
+                           ax_kind       = `Lemma;
                            ax_loca       = loca;
                            ax_visibility = `NoSmt;
                 })
@@ -832,7 +832,7 @@ module MC = struct
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams    = tyd.tyd_params;
                          ax_spec       = scheme;
-                         ax_kind       = `Axiom (Ssym.empty, false);
+                         ax_kind       = `Lemma;
                          ax_loca       = loca;
                          ax_visibility = `NoSmt;
               })
@@ -919,7 +919,7 @@ module MC = struct
             let ax = EcSubst.subst_form fsubst ax in
               (x, { ax_tparams    = [(self, Sp.singleton mypath)];
                     ax_spec       = ax;
-                    ax_kind       = `Axiom (Ssym.empty, false);
+                    ax_kind       = `Lemma;
                     ax_loca       = loca;
                     ax_visibility = `NoSmt; }))
           tc.tc_axs

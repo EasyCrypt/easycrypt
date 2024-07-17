@@ -1767,7 +1767,7 @@ module Ty = struct
           let ax = {
               ax_tparams    = [];
               ax_spec       = f;
-              ax_kind       = `Axiom (Ssym.empty, false);
+              ax_kind       = `Lemma;
               ax_visibility = `NoSmt;
               ax_loca       = lc;
           } in
