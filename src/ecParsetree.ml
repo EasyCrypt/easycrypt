@@ -451,10 +451,11 @@ type 'a ppt_head =
 
 type ppt_arg =
   | EA_none
-  | EA_form  of pformula
-  | EA_mem   of pmemory
-  | EA_mod   of pmsymbol located
-  | EA_proof of (pformula option) gppterm
+  | EA_form   of pformula
+  | EA_mem    of pmemory
+  | EA_mod    of pmsymbol located
+  | EA_proof  of (pformula option) gppterm
+  | EA_tactic of [`Done | `Smt | `DoneSmt]
 
 and 'a gppterm = {
   fp_mode : [`Implicit | `Explicit];
