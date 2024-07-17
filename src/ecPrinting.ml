@@ -2250,7 +2250,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   in
 
   match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op%a %t.@]"
+  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
       pp_opname ([], basename) pp_body
   | _  ->
       Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
