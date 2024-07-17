@@ -2339,10 +2339,10 @@ intro_pattern:
    { IPDone (Some `Variant) }
 
 | SLASHSHARP
-   { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt false }
 
 | SLASHSLASHSHARP
-   { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt true }
 
 | SLASHEQ
    { IPSimplify `Default }
@@ -2395,6 +2395,15 @@ gpterm_arg:
     exp=iboption(AT) p=qident tvi=tvars_app? args=loc(gpterm_arg)*
   RPAREN
     { EA_proof (mk_pterm exp (FPNamed (p, tvi)) args) }
+
+| SLASHSLASH
+    { EA_tactic `Done }
+
+| SLASHSHARP
+    { EA_tactic `Smt }
+
+| SLASHSLASHSHARP
+    { EA_tactic `DoneSmt }
 
 gpterm(F):
 | hd=gpterm_head(F)
@@ -2453,10 +2462,10 @@ rwarg1:
    { RWDone (Some `Variant) }
 
 | SLASHSHARP
-   { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (false, None) }
 
 | SLASHSLASHSHARP
-   { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (true, None) }
 
 | SLASHEQ
    { RWSimpl `Default }
@@ -2477,13 +2486,13 @@ rwarg1:
    { RWApp f }
 
 | SHARP SMT
-   { RWSmt (false, SMT.mk_smt_option []) }
+   { RWSmt (false, Some (SMT.mk_smt_option [])) }
 
 | SHARP SMT COLON pi=bracket(smt_info)
-   { RWSmt (false, pi) }
+   { RWSmt (false, Some pi) }
 
 | SHARP SMT COLON dbmap=paren(dbmap1*)
-   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
+   { RWSmt (false, Some (SMT.mk_smt_option [`WANTEDLEMMAS dbmap])) }
 
 | SHARP x=ident {
     let tactics = [("ring", `Ring); ("field", `Field)] in

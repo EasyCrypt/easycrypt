@@ -451,10 +451,11 @@ type 'a ppt_head =
 
 type ppt_arg =
   | EA_none
-  | EA_form  of pformula
-  | EA_mem   of pmemory
-  | EA_mod   of pmsymbol located
-  | EA_proof of (pformula option) gppterm
+  | EA_form   of pformula
+  | EA_mem    of pmemory
+  | EA_mod    of pmsymbol located
+  | EA_proof  of (pformula option) gppterm
+  | EA_tactic of [`Done | `Smt | `DoneSmt]
 
 and 'a gppterm = {
   fp_mode : [`Implicit | `Explicit];
@@ -835,7 +836,7 @@ and rwarg1 =
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
   | RWDone   of [`Default | `Variant] option
-  | RWSmt    of (bool * pprover_infos)
+  | RWSmt    of (bool * pprover_infos option)
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
@@ -866,7 +867,7 @@ type intropattern1 =
   | IPSubst    of (rwside * (int option) option)
   | IPClear    of psymbol list
   | IPDone     of [`Default | `Variant] option
-  | IPSmt      of (bool * pprover_infos)
+  | IPSmt      of bool
   | IPSubstTop of (int option * [`LtoR | `RtoL] option)
   | IPSimplify of [`Default | `Variant]
   | IPCrush    of crushmode

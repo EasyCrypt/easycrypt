@@ -2,6 +2,10 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
+module DSet = BatSet
+module DMap = BatMap
+
+(* -------------------------------------------------------------------- *)
 module Map = struct
   module type OrderedType = Why3.Extmap.OrderedType
 
