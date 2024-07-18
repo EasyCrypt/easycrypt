@@ -9,7 +9,7 @@ op convex (f : real -> real) (a b : real) =
   forall d, 0%r <= d <= 1%r =>
      f (d * a + (1%r - d) * b) <= d * f a + (1%r - d) * f b.
 
-lemma nosmt segment_coeff (a b x : real) : a <= x <= b =>
+lemma segment_coeff (a b x : real) : a <= x <= b =>
   exists d, 0%r <= d <= 1%r /\ x = d * a + (1%r - d) * b.
 proof.
 move=> x_in_ab; case (b - a = 0%r)=> [/# | nz_aBb].

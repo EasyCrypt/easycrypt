@@ -541,13 +541,13 @@ proof. by rewrite -expM=> /ZModpRing.mulrV ->; exact/exp1. qed.
 
 lemma expgK' (x : group) : x = g ^ log x by rewrite expgK.
 
-lemma nosmt logg1 : loge g = one by rewrite -exp1 loggK.
+lemma logg1 : loge g = one by rewrite -exp1 loggK.
 
 lemma logrzM' (x : group) (a : exp) : loge (x ^ a) = loge x * a
   by rewrite logrzM; algebra.
 
 (* Isn't it just inj? *)
-lemma nosmt log_bij (x y : group) : x = y <=> loge x = loge y.
+lemma log_bij (x y : group) : x = y <=> loge x = loge y.
 proof.
 split => [/#|]; suff mono_exp : forall x, exists (kx : exp), x = g ^ kx
   by move: (mono_exp x) (mono_exp y) => [kx ->] [ky ->]; rewrite !loggK => ->.
@@ -558,16 +558,16 @@ suff: kr = asint (inzmod k) by smt().
 by rewrite /kr /inzmod /asint Sub.insubdK; smt(gt0_order ltz_pmod modz_ge0).
 qed.
 
-lemma nosmt pow_bij (x y : exp) : x = y <=> g ^ x = g ^ y
+lemma pow_bij (x y : exp) : x = y <=> g ^ x = g ^ y
   by rewrite -loggK -(loggK y) !expgK -log_bij.
 
-lemma nosmt inv_def (a : group) : inv a = g ^ (-loge a)
+lemma inv_def (a : group) : inv a = g ^ (-loge a)
   by rewrite log_bij logrV loggK.
 
-lemma nosmt div_def (a b : group): g ^ (loge a - loge b) = a / b
+lemma div_def (a b : group): g ^ (loge a - loge b) = a / b
   by rewrite log_bij logDrN loggK.
 
-lemma nosmt g_neq0 : g ^ zero <> g
+lemma g_neq0 : g ^ zero <> g
   by rewrite -{2}[g]exp1 -pow_bij; smt(ZModpField.unitr1).
 
 lemma mulN (x : group) : x * inv x = g ^ zero by rewrite mulcV -(exp0 g).

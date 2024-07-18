@@ -12,114 +12,114 @@ abbrev ( - ) (x y : int) = x + (-y).
 
 abbrev "`|_|" = CoreInt.absz.
 
-lemma nosmt intind (p:int -> bool):
+lemma intind (p:int -> bool):
   (p 0) =>
   (forall i, 0 <= i => p i => p (i + 1)) =>
   (forall i, 0 <= i => p i).
 proof. exact/CoreInt.intind. qed.
 
 (* -------------------------------------------------------------------- *)
-axiom nosmt addzA     : forall x y z, x + (y + z) = (x + y) + z.
-axiom nosmt addzC     : forall x y, x + y = y + x.
-axiom nosmt addz0     : forall x, x + 0 = x.
-axiom nosmt add0z     : forall x, 0 + x = x.
-axiom nosmt addzN     : forall x, x - x = 0.
-axiom nosmt addNz     : forall x, -x + x = 0.
-axiom nosmt mulzA     : forall x y z, (x * y) * z = x * (y * z).
-axiom nosmt mulzC     : forall x y, x * y = y * x.
-axiom nosmt mulz1     : forall x, x * 1 = x.
-axiom nosmt mul1z     : forall x, 1 * x = x.
-axiom nosmt mulzDl    : forall x y z, (x + y) * z = x * z + y * z.
-axiom nosmt mulzDr    : forall x y z, x * (y + z) = x * y + x * z.
-axiom nosmt onez_neq0 : 1 <> 0.
+lemma addzA     : forall x y z, x + (y + z) = (x + y) + z    by smt().
+lemma addzC     : forall x y, x + y = y + x                  by smt().
+lemma addz0     : forall x, x + 0 = x                        by smt().
+lemma add0z     : forall x, 0 + x = x                        by smt().
+lemma addzN     : forall x, x - x = 0                        by smt().
+lemma addNz     : forall x, -x + x = 0                       by smt().
+lemma mulzA     : forall x y z, (x * y) * z = x * (y * z)    by smt().
+lemma mulzC     : forall x y, x * y = y * x                  by smt().
+lemma mulz1     : forall x, x * 1 = x                        by smt().
+lemma mul1z     : forall x, 1 * x = x                        by smt().
+lemma mulzDl    : forall x y z, (x + y) * z = x * z + y * z  by smt().
+lemma mulzDr    : forall x y z, x * (y + z) = x * y + x * z  by smt().
+lemma onez_neq0 : 1 <> 0                                     by smt().
 
 (* -------------------------------------------------------------------- *)
-axiom nosmt lezz      : forall x, x <= x.
-axiom nosmt lez_trans : forall y x z, x <= y => y <= z => x <= z.
-axiom nosmt ltz_trans : forall y x z, x < y => y < z => x < z.
-axiom nosmt lez_anti  : forall (x y : int), x <= y <= x => x = y.
-axiom nosmt lez01     : 0 <= 1.
-axiom nosmt lez_total : forall x y, x <= y \/ y <= x.
+lemma lezz      : forall x, x <= x                           by smt().
+lemma lez_trans : forall y x z, x <= y => y <= z => x <= z   by smt().
+lemma ltz_trans : forall y x z, x < y => y < z => x < z      by smt().
+lemma lez_anti  : forall (x y : int), x <= y <= x => x = y   by smt().
+lemma lez01     : 0 <= 1                                     by smt().
+lemma lez_total : forall x y, x <= y \/ y <= x               by smt().
 
 (* -------------------------------------------------------------------- *)
-axiom nosmt subzz (z : int): z - z = 0.
-axiom nosmt subz0 (z : int): z - 0 = z.
+lemma subzz (z : int): z - z = 0 by smt().
+lemma subz0 (z : int): z - 0 = z by smt().
 
-axiom nosmt oppzK: forall (x  : int), -(-x) = x.
-axiom nosmt oppz0: -0 = 0.
+lemma oppzK: forall (x  : int), -(-x) = x by smt().
+lemma oppz0: -0 = 0 by smt().
 
-axiom nosmt addzCA (x y z : int): x + (y + z) = y + (x + z).
-axiom nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y.
+lemma addzCA (x y z : int): x + (y + z) = y + (x + z) by smt().
+lemma addzAC (x y z : int): (x + y) + z = (x + z) + y by smt().
 
-axiom nosmt addzI  (x y z : int): x + y = x + z => y = z.
-axiom nosmt addIz  (x y z : int): y + x = z + x => y = z.
+lemma addzI  (x y z : int): x + y = x + z => y = z by smt().
+lemma addIz  (x y z : int): y + x = z + x => y = z by smt().
 
-axiom nosmt addzK (y x : int): (x + y) - y = x.
-axiom nosmt addKz (y x : int): -y + (y + x) = x.
+lemma addzK (y x : int): (x + y) - y = x by smt().
+lemma addKz (y x : int): -y + (y + x) = x by smt().
 
-axiom nosmt subz_add2r (x y z : int): (x + z) - (y + z) = x - y.
+lemma subz_add2r (x y z : int): (x + z) - (y + z) = x - y by smt().
 
-axiom nosmt lez_norm_add (x y : int): `|x + y| <= `|x| + `|y|.
+lemma lez_norm_add (x y : int): `|x + y| <= `|x| + `|y| by smt().
 
-axiom nosmt addz_gt0 (x y : int): 0 < x => 0 < y => 0 < x + y.
+lemma addz_gt0 (x y : int): 0 < x => 0 < y => 0 < x + y by smt().
 
-axiom nosmt normz_eq0 (x   : int): `|x| = 0 => x = 0.
+lemma normz_eq0 (x   : int): `|x| = 0 => x = 0 by smt().
 
-axiom nosmt normzM (x y : int): `|x * y| = `|x| * `|y|.
+lemma normzM (x y : int): `|x * y| = `|x| * `|y| by smt().
 
-axiom nosmt lez_def (x y : int): x <= y <=> `|y - x| = y - x.
-axiom nosmt ltz_def (x y : int): x < y <=> ( y <> x /\ x <= y).
+lemma lez_def (x y : int): x <= y <=> `|y - x| = y - x by smt().
+lemma ltz_def (x y : int): x < y <=> (y <> x /\ x <= y) by smt().
 
-axiom nosmt ltzz (z : int): z < z <=> false.
+lemma ltzz (z : int): z < z <=> false by smt().
 
-axiom nosmt ltzNge (x y : int): (x <  y) <=> !(y <= x).
-axiom nosmt lezNgt (x y : int): (x <= y) <=> !(y <  x).
+lemma ltzNge (x y : int): (x <  y) <=> !(y <= x) by smt().
+lemma lezNgt (x y : int): (x <= y) <=> !(y <  x) by smt().
 
-axiom nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x).
-axiom nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x).
+lemma neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by smt().
+lemma eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by smt().
 
-axiom nosmt lez_add2l (x y z : int): (x + y <= x + z) <=> (y <= z).
-axiom nosmt lez_add2r (x y z : int): (y + x <= z + x) <=> (y <= z).
+lemma lez_add2l (x y z : int): (x + y <= x + z) <=> (y <= z) by smt().
+lemma lez_add2r (x y z : int): (y + x <= z + x) <=> (y <= z) by smt().
 
-axiom nosmt ltz_add2l (x y z : int): (x + y <  x + z) <=> (y < z).
-axiom nosmt ltz_add2r (x y z : int): (y + x <  z + x) <=> (y < z).
+lemma ltz_add2l (x y z : int): (x + y <  x + z) <=> (y < z) by smt().
+lemma ltz_add2r (x y z : int): (y + x <  z + x) <=> (y < z) by smt().
 
-axiom nosmt lez_addl (x y : int) : (x <= x + y) = (0 <= y).
-axiom nosmt lez_addr (x y : int) : (x <= y + x) = (0 <= y).
+lemma lez_addl (x y : int) : (x <= x + y) = (0 <= y) by smt().
+lemma lez_addr (x y : int) : (x <= y + x) = (0 <= y) by smt().
 
-axiom nosmt ltz_addl (x y : int) : (x < x + y) = (0 < y).
-axiom nosmt ltz_addr (x y : int) : (x < y + x) = (0 < y).
+lemma ltz_addl (x y : int) : (x < x + y) = (0 < y) by smt().
+lemma ltz_addr (x y : int) : (x < y + x) = (0 < y) by smt().
 
-axiom nosmt addz_ge0 (x y : int) : 0 <= x => 0 <= y => 0 <= x + y.
+lemma addz_ge0 (x y : int) : 0 <= x => 0 <= y => 0 <= x + y by smt().
 
-axiom nosmt lez_add1r (x y : int): (1 + x <= y) = (x < y).
+lemma lez_add1r (x y : int): (1 + x <= y) = (x < y) by smt().
 
-axiom nosmt subz_ge0 x y : (0 <= y - x) = (x <= y).
-axiom nosmt subz_gt0 x y : (0 < y - x) = (x < y).
-axiom nosmt subz_le0 x y : (y - x <= 0) = (y <= x).
-axiom nosmt subz_lt0  x y : (y - x < 0) = (y < x).
+lemma subz_ge0 x y : (0 <= y - x) = (x <= y) by smt().
+lemma subz_gt0 x y : (0 < y - x) = (x < y)   by smt().
+lemma subz_le0 x y : (y - x <= 0) = (y <= x) by smt().
+lemma subz_lt0  x y : (y - x < 0) = (y < x)  by smt().
 
-axiom nosmt oppz_ge0 x : (0 <= - x) = (x <= 0).
-axiom nosmt oppz_gt0 x : (0 < - x) = (x < 0).
-axiom nosmt oppz_le0 x : (- x <= 0) = (0 <= x).
-axiom nosmt oppz_lt0 x : (- x < 0) = (0 < x).
+lemma oppz_ge0 x : (0 <= - x) = (x <= 0) by smt().
+lemma oppz_gt0 x : (0 < - x) = (x < 0)   by smt().
+lemma oppz_le0 x : (- x <= 0) = (0 <= x) by smt().
+lemma oppz_lt0 x : (- x < 0) = (0 < x)   by smt().
 
-axiom nosmt lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1).
-axiom nosmt ltzW (z1 z2 : int) : (z1 < z2) => (z1 <= z2).
+lemma lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1) by smt().
+lemma ltzW (z1 z2 : int) : (z1 < z2) => (z1 <= z2)   by smt().
 
-axiom nosmt addz1_neq0 (i : int) : 0 <= i => i+1 <> 0.
-axiom nosmt add1z_neq0 (i : int) : 0 <= i => 1+i <> 0.
-axiom nosmt addz1_neqC0 (i : int): 0 <= i => 0 <> i+1.
-axiom nosmt add1z_neqC0 (i : int): 0 <= i => 0 <> 1+i.
+lemma addz1_neq0 (i : int) : 0 <= i => i+1 <> 0 by smt().
+lemma add1z_neq0 (i : int) : 0 <= i => 1+i <> 0 by smt().
+lemma addz1_neqC0 (i : int): 0 <= i => 0 <> i+1 by smt().
+lemma add1z_neqC0 (i : int): 0 <= i => 0 <> 1+i by smt().
 
 hint rewrite addz_neq0 : addz1_neq0 add1z_neq0 addz1_neqC0 add1z_neqC0.
 
-axiom nosmt lez_eqVlt : forall x y, (x <= y) <=> ((x = y) \/ (x < y)).
+lemma lez_eqVlt : forall x y, (x <= y) <=> ((x = y) \/ (x < y)) by smt().
 
-axiom nosmt lez_lt_asym x y : !(x <= y < x).
+lemma lez_lt_asym x y : !(x <= y < x) by smt().
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt natind (p : int -> bool):
+lemma natind (p : int -> bool):
      (forall n, n <= 0 => p n)
   => (forall n, 0 <= n => p n => p (n+1))
   => forall n, p n.
@@ -128,13 +128,13 @@ move=> ihn ihp n; case: (lezWP 0 n)=> [|_ /ihn] //.
 by elim/intind: n => [|i /ihp]; first by apply/ihn.
 qed.
 
-lemma nosmt natcase (p : int -> bool):
+lemma natcase (p : int -> bool):
      (forall n, n <= 0 => p n)
   => (forall n, 0 <= n => p (n+1))
   => forall n, p n.
 proof. by move=> ihn ihp; elim/natind=> [n /ihn|n /ihp]. qed.
 
-lemma nosmt ge0ind (p : int -> bool):
+lemma ge0ind (p : int -> bool):
      (forall n, n < 0 => p n)
   => p 0
   => (forall n, 0 <= n => p n => p (n+1))
@@ -144,14 +144,14 @@ move=> ihn ih0 ihp; elim/natind=> [n|n /ihp] //.
 by rewrite lez_eqVlt=> -[->|/ihn].
 qed.
 
-lemma nosmt ge0case (p : int -> bool):
+lemma ge0case (p : int -> bool):
      (forall n, n < 0 => p n)
   => p 0
   => (forall n, 0 <= n => p (n+1))
   => forall n, p n.
 proof. by move=> ihn ih0 ihp n; apply/ge0ind=> // k /ihp. qed.
 
-lemma nosmt intwlog (p:int -> bool):
+lemma intwlog (p:int -> bool):
   (forall i, p (-i) => p i) =>
   (p 0) =>
   (forall i, 0 <= i => p i => p (i + 1)) =>
@@ -162,7 +162,7 @@ move=> {ih0 ihS} ih i; case: (lezWP 0 i); 1: by apply/ih.
 by move=> _ le0_i; apply/wlog/ih; rewrite oppz_ge0.
 qed.
 
-lemma nosmt intswlog (p:int -> bool):
+lemma intswlog (p:int -> bool):
   ((forall i, 0 <= i => p i) => (forall i, i < 0 => p i)) =>
   (p 0) =>
   (forall i, 0 <= i => p i => p (i + 1)) =>
@@ -173,7 +173,7 @@ move=> {ih0 ihS} ih i; case: (0 <= i); 1: by apply/ih.
 by rewrite lezNgt /=; apply/wlog/ih.
 qed.
 
-lemma nosmt sintind (p : int -> bool):
+lemma sintind (p : int -> bool):
   (forall i, 0 <= i => (forall j, 0 <= j < i => p j) => p i) =>
   (forall i, 0 <= i => p i).
 proof.
@@ -334,15 +334,21 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* TO BE REMOVED                                                        *)
 
-op fold : ('a -> 'a) -> 'a -> int -> 'a.
+op [opaque] fold ['a] (f : 'a -> 'a) (x : 'a) (i : int) =
+  iter i f x.
 
-axiom foldle0 p (f : 'a -> 'a) a: p <= 0 => fold f a p = a.
-axiom foldS (f : 'a -> 'a) a n: 0 <= n => fold f a (n+1) = f (fold f a n).
+lemma foldle0 (p : int) (f : 'a -> 'a) (a : 'a) :
+ p <= 0 => fold f a p = a.
+proof. by move=> @/fold; apply: iter0. qed.
+
+lemma foldS (f : 'a -> 'a) (a : 'a) (n : int) :
+  0 <= n => fold f a (n+1) = f (fold f a n).
+proof. by move=> @/fold; apply: iterS. qed.
 
 lemma fold0 (f : 'a -> 'a) a: fold f a 0 = a.
 proof. by rewrite foldle0. qed.
 
-lemma nosmt foldpos (f : 'a -> 'a) a n: 0 < n =>
+lemma foldpos (f : 'a -> 'a) a n: 0 < n =>
   f (fold f a (n-1)) = fold f a n.
 proof. by move=> gt0_n; rewrite -foldS /#. qed.
 

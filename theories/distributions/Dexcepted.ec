@@ -20,11 +20,11 @@ proof.
 by rewrite dscale1E weight_drestrict drestrict1E mu_not /predC; case: (P x). 
 qed.
 
-lemma nosmt dexcepted1E_notin (d : 'a distr) P x:
+lemma dexcepted1E_notin (d : 'a distr) P x:
   !P x => mu1 (d \ P) x = (mu1 d x / (weight d - mu d (P))).
 proof. by rewrite dexcepted1E => ->. qed.
 
-lemma nosmt dexcepted1E_in d P (x:'a):
+lemma dexcepted1E_in d P (x:'a):
   P x => mu1 (d \ P) x = 0%r.
 proof. by rewrite dexcepted1E => ->. qed.
 
@@ -33,7 +33,7 @@ lemma dexceptedE d P (E : 'a -> bool) :
   = mu d (predI E (predC P)) / (weight d - mu d P).
 proof. by rewrite dscaleE weight_drestrict drestrictE predIC mu_not. qed.
 
-lemma nosmt weight_dexcepted (d:'a distr) P :
+lemma weight_dexcepted (d:'a distr) P :
   weight (d \ P) = b2r (weight d <> mu d P).
 proof.
 by rewrite weight_dscale weight_drestrict mu_not /#.

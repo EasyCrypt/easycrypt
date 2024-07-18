@@ -17,7 +17,7 @@ op allperms (s : 'a list) = allperms_r (nseq (size s) tt) s.
 hint rewrite ap_r : allperms_r0 allperms_rS.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt allperms_rP n (s t : 'a list) : size s = size n =>
+lemma allperms_rP n (s t : 'a list) : size s = size n =>
   (mem (allperms_r n s) t) <=> (perm_eq s t).
 proof.
 elim: n s t => [s t /size_eq0 ->|? n ih s t] //=; rewrite ?ap_r /=.
@@ -49,7 +49,7 @@ by have/perm_eqrE <- := eq_st; apply/perm_cons/perm_eq_sym/perm_to_rem.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt uniq_allperms_r n (s : 'a list) : uniq (allperms_r n s).
+lemma uniq_allperms_r n (s : 'a list) : uniq (allperms_r n s).
 proof.
 elim: n s => [|? n ih] s; rewrite ?ap_r  //.
 apply/uniq_flatten_map/undup_uniq.

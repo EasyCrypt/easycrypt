@@ -13,7 +13,7 @@ move=> pN; rewrite /argmin choiceb_dfl => //= x; rewrite !negb_and -implybE => l
 by rewrite -implybE => px; move: (pN _ le0x).
 qed.
 
-lemma nosmt argminP_r (f : int -> 'a) p i: 0 <= i => p (f i) =>
+lemma argminP_r (f : int -> 'a) p i: 0 <= i => p (f i) =>
      0 <= argmin f p
   /\ p (f (argmin f p))
   /\ forall i, 0 <= i < (argmin f p) => !p (f i).

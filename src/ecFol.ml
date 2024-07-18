@@ -984,44 +984,48 @@ let f_dlet_simpl tya tyb d f =
  * - p1 => E x p2 -> [x] (p1 => p2)
  * - E x p1 => p2 -> [] (E x p1 => p2)
  *)
-let destr_exists_prenex f =
-  let rec prenex_exists bds p =
-    match sform_of_form p with
-    | SFand (`Sym, (f1, f2)) ->
-      let (bds, f2) = prenex_exists bds f2 in
-      let (bds, f1) = prenex_exists bds f1 in
+let destr_exists_prenex ?(bound : int option) (f : form) =
+  let rec prenex_exists ~bound bds p =
+    match bound, sform_of_form p with
+    | Some bound, _ when bound <= 0 ->
+      (bds, p)
+
+    | None, SFand (`Sym, (f1, f2)) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
       (bds, f_and f1 f2)
 
-    | SFor (`Sym, (f1, f2)) ->
-      let (bds, f2) = prenex_exists bds f2 in
-      let (bds, f1) = prenex_exists bds f1 in
+    | None, SFor (`Sym, (f1, f2)) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
       (bds, f_or f1 f2)
 
-    | SFimp (f1, f2) ->
-      let (bds, f2) = prenex_exists bds f2 in
+    | None, SFimp (f1, f2) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
       (bds, f_imp f1 f2)
 
-    | SFquant (Lexists, bd, lazy p) ->
-      let bd, p   =
+    | None, SFif (f, f1, f2) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
+      (bds, f_if f f1 f2)
+  
+    | bound, SFquant (Lexists, bd, lazy p) ->
+      let bound = Option.map (fun x -> x - 1) bound in
+      let bd, p =
         let s = Fsubst.f_subst_init ~freshen:true () in
         let s, bd = Fsubst.add_binding s bd in
         bd, Fsubst.f_subst s p in
       let bds = bd::bds in
-      prenex_exists bds p
+      prenex_exists ~bound bds p
 
-    | SFif (f, f1, f2) ->
-      let (bds, f2) = prenex_exists bds f2 in
-      let (bds, f1) = prenex_exists bds f1 in
-      (bds, f_if f f1 f2)
-
-    | SFop (op, [f1; f2]) when is_interp_ehoare_form_op op ->
-      let (bds, f1) = prenex_exists bds f1 in
+    | bound, SFop (op, [f1; f2]) when is_interp_ehoare_form_op op ->
+      let (bds, f1) = prenex_exists ~bound bds f1 in
       (bds, f_interp_ehoare_form f1 f2)
 
     | _ -> (bds, p)
   in
     (* Make it fail as with destr_exists *)
-    match prenex_exists [] f with
+    match prenex_exists ~bound [] f with
     | [] , _ -> destr_error "exists"
     | bds, f -> (List.rev bds, f)
 

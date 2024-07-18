@@ -39,7 +39,7 @@ type do_not_instantiate_this_type.
   asserting the existence of subtypes. We cannot use [axiom] here,
   because this would make the lemma a parameter of the theory *)
 
-lemma nosmt subtype_injection:
+lemma subtype_injection:
   exists (f : do_not_instantiate_this_type -> T),
     injective f /\ (forall x, P x <=> exists y, x = f y).
 admitted.
@@ -53,14 +53,14 @@ type sT = do_not_instantiate_this_type wrapped.
 
 (* We define `val` in two steps so that `print val` does not show the
    ugly internal stuff *)
-op nosmt [opaque] internal_val = choiceb
+op [opaque] internal_val = choiceb
    (fun (f : do_not_instantiate_this_type -> T),
      injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
 
 (* -------------------------------------------------------------------- *)
 
 (* Injection from [sT] to [T] *)
-op nosmt [opaque] val (x : sT) : T = with x = Wrap x' => internal_val x'.
+op [opaque] val (x : sT) : T = with x = Wrap x' => internal_val x'.
 
 lemma val_range x: P x <=> exists y, x = val y.
 proof.
@@ -81,7 +81,7 @@ lemma valP (x : sT): P (val x) by smt (val_range).
 
 (* -------------------------------------------------------------------- *)
 
-op nosmt [opaque] insub : T -> sT option = pinv val.
+op [opaque] insub : T -> sT option = pinv val.
 
 lemma insubN (x : T): !P x => insub x = None.
 proof. by rewrite /insub => not; apply pinvN; smt(val_range). qed.
@@ -97,7 +97,7 @@ proof. by move => Px @/insub; apply pinv_inv; smt(val_range). qed.
 (* TODO: Maybe this could be removed, it seems relatively
 pointless. It's here for compatibility with the previous Subtype
 implementation *)
-op nosmt wsT = val witness.
+op wsT = val witness.
 
 lemma insubW: insub wsT = Some witness<:sT>.
 proof. by rewrite /wsT; smt (valK). qed.

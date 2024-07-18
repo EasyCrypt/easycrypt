@@ -268,11 +268,11 @@ proof. by apply/fsetP=> x; rewrite in_fsetD in_filter andbC. qed.
 op (\subset) (s1 s2 : 'a fset) = forall x, x \in s1 => x \in s2.
 op (\proper) (s1 s2 : 'a fset) = s1 \subset s2 /\ s1 <> s2.
 
-lemma nosmt subsetP (s1 s2 : 'a fset):
+lemma subsetP (s1 s2 : 'a fset):
   (s1 \subset s2) <=> (mem s1 <= mem s2).
 proof. by []. qed.
 
-lemma nosmt subset_trans (s1 s2 s3 : 'a fset): 
+lemma subset_trans (s1 s2 s3 : 'a fset): 
   s1 \subset s2 => s2 \subset s3 => s1 \subset s3.
 proof. by move=> le1 le2 ? le3; apply/le2/le1. qed.
 
@@ -285,11 +285,11 @@ by rewrite iffE eqboolP &(andb_idl) => _; apply/le_XY.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A \subset B) /\ (B \subset A).
+lemma eqEsubset (A B : 'a fset) : (A = B) <=> (A \subset B) /\ (B \subset A).
 proof. by rewrite fsetP 2!subsetP subpred_eqP. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fset_ind (p : 'a fset -> bool):
+lemma fset_ind (p : 'a fset -> bool):
   p fset0 =>
   (forall x s, !mem s x => p s => p (s `|` (fset1 x))) =>
   (forall s, p s).
@@ -488,7 +488,7 @@ lemma fcard1 (x : 'a) : card (fset1 x) = 1.
 proof. by rewrite cardE elems_fset1. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fcardUI_indep (A B : 'a fset) : A `&` B = fset0 =>
+lemma fcardUI_indep (A B : 'a fset) : A `&` B = fset0 =>
   card (A `|` B) = card A + card B.
 proof.
 move/fsetP=> h; rewrite setUE !cardE; pose s := _ ++ _.
@@ -507,20 +507,20 @@ by rewrite addzAC fsetIC -addzA -fcardUI_indep ?fsetID ?fsetII.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fcardU (A B : 'a fset) :
+lemma fcardU (A B : 'a fset) :
   card (A `|` B) = card A + card B - card (A `&` B).
 proof. by rewrite -fcardUI Ring.IntID.addrK. qed.
 
-lemma nosmt fcardI (A B : 'a fset) :
+lemma fcardI (A B : 'a fset) :
   card (A `&` B) = card A + card B - card (A `|` B).
 proof. by rewrite -fcardUI addzAC subzz. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fcardID (A B : 'a fset) :
+lemma fcardID (A B : 'a fset) :
   card (A `&` B) + card (A `\` B) = card A.
 proof. by rewrite -fcardUI_indep ?fsetID // fsetII. qed.
 
-lemma nosmt fcardD (A B : 'a fset) :
+lemma fcardD (A B : 'a fset) :
   card (A `\` B) = card A - card (A `&` B).
 proof. by rewrite -(fcardID A B) addzAC subzz. qed.
 
@@ -536,7 +536,7 @@ lemma fcardU1 (A : 'a fset) x :
   card (A `|` fset1 x) = b2i (x \notin A) + card A.
 proof. by rewrite fcardU fcard1 fcardI1 /#. qed.
 
-lemma nosmt fcardD1 (A : 'a fset) (x : 'a) :
+lemma fcardD1 (A : 'a fset) (x : 'a) :
   card A = card (A `\` fset1 x) + (if mem A x then 1 else 0).
 proof. by rewrite fcardD fcardI1; ring. qed.
 
@@ -590,7 +590,7 @@ proof.                          (* FIXME: views *)
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eqEcard (A B : 'a fset) :
+lemma eqEcard (A B : 'a fset) :
   (A = B) <=> (A \subset B) /\ (card B <= card A).
 proof.
   split=> [->// |]; case=> le_AB le_cAB; rewrite subset_cardP //.
@@ -627,19 +627,19 @@ lemma mem_image (f:'a->'b) (s:'a fset) x:
   mem s x => mem (image f s) (f x).
 proof. by rewrite imageP=> ?;exists x. qed.
 
-lemma nosmt image0 (f : 'a -> 'b): image f fset0 = fset0.
+lemma image0 (f : 'a -> 'b): image f fset0 = fset0.
 proof.
   by apply/fsetP=> b; rewrite imageP; split=> [[a]|]; rewrite in_fset0.
 qed.
 
-lemma nosmt image1 (f : 'a -> 'b) (a : 'a):
+lemma image1 (f : 'a -> 'b) (a : 'a):
   image f (fset1 a) = fset1 (f a).
 proof.
   apply/fsetP=> b; rewrite imageP in_fset1.
   by split=> [[a']|->]; [|exists a]; rewrite in_fset1.
 qed.
 
-lemma nosmt imageU (f : 'a -> 'b) (A B : 'a fset):
+lemma imageU (f : 'a -> 'b) (A B : 'a fset):
   image f (A `|` B) = image f A `|` image f B.
 proof.
   apply/fsetP=> x; rewrite in_fsetU !imageP; split.
@@ -649,7 +649,7 @@ proof.
      exists x'; rewrite in_fsetU x'_in_X.
 qed.
 
-lemma nosmt imageI (f : 'a -> 'b) (A B : 'a fset):
+lemma imageI (f : 'a -> 'b) (A B : 'a fset):
   image f (A `&` B) \subset image f A `&` image f B.
 proof.
   move=> x; rewrite !inE !imageP=> -[a].
@@ -657,7 +657,7 @@ proof.
   by split; exists a.
 qed.
 
-lemma nosmt imageD (f : 'a -> 'b) (A B : 'a fset):
+lemma imageD (f : 'a -> 'b) (A B : 'a fset):
   image f A `\` image f B \subset image f (A `\` B).
 proof.
   move=> x; rewrite !inE !imageP=> -[[a] [a_in_A <-]].
@@ -666,7 +666,7 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fcard_image_leq (f : 'a -> 'b) (A : 'a fset):
+lemma fcard_image_leq (f : 'a -> 'b) (A : 'a fset):
   card (image f A) <= card A.
 proof.
   elim/fset_ind: A=> [|x A x_notin_A ih]; 1: by rewrite image0 !fcards0.

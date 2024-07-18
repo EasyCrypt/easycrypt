@@ -12,12 +12,12 @@ op cenum ['a] (p : 'a -> bool) =
   choiceb (fun f => enumerate f p) (fun _ => None).
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_enumerate ['a] E1 E2 (C : int -> 'a option) :
+lemma eq_enumerate ['a] E1 E2 (C : int -> 'a option) :
   (forall x, E1 x = E2 x) => enumerate C E1 => enumerate C E2.
 proof. by move/fun_ext=> ->. qed.
 
 (*-------------------------------------------------------------------- *)
-lemma nosmt enumerate_pmap_range
+lemma enumerate_pmap_range
      (J : int -> 'a option) (s : 'a list) (p : 'a -> bool) 
   :
      enumerate J p
@@ -33,7 +33,7 @@ exists (max (i+1) n) => a' pa' [->> | hin].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt enum_uniq_pmap_range (J : int -> 'a option) p n:
+lemma enum_uniq_pmap_range (J : int -> 'a option) p n:
   enumerate J p => uniq (pmap J (range 0 n)).
 proof.
 case=> injJ _; apply/pmap_inj_in_uniq/range_uniq.
@@ -67,7 +67,7 @@ lemma cnt_int : countableT<:int>.
 proof. by exists (fun i => Some i) => i _; exists i. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countableP ['a] (E : 'a -> bool) :
+lemma countableP ['a] (E : 'a -> bool) :
   (exists f, enumerate f E) <=> countable E.
 proof.
 split; case=> C => [[h1 h2]|h].
@@ -97,7 +97,7 @@ by move: h hR; apply/eqR.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countable_inj ['a] (p : 'a -> bool) :
+lemma countable_inj ['a] (p : 'a -> bool) :
   countable p => exists (f : 'a -> int), (* FIXME: (...) should not be mandatory *)
     forall x y, p x => p y => f x = f y => x = y.
 proof.
@@ -108,7 +108,7 @@ by rewrite -h => ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt inj_cond_countable ['a 'b] (f : 'a -> 'b) pb pa :
+lemma inj_cond_countable ['a 'b] (f : 'a -> 'b) pb pa :
      countable<:'b> pb
   => (forall x y, pa x => pa y => f x = f y => x = y)
   => (forall x, pa x => pb (f x))
@@ -124,14 +124,14 @@ by move/(hC _ _ h2 h1)/(inj_fp _ _ hpa pax).
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt inj_condL_countable ['a 'b] (f : 'a -> 'b) p :
+lemma inj_condL_countable ['a 'b] (f : 'a -> 'b) p :
      countableT<:'b>
   => (forall x y, p x => p y => f x = f y => x = y)
   => countable<:'a> p.
 proof. by move=> ??; apply: (@inj_cond_countable f predT). qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt inj_countable ['a] (f : 'a -> int) (p : 'a -> bool) :
+lemma inj_countable ['a] (f : 'a -> int) (p : 'a -> bool) :
      (forall x y, p x => p y => f x = f y => x = y)
   => countable p.
 proof. by apply/inj_condL_countable/cnt_int. qed.
@@ -282,24 +282,24 @@ qed.
 hint exact : cnt_unit cnt_bool cnt_int.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countable_le (E1 E2 : 'a -> bool) :
+lemma countable_le (E1 E2 : 'a -> bool) :
   countable E1 => E2 <= E1 => countable E2.
 proof.
 by case=> C hC le; exists C => x /le /hC [i <-]; exists i.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countableIL (E1 E2 : 'a -> bool) :
+lemma countableIL (E1 E2 : 'a -> bool) :
   countable E1 => countable (predI E1 E2).
 proof. by move=> h; apply/(@countable_le E1) => // x @/predI. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countableIR (E1 E2 : 'a -> bool) :
+lemma countableIR (E1 E2 : 'a -> bool) :
   countable E2 => countable (predI E1 E2).
 proof. by move=> h; apply/(@countable_le E2) => // x @/predI. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt countableU (E1 E2 : 'a -> bool) :
+lemma countableU (E1 E2 : 'a -> bool) :
   countable E1 => countable E2 => countable (predU E1 E2).
 proof.
 move=> /countable_inj[f1 h1] /countable_inj[f2 h2].
@@ -311,7 +311,7 @@ move=> x y @/predU @/f; case: (E1 x) => /= [E1x|].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt cnt_Uw ['a] (f : int -> 'a -> bool) :
+lemma cnt_Uw ['a] (f : int -> 'a -> bool) :
      (forall i, countable (f i))
   => countable (fun x => exists i, f i x).
 proof.
@@ -328,5 +328,5 @@ move=> /= x y [ix fix] [iy fiy] [^h] - <-; apply/hC.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt enum_cenum E : countable<:'a> E => enumerate (cenum E) E.
+lemma enum_cenum E : countable<:'a> E => enumerate (cenum E) E.
 proof. by move=> /countableP /(@choicebP _); apply. qed.

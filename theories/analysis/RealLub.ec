@@ -32,7 +32,7 @@ proof. split; case=> nz hub.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ler_lub_down (E1 E2 : real -> bool) :
+lemma ler_lub_down (E1 E2 : real -> bool) :
   (E1 <= down E2) => has_lub E2 => nonempty E1 => lub E1 <= lub E2.
 proof.
 move=> le lub2 [x E1x]; have {x E1x} lub1: has_lub E1.
@@ -46,7 +46,7 @@ by apply/lub_upper_bound.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ler_lub (E1 E2 : real -> bool) :
+lemma ler_lub (E1 E2 : real -> bool) :
      (forall x, E1 x => exists y, E2 y /\ x <= y)
   => has_lub E2 => nonempty E1 => lub E1 <= lub E2.
 proof. by move=> le12 lub2 nz1; apply: ler_lub_down. qed.
@@ -70,7 +70,7 @@ by move=> x; apply/eq_iff/eqE.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt lub_le_ub E z : has_lub E => ub E z => lub E <= z.
+lemma lub_le_ub E z : has_lub E => ub E z => lub E <= z.
 proof.
 move=> hlE ub_Ez; rewrite lerNgt &(negP) => lt_zlE.
 case: (lub_adherent _ hlE (lub E - z) _); 1: by rewrite subr_gt0.

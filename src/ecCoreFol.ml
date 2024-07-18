@@ -148,6 +148,12 @@ let hoarecmp_opp cmp =
   | FHge -> FHle
 
 (* -------------------------------------------------------------------- *)
+let string_of_quant = function
+  | Lforall -> "forall"
+  | Lexists -> "exists"
+  | Llambda -> "fun"
+
+(* -------------------------------------------------------------------- *)
 let mk_form = EcAst.mk_form
 let f_node { f_node = form } = form
 
@@ -601,41 +607,63 @@ exception DestrError of string
 let destr_error e = raise (DestrError e)
 
 (* -------------------------------------------------------------------- *)
-let destr_forall1 f =
+let decompose_binder ?(bound : int option) ~(quantif : quantif) (f : form) =
   match f.f_node with
-  | Fquant(Lforall,(x,t)::bd,p) -> x,t,f_forall bd p
-  | _ -> destr_error "forall"
+  | Fquant (q, bds, f) when q = quantif -> begin
+    match bound with
+    | None ->
+      bds, f
+    | Some bound ->
+      let bound = min bound (List.length bds) in
+      let bd1, bd2 = List.takedrop bound bds in
+      (bd1, f_quant quantif bd2 f)
+  end
 
-let destr_forall f =
-  match f.f_node with
-  | Fquant(Lforall,bd,p) -> bd, p
-  | _ -> destr_error "forall"
+  | _ ->
+    ([], f)
 
-let decompose_forall f =
-  match f.f_node with
-  | Fquant(Lforall,bd,p) -> bd, p
-  | _ -> [], f
+let decompose_forall ?(bound : int option) (f : form) =
+  decompose_binder ?bound ~quantif:Lforall f
 
-let destr_lambda f =
-  match f.f_node with
-  | Fquant(Llambda,bd,p) -> bd, p
-  | _ -> destr_error "lambda"
+let decompose_exists ?(bound : int option) (f : form) =
+  decompose_binder ?bound ~quantif:Lexists f
 
-let decompose_lambda f =
-  match f.f_node with
-  | Fquant(Llambda,bd,p) -> bd, p
-  | _ -> [], f
+let decompose_lambda ?(bound : int option) (f : form) =
+  decompose_binder ?bound ~quantif:Llambda f    
+  
+(* -------------------------------------------------------------------- *)
+let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
+  let bds, f = decompose_binder ?bound ~quantif f in
 
-let destr_exists1 f =
-  match f.f_node with
-  | Fquant(Lexists,(x,t)::bd,p) -> x,t,f_exists bd p
-  | _ -> destr_error "exists"
+  if 0 < Option.value ~default:1 bound && List.is_empty bds then
+    destr_error (string_of_quant quantif);
+  bds, f
 
-let destr_exists f =
-  match f.f_node with
-  | Fquant(Lexists,bd,p) -> bd, p
-  | _ -> destr_error "exists"
+let destr_forall ?(bound : int option) (f : form) =
+  destr_binder ?bound ~quantif:Lforall f
+  
+let destr_exists ?(bound : int option) (f : form) =
+  destr_binder ?bound ~quantif:Lexists f
+  
+let destr_lambda ?(bound : int option) (f : form) =
+  destr_binder ?bound ~quantif:Llambda f
 
+(* -------------------------------------------------------------------- *)
+let destr_binder1 ~quantif:quantif (f : form) =
+  let (x, t), f =
+    fst_map as_seq1 (destr_binder ~bound:1 ~quantif f)
+  in (x, t, f)
+
+let destr_forall1 (f : form) =
+  destr_binder1 ~quantif:Lforall f
+
+let destr_exists1 (f : form) =
+  destr_binder1 ~quantif:Lexists f
+  
+let destr_lambda1 (f : form) =
+  destr_binder1 ~quantif:Llambda f
+  
+(* -------------------------------------------------------------------- *)
 let destr_let f =
   match f.f_node with
   | Flet(lp, e1,e2) -> lp,e1,e2

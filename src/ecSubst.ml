@@ -895,8 +895,8 @@ and subst_notation (s : subst) (nott : notation) =
 
 and subst_op_body (s : subst) (bd : opbody) =
   match bd with
-  | OP_Plain (body, nosmt) ->
-      OP_Plain (subst_form s body, nosmt)
+  | OP_Plain body ->
+      OP_Plain (subst_form s body)
 
   | OP_Constr (p, i)  -> OP_Constr (subst_path s p, i)
   | OP_Record p       -> OP_Record (subst_path s p)
@@ -908,8 +908,7 @@ and subst_op_body (s : subst) (bd : opbody) =
       OP_Fix { opf_args     = args;
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
-               opf_branches = subst_branches es opfix.opf_branches;
-               opf_nosmt    = opfix.opf_nosmt; }
+               opf_branches = subst_branches es opfix.opf_branches; }
 
   | OP_TC -> OP_TC
 

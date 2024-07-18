@@ -403,7 +403,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
      | OP_TC -> assert false
-     | OP_Plain  (f, _) -> on_form cb f
+     | OP_Plain  f -> on_form cb f
      | OP_Fix    f ->
        let rec on_mpath_branches br =
          match br with
@@ -658,7 +658,7 @@ let tydecl_fv tyd =
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
-  | OP_Plain (f, _) -> EcIdent.fv_union fv (fv_and_tvar_f f)
+  | OP_Plain f -> EcIdent.fv_union fv (fv_and_tvar_f f)
   | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
   | OP_Fix opfix ->
     let fv =
@@ -812,7 +812,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
                        e_op path args opty) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
-        tg_subst, mk_op ~opaque:false tparams opty None `Global
+        tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
 
       | OB_pred None ->
         let fv = ty_fv_and_tvar operator.op_ty in
@@ -824,7 +824,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
                        f_op path args opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
-        tg_subst, mk_op ~opaque:false tparams opty None `Global
+        tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
 
       | OB_oper (Some body) ->
         let fv = op_body_fv body operator.op_ty in
@@ -845,8 +845,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
           match body with
           | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
           | OP_TC -> assert false (* ??? *)
-          | OP_Plain (f,nosmt) ->
-            OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f, nosmt)
+          | OP_Plain f ->
+            OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f)
           | OP_Fix opfix ->
             let subst = EcSubst.add_opdef EcSubst.empty path tosubst in
             let nb_extra = List.length extra_a in
@@ -858,10 +858,10 @@ let generalize_opdecl to_gen prefix (name, operator) =
                 opf_resty    = opfix.opf_resty;
                 opf_struct;
                 opf_branches = EcSubst.subst_branches subst opfix.opf_branches;
-                opf_nosmt    = opfix.opf_nosmt;
               }
         in
-        let operator = mk_op ~opaque:false tparams opty (Some body) `Global in
+        let operator =
+          mk_op ~opaque:operator.op_opaque tparams opty (Some body) `Global in
         tg_subst, operator
 
       | OB_pred (Some body) ->
@@ -891,7 +891,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           { op_tparams; op_ty;
             op_kind     = OB_pred (Some body);
             op_loca     = `Global;
-            op_opaque   = false;
+            op_opaque   = operator.op_opaque;
             op_clinline = operator.op_clinline;
             op_unfold   = operator.op_unfold; } in
         tg_subst, operator
@@ -907,7 +907,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           { op_tparams; op_ty;
             op_kind     = OB_nott nott;
             op_loca     = `Global;
-            op_opaque   = false;
+            op_opaque   = operator.op_opaque;
             op_clinline = operator.op_clinline;
             op_unfold   = operator.op_unfold; }
     in

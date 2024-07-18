@@ -8,11 +8,11 @@ theory Map.
 op tofun ['a 'b] (m : ('a, 'b) map) = ("_.[_]") m.
 op offun ['a 'b] : ('a -> 'b) -> ('a, 'b) map.
 
-axiom nosmt offunE ['a 'b] (m : 'a -> 'b) :
+axiom offunE ['a 'b] (m : 'a -> 'b) :
   forall x, (offun m).[x] = m x.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt map_eqP ['a 'b] (m1 m2 : ('a, 'b) map) :
+lemma map_eqP ['a 'b] (m1 m2 : ('a, 'b) map) :
   (forall x, m1.[x] = m2.[x]) <=> m1 = m2.
 proof. smt(). qed.          (* coming from the theory of maps (SMT) *)
 
@@ -24,31 +24,31 @@ lemma tofunK ['a 'b] : cancel tofun offun<:'a, 'b>.
 proof. by move=> m; apply/map_eqP=> x; rewrite offunE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt setE ['a 'b] (m : ('a, 'b) map) x v :
+lemma setE ['a 'b] (m : ('a, 'b) map) x v :
   m.[x <- v] = offun (fun y => if y = x then v else m.[y]).
 proof. by apply/map_eqP=> y /=; rewrite offunE /#. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt getE ['a 'b] (m : ('a, 'b) map) x : m.[x] = (tofun m) x.
+lemma getE ['a 'b] (m : ('a, 'b) map) x : m.[x] = (tofun m) x.
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_setE ['a 'b] (m : ('a, 'b) map) (x y : 'a) b :
+lemma get_setE ['a 'b] (m : ('a, 'b) map) (x y : 'a) b :
   m.[x <- b].[y] = if y = x then b else m.[y].
 proof. by rewrite setE getE offunK. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_sameE (m : ('a,'b) map) (x : 'a) b :
+lemma get_set_sameE (m : ('a,'b) map) (x : 'a) b :
   m.[x <- b].[x] = b.
 proof. by rewrite get_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_eqE (m : ('a, 'b) map) (x y : 'a) b :
+lemma get_set_eqE (m : ('a, 'b) map) (x y : 'a) b :
   y = x => m.[x <- b].[y] = b.
 proof. by move=> <-; rewrite get_set_sameE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_neqE (m : ('a, 'b) map) (x y : 'a) b :
+lemma get_set_neqE (m : ('a, 'b) map) (x y : 'a) b :
   y <> x => m.[x <- b].[y] = m.[y].
 proof. by rewrite get_setE => ->. qed.
 
@@ -78,21 +78,21 @@ op eq_except ['a 'b] X (m1 m2 : ('a, 'b) map) =
   forall y, !X y => m1.[y] = m2.[y].
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_refl ['a 'b] X : reflexive (eq_except<:'a, 'b> X).
+lemma eq_except_refl ['a 'b] X : reflexive (eq_except<:'a, 'b> X).
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_sym ['a 'b] X (m1 m2 : ('a, 'b) map) :
+lemma eq_except_sym ['a 'b] X (m1 m2 : ('a, 'b) map) :
   eq_except X m1 m2 => eq_except X m2 m1.
 proof. by move=> h x /h ->. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_trans ['a 'b] X (m2 m1 m3 : ('a, 'b) map) :
+lemma eq_except_trans ['a 'b] X (m2 m1 m3 : ('a, 'b) map) :
   eq_except X m1 m2 => eq_except X m2 m3 => eq_except X m1 m3.
 proof. by move=> h1 h2 x ^/h1 -> /h2 ->. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_sub ['a 'b] (X Y : 'a -> bool) (m1 m2 : ('a, 'b) map) :
+lemma eq_except_sub ['a 'b] (X Y : 'a -> bool) (m1 m2 : ('a, 'b) map) :
    X <= Y => eq_except X m1 m2 => eq_except Y m1 m2.
 proof. by move=> hsub + x hx => -> //; apply: contra (hsub x) hx. qed.
 
@@ -101,7 +101,7 @@ op merge ['a 'b 'c 'd] (f: 'a -> 'b -> 'c -> 'd)
      (m1 : ('a, 'b) map) (m2 : ('a, 'c) map) =
   offun (fun a => f a m1.[a] m2.[a]).
 
-lemma nosmt mergeE (f: 'a -> 'b -> 'c -> 'd) m1 m2 x:
+lemma mergeE (f: 'a -> 'b -> 'c -> 'd) m1 m2 x:
   (merge f m1 m2).[x] = f x m1.[x] m2.[x].
 proof. by rewrite /merge offunE. qed.
 
@@ -122,7 +122,7 @@ op "_.[_<-_]" ['a 'b] (m : ('a, 'b) fmap) x v =
 op dom ['a 'b] (m : ('a, 'b) fmap) =
   fun x => m.[x] <> None.
 
-lemma nosmt domE ['a 'b] (m : ('a, 'b) fmap) x :
+lemma domE ['a 'b] (m : ('a, 'b) fmap) x :
   dom m x <=> m.[x] <> None.
 proof. by []. qed.
 
@@ -160,12 +160,12 @@ axiom isfmap_offmap (m : ('a, 'b) fmap) :
   is_finite (fun x => (tomap m).[x] <> None).
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt finite_dom ['a 'b] (m : ('a, 'b) fmap) :
+lemma finite_dom ['a 'b] (m : ('a, 'b) fmap) :
   is_finite (dom m).
 proof. exact/isfmap_offmap. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt finite_rng ['a 'b] (m : ('a, 'b) fmap) : is_finite (rng m).
+lemma finite_rng ['a 'b] (m : ('a, 'b) fmap) : is_finite (rng m).
 proof.
 pose s := map (fun x => oget m.[x]) (to_seq (dom m)).
 apply/finiteP; exists s => y; rewrite rngE /= => -[x mxE].
@@ -173,7 +173,7 @@ by apply/mapP; exists x => /=; rewrite mem_to_seq 1:finite_dom domE mxE.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fmap_eqP ['a 'b] (m1 m2 : ('a, 'b) fmap) :
+lemma fmap_eqP ['a 'b] (m1 m2 : ('a, 'b) fmap) :
   (forall x, m1.[x] = m2.[x]) <=> m1 = m2.
 proof.
 split=> [pw_eq|->] //; rewrite -tomapK -(tomapK m2).
@@ -183,7 +183,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 op empty ['a 'b] : ('a, 'b) fmap = ofmap (cst None).
 
-lemma nosmt empty_valE ['a, 'b] : tomap empty<:'a, 'b> = cst None.
+lemma empty_valE ['a, 'b] : tomap empty<:'a, 'b> = cst None.
 proof.
 by rewrite /empty ofmapK //; exists [] => /= *; rewrite Map.cstE.
 qed.
@@ -201,7 +201,7 @@ lemma mem_rng_empty ['a 'b] y : !rng empty<:'a, 'b> y.
 proof. by rewrite rngE /= negb_exists=> /= x; rewrite emptyE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_valE ['a 'b] (m : ('a, 'b) fmap) x v :
+lemma set_valE ['a 'b] (m : ('a, 'b) fmap) x v :
   tomap m.[x <- v] = (tomap m).[x <- Some v].
 proof.
 pose s := to_seq (fun x => (tomap m).[x] <> None).
@@ -221,17 +221,17 @@ lemma get_setE ['a 'b] (m : ('a, 'b) fmap) (x y : 'a) b :
 proof. by rewrite /"_.[_]" /"_.[_<-_]" set_valE Map.get_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_sameE (m : ('a,'b) fmap) (x : 'a) b :
+lemma get_set_sameE (m : ('a,'b) fmap) (x : 'a) b :
   m.[x <- b].[x] = Some b.
 proof. by rewrite get_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_eqE (m : ('a, 'b) fmap) (x y : 'a) b :
+lemma get_set_eqE (m : ('a, 'b) fmap) (x y : 'a) b :
   y = x => m.[x <- b].[y] = Some b.
 proof. by move=> <-; rewrite get_set_sameE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt get_set_neqE (m : ('a, 'b) fmap) (x y : 'a) b :
+lemma get_set_neqE (m : ('a, 'b) fmap) (x y : 'a) b :
   y <> x => m.[x <- b].[y] = m.[y].
 proof. by rewrite get_setE => ->. qed.
 
@@ -244,7 +244,7 @@ by case: (z = x) => [->|] //; rewrite mxE.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_setE ['a 'b] (m : ('a, 'b) fmap) x x' b b' :
+lemma set_setE ['a 'b] (m : ('a, 'b) fmap) x x' b b' :
   m.[x <- b].[x' <- b']
     = (x' = x) ? m.[x' <- b'] : m.[x' <- b'].[x <- b].
 proof.
@@ -254,22 +254,22 @@ apply/fmap_eqP=> y; rewrite !get_setE; case: (x' = x)=> //= [<<-|].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_set_sameE ['a 'b] (m : ('a, 'b) fmap) (x : 'a) b b' :
+lemma set_set_sameE ['a 'b] (m : ('a, 'b) fmap) (x : 'a) b b' :
   m.[x <- b].[x <- b'] = m.[x <- b'].
 proof. by rewrite set_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_set_eqE ['a 'b] (m : ('a, 'b) fmap) (x x' : 'a) b b' :
+lemma set_set_eqE ['a 'b] (m : ('a, 'b) fmap) (x x' : 'a) b b' :
   x' = x => m.[x <- b].[x' <- b'] = m.[x <- b'].
 proof. by rewrite set_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_set_neqE ['a 'b] (m : ('a, 'b) fmap) (x x' : 'a) b b' :
+lemma set_set_neqE ['a 'b] (m : ('a, 'b) fmap) (x x' : 'a) b b' :
   x' <> x => m.[x <- b].[x' <- b'] = m.[x' <- b'].[x <- b].
 proof. by rewrite set_setE => ->. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_get ['a 'b] (m : ('a, 'b) fmap, x : 'a) :
+lemma set_get ['a 'b] (m : ('a, 'b) fmap, x : 'a) :
   x \in m => m.[x <- oget m.[x]] = m.
 proof.
 move=> x_in_m; apply/fmap_eqP=> y; rewrite get_setE.
@@ -277,7 +277,7 @@ by case: (y = x) => // ->>; rewrite -some_oget.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt set_get_eq ['a 'b] (m : ('a, 'b) fmap, x : 'a, y : 'b) :
+lemma set_get_eq ['a 'b] (m : ('a, 'b) fmap, x : 'a, y : 'b) :
   m.[x] = Some y => m.[x <- y] = m.
 proof. by move=> mxE; rewrite -{2}[m](set_get _ x) ?domE // mxE. qed.
 
@@ -291,7 +291,7 @@ op rem ['a 'b] (m : ('a, 'b) fmap) x =
   ofmap (tomap m).[x <- None].
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt rem_valE ['a 'b] (m : ('a, 'b) fmap) x :
+lemma rem_valE ['a 'b] (m : ('a, 'b) fmap) x :
   tomap (rem m x) = (tomap m).[x <- None].
 proof.
 rewrite /rem ofmapK //; pose P z := (tomap m).[z] <> None.
@@ -394,26 +394,26 @@ by case=> /h; rewrite !get_setE => + @/pred1 -> - ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_set_eq ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
+lemma eq_except_set_eq ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
   eq_except X m1 m2 => eq_except X m1.[x <- y] m2.[x <- y].
 proof. by move=> /(@eq_except_set _ x y y). qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_set_same ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
+lemma eq_except_set_same ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
      y = y'
   => eq_except X m1 m2
   => eq_except X m1.[x <- y] m2.[x <- y'].
 proof. by move=> <-; apply/eq_except_set_eq. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_set_neq ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
+lemma eq_except_set_neq ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
      y <> y'
   => eq_except X m1 m2
   => eq_except (predU X (pred1 x)) m1.[x <- y] m2.[x <- y'].
 proof. by move=> + /(@eq_except_set _ x y y' _ _)=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_set_getlr ['a 'b] (m1 m2 : ('a, 'b) fmap, x) :
+lemma eq_except_set_getlr ['a 'b] (m1 m2 : ('a, 'b) fmap, x) :
      x \in m1
   => eq_except (pred1 x) m1 m2
   => m1 = m2.[x <- oget m1.[x]].
@@ -423,14 +423,14 @@ by case: (x' = x) => [->>|/eqm] //; apply/some_oget.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_setlr (X : 'a -> bool, m : ('a, 'b) fmap, x, b, b'):
+lemma eq_except_setlr (X : 'a -> bool, m : ('a, 'b) fmap, x, b, b'):
   X x => eq_except X m.[x <- b] m.[x <- b'].
 proof.
 by move=> Xx; apply/eq_exceptP => x' NXx'; rewrite !get_setE; case: (x' = x).
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_remr (X : 'a -> bool, m1 m2 : ('a,'b) fmap, x) :
+lemma eq_except_remr (X : 'a -> bool, m1 m2 : ('a,'b) fmap, x) :
    X x => eq_except X m1 m2 => eq_except X m1 (rem m2 x).
 proof.
 move=> Xx /eq_exceptP eqm; apply/eq_exceptP => y NXy.
@@ -438,7 +438,7 @@ by rewrite remE; case: (y = x) => // _; apply/eqm.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_except_reml (X : 'a -> bool, m1 m2 : ('a,'b) fmap, x) :
+lemma eq_except_reml (X : 'a -> bool, m1 m2 : ('a,'b) fmap, x) :
    X x => eq_except X m1 m2 => eq_except X (rem m1 x) m2.
 proof.
 by move=> Xx /eq_except_sym ?; apply/eq_except_sym/eq_except_remr.
@@ -767,7 +767,7 @@ move=> unique; case: (findP P m)=> [->|] />.
 by move=> x'' + -> - /> {x''}; exact/unique.
 qed.
 
-lemma nosmt uniq_find_eq_some z (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) :
+lemma uniq_find_eq_some z (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) :
   (forall (x : 'a) (y : 'b), m.[x] = Some y => P x y => x = z) =>
   z \in m => P z (oget m.[z]) => find P m = Some z.
 proof.

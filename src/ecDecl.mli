@@ -49,7 +49,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcCoreFol.form * bool (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -65,7 +65,6 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
-  opf_nosmt    : bool;
 }
 
 and opbranches =
@@ -100,10 +99,12 @@ type operator = {
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
-  op_opaque   : bool;
+  op_opaque   : opopaque;
   op_clinline : bool;
   op_unfold   : int option;
 }
+
+and opopaque = { smt: bool; reduction: bool; }
 
 val op_ty     : operator -> ty
 val is_pred   : operator -> bool
@@ -115,8 +116,10 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
 
-val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:bool -> ty_params -> ty -> opbody option -> locality -> operator
-val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:bool -> ty_params -> ty list -> prbody option -> locality -> operator
+val optransparent : opopaque
+
+val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty -> opbody option -> locality -> operator
+val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty list -> prbody option -> locality -> operator
 
 val mk_abbrev :
      ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list

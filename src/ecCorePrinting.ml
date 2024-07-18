@@ -16,6 +16,7 @@ module type PrinterAPI = sig
 
     val ofenv : EcEnv.env -> t
     val add_locals : ?force:bool -> t -> EcIdent.t list -> t
+    val enter_theory : t -> EcPath.path -> t
   end
 
   (* ------------------------------------------------------------------ *)

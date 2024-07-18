@@ -38,7 +38,7 @@ lemma sumrB P F1 F2 (r : 'a list):
 proof. by rewrite sumrN sumrD; apply/eq_bigr => /=. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt sumr_const (P : 'a -> bool) x s:
+lemma sumr_const (P : 'a -> bool) x s:
   big P (fun _ => x) s = intmul x (count P s).
 proof. by rewrite big_const intmulpE 1:count_ge0 // -ZM.AddMonoid.iteropE. qed.
 
@@ -98,7 +98,7 @@ realize ZM.addrC. by apply/addrC. qed.
 realize ZM.add0r. by apply/add0r. qed.
 realize ZM.addNr. by apply/addNr. qed.
 
-lemma nosmt sumr_1 (P : 'a -> bool) s:
+lemma sumr_1 (P : 'a -> bool) s:
   big P (fun i => oner) s = CR.ofint (count P s).
 proof. by apply/sumr_const. qed.
 
@@ -114,7 +114,7 @@ lemma divr_suml (P : 'a -> bool) F s x :
   (big P F s) / x = big P (fun i => F i / x) s.
 proof. by rewrite mulr_suml; apply/eq_bigr. qed.
 
-lemma nosmt sum_pair_dep ['a 'b] u v J : uniq J =>
+lemma sum_pair_dep ['a 'b] u v J : uniq J =>
     big predT (fun (ij : 'a * 'b) => (u ij.`1 * v ij.`1 ij.`2)%CR) J
   = big predT
       (fun i => u i * big predT
@@ -126,7 +126,7 @@ move=> uqJ; rewrite big_pair // &(eq_bigr) => /= a _.
 by rewrite mulr_sumr !big_filter &(eq_bigr) => -[a' b] /= ->>.
 qed.
 
-lemma nosmt sum_pair ['a 'b] u v J : uniq J =>
+lemma sum_pair ['a 'b] u v J : uniq J =>
     big predT (fun (ij : 'a * 'b) => (u ij.`1 * v ij.`2)%CR) J
   = big predT
       (fun i => u i * big predT v (unzip2 (filter (fun ij : _ * _ => ij.`1 = i) J)))
@@ -175,7 +175,7 @@ by rewrite -exprS 1:/# subr_eq0; do 2! congr => /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt mulr_const_cond p s c:
+lemma mulr_const_cond p s c:
   BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
 proof.
 rewrite BMul.big_const -MulMonoid.iteropE /exp.
@@ -183,7 +183,7 @@ by rewrite IntOrder.ltrNge count_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt mulr_const s c:
+lemma mulr_const s c:
   BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
 proof. by rewrite mulr_const_cond count_predT. qed.
 end BigComRing.
@@ -224,7 +224,7 @@ realize CR.mulVr     . proof. by apply/Num.Domain.mulVr. qed.
 realize CR.unitP     . proof. by apply/Num.Domain.unitP. qed.
 realize CR.unitout   . proof. by apply/Num.Domain.unitout. qed.
 
-lemma nosmt ler_sum (P : 'a -> bool) (F1 F2 :'a -> t) s:
+lemma ler_sum (P : 'a -> bool) (F1 F2 :'a -> t) s:
      (forall a, P a => F1 a <= F2 a)
   => (BAdd.big P F1 s <= BAdd.big P F2 s).
 proof.
@@ -232,7 +232,7 @@ apply: (@BAdd.big_ind2 (fun (x y : t) => x <= y)) => //=.
   by apply/ler_add.
 qed.
 
-lemma nosmt sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
+lemma sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
      (forall a, P a => zeror <= F a)
   => zeror <= BAdd.big P F s.
 proof.
@@ -240,7 +240,7 @@ move=> h; apply: (@BAdd.big_ind (fun x => zeror <= x)) => //=.
   by apply/addr_ge0.
 qed.
 
-lemma nosmt sub_ler_sum (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s : 
+lemma sub_ler_sum (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s : 
   (forall x, P1 x => P2 x) => 
   (forall x, P1 x => F1 x <= F2 x) =>
   (forall x, P2 x => !P1 x => zeror <= F2 x) =>
@@ -258,7 +258,7 @@ proof.
 by move=> ge0_F; apply: BAdd.eq_bigr => /= a Pa; rewrite ger0_norm /#.
 qed.
 
-lemma nosmt prodr_ge0 (P : 'a -> bool) F s:
+lemma prodr_ge0 (P : 'a -> bool) F s:
      (forall a, P a => zeror <= F a)
   => zeror <= BMul.big P F s.
 proof.
@@ -266,7 +266,7 @@ move=> h; apply: (@BMul.big_ind (fun x => zeror <= x)) => //=.
   by apply/mulr_ge0.
 qed.
 
-lemma nosmt prodr_gt0 (P : 'a -> bool) F s:
+lemma prodr_gt0 (P : 'a -> bool) F s:
      (forall a, P a => zeror < F a)
   => zeror < BMul.big P F s.
 proof.
@@ -274,7 +274,7 @@ move=> h; apply: (@BMul.big_ind (fun x => zeror < x)) => //=.
   by apply/mulr_gt0.
 qed.
 
-lemma nosmt ler_prod (P : 'a -> bool) (F1 F2 :'a -> t) s:
+lemma ler_prod (P : 'a -> bool) (F1 F2 :'a -> t) s:
      (forall a, P a => zeror <= F1 a <= F2 a)
   => (BMul.big P F1 s <= BMul.big P F2 s).
 proof.
@@ -283,7 +283,7 @@ rewrite !BMul.big_cons; case: (P x)=> // /h [ge0F1x leF12x].
 by apply/ler_pmul=> //; apply/prodr_ge0=> a /h [].
 qed.
 
-lemma nosmt ler_sum_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
+lemma ler_sum_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
      (forall a, mem s a => P a => F1 a <= F2 a)
   => (BAdd.big P F1 s <= BAdd.big P F2 s).
 proof.
@@ -291,7 +291,7 @@ move=> h; rewrite !(@BAdd.big_seq_cond P).
 by rewrite ler_sum=> //= x []; apply/h.
 qed.
 
-lemma nosmt sumr_ge0_seq (P : 'a -> bool) (F : 'a -> t) s:
+lemma sumr_ge0_seq (P : 'a -> bool) (F : 'a -> t) s:
      (forall a, mem s a => P a => zeror <= F a)
   => zeror <= BAdd.big P F s.
 proof.
@@ -299,7 +299,7 @@ move=> h; rewrite !(@BAdd.big_seq_cond P).
 by rewrite sumr_ge0=> //= x []; apply/h.
 qed.
 
-lemma nosmt prodr_ge0_seq (P : 'a -> bool) F s:
+lemma prodr_ge0_seq (P : 'a -> bool) F s:
      (forall a, mem s a => P a => zeror <= F a)
   => zeror <= BMul.big P F s.
 proof.
@@ -307,7 +307,7 @@ move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite prodr_ge0=> //= x []; apply/h.
 qed.
 
-lemma nosmt prodr_gt0_seq (P : 'a -> bool) F s:
+lemma prodr_gt0_seq (P : 'a -> bool) F s:
      (forall a, mem s a => P a => zeror < F a)
   => zeror < BMul.big P F s.
 proof.
@@ -326,7 +326,7 @@ case: (P x) => [Px F_big_gt0 a a_x_s Pa| nPx /IHs]; 2:smt().
 smt(pmulr_gt0 prodr_ge0_seq).
 qed.
 
-lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 : 'a -> t) s:
+lemma ler_prod_seq (P : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall a, mem s a => P a => zeror <= F1 a <= F2 a)
   => (BMul.big P F1 s <= BMul.big P F2 s).
 proof.
@@ -334,7 +334,7 @@ move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite ler_prod=> //= x []; apply/h.
 qed.
 
-lemma nosmt prodr_eq0 P F s:
+lemma prodr_eq0 P F s:
       (exists x, P x /\ x \in s /\ F x = zeror)
   <=> BMul.big<:'a> P F s = zeror.
 proof. split.
