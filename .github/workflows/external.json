@@ -16,7 +16,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "sponge"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : "-jobs 1"
   }
 
   ,
@@ -27,7 +27,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "cryptobox"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : ""
   }
 
   ,
@@ -38,6 +38,6 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "xsalsa"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : ""
   }
 ]
