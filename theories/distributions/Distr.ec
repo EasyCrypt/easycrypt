@@ -1773,6 +1773,12 @@ rewrite (@mu_eq _ _ (fun (ab : 'a * 'b) => predT ab.`1 /\ Pb ab.`2)) 1:/#.
 by rewrite dprodE RField.mulrC.
 qed.
 
+lemma dprod_dunit ['a 'b] (x : 'a) (y : 'b) :
+  dunit x `*` dunit y = dunit (x, y).
+proof.
+by apply: eq_distr => -[a b]; rewrite dprod1E !dunit1E /#.
+qed.
+
 lemma le_dprod_or (da : 'a distr) (db : 'b distr) Pa Pb : 
    mu (da `*` db) (fun (ab : 'a * 'b) => Pa ab.`1 \/ Pb ab.`2) <= 
    mu da Pa * weight db + mu db Pb * weight da.
@@ -1938,6 +1944,78 @@ lemma dmap_dprodE_swap ['a 'b 'c] d1 d2 f :
 proof.
 rewrite dprodC dmap_comp dmap_dprodE &(eq_dlet) //.
 by move=> b /=; apply: eq_dlet => // ?.
+qed.
+
+lemma dprod_marginalL ['a 'b 'c] (da : 'a distr) (db : 'b distr) (f : 'a -> 'c) :
+    dmap (da `*` db) (fun ab : 'a * 'b => f ab.`1)
+  = weight db \cdot dmap da f.
+proof. by rewrite dmap_dprodE_swap /= dlet_cst_weight. qed.
+
+lemma dprod_marginalR ['a 'b 'c] (da : 'a distr) (db : 'b distr) (f : 'b -> 'c) :
+    dmap (da `*` db) (fun ab : 'a * 'b => f ab.`2)
+  = weight da \cdot dmap db f.
+proof. by rewrite dmap_dprodE /= dlet_cst_weight. qed.
+
+lemma dprod_dmap_cross ['a 'b 'c 'd 'e 'ab 'ac 'bd 'cd]
+  (da : 'a distr) (db : 'b distr) (dc : 'c distr) (dd : 'd distr)
+  (Fab : 'a * 'b -> 'ab)
+  (Fcd : 'c * 'd -> 'cd)
+  (F   : 'ab -> 'cd -> 'e)
+  (Fac : 'a * 'c -> 'ac)
+  (Fbd : 'b * 'd -> 'bd)
+  (G   : 'ac -> 'bd -> 'e)
+:
+  (forall a b c d, F (Fab (a, b)) (Fcd (c, d)) = G (Fac (a, c)) (Fbd (b, d))) =>
+
+  dlet
+    (dmap (da `*` db) Fab)
+    (fun ab =>
+      dmap
+        (dmap (dc `*` dd) Fcd)
+        (fun cd => F ab cd))
+  = dlet
+      (dmap (da `*` dc) Fac)
+      (fun ac =>
+        dmap
+          (dmap (db `*` dd) Fbd)
+          (fun bd => G ac bd)).
+proof.
+pose D1 := dlet (da `*` db)
+  (fun ab => dlet dc (fun c => dmap dd (fun d => F (Fab ab) (Fcd (c, d))))).
+move=> eq; rewrite dlet_dmap /= &(eq_trans D1) /D1 => {D1}.
+- by rewrite &(eq_dlet) // => ab /=; rewrite dmap_comp dmap_dprodE.
+pose D2 := dlet (da `*` dc)
+  (fun ac => dlet db (fun b => dmap dd (fun d => G (Fac ac) (Fbd (b, d))))).
+rewrite dlet_dmap /= &(eq_trans D2) /D2 => {D2}; last first.
+- by rewrite &(eq_dlet) // => ac /=; rewrite dmap_comp dmap_dprodE.
+rewrite !dprod_dlet !dlet_dlet /= &(eq_dlet) // => a /=.
+rewrite dlet_dlet /= dlet_swap &(eq_dlet) // => b /=.
+rewrite 2!(dlet_dunit, dlet_unit) /= dlet_dmap.
+rewrite &(eq_dlet) // => c /=; rewrite &(eq_dmap) // => d /=.
+by apply: eq.
+qed.
+
+lemma dprod_cross ['a 'b 'c 'd 'e]
+  (da : 'a distr) (db : 'b distr) (dc : 'c distr) (dd : 'd distr)
+  (F  : 'a -> 'b -> 'c -> 'd -> 'e)
+:
+  dlet
+    (da `*` db)
+    (fun ab : 'a * 'b =>
+      dmap
+        (dc `*` dd)
+        (fun cd : 'c * 'd => F ab.`1 ab.`2 cd.`1 cd.`2))
+  = dlet
+      (da `*` dc)
+      (fun ac : 'a * 'c =>
+        dmap
+          (db `*` dd)
+          (fun bd : 'b * 'd => F ac.`1 bd.`1 ac.`2 bd.`2)).
+proof.
+pose F1 (ab : 'a * 'b) (cd : 'c * 'd) := F ab.`1 ab.`2 cd.`1 cd.`2.
+pose F2 (ac : 'a * 'c) (bd : 'b * 'd) := F ac.`1 bd.`1 ac.`2 bd.`2.
+have := dprod_dmap_cross da db dc dd idfun idfun F1 idfun idfun F2 _.
+- by move=> *; reflexivity. by rewrite !dmap_id.
 qed.
 
 (* -------------------------------------------------------------------- *)

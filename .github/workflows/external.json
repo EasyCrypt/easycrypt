@@ -16,7 +16,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "sponge"
-  , "options"    : ""
+  , "options"    : "-jobs 1"
   }
 
   ,

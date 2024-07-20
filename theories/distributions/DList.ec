@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet Distr DProd StdBigop.
+require import AllCore List FSet Distr DProd StdOrder StdBigop.
 (*---*) import Bigreal Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
@@ -200,6 +200,45 @@ proof.
 case (n <= 0) => [?|?]; first by rewrite !dlist0E //; 1:smt(revK).
 case (size s = n) => [<-|?]; 2: smt(dlist1E supp_dlist_size size_rev).
 by rewrite -{1}size_rev &(dlist_perm_eq) perm_eq_sym perm_eq_rev.
+qed.
+
+lemma dlist_dlist ['a] (d : 'a distr) (m n : int) :
+  0 <= m => 0 <= n =>
+    dmap (dlist (dlist d m) n) flatten = dlist d (m * n).
+proof.
+move=> ge0_m; elim: n => /= [|n ge0_n ih].
+- by rewrite !dlist0 // dmap_dunit.
+rewrite mulrDr /= [dlist d (m * n + m)]dlist_add //.
+- by apply: IntOrder.mulr_ge0.
+rewrite dlistSr //= dmap_comp !dmap_dprodE /=.
+rewrite -ih dlet_dmap /= &(eq_dlet) // => xss /=.
+by rewrite &(eq_dmap) /(\o) /= => xs; rewrite flatten_rcons.
+qed.
+
+lemma dlist_insert ['a] (x0 : 'a) (i n : int) (d : 'a distr) :
+  0 <= n => 0 <= i <= n => dlist d (n+1) =
+    dmap (d `*` dlist d n) (fun x_xs : 'a * 'a list => insert x_xs.`1 x_xs.`2 i).
+proof.
+move=> ge0_n [ge0_i lti]; apply/eq_sym.
+pose f (x_xs : _ * _) := insert x_xs.`1 x_xs.`2 i.
+pose g (xs : 'a list) := (nth x0 xs i, take i xs ++ drop (i+1) xs).
+have ge0_Sn: 0 <= n + 1 by smt(). apply: (dmap_bij _ _ f g).
+- case=> [x xs] /supp_dprod[/=] x_in_d.
+  case/(supp_dlist _ _ _ ge0_n)=> sz_xs /allP xs_in_d.
+  move=> @/f /=; apply/supp_dlist; first smt().
+  rewrite size_insert ?sz_xs //=; apply/allP.
+  by move=> y /mem_insert[->>//|/xs_in_d].
+- move=> xs /(supp_dlist _ _ _ ge0_Sn)[sz_xs /allP xs_in_d] @/g.
+  rewrite dprod1E !dlist1E ~-1://# sz_xs /=.
+  rewrite size_cat size_take // size_drop 1:/#.
+  rewrite iftrue 1:/# -(BRM.big_consT (mu1 d)) &(BRM.eq_big_perm).
+  by rewrite -cat_cons perm_eq_sym  &(perm_eq_nth_take_drop) //#.
+- case=> x xs /supp_dprod[/=] _ /(supp_dlist _ _ _ ge0_n)[sz_xs _].
+  rewrite /g /f /= nth_insert ?sz_xs //= take_insert_le 1:/#.
+  by rewrite drop_insert_gt 1:/# /= cat_take_drop.
+- move=> xs /(supp_dlist _ _ _ ge0_Sn)[/=] sz_xs _ @/f @/g /=.
+  have sz_take: size (take i xs) = i by rewrite size_take //#.
+  by apply/insert_nth_take_drop => //#.
 qed.
 
 (* 0 <= n could be removed, but applying the lemma is pointless in that case *)
