@@ -304,7 +304,7 @@
         let pr =
           match k with
           | `Only ->
-            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
+                   ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
           | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
           | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }
 
@@ -419,7 +419,6 @@
 %token CHECK
 %token EDIT
 %token FIX
-%token COST
 %token DEBUG
 %token DECLARE
 %token DELTA

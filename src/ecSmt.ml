@@ -34,7 +34,6 @@ let w_t_lets vs ws w2 =
 
 (* -------------------------------------------------------------------- *)
 type w3_known_op = WTerm.lsymbol * WTheory.theory
-type w3_known_ty = WTy.tysymbol * WTheory.theory
 
 type w3ty = WTy.tysymbol
 
@@ -163,8 +162,8 @@ let preid_xp genv xp =
 (* -------------------------------------------------------------------- *)
 let dump_tasks (tasks : WTask.task) (filename : string) =
   let stream = open_out filename in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
+  EcUtils.try_finally
+    (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task tasks)
       (fun () -> close_out stream)
@@ -644,7 +643,7 @@ module E = struct
     in
     try Some (List.rev (doit [] k f)) with MFailure -> None
 
-  let trans_kpattern env (k, (ls, wth)) f =
+  let trans_kpattern env (k, (ls, _)) f =
     match kmatch k f with
     | Some args ->
       let dom, codom = List.map f_ty args, f.f_ty in
@@ -1071,7 +1070,7 @@ and create_op ?(body = false) (genv : tenv) p =
 
   let known, ls =
     match Hp.find_opt genv.te_known_w3 p with
-    | Some (ls, th) -> (true, ls)
+    | Some (ls, _) -> (true, ls)
 
     | None ->
         let ls = WTerm.create_lsymbol (preid_p genv p) (textra@wdom) wcodom in

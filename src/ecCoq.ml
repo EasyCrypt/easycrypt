@@ -66,7 +66,7 @@ let canceled = result Canceled
 
 let is_valid = function { verdict = Valid } -> true | _ -> false
 
-let ping_prover_call ~config p =
+let ping_prover_call p =
   let pr = Why3.Call_provers.wait_on_call p.call in
   let r =
     match pr.pr_answer with
@@ -82,7 +82,7 @@ let ping_prover_call ~config p =
   in
   Some r
 
-let call_prover_task ~timeout ~steps ~config prover call =
+let call_prover_task ~timeout ~steps prover call =
   let timeout = match timeout with None -> 0.0 | Some tlimit -> tlimit in
   let pcall = {
     call ; prover ;
@@ -90,7 +90,7 @@ let call_prover_task ~timeout ~steps ~config prover call =
     steps ; timeout ; timeover = None ;
   }
   in
-  ping_prover_call ~config pcall
+  ping_prover_call pcall
 
 let run_batch pconf driver ~config ?script ~timeout prover task =
   let config = Why3.Whyconf.get_main config in
@@ -112,7 +112,7 @@ let run_batch pconf driver ~config ?script ~timeout prover task =
     Why3.Driver.prove_task_prepared ?old:script ?inplace
       ~command ~limit ~config driver task
   in
-  call_prover_task ~config ~timeout ~steps prover call
+  call_prover_task ~timeout ~steps prover call
 
 let pp_to_file f pp =
   let cout = open_out f in
@@ -130,9 +130,14 @@ let make_output_dir dir =
   if Sys.file_exists dir then ()
   else Unix.mkdir dir 0o770
 
-let editor_command pconf config =
+let editor_command config =
   try
-    let ed = Why3.Whyconf.editor_by_id config pconf.Why3.Whyconf.editor in
+    let editors = Why3.Whyconf.get_editors config in
+    let editors = Why3.Whyconf.Meditor.filter
+        (fun _ a -> String.equal a.Why3.Whyconf.editor_name "Emacs/ProofGeneral/Coq")
+        editors
+    in
+    let (_,ed) = Why3.Whyconf.Meditor.max_binding editors in
     String.concat " " (ed.editor_command :: ed.editor_options)
   with Not_found ->
     Why3.Whyconf.(default_editor (get_main config))
@@ -170,15 +175,12 @@ let updatescript ~script driver task =
   let d_new = Digest.file script in
   if String.equal d_new d_old then safe_remove backup
 
-let editor ~script ~merge ~config pconf driver task =
+let editor ~script ~merge ~config (pconf:Why3.Whyconf.config_prover) driver task =
   if merge then updatescript ~script driver task ;
-  let command = editor_command pconf config in
+  let command = editor_command config in
   let config = Why3.Whyconf.get_main config in
-  let call =
-    Why3.Call_provers.call_editor
-      ~command ~config script
-  in
-  call_prover_task ~config ~timeout:None ~steps:None pconf.prover call
+  let call = Why3.Call_provers.call_editor ~command ~config script in
+  call_prover_task ~timeout:None ~steps:None pconf.prover call
 
 let prepare ~name ~loc driver task =
   let ext = Filename.extension (Why3.Driver.file_of_task driver "S" "T" task) in
@@ -192,7 +194,7 @@ let prepare ~name ~loc driver task =
       (script, false)
     end
 
-let interactive ~notify ~name ~coqmode ~loc pconf ~config driver prover task =
+let interactive ~name ~coqmode ~loc pconf ~config driver prover task =
   let time = 10 in
   let timeout = if time <= 0 then None else Some (float time) in
   let script, merge =  prepare ~name ~loc driver task in
@@ -223,31 +225,22 @@ let build_proof_task ~notify ~name ~coqmode ~loc ~config ~env task =
       let provers = Why3.Whyconf.filter_provers config fp in
       begin
         match Why3.Whyconf.Mprover.is_empty provers with
-        | false ->
-          begin
-            (* Format.eprintf "Versions of Coq found:\n"; *)
-            (* Why3.Whyconf.(Mprover.iter (fun k _ -> *)
-            (*     Format.printf " %s\n" k.prover_version *)
-            (*   )) provers; *)
-
-            let prover = Why3.Whyconf.Mprover.max_binding provers in
-
-            (* Format.eprintf "Take Coq %s\n" (fst prover).prover_version; *)
-
-            prover
-          end
+        | false -> Why3.Whyconf.Mprover.max_binding provers
         | true -> raise CoqNotFound
       end
     in
-    let drv = Why3.Driver.load_driver_for_prover (Why3.Whyconf.get_main config)
-        env pconf
+    let drv =
+      Why3.Driver.load_driver_for_prover
+        (Why3.Whyconf.get_main config)
+        env
+        pconf
     in
     let task = Why3.Driver.prepare_task drv task in
 
     if is_trivial task then
       Some valid
     else
-      interactive ~notify ~name ~coqmode ~loc pconf ~config drv prover task
+      interactive ~name ~coqmode ~loc pconf ~config drv prover task
   with
   | CoqNotFound ->
     notify |> oiter (fun notify -> notify `Critical (lazy (
