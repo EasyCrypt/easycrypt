@@ -40,4 +40,15 @@
   , "scenario"   : "xsalsa"
   , "options"    : ""
   }
+
+  ,
+
+  { "name"       : "xsalsa20"
+  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem.git"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "mlkem-spec-sec mlkem-spec-corr"
+  , "options"    : ""
+  }
 ]
