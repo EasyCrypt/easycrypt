@@ -28,7 +28,7 @@ module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_provers   : EcParsetree.pprover_infos option -> EcProvers.prover_infos;
   tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
@@ -826,7 +826,7 @@ let process_rewrite1_r ttenv ?target ri tc =
             ptenv.pte_ev := MEV.add x `Form !(ptenv.pte_ev)
           );
 
-          let pt = PTApply { pt_head = PTCut f; pt_args = []; } in
+          let pt = PTApply { pt_head = PTCut (f, None); pt_args = []; } in
           let pt = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = f; } in
 
           process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
@@ -1389,10 +1389,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       | None -> process_trivial
     in t tc
 
-  and intro1_smt (_ : ST.state) ((dn, pi) : _ * pprover_infos) (tc : tcenv1) =
+  and intro1_smt (_ : ST.state) (dn : bool) (tc : tcenv1) =
     if dn then
-      t_or process_done (process_smt ttenv pi) tc
-    else process_smt ttenv pi tc
+      t_or process_done (process_smt ttenv None) tc
+    else process_smt ttenv None tc
 
   and intro1_simplify (_ : ST.state) logic tc =
     t_simplify_lg ~delta:`IfApplied (ttenv, logic) tc
@@ -1923,6 +1923,9 @@ let process_cut ?(mode = `Have) engine ttenv ((ip, phi, t) : cut_t) tc =
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pcutdef
 
+let cutsolver (ttenv : ttenv) =
+  { smt = process_smt ttenv None; done_ = process_trivial; }
+
 let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt = {
       fp_mode = `Implicit;
@@ -1938,7 +1941,7 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt, ax = PT.concretize pt in
 
   FApi.t_sub
-    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
+    [EcLowGoal.t_apply ~cutsolver:(cutsolver ttenv) pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
 
 (* -------------------------------------------------------------------- *)
