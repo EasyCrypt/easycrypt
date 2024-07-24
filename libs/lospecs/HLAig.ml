@@ -95,7 +95,9 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     let bvinpt1 = (bvterm_of_reg r1) in
     let bvinpt2 = (bvterm_of_reg r2) in
     let inps = List.map (fun v -> ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v)))) inps in
-    let inps = List.map (fun name -> Map.String.find name !bvvars) inps in
+    let inps = List.map (fun name -> match Map.String.find_opt name !bvvars with
+    | Some bv -> bv
+    | None -> SMT.bvterm_of_name 1 name) inps in
     let bvinp = List.reduce (SMT.bvterm_concat) inps in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = (bvterm_of_node pcond) in
