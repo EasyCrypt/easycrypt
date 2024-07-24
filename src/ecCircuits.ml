@@ -491,6 +491,8 @@ let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool =
   (* inputs_equal f pcond && *)
   (* let cs = merge_inps3 f g pcond in *)
   (* Option.is_some cs && *) 
+  let g = {g with inps = g.inps @ (List.drop (List.length g.inps) f.inps)} in
+  let pcond = {pcond with inps = pcond.inps @ (List.drop (List.length pcond.inps) f.inps)} in
   begin
     (* let f, g, pcond = cs |> Option.get in *)
     (* let f, pcond = merge_inps f pcond |> Option.get in *)
