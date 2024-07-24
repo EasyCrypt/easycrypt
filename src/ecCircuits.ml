@@ -499,7 +499,7 @@ let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool =
     let pcond2 = apply_args pcond new_inps in
     (List.for_all2 (==) f.circ g2.circ) ||
     let module B = (val HL.makeBWZinterface ()) in
-    B.circ_equiv f.circ g2.circ (List.hd pcond2.circ)
+    B.circ_equiv f.circ g2.circ (List.hd pcond2.circ) (List.map (fun (a,b) -> (a.id_tag, b)) f.inps)
   end
   
 let circ_check (f: circuit) (pcond: circuit option) : bool =
@@ -550,6 +550,7 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) ?(cache=Map.
         let () = assert (List.length c_c.circ = 1) in
         let c_c = List.hd c_c.circ in
         env, {
+        (* TODO: change this to ite c_c t_c f_c *)
         circ = C.mux2_reg f_c.circ t_c.circ c_c;
         inps = List.rev vars; }
       (* Assumes no quantifier bindings/new inputs within if *)

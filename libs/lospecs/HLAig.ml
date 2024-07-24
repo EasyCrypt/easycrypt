@@ -43,7 +43,7 @@ module type SMTInstance = sig
 end
 
 module type SMTInterface = sig
-  val circ_equiv : reg -> reg -> node -> bool
+  val circ_equiv : reg -> reg -> node -> (int * int) list-> bool
 
   val circ_sat : node -> bool
 
@@ -53,7 +53,7 @@ end
 (* TODO Add model printing for circ_sat and circ_taut *)
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
-  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
+  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) (inps: (int * int) list) : bool =
     assert ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0));
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 
@@ -94,6 +94,9 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
 
     let bvinpt1 = (bvterm_of_reg r1) in
     let bvinpt2 = (bvterm_of_reg r2) in
+    let inps = List.map (fun v -> ("BV_" ^ (fst v |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (snd v)))) inps in
+    let inps = List.map (fun name -> Map.String.find name !bvvars) inps in
+    let bvinp = List.reduce (SMT.bvterm_concat) inps in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = (bvterm_of_node pcond) in
  
@@ -104,6 +107,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       else begin
         Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
+        Format.eprintf "input: %a@."  SMT.pp_term (SMT.get_value bvinp);
         false
       end
     end
