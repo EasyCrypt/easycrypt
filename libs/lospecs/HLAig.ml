@@ -108,7 +108,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
       if SMT.check_sat () = false then true 
       else begin
-        Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1);
+        Format.eprintf "fc:    %a@."     SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
         List.iteri (fun i bv -> 
         Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        

@@ -439,6 +439,8 @@ let applys (c: C.reg) (vs: (ident * C.reg) list) : C.reg =
 
 (* FIXME: check in what order to put the args *)
 let apply_args (c: circuit) (vs: circuit list) : circuit = 
+  Format.eprintf "#Args: %d@." (List.length vs);
+  List.iter (fun (a,b) -> Format.eprintf "%s@%d@." a.id_symb b) c.inps;
   assert (List.compare_lengths c.inps vs >= 0);
   let new_circs, new_inps = List.map (fun c -> (c.circ, c.inps)) vs |> List.split in
   let apply_inps, old_inps = List.takedrop (List.length vs) c.inps in
@@ -476,30 +478,33 @@ let apply_arg (c: circuit) (v: C.reg) : circuit =
   | [] -> let err = Format.asprintf "Can't apply to circuit with no arguments@." in
      raise @@ CircError err
 
-
+(* FIXME: arranjar renamings *)
 let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
   let pcond = match pcond with
   | Some pcond -> pcond
   | None -> {circ = [C.true_]; inps = f.inps}
   in
+  List.iter (fun (a,b) -> Format.eprintf "f: %s@%d@." a.id_symb b) f.inps;
+  List.iter (fun (a,b) -> Format.eprintf "g: %s@%d@." a.id_symb b) g.inps;
+  List.iter (fun (a,b) -> Format.eprintf "p: %s@%d@." a.id_symb b) pcond.inps;
   (* inputs_equal f g && *)
   (* inputs_equal f pcond && *)
-  let cs = merge_inps3 f g pcond in
-  Option.is_some cs && 
+  (* let cs = merge_inps3 f g pcond in *)
+  (* Option.is_some cs && *) 
   begin
-    let f, g, pcond = cs |> Option.get in
-    let f, pcond = merge_inps f pcond |> Option.get in
-    (* let new_inps = List.mapi (fun i (_, w) -> *) 
-      (* let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in *)
-      (* {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in *)
-    let new_inps = List.map (fun (id, w) ->
+    (* let f, g, pcond = cs |> Option.get in *)
+    (* let f, pcond = merge_inps f pcond |> Option.get in *)
+    let new_inps = List.mapi (fun i (_, w) -> 
+      let id = EcIdent.create ("equiv_inp_" ^ (string_of_int i)) in
       {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in
-    (* let f2 = apply_args f new_inps in *)
+    (* let new_inps = List.map (fun (id, w) -> *)
+      (* {circ = C.reg ~size:w ~name:id.id_tag; inps = [(id, w)]}) f.inps in *)
+    let f2 = apply_args f new_inps in
     let g2 = apply_args g new_inps in
     let pcond2 = apply_args pcond new_inps in
     (List.for_all2 (==) f.circ g2.circ) ||
     let module B = (val HL.makeBWZinterface ()) in
-    B.circ_equiv f.circ g2.circ (List.hd pcond2.circ) (List.map (fun (a,b) -> (a.id_tag, b)) f.inps)
+    B.circ_equiv f2.circ g2.circ (List.hd pcond2.circ) (List.map (fun (a,b) -> (a.id_tag, b)) f.inps)
   end
   
 let circ_check (f: circuit) (pcond: circuit option) : bool =
