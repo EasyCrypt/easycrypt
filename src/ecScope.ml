@@ -2441,14 +2441,41 @@ module Circ : sig
   val add_qfabvop : scope -> pqsymbol -> string -> scope
 
 end = struct
-  let add_bitstring (sc: scope) (tb: pqsymbol) (fb: pqsymbol) (t: pty) (n: int) : scope = 
+  let add_bitstring (sc: scope) (tb: pqsymbol) (fb: pqsymbol) (pt: pty) (n: int) : scope = 
     let env = (env sc) in
+    let loced a = mk_loc (tb.pl_loc) a in
 
     let tbp, _tbo = EcEnv.Op.lookup tb.pl_desc env in
     let fbp, _fbo = EcEnv.Op.lookup fb.pl_desc env in
     
-    let ue = EcTyping.transtyvars env (t.pl_loc, None) in
-    let t = EcTyping.transty tp_tydecl env ue t in
+    let ue = EcTyping.transtyvars env (pt.pl_loc, None) in
+    let t = EcTyping.transty tp_tydecl env ue pt in
+
+    let ov = {
+        opov_nosmt = false;
+        opov_tyvars = None;
+        opov_args = [];
+        opov_retty = loced PTunivar;
+        opov_body = loced (PFint (BI.of_int n));
+      } in
+    
+    let (tc: EcParsetree.theory_cloning) = {
+       pthc_base = loced (["Top"; "QFABV"], "BV");
+       pthc_name = Some (loced @@ Format.asprintf "BV_%a" 
+         (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t);
+       pthc_ext = [
+         (loced ([], "bv"), PTHO_Type (`BySyntax ([], pt), `Inline `Clear));
+         (loced ([], "size"), PTHO_Op (`BySyntax ov, `Inline `Keep));
+         ]; (* FIXME: add override for theory *)
+       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
+       pthc_rnm = [];
+       pthc_opts = [];
+       pthc_clears = [];
+       pthc_local = `Global;
+       pthc_import = None;
+      } 
+    in
+    let sc = Cloning.clone sc `Check tc in
     match t.ty_node with
     | Tconstr (p, []) -> 
       let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in
@@ -2461,6 +2488,22 @@ end = struct
     {sc with sc_env = EcSection.add_item item sc.sc_env }
     
   let add_qfabvop (sc: scope) (o: pqsymbol) (c: string) : scope =
+    (* TODO: Add theory cloning *)
+    let loced a = mk_loc o.pl_loc a in
+    let (tc: EcParsetree.theory_cloning) = {
+       pthc_base = loced (["Top"; "QFABV"], "BV");
+       pthc_name = Some (loced "RandomTheoryNameChangeMeLater");
+       pthc_ext = []; (* FIXME: add override for theory *)
+       pthc_prf = [];
+       pthc_rnm = [];
+       pthc_opts = [];
+       pthc_clears = [];
+       pthc_local = `Global;
+       pthc_import = None;
+      } 
+    in
+    let sc = Cloning.clone sc `Check tc in
+    
     let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
     let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
     {sc with sc_env = EcSection.add_item item sc.sc_env }
