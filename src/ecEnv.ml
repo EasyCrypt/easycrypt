@@ -171,7 +171,10 @@ type bitstring = {
   size: int;
 }
   
-type qfabvop = BVADD | BVSUB
+type qfabvop = 
+  | BVADD of int
+  | BVSUB of int
+
 type circ_env = {
   bitstrings: bitstring Mp.t;
   circuits: string Mp.t;
@@ -3642,15 +3645,6 @@ end = struct
     {env with env_circ = 
       {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
 
-  let bind_qfabvop (env: env) (k: path) (v: string) : env = 
-    let qfop = match v with
-    | "bvadd" -> BVADD
-    | "bvsub" -> BVSUB
-    | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
-    in 
-    {env with env_circ = 
-      {env.env_circ with qfabvops = Mp.add k qfop env.env_circ.qfabvops }}
-
   let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
     Mp.find_opt k env.env_circ.bitstrings
 
@@ -3684,6 +3678,39 @@ end = struct
     let p, _o = Op.lookup o env in
     lookup_circuit_path env p
 
+
+  let bind_qfabvop (env: env) (k: path) (v: string) : env = 
+    let o = Op.by_path k env in
+    let qfop = match o.op_ty.ty_node with
+    | Tfun (t1, {ty_node=Tfun(t2, t3)}) -> 
+      let b1 = match lookup_bitstring env t1 with
+      | Some b -> b
+      | None -> assert false (* FIXME: add proper error handling*)
+      in
+      let b2 = match lookup_bitstring env t2 with
+      | Some b -> b
+      | None -> assert false (* FIXME: add proper error handling*)
+      in
+      let b3 = match lookup_bitstring env t3 with
+      | Some b -> b
+      | None -> assert false (* FIXME: add proper error handling*)
+      in
+      let n = match b1.size, b2.size, b3.size with
+      | n1, n2, n3 when (n1 = n2) && (n2 = n3) -> n1
+      | n1, n2, n3 -> failwith (Format.sprintf "Inconsistent sizes for qfabvop binding %s: %d -> %d -> %d@."
+        v n1 n2 n3)
+      in
+      begin match v with
+      | "bvadd" -> BVADD n
+      | "bvsub" -> BVSUB n
+      | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
+      end
+    | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
+    in
+    {env with env_circ = 
+      {env.env_circ with qfabvops = Mp.add k qfop env.env_circ.qfabvops }}
+
+  
   let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
     Mp.find_opt v env.env_circ.qfabvops
 

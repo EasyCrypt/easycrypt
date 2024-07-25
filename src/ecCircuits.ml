@@ -195,7 +195,7 @@ let circuit_from_spec (env: env) (p : path) : circuit =
 module BaseOps = struct
   let temp_symbol = "temp_circ_input"
   
-  let is_baseop (p: path) : bool = 
+  let is_baseop (env: env) (p: path) : bool = 
     match (EcPath.toqsymbol p) with
     | ["Top"; "JWord"; _], _ -> true
     | ["Top"; "JModel_x86"], _ -> true
@@ -218,11 +218,14 @@ module BaseOps = struct
     | _, "true" -> true
     | _, "false" -> true
     
-    | _ -> false
+    | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
+      | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
+      | None   -> Format.eprintf "Did not find qfabv binding for %s@." (EcPath.tostring p); false
+    end
 
-  let circuit_of_baseop (p: path) : circuit = 
+  let circuit_of_baseop (env: env) (p: path) : circuit = 
     match (EcPath.toqsymbol p) with
-    | (["Top"; "JWord"; sz], op) as qpath -> 
+    | (["Top"; "JWord"; sz], op) as qpath when op <> "+" -> 
       let size = match sz with
       | "W256" -> 256
       | "W128" -> 128 
@@ -236,12 +239,12 @@ module BaseOps = struct
 
     begin match op with
     (* Arithmetic: *)
-    | "+" ->
-      let id1 = EcIdent.create (temp_symbol) in
-      let id2 = EcIdent.create (temp_symbol) in
-      let c1 = C.reg ~size ~name:id1.id_tag in
-      let c2 = C.reg ~size ~name:id2.id_tag in
-      {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]}
+    (* | "+" -> *)
+      (* let id1 = EcIdent.create (temp_symbol) in *)
+      (* let id2 = EcIdent.create (temp_symbol) in *)
+      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
+      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
+      (* {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]} *)
 
     | "*" -> (* Unsigned low word mul *)
       let id1 = EcIdent.create (temp_symbol) in
@@ -419,7 +422,21 @@ module BaseOps = struct
     (* let dc = C.or_ dp_modqt dm_modqt in *)
     {circ = [dc]; inps = [(id1, 16); (id2, 16)]}
   
-  | _ -> raise @@ CircError "Failed to generate op"
+  | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
+    | Some BVADD size -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]}
+    | Some BVSUB size ->
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = C.sub_dropc c1 c2; inps = [(id1, size); (id2, size)]}
+    | _ -> raise @@ CircError "Failed to generate op"
+    end
 end
 
 let apply (c: C.reg) (idn: ident) (v: C.reg) : C.reg = 
@@ -591,9 +608,9 @@ let circuit_of_form ?(pstate : (symbol, circuit) Map.t = Map.empty) ?(cache=Map.
         env, op
       | None -> 
         (* Format.eprintf "No cache for op: %s@." (EcPath.tostring pth); *)
-      if BaseOps.is_baseop pth then
+      if BaseOps.is_baseop env pth then
         try
-          let circ = BaseOps.circuit_of_baseop pth in
+          let circ = BaseOps.circuit_of_baseop env pth in
           op_cache := Mp.add pth circ !op_cache;
           env, circ 
         with

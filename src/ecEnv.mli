@@ -22,7 +22,9 @@ type bitstring = { (* FIXME: maybe move this later? *)
   from_bits : path;
   size : int;
 }
-type qfabvop = BVADD | BVSUB
+type qfabvop = 
+  | BVADD of int 
+  | BVSUB of int
 type env
 type scope = [
   | `Theory

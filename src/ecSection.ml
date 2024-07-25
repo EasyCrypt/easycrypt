@@ -1472,7 +1472,7 @@ let check_item scenv item =
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
   | Th_theory  _   -> assert false
-  | Th_bitstring _ | Th_circuit _ -> ()
+  | Th_bitstring _ | Th_circuit _ | Th_qfabvop _ -> ()
 
 let rec add_item (item : theory_item) (scenv : scenv) =
   let item = if scenv.sc_loca = `Local then set_local_item item else item in
