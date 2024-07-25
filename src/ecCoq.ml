@@ -259,12 +259,11 @@ let env = lazy (get_w3_env ())
 let check ~loc ~name ?notify pi ?(coqmode=Edit) (hyps : LDecl.hyps) (concl : form) =
   let config = Lazy.force config in
   let env = Lazy.force env in
-  let ec_env = LDecl.toenv hyps in
-  let hyps = LDecl.tohyps hyps in
-  let tenv = EcSmt.init ~env ec_env in
+  let ec_env,hyps,tenv,decl = EcSmt.init hyps concl in
 
   let execute_task toadd =
-    let task = EcSmt.make_task tenv hyps concl toadd in
+    let task = EcSmt.make_task tenv toadd decl in
+
     match build_proof_task ~notify ~name ~coqmode ~loc ~config ~env task with
     | None -> None
     | Some r -> match r.verdict with
