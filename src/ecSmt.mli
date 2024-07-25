@@ -8,6 +8,20 @@ open EcProvers
 val check : ?notify:notify -> prover_infos -> LDecl.hyps -> form -> bool
 val dump_why3 : env -> string -> unit
 
+type tenv
+
+
+val select : EcEnv.env -> EcProvers.prover_infos -> EcBaseLogic.hyps ->
+  EcFol.form -> ((EcPath.path * EcDecl.axiom) list -> bool option) -> bool
+
+val make_task : tenv -> (EcPath.path * EcDecl.axiom) list -> Why3.Decl.decl -> Why3.Task.task
+
+val init : EcEnv.LDecl.hyps ->
+  EcFol.form ->
+  EcEnv.env * EcBaseLogic.hyps * tenv * Why3.Decl.decl
+
+val trans_axiom : tenv -> EcPath.path * EcDecl.axiom -> unit
+
 module Frequency : sig
 
   (* -------------------------------------------------------------------- *)

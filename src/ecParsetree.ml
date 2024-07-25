@@ -962,6 +962,7 @@ type logtactic =
   | Pmemory     of psymbol
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
+  | Pcoq        of (EcProvers.coq_mode option * psymbol * pprover_infos)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
