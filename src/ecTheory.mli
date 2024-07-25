@@ -38,6 +38,7 @@ and theory_item_r =
   (* check this V *)
   | Th_bitstring of (path * path * path * int)
   | Th_circuit   of (path * string)
+  | Th_qfabvop   of (path * string)
 
 and thsource = {
   ths_base : EcPath.path;

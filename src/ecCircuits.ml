@@ -439,8 +439,8 @@ let applys (c: C.reg) (vs: (ident * C.reg) list) : C.reg =
 
 (* FIXME: check in what order to put the args *)
 let apply_args (c: circuit) (vs: circuit list) : circuit = 
-  Format.eprintf "#Args: %d@." (List.length vs);
-  List.iter (fun (a,b) -> Format.eprintf "%s@%d@." a.id_symb b) c.inps;
+  (* Format.eprintf "#Args: %d@." (List.length vs); *)
+  (* List.iter (fun (a,b) -> Format.eprintf "%s@%d@." a.id_symb b) c.inps; *)
   assert (List.compare_lengths c.inps vs >= 0);
   let new_circs, new_inps = List.map (fun c -> (c.circ, c.inps)) vs |> List.split in
   let apply_inps, old_inps = List.takedrop (List.length vs) c.inps in
@@ -479,6 +479,7 @@ let apply_arg (c: circuit) (v: C.reg) : circuit =
      raise @@ CircError err
 
 (* FIXME: arranjar renamings *)
+(* TODO: figure out how to deal with circuits with different inputs or some that match *)
 let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
   let pcond = match pcond with
   | Some pcond -> pcond

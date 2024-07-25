@@ -643,6 +643,9 @@ and process_bind_bitstring (scope : EcScope.scope) (tb: pqsymbol) (fb: pqsymbol)
 and process_bind_circuit (scope : EcScope.scope) (o: pqsymbol) (c: string) =
   EcScope.Circ.add_circuit scope o c
 
+and process_bind_qfabvop (scope : EcScope.scope) (o: pqsymbol) (c: string) =
+  EcScope.Circ.add_qfabvop scope o c
+
 and process_test (scope: EcScope.scope) (q: pqsymbol) (q2: pqsymbol) =
   let env = EcScope.env scope in
   EcCircuits.process_op env q q2
@@ -692,6 +695,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gbdep        (proc, f, n, m, vs, b) -> `State (fun scope -> process_bdep scope (proc, f, n, m, vs, b))
       | Gbbitstring  (tb, fb, t, n) -> `Fct (fun scope -> process_bind_bitstring scope tb fb t n )
       | Gbcircuit (o, c) -> `Fct (fun scope -> process_bind_circuit scope o c)
+      | Gbqfabvop (o, c) -> `Fct (fun scope -> process_bind_qfabvop scope o c)
       | Gtest (p1, p2) -> `State (fun scope -> process_test scope p1 p2)
     with
     | `Fct   f -> Some (f scope)

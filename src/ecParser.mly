@@ -3889,6 +3889,9 @@ global_action:
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }
 
+| BIND OP o=qoident c=STRING
+  { Gbqfabvop (o, c) }
+
 | BIND BDEP t1=qoident t2=qoident
   { Gtest (t1, t2) }
 

@@ -22,6 +22,7 @@ type bitstring = { (* FIXME: maybe move this later? *)
   from_bits : path;
   size : int;
 }
+type qfabvop = BVADD | BVSUB
 type env
 type scope = [
   | `Theory
@@ -511,13 +512,18 @@ val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
 
 
 module Circ : sig
-  val bind_bitstring : env -> path -> path -> path -> int -> env
-  val bind_circuit   : env -> path -> string -> env
-  val lookup_bitstring : env -> ty -> bitstring option
-  val lookup_bitstring_path: env -> path -> bitstring option
-  val lookup_bitstring_size : env -> ty -> int option
-  val lookup_circuit : env -> qsymbol -> string option
-  val lookup_bitstring_size_path : env -> path -> int option
-  val lookup_circuit_path : env -> path -> string option
+  
+  val bind_bitstring             : env -> path    -> path -> path -> int -> env
+  val bind_circuit               : env -> path    -> string -> env
+  val bind_qfabvop               : env -> path    -> string -> env
+
+  val lookup_bitstring           : env -> ty      -> bitstring option
+  val lookup_bitstring_path      : env -> path    -> bitstring option
+  val lookup_bitstring_size      : env -> ty      -> int option
+  val lookup_circuit             : env -> qsymbol -> string option
+  val lookup_bitstring_size_path : env -> path    -> int option
+  val lookup_circuit_path        : env -> path    -> string option
+  val lookup_qfabvop_path        : env -> path    -> qfabvop option
+  val lookup_qfabvop             : env -> qsymbol -> qfabvop option
 
 end 

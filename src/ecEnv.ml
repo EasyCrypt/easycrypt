@@ -171,11 +171,14 @@ type bitstring = {
   size: int;
 }
   
+type qfabvop = BVADD | BVSUB
 type circ_env = {
   bitstrings: bitstring Mp.t;
   circuits: string Mp.t;
+  qfabvops: qfabvop Mp.t;
 }
 
+(* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -320,7 +323,7 @@ let empty gstate =
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
-    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; };
+    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; qfabvops = Mp.empty; };
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -3616,17 +3619,21 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 
 
 module Circ : sig
+  
   val bind_bitstring : env -> path -> path -> path -> int -> env
   val bind_circuit   : env -> path -> string -> env
+  val bind_qfabvop   : env -> path -> string -> env
   val lookup_bitstring : env -> ty -> bitstring option
   val lookup_bitstring_path: env -> path -> bitstring option
   val lookup_bitstring_size : env -> ty -> int option
   val lookup_circuit : env -> qsymbol -> string option
   val lookup_bitstring_size_path : env -> path -> int option
   val lookup_circuit_path : env -> path -> string option
+  val lookup_qfabvop_path : env -> path -> qfabvop option
+  val lookup_qfabvop : env -> qsymbol -> qfabvop option
+  
 
 end = struct
-
   let bind_bitstring (env: env) (tb: path) (fb:path) (ty: path) (n: int) : env = 
     {env with env_circ =
       {env.env_circ with bitstrings = Mp.add ty {to_bits=tb;from_bits=fb;size=n} env.env_circ.bitstrings}}
@@ -3634,6 +3641,15 @@ end = struct
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     {env with env_circ = 
       {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
+
+  let bind_qfabvop (env: env) (k: path) (v: string) : env = 
+    let qfop = match v with
+    | "bvadd" -> BVADD
+    | "bvsub" -> BVSUB
+    | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
+    in 
+    {env with env_circ = 
+      {env.env_circ with qfabvops = Mp.add k qfop env.env_circ.qfabvops }}
 
   let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
     Mp.find_opt k env.env_circ.bitstrings
@@ -3667,5 +3683,12 @@ end = struct
   let lookup_circuit (env: env) (o: qsymbol) : string option =
     let p, _o = Op.lookup o env in
     lookup_circuit_path env p
+
+  let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
+    Mp.find_opt v env.env_circ.qfabvops
+
+  let lookup_qfabvop (env: env) (o: qsymbol) : qfabvop option =
+    let p, _o = Op.lookup o env in
+    lookup_qfabvop_path env p
   
 end

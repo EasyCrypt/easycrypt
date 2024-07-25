@@ -2438,6 +2438,7 @@ end
 module Circ : sig 
   val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
   val add_circuit : scope -> pqsymbol -> string -> scope
+  val add_qfabvop : scope -> pqsymbol -> string -> scope
 
 end = struct
   let add_bitstring (sc: scope) (tb: pqsymbol) (fb: pqsymbol) (t: pty) (n: int) : scope = 
@@ -2457,6 +2458,11 @@ end = struct
   let add_circuit (sc: scope) (o: pqsymbol) (c: string) : scope =
     let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
     let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
+    {sc with sc_env = EcSection.add_item item sc.sc_env }
+    
+  let add_qfabvop (sc: scope) (o: pqsymbol) (c: string) : scope =
+    let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
     {sc with sc_env = EcSection.add_item item sc.sc_env }
     
 
