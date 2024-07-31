@@ -3638,14 +3638,17 @@ module Circ : sig
 
 end = struct
   let bind_bitstring (env: env) (tb: path) (fb:path) (ty: path) (n: int) : env = 
+    Format.eprintf "Binding bitstring for type %s@." (EcPath.tostring ty);
     {env with env_circ =
       {env.env_circ with bitstrings = Mp.add ty {to_bits=tb;from_bits=fb;size=n} env.env_circ.bitstrings}}
     
   let bind_circuit (env: env) (k: path) (v: string) : env = 
+    (* TODO: add absolute paths for circuit binding and lookup *)
     {env with env_circ = 
       {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
 
   let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
     Mp.find_opt k env.env_circ.bitstrings
 
   let lookup_bitstring (env: env) (ty:ty) : bitstring option =

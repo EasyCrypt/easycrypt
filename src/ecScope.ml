@@ -2458,6 +2458,22 @@ end = struct
         opov_retty = loced PTunivar;
         opov_body = loced (PFint (BI.of_int n));
       } in
+
+    let otb = {
+        opov_nosmt = false;
+        opov_tyvars = None;
+        opov_args = [];
+        opov_retty = loced PTunivar;
+        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ tbp), None)
+    } in
+
+    let ofb = {
+        opov_nosmt = false;
+        opov_tyvars = None;
+        opov_args = [];
+        opov_retty = loced PTunivar;
+        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ fbp), None)
+    } in
     
     let (tc: EcParsetree.theory_cloning) = {
        pthc_base = loced (["Top"; "QFABV"], "BV");
@@ -2466,6 +2482,8 @@ end = struct
        pthc_ext = [
          (loced ([], "bv"), PTHO_Type (`BySyntax ([], pt), `Inline `Clear));
          (loced ([], "size"), PTHO_Op (`BySyntax ov, `Inline `Keep));
+         (loced ([], "tolist"), PTHO_Op (`BySyntax otb, `Inline `Keep));
+         (loced ([], "oflist"), PTHO_Op (`BySyntax ofb, `Inline `Keep));
          ]; (* FIXME: add override for theory *)
        pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
        pthc_rnm = [];
@@ -2475,7 +2493,7 @@ end = struct
        pthc_import = None;
       } 
     in
-    let sc = Cloning.clone sc `Check tc in
+    (* let sc = Cloning.clone sc `Check tc in *)
     match t.ty_node with
     | Tconstr (p, []) -> 
       let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in

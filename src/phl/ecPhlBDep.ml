@@ -228,6 +228,7 @@ let process_bdep
   let poutvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
   let poutvs = f_app_safe env EcCoreLib.CI_List.p_flatten [poutvs] in
   let poutvs = f_app_safe env (EcCoreLib.CI_List.p_chunk) [f_int (BI.of_int m); poutvs] in
+  let poutvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(bits2w_op outbty); poutvs] in
 
   
   (* ------------------------------------------------------------------ *)
