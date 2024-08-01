@@ -2497,7 +2497,7 @@ end = struct
     match t.ty_node with
     | Tconstr (p, []) -> 
       let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in
-      {sc with sc_env = EcSection.add_item item sc.sc_env }
+      Cloning.clone {sc with sc_env = EcSection.add_item item sc.sc_env } `Check tc
     | _ -> assert false
   
   let add_circuit (sc: scope) (o: pqsymbol) (c: string) : scope =
