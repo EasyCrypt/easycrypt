@@ -827,6 +827,14 @@ rewrite drop_cat lez_eqVlt; case: (n = size s1) => [->|] //=.
 by rewrite drop0 drop_size.
 qed.
 
+lemma drop_catl ['a] (s1 s2 : 'a list) (i : int) :
+  i <= size s1 => drop i (s1 ++ s2) = drop i s1 ++ s2.
+proof. by move=> ?; rewrite drop_cat_le iftrue. qed.
+
+lemma drop_catr ['a] (s1 s2 : 'a list) (i : int) :
+  size s1 <= i => drop i (s1 ++ s2) = drop (i - size s1) s2.
+proof. by move=> ?; rewrite drop_cat iffalse // ltzNge. qed.
+
 lemma drop_size_cat n (s1 s2 : 'a list):
   size s1 = n => drop n (s1 ++ s2) = s2.
 proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
@@ -902,6 +910,14 @@ rewrite take_cat lez_eqVlt; case: (n = size s1) => [->|] //=.
 by rewrite take0 take_size cats0.
 qed.
 
+lemma take_catl ['a] (s1 s2 : 'a list) (i : int) :
+  i <= size s1 => take i (s1 ++ s2) = take i s1.
+proof. by move=> ?; rewrite take_cat_le iftrue. qed.
+
+lemma take_catr ['a] (s1 s2 : 'a list) (i : int) :
+  size s1 <= i => take i (s1 ++ s2) = s1 ++ take (i - size s1) s2.
+proof. by move=> ?; rewrite take_cat iffalse // ltzNge. qed.
+
 lemma take_size_cat n (s1 s2 : 'a list):
   size s1 = n => take n (s1 ++ s2) = s1.
 proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
@@ -915,6 +931,37 @@ qed.
 
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim: s n=> /#. qed.
+
+lemma takeD ['a] (s : 'a list) (i j : int) :
+  0 <= i => 0 <= j => take (i + j) s = take i s ++ take j (drop i s).
+proof.
+move=> ge0_i ge0_j; case: (size s <= i) => [sz_le|/ltzNge sz_lt].
+- by rewrite drop_oversize //= cats0 !take_oversize //#.
+rewrite -{1}[s](cat_take_drop i) take_cat.
+by rewrite size_take // sz_lt /= iffalse 1:/# addrAC.
+qed.
+
+lemma size_eqD ['a] (m n : int) (s : 'a list) :
+  0 <= m => 0 <= n => size s = m + n =>
+    exists s1 s2, (size s1 = m /\ size s2 = n) /\ s = s1 ++ s2.
+proof.
+move=> ge0_m ge0_n szs; exists (take m s) (drop m s).
+by rewrite cat_take_drop /= !(size_take, size_drop) //#.
+qed.
+
+lemma drop_take ['a] (s : 'a list) (i j : int) :
+  0 <= i => 0 <= j => drop i (take j s) = take (j-i) (drop i s).
+proof.
+move=> ge0_i ge0_j; case: (j < i) => [lt_ji|/lezNgt le_ij].
+- rewrite (take_le0 (j-i)) 1:/# drop_oversize //.
+  by apply/(lez_trans j)/ltzW => //; apply/size_take_le.
+case: (i < size s) => [lti|]; last first.
+- move=> /lezNgt lei; rewrite !drop_oversize //=.
+  by rewrite &(lez_trans _ _ _ _ lei) size_take //#.
+rewrite {1}(_ : j = i + (j - i)) 1:addzCA //.
+rewrite takeD ~-1://# drop_catr // 1:&(size_take_le) //.
+by rewrite drop_le0 // size_take // lti.
+qed.
 
 lemma mem_drop n (s:'a list) x: mem (drop n s) x => mem s x.
 proof. by rewrite -{2}[s](cat_take_drop n) mem_cat=>->. qed.
@@ -949,6 +996,14 @@ case=> ge0_n lt_n_s; apply/eq_sym/(eq_from_nth x0).
 - by rewrite size_cat size_take -1:lt_n_s //= size_drop //#.
 move=> i [ge0_i lti]; rewrite nth_cat size_take //= lt_n_s /=.
 smt(nth_take nth_drop).
+qed.
+
+lemma drop_take1_nth ['a] (x0 : 'a) (s : 'a list) (i : int) :
+  0 <= i < size s => take 1 (drop i s) = [nth x0 s i].
+proof.
+move=> [ge0_i lti]; rewrite -{1}[s](cat_take_insert_drop x0 i) //.
+rewrite drop_cat_le size_take // lti /=.
+by rewrite drop_oversize 1:size_take // 1:lti //= take0.
 qed.
 
 lemma splitPr (xs : 'a list) (x : 'a): mem xs x =>
@@ -2548,8 +2603,13 @@ lemma mkseqS f n : 0 <= n =>
   mkseq<:'a> f (n + 1) = rcons (mkseq f n) (f n).
 proof. by move=> ge0_n; rewrite /mkseq iotaSr //= map_rcons. qed.
 
-lemma mkseqSr ['a] (f : int -> 'a) n : 0 <= n => mkseq f (n + 1) = f 0 :: mkseq (f \o ((+)%Int 1)) n.
+lemma mkseqSr ['a] (f : int -> 'a) n : 0 <= n =>
+  mkseq f (n + 1) = f 0 :: mkseq (f \o ((+)%Int 1)) n.
 proof. by move => le0n; rewrite /mkseq iotaS //= map_comp -iota_addl. qed.
+
+lemma mkseqSr_minus ['a] (f : int -> 'a) (n : int) :
+  0 < n => mkseq f n = f 0 :: mkseq (f \o (+) 1) (n - 1).
+proof. by move=> gt0_n; rewrite (mkseqSr _ (n-1)) //#. qed.
 
 lemma mkseq_add (f : int -> 'a) n m : 0 <= n => 0 <= m =>
   mkseq f (n+m) = mkseq f n ++ mkseq (fun i => f (n+i)) m.
@@ -2801,6 +2861,9 @@ proof.
   by rewrite !flatten_cons ih catA.
 qed.
 
+lemma flatten1 ['a] (x : 'a list) : flatten [x] = x.
+proof. by rewrite flatten_cons flatten_nil cats0. qed.
+
 lemma flatten_rcons (s : 'a list list) (x : 'a list)  :
   flatten (rcons s x) = flatten s ++ x.
 proof. by rewrite -cats1 flatten_cat flatten_seq1. qed.
@@ -2927,6 +2990,46 @@ case: (lez_total 0 k) => [ge0_k|le0_k]; last first.
 rewrite (_ : max 0 k = k) 1:/#  //; elim: k ge0_k => [|k ge0_k ih].
   by rewrite nseq0 flatten_nil.
 by rewrite nseqS // flatten_cons count_cat /#.
+qed.
+
+lemma size_flatten_ctt ['a] (n : int) (s : 'a list list) :
+     (forall x, x \in s => size x = n)
+  => size (flatten s) = n * (size s).
+proof.
+move=> sz_s; rewrite size_flatten (iffLR _ _ (eq_in_map _ (fun _ => n) _)) //.
+by elim: {sz_s} s => //= s @/sumz /= ->; rewrite mulzDr.
+qed.
+
+lemma drop_flatten_ctt ['a] (m n : int) (s : 'a list list) :
+     (forall x, x \in s => size x = m)
+  => drop (m * n) (flatten s) = flatten (drop n s).
+proof.
+move=> hsz; case: (m < 0) => [lt0_m|/lezNgt ge0_m].
+- have ->>//: s = []; apply: contraLR lt0_m.
+  case: s hsz => // x s /(_ x _) // <- _.
+  by rewrite ltzNge /= size_ge0.
+elim/natind: n s hsz => [n le0_n|n ge0_n ih] s hsz.
+- by rewrite !drop_le0 //#.
+rewrite mulzDr /=; case: s hsz => // x s hsz.
+rewrite flatten_cons drop_cat hsz // iffalse 1:/#.
+rewrite -addrA /=  iffalse 1:/# &(ih) => ??.
+by apply: hsz => /=; right.
+qed.
+
+lemma take_flatten_ctt ['a] (m n : int) (s : 'a list list) :
+     (forall x, x \in s => size x = m)
+  => take (m * n) (flatten s) = flatten (take n s).
+proof.
+move=> hsz; case: (m < 0) => [lt0_m|/lezNgt ge0_m].
+- have ->>//: s = []; apply: contraLR lt0_m.
+  case: s hsz => // x s /(_ x _) // <- _.
+  by rewrite ltzNge /= size_ge0.
+elim/natind: n s hsz => [n le0_n|n ge0_n ih] s hsz.
+- by rewrite !take_le0 //#.
+rewrite mulzDr /=; case: s hsz => // x s hsz.
+rewrite flatten_cons take_cat hsz // iffalse 1:/#.
+rewrite -addrA /=  iffalse 1:/# ih // => ??.
+by apply: hsz => /=; right.
 qed.
 
 lemma perm_eq_pair ['a 'b] (s : ('a * 'b) list) : uniq s => perm_eq s
