@@ -237,10 +237,10 @@ let operator_compatible env oper1 oper2 =
   let exn  = Incompatible (OpBody(*oper1,oper2*)) in
   match okind1, okind2 with
   | OB_oper None      , OB_oper _          -> ()
-  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob1 ob2
+  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob2 ob1
   | OB_pred None      , OB_pred _          -> ()
-  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb1 pb2
-  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb1 nb2
+  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb2 pb1
+  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb2 nb1
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
