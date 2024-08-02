@@ -2477,8 +2477,9 @@ end = struct
     
     let (tc: EcParsetree.theory_cloning) = {
        pthc_base = loced (["Top"; "QFABV"], "BV");
-       pthc_name = Some (loced @@ Format.asprintf "BV_%a" 
-         (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t);
+       pthc_name = Some (loced @@ (Format.asprintf "BV_%a" 
+         (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t 
+         |> String.map (fun c -> if c = '.' then '_' else c)));
        pthc_ext = [
          (loced ([], "bv"), PTHO_Type (`BySyntax ([], pt), `Inline `Clear));
          (loced ([], "size"), PTHO_Op (`BySyntax ov, `Inline `Keep));
@@ -2493,6 +2494,7 @@ end = struct
        pthc_import = None;
       } 
     in
+    let () = Format.eprintf "Registering theory %s@." (tc.pthc_name |> Option.get).pl_desc in
     (* let sc = Cloning.clone sc `Check tc in *)
     match t.ty_node with
     | Tconstr (p, []) -> 
@@ -2506,13 +2508,39 @@ end = struct
     {sc with sc_env = EcSection.add_item item sc.sc_env }
     
   let add_qfabvop (sc: scope) (o: pqsymbol) (c: string) : scope =
-    (* TODO: Add theory cloning *)
+    (* FIXME: rewrite this, this is horrible *)
     let loced a = mk_loc o.pl_loc a in
+    let env = env sc in
+    let opth, oop = EcEnv.Op.lookup o.pl_desc env in
+    let t = match oop.op_ty.ty_node with
+    | Tfun (t, _) -> t
+    | _ -> assert false
+    in
+    let thry = match c with
+    | "bvadd" -> "BVAdd"
+    | "bvsub" -> "BVSub"
+    | _ -> assert false
+    in
+    let o_ovrd = {
+        opov_nosmt = false;
+        opov_tyvars = None;
+        opov_args = [];
+        opov_retty = loced PTunivar;
+        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ opth), None)
+      }
+    in
+    let th_name = 
+      (Format.asprintf "BV_%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t)
+      |> String.map (fun c -> if c = '.' then '_' else c)
+    in    
     let (tc: EcParsetree.theory_cloning) = {
-       pthc_base = loced (["Top"; "QFABV"], "BV");
-       pthc_name = Some (loced "RandomTheoryNameChangeMeLater");
-       pthc_ext = []; (* FIXME: add override for theory *)
-       pthc_prf = [];
+       pthc_base = loced ([th_name], thry);
+       pthc_name = Some (loced 
+         (Format.asprintf "%s_%s" th_name thry));
+       pthc_ext = [
+         ((loced ([], c), PTHO_Op (`BySyntax o_ovrd, `Inline `Keep)))
+       ]; (* FIXME: add override for theory *)
+       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
        pthc_rnm = [];
        pthc_opts = [];
        pthc_clears = [];
@@ -2520,11 +2548,11 @@ end = struct
        pthc_import = None;
       } 
     in
-    let sc = Cloning.clone sc `Check tc in
+    (* let sc = Cloning.clone sc `Check tc in *)
     
-    let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
+    let p, _o = EcEnv.Op.lookup o.pl_desc env in
     let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
-    {sc with sc_env = EcSection.add_item item sc.sc_env }
+    Cloning.clone {sc with sc_env = EcSection.add_item item sc.sc_env } `Check tc
     
 
 end                                                                                                                                     
