@@ -3250,14 +3250,21 @@ phltactic:
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
-| BDEP LBRACKET inpvs=plist0(STRING, SEMICOLON) RBRACKET n=uint LBRACKET outvs=plist0(STRING, SEMICOLON) RBRACKET m=uint o=oident pc=oident
-    { Pbdep ((inpvs, (BI.to_int n)), (outvs, (BI.to_int m)), o, pc) }
-
-| BDEP LBRACKET inpv=STRING COLON inpw=uint RBRACKET n=uint LBRACKET outv=STRING COLON outw=uint RBRACKET m=uint o=oident pc=oident
-    { Pbdep ((arr_of_vars inpv (BI.to_int inpw), (BI.to_int n)), (arr_of_vars outv (BI.to_int outw), (BI.to_int m)), o, pc) }
+| BDEP n=uint m=uint 
+       invs=bdep_vars inpvs=bdep_vars outvs=bdep_vars
+       o=oident pc=oident
+    { Pbdep ((inpvs, invs, (BI.to_int n)), 
+             (outvs, (BI.to_int m)), 
+              o, pc) }
 
 | BDEP BITSTRING
     { Pcirc }
+
+%inline bdep_vars:
+| LBRACKET vs=plist0(STRING, SEMICOLON) RBRACKET
+  { vs }
+| LBRACKET v=STRING COLON w=uint RBRACKET
+  { arr_of_vars v (BI.to_int w) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

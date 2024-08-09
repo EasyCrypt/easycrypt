@@ -776,7 +776,7 @@ type phltactic =
   | Plossless
 
     (* Map-reduce *)
-  | Pbdep of ((string list) * int) * ((string list) * int) * psymbol * psymbol
+  | Pbdep of ((string list) * (string list) * int) * ((string list) * int) * psymbol * psymbol
   | Pcirc
 
     (* Program rewriting *)

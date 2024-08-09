@@ -168,7 +168,7 @@ let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: 
   FApi.close (!@ tc) VBdep
   
 let process_bdep 
-  ((inpvs, n): string list * int) 
+  ((inpvs, invs, n): string list * string list * int) 
   ((outvs, m): string list * int) 
   (op: psymbol) 
   (pcond: psymbol) 
@@ -185,6 +185,12 @@ let process_bdep
     match EcMemory.lookup_me v m with
     | Some (v, None, _) -> v
     | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false
+  in
+  let collapse (xs: 'a list) : 'a option = 
+    match xs with
+    | [] -> None
+    | x::[] -> Some x
+    | x::xs -> if List.for_all ((=) x) xs then Some x else None
   in
   let pop, oop = EcEnv.Op.lookup ([], op.pl_desc) env in
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
@@ -233,8 +239,14 @@ let process_bdep
   
   (* ------------------------------------------------------------------ *)
   let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
-  let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
-  let pinpvs = List.map (w2bits (List.hd pinpvs).f_ty) pinpvs in
+  (* let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in *)
+  let invs, inv_tys = List.map (fun v -> EcEnv.Var.lookup_local v env) invs |> List.split in
+  let inty = match collapse inv_tys with
+  | Some ty -> ty
+  | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
+  in
+  let invs = List.map (fun id -> f_local id inty) invs in
+  let pinpvs = List.map (w2bits inty) invs in
   let pinpvs = List.rev pinpvs in
   let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
   let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in
