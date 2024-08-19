@@ -412,9 +412,23 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
+let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
+  match mx with
+  | [] ->
+    ()
+
+  | [x, []] ->
+    Format.fprintf fmt "%s" x
+
+  | [x, args] ->
+    Format.fprintf fmt "@[<hov 2>%s(@,%a)@]" x (pp_list ",@ " pp_msymbol) args
+
+  | mx1 :: mx ->
+    Format.fprintf fmt "%a.@,%a" pp_msymbol [mx1] pp_msymbol mx
+
+(* -------------------------------------------------------------------- *)
 let pp_topmod ppe fmt p =
-  Format.fprintf fmt "%a"
-    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p)
+  Format.fprintf fmt "%a" pp_msymbol (PPEnv.mod_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar ppe fmt x =
@@ -485,8 +499,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
 
 
 (* -------------------------------------------------------------------- *)
-let pp_pv ppe fmt p =
-  EcSymbols.pp_msymbol fmt (msymbol_of_pv ppe p)
+let pp_pv ppe fmt p = pp_msymbol fmt (msymbol_of_pv ppe p)
 
 (* -------------------------------------------------------------------- *)
 exception NoProjArg
@@ -512,7 +525,7 @@ let pp_restr_s fmt = function
   | false -> Format.fprintf fmt "-"
 
 let pp_modtype1 (ppe : PPEnv.t) fmt mty =
-  EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
+  pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
@@ -1385,7 +1398,7 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a <@@@;<1 2>@[%a(@[<hov 0>%a@]);@]"
+    Format.fprintf fmt "%a <@@@;<1 2>@[%a(@[<hov 0>%a@]);@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
@@ -1962,7 +1975,7 @@ and pp_mod_params ppe bms =
     let ppe1 = PPEnv.add_local ppe id in
     let pp fmt =
       Format.fprintf fmt "%a : %a" (pp_local ppe1) id
-        EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mt) in
+        pp_msymbol (PPEnv.modtype_symb ppe mt) in
     ppe1, pp
   in
   let rec aux ppe bms =
@@ -2384,6 +2397,7 @@ let at (ppe : PPEnv.t) n i =
   | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
   | Sassert e        , 0 -> Some (`Assert e        , `P, [])
   | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
+
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
   | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
@@ -2480,7 +2494,7 @@ let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Some lv ->
-      Format.fprintf fmt "@[<hov 2>%a <@@@ %a(%a)@]"
+      Format.fprintf fmt "@[<hov 2>%a <@@@ @[<hov 2>%a(%a)@]@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
