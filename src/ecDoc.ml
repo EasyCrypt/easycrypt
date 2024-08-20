@@ -36,26 +36,25 @@ let itemkind_str_pl (ik : itemkind) : string =
 
 
 (* -------------------------------------------------------------------- *)
-let md_pre_format ~(kind : string) (s : string) =
-  pre [txt s]
+let md_pre_format ~kind (s : string) =
+  match kind with | _ -> pre [txt s]
 
 let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing elt = 
   let il_format = Str.regexp "^>\\([^|]+\\)|\\([^|]+\\)$" in
   if Str.string_match il_format hr.href_target 0 then
     let tkind = Str.matched_group 1 hr.href_target in
     let tname = Str.matched_group 2 hr.href_target in
-    (*
-    let tscope : string option = assert false in
-    let env = 
-      match tscope with 
-        | None -> env
-        | Some tscope -> 
-            let tscope = EcSymbols.qsymbol_of_string tscope in
-            let tscope = EcEnv.Theory.lookup_path ~mode:`All tscope in
-            EcEnv.Theory.env_of_theory tscope env (* Merge with main to have this *)
-    in
-    *) 
     let tqs = EcSymbols.qsymbol_of_string tname in
+      Printf.eprintf "QSymbol: %s\t" (EcSymbols.string_of_qsymbol tqs);
+    let env =
+      match fst tqs with
+      | [] -> env
+      | ["Top"] -> env
+      | _ ->
+        let ttopqs = EcSymbols.qsymbol_of_top tqs in
+        let ttopp = EcEnv.Theory.lookup_path ~mode:`All ttopqs env in 
+        EcEnv.Theory.env_of_theory ttopp env
+    in
     let ikstr, path =
       match tkind with 
       | "Ty" | "Type" -> itemkind_str_pl `Type, EcEnv.Ty.lookup_path tqs env
@@ -68,11 +67,11 @@ let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing 
         begin
           match (EcEnv.Mod.lookup_path tqs env).m_top with
           | `Concrete (p, None) -> p
-          | `Concrete (_, Some _) -> raise (failwith "Linking to sub-modules not supported.")
-          | `Local _ -> raise (failwith "Linking to local/declared modules not supported.")
+          | `Concrete (_, Some _) -> failwith "Linking to sub-modules not supported."
+          | `Local _ -> failwith "Linking to local/declared modules not supported."
         end
       | "Th" | "Theory" -> itemkind_str_pl `Theory, EcEnv.Theory.lookup_path ~mode:(`All) tqs env
-      | _ -> raise (failwith "Invalid item/entity kind.")
+      | _ -> failwith "Invalid item/entity kind."
     in
       Printf.eprintf "Root Path: %s\n" (EcPath.tostring (EcEnv.root env));
       Printf.eprintf "QSymbol: %s\t Path: %s\n" (EcSymbols.string_of_qsymbol tqs) (EcPath.tostring path); 
@@ -82,8 +81,8 @@ let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing 
   else 
     a ~a:[a_href (uri_of_string hr.href_target)] [txt hr.href_desc]
 
-let md_img_format (ir : Markdown.img_ref) =
-  raise (failwith "Image embedding not supported.")
+let md_img_format (_ : Markdown.img_ref) =
+  failwith "Image embedding not supported."
 
 let c_markdown (input : string) (env : EcEnv.env) =
   let input = Markdown.parse_text input in
@@ -133,7 +132,7 @@ let c_section_intro (gdoc : string list) (env : EcEnv.env) =
             let ids = "Introduction" in
             section ~a:[a_id ids; a_title ids; a_class ["intro-section"]] [
               div ~a:[a_class ["intro-text-container"]] 
-                  (List.map (fun s -> div ~a:[a_class ["item-details-par"]] (c_markdown s env)) gdoc)
+                  (List.map (fun s -> div ~a:[a_class ["intro-par-container"]] (c_markdown s env)) gdoc)
             ]
           ]
   
@@ -201,7 +200,7 @@ let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.doce
       let lents_ik = List.filter (fun ent -> 
         match ent with
         | ItemDoc (_, (md, ikp, _, _)) -> md = `Specific && ikp = ik
-        | SubDoc ((_, (md, ikp, _, _)), _) -> ikp = ik) lents
+        | SubDoc ((_, (_, ikp, _, _)), _) -> ikp = ik) lents
       in
       match lents_ik with
       | [] -> []
@@ -259,7 +258,7 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
     | de :: docents' ->
         match de with
         | ItemDoc _ -> c_subpages ?supths ?supthf th docents'
-        | SubDoc ((sgdoc, (smd, sik, sth, _)), sldocents) ->
+        | SubDoc ((sgdoc, (smd, _, sth, _)), sldocents) ->
              let ststr = (if smd = `Abstract then "Abstract " else "") ^ "Theory " ^ sth in
              let stsupf = 
                 match supthf with

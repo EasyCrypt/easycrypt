@@ -133,6 +133,10 @@ main {
   margin-left: 10px;
 }
 
+.item-basic-desc p {
+  margin-top: 0px;
+}
+
 .item-details {
   margin-left: 210px;
 }

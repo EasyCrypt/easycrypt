@@ -34,3 +34,4 @@ val pp_msymbol : Format.formatter -> msymbol -> unit
 val string_of_qsymbol : qsymbol -> string
 
 val qsymbol_of_string : string ->  qsymbol 
+val qsymbol_of_top : qsymbol -> qsymbol

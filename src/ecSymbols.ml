@@ -95,3 +95,10 @@ let qsymbol_of_string (s : string) : qsymbol =
     | [] -> assert false
     | [x] -> ([], x)
     | x :: xs -> (List.rev xs, x)
+
+
+let qsymbol_of_top (q : qsymbol) : qsymbol =
+  match List.rev (fst q) with
+  | [] -> assert false
+  | [x] -> ([], x)
+  | x :: xs -> (List.rev xs, x)
