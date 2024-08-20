@@ -43,8 +43,10 @@ val t_trivial          :
   ?subtc:FApi.backward -> ?keep:bool -> ?conv:[`Alpha | `Conv] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+type opmode = EcReduction.deltap
+
 type simplify_t =
-  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+  ?target:ident -> ?delta:opmode -> ?logic:rlogic_info -> FApi.backward
 
 type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
@@ -189,7 +191,7 @@ val t_cutdef : proofterm -> form -> FApi.backward
 (* -------------------------------------------------------------------- *)
 type vsubst = [
   | `Local of EcIdent.t
-  | `Glob  of EcPath.mpath * EcMemory.memory
+  | `Glob  of EcIdent.t * EcMemory.memory
   | `PVar  of EcTypes.prog_var * EcMemory.memory
 ]
 
@@ -252,6 +254,7 @@ val t_intros_sx_seq : inames -> (ident list -> FApi.backward) -> FApi.backward
 val t_intros_s_seq  : inames -> FApi.backward -> FApi.backward
 
 val t_intros_n : ?clear:bool -> int -> FApi.backward
+val t_intros_n_x : int -> tcenv1 -> tcenv * ident list
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
@@ -314,7 +317,7 @@ val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 val t_congr : form pair -> form pair list * ty -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 

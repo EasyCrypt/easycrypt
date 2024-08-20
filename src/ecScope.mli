@@ -36,11 +36,11 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : symbol option;
-  puc_mode   : bool option;
-  puc_jdg    : proof_state;
-  puc_flags  : pucflags;
-  puc_crt    : EcDecl.axiom;
+  puc_name    : symbol option;
+  puc_started : bool;
+  puc_jdg     : proof_state;
+  puc_flags   : pucflags;
+  puc_crt     : EcDecl.axiom;
 }
 
 and proof_ctxt =
@@ -84,6 +84,11 @@ val attop  : scope -> bool
 val goal   : scope -> proof_auc option
 val xgoal  : scope -> proof_uc option
 
+(* Creates a scope that is identical to the supplied one except
+ * that the environment and required theories are reset to the ones
+ * from the prelude. *)
+val for_loading : scope -> scope
+
 type topmode = [`InProof | `InActiveProof | `InTop]
 
 val check_state : topmode -> string -> scope -> unit
@@ -116,13 +121,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ax : sig
-  type mode = [`WeakCheck | `Check | `Report]
+  type proofmode = [`WeakCheck | `Check | `Report]
 
-  val add     : ?src:string -> scope -> mode -> paxiom located -> symbol option * scope
+  val add     : ?src:string -> scope -> proofmode -> paxiom located -> symbol option * scope
   val save    : ?src:string -> scope -> string option * scope
   val admit   : ?src:string -> scope -> string option * scope
   val abort   : ?src:string -> scope -> scope
-  val realize : scope -> mode -> prealize located -> symbol option * scope
+  val realize : scope -> proofmode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -130,7 +135,7 @@ module Ty : sig
   val add : ?src:string -> scope -> ptydecl located -> scope
 
   val add_class    : scope -> ptypeclass located -> scope
-  val add_instance : ?import:EcTheory.import -> scope -> Ax.mode -> ptycinstance located -> scope
+  val add_instance : ?import:EcTheory.import -> scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -150,6 +155,10 @@ module Theory : sig
   open EcTheory
 
   exception TopScope
+
+  (* [update_with_required dst src] updates [dst] with the required
+   * theories of [src] *)
+  val update_with_required : dst:scope -> src:scope -> scope
 
   (* [enter scope mode name] start a theory in scope [scope] with
    * name [name] and mode (abstract/concrete) [mode]. *)
@@ -194,9 +203,10 @@ module Tactics : sig
   open EcCoreGoal
 
   type prinfos = proofenv * (handle * handle list)
+  type proofmode = Ax.proofmode
 
-  val process : ?src:string -> scope -> Ax.mode -> ptactic list -> prinfos option * scope
-  val proof   : ?src:string -> scope -> Ax.mode -> bool -> scope
+  val process : ?src:string -> scope -> proofmode -> ptactic list -> prinfos option * scope
+  val proof   : ?src:string -> scope -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -225,6 +235,12 @@ module Prover : sig
   val set_default : scope -> smt_options -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
+
+  val pprover_infos_to_prover_infos :
+       EcEnv.env
+    -> EcProvers.prover_infos
+    -> pprover_infos
+    -> EcProvers.prover_infos
 end
 
 (* -------------------------------------------------------------------- *)
@@ -246,7 +262,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Cloning : sig
-  val clone : scope -> Ax.mode -> theory_cloning -> scope
+  val clone : scope -> Ax.proofmode -> theory_cloning -> scope
 end
 
 (* -------------------------------------------------------------------- *)

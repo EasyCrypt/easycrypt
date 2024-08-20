@@ -51,7 +51,7 @@ let rec addidir ?namespace ?(recursive = false) (idir : string) (ecl : ecloader)
       try Sys.is_directory filename with Sys_error _ -> false
     in
 
-    let dirs = (try EcUtils.Os.listdir idir with Unix.Unix_error _ -> []) in
+    let dirs = (try EcUtils.Os.listdir idir with Unix.Unix_error _ | Sys_error _ -> []) in
     let dirs = List.sort compare (List.filter isdir dirs) in
 
       List.iter (fun filename ->

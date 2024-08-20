@@ -1130,8 +1130,7 @@ section PROOFS.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       + by proc; auto.
       by auto; conseq (_: ={RO.m}) => //; sim.
-    transitivity*{1} { r <@ G3(GenChaChaPoly(OCC(IFinRO))).main(); } => //;1:smt().
-    + by symmetry; call (CCP_OCCP IFinRO G3).
+    rewrite equiv[{1} 1 -(CCP_OCCP IFinRO G3)].
     inline *; sim (_: ={Mem.lc, Mem.log, Mem.k} /\ OCC.gs{1} = RO.m{2}).
     proc; inline *;auto.
   qed.
@@ -1692,9 +1691,8 @@ section PROOFS.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move => &hr; elim (p2{hr}) => //. 
-          clear &hr.
-          smt (size_drop size_eq0 gt0_block_size).
+          move => &hr; elim (p2{hr}) => //= => {&hr}.
+          smt (size_drop size_ge0 size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
       + by move=> &2 _; islossless.

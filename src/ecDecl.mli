@@ -49,7 +49,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcCoreFol.form * bool (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -65,7 +65,6 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
-  opf_nosmt    : bool;
 }
 
 and opbranches =
@@ -100,9 +99,12 @@ type operator = {
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
-  op_opaque   : bool;
+  op_opaque   : opopaque;
   op_clinline : bool;
+  op_unfold   : int option;
 }
+
+and opopaque = { smt: bool; reduction: bool; }
 
 val op_ty     : operator -> ty
 val is_pred   : operator -> bool
@@ -114,8 +116,10 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
 
-val mk_op   : ?clinline:bool -> opaque:bool -> ty_params -> ty -> opbody option -> locality -> operator
-val mk_pred : ?clinline:bool -> opaque:bool -> ty_params -> ty list -> prbody option -> locality -> operator
+val optransparent : opopaque
+
+val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty -> opbody option -> locality -> operator
+val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty list -> prbody option -> locality -> operator
 
 val mk_abbrev :
      ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list
@@ -143,26 +147,6 @@ and ax_visibility = [`Visible | `NoSmt | `Hidden]
 (* -------------------------------------------------------------------- *)
 val is_axiom  : axiom_kind -> bool
 val is_lemma  : axiom_kind -> bool
-
-(* -------------------------------------------------------------------- *)
-type sc_params = (EcIdent.t * ty) list
-
-type pr_params = EcIdent.t list (* type bool *)
-
-(* [axs_params] are the free variables in [as_spec] expressions, i.e. in
-   [EcTypes.expr]. *)
-type ax_schema = {
-  axs_tparams : ty_params;
-  axs_pparams : pr_params;
-  axs_params  : sc_params;
-  axs_loca    : locality;
-  axs_spec    : EcCoreFol.form;
-}
-
-val sc_instantiate :
-  ty_params -> pr_params -> sc_params ->
-  ty list -> EcMemory.memtype -> mem_pr list -> expr list ->
-  EcCoreFol.form -> EcCoreFol.form
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :

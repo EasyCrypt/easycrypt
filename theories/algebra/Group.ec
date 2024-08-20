@@ -432,13 +432,13 @@ proof. by move=> rg; rewrite logK pmod_small. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma logMr (x : group) (a : int) : log (x ^ a) = a * log x %% order.
-proof. by rewrite -{1}expgK -expM logK mulrC. qed.
+proof. by rewrite -{1}[x]expgK -expM logK mulrC. qed.
 
 lemma logVr (x : group) : log (inv x) = (- log x) %% order.
 proof. by rewrite -mulN1r -logMr expN exp1. qed.
 
 lemma logDr (x y : group) : log (x * y) = (log x + log y) %% order.
-proof. by rewrite -{1}expgK -{1}(expgK y) -expD logK. qed.
+proof. by rewrite -{1}[x]expgK -{1}[y]expgK -expD logK. qed.
 
 lemma logDrN (x y : group) : log (x / y) = (log x - log y) %% order.
 proof. by rewrite logDr logVr modzDmr. qed.
@@ -505,7 +505,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma logrzM (x : group) (a : exp) : loge (x ^ a) = a * loge x.
-proof. by rewrite -{1}expgK -expM loggK ZModpRing.mulrC. qed.
+proof. by rewrite -{1}[x]expgK -expM loggK ZModpRing.mulrC. qed.
 
 lemma logrV (x : group) : loge (inv x) = (- loge x).
 proof.
@@ -513,7 +513,7 @@ by rewrite logE logVr (logE x) -inzmodN; apply/eq_inzmod; rewrite modz_mod.
 qed.
 
 lemma logDr (x y : group) : loge (x * y) = loge x + loge y.
-proof. by rewrite -{1}expgK -{1}(expgK y) -expD loggK. qed.
+proof. by rewrite -{1}[x]expgK -{1}[y]expgK -expD loggK. qed.
 
 lemma logDrN (x y : group) : loge (x / y) = loge x - loge y.
 proof. by rewrite logDr logrV. qed.
@@ -541,13 +541,13 @@ proof. by rewrite -expM=> /ZModpRing.mulrV ->; exact/exp1. qed.
 
 lemma expgK' (x : group) : x = g ^ log x by rewrite expgK.
 
-lemma nosmt logg1 : loge g = one by rewrite -exp1 loggK.
+lemma logg1 : loge g = one by rewrite -exp1 loggK.
 
 lemma logrzM' (x : group) (a : exp) : loge (x ^ a) = loge x * a
   by rewrite logrzM; algebra.
 
 (* Isn't it just inj? *)
-lemma nosmt log_bij (x y : group) : x = y <=> loge x = loge y.
+lemma log_bij (x y : group) : x = y <=> loge x = loge y.
 proof.
 split => [/#|]; suff mono_exp : forall x, exists (kx : exp), x = g ^ kx
   by move: (mono_exp x) (mono_exp y) => [kx ->] [ky ->]; rewrite !loggK => ->.
@@ -558,17 +558,17 @@ suff: kr = asint (inzmod k) by smt().
 by rewrite /kr /inzmod /asint Sub.insubdK; smt(gt0_order ltz_pmod modz_ge0).
 qed.
 
-lemma nosmt pow_bij (x y : exp) : x = y <=> g ^ x = g ^ y
+lemma pow_bij (x y : exp) : x = y <=> g ^ x = g ^ y
   by rewrite -loggK -(loggK y) !expgK -log_bij.
 
-lemma nosmt inv_def (a : group) : inv a = g ^ (-loge a)
+lemma inv_def (a : group) : inv a = g ^ (-loge a)
   by rewrite log_bij logrV loggK.
 
-lemma nosmt div_def (a b : group): g ^ (loge a - loge b) = a / b
+lemma div_def (a b : group): g ^ (loge a - loge b) = a / b
   by rewrite log_bij logDrN loggK.
 
-lemma nosmt g_neq0 : g ^ zero <> g
-  by rewrite -{2}exp1 -pow_bij; smt(ZModpField.unitr1).
+lemma g_neq0 : g ^ zero <> g
+  by rewrite -{2}[g]exp1 -pow_bij; smt(ZModpField.unitr1).
 
 lemma mulN (x : group) : x * inv x = g ^ zero by rewrite mulcV -(exp0 g).
 
@@ -601,38 +601,7 @@ by rewrite StdBigop.Bigreal.Num.Domain.mul0r StdOrder.RealOrder.ltr01.
 qed.
 
 hint exact random : dt_fu dt_ll dt_funi.
-
-abstract theory Cost.
-  op cdt : {int | 0 <= cdt } as ge0_cdt.
-  schema cost_dt `{P}: cost [P: dt] = N cdt.
-  hint simplify cost_dt.
-end Cost.
-
 end FDistr.
-
-abstract theory Cost.
-  op cgpow : int.
-  op cgmul: int.
-  op cgdiv: int.
-  op cgeq : int.
-  axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
-
-  schema cost_gen `{P} : cost [P:g] = '0.
-
-  schema cost_pow `{P} {g:group, x:exp} :
-    cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
-
-  schema cost_gmul `{P} {g1 g2:group} :
-    cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
-
-  schema cost_geq  `{P} {g1 g2:group} :
-    cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
-
-  schema cost_gdiv `{P} {g1 g2:group} :
-    cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
-
-  hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
-end Cost.
 
 end PowZMod.
 

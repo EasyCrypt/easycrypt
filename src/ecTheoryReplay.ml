@@ -3,6 +3,7 @@ open EcSymbols
 open EcUtils
 open EcLocation
 open EcParsetree
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules
@@ -11,6 +12,7 @@ open EcThCloning
 
 module Sp = EcPath.Sp
 module Mp = EcPath.Mp
+module CS = EcCoreSubst
 
 (* ------------------------------------------------------------------ *)
 type ovoptions = {
@@ -55,8 +57,8 @@ let tparams_compatible rtyvars ntyvars =
 
 let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
   tparams_compatible rtyvars ntyvars;
-  let subst = Tvar.init rtyvars (List.map tvar ntyvars) in
-  let rty   = Tvar.subst subst rty in
+  let subst = CS.Tvar.init rtyvars (List.map tvar ntyvars) in
+  let rty   = CS.Tvar.subst subst rty in
   try  EcUnify.unify env ue rty nty
   with EcUnify.UnificationFailure _ ->
     raise (Incompatible (DifferentType (rty, nty)))
@@ -132,12 +134,13 @@ let get_open_oper exn env p tys =
 
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
-  | OP_Plain(f1,_), OP_Plain(f2,_)  ->
-    error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
-  | OP_Plain({f_node = Fop(p,tys)},_), _ ->
+  | OP_Plain f1, OP_Plain f2 ->
+    let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
+    error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
+  | OP_Plain {f_node = Fop(p,tys)}, _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
-  | _, OP_Plain({f_node = Fop(p,tys)}, _) ->
+  | _, OP_Plain {f_node = Fop(p,tys)} ->
     let ob2 = get_open_oper exn env p tys in
     oper_compatible exn env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
@@ -209,7 +212,7 @@ and ind_compatible exn env pi1 pi2 =
 
 and prctor_compatible exn env s prc1 prc2 =
   error_body exn (EcSymbols.sym_equal prc1.prc_ctor prc2.prc_ctor);
-  let env, s = EcReduction.check_bindings exn [] env s prc1.prc_bds prc2.prc_bds in
+  let env, s = EcReduction.check_bindings exn env s prc1.prc_bds prc2.prc_bds in
   error_body exn (List.length prc1.prc_spec = List.length prc2.prc_spec);
   let doit f1 f2 =
     error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcSubst.subst_form s f2)) in
@@ -234,10 +237,10 @@ let operator_compatible env oper1 oper2 =
   let exn  = Incompatible (OpBody(*oper1,oper2*)) in
   match okind1, okind2 with
   | OB_oper None      , OB_oper _          -> ()
-  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob1 ob2
+  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob2 ob1
   | OB_pred None      , OB_pred _          -> ()
-  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb1 pb2
-  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb1 nb2
+  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb2 pb1
+  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb2 nb1
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
@@ -371,11 +374,11 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                   let newtparams = List.fst newtyd.tyd_params in
                   let newtparams_ty = List.map tvar newtparams in
                   let newdtype = tconstr np newtparams_ty in
-                  let tysubst = EcTypes.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+                  let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
 
                   List.fold_left (fun subst (name, tyargs) ->
                       let np = EcPath.pqoname (EcPath.prefix np) name in
-                      let newtyargs = List.map (Tvar.subst tysubst) tyargs in
+                      let newtyargs = List.map (CS.Tvar.subst tysubst) tyargs in
                       EcSubst.add_opdef subst
                         (xpath ove name)
                         (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
@@ -422,16 +425,6 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
       (subst, ops, proofs, ove.ovre_hooks.hadd_item scope import (Th_operator (x, oopd)))
 
   | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
-      let nosmt =
-        match opov with
-        | `BySyntax opov -> opov.opov_nosmt
-        | `ByPath   _    -> false in
-
-      if nosmt && is_inline_mode opmode then
-          ove.ovre_hooks.herr ~loc
-          ("operator overriding with nosmt only makes sense with alias mode");
-
-
       let refop = EcSubst.subst_op subst oopd in
       let (reftyvars, refty) = (refop.op_tparams, refop.op_ty) in
 
@@ -446,7 +439,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 let codom   = EcTyping.transty tp env ue opov.opov_retty in
                 let env, xs = EcTyping.trans_binding env ue opov.opov_args in
                 let body    = EcTyping.trans_form env ue opov.opov_body codom in
-                let lam     = EcFol.f_lambda (List.map (fun (x, ty) -> (x, EcFol.GTty ty)) xs) body in
+                let lam     = EcFol.f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) body in
                 (lam.f_ty, lam)
               in
               begin
@@ -461,14 +454,14 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ove.ovre_hooks.herr
                   ~loc "this operator body contains free type variables";
 
-              let sty     = Tuni.subst (EcUnify.UniEnv.close ue) in
-              let body    = EcFol.Fsubst.f_subst (EcFol.Fsubst.f_subst_init ~sty ()) body in
-              let ty      = ty_subst sty ty in
+              let sty     = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
+              let body    = EcFol.Fsubst.f_subst sty body in
+              let ty      = CS.ty_subst sty ty in
               let tparams = EcUnify.UniEnv.tparams ue in
               let newop   =
                 mk_op
-                  ~opaque:false ~clinline:(opmode <> `Alias)
-                  tparams ty (Some (OP_Plain (body, nosmt))) refop.op_loca in
+                  ~opaque:optransparent ~clinline:(opmode <> `Alias)
+                  tparams ty (Some (OP_Plain body)) refop.op_loca in
               (newop, body)
 
           | `ByPath p -> begin
@@ -478,12 +471,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 let body =
                   if refop.op_clinline then
                     (match refop.op_kind with
-                    | OB_oper (Some (OP_Plain (body, _))) -> body
+                    | OB_oper (Some (OP_Plain body)) -> body
                     | _ -> assert false)
                   else EcFol.f_op p tyargs refop.op_ty in
                 let decl   =
                   { refop with
-                      op_kind = OB_oper (Some (OP_Plain (body, nosmt)));
+                      op_kind = OB_oper (Some (OP_Plain body));
                       op_clinline = (opmode <> `Alias) } in
                 (decl, body)
 
@@ -557,7 +550,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
             let body =
               let env, xs = EcTyping.trans_binding env ue prov.prov_args in
               let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
-              let xs      = List.map (fun (x, ty) -> x, EcFol.GTty ty) xs in
+              let xs      = List.map (fun (x, ty) -> x, GTty ty) xs in
               let lam     = EcFol.f_lambda xs body in
               lam
             in
@@ -566,7 +559,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
               try
                 ty_compatible env ue
                   (List.map fst reftyvars, refty)
-                  (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty)
+                  (List.map fst (EcUnify.UniEnv.tparams ue), body.f_ty)
               with Incompatible err ->
                 clone_error env
                   (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
@@ -576,17 +569,17 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
               ove.ovre_hooks.herr
                 ~loc "this predicate body contains free type variables";
 
-            let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
-            let fs = EcFol.Fsubst.f_subst_init ~sty:ts () in
+            let fs = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
             let body    = EcFol.Fsubst.f_subst fs body in
             let tparams = EcUnify.UniEnv.tparams ue in
             let newpr   =
               { op_tparams  = tparams;
-                op_ty       = body.EcFol.f_ty;
+                op_ty       = body.f_ty;
                 op_kind     = OB_pred (Some (PR_Plain body));
                 op_opaque   = oopr.op_opaque;
                 op_clinline = prmode <> `Alias;
-                op_loca     = refpr.op_loca; } in
+                op_loca     = refpr.op_loca;
+                op_unfold   = refpr.op_unfold; } in
             (newpr, body)
 
         | `ByPath p -> begin
@@ -709,14 +702,6 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
     if axclear then scope else
       ove.ovre_hooks.hadd_item scope import (Th_axiom(x, ax))
   in (subst, ops, proofs, scope)
-
-(* -------------------------------------------------------------------- *)
-and replay_scd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, sc) =
-  let subst, x = rename ove subst (`Lemma, x) in
-  let sc = EcSubst.subst_schema subst sc in
-  let item = Th_schema (x, sc) in
-  let scope = ove.ovre_hooks.hadd_item scope import item in
-  (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
 and replay_modtype
@@ -860,22 +845,14 @@ and replay_reduction
 
     let p = EcSubst.subst_path subst p in
 
-    (* TODO: A: schema are not replayed for now, but reduction rules can use a
-       schema. Fix this. *)
     let rule =
       obind (fun rule ->
         let env = EcSection.env (ove.ovre_hooks.henv scope) in
 
         try
-          if not (
-            match opts.ur_mode with
-            | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
-            | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
-          ) then raise Removed;
-
-          Some (EcReduction.User.compile
-                  ~opts ~prio:rule.rl_prio
-                  env opts.ur_mode p)
+          if not (is_some (EcEnv.Ax.by_path_opt p env)) then
+            raise Removed;
+          Some (EcReduction.User.compile ~opts ~prio:rule.rl_prio env p)
         with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
@@ -903,7 +880,7 @@ and replay_instance
   let module E = struct exception InvInstPath end in
 
   let forpath (p : EcPath.path) =
-    match EcPath.getprefix opath p |> omap List.rev with
+    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
     | None | Some [] -> None
     | Some (x::px) ->
         let q = EcPath.fromqsymbol (List.rev px, x) in
@@ -925,7 +902,7 @@ and replay_instance
                 | OB_oper (Some (OP_Fix    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain (f, _))) ->
+                | OB_oper (Some (OP_Plain f)) ->
                     match f.f_node with
                     | Fop (r, _) -> Some r
                     | _ -> raise E.InvInstPath
@@ -987,9 +964,6 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (item.ti_import, x, ax)
-
-  | Th_schema (x, schema) ->
-     replay_scd ove (subst, ops, proofs, scope) (item.ti_import, x, schema)
 
   | Th_modtype (x, modty) ->
      replay_modtype ove (subst, ops, proofs, scope) (item.ti_import, x, modty)

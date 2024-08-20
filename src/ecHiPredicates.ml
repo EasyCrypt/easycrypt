@@ -3,7 +3,7 @@ open EcUtils
 open EcSymbols
 open EcLocation
 open EcTypes
-open EcCoreFol
+open EcCoreSubst
 open EcParsetree
 open EcDecl
 
@@ -21,10 +21,8 @@ let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
 let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
-  let sty = { ty_subst_id with ts_u = uni } in
-  let fs = EcFol.Fsubst.f_subst_init ~sty:sty () in
-  let fsubst = fs in
-  let tsubst = ty_subst sty in
+  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uni () in
+  let tsubst = ty_subst fsubst in
 
   match body with
   | PR_Plain body ->
@@ -33,7 +31,7 @@ let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
   | PR_Ind pri ->
      let for1 ctor =
        { prc_ctor = ctor.prc_ctor;
-         prc_bds  = List.map (snd_map (Fsubst.subst_gty fsubst)) ctor.prc_bds;
+         prc_bds  = List.map (snd_map (Fsubst.gty_subst fsubst)) ctor.prc_bds;
          prc_spec = List.map (Fsubst.f_subst fsubst) ctor.prc_spec; } in
      PR_Ind
        { pri_args  = List.map (snd_map tsubst) pri.pri_args;
@@ -54,7 +52,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
         let env, xs = TT.trans_binding env ue bd in
         let body = TT.trans_prop env ue pe in
         let dom = List.map snd xs in
-        let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
+        let xs = List.map (fun (x,ty) -> x, EcAst.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
         (dom, Some (PR_Plain lam))
 
@@ -85,7 +83,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
 
   let dom     = Tuni.subst_dom uidmap dom in
 
-  EcDecl.mk_pred ~opaque:false tparams dom body pr.pp_locality
+  EcDecl.mk_pred ~opaque:optransparent tparams dom body pr.pp_locality
 
 (* -------------------------------------------------------------------- *)
 let trans_preddecl (env : EcEnv.env) (pr : ppredicate located) =

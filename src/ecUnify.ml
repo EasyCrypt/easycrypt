@@ -4,7 +4,9 @@ open EcIdent
 open EcMaps
 open EcUtils
 open EcUid
+open EcAst
 open EcTypes
+open EcCoreSubst
 open EcDecl
 
 module Sp = EcPath.Sp
@@ -175,12 +177,6 @@ let rec unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) pb =
 
             | _, Tconstr (p, lt) when EcEnv.Ty.defined p env ->
                 Queue.push (`TyUni (t1, EcEnv.Ty.unfold p lt env)) pb
-
-            | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
-                Queue.push (`TyUni (EcEnv.NormMp.norm_tglob env mp, t2)) pb
-
-            | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-                Queue.push (`TyUni (t1, EcEnv.NormMp.norm_tglob env mp)) pb
 
             | _, _ -> failure ()
         end
@@ -360,7 +356,7 @@ module UniEnv = struct
     List.map (fun (tv, _) -> subst (tvar tv)) params
 
   let openty_r ue params tvi =
-    let subst = { ty_subst_id with ts_v = (opentvi ue params tvi) } in
+    let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
       (subst, subst_tv (ty_subst subst) params)
 
   let opentys ue params tvi tys =
@@ -471,7 +467,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
         | OB_nott nt ->
            let substnt () =
              let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
-             let es = e_subst { e_subst_id with es_ty = tip } in
+             let es = e_subst tip in
              let bd = es nt.D.ont_body in
              (xs, bd)
            in Some (Lazy.from_fun substnt)

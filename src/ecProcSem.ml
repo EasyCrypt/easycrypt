@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -90,7 +91,7 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
 
        match mode with
        | `Det   -> f_dmap tya tyb d body
-       | `Distr -> f_dlet_simpl tya tyb d body
+       | `Distr -> f_dlet_simpl tya (oget (as_tdistr tyb)) d body
 
      in (`Distr, expr_of_form mhr aout)
     end
@@ -136,7 +137,45 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
 
      let cmode, c = (cont env') in
 
-     (mode, e_let lv (e_if e bt bf) c) (* FIXME *)
+     begin
+       match mode, cmode with
+       | `Det, _ ->
+          (cmode, e_let lv (e_if e bt bf) c)
+
+       | `Distr, `Det ->
+          let body = form_of_expr mhr (e_if e bt bf) in
+          let tya  = oget (as_tdistr body.f_ty) in
+          let v    = EcIdent.create "v" in
+          let vx   = f_local v tya in
+          let aout =
+            f_dmap
+              tya
+              c.e_ty
+              body
+              (f_lambda
+                 [v, GTty tya]
+                 (f_let lv vx (form_of_expr mhr c)))
+
+          in (`Distr, expr_of_form mhr aout)
+
+       | `Distr, `Distr ->
+          let body = form_of_expr mhr (e_if e bt bf) in
+          let tya  = oget (as_tdistr body.f_ty) in
+          let tyb  = oget (as_tdistr c.e_ty) in
+          let v    = EcIdent.create "v" in
+          let vx   = f_local v tya in
+          let aout =
+            f_dlet_simpl
+              tya
+              tyb
+              body
+              (f_lambda
+                 [v, GTty tya]
+                 (f_let lv vx (form_of_expr mhr c)))
+
+          in (`Distr, expr_of_form mhr aout)
+
+     end
 
   | Scall (Some lv, ({ x_top = { m_top = `Concrete (p, _) }; x_sub = f } as xp), args)  ->
       let fd   = oget (EcEnv.Fun.by_xpath_opt xp env.env) in

@@ -35,9 +35,8 @@ case=> s fin_p; exists (filter p (undup s)); split.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma uniq_to_seq (P : 'a -> bool):
-  is_finite P => uniq (to_seq P).
-proof. by move=>/to_seq_finite [-> _]. qed.
+lemma uniq_to_seq (P : 'a -> bool): uniq (to_seq P).
+proof. by apply: choicebW => //= _ s []. qed.
 
 lemma mem_to_seq (P : 'a -> bool) x:
   is_finite P => mem (to_seq P) x <=> P x.

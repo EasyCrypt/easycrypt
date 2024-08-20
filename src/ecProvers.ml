@@ -50,8 +50,13 @@ end = struct
     compare v1.v_extra v2.v_extra
 
   let to_string (v : version) =
-    Printf.sprintf "%d.%d.%d.%s"
-      v.v_major v.v_minor v.v_subminor v.v_extra
+    let parts = [v.v_major; v.v_minor; v.v_subminor] in
+    let parts = List.map string_of_int parts in
+    let parts =
+      let extra = if String.is_empty v.v_extra then None else Some v.v_extra in
+      ofold (fun extra parts -> parts @ [extra]) parts extra in
+
+    String.concat "." parts
 end
 
 module VP = Version
@@ -70,7 +75,7 @@ let test_if_evict_prover test (name, version) =
   let evict =
     match test.pe_test with
     | `ByVersion (tname, (trel, tversion)) when name = tname -> begin
-        let cmp = VP.compare (VP.parse version) tversion in
+        let cmp = VP.compare version tversion in
         match trel with
         | `Eq -> cmp =  0
         | `Lt -> cmp <  0
@@ -107,7 +112,8 @@ let evictions : prover_eviction_test list = [
 (* -------------------------------------------------------------------- *)
 type prover = {
   pr_name    : string;
-  pr_version : string;
+  pr_version : Version.version;
+  pr_alt     : string;
   pr_evicted : (prover_eviction * bool) option;
 }
 
@@ -155,7 +161,8 @@ end = struct
 
         { pr_prover  =
             { pr_name    = name;
-              pr_version = version;
+              pr_version = Version.parse version;
+              pr_alt     = p.Whyconf.prover_altern;
               pr_evicted = None; };
           pr_config  = config;
           pr_driver  = driver; }
@@ -165,6 +172,15 @@ end = struct
         Whyconf.Mprover.fold
           (fun p c acc -> load_prover p c :: acc)
           (Whyconf.get_provers config) [] in
+
+      let provers =
+        let key_of_prover (p : why3prover) =
+          let p = p.pr_prover in
+          (p.pr_name, p.pr_version, p.pr_alt) in
+
+        List.sort
+          (fun p1 p2 -> compare (key_of_prover p1) (key_of_prover p2))
+          provers in
 
       let provers =
         List.map (fun prover ->
@@ -212,24 +228,79 @@ exception UnknownProver of string
 
 type parsed_pname = {
   prn_name     : string;
+  prn_alt      : string;
+  prn_version  : Version.version option;
   prn_ovrevict : bool;
 }
 
 let parse_prover_name name =
-  if   name <> "" && name.[0] = '!'
-  then { prn_name     = String.sub name 1 (String.length name - 1);
-         prn_ovrevict = true; }
-  else { prn_name = name; prn_ovrevict = false; }
+  let name, version =
+    if String.contains name '@' then
+      let index   = String.index name '@' in
+      let name    = String.sub name 0 index
+      and version = String.sub name (index+1) (String.length name - (index+1)) in
+      (name, Some version)
+    else
+      (name, None) in
 
-let get_prover name =
-  let name = parse_prover_name name in
+  let version = omap Version.parse version in
+
+  let ovrevict, name =
+      if name <> "" && name.[0] = '!' then
+        true, String.sub name 1 (String.length name - 1)
+      else false, name in
+
+  let name, alt =
+    let re = EcRegexp.regexp "^(.*)\\[(.*)\\]$" in
+    match EcRegexp.exec (`C re) name with
+    | None ->
+      name, ""
+    | Some m ->
+      let name = oget (EcRegexp.Match.group m 1) in
+      let alt  = oget (EcRegexp.Match.group m 2) in
+      name, alt in
+
+  { prn_name     = name;
+    prn_version  = version;
+    prn_alt      = alt;
+    prn_ovrevict = ovrevict; }
+
+let get_prover (rawname : string) =
+  let name = parse_prover_name rawname in
 
   let test p =
        p.pr_prover.pr_name = name.prn_name
+    && p.pr_prover.pr_alt  = name.prn_alt
     && (name.prn_ovrevict || not (is_evicted p.pr_prover)) in
 
-  try  List.find test (Config.provers ())
-  with Not_found -> raise (UnknownProver name.prn_name)
+  let provers = List.filter test (Config.provers ()) in
+
+  let provers = List.sort (fun p1 p2 ->
+      let v1 = p1.pr_prover.pr_version in
+      let v2 = p2.pr_prover.pr_version in
+      Version.compare v1 v2
+    ) provers
+  in
+
+  let exception CannotFindProver in
+
+  try
+    match name.prn_version with
+    | None ->
+        oget ~exn:CannotFindProver (List.Exceptionless.hd (List.rev provers))
+
+    | Some version -> begin
+        try
+          List.find
+            (fun p ->
+               Version.compare version p.pr_prover.pr_version <= 0)
+          provers
+
+        with Not_found -> raise CannotFindProver
+      end
+
+  with CannotFindProver ->
+    raise (UnknownProver rawname)
 
 let is_prover_known name =
   try ignore (get_prover name); true with UnknownProver _ -> false
@@ -358,6 +429,7 @@ let run_prover
   EcUtils.try_finally (fun () ->
     try
       let { pr_config = pr; pr_driver = dr; } = get_prover prover in
+
       let pc =
         let command = pr.Whyconf.command in
 

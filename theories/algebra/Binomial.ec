@@ -15,7 +15,7 @@ by apply/ler_addr. by rewrite IntID.mulrC.
 qed.
 
 lemma fact1 (n : int) : fact 1 = 1.
-proof. by rewrite -{1}IntID.add0r factS //= fact0. qed.
+proof. by rewrite -{1}[1]IntID.add0r factS //= fact0. qed.
 
 (* -------------------------------------------------------------------- *)
 op bin1 (s : int list) =

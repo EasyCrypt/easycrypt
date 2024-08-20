@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcDecl
 open EcCoreFol
@@ -139,7 +140,7 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
   | Tglob mp ->
-     tglob (subst_mpath s mp)
+     tglob (EcPath.mget_ident (subst_mpath s (EcPath.mident mp)))
 
   | Tunivar _ ->
      ty                         (* FIXME *)
@@ -491,7 +492,7 @@ let rec subst_form (s : subst) (f : form) =
      f_pvar pv ty m
 
   | Fglob (mp, m) ->
-     let mp = subst_mpath s mp in
+     let mp = EcPath.mget_ident (subst_mpath s (EcPath.mident mp)) in
      let m = subst_mem s m in
      f_glob mp m
 
@@ -532,26 +533,6 @@ let rec subst_form (s : subst) (f : form) =
      let hs_s = subst_stmt s hs_s in
      f_hoareS hs_m hs_pr hs_s hs_po
 
-  | FcHoareF { chf_pr; chf_f; chf_po; chf_co } ->
-     let chf_pr, chf_po =
-       let s = add_memory s mhr mhr in
-       let chf_pr = subst_form s chf_pr in
-       let chf_po = subst_form s chf_po in
-       (chf_pr, chf_po) in
-     let chf_f  = subst_xpath s chf_f in
-     let chf_co = subst_cost s chf_co in
-     f_cHoareF chf_pr chf_f chf_po chf_co
-
-  | FcHoareS { chs_m; chs_pr; chs_s; chs_po; chs_co } ->
-     let chs_m, (chs_pr, chs_po) =
-       let s, chs_m = subst_memtype s chs_m in
-       let chs_pr = subst_form s chs_pr in
-       let chs_po = subst_form s chs_po in
-       chs_m, (chs_pr, chs_po) in
-     let chs_s = subst_stmt s chs_s in
-     let chs_co = subst_cost s chs_co in (* FIXME: mem? *)
-     f_cHoareS chs_m chs_pr chs_s chs_po chs_co
-
   | FbdHoareF { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd } ->
      let bhf_pr, bhf_po =
        let s = add_memory s mhr mhr in
@@ -571,6 +552,24 @@ let rec subst_form (s : subst) (f : form) =
        bhs_m, (bhs_pr, bhs_po, bhs_bd) in
      let bhs_s = subst_stmt s bhs_s in
      f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
+
+   | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
+     let ehf_pr, ehf_po =
+       let s = add_memory s mhr mhr in
+       let ehf_pr = subst_form s ehf_pr in
+       let ehf_po = subst_form s ehf_po in
+       (ehf_pr, ehf_po) in
+     let ehf_f  = subst_xpath s ehf_f in
+     f_eHoareF ehf_pr ehf_f ehf_po
+
+  | FeHoareS { ehs_m; ehs_pr; ehs_s; ehs_po } ->
+     let ehs_m, (ehs_pr, ehs_po) =
+       let s, ehs_m = subst_memtype s ehs_m in
+       let ehs_pr = subst_form s ehs_pr in
+       let ehs_po = subst_form s ehs_po in
+       ehs_m, (ehs_pr, ehs_po) in
+     let ehs_s = subst_stmt s ehs_s in
+     f_eHoareS ehs_m ehs_pr ehs_s ehs_po
 
   | FequivF { ef_pr; ef_fl; ef_fr; ef_po } ->
      let ef_pr, ef_po =
@@ -607,13 +606,6 @@ let rec subst_form (s : subst) (f : form) =
      let eg_fr = subst_xpath s eg_fr in
      f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
-  | Fcoe { coe_pre; coe_mem; coe_e } ->
-     (* FIXME: check where coe_mem is bound *)
-     let s, coe_mem = subst_memtype s coe_mem in
-     let coe_pre = subst_form s coe_pre in
-     let coe_e = subst_expr s coe_e in
-     f_coe coe_pre coe_mem coe_e
-
   | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
      let pr_mem = subst_mem s pr_mem in
      let pr_fun = subst_xpath s pr_fun in
@@ -643,68 +635,17 @@ and subst_fop fty tys args (tyids, f) =
   f_app (subst_form s f) args fty
 
 (* -------------------------------------------------------------------- *)
-and subst_cost (s : subst) (c : cost) =
-  (* FIXME: refactor with the EcCoreFol version *)
-
-  let for_call xp { cb_cost; cb_called } (self, calls) =
-    let xp        = subst_xpath s xp in
-    let cb_cost   = subst_form s cb_cost in
-    let cb_called = subst_form s cb_called in
-
-    match xp.EcPath.x_top.m_top with
-    | `Local _ ->
-      let cb = call_bound_r cb_cost cb_called in
-      let calls =
-        EcPath.Mx.change
-          (fun old -> assert (old  = None); Some cb)
-          xp calls in
-      (self, calls)
-
-    | `Concrete _ ->
-       (f_xadd_simpl self (f_xmuli_simpl cb_called cb_cost), calls)
-  in
-
-  let c_self =
-    subst_form s c.c_self in
-
-  let self, c_calls =
-    EcPath.Mx.fold for_call c.c_calls (f_x0, EcPath.Mx.empty) in
-
-  let c_self = f_xadd_simpl c_self self in
-
-  cost_r c_self c_calls
-
-(* -------------------------------------------------------------------- *)
 and subst_oracle_info (s : subst) (oi : OI.t) =
-  let costs =
-    match PreOI.costs oi with
-    | `Unbounded -> `Unbounded
-    | `Bounded (self, calls) ->
-       let for_call x a calls =
-         EcPath.Mx.change
-           (fun old -> assert (old = None); Some (subst_form s a))
-           (subst_xpath s x)
-           calls in
-
-       let calls = EcPath.Mx.fold for_call calls EcPath.Mx.empty in
-       let self = subst_form s self in
-      `Bounded (self, calls)
-  in
-  OI.mk
-    (List.map (subst_xpath s) (PreOI.allowed oi))
-    costs
+  OI.mk (List.map (subst_xpath s) (PreOI.allowed oi))
 
 (* -------------------------------------------------------------------- *)
+and subst_oracle_infos (s : subst) (ois : oracle_infos) =
+  EcSymbols.Msym.map (fun oi -> subst_oracle_info s oi) ois
+
+    (* -------------------------------------------------------------------- *)
 and subst_mod_restr (s : subst) (mr : mod_restr) =
-  let rx = ur_app (fun set -> EcPath.Sx.fold (fun x r ->
-      EcPath.Sx.add (subst_xpath s x) r
-    ) set EcPath.Sx.empty) mr.mr_xpaths in
-  let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
-      EcPath.Sm.add (subst_mpath s x) r
-    ) set EcPath.Sm.empty) mr.mr_mpaths in
-  let ois = EcSymbols.Msym.map (fun oi ->
-      subst_oracle_info s oi) mr.mr_oinfos in
-  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
+  let subst_ (xs, ms) = Sx.map (subst_xpath s) xs, Sm.map (subst_mpath s) ms in
+  ur_app subst_ mr
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body_item (s : subst) (item : module_sig_body_item) =
@@ -742,8 +683,7 @@ and subst_modsig ?params (s : subst) (comps : module_sig) =
   let comps =
     { mis_params = newparams;
       mis_body   = subst_modsig_body sbody comps.mis_body;
-      mis_restr  = subst_mod_restr sbody comps.mis_restr;
-    }
+      mis_oinfos = subst_oracle_infos sbody comps.mis_oinfos; }
   in
     (sbody, comps)
 
@@ -756,8 +696,12 @@ and subst_modtype (s : subst) (modty : module_type) =
 
   { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
     mt_name   = mt_name;
-    mt_args   = List.map (subst_mpath s) modty.mt_args;
-    mt_restr = subst_mod_restr s modty.mt_restr; }
+    mt_args   = List.map (subst_mpath s) modty.mt_args; }
+
+
+(* -------------------------------------------------------------------- *)
+and subst_mty_mr (s : subst) ((mty, mr) : mty_mr) =
+  subst_modtype s mty, subst_mod_restr s mr
 
 (* -------------------------------------------------------------------- *)
 and subst_gty (s : subst) (ty : gty) =
@@ -766,7 +710,7 @@ and subst_gty (s : subst) (ty : gty) =
      GTty (subst_ty s ty)
 
   | GTmodty mty ->
-     GTmodty (subst_modtype s mty)
+     GTmodty (subst_mty_mr s mty)
 
   | GTmem m ->
      GTmem (EcMemory.mt_subst (subst_ty s) m)
@@ -845,7 +789,7 @@ and subst_module_body (s : subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl p -> ME_Decl (subst_modtype s p)
+  | ME_Decl p -> ME_Decl (subst_mty_mr s p)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : subst) (comps : module_comps) =
@@ -866,7 +810,8 @@ and subst_module (s : subst) (m : module_expr) =
   let me_body = subst_module_body sbody m.me_body in
   let me_comps = subst_module_comps sbody m.me_comps in
   let me_sig_body = subst_modsig_body sbody m.me_sig_body in
-  { me_name = m.me_name; me_body; me_comps; me_params; me_sig_body }
+  let me_oinfos = subst_oracle_infos sbody m.me_oinfos in
+  { me_name = m.me_name; me_params; me_body; me_comps; me_sig_body; me_oinfos; }
 
 (* -------------------------------------------------------------------- *)
 let subst_modsig ?params (s : subst) (comps : module_sig) =
@@ -891,17 +836,6 @@ let fresh_tparam (s : subst) ((x, tcs) : ty_param) =
 (* -------------------------------------------------------------------- *)
 let fresh_tparams (s : subst) (tparams : ty_params) =
   List.fold_left_map fresh_tparam s tparams
-
-(* -------------------------------------------------------------------- *)
-let fresh_pparam (s : subst) (x : EcIdent.t) =
-  let newx = EcIdent.fresh x in
-  let s = add_elocal s x (e_local newx tbool) in
-  let s = add_flocal s x (f_local newx tbool) in
-  (s, newx)
-
-(* -------------------------------------------------------------------- *)
-let fresh_pparams (s : subst) (pparams : pr_params) =
-  List.fold_left_map fresh_pparam s pparams
 
 (* -------------------------------------------------------------------- *)
 let subst_genty (s : subst) (tparams, ty) =
@@ -961,8 +895,8 @@ and subst_notation (s : subst) (nott : notation) =
 
 and subst_op_body (s : subst) (bd : opbody) =
   match bd with
-  | OP_Plain (body, nosmt) ->
-      OP_Plain (subst_form s body, nosmt)
+  | OP_Plain body ->
+      OP_Plain (subst_form s body)
 
   | OP_Constr (p, i)  -> OP_Constr (subst_path s p, i)
   | OP_Record p       -> OP_Record (subst_path s p)
@@ -974,8 +908,7 @@ and subst_op_body (s : subst) (bd : opbody) =
       OP_Fix { opf_args     = args;
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
-               opf_branches = subst_branches es opfix.opf_branches;
-               opf_nosmt    = opfix.opf_nosmt; }
+               opf_branches = subst_branches es opfix.opf_branches; }
 
   | OP_TC -> OP_TC
 
@@ -1021,7 +954,8 @@ let subst_op (s : subst) (op : operator) =
     op_kind     = kind          ;
     op_loca     = op.op_loca    ;
     op_opaque   = op.op_opaque  ;
-    op_clinline = op.op_clinline; }
+    op_clinline = op.op_clinline;
+    op_unfold   = op.op_unfold  ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =
@@ -1045,20 +979,6 @@ let fresh_scparam (s : subst) ((x, ty) : EcIdent.t * ty) =
 (* -------------------------------------------------------------------- *)
 let fresh_scparams (s : subst) (xtys : (EcIdent.t * ty) list) =
   List.fold_left_map fresh_scparam s xtys
-
-(* -------------------------------------------------------------------- *)
-let subst_schema (s : subst) (ax : ax_schema) =
-  (* FIXME: SCHEMA *)
-  let s, tparams = fresh_tparams s ax.axs_tparams in
-  let s, pparams = fresh_pparams s ax.axs_pparams in
-  let s, params  = fresh_scparams s ax.axs_params in
-  let spec       = subst_form s ax.axs_spec in
-
-  { axs_tparams = tparams;
-    axs_pparams = pparams;
-    axs_params  = params;
-    axs_loca    = ax.axs_loca;
-    axs_spec    = spec; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : subst) cr =
@@ -1111,9 +1031,6 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
-
-  | Th_schema (x, schema) ->
-      Th_schema (x, subst_schema s schema)
 
   | Th_modtype (x, tymod) ->
       Th_modtype (x, subst_top_modsig s tymod)

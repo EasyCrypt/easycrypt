@@ -2,6 +2,7 @@
 open EcUtils
 open EcMaps
 open EcPath
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv

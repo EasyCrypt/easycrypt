@@ -11,7 +11,7 @@ op n : {int | 0 <= n} as ge0_n.
 op dchar : t.
 op wordw : t list = mkseq (fun _ => dchar) n.
 
-lemma nosmt size_wordw: size wordw = n.
+lemma size_wordw: size wordw = n.
 proof. by rewrite size_mkseq ler_maxr ?ge0_n. qed.
 
 clone include Subtype
@@ -27,34 +27,34 @@ op ofword = val.
 
 (* -------------------------------------------------------------------- *)
 
-lemma nosmt mkwordK : cancel ofword mkword.
+lemma mkwordK : cancel ofword mkword.
 proof. smt(valK). qed.
 
-lemma nosmt ofwordK :
+lemma ofwordK :
   forall (s : t list), size s = n =>
     ofword (mkword s) = s.
 proof. smt(insubT). qed.
 
-lemma nosmt mkword_out :
+lemma mkword_out :
   forall (s : t list), size s <> n =>
     ofword (mkword s) = wordw.
 proof. smt(insubN insubdK size_wordw). qed.
 
-lemma nosmt size_word : forall w, size (ofword w) = n.
+lemma size_word : forall w, size (ofword w) = n.
 proof.
 move=> w; rewrite -mkwordK; case: (size (ofword w) = n).
 by rewrite mkwordK. by move/mkword_out=> ->; rewrite size_wordw.
 qed.
 
-lemma nosmt mkwordW (P : word -> bool):
+lemma mkwordW (P : word -> bool):
      (forall (s : t list), size s = n => P (mkword s))
   => forall n, P n.
 proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 
-lemma nosmt ofword_inj : injective ofword.
+lemma ofword_inj : injective ofword.
 proof. by apply/(can_inj _ _ mkwordK). qed.
 
-lemma nosmt mkword_pinj (s1 s2 : t list) :
+lemma mkword_pinj (s1 s2 : t list) :
   size s1 = n => size s2 = n =>
   mkword s1 = mkword s2 =>
   s1 = s2.

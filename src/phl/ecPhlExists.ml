@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcFol
 open EcEnv
-open EcModules
 
 open EcCoreGoal
 open EcLowGoal
@@ -19,27 +19,16 @@ let get_to_gens fs =
     let id =
       match f.f_node with
       | Fpvar (pv, m) -> id_of_pv pv m
-      | Fglob (mp, m) -> id_of_mp mp m
       | _             -> EcIdent.create "f" in
     id, f in
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
-let t_hr_exists_elim_r ?bound tc =
+let t_hr_exists_elim_r ?(bound : int option) (tc : tcenv1) =
   let pre = tc1_get_pre tc in
   let bd, pre =
-    try  destr_exists_prenex pre
+    try  destr_exists_prenex ?bound pre
     with DestrError _ -> [], pre in
-  let bd, pre =
-    bound
-      |> omap (fun bound ->
-             let bound = min bound (List.length bd) in
-             let bd1, bd2 = List.takedrop bound bd in
-
-             (bd1, f_exists bd2 pre))
-      |? (bd, pre) in
-
-  (* FIXME: check that bd is not bound in the post *)
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
 
@@ -47,13 +36,20 @@ let t_hr_exists_elim_r ?bound tc =
 let t_hr_exists_intro_r fs tc =
   let hyps  = FApi.tc1_hyps tc in
   let concl = FApi.tc1_goal tc in
-  let pre   = tc1_get_pre  tc in
+  let pre1  = tc1_get_pre  tc in
   let post  = tc1_get_post tc in
   let side  = is_equivS concl || is_equivF concl in
   let gen   = get_to_gens fs in
   let eqs   = List.map (fun (id, f) -> f_eq (f_local id f.f_ty) f) gen in
   let bd    = List.map (fun (id, f) -> (id, GTty f.f_ty)) gen in
-  let pre   = f_exists bd (f_and (f_ands eqs) pre) in
+  let is_ehoare =
+    match concl.f_node with
+    | FeHoareF _ | FeHoareS _ -> true
+    | _ -> false in
+  let pre   =
+    if is_ehoare then
+      f_interp_ehoare_form (f_exists bd (f_ands eqs)) pre1
+    else f_exists bd (f_and (f_ands eqs) pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
   let ms, subst =
@@ -77,13 +73,18 @@ let t_hr_exists_intro_r fs tc =
     List.map do1 gen
   in
 
+  let t_exists =
+    if is_ehoare then
+       t_intros_i ms @!
+       EcHiGoal.t_apply_prept (PT.Prept.uglob EcCoreLib.CI_Xreal.p_xle_cxr_l) @+
+       [ t_exists_intro_s args @! t_trivial;
+         t_trivial]
+    else FApi.t_seqs  [t_intros_i (ms@[h]); t_exists_intro_s args; t_apply_hyp h]
+  in
+
   let tactic =
-    FApi.t_seqsub (EcPhlConseq.t_conseq pre post)
-      [ FApi.t_seqs [
-          t_intros_i (ms@[h]);
-          t_exists_intro_s args;
-          t_apply_hyp h;
-        ];
+    (EcPhlConseq.t_conseq pre post) @+
+      [ t_exists;
         t_trivial;
         t_id]
   in
@@ -100,8 +101,8 @@ let process_exists_intro ~(elim : bool) fs tc =
     match concl.f_node with
     | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
     | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FcHoareF hf -> fst (LDecl.hoareF hf.chf_f hyps)
-    | FcHoareS hs -> LDecl.push_active hs.chs_m hyps
+    | FeHoareF hf -> fst (LDecl.hoareF hf.ehf_f hyps)
+    | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
     | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
     | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)

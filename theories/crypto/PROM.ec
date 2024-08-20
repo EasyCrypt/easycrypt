@@ -923,8 +923,7 @@ proof.
     call (_: ={glob RO});2..4: by sim.
     + by apply RO_LFinRO_init.
     by call RO_LFinRO_init;wp.
-  transitivity*{1} {r <@ MainD(D,GenFinRO(RO)).distinguish(x); } => //;1:smt().
-  + by symmetry; call (RO_LRO_D D')=> //; exact:dout_ll.
+  rewrite equiv[{1} 1 -(RO_LRO_D D' dout_ll)].
   inline MainD(D, GenFinRO(RO)).distinguish MainD(D, FinRO).distinguish; wp.
   call (_: ={RO.m} /\ (forall x, x \in RO.m){1}).
   + by conseq GFinRO_RO_init.
@@ -993,11 +992,7 @@ transitivity*{2} {
 }; 1,2: smt(); last first.
 - inline*; rnd : *0 *0; skip => />.
   by split => *; rewrite dmap_id dfun_dmap.
-transitivity*{2} {
-  Vars.r <@ S.loop_first(dout,FinFrom.enum);
-  FunRO.f <- tofun Vars.r;
-}; 1,2: smt(); last first.
-- by symmetry; wp; call Sample_Loop_first_eq; auto.
+rewrite equiv[{2} 1 Sample_Loop_first_eq].
 inline*; wp 3 4.
 while (l{1} = xs{2}  /\ d{2} = dout /\
   exists hd, FinFrom.enum = hd ++ l{1}

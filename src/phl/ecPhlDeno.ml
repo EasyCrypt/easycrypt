@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -81,6 +82,38 @@ let t_phoare_deno_r pre post tc =
 
   | _ -> t_core_phoare_deno pre post tc
 
+
+(* -------------------------------------------------------------------- *)
+let t_ehoare_deno_r pre post tc =
+  let env, _, concl = FApi.tc1_eflat tc in
+
+  let f, bd =
+    match concl.f_node with
+    | Fapp ({f_node = Fop (op, _)}, [f; bd])
+        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
+      (f, bd)
+
+    | _ -> tc_error !!tc "invalid goal shape"
+  in
+
+  let pr = destr_pr f in
+  let concl_e = f_eHoareF pre pr.pr_fun post in
+  let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_fun env in
+  (* pre <= bd *)
+  (* building the substitution for the pre *)
+  let sargs = PVM.add env pv_arg (fst mpr) pr.pr_args PVM.empty in
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id (fst mpr) pr.pr_mem in
+  let pre = Fsubst.f_subst smem (PVM.subst env sargs pre) in
+  let concl_pr = f_xreal_le pre (f_r2xr bd) in
+
+  (* forall m, ev%r%xr <= post *)
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst mpo) in
+  let ev = Fsubst.f_subst smem pr.pr_event in
+  let concl_po = f_xreal_le (f_b2xr ev) post in
+  let concl_po = f_forall_mems [mpo] concl_po in
+
+  FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
+
 (* -------------------------------------------------------------------- *)
 let cond_pre env prl prr pre =
   (* building the substitution for the pre *)
@@ -139,6 +172,7 @@ let t_equiv_deno_r pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let t_phoare_deno = FApi.t_low2 "phoare-deno" t_phoare_deno_r
+let t_ehoare_deno = FApi.t_low2 "ehoare-deno" t_ehoare_deno_r
 let t_equiv_deno  = FApi.t_low2 "equiv-deno"  t_equiv_deno_r
 
 (* -------------------------------------------------------------------- *)
@@ -185,6 +219,44 @@ let process_phoare_deno info tc =
   in
 
   FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_phoare_deno pre post tc)
+
+(* -------------------------------------------------------------------- *)
+let process_ehoare_deno info tc =
+  let error () =
+    tc_error !!tc "the conclusion is not a suitable Pr expression" in
+
+  let process_cut (pre, post) =
+    let hyps, concl = FApi.tc1_flat tc in
+    let f, bd =
+      match concl.f_node with
+      | Fapp({f_node = Fop (op, _)}, [f1; f2])
+          when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le && is_pr f1 ->
+          (f1, f2) (* f1 <= f2 *)
+      | _ -> error ()
+    in
+
+    let { pr_fun = f; pr_mem = m; pr_event = event; } = destr_pr f in
+    let penv, qenv = LDecl.hoareF f hyps in
+    let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m mhr in
+    let dpre = f_r2xr (Fsubst.f_subst smem bd) in
+
+    let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc penv p) dpre  in
+    let post = post |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc qenv p) (f_b2xr event) in
+
+    f_eHoareF pre f post
+  in
+
+  let pt, ax =
+    PT.tc1_process_full_closed_pterm_cut
+      ~prcut:process_cut tc info in
+
+  let pre, post =
+    let hf = pf_as_ehoareF !!tc ax in
+      (hf.ehf_pr, hf.ehf_po)
+  in
+
+  FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc)
+
 
 (* -------------------------------------------------------------------- *)
 let destr_deno_bad env f =
@@ -342,7 +414,7 @@ let process_pre tc hyps prl prr pre post =
     let dopv m mi x ty =
       if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi)) in
 
-    let doglob m mi g = push (f_eq (f_glob g m) (f_glob g mi)) in
+    let doglob m mi g = push (f_eq (NormMp.norm_glob env m g) (NormMp.norm_glob env mi g)) in
     let dof f a m mi =
       try
         let fv = PV.remove env pv_res (PV.fv env m post) in
@@ -512,11 +584,12 @@ let process_equiv_deno_bad2 info eq bad1 tc =
   t_rotate `Left !torotate gs
 
 (* -------------------------------------------------------------------- *)
-type denoff = ((pformula option) tuple2) gppterm * bool * pformula option
+type denoff = deno_ppterm * bool * pformula option
 
 let process_deno mode (info, eq, bad1) g =
   match mode with
   | `PHoare -> process_phoare_deno info g
+  | `EHoare -> process_ehoare_deno info g
   | `Equiv  ->
     match bad1 with
     | None -> process_equiv_deno info eq g

@@ -16,13 +16,21 @@ module Hints : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Version : sig
+  type version
+
+  val to_string : version -> string
+end
+
+(* -------------------------------------------------------------------- *)
 type prover_eviction = [
   | `Inconsistent
 ]
 
 type prover = {
   pr_name    : string;
-  pr_version : string;
+  pr_version : Version.version;
+  pr_alt     : string;
   pr_evicted : (prover_eviction * bool) option;
 }
 
@@ -51,6 +59,8 @@ val known : evicted:bool -> prover list
 (* -------------------------------------------------------------------- *)
 type parsed_pname = {
   prn_name     : string;
+  prn_alt      : string;
+  prn_version  : Version.version option;
   prn_ovrevict : bool;
 }
 

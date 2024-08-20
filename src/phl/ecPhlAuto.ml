@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcTypes
 open EcFol
 open EcModules
 
@@ -34,10 +33,6 @@ let t_auto_rnd_hoare_r tc =
   EcPhlRnd.t_hoare_rnd tc
 
 (* -------------------------------------------------------------------- *)
-let t_auto_rnd_choare_r tc =
-  EcPhlRnd.t_choare_rnd EcParsetree.PNoRndParams tc
-
-(* -------------------------------------------------------------------- *)
 let t_auto_rnd_bdhoare_r tc =
   let hs = tc1_as_bdhoareS tc in
 
@@ -66,15 +61,13 @@ let t_auto_rnd_equiv_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd_hoare   = FApi.t_low0 "auto-rnd-hoare"   t_auto_rnd_hoare_r
-let t_auto_rnd_choare  = FApi.t_low0 "auto-rnd-choare"  t_auto_rnd_choare_r
 let t_auto_rnd_bdhoare = FApi.t_low0 "auto-rnd-bdhoare" t_auto_rnd_bdhoare_r
 let t_auto_rnd_equiv   = FApi.t_low0 "auto-rnd-equiv"   t_auto_rnd_equiv_r
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd =
-  t_hS_or_chS_or_bhS_or_eS
+  t_hS_or_bhS_or_eS
     ~th:t_auto_rnd_hoare
-    ~tch:t_auto_rnd_choare
     ~tbh:t_auto_rnd_bdhoare
     ~te:t_auto_rnd_equiv
 
@@ -95,6 +88,7 @@ let t_auto_r ?conv tc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
+                 EcPhlTAuto.t_ehoare_zero;
                  t_auto_phl ]
   in t_trivial ?conv ~subtc ~keep:true tc
 
@@ -106,6 +100,7 @@ let t_phl_trivial_r tc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
+                 EcPhlTAuto.t_ehoare_zero;
                  EcPhlSkip.t_skip ]
   in FApi.t_try subtc tc
 

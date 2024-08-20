@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
+open EcAst
 open EcTypes
 open EcMemory
 open EcBigInt.Notations
@@ -10,6 +11,11 @@ module CI = EcCoreLib
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol
+include EcCoreSubst
+
+(* -------------------------------------------------------------------- *)
+let f_bind_mod s x mp env =
+  Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
@@ -31,6 +37,8 @@ let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
+  let mp1 = EcPath.mget_ident mp1 in
+  let mp2 = EcPath.mget_ident mp2 in
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
 
 (* -------------------------------------------------------------------- *)
@@ -97,6 +105,36 @@ let f_decimal (n, (l, f)) =
   if   EcBigInt.equal n EcBigInt.zero
   then fct
   else f_real_add (f_real_of_int (f_int n)) fct
+
+(* soft-constructor - xreal *)
+let fop_xreal_le = f_op CI.CI_Xreal.p_xle [] (toarrow [txreal; txreal] tbool)
+let fop_interp_ehoare_form =
+  f_op CI.CI_Xreal.p_interp_form [] (toarrow [tbool; txreal] txreal)
+
+let is_interp_ehoare_form_op (p, tys) = EcPath.p_equal p CI.CI_Xreal.p_interp_form && tys = []
+
+let fop_Ep ty =
+  f_op CI.CI_Xreal.p_Ep [ty] (toarrow [tdistr ty; toarrow [ty] txreal] txreal)
+
+let f_xreal_le f1 f2 = f_app fop_xreal_le [f1; f2] tbool
+let f_interp_ehoare_form f1 f2 = f_app fop_interp_ehoare_form [f1; f2] txreal
+let f_Ep ty d f = f_app (fop_Ep ty) [d; f] txreal
+
+
+let fop_concave_incr = f_op CI.CI_Xreal.p_concave_incr [] (tfun (tfun txreal txreal) tbool)
+let f_concave_incr f = f_app fop_concave_incr [f] tbool
+
+let f_op_rp2xr = f_op CI.CI_Xreal.p_rp [] (tfun trealp txreal)
+let f_op_of_real  = f_op CI.CI_Xreal.p_of_real [] (tfun treal trealp)
+
+let f_rp2xr f = f_app f_op_rp2xr [f] txreal
+let f_r2rp  f = f_app f_op_of_real [f] trealp
+let f_r2xr  f = f_rp2xr (f_r2rp f)
+let f_b2r   b = f_if b f_r1 f_r0
+let f_b2xr  b = f_r2xr (f_b2r b)
+
+
+let f_xreal_inf = f_op CI.CI_Xreal.p_inf [] txreal
 
 (* -------------------------------------------------------------------- *)
 let tmap aty bty =
@@ -554,7 +592,8 @@ let rec f_app_simpl f args ty =
   f_betared (f_app f args ty)
 
 and f_betared f =
-  let tx fo fp = if f_equal fo fp || can_betared fo then fp else f_betared fp in
+  let tx ~before:fo ~after:fp =
+    if f_equal fo fp || can_betared fo then fp else f_betared fp in
 
   match f.f_node with
   | Fapp ({ f_node = Fquant (Llambda, bds, body)}, args) ->
@@ -787,7 +826,7 @@ type sform =
   | SFint   of BI.zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcPath.mpath * memory
+  | SFglob  of EcIdent.t * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -807,8 +846,6 @@ type sform =
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
-  | SFcHoareF  of cHoareF
-  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -849,8 +886,6 @@ let rec sform_of_form fp =
 
   | FhoareF  hf -> SFhoareF  hf
   | FhoareS  hs -> SFhoareS  hs
-  | FcHoareF  hf -> SFcHoareF  hf
-  | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
@@ -949,50 +984,50 @@ let f_dlet_simpl tya tyb d f =
  * - p1 => E x p2 -> [x] (p1 => p2)
  * - E x p1 => p2 -> [] (E x p1 => p2)
  *)
-let destr_exists_prenex f =
-  let disjoint bds1 bds2 =
-    List.for_all
-      (fun (id1, _) -> List.for_all (fun (id2, _) -> id1 <> id2) bds2)
-      bds1
-  in
+let destr_exists_prenex ?(bound : int option) (f : form) =
+  let rec prenex_exists ~bound bds p =
+    match bound, sform_of_form p with
+    | Some bound, _ when bound <= 0 ->
+      (bds, p)
 
-  let rec prenex_exists bds p =
-    match sform_of_form p with
-    | SFand (`Sym, (f1, f2)) ->
-        let (bds1, f1) = prenex_exists [] f1 in
-        let (bds2, f2) = prenex_exists [] f2 in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_and f1 f2)
-          else (bds, p)
+    | None, SFand (`Sym, (f1, f2)) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
+      (bds, f_and f1 f2)
 
-    | SFor (`Sym, (f1, f2)) ->
-        let (bds1, f1) = prenex_exists [] f1 in
-        let (bds2, f2) = prenex_exists [] f2 in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_or f1 f2)
-          else (bds, p)
+    | None, SFor (`Sym, (f1, f2)) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
+      (bds, f_or f1 f2)
 
-    | SFimp (f1, f2) ->
-        let (bds2, f2) = prenex_exists bds f2 in
-          (bds2@bds, f_imp f1 f2)
+    | None, SFimp (f1, f2) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      (bds, f_imp f1 f2)
 
-    | SFquant (Lexists, bd, lazy p) ->
-        let (bds, p) = prenex_exists bds p in
-          (bd::bds, p)
+    | None, SFif (f, f1, f2) ->
+      let (bds, f2) = prenex_exists ~bound:None bds f2 in
+      let (bds, f1) = prenex_exists ~bound:None bds f1 in
+      (bds, f_if f f1 f2)
+  
+    | bound, SFquant (Lexists, bd, lazy p) ->
+      let bound = Option.map (fun x -> x - 1) bound in
+      let bd, p =
+        let s = Fsubst.f_subst_init ~freshen:true () in
+        let s, bd = Fsubst.add_binding s bd in
+        bd, Fsubst.f_subst s p in
+      let bds = bd::bds in
+      prenex_exists ~bound bds p
 
-    | SFif (f, ft, fe) ->
-        let (bds1, f1) = prenex_exists [] ft in
-        let (bds2, f2) = prenex_exists [] fe in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_if f f1 f2)
-          else (bds, p)
+    | bound, SFop (op, [f1; f2]) when is_interp_ehoare_form_op op ->
+      let (bds, f1) = prenex_exists ~bound bds f1 in
+      (bds, f_interp_ehoare_form f1 f2)
 
     | _ -> (bds, p)
   in
     (* Make it fail as with destr_exists *)
-    match prenex_exists [] f with
+    match prenex_exists ~bound [] f with
     | [] , _ -> destr_error "exists"
-    | bds, f -> (bds, f)
+    | bds, f -> (List.rev bds, f)
 
 (* -------------------------------------------------------------------- *)
 let destr_ands ~deep =
@@ -1076,7 +1111,7 @@ let rec dump_f f =
   | Fint    x -> BI.to_string x
   | Flocal  x -> EcIdent.tostring x
   | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fglob   (mp, x) -> EcPath.m_tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
   | Fop     (p, _) -> EcPath.tostring p
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
@@ -1084,14 +1119,14 @@ let rec dump_f f =
   | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
   | FhoareF _ -> "HoareF"
   | FhoareS _ -> "HoareS"
-  | FcHoareF _ -> "cHoareF"
-  | FcHoareS _ -> "cHoareS"
   | FbdHoareF _ -> "bdHoareF"
   | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
      "bdHoareS [ ME = " ^ EcIdent.tostring m
      ^ "; PR = " ^ dump_f pr
      ^ "; PO = " ^ dump_f po
      ^ "; BD = " ^ dump_f bd ^ "]"
+  | FeHoareS _ -> "eHoareS"
+  | FeHoareF _ -> "eHoareF"
   | FequivF _ -> "equivF"
   | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
      "equivS [ ML = " ^ EcIdent.tostring ml
@@ -1100,4 +1135,3 @@ let rec dump_f f =
      ^ "; PO = " ^ dump_f po
      ^ "]"
   | FeagerF _ -> "eagerF"
-  | Fcoe _ -> "Fcoe"

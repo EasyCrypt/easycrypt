@@ -7,6 +7,11 @@ open EcMemory
 (* -------------------------------------------------------------------- *)
 include module type of struct include EcCoreFol end
 
+include module type of struct include EcCoreSubst end
+
+(* -------------------------------------------------------------------- *)
+val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
+
 (* -------------------------------------------------------------------- *)
 val f_losslessF: xpath -> form
 
@@ -48,6 +53,20 @@ val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 val f_decimal  : zint * (int * zint) -> form
+
+(* soft-constructor - xreal *)
+val f_xreal_le : form -> form -> form
+val fop_interp_ehoare_form : form
+val f_interp_ehoare_form : form -> form -> form
+val f_Ep : EcTypes.ty -> form -> form -> form
+val f_concave_incr : form -> form
+
+val f_rp2xr : form -> form
+val f_r2rp  : form -> form
+val f_r2xr  : form -> form
+val f_b2r   : form -> form
+val f_b2xr  : form -> form
+val f_xreal_inf : form
 
 (* soft-constructor - map *)
 val f_map_cst : EcTypes.ty -> form -> form
@@ -130,7 +149,7 @@ val f_real_div_simpl : form -> form -> form
 val f_real_inv_simpl : form -> form
 
 (* -------------------------------------------------------------------- *)
-val destr_exists_prenex : form -> bindings * form
+val destr_exists_prenex : ?bound:int -> form -> bindings * form
 val destr_ands : deep:bool -> form -> form list
 
 (* -------------------------------------------------------------------- *)
@@ -176,7 +195,7 @@ type sform =
   | SFint   of zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of mpath * memory
+  | SFglob  of EcIdent.t * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -197,8 +216,6 @@ type sform =
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
-  | SFcHoareF  of cHoareF
-  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -230,15 +247,4 @@ module DestrReal : sig
 end
 
 (* -------------------------------------------------------------------- *)
-(*val cost_sub_self : cost -> form -> cost
-val cost_add_self : cost -> form -> cost
-val cost_sub_call : EcEnv.env -> cost -> EcPath.xpath -> form -> cost
-val cost_add_call : EcEnv.env -> cost -> EcPath.xpath -> form -> cost
-
-val cost_map      : (form -> form) -> cost -> cost
-val cost_op       : EcEnv.env -> (form -> form -> form ) -> cost -> cost -> cost
-val cost_app      : cost -> form list -> cost
-
-val cost_flatten  : cost -> form *)
-
 val dump_f : form -> string

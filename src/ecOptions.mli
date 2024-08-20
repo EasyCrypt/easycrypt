@@ -16,6 +16,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_compact : int option;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
@@ -30,12 +31,16 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_report    : string option;
+  runo_provers   : prv_options;
+  runo_jobs      : int option;
+  runo_rawargs   : string list;
 }
 
 and prv_options = {
-  prvo_maxjobs    : int;
-  prvo_timeout    : int;
-  prvo_cpufactor  : int;
+  prvo_maxjobs    : int option;
+  prvo_timeout    : int option;
+  prvo_cpufactor  : int option;
   prvo_provers    : string list option;
   prvo_pragmas    : string list;
   prvo_ppwidth    : int option;
@@ -63,12 +68,22 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+}
+
+type ini_context = {
+  inic_ini  : ini_options;
+  inic_root : string option;
 }
 
 (* -------------------------------------------------------------------- *)
 exception InvalidIniFile of (int * string)
 
 val read_ini_file : string -> ini_options
-val parse_cmdline : ?ini:ini_options -> string array -> options
+
+val parse_cmdline :
+     ?ini:(string option -> ini_context list)
+  -> string array
+  -> options

@@ -4,8 +4,9 @@ open Tyxml.Html
 open EcScope
 
 (* -------------------------------------------------------------------- *)
-let styles_file : string = 
-  Filename.concat EcRelocate.Sites.doc "styles.css"
+let styles_file : string =
+  let (module Sites) = EcRelocate.sites in
+  Filename.concat Sites.doc "styles.css"
 
 let stdlib_doc_root : string =
   ""

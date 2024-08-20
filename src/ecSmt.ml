@@ -3,6 +3,7 @@ open EcUtils
 open EcMaps
 open EcIdent
 open EcPath
+open EcAst
 open EcTypes
 open EcDecl
 open EcFol
@@ -351,25 +352,23 @@ let w_witness ty =
   WTerm.fs_app fs_witness [] ty
 
 (* -------------------------------------------------------------------- *)
-let mk_tglob genv mp =
-  assert (mp.EcPath.m_args = []);
-  let id = EcPath.mget_ident mp in
-  match Hid.find_opt genv.te_absmod id with
+let mk_tglob genv m =
+  match Hid.find_opt genv.te_absmod m with
   | Some { w3am_ty } -> w3am_ty
   | None ->
     (* create the type symbol *)
-    let pid = preid id in
+    let pid = preid m in
     let ts = WTy.create_tysymbol pid [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     let ty = WTy.ty_app ts [] in
-    Hid.add genv.te_absmod id { w3am_ty = ty };
+    Hid.add genv.te_absmod m { w3am_ty = ty };
     ty
 
 (* -------------------------------------------------------------------- *)
 let rec trans_ty ((genv, lenv) as env) ty =
   match ty.ty_node with
   | Tglob   mp ->
-    trans_tglob env mp
+    mk_tglob genv mp
   | Tunivar _ -> assert false
   | Tvar    x -> trans_tv lenv x
 
@@ -381,13 +380,6 @@ let rec trans_ty ((genv, lenv) as env) ty =
 
   | Tfun (t1, t2) ->
       WTy.ty_func (trans_ty env t1) (trans_ty env t2)
-
-and trans_tglob ((genv, _lenv) as env) mp =
-  let ty = NormMp.norm_tglob genv.te_env mp in
-  match ty.ty_node with
-  | Tglob mp -> mk_tglob genv mp
-
-  | _ -> trans_ty env ty
 
 and trans_tys env tys = List.map (trans_ty env) tys
 
@@ -703,10 +695,9 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fpr pr        -> trans_pr env pr
 
-  | Fcoe _
   | FeagerF _
   | FhoareF  _  | FhoareS   _
-  | FcHoareF  _ | FcHoareS   _
+  | FeHoareF   _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
     -> trans_gen env fp
@@ -858,31 +849,23 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
     WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
-and trans_glob ((genv, _) as env) mp mem =
-  let f = NormMp.norm_glob genv.te_env mem mp in
-  match f.f_node with
-  | Fglob (mp, mem) ->
-      assert (mp.EcPath.m_args = []);
-
-      let id   = EcPath.mget_ident mp in
-      let wmem = trans_mem env ~forglobal:true mem in
-      let w3op =
-        match Hid.find_opt genv.te_lc id with
-        | Some w3op -> w3op
-        | None ->
-          let ty  = Some (mk_tglob genv mp) in
-          let pid = preid id in
-          let ls  = WTerm.create_lsymbol pid [ty_mem] ty in
-          let w3op =
-            { w3op_fo = `LDecl ls;
-              w3op_ta = (fun _tys -> [], [Some ty_mem], ty);
-              w3op_ho = `HO_TODO (EcIdent.name id, [ty_mem], ty); } in
-          genv.te_task <- WTask.add_param_decl genv.te_task ls;
-          Hid.add genv.te_lc id w3op;
-          w3op
-      in apply_wop genv w3op [] [wmem]
-
-  | _ -> trans_form env f
+and trans_glob ((genv, _) as env) m mem =
+  let wmem = trans_mem env ~forglobal:true mem in
+  let w3op =
+    match Hid.find_opt genv.te_lc m with
+    | Some w3op -> w3op
+    | None ->
+       let ty  = Some (mk_tglob genv m) in
+       let pid = preid m in
+       let ls  = WTerm.create_lsymbol pid [ty_mem] ty in
+       let w3op =
+         { w3op_fo = `LDecl ls;
+           w3op_ta = (fun _tys -> [], [Some ty_mem], ty);
+           w3op_ho = `HO_TODO (EcIdent.name m, [ty_mem], ty); } in
+       genv.te_task <- WTask.add_param_decl genv.te_task ls;
+       Hid.add genv.te_lc m w3op;
+       w3op
+  in apply_wop genv w3op [] [wmem]
 
 (* -------------------------------------------------------------------- *)
 and trans_mem (genv,lenv) ~forglobal mem =
@@ -1043,7 +1026,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun (tv,_) -> not (Mid.mem tv (Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun (tv,_) -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
   let textra =
     List.map (fun (tv,_) -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in
@@ -1089,23 +1072,28 @@ and create_op ?(body = false) (genv : tenv) p =
     let wextra = List.map (fun ty ->
                      WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
     let decl =
-      match body, op.op_kind with
-      | true, OB_oper (Some (OP_Plain (body, false))) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+      let default () = WDecl.create_param_decl ls in
+
+      if op.op_opaque.smt then
+        default ()
+      else
+        match body, op.op_kind with
+        | true, OB_oper (Some (OP_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+
+        | true, OB_oper (Some (OP_Fix body)) ->
+          OneShot.now register;
+          let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
+          let wbody = Cast.arg wbody ls.WTerm.ls_value in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
-        OneShot.now register;
-        let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
-        let wbody = Cast.arg wbody ls.WTerm.ls_value in
-        WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+        | true, OB_pred (Some (PR_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom None body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_pred (Some (PR_Plain body)) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom None body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
-
-      | _, _ ->
-          WDecl.create_param_decl ls
+        | _, _ ->
+            default ()
 
     in
       OneShot.now register;
@@ -1413,11 +1401,10 @@ module Frequency = struct
       | Fproj    (e, _)       -> doit e
 
       | FhoareF _   | FhoareS _
-      | FcHoareF _  | FcHoareS _
+      | FeHoareF _ | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF _   | FequivS _
-      | FeagerF _
-      | Fcoe _ -> ()
+      | FeagerF _ -> ()
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
@@ -1446,23 +1433,32 @@ module Frequency = struct
 
   let f_ops_oper unwanted_op env p rs =
     match EcEnv.Op.by_path_opt p env with
-    | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain (f, false))) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
-      let rec aux rs = function
-        | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
-        | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
-      in
-      aux rs e.opf_branches
-    | Some {op_kind = OB_pred (Some (PR_Ind pri)) } ->
-       let for1 rs ctor =
-         List.fold_left
-           (fun rs f -> r_union rs (f_ops unwanted_op f))
-           rs ctor.prc_spec
-       in List.fold_left for1 rs pri.pri_ctors
-    | _ -> rs
+    | Some op -> begin
+      if op.op_opaque.smt then
+        rs
+      else
+        match op with
+        | {op_kind = OB_pred (Some (PR_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Fix e)) } ->
+          let rec aux rs = function
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
+          in
+          aux rs e.opf_branches
+        | {op_kind = OB_pred (Some (PR_Ind pri)) } ->
+          let for1 rs ctor =
+            List.fold_left
+              (fun rs f -> r_union rs (f_ops unwanted_op f))
+              rs ctor.prc_spec
+          in List.fold_left for1 rs pri.pri_ctors
+        | _ -> rs
+        end
+
+      | None ->
+        rs
 
   (* -------------------------------------------------------------------- *)
   type frequency = {

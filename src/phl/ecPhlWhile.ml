@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcFol
 open EcModules
@@ -7,6 +8,7 @@ open EcPV
 
 open EcCoreGoal
 open EcLowPhlGoal
+open EcLowGoal
 
 module Sx  = EcPath.Sx
 module TTC = EcProofTyping
@@ -78,62 +80,38 @@ let t_hoare_while_r inv tc =
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
-(* - [inv] is the loop invariant.
-   - [qdec] the strictly decreasing quantity at each iteration.
-   - [n] is the maximum number of iterations.
-   - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
-let t_choare_while_r inv qdec n (lam_cost : cost) tc =
-  let env = FApi.tc1_env tc in
+(* -------------------------------------------------------------------- *)
+let check_single_stmt tc s =
+  if not (List.is_empty s.s_node) then
+    tc_error !!tc  "only single loop statements are accepted"
 
-  let chs = tc1_as_choareS tc in
-  let (expr_e, c), s = tc1_last_while tc chs.chs_s in
-  let m = EcMemory.memory chs.chs_m in
-  let e = form_of_expr m expr_e in
+let t_ehoare_while_core tc =
+  let hyps = FApi.tc1_hyps tc in
+  let hs = tc1_as_ehoareS tc in
+  let (e, c), s = tc1_last_while tc hs.ehs_s in
+  check_single_stmt tc s;
+  let m = EcMemory.memory hs.ehs_m in
+  let e = form_of_expr m e in
+  if not (EcReduction.is_conv hyps hs.ehs_po (f_interp_ehoare_form (f_not e) hs.ehs_pr)) then
+    tc_error !!tc "ehoare while rule: wrong post-condition";
+  (* the body preserves the invariant *)
+  let b_pre  = f_interp_ehoare_form e hs.ehs_pr in
+  let b_concl = f_eHoareS hs.ehs_m b_pre c hs.ehs_pr in
+  FApi.xmutate1 tc `While [b_concl]
 
-  (* The [k]-th iteration preserves the invariant, and costs [lam_cost k]. *)
-  let k_id = EcIdent.create "z" in
-  let k = f_local k_id tint in
-  let qinc_eq_k = f_eq qdec k in
-  let k_lt_qinc = f_int_lt qdec k in
-  let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
-  let c_post = f_and_simpl inv k_lt_qinc in
-  let c_cost = EcCHoare.cost_app lam_cost [k] in
-  let c_concl = f_cHoareS_r { chs with chs_pr = c_pre;
-                                       chs_s  = c;
-                                       chs_po = c_post;
-                                       chs_co  = c_cost; } in
-  let c_concl = f_forall_simpl [(k_id,GTty tint)] c_concl in
-
-  (* When the decreasing quantity is less than zero, the loop exists *)
-  let n_term = f_imp_simpl (f_and_simpl inv (f_int_le qdec f_i0)) (f_not e) in
-  let n_term = f_forall_mems [chs.chs_m] n_term in
-
-  (* We compute the final cost. Since we have at most [n] iterations, we have:
-     - at most [n+1] evaluations of the loop condition [e].
-     - at most [n] evaluations of the loop body. *)
-  let e_cost_self =
-    f_xmuli
-      (f_int_add_simpl n f_i1)
-      (EcCHoare.cost_of_expr inv chs.chs_m expr_e) in
-
-  let body_cost = EcCHoare.choare_sum lam_cost (f_i0, n) in
-  let cond, cost =
-    EcCHoare.cost_sub env
-      chs.chs_co
-      (EcCHoare.cost_add_self body_cost e_cost_self) in
-
-  (* The wp of the while. *)
-  let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
-  let modi = s_write env c in
-  let post = generalize_mod env m modi post in
-  let inv_bd_loop = f_and_simpl inv (f_int_le qdec n) in
-  let post = f_and_simpl inv_bd_loop post in
-  let concl = f_cHoareS_r { chs with chs_s  = s;
-                                     chs_po = post;
-                                     chs_co  = cost; } in
-
-  FApi.xmutate1 tc `While [c_concl; n_term; cond; concl]
-
+let t_ehoare_while inv tc =
+  let hs = tc1_as_ehoareS tc in
+  let (e,_), _ = tc1_last_while tc hs.ehs_s in
+  let m = EcMemory.memory hs.ehs_m in
+  let e = form_of_expr m e in
+  let tc =
+    FApi.t_rotate `Left 1 (EcPhlApp.t_ehoare_app (0, `ByPos (List.length hs.ehs_s.s_node - 1)) inv tc) in
+  FApi.t_sub
+    [(EcPhlConseq.t_ehoareS_conseq inv (f_interp_ehoare_form (f_not e) inv)) @+
+       [t_trivial;
+        t_id;
+        t_ehoare_while_core ];
+     t_id] tc
 
 (* -------------------------------------------------------------------- *)
 (* rule >=, <=, =, with a stricly decreasing variant *)
@@ -234,8 +212,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
       "The variant decreasing rate lower-bound cannot "
       "depend on variables written by the loop body";
 
-  if not (List.is_empty rem_s.s_node) then
-    tc_error !!tc  "only single loop statements are accepted";
+  check_single_stmt tc rem_s;
 
   let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in
   let bound    = bhs.bhs_bd in
@@ -392,7 +369,6 @@ let t_equiv_while_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while           = FApi.t_low1 "hoare-while"   t_hoare_while_r
-let t_choare_while          = FApi.t_low4 "choare-while"  t_choare_while_r
 let t_bdhoare_while         = FApi.t_low2 "bdhoare-while" t_bdhoare_while_r
 let t_bdhoare_while_rev_geq = FApi.t_low4 "bdhoare-while" t_bdhoare_while_rev_geq_r
 let t_bdhoare_while_rev     = FApi.t_low1 "bdhoare-while" t_bdhoare_while_rev_r
@@ -408,47 +384,38 @@ let process_while side winfos tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS _ -> begin
       match vrnt with
-      | None -> t_hoare_while (TTC.tc1_process_Xhl_formula tc phi) tc
+      | None ->
+        t_hoare_while
+          (snd (TTC.tc1_process_Xhl_formula tc phi))
+          tc
       | _    -> tc_error !!tc "invalid arguments"
     end
 
-  | FcHoareS _ -> begin
-      match vrnt, bds with
-      | Some vrnt, Some (`Cost (n, cost)) ->
-        t_choare_while
-          (TTC.tc1_process_Xhl_formula tc         phi)
-          (TTC.tc1_process_Xhl_form    tc tint    vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint    n)
-          (TTC.tc1_process_cost        tc [tint]  cost)
-          tc
-
-      | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\
-                               I (invariant),@ \
-                               c (increasing quantity),@ \
-                               n (loop bound),@ \
-                               cost (iteration cost)@]"
-    end
+  | FeHoareS _ ->
+      let _, inv = TTC.tc1_process_Xhl_formula_xreal tc phi in
+      t_ehoare_while inv tc
 
   | FbdHoareS _ -> begin
       match vrnt, bds with
       | Some vrnt, None ->
-          t_bdhoare_while
-            (TTC.tc1_process_Xhl_formula tc phi)
-            (TTC.tc1_process_Xhl_form tc tint vrnt)
-            tc
+          let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+          let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
+
+          t_bdhoare_while phi vrnt tc
 
       | Some vrnt, Some (`Bd (k, eps)) ->
-        t_bdhoare_while_rev_geq
-          (TTC.tc1_process_Xhl_formula tc phi)
-          (TTC.tc1_process_Xhl_form    tc tint vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint k)
-          (TTC.tc1_process_Xhl_form    tc treal eps)
-          tc
+        let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+        let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
+        let _, k = TTC.tc1_process_Xhl_form tc tint k in
+        let _, eps = TTC.tc1_process_Xhl_form tc treal eps in
+
+        t_bdhoare_while_rev_geq phi vrnt k eps tc
 
       | None, None ->
-          t_bdhoare_while_rev (TTC.tc1_process_Xhl_formula tc phi) tc
+          let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+          t_bdhoare_while_rev phi tc
 
-      | Some _, Some (`Cost _) | None, Some _ ->
+      | None, Some _ ->
         tc_error !!tc "invalid arguments"
   end
 
@@ -515,10 +482,9 @@ module ASyncWhile = struct
 
            in e_local idx fp.f_ty
 
-      | Fcoe      _
       | Fglob     _
       | FhoareF   _ | FhoareS   _
-      | FcHoareF  _ | FcHoareS  _
+      | FeHoareF _  | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF   _ | FequivS   _
       | FeagerF   _ | Fpr       _ -> raise CannotTranslate

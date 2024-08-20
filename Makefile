@@ -6,12 +6,14 @@ ECARGS    ?=
 ECTOUT    ?= 10
 ECJOBS    ?= 0
 ECEXTRA   ?= --report=report.log
-ECPROVERS ?= Alt-Ergo Z3 CVC4
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
-CHECK     += --bin-args="$(ECARGS)" --bin-args="$(ECPROVERS:%=-p %)"
-CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
+CHECK     += --bin=./ec.native
+CHECK     += --jobs="$(ECJOBS)"
+CHECK     += --bin-args=-timeout --bin-args="$(ECTOUT)"
+CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
+NIX       ?= nix --extra-experimental-features "nix-command flakes"
 
 # --------------------------------------------------------------------
 UNAME_P = $(shell uname -p)
@@ -19,6 +21,7 @@ UNAME_S = $(shell uname -s)
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
+.PHONY: nix-build nix-build-with-provers nix-develop
 .PHONY: clean install uninstall
 
 default: build
@@ -26,7 +29,7 @@ default: build
 
 build:
 	rm -f src/ec.exe ec.native
-	dune build -p easycrypt
+	dune build
 	ln -sf src/ec.exe ec.native
 ifeq ($(UNAME_P)-$(UNAME_S),arm-Darwin)
 	-codesign -f -s - src/ec.exe
@@ -38,7 +41,8 @@ install: build
 uninstall:
 	$(DUNE) uninstall
 
-check: stdlib examples
+unit: build
+	$(CHECK) unit
 
 stdlib: build
 	$(CHECK) prelude stdlib
@@ -46,8 +50,17 @@ stdlib: build
 examples: build
 	$(CHECK) examples mee-cbc
 
-check: stdlib examples
+check: unit stdlib examples
 	@true
+
+nix-build:
+	$(NIX) build
+
+nix-build-with-provers:
+	$(NIX) build .#with_provers
+
+nix-develop:
+	$(NIX) develop
 
 clean:
 	rm -f ec.native && $(DUNE) clean

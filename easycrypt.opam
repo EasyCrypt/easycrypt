@@ -9,10 +9,26 @@ depends: [
   "dune-site"
   "ocaml-inifiles" {>= "1.2"}
   "pcre" {>= "7"}
-  "why3" {>= "1.6.0" & < "1.7"}
+  "why3" {>= "1.7.0" & < "1.8"}
   "yojson"
   "zarith" {>= "1.10"}
   "odoc" {with-doc}
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "--promote-install-files=false"
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
+  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 opam-version: "2.0"
 
@@ -36,8 +52,3 @@ can install AltErgo (package: alt-ergo).
 
 The required steps for configuring the provers are listed on:
   https://github.com/EasyCrypt/easycrypt#configuring-why3"""
-
-build: [
-  ["dune" "subst"]
-  ["dune" "build" "-p" name "-j" jobs "@install"]
-]

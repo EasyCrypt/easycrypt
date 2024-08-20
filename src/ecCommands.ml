@@ -189,6 +189,9 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type loader = Loader.loader
+
+(* -------------------------------------------------------------------- *)
 let process_search scope qs =
   EcScope.Search.search scope qs
 
@@ -263,7 +266,6 @@ let process_pr fmt scope p =
   | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
   | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
-  | Pr_sc   qs -> EcPrinting.ObjectInfo.pr_sc   fmt env   (unloc qs)
   | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
   | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
   | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
@@ -289,6 +291,80 @@ let check_opname_validity (scope : EcScope.scope) (x : string) =
 (* -------------------------------------------------------------------- *)
 let process_print scope p =
   process_pr Format.std_formatter scope p
+
+(* -------------------------------------------------------------------- *)
+let process_print_ax (scope : EcScope.scope) =
+  let env = EcScope.env scope in
+  let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
+
+  let module Trie : sig
+    type ('a, 'b) t
+
+    val empty : ('a, 'b) t
+    val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
+    val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
+  end = struct
+    module Map = BatMap
+
+    type ('a, 'b) t =
+      { children : ('a, ('a, 'b) t) Map.t
+      ; value    : 'b list }
+
+    let empty : ('a, 'b) t =
+      { value = []; children = Map.empty; }
+
+    let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
+      let rec doit (path : 'a list) (t : ('a, 'b) t) =
+        match path with
+        | [] ->
+          { t with value = value :: t.value }
+        | v :: path ->
+          let children =
+            t.children |> Map.update_stdlib v (fun children ->
+              let subtrie = Option.value ~default:empty children in
+              Some (doit path subtrie)
+            )
+          in { t with children }
+      in doit path t
+
+    let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
+      let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
+        if not (List.is_empty t.value) then
+          f prefix t.value;
+        Map.iter (fun k v -> doit (k :: prefix) v) t.children
+      in
+      
+      doit [] t
+  end in
+
+  let ax =
+    List.fold_left (fun axs ((p, _) as ax) ->
+      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) ax axs
+    ) Trie.empty ax in
+
+  let ppe0 = EcPrinting.PPEnv.ofenv env in
+  let buffer = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buffer in
+
+  Trie.iter (fun prefix axs ->
+    let thpath =
+      match prefix with
+      | [] -> assert false
+      | name :: prefix -> (List.rev prefix, name) in
+
+    let thpath = EcPath.fromqsymbol thpath in
+
+    let ppe = EcPrinting.PPEnv.enter_theory ppe0 thpath in
+
+    Format.fprintf fmt
+      "@.========== %a ==========@.@." (EcPrinting.pp_thname ppe0) thpath;
+
+    List.iter (fun ax ->
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) ax
+    ) axs
+  ) ax;
+
+  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
 
 (* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset | `Restart]
@@ -374,14 +450,12 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom ?(src : string option) (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  (* TODO: A: aybe rename, as this now also adds schemata. *)
   let (name, scope) = EcScope.Ax.add ?src scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
          | PAxiom _ -> EcScope.notify scope `Info "added axiom: `%s'" x
-         | PLemma _ -> EcScope.notify scope `Info "added lemma: `%s'" x
-         | PSchema  -> EcScope.notify scope `Info "added schema: `%s'" x);
+         | PLemma _ -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -444,7 +518,10 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
-          let commands = List.fold_left (process_internal subld) iscope commands in
+          let commands =
+            List.fold_left 
+              (fun scope g -> process_internal subld scope g.gl_action)
+              iscope commands in
           commands)
         (fun () -> Pragma.set i_pragma)
       in
@@ -498,8 +575,8 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics ?(src : string option) (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t  -> snd (EcScope.Tactics.process ?src scope mode t)
-  | `Proof  pm -> EcScope.Tactics.proof ?src scope mode pm.pm_strict
+  | `Actual t -> snd (EcScope.Tactics.process ?src scope mode t)
+  | `Proof    -> EcScope.Tactics.proof ?src scope
 
 (* -------------------------------------------------------------------- *)
 (* Add and store src for proofs *)
@@ -529,17 +606,10 @@ and process_proverinfo scope pi =
 
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
-  let pragma_check mode =
-    match EcScope.goal scope with
-    | Some { EcScope.puc_mode = Some false } ->
-        EcScope.hierror "pragma [Proofs:*] in non-strict proof script";
-    | _ -> pragma_check mode
-  in
-
   match unloc opt with
-  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
-  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
-  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
+  | x when x = Pragmas.Proofs.weak    -> pragma_check `WeakCheck
+  | x when x = Pragmas.Proofs.check   -> pragma_check `Check
+  | x when x = Pragmas.Proofs.report  -> pragma_check `Report
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
@@ -665,6 +735,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gpaxiom           -> `Fct   (fun scope -> process_print_ax   scope; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    ?src scope  t)
@@ -685,9 +756,14 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_internal ld scope g =
-  try  odfl scope (process ld scope g.gl_action)
-  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc g.gl_action) e)
+and process_internal
+  (ld     : Loader.loader)
+  (scope  : EcScope.scope)
+  (action : global_action located)
+  : EcScope.scope
+=
+  try  odfl scope (process ld scope action)
+  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc action) e)
 
 (* -------------------------------------------------------------------- *)
 let loader = Loader.create ()

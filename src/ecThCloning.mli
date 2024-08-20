@@ -17,13 +17,13 @@ type ovkind =
 | OVK_Abbrev
 | OVK_Theory
 | OVK_Lemma
-| OVK_ModExpr
 | OVK_ModType
 
 type clone_error =
 | CE_UnkTheory         of qsymbol
 | CE_DupOverride       of ovkind * qsymbol
 | CE_UnkOverride       of ovkind * qsymbol
+| CE_ThyOverride       of qsymbol
 | CE_UnkAbbrev         of qsymbol
 | CE_TypeArgMism       of ovkind * qsymbol
 | CE_OpIncompatible    of qsymbol * incompatible

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
+open EcAst
 open EcTypes
 open EcEnv
 open EcFol
@@ -41,13 +42,13 @@ end = struct
 
   let subst_id       = Fsubst.f_subst_id
   let subst          = Fsubst.f_subst ?tx:None
-  let subst_ty       = Fsubst.subst_ty
-  let subst_xpath    = Fsubst.subst_xpath
-  let subst_m        = Fsubst.subst_m
-  let subst_me       = Fsubst.subst_me
-  let subst_lpattern = Fsubst.subst_lpattern
-  let subst_stmt     = Fsubst.subst_stmt
-  let subst_e        = Fsubst.subst_e
+  let subst_ty       = ty_subst
+  let subst_xpath    = Fsubst.x_subst
+  let subst_m        = Fsubst.m_subst
+  let subst_me       = Fsubst.me_subst
+  let subst_lpattern = Fsubst.lp_subst
+  let subst_stmt     = Fsubst.s_subst
+  let subst_e        = Fsubst.e_subst
   let bind_local     = Fsubst.f_bind_local
   let add_binding    = Fsubst.add_binding
   let add_bindings   = Fsubst.add_bindings
@@ -55,8 +56,8 @@ end = struct
   let bind_locals (s : subst) xs =
     List.fold_left (fun s (x, e) -> bind_local s x e) s xs
 
-  let has_mem (s : subst) (x : ident) =
-    Mid.mem x s.fs_mem
+  let has_mem = Fsubst.has_mem
+
 end
 
 type subst = Subst.subst
@@ -174,19 +175,6 @@ let rec norm st s f =
  let f = cbv st s f (Args.empty (Subst.subst_ty s f.f_ty)) in
  norm_lambda st f
 
-and norm_cost st s c =
-  let self'  = norm st s c.c_self
-  and calls' =
-    EcPath.Mx.fold (fun f cb calls ->
-        (* We do not normalize the xpath, as it is not a valid xpath. *)
-        let f' = Subst.subst_xpath s f
-        and cb' = call_bound_r (norm st s cb.cb_cost)
-                               (norm st s cb.cb_called) in
-        EcPath.Mx.change (fun old -> assert (old = None); Some cb') f' calls
-      ) c.c_calls EcPath.Mx.empty in
-  cost_r self' calls'
-
-
 and norm_lambda (st : state) (f : form) =
   match f.f_node with
   | Fquant (Llambda, b, f) ->
@@ -203,11 +191,12 @@ and norm_lambda (st : state) (f : form) =
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
+
   | FhoareF _   | FhoareS _
-  | FcHoareF _  | FcHoareS _
   | FbdHoareF _ | FbdHoareS _
+  | FeHoareF _ | FeHoareS _
   | FequivF _   | FequivS _
-  | FeagerF   _ | Fpr _ | Fcoe _
+  | FeagerF   _ | Fpr _
 
     -> f
 
@@ -306,8 +295,7 @@ and app_red st f1 args =
 
       let body = EcFol.form_of_expr EcFol.mhr body in
       let body =
-        EcFol.Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+        Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
 
       cbv st subst body (Args.create ty eargs)
     with E.NoCtor ->
@@ -321,17 +309,18 @@ and app_red st f1 args =
     f_app f1 args.stack args.resty
 
 and reduce_user_delta st f1 p tys args =
-  let f2 =
-    f_app f1 args.stack args.resty in
+  let f2 = f_app f1 args.stack args.resty in
 
   match reduce_user_with_exn st f2 with
   | f -> f
   | exception NotReducible ->
     let mode = st.st_ri.delta_p p in
-    if mode <> `No && Op.reducible ~force:(mode = `Force) st.st_env p then
-      let f = Op.reduce ~force:(mode = `Force) st.st_env p tys in
+    let nargs = List.length args.stack in
+    match mode with
+    | #Op.redmode as mode when Op.reducible ~mode ~nargs st.st_env p ->
+      let f = Op.reduce ~mode ~nargs st.st_env p tys in
       cbv st Subst.subst_id f args
-    else f2
+    | _ -> f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
@@ -379,8 +368,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let rfn = f_app fn (List.take (List.length fnargs - 1) fnargs) f.f_ty in
     cbv st s rfn args
 
-  | Fquant (Llambda, b, f1) ->
-    betared st s b f1 args
+  | Fquant (Llambda, b, f1) when not (Args.isempty args) ->
+    cbv_init st Subst.subst_id (betared st s b f1 args)
+
+  | Fquant (Llambda, _, _) ->
+    assert (Args.isempty args);
+    Subst.subst s f
 
   | Fif (f, f1, f2) ->
     if st.st_ri.iota then
@@ -439,14 +432,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Flocal _ -> app_red st (Subst.subst s f) args
 
-  (* μ-reduction *)
-  | Fglob _ ->
-    let mp, m = destr_glob (Subst.subst s f) in
-    let f =
-      if   st.st_ri.modpath
-      then EcEnv.NormMp.norm_glob st.st_env m mp
-      else f_glob mp m in
-    app_red st f args
+  | Fglob _ -> app_red st (Subst.subst s f) args
 
   (* μ-reduction *)
   | Fpvar _ ->
@@ -492,24 +478,22 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_m  = norm_me s hs.hs_m in
     f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
 
-  | FcHoareF chf ->
+  | FeHoareF hf ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s mhr));
-    let chf_pr = norm st s chf.chf_pr in
-    let chf_po = norm st s chf.chf_po in
-    let chf_f  = norm_xfun st s chf.chf_f in
-    let chf_c  = norm_cost st s chf.chf_co in
-    f_cHoareF_r { chf_pr; chf_f; chf_po; chf_co = chf_c; }
+    let ehf_pr  = norm st s hf.ehf_pr  in
+    let ehf_po  = norm st s hf.ehf_po  in
+    let ehf_f   = norm_xfun st s hf.ehf_f in
+    f_eHoareF_r { ehf_pr; ehf_f; ehf_po; }
 
-  | FcHoareS chs ->
+  | FeHoareS hs ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s (fst chs.chs_m)));
-    let chs_pr = norm st s chs.chs_pr in
-    let chs_po = norm st s chs.chs_po in
-    let chs_s  = norm_stmt s chs.chs_s in
-    let chs_m  = norm_me s chs.chs_m in
-    let chs_c  = norm_cost st s chs.chs_co in
-    f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_co = chs_c; }
+    assert (not (Subst.has_mem s (fst hs.ehs_m)));
+    let ehs_pr  = norm st s hs.ehs_pr in
+    let ehs_po  = norm st s hs.ehs_po in
+    let ehs_s   = norm_stmt s hs.ehs_s in
+    let ehs_m   = norm_me s hs.ehs_m in
+    f_eHoareS_r { ehs_pr; ehs_po; ehs_s; ehs_m }
 
   | FbdHoareF hf ->
     assert (Args.isempty args);
@@ -563,21 +547,6 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let eg_sl = norm_stmt s eg.eg_sl in
     let eg_sr = norm_stmt s eg.eg_sr in
     f_eagerF_r {eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po }
-
-  | Fcoe coe ->
-    assert (Args.isempty args);
-    assert (not (Subst.has_mem s (fst coe.coe_mem)));
-    let coe_pre = norm st s coe.coe_pre in
-    let coe_e   = norm_e s coe.coe_e in
-    let coe_mem = norm_me s coe.coe_mem in
-
-    let coe = { coe_pre; coe_e; coe_mem } in
-
-    begin
-      match reduce_cost st.st_ri st.st_env coe with
-      | coe -> cbv_init st Subst.subst_id coe
-      | exception NotReducible -> reduce_user st (f_coe_r coe)
-    end
 
   | Fpr pr ->
     assert (Args.isempty args);

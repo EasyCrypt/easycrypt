@@ -27,31 +27,34 @@ val eq_handle : handle -> handle -> bool
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt proof-term:                                                *)
 (*                                                                      *)
-(*  pt ::= pt-head pt-arg*                                              *)
+(*  pt ::= pt-head pt-arg* | pt-quant                                   *)
 (*                                                                      *)
 (*  pt-head ::=                                                         *)
 (*   |  form<ft>                   (cut <ft> - generate subgoal)        *)
 (*   |  handle                     (formula associated to <handle>)     *)
 (*   |  local<id>                  (local hypothesis <id>)              *)
 (*   |  global<p,tyargs>           (global lemma <p<:tyargs>>)          *)
-(*   |  schema<p,tyargs,eargs>     (global schema <p<:tyargs>> eargs)   *)
+(*   |  proof-term                 (a proof term)                       *)
 (*                                                                      *)
 (* pt-arg ::=                                                           *)
 (*   | formula                     (∀-elimination)                      *)
 (*   | memory                      (∀[mem]-elimination)                 *)
 (*   | module-path                 (∀[mod]-elimination)                 *)
 (*   | pt                          (⇒-elimination)                      *)
+(*                                                                      *)
+(* pt-quant ::= binding * pt       (∀-introduction)                     *)
 (* -------------------------------------------------------------------- *)
 
-type proofterm = { pt_head : pt_head; pt_args : pt_arg list; }
+type proofterm =
+  | PTApply of { pt_head : pt_head; pt_args : pt_arg list; }
+  | PTQuant of binding * proofterm
 
 and pt_head =
 | PTCut    of EcFol.form
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
-| PTSchema of
-    EcPath.path * (ty list) * EcMemory.memtype * mem_pr list * (expr list)
+| PTTerm   of proofterm
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -71,12 +74,27 @@ val is_pamemory  : pt_arg -> bool
 val is_pamodule  : pt_arg -> bool
 val is_pasub     : pt_arg -> bool
 
+(* -------------------------------------------------------------------- *)
 val paformula : EcFol.form -> pt_arg
 val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
-val paglobal  : EcPath.path -> ty list -> pt_arg
-val palocal   : EcIdent.t -> pt_arg
-val pahandle  : handle -> pt_arg
+
+(* -------------------------------------------------------------------- *)
+val paglobal  : ?args:pt_arg list -> tys:ty list -> EcPath.path -> pt_arg
+val palocal   : ?args:pt_arg list -> EcIdent.t -> pt_arg
+val pahandle  : ?args:pt_arg list -> handle -> pt_arg
+
+(* -------------------------------------------------------------------- *)
+val ptglobal  : ?args:pt_arg list -> tys:ty list -> EcPath.path -> proofterm
+val ptlocal   : ?args:pt_arg list -> EcIdent.t -> proofterm
+val pthandle  : ?args:pt_arg list -> handle -> proofterm
+val ptcut     : ?args:pt_arg list -> EcFol.form -> proofterm
+
+(* -------------------------------------------------------------------- *)
+val ptapply : proofterm -> pt_arg list -> proofterm
+
+(* -------------------------------------------------------------------- *)
+val get_pt_top_args : proofterm -> pt_arg list
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
@@ -206,7 +224,7 @@ val tacuerror_exn :
   ?catchable:bool -> exn -> 'a
 
 (* -------------------------------------------------------------------- *)
-type symkind = [`Lemma | `Operator | `Local | `Schema]
+type symkind = [`Lemma | `Operator | `Local]
 
 val tc_lookup_error :
   proofenv -> ?loc:EcLocation.t -> ?who:string -> symkind -> qsymbol -> 'a
@@ -360,6 +378,8 @@ end
 val (!!) : tcenv1 -> proofenv
 val (!$) : tcenv  -> proofenv
 val (!@) : tcenv1 -> tcenv
+
+val (let+) : tcenv -> (tcenv1 -> 'a) -> 'a
 
 (* -------------------------------------------------------------------- *)
 (* Imperative API                                                       *)

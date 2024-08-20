@@ -43,15 +43,16 @@ let eq_handle (hd1 : handle) (hd2 : handle) =
   hd1 = hd2
 
 (* -------------------------------------------------------------------- *)
-type proofterm = { pt_head : pt_head; pt_args : pt_arg list; }
+type proofterm =
+  | PTApply of { pt_head : pt_head; pt_args : pt_arg list; }
+  | PTQuant of binding * proofterm
 
 and pt_head =
 | PTCut    of EcFol.form
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
-| PTSchema of
-    EcPath.path * (ty list) * EcMemory.memtype * mem_pr list * (expr list)
+| PTTerm   of proofterm
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -64,6 +65,7 @@ let is_ptcut    = function PTCut    _ -> true | _ -> false
 let is_pthandle = function PTHandle _ -> true | _ -> false
 let is_ptlocal  = function PTLocal  _ -> true | _ -> false
 let is_ptglobal = function PTGlobal _ -> true | _ -> false
+let is_ptterm   = function PTTerm   _ -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
 let is_paformula = function PAFormula _ -> true | _ -> false
@@ -76,14 +78,43 @@ let paformula = fun x -> PAFormula x
 let pamemory  = fun x -> PAMemory  x
 let pamodule  = fun x -> PAModule  x
 
-let paglobal p tys =
-  PASub (Some { pt_head = PTGlobal (p, tys); pt_args = []; })
+(* -------------------------------------------------------------------- *)
+let ptglobal ?(args = []) ~tys p =
+  PTApply { pt_head = PTGlobal (p, tys); pt_args = args; }
 
-let palocal x =
-  PASub (Some { pt_head = PTLocal x; pt_args = []; })
+let ptlocal ?(args = []) x =
+  PTApply { pt_head = PTLocal x; pt_args = args; }
 
-let pahandle x =
-  PASub (Some { pt_head = PTHandle x; pt_args = []; })
+let pthandle ?(args = []) x =
+  PTApply { pt_head = PTHandle x; pt_args = args; }
+
+let ptcut ?(args = []) f =
+  PTApply { pt_head = PTCut f; pt_args = args; }
+
+(* -------------------------------------------------------------------- *)
+let paglobal ?args ~tys p =
+  PASub (Some (ptglobal ?args ~tys p))
+
+let palocal ?args x =
+  PASub (Some (ptlocal ?args x))
+
+let pahandle ?args x =
+  PASub (Some (pthandle ?args x))
+
+(* -------------------------------------------------------------------- *)
+let ptapply pt args =
+  match pt with
+  | PTApply pt ->
+    PTApply { pt with pt_args = pt.pt_args @ args }
+
+  | PTQuant _ ->
+    PTApply { pt_head = PTTerm pt; pt_args = args }
+
+(* -------------------------------------------------------------------- *)
+let get_pt_top_args pt =
+  match pt with
+  | PTApply pt -> pt.pt_args
+  | PTQuant _  -> []
 
 (* -------------------------------------------------------------------- *)
 type rwproofterm = {
@@ -232,13 +263,12 @@ let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
   raise (TcError (mk_tcerror ~catchable ~penv ?loc (lazy (getmsg ()))))
 
 (* -------------------------------------------------------------------- *)
-type symkind = [`Lemma | `Operator | `Local | `Schema]
+type symkind = [`Lemma | `Operator | `Local]
 
 let tc_lookup_error pe ?loc ?who kind qs =
   let string_of_kind kind =
     match kind with
     | `Lemma    -> "lemma"
-    | `Schema   -> "schema"
     | `Operator -> "operator"
     | `Local    -> "local variable"
   in
@@ -855,6 +885,10 @@ end
 let (!!) = FApi.tc1_penv
 let (!$) = FApi.tc_penv
 let (!@) = FApi.tcenv_of_tcenv1
+
+(* -------------------------------------------------------------------- *)
+let (let+) (type a) (x : tcenv) (f : tcenv1 -> a) : a =
+  f (FApi.as_tcenv1 x)
 
 (* -------------------------------------------------------------------- *)
 module RApi = struct

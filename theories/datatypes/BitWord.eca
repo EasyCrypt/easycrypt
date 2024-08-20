@@ -133,15 +133,3 @@ proof. by rewrite ofwordKmkseq mkseq_nseq bs2int_nseq_false. qed.
 lemma onew_int:
   bs2int (ofword onew) = 2 ^ n - 1.
 proof. by rewrite ofwordKmkseq mkseq_nseq bs2int_nseq_true 1:ge0_n. qed.
-
-(* -------------------------------------------------------------------- *)
-abstract theory Cost.
-
-  op cxor : {int | 0 <= cxor } as ge0_cxor.
-
-  schema cost_cxor `{P} {w1 w2: word} :
-    cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + N cxor.
-
-  hint simplify cost_cxor.
-
-end Cost.

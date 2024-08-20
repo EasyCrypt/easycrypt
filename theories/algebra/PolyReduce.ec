@@ -231,7 +231,7 @@ qed.
 lemma reducedP p : (reduced p) <=> (deg p <= n).
 proof.
 split; first by move=> @/reduced <-; apply/deg_reduce.
-move=> led; rewrite /reduced {2}polyE /reduce.
+move=> led; rewrite /reduced {2}[p]polyE /reduce.
 rewrite !big_seq &(eq_bigr) => /= i /mem_range rg_i.
 by rewrite pmod_small 1:/# pdiv_small 1:/# expr0 mul1r.
 qed.

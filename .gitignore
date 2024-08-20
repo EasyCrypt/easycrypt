@@ -4,6 +4,7 @@
 *.pyo
 
 /_build
+/result
 /etc
 /theories/attic
 
@@ -19,3 +20,4 @@
 
 .merlin
 *.install
+*.log

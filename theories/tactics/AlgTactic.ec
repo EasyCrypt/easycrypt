@@ -57,79 +57,79 @@ theory Requires.
   op inv   : domain -> domain.
   op div   : domain -> domain -> domain.
 
-  axiom nosmt oner_neq0:
+  axiom oner_neq0:
     rone <> rzero.
 
-  axiom nosmt addr0:
+  axiom addr0:
     forall (x : domain), add x rzero = x.
 
-  axiom nosmt addrA:
+  axiom addrA:
     forall (x y z : domain), add x (add y z) = add (add x y) z.
 
-  axiom nosmt addrC:
+  axiom addrC:
     forall (x y : domain), add x y = add y x.
 
-  axiom nosmt addrN:
+  axiom addrN:
     forall (x : domain), add x (opp x) = rzero.
 
   (* For boolean ring *)
-  axiom nosmt addrK:
+  axiom addrK:
     forall (x : domain), add x x = rzero.
 
-  axiom nosmt oppr_id:
+  axiom oppr_id:
     forall (x : domain), opp x = x.
 
-  axiom nosmt mulr1:
+  axiom mulr1:
     forall (x : domain), mul x rone = x.
 
-  axiom nosmt mulrA:
+  axiom mulrA:
     forall (x y z : domain), mul x (mul y z) = mul (mul x y) z.
 
-  axiom nosmt mulrC:
+  axiom mulrC:
     forall (x y : domain), mul x y = mul y x.
 
-  axiom nosmt mulrDl:
+  axiom mulrDl:
     forall (x y z: domain), mul (add x y) z = add (mul x z) (mul y z).
 
   (* For boolean ring *)
-  axiom nosmt mulrK:
+  axiom mulrK:
     forall (x:domain), mul x x = x.
 
-  axiom nosmt expr0:
+  axiom expr0:
     forall (x : domain), expr x 0 = rone.
 
-  axiom nosmt exprS:
+  axiom exprS:
     forall (x : domain) (n : int), 0 <= n =>
       expr x (n+1) = mul x (expr x n).
 
-  axiom nosmt ofint0: ofint 0 = rzero.
-  axiom nosmt ofint1: ofint 1 = rone. (* This is a consequence of ofint0, ofintS *)
+  axiom ofint0: ofint 0 = rzero.
+  axiom ofint1: ofint 1 = rone. (* This is a consequence of ofint0, ofintS *)
 
-  axiom nosmt ofintS:
+  axiom ofintS:
     forall (n : int), 0 <= n => ofint (n+1) = add rone (ofint n).
 
-  axiom nosmt ofintN:
+  axiom ofintN:
     forall (n : int), ofint (-n) = opp (ofint n).
 
-  axiom nosmt subrE:
+  axiom subrE:
     forall (x y : domain), sub x y = add x (opp y).
 
-  axiom nosmt mulrV:
+  axiom mulrV:
     forall (x : domain), x <> rzero => mul x (inv x) = rone.
 
-  axiom nosmt exprN:
+  axiom exprN:
     forall (x : domain) (n : int), 0 <= n => expr x (-n) = inv (expr x n).
 
-  axiom nosmt divrE:
+  axiom divrE:
     forall (x y : domain), div x y = mul x (inv y).
 
   op Cn : int.
 
-  axiom nosmt Cn_eq0: ofint Cn = rzero.
+  axiom Cn_eq0: ofint Cn = rzero.
 
   op Cp : int.
 
-  axiom nosmt Cp_idp:
+  axiom Cp_idp:
     forall (x : domain), expr x Cp = x.
 
 end Requires.

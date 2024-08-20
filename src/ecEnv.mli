@@ -1,10 +1,12 @@
 (* -------------------------------------------------------------------- *)
 open EcPath
 open EcSymbols
+open EcAst
 open EcTypes
 open EcMemory
 open EcDecl
 open EcCoreFol
+open EcCoreSubst
 open EcModules
 open EcTheory
 
@@ -168,31 +170,6 @@ module Ax : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Schema : sig
-  type t = ax_schema
-
-  val by_path     : path -> env -> t
-  val by_path_opt : path -> env -> t option
-  val lookup      : qsymbol -> env -> path * t
-  val lookup_opt  : qsymbol -> env -> (path * t) option
-  val lookup_path : qsymbol -> env -> path
-
-  val add  : path -> env -> env
-  val bind : ?import:EcTheory.import -> symbol -> ax_schema -> env -> env
-
-  val iter : ?name:qsymbol -> (path -> ax_schema -> unit) -> env -> unit
-
-  val all :
-    ?check:(path -> ax_schema -> bool) -> ?name:qsymbol -> env -> (path * t) list
-
-  val instanciate :
-    path ->
-    EcTypes.ty list -> EcMemory.memtype ->
-    mem_pr list -> EcTypes.expr list ->
-    env -> form
-end
-
-(* -------------------------------------------------------------------- *)
 module Mod : sig
   type t   = top_module_expr
   type lkt = module_expr * locality option
@@ -210,12 +187,12 @@ module Mod : sig
   val bind  : ?import:import -> symbol -> t -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
 
-  val bind_local    : EcIdent.t -> module_type -> env -> env
-  val bind_locals   : (EcIdent.t * module_type) list -> env -> env
-  val declare_local : EcIdent.t -> module_type -> env -> env
+  val bind_local    : EcIdent.t -> mty_mr -> env -> env
+  val bind_locals   : (EcIdent.t * mty_mr) list -> env -> env
+  val bind_param    : EcIdent.t -> module_type -> env -> env
+  val bind_params   : (EcIdent.t * module_type) list -> env -> env
+  val declare_local : EcIdent.t -> mty_mr -> env -> env
   val is_declared   : EcIdent.t -> env -> bool
-
-  val add_restr_to_locals : Sx.t use_restr -> Sm.t use_restr -> env -> env
 
   val import_vars : env -> mpath -> env
 
@@ -240,10 +217,7 @@ module ModTy : sig
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> t -> env -> env
 
-  val mod_type_equiv :
-    (form -> form -> bool) -> env -> module_type -> module_type -> bool
-  val has_mod_type : env -> module_type list -> module_type -> bool
-  val sig_of_mt :  env -> module_type -> module_sig
+  val sig_of_mt : env -> module_type -> module_sig
 end
 
 (* -------------------------------------------------------------------- *)
@@ -264,8 +238,6 @@ module NormMp : sig
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
   val get_restr_use : env -> mpath -> use use_restr
-  val get_restr_me  : env -> module_expr -> mpath -> mod_restr
-  val get_restr     : env -> mpath -> mod_restr
 
   val sig_of_mp     : env -> mpath -> module_sig
 
@@ -275,10 +247,12 @@ module NormMp : sig
 
   val norm_glob     : env -> EcMemory.memory -> mpath -> form
   val norm_tglob    : env -> mpath -> EcTypes.ty
-  val tglob_reducible : env -> mpath -> bool
+
   val is_abstract_fun : xpath -> env -> bool
   val x_equal         : env -> xpath -> xpath -> bool
   val pv_equal        : env -> EcTypes.prog_var -> EcTypes.prog_var -> bool
+
+  val mod_type_equiv : env -> mty_mr -> mty_mr -> bool
 end
 
 (* -------------------------------------------------------------------- *)
@@ -286,17 +260,27 @@ module Theory : sig
   type t    = ctheory
   type mode = [`All | thmode]
 
+  type compiled
+
+  type compiled_theory = private {
+    name     : symbol;
+    ctheory  : t;
+    compiled : compiled;
+  }
+
   val by_path     : ?mode:mode -> path -> env -> t
   val by_path_opt : ?mode:mode -> path -> env -> t option
   val lookup      : ?mode:mode -> qsymbol -> env -> path * t
   val lookup_opt  : ?mode:mode -> qsymbol -> env -> (path * t) option
   val lookup_path : ?mode:mode -> qsymbol -> env -> path
 
+  val env_of_theory : path -> env -> env
+
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> ctheory -> env -> env
+  val bind : ?import:import -> compiled_theory -> env -> env
 
  (* FIXME: section ? ctheory -> theory *)
-  val require : symbol -> ctheory -> env -> env
+  val require : compiled_theory -> env -> env
   val import  : path -> env -> env
   val export  : path -> is_local -> env -> env
 
@@ -307,12 +291,14 @@ module Theory : sig
     -> ?pempty:[`Full | `ClearOnly | `No]
     -> EcTypes.is_local
     -> EcTheory.thmode
-    -> env -> ctheory option
+    -> env -> compiled_theory option
 end
 
 (* -------------------------------------------------------------------- *)
 module Op : sig
   type t = operator
+
+  type redmode = [`Force | `IfTransparent | `IfApplied]
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option
@@ -323,8 +309,8 @@ module Op : sig
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> operator -> env -> env
 
-  val reducible : ?force:bool -> env -> path -> bool
-  val reduce    : ?force:bool -> env -> path -> ty list -> form
+  val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
+  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
@@ -338,7 +324,7 @@ module Op : sig
 
   type notation = ty_params * EcDecl.notation
 
-  val get_notations : env -> (path * notation) list
+  val get_notations : head:path option -> env -> (path * notation) list
 
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
@@ -416,11 +402,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
   type rule   = EcTheory.rule
-  type topsym = [
-    | `Path of path
-    | `Tuple
-    | `Cost of [`Path of path | `Tuple]
-  ]
+  type topsym = [ `Path of path | `Tuple ]
 
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env

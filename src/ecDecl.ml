@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcCoreFol
 
@@ -7,6 +8,7 @@ module Sp   = EcPath.Sp
 module TC   = EcTypeClass
 module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
+module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
 type ty_param  = EcIdent.t * EcPath.Sp.t
@@ -62,8 +64,8 @@ let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =
 
 (* -------------------------------------------------------------------- *)
 let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = EcTypes.Tvar.init (List.map fst params) args in
-  EcTypes.Tvar.subst subst ty
+  let subst = CS.Tvar.init (List.map fst params) args in
+  CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -74,7 +76,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcCoreFol.form * bool  (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -90,7 +92,6 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
-  opf_nosmt    : bool;
 }
 
 and opbranches =
@@ -125,9 +126,12 @@ type operator = {
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
-  op_opaque   : bool;
+  op_opaque   : opopaque;
   op_clinline : bool;
+  op_unfold   : int option;
 }
+
+and opopaque = { smt: bool; reduction: bool; }
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -143,58 +147,6 @@ and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
 let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
-
-(* -------------------------------------------------------------------- *)
-type sc_params = (EcIdent.t * ty) list
-
-type pr_params = EcIdent.t list (* type bool *)
-
-type ax_schema = {
-  axs_tparams : ty_params;
-  axs_pparams : pr_params; (* variables for predicate *)
-  axs_params  : sc_params; (* variables representing expression *)
-  axs_loca    : locality;
-  axs_spec    : EcCoreFol.form;
-}
-
-let sc_instantiate
-    ty_params pr_params sc_params
-    ty_args memtype (pr_args : mem_pr list) sc_args f =
-  let fs = EcTypes.Tvar.init (List.map fst ty_params) ty_args in
-  let sty = { ty_subst_id with ts_v = fs } in
-
-
-  (* We substitute the predicate variables. *)
-  let preds = List.map2 (fun (mem,p) id ->
-      id, (mem,p)) pr_args pr_params in
-  let mpreds = EcIdent.Mid.of_list preds in
-
-  let exprs =
-    List.map2 (fun e (id,_ty) ->
-        id, e
-      ) sc_args sc_params in
-  let mexpr = EcIdent.Mid.of_list exprs in
-
-  (* FIXME: instantiating and substituting in schema is ugly. *)
-  (* We instantiate the variables. *)
-  (* For cost judgement, we also need to substitute the expression variables
-     in the precondition. *)
-  let tx f_old f_new = match f_old.f_node, f_new.f_node with
-    | Fcoe coe_old, Fcoe coe_new
-      when EcMemory.is_schema (snd coe_old.coe_mem) ->
-      let fs =
-        List.fold_left (fun s (id,e) ->
-            let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
-            Fsubst.f_bind_local s id f)
-          (Fsubst.f_subst_init ()) exprs in
-
-      EcCoreFol.f_coe_r { coe_new with
-                          coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
-    | _ -> f_new in
-
-  let fs = Fsubst.f_subst_init ~sty ~esloc:mexpr ~mt:memtype ~mempred:mpreds () in
-
-  Fsubst.f_subst ~tx fs f
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -239,23 +191,27 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op ?(clinline = false) ~opaque tparams ty kind lc = {
+let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
   op_tparams  = tparams;
   op_ty       = ty;
   op_kind     = kind;
   op_loca     = lc;
   op_opaque   = opaque;
   op_clinline = clinline;
+  op_unfold   = unfold;
 }
 
-let mk_pred ?clinline ~opaque tparams dom body lc =
+let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let kind = OB_pred body in
   let ty   =  (EcTypes.toarrow dom EcTypes.tbool) in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
-let mk_op ?clinline ~opaque tparams ty body lc =
+let optransparent : opopaque =
+  { smt = false; reduction = false; }
+
+let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -265,7 +221,7 @@ let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
     ont_ponly = ponly;
   } in
 
-  gen_op ~opaque:false tparams
+  gen_op ~opaque:optransparent tparams
     (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind) lc
 
 let operator_as_ctor (op : operator) =
@@ -298,9 +254,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
   let axbd, axpm =
     let bdpm = List.map fst tparams in
     let axpm = List.map EcIdent.fresh bdpm in
-      (EcCoreFol.Fsubst.subst_tvar
-         (EcTypes.Tvar.init bdpm (List.map EcTypes.tvar axpm))
-         axbd,
+      (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
        List.combine axpm (List.map snd tparams))
   in
 
@@ -314,7 +268,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcCoreFol.f_ty) in
+  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 

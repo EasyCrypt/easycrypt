@@ -84,6 +84,7 @@ abstract theory Ideal.
 type from, to.
 
 op sampleto : from -> to distr.
+axiom sampleto_ll : forall x, Distr.weight (sampleto x) = 1%r.
 
 module type RO = {
   proc init  ()                  : unit
@@ -232,8 +233,6 @@ proof. by proc; auto. qed.
 
 lemma FRO_set_ll : islossless FRO.set.
 proof. by proc; auto. qed.
-
-axiom sampleto_ll : forall x, Distr.weight (sampleto x) = 1%r.
 
 lemma RO_get_ll : islossless RO.get.
 proof. by proc; auto; progress; apply sampleto_ll. qed.

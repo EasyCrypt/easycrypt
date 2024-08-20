@@ -1,35 +1,54 @@
+(* -------------------------------------------------------------------- *)
 let myname = Filename.basename Sys.executable_name
 let mydir  = Filename.dirname  Sys.executable_name
 
-let eclocal =
+(* -------------------------------------------------------------------- *)
+let eclocal : bool =
   let rex = EcRegexp.regexp "^ec\\.(?:native|byte|exe)$" in
   EcRegexp.match_ (`C rex) myname
 
-let sourceroot =
+(* -------------------------------------------------------------------- *)
+let sourceroot : string option =
   if eclocal then
     if   Filename.basename mydir = "src"
     then Some (Filename.dirname mydir)
     else Some mydir
   else None
 
-let resource (name : string list) =
-  match eclocal with
-  | true ->
-      let root =
-        if Filename.basename mydir = "src" then
-          Filename.concat mydir Filename.parent_dir_name
-        else mydir in
+(* -------------------------------------------------------------------- *)
+let local (name : string list) : string =
+  List.fold_left Filename.concat (Option.value ~default:"." sourceroot) name
 
-      List.fold_left
-        Filename.concat root
-        (["_build"; "install"; "default"; "lib"; "easycrypt"] @ name)
-
-  | false ->
-      List.fold_left Filename.concat mydir
-        ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
-
-module Sites = struct
-  let theories = [resource ["theories"]]
-
-  let doc = resource ["doc"]
+(* -------------------------------------------------------------------- *)
+module type Sites = sig
+  val commands : string
+  val theories : string list
+  val doc      : string
 end
+
+(* -------------------------------------------------------------------- *)
+module LocalSites() : Sites = struct
+  let commands = local ["scripts"; "testing"]
+  let theories = [local ["theories"]]
+  let doc = local ["resources"; "styles"]
+end
+
+(* -------------------------------------------------------------------- *)
+module DuneSites() : Sites = struct
+  let commands =
+    Option.value ~default:"."
+      (EcUtils.List.Exceptionless.hd EcDuneSites.Sites.commands)
+
+  let theories =
+    EcDuneSites.Sites.theories
+
+  let doc =
+    Option.value ~default:"."
+      (EcUtils.List.Exceptionless.hd EcDuneSites.Sites.doc)
+end
+
+(* -------------------------------------------------------------------- *)
+let sites : (module Sites) =
+  if   eclocal
+  then (module LocalSites ())
+  else (module DuneSites ())

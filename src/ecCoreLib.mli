@@ -95,13 +95,8 @@ module CI_xint : sig
   val p_xopp      : path
   val p_xadd      : path
   val p_xmul      : path
-  val p_xle       : path
-  val p_xmax      : path
   val p_is_int    : path
   val p_is_inf    : path
-  val p_choaretac : path
-  val p_bigxint   : path
-  val p_big       : path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -127,6 +122,30 @@ module CI_Real : sig
 
   val real_lemma    : string -> path
   val real_order_lemma : string -> path
+
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Xreal : sig
+  val p_Xreal        : path
+
+  val p_realp        : path
+  val p_of_real      : path
+
+  val p_xreal        : path
+  val p_rp           : path
+  val p_inf          : path
+  val p_xadd         : path
+  val p_xmul         : path
+  val p_xle          : path
+  val p_is_real      : path
+  val p_is_inf       : path
+  val p_interp_form  : path
+  val p_Ep           : path
+  val p_concave_incr : path
+
+  val p_xle_cxr_l : path
+  val p_xle_cxr_r : path
 
 end
 

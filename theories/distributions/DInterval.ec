@@ -69,7 +69,8 @@ have uniq_s: uniq s; first apply: uniq_flatten_map.
   by move => x y _ _ /=; apply/addrI.
 - move=> x y /mem_range rg_x /mem_range rg_y /hasP /=.
   case=> j [/mapP[/= k [/mem_range rg_k]] ->>].
-  by case/mapP=> l [/mem_range rg_l] {rg_x} {rg_y} /#.
+  case/mapP=> l [/mem_range rg_l] {rg_x} {rg_y}.
+  smt(IntDiv.euclideU).
 - by apply: range_uniq.
 have mem_s: forall x, (x \in s) <=> (x \in range 0 p).
 - move=> x; rewrite mem_range; split.
@@ -97,14 +98,3 @@ rewrite mulzK 1:gtr_eqF // fromintM gt0_r /=.
 rewrite  RField.invrM ?eq_fromint 1,2:gtr_eqF //.
 by rewrite RField.mulrCA RField.divff // eq_fromint gtr_eqF.
 qed.
-
-(* -------------------------------------------------------------------- *)
-abstract theory Cost.
-  op cdinterval : int -> int.
-  axiom ge0_cdinterval m : 0 <= cdinterval m.
-  
-  schema cost_dinterval {i j : int} (k:int) : 
-    cost [ i <= j <= k - i : dinter i (j - 1)] = 
-    cost [true : i] + cost [true : j] + N (cdinterval k).
-  hint simplify cost_dinterval.
-end Cost.

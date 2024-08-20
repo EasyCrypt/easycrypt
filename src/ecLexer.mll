@@ -58,8 +58,7 @@
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
-    "choare"      , CHOARE     ;        (* KW: prog *)
-    "cost"        , COST       ;        (* KW: prog *)
+    "ehoare"      , EHOARE     ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)
@@ -68,7 +67,6 @@
     "first"       , FIRST      ;        (* KW: tactical *)
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
-    "strict"      , STRICT     ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
 
     (* Lambda tactics *)
@@ -145,6 +143,7 @@
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
+    "byehoare"    , BYEHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
     "byupto"      , BYUPTO     ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
@@ -152,8 +151,10 @@
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
+    "outline"     , OUTLINE    ;        (* KW: tactic *)
     "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
+    "weakmem"     , WEAKMEM    ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
     "fusion"      , FUSION     ;        (* KW: tactic *)
     "unroll"      , UNROLL     ;        (* KW: tactic *)
@@ -162,7 +163,6 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
-    "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
@@ -178,7 +178,6 @@
     "local"       , LOCAL      ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)
-    "nosmt"       , NOSMT      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
@@ -194,7 +193,6 @@
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
-    "instantiate" , INSTANTIATE;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
     "locate"      , LOCATE     ;        (* KW: global *)
@@ -210,6 +208,7 @@
     "remove"      , REMOVE     ;        (* KW: global *)
     "exit"        , EXIT       ;        (* KW: global *)
 
+    "fail"        , FAIL       ;        (* KW: internal *)
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)
@@ -410,7 +409,6 @@ rule main = parse
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
   | "`{"  { [TICKBRACE ] }
-  | "`("  { [TICKPAREN ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }

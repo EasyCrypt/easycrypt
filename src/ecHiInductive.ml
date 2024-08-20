@@ -5,7 +5,9 @@ open EcSymbols
 open EcIdent
 open EcUtils
 open EcTypes
+open EcCoreSubst
 open EcDecl
+
 
 module TT = EcTyping
 module EI = EcInductive
@@ -401,8 +403,7 @@ let trans_matchfix
       let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
-        let lcmap = Mid.add opname opexpr e_subst_id.es_loc in
-        { e_subst_id with es_freshen = false; es_ty = ts; es_loc = lcmap; }
+        bind_elocal ts opname opexpr
       in
 
       let branches =
