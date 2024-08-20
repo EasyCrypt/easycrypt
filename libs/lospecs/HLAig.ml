@@ -2,7 +2,12 @@ type node = Aig.node
 type reg = Aig.reg
 
 type input = string * int
+(* tdeps : int -> int set ; dependency for a single output bit 
+           i |->  {j | output depends on bit j of var i }*)
 type tdeps = (int, int Set.t) Map.t
+(* tdblock (n, d) = merged dependencies as above for n bits 
+  aka, the tdep represents dependencies for n bits rather than 1
+*)
 type tdblock = (int * tdeps)
 
 module Hashtbl = Batteries.Hashtbl
@@ -118,7 +123,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     end
 
 
-  let circ_sat (n : Aig.node)  : bool =
+  let circ_sat (n : Aig.node) : bool =
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 
     let rec bvterm_of_node : Aig.node -> SMT.bvterm =
@@ -466,6 +471,23 @@ let block_deps (d: tdeps array) : tdblock list =
       (n, h)::(decompose l')
   in
   decompose (Array.to_list d)
+
+let blocks_indep ((_,b):tdblock) ((_,d):tdblock) : bool =
+  let keys = Set.intersect (Set.of_enum @@ Map.keys b) (Set.of_enum @@ Map.keys d) in
+  let intersects = Set.map (fun k -> 
+    let b1 = Map.find k b in
+    let d1 = Map.find k d in
+    (Set.cardinal @@ Set.intersect b1 d1) = 0
+  ) keys in
+  Set.fold (&&) intersects true
+
+let block_list_indep (bs: tdblock list) : bool =
+  let rec doit (bs: tdblock list) (acc: tdblock list) : bool =
+   match bs with
+   | [] -> true
+   | b::bs -> List.for_all (blocks_indep b) acc && doit bs (b::acc)
+  in
+  doit bs []
 
 let merge_deps (d1: tdeps) (d2: tdeps) : tdeps = 
     Map.union_stdlib (fun _ a b -> Option.some (Set.union a b)) d1 d2

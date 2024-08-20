@@ -38,7 +38,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
-  let fc = EcCircuits.circuit_of_form env f in
+  let fc = circuit_of_form env f in
   (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
   (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
   (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
@@ -46,40 +46,46 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
   let pcondc = match pcondc.op_kind with
   | OB_oper (Some (OP_Plain (pcondc, _))) -> pcondc
   | _ -> failwith "Invalid operator type" in
-  let pcondc = EcCircuits.circuit_of_form env pcondc in
+  let pcondc = circuit_of_form env pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
   
-  let cache : (symbol, EcCircuits.circuit) Map.t = Map.empty in
+  let pstate : (symbol, circuit) Map.t = Map.empty in
 
   let inps = List.map (EcCircuits.input_of_variable env) invs in
-  let cache = List.fold_left 
-    (fun cache inp -> Map.add (List.hd inp.inps |> fst).id_symb inp cache)
-    cache inps 
+  let inpcs, inps = List.split inps in
+  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) invs in
+  let pstate = List.fold_left 
+    (fun pstate (inp, v) -> Map.add v inp pstate)
+    pstate inpcs 
   in
   
-  let cache = List.fold_left (EcCircuits.process_instr env mem) cache proc.s_node in
-
+  let pstate = List.fold_left (EcCircuits.process_instr env mem) pstate proc.s_node in
+  assert false;
   begin 
-    let circs = List.map (fun v -> Option.get (Map.find_opt v cache)) (List.map (fun v -> v.v_name) outvs) in
+    let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
     (* let () = List.iteri (fun i circ -> *)
     (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
     (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
       (* Format.eprintf "rp_%d_0 circuit blocks: " i; *)
     (* Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps *)
       (* ) circs in *)
-    let circ = circuit_concat circs in
+
+    (* FIXME: fix line below *)
+    (* let circ = circuit_concat circs in *)
 
     (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
     (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
       (* Format.eprintf "Proc circuit blocks: "; *)
     (* let () = Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps in *)
 
-    let circs = circuit_block_split n m circ in
+    (* FIXME: fix line below *)
+    (* let circs = circuit_block_split n m circ in *)
 
     let () = assert (List.for_all (fun c -> circ_equiv (List.hd circs) c (Some pcondc)) (List.tl circs)) in 
     let circ = List.hd circs in
 
-    let () = assert (circ_equiv {circ with circ=C.uextend ~size:(List.length fc.circ) circ.circ} fc (Some pcondc)) in
+    (* FIXME: fix line below *)
+    (* let () = assert (circ_equiv {circ with circ=C.uextend ~size:(List.length fc.circ) circ.circ} fc (Some pcondc)) in *)
     Format.eprintf "Success@."
   end 
 
@@ -87,7 +93,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
 
 (* FIXME UNTESTED *)
 let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
-  let pstate = EcCircuits.pstate_of_memtype env me in
+  let pstate, inps = EcCircuits.pstate_of_memtype env me in
   
   let pre_c = circuit_of_form ~pstate ~cache env pre in
   let pstate = List.fold_left (EcCircuits.process_instr env mem ~cache) pstate proc.s_node in
@@ -120,10 +126,10 @@ let circ_goal (env: env) (cache: _) (f: form) : unit =
 let t_circ (tc: tcenv1) : tcenv =
   let hyps = LDecl.tohyps (FApi.tc1_hyps tc) in
   let vs = List.filter_map (function 
-    | id, EcBaseLogic.LD_var (ty, _) -> 
+    | idn, EcBaseLogic.LD_var (ty, _) -> 
       begin try
-      let sz = width_of_type (FApi.tc1_env tc) ty in
-    Some (id, {circ=C.reg ~name:id.id_tag ~size:sz; inps=[(id, sz)]})
+      let inp = cinput_of_type ~idn (FApi.tc1_env tc) ty in
+    Some (idn, (inp, {(circ_ident inp) with inps=[]}))
       with CircError _ -> None
       end
     | _ -> None
