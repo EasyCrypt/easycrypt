@@ -38,7 +38,7 @@ module PPEnv = struct
 
   let ofenv (env : EcEnv.env) =
     let width =
-      EcGState.asint ~default:0
+      EcGState.asint ~default:80
         (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
 
     { ppe_env    = env;
