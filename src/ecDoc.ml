@@ -8,8 +8,12 @@ let styles_file : string =
   let (module Sites) = EcRelocate.sites in
   Filename.concat Sites.doc "styles.css"
 
-let stdlib_doc_root : string =
+let stdlib_doc_dp (th : string) : string =
   ""
+
+(* -------------------------------------------------------------------- *)
+let from_stdlib (th : string) : bool =
+  false
 
 (* -------------------------------------------------------------------- *)
 let c_filename ?(ext : string option) (nms : string list) =
@@ -34,26 +38,25 @@ let itemkind_str_pl (ik : itemkind) : string =
   | `Module -> "Modules"
   | `Theory -> "Theories"
 
+(* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 let md_pre_format ~kind (s : string) =
   match kind with | _ -> pre [txt s]
 
-let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing elt = 
+let md_href_format (rth : string) (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing elt =
   let il_format = Str.regexp "^>\\([^|]+\\)|\\([^|]+\\)$" in
   if Str.string_match il_format hr.href_target 0 then
     let tkind = Str.matched_group 1 hr.href_target in
     let tname = Str.matched_group 2 hr.href_target in
     let tqs = EcSymbols.qsymbol_of_string tname in
-      Printf.eprintf "QSymbol: %s\t" (EcSymbols.string_of_qsymbol tqs);
     let env =
       match fst tqs with
-      | [] -> env
-      | ["Top"] -> env
+      | [] | ["Top"] -> env
       | _ ->
-        let ttopqs = EcSymbols.qsymbol_of_top tqs in
-        let ttopp = EcEnv.Theory.lookup_path ~mode:`All ttopqs env in 
-        EcEnv.Theory.env_of_theory ttopp env
+        let tsupqs = EcSymbols.qsymbol_of_sup tqs in
+        let tsupp = EcEnv.Theory.lookup_path ~mode:`All tsupqs env in 
+        EcEnv.Theory.env_of_theory tsupp env
     in
     let ikstr, path =
       match tkind with 
@@ -73,10 +76,20 @@ let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing 
       | "Th" | "Theory" -> itemkind_str_pl `Theory, EcEnv.Theory.lookup_path ~mode:(`All) tqs env
       | _ -> failwith "Invalid item/entity kind."
     in
-      Printf.eprintf "Root Path: %s\n" (EcPath.tostring (EcEnv.root env));
-      Printf.eprintf "QSymbol: %s\t Path: %s\n" (EcSymbols.string_of_qsymbol tqs) (EcPath.tostring path); 
-    let nm = "DocGen" in 
-    let il = nm ^ ".html" ^ "#" ^ ikstr ^ tname in
+    let tqs = EcPath.toqsymbol path in
+    let fn =
+      match fst tqs with
+      | [] -> assert false 
+      | ["Top"] -> c_filename ~ext:".html" [rth]
+      | "Top" :: ts ->
+          let reqrt = (List.hd ts) in
+          if from_stdlib reqrt then
+            Filename.concat (stdlib_doc_dp reqrt) (c_filename ~ext:".html" ts) 
+          else
+            (c_filename ~ext:".html" (rth :: ts))
+      | _ -> assert false
+    in
+    let il = fn ^ "#" ^ ikstr ^ snd tqs in
     a ~a:[a_href (uri_of_string il)] [txt hr.href_desc]
   else 
     a ~a:[a_href (uri_of_string hr.href_target)] [txt hr.href_desc]
@@ -84,12 +97,12 @@ let md_href_format (env : EcEnv.env) (hr : Markdown.href) : Html_types.phrasing 
 let md_img_format (_ : Markdown.img_ref) =
   failwith "Image embedding not supported."
 
-let c_markdown (input : string) (env : EcEnv.env) =
+let c_markdown (input : string) (rth : string) (env : EcEnv.env) =
   let input = Markdown.parse_text input in
 
   MarkdownHTML.to_html
     ~render_pre:md_pre_format
-    ~render_link:(md_href_format env)
+    ~render_link:(md_href_format rth env)
     ~render_img:md_img_format
     input
 
@@ -125,19 +138,19 @@ let c_sidebar (th : string) (lents : EcScope.docentity list) =
         ]
   
 (* -------------------------------------------------------------------- *)
-let c_section_intro (gdoc : string list) (env : EcEnv.env) =
+let c_section_intro (rth : string) (gdoc : string list) (env : EcEnv.env) =
   match gdoc with
   | [] -> []
   | _ ->  [
             let ids = "Introduction" in
             section ~a:[a_id ids; a_title ids; a_class ["intro-section"]] [
               div ~a:[a_class ["intro-text-container"]] 
-                  (List.map (fun s -> div ~a:[a_class ["intro-par-container"]] (c_markdown s env)) gdoc)
+                  (List.map (fun s -> div ~a:[a_class ["intro-par-container"]] (c_markdown s rth env)) gdoc)
             ]
           ]
   
 (* -------------------------------------------------------------------- *)
-let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik : EcScope.docentity) (env : EcEnv.env) =
+let c_section_main_itemkind_li ?(supthf : string option) (rth : string) (th : string) (lent_ik : EcScope.docentity) (env : EcEnv.env) =
   match lent_ik with
   | SubDoc ((doc, (_, ik, subth, _)), _) -> 
     begin
@@ -156,11 +169,11 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
           li ~a:[a_id (itemkind_str_pl ik ^ subth); a_class ["item-entry"]] ([
             div ~a:[a_class ["item-name-desc-container"]] [  
               div ~a:[a_class ["item-name"]] [a ~a:[a_href (Xml.uri_of_string hn)] [txt subth]]; 
-              div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc env)
+              div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc rth env)
             ]
           ] @ (if tdoc <> []
                then [details ~a:[a_class ["item-details"]] (summary [])
-                             (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d env)) tdoc)]
+                             (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d rth env)) tdoc)]
                else []))
       | _ -> assert false
     end
@@ -177,23 +190,23 @@ let c_section_main_itemkind_li ?(supthf : string option) (th : string) (lent_ik 
             li ~a:[a_id (itemkind_str_pl ik ^ nm) ; a_class ["item-entry"]] [
               div ~a:[a_class ["item-name-desc-container"]] [
                 div ~a:[a_class ["item-name"]] [txt nm]; 
-                div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc env)
+                div ~a:[a_class ["item-basic-desc"]] (c_markdown hdoc rth env)
               ]; 
               details ~a:[a_class ["item-details"]] (summary [])
-                      (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d env)) tdoc 
+                      (List.map (fun d -> div ~a:[a_class ["item-details-par"]] (c_markdown d rth env)) tdoc 
                        @ [div ~a:[a_class ["source-container"]] 
                               [txt "Source:"; pre ~a:[a_class ["source"]] [txt psrc]]])
             ]
 
 (* -------------------------------------------------------------------- *)
-let c_section_main_itemkind ?(supthf : string option) (th : string) (lents_ik : EcScope.docentity list) (env : EcEnv.env) =
+let c_section_main_itemkind ?(supthf : string option) (rth : string) (th : string) (lents_ik : EcScope.docentity list) (env : EcEnv.env) =
   [
     ul ~a:[a_class ["item-list"]] 
-      (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf th lent_ik env) lents_ik)
+      (List.map (fun lent_ik -> c_section_main_itemkind_li ?supthf rth th lent_ik env) lents_ik)
   ]
 
 (* -------------------------------------------------------------------- *)
-let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.docentity list) (env : EcEnv.env) =
+let c_section_main ?(supthf : string option) (rth : string) (th : string) (lents : EcScope.docentity list) (env : EcEnv.env) =
   let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
   List.concat 
     (List.map (fun ik -> 
@@ -208,13 +221,13 @@ let c_section_main ?(supthf : string option) (th : string) (lents : EcScope.doce
                 let iks = itemkind_str_pl ik in
                 section ~a:[a_id iks; a_title iks; a_class ["item-section"]] [
                   h2 ~a:[a_class ["section-heading"]] [txt iks];
-                  div ~a:[a_class ["item-list-container"]] (c_section_main_itemkind ?supthf th lents_ik env)
+                  div ~a:[a_class ["item-list-container"]] (c_section_main_itemkind ?supthf rth th lents_ik env)
                 ]
               ]
       ) 
     iks)
 
-let c_body ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.body] elt =
+let c_body ?(supths : string option) ?(supthf : string option) (rth : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.body] elt =
   let sidebar = c_sidebar th ldocents in
   let page_heading = 
     div ~a:[a_class ["page-heading-container"]]
@@ -233,13 +246,13 @@ let c_body ?(supths : string option) ?(supthf : string option) (th : string) (ts
                     ]
                   ])
   in
-  let sec_intro = c_section_intro gdoc env in
-  let sec_main = c_section_main ?supthf th ldocents env in
+  let sec_intro = c_section_intro rth gdoc env in
+  let sec_main = c_section_main ?supthf rth th ldocents env in
   body (sidebar :: [main (page_heading :: sec_intro @ sec_main)])
 
 (* -------------------------------------------------------------------- *)
-let c_page ?(supths : string option) ?(supthf : string option) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.html] elt =
-    html (c_head tstr) (c_body ?supths ?supthf th tstr gdoc ldocents env)
+let c_page ?(supths : string option) ?(supthf : string option) (rth : string) (th : string) (tstr : string) (gdoc : string list) (ldocents : EcScope.docentity list) (env : EcEnv.env) : [> Html_types.html] elt =
+    html (c_head tstr) (c_body ?supths ?supthf rth th tstr gdoc ldocents env)
 
 (* -------------------------------------------------------------------- *)
 let emit_page (dp : string) (fn : string) (page : [> Html_types.html ] elt) =
@@ -266,13 +279,13 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
                 | Some supf -> c_filename [supf; th]
              in
              let stf = c_filename [stsupf; sth] in
-              (stf, c_page ~supths:th ~supthf:stsupf sth ststr sgdoc sldocents env)
+              (stf, c_page ~supths:th ~supthf:stsupf th sth ststr sgdoc sldocents env)
               :: c_subpages ~supths:th ~supthf:stsupf sth sldocents 
               @ c_subpages ?supths ?supthf th docents'
   in
   let spgs = c_subpages th ldocents in
   List.iter (fun fnpg -> emit_page dp (fst fnpg) (snd fnpg)) spgs;
-  emit_page dp th (c_page th tstr gdoc ldocents env)
+  emit_page dp th (c_page th th tstr gdoc ldocents env)
 
 (* -------------------------------------------------------------------- *)
 (* input = input name, scope contains all documentation items *)

@@ -97,7 +97,7 @@ let qsymbol_of_string (s : string) : qsymbol =
     | x :: xs -> (List.rev xs, x)
 
 
-let qsymbol_of_top (q : qsymbol) : qsymbol =
+let qsymbol_of_sup (q : qsymbol) : qsymbol =
   match List.rev (fst q) with
   | [] -> assert false
   | [x] -> ([], x)
