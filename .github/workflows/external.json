@@ -40,4 +40,37 @@
   , "scenario"   : "xsalsa"
   , "options"    : ""
   }
+
+  ,
+
+  { "name"       : "xmss-acai"
+  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-acai"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-fsai"
+  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-fsai"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "sphincsplus"
+  , "repository" : "https://github.com/MM45/FV-SPHINCSPLUS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "sphincsplus"
+  , "options"    : ""
+  }
 ]
