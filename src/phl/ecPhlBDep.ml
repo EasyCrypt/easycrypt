@@ -60,32 +60,21 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
   in
   
   let pstate = List.fold_left (EcCircuits.process_instr env mem) pstate proc.s_node in
-  assert false;
+  let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
   begin 
     let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
-    (* let () = List.iteri (fun i circ -> *)
-    (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
-    (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
-      (* Format.eprintf "rp_%d_0 circuit blocks: " i; *)
-    (* Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps *)
-      (* ) circs in *)
-
-    (* FIXME: fix line below *)
-    (* let circ = circuit_concat circs in *)
-
-    (* let namer tag = List.find (fun (id, w) -> id.id_tag = tag) circ.inps |> fst |> name in *)
-    (* let bdeps = HL.deps circ.circ |> HL.block_deps in *)
-      (* Format.eprintf "Proc circuit blocks: "; *)
-    (* let () = Format.eprintf "%a@." (fun fmt b -> HL.pp_bdeps ~namer fmt b) bdeps in *)
-
-    (* FIXME: fix line below *)
-    (* let circs = circuit_block_split n m circ in *)
-
-    let () = assert (List.for_all (fun c -> circ_equiv (List.hd circs) c (Some pcondc)) (List.tl circs)) in 
-    let circ = List.hd circs in
-
-    (* FIXME: fix line below *)
-    (* let () = assert (circ_equiv {circ with circ=C.uextend ~size:(List.length fc.circ) circ.circ} fc (Some pcondc)) in *)
+    let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name;
+      List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps);
+      Format.eprintf "@."; ) circs outvs in
+    assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1);
+    let cinp = (List.hd circs).inps in
+    let c = {(circuit_aggregate circs) with inps=cinp} in
+    let cs = circuit_mapreduce c n m in
+    List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
+    Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
+    let () = assert(List.for_all (fun c -> circ_equiv (List.hd cs) c (Some pcondc)) (List.tl cs)) in
+    Format.eprintf "Lane func: %s@." (circuit_to_string fc);
+    let () = assert(circ_equiv (List.hd cs) fc (Some pcondc)) in
     Format.eprintf "Success@."
   end 
 
@@ -112,6 +101,8 @@ let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (p
             (* Format.eprintf "@." in *)
   (* ()) [post_c]; *)
 
+  Format.eprintf "Inputs: "; List.iter (Format.eprintf "%s ") (List.map cinput_to_string post_c.inps);
+  Format.eprintf "@."; 
   if EcCircuits.circ_check post_c (Some pre_c) then (Format.eprintf "Success") else 
   raise BDepError
   

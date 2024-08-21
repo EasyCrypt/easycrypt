@@ -117,6 +117,10 @@ let size_of_circ = function
   | BWCirc r -> List.length r
   | BWArray a -> Array.fold_left (+) 0 (Array.map List.length a)
 
+let circ_to_string = function 
+  | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
+  | BWArray a -> Format.sprintf "BWArray[%d@%d]" (Array.length a) (a.(0) |> List.length)
+
 (* Represents a circuit function *)
 (* Circuits with free variables that are not inputs = 
    universal quantification over circuits with that shape *)
@@ -124,6 +128,12 @@ type circuit = {
   circ: circ;
   inps: cinput list
 }
+
+let circuit_to_string (c: circuit) =
+  Format.sprintf "%s | %s" 
+    (circ_to_string c.circ)
+    (if List.compare_length_with c.inps 0 = 0 then "" 
+    else List.reduce (fun a b -> a ^ ", " ^ b) (List.map cinput_to_string c.inps)) 
 
 (* Takes a list of inputs and returns the identity function over those inputs *)
 (* Useful for renaming or getting a given input shape for a circuit *)
@@ -387,19 +397,6 @@ let circuit_aggregate_inps (c: circuit) : circuit =
   | _ -> let circs, inp = bus_of_cinputs c.inps in
     {circ=apply c circs; inps=[inp]}
 
-(* TODO: figure out how dependencies should work for arrays *)
-let circuit_dep_split (c: circuit) : circuit list =
-  assert false
-  (* let r = destr_bwcirc c.circ in *)
-  (* let deps = HL.deps r in *)
-  (* let deps = Array.map (Map.enum) deps in *)
-  (* let deps = Array.map (Enum.map (fun (i, s) -> Set.map (fun v -> (i,v)) s)) deps in *)
-  (* let deps = Array.map (Enum.fold (Set.union) Set.empty) deps in *)
-  (* let deps = Array.fold_lefti *)
-    (* (fun acc i v -> *) 
-      
-    (* ) [] deps in *)
-
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
   let temp_symbol = "tdep_ident" in
   let m = Set.cardinal bs in
@@ -417,7 +414,7 @@ let inputs_of_tdep (td: HL.tdeps) :  _ * cinput list =
 (* Partitions into blocks of type n -> m *)
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let c = circuit_flatten c in
-  (* let c = circuit_aggregate_inps c in *)
+  let c = circuit_aggregate_inps c in
   let r = destr_bwcirc c.circ in
   let deps = HL.deps r in
   let deps = HL.split_deps m deps in
