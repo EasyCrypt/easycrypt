@@ -70,11 +70,15 @@ let print_config config =
 
   (* Print list of known provers *)
   begin
-    let string_of_prover prover =
+    let string_of_prover (prover : EcProvers.prover) =
       let fullname =
-        Printf.sprintf "%s@%s"
-          prover.EcProvers.pr_name
-          (EcProvers.Version.to_string prover.EcProvers.pr_version) in
+        Format.asprintf "%s%t@%s"
+          prover.pr_name
+          (fun fmt ->
+            if not (String.is_empty prover.pr_alt) then
+              Format.fprintf fmt "[%s]" prover.pr_alt)
+          (EcProvers.Version.to_string prover.pr_version)
+      in
 
       match prover.EcProvers.pr_evicted with
       | None -> fullname

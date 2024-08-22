@@ -76,7 +76,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcCoreFol.form * bool  (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -92,7 +92,6 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
-  opf_nosmt    : bool;
 }
 
 and opbranches =
@@ -127,10 +126,12 @@ type operator = {
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
-  op_opaque   : bool;
+  op_opaque   : opopaque;
   op_clinline : bool;
   op_unfold   : int option;
 }
+
+and opopaque = { smt: bool; reduction: bool; }
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -205,6 +206,9 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let ty   =  (EcTypes.toarrow dom EcTypes.tbool) in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
+let optransparent : opopaque =
+  { smt = false; reduction = false; }
+
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
@@ -217,7 +221,7 @@ let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
     ont_ponly = ponly;
   } in
 
-  gen_op ~opaque:false tparams
+  gen_op ~opaque:optransparent tparams
     (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind) lc
 
 let operator_as_ctor (op : operator) =

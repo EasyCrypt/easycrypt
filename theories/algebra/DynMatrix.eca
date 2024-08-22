@@ -42,13 +42,13 @@ type prevector = (int -> R) * int.
 op vclamp (pv: prevector): prevector =
   ((fun i => if 0 <= i < pv.`2 then pv.`1 i else zeror), max 0 pv.`2).
 
-lemma nosmt vclamp_idemp pv: vclamp (vclamp pv) = vclamp pv.
+lemma vclamp_idemp pv: vclamp (vclamp pv) = vclamp pv.
 proof. rewrite /vclamp /#. qed.
 
 op eqv (pv1 pv2: prevector) =
   vclamp pv1 = vclamp pv2.
 
-lemma nosmt eqv_vclamp pv: eqv pv (vclamp pv). 
+lemma eqv_vclamp pv: eqv pv (vclamp pv). 
 proof. by rewrite /eqv vclamp_idemp. qed.
 
 clone import Quotient.EquivQuotient as QuotientVec with
@@ -78,9 +78,9 @@ lemma vectorW (P : vector -> bool):
 (* Dimension of the vector *)
 op size v = (tofunv v).`2.
 
-lemma nosmt size_ge0 v: 0 <= size v by smt().
+lemma size_ge0 v: 0 <= size v by smt().
 
-lemma nosmt max0size v: max 0 (size v) = size v by smt().
+lemma max0size v: max 0 (size v) = size v by smt().
 
 hint simplify max0size.
 
@@ -184,7 +184,7 @@ qed.
 (* Additive inverse of vector *)
 op[opaque] [-] (v: vector) = offunv ((fun i => -v.[i]), size v).
 
-lemma nosmt size_oppv v: size (-v) = size v by rewrite /([-]).
+lemma size_oppv v: size (-v) = size v by rewrite /([-]).
 
 lemma getvN (v : vector) i : (-v).[i] = - v.[i].
 proof.
@@ -662,7 +662,7 @@ op mclamp (pm: prematrix): prematrix =
   ((fun i j => if 0 <= i < pm.`2 /\ 0 <= j < pm.`3 then pm.`1 i j else zeror),
    max 0 pm.`2, max 0 pm.`3).
 
-lemma nosmt mclamp_idemp pm: mclamp (mclamp pm) = mclamp pm.
+lemma mclamp_idemp pm: mclamp (mclamp pm) = mclamp pm.
 proof. by rewrite /mclamp /#. qed.
 
 hint simplify mclamp_idemp.
@@ -703,9 +703,9 @@ op cols m = (tofunm m).`3.
 
 abbrev size m = (rows m, cols m).
 
-lemma nosmt rows_ge0 m: 0 <= rows m by smt().
+lemma rows_ge0 m: 0 <= rows m by smt().
 
-lemma nosmt cols_ge0 m: 0 <= cols m by smt().
+lemma cols_ge0 m: 0 <= cols m by smt().
 
 lemma rows_offunm f r c: rows (offunm (f, r, c)) = max 0 r by done. 
 
@@ -715,9 +715,9 @@ lemma size_offunm f r c: size (offunm (f, r, c)) = (max 0 r, max 0 c) by done.
 
 hint simplify rows_offunm, cols_offunm.
 
-lemma nosmt max0rows m: max 0 (rows m) = rows m by smt().
+lemma max0rows m: max 0 (rows m) = rows m by smt().
 
-lemma nosmt max0cols m: max 0 (cols m) = cols m by smt(). 
+lemma max0cols m: max 0 (cols m) = cols m by smt(). 
 
 hint simplify max0rows, max0cols.
 
@@ -732,7 +732,7 @@ lemma get_offunm f r c (i j : int) : mrange (offunm (f, r, c)) i j =>
   (offunm (f, r, c)).[i, j] = f i j.
 proof. rewrite /get /= /mclamp /= /#. qed.
 
-lemma nosmt getm0E (m : matrix) (i j : int) : !mrange m i j => m.[i, j] = zeror.
+lemma getm0E (m : matrix) (i j : int) : !mrange m i j => m.[i, j] = zeror.
 proof. by smt(). qed.
 
 lemma offunm0E f r c (i j: int) : !(0 <= i < r /\ 0 <= j < c) =>
@@ -752,13 +752,13 @@ qed.
 (* Constant valued matrix with r rows and c columns *)
 op matrixc (rows cols: int) (c : R) = offunm ((fun _ _ => c), rows, cols).
 
-lemma nosmt rows_matrixc cst r c: rows (matrixc r c cst) = max 0 r by done.
+lemma rows_matrixc cst r c: rows (matrixc r c cst) = max 0 r by done.
 
-lemma nosmt cols_matrixc cst r c: cols (matrixc r c cst) = max 0 c by done.
+lemma cols_matrixc cst r c: cols (matrixc r c cst) = max 0 c by done.
 
 hint simplify rows_matrixc, cols_matrixc.
 
-lemma nosmt size_matrixc cst r c: size (matrixc r c cst) = (max 0 r, max 0 c).
+lemma size_matrixc cst r c: size (matrixc r c cst) = (max 0 r, max 0 c).
 proof. by done. qed.
 
 lemma get_matrixc cst c r i j: mrange (matrixc r c cst) i j => 

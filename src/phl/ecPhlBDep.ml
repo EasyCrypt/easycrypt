@@ -36,7 +36,7 @@ exception BDepError
 let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: psymbol) (pcond: psymbol) : unit =
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
-  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
   (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
@@ -44,7 +44,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
   (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
   let pcondc = EcEnv.Op.lookup ([], pcond.pl_desc) env |> snd in
   let pcondc = match pcondc.op_kind with
-  | OB_oper (Some (OP_Plain (pcondc, _))) -> pcondc
+  | OB_oper (Some (OP_Plain pcondc)) -> pcondc
   | _ -> failwith "Invalid operator type" in
   let pcondc = circuit_of_form env pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
@@ -331,7 +331,7 @@ let destruct_arr_chnk_init (f: form) : form * form * form * init_variant =
 let chunk_access (env: env) (f: path) (idx: zint) : zint Set.t =
   let o = EcEnv.Op.by_path f env in
   let fb = match o.op_kind with
-  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Unknown op type"
   in
   let i, fb = match fb.f_node with

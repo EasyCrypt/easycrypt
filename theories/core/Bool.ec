@@ -4,19 +4,19 @@ require import FinType.
 
 op (^^) (b1 b2:bool) = b1 = !b2.
 
-lemma nosmt xor_false b: b ^^ false = b
+lemma xor_false b: b ^^ false = b
 by case: b.
 
-lemma nosmt xor_true b: b ^^ true = !b
+lemma xor_true b: b ^^ true = !b
 by case: b.
 
-lemma nosmt xorA b1 b2 b3: (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
+lemma xorA b1 b2 b3: (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
 by case: b1 b2 b3=> - [] [].
 
-lemma nosmt xorC b1 b2: b1 ^^ b2 = b2 ^^ b1
+lemma xorC b1 b2: b1 ^^ b2 = b2 ^^ b1
 by case: b1 b2=> - [].
 
-lemma nosmt xorK b: b ^^ b = false
+lemma xorK b: b ^^ b = false
 by case: b.
 
 clone FinType as BoolFin with

@@ -180,13 +180,13 @@ op offunm : (int -> int -> R) -> matrix.
 abbrev mrange (i j : int) =
   0 <= i < size /\ 0 <= j < size.
 
-lemma nosmt mrangeL i j : mrange i j => 0 <= i < size.
+lemma mrangeL i j : mrange i j => 0 <= i < size.
 proof. by case. qed.
 
-lemma nosmt mrangeR i j : mrange i j => 0 <= j < size.
+lemma mrangeR i j : mrange i j => 0 <= j < size.
 proof. by case. qed.
 
-lemma nosmt mrangeC i j : mrange i j = mrange j i.
+lemma mrangeC i j : mrange i j = mrange j i.
 proof. by apply: andbC. qed.
 
 op prematrix (f : int -> int -> R) =

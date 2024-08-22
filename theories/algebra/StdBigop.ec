@@ -79,19 +79,19 @@ clone include Bigalg.BigOrder with
     remove abbrev Num.Domain.(-)
     remove abbrev Num.Domain.(/).
 
-lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
+lemma sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
 
-lemma nosmt big_constz (P : 'a -> bool) x s:
+lemma big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 
-lemma nosmt bigi_constz x (n m:int):
+lemma bigi_constz x (n m:int):
   n <= m =>
   BIA.bigi predT (fun i => x) n m = x * (m - n).
 proof. by move=> ?; rewrite BIA.sumri_const // -IntID.intmulz. qed.
 
-lemma nosmt big_count (P : 'a -> bool) s:
+lemma big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
 proof.
@@ -267,7 +267,7 @@ split; case=> y [sy ^Py /h ne_yx]; exists y.
   by rewrite ne_yx. by case: sy.
 qed.
 
-lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
+lemma b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
    b2i (big P1 P2 s) <= BIA.big P1 (fun i => b2i (P2 i)) s.
 proof.
 elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
@@ -276,7 +276,7 @@ rewrite -addrA ler_add2l ler_subl_addr ler_paddr //.
 by rewrite -b2i_and b2i_ge0.
 qed.
 
-lemma nosmt b2r_big (P1 P2 : 'a -> bool) (s : 'a list) :
+lemma b2r_big (P1 P2 : 'a -> bool) (s : 'a list) :
   b2r (big P1 P2 s) <= BRA.big P1 (fun i => b2r (P2 i)) s.
 proof.
 rewrite b2rE (BRA.eq_bigr _ _ (fun i => (b2i (P2 i))%r)).

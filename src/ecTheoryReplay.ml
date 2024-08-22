@@ -134,13 +134,13 @@ let get_open_oper exn env p tys =
 
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
-  | OP_Plain(f1,_), OP_Plain(f2,_)  ->
+  | OP_Plain f1, OP_Plain f2 ->
     let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
     error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
-  | OP_Plain({f_node = Fop(p,tys)},_), _ ->
+  | OP_Plain {f_node = Fop(p,tys)}, _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
-  | _, OP_Plain({f_node = Fop(p,tys)}, _) ->
+  | _, OP_Plain {f_node = Fop(p,tys)} ->
     let ob2 = get_open_oper exn env p tys in
     oper_compatible exn env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
@@ -237,10 +237,10 @@ let operator_compatible env oper1 oper2 =
   let exn  = Incompatible (OpBody(*oper1,oper2*)) in
   match okind1, okind2 with
   | OB_oper None      , OB_oper _          -> ()
-  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob1 ob2
+  | OB_oper (Some ob1), OB_oper (Some ob2) -> oper_compatible exn env ob2 ob1
   | OB_pred None      , OB_pred _          -> ()
-  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb1 pb2
-  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb1 nb2
+  | OB_pred (Some pb1), OB_pred (Some pb2) -> pred_compatible exn env pb2 pb1
+  | OB_nott nb1       , OB_nott nb2        -> nott_compatible exn env nb2 nb1
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
@@ -425,16 +425,6 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
       (subst, ops, proofs, ove.ovre_hooks.hadd_item scope import (Th_operator (x, oopd)))
 
   | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
-      let nosmt =
-        match opov with
-        | `BySyntax opov -> opov.opov_nosmt
-        | `ByPath   _    -> false in
-
-      if nosmt && is_inline_mode opmode then
-          ove.ovre_hooks.herr ~loc
-          ("operator overriding with nosmt only makes sense with alias mode");
-
-
       let refop = EcSubst.subst_op subst oopd in
       let (reftyvars, refty) = (refop.op_tparams, refop.op_ty) in
 
@@ -470,8 +460,8 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               let tparams = EcUnify.UniEnv.tparams ue in
               let newop   =
                 mk_op
-                  ~opaque:false ~clinline:(opmode <> `Alias)
-                  tparams ty (Some (OP_Plain (body, nosmt))) refop.op_loca in
+                  ~opaque:optransparent ~clinline:(opmode <> `Alias)
+                  tparams ty (Some (OP_Plain body)) refop.op_loca in
               (newop, body)
 
           | `ByPath p -> begin
@@ -481,12 +471,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 let body =
                   if refop.op_clinline then
                     (match refop.op_kind with
-                    | OB_oper (Some (OP_Plain (body, _))) -> body
+                    | OB_oper (Some (OP_Plain body)) -> body
                     | _ -> assert false)
                   else EcFol.f_op p tyargs refop.op_ty in
                 let decl   =
                   { refop with
-                      op_kind = OB_oper (Some (OP_Plain (body, nosmt)));
+                      op_kind = OB_oper (Some (OP_Plain body));
                       op_clinline = (opmode <> `Alias) } in
                 (decl, body)
 
@@ -890,7 +880,7 @@ and replay_instance
   let module E = struct exception InvInstPath end in
 
   let forpath (p : EcPath.path) =
-    match EcPath.getprefix opath p |> omap List.rev with
+    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
     | None | Some [] -> None
     | Some (x::px) ->
         let q = EcPath.fromqsymbol (List.rev px, x) in
@@ -912,7 +902,7 @@ and replay_instance
                 | OB_oper (Some (OP_Fix    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain (f, _))) ->
+                | OB_oper (Some (OP_Plain f)) ->
                     match f.f_node with
                     | Fop (r, _) -> Some r
                     | _ -> raise E.InvInstPath

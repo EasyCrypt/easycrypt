@@ -204,6 +204,10 @@ class Listener(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def glog(self, level, msg):
+        pass
+
+    @abc.abstractmethod
     def tick(self):
         pass
 
@@ -591,6 +595,11 @@ class TermListener(Listener):
         msg = msg.replace('\\n', '\n').split('\n')
         self._mbar.log(mark, [handle.filename] + msg, color)
 
+    def glog(self, level, msg):
+        mark, color = LOGMARKS.get(level, LOGMARKS[None])
+        msg = msg.replace('\\n', '\n').split('\n')
+        self._mbar.log(mark, msg, color)
+
     @clib.contextmanager
     def start(self):
         self._mbar.term.echooff()
@@ -640,6 +649,12 @@ class RawListener(Listener):
         else:
             self.log('[{}] {}: {}'.format(mark, handle.filename, msg[0]))
 
+    def glog(self, level, msg):
+        mark, _ = LOGMARKS.get(level, LOGMARKS[None])
+        msg = msg.strip('\n').split('\n')
+        for submsg in msg:
+            self.log('[{}] {}'.format(mark, submsg))
+
     def tick(self):
         pass
 
@@ -658,7 +673,10 @@ def get_njobs():
 
 # --------------------------------------------------------------------
 async def _run_all(options, allscripts, listener : Listener):
-    semaphore = asyncio.Semaphore(options.jobs or get_njobs())
+    njobs = options.jobs or get_njobs()
+    semaphore = asyncio.Semaphore(njobs)
+
+    listener.glog('info', 'number of parallel jobs: {}'.format(njobs))
 
     async def runcheck(config):
         async with semaphore:

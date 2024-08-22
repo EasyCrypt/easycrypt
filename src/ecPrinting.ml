@@ -38,7 +38,7 @@ module PPEnv = struct
 
   let ofenv (env : EcEnv.env) =
     let width =
-      EcGState.asint ~default:0
+      EcGState.asint ~default:80
         (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
 
     { ppe_env    = env;
@@ -412,9 +412,23 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
+let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
+  match mx with
+  | [] ->
+    ()
+
+  | [x, []] ->
+    Format.fprintf fmt "%s" x
+
+  | [x, args] ->
+    Format.fprintf fmt "@[<hov 2>%s(@,%a)@]" x (pp_list ",@ " pp_msymbol) args
+
+  | mx1 :: mx ->
+    Format.fprintf fmt "%a.@,%a" pp_msymbol [mx1] pp_msymbol mx
+
+(* -------------------------------------------------------------------- *)
 let pp_topmod ppe fmt p =
-  Format.fprintf fmt "%a"
-    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p)
+  Format.fprintf fmt "%a" pp_msymbol (PPEnv.mod_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar ppe fmt x =
@@ -485,8 +499,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
 
 
 (* -------------------------------------------------------------------- *)
-let pp_pv ppe fmt p =
-  EcSymbols.pp_msymbol fmt (msymbol_of_pv ppe p)
+let pp_pv ppe fmt p = pp_msymbol fmt (msymbol_of_pv ppe p)
 
 (* -------------------------------------------------------------------- *)
 exception NoProjArg
@@ -512,7 +525,7 @@ let pp_restr_s fmt = function
   | false -> Format.fprintf fmt "-"
 
 let pp_modtype1 (ppe : PPEnv.t) fmt mty =
-  EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
+  pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
@@ -1269,12 +1282,6 @@ let pp_locbinds ppe ?fv vs =
   pp_locbinds_blocks ppe ?fv (merge vs)
 
 (* -------------------------------------------------------------------- *)
-let string_of_quant = function
-  | Lforall -> "forall"
-  | Lexists -> "exists"
-  | Llambda -> "fun"
-
-(* -------------------------------------------------------------------- *)
 let string_of_hcmp = function
   | FHle -> "<="
   | FHeq -> "="
@@ -1391,7 +1398,7 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a <@@@;<1 2>@[%a(@[<hov 0>%a@]);@]"
+    Format.fprintf fmt "%a <@@@;<1 2>@[%a(@[<hov 0>%a@]);@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
@@ -1968,7 +1975,7 @@ and pp_mod_params ppe bms =
     let ppe1 = PPEnv.add_local ppe id in
     let pp fmt =
       Format.fprintf fmt "%a : %a" (pp_local ppe1) id
-        EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mt) in
+        pp_msymbol (PPEnv.modtype_symb ppe mt) in
     ppe1, pp
   in
   let rec aux ppe bms =
@@ -2172,21 +2179,12 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
-  let pp_nosmt fmt =
-    let b =
-      match op with
-      | None -> false
-      | Some (OP_Plain (_, b)) -> b
-      | Some (OP_Fix { opf_nosmt = b }) -> b
-      | _ -> false
-    in if b then Format.fprintf fmt "@ nosmt" else () in
-
   let pp_body fmt =
     match op with
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some (OP_Plain (f, _)) ->
+    | Some (OP_Plain f) ->
         let ((subppe, pp_vds), f, has_vds) =
           let (vds, f) =
             match f.f_node with
@@ -2259,11 +2257,11 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   in
 
   match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op%t %a %t.@]"
-      pp_nosmt pp_opname ([], basename) pp_body
+  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
+      pp_opname ([], basename) pp_body
   | _  ->
-      Format.fprintf fmt "@[<hov 2>op%t %a %a %t.@]"
-        pp_nosmt pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
+        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =
@@ -2399,6 +2397,7 @@ let at (ppe : PPEnv.t) n i =
   | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
   | Sassert e        , 0 -> Some (`Assert e        , `P, [])
   | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
+
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
   | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
@@ -2495,7 +2494,7 @@ let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Some lv ->
-      Format.fprintf fmt "@[<hov 2>%a <@@@ %a(%a)@]"
+      Format.fprintf fmt "@[<hov 2>%a <@@@ @[<hov 2>%a(%a)@]@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args

@@ -748,7 +748,7 @@ module MC = struct
       let axp  = EcPath.prefix (Lazy.force mypath) in
       let axp  = IPPath (EcPath.pqoname axp name) in
       let ax   =
-        { ax_kind       = `Axiom (Ssym.empty, false);
+        { ax_kind       = `Lemma;
           ax_tparams    = tv;
           ax_spec       = cl;
           ax_loca       = (snd obj).op_loca;
@@ -794,7 +794,8 @@ module MC = struct
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-            let cop = mk_op ~opaque:false (fst aty) (snd aty)
+            let cop = mk_op
+                        ~opaque:optransparent (fst aty) (snd aty)
                         (Some (OP_Constr (mypath, i))) loca in
             let cop = (ipath c, cop) in
               (c, cop)
@@ -805,7 +806,7 @@ module MC = struct
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams    = tyd.tyd_params;
                            ax_spec       = scheme;
-                           ax_kind       = `Axiom (Ssym.empty, false);
+                           ax_kind       = `Lemma;
                            ax_loca       = loca;
                            ax_visibility = `NoSmt;
                 })
@@ -838,7 +839,7 @@ module MC = struct
             let for1 i (f, aty) =
               let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-              let fop = mk_op ~opaque:false (fst aty) (snd aty)
+              let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
               let fop = (ipath f, fop) in
                 (f, fop)
@@ -850,7 +851,7 @@ module MC = struct
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams    = tyd.tyd_params;
                          ax_spec       = scheme;
-                         ax_kind       = `Axiom (Ssym.empty, false);
+                         ax_kind       = `Lemma;
                          ax_loca       = loca;
                          ax_visibility = `NoSmt;
               })
@@ -860,7 +861,7 @@ module MC = struct
           let stop   =
             let stty = toarrow (List.map snd fields) (tconstr mypath params) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
-              mk_op ~opaque:false (fst stty) (snd stty) (Some (OP_Record mypath)) loca
+              mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in
 
           let mc =
@@ -915,7 +916,7 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
-            mk_op ~opaque:false [(self, Sp.singleton mypath)]
+            mk_op ~opaque:optransparent [(self, Sp.singleton mypath)]
               optype (Some OP_TC) loca
           in (opid, xpath opname, optype, opdecl)
         in
@@ -937,7 +938,7 @@ module MC = struct
             let ax = EcSubst.subst_form fsubst ax in
               (x, { ax_tparams    = [(self, Sp.singleton mypath)];
                     ax_spec       = ax;
-                    ax_kind       = `Axiom (Ssym.empty, false);
+                    ax_kind       = `Lemma;
                     ax_loca       = loca;
                     ax_visibility = `NoSmt; }))
           tc.tc_axs
@@ -2723,13 +2724,13 @@ module Op = struct
     let op = oget (by_path_opt p env) in
 
     match op.op_kind with
-    | OB_oper (Some (OP_Plain (f, _)))
+    | OB_oper (Some (OP_Plain f))
     | OB_pred (Some (PR_Plain f)) -> begin
         let f =
           match mode with
           | `Force ->
              f
-          | `IfTransparent when not op.op_opaque ->
+          | `IfTransparent when not op.op_opaque.reduction ->
              f
           | `IfApplied when nargs >= odfl max_int op.op_unfold ->
              f
@@ -2920,7 +2921,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let env_of_theory (p : EcPath.path) (env : env) =
-    if EcPath.isprefix p env.env_scope.ec_path then
+    if EcPath.isprefix ~prefix:p ~path:env.env_scope.ec_path then
       env
     else
       Option.get (Mp.find_opt p env.env_thenvs)
@@ -3230,7 +3231,7 @@ module Theory = struct
 
       let compiled =
         Mp.filter
-          (fun path _ -> EcPath.isprefix path root)
+          (fun path _ -> EcPath.isprefix ~prefix:root ~path)
           env.env_thenvs in
       let compiled = Mp.add env.env_scope.ec_path env compiled in
 
