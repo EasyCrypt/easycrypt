@@ -69,7 +69,8 @@ have uniq_s: uniq s; first apply: uniq_flatten_map.
   by move => x y _ _ /=; apply/addrI.
 - move=> x y /mem_range rg_x /mem_range rg_y /hasP /=.
   case=> j [/mapP[/= k [/mem_range rg_k]] ->>].
-  by case/mapP=> l [/mem_range rg_l] {rg_x} {rg_y} /#.
+  case/mapP=> l [/mem_range rg_l] {rg_x} {rg_y}.
+  smt(IntDiv.euclideU).
 - by apply: range_uniq.
 have mem_s: forall x, (x \in s) <=> (x \in range 0 p).
 - move=> x; rewrite mem_range; split.

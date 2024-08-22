@@ -18,12 +18,12 @@ axiom ln_le0   : forall x, x <= 0%r => ln x = 0%r.
 axiom lnK  : forall x, ln (exp x) = x.
 axiom expK : forall x, 0%r < x => exp (ln x) = x.
 
-axiom nosmt le_ln_up (x : real): 0%r < x => ln x <= x - 1%r.
-axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
+axiom le_ln_up (x : real): 0%r < x => ln x <= x - 1%r.
+axiom le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
 
-axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
+axiom le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
 
-axiom nosmt convex_exp a b: convex exp a b.
+axiom convex_exp a b: convex exp a b.
 
 op log (a : real) = fun x => ln x / ln a.
 
@@ -35,47 +35,47 @@ op e : real = exp 1%r.
 axiom ge2_e : 2%r <= e.
 axiom lt3_e : e < 3%r.
 
-lemma nosmt e_boundW : 2%r <= e <= 3%r.
+lemma e_boundW : 2%r <= e <= 3%r.
 proof. by rewrite ge2_e /= ltrW ?lt3_e. qed.
 
-lemma nosmt e_gt0 : 0%r < e.
+lemma e_gt0 : 0%r < e.
 proof. by apply/(@ltr_le_trans 2%r)/ge2_e. qed.
 
-lemma nosmt e_ge0 : 0%r <= e.
+lemma e_ge0 : 0%r <= e.
 proof. by apply/ltrW/e_gt0. qed.
 
 hint exact : e_gt0 e_ge0.
 
-lemma nosmt exp_neq0 x : exp x <> 0%r.
+lemma exp_neq0 x : exp x <> 0%r.
 proof. by have := (exp_gt0 x); rewrite ltr_neqAle eq_sym => -[]. qed.
 
-lemma nosmt ln0 : ln 0%r = 0%r.
+lemma ln0 : ln 0%r = 0%r.
 proof. by rewrite ln_le0. qed.
 
-lemma nosmt inj_exp : injective exp.
+lemma inj_exp : injective exp.
 proof. by apply/mono_inj/exp_mono. qed.
 
-lemma nosmt expN (x : real) : exp (- x) = inv (exp x).
+lemma expN (x : real) : exp (- x) = inv (exp x).
 proof.
 apply/(mulfI _ (exp_neq0 x)); rewrite -expD addrN exp0.
 by rewrite mulrV // exp_neq0.
 qed.
 
-lemma nosmt exp_mono_ltr (x y : real): (exp x < exp y) <=> (x < y).
+lemma exp_mono_ltr (x y : real): (exp x < exp y) <=> (x < y).
 proof. by apply/lerW_mono/exp_mono. qed.
 
-lemma nosmt ln_mono (x y : real):
+lemma ln_mono (x y : real):
   0%r < x => 0%r < y => (ln x <= ln y) <=> (x <= y).
 proof. by move=> gt0x gt0y; rewrite -exp_mono !expK. qed.
 
-lemma nosmt ln_mono_ltr (x y : real):
+lemma ln_mono_ltr (x y : real):
   0%r < x => 0%r < y => (ln x < ln y) <=> (x < y).
 proof. by move=> gt0x gt0y; rewrite -exp_mono_ltr !expK. qed.
 
-lemma nosmt ln1 : ln 1%r = 0%r.
+lemma ln1 : ln 1%r = 0%r.
 proof. by rewrite -exp0 lnK. qed.
 
-lemma nosmt ln_gt0 x : 1%r < x => 0%r < ln x.
+lemma ln_gt0 x : 1%r < x => 0%r < ln x.
 proof. by move=> h; rewrite -ln1 ln_mono_ltr //#. qed.
 
 lemma ln_eq0 (x : real) : 0%r < x => (ln x = 0%r) <=> (x = 1%r).
@@ -84,17 +84,17 @@ move=> gt0_x; split=> [|->]; last by rewrite ln1.
 by move/(congr1 exp); rewrite expK // exp0.
 qed.
 
-lemma nosmt lnM (x y : real) : 0%r < x => 0%r < y =>
+lemma lnM (x y : real) : 0%r < x => 0%r < y =>
   ln (x * y) = ln x + ln y.
 proof.
 move=> gt0x gt0y; apply/inj_exp; rewrite expK ?pmulr_lgt0 //.
 by rewrite expD !expK.
 qed.
 
-lemma nosmt lnV (x : real) : 0%r < x => ln (inv x) = -(ln x).
+lemma lnV (x : real) : 0%r < x => ln (inv x) = -(ln x).
 proof. by move=> gt0x; apply/inj_exp; rewrite expN !expK ?invr_gt0. qed.
 
-lemma nosmt ln_ge0 (x:real): 1%r <= x => 0%r <= ln x.
+lemma ln_ge0 (x:real): 1%r <= x => 0%r <= ln x.
 proof. by move=> ge1x; rewrite -exp_mono exp0 expK // (ltr_le_trans 1%r). qed.
 
 (* -------------------------------------------------------------------- *)
@@ -105,7 +105,7 @@ op ( ^ ) (x a : real) =
 lemma rpowE (x a : real) : 0%r < x => x^a = exp (a * ln x).
 proof. by rewrite /(^) ltrNge => ->. qed.
 
-lemma nosmt rpoweE (a : real) : e^a = exp a.
+lemma rpoweE (a : real) : e^a = exp a.
 proof. by rewrite rpowE 1:e_gt0 // lnK mulr1. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -197,7 +197,7 @@ lemma rpowe_ge0 (x : real): 0%r <= e^x.
 proof. by rewrite rpoweE ltrW ?exp_gt0. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt rpoweM (x y : real): e^(x * y) = (e^x)^y.
+lemma rpoweM (x y : real): e^(x * y) = (e^x)^y.
 proof. by rewrite rpowM // e_gt0. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -260,7 +260,7 @@ by move=> gt0_b ne1_b gt0_x; rewrite &(inj_log b) // 1:rpow_gt0 // logK.
 qed.  
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt rpow_mono (x y n : real):
+lemma rpow_mono (x y n : real):
      0%r < n => 0%r <= x => 0%r <= y
   => (x^n <= y^n) <=> (x <= y).
 proof.
@@ -271,7 +271,7 @@ move/ler_eqVlt => [<-|lt0_y].
 by rewrite !rpowE // exp_mono ler_pmul2l // ln_mono.
 qed.
 
-lemma nosmt rpow_hmono (x y n : real):
+lemma rpow_hmono (x y n : real):
   0%r <= n => 0%r <= x <= y => x ^ n <= y ^ n.
 proof.
 rewrite ler_eqVlt=> -[<-|gt0n]; first by rewrite !rpow0 lerr.
@@ -285,7 +285,7 @@ move=> gt0_x ne1_x; rewrite !rpowE // => /inj_exp.
 by apply: mulIf; rewrite ln_eq0.
 qed.
 
-lemma nosmt rexpr_hmono (x n m : real) :
+lemma rexpr_hmono (x n m : real) :
   1%r <= x => 0%r <= n <= m => x^n <= x^m.
 proof.
 move=> ge1x [ge0n lenm]; have ge0m: 0%r <= m by apply/(ler_trans n).
@@ -293,7 +293,7 @@ rewrite !rpowE 1,2:(ltr_le_trans 1%r) // exp_mono.
 by apply/ler_wpmul2r=> //; apply/ln_ge0.
 qed.
 
-lemma nosmt rexpr_hmono_ltr (x n m : real) :
+lemma rexpr_hmono_ltr (x n m : real) :
   1%r < x => 0%r <= n < m => x^n < x^m.
 proof.
 move=> gt0_x [gt0_n lt_nm]; rewrite ltr_neqAle.
@@ -303,7 +303,7 @@ by apply/eq_sym; apply: inj_rexpr eq => /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt le1Dx_rpowe (x : real): 0%r <= x => 1%r+x <= e^x.
+lemma le1Dx_rpowe (x : real): 0%r <= x => 1%r+x <= e^x.
 proof. by rewrite rpoweE; apply/le1Dx_exp. qed.
 
 (* -------------------------------------------------------------------- *)

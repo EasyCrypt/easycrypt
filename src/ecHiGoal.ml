@@ -615,7 +615,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
         let op = EcEnv.Op.by_path (fst p) env in
 
         match op.EcDecl.op_kind with
-        | EcDecl.OB_oper (Some (EcDecl.OP_Plain (f, _))) ->
+        | EcDecl.OB_oper (Some (EcDecl.OP_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))

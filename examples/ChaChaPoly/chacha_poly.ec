@@ -1691,9 +1691,8 @@ section PROOFS.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move => &hr; elim (p2{hr}) => //. 
-          clear &hr.
-          smt (size_drop size_eq0 gt0_block_size).
+          move => &hr; elim (p2{hr}) => //= => {&hr}.
+          smt (size_drop size_ge0 size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
       + by move=> &2 _; islossless.

@@ -83,7 +83,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
 
   let dom     = Tuni.subst_dom uidmap dom in
 
-  EcDecl.mk_pred ~opaque:false tparams dom body pr.pp_locality
+  EcDecl.mk_pred ~opaque:optransparent tparams dom body pr.pp_locality
 
 (* -------------------------------------------------------------------- *)
 let trans_preddecl (env : EcEnv.env) (pr : ppredicate located) =

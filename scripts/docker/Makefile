@@ -1,26 +1,18 @@
-# -*- Makefile -*-
+#! -*- Makefile -*-
 
 # --------------------------------------------------------------------
-# docker.com account name
-DNAME ?= ghcr.io/easycrypt
-BBOX  := build-box test-box
+VARIANT ?= build
 
 # --------------------------------------------------------------------
-.PHONY: all __force__
+.PHONY: default build publish
 
-default:
-	@echo "Available images: $(BBOX)"
+default: build
 
-all:
-	for i in $(BBOX); do $(MAKE) $$i-build; done
+build:
+	docker build -f Dockerfile.$(VARIANT) \
+	  --platform linux/amd64 \
+	  -t ghcr.io/easycrypt/ec-$(VARIANT)-box \
+	  .
 
-%-test-box-build:
-	[ -d $*-test-box ] || mkdir $*-test-box
-	sed -e 's/BRANCH/$*/g' < templates/Dockerfile > $*-test-box/Dockerfile
-	cd $*-test-box && docker build -t $(DNAME)/ec-$*-test-box .
-
-%-build: __force__
-	cd $* && docker build --platform linux/amd64 -t $(DNAME)/ec-$* .
-
-%-publish: __force__
-	cd $* && docker push $(DNAME)/ec-$*:latest
+publish:
+	docker push ghcr.io/easycrypt/ec-$(VARIANT)-box

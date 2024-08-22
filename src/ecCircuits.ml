@@ -853,7 +853,7 @@ let circuit_of_form
         env, circ
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
-        | OB_oper ( Some (OP_Plain (f, _))) -> f
+        | OB_oper ( Some (OP_Plain f)) -> f
         | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
         in 
         let env, circ = doit cache env f in
@@ -923,7 +923,7 @@ let circuit_of_form
 let circuit_of_path (env: env) (p: path) : circuit =
   let f = EcEnv.Op.by_path p env in
   let f = match f.op_kind with
-  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type"
   in
   circuit_of_form env f
@@ -988,13 +988,13 @@ let insts_equiv (env: env) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_l
 let process_op (env : env) (f: pqsymbol) (f2: pqsymbol) : unit = 
   let f = EcEnv.Op.lookup f.pl_desc env |> snd in
   let f = match f.op_kind with
-  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
 
   let f2 = EcEnv.Op.lookup f2.pl_desc env |> snd in
   let f2 = match f2.op_kind with
-  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
   let fc2 = circuit_of_form env f2 in
 

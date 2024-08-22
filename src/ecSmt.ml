@@ -1072,23 +1072,28 @@ and create_op ?(body = false) (genv : tenv) p =
     let wextra = List.map (fun ty ->
                      WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
     let decl =
-      match body, op.op_kind with
-      | true, OB_oper (Some (OP_Plain (body, false))) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+      let default () = WDecl.create_param_decl ls in
+
+      if op.op_opaque.smt then
+        default ()
+      else
+        match body, op.op_kind with
+        | true, OB_oper (Some (OP_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+
+        | true, OB_oper (Some (OP_Fix body)) ->
+          OneShot.now register;
+          let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
+          let wbody = Cast.arg wbody ls.WTerm.ls_value in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
-        OneShot.now register;
-        let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
-        let wbody = Cast.arg wbody ls.WTerm.ls_value in
-        WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+        | true, OB_pred (Some (PR_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom None body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_pred (Some (PR_Plain body)) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom None body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
-
-      | _, _ ->
-          WDecl.create_param_decl ls
+        | _, _ ->
+            default ()
 
     in
       OneShot.now register;
@@ -1428,23 +1433,32 @@ module Frequency = struct
 
   let f_ops_oper unwanted_op env p rs =
     match EcEnv.Op.by_path_opt p env with
-    | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain (f, false))) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
-      let rec aux rs = function
-        | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
-        | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
-      in
-      aux rs e.opf_branches
-    | Some {op_kind = OB_pred (Some (PR_Ind pri)) } ->
-       let for1 rs ctor =
-         List.fold_left
-           (fun rs f -> r_union rs (f_ops unwanted_op f))
-           rs ctor.prc_spec
-       in List.fold_left for1 rs pri.pri_ctors
-    | _ -> rs
+    | Some op -> begin
+      if op.op_opaque.smt then
+        rs
+      else
+        match op with
+        | {op_kind = OB_pred (Some (PR_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Fix e)) } ->
+          let rec aux rs = function
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
+          in
+          aux rs e.opf_branches
+        | {op_kind = OB_pred (Some (PR_Ind pri)) } ->
+          let for1 rs ctor =
+            List.fold_left
+              (fun rs f -> r_union rs (f_ops unwanted_op f))
+              rs ctor.prc_spec
+          in List.fold_left for1 rs pri.pri_ctors
+        | _ -> rs
+        end
+
+      | None ->
+        rs
 
   (* -------------------------------------------------------------------- *)
   type frequency = {
