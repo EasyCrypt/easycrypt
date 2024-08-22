@@ -20,7 +20,7 @@ let c_filename ?(ext : string option) (nms : string list) =
   match ext with
   | None -> String.concat "!" nms 
   | Some ext -> String.concat "!" nms ^ ext
-
+    
 (* -------------------------------------------------------------------- *)
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
@@ -39,7 +39,27 @@ let itemkind_str_pl (ik : itemkind) : string =
   | `Theory -> "Theories"
 
 (* -------------------------------------------------------------------- *)
+let rec bot_env_of_qsymbol (q : EcSymbols.qsymbol) (env : EcEnv.env)=
+  match fst q with
+  | [] | ["Top"] -> env
+  | x :: xs ->
+    let p = EcEnv.Theory.lookup_path ~mode:`All ([], x) env in
+    let env = EcEnv.Theory.env_of_theory p env in
+      bot_env_of_qsymbol (xs, snd q) env
 
+let filename_of_path ?(ext : string option) (rth : string) (p : EcPath.path) =
+  let qs = EcPath.toqsymbol p in
+  match fst qs with
+  | [] -> assert false 
+  | ["Top"] -> c_filename ?ext [rth]
+  | "Top" :: ts ->
+      let reqrt = (List.hd ts) in
+      if from_stdlib reqrt then
+        Filename.concat (stdlib_doc_dp reqrt) (c_filename ?ext ts) 
+      else
+        (c_filename ?ext (rth :: ts))
+  | _ -> assert false
+      
 (* -------------------------------------------------------------------- *)
 let md_pre_format ~kind (s : string) =
   match kind with | _ -> pre [txt s]
@@ -50,14 +70,7 @@ let md_href_format (rth : string) (env : EcEnv.env) (hr : Markdown.href) : Html_
     let tkind = Str.matched_group 1 hr.href_target in
     let tname = Str.matched_group 2 hr.href_target in
     let tqs = EcSymbols.qsymbol_of_string tname in
-    let env =
-      match fst tqs with
-      | [] | ["Top"] -> env
-      | _ ->
-        let tsupqs = EcSymbols.qsymbol_of_sup tqs in
-        let tsupp = EcEnv.Theory.lookup_path ~mode:`All tsupqs env in 
-        EcEnv.Theory.env_of_theory tsupp env
-    in
+    let env = bot_env_of_qsymbol tqs env in
     let ikstr, path =
       match tkind with 
       | "Ty" | "Type" -> itemkind_str_pl `Type, EcEnv.Ty.lookup_path tqs env
@@ -73,22 +86,10 @@ let md_href_format (rth : string) (env : EcEnv.env) (hr : Markdown.href) : Html_
           | `Concrete (_, Some _) -> failwith "Linking to sub-modules not supported."
           | `Local _ -> failwith "Linking to local/declared modules not supported."
         end
-      | "Th" | "Theory" -> itemkind_str_pl `Theory, EcEnv.Theory.lookup_path ~mode:(`All) tqs env
+      | "Th" | "Theory" -> itemkind_str_pl `Theory, EcEnv.Theory.lookup_path ~mode:`All tqs env
       | _ -> failwith "Invalid item/entity kind."
     in
-    let tqs = EcPath.toqsymbol path in
-    let fn =
-      match fst tqs with
-      | [] -> assert false 
-      | ["Top"] -> c_filename ~ext:".html" [rth]
-      | "Top" :: ts ->
-          let reqrt = (List.hd ts) in
-          if from_stdlib reqrt then
-            Filename.concat (stdlib_doc_dp reqrt) (c_filename ~ext:".html" ts) 
-          else
-            (c_filename ~ext:".html" (rth :: ts))
-      | _ -> assert false
-    in
+    let fn = filename_of_path ~ext:".html" rth path in
     let il = fn ^ "#" ^ ikstr ^ snd tqs in
     a ~a:[a_href (uri_of_string il)] [txt hr.href_desc]
   else 

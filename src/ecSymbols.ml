@@ -92,13 +92,6 @@ let pp_msymbol fmt x =
 let qsymbol_of_string (s : string) : qsymbol =
   let sspl = String.split_on_char '.' s in
     match List.rev sspl with
-    | [] -> assert false
+    | [] -> raise (invalid_arg "EcSymbols.qsymbol_of_string")
     | [x] -> ([], x)
     | x :: xs -> (List.rev xs, x)
-
-
-let qsymbol_of_sup (q : qsymbol) : qsymbol =
-  match List.rev (fst q) with
-  | [] -> assert false
-  | [x] -> ([], x)
-  | x :: xs -> (List.rev xs, x)
