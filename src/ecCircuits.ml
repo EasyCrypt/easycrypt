@@ -170,7 +170,8 @@ let match_arg (inp: cinput) (var: circ) : bool =
   | BWInput (_, w), BWCirc r -> List.compare_length_with r w = 0
   | BWAInput (_, n, w), BWArray a -> (Array.length a = n) 
     && (Array.for_all (fun v -> List.compare_length_with v w = 0) a)
-  | _ -> false
+  | _ -> Format.eprintf "inp: %s does not match %s@."
+    (cinput_to_string inp) (circ_to_string var); false
 
 let apply (f: circuit) (args: circ list) : circ = 
   assert (List.compare_lengths f.inps args = 0);
@@ -238,8 +239,22 @@ let width_of_type (env: env) (t: ty) : int =
 
 (* returns size of array and underlying element type if array type, otherwise None *)
 let destr_array_type (env: env) (t: ty) : (int * ty) option = 
-  None
+  match t.ty_node with
+  | Tconstr (p, [et]) -> 
+    begin match EcEnv.Circ.lookup_bsarray_path env p with
+    | Some {size; _} -> Some (size, et)
+    | None -> None
+    end
+  | _ -> None
 
+let shape_of_array_type (env: env) (t: ty) : (int * int) = 
+  match t.ty_node with
+  | Tconstr (p, [et]) -> 
+    begin match EcEnv.Circ.lookup_bsarray_path env p with
+    | Some {size; _} -> size, width_of_type env et
+    | None -> assert false
+    end
+  | _ -> assert false
 
 let cinput_of_type ?(idn: ident option) (env: env) (t: ty) : cinput = 
   let name = "from_type" in
@@ -296,8 +311,22 @@ let circuit_aggregate (c: circuit list) : circuit =
 let circuit_array_aggregate (c: circuit list) : circuit =
   List.reduce (+@) c
 
+let circuit_bwarray_set (n: width) (w: width) (i: int) : circuit =
+  assert (n > i);
+  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let bw_inp = BWInput (create "bw_input", w) in
+  let arr = circ_ident arr_inp in
+  let bw = circ_ident bw_inp in
+  let () = (destr_bwarray arr.circ).(i) <- (destr_bwcirc bw.circ) in
+  {circ= arr.circ; inps = [arr_inp; bw_inp]}
 
+let circuit_bwarray_get (n: width) (w: width) (i: int) : circuit =
+  assert (n > i);
+  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let arr = circ_ident arr_inp in
+  {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
 
+  
 (* Function application, C.reg = concrete (non-function) circuit 
    Application must not be partial, for partial application
    one should do f(a, x, y) = f(a(), Id, Id)
@@ -723,10 +752,16 @@ module ArrayOps = struct
   let temp_symbol = "temp_array_input"
 
   let is_arrayop (env: env) (pth: path) : bool =
-    assert false
+    match EcEnv.Circ.lookup_bsarrayop env pth with
+    | Some _ -> true
+    | None -> false
 
-  let circuit_of_arrayop (env: env) (pth: path) : circuit =
-    assert false
+  
+  let destr_getset_opt (env: env) (pth: path) : bsarrayop option =
+    match EcEnv.Circ.lookup_bsarrayop env pth with
+    | Some (GET _) as g -> g 
+    | Some (SET _) as g -> g 
+    | _ -> None
 end
 
 let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
@@ -847,10 +882,10 @@ let circuit_of_form
           let circ = circuit_from_spec env pth in
           op_cache := Mp.add pth circ !op_cache;
           env, circ
-      else if ArrayOps.is_arrayop env pth then
-        let circ = ArrayOps.circuit_of_arrayop env pth in
-        op_cache := Mp.add pth circ !op_cache;
-        env, circ
+      (* else if ArrayOps.is_arrayop env pth then *)
+        (* let circ = ArrayOps.circuit_of_arrayop env pth in *)
+        (* op_cache := Mp.add pth circ !op_cache; *)
+        (* env, circ *)
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain f)) -> f
@@ -861,14 +896,36 @@ let circuit_of_form
         env, circ
     end
     | Fapp _ -> 
-      (* Check processing order of args and f FIXME *)
       let (f, fs) = EcCoreFol.destr_app f in
-      let env, f_c = doit cache env f in
-      let env, fcs = List.fold_left_map
-        (doit cache)
-        env fs 
-      in
-      env, compose f_c fcs
+      let env, res = match ArrayOps.destr_getset_opt env @@ (EcCoreFol.destr_op f |> fst) with
+          (* Assuming correct types coming from EC *)
+          (* FIXME: add typechecking here ? *)
+        | Some (GET n) -> let env, res = 
+          match fs with
+          | [arr; {f_node=Fint i; _}] ->
+            let (_, t) = destr_array_type env arr.f_ty |> Option.get in
+            let w = width_of_type env t in
+            let env, arr = doit cache env arr in
+            env, compose (circuit_bwarray_get n w (BI.to_int i)) [arr]
+          | _ -> raise (CircError "set")
+          in env, res
+        | Some (SET n) -> let env, res = 
+          match fs with
+          | [arr; {f_node=Fint i; _}; v] ->
+            let w = width_of_type env v.f_ty  in
+            let env, arr = doit cache env arr in
+            let env, v = doit cache env v in
+            env, compose (circuit_bwarray_set n w (BI.to_int i)) [arr; v]
+          | _ -> raise (CircError "set")
+          in env, res
+        | _ -> 
+          let env, f_c = doit cache env f in
+          let env, fcs = List.fold_left_map
+            (doit cache)
+            env fs 
+          in
+          env, compose f_c fcs
+        in env, res
       
     | Fquant (qnt, binds, f) -> 
       (* FIXME: check if this is desired behaviour for exists and add logic for others *)

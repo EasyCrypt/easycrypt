@@ -29,6 +29,10 @@ type bsarray = {
   size : int;
 }
 
+type bsarrayop = 
+  | GET of int
+  | SET of int
+
 type qfabvop = 
   | BVADD of int 
   | BVSUB of int
@@ -539,4 +543,5 @@ module Circ : sig
   val lookup_bsarray : env -> ty -> bsarray option
   val lookup_bsarray_path : env -> path -> bsarray option
   val lookup_bsarray_size : env -> ty -> int option
+  val lookup_bsarrayop   : env -> path -> bsarrayop option
 end 

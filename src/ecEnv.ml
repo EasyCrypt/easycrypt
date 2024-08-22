@@ -176,6 +176,11 @@ type bsarray = {
   set : path;
   size : int;
 }
+
+type bsarrayop = 
+  | GET of int
+  | SET of int
+
   
 type qfabvop = 
   | BVADD of int
@@ -186,6 +191,7 @@ type circ_env = {
   circuits: string Mp.t;
   qfabvops: qfabvop Mp.t;
   bsarrays: bsarray Mp.t;
+  bsarrayops: bsarrayop Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -334,7 +340,8 @@ let empty gstate =
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
     env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; 
-                    qfabvops = Mp.empty; bsarrays = Mp.empty;};
+                    qfabvops = Mp.empty; bsarrays = Mp.empty;
+                    bsarrayops = Mp.empty; };
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -3646,6 +3653,7 @@ module Circ : sig
   val lookup_circuit_path : env -> path -> string option
   val lookup_qfabvop_path : env -> path -> qfabvop option
   val lookup_qfabvop : env -> qsymbol -> qfabvop option
+  val lookup_bsarrayop : env -> path -> bsarrayop option
   
 
 end = struct
@@ -3657,7 +3665,8 @@ end = struct
   let bind_bsarray (env: env) (get: path) (set: path) (ty: path) (size: int) : env =
     Format.eprintf "Binding bsarray for type %s@." (EcPath.tostring ty);
     {env with env_circ = 
-      {env.env_circ with bsarrays = Mp.add ty {get; set; size} env.env_circ.bsarrays}}
+      {env.env_circ with bsarrays = Mp.add ty {get; set; size} env.env_circ.bsarrays;
+        bsarrayops= Mp.add set (SET size) (Mp.add get (GET size) env.env_circ.bsarrayops)}}
     
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     (* TODO: add absolute paths for circuit binding and lookup *)
@@ -3746,5 +3755,8 @@ end = struct
   let lookup_qfabvop (env: env) (o: qsymbol) : qfabvop option =
     let p, _o = Op.lookup o env in
     lookup_qfabvop_path env p
+
+  let lookup_bsarrayop (env: env) (pth: path) : bsarrayop option =
+    Mp.find_opt pth env.env_circ.bsarrayops
   
 end
