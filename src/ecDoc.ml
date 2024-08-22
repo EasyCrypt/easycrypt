@@ -158,7 +158,7 @@ let c_section_main_itemkind_li ?(supthf : string option) (rth : string) (th : st
       match ik with
       | `Theory -> 
           let (hdoc, tdoc) = 
-            if doc = [] then "", []
+            if doc = [] then "No description available.", []
             else if List.length doc = 1 then List.hd doc, []
             else List.hd doc, List.tl doc
           in
@@ -184,7 +184,7 @@ let c_section_main_itemkind_li ?(supthf : string option) (rth : string) (th : st
         | `Theory -> assert false
         | _ ->
             let (hdoc, tdoc) = 
-              if doc = [] then "", []
+              if doc = [] then "No description available. (However, source code is still provided in the details below.)", []
               else if List.length doc = 1 then List.hd doc, []
               else List.hd doc, List.tl doc
             in
