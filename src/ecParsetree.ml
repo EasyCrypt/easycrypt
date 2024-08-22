@@ -1286,7 +1286,7 @@ type global_action =
   | GdumpWhy3    of string
   | Gbdep        of pgamepath * psymbol * int * int * (string list) * psymbol
   | Gbbitstring  of pqsymbol * pqsymbol * pty * int
-  | Gbbsarray  of pqsymbol * pqsymbol * pty * int
+  | Gbbsarray    of pqsymbol * pqsymbol * pqsymbol * pty * int
   | Gbcircuit    of pqsymbol * string
   | Gbqfabvop    of pqsymbol * string
   | Gtest        of pqsymbol * pqsymbol

@@ -257,7 +257,7 @@ end
 
 module Circ : sig 
   val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
-  val add_bsarray : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
+  val add_bsarray : scope -> pqsymbol -> pqsymbol -> pqsymbol -> pty -> int -> scope
   val add_circuit : scope -> pqsymbol -> string -> scope
   val add_qfabvop : scope -> pqsymbol -> string -> scope
 

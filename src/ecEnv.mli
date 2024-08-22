@@ -26,6 +26,7 @@ type bitstring = { (* FIXME: maybe move this later? *)
 type bsarray = {
   get : path;
   set : path;
+  to_list: path;
   size : int;
 }
 
@@ -539,7 +540,7 @@ module Circ : sig
   val lookup_qfabvop_path        : env -> path    -> qfabvop option
   val lookup_qfabvop             : env -> qsymbol -> qfabvop option
 
-  val bind_bsarray   : env -> path -> path -> path -> int -> env
+  val bind_bsarray   : env -> path -> path -> path -> path -> int -> env
   val lookup_bsarray : env -> ty -> bsarray option
   val lookup_bsarray_path : env -> path -> bsarray option
   val lookup_bsarray_size : env -> ty -> int option

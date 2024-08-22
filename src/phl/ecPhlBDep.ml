@@ -66,6 +66,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
     let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name;
       List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps);
       Format.eprintf "@."; ) circs outvs in
+    let () = List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) circs in
     assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1);
     let cinp = (List.hd circs).inps in
     let c = {(circuit_aggregate circs) with inps=cinp} in
@@ -173,10 +174,11 @@ let process_bdep
 =
 
   let env = FApi.tc1_env tc in
-  let f_app_safe = EcTypesafeFol.f_app_safe in
+  let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
+
 
   (* DEBUG SECTION *)
-  (* let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in *)
+  let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
   
   let get_var (v: symbol) (m: memenv) : variable =
     match EcMemory.lookup_me v m with
@@ -221,54 +223,65 @@ let process_bdep
     f_op fb [] fbo.op_ty 
   in
 
+  let flatten_to_bits (f: form) = 
+    match EcEnv.Circ.lookup_bsarray env f.f_ty with
+    | Some {to_list=to_list; _} -> 
+      let base = match f.f_ty.ty_node with
+      | Tconstr (_, [b]) -> b
+      | _ -> assert false
+      in 
+      let w2bits = w2bits_op base in
+      EcCoreLib.CI_List.p_flatten @@!
+      [EcCoreLib.CI_List.p_map @@! [w2bits; (to_list @@! [f])]]
+    | None -> Format.eprintf "Not an array type %a@."
+      (pp_type) f.f_ty;
+      w2bits f.f_ty f
+  in
+  
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
 
   
-  let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
-  let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
-  let tc = EcPhlConseq.t_conseq f_true f_false tc in
-  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
 
   (* ------------------------------------------------------------------ *)
-  (* let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in *)
-  (* let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in *)
-  (* let poutvs = List.map (w2bits (List.hd poutvs).f_ty) poutvs in *)
-  (* let poutvs = List.rev poutvs in *)
-  (* let poutvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in *)
-  (* let poutvs = f_app_safe env EcCoreLib.CI_List.p_flatten [poutvs] in *)
-  (* let poutvs = f_app_safe env (EcCoreLib.CI_List.p_chunk) [f_int (BI.of_int m); poutvs] in *)
-  (* let poutvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(bits2w_op outbty); poutvs] in *)
+  let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
+  let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
+  let poutvs = List.map flatten_to_bits poutvs in
+  let poutvs = List.rev poutvs in
+  let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
+  let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_map @@! [(bits2w_op outbty); poutvs] in
 
   
   (* ------------------------------------------------------------------ *)
-  (* let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in *)
+  let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
   (* let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in *)
-  (* let invs, inv_tys = List.map (fun v -> EcEnv.Var.lookup_local v env) invs |> List.split in *)
-  (* let inty = match collapse inv_tys with *)
-  (* | Some ty -> ty *)
-  (* | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError *)
-  (* in *)
-  (* let invs = List.map (fun id -> f_local id inty) invs in *)
-  (* let pinpvs = List.map (w2bits inty) invs in *)
-  (* let pinpvs = List.rev pinpvs in *)
-  (* let pinpvs = List.fold_right (fun v1 v2 -> f_app_safe env EcCoreLib.CI_List.p_cons [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in *)
-  (* let pinpvs = f_app_safe env EcCoreLib.CI_List.p_flatten [pinpvs] in *)
-  (* let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in *)
-  (* let pinpvs = f_app_safe env EcCoreLib.CI_List.p_chunk [f_int (BI.of_int n); pinpvs] in *)
-  (* let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in *)
-  (* let b2w = (bits2w_op inpbty) in *)
-  (* let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in *)
-  (* let pinpvs =  EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [b2w; pinpvs] in *)
-  (* let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in *)
-  (* let pinpvs_post = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_map [(f_op pop [] oop.op_ty); pinpvs] in *)
+  let invs, inv_tys = List.map (fun v -> EcEnv.Var.lookup_local v env) invs |> List.split in
+  let inty = match collapse inv_tys with
+  | Some ty -> ty
+  | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
+  in
+  let invs = List.map (fun id -> f_local id inty) invs in
+  let pinpvs = List.map flatten_to_bits invs in
+  let pinpvs = List.rev pinpvs in
+  let pinpvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
+  let pinpvs = EcCoreLib.CI_List.p_flatten @@! [pinpvs] in
+  let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
+  let pinpvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinpvs] in
+  let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
+  let b2w = (bits2w_op inpbty) in
+  let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
+  let pinpvs = EcCoreLib.CI_List.p_map @@! [b2w; pinpvs] in
+  let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
+  let pinpvs_post = EcCoreLib.CI_List.p_map @@! [(f_op pop [] oop.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
-  (* let post = f_eq pinpvs_post poutvs in *)
-  (* let pre = EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_all [(f_op ppcond [] opcond.op_ty); pinpvs] in *)
+  let post = f_eq pinpvs_post poutvs in
+  let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpvs] in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
-  (* let tc = EcPhlConseq.t_conseq pre post tc in *)
-  (* FApi.t_last (t_bdep outvs n inpvs m op pcond) tc *) 
+  let tc = EcPhlConseq.t_conseq pre post tc in
+  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
 
 (* CODE STORAGE - DO NOT TOUCH *)
 

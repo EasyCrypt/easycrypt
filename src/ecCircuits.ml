@@ -175,7 +175,14 @@ let match_arg (inp: cinput) (var: circ) : bool =
 
 let apply (f: circuit) (args: circ list) : circ = 
   assert (List.compare_lengths f.inps args = 0);
-  assert (List.for_all2 match_arg f.inps args);
+  let () = try
+    assert (List.for_all2 match_arg f.inps args);
+  with Assert_failure _ as e -> 
+    Format.eprintf "Error applying on %s@." (circuit_to_string f);
+    Format.eprintf "Arguments: @.";
+    List.iter (Format.eprintf "%s@.") (List.map circ_to_string args);
+    raise e
+  in
   let args = List.combine f.inps args in
   let map_ = fun (id, i) ->
     let vr = List.find_opt (function 
@@ -326,6 +333,7 @@ let circuit_bwarray_get (n: width) (w: width) (i: int) : circuit =
   let arr = circ_ident arr_inp in
   {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
 
+
   
 (* Function application, C.reg = concrete (non-function) circuit 
    Application must not be partial, for partial application
@@ -387,6 +395,9 @@ let circuit_bw_split (c: circuit) (w: int) : circuit =
     assert (nk mod w = 0);
     let rs = blocks r w |> Array.of_list in
     {circ=BWArray rs; inps = c.inps}
+
+
+
 (* 
   if we have some 
   c(a_1, ..., a_n)
@@ -426,6 +437,28 @@ let circuit_aggregate_inps (c: circuit) : circuit =
   | _ -> let circs, inp = bus_of_cinputs c.inps in
     {circ=apply c circs; inps=[inp]}
 
+let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit =
+  assert (n*w > i*aw);
+  assert (n*w mod aw = 0);
+  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let arr = circ_ident arr_inp in
+  let arr = circuit_flatten arr in
+  {circ=BWCirc (List.drop (i*aw) (destr_bwcirc arr.circ) |> List.take aw); inps=[arr_inp]}
+
+let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit =
+  assert (n*w > i*aw);
+  assert (n*w mod aw = 0);
+  let bw_inp = BWInput (create "bw_input", aw) in
+  let bw = circ_ident bw_inp in
+  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let arr = circ_ident arr_inp in
+  let arr = circuit_flatten arr in
+  let arr_circ = destr_bwcirc arr.circ in
+  let bw_circ = destr_bwcirc bw.circ in
+  let res_circ = (List.take (i*aw) arr_circ) @ bw_circ @ (List.drop ((i+1)*aw) arr_circ) in
+  {circ=BWCirc (res_circ); inps=[arr_inp; bw_inp]}
+
+
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
   let temp_symbol = "tdep_ident" in
   let m = Set.cardinal bs in
@@ -460,6 +493,10 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in
     (r::cs, c)) ([], destr_bwcirc c.circ) deps in
   assert (List.length c = 0);
+  List.map (function
+    | {circ=BWCirc r; inps=[BWInput (idn, w)]}
+      -> {circ=BWCirc (C.uextend ~size:m r); inps=[BWInput (idn, n)]}
+    | _ -> assert false)
   cs
 
   
@@ -564,21 +601,21 @@ module BaseOps = struct
       {circ = BWCirc (C.opp c1); inps = [BWInput(id1, size)]}
 
     (* Bitwise operations *)
-    | "andw" -> (* Unsigned low word mul *)
+    | "andw" -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.land_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
-    | "`>>`" -> (* Unsigned low word mul *)
+    | "`>>`" -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size:8 ~name:id2.id_tag in
       {circ = BWCirc(C.shift ~side:`R ~sign:`L c1 c2); inps = [BWInput(id1, size); BWInput(id2, 8)]}
 
-    | "`<<`" -> (* Unsigned low word mul *)
+    | "`<<`" -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
@@ -821,6 +858,40 @@ let circuit_of_form
   : circuit =
   
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (env: env) (f: form) : env * circuit = 
+    let process_bwslice_ops (cache: _) (env: env) (f: form) : (env * circuit) option =
+      let (fp, _), fs = destr_op_app f in
+      match (EcPath.toqsymbol fp) with
+      | _, x when String.starts_with x "sliceget" -> 
+        let aw, n, w = match (String.split_on_char '_' x) with
+        | ["sliceget"; aw; n; w] ->
+          (String.to_int aw, String.to_int n, String.to_int w)
+        | _ -> assert false
+        in 
+        let arr, i = match fs with
+        | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
+        | _ -> assert false
+        in
+        let r = circuit_bwarray_slice_get n w aw i in
+        let env, arr = doit cache env arr in
+        Some (env, compose r [arr])
+  
+      | _, x when String.starts_with x "sliceset" -> 
+        let aw, n, w = match (String.split_on_char '_' x) with
+        | ["sliceset"; aw; n; w] ->
+          (String.to_int aw, String.to_int n, String.to_int w)
+        | _ -> assert false
+        in 
+        let arr, i, v = match fs with
+        | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
+        | _ -> assert false
+        in
+        let r = circuit_bwarray_slice_set n w aw i in
+        let env, arr = doit cache env arr in
+        let env, v = doit cache env v in
+        Some (env, compose r [arr; v])
+      | _ -> None
+    in
+    
     match f.f_node with
     (* hardcoding size for now FIXME *)
     | Fint z -> env, {circ = BWCirc(C.of_bigint ~size:256 (to_zt z)); inps = []}
@@ -896,36 +967,40 @@ let circuit_of_form
         env, circ
     end
     | Fapp _ -> 
-      let (f, fs) = EcCoreFol.destr_app f in
-      let env, res = match ArrayOps.destr_getset_opt env @@ (EcCoreFol.destr_op f |> fst) with
-          (* Assuming correct types coming from EC *)
-          (* FIXME: add typechecking here ? *)
-        | Some (GET n) -> let env, res = 
-          match fs with
-          | [arr; {f_node=Fint i; _}] ->
-            let (_, t) = destr_array_type env arr.f_ty |> Option.get in
-            let w = width_of_type env t in
-            let env, arr = doit cache env arr in
-            env, compose (circuit_bwarray_get n w (BI.to_int i)) [arr]
-          | _ -> raise (CircError "set")
+      begin match process_bwslice_ops cache env f with
+      | Some (env, c) -> env, c
+      | None ->
+        let (f, fs) = EcCoreFol.destr_app f in
+        let env, res = match ArrayOps.destr_getset_opt env @@ (EcCoreFol.destr_op f |> fst) with
+            (* Assuming correct types coming from EC *)
+            (* FIXME: add typechecking here ? *)
+          | Some (GET n) -> let env, res = 
+            match fs with
+            | [arr; {f_node=Fint i; _}] ->
+              let (_, t) = destr_array_type env arr.f_ty |> Option.get in
+              let w = width_of_type env t in
+              let env, arr = doit cache env arr in
+              env, compose (circuit_bwarray_get n w (BI.to_int i)) [arr]
+            | _ -> raise (CircError "set")
+            in env, res
+          | Some (SET n) -> let env, res = 
+            match fs with
+            | [arr; {f_node=Fint i; _}; v] ->
+              let w = width_of_type env v.f_ty  in
+              let env, arr = doit cache env arr in
+              let env, v = doit cache env v in
+              env, compose (circuit_bwarray_set n w (BI.to_int i)) [arr; v]
+            | _ -> raise (CircError "set")
+            in env, res
+          | _ -> 
+            let env, f_c = doit cache env f in
+            let env, fcs = List.fold_left_map
+              (doit cache)
+              env fs 
+            in
+            env, compose f_c fcs
           in env, res
-        | Some (SET n) -> let env, res = 
-          match fs with
-          | [arr; {f_node=Fint i; _}; v] ->
-            let w = width_of_type env v.f_ty  in
-            let env, arr = doit cache env arr in
-            let env, v = doit cache env v in
-            env, compose (circuit_bwarray_set n w (BI.to_int i)) [arr; v]
-          | _ -> raise (CircError "set")
-          in env, res
-        | _ -> 
-          let env, f_c = doit cache env f in
-          let env, fcs = List.fold_left_map
-            (doit cache)
-            env fs 
-          in
-          env, compose f_c fcs
-        in env, res
+      end
       
     | Fquant (qnt, binds, f) -> 
       (* FIXME: check if this is desired behaviour for exists and add logic for others *)
