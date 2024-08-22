@@ -170,6 +170,12 @@ type bitstring = {
   from_bits: path;
   size: int;
 }
+
+type bsarray = {
+  get : path;
+  set : path;
+  size : int;
+}
   
 type qfabvop = 
   | BVADD of int
@@ -179,6 +185,7 @@ type circ_env = {
   bitstrings: bitstring Mp.t;
   circuits: string Mp.t;
   qfabvops: qfabvop Mp.t;
+  bsarrays: bsarray Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -326,7 +333,8 @@ let empty gstate =
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
-    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; qfabvops = Mp.empty; };
+    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; 
+                    qfabvops = Mp.empty; bsarrays = Mp.empty;};
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -3622,13 +3630,16 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 
 
 module Circ : sig
-  
   val bind_bitstring : env -> path -> path -> path -> int -> env
+  val bind_bsarray   : env -> path -> path -> path -> int -> env
   val bind_circuit   : env -> path -> string -> env
   val bind_qfabvop   : env -> path -> string -> env
   val lookup_bitstring : env -> ty -> bitstring option
   val lookup_bitstring_path: env -> path -> bitstring option
   val lookup_bitstring_size : env -> ty -> int option
+  val lookup_bsarray : env -> ty -> bsarray option
+  val lookup_bsarray_path : env -> path -> bsarray option
+  val lookup_bsarray_size : env -> ty -> int option
   val lookup_circuit : env -> qsymbol -> string option
   val lookup_bitstring_size_path : env -> path -> int option
   val lookup_circuit_path : env -> path -> string option
@@ -3637,10 +3648,15 @@ module Circ : sig
   
 
 end = struct
-  let bind_bitstring (env: env) (tb: path) (fb:path) (ty: path) (n: int) : env = 
+  let bind_bitstring (env: env) (to_bits: path) (from_bits:path) (ty: path) (size: int) : env = 
     Format.eprintf "Binding bitstring for type %s@." (EcPath.tostring ty);
     {env with env_circ =
-      {env.env_circ with bitstrings = Mp.add ty {to_bits=tb;from_bits=fb;size=n} env.env_circ.bitstrings}}
+      {env.env_circ with bitstrings = Mp.add ty {to_bits;from_bits;size} env.env_circ.bitstrings}}
+
+  let bind_bsarray (env: env) (get: path) (set: path) (ty: path) (size: int) : env =
+    Format.eprintf "Binding bsarray for type %s@." (EcPath.tostring ty);
+    {env with env_circ = 
+      {env.env_circ with bsarrays = Mp.add ty {get; set; size} env.env_circ.bsarrays}}
     
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     (* TODO: add absolute paths for circuit binding and lookup *)
@@ -3664,18 +3680,27 @@ end = struct
       (* (List.fold_right (fun a b -> a ^ "." ^ b) h t); assert false *) 
     (* | Tfun    (ty1, ty2) -> Format.eprintf "Unknown bitstring type (Tfun)@."; assert false *) 
     
-  let lookup_bitstring_size_path (env: env) (ty: path) : int option = 
-    match Mp.find_opt ty env.env_circ.bitstrings with
-    | Some {size=sz;_} -> Some sz
-    | None -> None
+  let lookup_bitstring_size_path (env: env) (pth: path) : int option = 
+    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring_path env pth)
+
   
   let lookup_circuit_path (env: env) (v: path) : string option = 
     Mp.find_opt v env.env_circ.circuits
 
   let lookup_bitstring_size (env: env) (ty: ty) : int option =
+    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring env ty)
+
+  let lookup_bsarray_path (env: env) (pth: path) : bsarray option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
+    Mp.find_opt k env.env_circ.bsarrays
+
+  let lookup_bsarray (env: env) (ty: ty) : bsarray option = 
     match ty.ty_node with
-    | Tconstr (p, []) -> lookup_bitstring_size_path env p
+    | Tconstr (p, [w]) -> lookup_bsarray_path env p
     | _ -> None
+
+  let lookup_bsarray_size (env: env) (ty: ty) : int option = 
+    Option.map (fun c -> c.size) (lookup_bsarray env ty)
 
   let lookup_circuit (env: env) (o: qsymbol) : string option =
     let p, _o = Op.lookup o env in

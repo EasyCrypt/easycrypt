@@ -2437,6 +2437,7 @@ end
 
 module Circ : sig 
   val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
+  val add_bsarray : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
   val add_circuit : scope -> pqsymbol -> string -> scope
   val add_qfabvop : scope -> pqsymbol -> string -> scope
 
@@ -2501,6 +2502,25 @@ end = struct
       let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in
       Cloning.clone {sc with sc_env = EcSection.add_item item sc.sc_env } `Check tc
     | _ -> assert false
+
+  
+  let add_bsarray (sc: scope) (get: pqsymbol) (set: pqsymbol) (pt: pty) (n: int) : scope = 
+    let env = (env sc) in
+    (* let loced a = mk_loc (get.pl_loc) a in *)
+
+    let getp, _geto = EcEnv.Op.lookup get.pl_desc env in
+    let setp, _seto = EcEnv.Op.lookup set.pl_desc env in
+    
+    let ue = EcTyping.transtyvars env (pt.pl_loc, None) in
+    let t = EcTyping.transty tp_tydecl env ue pt in
+    match t.ty_node with
+    | Tconstr (p, [t]) ->
+      Format.eprintf "Registering array type %s over type %a@."
+        (EcPath.tostring p) (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t;
+      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bsarray (getp, setp, p, n)) in
+      {sc with sc_env = EcSection.add_item item sc.sc_env}
+    | _ -> assert false
+
   
   let add_circuit (sc: scope) (o: pqsymbol) (c: string) : scope =
     let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in

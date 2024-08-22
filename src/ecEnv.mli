@@ -22,6 +22,13 @@ type bitstring = { (* FIXME: maybe move this later? *)
   from_bits : path;
   size : int;
 }
+
+type bsarray = {
+  get : path;
+  set : path;
+  size : int;
+}
+
 type qfabvop = 
   | BVADD of int 
   | BVSUB of int
@@ -528,4 +535,8 @@ module Circ : sig
   val lookup_qfabvop_path        : env -> path    -> qfabvop option
   val lookup_qfabvop             : env -> qsymbol -> qfabvop option
 
+  val bind_bsarray   : env -> path -> path -> path -> int -> env
+  val lookup_bsarray : env -> ty -> bsarray option
+  val lookup_bsarray_path : env -> path -> bsarray option
+  val lookup_bsarray_size : env -> ty -> int option
 end 

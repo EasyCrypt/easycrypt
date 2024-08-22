@@ -3892,6 +3892,9 @@ global_action:
 
 | BIND BITSTRING tb=qoident fb=qoident t=loc(simpl_type_exp) n=uint
   { Gbbitstring (tb, fb, t, (BI.to_int n)) }
+
+| BIND BITSTRING CIRCUIT get=qoident set=qoident t=loc(simpl_type_exp) n=uint
+  { Gbbsarray (get, set, t, (BI.to_int n)) }
   
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }

@@ -39,6 +39,7 @@ and theory_item_r =
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of (int * symbol option * path list * is_local)
   | Th_bitstring of (path * path * path * int)
+  | Th_bsarray   of (path * path * path * int)
   | Th_circuit   of (path * string)
   | Th_qfabvop   of (path * string)
 
