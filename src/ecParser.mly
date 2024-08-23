@@ -660,6 +660,7 @@ _lident:
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
 | ASYNC      { "async"      }
+| BIND       { "bind"       }
 | DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
