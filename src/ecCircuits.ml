@@ -849,10 +849,13 @@ let circ_sat (f: circuit) (pcond: circuit option): bool =
 (* Refactor this later *)
 let op_cache = ref Mp.empty
 
+type pstate = (symbol, circuit) Map.t
+type cache  = (ident, (cinput * circuit)) Map.t
+
 (* TODO: simplify args and unify dealing with cache / vars *)
 let circuit_of_form 
-  ?(pstate : (symbol, circuit) Map.t = Map.empty) 
-  ?(cache  : (ident, (cinput * circuit))  Map.t = Map.empty) 
+  ?(pstate : pstate = Map.empty) 
+  ?(cache  : cache = Map.empty) 
    (env    : env) 
    (f      : EcAst.form) 
   : circuit =
@@ -1083,7 +1086,7 @@ let pstate_of_memtype ?(pstate = Map.empty) (env: env) (mt: memtype) =
   in pstate, inps
 
 
-let process_instr (env:env) (mem: memory) ?(cache: _ = Map.empty) (pstate: _) (inst: instr) =
+let process_instr (env:env) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache env) pstate
