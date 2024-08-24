@@ -794,6 +794,8 @@ let is_op_not      p = EcPath.p_equal EcCoreLib.CI_Bool.p_not p
 let is_op_imp      p = EcPath.p_equal EcCoreLib.CI_Bool.p_imp p
 let is_op_iff      p = EcPath.p_equal EcCoreLib.CI_Bool.p_iff p
 let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
+let is_op_cons     p = EcPath.p_equal EcCoreLib.CI_List.p_cons p
+let is_op_witness  p = EcPath.p_equal EcCoreLib.CI_Witness.p_witness p
 
 (* -------------------------------------------------------------------- *)
 let destr_op = function
@@ -865,6 +867,20 @@ let destr_nots form =
     | Some form -> aux (not b) form
   in aux true form
 
+let destr_cons form = 
+  match destr_app form with
+  | {f_node = Fop (p, _)}, [h;t] when is_op_cons p -> (h, t)
+  | _ -> destr_error "cons"
+
+(* Returns empty list if not actually a list FIXME *)
+let destr_list form =
+  let rec aux form = 
+    match try Some (destr_cons form) with DestrError _ -> None with
+    | Some (h, t) -> h::(aux t)
+    | None -> []
+  in
+  aux form
+
 (* -------------------------------------------------------------------- *)
 let is_from_destr dt f =
   try ignore (dt f); true with DestrError _ -> false
@@ -898,6 +914,8 @@ let is_bdHoareS  f = is_from_destr destr_bdHoareS  f
 let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
 let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
+
+let is_witness   f = destr_op f |> fst |> is_op_witness
 
 (* -------------------------------------------------------------------- *)
 let split_args f =

@@ -316,6 +316,10 @@ val destr_int       : form -> zint
 val destr_glob      : form -> EcIdent.t        * memory
 val destr_pvar      : form -> EcTypes.prog_var * memory
 
+val destr_cons      : form -> form * form
+val destr_list      : form -> form list
+val is_witness      : form -> bool
+
 (* -------------------------------------------------------------------- *)
 val is_true      : form -> bool
 val is_false     : form -> bool

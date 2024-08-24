@@ -333,7 +333,6 @@ let circuit_bwarray_get (n: width) (w: width) (i: int) : circuit =
   let arr = circ_ident arr_inp in
   {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
 
-
   
 (* Function application, C.reg = concrete (non-function) circuit 
    Application must not be partial, for partial application
@@ -456,7 +455,8 @@ let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit
   let arr_circ = destr_bwcirc arr.circ in
   let bw_circ = destr_bwcirc bw.circ in
   let res_circ = (List.take (i*aw) arr_circ) @ bw_circ @ (List.drop ((i+1)*aw) arr_circ) in
-  {circ=BWCirc (res_circ); inps=[arr_inp; bw_inp]}
+  let res_circs = blocks res_circ w in
+  {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
 
 
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
@@ -807,7 +807,7 @@ let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool =
   | None -> {circ = BWCirc [C.true_]; inps = f.inps}
   in
   match merge_inputs [f;g;pcond] with
-  | None -> false
+  | None -> Format.eprintf "Failed to merge inputs@."; false
   | Some [{circ=BWCirc fcirc; _} as f;
     {circ=BWCirc gcirc; _};
     {circ=BWCirc pccirc; _}] ->
@@ -894,6 +894,33 @@ let circuit_of_form
         Some (env, compose r [arr; v])
       | _ -> None
     in
+
+    let process_bw_oflist (cache: _) (env: env) (f: form) : (env * circuit) option =
+      let (pth, _), fs = destr_op_app f in
+      match (EcPath.toqsymbol pth), fs with
+      | (_, "of_list"), [wtn; vs] ->
+        let _, n, w = destr_bwainput @@ cinput_of_type env f.f_ty in
+        (* FIXME: have an actual way to get sizes without creating new idents *)
+        let vs = EcCoreFol.destr_list vs in
+        let env, vs = List.fold_left_map (doit cache) env vs in
+        begin match EcCoreFol.is_witness wtn with
+        | false -> 
+          let env, wtn = doit cache env wtn in
+          assert(List.is_empty wtn.inps && List.for_all (fun c -> List.is_empty c.inps) vs);
+          let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
+          let wtn = destr_bwcirc wtn.circ in
+          let r = Array.init n (fun i -> List.nth_opt vs i |> Option.default wtn) in
+          Some(env, {circ = BWArray r; inps = []})
+        | true -> 
+          assert (List.compare_length_with vs n = 0);
+          assert (List.for_all (fun c -> List.is_empty c.inps) vs);
+          let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
+          let r = Array.of_list vs in
+          Some(env, {circ=BWArray r; inps=[]})
+        end
+      | _ -> Format.eprintf "Not oflist %s@." (EcPath.tostring pth); None
+    in
+        
     
     match f.f_node with
     (* hardcoding size for now FIXME *)
@@ -970,9 +997,14 @@ let circuit_of_form
         env, circ
     end
     | Fapp _ -> 
-      begin match process_bwslice_ops cache env f with
-      | Some (env, c) -> env, c
-      | None ->
+      let t1 = process_bwslice_ops cache env f in
+      let t1 = match t1 with
+        | Some (env, c) -> t1
+        | None -> process_bw_oflist cache env f 
+      in
+      begin match t1 with
+        | Some (env, c) -> env, c
+        | None ->
         let (f, fs) = EcCoreFol.destr_app f in
         let env, res = match ArrayOps.destr_getset_opt env @@ (EcCoreFol.destr_op f |> fst) with
             (* Assuming correct types coming from EC *)
