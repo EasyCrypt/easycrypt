@@ -280,7 +280,9 @@ let process_bdep
   let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpvs] in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
-  let tc = EcPhlConseq.t_conseq pre post tc in
+  let goal = FApi.tc1_goal tc in
+  let orig_pre = (EcCoreFol.destr_hoareS goal).hs_pr in
+  let tc = EcPhlConseq.t_conseq pre (f_and orig_pre post) tc in
   FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
 
 (* CODE STORAGE - DO NOT TOUCH *)
