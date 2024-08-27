@@ -26,7 +26,7 @@ val circ_ident : cinput -> circuit
 val circuit_aggregate : circuit list -> circuit
 val circuit_mapreduce : circuit -> int -> int -> circuit list
 val circ_check : circuit -> circuit option -> bool
-val circ_equiv : circuit -> circuit -> circuit option -> bool
+val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
 val circuit_of_form : ?pstate:pstate -> ?cache:cache -> env -> form -> circuit
 val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list
 val input_of_variable : env -> variable -> circuit * cinput

@@ -73,7 +73,7 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
     let cs = circuit_mapreduce c n m in
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
-    let () = assert(List.for_all (fun c -> circ_equiv (List.hd cs) c (Some pcondc)) (List.tl cs)) in
+    let () = assert(List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c (Some pcondc)) (List.tl cs)) in
     Format.eprintf "Lane func: %s@." (circuit_to_string fc);
     let () = assert(circ_equiv (List.hd cs) fc (Some pcondc)) in
     Format.eprintf "Success@."

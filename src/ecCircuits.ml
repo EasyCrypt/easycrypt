@@ -77,11 +77,11 @@ let destr_bwainput= function
   | _ -> assert false
 
 let bwinput_of_size (w: width) : cinput =
-  let name = "circ_input" in
+  let name = "bw_input" in
   BWInput (create name, w)
 
 let bwainput_of_size (n: width) (w: width) : cinput =
-  let name = "circ_input" in
+  let name = "arr_input" in
   BWAInput (create name, n, w)
 
 let size_of_cinput = function
@@ -121,6 +121,12 @@ let circ_to_string = function
   | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
   | BWArray a -> Format.sprintf "BWArray[%d@%d]" (Array.length a) (a.(0) |> List.length)
 
+let circ_shape_equal (c1: circ) (c2: circ) = 
+  match c1, c2 with
+  | BWArray r1, BWArray r2 -> Array.for_all2 (fun a b -> List.compare_lengths a b = 0) r1 r2
+  | BWCirc r1, BWCirc r2 -> List.compare_lengths r1 r2 = 0
+  | _ -> false
+
 (* Represents a circuit function *)
 (* Circuits with free variables that are not inputs = 
    universal quantification over circuits with that shape *)
@@ -149,9 +155,13 @@ let circ_ident (input: cinput) : circuit =
 (* List of bws into array as identity *)
 (* FIXME: find better name *)
 let circ_array_of_bws (inps: cinput list) : circuit = 
-  assert false
+  let rs = List.map circ_ident inps |> List.map (fun c -> destr_bwcirc c.circ) in
+  {circ=BWArray (Array.of_list rs); inps}
 
-(* TODO: implement common functions *)
+let circ_array_of_bw (inp: cinput) (w: width) : circuit =
+  let r = circ_ident inp in
+  let r = destr_bwcirc r.circ in
+  {circ = BWArray(blocks r w |> Array.of_list); inps=[inp]}
 
 (* Maybe rename to sig_equals? *)
 let input_shape_equal (f: circuit) (g: circuit) : bool = 
@@ -173,6 +183,12 @@ let match_arg (inp: cinput) (var: circ) : bool =
   | _ -> Format.eprintf "inp: %s does not match %s@."
     (cinput_to_string inp) (circ_to_string var); false
 
+(* Function application, C.reg = concrete (non-function) circuit 
+   Application must not be partial, for partial application
+   one should do f(a, x, y) = f(a(), Id, Id)
+   where a() = a
+*)
+    
 let apply (f: circuit) (args: circ list) : circ = 
   assert (List.compare_lengths f.inps args = 0);
   let () = try
@@ -318,6 +334,9 @@ let circuit_aggregate (c: circuit list) : circuit =
 let circuit_array_aggregate (c: circuit list) : circuit =
   List.reduce (+@) c
 
+
+(* TODO: unify array and bitword sliceset/sliceget
+   by: array = flatten |> sliceset/get |> rebuild *)
 let circuit_bwarray_set (n: width) (w: width) (i: int) : circuit =
   assert (n > i);
   let arr_inp = BWAInput (create "arr_input", n, w) in
@@ -334,12 +353,6 @@ let circuit_bwarray_get (n: width) (w: width) (i: int) : circuit =
   {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
 
   
-(* Function application, C.reg = concrete (non-function) circuit 
-   Application must not be partial, for partial application
-   one should do f(a, x, y) = f(a(), Id, Id)
-   where a() = a
-*)
-    
 (* Function composition for circuits *)
 (* Reduces to application if arguments are 0-ary *)
 (* Implemented through application by:
@@ -395,7 +408,11 @@ let circuit_bw_split (c: circuit) (w: int) : circuit =
     let rs = blocks r w |> Array.of_list in
     {circ=BWArray rs; inps = c.inps}
 
-
+let circuit_bw_zeroextend (c: circuit) (w: int) : circuit = 
+  assert(size_of_circ c.circ <= w);
+  let r = destr_bwcirc c.circ in
+  let zs = List.init (w - size_of_circ c.circ) (fun _ -> C.true_) in
+  {c with circ = BWCirc(r @ zs)}
 
 (* 
   if we have some 
@@ -439,7 +456,7 @@ let circuit_aggregate_inps (c: circuit) : circuit =
 let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit =
   assert (n*w > i*aw);
   assert (n*w mod aw = 0);
-  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let arr_inp = bwainput_of_size n w in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
   {circ=BWCirc (List.drop (i*aw) (destr_bwcirc arr.circ) |> List.take aw); inps=[arr_inp]}
@@ -447,9 +464,9 @@ let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit
 let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit =
   assert (n*w > i*aw);
   assert (n*w mod aw = 0);
-  let bw_inp = BWInput (create "bw_input", aw) in
+  let bw_inp = bwinput_of_size aw in
   let bw = circ_ident bw_inp in
-  let arr_inp = BWAInput (create "arr_input", n, w) in
+  let arr_inp = bwainput_of_size n w in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
   let arr_circ = destr_bwcirc arr.circ in
@@ -458,6 +475,25 @@ let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit
   let res_circs = blocks res_circ w in
   {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
 
+let circuit_bwcirc_get (w: width) (aw:int) (i: int) : circuit =
+  assert (w > i*aw);
+  assert (w mod aw = 0);
+  let bw_inp = bwinput_of_size w in
+  let bw = circ_ident bw_inp in
+  let bw = destr_bwcirc bw.circ in
+  {circ = BWCirc(List.take aw (List.drop (i*aw) bw)); inps=[bw_inp]}
+
+let circuit_bwcirc_set (w: width) (aw:int) (i:int) : circuit =
+  assert (w > i*aw);
+  assert (w mod aw = 0);
+  let bw_inp = bwinput_of_size w in
+  let bw = circ_ident bw_inp in
+  let bw = destr_bwcirc bw.circ in
+  let bw2_inp = bwinput_of_size aw in
+  let bw2 = circ_ident bw2_inp in
+  let bw2 = destr_bwcirc bw2.circ in
+  let bw = List.take (i*aw) bw @ bw2 @ List.drop ((i+1)*aw) bw in
+  {circ = BWCirc bw; inps=[bw_inp; bw2_inp]}
 
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
   let temp_symbol = "tdep_ident" in
@@ -559,6 +595,8 @@ module BaseOps = struct
     | _, "<=>" -> true
     | _, "true" -> true
     | _, "false" -> true
+
+    | _, "zeroextu64" -> true
     
     | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
       | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
@@ -575,6 +613,7 @@ module BaseOps = struct
       | "W32" -> 32 
       | "W16" -> 16 
       | "W8" -> 8 
+      | "W4u16" -> 16
       | "W16u16" -> 256
       | _ -> Format.eprintf "Unknown size for path %s@." (EcSymbols.string_of_qsymbol qpath); assert false
       in 
@@ -665,6 +704,12 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = BWCirc(C.uextend ~size:256 c1); inps = [BWInput(id1, size)]} (* FIXME: Assumes integeres are 256 bits *)
 
+    | "zeroextu64" ->
+    assert(size <= 64);
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size ~name:id1.id_tag in
+    {circ = BWCirc(C.uextend ~size:64 c1); inps = [BWInput(id1, size)]}
+
     
     | _ -> 
       let err = Format.asprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath) in
@@ -680,6 +725,7 @@ module BaseOps = struct
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:16 ~name:id1.id_tag in
     {circ = BWCirc(C.uextend ~size:32 c1); inps = [BWInput(id1, 16)]}
+
   
   | _, "sar_32_26" ->
     let id1 = EcIdent.create temp_symbol in
@@ -801,7 +847,13 @@ module ArrayOps = struct
     | _ -> None
 end
 
-let circ_equiv (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
+let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
+  let f, g = 
+    if strict then (assert(circ_shape_equal f.circ g.circ); f, g)
+    else if size_of_circ f.circ < size_of_circ g.circ then
+      circuit_bw_zeroextend f (size_of_circ g.circ), g else
+      f, circuit_bw_zeroextend g (size_of_circ f.circ)
+  in
   let pcond = match pcond with
   | Some pcond -> pcond
   | None -> {circ = BWCirc [C.true_]; inps = f.inps}
@@ -865,33 +917,59 @@ let circuit_of_form
       let (fp, _), fs = destr_op_app f in
       match (EcPath.toqsymbol fp) with
       | _, x when String.starts_with x "sliceget" -> 
-        let aw, n, w = match (String.split_on_char '_' x) with
+        begin
+        match (String.split_on_char '_' x) with
         | ["sliceget"; aw; n; w] ->
-          (String.to_int aw, String.to_int n, String.to_int w)
+          let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in
+          let arr, i = match fs with
+          | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
+          | _ -> assert false
+          in
+          let r = circuit_bwarray_slice_get n w aw i in
+          let env, arr = doit cache env arr in
+          Some (env, compose r [arr])
+        | ["sliceget"; aw; w] ->
+          let aw, w = (String.to_int aw, String.to_int w) in
+          let bw, i = match fs with
+          | [bw; {f_node=(Fint i)}] -> bw, (BI.to_int i)
+          | _ -> assert false
+          in
+          assert(w = width_of_type env bw.f_ty);
+          assert(aw = width_of_type env f.f_ty);
+          let env, bw = doit cache env bw in
+          let get_circ = circuit_bwcirc_get w aw i in
+          Some (env, compose get_circ [bw])
         | _ -> assert false
-        in 
-        let arr, i = match fs with
-        | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
-        | _ -> assert false
-        in
-        let r = circuit_bwarray_slice_get n w aw i in
-        let env, arr = doit cache env arr in
-        Some (env, compose r [arr])
+        end
   
       | _, x when String.starts_with x "sliceset" -> 
-        let aw, n, w = match (String.split_on_char '_' x) with
+        begin
+        match (String.split_on_char '_' x) with
         | ["sliceset"; aw; n; w] ->
-          (String.to_int aw, String.to_int n, String.to_int w)
+          let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in 
+          let arr, i, v = match fs with
+          | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
+          | _ -> assert false
+          in
+          let r = circuit_bwarray_slice_set n w aw i in
+          let env, arr = doit cache env arr in
+          let env, v = doit cache env v in
+          Some (env, compose r [arr; v])
+        | ["sliceset"; aw; w] ->
+          let aw, w = (String.to_int aw, String.to_int w) in 
+          let bw, i, v = match fs with
+          | [bw; {f_node=(Fint i)}; v] -> bw, (BI.to_int i), v
+          | _ -> assert false
+          in
+          assert(w = width_of_type env bw.f_ty);
+          assert(aw = width_of_type env f.f_ty);
+          assert(aw = width_of_type env v.f_ty);
+          let env, bw = doit cache env bw in
+          let env, v = doit cache env v in
+          let set_circ = circuit_bwcirc_set w aw i in
+          Some (env, compose set_circ [bw; v])
         | _ -> assert false
-        in 
-        let arr, i, v = match fs with
-        | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
-        | _ -> assert false
-        in
-        let r = circuit_bwarray_slice_set n w aw i in
-        let env, arr = doit cache env arr in
-        let env, v = doit cache env v in
-        Some (env, compose r [arr; v])
+        end
       | _ -> None
     in
 
@@ -1076,7 +1154,10 @@ let circuit_of_form
       in
       let res = match Map.find_opt v pstate with
         | Some circ -> circ
-        | None -> failwith ("No value for var " ^ v)
+        | None -> let circ = circ_ident (cinput_of_type ~idn:(create "uninit") env f.f_ty) in
+          {circ with inps=[]}
+      (* EXPERIMENTAL: allowing unitialized values *)
+          (* failwith ("No value for var " ^ v) *)
       in env, res
     | Fglob   (id, mem) -> assert false
     | Ftuple  comps -> assert false
