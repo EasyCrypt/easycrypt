@@ -2,7 +2,7 @@
 
 prover [""].
 
-require import AllCore SmtMap FSet StdOrder.
+require import AllCore FMap FSet StdOrder.
 import IntOrder.
 
 lemma get_none (m : ('a, 'b) fmap, x : 'a) :

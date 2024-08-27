@@ -1,4 +1,4 @@
-require import AllCore List DBool SmtMap.
+require import AllCore List DBool FMap.
 
 abstract theory SKE.
 

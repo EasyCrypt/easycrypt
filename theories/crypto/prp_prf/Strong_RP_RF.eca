@@ -1,4 +1,4 @@
-require import AllCore Distr List FSet SmtMap.
+require import AllCore Distr List FSet FMap.
 require import Dexcepted.
 require (*--*) PRP.
 (*---*) import RField StdOrder.RealOrder.

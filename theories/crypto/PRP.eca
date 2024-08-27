@@ -64,7 +64,7 @@ end StrongPRP.
 (** Ideal and Real functionalities **)
 (* -------------------------------------------------------------------- *)
 abstract theory RP.
-require import SmtMap FSet.
+require import FMap FSet.
 require import Dexcepted.
 (*---*) import StdOrder.RealOrder RField.
 

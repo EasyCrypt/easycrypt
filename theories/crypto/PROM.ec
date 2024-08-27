@@ -1,7 +1,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import AllCore SmtMap Distr Mu_mem.
+require import AllCore FMap Distr Mu_mem.
 require import FinType.
 require import StdBigop FelTactic.
 
