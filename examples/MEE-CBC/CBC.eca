@@ -1,6 +1,6 @@
 (*** A proof that CBC mode turns any weak PRP into an IND$- CPA-secure
      symmetric encryption scheme **when used with random IVs**  ***)
-require import AllCore Int Real Distr List FSet SmtMap.
+require import AllCore Int Real Distr List FSet FMap.
 require import StdRing StdOrder DList.
 require (*ab*) PRP PRF SKE_INDR. (* Definitions and Security Notions *)
 (*---*) import RField RealOrder.

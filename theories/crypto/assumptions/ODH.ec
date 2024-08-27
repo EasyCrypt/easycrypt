@@ -1,4 +1,4 @@
-require import DBool SmtMap FSet DList Int List.
+require import DBool FMap FSet DList Int List.
 require (****) Group.
 
 (* Multiple Oracle-DH *)

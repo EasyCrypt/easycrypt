@@ -1,4 +1,4 @@
-require import AllCore Distr DInterval FSet List SmtMap.
+require import AllCore Distr DInterval FSet List FMap.
 require PROM PlugAndPray.
 
 (***************************************)
