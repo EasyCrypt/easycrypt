@@ -91,7 +91,7 @@ proof.
   + auto => &hr /=.
     case: (O.c{hr} = Q) => [ -> /= | *].
     + rewrite Ep_mu (:(fun (a : r) => a \in O.log{hr}) = mem O.log{hr}); 1: by auto.
-      smt(mu_mem_le_mu1 size_ge0 mu_bounded dr_mu1).
+      rewrite -of_realM /=; smt(mu_mem_le_mu1 size_ge0 eps_ge0 dr_mu1).
     case: (Q < O.c{hr}); by smt().
   auto => &hr /=; apply xle_cxr => *; split; 1:smt().
   have -> /=: (Q < O.c{hr} + 1) = (Q <= O.c{hr}) by smt().
