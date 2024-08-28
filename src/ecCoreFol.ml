@@ -198,7 +198,7 @@ let ty_lmap ty1 ty2 = toarrow ([toarrow [ty1] ty2; tlist ty1]) (tlist ty2)
 let ty_chunk ty = toarrow [tint; tlist ty] (tlist @@ tlist ty)
 let ty_all ty = toarrow [(toarrow [ty] tbool); tlist ty] tbool
 
-let fop_empty ty = f_op EcCoreLib.CI_List.p_empty [] (tlist ty)
+let fop_empty ty = f_op EcCoreLib.CI_List.p_empty [ty] (tlist ty)
 let fop_cons ty = f_op EcCoreLib.CI_List.p_cons [ty] (ty_ftlist2 ty)
 let fop_append ty = f_op EcCoreLib.CI_List.p_append [ty] (ty_flist2 ty)
 let fop_flatten ty = f_op EcCoreLib.CI_List.p_flatten [ty] (ty_fllist ty)

@@ -98,6 +98,7 @@ let f_app_safe ?(full=true) (env: EcEnv.env) (f: EcPath.path) (args: form list) 
   let subst = EcCoreSubst.Tuni.subst uidmap in
   let rty = EcCoreSubst.ty_subst subst rty in
   let newt = EcCoreSubst.ty_subst subst newt in
+  let tvars = List.map (EcCoreSubst.ty_subst subst) tvars in
   let op = f_op p_f tvars newt in
   if full then
   match rty.ty_node with
