@@ -14,6 +14,10 @@ let rec makedirs (x : string) =
   end
 
 (* -------------------------------------------------------------------- *)
+let safe_unlink ~(filename : string) : unit =
+  try Unix.unlink filename with Unix.Unix_error _ -> ()
+
+(* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
 
 (* -------------------------------------------------------------------- *)
@@ -681,7 +685,19 @@ module String = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module IO = BatIO
+module IO : sig
+  include module type of BatIO
+
+  val pp_to_file : filename:string -> (Format.formatter -> unit) -> unit
+end = struct
+  include BatIO
+
+  let pp_to_file ~(filename : string) (pp : Format.formatter -> unit) =
+    BatFile.with_file_out filename (fun channel ->
+      let fmt = BatFormat.formatter_of_output channel in
+      Format.fprintf fmt "%t@." pp
+    )
+  end
 
 (* -------------------------------------------------------------------- *)
 module File = struct

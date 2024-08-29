@@ -321,6 +321,14 @@ type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
+val t_coq:
+     loc:EcLocation.t
+  -> name:string
+  -> mode:smtmode
+  -> coq_mode option
+  -> prover_infos
+  -> FApi.backward
+
 (* -------------------------------------------------------------------- *)
 val t_solve :
      ?canfail:bool
