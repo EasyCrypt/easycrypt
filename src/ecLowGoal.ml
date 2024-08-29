@@ -2436,6 +2436,35 @@ let t_smt ~(mode:smtmode) pi tc =
   else error ()
 
 (* -------------------------------------------------------------------- *)
+let t_coq
+  ~(loc     : EcLocation.t)
+  ~(name    : string)
+  ~(mode    : smtmode)
+   (coqmode : EcProvers.coq_mode option)
+   (pi      : EcProvers.prover_infos)
+   (tc      : tcenv1)
+=
+  let error () =
+    match mode with
+    | `Sloppy ->
+        tc_error !!tc ~catchable:true  "cannot prove goal"
+    | `Strict ->
+        tc_error !!tc ~catchable:false "cannot prove goal (strict)"
+    | `Report loc ->
+        EcEnv.notify (FApi.tc1_env tc) `Critical
+          "%s: Coq call failed"
+          (loc |> omap EcLocation.tostring |> odfl "unknown");
+        t_admit tc
+  in
+
+  let env, hyps, concl = FApi.tc1_eflat tc in
+  let notify = (fun lvl (lazy s) -> EcEnv.notify env lvl "%s" s) in
+
+  if   EcCoq.check ~loc ~name ~notify ?coqmode pi hyps concl
+  then FApi.xmutate1 tc `Smt []
+  else error ()
+
+(* -------------------------------------------------------------------- *)
 let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(mode = fmdelta) ?(depth = 1) (tc : tcenv1) =
   let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
 
