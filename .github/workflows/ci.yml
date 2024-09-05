@@ -124,12 +124,12 @@ jobs:
       with:
         path: easycrypt
     - name: Extract target branch name
-      run: echo "branch=refs/heads/merge-${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+      run: echo "branch=merge-${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
       id: extract_branch
     - name: Find remote branch
       id: branch_name
       run: |
-        git ls-remote --exit-code --heads ${{ matrix.target.repository }} ${{ steps.extract_branch.outputs.branch }} || exists=$?
+        git ls-remote --exit-code --heads ${{ matrix.target.repository }} refs/heads/${{ steps.extract_branch.outputs.branch }} || exists=$?
         if [ "$exists" = "2" ];
         then echo "REPO_BRANCH=${{ matrix.target.branch }}" >> $GITHUB_OUTPUT;
         else echo "REPO_BRANCH=${{ steps.extract_branch.outputs.branch }}" >> $GITHUB_OUTPUT;
