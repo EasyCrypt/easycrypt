@@ -1,2 +1,2 @@
 (* -------------------------------------------------------------------- *)
-val generate_html : string option -> EcScope.scope -> unit
+val generate_html : ?outdirp:string -> string option -> EcScope.scope -> unit

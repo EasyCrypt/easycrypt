@@ -290,14 +290,25 @@ let emit_pages (dp : string) (th : string) (tstr : string) (gdoc : string list) 
 
 (* -------------------------------------------------------------------- *)
 (* input = input name, scope contains all documentation items *)
-let generate_html (fname : string option) (scope : EcScope.scope) : unit =
+let generate_html ?(outdirp : string option) (fname : string option) (scope : EcScope.scope) : unit =
   match fname with
   | Some fn ->
       let kind =
         try  EcLoader.getkind (Filename.extension fn)
         with EcLoader.BadExtension _ -> assert false 
       in
-      let dp, fn = Filename.dirname fn, Filename.basename fn in
+      let dp =
+        match outdirp with
+        | None -> Filename.dirname fn
+        | Some outdirp -> 
+          try
+            if Sys.is_directory outdirp
+            then outdirp
+            else raise (Invalid_argument (Format.sprintf "%s is not an existing directory." outdirp))
+          with
+          | _ as ex -> Printf.eprintf "Exception: %s\n." (Printexc.to_string ex); raise ex
+      in
+      let fn = Filename.basename fn in
       let th = Filename.remove_extension fn in
       let tstr = thkind_str kind  ^ " " ^ th in
       begin

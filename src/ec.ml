@@ -393,6 +393,7 @@ let main () =
       eco         : bool;
       gccompact   : int option;
       gendoc      : bool;
+      outdirp     : string option;
     }
   end in
 
@@ -448,7 +449,8 @@ let main () =
         ; interactive = true
         ; eco         = false
         ; gccompact   = None
-        ; gendoc      = false }
+        ; gendoc      = false 
+        ; outdirp     = None }
 
     end
 
@@ -476,14 +478,54 @@ let main () =
         ; interactive = false
         ; eco         = cmpopts.cmpo_noeco
         ; gccompact   = cmpopts.cmpo_compact
-        ; gendoc      = cmpopts.cmpo_doc }
+        ; gendoc      = false
+        ; outdirp     = None }
 
       end
 
     | `Runtest _ ->
         (* Eagerly executed *)
         assert false
+    
+    | `GenDoc docopts -> begin
+        let name = docopts.doco_input in
 
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+        let prvoff =  {
+          prvo_maxjobs = None;
+          prvo_timeout = None;
+          prvo_cpufactor = None;
+          prvo_provers = None;
+          prvo_pragmas = [];
+          prvo_ppwidth = None;
+          prvo_checkall = false;
+          prvo_profile = false;
+          prvo_iterate = false;
+          prvo_why3server = None; } 
+        in
+
+        let terminal =
+          lazy (T.from_channel ~name (open_in name))
+        in
+
+        { prvopts     = prvoff
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = true
+        ; gccompact   = None
+        ; gendoc      = true
+        ; outdirp     = docopts.doco_outdirp }
+      end
+
+      
   in
 
   (match state.input with
@@ -679,7 +721,7 @@ let main () =
             if not state.eco then
               finalize_input state.input (EcCommands.current ());
             if state.gendoc then
-              EcDoc.generate_html state.input (EcCommands.current ());
+              EcDoc.generate_html ?outdirp:state.outdirp state.input (EcCommands.current ());
             exit 0
           end;
       with

@@ -9,6 +9,7 @@ type command = [
   | `Config
   | `Runtest of run_option
   | `Why3Config
+  | `GenDoc  of doc_option 
 ]
 
 and options = {
@@ -24,7 +25,6 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
-  cmpo_doc     : bool;
 }
 
 and cli_option = {
@@ -39,6 +39,11 @@ and run_option = {
   runo_provers   : prv_options;
   runo_jobs      : int option;
   runo_rawargs   : string list;
+}
+
+and doc_option = {
+  doco_input     : string;
+  doco_outdirp   : string option;
 }
 
 and prv_options = {
@@ -342,8 +347,7 @@ let specs = {
       `Spec  ("tstats" , `String, "Save timing statistics to <file>");
       `Spec  ("script" , `Flag  , "Computer-friendly output");
       `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
-      `Spec  ("compact", `Int   , "<internal>");
-      `Spec  ("doc"    , `Flag  , "Generate documentation")]);
+      `Spec  ("compact", `Int   , "<internal>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -361,6 +365,10 @@ let specs = {
     ]);
 
     ("why3config", "Configure why3", []);
+    
+    ("gendoc", "Generate documentation", [
+      `Spec ("odir", `String, "Output documentation files in <dir>")
+    ]);
   ];
 
   xp_groups = [
@@ -508,8 +516,7 @@ let cmp_options_of_values ini values input =
     cmpo_compact = get_int "compact" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
-    cmpo_script  = get_flag "script" values;
-    cmpo_doc     = get_flag "doc" values;  }
+    cmpo_script  = get_flag "script" values; }
 
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
@@ -518,6 +525,10 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_provers   = prv_options_of_values ini values;
     runo_jobs      = get_int "jobs" values;
     runo_rawargs   = get_strings "raw-args" values; }
+
+let doc_options_of_values values input =
+  { doco_input     = input;
+    doco_outdirp   = get_string "odir" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
@@ -578,8 +589,20 @@ let parse getini argv =
 
         (cmd, ini, true)
 
-    | _ -> assert false
+    | "gendoc" -> 
+      begin
+        match anons with
+        | [input] ->
+          let ini = getini None in
+          let cmd = `GenDoc (doc_options_of_values values input) in
+            (cmd, ini, true)
 
+        | _ ->
+          raise (Arg.Bad "this command takes a single input file as argument")
+      end
+
+    | _ -> assert false
+    
   in {
     o_options = glb_options_of_values ~env ini values;
     o_command = command;
