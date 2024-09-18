@@ -3040,11 +3040,8 @@ phltactic:
 | INTERLEAVE info=loc(interleave_info)
     { Pinterleave info }
 
-| CFOLD s=side? c=codepos NOT n=word
-    { Pcfold (s, c, Some n) }
-
-| CFOLD s=side? c=codepos
-    { Pcfold (s, c, None) }
+| CFOLD s=side? c=codepos n=word?
+    { Pcfold (s, c, n) }
 
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
