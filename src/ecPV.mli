@@ -52,7 +52,10 @@ module Mpv : sig
 
   val find_glob : env -> mpath -> ('a,'b) t -> 'b
 
+  val esubst : env -> (expr, unit) t -> expr -> expr 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
+  val isubst : env -> (expr, unit) t -> instr -> instr 
+  val ssubst : env -> (expr, unit) t -> stmt -> stmt
 end
 
 (* -------------------------------------------------------------------- *)

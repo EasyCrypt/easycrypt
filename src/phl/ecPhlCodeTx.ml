@@ -14,6 +14,7 @@ open EcLowPhlGoal
 module Mid = EcIdent.Mid
 module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
+module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
 let t_kill_r side cpos olen tc =
@@ -136,68 +137,141 @@ let t_set_r side cpos (fresh, id) e tc =
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
-let cfold_stmt (pf, hyps) me olen zpr =
+let cfold_stmt ?(simplify=true) (pf, hyps) (me: memenv) olen zpr =
   let env = LDecl.toenv hyps in
 
-  let (asgn, i, tl) =
-    match zpr.Zpr.z_tail with
-    | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
-      let asgn =
-        match lv with
-        | LvVar (x, ty) -> [(x, ty, e)]
-        | LvTuple xs -> begin
-            match e.e_node with
-            | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
-            | _ -> assert false
-        end
-      in
-        (asgn, i, tl)
-    end
+  (* Fold constant until next assignment or end of given # of lines *)
+  let rec doit 
+    ((asg, subst): PV.t * (expr,  unit) Mpv.t) 
+    (olen: int option) 
+    (acc: instr list) 
+    (insts: instr list) 
+    : instr list =
+    let (asgn, tl) =
+      match insts with
+      | ({ i_node = Sasgn (lv, e) }) :: tl -> begin
+        let asgn =
+          match lv with
+          | LvVar (x, ty) -> 
+            (* check if first iteration or if variable is being propagated *)
+            assert (asg = PV.empty || PV.mem_pv env x asg);
+            [(x, ty, e)]
+          | LvTuple xs -> begin
+              match e.e_node with
+              | Etuple es -> 
+                (* check if first iteration or if all the variables in the tuple are being propagated *)
+                assert (asg = PV.empty || 
+                    List.for_all (fun x -> PV.mem_pv env x asg) (List.fst xs));
+                List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
+              | _ -> assert false
+          end
+        in
+          (asgn, tl)
+      end
 
-    | _ ->
-        tc_error pf "cannot find a left-value assignment at given position"
-  in
+      | _ -> 
+          tc_error pf "cannot find a left-value assignment at given position"
+    in
 
-  let (tl1, tl2) =
+    (* Check that we are assigning to local variables only *)
+    List.iter
+      (fun (x, _, _) ->
+        if is_glob x then
+          tc_error pf "left-values must be local variables")
+      asgn;
+
+    (* Check that we are assigning an expression that we can evaluate to a constant  *)
+    let expr_is_closed (e: expr) : bool = Mid.is_empty (e_fv e) && PV.is_empty (e_read env e) in
+
+    List.iter
+      (fun (_, _, e) ->
+          if not (expr_is_closed e) then
+            tc_error pf "right-values are not closed expression")
+      asgn;
+
+    (* List of variables we are assigning to *)
+    let asg = List.fold_left
+                (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
+                asg asgn
+    in
+
+  
+    let subst =
+      List.fold_left
+        (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
+        subst asgn
+    in
+
+    
+    let do_subst = Mpv.isubst env subst in
+    let do_substs = Mpv.issubst env subst in
+
+    (* Rebuild assignments *)
+    let asgn_instrs_from_pv_and_subst (asg) (subst) : instr = 
+      let asgns = fst (PV.elements asg) in
+      match asgns with 
+      | [] -> assert false (* meaning we dont propagate, should never happen *)
+      | [ (pv, ty) ] -> i_asgn (LvVar (pv, ty), e_var pv ty) |> (Mpv.isubst env subst)
+      | xs -> i_asgn (LvTuple xs, e_tuple (List.map (fun (pv, ty) -> e_var pv ty) xs))
+        |> (Mpv.isubst env subst)
+    in
+    let i = asgn_instrs_from_pv_and_subst asg subst in
+
+
+    (* if flag set, simplify expression before assignment *)
+    let simpl (inst: instr) : instr =
+      match inst.i_node with
+      | Sasgn (l, e) -> i_asgn (l, (expr_of_form (fst me) (EcReduction.simplify EcReduction.nodelta hyps (form_of_expr (fst me) e))))
+      | _ -> inst
+    in
+    let do_simpl tl1 = if simplify then List.map simpl tl1 else tl1 in
+    let i = if simplify then simpl i else i in
+    
+    let p inst = PV.indep env (i_write env inst) asg in
     match olen with
-    | None      -> (tl, [])
+    (* If not len parameter, sub until end of prog or some folded var is set *)
+    | None -> let p inst = PV.indep env (i_write env inst) asg in
+      let tl1, tl2 = EcUtils.List.takedrop_while p tl in
+      let tl1 = tl1 |> do_substs |> do_simpl in
+      begin match tl2 with
+      | inst :: tl2 -> let sinst = do_subst inst in 
+        begin match sinst with 
+        | {i_node = Sasgn (_, e)} when expr_is_closed e ->
+          doit (asg, subst) None (acc @ tl1) (sinst :: tl2)
+        | _ -> acc @ tl1 @ [i] @ (inst :: tl2) 
+        end
+      | [] -> acc @ tl1 @ [i]
+      end
+    
     | Some olen ->
-        if List.length tl < olen then
-          tc_error pf "expecting at least %d instructions after assignment" olen;
-        List.takedrop olen tl
+      if List.length tl < olen then
+        tc_error pf "expecting at least %d instructions after assignment" olen;
+      let tl1, tl2 = List.takedrop olen tl in
+      begin match (List.for_all p tl1) with
+      (* Here we can fold the number we need *)
+      | true -> 
+        let tl1 = do_simpl @@ do_substs tl1 in
+        acc @ tl1 @ [i] @ tl2
+      (* Here we hit a write first so we recurse *)
+      | false -> 
+        let tl11, tl12 = EcUtils.List.takedrop_while p tl1 in
+        let tl1, tl2 = tl11, tl12 @ tl2 in
+        let tl1 = do_simpl @@ do_substs tl1 in
+        let olen_rem = olen - (List.length tl1 + 1) in 
+        begin match (List.hd tl2) with
+        | {i_node = Sasgn (_lv, e)} ->
+          if expr_is_closed e then
+          doit (asg, subst) (Some olen_rem) (acc @ tl1) @@ (do_subst (List.hd tl2)) :: (List.tl tl2)
+          else tc_error pf "non-closed assignment for propagated variable with %d lines remaining" olen_rem
+        | _i -> tc_error pf "failed to propagate variable past non-assignment with %d lines remaining" olen_rem
+        end
+      end
+
   in
-
-  List.iter
-    (fun (x, _, _) ->
-      if is_glob x then
-        tc_error pf "left-values must be local variables")
-    asgn;
-
-  List.iter
-    (fun (_, _, e) ->
-        if e_fv e <> Mid.empty || e_read env e <> PV.empty then
-          tc_error pf "right-values are not closed expression")
-    asgn;
-
-  let wrs = is_write env tl1 in
-  let asg = List.fold_left
-              (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
-              EcPV.PV.empty asgn
-  in
-
-  if not (EcPV.PV.indep env wrs asg) then
-    tc_error pf "cannot cfold non read-only local variables";
-
-  let subst =
-    List.fold_left
-      (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
-      Mpv.empty asgn
-  in
-
-  let tl1 = Mpv.issubst env subst tl1 in
+  let insts = doit (EcPV.PV.empty, Mpv.empty) olen [] Zpr.(zpr.z_tail) in
 
   let zpr =
-    { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
+    { zpr with Zpr.z_tail = insts }
   in
     (me, zpr, [])
 
@@ -225,7 +299,6 @@ let process_alias (side, cpos, id) tc =
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
   t_set side cpos (fresh, id) e tc
-
 
 (* -------------------------------------------------------------------- *)
 
@@ -322,3 +395,4 @@ let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
+
