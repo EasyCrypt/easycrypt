@@ -294,6 +294,12 @@ module List : sig
   val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
   val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
 
+  val takedrop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  val fold_left_map_while :
+       ('a -> 'b -> [`Interrupt | `Continue of 'a * 'c])
+    -> 'a -> 'b list -> 'a * 'c list * 'b list
+
   (* ------------------------------------------------------------------ *)
   val ksort:
         ?stable:bool -> ?rev:bool
