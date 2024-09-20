@@ -665,7 +665,6 @@ let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
     tc
 
   | Some cutsolver -> begin
-    Format.eprintf "%d@." (DMap.cardinal subgoals);
     FApi.t_onall (fun tc ->
       let tactic =
         match  DMap.find_opt (FApi.tc1_handle tc) subgoals with
