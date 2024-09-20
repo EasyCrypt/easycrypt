@@ -2385,14 +2385,23 @@ module NormMp = struct
       if   x_equal p xp then pv
       else EcTypes.pv_glob p
 
+  let flatten_use (us : use) =
+    let globs = Sid.elements us.us_gl in
+    let globs = List.sort EcIdent.id_ntr_compare globs in
+
+    let pv = Mx.bindings us.us_pv in
+    let pv = List.sort (fun (xp1, _) (xp2, _) -> x_ntr_compare xp1 xp2) pv in
+
+    (globs, pv)
+
   let globals env m mp =
     let us = mod_use env mp in
-    let l =
-      Sid.fold (fun id l -> f_glob id m :: l) us.us_gl [] in
-    let l =
-      Mx.fold
-        (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
-    f_tuple l
+
+    let globs, pv = flatten_use us in
+    let globs = List.map (fun id -> f_glob id m) globs in
+    let pv = List.map (fun (xp, ty) -> f_pvar (pv_glob xp) ty m) pv in
+
+    f_tuple (globs @ pv)
 
   let norm_glob env m mp = globals env m mp
 

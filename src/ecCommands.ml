@@ -205,24 +205,25 @@ module HiPrinting = struct
     let ppe = EcPrinting.PPEnv.ofenv env in
     let (p, _) = EcTyping.trans_msymbol env pm in
     let us = EcEnv.NormMp.mod_use env p in
+    let (globs, pv) = EcEnv.NormMp.flatten_use us in
 
     Format.fprintf fmt "Globals [# = %d]:@."
       (Sid.cardinal us.EcEnv.us_gl);
-    Sid.iter (fun id ->
+    List.iter (fun id ->
       Format.fprintf fmt "  %s@." (EcIdent.name id))
-      us.EcEnv.us_gl;
+      globs;
 
     Format.fprintf fmt "@.";
 
     Format.fprintf fmt "Prog. variables [# = %d]:@."
       (Mx.cardinal us.EcEnv.us_pv);
-    List.iter (fun (xp,_) ->
+    List.iter (fun (xp, _) ->
       let pv = EcTypes.pv_glob xp in
       let ty = EcEnv.Var.by_xpath xp env in
       Format.fprintf fmt "  @[%a : %a@]@."
         (EcPrinting.pp_pv ppe) pv
         (EcPrinting.pp_type ppe) ty)
-      (List.rev (Mx.bindings us.EcEnv.us_pv))
+      pv
 
 
   let pr_goal fmt scope n =

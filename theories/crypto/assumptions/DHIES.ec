@@ -450,17 +450,17 @@ byequiv (_: !b{2} /\ ={glob A} ==> res{1} = !res{2}) => //.
 proc; inline *.
 pose inv (gPKE1 : glob MRPKE_lor) (gPKE2 : glob MRPKE_lor) (gODH2 : glob ODH_Orcl)
          (skeys2:(Pk * group, K) fmap) :=
-  !gODH2.`5 /\
+  !gODH2.`1 /\
   gPKE1.`1=gPKE2.`1 /\ gPKE1.`2=gPKE2.`2 /\ gPKE1.`3=gPKE2.`3 /\ gPKE1.`4=gPKE2.`4 /\
-  gPKE1.`6=gPKE2.`6  /\  fdom gPKE2.`5 = fdom gODH2.`4 /\ fdom skeys2 = gODH2.`3 /\
-  gODH2.`1 <= gPKE1.`2 /\
-  gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`5 /\
-  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g ^ sk) /\
-  (forall pk gx k, skeys2.[(pk,gx)] = Some k => pk \in gPKE2.`5 && exists (x : exp), gx = g ^ x && k = hash(pk ^ x)) /\
-  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g ^ sk) /\
+  gPKE1.`5=gPKE2.`5  /\  fdom gPKE2.`6 = fdom gODH2.`4 /\ fdom skeys2 = gODH2.`5 /\
+  gODH2.`3 <= gPKE1.`4 /\
+  gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`6 /\
+  (forall pk sk, gPKE1.`6.[pk] = Some sk => pk = g ^ sk) /\
+  (forall pk gx k, skeys2.[(pk,gx)] = Some k => pk \in gPKE2.`6 && exists (x : exp), gx = g ^ x && k = hash(pk ^ x)) /\
+  (forall pk sk, gPKE1.`6.[pk] = Some sk => pk = g ^ sk) /\
   (forall pk tag cph,
-    ((pk, tag, cph) \in gPKE1.`4)%List => pk \in gPKE1.`5 && (pk, cph.`1) \in skeys2)  /\
-  (forall pk sk gx k, gPKE1.`5.[pk] = Some sk => skeys2.[(pk, gx)] = Some k => k = hash(gx ^ sk)).
+    ((pk, tag, cph) \in gPKE1.`5)%List => pk \in gPKE1.`6 && (pk, cph.`1) \in skeys2)  /\
+  (forall pk sk gx k, gPKE1.`6.[pk] = Some sk => skeys2.[(pk, gx)] = Some k => k = hash(gx ^ sk)).
 wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2}); last first.
  wp; rnd; wp; skip; rewrite /inv /=; clear inv => />; smt (fdom0 emptyE).
 + proc; inline*.
@@ -632,11 +632,11 @@ byequiv (_: b{2} /\ ={glob A} ==> res{1} = res{2}) => //.
 proc; inline *.
 pose inv (gPKE1:glob MRPKErnd_lor) (gPKE2:glob MRPKE_lor) (gODH2:glob ODH_Orcl)
          (skeys2:(Pk*group,K) fmap) :=
-  gODH2.`5 /\ gPKE1.`2=gPKE2.`1 /\ gPKE1.`3=gPKE2.`2 /\ gPKE1.`4=gPKE2.`3 /\ gPKE1.`5=gPKE2.`4 /\
-  gPKE1.`7=gPKE2.`6 /\ fdom gPKE2.`5 = fdom gODH2.`4 /\ gODH2.`1 <= gPKE1.`3 /\
-  gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`6 /\ gPKE1.`1 = skeys2 /\ gODH2.`3 = fdom skeys2 /\
-  (forall pk cph tag, ((pk,cph,tag) \in gPKE1.`5)%List => pk \in gPKE1.`6) /\
-  (forall pk tag (ctxt : CTxt), (pk, tag, ctxt) \in gPKE1.`5 => (pk,ctxt.`1) \in skeys2).
+  gODH2.`1 /\ gPKE1.`2=gPKE2.`1 /\ gPKE1.`3=gPKE2.`2 /\ gPKE1.`5=gPKE2.`4 /\ gPKE1.`4=gPKE2.`3 /\
+  gPKE1.`6=gPKE2.`5 /\ fdom gPKE2.`6 = fdom gODH2.`4 /\ gODH2.`3 <= gPKE1.`5 /\
+  gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`7 /\ gPKE1.`1 = skeys2 /\ gODH2.`5 = fdom skeys2 /\
+  (forall pk cph tag, ((pk,cph,tag) \in gPKE1.`6)%List => pk \in gPKE1.`7) /\
+  (forall pk tag (ctxt : CTxt), (pk, tag, ctxt) \in gPKE1.`6 => (pk,ctxt.`1) \in skeys2).
 wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2});
  last by wp; rnd; wp; skip => /> *; smt(fdom0).
 + proc;inline*.
@@ -809,59 +809,24 @@ byequiv; first proc; inline *.
 seq 5 1 : (#pre /\ b{1} = MRPKE_lor.b{1} /\ b0{1} = b{1} /\
            MRPKE_lor.b{1} = AEADmul_Oracles.b{2});
            first by wp;rnd;skip.
-(* print glob MRPKErnd_lor.
-Prog. variables [# = 7]:
-1  MRPKErnd_lor.skeys : (Pk * group, K) fmap
-2  MRPKE_lor.count_dec : int
-3  MRPKE_lor.count_lor : int
-4  MRPKE_lor.count_gen : int
-5  MRPKE_lor.lorlist : (Pk * Tag * CTxt) list
-6  MRPKE_lor.pklist : (Pk, Sk) fmap
-7  MRPKE_lor.b : bool *)
-(* print glob Adv2_Procs.
-Prog. variables [# = 7]:
-1  Adv2_Procs.kindex : (Pk * Pk, int) fmap
-2  MRPKErnd_lor.skeys : (Pk * group, K) fmap
-3  MRPKE_lor.count_dec : int
-4  MRPKE_lor.count_lor : int
-5  MRPKE_lor.count_gen : int
-6  MRPKE_lor.lorlist : (Pk * Tag * CTxt) list
-7  MRPKE_lor.pklist : (Pk, Sk) fmap *)
-(* print glob AEADmul_Oracles.
-Prog. variables [# = 6]:
-1  AEADmul_Oracles.deccount : int
-2  AEADmul_Oracles.lorcount : int
-3  AEADmul_Oracles.lorlist : (int * AData * Cph) list
-4  AEADmul_Oracles.n_keys : int
-5  AEADmul_Oracles.keys : K list
-6  AEADmul_Oracles.b : bool *)
-(*
-Prog. variables [# = 6]:
-1-5  AEADmul_Oracles.keys : K list
-2-4  AEADmul_Oracles.n_keys : int
-3-1  AEADmul_Oracles.deccount : int
-4-2  AEADmul_Oracles.lorcount : int
-5-3  AEADmul_Oracles.lorlist : (int * AData * Cph) list
-6-6  AEADmul_Oracles.b : bool
-*)
 pose inv (gPKE1:glob MRPKErnd_lor) (gAdv2:glob Adv2_Procs) (gAEAD2:glob AEADmul_Oracles) :=
-         gPKE1.`7 = gAEAD2.`6 /\ gPKE1.`2 = gAdv2.`3 /\ gPKE1.`3 = gAdv2.`4 /\
-         gPKE1.`4 = gAdv2.`5 /\ gPKE1.`5 = gAdv2.`6 /\ gPKE1.`6 = gAdv2.`7 /\
-         fdom gPKE1.`1 = fdom gAdv2.`2 /\ gAEAD2.`1 <= gAdv2.`3 /\ gAEAD2.`2 <= gAdv2.`4 /\
-         fdom gAdv2.`1 = fdom gAdv2.`2 /\ size gAEAD2.`5 = gAEAD2.`4 /\
+         gPKE1.`2 = gAEAD2.`1 /\ gPKE1.`3 = gAdv2.`3 /\ gPKE1.`4 = gAdv2.`4 /\
+         gPKE1.`5 = gAdv2.`5 /\ gPKE1.`6 = gAdv2.`6 /\ gPKE1.`7 = gAdv2.`7 /\
+         fdom gPKE1.`1 = fdom gAdv2.`2 /\ gAEAD2.`2 <= gAdv2.`3 /\ gAEAD2.`4 <= gAdv2.`5 /\
+         fdom gAdv2.`1 = fdom gAdv2.`2 /\ size gAEAD2.`3 = gAEAD2.`6 /\
          (forall i tag cph,
-             (i, tag, cph) \in gAEAD2.`3 =>
-             0 <= i < gAEAD2.`4) /\
+             (i, tag, cph) \in gAEAD2.`5 =>
+             0 <= i < gAEAD2.`6) /\
          (forall pk eph i,
              gAdv2.`1.[(pk,eph)] = Some i =>
-             0 <= i < gAEAD2.`4) /\
+             0 <= i < gAEAD2.`6) /\
          (forall pk eph i tag c,
              gAdv2.`1.[(pk,eph)] = Some i =>
-             (i, tag, c) \in gAEAD2.`3 =>
+             (i, tag, c) \in gAEAD2.`5 =>
              (pk, tag, (eph,c)) \in gAdv2.`6) /\
          (forall pk eph i,
              gAdv2.`1.[(pk,eph)] = Some i =>
-             gPKE1.`1.[(pk,eph)] = Some (nth witness gAEAD2.`5 i)).
+             gPKE1.`1.[(pk,eph)] = Some (nth witness gAEAD2.`3 i)).
 wp; call (_: inv (glob MRPKErnd_lor){1} (glob Adv2_Procs){2} (glob AEADmul_Oracles){2});
 last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
 + proc;inline *.

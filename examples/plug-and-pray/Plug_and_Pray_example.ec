@@ -72,10 +72,10 @@ lemma Bound_aux &m (A <: Adv {-G0}):
   (1%r/q%r) * Pr[ G0(A).main() @ &m : G0.b ]
   = Pr[ Guess(G0(A)).main() @ &m :  G0.b /\ res.`1 = G0.k ].
 proof.
-pose phi:= fun (g : (glob G0(A))) (_ : unit)=> g.`1.
-pose psi:= fun (g : (glob G0(A))) (_ : unit)=> if 0 <= g.`2 < q then g.`2 else 0.
+pose phi:= fun (g : (glob G0(A))) (_ : unit)=> g.`2.
+pose psi:= fun (g : (glob G0(A))) (_ : unit)=> if 0 <= g.`3 < q then g.`3 else 0.
 have:= PBound (G0(A)) phi psi tt &m _.
-+ by move=> @/psi gG o /=; rewrite mem_range; case: (0 <= gG.`2 < q)=> //= _; exact/gt0_q.
++ by move=> @/psi gG o /=; rewrite mem_range; case: (0 <= gG.`3 < q)=> //= _; exact/gt0_q.
 have ->: card = q by rewrite undup_id 1:range_uniq size_range #smt:(gt0_q).
 have -> //=: Pr[Guess(G0(A)).main() @ &m: phi (glob G0(A)) res.`2 /\ res.`1 = psi (glob G0(A)) res.`2]
              = Pr[Guess(G0(A)).main() @ &m: G0.b /\ res.`1 = G0.k].

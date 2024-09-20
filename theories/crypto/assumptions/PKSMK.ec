@@ -505,8 +505,8 @@ abstract theory UF1_UF.
           res.`1 = odflt 0 Aux.forged].
     proof.
       pose phi (g:glob UF(Aux)) (_:bool) := 
-        (exists i, 0 <= i < q_gen /\ g.`1 = Some i).
-      pose psi (g:glob UF(Aux)) (_:bool) := odflt 0 g.`1.
+        (exists i, 0 <= i < q_gen /\ g.`7 = Some i).
+      pose psi (g:glob UF(Aux)) (_:bool) := odflt 0 g.`7.
       have Hpsi: forall g o, phi g o => psi g o \in range 0 q_gen.
       + by move=> g ? [i [h heq]];rewrite /psi heq /= mem_range.
       have := PBound (UF(Aux)) phi psi () &m Hpsi.  
