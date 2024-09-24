@@ -613,7 +613,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
         EcEnv.notify env `Warning "unused unfold: /%s" x
     end;
 
-    t_change ~ri ?target:idtg redform tc
+    t_change ~ri:{ ri with eta = true; beta = true; } ?target:idtg redform tc
 
   | _ ->
 
