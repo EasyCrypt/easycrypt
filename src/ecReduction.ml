@@ -717,11 +717,12 @@ let eta_expand bd f ty =
 let reduce_user_gen simplify ri env hyps f =
   if not ri.user then raise nohead;
 
-  let p =
+  let p : EcEnv.Reduction.topsym =
     match f.f_node with
     | Fop (p, _)
     | Fapp ({ f_node = Fop (p, _) }, _) -> `Path p
     | Ftuple _   -> `Tuple
+    | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
   let rules = EcEnv.Reduction.get p env in
@@ -766,6 +767,9 @@ let reduce_user_gen simplify ri env hyps f =
 
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
             ()
+
+        | ({ f_node = Fproj (target, i)}, _), R.Rule (`Proj ai, [arg]) when i = ai ->
+            doit target arg
 
         | _, R.Var x ->
           check_pv x f
@@ -960,8 +964,15 @@ let reduce_head simplify ri env hyps f =
       end
 
     (* ι-reduction (tuples projection) *)
-  | Fproj(f1, i) when ri.iota ->
-    check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+  | Fproj(f1, i) -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with
+      | NotRed NoHead when ri.iota ->
+        check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+      | NotRed _ as e ->
+        raise e
+    end
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
@@ -1048,7 +1059,12 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> reduce_delta ri env hyps f
+  | Fop _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ ->
+      reduce_delta ri env hyps f
+    end
 
   | Fapp({ f_node = Fop(p,_); }, args) -> begin
       try  reduce_logic ri env hyps f p args
@@ -1057,6 +1073,12 @@ let reduce_head simplify ri env hyps f =
         with NotRed kind2 ->
           if kind1 = NoHead && kind2 = NoHead then reduce_delta ri env hyps f
           else raise needsubterm
+    end
+
+  | Ftuple _ -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed _ -> raise needsubterm
     end
 
   | Fapp(_, _) -> raise needsubterm
@@ -1660,6 +1682,8 @@ module User = struct
             R.Rule (`Op (p, tys), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
+        | { f_node = Fproj (target, i) }, [] ->
+            R.Rule (`Proj i, [rule target])
         | { f_node = Fint i }, [] ->
             R.Int i
         | { f_node = Flocal x }, [] ->
@@ -1684,7 +1708,8 @@ module User = struct
                       | { ty_node = Tvar a } -> Sid.add a ltyvars
                       | _ as ty -> ty_fold doit ltyvars ty in doit)
                   cst.cst_ty_vs tys
-              | `Tuple -> cst.cst_ty_vs in
+              | `Tuple -> cst.cst_ty_vs
+              | `Proj _ -> cst.cst_ty_vs in
             let cst = {cst with cst_ty_vs = ltyvars } in
             List.fold_left doit cst args
 
