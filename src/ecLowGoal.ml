@@ -361,14 +361,14 @@ let t_cbv ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) 
 
 (* -------------------------------------------------------------------- *)
 let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
-  let action (lazy hyps) fp = Some (EcCallbyValue.norm_cbv ri hyps fp) in
+  let action (lazy hyps) fp = Some (EcReduction.simplify ri hyps fp) in
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
 let t_cbn ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
-  t_cbv_with_info ?target ri tc
+  t_cbn_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
 let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =

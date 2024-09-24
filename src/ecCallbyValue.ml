@@ -451,14 +451,14 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Ftuple args1 ->
     assert (Args.isempty args);
-    f_tuple (List.map (cbv_init st s) args1)
+    reduce_user st (f_tuple (List.map (cbv_init st s) args1))
 
   | Fproj (f1, i) ->
     let f1 = cbv_init st s f1 in
     let f1 =
       match f1.f_node with
       | Ftuple args when st.st_ri.iota -> List.nth args i
-      | _ -> f_proj (norm_lambda st f1) i f.f_ty in
+      | _ -> reduce_user st (f_proj (norm_lambda st f1) i f.f_ty) in
     app_red st f1 args
 
   | FhoareF hf ->

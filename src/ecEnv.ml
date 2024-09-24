@@ -117,17 +117,20 @@ type env_norm = {
 type red_topsym = [
   | `Path of path
   | `Tuple
+  | `Proj of int
 ]
 
 module Mrd = EcMaps.Map.Make(struct
   type t = red_topsym
 
+  let to_comparable (p : t) =
+    match p with
+    | `Path p -> `Path p.p_tag
+    | `Tuple  -> `Tuple
+    | `Proj i -> `Proj i
+
   let compare (p1 : t) (p2 : t) =
-    match p1, p2 with
-    | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
-    | `Tuple  , `Tuple   ->  0
-    | `Tuple  , `Path _  -> -1
-    | `Path _ , `Tuple   ->  1
+    Stdlib.compare (to_comparable p1) (to_comparable p2)
 end)
 
 (* -------------------------------------------------------------------- *)
@@ -1451,11 +1454,12 @@ module Reduction = struct
   let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
     match rule with None -> db | Some rule ->
 
-    let p =
+    let p : topsym =
       match rule.rl_ptn with
       | Rule (`Op p, _)   -> `Path (fst p)
-      | Rule (`Tuple, _) -> `Tuple
-      | Var _ | Int _    -> assert false in
+      | Rule (`Tuple, _)  -> `Tuple
+      | Rule (`Proj i, _) -> `Proj i
+      | Var _ | Int _     -> assert false in
 
     Mrd.change (fun rls ->
       let { ri_priomap } =
