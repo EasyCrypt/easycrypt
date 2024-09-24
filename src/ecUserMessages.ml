@@ -714,6 +714,11 @@ end = struct
         msg
           "inlined operator's body must be an expression-like formula: `%s'"
           (string_of_qsymbol x)
+
+    | CE_ProofForLemma x ->
+        msg
+          "cannot realized a (non-axiomatic) lemma: `%s'"
+          (string_of_qsymbol x)
 end
 
 (* -------------------------------------------------------------------- *)

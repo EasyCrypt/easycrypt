@@ -39,6 +39,7 @@ type clone_error =
 | CE_ModIncompatible   of qsymbol
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
+| CE_ProofForLemma     of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -70,7 +71,7 @@ and evlemma = {
 }
 
 and evtags = ([`Include | `Exclude] * symbol) list
-and evinfo = ptactic_core option * clmode
+and evinfo = ptactic_core option * clmode * bool
 
 (*-------------------------------------------------------------------- *)
 let evc_empty =
@@ -511,7 +512,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Proofs : sig
-  val proof : octxt -> evclone -> theory_cloning_proof -> evclone
+  val proof : intheory:bool -> octxt -> evclone -> theory_cloning_proof -> evclone
 end = struct
   let all_proof oc evc (name, tags, tactics) =
     let tags =
@@ -550,12 +551,12 @@ end = struct
         in
           evc_update update1 (fst name) evc
 
-  let proof oc evc prf =
+  let proof ~intheory oc evc prf =
     match prf.pthp_mode with
     | `All (name, tags) ->
          all_proof oc evc (name, tags, prf.pthp_tactic)
     | `Named (name, hide) ->
-         name_proof oc evc (name, (prf.pthp_tactic, hide))
+         name_proof oc evc (name, (prf.pthp_tactic, hide, not intheory))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -576,8 +577,8 @@ let clone (scenv : EcSection.scenv) (thcl : theory_cloning) =
       ([], evc_empty) thcl.pthc_ext
   in
 
-  let ovrds =
-    List.fold_left (Proofs.proof oc) ovrds (genproofs @ thcl.pthc_prf) in
+  let ovrds = List.fold_left (Proofs.proof ~intheory:true oc) ovrds genproofs in
+  let ovrds = List.fold_left (Proofs.proof ~intheory:false oc) ovrds thcl.pthc_prf in
   let rename = List.map (Renaming.rename1 oc) thcl.pthc_rnm in
 
   let ntclr =
