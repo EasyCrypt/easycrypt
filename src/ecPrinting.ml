@@ -3028,11 +3028,14 @@ let pp_ovdecl ppe fmt ov =
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
-let pp_funsig ppe fmt fs =
-  Format.fprintf fmt "@[<hov 2>proc %s(%a) :@ %a@]"
-    fs.fs_name
-    (pp_list ", " (pp_ovdecl ppe)) fs.fs_anames
-    (pp_type ppe) fs.fs_ret
+let pp_funsig ?(with_sig = true) ppe fmt fs =
+  if with_sig then
+    Format.fprintf fmt "@[<hov 2>proc %s(%a) :@ %a@]"
+      fs.fs_name
+      (pp_list ", " (pp_ovdecl ppe)) fs.fs_anames
+      (pp_type ppe) fs.fs_ret
+  else
+    Format.fprintf fmt "@[<hov 2>proc %s@]" fs.fs_name
 
 let pp_sigitem moi_opt ppe fmt (Tys_function fs) =
   Format.fprintf fmt "@[<hov 2>%a@ %t@]"
@@ -3189,6 +3192,10 @@ and pp_moditem ppe fmt (p, i) =
           Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
     in
 
+    let pp_funsig ppe fmt fun_ =
+      let with_sig = match fun_.f_def with FBalias _ -> false | _ -> true in
+      Format.fprintf fmt "%a" (pp_funsig ~with_sig ppe) fun_.f_sig in
+
     let pp_fundef ppe fmt fun_ =
       match fun_.f_def with
       | (FBdef def) ->
@@ -3210,9 +3217,7 @@ and pp_moditem ppe fmt (p, i) =
           Format.fprintf fmt "?ABSTRACT?"
     in
 
-    Format.fprintf fmt "@[<v>%a = %a@]"
-      (pp_funsig ppe) f.f_sig
-      (pp_fundef ppe) f
+    Format.fprintf fmt "@[<v>%a = %a@]" (pp_funsig ppe) f (pp_fundef ppe) f
 
 let pp_modexp ppe fmt (mp, me) =
   Format.fprintf fmt "%a." (pp_modexp ppe) (mp, me)
