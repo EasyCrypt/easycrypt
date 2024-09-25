@@ -947,21 +947,27 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (records projection) *)
   | Fapp ({ f_node = Fop (p, _); }, args)
-      when ri.iota && EcEnv.Op.is_projection env p ->
-      begin match args with
-      | mk :: args ->
-        begin match mk.f_node with
-        | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
-          if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
-          let v = oget (EcEnv.Op.by_path_opt p env) in
-          let v = proj3_2 (EcDecl.operator_as_proj v) in
-          let v = List.nth mkargs v in
-          f_app v args f.f_ty
+      when ri.iota && EcEnv.Op.is_projection env p -> begin
 
-        | _ -> raise needsubterm
-        end
-      | _ -> raise nohead
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed NoHead -> begin
+        begin match args with
+        | mk :: args ->
+          begin match mk.f_node with
+          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
+            if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
+            let v = oget (EcEnv.Op.by_path_opt p env) in
+            let v = proj3_2 (EcDecl.operator_as_proj v) in
+            let v = List.nth mkargs v in
+            f_app v args f.f_ty
+
+          | _ -> raise needsubterm
+          end
+        | _ -> raise nohead
       end
+    end
+  end
 
     (* ι-reduction (tuples projection) *)
   | Fproj(f1, i) -> begin
@@ -1081,7 +1087,11 @@ let reduce_head simplify ri env hyps f =
       with NotRed _ -> raise needsubterm
     end
 
-  | Fapp(_, _) -> raise needsubterm
+  | Fapp _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ -> raise needsubterm
+  end
 
   | Fquant((Lforall | Lexists), _, _) ->
     reduce_quant ri env hyps f
