@@ -166,6 +166,7 @@
     "bchange"     , BCHANGE    ;        (* KW: tactic *)
     
     "bdep"        , BDEP       ;        (* KW: global *)
+    "bdepeq"      , BDEPEQ     ;        (* KW: global *)
     "bind"        , BIND       ;        (* KW: global *)
     "circuit"     , CIRCUIT    ;        (* KW: global *)
     "bitstring"   , BITSTRING  ;        (* KW: global *)
