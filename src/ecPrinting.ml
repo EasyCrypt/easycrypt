@@ -322,6 +322,7 @@ module PPEnv = struct
           match EcEnv.Var.lookup_local_opt name ppe.ppe_env with
           | Some (id, _) when EcIdent.id_equal id x -> name
           | _ -> EcIdent.name x
+
   let tyvar (ppe : t) x =
     match Mid.find_opt x ppe.ppe_locals with
     | None   -> EcIdent.tostring x
@@ -1665,12 +1666,23 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       pp_local ppe fmt id
 
   | Fpvar (x, i) -> begin
-    match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
-    | Some i' when EcMemory.mem_equal i i' ->
-        Format.fprintf fmt "%a" (pp_pv ppe) x
-    | _ ->
-        let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+    let default (force : bool) =
+      let ppe = PPEnv.enter_by_memid ppe i in
+      Format.fprintf fmt "%a{%s%a}"
+        (pp_pv ppe) x (if force then "!" else "") (pp_mem ppe) i in
+
+      let force =
+        match x with
+        | PVloc  x -> Ssym.mem x ppe.ppe_inuse
+        | PVglob _ -> false in
+
+      if force then default true else
+
+      match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+      | Some i' when EcMemory.mem_equal i i' ->
+          Format.fprintf fmt "%a" (pp_pv ppe) x
+      | _ ->
+        default false
     end
 
   | Fglob (mp, i) -> begin

@@ -181,7 +181,7 @@ and pformula_r =
   | PFident   of pqsymbol * ptyannot option
   | PFref     of psymbol * pffilter list
   | PFmem     of psymbol
-  | PFside    of pformula * symbol located
+  | PFside    of pformula * (bool * symbol located)
   | PFapp     of pformula * pformula list
   | PFif      of pformula * pformula * pformula
   | PFmatch   of pformula * (ppattern * pformula) list

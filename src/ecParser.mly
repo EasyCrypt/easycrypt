@@ -881,6 +881,9 @@ pside_:
 pside:
 | x=brace(pside_) { x }
 
+pside_force:
+| brace(b=boption(NOT) m=loc(pside_) { (b, m) }) { $1 }
+
 (* -------------------------------------------------------------------- *)
 (* Patterns                                                             *)
 
@@ -1211,7 +1214,7 @@ sform_u(P):
    { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e1) (unloc e1) in
      pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
-| x=sform_r(P) s=loc(pside)
+| x=sform_r(P) s=pside_force
    { PFside (x, s) }
 
 | op=loc(numop) ti=tvars_app?

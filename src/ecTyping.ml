@@ -338,6 +338,7 @@ end
 let gen_select_op
     ~(actonly : bool)
     ~(mode    : OpSelect.mode)
+    ~(forcepv  : bool)
     (opsc     : path option)
     (tvi      : EcUnify.tvi)
     (env      : EcEnv.env)
@@ -348,15 +349,15 @@ let gen_select_op
     : OpSelect.gopsel list
 =
 
-  let fpv me (pv, ty, ue) =
+  let fpv me (pv, ty, ue) : OpSelect.gopsel =
     (`Pv (me, pv), ty, ue, (pv :> opmatch))
 
-  and fop (op, ty, ue, bd) =
+  and fop (op, ty, ue, bd) : OpSelect.gopsel=
     match bd with
     | None -> (`Op op, ty, ue, (`Op op :> opmatch))
     | Some bd -> (`Nt bd, ty, ue, (`Op op :> opmatch))
 
-  and flc (lc, ty, ue) =
+  and flc (lc, ty, ue) : OpSelect.gopsel =
     (`Lc lc, ty, ue, (`Lc lc :> opmatch)) in
 
   let ue_filter =
@@ -378,39 +379,52 @@ let gen_select_op
 
   in
 
-  match (if tvi = None then select_local env name else None) with
-  | Some (id, ty) ->
-     [ flc (id, ty, ue) ]
+  let locals () : OpSelect.gopsel list =
+    if Option.is_none tvi then
+      select_local env name
+      |> Option.map
+          (fun (id, ty) -> flc (id, ty, ue))
+      |>  Option.to_list
+    else [] in
 
-  | None ->
-      let ops () =
-        let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
-        let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
-        let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
-        let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
-        (List.map fop ops)
+  let ops () : OpSelect.gopsel list =
+    let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
+    let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
+    let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
+    let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
+    (List.map fop ops)
 
-      and pvs () =
-        let me, pvs =
-          match EcEnv.Memory.get_active env, actonly with
-          | None, true -> (None, [])
-          | me  , _    -> (  me, select_pv env me name ue tvi psig)
-        in List.map (fpv me) pvs
-      in
+  and pvs () : OpSelect.gopsel list =
+    let me, pvs =
+      match EcEnv.Memory.get_active env, actonly with
+      | None, true -> (None, [])
+      | me  , _    -> (  me, select_pv env me name ue tvi psig)
+    in List.map (fpv me) pvs
+  in
 
-      match mode with
-      | `Expr `InOp   -> ops ()
-      | `Form         -> (match pvs () with [] -> ops () | pvs -> pvs)
-      | `Expr `InProc -> (match pvs () with [] -> ops () | pvs -> pvs)
+  let select (filters : (unit -> OpSelect.gopsel list) list) : OpSelect.gopsel list =
+    List.find_map_opt
+      (fun f -> match f () with [] -> None | x -> Some x)
+      filters
+    |> odfl [] in
+
+  match mode with
+  | `Expr `InOp   -> select [locals; ops]
+  | `Form
+  | `Expr `InProc ->
+      if forcepv then
+        select [pvs; locals; ops]
+      else
+        select [locals; pvs; ops]
 
 (* -------------------------------------------------------------------- *)
 let select_exp_op env mode opsc name ue tvi psig =
-  gen_select_op ~actonly:false ~mode:(`Expr mode)
+  gen_select_op ~actonly:false ~forcepv:false ~mode:(`Expr mode)
     opsc tvi env name ue psig
 
 (* -------------------------------------------------------------------- *)
-let select_form_op env opsc name ue tvi psig =
-  gen_select_op ~actonly:true ~mode:`Form
+let select_form_op env ~forcepv opsc name ue tvi psig =
+  gen_select_op ~actonly:true ~mode:`Form ~forcepv
     opsc tvi env name ue psig
 
 (* -------------------------------------------------------------------- *)
@@ -1745,23 +1759,36 @@ module PFS : sig
 
   val set_memused : pfstate -> unit
   val get_memused : pfstate -> bool
-  val new_memused : ('a -> 'b) -> pfstate -> 'a -> bool * 'b
+  val isforced    : pfstate -> bool
+  val new_memused : ('a -> 'b) -> force:bool -> pfstate -> 'a -> bool * 'b
 end = struct
-  type pfstate = { mutable pfa_memused : bool; }
+  type pfstate1 = {
+    pfa_memused : bool;
+    pfa_forced  : bool;
+  }
 
-  let create () = { pfa_memused = true; }
+  type pfstate = pfstate1 ref
 
-  let set_memused state =
-    state.pfa_memused <- true
+  let create1 ~(force : bool) : pfstate1 =
+    { pfa_memused = false; pfa_forced = force; }
 
-  let get_memused state =
-    state.pfa_memused
+  let create () : pfstate =
+    ref (create1 ~force:false)
 
-  let new_memused f state x =
-    let old  = state.pfa_memused in
-    let aout = (state.pfa_memused <- false; f x) in
-    let new_ = state.pfa_memused in
-    state.pfa_memused <- old; (new_, aout)
+  let set_memused (state : pfstate) =
+    state := { !state with pfa_memused = true }
+
+  let get_memused (state : pfstate) =
+    (!state).pfa_memused
+
+  let isforced (state : pfstate) =
+    (!state).pfa_forced
+
+  let new_memused (f : 'a -> 'b) ~(force : bool) (state : pfstate) (x : 'a) =
+    let old  = !state in
+    let aout = (state := create1 ~force; f x) in
+    let new_ = get_memused state in
+    state := old; (new_, aout)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3026,7 +3053,10 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
 
     | PFident ({ pl_desc = name; pl_loc = loc }, tvi) ->
         let tvi = tvi |> omap (transtvi env ue) in
-        let ops = select_form_op env opsc name ue tvi [] in
+        let ops =
+          select_form_op
+            ~forcepv:(PFS.isforced state)
+            env opsc name ue tvi [] in
         begin match ops with
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
@@ -3045,7 +3075,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
             tyerror loc env (MultipleOpMatch (name, [], matches))
         end
 
-    | PFside (f, side) -> begin
+    | PFside (f, (force, side)) -> begin
         let (sloc, side) = (side.pl_loc, unloc side) in
         let me =
           match EcEnv.Memory.lookup side env with
@@ -3056,7 +3086,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
         let used, aout =
           PFS.new_memused
             (transf (EcEnv.Memory.set_active me env))
-            state f
+            ~force state f
         in
         if not used then begin
           let ppe = EcPrinting.PPEnv.ofenv env in
@@ -3139,11 +3169,11 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
           let _, f1 =
             PFS.new_memused
               (transf (EcEnv.Memory.set_active me1 env))
-              state f in
+              ~force:false state f in
           let _, f2 =
             PFS.new_memused
               (transf (EcEnv.Memory.set_active me2 env))
-              state f in
+              ~force:false state f in
           unify_or_fail env ue f.pl_loc ~expct:f1.f_ty f2.f_ty;
           f_eq f1 f2
 
@@ -3156,7 +3186,10 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
         let tvi  = tvi |> omap (transtvi env ue) in
         let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in
-        let ops  = select_form_op env opsc name ue tvi esig in
+        let ops  =
+          select_form_op ~forcepv:(PFS.isforced state)
+            env opsc name ue tvi esig in
+
           begin match ops with
           | [] ->
              let uidmap = UE.assubst ue in
