@@ -80,6 +80,59 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
   end 
 
 
+(* -------------------------------------------------------------------- *)
+let prog_equiv_prod 
+  (env : env) 
+  ((meml, mtl), (memr, mtr): memenv * memenv) 
+  (proc_l, proc_r: stmt * stmt) 
+  ((invs, n): (variable * variable) list * int) 
+  ((outvs, m) : (variable * variable) list * int) : unit =
+  let pstate_l : (symbol, circuit) Map.t = Map.empty in
+  let pstate_r : (symbol, circuit) Map.t = Map.empty in
+
+  let inps = List.map (EcCircuits.input_of_variable env) (List.fst invs) in
+  let inpcs, inps = List.split inps in
+  let pstate_l = List.fold_left2
+    (fun pstate inp v -> Map.add v inp pstate)
+    pstate_l inpcs (List.fst invs |> List.map (fun v -> v.v_name))
+  in
+  let pstate_r = List.fold_left2
+    (fun pstate inp v -> Map.add v inp pstate)
+    pstate_r inpcs (List.snd invs |> List.map (fun v -> v.v_name))
+  in
+  
+  let pstate_l = List.fold_left (EcCircuits.process_instr env meml) pstate_l proc_l.s_node in
+  let pstate_l = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_l in
+  let pstate_r = List.fold_left (EcCircuits.process_instr env memr) pstate_r proc_r.s_node in
+  let pstate_r = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_r in
+  begin 
+    let circs_l = List.map (fun v -> Option.get (Map.find_opt v pstate_l)) 
+                  (List.map (fun v -> v.v_name) (List.fst outvs)) in
+    let circs_r = List.map (fun v -> Option.get (Map.find_opt v pstate_r)) 
+                  (List.map (fun v -> v.v_name) (List.snd outvs)) in
+                
+    (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
+      (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
+      (* Format.eprintf "@."; ) circs outvs in *)
+    
+    (* let () = List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) circs in *)
+    assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_l = 1);
+    assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_r = 1);
+    let cinp_l = (List.hd circs_l).inps in
+    let cinp_r = (List.hd circs_r).inps in
+    let c_l = {(circuit_aggregate circs_l) with inps=cinp_l} in
+    let c_r = {(circuit_aggregate circs_r) with inps=cinp_r} in
+    let lanes_l = circuit_mapreduce c_l n m in
+    let lanes_r = circuit_mapreduce c_r n m in
+    Format.eprintf "Left program lanes: @.";
+    List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
+    Format.eprintf "Right program lanes: @.";
+    List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
+    let () = assert (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r None) lanes_l lanes_r) in
+    Format.eprintf "Success@."
+  end 
+
+
 
 (* FIXME UNTESTED *)
 let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
@@ -282,6 +335,83 @@ let process_bdep
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
   FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
+
+
+
+let t_bdepeq (inpvs: (variable * variable) list) (n: int) (outvs: (variable * variable) list) (m: int) (tc : tcenv1) =
+  (* Run bdep and check that is works FIXME *)
+  let () = match (FApi.tc1_goal tc).f_node with
+  | FequivF sE -> assert false
+  | FequivS sE -> prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs, n) (outvs, m) 
+  | FhoareF sH -> assert false  
+  | FhoareS sF -> assert false
+  | FbdHoareF _ -> assert false
+  | FbdHoareS _ -> assert false 
+  | FeHoareF _ -> assert false
+  | FeHoareS _ -> assert false 
+  | _ -> assert false
+  in
+  FApi.close (!@ tc) VBdep
+
+let process_bdepeq 
+  ((inpvsl, inpvsr, n): string list * string list * int) 
+  ((outvsl, outvsr, m): string list * string list * int) 
+  (tc: tcenv1) 
+=
+
+  let env = FApi.tc1_env tc in
+  let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
+
+
+  (* DEBUG SECTION *)
+  let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  
+  let get_var (v: symbol) (m: memenv) : variable =
+    match EcMemory.lookup_me v m with
+    | Some (v, None, _) -> v
+    | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false
+  in
+  
+  let eqS = EcLowPhlGoal.tc1_as_equivS tc in
+  let mem_l, mem_r = eqS.es_ml, eqS.es_mr in
+
+  (* ------------------------------------------------------------------ *)
+  let outvsl = List.map (fun v -> get_var v mem_l) outvsl in
+  let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
+
+  let outvsr = List.map (fun v -> get_var v mem_r) outvsr in
+  let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
+
+  let inpvsl = List.map (fun v -> get_var v mem_l) inpvsl in
+  let pinpvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) inpvsl in
+
+  let inpvsr = List.map (fun v -> get_var v mem_r) inpvsr in
+  let pinpvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) inpvsr in
+
+  let pre = List.map2 f_eq pinpvsl pinpvsr |> f_ands in
+  let post = List.map2 f_eq poutvsl poutvsr |> f_ands in
+  
+  (* ------------------------------------------------------------------ *)
+  let invs = List.combine inpvsl inpvsr in
+  let outvs = List.combine outvsl outvsr in
+  
+  let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
+  FApi.t_last (t_bdepeq invs n outvs m) tc 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 (* CODE STORAGE - DO NOT TOUCH *)
 

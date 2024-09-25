@@ -230,6 +230,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pprocchange (s, p, f)     -> EcPhlRewrite.process_change s p f
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
     | Pbdep (inp, out, o, pcond)-> EcPhlBDep.process_bdep inp out o pcond
+    | Pbdepeq (inp, out)        -> EcPhlBDep.process_bdepeq inp out
     | Pcirc                     -> EcPhlBDep.t_circ
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
   in

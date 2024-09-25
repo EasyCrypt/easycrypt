@@ -776,6 +776,7 @@ type phltactic =
 
     (* Map-reduce *)
   | Pbdep of ((string list) * (string list) * int) * ((string list) * int) * psymbol * psymbol
+  | Pbdepeq of ((string list) * (string list) * int) * ((string list) * (string list) * int)
   | Pcirc
 
     (* Program rewriting *)

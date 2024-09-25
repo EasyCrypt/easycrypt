@@ -398,6 +398,7 @@
 %token BACKSLASH
 %token BCHANGE
 %token BDEP
+%token BDEPEQ
 %token BETA
 %token BITSTRING
 %token BIND
@@ -3249,6 +3250,11 @@ phltactic:
     { Pbdep ((inpvs, invs, (BI.to_int n)), 
              (outvs, (BI.to_int m)), 
               o, pc) }
+
+| BDEPEQ n=uint m=uint inpvsl=bdep_vars inpvsr=bdep_vars
+         outvsl=bdep_vars outvsr=bdep_vars
+      { Pbdepeq ((inpvsl, inpvsr, BI.to_int n), 
+                 (outvsl, outvsr, BI.to_int m))}
 
 | BDEP BITSTRING
     { Pcirc }
