@@ -96,7 +96,7 @@ and 'a rfield = {
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr
+  | PLvMap    of pqsymbol * ptyannot option * pexpr list
 
 and plvalue = plvalue_r located
 

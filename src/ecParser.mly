@@ -1440,10 +1440,10 @@ lvalue_u:
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=loc(fident) DLBRACKET ti=tvars_app? e=expr RBRACKET
+| x=loc(fident) DLBRACKET ti=tvars_app? es=plist1(expr, COMMA) RBRACKET
    { match lqident_of_fident x.pl_desc with
      | None   -> parse_error x.pl_loc None
-     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, e) }
+     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, es) }
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }

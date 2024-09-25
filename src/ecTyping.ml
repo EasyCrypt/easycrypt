@@ -2709,11 +2709,12 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let ty = ttuple (List.map snd xs) in
       Lval (LvTuple xs), ty
 
-  | PLvMap (x, tvi, e) ->
+  | PLvMap (x, tvi, es) ->
       let tvi = tvi |> omap (transtvi env ue) in
       let codomty = UE.fresh ue in
       let pv, xty = trans_pv env x in
-      let e, ety = transexp env `InProc ue e in
+      let e, ety = List.split (List.map (transexp env `InProc ue) es) in
+      let e, ety = e_tuple e, ttuple ety in
       let name = ([], EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
       let ops = select_exp_op env `InProc None name ue tvi esig in
