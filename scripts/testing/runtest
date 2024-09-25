@@ -601,9 +601,10 @@ class TermListener(Listener):
     @clib.contextmanager
     def start(self):
         self._mbar.term.echooff()
-        yield
-        self._mbar.term.echoon()
-
+        try:
+            yield
+        finally:
+            self._mbar.term.echoon()
 
 # --------------------------------------------------------------------
 class RawListener(Listener):
