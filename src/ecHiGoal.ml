@@ -1675,6 +1675,57 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
             let id = fst (LDecl.by_name s hyps) in
             t_generalize_hyp ~clear id tc
 
+        | PFmem { pl_loc = loc; pl_desc = m; } -> begin
+            if doeq then
+              tacuerror "cannot generate an equation when generalizing a memory";
+
+            let m, lc =
+              try
+                LDecl.by_name m hyps
+              with LDecl.LdeclError (LookupError _) ->
+                tc_error !!tc ~loc "cannot find memory `%s'" m
+            in
+
+            let lc = match lc with LD_mem mt -> mt | _ -> assert false in
+
+            if is_none occ then
+              t_generalize_hyp ~clear m tc
+            else begin
+              let occ = norm_rwocc occ in
+
+              let ptnpos =
+                try
+                  FPosition.select ?o:occ (fun ctxt f ->
+                    if Sid.mem m ctxt then
+                      `Continue
+                    else
+                      match f.f_node with
+                      | Fglob (_, m')
+                      | Fpvar (_, m')
+                      | Fpr   { pr_mem = m' }  when EcIdent.id_equal m m' -> `Accept 0
+                      | _ -> `Continue
+                  ) concl
+                with InvalidOccurence -> tacuerror "invalid occurence selector"
+              in
+
+              let m' = EcIdent.fresh m in
+
+              let newconcl =
+                concl |> FPosition.map ptnpos (fun f ->
+                  match f.f_node with
+                  | Fglob (a, _) -> f_glob a m'
+                  | Fpvar (p, _) -> f_pvar p f.f_ty m'
+                  | Fpr   pr     -> f_pr_r { pr with pr_mem = m' }
+                  | _            -> assert false
+                ) in
+
+              let newconcl = f_forall [(m', GTmem lc)] newconcl in
+              let pt = ptcut ~args:[PAMemory m] newconcl in
+      
+              EcLowGoal.t_apply pt tc
+            end
+          end
+ 
         | _ ->
           let (ptenv, p) =
             let (ps, ue), p = TTC.tc1_process_pattern tc pf in
