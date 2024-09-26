@@ -445,6 +445,7 @@
 %token EQ
 %token EQUIV
 %token ETA
+%token EVAL
 %token EXACT
 %token EXFALSO
 %token EXIST
@@ -3831,6 +3832,12 @@ user_red_option:
 %inline search: x=sform_h { x }
 
 (* -------------------------------------------------------------------- *)
+(* Evaluation                                                           *)
+eval:
+| EVAL mp=loc(fident) args=paren(plist0(expr, COMMA))
+    { (mp, args) }
+
+(* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
 global_action:
@@ -3868,6 +3875,7 @@ global_action:
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
+| eval             { Geval        $1 }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }
