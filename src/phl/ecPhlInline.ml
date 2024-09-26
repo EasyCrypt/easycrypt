@@ -32,7 +32,7 @@ module LowSubst = struct
   let rec esubst m e =
     match e.e_node with
     | Evar pv -> e_var (pvsubst m pv) e.e_ty
-    | _ -> EcTypes.e_map (fun ty -> ty) (esubst m) e
+    | _ -> EcTypes.e_map (esubst m) e
 
   let lvsubst m lv =
     match lv with

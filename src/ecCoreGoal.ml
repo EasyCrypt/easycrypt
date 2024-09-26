@@ -51,7 +51,7 @@ and pt_head =
 | PTCut    of EcFol.form * cutsolve option
 | PTHandle of handle
 | PTLocal  of EcIdent.t
-| PTGlobal of EcPath.path * (ty list)
+| PTGlobal of EcPath.path * etyarg list
 | PTTerm   of proofterm
 
 and cutsolve = [`Done | `Smt | `DoneSmt]

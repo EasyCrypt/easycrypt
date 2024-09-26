@@ -366,7 +366,7 @@ end = struct
 
         let pp_op fmt ((op, inst), subue) =
           let uidmap = EcUnify.UniEnv.assubst subue in
-          let inst = Tuni.subst_dom uidmap inst in
+          let inst = Tuni.subst_dom uidmap (List.fst inst) in
 
           begin match inst with
           | [] ->
@@ -505,6 +505,14 @@ end = struct
 
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
+
+    | TCArgsCountMismatch (_, typarams, tys) ->
+        msg "typeclass expects %d arguments, got %d"
+          (List.length typarams) (List.length tys)
+
+    | CannotInferTC (ty, tc) ->
+        msg "cannot infer typeclass `%a' for type `%a'"
+          (EcPrinting.pp_typeclass env) tc pp_type ty
 
     | NoDefaultMemRestr ->
       msg "no default sign for memory restriction. Use '+' or '-', or \

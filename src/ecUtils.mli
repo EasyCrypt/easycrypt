@@ -65,6 +65,11 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a tuple2
 
 (* -------------------------------------------------------------------- *)
+module SmartPair : sig
+  val mk : 'a * 'b -> 'a -> 'b -> 'a * 'b
+end
+
+(* -------------------------------------------------------------------- *)
 val in_seq1: ' a -> 'a list
 
 (* -------------------------------------------------------------------- *)
@@ -277,6 +282,7 @@ module List : sig
   val min : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
   val max : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
 
+  val betail     : 'a list -> 'a list * 'a
   val nth_opt    : 'a list -> int -> 'a option
   val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
