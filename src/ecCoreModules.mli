@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
+open EcAst
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
@@ -133,7 +134,7 @@ val mr_equal :
 
 val mr_hash : mod_restr -> int
 
-val mr_is_empty : mod_restr -> bool
+val ois_is_empty : oracle_infos -> bool
 
 val mr_xpaths_fv : mr_xpaths -> int EcIdent.Mid.t
 val mr_mpaths_fv : mr_mpaths -> int EcIdent.Mid.t
@@ -149,7 +150,7 @@ type module_sig_body = module_sig_body_item list
 type module_sig = {
   mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : mod_restr;
+  mis_oinfos : oracle_infos;
 }
 
 type top_module_sig = {
@@ -206,10 +207,11 @@ type abs_uses = {
 
 type module_expr = {
   me_name     : symbol;
+  me_params   : (EcIdent.t * module_type) list;
   me_body     : module_body;
   me_comps    : module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * module_type) list;
+  me_oinfos   : oracle_infos;
 }
 
 (* Invariant:
@@ -219,10 +221,10 @@ type module_expr = {
 and module_body =
   | ME_Alias       of int * EcPath.mpath
   | ME_Structure   of module_structure       (* Concrete modules. *)
-  | ME_Decl        of module_type         (* Abstract modules. *)
+  | ME_Decl        of mty_mr                 (* Abstract modules. *)
 
 and module_structure = {
-  ms_body      : module_item list;
+  ms_body : module_item list;
 }
 
 and module_item =

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcPath
+open EcAst
 open EcMaps
 open EcIdent
 open EcTypes
@@ -38,12 +39,12 @@ type mod_restr = EcAst.mod_restr
 
 (* -------------------------------------------------------------------- *)
 val gtty    : EcTypes.ty -> gty
-val gtmodty : module_type -> gty
+val gtmodty : mty_mr -> gty
 val gtmem   : EcMemory.memtype -> gty
 
 (* -------------------------------------------------------------------- *)
 val as_gtty  : gty -> EcTypes.ty
-val as_modty : gty -> module_type
+val as_modty : gty -> mty_mr
 val as_mem   : gty -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
@@ -84,7 +85,7 @@ val form_forall: (form -> bool) -> form -> bool
 (* -------------------------------------------------------------------- *)
 val gty_as_ty  : gty -> EcTypes.ty
 val gty_as_mem : gty -> EcMemory.memtype
-val gty_as_mod : gty -> module_type
+val gty_as_mod : gty -> mty_mr
 val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 
 (* soft-constructors - common leaves *)
@@ -223,6 +224,9 @@ val f_xmul_simpl  : form -> form -> form
 val f_xmuli_simpl : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+val string_of_quant : quantif -> string
+
+(* -------------------------------------------------------------------- *)
 exception DestrError of string
 
 val destr_error : string -> 'a
@@ -233,6 +237,21 @@ val destr_app2 : name:string -> (path -> bool) -> form -> form * form
 
 val destr_app1_eq : name:string -> path -> form -> form
 val destr_app2_eq : name:string -> path -> form -> form * form
+
+val decompose_binder  : ?bound:int -> quantif:quantif -> form -> bindings * form
+val decompose_forall  : ?bound:int -> form -> bindings * form
+val decompose_exists  : ?bound:int -> form -> bindings * form
+val decompose_lambda  : ?bound:int -> form -> bindings * form
+
+val destr_binder  : ?bound:int -> quantif:quantif -> form -> bindings * form
+val destr_forall  : ?bound:int -> form -> bindings * form
+val destr_exists  : ?bound:int -> form -> bindings * form
+val destr_lambda  : ?bound:int -> form -> bindings * form
+
+val destr_binder1  : quantif:quantif -> form -> ident * gty * form
+val destr_forall1  : form -> ident * gty * form
+val destr_exists1  : form -> ident * gty * form
+val destr_lambda1  : form -> ident * gty * form
 
 val destr_op        : form -> EcPath.path * etyarg list
 val destr_local     : form -> EcIdent.t
@@ -254,14 +273,6 @@ val destr_eq        : form -> form * form
 val destr_eq_or_iff : form -> form * form
 val destr_let       : form -> lpattern * form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
-val destr_forall1   : form -> EcIdent.t * gty * form
-val destr_forall    : form -> bindings * form
-val decompose_forall: form -> bindings * form
-val decompose_lambda: form -> bindings * form
-val destr_lambda    : form -> bindings * form
-
-val destr_exists1   : form -> EcIdent.t * gty * form
-val destr_exists    : form -> bindings * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
 val destr_eagerF    : form -> eagerF

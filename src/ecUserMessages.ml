@@ -524,6 +524,9 @@ end = struct
              if you meant to call procedure `%a', assign its result using `<@' rather than `<-'"
             pp_qsymbol q
 
+    | PositiveShouldBeBeforeNegative ->
+        msg "positive restriction are only allowed before negative restriction"
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
@@ -718,6 +721,11 @@ end = struct
     | CE_InlinedOpIsForm x ->
         msg
           "inlined operator's body must be an expression-like formula: `%s'"
+          (string_of_qsymbol x)
+
+    | CE_ProofForLemma x ->
+        msg
+          "cannot realized a (non-axiomatic) lemma: `%s'"
           (string_of_qsymbol x)
 end
 

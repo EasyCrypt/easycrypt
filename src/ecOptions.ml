@@ -20,6 +20,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_compact : int option;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
@@ -36,6 +37,7 @@ and run_option = {
   runo_report    : string option;
   runo_provers   : prv_options;
   runo_jobs      : int option;
+  runo_rawargs   : string list;
 }
 
 and prv_options = {
@@ -338,7 +340,8 @@ let specs = {
       `Spec  ("gcstats", `Flag  , "Display GC statistics");
       `Spec  ("tstats" , `String, "Save timing statistics to <file>");
       `Spec  ("script" , `Flag  , "Computer-friendly output");
-      `Spec  ("no-eco" , `Flag  , "Do not cache verification results")]);
+      `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
+      `Spec  ("compact", `Int   , "<internal>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -352,6 +355,7 @@ let specs = {
       `Group "provers";
       `Spec  ("report", `String, "dump result to <report>");
       `Spec  ("jobs", `Int, "number of parallel jobs to run");
+      `Spec  ("raw-args", `String, "<internal>");
     ]);
 
     ("why3config", "Configure why3", []);
@@ -499,6 +503,7 @@ let cmp_options_of_values ini values input =
   { cmpo_input   = input;
     cmpo_provers = prv_options_of_values ini values;
     cmpo_gcstats = get_flag "gcstats" values;
+    cmpo_compact = get_int "compact" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values; }
@@ -508,7 +513,8 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_scenarios = scenarios;
     runo_report    = get_string "report" values;
     runo_provers   = prv_options_of_values ini values;
-    runo_jobs      = get_int "jobs" values; }
+    runo_jobs      = get_int "jobs" values;
+    runo_rawargs   = get_strings "raw-args" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =

@@ -50,8 +50,13 @@ end = struct
     compare v1.v_extra v2.v_extra
 
   let to_string (v : version) =
-    Printf.sprintf "%d.%d.%d.%s"
-      v.v_major v.v_minor v.v_subminor v.v_extra
+    let parts = [v.v_major; v.v_minor; v.v_subminor] in
+    let parts = List.map string_of_int parts in
+    let parts =
+      let extra = if String.is_empty v.v_extra then None else Some v.v_extra in
+      ofold (fun extra parts -> parts @ [extra]) parts extra in
+
+    String.concat "." parts
 end
 
 module VP = Version
@@ -108,6 +113,7 @@ let evictions : prover_eviction_test list = [
 type prover = {
   pr_name    : string;
   pr_version : Version.version;
+  pr_alt     : string;
   pr_evicted : (prover_eviction * bool) option;
 }
 
@@ -156,6 +162,7 @@ end = struct
         { pr_prover  =
             { pr_name    = name;
               pr_version = Version.parse version;
+              pr_alt     = p.Whyconf.prover_altern;
               pr_evicted = None; };
           pr_config  = config;
           pr_driver  = driver; }
@@ -165,6 +172,15 @@ end = struct
         Whyconf.Mprover.fold
           (fun p c acc -> load_prover p c :: acc)
           (Whyconf.get_provers config) [] in
+
+      let provers =
+        let key_of_prover (p : why3prover) =
+          let p = p.pr_prover in
+          (p.pr_name, p.pr_version, p.pr_alt) in
+
+        List.sort
+          (fun p1 p2 -> compare (key_of_prover p1) (key_of_prover p2))
+          provers in
 
       let provers =
         List.map (fun prover ->
@@ -212,6 +228,7 @@ exception UnknownProver of string
 
 type parsed_pname = {
   prn_name     : string;
+  prn_alt      : string;
   prn_version  : Version.version option;
   prn_ovrevict : bool;
 }
@@ -228,19 +245,32 @@ let parse_prover_name name =
 
   let version = omap Version.parse version in
 
-  if   name <> "" && name.[0] = '!'
-  then { prn_name     = String.sub name 1 (String.length name - 1);
-         prn_version  = version;
-         prn_ovrevict = true; }
-  else { prn_name     = name;
-         prn_version  = version;
-         prn_ovrevict = false; }
+  let ovrevict, name =
+      if name <> "" && name.[0] = '!' then
+        true, String.sub name 1 (String.length name - 1)
+      else false, name in
+
+  let name, alt =
+    let re = EcRegexp.regexp "^(.*)\\[(.*)\\]$" in
+    match EcRegexp.exec (`C re) name with
+    | None ->
+      name, ""
+    | Some m ->
+      let name = oget (EcRegexp.Match.group m 1) in
+      let alt  = oget (EcRegexp.Match.group m 2) in
+      name, alt in
+
+  { prn_name     = name;
+    prn_version  = version;
+    prn_alt      = alt;
+    prn_ovrevict = ovrevict; }
 
 let get_prover (rawname : string) =
   let name = parse_prover_name rawname in
 
   let test p =
        p.pr_prover.pr_name = name.prn_name
+    && p.pr_prover.pr_alt  = name.prn_alt
     && (name.prn_ovrevict || not (is_evicted p.pr_prover)) in
 
   let provers = List.filter test (Config.provers ()) in
@@ -276,6 +306,11 @@ let is_prover_known name =
   try ignore (get_prover name); true with UnknownProver _ -> false
 
 (* -------------------------------------------------------------------- *)
+
+let get_w3_main = Config.main
+let get_w3_conf = Config.config
+let get_w3_env = Config.w3_env
+
 let get_w3_th dirname name =
   Env.read_theory (Config.w3_env ()) dirname name
 
@@ -351,6 +386,12 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type coq_mode =
+  | Check (* Check scripts *)
+  | Edit  (* Edit then check scripts *)
+  | Fix   (* Try to check script, then edit script on non-success *)
+
+(* -------------------------------------------------------------------- *)
 type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
@@ -391,62 +432,127 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
+(* -------------------------------------------------------------------- *)
+let maybe_start_why3_server_ (pi : prover_infos) =
+  if not (Prove_client.is_connected ()) then begin
+    let sockname = Filename.temp_file "easycrypt.why3server." ".socket" in
+    let exec = Filename.concat (Whyconf.libdir (Config.main ())) "why3server" in
+    let pid = ref (-1) in
+
+    begin
+      let rd, wr = Unix.pipe ~cloexec:true () in
+
+      EcUtils.try_finally (fun () ->
+        pid := Unix.fork ();
+
+        if !pid = 0 then begin
+          Unix.close rd;
+          EUnix.setpgid 0 0;
+          Unix.chdir (Filename.get_temp_dir_name ());
+          Unix.execvp exec [|
+            exec; "--socket"; sockname; "--single-client";
+            "-j"; string_of_int pi.pr_maxprocs
+          |]
+        end else begin
+          Unix.close wr;
+          ignore (Unix.select [rd] [] [] (-1.0))
+        end)
+      (fun () ->
+        (try Unix.close rd with Unix.Unix_error _ -> ());
+        (try Unix.close wr with Unix.Unix_error _ -> ()))
+    end;
+
+    let connected = ref false in
+
+    EcUtils.try_finally (fun () ->
+      let n, d = ref 5, ref 0.1 in
+
+      while 0 < !n && not !connected do
+        if Sys.file_exists sockname then begin
+          try
+            Prove_client.connect_external sockname;
+            connected := true
+          with Prove_client.ConnectionError _ -> ()
+        end;
+        if not !connected then begin
+          ignore (Unix.select [] [] [] !d);
+          n := !n - 1;
+          d := 2.0 *. !d
+        end
+      done)
+
+    (fun () ->
+      if not !connected then begin
+        try
+          Unix.kill !pid Sys.sigkill
+        with Unix.Unix_error _ -> ()
+      end);
+
+    if not !connected then
+      raise (Prove_client.ConnectionError "cannot start & connect to why3server")
+  end
+
+(* -------------------------------------------------------------------- *)
+
+let maybe_start_why3_server (pi : prover_infos) =
+  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+
+  EcUtils.try_finally
+    (fun () -> maybe_start_why3_server_ pi)
+    (fun () -> ignore (Sys.signal Sys.sigint sigdef : Sys.signal_behavior))
+
+(* -------------------------------------------------------------------- *)
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
+  maybe_start_why3_server pi;
 
-  EcUtils.try_finally (fun () ->
-    try
-      let { pr_config = pr; pr_driver = dr; } = get_prover prover in
-      let pc =
-        let command = pr.Whyconf.command in
+  try
+    let { pr_config = pr; pr_driver = dr; } = get_prover prover in
 
-        let limit = { Call_provers.empty_limit with
-          Call_provers.limit_time =
-            let limit = pi.pr_timelimit * pi.pr_cpufactor in
-            if limit <= 0 then 0. else float_of_int limit;
-        } in
+    let pc =
+      let command = pr.Whyconf.command in
 
-        let rec doit gcdone =
-          try
-            Driver.prove_task
-              ~config:(Config.main ())
-              ~command ~limit dr task
-          with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
-            Gc.compact (); doit true
-        in
+      let limit = { Call_provers.empty_limit with
+        Call_provers.limit_time =
+          let limit = pi.pr_timelimit * pi.pr_cpufactor in
+          if limit <= 0 then 0. else float_of_int limit;
+      } in
 
-        if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
-          let stream = open_out (Printf.sprintf "%s.smt" prover) in
-          let fmt = Format.formatter_of_out_channel stream in
-          EcUtils.try_finally
-            (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
-            (fun () -> close_out stream)
-        end;
-
-        doit false
-
+      let rec doit gcdone =
+        try
+          Driver.prove_task
+            ~config:(Config.main ())
+            ~command ~limit dr task
+        with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
+          Gc.compact (); doit true
       in
-        Some (prover, pc)
 
-    with e ->
-      notify |> oiter (fun notify -> notify `Warning (lazy (
-        let buf = Buffer.create 0 in
-        let fmt = Format.formatter_of_buffer buf in
-        Format.fprintf fmt "error when starting `%s': %a%!"
-          prover EcPException.exn_printer e;
-        Buffer.contents buf)));
-      None)
+      if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
+        let stream = open_out (Printf.sprintf "%s.smt" prover) in
+        let fmt = Format.formatter_of_out_channel stream in
+        EcUtils.try_finally
+          (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
+          (fun () -> close_out stream)
+      end;
 
-  (fun () -> ()) (*
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
+      doit false
+
+    in
+      Some (prover, pc)
+
+  with e ->
+    notify |> oiter (fun notify -> notify `Warning (lazy (
+      let buf = Buffer.create 0 in
+      let fmt = Format.formatter_of_buffer buf in
+      Format.fprintf fmt "error when starting `%s': %a%!"
+        prover EcPException.exn_printer e;
+      Buffer.contents buf)));
+    None
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =
   let module CP = Call_provers in
-
-  Prove_client.set_max_running_provers pi.pr_maxprocs;
 
   let pcs = Array.make pi.pr_maxprocs None in
 

@@ -262,7 +262,6 @@ and pmod_restr_el = {
 
 and pmod_restr = {
   pmr_mem   : pmod_restr_mem;
-	pmr_procs : pmod_restr_el list;
  }
 
 (* -------------------------------------------------------------------- *)
@@ -272,7 +271,6 @@ and pmodule_sig =
 and pmodule_sig_struct = {
   pmsig_params : (psymbol * pmodule_type) list;
   pmsig_body   : pmodule_sig_struct_body;
-  pmsig_restr  : pmod_restr option;
 }
 
 and pmodule_sig_struct_body = pmodule_sig_item list
@@ -392,7 +390,6 @@ type poperator = {
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
-  po_nosmt  : bool;
   po_locality : locality;
 }
 
@@ -453,10 +450,11 @@ type 'a ppt_head =
 
 type ppt_arg =
   | EA_none
-  | EA_form  of pformula
-  | EA_mem   of pmemory
-  | EA_mod   of pmsymbol located
-  | EA_proof of (pformula option) gppterm
+  | EA_form   of pformula
+  | EA_mem    of pmemory
+  | EA_mod    of pmsymbol located
+  | EA_proof  of (pformula option) gppterm
+  | EA_tactic of [`Done | `Smt | `DoneSmt]
 
 and 'a gppterm = {
   fp_mode : [`Implicit | `Explicit];
@@ -965,6 +963,7 @@ type logtactic =
   | Pmemory     of psymbol
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
+  | Pcoq        of (EcProvers.coq_mode option * psymbol * pprover_infos)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -1031,7 +1030,6 @@ type paxiom = {
   pa_vars     : pgtybindings option;
   pa_formula  : pformula;
   pa_kind     : paxiom_kind;
-  pa_nosmt    : bool;
   pa_locality : locality;
 }
 
@@ -1182,7 +1180,6 @@ and 'a genoverride = [
 and ty_override_def = psymbol list * pty
 
 and op_override_def = {
-  opov_nosmt  : bool;
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
@@ -1248,6 +1245,7 @@ type global_action =
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
+  | Gpaxiom
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)

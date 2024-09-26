@@ -16,18 +16,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "sponge"
-  , "options"    : "-pragmas Proofs:weak"
-  }
-
-  ,
-
-  { "name"       : "ml-kem"
-  , "repository" : "https://github.com/formosa-crypto/formosa-mlkem"
-  , "branch"     : "master"
-  , "subdir"     : "."
-  , "config"     : "config/tests.config"
-  , "scenario"   : "mlkem"
-  , "options"    : "-pragmas Proofs:weak -jobs 1"
+  , "options"    : "-jobs 1"
   }
 
   ,
@@ -38,7 +27,7 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "cryptobox"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : ""
   }
 
   ,
@@ -49,6 +38,39 @@
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "xsalsa"
-  , "options"    : "-pragmas Proofs:weak"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-acai"
+  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-acai"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-fsai"
+  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-fsai"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "sphincsplus"
+  , "repository" : "https://github.com/MM45/FV-SPHINCSPLUS-EC"
+  , "branch"     : "master"
+  , "subdir"     : "."
+  , "config"     : "config/tests.config"
+  , "scenario"   : "sphincsplus"
+  , "options"    : ""
   }
 ]

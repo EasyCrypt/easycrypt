@@ -81,14 +81,13 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom  ?(nosmt = false) ~locality (x, ty, pv, vd, f) k =
+  let mk_axiom ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
       pa_pvars   = pv;
       pa_vars     = vd;
       pa_formula  = f;
       pa_kind     = k;
-      pa_nosmt    = nosmt;
       pa_locality = locality; }
 
   let mk_simplify l =
@@ -175,8 +174,9 @@
   ]
 
   module SMT : sig
-    val mk_pi_option  : psymbol -> pi option -> smt
-    val mk_smt_option : smt list -> pprover_infos
+    val mk_pi_option      : psymbol -> pi option -> smt
+    val mk_smt_option     : smt list -> pprover_infos
+    val simple_smt_option : pprover_infos
   end = struct
     let option_matching tomatch =
       let match_option = String.option_matching tomatch in
@@ -307,7 +307,7 @@
         let pr =
           match k with
           | `Only ->
-	            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
+                   ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
           | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
           | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }
 
@@ -353,6 +353,9 @@
         plem_selected   = !selected;
         psmt_debug      = !debug;
       }
+
+    let simple_smt_option =
+        { (mk_smt_option []) with plem_max = Some (Some 0) }
   end
 %}
 
@@ -418,6 +421,10 @@
 %token CONGR
 %token CONSEQ
 %token CONST
+%token COQ
+%token CHECK
+%token EDIT
+%token FIX
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -502,7 +509,6 @@
 %token MODULE
 %token MOVE
 %token NE
-%token NOSMT
 %token NOT
 %token NOTATION
 %token OF
@@ -670,6 +676,9 @@ _lident:
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
 | EXIT       { "exit"       }
+| CHECK      { "check"      }
+| EDIT       { "edit"       }
+| FIX        { "fix"        }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1644,19 +1653,10 @@ oracle_restr:
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
-mod_restr_el:
-  | f=lident COLON orcls=option(oracle_restr)
-    { { pmre_name = f; pmre_orcls = orcls; } }
-
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr; pmr_procs = [] } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = []; pmr_procs = l } }
-  | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
-    { { pmr_mem = mr;	pmr_procs = l } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = mr;	pmr_procs = l } }
+    { { pmr_mem = mr } }
+
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -1672,11 +1672,11 @@ mod_restr:
     { { pmty_pq = x; pmty_mem = Some mr; } }
 
 sig_def:
-| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* mr=mod_restr? EQ i=sig_body
+| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* EQ i=sig_body
     { let pi_sig =
         Pmty_struct { pmsig_params = List.flatten args;
                       pmsig_body   = i;
-			                pmsig_restr  = mr; } in
+			               } in
       { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; } }
 
 sig_body:
@@ -1845,7 +1845,7 @@ op_or_const:
 | CONST { `Const }
 
 operator:
-| locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
+| locality=locality k=op_or_const tags=bracket(ident*)?
     x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
@@ -1861,10 +1861,9 @@ operator:
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
-      po_nosmt    = st;
       po_locality = locality; } }
 
-| locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
+| locality=locality k=op_or_const tags=bracket(ident*)?
     x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
@@ -1876,7 +1875,6 @@ operator:
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;
-      po_nosmt    = st;
       po_locality = locality; } }
 
 opbody:
@@ -2043,21 +2041,17 @@ lemma_decl:
   COLON f=form
     { (x, tyvars, predvars, pd, f) }
 
-nosmt:
-| NOSMT { true  }
-| empty { false }
-
 axiom_tc:
 | /* empty */       { PLemma None }
 | BY bracket(empty) { PLemma (Some None) }
 | BY t=tactics      { PLemma (Some (Some t)) }
 
 axiom:
-| l=locality AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
-    { mk_axiom ~locality:l ~nosmt:o d (PAxiom (odfl [] ids)) }
+| l=locality AXIOM ids=bracket(ident+)? d=lemma_decl
+    { mk_axiom ~locality:l d (PAxiom (odfl [] ids)) }
 
-| l=locality LEMMA o=nosmt d=lemma_decl ao=axiom_tc
-    { mk_axiom ~locality:l ~nosmt:o d ao }
+| l=locality LEMMA d=lemma_decl ao=axiom_tc
+    { mk_axiom ~locality:l d ao }
 
 | l=locality  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
@@ -2350,10 +2344,10 @@ intro_pattern:
    { IPDone (Some `Variant) }
 
 | SLASHSHARP
-   { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt (false, SMT.simple_smt_option) }
 
 | SLASHSLASHSHARP
-   { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt (true, SMT.simple_smt_option) }
 
 | SLASHEQ
    { IPSimplify `Default }
@@ -2406,6 +2400,15 @@ gpterm_arg:
     exp=iboption(AT) p=qident tvi=tvars_app? args=loc(gpterm_arg)*
   RPAREN
     { EA_proof (mk_pterm exp (FPNamed (p, tvi)) args) }
+
+| SLASHSLASH
+    { EA_tactic `Done }
+
+| SLASHSHARP
+    { EA_tactic `Smt }
+
+| SLASHSLASHSHARP
+    { EA_tactic `DoneSmt }
 
 gpterm(F):
 | hd=gpterm_head(F)
@@ -2464,10 +2467,10 @@ rwarg1:
    { RWDone (Some `Variant) }
 
 | SLASHSHARP
-   { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (false, SMT.simple_smt_option) }
 
 | SLASHSLASHSHARP
-   { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (true, SMT.simple_smt_option) }
 
 | SLASHEQ
    { RWSimpl `Default }
@@ -2770,6 +2773,9 @@ logtactic:
 
 | SMT pi=smt_info
    { Psmt pi }
+
+| COQ mode=coq_info name=loc(STRING) LPAREN dbmap=dbmap1* RPAREN
+    { Pcoq (mode, name, SMT.mk_smt_option [`WANTEDLEMMAS dbmap])}
 
 | SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
@@ -3661,12 +3667,11 @@ clone_override:
 | TYPE ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
    { (x, PTHO_Type (`BySyntax (ps, t), mode)) }
 
-| OP st=nosmt x=qoident tyvars=bracket(tident*)?
+| OP x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))
     mode=loc(opclmode) f=form
 
    { let ov = {
-       opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = List.flatten p;
        opov_retty  = odfl (mk_loc mode.pl_loc PTunivar) sty;
@@ -3730,9 +3735,14 @@ print:
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
 
+coq_info:
+|           { None }
+| CHECK    { Some EcProvers.Check }
+| EDIT      { Some EcProvers.Edit }
+| FIX       { Some EcProvers.Fix }
 
 smt_info:
-| li=smt_info1* { SMT.mk_smt_option li}
+| li=smt_info1* { SMT.mk_smt_option li }
 
 smt_info1:
 | t=word
@@ -3849,6 +3859,7 @@ global_action:
 | hint             { Ghint        $1 }
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
+| PRINT AXIOM      { Gpaxiom         }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

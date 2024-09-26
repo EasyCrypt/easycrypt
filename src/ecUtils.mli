@@ -8,6 +8,7 @@ val unexpected : unit -> 'a
 
 (* -------------------------------------------------------------------- *)
 val makedirs : string -> unit
+val safe_unlink : filename:string -> unit
 
 (* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
@@ -213,6 +214,8 @@ end
 (* -------------------------------------------------------------------- *)
 module IO : sig
   include module type of BatIO
+
+  val pp_to_file : filename:string -> (Format.formatter -> unit) -> unit
 end
 
 (* -------------------------------------------------------------------- *)

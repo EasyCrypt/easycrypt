@@ -1073,23 +1073,28 @@ and create_op ?(body = false) (genv : tenv) p =
     let wextra = List.map (fun ty ->
                      WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
     let decl =
-      match body, op.op_kind with
-      | true, OB_oper (Some (OP_Plain (body, false))) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+      let default () = WDecl.create_param_decl ls in
+
+      if op.op_opaque.smt then
+        default ()
+      else
+        match body, op.op_kind with
+        | true, OB_oper (Some (OP_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+
+        | true, OB_oper (Some (OP_Fix body)) ->
+          OneShot.now register;
+          let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
+          let wbody = Cast.arg wbody ls.WTerm.ls_value in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
-        OneShot.now register;
-        let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
-        let wbody = Cast.arg wbody ls.WTerm.ls_value in
-        WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
+        | true, OB_pred (Some (PR_Plain body)) ->
+            let wparams, wbody = trans_body (genv, lenv) wdom None body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | true, OB_pred (Some (PR_Plain body)) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom None body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
-
-      | _, _ ->
-          WDecl.create_param_decl ls
+        | _, _ ->
+            default ()
 
     in
       OneShot.now register;
@@ -1429,23 +1434,32 @@ module Frequency = struct
 
   let f_ops_oper unwanted_op env p rs =
     match EcEnv.Op.by_path_opt p env with
-    | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain (f, false))) } ->
-      r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
-      let rec aux rs = function
-        | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
-        | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
-      in
-      aux rs e.opf_branches
-    | Some {op_kind = OB_pred (Some (PR_Ind pri)) } ->
-       let for1 rs ctor =
-         List.fold_left
-           (fun rs f -> r_union rs (f_ops unwanted_op f))
-           rs ctor.prc_spec
-       in List.fold_left for1 rs pri.pri_ctors
-    | _ -> rs
+    | Some op -> begin
+      if op.op_opaque.smt then
+        rs
+      else
+        match op with
+        | {op_kind = OB_pred (Some (PR_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Plain f)) } ->
+          r_union rs (f_ops unwanted_op f)
+        | {op_kind = OB_oper (Some (OP_Fix e)) } ->
+          let rec aux rs = function
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
+          in
+          aux rs e.opf_branches
+        | {op_kind = OB_pred (Some (PR_Ind pri)) } ->
+          let for1 rs ctor =
+            List.fold_left
+              (fun rs f -> r_union rs (f_ops unwanted_op f))
+              rs ctor.prc_spec
+          in List.fold_left for1 rs pri.pri_ctors
+        | _ -> rs
+        end
+
+      | None ->
+        rs
 
   (* -------------------------------------------------------------------- *)
   type frequency = {
@@ -1600,18 +1614,7 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
   dump_tasks tenv.te_task filename
 
-(* -------------------------------------------------------------------- *)
-let cnt = Counter.create ()
-
-let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
-  let out_task filename task =
-    let stream = open_out filename in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
-        (Format.formatter_of_out_channel stream)
-        "%a@." Why3.Pretty.print_task task)
-      (fun () -> close_out stream) in
-
+let init hyps concl =
   let env   = LDecl.toenv hyps in
   let hyps  = LDecl.tohyps hyps in
   let task  = create_global_task () in
@@ -1622,39 +1625,11 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+  env,hyps,tenv,decl
 
-  let execute_task toadd =
-    if pi.P.pr_selected then begin
-      let buffer = Buffer.create 0 in
-      let fmt    = Format.formatter_of_buffer buffer in
-      let ppe    = EcPrinting.PPEnv.ofenv env in
-      let l      = List.map fst toadd in
-      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
-      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
-      notify |> oiter (fun notify -> notify `Warning
-        (lazy (Buffer.contents buffer)))
-    end;
+(* -------------------------------------------------------------------- *)
 
-    List.iter (trans_axiom tenv) toadd;
-    let task = WTask.add_decl tenv.te_task decl in
-    let tkid = Counter.next cnt in
-
-    let dumpin_opt =
-      match pi.pr_dumpin with
-      | None -> Os.getenv "EC_WHY3"
-      | Some filename -> Some (EcLocation.unloc filename)
-    in
-    ( dumpin_opt |> oiter (fun filename ->
-          Format.eprintf "dumping in %s" filename;
-      let filename = Printf.sprintf "%.4d-%s" tkid filename in
-      out_task filename task));
-    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
-
-    if 1 <= pi.P.pr_verbose then
-      notify |> oiter (fun notify -> notify `Warning (lazy (
-        Printf.sprintf "SMT done: %.5f\n%!" tp)));
-    res in
-
+let select env pi hyps concl execute_task =
   if pi.P.pr_all then
     let init_select p ax =
       ax.ax_visibility = `Visible && not (P.Hints.mem p pi.P.pr_unwanted) in
@@ -1699,3 +1674,54 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
           end
 
         in aux pi.P.pr_max other 4
+
+(* -------------------------------------------------------------------- *)
+let cnt = Counter.create ()
+
+let make_task tenv toadd decl=
+    List.iter (trans_axiom tenv) toadd;
+    WTask.add_decl tenv.te_task decl
+
+let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
+  let out_task filename task =
+    let stream = open_out filename in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task task)
+      (fun () -> close_out stream) in
+
+  let env,hyps,tenv,decl = init hyps concl in
+
+  let execute_task toadd =
+    if pi.P.pr_selected then begin
+      let buffer = Buffer.create 0 in
+      let fmt    = Format.formatter_of_buffer buffer in
+      let ppe    = EcPrinting.PPEnv.ofenv env in
+      let l      = List.map fst toadd in
+      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
+      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
+      notify |> oiter (fun notify -> notify `Warning
+        (lazy (Buffer.contents buffer)))
+    end;
+
+    let task = make_task tenv toadd decl in
+    let tkid = Counter.next cnt in
+
+    let dumpin_opt =
+      match pi.pr_dumpin with
+      | None -> Os.getenv "EC_WHY3"
+      | Some filename -> Some (EcLocation.unloc filename)
+    in
+    ( dumpin_opt |> oiter (fun filename ->
+          Format.eprintf "dumping in %s" filename;
+      let filename = Printf.sprintf "%.4d-%s" tkid filename in
+      out_task filename task));
+    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
+
+    if 1 <= pi.P.pr_verbose then
+      notify |> oiter (fun notify -> notify `Warning (lazy (
+        Printf.sprintf "SMT done: %.5f\n%!" tp)));
+    res
+  in
+  select env pi hyps concl execute_task

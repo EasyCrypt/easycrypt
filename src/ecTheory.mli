@@ -2,6 +2,7 @@
 open EcSymbols
 open EcMaps
 open EcPath
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules
@@ -68,7 +69,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * ty list) | `Tuple]
+  [`Op of (EcPath.path * ty list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;
@@ -86,5 +87,4 @@ and rule_option = {
 val mkitem : import -> theory_item_r -> theory_item
 
 (* -------------------------------------------------------------------- *)
-val module_expr_of_module_sig:
-  EcIdent.t -> module_type -> module_sig -> module_expr
+val module_expr_of_module_sig : EcIdent.t -> mty_mr -> module_sig -> module_expr

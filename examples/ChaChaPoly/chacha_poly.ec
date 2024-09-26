@@ -1691,9 +1691,8 @@ section PROOFS.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move => &hr; elim (p2{hr}) => //. 
-          clear &hr.
-          smt (size_drop size_eq0 gt0_block_size).
+          move => &hr; elim (p2{hr}) => //= => {&hr}.
+          smt (size_drop size_ge0 size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
       + by move=> &2 _; islossless.
@@ -2521,9 +2520,9 @@ section PROOFS.
        (iota_ 0 qdec).
   proof.
     pose E := 
-      fun (_:unit) (g:glob UFCMA_l) (_:unit) => size g.`1 <= qdec /\ exists tt, tt \in g.`1 /\ tt.`1 = tt.`2.
+      fun (_:unit) (g:glob UFCMA_l) (_:unit) => size g.`6 <= qdec /\ exists tt, tt \in g.`6 /\ tt.`1 = tt.`2.
     pose phi :=
-      fun (_:unit) (g:glob UFCMA_l) (_:unit) => find (fun (tt:tag * tag) => tt.`1 = tt.`2) g.`1.
+      fun (_:unit) (g:glob UFCMA_l) (_:unit) => find (fun (tt:tag * tag) => tt.`1 = tt.`2) g.`6.
     have -> := LP.list_partitioning UFCMA_l () E phi (iota_ 0 qdec) &m (iota_uniq 0 qdec).
     have -> /= : Pr[UFCMA_l.f() @ &m : E tt (glob UFCMA_l) res /\ ! (phi tt (glob UFCMA_l) res \in iota_ 0 qdec)] = 0%r.
     + byphoare => //. 

@@ -306,7 +306,7 @@ abstract theory AdversaryN.
      `| Pr[Main(R(SampleE), CountA(A)).main() @ &m : E res Count.c (glob A) ] -
         Pr[Main(R(Sample), CountA(A)).main() @ &m : E res Count.c (glob A) ] | <= q%r * p%r / n%r .
   proof.
-    apply (ler_trans _ _ _ (pr_A_upto (CountA(A)) _ (fun r (x: int *  glob A) => E r x.`1 x.`2) &m)).
+    apply (ler_trans _ _ _ (pr_A_upto (CountA(A)) _ (fun r (x: glob A * int) => E r x.`2 x.`1) &m)).
     + move=> O O_ll;proc.
       call (A_ll (Count(O)) _); 2 : by auto.
       by proc;sp;if => //;wp;call O_ll.

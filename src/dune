@@ -12,6 +12,7 @@
 (library 
  (name ecLib)
  (public_name easycrypt.ecLib)
+ (foreign_stubs (language c) (names eunix))
  (modules :standard \ ec)
  (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith)
 )

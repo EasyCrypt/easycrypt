@@ -25,9 +25,7 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let check_oracle_use (_pf : proofenv) env adv o =
-  let restr = { mr_empty with
-                mr_mpaths = { mr_empty.mr_mpaths with
-                              ur_neg = Sm.singleton adv; }} in
+  let restr = { mr_empty with ur_neg = Sx.empty, Sm.singleton adv } in
 
   (* This only checks the memory restrictions. *)
   EcTyping.check_mem_restr_fun env o restr
@@ -42,16 +40,13 @@ let check_concrete pf env f =
 
 (* -------------------------------------------------------------------- *)
 let lossless_hyps env top sub =
-  let clear_to_top restr =
-    let mr_mpaths = { (ur_empty Sm.empty) with ur_neg = Sm.singleton top } in
-    { restr with mr_xpaths = ur_empty Sx.empty;
-                 mr_mpaths = mr_mpaths } in
+  let clear_to_top = { mr_empty with ur_neg = Sx.empty, Sm.singleton top } in
 
   let sig_ = EcEnv.NormMp.sig_of_mp env top in
   let bd =
     List.map
       (fun (id, mt) ->
-         (id, GTmodty { mt with mt_restr = clear_to_top mt.mt_restr } )
+         (id, GTmodty (mt, clear_to_top))
       ) sig_.mis_params
   in
   (* WARN: this implies that the oracle do not have access to top *)
@@ -59,7 +54,7 @@ let lossless_hyps env top sub =
   let concl = f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls =
     let name = sub in
-    (EcSymbols.Msym.find name sig_.mis_restr.mr_oinfos) |> OI.allowed
+    (EcSymbols.Msym.find name sig_.mis_oinfos) |> OI.allowed
   in
   let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl)

@@ -222,8 +222,8 @@ end) = struct
   (* -------------------------------------------------------------------- *)
   let add_modules env p1 p2 : EcEnv.env * EcSubst.subst =
     List.fold_left2 (fun (env, s) (id1,_) (id2,mt) ->
-        let env = EcEnv.Mod.bind_local id2 mt env in
-        env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty) p1 p2
+      let env = EcEnv.Mod.bind_param id2 mt env in
+      env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty) p1 p2
 
   (* ------------------------------------------------------------------ *)
   let rec for_module_type env ~norm (mt1:module_type) (mt2:module_type) =
@@ -390,18 +390,20 @@ let check_lpattern env subst lp1 lp2 =
 let check_memtype env mt1 mt2 =
   ensure (EcMemory.mt_equal_gen (EqTest_i.for_type env) mt1 mt2)
 
-let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
+let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   let gty2 = Fsubst.gty_subst subst gty2 in
   match gty1, gty2 with
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
-  | GTmodty p1, GTmodty p2 ->
-    let test f1 f2 = test env subst f1 f2 in
-    ensure (ModTy.mod_type_equiv test env p1 p2);
-    Mod.bind_local x1 p1 env,
-    if id_equal x1 x2 then subst
-    else Fsubst.f_bind_absmod subst x2 x1
+  | GTmodty mty1, GTmodty mty2 ->
+    ensure (NormMp.mod_type_equiv env mty1 mty2);
+    let env = Mod.bind_local x1 mty1 env in
+    let subst =
+      if   id_equal x1 x2
+      then subst
+      else Fsubst.f_bind_absmod subst x2 x1
+    in env, subst
 
   | GTmem me1, GTmem me2  ->
     check_memtype env me1 me2;
@@ -410,8 +412,8 @@ let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
     else Fsubst.f_bind_mem subst x2 x1
   | _, _ -> raise NotConv
 
-let check_bindings test env subst bd1 bd2 =
-    List.fold_left2 (check_binding test) (env,subst) bd1 bd2
+let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2
 
 let check_me_binding env subst (x1,mt1) (x2,mt2) =
   check_memtype env mt1 mt2;
@@ -466,7 +468,7 @@ let is_alpha_eq hyps f1 f2 =
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when
         q1 = q2 && List.length bd1 = List.length bd2 ->
 
-      let env, subst = check_bindings test env subst bd1 bd2 in
+      let env, subst = check_bindings env subst bd1 bd2 in
       aux env subst f1' f2'
 
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
@@ -733,11 +735,12 @@ let eta_expand bd f ty =
 let reduce_user_gen simplify ri env hyps f =
   if not ri.user then raise nohead;
 
-  let p =
+  let p : EcEnv.Reduction.topsym =
     match f.f_node with
     | Fop (p, _)
     | Fapp ({ f_node = Fop (p, _) }, _) -> `Path p
     | Ftuple _   -> `Tuple
+    | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
   let rules = EcEnv.Reduction.get p env in
@@ -783,6 +786,9 @@ let reduce_user_gen simplify ri env hyps f =
 
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
             ()
+
+        | ({ f_node = Fproj (target, i)}, _), R.Rule (`Proj ai, [arg]) when i = ai ->
+            doit target arg
 
         | _, R.Var x ->
           check_pv x f
@@ -876,6 +882,14 @@ let reduce_logic ri env hyps f p args =
           then f_false
           else f_ands (List.map2 f_eq args1 args2)
 
+        | (Fop (p1, tys1), args1), (Fop (p2, tys2), args2)
+            when    EcPath.p_equal p1 p2
+                 && EcEnv.Op.is_record_ctor env p1
+                 && EcEnv.Op.is_record_ctor env p2
+                 && List.for_all2 (EqTest_i.for_etyarg env) tys1 tys2 ->
+
+            f_ands (List.map2 f_eq args1 args2)
+
         | (_, []), (_, [])
             when EqTest_i.for_type env f1.f_ty EcTypes.tunit
                  && EqTest_i.for_type env f2.f_ty EcTypes.tunit ->
@@ -955,25 +969,38 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (records projection) *)
   | Fapp ({ f_node = Fop (p, _); }, args)
-      when ri.iota && EcEnv.Op.is_projection env p ->
-      begin match args with
-      | mk :: args ->
-        begin match mk.f_node with
-        | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
-          if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
-          let v = oget (EcEnv.Op.by_path_opt p env) in
-          let v = proj3_2 (EcDecl.operator_as_proj v) in
-          let v = List.nth mkargs v in
-          f_app v args f.f_ty
+      when ri.iota && EcEnv.Op.is_projection env p -> begin
 
-        | _ -> raise needsubterm
-        end
-      | _ -> raise nohead
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed NoHead -> begin
+        begin match args with
+        | mk :: args ->
+          begin match mk.f_node with
+          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
+            if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
+            let v = oget (EcEnv.Op.by_path_opt p env) in
+            let v = proj3_2 (EcDecl.operator_as_proj v) in
+            let v = List.nth mkargs v in
+            f_app v args f.f_ty
+
+          | _ -> raise needsubterm
+          end
+        | _ -> raise nohead
       end
+    end
+  end
 
     (* ι-reduction (tuples projection) *)
-  | Fproj(f1, i) when ri.iota ->
-    check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+  | Fproj(f1, i) -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with
+      | NotRed NoHead when ri.iota ->
+        check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+      | NotRed _ as e ->
+        raise e
+    end
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
@@ -1063,7 +1090,12 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> reduce_delta ri env f
+  | Fop _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ ->
+      reduce_delta ri env f
+    end
 
   | Fapp({ f_node = Fop(p,_); }, args) -> begin
       try  reduce_logic ri env hyps f p args
@@ -1074,7 +1106,17 @@ let reduce_head simplify ri env hyps f =
           else raise needsubterm
     end
 
-  | Fapp(_, _) -> raise needsubterm
+  | Ftuple _ -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed _ -> raise needsubterm
+    end
+
+  | Fapp _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ -> raise needsubterm
+  end
 
   | Fquant((Lforall | Lexists), _, _) ->
     reduce_quant ri env hyps f
@@ -1512,16 +1554,11 @@ let rec conv ri env f1 f2 stk =
 
   | _, _ -> force_head ri env f1 f2 stk
 
-and check_bindings_conv ri env q bd1 bd2 f1 f2 =
-  let test env subst f1 f2 =
-    let f2 = Fsubst.f_subst subst f2 in
-    conv ri env f1 f2 []
-  in
-
+and check_bindings_conv (_ri : redinfo) env q bd1 bd2 f1 f2 =
   let rec aux es bd bd1 bd2 =
     match bd1, bd2 with
     | b1::bd1', b2::bd2' ->
-      begin match check_binding test es b1 b2 with
+      begin match check_binding es b1 b2 with
       | es -> aux es (b1::bd) bd1' bd2'
       | exception NotConv -> es, bd, bd1, bd2
       end
@@ -1686,6 +1723,8 @@ module User = struct
             R.Rule (`Op (p, List.fst etyargs), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
+        | { f_node = Fproj (target, i) }, [] ->
+            R.Rule (`Proj i, [rule target])
         | { f_node = Fint i }, [] ->
             R.Int i
         | { f_node = Flocal x }, [] ->
@@ -1710,7 +1749,8 @@ module User = struct
                       | { ty_node = Tvar a } -> Sid.add a ltyvars
                       | _ as ty -> ty_fold doit ltyvars ty in doit)
                   cst.cst_ty_vs tys
-              | `Tuple -> cst.cst_ty_vs in
+              | `Tuple -> cst.cst_ty_vs
+              | `Proj _ -> cst.cst_ty_vs in
             let cst = {cst with cst_ty_vs = ltyvars } in
             List.fold_left doit cst args
 
@@ -1800,15 +1840,14 @@ let add_local (env, subst) (x1, ty1) (x2, ty2) =
   if id_equal x1 x2 then subst
   else EcSubst.rename_flocal subst x2 x1 ty1
 
-let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
+let check_binding (env, subst) (x1, gty1) (x2, gty2) =
   let gty2 = EcSubst.subst_gty subst gty2 in
   match gty1, gty2 with
   | GTty ty1, GTty ty2 ->
     add_local (env, subst) (x1,ty1) (x2,ty2)
 
   | GTmodty p1, GTmodty p2 ->
-    let test f1 f2 = test env subst f1 f2 in
-    ensure (ModTy.mod_type_equiv test env p1 p2);
+    ensure (NormMp.mod_type_equiv env p1 p2);
     Mod.bind_local x1 p1 env,
     if id_equal x1 x2 then subst
     else EcSubst.add_module subst x2 (mident x1)
@@ -1820,13 +1859,9 @@ let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
     else EcSubst.add_memory subst x2 x1
   | _, _ -> raise NotConv
 
-let check_bindings test env subst bd1 bd2 =
-    List.fold_left2 (check_binding test) (env,subst) bd1 bd2
+let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2
 
-let check_bindings exn tparams env s bd1 bd2 =
-  let test env s f1 f2 =
-    let f2 = EcSubst.subst_form s f2 in
-    is_conv (LDecl.init env tparams) f1 f2
-  in
-  try check_bindings test env s bd1 bd2
+let check_bindings exn env s bd1 bd2 =
+  try check_bindings env s bd1 bd2
   with NotConv -> raise exn
