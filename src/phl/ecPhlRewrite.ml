@@ -121,7 +121,7 @@ let process_rewrite
         (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
         (List.find_map try1 pts) in
 
-    (m, data), expr_of_form mhr e
+    (m, data), expr_of_form (fst m) e
   in
 
   let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
