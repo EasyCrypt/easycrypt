@@ -158,6 +158,7 @@ let circ_array_of_bws (inps: cinput list) : circuit =
   let rs = List.map circ_ident inps |> List.map (fun c -> destr_bwcirc c.circ) in
   {circ=BWArray (Array.of_list rs); inps}
 
+(* Each array element has size w *)
 let circ_array_of_bw (inp: cinput) (w: width) : circuit =
   let r = circ_ident inp in
   let r = destr_bwcirc r.circ in
@@ -453,8 +454,29 @@ let circuit_aggregate_inps (c: circuit) : circuit =
   | _ -> let circs, inp = bus_of_cinputs c.inps in
     {circ=apply c circs; inps=[inp]}
 
+let circuit_array_sliceget (w: width) (n: width) (m: width) (i: int) : circuit = 
+  assert (n >= m*(i+1));
+  (* assert (n mod m = 0); *)
+  let arr_inp = bwainput_of_size n w in
+  let arr = circ_ident arr_inp in
+  let out = destr_bwarray arr.circ in
+  let out = (Array.sub out (m*i) m) in
+  {arr with circ = BWArray out}
+  
+let circuit_array_sliceset (w: width) (n: width) (m: width) (i: int) : circuit = 
+  assert (n >= m*(i + 1));
+  (* assert (n mod m = 0); *)
+  let arr_inp = bwainput_of_size n w in
+  let new_arr_inp = bwainput_of_size m w in
+  let arr = circ_ident arr_inp in
+  let new_arr = circ_ident new_arr_inp in
+  let arr_b = Array.to_list (destr_bwarray arr.circ) in
+  let new_arr_b = Array.to_list (destr_bwarray new_arr.circ) in
+  let out = List.take (m*i) arr_b @ new_arr_b @ List.drop (m*(i+1)) arr_b |> Array.of_list in
+  {arr with circ = BWArray out; inps = [arr_inp; new_arr_inp]}
+
 let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit =
-  assert (n*w > i*aw);
+  assert (n*w >= (i + 1)*aw);
   assert (n*w mod aw = 0);
   let arr_inp = bwainput_of_size n w in
   let arr = circ_ident arr_inp in
@@ -462,7 +484,7 @@ let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit
   {circ=BWCirc (List.drop (i*aw) (destr_bwcirc arr.circ) |> List.take aw); inps=[arr_inp]}
 
 let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit =
-  assert (n*w > i*aw);
+  assert (n*w >= (i + 1)*aw);
   assert (n*w mod aw = 0);
   let bw_inp = bwinput_of_size aw in
   let bw = circ_ident bw_inp in
@@ -511,6 +533,7 @@ let inputs_of_tdep (td: HL.tdeps) :  _ * cinput list =
 
 (* Partitions into blocks of type n -> m *)
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
+  let const_inp = BWInput (create "const", n) in
   let c = circuit_flatten c in
   let c = circuit_aggregate_inps c in
   let r = destr_bwcirc c.circ in
@@ -532,7 +555,9 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   List.map (function
     | {circ=BWCirc r; inps=[BWInput (idn, w)]}
       -> {circ=BWCirc (C.uextend ~size:m r); inps=[BWInput (idn, n)]}
-    | _ -> assert false)
+    | {circ=BWCirc r; inps=[]}
+      -> {circ=BWCirc (C.uextend ~size:m r); inps=[const_inp]}
+    | c -> Format.eprintf "Failed for %s@." (circuit_to_string c) ; assert false)
   cs
 
   
@@ -922,61 +947,73 @@ let circuit_of_form
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (env: env) (f: form) : env * circuit = 
     let process_bwslice_ops (cache: _) (env: env) (f: form) : (env * circuit) option =
       let (fp, _), fs = destr_op_app f in
-      match (EcPath.toqsymbol fp) with
-      | _, x when String.starts_with x "sliceget" -> 
-        begin
-        match (String.split_on_char '_' x) with
-        | ["sliceget"; aw; n; w] ->
-          let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in
-          let arr, i = match fs with
-          | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
-          | _ -> assert false
-          in
-          let r = circuit_bwarray_slice_get n w aw i in
-          let env, arr = doit cache env arr in
-          Some (env, compose r [arr])
-        | ["sliceget"; aw; w] ->
-          let aw, w = (String.to_int aw, String.to_int w) in
-          let bw, i = match fs with
-          | [bw; {f_node=(Fint i)}] -> bw, (BI.to_int i)
-          | _ -> assert false
-          in
-          assert(w = width_of_type env bw.f_ty);
-          assert(aw = width_of_type env f.f_ty);
-          let env, bw = doit cache env bw in
-          let get_circ = circuit_bwcirc_get w aw i in
-          Some (env, compose get_circ [bw])
+      match (String.split_on_char '_' @@ snd (EcPath.toqsymbol fp)) with
+      | ["sliceget"; aw; n; w] ->
+        let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in
+        let arr, i = match fs with
+        | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
         | _ -> assert false
-        end
-  
-      | _, x when String.starts_with x "sliceset" -> 
-        begin
-        match (String.split_on_char '_' x) with
-        | ["sliceset"; aw; n; w] ->
-          let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in 
-          let arr, i, v = match fs with
-          | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
-          | _ -> assert false
-          in
-          let r = circuit_bwarray_slice_set n w aw i in
-          let env, arr = doit cache env arr in
-          let env, v = doit cache env v in
-          Some (env, compose r [arr; v])
-        | ["sliceset"; aw; w] ->
-          let aw, w = (String.to_int aw, String.to_int w) in 
-          let bw, i, v = match fs with
-          | [bw; {f_node=(Fint i)}; v] -> bw, (BI.to_int i), v
-          | _ -> assert false
-          in
-          assert(w = width_of_type env bw.f_ty);
-          assert(aw = width_of_type env f.f_ty);
-          assert(aw = width_of_type env v.f_ty);
-          let env, bw = doit cache env bw in
-          let env, v = doit cache env v in
-          let set_circ = circuit_bwcirc_set w aw i in
-          Some (env, compose set_circ [bw; v])
+        in
+        let r = circuit_bwarray_slice_get n w aw i in
+        let env, arr = doit cache env arr in
+        Some (env, compose r [arr])
+      | ["sliceget"; aw; w] ->
+        let aw, w = (String.to_int aw, String.to_int w) in
+        let bw, i = match fs with
+        | [bw; {f_node=(Fint i)}] -> bw, (BI.to_int i)
         | _ -> assert false
-        end
+        in
+        assert(w = width_of_type env bw.f_ty);
+        assert(aw = width_of_type env f.f_ty);
+        let env, bw = doit cache env bw in
+        let get_circ = circuit_bwcirc_get w aw i in
+        Some (env, compose get_circ [bw])
+      | ["sliceset"; aw; n; w] ->
+        let aw, n, w = (String.to_int aw, String.to_int n, String.to_int w) in 
+        let arr, i, v = match fs with
+        | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
+        | _ -> assert false
+        in
+        let r = circuit_bwarray_slice_set n w aw i in
+        let env, arr = doit cache env arr in
+        let env, v = doit cache env v in
+        Some (env, compose r [arr; v])
+      | ["sliceset"; aw; w] ->
+        let aw, w = (String.to_int aw, String.to_int w) in 
+        let bw, i, v = match fs with
+        | [bw; {f_node=(Fint i)}; v] -> bw, (BI.to_int i), v
+        | _ -> assert false
+        in
+        assert(w = width_of_type env bw.f_ty);
+        assert(aw = width_of_type env f.f_ty);
+        assert(aw = width_of_type env v.f_ty);
+        let env, bw = doit cache env bw in
+        let env, v = doit cache env v in
+        let set_circ = circuit_bwcirc_set w aw i in
+        Some (env, compose set_circ [bw; v])
+      | ["asliceget"; bw; n; m] ->
+        let bw, n, m = (String.to_int bw, String.to_int n, String.to_int m) in
+        let arr, i = match fs with
+        | [arr; {f_node= Fint i; _}] -> arr, (BI.to_int i)
+        | _ -> assert false
+        in
+        let r = circuit_array_sliceget bw n m i in
+        let env, arr = doit cache env arr in
+        Some (env, compose r [arr])
+      | ["asliceset"; bw; n; m] ->
+        let bw, n, m = (String.to_int bw, String.to_int n, String.to_int m) in 
+        let arr, i, v = match fs with
+        | [arr; {f_node= Fint i; _}; v] -> arr, (BI.to_int i), v
+        | _ -> assert false
+        in
+        let r = circuit_array_sliceset bw n m i in
+        let env, arr = doit cache env arr in
+        let env, v = doit cache env v in
+        Some (env, compose r [arr; v])
+      | "sliceget"::xs -> assert false
+      | "sliceset"::xs -> assert false
+      | "asliceget"::xs -> assert false
+      | "asliceset"::xs -> assert false
       | _ -> None
     in
 

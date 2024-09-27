@@ -24,6 +24,7 @@ val cinput_of_type : ?idn:ident -> env -> ty -> cinput
 val circuit_to_string : circuit -> string
 val circ_ident : cinput -> circuit
 val circuit_aggregate : circuit list -> circuit
+val circuit_aggregate_inps : circuit -> circuit
 val circuit_mapreduce : circuit -> int -> int -> circuit list
 val circ_check : circuit -> circuit option -> bool
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool

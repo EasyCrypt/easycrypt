@@ -70,6 +70,10 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
     assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1);
     let cinp = (List.hd circs).inps in
     let c = {(circuit_aggregate circs) with inps=cinp} in
+    (* let c = circuit_aggregate_inps c in *) 
+    (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
+      (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
+      (* Format.eprintf "@."; ) [c] outvs in *)
     let cs = circuit_mapreduce c n m in
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
