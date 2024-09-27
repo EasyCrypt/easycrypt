@@ -996,7 +996,9 @@ let circuit_of_form
           let r = Array.of_list vs in
           Some(env, {circ=BWArray r; inps=[]})
         end
-      | _ -> Format.eprintf "Not oflist %s@." (EcPath.tostring pth); None
+      | _ -> 
+        (* Format.eprintf "Not oflist %s@." (EcPath.tostring pth); *) 
+        None
     in
         
     
