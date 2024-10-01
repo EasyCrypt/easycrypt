@@ -951,13 +951,44 @@ let generalize_modtype to_gen (name, ms) =
     let ms = EcSubst.subst_top_modsig to_gen.tg_subst ms in
     to_gen, Some (Th_modtype (name, ms))
 
-let generalize_module to_gen me =
+let generalize_module to_gen prefix me =
   match me.tme_loca with
   | `Local -> to_gen, None
-  | `Global ->
-    (* FIXME section: we can generalize declare module *)
+
+  | `Global -> begin
     let me = EcSubst.subst_top_module to_gen.tg_subst me in
-    to_gen, Some (Th_module me)
+
+    match me.tme_expr.me_body with
+    | ME_Alias (_, mp) -> begin
+      let bds = to_gen.tg_binds in
+      let bds = List.filter_map (function Binding (m, GTmodty _) -> Some m | _ -> None) bds in
+      let bds = Sid.of_list bds in
+
+      let exception Inline in
+
+      let check_gen (x : cbarg) =
+        match x with
+        | `Module { m_top = `Local x } ->
+          if Sid.mem x bds then raise Inline
+        | _ -> () in
+
+      try
+        on_mp check_gen mp;
+        to_gen, Some (Th_module me)
+
+      with Inline ->
+        let to_gen = { to_gen with tg_subst =
+          EcSubst.add_moddef
+            ~src:(EcPath.pqname prefix me.tme_expr.me_name)
+            ~dst:mp to_gen.tg_subst } in
+        to_gen, None
+    end
+
+    | _ ->
+      (* FIXME section: we can generalize declare module *)
+      to_gen, Some (Th_module me)
+  end
+
   | `Declare -> assert false (* should be a LC_decl_mod *)
 
 let generalize_export to_gen (p,lc) =
@@ -1336,7 +1367,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
     | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
     | Th_modtype ms      -> generalize_modtype to_gen ms
-    | Th_module me       -> generalize_module  to_gen me
+    | Th_module me       -> generalize_module  to_gen prefix me
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
