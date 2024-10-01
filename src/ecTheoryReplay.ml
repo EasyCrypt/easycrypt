@@ -756,13 +756,7 @@ and replay_mod
 
       let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
 
-      let np =
-        match mp.m_top with
-        | `Concrete (p, None) -> p
-        | _ -> assert false
-      in
-
-      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:mp in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -772,12 +766,12 @@ and replay_mod
       if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
         clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
-      let (subst, _) =
+      let subst =
         match mode with
         | `Alias ->
-          rename ove subst (`Module, name)
+          fst (rename ove subst (`Module, name))
         | `Inline _ ->
-          substme, EcPath.basename np in
+          substme in
 
       let newme =
         if mode = `Alias || mode = `Inline `Keep then

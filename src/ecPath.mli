@@ -14,10 +14,11 @@ and path_node =
 | Pqname  of path * symbol
 
 (* -------------------------------------------------------------------- *)
-val psymbol : symbol -> path
-val pqname  : path -> symbol -> path
-val pqoname : path option -> symbol -> path
-val pappend : path -> path -> path
+val psymbol  : symbol -> path
+val pqname   : path -> symbol -> path
+val pqoname  : path option -> symbol -> path
+val pappend  : path -> path -> path
+val poappend : path -> path option -> path
 
 val p_equal       : path -> path -> bool
 val p_compare     : path -> path -> int
@@ -77,6 +78,9 @@ val m_ntr_compare : mpath -> mpath -> int
 val m_hash        : mpath -> int
 val m_apply       : mpath -> mpath list -> mpath
 val m_fv          : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
+
+val is_abstract : mpath -> bool
+val is_concrete : mpath -> bool
 
 val m_functor : mpath -> mpath
 
