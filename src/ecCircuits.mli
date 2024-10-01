@@ -9,6 +9,9 @@ open EcEnv
 module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
+val blocks : 'a list -> int -> 'a list list
+
+(* -------------------------------------------------------------------- *)
 type circ
 type cinput
 type circuit = { circ: circ; inps: cinput list; }
@@ -21,10 +24,12 @@ exception CircError of string
 (* -------------------------------------------------------------------- *)
 val cinput_to_string : cinput -> string
 val cinput_of_type : ?idn:ident -> env -> ty -> cinput
+val size_of_circ : circ -> int 
 val circuit_to_string : circuit -> string
 val circ_ident : cinput -> circuit
 val circuit_aggregate : circuit list -> circuit
 val circuit_aggregate_inps : circuit -> circuit
+val circuit_permutation : int -> int -> (int -> int) -> circuit 
 val circuit_mapreduce : circuit -> int -> int -> circuit list
 val circ_check : circuit -> circuit option -> bool
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool

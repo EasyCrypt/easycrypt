@@ -33,7 +33,17 @@ end
 
 exception BDepError
 (* -------------------------------------------------------------------- *)
-let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable list * int) ((outvs, m) : variable list * int) (f: psymbol) (pcond: psymbol) : unit =
+let mapreduce 
+  (env : env) 
+  ((mem, mt): memenv) 
+  (proc: stmt) 
+  ((invs, n): variable list * int) 
+  ((outvs, m) : variable list * int) 
+  (f: psymbol) 
+  (pcond: psymbol)
+  (perm: (int -> int) option)
+  : unit =
+  
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
@@ -70,6 +80,12 @@ let mapreduce (env : env) ((mem, mt): memenv) (proc: stmt) ((invs, n): variable 
     assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1);
     let cinp = (List.hd circs).inps in
     let c = {(circuit_aggregate circs) with inps=cinp} in
+
+    (* OPTIONAL PERMUTATION STEP *)
+    let c = match perm with 
+    | None -> c
+    | Some perm -> circuit_permutation (size_of_circ c.circ) m perm
+    in
     (* let c = circuit_aggregate_inps c in *) 
     (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
       (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
@@ -209,11 +225,19 @@ let t_circ (tc: tcenv1) : tcenv =
   in
   FApi.close (!@ tc) VBdep
     
-let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: psymbol) (pcond: psymbol) (tc : tcenv1) =
+let t_bdep 
+  (n: int) 
+  (m: int) 
+  (inpvs: variable list) 
+  (outvs: variable list) 
+  (pcond: psymbol) 
+  (op: psymbol) 
+  (perm: (int -> int) option) 
+  (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
-  | FhoareS sF -> mapreduce (FApi.tc1_env tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond
+  | FhoareS sF -> mapreduce (FApi.tc1_env tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -222,17 +246,31 @@ let t_bdep (outvs: variable list) (n: int) (inpvs: variable list) (m: int) (op: 
   in
   FApi.close (!@ tc) VBdep
   
-let process_bdep 
-  ((inpvs, invs, n): string list * string list * int) 
-  ((outvs, m): string list * int) 
-  (op: psymbol) 
-  (pcond: psymbol) 
-  (tc: tcenv1) 
-=
+let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
+  let invs = bdinfo.invs in
+  let inpvs = bdinfo.inpvs in
+  let outvs = bdinfo.outvs in
+  let n = bdinfo.n in
+  let m = bdinfo.m in
+  let lane = bdinfo.lane in
+  let pcond = bdinfo.pcond in
+  let perm = bdinfo.perm in
 
   let env = FApi.tc1_env tc in
   let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
 
+  let fperm = match perm with 
+  | None -> None
+  | Some perm -> 
+    let pperm = EcEnv.Op.lookup ([], perm.pl_desc) env |> fst in
+    let fperm (i: int) = 
+      let arg = f_int (BI.of_int i) in
+      let call = EcTypesafeFol.f_app_safe env pperm [arg] in
+      let res = EcCallbyValue.norm_cbv (EcReduction.full_red) (FApi.tc1_hyps tc) call in
+      destr_int res |> BI.to_int
+    in
+    Some fperm
+  in
 
   (* DEBUG SECTION *)
   let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
@@ -248,9 +286,9 @@ let process_bdep
     | x::[] -> Some x
     | x::xs -> if List.for_all ((=) x) xs then Some x else None
   in
-  let pop, oop = EcEnv.Op.lookup ([], op.pl_desc) env in
+  let plane, olane = EcEnv.Op.lookup ([], lane.pl_desc) env in
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
-  let inpbty, outbty = tfrom_tfun2 oop.op_ty in
+  let inpbty, outbty = tfrom_tfun2 olane.op_ty in
   
   (* Refactor this *)
   let w2bits (ty: ty) (arg: form) : form = 
@@ -304,6 +342,15 @@ let process_bdep
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = List.map flatten_to_bits poutvs in
   let poutvs = List.rev poutvs in
+
+  (* OPTIONAL PERMUTATION STEP *)
+  let poutvs = match fperm with 
+  | None -> poutvs
+  | Some fperm -> 
+    let poutvs = blocks poutvs m in
+    List.mapi (fun i v -> (fperm i, v)) poutvs |> List.sort (fun a b -> (fst a) - (fst b)) |> List.snd |> List.flatten
+  in
+  
   let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
   let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
   let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
@@ -330,7 +377,7 @@ let process_bdep
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinpvs = EcCoreLib.CI_List.p_map @@! [b2w; pinpvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
-  let pinpvs_post = EcCoreLib.CI_List.p_map @@! [(f_op pop [] oop.op_ty); pinpvs] in
+  let pinpvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinpvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinpvs_post poutvs in
@@ -338,7 +385,7 @@ let process_bdep
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
-  FApi.t_last (t_bdep outvs n inpvs m op pcond) tc 
+  FApi.t_last (t_bdep n m inpvs outvs pcond lane fperm) tc 
 
 
 

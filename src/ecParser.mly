@@ -84,6 +84,9 @@
   let arr_of_vars (v : string) (i : int) : string list =
     List.init i (fun i -> v ^ "_" ^ (string_of_int i))
 
+  let make_bdep_info n m invs inpvs outvs pcond lane perm = 
+    { n; m; invs; inpvs; outvs; pcond; lane; perm }
+
   let mk_axiom ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
@@ -3246,10 +3249,9 @@ phltactic:
 
 | BDEP n=uint m=uint 
        invs=bdep_vars inpvs=bdep_vars outvs=bdep_vars
-       o=oident pc=oident
-    { Pbdep ((inpvs, invs, (BI.to_int n)), 
-             (outvs, (BI.to_int m)), 
-              o, pc) }
+       o=oident pc=oident perm=oident?
+    { Pbdep (make_bdep_info (BI.to_int n) (BI.to_int m)
+      invs inpvs outvs pc o perm) }
 
 | BDEPEQ n=uint m=uint inpvsl=bdep_vars inpvsr=bdep_vars
          outvsl=bdep_vars outvsr=bdep_vars

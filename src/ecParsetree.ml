@@ -705,6 +705,17 @@ type matchmode = [
   | `SSided of side
 ]
 
+type bdep_info = {
+  n : int;
+  m : int;
+  invs : string list;
+  inpvs : string list;
+  outvs : string list;
+  pcond : psymbol;
+  lane  : psymbol;
+  perm  : psymbol option;
+}
+
 (* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
@@ -775,7 +786,7 @@ type phltactic =
   | Plossless
 
     (* Map-reduce *)
-  | Pbdep of ((string list) * (string list) * int) * ((string list) * int) * psymbol * psymbol
+  | Pbdep of bdep_info
   | Pbdepeq of ((string list) * (string list) * int) * ((string list) * (string list) * int)
   | Pcirc
 
