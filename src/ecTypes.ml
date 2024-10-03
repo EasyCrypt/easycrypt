@@ -72,6 +72,7 @@ let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
 
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
 let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
+let tlist ty   = tconstr EcCoreLib.CI_List.p_list     [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
@@ -86,6 +87,17 @@ let ttuple lt    =
 
 let toarrow dom ty =
   List.fold_right tfun dom ty
+
+let tfrom_tlist ty =
+  let p_list = EcCoreLib.CI_List.p_list in
+  match ty.ty_node with
+  | Tconstr (p, [ty]) when p = p_list -> ty
+  | _ -> assert false
+
+let tfrom_tfun2 ty =
+  match ty.ty_node with
+  | Tfun (a, b) -> (a, b)
+  | _ -> assert false
 
 let tpred t = tfun t tbool
 

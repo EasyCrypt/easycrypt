@@ -49,6 +49,29 @@ module CI_Bool = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_List = struct
+  let i_List = "List"
+  let p_List = EcPath.pqname p_top i_List
+  let _List  = fun x -> EcPath.pqname p_List x
+  let p_list = _List "list"
+
+  let p_empty = _List "[]"
+  let p_cons = _List "::"
+  let p_head = _List "head"
+  let p_behead = _List "behead"
+  let p_tail = p_behead
+  let p_append = _List "++"
+  let p_flatten = EcPath.pqname p_List "flatten"
+  let p_map = _List "map"
+  let p_mapi = _List "mapi"
+  let p_chunk = EcPath.pqname (EcPath.pqname (EcPath.pqname p_top "BitEncoding") "BitChunking") "chunk"
+  let p_all = _List "all"
+  let p_nth = _List "nth"
+  let p_size = _List "size"
+  let p_mkseq = _List "mkseq"
+end
+  
+(* -------------------------------------------------------------------- *)
 module CI_Option = struct
   let i_Option  = "Logic"
   let p_Option  = EcPath.pqname p_top i_Option
