@@ -259,8 +259,8 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let env = FApi.tc1_env tc in
   let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
 
-  let fperm = match perm with 
-  | None -> None
+  let fperm, pperm = match perm with 
+  | None -> None, None
   | Some perm -> 
     let pperm = EcEnv.Op.lookup ([], perm.pl_desc) env |> fst in
     let fperm (i: int) = 
@@ -269,7 +269,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
       let res = EcCallbyValue.norm_cbv (EcReduction.full_red) (FApi.tc1_hyps tc) call in
       destr_int res |> BI.to_int
     in
-    Some fperm
+    Some fperm, Some pperm
   in
 
   (* DEBUG SECTION *)
@@ -342,20 +342,25 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = List.map flatten_to_bits poutvs in
   let poutvs = List.rev poutvs in
-
-  (* OPTIONAL PERMUTATION STEP *)
-  let poutvs = match fperm with 
-  | None -> poutvs
-  | Some fperm -> 
-    let poutvs = blocks poutvs m in
-    List.mapi (fun i v -> (fperm i, v)) poutvs |> List.sort (fun a b -> (fst a) - (fst b)) |> List.snd |> List.flatten
-  in
-  
   let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
   let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
   let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
   let poutvs = EcCoreLib.CI_List.p_map @@! [(bits2w_op outbty); poutvs] in
 
+  (* OPTIONAL PERMUTATION STEP *)
+  let poutvs = match pperm with 
+  | None -> poutvs
+  | Some pperm -> 
+    let i = (create "i", GTty tint) in
+    let bty = tfrom_tlist poutvs.f_ty in
+    EcCoreLib.CI_List.p_mkseq @@! [
+      f_lambda [i] 
+        (EcCoreLib.CI_List.p_nth @@! [f_op EcCoreLib.CI_Witness.p_witness [bty] bty; poutvs; 
+          pperm @@! [f_local (fst i) tint]]);
+      EcCoreLib.CI_List.p_size @@! [poutvs]
+    ]
+  in
+  
   
   (* ------------------------------------------------------------------ *)
   let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in

@@ -63,9 +63,13 @@ module CI_List : sig
   val p_tail    : path
   val p_append  : path
   val p_flatten : path
-  val p_map    : path
+  val p_map     : path
+  val p_mapi    : path
   val p_chunk   : path
   val p_all     : path
+  val p_size    : path
+  val p_nth     : path
+  val p_mkseq   : path
   end
 
 (*-------------------------------------------------------------------- *)

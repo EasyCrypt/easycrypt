@@ -570,9 +570,7 @@ let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit =
   let inp_circ = circ_ident inp in
   let cblocks = destr_bwcirc inp_circ.circ in 
   let cblocks = blocks cblocks w in 
-  let cblocks = List.mapi (fun i v -> (f i, v)) cblocks in
-  let cblocks = List.sort (fun a b -> (fst a) - (fst b)) cblocks in
-  let cblocks = List.snd cblocks |> List.flatten in
+  let cblocks = List.mapi (fun i _ -> List.nth cblocks (f i)) cblocks |> List.flatten in
   {circ=BWCirc(cblocks); inps=[inp]}
   
 (* -------------------------------------------------------------------- *)
