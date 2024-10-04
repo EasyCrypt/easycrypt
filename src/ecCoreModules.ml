@@ -36,6 +36,10 @@ let lv_to_list = function
   | LvVar (pv, _) -> [pv]
   | LvTuple pvs -> List.fst pvs
 
+let lv_to_ty_list = function
+  | LvVar (pv, ty) -> [pv, ty]
+  | LvTuple pvs -> pvs
+
 let name_of_lv lv =
   match lv with
   | LvVar (pv, _) ->

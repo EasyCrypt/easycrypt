@@ -253,7 +253,6 @@ module NormMp : sig
   val norm_mpath    : env -> mpath -> mpath
   val norm_xfun     : env -> xpath -> xpath
   val norm_pvar     : env -> EcTypes.prog_var -> EcTypes.prog_var
-  val norm_form     : env -> form -> form
   val mod_use       : env -> mpath -> use
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
@@ -264,6 +263,8 @@ module NormMp : sig
   (* Return [true] if [x] is forbidden in [restr]. *)
   val use_mem_xp    : xpath -> use use_restr -> bool
   val use_mem_gl    : mpath -> use use_restr -> bool
+
+  val flatten_use : use -> EcIdent.t list * (xpath * ty) list
 
   val norm_glob     : env -> EcMemory.memory -> mpath -> form
   val norm_tglob    : env -> mpath -> EcTypes.ty
@@ -422,7 +423,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
   type rule   = EcTheory.rule
-  type topsym = [ `Path of path | `Tuple ]
+  type topsym = [ `Path of path | `Tuple | `Proj of int]
 
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env

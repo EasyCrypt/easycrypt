@@ -33,6 +33,7 @@ type clone_error =
 | CE_ModIncompatible   of qsymbol
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
+| CE_ProofForLemma     of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -56,7 +57,7 @@ and evlemma = {
 }
 
 and evtags = ([`Include | `Exclude] * symbol) list
-and evinfo = ptactic_core option * clmode
+and evinfo = ptactic_core option * clmode * bool (* explicit *)
 
 val evc_empty : evclone
 

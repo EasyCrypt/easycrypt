@@ -48,11 +48,13 @@ type proofterm =
   | PTQuant of binding * proofterm
 
 and pt_head =
-| PTCut    of EcFol.form
+| PTCut    of EcFol.form * cutsolve option
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
 | PTTerm   of proofterm
+
+and cutsolve = [`Done | `Smt | `DoneSmt]
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -88,8 +90,8 @@ let ptlocal ?(args = []) x =
 let pthandle ?(args = []) x =
   PTApply { pt_head = PTHandle x; pt_args = args; }
 
-let ptcut ?(args = []) f =
-  PTApply { pt_head = PTCut f; pt_args = args; }
+let ptcut ?(args = []) ?(cutsolve : cutsolve option) f =
+  PTApply { pt_head = PTCut (f, cutsolve); pt_args = args; }
 
 (* -------------------------------------------------------------------- *)
 let paglobal ?args ~tys p =

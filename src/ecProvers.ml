@@ -306,6 +306,11 @@ let is_prover_known name =
   try ignore (get_prover name); true with UnknownProver _ -> false
 
 (* -------------------------------------------------------------------- *)
+
+let get_w3_main = Config.main
+let get_w3_conf = Config.config
+let get_w3_env = Config.w3_env
+
 let get_w3_th dirname name =
   Env.read_theory (Config.w3_env ()) dirname name
 
@@ -381,6 +386,12 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type coq_mode =
+  | Check (* Check scripts *)
+  | Edit  (* Edit then check scripts *)
+  | Fix   (* Try to check script, then edit script on non-success *)
+
+(* -------------------------------------------------------------------- *)
 type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
@@ -421,63 +432,127 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
+(* -------------------------------------------------------------------- *)
+let maybe_start_why3_server_ (pi : prover_infos) =
+  if not (Prove_client.is_connected ()) then begin
+    let sockname = Filename.temp_file "easycrypt.why3server." ".socket" in
+    let exec = Filename.concat (Whyconf.libdir (Config.main ())) "why3server" in
+    let pid = ref (-1) in
+
+    begin
+      let rd, wr = Unix.pipe ~cloexec:true () in
+
+      EcUtils.try_finally (fun () ->
+        pid := Unix.fork ();
+
+        if !pid = 0 then begin
+          Unix.close rd;
+          EUnix.setpgid 0 0;
+          Unix.chdir (Filename.get_temp_dir_name ());
+          Unix.execvp exec [|
+            exec; "--socket"; sockname; "--single-client";
+            "-j"; string_of_int pi.pr_maxprocs
+          |]
+        end else begin
+          Unix.close wr;
+          ignore (Unix.select [rd] [] [] (-1.0))
+        end)
+      (fun () ->
+        (try Unix.close rd with Unix.Unix_error _ -> ());
+        (try Unix.close wr with Unix.Unix_error _ -> ()))
+    end;
+
+    let connected = ref false in
+
+    EcUtils.try_finally (fun () ->
+      let n, d = ref 5, ref 0.1 in
+
+      while 0 < !n && not !connected do
+        if Sys.file_exists sockname then begin
+          try
+            Prove_client.connect_external sockname;
+            connected := true
+          with Prove_client.ConnectionError _ -> ()
+        end;
+        if not !connected then begin
+          ignore (Unix.select [] [] [] !d);
+          n := !n - 1;
+          d := 2.0 *. !d
+        end
+      done)
+
+    (fun () ->
+      if not !connected then begin
+        try
+          Unix.kill !pid Sys.sigkill
+        with Unix.Unix_error _ -> ()
+      end);
+
+    if not !connected then
+      raise (Prove_client.ConnectionError "cannot start & connect to why3server")
+  end
+
+(* -------------------------------------------------------------------- *)
+
+let maybe_start_why3_server (pi : prover_infos) =
+  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+
+  EcUtils.try_finally
+    (fun () -> maybe_start_why3_server_ pi)
+    (fun () -> ignore (Sys.signal Sys.sigint sigdef : Sys.signal_behavior))
+
+(* -------------------------------------------------------------------- *)
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
+  maybe_start_why3_server pi;
 
-  EcUtils.try_finally (fun () ->
-    try
-      let { pr_config = pr; pr_driver = dr; } = get_prover prover in
+  try
+    let { pr_config = pr; pr_driver = dr; } = get_prover prover in
 
-      let pc =
-        let command = pr.Whyconf.command in
+    let pc =
+      let command = pr.Whyconf.command in
 
-        let limit = { Call_provers.empty_limit with
-          Call_provers.limit_time =
-            let limit = pi.pr_timelimit * pi.pr_cpufactor in
-            if limit <= 0 then 0. else float_of_int limit;
-        } in
+      let limit = { Call_provers.empty_limit with
+        Call_provers.limit_time =
+          let limit = pi.pr_timelimit * pi.pr_cpufactor in
+          if limit <= 0 then 0. else float_of_int limit;
+      } in
 
-        let rec doit gcdone =
-          try
-            Driver.prove_task
-              ~config:(Config.main ())
-              ~command ~limit dr task
-          with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
-            Gc.compact (); doit true
-        in
-
-        if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
-          let stream = open_out (Printf.sprintf "%s.smt" prover) in
-          let fmt = Format.formatter_of_out_channel stream in
-          EcUtils.try_finally
-            (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
-            (fun () -> close_out stream)
-        end;
-
-        doit false
-
+      let rec doit gcdone =
+        try
+          Driver.prove_task
+            ~config:(Config.main ())
+            ~command ~limit dr task
+        with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
+          Gc.compact (); doit true
       in
-        Some (prover, pc)
 
-    with e ->
-      notify |> oiter (fun notify -> notify `Warning (lazy (
-        let buf = Buffer.create 0 in
-        let fmt = Format.formatter_of_buffer buf in
-        Format.fprintf fmt "error when starting `%s': %a%!"
-          prover EcPException.exn_printer e;
-        Buffer.contents buf)));
-      None)
+      if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
+        let stream = open_out (Printf.sprintf "%s.smt" prover) in
+        let fmt = Format.formatter_of_out_channel stream in
+        EcUtils.try_finally
+          (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
+          (fun () -> close_out stream)
+      end;
 
-  (fun () -> ()) (*
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
+      doit false
+
+    in
+      Some (prover, pc)
+
+  with e ->
+    notify |> oiter (fun notify -> notify `Warning (lazy (
+      let buf = Buffer.create 0 in
+      let fmt = Format.formatter_of_buffer buf in
+      Format.fprintf fmt "error when starting `%s': %a%!"
+        prover EcPException.exn_printer e;
+      Buffer.contents buf)));
+    None
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =
   let module CP = Call_provers in
-
-  Prove_client.set_max_running_provers pi.pr_maxprocs;
 
   let pcs = Array.make pi.pr_maxprocs None in
 

@@ -83,14 +83,29 @@ module LowApply : sig
     | `Hyps of EcEnv.LDecl.hyps * proofenv
   ]
 
-  val check : [`Elim | `Intro] -> proofterm -> ckenv -> proofterm * form
+  val check :
+       [`Elim | `Intro]
+    -> proofterm
+    -> ckenv
+    -> proofterm * form
+
+  val check_with_cutsolve :
+       [`Elim | `Intro]
+    -> proofterm
+    -> ckenv
+    -> proofterm * form * (handle, cutsolve) EcMaps.DMap.t
 end
+
+type cutsolver = {
+  smt   : FApi.backward;
+  done_ : FApi.backward;
+}
 
 (* Main low-level MP tactic. Apply a fully constructed proof-term to
  * the focused goal. If the proof-term contains PTCut-terms, create the
  * related subgoals. Raise [InvalidProofTerm] is the proof-term is not
  * valid (not typable or not a proof of the focused goal). *)
-val t_apply : proofterm -> FApi.backward
+val t_apply : ?cutsolver:cutsolver -> proofterm -> FApi.backward
 
 (* Apply a proof term of the form [p<:ty1...tyn> f1...fp _ ... _]
  * constructed from the path, type parameters, and formulas given to
@@ -320,6 +335,14 @@ val t_congr : form pair -> form pair list * ty -> FApi.backward
 type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
+
+val t_coq:
+     loc:EcLocation.t
+  -> name:string
+  -> mode:smtmode
+  -> coq_mode option
+  -> prover_infos
+  -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_solve :

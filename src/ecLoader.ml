@@ -97,17 +97,20 @@ let check_case idir name (dev, ino) =
 
   let check1 tname =
       match name = norm_name `Lower tname with
-      | false -> false
+      | false -> None
       | true  -> begin
           try
             let stat = Filename.concat idir tname in
             let stat = Unix.lstat stat in
-              stat.Unix.st_dev = dev && stat.Unix.st_ino = ino
-          with Unix.Unix_error _ -> false
+
+            if stat.Unix.st_dev = dev && stat.Unix.st_ino = ino then
+              Some tname
+            else None
+          with Unix.Unix_error _ -> None
       end
   in
-    try  List.exists check1 (EcUtils.Os.listdir idir)
-    with Unix.Unix_error _ -> false
+    try  List.find_map_opt check1 (EcUtils.Os.listdir idir)
+    with Unix.Unix_error _ -> None
 
 (* -------------------------------------------------------------------- *)
 let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
@@ -145,9 +148,8 @@ let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
         | None -> None
         | Some (stat, name) ->
           let stat = (stat.Unix.st_dev, stat.Unix.st_ino) in
-            if   not (check_case idir name stat)
-            then None
-            else Some (inamespace, Filename.concat idir name, kind)
+            check_case idir name stat
+            |> Option.map (fun name -> (inamespace, Filename.concat idir name, kind))
     in
 
     match

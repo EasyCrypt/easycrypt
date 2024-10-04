@@ -32,7 +32,7 @@ type subst = {
   sb_fmem     : EcIdent.t Mid.t;
   sb_tydef    : (EcIdent.t list * ty) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
-  sb_moddef   : EcPath.path Mp.t;
+  sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -74,14 +74,27 @@ let subst_path (s : subst) (p : EcPath.path) = _subst_path s.sb_path p
 
 (* -------------------------------------------------------------------- *)
 let subst_mpath (s : subst) (mp : EcPath.mpath) =
-  let crt_ps = Mp.union (fun _ _ x -> Some x) s.sb_path s.sb_moddef in
-
   let rec doit s (mp : EcPath.mpath) =
       let args = List.map (doit s) mp.m_args in
       match mp.m_top with
+      | `Concrete (p, sub) when Mp.mem p s.sb_moddef -> begin
+        let s_p, s_sub, s_args =
+          match Mp.find p s.sb_moddef with
+          | { m_top = `Concrete (s_p, s_sub); m_args } -> (s_p, s_sub, m_args)
+          | _ -> assert false in
+
+        let cat_sub =
+          match s_sub with
+          | None -> sub
+          | Some s_sub -> Some (EcPath.poappend s_sub sub) in
+
+        EcPath.mpath_crt s_p (s_args @ mp.m_args) cat_sub
+      end
+
       | `Concrete (p, sub) ->
-         let p = _subst_path crt_ps p in
-         EcPath.mpath_crt p args sub
+        let p = _subst_path s.sb_path p in
+        EcPath.mpath_crt p args sub
+
       | `Local id ->
          match Mid.find_opt id s.sb_module with
          | None -> EcPath.mpath_abs id args
@@ -266,8 +279,9 @@ let add_pddef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
   { s with sb_def = Mp.add p (ids, `Pred f) s.sb_def }
 
-let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.path) =
+let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.mpath) =
   assert (Mp.find_opt src s.sb_moddef = None);
+  assert (EcPath.is_concrete dst);
   { s with sb_moddef = Mp.add src dst s.sb_moddef }
 
 (* -------------------------------------------------------------------- *)

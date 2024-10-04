@@ -430,7 +430,7 @@ section.
     by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
   pose ev :=
     fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
-      let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
+      let (ga,ge,l,l0) = g in p ga ge l r /\ l <= q.
   have := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
   have := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
   have supp_range: perm_eq (to_seq (support [0..max 0 (q - 1)])) (range 0 q).

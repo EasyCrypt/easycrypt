@@ -108,6 +108,7 @@
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "auto"        , AUTO       ;        (* KW: tactic *)
 
+
     (* Other tactics *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "move"        , MOVE       ;        (* KW: tactic *)
@@ -121,6 +122,10 @@
     "exact"       , EXACT      ;        (* KW: bytac *)
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
+    "coq"         , COQ        ;        (* KW: bytac *)
+    "check"       , CHECK      ;        (* KW: bytac *)
+    "edit"        , EDIT       ;        (* KW: bytac *)
+    "fix"         , FIX        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)
     "reflexivity" , REFLEX     ;        (* KW: bytac *)
     "done"        , DONE       ;        (* KW: bytac *)

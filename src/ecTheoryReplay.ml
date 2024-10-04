@@ -675,19 +675,21 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
 
     let doproof =
       match Msym.find_opt x (ove.ovre_ovrd.evc_lemmas.ev_bynames) with
-      | Some (pt, hide) -> Some (pt, hide)
+      | Some (pt, hide, explicit) -> Some (pt, hide, explicit)
       | None when is_axiom ax.ax_kind ->
           List.Exceptionless.find_map
-            (function (pt, None) -> Some (pt, `Alias) | (pt, Some pttags) ->
+            (function (pt, None) -> Some (pt, `Alias, false) | (pt, Some pttags) ->
                if check_evtags pttags (Ssym.elements tags) then
-                 Some (pt, `Alias)
+                 Some (pt, `Alias, false)
                else None)
             ove.ovre_glproof
       | _ -> None
     in
       match doproof with
       | None -> (ax, proofs, false)
-      | Some (pt, hide)  ->
+      | Some (pt, hide, explicit)  ->
+          if explicit && not (EcDecl.is_axiom ax.ax_kind) then
+            clone_error (EcSection.env scenv) (CE_ProofForLemma (snd ove.ovre_prefix, x));
           let ax  = { ax with
             ax_kind = `Lemma;
             ax_visibility = if hide <> `Alias then `Hidden else ax.ax_visibility
@@ -754,13 +756,7 @@ and replay_mod
 
       let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
 
-      let np =
-        match mp.m_top with
-        | `Concrete (p, None) -> p
-        | _ -> assert false
-      in
-
-      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:mp in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -770,12 +766,12 @@ and replay_mod
       if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
         clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
-      let (subst, _) =
+      let subst =
         match mode with
         | `Alias ->
-          rename ove subst (`Module, name)
+          fst (rename ove subst (`Module, name))
         | `Inline _ ->
-          substme, EcPath.basename np in
+          substme in
 
       let newme =
         if mode = `Alias || mode = `Inline `Keep then

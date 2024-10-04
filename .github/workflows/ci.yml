@@ -1,6 +1,10 @@
 name: EasyCrypt compilation & check
 
-on: [push,pull_request,merge_group]
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
 
 env:
   HOME: /home/charlie
@@ -8,22 +12,8 @@ env:
   OPAMJOBS: 2
 
 jobs:
-  pre_job:
-    name: Check for Duplicates Jobs
-    runs-on: ubuntu-20.04
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-    - uses: fkirc/skip-duplicate-actions@v5
-      id: skip_check
-      with:
-        concurrent_skipping: 'same_content_newer'
-        skip_after_successful_duplicate: 'false'
-
   compile-opam:
     name: EasyCrypt compilation (opam)
-    needs: pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
@@ -34,12 +24,10 @@ jobs:
         opam pin add -n easycrypt .
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam exec -- make
+      run: opam exec -- make PROFILE=ci
 
   compile-nix:
     name: EasyCrypt compilation (nix)
-    needs: pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     env:
       HOME: /home/runner
     runs-on: ubuntu-20.04
@@ -60,8 +48,7 @@ jobs:
 
   check:
     name: Check EasyCrypt Libraries
-    needs: [pre_job, compile-opam]
-    if: needs.pre_job.outputs.should_skip != 'true'
+    needs: compile-opam
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
@@ -95,7 +82,6 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
-    needs: [pre_job]
     runs-on: ubuntu-20.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -110,8 +96,7 @@ jobs:
 
   external:
     name: Check EasyCrypt External Projects
-    needs: [pre_job, compile-opam, fetch-external-matrix]
-    if: needs.pre_job.outputs.should_skip != 'true'
+    needs: [compile-opam, fetch-external-matrix]
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
@@ -123,10 +108,21 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: easycrypt
+    - name: Extract target branch name
+      run: echo "branch=merge-${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+      id: extract_branch
+    - name: Find remote branch
+      id: branch_name
+      run: |
+        git ls-remote --exit-code --heads ${{ matrix.target.repository }} refs/heads/${{ steps.extract_branch.outputs.branch }} || exists=$?
+        if [ "$exists" = "2" ];
+        then echo "REPO_BRANCH=${{ matrix.target.branch }}" >> $GITHUB_OUTPUT;
+        else echo "REPO_BRANCH=${{ steps.extract_branch.outputs.branch }}" >> $GITHUB_OUTPUT;
+        fi
     - name: Checkout External Project
       run: |
         git clone --recurse-submodules \
-          -b ${{ matrix.target.branch }} \
+          -b ${{ steps.branch_name.outputs.REPO_BRANCH }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
     - name: Install EasyCrypt dependencies

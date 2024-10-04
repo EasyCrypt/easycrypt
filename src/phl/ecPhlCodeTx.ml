@@ -137,110 +137,149 @@ let t_set_r side cpos (fresh, id) e tc =
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
-let cfold_stmt ?(simplify=true) ?(full=true) (pf, hyps) (me: memenv) olen zpr =
-  let env = LDecl.toenv hyps in
+let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
+  let env =  LDecl.toenv hyps in
 
-  let rec doit (olen: int option) (acc: instr list) (insts: instr list) : instr list =
-    let (asgn, i, tl) =
-      match insts with
-      | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
-        let asgn =
-          match lv with
-          | LvVar (x, ty) -> [(x, ty, e)]
-          | LvTuple xs -> begin
-              match e.e_node with
-              | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
-              | _ -> assert false
-          end
-        in
-          (asgn, i, tl)
-      end
+  let simplify : expr -> expr =
+    if simplify then (fun e ->
+      let e = form_of_expr (fst me) e in
+      let e = EcReduction.simplify EcReduction.nodelta hyps e in
+      let e = expr_of_form (fst me) e in
+      e
+    ) else identity in
 
-      | _ -> 
-          tc_error pf "cannot find a left-value assignment at given position"
-    in
+  let is_const_expression (e : expr) =
+    PV.is_empty (e_read env e) in
 
-    (* Check that we are assigning to local variables only *)
-    List.iter
-      (fun (x, _, _) ->
-        if is_glob x then
-          tc_error pf "left-values must be local variables")
-      asgn;
+  let for_instruction ((subst as subst0) : (expr, unit) Mpv.t) (i : instr) =
+    let wr = EcPV.i_write env i in
+    let i = Mpv.isubst env subst i in
 
-    (* Check that we are assigning an expression that we can evaluate to a constant  *)
-    List.iter
-      (fun (_, _, e) ->
-          if e_fv e <> Mid.empty || e_read env e <> PV.empty then
-            tc_error pf "right-values are not closed expression")
-      asgn;
+    let (subst, asgn) =
+      List.fold_left_map (fun subst ((pv, _) as pvty) ->
+        match Mpv.find env pv subst with
+        | e -> Mpv.remove env pv subst, Some (pvty, e)
+        | exception Not_found -> subst, None
+      ) subst (fst (PV.elements wr)) in
 
-    let asg = List.fold_left
-                (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
-                EcPV.PV.empty asgn
-    in
+    let asgn = List.filter_map identity asgn in
 
-  
-    let subst =
-      List.fold_left
-        (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
-        Mpv.empty asgn
-    in
+    let mk_asgn (lve : ((prog_var * ty) * expr) list) =
+      let lvs, es = List.split lve in
+      lv_of_list lvs
+      |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
+      |> Option.to_list in
 
-    
-    let do_subst = Mpv.isubst env subst in
-    let do_substs = Mpv.issubst env subst in
+    let exception Interrupt in
 
-    (* TEST CODE REMOVE LATER *) 
-    let simpl (inst: instr) : instr =
-      match inst.i_node with
-      | Sasgn (l, e) -> i_asgn (l, (expr_of_form (fst me) (EcReduction.simplify EcReduction.nodelta hyps (form_of_expr (fst me) e))))
-      | _ -> inst
-    in
-    let do_simpl tl1 = if simplify then List.map simpl tl1 else tl1 in
-    let i = if simplify then simpl i else i in
-    (* TEST CODE REMOVE LATER *)
+    try
+      let subst, aout =
+        let exception Default in
 
-    
-    let p inst = PV.indep env (i_write env inst) asg in
+        try
+          match i.i_node with
+          | Sasgn (lv, e) ->
+            (* We already removed the variables of `lv` from the substitution *)
+            (* We are only interested in the variables of `lv` that are in `wr` *)
+            let es =
+              match simplify e, lv with
+              | { e_node = Etuple es }, LvTuple _ -> es
+              | _, LvTuple _ -> raise Default
+              | e, _ -> [e] in
+
+            let lv = lv_to_ty_list lv in
+      
+            let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
+              Mpv.mem env pv subst0 && is_const_expression e
+            ) (List.combine lv es) in
+            
+            let subst =
+              List.fold_left
+                (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
+                subst tosubst in
+
+            let asgn =
+              List.filter
+                (fun ((pv, _), _) -> not (Mpv.mem env pv subst))
+                asgn in
+
+            (subst, mk_asgn asgn @ mk_asgn asgn2)
+
+          | Srnd _ ->
+            (subst, mk_asgn asgn @ [i])
+
+          | _ -> raise Default
+
+        with Default ->
+          if List.exists
+              (fun (pv, _) -> Mpv.mem env pv subst0)
+              (fst (PV.elements wr))
+          then raise Interrupt;
+          (subst, mk_asgn asgn @ [i])
+
+      in `Continue (subst, aout)
+
+    with Interrupt -> `Interrupt
+  in
+
+  let body, epilog =
     match olen with
-    | None -> let p inst = PV.indep env (i_write env inst) asg in
-      let tl1, tl2 = EcUtils.List.takedrop_while p tl in
-      let tl1 = tl1 |> do_substs |> do_simpl in
-      begin match tl2 with
-      | [] -> acc @ tl1 @ [i]
-      | inst::tl2 -> let tl2 = (Mpv.isubst env subst inst)::tl2 in 
-        doit None (acc @ tl1) tl2
-      end
-    
+    | None ->
+      (zpr.z_tail, [])
     | Some olen ->
-      if List.length tl < olen then
-        tc_error pf "expecting at least %d instructions after assignment" olen;
-      let tl1, tl2 = List.takedrop olen tl in
-      begin match (List.for_all p tl1) with
-      | true -> 
-        let tl1 = do_simpl @@ do_substs tl1 in
-        acc @ tl1 @ [i] @ tl2
-      | false -> 
-        let tl11, tl12 = EcUtils.List.takedrop_while p tl1 in
-        let tl1, tl2 = tl11, tl12 @ tl2 in
-        let tl1 = do_simpl @@ do_substs tl1 in
-        let olen_rem = olen - (List.length tl1 + 1) in
-        doit (Some olen_rem) (acc @ tl1) @@ (do_subst (List.hd tl2))::(List.tl tl2)
-      end
+      if List.length zpr.z_tail < olen+1 then
+        tc_error pf "expecting at least %d instructions" olen;
+      List.takedrop (olen+1) zpr.z_tail in
 
-      (* might be superfluous FIXME *)
-      (* if not (EcPV.PV.indep env wrs asg) then *)
-        (* tc_error pf "cannot cfold non read-only local variables" *)
-      (* else *) 
-         
+  let lv, subst, body, rem =
+    match body with
+    | { i_node = Sasgn (lv, e) } :: is ->
+      let es =
+        match simplify e, lv with
+        | { e_node = Etuple es }, LvTuple _ -> es
+        | _, LvTuple _ ->
+            tc_error pf
+              "the left-value is a tuple but the right-hand expression \
+               is not a tuple expression";
+        | e, _ -> [e] in
+      let lv = lv_to_ty_list lv in
+
+      if not (List.for_all is_const_expression es) then
+        tc_error pf "right-values are not closed expressions";
+
+      if not (List.for_all (is_loc |- fst) lv) then
+        tc_error pf "left-values must be made of local variables only";
+
+      let subst =
+        List.fold_left
+          (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
+          Mpv.empty (List.combine lv es) in
+
+      let subst, is, rem =
+        List.fold_left_map_while for_instruction subst is in
+
+      lv, subst, List.flatten is, rem
+
+    | _ ->
+      tc_error pf "cannot find a left-value assignment at given position"
   in
-  let insts = doit olen [] Zpr.(zpr.z_tail) in
 
-  let zpr =
-    { zpr with Zpr.z_tail = insts }
-  in
-    (me, zpr, [])
+  let lv, es =
+    List.filter_map (fun ((pv, _) as pvty) ->
+      match Mpv.find env pv subst with
+      | e -> Some (pvty, e)
+      | exception Not_found -> None
+    ) lv |> List.split in
 
+  let asgn =
+    lv_of_list lv
+    |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
+    |> Option.to_list in
+
+  let zpr = { zpr with Zpr.z_tail = body @ asgn @ rem @ epilog } in
+  (me, zpr, [])
+
+(* -------------------------------------------------------------------- *)
 let t_cfold_r side cpos olen g =
   let tr = fun side -> `Fold (side, cpos, olen) in
   let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
@@ -366,7 +405,6 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
-
 
 (* -------------------------------------------------------------------- *)
 (*             Start of Code Cryogenic Vault:                           *)

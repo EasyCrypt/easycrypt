@@ -28,7 +28,7 @@ module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_provers   : EcParsetree.pprover_infos option -> EcProvers.prover_infos;
   tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
@@ -146,6 +146,21 @@ let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
 
   | `Report ->
       t_seq (t_simplify ~delta:`No) (t_smt ~mode:(`Report loc) pi) tc
+
+(* -------------------------------------------------------------------- *)
+
+let process_coq ~loc ~name (ttenv : ttenv) coqmode  pi (tc : tcenv1) =
+  let pi = ttenv.tt_provers (Some pi) in
+
+  match ttenv.tt_smtmode with
+  | `Admit ->
+    t_admit tc
+
+  | (`Sloppy | `Strict) as mode ->
+    t_seq (t_simplify ~delta:`No) (t_coq ~loc ~name ~mode coqmode pi) tc
+
+  | `Report ->
+    t_seq (t_simplify ~delta:`No) (t_coq ~loc ~name ~mode:(`Report (Some loc)) coqmode pi) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =
@@ -598,7 +613,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
         EcEnv.notify env `Warning "unused unfold: /%s" x
     end;
 
-    t_change ~ri ?target:idtg redform tc
+    t_change ~ri:{ ri with eta = true; beta = true; } ?target:idtg redform tc
 
   | _ ->
 
@@ -826,7 +841,7 @@ let process_rewrite1_r ttenv ?target ri tc =
             ptenv.pte_ev := MEV.add x `Form !(ptenv.pte_ev)
           );
 
-          let pt = PTApply { pt_head = PTCut f; pt_args = []; } in
+          let pt = PTApply { pt_head = PTCut (f, None); pt_args = []; } in
           let pt = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = f; } in
 
           process_rewrite1_core ~mode ?target (theside, prw, o) pt tc
@@ -857,10 +872,10 @@ let process_rewrite1_r ttenv ?target ri tc =
   end
 
   | RWSmt (false, info) ->
-     process_smt ~loc:ri.pl_loc ttenv info tc
+     process_smt ~loc:ri.pl_loc ttenv (Some info) tc
 
   | RWSmt (true, info) ->
-     t_or process_done (process_smt ~loc:ri.pl_loc ttenv info) tc
+     t_or process_done (process_smt ~loc:ri.pl_loc ttenv (Some info)) tc
 
   | RWApp fp -> begin
       let implicits = ttenv.tt_implicits in
@@ -1389,10 +1404,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       | None -> process_trivial
     in t tc
 
-  and intro1_smt (_ : ST.state) ((dn, pi) : _ * pprover_infos) (tc : tcenv1) =
+  and intro1_smt (_ : ST.state) (dn : bool) (pi : pprover_infos) (tc : tcenv1) =
     if dn then
-      t_or process_done (process_smt ttenv pi) tc
-    else process_smt ttenv pi tc
+      t_or process_done (process_smt ttenv (Some pi)) tc
+    else process_smt ttenv (Some pi) tc
 
   and intro1_simplify (_ : ST.state) logic tc =
     t_simplify_lg ~delta:`IfApplied (ttenv, logic) tc
@@ -1560,8 +1575,8 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         | `Done b ->
             (nointro, rl (t_onall (intro1_done st b)) gs)
 
-        | `Smt pi ->
-            (nointro, rl (t_onall (intro1_smt st pi)) gs)
+        | `Smt (b, pi) ->
+            (nointro, rl (t_onall (intro1_smt st b pi)) gs)
 
         | `Simpl b ->
             (nointro, rl (t_onall (intro1_simplify st b)) gs)
@@ -1660,6 +1675,57 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
             let id = fst (LDecl.by_name s hyps) in
             t_generalize_hyp ~clear id tc
 
+        | PFmem { pl_loc = loc; pl_desc = m; } -> begin
+            if doeq then
+              tacuerror "cannot generate an equation when generalizing a memory";
+
+            let m, lc =
+              try
+                LDecl.by_name m hyps
+              with LDecl.LdeclError (LookupError _) ->
+                tc_error !!tc ~loc "cannot find memory `%s'" m
+            in
+
+            let lc = match lc with LD_mem mt -> mt | _ -> assert false in
+
+            if is_none occ then
+              t_generalize_hyp ~clear m tc
+            else begin
+              let occ = norm_rwocc occ in
+
+              let ptnpos =
+                try
+                  FPosition.select ?o:occ (fun ctxt f ->
+                    if Sid.mem m ctxt then
+                      `Continue
+                    else
+                      match f.f_node with
+                      | Fglob (_, m')
+                      | Fpvar (_, m')
+                      | Fpr   { pr_mem = m' }  when EcIdent.id_equal m m' -> `Accept 0
+                      | _ -> `Continue
+                  ) concl
+                with InvalidOccurence -> tacuerror "invalid occurence selector"
+              in
+
+              let m' = EcIdent.fresh m in
+
+              let newconcl =
+                concl |> FPosition.map ptnpos (fun f ->
+                  match f.f_node with
+                  | Fglob (a, _) -> f_glob a m'
+                  | Fpvar (p, _) -> f_pvar p f.f_ty m'
+                  | Fpr   pr     -> f_pr_r { pr with pr_mem = m' }
+                  | _            -> assert false
+                ) in
+
+              let newconcl = f_forall [(m', GTmem lc)] newconcl in
+              let pt = ptcut ~args:[PAMemory m] newconcl in
+      
+              EcLowGoal.t_apply pt tc
+            end
+          end
+ 
         | _ ->
           let (ptenv, p) =
             let (ps, ue), p = TTC.tc1_process_pattern tc pf in
@@ -1923,6 +1989,9 @@ let process_cut ?(mode = `Have) engine ttenv ((ip, phi, t) : cut_t) tc =
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pcutdef
 
+let cutsolver (ttenv : ttenv) =
+  { smt = process_smt ttenv None; done_ = process_trivial; }
+
 let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt = {
       fp_mode = `Implicit;
@@ -1938,7 +2007,7 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt, ax = PT.concretize pt in
 
   FApi.t_sub
-    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
+    [EcLowGoal.t_apply ~cutsolver:(cutsolver ttenv) pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
 
 (* -------------------------------------------------------------------- *)

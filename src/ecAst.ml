@@ -97,7 +97,6 @@ and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 
 (* -------------------------------------------------------------------- *)
-
 and lvalue =
   | LvVar   of (prog_var * ty)
   | LvTuple of (prog_var * ty) list

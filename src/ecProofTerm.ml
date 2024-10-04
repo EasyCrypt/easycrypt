@@ -62,11 +62,12 @@ exception ProofTermError of pterror
 (* -------------------------------------------------------------------- *)
 let argkind_of_parg arg : argkind option =
   match arg with
-  | EA_mod   _ -> Some `Mod
-  | EA_mem   _ -> Some `Mem
-  | EA_form  _ -> Some `Form
-  | EA_proof _ -> Some `PTerm
-  | EA_none    -> None
+  | EA_mod    _ -> Some `Mod
+  | EA_mem    _ -> Some `Mem
+  | EA_form   _ -> Some `Form
+  | EA_proof  _ -> Some `PTerm
+  | EA_tactic _ -> Some `PTerm
+  | EA_none     -> None
 
 (* -------------------------------------------------------------------- *)
 let argkind_of_ptarg arg : argkind =
@@ -133,7 +134,7 @@ let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
 
 and concretize_e_head ((CPTEnv subst) as cptenv) head =
   match head with
-  | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
+  | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
   | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
@@ -530,7 +531,7 @@ let process_pterm_cut ~prcut pe pt =
         | _ -> assert false
     end
 
-    | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
+    | FPCut fp -> let fp = prcut fp in (PTCut (fp, None), fp)
   in
 
   let pt = PTApply { pt_head = pt; pt_args = []; } in
@@ -546,8 +547,8 @@ let process_pterm pe pt =
   in process_pterm_cut ~prcut pe pt
 
 (* ------------------------------------------------------------------ *)
-let rec trans_pterm_arg_impl pe f =
-  let pt = { ptev_env = pe; ptev_pt = ptcut f; ptev_ax = f; } in
+let rec trans_pterm_arg_impl pe ?cutsolve f =
+  let pt = { ptev_env = pe; ptev_pt = ptcut ?cutsolve f; ptev_ax = f; } in
   { ptea_env = pe; ptea_arg = PVASub pt; }
 
 (* ------------------------------------------------------------------ *)
@@ -556,7 +557,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
   let name = name |> omap (Printf.sprintf "?%s") in
 
   match arg with
-  | EA_mod _ | EA_mem _ | EA_proof _ ->
+  | EA_mod _ | EA_mem _ | EA_proof _ | EA_tactic _ ->
       let ak = oget (argkind_of_parg arg) in
       tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Form))
 
@@ -591,7 +592,7 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
     | EA_none ->
        tc_pterm_apperror ~loc pe AE_CannotInferMod
 
-    | EA_mem _ | EA_proof _ ->
+    | EA_mem _ | EA_proof _ | EA_tactic _ ->
        let ak = oget (argkind_of_parg arg) in
        tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Mod))
 
@@ -621,7 +622,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg; pl_loc = loc; } =
   | EA_form { pl_loc = lc; pl_desc = (PFmem m) } ->
       trans_pterm_arg_mem pe ?name (mk_loc lc (EA_mem m))
 
-  | EA_mod  _ | EA_proof _ | EA_form _ ->
+  | EA_mod  _ | EA_proof _ | EA_form _ | EA_tactic _ ->
       let ak = oget (argkind_of_parg arg) in
       tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Mem))
 
@@ -664,6 +665,9 @@ and process_pterm_arg
       | EA_mem _ | EA_mod _ ->
           let ak = oget (argkind_of_parg (unloc arg)) in
           tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `PTerm))
+
+      | EA_tactic cutsolve ->
+          trans_pterm_arg_impl pe ~cutsolve f
   end
 
   | Some (`Forall (x, xty, _)) -> begin

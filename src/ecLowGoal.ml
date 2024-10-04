@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcLocation
 open EcIdent
 open EcSymbols
@@ -99,17 +100,21 @@ module LowApply = struct
    in List.for_all h_eqs ld1.h_local
 
   (* ------------------------------------------------------------------ *)
-  let rec check_pthead (pt : pt_head) (tc : ckenv) =
+  let rec check_pthead (pt : pt_head) (subgoals : _) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
 
     match pt with
-    | PTCut f -> begin
+    | PTCut (f, cutsolve) -> begin
         match tc with
-        | `Hyps ( _, _) -> (PTCut f, f)
+        | `Hyps ( _, _) -> (PTCut (f, None), f, subgoals) (* FIXME *)
         | `Tc   (tc, _) ->
             (* cut - create a dedicated subgoal *)
             let handle = RApi.newgoal tc ~hyps f in
-            (PTHandle handle, f)
+            let subgoals =
+              ofold
+                (fun cutsolve subgoals -> DMap.add handle cutsolve subgoals)
+                subgoals cutsolve
+            in (PTHandle handle, f, subgoals)
     end
 
     | PTHandle hd -> begin
@@ -121,38 +126,38 @@ module LowApply = struct
         (* proof reuse - fetch corresponding subgoal*)
         if not (sub_hyps subgoal.g_hyps (hyps_of_ckenv tc)) then
           raise InvalidProofTerm;
-        (pt, subgoal.g_concl)
+        (pt, subgoal.g_concl, subgoals)
     end
 
     | PTLocal x -> begin
         let hyps = hyps_of_ckenv tc in
-        try  (pt, LDecl.hyp_by_id x hyps)
+        try  (pt, LDecl.hyp_by_id x hyps, subgoals)
         with LDecl.LdeclError _ -> raise InvalidProofTerm
     end
 
     | PTGlobal (p, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instanciate p tys env)
+        (pt, EcEnv.Ax.instanciate p tys env, subgoals)
 
     | PTTerm pt ->
-      let pt, ax = check `Elim pt tc in
-      (PTTerm pt, ax)
+      let pt, ax, subgoals = check_ `Elim pt subgoals tc in
+      (PTTerm pt, ax, subgoals)
 
   (* ------------------------------------------------------------------ *)
-  and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
+  and check_ (mode : [`Intro | `Elim]) (pt : proofterm) (subgoals : _) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
     let env  = LDecl.toenv hyps in
 
-    let rec check_args (sbt, ax, nargs) args =
+    let rec check_args (sbt, ax, nargs) subgoals args =
       match args with
-      | [] -> (Fsubst.f_subst sbt ax, List.rev nargs)
+      | [] -> (Fsubst.f_subst sbt ax, List.rev nargs, subgoals)
 
       | arg :: args ->
-          let ((sbt, ax), narg) = check_arg (sbt, ax) arg in
-          check_args (sbt, ax, narg :: nargs) args
+          let ((sbt, ax), narg, subgoals) = check_arg (sbt, ax) subgoals arg in
+          check_args (sbt, ax, narg :: nargs) subgoals args
 
-    and check_arg (sbt, ax) arg =
+    and check_arg (sbt, ax) subgoals arg =
       let check_binder (x, xty) f =
         let xty = Fsubst.gty_subst sbt xty in
 
@@ -186,43 +191,53 @@ module LowApply = struct
                 | None       -> EcCoreGoal.ptcut f1
                 | Some subpt -> subpt
               in
-              let subpt, subax = check mode subpt tc in
+              let subpt, subax, subgoals = check_ mode subpt subgoals tc in
                 if not (EcReduction.is_conv hyps f1 subax) then
                   raise InvalidProofTerm;
-                ((sbt, f2), PASub (Some subpt))
+                ((sbt, f2), PASub (Some subpt), subgoals)
 
           | Some (`Forall (x, xty, f)), _ ->
-              (check_binder (x, xty) f, arg)
+              (check_binder (x, xty) f, arg, subgoals)
 
           | _, _ ->
               if Fsubst.is_subst_id sbt then
                 raise InvalidProofTerm;
-              check_arg (Fsubst.f_subst_id, Fsubst.f_subst sbt ax) arg
+              check_arg (Fsubst.f_subst_id, Fsubst.f_subst sbt ax) subgoals arg
       end
 
       | `Intro -> begin
           match TTC.destruct_exists hyps ax with
-          | Some (`Exists (x, xty, f)) -> (check_binder (x, xty) f, arg)
+          | Some (`Exists (x, xty, f)) ->
+              (check_binder (x, xty) f, arg, subgoals)
           | None ->
               if Fsubst.is_subst_id sbt then
                 raise InvalidProofTerm;
-              check_arg (Fsubst.f_subst_id, Fsubst.f_subst sbt ax) arg
+              check_arg (Fsubst.f_subst_id, Fsubst.f_subst sbt ax) subgoals arg
       end
     in
 
     match pt with
     | PTApply pt ->
-      let (nhd, ax) = check_pthead pt.pt_head tc in
-      let ax, nargs = check_args (Fsubst.f_subst_id, ax, []) pt.pt_args in
-      (PTApply { pt_head = nhd; pt_args = nargs }, ax)
+      let (nhd, ax, subgoals) = check_pthead pt.pt_head subgoals tc in
+      let ax, nargs, subgoals =
+        check_args (Fsubst.f_subst_id, ax, []) subgoals pt.pt_args in
+      (PTApply { pt_head = nhd; pt_args = nargs }, ax, subgoals)
 
     | PTQuant (bd, pt) -> begin
         match mode with
         | `Intro -> raise InvalidProofTerm
         | `Elim  ->
-          let pt, ax = check `Elim pt tc in
-          (PTQuant (bd, pt), f_forall [bd] ax)
+          let pt, ax, subgoals = check_ `Elim pt subgoals tc in
+          (PTQuant (bd, pt), f_forall [bd] ax, subgoals)
       end
+
+  let check_with_cutsolve (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
+    check_ mode pt DMap.empty tc
+
+  let check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
+    let pt, f, subgoals = check_ mode pt DMap.empty tc in
+    assert (DMap.is_empty subgoals);
+    (pt, f)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -346,14 +361,14 @@ let t_cbv ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) 
 
 (* -------------------------------------------------------------------- *)
 let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
-  let action (lazy hyps) fp = Some (EcCallbyValue.norm_cbv ri hyps fp) in
+  let action (lazy hyps) fp = Some (EcReduction.simplify ri hyps fp) in
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
 let t_cbn ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
-  t_cbv_with_info ?target ri tc
+  t_cbn_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
 let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
@@ -619,10 +634,16 @@ let t_intro_sx_seq id tt tc =
   FApi.t_focus (tt id) tc
 
 (* -------------------------------------------------------------------- *)
-let tt_apply (pt : proofterm) (tc : tcenv) =
+type cutsolver = {
+  smt   : FApi.backward;
+  done_ : FApi.backward;
+}
+  
+(* -------------------------------------------------------------------- *)
+let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
-  let tc, (pt, ax)  =
-    RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc (tc, None))) tc in
+  let tc, (pt, ax, subgoals)  =
+    RApi.to_pure (fun tc -> LowApply.check_with_cutsolve `Elim pt (`Tc (tc, None))) tc in
 
   if not (EcReduction.is_conv hyps ax concl) then begin
     (*
@@ -636,7 +657,24 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
     raise InvalidGoalShape
   end;
 
-  FApi.close tc (VApply pt)
+  let tc = FApi.close tc (VApply pt) in
+
+  match cutsolver with
+  | None ->
+    assert (DMap.is_empty subgoals);
+    tc
+
+  | Some cutsolver -> begin
+    FApi.t_onall (fun tc ->
+      let tactic =
+        match  DMap.find_opt (FApi.tc1_handle tc) subgoals with
+        | Some `Smt     -> cutsolver.smt
+        | Some `Done    -> cutsolver.done_
+        | Some `DoneSmt -> FApi.t_seq cutsolver.done_ cutsolver.smt
+        | None          -> t_id in
+      tactic tc
+    ) tc
+  end
 
 (* -------------------------------------------------------------------- *)
 let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
@@ -663,8 +701,8 @@ let tt_apply_hd (hd : handle) ?(args = []) ?(sk = 0) tc =
   tt_apply pt tc
 
 (* -------------------------------------------------------------------- *)
-let t_apply (pt : proofterm) (tc : tcenv1) =
-  tt_apply pt (FApi.tcenv_of_tcenv1 tc)
+let t_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv1) =
+  tt_apply ?cutsolver pt (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
 let t_apply_hyp (x : EcIdent.t) ?args ?sk tc =
@@ -2432,6 +2470,35 @@ let t_smt ~(mode:smtmode) pi tc =
   let notify = (fun lvl (lazy s) -> EcEnv.notify env lvl "%s" s) in
 
   if   EcSmt.check ~notify pi hyps concl
+  then FApi.xmutate1 tc `Smt []
+  else error ()
+
+(* -------------------------------------------------------------------- *)
+let t_coq
+  ~(loc     : EcLocation.t)
+  ~(name    : string)
+  ~(mode    : smtmode)
+   (coqmode : EcProvers.coq_mode option)
+   (pi      : EcProvers.prover_infos)
+   (tc      : tcenv1)
+=
+  let error () =
+    match mode with
+    | `Sloppy ->
+        tc_error !!tc ~catchable:true  "cannot prove goal"
+    | `Strict ->
+        tc_error !!tc ~catchable:false "cannot prove goal (strict)"
+    | `Report loc ->
+        EcEnv.notify (FApi.tc1_env tc) `Critical
+          "%s: Coq call failed"
+          (loc |> omap EcLocation.tostring |> odfl "unknown");
+        t_admit tc
+  in
+
+  let env, hyps, concl = FApi.tc1_eflat tc in
+  let notify = (fun lvl (lazy s) -> EcEnv.notify env lvl "%s" s) in
+
+  if   EcCoq.check ~loc ~name ~notify ?coqmode pi hyps concl
   then FApi.xmutate1 tc `Smt []
   else error ()
 

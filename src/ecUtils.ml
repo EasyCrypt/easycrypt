@@ -14,6 +14,10 @@ let rec makedirs (x : string) =
   end
 
 (* -------------------------------------------------------------------- *)
+let safe_unlink ~(filename : string) : unit =
+  try Unix.unlink filename with Unix.Unix_error _ -> ()
+
+(* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
 
 (* -------------------------------------------------------------------- *)
@@ -590,6 +594,7 @@ module List = struct
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
 
+  (* Separate list into a prefix for which p is true and the rest *)
   let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
     let rec doit (acc: 'a list) (xs : 'a list) =
     match xs with
@@ -597,15 +602,19 @@ module List = struct
     | x::xs -> if p x then doit (x::acc) xs else (List.rev acc, x::xs)
     in doit [] xs
 
-  let fold_left_map_while (f: 'a -> 'b -> 'a * 'c) (p: 'a -> 'b -> bool) (acc: 'a) (xs: 'b list) : 'a * 'c list =
-    let rec doit acc lacc = function
-    | [] -> acc, rev lacc
-    | x :: xs -> if p acc x then
-      let acc, x = f acc x in
-      doit acc (x :: lacc) xs
-      else acc, rev lacc @ (x :: xs) in
-    doit acc [] xs
+  type 'a interruptible = [`Interrupt | `Continue of 'a]
 
+  let fold_left_map_while (f : 'a -> 'b -> ('a * 'c) interruptible) =
+    let rec aux (state : 'a) (acc : 'c list) (xs : 'b list) =
+      match xs with
+      | [] -> (state, List.rev acc, [])
+      | y :: ys -> begin
+        match f state y with
+        | `Continue (state, y) -> aux state (y :: acc) ys
+        | `Interrupt -> (state, List.rev acc, xs)
+      end
+
+    in fun state xs -> aux state [] xs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -705,7 +714,19 @@ module String = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module IO = BatIO
+module IO : sig
+  include module type of BatIO
+
+  val pp_to_file : filename:string -> (Format.formatter -> unit) -> unit
+end = struct
+  include BatIO
+
+  let pp_to_file ~(filename : string) (pp : Format.formatter -> unit) =
+    BatFile.with_file_out filename (fun channel ->
+      let fmt = BatFormat.formatter_of_output channel in
+      Format.fprintf fmt "%t@." pp
+    )
+  end
 
 (* -------------------------------------------------------------------- *)
 module File = struct

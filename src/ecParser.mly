@@ -178,8 +178,9 @@
   ]
 
   module SMT : sig
-    val mk_pi_option  : psymbol -> pi option -> smt
-    val mk_smt_option : smt list -> pprover_infos
+    val mk_pi_option      : psymbol -> pi option -> smt
+    val mk_smt_option     : smt list -> pprover_infos
+    val simple_smt_option : pprover_infos
   end = struct
     let option_matching tomatch =
       let match_option = String.option_matching tomatch in
@@ -310,7 +311,7 @@
         let pr =
           match k with
           | `Only ->
-	            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
+                   ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
           | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
           | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }
 
@@ -356,6 +357,9 @@
         plem_selected   = !selected;
         psmt_debug      = !debug;
       }
+
+    let simple_smt_option =
+        { (mk_smt_option []) with plem_max = Some (Some 0) }
   end
 %}
 
@@ -427,6 +431,10 @@
 %token CONGR
 %token CONSEQ
 %token CONST
+%token COQ
+%token CHECK
+%token EDIT
+%token FIX
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -680,6 +688,9 @@ _lident:
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
 | EXIT       { "exit"       }
+| CHECK      { "check"      }
+| EDIT       { "edit"       }
+| FIX        { "fix"        }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -883,6 +894,9 @@ pside_:
 
 pside:
 | x=brace(pside_) { x }
+
+pside_force:
+| brace(b=boption(NOT) m=loc(pside_) { (b, m) }) { $1 }
 
 (* -------------------------------------------------------------------- *)
 (* Patterns                                                             *)
@@ -1214,7 +1228,7 @@ sform_u(P):
    { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e1) (unloc e1) in
      pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
-| x=sform_r(P) s=loc(pside)
+| x=sform_r(P) s=pside_force
    { PFside (x, s) }
 
 | op=loc(numop) ti=tvars_app?
@@ -1447,8 +1461,8 @@ lvalue_u:
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=lvalue_var DLBRACKET ti=tvars_app? e=expr RBRACKET
-   { PLvMap (x, ti, e) }
+| x=lvalue_var DLBRACKET ti=tvars_app? es=plist1(expr, COMMA) RBRACKET
+   { PLvMap (x, ti, es) }
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
@@ -2355,10 +2369,10 @@ intro_pattern:
    { IPDone (Some `Variant) }
 
 | SLASHSHARP
-   { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt (false, SMT.simple_smt_option) }
 
 | SLASHSLASHSHARP
-   { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt (true, SMT.simple_smt_option) }
 
 | SLASHEQ
    { IPSimplify `Default }
@@ -2411,6 +2425,15 @@ gpterm_arg:
     exp=iboption(AT) p=qident tvi=tvars_app? args=loc(gpterm_arg)*
   RPAREN
     { EA_proof (mk_pterm exp (FPNamed (p, tvi)) args) }
+
+| SLASHSLASH
+    { EA_tactic `Done }
+
+| SLASHSHARP
+    { EA_tactic `Smt }
+
+| SLASHSLASHSHARP
+    { EA_tactic `DoneSmt }
 
 gpterm(F):
 | hd=gpterm_head(F)
@@ -2469,10 +2492,10 @@ rwarg1:
    { RWDone (Some `Variant) }
 
 | SLASHSHARP
-   { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (false, SMT.simple_smt_option) }
 
 | SLASHSLASHSHARP
-   { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (true, SMT.simple_smt_option) }
 
 | SLASHEQ
    { RWSimpl `Default }
@@ -2780,6 +2803,9 @@ logtactic:
 | SMT pi=smt_info
    { Psmt pi }
 
+| COQ mode=coq_info name=loc(STRING) LPAREN dbmap=dbmap1* RPAREN
+    { Pcoq (mode, name, SMT.mk_smt_option [`WANTEDLEMMAS dbmap])}
+
 | SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
@@ -3035,11 +3061,8 @@ phltactic:
 | INTERLEAVE info=loc(interleave_info)
     { Pinterleave info }
 
-| CFOLD s=side? c=codepos NOT n=word
-    { Pcfold (s, c, Some n) }
-
-| CFOLD s=side? c=codepos
-    { Pcfold (s, c, None) }
+| CFOLD s=side? c=codepos n=word?
+    { Pcfold (s, c, n) }
 
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
@@ -3764,8 +3787,14 @@ print:
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
 
+coq_info:
+|           { None }
+| CHECK    { Some EcProvers.Check }
+| EDIT      { Some EcProvers.Edit }
+| FIX       { Some EcProvers.Fix }
+
 smt_info:
-| li=smt_info1* { SMT.mk_smt_option li}
+| li=smt_info1* { SMT.mk_smt_option li }
 
 smt_info1:
 | t=word

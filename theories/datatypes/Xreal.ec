@@ -354,7 +354,11 @@ proof. by move=> /(xler_addr z) h1 /(xler_addl y); apply xle_trans. qed.
 lemma xler_pmul2l (x:realp) : 0%rp < x => 
   forall (y z : xreal),
   rp x * y <= rp x * z <=> y <= z.
-proof. move=> hx y z; case: z => // z; case: y => // y; smt(to_realP). qed.
+proof.
+rewrite (of_realK 0%r) //.
+move=> hx y z; case: z => // z; case: y => // y.
+by rewrite /= -!to_realM !to_realM ler_pmul2l.
+qed.
 
 lemma xler_wpmul2l (x : realp) (y z : xreal) :
   y <= z => x%xr * y <= x%xr * z.
@@ -363,7 +367,11 @@ proof. case: z => // z; case: y => // y; smt(to_realP). qed.
 lemma xler_pmul2r (x:realp) : 0%rp < x => 
   forall (y z : xreal),
   y * rp x <= z * rp x <=> y <= z.
-proof. move=> hx y z; case: z => // z; case: y => // y; smt(to_realP). qed.
+proof.
+rewrite (of_realK 0%r) //.
+move=> hx y z; case: z => // z; case: y => // y.
+by rewrite /= -!to_realM !to_realM ler_pmul2r.
+qed.
 
 lemma xler_wpmul2r (x : realp) (y z : xreal) :
   y <= z => y * x%xr <= z * x%xr.

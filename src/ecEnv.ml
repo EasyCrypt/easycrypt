@@ -117,17 +117,20 @@ type env_norm = {
 type red_topsym = [
   | `Path of path
   | `Tuple
+  | `Proj of int
 ]
 
 module Mrd = EcMaps.Map.Make(struct
   type t = red_topsym
 
+  let to_comparable (p : t) =
+    match p with
+    | `Path p -> `Path p.p_tag
+    | `Tuple  -> `Tuple
+    | `Proj i -> `Proj i
+
   let compare (p1 : t) (p2 : t) =
-    match p1, p2 with
-    | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
-    | `Tuple  , `Tuple   ->  0
-    | `Tuple  , `Path _  -> -1
-    | `Path _ , `Tuple   ->  1
+    Stdlib.compare (to_comparable p1) (to_comparable p2)
 end)
 
 (* -------------------------------------------------------------------- *)
@@ -1486,11 +1489,12 @@ module Reduction = struct
   let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
     match rule with None -> db | Some rule ->
 
-    let p =
+    let p : topsym =
       match rule.rl_ptn with
       | Rule (`Op p, _)   -> `Path (fst p)
-      | Rule (`Tuple, _) -> `Tuple
-      | Var _ | Int _    -> assert false in
+      | Rule (`Tuple, _)  -> `Tuple
+      | Rule (`Proj i, _) -> `Proj i
+      | Var _ | Int _     -> assert false in
 
     Mrd.change (fun rls ->
       let { ri_priomap } =
@@ -2420,89 +2424,29 @@ module NormMp = struct
       if   x_equal p xp then pv
       else EcTypes.pv_glob p
 
+  let flatten_use (us : use) =
+    let globs = Sid.elements us.us_gl in
+    let globs = List.sort EcIdent.id_ntr_compare globs in
+
+    let pv = Mx.bindings us.us_pv in
+    let pv = List.sort (fun (xp1, _) (xp2, _) -> x_ntr_compare xp1 xp2) pv in
+
+    (globs, pv)
+
   let globals env m mp =
     let us = mod_use env mp in
-    let l =
-      Sid.fold (fun id l -> f_glob id m :: l) us.us_gl [] in
-    let l =
-      Mx.fold
-        (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
-    f_tuple l
+
+    let globs, pv = flatten_use us in
+    let globs = List.map (fun id -> f_glob id m) globs in
+    let pv = List.map (fun (xp, ty) -> f_pvar (pv_glob xp) ty m) pv in
+
+    f_tuple (globs @ pv)
 
   let norm_glob env m mp = globals env m mp
 
   let norm_tglob env mp =
     let g = (norm_glob env mhr mp) in
     g.f_ty
-
-  let rec norm_form env =
-    let has_mod b =
-      List.exists (fun (_,gty) ->
-        match gty with GTmodty _ -> true | _ -> false) b in
-
-    let norm_form =                     (* FIXME: use FSmart *)
-      EcCoreFol.Hf.memo_rec 107 (fun aux f ->
-        match f.f_node with
-        | Fquant(q,bd,f) ->
-          if has_mod bd then
-            let env = Mod.add_mod_binding bd env in
-            f_quant q bd (norm_form env f)
-          else
-          f_quant q bd (aux f)
-
-        | Fpvar(p,m) ->
-          let p' = norm_pvar env p in
-          if p == p' then f else
-            f_pvar p' f.f_ty m
-
-        | FhoareF hf ->
-          let pre' = aux hf.hf_pr and p' = norm_xfun env hf.hf_f
-          and post' = aux hf.hf_po in
-          if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
-          f_hoareF pre' p' post'
-
-        (* TODO: missing cases: FbdHoareF and every F*HoareS *)
-
-        | FequivF ef ->
-          let pre' = aux ef.ef_pr and l' = norm_xfun env ef.ef_fl
-          and r' = norm_xfun env ef.ef_fr and post' = aux ef.ef_po in
-          if ef.ef_pr == pre' && ef.ef_fl == l' &&
-            ef.ef_fr == r' && ef.ef_po == post' then f else
-          f_equivF pre' l' r' post'
-
-        | Fpr pr ->
-          let pr' = {
-            pr_mem   = pr.pr_mem;
-            pr_fun   = norm_xfun env pr.pr_fun;
-            pr_args  = aux pr.pr_args;
-            pr_event = aux pr.pr_event;
-          } in f_pr_r pr'
-
-        | _ -> f)
-          in
-    norm_form
-
-  let norm_op env op =
-    let kind =
-      match op.op_kind with
-      | OB_pred (Some (PR_Plain f)) ->
-         OB_pred (Some (PR_Plain (norm_form env f)))
-
-      | OB_pred (Some (PR_Ind pri)) ->
-         let pri = { pri with pri_ctors =
-           List.map (fun x ->
-             { x with prc_spec = List.map (norm_form env) x.prc_spec })
-             pri.pri_ctors }
-         in OB_pred (Some (PR_Ind pri))
-
-      | _ -> op.op_kind
-    in
-    { op with
-        op_kind = kind;
-        op_ty   = op.op_ty; }
-
-  let norm_ax env ax =
-    { ax with ax_spec = norm_form env ax.ax_spec }
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -2726,7 +2670,6 @@ module Op = struct
 
   let bind ?(import = import0) name op env =
     let env = if import.im_immediate then MC.bind_operator name op env else env in
-    let op  = NormMp.norm_op env op in
     let env_ntbase = update_ntbase (root env) (name, op) env.env_ntbase in
 
     { env with
@@ -2851,7 +2794,6 @@ module Ax = struct
     fst (lookup name env)
 
   let bind ?(import = import0) name ax env =
-    let ax  = NormMp.norm_ax env ax in
     let env = if import.im_immediate then MC.bind_axiom name ax env else env in
     { env with env_item = mkitem import (Th_axiom (name, ax)) :: env.env_item }
 

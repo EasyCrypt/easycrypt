@@ -50,11 +50,13 @@ type proofterm =
   | PTQuant of binding * proofterm
 
 and pt_head =
-| PTCut    of EcFol.form
+| PTCut    of EcFol.form * cutsolve option
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
 | PTTerm   of proofterm
+
+and cutsolve = [`Done | `Smt | `DoneSmt]
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -88,7 +90,7 @@ val pahandle  : ?args:pt_arg list -> handle -> pt_arg
 val ptglobal  : ?args:pt_arg list -> tys:ty list -> EcPath.path -> proofterm
 val ptlocal   : ?args:pt_arg list -> EcIdent.t -> proofterm
 val pthandle  : ?args:pt_arg list -> handle -> proofterm
-val ptcut     : ?args:pt_arg list -> EcFol.form -> proofterm
+val ptcut     : ?args:pt_arg list -> ?cutsolve:cutsolve -> EcFol.form -> proofterm
 
 (* -------------------------------------------------------------------- *)
 val ptapply : proofterm -> pt_arg list -> proofterm

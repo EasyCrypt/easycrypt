@@ -2520,9 +2520,9 @@ section PROOFS.
        (iota_ 0 qdec).
   proof.
     pose E := 
-      fun (_:unit) (g:glob UFCMA_l) (_:unit) => size g.`1 <= qdec /\ exists tt, tt \in g.`1 /\ tt.`1 = tt.`2.
+      fun (_:unit) (g:glob UFCMA_l) (_:unit) => size g.`6 <= qdec /\ exists tt, tt \in g.`6 /\ tt.`1 = tt.`2.
     pose phi :=
-      fun (_:unit) (g:glob UFCMA_l) (_:unit) => find (fun (tt:tag * tag) => tt.`1 = tt.`2) g.`1.
+      fun (_:unit) (g:glob UFCMA_l) (_:unit) => find (fun (tt:tag * tag) => tt.`1 = tt.`2) g.`6.
     have -> := LP.list_partitioning UFCMA_l () E phi (iota_ 0 qdec) &m (iota_uniq 0 qdec).
     have -> /= : Pr[UFCMA_l.f() @ &m : E tt (glob UFCMA_l) res /\ ! (phi tt (glob UFCMA_l) res \in iota_ 0 qdec)] = 0%r.
     + byphoare => //. 

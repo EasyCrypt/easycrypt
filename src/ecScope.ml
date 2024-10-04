@@ -643,8 +643,9 @@ module Prover = struct
     mk_prover_info_from_dft dft options
 
   (* -------------------------------------------------------------------- *)
-  let do_prover_info scope ppr =
-    let options = process_prover_option (env scope) ppr in
+  let do_prover_info scope ?(default = empty_options) ppr =
+    let options = Option.map (process_prover_option (env scope)) ppr in
+    let options = Option.value ~default options in
     mk_prover_info scope options
 
   (* -------------------------------------------------------------------- *)
@@ -656,7 +657,7 @@ module Prover = struct
 
   (* -------------------------------------------------------------------- *)
   let process scope ppr =
-    let pi = do_prover_info scope ppr in
+    let pi = do_prover_info scope (Some ppr) in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   (* -------------------------------------------------------------------- *)
