@@ -106,7 +106,8 @@ let prog_equiv_prod
   ((meml, mtl), (memr, mtr): memenv * memenv) 
   (proc_l, proc_r: stmt * stmt) 
   ((invs, n): (variable * variable) list * int) 
-  ((outvs, m) : (variable * variable) list * int) : unit =
+  ((outvs, m) : (variable * variable) list * int) 
+  (pcond : form option): unit =
   let pstate_l : (symbol, circuit) Map.t = Map.empty in
   let pstate_r : (symbol, circuit) Map.t = Map.empty in
 
@@ -119,6 +120,11 @@ let prog_equiv_prod
   let pstate_r = List.fold_left2
     (fun pstate inp v -> Map.add v inp pstate)
     pstate_r inpcs (List.snd invs |> List.map (fun v -> v.v_name))
+  in
+
+  let pcond = match pcond with
+    | None -> None
+    | Some pcond -> Some (circuit_of_form env pcond)
   in
   
   let pstate_l = List.fold_left (EcCircuits.process_instr env meml) pstate_l proc_l.s_node in
@@ -148,7 +154,7 @@ let prog_equiv_prod
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
     Format.eprintf "Right program lanes: @.";
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
-    let () = assert (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r None) lanes_l lanes_r) in
+    let () = assert (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r) in
     Format.eprintf "Success@."
   end 
 
@@ -394,11 +400,11 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
 
 
-let t_bdepeq (inpvs: (variable * variable) list) (n: int) (outvs: (variable * variable) list) (m: int) (tc : tcenv1) =
+let t_bdepeq (inpvs: (variable * variable) list) (n: int) (outvs: (variable * variable) list) (m: int) (pcond: form option)(tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FequivF sE -> assert false
-  | FequivS sE -> prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs, n) (outvs, m) 
+  | FequivS sE -> prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs, n) (outvs, m) pcond
   | FhoareF sH -> assert false  
   | FhoareS sF -> assert false
   | FbdHoareF _ -> assert false
@@ -410,14 +416,20 @@ let t_bdepeq (inpvs: (variable * variable) list) (n: int) (outvs: (variable * va
   FApi.close (!@ tc) VBdep
 
 let process_bdepeq 
-  ((inpvsl, inpvsr, n): string list * string list * int) 
-  ((outvsl, outvsr, m): string list * string list * int) 
+  (bdeinfo: bdepeq_info)
   (tc: tcenv1) 
 =
 
   let env = FApi.tc1_env tc in
   let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
 
+
+  let inpvsl = bdeinfo.inpvs_l in
+  let inpvsr = bdeinfo.inpvs_r in
+  let outvsl = bdeinfo.outvs_l in
+  let outvsr = bdeinfo.outvs_r in
+  let n = bdeinfo.n in
+  let m = bdeinfo.m in
 
   (* DEBUG SECTION *)
   let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
@@ -447,12 +459,24 @@ let process_bdepeq
   let pre = List.map2 f_eq pinpvsl pinpvsr |> f_ands in
   let post = List.map2 f_eq poutvsl poutvsr |> f_ands in
   
+  let pre, pcond = match bdeinfo.pcond with
+    | Some pcond -> 
+      (* FIXME: generate correct precond *) 
+      let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
+      let pcond = match opcond.op_kind with
+        | OB_oper (Some OP_Plain f) -> f
+        | _ -> failwith "Unsupported precondition kind for bdepeq"
+      in
+      pre, Some pcond
+    | None -> pre, None
+  in
+  
   (* ------------------------------------------------------------------ *)
   let invs = List.combine inpvsl inpvsr in
   let outvs = List.combine outvsl outvsr in
   
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
-  FApi.t_last (t_bdepeq invs n outvs m) tc 
+  FApi.t_last (t_bdepeq invs n outvs m pcond) tc 
 
 
 

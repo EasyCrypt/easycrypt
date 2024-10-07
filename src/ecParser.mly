@@ -87,6 +87,9 @@
   let make_bdep_info n m invs inpvs outvs pcond lane perm = 
     { n; m; invs; inpvs; outvs; pcond; lane; perm }
 
+  let make_bdepeq_info n m inpvs_l inpvs_r outvs_l outvs_r pcond = 
+    { n; m; inpvs_l; inpvs_r; outvs_l; outvs_r; pcond; }
+
   let mk_axiom ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
@@ -3277,9 +3280,9 @@ phltactic:
       invs inpvs outvs pc o perm) }
 
 | BDEPEQ n=uint m=uint inpvsl=bdep_vars inpvsr=bdep_vars
-         outvsl=bdep_vars outvsr=bdep_vars
-      { Pbdepeq ((inpvsl, inpvsr, BI.to_int n), 
-                 (outvsl, outvsr, BI.to_int m))}
+         outvsl=bdep_vars outvsr=bdep_vars pcond=oident?
+      { Pbdepeq (make_bdepeq_info (BI.to_int n) (BI.to_int m)
+                inpvsl inpvsr outvsl outvsr pcond)}
 
 | BDEP BITSTRING
     { Pcirc }

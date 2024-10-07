@@ -10,10 +10,10 @@ open EcAst
 
 val t_bdep : int -> int -> variable list -> variable list -> psymbol -> psymbol -> (int -> int) option -> tcenv1 -> tcenv
 
-val t_bdepeq : (variable * variable) list -> int -> (variable * variable) list -> int -> tcenv1 -> tcenv
+val t_bdepeq : (variable * variable) list -> int -> (variable * variable) list -> int -> form option -> tcenv1 -> tcenv
 
 val t_circ : tcenv1 -> tcenv
   
 val process_bdep : bdep_info -> tcenv1 -> tcenv
 
-val process_bdepeq : (string list * string list * int) -> (string list * string list * int) -> tcenv1 -> tcenv
+val process_bdepeq : bdepeq_info -> tcenv1 -> tcenv

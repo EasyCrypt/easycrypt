@@ -717,6 +717,16 @@ type bdep_info = {
   perm  : psymbol option;
 }
 
+type bdepeq_info = {
+  n : int;
+  m : int;
+  inpvs_l : string list;
+  inpvs_r : string list;
+  outvs_l: string list;
+  outvs_r: string list;
+  pcond: psymbol option;
+}
+
 (* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
@@ -788,7 +798,7 @@ type phltactic =
 
     (* Map-reduce *)
   | Pbdep of bdep_info
-  | Pbdepeq of ((string list) * (string list) * int) * ((string list) * (string list) * int)
+  | Pbdepeq of bdepeq_info
   | Pcirc
 
     (* Program rewriting *)
