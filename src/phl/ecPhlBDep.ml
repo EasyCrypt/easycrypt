@@ -489,7 +489,7 @@ let process_bdepeq
   let post = f_ands post in
   
   
-  let pre, pcond = match bdeinfo.pcond with
+  let prepcond, pcond = match bdeinfo.pcond with
     | Some pcond -> 
       (* FIXME: generate correct precond *) 
       let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
@@ -527,6 +527,8 @@ let process_bdepeq
       pre, Some pcond
     | None -> pre, None
   in
+
+  let pre = f_and pre prepcond in
   
   (* ------------------------------------------------------------------ *)
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
