@@ -80,7 +80,7 @@
   , "repository" : "https://github.com/formosa-crypto/formosa-25519"
   , "branch"     : "main"
   , "subdir"     : "proof/crypto_scalarmult/curve25519"
-  , "config"     : "../../tests.config"
+  , "config"     : "tests.config"
   , "scenario"   : "curve25519"
   , "options"    : ""
   }
