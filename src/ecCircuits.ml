@@ -620,6 +620,7 @@ module BaseOps = struct
     | _, "uext16_32" -> true
     | _, "sar_32_26" -> true
     | _, "truncate32_16" -> true
+    | _, "truncate32_8" -> true
     | _, "eqmod64q" -> true
     | _, "bvueq" -> true
     | _, "bvseq" -> true
@@ -683,6 +684,14 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.land_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    (* Bitwise operations *)
+    | "orw" -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | "`>>`" -> 
       let id1 = EcIdent.create (temp_symbol) in
@@ -779,6 +788,11 @@ module BaseOps = struct
   | _, "truncate32_16" ->
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:16 ~name:id1.id_tag in
+    { circ = BWCirc(c1); inps=[BWInput(id1, 32)]}
+
+  | _, "truncate32_8" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:8 ~name:id1.id_tag in
     { circ = BWCirc(c1); inps=[BWInput(id1, 32)]}
 
   
