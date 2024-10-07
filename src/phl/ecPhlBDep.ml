@@ -230,7 +230,71 @@ let t_circ (tc: tcenv1) : tcenv =
     raise BDepError
   in
   FApi.close (!@ tc) VBdep
-    
+
+
+
+  let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
+    let (@@!) = EcTypesafeFol.f_app_safe env in
+    match EcEnv.Circ.lookup_bsarray env ty with
+    | Some {to_list;} -> let bty = match ty.ty_node with
+      | Tconstr (p, [bty]) -> bty
+      | _ -> failwith "Wrong type structure for array"
+      in let ptb, otb = 
+        match EcEnv.Circ.lookup_bitstring env bty with
+        | Some {to_bits=tb; _} -> tb, EcEnv.Op.by_path tb env
+        | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+      in EcCoreLib.CI_List.p_flatten @@! [
+        EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
+        to_list @@! [arg]]
+      ]
+    | None -> 
+      begin match EcEnv.Circ.lookup_bitstring env ty with
+        | Some {to_bits=tb; _} -> tb @@! [arg]
+        | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+      end
+  
+
+  let w2bits (env: env) (ty: ty) (arg: form) : form = 
+    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {to_bits=tb; _} -> tb
+    | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in EcTypesafeFol.f_app_safe env tb [arg]
+  
+  let bits2w (env: env) (ty: ty) (arg: form) : form = 
+    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {from_bits=fb; _} -> fb
+    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in EcTypesafeFol.f_app_safe env fb [arg]
+  
+  let w2bits_op (env: env) (ty: ty) : form = 
+    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {to_bits=tb; _} -> tb
+    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
+    f_op tb [] tbo.op_ty 
+  
+  let bits2w_op (env: env) (ty: ty) : form = 
+    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    | Some {from_bits=fb; _} -> fb
+    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
+    f_op fb [] fbo.op_ty 
+  
+
+  let flatten_to_bits (env: env) (f: form) = 
+    let (@@!) = EcTypesafeFol.f_app_safe env in
+    match EcEnv.Circ.lookup_bsarray env f.f_ty with
+    | Some {to_list=to_list; _} -> 
+      let base = match f.f_ty.ty_node with
+      | Tconstr (_, [b]) -> b
+      | _ -> assert false
+      in 
+      let w2bits = w2bits_op env base in
+      EcCoreLib.CI_List.p_flatten @@!
+      [EcCoreLib.CI_List.p_map @@! [w2bits; (to_list @@! [f])]]
+    | None -> 
+      w2bits env f.f_ty f
+      
 let t_bdep 
   (n: int) 
   (m: int) 
@@ -251,7 +315,7 @@ let t_bdep
   | _ -> assert false
   in
   FApi.close (!@ tc) VBdep
-  
+
 let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let invs = bdinfo.invs in
   let inpvs = bdinfo.inpvs in
@@ -297,47 +361,6 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let inpbty, outbty = tfrom_tfun2 olane.op_ty in
   
   (* Refactor this *)
-  let w2bits (ty: ty) (arg: form) : form = 
-    let tb = match EcEnv.Circ.lookup_bitstring env ty with
-    | Some {to_bits=tb; _} -> tb
-    | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in EcTypesafeFol.f_app_safe env tb [arg]
-  in
-  let bits2w (ty: ty) (arg: form) : form = 
-    let fb = match EcEnv.Circ.lookup_bitstring env ty with
-    | Some {from_bits=fb; _} -> fb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in EcTypesafeFol.f_app_safe env fb [arg]
-  in
-  let w2bits_op (ty: ty) : form = 
-    let tb = match EcEnv.Circ.lookup_bitstring env ty with
-    | Some {to_bits=tb; _} -> tb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
-    f_op tb [] tbo.op_ty 
-  in
-  let bits2w_op (ty: ty) : form = 
-    let fb = match EcEnv.Circ.lookup_bitstring env ty with
-    | Some {from_bits=fb; _} -> fb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
-    f_op fb [] fbo.op_ty 
-  in
-
-  let flatten_to_bits (f: form) = 
-    match EcEnv.Circ.lookup_bsarray env f.f_ty with
-    | Some {to_list=to_list; _} -> 
-      let base = match f.f_ty.ty_node with
-      | Tconstr (_, [b]) -> b
-      | _ -> assert false
-      in 
-      let w2bits = w2bits_op base in
-      EcCoreLib.CI_List.p_flatten @@!
-      [EcCoreLib.CI_List.p_map @@! [w2bits; (to_list @@! [f])]]
-    | None -> Format.eprintf "Not an array type %a@."
-      (pp_type) f.f_ty;
-      w2bits f.f_ty f
-  in
   
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
 
@@ -346,12 +369,12 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   (* ------------------------------------------------------------------ *)
   let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
-  let poutvs = List.map flatten_to_bits poutvs in
+  let poutvs = List.map (flatten_to_bits env) poutvs in
   let poutvs = List.rev poutvs in
   let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
   let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
   let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
-  let poutvs = EcCoreLib.CI_List.p_map @@! [(bits2w_op outbty); poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_map @@! [(bits2w_op env outbty); poutvs] in
 
   (* OPTIONAL PERMUTATION STEP *)
   let poutvs = match pperm with 
@@ -377,14 +400,14 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
   in
   let invs = List.map (fun id -> f_local id inty) invs in
-  let pinpvs = List.map flatten_to_bits invs in
+  let pinpvs = List.map (flatten_to_bits env) invs in
   let pinpvs = List.rev pinpvs in
   let pinpvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
   let pinpvs = EcCoreLib.CI_List.p_flatten @@! [pinpvs] in
   let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
   let pinpvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinpvs] in
   let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
-  let b2w = (bits2w_op inpbty) in
+  let b2w = (bits2w_op env inpbty) in
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinpvs = EcCoreLib.CI_List.p_map @@! [b2w; pinpvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
@@ -430,7 +453,7 @@ let process_bdepeq
   let n = bdeinfo.n in
 
   (* DEBUG SECTION *)
-  let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  (* let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in *)
   
   let get_var (v: symbol) (m: memenv) : variable =
     match EcMemory.lookup_me v m with
@@ -474,6 +497,33 @@ let process_bdepeq
         | OB_oper (Some OP_Plain f) -> f
         | _ -> failwith "Unsupported precondition kind for bdepeq"
       in
+
+      let opinty = 
+        match opcond.op_ty.ty_node with
+      | Tfun (a, b) -> a
+      | _ -> failwith "precond should have function type"
+      in
+      
+      let pinpl_blocks = List.map (flatten_to_bits env) pinpvsl in
+      let pinpl_blocks = List.rev pinpl_blocks in
+      let pinpl_blocks = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) pinpl_blocks (fop_empty (List.hd pinpl_blocks).f_ty)  in
+      let pinpl_blocks = EcCoreLib.CI_List.p_flatten @@! [pinpl_blocks] in
+      let pinpl_blocks = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int n); pinpl_blocks] in
+      let pinpl_blocks = EcCoreLib.CI_List.p_map @@! [(bits2w_op env opinty); pinpl_blocks] in
+
+      let pinpr_blocks = List.map (flatten_to_bits env) pinpvsr in
+      let pinpr_blocks = List.rev pinpr_blocks in
+      let pinpr_blocks = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) pinpr_blocks (fop_empty (List.hd pinpr_blocks).f_ty)  in
+      let pinpr_blocks = EcCoreLib.CI_List.p_flatten @@! [pinpr_blocks] in
+      let pinpr_blocks = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int n); pinpr_blocks] in
+      let pinpr_blocks = EcCoreLib.CI_List.p_map @@! [(bits2w_op env opinty); pinpr_blocks] in
+
+      let pre_l = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpl_blocks] in
+
+      let pre_r = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpr_blocks] in
+
+      let pre = f_and pre_l pre_r in
+
       pre, Some pcond
     | None -> pre, None
   in
