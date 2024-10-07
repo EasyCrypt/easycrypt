@@ -87,8 +87,8 @@
   let make_bdep_info n m invs inpvs outvs pcond lane perm = 
     { n; m; invs; inpvs; outvs; pcond; lane; perm }
 
-  let make_bdepeq_info n m inpvs_l inpvs_r outvs_l outvs_r pcond = 
-    { n; m; inpvs_l; inpvs_r; outvs_l; outvs_r; pcond; }
+  let make_bdepeq_info n inpvs_l inpvs_r out_blocks pcond = 
+    { n; inpvs_l; inpvs_r; out_blocks; pcond; }
 
   let mk_axiom ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
@@ -3279,19 +3279,27 @@ phltactic:
     { Pbdep (make_bdep_info (BI.to_int n) (BI.to_int m)
       invs inpvs outvs pc o perm) }
 
-| BDEPEQ n=uint m=uint inpvsl=bdep_vars inpvsr=bdep_vars
-         outvsl=bdep_vars outvsr=bdep_vars pcond=oident?
-      { Pbdepeq (make_bdepeq_info (BI.to_int n) (BI.to_int m)
-                inpvsl inpvsr outvsl outvsr pcond)}
+| BDEPEQ n=uint inpvsl=bdep_vars inpvsr=bdep_vars
+         LBRACE outblocks=plist0(bdepeq_out_info, SEMICOLON) RBRACE pcond=oident?
+      { Pbdepeq (make_bdepeq_info (BI.to_int n) 
+                inpvsl inpvsr outblocks pcond)}
 
 | BDEP BITSTRING
     { Pcirc }
 
-%inline bdep_vars:
-| LBRACKET vs=plist0(STRING, SEMICOLON) RBRACKET
+%inline bd_vars:
+| vs=plist0(STRING, SEMICOLON) 
   { vs }
-| LBRACKET v=STRING COLON w=uint RBRACKET
+| v=STRING COLON w=uint
   { arr_of_vars v (BI.to_int w) }
+
+%inline bdep_vars:
+| LBRACKET vs=bd_vars RBRACKET
+  { vs }
+
+%inline bdepeq_out_info:
+| m=uint COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bd_vars RBRACKET
+  { ((BI.to_int m), outvs_l, outvs_r) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

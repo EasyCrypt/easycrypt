@@ -10,7 +10,7 @@ open EcAst
 
 val t_bdep : int -> int -> variable list -> variable list -> psymbol -> psymbol -> (int -> int) option -> tcenv1 -> tcenv
 
-val t_bdepeq : (variable * variable) list -> int -> (variable * variable) list -> int -> form option -> tcenv1 -> tcenv
+val t_bdepeq : variable list * variable list -> int -> (int * variable list * variable list) list -> form option -> tcenv1 -> tcenv
 
 val t_circ : tcenv1 -> tcenv
   

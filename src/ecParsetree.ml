@@ -719,11 +719,9 @@ type bdep_info = {
 
 type bdepeq_info = {
   n : int;
-  m : int;
   inpvs_l : string list;
   inpvs_r : string list;
-  outvs_l: string list;
-  outvs_r: string list;
+  out_blocks: (int * string list * string list) list;
   pcond: psymbol option;
 }
 

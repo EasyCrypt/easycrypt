@@ -105,21 +105,21 @@ let prog_equiv_prod
   (env : env) 
   ((meml, mtl), (memr, mtr): memenv * memenv) 
   (proc_l, proc_r: stmt * stmt) 
-  ((invs, n): (variable * variable) list * int) 
-  ((outvs, m) : (variable * variable) list * int) 
+  ((invs_l, invs_r, n): (variable list * variable list * int))
+  ((outvs_l, outvs_r, m) : (variable list * variable list * int))
   (pcond : form option): unit =
   let pstate_l : (symbol, circuit) Map.t = Map.empty in
   let pstate_r : (symbol, circuit) Map.t = Map.empty in
 
-  let inps = List.map (EcCircuits.input_of_variable env) (List.fst invs) in
+  let inps = List.map (EcCircuits.input_of_variable env) invs_l in
   let inpcs, inps = List.split inps in
   let pstate_l = List.fold_left2
     (fun pstate inp v -> Map.add v inp pstate)
-    pstate_l inpcs (List.fst invs |> List.map (fun v -> v.v_name))
+    pstate_l inpcs (invs_l |> List.map (fun v -> v.v_name))
   in
   let pstate_r = List.fold_left2
     (fun pstate inp v -> Map.add v inp pstate)
-    pstate_r inpcs (List.snd invs |> List.map (fun v -> v.v_name))
+    pstate_r inpcs (invs_r |> List.map (fun v -> v.v_name))
   in
 
   let pcond = match pcond with
@@ -133,9 +133,9 @@ let prog_equiv_prod
   let pstate_r = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_r in
   begin 
     let circs_l = List.map (fun v -> Option.get (Map.find_opt v pstate_l)) 
-                  (List.map (fun v -> v.v_name) (List.fst outvs)) in
+                  (List.map (fun v -> v.v_name) outvs_l) in
     let circs_r = List.map (fun v -> Option.get (Map.find_opt v pstate_r)) 
-                  (List.map (fun v -> v.v_name) (List.snd outvs)) in
+                  (List.map (fun v -> v.v_name) outvs_r) in
                 
     (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
       (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
@@ -400,11 +400,12 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
 
 
-let t_bdepeq (inpvs: (variable * variable) list) (n: int) (outvs: (variable * variable) list) (m: int) (pcond: form option)(tc : tcenv1) =
+let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_blocks: (int * variable list * variable list) list) (pcond: form option) (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FequivF sE -> assert false
-  | FequivS sE -> prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs, n) (outvs, m) pcond
+  | FequivS sE -> List.iter (fun (m, outvs_l, outvs_r) ->
+    prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond) out_blocks
   | FhoareF sH -> assert false  
   | FhoareS sF -> assert false
   | FbdHoareF _ -> assert false
@@ -426,10 +427,7 @@ let process_bdepeq
 
   let inpvsl = bdeinfo.inpvs_l in
   let inpvsr = bdeinfo.inpvs_r in
-  let outvsl = bdeinfo.outvs_l in
-  let outvsr = bdeinfo.outvs_r in
   let n = bdeinfo.n in
-  let m = bdeinfo.m in
 
   (* DEBUG SECTION *)
   let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
@@ -444,11 +442,15 @@ let process_bdepeq
   let mem_l, mem_r = eqS.es_ml, eqS.es_mr in
 
   (* ------------------------------------------------------------------ *)
-  let outvsl = List.map (fun v -> get_var v mem_l) outvsl in
-  let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
+  let process_block (outvsl: symbol list) (outvsr: symbol list) = 
+    let outvsl = List.map (fun v -> get_var v mem_l) outvsl in
+    let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
 
-  let outvsr = List.map (fun v -> get_var v mem_r) outvsr in
-  let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
+    let outvsr = List.map (fun v -> get_var v mem_r) outvsr in
+    let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
+    List.map2 f_eq poutvsl poutvsr |> f_ands, (outvsl, outvsr)
+  in
+   
 
   let inpvsl = List.map (fun v -> get_var v mem_l) inpvsl in
   let pinpvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) inpvsl in
@@ -457,7 +459,12 @@ let process_bdepeq
   let pinpvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) inpvsr in
 
   let pre = List.map2 f_eq pinpvsl pinpvsr |> f_ands in
-  let post = List.map2 f_eq poutvsl poutvsr |> f_ands in
+  let post, outvs = List.map (fun (m, vs_l, vs_r) -> 
+    let post, outvs = process_block vs_l vs_r in 
+    let outvs_l, outvs_r = outvs in
+    post, (m, outvs_l, outvs_r)) bdeinfo.out_blocks |> List.split in
+  let post = f_ands post in
+  
   
   let pre, pcond = match bdeinfo.pcond with
     | Some pcond -> 
@@ -472,11 +479,8 @@ let process_bdepeq
   in
   
   (* ------------------------------------------------------------------ *)
-  let invs = List.combine inpvsl inpvsr in
-  let outvs = List.combine outvsl outvsr in
-  
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
-  FApi.t_last (t_bdepeq invs n outvs m pcond) tc 
+  FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond) tc 
 
 
 
