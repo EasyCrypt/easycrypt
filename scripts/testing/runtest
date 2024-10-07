@@ -140,7 +140,11 @@ def _options():
     )
 
     config = cp.ConfigParser(defaults)
-    config.read(args[0])
+    try:
+        with open(args[0]) as cf:
+            config.read_file(cf)
+    except OSError as e:
+        parser.error(f'while reading configuration from \'{args[0]}\': {e.strerror}')
 
     def resolve_targets(names):
         targets = []
