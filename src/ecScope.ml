@@ -2316,6 +2316,7 @@ end = struct
     name      : symbol;
     types_    : (symbol * path) list;
     operators : (symbol * preoperator) list;
+    proofs    : symbol list;
   }
 
   let doclone (scope : scope) (clone : clone) =
@@ -2343,9 +2344,10 @@ end = struct
           evc_types  = Msym.of_list (List.map do_type clone.types_);
           evc_ops    = Msym.of_list (List.map do_operator clone.operators);
           evc_lemmas = {
-            ev_bynames = Msym.of_list [
-              "ge0_size", (Some (loced (Pby None)), `Alias, false)
-            ];
+            ev_bynames =
+              clone.proofs
+                |> List.map (fun name -> (name, (Some (loced (Pby None)), `Alias, false)))
+                |> Msym.of_list;
             ev_global  = [None, None]; } } in
 
     let npath = EcPath.pqname (EcEnv.root env) clone.name in
@@ -2388,7 +2390,8 @@ end = struct
       ; operators =
           [ ("size"  , `Int bs.size)
           ; ("tolist", `Path to_)
-          ; ("oflist", `Path from_) ] } in
+          ; ("oflist", `Path from_) ]
+      ; proofs    = ["ge0_size"] } in
 
     let proofs, scope = doclone scope preclone in
 
