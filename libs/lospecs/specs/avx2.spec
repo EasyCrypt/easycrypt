@@ -213,6 +213,8 @@ COMPRESS(w@16) -> @4 =
 
 ## EASYCRYPT WORD OPERATORS
 
+## INT CONVERSIONS
+## Assuming INT = 256 bits
 TO_UINT8(a@8) -> @256 =
   uextend<8, 256>(a)
 
@@ -221,6 +223,15 @@ TO_UINT16(a@16) -> @256 =
   
 TO_UINT32(a@32) -> @256 =
   uextend<32, 256>(a)
+
+TO_UINT64(a@64) -> @256 =
+  uextend<64, 256>(a)
+
+TO_UINT128(a@128) -> @256 =
+  uextend<128, 256>(a)
+
+TO_UINT256(a@256) -> @256 =
+  uextend<256, 256>(a)
 
 OF_INT8(a@256) -> @8 =
   a[@8|0]
@@ -231,27 +242,17 @@ OF_INT16(a@256) -> @16 =
 OF_INT32(a@256) -> @32 =
   a[@32|0]
 
+OF_INT64(a@256) -> @64 =
+  a[@64|0]
+
+OF_INT128(a@256) -> @128 =
+  a[@128|0]
+
+OF_INT256(a@256) -> @256 =
+  a[@256|0]
+
 LSHIFT32(a@32, c@8) -> @32 =
   sll<32>(a, c)
-
-
-ADD_8(a@8, b@8) -> @8 =
- add<8>(a, b)
-
-ADD_16(a@16, b@16) -> @16 =
- add<16>(a, b)
-
-ADD_32(a@32, b@32) -> @32 =
- add<32>(a, b)
-
-UMULL_8(a@8, b@8) -> @8 =
-  umullo<8>(a, b)
-
-UMULL_16(a@16, b@16) -> @16 =
-  umullo<16>(a, b)
-
-UMULL_32(a@32, b@32) -> @32 =
-  umullo<32>(a, b)
 
 RSHIFTL_8(a@8, c@8) -> @8 =
   srl<8>(a, c)
@@ -271,21 +272,6 @@ RSHIFTL_32(a@32, c@8) -> @32 =
 RSHIFTA_32(a@32, c@8) -> @32 =
   sra<32>(a, c)
 
-AND_8(a@8, b@8) -> @8 =
-  and<8>(a, b) 
-
-AND_16(a@16, b@16) -> @16 =
-  and<16>(a, b) 
-
-AND_32(a@32, b@32) -> @32 =
-  and<32>(a, b) 
-
-AND_256(a@256, b@256) -> @256 =
-  and<256>(a, b) 
-
 LT_256(a@256, b@256) -> @1 =
   ugt<256>(b, a)
-
-OR_32(a@32, b@32) -> @32 =
-  or<32>(a, b) 
 

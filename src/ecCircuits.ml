@@ -616,8 +616,8 @@ module BaseOps = struct
   
   let is_baseop (env: env) (p: path) : bool = 
     match (EcPath.toqsymbol p) with
-    | ["Top"; "JWord"; _], _ -> true
-    | ["Top"; "JModel_x86"], _ -> true
+    (* | ["Top"; "JWord"; _], _ -> true *)
+    (* | ["Top"; "JModel_x86"], _ -> true *)
 
     (* AdHoc for barrett FIXME: remove later *)
     | _, "sext16_32" -> true
@@ -628,15 +628,14 @@ module BaseOps = struct
     | _, "eqmod64q" -> true
     | _, "bvueq" -> true
     | _, "bvseq" -> true
-    | _, "/\\" -> true
-    | _, "&&" -> true
-    | _, "\\/" -> true
-    | _, "||" -> true
-    | _, "[!]" -> true
     | _, "=>" -> true
     | _, "<=>" -> true
     | _, "true" -> true
     | _, "false" -> true
+    | _, "`>>`" -> true
+    | _, "`|>>`" -> true
+    | _, "`<<`" -> true
+    | _, "[-]" -> true
 
     | _, "zeroextu64" -> true
     
@@ -661,57 +660,26 @@ module BaseOps = struct
       in 
 
     begin match op with
-    (* Arithmetic: *)
-    (* | "+" -> *)
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = C.add_dropc c1 c2; inps = [(id1, size); (id2, size)]} *)
-
-    | "*" -> (* Unsigned low word mul *)
-      let id1 = EcIdent.create (temp_symbol) in
-      let id2 = EcIdent.create (temp_symbol) in
-      let c1 = C.reg ~size ~name:id1.id_tag in
-      let c2 = C.reg ~size ~name:id2.id_tag in
-      {circ = BWCirc(C.umull c1 c2); inps = [BWInput (id1, size); BWInput (id2, size)]}
-
     | "[-]" ->
       let id1 = EcIdent.create temp_symbol in
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = BWCirc (C.opp c1); inps = [BWInput(id1, size)]}
 
-    (* Bitwise operations *)
-    | "andw" -> 
-      let id1 = EcIdent.create (temp_symbol) in
-      let id2 = EcIdent.create (temp_symbol) in
-      let c1 = C.reg ~size ~name:id1.id_tag in
-      let c2 = C.reg ~size ~name:id2.id_tag in
-      {circ = BWCirc(C.land_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
-
-    (* Bitwise operations *)
-    | "orw" -> 
-      let id1 = EcIdent.create (temp_symbol) in
-      let id2 = EcIdent.create (temp_symbol) in
-      let c1 = C.reg ~size ~name:id1.id_tag in
-      let c2 = C.reg ~size ~name:id2.id_tag in
-      {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
-
-    | "`>>`" -> 
+    | "`>>`" -> (* FIXME: remove after getting truncate *)
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size:8 ~name:id2.id_tag in
       {circ = BWCirc(C.shift ~side:`R ~sign:`L c1 c2); inps = [BWInput(id1, size); BWInput(id2, 8)]}
 
-    | "`|>>`" -> 
+    | "`|>>`" -> (* FIXME: get arithmetic shift from qfabv ops *)
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size:8 ~name:id2.id_tag in
       {circ = BWCirc(C.shift ~side:`R ~sign:`A c1 c2); inps = [BWInput(id1, size); BWInput(id2, 8)]}
 
-    | "`<<`" -> 
+    | "`<<`" -> (* FIXME: remove after getting truncate *)
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
@@ -800,7 +768,7 @@ module BaseOps = struct
     { circ = BWCirc(c1); inps=[BWInput(id1, 32)]}
 
   
-  | _, "bvueq" -> (* FIXME: remove hardcoded size *)
+  | _, "bvueq" -> (* FIXME: add general parsing for equality *)
     let id1 = EcIdent.create temp_symbol in
     let c1 = C.reg ~size:16 ~name:id1.id_tag in
     let id2 = EcIdent.create temp_symbol in
@@ -813,28 +781,6 @@ module BaseOps = struct
     let id2 = EcIdent.create temp_symbol in
     let c2 = C.reg ~size:32 ~name:id2.id_tag in
     {circ = BWCirc([C.bvseq c1 c2]); inps = [BWInput(id1, 32); BWInput(id2, 32)]}
-
-  
-  | _,"[!]" ->
-    let id1 = EcIdent.create temp_symbol in
-    let c1 = C.reg ~size:1 ~name:id1.id_tag in
-    {circ = BWCirc(C.lnot_ c1); inps = [BWInput(id1, 1)]}
-
-  | _, "&&"
-  | _, "/\\" -> (* FIXME: remove hardcoded size *)
-    let id1 = EcIdent.create temp_symbol in
-    let c1 = C.reg ~size:1 ~name:id1.id_tag in
-    let id2 = EcIdent.create temp_symbol in
-    let c2 = C.reg ~size:1 ~name:id2.id_tag in
-    {circ = BWCirc(C.land_ c1 c2); inps = [BWInput(id1, 1); BWInput(id2, 1)]}
-
-  | _, "\\/"
-  | _, "||" -> (* FIXME: remove hardcoded size *)
-    let id1 = EcIdent.create temp_symbol in
-    let c1 = C.reg ~size:1 ~name:id1.id_tag in
-    let id2 = EcIdent.create temp_symbol in
-    let c2 = C.reg ~size:1 ~name:id2.id_tag in
-    {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, 1); BWInput(id2, 1)]}
 
   | _, "=>" ->
     let id1 = EcIdent.create temp_symbol in
@@ -889,6 +835,61 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.sub_dropc c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Mul  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.umull c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `UDiv size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.udiv c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `URem size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.urem c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Shl  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.shift ~side:`L ~sign:`L c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Shr  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.shift ~side:`R ~sign:`L c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `And  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.land_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Or   size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Not  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = BWCirc(C.lnot_ c1 ); inps = [BWInput(id1, size)]}
+
     | _ -> raise @@ CircError "Failed to generate op"
     end
 end
