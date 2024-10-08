@@ -1881,13 +1881,16 @@ tyvars_decl:
 | LBRACKET tyvars=rlist2(tident , empty) RBRACKET
     { List.map (fun x -> (x, [])) tyvars }
 
+deps:
+| LT x=ptybindings GT { x }
+
 op_or_const:
 | OP    { `Op    }
 | CONST { `Const }
 
 operator:
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=pstybindings_opdecl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? deps=deps? args=pstybindings_opdecl?
     sty=prefix(COLON, loc(subtype_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
@@ -1901,13 +1904,14 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
+      po_deps     = odfl [] deps;
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
       po_locality = locality; } }
 
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=pstybindings_opdecl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? deps=deps? args=pstybindings_opdecl?
     COLON LBRACE sty=loc(subtype_exp) PIPE reft=form RBRACE AS rname=ident
 
   { { po_kind     = k;
@@ -1915,6 +1919,7 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
+      po_deps     = odfl [] deps;
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;
