@@ -1118,9 +1118,15 @@ module MC = struct
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | Th_export _ | Th_addrw _ | Th_instance _
-      | Th_auto   _ | Th_reduction _ ->
-          (mc, None)
+      | Th_export    _
+      | Th_addrw     _
+      | Th_instance  _
+      | Th_auto      _
+      | Th_reduction _
+      | Th_bitstring _
+      | Th_bsarray   _
+      | Th_qfabvop   _
+      | Th_circuit   _ -> (mc, None)
     in
 
     let (mc, submcs) =
@@ -3067,8 +3073,14 @@ module Theory = struct
         | Th_baserw (x, _) ->
             MC.import_rwbase (xpath x) env
 
-        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
-            env
+        | Th_addrw     _
+        | Th_instance  _
+        | Th_auto      _
+        | Th_reduction _
+        | Th_bitstring _
+        | Th_bsarray   _
+        | Th_qfabvop   _
+        | Th_circuit   _ -> env
 
       in
         List.fold_left import_th_item env th
