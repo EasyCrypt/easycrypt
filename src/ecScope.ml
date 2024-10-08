@@ -2357,7 +2357,7 @@ end = struct
       EcTheoryReplay.replay Cloning.hooks
         ~abstract:false ~local:`Global ~incl:false
         ~clears:Sp.empty ~renames:[] ~opath:clone.path ~npath
-        evclone scope (EcPath.basename clone.path, theory.cth_items)
+        evclone scope (EcPath.basename npath, theory.cth_items)
     in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
@@ -2392,7 +2392,7 @@ end = struct
           [ ("size"  , `Int bs.size)
           ; ("tolist", `Path to_)
           ; ("oflist", `Path from_) ]
-      ; proofs    = ["ge0_size"] } in
+      ; proofs    = ["gt0_size"] } in
 
     let proofs, scope = doclone scope preclone in
 
@@ -2408,20 +2408,46 @@ end = struct
   let add_bsarray (scope : scope) (ba : pbind_array) : scope = 
     let env = env scope in
 
-    let getp, _geto = EcEnv.Op.lookup ba.get.pl_desc env in
-    let setp, _seto = EcEnv.Op.lookup ba.set.pl_desc env in
-    let to_listp, _to_listo = EcEnv.Op.lookup ba.tolist.pl_desc env in
-    
-    let ue = EcUnify.UniEnv.create None in
-    let t = EcTyping.transty tp_tydecl env ue ba.type_ in
-    match t.ty_node with
-    | Tconstr (p, [t]) ->
-      Format.eprintf "Registering array type %s over type %a@."
-        (EcPath.tostring p) (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t;
-      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bsarray (getp, setp, to_listp, p, BI.to_int ba.size)) in
-      { scope with sc_env = EcSection.add_item item scope.sc_env }
-    | _ -> assert false
+    let bspath =
+      match EcEnv.Ty.lookup_opt (unloc ba.type_) env with
+      | None ->
+        hierror ~loc:(loc ba.type_)
+          "cannot find named type: `%s'"
+          (string_of_qsymbol (unloc ba.type_))
+     
+      | Some (path, decl) -> (* FIXME: normalize? *)
+        if List.length decl.tyd_params <> 1 then
+          hierror ~loc:(loc ba.type_)
+            "type constructor should take exactly one parameter: `%s'"
+            (string_of_qsymbol (unloc ba.type_));
+        path in
 
+    let get   , _ = EcEnv.Op.lookup ba.get.pl_desc env in
+    let set   , _ = EcEnv.Op.lookup ba.set.pl_desc env in      
+    let tolist, _ = EcEnv.Op.lookup ba.tolist.pl_desc env in
+    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) in
+
+    let preclone =
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
+      ; name      = name
+      ; types_    = ["t", bspath]
+      ; operators =
+          [ ("size"   , `Int ba.size)
+          ; ("get"    , `Path get)
+          ; ("set"    , `Path set)
+          ; ("to_list", `Path tolist) ]
+      ; proofs    = ["gt0_size"] } in
+
+    let proofs, scope = doclone scope preclone in
+
+    let item =
+      EcTheory.mkitem EcTheory.import0
+      (EcTheory.Th_bsarray
+        { get; set; tolist; type_ = bspath; size = BI.to_int ba.size }) in
+
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope proofs
   
   let add_circuit (scope : scope) (o : pqsymbol) (c : string) : scope =
     let p, _o = EcEnv.Op.lookup o.pl_desc (env scope) in

@@ -168,17 +168,9 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type bsarray = {
-  get : path;
-  set : path;
-  to_list : path;
-  size : int;
-}
-
 type bsarrayop = 
   | GET of int
   | SET of int
-
   
 type qfabvop = 
   | BVADD of int
@@ -3576,7 +3568,7 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 
 module Circ : sig
   val bind_bitstring : env -> bitstring -> env
-  val bind_bsarray   : env -> path -> path -> path -> path -> int -> env
+  val bind_bsarray   : env -> bsarray -> env
   val bind_circuit   : env -> path -> string -> env
   val bind_qfabvop   : env -> path -> string -> env
   val lookup_bitstring : env -> ty -> bitstring option
@@ -3596,11 +3588,14 @@ end = struct
     { env with env_circ =
       { env.env_circ with bitstrings = Mp.add bs.type_ bs env.env_circ.bitstrings } }
 
-  let bind_bsarray (env: env) (get: path) (set: path) (to_list: path) (ty: path) (size: int) : env =
-    Format.eprintf "Binding bsarray for type %s@." (EcPath.tostring ty);
-    {env with env_circ = 
-      {env.env_circ with bsarrays = Mp.add ty {get; set; to_list; size} env.env_circ.bsarrays;
-        bsarrayops= Mp.add set (SET size) (Mp.add get (GET size) env.env_circ.bsarrayops)}}
+  let bind_bsarray (env : env) (ba : bsarray) : env =
+    { env with env_circ =  { env.env_circ with
+        bsarrays   = Mp.add ba.type_ ba env.env_circ.bsarrays;
+        bsarrayops =
+          List.fold_left
+            (fun map (p, kind) -> Mp.add p kind map)
+            env.env_circ.bsarrayops
+            [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; } }
     
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     (* TODO: add absolute paths for circuit binding and lookup *)

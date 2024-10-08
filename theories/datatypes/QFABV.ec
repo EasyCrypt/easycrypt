@@ -1,10 +1,12 @@
+(* -------------------------------------------------------------------- *)
 require import AllCore List Int IntDiv BitEncoding.
 (* - *) import BS2Int. 
 
+(* -------------------------------------------------------------------- *)
 abstract theory BV.
   op size : int.
 
-  axiom ge0_size : 0 < size.
+  axiom gt0_size : 0 < size.
 
   type bv.
 
@@ -37,14 +39,32 @@ abstract theory BV.
   end BVSub.
 end BV.
 
+(* -------------------------------------------------------------------- *)
+theory A.
+  op size : int.
 
-(* type w16. *)
+  axiom gt0_size : 0 < size.
 
-(* clone import BV as BV_W16 *)
-(*   with op size <= 16, type bv <- w16 proof * by admit. *)
+  type 'a t.
 
-(* op add16 : w16 -> w16 -> w16. *)
+  op get ['a] : 'a t -> int -> 'a.
 
-(* clone BV_W16.BVAdd as BV_W16_BVAdd *)
-(*   with op bvadd <= add16 proof * by admit. *)
+  op set ['a] : 'a t -> int -> 'a -> 'a t.
 
+  op to_list ['a] : 'a t -> 'a list.
+
+  axiom tolistP ['a] (a : 'a t) :
+    to_list a = mkseq (fun i => get a i) size.
+
+  axiom eqP ['a] (a1 a2 : 'a t) :
+        (forall i, 0 <= i < size => get a1 i = get a2 i)
+    <=> (a1 = a2).
+
+  axiom get_setP ['a] (a : 'a t) (i j : int) (v : 'a) :
+       0 <= i < size
+    => 0 <= j < size
+    => get (set a j v) i = if i = j then v else get a i.
+
+  axiom get_out ['a] (a1 a2 : 'a t) (i : int) :
+    !(0 <= i < size) => get a1 i = get a2 i.
+end A.

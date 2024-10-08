@@ -1352,7 +1352,7 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
     | Th_bitstring bs    -> EcEnv.Circ.bind_bitstring env bs
-    | Th_bsarray (get, set, to_list, t, n) -> EcEnv.Circ.bind_bsarray env get set to_list t n
+    | Th_bsarray   ba    -> EcEnv.Circ.bind_bsarray env ba
     | Th_circuit (o, c)  -> EcEnv.Circ.bind_circuit env o c
     | Th_qfabvop (o, c)  -> EcEnv.Circ.bind_qfabvop env o c
     | _                  -> assert false

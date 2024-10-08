@@ -1280,7 +1280,7 @@ type pbind_array =
   { get    : pqsymbol
   ; set    : pqsymbol
   ; tolist : pqsymbol
-  ; type_  : pty
+  ; type_  : pqsymbol
   ; size   : EcBigInt.zint }
 
 (* -------------------------------------------------------------------- *)

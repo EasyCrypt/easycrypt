@@ -396,6 +396,7 @@
 %token ALIAS
 %token AMP
 %token APPLY
+%token ARRAY
 %token AS
 %token ASSERT
 %token ASSUMPTION
@@ -674,8 +675,10 @@ _lident:
 | x=LIDENT   { x }
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
+| ARRAY      { "array"      }
 | ASYNC      { "async"      }
 | BIND       { "bind"       }
+| BITSTRING  { "bitstring"  }
 | DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
@@ -3933,7 +3936,7 @@ global_action:
 | BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
   { Gbbitstring { from_; to_; type_; size; } }
 
-| BIND BITSTRING CIRCUIT get=qoident set=qoident tolist=qoident type_=loc(simpl_type_exp) size=uint
+| BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
   { Gbbsarray { get; set; tolist; type_; size; } }
   
 | BIND CIRCUIT o=qoident c=STRING

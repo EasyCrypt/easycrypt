@@ -170,6 +170,7 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
     "bchange"     , BCHANGE    ;        (* KW: tactic *)
     
+    "array"       , ARRAY      ;        (* KW: global *)
     "bdep"        , BDEP       ;        (* KW: global *)
     "bdepeq"      , BDEPEQ     ;        (* KW: global *)
     "bind"        , BIND       ;        (* KW: global *)

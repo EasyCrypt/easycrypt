@@ -17,13 +17,6 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
-type bsarray = {
-  get : path;
-  set : path;
-  to_list: path;
-  size : int;
-}
-
 type bsarrayop = 
   | GET of int
   | SET of int
@@ -31,7 +24,9 @@ type bsarrayop =
 type qfabvop = 
   | BVADD of int 
   | BVSUB of int
+
 type env
+
 type scope = [
   | `Theory
   | `Module of EcPath.mpath
@@ -522,9 +517,9 @@ val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
 
 module Circ : sig
   
-  val bind_bitstring             : env -> bitstring -> env
-  val bind_circuit               : env -> path -> string -> env
-  val bind_qfabvop               : env -> path -> string -> env
+  val bind_bitstring : env -> bitstring -> env
+  val bind_circuit   : env -> path -> string -> env
+  val bind_qfabvop   : env -> path -> string -> env
 
   val lookup_bitstring           : env -> ty      -> bitstring option
   val lookup_bitstring_path      : env -> path    -> bitstring option
@@ -535,9 +530,9 @@ module Circ : sig
   val lookup_qfabvop_path        : env -> path    -> qfabvop option
   val lookup_qfabvop             : env -> qsymbol -> qfabvop option
 
-  val bind_bsarray   : env -> path -> path -> path -> path -> int -> env
-  val lookup_bsarray : env -> ty -> bsarray option
+  val bind_bsarray        : env -> bsarray -> env
+  val lookup_bsarray      : env -> ty -> bsarray option
   val lookup_bsarray_path : env -> path -> bsarray option
   val lookup_bsarray_size : env -> ty -> int option
-  val lookup_bsarrayop   : env -> path -> bsarrayop option
+  val lookup_bsarrayop    : env -> path -> bsarrayop option
 end 

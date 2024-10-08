@@ -235,7 +235,7 @@ let t_circ (tc: tcenv1) : tcenv =
   let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
     match EcEnv.Circ.lookup_bsarray env ty with
-    | Some {to_list;} -> let bty = match ty.ty_node with
+    | Some {tolist;} -> let bty = match ty.ty_node with
       | Tconstr (p, [bty]) -> bty
       | _ -> failwith "Wrong type structure for array"
       in let ptb, otb = 
@@ -244,7 +244,7 @@ let t_circ (tc: tcenv1) : tcenv =
         | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
       in EcCoreLib.CI_List.p_flatten @@! [
         EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
-        to_list @@! [arg]]
+        tolist @@! [arg]]
       ]
     | None -> 
       begin match EcEnv.Circ.lookup_bitstring env ty with
@@ -283,14 +283,14 @@ let t_circ (tc: tcenv1) : tcenv =
   let flatten_to_bits (env: env) (f: form) = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
     match EcEnv.Circ.lookup_bsarray env f.f_ty with
-    | Some {to_list=to_list; _} -> 
+    | Some {tolist; _} -> 
       let base = match f.f_ty.ty_node with
       | Tconstr (_, [b]) -> b
       | _ -> assert false
       in 
       let w2bits = w2bits_op env base in
       EcCoreLib.CI_List.p_flatten @@!
-      [EcCoreLib.CI_List.p_map @@! [w2bits; (to_list @@! [f])]]
+      [EcCoreLib.CI_List.p_map @@! [w2bits; (tolist @@! [f])]]
     | None -> 
       w2bits env f.f_ty f
       
