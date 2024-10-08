@@ -171,12 +171,12 @@ type bsarrayop =
   | GET of int
   | SET of int
   
-type circ_env = {
-  bitstrings: bitstring Mp.t;
-  circuits: string Mp.t;
-  qfabvops: qfabvop Mp.t;
-  bsarrays: bsarray Mp.t;
-  bsarrayops: bsarrayop Mp.t;
+type circuits = {
+  bitstrings : bitstring Mp.t;
+  circuits   : circuit Mp.t;
+  qfabvops   : qfabvop Mp.t;
+  bsarrays   : bsarray Mp.t;
+  bsarrayops : bsarrayop Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -199,7 +199,7 @@ type preenv = {
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
-  env_circ     : circ_env;
+  env_circ     : circuits;
   (* Map theory paths to their env before just before theory was closed. *)
   (* The environment should be incuded for all theories, including       *)
   (* abstract ones. The purpose of this map is to simplify the code      *)
@@ -3577,7 +3577,7 @@ module Circ : sig
   val bind_bitstring : env -> bitstring -> env
   val bind_bsarray   : env -> bsarray -> env
   val bind_qfabvop   : env -> qfabvop -> env
-  val bind_circuit   : env -> path -> string -> env
+  val bind_circuit   : env -> circuit -> env
 
   val lookup_bitstring : env -> ty -> bitstring option
   val lookup_bitstring_path: env -> path -> bitstring option
@@ -3585,9 +3585,9 @@ module Circ : sig
   val lookup_bsarray : env -> ty -> bsarray option
   val lookup_bsarray_path : env -> path -> bsarray option
   val lookup_bsarray_size : env -> ty -> int option
-  val lookup_circuit : env -> qsymbol -> string option
+  val lookup_circuit : env -> qsymbol -> Lospecs.Ast.adef option
   val lookup_bitstring_size_path : env -> path -> int option
-  val lookup_circuit_path : env -> path -> string option
+  val lookup_circuit_path : env -> path -> Lospecs.Ast.adef option
   val lookup_qfabvop_path : env -> path -> qfabvop option
   val lookup_qfabvop : env -> qsymbol -> qfabvop option
   val lookup_bsarrayop : env -> path -> bsarrayop option
@@ -3609,10 +3609,10 @@ end = struct
     { env with env_circ = { env.env_circ with
         qfabvops = Mp.add op.operator op env.env_circ.qfabvops } }
   
-  let bind_circuit (env: env) (k: path) (v: string) : env = 
+  let bind_circuit (env: env) (cr : circuit) : env = 
     (* TODO: add absolute paths for circuit binding and lookup *)
-    {env with env_circ = 
-      {env.env_circ with circuits = Mp.add k v env.env_circ.circuits }}
+    { env with env_circ = { env.env_circ with
+        circuits = Mp.add cr.operator cr env.env_circ.circuits } }
 
   let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
@@ -3622,21 +3622,14 @@ end = struct
     match ty.ty_node with
     | Tconstr (p, []) -> lookup_bitstring_path env p
     | _ -> None
-    (* | Tglob   id  -> Format.eprintf "Unknown bitstring type (Tglob)@."; assert false *) 
-    (* | Tunivar uid -> Format.eprintf "Unknown bitstring type (Tunivar) id: %d@." uid; assert false *) 
-    (* | Tvar    var -> Format.eprintf "Unknown bitstring type (Tvar)."; assert false *)
-    (* | Ttuple  tys -> Format.eprintf "Unknown bitstring type (Ttuple)@."; assert false *) 
-    (* | Tconstr (pth, tys) -> let h, t = EcPath.toqsymbol pth in *)
-      (* Format.eprintf "Unknown bitstring type (Tconst w/ type params) %s" *) 
-      (* (List.fold_right (fun a b -> a ^ "." ^ b) h t); assert false *) 
-    (* | Tfun    (ty1, ty2) -> Format.eprintf "Unknown bitstring type (Tfun)@."; assert false *) 
     
   let lookup_bitstring_size_path (env: env) (pth: path) : int option = 
     Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring_path env pth)
 
   
-  let lookup_circuit_path (env: env) (v: path) : string option = 
+  let lookup_circuit_path (env: env) (v: path) : Lospecs.Ast.adef option = 
     Mp.find_opt v env.env_circ.circuits
+    |> Option.map (fun cr -> cr.circuit)
 
   let lookup_bitstring_size (env: env) (ty: ty) : int option =
     Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring env ty)
@@ -3653,7 +3646,7 @@ end = struct
   let lookup_bsarray_size (env: env) (ty: ty) : int option = 
     Option.map (fun c -> c.size) (lookup_bsarray env ty)
 
-  let lookup_circuit (env: env) (o: qsymbol) : string option =
+  let lookup_circuit (env: env) (o: qsymbol) : Lospecs.Ast.adef option =
     let p, _o = Op.lookup o env in
     lookup_circuit_path env p
 

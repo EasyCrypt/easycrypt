@@ -2307,7 +2307,7 @@ module Circuit : sig
   val add_bitstring : scope -> pbind_bitstring -> scope
   val add_bsarray   : scope -> pbind_array -> scope
   val add_qfabvop   : scope -> pbind_qfabvop -> scope
-  val add_circuit   : scope -> pqsymbol -> string -> scope
+  val add_circuit   : scope -> pbind_circuit -> scope
 end = struct
   type preoperator = [`Path of path | `Int of BI.zint]
 
@@ -2522,10 +2522,63 @@ end = struct
     
     Ax.add_defer scope proofs
     
-  let add_circuit (scope : scope) (o : pqsymbol) (c : string) : scope =
-    let p, _o = EcEnv.Op.lookup o.pl_desc (env scope) in
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }  
+  let add_circuit (scope : scope) (pc : pbind_circuit) : scope =
+    let env = env scope in
+    let operator, opdecl = EcEnv.Op.lookup pc.operator.pl_desc env in
+
+    if not (List.is_empty opdecl.op_tparams) then
+      hierror ~loc:(loc pc.operator) "operator must be monomorphic";
+
+    match EcCircuits.load_specification (unloc pc.circuit) with
+    | None ->
+      hierror ~loc:(loc pc.circuit)
+        "unknown circuit: %s" (unloc pc.circuit)
+
+    | Some circuit ->
+      let sig_ = List.map (fun (_, `W i) -> i) circuit.arguments in
+      let ret  = Lospecs.Ast.get_size circuit.rettype in
+      let dom, codom = EcEnv.Ty.decompose_fun opdecl.op_ty env in
+
+      if List.length dom <> List.length sig_ then
+        hierror ~loc:(loc pc.operator)
+          "the given operator must take %d arguments"
+          (List.length sig_);
+
+      List.iteri (fun position (ty, size) ->
+        match EcEnv.Circ.lookup_bitstring env ty with
+        | Some bitstring when bitstring.size = size -> ()
+        | Some bitstring ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc pc.operator)
+            "%d-th argument (of type %a) must be a bitstring of size %d, not %d"
+            (position + 1) (EcPrinting.pp_type ppe) ty
+            size bitstring.size
+        | None ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc pc.operator)
+            "%d-th argument (of type %a) must be a bitstring"
+            (position + 1) (EcPrinting.pp_type ppe) ty
+      ) (List.combine dom sig_);
+
+      begin
+        match EcEnv.Circ.lookup_bitstring env codom with
+        | Some bitstring when bitstring.size = ret -> ()
+        | Some bitstring ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc pc.operator)
+            "operator return type (%a) must be a bitstring of size %d, not %d"
+            (EcPrinting.pp_type ppe) codom ret bitstring.size
+        | None ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc pc.operator)
+            "operator return type (%a) must be a bitstring of size %d"
+            (EcPrinting.pp_type ppe) codom ret
+      end;
+
+      let item =
+          EcTheory.mkitem EcTheory.import0
+          (EcTheory.Th_circuit { operator; circuit }) in
+      { scope with sc_env = EcSection.add_item item scope.sc_env }  
 end
 
 (* -------------------------------------------------------------------- *)

@@ -721,8 +721,8 @@ and process_bind_bsarray (scope : EcScope.scope) (ba : pbind_array) =
 and process_bind_qfabvop (scope : EcScope.scope) (bop : pbind_qfabvop) =
   EcScope.Circuit.add_qfabvop scope bop
   
-and process_bind_circuit (scope : EcScope.scope) ((o, c) : pqsymbol * string) =
-  EcScope.Circuit.add_circuit scope o c
+and process_bind_circuit (scope : EcScope.scope) (pc : pbind_circuit) =
+  EcScope.Circuit.add_circuit scope pc
 
 and process_test (scope: EcScope.scope) (q: pqsymbol) (q2: pqsymbol) =
   let env = EcScope.env scope in

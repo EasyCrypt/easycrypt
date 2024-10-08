@@ -22,6 +22,7 @@ type cache  = (EcIdent.t, (cinput * circuit)) Map.t
 exception CircError of string
 
 (* -------------------------------------------------------------------- *)
+val load_specification : string -> Lospecs.Ast.adef option
 val cinput_to_string : cinput -> string
 val cinput_of_type : ?idn:ident -> env -> ty -> cinput
 val size_of_circ : circ -> int 

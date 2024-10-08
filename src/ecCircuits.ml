@@ -575,10 +575,14 @@ let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit =
   
 (* -------------------------------------------------------------------- *)
 (* Basis for hardcoded circuit gen *)
+let load_specification (name : string) =
+  C.get_specification name
+
 let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
   (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
   match EcEnv.Circ.lookup_circuit_path env p with
-  | Some op -> C.func_from_spec op
+  | Some circuit ->
+    (fun regs -> C.circuit_of_spec regs circuit) 
   | None -> Format.eprintf "No operator for path: %s@."
     (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
     assert false 

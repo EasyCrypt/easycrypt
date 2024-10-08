@@ -3942,8 +3942,8 @@ global_action:
 | BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
   { Gbqfabvop { type_; operator; name; } }
 
-| BIND CIRCUIT o=qoident c=STRING
-  { Gbcircuit (o, c) }
+| BIND CIRCUIT operator=qoident circuit=loc(STRING)
+  { Gbcircuit { operator; circuit; } }
 
 | BIND BDEP t1=qoident t2=qoident
   { Gtest (t1, t2) }

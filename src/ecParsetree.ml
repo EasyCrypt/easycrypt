@@ -1291,8 +1291,7 @@ type pbind_qfabvop = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pbind_circuit =
-  pqsymbol * string
+type pbind_circuit = { operator : pqsymbol; circuit : string located; }
 
 (* -------------------------------------------------------------------- *)
 type global_action =

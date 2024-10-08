@@ -39,7 +39,7 @@ and theory_item_r =
   | Th_bitstring of bitstring
   | Th_bsarray   of bsarray
   | Th_qfabvop   of qfabvop
-  | Th_circuit   of (path * string)
+  | Th_circuit   of circuit
 
 and bitstring =
   { type_: path; from_: path; to_: path; size: int; theory: path; }
@@ -66,7 +66,12 @@ and qfabvop =
   ; type_    : path
   ; operator : path
   ; theory   : path }
-        
+
+and circuit = {
+  circuit  : Lospecs.Ast.adef;
+  operator : path;  
+}
+  
 and thsource = {
   ths_base : EcPath.path;
 }

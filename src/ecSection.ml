@@ -1354,8 +1354,8 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_bitstring bs    -> EcEnv.Circ.bind_bitstring env bs
     | Th_bsarray   ba    -> EcEnv.Circ.bind_bsarray env ba
     | Th_qfabvop   op    -> EcEnv.Circ.bind_qfabvop env op
-    | Th_circuit (o, c)  -> EcEnv.Circ.bind_circuit env o c
-    | _                  -> assert false
+    | Th_circuit   cr    -> EcEnv.Circ.bind_circuit env cr
+    | Th_theory _        -> assert false
   in
   { scenv with
     sc_env = env;
