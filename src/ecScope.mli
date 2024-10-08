@@ -247,9 +247,9 @@ end
 (* -------------------------------------------------------------------- *)
 module Circuit : sig 
   val add_bitstring : scope -> pbind_bitstring -> scope
-  val add_bsarray : scope -> pbind_array -> scope
-  val add_circuit : scope -> pqsymbol -> string -> scope
-  val add_qfabvop : scope -> pqsymbol -> string -> scope
+  val add_bsarray   : scope -> pbind_array -> scope
+  val add_qfabvop   : scope -> pbind_qfabvop -> scope
+  val add_circuit   : scope -> pqsymbol -> string -> scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -2306,8 +2306,8 @@ end
 module Circuit : sig 
   val add_bitstring : scope -> pbind_bitstring -> scope
   val add_bsarray   : scope -> pbind_array -> scope
+  val add_qfabvop   : scope -> pbind_qfabvop -> scope
   val add_circuit   : scope -> pqsymbol -> string -> scope
-  val add_qfabvop   : scope -> pqsymbol -> string -> scope
 end = struct
   type preoperator = [`Path of path | `Int of BI.zint]
 
@@ -2399,7 +2399,10 @@ end = struct
     let item =
       EcTheory.mkitem EcTheory.import0
       (EcTheory.Th_bitstring
-        { from_; to_; type_ = bspath; size = BI.to_int bs.size }) in
+        { from_; to_;
+          type_  = bspath;
+          size   = BI.to_int bs.size;
+          theory = pqname (EcEnv.root env) name; }) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2449,57 +2452,81 @@ end = struct
 
     Ax.add_defer scope proofs
   
+  let add_qfabvop (scope : scope) (op : pbind_qfabvop) : scope =
+    let env = env scope in
+
+    let type_ =
+      let ue = EcUnify.UniEnv.create None in
+      let ty = EcTyping.transty tp_tydecl env ue op.type_ in
+      assert (EcUnify.UniEnv.closed ue);
+      ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty
+    in
+
+    let bspath =
+      match type_.ty_node with
+      | Tconstr (p, []) -> p
+      | _ ->
+          hierror ~loc:(op.type_.pl_loc)
+            "bit-string type must be a monomorphic named type" in
+
+    let bitstring =
+      match EcEnv.Circ.lookup_bitstring env type_ (* FIXME *) with
+      | None ->
+        hierror ~loc:(op.type_.pl_loc)
+          "this type is not bound to a bitstring type"
+      | Some bitstring -> bitstring in
+
+    let (kind, subname) : EcTheory.qfabv_opkind * _ =
+      match unloc op.name with
+      | "add"  -> `Add  bitstring.size, "Add"
+      | "sub"  -> `Sub  bitstring.size, "Sub"
+      | "mul"  -> `Mul  bitstring.size, "Mul"
+      | "udiv" -> `UDiv bitstring.size, "UDiv"
+      | "urem" -> `URem bitstring.size, "URem"
+      | "shl"  -> `Shl  bitstring.size, "SHL"
+      | "shr"  -> `Shr  bitstring.size, "SHR"
+      | "and"  -> `And  bitstring.size, "And"
+      | "or"   -> `Or   bitstring.size, "Or"
+      | "not"  -> `Not  bitstring.size, "Not"
+      | _      ->
+        hierror ~loc:(loc op.name)
+          "invalid bv operator name: %s" (unloc op.name) in
+
+    let subname = "BV" ^ subname in
+    let subpath = EcPath.pqname bitstring.theory subname in
+
+    let operator, _ = EcEnv.Op.lookup op.operator.pl_desc env in
+    let name = String.concat "_"
+      ("BVA" :: unloc op.name :: EcPath.tolist bspath) (* FIXME: not stable*) in
+
+    let preclone =
+      { path      = subpath
+      ; name      = name
+      ; types_    = []
+      ; operators = ["bv" ^ unloc op.name, `Path operator]
+      ; proofs    = [] } in
+
+      let proofs, scope = doclone scope preclone in
+
+    let item =
+        EcTheory.mkitem EcTheory.import0 (
+          EcTheory.Th_qfabvop {
+            kind     = kind;
+            type_    = bspath;
+            operator = operator;
+            theory   = subpath;
+          }) in
+  
+    let scope =
+      { scope with sc_env = EcSection.add_item item scope.sc_env } in
+    
+    Ax.add_defer scope proofs
+    
   let add_circuit (scope : scope) (o : pqsymbol) (c : string) : scope =
     let p, _o = EcEnv.Op.lookup o.pl_desc (env scope) in
     let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
-    
-  let add_qfabvop (scope : scope) (o : pqsymbol) (c : string) : scope =
-    (* FIXME: rewrite this, this is horrible *)
-    let loced a = mk_loc o.pl_loc a in
-    let env = env scope in
-    let opth, oop = EcEnv.Op.lookup o.pl_desc env in
-    let t = match oop.op_ty.ty_node with
-    | Tfun (t, _) -> t
-    | _ -> assert false
-    in
-    let thry = match c with
-    | "bvadd" -> "BVAdd"
-    | "bvsub" -> "BVSub"
-    | _ -> assert false
-    in
-    let o_ovrd = {
-        opov_tyvars = None;
-        opov_args = [];
-        opov_retty = loced PTunivar;
-        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ opth), None)
-      }
-    in
-    let th_name = 
-      (Format.asprintf "BV_%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t)
-      |> String.map (fun c -> if c = '.' then '_' else c)
-    in    
-    let (tc: EcParsetree.theory_cloning) = {
-       pthc_base = loced ([th_name], thry);
-       pthc_name = Some (loced 
-         (Format.asprintf "%s_%s" th_name thry));
-       pthc_ext = [
-         ((loced ([], c), PTHO_Op (`BySyntax o_ovrd, `Inline `Keep)))
-       ]; (* FIXME: add override for theory *)
-       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
-       pthc_rnm = [];
-       pthc_opts = [];
-       pthc_clears = [];
-       pthc_local = `Global;
-       pthc_import = None;
-      } 
-    in
-    (* let sc = Cloning.clone sc `Check tc in *)
-    
-    let p, _o = EcEnv.Op.lookup o.pl_desc env in
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
-    Cloning.clone { scope with sc_env = EcSection.add_item item scope.sc_env } `Check tc
-  end
+    { scope with sc_env = EcSection.add_item item scope.sc_env }  
+end
 
 (* -------------------------------------------------------------------- *)
 module Search = struct

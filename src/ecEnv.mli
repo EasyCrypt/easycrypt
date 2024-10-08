@@ -21,10 +21,7 @@ type bsarrayop =
   | GET of int
   | SET of int
 
-type qfabvop = 
-  | BVADD of int 
-  | BVSUB of int
-
+(* -------------------------------------------------------------------- *)
 type env
 
 type scope = [
@@ -519,7 +516,7 @@ module Circ : sig
   
   val bind_bitstring : env -> bitstring -> env
   val bind_circuit   : env -> path -> string -> env
-  val bind_qfabvop   : env -> path -> string -> env
+  val bind_qfabvop   : env -> qfabvop -> env
 
   val lookup_bitstring           : env -> ty      -> bitstring option
   val lookup_bitstring_path      : env -> path    -> bitstring option

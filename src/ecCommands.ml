@@ -718,11 +718,11 @@ and process_bind_bitstring (scope : EcScope.scope) (bs : pbind_bitstring) =
 and process_bind_bsarray (scope : EcScope.scope) (ba : pbind_array) =
   EcScope.Circuit.add_bsarray scope ba
  
+and process_bind_qfabvop (scope : EcScope.scope) (bop : pbind_qfabvop) =
+  EcScope.Circuit.add_qfabvop scope bop
+  
 and process_bind_circuit (scope : EcScope.scope) ((o, c) : pqsymbol * string) =
   EcScope.Circuit.add_circuit scope o c
-
-and process_bind_qfabvop (scope : EcScope.scope) ((o, c) : pqsymbol * string) =
-  EcScope.Circuit.add_qfabvop scope o c
 
 and process_test (scope: EcScope.scope) (q: pqsymbol) (q2: pqsymbol) =
   let env = EcScope.env scope in

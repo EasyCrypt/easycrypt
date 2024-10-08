@@ -1284,11 +1284,14 @@ type pbind_array =
   ; size   : EcBigInt.zint }
 
 (* -------------------------------------------------------------------- *)
-type pbind_circuit =
-  pqsymbol * string
+type pbind_qfabvop = {
+  name     : string located;
+  type_    : pty;
+  operator : pqsymbol;
+}
 
 (* -------------------------------------------------------------------- *)
-type pbind_qfabvop =
+type pbind_circuit =
   pqsymbol * string
 
 (* -------------------------------------------------------------------- *)

@@ -3939,11 +3939,11 @@ global_action:
 | BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
   { Gbbsarray { get; set; tolist; type_; size; } }
   
+| BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
+  { Gbqfabvop { type_; operator; name; } }
+
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }
-
-| BIND OP o=qoident c=STRING
-  { Gbqfabvop (o, c) }
 
 | BIND BDEP t1=qoident t2=qoident
   { Gtest (t1, t2) }

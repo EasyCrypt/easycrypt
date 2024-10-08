@@ -40,14 +40,34 @@ and theory_item_r =
   | Th_auto      of (int * symbol option * path list * is_local)
   | Th_bitstring of bitstring
   | Th_bsarray   of bsarray
+  | Th_qfabvop   of qfabvop
   | Th_circuit   of (path * string)
-  | Th_qfabvop   of (path * string)
 
 and bitstring =
-  { type_: path; from_: path; to_: path; size: int; }
+  { type_: path; from_: path; to_: path; size: int; theory: path; }
 
 and bsarray =
   { type_: path; get: path; set: path; tolist: path; size: int; }
+
+and qfabv_opkind = [
+  | `Add  of int
+  | `Sub  of int
+  | `Mul  of int
+  | `UDiv of int
+  | `URem of int
+  | `Shl  of int
+  | `Shr  of int
+  | `And  of int
+  | `Or   of int
+  | `Not  of int
+
+]
+
+and qfabvop =
+  { kind     : qfabv_opkind
+  ; type_    : path
+  ; operator : path
+  ; theory   : path }
   
 and thsource = {
   ths_base : EcPath.path;

@@ -27,7 +27,6 @@ type 'a suspension = {
   sp_params : int * (EcIdent.t * module_type) list;
 }
 
-
 (* -------------------------------------------------------------------- *)
 let check_not_suspended (params, obj) =
   if not (List.for_all (fun x -> x = None) params) then
@@ -172,10 +171,6 @@ type bsarrayop =
   | GET of int
   | SET of int
   
-type qfabvop = 
-  | BVADD of int
-  | BVSUB of int
-
 type circ_env = {
   bitstrings: bitstring Mp.t;
   circuits: string Mp.t;
@@ -3569,8 +3564,9 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 module Circ : sig
   val bind_bitstring : env -> bitstring -> env
   val bind_bsarray   : env -> bsarray -> env
+  val bind_qfabvop   : env -> qfabvop -> env
   val bind_circuit   : env -> path -> string -> env
-  val bind_qfabvop   : env -> path -> string -> env
+
   val lookup_bitstring : env -> ty -> bitstring option
   val lookup_bitstring_path: env -> path -> bitstring option
   val lookup_bitstring_size : env -> ty -> int option
@@ -3589,7 +3585,7 @@ end = struct
       { env.env_circ with bitstrings = Mp.add bs.type_ bs env.env_circ.bitstrings } }
 
   let bind_bsarray (env : env) (ba : bsarray) : env =
-    { env with env_circ =  { env.env_circ with
+    { env with env_circ = { env.env_circ with
         bsarrays   = Mp.add ba.type_ ba env.env_circ.bsarrays;
         bsarrayops =
           List.fold_left
@@ -3597,6 +3593,10 @@ end = struct
             env.env_circ.bsarrayops
             [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; } }
     
+  let bind_qfabvop (env : env) (op : qfabvop) : env =
+    { env with env_circ = { env.env_circ with
+        qfabvops = Mp.add op.operator op env.env_circ.qfabvops } }
+  
   let bind_circuit (env: env) (k: path) (v: string) : env = 
     (* TODO: add absolute paths for circuit binding and lookup *)
     {env with env_circ = 
@@ -3645,39 +3645,6 @@ end = struct
     let p, _o = Op.lookup o env in
     lookup_circuit_path env p
 
-
-  let bind_qfabvop (env: env) (k: path) (v: string) : env = 
-    let o = Op.by_path k env in
-    let qfop = match o.op_ty.ty_node with
-    | Tfun (t1, {ty_node=Tfun(t2, t3)}) -> 
-      let b1 = match lookup_bitstring env t1 with
-      | Some b -> b
-      | None -> assert false (* FIXME: add proper error handling*)
-      in
-      let b2 = match lookup_bitstring env t2 with
-      | Some b -> b
-      | None -> assert false (* FIXME: add proper error handling*)
-      in
-      let b3 = match lookup_bitstring env t3 with
-      | Some b -> b
-      | None -> assert false (* FIXME: add proper error handling*)
-      in
-      let n = match b1.size, b2.size, b3.size with
-      | n1, n2, n3 when (n1 = n2) && (n2 = n3) -> n1
-      | n1, n2, n3 -> failwith (Format.sprintf "Inconsistent sizes for qfabvop binding %s: %d -> %d -> %d@."
-        v n1 n2 n3)
-      in
-      begin match v with
-      | "bvadd" -> BVADD n
-      | "bvsub" -> BVSUB n
-      | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
-      end
-    | _ -> failwith (Format.sprintf "Unknown QF_ABV operator %s" v)
-    in
-    {env with env_circ = 
-      {env.env_circ with qfabvops = Mp.add k qfop env.env_circ.qfabvops }}
-
-  
   let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
     Mp.find_opt v env.env_circ.qfabvops
 

@@ -873,13 +873,13 @@ module BaseOps = struct
     {circ = BWCirc([dc]); inps = [BWInput(id1, 16); BWInput(id2, 16)]}
   
   | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
-    | Some BVADD size -> 
+    | Some { kind = `Add size } -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.add_dropc c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
-    | Some BVSUB size ->
+    | Some { kind = `Sub size } ->
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
