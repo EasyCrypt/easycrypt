@@ -245,6 +245,14 @@ module Reduction : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Circuit : sig 
+  val add_bitstring : scope -> pbind_bitstring -> scope
+  val add_bsarray : scope -> pbind_array -> scope
+  val add_circuit : scope -> pqsymbol -> string -> scope
+  val add_qfabvop : scope -> pqsymbol -> string -> scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Cloning : sig
   val clone : scope -> Ax.proofmode -> theory_cloning -> scope
 end
@@ -253,12 +261,4 @@ end
 module Search : sig
   val search : scope -> pformula list -> unit
   val locate : scope -> pqsymbol -> unit
-end
-
-module Circ : sig 
-  val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
-  val add_bsarray : scope -> pqsymbol -> pqsymbol -> pqsymbol -> pty -> int -> scope
-  val add_circuit : scope -> pqsymbol -> string -> scope
-  val add_qfabvop : scope -> pqsymbol -> string -> scope
-
 end

@@ -1269,6 +1269,29 @@ type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
 
 (* -------------------------------------------------------------------- *)
+type pbind_bitstring =
+  { from_ : pqsymbol
+  ; to_   : pqsymbol
+  ; type_ : pty
+  ; size  : EcBigInt.zint }
+  
+(* -------------------------------------------------------------------- *)
+type pbind_array =
+  { get    : pqsymbol
+  ; set    : pqsymbol
+  ; tolist : pqsymbol
+  ; type_  : pty
+  ; size   : EcBigInt.zint }
+
+(* -------------------------------------------------------------------- *)
+type pbind_circuit =
+  pqsymbol * string
+
+(* -------------------------------------------------------------------- *)
+type pbind_qfabvop =
+  pqsymbol * string
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
@@ -1307,10 +1330,10 @@ type global_action =
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
   | Gbdep        of pgamepath * psymbol * int * int * (string list) * psymbol
-  | Gbbitstring  of pqsymbol * pqsymbol * pty * int
-  | Gbbsarray    of pqsymbol * pqsymbol * pqsymbol * pty * int
-  | Gbcircuit    of pqsymbol * string
-  | Gbqfabvop    of pqsymbol * string
+  | Gbbitstring  of pbind_bitstring
+  | Gbbsarray    of pbind_array
+  | Gbcircuit    of pbind_circuit
+  | Gbqfabvop    of pbind_qfabvop
   | Gtest        of pqsymbol * pqsymbol
 
 type global = {

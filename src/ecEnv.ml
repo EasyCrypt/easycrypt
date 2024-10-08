@@ -168,12 +168,6 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type bitstring = {
-  to_bits: path;
-  from_bits: path;
-  size: int;
-}
-
 type bsarray = {
   get : path;
   set : path;
@@ -3581,7 +3575,7 @@ let pp_debug_form = ref (fun _env _fmt _f -> assert false)
 
 
 module Circ : sig
-  val bind_bitstring : env -> path -> path -> path -> int -> env
+  val bind_bitstring : env -> bitstring -> env
   val bind_bsarray   : env -> path -> path -> path -> path -> int -> env
   val bind_circuit   : env -> path -> string -> env
   val bind_qfabvop   : env -> path -> string -> env
@@ -3597,13 +3591,10 @@ module Circ : sig
   val lookup_qfabvop_path : env -> path -> qfabvop option
   val lookup_qfabvop : env -> qsymbol -> qfabvop option
   val lookup_bsarrayop : env -> path -> bsarrayop option
-  
-
 end = struct
-  let bind_bitstring (env: env) (to_bits: path) (from_bits:path) (ty: path) (size: int) : env = 
-    Format.eprintf "Binding bitstring for type %s@." (EcPath.tostring ty);
-    {env with env_circ =
-      {env.env_circ with bitstrings = Mp.add ty {to_bits;from_bits;size} env.env_circ.bitstrings}}
+  let bind_bitstring (env : env) (bs : bitstring) : env = 
+    { env with env_circ =
+      { env.env_circ with bitstrings = Mp.add bs.type_ bs env.env_circ.bitstrings } }
 
   let bind_bsarray (env: env) (get: path) (set: path) (to_list: path) (ty: path) (size: int) : env =
     Format.eprintf "Binding bsarray for type %s@." (EcPath.tostring ty);

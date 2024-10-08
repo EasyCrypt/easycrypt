@@ -241,7 +241,7 @@ let t_circ (tc: tcenv1) : tcenv =
       | _ -> failwith "Wrong type structure for array"
       in let ptb, otb = 
         match EcEnv.Circ.lookup_bitstring env bty with
-        | Some {to_bits=tb; _} -> tb, EcEnv.Op.by_path tb env
+        | Some {to_=tb; _} -> tb, EcEnv.Op.by_path tb env
         | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
       in EcCoreLib.CI_List.p_flatten @@! [
         EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
@@ -249,7 +249,7 @@ let t_circ (tc: tcenv1) : tcenv =
       ]
     | None -> 
       begin match EcEnv.Circ.lookup_bitstring env ty with
-        | Some {to_bits=tb; _} -> tb @@! [arg]
+        | Some {to_=tb; _} -> tb @@! [arg]
         | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
       end
   

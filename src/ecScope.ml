@@ -2233,7 +2233,31 @@ module Cloning = struct
   end
 
   (* ------------------------------------------------------------------ *)
-  let clone (scope : scope) mode (thcl : theory_cloning) =
+  let replay_proofs (scope : scope) (mode : Tactics.proofmode) (proofs : _) =
+    proofs |> List.pmap (fun axc ->
+      match axc.C.axc_tac with
+      | None ->
+          Some (fst_map some axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
+
+      | Some pt ->
+          let t = { pt_core = pt; pt_intros = []; } in
+          let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
+          let t = { pt_core = t; pt_intros = []; } in
+          let (x, ax) = axc.C.axc_axiom in
+
+          let pucflags = { puc_visibility = `Visible; puc_local = false; } in
+          let pucflags = (([], None), pucflags) in
+          let check    = Check_mode.check scope.sc_options in
+
+          let escope = { scope with sc_env = axc.C.axc_env; } in
+          let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
+          let escope = Tactics.proof escope in
+          let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
+          ignore (Ax.save_r escope); None
+    )
+
+  (* ------------------------------------------------------------------ *)
+  let clone (scope : scope) (mode : Tactics.proofmode) (thcl : theory_cloning) =
     assert (scope.sc_pr_uc = None);
 
     let { cl_name   = name;
@@ -2262,28 +2286,7 @@ module Cloning = struct
         scope (name, oth.cth_items)
     in
 
-    let proofs = List.pmap (fun axc ->
-      match axc.C.axc_tac with
-      | None ->
-          Some (fst_map some axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
-
-      | Some pt ->
-          let t = { pt_core = pt; pt_intros = []; } in
-          let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in
-          let (x, ax) = axc.C.axc_axiom in
-
-          let pucflags = { puc_visibility = `Visible; puc_local = false; } in
-          let pucflags = (([], None), pucflags) in
-          let check    = Check_mode.check scope.sc_options in
-
-          let escope = { scope with sc_env = axc.C.axc_env; } in
-          let escope = Ax.start_lemma escope pucflags check ~name:x (ax, None) in
-          let escope = Tactics.proof escope in
-          let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
-            ignore (Ax.save_r escope); None)
-      proofs
-    in
+    let proofs = replay_proofs scope mode proofs in
 
     let scope =
       thcl.pthc_import |> ofold (fun flag scope ->
@@ -2294,11 +2297,179 @@ module Cloning = struct
           let item = EcTheory.mkitem EcTheory.import0 (Th_export (npath, `Global)) in
           { scope with sc_env = EcSection.add_item item scope.sc_env; }
         | `Include -> scope)
-        scope
+        scope in
 
-    in Ax.add_defer scope proofs
-
+    Ax.add_defer scope proofs
 end
+
+(* -------------------------------------------------------------------- *)
+module Circuit : sig 
+  val add_bitstring : scope -> pbind_bitstring -> scope
+  val add_bsarray   : scope -> pbind_array -> scope
+  val add_circuit   : scope -> pqsymbol -> string -> scope
+  val add_qfabvop   : scope -> pqsymbol -> string -> scope
+end = struct
+  type preoperator = [`Path of path | `Int of BI.zint]
+
+  type clone = {
+    path      : EcPath.path;
+    name      : symbol;
+    types_    : (symbol * path) list;
+    operators : (symbol * preoperator) list;
+  }
+
+  let doclone (scope : scope) (clone : clone) =
+    let loced x = mk_loc _dummy x in
+    let env = env scope in
+
+    let evclone =
+      let do_type ((x, type_) : symbol * path) : symbol * ty_override located =
+        (x, loced (`ByPath type_, `Inline `Keep)) in
+
+      let do_operator ((x, operator) : symbol * preoperator) : symbol * op_override located =
+        let operator =
+          match operator with
+          | `Path name -> `ByPath name
+          | `Int  i    ->
+              `BySyntax
+                { opov_tyvars = None
+                ; opov_args   = []
+                ; opov_retty  = loced PTunivar
+                ; opov_body   = loced (PFint i) } 
+        in (x, loced (operator, `Inline `Keep))
+      in
+
+      { EcThCloning.evc_empty with
+          evc_types  = Msym.of_list (List.map do_type clone.types_);
+          evc_ops    = Msym.of_list (List.map do_operator clone.operators);
+          evc_lemmas = {
+            ev_bynames = Msym.of_list [
+              "ge0_size", (Some (loced (Pby None)), `Alias, false)
+            ];
+            ev_global  = [None, None]; } } in
+
+    let npath = EcPath.pqname (EcEnv.root env) clone.name in
+    let theory = EcEnv.Theory.by_path clone.path env in
+
+    let (proofs, scope) =
+      EcTheoryReplay.replay Cloning.hooks
+        ~abstract:false ~local:`Global ~incl:false
+        ~clears:Sp.empty ~renames:[] ~opath:clone.path ~npath
+        evclone scope (EcPath.basename clone.path, theory.cth_items)
+    in
+
+    let proofs = Cloning.replay_proofs scope `Check proofs in
+    
+    (proofs, scope)
+
+  let add_bitstring (scope : scope) (bs : pbind_bitstring) : scope = 
+    let env = env scope in
+
+    let type_ =
+      let ue = EcUnify.UniEnv.create None in
+      let ty = EcTyping.transty tp_tydecl env ue bs.type_ in
+      assert (EcUnify.UniEnv.closed ue);
+      ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty in
+
+    let bspath =
+      match (EcEnv.ty_hnorm type_ env).ty_node with
+      | Tconstr (p, []) -> p
+      | _ ->
+          hierror ~loc:(bs.type_.pl_loc)
+            "bit-string type must be a monomorphic named type" in
+
+    let from_, _ = EcEnv.Op.lookup bs.to_.pl_desc env in
+    let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in      
+
+    let preclone =
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
+      ; name      = "BVA"
+      ; types_    = ["bv", bspath]
+      ; operators =
+          [ ("size"  , `Int bs.size)
+          ; ("tolist", `Path to_)
+          ; ("oflist", `Path from_) ] } in
+
+    let proofs, scope = doclone scope preclone in
+
+    let item =
+      EcTheory.mkitem EcTheory.import0
+      (EcTheory.Th_bitstring
+        { from_; to_; type_ = bspath; size = BI.to_int bs.size }) in
+
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope proofs
+
+  let add_bsarray (scope : scope) (ba : pbind_array) : scope = 
+    let env = env scope in
+
+    let getp, _geto = EcEnv.Op.lookup ba.get.pl_desc env in
+    let setp, _seto = EcEnv.Op.lookup ba.set.pl_desc env in
+    let to_listp, _to_listo = EcEnv.Op.lookup ba.tolist.pl_desc env in
+    
+    let ue = EcUnify.UniEnv.create None in
+    let t = EcTyping.transty tp_tydecl env ue ba.type_ in
+    match t.ty_node with
+    | Tconstr (p, [t]) ->
+      Format.eprintf "Registering array type %s over type %a@."
+        (EcPath.tostring p) (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t;
+      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bsarray (getp, setp, to_listp, p, BI.to_int ba.size)) in
+      { scope with sc_env = EcSection.add_item item scope.sc_env }
+    | _ -> assert false
+
+  
+  let add_circuit (scope : scope) (o : pqsymbol) (c : string) : scope =
+    let p, _o = EcEnv.Op.lookup o.pl_desc (env scope) in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
+    { scope with sc_env = EcSection.add_item item scope.sc_env }
+    
+  let add_qfabvop (scope : scope) (o : pqsymbol) (c : string) : scope =
+    (* FIXME: rewrite this, this is horrible *)
+    let loced a = mk_loc o.pl_loc a in
+    let env = env scope in
+    let opth, oop = EcEnv.Op.lookup o.pl_desc env in
+    let t = match oop.op_ty.ty_node with
+    | Tfun (t, _) -> t
+    | _ -> assert false
+    in
+    let thry = match c with
+    | "bvadd" -> "BVAdd"
+    | "bvsub" -> "BVSub"
+    | _ -> assert false
+    in
+    let o_ovrd = {
+        opov_tyvars = None;
+        opov_args = [];
+        opov_retty = loced PTunivar;
+        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ opth), None)
+      }
+    in
+    let th_name = 
+      (Format.asprintf "BV_%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t)
+      |> String.map (fun c -> if c = '.' then '_' else c)
+    in    
+    let (tc: EcParsetree.theory_cloning) = {
+       pthc_base = loced ([th_name], thry);
+       pthc_name = Some (loced 
+         (Format.asprintf "%s_%s" th_name thry));
+       pthc_ext = [
+         ((loced ([], c), PTHO_Op (`BySyntax o_ovrd, `Inline `Keep)))
+       ]; (* FIXME: add override for theory *)
+       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
+       pthc_rnm = [];
+       pthc_opts = [];
+       pthc_clears = [];
+       pthc_local = `Global;
+       pthc_import = None;
+      } 
+    in
+    (* let sc = Cloning.clone sc `Check tc in *)
+    
+    let p, _o = EcEnv.Op.lookup o.pl_desc env in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
+    Cloning.clone { scope with sc_env = EcSection.add_item item scope.sc_env } `Check tc
+  end
 
 (* -------------------------------------------------------------------- *)
 module Search = struct
@@ -2424,142 +2595,3 @@ module Search = struct
 
     notify scope `Info "%s" (Buffer.contents buffer)
 end
-
-module Circ : sig 
-  val add_bitstring : scope -> pqsymbol -> pqsymbol -> pty -> int -> scope
-  val add_bsarray : scope -> pqsymbol -> pqsymbol -> pqsymbol -> pty -> int -> scope
-  val add_circuit : scope -> pqsymbol -> string -> scope
-  val add_qfabvop : scope -> pqsymbol -> string -> scope
-
-end = struct
-  let add_bitstring (sc: scope) (tb: pqsymbol) (fb: pqsymbol) (pt: pty) (n: int) : scope = 
-    let env = (env sc) in
-    let loced a = mk_loc (tb.pl_loc) a in
-
-    let tbp, _tbo = EcEnv.Op.lookup tb.pl_desc env in
-    let fbp, _fbo = EcEnv.Op.lookup fb.pl_desc env in
-    
-    let ue = EcTyping.transtyvars env (pt.pl_loc, None) in
-    let t = EcTyping.transty tp_tydecl env ue pt in
-
-    let ov = {
-        opov_tyvars = None;
-        opov_args = [];
-        opov_retty = loced PTunivar;
-        opov_body = loced (PFint (BI.of_int n));
-      } in
-
-    let otb = {
-        opov_tyvars = None;
-        opov_args = [];
-        opov_retty = loced PTunivar;
-        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ tbp), None)
-    } in
-
-    let ofb = {
-        opov_tyvars = None;
-        opov_args = [];
-        opov_retty = loced PTunivar;
-        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ fbp), None)
-    } in
-    
-    let (tc: EcParsetree.theory_cloning) = {
-       pthc_base = loced (["Top"; "QFABV"], "BV");
-       pthc_name = Some (loced @@ (Format.asprintf "BV_%a" 
-         (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t 
-         |> String.map (fun c -> if c = '.' then '_' else c)));
-       pthc_ext = [
-         (loced ([], "bv"), PTHO_Type (`BySyntax ([], pt), `Inline `Clear));
-         (loced ([], "size"), PTHO_Op (`BySyntax ov, `Inline `Keep));
-         (loced ([], "tolist"), PTHO_Op (`BySyntax otb, `Inline `Keep));
-         (loced ([], "oflist"), PTHO_Op (`BySyntax ofb, `Inline `Keep));
-         ]; (* FIXME: add override for theory *)
-       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
-       pthc_rnm = [];
-       pthc_opts = [];
-       pthc_clears = [];
-       pthc_local = `Global;
-       pthc_import = None;
-      } 
-    in
-    let () = Format.eprintf "Registering theory %s@." (tc.pthc_name |> Option.get).pl_desc in
-    (* let sc = Cloning.clone sc `Check tc in *)
-    match t.ty_node with
-    | Tconstr (p, []) -> 
-      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (tbp, fbp, p, n)) in
-      Cloning.clone {sc with sc_env = EcSection.add_item item sc.sc_env } `Check tc
-    | _ -> assert false
-
-  
-  let add_bsarray (sc: scope) (get: pqsymbol) (set: pqsymbol) (to_list: pqsymbol) (pt: pty) (n: int) : scope = 
-    let env = (env sc) in
-    (* let loced a = mk_loc (get.pl_loc) a in *)
-
-    let getp, _geto = EcEnv.Op.lookup get.pl_desc env in
-    let setp, _seto = EcEnv.Op.lookup set.pl_desc env in
-    let to_listp, _to_listo = EcEnv.Op.lookup to_list.pl_desc env in
-    
-    let ue = EcTyping.transtyvars env (pt.pl_loc, None) in
-    let t = EcTyping.transty tp_tydecl env ue pt in
-    match t.ty_node with
-    | Tconstr (p, [t]) ->
-      Format.eprintf "Registering array type %s over type %a@."
-        (EcPath.tostring p) (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t;
-      let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bsarray (getp, setp, to_listp, p, n)) in
-      {sc with sc_env = EcSection.add_item item sc.sc_env}
-    | _ -> assert false
-
-  
-  let add_circuit (sc: scope) (o: pqsymbol) (c: string) : scope =
-    let p, _o = EcEnv.Op.lookup o.pl_desc (env sc) in
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_circuit (p, c)) in
-    {sc with sc_env = EcSection.add_item item sc.sc_env }
-    
-  let add_qfabvop (sc: scope) (o: pqsymbol) (c: string) : scope =
-    (* FIXME: rewrite this, this is horrible *)
-    let loced a = mk_loc o.pl_loc a in
-    let env = env sc in
-    let opth, oop = EcEnv.Op.lookup o.pl_desc env in
-    let t = match oop.op_ty.ty_node with
-    | Tfun (t, _) -> t
-    | _ -> assert false
-    in
-    let thry = match c with
-    | "bvadd" -> "BVAdd"
-    | "bvsub" -> "BVSub"
-    | _ -> assert false
-    in
-    let o_ovrd = {
-        opov_tyvars = None;
-        opov_args = [];
-        opov_retty = loced PTunivar;
-        opov_body = loced @@ PFident ((loced @@ EcPath.toqsymbol @@ opth), None)
-      }
-    in
-    let th_name = 
-      (Format.asprintf "BV_%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t)
-      |> String.map (fun c -> if c = '.' then '_' else c)
-    in    
-    let (tc: EcParsetree.theory_cloning) = {
-       pthc_base = loced ([th_name], thry);
-       pthc_name = Some (loced 
-         (Format.asprintf "%s_%s" th_name thry));
-       pthc_ext = [
-         ((loced ([], c), PTHO_Op (`BySyntax o_ovrd, `Inline `Keep)))
-       ]; (* FIXME: add override for theory *)
-       pthc_prf = [{pthp_mode = `All (None, []); pthp_tactic = None}];
-       pthc_rnm = [];
-       pthc_opts = [];
-       pthc_clears = [];
-       pthc_local = `Global;
-       pthc_import = None;
-      } 
-    in
-    (* let sc = Cloning.clone sc `Check tc in *)
-    
-    let p, _o = EcEnv.Op.lookup o.pl_desc env in
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_qfabvop (p, c)) in
-    Cloning.clone {sc with sc_env = EcSection.add_item item sc.sc_env } `Check tc
-    
-
-end                                                                                                                                     

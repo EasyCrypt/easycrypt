@@ -3930,11 +3930,11 @@ global_action:
 | BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET pc=oident
   { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, pc) }
 
-| BIND BITSTRING tb=qoident fb=qoident t=loc(simpl_type_exp) n=uint
-  { Gbbitstring (tb, fb, t, (BI.to_int n)) }
+| BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
+  { Gbbitstring { from_; to_; type_; size; } }
 
-| BIND BITSTRING CIRCUIT get=qoident set=qoident tl=qoident t=loc(simpl_type_exp) n=uint
-  { Gbbsarray (get, set, tl, t, (BI.to_int n)) }
+| BIND BITSTRING CIRCUIT get=qoident set=qoident tolist=qoident type_=loc(simpl_type_exp) size=uint
+  { Gbbsarray { get; set; tolist; type_; size; } }
   
 | BIND CIRCUIT o=qoident c=STRING
   { Gbcircuit (o, c) }

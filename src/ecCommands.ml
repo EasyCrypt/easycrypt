@@ -712,17 +712,17 @@ and process_bdep (scope : EcScope.scope) ((p, f, n, m, vs, pcond) : pgamepath * 
   assert false
   (* EcPhlBDep.bdep_xpath (EcScope.env scope) p f n m vs pcond *)
 
-and process_bind_bitstring (scope : EcScope.scope) (tb: pqsymbol) (fb: pqsymbol) (t: pty) (n: int) =
-  EcScope.Circ.add_bitstring scope tb fb t n
+and process_bind_bitstring (scope : EcScope.scope) (bs : pbind_bitstring) =
+  EcScope.Circuit.add_bitstring scope bs
 
-and process_bind_bsarray (scope : EcScope.scope) (get: pqsymbol) (set: pqsymbol) (to_list: pqsymbol) (t: pty) (n: int) =
-  EcScope.Circ.add_bsarray scope get set to_list t n
+and process_bind_bsarray (scope : EcScope.scope) (ba : pbind_array) =
+  EcScope.Circuit.add_bsarray scope ba
  
-and process_bind_circuit (scope : EcScope.scope) (o: pqsymbol) (c: string) =
-  EcScope.Circ.add_circuit scope o c
+and process_bind_circuit (scope : EcScope.scope) ((o, c) : pqsymbol * string) =
+  EcScope.Circuit.add_circuit scope o c
 
-and process_bind_qfabvop (scope : EcScope.scope) (o: pqsymbol) (c: string) =
-  EcScope.Circ.add_qfabvop scope o c
+and process_bind_qfabvop (scope : EcScope.scope) ((o, c) : pqsymbol * string) =
+  EcScope.Circuit.add_qfabvop scope o c
 
 and process_test (scope: EcScope.scope) (q: pqsymbol) (q2: pqsymbol) =
   let env = EcScope.env scope in
@@ -772,11 +772,11 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
       | Gbdep        (proc, f, n, m, vs, b) -> `State (fun scope -> process_bdep scope (proc, f, n, m, vs, b))
-      | Gbbitstring  (tb, fb, t, n) -> `Fct (fun scope -> process_bind_bitstring scope tb fb t n )
-      | Gbbsarray  (get, set, to_list, t, n) -> `Fct (fun scope -> process_bind_bsarray scope get set to_list t n )
-      | Gbcircuit (o, c) -> `Fct (fun scope -> process_bind_circuit scope o c)
-      | Gbqfabvop (o, c) -> `Fct (fun scope -> process_bind_qfabvop scope o c)
-      | Gtest (p1, p2) -> `State (fun scope -> process_test scope p1 p2)
+      | Gbbitstring  bs   -> `Fct   (fun scope -> process_bind_bitstring scope bs)
+      | Gbbsarray    ba   -> `Fct   (fun scope -> process_bind_bsarray scope ba)
+      | Gbcircuit    oc   -> `Fct   (fun scope -> process_bind_circuit scope oc)
+      | Gbqfabvop    oc   -> `Fct   (fun scope -> process_bind_qfabvop scope oc)
+      | Gtest (p1, p2)    -> `State (fun scope -> process_test scope p1 p2)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
