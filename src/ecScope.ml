@@ -2382,10 +2382,11 @@ end = struct
 
     let from_, _ = EcEnv.Op.lookup bs.to_.pl_desc env in
     let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in      
+    let name     = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
 
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
-      ; name      = "BVA"
+      ; name      = name
       ; types_    = ["bv", bspath]
       ; operators =
           [ ("size"  , `Int bs.size)
