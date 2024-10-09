@@ -2314,6 +2314,7 @@ end = struct
   type clone = {
     path      : EcPath.path;
     name      : symbol;
+    local     : is_local;
     types_    : (symbol * path) list;
     operators : (symbol * preoperator) list;
     proofs    : symbol list;
@@ -2355,7 +2356,7 @@ end = struct
 
     let (proofs, scope) =
       EcTheoryReplay.replay Cloning.hooks
-        ~abstract:false ~local:`Global ~incl:false
+        ~abstract:false ~local:clone.local ~incl:false
         ~clears:Sp.empty ~renames:[] ~opath:clone.path ~npath
         evclone scope (EcPath.basename npath, theory.cth_items)
     in
@@ -2387,6 +2388,7 @@ end = struct
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
       ; name      = name
+      ; local     = bs.local
       ; types_    = ["bv", bspath]
       ; operators =
           [ ("size"  , `Int bs.size)
@@ -2402,7 +2404,7 @@ end = struct
         size   = BI.to_int bs.size;
         theory = pqname (EcEnv.root env) name; } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (item, `Global)) in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (item, bs.local)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2433,6 +2435,7 @@ end = struct
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
       ; name      = name
+      ; local     = ba.local
       ; types_    = ["t", bspath]
       ; operators =
           [ ("size"   , `Int ba.size)
@@ -2446,7 +2449,7 @@ end = struct
     let item : EcTheory.bsarray =
       { get; set; tolist; type_ = bspath; size = BI.to_int ba.size } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (Th_bsarray (item, `Global)) in
+    let item = EcTheory.mkitem EcTheory.import0 (Th_bsarray (item, ba.local)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2502,6 +2505,7 @@ end = struct
     let preclone =
       { path      = subpath
       ; name      = name
+      ; local     = op.local
       ; types_    = []
       ; operators = ["bv" ^ unloc op.name, `Path operator]
       ; proofs    = [] } in
@@ -2514,7 +2518,7 @@ end = struct
         operator = operator;
         theory   = subpath; } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (Th_qfabvop (item, `Global)) in
+    let item = EcTheory.mkitem EcTheory.import0 (Th_qfabvop (item, op.local)) in
   
     let scope =
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
@@ -2578,7 +2582,7 @@ end = struct
 
       let item =
           EcTheory.mkitem EcTheory.import0
-          (EcTheory.Th_circuit (item, `Global)) in
+          (EcTheory.Th_circuit (item, pc.local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
 end
 

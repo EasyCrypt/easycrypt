@@ -1270,28 +1270,33 @@ type threquire =
 
 (* -------------------------------------------------------------------- *)
 type pbind_bitstring =
-  { from_ : pqsymbol
+  { local : is_local
+  ; from_ : pqsymbol
   ; to_   : pqsymbol
   ; type_ : pty
   ; size  : EcBigInt.zint }
   
 (* -------------------------------------------------------------------- *)
 type pbind_array =
-  { get    : pqsymbol
+  { local  : is_local
+  ; get    : pqsymbol
   ; set    : pqsymbol
   ; tolist : pqsymbol
   ; type_  : pqsymbol
   ; size   : EcBigInt.zint }
 
 (* -------------------------------------------------------------------- *)
-type pbind_qfabvop = {
-  name     : string located;
-  type_    : pty;
-  operator : pqsymbol;
-}
+type pbind_qfabvop =
+  { local    : is_local
+  ; name     : string located
+  ; type_    : pty
+  ; operator : pqsymbol }
 
 (* -------------------------------------------------------------------- *)
-type pbind_circuit = { operator : pqsymbol; circuit : string located; }
+type pbind_circuit =
+  { local    : is_local
+  ; operator : pqsymbol
+  ; circuit  : string located }
 
 (* -------------------------------------------------------------------- *)
 type global_action =

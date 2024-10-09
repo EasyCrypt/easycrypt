@@ -153,6 +153,7 @@
 
   let bool_as_local b =
     if b then `Local else `Global
+
   (* ------------------------------------------------------------------ *)
   type prover =
     [ `Exclude | `Include | `Only] * psymbol
@@ -3930,20 +3931,20 @@ global_action:
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
+| local=is_local BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
+  { Gbbitstring { local; from_; to_; type_; size; } }
+
+| local=is_local BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
+  { Gbbsarray { local; get; set; tolist; type_; size; } }
+  
+| local=is_local BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
+  { Gbqfabvop { local; type_; operator; name; } }
+
+| local=is_local BIND CIRCUIT operator=qoident circuit=loc(STRING)
+  { Gbcircuit { local; operator; circuit; } }
+
 | BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET pc=oident
   { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, pc) }
-
-| BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
-  { Gbbitstring { from_; to_; type_; size; } }
-
-| BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
-  { Gbbsarray { get; set; tolist; type_; size; } }
-  
-| BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
-  { Gbqfabvop { type_; operator; name; } }
-
-| BIND CIRCUIT operator=qoident circuit=loc(STRING)
-  { Gbcircuit { operator; circuit; } }
 
 | BIND BDEP t1=qoident t2=qoident
   { Gtest (t1, t2) }

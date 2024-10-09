@@ -22,6 +22,10 @@ type cbarg = [
   | `ModuleType of path
   | `Typeclass  of path
   | `Instance   of tcinstance
+  | `Bitstring  of bitstring * is_local
+  | `Bsarray    of bsarray * is_local
+  | `Qfabvop    of qfabvop * is_local
+  | `Circuit    of circuit * is_local
 ]
 
 type cb = cbarg -> unit
@@ -50,11 +54,16 @@ let pp_cbarg env fmt (who : cbarg) =
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
   | `Typeclass p ->
     Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tcname ppe) p
-  | `Instance tci ->
+  | `Instance tci -> begin
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"
     | `Field _ -> Format.fprintf fmt "field instance"
     | `General _ -> Format.fprintf fmt "instance"
+  end
+  | `Bitstring _ -> Format.fprintf fmt "bitstring binding"
+  | `Bsarray _ -> Format.fprintf fmt "array binding"
+  | `Qfabvop _ -> Format.fprintf fmt "bitstring operator binding"
+  | `Circuit _ -> Format.fprintf fmt "circuit binding"
 
 let pp_locality fmt = function
   | `Local -> Format.fprintf fmt "local"
@@ -515,6 +524,10 @@ let locality (env : EcEnv.env) (who : cbarg) =
     | _         -> `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
+  | `Bitstring (_, lc) -> (lc :> locality)
+  | `Bsarray (_, lc) -> (lc :> locality)
+  | `Qfabvop (_, lc) -> (lc :> locality)
+  | `Circuit (_, lc) -> (lc :> locality)
   | `Instance _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -1120,15 +1133,19 @@ let cd_glob =
     d_tc    = [`Global];
   }
 
-let can_depend (cd : can_depend) = function
+let can_depend (cd : can_depend) (who : cbarg) =
+  match who with
   | `Type       _ -> cd.d_ty
   | `Op         _ -> cd.d_op
   | `Ax         _ -> cd.d_ax
-  | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
   | `Instance   _ -> assert false
+  | `Bitstring  _ -> assert false (* FIXME *)
+  | `Bsarray    _ -> assert false (* FIXME *)
+  | `Qfabvop    _ -> assert false (* FIXME *)
+  | `Circuit    _ -> assert false (* FIXME *)
 
 
 let cb scenv from cd who =
@@ -1313,16 +1330,38 @@ let check_instance scenv ty tci lc =
         on_instance (cb scenv from cd) ty tci
 
 let check_bitstring (scenv : scenv) ((bs, lc) : bitstring * is_local) =
-  assert false
+  let from = (lc :> locality), `Bitstring (bs, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [bs.from_; bs.to_];
+    cb scenv from cd_glob (`Type bs.type_)
+  end
 
 let check_bsarray (scenv : scenv) ((ba, lc) : bsarray * is_local) =
-  assert false
+  let from = (lc :> locality), `Bsarray (ba, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [ba.get; ba.set; ba.tolist];
+    cb scenv from cd_glob (`Type ba.type_)
+  end
   
 let check_qfabvop (scenv : scenv) ((op, lc) : qfabvop * is_local) =
-  assert false
-  
+  let from = (lc :> locality), `Qfabvop (op, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    cb scenv from cd_glob (`Op op.operator);
+    cb scenv from cd_glob (`Type op.type_)
+  end
+
 let check_circuit (scenv : scenv) ((cr, lc) : circuit * is_local) =
-  assert false
+  let from = (lc :> locality), `Circuit (cr, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then
+    cb scenv from cd_glob (`Op cr.operator)
   
 (* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
@@ -1381,23 +1420,25 @@ let add_th ~import (cth : EcEnv.Theory.compiled_theory) scenv =
 let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_item) =
   let to_gen, item =
     match th_item.ti_item with
-    | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
-    | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
-    | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
-    | Th_modtype ms      -> generalize_modtype to_gen ms
-    | Th_module me       -> generalize_module  to_gen prefix me
-    | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
-    | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
-    | Th_instance tci    -> generalize_instance to_gen tci
-    | Th_typeclass _     -> assert false
-    | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
-    | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
-    | Th_reduction rl    -> generalize_reduction to_gen rl
-    | Th_auto hints      -> generalize_auto to_gen hints
-    | Th_bitstring _
-    | Th_bsarray _
-    | Th_qfabvop _
-    | Th_circuit _       -> to_gen, Some th_item.ti_item
+    | Th_type tydecl       -> generalize_tydecl to_gen prefix tydecl
+    | Th_operator opdecl   -> generalize_opdecl to_gen prefix opdecl
+    | Th_axiom  ax         -> generalize_axiom  to_gen prefix ax
+    | Th_modtype ms        -> generalize_modtype to_gen ms
+    | Th_module me         -> generalize_module  to_gen prefix me
+    | Th_theory th         -> (generalize_ctheory to_gen prefix th, None)
+    | Th_export (p,lc)     -> generalize_export to_gen (p,lc)
+    | Th_instance tci      -> generalize_instance to_gen tci
+    | Th_typeclass _       -> assert false
+    | Th_baserw (s,lc)     -> generalize_baserw to_gen prefix (s,lc)
+    | Th_addrw (p,ps,lc)   -> generalize_addrw to_gen (p, ps, lc)
+    | Th_reduction rl      -> generalize_reduction to_gen rl
+    | Th_auto hints        -> generalize_auto to_gen hints
+    | Th_bitstring (_, lc)
+    | Th_bsarray (_, lc)
+    | Th_qfabvop (_, lc)
+    | Th_circuit (_, lc)   ->
+      let item = if lc = `Local then None else Some th_item.ti_item in
+      to_gen, item
 
   in
 
