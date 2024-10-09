@@ -3371,22 +3371,24 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         lvl (odfl "" base)
         (pp_list "@ " (pp_axname ppe)) p
 
-  | EcTheory.Th_bitstring bs -> 
-      Format.fprintf fmt "bind bitstring %a %a %a %d."
+  | EcTheory.Th_bitstring (bs, lc) -> 
+      Format.fprintf fmt "%abind bitstring %a %a %a %d."
+        pp_locality lc
         (pp_opname ppe) bs.to_
         (pp_opname ppe) bs.from_
         (pp_tyname ppe) bs.type_
         bs.size
 
-  | EcTheory.Th_bsarray ba ->
-      Format.fprintf fmt "bind array %a %a %a %a %d."
+  | EcTheory.Th_bsarray (ba, lc) ->
+      Format.fprintf fmt "%abind array %a %a %a %a %d."
+        pp_locality lc
         (pp_tyname ppe) ba.type_
         (pp_opname ppe) ba.get
         (pp_opname ppe) ba.set
         (pp_opname ppe) ba.tolist
         ba.size
 
-  | EcTheory.Th_qfabvop op ->
+  | EcTheory.Th_qfabvop (op, lc) ->
       let kind =
         match op.kind with
         | `Add   _ -> "add"
@@ -3400,14 +3402,15 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `And   _ -> "and"
         | `Or    _ -> "or"
       in
-      Format.fprintf fmt "bind op %a %a \"%s\""
+      Format.fprintf fmt "%abind op %a %a \"%s\""
+        pp_locality lc
         (pp_tyname ppe) op.type_
         (pp_opname ppe) op.operator
         kind
 
-  | EcTheory.Th_circuit circuit ->
-      Format.fprintf fmt "bind circuit %a \"%s\"."
-        (pp_opname ppe) circuit.operator circuit.name
+  | EcTheory.Th_circuit (circuit, lc) ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) circuit.operator circuit.name
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

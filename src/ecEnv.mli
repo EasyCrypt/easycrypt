@@ -435,10 +435,10 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit : sig  
-  val bind_bitstring : ?import:import -> bitstring -> env -> env
-  val bind_bsarray   : ?import:import -> bsarray -> env -> env
-  val bind_qfabvop   : ?import:import -> qfabvop -> env -> env
-  val bind_circuit   : ?import:import -> circuit -> env -> env
+  val bind_bitstring : ?import:import -> is_local -> bitstring -> env -> env
+  val bind_bsarray   : ?import:import -> is_local -> bsarray -> env -> env
+  val bind_qfabvop   : ?import:import -> is_local -> qfabvop -> env -> env
+  val bind_circuit   : ?import:import -> is_local -> circuit -> env -> env
 
   val lookup_bitstring           : env -> ty      -> bitstring option
   val lookup_bitstring_path      : env -> path    -> bitstring option

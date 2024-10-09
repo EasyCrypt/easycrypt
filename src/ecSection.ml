@@ -1047,8 +1047,10 @@ let rec set_local_item item =
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
     | Th_auto     (i,s,p,lc) -> Th_auto      (i, s, p, set_local lc)
-    | Th_bitstring _  -> item.ti_item
-    | Th_circuit _ -> item.ti_item
+    | Th_bitstring (bs, lc)  -> Th_bitstring (bs, set_local lc)
+    | Th_bsarray   (ba, lc)  -> Th_bsarray   (ba, set_local lc)
+    | Th_qfabvop   (op, lc)  -> Th_qfabvop   (op, lc)
+    | Th_circuit   (cr, lc)  -> Th_circuit   (cr, lc)
 
   in { item with ti_item = lcitem }
 
@@ -1065,9 +1067,7 @@ let sc_th_item t item =
 
 let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 
-
 (* ---------------------------------------------------------------- *)
-
 let is_abstract_ty = function
   | `Abstract _ -> true
   | _           -> false
@@ -1312,6 +1312,18 @@ let check_instance scenv ty tci lc =
         let cd = { cd_glob with d_ty = [`Declare; `Global]; } in
         on_instance (cb scenv from cd) ty tci
 
+let check_bitstring (scenv : scenv) ((bs, lc) : bitstring * is_local) =
+  assert false
+
+let check_bsarray (scenv : scenv) ((ba, lc) : bsarray * is_local) =
+  assert false
+  
+let check_qfabvop (scenv : scenv) ((op, lc) : qfabvop * is_local) =
+  assert false
+  
+let check_circuit (scenv : scenv) ((cr, lc) : circuit * is_local) =
+  assert false
+  
 (* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
   if not scenv.sc_insec && lc = `Local then
@@ -1339,23 +1351,23 @@ let add_item_ (item : theory_item) (scenv:scenv) =
   let env = scenv.sc_env in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op) -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
-    | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
-    | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
+    | Th_type    (s,tyd)     -> EcEnv.Ty.bind s tyd env
+    | Th_operator (s,op)     -> EcEnv.Op.bind s op env
+    | Th_axiom   (s, ax)     -> EcEnv.Ax.bind s ax env
+    | Th_modtype (s, ms)     -> EcEnv.ModTy.bind s ms env
+    | Th_module       me     -> EcEnv.Mod.bind me.tme_expr.me_name me env
+    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind s tc env
+    | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
-    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
+    | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add s lc env
+    | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
-    | Th_reduction r     -> EcEnv.Reduction.add r env
-    | Th_bitstring bs    -> EcEnv.Circuit.bind_bitstring bs env
-    | Th_bsarray   ba    -> EcEnv.Circuit.bind_bsarray ba env
-    | Th_qfabvop   op    -> EcEnv.Circuit.bind_qfabvop op env
-    | Th_circuit   cr    -> EcEnv.Circuit.bind_circuit cr env
-    | Th_theory _        -> assert false
+    | Th_reduction r         -> EcEnv.Reduction.add r env
+    | Th_bitstring (bs, lc)  -> EcEnv.Circuit.bind_bitstring lc bs env
+    | Th_bsarray   (ba, lc)  -> EcEnv.Circuit.bind_bsarray lc ba env
+    | Th_qfabvop   (op, lc)  -> EcEnv.Circuit.bind_qfabvop lc op env
+    | Th_circuit   (cr, lc)  -> EcEnv.Circuit.bind_circuit lc cr env
+    | Th_theory _            -> assert false
   in
   { scenv with
     sc_env = env;
@@ -1382,6 +1394,10 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
     | Th_auto hints      -> generalize_auto to_gen hints
+    | Th_bitstring _
+    | Th_bsarray _
+    | Th_qfabvop _
+    | Th_circuit _       -> to_gen, Some th_item.ti_item
 
   in
 
@@ -1502,9 +1518,12 @@ let check_item scenv item =
   | Th_auto (_, _, _, lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
-  | Th_reduction _ -> ()
+  | Th_reduction _ -> () (* FIXME *)
+  | Th_bitstring (bs, lc) -> check_bitstring scenv (bs, lc)
+  | Th_bsarray (ba, lc) -> check_bsarray scenv (ba, lc)
+  | Th_qfabvop (op, lc) -> check_qfabvop scenv (op, lc)
+  | Th_circuit (cr, lc) -> check_circuit scenv (cr, lc)
   | Th_theory  _   -> assert false
-  | Th_bsarray _ | Th_bitstring _ | Th_circuit _ | Th_qfabvop _ -> ()
 
 let rec add_item (item : theory_item) (scenv : scenv) =
   let item = if scenv.sc_loca = `Local then set_local_item item else item in

@@ -2824,9 +2824,9 @@ module Circuit = struct
   let rebind_bitstring (bs : bitstring) (env : env) : env =
     { env with env_circ = rebind_bitstring_ bs env.env_circ }
 
-  let bind_bitstring ?(import = import0) (bs : bitstring) (env : env) : env = 
+  let bind_bitstring ?(import = import0) (lc : is_local) (bs : bitstring) (env : env) : env = 
     let env = if import.im_immediate then rebind_bitstring bs env else env in
-    { env with env_item = mkitem import (Th_bitstring bs) :: env.env_item; }
+    { env with env_item = mkitem import (Th_bitstring (bs, lc)) :: env.env_item; }
 
   let rebind_bsarray_ (ba : bsarray) (circuits : circuits) : circuits =
     { circuits with
@@ -2840,9 +2840,9 @@ module Circuit = struct
   let rebind_bsarray (ba : bsarray) (env : env) : env =
     { env with env_circ = rebind_bsarray_ ba env.env_circ }
 
-  let bind_bsarray ?(import = import0) (ba : bsarray) (env : env) : env =
+  let bind_bsarray ?(import = import0) (lc : is_local) (ba : bsarray) (env : env) : env =
     let env = if import.im_immediate then rebind_bsarray ba env else env in
-    { env with env_item = mkitem import (Th_bsarray ba) :: env.env_item; }
+    { env with env_item = mkitem import (Th_bsarray (ba, lc)) :: env.env_item; }
 
   let rebind_qfabvop_ (op : qfabvop) (circuits : circuits) : circuits =
     { circuits with
@@ -2851,9 +2851,9 @@ module Circuit = struct
   let rebind_qfabvop (op : qfabvop) (env : env) : env =
     { env with env_circ = rebind_qfabvop_ op env.env_circ }
 
-  let bind_qfabvop ?(import = import0) (op : qfabvop) (env : env) : env =
+  let bind_qfabvop ?(import = import0) (lc : is_local) (op : qfabvop) (env : env) : env =
     let env = if import.im_immediate then rebind_qfabvop op env else env in
-    { env with env_item = mkitem import (Th_qfabvop op) :: env.env_item; }
+    { env with env_item = mkitem import (Th_qfabvop (op, lc)) :: env.env_item; }
   
   let rebind_circuit_ (cr : circuit) (circuits : circuits) : circuits =
     { circuits with
@@ -2862,9 +2862,9 @@ module Circuit = struct
   let rebind_circuit (cr : circuit) (env : env) : env =
     { env with env_circ = rebind_circuit_ cr env.env_circ }
 
-  let bind_circuit ?(import = import0) (cr : circuit) (env: env) : env = 
+  let bind_circuit ?(import = import0) (lc : is_local) (cr : circuit) (env: env) : env = 
     let env = if import.im_immediate then rebind_circuit cr env else env in
-    { env with env_item = mkitem import (Th_circuit cr) :: env.env_item; }
+    { env with env_item = mkitem import (Th_circuit (cr, lc)) :: env.env_item; }
 
   let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
@@ -3085,16 +3085,16 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_cr_th =
     let for1 (_ : path) (circuits : circuits) = function
-      | Th_bitstring bs ->
+      | Th_bitstring (bs, _) ->
         Some (Circuit.rebind_bitstring_ bs circuits)
 
-      | Th_bsarray ba ->
+      | Th_bsarray (ba, _) ->
         Some (Circuit.rebind_bsarray_ ba circuits)
 
-      | Th_qfabvop op ->
+      | Th_qfabvop (op, _) ->
         Some (Circuit.rebind_qfabvop_ op circuits)
 
-      | Th_circuit circuit ->
+      | Th_circuit (circuit, _) ->
         Some (Circuit.rebind_circuit_ circuit circuits)
 
       | _ -> None

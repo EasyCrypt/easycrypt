@@ -2396,13 +2396,13 @@ end = struct
 
     let proofs, scope = doclone scope preclone in
 
-    let item =
-      EcTheory.mkitem EcTheory.import0
-      (EcTheory.Th_bitstring
-        { from_; to_;
-          type_  = bspath;
-          size   = BI.to_int bs.size;
-          theory = pqname (EcEnv.root env) name; }) in
+    let item : EcTheory.bitstring = 
+      { from_; to_;
+        type_  = bspath;
+        size   = BI.to_int bs.size;
+        theory = pqname (EcEnv.root env) name; } in
+
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (item, `Global)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2443,10 +2443,10 @@ end = struct
 
     let proofs, scope = doclone scope preclone in
 
-    let item =
-      EcTheory.mkitem EcTheory.import0
-      (EcTheory.Th_bsarray
-        { get; set; tolist; type_ = bspath; size = BI.to_int ba.size }) in
+    let item : EcTheory.bsarray =
+      { get; set; tolist; type_ = bspath; size = BI.to_int ba.size } in
+
+    let item = EcTheory.mkitem EcTheory.import0 (Th_bsarray (item, `Global)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2508,14 +2508,13 @@ end = struct
 
       let proofs, scope = doclone scope preclone in
 
-    let item =
-        EcTheory.mkitem EcTheory.import0 (
-          EcTheory.Th_qfabvop {
-            kind     = kind;
-            type_    = bspath;
-            operator = operator;
-            theory   = subpath;
-          }) in
+    let item : EcTheory.qfabvop =
+      { kind     = kind;
+        type_    = bspath;
+        operator = operator;
+        theory   = subpath; } in
+
+    let item = EcTheory.mkitem EcTheory.import0 (Th_qfabvop (item, `Global)) in
   
     let scope =
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
@@ -2575,9 +2574,11 @@ end = struct
             (EcPrinting.pp_type ppe) codom ret
       end;
 
+      let item : EcTheory.circuit = { operator; circuit; name = unloc pc.circuit; } in
+
       let item =
           EcTheory.mkitem EcTheory.import0
-          (EcTheory.Th_circuit { operator; circuit; name = unloc pc.circuit; }) in
+          (EcTheory.Th_circuit (item, `Global)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
 end
 

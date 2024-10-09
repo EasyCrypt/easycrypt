@@ -36,10 +36,10 @@ and theory_item_r =
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of (int * symbol option * path list * is_local)
   (* check this V *)
-  | Th_bitstring of bitstring
-  | Th_bsarray   of bsarray
-  | Th_qfabvop   of qfabvop
-  | Th_circuit   of circuit
+  | Th_bitstring of (bitstring * is_local)
+  | Th_bsarray   of (bsarray * is_local)
+  | Th_qfabvop   of (qfabvop * is_local)
+  | Th_circuit   of (circuit * is_local)
 
 and bitstring =
   { type_: path; from_: path; to_: path; size: int; theory: path; }
