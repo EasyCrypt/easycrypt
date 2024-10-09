@@ -635,6 +635,7 @@ module BaseOps = struct
     | _, "false" -> true
 
     | _, "zeroextu64" -> true
+    | _, "opp" -> true
     
     | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
       | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
@@ -651,8 +652,13 @@ module BaseOps = struct
       | "W32" -> 32 
       | "W16" -> 16 
       | "W8" -> 8 
-      | "W4u16" -> 16
+      | "W4u16" -> 64
       | "W16u16" -> 256
+      | "W4u64" -> 256
+      | "W8u32" -> 256
+      | "W4u32" -> 128
+      | "W2u32" -> 64
+      | "W2u128" -> 256
       | _ -> Format.eprintf "Unknown size for path %s@." (EcSymbols.string_of_qsymbol qpath); assert false
       in 
 
@@ -692,6 +698,11 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | "invw" ->
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = BWCirc(C.lnot_ c1); inps=[BWInput(id1, size)]}
 
     | "`>>`" -> 
       let id1 = EcIdent.create (temp_symbol) in
@@ -758,12 +769,17 @@ module BaseOps = struct
       {circ = BWCirc(C.uextend ~size:256 c1); inps = [BWInput(id1, size)]} (* FIXME: Assumes integeres are 256 bits *)
 
     | "zeroextu64" ->
-    assert(size <= 64);
-    let id1 = EcIdent.create temp_symbol in
-    let c1 = C.reg ~size ~name:id1.id_tag in
-    {circ = BWCirc(C.uextend ~size:64 c1); inps = [BWInput(id1, size)]}
+      assert(size <= 64);
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      {circ = BWCirc(C.uextend ~size:64 c1); inps = [BWInput(id1, size)]}
 
-    
+    | "truncateu128" ->
+      assert(size >= 128);
+      let id1 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size:128 ~name:id1.id_tag in
+      {circ = BWCirc(c1); inps = [BWInput(id1, size)]}
+
     | _ -> 
       let err = Format.asprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath) in
       raise @@ CircError err
@@ -851,6 +867,11 @@ module BaseOps = struct
 
   | _, "false" ->
     {circ = BWCirc([C.false_]); inps = []}
+
+  | _, "opp" ->
+    let id1 = EcIdent.create temp_symbol in
+    let c1 = C.reg ~size:256 ~name:id1.id_tag in
+    {circ = BWCirc(C.opp c1); inps=[BWInput(id1, 256)]}
 
   | _, "eqmod64q" ->
     let id1 = EcIdent.create temp_symbol in
@@ -1140,7 +1161,8 @@ let circuit_of_form
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain f)) -> f
-        | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
+        | _ -> Format.eprintf "%s@." (EcPath.tostring pth); 
+          failwith ("Unsupported op kind for op " ^ (EcPath.tostring pth))
         in 
         let env, circ = doit cache env f in
         op_cache := Mp.add pth circ !op_cache;

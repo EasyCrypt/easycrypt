@@ -28,6 +28,27 @@ VPADD_16u16(w1@256, w2@256) -> @256 =
 VPADD_32u8(w1@256, w2@256) -> @256 =
   map<8, 32>(add<8>, w1, w2)
 
+# Intel intrinsic: _mm256_madd_epi16
+VPMADDWD_256(w1@256, w2@256) -> @256 =
+  map<32, 8>(
+    fun w1@32 w2@32 .
+      add<32>(
+        smul<16>(w1[@16|0], w2[@16|0]),
+        smul<16>(w1[@16|1], w2[@16|1])
+      ),
+    w1,
+    w2
+  )
+
+# Intel intrinsic: _mm256_sllv_epi32
+VPSLLV_8u32(w1@256, counts@256) -> @256 =
+  map<32, 8>(
+    fun w1@32 count@32 .
+    ugt<32>(0x0020@32, count) ? sll<32>(w1, count[@8|0]) : 0,
+    w1,
+    counts
+  )
+
 # Intel intrinsic: _mm256_sub_epi16
 VPSUB_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(sub<16>, w1, w2)
@@ -47,10 +68,16 @@ VPNAND_256(w1@256, w2@256) -> @256 =
 # Intel intrinsic: _mm256_broadcastw_epi16
 VPBROADCAST_16u16(w@16) -> @256 = 
   repeat<16>(w[@16|0], 16)
+
+VPBROADCAST_4u64(w@64) -> @256 = 
+  repeat<64>(w[@64|0], 4)
   
 # Intel intrinsic: _mm256_mulhi_epu16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(umulhi<16>, w1, w2)
+
+VPMULL_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(umullo<16>, w1, w2)
 
 # Intel intrinsic: _mm256_mulhrs_epi16
 VPMULHRS_16u16(w1@256, w2@256) -> @256 =
@@ -78,6 +105,9 @@ VPSRL_4u64(w@256, count@8) -> @256 =
 # Intel intrinsic: _mm256_sll_epi64
 VPSLL_4u64(w@256, count@8) -> @256 =
   map<64, 4>(sll<64>(., count), w)
+
+VPSLL_16u16(w@256, count@8) -> @256 =
+  map<16, 16>(sll<16>(., count), w)
 
 VPSLLDQ_256(w@256, count@8) -> @256 =
   map<128, 2>(sll<128>(., count), w)
@@ -150,6 +180,15 @@ VPBLEND_16u16(w1@256, w2@256, c@8) -> @256 =
     w2
   )
 
+VPBLENDW_128(w1@128, w2@128, c@8) -> @128 = 
+  let c = map<1, 8>(uextend<1, 16>, c) in
+  map<16, 8>(
+    fun c@16 w1@16 w2@16 . c[0] ? w2 : w1,
+    c, 
+    w1,
+    w2
+  )
+
 # Intel intrinsic: _mm256_cmpgt_epi16
 VPCMPGT_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
@@ -183,6 +222,15 @@ VPEXTRACTI128(w@256, i@8) -> @128 =
 
 VEXTRACTI128(w@256, i@8) -> @128 =
   w[@128|i[0]]
+
+VPEXTRACTI32_8(w@256, i@8) -> @32 = 
+  w[@32|i[@3|0]]
+
+VPEXTRACTI32_4(w@128, i@8) -> @32 = 
+  w[@32|i[@2|0]]
+
+VPEXTRACTI32_2(w@64, i@8) -> @32 = 
+  w[@32|i[0]]
 
 # Intel intrinsic: _mm256_inserti128_si256
 VPINSERTI128(w@256, m@128, i@8) -> @256 =
