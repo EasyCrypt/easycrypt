@@ -313,6 +313,41 @@ let rename ove subst (kind, name) =
   with Not_found -> (subst, name)
 
 (* -------------------------------------------------------------------- *)
+exception InvInstPath
+
+(* -------------------------------------------------------------------- *)
+let forpath ~(opath : EcPath.path) ~(npath : EcPath.path) ~(ops : _ Mp.t) (p : EcPath.path) =
+  match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
+  | None | Some [] -> None
+  | Some (x::px) ->
+      let q = EcPath.fromqsymbol (List.rev px, x) in
+
+      match Mp.find_opt q ops with
+      | None ->
+          Some (EcPath.pappend npath q)
+      | Some (op, alias) ->
+          match alias with
+          | true  -> Some (EcPath.pappend npath q)
+          | false ->
+              match op.EcDecl.op_kind with
+              | OB_pred _
+              | OB_nott _    -> assert false
+              | OB_oper None -> None
+              | OB_oper (Some (OP_Constr _))
+              | OB_oper (Some (OP_Record _))
+              | OB_oper (Some (OP_Proj   _))
+              | OB_oper (Some (OP_Fix    _))
+              | OB_oper (Some (OP_TC      )) ->
+                  Some (EcPath.pappend npath q)
+              | OB_oper (Some (OP_Plain f)) ->
+                  match f.f_node with
+                  | Fop (r, _) -> Some r
+                  | _ -> raise InvInstPath
+
+let forpath ~opath ~npath ~ops p =
+  odfl p (forpath ~opath ~npath ~ops p)
+ 
+(* -------------------------------------------------------------------- *)
 let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd) =
   let scenv = ove.ovre_hooks.henv scope in
   let env   = EcSection.env scenv in
@@ -872,39 +907,7 @@ and replay_instance
 =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
-
-  let module E = struct exception InvInstPath end in
-
-  let forpath (p : EcPath.path) =
-    match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
-    | None | Some [] -> None
-    | Some (x::px) ->
-        let q = EcPath.fromqsymbol (List.rev px, x) in
-
-        match Mp.find_opt q ops with
-        | None ->
-            Some (EcPath.pappend npath q)
-        | Some (op, alias) ->
-            match alias with
-            | true  -> Some (EcPath.pappend npath q)
-            | false ->
-                match op.EcDecl.op_kind with
-                | OB_pred _
-                | OB_nott _    -> assert false
-                | OB_oper None -> None
-                | OB_oper (Some (OP_Constr _))
-                | OB_oper (Some (OP_Record _))
-                | OB_oper (Some (OP_Proj   _))
-                | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_TC      )) ->
-                    Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain f)) ->
-                    match f.f_node with
-                    | Fop (r, _) -> Some r
-                    | _ -> raise E.InvInstPath
-  in
-
-  let forpath p = odfl p (forpath p) in
+  let forpath = forpath ~npath ~opath ~ops in
 
   try
     let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
@@ -940,7 +943,88 @@ and replay_instance
     let scope = ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc)) in
     (subst, ops, proofs, scope)
 
-  with E.InvInstPath ->
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, lc) =
+  let opath = ove.ovre_opath in
+  let npath = ove.ovre_npath in
+  let forpath = forpath ~npath ~opath ~ops in
+
+  try
+    let to_    = forpath bs.to_ in
+    let from_  = forpath bs.from_ in
+    let type_  = bs.type_ in (* FIXME *)
+    let theory = bs.theory in (* FIXME *)
+    let size   = bs.size in
+
+    let bs : bitstring = { to_; from_; type_; theory; size; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_bitstring (bs, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_bsarray (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc) =
+  let opath = ove.ovre_opath in
+  let npath = ove.ovre_npath in
+  let forpath = forpath ~npath ~opath ~ops in
+
+  try
+    let get    = forpath ba.get in
+    let set    = forpath ba.set in
+    let tolist = forpath ba.tolist in
+    let type_  = ba.type_ in (* FIXME*)
+    let size   = ba.size in
+
+    let ba : bsarray = { get; set; tolist; type_; size; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_bsarray (ba, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_qfabvop (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc) =
+  let opath = ove.ovre_opath in
+  let npath = ove.ovre_npath in
+  let forpath = forpath ~npath ~opath ~ops in
+
+  try
+    let kind     = op.kind in
+    let operator = forpath op.operator in
+    let type_    = op.type_ in (* FIXME *)
+    let theory   = op.theory in (* FIXME *)
+
+    let op : qfabvop = { kind; operator; type_; theory; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_qfabvop (op, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc) =
+  let opath = ove.ovre_opath in
+  let npath = ove.ovre_npath in
+  let forpath = forpath ~npath ~opath ~ops in
+
+  try
+    let name     = cr.name in
+    let circuit  = cr.circuit in
+    let operator = forpath cr.operator in
+
+    let cr : circuit = { name; circuit; operator; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_circuit (cr, lc)) in
+
+    (subst, ops, proofs, scope)
+
+  with InvInstPath ->
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -987,6 +1071,18 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_instance ((typ, ty), tc, lc) ->
      replay_instance ove (subst, ops, proofs, scope) (item.ti_import, (typ, ty), tc, lc)
+
+  | Th_bitstring (bs, lc) ->
+     replay_bitstring ove (subst, ops, proofs, scope) (item.ti_import, bs, lc)
+
+  | Th_bsarray (ba, lc) ->
+     replay_bsarray ove (subst, ops, proofs, scope) (item.ti_import, ba, lc)
+
+  | Th_qfabvop (op, lc) ->
+     replay_qfabvop ove (subst, ops, proofs, scope) (item.ti_import, op, lc)
+
+  | Th_circuit (cr, lc) ->
+     replay_circuit ove (subst, ops, proofs, scope) (item.ti_import, cr, lc)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in

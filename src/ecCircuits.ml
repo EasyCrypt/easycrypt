@@ -3,7 +3,6 @@ open EcUtils
 open EcBigInt
 open EcSymbols
 open EcPath
-open EcParsetree
 open EcEnv
 open EcAst
 open EcCoreFol
@@ -1306,32 +1305,3 @@ let insts_equiv (env: env) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_l
       let circ2 = {circ2 with inps=inps @ circ2.inps} in
       bacc && (circ_equiv circ circ2 None)) 
     pstate_left true
-    
-(* -------------------------------------------------------------------- *)
-(* WIP *)
-let process_op (env : env) (f: pqsymbol) (f2: pqsymbol) : unit = 
-  let f = EcEnv.Op.lookup f.pl_desc env |> snd in
-  let f = match f.op_kind with
-  | OB_oper (Some (OP_Plain f)) -> f
-  | _ -> failwith "Invalid operator type" in
-  let fc = circuit_of_form env f in
-
-  let f2 = EcEnv.Op.lookup f2.pl_desc env |> snd in
-  let f2 = match f2.op_kind with
-  | OB_oper (Some (OP_Plain f)) -> f
-  | _ -> failwith "Invalid operator type" in
-  let fc2 = circuit_of_form env f2 in
-
-  (* let fc = List.take 4 fc in (* FIXME: this needs to be removed *) *)
-  (* let () = Format.eprintf "%a" (HL.pp_node hlenv) (List.hd fc) in *)
-  (* DEBUG PRINTS FOR OP CIRCUIT *)
-  let namer = fun id -> 
-    List.find_opt (fun idn -> tag idn = id) (List.map ident_of_cinput fc.inps) 
-    |> Option.map name |> Option.default (string_of_int id) in
-  let () = Format.eprintf "Out len: %d @." (size_of_circ fc.circ) in
-  (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%s %d@." (fst x |> namer) (snd x)) in *)
-  (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps ~namer fmt) (HL.deps fc.circ |> Array.to_list) in *)
-  let () = Format.eprintf "Args for circuit: "; 
-            List.iter (fun inp -> Format.eprintf "%s" (cinput_to_string inp)) fc.inps;
-            Format.eprintf "@." in
-  Format.eprintf "Circuits: %s@." (if circ_equiv fc fc2 None then "Equiv" else "Not equiv")

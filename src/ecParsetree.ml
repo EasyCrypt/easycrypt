@@ -1336,12 +1336,10 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
-  | Gbdep        of pgamepath * psymbol * int * int * (string list) * psymbol
   | Gbbitstring  of pbind_bitstring
   | Gbbsarray    of pbind_array
   | Gbcircuit    of pbind_circuit
   | Gbqfabvop    of pbind_qfabvop
-  | Gtest        of pqsymbol * pqsymbol
 
 type global = {
   gl_action : global_action located;

@@ -706,12 +706,6 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_bdep (scope : EcScope.scope) ((p, f, n, m, vs, pcond) : pgamepath * psymbol * int * int * (string list) * psymbol) =
-  let env = EcScope.env scope in
-  let p = EcTyping.trans_gamepath env p in
-  assert false
-  (* EcPhlBDep.bdep_xpath (EcScope.env scope) p f n m vs pcond *)
-
 and process_bind_bitstring (scope : EcScope.scope) (bs : pbind_bitstring) =
   EcScope.Circuit.add_bitstring scope bs
 
@@ -723,10 +717,6 @@ and process_bind_qfabvop (scope : EcScope.scope) (bop : pbind_qfabvop) =
   
 and process_bind_circuit (scope : EcScope.scope) (pc : pbind_circuit) =
   EcScope.Circuit.add_circuit scope pc
-
-and process_test (scope: EcScope.scope) (q: pqsymbol) (q2: pqsymbol) =
-  let env = EcScope.env scope in
-  EcCircuits.process_op env q q2
 
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
@@ -771,12 +761,10 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
-      | Gbdep        (proc, f, n, m, vs, b) -> `State (fun scope -> process_bdep scope (proc, f, n, m, vs, b))
       | Gbbitstring  bs   -> `Fct   (fun scope -> process_bind_bitstring scope bs)
       | Gbbsarray    ba   -> `Fct   (fun scope -> process_bind_bsarray scope ba)
       | Gbcircuit    oc   -> `Fct   (fun scope -> process_bind_circuit scope oc)
       | Gbqfabvop    oc   -> `Fct   (fun scope -> process_bind_qfabvop scope oc)
-      | Gtest (p1, p2)    -> `State (fun scope -> process_test scope p1 p2)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

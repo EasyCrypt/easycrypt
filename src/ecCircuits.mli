@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcParsetree
 open EcIdent
 open EcSymbols
 open EcAst
@@ -38,5 +37,4 @@ val circuit_of_form : ?pstate:pstate -> ?cache:cache -> env -> form -> circuit
 val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list
 val input_of_variable : env -> variable -> circuit * cinput
 val insts_equiv : env -> memenv -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_op : env -> pqsymbol -> pqsymbol -> unit
 val process_instr : env -> memory -> ?cache:cache -> pstate -> instr -> (symbol, circuit) Map.t

@@ -3943,12 +3943,6 @@ global_action:
 | local=is_local BIND CIRCUIT operator=qoident circuit=loc(STRING)
   { Gbcircuit { local; operator; circuit; } }
 
-| BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET pc=oident
-  { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, pc) }
-
-| BIND BDEP t1=qoident t2=qoident
-  { Gtest (t1, t2) }
-
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }
 | PRAGMA MINUS x=pragma { Goption (x, `Bool false) }
