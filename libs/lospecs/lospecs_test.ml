@@ -6,8 +6,6 @@ open Lospecs
 type options = {
   pp_pst : bool;
   pp_ast : bool;
-  pp_bd  : bool;
-  evalf  : bool;
   input  : string;
 }
 
@@ -24,30 +22,12 @@ let entry (options : options) =
   
     let ast = Typing.tt_program Typing.Env.empty prog in
 
-    if options.evalf then begin
-      let eval_fun  = "VSAT" in
-      let eval_args = [
-        (*(Evaluator.from_int_list [0x8000fffe; 0x13; 0xffff; 0x15; 0x21; 0x00; 0x1100; 0x0200] 32); *)
-        (Evaluator.from_int_list [0x7000f000] 32)] in
-      Evaluator.eval_adef (List.find (fun x -> (compare (fst x) eval_fun) == 0) ast |> snd) eval_args
-      |> (fun (bw, bn) -> Format.eprintf "vaL: %s@.size: %d" (Z.format ("%" ^ (string_of_int (bn/16 + 1)) ^ "x") bw) bn)
-    end;
-
     if options.pp_ast then begin
       List.iter (fun (name, def) ->
         Format.eprintf "%s:@.%a@."
         name
           (Yojson.Safe.pretty_print ~std:true)
           (Ast.adef_to_yojson def)
-      ) ast
-    end;
-
-    if options.pp_bd then begin
-      List.iter (fun (name, def) ->
-        Format.eprintf "%s:@.%a@."
-        name
-        Deps.pp_deps
-        (Bitdep.bd_adef def) 
       ) ast
     end;
 
@@ -74,8 +54,8 @@ let main () : unit =
   let open Cmdliner in
 
   let cmd =
-    let mk (pp_pst : bool) (pp_ast : bool) (pp_bd : bool) (evalf : bool) (input : string) =
-      entry { pp_pst; pp_ast; pp_bd; evalf; input; }
+    let mk (pp_pst : bool) (pp_ast : bool) (input : string) =
+      entry { pp_pst; pp_ast; input; }
     in
 
     let print_pst =
@@ -86,20 +66,12 @@ let main () : unit =
       let doc = "Print the abstract syntax tree" in
       Arg.(value & flag & info ["print-ast"] ~doc) in
 
-    let print_bd =
-      let doc = "Print the bit level dependency" in
-      Arg.(value & flag & info ["print-bd"] ~doc) in
-
-    let evalf =
-      let doc = "Evaluate hard coded function with arguments" in
-      Arg.(value & flag & info ["eval"] ~doc) in
-
     let input =
       let doc = "The specification file" in
       Arg.(required & pos 0 (some string) None & info [] ~docv:"SPEC" ~doc) in
 
     let info = Cmd.info "lospec" in
-    Cmd.v info Term.(const mk $ print_pst $ print_ast $ print_bd $ evalf $ input)
+    Cmd.v info Term.(const mk $ print_pst $ print_ast $ input)
   in
 
   exit (Cmd.eval cmd)
