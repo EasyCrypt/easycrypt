@@ -234,12 +234,12 @@ let t_circ (tc: tcenv1) : tcenv =
 
   let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circ.lookup_bsarray env ty with
+    match EcEnv.Circuit.lookup_bsarray env ty with
     | Some {tolist;} -> let bty = match ty.ty_node with
       | Tconstr (p, [bty]) -> bty
       | _ -> failwith "Wrong type structure for array"
       in let ptb, otb = 
-        match EcEnv.Circ.lookup_bitstring env bty with
+        match EcEnv.Circuit.lookup_bitstring env bty with
         | Some {to_=tb; _} -> tb, EcEnv.Op.by_path tb env
         | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
       in EcCoreLib.CI_List.p_flatten @@! [
@@ -247,33 +247,33 @@ let t_circ (tc: tcenv1) : tcenv =
         tolist @@! [arg]]
       ]
     | None -> 
-      begin match EcEnv.Circ.lookup_bitstring env ty with
+      begin match EcEnv.Circuit.lookup_bitstring env ty with
         | Some {to_=tb; _} -> tb @@! [arg]
         | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
       end
   
 
   let w2bits (env: env) (ty: ty) (arg: form) : form = 
-    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    let tb = match EcEnv.Circuit.lookup_bitstring env ty with
     | Some {to_=tb; _} -> tb
     | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in EcTypesafeFol.f_app_safe env tb [arg]
   
   let bits2w (env: env) (ty: ty) (arg: form) : form = 
-    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    let fb = match EcEnv.Circuit.lookup_bitstring env ty with
     | Some {from_=fb; _} -> fb
     | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in EcTypesafeFol.f_app_safe env fb [arg]
   
   let w2bits_op (env: env) (ty: ty) : form = 
-    let tb = match EcEnv.Circ.lookup_bitstring env ty with
+    let tb = match EcEnv.Circuit.lookup_bitstring env ty with
     | Some {to_=tb; _} -> tb
     | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
     f_op tb [] tbo.op_ty 
   
   let bits2w_op (env: env) (ty: ty) : form = 
-    let fb = match EcEnv.Circ.lookup_bitstring env ty with
+    let fb = match EcEnv.Circuit.lookup_bitstring env ty with
     | Some {from_=fb; _} -> fb
     | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
     in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
@@ -282,7 +282,7 @@ let t_circ (tc: tcenv1) : tcenv =
 
   let flatten_to_bits (env: env) (f: form) = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circ.lookup_bsarray env f.f_ty with
+    match EcEnv.Circuit.lookup_bsarray env f.f_ty with
     | Some {tolist; _} -> 
       let base = match f.f_ty.ty_node with
       | Tconstr (_, [b]) -> b

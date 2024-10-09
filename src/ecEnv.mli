@@ -434,6 +434,28 @@ module AbsStmt : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Circuit : sig  
+  val bind_bitstring : ?import:import -> bitstring -> env -> env
+  val bind_bsarray   : ?import:import -> bsarray -> env -> env
+  val bind_qfabvop   : ?import:import -> qfabvop -> env -> env
+  val bind_circuit   : ?import:import -> circuit -> env -> env
+
+  val lookup_bitstring           : env -> ty      -> bitstring option
+  val lookup_bitstring_path      : env -> path    -> bitstring option
+  val lookup_bitstring_size      : env -> ty      -> int option
+  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
+  val lookup_bitstring_size_path : env -> path    -> int option
+  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
+  val lookup_qfabvop_path        : env -> path    -> qfabvop option
+  val lookup_qfabvop             : env -> qsymbol -> qfabvop option
+
+  val lookup_bsarray      : env -> ty -> bsarray option
+  val lookup_bsarray_path : env -> path -> bsarray option
+  val lookup_bsarray_size : env -> ty -> int option
+  val lookup_bsarrayop    : env -> path -> bsarrayop option
+end 
+
+(* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.ty
   | `Function  of function_
@@ -508,28 +530,3 @@ module LDecl : sig
   val inv_memenv  : hyps -> hyps
   val inv_memenv1 : hyps -> hyps
 end
-
-val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
-
-
-module Circ : sig
-  
-  val bind_bitstring : env -> bitstring -> env
-  val bind_circuit   : env -> circuit -> env
-  val bind_qfabvop   : env -> qfabvop -> env
-
-  val lookup_bitstring           : env -> ty      -> bitstring option
-  val lookup_bitstring_path      : env -> path    -> bitstring option
-  val lookup_bitstring_size      : env -> ty      -> int option
-  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
-  val lookup_bitstring_size_path : env -> path    -> int option
-  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
-  val lookup_qfabvop_path        : env -> path    -> qfabvop option
-  val lookup_qfabvop             : env -> qsymbol -> qfabvop option
-
-  val bind_bsarray        : env -> bsarray -> env
-  val lookup_bsarray      : env -> ty -> bsarray option
-  val lookup_bsarray_path : env -> path -> bsarray option
-  val lookup_bsarray_size : env -> ty -> int option
-  val lookup_bsarrayop    : env -> path -> bsarrayop option
-end 

@@ -3371,6 +3371,44 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         lvl (odfl "" base)
         (pp_list "@ " (pp_axname ppe)) p
 
+  | EcTheory.Th_bitstring bs -> 
+      Format.fprintf fmt "bind bitstring %a %a %a %d."
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        bs.size
+
+  | EcTheory.Th_bsarray ba ->
+      Format.fprintf fmt "bind array %a %a %a %a %d."
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        ba.size
+
+  | EcTheory.Th_qfabvop op ->
+      let kind =
+        match op.kind with
+        | `Add   _ -> "add"
+        | `Sub   _ -> "sub"
+        | `Mul   _ -> "mul"
+        | `UDiv  _ -> "udiv"
+        | `URem  _ -> "urem"
+        | `Shl   _ -> "shl"
+        | `Shr   _ -> "shr"
+        | `Not   _ -> "not"
+        | `And   _ -> "and"
+        | `Or    _ -> "or"
+      in
+      Format.fprintf fmt "bind op %a %a \"%s\""
+        (pp_tyname ppe) op.type_
+        (pp_opname ppe) op.operator
+        kind
+
+  | EcTheory.Th_circuit circuit ->
+      Format.fprintf fmt "bind circuit %a \"%s\"."
+        (pp_opname ppe) circuit.operator circuit.name
+
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
   let ppnode = collect2_s ppe stmt.s_node [] in
@@ -3526,10 +3564,3 @@ module ObjectInfo = struct
     if !ok = 0 then
       Format.fprintf fmt "%s@." "no such object in any category"
 end
-
-(* ------------------------------------------------------------------ *)
-let () =
-  EcEnv.pp_debug_form :=
-    (fun env fmt f ->
-       let ppe = PPEnv.ofenv env in
-       pp_form ppe fmt f)

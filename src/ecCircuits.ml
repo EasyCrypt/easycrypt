@@ -72,15 +72,15 @@ let destr_bwinput = function
   | BWInput (idn, w) -> (idn, w)
   | _ -> assert false
 
-let destr_bwainput= function
+let destr_bwainput = function
   | BWAInput (idn, n, w) -> (idn, n, w)
   | _ -> assert false
 
-let bwinput_of_size (w: width) : cinput =
+let bwinput_of_size (w : width) : cinput =
   let name = "bw_input" in
   BWInput (create name, w)
 
-let bwainput_of_size (n: width) (w: width) : cinput =
+let bwainput_of_size (n : width) (w : width) : cinput =
   let name = "arr_input" in
   BWAInput (create name, n, w)
 
@@ -138,8 +138,7 @@ type circuit = {
 let circuit_to_string (c: circuit) =
   Format.sprintf "%s | %s" 
     (circ_to_string c.circ)
-    (if List.compare_length_with c.inps 0 = 0 then "" 
-    else List.reduce (fun a b -> a ^ ", " ^ b) (List.map cinput_to_string c.inps)) 
+    (String.concat ", " (List.map cinput_to_string c.inps))
 
 (* Takes a list of inputs and returns the identity function over those inputs *)
 (* Useful for renaming or getting a given input shape for a circuit *)
@@ -255,7 +254,7 @@ let dist_inputs (c: circuit list) : circuit list =
 exception CircError of string
 
 let width_of_type (env: env) (t: ty) : int =
-  match EcEnv.Circ.lookup_bitstring_size env t with
+  match EcEnv.Circuit.lookup_bitstring_size env t with
   | Some w -> w
   | None -> let err = Format.asprintf "No bitvector binding for type %a@."
   (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
@@ -265,7 +264,7 @@ let width_of_type (env: env) (t: ty) : int =
 let destr_array_type (env: env) (t: ty) : (int * ty) option = 
   match t.ty_node with
   | Tconstr (p, [et]) -> 
-    begin match EcEnv.Circ.lookup_bsarray_path env p with
+    begin match EcEnv.Circuit.lookup_bsarray_path env p with
     | Some {size; _} -> Some (size, et)
     | None -> None
     end
@@ -274,7 +273,7 @@ let destr_array_type (env: env) (t: ty) : (int * ty) option =
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
   match t.ty_node with
   | Tconstr (p, [et]) -> 
-    begin match EcEnv.Circ.lookup_bsarray_path env p with
+    begin match EcEnv.Circuit.lookup_bsarray_path env p with
     | Some {size; _} -> size, width_of_type env et
     | None -> assert false
     end
@@ -580,7 +579,7 @@ let load_specification (name : string) =
 
 let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
   (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
-  match EcEnv.Circ.lookup_circuit_path env p with
+  match EcEnv.Circuit.lookup_circuit_path env p with
   | Some circuit ->
     (fun regs -> C.circuit_of_spec regs circuit) 
   | None -> Format.eprintf "No operator for path: %s@."
@@ -639,7 +638,7 @@ module BaseOps = struct
 
     | _, "zeroextu64" -> true
     
-    | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
+    | _ -> begin match EcEnv.Circuit.lookup_qfabvop_path env p with
       | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
       | None   -> Format.eprintf "Did not find qfabv binding for %s@." (EcPath.tostring p); false
     end
@@ -822,7 +821,7 @@ module BaseOps = struct
     (* let dc = C.or_ dp_modqt dm_modqt in *)
     {circ = BWCirc([dc]); inps = [BWInput(id1, 16); BWInput(id2, 16)]}
   
-  | _ -> begin match EcEnv.Circ.lookup_qfabvop_path env p with
+  | _ -> begin match EcEnv.Circuit.lookup_qfabvop_path env p with
     | Some { kind = `Add size } -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
@@ -898,13 +897,13 @@ module ArrayOps = struct
   let temp_symbol = "temp_array_input"
 
   let is_arrayop (env: env) (pth: path) : bool =
-    match EcEnv.Circ.lookup_bsarrayop env pth with
+    match EcEnv.Circuit.lookup_bsarrayop env pth with
     | Some _ -> true
     | None -> false
 
   
   let destr_getset_opt (env: env) (pth: path) : bsarrayop option =
-    match EcEnv.Circ.lookup_bsarrayop env pth with
+    match EcEnv.Circuit.lookup_bsarrayop env pth with
     | Some (GET _) as g -> g 
     | Some (SET _) as g -> g 
     | _ -> None

@@ -2817,6 +2817,102 @@ module Algebra = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Circuit = struct
+  let rebind_bitstring_ (bs : bitstring) (circuits : circuits) : circuits =
+    { circuits with bitstrings = Mp.add bs.type_ bs circuits.bitstrings }
+
+  let rebind_bitstring (bs : bitstring) (env : env) : env =
+    { env with env_circ = rebind_bitstring_ bs env.env_circ }
+
+  let bind_bitstring ?(import = import0) (bs : bitstring) (env : env) : env = 
+    let env = if import.im_immediate then rebind_bitstring bs env else env in
+    { env with env_item = mkitem import (Th_bitstring bs) :: env.env_item; }
+
+  let rebind_bsarray_ (ba : bsarray) (circuits : circuits) : circuits =
+    { circuits with
+        bsarrays   = Mp.add ba.type_ ba circuits.bsarrays;
+        bsarrayops =
+          List.fold_left
+            (fun map (p, kind) -> Mp.add p kind map)
+            circuits.bsarrayops
+            [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; }
+
+  let rebind_bsarray (ba : bsarray) (env : env) : env =
+    { env with env_circ = rebind_bsarray_ ba env.env_circ }
+
+  let bind_bsarray ?(import = import0) (ba : bsarray) (env : env) : env =
+    let env = if import.im_immediate then rebind_bsarray ba env else env in
+    { env with env_item = mkitem import (Th_bsarray ba) :: env.env_item; }
+
+  let rebind_qfabvop_ (op : qfabvop) (circuits : circuits) : circuits =
+    { circuits with
+        qfabvops = Mp.add op.operator op circuits.qfabvops }
+
+  let rebind_qfabvop (op : qfabvop) (env : env) : env =
+    { env with env_circ = rebind_qfabvop_ op env.env_circ }
+
+  let bind_qfabvop ?(import = import0) (op : qfabvop) (env : env) : env =
+    let env = if import.im_immediate then rebind_qfabvop op env else env in
+    { env with env_item = mkitem import (Th_qfabvop op) :: env.env_item; }
+  
+  let rebind_circuit_ (cr : circuit) (circuits : circuits) : circuits =
+    { circuits with
+        circuits = Mp.add cr.operator cr circuits.circuits }
+
+  let rebind_circuit (cr : circuit) (env : env) : env =
+    { env with env_circ = rebind_circuit_ cr env.env_circ }
+
+  let bind_circuit ?(import = import0) (cr : circuit) (env: env) : env = 
+    let env = if import.im_immediate then rebind_circuit cr env else env in
+    { env with env_item = mkitem import (Th_circuit cr) :: env.env_item; }
+
+  let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
+    Mp.find_opt k env.env_circ.bitstrings
+
+  let lookup_bitstring (env: env) (ty:ty) : bitstring option =
+    match ty.ty_node with
+    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | _ -> None
+    
+  let lookup_bitstring_size_path (env: env) (pth: path) : int option = 
+    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring_path env pth)
+  
+  let lookup_circuit_path (env: env) (v: path) : Lospecs.Ast.adef option = 
+    Mp.find_opt v env.env_circ.circuits
+    |> Option.map (fun cr -> cr.circuit)
+
+  let lookup_bitstring_size (env: env) (ty: ty) : int option =
+    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring env ty)
+
+  let lookup_bsarray_path (env: env) (pth: path) : bsarray option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
+    Mp.find_opt k env.env_circ.bsarrays
+
+  let lookup_bsarray (env: env) (ty: ty) : bsarray option = 
+    match ty.ty_node with
+    | Tconstr (p, [w]) -> lookup_bsarray_path env p
+    | _ -> None
+
+  let lookup_bsarray_size (env: env) (ty: ty) : int option = 
+    Option.map (fun c -> c.size) (lookup_bsarray env ty)
+
+  let lookup_circuit (env: env) (o: qsymbol) : Lospecs.Ast.adef option =
+    let p, _o = Op.lookup o env in
+    lookup_circuit_path env p
+
+  let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
+    Mp.find_opt v env.env_circ.qfabvops
+
+  let lookup_qfabvop (env: env) (o: qsymbol) : qfabvop option =
+    let p, _o = Op.lookup o env in
+    lookup_qfabvop_path env p
+
+  let lookup_bsarrayop (env: env) (pth: path) : bsarrayop option =
+    Mp.find_opt pth env.env_circ.bsarrayops
+end
+
+(* -------------------------------------------------------------------- *)
 module Theory = struct
   type t    = ctheory
   type mode = [`All | thmode]
@@ -2987,6 +3083,24 @@ module Theory = struct
     in bind_base_th for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_cr_th =
+    let for1 (_ : path) (circuits : circuits) = function
+      | Th_bitstring bs ->
+        Some (Circuit.rebind_bitstring_ bs circuits)
+
+      | Th_bsarray ba ->
+        Some (Circuit.rebind_bsarray_ ba circuits)
+
+      | Th_qfabvop op ->
+        Some (Circuit.rebind_qfabvop_ op circuits)
+
+      | Th_circuit circuit ->
+        Some (Circuit.rebind_circuit_ circuit circuits)
+
+      | _ -> None
+  in bind_base_th for1
+
+  (* ------------------------------------------------------------------ *)
   let bind
     ?(import = import0)
      (cth  : compiled_theory)
@@ -3009,10 +3123,12 @@ module Theory = struct
           let env_atbase  = bind_at_th thname env.env_atbase items in
           let env_ntbase  = bind_nt_th thname env.env_ntbase items in
           let env_redbase = bind_rd_th thname env.env_redbase items in
+          let env_circ    = bind_cr_th thname env.env_circ items in
           let env =
             { env with
-                env_tci   ; env_tc     ; env_rwbase;
-                env_atbase; env_ntbase; env_redbase; }
+                env_tci   ; env_tc    ; env_rwbase;
+                env_atbase; env_ntbase; env_redbase;
+                env_circ  ; }
           in
           add_restr_th thname env items
 
@@ -3567,97 +3683,4 @@ module LDecl = struct
 
   let inv_memenv1 lenv =
     { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
-end
-
-
-let pp_debug_form = ref (fun _env _fmt _f -> assert false)
-
-
-module Circ : sig
-  val bind_bitstring : env -> bitstring -> env
-  val bind_bsarray   : env -> bsarray -> env
-  val bind_qfabvop   : env -> qfabvop -> env
-  val bind_circuit   : env -> circuit -> env
-
-  val lookup_bitstring : env -> ty -> bitstring option
-  val lookup_bitstring_path: env -> path -> bitstring option
-  val lookup_bitstring_size : env -> ty -> int option
-  val lookup_bsarray : env -> ty -> bsarray option
-  val lookup_bsarray_path : env -> path -> bsarray option
-  val lookup_bsarray_size : env -> ty -> int option
-  val lookup_circuit : env -> qsymbol -> Lospecs.Ast.adef option
-  val lookup_bitstring_size_path : env -> path -> int option
-  val lookup_circuit_path : env -> path -> Lospecs.Ast.adef option
-  val lookup_qfabvop_path : env -> path -> qfabvop option
-  val lookup_qfabvop : env -> qsymbol -> qfabvop option
-  val lookup_bsarrayop : env -> path -> bsarrayop option
-end = struct
-  let bind_bitstring (env : env) (bs : bitstring) : env = 
-    { env with env_circ =
-      { env.env_circ with bitstrings = Mp.add bs.type_ bs env.env_circ.bitstrings } }
-
-  let bind_bsarray (env : env) (ba : bsarray) : env =
-    { env with env_circ = { env.env_circ with
-        bsarrays   = Mp.add ba.type_ ba env.env_circ.bsarrays;
-        bsarrayops =
-          List.fold_left
-            (fun map (p, kind) -> Mp.add p kind map)
-            env.env_circ.bsarrayops
-            [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; } }
-    
-  let bind_qfabvop (env : env) (op : qfabvop) : env =
-    { env with env_circ = { env.env_circ with
-        qfabvops = Mp.add op.operator op env.env_circ.qfabvops } }
-  
-  let bind_circuit (env: env) (cr : circuit) : env = 
-    (* TODO: add absolute paths for circuit binding and lookup *)
-    { env with env_circ = { env.env_circ with
-        circuits = Mp.add cr.operator cr env.env_circ.circuits } }
-
-  let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
-    let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
-    Mp.find_opt k env.env_circ.bitstrings
-
-  let lookup_bitstring (env: env) (ty:ty) : bitstring option =
-    match ty.ty_node with
-    | Tconstr (p, []) -> lookup_bitstring_path env p
-    | _ -> None
-    
-  let lookup_bitstring_size_path (env: env) (pth: path) : int option = 
-    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring_path env pth)
-
-  
-  let lookup_circuit_path (env: env) (v: path) : Lospecs.Ast.adef option = 
-    Mp.find_opt v env.env_circ.circuits
-    |> Option.map (fun cr -> cr.circuit)
-
-  let lookup_bitstring_size (env: env) (ty: ty) : int option =
-    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring env ty)
-
-  let lookup_bsarray_path (env: env) (pth: path) : bsarray option = 
-    let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
-    Mp.find_opt k env.env_circ.bsarrays
-
-  let lookup_bsarray (env: env) (ty: ty) : bsarray option = 
-    match ty.ty_node with
-    | Tconstr (p, [w]) -> lookup_bsarray_path env p
-    | _ -> None
-
-  let lookup_bsarray_size (env: env) (ty: ty) : int option = 
-    Option.map (fun c -> c.size) (lookup_bsarray env ty)
-
-  let lookup_circuit (env: env) (o: qsymbol) : Lospecs.Ast.adef option =
-    let p, _o = Op.lookup o env in
-    lookup_circuit_path env p
-
-  let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
-    Mp.find_opt v env.env_circ.qfabvops
-
-  let lookup_qfabvop (env: env) (o: qsymbol) : qfabvop option =
-    let p, _o = Op.lookup o env in
-    lookup_qfabvop_path env p
-
-  let lookup_bsarrayop (env: env) (pth: path) : bsarrayop option =
-    Mp.find_opt pth env.env_circ.bsarrayops
-  
 end

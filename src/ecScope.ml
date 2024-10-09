@@ -2470,7 +2470,7 @@ end = struct
             "bit-string type must be a monomorphic named type" in
 
     let bitstring =
-      match EcEnv.Circ.lookup_bitstring env type_ (* FIXME *) with
+      match EcEnv.Circuit.lookup_bitstring env type_ (* FIXME *) with
       | None ->
         hierror ~loc:(op.type_.pl_loc)
           "this type is not bound to a bitstring type"
@@ -2545,7 +2545,7 @@ end = struct
           (List.length sig_);
 
       List.iteri (fun position (ty, size) ->
-        match EcEnv.Circ.lookup_bitstring env ty with
+        match EcEnv.Circuit.lookup_bitstring env ty with
         | Some bitstring when bitstring.size = size -> ()
         | Some bitstring ->
           let ppe = EcPrinting.PPEnv.ofenv env in
@@ -2561,7 +2561,7 @@ end = struct
       ) (List.combine dom sig_);
 
       begin
-        match EcEnv.Circ.lookup_bitstring env codom with
+        match EcEnv.Circuit.lookup_bitstring env codom with
         | Some bitstring when bitstring.size = ret -> ()
         | Some bitstring ->
           let ppe = EcPrinting.PPEnv.ofenv env in
@@ -2577,7 +2577,7 @@ end = struct
 
       let item =
           EcTheory.mkitem EcTheory.import0
-          (EcTheory.Th_circuit { operator; circuit }) in
+          (EcTheory.Th_circuit { operator; circuit; name = unloc pc.circuit; }) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
 end
 

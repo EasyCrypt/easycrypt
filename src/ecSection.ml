@@ -1351,10 +1351,10 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
-    | Th_bitstring bs    -> EcEnv.Circ.bind_bitstring env bs
-    | Th_bsarray   ba    -> EcEnv.Circ.bind_bsarray env ba
-    | Th_qfabvop   op    -> EcEnv.Circ.bind_qfabvop env op
-    | Th_circuit   cr    -> EcEnv.Circ.bind_circuit env cr
+    | Th_bitstring bs    -> EcEnv.Circuit.bind_bitstring bs env
+    | Th_bsarray   ba    -> EcEnv.Circuit.bind_bsarray ba env
+    | Th_qfabvop   op    -> EcEnv.Circuit.bind_qfabvop op env
+    | Th_circuit   cr    -> EcEnv.Circuit.bind_circuit cr env
     | Th_theory _        -> assert false
   in
   { scenv with
@@ -1376,7 +1376,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_module me       -> generalize_module  to_gen prefix me
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
-    | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
+    | Th_instance tci    -> generalize_instance to_gen tci
     | Th_typeclass _     -> assert false
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
