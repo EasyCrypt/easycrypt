@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet SmtMap.
+require import AllCore List FSet FMap.
 require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
@@ -287,7 +287,7 @@ seq  8  5: (   ={glob A, glob LRO, glob Log, pk, sk, b}
 + auto; call (:   ={glob Log, glob LRO}
                /\ (forall x, x \in Log.qs{1} <=> x \in LRO.m{1})).
   + proc; inline LRO.o.
-    by auto=> /> &2 log_is_dom y _; smt(@SmtMap).
+    by auto=> /> &2 log_is_dom y _; smt(@FMap).
   by inline *; auto=> /> _ _ x; rewrite mem_empty.
 (* We now deal with everything that happens after the programs differ: *)
 (*   - until r gets queried to the random oracle by the adversary      *)

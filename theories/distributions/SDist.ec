@@ -704,7 +704,7 @@ end N1.
 
 abstract theory ROM.
 
-import SmtMap.
+import FMap.
 
 type in_t.
 op [lossless] d1 : a distr.

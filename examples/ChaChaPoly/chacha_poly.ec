@@ -1,4 +1,4 @@
-require import AllCore List Int IntDiv Real SmtMap Distr DBool DList DProd FSet PROM SplitRO FelTactic.
+require import AllCore List Int IntDiv Real FMap Distr DBool DList DProd FSet PROM SplitRO FelTactic.
 require import FinType.
 
 require (****) Subtype Ske RndProd Indistinguishability Monoid EventPartitioning.

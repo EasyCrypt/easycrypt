@@ -37,7 +37,7 @@ module Exp (H : Oracle) (D : Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 theory Lazy.
-require import SmtMap.
+require import FMap.
 
 module LRO : Oracle = {
   var m : (in_t, out_t) fmap
@@ -92,7 +92,7 @@ end Lazy.
 
 (* -------------------------------------------------------------------- *)
 abstract theory FiniteEager.
-require import List SmtMap.
+require import List FMap.
 require import FinType.
 
 (** TODO: expose finiteness assumption **)
@@ -151,7 +151,7 @@ end FiniteEager.
 
 (* -------------------------------------------------------------------- *)
 abstract theory LazyEager.
-require import List SmtMap PROM.
+require import List FMap PROM.
 require import FinType.
 
 clone import FinType with
@@ -433,7 +433,7 @@ end SetLog.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ROM_BadCall.
-require import FSet SmtMap.
+require import FSet FMap.
 
 op qH : int.
 
