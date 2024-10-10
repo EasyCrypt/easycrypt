@@ -17,9 +17,21 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
-type crb_array_op = 
-  | GET of int
-  | SET of int
+type crb_tyrev_binding = [
+  | `Bitstring of crb_bitstring
+  | `Array     of crb_array
+]
+
+type crb_bitstring_operator = crb_bitstring * [`From | `To]
+
+type crb_array_operator = crb_array * [`Get | `Set | `ToList]
+
+type crb_oprev_binding = [
+  | `Bitstring  of crb_bitstring_operator
+  | `Array      of crb_array_operator
+  | `BvOperator of crb_bvoperator
+  | `Circuit    of crb_circuit
+]
 
 (* -------------------------------------------------------------------- *)
 type env
@@ -444,16 +456,25 @@ module Circuit : sig
   val lookup_bitstring           : env -> ty      -> crb_bitstring option
   val lookup_bitstring_path      : env -> path    -> crb_bitstring option
   val lookup_bitstring_size      : env -> ty      -> int option
-  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
   val lookup_bitstring_size_path : env -> path    -> int option
-  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
+
   val lookup_bvoperator_path     : env -> path    -> crb_bvoperator option
   val lookup_bvoperator          : env -> qsymbol -> crb_bvoperator option
 
-  val lookup_bsarray      : env -> ty -> crb_array option
-  val lookup_bsarray_path : env -> path -> crb_array option
-  val lookup_bsarray_size : env -> ty -> int option
-  val lookup_bsarrayop    : env -> path -> crb_array_op option
+  val lookup_array      : env -> ty -> crb_array option
+  val lookup_array_path : env -> path -> crb_array option
+  val lookup_array_size : env -> ty -> int option
+
+  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
+  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
+
+  val reverse_type     : env -> path -> crb_tyrev_binding list
+  val reverse_operator : env -> path -> crb_oprev_binding list
+
+  val reverse_bitstring_operator : env -> path -> crb_bitstring_operator option
+  val reverse_array_operator : env -> path -> crb_array_operator option
+  val reverse_bvoperator : env -> path -> crb_bvoperator option
+  val reverse_circuit : env -> path -> crb_circuit option
 end 
 
 (* -------------------------------------------------------------------- *)

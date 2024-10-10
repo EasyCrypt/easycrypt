@@ -167,16 +167,32 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type crb_array_op = 
-  | GET of int
-  | SET of int
+type crb_tyrev_binding = [
+  | `Bitstring of crb_bitstring
+  | `Array     of crb_array
+]
+
+type crb_bitstring_operator = crb_bitstring * [`From | `To]
+
+type crb_array_operator = crb_array * [`Get | `Set | `ToList]
+
+type crb_oprev_binding = [
+  | `Bitstring  of crb_bitstring_operator
+  | `Array      of crb_array_operator
+  | `BvOperator of crb_bvoperator
+  | `Circuit    of crb_circuit
+]
   
+type crb_tyrev_map = crb_tyrev_binding list Mp.t
+type crb_oprev_map = crb_oprev_binding list Mp.t
+
 type crbindings = {
   bitstrings  : crb_bitstring Mp.t;
   arrays      : crb_array Mp.t;
   bvoperators : crb_bvoperator Mp.t;
   circuits    : crb_circuit Mp.t;
-  arrayops    : crb_array_op Mp.t;
+  opreverse   : crb_oprev_map;
+  tyreverse   : crb_tyrev_map;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -310,8 +326,9 @@ let empty gstate =
     { bitstrings  = Mp.empty
     ; arrays      = Mp.empty
     ; bvoperators = Mp.empty
-    ; arrayops    = Mp.empty
-    ; circuits    = Mp.empty } in
+    ; circuits    = Mp.empty
+    ; opreverse   = Mp.empty
+    ; tyreverse   = Mp.empty } in
 
   { env_top      = None;
     env_gstate   = gstate;
@@ -2820,8 +2837,31 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit = struct
+  let push_tyreverse (reverse : crb_tyrev_map) (p : path) (v : crb_tyrev_binding) =
+    Mp.change
+      (fun vs -> Some (v :: Option.value ~default:[] vs))
+      p reverse
+
+  let push_all_tyreverse (reverse : crb_tyrev_map) (pvs : (path * crb_tyrev_binding) list) =
+    List.fold_left (fun rv (p, v) -> push_tyreverse rv p v) reverse pvs    
+
+  let push_opreverse (reverse : crb_oprev_map) (p : path) (v : crb_oprev_binding) =
+    Mp.change
+      (fun vs -> Some (v :: Option.value ~default:[] vs))
+      p reverse
+
+  let push_all_opreverse (reverse : crb_oprev_map) (pvs : (path * crb_oprev_binding) list) =
+    List.fold_left (fun rv (p, v) -> push_opreverse rv p v) reverse pvs
+
   let rebind_bitstring_ (bs : crb_bitstring) (bindings : crbindings) =
-    { bindings with bitstrings = Mp.add bs.type_ bs bindings.bitstrings }
+    { bindings with
+        bitstrings = Mp.add bs.type_ bs bindings.bitstrings;
+        tyreverse  = push_tyreverse bindings.tyreverse bs.type_ (`Bitstring bs);
+        opreverse  =
+          push_all_opreverse
+            bindings.opreverse
+            [ (bs.from_, `Bitstring (bs, `From))
+            ; (bs.to_  , `Bitstring (bs, `To  )) ]; }
 
   let rebind_bitstring (bs : crb_bitstring) (env : env) : env =
     { env with env_crbds = rebind_bitstring_ bs env.env_crbds }
@@ -2833,12 +2873,14 @@ module Circuit = struct
 
   let rebind_array_ (ba : crb_array) (bindings : crbindings) =
     { bindings with
-        arrays = Mp.add ba.type_ ba bindings.arrays;
-        arrayops =
-          List.fold_left
-            (fun map (p, kind) -> Mp.add p kind map)
-            bindings.arrayops
-            [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; }
+        arrays    = Mp.add ba.type_ ba bindings.arrays;
+        tyreverse = push_tyreverse bindings.tyreverse ba.type_ (`Array ba);
+        opreverse =
+          push_all_opreverse
+            bindings.opreverse
+            [ (ba.set   , `Array (ba, `Set))
+            ; (ba.get   , `Array (ba, `Get))
+            ; (ba.tolist, `Array (ba, `ToList)) ]}
 
   let rebind_array (ba : crb_array) (env : env) : env =
     { env with env_crbds = rebind_array_ ba env.env_crbds }
@@ -2850,7 +2892,8 @@ module Circuit = struct
 
   let rebind_bvoperator_ (op : crb_bvoperator) (bindings : crbindings) =
     { bindings with
-        bvoperators = Mp.add op.operator op bindings.bvoperators }
+        bvoperators = Mp.add op.operator op bindings.bvoperators;
+        opreverse   = push_opreverse bindings.opreverse op.operator (`BvOperator op); }
 
   let rebind_bvoperator (op : crb_bvoperator) (env : env) =
     { env with env_crbds = rebind_bvoperator_ op env.env_crbds }
@@ -2862,7 +2905,8 @@ module Circuit = struct
   
   let rebind_circuit_ (cr : crb_circuit) (bindings : crbindings) =
     { bindings with
-        circuits = Mp.add cr.operator cr bindings.circuits }
+        circuits  = Mp.add cr.operator cr bindings.circuits;
+        opreverse = push_opreverse bindings.opreverse cr.operator (`Circuit cr); }
 
   let rebind_circuit (cr : crb_circuit) (env : env) =
     { env with env_crbds = rebind_circuit_ cr env.env_crbds }
@@ -2898,31 +2942,55 @@ module Circuit = struct
   let lookup_bitstring_size (env : env) (ty : ty) : int option =
     Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)
 
-  let lookup_bsarray_path (env : env) (pth : path) : crb_array option = 
+  let lookup_array_path (env : env) (pth : path) : crb_array option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
     Mp.find_opt k env.env_crbds.arrays
 
-  let lookup_bsarray (env: env) (ty: ty) : crb_array option = 
+  let lookup_array (env : env) (ty : ty) : crb_array option = 
     match ty.ty_node with
-    | Tconstr (p, [w]) -> lookup_bsarray_path env p
+    | Tconstr (p, [w]) -> lookup_array_path env p
     | _ -> None
 
-  let lookup_bsarray_size (env: env) (ty: ty) : int option = 
-    Option.map (fun c -> c.size) (lookup_bsarray env ty)
+  let lookup_array_size (env : env) (ty : ty) : int option = 
+    Option.map (fun c -> c.size) (lookup_array env ty)
 
-  let lookup_circuit (env: env) (o: qsymbol) : Lospecs.Ast.adef option =
-    let p, _o = Op.lookup o env in
-    lookup_circuit_path env p
-
-  let lookup_bvoperator_path (env: env) (v: path) : crb_bvoperator option = 
+  let lookup_bvoperator_path (env : env) (v : path) : crb_bvoperator option = 
     Mp.find_opt v env.env_crbds.bvoperators
 
-  let lookup_bvoperator (env: env) (o: qsymbol) : crb_bvoperator option =
+  let lookup_bvoperator (env : env) (o : qsymbol) : crb_bvoperator option =
     let p, _o = Op.lookup o env in
     lookup_bvoperator_path env p
 
-  let lookup_bsarrayop (env: env) (pth: path) : crb_array_op option =
-    Mp.find_opt pth env.env_crbds.arrayops
+  let lookup_circuit (env : env) (o : qsymbol) : Lospecs.Ast.adef option =
+    let p, _o = Op.lookup o env in
+    lookup_circuit_path env p  
+
+  let reverse_type (env : env) (p : path) : crb_tyrev_binding list =
+    Mp.find_def [] p env.env_crbds.tyreverse
+
+  let reverse_operator (env: env) (p : path) : crb_oprev_binding list =
+    Mp.find_def [] p env.env_crbds.opreverse
+
+  let reverse_and_filter_operator
+    ~(filter : crb_oprev_binding -> 'a option) (env : env) (p : path)
+  =
+    List.find_map_opt filter (reverse_operator env p)
+
+  let reverse_bitstring_operator =
+    reverse_and_filter_operator
+      ~filter:(function `Bitstring x -> Some x | _ -> None)
+
+  let reverse_array_operator =
+    reverse_and_filter_operator
+      ~filter:(function `Array x -> Some x | _ -> None)
+
+  let reverse_bvoperator =
+    reverse_and_filter_operator
+      ~filter:(function `BvOperator x -> Some x | _ -> None)
+
+  let reverse_circuit =
+    reverse_and_filter_operator
+      ~filter:(function `Circuit x -> Some x | _ -> None)        
 end
 
 (* -------------------------------------------------------------------- *)

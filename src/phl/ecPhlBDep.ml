@@ -233,7 +233,7 @@ let t_circ (tc: tcenv1) : tcenv =
 
   let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circuit.lookup_bsarray env ty with
+    match EcEnv.Circuit.lookup_array env ty with
     | Some {tolist;} -> let bty = match ty.ty_node with
       | Tconstr (p, [bty]) -> bty
       | _ -> failwith "Wrong type structure for array"
@@ -281,7 +281,7 @@ let t_circ (tc: tcenv1) : tcenv =
 
   let flatten_to_bits (env: env) (f: form) = 
     let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circuit.lookup_bsarray env f.f_ty with
+    match EcEnv.Circuit.lookup_array env f.f_ty with
     | Some {tolist; _} -> 
       let base = match f.f_ty.ty_node with
       | Tconstr (_, [b]) -> b

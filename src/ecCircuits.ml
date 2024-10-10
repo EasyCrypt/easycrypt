@@ -279,7 +279,7 @@ let width_of_type (env: env) (t: ty) : int =
 let destr_array_type (env: env) (t: ty) : (int * ty) option = 
   match t.ty_node with
   | Tconstr (p, [et]) -> 
-    begin match EcEnv.Circuit.lookup_bsarray_path env p with
+    begin match EcEnv.Circuit.lookup_array_path env p with
     | Some {size; _} -> Some (size, et)
     | None -> None
     end
@@ -288,7 +288,7 @@ let destr_array_type (env: env) (t: ty) : (int * ty) option =
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
   match t.ty_node with
   | Tconstr (p, [et]) -> 
-    begin match EcEnv.Circuit.lookup_bsarray_path env p with
+    begin match EcEnv.Circuit.lookup_array_path env p with
     | Some {size; _} -> size, width_of_type env et
     | None -> assert false
     end
@@ -899,15 +899,11 @@ module ArrayOps = struct
   let temp_symbol = "temp_array_input"
 
   let is_arrayop (env: env) (pth: path) : bool =
-    match EcEnv.Circuit.lookup_bsarrayop env pth with
-    | Some _ -> true
-    | None -> false
+    Option.is_some
+      (EcEnv.Circuit.reverse_array_operator env pth)
   
-  let destr_getset_opt (env: env) (pth: path) : crb_array_op option =
-    match EcEnv.Circuit.lookup_bsarrayop env pth with
-    | Some (GET _) as g -> g 
-    | Some (SET _) as g -> g 
-    | _ -> None
+  let destr_getset_opt (env: env) (pth: path) : crb_array_operator option =
+    EcEnv.Circuit.reverse_array_operator env pth
 end
 
 let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option) : bool = 
@@ -1164,7 +1160,7 @@ let circuit_of_form
         let env, res = match ArrayOps.destr_getset_opt env @@ (EcCoreFol.destr_op f |> fst) with
             (* Assuming correct types coming from EC *)
             (* FIXME: add typechecking here ? *)
-          | Some (GET n) -> let env, res = 
+          | Some ({ size = n }, `Get) -> let env, res = 
             match fs with
             | [arr; {f_node=Fint i; _}] ->
               let (_, t) = destr_array_type env arr.f_ty |> Option.get in
@@ -1173,7 +1169,7 @@ let circuit_of_form
               env, compose (circuit_bwarray_get n w (BI.to_int i)) [arr]
             | _ -> raise (CircError "set")
             in env, res
-          | Some (SET n) -> let env, res = 
+          | Some({ size = n }, `Set) -> let env, res = 
             match fs with
             | [arr; {f_node=Fint i; _}; v] ->
               let w = width_of_type env v.f_ty  in
