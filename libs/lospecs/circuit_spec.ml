@@ -6,6 +6,13 @@ open Aig
 let rec log2 n =
   if n <= 1 then 0 else 1 + log2 (n asr 1)
   
+
+(* ==================================================================== *)
+let load_from_file ~(filename : string) =
+  let specs = File.with_file_in filename (Io.parse filename) in
+  let specs = Typing.tt_program Typing.Env.empty specs in
+  specs
+
 (* ==================================================================== *)
 module Env : sig
   type env
@@ -60,7 +67,7 @@ end
 type env = Env.env
 
 (* ==================================================================== *)
-let circuit_of_spec (rs : reg list) (p : adef) : reg =
+let circuit_of_specification (rs : reg list) (p : adef) : reg =
   assert (List.length rs = List.length p.arguments);
   assert (List.for_all2 (fun r (_, `W n) -> List.length r = n) rs p.arguments);
 

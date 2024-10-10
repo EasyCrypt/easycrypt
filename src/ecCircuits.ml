@@ -18,12 +18,11 @@ module Option = Batteries.Option
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
-  include Lospecs.Circuit_avx2.FromSpec ()
   include Lospecs.Circuit_spec
 end
 
 module HL = struct
-  include Lospecs.HLAig
+  include Lospecs.Hlaig
 end
 
 (* List of size n*w into list of n lists of size w *)
@@ -574,14 +573,22 @@ let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit =
   
 (* -------------------------------------------------------------------- *)
 (* Basis for hardcoded circuit gen *)
-let load_specification (name : string) =
-  C.get_specification name
+let specifications : (string, Lospecs.Ast.adef) Map.t Lazy.t =
+  Lazy.from_fun (fun () ->
+    let specs = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
+    let specs = C.load_from_file ~filename:specs in
+    Map.of_seq (List.to_seq specs)
+  )
+
+let get_specification_by_name (name : string) : Lospecs.Ast.adef option =
+  let lazy specifications = specifications in
+  Map.find_opt name specifications
 
 let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
   (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
   match EcEnv.Circuit.lookup_circuit_path env p with
   | Some circuit ->
-    (fun regs -> C.circuit_of_spec regs circuit) 
+    (fun regs -> C.circuit_of_specification regs circuit) 
   | None -> Format.eprintf "No operator for path: %s@."
     (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b);
     assert false 

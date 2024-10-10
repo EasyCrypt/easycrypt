@@ -2527,7 +2527,7 @@ module Circuit = struct
     if not (List.is_empty opdecl.op_tparams) then
       hierror ~loc:(loc pc.operator) "operator must be monomorphic";
 
-    match EcCircuits.load_specification (unloc pc.circuit) with
+    match EcCircuits.get_specification_by_name (unloc pc.circuit) with
     | None ->
       hierror ~loc:(loc pc.circuit)
         "unknown circuit: %s" (unloc pc.circuit)

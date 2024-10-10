@@ -3,37 +3,18 @@
  (sites easycrypt))
 
 (library
- (name lospecs)
- (public_name easycrypt.lospecs)
- (flags
-  (:standard -open Batteries))
- (modules :standard config \ lospecs_test circuit_test)
- (preprocess
-  (pps ppx_deriving_yojson))
- (foreign_stubs
-  (language cxx)
-  (flags :standard -std=c++17 -mavx -mavx2)
-  (names avx2_runtime))
- (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime bitwuzla))
-
-(executable
- (name lospecs_test)
- (flags
-  (:standard -open Batteries))
- (modules lospecs_test)
- (promote (until-clean))
- (libraries batteries cmdliner lospecs))
-
-(executable
- (name circuit_test)
- (flags
-  (:standard -open Batteries))
- (modules circuit_test)
- (promote (until-clean))
- (libraries batteries hex iter lospecs progress))
+  (name lospecs)
+  (public_name easycrypt.lospecs)
+  (flags
+    (:standard -open Batteries))
+  (modules :standard config)
+  (preprocess
+    (pps ppx_deriving_yojson))
+  (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime bitwuzla))
 
 (ocamllex lexer)
 
 (menhir
- (modules parser)
- (flags --table --explain))
+  (modules parser)
+  (explain true)
+  (flags --table))

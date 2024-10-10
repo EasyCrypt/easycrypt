@@ -21,12 +21,11 @@ module Set = Batteries.Set
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
-  include Lospecs.Circuit_avx2.FromSpec ()
   include Lospecs.Circuit_spec
 end
 
 module HL = struct
-  include Lospecs.HLAig
+  include Lospecs.Hlaig
 end
 
 
