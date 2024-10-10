@@ -18,7 +18,7 @@
   (camlp-streams (>= 5))
   camlzip
   cmdliner
-  (dune (>= 3.6))
+  dune
   dune-build-info
   dune-site
   hex
