@@ -706,17 +706,12 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_bind_bitstring (scope : EcScope.scope) (bs : pbind_bitstring) =
-  EcScope.Circuit.add_bitstring scope bs
-
-and process_bind_bsarray (scope : EcScope.scope) (ba : pbind_array) =
-  EcScope.Circuit.add_bsarray scope ba
- 
-and process_bind_qfabvop (scope : EcScope.scope) (bop : pbind_qfabvop) =
-  EcScope.Circuit.add_qfabvop scope bop
-  
-and process_bind_circuit (scope : EcScope.scope) (pc : pbind_circuit) =
-  EcScope.Circuit.add_circuit scope pc
+and process_crbind (scope : EcScope.scope) (binding : pcrbinding) =
+  match binding.binding with
+  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring scope binding.locality bs
+  | CRB_Array      ba -> EcScope.Circuit.add_bsarray   scope binding.locality ba
+  | CRB_BvOperator op -> EcScope.Circuit.add_qfabvop   scope binding.locality op
+  | CRB_Circuit    cr -> EcScope.Circuit.add_circuit   scope binding.locality cr
 
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
@@ -761,10 +756,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
-      | Gbbitstring  bs   -> `Fct   (fun scope -> process_bind_bitstring scope bs)
-      | Gbbsarray    ba   -> `Fct   (fun scope -> process_bind_bsarray scope ba)
-      | Gbcircuit    oc   -> `Fct   (fun scope -> process_bind_circuit scope oc)
-      | Gbqfabvop    oc   -> `Fct   (fun scope -> process_bind_qfabvop scope oc)
+      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope bind)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

@@ -3371,7 +3371,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         lvl (odfl "" base)
         (pp_list "@ " (pp_axname ppe)) p
 
-  | EcTheory.Th_bitstring (bs, lc) -> 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
       Format.fprintf fmt "%abind bitstring %a %a %a %d."
         pp_locality lc
         (pp_opname ppe) bs.to_
@@ -3379,7 +3381,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         (pp_tyname ppe) bs.type_
         bs.size
 
-  | EcTheory.Th_bsarray (ba, lc) ->
+    | CRB_Array ba ->
       Format.fprintf fmt "%abind array %a %a %a %a %d."
         pp_locality lc
         (pp_tyname ppe) ba.type_
@@ -3388,7 +3390,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         (pp_opname ppe) ba.tolist
         ba.size
 
-  | EcTheory.Th_qfabvop (op, lc) ->
+    | CRB_BvOperator op ->
       let kind =
         match op.kind with
         | `Add   _ -> "add"
@@ -3408,9 +3410,10 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         (pp_opname ppe) op.operator
         kind
 
-  | EcTheory.Th_circuit (circuit, lc) ->
+  | CRB_Circuit cr ->
       Format.fprintf fmt "%abind circuit %a \"%s\"."
-        pp_locality lc (pp_opname ppe) circuit.operator circuit.name
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

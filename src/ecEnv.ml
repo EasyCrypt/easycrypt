@@ -167,16 +167,16 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type bsarrayop = 
+type crb_array_op = 
   | GET of int
   | SET of int
   
-type circuits = {
-  bitstrings : bitstring Mp.t;
-  circuits   : circuit Mp.t;
-  qfabvops   : qfabvop Mp.t;
-  bsarrays   : bsarray Mp.t;
-  bsarrayops : bsarrayop Mp.t;
+type crbindings = {
+  bitstrings  : crb_bitstring Mp.t;
+  arrays      : crb_array Mp.t;
+  bvoperators : crb_bvoperator Mp.t;
+  circuits    : crb_circuit Mp.t;
+  arrayops    : crb_array_op Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -199,7 +199,7 @@ type preenv = {
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
-  env_circ     : circuits;
+  env_crbds    : crbindings;
   (* Map theory paths to their env before just before theory was closed. *)
   (* The environment should be incuded for all theories, including       *)
   (* abstract ones. The purpose of this map is to simplify the code      *)
@@ -306,6 +306,13 @@ let empty gstate =
     let icomps = MMsym.add name (IPPath path) MMsym.empty in
     { (empty_mc None) with mc_components = icomps } in
 
+  let empty_crbindings : crbindings =
+    { bitstrings  = Mp.empty
+    ; arrays      = Mp.empty
+    ; bvoperators = Mp.empty
+    ; arrayops    = Mp.empty
+    ; circuits    = Mp.empty } in
+
   { env_top      = None;
     env_gstate   = gstate;
     env_scope    = { ec_path = path; ec_scope = `Theory; };
@@ -324,9 +331,7 @@ let empty gstate =
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
-    env_circ     = {circuits = Mp.empty; bitstrings = Mp.empty; 
-                    qfabvops = Mp.empty; bsarrays = Mp.empty;
-                    bsarrayops = Mp.empty; };
+    env_crbds    = empty_crbindings;
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -1123,10 +1128,7 @@ module MC = struct
       | Th_instance  _
       | Th_auto      _
       | Th_reduction _
-      | Th_bitstring _
-      | Th_bsarray   _
-      | Th_qfabvop   _
-      | Th_circuit   _ -> (mc, None)
+      | Th_crbinding _ -> (mc, None)
     in
 
     let (mc, submcs) =
@@ -2818,78 +2820,89 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit = struct
-  let rebind_bitstring_ (bs : bitstring) (circuits : circuits) : circuits =
-    { circuits with bitstrings = Mp.add bs.type_ bs circuits.bitstrings }
+  let rebind_bitstring_ (bs : crb_bitstring) (bindings : crbindings) =
+    { bindings with bitstrings = Mp.add bs.type_ bs bindings.bitstrings }
 
-  let rebind_bitstring (bs : bitstring) (env : env) : env =
-    { env with env_circ = rebind_bitstring_ bs env.env_circ }
+  let rebind_bitstring (bs : crb_bitstring) (env : env) : env =
+    { env with env_crbds = rebind_bitstring_ bs env.env_crbds }
 
-  let bind_bitstring ?(import = import0) (lc : is_local) (bs : bitstring) (env : env) : env = 
+  let bind_bitstring ?(import = import0) (lc : is_local) (bs : crb_bitstring) (env : env) = 
     let env = if import.im_immediate then rebind_bitstring bs env else env in
-    { env with env_item = mkitem import (Th_bitstring (bs, lc)) :: env.env_item; }
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Bitstring bs, lc)) :: env.env_item; }
 
-  let rebind_bsarray_ (ba : bsarray) (circuits : circuits) : circuits =
-    { circuits with
-        bsarrays   = Mp.add ba.type_ ba circuits.bsarrays;
-        bsarrayops =
+  let rebind_array_ (ba : crb_array) (bindings : crbindings) =
+    { bindings with
+        arrays = Mp.add ba.type_ ba bindings.arrays;
+        arrayops =
           List.fold_left
             (fun map (p, kind) -> Mp.add p kind map)
-            circuits.bsarrayops
+            bindings.arrayops
             [ (ba.set, SET ba.size); (ba.get, GET ba.size)]; }
 
-  let rebind_bsarray (ba : bsarray) (env : env) : env =
-    { env with env_circ = rebind_bsarray_ ba env.env_circ }
+  let rebind_array (ba : crb_array) (env : env) : env =
+    { env with env_crbds = rebind_array_ ba env.env_crbds }
 
-  let bind_bsarray ?(import = import0) (lc : is_local) (ba : bsarray) (env : env) : env =
-    let env = if import.im_immediate then rebind_bsarray ba env else env in
-    { env with env_item = mkitem import (Th_bsarray (ba, lc)) :: env.env_item; }
+  let bind_array ?(import = import0) (lc : is_local) (ba : crb_array) (env : env) =
+    let env = if import.im_immediate then rebind_array ba env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Array ba, lc)) :: env.env_item; }
 
-  let rebind_qfabvop_ (op : qfabvop) (circuits : circuits) : circuits =
-    { circuits with
-        qfabvops = Mp.add op.operator op circuits.qfabvops }
+  let rebind_bvoperator_ (op : crb_bvoperator) (bindings : crbindings) =
+    { bindings with
+        bvoperators = Mp.add op.operator op bindings.bvoperators }
 
-  let rebind_qfabvop (op : qfabvop) (env : env) : env =
-    { env with env_circ = rebind_qfabvop_ op env.env_circ }
+  let rebind_bvoperator (op : crb_bvoperator) (env : env) =
+    { env with env_crbds = rebind_bvoperator_ op env.env_crbds }
 
-  let bind_qfabvop ?(import = import0) (lc : is_local) (op : qfabvop) (env : env) : env =
-    let env = if import.im_immediate then rebind_qfabvop op env else env in
-    { env with env_item = mkitem import (Th_qfabvop (op, lc)) :: env.env_item; }
+  let bind_bvoperator ?(import = import0) (lc : is_local) (op : crb_bvoperator) (env : env) =
+    let env = if import.im_immediate then rebind_bvoperator op env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_BvOperator op, lc)) :: env.env_item; }
   
-  let rebind_circuit_ (cr : circuit) (circuits : circuits) : circuits =
-    { circuits with
-        circuits = Mp.add cr.operator cr circuits.circuits }
+  let rebind_circuit_ (cr : crb_circuit) (bindings : crbindings) =
+    { bindings with
+        circuits = Mp.add cr.operator cr bindings.circuits }
 
-  let rebind_circuit (cr : circuit) (env : env) : env =
-    { env with env_circ = rebind_circuit_ cr env.env_circ }
+  let rebind_circuit (cr : crb_circuit) (env : env) =
+    { env with env_crbds = rebind_circuit_ cr env.env_crbds }
 
-  let bind_circuit ?(import = import0) (lc : is_local) (cr : circuit) (env: env) : env = 
+  let bind_circuit ?(import = import0) (lc : is_local) (cr : crb_circuit) (env : env) = 
     let env = if import.im_immediate then rebind_circuit cr env else env in
-    { env with env_item = mkitem import (Th_circuit (cr, lc)) :: env.env_item; }
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Circuit cr, lc)) :: env.env_item; }
 
-  let lookup_bitstring_path (env: env) (k: path) : bitstring option = 
+  let bind_crbinding ?import (lc : is_local) (crb : crbinding) (env : env) =
+    match crb with
+    | CRB_Bitstring  bs -> bind_bitstring  ?import lc bs env
+    | CRB_Array      ba -> bind_array      ?import lc ba env
+    | CRB_BvOperator op -> bind_bvoperator ?import lc op env
+    | CRB_Circuit    cr -> bind_circuit    ?import lc cr env
+
+  let lookup_bitstring_path (env : env) (k : path) : crb_bitstring option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
-    Mp.find_opt k env.env_circ.bitstrings
+    Mp.find_opt k env.env_crbds.bitstrings
 
-  let lookup_bitstring (env: env) (ty:ty) : bitstring option =
+  let lookup_bitstring (env : env) (ty : ty) : crb_bitstring option =
     match ty.ty_node with
     | Tconstr (p, []) -> lookup_bitstring_path env p
     | _ -> None
     
-  let lookup_bitstring_size_path (env: env) (pth: path) : int option = 
-    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring_path env pth)
+  let lookup_bitstring_size_path (env : env) (pth : path) : int option = 
+    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring_path env pth)
   
-  let lookup_circuit_path (env: env) (v: path) : Lospecs.Ast.adef option = 
-    Mp.find_opt v env.env_circ.circuits
+  let lookup_circuit_path (env : env) (v : path) : Lospecs.Ast.adef option = 
+    Mp.find_opt v env.env_crbds.circuits
     |> Option.map (fun cr -> cr.circuit)
 
-  let lookup_bitstring_size (env: env) (ty: ty) : int option =
-    Option.map (fun (c: bitstring) -> c.size) (lookup_bitstring env ty)
+  let lookup_bitstring_size (env : env) (ty : ty) : int option =
+    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)
 
-  let lookup_bsarray_path (env: env) (pth: path) : bsarray option = 
+  let lookup_bsarray_path (env : env) (pth : path) : crb_array option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
-    Mp.find_opt k env.env_circ.bsarrays
+    Mp.find_opt k env.env_crbds.arrays
 
-  let lookup_bsarray (env: env) (ty: ty) : bsarray option = 
+  let lookup_bsarray (env: env) (ty: ty) : crb_array option = 
     match ty.ty_node with
     | Tconstr (p, [w]) -> lookup_bsarray_path env p
     | _ -> None
@@ -2901,15 +2914,15 @@ module Circuit = struct
     let p, _o = Op.lookup o env in
     lookup_circuit_path env p
 
-  let lookup_qfabvop_path (env: env) (v: path) : qfabvop option = 
-    Mp.find_opt v env.env_circ.qfabvops
+  let lookup_bvoperator_path (env: env) (v: path) : crb_bvoperator option = 
+    Mp.find_opt v env.env_crbds.bvoperators
 
-  let lookup_qfabvop (env: env) (o: qsymbol) : qfabvop option =
+  let lookup_bvoperator (env: env) (o: qsymbol) : crb_bvoperator option =
     let p, _o = Op.lookup o env in
-    lookup_qfabvop_path env p
+    lookup_bvoperator_path env p
 
-  let lookup_bsarrayop (env: env) (pth: path) : bsarrayop option =
-    Mp.find_opt pth env.env_circ.bsarrayops
+  let lookup_bsarrayop (env: env) (pth: path) : crb_array_op option =
+    Mp.find_opt pth env.env_crbds.arrayops
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3084,18 +3097,18 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind_cr_th =
-    let for1 (_ : path) (circuits : circuits) = function
-      | Th_bitstring (bs, _) ->
-        Some (Circuit.rebind_bitstring_ bs circuits)
+    let for1 (_ : path) (bindings : crbindings) = function
+      | Th_crbinding (CRB_Bitstring bs, _) ->
+        Some (Circuit.rebind_bitstring_ bs bindings)
 
-      | Th_bsarray (ba, _) ->
-        Some (Circuit.rebind_bsarray_ ba circuits)
+      | Th_crbinding (CRB_Array ba, _) ->
+        Some (Circuit.rebind_array_ ba bindings)
 
-      | Th_qfabvop (op, _) ->
-        Some (Circuit.rebind_qfabvop_ op circuits)
+      | Th_crbinding (CRB_BvOperator op, _) ->
+        Some (Circuit.rebind_bvoperator_ op bindings)
 
-      | Th_circuit (circuit, _) ->
-        Some (Circuit.rebind_circuit_ circuit circuits)
+      | Th_crbinding (CRB_Circuit cr, _) ->
+        Some (Circuit.rebind_circuit_ cr bindings)
 
       | _ -> None
   in bind_base_th for1
@@ -3123,12 +3136,12 @@ module Theory = struct
           let env_atbase  = bind_at_th thname env.env_atbase items in
           let env_ntbase  = bind_nt_th thname env.env_ntbase items in
           let env_redbase = bind_rd_th thname env.env_redbase items in
-          let env_circ    = bind_cr_th thname env.env_circ items in
+          let env_crbds   = bind_cr_th thname env.env_crbds items in
           let env =
             { env with
                 env_tci   ; env_tc    ; env_rwbase;
                 env_atbase; env_ntbase; env_redbase;
-                env_circ  ; }
+                env_crbds ; }
           in
           add_restr_th thname env items
 
@@ -3193,11 +3206,7 @@ module Theory = struct
         | Th_instance  _
         | Th_auto      _
         | Th_reduction _
-        | Th_bitstring _
-        | Th_bsarray   _
-        | Th_qfabvop   _
-        | Th_circuit   _ -> env
-
+        | Th_crbinding _ -> env
       in
         List.fold_left import_th_item env th
 

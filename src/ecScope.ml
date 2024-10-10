@@ -2303,12 +2303,7 @@ module Cloning = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Circuit : sig 
-  val add_bitstring : scope -> pbind_bitstring -> scope
-  val add_bsarray   : scope -> pbind_array -> scope
-  val add_qfabvop   : scope -> pbind_qfabvop -> scope
-  val add_circuit   : scope -> pbind_circuit -> scope
-end = struct
+module Circuit = struct
   type preoperator = [`Path of path | `Int of BI.zint]
 
   type clone = {
@@ -2365,7 +2360,7 @@ end = struct
     
     (proofs, scope)
 
-  let add_bitstring (scope : scope) (bs : pbind_bitstring) : scope = 
+  let add_bitstring (scope : scope) (local : is_local) (bs : pbind_bitstring) : scope = 
     let env = env scope in
 
     let type_ =
@@ -2388,7 +2383,7 @@ end = struct
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
       ; name      = name
-      ; local     = bs.local
+      ; local     = local
       ; types_    = ["bv", bspath]
       ; operators =
           [ ("size"  , `Int bs.size)
@@ -2398,19 +2393,19 @@ end = struct
 
     let proofs, scope = doclone scope preclone in
 
-    let item : EcTheory.bitstring = 
+    let item = CRB_Bitstring 
       { from_; to_;
         type_  = bspath;
         size   = BI.to_int bs.size;
         theory = pqname (EcEnv.root env) name; } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_bitstring (item, bs.local)) in
+    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_crbinding (item, local)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
     Ax.add_defer scope proofs
 
-  let add_bsarray (scope : scope) (ba : pbind_array) : scope = 
+  let add_bsarray (scope : scope) (local : is_local) (ba : pbind_array) : scope = 
     let env = env scope in
 
     let bspath =
@@ -2435,7 +2430,7 @@ end = struct
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
       ; name      = name
-      ; local     = ba.local
+      ; local     = local
       ; types_    = ["t", bspath]
       ; operators =
           [ ("size"   , `Int ba.size)
@@ -2446,16 +2441,16 @@ end = struct
 
     let proofs, scope = doclone scope preclone in
 
-    let item : EcTheory.bsarray =
+    let item = CRB_Array
       { get; set; tolist; type_ = bspath; size = BI.to_int ba.size } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (Th_bsarray (item, ba.local)) in
+    let item = EcTheory.mkitem EcTheory.import0 (Th_crbinding (item, local)) in
 
     let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
     Ax.add_defer scope proofs
   
-  let add_qfabvop (scope : scope) (op : pbind_qfabvop) : scope =
+  let add_qfabvop (scope : scope) (local : is_local) (op : pbind_bvoperator) : scope =
     let env = env scope in
 
     let type_ =
@@ -2479,7 +2474,7 @@ end = struct
           "this type is not bound to a bitstring type"
       | Some bitstring -> bitstring in
 
-    let (kind, subname) : EcTheory.qfabv_opkind * _ =
+    let (kind, subname) : EcDecl.bv_opkind * _ =
       match unloc op.name with
       | "add"  -> `Add  bitstring.size, "Add"
       | "sub"  -> `Sub  bitstring.size, "Sub"
@@ -2505,27 +2500,27 @@ end = struct
     let preclone =
       { path      = subpath
       ; name      = name
-      ; local     = op.local
+      ; local     = local
       ; types_    = []
       ; operators = ["bv" ^ unloc op.name, `Path operator]
       ; proofs    = [] } in
 
       let proofs, scope = doclone scope preclone in
 
-    let item : EcTheory.qfabvop =
+    let item = CRB_BvOperator
       { kind     = kind;
         type_    = bspath;
         operator = operator;
         theory   = subpath; } in
 
-    let item = EcTheory.mkitem EcTheory.import0 (Th_qfabvop (item, op.local)) in
+    let item = EcTheory.mkitem EcTheory.import0 (Th_crbinding (item, local)) in
   
     let scope =
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
     
     Ax.add_defer scope proofs
     
-  let add_circuit (scope : scope) (pc : pbind_circuit) : scope =
+  let add_circuit (scope : scope) (local : is_local) (pc : pbind_circuit) : scope =
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup pc.operator.pl_desc env in
 
@@ -2578,11 +2573,11 @@ end = struct
             (EcPrinting.pp_type ppe) codom ret
       end;
 
-      let item : EcTheory.circuit = { operator; circuit; name = unloc pc.circuit; } in
+      let item = CRB_Circuit { operator; circuit; name = unloc pc.circuit; } in
 
       let item =
           EcTheory.mkitem EcTheory.import0
-          (EcTheory.Th_circuit (item, pc.local)) in
+          (EcTheory.Th_crbinding (item, local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
 end
 

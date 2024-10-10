@@ -1270,33 +1270,39 @@ type threquire =
 
 (* -------------------------------------------------------------------- *)
 type pbind_bitstring =
-  { local : is_local
-  ; from_ : pqsymbol
+  { from_ : pqsymbol
   ; to_   : pqsymbol
   ; type_ : pty
   ; size  : EcBigInt.zint }
   
 (* -------------------------------------------------------------------- *)
 type pbind_array =
-  { local  : is_local
-  ; get    : pqsymbol
+  { get    : pqsymbol
   ; set    : pqsymbol
   ; tolist : pqsymbol
   ; type_  : pqsymbol
   ; size   : EcBigInt.zint }
 
 (* -------------------------------------------------------------------- *)
-type pbind_qfabvop =
-  { local    : is_local
-  ; name     : string located
+type pbind_bvoperator =
+  { name     : string located
   ; type_    : pty
   ; operator : pqsymbol }
 
 (* -------------------------------------------------------------------- *)
 type pbind_circuit =
-  { local    : is_local
-  ; operator : pqsymbol
+  { operator : pqsymbol
   ; circuit  : string located }
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding_r =
+  | CRB_Bitstring  of pbind_bitstring
+  | CRB_Array      of pbind_array
+  | CRB_BvOperator of pbind_bvoperator
+  | CRB_Circuit    of pbind_circuit
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding = { locality : is_local; binding : pcrbinding_r }
 
 (* -------------------------------------------------------------------- *)
 type global_action =
@@ -1336,10 +1342,7 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
-  | Gbbitstring  of pbind_bitstring
-  | Gbbsarray    of pbind_array
-  | Gbcircuit    of pbind_circuit
-  | Gbqfabvop    of pbind_qfabvop
+  | Gcrbinding   of pcrbinding
 
 type global = {
   gl_action : global_action located;

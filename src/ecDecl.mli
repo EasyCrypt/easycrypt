@@ -194,3 +194,48 @@ type field = {
   f_div  : EcPath.path option;
 }
 val field_equal : field -> field -> bool
+
+(* -------------------------------------------------------------------- *)
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; size   : int
+  ; theory : EcPath.path }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; size   : int }
+  
+type bv_opkind = [
+  | `Add  of int
+  | `Sub  of int
+  | `Mul  of int
+  | `UDiv of int
+  | `URem of int
+  | `Shl  of int
+  | `Shr  of int
+  | `And  of int
+  | `Or   of int
+  | `Not  of int
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; type_    : EcPath.path
+  ; operator : EcPath.path
+  ; theory   : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit

@@ -17,7 +17,7 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
-type bsarrayop = 
+type crb_array_op = 
   | GET of int
   | SET of int
 
@@ -435,24 +435,25 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit : sig  
-  val bind_bitstring : ?import:import -> is_local -> bitstring -> env -> env
-  val bind_bsarray   : ?import:import -> is_local -> bsarray -> env -> env
-  val bind_qfabvop   : ?import:import -> is_local -> qfabvop -> env -> env
-  val bind_circuit   : ?import:import -> is_local -> circuit -> env -> env
+  val bind_bitstring  : ?import:import -> is_local -> crb_bitstring -> env -> env
+  val bind_array      : ?import:import -> is_local -> crb_array -> env -> env
+  val bind_bvoperator : ?import:import -> is_local -> crb_bvoperator -> env -> env
+  val bind_circuit    : ?import:import -> is_local -> crb_circuit -> env -> env
+  val bind_crbinding  : ?import:import -> is_local -> crbinding -> env -> env
 
-  val lookup_bitstring           : env -> ty      -> bitstring option
-  val lookup_bitstring_path      : env -> path    -> bitstring option
+  val lookup_bitstring           : env -> ty      -> crb_bitstring option
+  val lookup_bitstring_path      : env -> path    -> crb_bitstring option
   val lookup_bitstring_size      : env -> ty      -> int option
   val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
   val lookup_bitstring_size_path : env -> path    -> int option
   val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
-  val lookup_qfabvop_path        : env -> path    -> qfabvop option
-  val lookup_qfabvop             : env -> qsymbol -> qfabvop option
+  val lookup_bvoperator_path     : env -> path    -> crb_bvoperator option
+  val lookup_bvoperator          : env -> qsymbol -> crb_bvoperator option
 
-  val lookup_bsarray      : env -> ty -> bsarray option
-  val lookup_bsarray_path : env -> path -> bsarray option
+  val lookup_bsarray      : env -> ty -> crb_array option
+  val lookup_bsarray_path : env -> path -> crb_array option
   val lookup_bsarray_size : env -> ty -> int option
-  val lookup_bsarrayop    : env -> path -> bsarrayop option
+  val lookup_bsarrayop    : env -> path -> crb_array_op option
 end 
 
 (* -------------------------------------------------------------------- *)

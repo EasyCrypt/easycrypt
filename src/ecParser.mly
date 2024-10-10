@@ -3889,6 +3889,25 @@ user_red_option:
   }
 
 (* -------------------------------------------------------------------- *)
+(* Circuit & bo bindings                                                *)
+cr_binding_r:
+| BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
+  { CRB_Bitstring { from_; to_; type_; size; } }
+
+| BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
+  { CRB_Array { get; set; tolist; type_; size; } }
+  
+| BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
+  { CRB_BvOperator { type_; operator; name; } }
+
+| BIND CIRCUIT operator=qoident circuit=loc(STRING)
+  { CRB_Circuit { operator; circuit; } }
+
+%inline cr_binding:
+| locality=is_local binding=cr_binding_r
+  { { locality; binding; }}
+
+(* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
 %inline search: x=sform_h { x }
 
@@ -3924,24 +3943,13 @@ global_action:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 | hint             { Ghint        $1 }
+| cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | PRINT AXIOM      { Gpaxiom         }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
-
-| local=is_local BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
-  { Gbbitstring { local; from_; to_; type_; size; } }
-
-| local=is_local BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
-  { Gbbsarray { local; get; set; tolist; type_; size; } }
-  
-| local=is_local BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
-  { Gbqfabvop { local; type_; operator; name; } }
-
-| local=is_local BIND CIRCUIT operator=qoident circuit=loc(STRING)
-  { Gbcircuit { local; operator; circuit; } }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }

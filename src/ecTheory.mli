@@ -35,44 +35,8 @@ and theory_item_r =
   (* reduction rule does not survive to section so no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of (int * symbol option * path list * is_local)
-  (* check this V *)
-  | Th_bitstring of (bitstring * is_local)
-  | Th_bsarray   of (bsarray * is_local)
-  | Th_qfabvop   of (qfabvop * is_local)
-  | Th_circuit   of (circuit * is_local)
+  | Th_crbinding of crbinding * is_local
 
-and bitstring =
-  { type_: path; from_: path; to_: path; size: int; theory: path; }
-
-and bsarray =
-  { type_: path; get: path; set: path; tolist: path; size: int; }  
-
-and qfabv_opkind = [
-  | `Add  of int
-  | `Sub  of int
-  | `Mul  of int
-  | `UDiv of int
-  | `URem of int
-  | `Shl  of int
-  | `Shr  of int
-  | `And  of int
-  | `Or   of int
-  | `Not  of int
-
-]
-
-and qfabvop =
-  { kind     : qfabv_opkind
-  ; type_    : path
-  ; operator : path
-  ; theory   : path }
-
-and circuit = {
-  name     : string;
-  circuit  : Lospecs.Ast.adef;
-  operator : path;  
-}
-  
 and thsource = {
   ths_base : EcPath.path;
 }

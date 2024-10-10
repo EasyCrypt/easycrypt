@@ -344,3 +344,48 @@ let field_equal f1 f2 =
      ring_equal f1.f_ring f2.f_ring
   && EcPath.p_equal f1.f_inv f2.f_inv
   && EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div
+
+(* -------------------------------------------------------------------- *)
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; size   : int
+  ; theory : EcPath.path }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; size   : int }
+  
+type bv_opkind = [
+  | `Add  of int
+  | `Sub  of int
+  | `Mul  of int
+  | `UDiv of int
+  | `URem of int
+  | `Shl  of int
+  | `Shr  of int
+  | `And  of int
+  | `Or   of int
+  | `Not  of int
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; type_    : EcPath.path
+  ; operator : EcPath.path
+  ; theory   : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit

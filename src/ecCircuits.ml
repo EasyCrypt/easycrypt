@@ -33,6 +33,7 @@ let rec blocks (xs: 'a list) (w: int) : 'a list list =
   | _ -> let h, t = List.takedrop w xs in
     h::(blocks t w)
 
+
 (* -------------------------------------------------------------------- *)
 type width = int
 type deps = ((int * int) * int C.VarRange.t) list
@@ -637,7 +638,7 @@ module BaseOps = struct
 
     | _, "zeroextu64" -> true
     
-    | _ -> begin match EcEnv.Circuit.lookup_qfabvop_path env p with
+    | _ -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
       | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
       | None   -> Format.eprintf "Did not find qfabv binding for %s@." (EcPath.tostring p); false
     end
@@ -820,7 +821,7 @@ module BaseOps = struct
     (* let dc = C.or_ dp_modqt dm_modqt in *)
     {circ = BWCirc([dc]); inps = [BWInput(id1, 16); BWInput(id2, 16)]}
   
-  | _ -> begin match EcEnv.Circuit.lookup_qfabvop_path env p with
+  | _ -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
     | Some { kind = `Add size } -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
@@ -901,7 +902,7 @@ module ArrayOps = struct
     | None -> false
 
   
-  let destr_getset_opt (env: env) (pth: path) : bsarrayop option =
+  let destr_getset_opt (env: env) (pth: path) : crb_array_op option =
     match EcEnv.Circuit.lookup_bsarrayop env pth with
     | Some (GET _) as g -> g 
     | Some (SET _) as g -> g 

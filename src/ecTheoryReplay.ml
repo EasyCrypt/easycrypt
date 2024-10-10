@@ -947,7 +947,7 @@ and replay_instance
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
-and replay_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, lc) =
+and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, lc) =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
@@ -959,8 +959,8 @@ and replay_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, l
     let theory = bs.theory in (* FIXME *)
     let size   = bs.size in
 
-    let bs : bitstring = { to_; from_; type_; theory; size; } in
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_bitstring (bs, lc)) in
+    let bs = CRB_Bitstring { to_; from_; type_; theory; size; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (bs, lc)) in
 
     (subst, ops, proofs, scope)
 
@@ -968,7 +968,7 @@ and replay_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, bs, l
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
-and replay_bsarray (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc) =
+and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc) =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
@@ -980,8 +980,8 @@ and replay_bsarray (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc)
     let type_  = ba.type_ in (* FIXME*)
     let size   = ba.size in
 
-    let ba : bsarray = { get; set; tolist; type_; size; } in
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_bsarray (ba, lc)) in
+    let ba = CRB_Array { get; set; tolist; type_; size; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (ba, lc)) in
 
     (subst, ops, proofs, scope)
 
@@ -989,7 +989,7 @@ and replay_bsarray (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, lc)
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
-and replay_qfabvop (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc) =
+and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc) =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
@@ -1000,8 +1000,8 @@ and replay_qfabvop (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc)
     let type_    = op.type_ in (* FIXME *)
     let theory   = op.theory in (* FIXME *)
 
-    let op : qfabvop = { kind; operator; type_; theory; } in
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_qfabvop (op, lc)) in
+    let op = CRB_BvOperator { kind; operator; type_; theory; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (op, lc)) in
 
     (subst, ops, proofs, scope)
 
@@ -1009,7 +1009,7 @@ and replay_qfabvop (ove : _ ovrenv) (subst, ops, proofs, scope) (import, op, lc)
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
-and replay_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc) =
+and replay_crb_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc) =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
@@ -1019,13 +1019,28 @@ and replay_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc)
     let circuit  = cr.circuit in
     let operator = forpath cr.operator in
 
-    let cr : circuit = { name; circuit; operator; } in
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_circuit (cr, lc)) in
+    let cr = CRB_Circuit { name; circuit; operator; } in
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (cr, lc)) in
 
     (subst, ops, proofs, scope)
 
   with InvInstPath ->
     (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_crbinding (ove : _ ovrenv) (subst, ops, proofs, scope) (import, binding, lc) =
+  match binding with
+  | CRB_Bitstring bs ->
+    replay_crb_bitstring ove (subst, ops, proofs, scope) (import, bs, lc)
+
+  | CRB_Array ba ->
+    replay_crb_array ove (subst, ops, proofs, scope) (import, ba, lc)
+  
+  | CRB_BvOperator op ->
+    replay_crb_bvoperator ove (subst, ops, proofs, scope) (import, op, lc)
+  
+  | CRB_Circuit cr ->
+    replay_crb_circuit ove (subst, ops, proofs, scope) (import, cr, lc)  
 
 (* -------------------------------------------------------------------- *)
 and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
@@ -1072,17 +1087,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | Th_instance ((typ, ty), tc, lc) ->
      replay_instance ove (subst, ops, proofs, scope) (item.ti_import, (typ, ty), tc, lc)
 
-  | Th_bitstring (bs, lc) ->
-     replay_bitstring ove (subst, ops, proofs, scope) (item.ti_import, bs, lc)
-
-  | Th_bsarray (ba, lc) ->
-     replay_bsarray ove (subst, ops, proofs, scope) (item.ti_import, ba, lc)
-
-  | Th_qfabvop (op, lc) ->
-     replay_qfabvop ove (subst, ops, proofs, scope) (item.ti_import, op, lc)
-
-  | Th_circuit (cr, lc) ->
-     replay_circuit ove (subst, ops, proofs, scope) (item.ti_import, cr, lc)
+  | Th_crbinding (binding, lc) ->
+     replay_crbinding ove (subst, ops, proofs, scope) (item.ti_import, binding, lc)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in

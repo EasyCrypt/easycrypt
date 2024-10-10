@@ -1034,6 +1034,48 @@ let subst_tc (s : subst) tc =
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
 (* -------------------------------------------------------------------- *)
+let subst_crbinding (s : subst) (crb : crbinding) =
+  match crb with
+  | CRB_Bitstring bs ->
+    assert (not (Mp.mem bs.type_ s.sb_tydef));
+    assert (not (Mp.mem bs.from_ s.sb_def));
+    assert (not (Mp.mem bs.to_ s.sb_def));
+    CRB_Bitstring {
+      type_  = subst_path s bs.type_;
+      from_  = subst_path s bs.from_;
+      to_    = subst_path s bs.to_;
+      size   = bs.size;
+      theory = subst_path s bs.theory; }
+
+  | CRB_Array ba ->
+    assert (not (Mp.mem ba.type_ s.sb_tydef));
+    assert (not (Mp.mem ba.get s.sb_def));
+    assert (not (Mp.mem ba.set s.sb_def));
+    assert (not (Mp.mem ba.tolist s.sb_def));
+    CRB_Array {
+      type_  = subst_path s ba.type_;
+      get    = subst_path s ba.get;
+      set    = subst_path s ba.set;
+      tolist = subst_path s ba.tolist;
+      size   = ba.size; }
+
+  | CRB_BvOperator op ->
+    assert (not (Mp.mem op.type_ s.sb_tydef));
+    assert (not (Mp.mem op.operator s.sb_def));
+    CRB_BvOperator {
+      kind     = op.kind;
+      type_    = subst_path s op.type_;
+      operator = subst_path s op.operator;
+      theory   = subst_path s op.theory; }
+
+  | CRB_Circuit cr ->
+      assert (not (Mp.mem cr.operator s.sb_def));
+      CRB_Circuit {
+        name     = cr.name;
+        circuit  = cr.circuit;
+        operator = subst_path s cr.operator; }
+  
+(* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   match item with
@@ -1078,48 +1120,8 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_auto (lvl, base, ps, lc) ->
       Th_auto (lvl, base, List.map (subst_path s) ps, lc)
 
-  | Th_bitstring (bs, lc) ->
-    assert (not (Mp.mem bs.type_ s.sb_tydef));
-    assert (not (Mp.mem bs.from_ s.sb_def));
-    assert (not (Mp.mem bs.to_ s.sb_def));
-    let bs = {
-      type_  = subst_path s bs.type_;
-      from_  = subst_path s bs.from_;
-      to_    = subst_path s bs.to_;
-      size   = bs.size;
-      theory = subst_path s bs.theory;
-    } in Th_bitstring (bs, lc)
-
-  | Th_bsarray (ba, lc) ->
-    assert (not (Mp.mem ba.type_ s.sb_tydef));
-    assert (not (Mp.mem ba.get s.sb_def));
-    assert (not (Mp.mem ba.set s.sb_def));
-    assert (not (Mp.mem ba.tolist s.sb_def));
-    let ba = {
-      type_  = subst_path s ba.type_;
-      get    = subst_path s ba.get;
-      set    = subst_path s ba.set;
-      tolist = subst_path s ba.tolist;
-      size   = ba.size;
-    } in Th_bsarray (ba, lc)
-
-  | Th_qfabvop (op, lc) ->
-    assert (not (Mp.mem op.type_ s.sb_tydef));
-    assert (not (Mp.mem op.operator s.sb_def));
-    let op = {
-      kind     = op.kind;
-      type_    = subst_path s op.type_;
-      operator = subst_path s op.operator;
-      theory   = subst_path s op.theory;
-    } in Th_qfabvop (op, lc)
-
-  | Th_circuit (circuit, lc) ->
-      assert (not (Mp.mem circuit.operator s.sb_def));
-      let circuit = {
-        name     = circuit.name;
-        circuit  = circuit.circuit;
-        operator = subst_path s circuit.operator;
-      } in Th_circuit (circuit, lc)
+  | Th_crbinding (bd, lc) ->
+      Th_crbinding (subst_crbinding s bd, lc)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : subst) (items : theory) =
