@@ -6,7 +6,7 @@ depends: [
   "camlp-streams" {>= "5"}
   "camlzip"
   "cmdliner"
-  "dune" {>= "3.13" & >= "3.6"}
+  "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"
   "hex"
