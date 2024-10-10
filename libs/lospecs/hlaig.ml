@@ -272,10 +272,8 @@ end = struct
     match Map.find_opt s env.forward with
     | None ->
       let id = fresh () in
-      ({ env with
-      forward = Map.add s id env.forward;
-      reverse = Map.add id s env.reverse;
-      }, id)
+      ({ forward = Map.add s id env.forward;
+         reverse = Map.add id s env.reverse; }, id)
     | Some i -> (env, i)
 
   let get (env: env) (s: string) = 
