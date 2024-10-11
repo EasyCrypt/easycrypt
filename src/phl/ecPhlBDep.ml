@@ -314,6 +314,21 @@ let t_bdep
   in
   FApi.close (!@ tc) VBdep
 
+let get_var (v : bdepvar) (m : memenv) : variable list =
+  let get1 (v : symbol) =
+    match EcMemory.lookup_me v m with
+    | Some (v, None, _) -> v
+    | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false in
+
+  match v with
+  | `Var v ->
+      [get1 v]
+  | `VarRange (v, n) ->
+      List.init n (fun i -> get1 (Format.sprintf "%s_%d" v n))
+
+let get_vars (vs : bdepvar list) (m : memenv) : variable list =
+  List.flatten (List.map (fun v -> get_var v m) vs)
+
 let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let invs = bdinfo.invs in
   let inpvs = bdinfo.inpvs in
@@ -341,13 +356,9 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   in
 
   (* DEBUG SECTION *)
-  let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  let pp_type (fmt: Format.formatter) (ty: ty) =
+    Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
   
-  let get_var (v: symbol) (m: memenv) : variable =
-    match EcMemory.lookup_me v m with
-    | Some (v, None, _) -> v
-    | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false
-  in
   let collapse (xs: 'a list) : 'a option = 
     match xs with
     | [] -> None
@@ -365,7 +376,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   
 
   (* ------------------------------------------------------------------ *)
-  let outvs = List.map (fun v -> get_var v hr.hs_m) outvs in
+  let outvs  = get_vars outvs hr.hs_m in
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = List.map (flatten_to_bits env) poutvs in
   let poutvs = List.rev poutvs in
@@ -390,9 +401,19 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   
   
   (* ------------------------------------------------------------------ *)
-  let inpvs = List.map (fun v -> get_var v hr.hs_m) inpvs in
+  let inpvs = get_vars inpvs hr.hs_m in
   (* let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in *)
-  let invs, inv_tys = List.map (fun v -> EcEnv.Var.lookup_local v env) invs |> List.split in
+  let invs, inv_tys =
+    let lookup (x : bdepvar) : (ident * ty) list =
+      let get1 (v : symbol) =
+        EcEnv.Var.lookup_local v env in
+
+      match x with
+      | `Var x ->
+          [get1 x]
+      | `VarRange (x, n) ->
+          List.init n (fun i -> get1 (Format.sprintf "%s_%d" x i)) in 
+    List.map lookup invs |> List.flatten |> List.split in
   let inty = match collapse inv_tys with
   | Some ty -> ty
   | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
@@ -451,32 +472,25 @@ let process_bdepeq
   let n = bdeinfo.n in
 
   (* DEBUG SECTION *)
-  (* let pp_type (fmt: Format.formatter) (ty: ty) = Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in *)
-  
-  let get_var (v: symbol) (m: memenv) : variable =
-    match EcMemory.lookup_me v m with
-    | Some (v, None, _) -> v
-    | _ -> Format.eprintf "Couldn't locate variable %s@." v; assert false
-  in
-  
+    
   let eqS = EcLowPhlGoal.tc1_as_equivS tc in
   let mem_l, mem_r = eqS.es_ml, eqS.es_mr in
 
   (* ------------------------------------------------------------------ *)
-  let process_block (outvsl: symbol list) (outvsr: symbol list) = 
-    let outvsl = List.map (fun v -> get_var v mem_l) outvsl in
+  let process_block (outvsl: bdepvar list) (outvsr: bdepvar list) = 
+    let outvsl = get_vars outvsl mem_l in
     let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
 
-    let outvsr = List.map (fun v -> get_var v mem_r) outvsr in
+    let outvsr = get_vars outvsr mem_r in
     let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
     List.map2 f_eq poutvsl poutvsr |> f_ands, (outvsl, outvsr)
   in
    
 
-  let inpvsl = List.map (fun v -> get_var v mem_l) inpvsl in
+  let inpvsl = get_vars inpvsl mem_l in
   let pinpvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) inpvsl in
 
-  let inpvsr = List.map (fun v -> get_var v mem_r) inpvsr in
+  let inpvsr = get_vars inpvsr mem_r in
   let pinpvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) inpvsr in
 
   let pre = List.map2 f_eq pinpvsl pinpvsr |> f_ands in

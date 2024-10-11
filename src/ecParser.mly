@@ -81,15 +81,6 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let arr_of_vars (v : string) (i : int) : string list =
-    List.init i (fun i -> v ^ "_" ^ (string_of_int i))
-
-  let make_bdep_info n m invs inpvs outvs pcond lane perm = 
-    { n; m; invs; inpvs; outvs; pcond; lane; perm }
-
-  let make_bdepeq_info n inpvs_l inpvs_r out_blocks pcond = 
-    { n; inpvs_l; inpvs_r; out_blocks; pcond; }
-
   let mk_axiom ~locality (x, ty, pv, vd, f) k =
     { pa_name     = x;
       pa_tyvars   = ty;
@@ -3005,7 +2996,7 @@ interleave_info:
 | s=brace(stmt) { OKstmt(s) }
 | r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
 
-phltactic:
+%public phltactic:
 | PROC
    { Pfun `Def }
 
@@ -3277,33 +3268,39 @@ phltactic:
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
-| BDEP n=uint m=uint 
-       invs=bdep_vars inpvs=bdep_vars outvs=bdep_vars
-       o=oident pc=oident perm=oident?
-    { Pbdep (make_bdep_info (BI.to_int n) (BI.to_int m)
-      invs inpvs outvs pc o perm) }
+bd_vars:
+| vs=plist0(STRING, SEMICOLON) 
+  { List.map (fun v -> (`Var v :> bdepvar)) vs }
 
-| BDEPEQ n=uint inpvsl=bdep_vars inpvsr=bdep_vars
-         LBRACE outblocks=plist0(bdepeq_out_info, SEMICOLON) RBRACE pcond=oident?
-      { Pbdepeq (make_bdepeq_info (BI.to_int n) 
-                inpvsl inpvsr outblocks pcond)}
+| v=STRING COLON w=word
+  { [(`VarRange (v, w) :> bdepvar)] }
+
+bdepeq_out_info:
+| m=word COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bracket(bd_vars) RBRACKET
+  { (m, outvs_l, outvs_r) }
+
+%public phltactic:
+| BDEP
+    n=word
+    m=word
+    invs=bracket(bd_vars)
+    inpvs=bracket(bd_vars)
+    outvs=bracket(bd_vars)
+    lane=oident
+    pcond=oident
+    perm=oident?
+  { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; } }
+
+| BDEPEQ
+    n=word
+    inpvs_l=bracket(bd_vars)
+    inpvs_r=bracket(bd_vars)
+    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
+    pcond=oident?
+  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; } }
 
 | BDEP BITSTRING
-    { Pcirc }
-
-%inline bd_vars:
-| vs=plist0(STRING, SEMICOLON) 
-  { vs }
-| v=STRING COLON w=uint
-  { arr_of_vars v (BI.to_int w) }
-
-%inline bdep_vars:
-| LBRACKET vs=bd_vars RBRACKET
-  { vs }
-
-%inline bdepeq_out_info:
-| m=uint COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bd_vars RBRACKET
-  { ((BI.to_int m), outvs_l, outvs_r) }
+  { Pcirc }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

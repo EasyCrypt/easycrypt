@@ -706,24 +706,25 @@ type matchmode = [
   | `SSided of side
 ]
 
-type bdep_info = {
-  n : int;
-  m : int;
-  invs : string list;
-  inpvs : string list;
-  outvs : string list;
-  pcond : psymbol;
-  lane  : psymbol;
-  perm  : psymbol option;
-}
+(* -------------------------------------------------------------------- *)
+type bdepvar = [`Var of string | `VarRange of string * int]
 
-type bdepeq_info = {
-  n : int;
-  inpvs_l : string list;
-  inpvs_r : string list;
-  out_blocks: (int * string list * string list) list;
-  pcond: psymbol option;
-}
+type bdep_info =
+  { n     : int
+  ; m     : int
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; pcond : psymbol
+  ; lane  : psymbol
+  ; perm  : psymbol option }
+
+type bdepeq_info =
+  { n          : int
+  ; inpvs_l    : bdepvar list
+  ; inpvs_r    : bdepvar list
+  ; out_blocks : (int * bdepvar list * bdepvar list) list
+  ; pcond      : psymbol option }
 
 (* -------------------------------------------------------------------- *)
 type phltactic =
