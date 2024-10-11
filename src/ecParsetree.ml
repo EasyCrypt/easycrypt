@@ -398,15 +398,15 @@ and pop_pattern = {
 }
 
 type poperator = {
-  po_kind   : [`Op | `Const];
-  po_name   : psymbol;
-  po_aliases: psymbol list;
-  po_tags   : psymbol list;
-  po_tyvars : ptyvardecls option;
-  po_deps   : ptybindings;
-  po_args   : pstybindings * pstybindings option;
-  po_def    : pop_def;
-  po_ax     : osymbol_r;
+  po_kind     : [`Op | `Const];
+  po_name     : psymbol;
+  po_aliases  : psymbol list;
+  po_tags     : psymbol list;
+  po_tyvars   : ptyvardecls option;
+  po_vparams  : ptybindings;
+  po_args     : pstybindings * pstybindings option;
+  po_def      : pop_def;
+  po_ax       : osymbol_r;
   po_locality : locality;
 }
 

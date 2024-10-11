@@ -325,7 +325,7 @@ module PPEnv = struct
 
   let tyvar (ppe : t) x =
     match Mid.find_opt x ppe.ppe_locals with
-    | None   -> EcIdent.tostring x
+    | None   -> EcIdent.name x
     | Some x -> x
 
   exception FoundUnivarSym of symbol
@@ -1000,11 +1000,11 @@ let pp_opapp
       fun () ->
         match es with
         | [] ->
-            pp_opname_with_tvi ppe fmt (nm, opname, Some tvi)
+            pp_opname fmt (nm, opname)
 
         | _  ->
-            let pp_subs = ((fun ppe _ -> pp_opname_with_tvi ppe), pp_sub) in
-            let pp fmt () = pp_app ppe pp_subs outer fmt (([], opname, Some tvi), es) in
+            let pp_subs = ((fun _ _ -> pp_opname), pp_sub) in
+            let pp fmt () = pp_app ppe pp_subs outer fmt (([], opname), es) in
             maybe_paren outer (inm, max_op_prec) pp fmt ()
 
   and try_pp_as_uniop () =

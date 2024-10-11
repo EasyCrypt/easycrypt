@@ -3516,9 +3516,15 @@ let transsty tp env ue sty =
       base_ty, Some (w, pred)
   end
 
+(* Translate bindings with possible subtypes *)
 let trans_sbinding env ue bd =
+  (* NOTE:
+     We maintain a copy of the initial env to prevent typing subtypes
+     using regular bindings instead of just value parameters. *)
+  let eenv = env in
+
   let trans_bd1 env (xs, psty) =
-    let ty, opred = transsty tp_relax env ue psty in
+    let ty, opred = transsty tp_relax eenv ue psty in
 
     let xs =
       List.map
@@ -3533,7 +3539,8 @@ let trans_sbinding env ue bd =
       xs
     in
     let env = EcEnv.Var.bind_locals (List.fst xs) env in
-    env, xs in
+    env, xs
+  in
   let env, bd = List.map_fold trans_bd1 env bd in
   let bd = List.flatten bd in
   env, bd

@@ -1093,44 +1093,46 @@ module Op = struct
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
     let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
+
+    (* NOTE: Value params are non-polymorphic so we translate them first in an
+             empty unification environment. *)
+    let ue = EcUnify.UniEnv.create None in
+    let eenv, vps = TT.trans_binding eenv ue op.po_vparams in
+    let non_poly = List.for_all (fun (_, ty) -> match ty.ty_node with | Tvar _ -> false | _ -> true) vps in
+    if not (EcUnify.UniEnv.closed ue) || not non_poly then
+      hierror ~loc "this operator has free type variables in its value parameters";
+
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
-    let (ty, body, refts, slemma) =
+
+    (* Construct a spec for a provided witness/predicate pair. *)
+    let extract_spec is_axiom xs codom (w, pred) = 
+      let (args, specs) = List.split xs in
+      let ax = EcCoreFol.f_imps (List.filter_map identity specs) pred in
+      let opfm = EcCoreFol.f_op opname [] codom in
+      let spec = EcSubst.subst_form (EcSubst.add_flocal EcSubst.empty w opfm) ax in
+      (is_axiom, vps, args, spec, codom)
+    in
+
+    let (ty, body, refts, ospec) =
       match op.po_def with
       | PO_abstr pty ->
-          let eenv, ds = TT.trans_binding eenv ue op.po_deps in
           let eenv, xs = TT.trans_sbinding eenv ue args in
           let (codom, opred) = TT.transsty TT.tp_relax eenv ue pty in
-          let opty = EcTypes.toarrow (List.map snd (ds @ List.fst xs)) codom in
-          begin match opred with
-          | Some (w, pred) ->
-            let ax = (EcCoreFol.f_imps (List.filter_map (fun x -> x) (List.snd xs)) pred) in
-            let opfm = EcCoreFol.f_op opname [] codom in
-            let reft = EcSubst.subst_form (EcSubst.add_flocal EcSubst.empty w opfm) ax in
-            let ax_name = unloc op.po_name ^ "_spec" in
-            (opty, `Abstract, [(mk_loc loc ax_name, ds @ List.fst xs, reft, codom)], None)
-          | None ->
-            (opty, `Abstract, [], None)
-          end
+          let opty = EcTypes.toarrow (List.map snd (List.fst xs)) codom in
+          let ospec = omap (extract_spec true xs codom) opred in
+          (opty, `Abstract, [], ospec)
 
       | PO_concr (pty, pf) ->
-          let eenv, ds = TT.trans_binding eenv ue op.po_deps in
           let eenv, xs = TT.trans_sbinding eenv ue args in
           let (codom, opred) = TT.transsty TT.tp_relax eenv ue pty in
           let body = TT.trans_form eenv ue pf codom in
-          let lam  = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) (ds @ List.fst xs)) body in
-          begin match opred with
-          | Some (w, pred) ->
-            let ax = (EcCoreFol.f_imps (List.filter_map (fun x -> x) (List.snd xs)) pred) in
-            let opfm = EcCoreFol.f_op opname [] codom in
-            let reft = EcSubst.subst_form (EcSubst.add_flocal EcSubst.empty w opfm) ax in
-            let ax_name = unloc op.po_name ^ "_spec" in
-            (lam.f_ty, `Plain lam, [], Some (mk_loc loc ax_name, ds @ List.fst xs, reft, codom))
-          | None ->
-            (lam.f_ty, `Plain lam, [], None)
-          end
+          let lam  = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) (List.fst xs)) body in
+          let ospec = omap (extract_spec false xs codom) opred in
+          (lam.f_ty, `Plain lam, [], ospec)
 
+      (* TODO: Generate type specs here. *)
       | PO_case (pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
           match EHI.trans_matchfix eenv ue name (args, pty, pbs) with
@@ -1139,16 +1141,16 @@ module Op = struct
 
       | PO_reft (pty, (rname, reft)) ->
           let env      = env scope in
-          let eenv, ds = TT.trans_binding eenv ue op.po_deps in
           let eenv, xs = TT.trans_sbinding eenv ue args in
-          let (codom, _opred) = TT.transsty TT.tp_relax eenv ue pty in
-          let xs = ds @ List.fst xs in
+          let (codom, opred) = TT.transsty TT.tp_relax eenv ue pty in
+          let ospec = omap (extract_spec true xs codom) opred in
+          let xs = List.fst xs in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
           let opabs    = EcDecl.mk_op ~opaque:optransparent [] codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
-          (opty, `Abstract, [(rname, xs, reft, codom)], None)
+          (opty, `Abstract, [(rname, vps @ xs, reft, codom)], ospec)
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -1332,21 +1334,17 @@ module Op = struct
       else scope in
 
     let scope =
-      match slemma with
+      match ospec with
       | None -> scope
-      | Some (rname, xs, ax, codom) -> begin
+      | Some (is_axiom, vs, xs, ax, codom) -> begin
           let ax =
             let opargs  = List.map (fun (x, xty) -> f_local x xty) xs in
             let opapp   = List.map (tvar |- fst) tparams in
             let opapp   = f_app (f_op opname opapp ty) opargs codom in
-
             let subst   = EcSubst.add_pddef EcSubst.empty opname ([], opapp) in
             let ax      = EcSubst.subst_form subst ax in
-            let ax      = f_forall (List.map (snd_map gtty) xs) ax in
-
-            let ax      = fs ax in
-
-            ax
+            let ax      = f_forall (List.map (snd_map gtty) (vs @ xs)) ax in
+            fs ax
           in
 
           let ax, axpm =
@@ -1354,23 +1352,24 @@ module Op = struct
             let axpm = List.map EcIdent.fresh bdpm in
               (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
                List.combine axpm (List.map snd tparams)) in
+
           let ax =
             { ax_tparams    = axpm;
               ax_spec       = ax;
-              ax_kind       = `Lemma;
+              ax_kind       = if is_axiom then `Axiom (Ssym.empty, false) else `Lemma;
               ax_loca       = lc;
               ax_visibility = `Visible; }
           in
+          let scope, axname =
+            let axname = Printf.sprintf "%s_%s" (unloc op.po_name) "spec" in
+            Ax.bind scope (axname, ax), axname
+          in
 
-          let local =
-            match lc with
-            | `Declare -> hierror ~loc "cannot mark with `declare` a lemma"
-            | `Local   -> true
-            | `Global  -> false in
-          let check    = Check_mode.check scope.sc_options in
-          let pucflags = { puc_visibility = ax.ax_visibility; puc_local = local; } in
-          let pucflags = (([], None), pucflags) in
-          Ax.start_lemma scope pucflags check ~name:(unloc rname) (ax, None)
+          let axpath = EcPath.psymbol axname in
+          if is_axiom then
+            (axs := axname :: !axs; scope)
+          else 
+            Ax.add_defer scope [((Some axname, ax), axpath, scope.sc_env)]
       end
     in
 
