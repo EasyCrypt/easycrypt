@@ -368,22 +368,31 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             let ue    = EcUnify.UniEnv.create (Some nargs) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
             let decl  =
-              { tyd_params  = nargs;
-                tyd_type    = `Concrete ntyd;
-                tyd_resolve = otyd.tyd_resolve && (mode = `Alias);
-                tyd_loca    = otyd.tyd_loca; }
+              { tyd_params   = nargs;
+                tyd_type     = `Concrete ntyd;
+                tyd_resolve  = otyd.tyd_resolve && (mode = `Alias);
+                tyd_loca     = otyd.tyd_loca;
+                tyd_clinline = (mode <> `Alias); }
 
             in (decl, ntyd)
 
         | `ByPath p -> begin
             match EcEnv.Ty.by_path_opt p env with
             | Some reftyd ->
-                let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) reftyd.tyd_params in
-                let body   = tconstr p tyargs in
+              let body =
+                if reftyd.tyd_clinline then
+                  (match reftyd.tyd_type with
+                  | `Concrete body -> body
+                  | _ -> assert false)
+                else
+                  let tyargs =
+                    List.map (fun (x, _) -> EcTypes.tvar x) reftyd.tyd_params in
+                  tconstr p tyargs in
                 let decl   =
                   { reftyd with
-                      tyd_type    = `Concrete body;
-                      tyd_resolve = otyd.tyd_resolve && (mode = `Alias); } in
+                      tyd_type     = `Concrete body;
+                      tyd_resolve  = otyd.tyd_resolve && (mode = `Alias);
+                      tyd_clinline = (mode <> `Alias); } in
                 (decl, body)
 
             | _ -> assert false
@@ -997,10 +1006,10 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
   try
     let kind     = op.kind in
     let operator = forpath op.operator in
-    let type_    = op.type_ in (* FIXME *)
+    let types    = op.types in (* FIXME *)
     let theory   = op.theory in (* FIXME *)
 
-    let op = CRB_BvOperator { kind; operator; type_; theory; } in
+    let op = CRB_BvOperator { kind; operator; types; theory; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (op, lc)) in
 
     (subst, ops, proofs, scope)

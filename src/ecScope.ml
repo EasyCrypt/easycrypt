@@ -1604,7 +1604,11 @@ module Ty = struct
         record.ELI.rc_tparams, `Record (scheme, record.ELI.rc_fields)
     in
 
-    bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; tyd_resolve = true; })
+    let tydecl =
+      { tyd_params; tyd_type; tyd_loca;
+        tyd_resolve = true; tyd_clinline = false; } in
+
+    bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
   let bindclass ?(import = EcTheory.import0) (scope : scope) (x, tc) =
@@ -1633,10 +1637,11 @@ module Ty = struct
 
       let asty  =
         let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
-          { tyd_params  = [];
-            tyd_type    = `Abstract body;
-            tyd_loca    = (lc :> locality);
-            tyd_resolve = true;  } in
+          { tyd_params   = [];
+            tyd_type     = `Abstract body;
+            tyd_loca     = (lc :> locality);
+            tyd_resolve  = true;
+            tyd_clinline = false; } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
       (* Check for duplicated field names *)
@@ -2310,6 +2315,7 @@ module Circuit = struct
     path      : EcPath.path;
     name      : symbol;
     local     : is_local;
+    theories  : (symbol * path) list;
     types_    : (symbol * path) list;
     operators : (symbol * preoperator) list;
     proofs    : symbol list;
@@ -2336,15 +2342,47 @@ module Circuit = struct
         in (x, loced (operator, `Inline `Keep))
       in
 
+      let do_theory (x : symbol) (theory : path) : EcThCloning.evclone =
+        Format.eprintf "@.@.%s@.@." (EcPath.tostring clone.path);
+        let thenv = EcEnv.Theory.env_of_theory clone.path env in
+        let atheory = EcEnv.Theory.by_path (pqname clone.path x) thenv in
+
+        List.fold_left (fun (evc : EcThCloning.evclone) (item : EcTheory.theory_item) ->
+          match item.ti_item with
+          | Th_operator (x, opdecl) -> begin
+            match opdecl.op_kind with
+            | OB_oper None ->
+              let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
+              { evc with evc_ops = Msym.add x (loced ovrd) evc.evc_ops }
+            | _ -> evc
+            end
+          | Th_type (x, _) ->
+            let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
+            { evc with evc_types = Msym.add x (loced ovrd) evc.evc_types }
+          | Th_axiom (x, _) ->         
+            let evc_lemmas =
+              let proof = loced (EcPath.toqsymbol (pqname theory x)) in
+              let proof = Papply (`ExactType proof, None) in
+              let proof = loced (Plogic proof) in              
+              let proof = (Some proof, `Inline `Clear, false) in
+              { evc.evc_lemmas with
+                  ev_bynames = Msym.add x proof evc.evc_lemmas.ev_bynames }
+            in { evc with evc_lemmas }
+          | _ -> assert false
+        ) EcThCloning.evc_empty atheory.cth_items in
+
       { EcThCloning.evc_empty with
           evc_types  = Msym.of_list (List.map do_type clone.types_);
           evc_ops    = Msym.of_list (List.map do_operator clone.operators);
+          evc_ths    = Msym.of_list (List.map (fun (x, th) -> (x, do_theory x th)) clone.theories);
           evc_lemmas = {
             ev_bynames =
               clone.proofs
                 |> List.map (fun name -> (name, (Some (loced (Pby None)), `Alias, false)))
                 |> Msym.of_list;
-            ev_global  = [None, None]; } } in
+            ev_global  = 
+              [ (Some (loced (Pby None)), Some [`Include, "bydone"])
+              ; (None, None) ]; } } in
 
     let npath = EcPath.pqname (EcEnv.root env) clone.name in
     let theory = EcEnv.Theory.by_path clone.path env in
@@ -2384,12 +2422,13 @@ module Circuit = struct
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
       ; name      = name
       ; local     = local
+      ; theories  = []
       ; types_    = ["bv", bspath]
       ; operators =
           [ ("size"  , `Int bs.size)
           ; ("tolist", `Path to_)
           ; ("oflist", `Path from_) ]
-      ; proofs    = ["gt0_size"] } in
+      ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
 
@@ -2405,7 +2444,7 @@ module Circuit = struct
 
     Ax.add_defer scope proofs
 
-  let add_bsarray (scope : scope) (local : is_local) (ba : pbind_array) : scope = 
+  let add_array (scope : scope) (local : is_local) (ba : pbind_array) : scope = 
     let env = env scope in
 
     let bspath =
@@ -2431,13 +2470,14 @@ module Circuit = struct
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
       ; name      = name
       ; local     = local
+      ; theories  = []
       ; types_    = ["t", bspath]
       ; operators =
           [ ("size"   , `Int ba.size)
           ; ("get"    , `Path get)
           ; ("set"    , `Path set)
           ; ("to_list", `Path tolist) ]
-      ; proofs    = ["gt0_size"] } in
+      ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
 
@@ -2450,57 +2490,79 @@ module Circuit = struct
 
     Ax.add_defer scope proofs
   
-  let add_qfabvop (scope : scope) (local : is_local) (op : pbind_bvoperator) : scope =
+  let add_bvoperator (scope : scope) (local : is_local) (op : pbind_bvoperator) : scope =
     let env = env scope in
 
-    let type_ =
-      let ue = EcUnify.UniEnv.create None in
-      let ty = EcTyping.transty tp_tydecl env ue op.type_ in
-      assert (EcUnify.UniEnv.closed ue);
-      ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty
-    in
+    let types =
+      let for1 (ty : pty) =
+        let type_ =
+          let ue = EcUnify.UniEnv.create None in
+          let ty = EcTyping.transty tp_tydecl env ue ty in
+          assert (EcUnify.UniEnv.closed ue);
+          ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty in
 
-    let bspath =
-      match type_.ty_node with
-      | Tconstr (p, []) -> p
-      | _ ->
-          hierror ~loc:(op.type_.pl_loc)
-            "bit-string type must be a monomorphic named type" in
+        let bspath =
+          match type_.ty_node with
+          | Tconstr (p, []) -> p
+          | _ ->
+              hierror ~loc:(ty.pl_loc)
+                "bit-string type must be a monomorphic named type" in
 
-    let bitstring =
-      match EcEnv.Circuit.lookup_bitstring env type_ (* FIXME *) with
-      | None ->
-        hierror ~loc:(op.type_.pl_loc)
-          "this type is not bound to a bitstring type"
-      | Some bitstring -> bitstring in
+        let bitstring =
+          match EcEnv.Circuit.lookup_bitstring env type_ with
+          | None ->
+            hierror ~loc:(ty.pl_loc)
+              "this type is not bound to a bitstring type"
+          | Some bitstring -> bitstring in
+
+        (type_, bspath, bitstring) in
+
+      List.map for1 op.types in
 
     let (kind, subname) : EcDecl.bv_opkind * _ =
-      match unloc op.name with
-      | "add"  -> `Add  bitstring.size, "Add"
-      | "sub"  -> `Sub  bitstring.size, "Sub"
-      | "mul"  -> `Mul  bitstring.size, "Mul"
-      | "udiv" -> `UDiv bitstring.size, "UDiv"
-      | "urem" -> `URem bitstring.size, "URem"
-      | "shl"  -> `Shl  bitstring.size, "SHL"
-      | "shr"  -> `Shr  bitstring.size, "SHR"
-      | "and"  -> `And  bitstring.size, "And"
-      | "or"   -> `Or   bitstring.size, "Or"
-      | "not"  -> `Not  bitstring.size, "Not"
-      | _      ->
+      match unloc op.name, types with
+      | "add"     , [_,_, bs]  -> `Add  bs.size, "Add"
+      | "sub"     , [_,_, bs]  -> `Sub  bs.size, "Sub"
+      | "mul"     , [_,_, bs]  -> `Mul  bs.size, "Mul"
+      | "udiv"    , [_,_, bs]  -> `UDiv bs.size, "UDiv"
+      | "urem"    , [_,_, bs]  -> `URem bs.size, "URem"
+      | "shl"     , [_,_, bs]  -> `Shl  bs.size, "SHL"
+      | "shr"     , [_,_, bs]  -> `Shr  bs.size, "SHR"
+      | "and"     , [_,_, bs]  -> `And  bs.size, "And"
+      | "or"      , [_,_, bs]  -> `Or   bs.size, "Or"
+      | "not"     , [_,_, bs]  -> `Not  bs.size, "Not"
+
+      | "zextend", [bs1; bs2] ->
+        (`ZExtend ((proj3_3 bs1).size, (proj3_3 bs2).size), "ZExtend")
+
+      | "truncate", [bs1; bs2] ->
+        (`Truncate ((proj3_3 bs1).size, (proj3_3 bs2).size), "Truncate")
+
+      | _ ->
         hierror ~loc:(loc op.name)
           "invalid bv operator name: %s" (unloc op.name) in
 
     let subname = "BV" ^ subname in
-    let subpath = EcPath.pqname bitstring.theory subname in
 
     let operator, _ = EcEnv.Op.lookup op.operator.pl_desc env in
-    let name = String.concat "_"
-      ("BVA" :: unloc op.name :: EcPath.tolist bspath) (* FIXME: not stable*) in
+    let name =
+      let suffix = List.map (EcPath.tolist |- proj3_2) types in
+      let suffix = List.flatten suffix in
+      String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME: not stable*) in
+
+    let cltheories =
+      match types with
+      | [_, _, bs] -> ["BV", bs.theory]
+      | _ ->
+        List.mapi (fun i (_, _, (bs : crb_bitstring)) ->
+          (Format.asprintf "BV%d" (i + 1), bs.theory)
+        ) types in
 
     let preclone =
-      { path      = subpath
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"; "BVOperators"], subname)
       ; name      = name
       ; local     = local
+      ; theories  = cltheories
       ; types_    = []
       ; operators = ["bv" ^ unloc op.name, `Path operator]
       ; proofs    = [] } in
@@ -2509,9 +2571,9 @@ module Circuit = struct
 
     let item = CRB_BvOperator
       { kind     = kind;
-        type_    = bspath;
+        types    = List.map proj3_2 types;
         operator = operator;
-        theory   = subpath; } in
+        theory   = EcPath.pqname (EcEnv.root env) subname; } in
 
     let item = EcTheory.mkitem EcTheory.import0 (Th_crbinding (item, local)) in
   

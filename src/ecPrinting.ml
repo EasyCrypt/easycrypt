@@ -3393,20 +3393,22 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     | CRB_BvOperator op ->
       let kind =
         match op.kind with
-        | `Add   _ -> "add"
-        | `Sub   _ -> "sub"
-        | `Mul   _ -> "mul"
-        | `UDiv  _ -> "udiv"
-        | `URem  _ -> "urem"
-        | `Shl   _ -> "shl"
-        | `Shr   _ -> "shr"
-        | `Not   _ -> "not"
-        | `And   _ -> "and"
-        | `Or    _ -> "or"
+        | `Add      _ -> "add"
+        | `Sub      _ -> "sub"
+        | `Mul      _ -> "mul"
+        | `UDiv     _ -> "udiv"
+        | `URem     _ -> "urem"
+        | `Shl      _ -> "shl"
+        | `Shr      _ -> "shr"
+        | `Not      _ -> "not"
+        | `And      _ -> "and"
+        | `Or       _ -> "or"
+        | `ZExtend  _ -> "zextend"
+        | `Truncate _ -> "truncate"
       in
-      Format.fprintf fmt "%abind op %a %a \"%s\""
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
         pp_locality lc
-        (pp_tyname ppe) op.type_
+        (pp_list " & " (pp_tyname ppe)) op.types
         (pp_opname ppe) op.operator
         kind
 

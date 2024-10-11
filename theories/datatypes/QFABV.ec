@@ -2,11 +2,11 @@
 require import AllCore List Int IntDiv BitEncoding.
 (* - *) import BS2Int. 
 
-(* -------------------------------------------------------------------- *)
+(* ==================================================================== *)
 abstract theory BV.
   op size : int.
 
-  axiom gt0_size : 0 < size.
+  axiom [bydone] gt0_size : 0 < size.
 
   type bv.
 
@@ -23,79 +23,138 @@ abstract theory BV.
 
   axiom tolistK (bv : bv) : oflist (tolist bv) = bv.
   axiom oflistK (xs : bool list) : size xs = size => tolist (oflist xs) = xs.
+end BV.
 
+(* ==================================================================== *)
+theory BVOperators.
+  (* ------------------------------------------------------------------ *)
   abstract theory BVAdd.
+    clone import BV.
+  
     op bvadd : bv -> bv -> bv.
-
+  
     axiom bvaddP (bv1 bv2 : bv) :
-      toint (bvadd bv1 bv2) = (toint bv1 + toint bv2) %% 2^size.
+      toint (bvadd bv1 bv2) = (toint bv1 + toint bv2) %% 2^BV.size.
   end BVAdd.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVSub.
+    clone import BV.
+  
     op bvsub : bv -> bv -> bv.
-
+  
     axiom bvsubP (bv1 bv2 : bv) :
-      toint (bvsub bv1 bv2) = (toint bv1 - toint bv2) %% 2^size.
+      toint (bvsub bv1 bv2) = (toint bv1 - toint bv2) %% 2^BV.size.
   end BVSub.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVMul.
+    clone import BV.
+  
     op bvmul : bv -> bv -> bv.
-
+  
     axiom bvmulP (bv1 bv2 : bv) :
-      toint (bvmul bv1 bv2) = (toint bv1 * toint bv2) %% 2^size.
+      toint (bvmul bv1 bv2) = (toint bv1 * toint bv2) %% 2^BV.size.
   end BVMul.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVUDiv.
+    clone import BV.
+  
     op bvudiv : bv -> bv -> bv.
-
+  
     axiom bvudivP (bv1 bv2 : bv) : toint bv2 <> 0 =>
       toint (bvudiv bv1 bv2) = toint bv1 %/ toint bv2.
   end BVUDiv.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVURem.
+    clone import BV.
+  
     op bvurem : bv -> bv -> bv.
-
+  
     axiom bvuremP (bv1 bv2 : bv) :
       toint (bvurem bv1 bv2) = toint bv1 %% toint bv2.
   end BVURem.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVSHL.
+    clone import BV.
+  
     op bvshl : bv -> bv -> bv.
-
+  
     axiom bvshlP (bv1 bv2 : bv) : toint (bvshl bv1 bv2) =
       toint bv1 * 2 ^ (toint bv2).
   end BVSHL.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVSHR.
+    clone import BV.
+  
     op bvshr : bv -> bv -> bv.
-
+  
     axiom bvshrP (bv1 bv2 : bv) : toint (bvshr bv1 bv2) =
       toint bv1 %/ 2 ^ (toint bv2).
   end BVSHR.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVAnd.
+    clone import BV.
+  
     op bvand : bv -> bv -> bv.
-
+  
     axiom bvandP (bv1 bv2 : bv) : tolist (bvand bv1 bv2) =
       map (fun (b : _ * _) => b.`1 /\ b.`2) (zip (tolist bv1) (tolist bv2)).
   end BVAnd.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVOr.
+    clone import BV.
+  
     op bvor : bv -> bv -> bv.
-
+  
     axiom bvorP (bv1 bv2 : bv) : tolist (bvor bv1 bv2) =
       map (fun (b : _ * _) => b.`1 \/ b.`2) (zip (tolist bv1) (tolist bv2)).
   end BVOr.
-
+  
+  (* ------------------------------------------------------------------ *)
   abstract theory BVNot.
+    clone import BV.
+  
     op bvnot : bv -> bv.
-
+  
     axiom bvnotP (bv : bv) : tolist (bvnot bv) =
       map (fun b => !b) (tolist bv).
   end BVNot.
-end BV.
 
-(* -------------------------------------------------------------------- *)
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVZExtend.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV1.size <= BV2.size.
+
+    op bvzextend : BV1.bv -> BV2.bv.
+
+    axiom bvzextendP (bv : BV1.bv) :
+      BV1.toint bv = BV2.toint (bvzextend bv).
+  end BVZExtend.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVTruncate.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size.
+
+    op bvtruncate : BV1.bv -> BV2.bv.
+
+    axiom bvtruncateP (bv : BV1.bv) :
+      take BV2.size (BV1.tolist bv) = BV2.tolist (bvtruncate bv).
+  end BVTruncate.
+end BVOperators.
+
+(* ==================================================================== *)
 theory A.
   op size : int.
 

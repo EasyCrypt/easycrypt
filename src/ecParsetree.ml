@@ -1286,7 +1286,7 @@ type pbind_array =
 (* -------------------------------------------------------------------- *)
 type pbind_bvoperator =
   { name     : string located
-  ; type_    : pty
+  ; types    : pty list
   ; operator : pqsymbol }
 
 (* -------------------------------------------------------------------- *)

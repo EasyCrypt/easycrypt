@@ -708,10 +708,10 @@ and process_dump scope (source, tc) =
 (* -------------------------------------------------------------------- *)
 and process_crbind (scope : EcScope.scope) (binding : pcrbinding) =
   match binding.binding with
-  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring scope binding.locality bs
-  | CRB_Array      ba -> EcScope.Circuit.add_bsarray   scope binding.locality ba
-  | CRB_BvOperator op -> EcScope.Circuit.add_qfabvop   scope binding.locality op
-  | CRB_Circuit    cr -> EcScope.Circuit.add_circuit   scope binding.locality cr
+  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring  scope binding.locality bs
+  | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
+  | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
+  | CRB_Circuit    cr -> EcScope.Circuit.add_circuit    scope binding.locality cr
 
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =

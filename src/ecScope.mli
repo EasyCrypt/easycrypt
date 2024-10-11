@@ -246,10 +246,10 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit : sig 
-  val add_bitstring : scope -> is_local -> pbind_bitstring -> scope
-  val add_bsarray   : scope -> is_local -> pbind_array -> scope
-  val add_qfabvop   : scope -> is_local -> pbind_bvoperator -> scope
-  val add_circuit   : scope -> is_local -> pbind_circuit -> scope
+  val add_bitstring  : scope -> is_local -> pbind_bitstring -> scope
+  val add_array      : scope -> is_local -> pbind_array -> scope
+  val add_bvoperator : scope -> is_local -> pbind_bvoperator -> scope
+  val add_circuit    : scope -> is_local -> pbind_circuit -> scope
 end
 
 (* -------------------------------------------------------------------- *)

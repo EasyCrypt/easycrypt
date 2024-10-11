@@ -881,10 +881,11 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
   let s, tparams = fresh_tparams s tyd.tyd_params in
   let body = subst_tydecl_body s tyd.tyd_type in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_resolve = tyd.tyd_resolve;
-    tyd_loca    = tyd.tyd_loca; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_resolve  = tyd.tyd_resolve;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
@@ -1060,11 +1061,11 @@ let subst_crbinding (s : subst) (crb : crbinding) =
       size   = ba.size; }
 
   | CRB_BvOperator op ->
-    assert (not (Mp.mem op.type_ s.sb_tydef));
+    assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
     assert (not (Mp.mem op.operator s.sb_def));
     CRB_BvOperator {
       kind     = op.kind;
-      type_    = subst_path s op.type_;
+      types    = List.map (subst_path s) op.types;
       operator = subst_path s op.operator;
       theory   = subst_path s op.theory; }
 

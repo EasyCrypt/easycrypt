@@ -798,7 +798,8 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tydecl = {
         tyd_params; tyd_type;
         tyd_loca = `Global;
-        tyd_resolve = tydecl.tyd_resolve } in
+        tyd_resolve = tydecl.tyd_resolve;
+        tyd_clinline = tydecl.tyd_clinline; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->
@@ -1349,7 +1350,7 @@ let check_crb_bvoperator (scenv : scenv) ((op, lc) : crb_bvoperator * is_local) 
     check_section scenv from
   else if scenv.sc_insec then begin
     cb scenv from cd_glob (`Op op.operator);
-    cb scenv from cd_glob (`Type op.type_)
+    List.iter (fun ty -> cb scenv from cd_glob (`Type ty)) op.types
   end
 
 let check_crb_circuit (scenv : scenv) ((cr, lc) : crb_circuit * is_local) =

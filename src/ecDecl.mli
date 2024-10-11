@@ -12,10 +12,11 @@ type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_resolve : bool;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_resolve  : bool;
+  tyd_clinline : bool;
 }
 
 and ty_body = [
@@ -211,21 +212,23 @@ type crb_array =
   ; size   : int }
   
 type bv_opkind = [
-  | `Add  of int
-  | `Sub  of int
-  | `Mul  of int
-  | `UDiv of int
-  | `URem of int
-  | `Shl  of int
-  | `Shr  of int
-  | `And  of int
-  | `Or   of int
-  | `Not  of int
+  | `Add      of int
+  | `Sub      of int
+  | `Mul      of int
+  | `UDiv     of int
+  | `URem     of int
+  | `Shl      of int
+  | `Shr      of int
+  | `And      of int
+  | `Or       of int
+  | `Not      of int
+  | `ZExtend  of int * int
+  | `Truncate of int * int
 ]
   
 type crb_bvoperator =
   { kind     : bv_opkind
-  ; type_    : EcPath.path
+  ; types    : EcPath.path list
   ; operator : EcPath.path
   ; theory   : EcPath.path }
   
