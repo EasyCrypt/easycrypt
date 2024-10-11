@@ -707,7 +707,7 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type bdepvar = [`Var of string | `VarRange of string * int]
+type bdepvar = [`Var of psymbol | `VarRange of psymbol * int]
 
 type bdep_info =
   { n     : int

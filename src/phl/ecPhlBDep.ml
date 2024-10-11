@@ -1,15 +1,14 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcBigInt
+open EcIdent
 open EcSymbols
-open EcPath
+open EcLocation
 open EcParsetree
+open EcAst
 open EcEnv
 open EcTypes
 open EcCoreGoal
-open EcAst
-open EcCoreFol
-open EcIdent
+open EcFol
 open EcCircuits
 
 (* -------------------------------------------------------------------- *)
@@ -28,8 +27,8 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
-
 exception BDepError
+
 (* -------------------------------------------------------------------- *)
 let mapreduce 
   (env : env) 
@@ -322,9 +321,9 @@ let get_var (v : bdepvar) (m : memenv) : variable list =
 
   match v with
   | `Var v ->
-      [get1 v]
+      [get1 (unloc v)]
   | `VarRange (v, n) ->
-      List.init n (fun i -> get1 (Format.sprintf "%s_%d" v n))
+      List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc v) n))
 
 let get_vars (vs : bdepvar list) (m : memenv) : variable list =
   List.flatten (List.map (fun v -> get_var v m) vs)
@@ -410,9 +409,9 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
       match x with
       | `Var x ->
-          [get1 x]
+          [get1 (unloc x)]
       | `VarRange (x, n) ->
-          List.init n (fun i -> get1 (Format.sprintf "%s_%d" x i)) in 
+          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) in 
     List.map lookup invs |> List.flatten |> List.split in
   let inty = match collapse inv_tys with
   | Some ty -> ty
@@ -545,184 +544,3 @@ let process_bdepeq
   (* ------------------------------------------------------------------ *)
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
   FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond) tc 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(* CODE STORAGE - DO NOT TOUCH *)
-
-
-(* ----------------------------------------------------------------------- *)
-(* FIXME: standardize this, maybe move to common EC lib *)
-let op_is_arr_get (p: path) : bool =
-  match (EcPath.toqsymbol p) with
-  | ["Top"; thr; _], "_.[_]" when String.starts_with thr "Array" -> true
-  | _ -> false
-  
-let op_is_arr_set (p: path) : bool =
-  match (EcPath.toqsymbol p) with
-  | ["Top"; thr; _], "_.[_<-_]" when String.starts_with thr "Array"  -> true
-  | _ -> false
-
-let destruct_array_get (env: env) (f: form) : form * form =
-  match f.f_node with 
-  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_ty=t_int} as i]) when op_is_arr_get p ->
-    arr, i
-  | _ -> raise (DestrError "Not an array get")
-
-let destruct_array_set (env: env) (f: form) : form * BI.zint * form =
-  match f.f_node with 
-  | Fapp ({f_node=Fop (p, ty)}, [arr;{f_node=Fint i; f_ty=t_int}; v]) when op_is_arr_set p ->
-    arr, i, v
-  | _ -> raise (DestrError "Not an array set (with fixed index)")
-  
-let destruct_nested_array_set (env: env) (f: form) : form * (BI.zint * form) list = 
-  let rec doit acc f =
-    try
-      let arr, i, v = destruct_array_set env f in
-      doit ((i, v)::acc) arr
-    with
-      | DestrError _ -> f, acc
-  in
-  let arr, i, v = destruct_array_set env f in
-  doit [(i,v)] arr
-
-type init_variant =
-| INIT
-| MAP
-
-let destruct_array_init (f: form) : form = 
-  let p = function
-  | _, "init" -> true
-  | _ -> false in
-  let p pth = p (EcPath.toqsymbol pth) in
-  destr_app1 ~name:"init" p f
-
-
-let destruct_arr_chnk_init (f: form) : form * form * form * init_variant =
-  let fn = destruct_array_init f in
-  match fn.f_node with
-  | Fquant _ -> let binds, fb = destr_lambda fn in
-    begin
-    match fb.f_node with
-    (* map variant *)    
-    | Fapp (f, [{f_node=Fapp (chnk, [arr;_i])}]) -> (f, chnk, arr, MAP) 
-    (* init variant *)
-    | Fapp (f, [{f_node=Fapp (chnk, [arr;_i])}; {f_ty=tint}]) -> (f, chnk, arr, INIT)
-    | _ -> failwith "Unsupported form of init body"
-    end
-  | _ -> failwith "Only lambda init supported"
-
-let chunk_access (env: env) (f: path) (idx: zint) : zint Set.t =
-  let o = EcEnv.Op.by_path f env in
-  let fb = match o.op_kind with
-  | OB_oper (Some (OP_Plain f)) -> f
-  | _ -> failwith "Unknown op type"
-  in
-  let i, fb = match fb.f_node with
-  | Fquant (_, [arr; (i, i_ty)], f) -> 
-    (i, f)
-  | _ -> failwith "Wrong form for chunk"
-  in
-  let subst = EcSubst.add_flocal EcSubst.empty i (f_int idx) in
-  let eval_form = 
-    fun f -> (EcReduction.simplify EcReduction.full_red (EcEnv.LDecl.init env []) 
-    (EcSubst.subst_form subst f)
-    |> destr_int
-  ) in
-  match fb.f_node with
-  | Ftuple fs -> List.fold_left (fun acc i -> 
-    let i = (destruct_array_get env i |> snd) in
-    let i = eval_form i in
-    Set.add i acc) Set.empty fs
-  | Fapp _ -> let i = fb in (* FIXME: write better code here *)
-    let i = (destruct_array_get env i |> snd) in
-    let i = eval_form i in
-    Set.singleton i
-  | _ -> failwith "Chunk should return tuple"
-
-let const_index_accesses_from_form (env: env) (f: form) : zint Set.t =
-  let rec doit (f: form) =
-  begin
-    let res = try
-      let arr, i = destruct_array_get env f in
-      let i = destr_int i in
-      Set.singleton i
-    with 
-    | DestrError e when e = "destr_int" ->
-      failwith "Non-constant array access"
-    | DestrError e -> 
-      (* Improve this later *)
-      match f.f_node with
-      | Fint _ -> Set.empty
-      | Fop _ -> Set.empty
-      | Fproj (f, _) -> doit f
-      | Ftuple args 
-      | Fapp (_, args) -> List.fold_left (Set.union) Set.empty (List.map doit args)
-      | Fif (cond, ft, ff) -> let ca = doit cond in
-        let ta = doit ft in
-        let tf = doit ff in
-        if (Set.equal ta tf) then Set.union ca ta 
-        else begin match (EcReduction.simplify EcReduction.full_red (LDecl.init env []) cond).f_node with
-        | Fop (p, _) when p = EcCoreLib.CI_Bool.p_true -> Set.union ca ta
-        | Fop (p, _) when p = EcCoreLib.CI_Bool.p_false -> Set.union ca tf
-        | _ -> failwith "Non-closed if condition with different array accesses in branches"
-        end      
-      | _ -> Format.eprintf "%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f; 
-        failwith "Uncaught case for const idx array access"
-    in res
-  end 
-  in doit f
-
-(* ----------------------------------------------------------------------- *)
-let auto_init (env: env) (f: form) =
-  let arr_f, init_f = destr_eq f in
-  let arr, asgns = try
-    destruct_nested_array_set env arr_f
-    with
-    | DestrError _ -> Format.eprintf "arr: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) arr_f;
-      raise (DestrError "Not an array on left side") (* FIXME: improve error handling *)
-  in 
-  let f, chnk, arr, init_var = destruct_arr_chnk_init init_f in
-  assert (List.is_unique ~eq:BI.equal (List.fst asgns));
-  let chnk, _tys = destr_op chnk in
-  (* TODO: Replace above by sort (order-preserving) + unique pass ?*)
-  List.iter (fun (i, f) -> 
-    let chunk = chunk_access env chnk i in
-    let arr = const_index_accesses_from_form env f in
-    if not (Set.subset arr chunk) then
-    begin
-     Format.eprintf "arr accesses: @.";
-     Set.iter (Format.eprintf "%s ") (Set.map BI.to_string arr);
-     Format.eprintf "chunk accesses: @.";
-     Set.iter (Format.eprintf "%s ") (Set.map BI.to_string chunk);
-     Format.eprintf "@."
-    end;
-     assert(Set.subset arr chunk)) asgns;
-  let rs_b = destruct_array_init init_f in
-  match destr_lambda rs_b with
-  | ([(i, i_ty)], rs_f) -> 
-  let eval_rs (idx: zint) = 
-    let subst = EcSubst.add_flocal (EcSubst.empty) i (f_int idx) in
-    EcSubst.subst_form subst rs_f
-  in
-  List.map (fun (idx, f) -> f_eq f (eval_rs idx)) asgns |> List.fold_left (fun a b -> EcTypesafeFol.f_app_safe env (EcEnv.Op.lookup_path ([], "/\\") env) [a;b]) (f_true)
-  | _ -> assert false
-  
-  
-  
-  (* Right side checks TODO *)
-  (* Array safety checks TODO *)
- 
