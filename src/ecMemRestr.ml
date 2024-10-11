@@ -97,6 +97,9 @@ let ff_norm env ff mem =
   let _, fuses = funs_uses_core env ff.ff_params [ff.ff_xp] in
   Uses.to_form env ff.ff_params fuses mem
 
+let ff_norm_ty env ff =
+  let _, fuses = funs_uses_core env ff.ff_params [ff.ff_xp] in
+  Uses.to_type env ff.ff_params fuses
 
 let funs_uses_mr env params fs =
   let env, fuses = funs_uses_core env params fs in
@@ -156,6 +159,54 @@ let rec norm_mem_restr env mr =
   | Union(s1, s2) -> mr_union (norm_mem_restr env s1) (norm_mem_restr env s2)
   | Inter(s1, s2) -> mr_inter (norm_mem_restr env s1) (norm_mem_restr env s2)
   | Diff (s1, s2) -> mr_diff  (norm_mem_restr env s1) (norm_mem_restr env s2)
+
+
+let rec norm_globs_restrs env f =
+  let has_mod b =
+    List.exists (fun (_,gty) ->
+      match gty with GTmodty _ -> true | _ -> false) b in
+
+  let norm_bind env (x, gty) =
+    match gty with
+    | GTty ty -> begin
+      match ty.ty_node with
+      | Tglob ff -> (x, GTty (ff_norm_ty env ff))
+      | _ -> (x, gty)
+      end
+    | GTmodty (mt, mr) -> (x, (GTmodty (mt, norm_mem_restr env mr)))
+    | GTmem _ -> (x, gty)
+  in
+
+  match f.f_node with
+  | Fquant (q, bd, f) -> 
+    let env = if has_mod bd then EcEnv.Mod.add_mod_binding bd env else env in
+    f_quant q (List.map (norm_bind env) bd) (norm_globs_restrs env f)
+  | Fglob (ff, m) -> ff_norm env ff m
+  | Fif (f1, f2, f3) -> 
+    f_if
+      (norm_globs_restrs env f1)
+      (norm_globs_restrs env f2)
+      (norm_globs_restrs env f3)
+  | Fmatch (b, fs, ty) ->
+    f_match 
+      (norm_globs_restrs env b)
+      (List.map (norm_globs_restrs env) fs)
+      ty
+  | Flet (lv, f1, f2) ->
+    f_let 
+      lv 
+      (norm_globs_restrs env f1)
+      (norm_globs_restrs env f2)
+  | Fapp (e, es) -> 
+    f_app 
+      (norm_globs_restrs env e)
+      (List.map (norm_globs_restrs env) es)
+      f.f_ty
+  | Ftuple es -> 
+      f_tuple (List.map (norm_globs_restrs env) es)
+  | Fproj (e, i) -> 
+    f_proj (norm_globs_restrs env e) i f.f_ty
+  | _ -> f
 
 let sup env ff =
   (* The xpath is know to be normalised so it is abstract *)
@@ -456,6 +507,16 @@ and process (env : env) (r : mem) (st : local_state) =
 
 
 (* ------------------------------------------------------------------- *)
+
+let rec dump_mem_restr mr =
+  match mr with
+  | Empty -> "Empty"
+  | All -> "All"
+  | Var x -> Format.sprintf "Var (%s)" (EcPath.x_tostring x)
+  | GlobFun ff -> Format.sprintf "GlobFun (%s)" (EcPath.x_tostring ff.ff_xp)
+  | Inter (l, r) -> Format.sprintf "Inter (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
+  | Union (l, r) -> Format.sprintf "Union (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
+  | Diff (l, r) -> Format.sprintf "Diff (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
 
 (* /!\ Precondition s1 and s2 should have been normalised *)
 let core_subset env s1 s2 =

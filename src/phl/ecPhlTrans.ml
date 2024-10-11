@@ -154,7 +154,7 @@ let process_equiv_trans (tk, tf) tc =
       let mk_eqs fv =
         let vfv, gfv = EcPV.PV.elements fv in
         let veq = List.map (fun (x,ty) -> f_eq (f_pvar x ty mleft) (f_pvar x ty mright)) vfv in
-        let geq = List.map (fun mp -> f_eqglob mp mleft mp mright) gfv in
+        let geq = List.map (fun mp -> assert false (* f_eqglob mp mleft mp mright *) ) gfv in 
         f_ands (veq @ geq) in
       let pre = mk_eqs (EcPV.PV.union fvr fv) in
       let post = mk_eqs fv in

@@ -39,6 +39,21 @@ module EqTest_base = struct
 
     | Tglob ff1, Tglob ff2 -> EcMemRestr.ff_alpha_equal ff1 ff2
 
+    | Tglob ff, _ -> 
+      let t1' = EcMemRestr.ff_norm_ty env ff in
+      (* NOTE: This check prevents non-termination in the recursive call *)
+      if ty_equal t1 t1' then
+        false
+      else
+        for_type env t1' t2
+
+    | _, Tglob ff ->
+      let t2' = EcMemRestr.ff_norm_ty env ff in
+      if ty_equal t2 t2' then
+        false
+      else
+        for_type env t1 t2'
+
     | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
         if
              List.length lt1 = List.length lt2

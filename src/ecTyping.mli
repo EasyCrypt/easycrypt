@@ -33,15 +33,11 @@ type mismatch_funsig =
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
 
-type restr_failure = Sx.t * Sm.t
-
-type restr_eq_failure = Sx.t * Sm.t * Sx.t * Sm.t
+type restr_failure = mem_restr * mem_restr
 
 type mismatch_restr = [
   | `Sub    of restr_failure          (* Should not be allowed *)
-  | `RevSub of restr_failure option   (* Should be allowed. None is everybody *)
-  | `Eq     of restr_eq_failure       (* Should be equal *)
-  | `FunCanCallUnboundedOracle of symbol * EcPath.xpath
+  | `Eq     of restr_failure       (* Should be equal *)
 ]
 
 type restriction_who =

@@ -142,7 +142,10 @@ let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
     | None   -> Some m
-    | Some _ -> raise (SubstNameClash (`Ident x))
+    | Some mp -> 
+      Printf.printf "## Clash %s existed\n" (EcPath.m_tostring mp);
+      Some m
+      (* raise (SubstNameClash (`Ident x)) *)
   in
     { s with sb_module = Mid.change merger x s.sb_module }
 
@@ -206,7 +209,9 @@ and subst_modtype (s : subst) (modty : module_type) =
 
 (* -------------------------------------------------------------------- *)
 and subst_mty_mr (s : subst) ((mty, mr) : mty_mr) =
-  subst_modtype s mty, subst_mem_restr s mr
+  let mty = subst_modtype s mty in
+  let mr = subst_mem_restr s mr in
+  mty, mr
 
 (* -------------------------------------------------------------------- *)
 and subst_mem_restr (s : subst) (mr : mem_restr) =
@@ -497,7 +502,7 @@ let subst_variable (s : subst) (x : variable) =
 (* -------------------------------------------------------------------- *)
 let subst_fun_uses (s : subst) (u : uses) =
   let x_subst = subst_xpath s in
-  let calls  = List.map x_subst u.us_calls
+  let calls  = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_calls Sx.empty
   and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_reads Sx.empty
   and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_writes Sx.empty in
   EcModules.mk_uses calls reads writes
@@ -808,7 +813,9 @@ and subst_module_body (s : subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl p -> ME_Decl (subst_mty_mr s p)
+  | ME_Decl p -> 
+    let v = (subst_mty_mr s p) in
+    ME_Decl v
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : subst) (comps : module_comps) =
@@ -816,6 +823,7 @@ and subst_module_comps (s : subst) (comps : module_comps) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (m : module_expr) =
+  (* Printf.printf "** subst_module_start %s \n" m.me_name; *)
   let sbody, me_params = match m.me_params with
     | [] -> (s, [])
     | _  ->

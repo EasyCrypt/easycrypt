@@ -1792,7 +1792,8 @@ module Mod = struct
         (fun s (x, _) a -> EcSubst.add_module s x a)
         EcSubst.empty params args
     in
-      f s o
+
+    f s o
 
   let clearparams n params =
     let _, remaining = List.takedrop n params in

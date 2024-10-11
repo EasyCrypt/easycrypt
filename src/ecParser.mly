@@ -791,7 +791,9 @@ mod_ident1:
 | x=lident { ([], x) }
 
 f_or_mod_ident:
-| LBRACE p=mod_params IMPL f=loc(fident) RBRACKET
+| LBRACE UNDERSCORE IMPL f=loc(fident) RBRACE
+{ FM_ff {pff_params = []; pff_xp = f } }
+| LBRACE p=mod_params IMPL f=loc(fident) RBRACE
     { FM_ff {pff_params = p; pff_xp = f } }
 | f=loc(fident)
     { FM_FunOrVar f }

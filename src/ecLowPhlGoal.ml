@@ -453,7 +453,8 @@ let subst_form_lv env m lv t f =
 
 (* -------------------------------------------------------------------- *)
 (* Remark: m is only used to create fresh name, id_of_pv *)
-let generalize_subst_ env m uelts uglob =
+let generalize_subst_ env m uelts uglob = assert false
+(*
   let create (pv, ty) = id_of_pv pv m, GTty ty in
   let b = List.map create uelts in
   let s =
@@ -471,8 +472,10 @@ let generalize_subst_ env m uelts uglob =
       s uglob b'
   in
     (b', b, s)
+*)
 
-let generalize_mod_ env m modi f =
+let generalize_mod_ env m modi f = assert false
+(*
   let (melts, mglob) = PV.ntr_elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
@@ -512,7 +515,7 @@ let generalize_mod_ env m modi f =
   let s = PVM.of_mpv s m in
   let f = PVM.subst env s f in
   f_forall_simpl (bd'@bd) f, (bd', uglob), (bd, uelts)
-
+    *)
 let generalize_subst env m uelts uglob =
   let (b',b,f) = generalize_subst_ env m uelts uglob in
   b'@b, f
