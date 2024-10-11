@@ -540,8 +540,8 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fproj (f1, i), Fproj (f2, j) ->
           if i <> j then failure () else doit env ilc f1 f2
 
-      | Fop (op1, tys1), Fop (op2, tys2) -> begin
-          if not (EcPath.p_equal op1 op2) then
+      | Fop (op1, tys1, sp1), Fop (op2, tys2, sp2) -> begin
+          if not (EcPath.p_equal op1 op2 && sp1 = sp2) then
             failure ();
           try  List.iter2 (EcUnify.unify env ue) tys1 tys2
           with EcUnify.UnificationFailure _ -> failure ()
@@ -630,10 +630,10 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         | _, (Flocal x2, args2) when LDecl.can_unfold x2 hyps ->
             doit_lreduce env (doit env ilc f1) f2.f_ty x2 args2
 
-        | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
+        | (Fop (op1, tys1, _), args1), _ when EcEnv.Op.reducible env op1 ->
             doit_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
 
-        | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
+        | _, (Fop (op2, tys2, _), args2) when EcEnv.Op.reducible env op2 ->
             doit_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
 
         | _, _ -> failure ()
@@ -917,7 +917,7 @@ module FPosition = struct
     let kmatch key tp =
       match key, (fst (destr_app tp)).f_node with
       | `NoKey , _           -> true
-      | `Path p, Fop (p', _) -> EcPath.p_equal p p'
+      | `Path p, Fop (p', _, _) -> EcPath.p_equal p p'
       | `Path _, _           -> false
       | `Var  x, Flocal x'   -> id_equal x x'
       | `Var  _, _           -> false
@@ -927,7 +927,7 @@ module FPosition = struct
 
     let key =
       match (fst (destr_app p)).f_node with
-      | Fop (p, _) -> `Path p
+      | Fop (p, _, _) -> `Path p
       | Flocal x   -> `Var x
       | _          -> `NoKey
     in

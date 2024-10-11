@@ -57,8 +57,8 @@ let destr_rint f =
       try destr_int f1 with DestrError _ -> destr_error "destr_rint"
   end
 
-  | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real0 -> BI.zero
-  | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
+  | Fop (p, _, _) when EcPath.p_equal p CI.CI_Real.p_real0 -> BI.zero
+  | Fop (p, _, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
 
   | _ -> destr_error "destr_rint"
 
@@ -704,8 +704,8 @@ let rec f_iff_simpl f1 f2 =
   else if is_false f2    then f_not_simpl f1
   else
     match f1.f_node, f2.f_node with
-    | Fapp ({f_node = Fop (op1, [])}, [f1]),
-      Fapp ({f_node = Fop (op2, [])}, [f2]) when
+    | Fapp ({f_node = Fop (op1, [], _)}, [f1]),
+      Fapp ({f_node = Fop (op2, [], _)}, [f2]) when
         (EcPath.p_equal op1 CI.CI_Bool.p_not &&
          EcPath.p_equal op2 CI.CI_Bool.p_not)
         -> f_iff_simpl f1 f2
@@ -728,7 +728,7 @@ let rec f_eq_simpl f1 f2 =
       when f_equal op1 f_op_real_of_int &&
            f_equal op2 f_op_real_of_int
     -> f_false
-  | Fop (op1, []), Fop (op2, []) when
+  | Fop (op1, [], _), Fop (op2, [], _) when
          (EcPath.p_equal op1 CI.CI_Bool.p_true  &&
           EcPath.p_equal op2 CI.CI_Bool.p_false  )
       || (EcPath.p_equal op2 CI.CI_Bool.p_true  &&
@@ -892,10 +892,10 @@ let rec sform_of_form fp =
   | FequivS   es -> SFequivS   es
   | Fpr       pr -> SFpr       pr
 
-  | Fop (op, ty) ->
+  | Fop (op, ty, _) ->
       sform_of_op (op, ty) []
 
-  | Fapp ({ f_node = Fop (op, ty) }, args) ->
+  | Fapp ({ f_node = Fop (op, ty, _) }, args) ->
       sform_of_op (op, ty) args
 
   | _ -> SFother fp
@@ -1112,7 +1112,7 @@ let rec dump_f f =
   | Flocal  x -> EcIdent.tostring x
   | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
   | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fop     (p, _) -> EcPath.tostring p
+  | Fop     (p, _, _) -> EcPath.tostring p
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
   | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x

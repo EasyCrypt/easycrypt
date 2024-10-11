@@ -43,7 +43,7 @@
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
   let mk_pfid_symb loc s ti =
-    mk_loc loc (PFident (pqsymb_of_symb loc s, ti))
+    mk_loc loc (PFident (pqsymb_of_symb loc s, ti, false))
 
   let peapp_symb loc s ti es =
     PEapp (mk_peid_symb loc s ti, es)
@@ -1195,7 +1195,7 @@ sform_u(P):
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      else
        let p = lmap (fun x -> "%" ^ x) p in
-       PFapp (mk_loc (loc p) (PFident (pqsymb_of_psymb p, None)), [f]) }
+       PFapp (mk_loc (loc p) (PFident (pqsymb_of_psymb p, None, false)), [f]) }
 
 | SHARP pf=pffilter* x=ident
    { PFref (x, pf) }
@@ -1210,10 +1210,13 @@ sform_u(P):
    { PFdecimal d }
 
 | x=loc(RES)
-   { PFident (mk_loc x.pl_loc ([], "res"), None) }
+   { PFident (mk_loc x.pl_loc ([], "res"), None, false) }
 
 | x=qoident ti=tvars_app?
-   { PFident (x, ti) }
+   { PFident (x, ti, false) }
+
+| SHARPPIPE x=qoident ti=tvars_app?
+   { PFident (x, ti, true) }
 
 | x=mident
    { PFmem x }
@@ -1272,10 +1275,10 @@ sform_u(P):
     { PFprob (mp, args, pn, event) }
 
 | r=loc(RBOOL)
-    { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
+    { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None, false) }
 
 | LBRACKET ti=tvars_app? e1=form_r(P) op=loc(DOTDOT) e2=form_r(P) RBRACKET
-    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
+    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti, false) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) }
 
 form_u(P):
@@ -1327,7 +1330,7 @@ form_u(P):
 | FUN    pd=ptybindings  IMPL  e=form_r(P) { PFlambda (pd, e) }
 
 | r=loc(RBOOL) TILD e=sform_r(P)
-    { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
+    { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None, false) in
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
 

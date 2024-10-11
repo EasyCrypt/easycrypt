@@ -432,10 +432,10 @@ module Fsubst = struct
         f_local id ty'
     end
 
-    | Fop (p, tys) ->
+    | Fop (p, tys, sp) ->
       let ty'  = ty_subst s fp.f_ty in
       let tys' = List.Smart.map (ty_subst s) tys in
-      f_op p tys' ty'
+      f_op ~spec:sp p tys' ty'
 
     | Fpvar (pv, m) ->
       let pv' = pv_subst s pv in

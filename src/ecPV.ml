@@ -851,8 +851,8 @@ module Mpv2 = struct
       | Fglob(mp1,m1), Fglob(mp2,m2)
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
           add_glob env (EcPath.mident mp1) (EcPath.mident mp2) eqs
-      | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
-          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+      | Fop(op1,tys1,sp1), Fop(op2,tys2,sp2) when EcPath.p_equal op1 op2 &&
+          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 && sp1 = sp2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
@@ -879,9 +879,9 @@ module Mpv2 = struct
           let lp = lp_bind lp1 in
           enter_local env local lp lp in
         aux local eqs f1
-      | Fop(op,_) when EcPath.p_equal op EcCoreLib.CI_Bool.p_true -> eqs
+      | Fop(op,_,_) when EcPath.p_equal op EcCoreLib.CI_Bool.p_true -> eqs
 
-      | Fapp({f_node = Fop(op,_)},a) ->
+      | Fapp({f_node = Fop(op,_,_)},a) ->
         begin match op_kind op with
         | Some `True -> eqs
         | Some (`Eq | `Iff) -> add_eq local eqs (List.nth a 0) (List.nth a 1)

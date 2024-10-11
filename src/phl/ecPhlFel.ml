@@ -117,7 +117,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   let (pr, bd) =
     match concl.f_node with
-    | Fapp ({ f_node =Fop (op, _) }, [pr; bd])
+    | Fapp ({ f_node =Fop (op, _, _) }, [pr; bd])
         when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
       -> ((destr_pr pr), bd)
 
@@ -251,7 +251,7 @@ let process_fel at_pos (infos : fel_info) tc =
 
   let pr =
     match concl.f_node with
-    | Fapp ({ f_node = Fop (op, _) }, [pr; _])
+    | Fapp ({ f_node = Fop (op, _, _) }, [pr; _])
         when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
       -> destr_pr pr
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" in

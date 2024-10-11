@@ -201,7 +201,7 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcAst.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
     | EcAst.Fmatch    (b, fs, ty)  -> on_ty cb ty; List.iter cbrec (b :: fs)
     | EcAst.Flet      (lp, f1, f2) -> on_lp cb lp; List.iter cbrec [f1; f2]
-    | EcAst.Fop       (p, tys)     -> cb (`Op p); List.iter (on_ty cb) tys
+    | EcAst.Fop       (p, tys, _)     -> cb (`Op p); List.iter (on_ty cb) tys
     | EcAst.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
     | EcAst.Ftuple    fs           -> List.iter cbrec fs
     | EcAst.Fproj     (f, _)       -> cbrec f
@@ -629,7 +629,7 @@ and fv_and_tvar_f f =
   let rec aux f =
     fv := EcIdent.fv_union !fv (tvar_fv f.f_ty);
     match f.f_node with
-    | Fop(_, tys) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys
+    | Fop(_, tys, _) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys
     | Fquant(_, d, f) ->
       fv := List.fold_left (fun fv (_,gty) -> EcIdent.fv_union fv (gty_fv_and_tvar gty)) !fv d;
       aux f
@@ -893,6 +893,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
         in
         let operator =
           { op_tparams; op_ty;
+            op_vparams  = operator.op_vparams;
             op_kind     = OB_pred (Some body);
             op_loca     = `Global;
             op_opaque   = operator.op_opaque;
@@ -909,6 +910,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let nott = { nott with ont_args = extra_a @ nott.ont_args; } in
         to_gen.tg_subst,
           { op_tparams; op_ty;
+            op_vparams  = operator.op_vparams;
             op_kind     = OB_nott nott;
             op_loca     = `Global;
             op_opaque   = operator.op_opaque;

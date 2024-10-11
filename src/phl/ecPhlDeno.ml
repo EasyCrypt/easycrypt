@@ -38,15 +38,15 @@ let t_core_phoare_deno pre post tc =
 
   let cmp, f, bd, concl_post =
     match concl.f_node with
-    | Fapp ({f_node = Fop (op, _)}, [f; bd])
+    | Fapp ({f_node = Fop (op, _, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (FHle, f, bd, fun ev -> f_imp_simpl ev post)
 
-    | Fapp ({f_node = Fop (op, _)}, [bd; f])
+    | Fapp ({f_node = Fop (op, _, _)}, [bd; f])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (FHge, f, bd, fun ev -> f_imp_simpl post ev)
 
-    | Fapp ({f_node = Fop (op, _)}, [f; bd])
+    | Fapp ({f_node = Fop (op, _, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
       (FHeq, f, bd, f_iff_simpl post)
 
@@ -76,7 +76,7 @@ let t_phoare_deno_r pre post tc =
   let concl = FApi.tc1_goal tc in
 
   match concl.f_node with
-  | Fapp ({f_node = Fop (op, _)}, [f; _bd])
+  | Fapp ({f_node = Fop (op, _, _)}, [f; _bd])
       when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq && not (is_pr f) ->
     (t_symmetry @! t_core_phoare_deno pre post) tc
 
@@ -89,7 +89,7 @@ let t_ehoare_deno_r pre post tc =
 
   let f, bd =
     match concl.f_node with
-    | Fapp ({f_node = Fop (op, _)}, [f; bd])
+    | Fapp ({f_node = Fop (op, _, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (f, bd)
 
@@ -130,7 +130,7 @@ let t_equiv_deno_r pre post tc =
 
   let cmp, f1, f2 =
     match concl.f_node with
-    | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
+    | Fapp({f_node = Fop(op,_,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
         (EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ||
          EcPath.p_equal op EcCoreLib.CI_Real.p_real_le) ->
       let cmp =
@@ -184,14 +184,14 @@ let process_phoare_deno info tc =
     let hyps, concl = FApi.tc1_flat tc in
     let cmp, f, bd =
       match concl.f_node with
-      | Fapp ({f_node = Fop (op, _)}, [f1; f2])
+      | Fapp ({f_node = Fop (op, _, _)}, [f1; f2])
           when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq
         ->
              if is_pr f1 then (FHeq, f1, f2)
         else if is_pr f2 then (FHeq, f2, f1)
         else error ()
 
-      | Fapp({f_node = Fop (op, _)}, [f1; f2])
+      | Fapp({f_node = Fop (op, _, _)}, [f1; f2])
           when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
         ->
              if is_pr f1 then (FHle, f1, f2) (* f1 <= f2 *)
@@ -229,7 +229,7 @@ let process_ehoare_deno info tc =
     let hyps, concl = FApi.tc1_flat tc in
     let f, bd =
       match concl.f_node with
-      | Fapp({f_node = Fop (op, _)}, [f1; f2])
+      | Fapp({f_node = Fop (op, _, _)}, [f1; f2])
           when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le && is_pr f1 ->
           (f1, f2) (* f1 <= f2 *)
       | _ -> error ()
@@ -442,7 +442,7 @@ let process_equiv_deno1 info eq tc =
 
     let op, f1, f2 =
       match concl.f_node with
-      | Fapp ({f_node = Fop (op, _)}, [f1; f2]) when is_pr f1 && is_pr f2 ->
+      | Fapp ({f_node = Fop (op, _, _)}, [f1; f2]) when is_pr f1 && is_pr f2 ->
           (op, f1, f2)
 
       | _ -> tc_error !!tc "invalid goal shape"

@@ -192,7 +192,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let rec doit form =
     let o, args = destr_app form in
     match o.f_node with
-    | Fop (op, _) -> begin
+    | Fop (op, _, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -224,7 +224,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
     in
       match f.f_node with
       | Fint n -> PEc n
-      | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
+      | Fapp ({f_node = Fop (p,_,_)}, [a1; a2]) -> begin
           match op_kind p with
           | Some `Int_add -> PEadd (of_int a1, of_int a2)
           | Some `Int_mul -> PEmul (of_int a1, of_int a2)
@@ -235,7 +235,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           end
           | _ -> abstract ()
         end
-      | Fapp ({f_node = Fop (p,_)}, [a]) -> begin
+      | Fapp ({f_node = Fop (p,_,_)}, [a]) -> begin
           match op_kind p with
           | Some `Int_opp -> PEsub (PEc c0, of_int a)
           | _ -> abstract ()
@@ -255,7 +255,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let rec doit form =
     let o, args = destr_app form in
     match o.f_node with
-    | Fop(op, _) -> begin
+    | Fop(op, _, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -290,7 +290,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
 
     match f.f_node with
     | Fint n -> FEc n
-    | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
+    | Fapp ({f_node = Fop (p,_,_)}, [a1; a2]) -> begin
         match op_kind p with
         | Some `Int_add -> FEadd (of_int a1, of_int a2)
         | Some `Int_mul -> FEmul (of_int a1, of_int a2)
@@ -301,7 +301,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           end
         | _ -> abstract ()
       end
-    | Fapp({f_node = Fop (p,_)}, [a]) -> begin
+    | Fapp({f_node = Fop (p,_,_)}, [a]) -> begin
         match op_kind p with
         | Some `Int_opp -> FEsub (FEc c0, of_int a)
         | _ -> abstract ()

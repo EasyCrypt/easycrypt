@@ -1793,7 +1793,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let form_of_opselect
-  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
+  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args sp
 =
   EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
@@ -1825,7 +1825,7 @@ let form_of_opselect
          in (f_lambda flam (Fsubst.f_subst subst body), args)
 
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
-      | `Op (p, tys) -> f_op p tys ty
+      | `Op (p, tys) -> f_op ~spec:sp p tys ty
       | `Lc id       -> f_local id ty
       | `Pv (me, pv) ->
         var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
@@ -3051,7 +3051,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
           | fs  -> f_tuple fs
     end
 
-    | PFident ({ pl_desc = name; pl_loc = loc }, tvi) ->
+    | PFident ({ pl_desc = name; pl_loc = loc }, tvi, sp) ->
         let tvi = tvi |> omap (transtvi env ue) in
         let ops =
           select_form_op
@@ -3062,7 +3062,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
             tyerror loc env (UnknownVarOrOp (name, []))
 
         | [sel] -> begin
-            let op = form_of_opselect (env, ue) loc sel [] in
+            let op = form_of_opselect (env, ue) loc sel [] sp in
             let inmem =
               match op.f_node with
               | Fpvar _ | Fproj ({ f_node = Fpvar _ }, _) -> true
@@ -3182,7 +3182,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
           check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map (do1 (EcFol.mleft, EcFol.mright)) fs)
 
-    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
+    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi, sp)}, pes) ->
         let tvi  = tvi |> omap (transtvi env ue) in
         let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in
@@ -3198,7 +3198,7 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
 
           | [sel] ->
               let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
-              form_of_opselect (env, ue) loc sel es
+              form_of_opselect (env, ue) loc sel es sp
 
           | _ ->
              let uidmap = UE.assubst ue in

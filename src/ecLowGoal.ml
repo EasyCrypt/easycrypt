@@ -1461,7 +1461,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
     | SFimp (f1, f2) ->
        let (p, sk), tv, args =
          match fst_map f_node (destr_app f1) with
-         | Fop (p, tv), args when EcEnv.Op.is_prind env p -> begin
+         | Fop (p, tv, _), args when EcEnv.Op.is_prind env p -> begin
             if is_some accept then
               let pri = oget (EcEnv.Op.by_path_opt p env) in
               let pri = EcDecl.operator_as_prind pri in
@@ -1542,7 +1542,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
 
     let p, tv, args =
       match fst_map f_node (destr_app fp) with
-      | Fop (p, tv), args when EcEnv.Op.is_prind env p ->
+      | Fop (p, tv, _), args when EcEnv.Op.is_prind env p ->
          (p, tv, args)
       | _ -> raise InvalidGoalShape in
     let pri = oget (EcEnv.Op.by_path_opt p env) in
@@ -1563,7 +1563,7 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
 
     let p, tv, args =
       match fst_map f_node (destr_app fp) with
-      | Fop (p, tv), args when EcEnv.Op.is_prind env p ->
+      | Fop (p, tv, _), args when EcEnv.Op.is_prind env p ->
          (p, tv, args)
       | _ -> raise InvalidGoalShape in
     let pri = oget (EcEnv.Op.by_path_opt p env) in

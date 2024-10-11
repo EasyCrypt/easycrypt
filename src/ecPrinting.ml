@@ -1362,12 +1362,12 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form)
     | Fquant _ -> Some (fst e_bin_prio_lambda)
     | Fif _    -> Some (fst e_bin_prio_if)
     | Flet _   -> Some (fst e_bin_prio_letin)
-    | Fapp ({f_node = Fop (op, _)}, [_; f2])
+    | Fapp ({f_node = Fop (op, _, _)}, [_; f2])
         when EcPath.basename op = EcCoreLib.s_cons ->
         if fst e_bin_prio_rop4 < fst opprec
         then None
         else l_l f2 onm e_bin_prio_rop4
-    | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
+    | Fapp ({f_node = Fop (op, tys, _)}, [f1; f2]) ->
         (let (inm, opname) =
            PPEnv.op_symb ppe op (Some (`Form, tys, List.map t_ty [f1; f2])) in
          if inm <> [] && inm <> onm
@@ -1532,7 +1532,7 @@ and try_pp_chained_orderings (ppe : PPEnv.t) outer fmt f =
     match sform_of_form f with
     | SFand (`Asym, (f1, f2)) -> begin
         match f2.f_node with
-        | Fapp ({ f_node = Fop (op, tvi) }, [i1; i2])
+        | Fapp ({ f_node = Fop (op, tvi, _) }, [i1; i2])
             when isordering op
           -> begin
             match le with
@@ -1646,7 +1646,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   let pp_opapp ppe outer fmt (op, tys, es) =
     let rec dt_sub f =
       match destr_app f with
-      | ({ f_node = Fop (p, tvi) }, args) -> Some (p, tvi, args)
+      | ({ f_node = Fop (p, tvi, _) }, args) -> Some (p, tvi, args)
       | _ -> None
 
     and is_trm f =
@@ -1662,7 +1662,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
     and is_proj (rc : EcPath.path) (f : form) =
       match f.f_node with
-      | Fapp ({ f_node = Fop (p, _) }, [{ f_node = Flocal x }]) -> begin
+      | Fapp ({ f_node = Fop (p, _, _) }, [{ f_node = Flocal x }]) -> begin
           match (EcEnv.Op.by_path p ppe.PPEnv.ppe_env).op_kind with
           | OB_oper (Some (OP_Proj (rc', i, _))) when EcPath.p_equal rc rc' ->
               Some (x, i)
@@ -1735,18 +1735,18 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Flet (lp, f1, f2) ->
       pp_let ~fv:f2.f_fv ppe pp_form_r outer fmt (lp, f1, f2)
 
-  | Fop (op, tvi) ->
+  | Fop (op, tvi, _) ->
       pp_opapp ppe outer fmt (op, tvi, [])
 
-  | Fapp ({f_node = Fop (op, _)},
-            [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
+  | Fapp ({f_node = Fop (op, _, _)},
+            [{f_node = Fapp ({f_node = Fop (op', tys, _)}, [f1; f2])}])
       when EcPath.p_equal op  EcCoreLib.CI_Bool.p_not
         && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
     ->
       let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
       pp_opapp ppe outer fmt (negop, tys, [f1; f2])
 
-  | Fapp ({f_node = Fop (p, tys)}, args) ->
+  | Fapp ({f_node = Fop (p, tys, _)}, args) ->
       pp_opapp ppe outer fmt (p, tys, args)
 
   | Fapp (e, args) ->

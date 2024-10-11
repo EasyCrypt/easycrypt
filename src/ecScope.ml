@@ -1185,7 +1185,7 @@ module Op = struct
       | (a, Some _) -> Some (List.length a)
       | (_, None) -> None in
 
-    let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ty body lc in
+    let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ~vparams:vps ty body lc in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in
@@ -1409,6 +1409,7 @@ module Op = struct
 
     let opdecl = EcDecl.{
       op_tparams  = [];
+      op_vparams  = [];
       op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain aout));
       op_loca     = op.ppo_locality;
@@ -2401,7 +2402,7 @@ module Search = struct
     let paths =
       let do1 fp =
         match unloc fp with
-        | PFident (q, None) -> begin
+        | PFident (q, None, _) -> begin
             match EcEnv.Op.all ~name:q.pl_desc env with
             | [] ->
                 hierror ~loc:q.pl_loc "unknown operator: `%s'"
@@ -2420,7 +2421,7 @@ module Search = struct
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with
-                    | Fop (pf, _) -> (pf :: paths, pts)
+                    | Fop (pf, _, _) -> (pf :: paths, pts)
                     | _ -> (paths, (ps, ue, fp) ::pts)
                   end
 

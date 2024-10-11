@@ -158,7 +158,7 @@ let mk_form = EcAst.mk_form
 let f_node { f_node = form } = form
 
 (* -------------------------------------------------------------------- *)
-let f_op x tys ty = mk_form (Fop (x, tys)) ty
+let f_op ?(spec = false) x tys ty = mk_form (Fop (x, tys, spec)) ty
 
 let f_app f args ty =
   let f, args' =
@@ -434,10 +434,10 @@ let f_map gt g fp =
       let ty' = gt fp.f_ty in
         f_pvar id ty' s
 
-  | Fop (p, tys) ->
+  | Fop (p, tys, s) ->
       let tys' = List.Smart.map gt tys in
       let ty'  = gt fp.f_ty in
-        f_op p tys' ty'
+        f_op ~spec:s p tys' ty'
 
   | Fapp (f, fs) ->
       let f'  = g f in
@@ -597,7 +597,7 @@ let f_ops f =
   let aout = ref EcPath.Sp.empty in
   let rec doit f =
     match f.f_node with
-    | Fop (p, _) -> aout := Sp.add p !aout
+    | Fop (p, _, _) -> aout := Sp.add p !aout
     | _ -> f_iter doit f
   in doit f; !aout
 
@@ -769,7 +769,7 @@ let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
 
 (* -------------------------------------------------------------------- *)
 let destr_op = function
-  { f_node = Fop (op, tys) } -> op, tys | _ -> destr_error "op"
+  { f_node = Fop (op, tys, _) } -> op, tys | _ -> destr_error "op"
 
 let destr_app = function
   { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
@@ -791,12 +791,12 @@ let destr_proj  = function
 
 let destr_app1 ~name pred form =
   match destr_app form with
-  | { f_node = Fop (p, _) }, [f] when pred p -> f
+  | { f_node = Fop (p, _, _) }, [f] when pred p -> f
   | _ -> destr_error name
 
 let destr_app2 ~name pred form =
   match destr_app form with
-  | { f_node = Fop (p, _) }, [f1; f2] when pred p -> (f1, f2)
+  | { f_node = Fop (p, _, _) }, [f1; f2] when pred p -> (f1, f2)
   | _ -> destr_error name
 
 let destr_app1_eq ~name p f = destr_app1 ~name (EcPath.p_equal p) f
@@ -820,14 +820,14 @@ let destr_eq_or_iff =
 
 let destr_or_r form =
   match destr_app form with
-  | { f_node = Fop (p, _) }, [f1; f2] when is_op_or_sym  p -> (`Sym , (f1, f2))
-  | { f_node = Fop (p, _) }, [f1; f2] when is_op_or_asym p -> (`Asym, (f1, f2))
+  | { f_node = Fop (p, _, _) }, [f1; f2] when is_op_or_sym  p -> (`Sym , (f1, f2))
+  | { f_node = Fop (p, _, _) }, [f1; f2] when is_op_or_asym p -> (`Asym, (f1, f2))
   | _ -> destr_error "or"
 
 let destr_and_r form =
   match destr_app form with
-  | { f_node = Fop (p, _) }, [f1; f2] when is_op_and_sym  p -> (`Sym , (f1, f2))
-  | { f_node = Fop (p, _) }, [f1; f2] when is_op_and_asym p -> (`Asym, (f1, f2))
+  | { f_node = Fop (p, _, _) }, [f1; f2] when is_op_and_sym  p -> (`Sym , (f1, f2))
+  | { f_node = Fop (p, _, _) }, [f1; f2] when is_op_and_asym p -> (`Asym, (f1, f2))
   | _ -> destr_error "and"
 
 let destr_nots form =
@@ -950,7 +950,7 @@ let expr_of_form mh f =
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fop  (p, tys, _) -> e_op p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty

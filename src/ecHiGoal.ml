@@ -597,7 +597,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   in
 
   match unloc p with
-  | PFident ({ pl_desc = ([], x) }, None)
+  | PFident ({ pl_desc = ([], x) }, None, _)
       when s = `LtoR && EcUtils.is_none o ->
 
     let check_op = fun p -> if sym_equal (EcPath.basename p) x then `Force else `No in
@@ -1669,7 +1669,7 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
     match pattern with
     | `Form (occ, pf) -> begin
         match pf.pl_desc with
-        | PFident ({pl_desc = ([], s)}, None)
+        | PFident ({pl_desc = ([], s)}, None, _)
             when not doeq && is_none occ && LDecl.has_name s hyps
           ->
             let id = fst (LDecl.by_name s hyps) in
@@ -2066,7 +2066,7 @@ let process_case ?(doeq = false) gp tc =
             raise E.LEMFailure;
           begin
             match (fst (destr_app f)).f_node with
-            | Fop (p, _) when EcEnv.Op.is_prind env p ->
+            | Fop (p, _, _) when EcEnv.Op.is_prind env p ->
                raise E.LEMFailure
             | _ -> ()
           end;

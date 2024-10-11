@@ -137,10 +137,10 @@ let rec oper_compatible exn env ob1 ob2 =
   | OP_Plain f1, OP_Plain f2 ->
     let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
     error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
-  | OP_Plain {f_node = Fop(p,tys)}, _ ->
+  | OP_Plain {f_node = Fop(p,tys,_)}, _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
-  | _, OP_Plain {f_node = Fop(p,tys)} ->
+  | _, OP_Plain {f_node = Fop(p,tys, _)} ->
     let ob2 = get_open_oper exn env p tys in
     oper_compatible exn env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
@@ -195,10 +195,10 @@ let get_open_pred exn env p tys =
 let rec pred_compatible exn env pb1 pb2 =
   match pb1, pb2 with
   | PR_Plain f1, PR_Plain f2 -> error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
-  | PR_Plain {f_node = Fop(p,tys)}, _ ->
+  | PR_Plain {f_node = Fop(p,tys,_)}, _ ->
     let pb1 = get_open_pred exn env p tys  in
     pred_compatible exn env pb1 pb2
-  | _, PR_Plain {f_node = Fop(p,tys)} ->
+  | _, PR_Plain {f_node = Fop(p,tys, _)} ->
     let pb2 = get_open_pred exn env p tys  in
     pred_compatible exn env pb1 pb2
   | PR_Ind pr1, PR_Ind pr2 ->
@@ -574,6 +574,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
             let tparams = EcUnify.UniEnv.tparams ue in
             let newpr   =
               { op_tparams  = tparams;
+                op_vparams  = refpr.op_vparams;
                 op_ty       = body.f_ty;
                 op_kind     = OB_pred (Some (PR_Plain body));
                 op_opaque   = oopr.op_opaque;
@@ -908,7 +909,7 @@ and replay_instance
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->
                     match f.f_node with
-                    | Fop (r, _) -> Some r
+                    | Fop (r, _, _) -> Some r
                     | _ -> raise E.InvInstPath
   in
 

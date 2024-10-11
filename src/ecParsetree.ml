@@ -178,7 +178,7 @@ and pformula_r =
   | PFint     of zint
   | PFdecimal of (zint * (int * zint))
   | PFtuple   of pformula list
-  | PFident   of pqsymbol * ptyannot option
+  | PFident   of pqsymbol * ptyannot option * bool
   | PFref     of psymbol * pffilter list
   | PFmem     of psymbol
   | PFside    of pformula * (bool * symbol located)
@@ -364,7 +364,7 @@ type pinterface = {
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
   match unloc f with
-  | PFident ({ pl_desc = ([], x) }, _) -> Some x
+  | PFident ({ pl_desc = ([], x) }, _, _) -> Some x
   | PFtuple [f] when not raw -> pf_ident ~raw f
   | _ -> None
 

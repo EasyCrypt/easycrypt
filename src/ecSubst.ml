@@ -510,24 +510,24 @@ let rec subst_form (s : subst) (f : form) =
      let m = subst_mem s m in
      f_glob mp m
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when has_def s p ->
+  | Fapp ({ f_node = Fop (p, tys, _) }, args) when has_def s p ->
       let tys  = subst_tys s tys in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
       let args = List.map (subst_form s) args in
       subst_fop ty tys args body
 
-  | Fop (p, tys) when has_def s p ->
+  | Fop (p, tys, _) when has_def s p ->
       let tys  = subst_tys s tys in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
       subst_fop ty tys [] body
 
-  | Fop (p, tys) ->
+  | Fop (p, tys, sp) ->
       let p   = subst_path s p in
       let tys = subst_tys s tys in
       let ty  = subst_ty s f.f_ty in
-      f_op p tys ty
+      f_op ~spec:sp p tys ty
 
   | FhoareF { hf_pr; hf_f; hf_po } ->
      let hf_pr, hf_po =
@@ -974,6 +974,7 @@ let subst_op (s : subst) (op : operator) =
   let kind = subst_op_kind s op.op_kind in
 
   { op_tparams  = tparams       ;
+    op_vparams  = op.op_vparams ;
     op_ty       = opty          ;
     op_kind     = kind          ;
     op_loca     = op.op_loca    ;

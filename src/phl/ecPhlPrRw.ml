@@ -103,7 +103,7 @@ let select_pr on_ev sid f =
 
 let select_pr_cmp on_cmp sid f =
   match f.f_node with
-  | Fapp({f_node = Fop(op,_)},
+  | Fapp({f_node = Fop(op,_,_)},
          [{f_node = Fpr pr1};
           {f_node = Fpr pr2}]) ->
 
@@ -119,7 +119,7 @@ let select_pr_cmp on_cmp sid f =
 
 let select_pr_ge0 sid f =
   match f.f_node with
-  | Fapp({f_node = Fop(op,_)}, [f'; {f_node = Fpr _}]) ->
+  | Fapp({f_node = Fop(op,_,_)}, [f'; {f_node = Fpr _}]) ->
       if    EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
          && f_equal f' f_r0
          && Mid.set_disjoint f.f_fv sid
@@ -130,7 +130,7 @@ let select_pr_ge0 sid f =
 
 let select_pr_le1 sid f =
   match f.f_node with
-  | Fapp({f_node = Fop(op,_)}, [{f_node = Fpr _}; f']) ->
+  | Fapp({f_node = Fop(op,_,_)}, [{f_node = Fpr _}; f']) ->
       if    EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
          && f_equal f' f_r1
          && Mid.set_disjoint f.f_fv sid

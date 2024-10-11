@@ -612,7 +612,7 @@ let kmatch =
     | KProj (sk, i), (Fproj (sf, j), []) when i = j ->
         doit acc sk sf
 
-    | KApp (sp, ks), (Fop (p, _), fs)
+    | KApp (sp, ks), (Fop (p, _, _), fs)
         when EcPath.p_equal sp p && List.length ks = List.length fs
       -> List.fold_left2 doit acc ks fs
 
@@ -679,7 +679,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | Fop    _ -> trans_app env fp []
 
     (* Special case for `%r` *)
-  | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
+  | Fapp({ f_node = Fop (p, [], _)},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
     WTerm.t_real_const (BI.to_why3 n)
 
@@ -710,7 +710,7 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
   | Fquant (Llambda, bds, body) ->
       trans_fun env bds body args
 
-  | Fop (p, ts) ->
+  | Fop (p, ts, _) ->
       let wop = trans_op genv p in
       let tys = List.map (trans_ty (genv,lenv)) ts in
       apply_wop genv wop tys args
@@ -1390,7 +1390,7 @@ module Frequency = struct
     let rec doit f =
       match f.f_node with
       | Fint _ | Flocal _ | Fpvar _ | Fglob _ -> ()
-      | Fop (p,_) ->
+      | Fop (p,_,_) ->
         if not (Sp.mem p unwanted_op) then sp := Sp.add p !sp
       | Fquant (_ , _ , f1) -> doit f1
       | Fif      (f1, f2, f3) -> List.iter doit [f1; f2; f3]
@@ -1479,7 +1479,7 @@ module Frequency = struct
 
     let rec add f =
       match f.f_node with
-      | Fop      (p,_)        -> addp p
+      | Fop      (p,_,_)        -> addp p
       | Fquant   (_ , _ , f1) -> add f1
       | Fif      (f1, f2, f3) -> List.iter add [f1; f2; f3]
       | Fmatch   (b, fs, _)   -> List.iter add (b :: fs)

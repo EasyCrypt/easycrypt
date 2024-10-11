@@ -67,7 +67,7 @@ let rec f_eq_simpl st f1 f2 =
   if f_equal f1 f2 then f_true else
 
   match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
-  | (Fop (p1, _), args1), (Fop (p2, _), args2)
+  | (Fop (p1, _, _), args1), (Fop (p2, _, _), args2)
       when EcEnv.Op.is_dtype_ctor st.st_env p1
            && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
 
@@ -89,11 +89,11 @@ let rec f_eq_simpl st f1 f2 =
 (* -------------------------------------------------------------------- *)
 let rec f_map_get_simpl st m x bty =
   match m.f_node with
-  | Fapp({ f_node = Fop(p, _)}, [e])
+  | Fapp({ f_node = Fop(p, _, _)}, [e])
       when EcPath.p_equal p EcCoreLib.CI_Map.p_cst ->
     e
 
-  | Fapp({f_node = Fop(p, _)}, [m'; x'; e])
+  | Fapp({f_node = Fop(p, _, _)}, [m'; x'; e])
       when EcPath.p_equal p EcCoreLib.CI_Map.p_set
     -> begin
 
@@ -110,7 +110,7 @@ let rec f_map_get_simpl st m x bty =
 
 and f_map_set_simplify st m x =
   match m.f_node with
-  | Fapp({ f_node = Fop(p, _)}, [m'; x'; e])
+  | Fapp({ f_node = Fop(p, _, _)}, [m'; x'; e])
       when EcPath.p_equal p EcCoreLib.CI_Map.p_set
     -> begin
 
@@ -230,7 +230,7 @@ and try_reduce_record_projection
     let mk, args1 = oget (Args.pop args) in
 
     match mk.f_node with
-    | Fapp ({ f_node = Fop (mkp, _) }, mkargs)
+    | Fapp ({ f_node = Fop (mkp, _, _) }, mkargs)
         when (EcEnv.Op.is_record_ctor st.st_env mkp) ->
       let v = oget (EcEnv.Op.by_path_opt p st.st_env) in
       let v = proj3_2 (EcDecl.operator_as_proj v) in
@@ -266,7 +266,7 @@ and try_reduce_fixdef
         let v = vargs.(v) in
 
           match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
-          | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
+          | (Fop (p, _, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
               let idx = EcEnv.Op.by_path p st.st_env in
               let idx = snd (EcDecl.operator_as_ctor idx) in
                 match opb with
@@ -314,7 +314,7 @@ and app_red st f1 args =
       betared st Subst.subst_id bd f2 args
 
   (* op reduction (ι-reduction / delta / user-defined rules) *)
-  | Fop (p, tys) ->
+  | Fop (p, tys, _) ->
     List.find_map_opt
       (fun f -> f st (p, tys) args)
       [ try_reduce_record_projection
@@ -409,7 +409,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       if st.st_ri.iota then
         let cf = cbv_init st s cf in
         match fst_map f_node (destr_app cf) with
-        | Fop (p, _), cargs when EcEnv.Op.is_dtype_ctor st.st_env p ->
+        | Fop (p, _, _), cargs when EcEnv.Op.is_dtype_ctor st.st_env p ->
             let idx = EcEnv.Op.by_path p st.st_env in
             let idx = snd (EcDecl.operator_as_ctor idx) in
             let br  = oget (List.nth_opt bs idx) in

@@ -76,6 +76,7 @@ type stydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
+type val_params = (EcIdent.t * EcTypes.ty) list
 type locals = EcIdent.t list
 
 type operator_kind =
@@ -131,6 +132,7 @@ and prctor = {
 
 type operator = {
   op_tparams  : ty_params;
+  op_vparams  : val_params;
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
@@ -199,8 +201,9 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
+let gen_op ?(clinline = false) ?unfold ?(vparams = []) ~opaque tparams ty kind lc = {
   op_tparams  = tparams;
+  op_vparams  = vparams;
   op_ty       = ty;
   op_kind     = kind;
   op_loca     = lc;
@@ -217,9 +220,9 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
 let optransparent : opopaque =
   { smt = false; reduction = false; }
 
-let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
+let mk_op ?clinline ?unfold ~opaque tparams ?(vparams = []) ty body lc =
   let kind = OB_oper body in
-  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ~vparams ty kind lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {

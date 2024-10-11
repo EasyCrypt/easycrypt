@@ -180,7 +180,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * ty list * bool
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int

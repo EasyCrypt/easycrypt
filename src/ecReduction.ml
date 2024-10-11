@@ -527,7 +527,7 @@ let is_alpha_eq hyps f1 f2 =
       check_mem subst mem1 mem2;
       check_mod subst m1 m2
 
-    | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, ty1, sp1), Fop(p2, ty2, sp2) when EcPath.p_equal p1 p2 && sp1 = sp2 ->
       List.iter2 (check_ty env subst) ty1 ty2
 
     | Fapp(f1',args1), Fapp(f2',args2) when
@@ -694,7 +694,7 @@ let reduce_op ri env nargs p tys =
 
 let is_record env f =
   match EcFol.destr_app f with
-  | { f_node = Fop (p, _) }, _ -> EcEnv.Op.is_record_ctor env p
+  | { f_node = Fop (p, _, _) }, _ -> EcEnv.Op.is_record_ctor env p
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
@@ -719,8 +719,8 @@ let reduce_user_gen simplify ri env hyps f =
 
   let p : EcEnv.Reduction.topsym =
     match f.f_node with
-    | Fop (p, _)
-    | Fapp ({ f_node = Fop (p, _) }, _) -> `Path p
+    | Fop (p, _, _)
+    | Fapp ({ f_node = Fop (p, _, _) }, _) -> `Path p
     | Ftuple _   -> `Tuple
     | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
@@ -750,7 +750,7 @@ let reduce_user_gen simplify ri env hyps f =
 
       let rec doit f ptn =
         match destr_app f, ptn with
-        | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
+        | ({ f_node = Fop (p, tys, _) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
           let tys' = List.map (Tvar.subst tvi) tys' in
@@ -851,7 +851,7 @@ let reduce_logic ri env hyps f p args =
     | Some (`Eq       ), [f1;f2] ->
       begin
         match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
-        | (Fop (p1, _), args1), (Fop (p2, _), args2)
+        | (Fop (p1, _, _), args1), (Fop (p2, _, _), args2)
             when EcEnv.Op.is_dtype_ctor env p1
                  && EcEnv.Op.is_dtype_ctor env p2 ->
 
@@ -863,10 +863,11 @@ let reduce_logic ri env hyps f p args =
           then f_false
           else f_ands (List.map2 f_eq args1 args2)
 
-        | (Fop (p1, tys1), args1), (Fop (p2, tys2), args2)
+        | (Fop (p1, tys1, sp1), args1), (Fop (p2, tys2, sp2), args2)
             when    EcPath.p_equal p1 p2
                  && EcEnv.Op.is_record_ctor env p1
                  && EcEnv.Op.is_record_ctor env p2
+                 && sp1 = sp2
                  && List.for_all2 (EqTest_i.for_type env) tys1 tys2 ->
 
             f_ands (List.map2 f_eq args1 args2)
@@ -890,10 +891,10 @@ let reduce_logic ri env hyps f p args =
 (* -------------------------------------------------------------------- *)
 let reduce_delta ri env _hyps f =
   match f.f_node with
-  | Fop (p, tys) when ri.delta_p p <> `No ->
+  | Fop (p, tys, _) when ri.delta_p p <> `No ->
       reduce_op ri env 0 p tys
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
+  | Fapp ({ f_node = Fop (p, tys, _) }, args) when ri.delta_p p <> `No ->
       let op = reduce_op ri env (List.length args) p tys in
       f_app_simpl op args f.f_ty
 
@@ -946,7 +947,7 @@ let reduce_head simplify ri env hyps f =
     else raise nohead
 
     (* ι-reduction (records projection) *)
-  | Fapp ({ f_node = Fop (p, _); }, args)
+  | Fapp ({ f_node = Fop (p, _, _); }, args)
       when ri.iota && EcEnv.Op.is_projection env p -> begin
 
       try
@@ -955,7 +956,7 @@ let reduce_head simplify ri env hyps f =
         begin match args with
         | mk :: args ->
           begin match mk.f_node with
-          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
+          | Fapp ({ f_node = Fop (mkp, _, _) }, mkargs) ->
             if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
             let v = oget (EcEnv.Op.by_path_opt p env) in
             let v = proj3_2 (EcDecl.operator_as_proj v) in
@@ -989,7 +990,7 @@ let reduce_head simplify ri env hyps f =
       let op, args = destr_app c in
 
         match op.f_node with
-        | Fop (p, _) when EcEnv.Op.is_dtype_ctor env p ->
+        | Fop (p, _, _) when EcEnv.Op.is_dtype_ctor env p ->
             let idx = EcEnv.Op.by_path p env in
             let idx = snd (EcDecl.operator_as_ctor idx) in
             let br  = oget (List.nth_opt bs idx) in
@@ -999,7 +1000,7 @@ let reduce_head simplify ri env hyps f =
     end
 
     (* ι-reduction (match-fix) *)
-  | Fapp ({ f_node = Fop (p, tys); }, fargs)
+  | Fapp ({ f_node = Fop (p, tys, _); }, fargs)
       when ri.iota && EcEnv.Op.is_fix_def env p ->
 
       let op  = oget (EcEnv.Op.by_path_opt p env) in
@@ -1014,7 +1015,7 @@ let reduce_head simplify ri env hyps f =
       let pargs = List.fold_left (fun (opb, acc) v ->
              let v = args.(v) in
               match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
-              | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor env p -> begin
+              | (Fop (p, _, _), cargs) when EcEnv.Op.is_dtype_ctor env p -> begin
                   let idx = EcEnv.Op.by_path p env in
                   let idx = snd (EcDecl.operator_as_ctor idx) in
                   match opb with
@@ -1072,7 +1073,7 @@ let reduce_head simplify ri env hyps f =
       reduce_delta ri env hyps f
     end
 
-  | Fapp({ f_node = Fop(p,_); }, args) -> begin
+  | Fapp({ f_node = Fop(p,_,_); }, args) -> begin
       try  reduce_logic ri env hyps f p args
       with NotRed kind1 ->
         try  reduce_user_gen simplify ri env hyps f
@@ -1417,8 +1418,8 @@ let rec conv ri env f1 f2 stk =
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
-  | Fop(p1, ty1), Fop(p2,ty2)
-      when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) ty1 ty2 ->
+  | Fop(p1, ty1, sp1), Fop(p2,ty2,sp2)
+      when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) ty1 ty2 && sp1 = sp2 ->
     conv_next ri env f1 stk
 
   | Fapp(f1', args1), Fapp(f2', args2)
@@ -1426,7 +1427,7 @@ let rec conv ri env f1 f2 stk =
         && List.length args1 = List.length args2 -> begin
     (* So that we do not unfold operators *)
     match f1'.f_node, f2'.f_node with
-    | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, _, _), Fop(p2, _, _) when EcPath.p_equal p1 p2 ->
       conv_next ri env f1' (zapp args1 args2 f1.f_ty stk)
     | _, _ ->
       conv ri env f1' f2' (zapp args1 args2 f1.f_ty stk)
@@ -1589,7 +1590,7 @@ let reduce_user_gen simplify ri env hyps f =
 
 (* -------------------------------------------------------------------- *)
 let reduce_logic ri env hyps f = match f.f_node with
-  | Fapp({ f_node = Fop(p,_); }, args) -> begin
+  | Fapp({ f_node = Fop(p,_,_); }, args) -> begin
       try reduce_logic ri env hyps f p args with
       | NotRed _ -> raise NotReducible
     end
@@ -1688,7 +1689,7 @@ module User = struct
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
+        | { f_node = Fop (p, tys, _) }, args ->
             R.Rule (`Op (p, tys), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)

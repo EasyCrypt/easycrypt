@@ -44,7 +44,7 @@ let get_injection env p =
     let _, f = destr_iff concl in
     let f1, f2 = destr_eq f in
     match f1.f_node, f2.f_node with
-    | Fapp({f_node = Fop(op1,_)}, [_]), Fapp({f_node = Fop(op2,_)}, [_]) when
+    | Fapp({f_node = Fop(op1,_,_)}, [_]), Fapp({f_node = Fop(op2,_,_)}, [_]) when
         EcPath.p_equal op1 op2 ->
       Some(op1, p)
     | _ -> None
@@ -64,7 +64,7 @@ let init_einfo env =
 
 let is_inj info f =
   match f.f_node with
-  | Fop(p,_) -> Sp.mem p info.inj_info
+  | Fop(p,_,_) -> Sp.mem p info.inj_info
   | _ -> false
 
 let get_field env hyps ty () =

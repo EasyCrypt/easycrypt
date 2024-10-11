@@ -98,7 +98,7 @@ val f_pvloc : variable -> memory -> form
 val f_glob  : EcIdent.t -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
-val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
+val f_op     : ?spec:bool -> path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form

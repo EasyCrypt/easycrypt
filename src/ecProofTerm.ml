@@ -315,7 +315,7 @@ let pf_find_occurence
   let kmatch key tp =
     match key, (fst (destr_app tp)).f_node with
     | `NoKey , _           -> true
-    | `Path p, Fop (p', _) -> EcPath.p_equal p p'
+    | `Path p, Fop (p', _, _) -> EcPath.p_equal p p'
     | `Path _, _           -> false
     | `Var  x, Flocal x'   -> id_equal x x'
     | `Var  _, _           -> false
@@ -326,7 +326,7 @@ let pf_find_occurence
   (* Extract key from pattern *)
   let key =
     match (fst (destr_app ptn)).f_node with
-    | Fop (p, _) -> `Path p
+    | Fop (p, _, _) -> `Path p
     | Flocal x   ->
         if   is_none (EcMatching.MEV.get x `Form !(pt.pte_ev))
         then `Var x
@@ -419,10 +419,10 @@ let pf_unify (pt : pt_env) ty1 ty2 =
 (* -------------------------------------------------------------------- *)
 let rec pmsymbol_of_pform fp : pmsymbol option =
   match unloc fp with
-  | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) when EcIo.is_mod_ident x ->
+  | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _, _) when EcIo.is_mod_ident x ->
       Some (List.map (fun nm1 -> (mk_loc loc nm1, None)) (nm @ [x]))
 
-  | PFapp ({ pl_desc = PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) },
+  | PFapp ({ pl_desc = PFident ({ pl_desc = (nm, x); pl_loc = loc }, _, _) },
            [{ pl_desc = PFtuple args; }]) -> begin
 
     let mod_ = List.map (fun nm1 -> (mk_loc loc nm1, None)) nm in
@@ -477,7 +477,7 @@ let ffpattern_of_form hyps fp : ppterm option =
     | _      -> mk_loc fp.pl_loc (EA_form fp)
   in
     match destr_app fp with
-    | ({ pl_desc = PFident (p, tya) }, args) ->
+    | ({ pl_desc = PFident (p, tya, _) }, args) ->
         let hastyp = not (EcUtils.is_none tya) in
         if lookup_named_psymbol hyps ~hastyp (unloc p) <> None then
           Some ({ fp_mode = `Implicit;

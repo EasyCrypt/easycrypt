@@ -49,6 +49,8 @@ type stydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
+type val_params = (EcIdent.t * EcTypes.ty) list
+
 type locals = EcIdent.t list
 
 type operator_kind =
@@ -104,6 +106,7 @@ and prctor = {
 
 type operator = {
   op_tparams  : ty_params;
+  op_vparams  : (EcIdent.t * EcTypes.ty) list;
   op_ty       : EcTypes.ty;
   op_kind     : operator_kind;
   op_loca     : locality;
@@ -126,7 +129,7 @@ val is_prind  : operator -> bool
 
 val optransparent : opopaque
 
-val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty -> opbody option -> locality -> operator
+val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ?vparams:val_params -> ty -> opbody option -> locality -> operator
 val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> ty list -> prbody option -> locality -> operator
 
 val mk_abbrev :
