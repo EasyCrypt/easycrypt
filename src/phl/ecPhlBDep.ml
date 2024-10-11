@@ -119,11 +119,8 @@ let prog_equiv_prod
     pstate_r inpcs (invs_r |> List.map (fun v -> v.v_name))
   in
 
-  let pcond = match pcond with
-    | None -> None
-    | Some pcond -> Some (circuit_of_form env pcond)
-  in
-  
+  let pcond = Option.map (circuit_of_form env) pcond in
+
   let pstate_l = List.fold_left (EcCircuits.process_instr env meml) pstate_l proc_l.s_node in
   let pstate_l = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_l in
   let pstate_r = List.fold_left (EcCircuits.process_instr env memr) pstate_r proc_r.s_node in
@@ -329,14 +326,7 @@ let get_vars (vs : bdepvar list) (m : memenv) : variable list =
   List.flatten (List.map (fun v -> get_var v m) vs)
 
 let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
-  let invs = bdinfo.invs in
-  let inpvs = bdinfo.inpvs in
-  let outvs = bdinfo.outvs in
-  let n = bdinfo.n in
-  let m = bdinfo.m in
-  let lane = bdinfo.lane in
-  let pcond = bdinfo.pcond in
-  let perm = bdinfo.perm in
+  let { m; n; invs; inpvs; outvs; lane; pcond; perm } = bdinfo in
 
   let env = FApi.tc1_env tc in
   let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
@@ -358,12 +348,6 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let pp_type (fmt: Format.formatter) (ty: ty) =
     Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
   
-  let collapse (xs: 'a list) : 'a option = 
-    match xs with
-    | [] -> None
-    | x::[] -> Some x
-    | x::xs -> if List.for_all ((=) x) xs then Some x else None
-  in
   let plane, olane = EcEnv.Op.lookup ([], lane.pl_desc) env in
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
   let inpbty, outbty = tfrom_tfun2 olane.op_ty in
@@ -413,7 +397,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
       | `VarRange (x, n) ->
           List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) in 
     List.map lookup invs |> List.flatten |> List.split in
-  let inty = match collapse inv_tys with
+  let inty = match List.collapse inv_tys with
   | Some ty -> ty
   | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
   in

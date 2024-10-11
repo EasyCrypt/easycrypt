@@ -25,14 +25,6 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
-(* List of size n*w into list of n lists of size w *)
-let rec blocks (xs: 'a list) (w: int) : 'a list list =
-  match xs with
-  | [] -> []
-  | _ -> let h, t = List.takedrop w xs in
-    h::(blocks t w)
-
-
 (* -------------------------------------------------------------------- *)
 type width = int
 (* type deps = ((int * int) * int C.VarRange.t) list *)
@@ -154,7 +146,7 @@ let circ_ident (input: cinput) : circuit =
     { circ = BWCirc (C.reg ~size:w ~name:(tag idn)); inps = [input]}
   | BWAInput (idn, n, w) -> 
     let c = C.reg ~name:(tag idn) ~size:(n*w) in
-    let c = Array.of_list (blocks c w) in
+    let c = Array.of_list (List.chunkify w c) in
     { circ = BWArray c; inps=[input]}
 
 (* Packs a collection (list) of bitwords into an array *)
@@ -168,7 +160,7 @@ let circ_array_of_bws (inps: cinput list) : circuit =
 let circ_array_of_bw (inp: cinput) (w: width) : circuit =
   let r = circ_ident inp in
   let r = destr_bwcirc r.circ in
-  {circ = BWArray(blocks r w |> Array.of_list); inps=[inp]}
+  {circ = BWArray(List.chunkify w r |> Array.of_list); inps=[inp]}
 
 (* Checks whether the two circuits have the same inputs up to renaming *)
 let input_shape_equal (f: circuit) (g: circuit) : bool = 
@@ -402,7 +394,7 @@ let circuit_bw_split (c: circuit) (w: int) : circuit =
   | BWCirc r -> 
     let nk = List.length r in
     assert (nk mod w = 0);
-    let rs = blocks r w |> Array.of_list in
+    let rs = List.chunkify w r |> Array.of_list in
     {circ=BWArray rs; inps = c.inps}
 
 (* Zero-extends a bitstring *)
@@ -427,7 +419,7 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
     | _, BWInput (_, w)::cs -> let r1, r2 = List.takedrop w r in
       (BWCirc r1)::(doit r2 cs)
     | _, BWAInput (_, n, w)::cs -> let r1, r2 = List.takedrop (w*n) r in
-      let r1 = blocks r1 w |> Array.of_list in
+      let r1 = List.chunkify w r1 |> Array.of_list in
       (BWArray r1)::(doit r2 cs)
   in
   doit r inps, BWInput (idn, bsize)
@@ -484,7 +476,7 @@ let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit
   let arr_circ = destr_bwcirc arr.circ in
   let bw_circ = destr_bwcirc bw.circ in
   let res_circ = (List.take (i*aw) arr_circ) @ bw_circ @ (List.drop ((i+1)*aw) arr_circ) in
-  let res_circs = blocks res_circ w in
+  let res_circs = List.chunkify w res_circ in
   {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
 
 (* To be removed when we have external op bindings *)
@@ -562,7 +554,7 @@ let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit =
   let inp = bwinput_of_size n in
   let inp_circ = circ_ident inp in
   let cblocks = destr_bwcirc inp_circ.circ in 
-  let cblocks = blocks cblocks w in 
+  let cblocks = List.chunkify w cblocks in 
   let cblocks = List.mapi (fun i _ -> List.nth cblocks (f i)) cblocks |> List.flatten in
   {circ=BWCirc(cblocks); inps=[inp]}
   

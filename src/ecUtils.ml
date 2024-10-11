@@ -594,6 +594,21 @@ module List = struct
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
 
+  let collapse ?(eq : 'a -> 'a -> bool = (=)) (xs : 'a list) =
+    match xs with
+    | [] -> None
+    | x :: xs -> if List.for_all (eq x) xs then Some x else None
+
+  (* List of size n*w into list of n lists of size w *)
+  let chunkify (w : int) =
+    let rec doit (acc : 'a list list) (xs : 'a list) =
+      if is_empty xs then
+        rev acc
+      else
+        let hd, tl = takedrop w xs in
+        doit (hd :: acc) tl
+    in fun (xs : 'a list) -> doit [] xs
+
   (* Separate list into a prefix for which p is true and the rest *)
   let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
     let rec doit (acc: 'a list) (xs : 'a list) =
