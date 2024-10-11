@@ -3269,10 +3269,10 @@ interleave_info:
     { Prwprgm (`IdAssign (o, x)) }
 
 bd_vars:
-| vs=plist0(STRING, SEMICOLON) 
+| vs=plist0(lident, SEMICOLON) 
   { List.map (fun v -> (`Var v :> bdepvar)) vs }
 
-| v=STRING COLON w=word
+| v=lident COLON w=word
   { [(`VarRange (v, w) :> bdepvar)] }
 
 bdepeq_out_info:
