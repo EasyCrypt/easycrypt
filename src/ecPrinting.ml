@@ -3405,6 +3405,8 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Or       _ -> "or"
         | `ZExtend  _ -> "zextend"
         | `Truncate _ -> "truncate"
+        | `A2B      _ -> "a2b"
+        | `B2A      _ -> "b2a"
       in
       Format.fprintf fmt "%abind op [%a] %a \"%s\"."
         pp_locality lc

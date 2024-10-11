@@ -25,6 +25,37 @@ abstract theory BV.
   axiom oflistK (xs : bool list) : size xs = size => tolist (oflist xs) = xs.
 end BV.
 
+
+(* ==================================================================== *)
+theory A.
+  op size : int.
+
+  axiom [bydone] gt0_size : 0 < size.
+
+  type 'a t.
+
+  op get ['a] : 'a t -> int -> 'a.
+
+  op set ['a] : 'a t -> int -> 'a -> 'a t.
+
+  op to_list ['a] : 'a t -> 'a list.
+
+  axiom tolistP ['a] (a : 'a t) :
+    to_list a = mkseq (fun i => get a i) size.
+
+  axiom eqP ['a] (a1 a2 : 'a t) :
+        (forall i, 0 <= i < size => get a1 i = get a2 i)
+    <=> (a1 = a2).
+
+  axiom get_setP ['a] (a : 'a t) (i j : int) (v : 'a) :
+       0 <= i < size
+    => 0 <= j < size
+    => get (set a j v) i = if i = j then v else get a i.
+
+  axiom get_out ['a] (a1 a2 : 'a t) (i : int) :
+    !(0 <= i < size) => get a1 i = get a2 i.
+end A.
+
 (* ==================================================================== *)
 theory BVOperators.
   (* ------------------------------------------------------------------ *)
@@ -152,34 +183,59 @@ theory BVOperators.
     axiom bvtruncateP (bv : BV1.bv) :
       take BV2.size (BV1.tolist bv) = BV2.tolist (bvtruncate bv).
   end BVTruncate.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVA2B.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone A.
+
+    axiom [bydone] size_ok : A.size * BV2.size = BV1.size.
+
+    op a2b : BV2.bv A.t -> BV1.bv.
+
+    axiom a2bP (bva : BV2.bv A.t) :
+      flatten (map BV2.tolist (A.to_list bva)) = BV1.tolist (a2b bva).
+  end BVA2B.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVB2A.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone A.
+
+    axiom [bydone] size_ok : A.size * BV2.size = BV1.size.
+
+    op b2a : BV1.bv -> BV2.bv A.t.
+
+    axiom b2aP (bva : BV1.bv) :
+      BV1.tolist bva = flatten (map BV2.tolist (A.to_list (b2a bva))).
+  end BVB2A.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory A2B2A.        (* choubidoubidou *)
+    clone BV as BV1.
+    clone BV as BV2.
+    clone import A.
+
+    axiom [bydone] size_ok : A.size * BV2.size = BV1.size.
+
+    clone import BVA2B with
+      theory BV1 <- BV1,
+      theory BV2 <- BV2,
+      theory A   <- A
+      proof size_ok by exact/size_ok.
+
+    clone import BVB2A with
+      theory BV1 <- BV1,
+      theory BV2 <- BV2,
+      theory A   <- A
+      proof size_ok by exact/size_ok.
+
+    lemma a2bK : cancel a2b b2a.
+    proof. admitted.
+
+    lemma b2aK : cancel a2b b2a.
+    proof. admitted.
+  end A2B2A.
 end BVOperators.
-
-(* ==================================================================== *)
-theory A.
-  op size : int.
-
-  axiom gt0_size : 0 < size.
-
-  type 'a t.
-
-  op get ['a] : 'a t -> int -> 'a.
-
-  op set ['a] : 'a t -> int -> 'a -> 'a t.
-
-  op to_list ['a] : 'a t -> 'a list.
-
-  axiom tolistP ['a] (a : 'a t) :
-    to_list a = mkseq (fun i => get a i) size.
-
-  axiom eqP ['a] (a1 a2 : 'a t) :
-        (forall i, 0 <= i < size => get a1 i = get a2 i)
-    <=> (a1 = a2).
-
-  axiom get_setP ['a] (a : 'a t) (i j : int) (v : 'a) :
-       0 <= i < size
-    => 0 <= j < size
-    => get (set a j v) i = if i = j then v else get a i.
-
-  axiom get_out ['a] (a1 a2 : 'a t) (i : int) :
-    !(0 <= i < size) => get a1 i = get a2 i.
-end A.

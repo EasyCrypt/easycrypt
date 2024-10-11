@@ -3897,10 +3897,10 @@ cr_binding_r:
 | BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
   { CRB_Array { get; set; tolist; type_; size; } }
   
-| BIND OP type_=loc(simpl_type_exp) operator=qoident name=loc(STRING)
+| BIND OP type_=qident operator=qoident name=loc(STRING)
   { CRB_BvOperator { types = [type_]; operator; name; } }
 
-| BIND OP types=bracket(plist1(loc(simpl_type_exp), AMP)) operator=qoident name=loc(STRING)
+| BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
   { CRB_BvOperator { types; operator; name; } }
 
 | BIND CIRCUIT operator=qoident circuit=loc(STRING)

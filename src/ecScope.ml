@@ -2343,7 +2343,6 @@ module Circuit = struct
       in
 
       let do_theory (x : symbol) (theory : path) : EcThCloning.evclone =
-        Format.eprintf "@.@.%s@.@." (EcPath.tostring clone.path);
         let thenv = EcEnv.Theory.env_of_theory clone.path env in
         let atheory = EcEnv.Theory.by_path (pqname clone.path x) thenv in
 
@@ -2482,7 +2481,10 @@ module Circuit = struct
     let proofs, scope = doclone scope preclone in
 
     let item = CRB_Array
-      { get; set; tolist; type_ = bspath; size = BI.to_int ba.size } in
+      { get; set; tolist;
+        type_  = bspath;
+        size   = BI.to_int ba.size;
+        theory = pqname (EcEnv.root env) name; } in
 
     let item = EcTheory.mkitem EcTheory.import0 (Th_crbinding (item, local)) in
 
@@ -2493,70 +2495,121 @@ module Circuit = struct
   let add_bvoperator (scope : scope) (local : is_local) (op : pbind_bvoperator) : scope =
     let env = env scope in
 
-    let types =
-      let for1 (ty : pty) =
-        let type_ =
-          let ue = EcUnify.UniEnv.create None in
-          let ty = EcTyping.transty tp_tydecl env ue ty in
-          assert (EcUnify.UniEnv.closed ue);
-          ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty in
+    let (kind, sig_, subname) : (_ -> EcDecl.bv_opkind) * _ * _ =
+      match unloc op.name with
+      | "add"  -> (fun sz -> `Add  (as_seq1 sz)), [`BV], "Add"
+      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz)), [`BV], "Sub"
+      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz)), [`BV], "Mul"
+      | "udiv" -> (fun sz -> `UDiv (as_seq1 sz)), [`BV], "UDiv"
+      | "urem" -> (fun sz -> `URem (as_seq1 sz)), [`BV], "URem"
+      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz)), [`BV], "SHL"
+      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz)), [`BV], "SHR"
+      | "and"  -> (fun sz -> `And  (as_seq1 sz)), [`BV], "And"
+      | "or"   -> (fun sz -> `Or   (as_seq1 sz)), [`BV], "Or"
+      | "not"  -> (fun sz -> `Not  (as_seq1 sz)), [`BV], "Not"
 
-        let bspath =
-          match type_.ty_node with
-          | Tconstr (p, []) -> p
-          | _ ->
-              hierror ~loc:(ty.pl_loc)
-                "bit-string type must be a monomorphic named type" in
+      | "zextend" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in  `ZExtend (sz1, sz2)in
+        mk, [`BV; `BV], "ZExtend"
 
-        let bitstring =
-          match EcEnv.Circuit.lookup_bitstring env type_ with
-          | None ->
-            hierror ~loc:(ty.pl_loc)
-              "this type is not bound to a bitstring type"
-          | Some bitstring -> bitstring in
+      | "truncate" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in  `Truncate (sz1, sz2)in
+        mk, [`BV; `BV], "Truncate"
 
-        (type_, bspath, bitstring) in
+      | "a2b" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `A2B ((sz2, asz), sz1) in
+        mk, [`BV; `BV; `A], "A2B"
 
-      List.map for1 op.types in
-
-    let (kind, subname) : EcDecl.bv_opkind * _ =
-      match unloc op.name, types with
-      | "add"     , [_,_, bs]  -> `Add  bs.size, "Add"
-      | "sub"     , [_,_, bs]  -> `Sub  bs.size, "Sub"
-      | "mul"     , [_,_, bs]  -> `Mul  bs.size, "Mul"
-      | "udiv"    , [_,_, bs]  -> `UDiv bs.size, "UDiv"
-      | "urem"    , [_,_, bs]  -> `URem bs.size, "URem"
-      | "shl"     , [_,_, bs]  -> `Shl  bs.size, "SHL"
-      | "shr"     , [_,_, bs]  -> `Shr  bs.size, "SHR"
-      | "and"     , [_,_, bs]  -> `And  bs.size, "And"
-      | "or"      , [_,_, bs]  -> `Or   bs.size, "Or"
-      | "not"     , [_,_, bs]  -> `Not  bs.size, "Not"
-
-      | "zextend", [bs1; bs2] ->
-        (`ZExtend ((proj3_3 bs1).size, (proj3_3 bs2).size), "ZExtend")
-
-      | "truncate", [bs1; bs2] ->
-        (`Truncate ((proj3_3 bs1).size, (proj3_3 bs2).size), "Truncate")
-
+      | "b2a" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `B2A (sz1, (sz2, asz)) in
+        mk, [`BV; `BV; `A], "B2A"
+  
       | _ ->
         hierror ~loc:(loc op.name)
           "invalid bv operator name: %s" (unloc op.name) in
 
+    if List.compare_lengths sig_ op.types <> 0 then
+      hierror ~loc:(loc op.operator)
+        "%d type(s) should be provided" (List.length sig_);
+
+    let check_type (mode : [`BV | `A]) (ty : pqsymbol) =
+      let path =
+        match EcEnv.Ty.lookup_opt (unloc ty) env, mode with
+        | None, _ ->
+          hierror ~loc:(loc ty)
+            "cannot find named type: `%s'"
+            (string_of_qsymbol (unloc ty))
+      
+        | Some (path, decl), `BV -> (* FIXME: normalize? *)
+          if List.length decl.tyd_params <> 0 then
+            hierror ~loc:(loc ty)
+              "a bit-string type must be a monomorphic named type";
+          path
+
+        | Some (path, decl), `A ->
+          if List.length decl.tyd_params <> 1 then
+            hierror ~loc:(ty.pl_loc)
+              "an array type must be a 1-polymorphic named type";
+          path
+      in
+      
+      let (size, theory) =
+        match mode with
+        | `BV -> begin
+          match EcEnv.Circuit.lookup_bitstring_path env path with
+          | None ->
+            hierror ~loc:(ty.pl_loc)
+              "this type is not bound to a bitstring type"
+          | Some bs -> (bs.size, bs.theory)
+          end
+        | `A -> begin
+          match EcEnv.Circuit.lookup_array_path env path with
+          | None ->
+            hierror ~loc:(ty.pl_loc)
+              "this type is not bound to an array type"
+          | Some ba -> (ba.size, ba.theory)
+          end
+      in (path, size, (mode, theory))
+
+    in
+
+    let types = List.map2 check_type sig_ op.types in
     let subname = "BV" ^ subname in
 
     let operator, _ = EcEnv.Op.lookup op.operator.pl_desc env in
     let name =
-      let suffix = List.map (EcPath.tolist |- proj3_2) types in
+      let suffix = List.map (EcPath.tolist |- proj3_1) types in
       let suffix = List.flatten suffix in
       String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME: not stable*) in
 
-    let cltheories =
-      match types with
-      | [_, _, bs] -> ["BV", bs.theory]
-      | _ ->
-        List.mapi (fun i (_, _, (bs : crb_bitstring)) ->
-          (Format.asprintf "BV%d" (i + 1), bs.theory)
-        ) types in
+    let _, cltheories =
+      let string_of_mode = function `A -> "A" | `BV -> "BV" in
+
+      let counts0 =
+          [`A; `BV]
+      |> List.to_seq
+      |> Seq.map (fun mode -> (mode, 0))
+      |> BatMap.of_seq in
+
+     let maxs =
+        List.fold_left (fun counts mode ->
+          BatMap.modify mode ((+) 1) counts
+        ) counts0 sig_ in
+
+      List.fold_left_map (fun counts (_, _, (mode, theory)) ->
+        let prefix = string_of_mode mode in
+
+          let counts, name =
+          if BatMap.find mode maxs < 2 then
+            (counts, prefix)
+          else
+            let counts = BatMap.modify mode ((+) 1) counts in
+            let name = Format.sprintf "%s%d" prefix (BatMap.find mode counts) in
+            (counts, name)
+          in (counts, (name, theory))
+      ) counts0 types in
 
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"; "BVOperators"], subname)
@@ -2570,8 +2623,8 @@ module Circuit = struct
       let proofs, scope = doclone scope preclone in
 
     let item = CRB_BvOperator
-      { kind     = kind;
-        types    = List.map proj3_2 types;
+      { kind     = kind (List.map proj3_2 types);
+        types    = List.map proj3_1 types;
         operator = operator;
         theory   = EcPath.pqname (EcEnv.root env) subname; } in
 

@@ -209,7 +209,8 @@ type crb_array =
   ; get    : EcPath.path
   ; set    : EcPath.path
   ; tolist : EcPath.path
-  ; size   : int }
+  ; size   : int
+  ; theory : EcPath.path }
   
 type bv_opkind = [
   | `Add      of int
@@ -224,6 +225,8 @@ type bv_opkind = [
   | `Not      of int
   | `ZExtend  of int * int
   | `Truncate of int * int
+  | `A2B      of (int * int) * int
+  | `B2A      of int * (int * int)
 ]
   
 type crb_bvoperator =

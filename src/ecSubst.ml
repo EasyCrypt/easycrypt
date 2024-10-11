@@ -1058,7 +1058,8 @@ let subst_crbinding (s : subst) (crb : crbinding) =
       get    = subst_path s ba.get;
       set    = subst_path s ba.set;
       tolist = subst_path s ba.tolist;
-      size   = ba.size; }
+      size   = ba.size;
+      theory = subst_path s ba.theory }
 
   | CRB_BvOperator op ->
     assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
