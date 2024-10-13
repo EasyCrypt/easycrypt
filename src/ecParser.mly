@@ -3891,8 +3891,8 @@ cr_binding_r:
 | BIND BITSTRING from_=qoident to_=qoident type_=loc(simpl_type_exp) size=uint
   { CRB_Bitstring { from_; to_; type_; size; } }
 
-| BIND ARRAY get=qoident set=qoident tolist=qoident type_=qoident size=uint
-  { CRB_Array { get; set; tolist; type_; size; } }
+| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=uint
+  { CRB_Array { get; set; tolist; oflist; type_; size; } }
   
 | BIND OP type_=qident operator=qoident name=loc(STRING)
   { CRB_BvOperator { types = [type_]; operator; name; } }

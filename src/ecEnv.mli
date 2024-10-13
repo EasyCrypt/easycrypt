@@ -24,7 +24,7 @@ type crb_tyrev_binding = [
 
 type crb_bitstring_operator = crb_bitstring * [`From | `To]
 
-type crb_array_operator = crb_array * [`Get | `Set | `ToList]
+type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
 
 type crb_oprev_binding = [
   | `Bitstring  of crb_bitstring_operator

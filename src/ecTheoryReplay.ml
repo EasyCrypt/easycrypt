@@ -986,11 +986,12 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
     let get    = forpath ba.get in
     let set    = forpath ba.set in
     let tolist = forpath ba.tolist in
-    let type_  = ba.type_ in (* FIXME*)
+    let oflist = forpath ba.oflist in
+    let type_  = ba.type_ in (* FIXME *)
     let size   = ba.size in
     let theory = ba.theory in (* FIXME *)
 
-    let ba = CRB_Array { get; set; tolist; type_; size; theory; } in
+    let ba = CRB_Array { get; set; tolist; oflist; type_; size; theory; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (ba, lc)) in
 
     (subst, ops, proofs, scope)

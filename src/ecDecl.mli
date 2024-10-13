@@ -209,6 +209,7 @@ type crb_array =
   ; get    : EcPath.path
   ; set    : EcPath.path
   ; tolist : EcPath.path
+  ; oflist : EcPath.path
   ; size   : int
   ; theory : EcPath.path }
   

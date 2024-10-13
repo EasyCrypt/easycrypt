@@ -174,7 +174,7 @@ type crb_tyrev_binding = [
 
 type crb_bitstring_operator = crb_bitstring * [`From | `To]
 
-type crb_array_operator = crb_array * [`Get | `Set | `ToList]
+type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
 
 type crb_oprev_binding = [
   | `Bitstring  of crb_bitstring_operator
@@ -2880,7 +2880,8 @@ module Circuit = struct
             bindings.opreverse
             [ (ba.set   , `Array (ba, `Set))
             ; (ba.get   , `Array (ba, `Get))
-            ; (ba.tolist, `Array (ba, `ToList)) ]}
+            ; (ba.tolist, `Array (ba, `ToList))
+            ; (ba.oflist, `Array (ba, `OfList)) ]}
 
   let rebind_array (ba : crb_array) (env : env) : env =
     { env with env_crbds = rebind_array_ ba env.env_crbds }

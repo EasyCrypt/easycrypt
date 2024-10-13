@@ -3382,12 +3382,13 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         bs.size
 
     | CRB_Array ba ->
-      Format.fprintf fmt "%abind array %a %a %a %a %d."
+      Format.fprintf fmt "%abind array %a %a %a %a %a %d."
         pp_locality lc
         (pp_tyname ppe) ba.type_
         (pp_opname ppe) ba.get
         (pp_opname ppe) ba.set
         (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
         ba.size
 
     | CRB_BvOperator op ->

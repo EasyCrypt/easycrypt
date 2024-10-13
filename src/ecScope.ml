@@ -2463,6 +2463,7 @@ module Circuit = struct
     let get   , _ = EcEnv.Op.lookup ba.get.pl_desc env in
     let set   , _ = EcEnv.Op.lookup ba.set.pl_desc env in      
     let tolist, _ = EcEnv.Op.lookup ba.tolist.pl_desc env in
+    let oflist, _ = EcEnv.Op.lookup ba.oflist.pl_desc env in
     let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) in
 
     let preclone =
@@ -2475,13 +2476,14 @@ module Circuit = struct
           [ ("size"   , `Int ba.size)
           ; ("get"    , `Path get)
           ; ("set"    , `Path set)
-          ; ("to_list", `Path tolist) ]
+          ; ("to_list", `Path tolist)
+          ; ("of_list", `Path oflist) ]
       ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
 
     let item = CRB_Array
-      { get; set; tolist;
+      { get; set; tolist; oflist;
         type_  = bspath;
         size   = BI.to_int ba.size;
         theory = pqname (EcEnv.root env) name; } in

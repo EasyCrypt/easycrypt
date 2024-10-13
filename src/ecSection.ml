@@ -1340,7 +1340,7 @@ let check_crb_array (scenv : scenv) ((ba, lc) : crb_array * is_local) =
   if lc = `Local then
     check_section scenv from
   else if scenv.sc_insec then begin
-    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [ba.get; ba.set; ba.tolist];
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [ba.get; ba.set; ba.tolist; ba.oflist];
     cb scenv from cd_glob (`Type ba.type_)
   end
   

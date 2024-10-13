@@ -1053,11 +1053,13 @@ let subst_crbinding (s : subst) (crb : crbinding) =
     assert (not (Mp.mem ba.get s.sb_def));
     assert (not (Mp.mem ba.set s.sb_def));
     assert (not (Mp.mem ba.tolist s.sb_def));
+    assert (not (Mp.mem ba.oflist s.sb_def));
     CRB_Array {
       type_  = subst_path s ba.type_;
       get    = subst_path s ba.get;
       set    = subst_path s ba.set;
       tolist = subst_path s ba.tolist;
+      oflist = subst_path s ba.oflist;
       size   = ba.size;
       theory = subst_path s ba.theory }
 
