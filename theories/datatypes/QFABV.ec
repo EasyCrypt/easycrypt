@@ -13,18 +13,23 @@ abstract theory BV.
   op tolist : bv -> bool list.
   op oflist : bool list -> bv.
 
+  op toint : bv -> int.
+  op ofint : int -> bv.
+
   op get (b: bv) (n: int) : bool = 
     List.nth false (tolist b) n.
 
-  op toint (b: bv) : int = 
-    bs2int (tolist b).
-
   axiom size_tolist (bv : bv): List.size (tolist bv) = size.
 
-  axiom tolistK (bv : bv) : oflist (tolist bv) = bv.
-  axiom oflistK (xs : bool list) : size xs = size => tolist (oflist xs) = xs.
-end BV.
+  axiom tolistP (bv : bv) : oflist (tolist bv) = bv.
+  axiom oflistP (xs : bool list) : size xs = size => tolist (oflist xs) = xs.
 
+  axiom tointP (bv : bv) :
+    toint bv = bs2int (tolist bv).
+
+  axiom ofintP (i : int) :
+    ofint i = oflist (int2bs size i).
+end BV.
 
 (* ==================================================================== *)
 theory A.

@@ -2414,7 +2414,9 @@ module Circuit = struct
             "bit-string type must be a monomorphic named type" in
 
     let from_, _ = EcEnv.Op.lookup bs.to_.pl_desc env in
-    let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in      
+    let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in
+    let toint, _ = EcEnv.Op.lookup bs.toint.pl_desc env in
+    let ofint, _ = EcEnv.Op.lookup bs.ofint.pl_desc env in
     let name     = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
 
     let preclone =
@@ -2426,7 +2428,9 @@ module Circuit = struct
       ; operators =
           [ ("size"  , `Int bs.size)
           ; ("tolist", `Path to_)
-          ; ("oflist", `Path from_) ]
+          ; ("oflist", `Path from_)
+          ; ("toint" , `Path toint)
+          ; ("ofint" , `Path ofint) ]
       ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in

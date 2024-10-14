@@ -3,7 +3,7 @@ from Jasmin require import JModel JArray.
 
 clone import PolyArray as Array2 with op size <- 2.
 
-bind array Array2."_.[_]" Array2."_.[_<-_]" Array2.to_list Array2.t 2.
+bind array Array2."_.[_]" Array2."_.[_<-_]" Array2.to_list Array2.of_list Array2.t 2.
 realize tolistP by admit.
 realize eqP by admit.
 realize get_setP by admit.
@@ -13,12 +13,15 @@ realize get_out by admit.
 op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.
 
-bind bitstring bool2bits bits2bool bool 1.
-realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-      
+op i2b (i : int) = (i %% 2 <> 0).
 
+bind bitstring bool2bits bits2bool b2i i2b bool 1.
+realize size_tolist by auto.
+realize tolistP by auto.
+realize oflistP by admit.
+realize ofintP by admit.
+realize tointP by admit.
+      
 bind op bool (&&) "mul".
 realize bvmulP by admit.
 
@@ -50,11 +53,12 @@ realize bvnotP by admit.
 
 
 (* ----------- BEGIN W8 BINDINGS ---------- *)
-bind bitstring W8.w2bits W8.bits2w W8.t 8.
+bind bitstring W8.w2bits W8.bits2w W8.to_uint W8.of_int W8.t 8.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize ofintP by admit.
+realize tointP by admit.
 
 bind op W8.t W8.( + ) "add".
 realize bvaddP by admit.
@@ -88,11 +92,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W16 BINDINGS ---------- *)
 
-bind bitstring W16.w2bits W16.bits2w W16.t 16.
+bind bitstring W16.w2bits W16.bits2w W16.to_uint W16.of_int W16.t 16.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize ofintP by admit.
+realize tointP by admit.
 
 bind op W16.t W16.( + ) "add".
 realize bvaddP by admit.
@@ -126,11 +131,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W32 BINDINGS ---------- *)
 
-bind bitstring W32.w2bits W32.bits2w W32.t 32.
+bind bitstring W32.w2bits W32.bits2w W32.to_uint W32.of_int W32.t 32.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize tointP by admit.
+realize ofintP by admit.
 
 bind op W32.t W32.( + ) "add".
 realize bvaddP by admit.
@@ -164,11 +170,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W64 BINDINGS ---------- *)
 
-bind bitstring W64.w2bits W64.bits2w W64.t 64.
+bind bitstring W64.w2bits W64.bits2w W64.to_uint W64.of_int W64.t 64.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize tointP by admit.
+realize ofintP by admit.
 
 bind op W64.t W64.( + ) "add".
 realize bvaddP by admit.
@@ -202,11 +209,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W128 BINDINGS ---------- *)
 
-bind bitstring W128.w2bits W128.bits2w W128.t 128.
+bind bitstring W128.w2bits W128.bits2w W128.to_uint W128.of_int W128.t 128.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize tointP by admit.
+realize ofintP by admit.
 
 bind op W128.t W128.( + ) "add".
 realize bvaddP by admit.
@@ -239,11 +247,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W256 BINDINGS ---------- *)
 
-bind bitstring W256.w2bits W256.bits2w W256.t 256.
+bind bitstring W256.w2bits W256.bits2w W256.to_uint W256.of_int W256.t 256.
 realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
+realize tolistP by auto.
+realize oflistP by admit.
+realize tointP by admit.
+realize ofintP by admit.
 
 bind op W256.t W256.( + ) "add".
 realize bvaddP by admit.
@@ -274,34 +283,7 @@ realize bvnotP by admit.
 
 (* TODO: Add shifts once we have truncate/extend *)
 
-(* ----------- BEGIN INT BINDINDS ---------- *)
-(* FIXME: Figure out how to deal with this correctly later *)
-op int2bits (n: int) : bool list =
-  W256.w2bits (W256.of_int n).
-
-op bits2int (b: bool list) : int =
-  W256.to_uint (W256.bits2w b).
-
-bind bitstring int2bits bits2int int 256.
-realize size_tolist by auto.
-realize tolistK by auto.
-realize oflistK by admit.
-
 (* ----------- BEGIN SPEC FILE BINDINDS ---------- *)
-
-(* ---- INT CONVERSIONS ---- *)
-bind circuit W8.of_int "OF_INT8".
-bind circuit W8.to_uint "TO_UINT8".
-bind circuit W16.of_int "OF_INT16".
-bind circuit W16.to_uint "TO_UINT16".
-bind circuit W32.of_int "OF_INT32".
-bind circuit W32.to_uint "TO_UINT32".
-bind circuit W64.of_int "OF_INT64".
-bind circuit W64.to_uint "TO_UINT64".
-bind circuit W128.of_int "OF_INT128".
-bind circuit W128.to_uint "TO_UINT128".
-bind circuit W256.of_int "OF_INT256".
-bind circuit W256.to_uint "TO_UINT256".
 
 
 (* --- MISC TO BE DEPRECATED --- *)
