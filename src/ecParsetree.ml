@@ -745,6 +745,7 @@ type phltactic =
   | Palias         of (oside * pcodepos * osymbol_r)
   | Pweakmem       of (oside * psymbol * fun_params)
   | Pset           of (oside * pcodepos * bool * psymbol * pexpr)
+  | Psetmatch      of (oside * pcodepos * psymbol * pformula)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
   | Pconcave       of (pformula option tuple2 gppterm * pformula)

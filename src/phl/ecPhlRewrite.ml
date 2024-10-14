@@ -7,16 +7,6 @@ open EcModules
 open EcFol
 
 (* -------------------------------------------------------------------- *)
-let get_expression_of_instruction (i : instr) =
-  match i.i_node with
-  | Sasgn  (lv, e)     -> Some (e, (fun e -> i_asgn  (lv, e)))
-  | Srnd   (lv, e)     -> Some (e, (fun e -> i_rnd   (lv, e)))
-  | Sif    (e, s1, s2) -> Some (e, (fun e -> i_if    (e, s1, s2)))
-  | Swhile (e, s)      -> Some (e, (fun e -> i_while (e, s)))
-  | Smatch (e, bs)     -> Some (e, (fun e -> i_match (e, bs)))
-  | _                  -> None
-
-(* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
     (pos  : EcMatching.Position.codepos)
@@ -26,12 +16,11 @@ let t_change
   let hyps, concl = FApi.tc1_flat tc in
 
   let change (m : memenv) (i : instr) =
-    let e, mk =
+    let e, _, mk =
       EcUtils.ofdfl
         (fun () ->
            tc_error !!tc
-             "targeted instruction should be \
-             an assignment or random sampling")
+             "targetted instruction should contain an expression")
         (get_expression_of_instruction i)
     in
 
