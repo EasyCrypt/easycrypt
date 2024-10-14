@@ -87,6 +87,12 @@ realize bvorP by admit.
 bind op W8.t W8.invw "not".
 realize bvnotP by admit.
 
+bind op [bool & W8.t] W8.\ult "ult".
+realize bvultP by admit.
+
+bind op [bool & W8.t] W8.\ult "ule".
+realize bvuleP by admit.
+
 (* TODO: Add shifts once we have truncate/extend *)
 
 

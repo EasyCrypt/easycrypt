@@ -2503,34 +2503,37 @@ module Circuit = struct
 
     let (kind, sig_, subname) : (_ -> EcDecl.bv_opkind) * _ * _ =
       match unloc op.name with
-      | "add"  -> (fun sz -> `Add  (as_seq1 sz)), [`BV], "Add"
-      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz)), [`BV], "Sub"
-      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz)), [`BV], "Mul"
-      | "udiv" -> (fun sz -> `UDiv (as_seq1 sz)), [`BV], "UDiv"
-      | "urem" -> (fun sz -> `URem (as_seq1 sz)), [`BV], "URem"
-      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz)), [`BV], "SHL"
-      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz)), [`BV], "SHR"
-      | "and"  -> (fun sz -> `And  (as_seq1 sz)), [`BV], "And"
-      | "or"   -> (fun sz -> `Or   (as_seq1 sz)), [`BV], "Or"
-      | "not"  -> (fun sz -> `Not  (as_seq1 sz)), [`BV], "Not"
+      | "add"  -> (fun sz -> `Add  (as_seq1 sz)), [`BV None], "Add"
+      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz)), [`BV None], "Sub"
+      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz)), [`BV None], "Mul"
+      | "udiv" -> (fun sz -> `UDiv (as_seq1 sz)), [`BV None], "UDiv"
+      | "urem" -> (fun sz -> `URem (as_seq1 sz)), [`BV None], "URem"
+      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz)), [`BV None], "SHL"
+      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz)), [`BV None], "SHR"
+      | "and"  -> (fun sz -> `And  (as_seq1 sz)), [`BV None], "And"
+      | "or"   -> (fun sz -> `Or   (as_seq1 sz)), [`BV None], "Or"
+      | "not"  -> (fun sz -> `Not  (as_seq1 sz)), [`BV None], "Not"
+
+      | "ult"  -> (fun sz -> `ULt  (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "ULt"
+      | "ule"  -> (fun sz -> `ULe  (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "ULe"
 
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in  `ZExtend (sz1, sz2)in
-        mk, [`BV; `BV], "ZExtend"
+        mk, [`BV None; `BV None], "ZExtend"
 
       | "truncate" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in  `Truncate (sz1, sz2)in
-        mk, [`BV; `BV], "Truncate"
+        mk, [`BV None; `BV None], "Truncate"
 
       | "a2b" ->
         let mk sz =
           let sz1, sz2, asz = as_seq3 sz in `A2B ((sz2, asz), sz1) in
-        mk, [`BV; `BV; `A], "A2B"
+        mk, [`BV None; `BV None; `A], "A2B"
 
       | "b2a" ->
         let mk sz =
           let sz1, sz2, asz = as_seq3 sz in `B2A (sz1, (sz2, asz)) in
-        mk, [`BV; `BV; `A], "B2A"
+        mk, [`BV None; `BV None; `A], "B2A"
   
       | _ ->
         hierror ~loc:(loc op.name)
@@ -2540,7 +2543,7 @@ module Circuit = struct
       hierror ~loc:(loc op.operator)
         "%d type(s) should be provided" (List.length sig_);
 
-    let check_type (mode : [`BV | `A]) (ty : pqsymbol) =
+    let check_type (mode : [`BV of int option | `A]) (ty : pqsymbol) =
       let path =
         match EcEnv.Ty.lookup_opt (unloc ty) env, mode with
         | None, _ ->
@@ -2548,7 +2551,7 @@ module Circuit = struct
             "cannot find named type: `%s'"
             (string_of_qsymbol (unloc ty))
       
-        | Some (path, decl), `BV -> (* FIXME: normalize? *)
+        | Some (path, decl), `BV _ -> (* FIXME: normalize? *)
           if List.length decl.tyd_params <> 0 then
             hierror ~loc:(loc ty)
               "a bit-string type must be a monomorphic named type";
@@ -2563,12 +2566,19 @@ module Circuit = struct
       
       let (size, theory) =
         match mode with
-        | `BV -> begin
+        | `BV osize -> begin
           match EcEnv.Circuit.lookup_bitstring_path env path with
           | None ->
             hierror ~loc:(ty.pl_loc)
               "this type is not bound to a bitstring type"
-          | Some bs -> (bs.size, bs.theory)
+          | Some bs ->
+            osize |> Option.iter (fun osize ->
+              if osize <> bs.size then
+                hierror ~loc:(ty.pl_loc)
+                  "this type is not bound to a bitstring type of size %d (but of size %d)"
+                  osize bs.size
+            );
+            (bs.size, bs.theory)
           end
         | `A -> begin
           match EcEnv.Circuit.lookup_array_path env path with
@@ -2592,6 +2602,7 @@ module Circuit = struct
 
     let _, cltheories =
       let string_of_mode = function `A -> "A" | `BV -> "BV" in
+      let strip_mode_arg = function `A -> `A | `BV _ -> `BV in
 
       let counts0 =
           [`A; `BV]
@@ -2601,20 +2612,22 @@ module Circuit = struct
 
      let maxs =
         List.fold_left (fun counts mode ->
+          let mode = strip_mode_arg mode in
           BatMap.modify mode ((+) 1) counts
         ) counts0 sig_ in
 
       List.fold_left_map (fun counts (_, _, (mode, theory)) ->
+        let mode = strip_mode_arg mode in
         let prefix = string_of_mode mode in
 
-          let counts, name =
-          if BatMap.find mode maxs < 2 then
-            (counts, prefix)
-          else
-            let counts = BatMap.modify mode ((+) 1) counts in
-            let name = Format.sprintf "%s%d" prefix (BatMap.find mode counts) in
-            (counts, name)
-          in (counts, (name, theory))
+        let counts, name =
+        if BatMap.find mode maxs < 2 then
+          (counts, prefix)
+        else
+          let counts = BatMap.modify mode ((+) 1) counts in
+          let name = Format.sprintf "%s%d" prefix (BatMap.find mode counts) in
+          (counts, name)
+        in (counts, (name, theory))
       ) counts0 types in
 
     let preclone =

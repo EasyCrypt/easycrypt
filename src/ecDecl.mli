@@ -224,6 +224,8 @@ type bv_opkind = [
   | `And      of int
   | `Or       of int
   | `Not      of int
+  | `ULt      of int
+  | `ULe      of int
   | `ZExtend  of int * int
   | `Truncate of int * int
   | `A2B      of (int * int) * int

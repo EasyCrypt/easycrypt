@@ -3404,6 +3404,8 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Not      _ -> "not"
         | `And      _ -> "and"
         | `Or       _ -> "or"
+        | `ULt      _ -> "ult"
+        | `ULe      _ -> "ule"
         | `ZExtend  _ -> "zextend"
         | `Truncate _ -> "truncate"
         | `A2B      _ -> "a2b"

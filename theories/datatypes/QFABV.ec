@@ -164,6 +164,28 @@ theory BVOperators.
   end BVNot.
 
   (* ------------------------------------------------------------------ *)
+  abstract theory BVULt.
+    clone import BV as BV1 with op size <= 1.
+    clone import BV as BV2.
+  
+    op ult : BV2.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvultP (bv1 bv2 : BV2.bv) :
+      BV1.toint (ult bv1 bv2) <> 0 <=> (BV2.toint bv1 < BV2.toint bv2).
+  end BVULt.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVULe.
+    clone import BV as BV1 with op size <= 1.
+    clone import BV as BV2.
+  
+    op ule : BV2.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvuleP (bv1 bv2 : BV2.bv) :
+      BV1.toint (ule bv1 bv2) <> 0 <=> (BV2.toint bv1 <= BV2.toint bv2).
+  end BVULe.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVZExtend.
     clone BV as BV1.
     clone BV as BV2.
