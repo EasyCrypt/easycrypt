@@ -196,6 +196,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
+    | Psetmatch info            -> EcPhlCodeTx.process_set_match info
     | Pweakmem info             -> EcPhlCodeTx.process_weakmem info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
     | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
