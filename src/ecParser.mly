@@ -3106,6 +3106,9 @@ interleave_info:
 | ALIAS s=side? o=codepos x=lident EQ e=expr
     { Pset (s, o, false, x,e) }
 
+| ALIAS s=side? o=codepos x=lident CEQ p=sform_h
+    { Psetmatch (s, o, x, p) }
+
 | WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
     { Pweakmem(s, h, p) }
 

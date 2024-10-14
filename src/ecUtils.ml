@@ -468,6 +468,10 @@ module List = struct
   include Parallel
 
   (* ------------------------------------------------------------------ *)
+  let destruct (s : 'a list) =
+    match s with x :: xs -> (x, xs) | _ -> assert false
+
+  (* ------------------------------------------------------------------ *)
   let nth_opt (s : 'a list) (i : int) =
     try  Some (List.nth s i)
     with Failure _ | Invalid_argument _ -> None
