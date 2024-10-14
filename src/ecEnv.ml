@@ -172,7 +172,7 @@ type crb_tyrev_binding = [
   | `Array     of crb_array
 ]
 
-type crb_bitstring_operator = crb_bitstring * [`From | `To]
+type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToInt]
 
 type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
 
@@ -2860,8 +2860,10 @@ module Circuit = struct
         opreverse  =
           push_all_opreverse
             bindings.opreverse
-            [ (bs.from_, `Bitstring (bs, `From))
-            ; (bs.to_  , `Bitstring (bs, `To  )) ]; }
+            [ (bs.from_, `Bitstring (bs, `From ))
+            ; (bs.to_  , `Bitstring (bs, `To   ))
+            ; (bs.toint, `Bitstring (bs, `ToInt))
+            ; (bs.ofint, `Bitstring (bs, `OfInt)) ]; }
 
   let rebind_bitstring (bs : crb_bitstring) (env : env) : env =
     { env with env_crbds = rebind_bitstring_ bs env.env_crbds }

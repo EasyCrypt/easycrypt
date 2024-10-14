@@ -2436,7 +2436,7 @@ module Circuit = struct
     let proofs, scope = doclone scope preclone in
 
     let item = CRB_Bitstring 
-      { from_; to_;
+      { from_; to_; toint; ofint;
         type_  = bspath;
         size   = BI.to_int bs.size;
         theory = pqname (EcEnv.root env) name; } in

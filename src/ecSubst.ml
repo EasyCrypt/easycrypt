@@ -1041,10 +1041,14 @@ let subst_crbinding (s : subst) (crb : crbinding) =
     assert (not (Mp.mem bs.type_ s.sb_tydef));
     assert (not (Mp.mem bs.from_ s.sb_def));
     assert (not (Mp.mem bs.to_ s.sb_def));
+    assert (not (Mp.mem bs.toint s.sb_def));
+    assert (not (Mp.mem bs.ofint s.sb_def));
     CRB_Bitstring {
       type_  = subst_path s bs.type_;
       from_  = subst_path s bs.from_;
       to_    = subst_path s bs.to_;
+      toint  = subst_path s bs.toint;
+      ofint  = subst_path s bs.ofint;
       size   = bs.size;
       theory = subst_path s bs.theory; }
 
