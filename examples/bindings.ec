@@ -93,6 +93,12 @@ realize bvultP by admit.
 bind op [bool & W8.t] W8.\ult "ule".
 realize bvuleP by admit.
 
+bind op W8.t W8.(`>>`) "shr".
+realize bvshrP by admit. 
+
+bind op W8.t W8.(`<<`) "shl".
+realize bvshlP by admit.
+
 (* TODO: Add shifts once we have truncate/extend *)
 
 
@@ -131,6 +137,20 @@ realize bvorP by admit.
 
 bind op W16.t W16.invw "not".
 realize bvnotP by admit.
+
+op uext8_16 (w: W8.t) : W16.t = 
+  W16.of_int (W8.to_uint w).
+
+bind op [W8.t & W16.t] uext8_16 "zextend".
+realize bvzextendP by admit.
+
+op shl16 (w: W16.t) (sa: W16.t) : W16.t.
+
+lemma shl_shift w sa : 
+    W16.(`<<`) w sa = shl16 w (uext8_16 sa) by admit.
+
+bind op W16.t shl16 "shl".
+realize bvshlP by admit.
 
 (* TODO: Add shifts once we have truncate/extend *)
 
@@ -292,11 +312,10 @@ realize bvnotP by admit.
 (* ----------- BEGIN SPEC FILE BINDINDS ---------- *)
 
 
-(* --- MISC TO BE DEPRECATED --- *)
-bind circuit W32.(`<<`) "LSHIFT32".
+(*bind circuit W32.(`<<`) "LSHIFT32".
 bind circuit W32.(`>>`) "RSHIFTL_32".
 bind circuit CoreInt.lt "LT_256".
-
+*)
 (* -- AVX2 VECTORIZED -- *)
 bind circuit VPSUB_16u16 "VPSUB_16u16".
 bind circuit VPSRA_16u16 "VPSRA_16u16".

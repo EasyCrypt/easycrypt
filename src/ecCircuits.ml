@@ -161,6 +161,7 @@ let circ_array_of_bw (r: circuit) (w: width) : circuit =
   let c = destr_bwcirc r.circ in
   {r with circ = BWArray(List.chunkify w c |> Array.of_list)}
 
+
 (* Checks whether the two circuits have the same inputs up to renaming *)
 let input_shape_equal (f: circuit) (g: circuit) : bool = 
   (List.compare_lengths f.inps g.inps = 0) && 
@@ -616,77 +617,13 @@ module BaseOps = struct
       | None   -> Format.eprintf "Did not find qfabv binding for %s@." (EcPath.tostring p); false
     end
 
+  let is_of_int (env: env) (p: path) : bool = 
+    match EcEnv.Circuit.reverse_bitstring_operator env p with
+    | Some (_, `OfInt) -> true
+    | _ -> false
+
   let circuit_of_baseop (env: env) (p: path) : circuit = 
-    (* Comparisons: *)
-    (* match EcPath.toqsymbol p |> snd with *)
-    (* | "\\ule" -> *) 
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc([C.uge c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]} *)
-    (* | "\\ult" -> *) 
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc([C.ugt c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]} *)
-    (* Comparisons: *)
-    (* | "\\sle" -> *) 
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc([C.sge c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]} *)
-    (* | "\\slt" -> *) 
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc([C.sgt c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]} *)
-    
-    (* (* Conversions *) 
-      (* These int conversions assume a fixed size, *)
-      (* FIXME: require all int conversions to be explicit *)
-      (* (and have some upper bound somewhere of what is the maximum size ) *)
-    (* *) *)
-    (* | "of_int" -> *)
-      (* let id1 = EcIdent.create temp_symbol in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* {circ = BWCirc(c1); inps = [BWInput(id1, 256)]} (* FIXME: Assumes integeres are 256 bits *) *)
-    
-    (* | "to_uint" -> *)
-      (* let id1 = EcIdent.create temp_symbol in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* {circ = BWCirc(C.uextend ~size:256 c1); inps = [BWInput(id1, size)]} (* FIXME: Assumes integeres are 256 bits *) *)
-
-    (* | "zeroextu64" -> *)
-    (* assert(size <= 64); *)
-    (* let id1 = EcIdent.create temp_symbol in *)
-    (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-    (* {circ = BWCirc(C.uextend ~size:64 c1); inps = [BWInput(id1, size)]} *)
-
-    
-    (* | _ -> *) 
-      (* let err = Format.asprintf "Unregistered JOp : %s @." (EcSymbols.string_of_qsymbol qpath) in *)
-      (* raise @@ CircError err *)
-    (* end *)
-  (* AdHoc stuff for barrett example FIXME: remove later *)
-  (* | _, "bvueq" -> (* FIXME: add general parsing for equality *) *)
-    (* let id1 = EcIdent.create temp_symbol in *)
-    (* let c1 = C.reg ~size:16 ~name:id1.id_tag in *)
-    (* let id2 = EcIdent.create temp_symbol in *)
-    (* let c2 = C.reg ~size:16 ~name:id2.id_tag in *)
-    (* {circ = BWCirc([C.bvueq c1 c2]); inps = [BWInput(id1, 16); BWInput(id2, 16)]} *)
-  
-  (* | _, "bvseq" -> (* FIXME: remove hardcoded size *) *)
-    (* let id1 = EcIdent.create temp_symbol in *)
-    (* let c1 = C.reg ~size:32 ~name:id1.id_tag in *)
-    (* let id2 = EcIdent.create temp_symbol in *)
-    (* let c2 = C.reg ~size:32 ~name:id2.id_tag in *)
-    (* {circ = BWCirc([C.bvseq c1 c2]); inps = [BWInput(id1, 32); BWInput(id2, 32)]} *)
-
-  match EcEnv.Circuit.lookup_bvoperator_path env p with
+    match EcEnv.Circuit.lookup_bvoperator_path env p with
     | Some { kind = `Add size } -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
@@ -753,6 +690,20 @@ module BaseOps = struct
       let id1 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = BWCirc(C.lnot_ c1 ); inps = [BWInput(id1, size)]}
+
+    | Some { kind = `ULt size } ->
+      let id1 = EcIdent.create temp_symbol in
+      let id2 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in 
+      let c2 = C.reg ~size ~name:id2.id_tag in 
+      { circ = BWCirc([C.ugt c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `ULe size } ->
+      let id1 = EcIdent.create temp_symbol in
+      let id2 = EcIdent.create temp_symbol in
+      let c1 = C.reg ~size ~name:id1.id_tag in 
+      let c2 = C.reg ~size ~name:id2.id_tag in 
+      { circ = BWCirc([C.uge c2 c1]); inps=[BWInput(id1, size); BWInput(id2, size)]}    
 
     | Some { kind = `ZExtend (size, ext_size) } ->
       assert (size <= ext_size);
@@ -863,7 +814,8 @@ let circuit_of_form
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (env: env) (f: form) : env * circuit = 
     match f.f_node with
     (* hardcoding size for now FIXME *)
-    | Fint z -> env, {circ = BWCirc(C.of_bigint ~size:256 (to_zt z)); inps = []}
+    | Fint z -> assert false
+      (* env, {circ = BWCirc(C.of_bigint ~size:256 (to_zt z)); inps = []} *)
       (* failwith "Add logic to deal with ints (maybe force conversion?)" *)
       (* hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z) *)
     | Fif (c_f, t_f, f_f) -> 
@@ -940,28 +892,28 @@ let circuit_of_form
     let env, res = 
       (* Assuming correct types coming from EC *)
       (* FIXME: add typechecking here ? *)
-      match ArrayOps.destr_array_opt env @@ (EcCoreFol.destr_op f |> fst) with
-      | Some ({ size = n }, `Get) -> let env, res = 
+      match EcEnv.Circuit.reverse_operator env @@ (EcCoreFol.destr_op f |> fst) with
+      | `Array ({ size }, `Get) :: _ -> let env, res = 
         match fs with
         | [arr; {f_node=Fint i; _}] ->
           let (_, t) = destr_array_type env arr.f_ty |> Option.get in
           let w = width_of_type env t in
           let env, arr = doit cache env arr in
-          env, compose (circuit_bwarray_get n w (BI.to_int i)) [arr]
+          env, compose (circuit_bwarray_get size w (BI.to_int i)) [arr]
         | _ -> raise (CircError "set")
         in env, res
-      | Some({ size = n }, `Set) -> let env, res = 
+      | `Array ({ size }, `Set) :: _ -> let env, res = 
         match fs with
         | [arr; {f_node=Fint i; _}; v] ->
           let w = width_of_type env v.f_ty  in
           let env, arr = doit cache env arr in
           let env, v = doit cache env v in
-          env, compose (circuit_bwarray_set n w (BI.to_int i)) [arr; v]
+          env, compose (circuit_bwarray_set size w (BI.to_int i)) [arr; v]
         | _ -> raise (CircError "set")
         in env, res
-      | Some({ size = n_}, `OfList) ->
+      | `Array ({ size }, `OfList) :: _->
         let _, n, w = destr_bwainput @@ cinput_of_type env f.f_ty in
-        assert (n = n_);
+        assert (n = size);
         (* FIXME: have an actual way to get sizes without creating new idents *)
         let wtn, vs = match fs with
           | [wtn; vs] -> wtn, vs 
@@ -984,14 +936,36 @@ let circuit_of_form
           let r = Array.of_list vs in
           env, {circ=BWArray r; inps=[]}
         end
-        
-      | _ -> 
+      | `Bitstring ({ size }, `OfInt) :: _ ->
+        let i = match fs with
+        | { f_node = Fint i } :: _ -> i 
+        | _ -> assert false
+        in 
+        env, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
+      | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
+        | Some `Eq, [f1; f2] -> 
+          let env, c1 = doit cache env f1 in
+          let env, c2 = doit cache env f2 in
+          begin match c1.circ, c2.circ with
+          | BWCirc r1, BWCirc r2 -> 
+            assert (List.compare_lengths r1 r2 = 0);
+            env, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} (* FIXME: check inps here *)
+          | BWArray a1, BWArray a2 -> 
+            assert (Array.length a1 = Array.length a2);
+            assert (Array.for_all2 (fun a b -> (List.compare_lengths a b) = 0) a1 a2);
+            let rs = Array.map2 C.bvueq a1 a2 in
+            env, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = c1.inps @ c2.inps}
+          | _ -> assert false
+          end
+        | None, _ -> 
         let env, f_c = doit cache env f in
         let env, fcs = List.fold_left_map
           (doit cache)
           env fs 
         in
         env, compose f_c fcs
+        | _ -> assert false
+        end
       in env, res
       
     | Fquant (qnt, binds, f) -> 
