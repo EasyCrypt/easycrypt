@@ -232,6 +232,19 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
 let get_uninit_read (s : stmt) =
   snd (s_get_uninit_read Ssym.empty s)
 
+
+(* -------------------------------------------------------------------- *)
+type instr_with_expr = [`Sasgn | `Srnd | `Sif | `Smatch | `Swhile]
+
+let get_expression_of_instruction (i : instr) : (_ * instr_with_expr * _) option =
+  match i.i_node with
+  | Sasgn  (lv, e)     -> Some (e, `Sasgn , (fun e -> i_asgn  (lv, e)))
+  | Srnd   (lv, e)     -> Some (e, `Srnd  , (fun e -> i_rnd   (lv, e)))
+  | Sif    (e, s1, s2) -> Some (e, `Sif   , (fun e -> i_if    (e, s1, s2)))
+  | Swhile (e, s)      -> Some (e, `Swhile, (fun e -> i_while (e, s)))
+  | Smatch (e, bs)     -> Some (e, `Smatch, (fun e -> i_match (e, bs)))
+  | _                  -> None
+
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = 'a EcAst.use_restr
 

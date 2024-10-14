@@ -1,12 +1,14 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcSymbols
 open EcAst
 open EcTypes
 open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcMatching
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -135,6 +137,51 @@ let set_stmt (fresh, id) e =
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+
+(* -------------------------------------------------------------------- *)
+let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
+  fun (pe, hyps) _ me z ->
+    let i, is = List.destruct z.Zpr.z_tail in
+    let e, mk =
+      let e, kind, mk =
+        get_expression_of_instruction i |> ofdfl (fun () ->
+          tc_error pe "targetted instruction should contain an expression"
+        ) in
+
+      match kind with
+      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, mk)
+      | `Swhile -> tc_error pe "while loops not supported"
+    in
+
+    try
+      let ptev = EcProofTerm.ptenv pe hyps (ue, mev) in
+      let e = form_of_expr (fst me) e in
+      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e in
+
+      assert (EcProofTerm.can_concretize ptev);
+
+      let cpos =
+        EcMatching.FPosition.select_form
+          ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+          hyps None subf e in
+
+      let v = { ov_name = Some id; ov_type = subf.f_ty } in
+      let (me, id) = EcMemory.bind_fresh v me in
+      let pv = pv_loc (oget id.ov_name) in
+      let e = EcMatching.FPosition.map cpos (fun _ -> f_pvar pv (subf.f_ty) (fst me)) e in
+
+      let i1 = i_asgn (LvVar (pv, subf.f_ty), expr_of_form (fst me) subf) in
+      let i2 = mk (expr_of_form (fst me) e) in
+
+      (me, { z with z_tail = i1 :: i2 :: is }, [])
+
+    with EcProofTerm.FindOccFailure _ ->
+      tc_error pe "cannot find an occurrence of the pattern"
+
+let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
+  let tr = fun side -> `SetMatch (side, cpos) in
+  t_code_transform side ~bdhoare:true cpos tr
+    (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
@@ -286,10 +333,11 @@ let t_cfold_r side cpos olen g =
   t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
-let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r
-let t_alias = FApi.t_low3 "code-tx-alias" t_alias_r
-let t_set   = FApi.t_low4 "code-tx-set"   t_set_r
-let t_cfold = FApi.t_low3 "code-tx-cfold" t_cfold_r
+let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
+let t_alias     = FApi.t_low3 "code-tx-alias"     t_alias_r
+let t_set       = FApi.t_low4 "code-tx-set"       t_set_r
+let t_set_match = FApi.t_low4 "code-tx-set-match" t_set_match_r
+let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
@@ -309,8 +357,18 @@ let process_set (side, cpos, fresh, id, e) tc =
   let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
+let process_set_match (side, cpos, id, pattern) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let me, _ = tc1_get_stmt side tc in
+  let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
+  let ue  = EcProofTyping.unienv_of_hyps hyps in
+  let ptnmap = ref Mid.empty in
+  let pattern = EcTyping.trans_pattern (LDecl.toenv hyps) ptnmap ue pattern in
+  t_set_match side cpos (EcLocation.unloc id)
+    (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
+    tc
+  
 (* -------------------------------------------------------------------- *)
-
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
   let hyps = FApi.tc1_hyps tc in
