@@ -3241,7 +3241,10 @@ phltactic:
     { Pprocchange (side, pos, f) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
-    { Pprocrewrite (side, pos, f) }
+    { Pprocrewrite (side, pos, `Rw f) }
+
+| PROC REWRITE side=side? pos=codepos SLASHEQ
+    { Pprocrewrite (side, pos, `Simpl) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
