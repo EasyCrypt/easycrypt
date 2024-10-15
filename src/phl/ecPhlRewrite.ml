@@ -137,17 +137,24 @@ let process_rewrite_simpl
   (pos  : pcodepos)
   (tc   : tcenv1)
 =
-  let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
-    let ri = { EcReduction.nodelta with delta_p = fun _ -> `IfTransparent } in
-    let e = form_of_expr (fst me) e in
-    let e = EcCallbyValue.norm_cbv ri hyps e in
-    let e = expr_of_form (fst me) e in
-    (), e
+let ri = EcReduction.nodelta in
+
+let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
+    let f = form_of_expr (fst me) e in
+    let f = EcCallbyValue.norm_cbv ri hyps f in
+    let e = expr_of_form (fst me) f in
+    (fst me, f), e
   in
 
-  let (), tc = t_change side pos change tc in
+  let (m, f), tc = t_change side pos change tc in
 
-  FApi.t_first EcLowGoal.t_reflex tc
+  FApi.t_first (
+    FApi.t_seqs [
+      EcLowGoal.t_intro_s (`Ident m);
+      EcLowGoal.t_change ~ri (f_eq f f);
+      EcLowGoal.t_reflex
+    ]
+  ) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite
