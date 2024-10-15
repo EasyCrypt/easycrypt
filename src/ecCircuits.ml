@@ -652,12 +652,11 @@ module BaseOps = struct
       {circ = BWCirc(C.udiv c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Div (size, true) } -> 
-      assert false
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc(C.udiv c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]} *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.sdiv c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Rem (size, false) } -> 
       let id1 = EcIdent.create (temp_symbol) in
@@ -667,12 +666,11 @@ module BaseOps = struct
       {circ = BWCirc(C.urem c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Rem (size, true) } -> 
-      assert false
-      (* let id1 = EcIdent.create (temp_symbol) in *)
-      (* let id2 = EcIdent.create (temp_symbol) in *)
-      (* let c1 = C.reg ~size ~name:id1.id_tag in *)
-      (* let c2 = C.reg ~size ~name:id2.id_tag in *)
-      (* {circ = BWCirc(C.urem c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]} *)
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.srem c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Shl  size } -> 
       let id1 = EcIdent.create (temp_symbol) in

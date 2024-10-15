@@ -142,4 +142,8 @@ val udiv : reg -> reg -> reg
 
 val urem : reg -> reg -> reg
 
+val sdiv : reg -> reg -> reg
+
+val srem : reg -> reg -> reg
+
 val smod : reg -> reg -> reg

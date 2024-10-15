@@ -617,6 +617,28 @@ let urem (a: reg) (b: reg) : reg =
                  (bvadd u t)
                  (bvneg u))))))))
 *)
+
+let sdiv (s: reg) (t: reg) : reg =
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
+    (udiv s t) @@
+  ite (and_ (xnor msb_s true_) (xnor msb_t false_))
+    (opp (udiv (opp s) t)) @@
+  ite (and_ (xnor msb_s false_) (xnor msb_t true_))
+    (opp (udiv s (opp t)))
+    (udiv (opp s) (opp t))
+
+let srem (s: reg) (t: reg) : reg =
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
+    (urem s t) @@
+  ite (and_ (xnor msb_s true_) (xnor msb_t false_))
+    (opp (urem (opp s) t)) @@
+  ite (and_ (xnor msb_s false_) (xnor msb_t true_))
+    (urem s (opp t))
+    (opp (urem (opp s) (opp t)))
        
 (* Implicit extend *)
 let smod (s: reg) (t: reg) : reg =  
