@@ -727,6 +727,9 @@ type bdepeq_info =
   ; pcond      : psymbol option }
 
 (* -------------------------------------------------------------------- *)
+type prrewrite = [`Rw of ppterm | `Simpl]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -778,7 +781,7 @@ type phltactic =
   | Psymmetry
   | Pbdhoare_split of bdh_split
   | Pprocchange    of side option * pcodepos * pexpr
-  | Pprocrewrite   of side option * pcodepos * ppterm
+  | Pprocrewrite   of side option * pcodepos * prrewrite
 
     (* Eager *)
   | Peager_seq       of (eager_info * pcodepos1 pair * pformula)

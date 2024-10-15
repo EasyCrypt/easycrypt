@@ -68,7 +68,7 @@ let process_change
   let (), tc = t_change side pos expr tc in tc
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite
+let process_rewrite_rw
     (side : side option)
     (pos  : pcodepos)
     (pt   : ppterm)
@@ -130,3 +130,32 @@ let process_rewrite
   in
 
   FApi.t_first discharge tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite_simpl
+  (side : side option)
+  (pos  : pcodepos)
+  (tc   : tcenv1)
+=
+  let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
+    let ri = { EcReduction.nodelta with delta_p = fun _ -> `IfTransparent } in
+    let e = form_of_expr (fst me) e in
+    let e = EcCallbyValue.norm_cbv ri hyps e in
+    let e = expr_of_form (fst me) e in
+    (), e
+  in
+
+  let (), tc = t_change side pos change tc in
+
+  FApi.t_first EcLowGoal.t_reflex tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite
+  (side : side option)
+  (pos  : pcodepos)
+  (rw   : prrewrite)
+  (tc   : tcenv1)
+=
+  match rw with
+  | `Rw rw -> process_rewrite_rw side pos rw tc
+  | `Simpl -> process_rewrite_simpl side pos tc
