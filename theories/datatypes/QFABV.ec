@@ -13,7 +13,7 @@ abstract theory BV.
   op tolist : bv -> bool list.
   op oflist : bool list -> bv.
 
-  op toint : bv -> int.
+  op touint : bv -> int.
   op ofint : int -> bv.
 
   op get (b: bv) (n: int) : bool = 
@@ -24,8 +24,8 @@ abstract theory BV.
   axiom tolistP (bv : bv) : oflist (tolist bv) = bv.
   axiom oflistP (xs : bool list) : size xs = size => tolist (oflist xs) = xs.
 
-  axiom tointP (bv : bv) :
-    toint bv = bs2int (tolist bv).
+  axiom touintP (bv : bv) :
+    touint bv = bs2int (tolist bv).
 
   axiom ofintP (i : int) :
     ofint i = oflist (int2bs size i).
@@ -70,7 +70,7 @@ theory BVOperators.
     op bvadd : bv -> bv -> bv.
   
     axiom bvaddP (bv1 bv2 : bv) :
-      toint (bvadd bv1 bv2) = (toint bv1 + toint bv2) %% 2^BV.size.
+      touint (bvadd bv1 bv2) = (touint bv1 + touint bv2) %% 2^BV.size.
   end BVAdd.
   
   (* ------------------------------------------------------------------ *)
@@ -80,7 +80,7 @@ theory BVOperators.
     op bvsub : bv -> bv -> bv.
   
     axiom bvsubP (bv1 bv2 : bv) :
-      toint (bvsub bv1 bv2) = (toint bv1 - toint bv2) %% 2^BV.size.
+      touint (bvsub bv1 bv2) = (touint bv1 - touint bv2) %% 2^BV.size.
   end BVSub.
   
   (* ------------------------------------------------------------------ *)
@@ -90,7 +90,7 @@ theory BVOperators.
     op bvmul : bv -> bv -> bv.
   
     axiom bvmulP (bv1 bv2 : bv) :
-      toint (bvmul bv1 bv2) = (toint bv1 * toint bv2) %% 2^BV.size.
+      touint (bvmul bv1 bv2) = (touint bv1 * touint bv2) %% 2^BV.size.
   end BVMul.
   
   (* ------------------------------------------------------------------ *)
@@ -99,8 +99,8 @@ theory BVOperators.
   
     op bvudiv : bv -> bv -> bv.
   
-    axiom bvudivP (bv1 bv2 : bv) : toint bv2 <> 0 =>
-      toint (bvudiv bv1 bv2) = toint bv1 %/ toint bv2.
+    axiom bvudivP (bv1 bv2 : bv) : touint bv2 <> 0 =>
+      touint (bvudiv bv1 bv2) = touint bv1 %/ touint bv2.
   end BVUDiv.
   
   (* ------------------------------------------------------------------ *)
@@ -110,7 +110,7 @@ theory BVOperators.
     op bvurem : bv -> bv -> bv.
   
     axiom bvuremP (bv1 bv2 : bv) :
-      toint (bvurem bv1 bv2) = toint bv1 %% toint bv2.
+      touint (bvurem bv1 bv2) = touint bv1 %% touint bv2.
   end BVURem.
   
   (* ------------------------------------------------------------------ *)
@@ -119,8 +119,8 @@ theory BVOperators.
   
     op bvshl : bv -> bv -> bv.
   
-    axiom bvshlP (bv1 bv2 : bv) : toint (bvshl bv1 bv2) =
-      toint bv1 * 2 ^ (toint bv2).
+    axiom bvshlP (bv1 bv2 : bv) : touint (bvshl bv1 bv2) =
+      touint bv1 * 2 ^ (touint bv2).
   end BVSHL.
   
   (* ------------------------------------------------------------------ *)
@@ -129,8 +129,8 @@ theory BVOperators.
   
     op bvshr : bv -> bv -> bv.
   
-    axiom bvshrP (bv1 bv2 : bv) : toint (bvshr bv1 bv2) =
-      toint bv1 %/ 2 ^ (toint bv2).
+    axiom bvshrP (bv1 bv2 : bv) : touint (bvshr bv1 bv2) =
+      touint bv1 %/ 2 ^ (touint bv2).
   end BVSHR.
   
   (* ------------------------------------------------------------------ *)
@@ -171,7 +171,7 @@ theory BVOperators.
     op ult : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvultP (bv1 bv2 : BV2.bv) :
-      BV1.toint (ult bv1 bv2) <> 0 <=> (BV2.toint bv1 < BV2.toint bv2).
+      BV1.touint (ult bv1 bv2) <> 0 <=> (BV2.touint bv1 < BV2.touint bv2).
   end BVULt.
 
   (* ------------------------------------------------------------------ *)
@@ -182,7 +182,7 @@ theory BVOperators.
     op ule : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvuleP (bv1 bv2 : BV2.bv) :
-      BV1.toint (ule bv1 bv2) <> 0 <=> (BV2.toint bv1 <= BV2.toint bv2).
+      BV1.touint (ule bv1 bv2) <> 0 <=> (BV2.touint bv1 <= BV2.touint bv2).
   end BVULe.
 
   (* ------------------------------------------------------------------ *)
@@ -195,7 +195,7 @@ theory BVOperators.
     op bvzextend : BV1.bv -> BV2.bv.
 
     axiom bvzextendP (bv : BV1.bv) :
-      BV1.toint bv = BV2.toint (bvzextend bv).
+      BV1.touint bv = BV2.touint (bvzextend bv).
   end BVZExtend.
 
   (* ------------------------------------------------------------------ *)

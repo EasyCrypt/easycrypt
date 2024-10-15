@@ -216,22 +216,23 @@ type crb_array =
   ; theory : EcPath.path }
   
 type bv_opkind = [
-  | `Add      of int
-  | `Sub      of int
-  | `Mul      of int
-  | `UDiv     of int
-  | `URem     of int
-  | `Shl      of int
-  | `Shr      of int
-  | `And      of int
-  | `Or       of int
-  | `Not      of int
-  | `ULt      of int
-  | `ULe      of int
-  | `ZExtend  of int * int
-  | `Truncate of int * int
-  | `A2B      of (int * int) * int
-  | `B2A      of int * (int * int)
+  | `Add      of int (* size *)
+  | `Sub      of int (* size *)
+  | `Mul      of int (* size *)
+  | `Div      of int * bool (* size + sign *)
+  | `Rem      of int * bool (* size + sign *)
+  | `Shl      of int (* size *)
+  | `Shr      of int * bool (* size + sign *)
+  | `And      of int (* size *)
+  | `Or       of int (* size *)
+  | `Not      of int (* size *)
+  | `Lt       of int * bool (* size + sign *) 
+  | `Le       of int * bool (* size + sign *)
+  | `Extend   of int * int * bool (* size in + size out + sign *)
+  | `Truncate of int * int (* size in + size out *)
+  | `Extract  of int * int (* size in + size out *)
+  | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)
+  | `B2A      of int * (int * int) (* size in, (arr_len, elem_sz)  *)
 ]
   
 type crb_bvoperator =

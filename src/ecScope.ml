@@ -2506,24 +2506,37 @@ module Circuit = struct
       | "add"  -> (fun sz -> `Add  (as_seq1 sz)), [`BV None], "Add"
       | "sub"  -> (fun sz -> `Sub  (as_seq1 sz)), [`BV None], "Sub"
       | "mul"  -> (fun sz -> `Mul  (as_seq1 sz)), [`BV None], "Mul"
-      | "udiv" -> (fun sz -> `UDiv (as_seq1 sz)), [`BV None], "UDiv"
-      | "urem" -> (fun sz -> `URem (as_seq1 sz)), [`BV None], "URem"
+      | "udiv" -> (fun sz -> `Div  (as_seq1 sz, false)), [`BV None], "UDiv"
+      | "sdiv" -> (fun sz -> `Div  (as_seq1 sz, true)), [`BV None], "SDiv"
+      | "urem" -> (fun sz -> `Rem  (as_seq1 sz, false)), [`BV None], "URem"
+      | "srem" -> (fun sz -> `Rem  (as_seq1 sz, true)), [`BV None], "SRem"
       | "shl"  -> (fun sz -> `Shl  (as_seq1 sz)), [`BV None], "SHL"
-      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz)), [`BV None], "SHR"
+      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz, false)), [`BV None], "SHR"
+      | "ashr" -> (fun sz -> `Shr  (as_seq1 sz,true)), [`BV None], "ASHR"
       | "and"  -> (fun sz -> `And  (as_seq1 sz)), [`BV None], "And"
       | "or"   -> (fun sz -> `Or   (as_seq1 sz)), [`BV None], "Or"
       | "not"  -> (fun sz -> `Not  (as_seq1 sz)), [`BV None], "Not"
 
-      | "ult"  -> (fun sz -> `ULt  (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "ULt"
-      | "ule"  -> (fun sz -> `ULe  (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "ULe"
+      | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"
+      | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true)), [`BV (Some 1); `BV None], "SLt"
+      | "ule"  -> (fun sz -> `Le  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULe"
+      | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true)), [`BV (Some 1); `BV None], "SLe"
 
       | "zextend" ->
-        let mk sz = let sz1, sz2 = as_seq2 sz in  `ZExtend (sz1, sz2)in
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
         mk, [`BV None; `BV None], "ZExtend"
 
+      | "sextend" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, true) in
+        mk, [`BV None; `BV None], "SExtend"
+
       | "truncate" ->
-        let mk sz = let sz1, sz2 = as_seq2 sz in  `Truncate (sz1, sz2)in
+        let mk sz = let sz1, sz2 = as_seq2 sz in  `Truncate (sz1, sz2) in
         mk, [`BV None; `BV None], "Truncate"
+
+      | "extract" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in  `Extract (sz1, sz2) in
+        mk, [`BV None; `BV None], "Extract"
 
       | "a2b" ->
         let mk sz =
