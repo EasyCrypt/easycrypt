@@ -698,6 +698,9 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type prrewrite = [`Rw of ppterm | `Simpl]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -748,7 +751,7 @@ type phltactic =
   | Psymmetry
   | Pbdhoare_split of bdh_split
   | Pprocchange    of side option * codepos * pexpr
-  | Pprocrewrite   of side option * codepos * ppterm
+  | Pprocrewrite   of side option * codepos * prrewrite
 
     (* Eager *)
   | Peager_seq       of (eager_info * codepos1 pair * pformula)
