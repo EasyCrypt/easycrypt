@@ -1279,12 +1279,13 @@ type threquire =
 
 (* -------------------------------------------------------------------- *)
 type pbind_bitstring =
-  { from_ : pqsymbol
-  ; to_   : pqsymbol
-  ; toint : pqsymbol
-  ; ofint : pqsymbol
-  ; type_ : pty
-  ; size  : EcBigInt.zint }
+  { from_  : pqsymbol
+  ; to_    : pqsymbol
+  ; touint : pqsymbol
+  ; tosint : pqsymbol
+  ; ofint  : pqsymbol
+  ; type_  : pty
+  ; size   : EcBigInt.zint }
   
 (* -------------------------------------------------------------------- *)
 type pbind_array =

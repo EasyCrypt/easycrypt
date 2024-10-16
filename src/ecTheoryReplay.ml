@@ -964,13 +964,14 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
   try
     let to_    = forpath bs.to_ in
     let from_  = forpath bs.from_ in
-    let toint  = forpath bs.toint in
+    let touint  = forpath bs.touint in
+    let tosint  = forpath bs.tosint in
     let ofint  = forpath bs.ofint in
     let type_  = bs.type_ in (* FIXME *)
     let theory = bs.theory in (* FIXME *)
     let size   = bs.size in
 
-    let bs = CRB_Bitstring { to_; from_; toint; ofint; type_; theory; size; } in
+    let bs = CRB_Bitstring { to_; from_; touint; tosint; ofint; type_; theory; size; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (bs, lc)) in
 
     (subst, ops, proofs, scope)

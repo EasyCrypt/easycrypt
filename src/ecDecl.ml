@@ -356,7 +356,8 @@ type crb_bitstring =
   ; from_  : EcPath.path
   ; to_    : EcPath.path
   ; ofint  : EcPath.path
-  ; toint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
   ; size   : int
   ; theory : EcPath.path }
   

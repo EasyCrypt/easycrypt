@@ -14,13 +14,15 @@ op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.
 
 op i2b (i : int) = (i %% 2 <> 0).
+op b2si (b: bool) = 0.
 
-bind bitstring bool2bits bits2bool b2i i2b bool 1.
+bind bitstring bool2bits bits2bool b2i b2si i2b bool 1.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
 realize ofintP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by auto.
       
 bind op bool (&&) "mul".
 realize bvmulP by admit.
@@ -53,12 +55,13 @@ realize bvnotP by admit.
 
 
 (* ----------- BEGIN W8 BINDINGS ---------- *)
-bind bitstring W8.w2bits W8.bits2w W8.to_uint W8.of_int W8.t 8.
+bind bitstring W8.w2bits W8.bits2w W8.to_uint W8.to_sint W8.of_int W8.t 8.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
 realize ofintP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 
 bind op W8.t W8.( + ) "add".
 realize bvaddP by admit.
@@ -93,23 +96,32 @@ realize bvultP by admit.
 bind op [bool & W8.t] W8.\ult "ule".
 realize bvuleP by admit.
 
+bind op [bool & W8.t] W8.\slt "slt".
+realize bvsltP by admit.
+
+bind op [bool & W8.t] W8.\sle "sle".
+realize bvsleP by admit.
+
 bind op W8.t W8.(`>>`) "shr".
 realize bvshrP by admit. 
 
 bind op W8.t W8.(`<<`) "shl".
 realize bvshlP by admit.
 
-(* TODO: Add shifts once we have truncate/extend *)
+bind op W8.t W8.(`|>>`) "ashr".
+realize bvashrP by admit.
+
 
 
 (* ----------- BEGIN W16 BINDINGS ---------- *)
 
-bind bitstring W16.w2bits W16.bits2w W16.to_uint W16.of_int W16.t 16.
+bind bitstring W16.w2bits W16.bits2w W16.to_uint W16.to_sint W16.of_int W16.t 16.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
 realize ofintP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 
 bind op W16.t W16.( + ) "add".
 realize bvaddP by admit.
@@ -143,6 +155,18 @@ op uext8_16 (w: W8.t) : W16.t =
 
 bind op [W8.t & W16.t] uext8_16 "zextend".
 realize bvzextendP by admit.
+
+op sext8_16 (w: W8.t) : W16.t = 
+  W16.of_int (W8.to_sint w).
+
+bind op [W8.t & W16.t] sext8_16 "sextend".
+realize bvsextendP by admit.
+
+op concat8_8_16 (w: W8.t) (w: W8.t) : W16.t.
+
+bind op [W8.t & W8.t & W16.t] concat8_8_16 "concat".
+realize bvconcatP by admit.
+
 
 op shl16 (w: W16.t) (sa: W16.t) : W16.t.
 

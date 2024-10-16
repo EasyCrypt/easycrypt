@@ -2415,7 +2415,8 @@ module Circuit = struct
 
     let from_, _ = EcEnv.Op.lookup bs.to_.pl_desc env in
     let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in
-    let toint, _ = EcEnv.Op.lookup bs.toint.pl_desc env in
+    let touint, _ = EcEnv.Op.lookup bs.touint.pl_desc env in
+    let tosint, _ = EcEnv.Op.lookup bs.tosint.pl_desc env in
     let ofint, _ = EcEnv.Op.lookup bs.ofint.pl_desc env in
     let name     = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
 
@@ -2429,14 +2430,15 @@ module Circuit = struct
           [ ("size"  , `Int bs.size)
           ; ("tolist", `Path to_)
           ; ("oflist", `Path from_)
-          ; ("toint" , `Path toint)
+          ; ("touint", `Path touint)
+          ; ("tosint", `Path tosint)
           ; ("ofint" , `Path ofint) ]
       ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
 
     let item = CRB_Bitstring 
-      { from_; to_; toint; ofint;
+      { from_; to_; touint; tosint; ofint;
         type_  = bspath;
         size   = BI.to_int bs.size;
         theory = pqname (EcEnv.root env) name; } in
@@ -2540,7 +2542,7 @@ module Circuit = struct
 
       | "concat" ->
         let mk sz = let sz1, sz2, sz3 = as_seq3 sz in  `Concat (sz1, sz2, sz3) in
-        mk, [`BV None; `BV None], "Extract"
+        mk, [`BV None; `BV None; `BV None], "Concat"
 
       | "a2b" ->
         let mk sz =

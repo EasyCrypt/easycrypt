@@ -14,10 +14,14 @@ abstract theory BV.
   op oflist : bool list -> bv.
 
   op touint : bv -> int.
+  op tosint : bv -> int.
   op ofint : int -> bv.
 
   op get (b: bv) (n: int) : bool = 
     List.nth false (tolist b) n.
+
+  op msb (b: bv) : bool = 
+    List.nth false (tolist b) (size - 1).
 
   axiom size_tolist (bv : bv): List.size (tolist bv) = size.
 
@@ -26,6 +30,14 @@ abstract theory BV.
 
   axiom touintP (bv : bv) :
     touint bv = bs2int (tolist bv).
+
+  axiom tosintP (bv : bv) :
+    (size = 1) \/
+    let v = bs2int (tolist bv) in
+    if (msb bv) then
+      tosint bv = v - 2^size
+    else 
+      tosint bv = v.
 
   axiom ofintP (i : int) :
     ofint i = oflist (int2bs size i).
@@ -134,6 +146,16 @@ theory BVOperators.
   end BVSHR.
   
   (* ------------------------------------------------------------------ *)
+  abstract theory BVASHR.
+    clone import BV.
+  
+    op bvashr : bv -> bv -> bv.
+  
+    axiom bvashrP (bv1 bv2 : bv) : tosint (bvashr bv1 bv2) =
+      tosint bv1 %/ 2 ^ (touint bv2).
+  end BVASHR.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVAnd.
     clone import BV.
   
@@ -174,6 +196,18 @@ theory BVOperators.
       BV1.touint (ult bv1 bv2) <> 0 <=> (BV2.touint bv1 < BV2.touint bv2).
   end BVULt.
 
+(* ------------------------------------------------------------------ *)
+  abstract theory BVSLt.
+    clone import BV as BV1 with op size <= 1.
+    clone import BV as BV2.
+  
+    op slt : BV2.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvsltP (bv1 bv2 : BV2.bv) :
+      BV1.touint (slt bv1 bv2) <> 0 <=> (BV2.tosint bv1 < BV2.tosint bv2).
+  end BVSLt.
+
+
   (* ------------------------------------------------------------------ *)
   abstract theory BVULe.
     clone import BV as BV1 with op size <= 1.
@@ -184,6 +218,18 @@ theory BVOperators.
     axiom bvuleP (bv1 bv2 : BV2.bv) :
       BV1.touint (ule bv1 bv2) <> 0 <=> (BV2.touint bv1 <= BV2.touint bv2).
   end BVULe.
+
+(* ------------------------------------------------------------------ *)
+  abstract theory BVSLe.
+    clone import BV as BV1 with op size <= 1.
+    clone import BV as BV2.
+  
+    op sle : BV2.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvsleP (bv1 bv2 : BV2.bv) :
+      BV1.touint (sle bv1 bv2) <> 0 <=> (BV2.tosint bv1 <= BV2.tosint bv2).
+  end BVSLe.
+
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVZExtend.
@@ -197,6 +243,19 @@ theory BVOperators.
     axiom bvzextendP (bv : BV1.bv) :
       BV1.touint bv = BV2.touint (bvzextend bv).
   end BVZExtend.
+
+(* ------------------------------------------------------------------ *)
+  abstract theory BVSExtend.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV1.size <= BV2.size.
+
+    op bvsextend : BV1.bv -> BV2.bv.
+
+    axiom bvsextendP (bv : BV1.bv) :
+      BV1.tosint bv = BV2.tosint (bvsextend bv).
+  end BVSExtend.
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVTruncate.
@@ -233,14 +292,14 @@ print List.
   abstract theory BVConcat.
     clone BV as BV1.
     clone BV as BV2.
-    clone BV as BVO.
+    clone BV as BV3.
 
-    axiom [bydone] eq_size : BV1.size + BV2.size = BVO.size.
+    axiom [bydone] eq_size : BV1.size + BV2.size = BV3.size.
 
-    op bvconcat : BV1.bv -> BV2.bv -> BVO.bv.
+    op bvconcat : BV1.bv -> BV2.bv -> BV3.bv.
 
     axiom bvconcatP (bv1 : BV1.bv) (bv2: BV2.bv) :
-      BVO.tolist (bvconcat bv1 bv2) = (BV1.tolist bv1) ++ (BV2.tolist bv2).
+      BV3.tolist (bvconcat bv1 bv2) = (BV1.tolist bv1) ++ (BV2.tolist bv2).
   end BVConcat.
 
 
