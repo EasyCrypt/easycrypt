@@ -608,16 +608,6 @@ let circuit_from_spec (env: env) (p : path) : circuit =
 module BaseOps = struct
   let temp_symbol = "temp_circ_input"
   
-  let is_baseop (env: env) (p: path) : bool = 
-    match (EcPath.toqsymbol p) with
-    | _, "bvueq" -> true
-    | _, "bvseq" -> true
-    
-    | _ -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
-      | Some _ -> Format.eprintf "Found qfabv binding for %s@." (EcPath.tostring p); true
-      | None   -> Format.eprintf "Did not find qfabv binding for %s@." (EcPath.tostring p); false
-    end
-
   let is_of_int (env: env) (p: path) : bool = 
     match EcEnv.Circuit.reverse_bitstring_operator env p with
     | Some (_, `OfInt) -> true
@@ -921,20 +911,14 @@ let circuit_of_form
         hyps, op
       | None -> 
         (* Format.eprintf "No cache for op: %s@." (EcPath.tostring pth); *)
-      if BaseOps.is_baseop env pth then
-        try
-          let circ = BaseOps.circuit_of_baseop env pth in
-          op_cache := Mp.add pth circ !op_cache;
-          hyps, circ 
-        with
-        | CircError err -> 
-          let circ = circuit_from_spec env pth in
-          op_cache := Mp.add pth circ !op_cache;
-          hyps, circ
-      (* else if ArrayOps.is_arrayop env pth then *)
-        (* let circ = ArrayOps.circuit_of_arrayop env pth in *)
-        (* op_cache := Mp.add pth circ !op_cache; *)
-        (* env, circ *)
+      if (Option.is_some @@ EcEnv.Circuit.reverse_bvoperator env pth) then
+        let circ = BaseOps.circuit_of_baseop env pth in
+        op_cache := Mp.add pth circ !op_cache;
+        hyps, circ 
+      else if (Option.is_some @@ EcEnv.Circuit.reverse_circuit env pth) then
+        let circ = circuit_from_spec env pth in
+        op_cache := Mp.add pth circ !op_cache;
+        hyps, circ
       else
         let f = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper ( Some (OP_Plain f)) -> f
