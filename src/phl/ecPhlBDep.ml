@@ -10,6 +10,7 @@ open EcTypes
 open EcCoreGoal
 open EcFol
 open EcCircuits
+open LDecl
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -31,7 +32,7 @@ exception BDepError
 
 (* -------------------------------------------------------------------- *)
 let mapreduce 
-  (env : env) 
+  (hyps : hyps) 
   ((mem, mt): memenv) 
   (proc: stmt) 
   ((invs, n): variable list * int) 
@@ -40,12 +41,13 @@ let mapreduce
   (pcond: psymbol)
   (perm: (int -> int) option)
   : unit =
-  
+
+  let env = toenv hyps in
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
-  let fc = circuit_of_form env f in
+  let fc = circuit_of_form hyps f in
   (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
   (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
   (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
@@ -53,7 +55,7 @@ let mapreduce
   let pcondc = match pcondc.op_kind with
   | OB_oper (Some (OP_Plain pcondc)) -> pcondc
   | _ -> failwith "Invalid operator type" in
-  let pcondc = circuit_of_form env pcondc in
+  let pcondc = circuit_of_form hyps pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
   
   let pstate : (symbol, circuit) Map.t = Map.empty in
@@ -66,7 +68,7 @@ let mapreduce
     pstate inpcs 
   in
   
-  let pstate = List.fold_left (EcCircuits.process_instr env mem) pstate proc.s_node in
+  let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate proc.s_node in
   let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
   begin 
     let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
@@ -99,12 +101,14 @@ let mapreduce
 
 (* -------------------------------------------------------------------- *)
 let prog_equiv_prod 
-  (env : env) 
+  (hyps : hyps) 
   ((meml, mtl), (memr, mtr): memenv * memenv) 
   (proc_l, proc_r: stmt * stmt) 
   ((invs_l, invs_r, n): (variable list * variable list * int))
   ((outvs_l, outvs_r, m) : (variable list * variable list * int))
   (pcond : form option): unit =
+  let env = toenv hyps in
+  
   let pstate_l : (symbol, circuit) Map.t = Map.empty in
   let pstate_r : (symbol, circuit) Map.t = Map.empty in
 
@@ -119,11 +123,11 @@ let prog_equiv_prod
     pstate_r inpcs (invs_r |> List.map (fun v -> v.v_name))
   in
 
-  let pcond = Option.map (circuit_of_form env) pcond in
+  let pcond = Option.map (circuit_of_form hyps) pcond in
 
-  let pstate_l = List.fold_left (EcCircuits.process_instr env meml) pstate_l proc_l.s_node in
+  let pstate_l = List.fold_left (EcCircuits.process_instr hyps meml) pstate_l proc_l.s_node in
   let pstate_l = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_l in
-  let pstate_r = List.fold_left (EcCircuits.process_instr env memr) pstate_r proc_r.s_node in
+  let pstate_r = List.fold_left (EcCircuits.process_instr hyps memr) pstate_r proc_r.s_node in
   let pstate_r = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_r in
   begin 
     let circs_l = List.map (fun v -> Option.get (Map.find_opt v pstate_l)) 
@@ -155,12 +159,12 @@ let prog_equiv_prod
 
 
 (* FIXME UNTESTED *)
-let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
-  let pstate, inps = EcCircuits.pstate_of_memtype env me in
+let circ_hoare (hyps : hyps) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
+  let pstate, inps = EcCircuits.pstate_of_memtype (LDecl.toenv hyps) me in
   
-  let pre_c = circuit_of_form ~pstate ~cache env pre in
-  let pstate = List.fold_left (EcCircuits.process_instr env mem ~cache) pstate proc.s_node in
-  let post_c = EcCircuits.circuit_of_form ~pstate ~cache env post in
+  let pre_c = circuit_of_form ~pstate ~cache hyps pre in
+  let pstate = List.fold_left (EcCircuits.process_instr hyps mem ~cache) pstate proc.s_node in
+  let post_c = EcCircuits.circuit_of_form ~pstate ~cache hyps post in
   
   (* DEBUG PRINTS *)
   (* List.iter (fun fc -> *)
@@ -181,9 +185,9 @@ let circ_hoare (env : env) cache ((mem, me): memenv) (pre: form) (proc: stmt) (p
   raise BDepError
   
 (* FIXME UNTESTED *)
-let circ_goal (env: env) (cache: _) (f: form) : unit = 
+let circ_goal (hyps: hyps) (cache: _) (f: form) : unit = 
   
-  let f_c = circuit_of_form ~cache env f in
+  let f_c = circuit_of_form ~cache hyps f in
   begin
   assert (EcCircuits.circ_check f_c None);
   end
@@ -205,7 +209,7 @@ let t_circ (tc: tcenv1) : tcenv =
   let f = (FApi.tc1_goal tc) in
   let () = match f.f_node with
   | FhoareF sH -> assert false
-  | FhoareS sF -> circ_hoare (FApi.tc1_env tc) cache sF.hs_m sF.hs_pr sF.hs_s sF.hs_po
+  | FhoareS sF -> circ_hoare (FApi.tc1_hyps tc) cache sF.hs_m sF.hs_pr sF.hs_s sF.hs_po
   
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false
@@ -219,7 +223,7 @@ let t_circ (tc: tcenv1) : tcenv =
   | FeagerF _ -> assert false
 
   | Fpr _ -> assert false
-  | _ when f.f_ty = tbool -> circ_goal (FApi.tc1_env tc) cache f
+  | _ when f.f_ty = tbool -> circ_goal (FApi.tc1_hyps tc) cache f
   | _ -> Format.eprintf "f has type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv (FApi.tc1_env tc))) f.f_ty;
     raise BDepError
   in
@@ -301,7 +305,7 @@ let t_bdep
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
-  | FhoareS sF -> mapreduce (FApi.tc1_env tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm
+  | FhoareS sF -> mapreduce (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -430,7 +434,7 @@ let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_b
   let () = match (FApi.tc1_goal tc).f_node with
   | FequivF sE -> assert false
   | FequivS sE -> List.iter (fun (m, outvs_l, outvs_r) ->
-    prog_equiv_prod (FApi.tc1_env tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond) out_blocks
+    prog_equiv_prod (FApi.tc1_hyps tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond) out_blocks
   | FhoareF sH -> assert false  
   | FhoareS sF -> assert false
   | FbdHoareF _ -> assert false

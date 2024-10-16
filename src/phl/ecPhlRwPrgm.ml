@@ -25,7 +25,7 @@ let process_change ((cpos, i, s) : change_t) (tc : tcenv1) =
   let zp = Zpr.zipper_of_cpos env cpos hs.hs_s in
   let zp =
     let old, tl = List.split_at i zp.z_tail in
-    let () = assert (EcCircuits.insts_equiv (FApi.tc1_env tc) hs.hs_m old s.s_node) in
+    let () = assert (EcCircuits.insts_equiv (FApi.tc1_hyps tc) hs.hs_m old s.s_node) in
     { zp with z_tail = s.s_node @ tl } in
 
   let zp = Zpr.zip zp in

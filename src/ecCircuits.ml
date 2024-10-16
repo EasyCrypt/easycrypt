@@ -7,6 +7,7 @@ open EcEnv
 open EcAst
 open EcCoreFol
 open EcIdent
+open LDecl
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -848,15 +849,16 @@ type cache  = (ident, (cinput * circuit)) Map.t
 let circuit_of_form 
   ?(pstate : pstate = Map.empty) (* Program variable values *)
   ?(cache  : cache = Map.empty) (* Let-bindings and such *)
-   (env    : env) 
+   (hyps    : hyps) 
    (f      : EcAst.form) 
   : circuit =
 
-  let rec doit (cache: (ident, (cinput * circuit)) Map.t) (env: env) (f: form) : env * circuit = 
+  let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f: form) : hyps * circuit = 
+    let env = toenv hyps in
     let int_of_form (f: form) : zint = 
       match f.f_node with 
       | Fint i -> i
-      | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red (LDecl.init env []) f
+      | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
     in
     
     match f.f_node with
@@ -866,9 +868,9 @@ let circuit_of_form
       (* failwith "Add logic to deal with ints (maybe force conversion?)" *)
       (* hlenv, C.of_bigint ~size:256 (EcAst.BI.to_zt z) *)
     | Fif (c_f, t_f, f_f) -> 
-        let env, c_c = doit cache env c_f in
-        let env, t_c = doit cache env t_f in
-        let env, f_c = doit cache env f_f in
+        let hyps, c_c = doit cache hyps c_f in
+        let hyps, t_c = doit cache hyps t_f in
+        let hyps, f_c = doit cache hyps f_f in
         let () = assert (List.length (destr_bwcirc c_c.circ) = 1) in
         let () = assert (List.is_empty c_c.inps) in
         let () = assert (List.is_empty t_c.inps) in
@@ -877,12 +879,12 @@ let circuit_of_form
         begin
         match t_c.circ, f_c.circ with
         | BWCirc t_c, BWCirc f_c ->
-        env, {
+        hyps, {
           circ = BWCirc (C.ite c_c t_c f_c);
           inps = []; 
         }
         | BWArray t_cs, BWArray f_cs when (Array.length t_cs = Array.length f_cs) ->
-          env, {
+          hyps, {
             circ = BWArray (Array.map2 (C.ite c_c) t_cs f_cs);
             inps = []; (* FIXME: check if we want to allow bindings inside ifs *)
           }
@@ -894,7 +896,7 @@ let circuit_of_form
       | Some (inp, circ) -> 
         (* Check if we want = or equiv here FIXME *)
         if (cinput_equiv inp (cinput_of_type env f.f_ty)) then
-        env, circ
+        hyps, circ
         else 
           let err = Format.asprintf "Var binding shape %s for %s does not match shape of form type %s@."
            (cinput_to_string inp) idn.id_symb (cinput_of_type env f.f_ty |> cinput_to_string) in
@@ -908,19 +910,19 @@ let circuit_of_form
       match Mp.find_opt pth !op_cache with
       | Some op -> 
         (* Format.eprintf "Using cached op: %s@." (EcPath.tostring pth); *)
-        env, op
+        hyps, op
       | None -> 
         (* Format.eprintf "No cache for op: %s@." (EcPath.tostring pth); *)
       if BaseOps.is_baseop env pth then
         try
           let circ = BaseOps.circuit_of_baseop env pth in
           op_cache := Mp.add pth circ !op_cache;
-          env, circ 
+          hyps, circ 
         with
         | CircError err -> 
           let circ = circuit_from_spec env pth in
           op_cache := Mp.add pth circ !op_cache;
-          env, circ
+          hyps, circ
       (* else if ArrayOps.is_arrayop env pth then *)
         (* let circ = ArrayOps.circuit_of_arrayop env pth in *)
         (* op_cache := Mp.add pth circ !op_cache; *)
@@ -930,36 +932,36 @@ let circuit_of_form
         | OB_oper ( Some (OP_Plain f)) -> f
         | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
         in 
-        let env, circ = doit cache env f in
+        let hyps, circ = doit cache hyps f in
         op_cache := Mp.add pth circ !op_cache;
-        env, circ
+        hyps, circ
     end
     | Fapp _ -> 
     let (f, fs) = EcCoreFol.destr_app f in
-    let env, res = 
+    let hyps, res = 
       (* Assuming correct types coming from EC *)
       (* FIXME: add typechecking here ? *)
       match EcEnv.Circuit.reverse_operator env @@ (EcCoreFol.destr_op f |> fst) with
-      | `Array ({ size }, `Get) :: _ -> let env, res = 
+      | `Array ({ size }, `Get) :: _ -> let hyps, res = 
         match fs with
         | [arr; i] ->
           let i = int_of_form i in
           let (_, t) = destr_array_type env arr.f_ty |> Option.get in
           let w = width_of_type env t in
-          let env, arr = doit cache env arr in
-          env, compose (circuit_bwarray_get size w (BI.to_int i)) [arr]
+          let hyps, arr = doit cache hyps arr in
+          hyps, compose (circuit_bwarray_get size w (BI.to_int i)) [arr]
         | _ -> raise (CircError "set")
-        in env, res
-      | `Array ({ size }, `Set) :: _ -> let env, res = 
+        in hyps, res
+      | `Array ({ size }, `Set) :: _ -> let hyps, res = 
         match fs with
         | [arr; i; v] ->
           let i = int_of_form i in
           let w = width_of_type env v.f_ty  in
-          let env, arr = doit cache env arr in
-          let env, v = doit cache env v in
-          env, compose (circuit_bwarray_set size w (BI.to_int i)) [arr; v]
+          let hyps, arr = doit cache hyps arr in
+          let hyps, v = doit cache hyps v in
+          hyps, compose (circuit_bwarray_set size w (BI.to_int i)) [arr; v]
         | _ -> raise (CircError "set")
-        in env, res
+        in hyps, res
       | `Array ({ size }, `OfList) :: _->
         let _, n, w = destr_bwainput @@ cinput_of_type env f.f_ty in
         assert (n = size);
@@ -969,28 +971,28 @@ let circuit_of_form
           | _ -> assert false (* should only be two arguments to of_list *)
         in
         let vs = EcCoreFol.destr_list vs in
-        let env, vs = List.fold_left_map (doit cache) env vs in
+        let hyps, vs = List.fold_left_map (doit cache) hyps vs in
         begin match EcCoreFol.is_witness wtn with
         | false -> 
-          let env, wtn = doit cache env wtn in
+          let hyps, wtn = doit cache hyps wtn in
           assert(List.is_empty wtn.inps && List.for_all (fun c -> List.is_empty c.inps) vs);
           let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
           let wtn = destr_bwcirc wtn.circ in
           let r = Array.init n (fun i -> List.nth_opt vs i |> Option.default wtn) in
-          env, {circ = BWArray r; inps = []}
+          hyps, {circ = BWArray r; inps = []}
         | true -> 
           assert (List.compare_length_with vs n = 0);
           assert (List.for_all (fun c -> List.is_empty c.inps) vs);
           let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
           let r = Array.of_list vs in
-          env, {circ=BWArray r; inps=[]}
+          hyps, {circ=BWArray r; inps=[]}
         end
       | `Bitstring ({ size }, `OfInt) :: _ ->
         let i = match fs with
         | f :: _ -> int_of_form f
         | _ -> assert false
         in 
-        env, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
+        hyps, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
       | `BvOperator ({ kind = `Extract (size, out_sz) }) :: _ ->
         assert (size >= out_sz);
         let id1 = EcIdent.create ("extract_inp") in
@@ -1000,32 +1002,32 @@ let circuit_of_form
         | _ -> assert false
         in
         let c1 = List.take out_sz (List.drop (to_int b) c1) in
-        env, { circ = BWCirc(c1); inps=[BWInput (id1, size)] }
+        hyps, { circ = BWCirc(c1); inps=[BWInput (id1, size)] }
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
-          let env, c1 = doit cache env f1 in
-          let env, c2 = doit cache env f2 in
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
           begin match c1.circ, c2.circ with
           | BWCirc r1, BWCirc r2 -> 
             assert (List.compare_lengths r1 r2 = 0);
-            env, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} (* FIXME: check inps here *)
+            hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} (* FIXME: check inps here *)
           | BWArray a1, BWArray a2 -> 
             assert (Array.length a1 = Array.length a2);
             assert (Array.for_all2 (fun a b -> (List.compare_lengths a b) = 0) a1 a2);
             let rs = Array.map2 C.bvueq a1 a2 in
-            env, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = c1.inps @ c2.inps}
+            hyps, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = c1.inps @ c2.inps}
           | _ -> assert false
           end
         | None, _ -> 
-        let env, f_c = doit cache env f in
-        let env, fcs = List.fold_left_map
+        let hyps, f_c = doit cache hyps f in
+        let hyps, fcs = List.fold_left_map
           (doit cache)
-          env fs 
+          hyps fs 
         in
-        env, compose f_c fcs
+        hyps, compose f_c fcs
         | _ -> assert false
         end
-      in env, res
+      in hyps, res
       
     | Fquant (qnt, binds, f) -> 
       (* FIXME: check if this is desired behaviour for exists and add logic for others *)
@@ -1034,9 +1036,9 @@ let circuit_of_form
         (fun cache inp -> 
           let circ = {(circ_ident inp) with inps = []} in
           Map.add (ident_of_cinput inp) (inp, circ) cache) cache binds in
-      let env, circ = doit cache env f in
+      let hyps, circ = doit cache hyps f in
       begin match qnt with
-      | Llambda -> env, {circ with inps=binds @ circ.inps} (* FIXME: check input order *)
+      | Llambda -> hyps, {circ with inps=binds @ circ.inps} (* FIXME: check input order *)
       | Lforall 
       | Lexists -> assert false
       (* TODO: figure out how to handle quantifiers *)
@@ -1044,18 +1046,18 @@ let circuit_of_form
     | Fproj (f, i) ->
         begin match f.f_node with
         | Ftuple tp ->
-          doit cache env (tp |> List.drop (i-1) |> List.hd)
+          doit cache hyps (tp |> List.drop (i-1) |> List.hd)
         | _ -> failwith "Don't handle projections on non-tuples"
         end
     | Fmatch  (f, fs, ty) -> assert false
     | Flet    (lpat, v, f) -> 
       begin match lpat with
       | LSymbol (idn, ty) -> 
-        let env, vc = doit cache env v in
+        let hyps, vc = doit cache hyps v in
         let inp = cinput_of_type ~idn env ty in
         let () = assert (match_arg inp vc.circ) in
         let cache = Map.add idn (inp, vc) cache in
-        doit cache env f
+        doit cache hyps f
       | LTuple  symbs -> assert false
       | LRecord (pth, osymbs) -> assert false
       end
@@ -1070,23 +1072,23 @@ let circuit_of_form
           {circ with inps=[]}
       (* EXPERIMENTAL: allowing unitialized values *)
           (* failwith ("No value for var " ^ v) *)
-      in env, res
+      in hyps, res
     | Fglob   (id, mem) -> assert false
     | Ftuple  comps -> assert false
     | _ -> failwith "Not yet implemented"
 
   in 
-  let env, f_c = doit cache env f in
+  let hyps, f_c = doit cache hyps f in
   f_c
 
 
-let circuit_of_path (env: env) (p: path) : circuit =
-  let f = EcEnv.Op.by_path p env in
+let circuit_of_path (hyps: hyps) (p: path) : circuit =
+  let f = EcEnv.Op.by_path p (toenv hyps) in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type"
   in
-  circuit_of_form env f
+  circuit_of_form hyps f
 
 let input_of_variable (env:env) (v: variable) : circuit * cinput =
   let idn = create v.v_name in
@@ -1111,10 +1113,11 @@ let pstate_of_memtype ?(pstate = Map.empty) (env: env) (mt: memtype) =
   in pstate, inps
 
 
-let process_instr (env:env) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
+let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
+  let env = toenv hyps in
   try
     match inst.i_node with
-    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache env) pstate
+    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate
     | _ -> failwith "Case not implemented yet"
   with 
   | e -> let err = Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@."
@@ -1122,10 +1125,10 @@ let process_instr (env:env) (mem: memory) ?(cache: cache = Map.empty) (pstate: _
       (Printexc.to_string e) in 
       raise @@ CircError err
 
-let insts_equiv (env: env) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_left: instr list) (insts_right: instr list): bool =
-  let pstate, inps = pstate_of_memtype ~pstate env mt in
-  let pstate_left = List.fold_left (process_instr env mem) pstate insts_left in
-  let pstate_right = List.fold_left (process_instr env mem) pstate insts_right in
+let insts_equiv (hyps: hyps) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_left: instr list) (insts_right: instr list): bool =
+  let pstate, inps = pstate_of_memtype ~pstate (toenv hyps) mt in
+  let pstate_left = List.fold_left (process_instr hyps mem) pstate insts_left in
+  let pstate_right = List.fold_left (process_instr hyps mem) pstate insts_right in
 
   (* if (Map.keys pstate_left |> Set.of_enum) != (Map.keys pstate_right |> Set.of_enum) then *)
     (* begin *)

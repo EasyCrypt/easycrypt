@@ -3,6 +3,7 @@ open EcIdent
 open EcSymbols
 open EcAst
 open EcEnv
+open LDecl
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
@@ -30,8 +31,8 @@ val circuit_permutation : int -> int -> (int -> int) -> circuit
 val circuit_mapreduce : circuit -> int -> int -> circuit list
 val circ_check : circuit -> circuit option -> bool
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
-val circuit_of_form : ?pstate:pstate -> ?cache:cache -> env -> form -> circuit
+val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
 val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list
 val input_of_variable : env -> variable -> circuit * cinput
-val insts_equiv : env -> memenv -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_instr : env -> memory -> ?cache:cache -> pstate -> instr -> (symbol, circuit) Map.t
+val insts_equiv : hyps -> memenv -> ?pstate:pstate -> instr list -> instr list -> bool
+val process_instr : hyps -> memory -> ?cache:cache -> pstate -> instr -> (symbol, circuit) Map.t
