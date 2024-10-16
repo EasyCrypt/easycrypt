@@ -11,10 +11,9 @@ type change_t = pcodepos * int * pstmt
 let process_change ((cpos, i, s) : change_t) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
+  let env = EcEnv.Memory.push_active hs.hs_m env in
 
-  let cpos =
-    let env = EcEnv.Memory.push_active hs.hs_m env in
-    EcTyping.trans_codepos env cpos in
+  let cpos = EcTyping.trans_codepos env cpos in
 
   let s =
     let ue = EcProofTyping.unienv_of_hyps (FApi.tc1_hyps tc) in

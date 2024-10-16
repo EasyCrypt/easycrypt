@@ -1137,7 +1137,7 @@ let instrs_equiv
   if not (List.for_all (EcTypes.is_loc |- fst) (rd @ wr)) then
     raise (CircError "the statements should not read/write global variables");
 
-  let pstate = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) wr in
+  let pstate = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) (rd @ wr) in
   let pstate, inputs = pstate_of_variables env pstate in
 
   let pstate1 = List.fold_left (process_instr hyps mem) pstate s1 in
