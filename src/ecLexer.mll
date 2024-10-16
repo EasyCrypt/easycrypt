@@ -168,7 +168,6 @@
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
-    "bchange"     , BCHANGE    ;        (* KW: tactic *)
     
     "array"       , ARRAY      ;        (* KW: global *)
     "bdep"        , BDEP       ;        (* KW: global *)

@@ -399,7 +399,6 @@
 %token AXIOMATIZED
 %token BACKS
 %token BACKSLASH
-%token BCHANGE
 %token BDEP
 %token BDEPEQ
 %token BETA
@@ -3272,7 +3271,7 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
-| BCHANGE o=codepos PLUS w=word s=brace(stmt)
+| PROC CHANGE CIRCUIT o=codepos PLUS w=word s=brace(stmt)
     { Prwprgm (`Change (o, w, s)) }
 
 | IDASSIGN o=codepos x=lvalue_var
