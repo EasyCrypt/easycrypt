@@ -1,4 +1,6 @@
 [general]
 provers = Alt-Ergo@2.4
-provers = CVC5@1.0
-provers = Z3@4.12
+provers = CVC4@1.8
+provers = Z3@4.8
+
+rdirs = Jasmin:jasmin/eclib

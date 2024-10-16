@@ -1104,22 +1104,24 @@ let input_of_variable (env:env) (v: variable) : circuit * cinput =
   {(circ_ident inp) with inps=[]}, inp
   
 
-let pstate_of_memtype ?(pstate = Map.empty) (env: env) (mt: memtype) =
-  let invs = match mt with
-  | Lmt_concrete (Some lmt) -> lmt.lmt_decl 
-    |> List.filter_map (fun ov -> if Option.is_none ov.ov_name then None
-                                  else Some {v_name = Option.get ov.ov_name; v_type=ov.ov_type})
-  | _ -> assert false
-  in
-
-  let inps = List.map (input_of_variable env) invs in
+let pstate_of_variables ?(pstate = Map.empty) (env : env) (vars : variable list) =
+  let inps = List.map (input_of_variable env) vars in
   let inpcs, inps = List.split inps in
-  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) invs in
+  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) vars in
   let pstate = List.fold_left 
     (fun pstate (inp, v) -> Map.add v inp pstate)
     pstate inpcs 
   in pstate, inps
 
+let pstate_of_memtype ?pstate (env: env) (mt : memtype) =
+  let Lmt_concrete lmt = mt in
+  let vars =
+    List.filter_map (function 
+      | { ov_name = Some name; ov_type = ty } ->
+        Some { v_name = name; v_type = ty; }
+      | _ -> None
+    ) (Option.get lmt).lmt_decl in
+  pstate_of_variables ?pstate env vars
 
 let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
   let env = toenv hyps in
@@ -1133,23 +1135,34 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
       (Printexc.to_string e) in 
       raise @@ CircError err
 
-let insts_equiv (hyps: hyps) ((mem, mt): memenv) ?(pstate: _ = Map.empty) (insts_left: instr list) (insts_right: instr list): bool =
-  let pstate, inps = pstate_of_memtype ~pstate (toenv hyps) mt in
-  let pstate_left = List.fold_left (process_instr hyps mem) pstate insts_left in
-  let pstate_right = List.fold_left (process_instr hyps mem) pstate insts_right in
+let instrs_equiv
+   (hyps       : hyps         )
+   ((mem, mt)  : memenv       )
+  ?(pstate     : _ = Map.empty)
+   (s1         : instr list   )
+   (s2         : instr list   ) : bool
+=
+  let env = LDecl.toenv hyps in
 
-  (* if (Map.keys pstate_left |> Set.of_enum) != (Map.keys pstate_right |> Set.of_enum) then *)
-    (* begin *)
-    (* Format.eprintf "Left: @."; *)
-    (* Map.iter (fun k _ -> Format.eprintf "%s@." k) pstate_left; *)
-    (* Format.eprintf "Right: @."; *)
-    (* Map.iter (fun k _ -> Format.eprintf "%s@." k) pstate_right; *)
-    (* false *)
-    (* end *)
-  (* else *)
-    Map.foldi (fun var circ bacc -> 
-      let circ = {circ with inps=inps @ circ.inps} in
-      let circ2 = (Map.find var pstate_right) in
-      let circ2 = {circ2 with inps=inps @ circ2.inps} in
-      bacc && (circ_equiv circ circ2 None)) 
-    pstate_left true
+  let rd, rglobs = EcPV.PV.elements (EcPV.is_read  env (s1 @ s2)) in
+  let wr, wglobs = EcPV.PV.elements (EcPV.is_write env (s1 @ s2)) in
+
+  if not (List.is_empty rglobs && List.is_empty wglobs) then
+    raise (CircError "the statements should not read/write globs");
+
+  if not (List.for_all (EcTypes.is_loc |- fst) (rd @ wr)) then
+    raise (CircError "the statements should not read/write global variables");
+
+  let pstate = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) wr in
+  let pstate, inputs = pstate_of_variables env pstate in
+
+  let pstate1 = List.fold_left (process_instr hyps mem) pstate s1 in
+  let pstate2 = List.fold_left (process_instr hyps mem) pstate s2 in
+
+  Map.keys pstate |> Enum.for_all (fun var -> 
+    let circ1 = Map.find var pstate1 in
+    let circ1 = { circ1 with inps = inputs @ circ1.inps } in
+    let circ2 = Map.find var pstate2 in
+    let circ2 = { circ2 with inps = inputs @ circ2.inps } in
+    circ_equiv circ1 circ2 None
+  )

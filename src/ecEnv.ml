@@ -3428,6 +3428,7 @@ module Theory = struct
           env_atbase  = bind_at_th thpath env.env_atbase cth.cth_items;
           env_ntbase  = bind_nt_th thpath env.env_ntbase cth.cth_items;
           env_redbase = bind_rd_th thpath env.env_redbase cth.cth_items;
+          env_crbds   = bind_cr_th thpath env.env_crbds cth.cth_items;
           env_thenvs  = Mp.set_union env.env_thenvs compiled.compiled; }
 end
 

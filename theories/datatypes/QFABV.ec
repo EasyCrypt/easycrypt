@@ -271,7 +271,6 @@ theory BVOperators.
   end BVTruncate.
 
 
-print List.drop.
   (* ------------------------------------------------------------------ *)
   abstract theory BVExtract.
     clone BV as BV1.
@@ -287,8 +286,7 @@ print List.drop.
   end BVExtract.
 
 
-print List. 
-(* ------------------------------------------------------------------ *)
+  (* ------------------------------------------------------------------ *)
   abstract theory BVConcat.
     clone BV as BV1.
     clone BV as BV2.

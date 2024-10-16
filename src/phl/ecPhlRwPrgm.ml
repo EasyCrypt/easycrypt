@@ -7,35 +7,45 @@ open EcLowPhlGoal
 (* -------------------------------------------------------------------- *)
 type change_t = pcodepos * int * pstmt
 
-
+(* -------------------------------------------------------------------- *)
 let process_change ((cpos, i, s) : change_t) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
-  let env = EcEnv.Memory.push_active hs.hs_m env in
 
-  let cpos = EcTyping.trans_codepos env cpos in
+  let cpos =
+    let env = EcEnv.Memory.push_active hs.hs_m env in
+    EcTyping.trans_codepos env cpos in
+
   let s =
     let ue = EcProofTyping.unienv_of_hyps (FApi.tc1_hyps tc) in
     let s  = EcTyping.transstmt env ue s in
-    let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
-    (* let sb = { EcTypes.e_subst_id with es_ty = sb } in *)
 
+    assert (EcUnify.UniEnv.closed ue); (* FIXME *)
+
+    let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
     EcCoreSubst.s_subst sb s in
 
   let zp = Zpr.zipper_of_cpos env cpos hs.hs_s in
   let zp =
-    let old, tl = List.split_at i zp.z_tail in
-    let () = assert (EcCircuits.insts_equiv (FApi.tc1_hyps tc) hs.hs_m old s.s_node) in
+    let target, tl = List.split_at i zp.z_tail in
+
+    begin
+      try
+        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) hs.hs_m target s.s_node) then
+          tc_error !!tc "statements are not circuit-equivalent"
+        with EcCircuits.CircError s ->
+          tc_error !!tc "circuit-equivalence checker error: %s" s
+    end;
     { zp with z_tail = s.s_node @ tl } in
 
-  let zp = Zpr.zip zp in
-
-  let hs = { hs with hs_s = zp } in
+  let hs = { hs with hs_s = Zpr.zip zp } in
 
   FApi.xmutate1 tc `BChange [EcFol.f_hoareS_r hs]
 
+(* -------------------------------------------------------------------- *)
 type idassign_t = pcodepos * pqsymbol
 
+(* -------------------------------------------------------------------- *)
 let process_idassign ((cpos, pv) : idassign_t) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
