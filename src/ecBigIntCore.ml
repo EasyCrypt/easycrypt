@@ -64,4 +64,5 @@ module type TheInterface = sig
   val pp_print : Format.formatter -> zint -> unit
 
   val to_why3 : zint -> Why3.BigInt.t
+  val to_zt: zint -> Z.t
 end

@@ -147,6 +147,10 @@ type 'a doption =
   | Single of 'a
   | Double of ('a * 'a)
 
+module DOption : sig
+  val map : ('a -> 'b) -> 'a doption -> 'b doption
+end
+
 (* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 
@@ -277,6 +281,7 @@ module List : sig
   val min : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
   val max : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
 
+  val destruct   : 'a list -> 'a * 'a list
   val nth_opt    : 'a list -> int -> 'a option
   val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
@@ -293,6 +298,8 @@ module List : sig
   val reduce1    : ('a list -> 'a) -> 'a list -> 'a
   val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
   val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
+  val collapse   : ?eq:('a -> 'a -> bool) -> 'a list -> 'a option
+  val chunkify   : int -> 'a list -> 'a list list
 
   val takedrop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
 

@@ -18,10 +18,10 @@ module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-type fission_t    = oside * codepos * (int * (int * int))
-type fusion_t     = oside * codepos * (int * (int * int))
-type unroll_t     = oside * codepos * bool
-type splitwhile_t = pexpr * oside * codepos
+type fission_t    = oside * pcodepos * (int * (int * int))
+type fusion_t     = oside * pcodepos * (int * (int * int))
+type unroll_t     = oside * pcodepos * bool
+type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
 let check_independence (pf, hyps) b init c1 c2 c3 =
@@ -205,26 +205,31 @@ let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
 (* -------------------------------------------------------------------- *)
 let process_fission (side, cpos, infos) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_fission side cpos infos tc
 
 let process_fusion (side, cpos, infos) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_fusion side cpos infos tc
 
 let process_splitwhile (b, side, cpos) tc =
   let b =
     try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
-    with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement"
-  in t_splitwhile b side cpos tc
+    with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement" in
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  t_splitwhile b side cpos tc
 
 (* -------------------------------------------------------------------- *)
 let process_unroll_for side cpos tc =
+  let env  = FApi.tc1_env tc in
+  let hyps = FApi.tc1_hyps tc in
+  let c    = EcLowPhlGoal.tc1_get_stmt side tc in
+
   if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
 
-  let env  = FApi.tc1_env tc in
-  let hyps = FApi.tc1_hyps tc in
-  let _, c = EcLowPhlGoal.tc1_get_stmt side tc in
-  let z    = Zpr.zipper_of_cpos cpos c in
+  let cpos = EcTyping.trans_codepos env cpos in
+  let z    = Zpr.zipper_of_cpos env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
   (* Extract loop condition / body *)
@@ -270,7 +275,7 @@ let process_unroll_for side cpos tc =
       match sform_of_form (simplify full_red hyps cond) with
       | SFtrue  -> true
       | SFfalse -> false
-      | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in
+      | _       -> Format.eprintf "condition after simplify: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) (simplify full_red hyps cond); tc_error !!tc "while loop condition does not reduce to a constant" in
 
   let rec eval_cond z0 =
     if test_cond z0 then z0 :: eval_cond (incrz z0) else [z0] in
@@ -320,6 +325,9 @@ let process_unroll_for side cpos tc =
 
 (* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =
-  if   for_
-  then process_unroll_for side cpos tc
-  else t_unroll side cpos tc
+  if for_ then
+    process_unroll_for side cpos tc
+  else begin
+    let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+    t_unroll side cpos tc
+  end

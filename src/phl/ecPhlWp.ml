@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcAst
 open EcModules
 open EcFol
@@ -142,7 +143,7 @@ module TacInternal = struct
   let t_hoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let (s_hd, s_wp) = o_split i hs.hs_s in
+    let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
     let s_wp, post =
       wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po in
@@ -154,7 +155,7 @@ module TacInternal = struct
   let t_ehoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_ehoareS tc in
-    let (s_hd, s_wp) = o_split i hs.ehs_s in
+    let (s_hd, s_wp) = o_split env i hs.ehs_s in
     let s_wp = EcModules.stmt s_wp in
     let (s_wp, post) = ewp ~uselet env hs.ehs_m s_wp hs.ehs_po in
     check_wp_progress tc i hs.ehs_s s_wp;
@@ -165,7 +166,7 @@ module TacInternal = struct
   let t_bdhoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let bhs = tc1_as_bdhoareS tc in
-    let (s_hd, s_wp) = o_split i bhs.bhs_s in
+    let (s_hd, s_wp) = o_split env i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
     let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
     check_wp_progress tc i bhs.bhs_s s_wp;
@@ -177,8 +178,8 @@ module TacInternal = struct
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let i = omap fst ij and j = omap snd ij in
-    let s_hdl,s_wpl = o_split i es.es_sl in
-    let s_hdr,s_wpr = o_split j es.es_sr in
+    let s_hdl,s_wpl = o_split env i es.es_sl in
+    let s_hdr,s_wpr = o_split env j es.es_sr in
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
@@ -223,5 +224,6 @@ let typing_wp env m s f =
 let () = EcTyping.wp := Some typing_wp
 
 (* -------------------------------------------------------------------- *)
-let process_wp k tc =
+let process_wp (k : pcodepos1 doption option) (tc : tcenv1) =
+  let k = Option.map (EcTyping.trans_dcodepos1 (FApi.tc1_env tc)) k in
   t_wp k tc

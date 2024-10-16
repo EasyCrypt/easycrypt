@@ -9,6 +9,7 @@ open EcFol
 open EcEnv
 open EcPV
 open EcCoreGoal
+open EcMatching.Position
 
 module Zpr = EcMatching.Zipper
 
@@ -189,20 +190,24 @@ let is_program_logic (f : form) (ks : hlkind list) =
   List.exists do1 ks
 
 (* -------------------------------------------------------------------- *)
-let tc1_get_stmt side tc =
+let tc1_get_stmt_with_memory side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
-  | None, FhoareS hs -> hs.hs_m, hs.hs_s
-  | None, FeHoareS hs -> hs.ehs_m, hs.ehs_s
-  | None, FbdHoareS hs -> hs.bhs_m, hs.bhs_s
+  | None, FhoareS hs -> (hs.hs_m, hs.hs_s)
+  | None, FeHoareS hs -> (hs.ehs_m, hs.ehs_s)
+  | None, FbdHoareS hs -> (hs.bhs_m, hs.bhs_s)
   | Some _ , (FhoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
-  | Some `Left, FequivS es   -> es.es_ml, es.es_sl
-  | Some `Right, FequivS es  -> es.es_mr, es.es_sr
+  | Some `Left, FequivS es   -> (es.es_ml, es.es_sl)
+  | Some `Right, FequivS es  -> (es.es_mr, es.es_sr)
   | None, FequivS _ ->
       tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
-  | _            ->
+  | _ ->
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+
+(* -------------------------------------------------------------------- *)
+let tc1_get_stmt side tc =
+  snd (tc1_get_stmt_with_memory side tc)
 
 (* -------------------------------------------------------------------- *)
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
@@ -266,19 +271,19 @@ let set_pre ~pre f =
 (* -------------------------------------------------------------------- *)
 exception InvalidSplit of codepos1
 
-let s_split i s =
+let s_split env i s =
   let module Zpr = EcMatching.Zipper in
-  try  Zpr.split_at_cpos1 i s
+  try  Zpr.split_at_cpos1 env i s
   with Zpr.InvalidCPos -> raise (InvalidSplit i)
 
-let s_split_i i s =
+let s_split_i env i s =
   let module Zpr = EcMatching.Zipper in
-  try  Zpr.find_by_cpos1 ~rev:false i s
+  try  Zpr.find_by_cpos1 ~rev:false env i s
   with Zpr.InvalidCPos -> raise (InvalidSplit i)
 
-let o_split ?rev i s =
+let o_split ?rev env i s =
   let module Zpr = EcMatching.Zipper in
-  try  Zpr.may_split_at_cpos1 ?rev i s
+  try  Zpr.may_split_at_cpos1 ?rev env i s
   with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
@@ -576,13 +581,15 @@ type 'a zip_t =
 
 let t_fold f (cenv : code_txenv) (cpos : codepos) (_ : form * form) (state, s) =
   try
-    let (me, f) = Zpr.fold cenv cpos f state s in
+    let env = EcEnv.LDecl.toenv (snd cenv) in
+    let (me, f) = Zpr.fold env cenv cpos f state s in
       ((me, f, []) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
 let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s) =
   try
-    let (me, zpr, gs) = f cenv prpo state (Zpr.zipper_of_cpos cpos s) in
+    let env = EcEnv.LDecl.toenv (snd cenv) in
+    let (me, zpr, gs) = f cenv prpo state (Zpr.zipper_of_cpos env cpos s) in
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 

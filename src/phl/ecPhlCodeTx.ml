@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcSymbols
 open EcAst
 open EcTypes
 open EcModules
@@ -135,6 +136,51 @@ let set_stmt (fresh, id) e =
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+
+(* -------------------------------------------------------------------- *)
+let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
+  fun (pe, hyps) _ me z ->
+    let i, is = List.destruct z.Zpr.z_tail in
+    let e, mk =
+      let e, kind, mk =
+        get_expression_of_instruction i |> ofdfl (fun () ->
+          tc_error pe "targetted instruction should contain an expression"
+        ) in
+
+      match kind with
+      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, mk)
+      | `Swhile -> tc_error pe "while loops not supported"
+    in
+
+    try
+      let ptev = EcProofTerm.ptenv pe hyps (ue, mev) in
+      let e = form_of_expr (fst me) e in
+      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e in
+
+      assert (EcProofTerm.can_concretize ptev);
+
+      let cpos =
+        EcMatching.FPosition.select_form
+          ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+          hyps None subf e in
+
+      let v = { ov_name = Some id; ov_type = subf.f_ty } in
+      let (me, id) = EcMemory.bind_fresh v me in
+      let pv = pv_loc (oget id.ov_name) in
+      let e = EcMatching.FPosition.map cpos (fun _ -> f_pvar pv (subf.f_ty) (fst me)) e in
+
+      let i1 = i_asgn (LvVar (pv, subf.f_ty), expr_of_form (fst me) subf) in
+      let i2 = mk (expr_of_form (fst me) e) in
+
+      (me, { z with z_tail = i1 :: i2 :: is }, [])
+
+    with EcProofTerm.FindOccFailure _ ->
+      tc_error pe "cannot find an occurrence of the pattern"
+
+let t_set_match_r (side : oside) (cpos : EcMatching.Position.codepos) (id : symbol) pattern tc =
+  let tr = fun side -> `SetMatch (side, cpos) in
+  t_code_transform side ~bdhoare:true cpos tr
+    (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
@@ -286,27 +332,44 @@ let t_cfold_r side cpos olen g =
   t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
-let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r
-let t_alias = FApi.t_low3 "code-tx-alias" t_alias_r
-let t_set   = FApi.t_low4 "code-tx-set"   t_set_r
-let t_cfold = FApi.t_low3 "code-tx-cfold" t_cfold_r
+let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
+let t_alias     = FApi.t_low3 "code-tx-alias"     t_alias_r
+let t_set       = FApi.t_low4 "code-tx-set"       t_set_r
+let t_set_match = FApi.t_low4 "code-tx-set-match" t_set_match_r
+let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_set side cpos (fresh, id) e tc
 
+let process_set_match (side, cpos, id, pattern) tc =
+  let me, _ = tc1_get_stmt_with_memory side tc in
+  let cpos =
+    let env = EcEnv.Memory.push_active me (FApi.tc1_env tc) in
+    EcTyping.trans_codepos env cpos in
+  let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
+  let ue  = EcProofTyping.unienv_of_hyps hyps in
+  let ptnmap = ref Mid.empty in
+  let pattern = EcTyping.trans_pattern (LDecl.toenv hyps) ptnmap ue pattern in
+  t_set_match side cpos (EcLocation.unloc id)
+    (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
+    tc
+  
 (* -------------------------------------------------------------------- *)
-
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
   let hyps = FApi.tc1_hyps tc in
@@ -363,7 +426,7 @@ let process_weakmem (side, id, params) tc =
   FApi.xmutate1 tc `WeakenMem [concl]
 
 (* -------------------------------------------------------------------- *)
-let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
+let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let (env, _, concl) = FApi.tc1_eflat tc in
 
   let change (i : instr) =
@@ -395,9 +458,115 @@ let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
     assert false;
 
-  let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let goals, s = EcMatching.Zipper.map pos change s in
+  let s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let pos = EcTyping.trans_codepos env pos in
+  let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
 
+(* -------------------------------------------------------------------- *)
+(*             Start of Code Cryogenic Vault:                           *)
+(* -------------------------------------------------------------------- *)
+let subst_array env (me: memenv) (insts) : memenv * instr list =
+  let cache : (prog_var, prog_var array * ty) Map.t = Map.empty in
+
+  let size_of_array (arr_e: expr) = match arr_e.e_ty.ty_node with
+  | Tconstr (p, _) -> begin match (EcPath.toqsymbol p) with
+    | ["Top"; "Array256"; _], _ -> Some 256
+    | ["Top"; "Array32"; _], _ -> Some 32
+    | _, "ipoly" -> Some 256
+    | h,t -> Format.eprintf "Unknown array type %s@." (List.fold_right (fun a b -> a ^ "." ^ b) h t);
+      assert false
+    end
+  | _ -> None
+  in
+  let is_arr_read (e: expr) : bool =
+  match e.e_node with
+  | Eop (p, _) -> begin 
+    match (EcPath.toqsymbol p) with
+    | _, "_.[_]" -> true
+    | _ -> Format.eprintf "Unknown arr read %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
+  end 
+  | _ -> false 
+  in
+  let is_arr_write (e: expr) : bool =
+  match e.e_node with
+  | Eop (p, _) -> begin 
+    match (EcPath.toqsymbol p) with
+    | _, "_.[_<-_]" -> true
+    | _ -> Format.eprintf "Unknown arr write %a@." (EcPrinting.pp_expr (EcPrinting.PPEnv.ofenv env)) e; false
+  end 
+  | _ -> false 
+  in
+  
+  let vars_of_array (arr_e : expr) : prog_var array option =
+    let name_from_array (arr_e : expr) : string = 
+      match arr_e.e_node with
+      | Evar (PVloc v) -> v
+      | _ -> assert false
+    in
+    let name = name_from_array arr_e in
+    match size_of_array arr_e with
+    | None -> assert false
+    | Some size -> Some ( 
+      Array.init size (fun i -> 
+        pv_loc @@ name ^ "_" ^ (string_of_int i)))
+  in
+  let array_of_vars (ty:ty) (vars: prog_var array) : expr =
+    let vars = Array.map (fun v -> e_var v ty) vars in
+    let vars = Array.map (form_of_expr (fst me)) vars in
+    let arr = Array.fold_left 
+      (fun acc v -> EcTypesafeFol.f_app_safe env EcCoreLib.CI_List.p_cons [v; acc]) 
+      (fop_empty ty)
+      (Array.rev vars)
+    in 
+    let () = Format.eprintf "type of list :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
+    let p_of_list, o_of_list = EcEnv.Op.lookup (["Array" ^ (string_of_int @@ Array.length vars)], "of_list") env in
+    let arr = EcTypesafeFol.f_app_safe env p_of_list [Array.get vars 0; arr] in
+    let () = Format.eprintf "type of arr :%a @." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) arr.f_ty in
+    expr_of_form (fst me) arr
+
+  in
+  let rec subst_expr cache (e: expr) =
+  match e.e_node with
+  | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node=Eint idx}]) when is_arr_read op -> 
+    begin match Map.find_opt arr_v cache with
+    | Some (vars, ty) -> (cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty) 
+    | None -> let vars = vars_of_array arr_e |> Option.get in
+      (Map.add arr_v (vars, e.e_ty) cache, e_var (Array.get vars (BI.to_int idx)) e.e_ty)
+    end
+  | Eapp (op, args) -> let cache, args = List.fold_left_map (fun cache e -> subst_expr cache e) cache args in
+    (cache, e_app op args e.e_ty)
+  | _ -> (cache, e)
+  in
+
+  let subst_instr cache (i: instr) = 
+  match i.i_node with
+  | Sasgn (lv, e) -> begin match e.e_node with
+    | Eapp (op, [{e_node=Evar arr_v} as arr_e; {e_node = Eint idx}; v]) 
+      when is_arr_write op -> let cache, v = subst_expr cache v in
+      let cache, var = match Map.find_opt arr_v cache with
+      | Some (vars, ty) -> (cache, Array.get vars (BI.to_int idx))
+      | None -> let vars = vars_of_array arr_e |> Option.get in
+        (Map.add arr_v (vars, v.e_ty) cache, Array.get vars (BI.to_int idx)) in
+      (cache, i_asgn (LvVar (var, v.e_ty), v))
+    | Eapp _ -> let cache, e = subst_expr cache e in 
+      (cache, i_asgn (lv, e))
+    | _ -> (cache, i)
+    end
+  | _ -> (cache, i)
+  in
+  let cache, insts = List.fold_left_map subst_instr cache insts in
+  let arr_defs = Map.to_seq cache 
+    |> List.of_seq 
+    |> List.map (fun (arr, (vars, ty)) -> i_asgn (LvVar (arr, ty), array_of_vars ty vars))
+  in 
+  let me = Map.fold (fun (vars, ty) me -> 
+    let vars = Array.map (fun v -> match v with | PVloc v -> {ov_name = Some v; ov_type=ty} | _ -> assert false ) vars in
+    EcMemory.bindall (Array.to_list vars) me) cache me in
+  (me, insts @ arr_defs)
+  
+(* -------------------------------------------------------------------- *)
+(*               End of Code Cryogenic Vault:                           *)
+(* -------------------------------------------------------------------- *)

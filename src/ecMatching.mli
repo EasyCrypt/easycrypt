@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcUid
-open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
@@ -11,7 +10,34 @@ open EcEnv
 open EcGenRegexp
 
 (* -------------------------------------------------------------------- *)
+module Position : sig
+  type cp_match = [
+    | `If
+    | `While
+    | `Assign of lvmatch
+    | `Sample
+    | `Call
+  ]
+
+  and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
+
+  type cp_base = [
+    | `ByPos of int
+    | `ByMatch of int option * cp_match
+  ]
+
+  type codepos1    = int * cp_base
+  type codepos     = (codepos1 * int) list * codepos1
+  type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
+
+  val shift : offset:int -> codepos1 -> codepos1
+  val resolve_offset : base:codepos1 -> offset:codeoffset1 -> codepos1
+end
+
+(* -------------------------------------------------------------------- *)
 module Zipper : sig
+  open Position
+
   type ipath =
   | ZTop
   | ZWhile  of expr * spath
@@ -32,18 +58,21 @@ module Zipper : sig
   val cpos : int -> codepos1
 
   (* Split a statement from a top-level position (codepos1) *)
-  val find_by_cpos1  : ?rev:bool -> codepos1 -> stmt -> instr list * instr * instr list
-  val split_at_cpos1 : codepos1 -> stmt -> instr list * instr list
+  val find_by_cpos1  : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr * instr list
+  val split_at_cpos1 : env -> codepos1 -> stmt -> instr list * instr list
 
   (* Split a statement from an optional top-level position (codepos1) *)
-  val may_split_at_cpos1 : ?rev:bool -> codepos1 option -> stmt -> instr list * instr list
+  val may_split_at_cpos1 : ?rev:bool -> env -> codepos1 option -> stmt -> instr list * instr list
+
+  (* Find the absolute offset of a top-level position (codepos1) w.r.t. a given statement *)
+  val offset_of_position : env -> codepos1 -> stmt -> int
 
   (* [zipper] soft constructor *)
   val zipper : instr list -> instr list -> ipath -> zipper
 
   (* Return the zipper for the stmt [stmt] at code position [codepos].
    * Raise [InvalidCPos] if [codepos] is not valid for [stmt]. *)
-  val zipper_of_cpos : codepos -> stmt -> zipper
+  val zipper_of_cpos : env -> codepos -> stmt -> zipper
 
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
@@ -65,13 +94,12 @@ module Zipper : sig
    * Raise [InvalidCPos] if [cpos] is not valid for [s], or any exception
    * raised by [f].
    *)
-  val fold : 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
+  val fold : env -> 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
 
-  (* [map cpos f s] is a special case of [fold] where the state and the
+    (* [map cpos f s] is a special case of [fold] where the state and the
    * out-of-band data are absent
    *)
-  val map : codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
-
+   val map : env -> codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
 end
 
 (* -------------------------------------------------------------------- *)

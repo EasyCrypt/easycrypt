@@ -79,7 +79,7 @@ module S = {
 
 equiv Sample_Loop_eq: S.sample ~ S.loop: ={d, xs} ==> ={res}.
 proof. 
-  proc => /=;  alias{1} 0 rb = witness <:tb>.
+  proc => /=; alias{1} 1 rb = witness <:tb>.
   sp 1 2; exlim xs{1}, l{2} => xs_ l2.
   pose xs' := List."[]" <:ta>.
   conseq (: ={d} /\ l{2} = l2 /\ i{2} = size xs_ - 1 /\ xs{1} = xs_ /\ xs{2} = xs_ ++ xs'
@@ -118,7 +118,7 @@ qed.
 
 equiv Sample_Loop_first_eq: S.sample ~ S.loop_first : ={d, xs} ==> ={res}.
 proof. 
-  proc => /=;  alias{1} 0 rb = witness <:tb>.
+  proc => /=;  alias{1} 1 rb = witness <:tb>.
   sp 1 1; exlim xs{1}, l{2} => xs_ l2.
   conseq (: ={d,xs} /\ l{2} = l2 /\ xs{2} = xs_ 
              ==> l2++r{1} = l{2}); 1,2: by move=> />.

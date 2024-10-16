@@ -24,7 +24,6 @@ module type PrinterAPI = sig
 
   (* ------------------------------------------------------------------ *)
   val string_of_hcmp : EcFol.hoarecmp -> string
-  val string_of_cpos1 : EcParsetree.codepos1 -> string
 
   (* ------------------------------------------------------------------ *)
   type 'a pp = Format.formatter -> 'a -> unit
@@ -62,6 +61,10 @@ module type PrinterAPI = sig
   val pp_tyvar    : PPEnv.t -> ident pp
   val pp_tyunivar : PPEnv.t -> EcUid.uid pp
   val pp_path     : path pp
+
+  (* ------------------------------------------------------------------ *)
+  val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
+  val pp_codeoffset1 : PPEnv.t -> EcMatching.Position.codeoffset1 pp
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp

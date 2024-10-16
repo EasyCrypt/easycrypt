@@ -10,6 +10,7 @@ open EcParsetree
 open EcTypes
 open EcModules
 open EcFol
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type wp = EcEnv.env -> EcMemory.memenv -> stmt -> EcFol.form -> EcFol.form option
@@ -210,15 +211,23 @@ val transexpcast_opt :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
+val trans_pv : EcEnv.env -> pqsymbol -> prog_var * ty
+
+(* -------------------------------------------------------------------- *)
 type ismap = (instr list) EcMaps.Mstr.t
 
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
+val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
+val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
+val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
+
+(* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
 type metavs = EcFol.form Msym.t
 
-val transmem       : env -> EcSymbols.symbol located -> EcIdent.t
+val transmem : env -> EcSymbols.symbol located -> EcIdent.t
 
 val trans_form_opt :
   env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
@@ -258,7 +267,6 @@ val trans_args :
   -> expr list * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-
 (* This only checks the memory restrictions. *)
 val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit

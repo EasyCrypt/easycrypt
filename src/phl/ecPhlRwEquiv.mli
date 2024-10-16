@@ -1,8 +1,11 @@
+(* -------------------------------------------------------------------- *)
 open EcCoreGoal.FApi
+open EcAst
 open EcParsetree
 open EcCoreGoal
-open EcAst
+open EcMatching.Position
 
+(* -------------------------------------------------------------------- *)
 val t_rewrite_equiv :
   side ->
   [`LtoR | `RtoL ] ->

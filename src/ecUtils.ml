@@ -278,6 +278,13 @@ type 'a doption =
   | Single of 'a
   | Double of ('a * 'a)
 
+module DOption = struct
+  let map (type a b) (f : a -> b) (x : a doption) : b doption =
+    match x with
+    | Single v -> Single (f v)
+    | Double (v1, v2) -> Double (f v1, f v2)
+end
+
 (* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 
@@ -461,6 +468,10 @@ module List = struct
   include Parallel
 
   (* ------------------------------------------------------------------ *)
+  let destruct (s : 'a list) =
+    match s with x :: xs -> (x, xs) | _ -> assert false
+
+  (* ------------------------------------------------------------------ *)
   let nth_opt (s : 'a list) (i : int) =
     try  Some (List.nth s i)
     with Failure _ | Invalid_argument _ -> None
@@ -587,6 +598,21 @@ module List = struct
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
 
+  let collapse ?(eq : 'a -> 'a -> bool = (=)) (xs : 'a list) =
+    match xs with
+    | [] -> None
+    | x :: xs -> if List.for_all (eq x) xs then Some x else None
+
+  (* List of size n*w into list of n lists of size w *)
+  let chunkify (w : int) =
+    let rec doit (acc : 'a list list) (xs : 'a list) =
+      if is_empty xs then
+        rev acc
+      else
+        let hd, tl = takedrop w xs in
+        doit (hd :: acc) tl
+    in fun (xs : 'a list) -> doit [] xs
+
   (* Separate list into a prefix for which p is true and the rest *)
   let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
     let rec doit (acc: 'a list) (xs : 'a list) =
@@ -594,7 +620,6 @@ module List = struct
     | [] -> (List.rev acc, [])
     | x::xs -> if p x then doit (x::acc) xs else (List.rev acc, x::xs)
     in doit [] xs
-
 
   type 'a interruptible = [`Interrupt | `Continue of 'a]
 

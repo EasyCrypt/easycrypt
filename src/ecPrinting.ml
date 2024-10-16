@@ -1316,33 +1316,6 @@ let pp_locality fmt lc =
   Format.fprintf fmt "%s" (odfl "" (string_of_locality lc))
 
 (* -------------------------------------------------------------------- *)
-let string_of_cpos1 ((off, cp) : EcParsetree.codepos1) =
-  let s =
-    match cp with
-    | `ByPos i ->
-        string_of_int i
-
-    | `ByMatch (i, k) ->
-        let s =
-          let k =
-            match k with
-            | `If     -> "if"
-            | `While  -> "while"
-            | `Assign -> "<-"
-            | `Sample -> "<$"
-            | `Call   -> "<@"
-          in Printf.sprintf "^%s" k in
-
-        match i with
-        | None | Some 1 -> s
-        | Some i -> Printf.sprintf "%s{%d}" s i
-  in
-
-  if off = 0 then s else
-
-  Printf.sprintf "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
-
-(* -------------------------------------------------------------------- *)
 (* suppose g is a formula consisting of the application of a binary
    operator op with scope onm and precedence opprec to formula
    arguments [_; f]. Because f may end with an implication,
@@ -2138,6 +2111,41 @@ let pp_scvar ppe fmt vs =
 
   pp_list "@ " pp_grp fmt vs
 
+(* -------------------------------------------------------------------- *)
+let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : EcMatching.Position.codepos1) =
+  let s : string =
+    match cp with
+    | `ByPos i ->
+        string_of_int i
+
+    | `ByMatch (i, k) ->
+        let s =
+          let k =
+            match k with
+            | `If     -> "if"
+            | `While  -> "while"
+            | `Sample -> "<$"
+            | `Call   -> "<@"
+            | `Assign `LvmNone -> "<-"
+            | `Assign (`LvmVar pv) -> Format.asprintf "%a<-" (pp_pv ppe) pv
+          in Format.asprintf "^%s" k in
+
+        match i with
+        | None | Some 1 -> s
+        | Some i -> Format.asprintf "%s{%d}" s i
+  in
+
+  if off = 0 then
+    Format.fprintf fmt "%s" s
+  else
+    Format.fprintf fmt "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
+
+(* -------------------------------------------------------------------- *)
+let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : EcMatching.Position.codeoffset1) =
+  match offset with
+  | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
+  | `ByOffset   o -> Format.fprintf fmt "%d" o
+  
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
@@ -3371,6 +3379,65 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         lvl (odfl "" base)
         (pp_list "@ " (pp_axname ppe)) p
 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
+      Format.fprintf fmt "%abind bitstring %a %a %a %d."
+        pp_locality lc
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        bs.size
+
+    | CRB_Array ba ->
+      Format.fprintf fmt "%abind array %a %a %a %a %a %d."
+        pp_locality lc
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
+        ba.size
+
+    | CRB_BvOperator op ->
+      let kind =
+        match op.kind with
+        | `Add      _            -> "add"
+        | `Sub      _            -> "sub"
+        | `Mul      _            -> "mul"
+        | `Div     (_,    false) -> "udiv"
+        | `Div     (_,    true ) -> "sdiv"
+        | `Rem     (_,    false) -> "urem"
+        | `Rem     (_,    true ) -> "srem"
+        | `Shl      _            -> "shl"
+        | `Shr     (_,    false) -> "shr"
+        | `Shr     (_,    true ) -> "ashr"
+        | `Not      _            -> "not"
+        | `And      _            -> "and"
+        | `Or       _            -> "or"
+        | `Lt      (_,    false) -> "ult"
+        | `Lt      (_,    true ) -> "slt"
+        | `Le      (_,    false) -> "ule"
+        | `Le      (_,    true ) -> "sle"
+        | `Extend  (_, _, false) -> "zextend"
+        | `Extend  (_, _, true ) -> "sextend"
+        | `Extract  _            -> "extract"
+        | `Concat   _            -> "concat"
+        | `Truncate _            -> "truncate"
+        | `A2B      _            -> "a2b"
+        | `B2A      _            -> "b2a"
+      in
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
+        pp_locality lc
+        (pp_list " & " (pp_tyname ppe)) op.types
+        (pp_opname ppe) op.operator
+        kind
+
+  | CRB_Circuit cr ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
+
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
   let ppnode = collect2_s ppe stmt.s_node [] in
@@ -3526,10 +3593,3 @@ module ObjectInfo = struct
     if !ok = 0 then
       Format.fprintf fmt "%s@." "no such object in any category"
 end
-
-(* ------------------------------------------------------------------ *)
-let () =
-  EcEnv.pp_debug_form :=
-    (fun env fmt f ->
-       let ppe = PPEnv.ofenv env in
-       pp_form ppe fmt f)

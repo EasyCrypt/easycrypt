@@ -12,10 +12,11 @@ type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_resolve : bool;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_resolve  : bool;
+  tyd_clinline : bool;
 }
 
 and ty_body = [
@@ -194,3 +195,61 @@ type field = {
   f_div  : EcPath.path option;
 }
 val field_equal : field -> field -> bool
+
+(* -------------------------------------------------------------------- *)
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; ofint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
+  ; size   : int
+  ; theory : EcPath.path }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; oflist : EcPath.path
+  ; size   : int
+  ; theory : EcPath.path }
+  
+type bv_opkind = [
+  | `Add      of int (* size *)
+  | `Sub      of int (* size *)
+  | `Mul      of int (* size *)
+  | `Div      of int * bool (* size + sign *)
+  | `Rem      of int * bool (* size + sign *)
+  | `Shl      of int (* size *)
+  | `Shr      of int * bool (* size + sign *)
+  | `And      of int (* size *)
+  | `Or       of int (* size *)
+  | `Not      of int (* size *)
+  | `Lt       of int * bool (* size + sign *) 
+  | `Le       of int * bool (* size + sign *)
+  | `Extend   of int * int * bool (* size in + size out + sign *)
+  | `Truncate of int * int (* size in + size out *)
+  | `Extract  of int * int (* size in + size out *)
+  | `Concat   of int * int * int (* size in1 + size in2 + size out *)
+  | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)
+  | `B2A      of int * (int * int) (* size in, (arr_len, elem_sz)  *)
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; types    : EcPath.path list
+  ; operator : EcPath.path
+  ; theory   : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit
