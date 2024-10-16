@@ -358,7 +358,9 @@ let process_set (side, cpos, fresh, id, e) tc =
 
 let process_set_match (side, cpos, id, pattern) tc =
   let me, _ = tc1_get_stmt_with_memory side tc in
-  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  let cpos =
+    let env = EcEnv.Memory.push_active me (FApi.tc1_env tc) in
+    EcTyping.trans_codepos env cpos in
   let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
   let ue  = EcProofTyping.unienv_of_hyps hyps in
   let ptnmap = ref Mid.empty in
