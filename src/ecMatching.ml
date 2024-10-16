@@ -32,6 +32,15 @@ module Position = struct
 
   type codepos1   = int * cp_base
   type codepos    = (codepos1 * int) list * codepos1
+  type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
+
+  let shift ~(offset : int) ((o, p) : codepos1) : codepos1 =
+    (o + offset, p)
+
+  let resolve_offset ~(base : codepos1) ~(offset : codeoffset1) : codepos1 =
+    match offset with
+    | `ByPosition pos -> pos
+    | `ByOffset   off -> (off + fst base, snd base)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -111,11 +120,19 @@ module Zipper = struct
     | false -> (s1, ir, s2)
     | true  -> (s2, ir, s1)
 
-  let split_at_cp_base ~after (env : EcEnv.env) (cb : cp_base) (s : stmt) =
+  type after = [`Yes | `No | `Auto]
+
+  let split_at_cp_base ~(after : after) (env : EcEnv.env) (cb : cp_base) (s : stmt) =
     match cb with
     | `ByPos i -> begin
-        let i = if i < 0 then List.length s.s_node + i else i in
-        try  List.takedrop (i - if after then 0 else 1) s.s_node
+        let after =
+          match after with
+          | `Auto -> 0 <= i
+          | `Yes  -> true
+          | `No   -> false in
+        let i = if i < 0 then List.length s.s_node + i + 1 else i in
+        let i = i - if after then 0 else 1 in
+        try  List.takedrop i s.s_node
         with (Invalid_argument _ | Not_found) -> raise InvalidCPos
       end
 
@@ -123,8 +140,8 @@ module Zipper = struct
         let (s1, i, s2) = find_by_cp_match env (i, cm) s in
 
         match after with
-        | false -> (List.rev s1, i :: s2)
-        | true  -> (List.rev_append s1 [i], s2)
+        | `No -> (List.rev s1, i :: s2)
+        | _   -> (List.rev_append s1 [i], s2)
 
   let split_at_cpos1 ~after (env : EcEnv.env) ((ipos, cb) : codepos1) s =
     let (s1, s2) = split_at_cp_base ~after env cb s in
@@ -147,10 +164,14 @@ module Zipper = struct
 
     in (s1, s2)
 
-  let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cpos1 : codepos1) s =
-    match split_at_cpos1 ~after:false env cpos1 s with
+  let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cpos1 : codepos1) (s : stmt) =
+    match split_at_cpos1 ~after:`No env cpos1 s with
     | (s1, i :: s2) -> ((if rev then List.rev s1 else s1), i, s2)
     | _ -> raise InvalidCPos
+
+  let offset_of_position (env : EcEnv.env) (cpos : codepos1) (s : stmt) =
+    let (s, _) = split_at_cpos1 ~after:`No env cpos s in
+    1 + List.length s
 
   let zipper_at_nm_cpos1 (env : EcEnv.env) ((cp1, sub) : codepos1 * int) s zpr =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
@@ -178,7 +199,7 @@ module Zipper = struct
     zipper s1 (i :: s2) zpr
 
   let split_at_cpos1 env cpos1 s =
-    split_at_cpos1 ~after:true env cpos1 s
+    split_at_cpos1 ~after:`Auto env cpos1 s
 
   let may_split_at_cpos1 ?(rev = false) env cpos1 s =
     ofdfl
