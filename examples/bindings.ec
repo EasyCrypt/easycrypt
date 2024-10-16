@@ -181,11 +181,12 @@ realize bvshlP by admit.
 
 (* ----------- BEGIN W32 BINDINGS ---------- *)
 
-bind bitstring W32.w2bits W32.bits2w W32.to_uint W32.of_int W32.t 32.
+bind bitstring W32.w2bits W32.bits2w W32.to_uint W32.to_sint W32.of_int W32.t 32.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 realize ofintP by admit.
 
 bind op W32.t W32.( + ) "add".
@@ -220,11 +221,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W64 BINDINGS ---------- *)
 
-bind bitstring W64.w2bits W64.bits2w W64.to_uint W64.of_int W64.t 64.
+bind bitstring W64.w2bits W64.bits2w W64.to_uint W64.to_sint W64.of_int W64.t 64.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 realize ofintP by admit.
 
 bind op W64.t W64.( + ) "add".
@@ -259,11 +261,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W128 BINDINGS ---------- *)
 
-bind bitstring W128.w2bits W128.bits2w W128.to_uint W128.of_int W128.t 128.
+bind bitstring W128.w2bits W128.bits2w W128.to_uint W128.to_sint W128.of_int W128.t 128.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 realize ofintP by admit.
 
 bind op W128.t W128.( + ) "add".
@@ -297,11 +300,12 @@ realize bvnotP by admit.
 
 (* ----------- BEGIN W256 BINDINGS ---------- *)
 
-bind bitstring W256.w2bits W256.bits2w W256.to_uint W256.of_int W256.t 256.
+bind bitstring W256.w2bits W256.bits2w W256.to_uint W256.to_sint W256.of_int W256.t 256.
 realize size_tolist by auto.
 realize tolistP by auto.
 realize oflistP by admit.
-realize tointP by admit.
+realize touintP by admit.
+realize tosintP by admit.
 realize ofintP by admit.
 
 bind op W256.t W256.( + ) "add".
