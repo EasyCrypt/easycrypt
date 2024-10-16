@@ -1316,33 +1316,6 @@ let pp_locality fmt lc =
   Format.fprintf fmt "%s" (odfl "" (string_of_locality lc))
 
 (* -------------------------------------------------------------------- *)
-let string_of_cpos1 ((off, cp) : EcMatching.Position.codepos1) =
-  let s =
-    match cp with
-    | `ByPos i ->
-        string_of_int i
-
-    | `ByMatch (i, k) ->
-        let s =
-          let k =
-            match k with
-            | `If       -> "if"
-            | `While    -> "while"
-            | `Assign _ -> "<-"
-            | `Sample   -> "<$"
-            | `Call     -> "<@"
-          in Printf.sprintf "^%s" k in
-
-        match i with
-        | None | Some 1 -> s
-        | Some i -> Printf.sprintf "%s{%d}" s i
-  in
-
-  if off = 0 then s else
-
-  Printf.sprintf "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
-
-(* -------------------------------------------------------------------- *)
 (* suppose g is a formula consisting of the application of a binary
    operator op with scope onm and precedence opprec to formula
    arguments [_; f]. Because f may end with an implication,
@@ -2138,6 +2111,41 @@ let pp_scvar ppe fmt vs =
 
   pp_list "@ " pp_grp fmt vs
 
+(* -------------------------------------------------------------------- *)
+let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : EcMatching.Position.codepos1) =
+  let s : string =
+    match cp with
+    | `ByPos i ->
+        string_of_int i
+
+    | `ByMatch (i, k) ->
+        let s =
+          let k =
+            match k with
+            | `If     -> "if"
+            | `While  -> "while"
+            | `Sample -> "<$"
+            | `Call   -> "<@"
+            | `Assign `LvmNone -> "<-"
+            | `Assign (`LvmVar pv) -> Format.asprintf "%a<-" (pp_pv ppe) pv
+          in Format.asprintf "^%s" k in
+
+        match i with
+        | None | Some 1 -> s
+        | Some i -> Format.asprintf "%s{%d}" s i
+  in
+
+  if off = 0 then
+    Format.fprintf fmt "%s" s
+  else
+    Format.fprintf fmt "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
+
+(* -------------------------------------------------------------------- *)
+let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : EcMatching.Position.codeoffset1) =
+  match offset with
+  | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
+  | `ByOffset   o -> Format.fprintf fmt "%d" o
+  
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in

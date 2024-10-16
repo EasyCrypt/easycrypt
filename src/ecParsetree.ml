@@ -503,12 +503,16 @@ type pcodepos1 = int * pcp_base
 type pcodepos  = (pcodepos1 * int) list * pcodepos1
 type pdocodepos1 = pcodepos1 doption option
 
+type pcodeoffset1 = [
+  | `ByOffset   of int
+  | `ByPosition of pcodepos1
+]
+
 (* -------------------------------------------------------------------- *)
-type swap_kind =
-  | SKbase      of int * int * int
-  | SKmove      of int
-  | SKmovei     of int * int
-  | SKmoveinter of int * int * int
+type pswap_kind = {
+  interval : (pcodepos1 * pcodepos1 option) option;
+  offset   : pcodeoffset1;
+}
 
 type interleave_info = oside * (int * int) * ((int * int) list) * int
 
@@ -729,7 +733,7 @@ type phltactic =
   | Prmatch        of (oside * symbol * pcodepos1)
   | Pcond          of pcond_info
   | Pmatch         of matchmode
-  | Pswap          of ((oside * swap_kind) located list)
+  | Pswap          of ((oside * pswap_kind) located list)
   | Pcfold         of (oside * pcodepos * int option)
   | Pinline        of inline_info
   | Poutline       of outline_info
