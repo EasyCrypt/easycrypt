@@ -3422,6 +3422,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Extend  (_, _, false) -> "zextend"
         | `Extend  (_, _, true ) -> "sextend"
         | `Extract  _            -> "extract"
+        | `Concat   _            -> "concat"
         | `Truncate _            -> "truncate"
         | `A2B      _            -> "a2b"
         | `B2A      _            -> "b2a"

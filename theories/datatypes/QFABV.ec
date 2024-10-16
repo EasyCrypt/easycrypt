@@ -227,6 +227,23 @@ print List.drop.
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
 
+
+print List. 
+(* ------------------------------------------------------------------ *)
+  abstract theory BVConcat.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone BV as BVO.
+
+    axiom [bydone] eq_size : BV1.size + BV2.size = BVO.size.
+
+    op bvconcat : BV1.bv -> BV2.bv -> BVO.bv.
+
+    axiom bvconcatP (bv1 : BV1.bv) (bv2: BV2.bv) :
+      BVO.tolist (bvconcat bv1 bv2) = (BV1.tolist bv1) ++ (BV2.tolist bv2).
+  end BVConcat.
+
+
   (* ------------------------------------------------------------------ *)
   abstract theory BVA2B.
     clone BV as BV1.

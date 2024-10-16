@@ -2538,6 +2538,10 @@ module Circuit = struct
         let mk sz = let sz1, sz2 = as_seq2 sz in  `Extract (sz1, sz2) in
         mk, [`BV None; `BV None], "Extract"
 
+      | "concat" ->
+        let mk sz = let sz1, sz2, sz3 = as_seq3 sz in  `Concat (sz1, sz2, sz3) in
+        mk, [`BV None; `BV None], "Extract"
+
       | "a2b" ->
         let mk sz =
           let sz1, sz2, asz = as_seq3 sz in `A2B ((sz2, asz), sz1) in

@@ -231,6 +231,7 @@ type bv_opkind = [
   | `Extend   of int * int * bool (* size in + size out + sign *)
   | `Truncate of int * int (* size in + size out *)
   | `Extract  of int * int (* size in + size out *)
+  | `Concat   of int * int * int (* size in1 + size in2 + size out *)
   | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)
   | `B2A      of int * (int * int) (* size in, (arr_len, elem_sz)  *)
 ]

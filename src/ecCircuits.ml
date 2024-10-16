@@ -759,6 +759,14 @@ module BaseOps = struct
       let c1 = C.reg ~size:out_sz ~name:id1.id_tag in
       { circ = BWCirc(c1); inps=[BWInput (id1, size)]}
 
+    | Some { kind = `Concat (sz1, sz2, szo) } ->
+      assert (sz1 + sz2 = szo);
+      let id1 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size:sz1 ~name:id1.id_tag in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c2 = C.reg ~size:sz2 ~name:id2.id_tag in
+      { circ = BWCirc(c1 @ c2); inps=[BWInput (id1, sz1); BWInput (id2, sz2)]}
+
     | Some { kind = `A2B ((n, w), m)} ->
       assert (n*w = m);
       let id1 = EcIdent.create temp_symbol in
