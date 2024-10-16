@@ -26,8 +26,12 @@ module Position : sig
     | `ByMatch of int option * cp_match
   ]
 
-  type codepos1   = int * cp_base
-  type codepos    = (codepos1 * int) list * codepos1
+  type codepos1    = int * cp_base
+  type codepos     = (codepos1 * int) list * codepos1
+  type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
+
+  val shift : offset:int -> codepos1 -> codepos1
+  val resolve_offset : base:codepos1 -> offset:codeoffset1 -> codepos1
 end
 
 (* -------------------------------------------------------------------- *)
@@ -59,6 +63,9 @@ module Zipper : sig
 
   (* Split a statement from an optional top-level position (codepos1) *)
   val may_split_at_cpos1 : ?rev:bool -> env -> codepos1 option -> stmt -> instr list * instr list
+
+  (* Find the absolute offset of a top-level position (codepos1) w.r.t. a given statement *)
+  val offset_of_position : env -> codepos1 -> stmt -> int
 
   (* [zipper] soft constructor *)
   val zipper : instr list -> instr list -> ipath -> zipper

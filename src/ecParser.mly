@@ -2639,6 +2639,10 @@ codepos:
 | nm=rlist0(nm1_codepos, empty) i=codepos1
     { (List.rev nm, i) }
 
+codeoffset1:
+| i=sword       { (`ByOffset   i :> pcodeoffset1) }
+| AT p=codepos1 { (`ByPosition p :> pcodeoffset1) }
+
 o_codepos1:
 | UNDERSCORE { None }
 | i=codepos1 { Some i}
@@ -2691,21 +2695,24 @@ rnd_info:
 | phi=sform d1=sform d2=sform d3=sform d4=sform p=sform?
     { PMultRndParams ((phi, d1, d2, d3, d4), p) }
 
+(* ------------------------------------------------------------------------ *)
+(* Code motion                                                              *)
+%public phltactic:
+| SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
+    { Pswap info }
+
 swap_info:
-| s=side? p=swap_pos { s,p }
+| s=side? p=swap_position { (s, p) }
 
-swap_pos:
-| i1=word i2=word i3=word
-    { SKbase (i1, i2, i3) }
+swap_position:
+| offset=codeoffset1
+    { { interval = None; offset; } }
 
-| p=sword
-    { SKmove p }
+| start=codepos1 offset=codeoffset1
+    { { interval = Some (start, None); offset; } }
 
-| i1=word p=sword
-    { SKmovei (i1, p) }
-
-| LBRACKET i1=word DOTDOT i2=word RBRACKET p=sword
-    { SKmoveinter (i1, i2, p) }
+| LBRACKET start=codepos1 DOTDOT end_=codepos1 RBRACKET offset=codeoffset1
+    { { interval = Some (start, Some end_); offset; } }
 
 side:
 | LBRACE n=word RBRACE {
@@ -2984,7 +2991,7 @@ interleave_info:
 | s=brace(stmt) { OKstmt(s) }
 | r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
 
-phltactic:
+%public phltactic:
 | PROC
    { Pfun `Def }
 
@@ -3040,9 +3047,6 @@ phltactic:
       | Some s, false -> Pmatch (`SSided s)
       | Some _, true  ->
           parse_error s.pl_loc (Some "cannot give side and '='") }
-
-| SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
-    { Pswap info }
 
 | INTERLEAVE info=loc(interleave_info)
     { Pinterleave info }
