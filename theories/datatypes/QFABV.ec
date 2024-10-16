@@ -212,6 +212,19 @@ theory BVOperators.
   end BVTruncate.
 
   (* ------------------------------------------------------------------ *)
+  abstract theory BVExtract.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size.
+
+    op bvextract : BV1.bv -> BV2.bv.
+
+    axiom bvextractP (bv : BV1.bv) :
+      take BV2.size (BV1.tolist bv) = BV2.tolist (bvextract bv).
+  end BVExtract.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVA2B.
     clone BV as BV1.
     clone BV as BV2.

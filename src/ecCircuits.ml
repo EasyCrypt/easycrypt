@@ -758,15 +758,6 @@ module BaseOps = struct
       let c1 = C.reg ~size:out_sz ~name:id1.id_tag in
       { circ = BWCirc(c1); inps=[BWInput (id1, size)]}
 
-    | Some { kind = `Extract (size, out_sz) } ->
-      assert (size >= out_sz);
-      let id1 = EcIdent.create (temp_symbol) in
-      let c1 = C.reg ~size ~name:id1.id_tag in
-      let id2 = EcIdent.create (temp_symbol) in
-      let c2 = C.reg ~size ~name:id2.id_tag in
-      let r = C.shift ~side:`L ~sign:`L c1 c2 |> List.take out_sz in
-      { circ = BWCirc(r); inps=[BWInput (id1, size); BWInput (id2, size)]}
-
     | Some { kind = `A2B ((n, w), m)} ->
       assert (n*w = m);
       let id1 = EcIdent.create temp_symbol in
@@ -862,6 +853,12 @@ let circuit_of_form
   : circuit =
 
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (env: env) (f: form) : env * circuit = 
+    let int_of_form (f: form) : zint = 
+      match f.f_node with 
+      | Fint i -> i
+      | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red (LDecl.init env []) f
+    in
+    
     match f.f_node with
     (* hardcoding size for now FIXME *)
     | Fint z -> assert false
@@ -945,7 +942,8 @@ let circuit_of_form
       match EcEnv.Circuit.reverse_operator env @@ (EcCoreFol.destr_op f |> fst) with
       | `Array ({ size }, `Get) :: _ -> let env, res = 
         match fs with
-        | [arr; {f_node=Fint i; _}] ->
+        | [arr; i] ->
+          let i = int_of_form i in
           let (_, t) = destr_array_type env arr.f_ty |> Option.get in
           let w = width_of_type env t in
           let env, arr = doit cache env arr in
@@ -954,7 +952,8 @@ let circuit_of_form
         in env, res
       | `Array ({ size }, `Set) :: _ -> let env, res = 
         match fs with
-        | [arr; {f_node=Fint i; _}; v] ->
+        | [arr; i; v] ->
+          let i = int_of_form i in
           let w = width_of_type env v.f_ty  in
           let env, arr = doit cache env arr in
           let env, v = doit cache env v in
@@ -988,10 +987,20 @@ let circuit_of_form
         end
       | `Bitstring ({ size }, `OfInt) :: _ ->
         let i = match fs with
-        | { f_node = Fint i } :: _ -> i 
+        | f :: _ -> int_of_form f
         | _ -> assert false
         in 
         env, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
+      | `BvOperator ({ kind = `Extract (size, out_sz) }) :: _ ->
+        assert (size >= out_sz);
+        let id1 = EcIdent.create ("extract_inp") in
+        let c1 = C.reg ~size ~name:id1.id_tag in
+        let b = match fs with
+        | f :: _ -> int_of_form f
+        | _ -> assert false
+        in
+        let c1 = List.take out_sz (List.drop (to_int b) c1) in
+        env, { circ = BWCirc(c1); inps=[BWInput (id1, size)] }
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
           let env, c1 = doit cache env f1 in
