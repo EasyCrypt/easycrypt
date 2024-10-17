@@ -3,6 +3,10 @@
 open Aig
 
 (* ==================================================================== *)
+let rec log2 n =
+  if n <= 1 then 0 else 1 + log2 (n lsr 1)
+
+(* ==================================================================== *)
 let sint_of_bools (bs : bool list) : int =
   assert (List.length bs <= Sys.int_size);
 
@@ -235,12 +239,13 @@ let arshift ~(offset : int) (r : reg) =
   List.drop offset r @ List.make (min offset l) sign
 
 (* -------------------------------------------------------------------- *)
-let lsr_ (r : reg) (s : reg) : reg =
+let lsr_ (r as r0 : reg) (s : reg) : reg =
+  let clamp = log2 (List.length r + 1) in
   let _, r =
     List.fold_left (fun (i, r) c ->
       (i+1, c_rshift ~offset:(1 lsl i) ~sign:false_ c r)
-    ) (0, r) s
-  in r
+    ) (0, r) (List.take clamp s)
+  in assert (List.length r = List.length r0); r
 
 (* -------------------------------------------------------------------- *)
 let lsl_ (r : reg) (s : reg) : reg =
