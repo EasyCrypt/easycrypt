@@ -851,7 +851,7 @@ let circuit_of_form
    (f      : EcAst.form) 
   : circuit =
 
-  let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f: form) : hyps * circuit = 
+  let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
     let int_of_form (f: form) : zint = 
       match f.f_node with 
@@ -859,7 +859,7 @@ let circuit_of_form
       | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
     in
     
-    match f.f_node with
+    match f_.f_node with
     (* hardcoding size for now FIXME *)
     | Fint z -> assert false
       (* env, {circ = BWCirc(C.of_bigint ~size:256 (to_zt z)); inps = []} *)
@@ -955,7 +955,7 @@ let circuit_of_form
         | _ -> raise (CircError "set")
         in hyps, res
       | `Array ({ size }, `OfList) :: _->
-        let _, n, w = destr_bwainput @@ cinput_of_type env f.f_ty in
+        let _, n, w = destr_bwainput @@ cinput_of_type env f_.f_ty in
         assert (n = size);
         (* FIXME: have an actual way to get sizes without creating new idents *)
         let wtn, vs = match fs with
