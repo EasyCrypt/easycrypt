@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
+open EcUtils
 open EcAst
 open EcCoreGoal
 open EcEnv
@@ -112,7 +113,7 @@ let process_rewrite_rw
     let data, e =
       EcUtils.ofdfl
         (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
-        (List.find_map try1 pts) in
+        (List.find_map_opt try1 pts) in
 
     (m, data), expr_of_form (fst m) e
   in
@@ -166,3 +167,61 @@ let process_rewrite
   match rw with
   | `Rw rw -> process_rewrite_rw side pos rw tc
   | `Simpl -> process_rewrite_simpl side pos tc
+
+(* -------------------------------------------------------------------- *)
+let process_change_stmt 
+  (side   : side option)
+  ((p, o) : pcodepos1 * pcodeoffset1)
+  (s      : pstmt)
+  (tc     : tcenv1)
+=
+  let env = FApi.tc1_env tc in
+  let me, stmt = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
+
+  let p, o =
+    let env = EcEnv.Memory.push_active me env in
+    let pos = EcTyping.trans_codepos1 env p in
+    let off = EcTyping.trans_codeoffset1 env o in
+    let off = EcMatching.Position.resolve_offset ~base:pos ~offset:off in
+
+    let start = EcMatching.Zipper.offset_of_position env pos stmt in
+    let end_  = EcMatching.Zipper.offset_of_position env off stmt in
+
+    if (end_ < start) then
+      tc_error !!tc "end position cannot be before start position";
+
+    (start - 1, end_ - start)
+  in
+    
+  let stmt     = stmt.s_node in
+  let hd, stmt = List.takedrop p stmt in
+  let stmt, tl = List.takedrop o stmt in
+
+  let s = EcProofTyping.tc1_process_stmt tc (snd me) s in
+
+  let pvs = EcPV.is_write env (stmt @ s.s_node) in
+  let pvs, globs = EcPV.PV.elements pvs in
+
+  let eq =
+    List.map
+      (fun (pv, ty) -> f_eq (f_pvar pv ty mleft) (f_pvar pv ty mright))
+      pvs
+    @
+    List.map
+      (fun mp -> f_eqglob mp mleft mp mright)
+      globs in
+
+  let goal1 =
+      f_equivS
+        (mleft, snd me) (mright, snd me)
+        f_true
+        (EcAst.stmt stmt) s
+        (f_ands eq)
+  in
+
+  let goal2 =
+    EcLowPhlGoal.hl_set_stmt
+      side (FApi.tc1_goal tc)
+      (EcAst.stmt (List.flatten [hd; s.s_node; tl])) in
+
+  FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]

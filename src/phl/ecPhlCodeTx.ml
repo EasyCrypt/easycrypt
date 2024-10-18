@@ -344,7 +344,10 @@ let process_cfold (side, cpos, olen) tc =
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
-  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  let cpos =
+    let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
+    let env = EcEnv.Memory.push_active me (FApi.tc1_env tc) in
+    EcTyping.trans_codepos env cpos in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
@@ -435,7 +438,14 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
 
     let lv, e = destr_asgn i in
 
-    let pvl = EcPV.lp_write env lv in
+    let pvl = (* FIXME: do we want to do this TCB-wise? *)
+      match lv with
+      | LvVar _ -> PV.empty
+      | LvTuple lvs ->
+        let lvs = List.tl (List.rev lvs) in
+        let lvs = Option.get (lv_of_list lvs) in
+        EcPV.lp_write env lvs in
+
     let pve = EcPV.e_read env e in
     let lv  = lv_to_list lv in
 
@@ -446,7 +456,11 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
       match lv, e.e_node with
       | [_], _         -> [e]
       | _  , Etuple es -> es
-      | _  ,_          -> assert false in
+      | _  ,_          ->
+        let tys =
+          match (EcEnv.Ty.hnorm e.e_ty env).ty_node with
+          | Ttuple tys -> tys | _ -> assert false in
+        List.mapi (fun i ty -> e_proj e i ty) tys in
 
     let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
 
@@ -458,8 +472,10 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
     assert false;
 
-  let s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let pos = EcTyping.trans_codepos env pos in
+  let me, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
+  let pos =
+    let env = EcEnv.Memory.push_active me env in
+    EcTyping.trans_codepos env pos in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
