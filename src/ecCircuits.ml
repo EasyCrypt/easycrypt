@@ -848,7 +848,7 @@ let circuit_of_form
   ?(pstate : pstate = Map.empty) (* Program variable values *)
   ?(cache  : cache = Map.empty) (* Let-bindings and such *)
    (hyps    : hyps) 
-   (f      : EcAst.form) 
+   (f_      : EcAst.form) 
   : circuit =
 
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f_: form) : hyps * circuit = 
@@ -893,11 +893,11 @@ let circuit_of_form
       begin match Map.find_opt idn cache with
       | Some (inp, circ) -> 
         (* Check if we want = or equiv here FIXME *)
-        if (cinput_equiv inp (cinput_of_type env f.f_ty)) then
+        if (cinput_equiv inp (cinput_of_type env f_.f_ty)) then
         hyps, circ
         else 
           let err = Format.asprintf "Var binding shape %s for %s does not match shape of form type %s@."
-           (cinput_to_string inp) idn.id_symb (cinput_of_type env f.f_ty |> cinput_to_string) in
+           (cinput_to_string inp) idn.id_symb (cinput_of_type env f_.f_ty |> cinput_to_string) in
            raise @@ CircError err
       | None -> 
           let err = Format.asprintf "Var binding not found for %s@." idn.id_symb in 
@@ -929,7 +929,7 @@ let circuit_of_form
         hyps, circ
     end
     | Fapp _ -> 
-    let (f, fs) = EcCoreFol.destr_app f in
+    let (f, fs) = EcCoreFol.destr_app f_ in
     let hyps, res = 
       (* Assuming correct types coming from EC *)
       (* FIXME: add typechecking here ? *)
@@ -1064,7 +1064,7 @@ let circuit_of_form
       in
       let res = match Map.find_opt v pstate with
         | Some circ -> circ
-        | None -> let circ = circ_ident (cinput_of_type ~idn:(create "uninit") env f.f_ty) in
+        | None -> let circ = circ_ident (cinput_of_type ~idn:(create "uninit") env f_.f_ty) in
           {circ with inps=[]}
       (* EXPERIMENTAL: allowing unitialized values *)
           (* failwith ("No value for var " ^ v) *)
@@ -1074,7 +1074,7 @@ let circuit_of_form
     | _ -> failwith "Not yet implemented"
 
   in 
-  let hyps, f_c = doit cache hyps f in
+  let hyps, f_c = doit cache hyps f_ in
   f_c
 
 
