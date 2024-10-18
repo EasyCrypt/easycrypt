@@ -1,12 +1,7 @@
 (* ==================================================================== *)
 open Ast
 open Aig
-
-(* ==================================================================== *)
-let rec log2 n =
-  if n <= 1 then 0 else 1 + log2 (n asr 1)
   
-
 (* ==================================================================== *)
 let load_from_file ~(filename : string) =
   let specs = File.with_file_in filename (Io.parse filename) in
@@ -159,7 +154,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       List.take size (List.drop offset e)
 
     | ESlice (e, (offset, size, scale)) ->
-      let lgscale = log2 scale in
+      let lgscale = Circuit.log2 scale in
       assert (1 lsl lgscale = scale);
 
       let e = of_expr env e in
@@ -182,7 +177,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
     | EAssign (e, (offset, size, scale), v) ->
       let esz = atype_as_aword e.type_ in
 
-      let lgscale = log2 scale in
+      let lgscale = Circuit.log2 scale in
       assert (1 lsl lgscale = scale);
 
       let e = of_expr env e in

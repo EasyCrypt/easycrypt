@@ -738,7 +738,7 @@ module BaseOps = struct
       {circ = BWCirc(C.uextend ~size:out_size c1); inps = [BWInput (id1, size)]}
 
     | Some { kind = `Extend (size, out_size, true) } ->
-      assert (size <= out_size);
+      assert (size <= out_size);  
       let id1 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       {circ = BWCirc(C.sextend ~size:out_size c1); inps = [BWInput (id1, size)]}
@@ -987,14 +987,14 @@ let circuit_of_form
         hyps, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
       | `BvOperator ({ kind = `Extract (size, out_sz) }) :: _ ->
         assert (size >= out_sz);
-        let id1 = EcIdent.create ("extract_inp") in
-        let c1 = C.reg ~size ~name:id1.id_tag in
-        let b = match fs with
-        | f :: _ -> int_of_form f
+        let c1, b = match fs with
+        | [c; f] -> c, int_of_form f
         | _ -> assert false
         in
-        let c1 = List.take out_sz (List.drop (to_int b) c1) in
-        hyps, { circ = BWCirc(c1); inps=[BWInput (id1, size)] }
+        let hyps, c1 = doit cache hyps c1 in
+        let c = destr_bwcirc c1.circ in
+        let c = List.take out_sz (List.drop (to_int b) c) in
+        hyps, { circ = BWCirc(c); inps=c1.inps }
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
           let hyps, c1 = doit cache hyps f1 in
@@ -1118,9 +1118,12 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
     | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate
     | _ -> failwith "Case not implemented yet"
   with 
-  | e -> let err = Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@."
-      (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
-      (Printexc.to_string e) in 
+  | e ->
+      let bt = Printexc.get_backtrace () in
+      let err = Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@.BACKTRACE: %s@.@."
+        (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
+        (Printexc.to_string e)
+        bt in 
       raise @@ CircError err
 
 let instrs_equiv

@@ -270,7 +270,6 @@ theory BVOperators.
       take BV2.size (BV1.tolist bv) = BV2.tolist (bvtruncate bv).
   end BVTruncate.
 
-
   (* ------------------------------------------------------------------ *)
   abstract theory BVExtract.
     clone BV as BV1.
@@ -280,11 +279,9 @@ theory BVOperators.
 
     op bvextract : BV1.bv -> int -> BV2.bv.
 
-    axiom bvextractP (bv : BV1.bv) (base: int) :
-      (base + BV2.size) <= BV1.size =>
+    axiom bvextractP (bv : BV1.bv) (base : int) : base + BV2.size <= BV1.size =>
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
-
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVConcat.
@@ -296,10 +293,9 @@ theory BVOperators.
 
     op bvconcat : BV1.bv -> BV2.bv -> BV3.bv.
 
-    axiom bvconcatP (bv1 : BV1.bv) (bv2: BV2.bv) :
-      BV3.tolist (bvconcat bv1 bv2) = (BV1.tolist bv1) ++ (BV2.tolist bv2).
+    axiom bvconcatP (bv1 : BV1.bv) (bv2 : BV2.bv) :
+      BV3.tolist (bvconcat bv1 bv2) = BV1.tolist bv1 ++ BV2.tolist bv2.
   end BVConcat.
-
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVA2B.

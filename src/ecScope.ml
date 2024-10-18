@@ -2505,24 +2505,24 @@ module Circuit = struct
 
     let (kind, sig_, subname) : (_ -> EcDecl.bv_opkind) * _ * _ =
       match unloc op.name with
-      | "add"  -> (fun sz -> `Add  (as_seq1 sz)), [`BV None], "Add"
-      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz)), [`BV None], "Sub"
-      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz)), [`BV None], "Mul"
+      | "add"  -> (fun sz -> `Add  (as_seq1 sz       )), [`BV None], "Add"
+      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz       )), [`BV None], "Sub"
+      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz       )), [`BV None], "Mul"
       | "udiv" -> (fun sz -> `Div  (as_seq1 sz, false)), [`BV None], "UDiv"
-      | "sdiv" -> (fun sz -> `Div  (as_seq1 sz, true)), [`BV None], "SDiv"
+      | "sdiv" -> (fun sz -> `Div  (as_seq1 sz, true )), [`BV None], "SDiv"
       | "urem" -> (fun sz -> `Rem  (as_seq1 sz, false)), [`BV None], "URem"
-      | "srem" -> (fun sz -> `Rem  (as_seq1 sz, true)), [`BV None], "SRem"
-      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz)), [`BV None], "SHL"
+      | "srem" -> (fun sz -> `Rem  (as_seq1 sz, true )), [`BV None], "SRem"
+      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz       )), [`BV None], "SHL"
       | "shr"  -> (fun sz -> `Shr  (as_seq1 sz, false)), [`BV None], "SHR"
-      | "ashr" -> (fun sz -> `Shr  (as_seq1 sz,true)), [`BV None], "ASHR"
-      | "and"  -> (fun sz -> `And  (as_seq1 sz)), [`BV None], "And"
-      | "or"   -> (fun sz -> `Or   (as_seq1 sz)), [`BV None], "Or"
-      | "not"  -> (fun sz -> `Not  (as_seq1 sz)), [`BV None], "Not"
+      | "ashr" -> (fun sz -> `Shr  (as_seq1 sz, true )), [`BV None], "ASHR"
+      | "and"  -> (fun sz -> `And  (as_seq1 sz       )), [`BV None], "And"
+      | "or"   -> (fun sz -> `Or   (as_seq1 sz       )), [`BV None], "Or"
+      | "not"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Not"
 
       | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"
-      | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true)), [`BV (Some 1); `BV None], "SLt"
+      | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLt"
       | "ule"  -> (fun sz -> `Le  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULe"
-      | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true)), [`BV (Some 1); `BV None], "SLe"
+      | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLe"
 
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
@@ -2533,11 +2533,11 @@ module Circuit = struct
         mk, [`BV None; `BV None], "SExtend"
 
       | "truncate" ->
-        let mk sz = let sz1, sz2 = as_seq2 sz in  `Truncate (sz1, sz2) in
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Truncate (sz1, sz2) in
         mk, [`BV None; `BV None], "Truncate"
 
       | "extract" ->
-        let mk sz = let sz1, sz2 = as_seq2 sz in  `Extract (sz1, sz2) in
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2) in
         mk, [`BV None; `BV None], "Extract"
 
       | "concat" ->
