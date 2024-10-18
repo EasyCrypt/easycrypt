@@ -1010,6 +1010,10 @@ let circuit_of_form
             hyps, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = c1.inps @ c2.inps}
           | _ -> assert false
           end
+        | Some `True, [] ->
+          hyps, {circ = BWCirc([C.true_]); inps=[]}
+        | Some `False, [] ->
+          hyps, {circ = BWCirc([C.false_]); inps=[]}
         | None, _ -> 
         let hyps, f_c = doit cache hyps f in
         let hyps, fcs = List.fold_left_map
