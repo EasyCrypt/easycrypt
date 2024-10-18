@@ -44,7 +44,7 @@ abstract theory BV.
 end BV.
 
 (* ==================================================================== *)
-theory A.
+abstract theory A.
   op size : int.
 
   axiom [bydone] gt0_size : 0 < size.
