@@ -3464,9 +3464,16 @@ let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : c
   match p with
   | `ByPos _ as p -> (p :> cp_base)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
+
 (* -------------------------------------------------------------------- *)
 let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
   snd_map (trans_cp_base ?memory env) p
+
+(* -------------------------------------------------------------------- *)
+let trans_codeoffset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+  match o with
+  | `ByOffset   i -> `ByOffset i
+  | `ByPosition p -> `ByPosition (trans_codepos1 ?memory env p)
 
 (* -------------------------------------------------------------------- *)
 let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =

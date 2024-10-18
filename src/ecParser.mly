@@ -724,6 +724,7 @@ _lident:
 
 %inline sword:
 |       n=word {  n }
+| PLUS  n=word {  n }
 | MINUS n=word { -n }
 
 (* -------------------------------------------------------------------- *)
@@ -3264,6 +3265,11 @@ interleave_info:
 
 | PROC CHANGE side=side? pos=codepos COLON f=sexpr
     { Pprocchange (side, pos, f) }
+
+| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 s=brace(stmt)
+    { if not (List.is_empty (fst (unloc pos))) then
+        parse_error (loc pos) (Some "only top-level positions are supported");
+      Pchangestmt (side, (snd (unloc pos), offset), s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }

@@ -222,6 +222,7 @@ val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
+val trans_codeoffset1 : ?memory:EcMemory.memory -> env -> pcodeoffset1 -> codeoffset1
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
