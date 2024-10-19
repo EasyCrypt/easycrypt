@@ -28,6 +28,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 type width = int
+
+type asize = { wordsize: int; nelements: width; }
+
+let size_of_asize (sz : asize) : int =
+  sz.wordsize * sz.nelements
+
 (* type deps = ((int * int) * int C.VarRange.t) list *)
 (* Inputs to circuit functions: 
    Either bitstring of fixed size
@@ -35,18 +41,21 @@ type width = int
 type cinput = 
   (* Name of input + size *)
   | BWInput of (ident * int)
-  (* Name of array + array size + element size *)
-  | BWAInput of (ident * int * int)
+  (* Name of array + (array size x element size) *)
+  | BWAInput of (ident * asize)
+
+let asize_to_string (asize : asize) : string =
+  Format.sprintf "%d[%d]" asize.wordsize asize.nelements
 
 let cinput_to_string = function
   | BWInput (idn, w) -> Format.sprintf "(%s, %d)" (name idn) w
-  | BWAInput (idn, n, w) -> Format.sprintf "(%s, %d@%d)" (name idn) n w
+  | BWAInput (idn, sz) -> Format.sprintf "(%s, %s)" (name idn) (asize_to_string sz)
 
 (* Checks whether inputs are the same up to renaming *)
 let cinput_equiv (a: cinput) (b: cinput) : bool =
   match a, b with
-  | BWInput (_, w), BWInput (_, w_) -> w = w_ 
-  | BWAInput (_, n, w), BWAInput (_, n_, w_) -> n = n_ && w = w_ 
+  | BWInput (_, w1), BWInput (_, w2) -> w1 = w2 
+  | BWAInput (_, sz1), BWAInput (_, sz2) -> sz1 = sz2 
   | _ -> false
 
 let is_bwinput = function
@@ -62,26 +71,26 @@ let destr_bwinput = function
   | _ -> assert false
 
 let destr_bwainput = function
-  | BWAInput (idn, n, w) -> (idn, n, w)
+  | BWAInput (idn, sz) -> (idn, sz)
   | _ -> assert false
 
 let bwinput_of_size (w : width) : cinput =
   let name = "bw_input" in
   BWInput (create name, w)
 
-let bwainput_of_size (n : width) (w : width) : cinput =
+let bwainput_of_size ~(nelements : width) ~(wordsize : width) : cinput =
   let name = "arr_input" in
-  BWAInput (create name, n, w)
+  BWAInput (create name, { nelements; wordsize; })
 
 (* # of total bits of input *)
 let size_of_cinput = function
   | BWInput (_, w) -> w
-  | BWAInput (_, n, w) -> n*w
+  | BWAInput (_, sz) -> size_of_asize sz
 
 (* name of input *)
 let ident_of_cinput = function
   | BWInput (idn, _) -> idn
-  | BWAInput (idn, _, _) -> idn
+  | BWAInput (idn, _) -> idn
 
 (* Base circuit, represents body of a circuit function *)
 type circ = 
@@ -112,7 +121,7 @@ let size_of_circ = function
 (* Simple representation *)
 let circ_to_string = function 
   | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
-  | BWArray a -> Format.sprintf "BWArray[%d@%d]" (Array.length a) (a.(0) |> List.length)
+  | BWArray a -> Format.sprintf "BWArray[%d[%d]]" (a.(0) |> List.length) (Array.length a)
 
 (* Checks whether the output shapes are the same
   FIXME: should be enough to compare first element of the array
@@ -145,23 +154,11 @@ let circ_ident (input: cinput) : circuit =
   match input with
   | BWInput (idn, w) -> 
     { circ = BWCirc (C.reg ~size:w ~name:(tag idn)); inps = [input]}
-  | BWAInput (idn, n, w) -> 
-    let c = C.reg ~name:(tag idn) ~size:(n*w) in
-    let c = Array.of_list (List.chunkify w c) in
+  | BWAInput (idn, sz) -> 
+    let c = C.reg ~name:(tag idn) ~size:(size_of_asize sz) in
+    let c = Array.of_list (List.chunkify sz.wordsize c) in
+    assert (Array.length c = sz.nelements);
     { circ = BWArray c; inps=[input]}
-
-(* Packs a collection (list) of bitwords into an array *)
-(* FIXME: maybe enforce that we want the array to be homogeneous? *)
-let circ_array_of_bws (inps: cinput list) : circuit = 
-  let rs = List.map circ_ident inps |> List.map (fun c -> destr_bwcirc c.circ) in
-  {circ=BWArray (Array.of_list rs); inps}
-
-
-(* Splits a bitword input into an array of chunks of size w *)
-let circ_array_of_bw (r: circuit) (w: width) : circuit =
-  let c = destr_bwcirc r.circ in
-  {r with circ = BWArray(List.chunkify w c |> Array.of_list)}
-
 
 (* Checks whether the two circuits have the same inputs up to renaming *)
 let input_shape_equal (f: circuit) (g: circuit) : bool = 
@@ -182,9 +179,12 @@ let inputs_indep (fs: circuit list) : bool =
   matches the shape of the input *)
 let match_arg (inp: cinput) (val_: circ) : bool =
   match inp, val_ with
-  | BWInput (_, w), BWCirc r -> List.compare_length_with r w = 0
-  | BWAInput (_, n, w), BWArray a -> (Array.length a = n) 
-    && (Array.for_all (fun v -> List.compare_length_with v w = 0) a)
+  | BWInput (_, w), BWCirc r when List.compare_length_with r w = 0 ->
+    true
+  | BWAInput (_, sz), BWArray a
+    when Array.length a = sz.nelements
+      && Array.for_all (fun v -> List.compare_length_with v sz.wordsize = 0) a ->
+      true
   | _ -> Format.eprintf "inp: %s does not match %s@."
     (cinput_to_string inp) (circ_to_string val_); false
 
@@ -197,6 +197,7 @@ let apply (f: circuit) (args: circ list) : circ =
   let () = try
     assert (List.for_all2 match_arg f.inps args);
   with Assert_failure _ as e -> 
+    Format.eprintf "%s@." (Printexc.get_backtrace ());
     Format.eprintf "Error applying on %s@." (circuit_to_string f);
     Format.eprintf "Arguments: @.";
     List.iter (Format.eprintf "%s@.") (List.map circ_to_string args);
@@ -206,14 +207,14 @@ let apply (f: circuit) (args: circ list) : circ =
   let map_ = fun (id, i) ->
     let vr = List.find_opt (function 
       | BWInput (idn, _), _ when id = tag idn -> true
-      | BWAInput (idn, _, _), _ when id = tag idn -> true
+      | BWAInput (idn, _), _ when id = tag idn -> true
       | _ -> false 
       ) args
     in Option.bind vr 
       (function 
       | BWInput (_, w), BWCirc r -> List.at_opt r i
-      | BWAInput (_, n, w), BWArray a -> 
-        let ia, iw = (i / w), (i mod w) in
+      | BWAInput (_, sz), BWArray a -> 
+        let ia, iw = (i / sz.wordsize), (i mod sz.wordsize) in
         let res = try 
           List.at_opt a.(ia) iw
         with Invalid_argument _ ->
@@ -230,7 +231,7 @@ let apply (f: circuit) (args: circ list) : circ =
 let fresh_cinput (c: cinput) : cinput = 
   match c with
   | BWInput (idn, w) -> BWInput (fresh idn, w)
-  | BWAInput (idn, n, w) -> BWAInput (fresh idn, n, w)
+  | BWAInput (idn, sz) -> BWAInput (fresh idn, sz)
 
 (* Given a circuit function returns a new circuit function 
    with new names for the inputs (with the needed substituition
@@ -297,7 +298,9 @@ let cinput_of_type ?(idn: ident option) (env: env) (t: ty) : cinput =
   in
   match destr_array_type env t with
   | None -> BWInput (idn, width_of_type env t)
-  | Some (n, t) -> BWAInput (idn, n, width_of_type env t)
+  | Some (nelements, t) ->
+    let wordsize = width_of_type env t in
+    BWAInput (idn, { nelements; wordsize })
 
 (* given f(inps1), g(inps2) returns h(inps1,inps2) = f(a) @ g(b)
    where @ denotes concatenation of circuits *)
@@ -330,19 +333,19 @@ let circuit_array_aggregate (c: circuit list) : circuit =
 
 
 (* To be removed and replaced by a combination of other operations *)
-let circuit_bwarray_set (n: width) (w: width) (i: int) : circuit =
-  assert (n > i);
-  let arr_inp = BWAInput (create "arr_input", n, w) in
-  let bw_inp = BWInput (create "bw_input", w) in
+let circuit_bwarray_set ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
+  assert (nelements > i);
+  let arr_inp = BWAInput (create "arr_input", { nelements; wordsize; }) in
+  let bw_inp = BWInput (create "bw_input", wordsize) in
   let arr = circ_ident arr_inp in
   let bw = circ_ident bw_inp in
   let () = (destr_bwarray arr.circ).(i) <- (destr_bwcirc bw.circ) in
   {circ= arr.circ; inps = [arr_inp; bw_inp]}
 
 (* Same as above *)
-let circuit_bwarray_get (n: width) (w: width) (i: int) : circuit =
-  assert (n > i);
-  let arr_inp = BWAInput (create "arr_input", n, w) in
+let circuit_bwarray_get ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
+  assert (nelements > i);
+  let arr_inp = BWAInput (create "arr_input", { nelements; wordsize; }) in
   let arr = circ_ident arr_inp in
   {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
 
@@ -419,8 +422,8 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
     | _, [] -> assert false
     | _, BWInput (_, w)::cs -> let r1, r2 = List.takedrop w r in
       (BWCirc r1)::(doit r2 cs)
-    | _, BWAInput (_, n, w)::cs -> let r1, r2 = List.takedrop (w*n) r in
-      let r1 = List.chunkify w r1 |> Array.of_list in
+    | _, BWAInput (_, sz)::cs -> let r1, r2 = List.takedrop (size_of_asize sz) r in
+      let r1 = List.chunkify sz.wordsize r1 |> Array.of_list in
       (BWArray r1)::(doit r2 cs)
   in
   doit r inps, BWInput (idn, bsize)
@@ -434,21 +437,21 @@ let circuit_aggregate_inps (c: circuit) : circuit =
     {circ=apply c circs; inps=[inp]}
 
 (* To be removed when we have external op bindings *)
-let circuit_array_sliceget (w: width) (n: width) (m: width) (i: int) : circuit = 
-  assert (n >= m*(i+1));
+let circuit_array_sliceget ~(wordsize : width) (n : width) (m: width) (i: int) : circuit = 
+  assert (n >=  m * (i + 1));
   (* assert (n mod m = 0); *)
-  let arr_inp = bwainput_of_size n w in
+  let arr_inp = bwainput_of_size ~nelements:n ~wordsize in
   let arr = circ_ident arr_inp in
   let out = destr_bwarray arr.circ in
-  let out = (Array.sub out (m*i) m) in
+  let out = (Array.sub out (m * i) m) in
   {arr with circ = BWArray out}
   
 (* To be removed when we have external op bindings *)
-let circuit_array_sliceset (w: width) (n: width) (m: width) (i: int) : circuit = 
-  assert (n >= m*(i + 1));
+let circuit_array_sliceset ~(wordsize : width) (n : width) (m: width) (i: int) : circuit = 
+  assert (n >= m * (i + 1));
   (* assert (n mod m = 0); *)
-  let arr_inp = bwainput_of_size n w in
-  let new_arr_inp = bwainput_of_size m w in
+  let arr_inp = bwainput_of_size ~nelements:n ~wordsize in
+  let new_arr_inp = bwainput_of_size ~nelements:m ~wordsize in
   let arr = circ_ident arr_inp in
   let new_arr = circ_ident new_arr_inp in
   let arr_b = Array.to_list (destr_bwarray arr.circ) in
@@ -460,7 +463,7 @@ let circuit_array_sliceset (w: width) (n: width) (m: width) (i: int) : circuit =
 let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit =
   assert (n*w >= (i + 1)*aw);
   assert (n*w mod aw = 0);
-  let arr_inp = bwainput_of_size n w in
+  let arr_inp = bwainput_of_size ~nelements:n ~wordsize:w in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
   {circ=BWCirc (List.drop (i*aw) (destr_bwcirc arr.circ) |> List.take aw); inps=[arr_inp]}
@@ -471,7 +474,7 @@ let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit
   assert (n*w mod aw = 0);
   let bw_inp = bwinput_of_size aw in
   let bw = circ_ident bw_inp in
-  let arr_inp = bwainput_of_size n w in
+  let arr_inp = bwainput_of_size ~nelements:n ~wordsize:w in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
   let arr_circ = destr_bwcirc arr.circ in
@@ -525,9 +528,12 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let r = destr_bwcirc c.circ in
   let deps = HL.deps r in
   let deps = HL.split_deps m deps in
+
+  Format.eprintf "%d@." (List.length deps);
+
   assert (HL.block_list_indep deps);
   assert (List.for_all (HL.check_dep_width n) (List.snd deps));
-  assert ((List.fold_left (+) 0 (List.map size_of_cinput c.inps)) mod n = 0);
+(*  assert ((List.sum (List.map size_of_cinput c.inps)) mod n = 0);*)
   
   let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg =
     let res, c = List.takedrop (fst db) c in
@@ -757,13 +763,13 @@ module BaseOps = struct
       let c2 = C.reg ~size:sz2 ~name:id2.id_tag in
       { circ = BWCirc(c1 @ c2); inps=[BWInput (id1, sz1); BWInput (id2, sz2)]}
 
-    | Some { kind = `A2B ((n, w), m)} ->
-      assert (n*w = m);
+    | Some { kind = `A2B ((w, n), m)} ->
+      assert (n * w = m);
       let id1 = EcIdent.create temp_symbol in
       let c1 = C.reg ~size:m ~name:id1.id_tag in
-      { circ = BWCirc(c1); inps = [BWAInput (id1, n, w)]}
+      { circ = BWCirc(c1); inps = [BWAInput (id1, { nelements = n; wordsize = w })]}
 
-    | Some { kind = `B2A (m, (n, w))} -> 
+    | Some { kind = `B2A (m, (w, n))} ->
       assert (n * w = m);
       let id1 = EcIdent.create temp_symbol in
       let c1 = C.reg ~size:m ~name:id1.id_tag in
@@ -941,7 +947,7 @@ let circuit_of_form
           let (_, t) = destr_array_type env arr.f_ty |> Option.get in
           let w = width_of_type env t in
           let hyps, arr = doit cache hyps arr in
-          hyps, compose (circuit_bwarray_get size w (BI.to_int i)) [arr]
+          hyps, compose (circuit_bwarray_get ~nelements:size ~wordsize:w (BI.to_int i)) [arr]
         | _ -> raise (CircError "set")
         in hyps, res
       | `Array ({ size }, `Set) :: _ -> let hyps, res = 
@@ -951,11 +957,11 @@ let circuit_of_form
           let w = width_of_type env v.f_ty  in
           let hyps, arr = doit cache hyps arr in
           let hyps, v = doit cache hyps v in
-          hyps, compose (circuit_bwarray_set size w (BI.to_int i)) [arr; v]
+          hyps, compose (circuit_bwarray_set ~nelements:size ~wordsize:w (BI.to_int i)) [arr; v]
         | _ -> raise (CircError "set")
         in hyps, res
       | `Array ({ size }, `OfList) :: _->
-        let _, n, w = destr_bwainput @@ cinput_of_type env f_.f_ty in
+        let _, { nelements = n; wordsize = w } = destr_bwainput @@ cinput_of_type env f_.f_ty in
         assert (n = size);
         (* FIXME: have an actual way to get sizes without creating new idents *)
         let wtn, vs = match fs with
