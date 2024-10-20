@@ -1070,8 +1070,9 @@ let circuit_of_form
       in
       let res = match Map.find_opt v pstate with
         | Some circ -> circ
-        | None -> let circ = circ_ident (cinput_of_type ~idn:(create "uninit") env f_.f_ty) in
-          {circ with inps=[]}
+        | None -> raise (CircError (Format.sprintf "Uninitialized program variable %s" v))
+        (* | None -> let circ = circ_ident (cinput_of_type ~idn:(create "uninit") env f_.f_ty) in *)
+          (* {circ with inps=[]} *)
       (* EXPERIMENTAL: allowing unitialized values *)
           (* failwith ("No value for var " ^ v) *)
       in hyps, res
