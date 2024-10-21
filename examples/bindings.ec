@@ -93,7 +93,7 @@ realize bvnotP by admit.
 bind op [bool & W8.t] W8.\ult "ult".
 realize bvultP by admit.
 
-bind op [bool & W8.t] W8.\ult "ule".
+bind op [bool & W8.t] W8.\ule "ule".
 realize bvuleP by admit.
 
 bind op [bool & W8.t] W8.\slt "slt".
@@ -149,6 +149,12 @@ realize bvorP by admit.
 
 bind op W16.t W16.invw "not".
 realize bvnotP by admit.
+
+bind op [bool & W16.t] W16.\ult "ult".
+realize bvultP by admit.
+
+bind op [bool & W16.t] W16.\ule "ule".
+realize bvuleP by admit.
 
 op uext8_16 (w: W8.t) : W16.t = 
   W16.of_int (W8.to_uint w).
@@ -354,3 +360,10 @@ bind circuit VPMULHRS_16u16 "VPMULHRS_16u16".
 bind circuit VPACKUS_16u16 "VPACKUS_16u16".
 bind circuit VPMADDUBSW_256 "VPMADDUBSW_256".
 bind circuit VPERMD "VPERMD".
+
+
+bind op [bool & W16.t] W16.init "init".
+realize bvinitP by admit.
+
+bind op [W16.t & W16.t & Array2.t] map_test "map".
+realize mapP by admit.

@@ -298,6 +298,35 @@ theory BVOperators.
   end BVConcat.
 
   (* ------------------------------------------------------------------ *)
+  abstract theory BVInit.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] size_1 : BV1.size = 1.
+
+    op bvinit : (int -> BV1.bv) -> BV2.bv.
+
+    print List.mkseq.
+
+    axiom bvinitP (f : int -> BV1.bv) : 
+      BV2.tolist (bvinit f) = List.flatten (List.mkseq (fun i => BV1.tolist (f i)) BV2.size).
+  end BVInit.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVMap.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone A.
+
+    op map (f: BV1.bv -> BV2.bv) (abv: BV1.bv A.t) : BV2.bv A.t.
+    
+    print List.map.
+
+    axiom mapP (f: BV1.bv -> BV2.bv) (abv: BV1.bv A.t) : 
+      A.to_list (map f abv) = List.map f (A.to_list abv).
+  end BVMap.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVA2B.
     clone BV as BV1.
     clone BV as BV2.
@@ -352,3 +381,4 @@ theory BVOperators.
     proof. admitted.
   end A2B2A.
 end BVOperators.
+

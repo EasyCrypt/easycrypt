@@ -3419,6 +3419,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Lt      (_,    true ) -> "slt"
         | `Le      (_,    false) -> "ule"
         | `Le      (_,    true ) -> "sle"
+        | `Init     _            -> "init"
         | `Extend  (_, _, false) -> "zextend"
         | `Extend  (_, _, true ) -> "sextend"
         | `Extract  _            -> "extract"
@@ -3426,6 +3427,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Truncate _            -> "truncate"
         | `A2B      _            -> "a2b"
         | `B2A      _            -> "b2a"
+        | `Map      _            -> "map"
       in
       Format.fprintf fmt "%abind op [%a] %a \"%s\"."
         pp_locality lc

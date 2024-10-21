@@ -4,6 +4,7 @@ open EcTypes
 open EcCoreFol
 open EcUnify
 open EcSubst
+open EcEnv
 
 module Map = Batteries.Map
 
@@ -76,7 +77,7 @@ let open_oper_ue op ue =
   let ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
   (tys, open_oper op tys)
 
-let f_app_safe ?(full=true) (env: EcEnv.env) (f: EcPath.path) (args: form list) =
+let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
   let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
   let tvars,(newt,f_kind) = open_oper_ue o_f ue in
@@ -107,4 +108,16 @@ let f_app_safe ?(full=true) (env: EcEnv.env) (f: EcPath.path) (args: form list) 
   else
   f_app op args rty
   
-  
+let fapply_safe (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
+  match f.f_node with
+  | Fop (pth, _) -> f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv EcReduction.full_red hyps
+  | Fquant (Llambda, binds, f) ->
+    assert (List.compare_lengths binds fs >= 0);
+    let subst = 
+      List.fold_left2  
+      (fun subst b f -> EcSubst.add_flocal subst (fst b) f) EcSubst.empty binds fs
+    in
+    let binds = List.drop (List.length fs) binds in
+    let f = f_quant Llambda binds (EcSubst.subst_form subst f) in
+    EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+  | _ -> assert false

@@ -2524,6 +2524,8 @@ module Circuit = struct
       | "ule"  -> (fun sz -> `Le  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULe"
       | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLe"
 
+      | "init" -> (fun sz -> `Init (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "Init"
+
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
         mk, [`BV None; `BV None], "ZExtend"
@@ -2553,6 +2555,11 @@ module Circuit = struct
         let mk sz =
           let sz1, sz2, asz = as_seq3 sz in `B2A (sz1, (sz2, asz)) in
         mk, [`BV None; `BV None; `A], "B2A"
+
+      | "map" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `Map (sz1, sz2, asz) in
+        mk, [`BV None; `BV None; `A], "Map"
   
       | _ ->
         hierror ~loc:(loc op.name)

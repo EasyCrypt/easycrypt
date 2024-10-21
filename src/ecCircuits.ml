@@ -361,6 +361,7 @@ let compose (f: circuit) (args: circuit list) : circuit =
   {circ=apply f (List.map (fun c -> c.circ) args); 
   inps=List.reduce (@) (List.map (fun c -> c.inps) args)}
 
+
 (* 
   Unifies input to allow for equivalence testing 
 *)
@@ -519,6 +520,17 @@ let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput =
 let inputs_of_tdep (td: HL.tdeps) :  _ * cinput list =
   Map.foldi (fun n bs (map_, inps) -> let map_2, inp = input_of_tdep n bs in
     (Map.union map_ map_2, inp::inps)) td (Map.empty, [])   
+
+(* 
+  f : BV1 -> BV2 
+  a : BV1 Arr
+  returns: BV2 Array = mapping f over a
+*)
+let circuit_map (f: circuit) (a: circuit) : circuit =
+  let a, inps = destr_bwarray a.circ, a.inps in
+  let r = Array.map (fun r -> apply f [BWCirc r]) a in
+  let r = Array.map (destr_bwcirc) r in
+  {circ = BWArray r; inps}
 
 (* Partitions into blocks of type n -> m *)
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
@@ -926,11 +938,18 @@ let circuit_of_form
         op_cache := Mp.add pth circ !op_cache;
         hyps, circ
       else
-        let f = match (EcEnv.Op.by_path pth env).op_kind with
-        | OB_oper ( Some (OP_Plain f)) -> f
-        | _ -> Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
+        let hyps, circ = match (EcEnv.Op.by_path pth env).op_kind with
+        | OB_oper ( Some (OP_Plain f)) -> 
+          doit cache hyps f
+        | _ -> begin match EcFol.op_kind (destr_op f_ |> fst) with
+          | Some `True -> 
+            hyps, {circ = BWCirc([C.true_]); inps=[]}
+          | Some `False ->
+            hyps, {circ = BWCirc([C.false_]); inps=[]}
+          | _ -> 
+            Format.eprintf "%s@." (EcPath.tostring pth); failwith "Unsupported op kind"
+        end
         in 
-        let hyps, circ = doit cache hyps f in
         op_cache := Mp.add pth circ !op_cache;
         hyps, circ
     end
@@ -1001,6 +1020,32 @@ let circuit_of_form
         let c = destr_bwcirc c1.circ in
         let c = List.take out_sz (List.drop (to_int b) c) in
         hyps, { circ = BWCirc(c); inps=c1.inps }
+      | `BvOperator ({kind = `Init (size)}) :: _ ->
+        let f = match fs with
+        | [f] -> f
+        | _ -> assert false
+        in
+        let fs = List.init size (fun i -> EcTypesafeFol.fapply_safe hyps f [f_int (of_int i)]) in
+        (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
+        let hyps, fs = List.fold_left_map (doit cache) hyps fs in
+        hyps, circuit_aggregate fs
+
+        (* begin *)
+        (* match f.f_node with *)
+        (* | Fapp _ -> Format.eprintf "Its an Fapp@."; assert false *)
+        (* | Fquant (Llambda, _, _) -> Format.eprintf "Its an Flambda@."; assert false *)
+        (* | Fop _ -> Format.eprintf "Its an Fop@."; assert false *)
+        (* | _ -> Format.eprintf "Its something else @."; assert false *)
+        (* end *)
+      | `BvOperator ({kind = `Map (sz1, sz2, asz)}) :: _ -> 
+        let f, a = match fs with
+        | [f; a] -> f, a
+        | _ -> assert false
+        in 
+        let hyps, f = doit cache hyps f in
+        let hyps, a = doit cache hyps a in
+        hyps, circuit_map f a
+
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
           let hyps, c1 = doit cache hyps f1 in
@@ -1021,13 +1066,14 @@ let circuit_of_form
         | Some `False, [] ->
           hyps, {circ = BWCirc([C.false_]); inps=[]}
         | None, _ -> 
-        let hyps, f_c = doit cache hyps f in
-        let hyps, fcs = List.fold_left_map
-          (doit cache)
-          hyps fs 
-        in
-        hyps, compose f_c fcs
-        | _ -> assert false
+          let hyps, f_c = doit cache hyps f in
+          let hyps, fcs = List.fold_left_map
+            (doit cache)
+            hyps fs 
+          in
+          hyps, compose f_c fcs
+        | _ -> Format.eprintf "Problem at %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_;
+          assert false
         end
       in hyps, res
       
