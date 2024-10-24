@@ -438,50 +438,50 @@ let circuit_aggregate_inps (c: circuit) : circuit =
     {circ=apply c circs; inps=[inp]}
 
 (* To be removed when we have external op bindings *)
-let circuit_array_sliceget ~(wordsize : width) (n : width) (m: width) (i: int) : circuit = 
-  assert (n >=  m * (i + 1));
+let circuit_array_sliceget ~(wordsize : width) (arr_sz : width) (out_sz: width) (i: int) : circuit = 
+  assert (arr_sz >=  out_sz * (i + 1));
   (* assert (n mod m = 0); *)
-  let arr_inp = bwainput_of_size ~nelements:n ~wordsize in
+  let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize in
   let arr = circ_ident arr_inp in
   let out = destr_bwarray arr.circ in
-  let out = (Array.sub out (m * i) m) in
+  let out = (Array.sub out (out_sz * i) out_sz) in
   {arr with circ = BWArray out}
   
 (* To be removed when we have external op bindings *)
-let circuit_array_sliceset ~(wordsize : width) (n : width) (m: width) (i: int) : circuit = 
-  assert (n >= m * (i + 1));
+let circuit_array_sliceset ~(wordsize : width) (arr_sz : width) (out_sz: width) (i: int) : circuit = 
+  assert (arr_sz >= out_sz * (i + 1));
   (* assert (n mod m = 0); *)
-  let arr_inp = bwainput_of_size ~nelements:n ~wordsize in
-  let new_arr_inp = bwainput_of_size ~nelements:m ~wordsize in
+  let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize in
+  let new_arr_inp = bwainput_of_size ~nelements:out_sz ~wordsize in
   let arr = circ_ident arr_inp in
   let new_arr = circ_ident new_arr_inp in
   let arr_b = Array.to_list (destr_bwarray arr.circ) in
   let new_arr_b = Array.to_list (destr_bwarray new_arr.circ) in
-  let out = List.take (m*i) arr_b @ new_arr_b @ List.drop (m*(i+1)) arr_b |> Array.of_list in
+  let out = List.take (out_sz*i) arr_b @ new_arr_b @ List.drop (out_sz*(i+1)) arr_b |> Array.of_list in
   {arr with circ = BWArray out; inps = [arr_inp; new_arr_inp]}
 
 (* To be removed when we have external op bindings *)
-let circuit_bwarray_slice_get (n: width) (w: width) (aw: int) (i: int) : circuit =
-  assert (n*w >= (i + 1)*aw);
-  assert (n*w mod aw = 0);
-  let arr_inp = bwainput_of_size ~nelements:n ~wordsize:w in
+let circuit_bwarray_slice_get (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
+  assert (arr_sz*el_sz >= (i + 1)*acc_sz);
+  assert (arr_sz*el_sz mod acc_sz = 0);
+  let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
-  {circ=BWCirc (List.drop (i*aw) (destr_bwcirc arr.circ) |> List.take aw); inps=[arr_inp]}
+  {circ=BWCirc (List.drop (i*acc_sz) (destr_bwcirc arr.circ) |> List.take acc_sz); inps=[arr_inp]}
 
 (* To be removed when we have external op bindings *)
-let circuit_bwarray_slice_set (n: width) (w: width) (aw: int) (i: int) : circuit =
-  assert (n*w >= (i + 1)*aw);
-  assert (n*w mod aw = 0);
-  let bw_inp = bwinput_of_size aw in
+let circuit_bwarray_slice_set (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
+  assert (arr_sz*el_sz >= (i + 1)*acc_sz);
+  assert (arr_sz*el_sz mod acc_sz = 0);
+  let bw_inp = bwinput_of_size acc_sz in
   let bw = circ_ident bw_inp in
-  let arr_inp = bwainput_of_size ~nelements:n ~wordsize:w in
+  let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
   let arr_circ = destr_bwcirc arr.circ in
   let bw_circ = destr_bwcirc bw.circ in
-  let res_circ = (List.take (i*aw) arr_circ) @ bw_circ @ (List.drop ((i+1)*aw) arr_circ) in
-  let res_circs = List.chunkify w res_circ in
+  let res_circ = (List.take (i*acc_sz) arr_circ) @ bw_circ @ (List.drop ((i+1)*acc_sz) arr_circ) in
+  let res_circs = List.chunkify el_sz res_circ in
   {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
 
 (* To be removed when we have external op bindings *)
@@ -1055,6 +1055,25 @@ let circuit_of_form
         let hyps, f = doit cache hyps f in
         let hyps, a = doit cache hyps a in
         hyps, circuit_map f a
+
+      | `BvOperator ({kind = `ASliceGet ((arr_sz, sz1), sz2)}) :: _ ->
+        let arr, i = match fs with
+        | [arr; i] -> arr, int_of_form i
+        | _ -> assert false
+        in
+        let op = circuit_bwarray_slice_get arr_sz sz1 sz2 (to_int i) in
+        let hyps, arr = doit cache hyps arr in
+        hyps, compose op [arr]
+        
+      | `BvOperator ({kind = `ASliceSet ((arr_sz, sz1), sz2)}) :: _ ->
+        let arr, i, bv = match fs with
+        | [arr; i; bv] -> arr, int_of_form i, bv
+        | _ -> assert false
+        in
+        let op = circuit_bwarray_slice_set arr_sz sz1 sz2 (to_int i) in
+        let hyps, arr = doit cache hyps arr in
+        let hyps, bv = doit cache hyps bv in
+        hyps, compose op [arr; bv]
 
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 

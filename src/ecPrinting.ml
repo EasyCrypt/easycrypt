@@ -3429,6 +3429,8 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `A2B      _            -> "a2b"
         | `B2A      _            -> "b2a"
         | `Map      _            -> "map"
+        | `ASliceGet _           -> "asliceget"
+        | `ASliceSet _           -> "asliceset"
       in
       Format.fprintf fmt "%abind op [%a] %a \"%s\"."
         pp_locality lc

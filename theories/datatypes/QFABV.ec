@@ -284,6 +284,37 @@ theory BVOperators.
   end BVExtract.
 
   (* ------------------------------------------------------------------ *)
+  abstract theory BVASliceGet.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone A.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size * A.size.
+
+    op bvasliceget : (BV1.bv A.t) -> int -> BV2.bv.
+
+    axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) : offset + BV2.size <= BV1.size * A.size =>
+      take BV2.size (drop offset (List.flatten (List.map (BV1.tolist) (A.to_list arr)))) 
+      = BV2.tolist (bvasliceget arr offset).
+  end BVASliceGet.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVASliceSet.
+    clone BV as BV1.
+    clone BV as BV2.
+    clone A.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size * A.size.
+
+    op bvasliceset : (BV1.bv A.t) -> int -> (BV2.bv) -> BV1.bv A.t.
+
+    axiom bvaslicesetP (arr : BV1.bv A.t) (offset : int) (bv: BV2.bv): offset + BV2.size <= BV1.size * A.size =>
+      let arr_l = List.flatten (List.map (BV1.tolist) (A.to_list arr)) in
+      take offset arr_l ++ (BV2.tolist bv) ++ drop (offset + BV2.size) arr_l
+      = List.flatten (List.map BV1.tolist (A.to_list (bvasliceset arr offset bv))).
+  end BVASliceSet.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVConcat.
     clone BV as BV1.
     clone BV as BV2.

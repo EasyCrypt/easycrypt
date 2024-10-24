@@ -238,6 +238,8 @@ type bv_opkind = [
   | `Map      of int * int * int (* size_in + size_out + arr_size *)
   | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)
   | `B2A      of int * (int * int) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (int * int) * int (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (int * int) * int (* arr_len + el_sz + sz_in *)
 ]
   
 type crb_bvoperator =

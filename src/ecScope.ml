@@ -2544,6 +2544,14 @@ module Circuit = struct
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2) in
         mk, [`BV None; `BV None], "Extract"
 
+      | "asliceget" ->
+        let mk sz = let sz1, sz2, arr_sz = as_seq3 sz in `ASliceGet ((arr_sz, sz1), sz2) in
+        mk, [`BV None; `BV None; `A], "ASliceGet"
+
+      | "asliceset" ->
+        let mk sz = let sz1, sz2, arr_sz = as_seq3 sz in `ASliceSet ((arr_sz, sz1), sz2) in
+        mk, [`BV None; `BV None; `A], "ASliceSet"
+
       | "concat" ->
         let mk sz = let sz1, sz2, sz3 = as_seq3 sz in  `Concat (sz1, sz2, sz3) in
         mk, [`BV None; `BV None; `BV None], "Concat"
