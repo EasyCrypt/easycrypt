@@ -1029,6 +1029,16 @@ let circuit_of_form
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         hyps, circuit_aggregate fs
+      | `BvOperator ({kind = `AInit (arr_sz, bw_sz)}) :: _ ->
+        let f = match fs with
+        | [f] -> f
+        | _ -> assert false
+        in
+        let fs = List.init arr_sz (fun i -> EcTypesafeFol.fapply_safe hyps f [f_int (of_int i)]) in
+        (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
+        let hyps, fs = List.fold_left_map (doit cache) hyps fs in
+        assert (List.for_all (fun c -> List.is_empty c.inps) fs);
+        hyps, {circ = BWArray(Array.of_list (List.map (fun c -> destr_bwcirc c.circ) fs)); inps=[]}
 
         (* begin *)
         (* match f.f_node with *)

@@ -365,5 +365,10 @@ bind circuit VPERMD "VPERMD".
 bind op [bool & W16.t] W16.init "init".
 realize bvinitP by admit.
 
+print Array2.map.
+
+op map_test (f: W16.t -> W16.t) (arr: W16.t Array2.t) : W16.t Array2.t =
+  Array2.map f arr.
+
 bind op [W16.t & W16.t & Array2.t] map_test "map".
 realize mapP by admit.

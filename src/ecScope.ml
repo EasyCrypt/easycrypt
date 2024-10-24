@@ -2526,6 +2526,8 @@ module Circuit = struct
 
       | "init" -> (fun sz -> `Init (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "Init"
 
+      | "ainit" -> (fun sz -> `AInit (as_seq2 (sz |> List.rev))), [`BV None; `A], "AInit"
+
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
         mk, [`BV None; `BV None], "ZExtend"

@@ -306,11 +306,20 @@ theory BVOperators.
 
     op bvinit : (int -> BV1.bv) -> BV2.bv.
 
-    print List.mkseq.
-
     axiom bvinitP (f : int -> BV1.bv) : 
       BV2.tolist (bvinit f) = List.flatten (List.mkseq (fun i => BV1.tolist (f i)) BV2.size).
   end BVInit.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVAInit.
+    clone BV.
+    clone A.
+
+    op bvinit : (int -> BV.bv) -> BV.bv A.t.
+
+    axiom bvainitP (f : int -> BV.bv) : 
+      A.to_list (bvinit f) = List.mkseq (fun i => (f i)) A.size.
+  end BVAInit.
 
   (* ------------------------------------------------------------------ *)
   abstract theory BVMap.
