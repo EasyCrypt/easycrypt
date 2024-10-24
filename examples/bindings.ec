@@ -356,6 +356,7 @@ bind circuit VPSRA_16u16 "VPSRA_16u16".
 bind circuit VPADD_16u16 "VPADD_16u16".
 bind circuit VPBROADCAST_16u16 "VPBROADCAST_16u16".
 bind circuit VPMULH_16u16 "VPMULH_16u16".
+bind circuit VPMULL_16u16 "VPMULL_16u16".
 bind circuit VPMULHRS_16u16 "VPMULHRS_16u16".
 bind circuit VPACKUS_16u16 "VPACKUS_16u16".
 bind circuit VPMADDUBSW_256 "VPMADDUBSW_256".

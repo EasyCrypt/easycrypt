@@ -52,6 +52,10 @@ VPBROADCAST_16u16(w@16) -> @256 =
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(umulhi<16>, w1, w2)
 
+# Intel intrinsic: _mm256_mullo_epu16
+VPMULL_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(umullo<16>, w1, w2)
+
 # Intel intrinsic: _mm256_mulhrs_epi16
 VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
