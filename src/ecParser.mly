@@ -1595,6 +1595,19 @@ mod_item:
 | IMPORT VAR ms=loc(mod_qident)+
     { Pst_import ms }
 
+mod_update_var:
+| v=var_decl { v }
+
+mod_update_fun:
+| PROC x=lident fups=bracket(plist1(fun_update, COMMA))
+  { (x, List.flatten fups) }
+
+fun_update:
+| cp=codepos PLUS s=brace(stmt){ [(cp, Pup_add (s, true))] }
+| cp=codepos MINUS s=brace(stmt){ [(cp, Pup_add (s, false))] }
+| cp=codepos TILD s=brace(stmt) { [(cp, Pup_del); (cp, Pup_add (s, true))] }
+| cp=codepos MINUS { [(cp, Pup_del)] }
+
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
 
@@ -1604,6 +1617,9 @@ mod_body:
 
 | LBRACE stt=loc(mod_item)* RBRACE
     { Pm_struct stt }
+
+| m=mod_qident WITH LBRACE vs=mod_update_var* fs=mod_update_fun* RBRACE
+  { Pm_update (m, vs, fs) }
 
 mod_def_or_decl:
 | locality=locality MODULE header=mod_header c=mod_cast? EQ ptm_body=loc(mod_body)
@@ -2632,7 +2648,7 @@ codepos1:
 | cp=codepos1_wo_off AMP MINUS i=word { (-i, cp) }
 
 %inline nm1_codepos:
-| i=codepos1 k=ID(DOT { 0 } | QUESTION { 1 } )
+| i=codepos1 k=ID(DOT COLON { 0 } | QUESTION { 0 } )
     { (i, k) }
 
 codepos:

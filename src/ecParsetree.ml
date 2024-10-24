@@ -36,6 +36,28 @@ type osymbol_r   = psymbol option
 type osymbol     = osymbol_r located
 
 (* -------------------------------------------------------------------- *)
+type pcp_match = [
+  | `If
+  | `While
+  | `Assign of plvmatch
+  | `Sample
+  | `Call
+]
+
+and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
+
+type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
+
+type pcodepos1 = int * pcp_base
+type pcodepos  = (pcodepos1 * int) list * pcodepos1
+type pdocodepos1 = pcodepos1 doption option
+
+type pcodeoffset1 = [
+  | `ByOffset   of int
+  | `ByPosition of pcodepos1
+]
+(* -------------------------------------------------------------------- *)
+
 type pty_r =
   | PTunivar
   | PTtuple  of pty list
@@ -323,6 +345,7 @@ and pmodule_params = (psymbol * pmodule_type) list
 and pmodule_expr_r =
   | Pm_ident  of pmsymbol
   | Pm_struct of pstructure
+  | Pm_update of pmsymbol * pupdate_var list * pupdate_fun list
 
 and pmodule_expr = pmodule_expr_r located
 
@@ -336,6 +359,12 @@ and pstructure_item =
   | Pst_include  of (pmsymbol located * bool * minclude_proc option)
   | Pst_import   of (pmsymbol located) list
 
+and pupdate_var = psymbol list * pty
+and pupdate_fun = psymbol * (pcodepos * pupdate_item) list
+
+and pupdate_item =
+  | Pup_add of (pstmt * bool)
+  | Pup_del
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -486,27 +515,6 @@ type preduction = {
   puser    : bool;                      (* user reduction *)
 }
 
-(* -------------------------------------------------------------------- *)
-type pcp_match = [
-  | `If
-  | `While
-  | `Assign of plvmatch
-  | `Sample
-  | `Call
-]
-
-and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
-
-type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
-
-type pcodepos1 = int * pcp_base
-type pcodepos  = (pcodepos1 * int) list * pcodepos1
-type pdocodepos1 = pcodepos1 doption option
-
-type pcodeoffset1 = [
-  | `ByOffset   of int
-  | `ByPosition of pcodepos1
-]
 
 (* -------------------------------------------------------------------- *)
 type pswap_kind = {

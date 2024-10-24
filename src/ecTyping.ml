@@ -2249,6 +2249,96 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
+  | Pm_update (m, vars, funs) ->
+    let (mp, _sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+
+    let doit_var env (xs, ty) = 
+      let ty = transty_for_decl env ty in
+      List.map
+        (fun { pl_desc = x } -> (x, ty), MI_Variable { v_name = x; v_type = ty; })
+        xs
+    in
+    let env, items =
+      List.fold_left 
+        (fun (env, acc) v -> 
+          let pvs, items = List.split (doit_var env v) in
+          EcEnv.Var.bindall_pvglob pvs env, items @ acc)
+        (env, [])
+        vars
+    in
+
+    let fnames = List.map (fun ({pl_desc = f}, _) -> f) funs in
+    let me, _ = EcEnv.Mod.by_mpath mp env in
+    let p = match mp.m_top with | `Concrete (p, _) -> p | _ -> assert false in
+    let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
+    let me = EcSubst.subst_module subst me in
+
+    let env, items = 
+      match me.me_body with
+      | ME_Structure mb ->
+        let doit (env, items) mi =
+          match mi with
+          | MI_Variable v ->
+            let env = EcEnv.Var.bind_pvglob v.v_name v.v_type env in
+            env, mi :: items 
+          | MI_Function f when not (List.mem f.f_name fnames) ->
+            let env = EcEnv.bind1 (f.f_name, `Function f) env in
+            env, mi :: items
+          | MI_Module me -> 
+            let env = EcEnv.bind1 (me.me_name, `Module me) env in
+            env, mi :: items 
+          | _ -> env, items
+        in
+        List.fold_left doit (env, items) mb.ms_body
+      | _ -> assert false
+    in
+
+    let doit_fun ({pl_desc = fn}, ups) = 
+      let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
+      let fun_ = EcSubst.subst_function subst fun_ in
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr fun_ in
+      let env = EcEnv.Memory.push_active memenv env in
+      let body = 
+        List.fold_right (fun (cp, up) bd ->
+          let cp = trans_codepos env cp in
+          let changer i = match up with
+            | Pup_add (s, after) ->
+              let ue  = UE.create (Some []) in
+              let s = transstmt env ue s in
+              let ts = Tuni.subst (UE.close ue) in
+              if after then
+                i :: (s_subst ts s).s_node
+              else
+                (s_subst ts s).s_node @ [i]
+            | Pup_del -> []
+          in
+
+          let _, s = EcMatching.Zipper.fold env () cp (fun () _ i -> (), changer i) () bd in
+          s
+        )
+          ups
+          fd.f_body
+      in
+      let uses = fd.f_ret |> ofold ((^~) se_inuse) (s_inuse body) in
+      let fd = {fd with f_uses = uses; f_body = body } in 
+      let fun_ = {fun_ with f_def = FBdef fd} in
+
+      MI_Function fun_
+    in
+
+    let items = items @ List.map doit_fun funs in
+    let ois = get_oi_calls env (stparams, items) in
+
+    (* Construct structure representation *)
+    let me =
+      { me_name       = x.pl_desc;
+        me_body       = ME_Structure { ms_body = items; };
+        me_comps      = items;
+        me_params     = stparams;
+        me_sig_body   = me.me_sig_body;
+        me_oinfos     = ois; }
+    in
+    me
 
 (* -------------------------------------------------------------------- *)
 (* Module parameters must have been added to the environment            *)
@@ -3442,7 +3532,7 @@ and trans_pattern env ps ue pf =
   trans_form_or_pattern env ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
-let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
+and trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
   match p with
   | `LvmNone as p -> (p :> lvmatch)
   | `LvmVar pv -> begin
@@ -3453,29 +3543,29 @@ let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : 
       `LvmVar (transpvar env m pv)
     end
 (* -------------------------------------------------------------------- *)
-let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
+and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
   match p with
   | (`Sample | `While | `Call | `If) as p ->
     (p :> cp_match)
   | `Assign lv ->
     `Assign (trans_lv_match ?memory env lv)
 (* -------------------------------------------------------------------- *)
-let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
+and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with
   | `ByPos _ as p -> (p :> cp_base)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
 (* -------------------------------------------------------------------- *)
-let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
+and trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
+and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
   let nm = List.map (fst_map (trans_codepos1 ?memory env)) nm in
   let p = trans_codepos1 ?memory env p in
   (nm, p)
 
 (* -------------------------------------------------------------------- *)
-let trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
+and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
