@@ -110,8 +110,14 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   
 let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
   match f.f_node with
-  | Fop (pth, _) -> f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
-  | Fapp (fop, args) -> fapply_safe hyps fop (args @ fs)
+  | Fop (pth, _) -> 
+    f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
+  | Fapp (fop, args) -> 
+    let new_args = args @ fs in
+    (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) in *)
+    (* let pp_forms fmt = List.iter (Format.fprintf fmt "%a, " pp_form) in *)
+    (* Format.eprintf "new_args: %a@." pp_forms new_args; *)
+    fapply_safe ~redmode hyps fop (args @ fs)
   | Fquant (Llambda, binds, f) ->
     assert (List.compare_lengths binds fs >= 0);
     let subst = 

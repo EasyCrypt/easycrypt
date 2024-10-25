@@ -876,7 +876,16 @@ let circuit_of_form
       else
         `No)
     } in
-    let fapply_safe = EcTypesafeFol.fapply_safe ~redmode hyps in
+    (* let redmode = {redmode with delta_p = fun _ -> `No} in *)
+    let fapply_safe f fs = 
+      (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env) in *)
+      (* Format.eprintf "f: %a@.fs: %a@." pp_form *)
+        (* f (fun fmt fs -> List.iter (Format.fprintf fmt "%a, " pp_form) fs) fs; *)
+      let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
+      (* Format.eprintf "res : %a@." pp_form f; *)
+      res
+    in
+
     let int_of_form (f: form) : zint = 
       match f.f_node with 
       | Fint i -> i
@@ -1032,7 +1041,6 @@ let circuit_of_form
         | _ -> assert false
         in
         let fs = List.init size (fun i -> fapply_safe f [f_int (of_int i)]) in
-        List.iter (Format.eprintf "f: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs;
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         hyps, circuit_aggregate fs
@@ -1042,7 +1050,6 @@ let circuit_of_form
         | _ -> assert false
         in
         let fs = List.init arr_sz (fun i -> fapply_safe f [f_int (of_int i)]) in
-        List.iter (Format.eprintf "f: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs;
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         assert (List.for_all (fun c -> List.is_empty c.inps) fs);
