@@ -1595,6 +1595,30 @@ mod_item:
 | IMPORT VAR ms=loc(mod_qident)+
     { Pst_import ms }
 
+mod_update_var:
+| v=var_decl { v }
+
+mod_update_fun:
+| PROC x=lident fups=bracket(plist1(fun_update, COMMA)) res_up=option(RES e=sexpr {e})
+  { x, (List.flatten fups, res_up) }
+
+update_stmt:
+| PLUS s=brace(stmt){ [Pups_add (s, true)] }
+| MINUS s=brace(stmt){ [Pups_add (s, false)] }
+| TILD s=brace(stmt) { [Pups_del; Pups_add (s, true)] }
+| MINUS { [Pups_del] }
+
+update_cond:
+| PLUS e=sexpr { Pupc_add e }
+| TILD e=sexpr { Pupc_mod e }
+| MINUS bs=branch_select { Pupc_del bs }
+
+fun_update:
+| cp=codepos sup=update_stmt 
+  { List.map (fun v -> (cp, Pup_stmt v)) sup }
+| cp=codepos cup=update_cond 
+  { [(cp, Pup_cond cup)] }
+
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
 
@@ -1604,6 +1628,9 @@ mod_body:
 
 | LBRACE stt=loc(mod_item)* RBRACE
     { Pm_struct stt }
+
+| m=mod_qident WITH LBRACE vs=mod_update_var* fs=mod_update_fun* RBRACE
+  { Pm_update (m, vs, fs) }
 
 mod_def_or_decl:
 | locality=locality MODULE header=mod_header c=mod_cast? EQ ptm_body=loc(mod_body)
