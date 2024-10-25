@@ -462,17 +462,15 @@ let circuit_array_sliceset ~(wordsize : width) (arr_sz : width) (out_sz: width) 
 
 (* To be removed when we have external op bindings *)
 let circuit_bwarray_slice_get (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
-  assert (arr_sz*el_sz >= (i + 1)*acc_sz);
-  assert (arr_sz*el_sz mod acc_sz = 0);
+  assert (arr_sz*el_sz >= i + acc_sz);
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
   let arr = circ_ident arr_inp in
   let arr = circuit_flatten arr in
-  {circ=BWCirc (List.drop (i*acc_sz) (destr_bwcirc arr.circ) |> List.take acc_sz); inps=[arr_inp]}
+  {circ=BWCirc (List.drop (i) (destr_bwcirc arr.circ) |> List.take acc_sz); inps=[arr_inp]}
 
 (* To be removed when we have external op bindings *)
 let circuit_bwarray_slice_set (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
-  assert (arr_sz*el_sz >= (i + 1)*acc_sz);
-  assert (arr_sz*el_sz mod acc_sz = 0);
+  assert (arr_sz*el_sz >= i + acc_sz);
   let bw_inp = bwinput_of_size acc_sz in
   let bw = circ_ident bw_inp in
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
@@ -480,7 +478,7 @@ let circuit_bwarray_slice_set (arr_sz: width) (el_sz: width) (acc_sz: int) (i: i
   let arr = circuit_flatten arr in
   let arr_circ = destr_bwcirc arr.circ in
   let bw_circ = destr_bwcirc bw.circ in
-  let res_circ = (List.take (i*acc_sz) arr_circ) @ bw_circ @ (List.drop ((i+1)*acc_sz) arr_circ) in
+  let res_circ = (List.take i arr_circ) @ bw_circ @ (List.drop (i + acc_sz) arr_circ) in
   let res_circs = List.chunkify el_sz res_circ in
   {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
 
@@ -871,6 +869,14 @@ let circuit_of_form
 
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
+    let redmode = EcReduction.full_red in
+    let redmode = {redmode with delta_p = (fun pth ->
+      if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
+        redmode.delta_p pth
+      else
+        `No)
+    } in
+    let fapply_safe = EcTypesafeFol.fapply_safe ~redmode hyps in
     let int_of_form (f: form) : zint = 
       match f.f_node with 
       | Fint i -> i
@@ -1025,7 +1031,8 @@ let circuit_of_form
         | [f] -> f
         | _ -> assert false
         in
-        let fs = List.init size (fun i -> EcTypesafeFol.fapply_safe hyps f [f_int (of_int i)]) in
+        let fs = List.init size (fun i -> fapply_safe f [f_int (of_int i)]) in
+        List.iter (Format.eprintf "f: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs;
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         hyps, circuit_aggregate fs
@@ -1034,7 +1041,8 @@ let circuit_of_form
         | [f] -> f
         | _ -> assert false
         in
-        let fs = List.init arr_sz (fun i -> EcTypesafeFol.fapply_safe hyps f [f_int (of_int i)]) in
+        let fs = List.init arr_sz (fun i -> fapply_safe f [f_int (of_int i)]) in
+        List.iter (Format.eprintf "f: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs;
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         assert (List.for_all (fun c -> List.is_empty c.inps) fs);
@@ -1198,6 +1206,12 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate
+    | Sasgn (LvTuple (vs), e) -> begin match e.e_node with
+      | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e ->
+        let v = match v with | PVloc v -> v | _ -> assert false in
+        Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate) pstate vs es
+      | _ -> failwith "Case not implemented yet"
+    end
     | _ -> failwith "Case not implemented yet"
   with 
   | e ->
