@@ -89,6 +89,14 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidFun
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
@@ -155,6 +163,7 @@ type tyerror =
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
@@ -2016,6 +2025,263 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
+  | Pm_update (m, vars, funs) ->
+    let loc = me.pl_loc in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = loc} in
+
+    (* Prohibit functor updates *)
+    if not (List.is_empty sig_.miss_params) then
+      tyerror loc env (InvalidModUpdate MUE_Functor);
+
+    (* Construct the set of new module variables *)
+    let items =
+      List.concat_map
+        (fun (xs, ty) ->
+          let ty = transty_for_decl env ty in
+          let items = List.map
+            (fun { pl_desc = x } -> MI_Variable { v_name = x; v_type = ty; })
+            xs
+          in
+          items)
+        vars
+    in
+
+    let me, _ = EcEnv.Mod.by_mpath mp env in
+    let p = match mp.m_top with | `Concrete (p, _) -> p | _ -> assert false in
+    let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
+    let me = EcSubst.subst_module subst me in
+
+    let update_fun env fn plocals pupdates pupdate_res =
+      (* Extract the function body and load the memory *)
+      let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
+
+      (* Follow a function alias until we get to the concrete definition *)
+      let rec resolve_alias f =
+        match f.f_def with
+        | FBabs _ ->
+          tyerror loc env (InvalidModUpdate MUE_AbstractModule);
+        | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
+        | FBdef _ -> f
+      in
+
+      let target_fun = EcSubst.subst_function subst (resolve_alias fun_) in
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr target_fun in
+
+      let fun_ = EcSubst.subst_function subst fun_ in
+
+      (* Introduce the new local variables *)
+      let locals = List.concat_map (fun (vs, pty) ->
+          let ty = transty_for_decl env pty in
+          List.map (fun x -> { v_name = x.pl_desc; v_type = ty; }, x.pl_loc) vs
+        )
+        plocals
+      in
+
+      let memenv = fundef_add_symbol env memenv locals in
+      let env = EcEnv.Memory.push_active memenv env in
+
+      let locals = ref locals in
+      let memenv = ref memenv in
+
+      (* Semantics for stmt updating, `i` is the target of the update. *)
+      let eval_supdate env sup i =
+        match sup with
+        | Pups_add (s, after) ->
+          let ue  = UE.create (Some []) in
+          let s = transstmt env ue s in
+          let ts = Tuni.subst (UE.close ue) in
+          if after then
+            i :: (s_subst ts s).s_node
+          else
+            (s_subst ts s).s_node @ [i]
+        | Pups_del -> []
+      in
+
+      (* Semantics for condition updating *)
+      (* `i` is the target of the update, and `tl` is the instr suffix. *)
+      let eval_cupdate cp_loc env cup i tl =
+        match cup with
+        (* Insert an if with condition `e` with body `tl` *)
+        | Pupc_add e ->
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          unify_or_fail env ue loc ~expct:tbool ty;
+          i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+
+        (* Change the condition expression to `e` for a conditional instr `i` *)
+        | Pupc_mod e -> begin
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          match i.i_node with
+          | Sif (_, t, f) ->
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_if (e_subst ts e, t, f)] @ tl
+          | Smatch (p, bs) ->
+            unify_or_fail env ue loc ~expct:p.e_ty ty;
+            [i_match (e_subst ts e, bs)] @ tl
+          | Swhile (_, t) ->
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_while (e_subst ts e, t)] @ tl
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
+          end
+
+        (* Collapse a conditional `i` to a specific branch `bs` *)
+        | Pupc_del bs -> begin
+          let bs = trans_codepos_brsel bs in
+          match i.i_node, bs with
+          | Sif (_, t, _), `Cond true -> t.s_node
+          | Sif (_, _, f), `Cond false -> f.s_node
+          | Swhile (_, t), `Cond true -> t.s_node
+          | Smatch (e, bs), `Match cn -> begin
+            (* match e with | C a b c => b | ...  ---> (a, b, c) <- oget (get_as_C e); b *)
+
+            let typ, tydc, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+            let tyinst = List.combine tydc.tyd_params tyinst in
+            let indt = oget (EcDecl.tydecl_as_datatype tydc) in
+            let cnames = List.fst indt.tydt_ctors in
+            let r = List.assoc_opt cn (List.combine cnames bs) in
+            match r with
+            | None ->
+              tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond)
+            | Some (p, b) -> begin
+              (* TODO: Factorize. This is mostly just a copy/paste from EcPhlRCond.gen_rcond_full. *)
+              let cvars = List.map (fun (x, xty) -> { ov_name = Some (EcIdent.name x); ov_type = xty; }) p in
+              let me, cvars = EcMemory.bindall_fresh cvars !memenv in
+
+              let subst, pvs =
+                let s = Fsubst.f_subst_id in
+                let s, pvs = List.fold_left_map (fun s ((x, xty), name) ->
+                    let pv = pv_loc (oget name.ov_name) in
+                    let s  = bind_elocal s x (e_var pv xty) in
+                    (s, (pv, xty)))
+                  s (List.combine p cvars)
+                in
+                (s, pvs)
+              in
+
+              let asgn = EcModules.lv_of_list pvs |> omap (fun lv ->
+                  let rty  = ttuple (List.snd p) in
+                  let proj = EcInductive.datatype_proj_path typ cn in
+                  let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+                  let proj = e_app proj [e] (toption rty) in
+                  let proj = e_oget proj rty in
+                  i_asgn (lv, proj))
+              in
+
+              memenv := me;
+              locals := !locals @ (List.map (fun ov -> {v_name = oget ov.ov_name; v_type = ov.ov_type; }, cp_loc) cvars);
+
+              match asgn with
+              | None -> b.s_node @ tl
+              | Some a -> a :: (s_subst subst b).s_node @ tl
+            end
+          end
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
+          end
+      in
+
+      (* Apply each of updates in reverse *)
+      (* NOTE: This is with the expectation that the user entered them in chronological order. *)
+      let body =
+        List.fold_right (fun (cp, up) bd ->
+          let {pl_desc = cp; pl_loc = loc} = cp in
+          let cp = trans_codepos env cp in
+          let change env _ _ i tl = (),
+            match up with
+            | Pup_stmt sup ->
+              eval_supdate env sup i @ tl
+            | Pup_cond cup ->
+              eval_cupdate loc env cup i tl
+          in
+          let env = EcEnv.Memory.push_active !memenv env in
+          try
+            let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
+            s
+          with
+            | EcMatching.Zipper.InvalidCPos ->
+              tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
+        )
+        pupdates
+        fd.f_body
+      in
+
+      (* Apply the result update if given *)
+      let ret = match fd.f_ret, pupdate_res with
+        | Some e, Some e' ->
+          let loc = e'.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e', ty = transexp env `InProc ue e' in
+          unify_or_fail env ue loc ~expct:e.e_ty ty;
+          let ts = Tuni.subst (UE.close ue) in
+          Some (e_subst ts e')
+        | _ -> fd.f_ret
+      in
+
+      (* Reconstruct the function def *)
+      let uses = ret |> ofold ((^~) se_inuse) (s_inuse body) in
+      let fd = {f_locals = fd.f_locals @ (List.fst !locals); f_body = body; f_ret = ret; f_uses = uses; } in
+      let fun_ = {fun_ with f_def = FBdef fd} in
+      fun_
+    in
+
+    let allowed_funs = List.map (fun (Tys_function f) -> f.fs_name) me.me_sig_body in
+    let funs = List.map (fun ({pl_loc = loc; pl_desc = fn}, lvs, v) ->
+      if List.mem fn allowed_funs then
+        fn, (lvs, v)
+      else
+        tyerror loc env (InvalidModUpdate MUE_InvalidFun)
+    ) funs
+    in
+
+    (* Update all module items *)
+    let env, items =
+      match me.me_body with
+      | ME_Structure mb ->
+        let doit (env, items) mi =
+          match mi with
+          | MI_Variable v ->
+            let env = EcEnv.Var.bind_pvglob v.v_name v.v_type env in
+            env, items @ [mi]
+          | MI_Function f  -> begin
+            match List.assoc_opt f.f_name funs with
+            | None ->
+              let env = EcEnv.bind1 (f.f_name, `Function f) env in
+              env, items @ [mi]
+            | Some (lvs, (upsc, rup)) ->
+              let f = update_fun env f.f_name lvs upsc rup in
+              let env = EcEnv.bind1 (f.f_name, `Function f) env in
+              env, items @ [MI_Function f]
+            end
+          | MI_Module me ->
+            let env = EcEnv.bind1 (me.me_name, `Module me) env in
+            env, items @ [mi]
+        in
+        List.fold_left doit (env, []) (items @ mb.ms_body)
+
+      | _ ->
+        tyerror loc env (InvalidModUpdate MUE_AbstractModule);
+    in
+
+    let ois = get_oi_calls env (stparams, items) in
+
+    (* Construct structure representation *)
+    let me =
+      { me_name       = x.pl_desc;
+        me_body       = ME_Structure { ms_body = items; };
+        me_comps      = items;
+        me_params     = stparams;
+        me_sig_body   = me.me_sig_body;
+        me_oinfos     = ois; }
+    in
+    me
 
 (* -------------------------------------------------------------------- *)
 (* Module parameters must have been added to the environment            *)
@@ -3300,7 +3566,7 @@ and transexpcast_opt (env : EcEnv.env) mode ue oty e =
   match oty with
   | None   -> fst (transexp env mode ue e)
   | Some t -> transexpcast env mode ue t e
-  
+
 (* -------------------------------------------------------------------- *)
 and trans_form_opt env ?mv ue pf oty =
   trans_form_or_pattern env `Form ?mv ue pf oty
@@ -3318,10 +3584,10 @@ and trans_pattern env ps ue pf =
   trans_form_or_pattern env `Form ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
-let trans_args env ue = transcall (transexp env `InProc ue) env ue
+and trans_args env ue = transcall (transexp env `InProc ue) env ue
 
 (* -------------------------------------------------------------------- *)
-let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
+and trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
   match p with
   | `LvmNone as p -> (p :> lvmatch)
   | `LvmVar pv -> begin
@@ -3332,7 +3598,7 @@ let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : 
       `LvmVar (transpvar env m pv)
     end
 (* -------------------------------------------------------------------- *)
-let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
+and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
   match p with
   | (`While | `If | `Match) as p ->
     (p :> cp_match)
@@ -3343,29 +3609,29 @@ let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) :
   | `Assign lv ->
     `Assign (trans_lv_match ?memory env lv)
 (* -------------------------------------------------------------------- *)
-let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
+and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with
   | `ByPos _ as p -> (p :> cp_base)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
+and trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
+and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   match bs with
   | `Cond b -> `Cond b
   | `Match { pl_desc = x } -> `Match x
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
+and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
   let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
   let p = trans_codepos1 ?memory env p in
   (nm, p)
 
 (* -------------------------------------------------------------------- *)
-let trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
+and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
