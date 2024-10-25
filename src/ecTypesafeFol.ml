@@ -108,9 +108,10 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   else
   f_app op args rty
   
-let fapply_safe (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
+let rec fapply_safe (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
   match f.f_node with
   | Fop (pth, _) -> f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv EcReduction.full_red hyps
+  | Fapp (fop, args) -> fapply_safe hyps fop (args @ fs)
   | Fquant (Llambda, binds, f) ->
     assert (List.compare_lengths binds fs >= 0);
     let subst = 
@@ -120,4 +121,14 @@ let fapply_safe (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
     let binds = List.drop (List.length fs) binds in
     let f = f_quant Llambda binds (EcSubst.subst_form subst f) in
     EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+  | Fquant  (qtf, _, _) -> assert false
+  | Fif     (f, ft, ff) -> assert false
+  | Fmatch  (f, fs, t) -> assert false
+  | Flet    (lpat, f, fb) -> assert false
+  | Fint    (i) -> assert false
+  | Flocal  (id) -> assert false
+  | Fpvar   (pv, m) -> assert false
+  | Fglob   (id, m) -> assert false
+  | Ftuple  (fs) -> assert false
+  | Fproj   (f, i) -> assert false
   | _ -> assert false
