@@ -346,8 +346,9 @@ let circuit_bwarray_set ~(nelements : width) ~(wordsize : width) (i: int) : circ
 let circuit_bwarray_get ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
   assert (nelements > i);
   let arr_inp = BWAInput (create "arr_input", { nelements; wordsize; }) in
-  let arr = circ_ident arr_inp in
-  {circ=BWCirc (destr_bwarray arr.circ).(i); inps=[arr_inp]}
+  let out = List.init wordsize (fun j -> C.input ((ident_of_cinput arr_inp).id_tag, j + wordsize*i)) in
+  {circ=BWCirc (out); inps=[arr_inp]}
+
 
   
 (* Function composition for circuits *)
@@ -1210,9 +1211,14 @@ let pstate_of_memtype ?pstate (env: env) (mt : memtype) =
 
 let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
   let env = toenv hyps in
+  Format.eprintf "[W]Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;
+  let start = Unix.gettimeofday () in
   try
     match inst.i_node with
-    | Sasgn (LvVar (PVloc v, ty), e) -> Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate
+    | Sasgn (LvVar (PVloc v, ty), e) -> 
+      let pstate = Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate in
+      Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start);
+      pstate
     | Sasgn (LvTuple (vs), e) -> begin match e.e_node with
       | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e ->
         let v = match v with | PVloc v -> v | _ -> assert false in
