@@ -104,7 +104,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     let inps = List.map (List.map (fun name -> match Map.String.find_opt name !bvvars with
     | Some bv -> bv
     | None -> SMT.bvterm_of_name 1 name)) inps in
-    let bvinp = List.map (List.reduce (SMT.bvterm_concat)) inps in
+    let bvinp = List.map (fun i -> List.reduce (SMT.bvterm_concat) (List.rev i)) inps in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = (bvterm_of_node pcond) in
  
@@ -113,8 +113,8 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
       if SMT.check_sat () = false then true 
       else begin
-        Format.eprintf "fc:    %a@."     SMT.pp_term (SMT.get_value bvinpt1);
-        Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
+        Format.eprintf "block:    %a@."     SMT.pp_term (SMT.get_value bvinpt1);
+        Format.eprintf "fc: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
         List.iteri (fun i bv -> 
         Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
         ) bvinp;

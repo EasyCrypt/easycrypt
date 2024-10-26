@@ -391,7 +391,7 @@ let circuit_flatten (c: circuit) : circuit =
   match c.circ with
   | BWCirc _ -> c
   | BWArray a -> 
-    {circ=BWCirc(Array.fold_left (@) [] a); inps=c.inps}
+    {circ=BWCirc(Array.fold_right (@) a []); inps=c.inps}
 
 (* Chunks a bitstring into an array of bitstrings, each of size w *)
 let circuit_bw_split (c: circuit) (w: int) : circuit = 
@@ -438,72 +438,66 @@ let circuit_aggregate_inps (c: circuit) : circuit =
   | _ -> let circs, inp = bus_of_cinputs c.inps in
     {circ=apply c circs; inps=[inp]}
 
-(* To be removed when we have external op bindings *)
+(* 
+  Array slices
+  out_sz = size of out array (base size = input array base size)
+  i = start_index
+*)
 let circuit_array_sliceget ~(wordsize : width) (arr_sz : width) (out_sz: width) (i: int) : circuit = 
-  assert (arr_sz >=  out_sz * (i + 1));
-  (* assert (n mod m = 0); *)
+  assert (arr_sz >= out_sz + i);
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize in
-  let arr = circ_ident arr_inp in
-  let out = destr_bwarray arr.circ in
-  let out = (Array.sub out (out_sz * i) out_sz) in
-  {arr with circ = BWArray out}
+  let arr_id = (ident_of_cinput arr_inp).id_tag in
+  let out = Array.init out_sz (fun ja ->
+    List.init wordsize (fun jl -> 
+      C.input (arr_id, (i+ja)*wordsize + jl)
+    )
+  ) in
+  {circ = BWArray out; inps=[arr_inp]}
   
-(* To be removed when we have external op bindings *)
+(* 
+  Array slice assignment
+  out_sz = size of array to assign (base size = input array base size)
+  i = start_index
+*)
 let circuit_array_sliceset ~(wordsize : width) (arr_sz : width) (out_sz: width) (i: int) : circuit = 
-  assert (arr_sz >= out_sz * (i + 1));
-  (* assert (n mod m = 0); *)
+  assert (arr_sz >= out_sz + i);
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize in
+  let arr_id = (ident_of_cinput arr_inp).id_tag in
   let new_arr_inp = bwainput_of_size ~nelements:out_sz ~wordsize in
-  let arr = circ_ident arr_inp in
-  let new_arr = circ_ident new_arr_inp in
-  let arr_b = Array.to_list (destr_bwarray arr.circ) in
-  let new_arr_b = Array.to_list (destr_bwarray new_arr.circ) in
-  let out = List.take (out_sz*i) arr_b @ new_arr_b @ List.drop (out_sz*(i+1)) arr_b |> Array.of_list in
-  {arr with circ = BWArray out; inps = [arr_inp; new_arr_inp]}
+  let new_arr_id = (ident_of_cinput new_arr_inp).id_tag in
+  let out = Array.init arr_sz (fun ja ->
+    if ja < i || ja >= (i + out_sz) then 
+      List.init wordsize (fun jl -> C.input (arr_id, ja*wordsize + jl))
+    else
+      List.init wordsize (fun jl -> C.input (new_arr_id, (ja-i)*wordsize + jl))
+  ) in
+  {circ = BWArray out; inps = [arr_inp; new_arr_inp]}
 
 (* To be removed when we have external op bindings *)
 let circuit_bwarray_slice_get (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
   assert (arr_sz*el_sz >= i + acc_sz);
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
-  let arr = circ_ident arr_inp in
-  let arr = circuit_flatten arr in
-  {circ=BWCirc (List.drop (i) (destr_bwcirc arr.circ) |> List.take acc_sz); inps=[arr_inp]}
+  let arr_id = (ident_of_cinput arr_inp).id_tag in
+  let out = List.init acc_sz (fun j -> C.input (arr_id, i+j)) in
+  {circ=BWCirc out; inps=[arr_inp]}
 
 (* To be removed when we have external op bindings *)
 let circuit_bwarray_slice_set (arr_sz: width) (el_sz: width) (acc_sz: int) (i: int) : circuit =
   assert (arr_sz*el_sz >= i + acc_sz);
   let bw_inp = bwinput_of_size acc_sz in
-  let bw = circ_ident bw_inp in
+  let bw_id = (ident_of_cinput bw_inp).id_tag in
   let arr_inp = bwainput_of_size ~nelements:arr_sz ~wordsize:el_sz in
-  let arr = circ_ident arr_inp in
-  let arr = circuit_flatten arr in
-  let arr_circ = destr_bwcirc arr.circ in
-  let bw_circ = destr_bwcirc bw.circ in
-  let res_circ = (List.take i arr_circ) @ bw_circ @ (List.drop (i + acc_sz) arr_circ) in
-  let res_circs = List.chunkify el_sz res_circ in
-  {circ=BWArray (Array.of_list res_circs); inps=[arr_inp; bw_inp]}
-
-(* To be removed when we have external op bindings *)
-let circuit_bwcirc_get (w: width) (aw:int) (i: int) : circuit =
-  assert (w > i*aw);
-  assert (w mod aw = 0);
-  let bw_inp = bwinput_of_size w in
-  let bw = circ_ident bw_inp in
-  let bw = destr_bwcirc bw.circ in
-  {circ = BWCirc(List.take aw (List.drop (i*aw) bw)); inps=[bw_inp]}
-
-(* To be removed when we have external op bindings *)
-let circuit_bwcirc_set (w: width) (aw:int) (i:int) : circuit =
-  assert (w > i*aw);
-  assert (w mod aw = 0);
-  let bw_inp = bwinput_of_size w in
-  let bw = circ_ident bw_inp in
-  let bw = destr_bwcirc bw.circ in
-  let bw2_inp = bwinput_of_size aw in
-  let bw2 = circ_ident bw2_inp in
-  let bw2 = destr_bwcirc bw2.circ in
-  let bw = List.take (i*aw) bw @ bw2 @ List.drop ((i+1)*aw) bw in
-  {circ = BWCirc bw; inps=[bw_inp; bw2_inp]}
+  let arr_id = (ident_of_cinput arr_inp).id_tag in
+  let out = Array.init arr_sz (fun ja ->
+    List.init el_sz (fun jl -> 
+      let idx = ja*el_sz + jl in
+      if idx < i || idx >= (i + acc_sz) then
+        C.input (arr_id, idx)
+      else
+        C.input (bw_id, idx - i)
+    )
+  ) in
+  {circ=BWArray (out); inps=[arr_inp; bw_inp]}
 
 (* Input for splitting function w.r.t. dependencies *)
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
@@ -535,7 +529,10 @@ let circuit_map (f: circuit) (a: circuit) : circuit =
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let const_inp = BWInput (create "const", n) in
   let c = circuit_flatten c in
-  let c = circuit_aggregate_inps c in
+  let c = if List.compare_length_with c.inps 1 > 0 then
+    circuit_aggregate_inps c 
+    else c
+  in
   let r = destr_bwcirc c.circ in
   let deps = HL.deps r in
   let deps = HL.split_deps m deps in
