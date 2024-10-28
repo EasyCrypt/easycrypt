@@ -110,7 +110,7 @@ VPSLL_8u32(w@256, count@8) -> @256 =
 VPSLLV_8u32(w@256, counts@256) -> @256 =
   map<32, 8>(
     fun w1@32 count@32 .
-      ugt<32>(count, 0xff@32) ? 0 : sll<32>(w1, count[@8|0]),
+      ugt<32>(count, 0x20@32) ? 0 : sll<32>(w1, count[@8|0]),
     w,
     counts
   )
