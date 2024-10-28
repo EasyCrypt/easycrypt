@@ -227,24 +227,30 @@ let ite (c: node) (t: reg) (f: reg) : reg =
   mux2_reg f t c
 
 (* -------------------------------------------------------------------- *)
-let c_rshift ~(offset : int) ~(sign : node) (c : node) (r : reg) =
-  let l = List.length r in
-  let s = List.drop offset r @ List.make (min offset l) sign in
-  List.map2 (fun r1 s1 -> mux2 r1 s1 c) r s
+let c_rshift ~(lg2o : int) ~(sign : node) (c : node) (r : reg) =
+  let len   = List.length r in
+  let clamp = log2 len in
+  let s =
+    if lg2o > clamp then
+      List.make len sign
+    else
+      let offset = 1 lsl lg2o in
+      List.drop (min offset len) r @ List.make (min offset len) sign
+  in
+    List.map2 (fun r1 s1 -> mux2 r1 s1 c) r s
 
 (* -------------------------------------------------------------------- *)
 let arshift ~(offset : int) (r : reg) =
   let sign = Option.default false_ (List.Exceptionless.last r) in
   let l = List.length r in
-  List.drop offset r @ List.make (min offset l) sign
+  List.drop (min offset l) r @ List.make (min offset l) sign
 
 (* -------------------------------------------------------------------- *)
 let lsr_ (r as r0 : reg) (s : reg) : reg =
-  let clamp = log2 (List.length r + 1) in
   let _, r =
     List.fold_left (fun (i, r) c ->
-      (i+1, c_rshift ~offset:(1 lsl i) ~sign:false_ c r)
-    ) (0, r) (List.take clamp s)
+      (i+1, c_rshift ~lg2o:i ~sign:false_ c r)
+    ) (0, r) s
   in assert (List.length r = List.length r0); r
 
 (* -------------------------------------------------------------------- *)
@@ -262,7 +268,7 @@ let asr_ (r : reg) (s : reg) : reg =
 
   let _, r =
     List.fold_left (fun (i, r) c ->
-      (i+1, c_rshift ~offset:(1 lsl i) ~sign c r)
+      (i+1, c_rshift ~lg2o:i ~sign c r)
     ) (0, r) s
   in r
 

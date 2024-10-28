@@ -169,8 +169,9 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
 
   in
 
-  test (op 8);
-  test (op 14)
+  for i = 1 to 14 do
+    test (op i)
+  done
 
 (* -------------------------------------------------------------------- *)
 let test_opp () =
