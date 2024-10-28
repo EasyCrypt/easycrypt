@@ -156,6 +156,12 @@ realize bvultP by admit.
 bind op [bool & W16.t] W16.\ule "ule".
 realize bvuleP by admit.
 
+bind op [bool & W16.t] W16.\sle "sle".
+realize bvsleP by admit.
+
+bind op [bool & W16.t] W16.\slt "slt".
+realize bvsltP by admit.
+
 op uext8_16 (w: W8.t) : W16.t = 
   W16.of_int (W8.to_uint w).
 
