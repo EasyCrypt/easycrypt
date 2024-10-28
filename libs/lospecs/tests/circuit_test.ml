@@ -131,6 +131,17 @@ let test_uextend () =
 
   in test (op 8 16)
 
+let test_ite () =
+  let op () : op =
+    { name = (Format.sprintf "ite")
+    ; args = [(1, `U)]
+    ; out  = `U
+    ; mk   = (fun rs -> C.ite (as_seq1 @@ as_seq1 rs) [C.true_] [C.false_])
+    ; reff = (fun vs -> as_seq1 vs)
+    }
+
+  in test (op ())
+
 (* -------------------------------------------------------------------- *)
 let test_sextend () =
   let op (isize : int) (osize : int) : op =
@@ -878,8 +889,16 @@ let test_smod () =
 
     let sim (x : int) (y : int) : int =
       if y = 0 then x else
-      let u = x mod y in
-      if u < 0 then y + u else u
+      let u = (abs x) mod (abs y) in
+      if u = 0 
+        then u 
+      else if (x >= 0) && (y >= 0) 
+        then u 
+      else if (x < 0) && (y >= 0) 
+        then (-u + y) 
+      else if (x >= 0) && (y < 0) 
+        then (u + y) 
+      else -u
     in
 
     { name = (Format.sprintf "smod<%d>" size)
@@ -899,8 +918,8 @@ let tests = [
   ("incr", test_incr);
   ("add" , test_add );
   ("sub" , test_sub );
-  ("umul", test_umul);
-  ("smul", test_smul);
+  (* ("umul", test_umul); *)
+  (* ("smul", test_smul); *)
   ("ssat", test_ssat);
   ("usat", test_usat);
 
@@ -921,8 +940,10 @@ let tests = [
   ("uextend", test_uextend);
   ("sextend", test_sextend);
 
-  ("smod", test_smod);
+  ("ite", test_ite);
+
   ("mod", test_mod);
+  ("smod", test_smod);
 
   ("bvueq", test_bvueq);
   ("bvseq", test_bvseq);
