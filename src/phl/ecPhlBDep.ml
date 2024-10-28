@@ -42,12 +42,22 @@ let mapreduce
   (perm: (int -> int) option)
   : unit =
 
+  let time (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+  let tm = Unix.gettimeofday () in
+  
   let env = toenv hyps in
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form hyps f in
+
+  let tm = time tm "Lane function circuit generation done" in
+  
   (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
   (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
   (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
@@ -57,6 +67,9 @@ let mapreduce
   | _ -> failwith "Invalid operator type" in
   let pcondc = circuit_of_form hyps pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
+
+  
+  let tm = time tm "Precondition circuit generation done" in
   
   let pstate : (symbol, circuit) Map.t = Map.empty in
 
@@ -70,6 +83,9 @@ let mapreduce
   
   let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate proc.s_node in
   let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
+
+  let tm = time tm "Program circuit generation done" in
+
   begin 
     let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
     let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name;
@@ -90,11 +106,22 @@ let mapreduce
       (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
       (* Format.eprintf "@."; ) [c] outvs in *)
     let cs = circuit_mapreduce c n m in
+
+    let tm = time tm "circuit dependecy analysis + splitting done" in
+
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
     let () = assert(List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c (Some pcondc)) (List.tl cs)) in
+
+    let tm = time tm "Program lanes equivs done" in
+
+    List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Lane func: %s@." (circuit_to_string fc);
+    
     let () = assert(circ_equiv (List.hd cs) fc (Some pcondc)) in
+
+    let _tm = time tm "Program to lane func equiv done" in
+    
     Format.eprintf "Success@."
   end 
 

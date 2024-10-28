@@ -337,10 +337,12 @@ let circuit_bwarray_set ~(nelements : width) ~(wordsize : width) (i: int) : circ
   assert (nelements > i);
   let arr_inp = BWAInput (create "arr_input", { nelements; wordsize; }) in
   let bw_inp = BWInput (create "bw_input", wordsize) in
-  let arr = circ_ident arr_inp in
-  let bw = circ_ident bw_inp in
-  let () = (destr_bwarray arr.circ).(i) <- (destr_bwcirc bw.circ) in
-  {circ= arr.circ; inps = [arr_inp; bw_inp]}
+  let arr_id = (ident_of_cinput arr_inp).id_tag in
+  let bw_id = (ident_of_cinput bw_inp).id_tag in
+  let out = Array.init nelements (fun ja ->
+    if ja = i then List.init wordsize (fun j -> C.input (bw_id, j))
+    else List.init wordsize (fun j -> C.input (arr_id, ja*wordsize + j))) in
+  {circ= BWArray (out); inps = [arr_inp; bw_inp]}
 
 (* Same as above *)
 let circuit_bwarray_get ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
@@ -527,6 +529,8 @@ let circuit_map (f: circuit) (a: circuit) : circuit =
 
 (* Partitions into blocks of type n -> m *)
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
+  let tm = Unix.gettimeofday () in
+  Format.eprintf "[W] Beginning dependency analysis@.";
   let const_inp = BWInput (create "const", n) in
   let c = circuit_flatten c in
   let c = if List.compare_length_with c.inps 1 > 0 then
@@ -542,6 +546,9 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   assert (HL.block_list_indep deps);
   assert (List.for_all (HL.check_dep_width n) (List.snd deps));
 (*  assert ((List.sum (List.map size_of_cinput c.inps)) mod n = 0);*)
+
+  Format.eprintf "[W] Dependency analysis complete after %f seconds@."
+  (Unix.gettimeofday () -. tm);
   
   let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg =
     let res, c = List.takedrop (fst db) c in
@@ -1208,13 +1215,13 @@ let pstate_of_memtype ?pstate (env: env) (mt : memtype) =
 
 let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
   let env = toenv hyps in
-  Format.eprintf "[W]Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;
-  let start = Unix.gettimeofday () in
+  (* Format.eprintf "[W]Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst; *)
+  (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, ty), e) -> 
       let pstate = Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate in
-      Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start);
+      (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate
     | Sasgn (LvTuple (vs), e) -> begin match e.e_node with
       | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e ->
