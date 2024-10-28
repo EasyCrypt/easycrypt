@@ -219,11 +219,24 @@ let mux2_2
     c1
 
 (* -------------------------------------------------------------------- *)
+let mux2_2reg
+  ~(k00 : reg)
+  ~(k01 : reg)
+  ~(k10 : reg)
+  ~(k11 : reg)
+  ((c1, c2) : node * node)
+=
+  mux2_reg
+    (mux2_reg k00 k01 c2)
+    (mux2_reg k10 k11 c2)
+    c1
+
+(* -------------------------------------------------------------------- *)
 let mux_reg (cr : (node * reg) list) (r : reg) : reg =
   List.fold_right (fun (c, r) s -> mux2_reg s r c) cr r
 
 (* -------------------------------------------------------------------- *)
-let ite (c: node) (t: reg) (f: reg) : reg =
+let ite (c : node) (t : reg) (f : reg) : reg =
   mux2_reg f t c
 
 (* -------------------------------------------------------------------- *)
@@ -407,7 +420,7 @@ let smull (r1 : reg) (r2 : reg) : reg =
 let smulh (r1 : reg) (r2 : reg) : reg =
   snd (smul_ r1 r2)
 
-  (* -------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
 let ssat ~(size : int) (r : reg) : reg =
   assert (0 < size);
   assert (size < List.length r);
@@ -479,7 +492,7 @@ let usmul (r1 : reg) (r2 : reg) : reg =
 let ugte (eq : node) (r1 : reg) (r2 : reg) : node =
   let n1 = List.length r1 in
   let n2 = List.length r2 in
-  let n = max n1 n2 in
+  let n  = max n1 n2 in
   let r1 = uextend ~size:n r1 in
   let r2 = uextend ~size:n r2 in
 
@@ -503,7 +516,7 @@ let sgte (eq : node) (r1 : reg) (r2 : reg) : node =
     ~k11:(ugte eq r1 r2)
 
 (* -------------------------------------------------------------------- *)
-let bvueq (r1: reg) (r2: reg) : node = 
+let bvueq (r1 : reg) (r2 : reg) : node = 
   let n1 = List.length r1 in
   let n2 = List.length r2 in
   let n = max n1 n2 in
@@ -519,7 +532,7 @@ let bvueq (r1: reg) (r2: reg) : node =
   ) Aig.true_ r1 r2
   
 (* -------------------------------------------------------------------- *)
-let bvseq (r1: reg) (r2: reg) : node = 
+let bvseq (r1 : reg) (r2 : reg) : node = 
   let n1 = List.length r1 in
   let n2 = List.length r2 in
   let n = max n1 n2 in
@@ -542,7 +555,6 @@ let ugt (r1 : reg) (r2 : reg) : node =
 let uge (r1 : reg) (r2 : reg) : node =
   ugte Aig.true_ r1 r2
 
-
 (* -------------------------------------------------------------------- *)
 let ult (r1: reg) (r2 : reg) : node =
   ugt r2 r1
@@ -560,12 +572,21 @@ let sge (r1 : reg) (r2 : reg) : node =
   sgte Aig.true_ r1 r2
 
 (* -------------------------------------------------------------------- *)
-let slt (r1: reg) (r2 : reg) : node =
+let slt (r1 : reg) (r2 : reg) : node =
   sgt r2 r1
 
 (* -------------------------------------------------------------------- *)
 let sle (r1 : reg) (r2 : reg) : node =
   sge r2 r1
+
+(* -------------------------------------------------------------------- *)
+let iszero (r : reg) : node =
+  bvueq r (List.map (fun _ -> false_) r)
+
+(* -------------------------------------------------------------------- *)
+let abs (a : reg) : reg =
+  let msb_a, _ = split_msb a in
+  ite (msb_a) (opp a) a
 
 (* -------------------------------------------------------------------- *)
 let udiv_ (a : reg) (b : reg) : reg * reg =
@@ -590,81 +611,60 @@ let udiv_ (a : reg) (b : reg) : reg * reg =
     in (c, List.map (fun pu -> pu c) pus)
   in
 
-  let q, r =
-    List.fold_lefti (fun (q, a) i d ->
-      let q', a = create_line i d a in (q' :: q, a)
-    ) ([], List.make n false_) (List.rev a)
-  in
+  List.fold_lefti (fun (q, a) i d ->
+    let q', a = create_line i d a in (q' :: q, a)
+  ) ([], List.make n false_) (List.rev a)
 
-  (q, snd (split_msb r))
+(* -------------------------------------------------------------------- *)
+let udiv (a : reg) (b : reg) : reg =
+  let m = max (List.length a) (List.length b) in
+  let a = uextend ~size:m a in
+  let b = uextend ~size:m b in
+  ite (iszero b) a (fst (udiv_ a b))
 
-let bvabs (a: reg) : reg =
-  let msb_a, _ = split_msb a in
-  ite (msb_a) (opp a) a
-
-let udiv (a: reg) (b: reg) : reg =
-  fst (udiv_ a b)
-
-let urem (a: reg) (b: reg) : reg =
-  let b_zero = ugt (of_int ~size:(List.length b) 1) b in
-  let b_gt_a = ugt b a in
-  let res = snd (udiv_ a b) in
-  ite (or_ b_zero b_gt_a) a @@ (uextend ~size:(List.length a) res)
-
-(*
-    (bvsmod s t) abbreviates
-      (let ((?msb_s ((_ extract |m-1| |m-1|) s))
-            (?msb_t ((_ extract |m-1| |m-1|) t)))
-        (let ((abs_s (ite (= ?msb_s #b0) s (bvneg s)))
-              (abs_t (ite (= ?msb_t #b0) t (bvneg t))))
-          (let ((u (bvurem abs_s abs_t)))
-            (ite (= u (_ bv0 m))
-                 u
-            (ite (and (= ?msb_s #b0) (= ?msb_t #b0))
-                 u
-            (ite (and (= ?msb_s #b1) (= ?msb_t #b0))
-                 (bvadd (bvneg u) t)
-            (ite (and (= ?msb_s #b0) (= ?msb_t #b1))
-                 (bvadd u t)
-                 (bvneg u))))))))
-*)
-
-let sdiv (s: reg) (t: reg) : reg =
+(* -------------------------------------------------------------------- *)
+let sdiv (s : reg) (t : reg) : reg =
   let msb_s, _ = split_msb s in
   let msb_t, _ = split_msb t in
-  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
-    (udiv s t) @@
-  ite (and_ (xnor msb_s true_) (xnor msb_t false_))
-    (opp (udiv (opp s) t)) @@
-  ite (and_ (xnor msb_s false_) (xnor msb_t true_))
-    (opp (udiv s (opp t)))
-    (udiv (opp s) (opp t))
 
-let srem (s: reg) (t: reg) : reg =
+  mux2_2reg
+    ~k00:(    (udiv (    s) (    t)))
+    ~k10:(opp (udiv (opp s) (    t)))
+    ~k01:(opp (udiv (    s) (opp t)))
+    ~k11:(    (udiv (opp s) (opp t)))
+    (msb_s, msb_t)
+
+(* -------------------------------------------------------------------- *)
+let umod (a : reg) (b : reg) : reg =
+  let m = max (List.length a) (List.length b) in
+  let a = uextend ~size:m a in
+  let b = uextend ~size:m b in
+
+  ite
+    (iszero b)
+    (List.map (fun _ -> false_) b)
+    (uextend ~size:m (snd (udiv_ a b)))
+
+(* -------------------------------------------------------------------- *)
+let srem (s : reg) (t : reg) : reg =
   let msb_s, _ = split_msb s in
   let msb_t, _ = split_msb t in
-  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
-    (urem s t) @@
-  ite (and_ (xnor msb_s true_) (xnor msb_t false_))
-    (opp (urem (opp s) t)) @@
-  ite (and_ (xnor msb_s false_) (xnor msb_t true_))
-    (urem s (opp t))
-    (opp (urem (opp s) (opp t)))
-       
-(* Implicit extend *)
-let smod (s: reg) (t: reg) : reg =  
-  let msb_s,_ = split_msb s in
-  let msb_t,_ = split_msb t in
-  let u = urem (bvabs s) (bvabs t) in
-  ite (bvueq u @@ of_int ~size:(List.length u) 0) 
-    u @@
-  ite (and_ (xnor msb_s false_) (xnor msb_t false_))
-    u
-  (ite (and_ (xnor msb_s true_) (xnor msb_t false_))
-    (add_dropc (opp u) t)
-  (ite (and_ (xnor msb_s false_) (xnor msb_t true_))
-    (add_dropc u t)
-    (opp u)
-  ))
-  
-  
+
+  mux2_2reg
+    ~k00:(    (umod (    s) (    t)))
+    ~k10:(opp (umod (opp s) (    t)))
+    ~k01:(opp (umod (    s) (opp t)))
+    ~k11:(    (umod (opp s) (opp t)))
+    (msb_s, msb_t)
+
+(* -------------------------------------------------------------------- *)
+let smod (s : reg) (t : reg) : reg =  
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+
+  mux2_2reg
+    ~k00:(               (umod (    s) (    t))   )
+    ~k10:(add_dropc (opp (umod (opp s) (    t))) t)
+    ~k01:(add_dropc (opp (umod (    s) (opp t))) t)
+    ~k11:(               (umod (opp s) (opp t))   )
+    (msb_s, msb_t)

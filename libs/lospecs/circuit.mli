@@ -143,7 +143,7 @@ val udiv_ : reg -> reg -> reg * reg
 
 val udiv : reg -> reg -> reg
 
-val urem : reg -> reg -> reg
+val umod : reg -> reg -> reg
 
 val sdiv : reg -> reg -> reg
 

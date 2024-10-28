@@ -11,6 +11,7 @@ module type S = sig
   val add  : t -> t -> t
   val sub  : t -> t -> t
   val mul  : t -> t -> t
+  val div  : t -> t -> t
 
   val lognot : t -> t
   val logand : t -> t -> t
@@ -66,6 +67,9 @@ module SWord(I : Size) : S = struct
   let mul (x : t) (y : t) : t =
     (to_int x) * y
 
+  let div (x : t) (y : t) : t =
+    of_int (x / y)
+
   let logand (x : t) (y : t) : t =
     x land y
 
@@ -117,11 +121,14 @@ module UWord(I : Size) : S = struct
   let sub (x : t) (y : t) =
     of_int (x - y)
 
+  let neg (x : t) : t =
+    of_int (-x)
+
   let mul (x : t) (y : t) =
     of_int (x * y)
 
-  let neg (x : t) : t =
-    of_int (-x)
+  let div (x : t) (y : t) : t =
+    of_int (x / y)
 
   let logand (x : t) (y : t) : t =
     x land y

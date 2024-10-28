@@ -11,6 +11,7 @@ module type S = sig
   val add  : t -> t -> t
   val sub  : t -> t -> t
   val mul  : t -> t -> t
+  val div  : t -> t -> t
 
   val lognot : t -> t
   val logand : t -> t -> t
