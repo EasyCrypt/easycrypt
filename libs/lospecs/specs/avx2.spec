@@ -54,9 +54,13 @@ VPBROADCAST_8u32(w@32) -> @256 =
 VPBROADCAST_4u64(w@64) -> @256 = 
   repeat<64>(w[@64|0], 4)
   
-# Intel intrinsic: _mm256_mulhi_epu16
+# Intel intrinsic: _mm256_mulhi_epi16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(smulhi<16>, w1, w2)
+
+# Intel intrinsic: _mm256_mulhi_epu16
+VPMULHU_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(umulhi<16>, w1, w2)
 
 # Intel intrinsic: _mm256_mullo_epu16
 VPMULL_16u16(w1@256, w2@256) -> @256 =
@@ -67,6 +71,17 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 .
       let w = smul<16>(x, y) in
+      let w = incr<32>(srl<32>(w, 14)) in
+      w[1:16],
+    w1,
+    w2
+  )
+
+# Intel intrinsic: _mm256_mulhrs_epu16
+VPMULHRSU_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 .
+      let w = umul<16>(x, y) in
       let w = incr<32>(srl<32>(w, 14)) in
       w[1:16],
     w1,

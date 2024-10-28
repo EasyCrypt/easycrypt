@@ -592,6 +592,17 @@ let test_vpmulh_16u16 () =
     name = "vpmulh_16u16";
     args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulh_16u16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_mulhi_epi16;
+  } in
+
+  test_vp 200 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpmulhu_16u16 () =
+  let op = {
+    name = "vpmulhu_16u16";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulhu_16u16 x y);
     reff = call_m256x2_m256 Avx2.mm256_mulhi_epu16;
   } in
 
@@ -923,6 +934,7 @@ let tests = [
   ("vpsrl_16u16"      , test_vpsrl_16u16      );
   ("vpand_256"        , test_vpand_256        );
   ("vpmulh_16u16"     , test_vpmulh_16u16     );
+  ("vpmulhu_16u16"    , test_vpmulhu_16u16    );
   ("vpmulhrs_16u16"   , test_vpmulhrs_16u16   );
   ("vpackus_16u16"    , test_vpackus_16u16    );
   ("vpackss_16u16"    , test_vpackss_16u16    );

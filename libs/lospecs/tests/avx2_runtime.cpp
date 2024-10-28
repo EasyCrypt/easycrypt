@@ -342,6 +342,7 @@ BIND_256x2_256(mm256_sub_epi16);
 BIND_256x2_256(mm256_maddubs_epi16);
 BIND_256x2_256(mm256_packus_epi16);
 BIND_256x2_256(mm256_packs_epi16);
+BIND_256x2_256(mm256_mulhi_epi16);
 BIND_256x2_256(mm256_mulhi_epu16);
 BIND_256x2_256(mm256_mulhrs_epi16);
 

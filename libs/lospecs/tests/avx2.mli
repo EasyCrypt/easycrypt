@@ -83,6 +83,7 @@ val mm256_add_epi8 : m256 -> m256 -> m256
 val mm256_add_epi16 : m256 -> m256 -> m256
 val mm256_sub_epi8 : m256 -> m256 -> m256
 val mm256_sub_epi16 : m256 -> m256 -> m256
+val mm256_mulhi_epi16 : m256 -> m256 -> m256
 val mm256_mulhi_epu16 : m256 -> m256 -> m256
 val mm256_mulhrs_epi16 : m256 -> m256 -> m256
 val mm256_packus_epi16 : m256 -> m256 -> m256

@@ -16,6 +16,7 @@ module type S = sig
   val vpand_256 : reg -> reg -> reg
   val vpmaddubsw_256 : reg -> reg -> reg
   val vpmulh_16u16 : reg -> reg -> reg
+  val vpmulhu_16u16 : reg -> reg -> reg
   val vpmulhrs_16u16 : reg -> reg -> reg
   val vpsra_16u16 : reg -> int -> reg
   val vpsrl_16u16 : reg -> int -> reg
@@ -107,6 +108,12 @@ module FromSpec () : S = struct
 
   let vpmulh_16u16 (r1 : reg) (r2 : reg) : reg =
     Circuit_spec.circuit_of_specification [r1; r2] vpmulh_16u16
+
+  (* ------------------------------------------------------------------ *)
+  let vpmulhu_16u16 = Option.get (get_specification "VPMULHU_16u16")
+
+  let vpmulhu_16u16 (r1 : reg) (r2 : reg) : reg =
+    Circuit_spec.circuit_of_specification [r1; r2] vpmulhu_16u16
 
   (* ------------------------------------------------------------------ *)
   let vpmulhrs_16u16 = Option.get (get_specification "VPMULHRS_16u16")
