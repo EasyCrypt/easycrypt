@@ -31,8 +31,13 @@ type width = int
 
 type asize = { wordsize: int; nelements: width; }
 
+type tpsize = { wordsize : int; npos : width; }
+
 let size_of_asize (sz : asize) : int =
   sz.wordsize * sz.nelements
+
+let size_of_tpsize (sz : tpsize) : int =
+  sz.wordsize * sz.npos
 
 (* type deps = ((int * int) * int C.VarRange.t) list *)
 (* Inputs to circuit functions: 
@@ -43,13 +48,19 @@ type cinput =
   | BWInput of (ident * int)
   (* Name of array + (array size x element size) *)
   | BWAInput of (ident * asize)
+  (* Name of tuple, + (tuple size x element size) *)
+  | BWTInput of (ident * tpsize)
 
 let asize_to_string (asize : asize) : string =
   Format.sprintf "%d[%d]" asize.wordsize asize.nelements
 
+let tpsize_to_string (tpsize : tpsize) : string =
+  Format.sprintf "%d[%d]" tpsize.wordsize tpsize.npos
+
 let cinput_to_string = function
   | BWInput (idn, w) -> Format.sprintf "(%s, %d)" (name idn) w
   | BWAInput (idn, sz) -> Format.sprintf "(%s, %s)" (name idn) (asize_to_string sz)
+  | BWTInput (idn, sz) -> Format.sprintf "(%s, %s)" (name idn) (tpsize_to_string sz)
 
 (* Checks whether inputs are the same up to renaming *)
 let cinput_equiv (a: cinput) (b: cinput) : bool =
@@ -86,16 +97,19 @@ let bwainput_of_size ~(nelements : width) ~(wordsize : width) : cinput =
 let size_of_cinput = function
   | BWInput (_, w) -> w
   | BWAInput (_, sz) -> size_of_asize sz
+  | BWTInput (_, sz) -> size_of_tpsize sz
 
 (* name of input *)
 let ident_of_cinput = function
   | BWInput (idn, _) -> idn
   | BWAInput (idn, _) -> idn
+  | BWTInput (idn, _) -> idn
 
 (* Base circuit, represents body of a circuit function *)
 type circ = 
   | BWCirc of C.reg
   | BWArray of C.reg array
+  | BWTuple of C.reg list
 
 let is_bwcirc = function
   | BWCirc _ -> true
@@ -103,6 +117,10 @@ let is_bwcirc = function
 
 let is_bwarray = function
   | BWArray _ -> true
+  | _ -> false
+
+let is_bwtuple = function
+  | BWTuple _ -> true
   | _ -> false
 
 let destr_bwcirc = function
@@ -113,15 +131,21 @@ let destr_bwarray = function
   | BWArray a -> a
   | _ -> assert false
 
+let destr_bwtuple = function
+  | BWTuple tp -> tp
+  | _ -> assert false
+
 (* # of total bits of output *)
 let size_of_circ = function
   | BWCirc r -> List.length r
   | BWArray a -> Array.fold_left (+) 0 (Array.map List.length a)
+  | BWTuple tp -> List.fold_left (+) 0 (List.map List.length tp)
 
 (* Simple representation *)
 let circ_to_string = function 
   | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
   | BWArray a -> Format.sprintf "BWArray[%d[%d]]" (a.(0) |> List.length) (Array.length a)
+  | BWTuple tp -> Format.sprintf "BWTuple(%d, ...)[%d]" (List.hd tp |> List.length) (List.length tp)
 
 (* Checks whether the output shapes are the same
   FIXME: should be enough to compare first element of the array
@@ -129,8 +153,9 @@ let circ_to_string = function
   If not then array input should change *)
 let circ_shape_equal (c1: circ) (c2: circ) = 
   match c1, c2 with
-  | BWArray r1, BWArray r2 -> Array.for_all2 (fun a b -> List.compare_lengths a b = 0) r1 r2
+  | BWArray r1, BWArray r2 -> Array.length r1 = Array.length r2 && Array.for_all2 (fun a b -> List.compare_lengths a b = 0) r1 r2
   | BWCirc r1, BWCirc r2 -> List.compare_lengths r1 r2 = 0
+  | BWTuple tp1, BWTuple tp2 -> List.compare_lengths tp1 tp2 = 0 && List.for_all2 (fun a b -> List.compare_lengths a b = 0) tp1 tp2
   | _ -> false
 
 (* Circuit functions:
@@ -155,10 +180,16 @@ let circ_ident (input: cinput) : circuit =
   | BWInput (idn, w) -> 
     { circ = BWCirc (C.reg ~size:w ~name:(tag idn)); inps = [input]}
   | BWAInput (idn, sz) -> 
-    let c = C.reg ~name:(tag idn) ~size:(size_of_asize sz) in
-    let c = Array.of_list (List.chunkify sz.wordsize c) in
-    assert (Array.length c = sz.nelements);
-    { circ = BWArray c; inps=[input]}
+    let out = Array.init sz.nelements (fun ja ->
+      List.init sz.wordsize (fun j -> C.input (idn.id_tag, ja*sz.wordsize + j))) 
+    in
+    { circ = BWArray out; inps=[input]}
+  | BWTInput (idn, sz) ->
+    let out = List.init sz.npos (fun jt ->
+      List.init sz.wordsize (fun j -> C.input (idn.id_tag, jt*sz.wordsize + j)))
+    in
+    {circ = BWTuple out; inps=[input]}
+
 
 (* Checks whether the two circuits have the same inputs up to renaming *)
 let input_shape_equal (f: circuit) (g: circuit) : bool = 
@@ -185,6 +216,10 @@ let match_arg (inp: cinput) (val_: circ) : bool =
     when Array.length a = sz.nelements
       && Array.for_all (fun v -> List.compare_length_with v sz.wordsize = 0) a ->
       true
+  | BWTInput (_, sz), BWTuple tp
+    when List.compare_length_with tp sz.npos = 0
+      && List.for_all (fun v -> List.compare_length_with v sz.wordsize = 0) tp ->
+      true
   | _ -> Format.eprintf "inp: %s does not match %s@."
     (cinput_to_string inp) (circ_to_string val_); false
 
@@ -193,8 +228,8 @@ let match_arg (inp: cinput) (val_: circ) : bool =
    returning a constant value
 *) 
 let apply (f: circuit) (args: circ list) : circ = 
-  assert (List.compare_lengths f.inps args = 0);
   let () = try
+    assert (List.compare_lengths f.inps args = 0);
     assert (List.for_all2 match_arg f.inps args);
   with Assert_failure _ as e -> 
     Format.eprintf "%s@." (Printexc.get_backtrace ());
@@ -208,6 +243,7 @@ let apply (f: circuit) (args: circ list) : circ =
     let vr = List.find_opt (function 
       | BWInput (idn, _), _ when id = tag idn -> true
       | BWAInput (idn, _), _ when id = tag idn -> true
+      | BWTInput (idn, _), _ when id = tag idn -> true
       | _ -> false 
       ) args
     in Option.bind vr 
@@ -220,18 +256,23 @@ let apply (f: circuit) (args: circ list) : circ =
         with Invalid_argument _ ->
           None
         in res
+      | BWTInput (_, sz), BWTuple tp ->
+        let it, iw = (i / sz.wordsize), (i mod sz.wordsize) in
+        Option.bind (List.at_opt tp it) (fun l -> List.at_opt l iw) 
       | _ -> assert false
         )
   in
   match f.circ with
   | BWCirc r -> BWCirc (C.maps map_ r)
   | BWArray rs -> BWArray (Array.map (C.maps map_) rs)
+  | BWTuple tp -> BWTuple (List.map (C.maps map_) tp)
 
 (* Given an input returns a new input with the same shape *)
 let fresh_cinput (c: cinput) : cinput = 
   match c with
   | BWInput (idn, w) -> BWInput (fresh idn, w)
   | BWAInput (idn, sz) -> BWAInput (fresh idn, sz)
+  | BWTInput (idn, sz) -> BWTInput (fresh idn, sz)
 
 (* Given a circuit function returns a new circuit function 
    with new names for the inputs (with the needed substituition
@@ -387,6 +428,8 @@ let circuits_of_circuit (c: circuit) : circuit list =
   | BWCirc r -> [c]
   | BWArray a -> 
     List.map (fun r -> {circ=BWCirc r; inps=c.inps}) (Array.to_list a)
+  | BWTuple tp ->
+    List.map (fun r -> {circ=BWCirc r; inps=c.inps}) tp
 
 (* Ident on bitstrings, flattens arrays into bitstrings *)
 let circuit_flatten (c: circuit) : circuit =
@@ -394,11 +437,13 @@ let circuit_flatten (c: circuit) : circuit =
   | BWCirc _ -> c
   | BWArray a -> 
     {circ=BWCirc(Array.fold_right (@) a []); inps=c.inps}
+  | BWTuple _ -> assert false
 
 (* Chunks a bitstring into an array of bitstrings, each of size w *)
 let circuit_bw_split (c: circuit) (w: int) : circuit = 
   match c.circ with
   | BWArray _ -> assert false
+  | BWTuple _ -> assert false
   | BWCirc r -> 
     let nk = List.length r in
     assert (nk mod w = 0);
@@ -429,6 +474,7 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
     | _, BWAInput (_, sz)::cs -> let r1, r2 = List.takedrop (size_of_asize sz) r in
       let r1 = List.chunkify sz.wordsize r1 |> Array.of_list in
       (BWArray r1)::(doit r2 cs)
+    | _ -> assert false (* FIXME: This catches the tuple case, check if doesnt cause issues *)
   in
   doit r inps, BWInput (idn, bsize)
 
@@ -500,6 +546,16 @@ let circuit_bwarray_slice_set (arr_sz: width) (el_sz: width) (acc_sz: int) (i: i
     )
   ) in
   {circ=BWArray (out); inps=[arr_inp; bw_inp]}
+
+let circuit_tuple_proj (c: circuit) (i: int) : circuit = 
+  match c.circ with
+  | BWTuple tp -> begin try
+    {c with circ=BWCirc (List.at tp i)}
+    with Invalid_argument e -> 
+      Format.eprintf "Proj outside tuple size (should never happen)@.";
+      assert false
+    end
+  | _ -> assert false
 
 (* Input for splitting function w.r.t. dependencies *)
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
@@ -927,6 +983,11 @@ let circuit_of_form
             circ = BWArray (Array.map2 (C.ite c_c) t_cs f_cs);
             inps = []; (* FIXME: check if we want to allow bindings inside ifs *)
           }
+        | BWTuple t_tp, BWTuple f_tp when (List.compare_lengths t_tp f_tp = 0) ->
+            hyps, {
+            circ = BWTuple (List.map2 (C.ite c_c) t_tp f_tp);
+            inps = [];
+          }
         | _ -> assert false
         end
       (* Assumes no quantifier bindings/new inputs within if *)
@@ -1144,11 +1205,13 @@ let circuit_of_form
       (* TODO: figure out how to handle quantifiers *)
       end
     | Fproj (f, i) ->
-        begin match f.f_node with
-        | Ftuple tp ->
-          doit cache hyps (tp |> List.drop (i-1) |> List.hd)
-        | _ -> failwith "Don't handle projections on non-tuples"
-        end
+        let hyps, ftp = doit cache hyps f in
+        hyps, circuit_tuple_proj ftp i
+        (* begin match f.f_node with *)
+        (* | Ftuple tp -> *)
+          (* doit cache hyps (tp |> List.drop (i-1) |> List.hd) *)
+        (* | _ -> failwith "Don't handle projections on non-tuples" *)
+        (* end *)
     | Fmatch  (f, fs, ty) -> assert false
     | Flet    (lpat, v, f) -> 
       begin match lpat with
@@ -1158,7 +1221,20 @@ let circuit_of_form
         let () = assert (match_arg inp vc.circ) in
         let cache = Map.add idn (inp, vc) cache in
         doit cache hyps f
-      | LTuple  symbs -> assert false
+      | LTuple  symbs -> 
+        let hyps, tp = doit cache hyps v in
+        let comps = if is_bwtuple tp.circ 
+          then circuits_of_circuit tp
+          else raise (CircError "tuple let")
+        in
+        
+        (* Assuming types match coming from EC *)
+        let cache = List.fold_left2 (fun cache (idn, ty) c -> 
+          let inp = cinput_of_type ~idn env ty in
+          Map.add idn (inp, c) cache) cache symbs comps 
+        in
+        doit cache hyps f
+        
       | LRecord (pth, osymbs) -> assert false
       end
     | Fpvar   (pv, mem) -> 
@@ -1175,8 +1251,15 @@ let circuit_of_form
           (* failwith ("No value for var " ^ v) *)
       in hyps, res
     | Fglob   (id, mem) -> assert false
-    | Ftuple  comps -> assert false
+    | Ftuple  comps -> 
+      let hyps, comps = 
+        List.fold_left_map (fun hyps comp -> doit cache hyps comp) hyps comps 
+      in
+      let inps = List.fold_right (@) (List.map (fun c -> c.inps) comps) [] in
+      let comps = List.map (fun c -> destr_bwcirc c.circ) comps in
+      hyps, {circ= BWTuple comps; inps}
     | _ -> failwith "Not yet implemented"
+
 
   in 
   let hyps, f_c = doit cache hyps f_ in
@@ -1230,8 +1313,18 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
       | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e ->
         let v = match v with | PVloc v -> v | _ -> assert false in
         Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate) pstate vs es
-      | _ -> failwith "Case not implemented yet"
-    end
+      | _ -> let c = (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) in
+        assert (is_bwtuple c.circ);
+        let circs = circuits_of_circuit c in
+        assert (List.compare_lengths circs vs = 0);
+        let pstate = List.fold_left2 (fun pstate pv c -> 
+          match pv with
+          | PVloc v -> Map.add v c pstate
+          | _ -> assert false
+        ) pstate (List.fst vs) circs in
+        pstate
+
+      end
     | _ -> failwith "Case not implemented yet"
   with 
   | e ->
