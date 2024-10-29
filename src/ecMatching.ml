@@ -34,8 +34,11 @@ module Position = struct
   type codepos    = (codepos1 * int) list * codepos1
   type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
 
-  let shift ~(offset : int) ((o, p) : codepos1) : codepos1 =
+  let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
     (o + offset, p)
+
+  let shift ~(offset : int) ((outp, p) : codepos) : codepos =
+    (outp, shift1 ~offset p)
 
   let resolve_offset ~(base : codepos1) ~(offset : codeoffset1) : codepos1 =
     match offset with

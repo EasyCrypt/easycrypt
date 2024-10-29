@@ -30,7 +30,9 @@ module Position : sig
   type codepos     = (codepos1 * int) list * codepos1
   type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
 
-  val shift : offset:int -> codepos1 -> codepos1
+  val shift1 : offset:int -> codepos1 -> codepos1
+  val shift  : offset:int -> codepos  -> codepos
+
   val resolve_offset : base:codepos1 -> offset:codeoffset1 -> codepos1
 end
 
