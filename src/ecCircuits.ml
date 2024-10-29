@@ -584,8 +584,11 @@ let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit =
 (* Basis for hardcoded circuit gen *)
 let specifications : (string, Lospecs.Ast.adef) Map.t Lazy.t =
   Lazy.from_fun (fun () ->
-    let specs = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
-    let specs = C.load_from_file ~filename:specs in
+    let specs_avx2 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
+    let specs_avx2 = C.load_from_file ~filename:specs_avx2 in
+    let specs_armv7 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "armv7.spec" in
+    let specs_armv7 = C.load_from_file ~filename:specs_armv7 in
+    let specs = specs_armv7 @ specs_avx2 in
     Map.of_seq (List.to_seq specs)
   )
 
@@ -675,7 +678,7 @@ module BaseOps = struct
       let id2 = EcIdent.create (temp_symbol) in
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
-      {circ = BWCirc(C.urem c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+      {circ = BWCirc(C.umod c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Rem (size, true) } -> 
       let id1 = EcIdent.create (temp_symbol) in

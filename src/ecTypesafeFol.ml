@@ -113,7 +113,7 @@ let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: for
   | Fop (pth, _) -> 
     f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
   | Fapp (fop, args) -> 
-    let new_args = args @ fs in
+    (* let new_args = args @ fs in *)
     (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) in *)
     (* let pp_forms fmt = List.iter (Format.fprintf fmt "%a, " pp_form) in *)
     (* Format.eprintf "new_args: %a@." pp_forms new_args; *)

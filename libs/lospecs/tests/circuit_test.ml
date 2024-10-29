@@ -878,6 +878,45 @@ let test_bvseq () =
   in test (op 9)
 
 (* -------------------------------------------------------------------- *)
+let test_mod () =
+  let op (size : int) : op =
+    let module M = (val Word.uword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      M.to_int @@ M.mod_ (M.of_int x) (M.of_int y)
+    in
+
+    { name = (Format.sprintf "mod<%d>" size)
+    ; args = List.make 2 (size, `U)
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.umod x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in test (op 9)
+
+(* -------------------------------------------------------------------- *)
+let test_smod () =
+  let op (size : int) : op =
+    let module M = (val Word.sword ~size) in
+
+    let sim (x : int) (y : int) : int =
+      M.to_int @@ M.mod_ (M.of_int x) (M.of_int y)
+    in
+
+    { name = (Format.sprintf "smod<%d>" size)
+    ; args = List.make 2 (size, `S)
+    ; out  = `S
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.smod x y)
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in 
+  for i = 1 to 9 do 
+    test (op i)
+  done
+  
+(* -------------------------------------------------------------------- *)
 let tests = [
   ("opp" , test_opp );
   ("incr", test_incr);

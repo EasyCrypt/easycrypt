@@ -25,6 +25,8 @@ module type S = sig
 
   val of_int : int -> t
   val to_int : t -> int
+
+  val mod_ : t -> t -> t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -90,6 +92,27 @@ module SWord(I : Size) : S = struct
 
   let abs (x : t) : t =
     abs x
+
+  (* Careful with size *)
+  let urem (x : t) (y : t) : t =
+    assert (Sys.int_size - nbits >= 1);
+    let x = x lsr 1 in
+    let y = y lsr 1 in
+    (x mod y) lsl 1
+
+  let mod_ (x: t) (y: t) : t =
+      if y = zero then x else
+      let u = urem (abs x) (abs y) in
+      if u = zero 
+        then u 
+      else if (x >= zero) && (y >= zero) 
+        then u 
+      else if (x < zero) && (y >= zero) 
+        then (-u + y) 
+      else if (x >= zero) && (y < zero) 
+        then (u + y) 
+      else -u
+    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -150,6 +173,9 @@ module UWord(I : Size) : S = struct
 
   let abs (x : t) : t =
     x
+
+  let mod_ (x: t) (y : t) : t =
+    if y = 0 then x else x mod y
 end
 
 (* -------------------------------------------------------------------- *)
