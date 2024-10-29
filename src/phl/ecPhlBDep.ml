@@ -360,7 +360,13 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let { m; n; invs; inpvs; outvs; lane; pcond; perm } = bdinfo in
 
   let env = FApi.tc1_env tc in
-  let (@@!) pth args = EcTypesafeFol.f_app_safe env pth args in
+  let (@@!) pth args = 
+    try
+      EcTypesafeFol.f_app_safe env pth args 
+    with EcUnify.UnificationFailure _ ->
+      Format.eprintf "Type mismatch in pre-post generation, check your lane and precondition types@.";
+      raise BDepError
+  in
 
   let fperm, pperm = match perm with 
   | None -> None, None
@@ -381,6 +387,8 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   
   let plane, olane = EcEnv.Op.lookup ([], lane.pl_desc) env in
   let ppcond, opcond = EcEnv.Op.lookup ([], pcond.pl_desc) env in
+  (* FIXME: Add a check that this does not return a function type 
+    aka lane function only have one argument *)
   let inpbty, outbty = tfrom_tfun2 olane.op_ty in
   
   (* Refactor this *)

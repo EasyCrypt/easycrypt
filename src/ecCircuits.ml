@@ -1305,26 +1305,39 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
-    | Sasgn (LvVar (PVloc v, ty), e) -> 
+    | Sasgn (LvVar (PVloc v, _ty), e) -> 
       let pstate = Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate in
       (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate
-    | Sasgn (LvTuple (vs), e) -> begin match e.e_node with
-      | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e ->
-        let v = match v with | PVloc v -> v | _ -> assert false in
-        Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate) pstate vs es
-      | _ -> let c = (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) in
-        assert (is_bwtuple c.circ);
-        let circs = circuits_of_circuit c in
-        assert (List.compare_lengths circs vs = 0);
-        let pstate = List.fold_left2 (fun pstate pv c -> 
-          match pv with
-          | PVloc v -> Map.add v c pstate
-          | _ -> assert false
-        ) pstate (List.fst vs) circs in
-        pstate
+    | Sasgn (LvTuple (vs), e) ->
+      let tp = (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) in
+      assert (is_bwtuple tp.circ);
+      let comps = circuits_of_circuit tp in
+      let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
+        let v = match pv with
+        | PVloc v -> v
+        | _ -> assert false
+        in
+        Map.add v c pstate
+        ) pstate vs comps
+      in 
+      pstate
+      (* begin match e.e_node with *)
+      (* | Etuple (es) -> List.fold_left2 (fun pstate (v, t) e -> *)
+        (* let v = match v with | PVloc v -> v | _ -> assert false in *)
+        (* Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate) pstate vs es *)
+      (* | _ -> let c = (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) in *)
+        (* assert (is_bwtuple c.circ); *)
+        (* let circs = circuits_of_circuit c in *)
+        (* assert (List.compare_lengths circs vs = 0); *)
+        (* let pstate = List.fold_left2 (fun pstate pv c -> *) 
+          (* match pv with *)
+          (* | PVloc v -> Map.add v c pstate *)
+          (* | _ -> assert false *)
+        (* ) pstate (List.fst vs) circs in *)
+        (* pstate *)
 
-      end
+      (* end *)
     | _ -> failwith "Case not implemented yet"
   with 
   | e ->
