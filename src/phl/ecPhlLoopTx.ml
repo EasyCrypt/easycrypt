@@ -317,7 +317,14 @@ let process_unroll_for side cpos tc =
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
-  let tcenv = t_doit 0 pos zs tc in FApi.t_onalli doi tcenv
+  let tcenv = t_doit 0 pos zs tc in
+  let tcenv = FApi.t_onalli doi tcenv in
+
+  let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+  let clen = blen * (List.length zs - 1) in
+
+  Format.eprintf "[W]%d %d@." blen (List.length zs);
+  FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
 
 (* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =

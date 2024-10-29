@@ -108,7 +108,6 @@ theory CfoldWhileUnroll.
   proc.
   cfold 1.
   unroll for 2.
-  cfold 1.
   by auto => />.
   qed.
 end CfoldWhileUnroll.
