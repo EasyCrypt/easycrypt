@@ -3455,8 +3455,12 @@ let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : 
 (* -------------------------------------------------------------------- *)
 let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
   match p with
-  | (`Sample | `While | `Call | `If) as p ->
+  | (`While | `If | `Match) as p ->
     (p :> cp_match)
+  | `Sample lv ->
+    `Sample (trans_lv_match ?memory env lv)
+  | `Call lv ->
+    `Call (trans_lv_match ?memory env lv)
   | `Assign lv ->
     `Assign (trans_lv_match ?memory env lv)
 (* -------------------------------------------------------------------- *)
@@ -3464,13 +3468,20 @@ let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : c
   match p with
   | `ByPos _ as p -> (p :> cp_base)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
+
 (* -------------------------------------------------------------------- *)
 let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
+let trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
+  match bs with
+  | `Cond b -> `Cond b
+  | `Match { pl_desc = x } -> `Match x
+
+(* -------------------------------------------------------------------- *)
 let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
-  let nm = List.map (fst_map (trans_codepos1 ?memory env)) nm in
+  let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
   let p = trans_codepos1 ?memory env p in
   (nm, p)
 

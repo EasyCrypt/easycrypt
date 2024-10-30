@@ -309,6 +309,10 @@ module HiInternal = struct
       | Zp.ZWhile  (_, sp)    -> aux_s (IPwhile aout) sp
       | Zp.ZIfThen (_, sp, _) -> aux_s (IPif (aout, [])) sp
       | Zp.ZIfElse (_, _, sp) -> aux_s (IPif ([], aout)) sp
+      | Zp.ZMatch (_, sp, mpi) ->
+        let prebr  = List.map (fun _ -> []) mpi.prebr  in
+        let postbr = List.map (fun _ -> []) mpi.postbr in
+        aux_s (IPmatch (prebr @ aout :: postbr)) sp
 
     and aux_s aout ((sl, _), ip) =
       aux_i [(List.length sl, aout)] ip

@@ -2124,9 +2124,12 @@ let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos
           let k =
             match k with
             | `If     -> "if"
+            | `Match  -> "match"
             | `While  -> "while"
-            | `Sample -> "<$"
-            | `Call   -> "<@"
+            | `Sample `LvmNone -> "<$"
+            | `Sample (`LvmVar pv) -> Format.asprintf "%a<$" (pp_pv ppe) pv
+            | `Call `LvmNone -> "<@"
+            | `Call (`LvmVar pv) -> Format.asprintf "%a<@" (pp_pv ppe) pv
             | `Assign `LvmNone -> "<-"
             | `Assign (`LvmVar pv) -> Format.asprintf "%a<-" (pp_pv ppe) pv
           in Format.asprintf "^%s" k in
@@ -2146,14 +2149,20 @@ let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoff
   match offset with
   | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
   | `ByOffset   o -> Format.fprintf fmt "%d" o
-  
+
 (* -------------------------------------------------------------------- *)
 let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
-  let pp_nm (fmt : Format.formatter) ((cp, i) : CP.codepos1 * int) =
-    Format.eprintf "%a%s" (pp_codepos1 ppe) cp (if i = 0 then "." else "?")
+  let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
+    let bs = 
+      match bs with
+      | `Cond  true  -> "."
+      | `Cond  false -> "?"
+      | `Match cp    -> Format.sprintf "#%s." cp
+      in
+    Format.fprintf fmt "%a%s" (pp_codepos1 ppe) cp bs
   in
 
-  Format.eprintf "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
+  Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
