@@ -2637,7 +2637,7 @@ codepos1:
 
 codepos:
 | nm=rlist0(nm1_codepos, empty) i=codepos1
-    { (List.rev nm, i) }
+    { (nm, i) }
 
 codeoffset1:
 | i=sword       { (`ByOffset   i :> pcodeoffset1) }
