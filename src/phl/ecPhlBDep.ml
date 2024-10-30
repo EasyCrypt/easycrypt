@@ -42,6 +42,7 @@ let mapreduce
   (perm: (int -> int) option)
   : unit =
 
+
   let time (t: float) (msg: string) : float =
     let new_t = Unix.gettimeofday () in
     Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
@@ -50,10 +51,12 @@ let mapreduce
   let tm = Unix.gettimeofday () in
   
   let env = toenv hyps in
+  let ppenv = EcPrinting.PPEnv.ofenv env in
   let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
   | _ -> failwith "Invalid operator type" in
+  Format.eprintf "Lane: %a@." (EcPrinting.pp_form ppenv) f;
   let fc = circuit_of_form hyps f in
 
   let tm = time tm "Lane function circuit generation done" in
@@ -111,14 +114,23 @@ let mapreduce
 
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
-    let () = assert(List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c (Some pcondc)) (List.tl cs)) in
+    let () = try 
+      assert (List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c (Some pcondc)) (List.tl cs));
+      with Assert_failure _ as e ->
+        Format.eprintf "Program lane equivalence failed between lanes@.";
+        raise e
+    in
 
     let tm = time tm "Program lanes equivs done" in
 
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Lane func: %s@." (circuit_to_string fc);
     
-    let () = assert(circ_equiv (List.hd cs) fc (Some pcondc)) in
+    let () = try assert(circ_equiv (List.hd cs) fc (Some pcondc))
+      with Assert_failure _ as e ->
+      Format.eprintf "Equivalence check failed between program lanes(bvout1) and lane function(bvout2)@.";
+      raise e
+    in
 
     let _tm = time tm "Program to lane func equiv done" in
     
