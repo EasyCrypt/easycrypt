@@ -229,7 +229,7 @@ let process_unroll_for side cpos tc =
     tc_error !!tc "cannot use deep code position";
 
   let cpos = EcTyping.trans_codepos env cpos in
-  let z    = Zpr.zipper_of_cpos env cpos c in
+  let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
   (* Extract loop condition / body *)
@@ -327,7 +327,6 @@ let process_unroll_for side cpos tc =
   let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
   let clen = blen * (List.length zs - 1) in
 
-  Format.eprintf "[W]%d %d@." blen (List.length zs);
   FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
 
 (* -------------------------------------------------------------------- *)

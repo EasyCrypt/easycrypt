@@ -73,7 +73,12 @@ module Zipper : sig
   val zipper : instr list -> instr list -> ipath -> zipper
 
   (* Return the zipper for the stmt [stmt] at code position [codepos].
-   * Raise [InvalidCPos] if [codepos] is not valid for [stmt]. *)
+   * Raise [InvalidCPos] if [codepos] is not valid for [stmt]. It also
+   * returns a input code-position, but fully resolved (i.e. with absolute
+   * positions only). The second variant simply throw away the second
+   * output.
+   *)
+  val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * codepos
   val zipper_of_cpos : env -> codepos -> stmt -> zipper
 
   (* Zip the zipper, returning the corresponding statement *)

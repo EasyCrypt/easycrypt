@@ -30,8 +30,8 @@ module Position = struct
     | `ByMatch of int option * cp_match
   ]
 
-  type codepos1   = int * cp_base
-  type codepos    = (codepos1 * int) list * codepos1
+  type codepos1    = int * cp_base
+  type codepos     = (codepos1 * int) list * codepos1
   type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
 
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
@@ -176,30 +176,41 @@ module Zipper = struct
     let (s, _) = split_at_cpos1 ~after:`No env cpos s in
     1 + List.length s
 
-  let zipper_at_nm_cpos1 (env : EcEnv.env) ((cp1, sub) : codepos1 * int) s zpr =
+  let zipper_at_nm_cpos1
+    (env        : EcEnv.env)
+    ((cp1, sub) : codepos1 * int)
+    (s          : stmt)
+    (zpr        : ipath)
+  : (ipath * stmt) * (codepos1 * int)
+  =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
+    let zpr =
+      match i.i_node, sub with
+      | Swhile (e, sw), 0 ->
+          (ZWhile (e, ((s1, s2), zpr)), sw)
 
-    match i.i_node, sub with
-    | Swhile (e, sw), 0 ->
-        (ZWhile (e, ((s1, s2), zpr)), sw)
+      | Sif (e, ifs1, ifs2), 0 ->
+          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
 
-    | Sif (e, ifs1, ifs2), 0 ->
-        (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
+      | Sif (e, ifs1, ifs2), 1 ->
+          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
 
-    | Sif (e, ifs1, ifs2), 1 ->
-        (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
+      | _ -> raise InvalidCPos
+    in zpr, ((0, `ByPos (1 + List.length s1)), sub)
 
-    | _ -> raise InvalidCPos
-
-  let zipper_of_cpos (env : EcEnv.env) ((nm, cp1) : codepos) s =
-    let zpr, s =
-      List.fold_left
+  let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
+    let (zpr, s), nm =
+      List.fold_left_map
         (fun (zpr, s) nm1 -> zipper_at_nm_cpos1 env nm1 s zpr)
         (ZTop, s) nm in
 
     let s1, i, s2 = find_by_cpos1 env cp1 s in
+    let zpr = zipper s1 (i :: s2) zpr in
 
-    zipper s1 (i :: s2) zpr
+    (zpr, (nm, (0, `ByPos (1 + List.length s1))))
+
+  let zipper_of_cpos (env : EcEnv.env) (cp : codepos) (s : stmt) =
+    fst (zipper_of_cpos_r env cp s)
 
   let split_at_cpos1 env cpos1 s =
     split_at_cpos1 ~after:`Auto env cpos1 s

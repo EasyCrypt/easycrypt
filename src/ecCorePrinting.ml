@@ -66,6 +66,8 @@ module type PrinterAPI = sig
   val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
   val pp_codeoffset1 : PPEnv.t -> EcMatching.Position.codeoffset1 pp
 
+  val pp_codepos     : PPEnv.t -> EcMatching.Position.codepos pp
+
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
