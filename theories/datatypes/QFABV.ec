@@ -132,7 +132,7 @@ theory BVOperators.
     op bvshl : bv -> bv -> bv.
   
     axiom bvshlP (bv1 bv2 : bv) : touint (bvshl bv1 bv2) =
-      touint bv1 * 2 ^ (touint bv2).
+      (touint bv1 * 2 ^ (touint bv2)) %% (2 ^ BV.size).
   end BVSHL.
   
   (* ------------------------------------------------------------------ *)
@@ -346,10 +346,10 @@ theory BVOperators.
     clone BV.
     clone A.
 
-    op bvinit : (int -> BV.bv) -> BV.bv A.t.
+    op bvainit : (int -> BV.bv) -> BV.bv A.t.
 
     axiom bvainitP (f : int -> BV.bv) : 
-      A.to_list (bvinit f) = List.mkseq (fun i => (f i)) A.size.
+      A.to_list (bvainit f) = List.mkseq (fun i => (f i)) A.size.
   end BVAInit.
 
   (* ------------------------------------------------------------------ *)
