@@ -311,9 +311,16 @@ theory BVOperators.
     op bvasliceset : (BV1.bv A.t) -> int -> (BV2.bv) -> BV1.bv A.t.
 
     axiom bvaslicesetP (arr : BV1.bv A.t) (offset : int) (bv: BV2.bv): offset + BV2.size <= BV1.size * A.size =>
-      let arr_l = List.flatten (List.map (BV1.tolist) (A.to_list arr)) in
-      take offset arr_l ++ (BV2.tolist bv) ++ drop (offset + BV2.size) arr_l
-      = List.flatten (List.map BV1.tolist (A.to_list (bvasliceset arr offset bv))).
+      forall (i : int),
+      0 <= i < (BV1.size * A.size) =>
+      let input_arr = List.flatten (List.map (BV1.tolist) (A.to_list arr)) in
+      let input_bv = BV2.tolist bv in
+      let output_arr = List.flatten (List.map BV1.tolist (A.to_list (bvasliceset arr offset bv))) in
+      List.nth witness output_arr i = 
+      if i < offset \/ offset + BV2.size < i then
+        List.nth witness input_arr i 
+      else
+        List.nth witness input_bv (i - offset).
   end BVASliceSet.
 
   (* ------------------------------------------------------------------ *)
