@@ -292,10 +292,12 @@ theory BVOperators.
     axiom [bydone] le_size : BV2.size <= BV1.size * A.size.
 
     op bvasliceget : (BV1.bv A.t) -> int -> BV2.bv.
+    print List.size.
 
-    axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) : offset + BV2.size <= BV1.size * A.size =>
-      take BV2.size (drop offset (List.flatten (List.map (BV1.tolist) (A.to_list arr)))) 
-      = BV2.tolist (bvasliceget arr offset).
+    axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) :
+    let base = List.flatten (List.map BV1.tolist (A.to_list arr)) in
+    let ret = BV2.tolist (bvasliceget arr offset) in
+    List.nth false ret = List.nth false (List.drop offset ret).
   end BVASliceGet.
 
   (* ------------------------------------------------------------------ *)
