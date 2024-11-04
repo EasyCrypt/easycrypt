@@ -297,7 +297,7 @@ theory BVOperators.
        a rewrite without conditions, but the binding just
        needs to be correct for valid offsets *)
     axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) :
-    0 <= offset < BV1.size * A.size - BV2.size =>
+    0 <= offset <= BV1.size * A.size - BV2.size =>
     let base = List.flatten (List.map BV1.tolist (A.to_list arr)) in
     let ret = bvasliceget arr offset in
        forall i, 0 <= i < BV2.size =>
