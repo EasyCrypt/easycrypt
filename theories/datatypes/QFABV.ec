@@ -292,12 +292,16 @@ theory BVOperators.
     axiom [bydone] le_size : BV2.size <= BV1.size * A.size.
 
     op bvasliceget : (BV1.bv A.t) -> int -> BV2.bv.
-    print List.size.
 
+    (* We need the definition of target semantic to allow
+       a rewrite without conditions, but the binding just
+       needs to be correct for valid offsets *)
     axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) :
+    0 <= offset < BV1.size * A.size - BV2.size =>
     let base = List.flatten (List.map BV1.tolist (A.to_list arr)) in
-    let ret = BV2.tolist (bvasliceget arr offset) in
-    List.nth false ret = List.nth false (take BV2.size (List.drop offset base)).
+    let ret = bvasliceget arr offset in
+       forall i, 0 <= i < BV2.size =>
+       nth false (BV2.tolist ret) i = nth false (take BV2.size (List.drop offset base)) i.
   end BVASliceGet.
 
   (* ------------------------------------------------------------------ *)
@@ -310,17 +314,20 @@ theory BVOperators.
 
     op bvasliceset : (BV1.bv A.t) -> int -> (BV2.bv) -> BV1.bv A.t.
 
-    axiom bvaslicesetP (arr : BV1.bv A.t) (offset : int) (bv: BV2.bv): offset + BV2.size <= BV1.size * A.size =>
-      forall (i : int),
-      0 <= i < (BV1.size * A.size) =>
+    (* We need the definition of target semantic to allow
+       a rewrite without conditions, but the binding just
+       needs to be correct for valid offsets *)
+    axiom bvaslicesetP (arr : BV1.bv A.t) (offset : int) (bv: BV2.bv): 
+       0 <= offset <= BV1.size * A.size - BV2.size  =>
       let input_arr = List.flatten (List.map (BV1.tolist) (A.to_list arr)) in
       let input_bv = BV2.tolist bv in
       let output_arr = List.flatten (List.map BV1.tolist (A.to_list (bvasliceset arr offset bv))) in
-      List.nth witness output_arr i = 
-      if i < offset \/ offset + BV2.size < i then
-        List.nth witness input_arr i 
+      forall i, 0 <= i < BV1.size * A.size =>
+      List.nth false output_arr i = 
+      if offset <= i < offset + BV2.size then
+        List.nth false input_bv (i - offset)
       else
-        List.nth witness input_bv (i - offset).
+        List.nth false input_arr i.
   end BVASliceSet.
 
   (* ------------------------------------------------------------------ *)
