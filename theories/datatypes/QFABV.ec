@@ -297,7 +297,7 @@ theory BVOperators.
     axiom bvaslicegetP (arr : BV1.bv A.t) (offset : int) :
     let base = List.flatten (List.map BV1.tolist (A.to_list arr)) in
     let ret = BV2.tolist (bvasliceget arr offset) in
-    List.nth false ret = List.nth false (List.drop offset base).
+    List.nth false ret = List.nth false (take BV2.size (List.drop offset base)).
   end BVASliceGet.
 
   (* ------------------------------------------------------------------ *)
