@@ -283,6 +283,20 @@ theory BVOperators.
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
 
+(* ------------------------------------------------------------------ *)
+  abstract theory BVGet.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size.
+    axiom [bydone] eq1_size : BV2.size = 1.
+
+    op bvget : BV1.bv -> int -> BV2.bv.
+
+    axiom bvgetP (bv : BV1.bv) (idx: int) : 
+      List.nth witness (BV2.tolist (bvget bv idx)) 0 = List.nth witness (BV1.tolist bv) idx.
+  end BVGet.
+
   (* ------------------------------------------------------------------ *)
   abstract theory BVASliceGet.
     clone BV as BV1.

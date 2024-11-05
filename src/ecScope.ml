@@ -2525,6 +2525,7 @@ module Circuit = struct
       | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLe"
 
       | "init" -> (fun sz -> `Init (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "Init"
+      | "get" -> (fun sz -> `Get (fst (as_seq2 sz))), [`BV None; `BV (Some 1)], "Get"
 
       | "ainit" -> (fun sz -> `AInit (as_seq2 (sz |> List.rev))), [`BV None; `A], "AInit"
 

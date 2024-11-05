@@ -234,6 +234,7 @@ type bv_opkind = [
   | `Extract  of int * int (* size in + size out *)
   | `Concat   of int * int * int (* size in1 + size in2 + size out *)
   | `Init     of int (* size_out *)
+  | `Get      of int (* size_in *)
   | `AInit    of int * int (* arr_sz + size_out *)
   | `Map      of int * int * int (* size_in + size_out + arr_size *)
   | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)

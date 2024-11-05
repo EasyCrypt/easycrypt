@@ -3429,6 +3429,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Le      (_,    false) -> "ule"
         | `Le      (_,    true ) -> "sle"
         | `Init     _            -> "init"
+        | `Get      _            -> "get"
         | `AInit    _            -> "ainit"
         | `Extend  (_, _, false) -> "zextend"
         | `Extend  (_, _, true ) -> "sextend"

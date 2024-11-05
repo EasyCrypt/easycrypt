@@ -955,6 +955,25 @@ let circuit_of_form
       | Fint i -> i
       | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
     in
+
+    (* Takes an Fapp and returns an Fapp with any integer arguments preapplied to the body *)
+    let apply_int_args (f_: form) : form = 
+
+      let () = Format.eprintf "Input form: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_ in
+      let is_bound_type (t: ty) : bool =
+        (EcEnv.Circuit.lookup_array env t |> Option.is_some) 
+        || (EcEnv.Circuit.lookup_bitstring env t |> Option.is_some)
+      in
+      
+      let f, args = destr_app f_ in
+      if List.for_all (fun f -> is_bound_type f.f_ty) args then 
+        f_
+      else
+        let f = EcTypesafeFol.fapply_safe ~redmode hyps f args in
+        let () = Format.eprintf "Output form: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
+        f
+    in
+
     
     match f_.f_node with
     (* hardcoding size for now FIXME *)
@@ -1038,6 +1057,7 @@ let circuit_of_form
         hyps, circ
     end
     | Fapp _ -> 
+    (* let f_ = apply_int_args f_ in *)
     let (f, fs) = EcCoreFol.destr_app f_ in
     let hyps, res = 
       (* Assuming correct types coming from EC *)
@@ -1113,6 +1133,16 @@ let circuit_of_form
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         hyps, circuit_aggregate fs
+      | `BvOperator ({kind = `Get (size)}) :: _ ->
+        let bv, i = match fs with
+        | [bv; i] -> bv, int_of_form i |> to_int
+        | _ -> assert false
+        in
+        assert (i < size);
+        let hyps, bv = doit cache hyps bv in
+        let bv_base = destr_bwcirc bv.circ in
+        hyps, {bv with circ = BWCirc([List.nth bv_base i])}
+        
       | `BvOperator ({kind = `AInit (arr_sz, bw_sz)}) :: _ ->
         let f = match fs with
         | [f] -> f
@@ -1178,7 +1208,9 @@ let circuit_of_form
           hyps, {circ = BWCirc([C.true_]); inps=[]}
         | Some `False, [] ->
           hyps, {circ = BWCirc([C.false_]); inps=[]}
+        (* recurse down into definition *)
         | None, _ -> 
+          (* let f, fs = destr_app (apply_int_args f_) in *)
           let hyps, f_c = doit cache hyps f in
           let hyps, fcs = List.fold_left_map
             (doit cache)
