@@ -73,4 +73,15 @@
   , "scenario"   : "sphincsplus"
   , "options"    : ""
   }
+
+  ,
+
+  { "name"       : "curve25519"
+  , "repository" : "https://github.com/formosa-crypto/formosa-25519"
+  , "branch"     : "main"
+  , "subdir"     : "proof/crypto_scalarmult/curve25519"
+  , "config"     : "tests.config"
+  , "scenario"   : "curve25519"
+  , "options"    : ""
+  }
 ]
