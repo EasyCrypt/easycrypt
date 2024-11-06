@@ -194,6 +194,33 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
   done
 
 (* -------------------------------------------------------------------- *)
+let test_rot ~(side : [`L | `R]) =
+  let str_side = match side with `L -> "left" | `R -> "right" in
+
+  let op (size : int) : op =
+    let module M = (val Word.word ~sign:`U ~size) in
+
+    let sim (v : int) (i : int) =
+      assert false
+    in
+
+    { name = (Format.sprintf "shift<%s,%d>" str_side size)
+    ; args = [(size, `U); (4, `U)]
+    ; out  = `U
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in match side with
+    | `L -> C.rol x y
+    | `R -> C.ror x y
+    )
+    ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
+    }
+
+  in
+
+  for i = 1 to 14 do
+    test (op i)
+  done
+
+(* -------------------------------------------------------------------- *)
 let test_opp () =
   let op (size : int) : op =
     let module M = (val Word.sword ~size) in
@@ -935,6 +962,8 @@ let tests = [
 
   ("lsl", (fun () -> test_shift ~side:`L ~sign:`U));
   ("lsr", (fun () -> test_shift ~side:`R ~sign:`U));
+  ("rol", (fun () -> test_rot ~side:`L));
+  ("ror", (fun () -> test_rot ~side:`R));
 
   ("asl", (fun () -> test_shift ~side:`L ~sign:`S));
   ("asr", (fun () -> test_shift ~side:`R ~sign:`S));

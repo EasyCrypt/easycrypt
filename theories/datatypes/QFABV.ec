@@ -134,6 +134,24 @@ theory BVOperators.
     axiom bvshlP (bv1 bv2 : bv) : touint (bvshl bv1 bv2) =
       (touint bv1 * 2 ^ (touint bv2)) %% (2 ^ BV.size).
   end BVSHL.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVROL.
+    clone import BV.
+  
+    op bvrol : bv -> bv -> bv.
+  
+    axiom bvrolP (bv1 bv2 : bv) : false.
+  end BVROL.
+  
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVROR.
+    clone import BV.
+  
+    op bvror : bv -> bv -> bv.
+  
+    axiom bvrorP (bv1 bv2 : bv) : false.
+  end BVROR.
   
   (* ------------------------------------------------------------------ *)
   abstract theory BVSHR.
@@ -174,6 +192,16 @@ theory BVOperators.
     axiom bvorP (bv1 bv2 : bv) : tolist (bvor bv1 bv2) =
       map (fun (b : _ * _) => b.`1 \/ b.`2) (zip (tolist bv1) (tolist bv2)).
   end BVOr.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVXor.
+    clone import BV.
+  
+    op bvxor: bv -> bv -> bv.
+  
+    axiom bvxorP (bv1 bv2 : bv) : tolist (bvxor bv1 bv2) =
+      map (fun (b : _ * _) => b.`1 \/ b.`2) (zip (tolist bv1) (tolist bv2)).
+  end BVXor.
   
   (* ------------------------------------------------------------------ *)
   abstract theory BVNot.

@@ -150,3 +150,7 @@ val sdiv : reg -> reg -> reg
 val srem : reg -> reg -> reg
 
 val smod : reg -> reg -> reg
+
+val rol : reg -> reg -> reg
+
+val ror : reg -> reg -> reg

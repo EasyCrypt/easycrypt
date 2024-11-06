@@ -2513,10 +2513,13 @@ module Circuit = struct
       | "urem" -> (fun sz -> `Rem  (as_seq1 sz, false)), [`BV None], "URem"
       | "srem" -> (fun sz -> `Rem  (as_seq1 sz, true )), [`BV None], "SRem"
       | "shl"  -> (fun sz -> `Shl  (as_seq1 sz       )), [`BV None], "SHL"
+      | "rol"  -> (fun sz -> `Rol  (as_seq1 sz       )), [`BV None], "ROL"
+      | "ror"  -> (fun sz -> `Ror  (as_seq1 sz       )), [`BV None], "ROR"
       | "shr"  -> (fun sz -> `Shr  (as_seq1 sz, false)), [`BV None], "SHR"
       | "ashr" -> (fun sz -> `Shr  (as_seq1 sz, true )), [`BV None], "ASHR"
       | "and"  -> (fun sz -> `And  (as_seq1 sz       )), [`BV None], "And"
       | "or"   -> (fun sz -> `Or   (as_seq1 sz       )), [`BV None], "Or"
+      | "xor"  -> (fun sz -> `Xor  (as_seq1 sz       )), [`BV None], "Xor"
       | "not"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Not"
 
       | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"

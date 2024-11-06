@@ -750,6 +750,20 @@ module BaseOps = struct
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.shift ~side:`L ~sign:`L c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
+    | Some { kind = `Rol  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.rol c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Ror  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.ror c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
     | Some { kind = `Shr  (size, false) } -> 
       let id1 = EcIdent.create (temp_symbol) in
       let id2 = EcIdent.create (temp_symbol) in
@@ -777,6 +791,13 @@ module BaseOps = struct
       let c1 = C.reg ~size ~name:id1.id_tag in
       let c2 = C.reg ~size ~name:id2.id_tag in
       {circ = BWCirc(C.lor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
+
+    | Some { kind = `Xor  size } -> 
+      let id1 = EcIdent.create (temp_symbol) in
+      let id2 = EcIdent.create (temp_symbol) in
+      let c1 = C.reg ~size ~name:id1.id_tag in
+      let c2 = C.reg ~size ~name:id2.id_tag in
+      {circ = BWCirc(C.lxor_ c1 c2); inps = [BWInput(id1, size); BWInput(id2, size)]}
 
     | Some { kind = `Not  size } -> 
       let id1 = EcIdent.create (temp_symbol) in

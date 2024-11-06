@@ -293,6 +293,7 @@ let shift ~(side : [`L | `R]) ~(sign : [`L | `A]) =
   | `L, `A -> asl_
   | `R, `A -> asr_
 
+
 (* -------------------------------------------------------------------- *)
 let halfadder (a : node) (b : node) : node * node =
   (and_ a b, xor a b)
@@ -668,3 +669,13 @@ let smod (s : reg) (t : reg) : reg =
     ~k01:(add_dropc (opp (umod (    s) (opp t))) t)
     ~k11:(               (umod (opp s) (opp t))   )
     (msb_s, msb_t)
+
+(* -------------------------------------------------------------------- *)
+let rol (r: reg) (s: reg) : reg =
+  let size = List.length r in
+  lor_ (shift ~side:`L ~sign:`L r s) (shift ~side:`R ~sign:`L r (sub_dropc (of_int ~size size) s)) 
+
+(* -------------------------------------------------------------------- *)
+let ror (r: reg) (s: reg) : reg =
+  let size = List.length r in
+  lor_ (shift ~side:`R ~sign:`L r s) (shift ~side:`L ~sign:`L r (sub_dropc (of_int ~size size) s)) 
