@@ -673,9 +673,11 @@ let smod (s : reg) (t : reg) : reg =
 (* -------------------------------------------------------------------- *)
 let rol (r: reg) (s: reg) : reg =
   let size = List.length r in
+  let s = umod s (of_int ~size size) in
   lor_ (shift ~side:`L ~sign:`L r s) (shift ~side:`R ~sign:`L r (sub_dropc (of_int ~size size) s)) 
 
 (* -------------------------------------------------------------------- *)
 let ror (r: reg) (s: reg) : reg =
   let size = List.length r in
+  let s = umod s (of_int ~size size) in
   lor_ (shift ~side:`R ~sign:`L r s) (shift ~side:`L ~sign:`L r (sub_dropc (of_int ~size size) s)) 
