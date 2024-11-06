@@ -465,6 +465,8 @@ module Circuit : sig
   val lookup_array_path : env -> path -> crb_array option
   val lookup_array_size : env -> ty -> int option
 
+  val lookup_array_and_bitstring : env -> ty -> (crb_array * crb_bitstring) option
+
   val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
   val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
 

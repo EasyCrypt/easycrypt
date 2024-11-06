@@ -147,6 +147,18 @@ let circ_to_string = function
   | BWArray a -> Format.sprintf "BWArray[%d[%d]]" (a.(0) |> List.length) (Array.length a)
   | BWTuple tp -> Format.sprintf "BWTuple(%d, ...)[%d]" (List.hd tp |> List.length) (List.length tp)
 
+let circ_of_int (size: int) (z: zint) : circ =
+  BWCirc (C.of_bigint ~size (to_zt z))
+
+let circ_array_of_ints (size: int) (zs: zint list) : circ = 
+  let cs = List.map (fun z -> C.of_bigint ~size (to_zt z)) zs in
+  BWArray (Array.of_list cs)
+
+let circ_tuple_of_ints (size: int) (zs: zint list) : circ =
+  let cs = List.map (fun z -> C.of_bigint ~size (to_zt z)) zs in
+  BWTuple cs
+  
+
 (* Checks whether the output shapes are the same
   FIXME: should be enough to compare first element of the array
   if we enforce arrays to be homogeneous 
@@ -304,20 +316,18 @@ let dist_inputs (c: circuit list) : circuit list =
 exception CircError of string
 
 let width_of_type (env: env) (t: ty) : int =
-  match EcEnv.Circuit.lookup_bitstring_size env t with
-  | Some w -> w
-  | None -> let err = Format.asprintf "No bitvector binding for type %a@."
-  (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
-  raise (CircError err)
+  match EcEnv.Circuit.lookup_array_and_bitstring env t with
+  | Some ({size=size_arr}, {size=size_bs}) -> size_arr * size_bs
+  | _ -> match EcEnv.Circuit.lookup_bitstring_size env t with
+    | Some w -> w
+    | None -> let err = Format.asprintf "No bitvector binding for type %a@."
+    (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
+    raise (CircError err)
 
 (* returns size of array and underlying element type if array type, otherwise None *)
 let destr_array_type (env: env) (t: ty) : (int * ty) option = 
-  match t.ty_node with
-  | Tconstr (p, [et]) -> 
-    begin match EcEnv.Circuit.lookup_array_path env p with
-    | Some {size; _} -> Some (size, et)
-    | None -> None
-    end
+  match EcEnv.Circuit.lookup_array_and_bitstring env t with
+  | Some ({size}, {type_}) -> Some (size, EcTypes.tconstr type_ [])
   | _ -> None
 
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
@@ -898,7 +908,7 @@ let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option)
   | None -> {circ = BWCirc [C.true_]; inps = f.inps}
   in
   match merge_inputs [f;g;pcond] with
-  | None -> Format.eprintf "Failed to merge inputs@."; false
+  | None -> Format.eprintf "Failed to merge inputs %s %s %s@." (circuit_to_string f) (circuit_to_string g) (circuit_to_string pcond); false
   | Some [{circ=BWCirc fcirc; _} as f;
     {circ=BWCirc gcirc; _};
     {circ=BWCirc pccirc; _}] ->

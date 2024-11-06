@@ -2962,6 +2962,20 @@ module Circuit = struct
     | Tconstr (p, [w]) -> lookup_array_path env p
     | _ -> None
 
+  let rec lookup_array_and_bitstring (env: env) (ty: ty) : (crb_array * crb_bitstring) option =
+    match ty.ty_node with
+    | Tconstr (p, [w]) -> 
+      let arr = lookup_array_path env p in
+      let bs = lookup_bitstring env w in
+      begin match arr, bs with
+      | Some arr, Some bs -> Some (arr, bs)
+      | _ -> None    
+      end
+    | Tconstr (p, []) -> (try
+      lookup_array_and_bitstring env (Ty.unfold p [] env)
+      with LookupFailure _ -> None)
+    | _ -> None
+
   let lookup_array_size (env : env) (ty : ty) : int option = 
     Option.map (fun c -> c.size) (lookup_array env ty)
 

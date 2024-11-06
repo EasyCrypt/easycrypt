@@ -58,6 +58,8 @@ let mapreduce
   | _ -> failwith "Invalid operator type" in
   Format.eprintf "Lane: %a@." (EcPrinting.pp_form ppenv) f;
   let fc = circuit_of_form hyps f in
+  let fc = circuit_flatten fc in
+  let fc = circuit_aggregate_inps fc in
 
   let tm = time tm "Lane function circuit generation done" in
   
@@ -69,6 +71,8 @@ let mapreduce
   | OB_oper (Some (OP_Plain pcondc)) -> pcondc
   | _ -> failwith "Invalid operator type" in
   let pcondc = circuit_of_form hyps pcondc in
+  let pcondc = circuit_flatten pcondc in
+  let pcondc = circuit_aggregate_inps pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
 
   
@@ -126,11 +130,7 @@ let mapreduce
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Lane func: %s@." (circuit_to_string fc);
     
-    let () = try assert(circ_equiv (List.hd cs) fc (Some pcondc))
-      with Assert_failure _ as e ->
-      Format.eprintf "Equivalence check failed between program lanes(bvout1) and lane function(bvout2)@.";
-      raise e
-    in
+    assert(circ_equiv (List.hd cs) fc (Some pcondc));
 
     let _tm = time tm "Program to lane func equiv done" in
     
@@ -270,68 +270,94 @@ let t_circ (tc: tcenv1) : tcenv =
 
 
 
-  let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
-    let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circuit.lookup_array env ty with
-    | Some {tolist;} -> let bty = match ty.ty_node with
-      | Tconstr (p, [bty]) -> bty
-      | _ -> failwith "Wrong type structure for array"
-      in let ptb, otb = 
-        match EcEnv.Circuit.lookup_bitstring env bty with
-        | Some {to_=tb; _} -> tb, EcEnv.Op.by_path tb env
-        | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-      in EcCoreLib.CI_List.p_flatten @@! [
-        EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
-        tolist @@! [arg]]
-      ]
-    | None -> 
-      begin match EcEnv.Circuit.lookup_bitstring env ty with
-        | Some {to_=tb; _} -> tb @@! [arg]
-        | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-      end
-  
+let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
+  let (@@!) = EcTypesafeFol.f_app_safe env in
+  match EcEnv.Circuit.lookup_array env ty with
+  | Some {tolist;} -> let bty = match ty.ty_node with
+    | Tconstr (p, [bty]) -> bty
+    | _ -> failwith "Wrong type structure for array"
+    in let ptb, otb = 
+      match EcEnv.Circuit.lookup_bitstring env bty with
+      | Some {to_=tb; _} -> tb, EcEnv.Op.by_path tb env
+      | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    in EcCoreLib.CI_List.p_flatten @@! [
+      EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
+      tolist @@! [arg]]
+    ]
+  | None -> 
+    begin match EcEnv.Circuit.lookup_bitstring env ty with
+      | Some {to_=tb; _} -> tb @@! [arg]
+      | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+    end
 
-  let w2bits (env: env) (ty: ty) (arg: form) : form = 
-    let tb = match EcEnv.Circuit.lookup_bitstring env ty with
-    | Some {to_=tb; _} -> tb
-    | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in EcTypesafeFol.f_app_safe env tb [arg]
-  
-  let bits2w (env: env) (ty: ty) (arg: form) : form = 
-    let fb = match EcEnv.Circuit.lookup_bitstring env ty with
-    | Some {from_=fb; _} -> fb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in EcTypesafeFol.f_app_safe env fb [arg]
-  
-  let w2bits_op (env: env) (ty: ty) : form = 
-    let tb = match EcEnv.Circuit.lookup_bitstring env ty with
-    | Some {to_=tb; _} -> tb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
-    f_op tb [] tbo.op_ty 
-  
-  let bits2w_op (env: env) (ty: ty) : form = 
-    let fb = match EcEnv.Circuit.lookup_bitstring env ty with
-    | Some {from_=fb; _} -> fb
-    | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
-    in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
-    f_op fb [] fbo.op_ty 
-  
+let w2bits (env: env) (ty: ty) (arg: form) : form = 
+  let tb = match EcEnv.Circuit.lookup_bitstring env ty with
+  | Some {to_=tb; _} -> tb
+  | _ -> Format.eprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+  in EcTypesafeFol.f_app_safe env tb [arg]
 
-  let flatten_to_bits (env: env) (f: form) = 
-    let (@@!) = EcTypesafeFol.f_app_safe env in
-    match EcEnv.Circuit.lookup_array env f.f_ty with
-    | Some {tolist; _} -> 
-      let base = match f.f_ty.ty_node with
-      | Tconstr (_, [b]) -> b
-      | _ -> assert false
-      in 
-      let w2bits = w2bits_op env base in
-      EcCoreLib.CI_List.p_flatten @@!
-      [EcCoreLib.CI_List.p_map @@! [w2bits; (tolist @@! [f])]]
-    | None -> 
-      w2bits env f.f_ty f
-      
+let bits2w (env: env) (ty: ty) (arg: form) : form = 
+  let fb = match EcEnv.Circuit.lookup_bitstring env ty with
+  | Some {from_=fb; _} -> fb
+  | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+  in EcTypesafeFol.f_app_safe env fb [arg]
+
+let w2bits_op (env: env) (ty: ty) : form = 
+  let tb = match EcEnv.Circuit.lookup_bitstring env ty with
+  | Some {to_=tb; _} -> tb
+  | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+  in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
+  f_op tb [] tbo.op_ty 
+
+let bits2w_op (env: env) (ty: ty) : form = 
+  let fb = match EcEnv.Circuit.lookup_bitstring env ty with
+  | Some {from_=fb; _} -> fb
+  | _ -> Format.eprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty; assert false
+  in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
+  f_op fb [] fbo.op_ty 
+
+
+let flatten_to_bits (env: env) (f: form) = 
+  let (@@!) = EcTypesafeFol.f_app_safe env in
+  match EcEnv.Circuit.lookup_array_and_bitstring env f.f_ty with
+  | Some ({ tolist }, {type_; to_=tb}) -> 
+    let base = tconstr type_ [] in
+    let w2bits = w2bits_op env base in
+    EcCoreLib.CI_List.p_flatten @@!
+    [EcCoreLib.CI_List.p_map @@! [w2bits; (tolist @@! [f])]]
+  | None -> 
+    w2bits env f.f_ty f
+
+let reconstruct_from_bits (env: env) (f: form) (t: ty) =
+  (* Check input is a bool list *)
+  assert (match f.f_ty.ty_node with
+  | Tconstr(p, [b]) when p = EcCoreLib.CI_List.p_List -> b = tbool
+  | _ -> false);
+  let (@@!) = EcTypesafeFol.f_app_safe env in
+  match EcEnv.Circuit.lookup_array_and_bitstring env t with
+  | Some ({ oflist }, {type_; size; ofint}) -> 
+    let base = tconstr type_ [] in
+    oflist @@! [ ofint @@! [f_int (BI.of_int 0)];
+    EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
+    EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f]]]
+  | _ -> 
+    bits2w env t f
+
+let reconstruct_from_bits_op (env: env) (t: ty) =
+  (* Check input is a bool list *)
+  let (@@!) = EcTypesafeFol.f_app_safe env in
+  match EcEnv.Circuit.lookup_array_and_bitstring env t with
+  | Some ({ oflist }, {type_; size; ofint}) -> 
+    let base = tconstr type_ [] in
+    let temp = create "temp" in
+    let bool_list = tconstr EcCoreLib.CI_List.p_list [tbool] in
+    f_quant Llambda [(temp, GTty bool_list)] @@
+    oflist @@! [ ofint @@! [f_int (BI.of_int 0)];
+    EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
+    EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f_local temp bool_list]]]
+  | _ -> 
+    bits2w_op env t
+    
 let t_bdep 
   (n: int) 
   (m: int) 
@@ -372,6 +398,16 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let { m; n; invs; inpvs; outvs; lane; pcond; perm } = bdinfo in
 
   let env = FApi.tc1_env tc in
+
+  (* FIXME: remove shortcircuit *)
+  (* if true then *)
+    (* let hr = EcLowPhlGoal.tc1_as_hoareS tc in *)
+    (* let outvs  = get_vars outvs hr.hs_m in *)
+    (* let inpvs = get_vars inpvs hr.hs_m in *)
+    (* let tc = EcPhlConseq.t_hoareS_conseq_nm f_true f_true tc in *)
+    (* FApi.t_last (t_bdep n m inpvs outvs pcond lane None) tc *) 
+  (* else *)
+  
   let (@@!) pth args = 
     try
       EcTypesafeFol.f_app_safe env pth args 
@@ -414,10 +450,10 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = List.map (flatten_to_bits env) poutvs in
   let poutvs = List.rev poutvs in
-  let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty)  in
+  let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty) in
   let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
   let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
-  let poutvs = EcCoreLib.CI_List.p_map @@! [(bits2w_op env outbty); poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_map @@! [(reconstruct_from_bits_op env outbty); poutvs] in
 
   (* OPTIONAL PERMUTATION STEP *)
   let poutvs = match pperm with 
@@ -460,7 +496,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
   let pinpvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinpvs] in
   let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
-  let b2w = (bits2w_op env inpbty) in
+  let b2w = (reconstruct_from_bits_op env inpbty) in
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinpvs = EcCoreLib.CI_List.p_map @@! [b2w; pinpvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in

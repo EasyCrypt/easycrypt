@@ -103,7 +103,9 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   let op = f_op p_f tvars newt in
   if full then
   match rty.ty_node with
-  | Tfun _ -> raise InsufficientArguments
+  | Tfun _ -> Format.eprintf "op: %a@.args: " (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) op; 
+    List.iter (fun a -> Format.eprintf "%a, " (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) a) args; Format.eprintf "@.";
+    raise InsufficientArguments
   | _ -> f_app op args rty
   else
   f_app op args rty
