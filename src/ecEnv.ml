@@ -2927,11 +2927,14 @@ module Circuit = struct
     | CRB_BvOperator op -> bind_bvoperator ?import lc op env
     | CRB_Circuit    cr -> bind_circuit    ?import lc cr env
 
-  let lookup_bitstring_path (env : env) (k : path) : crb_bitstring option = 
+  let rec lookup_bitstring_path (env : env) (k : path) : crb_bitstring option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
-    Mp.find_opt k env.env_crbds.bitstrings
+    match Mp.find_opt k env.env_crbds.bitstrings with
+    | Some _ as bs -> bs
+    | None -> try lookup_bitstring env (Ty.unfold k [] env)
+      with LookupFailure _ -> None
 
-  let lookup_bitstring (env : env) (ty : ty) : crb_bitstring option =
+  and lookup_bitstring (env : env) (ty : ty) : crb_bitstring option =
     match ty.ty_node with
     | Tconstr (p, []) -> lookup_bitstring_path env p
     | _ -> None
@@ -2946,11 +2949,15 @@ module Circuit = struct
   let lookup_bitstring_size (env : env) (ty : ty) : int option =
     Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)
 
-  let lookup_array_path (env : env) (pth : path) : crb_array option = 
+  let rec lookup_array_path (env : env) (pth : path) : crb_array option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
-    Mp.find_opt k env.env_crbds.arrays
+    match Mp.find_opt k env.env_crbds.arrays with
+    | Some arr -> Some arr
+    | None -> try
+      lookup_array env (Ty.unfold pth [] env)
+      with LookupFailure e -> None
 
-  let lookup_array (env : env) (ty : ty) : crb_array option = 
+  and lookup_array (env : env) (ty : ty) : crb_array option = 
     match ty.ty_node with
     | Tconstr (p, [w]) -> lookup_array_path env p
     | _ -> None
