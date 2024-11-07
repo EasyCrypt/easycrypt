@@ -184,6 +184,31 @@ VPSHUFB_256(w@256, widx@256) -> @256 =
     widx
   )
 
+# https://www.felixcloutier.com/x86/pshufd
+VPSHUFD_256(w@256, idx@8) -> @256 =
+  let hi = w[@128|1] in
+  let lo = w[@128|0] in
+  concat<32>(
+    lo[@32|idx[@2|0]],
+    lo[@32|idx[@2|1]],
+    lo[@32|idx[@2|2]],
+    lo[@32|idx[@2|3]],
+
+    hi[@32|idx[@2|0]],
+    hi[@32|idx[@2|1]],
+    hi[@32|idx[@2|2]],
+    hi[@32|idx[@2|3]]
+  )
+
+# https://www.felixcloutier.com/x86/pshufd
+VPSHUFD_128(w@128, idx@8) -> @128 =
+  concat<32>(
+    w[@32|idx[@2|0]],
+    w[@32|idx[@2|1]],
+    w[@32|idx[@2|2]],
+    w[@32|idx[@2|3]]
+  )
+
 # Intel intrinsic: _mm256_blend_epi16
 # FIXME: we need an heterogeneous `map' combinator
 VPBLEND_16u16(w1@256, w2@256, c@8) -> @256 =
