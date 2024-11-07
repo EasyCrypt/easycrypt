@@ -1240,7 +1240,7 @@ let circuit_of_form
         | Some `False, [] ->
           hyps, {circ = BWCirc([C.false_]); inps=[]}
         (* recurse down into definition *)
-        | None, _ -> 
+        | _ -> 
           (* let f, fs = destr_app (apply_int_args f_) in *)
           let hyps, f_c = doit cache hyps f in
           let hyps, fcs = List.fold_left_map
@@ -1248,8 +1248,8 @@ let circuit_of_form
             hyps fs 
           in
           hyps, compose f_c fcs
-        | _ -> Format.eprintf "Problem at %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_;
-          assert false
+        (* | _ -> Format.eprintf "Problem at %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_; *)
+          (* assert false *)
         end
       in hyps, res
       
