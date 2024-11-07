@@ -2250,8 +2250,14 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
   | Pm_update (m, vars, funs) ->
-    let (mp, _sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
 
+    (* Prohibit functor updates *)
+    (* TODO: Better error message *)
+    if 0 < List.length sig_.miss_params then
+      tyerror me.pl_loc env (InvalidModAppl (MAE_WrongArgCount(0,List.length sig_.miss_params)));
+
+    (* Construct the set of new module variables *)
     let items =
       List.fold_right 
         (fun (xs, ty) acc -> 
@@ -2270,86 +2276,103 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
     let me = EcSubst.subst_module subst me in
 
-    let doit_fun env fn upsc _upr = 
+    let update_fun env fn pupdates pupdate_res = 
+      (* Extract the function body and load the memory *)
       let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
       let fun_ = EcSubst.subst_function subst fun_ in
       let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr fun_ in
       let env = EcEnv.Memory.push_active memenv env in
+
+      (* Semantics for stmt updating, `i` is the target of the update. *)
+      let eval_supdate env sup i =
+        match sup with
+        | Pups_add (s, after) ->
+          let ue  = UE.create (Some []) in
+          let s = transstmt env ue s in
+          let ts = Tuni.subst (UE.close ue) in
+          if after then
+            i :: (s_subst ts s).s_node
+          else
+            (s_subst ts s).s_node @ [i]
+        | Pups_del -> []
+      in
+
+      (* Semantics for condition updating *)
+      (* `i` is the target of the update, and `tl` is the instr suffix. *)
+      let eval_cupdate env cup i tl =
+        match cup with
+        (* Insert an if with condition `e` with body `tl` *)
+        | Pupc_add e ->
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          unify_or_fail env ue loc ~expct:tbool ty;
+          [i] @ [i_if (e_subst ts e, stmt tl, s_empty)]
+
+        (* Change the condition expression to `e` for a conditional instr `i` *)
+        | Pupc_mod e -> begin
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          match i.i_node with
+          | Sif (_, t, f) -> 
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_if (e_subst ts e, t, f)] @ tl
+          | Smatch (p, bs) ->
+            unify_or_fail env ue loc ~expct:p.e_ty ty;
+            [i_match (e_subst ts e, bs)] @ tl
+          | Swhile (_, t) ->
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_while (e_subst ts e, t)] @ tl
+          | _ -> assert false
+          end
+
+        (* Collapse a conditional `i` to a specific branch `bs` *)
+        | Pupc_del bs -> begin
+          let bs = trans_codepos_brsel bs in
+          match i.i_node, bs with
+          | Sif (_, t, _), `Cond true -> t.s_node
+          | Sif (_, _, f), `Cond false -> f.s_node
+          | Swhile (_, t), `Cond true -> t.s_node
+          | Smatch (e, bs), `Match cn ->
+            (* FIXME: need to introduce binding for constructor pattern variables *)
+            let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+            let indt = oget (EcDecl.tydecl_as_datatype indt) in
+            let cnames = List.fst indt.tydt_ctors in
+            let ix, _ = List.findi (fun _ n -> EcSymbols.sym_equal cn n) cnames in
+            let _, r = List.split_at ix bs in
+            let _p, b, _ = match r with (p, b) :: r -> p, b, r | _ -> assert false in
+            b.s_node @ tl
+          | _ -> assert false
+          end
+      in
+
+      (* Apply each of updates in reverse *)
+      (* NOTE: This is with the expectation that the user entered them in chronological order. *)
       let body = 
         List.fold_right (fun (cp, up) bd ->
           let cp = trans_codepos env cp in
-          match up with
-          | Pup_stmt sup ->
-            let changer env i =
-              match sup with
-              | Pups_add (s, after) ->
-                let ue  = UE.create (Some []) in
-                let s = transstmt env ue s in
-                let ts = Tuni.subst (UE.close ue) in
-                if after then
-                  i :: (s_subst ts s).s_node
-                else
-                  (s_subst ts s).s_node @ [i]
-              | Pups_del -> []
-            in
-            let _, s = EcMatching.Zipper.fold env () cp (fun env () _ i -> (), changer env i) () bd in
-            s
-          | Pup_cond cup ->
-            let changer env i tl =
-              match cup with
-              | Pupc_add e -> begin
-                let loc = e.pl_loc in
-                let ue  = UE.create (Some []) in
-                let e, ty = transexp env `InProc ue e in
-                let ts = Tuni.subst (UE.close ue) in
-                let ty = ty_subst ts ty in
-                unify_or_fail env ue loc ~expct:tbool ty;
-                [i] @ [i_if (e_subst ts e, stmt tl, s_empty)]
-                end
-              | Pupc_mod e -> begin
-                let loc = e.pl_loc in
-                let ue  = UE.create (Some []) in
-                let e, ty = transexp env `InProc ue e in
-                let ts = Tuni.subst (UE.close ue) in
-                let ty = ty_subst ts ty in
-                match i.i_node with
-                | Sif (_, t, f) -> 
-                  unify_or_fail env ue loc ~expct:tbool ty;
-                  [i_if (e_subst ts e, t, f)] @ tl
-                | Smatch (p, bs) ->
-                  unify_or_fail env ue loc ~expct:p.e_ty ty;
-                  [i_match (e_subst ts e, bs)] @ tl
-                | Swhile (_, t) ->
-                  unify_or_fail env ue loc ~expct:tbool ty;
-                  [i_while (e_subst ts e, t)] @ tl
-                | _ -> assert false
-                end
-              | Pupc_del bs -> begin
-                let bs = trans_codepos_brsel bs in
-                match i.i_node, bs with
-                | Sif (_, t, _), `Cond true -> t.s_node
-                | Sif (_, _, f), `Cond false -> f.s_node
-                | Swhile (_, t), `Cond true -> t.s_node
-                | Smatch (e, bs), `Match cn ->
-                  (* FIXME: need to introduce binding for constructor pattern variables *)
-                  let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-                  let indt = oget (EcDecl.tydecl_as_datatype indt) in
-                  let cnames = List.fst indt.tydt_ctors in
-                  let ix, _ = List.findi (fun _ n -> EcSymbols.sym_equal cn n) cnames in
-                  let _, r = List.split_at ix bs in
-                  let _p, b, _ = match r with (p, b) :: r -> p, b, r | _ -> assert false in
-                  b.s_node @ tl
-                | _ -> assert false
-                end
-            in
-            let _, s = EcMatching.Zipper.fold_tl env () cp (fun env () _ i tl -> (), changer env i tl) () bd in
-            s
+          let change env _ _ i tl = (),
+            match up with
+            | Pup_stmt sup ->
+              eval_supdate env sup i @ tl
+            | Pup_cond cup ->
+              eval_cupdate env cup i tl
+          in
+          let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
+          s
         )
-          upsc
+          pupdates
           fd.f_body
       in
-      let ret = match fd.f_ret, _upr with
-        | Some e, Some e' -> 
+
+      (* Apply the result update if given *)
+      let ret = match fd.f_ret, pupdate_res with
+        | Some e, Some e' ->
           let loc = e'.pl_loc in
           let ue  = UE.create (Some []) in
           let e', ty = transexp env `InProc ue e' in
@@ -2360,6 +2383,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           | _ -> fd.f_ret
       in
 
+      (* Reconstruct the function def *)
       let uses = ret |> ofold ((^~) se_inuse) (s_inuse body) in
       let fd = {fd with f_uses = uses; f_body = body; f_ret = ret} in 
       let fun_ = {fun_ with f_def = FBdef fd} in
@@ -2368,6 +2392,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
 
     let funs = List.map (fun ({pl_desc = fn}, v) -> fn, v) funs in
 
+    (* Update all module items *)
     let env, items = 
       match me.me_body with
       | ME_Structure mb ->
@@ -2382,7 +2407,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
               let env = EcEnv.bind1 (f.f_name, `Function f) env in
               env, items @ [mi]
             | Some (upsc, rup) ->
-              let f = doit_fun env f.f_name upsc rup in
+              let f = update_fun env f.f_name upsc rup in
               let env = EcEnv.bind1 (f.f_name, `Function f) env in
               env, items @ [MI_Function f]
             end
@@ -2391,8 +2416,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             env, items @ [mi] 
         in
         List.fold_left doit (env, []) (items @ mb.ms_body)
+
+      (* TODO: Add error message. *)
       | _ -> assert false
     in
+
     let ois = get_oi_calls env (stparams, items) in
 
     (* Construct structure representation *)
