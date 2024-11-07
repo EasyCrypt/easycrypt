@@ -915,7 +915,7 @@ let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
 let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
 
-let is_witness   f = destr_op f |> fst |> is_op_witness
+let is_witness   f = is_from_destr (fun f -> destr_op f |> fst |> is_op_witness) f
 
 (* -------------------------------------------------------------------- *)
 let split_args f =
