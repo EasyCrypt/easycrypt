@@ -19,8 +19,14 @@ module Position = struct
     | `If
     | `While
     | `Assign of lvmatch
+<<<<<<< HEAD
     | `Sample
     | `Call
+=======
+    | `Sample of lvmatch
+    | `Call   of lvmatch
+    | `Match
+>>>>>>> origin/main
   ]
 
   and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
@@ -30,9 +36,16 @@ module Position = struct
     | `ByMatch of int option * cp_match
   ]
 
+<<<<<<< HEAD
   type codepos1    = int * cp_base
   type codepos     = (codepos1 * int) list * codepos1
   type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
+=======
+  type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
+  type codepos1      = int * cp_base
+  type codepos       = (codepos1 * codepos_brsel) list * codepos1
+  type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
+>>>>>>> origin/main
 
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
     (o + offset, p)
@@ -57,12 +70,19 @@ module Zipper = struct
   type ('a, 'state) folder =
     'a -> 'state -> instr -> 'state * instr list
 
+  type spath_match_ctxt = {
+    locals : (EcIdent.t * ty) list;
+    prebr  : ((EcIdent.t * ty) list * stmt) list;
+    postbr : ((EcIdent.t * ty) list * stmt) list;
+  }
+
   type ipath =
   | ZTop
   | ZWhile  of expr * spath
   | ZIfThen of expr * spath * stmt
   | ZIfElse of expr * stmt  * spath
-
+  | ZMatch  of expr * spath * spath_match_ctxt
+  
   and spath = (instr list * instr list) * ipath
 
   type zipper = {
@@ -95,9 +115,18 @@ module Zipper = struct
         match ir.i_node, cm with
         | Swhile _, `While  -> i-1
         | Sif    _, `If     -> i-1
+<<<<<<< HEAD
         | Srnd   _, `Sample -> i-1
         | Scall  _, `Call   -> i-1
 
+=======
+        | Smatch _, `Match  -> i-1
+
+        | Scall  (None, _, _), `Call `LvmNone -> i-1
+
+        | Scall  (Some lv, _, _), `Call lvm
+        | Srnd   (lv, _), `Sample lvm
+>>>>>>> origin/main
         | Sasgn  (lv, _), `Assign lvm -> begin
             match lv, lvm with
             | _, `LvmNone -> i-1
@@ -178,14 +207,22 @@ module Zipper = struct
 
   let zipper_at_nm_cpos1
     (env        : EcEnv.env)
+<<<<<<< HEAD
     ((cp1, sub) : codepos1 * int)
     (s          : stmt)
     (zpr        : ipath)
   : (ipath * stmt) * (codepos1 * int)
+=======
+    ((cp1, sub) : codepos1 * codepos_brsel)
+    (s          : stmt)
+    (zpr        : ipath)
+  : (ipath * stmt) * (codepos1 * codepos_brsel)
+>>>>>>> origin/main
   =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
     let zpr =
       match i.i_node, sub with
+<<<<<<< HEAD
       | Swhile (e, sw), 0 ->
           (ZWhile (e, ((s1, s2), zpr)), sw)
 
@@ -198,6 +235,31 @@ module Zipper = struct
       | _ -> raise InvalidCPos
     in zpr, ((0, `ByPos (1 + List.length s1)), sub)
 
+=======
+      | Swhile (e, sw), `Cond true ->
+          (ZWhile (e, ((s1, s2), zpr)), sw)
+
+      | Sif (e, ifs1, ifs2), `Cond true ->
+          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
+
+      | Sif (e, ifs1, ifs2), `Cond false ->
+          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
+
+      | Smatch (e, bs), `Match cn ->
+          let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+          let indt = oget (EcDecl.tydecl_as_datatype indt) in
+          let cnames = List.fst indt.tydt_ctors in
+          let ix, _ =
+            try  List.findi (fun _ n -> EcSymbols.sym_equal cn n) cnames
+            with Not_found -> raise InvalidCPos
+          in
+          let prebr, (locals, body), postbr = List.pivot_at ix bs in
+          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body)
+
+      | _ -> raise InvalidCPos
+    in zpr, ((0, `ByPos (1 + List.length s1)), sub)
+
+>>>>>>> origin/main
   let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
     let (zpr, s), nm =
       List.fold_left_map
@@ -228,6 +290,8 @@ module Zipper = struct
     | ZWhile  (e, sp)     -> zip (Some (i_while (e, s))) sp
     | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
     | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
+    | ZMatch (e, sp, mpi) ->
+      zip (Some (i_match (e, mpi.prebr @ (mpi.locals, s) :: mpi.postbr))) sp
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
@@ -238,6 +302,7 @@ module Zipper = struct
       | ZWhile  (_, ((_, is), ip))    -> doit (is :: acc) ip
       | ZIfThen (_, ((_, is), ip), _) -> doit (is :: acc) ip
       | ZIfElse (_, _, ((_, is), ip)) -> doit (is :: acc) ip
+      | ZMatch (_, ((_, is), ip), _) -> doit (is :: acc) ip
     in
 
     let after =
@@ -1295,6 +1360,10 @@ module RegexpBaseInstr = struct
           next_zipper z'
 
        | ZIfElse (_e, _stmttrue, ((head, tail), path)) ->
+          let z' = zipper head tail path in
+          next_zipper z'
+
+       | ZMatch (_, ((head, tail), path), _) ->
           let z' = zipper head tail path in
           next_zipper z'
 

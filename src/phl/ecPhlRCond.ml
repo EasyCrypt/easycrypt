@@ -107,8 +107,8 @@ let t_rcond side b at_pos tc =
   | Some side ->
     Low.t_equiv_rcond side b at_pos tc
 
-let process_rcond (side : oside) (b : bool) (at_pos : pcodepos1) (tc : tcenv1) =
-  let at_pos = EcTyping.trans_codepos1 (FApi.tc1_env tc) at_pos in
+let process_rcond side b at_pos tc =
+  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
   t_rcond side b at_pos tc
 
 (* -------------------------------------------------------------------- *)
@@ -318,6 +318,5 @@ let t_rcond_match side c at_pos tc =
 
 (* -------------------------------------------------------------------- *)
 let process_rcond_match side c at_pos tc =
-  let env = FApi.tc1_env tc in
-  let at_pos = EcTyping.trans_codepos1 env at_pos in
+  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
   t_rcond_match side c at_pos tc

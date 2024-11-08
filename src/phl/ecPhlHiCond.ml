@@ -8,7 +8,7 @@ open EcPhlCond
 open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
-let process_cond (info : pcond_info) tc =
+let process_cond (info : EcParsetree.pcond_info) tc =
   let default_if (i : codepos1 option) s =
     ofdfl (fun _ -> Zpr.cpos (tc1_pos_last_if tc s)) i in
 
@@ -24,8 +24,8 @@ let process_cond (info : pcond_info) tc =
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let f  = EcProofTyping.tc1_process_prhl_formula tc f in
-    let i1 = Option.map (EcTyping.trans_codepos1 env) i1 in
-    let i2 = Option.map (EcTyping.trans_codepos1 env) i2 in
+    let i1 = Option.map (fun i1 -> EcProofTyping.tc1_process_codepos1 tc (side, i1)) i1 in
+    let i2 = Option.map (fun i2 -> EcProofTyping.tc1_process_codepos1 tc (side, i2)) i2 in
     let n1 = default_if i1 es.es_sl in
     let n2 = default_if i2 es.es_sr in
     FApi.t_seqsub (EcPhlApp.t_equiv_app (n1, n2) f)
@@ -34,7 +34,7 @@ let process_cond (info : pcond_info) tc =
   | `SeqOne (s, i, f1, f2) ->
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
-    let i = Option.map (EcTyping.trans_codepos1 env) i in
+    let i = Option.map (fun i1 -> EcProofTyping.tc1_process_codepos1 tc (Some s, i1)) i in
     let n = default_if i (match s with `Left -> es.es_sl | `Right -> es.es_sr) in
     let _, f1 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f1 in
     let _, f2 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f2 in

@@ -9,7 +9,7 @@ open EcMatching.Position
 val t_rewrite_equiv :
   side ->
   [`LtoR | `RtoL ] ->
-  codepos1 ->
+  pcodepos1 ->
   equivF ->
   proofterm ->
   (expr list * lvalue option) option ->

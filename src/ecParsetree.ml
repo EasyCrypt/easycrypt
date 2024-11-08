@@ -490,18 +490,20 @@ type preduction = {
 type pcp_match = [
   | `If
   | `While
+  | `Match
   | `Assign of plvmatch
-  | `Sample
-  | `Call
+  | `Sample of plvmatch
+  | `Call   of plvmatch
 ]
 
 and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
 
 type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
 
-type pcodepos1 = int * pcp_base
-type pcodepos  = (pcodepos1 * int) list * pcodepos1
-type pdocodepos1 = pcodepos1 doption option
+type pbranch_select = [`Cond of bool | `Match of psymbol]
+type pcodepos1      = int * pcp_base
+type pcodepos       = (pcodepos1 * pbranch_select) list * pcodepos1
+type pdocodepos1    = pcodepos1 doption option
 
 type pcodeoffset1 = [
   | `ByOffset   of int

@@ -207,13 +207,13 @@ let process_app (side, dir, k, phi, bd_info) tc =
   | Single i, PAppNone when is_hoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcTyping.trans_codepos1 (FApi.tc1_env tc) i in
+    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
     t_hoare_app i phi tc
 
   | Single i, PAppNone when is_eHoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
-    let i = EcTyping.trans_codepos1 (FApi.tc1_env tc) i in
+    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
     t_ehoare_app i phi tc
 
   | Single i, PAppNone when is_equivS concl ->
@@ -228,19 +228,21 @@ let process_app (side, dir, k, phi, bd_info) tc =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
-    let i = EcTyping.trans_codepos1 (FApi.tc1_env tc) i in
+    let i = EcProofTyping.tc1_process_codepos1 tc (Some side, i) in
     t_equiv_app_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
+      check_side side;
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
-      let i = EcTyping.trans_codepos1 (FApi.tc1_env tc) i in
+      let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
   | Double (i, j), PAppNone when is_equivS concl ->
+      check_side side;
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      let i = EcTyping.trans_codepos1 (FApi.tc1_env tc) i in
-      let j = EcTyping.trans_codepos1 (FApi.tc1_env tc) j in
+      let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left, i) in
+      let j = EcProofTyping.tc1_process_codepos1 tc (Some `Left, j) in
       t_equiv_app (i, j) phi tc
 
   | Single _, PAppNone

@@ -8,6 +8,7 @@ open EcModules
 open EcEnv
 open EcCoreGoal
 open EcMemory
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -61,6 +62,9 @@ val tc1_process_stmt :
 
 val tc1_process_prhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> side -> pstmt -> stmt
+
+val tc1_process_codepos : tcenv1 -> oside * pcodepos -> codepos
+val tc1_process_codepos1 : tcenv1 -> oside * pcodepos1 -> codepos1
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

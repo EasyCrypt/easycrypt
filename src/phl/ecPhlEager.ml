@@ -614,9 +614,8 @@ let process_info info tc =
 let process_seq info (i, j) eqR tc =
   let eqR   = TTC.tc1_process_prhl_form tc tbool eqR in
   let gs, h = process_info info tc in
-  let env = FApi.tc1_env tc in
-  let i = EcTyping.trans_codepos1 env i in
-  let j = EcTyping.trans_codepos1 env j in
+  let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left , i) in
+  let j = EcProofTyping.tc1_process_codepos1 tc (Some `Right, j) in
   FApi.t_last (t_eager_seq i j eqR h) gs
 
 (* -------------------------------------------------------------------- *)

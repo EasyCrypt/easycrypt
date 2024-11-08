@@ -247,7 +247,8 @@ let t_sp_side pos tc =
       let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
 
-  | FbdHoareS bhs, (None | Some (Single _)) ->
+
+    | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true env pos bhs.bhs_s in
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;

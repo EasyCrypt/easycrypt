@@ -25,9 +25,9 @@ module M = {
 lemma L : hoare[M.g : true ==> true].
 proof.
 proc.
-alias 1 c := (_ + 3).
-alias 3 d := (x + _).
+alias c := (_ + 3) @ 1.
+alias d := (x + _) @ 3.
 
-fail alias ^ while e := (_ * x).
-fail alias ^ <@ e := 3.
+fail alias e := (_ * x) @ ^ while.
+fail alias e := 3 @ ^ <@.
 abort.

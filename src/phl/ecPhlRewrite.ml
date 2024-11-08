@@ -10,7 +10,7 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
-    (pos  : pcodepos)
+    (pos  : EcMatching.Position.codepos)
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =
@@ -41,12 +41,9 @@ let t_change
       "conclusion should be a program logic \
       (hoare | ehoare | phoare | equiv)";
 
-  let m, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
-  let pos =
-    let env = EcEnv.Memory.push_active m env in    
-    EcTyping.trans_codepos env pos
-  in
-  let (data, goals), s = EcMatching.Zipper.map env pos (change m) s in
+  let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let (data, goals), s =
+    EcMatching.Zipper.map (FApi.tc1_env tc) pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   data, FApi.xmutate1 tc `ProcChange (goals @ [concl])
@@ -58,6 +55,8 @@ let process_change
     (form : pexpr)
     (tc   : tcenv1)
 =
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
     let hyps = LDecl.push_active m hyps in
     let e =
@@ -118,8 +117,8 @@ let process_rewrite_rw
     (m, data), expr_of_form (fst m) e
   in
 
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
-
   let cpos = EcMatching.FPosition.reroot [1] cpos in
 
   let discharge (tc : tcenv1) =
@@ -147,6 +146,7 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     (fst me, f), e
   in
 
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, f), tc = t_change side pos change tc in
 
   FApi.t_first (

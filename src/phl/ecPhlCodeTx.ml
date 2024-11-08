@@ -8,6 +8,7 @@ open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcMatching
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -177,7 +178,11 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
     with EcProofTerm.FindOccFailure _ ->
       tc_error pe "cannot find an occurrence of the pattern"
 
+<<<<<<< HEAD
 let t_set_match_r (side : oside) (cpos : EcMatching.Position.codepos) (id : symbol) pattern tc =
+=======
+let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
+>>>>>>> origin/main
   let tr = fun side -> `SetMatch (side, cpos) in
   t_code_transform side ~bdhoare:true cpos tr
     (t_zip (set_match_stmt id pattern)) tc
@@ -340,30 +345,25 @@ let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
-  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
-  let cpos =
-    let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
-    let env = EcEnv.Memory.push_active me (FApi.tc1_env tc) in
-    EcTyping.trans_codepos env cpos in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
-  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
-  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
 let process_set_match (side, cpos, id, pattern) tc =
-  let me, _ = tc1_get_stmt_with_memory side tc in
-  let cpos =
-    let env = EcEnv.Memory.push_active me (FApi.tc1_env tc) in
-    EcTyping.trans_codepos env cpos in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let me, _ = tc1_get_stmt side tc in
   let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
   let ue  = EcProofTyping.unienv_of_hyps hyps in
   let ptnmap = ref Mid.empty in
@@ -472,10 +472,8 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
     assert false;
 
-  let me, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
-  let pos =
-    let env = EcEnv.Memory.push_active me env in
-    EcTyping.trans_codepos env pos in
+  let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 

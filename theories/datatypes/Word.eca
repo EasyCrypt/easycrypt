@@ -143,8 +143,8 @@ proof. by rewrite set_set_if. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma set_set_swap (w : word) (k k' : int) (x x' : t):
-  k <> k => w.[k <- x].[k' <- x'] = w.[k' <- x'].[k' <- x'].
-proof. by rewrite set_set_if. qed.
+  k <> k' => w.[k <- x].[k' <- x'] = w.[k' <- x'].[k <- x].
+proof. by rewrite set_set_if => ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op offun f: word = mkword (mkseq f n).

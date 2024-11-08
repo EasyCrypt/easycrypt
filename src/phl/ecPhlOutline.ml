@@ -235,11 +235,16 @@ let t_outline_proc side start_pos end_pos fname res_lv tc =
 let process_outline info tc =
   let env = tc1_env tc in
   let side = info.outline_side in
-  let start_pos = EcTyping.trans_codepos1 env info.outline_start in
-  let end_pos = EcTyping.trans_codepos1 env info.outline_end in
 
   let goal = tc1_as_equivS tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
+
+  let start_pos =
+    EcProofTyping.tc1_process_codepos1 tc
+      (Some side, info.outline_start) in
+  let end_pos =
+    EcProofTyping.tc1_process_codepos1 tc
+      (Some side, info.outline_end) in
 
   (* Check which memory we are outlining *)
   let mem = match side with

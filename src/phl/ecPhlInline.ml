@@ -309,6 +309,10 @@ module HiInternal = struct
       | Zp.ZWhile  (_, sp)    -> aux_s (IPwhile aout) sp
       | Zp.ZIfThen (_, sp, _) -> aux_s (IPif (aout, [])) sp
       | Zp.ZIfElse (_, _, sp) -> aux_s (IPif ([], aout)) sp
+      | Zp.ZMatch (_, sp, mpi) ->
+        let prebr  = List.map (fun _ -> []) mpi.prebr  in
+        let postbr = List.map (fun _ -> []) mpi.postbr in
+        aux_s (IPmatch (prebr @ aout :: postbr)) sp
 
     and aux_s aout ((sl, _), ip) =
       aux_i [(List.length sl, aout)] ip
@@ -402,7 +406,7 @@ let process_inline_occs ~use_tuple side cond occs tc =
 let process_inline_codepos ~use_tuple side pos tc =
   let env = FApi.tc1_env tc in
   let concl = FApi.tc1_goal tc in
-  let pos = EcTyping.trans_codepos env pos in
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
 
   try
     match concl.f_node, side with

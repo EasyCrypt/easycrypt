@@ -654,14 +654,18 @@ let process_rnd side pos tac_info tc =
       | _ -> tc_error !!tc "invalid arguments"
     in
 
-    let pos = pos |>Option.map (function
-        | Single (b, p) ->
-            Single (b, EcTyping.trans_codepos1 env p)
-        | Double ((b1, p1), (b2, p2)) ->
-            let p1 = EcTyping.trans_codepos1 env p1 in
-            let p2 = EcTyping.trans_codepos1 env p2 in
-            Double ((b1, p1), (b2, p2))
-      )
+    let pos = pos |> Option.map (function
+      | Single (b, p) ->
+          let p =
+            if Option.is_some side then
+              EcProofTyping.tc1_process_codepos1 tc (side, p)
+            else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+          in Single (b, p)
+      | Double ((b1, p1), (b2, p2)) ->
+          let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
+          let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+          Double ((b1, p1), (b2, p2))
+    )
     in
     
     t_equiv_rnd side ?pos bij_info tc
@@ -675,8 +679,8 @@ let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 
 (* -------------------------------------------------------------------- *)
 let process_rndsem ~reduce side pos tc =
-  let env, _, concl = FApi.tc1_eflat tc in
-  let pos = EcTyping.trans_codepos1 env pos in
+  let concl = FApi.tc1_goal tc in
+  let pos = EcProofTyping.tc1_process_codepos1 tc (side, pos) in
 
   match side with
   | None when is_hoareS concl ->
