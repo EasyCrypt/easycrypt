@@ -1432,7 +1432,7 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
 let instrs_equiv
    (hyps       : hyps             )
    ((mem, mt)  : memenv           )
-  ?(keep       : _ option         )
+  ?(keep       : EcPV.PV.t option )
   ?(pstate     : _ = Map.empty    )
    (s1         : instr list       )
    (s2         : instr list       ) : bool
@@ -1453,8 +1453,21 @@ let instrs_equiv
 
   let pstate1 = List.fold_left (process_instr hyps mem) pstate s1 in
   let pstate2 = List.fold_left (process_instr hyps mem) pstate s2 in
-
-  Map.keys pstate |> Enum.for_all (fun var -> 
+  match keep with
+  | Some pv -> 
+    let vs = EcPV.PV.elements pv |> fst in
+    let vs = List.map (function 
+      | (PVloc v, ty) -> v
+      | _ -> assert false
+      ) vs 
+    in List.for_all (fun var -> 
+      let circ1 = Map.find var pstate1 in
+      let circ1 = { circ1 with inps = inputs @ circ1.inps } in
+      let circ2 = Map.find var pstate2 in
+      let circ2 = { circ2 with inps = inputs @ circ2.inps } in
+      circ_equiv circ1 circ2 None
+    ) vs
+  | None -> Map.keys pstate |> Enum.for_all (fun var -> 
     let circ1 = Map.find var pstate1 in
     let circ1 = { circ1 with inps = inputs @ circ1.inps } in
     let circ2 = Map.find var pstate2 in
