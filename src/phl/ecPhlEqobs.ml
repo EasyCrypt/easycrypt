@@ -454,8 +454,6 @@ let t_eqobs_inS_ (info : sim_info) (tc : tcenv1) =
         (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_trivial))
         (t_eqobs_inS sim eqo tc)
     | Some(p1,p2) ->
-      let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
-      let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
       let _,sl2 = s_split env p1 es.es_sl in
       let _,sr2 = s_split env p2 es.es_sr in
       let _, eqi =

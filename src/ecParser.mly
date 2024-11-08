@@ -1459,13 +1459,8 @@ lvalue_u:
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-<<<<<<< HEAD
-| x=lvalue_var DLBRACKET ti=tvars_app? es=plist1(expr, COMMA) RBRACKET
-   { PLvMap (x, ti, es) }
-=======
 | x=lvalue_var DLBRACKET ti=tvars_app? e=plist1(expr, COMMA) RBRACKET
    { PLvMap (x, ti, e) }
->>>>>>> origin/main
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
@@ -2623,16 +2618,10 @@ tac_dir:
 icodepos_r:
 | IF       { (`If     :> pcp_match) }
 | WHILE    { (`While  :> pcp_match) }
-<<<<<<< HEAD
-| LESAMPLE { (`Sample :> pcp_match) }
-| LEAT     { (`Call   :> pcp_match) }
-
-=======
 | MATCH    { (`Match  :> pcp_match) }
 
 | lvm=lvmatch LESAMPLE { (`Sample lvm :> pcp_match) }
 | lvm=lvmatch LEAT { (`Call lvm :> pcp_match) }
->>>>>>> origin/main
 | lvm=lvmatch LARROW { (`Assign lvm :> pcp_match) }
 
 lvmatch:
@@ -3293,7 +3282,6 @@ interleave_info:
 
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
-<<<<<<< HEAD
 
 | PROC CHANGE CIRCUIT o=codepos PLUS w=word s=brace(stmt)
     { Prwprgm (`Change (o, w, s)) }
@@ -3334,8 +3322,6 @@ bdepeq_out_info:
 
 | BDEP BITSTRING
   { Pcirc }
-=======
->>>>>>> origin/main
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

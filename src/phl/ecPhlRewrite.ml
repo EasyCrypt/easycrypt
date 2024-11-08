@@ -41,7 +41,7 @@ let t_change
       "conclusion should be a program logic \
       (hoare | ehoare | phoare | equiv)";
 
-  let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let m, s = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
   let (data, goals), s =
     EcMatching.Zipper.map (FApi.tc1_env tc) pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in

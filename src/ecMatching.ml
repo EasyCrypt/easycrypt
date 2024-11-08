@@ -19,14 +19,9 @@ module Position = struct
     | `If
     | `While
     | `Assign of lvmatch
-<<<<<<< HEAD
-    | `Sample
-    | `Call
-=======
     | `Sample of lvmatch
     | `Call   of lvmatch
     | `Match
->>>>>>> origin/main
   ]
 
   and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
@@ -36,16 +31,10 @@ module Position = struct
     | `ByMatch of int option * cp_match
   ]
 
-<<<<<<< HEAD
-  type codepos1    = int * cp_base
-  type codepos     = (codepos1 * int) list * codepos1
-  type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
-=======
   type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
   type codepos1      = int * cp_base
   type codepos       = (codepos1 * codepos_brsel) list * codepos1
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
->>>>>>> origin/main
 
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
     (o + offset, p)
@@ -115,18 +104,12 @@ module Zipper = struct
         match ir.i_node, cm with
         | Swhile _, `While  -> i-1
         | Sif    _, `If     -> i-1
-<<<<<<< HEAD
-        | Srnd   _, `Sample -> i-1
-        | Scall  _, `Call   -> i-1
-
-=======
         | Smatch _, `Match  -> i-1
 
         | Scall  (None, _, _), `Call `LvmNone -> i-1
 
         | Scall  (Some lv, _, _), `Call lvm
         | Srnd   (lv, _), `Sample lvm
->>>>>>> origin/main
         | Sasgn  (lv, _), `Assign lvm -> begin
             match lv, lvm with
             | _, `LvmNone -> i-1
@@ -207,35 +190,14 @@ module Zipper = struct
 
   let zipper_at_nm_cpos1
     (env        : EcEnv.env)
-<<<<<<< HEAD
-    ((cp1, sub) : codepos1 * int)
-    (s          : stmt)
-    (zpr        : ipath)
-  : (ipath * stmt) * (codepos1 * int)
-=======
     ((cp1, sub) : codepos1 * codepos_brsel)
     (s          : stmt)
     (zpr        : ipath)
   : (ipath * stmt) * (codepos1 * codepos_brsel)
->>>>>>> origin/main
   =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
     let zpr =
       match i.i_node, sub with
-<<<<<<< HEAD
-      | Swhile (e, sw), 0 ->
-          (ZWhile (e, ((s1, s2), zpr)), sw)
-
-      | Sif (e, ifs1, ifs2), 0 ->
-          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
-
-      | Sif (e, ifs1, ifs2), 1 ->
-          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
-
-      | _ -> raise InvalidCPos
-    in zpr, ((0, `ByPos (1 + List.length s1)), sub)
-
-=======
       | Swhile (e, sw), `Cond true ->
           (ZWhile (e, ((s1, s2), zpr)), sw)
 
@@ -259,7 +221,6 @@ module Zipper = struct
       | _ -> raise InvalidCPos
     in zpr, ((0, `ByPos (1 + List.length s1)), sub)
 
->>>>>>> origin/main
   let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
     let (zpr, s), nm =
       List.fold_left_map

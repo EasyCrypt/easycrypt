@@ -14,16 +14,10 @@ module Position : sig
   type cp_match = [
     | `If
     | `While
-<<<<<<< HEAD
-    | `Assign of lvmatch
-    | `Sample
-    | `Call
-=======
     | `Match
     | `Assign of lvmatch
     | `Sample of lvmatch
     | `Call   of lvmatch
->>>>>>> origin/main
   ]
 
   and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
@@ -33,16 +27,10 @@ module Position : sig
     | `ByMatch of int option * cp_match
   ]
 
-<<<<<<< HEAD
-  type codepos1    = int * cp_base
-  type codepos     = (codepos1 * int) list * codepos1
-  type codeoffset1 = [`ByOffset of int | `ByPosition of codepos1]
-=======
   type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
   type codepos1      = int * cp_base
   type codepos       = (codepos1 * codepos_brsel) list * codepos1
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
->>>>>>> origin/main
 
   val shift1 : offset:int -> codepos1 -> codepos1
   val shift  : offset:int -> codepos  -> codepos
@@ -54,15 +42,12 @@ end
 module Zipper : sig
   open Position
 
-<<<<<<< HEAD
-=======
   type spath_match_ctxt = {
     locals : (EcIdent.t * ty) list;
     prebr  : ((EcIdent.t * ty) list * stmt) list;
     postbr : ((EcIdent.t * ty) list * stmt) list;
   }
 
->>>>>>> origin/main
   type ipath =
   | ZTop
   | ZWhile  of expr * spath
@@ -127,18 +112,11 @@ module Zipper : sig
    *)
   val fold : env -> 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
 
-<<<<<<< HEAD
-    (* [map cpos f s] is a special case of [fold] where the state and the
-   * out-of-band data are absent
-   *)
-   val map : env -> codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
-=======
   (* [map cpos env f s] is a special case of [fold] where the state and the
    * out-of-band data are absent
    *)
   val map : env -> codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
 
->>>>>>> origin/main
 end
 
 (* -------------------------------------------------------------------- *)
