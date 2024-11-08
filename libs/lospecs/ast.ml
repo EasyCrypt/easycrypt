@@ -63,11 +63,12 @@ type aexpr_ =
   | EIncr of aword * aexpr
   | EAdd of aword * [`Sat of us | `Word] * (aexpr * aexpr)
   | ESub of aword * (aexpr * aexpr)
+  | EMul of mulk * aword * (aexpr * aexpr)
   | EOr of aword * (aexpr * aexpr)
   | EXor of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
-  | EMul of mulk * aword * (aexpr * aexpr)
   | ECmp of aword * us * [`Gt | `Ge] * (aexpr * aexpr)
+  | EPopCount of aword * aexpr
 [@@deriving yojson]
 
 and aexpr = { node : aexpr_; type_ : atype } [@@deriving yojson]

@@ -79,6 +79,10 @@ val asr_ : reg -> reg -> reg
 
 val shift : side:[`L | `R] -> sign:[`L | `A] -> reg -> reg -> reg
 
+val rol : reg -> reg -> reg
+
+val ror : reg -> reg -> reg
+
 (* ==================================================================== *)
 val incr : reg -> node * reg
 
@@ -151,6 +155,5 @@ val srem : reg -> reg -> reg
 
 val smod : reg -> reg -> reg
 
-val rol : reg -> reg -> reg
-
-val ror : reg -> reg -> reg
+(* ==================================================================== *)
+val popcount : size:int -> reg -> reg

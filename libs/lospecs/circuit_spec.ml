@@ -147,6 +147,9 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       | `S -> Circuit.sextend ~size e
       end
 
+    | EPopCount (size, e) ->
+      Circuit.popcount ~size:(get_size size) (of_expr env e)
+
     | ESlice (e, ({ node = EInt offset }, size, scale)) ->
       let e = of_expr env e in
       let offset = offset * scale in

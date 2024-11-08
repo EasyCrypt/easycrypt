@@ -149,6 +149,7 @@ module Sigs : sig
   val sge : sig_
   val ugt : sig_
   val uge : sig_
+  val popcount : sig_
 end = struct
   let mk1 (f : aexpr -> aexpr_) (a : aexpr list) =
     f (as_seq1 a)
@@ -299,6 +300,14 @@ end = struct
   let xor_ : sig_ =
     let mk = fun ws x y -> EXor (as_seq1 ws, (x, y)) in
     binop ~name:"xor" mk
+
+  let popcount = {
+      s_name = "popcount";
+      s_ntyparams = 2;
+      s_argsty = (fun ws -> [fst (as_seq2 ws)]);
+      s_retty = (fun ws -> snd (as_seq2 ws));
+      s_mk = (fun ws -> mk1 (fun x -> EPopCount (snd (as_seq2 ws), x)));
+    }  
 end
 
 (* -------------------------------------------------------------------- *)
@@ -331,6 +340,7 @@ let sigs : sig_ list = [
   Sigs.sge;
   Sigs.ugt;
   Sigs.uge;
+  Sigs.popcount;
 ]
 
 (* -------------------------------------------------------------------- *)

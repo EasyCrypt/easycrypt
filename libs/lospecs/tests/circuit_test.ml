@@ -468,6 +468,18 @@ let test_uge () =
   test (op 10)
 
 (* -------------------------------------------------------------------- *)
+let test_popcount () =
+  let op (size : int) =
+    {  name = Format.sprintf "popcount<%d>" size;
+        args = [(size, `U)];
+        out  = `U;
+        mk   = (fun rs -> let x = as_seq1 rs in C.popcount ~size x);
+        reff = (fun vs -> let x = as_seq1 vs in Z.popcount (Z.of_int x)); }
+
+  in
+  test (op 16)
+
+(* -------------------------------------------------------------------- *)
 type mvalue = M256 of Avx2.m256 | M128 of Avx2.m128
 
 module MValue : sig
@@ -983,6 +995,8 @@ let tests = [
 
   ("bvueq", test_bvueq);
   ("bvseq", test_bvseq);
+
+  ("popcount", test_popcount);
 
   ("vpadd_16u16"      , test_vpadd_16u16      );
   ("vpadd_32u8"       , test_vpadd_32u8       );
