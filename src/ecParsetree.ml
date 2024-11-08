@@ -809,7 +809,7 @@ type phltactic =
     (* Map-reduce *)
   | Pbdep of bdep_info
   | Pbdepeq of bdepeq_info
-  | Pcirc
+  | Pcirc of (bdepvar list * pformula * bdepvar)
 
     (* Program rewriting *)
   | Prwprgm of rwprgm

@@ -195,8 +195,104 @@ let prog_equiv_prod
     Format.eprintf "Success@."
   end 
 
+(*
+  Input: pstate -> Map from program variables to circuits, possibly empty
+         hyps
+         form -> form to be processed
+  Output: 
+    Form with equalities between bitstring replaced by true
+    if both sides are equivalent as circuits 
+    or false otherwise
+*)
+let rec circ_simplify_form_bitstring_equality
+  ?(mem = mhr) 
+  ?(pstate: (symbol, circuit) Map.t = Map.empty) 
+  ?(pcond: circuit option)
+  ?(inps: cinput list option)
+  (hyps: hyps) 
+  (f: form)
+  : form =
+  let env = toenv hyps in
+  let g = fun f ->
+  match f.f_node with
+  | Fapp ({f_node = Fop (pth, _)}, [f1; f2]) -> 
+    begin match EcFol.op_kind pth with
+    | Some `Eq 
+      when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty 
+         || Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty) ->
+      let c1 = circuit_of_form ~pstate hyps f1 in
+      let c2 = circuit_of_form ~pstate hyps f2 in
+      let c1, c2 = match inps with
+        | Some inps -> {c1 with inps = inps}, {c2 with inps = inps}
+        | None -> c1, c2
+      in
+      Format.eprintf "Testing circuit equivalence for forms:
+      %a@.%a@.With circuits: %s | %s@."
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f2
+      (circuit_to_string c1)
+      (circuit_to_string c2);
+      if circ_equiv c1 c2 pcond then
+      f_true
+      else
+      f_false
+    | _ -> f    
+    end
+  | _ -> f
+  in
+  f_map (fun t -> t) g (g f)
 
 
+let circ_form_eval_plus_equiv 
+  ?(mem = mhr) 
+  (hyps: hyps) 
+  (proc: stmt) 
+  (invs: variable list) 
+  (f: form) 
+  (v : variable) 
+  : bool = 
+  assert(f.f_ty = tbool);
+  let env = toenv hyps in
+  let redmode = circ_red hyps in
+  let (@@!) = EcTypesafeFol.f_app_safe env in
+  let pstate : (symbol, circuit) Map.t = Map.empty in
+  let inps = List.map (EcCircuits.input_of_variable env) invs in
+  let inpcs, inps = List.split inps in
+  let pstate = List.fold_left2
+    (fun pstate inp v -> Map.add v inp pstate)
+    pstate inpcs (invs |> List.map (fun v -> v.v_name))
+  in
+  let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate proc.s_node in
+  let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
+  let size, of_int = match EcEnv.Circuit.lookup_bitstring env v.v_type with
+  | Some {size; ofint} -> size, ofint 
+  | None -> Format.eprintf "Binding not found for variable %s of type %a@."
+    v.v_name (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) v.v_type; assert false
+  in
+  let rec test_values (size: int) (cur: BI.zint) : bool =
+    Format.eprintf "[W] Testing for var = %s@." (BI.to_string cur);
+    if Z.numbits (BI.to_zt cur) > size then
+    true
+    else
+    let cur_val = of_int @@! [f_int cur] in 
+    let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
+    let pcond = match Map.find_opt v.v_name pstate with
+      | Some circ -> Some (circuit_ueq circ (circuit_of_form hyps cur_val))
+      | None -> None
+    in
+    let () = Format.eprintf "Form before circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
+    let f = circ_simplify_form_bitstring_equality ~mem ~pstate ~inps ?pcond hyps f in
+    let f = EcCallbyValue.norm_cbv redmode hyps f in
+    if f <> f_true then
+    (Format.eprintf "Got %a after reduction@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
+    false)
+    else
+    test_values size (BI.(add cur one))
+  in
+  test_values size (BI.zero)
+
+
+ 
 (* FIXME UNTESTED *)
 let circ_hoare (hyps : hyps) cache ((mem, me): memenv) (pre: form) (proc: stmt) (post: form) : unit =
   let pstate, inps = EcCircuits.pstate_of_memtype (LDecl.toenv hyps) me in
@@ -357,7 +453,7 @@ let reconstruct_from_bits_op (env: env) (t: ty) =
     EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f_local temp bool_list]]]
   | _ -> 
     bits2w_op env t
-    
+   
 let t_bdep 
   (n: int) 
   (m: int) 
@@ -615,3 +711,37 @@ let process_bdepeq
   (* ------------------------------------------------------------------ *)
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
   FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond) tc 
+
+let t_bdep_form 
+  (invs: variable list)
+  (f: form)
+  (v: variable)
+  (tc : tcenv1)
+  : tcenv =
+  match (FApi.tc1_goal tc).f_node with
+  | FhoareF sH -> assert false
+  | FhoareS sF -> if (circ_form_eval_plus_equiv ~mem:(fst sF.hs_m) (FApi.tc1_hyps tc) sF.hs_s invs f v) then
+    let new_sF = {sF with hs_po=f_imp f sF.hs_po} in
+    FApi.xmutate1 tc VBdep [f_hoareS_r new_sF]
+    else 
+    (Format.eprintf "Supplied formula is not always true@.";
+    assert false)
+  | _ -> assert false
+
+let process_bdep_form 
+  (invs: bdepvar list)
+  (f: pformula)
+  (v: bdepvar)
+  (tc : tcenv1)
+  : tcenv =
+  let hr = EcLowPhlGoal.tc1_as_hoareS tc in
+  let hyps = FApi.tc1_hyps tc in
+  let invs = get_vars invs hr.hs_m in
+  let v = get_var v hr.hs_m |> as_seq1 in
+  let ue = EcUnify.UniEnv.create None in
+  let env = (toenv hyps) in
+  let env = Memory.push_active hr.hs_m env in
+  let f = EcTyping.trans_prop env ue f in
+  t_bdep_form invs f v tc
+
+

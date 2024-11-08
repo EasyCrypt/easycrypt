@@ -26,6 +26,14 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
+let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
+  {base_red with delta_p = (fun pth ->
+  if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
+    base_red.delta_p pth
+  else
+    `No)
+} 
+
 (* -------------------------------------------------------------------- *)
 type width = int
 
@@ -413,7 +421,7 @@ let compose (f: circuit) (args: circuit list) : circuit =
     dist_inputs args
   in
   {circ=apply f (List.map (fun c -> c.circ) args); 
-  inps=List.reduce (@) (List.map (fun c -> c.inps) args)}
+  inps=List.fold_right (@) (List.map (fun c -> c.inps) args) []} 
 
 
 (* 
@@ -566,6 +574,11 @@ let circuit_tuple_proj (c: circuit) (i: int) : circuit =
       assert false
     end
   | _ -> assert false
+
+let circuit_ueq (c: circuit) (d: circuit) : circuit =
+  match c.circ, d.circ with
+  | BWCirc r1, BWCirc r2 -> {circ= BWCirc[C.bvueq r1 r2]; inps=c.inps @ d.inps}
+  | _ -> failwith "Implement other cases for circuit_ueq"
 
 (* Input for splitting function w.r.t. dependencies *)
 let input_of_tdep (n: int) (bs: int Set.t) : _ * cinput = 
@@ -903,6 +916,17 @@ let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option)
       circuit_bw_zeroextend f (size_of_circ g.circ), g else
       f, circuit_bw_zeroextend g (size_of_circ f.circ)
   in
+  (* if (List.is_empty f.inps) || (List.is_empty g.inps) then *)
+    (* if (List.is_empty f.inps) && (List.is_empty g.inps) then *)
+      (* match f.circ, g.circ with *)
+      (* | BWCirc r1, BWCirc r2 -> r1 = r2 *)
+      (* | BWArray a1,BWArray a2 -> a1 = a2 *)      
+      (* | BWTuple t1, BWTuple t2 -> t1 = t2 *)
+      (* | _ -> false *)
+    (* else *)
+    (* false *)
+  (* else *)
+  (* FIXME: more general input unification procedure *)  
   let pcond = match pcond with
   | Some pcond -> pcond
   | None -> {circ = BWCirc [C.true_]; inps = f.inps}
@@ -964,13 +988,7 @@ let circuit_of_form
 
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
-    let redmode = EcReduction.full_red in
-    let redmode = {redmode with delta_p = (fun pth ->
-      if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
-        redmode.delta_p pth
-      else
-        `No)
-    } in
+    let redmode = circ_red hyps in
     (* let redmode = {redmode with delta_p = fun _ -> `No} in *)
     let fapply_safe f fs = 
       (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env) in *)

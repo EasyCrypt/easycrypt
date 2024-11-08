@@ -3320,8 +3320,8 @@ bdepeq_out_info:
     pcond=oident?
   { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; } }
 
-| BDEP BITSTRING
-  { Pcirc }
+| BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
+  { Pcirc (invs, f, (`Var v :> bdepvar)) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
