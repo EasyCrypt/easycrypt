@@ -255,15 +255,8 @@ let circ_form_eval_plus_equiv
   let env = toenv hyps in
   let redmode = circ_red hyps in
   let (@@!) = EcTypesafeFol.f_app_safe env in
-  let pstate : (symbol, circuit) Map.t = Map.empty in
   let inps = List.map (EcCircuits.input_of_variable env) invs in
   let inpcs, inps = List.split inps in
-  let pstate = List.fold_left2
-    (fun pstate inp v -> Map.add v inp pstate)
-    pstate inpcs (invs |> List.map (fun v -> v.v_name))
-  in
-  let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate proc.s_node in
-  let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
   let size, of_int = match EcEnv.Circuit.lookup_bitstring env v.v_type with
   | Some {size; ofint} -> size, ofint 
   | None -> Format.eprintf "Binding not found for variable %s of type %a@."
@@ -275,6 +268,24 @@ let circ_form_eval_plus_equiv
     true
     else
     let cur_val = of_int @@! [f_int cur] in 
+    let pstate : (symbol, circuit) Map.t = Map.empty in
+    let pstate = List.fold_left2
+      (fun pstate inp v -> Map.add v inp pstate)
+      pstate inpcs (invs |> List.map (fun v -> v.v_name))
+    in
+    let insts = List.map (fun i -> 
+      match i.i_node with
+      | Sasgn (lv, e) -> 
+        let f = form_of_expr mem e in
+        let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
+        let f = EcCallbyValue.norm_cbv redmode hyps f in
+        let e = expr_of_form mem f in
+        EcCoreModules.i_asgn (lv,e)
+      | _ -> i
+      ) proc.s_node 
+    in
+    let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate insts in
+    let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
     let pcond = match Map.find_opt v.v_name pstate with
       | Some circ -> Some (circuit_ueq circ (circuit_of_form hyps cur_val))
