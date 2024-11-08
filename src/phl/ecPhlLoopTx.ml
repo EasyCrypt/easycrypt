@@ -20,7 +20,7 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 type fission_t    = oside * pcodepos * (int * (int * int))
 type fusion_t     = oside * pcodepos * (int * (int * int))
-type unroll_t     = oside * pcodepos * bool
+type unroll_t     = oside * pcodepos * [`While | `For of bool]
 type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
@@ -220,7 +220,7 @@ let process_splitwhile (b, side, cpos) tc =
   t_splitwhile b side cpos tc
 
 (* -------------------------------------------------------------------- *)
-let process_unroll_for side cpos tc =
+let process_unroll_for ~cfold side cpos tc =
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
   let c    = EcLowPhlGoal.tc1_get_stmt side tc in
@@ -275,7 +275,7 @@ let process_unroll_for side cpos tc =
       match sform_of_form (simplify full_red hyps cond) with
       | SFtrue  -> true
       | SFfalse -> false
-      | _       -> Format.eprintf "condition after simplify: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) (simplify full_red hyps cond); tc_error !!tc "while loop condition does not reduce to a constant" in
+      | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in
 
   let rec eval_cond z0 =
     if test_cond z0 then z0 :: eval_cond (incrz z0) else [z0] in
@@ -324,16 +324,19 @@ let process_unroll_for side cpos tc =
   let tcenv = t_doit 0 pos zs tc in
   let tcenv = FApi.t_onalli doi tcenv in
 
-  let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
-  let clen = blen * (List.length zs - 1) in
+  if cfold then begin
+    let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+    let clen = blen * (List.length zs - 1) in
 
-  FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+    FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+  end else tcenv
 
 (* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =
-  if for_ then
-    process_unroll_for side cpos tc
-  else begin
+  match for_ with
+  | `While ->
     let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
     t_unroll side cpos tc
-  end
+
+  | `For cfold ->
+    process_unroll_for ~cfold side cpos tc
