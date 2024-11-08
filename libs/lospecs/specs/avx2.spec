@@ -369,3 +369,20 @@ LT_256(a@256, b@256) -> @1 =
 
 POPCOUNT_64(x@64) -> @64 =
   popcount<64, 64>(x)
+
+# Not part of the arch
+VPINC_8u8(w@64) -> @64 =
+  map<8, 8>(incr<8>, w)
+
+VPUNPCKL_16u8(w1@64, w2@64) -> @128 =
+  map<8, 8>(
+    fun w1@8 w2@8 . concat<8>(w1, w2),
+    w1,
+    w2
+  )
+
+VPSHUFB_128(w@128, widx@128) -> @128 =
+  map<8, 16>(
+    fun idx@8 . idx[7] ? 0 : w[@8|idx[@4|0]],
+    widx
+  )

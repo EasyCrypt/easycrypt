@@ -1430,11 +1430,12 @@ let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate
       raise @@ CircError err
 
 let instrs_equiv
-   (hyps       : hyps         )
-   ((mem, mt)  : memenv       )
-  ?(pstate     : _ = Map.empty)
-   (s1         : instr list   )
-   (s2         : instr list   ) : bool
+   (hyps       : hyps             )
+   ((mem, mt)  : memenv           )
+  ?(keep       : _ option         )
+  ?(pstate     : _ = Map.empty    )
+   (s1         : instr list       )
+   (s2         : instr list       ) : bool
 =
   let env = LDecl.toenv hyps in
 

@@ -3283,8 +3283,8 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
-| PROC CHANGE CIRCUIT o=codepos PLUS w=word s=brace(stmt)
-    { Prwprgm (`Change (o, w, s)) }
+| PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
+    { Prwprgm (`Change (o, b, w, s)) }
 
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }

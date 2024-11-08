@@ -37,5 +37,5 @@ val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
 val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
 val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list
 val input_of_variable : env -> variable -> circuit * cinput
-val instrs_equiv : hyps -> memenv -> ?pstate:pstate -> instr list -> instr list -> bool
+val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
 val process_instr : hyps -> memory -> ?cache:cache -> pstate -> instr -> (symbol, circuit) Map.t

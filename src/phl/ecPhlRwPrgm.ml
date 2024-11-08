@@ -5,15 +5,35 @@ open EcCoreGoal
 open EcLowPhlGoal
 
 (* -------------------------------------------------------------------- *)
-type change_t = pcodepos * int * pstmt
+type change_t = pcodepos * ptybindings option * int * pstmt
 
 (* -------------------------------------------------------------------- *)
-let process_change ((cpos, i, s) : change_t) (tc : tcenv1) =
-  let env = FApi.tc1_env tc in
+let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
-  let env = EcEnv.Memory.push_active hs.hs_m env in
+  let cpos = EcProofTyping.tc1_process_codepos tc (None, cpos) in
 
-  let cpos = EcTyping.trans_codepos env cpos in
+  let mem, _ =
+    let bindings =
+      bindings
+      |> Option.value ~default:[]
+      |> List.map (fun (xs, ty) -> List.map (fun x -> (x, ty)) xs)
+      |> List.flatten in
+    List.fold_left_map (fun mem (x, ty) ->
+      let ue = EcUnify.UniEnv.create (Some (EcEnv.LDecl.tohyps hyps).h_tvar) in
+      let ty = EcTyping.transty EcTyping.tp_tydecl env ue ty in
+      assert (EcUnify.UniEnv.closed ue);
+      let ty = 
+        let subst = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+        EcCoreSubst.ty_subst subst ty in
+      let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
+      let vr = EcAst.{ ov_name = x; ov_type = ty; } in
+      let (mem, _) = EcMemory.bind_fresh vr mem in
+      (mem, (EcTypes.pv_loc (oget x), ty)) (* FIXME *)
+    ) hs.hs_m bindings in
+
+  let env = EcEnv.Memory.push_active mem env in
 
   let s =
     let ue = EcProofTyping.unienv_of_hyps (FApi.tc1_hyps tc) in
@@ -25,19 +45,36 @@ let process_change ((cpos, i, s) : change_t) (tc : tcenv1) =
     EcCoreSubst.s_subst sb s in
 
   let zp = Zpr.zipper_of_cpos env cpos hs.hs_s in
+
+  let rec pvtail (pvs : EcPV.PV.t) (zp : Zpr.ipath) =
+    let parent =
+      match zp with
+      | Zpr.ZTop -> None
+      | Zpr.ZWhile (_, p) -> Some p
+      | Zpr.ZIfThen (e, p, _) -> Some p
+      | Zpr.ZIfElse (e, _, p) -> Some p
+      | Zpr.ZMatch (e, p, _) -> Some p in
+    match parent with
+    | None -> pvs
+    | Some ((_, tl), p) -> pvtail (EcPV.PV.union pvs (EcPV.is_read env tl)) p
+  in
+
   let zp =
     let target, tl = List.split_at i zp.z_tail in
 
+    let keep = pvtail (EcPV.is_read env tl) zp.z_path in
+    let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) hs.hs_po) in
+
     begin
       try
-        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) hs.hs_m target s.s_node) then
+        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem target s.s_node) then
           tc_error !!tc "statements are not circuit-equivalent"
         with EcCircuits.CircError s ->
           tc_error !!tc "circuit-equivalence checker error: %s" s
     end;
     { zp with z_tail = s.s_node @ tl } in
 
-  let hs = { hs with hs_s = Zpr.zip zp } in
+  let hs = { hs with hs_s = Zpr.zip zp; hs_m = mem; } in
 
   FApi.xmutate1 tc `BChange [EcFol.f_hoareS_r hs]
 
@@ -64,5 +101,5 @@ let process_rw_prgm (mode : rwprgm) (tc : tcenv1) =
   match mode with 
   | `IdAssign (cpos, pv) ->
     process_idassign (cpos, pv) tc
-  | `Change (cpos, i, s) ->
-    process_change (cpos, i, s) tc
+  | `Change (cpos, bindings, i, s) ->
+    process_change (cpos, bindings, i, s) tc
