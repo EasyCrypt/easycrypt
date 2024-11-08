@@ -184,6 +184,7 @@ let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern
     (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: have a better handling of PV                                  *)
 let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
   let env =  LDecl.toenv hyps in
 
@@ -195,19 +196,23 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
       e
     ) else identity in
 
-  let is_const_expression (e : expr) =
-    PV.is_empty (e_read env e) in
-
   let for_instruction ((subst as subst0) : (expr, unit) Mpv.t) (i : instr) =
     let wr = EcPV.i_write env i in
     let i = Mpv.isubst env subst i in
 
     let (subst, asgn) =
-      List.fold_left_map (fun subst ((pv, _) as pvty) ->
-        match Mpv.find env pv subst with
-        | e -> Mpv.remove env pv subst, Some (pvty, e)
-        | exception Not_found -> subst, None
-      ) subst (fst (PV.elements wr)) in
+      List.fold_left_map (fun subst (pv, e) ->
+        let exception Remove in
+
+        try
+          if PV.mem_pv env pv wr then raise Remove;
+          let rd = EcPV.e_read env e in
+          if PV.mem_pv env pv rd then raise Remove;
+          subst, None
+
+        with Remove ->
+          Mpv.remove env pv subst, Some ((pv, e.e_ty), e)
+      ) subst (EcPV.Mnpv.bindings (Mpv.pvs subst)) in
 
     let asgn = List.filter_map identity asgn in
 
@@ -226,7 +231,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
         try
           match i.i_node with
           | Sasgn (lv, e) ->
-            (* We already removed the variables of `lv` from the substitution *)
+            (* We already removed the variables of `lv` & the rhs from the substitution *)
             (* We are only interested in the variables of `lv` that are in `wr` *)
             let es =
               match simplify e, lv with
@@ -237,7 +242,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
             let lv = lv_to_ty_list lv in
       
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
-              Mpv.mem env pv subst0 && is_const_expression e
+              Mpv.mem env pv subst0
             ) (List.combine lv es) in
             
             let subst =
@@ -290,9 +295,6 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
                is not a tuple expression";
         | e, _ -> [e] in
       let lv = lv_to_ty_list lv in
-
-      if not (List.for_all is_const_expression es) then
-        tc_error pf "right-values are not closed expressions";
 
       if not (List.for_all (is_loc |- fst) lv) then
         tc_error pf "left-values must be made of local variables only";

@@ -111,6 +111,8 @@ module Mpv = struct
       check_glob env mp m;
       raise Not_found
 
+  let pvs { s_pv } = s_pv
+
   type esubst = (expr, unit) t
 
   let rec esubst env (s : esubst) e =

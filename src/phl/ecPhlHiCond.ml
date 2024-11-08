@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcParsetree
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
@@ -21,7 +20,6 @@ let process_cond (info : EcParsetree.pcond_info) tc =
       ~te:(t_equiv_cond side) tc
 
   | `Seq (side, (i1, i2), f) ->
-    let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let f  = EcProofTyping.tc1_process_prhl_formula tc f in
     let i1 = Option.map (fun i1 -> EcProofTyping.tc1_process_codepos1 tc (side, i1)) i1 in
@@ -32,7 +30,6 @@ let process_cond (info : EcParsetree.pcond_info) tc =
       [ t_id; t_equiv_cond side ] tc
 
   | `SeqOne (s, i, f1, f2) ->
-    let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let i = Option.map (fun i1 -> EcProofTyping.tc1_process_codepos1 tc (Some s, i1)) i in
     let n = default_if i (match s with `Left -> es.es_sl | `Right -> es.es_sr) in

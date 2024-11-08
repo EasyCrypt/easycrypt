@@ -641,8 +641,6 @@ let process_rnd side pos tac_info tc =
       t_bdhoare_rnd tac_info tc
 
   | _, _, _ when is_equivS concl ->
-    let env = FApi.tc1_env tc in
-
     let process_form f ty1 ty2 =
       TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 

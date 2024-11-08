@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcParsetree
 open EcSymbols
 open EcAst
 open EcTypes
