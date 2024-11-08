@@ -339,4 +339,4 @@ let process_unroll (side, cpos, for_) tc =
     t_unroll side cpos tc
 
   | `For cfold ->
-    process_unroll_for ~cfold side cpos tc
+    process_unroll_for ~cfold:(not cfold) side cpos tc
