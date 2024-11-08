@@ -1457,13 +1457,25 @@ let instrs_equiv
   | Some pv -> 
     let vs = EcPV.PV.elements pv |> fst in
     let vs = List.map (function 
-      | (PVloc v, ty) -> v
+      | (PVloc v, ty) -> (v, ty)
       | _ -> assert false
       ) vs 
-    in List.for_all (fun var -> 
-      let circ1 = Map.find var pstate1 in
+    in List.for_all (fun (var, ty) -> 
+      let circ1 = Map.find_opt var pstate1 in
+      let circ2 = Map.find_opt var pstate2 in
+      match circ1, circ2 with
+      | None, None -> true
+      | None, Some circ1
+      | Some circ1, None -> 
+        let circ2 = Map.find_opt var pstate in
+        if Option.is_none circ2 then assert false (* Should never happen *)
+        else
+          let circ1 = {circ1 with inps = inputs @ circ1.inps} in
+          let circ2 = Option.get circ2 in
+          let circ2 = {circ2 with inps = circ1.inps } in
+          circ_equiv circ1 circ2 None
+      | Some circ1, Some circ2 ->
       let circ1 = { circ1 with inps = inputs @ circ1.inps } in
-      let circ2 = Map.find var pstate2 in
       let circ2 = { circ2 with inps = inputs @ circ2.inps } in
       circ_equiv circ1 circ2 None
     ) vs
