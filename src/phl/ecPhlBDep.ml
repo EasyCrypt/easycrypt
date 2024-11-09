@@ -213,35 +213,28 @@ let rec circ_simplify_form_bitstring_equality
   (f: form)
   : form =
   let env = toenv hyps in
-  let g = fun f ->
-  match f.f_node with
-  | Fapp ({f_node = Fop (pth, _)}, [f1; f2]) -> 
-    begin match EcFol.op_kind pth with
-    | Some `Eq 
-      when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty 
-         || Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty) ->
+
+  let rec check (f : form) =
+    match sform_of_form f with
+    | SFeq (f1, f2)
+         when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
+           || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty)
+      ->
       let c1 = circuit_of_form ~pstate hyps f1 in
       let c2 = circuit_of_form ~pstate hyps f2 in
       let c1, c2 = match inps with
         | Some inps -> {c1 with inps = inps}, {c2 with inps = inps}
         | None -> c1, c2
       in
-      Format.eprintf "Testing circuit equivalence for forms:
+      Format.eprintf "[W]Testing circuit equivalence for forms:
       %a@.%a@.With circuits: %s | %s@."
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f2
       (circuit_to_string c1)
       (circuit_to_string c2);
-      if circ_equiv c1 c2 pcond then
-      f_true
-      else
-      f_false
-    | _ -> f    
-    end
-  | _ -> f
-  in
-  f_map (fun t -> t) g (g f)
-
+      f_bool (circ_equiv c1 c2 pcond)
+    | _ -> f_map (fun ty -> ty) check f 
+  in check f
 
 let circ_form_eval_plus_equiv 
   ?(mem = mhr) 
@@ -754,6 +747,8 @@ let process_bdep_form
   let env = (toenv hyps) in
   let env = Memory.push_active hr.hs_m env in
   let f = EcTyping.trans_prop env ue f in
+  assert (EcUnify.UniEnv.closed ue);
+  let f = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) f in
   t_bdep_form invs f v tc
 
 
