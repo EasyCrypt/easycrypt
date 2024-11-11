@@ -606,13 +606,35 @@ let circuit_map (f: circuit) (a: circuit) : circuit =
   let r = Array.map (destr_bwcirc) r in
   {circ = BWArray r; inps}
 
+let circuit_split (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list =
+  assert (List.length f.inps = 1);
+  let r = destr_bwcirc f.circ in
+  let inp_t, inp_w = List.hd f.inps |> destr_bwinput in 
+  assert ((inp_w mod lane_in_w = 0) && (List.length r mod lane_out_w = 0));
+  let rs = List.chunkify (lane_out_w) r in
+  let rs = List.mapi (fun lane_idx lane_circ -> 
+    let id = create ("split_" ^ (string_of_int lane_idx)) in
+    let map_ = (function 
+      | (v, j) when v = inp_t.id_tag 
+          && (0 <= (j - (lane_idx*lane_in_w)) && (j-(lane_in_w*lane_idx)) < lane_in_w) 
+          -> Some (C.input (id.id_tag, j - (lane_idx*lane_in_w))) 
+      | _ -> None
+      ) in
+    let circ = BWCirc(C.maps map_ lane_circ) in
+    {circ; inps=[BWInput(id, lane_in_w)]}
+  ) rs in
+  rs
+
 (* Partitions into blocks of type n -> m *)
 let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let tm = Unix.gettimeofday () in
   Format.eprintf "[W] Beginning dependency analysis@.";
   let const_inp = BWInput (create "const", n) in
   let c = circuit_flatten c in
-  let c = if List.compare_length_with c.inps 1 > 0 then
+  let c = if List.compare_length_with c.inps 1 > 0 
+    || ((List.compare_length_with c.inps 1 = 0) 
+    && not (is_bwinput (List.hd c.inps)))
+    then
     circuit_aggregate_inps c 
     else c
   in
@@ -621,6 +643,7 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   let deps = HL.split_deps m deps in
 
   Format.eprintf "%d@." (List.length deps);
+  (* Format.eprintf "%a@." (fun fmt -> HL.pp_bdeps fmt) deps; *)
 
   assert (HL.block_list_indep deps);
   assert (List.for_all (HL.check_dep_width n) (List.snd deps));
@@ -629,15 +652,16 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   Format.eprintf "[W] Dependency analysis complete after %f seconds@."
   (Unix.gettimeofday () -. tm);
   
-  let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg =
-    let res, c = List.takedrop (fst db) c in
-    let map_, inps = inputs_of_tdep (snd db) in
-    let res = C.maps (fun a -> Map.find_opt a map_) res in
-    {circ = BWCirc res; inps}, c
-  in
-  let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in
-    (r::cs, c)) ([], destr_bwcirc c.circ) deps in
-  assert (List.length c = 0);
+  (* let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg = *)
+    (* let res, c = List.takedrop (fst db) c in *)
+    (* let map_, inps = inputs_of_tdep (snd db) in *)
+    (* let res = C.maps (fun a -> Map.find_opt a map_) res in *)
+    (* {circ = BWCirc res; inps}, c *)
+  (* in *)
+  (* let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in *)
+    (* (r::cs, c)) ([], destr_bwcirc c.circ) deps in *)
+  (* assert (List.length c = 0); *)
+  let cs = circuit_split c n m in
   List.map (function
     | {circ=BWCirc r; inps=[BWInput (idn, w)]}
       -> {circ=BWCirc (C.uextend ~size:m r); inps=[BWInput (idn, n)]}
