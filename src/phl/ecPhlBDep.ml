@@ -424,11 +424,13 @@ let mapreduce_eval
     assert(List.for_all (fun v ->
       let fv = v in
       let v = destr_int v in 
-      Format.eprintf "[W] Processing input = %s@." (BI.to_string v); 
       let lane_val = fc @@! [fv] in
       let lane_val = int_of_form hyps lane_val in
       let circ_val = compute (List.hd cs) [v] in
-      BI.((of_int circ_val) = lane_val)
+      if BI.((of_int circ_val) = lane_val) then true else
+      (Format.eprintf "Error on input %s@.Circ val:%d | Lane val: %s@." (BI.to_string v)
+      circ_val (BI.to_string lane_val); 
+      false)
     ) range);
 
     let _tm = time tm "Program to lane func equiv done" in
