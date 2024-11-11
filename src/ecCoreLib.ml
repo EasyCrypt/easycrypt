@@ -69,6 +69,8 @@ module CI_List = struct
   let p_nth = _List "nth"
   let p_size = _List "size"
   let p_mkseq = _List "mkseq"
+  let p_mem = _List "mem"
+  let p_iota = EcPath.extend p_top ["List"; "Iota"; "iota_"]
 end
   
 (* -------------------------------------------------------------------- *)

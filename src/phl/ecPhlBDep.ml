@@ -30,6 +30,12 @@ end
 
 exception BDepError
 
+
+let int_of_form (hyps: hyps) (f: form) : BI.zint = 
+  match f.f_node with 
+  | Fint i -> i
+  | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+
 (* -------------------------------------------------------------------- *)
 let mapreduce 
   (hyps : hyps) 
@@ -333,6 +339,102 @@ let circ_form_eval_plus_equiv
   in
   test_values size (BI.zero)
 
+(* -------------------------------------------------------------------- *)
+let mapreduce_eval
+  (hyps : hyps) 
+  ((mem, mt): memenv) 
+  (proc: stmt) 
+  ((invs, n): variable list * int) 
+  ((outvs, m) : variable list * int) 
+  (f: psymbol) 
+  (range: form list)
+  : unit =
+
+
+  let time (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+  let tm = Unix.gettimeofday () in
+  
+  let env = toenv hyps in
+  let ppenv = EcPrinting.PPEnv.ofenv env in
+  let fc = EcEnv.Op.lookup ([], f.pl_desc) env |> fst in
+  let (@@!) = EcTypesafeFol.f_app_safe env in 
+
+  let tm = time tm "Lane function circuit generation done" in
+  
+  (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
+  (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
+  (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
+
+  
+  let tm = time tm "Precondition circuit generation done" in
+  
+  let pstate : (symbol, circuit) Map.t = Map.empty in
+
+  let inps = List.map (EcCircuits.input_of_variable env) invs in
+  let inpcs, inps = List.split inps in
+  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) invs in
+  let pstate = List.fold_left 
+    (fun pstate (inp, v) -> Map.add v inp pstate)
+    pstate inpcs 
+  in
+  
+  let pstate = List.fold_left (EcCircuits.process_instr hyps mem) pstate proc.s_node in
+  let pstate = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate in
+
+  let tm = time tm "Program circuit generation done" in
+
+  begin 
+    let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
+    let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name;
+      List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps);
+      Format.eprintf "@."; ) circs outvs in
+    let () = List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) circs in
+    assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1);
+    let cinp = (List.hd circs).inps in
+    let c = {(circuit_aggregate circs) with inps=cinp} in
+
+    (* OPTIONAL PERMUTATION STEP *)
+    (* let c = match perm with *) 
+    (* | None -> c *)
+    (* | Some perm -> circuit_permutation (size_of_circ c.circ) m perm *)
+    (* in *)
+    (* let c = circuit_aggregate_inps c in *) 
+    (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
+      (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
+      (* Format.eprintf "@."; ) [c] outvs in *)
+    let cs = circuit_mapreduce c n m in
+
+    let tm = time tm "circuit dependecy analysis + splitting done" in
+
+    List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
+    let () = try 
+      assert (List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c None) (List.tl cs));
+      with Assert_failure _ as e ->
+        Format.eprintf "Program lane equivalence failed between lanes@.";
+        raise e
+    in
+
+    let tm = time tm "Program lanes equivs done" in
+
+
+    assert(List.for_all (fun v ->
+      let fv = v in
+      let v = destr_int v in 
+      let lane_val = fc @@! [fv] in
+      let lane_val = int_of_form hyps lane_val in
+      let circ_val = compute (List.hd cs) [v] in
+      BI.((of_int circ_val) = lane_val)
+    ) range);
+
+    let _tm = time tm "Program to lane func equiv done" in
+    
+    Format.eprintf "Success@."
+  end 
+
 
  
 (* FIXME UNTESTED *)
@@ -469,7 +571,7 @@ let flatten_to_bits (env: env) (f: form) =
 let reconstruct_from_bits (env: env) (f: form) (t: ty) =
   (* Check input is a bool list *)
   assert (match f.f_ty.ty_node with
-  | Tconstr(p, [b]) when p = EcCoreLib.CI_List.p_List -> b = tbool
+  | Tconstr(p, [b]) when p = EcCoreLib.CI_List.p_list -> b = tbool
   | _ -> false);
   let (@@!) = EcTypesafeFol.f_app_safe env in
   match EcEnv.Circuit.lookup_array_and_bitstring env t with
@@ -792,5 +894,167 @@ let process_bdep_form
   assert (EcUnify.UniEnv.closed ue);
   let f = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) f in
   t_bdep_form invs f v tc
+
+let form_list_from_iota (hyps: hyps) (f: form) : form list =
+  match f.f_node with
+  | Fapp ({f_node = Fop(p, _)}, [n; m]) when p = EcCoreLib.CI_List.p_iota ->
+    let n = int_of_form hyps n in
+    let m = int_of_form hyps m in
+    List.init (BI.to_int m) (fun i -> f_int (BI.(add n (of_int i))))
+  | _ -> assert false
+
+let t_bdep_eval
+  (n: int) 
+  (m: int) 
+  (inpvs: variable list) 
+  (outvs: variable list) 
+  (op: psymbol) 
+  (range: form list) 
+  (tc : tcenv1) =
+  (* Run bdep and check that is works FIXME *)
+  let () = match (FApi.tc1_goal tc).f_node with
+  | FhoareF sH -> assert false  
+  | FhoareS sF -> mapreduce_eval (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op range
+  | FbdHoareF _ -> assert false
+  | FbdHoareS _ -> assert false 
+  | FeHoareF _ -> assert false
+  | FeHoareS _ -> assert false 
+  | _ -> assert false
+  in
+  FApi.close (!@ tc) VBdep
+
+let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
+  let { in_ty; out_ty; invs; inpvs; outvs; lane; range } = bdeinfo in
+
+  let env = FApi.tc1_env tc in
+  let hr = EcLowPhlGoal.tc1_as_hoareS tc in
+  let hyps = FApi.tc1_hyps tc in
+
+  (* FIXME: remove shortcircuit *)
+  (* if true then *)
+    (* let hr = EcLowPhlGoal.tc1_as_hoareS tc in *)
+    (* let outvs  = get_vars outvs hr.hs_m in *)
+    (* let inpvs = get_vars inpvs hr.hs_m in *)
+    (* let tc = EcPhlConseq.t_hoareS_conseq_nm f_true f_true tc in *)
+    (* FApi.t_last (t_bdep n m inpvs outvs pcond lane None) tc *) 
+  (* else *)
+  
+  let (@@!) pth args = 
+    try
+      EcTypesafeFol.f_app_safe env pth args 
+    with EcUnify.UnificationFailure _ ->
+      Format.eprintf "Type mismatch in pre-post generation, check your lane and precondition types@.";
+      raise BDepError
+  in
+  let (@@!!) pth args = 
+    try
+      EcTypesafeFol.f_app_safe ~full:false env pth args 
+    with EcUnify.UnificationFailure _ ->
+      Format.eprintf "Type mismatch in pre-post generation, check your lane and precondition types@.";
+      raise BDepError
+  in
+
+  (* DEBUG SECTION *)
+  let pp_type (fmt: Format.formatter) (ty: ty) =
+    Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  
+  let plane, olane = EcEnv.Op.lookup ([], lane.pl_desc) env in
+  (* let inpbty, outbty = tfrom_tfun2 olane.op_ty in *)
+  let in_ty =
+    let ue = EcUnify.UniEnv.create None in
+    let ty = EcTyping.transty EcTyping.tp_tydecl env ue in_ty in
+    assert (EcUnify.UniEnv.closed ue);
+    ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty 
+  in
+  let out_ty =
+    let ue = EcUnify.UniEnv.create None in
+    let ty = EcTyping.transty EcTyping.tp_tydecl env ue out_ty in
+    assert (EcUnify.UniEnv.closed ue);
+    ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty 
+  in
+
+  let ue = EcUnify.UniEnv.create None in
+  let env = Memory.push_active hr.hs_m env in
+  let range = EcTyping.trans_form env ue range (tconstr EcCoreLib.CI_List.p_list [tint])in
+  assert (EcUnify.UniEnv.closed ue);
+  let range = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) range in
+
+  let frange = form_list_from_iota hyps range in
+
+
+  let n = match EcEnv.Circuit.lookup_bitstring env in_ty with
+  | Some {size} -> size
+  | _ -> Format.eprintf "No binding for type %a@." pp_type in_ty; raise BDepError
+  in
+  let m, out_of_int, out_to_uint = match EcEnv.Circuit.lookup_bitstring env out_ty with
+  | Some {size; ofint; touint} -> size, ofint, touint
+  | _ -> Format.eprintf "No binding for type %a@." pp_type out_ty; raise BDepError
+  in
+  let out_of_int = f_op out_of_int [] (tfun tint out_ty) in
+  let out_to_uint = f_op out_to_uint [] (tfun out_ty tint) in
+  
+ 
+  if false then 
+  let inpvs = get_vars inpvs hr.hs_m in
+  let outvs  = get_vars outvs hr.hs_m in
+  let tc = EcPhlConseq.t_hoareS_conseq_nm f_true f_false tc in
+  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange) tc 
+
+  else
+  (* ------------------------------------------------------------------ *)
+  let outvs  = get_vars outvs hr.hs_m in
+  let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
+  let poutvs = List.map (flatten_to_bits env) poutvs in
+  let poutvs = List.rev poutvs in
+  let poutvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) poutvs (fop_empty (List.hd poutvs).f_ty) in
+  let poutvs = EcCoreLib.CI_List.p_flatten @@! [poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int m); poutvs] in
+  let poutvs = EcCoreLib.CI_List.p_map @@! [(reconstruct_from_bits_op env out_ty); poutvs] in
+
+  
+  (* ------------------------------------------------------------------ *)
+  let inpvs = get_vars inpvs hr.hs_m in
+  let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
+  let invs, inv_tys =
+    let lookup (x : bdepvar) : (ident * ty) list =
+      let get1 (v : symbol) =
+        EcEnv.Var.lookup_local v env in
+
+      match x with
+      | `Var x ->
+          [get1 (unloc x)]
+      | `VarRange (x, n) ->
+          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) in 
+    List.map lookup invs |> List.flatten |> List.split in
+  let inty = match List.collapse inv_tys with
+  | Some ty -> ty
+  | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
+  in
+  let finvs = List.map (fun id -> f_local id inty) invs in
+  let pinvs = List.map (flatten_to_bits env) finvs in
+  let pinvs = List.rev pinvs in
+  let pinvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinvs) (fop_empty (List.hd pinvs).f_ty) in
+  let pinvs = EcCoreLib.CI_List.p_flatten @@! [pinvs] in
+  let () = Format.eprintf "Type after flatten %a@." pp_type pinvs.f_ty in
+  let pinvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinvs] in
+  let () = Format.eprintf "Type after chunk %a@." pp_type pinvs.f_ty in
+  let b2w = (reconstruct_from_bits_op env in_ty) in
+  let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
+  let pinvs = EcCoreLib.CI_List.p_map @@! [b2w; pinvs] in
+  let () = Format.eprintf "Type after first map %a@." pp_type pinvs.f_ty in
+  let pinvs = EcCoreLib.CI_List.p_map @@! [out_to_uint; pinvs] in
+  let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
+  let pinvs_post = EcCoreLib.CI_List.p_map @@! [out_of_int; pinvs_post] in
+  (* A REFACTOR EVERYTHING HERE A *)
+  (* ------------------------------------------------------------------ *)
+  let post = f_eq pinvs_post poutvs in
+  let pre = EcCoreLib.CI_List.p_all @@! [(EcCoreLib.CI_List.p_mem @@!! [range]); pinvs] in
+
+  assert (List.compare_lengths inpvs invs = 0);
+  let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
+
+  (* let env, hyps, concl = FApi.tc1_eflat tc in *)
+  let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
+  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange) tc 
 
 

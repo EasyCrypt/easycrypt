@@ -13,9 +13,13 @@ val t_bdep : int -> int -> variable list -> variable list -> psymbol -> psymbol 
 val t_bdepeq : variable list * variable list -> int -> (int * variable list * variable list) list -> form option -> bool -> tcenv1 -> tcenv
 
 val t_circ : tcenv1 -> tcenv
+
+val t_bdep_eval :  int ->  int ->  variable list ->  variable list ->  psymbol ->  form list ->  tcenv1 -> tcenv
   
 val process_bdep : bdep_info -> tcenv1 -> tcenv
 
 val process_bdepeq : bdepeq_info -> tcenv1 -> tcenv
 
 val process_bdep_form  : bdepvar list -> pformula -> bdepvar -> tcenv1 -> tcenv
+
+val process_bdep_eval : bdep_eval_info ->  tcenv1 -> tcenv

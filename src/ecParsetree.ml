@@ -725,6 +725,15 @@ type bdep_info =
   ; lane  : psymbol
   ; perm  : psymbol option }
 
+type bdep_eval_info =
+  { in_ty     : pty
+  ; out_ty    : pty
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; lane  : psymbol 
+  ; range : pformula }
+
 type bdepeq_info =
   { n          : int
   ; inpvs_l    : bdepvar list
@@ -809,6 +818,7 @@ type phltactic =
 
     (* Map-reduce *)
   | Pbdep of bdep_info
+  | Pbdepeval of bdep_eval_info
   | Pbdepeq of bdepeq_info
   | Pcirc of (bdepvar list * pformula * bdepvar)
 

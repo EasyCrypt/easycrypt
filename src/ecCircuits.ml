@@ -423,6 +423,21 @@ let compose (f: circuit) (args: circuit list) : circuit =
   {circ=apply f (List.map (fun c -> c.circ) args); 
   inps=List.fold_right (@) (List.map (fun c -> c.inps) args) []} 
 
+(* FIXME: convert computation to return BI.zint *)
+let compute (f: circuit) (r: BI.zint list) : int = 
+  assert (List.compare_lengths f.inps r = 0);
+  let vs = List.map2 (fun inp r -> 
+    let _, size = destr_bwinput inp in
+    BWCirc(C.of_bigint ~size (BI.to_zt r ))
+  ) f.inps r in
+  let res = apply f vs in
+  let res = destr_bwcirc res in 
+  let res = List.map (function | {C.gate = C.False; C.id = id} -> 
+    if id >= 0 then false
+    else true
+    | _ -> assert false
+  ) res in
+  C.uint_of_bools res
 
 (* 
   Unifies input to allow for equivalence testing 

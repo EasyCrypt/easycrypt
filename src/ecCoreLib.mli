@@ -70,6 +70,8 @@ module CI_List : sig
   val p_size    : path
   val p_nth     : path
   val p_mkseq   : path
+  val p_mem     : path
+  val p_iota    : path
   end
 
 (*-------------------------------------------------------------------- *)
