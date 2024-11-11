@@ -424,6 +424,7 @@ let mapreduce_eval
     assert(List.for_all (fun v ->
       let fv = v in
       let v = destr_int v in 
+      Format.eprintf "[W] Processing input = %s@." (BI.to_string v); 
       let lane_val = fc @@! [fv] in
       let lane_val = int_of_form hyps lane_val in
       let circ_val = compute (List.hd cs) [v] in
@@ -929,6 +930,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let env = FApi.tc1_env tc in
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
   let hyps = FApi.tc1_hyps tc in
+  let ppenv = EcPrinting.PPEnv.ofenv env in
 
   (* FIXME: remove shortcircuit *)
   (* if true then *)
@@ -943,7 +945,9 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
     try
       EcTypesafeFol.f_app_safe env pth args 
     with EcUnify.UnificationFailure _ ->
-      Format.eprintf "Type mismatch in pre-post generation, check your lane and precondition types@.";
+      Format.eprintf "Type mismatch in pre-post generation, check your lane and precondition types@.
+      Args: %a@." (fun fmt fs -> List.iter 
+      (fun f -> (Format.fprintf fmt "%a | "(EcPrinting.pp_form ppenv) f)) fs) args;
       raise BDepError
   in
   let (@@!!) pth args = 
@@ -982,16 +986,16 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let frange = form_list_from_iota hyps range in
 
 
-  let n = match EcEnv.Circuit.lookup_bitstring env in_ty with
-  | Some {size} -> size
+  let n, in_to_uint = match EcEnv.Circuit.lookup_bitstring env in_ty with
+  | Some {size; touint} -> size, touint
   | _ -> Format.eprintf "No binding for type %a@." pp_type in_ty; raise BDepError
   in
-  let m, out_of_int, out_to_uint = match EcEnv.Circuit.lookup_bitstring env out_ty with
-  | Some {size; ofint; touint} -> size, ofint, touint
+  let in_to_uint = f_op in_to_uint [] (tfun in_ty tint) in
+  let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
+  | Some {size; ofint} -> size, ofint 
   | _ -> Format.eprintf "No binding for type %a@." pp_type out_ty; raise BDepError
   in
   let out_of_int = f_op out_of_int [] (tfun tint out_ty) in
-  let out_to_uint = f_op out_to_uint [] (tfun out_ty tint) in
   
  
   if false then 
@@ -1042,7 +1046,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinvs = EcCoreLib.CI_List.p_map @@! [b2w; pinvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinvs.f_ty in
-  let pinvs = EcCoreLib.CI_List.p_map @@! [out_to_uint; pinvs] in
+  let pinvs = EcCoreLib.CI_List.p_map @@! [in_to_uint; pinvs] in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [out_of_int; pinvs_post] in
   (* A REFACTOR EVERYTHING HERE A *)

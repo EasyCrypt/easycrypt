@@ -428,7 +428,7 @@ let compute (f: circuit) (r: BI.zint list) : int =
   assert (List.compare_lengths f.inps r = 0);
   let vs = List.map2 (fun inp r -> 
     let _, size = destr_bwinput inp in
-    BWCirc(C.of_bigint ~size (BI.to_zt r ))
+    BWCirc(C.of_sbigint ~size (BI.to_zt r))
   ) f.inps r in
   let res = apply f vs in
   let res = destr_bwcirc res in 

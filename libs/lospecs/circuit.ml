@@ -108,6 +108,8 @@ let of_bigint ~(size : int) (v : Z.t) : reg =
   assert (Z.numbits v <= size);
   List.init size (fun i -> constant (Z.testbit v i))
 
+  
+
 (* -------------------------------------------------------------------- *)
 let of_string ~(size : int) (s : string) : reg =
   of_bigint ~size (Z.of_string s)
@@ -687,3 +689,14 @@ let popcount ~(size : int) (r : reg) : reg =
   List.fold_left (fun aout node ->
     ite node (incr_dropc aout) aout
   ) (List.make size Aig.false_) r
+
+(* -------------------------------------------------------------------- *)
+let of_sbigint ~(size : int) (v : Z.t) : reg =
+  let w = Z.abs v in
+  assert (Z.numbits w <= size - 1);
+  let res = List.init size (fun i -> if i = size - 1 then
+    constant false else
+    constant (Z.testbit w i)) in
+  if Z.sign v = -1 then
+    opp res
+  else res
