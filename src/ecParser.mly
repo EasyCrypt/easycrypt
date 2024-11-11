@@ -3300,7 +3300,7 @@ bd_vars:
   { [(`VarRange (v, w) :> bdepvar)] }
 
 bdepeq_out_info:
-| m=word COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bracket(bd_vars) RBRACKET
+| m=word COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bd_vars RBRACKET
   { (m, outvs_l, outvs_r) }
 
 %public phltactic:
