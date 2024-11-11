@@ -735,18 +735,19 @@ let process_bdepeq
       let pinpl_blocks = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int n); pinpl_blocks] in
       let pinpl_blocks = EcCoreLib.CI_List.p_map @@! [(bits2w_op env opinty); pinpl_blocks] in
 
-      let pinpr_blocks = List.map (flatten_to_bits env) pinpvsr in
-      let pinpr_blocks = List.rev pinpr_blocks in
-      let pinpr_blocks = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) pinpr_blocks (fop_empty (List.hd pinpr_blocks).f_ty)  in
-      let pinpr_blocks = EcCoreLib.CI_List.p_flatten @@! [pinpr_blocks] in
-      let pinpr_blocks = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int n); pinpr_blocks] in
-      let pinpr_blocks = EcCoreLib.CI_List.p_map @@! [(bits2w_op env opinty); pinpr_blocks] in
+      (* let pinpr_blocks = List.map (flatten_to_bits env) pinpvsr in *)
+      (* let pinpr_blocks = List.rev pinpr_blocks in *)
+      (* let pinpr_blocks = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) pinpr_blocks (fop_empty (List.hd pinpr_blocks).f_ty)  in *)
+      (* let pinpr_blocks = EcCoreLib.CI_List.p_flatten @@! [pinpr_blocks] in *)
+      (* let pinpr_blocks = EcCoreLib.CI_List.p_chunk   @@! [f_int (BI.of_int n); pinpr_blocks] in *)
+      (* let pinpr_blocks = EcCoreLib.CI_List.p_map @@! [(bits2w_op env opinty); pinpr_blocks] in *)
 
       let pre_l = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpl_blocks] in
 
-      let pre_r = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpr_blocks] in
+      (* let pre_r = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpr_blocks] in *)
 
-      let pre = f_and pre_l pre_r in
+      (* let pre = f_and pre_l pre_r in *)
+      let pre = pre_l in
 
       pre, Some pcond
     | None -> pre, None
