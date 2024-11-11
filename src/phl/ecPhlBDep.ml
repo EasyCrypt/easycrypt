@@ -169,10 +169,22 @@ let prog_equiv_prod
 
   let pcond = Option.map (circuit_of_form hyps) pcond in
 
+  let time (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+  let tm = Unix.gettimeofday () in
+  
   let pstate_l = List.fold_left (EcCircuits.process_instr hyps meml) pstate_l proc_l.s_node in
   let pstate_l = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_l in
+
+  let tm = time tm "Left program generation done" in
+  
   let pstate_r = List.fold_left (EcCircuits.process_instr hyps memr) pstate_r proc_r.s_node in
   let pstate_r = Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate_r in
+
+  let tm = time tm "Right program generation done" in
   begin 
     let circs_l = List.map (fun v -> Option.get (Map.find_opt v pstate_l)) 
                   (List.map (fun v -> v.v_name) outvs_l) in
@@ -190,18 +202,31 @@ let prog_equiv_prod
     let cinp_r = (List.hd circs_r).inps in
     let c_l = {(circuit_aggregate circs_l) with inps=cinp_l} in
     let c_r = {(circuit_aggregate circs_r) with inps=cinp_r} in
+    let tm = time tm "Preprocessing for mapreduce done" in
     let lanes_l = circuit_mapreduce c_l n m in
+    let tm = time tm "Left program deps + split done" in
     let lanes_r = circuit_mapreduce c_r n m in
+    let tm = time tm "Right program deps + split done" in
     Format.eprintf "Left program lanes: @.";
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
     Format.eprintf "Right program lanes: @.";
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
-    let success = if preprocess then
-      ((List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_l) c pcond) (List.tl lanes_l)) &&
-      (List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_r) c pcond) (List.tl lanes_r)) &&
-      (circ_equiv ~strict:true (List.hd lanes_l) (List.hd lanes_r) pcond))
+    let success : bool = if preprocess then
+        (if (List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_l) c pcond) (List.tl lanes_l)) then
+        let tm = time tm "Left program lanes equiv done" in
+        (if (List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_r) c pcond) (List.tl lanes_r)) then
+        let tm = time tm "Right program lanes equiv done" in
+        (if (circ_equiv ~strict:true (List.hd lanes_l) (List.hd lanes_r) pcond) then
+        (let tm = time tm "First lanes equiv done" in
+        true) else false
+        ) else false
+        ) else false
+        )
     else
-      (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r)
+      if (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r) then
+      let tm = time tm "Lane equivs done" in
+      true
+      else false
     in
     assert success;
     Format.eprintf "Success@."
