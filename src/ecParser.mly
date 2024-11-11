@@ -3321,7 +3321,15 @@ bdepeq_out_info:
     inpvs_r=bracket(bd_vars)
     out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
     pcond=oident?
-  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; } }
+  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=false} }
+
+| BDEPEQ STAR
+    n=word
+    inpvs_l=bracket(bd_vars)
+    inpvs_r=bracket(bd_vars)
+    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
+    pcond=oident?
+  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=true} }
 
 | BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
   { Pcirc (invs, f, (`Var v :> bdepvar)) }

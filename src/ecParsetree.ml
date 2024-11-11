@@ -730,7 +730,8 @@ type bdepeq_info =
   ; inpvs_l    : bdepvar list
   ; inpvs_r    : bdepvar list
   ; out_blocks : (int * bdepvar list * bdepvar list) list
-  ; pcond      : psymbol option }
+  ; pcond      : psymbol option 
+  ; preprocess : bool }
 
 (* -------------------------------------------------------------------- *)
 type prrewrite = [`Rw of ppterm | `Simpl]

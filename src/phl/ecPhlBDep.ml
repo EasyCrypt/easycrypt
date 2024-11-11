@@ -145,7 +145,8 @@ let prog_equiv_prod
   (proc_l, proc_r: stmt * stmt) 
   ((invs_l, invs_r, n): (variable list * variable list * int))
   ((outvs_l, outvs_r, m) : (variable list * variable list * int))
-  (pcond : form option): unit =
+  (pcond : form option)
+  (preprocess : bool ): unit =
   let env = toenv hyps in
   
   let pstate_l : (symbol, circuit) Map.t = Map.empty in
@@ -191,7 +192,14 @@ let prog_equiv_prod
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
     Format.eprintf "Right program lanes: @.";
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) lanes_l;
-    let () = assert (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r) in
+    let success = if preprocess then
+      ((List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_l) c pcond) (List.tl lanes_l)) &&
+      (List.for_all (fun c -> circ_equiv ~strict:true (List.hd lanes_r) c pcond) (List.tl lanes_r)) &&
+      (circ_equiv ~strict:true (List.hd lanes_l) (List.hd lanes_r) pcond))
+    else
+      (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r)
+    in
+    assert success;
     Format.eprintf "Success@."
   end 
 
@@ -613,12 +621,12 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
 
 
-let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_blocks: (int * variable list * variable list) list) (pcond: form option) (tc : tcenv1) =
+let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_blocks: (int * variable list * variable list) list) (pcond: form option) (preprocess: bool) (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FequivF sE -> assert false
   | FequivS sE -> List.iter (fun (m, outvs_l, outvs_r) ->
-    prog_equiv_prod (FApi.tc1_hyps tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond) out_blocks
+    prog_equiv_prod (FApi.tc1_hyps tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond preprocess) out_blocks
   | FhoareF sH -> assert false  
   | FhoareS sF -> assert false
   | FbdHoareF _ -> assert false
@@ -641,6 +649,7 @@ let process_bdepeq
   let inpvsl = bdeinfo.inpvs_l in
   let inpvsr = bdeinfo.inpvs_r in
   let n = bdeinfo.n in
+  let preprocess = bdeinfo.preprocess in
 
   (* DEBUG SECTION *)
     
@@ -715,7 +724,7 @@ let process_bdepeq
   
   (* ------------------------------------------------------------------ *)
   let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
-  FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond) tc 
+  FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond preprocess) tc 
 
 let t_bdep_form 
   (invs: variable list)
