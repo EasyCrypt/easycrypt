@@ -610,7 +610,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   
   (* ------------------------------------------------------------------ *)
   let inpvs = get_vars inpvs hr.hs_m in
-  (* let pinpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in *)
+  let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
   let invs, inv_tys =
     let lookup (x : bdepvar) : (ident * ty) list =
       let get1 (v : symbol) =
@@ -626,23 +626,26 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   | Some ty -> ty
   | None -> Format.eprintf "Failed to coallesce types for input@."; raise BDepError
   in
-  let invs = List.map (fun id -> f_local id inty) invs in
-  let pinpvs = List.map (flatten_to_bits env) invs in
-  let pinpvs = List.rev pinpvs in
-  let pinpvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinpvs) (fop_empty (List.hd pinpvs).f_ty) in
-  let pinpvs = EcCoreLib.CI_List.p_flatten @@! [pinpvs] in
-  let () = Format.eprintf "Type after flatten %a@." pp_type pinpvs.f_ty in
-  let pinpvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinpvs] in
-  let () = Format.eprintf "Type after chunk %a@." pp_type pinpvs.f_ty in
+  let finvs = List.map (fun id -> f_local id inty) invs in
+  let pinvs = List.map (flatten_to_bits env) finvs in
+  let pinvs = List.rev pinvs in
+  let pinvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinvs) (fop_empty (List.hd pinvs).f_ty) in
+  let pinvs = EcCoreLib.CI_List.p_flatten @@! [pinvs] in
+  let () = Format.eprintf "Type after flatten %a@." pp_type pinvs.f_ty in
+  let pinvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinvs] in
+  let () = Format.eprintf "Type after chunk %a@." pp_type pinvs.f_ty in
   let b2w = (reconstruct_from_bits_op env inpbty) in
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
-  let pinpvs = EcCoreLib.CI_List.p_map @@! [b2w; pinpvs] in
-  let () = Format.eprintf "Type after first map %a@." pp_type pinpvs.f_ty in
-  let pinpvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinpvs] in
+  let pinvs = EcCoreLib.CI_List.p_map @@! [b2w; pinvs] in
+  let () = Format.eprintf "Type after first map %a@." pp_type pinvs.f_ty in
+  let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
-  let post = f_eq pinpvs_post poutvs in
-  let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpvs] in
+  let post = f_eq pinvs_post poutvs in
+  let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinvs] in
+
+  assert (List.compare_lengths inpvs invs = 0);
+  let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
