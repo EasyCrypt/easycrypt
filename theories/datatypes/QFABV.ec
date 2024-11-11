@@ -218,10 +218,10 @@ theory BVOperators.
     clone import BV as BV1 with op size <= 1.
     clone import BV as BV2.
   
-    op ult : BV2.bv -> BV2.bv -> BV1.bv.
+    op bvult : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvultP (bv1 bv2 : BV2.bv) :
-      BV1.touint (ult bv1 bv2) <> 0 <=> (BV2.touint bv1 < BV2.touint bv2).
+      BV1.touint (bvult bv1 bv2) <> 0 <=> (BV2.touint bv1 < BV2.touint bv2).
   end BVULt.
 
 (* ------------------------------------------------------------------ *)
@@ -229,10 +229,10 @@ theory BVOperators.
     clone import BV as BV1 with op size <= 1.
     clone import BV as BV2.
   
-    op slt : BV2.bv -> BV2.bv -> BV1.bv.
+    op bvslt : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvsltP (bv1 bv2 : BV2.bv) :
-      BV1.touint (slt bv1 bv2) <> 0 <=> (BV2.tosint bv1 < BV2.tosint bv2).
+      BV1.touint (bvslt bv1 bv2) <> 0 <=> (BV2.tosint bv1 < BV2.tosint bv2).
   end BVSLt.
 
 
@@ -241,10 +241,10 @@ theory BVOperators.
     clone import BV as BV1 with op size <= 1.
     clone import BV as BV2.
   
-    op ule : BV2.bv -> BV2.bv -> BV1.bv.
+    op bvule : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvuleP (bv1 bv2 : BV2.bv) :
-      BV1.touint (ule bv1 bv2) <> 0 <=> (BV2.touint bv1 <= BV2.touint bv2).
+      BV1.touint (bvule bv1 bv2) <> 0 <=> (BV2.touint bv1 <= BV2.touint bv2).
   end BVULe.
 
 (* ------------------------------------------------------------------ *)
@@ -252,10 +252,10 @@ theory BVOperators.
     clone import BV as BV1 with op size <= 1.
     clone import BV as BV2.
   
-    op sle : BV2.bv -> BV2.bv -> BV1.bv.
+    op bvsle : BV2.bv -> BV2.bv -> BV1.bv.
   
     axiom bvsleP (bv1 bv2 : BV2.bv) :
-      BV1.touint (sle bv1 bv2) <> 0 <=> (BV2.tosint bv1 <= BV2.tosint bv2).
+      BV1.touint (bvsle bv1 bv2) <> 0 <=> (BV2.tosint bv1 <= BV2.tosint bv2).
   end BVSLe.
 
 
