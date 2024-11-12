@@ -3275,7 +3275,7 @@ interleave_info:
 | PROC CHANGE side=side? pos=codepos COLON f=sexpr
     { Pprocchange (side, pos, f) }
 
-| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 s=brace(stmt)
+| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 COLON s=brace(stmt)
     { if not (List.is_empty (fst (unloc pos))) then
         parse_error (loc pos) (Some "only top-level positions are supported");
       Pchangestmt (side, (snd (unloc pos), offset), s) }
@@ -3322,7 +3322,7 @@ bdepeq_out_info:
     out_ty=bracket(loc(simpl_type_exp))
     outvs=bracket(bd_vars)
     lane=oident
-    range=form
+    range=sform
   { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range } }
 
 | BDEPEQ

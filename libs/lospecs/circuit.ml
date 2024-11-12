@@ -694,7 +694,7 @@ let popcount ~(size : int) (r : reg) : reg =
 (* FIXME: redo this *)
 let of_sbigint ~(size : int) (v : Z.t) : reg =
   let neg_max = Z.neg (Z.(lsl) Z.one (size - 1)) in
-  if Z.(v = neg_max) then
+  if Z.equal v neg_max then
     List.init size (fun i -> if i = size - 1 
     then constant true 
     else constant false) else

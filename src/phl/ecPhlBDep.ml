@@ -224,14 +224,14 @@ let prog_equiv_prod
         let tm = time tm "Right program lanes equiv done" in
         (if (circ_equiv ~strict:true (List.hd lanes_l) (List.hd lanes_r) pcond) then
         (let tm = time tm "First lanes equiv done" in
-        true) else false
+         ignore tm; true) else false
         ) else false
         ) else false
         )
     else
       if (List.for_all2 (fun c_l c_r -> circ_equiv ~strict:true c_l c_r pcond) lanes_l lanes_r) then
       let tm = time tm "Lane equivs done" in
-      true
+      (ignore tm; true)
       else false
     in
     assert success;
@@ -359,7 +359,6 @@ let mapreduce_eval
   let tm = Unix.gettimeofday () in
   
   let env = toenv hyps in
-  let ppenv = EcPrinting.PPEnv.ofenv env in
   let fc = EcEnv.Op.lookup ([], f.pl_desc) env |> fst in
   let (@@!) = EcTypesafeFol.f_app_safe env in 
 

@@ -1044,25 +1044,6 @@ let circuit_of_form
       | _ -> destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
     in
 
-    (* Takes an Fapp and returns an Fapp with any integer arguments preapplied to the body *)
-    let apply_int_args (f_: form) : form = 
-
-      let () = Format.eprintf "Input form: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_ in
-      let is_bound_type (t: ty) : bool =
-        (EcEnv.Circuit.lookup_array env t |> Option.is_some) 
-        || (EcEnv.Circuit.lookup_bitstring env t |> Option.is_some)
-      in
-      
-      let f, args = destr_app f_ in
-      if List.for_all (fun f -> is_bound_type f.f_ty) args then 
-        f_
-      else
-        let f = EcTypesafeFol.fapply_safe ~redmode hyps f args in
-        let () = Format.eprintf "Output form: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
-        f
-    in
-
-    
     match f_.f_node with
     (* hardcoding size for now FIXME *)
     | Fint z -> assert false
