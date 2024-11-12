@@ -733,7 +733,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   in
   let finvs = List.map (fun id -> f_local id inty) invs in
   let pinvs = List.map (flatten_to_bits env) finvs in
-  let pinvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinvs) (fop_empty (List.hd pinvs).f_ty) in
+  let pinvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) pinvs (fop_empty (List.hd pinvs).f_ty) in
   let pinvs = EcCoreLib.CI_List.p_flatten @@! [pinvs] in
   let () = Format.eprintf "Type after flatten %a@." pp_type pinvs.f_ty in
   let pinvs = EcCoreLib.CI_List.p_chunk @@! [f_int (BI.of_int n); pinvs] in
