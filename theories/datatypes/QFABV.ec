@@ -418,8 +418,6 @@ theory BVOperators.
 
     op map (f: BV1.bv -> BV2.bv) (abv: BV1.bv A.t) : BV2.bv A.t.
     
-    print List.map.
-
     axiom mapP (f: BV1.bv -> BV2.bv) (abv: BV1.bv A.t) : 
       A.to_list (map f abv) = List.map f (A.to_list abv).
   end BVMap.
@@ -432,10 +430,10 @@ theory BVOperators.
 
     axiom [bydone] size_ok : A.size * BV2.size = BV1.size.
 
-    op a2b : BV2.bv A.t -> BV1.bv.
+    op bva2b : BV2.bv A.t -> BV1.bv.
 
     axiom a2bP (bva : BV2.bv A.t) :
-      flatten (map BV2.tolist (A.to_list bva)) = BV1.tolist (a2b bva).
+      flatten (map BV2.tolist (A.to_list bva)) = BV1.tolist (bva2b bva).
   end BVA2B.
 
   (* ------------------------------------------------------------------ *)
@@ -446,10 +444,10 @@ theory BVOperators.
 
     axiom [bydone] size_ok : A.size * BV2.size = BV1.size.
 
-    op b2a : BV1.bv -> BV2.bv A.t.
+    op bvb2a : BV1.bv -> BV2.bv A.t.
 
     axiom b2aP (bva : BV1.bv) :
-      BV1.tolist bva = flatten (map BV2.tolist (A.to_list (b2a bva))).
+      BV1.tolist bva = flatten (map BV2.tolist (A.to_list (bvb2a bva))).
   end BVB2A.
 
   (* ------------------------------------------------------------------ *)
@@ -472,10 +470,10 @@ theory BVOperators.
       theory A   <- A
       proof size_ok by exact/size_ok.
 
-    lemma a2bK : cancel a2b b2a.
+    lemma a2bK : cancel bva2b bvb2a.
     proof. admitted.
 
-    lemma b2aK : cancel a2b b2a.
+    lemma b2aK : cancel bva2b bvb2a.
     proof. admitted.
   end A2B2A.
 end BVOperators.
