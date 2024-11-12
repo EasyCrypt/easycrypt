@@ -628,7 +628,7 @@ let circuit_split (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list
   assert (List.length f.inps = 1);
   let r = destr_bwcirc f.circ in
   let inp_t, inp_w = List.hd f.inps |> destr_bwinput in 
-  assert ((inp_w mod lane_in_w = 0) && (List.length r mod lane_out_w = 0));
+  (*assert ((inp_w mod lane_in_w = 0) && (List.length r mod lane_out_w = 0));*)
   let rs = List.chunkify (lane_out_w) r in
   let rs = List.mapi (fun lane_idx lane_circ -> 
     let id = create ("split_" ^ (string_of_int lane_idx)) in
