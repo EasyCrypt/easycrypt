@@ -715,6 +715,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   (* ------------------------------------------------------------------ *)
   let inpvs = get_vars inpvs hr.hs_m in
   let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
+
   let invs, inv_tys =
     let lookup (x : bdepvar) : (ident * ty) list =
       let get1 (v : symbol) =
@@ -732,7 +733,6 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   in
   let finvs = List.map (fun id -> f_local id inty) invs in
   let pinvs = List.map (flatten_to_bits env) finvs in
-  let pinvs = List.rev pinvs in
   let pinvs = List.fold_right (fun v1 v2 -> EcCoreLib.CI_List.p_cons @@! [v1; v2]) (List.rev pinvs) (fop_empty (List.hd pinvs).f_ty) in
   let pinvs = EcCoreLib.CI_List.p_flatten @@! [pinvs] in
   let () = Format.eprintf "Type after flatten %a@." pp_type pinvs.f_ty in
