@@ -325,7 +325,7 @@ let circ_form_eval_plus_equiv
     let () = Format.eprintf "Form before circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
     let f = EcCallbyValue.norm_cbv redmode hyps f in
     let f = circ_simplify_form_bitstring_equality ~mem ~pstate ~inps ?pcond hyps f in
-    let f = EcCallbyValue.norm_cbv redmode hyps f in
+    let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
     if f <> f_true then
     (Format.eprintf "Got %a after reduction@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
     false)
@@ -984,12 +984,13 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let frange = form_list_from_iota hyps range in
 
 
-  let n, in_to_uint, in_to_sint  = match EcEnv.Circuit.lookup_bitstring env in_ty with
-  | Some {size; touint; tosint} -> size, touint, tosint
+  let n, in_to_uint, in_to_sint,in_of_int = match EcEnv.Circuit.lookup_bitstring env in_ty with
+  | Some {size; touint; tosint; ofint} -> size, touint, tosint, ofint
   | _ -> Format.eprintf "No binding for type %a@." pp_type in_ty; raise BDepError
   in
   let in_to_uint = f_op in_to_uint [] (tfun in_ty tint) in
   let in_to_sint = f_op in_to_sint [] (tfun in_ty tint) in
+  let in_of_int = f_op in_of_int [] (tfun tint in_ty) in
   let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
   | Some {size; ofint} -> size, ofint 
   | _ -> Format.eprintf "No binding for type %a@." pp_type out_ty; raise BDepError
@@ -1045,16 +1046,18 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinvs = EcCoreLib.CI_List.p_map @@! [b2w; pinvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinvs.f_ty in
-  let pinvs = if sign 
+  let pinvs_post = if sign 
     then EcCoreLib.CI_List.p_map @@! [in_to_sint; pinvs] 
     else EcCoreLib.CI_List.p_map @@! [in_to_uint; pinvs] 
   in
-  let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
+  let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs_post] in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [out_of_int; pinvs_post] in
   (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinvs_post poutvs in
-  let pre = EcCoreLib.CI_List.p_all @@! [(EcCoreLib.CI_List.p_mem @@!! [range]); pinvs] in
+  let pre = EcCoreLib.CI_List.p_all @@! 
+    [(EcCoreLib.CI_List.p_mem @@!! [
+      (EcCoreLib.CI_List.p_map @@! [in_of_int; range])]); pinvs] in
 
   assert (List.compare_lengths inpvs invs = 0);
   let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
