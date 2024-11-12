@@ -83,6 +83,7 @@ let mapreduce
 
   let inps = List.map (EcCircuits.input_of_variable env) invs in
   let inpcs, inps = List.split inps in
+  (* List.iter (fun c -> Format.eprintf "Inp: %s @." (cinput_to_string c)) inps; *)
   let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) invs in
   let pstate = List.fold_left 
     (fun pstate (inp, v) -> Map.add v inp pstate)
@@ -124,7 +125,9 @@ let mapreduce
     List.iter (fun c -> Format.eprintf "%s@." (circuit_to_string c)) cs;
     Format.eprintf "Pcond: %s@." (circuit_to_string pcondc);
     let () = try 
-      assert (List.for_all (fun c -> circ_equiv ~strict:true (List.hd cs) c (Some pcondc)) (List.tl cs));
+      assert (List.fold_lefti (fun b i c -> 
+        if b && circ_equiv ~strict:true (List.hd cs) c (Some pcondc) then true
+        else (Format.eprintf "Failed on lane %d@." i; false)) true (List.tl cs));
       with Assert_failure _ as e ->
         Format.eprintf "Program lane equivalence failed between lanes@.";
         raise e

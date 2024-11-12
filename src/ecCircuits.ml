@@ -66,9 +66,9 @@ let tpsize_to_string (tpsize : tpsize) : string =
   Format.sprintf "%d[%d]" tpsize.wordsize tpsize.npos
 
 let cinput_to_string = function
-  | BWInput (idn, w) -> Format.sprintf "(%s, %d)" (name idn) w
-  | BWAInput (idn, sz) -> Format.sprintf "(%s, %s)" (name idn) (asize_to_string sz)
-  | BWTInput (idn, sz) -> Format.sprintf "(%s, %s)" (name idn) (tpsize_to_string sz)
+  | BWInput (idn, w) -> Format.sprintf "(%s(id=%d), %d)" (name idn) (tag idn) w
+  | BWAInput (idn, sz) -> Format.sprintf "(%s(id=%d), %s)" (name idn) (tag idn) (asize_to_string sz)
+  | BWTInput (idn, sz) -> Format.sprintf "(%s(id=%d), %s)" (name idn) (tag idn) (tpsize_to_string sz)
 
 (* Checks whether inputs are the same up to renaming *)
 let cinput_equiv (a: cinput) (b: cinput) : bool =
@@ -364,11 +364,17 @@ let cinput_of_type ?(idn: ident option) (env: env) (t: ty) : cinput =
 (* given f(inps1), g(inps2) returns h(inps1,inps2) = f(a) @ g(b)
    where @ denotes concatenation of circuits *)
 let circuit_concat (c: circuit) (d: circuit) : circuit =
-  let d = if inputs_indep [c;d] then d else fresh_inputs d in
-  match c.circ, d.circ with
-  | BWCirc ccirc, BWCirc dcirc -> 
-    {circ=BWCirc(ccirc @ dcirc); inps=c.inps @ d.inps}
-  | _ -> assert false
+  if c.inps = d.inps then
+    match c.circ, d.circ with
+    | BWCirc ccirc, BWCirc dcirc -> 
+      {circ=BWCirc(ccirc @ dcirc); inps=c.inps}
+    | _ -> assert false
+  else
+    let d = if inputs_indep [c;d] then d else fresh_inputs d in
+    match c.circ, d.circ with
+    | BWCirc ccirc, BWCirc dcirc -> 
+      {circ=BWCirc(ccirc @ dcirc); inps=c.inps @ d.inps}
+    | _ -> assert false
 
 (* Same as above but concatenates arrays of bitwords *)
 let circuit_array_concat (c: circuit) (d: circuit) : circuit =
@@ -519,7 +525,12 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
 let circuit_aggregate_inps (c: circuit) : circuit = 
   match c.inps with
   | [] -> c
-  | _ -> let circs, inp = bus_of_cinputs c.inps in
+  | _inps -> 
+    (* Format.eprintf "Previous inputs: "; *)
+    (* List.iter (Format.eprintf "%s |") (List.map (cinput_to_string) inps); *)
+    (* Format.eprintf "@."; *)
+    let circs, inp = bus_of_cinputs c.inps in
+    (* Format.eprintf "Aggregating inputs to input: %s@." (cinput_to_string inp); *)
     {circ=apply c circs; inps=[inp]}
 
 (* 
