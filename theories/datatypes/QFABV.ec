@@ -307,7 +307,7 @@ theory BVOperators.
 
     op bvextract : BV1.bv -> int -> BV2.bv.
 
-    axiom bvextractP (bv : BV1.bv) (base : int) : base + BV2.size <= BV1.size =>
+    axiom bvextractP (bv : BV1.bv) (base : int) : 0 <= base => base + BV2.size <= BV1.size =>
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
 
