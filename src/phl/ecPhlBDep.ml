@@ -58,11 +58,8 @@ let mapreduce
   
   let env = toenv hyps in
   let ppenv = EcPrinting.PPEnv.ofenv env in
-  let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
-  let f = match f.op_kind with
-  | OB_oper (Some (OP_Plain f)) -> f
-  | _ -> failwith "Invalid operator type" in
-  Format.eprintf "Lane: %a@." (EcPrinting.pp_form ppenv) f;
+  let fpth, _fo = EcEnv.Op.lookup ([], f.pl_desc) env in
+  let f = EcTypesafeFol.fop_from_path env fpth in
   let fc = circuit_of_form hyps f in
   let fc = circuit_flatten fc in
   let fc = circuit_aggregate_inps fc in
@@ -72,11 +69,9 @@ let mapreduce
   (* let () = Format.eprintf "len %d @." (List.length fc.circ) in *)
   (* let () = HL.inputs_of_reg fc.circ |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in *)
   (* let () = Format.eprintf "%a@." (fun fmt -> HL.pp_deps fmt) (HL.deps fc.circ |> Array.to_list) in *)
-  let pcondc = EcEnv.Op.lookup ([], pcond.pl_desc) env |> snd in
-  let pcondc = match pcondc.op_kind with
-  | OB_oper (Some (OP_Plain pcondc)) -> pcondc
-  | _ -> failwith "Invalid operator type" in
-  let pcondc = circuit_of_form hyps pcondc in
+  let pcond_pth, _pcondo = EcEnv.Op.lookup ([], pcond.pl_desc) env in
+  let pcond = EcTypesafeFol.fop_from_path env pcond_pth in
+  let pcondc = circuit_of_form hyps pcond in
   let pcondc = circuit_flatten pcondc in
   let pcondc = circuit_aggregate_inps pcondc in
   (* let () = Format.eprintf "pcondc output size: %d@." (List.length pcondc.circ) in *)
