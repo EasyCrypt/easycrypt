@@ -114,11 +114,11 @@ let mapreduce
     (* let () = List.iter2 (fun c v -> Format.eprintf "%s inputs: " v.v_name; *)
       (* List.iter (Format.eprintf "%s ") (List.map cinput_to_string c.inps); *)
       (* Format.eprintf "@."; ) [c] outvs in *)
-    let cs = circuit_mapreduce c n m in
-    let cs = match perm with
-      | None -> cs
-      | Some perm -> List.init (List.length cs) (fun i -> List.nth cs (perm i))
-    in
+    let cs = circuit_mapreduce ?perm c n m in
+    (* let cs = match perm with *)
+      (* | None -> cs *)
+      (* | Some perm -> List.init (List.length cs) (fun i -> List.nth cs (perm i)) *)
+    (* in *)
 
     let tm = time tm "circuit dependecy analysis + splitting done" in
 

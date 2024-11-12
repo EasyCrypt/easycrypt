@@ -156,14 +156,14 @@ let circ_to_string = function
   | BWTuple tp -> Format.sprintf "BWTuple(%d, ...)[%d]" (List.hd tp |> List.length) (List.length tp)
 
 let circ_of_int (size: int) (z: zint) : circ =
-  BWCirc (C.of_bigint ~size (to_zt z))
+  BWCirc (C.of_bigint_all ~size (to_zt z))
 
 let circ_array_of_ints (size: int) (zs: zint list) : circ = 
-  let cs = List.map (fun z -> C.of_bigint ~size (to_zt z)) zs in
+  let cs = List.map (fun z -> C.of_bigint_all ~size (to_zt z)) zs in
   BWArray (Array.of_list cs)
 
 let circ_tuple_of_ints (size: int) (zs: zint list) : circ =
-  let cs = List.map (fun z -> C.of_bigint ~size (to_zt z)) zs in
+  let cs = List.map (fun z -> C.of_bigint_all ~size (to_zt z)) zs in
   BWTuple cs
   
 
@@ -635,12 +635,18 @@ let circuit_map (f: circuit) (a: circuit) : circuit =
   let r = Array.map (destr_bwcirc) r in
   {circ = BWArray r; inps}
 
-let circuit_split (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list =
+let circuit_split ?(perm: (int -> int) option) (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list =
   assert (List.length f.inps = 1);
   let r = destr_bwcirc f.circ in
   let inp_t, inp_w = List.hd f.inps |> destr_bwinput in 
   (*assert ((inp_w mod lane_in_w = 0) && (List.length r mod lane_out_w = 0));*)
   let rs = List.chunkify (lane_out_w) r in
+  let rs = match perm with
+    | Some perm -> List.filteri_map (fun i _ -> let idx = (perm i) in
+      if idx < 0 || idx > (List.length rs) then None else
+      Some (List.nth rs (idx))) rs
+    | None -> rs
+  in
   let rs = List.mapi (fun lane_idx lane_circ -> 
     let id = create ("split_" ^ (string_of_int lane_idx)) in
     let map_ = (function 
@@ -655,7 +661,7 @@ let circuit_split (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list
   rs
 
 (* Partitions into blocks of type n -> m *)
-let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
+let circuit_mapreduce ?(perm: (int -> int) option) (c: circuit) (n:int) (m:int) : circuit list =
   let tm = Unix.gettimeofday () in
   Format.eprintf "[W] Beginning dependency analysis@.";
   let const_inp = BWInput (create "const", n) in
@@ -690,7 +696,7 @@ let circuit_mapreduce (c: circuit) (n:int) (m:int) : circuit list =
   (* let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in *)
     (* (r::cs, c)) ([], destr_bwcirc c.circ) deps in *)
   (* assert (List.length c = 0); *)
-  let cs = circuit_split c n m in
+  let cs = circuit_split ?perm c n m in
   List.map (function
     | {circ=BWCirc r; inps=[BWInput (idn, w)]}
       -> {circ=BWCirc (C.uextend ~size:m r); inps=[BWInput (idn, n)]}
@@ -1196,7 +1202,7 @@ let circuit_of_form
         | f :: _ -> int_of_form f
         | _ -> assert false
         in 
-        hyps, { circ = BWCirc (C.of_bigint ~size (to_zt i)); inps = [] }
+        hyps, { circ = BWCirc (C.of_bigint_all ~size (to_zt i)); inps = [] }
       | `BvOperator ({ kind = `Extract (size, out_sz) }) :: _ ->
         assert (size >= out_sz);
         let c1, b = match fs with

@@ -32,7 +32,7 @@ val circuit_aggregate : circuit list -> circuit
 val circuit_aggregate_inps : circuit -> circuit
 val circuit_flatten : circuit -> circuit
 val circuit_permutation : int -> int -> (int -> int) -> circuit 
-val circuit_mapreduce : circuit -> int -> int -> circuit list
+val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list
 val circ_check : circuit -> circuit option -> bool
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
 val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
