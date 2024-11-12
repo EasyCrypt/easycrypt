@@ -324,6 +324,7 @@ let circ_form_eval_plus_equiv
     in
     let () = Format.eprintf "Form before circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
     let f = EcCallbyValue.norm_cbv redmode hyps f in
+    let () = Format.eprintf "Form after circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
     let f = circ_simplify_form_bitstring_equality ~mem ~pstate ~inps ?pcond hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
     if f <> f_true then

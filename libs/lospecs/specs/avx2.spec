@@ -242,8 +242,8 @@ VPCMPGT_16u16(w1@256, w2@256) -> @256 =
   )
 
 # Intel intrincis: _mm256_movemask_epi8
-VPMOVMSKB_u256u64(w@256) -> @32 =
-  map<8, 32>(fun i@8 . i[7], w)
+VPMOVMSKB_u256u64(w@256) -> @64 =
+  uextend<32, 64>(map<8, 32>(fun i@8 . i[7], w))
 
 # Intel intrinsic: _mm256_unpacklo_epi8
 VPUNPCKL_32u8(w1@256, w2@256) -> @256 =
