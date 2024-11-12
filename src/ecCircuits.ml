@@ -424,11 +424,11 @@ let compose (f: circuit) (args: circuit list) : circuit =
   inps=List.fold_right (@) (List.map (fun c -> c.inps) args) []} 
 
 (* FIXME: convert computation to return BI.zint *)
-let compute (f: circuit) (r: BI.zint list) : int = 
+let compute ~(sign:bool) (f: circuit) (r: BI.zint list) : int = 
   assert (List.compare_lengths f.inps r = 0);
   let vs = List.map2 (fun inp r -> 
     let _, size = destr_bwinput inp in
-    BWCirc(C.of_sbigint ~size (BI.to_zt r))
+    BWCirc(C.of_bigint_all ~size (BI.to_zt r))
   ) f.inps r in
   let res = apply f vs in
   let res = destr_bwcirc res in 
@@ -437,6 +437,9 @@ let compute (f: circuit) (r: BI.zint list) : int =
     else true
     | _ -> assert false
   ) res in
+  if sign then 
+  C.sint_of_bools res
+  else
   C.uint_of_bools res
 
 (* 

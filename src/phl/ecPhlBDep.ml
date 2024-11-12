@@ -343,6 +343,7 @@ let mapreduce_eval
   ((outvs, m) : variable list * int) 
   (f: psymbol) 
   (range: form list)
+  (sign: bool)
   : unit =
 
 
@@ -420,7 +421,7 @@ let mapreduce_eval
       let v = destr_int v in 
       let lane_val = fc @@! [fv] in
       let lane_val = int_of_form hyps lane_val in
-      let circ_val = compute (List.hd cs) [v] in
+      let circ_val = compute ~sign (List.hd cs) [v] in
       if BI.((of_int circ_val) = lane_val) then true else
       (Format.eprintf "Error on input %s@.Circ val:%d | Lane val: %s@." (BI.to_string v)
       circ_val (BI.to_string lane_val); 
@@ -907,11 +908,12 @@ let t_bdep_eval
   (outvs: variable list) 
   (op: psymbol) 
   (range: form list) 
+  (sign: bool)
   (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
-  | FhoareS sF -> mapreduce_eval (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op range
+  | FhoareS sF -> mapreduce_eval (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op range sign
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -921,7 +923,7 @@ let t_bdep_eval
   FApi.close (!@ tc) VBdep
 
 let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
-  let { in_ty; out_ty; invs; inpvs; outvs; lane; range } = bdeinfo in
+  let { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign } = bdeinfo in
 
   let env = FApi.tc1_env tc in
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
@@ -982,11 +984,12 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let frange = form_list_from_iota hyps range in
 
 
-  let n, in_to_uint = match EcEnv.Circuit.lookup_bitstring env in_ty with
-  | Some {size; touint} -> size, touint
+  let n, in_to_uint, in_to_sint  = match EcEnv.Circuit.lookup_bitstring env in_ty with
+  | Some {size; touint; tosint} -> size, touint, tosint
   | _ -> Format.eprintf "No binding for type %a@." pp_type in_ty; raise BDepError
   in
   let in_to_uint = f_op in_to_uint [] (tfun in_ty tint) in
+  let in_to_sint = f_op in_to_sint [] (tfun in_ty tint) in
   let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
   | Some {size; ofint} -> size, ofint 
   | _ -> Format.eprintf "No binding for type %a@." pp_type out_ty; raise BDepError
@@ -998,7 +1001,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let inpvs = get_vars inpvs hr.hs_m in
   let outvs  = get_vars outvs hr.hs_m in
   let tc = EcPhlConseq.t_hoareS_conseq_nm f_true f_false tc in
-  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange) tc 
+  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
   else
   (* ------------------------------------------------------------------ *)
@@ -1042,7 +1045,10 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let () = Format.eprintf "Type of b2w %a@." pp_type b2w.f_ty in
   let pinvs = EcCoreLib.CI_List.p_map @@! [b2w; pinvs] in
   let () = Format.eprintf "Type after first map %a@." pp_type pinvs.f_ty in
-  let pinvs = EcCoreLib.CI_List.p_map @@! [in_to_uint; pinvs] in
+  let pinvs = if sign 
+    then EcCoreLib.CI_List.p_map @@! [in_to_sint; pinvs] 
+    else EcCoreLib.CI_List.p_map @@! [in_to_uint; pinvs] 
+  in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [out_of_int; pinvs_post] in
   (* A REFACTOR EVERYTHING HERE A *)
@@ -1055,6 +1061,6 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
-  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange) tc 
+  FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
 

@@ -24,7 +24,7 @@ val circ_red : hyps -> EcReduction.reduction_info
 val cinput_to_string : cinput -> string
 val cinput_of_type : ?idn:ident -> env -> ty -> cinput
 val size_of_circ : circ -> int 
-val compute : circuit -> BI.zint list -> int
+val compute : sign:bool -> circuit -> BI.zint list -> int
 val circuit_to_string : circuit -> string
 val circ_ident : cinput -> circuit
 val circuit_ueq : circuit -> circuit -> circuit

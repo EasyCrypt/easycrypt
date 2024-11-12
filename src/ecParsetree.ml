@@ -732,7 +732,8 @@ type bdep_eval_info =
   ; inpvs : bdepvar list
   ; outvs : bdepvar list
   ; lane  : psymbol 
-  ; range : pformula }
+  ; range : pformula 
+  ; sign  : bool }
 
 type bdepeq_info =
   { n          : int

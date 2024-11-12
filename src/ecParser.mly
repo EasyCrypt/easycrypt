@@ -3323,7 +3323,17 @@ bdepeq_out_info:
     outvs=bracket(bd_vars)
     lane=oident
     range=sform
-  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range } }
+  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=false } }
+
+| BDEP STAR STAR
+    in_ty=bracket(loc(simpl_type_exp))
+    invs=bracket(bd_vars)
+    inpvs=bracket(bd_vars)
+    out_ty=bracket(loc(simpl_type_exp))
+    outvs=bracket(bd_vars)
+    lane=oident
+    range=sform
+  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=true } }
 
 | BDEPEQ
     n=word

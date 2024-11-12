@@ -158,4 +158,4 @@ val smod : reg -> reg -> reg
 (* ==================================================================== *)
 val popcount : size:int -> reg -> reg
 
-val of_sbigint : size:int -> Z.t -> reg
+val of_bigint_all : size:int -> Z.t -> reg
