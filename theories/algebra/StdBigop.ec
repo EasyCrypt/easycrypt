@@ -86,6 +86,13 @@ lemma big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 
+lemma sumz_nseq (n v : int) : 0 <= n => sumz (nseq n v) = n * v.
+proof.
+move=> ge0_n; rewrite sumzE (_ : n = size (iota_ 0 n)).
+- by rewrite size_iota lez_maxr.
+by rewrite -map_nseq BIA.big_map /(\o) /= big_constz count_predT mulzC.
+qed.
+
 lemma bigi_constz x (n m:int):
   n <= m =>
   BIA.bigi predT (fun i => x) n m = x * (m - n).
