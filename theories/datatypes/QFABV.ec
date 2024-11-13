@@ -322,7 +322,7 @@ theory BVOperators.
     op bvget : BV1.bv -> int -> BV2.bv.
 
     axiom bvgetP (bv : BV1.bv) (idx: int) : 
-      List.nth witness (BV2.tolist (bvget bv idx)) 0 = List.nth witness (BV1.tolist bv) idx.
+      List.nth false (BV2.tolist (bvget bv idx)) 0 = List.nth false (BV1.tolist bv) idx.
   end BVGet.
 
   (* ------------------------------------------------------------------ *)
