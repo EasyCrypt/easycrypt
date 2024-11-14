@@ -141,7 +141,11 @@ theory BVOperators.
   
     op bvrol : bv -> bv -> bv.
   
-    axiom bvrolP (bv1 bv2 : bv) : false.
+    axiom bvrolP (bv1 bv2 : bv) (i: int) : 
+      0 <= i < BV.size =>
+      List.nth false (tolist (bvrol bv1 bv2)) i =
+      List.nth false (tolist bv1) ((i-touint bv2)%%BV.size).
+
   end BVROL.
   
   (* ------------------------------------------------------------------ *)
@@ -150,7 +154,11 @@ theory BVOperators.
   
     op bvror : bv -> bv -> bv.
   
-    axiom bvrorP (bv1 bv2 : bv) : false.
+    axiom bvrorP (bv1 bv2 : bv) (i: int):
+      0 <= i < BV.size =>
+      List.nth false (tolist (bvror bv1 bv2)) i =
+      List.nth false (tolist bv1) ((i+touint bv2)%%BV.size).
+
   end BVROR.
   
   (* ------------------------------------------------------------------ *)
@@ -198,9 +206,9 @@ theory BVOperators.
     clone import BV.
   
     op bvxor: bv -> bv -> bv.
-  
+
     axiom bvxorP (bv1 bv2 : bv) : tolist (bvxor bv1 bv2) =
-      map (fun (b : _ * _) => b.`1 \/ b.`2) (zip (tolist bv1) (tolist bv2)).
+      map (fun (b : _ * _) => Bool.(^^) b.`1 b.`2)%Bool (zip (tolist bv1) (tolist bv2)).
   end BVXor.
   
   (* ------------------------------------------------------------------ *)
