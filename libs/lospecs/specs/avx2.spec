@@ -20,6 +20,14 @@ VPERMQ(w@256, i@8) -> @256 =
     permute(i[@2|3])
   )
 
+# Intel intrinsic: _mm256_add_epi64
+VPADD_4u64(w1@256, w2@256) -> @256 =
+  map<64, 4>(add<64>, w1, w2)
+
+# Intel intrinsic: _mm256_add_epi32
+VPADD_8u32(w1@256, w2@256) -> @256 =
+  map<32, 8>(add<32>, w1, w2)
+
 # Intel intrinsic: _mm256_add_epi16
 VPADD_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(add<16>, w1, w2)
@@ -107,6 +115,23 @@ VPSLL_4u64(w@256, count@8) -> @256 =
 VPSLL_8u32(w@256, count@8) -> @256 =
   map<32, 8>(sll<32>(., count), w)
 
+VPSLLV_4u64(w@256, counts@256) -> @256 =
+  map<64, 4>(
+    fun w1@64 count@64 .
+      ugt<64>(count, 0x40@64) ? 0 : sll<64>(w1, count[@8|0]),
+    w,
+    counts
+  )
+
+VPSRLV_4u64(w@256, counts@256) -> @256 =
+  map<64, 4>(
+    fun w1@64 count@64 .
+      ugt<64>(count, 0x40@64) ? 0 : srl<64>(w1, count[@8|0]),
+    w,
+    counts
+  )
+
+
 VPSLLV_8u32(w@256, counts@256) -> @256 =
   map<32, 8>(
     fun w1@32 count@32 .
@@ -116,10 +141,10 @@ VPSLLV_8u32(w@256, counts@256) -> @256 =
   )
 
 VPSLLDQ_256(w@256, count@8) -> @256 =
-  map<128, 2>(sll<128>(., count), w)
+  map<128, 2>(sll<128>(., sll<8>(count, 3)), w)
 
 VPSRLDQ_256(w@256, count@8) -> @256 =
-  map<128, 2>(srl<128>(., count), w)
+  map<128, 2>(srl<128>(., sll<8>(count, 3)), w)
 
 VPSLLDQ_128(w@128, count@8) -> @128 =
   sll<128>(w, count)
@@ -207,6 +232,18 @@ VPSHUFD_128(w@128, idx@8) -> @128 =
     w[@32|idx[@2|1]],
     w[@32|idx[@2|2]],
     w[@32|idx[@2|3]]
+  )
+
+# Intel intrinsic: _mm256_blend_epi32
+# FIXME: we need an heterogeneous `map' combinator
+VPBLEND_8u32(w1@256, w2@256, c@8) -> @256 =
+  let c = map<1, 8>(uextend<1, 32>, c) in
+
+  map<32, 8>(
+    fun c@32 w1@32 w2@32 . c[0] ? w2 : w1,
+    c,
+    w1,
+    w2
   )
 
 # Intel intrinsic: _mm256_blend_epi16
