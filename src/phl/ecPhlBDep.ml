@@ -57,7 +57,6 @@ let mapreduce
   let tm = Unix.gettimeofday () in
   
   let env = toenv hyps in
-  let ppenv = EcPrinting.PPEnv.ofenv env in
   let fpth, _fo = EcEnv.Op.lookup ([], f.pl_desc) env in
   let f = EcTypesafeFol.fop_from_path env fpth in
   let fc = circuit_of_form hyps f in
@@ -869,10 +868,9 @@ let t_bdep_form
   (tc : tcenv1)
   : tcenv =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF sH -> assert false
-  | FhoareS sF -> if (circ_form_eval_plus_equiv ~mem:(fst sF.hs_m) (FApi.tc1_hyps tc) sF.hs_s invs f v) then
-    let new_sF = {sF with hs_po=f_imp f sF.hs_po} in
-    FApi.xmutate1 tc VBdep [f_hoareS_r new_sF]
+  | FhoareS sF ->
+    if circ_form_eval_plus_equiv ~mem:(fst sF.hs_m) (FApi.tc1_hyps tc) sF.hs_s invs f v then
+    FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcPhlConseq.t_hoareS_conseq_nm sF.hs_pr (f_and f sF.hs_po) tc)
     else 
     (Format.eprintf "Supplied formula is not always true@.";
     assert false)
