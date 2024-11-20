@@ -1974,10 +1974,11 @@ let process_right (tc : tcenv1) =
     tc_error !!tc "cannot apply `right` on that goal"
 
 (* -------------------------------------------------------------------- *)
-let process_split (tc : tcenv1) =
-  try  t_ors [EcLowGoal.t_split; EcLowGoal.t_split_prind] tc
+let process_split ?i (tc : tcenv1) =
+  let i = Option.map (fun n -> int_of_string n.pl_desc) i in
+  try  t_ors [EcLowGoal.t_split ?i; EcLowGoal.t_split_prind] tc
   with InvalidGoalShape ->
-    tc_error !!tc "cannot apply `split` on that goal"
+    tc_error !!tc "cannot apply `split` on(Option.map (fun n -> int_of_string n.pl_desc) i) that goal"
 
 (* -------------------------------------------------------------------- *)
 let process_elim (pe, qs) tc =

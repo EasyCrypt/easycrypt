@@ -129,7 +129,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Preflexivity        -> process_reflexivity
     | Passumption         -> process_assumption
     | Psmt pi             -> process_smt ~loc:(loc t) ttenv (Some pi)
-    | Psplit              -> process_split
+    | Psplit i            -> process_split ?i
     | Pfield st           -> process_algebra `Solve `Field st
     | Pring st            -> process_algebra `Solve `Ring  st
     | Palg_norm           -> EcStrongRing.t_alg_eq

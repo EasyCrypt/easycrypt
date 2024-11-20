@@ -638,7 +638,7 @@ type cutsolver = {
   smt   : FApi.backward;
   done_ : FApi.backward;
 }
-  
+
 (* -------------------------------------------------------------------- *)
 let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
@@ -1510,8 +1510,27 @@ let t_elim_iso_or ?reduce tc =
 
     let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
 
+
+let rec t_and_i i opsym (f1, f2 : form pair) (tc : tcenv1) =
+  if i <= 0 then
+    begin
+      let tc =
+        FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty))
+          (EcFol.f_and f1 f2)
+      in
+      t_and_intro_s opsym (f1, f2) tc
+  end
+  else
+    begin
+      match sform_of_form f2 with
+      | SFand (b, (f1', f2')) ->
+        t_and_i (i - 1) b (EcFol.f_and f1 f1', f2') tc
+      |  _ ->
+        t_and_intro_s opsym (f1, f2) tc
+    end
+
 (* -------------------------------------------------------------------- *)
-let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
+let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let concl = FApi.tc1_goal tc in
 
@@ -1519,7 +1538,7 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
     | SFtrue ->
         t_true tc
     | SFand (b, (f1, f2)) when not closeonly ->
-        t_and_intro_s b (f1, f2) tc
+      t_and_i i b (f1, f2) tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
@@ -2183,13 +2202,14 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     end
 
     | _ when options.pgo_split ->
-       let thesplit =
+       let (thesplit:tcenv1 -> tcenv) =
          match options.pgo_delta.pgod_split with
-         | true  -> t_split ~closeonly:false ~reduce:`Full
+         | true  -> (fun x -> t_split ~closeonly:false ~reduce:`Full x)
          | false ->
-             FApi.t_or
-               (t_split ~reduce:`NoDelta)
-               (t_split ~closeonly:true ~reduce:`Full) in
+           FApi.t_or
+             (t_split ~reduce:`NoDelta)
+             (t_split ~closeonly:true ~reduce:`Full)
+       in
 
         FApi.t_try (FApi.t_seq thesplit aux0) tc
 
