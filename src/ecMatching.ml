@@ -501,8 +501,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
     let var_form_match ((x, xty) : ident * ty) (f : form) =
       match EV.get x !ev.evm_form with
-      | None ->
-        failure ()
+      | None -> assert false
 
       | Some `Unset ->
         let f = norm f in
@@ -583,10 +582,10 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
-      | Flocal x, _ ->
+      | Flocal x, _ when EV.mem x !ev.evm_form ->
           var_form_match (x, f1.f_ty) f2
 
-      | _, Flocal y ->
+      | _, Flocal y when EV.mem y !ev.evm_form ->
           var_form_match (y, f2.f_ty) f1
 
       | Fapp (f1, fs1), Fapp (f2, fs2) ->
