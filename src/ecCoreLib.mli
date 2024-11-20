@@ -213,6 +213,7 @@ module CI_Logic : sig
   val p_and_proj_r    : path
   val p_anda_proj_l   : path
   val p_anda_proj_r   : path
+  val p_anda_proj_rs  : path
   val p_or_elim       : path
   val p_ora_elim      : path
   val p_iff_elim      : path
@@ -221,6 +222,7 @@ module CI_Logic : sig
   val p_true_intro    : path
   val p_and_intro     : path
   val p_anda_intro    : path
+  val p_anda_intro_s  : path
   val p_or_intro_l    : path
   val p_ora_intro_l   : path
   val p_or_intro_r    : path

@@ -2025,10 +2025,17 @@ let process_right (tc : tcenv1) =
     tc_error !!tc "cannot apply `right` on that goal"
 
 (* -------------------------------------------------------------------- *)
-let process_split (tc : tcenv1) =
-  try  t_ors [EcLowGoal.t_split; EcLowGoal.t_split_prind] tc
+let process_split ?(i : int option) (tc : tcenv1) =
+  let tactics : FApi.backward list =
+    match i with
+    | None -> [EcLowGoal.t_split; EcLowGoal.t_split_prind]
+    | Some i -> [EcLowGoal.t_split ~i] in
+
+  try  t_ors tactics tc
   with InvalidGoalShape ->
-    tc_error !!tc "cannot apply `split` on that goal"
+    tc_error !!tc
+      "cannot apply `split/%a` on that goal"
+      (EcPrinting.pp_opt Format.pp_print_int) i
 
 (* -------------------------------------------------------------------- *)
 let process_elim (pe, qs) tc =
