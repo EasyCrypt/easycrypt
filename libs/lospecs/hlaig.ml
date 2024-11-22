@@ -59,7 +59,9 @@ end
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
   let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) (inps: (int * int) list) : bool =
-    assert ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0));
+    if not ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0)) then
+      (Format.eprintf "Sizes differ in circ_equiv"; false)
+    else
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 
     let rec bvterm_of_node : Aig.node -> SMT.bvterm =
