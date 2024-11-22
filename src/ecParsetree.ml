@@ -1284,6 +1284,7 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
+  | Geval        of (pgamepath * pexpr list)
 
 type global = {
   gl_action : global_action located;
