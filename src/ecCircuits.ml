@@ -1275,7 +1275,7 @@ let circuit_of_form
             let dfl = destr_bwcirc dfl.circ in
             let r = Array.init n (fun i -> List.nth_opt vs i |> Option.default dfl) in
             hyps, {circ = BWArray r; inps = []}
-          with CircError "destr_bwcirc" _ ->
+          with CircError "destr_bwcirc" ->
             raise (CircError "BWCirc destruct error in array of_list ")
           end
         | true -> 
@@ -1308,7 +1308,7 @@ let circuit_of_form
         in
         let hyps, c1 = doit cache hyps c1 in
         let c = try destr_bwcirc c1.circ 
-          with CircError _ -> raise "BWCirc destr error at bvextract"
+          with CircError _ -> raise (CircError "destr error at bvextract")
         in
         let c = List.take out_sz (List.drop (to_int b) c) in
         hyps, { circ = BWCirc(c); inps=c1.inps }
