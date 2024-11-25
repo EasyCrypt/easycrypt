@@ -340,6 +340,144 @@ let t_equiv_while_disj_r side vrnt inv tc =
   FApi.xmutate1 tc `While [b_concl; concl]
 
 (* -------------------------------------------------------------------- *)
+
+module Truc = struct
+  exception CannotTranslate
+
+  let form_of_expr env mother mh =
+    let map = ref (Mid.add mother (EcPV.PVMap.create env) Mid.empty) in
+
+    let rec aux fp =
+      match fp.f_node with
+      | Fint   z -> e_int z
+      | Flocal x -> e_local x fp.f_ty
+
+      | Fop  (p, tys) -> e_op p tys fp.f_ty
+      | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
+      | Ftuple fs     -> e_tuple (List.map aux fs)
+      | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
+
+      | Fif (c, f1, f2) ->
+         e_if (aux c) (aux f1) (aux f2)
+
+      | Fmatch (c, bs, ty) ->
+         e_match (aux c) (List.map aux bs) ty
+
+      | Flet (lp, f1, f2) ->
+         e_let lp (aux f1) (aux f2)
+
+      | Fquant (kd, bds, f) ->
+         e_quantif (auxkd kd) (List.map auxbd bds) (aux f)
+
+      | Fpvar (pv, m) ->
+         if EcIdent.id_equal m mh then
+           e_var pv fp.f_ty
+         else
+           let bds = odfl (EcPV.PVMap.create env) (Mid.find_opt m !map) in
+           let idx =
+             match EcPV.PVMap.find pv bds with
+             | None ->
+                 let pfx = EcIdent.name m in
+                 let pfx = String.sub pfx  1 (String.length pfx - 1) in
+                 let x   = symbol_of_pv pv in
+                 let x   = EcIdent.create (x ^ "_" ^ pfx) in
+                 let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
+                 map := Mid.add m bds !map; x
+             | Some (x, _) -> x
+
+           in e_local idx fp.f_ty
+
+      | Fglob     _
+      | FhoareF   _ | FhoareS   _
+      | FeHoareF _  | FeHoareS _
+      | FbdHoareF _ | FbdHoareS _
+      | FequivF   _ | FequivS   _
+      | FeagerF   _ | Fpr       _ -> raise CannotTranslate
+
+    and auxkd (kd : quantif) : equantif =
+      match kd with
+      | Lforall -> `EForall
+      | Lexists -> `EExists
+      | Llambda -> `ELambda
+
+    and auxbd ((x, bd) : binding) =
+      match bd with
+      | GTty ty -> (x, ty)
+      | _ -> raise CannotTranslate
+
+    in fun f -> let e = aux f in (e, !map)
+end
+
+let t_equiv_ll_while_disj_r side inv tc =
+  let env = FApi.tc1_env tc in
+  let es = tc1_as_equivS tc in
+  let s, m_side, m_other =
+    match side with
+    | `Left  -> es.es_sl, es.es_ml, es.es_mr
+    | `Right -> es.es_sr, es.es_mr, es.es_ml in
+  let (e, c), s = tc1_last_while tc s in
+  let e = form_of_expr (EcMemory.memory m_side) e in
+
+  let ll =
+    let evs  = tc1_as_equivS tc in
+
+    let xhyps =
+      let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in
+
+      fun m fp ->
+        let fp =
+          Mid.fold (fun mh pvs fp ->
+              let mty = Mid.find_opt mh mtypes in
+              let fp  =
+                EcPV.Mnpv.fold (fun pv (x, ty) fp ->
+                    f_let1 x (f_pvar pv ty mh) fp)
+                  (EcPV.PVMap.raw pvs) fp
+              in f_forall_mems [mh, oget mty] fp)
+            m fp
+        in fp
+    in
+
+    let ml      = EcMemory.memory evs.es_ml in
+    let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
+    let inv     = Fsubst.f_subst subst inv in
+    let e, m    = Truc.form_of_expr env (EcMemory.memory evs.es_mr) ml e in
+    let c       = s_while (e, c) in
+    xhyps m
+      (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
+  in
+
+  (* 1. The body preserves the invariant and the loop is lossless. *)
+
+  let m_other' = (EcIdent.create "&m", EcMemory.memtype m_other) in
+
+  let smem = Fsubst.f_subst_id in
+  let smem = Fsubst.f_bind_mem smem (EcMemory.memory m_side ) mhr in
+  let smem = Fsubst.f_bind_mem smem (EcMemory.memory m_other) (EcMemory.memory m_other') in
+
+  let b_pre   = f_and_simpl inv e in
+  let b_pre   = Fsubst.f_subst smem b_pre in
+  let b_post  = inv in
+  let b_post  = Fsubst.f_subst smem b_post in
+  let b_concl = f_bdHoareS (mhr, EcMemory.memtype m_side) b_pre c b_post FHeq f_r1 in
+  let b_concl = b_concl in
+  let b_concl = f_forall_mems [m_other'] b_concl in
+
+  (* 2. WP of the while *)
+  let post = f_imps_simpl [f_not_simpl e; inv] es.es_po in
+  let term_condition = f_imps_simpl [inv] (f_not_simpl e) in
+  let post = f_and term_condition post in
+  let modi = s_write env c in
+  let post = generalize_mod env (EcMemory.memory m_side) modi post in
+  let post = f_and_simpl inv post in
+  let concl =
+    match side with
+    | `Left  -> f_equivS_r { es with es_sl = s; es_po=post; }
+    | `Right -> f_equivS_r { es with es_sr = s; es_po=post; }
+  in
+
+  FApi.xmutate1 tc `While [b_concl; ll; concl]
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_while_r inv tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
@@ -374,6 +512,7 @@ let t_bdhoare_while_rev_geq = FApi.t_low4 "bdhoare-while" t_bdhoare_while_rev_ge
 let t_bdhoare_while_rev     = FApi.t_low1 "bdhoare-while" t_bdhoare_while_rev_r
 let t_equiv_while           = FApi.t_low1 "equiv-while"   t_equiv_while_r
 let t_equiv_while_disj      = FApi.t_low3 "equiv-while"   t_equiv_while_disj_r
+let t_equiv_ll_while_dish   = FApi.t_low2 "equiv-while"   t_equiv_ll_while_disj_r
 
 (* -------------------------------------------------------------------- *)
 let process_while side winfos tc =
@@ -400,7 +539,6 @@ let process_while side winfos tc =
       | Some vrnt, None ->
           let _, phi = TTC.tc1_process_Xhl_formula tc phi in
           let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
-
           t_bdhoare_while phi vrnt tc
 
       | Some vrnt, Some (`Bd (k, eps)) ->
@@ -410,7 +548,6 @@ let process_while side winfos tc =
         let _, eps = TTC.tc1_process_Xhl_form tc treal eps in
 
         t_bdhoare_while_rev_geq phi vrnt k eps tc
-
       | None, None ->
           let _, phi = TTC.tc1_process_Xhl_formula tc phi in
           t_bdhoare_while_rev phi tc
@@ -427,6 +564,11 @@ let process_while side winfos tc =
       | Some side, Some vrnt ->
           t_equiv_while_disj side
             (TTC.tc1_process_prhl_form    tc tint vrnt)
+            (TTC.tc1_process_prhl_formula tc phi)
+            tc
+
+      | Some side, None ->
+        t_equiv_ll_while_dish side
             (TTC.tc1_process_prhl_formula tc phi)
             tc
 
