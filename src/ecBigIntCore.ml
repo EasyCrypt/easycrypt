@@ -65,4 +65,5 @@ module type TheInterface = sig
 
   val to_why3 : zint -> Why3.BigInt.t
   val to_zt: zint -> Z.t
+  val of_zt: Z.t -> zint
 end

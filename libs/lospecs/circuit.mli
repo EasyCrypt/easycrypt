@@ -14,6 +14,10 @@ val uint_of_bools : bool list -> int
 
 val bytes_of_bools : bool list -> bytes
 
+val ubigint_of_bools : bool list -> Z.t
+
+val sbigint_of_bools : bool list -> Z.t
+
 (* ==================================================================== *)
 val of_int : size:int -> int -> reg
 

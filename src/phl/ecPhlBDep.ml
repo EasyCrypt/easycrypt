@@ -429,11 +429,11 @@ let mapreduce_eval
       let lane_val = fc @@! [fv] in
       let lane_val = int_of_form hyps lane_val in
       let circ_val = compute ~sign (List.hd cs) [v] in
-      if BI.((of_int circ_val) = lane_val) then () 
+      if circ_val = lane_val then () 
       else let err = 
-        Format.sprintf "Error on input %s@.Circ val:%d | Lane val: %s@." 
+        Format.sprintf "Error on input %s@.Circ val:%s | Lane val: %s@." 
           (BI.to_string v) 
-          circ_val 
+          (BI.to_string circ_val)
           (BI.to_string lane_val) 
       in raise (BDepError err)
     ) range;

@@ -40,13 +40,13 @@ type width = int
 
 type asize = { wordsize: int; nelements: width; }
 
-type tpsize = { wordsize : int; npos : width; }
+type tpsize = { wordsizes : int list; npos : width; }
 
 let size_of_asize (sz : asize) : int =
   sz.wordsize * sz.nelements
 
 let size_of_tpsize (sz : tpsize) : int =
-  sz.wordsize * sz.npos
+  List.sum sz.wordsizes
 
 exception CircError of string
 
@@ -66,7 +66,10 @@ let asize_to_string (asize : asize) : string =
   Format.sprintf "%d[%d]" asize.wordsize asize.nelements
 
 let tpsize_to_string (tpsize : tpsize) : string =
-  Format.sprintf "%d[%d]" tpsize.wordsize tpsize.npos
+  match tpsize.wordsizes with
+  | [] -> "()"
+  | sz::szs ->
+    Format.asprintf "(%d%a)" sz (fun fmt szs -> List.iter (Format.fprintf fmt ", %d") szs) szs  
 
 let cinput_to_string = function
   | BWInput (idn, w) -> Format.sprintf "(%s(id=%d), %d)" (name idn) (tag idn) w
@@ -78,6 +81,9 @@ let cinput_equiv (a: cinput) (b: cinput) : bool =
   match a, b with
   | BWInput (_, w1), BWInput (_, w2) -> w1 = w2 
   | BWAInput (_, sz1), BWAInput (_, sz2) -> sz1 = sz2 
+  | BWTInput (_, sz1), BWTInput (_, sz2) -> 
+    sz1.npos = sz2.npos && 
+    (List.for_all2 (=) sz1.wordsizes sz2.wordsizes)
   | _ -> false
 
 let is_bwinput = function
@@ -108,9 +114,9 @@ let bwainput_of_size ~(nelements : width) ~(wordsize : width) : cinput =
   let name = "arr_input" in
   BWAInput (create name, { nelements; wordsize; })
 
-let bwtpinput_of_size ~(npos : width) ~(wordsize : width) : cinput =
-  let name = "arr_input" in
-  BWTInput (create name, { npos; wordsize; })
+let bwtpinput_of_sizes ~(npos : width) ~(wordsizes : int list) : cinput =
+  let name = "tp_input" in
+  BWTInput (create name, { npos; wordsizes; })
 
 (* # of total bits of input *)
 let size_of_cinput = function
@@ -125,6 +131,7 @@ let ident_of_cinput = function
   | BWTInput (idn, _) -> idn
 
 (* Base circuit, represents body of a circuit function *)
+(* BWArray is homogeneous, BWTuple it not *)
 type circ = 
   | BWCirc of C.reg
   | BWArray of C.reg array
@@ -157,14 +164,18 @@ let destr_bwtuple = function
 (* # of total bits of output *)
 let size_of_circ = function
   | BWCirc r -> List.length r
-  | BWArray a -> Array.fold_left (+) 0 (Array.map List.length a)
+  | BWArray a -> if Array.length a = 0 then 0 else
+    (Array.length a) * (List.length a.(0))
   | BWTuple tp -> List.fold_left (+) 0 (List.map List.length tp)
 
 (* Simple representation *)
 let circ_to_string = function 
   | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
   | BWArray a -> Format.sprintf "BWArray[%d[%d]]" (a.(0) |> List.length) (Array.length a)
-  | BWTuple tp -> Format.sprintf "BWTuple(%d, ...)[%d]" (List.hd tp |> List.length) (List.length tp)
+  | BWTuple tp -> Format.asprintf "BWTuple(%a)" 
+    (fun fmt rs -> if List.is_empty rs then () 
+      else Format.fprintf fmt "%d" (List.hd rs); List.iter (Format.fprintf fmt ", %d") (List.tl rs)) 
+    (List.map (List.length) tp)
 
 let circ_of_int (size: int) (z: zint) : circ =
   BWCirc (C.of_bigint_all ~size (to_zt z))
@@ -178,13 +189,12 @@ let circ_tuple_of_ints (size: int) (zs: zint list) : circ =
   BWTuple cs
   
 
-(* Checks whether the output shapes are the same
-  FIXME: should be enough to compare first element of the array
-  if we enforce arrays to be homogeneous 
-  If not then array input should change *)
+(* Checks whether the output shapes are the same *)
 let circ_shape_equal (c1: circ) (c2: circ) = 
   match c1, c2 with
-  | BWArray r1, BWArray r2 -> Array.length r1 = Array.length r2 && Array.for_all2 (fun a b -> List.compare_lengths a b = 0) r1 r2
+  | BWArray r1, BWArray r2 -> 
+    Array.length r1 = Array.length r2 && 
+    (Array.length r1 = 0 || List.length r1.(0) = List.length r2.(0))
   | BWCirc r1, BWCirc r2 -> List.compare_lengths r1 r2 = 0
   | BWTuple tp1, BWTuple tp2 -> List.compare_lengths tp1 tp2 = 0 && List.for_all2 (fun a b -> List.compare_lengths a b = 0) tp1 tp2
   | _ -> false
@@ -216,8 +226,11 @@ let circ_ident (input: cinput) : circuit =
     in
     { circ = BWArray out; inps=[input]}
   | BWTInput (idn, sz) ->
-    let out = List.init sz.npos (fun jt ->
-      List.init sz.wordsize (fun j -> C.input (idn.id_tag, jt*sz.wordsize + j)))
+    let out = List.fold_left_map 
+      (fun acc sz -> acc + sz, List.init sz (fun j -> C.input (idn.id_tag, acc + j))) 
+      0
+      sz.wordsizes
+      |> snd
     in
     {circ = BWTuple out; inps=[input]}
 
@@ -249,7 +262,7 @@ let match_arg (inp: cinput) (val_: circ) : bool =
       true
   | BWTInput (_, sz), BWTuple tp
     when List.compare_length_with tp sz.npos = 0
-      && List.for_all (fun v -> List.compare_length_with v sz.wordsize = 0) tp ->
+      && List.for_all2 (fun v1 v2 -> List.compare_length_with v1 v2 = 0) tp sz.wordsizes ->
       true
   | _ -> Format.eprintf "inp: %s does not match %s@."
     (cinput_to_string inp) (circ_to_string val_); false
@@ -291,8 +304,8 @@ let apply (f: circuit) (args: circ list) : circ =
           None
         in res
       | BWTInput (_, sz), BWTuple tp ->
-        let it, iw = (i / sz.wordsize), (i mod sz.wordsize) in
-        Option.bind (List.at_opt tp it) (fun l -> List.at_opt l iw) 
+        let tp = List.flatten tp in
+        (List.at_opt tp i) 
       | _ -> 
         let err = Format.asprintf "Backtrace: %s@.\
           Error applying on %s@.\
@@ -343,6 +356,14 @@ let dist_inputs (c: circuit list) : circuit list =
   | c::[] -> [c]
   | c::cs -> c::(doit cs (Set.of_list c.inps))
 
+let rec merge_inputs (c: cinput list) (d: cinput list) : cinput list =
+  match c, d with
+  | [], [] -> []
+  | xs, []
+  | [], xs -> xs
+  | x::xs, y::ys -> if x = y then x::(merge_inputs xs ys) else
+    c @ d
+
 (* -------------------------------------------------------------------- *)
 
 let width_of_type (env: env) (t: ty) : int =
@@ -391,24 +412,16 @@ let cinput_of_type ?(idn: ident option) (env: env) (t: ty) : cinput =
 (* given f(inps1), g(inps2) returns h(inps1,inps2) = f(a) @ g(b)
    where @ denotes concatenation of circuits *)
 let circuit_concat (c: circuit) (d: circuit) : circuit =
-  if c.inps = d.inps then
     match c.circ, d.circ with
     | BWCirc ccirc, BWCirc dcirc -> 
-      {circ=BWCirc(ccirc @ dcirc); inps=c.inps}
-    | _ -> raise (CircError "concat")
-  else
-    let d = if inputs_indep [c;d] then d else fresh_inputs d in
-    match c.circ, d.circ with
-    | BWCirc ccirc, BWCirc dcirc -> 
-      {circ=BWCirc(ccirc @ dcirc); inps=c.inps @ d.inps}
+      {circ=BWCirc(ccirc @ dcirc); inps=merge_inputs c.inps d.inps}
     | _ -> raise (CircError "concat")
 
 (* Same as above but concatenates arrays of bitwords *)
 let circuit_array_concat (c: circuit) (d: circuit) : circuit =
-  let d = if inputs_indep [c;d] then d else fresh_inputs d in
   match c.circ, d.circ with
   | BWArray carr, BWArray darr -> 
-    {circ=BWArray(Array.concat [carr; darr]); inps=c.inps @ d.inps}
+    {circ=BWArray(Array.concat [carr; darr]); inps=merge_inputs c.inps d.inps}
   | _ -> raise (CircError "array concat")
 
 let (++) : circuit -> circuit -> circuit = circuit_concat
@@ -417,14 +430,20 @@ let (+@) : circuit -> circuit -> circuit = circuit_array_concat
 (* Given f_i(inps_i) returns h(inps_1, ...) = f_1(inps_1) @ ... 
   aka given a list of functions returns a function that concatenates 
   their outputs, given all their inputs *)
-let circuit_aggregate (c: circuit list) : circuit =
-  List.reduce (++) c
+let rec circuit_aggregate (c: circuit list) : circuit =
+  match c with
+  | [] -> assert false
+  | c :: [] -> c
+  | d :: c :: [] -> d ++ c
+  | c :: cs -> c ++ (circuit_aggregate cs)
 
-let circuit_array_aggregate (c: circuit list) : circuit =
-  List.reduce (+@) c
+let rec circuit_array_aggregate (c: circuit list) : circuit =
+  match c with
+  | [] -> assert false
+  | c :: [] -> c
+  | d :: c :: [] -> d +@ c
+  | c :: cs -> c +@ (circuit_array_aggregate cs)
 
-
-(* To be removed and replaced by a combination of other operations *)
 let circuit_bwarray_set ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
   (* Index guarantee should come from EC *)
   (* assert (nelements > i); *)
@@ -437,14 +456,11 @@ let circuit_bwarray_set ~(nelements : width) ~(wordsize : width) (i: int) : circ
     else List.init wordsize (fun j -> C.input (arr_id, ja*wordsize + j))) in
   {circ= BWArray (out); inps = [arr_inp; bw_inp]}
 
-(* Same as above *)
 let circuit_bwarray_get ~(nelements : width) ~(wordsize : width) (i: int) : circuit =
   (* assert (nelements > i); *)
   let arr_inp = BWAInput (create "arr_input", { nelements; wordsize; }) in
   let out = List.init wordsize (fun j -> C.input ((ident_of_cinput arr_inp).id_tag, j + wordsize*i)) in
   {circ=BWCirc (out); inps=[arr_inp]}
-
-
   
 (* Function composition for circuits *)
 (* Reduces to application if arguments are 0-ary *)
@@ -463,8 +479,7 @@ let compose (f: circuit) (args: circuit list) : circuit =
   with CircError err ->
     raise (CircError ("On compose call, apply failed with err:\n" ^ err) )
 
-(* FIXME: convert computation to return BI.zint *)
-let compute ~(sign:bool) (f: circuit) (r: BI.zint list) : int = 
+let compute ~(sign:bool) (f: circuit) (r: BI.zint list) : BI.zint = 
   (* FIXME: can we remove the parenthesis around the try/with block? *)
   (try
     assert (List.compare_lengths f.inps r = 0)
@@ -488,14 +503,14 @@ let compute ~(sign:bool) (f: circuit) (r: BI.zint list) : int =
   ) res in
   (* conversion functions need to be reworked FIXME *)
   if sign then 
-  C.sint_of_bools res
+  C.sbigint_of_bools res |> BI.of_zt
   else
-  C.uint_of_bools res
+  C.ubigint_of_bools res |> BI.of_zt
 
 (* 
-  Unifies input to allow for equivalence testing 
+  Unifies inputs to allow for equivalence testing 
 *)
-let merge_inputs (fs: circuit list) : circuit list option =
+let unify_inputs (fs: circuit list) : circuit list option =
   match fs with
   | [] -> Some [] 
   | [f] -> Some [f]
@@ -565,9 +580,12 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
       let r1 = List.chunkify sz.wordsize r1 |> Array.of_list in
       (BWArray r1)::(doit r2 cs)
     | r, BWTInput (_, sz)::cs ->
-      let r1, r2 = List.takedrop (size_of_tpsize sz) r in
-      let r1 = List.chunkify sz.wordsize r1 in
-      (BWTuple r1)::(doit r2 cs)
+      let r, tp = List.fold_left_map (fun r sz -> 
+        let comp, r = List.takedrop sz r in
+        r, comp
+      ) r sz.wordsizes
+      in
+      (BWTuple tp)::(doit r cs)
   in
   doit r inps, BWInput (idn, bsize)
 
@@ -734,27 +752,14 @@ let circuit_mapreduce ?(perm: (int -> int) option) (c: circuit) (n:int) (m:int) 
   let deps = HL.deps r in
   let deps = HL.split_deps m deps in
 
-  (* Format.eprintf "%d@." (List.length deps); *)
-  (* Format.eprintf "%a@." (fun fmt -> HL.pp_bdeps fmt) deps; *)
-
   if not ((HL.block_list_indep deps) && (List.for_all (HL.check_dep_width n) (List.snd deps)))
   then
     raise (CircError "Failed mapreduce split (dependency split condition not true)")
   else
-(*  assert ((List.sum (List.map size_of_cinput c.inps)) mod n = 0);*)
 
   Format.eprintf "[W] Dependency analysis complete after %f seconds@."
   (Unix.gettimeofday () -. tm);
   
-  (* let doit (db: HL.tdblock) (c: C.reg) : circuit * C.reg = *)
-    (* let res, c = List.takedrop (fst db) c in *)
-    (* let map_, inps = inputs_of_tdep (snd db) in *)
-    (* let res = C.maps (fun a -> Map.find_opt a map_) res in *)
-    (* {circ = BWCirc res; inps}, c *)
-  (* in *)
-  (* let cs, c = List.fold_left (fun (cs, c) bd -> let r, c = doit bd c in *)
-    (* (r::cs, c)) ([], destr_bwcirc c.circ) deps in *)
-  (* assert (List.length c = 0); *)
   let cs = circuit_split ?perm c n m in
   List.map (function
     | {circ=BWCirc r; inps=[BWInput (idn, w)]}
@@ -1046,12 +1051,12 @@ let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option)
   if Option.is_none fg then false
   else
   let f, g = Option.get fg in
-  (* FIXME: more general input unification procedure *)  
+  (* FIXME: more general input unification procedure ? *)  
   let pcond = match pcond with
   | Some pcond -> pcond
   | None -> {circ = BWCirc [C.true_]; inps = f.inps}
   in
-  match merge_inputs [f;g;pcond] with
+  match unify_inputs [f;g;pcond] with
   | None -> Format.eprintf "Failed to merge inputs %s %s %s@." (circuit_to_string f) (circuit_to_string g) (circuit_to_string pcond); false
   | Some [{circ=BWCirc fcirc; _} as f;
     {circ=BWCirc gcirc; _};
@@ -1070,33 +1075,8 @@ let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option)
       (* Assuming no array inputs for now *)
     end
   | _ -> assert false
-  
-let circ_check (f: circuit) (pcond: circuit option) : bool =
-  let module B = (val HL.makeBWZinterface ()) in
-  let f = match f with
-  | {circ=BWCirc([f]); _} -> f
-  | _ -> raise @@ CircError "Form should only output one bit (bool)"
-  in
-  match pcond with
-  | None -> B.circ_taut f
-  | Some {circ=BWCirc([pcond]);_} -> not @@ B.circ_sat @@ (C.and_ pcond (C.neg f))
-  | _ -> raise @@ CircError "Precondition should output one bit (bool)"
 
-let circ_sat (f: circuit) (pcond: circuit option): bool = 
-  let module B = (val HL.makeBWZinterface ()) in
-  let f = match f with
-  | {circ=BWCirc([f]); _} -> f
-  | _ -> raise @@ CircError "Form should only output one bit (bool)"
-  in
-  match pcond with
-  | Some {circ=BWCirc([pcond]); _} -> B.circ_sat (C.and_ pcond f)
-  | None -> B.circ_sat f
-  | _ -> raise @@ CircError "pcond should only output one bit (bool)"
-  
-
-(* Vars = bindings in scope (maybe we have some other way of doing this? *)
-
-(* FIXME: Refactor this later *)
+(* FIXME: Transfer this to EcEnv/wherever else appropriate *)
 let op_cache = ref Mp.empty
 
 type pstate = (symbol, circuit) Map.t
@@ -1105,8 +1085,8 @@ type cache  = (ident, (cinput * circuit)) Map.t
 (* TODO: Decide if we want to store stuff in the environment or not, 
          if not: remove env argument from recursive calls *)
 let circuit_of_form 
-  ?(pstate : pstate = Map.empty) (* Program variable values *)
-  ?(cache  : cache = Map.empty) (* Let-bindings and such *)
+  ?(pstate  : pstate = Map.empty) (* Program variable values *)
+  ?(cache   : cache = Map.empty) (* Let-bindings and such *)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
   : circuit =
@@ -1151,9 +1131,6 @@ let circuit_of_form
         ) then raise (CircError "Condition circuit output size too big")
 
         else
-        (* let () = assert (List.is_empty c_c.inps) in *)
-        (* let () = assert (List.is_empty t_c.inps) in *)
-        (* let () = assert (List.is_empty f_c.inps) in *)
         let c_c = List.hd (destr_bwcirc c_c.circ) in
         begin
         match t_c.circ, f_c.circ with
@@ -1223,6 +1200,8 @@ let circuit_of_form
         hyps, circ
     end
     | Fapp _ -> 
+    (* TODO: find a way to properly propagate int arguments *)
+
     (* let f_ = apply_int_args f_ in *)
     let (f, fs) = EcCoreFol.destr_app f_ in
     let hyps, res = 
@@ -1386,7 +1365,8 @@ let circuit_of_form
           | BWCirc r1, BWCirc r2 -> 
             (* assert (List.compare_lengths r1 r2 = 0); *)
             (* Should never happen, caught in EC typecheck/bindings *)
-            hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} (* FIXME: check inps here *)
+            hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} 
+            (* FIXME: check inps here *)
           | BWArray a1, BWArray a2 -> 
             (* assert (Array.for_all2 (fun a b -> (List.compare_lengths a b) = 0) a1 a2); *)
             (* Should never happen, caught in EC typecheck/bindings *)
@@ -1416,7 +1396,6 @@ let circuit_of_form
       in hyps, res
       
     | Fquant (qnt, binds, f) -> 
-      (* FIXME: check if this is desired behaviour for exists and add logic for others *)
       let binds = List.map (fun (idn, t) -> cinput_of_type ~idn env (gty_as_ty t)) binds in
       let cache = List.fold_left 
         (fun cache inp -> 
@@ -1424,7 +1403,7 @@ let circuit_of_form
           Map.add (ident_of_cinput inp) (inp, circ) cache) cache binds in
       let hyps, circ = doit cache hyps f in
       begin match qnt with
-      | Llambda -> hyps, {circ with inps=binds @ circ.inps} (* FIXME: check input order *)
+      | Llambda -> hyps, {circ with inps=binds @ circ.inps} 
       | Lforall 
       | Lexists -> raise (CircError "Universal/Existential quantification not supported ")
       (* TODO: figure out how to handle quantifiers *)

@@ -40,6 +40,23 @@ let int32_of_bools (bs : bool list) : int32 =
          v)
     0l bs
 
+let ubigint_of_bools (bs: bool list) : Z.t =
+  List.fold_right 
+    (fun b acc -> 
+    Z.(+) (Z.shift_left acc 1) (if b then Z.one else Z.zero)) 
+    bs 
+    Z.zero
+
+let sbigint_of_bools (bs: bool list) : Z.t = 
+  let bs = List.rev bs in
+  let msb = List.hd bs in
+  let vbs = List.tl bs in
+  List.fold_left 
+    (fun acc b -> 
+    Z.(+) (Z.shift_left acc 1) (if b then Z.one else Z.zero)) 
+    (if msb then Z.neg Z.one else Z.zero)
+    vbs
+
 (* -------------------------------------------------------------------- *)
 let explode (type t) ~(size : int) (r : t list) =
   assert (List.length r mod size == 0);

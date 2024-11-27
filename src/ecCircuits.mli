@@ -24,7 +24,7 @@ val circ_red : hyps -> EcReduction.reduction_info
 val cinput_to_string : cinput -> string
 val cinput_of_type : ?idn:ident -> env -> ty -> cinput
 val size_of_circ : circ -> int 
-val compute : sign:bool -> circuit -> BI.zint list -> int
+val compute : sign:bool -> circuit -> BI.zint list -> BI.zint
 val circuit_to_string : circuit -> string
 val circ_ident : cinput -> circuit
 val circuit_ueq : circuit -> circuit -> circuit
@@ -33,7 +33,6 @@ val circuit_aggregate_inps : circuit -> circuit
 val circuit_flatten : circuit -> circuit
 val circuit_permutation : int -> int -> (int -> int) -> circuit 
 val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list
-val circ_check : circuit -> circuit option -> bool
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
 val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
 val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list
