@@ -1536,9 +1536,47 @@ let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
 
     doit fsl in
 
+  let tc = FApi.tcenv_of_tcenv1 tc in
+  let tc, gl = FApi.newgoal tc fsl in
+  let tc, gr = FApi.newgoal tc fsr in
+
+  tc
+
+  (*
+(* -------------------------------------------------------------------- *)
+require import AllCore.
+
+lemma test : forall a b c d, a && (b /\ (c /\ d)).
+proof.
+move => *.
+split 1.
+admit.
+
+gl = a && b
+gr = c /\ d
+
+proja2 gl = b
+
+conja (proja1 gl) (conj (proja2 gl) gr) = a && (b /\ (c /\ d))
+
+
+
+admit.
+
+
+
+admit.
+
+
+
+
+abort.
+
+
+
   FApi.xmutate1
     tc (fun hd -> VConv (hd, Sid.empty)) [fsl; fsr]
-
+*)
 
 (*
   if i <= 0 then begin
