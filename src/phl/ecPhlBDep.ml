@@ -584,12 +584,10 @@ let blocks_from_vars (env: env) (vs: form list) (ty: ty) : form =
         let err = Format.sprintf "Type mismatch in pre-post generation, check your lane and precondition types@." in
         raise (BDepError err)
     in   
-    let m = match EcEnv.Circuit.lookup_bitstring_size env ty with
-      | Some m -> m
-      | None -> let err = 
-        Format.asprintf "Failed to get size for type %a (maybe you are missing a binding?)@." 
-        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty
-        in raise (BDepError err)
+    let m = try
+      width_of_type env ty
+      with CircError err ->
+        raise (BDepError ("Error while constructing precondition: \n" ^ err))
     in
     (* let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type mem) vs in *)
     let poutvs = List.map (flatten_to_bits env) vs in
@@ -728,7 +726,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let post = f_eq pinvs_post poutvs in
   let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinvs] in
 
-  if (List.compare_lengths inpvs invs = 0) 
+  if (List.compare_lengths inpvs invs <> 0) 
     then tc_error pe "Logical variables should correspond 1-1 to program variables";
   let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
 

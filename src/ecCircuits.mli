@@ -23,6 +23,7 @@ val get_specification_by_name : string -> Lospecs.Ast.adef option
 val circ_red : hyps -> EcReduction.reduction_info
 val cinput_to_string : cinput -> string
 val cinput_of_type : ?idn:ident -> env -> ty -> cinput
+val width_of_type : env -> ty -> int 
 val size_of_circ : circ -> int 
 val compute : sign:bool -> circuit -> BI.zint list -> BI.zint
 val circuit_to_string : circuit -> string
