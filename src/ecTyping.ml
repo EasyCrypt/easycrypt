@@ -2280,7 +2280,16 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       (* Extract the function body and load the memory *)
       let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
       let fun_ = EcSubst.subst_function subst fun_ in
-      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr fun_ in
+
+      (* Follow a function alias until we get to the concrete definition *)
+      let rec resolve_alias f = 
+        match f.f_def with
+        | FBabs _ -> assert false
+        | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
+        | FBdef _ -> f
+      in
+
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr (resolve_alias fun_) in
       let env = EcEnv.Memory.push_active memenv env in
 
       (* Semantics for stmt updating, `i` is the target of the update. *)
