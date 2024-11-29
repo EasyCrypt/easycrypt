@@ -1039,9 +1039,7 @@ let destr_ands ~deep =
 
   in fun f -> doit f
 
-
-(*---------------------------------------------*)
-
+(* -------------------------------------------------------------------- *)
 let rec one_sided mem fp =
   match fp.f_node with
   | Fint   _      -> true

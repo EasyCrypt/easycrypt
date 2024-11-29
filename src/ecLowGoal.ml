@@ -1511,23 +1511,50 @@ let t_elim_iso_or ?reduce tc =
     let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
 
 
-let rec t_and_i i opsym (f1, f2 : form pair) (tc : tcenv1) =
-  if i <= 0 then
-    begin
-      let tc =
-        FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty))
-          (EcFol.f_and f1 f2)
-      in
+(* -------------------------------------------------------------------- *)
+let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
+  assert (0 <= i);
+
+  let fsl, fsr =
+    let rec destr (acc : ([`Asym | `Sym] * form) list) (i  : int) (f : form) =
+      if i < 0 then
+        (List.rev acc, f)
+      else
+        match sform_of_form f with
+        | SFand (b, (f1, f2)) ->
+            destr ((b, f1) :: acc) (i - 1) f2
+        | _ -> assert false in
+
+    destr [] i f in
+
+  let fsl =
+    let rec doit = function
+      | [] -> assert false
+      | [_, f] -> f
+      | (b, f) :: fs ->
+          (match b with `Asym -> f_anda | `Sym -> f_and) f (doit fs) in
+
+    doit fsl in
+
+  FApi.xmutate1
+    tc (fun hd -> VConv (hd, Sid.empty)) [fsl; fsr]
+
+
+(*
+  if i <= 0 then begin
+    let tc =
+      FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty))
+        (EcFol.f_and f1 f2)
+    in
+    t_and_intro_s opsym (f1, f2) tc
+  end else begin
+    match sform_of_form f2 with
+    | SFand (b, (f1', f2')) ->
+      t_and_i (i - 1) b (EcFol.f_and f1 f1', f2') tc
+    | _ ->
       t_and_intro_s opsym (f1, f2) tc
   end
-  else
-    begin
-      match sform_of_form f2 with
-      | SFand (b, (f1', f2')) ->
-        t_and_i (i - 1) b (EcFol.f_and f1 f1', f2') tc
-      |  _ ->
-        t_and_intro_s opsym (f1, f2) tc
-    end
+  *)
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
@@ -1537,8 +1564,8 @@ let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
     match sform_of_form fp with
     | SFtrue ->
         t_true tc
-    | SFand (b, (f1, f2)) when not closeonly ->
-      t_and_i i b (f1, f2) tc
+    | SFand _ when not closeonly ->
+        t_split_and_i i fp tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->

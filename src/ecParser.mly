@@ -2785,8 +2785,8 @@ logtactic:
 | SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
-| SPLIT i=loc(STRING)?
-    { Psplit i}
+| SPLIT i=word?
+    { Psplit i }
 
 | FIELD eqs=ident*
     { Pfield eqs }

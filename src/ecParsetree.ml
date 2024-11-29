@@ -938,7 +938,7 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
-  | Psplit      of psymbol option
+  | Psplit      of int option
   | Pfield      of psymbol list
   | Pring       of psymbol list
   | Palg_norm
