@@ -101,12 +101,12 @@ VPSRA_16u16(w@256, count@8) -> @256 =
   map<16, 16>(sra<16>(., count), w)
 
 # Intel intrinsic: _mm256_srli_epi16
-VPSRL_16u16(w@256, count@8) -> @256 =
-  map<16, 16>(srl<16>(., count), w)
+VPSRL_16u16(w@256, count@128) -> @256 =
+  map<16, 16>(srl<16>(., count[@8|0]), w)
 
 # Intel intrinsic: _mm256_srli_epi64
-VPSRL_4u64(w@256, count@8) -> @256 =
-  map<64, 4>(srl<64>(., count), w)
+VPSRL_4u64(w@256, count@128) -> @256 =
+  map<64, 4>(srl<64>(., count[@8|0]), w)
 
 # Intel intrinsic: _mm256_sll_epi64
 VPSLL_4u64(w@256, count@8) -> @256 =
