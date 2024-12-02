@@ -1086,10 +1086,10 @@ type cache  = (ident, (cinput * circuit)) Map.t
          if not: remove env argument from recursive calls *)
 let circuit_of_form 
   ?(pstate  : pstate = Map.empty) (* Program variable values *)
-  ?(cache   : cache = Map.empty) (* Let-bindings and such *)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
   : circuit =
+  let cache = Map.empty in
 
   let rec doit (cache: (ident, (cinput * circuit)) Map.t) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
@@ -1497,18 +1497,18 @@ let pstate_of_memtype ?pstate (env: env) (mt : memtype) =
     ) (Option.get lmt).lmt_decl in
   pstate_of_variables ?pstate env vars
 
-let process_instr (hyps: hyps) (mem: memory) ?(cache: cache = Map.empty) (pstate: _) (inst: instr) =
+let process_instr (hyps: hyps) (mem: memory) (pstate: _) (inst: instr) =
   let env = toenv hyps in
   (* Format.eprintf "[W]Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst; *)
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
-      let pstate = Map.add v (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) pstate in
+      let pstate = Map.add v (form_of_expr mem e |> circuit_of_form ~pstate hyps) pstate in
       (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate
     | Sasgn (LvTuple (vs), e) ->
-      let tp = (form_of_expr mem e |> circuit_of_form ~pstate ~cache hyps) in
+      let tp = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
       assert (is_bwtuple tp.circ);
       let comps = circuits_of_circuit tp in
       let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
@@ -1590,3 +1590,55 @@ let instrs_equiv
     let circ2 = { circ2 with inps = inputs @ circ2.inps } in
     circ_equiv circ1 circ2 None
   )
+
+let initial_pstate_of_vars (env: env) (invs: variable list) : cinput list * (symbol, circuit) Map.t =
+  let pstate : (symbol, circuit) Map.t = Map.empty in
+
+  let inps = List.map (input_of_variable env) invs in
+  let inpcs, inps = List.split inps in
+  (* List.iter (fun c -> Format.eprintf "Inp: %s @." (cinput_to_string c)) inps; *)
+  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) invs in
+
+  inps, List.fold_left 
+    (fun pstate (inp, v) -> Map.add v inp pstate)
+    pstate inpcs 
+
+    (* Generates pstate : (symbol, circuit) Map from program 
+  and inputs associated to the program
+        Throws: CircError on failure 
+       *)
+let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable list) : (symbol, circuit) Map.t =
+  let inps, pstate = initial_pstate_of_vars (toenv hyps) (invs) in
+
+  let pstate = 
+    List.fold_left (process_instr hyps mem) pstate proc
+  in
+  Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate 
+
+(* FIXME: refactor this function *)
+let rec circ_simplify_form_bitstring_equality
+  ?(mem = mhr) 
+  ?(pstate: (symbol, circuit) Map.t = Map.empty) 
+  ?(pcond: circuit option)
+  (hyps: hyps) 
+  (f: form)
+  : form =
+  let env = toenv hyps in
+
+  let rec check (f : form) =
+    match EcFol.sform_of_form f with
+    | SFeq (f1, f2)
+         when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
+           || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty)
+      ->
+      let c1 = circuit_of_form ~pstate hyps f1 in
+      let c2 = circuit_of_form ~pstate hyps f2 in
+      Format.eprintf "[W]Testing circuit equivalence for forms:
+      %a@.%a@.With circuits: %s | %s@."
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f2
+      (circuit_to_string c1)
+      (circuit_to_string c2);
+      f_bool (circ_equiv c1 c2 pcond)
+    | _ -> f_map (fun ty -> ty) check f 
+  in check f
