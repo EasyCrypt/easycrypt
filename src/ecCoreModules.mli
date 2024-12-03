@@ -7,13 +7,14 @@ open EcTypes
 (* -------------------------------------------------------------------- *)
 type lvalue = EcAst.lvalue
 
-val lv_equal     : lvalue -> lvalue -> bool
-val symbol_of_lv : lvalue -> symbol
-val ty_of_lv     : lvalue -> EcTypes.ty
-val lv_of_list   : (prog_var * ty) list -> lvalue option
-val lv_to_list   : lvalue -> prog_var list
-val name_of_lv   : lvalue -> string
-val lv_of_expr   : expr -> lvalue
+val lv_equal        : lvalue -> lvalue -> bool
+val symbol_of_lv    : lvalue -> symbol
+val ty_of_lv        : lvalue -> EcTypes.ty
+val lv_of_list      : (prog_var * ty) list -> lvalue option
+val lv_to_list      : lvalue -> prog_var list
+val lv_to_ty_list   : lvalue -> (prog_var * ty) list
+val name_of_lv      : lvalue -> string
+val lv_of_expr      : expr -> lvalue
 
 (* --------------------------------------------------------------------- *)
 type instr = EcAst.instr
@@ -77,6 +78,11 @@ val is_assert : instr -> bool
 
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Sx.t
+
+(* -------------------------------------------------------------------- *)
+type instr_with_expr = [`Sasgn | `Srnd | `Sif | `Smatch | `Swhile]
+
+val get_expression_of_instruction : instr -> (expr * instr_with_expr * (expr -> instr)) option
 
 (* -------------------------------------------------------------------- *)
 type funsig = {

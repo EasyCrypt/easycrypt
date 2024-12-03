@@ -46,13 +46,20 @@ module Mpv : sig
 
   val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
 
+  val remove : env -> prog_var -> ('a,'b) t -> ('a,'b) t
+
   val add_glob : env -> mpath -> 'b -> ('a,'b) t -> ('a,'b) t
 
   val find : env -> prog_var -> ('a,'b) t -> 'a
 
+  val mem : env -> prog_var -> ('a,'b) t -> bool
+
   val find_glob : env -> mpath -> ('a,'b) t -> 'b
 
+  val esubst : env -> (expr, unit) t -> expr -> expr 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
+  val isubst : env -> (expr, unit) t -> instr -> instr 
+  val ssubst : env -> (expr, unit) t -> stmt -> stmt
 end
 
 (* -------------------------------------------------------------------- *)

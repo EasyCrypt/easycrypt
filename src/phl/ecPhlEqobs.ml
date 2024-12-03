@@ -434,8 +434,10 @@ let process_eqobs_inS info tc =
         (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_trivial))
         (t_eqobs_inS sim eqo tc)
     | Some(p1,p2) ->
-      let _,sl2 = s_split p1 es.es_sl in
-      let _,sr2 = s_split p2 es.es_sr in
+      let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
+      let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+      let _,sl2 = s_split env p1 es.es_sl in
+      let _,sr2 = s_split env p2 es.es_sr in
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in

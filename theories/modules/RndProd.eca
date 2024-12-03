@@ -1,4 +1,4 @@
-require import Distr DProd SmtMap.
+require import Distr DProd FMap.
 require (****) PROM.
 
 type a, b, t_in.

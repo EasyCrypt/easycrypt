@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcAst
 open EcTypes
 open EcModules
@@ -240,15 +241,16 @@ let t_sp_side pos tc =
   match concl.f_node, pos with
   | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = o_split ~rev:true pos hs.hs_s in
+      let stmt1, stmt2 = o_split ~rev:true env pos hs.hs_s in
       let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 hs.hs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
 
-  | FbdHoareS bhs, (None | Some (Single _)) ->
+
+    | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = o_split ~rev:true pos bhs.bhs_s in
+      let stmt1, stmt2 = o_split ~rev:true env pos bhs.bhs_s in
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
       let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
@@ -260,8 +262,8 @@ let t_sp_side pos tc =
       let posL = pos |> omap fst in
       let posR = pos |> omap snd in
 
-      let stmtL1, stmtL2 = o_split ~rev:true posL es.es_sl in
-      let stmtR1, stmtR2 = o_split ~rev:true posR es.es_sr in
+      let stmtL1, stmtL2 = o_split ~rev:true env posL es.es_sl in
+      let stmtR1, stmtR2 = o_split ~rev:true env posR es.es_sr in
 
       let         es_pr = es.es_pr in
       let stmtL1, es_pr = LI.sp_stmt es.es_ml env stmtL1 es_pr in
@@ -289,3 +291,9 @@ let t_sp_side pos tc =
 
 (* -------------------------------------------------------------------- *)
 let t_sp = FApi.t_low1 "sp" t_sp_side
+
+(* -------------------------------------------------------------------- *)
+let process_sp (cpos : pcodepos1 doption option) (tc : tcenv1) =
+  let env = FApi.tc1_env tc in
+  let cpos = Option.map (EcTyping.trans_dcodepos1 env) cpos in
+  t_sp cpos tc

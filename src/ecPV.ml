@@ -72,10 +72,19 @@ module Mpv = struct
     check_npv env pv m;
     { m with s_pv = Mnpv.add pv f m.s_pv }
 
+  let remove env pv m =
+    let pv = pvm env pv in
+    { m with s_pv = Mnpv.remove pv m.s_pv }
+
   let find env pv m =
     let pv = pvm env pv in
     try Mnpv.find pv m.s_pv
     with Not_found -> check_npv env pv m; raise Not_found
+
+  let mem env pv m =
+    match find env pv m with
+    | _ -> true
+    | exception Not_found -> false
 
   let check_mp_mp env mp restr mp' restr' =
     if not (EcPath.m_equal mp mp') &&

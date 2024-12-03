@@ -96,7 +96,7 @@ and 'a rfield = {
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr
+  | PLvMap    of pqsymbol * ptyannot option * pexpr list
 
 and plvalue = plvalue_r located
 
@@ -183,7 +183,7 @@ and pformula_r =
   | PFident   of pqsymbol * ptyannot option
   | PFref     of psymbol * pffilter list
   | PFmem     of psymbol
-  | PFside    of pformula * symbol located
+  | PFside    of pformula * (bool * symbol located)
   | PFapp     of pformula * pformula list
   | PFif      of pformula * pformula * pformula
   | PFmatch   of pformula * (ppattern * pformula) list
@@ -487,19 +487,34 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
-type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
+type pcp_match = [
+  | `If
+  | `While
+  | `Match
+  | `Assign of plvmatch
+  | `Sample of plvmatch
+  | `Call of plvmatch
+]
 
-type codepos1 = int * cp_base
-type codepos  = (codepos1 * int) list * codepos1
-type docodepos1 = codepos1 doption option
+and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
+
+type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
+
+type pbranch_select = [`Cond of bool | `Match of psymbol]
+type pcodepos1 = int * pcp_base
+type pcodepos  = (pcodepos1 * pbranch_select) list * pcodepos1
+type pdocodepos1 = pcodepos1 doption option
+
+type pcodeoffset1 = [
+  | `ByOffset   of int
+  | `ByPosition of pcodepos1
+]
 
 (* -------------------------------------------------------------------- *)
-type swap_kind =
-  | SKbase      of int * int * int
-  | SKmove      of int
-  | SKmovei     of int * int
-  | SKmoveinter of int * int * int
+type pswap_kind = {
+  interval : (pcodepos1 * pcodepos1 option) option;
+  offset   : pcodeoffset1;
+}
 
 type interleave_info = oside * (int * int) * ((int * int) list) * int
 
@@ -530,7 +545,7 @@ type ('a, 'b, 'c) rnd_tac_info =
 type rnd_tac_info_f =
   (pformula, pformula option, pformula) rnd_tac_info
 
-type semrndpos = (bool * codepos1) doption
+type psemrndpos = (bool * pcodepos1) doption
 
 type tac_dir = Backs | Fwds
 
@@ -597,13 +612,13 @@ type fun_info = [
 
 (* -------------------------------------------------------------------- *)
 type app_info =
-  oside * tac_dir * codepos1 doption * pformula doption * p_app_xt_info
+  oside * tac_dir * pcodepos1 doption * pformula doption * p_app_xt_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
   | `Head   of oside
-  | `Seq    of oside * codepos1 option pair * pformula
-  | `SeqOne of  side * codepos1 option * pformula * pformula
+  | `Seq    of oside * pcodepos1 option pair * pformula
+  | `SeqOne of  side * pcodepos1 option * pformula * pformula
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -634,7 +649,7 @@ type inline_pat = ([ `DIFF | `UNION] * inline_pat1) list
 
 type inline_info = [
   | `ByName    of oside * inlineopt * (inline_pat * int list option)
-  | `CodePos   of (oside * inlineopt * codepos)
+  | `CodePos   of (oside * inlineopt * pcodepos)
  (* | `All       of oside * inlineopt *)
 ]
 
@@ -645,8 +660,8 @@ type outline_kind =
 
 type outline_info = {
     outline_side: side;
-    outline_start: codepos1;
-    outline_end: codepos1;
+    outline_start: pcodepos1;
+    outline_end: pcodepos1;
     outline_kind: outline_kind;
 }
 
@@ -670,7 +685,7 @@ type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
-  sim_pos  : codepos1 pair option;
+  sim_pos  : pcodepos1 pair option;
   sim_hint : (pgamepath option pair * pformula) list * pformula option;
   sim_eqs  : pformula option
 }
@@ -679,7 +694,7 @@ type sim_info = {
 type rw_eqv_info = {
   rw_eqv_side  : side;
   rw_eqv_dir   : [`LtoR | `RtoL];
-  rw_eqv_pos   : codepos1;
+  rw_eqv_pos   : pcodepos1;
   rw_eqv_lemma : ppterm;
   rw_eqv_proc  : (pexpr list located * pexpr option) option;
 }
@@ -698,37 +713,41 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type prrewrite = [`Rw of ppterm | `Simpl]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of docodepos1
-  | Psp            of docodepos1
+  | Pwp            of pdocodepos1
+  | Psp            of pdocodepos1
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
-  | Pfission       of (oside * codepos * (int * (int * int)))
-  | Pfusion        of (oside * codepos * (int * (int * int)))
-  | Punroll        of (oside * codepos * bool)
-  | Psplitwhile    of (pexpr * oside * codepos)
+  | Pfission       of (oside * pcodepos * (int * (int * int)))
+  | Pfusion        of (oside * pcodepos * (int * (int * int)))
+  | Punroll        of (oside * pcodepos * bool)
+  | Psplitwhile    of (pexpr * oside * pcodepos)
   | Pcall          of oside * call_info gppterm
   | Pcallconcave   of (pformula * call_info gppterm)
-  | Prcond         of (oside * bool * codepos1)
-  | Prmatch        of (oside * symbol * codepos1)
+  | Prcond         of (oside * bool * pcodepos1)
+  | Prmatch        of (oside * symbol * pcodepos1)
   | Pcond          of pcond_info
   | Pmatch         of matchmode
-  | Pswap          of ((oside * swap_kind) located list)
-  | Pcfold         of (oside * codepos * int option)
+  | Pswap          of ((oside * pswap_kind) located list)
+  | Pcfold         of (oside * pcodepos * int option)
   | Pinline        of inline_info
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
-  | Pkill          of (oside * codepos * int option)
-  | Pasgncase      of (oside * codepos)
-  | Prnd           of oside * semrndpos option * rnd_tac_info_f
-  | Prndsem        of bool * oside * codepos1
-  | Palias         of (oside * codepos * osymbol_r)
+  | Pkill          of (oside * pcodepos * int option)
+  | Pasgncase      of (oside * pcodepos)
+  | Prnd           of oside * psemrndpos option * rnd_tac_info_f
+  | Prndsem        of bool * oside * pcodepos1
+  | Palias         of (oside * pcodepos * osymbol_r)
   | Pweakmem       of (oside * psymbol * fun_params)
-  | Pset           of (oside * codepos * bool * psymbol * pexpr)
+  | Pset           of (oside * pcodepos * bool * psymbol * pexpr)
+  | Psetmatch      of (oside * pcodepos * psymbol * pformula)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
   | Pconcave       of (pformula option tuple2 gppterm * pformula)
@@ -739,7 +758,7 @@ type phltactic =
   | Pbydeno        of ([`PHoare | `Equiv | `EHoare ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
   | Pbyupto
-  | Pfel           of (codepos1 * fel_info)
+  | Pfel           of (pcodepos1 * fel_info)
   | Phoare
   | Pprbounded
   | Psim           of crushmode option* sim_info
@@ -747,11 +766,11 @@ type phltactic =
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Pprocchange    of side option * codepos * pexpr
-  | Pprocrewrite   of side option * codepos * ppterm
+  | Pprocchange    of side option * pcodepos * pexpr
+  | Pprocrewrite   of side option * pcodepos * prrewrite
 
     (* Eager *)
-  | Peager_seq       of (eager_info * codepos1 pair * pformula)
+  | Peager_seq       of (eager_info * pcodepos1 pair * pformula)
   | Peager_if
   | Peager_while     of (eager_info)
   | Peager_fun_def

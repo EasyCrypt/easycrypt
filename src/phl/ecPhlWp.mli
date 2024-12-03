@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcMatching.Position
 
 open EcCoreGoal.FApi
 
@@ -13,4 +14,4 @@ open EcCoreGoal.FApi
 
 val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward
 
-val process_wp : (codepos1 doption) option -> backward
+val process_wp : (pcodepos1 doption) option -> backward

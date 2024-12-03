@@ -5,7 +5,7 @@
   *   ac9b6e7bc63468cbcc2367fefc1e7fb073a15642                          *)
 
 (* Loading core datatype theories *)
-require import AllCore List FSet SmtMap.
+require import AllCore List FSet FMap.
 (* Loading algebraic theories *)
 require import StdRing StdOrder StdBigop.
 (*---*) import Ring.IntID RField IntOrder RealOrder Bigreal BRA.

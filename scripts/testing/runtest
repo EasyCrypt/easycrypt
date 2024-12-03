@@ -140,7 +140,11 @@ def _options():
     )
 
     config = cp.ConfigParser(defaults)
-    config.read(args[0])
+    try:
+        with open(args[0]) as cf:
+            config.read_file(cf)
+    except OSError as e:
+        parser.error(f'while reading configuration from \'{args[0]}\': {e.strerror}')
 
     def resolve_targets(names):
         targets = []
@@ -601,9 +605,10 @@ class TermListener(Listener):
     @clib.contextmanager
     def start(self):
         self._mbar.term.echooff()
-        yield
-        self._mbar.term.echoon()
-
+        try:
+            yield
+        finally:
+            self._mbar.term.echoon()
 
 # --------------------------------------------------------------------
 class RawListener(Listener):

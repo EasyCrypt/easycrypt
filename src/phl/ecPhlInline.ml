@@ -309,6 +309,10 @@ module HiInternal = struct
       | Zp.ZWhile  (_, sp)    -> aux_s (IPwhile aout) sp
       | Zp.ZIfThen (_, sp, _) -> aux_s (IPif (aout, [])) sp
       | Zp.ZIfElse (_, _, sp) -> aux_s (IPif ([], aout)) sp
+      | Zp.ZMatch (_, sp, mpi) ->
+        let prebr  = List.map (fun _ -> []) mpi.prebr  in
+        let postbr = List.map (fun _ -> []) mpi.postbr in
+        aux_s (IPmatch (prebr @ aout :: postbr)) sp
 
     and aux_s aout ((sl, _), ip) =
       aux_i [(List.length sl, aout)] ip
@@ -316,10 +320,10 @@ module HiInternal = struct
     in fun (p : Zp.spath) -> aux_s IPpat p
 
   (* ------------------------------------------------------------------ *)
-  let pat_of_codepos pos stmt =
+  let pat_of_codepos env pos stmt =
     let module Zp = EcMatching.Zipper in
 
-    let zip = Zp.zipper_of_cpos pos stmt in
+    let zip = Zp.zipper_of_cpos env pos stmt in
     match zip.Zp.z_tail with
     | { i_node = Scall _ } :: tl ->
          pat_of_spath ((zip.Zp.z_head, tl), zip.Zp.z_path)
@@ -400,21 +404,23 @@ let process_inline_occs ~use_tuple side cond occs tc =
 
 (* -------------------------------------------------------------------- *)
 let process_inline_codepos ~use_tuple side pos tc =
+  let env = FApi.tc1_env tc in
   let concl = FApi.tc1_goal tc in
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
 
   try
     match concl.f_node, side with
     | FequivS es, Some b ->
         let st = sideif b es.es_sl es.es_sr in
-        let sp = HiInternal.pat_of_codepos pos st in
+        let sp = HiInternal.pat_of_codepos env pos st in
         t_inline_equiv ~use_tuple b sp tc
 
     | FhoareS hs, None ->
-        let sp = HiInternal.pat_of_codepos pos hs.hs_s in
+        let sp = HiInternal.pat_of_codepos env pos hs.hs_s in
         t_inline_hoare ~use_tuple sp tc
 
     | FbdHoareS bhs, None ->
-        let sp = HiInternal.pat_of_codepos pos bhs.bhs_s in
+        let sp = HiInternal.pat_of_codepos env pos bhs.bhs_s in
         t_inline_bdhoare ~use_tuple sp tc
 
     | _, _ -> tc_error !!tc "invalid arguments"

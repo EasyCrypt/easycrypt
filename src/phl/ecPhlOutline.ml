@@ -107,6 +107,7 @@ let t_equivS_trans_eq side s tc =
 (* FIXME: Maybe move to ecPhlTrans as well *)
 
 let t_outline_stmt side start_pos end_pos s tc =
+  let env = FApi.tc1_env tc in
   let goal = tc1_as_equivS tc in
 
   (* Check which memory/program we are outlining *)
@@ -116,8 +117,8 @@ let t_outline_stmt side start_pos end_pos s tc =
   in
 
   (* Extract the program prefix and suffix *)
-  let rest, code_suff  = s_split end_pos code in
-  let code_pref, _, _ = s_split_i start_pos (stmt rest) in
+  let rest, code_suff  = s_split env end_pos code in
+  let code_pref, _, _ = s_split_i env start_pos (stmt rest) in
 
   let new_prog = s_seq (s_seq (stmt code_pref) s) (stmt code_suff) in
   let tc = t_equivS_trans_eq side new_prog tc in
@@ -180,12 +181,12 @@ let t_outline_proc side start_pos end_pos fname res_lv tc =
 
   (* Get the return statement and body we will attempt to unify *)
   let old_code_body, old_code_ret =
-    let rest, ret_instr, _ = s_split_i end_pos code in
+    let rest, ret_instr, _ = s_split_i env end_pos code in
     let body =
        if start_pos = end_pos then
          s_empty
        else
-         let _, hd, tl  = s_split_i start_pos (stmt rest) in
+         let _, hd, tl  = s_split_i env start_pos (stmt rest) in
          stmt (hd :: tl)
     in
 
@@ -232,13 +233,17 @@ let t_outline_proc side start_pos end_pos fname res_lv tc =
 (* Process a user call to outline *)
 
 let process_outline info tc =
-  let side = info.outline_side in
-  let start_pos = info.outline_start in
-  let end_pos = info.outline_end in
-
   let env = tc1_env tc in
+  let side = info.outline_side in
   let goal = tc1_as_equivS tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
+
+  let start_pos =
+    EcProofTyping.tc1_process_codepos1 tc
+      (Some side, info.outline_start) in
+  let end_pos =
+    EcProofTyping.tc1_process_codepos1 tc
+      (Some side, info.outline_end) in
 
   (* Check which memory we are outlining *)
   let mem = match side with

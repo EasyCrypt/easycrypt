@@ -284,6 +284,13 @@ type 'a doption =
   | Single of 'a
   | Double of ('a * 'a)
 
+module DOption = struct
+  let map (type a b) (f : a -> b) (x : a doption) : b doption =
+    match x with
+    | Single v -> Single (f v)
+    | Double (v1, v2) -> Double (f v1, f v2)
+end
+
 (* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 
@@ -467,6 +474,10 @@ module List = struct
   include Parallel
 
   (* ------------------------------------------------------------------ *)
+  let destruct (s : 'a list) =
+    match s with x :: xs -> (x, xs) | _ -> assert false
+
+  (* ------------------------------------------------------------------ *)
   let nth_opt (s : 'a list) (i : int) =
     try  Some (List.nth s i)
     with Failure _ | Invalid_argument _ -> None
@@ -603,6 +614,29 @@ module List = struct
 
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
+
+  (* Separate list into a prefix for which p is true and the rest *)
+  let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
+    let rec doit (acc: 'a list) (xs : 'a list) =
+    match xs with
+    | [] -> (List.rev acc, [])
+    | x::xs -> if p x then doit (x::acc) xs else (List.rev acc, x::xs)
+    in doit [] xs
+
+
+  type 'a interruptible = [`Interrupt | `Continue of 'a]
+
+  let fold_left_map_while (f : 'a -> 'b -> ('a * 'c) interruptible) =
+    let rec aux (state : 'a) (acc : 'c list) (xs : 'b list) =
+      match xs with
+      | [] -> (state, List.rev acc, [])
+      | y :: ys -> begin
+        match f state y with
+        | `Continue (state, y) -> aux state (y :: acc) ys
+        | `Interrupt -> (state, List.rev acc, xs)
+      end
+
+    in fun state xs -> aux state [] xs
 end
 
 (* -------------------------------------------------------------------- *)

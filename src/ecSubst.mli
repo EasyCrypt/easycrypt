@@ -29,7 +29,7 @@ val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
 val add_tyvar    : subst -> EcIdent.t -> etyarg -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
-val add_moddef   : subst -> src:path -> dst:path -> subst
+val add_moddef   : subst -> src:path -> dst:mpath -> subst (* Only concrete modules *)
 val add_memory   : subst -> EcIdent.t -> EcIdent.t -> subst
 
 val add_flocal : subst -> EcIdent.t -> form -> subst

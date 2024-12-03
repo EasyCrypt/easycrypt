@@ -1,4 +1,4 @@
-require import AllCore PROM SmtMap Distr DProd.
+require import AllCore PROM FMap Distr DProd.
 
 abstract theory Split.
 

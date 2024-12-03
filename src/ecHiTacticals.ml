@@ -174,9 +174,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp info                 -> EcPhlApp.process_app info
     | Pwp wp                    -> EcPhlWp.process_wp wp
-    | Psp sp                    -> EcPhlSp.t_sp sp
+    | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
-    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
+    | Prmatch (side, c, i)      -> EcPhlRCond.process_rcond_match side c i
     | Pcond info                -> EcPhlHiCond.process_cond info
     | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
@@ -196,6 +196,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
+    | Psetmatch info            -> EcPhlCodeTx.process_set_match info
     | Pweakmem info             -> EcPhlCodeTx.process_weakmem info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
     | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
@@ -236,8 +237,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   with (* PHL Specific low errors *)
   | EcLowPhlGoal.InvalidSplit cpos1 ->
       tc_error_lazy !!tc (fun fmt ->
-        Format.fprintf fmt "invalid split index: %s"
-          (EcPrinting.string_of_cpos1 cpos1))
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "invalid split index: %a"
+          (EcPrinting.pp_codepos1 ppe) cpos1)
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

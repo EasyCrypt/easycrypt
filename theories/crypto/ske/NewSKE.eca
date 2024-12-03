@@ -1,4 +1,4 @@
-require import Bool FSet SmtMap.
+require import Bool FSet FMap.
 
 type key, plain, cipher.
 
