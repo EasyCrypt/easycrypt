@@ -390,23 +390,6 @@ let gen_select_op
       |>  Option.to_list
     else [] in
 
-<<<<<<< HEAD
-  | None ->
-      let ops () : (OpSelect.opsel * ty * EcUnify.unienv * opmatch) list =
-        let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
-        let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
-        let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
-        let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
-        (List.map fop ops)
-
-      and pvs () : (OpSelect.opsel * ty * EcUnify.unienv * opmatch) list =
-        let me, pvs =
-          match EcEnv.Memory.get_active env, actonly with
-          | None, true -> (None, [])
-          | me  , _    -> (  me, select_pv env me name ue tvi psig)
-        in List.map (fpv me) pvs
-      in
-=======
   let ops () : OpSelect.gopsel list =
     let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
@@ -421,7 +404,6 @@ let gen_select_op
       | me  , _    -> (  me, select_pv env me name ue tvi psig)
     in List.map (fpv me) pvs
   in
->>>>>>> origin/main
 
   let select (filters : (unit -> OpSelect.gopsel list) list) : OpSelect.gopsel list =
     List.find_map_opt
