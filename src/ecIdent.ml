@@ -57,3 +57,4 @@ let tostring (id : t) =
 
 (* -------------------------------------------------------------------- *)
 let pp_ident fmt id = Format.fprintf fmt "%s" (name id)
+let pp = pp_ident

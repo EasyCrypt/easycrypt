@@ -1,41 +1,60 @@
 (* -------------------------------------------------------------------- *)
 open EcUid
-open EcSymbols
+open EcIdent
 open EcPath
+open EcSymbols
+open EcMaps
 open EcTypes
 open EcDecl
 
-(* -------------------------------------------------------------------- *)
-exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
+(* ==================================================================== *)
+type problem = [
+  | `TyUni of ty * ty
+  | `TcTw  of tcwitness * tcwitness
+  | `TcCtt of EcUid.uid * ty * typeclass
+]
+
+exception UnificationFailure of problem
 exception UninstanciateUni
 
 type unienv
 
+type petyarg = ty option * tcwitness option list option
+
 type tvar_inst =
-| TVIunamed of ty list
-| TVInamed  of (EcSymbols.symbol * ty) list
+| TVIunamed of petyarg list
+| TVInamed  of (EcSymbols.symbol * petyarg) list
 
 type tvi = tvar_inst option
-type uidmap = uid -> ty option
+
+val tvi_unamed : etyarg list -> tvar_inst
 
 module UniEnv : sig
-  val create     : (EcIdent.t * Sp.t) list option -> unienv
+  type opened = {
+    subst  : etyarg Mid.t;
+    params : (ty * typeclass list) list;
+    args   : etyarg list;
+  }
+
+  val create     : (EcIdent.t * typeclass list) list option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val fresh      : ?tc:EcPath.Sp.t -> ?ty:ty -> unienv -> ty
+  val xfresh     : ?tcs:(EcDecl.typeclass * EcTypes.tcwitness option) list -> ?ty:ty -> unienv -> etyarg
+  val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty
-  val opentvi    : unienv -> ty_params -> tvi -> ty EcIdent.Mid.t
-  val openty     : unienv -> ty_params -> tvi -> ty -> ty * ty list
-  val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * ty list
+  val opentvi    : unienv -> ty_params -> tvi -> opened
+  val openty     : unienv -> ty_params -> tvi -> ty -> ty * opened 
+  val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool
-  val close      : unienv -> ty Muid.t
-  val assubst    : unienv -> ty Muid.t
+  val close      : unienv -> etyarg Muid.t
+  val assubst    : unienv -> etyarg Muid.t
   val tparams    : unienv -> ty_params
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
-val hastc : EcEnv.env -> unienv -> ty -> Sp.t -> unit
+
+val hastc : EcEnv.env -> unienv -> ty -> typeclass -> ((path * ty list) Mstr.t) option option
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 
@@ -43,10 +62,10 @@ type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 val select_op :
      ?hidden:bool
-  -> ?filter:(path -> operator -> bool)
+  -> ?filter:(EcPath.path -> operator -> bool)
   -> tvi
   -> EcEnv.env
   -> qsymbol
   -> unienv
   -> dom
-  -> ((EcPath.path * ty list) * ty * unienv * sbody option) list
+  -> ((EcPath.path * etyarg list) * ty * unienv * sbody option) list

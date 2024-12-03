@@ -49,9 +49,27 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * etyarg list
   | Tfun    of ty * ty
 
+(* -------------------------------------------------------------------- *)
+and etyarg = ty * tcwitness list
+
+and tcwitness =
+  | TCIConcrete of {
+      path: EcPath.path;
+      etyargs: (ty * tcwitness list) list;
+  }
+
+  | TCIAbstract of {
+      support: [
+        | `Var    of EcIdent.t
+        | `Univar of EcUid.uid
+        | `Abs    of EcPath.path
+      ];
+      offset: int;
+  }
+  
 (* -------------------------------------------------------------------- *)
 and ovariable = {
   ov_name : EcSymbols.symbol option;
@@ -79,7 +97,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * etyarg list    (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -92,7 +110,6 @@ and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 
 (* -------------------------------------------------------------------- *)
-
 and lvalue =
   | LvVar   of (prog_var * ty)
   | LvTuple of (prog_var * ty) list
@@ -180,7 +197,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * etyarg list
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -300,6 +317,17 @@ val idty_hash  : (EcIdent.t * ty) hash
 val lp_equal : lpattern equality
 val lp_hash  : lpattern hash
 val lp_fv    : lpattern -> EcIdent.Sid.t
+
+(* -------------------------------------------------------------------- *)
+val etyarg_fv    : etyarg -> int Mid.t
+val etyargs_fv   : etyarg list -> int Mid.t
+val etyarg_hash  : etyarg -> int
+val etyarg_equal : etyarg -> etyarg -> bool
+
+(* -------------------------------------------------------------------- *)
+val tcw_fv    : tcwitness -> int Mid.t
+val tcw_hash  : tcwitness -> int
+val tcw_equal : tcwitness -> tcwitness -> bool
 
 (* -------------------------------------------------------------------- *)
 val e_equal : expr equality

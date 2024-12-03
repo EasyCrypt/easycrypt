@@ -14,12 +14,9 @@ val mleft  : memory
 val mright : memory
 
 (* -------------------------------------------------------------------- *)
-type quantif = EcAst.quantif
-
+type quantif  = EcAst.quantif
 type hoarecmp = EcAst.hoarecmp
-
-type gty = EcAst.gty
-
+type gty      = EcAst.gty
 type binding  = (EcIdent.t * gty)
 type bindings = binding list
 
@@ -79,8 +76,9 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
-val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val f_map  : (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
+
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
 
@@ -98,7 +96,8 @@ val f_pvloc : variable -> memory -> form
 val f_glob  : EcIdent.t -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
-val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
+val f_op     : path -> ty list -> EcTypes.ty -> form
+val f_op_tc  : path -> etyarg list -> EcTypes.ty -> form
 val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form
@@ -254,13 +253,13 @@ val destr_forall1  : form -> ident * gty * form
 val destr_exists1  : form -> ident * gty * form
 val destr_lambda1  : form -> ident * gty * form
 
-val destr_op        : form -> EcPath.path * ty list
+val destr_op        : form -> EcPath.path * etyarg list
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
-val destr_op_app    : form -> (EcPath.path * ty list) * form list
+val destr_op_app    : form -> (EcPath.path * etyarg list) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form

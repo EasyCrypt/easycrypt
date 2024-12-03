@@ -104,6 +104,9 @@ let rec tostring p =
   | Psymbol x    -> x
   | Pqname (p,x) -> Printf.sprintf "%s.%s" (tostring p) x
 
+let pp_path fmt p =
+  Format.fprintf fmt "%s" (tostring p)
+
 let tolist =
   let rec aux l p =
     match p.p_node with
@@ -394,9 +397,15 @@ let rec m_tostring (m : mpath) =
   in
     Printf.sprintf "%s%s%s" top args sub
 
+let pp_mpath fmt p =
+  Format.fprintf fmt "%s" (m_tostring p)
+
 let x_tostring x =
   Printf.sprintf "%s./%s"
     (m_tostring x.x_top) x.x_sub
+
+let pp_xpath fmt x =
+  Format.fprintf fmt "%s" (x_tostring x)
 
 (* -------------------------------------------------------------------- *)
 type smsubst = {
