@@ -1556,46 +1556,59 @@ and try_pp_chained_orderings
   (fmt   : Format.formatter)
   (f     : form)
 =
-  let isordering op =
-    match EcIo.lex_single_token (EcPath.basename op) with
+  let exception Bailout in
+
+  let is_ordering_op (p : EcPath.path) =
+    match EcIo.lex_single_token (EcPath.basename p) with
     | Some (EP.LE | EP.LT | EP.GE | EP.GT) -> true
-    | _ -> false
+    | _ -> false in
+
+  let as_ordering (f : form) =
+    match match_pp_notations ~filter:(fun (p, _) -> is_ordering_op p) ppe f with
+    | Some ((op, (tvi, _)), ue, ev, ov, [i1; i2]) -> begin
+      let ti  = Tvar.subst ov in
+      let tvi = List.map (ti |- tvar |- fst) tvi in
+      let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
+      let i1  = Fsubst.f_subst sb i1 in
+      let i2  = Fsubst.f_subst sb i2 in
+  
+      (op, tvi), (i1, i2)
+    end
+
+    | _ -> begin
+      match sform_of_form f with
+      | SFop ((op, tvi), [i1; i2]) when is_ordering_op op ->
+        (op, tvi), (i1, i2)
+      | _ -> raise Bailout
+    end
   in
 
   let rec collect acc le f =
-    match sform_of_form f with
-    | SFand (`Asym, (f1, f2)) -> begin
-        match f2.f_node with
-        | Fapp ({ f_node = Fop (op, tvi) }, [i1; i2])
-            when isordering op
-          -> begin
-            match le with
-            | None ->
-                collect ((op, tvi, i2) :: acc) (Some i1) f1
-            | Some le when EcFol.f_equal i2 le ->
-                collect ((op, tvi, i2) :: acc) (Some i1) f1
-            | _ -> None
-          end
+    let f1, f2 =
+      match sform_of_form f with
+      | SFand (`Asym, (f1, f2)) -> (Some f1, f2)
+      | _ -> (None, f) in
 
-        | _ -> None
-    end
+    let ((op, tvi), (i1, i2)) = as_ordering f2 in
 
-    | SFop ((op, tvi), [i1; i2]) when isordering op -> begin
-        match le with
-        | None ->
-            Some (i1, ((op, tvi, i2) :: acc))
-        | Some le when EcFol.f_equal i2 le ->
-            Some (i1, ((op, tvi, i2) :: acc))
-        | _ -> None
-      end
+    Option.iter
+      (fun le -> if not (EcFol.f_equal i2 le) then raise Bailout)
+      le;
 
-    | _ -> None
+    let acc = (op, tvi, i2) :: acc in
+    
+    Option.fold ~none:(i1, acc) ~some:(collect acc (Some i1)) f1
   in
     match collect [] None f with
-    | None | Some (_, ([] | [_])) -> false
-    | Some (f, fs) ->
+    | (_, ([] | [_])) ->
+      false
+
+    | (f, fs) ->
         pp_chained_orderings ppe f_ty pp_form_r outer fmt (f, fs);
         true
+
+    | exception Bailout ->
+      false
 
 and try_pp_lossless
   (ppe   : PPEnv.t)
@@ -1622,15 +1635,14 @@ and try_pp_lossless
             in
               maybe_paren outer prio pp fmt (); true
 
-and try_pp_notations
-  (ppe   : PPEnv.t)
-  (outer : opprec * iassoc)
-  (fmt   : Format.formatter)
-  (f     : form)
+and match_pp_notations
+  ?(filter : (_ -> bool) = predT)
+   (ppe   : PPEnv.t)
+   (f     : form)
 =
   let open EcMatching in
 
-  let try_notation (p, (tv, nt)) =
+  let try_notation ((p, (tv, nt)) as ntt) =
     if not (Sp.mem p ppe.PPEnv.ppe_fb) then begin
       let na   =
           List.length nt.ont_args
@@ -1642,14 +1654,14 @@ and try_pp_notations
           let a1, a2 = List.split_at na a in
           f_app f a1 (toarrow (List.map f_ty a2) oty), a2
         else f_app f a oty, [] in
-      let ev   = MEV.of_idents (List.map fst nt.ont_args) `Form in
-      let ue   = EcUnify.UniEnv.create None in
-      let ov   = EcUnify.UniEnv.opentvi ue tv None in
-      let ti   = Tvar.subst ov in
-      let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-      let mr   = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
-      let bd   = form_of_expr mr nt.ont_body in
-      let bd   = Fsubst.f_subst_tvar ~freshen:true ov bd in
+
+      let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
+      let ue = EcUnify.UniEnv.create None in
+      let ov = EcUnify.UniEnv.opentvi ue tv None in
+      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
+      let bd = form_of_expr mr nt.ont_body in
+      let bd = Fsubst.f_subst_tvar ~freshen:true ov bd in
 
       try
         let (ue, ev) =
@@ -1659,21 +1671,14 @@ and try_pp_notations
         if not (EcMatching.can_concretize ev ue) then
           raise EcMatching.MatchFailure;
 
-        let rty  = ti nt.ont_resty in
-        let tv   = List.map (ti |- tvar |- fst) tv in
-        let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
-        let f    = f_op p tv (toarrow tv rty) in
-        let f    = f_app f args rty in
-        let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in
-        let f    = f_app f a oty in
-        pp_form_core_r ppe outer fmt f; true
+        Some (ntt, ue, ev, ov, a)
 
       with EcMatching.MatchFailure ->
-        false
-    end else false
+        None
+    end else None
 
   in let try_notation ((_, (_, nt)) as args) =
-     not nt.ont_ponly && try_notation args
+    if nt.ont_ponly || not (filter args) then None else try_notation args
   in
 
   let head =
@@ -1684,7 +1689,29 @@ and try_pp_notations
 
   let nts = EcEnv.Op.get_notations ~head ppe.PPEnv.ppe_env in
 
-  List.exists try_notation nts
+  List.find_map_opt try_notation nts
+          
+            
+and try_pp_notations
+  (ppe   : PPEnv.t)
+  (outer : opprec * iassoc)
+  (fmt   : Format.formatter)
+  (f     : form)
+=
+  match match_pp_notations ppe f with
+  | None ->
+    false
+
+  | Some ((p, (tv, nt)), ue, ev, ov, eargs) ->
+    let ti   = Tvar.subst ov in
+    let rty  = ti nt.ont_resty in
+    let tv   = List.map (ti |- tvar |- fst) tv in
+    let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
+    let f    = f_op p tv (toarrow tv rty) in
+    let f    = f_app f args rty in
+    let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in
+    let f    = f_app f eargs f.f_ty in
+    pp_form_core_r ppe outer fmt f; true
 
 and pp_form_core_r
   (ppe   : PPEnv.t)
