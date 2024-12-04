@@ -2817,29 +2817,93 @@ let pp_node mode fmt node =
     pp_node_r mode stats 0 [] fmt node
 
 (* -------------------------------------------------------------------- *)
-let rec pp_prpo (ppe : PPEnv.t) tag mode fmt f of_  =
-  if mode then
-    let fs = EcFol.destr_ands ~deep:false f in
-    let ns = List.length fs in
+module PPTree : sig
+  type 'a tree = Node of 'a tree list | Leaf of 'a
 
-    if ns <= 1 then pp_prpo ppe tag false fmt f of_ else
+  val print : 'a pp -> 'a tree pp
+end = struct
+  type 'a tree = Node of 'a tree list | Leaf of 'a
 
-    let ws = max 0. (log10 (float_of_int ((List.length fs - 1)))) in
-    let ws = int_of_float (ceil ws) in
+  type prefix1 = [`First | `Middle | `Last | `Single]
+  type prefix  = prefix1 list
 
-    Format.fprintf fmt "%s:\n%!" tag;
-    List.iteri (fun i f ->
-      Format.fprintf fmt "  [%.*d]: @[<hov 2>%a@]\n%!"
-        ws (i + 1) (pp_form ppe) f) fs;
-    (if of_ <> None then
-       Format.fprintf fmt "  | @[<hov 2>%a@]\n!"
-         (pp_form ppe) (oget of_))
-  else
-    if of_ = None then
-      Format.fprintf fmt "@[<hov 2>%s =@ %a@]\n%!" tag (pp_form ppe) f
-    else
-      Format.fprintf fmt "@[%s @[<v>= @[<hov 2>%a@]@ | @[<hov 2>%a@]@]@]\n%!"
-        tag (pp_form ppe) f (pp_form ppe) (oget of_)
+  let pp_prefix =
+    let rec doit (fmt : Format.formatter) (depth : int) (prefix : prefix) =
+      match prefix with
+      | []        -> ()
+      | [`First]  -> Format.fprintf fmt (if depth = 0 then "├──" else "┬──")
+      | [`Middle] -> Format.fprintf fmt "├──"
+      | [`Last]   -> Format.fprintf fmt "└──"
+      | [`Single] -> Format.fprintf fmt "───"
+
+      | p :: tl ->
+        let first = List.for_all (fun x -> x = `First || x = `Single) tl in
+        begin
+          match p  with
+          | `Last when first   -> Format.fprintf fmt "└──"
+          | `Last              -> Format.fprintf fmt "   "
+          | `Single when first -> Format.fprintf fmt "───"
+          | _       when first -> Format.fprintf fmt (if depth = 0 then "├──" else "┬──")
+          | _                  -> Format.fprintf fmt "│  "
+        end;
+        doit fmt (depth + 1) tl
+
+    in fun fmt prefix -> doit fmt 0 (List.rev prefix)
+
+  let print (pp : 'a pp) (fmt : Format.formatter) =
+    let rec doit (prefix : prefix) (node : 'a tree) =
+      match node with
+      | Leaf x ->
+        Format.fprintf fmt "%a %a@." pp_prefix prefix pp x
+      | Node [] ->
+        Format.fprintf fmt "%a@." pp_prefix prefix
+      | Node [n] ->
+        doit (`Single :: prefix) n
+      | Node ns ->
+        let len = List.length ns in
+        let pr (i : int) : prefix1 =
+          match i with
+          | 0 -> `First
+          | _ when i+1 = len -> `Last
+          | _ -> `Middle in
+        List.iteri (fun i node -> doit (pr i :: prefix) node) ns
+
+    in fun node -> doit [] node
+end
+
+(* -------------------------------------------------------------------- *)
+let pp_prpo
+  (ppe   : PPEnv.t)
+  (tag   : symbol)
+  (split : bool)
+  (fmt   : Format.formatter)
+  (f     : form)
+  (of_   : form option)
+=
+  let module Split = struct
+    type split = form PPTree.tree
+
+    let rec split (f : form) : split =
+      match EcFol.destr_ands ~deep:false f with
+      | []  -> assert false
+      | [_] -> Leaf f
+      | fs  -> Node (List.map split fs)
+  end in
+
+  if split then begin
+    Format.fprintf fmt "%s:@." tag;
+    Format.fprintf fmt "%a" (PPTree.print (pp_form ppe)) (Split.split f);
+    oiter (Format.fprintf fmt "  | @[<hov 2>%a@]\n!" (pp_form ppe)) of_
+  end else begin
+    match of_ with
+    | None ->
+      Format.fprintf fmt
+        "@[<hov 2>%s =@ %a@]\n%!" tag (pp_form ppe) f
+    | Some of_ ->
+      Format.fprintf fmt
+        "@[%s @[<v>= @[<hov 2>%a@]@ | @[<hov 2>%a@]@]@]\n%!"
+        tag (pp_form ppe) f (pp_form ppe) of_
+  end
 
 (* -------------------------------------------------------------------- *)
 let pp_pre (ppe : PPEnv.t) ?prpo fmt pre =
