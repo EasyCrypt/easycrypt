@@ -243,11 +243,12 @@ let input_shape_equal (f: circuit) (g: circuit) : bool =
 (* Checks if there are no shared inputs among elements of the list
   That is, the name of each input to each circuit in the list does not 
   appear as an input in another element in the list *)
-let inputs_indep (fs: circuit list) : bool =
-  let s = List.map (fun c -> Set.of_list (List.map ident_of_cinput c.inps)) fs in
-  let c = List.fold_left (fun acc s -> acc + (Set.cardinal s)) 0 s in
-  let s = List.fold_left Set.union Set.empty s in
-  (Set.cardinal s) = c
+(* FIXME: maybe remove ? *)
+(*let inputs_indep (fs: circuit list) : bool =*)
+(*  let s = List.map (fun c -> Set.of_list (List.map ident_of_cinput c.inps)) fs in*)
+(*  let c = List.fold_left (fun acc s -> acc + (Set.cardinal s)) 0 s in*)
+(*  let s = List.fold_left Set.union Set.empty s in*)
+(*  (Set.cardinal s) = c*)
 
 (* Checks whether the given circuit can be applied to the given input 
   That is, if the shape of the output of the circ 
@@ -468,11 +469,6 @@ let circuit_bwarray_get ~(nelements : width) ~(wordsize : width) (i: int) : circ
   THROWS: CircError on failure (from apply calls)
 *)
 let compose (f: circuit) (args: circuit list) : circuit = 
-  (* assert (List.compare_lengths f.inps args = 0); *)
-  (* Length comparison should be done in apply *)
-  let args = 
-    dist_inputs args
-  in
   try 
     {circ=apply f (List.map (fun c -> c.circ) args); 
     inps=List.fold_right (@) (List.map (fun c -> c.inps) args) []} 
@@ -594,6 +590,7 @@ let bus_of_cinputs (inps: cinput list) : circ list * cinput =
 let circuit_aggregate_inps (c: circuit) : circuit = 
   match c.inps with
   | [] -> c
+  | BWInput _ :: [] -> c
   | inps -> 
     let circs, inp = bus_of_cinputs inps in
     {circ=apply c circs; inps=[inp]}
@@ -739,13 +736,7 @@ let circuit_mapreduce ?(perm: (int -> int) option) (c: circuit) (n:int) (m:int) 
   Format.eprintf "[W] Beginning dependency analysis@.";
   let const_inp = BWInput (create "const", n) in
   let c = circuit_flatten c in
-  let c = if List.compare_length_with c.inps 1 > 0 
-    || ((List.compare_length_with c.inps 1 = 0) 
-    && not (is_bwinput (List.hd c.inps)))
-    then
-    circuit_aggregate_inps c 
-    else c
-  in
+  let c = circuit_aggregate_inps c in
   let r = try destr_bwcirc c.circ 
     with CircError _ -> raise (CircError "Cannot mapreduce on non-bitstring return type") 
   in
@@ -1076,14 +1067,12 @@ let circ_equiv ?(strict=false) (f: circuit) (g: circuit) (pcond: circuit option)
     end
   | _ -> assert false
 
-(* FIXME: Transfer this to EcEnv/wherever else appropriate *)
+(* FIXME: TODO: Transfer this to EcEnv/wherever else appropriate *)
 let op_cache = ref Mp.empty
 
 type pstate = (symbol, circuit) Map.t
 type cache  = (ident, (cinput * circuit)) Map.t
 
-(* TODO: Decide if we want to store stuff in the environment or not, 
-         if not: remove env argument from recursive calls *)
 let circuit_of_form 
   ?(pstate  : pstate = Map.empty) (* Program variable values *)
    (hyps    : hyps) 
@@ -1096,11 +1085,7 @@ let circuit_of_form
     let redmode = circ_red hyps in
     (* let redmode = {redmode with delta_p = fun _ -> `No} in *)
     let fapply_safe f fs = 
-      (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env) in *)
-      (* Format.eprintf "f: %a@.fs: %a@." pp_form *)
-        (* f (fun fmt fs -> List.iter (Format.fprintf fmt "%a, " pp_form) fs) fs; *)
       let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
-      (* Format.eprintf "res : %a@." pp_form f; *)
       res
     in
 
@@ -1132,6 +1117,7 @@ let circuit_of_form
 
         else
         let c_c = List.hd (destr_bwcirc c_c.circ) in
+        (* inps = [] since we disallow definitions/quantifiers inside conditionals *)
         begin
         match t_c.circ, f_c.circ with
         | BWCirc t_c, BWCirc f_c ->
@@ -1247,7 +1233,7 @@ let circuit_of_form
         | false -> 
           let hyps, dfl = doit cache hyps dfl in
           if not (List.is_empty dfl.inps && List.for_all (fun c -> List.is_empty c.inps) vs) then
-            raise (CircError "Non-constant circuits in of_list not supported")
+            raise (CircError "Definitions inside of_list call not supported")
           else
           begin try 
             let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
@@ -1262,7 +1248,7 @@ let circuit_of_form
             raise (CircError "Insufficient list length for of_list with default = witness")
           else
           if not (List.for_all (fun c -> List.is_empty c.inps) vs) then
-            raise (CircError "Non-constant circuits in of_list not supported")
+            raise (CircError "Definitions inside of_list not supported")
           else
           begin try
             let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
@@ -1322,7 +1308,7 @@ let circuit_of_form
         (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)
         let hyps, fs = List.fold_left_map (doit cache) hyps fs in
         if not (List.for_all (fun c -> List.is_empty c.inps) fs) then
-          raise (CircError "Circut Input problem at array init")
+          raise (CircError "Quantifiers/Definitions inside init lambda not supported")
         else
         begin try 
         hyps, {circ = BWArray(Array.of_list (List.map (fun c -> destr_bwcirc c.circ) fs)); inps=[]}
@@ -1365,8 +1351,8 @@ let circuit_of_form
           | BWCirc r1, BWCirc r2 -> 
             (* assert (List.compare_lengths r1 r2 = 0); *)
             (* Should never happen, caught in EC typecheck/bindings *)
-            hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=c1.inps @ c2.inps} 
-            (* FIXME: check inps here *)
+            hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=merge_inputs c1.inps c2.inps} 
+            (* FIXME: Do we allow quantifiers/definitions inside equality sides? *)
           | BWArray a1, BWArray a2 -> 
             (* assert (Array.for_all2 (fun a b -> (List.compare_lengths a b) = 0) a1 a2); *)
             (* Should never happen, caught in EC typecheck/bindings *)
@@ -1374,7 +1360,7 @@ let circuit_of_form
               raise (CircError "Comparison between arrays of different size")
             else
             let rs = Array.map2 C.bvueq a1 a2 in
-            hyps, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = c1.inps @ c2.inps}
+            hyps, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = merge_inputs c1.inps c2.inps}
           | _ -> assert false
           end
         | Some `True, [] ->
@@ -1453,7 +1439,8 @@ let circuit_of_form
       let hyps, comps = 
         List.fold_left_map (fun hyps comp -> doit cache hyps comp) hyps comps 
       in
-      let inps = List.fold_right (@) (List.map (fun c -> c.inps) comps) [] in
+      (* FIXME: Change to inps = [] if we disallow definitions/quantifiers inside tuples *)
+      let inps = List.fold_right merge_inputs (List.map (fun c -> c.inps) comps) [] in
       let comps = List.map (fun c -> destr_bwcirc c.circ) comps in
       hyps, {circ= BWTuple comps; inps}
     | _ -> raise (CircError "Unsupported form kind in translation")
@@ -1472,11 +1459,11 @@ let circuit_of_path (hyps: hyps) (p: path) : circuit =
   in
   circuit_of_form hyps f
 
+(* For program generation, input is passed outside of circuit since it is only set at end of generation *)
 let input_of_variable (env:env) (v: variable) : circuit * cinput =
   let idn = create v.v_name in
   let inp = cinput_of_type ~idn env v.v_type in
   {(circ_ident inp) with inps=[]}, inp
-  
 
 let pstate_of_variables ?(pstate = Map.empty) (env : env) (vars : variable list) =
   let inps = List.map (input_of_variable env) vars in
@@ -1572,7 +1559,7 @@ let instrs_equiv
       | None, Some circ1
       | Some circ1, None -> 
         let circ2 = Map.find_opt var pstate in
-        if Option.is_none circ2 then assert false (* Should never happen *)
+        if Option.is_none circ2 then assert false (* Should never happen (do we return false if it does?) FIXME *)
         else
           let circ1 = {circ1 with inps = inputs @ circ1.inps} in
           let circ2 = Option.get circ2 in
@@ -1614,6 +1601,15 @@ let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable
     List.fold_left (process_instr hyps mem) pstate proc
   in
   Map.map (fun c -> assert (c.inps = []); {c with inps=inps}) pstate 
+
+let pstate_get (pstate: pstate) (v: symbol) : circuit = 
+  try
+    Map.find v pstate  
+  with Not_found ->
+    raise (CircError (Format.sprintf "No circuit in state for name %s@." v))
+
+let pstate_get_all (pstate: pstate) : circuit list = 
+  Map.values pstate |> List.of_enum
 
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality

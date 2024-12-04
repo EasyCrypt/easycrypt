@@ -10,37 +10,44 @@ module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
 type circuit 
-type pstate = (symbol, circuit) Map.t
-(*type cache  = (EcIdent.t, (cinput * circuit)) Map.t*)
+type pstate
 
 (* -------------------------------------------------------------------- *)
 exception CircError of string
 
 (* -------------------------------------------------------------------- *)
-val get_specification_by_name : string -> Lospecs.Ast.adef option
+(* Utilities (figure out better name) *)
 val circ_red : hyps -> EcReduction.reduction_info
-(*val cinput_to_string : cinput -> string*)
-(*val cinput_of_type : ?idn:ident -> env -> ty -> cinput*)
 val width_of_type : env -> ty -> int 
-(*val size_of_circ : circ -> int *)
-val compute : sign:bool -> circuit -> BI.zint list -> BI.zint
 val circuit_to_string : circuit -> string
-(*val circ_ident : cinput -> circuit*)
+val get_specification_by_name : string -> Lospecs.Ast.adef option
+
+(* Pstate utilities *)
+val pstate_get : pstate -> symbol -> circuit
+val pstate_get_all : pstate -> circuit list 
+
+(* Transform circuits *)
 val circuit_ueq : circuit -> circuit -> circuit
 val circuit_aggregate : circuit list -> circuit
 val circuit_aggregate_inps : circuit -> circuit
 val circuit_flatten : circuit -> circuit
 val circuit_permutation : int -> int -> (int -> int) -> circuit 
 val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list
+
+(* Use circuits *)
+val compute : sign:bool -> circuit -> BI.zint list -> BI.zint
 val circ_equiv : ?strict:bool -> circuit -> circuit -> circuit option -> bool
+
+(* Generate circuits *)
+(* Form processors *)
 val circuit_of_form : ?pstate:pstate -> hyps -> form -> circuit
-(*val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list*)
-val pstate_of_prog : hyps -> memory -> instr list -> variable list -> (symbol, circuit) Map.t 
-(*val input_of_variable : env -> variable -> circuit * cinput*)
-val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_instr : hyps -> memory -> pstate -> instr -> (symbol, circuit) Map.t
 val circ_simplify_form_bitstring_equality :
   ?mem:EcMemory.memory ->
   ?pstate:(string, circuit) Map.t ->
   ?pcond:circuit -> hyps -> form -> form
  
+(* Proc processors *)
+val pstate_of_prog : hyps -> memory -> instr list -> variable list -> (symbol, circuit) Map.t 
+val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
+val process_instr : hyps -> memory -> pstate -> instr -> (symbol, circuit) Map.t
+(* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
