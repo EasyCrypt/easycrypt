@@ -1599,8 +1599,8 @@ mod_update_var:
 | v=var_decl { v }
 
 mod_update_fun:
-| PROC x=lident fups=bracket(plist1(fun_update, COMMA)) res_up=option(RES e=sexpr {e})
-  { x, (List.flatten fups, res_up) }
+| PROC x=lident LBRACKET lvs=plist0(var_decl, SEMICOLON) fups=plist1(fun_update, COMMA) RBRACKET res_up=option(RES e=sexpr {e})
+  { (x, lvs, (List.flatten fups, res_up)) }
 
 update_stmt:
 | PLUS s=brace(stmt){ [Pups_add (s, true)] }

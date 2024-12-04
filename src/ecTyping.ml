@@ -2276,7 +2276,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
     let me = EcSubst.subst_module subst me in
 
-    let update_fun env fn pupdates pupdate_res = 
+    let update_fun env fn plocals pupdates pupdate_res = 
       (* Extract the function body and load the memory *)
       let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
       let fun_ = EcSubst.subst_function subst fun_ in
@@ -2288,8 +2288,17 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
         | FBdef _ -> f
       in
-
       let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr (resolve_alias fun_) in
+
+      (* Introduce the new local variables *)
+      let locals = List.concat_map (fun (vs, pty) -> 
+          let ty = transty_for_decl env pty in
+          List.map (fun x -> { v_name = x.pl_desc; v_type = ty; }, x.pl_loc) vs
+        )
+        plocals
+      in
+
+      let memenv = fundef_add_symbol env memenv locals in
       let env = EcEnv.Memory.push_active memenv env in
 
       (* Semantics for stmt updating, `i` is the target of the update. *)
@@ -2399,7 +2408,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       fun_
     in
 
-    let funs = List.map (fun ({pl_desc = fn}, v) -> fn, v) funs in
+    let funs = List.map (fun ({pl_desc = fn}, lvs, v) -> fn, (lvs, v)) funs in
 
     (* Update all module items *)
     let env, items = 
@@ -2415,8 +2424,8 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             | None ->
               let env = EcEnv.bind1 (f.f_name, `Function f) env in
               env, items @ [mi]
-            | Some (upsc, rup) ->
-              let f = update_fun env f.f_name upsc rup in
+            | Some (lvs, (upsc, rup)) ->
+              let f = update_fun env f.f_name lvs upsc rup in
               let env = EcEnv.bind1 (f.f_name, `Function f) env in
               env, items @ [MI_Function f]
             end
