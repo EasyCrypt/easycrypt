@@ -941,7 +941,7 @@ let pp_opapp
       (es      : 'a list))
 =
   let (nm, opname) =
-    PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
+    PPEnv.op_symb ppe op (Some (pred, tvi, (List.map t_ty es, None))) in
 
   let inm = if nm = [] then fst outer else nm in
 
@@ -1250,7 +1250,7 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
         ignore (List.fold_left
           (fun fe (op, tvi, f) ->
             let (nm, opname) =
-              PPEnv.op_symb ppe op (Some (`Form, tvi, [t_ty fe; t_ty f]))
+              PPEnv.op_symb ppe op (Some (`Form, tvi, ([t_ty fe; t_ty f], None)))
             in
               Format.fprintf fmt " %t@ %a"
                 (fun fmt ->
@@ -1343,7 +1343,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form)
         else l_l f2 onm e_bin_prio_rop4
     | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
         (let (inm, opname) =
-           PPEnv.op_symb ppe op (Some (`Form, tys, List.map t_ty [f1; f2])) in
+           PPEnv.op_symb ppe op (Some (`Form, tys, (List.map t_ty [f1; f2], None))) in
          if inm <> [] && inm <> onm
          then None
          else match priority_of_binop opname with
