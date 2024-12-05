@@ -1689,7 +1689,7 @@ module Ty = struct
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
         let selected =
           EcUnify.select_op ~filter:(fun _ -> EcDecl.is_oper)
-            (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
+            (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue ([], None)
         in
         let op =
           match selected with

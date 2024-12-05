@@ -396,15 +396,15 @@ let hastc env ue ty tc =
     ue := { !ue with ue_uf = uf; }
 
 (* -------------------------------------------------------------------- *)
-let tfun_expected ue psig =
-  let tres = UniEnv.fresh ue in
-    EcTypes.toarrow psig tres
+let tfun_expected ue ?retty psig =
+  let retty = ofdfl (fun () -> UniEnv.fresh ue) retty in
+  EcTypes.toarrow psig retty
 
 (* -------------------------------------------------------------------- *)
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig =
+let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue (psig, retty) =
   ignore hidden;                (* FIXME *)
 
   let module D = EcDecl in
@@ -457,7 +457,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
 
       let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
       let top = ty_subst tip op.D.op_ty in
-      let texpected = tfun_expected subue psig in
+      let texpected = tfun_expected subue ?retty psig in
 
       (try  unify env subue top texpected
        with UnificationFailure _ -> raise E.Failure);
