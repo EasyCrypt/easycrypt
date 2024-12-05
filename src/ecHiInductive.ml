@@ -284,7 +284,7 @@ let trans_matchfix
           let filter = fun _ op -> EcDecl.is_ctor op in
           let PPApp ((cname, tvi), cargs) = pb.pop_pattern in
           let tvi = tvi |> omap (TT.transtvi env ue) in
-          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
 
           match cts with
           | [] ->
