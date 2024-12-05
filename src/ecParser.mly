@@ -1599,7 +1599,7 @@ mod_update_var:
 | v=var_decl { v }
 
 mod_update_fun:
-| PROC x=lident LBRACKET lvs=plist0(var_decl, SEMICOLON) fups=plist1(fun_update, COMMA) RBRACKET res_up=option(RES e=sexpr {e})
+| PROC x=lident LBRACKET lvs=plist0(var_decl, COMMA) fups=plist1(fun_update, COMMA) RBRACKET res_up=option(RES e=sexpr {e})
   { (x, lvs, (List.flatten fups, res_up)) }
 
 update_stmt:
@@ -1614,9 +1614,9 @@ update_cond:
 | MINUS bs=branch_select { Pupc_del bs }
 
 fun_update:
-| cp=codepos sup=update_stmt 
+| cp=loc(codepos) sup=update_stmt 
   { List.map (fun v -> (cp, Pup_stmt v)) sup }
-| cp=codepos cup=update_cond 
+| cp=loc(codepos) cup=update_cond 
   { [(cp, Pup_cond cup)] }
 
 (* -------------------------------------------------------------------- *)

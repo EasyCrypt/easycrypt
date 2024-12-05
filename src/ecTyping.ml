@@ -89,6 +89,13 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
@@ -155,6 +162,7 @@ type tyerror =
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
@@ -2250,12 +2258,12 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
   | Pm_update (m, vars, funs) ->
-    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+    let loc = me.pl_loc in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = loc} in
 
     (* Prohibit functor updates *)
-    (* TODO: Better error message *)
     if 0 < List.length sig_.miss_params then
-      tyerror me.pl_loc env (InvalidModAppl (MAE_WrongArgCount(0,List.length sig_.miss_params)));
+      tyerror loc env (InvalidModUpdate MUE_Functor);
 
     (* Construct the set of new module variables *)
     let items =
@@ -2284,7 +2292,8 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       (* Follow a function alias until we get to the concrete definition *)
       let rec resolve_alias f = 
         match f.f_def with
-        | FBabs _ -> assert false
+        | FBabs _ ->
+          tyerror loc env (InvalidModUpdate MUE_AbstractModule);
         | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
         | FBdef _ -> f
       in
@@ -2317,7 +2326,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
 
       (* Semantics for condition updating *)
       (* `i` is the target of the update, and `tl` is the instr suffix. *)
-      let eval_cupdate env cup i tl =
+      let eval_cupdate cp_loc env cup i tl =
         match cup with
         (* Insert an if with condition `e` with body `tl` *)
         | Pupc_add e ->
@@ -2346,7 +2355,8 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           | Swhile (_, t) ->
             unify_or_fail env ue loc ~expct:tbool ty;
             [i_while (e_subst ts e, t)] @ tl
-          | _ -> assert false
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
           end
 
         (* Collapse a conditional `i` to a specific branch `bs` *)
@@ -2356,8 +2366,10 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           | Sif (_, t, _), `Cond true -> t.s_node
           | Sif (_, _, f), `Cond false -> f.s_node
           | Swhile (_, t), `Cond true -> t.s_node
-          | Smatch (e, bs), `Match cn ->
+          | Smatch (_e, _bs), `Match _cn ->
             (* FIXME: need to introduce binding for constructor pattern variables *)
+            (* match e with | C a b c => b | ...  ---> (a, b, c) <- oget (get_as_C e); b *)
+            (*
             let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
             let indt = oget (EcDecl.tydecl_as_datatype indt) in
             let cnames = List.fst indt.tydt_ctors in
@@ -2365,7 +2377,10 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             let _, r = List.split_at ix bs in
             let _p, b, _ = match r with (p, b) :: r -> p, b, r | _ -> assert false in
             b.s_node @ tl
-          | _ -> assert false
+            *)
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
           end
       in
 
@@ -2373,16 +2388,21 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       (* NOTE: This is with the expectation that the user entered them in chronological order. *)
       let body = 
         List.fold_right (fun (cp, up) bd ->
+          let {pl_desc = cp; pl_loc = loc} = cp in
           let cp = trans_codepos env cp in
           let change env _ _ i tl = (),
             match up with
             | Pup_stmt sup ->
               eval_supdate env sup i @ tl
             | Pup_cond cup ->
-              eval_cupdate env cup i tl
+              eval_cupdate loc env cup i tl
           in
-          let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
-          s
+          try
+            let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
+            s
+          with
+            | EcMatching.Zipper.InvalidCPos ->
+              tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
         )
           pupdates
           fd.f_body
@@ -2435,8 +2455,8 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         in
         List.fold_left doit (env, []) (items @ mb.ms_body)
 
-      (* TODO: Add error message. *)
-      | _ -> assert false
+      | _ ->
+        tyerror loc env (InvalidModUpdate MUE_AbstractModule);
     in
 
     let ois = get_oi_calls env (stparams, items) in

@@ -362,7 +362,7 @@ and pstructure_item =
   | Pst_import   of (pmsymbol located) list
 
 and pupdate_var = psymbol list * pty
-and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos * pupdate_item) list * pexpr option)
+and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos located * pupdate_item) list * pexpr option)
 
 and pupdate_item =
   | Pup_stmt of pupdate_stmt
