@@ -2414,16 +2414,15 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           let loc = e'.pl_loc in
           let ue  = UE.create (Some []) in
           let e', ty = transexp env `InProc ue e' in
-          let ts = Tuni.subst (UE.close ue) in
-          let ty = ty_subst ts ty in
           unify_or_fail env ue loc ~expct:e.e_ty ty;
+          let ts = Tuni.subst (UE.close ue) in
           Some (e_subst ts e')
           | _ -> fd.f_ret
       in
 
       (* Reconstruct the function def *)
       let uses = ret |> ofold ((^~) se_inuse) (s_inuse body) in
-      let fd = {fd with f_uses = uses; f_body = body; f_ret = ret} in 
+      let fd = {f_locals = fd.f_locals @ (List.fst locals); f_body = body; f_ret = ret; f_uses = uses} in 
       let fun_ = {fun_ with f_def = FBdef fd} in
       fun_
     in

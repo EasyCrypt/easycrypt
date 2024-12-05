@@ -1599,7 +1599,7 @@ mod_update_var:
 | v=var_decl { v }
 
 mod_update_fun:
-| PROC x=lident LBRACKET lvs=plist0(var_decl, COMMA) fups=plist1(fun_update, COMMA) RBRACKET res_up=option(RES e=sexpr {e})
+| PROC x=lident LBRACKET lvs=var_decl* fups=fun_update+ RBRACKET res_up=option(RES TILD e=sexpr {e})
   { (x, lvs, (List.flatten fups, res_up)) }
 
 update_stmt:

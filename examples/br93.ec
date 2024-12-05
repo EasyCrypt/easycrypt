@@ -253,13 +253,14 @@ declare axiom A_a2_ll (O <: POracle {-A}): islossless O.o => islossless A(O).a2.
 (* Step 1: replace RO call with random sampling                         *)
 local module Game1 = BR93_CPA(A) with {
   var r : rand
-  var h : ptxt (* This should be local *)
 
   proc main [
+    (* new local variable to store the sampled ptxt *)
+    var h : ptxt
     (* inline key generation *)
-    2 ~ { (pk, sk) <$ dkeys; },
+    ^ <@ {2} ~ { (pk, sk) <$ dkeys; }
     (* inline challenge encryption and idealize RO call *)
-    5 ~ { r <$ drand; h <$ dptxt; c <- (f pk r, h +^ (b ? m0 : m1)); }
+    ^ c<@ ~ { r <$ drand; h <$ dptxt; c <- (f pk r, h +^ (b ? m0 : m1)); }
   ]
 }.
 
@@ -323,7 +324,7 @@ qed.
 local module Game2 = Game1 with {
   proc main [
     (* Challenge ciphertext is now produced uniformly at random *)
-    7 ~ { c <- (f pk r, h); }
+    ^ c<- ~ { c <- (f pk r, h); }
   ]
 }.
 
@@ -656,4 +657,3 @@ by move=> O O_o_ll; proc; call (A_a2_ll O O_o_ll).
 qed.
 
 end section.
-
