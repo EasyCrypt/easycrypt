@@ -85,6 +85,7 @@ type modupd_error =
 | MUE_Functor
 | MUE_AbstractFun
 | MUE_AbstractModule
+| MUE_InvalidFun
 | MUE_InvalidCodePos
 | MUE_InvalidTargetCond
 

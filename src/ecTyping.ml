@@ -93,6 +93,7 @@ type modupd_error =
 | MUE_Functor
 | MUE_AbstractFun
 | MUE_AbstractModule
+| MUE_InvalidFun
 | MUE_InvalidCodePos
 | MUE_InvalidTargetCond
 
@@ -2427,7 +2428,14 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       fun_
     in
 
-    let funs = List.map (fun ({pl_desc = fn}, lvs, v) -> fn, (lvs, v)) funs in
+    let allowed_funs = List.map (fun (Tys_function f) -> f.fs_name) me.me_sig_body in
+    let funs = List.map (fun ({pl_loc = loc; pl_desc = fn}, lvs, v) ->
+      if List.mem fn allowed_funs then
+      fn, (lvs, v)
+      else
+        tyerror loc env (InvalidModUpdate MUE_InvalidFun)
+    ) funs
+    in
 
     (* Update all module items *)
     let env, items = 

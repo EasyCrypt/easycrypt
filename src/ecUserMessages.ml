@@ -461,6 +461,9 @@ end = struct
     | InvalidModUpdate MUE_AbstractModule ->
         msg "cannot update an abstract module"
 
+    | InvalidModUpdate MUE_InvalidFun ->
+        msg "unknown function"
+
     | InvalidModUpdate MUE_InvalidCodePos->
         msg "invalid code position"
 
