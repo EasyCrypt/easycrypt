@@ -517,6 +517,10 @@ clone import Ring.ComRing as PolyComRing with
 (* -------------------------------------------------------------------- *)
 lemma mul_lc p q : lc p * lc q = (p * q).[deg p + deg q - 2].
 proof.
+case: (p = PolyComRing.zeror).
+  move => ->.
+  have := mul0r q.
+move => ->.
 case: (p = poly0) => [->|nz_p]; first by rewrite !(mul0r, poly0E).
 case: (q = poly0) => [->|nz_q]; first by rewrite !(mulr0, poly0E).
 have ->: deg p + deg q - 2 = (deg p - 1) + (deg q - 1) by ring.
