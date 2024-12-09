@@ -159,7 +159,7 @@ module PPEnv = struct
 
   let ty_symb (ppe : t) p =
       let exists sm =
-      try  EcPath.p_equal (EcEnv.Ty.lookup_path sm ppe.ppe_env) p
+      try  EcPath.p_equal (EcEnv.Ty.lookup_path ~unique:true sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
       p_shorten exists p
