@@ -376,7 +376,7 @@ let rec trans_ty ((genv, lenv) as env) ty =
 
   | Tconstr (p, tys) ->
       let id = trans_pty genv p in
-      WTy.ty_app id (trans_tys env tys)
+      WTy.ty_app id (trans_tys env (List.fst tys)) (* FIXME:TC *)
 
   | Tfun (t1, t2) ->
       WTy.ty_func (trans_ty env t1) (trans_ty env t2)
@@ -712,6 +712,7 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
 
   | Fop (p, ts) ->
       let wop = trans_op genv p in
+      let ts  = List.fst ts in  (* FIXME:TC *)
       let tys = List.map (trans_ty (genv,lenv)) ts in
       apply_wop genv wop tys args
 
@@ -764,7 +765,7 @@ and trans_branch (genv, lenv) (p, _dty, tvs) (f, (cname, argsty)) =
   in
 
   let lenv, ws = trans_lvars genv lenv xs in
-  let wcty = trans_ty (genv, lenv) (tconstr p tvs) in
+  let wcty = trans_ty (genv, lenv) (tconstr_tc p tvs) in
   let ws = List.map WTerm.pat_var ws in
   let ws = WTerm.pat_app csymb ws wcty in
   let wf = trans_app (genv, lenv) f [] in

@@ -13,6 +13,8 @@ and path_node =
 | Psymbol of symbol
 | Pqname  of path * symbol
 
+val pp_path : Format.formatter -> path -> unit
+
 (* -------------------------------------------------------------------- *)
 val psymbol  : symbol -> path
 val pqname   : path -> symbol -> path
@@ -62,6 +64,8 @@ and mpath_top =
 [ | `Local of ident
   | `Concrete of path * path option ]
 
+val pp_mpath : Format.formatter -> mpath -> unit
+
 (* -------------------------------------------------------------------- *)
 val mpath     : mpath_top -> mpath list -> mpath
 val mpath_abs : ident -> mpath list -> mpath
@@ -95,6 +99,8 @@ type xpath = private {
   x_sub : symbol;
   x_tag : int;
 }
+
+val pp_xpath : Format.formatter -> xpath -> unit
 
 val xpath     : mpath -> symbol -> xpath
 val xastrip   : xpath -> xpath

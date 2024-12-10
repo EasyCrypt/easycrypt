@@ -188,7 +188,7 @@ let tc1_process_codepos1 tc (side, cpos) =
   
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
-(* FIXME: TC HOOK - check parameter constraints                       *)
+(* FIXME:TC HOOK - check parameter constraints                        *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) typ tvi =
   match tvi with

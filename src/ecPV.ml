@@ -116,7 +116,7 @@ module Mpv = struct
   let rec esubst env (s : esubst) e =
     match e.e_node with
     | Evar pv -> (try find env pv s with Not_found -> e)
-    | _ -> EcTypes.e_map (fun ty -> ty) (esubst env s) e
+    | _ -> EcTypes.e_map (esubst env s) e
 
   let rec isubst env (s : esubst) (i : instr) =
     let esubst = esubst env s in
@@ -182,30 +182,30 @@ module PVM = struct
       | FequivF _ ->
         check_binding EcFol.mleft s;
         check_binding EcFol.mright s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FequivS es ->
         check_binding (fst es.es_ml) s;
         check_binding (fst es.es_mr) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FhoareF _ | FbdHoareF _ ->
         check_binding EcFol.mhr s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FhoareS hs ->
         check_binding (fst hs.hs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | FbdHoareS hs ->
         check_binding (fst hs.bhs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | Fpr pr ->
         check_binding pr.pr_mem s;
-        EcFol.f_map (fun ty -> ty) aux f
+        EcFol.f_map aux f
       | Fquant(q,b,f1) ->
         let f1 =
           if has_mod b then subst (Mod.add_mod_binding b env) s f1
           else aux f1 in
         f_quant q b f1
 
-      | _ -> EcFol.f_map (fun ty -> ty) aux f)
+      | _ -> EcFol.f_map aux f)
 
   let subst1 env pv m f =
     let s = add env pv m f empty in
@@ -852,7 +852,7 @@ module Mpv2 = struct
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
           add_glob env (EcPath.mident mp1) (EcPath.mident mp2) eqs
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
-          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+          List.all2 (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
@@ -951,7 +951,7 @@ module Mpv2 = struct
      I postpone this for latter *)
     | Eop(op1,tys1), Eop(op2,tys2)
       when EcPath.p_equal op1 op2 &&
-        List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+        List.all2  (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
     | Eapp(f1,a1), Eapp(f2,a2) ->
       List.fold_left2 (add_eqs_loc env local) eqs (f1::a1) (f2::a2)
     | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->

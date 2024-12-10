@@ -416,7 +416,7 @@ and translate_e (env : senv) (e : expr) =
      raise SemNotSupported
 
   | _ ->
-     e_map (fun x -> x) (translate_e env) e
+     e_map (translate_e env) e
 
 (* -------------------------------------------------------------------- *)
 and translate_lv (env : senv) (lv : lvalue) : lpattern =
