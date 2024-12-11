@@ -746,7 +746,6 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
 
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
-
   match PT.destruct_product pe.pte_hy (get_head_symbol pe pt.ptev_ax) with
   | None   -> tc_pterm_apperror ?loc pe AE_NotFunctional
   | Some t ->
@@ -757,6 +756,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
             | PVASub arg -> begin
               try
                 pf_form_match ~mode:EcMatching.fmdelta pe ~ptn:f1 arg.ptev_ax;
+
                 (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
                 tc_pterm_apperror ?loc pe (AE_InvalidArgProof (arg.ptev_ax, f1))
@@ -911,6 +911,7 @@ type prept = [
   | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
   | `HD   of handle
+  | `PE   of pt_ev
   | `App  of prept * prept_arg list
 ]
 
@@ -923,14 +924,13 @@ and prept_arg =  [
 ]
 
 (* -------------------------------------------------------------------- *)
-let pt_of_prept tc (pt : prept) =
-  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
-
-  let rec build_pt = function
+let pt_of_prept_r (ptenv : pt_env) : prept -> pt_ev =
+  let rec build_pt : prept -> pt_ev = function
     | `Hy  id         -> pt_of_hyp_r ptenv id
     | `G   (p, tys)   -> pt_of_global_r ptenv p tys
     | `UG  p          -> pt_of_global_r ptenv p []
     | `HD  hd         -> pt_of_handle_r ptenv hd
+    | `PE  pe         -> pe
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
 
   and app_pt_ev pt_ev = function
@@ -940,7 +940,12 @@ let pt_of_prept tc (pt : prept) =
     | `Sub pt -> apply_pterm_to_arg_r pt_ev (PVASub (build_pt pt))
     | `H_     -> apply_pterm_to_hole pt_ev
 
-  in build_pt pt
+  in fun pt -> build_pt pt
+
+(* -------------------------------------------------------------------- *)
+let pt_of_prept (tc : tcenv1) (pt : prept) : pt_ev =
+  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
+  pt_of_prept_r ptenv pt
 
 (* -------------------------------------------------------------------- *)
 module Prept = struct

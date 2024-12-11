@@ -1515,7 +1515,7 @@ let t_elim_iso_or ?reduce tc =
 let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
   assert (0 <= i);
 
-  let fsl, fsr =
+  let xfsl, fsr =
     let rec destr (acc : ([`Asym | `Sym] * form) list) (i  : int) (f : form) =
       if i < 0 then
         (List.rev acc, f)
@@ -1523,7 +1523,7 @@ let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
         match sform_of_form f with
         | SFand (b, (f1, f2)) ->
             destr ((b, f1) :: acc) (i - 1) f2
-        | _ -> assert false in
+        | _ -> tc_error !!tc ~catchable:true  "not enought conjunctions" in
 
     destr [] i f in
 
@@ -1534,65 +1534,54 @@ let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
       | (b, f) :: fs ->
           (match b with `Asym -> f_anda | `Sym -> f_and) f (doit fs) in
 
-    doit fsl in
+    doit xfsl in
 
   let tc = FApi.tcenv_of_tcenv1 tc in
   let tc, gl = FApi.newgoal tc fsl in
   let tc, gr = FApi.newgoal tc fsr in
 
-  tc
+  let pelim (sym : [`Sym | `Asym]) (side : [`L | `R]) =
+    match sym, side with
+    | `Sym , `L -> LG.p_and_proj_l
+    | `Sym , `R -> LG.p_and_proj_r
+    | `Asym, `L -> LG.p_anda_proj_l
+    | `Asym, `R -> LG.p_anda_proj_rs
+  in
 
-  (*
-(* -------------------------------------------------------------------- *)
-require import AllCore.
+  let pintro (sym  : [`Sym | `Asym]) =
+    match sym with
+    | `Sym  -> LG.p_and_intro
+    | `Asym -> LG.p_anda_intro_s in
 
-lemma test : forall a b c d, a && (b /\ (c /\ d)).
-proof.
-move => *.
-split 1.
-admit.
+  let pte = ptenv_of_penv (FApi.tc_hyps tc) !$tc in
 
-gl = a && b
-gr = c /\ d
+  let projs =
+    let xfsl, sym =
+      match List.rev xfsl with
+      | [] -> assert false
+      | (sym, _) :: tl -> List.rev tl, sym in
 
-proja2 gl = b
+    let proj, projs =
+      List.fold_left_map (fun h (sym, _) ->
+        let j : prept = `App (`G (pelim sym `L, []), [`H_; `H_; `Sub h]) in
+        let h : prept = `App (`G (pelim sym `R, []), [`H_; `H_; `Sub h]) in
+        let j = pt_of_prept_r pte j in
+        let h = pt_of_prept_r pte h in
+        assert (PT.can_concretize j.ptev_env);
+        assert (PT.can_concretize h.ptev_env);
+        (`PE h, (sym, `PE j))
+      ) (`HD gl :> prept) xfsl
+    in projs @ [sym, proj] in
 
-conja (proja1 gl) (conj (proja2 gl) gr) = a && (b /\ (c /\ d))
+  let pt =
+    List.fold_right
+      (fun (sym, ptproj) pt ->
+        `App (`G (pintro sym, []), [`H_; `H_; `Sub ptproj; `Sub pt]))
+      projs (`HD gr :> prept) in
 
+  let pt = pt_of_prept_r pte pt in
 
-
-admit.
-
-
-
-admit.
-
-
-
-
-abort.
-
-
-
-  FApi.xmutate1
-    tc (fun hd -> VConv (hd, Sid.empty)) [fsl; fsr]
-*)
-
-(*
-  if i <= 0 then begin
-    let tc =
-      FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty))
-        (EcFol.f_and f1 f2)
-    in
-    t_and_intro_s opsym (f1, f2) tc
-  end else begin
-    match sform_of_form f2 with
-    | SFand (b, (f1', f2')) ->
-      t_and_i (i - 1) b (EcFol.f_and f1 f1', f2') tc
-    | _ ->
-      t_and_intro_s opsym (f1, f2) tc
-  end
-  *)
+  FApi.t_first (Apply.t_apply_bwd_r pt) tc
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
