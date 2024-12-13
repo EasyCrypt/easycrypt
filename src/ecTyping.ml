@@ -2288,7 +2288,6 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     let update_fun env fn plocals pupdates pupdate_res = 
       (* Extract the function body and load the memory *)
       let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
-      let fun_ = EcSubst.subst_function subst fun_ in
 
       (* Follow a function alias until we get to the concrete definition *)
       let rec resolve_alias f = 
@@ -2298,7 +2297,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
         | FBdef _ -> f
       in
-      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr (resolve_alias fun_) in
+
+      let target_fun = EcSubst.subst_function subst (resolve_alias fun_) in
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr target_fun in
+
+      let fun_ = EcSubst.subst_function subst fun_ in
 
       (* Introduce the new local variables *)
       let locals = List.concat_map (fun (vs, pty) -> 
