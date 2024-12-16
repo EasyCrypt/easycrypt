@@ -519,6 +519,20 @@ end = struct
     | PositiveShouldBeBeforeNegative ->
         msg "positive restriction are only allowed before negative restriction"
 
+    | NotAnExpression `Unknown ->
+        msg "this expression contains form-like constructors"
+
+    | NotAnExpression ((`LL | `Pr | `Logic | `Glob | `MemSel) as what) -> begin
+        msg "expressions cannot contain a %s"
+        begin match what with
+        | `LL     -> "lossless statement"
+        | `Pr     -> "Pr[...] statement"
+        | `Logic  -> "program logic statement"
+        | `Glob   -> "glob statement"
+        | `MemSel -> "memory selector"
+      end
+    end
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
