@@ -166,6 +166,7 @@ type tyerror =
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
+| NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
