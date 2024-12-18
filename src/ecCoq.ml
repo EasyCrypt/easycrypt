@@ -37,7 +37,7 @@ let run_batch ~(script : string) ~(coqenv : coqenv) (task : WTask.task) =
   let config = Why3.Whyconf.get_main coqenv.config in
   let config_mem = Why3.Whyconf.memlimit config in
   let config_time = Why3.Whyconf.timelimit config in
-  let limit =
+  let limits =
     Why3.Call_provers.{
       limit_time = config_time;
       limit_steps = 0;
@@ -50,7 +50,7 @@ let run_batch ~(script : string) ~(coqenv : coqenv) (task : WTask.task) =
   let call =
     Why3.Driver.prove_task_prepared
       ~old:script ~inplace:true
-      ~command ~limit ~config coqenv.driver task
+      ~command ~limits ~config coqenv.driver task
   in call_prover_task ~coqenv call
 
 (* -------------------------------------------------------------------- *)
