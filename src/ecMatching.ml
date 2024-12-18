@@ -405,8 +405,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
     let var_form_match ((x, xty) : ident * ty) (f : form) =
       match EV.get x !ev.evm_form with
-      | None ->
-        failure ()
+      | None -> assert false
 
       | Some `Unset ->
         let f = norm f in
