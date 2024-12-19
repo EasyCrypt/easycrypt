@@ -1978,7 +1978,7 @@ let process_split ?(i : int option) (tc : tcenv1) =
   let tactics : FApi.backward list =
     match i with
     | None -> [EcLowGoal.t_split; EcLowGoal.t_split_prind]
-    | Some i -> [EcLowGoal.t_split ~i] in
+    | Some i -> [EcLowGoal.t_split_select i] in
 
   try  t_ors tactics tc
   with InvalidGoalShape ->

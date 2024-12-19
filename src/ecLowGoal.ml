@@ -1512,7 +1512,7 @@ let t_elim_iso_or ?reduce tc =
 
 
 (* -------------------------------------------------------------------- *)
-let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
+let t_split_select (i : int) (tc : tcenv1) =
   assert (0 <= i);
 
   let xfsl, fsr =
@@ -1525,7 +1525,7 @@ let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
             destr ((b, f1) :: acc) (i - 1) f2
         | _ -> tc_error !!tc ~catchable:true  "not enought conjunctions" in
 
-    destr [] i f in
+    destr [] i (FApi.tc1_goal tc) in
 
   let fsl =
     let rec doit = function
@@ -1584,15 +1584,15 @@ let t_split_and_i (i : int) (f : form) (tc : tcenv1) =
   FApi.t_first (Apply.t_apply_bwd_r pt) tc
 
 (* -------------------------------------------------------------------- *)
-let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
+let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let concl = FApi.tc1_goal tc in
 
     match sform_of_form fp with
     | SFtrue ->
         t_true tc
-    | SFand _ when not closeonly ->
-        t_split_and_i i fp tc
+    | SFand (b, (f1, f2)) when not closeonly ->
+        t_and_intro_s b (f1, f2) tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
