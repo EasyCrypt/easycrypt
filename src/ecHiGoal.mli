@@ -82,7 +82,7 @@ val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
 val process_cutdef      : ttenv -> cutdef_t -> backward
 val process_left        : backward
 val process_right       : backward
-val process_split       : backward
+val process_split       : ?i:int -> backward
 val process_elim        : prevert * pqsymbol option -> backward
 val process_case        : ?doeq:bool -> prevertv -> backward
 val process_exists      : ppt_arg located list -> backward
