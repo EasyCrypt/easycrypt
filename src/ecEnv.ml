@@ -593,11 +593,14 @@ module MC = struct
           p |> obind (fun p -> Mip.find_opt p env.env_comps)
 
   (* ------------------------------------------------------------------ *)
-  let lookup proj (qn, x) env =
+  let lookup ?(unique = false) proj (qn, x) env =
     let mc = lookup_mc qn env in
       omap
         (fun (p, obj) -> (p, (_params_of_ipath p env, obj)))
-        (mc |> obind (fun mc -> MMsym.last x (proj mc)))
+        (mc |> obind (fun mc ->
+          if unique && List.length (MMsym.all x (proj mc)) > 1 then
+            None
+          else MMsym.last x (proj mc)))
 
   (* ------------------------------------------------------------------ *)
   let lookup_all proj (qn, x) env =
@@ -745,8 +748,8 @@ module MC = struct
     import (_up_operator true) (IPPath p) op env
 
   (* -------------------------------------------------------------------- *)
-  let lookup_tydecl qnx env =
-    match lookup (fun mc -> mc.mc_tydecls) qnx env with
+  let lookup_tydecl ?unique qnx env =
+    match lookup ?unique (fun mc -> mc.mc_tydecls) qnx env with
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
 
@@ -2481,14 +2484,14 @@ module Ty = struct
     let obj = by_path p env in
       MC.import_tydecl p obj env
 
-  let lookup qname (env : env) =
-    MC.lookup_tydecl qname env
+  let lookup ?unique (qname : qsymbol) (env : env) =
+    MC.lookup_tydecl ?unique qname env
 
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
+  let lookup_opt ?(unique : bool option) (name : qsymbol) (env : env) =
+    try_lf (fun () -> lookup ?unique name env)
 
-  let lookup_path name env =
-    fst (lookup name env)
+  let lookup_path ?(unique : bool option) (name : qsymbol) (env : env) =
+    fst (lookup ?unique name env)
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
