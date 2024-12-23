@@ -3297,9 +3297,14 @@ and pp_instr ppe fmt i =
 
 and pp_block ppe fmt s =
   match s.s_node with
-  | []  -> Format.fprintf fmt "{}"
-  | [i] -> Format.fprintf fmt "@;<1 2>%a" (pp_instr ppe) i
-  | _   -> Format.fprintf fmt "{@,  @[<v>%a@]@,}" (pp_stmt ppe) s
+  | [] ->
+    Format.fprintf fmt "{}"
+
+  | [ { i_node = (Sasgn _ | Srnd _ | Scall _ | Sassert _ | Sabstract _) } as i ] ->
+    Format.fprintf fmt "@;<1 2>%a" (pp_instr ppe) i
+
+  | _ ->
+    Format.fprintf fmt "{@,  @[<v>%a@]@,}" (pp_stmt ppe) s
 
 and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
