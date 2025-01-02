@@ -12,7 +12,7 @@
   - [Keeping Up with the KEMs: Stronger Security Notions for KEMs and Automated Analysis of KEM-based Protocols](https://eprint.iacr.org/2023/1933)
   - [Unbindable Kemmy Schmidt: ML-KEM is neither MAL-BIND-K-CT nor MAL-BIND-K-PK](https://eprint.iacr.org/2024/523)
   - [On the Complete Non-Malleability of the Fujisaki-Okamoto Transform](https://eprint.iacr.org/2022/1654)
-    (Missing properties: complete non-malleability)
+  (Missing properties: complete non-malleability)
 ^*)
 
 (* Require/Import libraries *)
@@ -239,7 +239,7 @@ module type Adv_OWCPA = {
 }.
 
 (** OW-CPA security game **)
-module OW_CPA (S : Scheme, A : Adv_OWCPA) = {
+module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -269,7 +269,7 @@ module type Adv_OWCCA1 (O : Oracles_CCA) = {
 }.
 
 (** OW-CCA1 security game **)
-module OW_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_OWCCA1) = {
+module OW_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_OWCCA1) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -302,7 +302,7 @@ module type Adv_OWCCA2 (O : Oracles_CCA) = {
 }.
 
 (** OW-CCA2 security game **)
-module OW_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_OWCCA2) = {
+module OW_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_OWCCA2) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -335,7 +335,7 @@ module type Adv_OWCCA (O : Oracles_CCA) = {
 }.
 
 (** OW-CCA (i.e., modern OW-CCA2) security game **)
-module OW_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_OWCCA) = {
+module OW_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_OWCCA) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -357,16 +357,15 @@ module OW_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_OWCCA) = {
 (**
   (ciphertext) INDistinguishability (IND). 
   The adversary is asked to determine whether a given
-  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently
-  sampled at random.
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
 **)
 abstract theory IND.
 (* Distributions *)
 (** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
 (** 
   Dependence on public key may be used to, e.g., model cases where the key space
-  depends on the public key (like in the case of RSA). Instead of having the actual type
-  change depending on the public key (which, at the time of writing, is not possible in EC).
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
 **)
 op dkeym : pk_t -> key_t distr.
 
@@ -374,8 +373,7 @@ op dkeym : pk_t -> key_t distr.
 (*
   (ciphertext) INDistinguishability under Chosen-Plaintext Attacks (IND-CPA).
   In a CPA setting, the adversary is asked to determine whether a given
-  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently
-  sampled at random (from dkeym).
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
 *)
 (** Adversary class considered for IND-CPA **)
 module type Adv_INDCPA = { 
@@ -383,7 +381,7 @@ module type Adv_INDCPA = {
 }.
 
 (** IND-CPA security game (sampled bit) **)
-module IND_CPA (S : Scheme, A : Adv_INDCPA) = {
+module IND_CPA (S : Scheme) (A : Adv_INDCPA) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -405,7 +403,7 @@ module IND_CPA (S : Scheme, A : Adv_INDCPA) = {
 }.
 
 (** IND-CPA security game (provided bit) **)
-module IND_CPA_P (S : Scheme, A : Adv_INDCPA) = {
+module IND_CPA_P (S : Scheme) (A : Adv_INDCPA) = {
   proc main(b : bool) : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -428,8 +426,7 @@ module IND_CPA_P (S : Scheme, A : Adv_INDCPA) = {
 (*
   (ciphertext) INDistinguishability under non-adaptive Chosen-Ciphertext Attacks (IND-CCA1).
   In a CCA1 setting, the adversary is asked to determine whether a given
-  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently
-  sampled at random (from dkeym).
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
 *)
 (** Adversary class considered for IND-CCA1 **)
 module type Adv_INDCCA1 (O : Oracles_CCA) = { 
@@ -438,7 +435,7 @@ module type Adv_INDCCA1 (O : Oracles_CCA) = {
 }.
 
 (** IND-CCA1 security game (sampled bit) **)
-module IND_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_INDCCA1) = {
+module IND_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -463,7 +460,7 @@ module IND_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_INDCCA1) = {
 }.
 
 (** IND-CCA1 security game (provided bit) **)
-module IND_CCA1_P (S : Scheme, O : Oracles_CCA1i, A : Adv_INDCCA1) = {
+module IND_CCA1_P (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
   proc main(b : bool) : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -489,8 +486,7 @@ module IND_CCA1_P (S : Scheme, O : Oracles_CCA1i, A : Adv_INDCCA1) = {
 (*
   (ciphertext) INDistinguishability under (traditional) adaptive Chosen-Ciphertext Attacks (IND-CCA2).
   In a (traditional) CCA2 setting, the adversary is asked to determine whether a given
-  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently
-  sampled at random (from dkeym).
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
 *)
 (** Adversary class considered for IND-CCA2 **)
 module type Adv_INDCCA2 (O : Oracles_CCA) = { 
@@ -499,7 +495,7 @@ module type Adv_INDCCA2 (O : Oracles_CCA) = {
 }.
 
 (** IND-CCA2 security game (sampled bit) **)
-module IND_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_INDCCA2) = {
+module IND_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -525,7 +521,7 @@ module IND_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_IND
 }.
 
 (** IND-CCA2 security game (provided bit) **)
-module IND_CCA2_P (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_INDCCA2) = {
+module IND_CCA2_P (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
   proc main(b : bool) : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -552,8 +548,7 @@ module IND_CCA2_P (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_I
 (*
   (ciphertext) INDistinguishability under (modern) adaptive Chosen-Ciphertext Attacks (IND-CCA2).
   In a (modern) CCA2 setting, the adversary is asked to determine whether a given
-  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently
-  sampled at random (from dkeym).
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
 *)
 (** Adversary class considered for IND-CCA (i.e., modern IND-CCA2) **)
 module type Adv_INDCCA (O : Oracles_CCA) = {
@@ -561,7 +556,7 @@ module type Adv_INDCCA (O : Oracles_CCA) = {
 }.
 
 (** IND-CCA (i.e., modern IND-CCA2) security game (sampled bit) **)
-module IND_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_INDCCA) = {
+module IND_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_INDCCA) = {
   proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -584,7 +579,7 @@ module IND_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_INDCCA) = {
 }.
 
 (** IND-CCA (i.e., modern IND-CCA2) security game (provided bit) **)
-module IND_CCA_P (S : Scheme, O : Oracles_CCA2i, A : Adv_INDCCA) = {
+module IND_CCA_P (S : Scheme) (O : Oracles_CCA2i) (A : Adv_INDCCA) = {
   proc main(b : bool) : bool = {
     var pk : pk_t;
     var sk : sk_t;
@@ -612,14 +607,13 @@ end IND.
   Given a ciphertext (encapsulating some key K), the adversary is 
   asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
   resulting from decapsulating the ciphertexts (in the list) are related (through R) with
-  K (significantly) more often than with a (symmetric) key that is independently sampled
-  at random.
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
   
   (ciphertext) Strong Non-Malleability (SNM)
-  As NM-CPA, but the adversary is additionally given a pair of (symmetric) keys of
-  which one is independently sampled at random, and the other is the one
-  encapsulated by the given ciphertext. (The order in which they appear in the pair
-  is (uniformly) random).
+  As NM, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
   
   Note that these notions only have a sensible definition with a provided bit, so 
   no "sampled bit" variants are defined.
@@ -629,18 +623,18 @@ abstract theory NM.
 (** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
 (** 
   Dependence on public key may be used to, e.g., model cases where the key space
-  depends on the public key (like in the case of RSA). Instead of having the actual type
-  change depending on the public key (which, at the time of writing, is not possible in EC).
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
 **)
 op dkeym : pk_t -> key_t distr.
+
 
 (*
   (ciphertext) Non-Malleability under Chosen-Plaintext Attacks (NM-CPA).
   In a CPA setting, given a ciphertext (encapsulating some key K), the adversary is 
   asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
   resulting from decapsulating the ciphertexts (in the list) are related (through R) with
-  K (significantly) more often than with a (symmetric) key that is independently sampled
-  at random.
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
 *)
 (** Adversary class considered for NM-CPA **)
 module type Adv_NMCPA = {
@@ -648,7 +642,7 @@ module type Adv_NMCPA = {
 }.
 
 (** NM-CPA security game **)
-module NM_CPA (S : Scheme, A : Adv_NMCPA) = {
+module NM_CPA (S : Scheme) (A : Adv_NMCPA) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -679,9 +673,9 @@ module NM_CPA (S : Scheme, A : Adv_NMCPA) = {
 (*
   (ciphertext) Strong Non-Malleability under Chosen-Plaintext Attacks (SNM-CPA).
   As NM-CPA, but the adversary is additionally given a pair of (symmetric) keys of
-  which one is independently sampled at random, and the other is the one
-  encapsulated by the given ciphertext. (The order in which they appear in the pair
-  is (uniformly) random).
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
 *)
 (** Adversary class considered for SNM-CPA **)
 module type Adv_SNMCPA = {
@@ -689,7 +683,7 @@ module type Adv_SNMCPA = {
 }.
 
 (** SNM-CPA security game **)
-module SNM_CPA (S : Scheme, A : Adv_SNMCPA) = {
+module SNM_CPA (S : Scheme) (A : Adv_SNMCPA) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -725,8 +719,7 @@ module SNM_CPA (S : Scheme, A : Adv_SNMCPA) = {
   In a CCA1 setting, given a ciphertext (encapsulating some key K), the adversary is 
   asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
   resulting from decapsulating the ciphertexts (in the list) are related (through R) with
-  K (significantly) more often than with a (symmetric) key that is independently sampled
-  at random.
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
 *)
 (** Adversary class considered for NM-CCA1 **)
 module type Adv_NMCCA1 (O : Oracles_CCA) = {
@@ -735,7 +728,7 @@ module type Adv_NMCCA1 (O : Oracles_CCA) = {
 }.
 
 (** NM-CCA1 security game **)
-module NM_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_NMCCA1) = {
+module NM_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_NMCCA1) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -769,9 +762,9 @@ module NM_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_NMCCA1) = {
 (*
   (ciphertext) Strong Non-Malleability under non-adaptive Chosen-Ciphertext Attacks (SNM-CCA1).
   As NM-CCA1, but the adversary is additionally given a pair of (symmetric) keys of
-  which one is independently sampled at random, and the other is the one
-  encapsulated by the given ciphertext. (The order in which they appear in the pair
-  is (uniformly) random).
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
 *)
 (** Adversary class considered for SNM-CCA1 **)
 module type Adv_SNMCCA1 (O : Oracles_CCA) = {
@@ -780,7 +773,7 @@ module type Adv_SNMCCA1 (O : Oracles_CCA) = {
 }.
 
 (** SNM-CCA1 security game **)
-module SNM_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_SNMCCA1) = {
+module SNM_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_SNMCCA1) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -819,8 +812,7 @@ module SNM_CCA1 (S : Scheme, O : Oracles_CCA1i, A : Adv_SNMCCA1) = {
   In a (traditional) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
   asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
   resulting from decapsulating the ciphertexts (in the list) are related (through R) with
-  K (significantly) more often than with a (symmetric) key that is independently sampled
-  at random.
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
 *)
 (** Adversary class considered for NM-CCA2 **)
 module type Adv_NMCCA2 (O : Oracles_CCA) = {
@@ -829,7 +821,7 @@ module type Adv_NMCCA2 (O : Oracles_CCA) = {
 }.
 
 (** NM-CCA2 security game **)
-module NM_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_NMCCA2) = {
+module NM_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_NMCCA2) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -864,9 +856,9 @@ module NM_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_NMCC
 (*
   (ciphertext) Strong Non-Malleability under (traditional) adaptive Chosen-Ciphertext Attacks (SNM-CCA2).
   As NM-CCA2, but the adversary is additionally given a pair of (symmetric) keys of
-  which one is independently sampled at random, and the other is the one
-  encapsulated by the given ciphertext. (The order in which they appear in the pair
-  is (uniformly) random).
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
 *)
 (** Adversary class considered for SNM-CCA2 **)
 module type Adv_SNMCCA2 (O : Oracles_CCA) = {
@@ -875,7 +867,7 @@ module type Adv_SNMCCA2 (O : Oracles_CCA) = {
 }.
 
 (** SNM-CCA2 security game **)
-module SNM_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_SNMCCA2) = {
+module SNM_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_SNMCCA2) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -915,8 +907,7 @@ module SNM_CCA2 (S : Scheme, O1 : Oracles_CCA1i, O2 : Oracles_CCA2i, A : Adv_SNM
   In a (modern) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
   asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
   resulting from decapsulating the ciphertexts (in the list) are related (through R) with
-  K (significantly) more often than with a (symmetric) key that is independently sampled
-  at random.
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
 *)
 (** Adversary class considered for NM-CCA (i.e., modern NM-CCA2) **)
 module type Adv_NMCCA (O : Oracles_CCA) = {
@@ -924,7 +915,7 @@ module type Adv_NMCCA (O : Oracles_CCA) = {
 }.
 
 (** NM-CCA (i.e., modern NM-CCA2) security game **)
-module NM_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_NMCCA) = {
+module NM_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_NMCCA) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -956,9 +947,9 @@ module NM_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_NMCCA) = {
 (*
   (ciphertext) Strong Non-Malleability under (modern) adaptive Chosen-Ciphertext Attacks (SNM-CCA).
   As NM-CCA, but the adversary is additionally given a pair of (symmetric) keys of
-  which one is independently sampled at random, and the other is the one
-  encapsulated by the given ciphertext. (The order in which they appear in the pair
-  is (uniformly) random).
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
 *)
 (** Adversary class considered for SNM-CCA (i.e., modern SNM-CCA2) **)
 module type Adv_SNMCCA (O : Oracles_CCA) = {
@@ -966,7 +957,7 @@ module type Adv_SNMCCA (O : Oracles_CCA) = {
 }.
 
 (** SNM-CCA (i.e., modern SNM-CCA2) security game **)
-module SNM_CCA (S : Scheme, O : Oracles_CCA2i, A : Adv_SNMCCA) = {
+module SNM_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_SNMCCA) = {
   proc main(b : bool) = {
     var pk : pk_t;
     var sk : sk_t;
@@ -1011,18 +1002,18 @@ end NM.
   (i.e., not the key).
 *)
 (*
-  ANOnymity under Chosen-Plaintext attack (ANO-CPA).
-  In a CPA setting, The adversary is given two (honestly generated) public keys 
+  ANOnymity under Chosen-Plaintext Attack4 (ANO-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys 
   and an encapsulation (i.e., key/ciphertext pair), and asked to determine which 
   public key was used to create the encapsulation.
 *)
-(** Adversary class considerd for ANO-CPA **)
+(** Adversary class considered for ANO-CPA **)
 module type Adv_ANOCPA = {
   proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool
 }.
 
 (** ANO-CPA security game (sampled bit) **)
-module ANO_CPA (S : Scheme, A : Adv_ANOCPA) = {
+module ANO_CPA (S : Scheme) (A : Adv_ANOCPA) = {
   proc main() = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1043,7 +1034,7 @@ module ANO_CPA (S : Scheme, A : Adv_ANOCPA) = {
 }.
 
 (** ANO-CPA security game (provided bit) **)
-module ANO_CPA_P (S : Scheme, A : Adv_ANOCPA) = {
+module ANO_CPA_P (S : Scheme) (A : Adv_ANOCPA) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1062,17 +1053,17 @@ module ANO_CPA_P (S : Scheme, A : Adv_ANOCPA) = {
 }.
 
 (*
-  Weak ANOnymity under Chosen-Plaintext attack (WANO-CPA).
+  Weak ANOnymity under Chosen-Plaintext Attacks (WANO-CPA).
   As ANO-CPA, but the adversary is only given the ciphertext of the encapsulation 
   (i.e., not the key).
 *)
-(** Adversary class considerd for WANO-CPA **)
+(** Adversary class considered for WANO-CPA **)
 module type Adv_WANOCPA = {
   proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool
 }.
 
 (** WANO-CPA security game (sampled bit) **)
-module WANO_CPA (S : Scheme, A : Adv_WANOCPA) = {
+module WANO_CPA (S : Scheme) (A : Adv_WANOCPA) = {
   proc main() = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1094,7 +1085,7 @@ module WANO_CPA (S : Scheme, A : Adv_WANOCPA) = {
 }.
 
 (** WANO-CPA security game (provided bit) **)
-module WANO_CPA_P (S : Scheme, A : Adv_WANOCPA) = {
+module WANO_CPA_P (S : Scheme) (A : Adv_WANOCPA) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1115,19 +1106,19 @@ module WANO_CPA_P (S : Scheme, A : Adv_WANOCPA) = {
 
 
 (*
-  ANOnymity under non-adaptive Chosen-Plaintext attack (ANO-CCA1).
+  ANOnymity under non-adaptive Chosen-Ciphertext Attacks (ANO-CCA1).
   In a CCA1 setting, the adversary is given (in the first stage) two (honestly generated) public keys 
   and (in the second stage) an encapsulation (i.e., key/ciphertext pair), and is 
   asked to determine which public key was used to create the encapsulation.
 *)
-(** Adversary class considerd for ANO-CCA1 **)
-module type Adv_ANOCCA1 (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for ANO-CCA1 **)
+module type Adv_ANOCCA1 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
   proc distinguish(kc : key_t * ctxt_t) : bool { }
 }.
 
 (** ANO-CCA1 security game (sampled bit) **)
-module ANO_CCA1 (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_ANOCCA1) = {
+module ANO_CCA1 (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
   proc main() = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1152,7 +1143,7 @@ module ANO_CCA1 (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_ANO
 }.
 
 (** ANO-CCA1 security game (provided bit) **)
-module ANO_CCA1_P (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_ANOCCA1) = {
+module ANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1176,18 +1167,18 @@ module ANO_CCA1_P (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_A
 
 
 (*
-  Weak ANOnymity under non-adaptive Chosen-Plaintext attack (WANO-CCA1).
+  Weak ANOnymity under non-adaptive Chosen-Ciphertext Attacks (WANO-CCA1).
   As ANO-CCA1, but the adversary is only given the ciphertext of the encapsulation 
   (i.e., not the key).
 *)
-(** Adversary class considerd for WANO-CCA1 **)
-module type Adv_WANOCCA1 (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for WANO-CCA1 **)
+module type Adv_WANOCCA1 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
   proc distinguish(c : ctxt_t) : bool { }
 }.
 
 (** WANO-CCA1 security game (sampled bit) **)
-module WANO_CCA1 (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WANOCCA1) = {
+module WANO_CCA1 (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WANOCCA1) = {
   proc main() = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1213,7 +1204,7 @@ module WANO_CCA1 (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WA
 }.
 
 (** WANO-CCA1 security game (provided bit) **)
-module WANO_CCA1_P (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WANOCCA1) = {
+module WANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WANOCCA1) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1238,22 +1229,22 @@ module WANO_CCA1_P (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_
 
 
 (*
-  ANOnymity under (traditional) adaptive Chosen-Plaintext attack (ANO-CCA2).
+  ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (ANO-CCA2).
   In a (traditional) CCA2 setting, the adversary is given (in the first stage) two 
   (honestly generated) public keys and (in the second stage) an encapsulation 
-  (i.e., key/ciphertext pair), and is 
-  asked to determine which public key was used to create the encapsulation.
+  (i.e., key/ciphertext pair), and is asked to determine which public key 
+  was used to create the encapsulation.
 *)
-(** Adversary class considerd for ANO-CCA2 **)
-module type Adv_ANOCCA2 (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for ANO-CCA2 **)
+module type Adv_ANOCCA2 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit
   proc distinguish(kc : key_t * ctxt_t) : bool
 }.
 
 (** ANO-CCA2 security game (sampled bit) **)
 module ANO_CCA2 (S : Scheme)
-                (O01 : Oracles_CCA1i, O11 : Oracles_CCA1i)
-                (O02 : Oracles_CCA2i, O12 : Oracles_CCA2i)
+                (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
                 (A : Adv_ANOCCA2) = {
   proc main() = {
     var pk0, pk1 : pk_t;
@@ -1283,8 +1274,8 @@ module ANO_CCA2 (S : Scheme)
 
 (** ANO-CCA2 security game (provided bit) **)
 module ANO_CCA2_P (S : Scheme)
-                  (O01 : Oracles_CCA1i, O11 : Oracles_CCA1i)
-                  (O02 : Oracles_CCA2i, O12 : Oracles_CCA2i)
+                  (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                  (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
                   (A : Adv_ANOCCA2) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
@@ -1311,20 +1302,20 @@ module ANO_CCA2_P (S : Scheme)
 }.
 
 (*
-  Weak ANOnymity under (traditional) adaptive Chosen-Plaintext attack (WANO-CCA2).
+  Weak ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (WANO-CCA2).
   As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
   (i.e., not the key).
 *)
-(** Adversary class considerd for WANO-CCA2 **)
-module type Adv_WANOCCA2 (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for WANO-CCA2 **)
+module type Adv_WANOCCA2 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit
   proc distinguish(c : ctxt_t) : bool
 }.
 
 (** WANO-CCA2 security game (sampled bit) **)
 module WANO_CCA2 (S : Scheme)
-                 (O01 : Oracles_CCA1i, O11 : Oracles_CCA1i)
-                 (O02 : Oracles_CCA2i, O12 : Oracles_CCA2i)
+                 (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                 (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
                  (A : Adv_WANOCCA2) = {
   proc main() = {
     var pk0, pk1 : pk_t;
@@ -1354,8 +1345,8 @@ module WANO_CCA2 (S : Scheme)
 
 (** WANO-CCA2 security game (provided bit) **)
 module WANO_CCA2_P (S : Scheme)
-                   (O01 : Oracles_CCA1i, O11 : Oracles_CCA1i)
-                   (O02 : Oracles_CCA2i, O12 : Oracles_CCA2i)
+                   (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                   (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
                    (A : Adv_WANOCCA2) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
@@ -1383,20 +1374,20 @@ module WANO_CCA2_P (S : Scheme)
 
 
 (*
-  ANOnymity under (modern) adaptive Chosen-Plaintext attack (ANO-CCA).
+  ANOnymity under (modern) adaptive Chosen-Ciphertext Attacks (ANO-CCA).
   In a (modern) CCA setting, the adversary is given (in the first stage) two 
   (honestly generated) public keys and (in the second stage) an encapsulation 
   (i.e., key/ciphertext pair), and is 
   asked to determine which public key was used to create the encapsulation.
 *)
-(** Adversary class considerd for ANO-CCA (i.e., modern ANO-CCA2) **)
-module type Adv_ANOCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for ANO-CCA (i.e., modern ANO-CCA2) **)
+module type Adv_ANOCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool
 }.
 
 (** ANO-CCA (i.e., modern ANO-CCA2) security game (sampled bit) **)
 module ANO_CCA (S : Scheme)
-               (O0 : Oracles_CCA2i, O1 : Oracles_CCA2i)
+               (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
                (A : Adv_ANOCCA) = {
   proc main() = {
     var pk0, pk1 : pk_t;
@@ -1422,7 +1413,7 @@ module ANO_CCA (S : Scheme)
 
 (** ANO-CCA (i.e., modern ANO-CCA2) security game (provided bit) **)
 module ANO_CCA_P (S : Scheme)
-                 (O0 : Oracles_CCA2i, O1 : Oracles_CCA2i)
+                 (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
                  (A : Adv_ANOCCA) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
@@ -1445,18 +1436,18 @@ module ANO_CCA_P (S : Scheme)
 }.
 
 (*
-  Weak ANOnymity under (modern) adaptive Chosen-Plaintext attack (WANO-CCA).
+  Weak ANOnymity under (modern) adaptive Chosen-Plaintext Attacks (WANO-CCA).
   As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
   (i.e., not the key).
 *)
-(** Adversary class considerd for ANO-CCA (i.e., modern ANO-CCA2) **)
-module type Adv_WANOCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+(** Adversary class considered for ANO-CCA (i.e., modern ANO-CCA2) **)
+module type Adv_WANOCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool
 }.
 
 (** WANO-CCA (i.e., modern WANO-CCA2) security game (sampled bit) **)
 module WANO_CCA (S : Scheme)
-                (O0 : Oracles_CCA2i, O1 : Oracles_CCA2i)
+                (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
                 (A : Adv_WANOCCA) = {
   proc main() = {
     var pk0, pk1 : pk_t;
@@ -1482,7 +1473,7 @@ module WANO_CCA (S : Scheme)
 
 (** WANO-CCA (i.e., modern WANO-CCA2) security game (provided bit) **)
 module WANO_CCA_P (S : Scheme)
-                  (O0 : Oracles_CCA2i, O1 : Oracles_CCA2i)
+                  (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
                   (A : Adv_WANOCCA) = {
   proc main(b : bool) = {
     var pk0, pk1 : pk_t;
@@ -1535,7 +1526,7 @@ module type Adv_SROBCPA = {
 }.
 
 (** SROB-CPA security game **)
-module SROB_CPA (S : Scheme, A : Adv_SROBCPA) = {
+module SROB_CPA (S : Scheme) (A : Adv_SROBCPA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1568,7 +1559,7 @@ module type Adv_WROBCPA = {
 }.
 
 (** WROB-CPA security game **)
-module WROB_CPA (S : Scheme, A : Adv_WROBCPA) = {
+module WROB_CPA (S : Scheme) (A : Adv_WROBCPA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1597,12 +1588,12 @@ module WROB_CPA (S : Scheme, A : Adv_WROBCPA) = {
   of the secret keys (corresponding to the provided public keys).
 *)
 (** Adversary class considered for SROB-CCA **)
-module type Adv_SROBCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module type Adv_SROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
 }.
 
 (** SROB-CCA security game **)
-module SROB_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_SROBCCA) = {
+module SROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SROBCCA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1632,12 +1623,12 @@ module SROB_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_SRO
   (i.e., returns a valid symmetric key).
 *)
 (** Adversary class considered for WROB-CCA **)
-module type Adv_WROBCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module type Adv_WROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(pk0 : pk_t, pk1 : pk_t) : bool
 }.
 
 (** WROB-CCA security game **)
-module WROB_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WROBCCA) = {
+module WROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WROBCCA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1682,7 +1673,7 @@ module type Adv_SCFRCPA = {
 }.
 
 (** SCFR-CPA security game **)
-module SCFR_CPA (S : Scheme, A : Adv_SCFRCPA) = {
+module SCFR_CPA (S : Scheme) (A : Adv_SCFRCPA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1715,7 +1706,7 @@ module type Adv_WCFRCPA = {
 }.
 
 (** WCFR-CPA security game **)
-module WCFR_CPA (S : Scheme, A : Adv_WCFRCPA) = {
+module WCFR_CPA (S : Scheme) (A : Adv_WCFRCPA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1744,12 +1735,12 @@ module WCFR_CPA (S : Scheme, A : Adv_WCFRCPA) = {
   of the secret keys (corresponding to the provided public keys).
 *)
 (** Adversary class considered for SCFR-CCA **)
-module type Adv_SCFRCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module type Adv_SCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
 }.
 
 (** SCFR-CCA security game **)
-module SCFR_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_SCFRCCA) = {
+module SCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SCFRCCA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1779,12 +1770,12 @@ module SCFR_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_SCF
   a valid symmetric key that is equal to the encapsulated one.
 *)
 (** Adversary class considered for WCFR-CCA **)
-module type Adv_WCFRCCA (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module type Adv_WCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(pk0 : pk_t, pk1 : pk_t) : bool
 }.
 
 (** WCFR-CCA security game **)
-module WCFR_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WCFRCCA) = {
+module WCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WCFRCCA) = {
   proc main() : bool = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1812,10 +1803,9 @@ module WCFR_CCA (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_WCF
   BINDing (BIND).
   Intuitively, binding properties capture to which extent certain artifacts (in a 
   a non-failing KEM execution) determine other artifacts (in that same execution).
-  That is, informally, an artifact (e.g., symmetric key) binds another artifact (e.g., a ciphertext)
-  if seeing a certain value for the symmetric key (without failing) implies that the ciphertext is actually
-  the one corresponding to this symmetric key (because it is hard to find another one that decapsulates to the
-  same symmetric key without failing).
+  That is, informally, an artifact (e.g., symmetric key) binds another artifact (e.g., ciphertext)
+  if using/obtaining a certain value for the former implies a certain value for the latter 
+  (because it is hard to find another value for the latter without failing).
   Depending on the adversarial model, the artifacts used as input to the KEM's procedures
   are either honestly or maliciously generated.
 *)
@@ -1877,13 +1867,13 @@ op is_bindbreak (bc : bindconf) (k0 k1 : key_t) (pk0 pk1 : pk_t) (c0 c1 : ctxt_t
   w.r.t. the corresponding secret keys.
 *)
 (** Adversary class considered for HON-BIND **)
-module type Adv_HONBIND (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module type Adv_HONBIND (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(bc : bindconf) : bool { }
   proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t
 }.
 
 (** HON-BIND security game (specific configuration is passed to the procedure) **)
-module HON_BIND (S : Scheme, O0 : Oracles_CCA1i, O1 : Oracles_CCA1i, A : Adv_HONBIND) = {
+module HON_BIND (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_HONBIND) = {
   proc main(bc : bindconf) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -1934,7 +1924,7 @@ module type Adv_LEAKBIND = {
 }.
 
 (** LEAK-BIND security game (specific configuration is passed to the procedure) **)
-module LEAK_BIND (S : Scheme, A : Adv_LEAKBIND) = {
+module LEAK_BIND (S : Scheme) (A : Adv_LEAKBIND) = {
   proc main(bc : bindconf) = {
     var pk0, pk1 : pk_t;
     var sk0, sk1 : sk_t;
@@ -2003,7 +1993,7 @@ module type Adv_MALBIND_DD = {
 }.
 
 (** MAL-BIND-DD security game (specific configuration is passed to the procedure) **)
-module MAL_BIND_DD (S : Scheme, A : Adv_MALBIND_DD) = {
+module MAL_BIND_DD (S : Scheme) (A : Adv_MALBIND_DD) = {
   proc main(bc : bindconf) : bool = {
     var sk0, sk1 : sk_t;
     var c0, c1 : ctxt_t;
@@ -2586,7 +2576,7 @@ qed.
 
 
 (** Reduction adversary reducing ANO-CCA1 to ANO-CPA **)
-module (R_ANOCCA1_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA1) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_ANOCCA1_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   var pkc0, pkc1 : pk_t
   
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
@@ -2623,7 +2613,7 @@ qed.
 
 
 (** Reduction adversary reducing ANO-CCA to ANO-CPA **)
-module (R_ANOCCA_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_ANOCCA_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool = {
     var b : bool;
     
@@ -2677,7 +2667,7 @@ qed.
 
 
 (** Reduction adversary reducing WANO-CCA1 to WANO-CPA **)
-module (R_WANOCCA1_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA1) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_WANOCCA1_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   var pkc0, pkc1 : pk_t
   
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
@@ -2714,7 +2704,7 @@ qed.
 
 
 (** Reduction adversary reducing WANO-CCA to WANO-CPA **)
-module (R_WANOCCA_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_WANOCCA_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool = {
     var b : bool;
     
@@ -2745,7 +2735,7 @@ qed.
 
 (* Security goal: Robustness *)
 (** Reduction adversary reducing SROB-CCA to SROB-CPA **)
-module (R_SROBCCA_SROBCPA (A : Adv_SROBCPA) : Adv_SROBCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_SROBCCA_SROBCPA (A : Adv_SROBCPA) : Adv_SROBCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
     var c : ctxt_t;
     
@@ -2774,7 +2764,7 @@ qed.
 
 
 (** Reduction adversary reducing WROB-CCA to WROB-CPA **)
-module (R_WROBCCA_WROBCPA (A : Adv_WROBCPA) : Adv_WROBCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_WROBCCA_WROBCPA (A : Adv_WROBCPA) : Adv_WROBCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc choose(pk0 : pk_t, pk1 : pk_t) : bool = {
     var b : bool;
     
@@ -2804,7 +2794,7 @@ qed.
 
 (* Security goal: Collision-freeness *)
 (** Reduction adversary reducing SCFR-CCA to SCFR-CPA **)
-module (R_SCFRCCA_SCFRCPA (A : Adv_SCFRCPA) : Adv_SCFRCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_SCFRCCA_SCFRCPA (A : Adv_SCFRCPA) : Adv_SCFRCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
     var c : ctxt_t;
     
@@ -2833,7 +2823,7 @@ qed.
 
 
 (** Reduction adversary reducing WCFR-CCA to WCFR-CPA **)
-module (R_WCFRCCA_WCFRCPA (A : Adv_WCFRCPA) : Adv_WCFRCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA) = { 
+module (R_WCFRCCA_WCFRCPA (A : Adv_WCFRCPA) : Adv_WCFRCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
   proc choose(pk0 : pk_t, pk1 : pk_t) : bool = {
     var b : bool;
     
@@ -2882,7 +2872,7 @@ module R_SNMCPA_NMCPA (A : Adv_NMCPA) : Adv_SNMCPA = {
 
 (** 
   Equivalence between NM_CPA (for arbitrary adversary) and SNM_CPA
-  (with above reduction adverary). (Shows SNM_CPA --> SNM_CPA.)
+  (with above reduction adverary). (Shows SNM_CPA --> NM_CPA.)
 **)
 lemma Eqv_NMCPA_SNMCPA (S <: Scheme) (A <: Adv_NMCPA{-S}) :
   equiv[NM_CPA(S, A).main ~ SNM_CPA(S, R_SNMCPA_NMCPA(A)).main :
@@ -3007,7 +2997,7 @@ module R_ANOCPA_WANOCPA (A : Adv_WANOCPA) : Adv_ANOCPA = {
 
 (** 
   Equivalence between WANO_CPA (for arbitrary adversary) and ANO_CPA
-  (with above reduction adverary). (Shows ANO_CPA --> ANO_CPA.)
+  (with above reduction adverary). (Shows ANO_CPA --> WANO_CPA.)
 **)
 lemma Eqv_WANOCPA_ANOCPA (S <: Scheme) 
                          (A <: Adv_WANOCPA{-S}) :
@@ -3021,7 +3011,7 @@ qed.
 
 
 (** Reduction adversary reducing ANO-CCA1 to WANO-CCA1 **)
-module (R_ANOCCA1_WANOCCA1 (A : Adv_WANOCCA1) : Adv_ANOCCA1) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_ANOCCA1_WANOCCA1 (A : Adv_WANOCCA1) : Adv_ANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
     A(O0, O1).scout(pk0, pk1);
   }
@@ -3053,7 +3043,7 @@ qed.
 
 
 (** Reduction adversary reducing ANO-CCA2 to WANO-CCA2 **)
-module (R_ANOCCA2_WANOCCA2 (A : Adv_WANOCCA2) : Adv_ANOCCA2) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_ANOCCA2_WANOCCA2 (A : Adv_WANOCCA2) : Adv_ANOCCA2) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
     A(O0, O1).scout(pk0, pk1);
   }
@@ -3089,7 +3079,7 @@ qed.
 
 
 (** Reduction adversary reducing ANO-CCA to WANO-CCA **)
-module (R_ANOCCA_WANOCCA (A : Adv_WANOCCA) : Adv_ANOCCA) (O0 : Oracles_CCA, O1 : Oracles_CCA)  = {
+module (R_ANOCCA_WANOCCA (A : Adv_WANOCCA) : Adv_ANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA)  = {
   proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool = {
     var b : bool;
     
@@ -3474,7 +3464,7 @@ module Keygen_Equal_PK (S : Scheme) = {
 }.
 
 (** Reduction adversary reducing from LEAK-BIND to HON-BIND **)
-module R_LEAK_HON (S : Scheme) (O0 : Oracles_CCA1i, O1 : Oracles_CCA1i) (A : Adv_HONBIND) : Adv_LEAKBIND = {
+module R_LEAK_HON (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_HONBIND) : Adv_LEAKBIND = {
   proc choose(bc : bindconf) : bool = {
     var b : bool;
     
@@ -3576,7 +3566,7 @@ by skip => /> /#.
 qed.
 
 (** Reduction adversary reducing HON-BIND-K-CT and HON-BIND-PKK-CT **)
-module (R_HON_K_PKK_CT (S : Scheme) (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_HON_K_PKK_CT (S : Scheme) (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(bc : bindconf) : bool = {
     return false;
   }
@@ -3611,7 +3601,7 @@ by wp; call (: true).
 qed.
 
 (** Reduction adversary reducing HON-BIND-K-PK and HON-BIND-CT-PK to HON-BIND-KCT-PK **)
-module (R_HON_K_CT_KCT_PK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_HON_K_CT_KCT_PK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(bc : bindconf) : bool = {
     return witness;
   }
@@ -3650,7 +3640,7 @@ qed.
 
 
 (** Reduction adversary reducing HON-BIND-CT-PK to HON-BIND-CT-K **)
-module (R_HON_CT_PK_K (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_HON_CT_PK_K (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(bc : bindconf) : bool = {
     return witness;
   }
@@ -3820,7 +3810,7 @@ end section.
   Reduction adversary reducing HON-BIND-K-CT (resp. HON-BIND-K,CT-PK) 
   to HON-BIND-K-PK in the case of unequal ciphertexts (resp. equal ciphertexts)
 **)
-module (R_HON_KCT_KCTPK_KPK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA, O1 : Oracles_CCA) = {
+module (R_HON_KCT_KCTPK_KPK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
   proc choose(bc : bindconf) : bool = {
     return true;
   }
@@ -3904,7 +3894,6 @@ proof. by byequiv => //; sim. qed.
 (**
   Relation between HON-BIND-K-PK (for arbitrary adversary)
   and HON-BIND-K-CT and HON-BIND-K,CT-PK (with above reduction adversary).
-  Requires generated public keys to be different.
   (Shows HON-BIND-K-CT + HON-BIND-K,CT-PK --> HON-BIND-K-PK.) 
 **)
 lemma Bnd_HON_KPK_KCT_KCTPK &m :
@@ -4250,7 +4239,6 @@ proof. by byequiv => //; sim. qed.
 (**
   Relation between LEAK-BIND-K-PK (for arbitrary adversary)
   and LEAK-BIND-K-CT and LEAK-BIND-K,CT-PK (with above reduction adversary).
-  Requires generated public keys to be different.
   (Shows LEAK-BIND-K-CT + LEAK-BIND-K,CT-PK --> LEAK-BIND-K-PK.) 
 **)
 lemma Bnd_LEAK_KPK_KCT_KCTPK &m :
@@ -4516,7 +4504,6 @@ proof. by byequiv => //; sim. qed.
 (**
   Relation between MAL-BIND-K-PK (for arbitrary adversary)
   and MAL-BIND-K-CT and MAL-BIND-K,CT-PK (with above reduction adversary).
-  Requires generated public keys to be different.
   (Shows MAL-BIND-K-CT + MAL-BIND-K,CT-PK --> MAL-BIND-K-PK.) 
 **)
 lemma Bnd_MAL_KPK_KCT_KCTPK &m :
