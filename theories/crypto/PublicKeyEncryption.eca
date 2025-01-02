@@ -1405,7 +1405,7 @@ module type Adv_OWCPA = {
   Provided here for convenience.
 **)
 module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1425,7 +1425,7 @@ module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
 
 (** OW-CPA (final check performed with oracle) security game **)
 module OW_CPA_O (S : Scheme) (O : Oracles_PCi) (A : Adv_OWCPA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1459,7 +1459,7 @@ module type Adv_OWPCA (O : Oracles_PC) = {
 
 (** OW-PCA security game **)
 module OW_PCA (S : Scheme) (O : Oracles_PCi) (A : Adv_OWPCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1480,7 +1480,7 @@ module OW_PCA (S : Scheme) (O : Oracles_PCi) (A : Adv_OWPCA) = {
 
 (** OW-PCA (final check performed with oracle) security game **)
 module OW_PCA_O (S : Scheme) (O : Oracles_PCi) (A : Adv_OWPCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1514,7 +1514,7 @@ module type Adv_OWVCA (O : Oracles_CV) = {
 
 (** OW-VCA security game **)
 module OW_VCA (S : Scheme) (OCV : Oracles_CVi) (A : Adv_OWVCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1535,7 +1535,7 @@ module OW_VCA (S : Scheme) (OCV : Oracles_CVi) (A : Adv_OWVCA) = {
 
 (** OW-VCA (final check performed with oracle) security game **)
 module OW_VCA_O (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWVCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1570,7 +1570,7 @@ module type Adv_OWPVCA (OPC : Oracles_PC, OCV : Oracles_CV) = {
 
 (** OW-PVCA security game **)
 module OW_PVCA (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWPVCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;
@@ -1592,7 +1592,7 @@ module OW_PVCA (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWP
 
 (** OW-PVCA (final check performed with oracle) security game **)
 module OW_PVCA_O (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWPVCA) = {
-  proc main() = {
+  proc main() : bool = {
     var pk : pk_t;
     var sk : sk_t;
     var p, p' : ptxt_t;

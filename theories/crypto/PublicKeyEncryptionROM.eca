@@ -1050,7 +1050,7 @@ module type Adv_OWPVCA_ROM (RO : RandomOracle) (OPC : Oracles_PC, OCV : Oracles_
 module OW_PVCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) 
                    (OPC : Oracles_PCi_ROM) (OCV : Oracles_CVi_ROM) 
                    (A : Adv_OWPVCA_ROM) = {
-  proc main() = {
+  proc main() : bool = {
     var r : bool;
     
     RO.init();
@@ -1065,7 +1065,7 @@ module OW_PVCA_ROM (RO : RandomOraclei) (S : Scheme_ROM)
 module OW_PVCA_O_ROM (RO : RandomOraclei) (S : Scheme_ROM) 
                      (OPC : Oracles_PCi_ROM) (OCV : Oracles_CVi_ROM) 
                      (A : Adv_OWPVCA_ROM) = {
-  proc main() = {
+  proc main() : bool = {
     var r : bool;
     
     RO.init();
