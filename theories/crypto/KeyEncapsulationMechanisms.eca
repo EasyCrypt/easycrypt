@@ -1002,7 +1002,7 @@ end NM.
   (i.e., not the key).
 *)
 (*
-  ANOnymity under Chosen-Plaintext Attack4 (ANO-CPA).
+  ANOnymity under Chosen-Plaintext Attacks (ANO-CPA).
   In a CPA setting, the adversary is given two (honestly generated) public keys 
   and an encapsulation (i.e., key/ciphertext pair), and asked to determine which 
   public key was used to create the encapsulation.
