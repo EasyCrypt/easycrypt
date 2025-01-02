@@ -1002,7 +1002,6 @@ module OW_PCA_O_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_PCi_ROM) 
   In a VCA setting, the adversary is asked to produce the message/plaintext 
   encrypted by a given ciphertext.
 *)
-*)
 (** Adversary type considered for OW-VCA in ROM **)
 module type Adv_OWVCA_ROM (RO : RandomOracle) (O : Oracles_CV) = {
   proc find(pk : pk_t, c : ctxt_t) : ptxt_t
