@@ -1,0 +1,1619 @@
+(*^
+  This library generically defines Public-Key Encryption (PKE) schemes
+  and their properties (both correctness and security).
+  For convenience, it also provides some sensible defaults, particularly for oracles.
+  Most of the content is based on relevant literature.
+  More precisely, (almost) all of the content is extracted from 
+  one or more of the following papers (in no particular order):
+  - [Relations Among Notions of Security for Public-Key Encryption Schemes](https://eprint.iacr.org/1998/021)
+  - [KEM/DEM: Necessary and Sufficient Conditions for Secure Hybrid Encryption](https://eprint.iacr.org/2006/265)
+  - [Key-Privacy in Public-Key Encryption](https://iacr.org/archive/asiacrypt2001/22480568.pdf)
+  - [Anonymous, Robust Post-Quantum Public Key Encryption](https://eprint.iacr.org/2021/708)
+  - [Binding Security of Implicitly-Rejecting KEMs and Application to BIKE and HQC](https://eprint.iacr.org/2024/1233)
+  - [A Modular Analysis of the Fujisaki-Okamoto Transformation](https://eprint.iacr.org/2017/604)
+  - [Generic Constructions of Quantum-Resistant Cryptosystems](https://hss-opus.ub.ruhr-uni-bochum.de/opus4/frontdoor/deliver/index/docId/7758/file/diss.pdf)
+  - [Completely Non-Malleable Encryption Revisited](https://iacr.org/archive/pkc2008/49390068/49390068.pdf)
+  (Missing properties: complete non-malleability, plaintext awareness)
+^*)
+
+(* Require/Import libraries *)
+require import AllCore List DBool.
+
+(* Types *)
+(** Public keys **)
+type pk_t.
+
+(** Secret keys **)
+type sk_t.
+
+(** Plaintext/messages **)
+type ptxt_t.
+
+(** Ciphertexts **)
+type ctxt_t.
+
+
+(* Schemes *)
+(** PKE scheme (interface) **)
+module type Scheme = {
+  proc keygen() : pk_t * sk_t
+  proc enc(pk : pk_t, p : ptxt_t) : ctxt_t
+  proc dec(sk : sk_t, c : ctxt_t) : ptxt_t option 
+}.
+
+
+(* Correctness *)
+(** Correctness (probabilistic) program/game **)
+module Correctness (S : Scheme) = {
+  proc main(p : ptxt_t) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var c : ctxt_t;
+    var p' : ptxt_t option;
+    
+    (pk, sk) <@ S.keygen();
+    c <@ S.enc(pk, p);
+    p' <@ S.dec(sk, c);
+    
+    return p' = Some p;
+  }
+}.
+
+
+(* Attacker capabilities/models *)
+(* 
+  Chosen-Plaintext Attacks (CPA).
+  The adversary is given the considered public key and, hence, 
+  is able to produce ciphertexts corresponding to chosen plaintexts.
+*)
+
+(* 
+  non-adaptive Chosen-Ciphertext Attacks (CCA1)
+  The adversary is given the considered public key and access to a decryption oracle
+  *before* the stage in which it is expected to distinguish/return a break.
+  Hence, the adversary is able to produce ciphertext corresponding to chosen plaintexts
+  *and* query for decryptions of chosen ciphertexts.
+*)
+(* Oracles *)
+(** Interface for oracles employed in CCA1 security games **)
+module type Oracles_CCA1i (S : Scheme)  = {
+  proc init(sk_init : sk_t) : unit
+  proc dec(c : ctxt_t) : ptxt_t option
+}.
+
+(** A default implementation for the oracles employed in CCA1 security games **)
+module (O_CCA1_Default : Oracles_CCA1i) (S : Scheme) = {
+  var sk : sk_t
+  var qs : (ctxt_t * ptxt_t option) list
+  
+  proc init(sk_init : sk_t) = {
+    sk <- sk_init;
+    qs <- [];
+  }
+  
+  proc dec(c : ctxt_t) : ptxt_t option = {
+    var p : ptxt_t option;
+    
+    p <@ S.dec(sk, c);
+    
+    qs <- rcons qs (c, p);
+    
+    return p;
+  }
+}.
+
+(** 
+  A duplicate of the default implementation for the oracles employed in CCA1 security games 
+  (as well as the first stage of CCA2 games). May be useful for security notions considering two
+  such (sets of) oracles.
+**)
+module (O_CCA1_DDefault : Oracles_CCA1i) (S : Scheme)  = {
+  var sk : sk_t
+  var qs : (ctxt_t * ptxt_t option) list
+  
+  proc init(sk_init : sk_t) = {
+    sk <- sk_init;
+    qs <- [];
+  }
+  
+  proc dec(c : ctxt_t) : ptxt_t option = {
+    var p : ptxt_t option;
+    
+    p <@ S.dec(sk, c);
+    
+    qs <- rcons qs (c, p);
+    
+    return p;
+  }
+}.
+
+
+(* 
+  adaptive Chosen-Ciphertext Attacks (CCA2)
+  The adversary is given the considered public key and access to a decryption oracle throughout.  
+  Hence, the adversary is able to produce ciphertext corresponding to chosen plaintexts
+  *and* query for decryptions of chosen ciphertexts (potentially barring ciphertexts
+  that are part of the challenge).
+*)
+(** Interface for oracles employed in (the second stage of) CCA2 security games **)
+module type Oracles_CCA2i (S : Scheme) = {
+  proc init(sk_init : sk_t, c'_init : ctxt_t) : unit
+  proc dec(c : ctxt_t) : ptxt_t option
+}.
+
+(** A default implementation for the oracles employed in (the second stage of) CCA2 security games **)
+module (O_CCA2_Default : Oracles_CCA2i) (S : Scheme) = {
+  var sk : sk_t
+  var c' : ctxt_t
+  var qs : (ctxt_t * ptxt_t option) list
+  
+  proc init(sk_init : sk_t, c'_init : ctxt_t) = {
+    sk <- sk_init;
+    c' <- c'_init;
+    qs <- [];
+  }
+  
+  proc dec(c : ctxt_t) : ptxt_t option = {
+    var p : ptxt_t option;
+    
+    if (c <> c') {
+      p <@ S.dec(sk, c);
+    } else {
+      p <- None;
+    }
+    
+    qs <- rcons qs (c, p);
+    
+    return p;
+  }
+}.
+
+(** 
+  A duplicate of the default implementation for the oracles employed in 
+  (the second stage of) CCA2 security games. May be useful for security notions considering two
+  such (sets of) oracles.
+**)
+module (O_CCA2_DDefault : Oracles_CCA2i) (S : Scheme)  = {
+  var sk : sk_t
+  var c' : ctxt_t
+  var qs : (ctxt_t * ptxt_t option) list
+  
+  proc init(sk_init : sk_t, c'_init : ctxt_t) = {
+    sk <- sk_init;
+    c' <- c'_init;
+    qs <- [];
+  }
+  
+  proc dec(c : ctxt_t) : ptxt_t option = {
+    var p : ptxt_t option;
+    
+    if (c <> c') {
+      p <@ S.dec(sk, c);
+    } else {
+      p <- None;
+    }
+    
+    qs <- rcons qs (c, p);
+    
+    return p;
+  }
+}.
+
+(** Interface for oracles given to the adversary in CCA (both 1 and 2) security games **)
+module type Oracles_CCA = {
+  proc dec(c : ctxt_t) : ptxt_t option
+}.
+
+
+(* Properties (regular) *)
+(**
+  One-Wayness (OW).
+  The adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+**)
+abstract theory OW.
+(* Distributions *)
+(** (Sub-)Distribution over plaintexts (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the message space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dptxtm : pk_t -> ptxt_t distr.
+
+
+(*
+  One-Wayness under Chosen-Plaintext Attacks (OW-CPA).
+  In a CPA setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-CPA **)
+module type Adv_OWCPA = {
+  proc find(pk : pk_t, c : ctxt_t) : ptxt_t
+}.
+
+(** OW-CPA security game **)
+module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    
+    p' <@ A.find(pk, c);
+
+    return p' = p; 
+  }
+}.
+
+(*
+  One-Wayness under non-adaptive Chosen-Ciphertext Attacks (OW-CCA1).
+  In a CCA1 setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA1 **)
+module type Adv_OWCCA1 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit { O.dec } 
+  proc find(c : ctxt_t) : ptxt_t { }
+}.
+
+(** OW-CCA1 security game **)
+module OW_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_OWCCA1) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+    
+    p <$ dptxtm pk;
+    
+    c <@ S.enc(pk, p);
+    
+    p' <@ A(O(S)).find(c);
+    
+    return p' = p; 
+  }
+}.
+
+
+(*
+  One-Wayness under adaptive Chosen-Ciphertext Attacks (OW-CCA2).
+  In a CCA2 setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA2 **)
+module type Adv_OWCCA2 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t) : ptxt_t
+}.
+
+(** OW-CCA2 security game **)
+module OW_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_OWCCA2) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+    
+    p <$ dptxtm pk;
+    
+    c <@ S.enc(pk, p);
+    O2(S).init(sk, c);
+    
+    p' <@ A(O2(S)).find(c);
+    
+    return p' = p; 
+  }
+}.
+
+end OW.
+
+
+(* 
+  (ciphertext) INDistinguishability (IND).
+  The adversary is asked to provide two plaintexts and, subsequently,
+  determine which of these plaintexts is encrypted by a given ciphertext.
+*)
+(*
+  (ciphertext) INDistinguishability under Chosen-Plaintext Attacks (IND-CPA).
+  In a CPA setting, the adversary is asked to provide two plaintexts and, subsequently,
+  determine which of these plaintexts is encrypted by a given ciphertext.
+*)
+(** Adversary class considered for IND-CPA **)
+module type Adv_INDCPA = {
+  proc choose(pk : pk_t) : ptxt_t * ptxt_t
+  proc distinguish(c : ctxt_t) : bool 
+}.
+
+(** IND-CPA security game (sampled bit) **)
+module IND_CPA (S : Scheme) (A : Adv_INDCPA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (p0, p1) <@ A.choose(pk);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    
+    b' <@ A.distinguish(c);
+    
+    return b' = b; 
+  }
+}.
+
+(** IND-CPA security game (provided bit) **)
+module IND_CPA_P (S : Scheme) (A : Adv_INDCPA) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (p0, p1) <@ A.choose(pk);
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    
+    b' <@ A.distinguish(c);
+    
+    return b';
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under non-adaptive Chosen-Ciphertext Attacks (IND-CCA1).
+  In a CCA1 setting, the adversary is asked to provide two plaintexts and, subsequently,
+  determine which of these plaintexts is encrypted by a given ciphertext.
+*)
+(** Adversary class considered for IND-CCA1 **)
+module type Adv_INDCCA1 (O : Oracles_CCA) = { 
+  proc choose(pk : pk_t) : ptxt_t * ptxt_t { O.dec } 
+  proc distinguish(c : ctxt_t) : bool { }
+}.
+
+(** IND-CCA1 security game (sampled bit) **)
+module IND_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    (p0, p1) <@ A(O(S)).choose(pk);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    
+    b' <@ A(O(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** IND-CCA1 security game (provided bit) **)
+module IND_CCA1_P (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    (p0, p1) <@ A(O(S)).choose(pk);
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    
+    b' <@ A(O(S)).distinguish(c);
+    
+    return b' = b; 
+  }
+}.
+
+(*
+  (ciphertext) INDistinguishability under adaptive Chosen-Ciphertext Attacks (IND-CCA2).
+  In a CCA2 setting, the adversary is asked to provide two plaintexts and, subsequently,
+  determine which of these plaintexts is encrypted by a given ciphertext.
+*)
+(** Adversary class considered for IND-CCA2 **)
+module type Adv_INDCCA2 (O : Oracles_CCA) = { 
+  proc choose(pk : pk_t) : ptxt_t * ptxt_t
+  proc distinguish(c : ctxt_t) : bool
+}.
+
+(** IND-CCA2 security game (sampled bit) **)
+module IND_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    (p0, p1) <@ A(O1(S)).choose(pk);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    O2(S).init(sk, c);
+    
+    b' <@ A(O2(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** IND-CCA2 security game (provided bit) **)
+module IND_CCA2_P (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var p0, p1 : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    (p0, p1) <@ A(O1(S)).choose(pk);
+    
+    c <@ S.enc(pk, if b then p1 else p0);
+    O2(S).init(sk, c);
+    
+    b' <@ A(O2(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+
+(** 
+  Non-Malleability (NM).
+  The adversary is asked to provide a relation (say R) and
+  a list of ciphertexts such that the plaintexts obtained from decrypting these
+  ciphertexts are related (under R) to the plaintext corresponding to a given ciphertext.
+  
+  Note that these notions only have a sensible definition with a provided bit, so 
+  no "sampled bit" variants are defined.
+**)
+abstract theory NM.
+(* Operators *)
+(** 
+  Checks "validity" of the plaintext distribution output by 
+  (the first stage of) the adversary, something the pen-and-paper 
+  definitions simply "insist on" the adversary does. Specifically, this should check
+  whether the plaintexts in the distribution's support are the same w.r.t.
+  the public information that is not necessarily (supposed to be) hidden by 
+  the corresponding ciphertexts.
+  Typically, this public information is the length of the plaintexts 
+  (and this is also what the pen-and-paper definitions refer to).
+**)
+op is_valid_dp : ptxt_t distr -> bool.
+
+
+(* Properties *)
+(*
+  Non-Malleability under Chosen-Plaintext Attacks (NM-CPA)
+  In a CPA setting, the adversary is asked to provide a relation (say R) and
+  a list of ciphertexts such that the plaintexts obtained from decrypting these
+  ciphertexts are related (under R) to the plaintext corresponding to a given ciphertext.
+*)
+(** Adversary class considered for NM-CPA **)
+module type Adv_NMCPA = {
+  proc choose(pk : pk_t) : ptxt_t distr
+  proc find(c : ctxt_t) : (ptxt_t -> ptxt_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CPA security game **)
+module NM_CPA (S : Scheme) (A : Adv_NMCPA) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var dp : ptxt_t distr;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var rel : ptxt_t -> ptxt_t option list -> bool;
+    var cl : ctxt_t list;
+    var po : ptxt_t option;
+    var pol : ptxt_t option list;
+    
+    (pk, sk) <@ S.keygen();
+    
+    dp <@ A.choose(pk);
+    
+    p <$ dp;
+    p' <$ dp;
+    
+    c <@ S.enc(pk, p);
+    
+    (rel, cl) <@ A.find(c);
+    
+    pol <- [];
+    while (size pol < size cl) {
+      po <@ S.dec(sk, nth witness cl (size pol));
+      pol <- rcons pol po;
+    }
+    
+    return is_valid_dp dp /\ !(c \in cl) /\ rel (if b then p' else p) pol;
+  }
+}.
+
+
+(*
+  Non-Malleability under non-adaptive Chosen-Plaintext Attacks (NM-CCA1)
+  In a CCA1 setting, the adversary is asked to provide a relation (say R) and
+  a list of ciphertexts such that the plaintexts obtained from decrypting these
+  ciphertexts are related (under R) to the plaintext corresponding to a given ciphertext.
+*)
+(** Adversary class considered for NM-CCA1 **)
+module type Adv_NMCCA1 (O : Oracles_CCA) = {
+  proc choose(pk : pk_t) : ptxt_t distr { O.dec }
+  proc find(c : ctxt_t) : (ptxt_t -> ptxt_t option list -> bool) * ctxt_t list { }
+}.
+
+(** NM-CCA1 security game **)
+module NM_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_NMCCA1) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var dp : ptxt_t distr;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var rel : ptxt_t -> ptxt_t option list -> bool;
+    var cl : ctxt_t list;
+    var po : ptxt_t option;
+    var pol : ptxt_t option list;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    dp <@ A(O(S)).choose(pk);
+    
+    p <$ dp;
+    p' <$ dp;
+    
+    c <@ S.enc(pk, p);
+    
+    (rel, cl) <@ A(O(S)).find(c);
+    
+    pol <- [];
+    while (size pol < size cl) {
+      po <@ S.dec(sk, nth witness cl (size pol));
+      pol <- rcons pol po;
+    }
+    
+    return is_valid_dp dp /\ !(c \in cl) /\ rel (if b then p' else p) pol;
+  }
+}.
+
+
+(*
+  Non-Malleability under adaptive Chosen-Plaintext Attacks (NM-CCA2)
+  In a CCA2 setting, the adversary is asked to provide a relation (say R) and
+  a list of ciphertexts such that the plaintexts obtained from decrypting these
+  ciphertexts are related (under R) to the plaintext corresponding to a given ciphertext.
+*)
+(** Adversary class considered for NM-CCA2 **)
+module type Adv_NMCCA2 (O : Oracles_CCA) = {
+  proc choose(pk : pk_t) : ptxt_t distr
+  proc find(c : ctxt_t) : (ptxt_t -> ptxt_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CCA2 security game **)
+module NM_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_NMCCA2) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var dp : ptxt_t distr;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var rel : ptxt_t -> ptxt_t option list -> bool;
+    var cl : ctxt_t list;
+    var po : ptxt_t option;
+    var pol : ptxt_t option list;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    dp <@ A(O1(S)).choose(pk);
+    
+    p <$ dp;
+    p' <$ dp;
+    
+    c <@ S.enc(pk, p);
+    O2(S).init(sk, c);
+    
+    (rel, cl) <@ A(O2(S)).find(c);
+    
+    pol <- [];
+    while (size pol < size cl) {
+      po <@ S.dec(sk, nth witness cl (size pol));
+      pol <- rcons pol po;
+    }
+    
+    return is_valid_dp dp /\ !(c \in cl) /\ rel (if b then p' else p) pol;
+  }
+}.
+
+end NM.
+
+
+(* 
+  ANOnymity (ANO). 
+  (Alternatively: Indistinguishability of (public) Keys (IK).)
+  First, the adversary is given two (honestly generated) public keys and asked
+  to provide a plaintext. Subsequently, the adversary is given the encryption (under one of
+  the aforementioned public keys) of the provided plaintext and should decide which
+  public key was used for the encryption.
+*)
+(*
+  ANOnymity under Chosen-Plaintext Attacks (ANO-CPA).
+  (Alternatively: Indistinguishability of (public) Keys under Chosen-Plaintext Attacks (IK-CPA).)
+  In a CPA setting, first, the adversary is given two (honestly generated) public keys and asked
+  to provide a plaintext. Subsequently, the adversary is given the encryption (under one of
+  the aforementioned public keys) of the provided plaintext and should decide which
+  public key was used for the encryption.
+*)
+(** Adversary class considered for ANO-CPA **)
+module type Adv_ANOCPA = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : ptxt_t
+  proc distinguish(c : ctxt_t) : bool
+}.
+
+(** ANO-CPA security game (sampled bit) **)
+module ANO_CPA (S : Scheme) (A : Adv_ANOCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    p <@ A.choose(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    
+    b' <@ A.distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CPA security game (provided bit) **)
+module ANO_CPA_P (S : Scheme) (A : Adv_ANOCPA) = {
+  proc main(b : bool) : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    p <@ A.choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    
+    b' <@ A.distinguish(c);
+    
+    return b';
+  }
+}.
+
+
+(*
+  ANOnymity under non-adaptive Chosen-Ciphertext Attacks (ANO-CCA1).
+  (Alternatively: Indistinguishability of (public) Keys under non-adaptive Chosen-Ciphertext Attacks (IK-CCA1).)
+  In a CCA1 setting, first, the adversary is given two (honestly generated) public keys and asked
+  to provide a plaintext. Subsequently, the adversary is given the encryption (under one of
+  the aforementioned public keys) of the provided plaintext and should decide which
+  public key was used for the encryption.
+*)
+(** Adversary class considered for ANO-CCA1 **)
+module type Adv_ANOCCA1 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : ptxt_t { O0.dec, O1.dec }
+  proc distinguish(c : ctxt_t) : bool { }
+}.
+
+(** ANO-CCA1 security game (sampled bit) **)
+module ANO_CCA1 (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    p <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CCA1 security game (provided bit) **)
+module ANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    p <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(c);
+    
+    return b';
+  }
+}.
+
+
+(*
+  ANOnymity under adaptive Chosen-Ciphertext Attacks (ANO-CCA2).
+  (Alternatively: Indistinguishability of (public) Keys under adaptive Chosen-Ciphertext Attacks (IK-CCA2).)
+  In a CCA2 setting, first, the adversary is given two (honestly generated) public keys and asked
+  to provide a plaintext. Subsequently, the adversary is given the encryption (under one of
+  the aforementioned public keys) of the provided plaintext and should decide which
+  public key was used for the encryption.
+*)
+(** Adversary class considered for ANO-CCA2 **)
+module type Adv_ANOCCA2 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : ptxt_t
+  proc distinguish(c : ctxt_t) : bool
+}.
+
+(** ANO-CCA2 security game (sampled bit) **)
+module ANO_CCA2 (S : Scheme)
+                (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                (A : Adv_ANOCCA2) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    p <@ A(O01(S), O11(S)).choose(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CCA2 security game (provided bit) **)
+module ANO_CCA2_P (S : Scheme)
+                  (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                  (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                  (A : Adv_ANOCCA2) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    p <@ A(O01(S), O11(S)).choose(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish(c);
+    
+    return b';
+  }
+}.
+
+
+(*
+  Strong ROBustness (SROB).
+  The adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decrypts to valid plaintexts under both 
+  of the secret keys (corresponding to the provided public keys).
+  
+  Weak ROBustness (WROB).
+  The adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encryption and which one to use (the corresponding secret key of)
+  for decryption. Here, the goal is that the decryption (with the key appointed for
+  decryption) of the encryption (created with the key appointed for encryption) succeeds 
+  (i.e., returns a valid plaintext).
+  
+  Note, as there is no stage in which the adversary is given a distinct challenge artifact, it does
+  not make sense to have different CCA1/CCA2 settings for these properties. Instead,
+  we only consider a CPA setting (no decryption oracle) and a CCA setting (a decryption
+  oracle like in CCA1, i.e., no considered challenge).
+*)
+(*
+  Strong ROBustness under Chosen-Plaintext Attacks (SROB-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decrypts to valid plaintexts under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CPA **)
+module type Adv_SROBCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SROB-CPA security game **)
+module SROB_CPA (S : Scheme) (A : Adv_SROBCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, pk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Plaintext Attacks (WROB-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encryption and which one to use (the corresponding secret key of)
+  for decryption. Here, the goal is that the decryption (with the key appointed for
+  decryption) of the encryption (created with the key appointed for encryption) succeeds 
+  (i.e., returns a valid plaintext).
+*)
+(** Adversary class considered for WROB-CPA **)
+module type Adv_WROBCPA = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool * ptxt_t
+}.
+
+(** WROB-CPA security game **)
+module WROB_CPA (S : Scheme) (A : Adv_WROBCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p : ptxt_t;
+    var p' : ptxt_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+
+    (b, p) <@ A.choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    p' <@ S.dec(if b then sk0 else sk1, c);
+    
+    return p' <> None;
+  }
+}.
+
+
+(*
+  Strong ROBustness under Chosen-Ciphertext Attacks (SROB-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decrypts to valid plaintexts under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CCA **)
+module type Adv_SROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SROB-CCA security game **)
+module SROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SROBCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    c <@ A(O0(S), O1(S)).find(pk0, pk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Ciphertext Attacks (WROB-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encryption and which one to use (the corresponding secret key of)
+  for decryption. Here, the goal is that the decryption (with the key appointed for
+  decryption) of the encryption (created with the key appointed for encryption) succeeds 
+  (i.e., returns a valid plaintext).
+*)
+(** Adversary class considered for WROB-CCA **)
+module type Adv_WROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool * ptxt_t
+}.
+
+(** WROB-CCA security game **)
+module WROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WROBCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p : ptxt_t;
+    var p' : ptxt_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (b, p) <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    p' <@ S.dec(if b then sk0 else sk1, c);
+    
+    return p' <> None;
+  }
+}.
+
+
+(*
+  Strong ROBustness under (secret key) LEAKage (SROB-LEAK).
+  The adversary is given two (honestly generated) key pairs and is asked to
+  provide a (single) ciphertext that decrypts to valid plaintexts under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-LEAK **)
+module type Adv_SROBLEAK = {
+  proc find(pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t
+}.
+
+(** SROB-LEAK security game **)
+module SROB_LEAK (S : Scheme) (A : Adv_SROBLEAK) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, sk0, pk1, sk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness (SCFR).
+  As SROB, but additionally requires the resulting plaintexts to be
+  equal to eachother (instead of only requiring them to be valid).
+  
+  Weak Collision-FReeness (WCFR).
+  As WROB, but additionally requires the resulting plaintexts to be
+  equal to eachother (instead of only requiring the final plaintext to be valid).
+*)
+(*
+  Strong Collision-FReeness under Chosen-Plaintext Attacks (SCFR-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decrypts to the same valid plaintext under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CPA **)
+module type Adv_SCFRCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SCFR-CPA security game **)
+module SCFR_CPA (S : Scheme) (A : Adv_SCFRCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, pk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None /\ p0 = p1;
+  }
+}.
+
+(*
+  Weak Collision-FReeness under Chosen-Plaintext Attacks (WCFR-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encryption and which one to use (the corresponding secret key of)
+  for decryption. Here, the goal is that the decryption (with the key appointed for
+  decryption) of the encryption (created with the key appointed for encryption) returns
+  a valid plaintext that is equal to the encrypted one.
+*)
+(** Adversary class considered for WCFR-CPA **)
+module type Adv_WCFRCPA = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool * ptxt_t
+}.
+
+(** WCFR-CPA security game **)
+module WCFR_CPA (S : Scheme) (A : Adv_WCFRCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p : ptxt_t;
+    var p' : ptxt_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+
+    (b, p) <@ A.choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    p' <@ S.dec(if b then sk0 else sk1, c);
+    
+    return p' = Some p;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness under Chosen-Ciphertext Attacks (SCFR-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decrypts to the same valid plaintext under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CCA **)
+module type Adv_SCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SCFR-CCA security game **)
+module SCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SCFRCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    c <@ A(O0(S), O1(S)).find(pk0, pk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None /\ p0 = p1;
+  }
+}.
+
+(*
+  Weak Collision-FReeness under Chosen-Ciphertext Attacks (WCFR-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encryption and which one to use (the corresponding secret key of)
+  for decryption. Here, the goal is that the decryption (with the key appointed for
+  decryption) of the encryption (created with the key appointed for encryption) returns
+  a valid plaintext that is equal to the encrypted one.
+*)
+(** Adversary class considered for WCFR-CCA **)
+module type Adv_WCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool * ptxt_t
+}.
+
+(** WCFR-CCA security game **)
+module WCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WCFRCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p : ptxt_t;
+    var p' : ptxt_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (b, p) <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    c <@ S.enc(if b then pk1 else pk0, p);
+    p' <@ S.dec(if b then sk0 else sk1, c);
+    
+    return p' = Some p;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness under (secret key) LEAKage (SCFR-LEAK).
+  The adversary is given two (honestly generated) key pairs and is asked to
+  provide a (single) ciphertext that decrypts to the same valid plaintext under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-LEAK **)
+module type Adv_SCFRLEAK = {
+  proc find(pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t
+}.
+
+(** SCFR-LEAK security game **)
+module SCFR_LEAK (S : Scheme) (A : Adv_SCFRLEAK) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var p0, p1 : ptxt_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, sk0, pk1, sk1);
+    
+    p0 <@ S.dec(sk0, c);
+    p1 <@ S.dec(sk1, c);
+    
+    return p0 <> None /\ p1 <> None /\ p0 = p1;
+  }
+}.
+
+
+(** Delta-correct (i.e., partially-correct) PKE schemes. **)
+theory DeltaCorrect.
+(* Correctness (partial/delta) *)
+(** Adversary class considered for (partial/delta) correctness **)
+module type Adv_Cor = {
+  proc find(pk : pk_t, sk : sk_t) : ptxt_t
+}.
+
+(** Correctness (partial/delta) game **)
+module Correctness_Delta (S : Scheme) (A : Adv_Cor) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p : ptxt_t;
+    var c : ctxt_t;
+    var p' : ptxt_t option;
+    
+    (pk, sk) <@ S.keygen();
+    
+    p <@ A.find(pk, sk);
+    
+    c <@ S.enc(pk, p);
+    p' <@ S.dec(sk, c);
+    
+    return p' <> Some p;
+  }
+}.
+
+
+(* Attacker capabilities/models (additional) *)
+(* 
+  Plaintext Checking Attacks (PCA)
+  The adversary is given the considered public key and access to a 
+  plaintext-checking oracle (with which it can check whether a ciphertext
+  decrypts to a certain plaintext).
+*)
+(* Oracles *)
+(** Interface for Plaintext-Checking (PC) oracles used by games **)
+module type Oracles_PCi (S : Scheme) = {
+  proc init(sk_init : sk_t) : unit
+  proc check(p : ptxt_t, c : ctxt_t) : bool
+}.
+
+(** A default implementation for the plaintext-checking oracles **)
+module (O_PC_Default : Oracles_PCi) (S : Scheme) = {
+  var sk : sk_t
+  var qs : (ptxt_t * ctxt_t * bool) list
+  
+  proc init(sk_init : sk_t) = {
+    sk <- sk_init;
+    qs <- [];
+  }
+  
+  proc check(p : ptxt_t, c : ctxt_t) : bool = {
+    var p' : ptxt_t option;
+    
+    p' <@ S.dec(sk, c);
+    
+    return p' = Some p;
+  }
+}.
+
+(** Interface for PC oracles given to adversaries **)
+module type Oracles_PC = {
+  proc check(p : ptxt_t, c : ctxt_t) : bool
+}.
+
+
+(* 
+  (ciphertext) Validity Checking Attacks (VCA)
+  The adversary is given the considered public key and access to a 
+  (ciphertext) validity-checking oracle (with which it can check whether any
+  ciphertext, potentially barring any challenge ciphertexts, decrypts succesfully).
+*)
+(** Interface for Ciphertext-Validity (CV) oracles used by games **)
+module type Oracles_CVi (S : Scheme) = {
+  proc init(sk_init : sk_t, c'_init : ctxt_t ) : unit
+  proc check(c : ctxt_t) : bool option
+}.
+
+(** A default implementation for the ciphertext-validity oracles **)
+module (O_CV_Default : Oracles_CVi) (S : Scheme) = {
+  var sk : sk_t
+  var c' : ctxt_t
+  var qs : (ctxt_t * bool) list
+  
+  proc init(sk_init : sk_t, c'_init : ctxt_t) : unit = {
+    sk <- sk_init;
+    c' <- c'_init;
+    qs <- [];
+  }
+  
+  proc check(c : ctxt_t) : bool option = {
+    var p : ptxt_t option;
+    var b : bool option;
+    
+    if (c <> c') {
+      p <@ S.dec(sk, c);
+      b <- Some (p <> None);
+    } else {
+      b <- None;    
+    }
+    
+    return b;
+  }
+}.
+
+(** Interface for CV oracles given to adversaries **)
+module type Oracles_CV = {
+  proc check(c : ctxt_t) : bool option
+}.
+
+(* 
+  Plaintext and (ciphertext) Validity Checking Attacks (PVCA)
+  The adversary is given the considered public key, as well as access to both
+  a plaintext-checking oracle and a (ciphertext) validity-checking oracle.
+  Essentially combines PCA and VCA.
+*)
+
+
+(* Security (delta-correct) *)
+(**
+  One-Wayness (OW).
+  The adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext. In the context of delta-correct schemes, there
+  have been two ways to perform the final check: directly checking equality
+  of messages (as for perfectly correct schemes), or via the plaintext-checking oracle.
+  Both are equivalent up to the challenge message inducing a correctness failure.
+  Here, we provide both definitions (an _O suffix indicates that the oracle is used for
+  the final check). 
+**)
+abstract theory OW.
+(* Distributions *)
+(** (Sub-)Distribution over plaintexts (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the message space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dptxtm : pk_t -> ptxt_t distr.
+
+
+(* One-Wayness under Chosen-Plaintext Attacks (OW-CPA) *)
+(** Adversary class considered for OW-CPA **)
+module type Adv_OWCPA = {
+  proc find(pk : pk_t, c : ctxt_t) : ptxt_t
+}.
+
+(** OW-CPA security game **)
+(**  
+  Identical to OW-CPA game for perfectly correct schemes.
+  Provided here for convenience.
+**)
+module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    
+    p' <@ A.find(pk, c);
+    
+    return p' = p; 
+  }
+}.
+
+(** OW-CPA (final check performed with oracle) security game **)
+module OW_CPA_O (S : Scheme) (O : Oracles_PCi) (A : Adv_OWCPA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    
+    p' <@ A.find(pk, c);
+    
+    is_pre <@ O(S).check(p', c);
+    
+    return is_pre; 
+  }
+}.
+
+
+(* 
+  One-Wayness under Plaintext-Checking Attacks (OW-PCA).
+  In a PCA setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-PCA **)
+module type Adv_OWPCA (O : Oracles_PC) = {
+  proc find(pk : pk_t, c : ctxt_t) : ptxt_t
+}.
+
+(** OW-PCA security game **)
+module OW_PCA (S : Scheme) (O : Oracles_PCi) (A : Adv_OWPCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    
+    p' <@ A(O(S)).find(pk, c);
+    
+    return p' = p; 
+  }
+}.
+
+(** OW-PCA (final check performed with oracle) security game **)
+module OW_PCA_O (S : Scheme) (O : Oracles_PCi) (A : Adv_OWPCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    
+    p' <@ A(O(S)).find(pk, c);
+    
+    is_pre <@ O(S).check(p', c);
+    
+    return is_pre; 
+  }
+}.
+
+
+(* 
+  One-Wayness under Validity Checking Attacks (OW-VCA) 
+  In a VCA setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-VCA **)
+module type Adv_OWVCA (O : Oracles_CV) = {
+  proc find(pk : pk_t, c : ctxt_t) : ptxt_t
+}.
+
+(** OW-VCA security game **)
+module OW_VCA (S : Scheme) (OCV : Oracles_CVi) (A : Adv_OWVCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    OCV(S).init(sk, c);
+    
+    p' <@ A(OCV(S)).find(pk, c);
+    
+    return p' = p; 
+  }
+}.
+
+(** OW-VCA (final check performed with oracle) security game **)
+module OW_VCA_O (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWVCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    OPC(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    OCV(S).init(sk, c);
+    
+    p' <@ A(OCV(S)).find(pk, c);
+    
+    is_pre <@ OPC(S).check(p', c);
+    
+    return is_pre; 
+  }
+}.
+
+
+(* 
+  One-Wayness under Plaintext and Validity Checking Attacks (OW-PVCA)
+  In a PVCA setting, the adversary is asked to produce the message/plaintext 
+  encrypted by a given ciphertext.
+*)
+(** Adversary class considered for OW-PVCA **)
+module type Adv_OWPVCA (OPC : Oracles_PC, OCV : Oracles_CV) = {
+  proc find(pk : pk_t, c : ctxt_t) : ptxt_t
+}.
+
+(** OW-PVCA security game **)
+module OW_PVCA (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWPVCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    OPC(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    OCV(S).init(sk, c);
+    
+    p' <@ A(OPC(S), OCV(S)).find(pk, c);
+    
+    return p' = p; 
+  }
+}.
+
+(** OW-PVCA (final check performed with oracle) security game **)
+module OW_PVCA_O (S : Scheme) (OPC : Oracles_PCi) (OCV : Oracles_CVi) (A : Adv_OWPVCA) = {
+  proc main() = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var p, p' : ptxt_t;
+    var c : ctxt_t;
+    var is_pre : bool;
+    
+    (pk, sk) <@ S.keygen();
+    OPC(S).init(sk);
+    
+    p <$ dptxtm pk;
+    c <@ S.enc(pk, p);
+    OCV(S).init(sk, c);
+    
+    p' <@ A(OPC(S), OCV(S)).find(pk, c);
+    
+    is_pre <@ OPC(S).check(p', c);
+    
+    return is_pre; 
+  }
+}.
+
+end OW.
+
+end DeltaCorrect.
