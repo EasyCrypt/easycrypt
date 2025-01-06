@@ -117,3 +117,23 @@ apply eqr_le; split => [|_].
 rewrite -ler_pdivl_mull //; apply lub_le_ub => // x Ex.
 by rewrite ler_pdivl_mull //; smt(lub_upper_bound has_lub_scale). 
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lub_cBf (E : real -> bool) : nonempty E =>
+  lub (fun x => exists y, E y /\ x = (ceil y - floor y)%r)
+    = b2r (exists x, E x /\ !isint x).
+proof.
+case=> z Ez; pose P (x : real) := exists (y : real),
+  E y /\ x = (ceil y - floor y)%r.
+have hlP: has_lub P; first split.
+- exists ((ceil z)%r - (floor z)%r); smt().
+  exists 1%r => x [y] [_ ->>]; smt(cBf_eq0P cBf_eq1P).
+rewrite RealOrder.eqr_le; split=> [|_].
+- apply: lub_le_ub => // x [y] [Ey ->>]; case: (isint y).
+  - by move/cBf_eq0P => -> /#.
+  - by move=> ^/cBf_eq1P -> Nint_y; rewrite iftrue //; exists y.
+- apply: lub_upper_bound => //; case: (exists x, E x /\ !isint x).
+  - by case=> x [Ex /cBf_eq1P Nint_x] @/P; exists x; rewrite Nint_x.
+  rewrite negb_exists /= => /(_ z); rewrite Ez /=.
+  by move/cBf_eq0P => int_z; exists z; rewrite int_z.
+qed.
