@@ -65,59 +65,11 @@ type ppattern =
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
-and pexpr_r =
-  | PEcast   of pexpr * pty                       (* type cast          *)
-  | PEint    of zint                              (* int. literal       *)
-  | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
-  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp    of pexpr * pexpr list                (* op. application    *)
-  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
-  | PEtuple  of pexpr list                        (* tuple constructor  *)
-  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PEmatch  of pexpr * (ppattern * pexpr) list   (* match              *)
-  | PEforall of ptybindings * pexpr               (* forall quant.      *)
-  | PEexists of ptybindings * pexpr               (* exists quant.      *)
-  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord of pexpr option * pexpr rfield list  (* record             *)
-  | PEproj   of pexpr * pqsymbol                  (* projection         *)
-  | PEproji  of pexpr * int                       (* tuple projection   *)
-  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
-
-and pexpr = pexpr_r located
-and pexpr_wty = pexpr * pty option
-
 and 'a rfield = {
   rf_name  : pqsymbol;
   rf_tvi   : ptyannot option;
   rf_value : 'a;
 }
-
-(* -------------------------------------------------------------------- *)
-type plvalue_r =
-  | PLvSymbol of pqsymbol
-  | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr list
-
-and plvalue = plvalue_r located
-
-type pinstr_r =
-  | PSident  of psymbol
-  | PSasgn   of plvalue * pexpr
-  | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pgamepath * (pexpr list) located
-  | PSif     of pscond * pscond list * pstmt
-  | PSwhile  of pscond
-  | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
-
-and psmatch = [
-  | `Full of (ppattern * pstmt) list
-  | `If   of (ppattern * pstmt) * pstmt option
-]
-
-and pscond = pexpr * pstmt
-and pinstr = pinstr_r located
-and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type is_local = [ `Local | `Global]
@@ -172,7 +124,37 @@ type glob_or_var =
   | GVglob of pmsymbol located * pqsymbol list
   | GVvar  of pqsymbol
 
-type pformula  = pformula_r located
+(* -------------------------------------------------------------------- *)
+type plvalue_r =
+  | PLvSymbol of pqsymbol
+  | PLvTuple  of pqsymbol list
+  | PLvMap    of pqsymbol * ptyannot option * pexpr list
+
+and plvalue = plvalue_r located
+
+and pinstr_r =
+  | PSident  of psymbol
+  | PSasgn   of plvalue * pexpr
+  | PSrnd    of plvalue * pexpr
+  | PScall   of plvalue option * pgamepath * (pexpr list) located
+  | PSif     of pscond * pscond list * pstmt
+  | PSwhile  of pscond
+  | PSmatch  of pexpr * psmatch
+  | PSassert of pexpr
+
+and psmatch = [
+  | `Full of (ppattern * pstmt) list
+  | `If   of (ppattern * pstmt) * pstmt option
+]
+
+and pscond = pexpr * pstmt
+and pinstr = pinstr_r located
+and pstmt  = pinstr list
+
+and pexpr   = pexpr_r located
+and pexpr_r = Expr of pformula
+
+and pformula  = pformula_r located
 
 and pformula_r =
   | PFhole

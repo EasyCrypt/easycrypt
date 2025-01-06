@@ -198,6 +198,23 @@ let rec s_eqobs_in_rev rsl rsr sim local (eqo:Mpv2.t) =
 
 and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
   match il.i_node, ir.i_node with
+  | Sasgn(LvTuple lvls as lvl, ({e_node = Etuple els} as el)), Sasgn(LvTuple lvrs as lvr, ({e_node = Etuple ers} as er)) ->
+    let unpack lvs es =
+        let mk_assigns = List.map2 (fun lv e -> mk_instr (Sasgn (LvVar lv, e))) in
+        let lvs' = List.mapi (
+            (* These new variables will disappear after s_eqobs_in thanks
+               to the two consecutive assignments. *)
+            fun i (_, ty) -> PVloc (Format.sprintf "$i_eqobs_in_tup_tmp%i" i), ty
+            ) lvs in
+        let lvs2expr lvs = List.map (fun (lv, ty) -> mk_expr (Evar lv) ty) lvs in
+        stmt ((mk_assigns lvs' es) @ (mk_assigns lvs (lvs2expr lvs')))
+        in
+    let l1, l2, sim', eqo' = s_eqobs_in (unpack lvls els) (unpack lvrs ers) sim local eqo in
+    if l1 = [] && l2 = [] then
+      (sim', eqo')
+    else
+      sim, add_eqs sim local (remove sim lvl lvr eqo) el er
+
   | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
     sim, add_eqs sim local (remove sim lvl lvr eqo) el er
 

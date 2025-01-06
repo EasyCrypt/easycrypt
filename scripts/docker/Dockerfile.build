@@ -16,6 +16,15 @@ COPY --chmod=0755 --chown=1001:0 docker-parts/alt-ergo bin/run-alt-ergo
 ENV PATH="/home/charlie/bin:$PATH"
 
 RUN \
+	version=2.6.0 && \
+	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
+	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
+	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
+	opam install --switch=alt-ergo-${version} alt-ergo && \
+	opam clean   --switch=alt-ergo-${version} && \
+	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
+
+RUN \
 	version=2.5.4 && \
 	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
 	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
