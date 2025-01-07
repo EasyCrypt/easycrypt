@@ -1994,8 +1994,12 @@ module Ty = struct
       ; tci_instance = `General (tcp, Some symbols)
       ; tci_local    = lc } in
 
+    let name =
+      Format.sprintf "%s#%d"
+      (EcPath.basename tcp.tc_name) (EcUid.unique ()) in
+
     let scope =
-      let item = EcTheory.Th_instance (None, instance) in (* FIXME *)
+      let item = EcTheory.Th_instance (Some name, instance) in (* FIXME:TC *)
       let item = EcTheory.mkitem import item in
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
 

@@ -8,7 +8,7 @@ open EcDecl
 type problem = [
   | `TyUni of ty * ty
   | `TcTw  of tcwitness * tcwitness
-  | `TcCtt of EcUid.uid * ty * typeclass
+  | `TcCtt of EcAst.tcuni * ty * typeclass
 ]
 
 type uniflags = { tyvars: bool; tcvars: bool; }

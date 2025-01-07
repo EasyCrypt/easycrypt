@@ -14,7 +14,7 @@ module Sp = EcPath.Sp
 type problem = [
   | `TyUni of ty * ty
   | `TcTw  of tcwitness * tcwitness
-  | `TcCtt of EcUid.uid * ty * typeclass
+  | `TcCtt of tcuni * ty * typeclass
 ]
 
 (* ==================================================================== *)
@@ -73,14 +73,10 @@ module Unify = struct
   }
 
   and tcenv = {
-    (* Map from UID to TC problems. The UID set collects all the    *
-     * unification variables the TC problem depends on. Only        *
-     * fully instantiated problems trigger a type-class resolution. *)
-    problems : (TyUni.Suid.t * typeclass) TcUni.Muid.t;
+    (* Map from UID to TC problems.                                 *)
+    problems : (ty * typeclass) TcUni.Muid.t;
 
-    (* Map from univars to TC problems that depend on them. This    *
-     * map is kept in sync with the UID set that appears in the     *
-     * bindings of [problems]                                       *)
+    (* Map from univars to TC problems that depend on them.         *)
     byunivar : TcUni.Suid.t TyUni.Muid.t;
 
     (* Map from problems UID to type-class instance witness         *)
@@ -110,7 +106,7 @@ module Unify = struct
     let deps = Tuni.univars ty in (* FIXME:TC *)
 
     let tcenv = {
-      problems = TcUni.Muid.add uid (deps, tc) tcenv.problems;
+      problems = TcUni.Muid.add uid (ty, tc) tcenv.problems;
       byunivar = TyUni.Suid.fold (fun duni byunivar ->
           TyUni.Muid.change (fun pbs ->
             Some (TcUni.Suid.add uid (Option.value ~default:TcUni.Suid.empty pbs))
@@ -159,22 +155,22 @@ module Unify = struct
   let unify_core (env : EcEnv.env) (uc : ucore) (pb : problem) : ucore =
     let failure () = raise (UnificationFailure pb) in
 
-    let uf = ref uc.uf in
+    let uc = ref uc in
     let pb = let x = Queue.create () in Queue.push pb x; x in
 
     let ocheck i t =
-      let i   = UF.find i !uf in
+      let i   = UF.find i (!uc).uf in
       let map = Hint.create 0 in
 
       let rec doit t =
         match t.ty_node with
         | Tunivar i' -> begin
-            let i' = UF.find i' !uf in
+            let i' = UF.find i' (!uc).uf in
             match i' with
             | _ when i = i' -> true
             | _ when Hint.mem map (i' :> int) -> false
             | _ ->
-                match UF.data i' !uf with
+                match UF.data i' (!uc).uf with
                 | None   -> Hint.add map (i' :> int) (); false
                 | Some t ->
                   match doit t with
@@ -187,17 +183,35 @@ module Unify = struct
         doit t
     in
 
-    let setvar i t =
+    let setvar (i : tyuni) (t : ty) =
       let (ti, effects) =
-        UFArgs.D.union (UF.data i !uf) (Some t)
+        UFArgs.D.union (UF.data i (!uc).uf) (Some t)
       in
         if odfl false (ti |> omap (ocheck i)) then failure ();
         List.iter (Queue.push^~ pb) effects;
-        uf := UF.set i ti !uf
+
+        begin
+          (* FIXME:TC (cache!)*)
+          match TyUni.Muid.find i (!uc).tcenv.byunivar with
+          | tcpbs ->
+            uc := { !uc with tcenv = { (!uc).tcenv with
+              byunivar = TyUni.Muid.remove i (!uc).tcenv.byunivar
+            } };
+            let tcpbs = TcUni.Suid.elements tcpbs in
+            let tcpbs = List.map (fun uid ->
+              let pb = TcUni.Muid.find uid (!uc).tcenv.problems in
+              (uid, pb)
+            ) tcpbs in
+            List.iter (fun (uid, (ty, tc)) -> Queue.push (`TcCtt (uid, ty, tc)) pb) tcpbs
+
+          | exception Not_found -> ()
+        end;
+
+        uc := { !uc with uf = UF.set i ti (!uc).uf }
 
     and getvar t =
       match t.ty_node with
-      | Tunivar i -> odfl t (UF.data i !uf)
+      | Tunivar i -> odfl t (UF.data i (!uc).uf)
       | _ -> t
     in
 
@@ -213,7 +227,11 @@ module Unify = struct
               match t1.ty_node, t2.ty_node with
               | Tunivar id1, Tunivar id2 -> begin
                   if not (TyUni.uid_equal id1 id2) then
-                    let effects = reffold (swap |- UF.union id1 id2) uf in
+                    let effects =
+                        reffold (fun uc ->
+                          let uf, effects = UF.union id1 id2 uc.uf in
+                          effects, { uc with uf }
+                        ) uc in
                     List.iter (Queue.push^~ pb) effects
               end
 
@@ -251,11 +269,83 @@ module Unify = struct
           end
         end
 
+        | `TcCtt (uid, ty, tc) ->
+          if not (List.is_empty tc.tc_args) then
+            failure ();
+
+          let deps = ref TyUni.Suid.empty in
+
+          let rec check (ty : ty) : ty =
+            match ty.ty_node with
+            | Tunivar tyuvar -> begin
+              match UF.data tyuvar (!uc).uf with
+              | None -> 
+                deps := TyUni.Suid.add tyuvar !deps;
+                ty
+              | Some ty ->
+                check ty
+              end
+            | _ -> ty_map check ty in
+
+          let ty = check ty in
+          let deps = !deps in
+
+          let check_tci (tci : EcTheory.tcinstance) : bool =
+            let exception Bailout in
+
+            try
+              begin
+                match tci.tci_instance with
+                | `General (tc', _) ->
+                  if not (List.is_empty tc'.tc_args) then
+                    raise Bailout;
+                  if not (EcPath.p_equal tc'.tc_name tc.tc_name) then
+                    raise Bailout
+                | _ -> raise Bailout
+              end;
+              if not (List.is_empty tci.tci_params) then
+                raise Bailout;
+                if not (EcCoreEqTest.for_type env ty tci.tci_type) then
+                raise Bailout;
+              true
+
+            with Bailout ->
+              false in
+
+          if TyUni.Suid.is_empty deps then begin
+            let tci =
+                EcEnv.TcInstance.get_all env
+              |> List.to_seq
+              |> Seq.filter_map (fun (p, tci) -> Option.map (fun p -> (p, tci)) p)
+              |> Seq.filter (fun (_, tci) -> check_tci tci)
+              |> Seq.uncons |> Option.map (fst |- fst) in
+
+            match tci with
+            | None ->
+              failure ()
+
+            | Some tci ->
+              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                TcUni.Muid.add uid (TCIConcrete {
+                  path = tci; etyargs = [];
+                }) (!uc).tcenv.resolution
+              } }
+          end else begin
+            TyUni.Suid.iter (fun tyvar ->
+              uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
+                TyUni.Muid.change (fun map ->
+                  let map = Option.value ~default:TcUni.Suid.empty map in
+                  Some (TcUni.Suid.add uid map)
+                ) tyvar (!uc).tcenv.byunivar
+              } }
+            ) deps
+          end
+
         | _ ->
           () (* FIXME:TC *)
       done
     in
-      doit (); { uc with uf = !uf }
+      doit (); !uc
 
   (* -------------------------------------------------------------------- *)
   type closed = { tyuni : ty -> ty; tcuni : tcwitness -> tcwitness; }
