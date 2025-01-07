@@ -134,6 +134,9 @@ and etyarg_map (f : ty -> ty) ((ty, tcw) : etyarg) : etyarg =
 
 and tcw_map (f : ty -> ty) (tcw : tcwitness) : tcwitness =
   match tcw with
+  | TCIUni _ ->
+    tcw
+
   | TCIConcrete { path; etyargs; } ->
     let etyargs = List.Smart.map (etyarg_map f) etyargs in
     TCIConcrete { path; etyargs; }
@@ -158,7 +161,7 @@ and tcw_fold (f : 'a -> ty -> 'a) (v : 'a) (tcw : tcwitness) : 'a =
   | TCIConcrete { etyargs } ->
     List.fold_left (etyarg_fold f) v etyargs
 
-  | TCIAbstract _ ->
+  | TCIUni _ | TCIAbstract _ ->
     v
 
 (* -------------------------------------------------------------------- *)
@@ -271,13 +274,16 @@ and tcws_tvar_fv (tcws : tcwitness list) =
 
 and tcw_tvar_fv (tcw : tcwitness) : Sid.t =
   match tcw with
+  | TCIUni _ ->
+    Sid.empty
+
   | TCIConcrete { etyargs } ->
     etyargs_tvar_fv etyargs
 
   | TCIAbstract { support = `Var tyvar } ->
     Sid.singleton tyvar
 
-  | TCIAbstract { support = (`Univar _ | `Abs _) } ->
+  | TCIAbstract { support = (`Abs _) } ->
     Sid.empty
   
 (* -------------------------------------------------------------------- *)

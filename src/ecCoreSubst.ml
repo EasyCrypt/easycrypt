@@ -17,7 +17,8 @@ type mod_extra = {
 (* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
-  fs_u       : etyarg Muid.t;
+  fs_u       : ty Muid.t;
+  fs_utc     : tcwitness Muid.t;
   fs_v       : etyarg Mid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
@@ -48,21 +49,35 @@ let fv_Mid (type a)
   Mid.fold (fun _ t s -> fv_union s (fv t)) m s
 
 (* -------------------------------------------------------------------- *)
+type unisubst = {
+  uvars   : ty Muid.t;
+  utcvars : tcwitness Muid.t;
+}
+
+(* -------------------------------------------------------------------- *)
+let unisubst0 : unisubst = {
+  uvars = Muid.empty; utcvars = Muid.empty;
+}
+
+(* -------------------------------------------------------------------- *)
 let f_subst_init
-      ?(freshen=false)
-      ?(tu=Muid.empty)
-      ?(tv=Mid.empty)
-      ?(esloc=Mid.empty)
-      () =
+  ?(freshen = false)
+  ?(tu      = unisubst0)
+  ?(tv      = Mid.empty)
+  ?(esloc   = Mid.empty)
+  ()
+=
 
   let fv = Mid.empty in
-  let fv = Muid.fold (fun _ t s -> fv_union s (etyarg_fv t)) tu fv in
+  let fv = Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu.uvars fv in
+  let fv = Muid.fold (fun _ t s -> fv_union s (tcw_fv t)) tu.utcvars fv in
   let fv = fv_Mid etyarg_fv tv fv in
   let fv = fv_Mid e_fv esloc fv in
 
   {
     fs_freshen  = freshen;
-    fs_u        = tu;
+    fs_u        = tu.uvars;
+    fs_utc      = tu.utcvars;
     fs_v        = tv;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
@@ -166,7 +181,7 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
 
   | Tunivar id ->
        Muid.find_opt id s.fs_u
-    |> Option.map (fun (ty, _) -> ty_subst s ty)
+    |> Option.map (ty_subst s)
     |> Option.value ~default:ty
 
   | Tvar id ->
@@ -190,7 +205,11 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
 (* -------------------------------------------------------------------- *)
 and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
   match tcw with
-  | TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
+  | TCIUni uid ->
+       Muid.find_opt uid s.fs_utc
+    |> Option.value ~default:tcw
+
+| TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
     let etyargs = List.Smart.map (etyarg_subst s) etyargs0 in
     if etyargs ==(*phy*) etyargs0 then
       tcw
@@ -198,11 +217,6 @@ and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
 
   | TCIAbstract { support = `Var tyvar; offset } ->
        Mid.find_opt tyvar s.fs_v
-    |> Option.map (fun (_, tcws) -> List.nth tcws offset)
-    |> Option.value ~default:tcw
-
-  | TCIAbstract { support = `Univar uni; offset } ->
-       Muid.find_opt uni s.fs_u
     |> Option.map (fun (_, tcws) -> List.nth tcws offset)
     |> Option.value ~default:tcw
 
@@ -768,13 +782,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
-  let subst (uidmap : etyarg Muid.t) : f_subst =
+  let subst (uidmap : unisubst) : f_subst =
     f_subst_init ~tu:uidmap ()
 
-  let subst1 ((id, t) : uid * etyarg) : f_subst =
-    subst (Muid.singleton id t)
+  let subst1 ((id, t) : uid * ty) : f_subst =
+    subst { unisubst0 with uvars = Muid.singleton id t }
 
-  let subst_dom (uidmap : etyarg Muid.t) (dom : dom) : dom =
+  let subst_dom (uidmap : unisubst) (dom : dom) : dom =
     List.map (ty_subst (subst uidmap)) dom
 
   let occurs (u : uid) : ty -> bool =

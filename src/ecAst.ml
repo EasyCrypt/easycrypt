@@ -57,9 +57,11 @@ and ty_node =
   | Tfun    of ty * ty
 
 (* -------------------------------------------------------------------- *)
-and etyarg    = ty * tcwitness list
+and etyarg = ty * tcwitness list
 
 and tcwitness =
+  | TCIUni of EcUid.uid
+
   | TCIConcrete of {
       path: EcPath.path;
       etyargs: (ty * tcwitness list) list;
@@ -68,12 +70,11 @@ and tcwitness =
   | TCIAbstract of {
       support: [
         | `Var    of EcIdent.t
-        | `Univar of EcUid.uid
         | `Abs    of EcPath.path
       ];
       offset: int;
   }
-  
+
 (* -------------------------------------------------------------------- *)
 and ovariable = {
   ov_name : EcSymbols.symbol option;
@@ -374,6 +375,9 @@ let lp_fv = function
 (* -------------------------------------------------------------------- *)
 let rec tcw_fv (tcw : tcwitness) =
   match tcw with
+  | TCIUni _  ->
+    Mid.empty
+
   | TCIConcrete { etyargs } ->
     List.fold_left
       (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
@@ -398,6 +402,9 @@ let etyargs_fv (tyargs : etyarg list) =
 (* -------------------------------------------------------------------- *)
 let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
+  | TCIUni uid1, TCIUni uid2 ->
+    uid_equal uid1 uid2
+
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path
     && List.all2 etyarg_equal tcw1.etyargs tcw2.etyargs
@@ -409,8 +416,6 @@ let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
       match support1, support2 with
       | `Var x1, `Var x2 ->
         EcIdent.id_equal x1 x2
-      | `Univar u1, `Univar u2 ->
-        uid_equal u1 u2
       | `Abs p1, `Abs p2 ->
         EcPath.p_equal p1 p2
       | _, _ -> false
@@ -426,6 +431,9 @@ and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
 (* -------------------------------------------------------------------- *)
 let rec tcw_hash (tcw : tcwitness) =
   match tcw with
+  | TCIUni uid ->
+    Hashtbl.hash uid
+
   | TCIConcrete tcw ->
     Why3.Hashcons.combine_list
       etyarg_hash
@@ -435,9 +443,6 @@ let rec tcw_hash (tcw : tcwitness) =
   | TCIAbstract { support = `Var tyvar; offset } ->
     Why3.Hashcons.combine (EcIdent.id_hash tyvar) offset
 
-  | TCIAbstract { support = `Univar uni; offset } ->
-    Why3.Hashcons.combine (Hashtbl.hash uni) offset
-  
   | TCIAbstract { support = `Abs p; offset } ->
     Why3.Hashcons.combine (EcPath.p_hash p) offset
 

@@ -118,10 +118,10 @@ module Unify = struct
 
     let tcs, tws = List.split (Option.value ~default:[] tcs) in
 
-    let tws = tws |> List.mapi (fun i tcw ->
+    let tws = tws |> List.map (fun tcw ->
       match tcw with
       | None ->
-        TCIAbstract { support = `Univar uid; offset = i }
+        TCIUni (EcUid.unique ()) (* FIXME:TC *)
       | Some tcw ->
         tcw
     ) in
@@ -271,7 +271,7 @@ module Unify = struct
     List.fold_left (fun m uid ->
       match close (tuni uid) with
       | { ty_node = Tunivar uid' } when uid_equal uid uid' -> m
-      | t -> Muid.add uid (t, []) m (* FIXME:TC *)
+      | t -> Muid.add uid t m
     ) Muid.empty (UF.domain uc.uf)
 end
 
@@ -440,12 +440,13 @@ module UniEnv = struct
   let closed (ue : unienv) =
     Unify.UF.closed (!ue).ue_uc.uf (* FIXME:TC *)
 
+  let assubst (ue : unienv) =
+    { uvars = Unify.subst_of_uf (!ue).ue_uc
+    ; utcvars = Muid.empty; (* FIXME:TC *) }
+
   let close (ue : unienv) =
     if not (closed ue) then raise UninstanciateUni;
-    (Unify.subst_of_uf (!ue).ue_uc)
-
-  let assubst (ue : unienv) =
-    Unify.subst_of_uf (!ue).ue_uc
+    assubst ue
 
   let tparams (ue : unienv) =
     let fortv x = odfl [] (Mid.find_opt x (!ue).ue_uc.tvtc) in
@@ -460,25 +461,6 @@ let unify_core (env : EcEnv.env) (ue : unienv) (pb : problem) =
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) (t1 : ty) (t2 : ty) =
   unify_core env ue (`TyUni (t1, t2))
-
-let xhastc_r (env : EcEnv.env) (ue : unienv) (ty : ty) (tc : typeclass) =
-  let uid = EcUid.unique () in
-  unify_core env ue (`TcCtt (uid, ty, tc));
-  assert false
-
-let hastc_r (env : EcEnv.env) (ue : unienv) (ty : ty) (tc : typeclass) =
-  ignore (xhastc_r env ue ty tc : _ option)
-
-let xhastcs_r (env : EcEnv.env) (ue : unienv) (ty : ty) (tcs : typeclass list) =
-  List.map (hastc_r env ue ty) tcs
-
-let hastcs_r (env : EcEnv.env) (ue : unienv) (ty : ty) (tcs : typeclass list) =
-  List.iter (hastc_r env ue ty) tcs
-
-(* -------------------------------------------------------------------- *)
-let hastc (env : EcEnv.env) (ue : unienv) (ty : ty) (tc : typeclass) =
-  try  Some (xhastc_r env ue ty tc)
-  with UnificationFailure _ -> None
 
 (* -------------------------------------------------------------------- *)
 let tfun_expected (ue : unienv) (psig : ty list) =
@@ -534,15 +516,17 @@ let select_op
     let subue = UniEnv.copy ue in
 
     try
-      let UniEnv.{ subst = tip; params = tvtcs } =
+      let UniEnv.{ subst = tip; args } =
         UniEnv.opentvi subue op.D.op_tparams tvi in
       let tip = f_subst_init ~tv:tip () in
 
+      (*
       List.iter
         (fun (tv, tcs) ->
           try  hastcs_r env subue tv tcs
           with UnificationFailure _ -> raise E.Failure)
         tvtcs;
+      *)
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue psig in
@@ -562,8 +546,6 @@ let select_op
 
         | _ -> None
       in
-
-      let args = List.map (fun ty -> (ty, [])) (List.fst tvtcs) in
 
       Some ((path, args), top, subue, bd) (* FIXME:TC *)
 

@@ -116,6 +116,9 @@ and on_etyarg cb ((ty, tcw) : etyarg) =
 
 and on_tcwitness cb (tcw : tcwitness) =
   match tcw with
+  | TCIUni _ ->
+    ()
+
   | TCIConcrete { path; etyargs } ->
     List.iter (on_etyarg cb) etyargs;
     cb (`Type path)                  (* FIXME:TC *)
@@ -123,7 +126,7 @@ and on_tcwitness cb (tcw : tcwitness) =
   | TCIAbstract { support = `Abs path } ->
     cb (`Type path)
 
-  | TCIAbstract { support = `Var _ | `Univar _ } ->
+  | TCIAbstract { support = `Var _ } ->
     ()
 
 let on_pv (cb : cb) (pv : prog_var)=

@@ -62,6 +62,9 @@ and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
 
 and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
+  | TCIUni uid1, TCIUni uid2 ->
+    EcUid.uid_equal uid1 uid2
+
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path
     && for_etyargs env tcw1.etyargs tcw2.etyargs
@@ -69,10 +72,6 @@ and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
   | TCIAbstract { support = `Var v1; offset = o1 },
     TCIAbstract { support = `Var v2; offset = o2 } ->
     EcIdent.id_equal v1 v2 && o1 = o2
-
-  | TCIAbstract { support = `Univar v1; offset = o1 },
-    TCIAbstract { support = `Univar v2; offset = o2 } ->
-    EcUid.uid_equal v1 v2 && o1 = o2
 
   | TCIAbstract { support = `Abs p1; offset = o1 },
     TCIAbstract { support = `Abs p2; offset = o2 } ->

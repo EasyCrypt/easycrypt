@@ -197,6 +197,9 @@ and subst_etyargs (s : subst) (tyargs : etyarg list) : etyarg list =
 (* -------------------------------------------------------------------- *)
 and subst_tcw (s : subst) (tcw : tcwitness) =
   match tcw with
+  | TCIUni _ ->
+    tcw
+
   | TCIConcrete { etyargs; path } ->
     let path = subst_path s path in
     let etyargs = subst_etyargs s etyargs in
@@ -207,9 +210,6 @@ and subst_tcw (s : subst) (tcw : tcwitness) =
     |> Option.map snd
     |> Option.map (fun tcs -> List.nth tcs offset)
     |> Option.value ~default:tcw
-
-  | TCIAbstract { support = `Univar _ } ->
-    tcw
 
   | TCIAbstract ({ support = `Abs p  } as tcw) ->
     match Mp.find_opt p s.sb_tydef with

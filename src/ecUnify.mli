@@ -1,9 +1,6 @@
 (* -------------------------------------------------------------------- *)
-open EcUid
 open EcIdent
-open EcPath
 open EcSymbols
-open EcMaps
 open EcTypes
 open EcDecl
 
@@ -47,14 +44,12 @@ module UniEnv : sig
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * opened 
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool
-  val close      : unienv -> etyarg Muid.t
-  val assubst    : unienv -> etyarg Muid.t
+  val close      : unienv -> EcCoreSubst.unisubst
+  val assubst    : unienv -> EcCoreSubst.unisubst
   val tparams    : unienv -> ty_params
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
-
-val hastc : EcEnv.env -> unienv -> ty -> typeclass -> ((path * ty list) Mstr.t) option option
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 

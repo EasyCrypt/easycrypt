@@ -2,7 +2,6 @@
 open EcUtils
 open EcSymbols
 open EcLocation
-open EcTypes
 open EcCoreSubst
 open EcParsetree
 open EcDecl
@@ -20,8 +19,8 @@ exception TransPredError of EcLocation.t * EcEnv.env * tperror
 let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let close_pr_body (uni : etyarg EcUid.Muid.t) (body : prbody) =
-  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uni () in
+let close_pr_body (uidmap : unisubst) (body : prbody) =
+  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uidmap () in
   let tsubst = ty_subst fsubst in
 
   match body with

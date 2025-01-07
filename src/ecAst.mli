@@ -56,6 +56,8 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
+  | TCIUni of EcUid.uid
+
   | TCIConcrete of {
       path: EcPath.path;
       etyargs: (ty * tcwitness list) list;
@@ -64,7 +66,6 @@ and tcwitness =
   | TCIAbstract of {
       support: [
         | `Var    of EcIdent.t
-        | `Univar of EcUid.uid
         | `Abs    of EcPath.path
       ];
       offset: int;

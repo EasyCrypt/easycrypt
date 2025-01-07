@@ -561,7 +561,7 @@ let pp_modtype1 (ppe : PPEnv.t) fmt mty =
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
-  Format.fprintf fmt "%s" (EcIdent.tostring x) (* (PPEnv.local_symb ppe x) *)
+  Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
 let pp_local ?fv (ppe : PPEnv.t) fmt x =
@@ -947,6 +947,36 @@ let pp_opname fmt (nm, op) =
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
 
+(* -------------------------------------------------------------------- *)
+let rec pp_etyarg (ppe : PPEnv.t) (fmt : Format.formatter) ((ty, tcws) : etyarg) =
+  Format.fprintf fmt "%a[%a]" (pp_type ppe) ty (pp_tcws ppe) tcws
+
+(* -------------------------------------------------------------------- *)
+and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
+    Format.fprintf fmt "%a" (pp_list ",@ " (pp_etyarg ppe)) etys
+
+(* -------------------------------------------------------------------- *)
+and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
+  match tcw with
+  | TCIUni uid ->
+    Format.fprintf fmt "%a" (pp_tyunivar ppe) uid
+
+  | TCIConcrete { path; etyargs } ->
+    Format.fprintf fmt "%a[%a]"
+      pp_qsymbol (EcPath.toqsymbol path)
+      (pp_etyargs ppe) etyargs
+
+  | TCIAbstract { support = `Var x; offset } ->
+    Format.fprintf fmt "%a.`%d" (pp_tyvar ppe) x (offset + 1)
+  
+  | TCIAbstract { support = `Abs path; offset } ->
+    Format.fprintf fmt "%a.`%d" (pp_tyname ppe) path (offset + 1)
+
+(* -------------------------------------------------------------------- *)
+and pp_tcws (ppe : PPEnv.t) (fmt : Format.formatter) (tcws : tcwitness list) =
+  Format.fprintf fmt "%a" (pp_list ",@ " (pp_tcw ppe)) tcws
+
+(* -------------------------------------------------------------------- *)
 let pp_opname_with_tvi
   (ppe : PPEnv.t)
   (fmt : Format.formatter)
@@ -958,8 +988,7 @@ let pp_opname_with_tvi
 
   | Some tvi ->
       Format.fprintf fmt "%a<:%a>"
-        pp_opname (nm, op)
-        (pp_list ",@ " (pp_type ppe)) (List.fst tvi)
+        pp_opname (nm, op) (pp_etyargs ppe) tvi
 
 (* -------------------------------------------------------------------- *)
 let pp_opapp

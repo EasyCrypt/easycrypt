@@ -676,6 +676,9 @@ let reduce_tc (env : EcEnv.env) (p : path) (tys : etyarg list) =
   let tcw = as_seq1 tcw in
 
   match tcw with
+  | TCIUni _ ->
+    None
+
   | TCIAbstract _ ->
     None
   
