@@ -874,8 +874,11 @@ module Ax = struct
 
     let concl = TT.trans_prop env ue pconcl in
 
-    if not (EcUnify.UniEnv.closed ue) then
-      hierror "the formula contains free type variables";
+    Option.iter (fun infos ->
+      hierror
+        "the formula contains free %a variables"
+        EcUserMessages.TypingError.pp_uniflags infos
+    ) (EcUnify.UniEnv.xclosed ue);
 
     let uidmap = EcUnify.UniEnv.close ue in
     let fs = Tuni.subst uidmap in
@@ -1154,8 +1157,11 @@ module Op = struct
           (opty, `Abstract, [(rname, xs, reft, codom)])
     in
 
-    if not (EcUnify.UniEnv.closed ue) then
-      hierror ~loc "this operator type contains free type variables";
+    Option.iter (fun infos ->
+      hierror ~loc
+        "this operator type contains free %a variables"
+        EcUserMessages.TypingError.pp_uniflags infos
+    ) (EcUnify.UniEnv.xclosed ue);
 
     let uidmap  = EcUnify.UniEnv.close ue in
     let ts      = Tuni.subst uidmap in

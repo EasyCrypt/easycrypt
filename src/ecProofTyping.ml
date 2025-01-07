@@ -25,9 +25,9 @@ let process_form_opt ?mv hyps pf oty =
     let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
-  with EcUnify.UninstanciateUni ->
+  with EcUnify.UninstanciateUni infos ->
     EcTyping.tyerror pf.EcLocation.pl_loc
-      (LDecl.toenv hyps) EcTyping.FreeTypeVariables
+      (LDecl.toenv hyps) (FreeUniVariables infos)
 
 let process_form ?mv hyps pf ty =
   process_form_opt ?mv hyps pf (Some ty)

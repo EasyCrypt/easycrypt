@@ -843,7 +843,7 @@ let f_match opts hyps (ue, ev) f1 f2 =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstanciateUni -> raise MatchFailure
+      with EcUnify.UninstanciateUni _ -> raise MatchFailure
     in
       (ue, clue, ev)
 

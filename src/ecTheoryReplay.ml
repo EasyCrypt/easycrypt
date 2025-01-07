@@ -458,9 +458,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                   clone_error env (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
               end;
 
-              if not (EcUnify.UniEnv.closed ue) then
-                ove.ovre_hooks.herr
-                  ~loc "this operator body contains free type variables";
+              Option.iter (fun infos ->
+                ove.ovre_hooks.herr ~loc
+                  (Format.asprintf
+                    "this operator body contains free %a variables"
+                    EcUserMessages.TypingError.pp_uniflags infos)
+              ) (EcUnify.UniEnv.xclosed ue);
 
               let sty     = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
               let body    = EcFol.Fsubst.f_subst sty body in
@@ -573,9 +576,12 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
                   (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
             end;
 
-            if not (EcUnify.UniEnv.closed ue) then
-              ove.ovre_hooks.herr
-                ~loc "this predicate body contains free type variables";
+            Option.iter (fun infos ->
+              ove.ovre_hooks.herr ~loc
+                (Format.asprintf
+                  "this predicate body contains free %a variables"
+                  EcUserMessages.TypingError.pp_uniflags infos)
+            ) (EcUnify.UniEnv.xclosed ue);
 
             let fs = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
             let body    = EcFol.Fsubst.f_subst fs body in

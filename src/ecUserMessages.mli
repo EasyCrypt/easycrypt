@@ -14,6 +14,7 @@ val set_ppo : pp_options -> unit
 module TypingError : sig
   open EcTyping
 
+  val pp_uniflags        : Format.formatter -> EcUnify.uniflags -> unit
   val pp_tyerror         : env -> Format.formatter -> tyerror -> unit
   val pp_cnv_failure     : env -> Format.formatter -> tymod_cnv_failure -> unit
   val pp_mismatch_funsig : env -> Format.formatter -> mismatch_funsig -> unit

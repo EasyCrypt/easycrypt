@@ -12,7 +12,7 @@ module TT = EcTyping
 (* -------------------------------------------------------------------- *)
 type nterror =
 | NTE_Typing        of EcTyping.tyerror
-| NTE_TyNotClosed
+| NTE_TyNotClosed   of EcUnify.uniflags
 | NTE_DupIdent
 | NTE_UnknownBinder of symbol
 | NTE_AbbrevIsVar
@@ -62,8 +62,8 @@ let trans_notation_r (env : env) (nt : pnotation located) =
   let codom = TT.transty TT.tp_relax env ue nt.nt_codom in
   let body  = TT.transexpcast benv `InOp ue codom nt.nt_body in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    nterror gloc env NTE_TyNotClosed;
+  Option.iter (fun infos -> nterror gloc env (NTE_TyNotClosed infos))
+    @@ EcUnify.UniEnv.xclosed ue;
 
   ignore body; ()
 
@@ -80,8 +80,8 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   let codom = TT.transty TT.tp_relax env ue (fst at.ab_def) in
   let body = TT.transexpcast benv `InOp ue codom (snd at.ab_def) in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    nterror gloc env NTE_TyNotClosed;
+  Option.iter (fun infos -> nterror gloc env (NTE_TyNotClosed infos))
+    @@ EcUnify.UniEnv.xclosed ue;
 
   let ts      = Tuni.subst (EcUnify.UniEnv.close ue) in
   let es      = e_subst ts in

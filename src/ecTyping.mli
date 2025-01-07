@@ -106,7 +106,7 @@ type filter_error =
 
 type tyerror =
 | UniVarNotAllowed
-| FreeTypeVariables
+| FreeUniVariables       of EcUnify.uniflags
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
 | NoConcreteAnonParams

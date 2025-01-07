@@ -10,8 +10,8 @@ module TT = EcTyping
 
 (* -------------------------------------------------------------------- *)
 type tperror =
-| TPE_Typing of EcTyping.tyerror
-| TPE_TyNotClosed
+| TPE_Typing           of EcTyping.tyerror
+| TPE_TyNotClosed      of EcUnify.uniflags
 | TPE_DuplicatedConstr of symbol
 
 exception TransPredError of EcLocation.t * EcEnv.env * tperror
@@ -73,8 +73,9 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
 
   in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    tperror loc env TPE_TyNotClosed;
+  Option.iter
+    (fun infos -> tperror loc env (TPE_TyNotClosed infos))
+    (EcUnify.UniEnv.xclosed ue);
 
   let uidmap  = EcUnify.UniEnv.assubst ue in
   let tparams = EcUnify.UniEnv.tparams ue in

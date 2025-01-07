@@ -11,8 +11,10 @@ type problem = [
   | `TcCtt of EcUid.uid * ty * typeclass
 ]
 
+type uniflags = { tyvars: bool; tcvars: bool; }
+
 exception UnificationFailure of problem
-exception UninstanciateUni
+exception UninstanciateUni of uniflags
 
 type unienv
 
@@ -44,6 +46,7 @@ module UniEnv : sig
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * opened 
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool
+  val xclosed    : unienv -> uniflags option
   val close      : unienv -> EcCoreSubst.unisubst
   val assubst    : unienv -> EcCoreSubst.unisubst
   val tparams    : unienv -> ty_params
