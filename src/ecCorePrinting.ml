@@ -59,7 +59,8 @@ module type PrinterAPI = sig
   val pp_mem      : PPEnv.t -> EcIdent.t pp
   val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
   val pp_tyvar    : PPEnv.t -> ident pp
-  val pp_tyunivar : PPEnv.t -> EcUid.uid pp
+  val pp_tyunivar : PPEnv.t -> EcAst.tyuni pp
+  val pp_tcunivar : PPEnv.t -> EcAst.tcuni pp
   val pp_path     : path pp
 
   (* ------------------------------------------------------------------ *)

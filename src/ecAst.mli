@@ -38,6 +38,13 @@ type mr_xpaths = EcPath.Sx.t use_restr
 type mr_mpaths = EcPath.Sm.t use_restr
 
 (* -------------------------------------------------------------------- *)
+module TyUni : EcUid.ICore with type uid = private EcUid.uid
+module TcUni : EcUid.ICore with type uid = private EcUid.uid
+
+type tyuni = TyUni.uid
+type tcuni = TcUni.uid
+
+(* -------------------------------------------------------------------- *)
 type ty = private {
   ty_node : ty_node;
   ty_fv   : int Mid.t; (* only ident appearing in path *)
@@ -46,7 +53,7 @@ type ty = private {
 
 and ty_node =
   | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
-  | Tunivar of EcUid.uid
+  | Tunivar of tyuni
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
   | Tconstr of EcPath.path * etyarg list
@@ -56,7 +63,7 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
-  | TCIUni of EcUid.uid
+  | TCIUni of tcuni
 
   | TCIConcrete of {
       path: EcPath.path;

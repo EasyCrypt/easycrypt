@@ -2346,7 +2346,7 @@ and fundef_add_symbol env (memenv : memenv) xtys : memenv =
 
 and fundef_check_type subst_uni env os (ty, loc) =
   let ty = subst_uni ty in
-    if not (EcUid.Suid.is_empty (Tuni.fv ty)) then
+    if not (TyUni.Suid.is_empty (Tuni.fv ty)) then
       tyerror loc env (OnlyMonoTypeAllowed os);
     ty
 

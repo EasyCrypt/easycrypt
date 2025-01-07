@@ -335,7 +335,7 @@ module PPEnv = struct
 
   exception FoundUnivarSym of symbol
 
-  let tyunivar (ppe : t) i =
+  let univar (ppe : t) (i : EcUid.uid) =
     if not (Mint.mem i (fst !(ppe.ppe_univar))) then begin
       let alpha  = "abcdefghijklmnopqrstuvwxyz" in
 
@@ -469,8 +469,12 @@ let pp_tyvar ppe fmt x =
   Format.fprintf fmt "%s" (PPEnv.tyvar ppe x)
 
 (* -------------------------------------------------------------------- *)
-let pp_tyunivar ppe fmt x =
-  Format.fprintf fmt "%s" (PPEnv.tyunivar ppe x)
+let pp_tyunivar (ppe : PPEnv.t) (fmt : Format.formatter) (a : tyuni) =
+  Format.fprintf fmt "%s" (PPEnv.univar ppe (a :> EcUid.uid))
+
+(* -------------------------------------------------------------------- *)
+let pp_tcunivar (ppe : PPEnv.t) (fmt : Format.formatter) (a : tcuni) =
+  Format.fprintf fmt "%s" (PPEnv.univar ppe (a :> EcUid.uid))
 
 (* -------------------------------------------------------------------- *)
 let pp_tyname ppe fmt p =
@@ -959,7 +963,7 @@ and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
 and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
   match tcw with
   | TCIUni uid ->
-    Format.fprintf fmt "%a" (pp_tyunivar ppe) uid
+    Format.fprintf fmt "%a" (pp_tcunivar ppe) uid
 
   | TCIConcrete { path; etyargs } ->
     Format.fprintf fmt "%a[%a]"

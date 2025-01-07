@@ -3,7 +3,6 @@ open EcSymbols
 open EcIdent
 open EcMaps
 open EcUtils
-open EcUid
 open EcAst
 open EcTypes
 open EcCoreSubst
@@ -27,10 +26,10 @@ exception UninstanciateUni
 module Unify = struct
   module UFArgs = struct
     module I = struct
-      type t = uid
+      type t = tyuni
 
-      let equal   = uid_equal
-      let compare = uid_compare
+      let equal   = TyUni.uid_equal
+      let compare = TyUni.uid_compare
     end
 
     module D = struct
@@ -77,23 +76,23 @@ module Unify = struct
      * unification variables the TC problem depends on. Only        *
      * fully instantiated problems trigger a type-class resolution. *
      * The UID is the univar from which the TC problem originates.  *)
-    problems : (Suid.t * typeclass list) Muid.t;
+    problems : (TyUni.Suid.t * typeclass list) TyUni.Muid.t;
 
     (* Map from univars to TC problems that depend on them. This    *
      * map is kept in sync with the UID set that appears in the     *
      * bindings of [problems]                                       *)
-    byunivar : Suid.t Muid.t;
+    byunivar : TyUni.Suid.t TyUni.Muid.t;
 
     (* Map from problems UID to type-class instance witness         *)
-    resolution : tcwitness list Muid.t
+    resolution : tcwitness list TyUni.Muid.t
   }
 
   (* ------------------------------------------------------------------ *)
   let initial_ucore ?(tvtc = Mid.empty) () : ucore =
     let tcenv =
-      { problems = Muid.empty
-      ; byunivar = Muid.empty
-      ; resolution = Muid.empty }
+      { problems   = TyUni.Muid.empty
+      ; byunivar   = TyUni.Muid.empty
+      ; resolution = TyUni.Muid.empty }
     in { uf = UF.initial; tvtc; tcenv; }
 
   (* ------------------------------------------------------------------ *)
@@ -102,7 +101,7 @@ module Unify = struct
     ?(ty : ty option)
     ({ uf; tcenv } as uc : ucore)
   =
-    let uid = EcUid.unique () in
+    let uid = TyUni.unique () in
 
     let uf  =
       match ty with
@@ -121,20 +120,20 @@ module Unify = struct
     let tws = tws |> List.map (fun tcw ->
       match tcw with
       | None ->
-        TCIUni (EcUid.unique ()) (* FIXME:TC *)
+        TCIUni (TcUni.unique ()) (* FIXME:TC *)
       | Some tcw ->
         tcw
     ) in
 
     let tcenv =
       let deps = Tuni.univars ty in
-      let problems = Muid.add uid (deps, tcs) tcenv.problems in
-      let byunivar = Suid.fold (fun duni byunivar ->
-          Muid.change (fun pbs ->
-            Some (Suid.add uid (Option.value ~default:Suid.empty pbs))
+      let problems = TyUni.Muid.add uid (deps, tcs) tcenv.problems in
+      let byunivar = TyUni.Suid.fold (fun duni byunivar ->
+          TyUni.Muid.change (fun pbs ->
+            Some (TyUni.Suid.add uid (Option.value ~default:TyUni.Suid.empty pbs))
           ) duni byunivar
         ) deps tcenv.byunivar in
-      let resolution = Muid.add uid tws tcenv.resolution in
+      let resolution = TyUni.Muid.add uid tws tcenv.resolution in
       { problems; byunivar; resolution; }
     in
 
@@ -157,14 +156,14 @@ module Unify = struct
             let i' = UF.find i' !uf in
             match i' with
             | _ when i = i' -> true
-            | _ when Hint.mem map i' -> false
+            | _ when Hint.mem map (i' :> int) -> false
             | _ ->
                 match UF.data i' !uf with
-                | None   -> Hint.add map i' (); false
+                | None   -> Hint.add map (i' :> int) (); false
                 | Some t ->
                   match doit t with
                   | true  -> true
-                  | false -> Hint.add map i' (); false
+                  | false -> Hint.add map (i' :> int) (); false
         end
 
         | _ -> EcTypes.ty_sub_exists doit t
@@ -197,7 +196,7 @@ module Unify = struct
           | false -> begin
               match t1.ty_node, t2.ty_node with
               | Tunivar id1, Tunivar id2 -> begin
-                  if not (uid_equal id1 id2) then
+                  if not (TyUni.uid_equal id1 id2) then
                     let effects = reffold (swap |- UF.union id1 id2) uf in
                     List.iter (Queue.push^~ pb) effects
               end
@@ -249,7 +248,7 @@ module Unify = struct
     let rec doit t =
       match t.ty_node with
       | Tunivar i -> begin
-          match Hint.find_opt map i with
+          match Hint.find_opt map (i :> int) with
           | Some t -> t
           | None   -> begin
             let t =
@@ -257,7 +256,7 @@ module Unify = struct
               | None   -> tuni (UF.find i uc.uf)
               | Some t -> doit t
             in
-              Hint.add map i t; t
+              Hint.add map (i :> int) t; t
           end
       end
 
@@ -270,9 +269,9 @@ module Unify = struct
     let close = close uc in
     List.fold_left (fun m uid ->
       match close (tuni uid) with
-      | { ty_node = Tunivar uid' } when uid_equal uid uid' -> m
-      | t -> Muid.add uid t m
-    ) Muid.empty (UF.domain uc.uf)
+      | { ty_node = Tunivar uid' } when TyUni.uid_equal uid uid' -> m
+      | t -> TyUni.Muid.add uid t m
+    ) TyUni.Muid.empty (UF.domain uc.uf)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -442,7 +441,7 @@ module UniEnv = struct
 
   let assubst (ue : unienv) =
     { uvars = Unify.subst_of_uf (!ue).ue_uc
-    ; utcvars = Muid.empty; (* FIXME:TC *) }
+    ; utcvars = TcUni.Muid.empty; (* FIXME:TC *) }
 
   let close (ue : unienv) =
     if not (closed ue) then raise UninstanciateUni;

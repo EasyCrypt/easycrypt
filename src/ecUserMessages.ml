@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
-open EcUid
 open EcPath
 open EcUtils
+open EcAst
 open EcTypes
 open EcCoreSubst
 open EcEnv
@@ -348,7 +348,7 @@ end = struct
 
     | MultipleOpMatch (name, tys, matches) -> begin
         let uvars = List.map Tuni.univars tys in
-        let uvars = List.fold_left Suid.union Suid.empty uvars in
+        let uvars = List.fold_left TyUni.Suid.union TyUni.Suid.empty uvars in
 
         begin match tys with
         | [] ->
@@ -379,8 +379,8 @@ end = struct
           end;
 
           let myuvars = List.map Tuni.univars inst in
-          let myuvars = List.fold_left Suid.union uvars myuvars in
-          let myuvars = Suid.elements myuvars in
+          let myuvars = List.fold_left TyUni.Suid.union uvars myuvars in
+          let myuvars = TyUni.Suid.elements myuvars in
 
           let uidmap = EcUnify.UniEnv.assubst subue in
           let tysubst = ty_subst (Tuni.subst uidmap) in

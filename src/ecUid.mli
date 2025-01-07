@@ -5,21 +5,37 @@ open EcSymbols
 (* -------------------------------------------------------------------- *)
 val unique : unit -> int
 
+module type ICore = sig
+  type uid
+
+  (* ------------------------------------------------------------------ *)
+  val unique      : unit -> uid
+  val uid_equal   : uid -> uid -> bool
+  val uid_compare : uid -> uid -> int
+
+  (* ------------------------------------------------------------------ *)
+  module Muid : Map.S  with type key = uid
+  module Suid : Set.S  with module M = Map.MakeBase(Muid)
+
+  (* ------------------------------------------------------------------ *)
+  module SMap : sig
+    type uidmap
+
+    val create : unit -> uidmap
+    val lookup : uidmap -> symbol -> uid option
+    val forsym : uidmap -> symbol -> uid
+    val pp_uid : Format.formatter -> uid -> unit
+  end
+end
+
 (* -------------------------------------------------------------------- *)
 type uid = int
-type uidmap
-
-val create : unit -> uidmap
-val lookup : uidmap -> symbol -> uid option
-val forsym : uidmap -> symbol -> uid
-val pp_uid : Format.formatter -> uid -> unit
 
 (* -------------------------------------------------------------------- *)
-val uid_equal   : uid -> uid -> bool
-val uid_compare : uid -> uid -> int
+include ICore with type uid := uid
 
-module Muid : Map.S  with type key = uid
-module Suid : Set.S  with module M = Map.MakeBase(Muid)
+(* -------------------------------------------------------------------- *)
+module CoreGen() : ICore with type uid = private uid
 
 (* -------------------------------------------------------------------- *)
 module NameGen : sig

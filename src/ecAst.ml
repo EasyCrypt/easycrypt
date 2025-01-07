@@ -3,7 +3,6 @@ open EcUtils
 open EcSymbols
 open EcIdent
 open EcPath
-open EcUid
 
 module BI = EcBigInt
 
@@ -42,6 +41,13 @@ type mr_xpaths = EcPath.Sx.t use_restr
 type mr_mpaths = EcPath.Sm.t use_restr
 
 (* -------------------------------------------------------------------- *)
+module TyUni = EcUid.CoreGen ()
+module TcUni = EcUid.CoreGen ()
+
+type tyuni = TyUni.uid
+type tcuni = TcUni.uid
+
+(* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
   ty_fv   : int Mid.t; (* only ident appearing in path *)
@@ -50,7 +56,7 @@ type ty = {
 
 and ty_node =
   | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
-  | Tunivar of EcUid.uid
+  | Tunivar of tyuni
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
   | Tconstr of EcPath.path * etyarg list
@@ -60,7 +66,7 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
-  | TCIUni of EcUid.uid
+  | TCIUni of tcuni
 
   | TCIConcrete of {
       path: EcPath.path;
@@ -403,7 +409,7 @@ let etyargs_fv (tyargs : etyarg list) =
 let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
   | TCIUni uid1, TCIUni uid2 ->
-    uid_equal uid1 uid2
+    TcUni.uid_equal uid1 uid2
 
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path
@@ -866,7 +872,7 @@ module Hsty = Why3.Hashcons.Make (struct
         EcIdent.id_equal m1 m2
 
     | Tunivar u1, Tunivar u2 ->
-        uid_equal u1 u2
+        TyUni.uid_equal u1 u2
 
     | Tvar v1, Tvar v2 ->
         id_equal v1 v2
@@ -885,7 +891,7 @@ module Hsty = Why3.Hashcons.Make (struct
   let hash ty =
     match ty.ty_node with
     | Tglob m          -> EcIdent.id_hash m
-    | Tunivar u        -> u
+    | Tunivar u        -> Hashtbl.hash u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
     | Tconstr (p, tl)  -> Why3.Hashcons.combine_list etyarg_hash p.p_tag tl

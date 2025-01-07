@@ -42,7 +42,7 @@ let rec dump_ty ty =
       EcIdent.tostring p
 
   | Tunivar i ->
-      Printf.sprintf "#%d" i
+      Printf.sprintf "#%d" (i :> int)
 
   | Tvar id ->
       EcIdent.tostring id

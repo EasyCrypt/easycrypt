@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcUid
 open EcIdent
 open EcPath
 open EcAst
@@ -18,7 +17,8 @@ type 'a subst_binder = f_subst -> 'a -> f_subst * 'a
 
 (* -------------------------------------------------------------------- *)
 type unisubst = {
-  uvars : ty Muid.t; utcvars : tcwitness Muid.t;
+  uvars   : ty TyUni.Muid.t;
+  utcvars : tcwitness TcUni.Muid.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -32,12 +32,12 @@ val f_subst_init :
 
 (* -------------------------------------------------------------------- *)
 module Tuni : sig
-  val univars   : ty -> Suid.t
-  val subst1    : (uid * ty) -> f_subst
+  val univars   : ty -> TyUni.Suid.t
+  val subst1    : (tyuni * ty) -> f_subst
   val subst     : unisubst -> f_subst
   val subst_dom : unisubst -> dom -> dom
-  val occurs    : uid -> ty -> bool
-  val fv        : ty -> Suid.t
+  val occurs    : tyuni -> ty -> bool
+  val fv        : ty -> TyUni.Suid.t
 end
 
 (* -------------------------------------------------------------------- *)

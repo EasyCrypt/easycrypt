@@ -21,7 +21,8 @@ let rec for_type env t1 t2 =
 (* -------------------------------------------------------------------- *)
 and for_type_r env t1 t2 =
   match t1.ty_node, t2.ty_node with
-  | Tunivar uid1, Tunivar uid2 -> EcUid.uid_equal uid1 uid2
+  | Tunivar uid1, Tunivar uid2 ->
+      EcAst.TyUni.uid_equal uid1 uid2
 
   | Tvar i1, Tvar i2 -> i1 = i2
 
@@ -63,7 +64,7 @@ and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
 and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
   | TCIUni uid1, TCIUni uid2 ->
-    EcUid.uid_equal uid1 uid2
+    EcAst.TcUni.uid_equal uid1 uid2
 
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path

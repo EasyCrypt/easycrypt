@@ -29,7 +29,7 @@ val dump_ty : ty -> string
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int
 
-val tuni       : EcUid.uid -> ty
+val tuni       : tyuni -> ty
 val tvar       : EcIdent.t -> ty
 val ttuple     : ty list -> ty
 val tconstr    : EcPath.path -> ty list -> ty
