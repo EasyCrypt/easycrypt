@@ -1940,6 +1940,12 @@ module Ty = struct
   let add_generic_instance
     ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
   =
+    let name =
+      match tci.pti_name with
+      | None ->
+        hierror ~loc "typeclass instances must be given a name"
+      | Some name -> name in
+
     let (typarams, _) as ty =
       let ue = TT.transtyvars (env scope) (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl (env scope) ue (snd tci.pti_type) in
@@ -1952,7 +1958,7 @@ module Ty = struct
 
     let tcp =
       let ue = EcUnify.UniEnv.create (Some typarams) in
-      TT.transtc (env scope) ue tci.pti_name in
+      TT.transtc (env scope) ue tci.pti_tc in
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
@@ -1994,12 +2000,8 @@ module Ty = struct
       ; tci_instance = `General (tcp, Some symbols)
       ; tci_local    = lc } in
 
-    let name =
-      Format.sprintf "%s#%d"
-      (EcPath.basename tcp.tc_name) (EcUid.unique ()) in
-
     let scope =
-      let item = EcTheory.Th_instance (Some name, instance) in (* FIXME:TC *)
+      let item = EcTheory.Th_instance (Some (unloc name), instance) in
       let item = EcTheory.mkitem import item in
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
 
@@ -2009,7 +2011,7 @@ module Ty = struct
   let add_instance
     ?(import = EcTheory.import0) (scope : scope) mode ({ pl_desc = tci } as toptci)
   =
-    match unloc (fst tci.pti_name) with
+    match unloc (fst tci.pti_tc) with
     | ([], "bring") -> begin
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";

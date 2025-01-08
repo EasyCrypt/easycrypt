@@ -1646,11 +1646,12 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| loca=is_local INSTANCE x=tcparam args=tyci_args?
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+| loca=is_local INSTANCE tc=tcparam args=tyci_args?
+    name=prefix(AS, lident)? WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
-    { pti_name = x;
+    { pti_tc   = tc;
+      pti_name = name;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;

@@ -175,12 +175,19 @@ module PPEnv = struct
     in
       p_shorten exists p
 
+  let tci_symb (ppe : t) p =
+    let exists sm =
+    try  EcPath.p_equal (EcEnv.TcInstance.lookup_path sm ppe.ppe_env) p
+    with EcEnv.LookupFailure _ -> false
+  in
+    p_shorten exists p
+
   let rw_symb (ppe : t) p =
-      let exists sm =
-      try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
-      with EcEnv.LookupFailure _ -> false
-    in
-      p_shorten exists p
+    let exists sm =
+    try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
+    with EcEnv.LookupFailure _ -> false
+  in
+    p_shorten exists p
 
   let ax_symb (ppe : t) p =
       let exists sm =
@@ -485,6 +492,10 @@ let pp_tcname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tc_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
+let pp_tciname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tci_symb ppe p)
+
+  (* -------------------------------------------------------------------- *)
 let pp_rwname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.rw_symb ppe p)
 
@@ -967,8 +978,7 @@ and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
 
   | TCIConcrete { path; etyargs } ->
     Format.fprintf fmt "%a[%a]"
-      pp_qsymbol (EcPath.toqsymbol path)
-      (pp_etyargs ppe) etyargs
+      (pp_tciname ppe) path (pp_etyargs ppe) etyargs
 
   | TCIAbstract { support = `Var x; offset } ->
     Format.fprintf fmt "%a.`%d" (pp_tyvar ppe) x (offset + 1)

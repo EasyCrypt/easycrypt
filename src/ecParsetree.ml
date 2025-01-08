@@ -1051,7 +1051,8 @@ type ptypeclass = {
 }
 
 type ptycinstance = {
-  pti_name : ptcparam;
+  pti_tc   : ptcparam;
+  pti_name : psymbol option;
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
