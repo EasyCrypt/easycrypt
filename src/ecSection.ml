@@ -22,7 +22,7 @@ type cbarg = [
   | `Module     of mpath
   | `ModuleType of path
   | `Typeclass  of path
-  | `Instance   of tcinstance
+  | `TcInstance of [`General of path | `Ring | `Field]
 ]
 
 type cb = cbarg -> unit
@@ -52,12 +52,13 @@ let pp_cbarg env fmt (who : cbarg) =
         (EcEnv.ModTy.modtype p env)
   | `Typeclass p ->
       Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tyname ppe) p
-  | `Instance tci ->
-    match tci.tci_instance with
-    | `Ring _ -> Format.fprintf fmt "ring instance"
-    | `Field _ -> Format.fprintf fmt "field instance"
-    | `General _ -> Format.fprintf fmt "instance"
-
+  | `TcInstance (`General p) ->
+      Format.fprintf fmt "typeclass instance %s" (EcPath.tostring p) (* FIXME:TC *)
+  | `TcInstance `Ring ->
+      Format.fprintf fmt "ring instance"
+  | `TcInstance `Field ->
+     Format.fprintf fmt "field instance"
+  
 let pp_locality fmt = function
   | `Local -> Format.fprintf fmt "local"
   | `Global -> ()
@@ -121,7 +122,7 @@ and on_tcwitness cb (tcw : tcwitness) =
 
   | TCIConcrete { path; etyargs } ->
     List.iter (on_etyarg cb) etyargs;
-    cb (`Type path)                  (* FIXME:TC *)
+    cb (`TcInstance (`General path))
  
   | TCIAbstract { support = `Abs path } ->
     cb (`Type path)
@@ -548,7 +549,8 @@ let locality (env : EcEnv.env) (who : cbarg) =
     | _         -> `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
-  | `Instance _ -> assert false
+  | `TcInstance (`General p) -> (EcEnv.TcInstance.by_path p env).tci_local
+  | `TcInstance (`Ring | `Field) -> `Global
 
 (* -------------------------------------------------------------------- *)
 type to_clear =
@@ -1113,22 +1115,6 @@ let is_abstract_ty = function
   | `Abstract _ -> true
   | _           -> false
 
-(*
-let rec check_glob_mp_ty s scenv mp =
-  let mtop = `Module (mastrip mp) in
-  if is_declared scenv mtop then
-    hierror "global %s can't depend on declared module" s;
-  if is_local scenv mtop then
-    hierror "global %s can't depend on local module" s;
-  List.iter (check_glob_mp_ty s scenv) mp.m_args
-
-let rec check_glob_mp scenv mp =
-  let mtop = `Module (mastrip mp) in
-  if is_local scenv mtop then
-    hierror "global definition can't depend on local module";
-  List.iter (check_glob_mp scenv) mp.m_args
- *)
-
 let check s scenv who b =
   if not b then
     hierror "%a %s" (pp_lc_cbarg scenv.sc_env) who s
@@ -1142,24 +1128,26 @@ let check_polymorph scenv who typarams =
 let check_abstract = check "should be abstract"
 
 type can_depend = {
-    d_ty    : locality list;
-    d_op    : locality list;
-    d_ax    : locality list;
-    d_sc    : locality list;
-    d_mod   : locality list;
-    d_modty : locality list;
-    d_tc    : locality list;
-  }
+  d_ty    : locality list;
+  d_op    : locality list;
+  d_ax    : locality list;
+  d_sc    : locality list;
+  d_mod   : locality list;
+  d_modty : locality list;
+  d_tc    : locality list;
+  d_tci   : locality list;
+}
 
-let cd_glob =
-  { d_ty    = [`Global];
-    d_op    = [`Global];
-    d_ax    = [`Global];
-    d_sc    = [`Global];
-    d_mod   = [`Global];
-    d_modty = [`Global];
-    d_tc    = [`Global];
-  }
+let cd_glob = {
+  d_ty    = [`Global];
+  d_op    = [`Global];
+  d_ax    = [`Global];
+  d_sc    = [`Global];
+  d_mod   = [`Global];
+  d_modty = [`Global];
+  d_tc    = [`Global];
+  d_tci   = [`Global];
+}
 
 let can_depend (cd : can_depend) = function
   | `Type       _ -> cd.d_ty
@@ -1169,8 +1157,7 @@ let can_depend (cd : can_depend) = function
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
-  | `Instance   _ -> assert false
-
+  | `TcInstance _ -> cd.d_tci
 
 let cb scenv from cd who =
   let env = scenv.sc_env in
@@ -1201,28 +1188,9 @@ let check_tyd scenv prefix name tyd =
         d_mod   = [`Global];
         d_modty = [];
         d_tc    = [`Global];
+        d_tci   = [`Global];
       } in
     on_tydecl (cb scenv from cd) tyd
-
-(*
-let cb_glob scenv (who:cbarg) =
-  match who with
-  | `Type p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local type %s"
-        (EcPath.tostring p)
-  | `Module mp ->
-    check_glob_mp scenv mp
-  | `Op p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local op %s"
-        (EcPath.tostring p)
-  | `ModuleType p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local module type %s"
-        (EcPath.tostring p)
-  | `Ax _ | `Typeclass _ -> assert false
-*)
 
 let is_abstract_op op =
   match op.op_kind with
@@ -1247,6 +1215,7 @@ let check_op scenv prefix name op =
         d_mod   = [`Declare; `Global];
         d_modty = [];
         d_tc    = [`Global];
+        d_tci   = [`Global];
       } in
     on_opdecl (cb scenv from cd) op
 
@@ -1259,6 +1228,7 @@ let check_op scenv prefix name op =
         d_mod   = [`Global];
         d_modty = [];
         d_tc    = [`Global];
+        d_tci   = [`Global];
       } in
     on_opdecl (cb scenv from cd) op
 
@@ -1278,6 +1248,7 @@ let check_ax (scenv : scenv) (prefix : path) (name : symbol) (ax : axiom) =
       d_mod   = [`Declare; `Global];
       d_modty = [`Global];
       d_tc    = [`Global];
+      d_tci   = [`Global];
     } in
   let doit = on_axiom (cb scenv from cd) in
   let error b s1 s =
@@ -1330,6 +1301,7 @@ let check_module scenv prefix tme =
           d_mod   = [`Global]; (* FIXME section: add local *)
           d_modty = [`Global];
           d_tc    = [`Global];
+          d_tci   = [`Global];
         } in
       on_module (cb scenv from cd) me
   | `Declare -> (* Should be SC_decl_mod ... *)
@@ -1342,8 +1314,16 @@ let check_tcdecl scenv prefix name tc =
   else
     on_tcdecl (cb scenv from cd_glob) tc
 
-let check_instance scenv tci =
-  let from = (tci.tci_local, `Instance tci) in
+let check_instance scenv prefix x tci =
+  let from =
+    match x, tci.tci_instance with
+    | Some x, `General _ -> `General (pqname prefix x)
+    | None  , `Ring _    -> `Ring
+    | None  , `Field _   -> `Field
+    | _     , _          -> assert false in
+    
+  let from = (tci.tci_local, `TcInstance from) in
+
   if tci.tci_local = `Local then check_section scenv from
   else
     if scenv.sc_insec then
@@ -1416,7 +1396,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (x,tci)-> generalize_instance to_gen (x,tci)
-    | Th_typeclass _     -> assert false
+    | Th_typeclass _     -> assert false (* FIXME:TC *)
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
@@ -1531,7 +1511,7 @@ let check_item scenv item =
   | Th_module        me -> check_module  scenv prefix me
   | Th_typeclass (s,tc) -> check_tcdecl  scenv prefix s tc
   | Th_export   (_, lc) -> assert (lc = `Global || scenv.sc_insec);
-  | Th_instance(_, tci) -> check_instance scenv tci
+  | Th_instance(x, tci) -> check_instance scenv prefix x tci
   | Th_baserw (_,lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local base rewrite can only be declared inside section";
@@ -1575,6 +1555,7 @@ let add_decl_mod id mt scenv =
       d_mod   = [`Declare; `Global];
       d_modty = [`Global];
       d_tc    = [`Global];
+      d_tci   = [`Global];
     } in
     let from = `Declare, `Module (mpath_abs id []) in
     on_mty_mr (cb scenv from cd) mt;
