@@ -305,7 +305,7 @@ module Unify = struct
               end;
               if not (List.is_empty tci.tci_params) then
                 raise Bailout;
-                if not (EcCoreEqTest.for_type env ty tci.tci_type) then
+              if not (EcCoreEqTest.for_type env ty tci.tci_type) then
                 raise Bailout;
               true
 
@@ -313,23 +313,41 @@ module Unify = struct
               false in
 
           if TyUni.Suid.is_empty deps then begin
-            let tci =
-                EcEnv.TcInstance.get_all env
-              |> List.to_seq
-              |> Seq.filter_map (fun (p, tci) -> Option.map (fun p -> (p, tci)) p)
-              |> Seq.filter (fun (_, tci) -> check_tci tci)
-              |> Seq.uncons |> Option.map (fst |- fst) in
+            match ty.ty_node with
+            | Tvar a ->
+              let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
+              let idx =
+                let eq (tc' : typeclass) =
+                  EcPath.p_equal tc.tc_name tc'.tc_name
+                  && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
+                ofdfl failure (List.find_index eq tcs) in
 
-            match tci with
-            | None ->
-              failure ()
-
-            | Some tci ->
               uc := { !uc with tcenv = { (!uc).tcenv with resolution =
-                TcUni.Muid.add uid (TCIConcrete {
-                  path = tci; etyargs = [];
-                }) (!uc).tcenv.resolution
+                TcUni.Muid.add
+                  uid
+                  (TCIAbstract { support = `Var a; offset = idx; })
+                  (!uc).tcenv.resolution
               } }
+
+            | _-> begin
+              let tci =
+                  EcEnv.TcInstance.get_all env
+                |> List.to_seq
+                |> Seq.filter_map (fun (p, tci) -> Option.map (fun p -> (p, tci)) p)
+                |> Seq.filter (fun (_, tci) -> check_tci tci)
+                |> Seq.uncons |> Option.map (fst |- fst) in
+
+              match tci with
+              | None ->
+                failure ()
+
+              | Some tci ->
+                uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                  TcUni.Muid.add uid (TCIConcrete {
+                    path = tci; etyargs = [];
+                  }) (!uc).tcenv.resolution
+                } }
+            end
           end else begin
             TyUni.Suid.iter (fun tyvar ->
               uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
