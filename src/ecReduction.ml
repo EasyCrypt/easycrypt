@@ -618,16 +618,16 @@ let full_red = {
 }
 
 let no_red = {
-  beta    = false;
-  delta_p = (fun _ -> `No);
-  delta_h = EcUtils.pred0;
+  beta     = false;
+  delta_p  = (fun _ -> `No);
+  delta_h  = EcUtils.pred0;
   delta_tc = false;
-  zeta    = false;
-  iota    = false;
-  eta     = false;
-  logic   = None;
-  modpath = false;
-  user    = false;
+  zeta     = false;
+  iota     = false;
+  eta      = false;
+  logic    = None;
+  modpath  = false;
+  user     = false;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -636,8 +636,7 @@ let betaiota_red = { no_red with beta = true; iota = true; }
 let nodelta =
   { full_red with
       delta_h  = EcUtils.pred0;
-      delta_p  = (fun _ -> `No);
-      delta_tc = false; }
+      delta_p  = (fun _ -> `No); }
 
 let delta = { no_red with delta_p = (fun _ -> `IfTransparent); }
 
@@ -913,7 +912,7 @@ let reduce_logic ri env hyps f p args =
 let reduce_delta ri env f =
   match f.f_node with
   | Fop (p, tys) when ri.delta_tc && EcEnv.Op.is_tc_op env p ->
-     may_reduce_tc ri env p tys
+    may_reduce_tc ri env p tys
 
   | Fop (p, tys) when ri.delta_p p <> `No ->
       reduce_op ri env 0 p tys

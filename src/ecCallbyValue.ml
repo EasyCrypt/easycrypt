@@ -340,11 +340,11 @@ and reduce_user_delta st f1 p tys args =
       let f = Op.reduce ~mode ~nargs st.st_env p tys in
       cbv st Subst.subst_id f args
     | _ ->
-       if st.st_ri.delta_tc then
-         match EcReduction.reduce_tc st.st_env p tys with
-         | None -> f2
-         | Some f -> cbv st Subst.subst_id f args
-       else f2
+       if st.st_ri.delta_tc then begin
+          match EcReduction.reduce_tc st.st_env p tys with
+          | None -> f2
+          | Some f -> cbv st Subst.subst_id f args
+       end else f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
