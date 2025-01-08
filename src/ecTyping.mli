@@ -18,7 +18,7 @@ val  wp : wp option ref
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcTypes.etyarg list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
@@ -27,7 +27,7 @@ type opmatch = [
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
 
-type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
+type 'a suboreq = [`Eq of 'a | `Sub of 'a ]
 
 type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)
@@ -106,7 +106,7 @@ type filter_error =
 
 type tyerror =
 | UniVarNotAllowed
-| FreeTypeVariables
+| FreeUniVariables       of EcUnify.uniflags
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
 | NoConcreteAnonParams
@@ -163,6 +163,8 @@ type tyerror =
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
+| TCArgsCountMismatch    of qsymbol * ty_params * ty list
+| CannotInferTC          of ty * typeclass
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
@@ -183,6 +185,9 @@ val tp_tydecl : typolicy
 val tp_relax  : typolicy
 
 (* -------------------------------------------------------------------- *)
+val transtc:
+  env -> EcUnify.unienv -> ptcparam -> EcDecl.typeclass
+
 val transtyvars:
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 

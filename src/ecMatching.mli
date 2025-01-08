@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUid
 open EcIdent
 open EcTypes
 open EcModules
@@ -196,7 +195,7 @@ val f_match :
   -> unienv * mevmap
   -> form
   -> form
-  -> unienv * (ty Muid.t) * mevmap
+  -> unienv * unisubst * mevmap
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t

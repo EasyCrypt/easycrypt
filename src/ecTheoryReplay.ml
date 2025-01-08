@@ -1,5 +1,6 @@
 (* ------------------------------------------------------------------ *)
 open EcSymbols
+open EcMaps
 open EcUtils
 open EcLocation
 open EcParsetree
@@ -50,14 +51,17 @@ let keep_of_mode (mode : clmode) =
 (* -------------------------------------------------------------------- *)
 exception Incompatible of incompatible
 
-let tparams_compatible rtyvars ntyvars =
+(* FIXME:TC *)
+let tparams_compatible (rtyvars : ty_params) (ntyvars : ty_params) =
   let rlen = List.length rtyvars and nlen = List.length ntyvars in
   if rlen <> nlen then
-    raise (Incompatible (NotSameNumberOfTyParam(rlen,nlen)))
+    raise (Incompatible (NotSameNumberOfTyParam (rlen, nlen)))
 
 let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
   tparams_compatible rtyvars ntyvars;
-  let subst = CS.Tvar.init rtyvars (List.map tvar ntyvars) in
+  let subst =
+    let etyargs = etyargs_of_tparams ntyvars in
+    CS.Tvar.init (List.combine (List.fst rtyvars) etyargs) in
   let rty   = CS.Tvar.subst subst rty in
   try  EcUnify.unify env ue rty nty
   with EcUnify.UnificationFailure _ ->
@@ -113,7 +117,7 @@ let rec tybody_compatible exn hyps ty_body1 ty_body2 =
 let tydecl_compatible env tyd1 tyd2 =
   let params = tyd1.tyd_params in
   tparams_compatible params tyd2.tyd_params;
-  let tparams = List.map (fun (id,_) -> tvar id) params in
+  let tparams = etyargs_of_tparams params in
   let ty_body1 = tyd1.tyd_type in
   let ty_body2 = EcSubst.open_tydecl tyd2 tparams in
   let exn  = Incompatible (TyBody(*tyd1,tyd2*)) in
@@ -130,12 +134,13 @@ let expr_compatible exn env s e1 e2 =
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
-  let _, okind = EcSubst.open_oper oper tys in
+  let _, okind = EcSubst.open_oper oper tys in (* FIXME:TC *)
   match okind with
   | OB_oper (Some ob) -> ob
   | _ -> raise exn
 
 let rec oper_compatible exn env ob1 ob2 =
+  (* FIXME: duplicated code *)
   match ob1, ob2 with
   | OP_Plain f1, OP_Plain f2 ->
     error_body exn (EcReduction.is_conv ~ri:ri_compatible (EcEnv.LDecl.init env []) f1 f2)
@@ -153,7 +158,8 @@ let rec oper_compatible exn env ob1 ob2 =
     error_body exn (EcPath.p_equal p1 p2 && i11 = i21 && i12 = i22)
   | OP_Fix f1, OP_Fix f2 ->
     opfix_compatible exn env f1 f2
-  | OP_TC, OP_TC -> ()
+  | OP_TC (p1, n1), OP_TC (p2, n2) ->
+     error_body exn (EcPath.p_equal p1 p2 && n1 = n2)
   | _, _ -> raise exn
 
 and opfix_compatible exn env f1 f2 =
@@ -198,10 +204,10 @@ let rec pred_compatible exn env pb1 pb2 =
   match pb1, pb2 with
   | PR_Plain f1, PR_Plain f2 -> error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
   | PR_Plain {f_node = Fop(p,tys)}, _ ->
-    let pb1 = get_open_pred exn env p tys  in
+    let pb1 = get_open_pred exn env p tys in
     pred_compatible exn env pb1 pb2
   | _, PR_Plain {f_node = Fop(p,tys)} ->
-    let pb2 = get_open_pred exn env p tys  in
+    let pb2 = get_open_pred exn env p tys in
     pred_compatible exn env pb1 pb2
   | PR_Ind pr1, PR_Ind pr2 ->
     ind_compatible exn env pr1 pr2
@@ -230,7 +236,7 @@ let operator_compatible env oper1 oper2 =
   let params = oper1.op_tparams in
   tparams_compatible oper1.op_tparams oper2.op_tparams;
   let oty1, okind1 = oper1.op_ty, oper1.op_kind in
-  let tparams = List.map (fun (id,_) -> tvar id) params in
+  let tparams = etyargs_of_tparams params in
   let oty2, okind2 = EcSubst.open_oper oper2 tparams in
   if not (EcReduction.EqTest.for_type env oty1 oty2) then
     raise (Incompatible (DifferentType(oty1, oty2)));
@@ -373,17 +379,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
                 | `Datatype { tydt_ctors = _ } ->
-                  let newtparams = List.fst newtyd.tyd_params in
-                  let newtparams_ty = List.map tvar newtparams in
-                  let newdtype = tconstr np newtparams_ty in
-                  let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+                  let newtparams = etyargs_of_tparams newtyd.tyd_params in
+                  let newdtype = tconstr_tc np newtparams in
+                  let tysubst =
+                    CS.Tvar.init (List.combine (List.fst otyd.tyd_params) newtparams) in
 
                   List.fold_left (fun subst (name, tyargs) ->
                       let np = EcPath.pqoname (EcPath.prefix np) name in
                       let newtyargs = List.map (CS.Tvar.subst tysubst) tyargs in
                       EcSubst.add_opdef subst
                         (xpath ove name)
-                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
+                        (List.fst newtyd.tyd_params, e_op_tc np newtparams (toarrow newtyargs newdtype)))
                     subst octors
                 | _ -> subst
               end
@@ -446,15 +452,18 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               in
               begin
                 try ty_compatible env ue
-                    (List.map fst reftyvars, refty)
-                    (List.map fst (EcUnify.UniEnv.tparams ue), ty)
+                    (reftyvars, refty)
+                    (EcUnify.UniEnv.tparams ue, ty)
                 with Incompatible err ->
                   clone_error env (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
               end;
 
-              if not (EcUnify.UniEnv.closed ue) then
-                ove.ovre_hooks.herr
-                  ~loc "this operator body contains free type variables";
+              Option.iter (fun infos ->
+                ove.ovre_hooks.herr ~loc
+                  (Format.asprintf
+                    "this operator body contains free %a variables"
+                    EcUserMessages.TypingError.pp_uniflags infos)
+              ) (EcUnify.UniEnv.xclosed ue);
 
               let sty     = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
               let body    = EcFol.Fsubst.f_subst sty body in
@@ -560,16 +569,19 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
             begin
               try
                 ty_compatible env ue
-                  (List.map fst reftyvars, refty)
-                  (List.map fst (EcUnify.UniEnv.tparams ue), body.f_ty)
+                  (reftyvars, refty)
+                  (EcUnify.UniEnv.tparams ue, body.f_ty)
               with Incompatible err ->
                 clone_error env
                   (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
             end;
 
-            if not (EcUnify.UniEnv.closed ue) then
-              ove.ovre_hooks.herr
-                ~loc "this predicate body contains free type variables";
+            Option.iter (fun infos ->
+              ove.ovre_hooks.herr ~loc
+                (Format.asprintf
+                  "this predicate body contains free %a variables"
+                  EcUserMessages.TypingError.pp_uniflags infos)
+            ) (EcUnify.UniEnv.xclosed ue);
 
             let fs = CS.Tuni.subst (EcUnify.UniEnv.close ue) in
             let body    = EcFol.Fsubst.f_subst fs body in
@@ -870,7 +882,7 @@ and replay_typeclass
 
 (* -------------------------------------------------------------------- *)
 and replay_instance
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (typ, ty), tc, lc)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, tci)
 =
   let opath = ove.ovre_opath in
   let npath = ove.ovre_npath in
@@ -898,7 +910,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_TC      )) ->
+                | OB_oper (Some (OP_TC     _)) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->
                     match f.f_node with
@@ -908,9 +920,15 @@ and replay_instance
 
   let forpath p = odfl p (forpath p) in
 
+  let fortypeclass (tc : typeclass) =
+    { tc_name = forpath tc.tc_name;
+      tc_args = List.map (EcSubst.subst_etyarg subst) tc.tc_args; } in
+
   try
-    let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
-    let tc =
+    let subst, tci_params = EcSubst.fresh_tparams subst tci.tci_params in
+    let tci_type = EcSubst.subst_ty subst tci.tci_type in
+
+    let tci_instance : tcibody =
       let rec doring cr =
         { r_type  = EcSubst.subst_ty subst cr.r_type;
           r_zero  = forpath cr.r_zero;
@@ -933,14 +951,25 @@ and replay_instance
           f_inv  = forpath cr.f_inv;
           f_div  = cr.f_div |> omap forpath; }
       in
-        match tc with
-        | `Ring    cr -> `Ring  (doring  cr)
-        | `Field   cr -> `Field (dofield cr)
-        | `General p  -> `General (forpath p)
+        match tci.tci_instance with
+        | `Ring  cr -> `Ring  (doring  cr)
+        | `Field cr -> `Field (dofield cr)
+
+        | `General (tc, syms) ->
+           let tc   = fortypeclass tc in
+           let syms =
+             Option.map
+               (Mstr.map (fun (p, tys) ->
+                  (forpath p, List.map (EcSubst.subst_etyarg subst) tys)))
+               syms in
+           `General (tc, syms)
     in
 
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc)) in
-    (subst, ops, proofs, scope)
+    let tci = { tci with tci_params; tci_type; tci_instance; } in
+
+    let scope =
+      ove.ovre_hooks.hadd_item scope import (Th_instance (x, tci))
+    in (subst, ops, proofs, scope)
 
   with E.InvInstPath ->
     (subst, ops, proofs, scope)
@@ -987,8 +1016,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | Th_typeclass (x, tc) ->
      replay_typeclass ove (subst, ops, proofs, scope) (item.ti_import, x, tc)
 
-  | Th_instance ((typ, ty), tc, lc) ->
-     replay_instance ove (subst, ops, proofs, scope) (item.ti_import, (typ, ty), tc, lc)
+  | Th_instance (x, tci) ->
+     replay_instance ove (subst, ops, proofs, scope) (item.ti_import, x, tci)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in

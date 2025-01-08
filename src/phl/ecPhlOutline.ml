@@ -279,8 +279,8 @@ let process_outline info tc =
                let sty = f_subst_init ~tu () in
                let es = e_subst sty in
                Some (lv_of_expr (es res))
-             with EcUnify.UninstanciateUni ->
-               EcTyping.tyerror loc env EcTyping.FreeTypeVariables
+             with EcUnify.UninstanciateUni infos ->
+               EcTyping.tyerror loc env (FreeUniVariables infos)
            end
          | None, _ -> None
          | _, _ -> raise (OutlineError OE_UnnecessaryReturn)

@@ -14,17 +14,12 @@ type mod_extra = {
   mex_glob  : memory -> form;
 }
 
-type sc_instanciate = {
-  sc_memtype : memtype;
-  sc_mempred : mem_pr Mid.t;
-  sc_expr    : expr Mid.t;
-}
-
 (* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
-  fs_u       : ty Muid.t;
-  fs_v       : ty Mid.t;
+  fs_u       : ty TyUni.Muid.t;
+  fs_utc     : tcwitness TcUni.Muid.t;
+  fs_v       : etyarg Mid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
@@ -49,25 +44,41 @@ let mex_fv (mp : mpath) (ex : mod_extra) : uid Mid.t =
 
 (* -------------------------------------------------------------------- *)
 let fv_Mid (type a)
-  (fv : a -> uid Mid.t) (m  : a Mid.t) (s  : uid Mid.t) : uid Mid.t
+  (fv : a -> int Mid.t) (m  : a Mid.t) (s : int Mid.t) : int Mid.t
 =
   Mid.fold (fun _ t s -> fv_union s (fv t)) m s
 
 (* -------------------------------------------------------------------- *)
+type unisubst = {
+  uvars   : ty TyUni.Muid.t;
+  utcvars : tcwitness TcUni.Muid.t;
+}
+
+(* -------------------------------------------------------------------- *)
+let unisubst0 : unisubst = {
+  uvars   = TyUni.Muid.empty;
+  utcvars = TcUni.Muid.empty;
+}
+
+(* -------------------------------------------------------------------- *)
 let f_subst_init
-      ?(freshen=false)
-      ?(tu=Muid.empty)
-      ?(tv=Mid.empty)
-      ?(esloc=Mid.empty)
-      () =
+  ?(freshen = false)
+  ?(tu      = unisubst0)
+  ?(tv      = Mid.empty)
+  ?(esloc   = Mid.empty)
+  ()
+=
+
   let fv = Mid.empty in
-  let fv = Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu fv in
-  let fv = fv_Mid ty_fv tv fv in
+  let fv = TyUni.Muid.fold (fun _ t s -> fv_union s (ty_fv t)) tu.uvars fv in
+  let fv = TcUni.Muid.fold (fun _ t s -> fv_union s (tcw_fv t)) tu.utcvars fv in
+  let fv = fv_Mid etyarg_fv tv fv in
   let fv = fv_Mid e_fv esloc fv in
 
   {
     fs_freshen  = freshen;
-    fs_u        = tu;
+    fs_u        = tu.uvars;
+    fs_utc      = tu.utcvars;
     fs_v        = tv;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
@@ -158,7 +169,8 @@ let f_rem_mod (s : f_subst) (x : ident) : f_subst =
 (* -------------------------------------------------------------------- *)
 let is_ty_subst_id (s : f_subst) : bool =
      Mid.is_empty s.fs_mod
-  && Muid.is_empty s.fs_u
+  && TyUni.Muid.is_empty s.fs_u
+  && TcUni.Muid.is_empty s.fs_utc
   && Mid.is_empty s.fs_v
 
 (* -------------------------------------------------------------------- *)
@@ -168,18 +180,68 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
        Mid.find_opt m s.fs_modex
     |> Option.map (fun ex -> ex.mex_tglob)
     |> Option.value ~default:ty
+
   | Tunivar id ->
-       Muid.find_opt id s.fs_u
+       TyUni.Muid.find_opt id s.fs_u
     |> Option.map (ty_subst s)
     |> Option.value ~default:ty
+
   | Tvar id ->
-    Mid.find_def ty id s.fs_v
-  | _ ->
-    ty_map (ty_subst s) ty
+       Mid.find_opt id s.fs_v
+    |> Option.map fst
+    |> Option.value ~default:ty
+
+  | Tfun (ty1, ty2) ->
+    let ty1 = ty_subst s ty1 in
+    let ty2 = ty_subst s ty2 in
+    tfun ty1 ty2
+
+  | Ttuple tys ->
+    let tys = List.Smart.map (ty_subst s) tys in
+    ttuple tys
+
+  | Tconstr (p, etyargs) ->
+    let etyargs = List.Smart.map (etyarg_subst s) etyargs in
+    tconstr_tc p etyargs
+
+(* -------------------------------------------------------------------- *)
+and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
+  match tcw with
+  | TCIUni uid ->
+       TcUni.Muid.find_opt uid s.fs_utc
+    |> Option.value ~default:tcw
+
+| TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
+    let etyargs = List.Smart.map (etyarg_subst s) etyargs0 in
+    if etyargs ==(*phy*) etyargs0 then
+      tcw
+    else TCIConcrete { rtcw with etyargs }
+
+  | TCIAbstract { support = `Var tyvar; offset } ->
+       Mid.find_opt tyvar s.fs_v
+    |> Option.map (fun (_, tcws) -> List.nth tcws offset)
+    |> Option.value ~default:tcw
+
+  | TCIAbstract { support = `Abs _ } ->
+    tcw
+
+(* -------------------------------------------------------------------- *)
+and etyarg_subst (s : f_subst) ((ty, tcws) as tyarg : etyarg) : etyarg =
+  let ty'   = ty_subst s ty in
+  let tcws' = List.Smart.map (tcw_subst s) tcws in
+  SmartPair.mk tyarg ty' tcws'
 
 (* -------------------------------------------------------------------- *)
 let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
+
+(* -------------------------------------------------------------------- *)
+let etyarg_subst (s : f_subst) : etyarg -> etyarg =
+  if is_ty_subst_id s then identity else etyarg_subst s
+
+(* -------------------------------------------------------------------- *)
+let tcw_subst (s : f_subst) : tcwitness -> tcwitness =
+  if is_ty_subst_id s then identity else tcw_subst s
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
@@ -243,35 +305,57 @@ let elp_subst (s : f_subst) (lp : lpattern) : f_subst * lpattern =
 
 (* -------------------------------------------------------------------- *)
 let rec e_subst (s : f_subst) (e : expr) : expr =
+  let mk (node : expr_node) =
+    let ty = ty_subst s e.e_ty in
+    mk_expr node ty in
+
   match e.e_node with
+  | Eint _ ->
+    e
+
   | Elocal id -> begin
     match Mid.find_opt id s.fs_eloc with
     | Some e' -> e'
-    | None    -> e_local id (ty_subst s e.e_ty)
+    | None    -> mk (Elocal id)
     end
 
   | Evar pv ->
-    let pv' = pv_subst s pv in
-    let ty' = ty_subst s e.e_ty in
-    e_var pv' ty'
+    mk (Evar (pv_subst s pv))
 
-  | Eop (p, tys) ->
-    let tys' = List.Smart.map (ty_subst s) tys in
-    let ty'  = ty_subst s e.e_ty in
-    e_op p tys' ty'
+  | Eop (p, etyargs) ->
+    mk (Eop (p, List.Smart.map (etyarg_subst s) etyargs))
 
   | Elet (lp, e1, e2) ->
     let e1' = e_subst s e1 in
     let s, lp' = elp_subst s lp in
     let e2' = e_subst s e2 in
-    e_let lp' e1' e2'
+    mk (Elet (lp', e1', e2'))
 
-  | Equant (q, b, e1) ->
+  | Equant (q, b, bd) ->
     let s, b' = add_elocals s b in
-    let e1' = e_subst s e1 in
-    e_quantif q b' e1'
+    let bd' = e_subst s bd in
+    mk (Equant (q, b', bd'))
 
-  | _ -> e_map (ty_subst s) (e_subst s) e
+  | Eapp (e, es) ->
+    let e  = e_subst s e in
+    let es = List.Smart.map (e_subst s) es in 
+    mk (Eapp (e, es))
+    
+  | Etuple es ->
+    let es = List.Smart.map (e_subst s) es in
+    mk (Etuple es)
+  
+  | Eif (c, e1, e2) ->
+    mk (Eif (e_subst s c, e_subst s e1, e_subst s e2))
+  
+  | Ematch (e, bs, ty) ->
+    let e  = e_subst s e in
+    let bs = List.Smart.map (e_subst s) bs in
+    let ty = ty_subst s ty in
+    mk (Ematch (e, bs, ty))
+    
+  | Eproj (e, (i : int)) ->
+    mk (Eproj (e_subst s e, i))
 
 (* -------------------------------------------------------------------- *)
 let e_subst (s : f_subst) : expr -> expr=
@@ -411,37 +495,44 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)
   let rec f_subst ~(tx : tx) (s : f_subst) (fp : form) : form =
+    let f_subst = f_subst ~tx in
+
+    let mk (node : f_node) : form =
+      let ty = ty_subst s fp.f_ty in
+      mk_form node ty in
+
     tx ~before:fp ~after:(match fp.f_node with
-    | Fquant (q, b, f) ->
-      let s, b' = add_bindings s b in
-      let f' = f_subst ~tx s f in
-      f_quant q b' f'
+    | Fint _ ->
+      fp
+
+    | Fquant (q, b, bd) ->
+      let s, b = add_bindings s b in
+      let bd = f_subst s bd in
+      mk (Fquant (q, b, bd))
 
     | Flet (lp, f1, f2) ->
-      let f1' = f_subst ~tx s f1 in
-      let s, lp' = lp_subst s lp in
-      let f2' = f_subst ~tx s f2 in
-      f_let lp' f1' f2'
+      let f1 = f_subst s f1 in
+      let s, lp = lp_subst s lp in
+      let f2 = f_subst s f2 in
+      mk (Flet (lp, f1, f2))
 
-    | Flocal id -> begin
-      match Mid.find_opt id s.fs_loc with
-      | Some f ->
-        f
-      | None ->
-        let ty' = ty_subst s fp.f_ty in
-        f_local id ty'
-    end
+    | Flocal id ->
+         Mid.find_opt id s.fs_loc
+      |> ofdfl (fun () -> mk (Flocal id))
 
-    | Fop (p, tys) ->
-      let ty'  = ty_subst s fp.f_ty in
-      let tys' = List.Smart.map (ty_subst s) tys in
-      f_op p tys' ty'
+    | Fop (p, etyargs) ->
+      let etyargs = List.Smart.map (etyarg_subst s) etyargs in
+      mk (Fop (p, etyargs))
+
+    | Fapp (f, fs) ->
+      let f = f_subst s f in
+      let fs = List.Smart.map (f_subst s) fs in
+      mk (Fapp (f, fs))
 
     | Fpvar (pv, m) ->
-      let pv' = pv_subst s pv in
-      let m'  = m_subst s m in
-      let ty' = ty_subst s fp.f_ty in
-      f_pvar pv' ty' m'
+      let pv = pv_subst s pv in
+      let m  = m_subst s m in
+      mk (Fpvar (pv, m))
 
     | Fglob (mid, m) ->
       let m'  = m_subst s m in
@@ -450,48 +541,68 @@ module Fsubst = struct
       | Some _ -> (Mid.find mid s.fs_modex).mex_glob m'
       end
 
+    | Ftuple fs ->
+      let fs = List.Smart.map (f_subst s) fs in
+      mk (Ftuple fs)
+
+    | Fproj (f, (i : int)) ->
+      let f = f_subst s f in
+      mk (Fproj (f, i))
+
+    | Fif (c, f1, f2) ->
+      let c = f_subst  s c in
+      let f1 = f_subst s f1 in
+      let f2 = f_subst s f2 in
+      mk (Fif (c, f1, f2))
+
+    | Fmatch (f, bs, ty) ->
+      let f = f_subst s f in
+      let bs = List.Smart.map (f_subst s) bs in
+      let ty = ty_subst s ty in
+      mk (Fmatch (f, bs, ty))
+
     | FhoareF hf ->
       let hf_f  = x_subst s hf.hf_f in
       let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.hf_pr in
-      let hf_po = f_subst ~tx s hf.hf_po in
+      let hf_pr = f_subst s hf.hf_pr in
+      let hf_po = f_subst s hf.hf_po in
       f_hoareF hf_pr hf_f hf_po
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
       let s, hs_m = add_me_binding s hs.hs_m in
-      let hs_pr   = f_subst ~tx s hs.hs_pr in
-      let hs_po   = f_subst ~tx s hs.hs_po in
+      let hs_pr   = f_subst s hs.hs_pr in
+      let hs_po   = f_subst s hs.hs_po in
       f_hoareS hs_m hs_pr hs_s hs_po
 
     | FeHoareF hf ->
       let hf_f  = x_subst s hf.ehf_f in
       let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.ehf_pr in
-      let hf_po = f_subst ~tx s hf.ehf_po in
+      let hf_pr = f_subst s hf.ehf_pr in
+      let hf_po = f_subst s hf.ehf_po in
       f_eHoareF hf_pr hf_f hf_po
 
     | FeHoareS hs ->
       let hs_s    = s_subst s hs.ehs_s in
       let s, hs_m = add_me_binding s hs.ehs_m in
-      let hs_pr   = f_subst ~tx s hs.ehs_pr in
-      let hs_po   = f_subst ~tx s hs.ehs_po in
+      let hs_pr   = f_subst s hs.ehs_pr in
+      let hs_po   = f_subst s hs.ehs_po in
       f_eHoareS hs_m hs_pr hs_s hs_po
 
     | FbdHoareF hf ->
       let hf_f  = x_subst s hf.bhf_f in
       let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.bhf_pr in
-      let hf_po = f_subst ~tx s hf.bhf_po in
-      let hf_bd = f_subst ~tx s hf.bhf_bd in
+      let hf_pr = f_subst s hf.bhf_pr in
+      let hf_po = f_subst s hf.bhf_po in
+      let hf_bd = f_subst s hf.bhf_bd in
       f_bdHoareF hf_pr hf_f hf_po hf.bhf_cmp hf_bd
 
     | FbdHoareS hs ->
       let hs_s = s_subst s hs.bhs_s in
       let s, hs_m = add_me_binding s hs.bhs_m in
-      let hs_pr = f_subst ~tx s hs.bhs_pr in
-      let hs_po = f_subst ~tx s hs.bhs_po in
-      let hs_bd = f_subst ~tx s hs.bhs_bd in
+      let hs_pr = f_subst s hs.bhs_pr in
+      let hs_po = f_subst s hs.bhs_po in
+      let hs_bd = f_subst s hs.bhs_bd in
       f_bdHoareS hs_m hs_pr hs_s hs_po hs.bhs_cmp hs_bd
 
     | FequivF ef ->
@@ -499,8 +610,8 @@ module Fsubst = struct
       let ef_fr = x_subst s ef.ef_fr in
       let s = f_rem_mem s mleft in
       let s = f_rem_mem s mright in
-      let ef_pr = f_subst ~tx s ef.ef_pr in
-      let ef_po = f_subst ~tx s ef.ef_po in
+      let ef_pr = f_subst s ef.ef_pr in
+      let ef_po = f_subst s ef.ef_po in
       f_equivF ef_pr ef_fl ef_fr ef_po
 
     | FequivS es ->
@@ -508,8 +619,8 @@ module Fsubst = struct
       let es_sr = s_subst s es.es_sr in
       let s, es_ml = add_me_binding s es.es_ml in
       let s, es_mr = add_me_binding s es.es_mr in
-      let es_pr = f_subst ~tx s es.es_pr in
-      let es_po = f_subst ~tx s es.es_po in
+      let es_pr = f_subst s es.es_pr in
+      let es_po = f_subst s es.es_po in
       f_equivS es_ml es_mr es_pr es_sl es_sr es_po
 
     | FeagerF eg ->
@@ -519,21 +630,18 @@ module Fsubst = struct
       let eg_sr = s_subst s eg.eg_sr in
       let s = f_rem_mem s mleft in
       let s = f_rem_mem s mright in
-      let eg_pr = f_subst ~tx s eg.eg_pr in
-      let eg_po = f_subst ~tx s eg.eg_po in
+      let eg_pr = f_subst s eg.eg_pr in
+      let eg_po = f_subst s eg.eg_po in
       f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
     | Fpr pr ->
       let pr_mem   = m_subst s pr.pr_mem in
       let pr_fun   = x_subst s pr.pr_fun in
-      let pr_args  = f_subst ~tx s pr.pr_args in
+      let pr_args  = f_subst s pr.pr_args in
       let s = f_rem_mem s mhr in
-      let pr_event = f_subst ~tx s pr.pr_event in
+      let pr_event = f_subst s pr.pr_event in
 
-      f_pr pr_mem pr_fun pr_args pr_event
-
-    | _ ->
-      f_map (ty_subst s) (f_subst ~tx s) fp)
+      f_pr pr_mem pr_fun pr_args pr_event)
 
   (* ------------------------------------------------------------------ *)
   and oi_subst (s : f_subst) (oi : PreOI.t) : PreOI.t =
@@ -667,60 +775,62 @@ module Fsubst = struct
     fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
 
   (* ------------------------------------------------------------------ *)
-  let init_subst_tvar ~(freshen : bool) (s : ty Mid.t) : f_subst =
+  let init_subst_tvar ~(freshen : bool) (s : etyarg Mid.t) : f_subst =
     f_subst_init ~freshen ~tv:s ()
 
-  let f_subst_tvar ~(freshen : bool) (s : ty Mid.t) : form -> form =
+  let f_subst_tvar ~(freshen : bool) (s : etyarg Mid.t) : form -> form =
     f_subst (init_subst_tvar ~freshen s)
 end
 
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
-  let subst (uidmap : ty Muid.t) : f_subst =
+  let subst (uidmap : unisubst) : f_subst =
     f_subst_init ~tu:uidmap ()
 
-  let subst1 ((id, t) : uid * ty) : f_subst =
-    subst (Muid.singleton id t)
+  let subst1 ((id, t) : tyuni * ty) : f_subst =
+    subst { unisubst0 with uvars = TyUni.Muid.singleton id t }
 
-  let subst_dom (uidmap : ty Muid.t) (dom : dom) : dom =
+  let subst_dom (uidmap : unisubst) (dom : dom) : dom =
     List.map (ty_subst (subst uidmap)) dom
 
-  let occurs (u : uid) : ty -> bool =
+  let occurs (u : tyuni) : ty -> bool =
     let rec aux t =
       match t.ty_node with
-      | Tunivar u' -> uid_equal u u'
+      | Tunivar u' -> TyUni.uid_equal u u'
       | _ -> ty_sub_exists aux t in
     aux
 
-  let univars : ty -> Suid.t =
+  let univars : ty -> TyUni.Suid.t =
     let rec doit univars t =
       match t.ty_node with
-      | Tunivar uid -> Suid.add uid univars
+      | Tunivar uid -> TyUni.Suid.add uid univars
       | _ -> ty_fold doit univars t
 
-    in fun t -> doit Suid.empty t
+    in fun t -> doit TyUni.Suid.empty t
 
-  let rec fv_rec (fv : Suid.t) (t : ty) : Suid.t =
+  let rec fv_rec (fv : TyUni.Suid.t) (t : ty) : TyUni.Suid.t =
     match t.ty_node with
-    | Tunivar id -> Suid.add id fv
+    | Tunivar id -> TyUni.Suid.add id fv
     | _ -> ty_fold fv_rec fv t
 
-  let fv (ty : ty) : Suid.t =
-    fv_rec Suid.empty ty
+  let fv (ty : ty) : TyUni.Suid.t =
+    fv_rec TyUni.Suid.empty ty
 end
 
 (* -------------------------------------------------------------------- *)
 module Tvar = struct
-  let subst (s : ty Mid.t) (ty : ty) : ty =
+  let subst (s : etyarg Mid.t) (ty : ty) : ty =
     ty_subst { f_subst_id with fs_v = s } ty
 
-  let subst1 ((id, t) : ebinding) (ty : ty) : ty =
+  let subst1 ((id, t) : ident * etyarg) (ty : ty) : ty =
     subst (Mid.singleton id t) ty
 
-  let init (lv : ident list) (lt : ty list) : ty Mid.t =
-    assert (List.length lv = List.length lt);
-    List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
+  let init (init : (ident * etyarg) list) : etyarg Mid.t =
+    Mid.of_list init
 
-  let f_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : form -> form =
-    Fsubst.f_subst_tvar ~freshen (init lv lt)
+  let subst_etyarg (s : etyarg Mid.t) (ety : etyarg) : etyarg =
+    etyarg_subst { f_subst_id with fs_v = s } ety
+
+  let f_subst ~(freshen : bool) (bds : (ident * etyarg) list) : form -> form =
+    Fsubst.f_subst_tvar ~freshen (init bds)
 end

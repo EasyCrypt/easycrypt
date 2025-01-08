@@ -5,8 +5,8 @@ open EcParsetree
 
 (* -------------------------------------------------------------------- *)
 type tperror =
-| TPE_Typing of EcTyping.tyerror
-| TPE_TyNotClosed
+| TPE_Typing           of EcTyping.tyerror
+| TPE_TyNotClosed      of EcUnify.uniflags
 | TPE_DuplicatedConstr of symbol
 
 exception TransPredError of EcLocation.t * EcEnv.env * tperror

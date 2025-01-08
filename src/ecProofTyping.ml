@@ -25,9 +25,9 @@ let process_form_opt ?mv hyps pf oty =
     let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
-  with EcUnify.UninstanciateUni ->
+  with EcUnify.UninstanciateUni infos ->
     EcTyping.tyerror pf.EcLocation.pl_loc
-      (LDecl.toenv hyps) EcTyping.FreeTypeVariables
+      (LDecl.toenv hyps) (FreeUniVariables infos)
 
 let process_form ?mv hyps pf ty =
   process_form_opt ?mv hyps pf (Some ty)
@@ -188,7 +188,7 @@ let tc1_process_codepos1 tc (side, cpos) =
   
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
-(* FIXME: TC HOOK - check parameter constraints                       *)
+(* FIXME:TC HOOK - check parameter constraints                        *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) typ tvi =
   match tvi with

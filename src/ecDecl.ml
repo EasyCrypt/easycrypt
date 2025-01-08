@@ -5,13 +5,17 @@ open EcTypes
 open EcCoreFol
 
 module Sp   = EcPath.Sp
-module TC   = EcTypeClass
 module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type typeclass = {
+  tc_name : EcPath.path;
+  tc_args : etyarg list;
+}
+
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -24,7 +28,7 @@ type tydecl = {
 
 and ty_body = [
   | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
+  | `Abstract of typeclass list
   | `Datatype of ty_dtype
   | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
@@ -48,7 +52,7 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with `Record x -> Some x | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =
+let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
   let params =
     match params with
     | `Named params ->
@@ -56,15 +60,26 @@ let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
         List.map
-          (fun x -> (EcIdent.create x, Sp.empty))
+          (fun x -> (EcIdent.create x, []))
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_resolve = resolve; tyd_loca = lc; }
+  { tyd_params  = params;
+    tyd_type    = `Abstract tc;
+    tyd_resolve = resolve;
+    tyd_loca    = lc; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init (List.map fst params) args in
+let etyargs_of_tparams (tps : ty_params) : etyarg list =
+  List.map (fun (a, tcs) ->
+    let ety =
+      List.mapi (fun offset _ -> TCIAbstract { support = `Var a; offset }) tcs
+    in (tvar a, ety)
+  ) tps
+
+(* -------------------------------------------------------------------- *)
+let ty_instanciate (params : ty_params) (args : etyarg list) (ty : ty) =
+  let subst = CS.Tvar.init (List.combine (List.map fst params) args) in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -81,7 +96,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -176,6 +191,11 @@ let is_rcrd op =
   | OB_oper (Some (OP_Record _)) -> true
   | _ -> false
 
+let is_tc_op op =
+  match op.op_kind with
+  | OB_oper (Some (OP_TC _)) -> true
+  | _ -> false
+
 let is_fix op =
   match op.op_kind with
   | OB_oper (Some (OP_Fix _)) -> true
@@ -249,41 +269,18 @@ let operator_as_prind (op : operator) =
   | OB_pred (Some (PR_Ind pri)) -> pri
   | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
-  let axbd, axpm =
-    let bdpm = List.map fst tparams in
-    let axpm = List.map EcIdent.fresh bdpm in
-      (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
-       List.combine axpm (List.map snd tparams))
-  in
-
-  let args, axbd =
-    match axbd.f_node with
-    | Fquant (Llambda, bds, axbd) ->
-        let bds, flam = List.split_at nargs bds in
-        (bds, f_lambda flam axbd)
-    | _ -> [], axbd
-  in
-
-  let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
-  let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
-  let op     = f_app op opargs axbd.f_ty in
-  let axspec = f_forall args (f_eq op axbd) in
-
-  { ax_tparams    = axpm;
-    ax_spec       = axspec;
-    ax_kind       = `Axiom (Ssym.empty, false);
-    ax_loca       = lc;
-    ax_visibility = if nosmt then `NoSmt else `Visible; }
+let operator_as_tc (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some OP_TC (tcpath, name)) -> (tcpath, name)
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * EcCoreFol.form) list;
-  tc_loca: is_local;
+type tc_decl = {
+  tc_tparams : ty_params;
+  tc_prt     : typeclass option;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
+  tc_loca    : is_local;
 }
 
 (* -------------------------------------------------------------------- *)

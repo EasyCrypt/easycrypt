@@ -2,7 +2,6 @@
 open EcUtils
 open EcSymbols
 open EcLocation
-open EcTypes
 open EcCoreSubst
 open EcParsetree
 open EcDecl
@@ -11,8 +10,8 @@ module TT = EcTyping
 
 (* -------------------------------------------------------------------- *)
 type tperror =
-| TPE_Typing of EcTyping.tyerror
-| TPE_TyNotClosed
+| TPE_Typing           of EcTyping.tyerror
+| TPE_TyNotClosed      of EcUnify.uniflags
 | TPE_DuplicatedConstr of symbol
 
 exception TransPredError of EcLocation.t * EcEnv.env * tperror
@@ -20,8 +19,8 @@ exception TransPredError of EcLocation.t * EcEnv.env * tperror
 let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
-  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uni () in
+let close_pr_body (uidmap : unisubst) (body : prbody) =
+  let fsubst = EcFol.Fsubst.f_subst_init ~tu:uidmap () in
   let tsubst = ty_subst fsubst in
 
   match body with
@@ -74,13 +73,13 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
 
   in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    tperror loc env TPE_TyNotClosed;
+  Option.iter
+    (fun infos -> tperror loc env (TPE_TyNotClosed infos))
+    (EcUnify.UniEnv.xclosed ue);
 
-  let uidmap     = EcUnify.UniEnv.assubst ue in
+  let uidmap  = EcUnify.UniEnv.assubst ue in
   let tparams = EcUnify.UniEnv.tparams ue in
   let body    = body |> omap (close_pr_body uidmap) in
-
   let dom     = Tuni.subst_dom uidmap dom in
 
   EcDecl.mk_pred ~opaque:optransparent tparams dom body pr.pp_locality

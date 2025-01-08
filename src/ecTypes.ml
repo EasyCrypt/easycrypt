@@ -42,7 +42,7 @@ let rec dump_ty ty =
       EcIdent.tostring p
 
   | Tunivar i ->
-      Printf.sprintf "#%d" i
+      Printf.sprintf "#%d" (i :> int)
 
   | Tvar id ->
       EcIdent.tostring id
@@ -52,17 +52,18 @@ let rec dump_ty ty =
 
   | Tconstr (p, tys) ->
       Printf.sprintf "%s[%s]" (EcPath.tostring p)
-        (String.concat ", " (List.map dump_ty tys))
+        (String.concat ", " (List.map dump_ty (List.fst tys)))
 
   | Tfun (t1, t2) ->
       Printf.sprintf "(%s) -> (%s)" (dump_ty t1) (dump_ty t2)
 
 (* -------------------------------------------------------------------- *)
-let tuni uid     = mk_ty (Tunivar uid)
-let tvar id      = mk_ty (Tvar id)
-let tconstr p lt = mk_ty (Tconstr (p, lt))
-let tfun t1 t2   = mk_ty (Tfun (t1, t2))
-let tglob m      = mk_ty (Tglob m)
+let tuni uid        = mk_ty (Tunivar uid)
+let tvar id         = mk_ty (Tvar id)
+let tconstr p lt    = mk_ty (Tconstr (p, List.map (fun ty -> (ty, [])) lt))
+let tconstr_tc p lt = mk_ty (Tconstr (p, lt))
+let tfun t1 t2      = mk_ty (Tfun (t1, t2))
+let tglob m         = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
@@ -103,7 +104,7 @@ let rec tyfun_flat (ty : ty) =
 (* -------------------------------------------------------------------- *)
 let as_tdistr (ty : ty) =
   match ty.ty_node with
-  | Tconstr (p, [sty])
+  | Tconstr (p, [sty, []])
       when EcPath.p_equal p EcCoreLib.CI_Distr.p_distr
     -> Some sty
 
@@ -112,7 +113,7 @@ let as_tdistr (ty : ty) =
 let is_tdistr (ty : ty) = as_tdistr ty <> None
 
 (* -------------------------------------------------------------------- *)
-let ty_map f t =
+let rec ty_map (f : ty -> ty) (t : ty) : ty =
   match t.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> t
 
@@ -120,39 +121,88 @@ let ty_map f t =
      ttuple (List.Smart.map f lty)
 
   | Tconstr (p, lty) ->
-     let lty = List.Smart.map f lty in
-     tconstr p lty
+     let lty = List.Smart.map (etyarg_map f) lty in
+     tconstr_tc p lty
 
   | Tfun (t1, t2) ->
       tfun (f t1) (f t2)
 
-let ty_fold f s ty =
+and etyarg_map (f : ty -> ty) ((ty, tcw) : etyarg) : etyarg =
+  let ty = f ty in
+  let tcw = List.Smart.map (tcw_map f) tcw in
+  (ty, tcw)
+
+and tcw_map (f : ty -> ty) (tcw : tcwitness) : tcwitness =
+  match tcw with
+  | TCIUni _ ->
+    tcw
+
+  | TCIConcrete { path; etyargs; } ->
+    let etyargs = List.Smart.map (etyarg_map f) etyargs in
+    TCIConcrete { path; etyargs; }
+
+  | TCIAbstract _ ->
+    tcw
+
+(* -------------------------------------------------------------------- *)
+let rec ty_fold (f : 'a -> ty -> 'a) (v : 'a) (ty : ty) : 'a =
   match ty.ty_node with
-  | Tglob _ | Tunivar _ | Tvar _ -> s
-  | Ttuple lty -> List.fold_left f s lty
-  | Tconstr(_, lty) -> List.fold_left f s lty
-  | Tfun(t1,t2) -> f (f s t1) t2
+  | Tglob _ | Tunivar _ | Tvar _ -> v
+  | Ttuple lty -> List.fold_left f v lty
+  | Tconstr (_, lty) -> List.fold_left (etyarg_fold f) v lty
+  | Tfun (t1, t2) -> f (f v t1) t2
 
-let ty_sub_exists f t =
-  match t.ty_node with
-  | Tglob _ | Tunivar _ | Tvar _ -> false
-  | Ttuple lty -> List.exists f lty
-  | Tconstr (_, lty) -> List.exists f lty
-  | Tfun (t1, t2) -> f t1 || f t2
+and etyarg_fold (f : 'a -> ty -> 'a) (v : 'a) (ety : etyarg) : 'a =
+  let (ty, tcw) = ety in
+  List.fold_left (tcw_fold f) (f v ty) tcw
+  
+and tcw_fold (f : 'a -> ty -> 'a) (v : 'a) (tcw : tcwitness) : 'a =
+  match tcw with
+  | TCIConcrete { etyargs } ->
+    List.fold_left (etyarg_fold f) v etyargs
 
-let ty_iter f t =
-  match t.ty_node with
-  | Tglob _ | Tunivar _ | Tvar _ -> ()
-  | Ttuple lty -> List.iter f lty
-  | Tconstr (_, lty) -> List.iter f lty
-  | Tfun (t1,t2) -> f t1; f t2
+  | TCIUni _ | TCIAbstract _ ->
+    v
 
+(* -------------------------------------------------------------------- *)
+let ty_iter (f : ty -> unit) (ty : ty) : unit =
+  ty_fold (fun () -> f) () ty
+
+let etyarg_iter (f : ty -> unit) (ety : etyarg) : unit =
+  etyarg_fold (fun () -> f) () ety
+
+let tcw_iter (f : ty -> unit) (tcw : tcwitness) : unit =
+  tcw_fold (fun () -> f) () tcw
+  
+(* -------------------------------------------------------------------- *)
+let ty_sub_exists (f : ty -> bool) (ty : ty) =
+  let exception Exists in
+  try
+    ty_iter (fun ty -> if f ty then raise Exists) ty;
+    false
+  with Exists -> true
+
+let etyarg_sub_exists (f : ty -> bool) (ety : etyarg) =
+  let exception Exists in
+  try
+    etyarg_iter (fun ty -> if f ty then raise Exists) ety;
+    false
+  with Exists -> true  
+
+let tcw_sub_exists (f : ty -> bool) (tcw : tcwitness) =
+  let exception Exists in
+  try
+    tcw_iter (fun ty -> if f ty then raise Exists) tcw;
+    false
+  with Exists -> true  
+  
+(* -------------------------------------------------------------------- *)
 exception FoundUnivar
 
-let rec ty_check_uni t =
-  match t.ty_node with
+let rec ty_check_uni (ty : ty) : unit  =
+  match ty.ty_node with
   | Tunivar _ -> raise FoundUnivar
-  | _ -> ty_iter ty_check_uni t
+  | _ -> ty_iter ty_check_uni ty
 
 (* -------------------------------------------------------------------- *)
 let symbol_of_ty (ty : ty) =
@@ -197,7 +247,6 @@ let ovar_of_var { v_name = n; v_type = t } =
   { ov_name = Some n; ov_type = t }
 
 module Tvar = struct
-
   let rec fv_rec fv t =
     match t.ty_node with
     | Tvar id -> Sid.add id fv
@@ -209,6 +258,34 @@ end
 let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
 
+(* -------------------------------------------------------------------- *)
+let rec etyargs_tvar_fv (etyargs : etyarg list) =
+  List.fold_left
+    (fun fv etyarg -> Sid.union fv (etyarg_tvar_fv etyarg))
+    Sid.empty etyargs
+
+and etyarg_tvar_fv ((ty, tcws) : etyarg) : Sid.t =
+  Sid.union (Tvar.fv ty) (tcws_tvar_fv tcws)
+
+and tcws_tvar_fv (tcws : tcwitness list) =
+  List.fold_left
+    (fun fv tcw -> Sid.union fv (tcw_tvar_fv tcw))
+    Sid.empty tcws
+
+and tcw_tvar_fv (tcw : tcwitness) : Sid.t =
+  match tcw with
+  | TCIUni _ ->
+    Sid.empty
+
+  | TCIConcrete { etyargs } ->
+    etyargs_tvar_fv etyargs
+
+  | TCIAbstract { support = `Var tyvar } ->
+    Sid.singleton tyvar
+
+  | TCIAbstract { support = (`Abs _) } ->
+    Sid.empty
+  
 (* -------------------------------------------------------------------- *)
 type pvar_kind = EcAst.pvar_kind
 
@@ -310,10 +387,8 @@ let lp_bind = function
       List.pmap (fun (x, ty) -> omap (fun x -> (x, ty)) x) b
 
 (* -------------------------------------------------------------------- *)
-type expr = EcAst.expr
-
+type expr      = EcAst.expr
 type expr_node = EcAst.expr_node
-
 type equantif  = EcAst.equantif
 type ebinding  = EcAst.ebinding
 type ebindings = EcAst.ebindings
@@ -321,27 +396,45 @@ type ebindings = EcAst.ebindings
 type closure = (EcIdent.t * ty) list * expr
 
 (* -------------------------------------------------------------------- *)
+type etyarg = EcAst.etyarg
+
+let etyarg_fv    = EcAst.etyarg_fv
+let etyargs_fv   = EcAst.etyargs_fv
+let etyarg_hash  = EcAst.etyarg_hash
+let etyarg_equal = EcAst.etyarg_equal
+
+(* -------------------------------------------------------------------- *)
+type tcwitness = EcAst.tcwitness
+
+let tcw_fv    = EcAst.tcw_fv
+let tcw_hash  = EcAst.tcw_hash
+let tcw_equal = EcAst.tcw_equal
+
+(* -------------------------------------------------------------------- *)
 let e_equal   = EcAst.e_equal
-let e_hash    = EcAst.e_hash
 let e_compare = fun e1 e2 -> e_hash e1 - e_hash e2
 let e_fv      = EcAst.e_fv
+let e_hash    = EcAst.e_hash
 let e_ty  e   = e.e_ty
 
 (* -------------------------------------------------------------------- *)
 let lp_fv = EcAst.lp_fv
-
 let pv_fv = EcAst.pv_fv
 
 (* -------------------------------------------------------------------- *)
 let eqt_equal = EcAst.eqt_equal
 
-(* -------------------------------------------------------------------- *)
-
 let e_tt    = mk_expr (Eop (EcCoreLib.CI_Unit.p_tt, [])) tunit
 let e_int   = fun i -> mk_expr (Eint i) tint
 let e_local = fun x ty -> mk_expr (Elocal x) ty
 let e_var   = fun x ty -> mk_expr (Evar x) ty
-let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
+
+let e_op_tc x targs ty =
+  mk_expr (Eop (x, targs)) ty
+
+let e_op x targs ty =
+  e_op_tc x (List.map (fun ty -> (ty, [])) targs) ty
+
 let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
 let e_tuple = fun es ->
   match es with
@@ -359,13 +452,6 @@ let e_proj_simpl e i ty =
   | _ -> e_proj e i ty
 
 let e_quantif q b e =
-  if List.is_empty b then e else
-
-  let b, e =
-    match e.e_node with
-    | Equant (q', b', e) when eqt_equal q q' -> (b@b', e)
-    | _ -> b, e in
-
   let ty =
     match q with
     | `ELambda -> toarrow (List.map snd b) e.e_ty
@@ -378,11 +464,7 @@ let e_exists b e = e_quantif `EExists b e
 let e_lam    b e = e_quantif `ELambda b e
 
 let e_app x args ty =
-  if args = [] then x
-  else
-    match x.e_node with
-    | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
-    | _ -> mk_expr (Eapp (x, args)) ty
+  mk_expr (Eapp (x, args)) ty
 
 let e_app_op ?(tyargs=[]) op args ty =
   e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
@@ -438,54 +520,33 @@ let e_oget (e : expr) (ty : ty) : expr =
   e_app op [e] ty
 
 (* -------------------------------------------------------------------- *)
-let e_map fty fe e =
+let e_map (fe : expr -> expr) (e : expr) : expr =
   match e.e_node with
-  | Eint _ | Elocal _ | Evar _ -> e
-
-  | Eop (p, tys) ->
-      let tys' = List.Smart.map fty tys in
-      let ty'  = fty e.e_ty in
-        e_op p tys' ty'
+  | Eint   _ -> e
+  | Elocal _ -> e
+  | Evar   _ -> e
+  | Eop    _ -> e
 
   | Eapp (e1, args) ->
-      let e1'   = fe e1 in
-      let args' = List.Smart.map fe args in
-      let ty'   = fty e.e_ty in
-        e_app e1' args' ty'
+    e_app (fe e1) (List.Smart.map fe args) e.e_ty
 
   | Elet (lp, e1, e2) ->
-      let e1' = fe e1 in
-      let e2' = fe e2 in
-        e_let lp e1' e2'
+    e_let lp (fe e1) (fe e2)
 
   | Etuple le ->
-      let le' = List.Smart.map fe le in
-        e_tuple le'
+    e_tuple (List.Smart.map fe le)
 
   | Eproj (e1, i) ->
-      let e' = fe e1 in
-      let ty = fty e.e_ty in
-      e_proj e' i ty
+    e_proj (fe e1) i e.e_ty
 
   | Eif (e1, e2, e3) ->
-      let e1' = fe e1 in
-      let e2' = fe e2 in
-      let e3' = fe e3 in
-      e_if e1' e2' e3'
+    e_if (fe e1) (fe e2) (fe e3)
 
-  | Ematch (b, es, ty) ->
-      let ty' = fty ty in
-      let b'  = fe b in
-      let es' = List.Smart.map fe es in
-      e_match b' es' ty'
+  | Ematch (e, bs, ty) ->
+    e_match (fe e) (List.Smart.map fe bs) ty
 
   | Equant (q, b, bd) ->
-      let dop (x, ty as xty) =
-        let ty' = fty ty in
-          if ty == ty' then xty else (x, ty') in
-      let b'  = List.Smart.map dop b in
-      let bd' = fe bd in
-      e_quantif q b' bd'
+    e_quantif q b (fe bd)
 
 let e_fold (fe : 'a -> expr -> 'a) (state : 'a) (e : expr) =
   match e.e_node with
@@ -504,6 +565,7 @@ let e_fold (fe : 'a -> expr -> 'a) (state : 'a) (e : expr) =
 let e_iter (fe : expr -> unit) (e : expr) =
   e_fold (fun () e -> fe e) () e
 
+(* -------------------------------------------------------------------- *)
 module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
 module Me = MSHe.M
 module Se = MSHe.S
@@ -554,3 +616,4 @@ let split_args e =
   match e.e_node with
   | Eapp (e, args) -> (e, args)
   | _ -> (e, [])
+ 

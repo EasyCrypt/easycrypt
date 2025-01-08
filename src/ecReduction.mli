@@ -19,16 +19,17 @@ type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> '
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
-  val for_type  : ty          eqtest
-  val for_pv    : prog_var    eqntest
-  val for_lv    : lvalue      eqntest
-  val for_xp    : xpath       eqntest
-  val for_mp    : mpath       eqntest
-  val for_instr : instr       eqantest
-  val for_stmt  : stmt        eqantest
-  val for_expr  : expr        eqantest
-  val for_msig  : module_sig  eqntest
-  val for_mexpr : env -> ?norm:bool -> ?body:bool -> module_expr -> module_expr -> bool
+  val for_type   : ty          eqtest
+  val for_etyarg : etyarg      eqtest
+  val for_pv     : prog_var    eqntest
+  val for_lv     : lvalue      eqntest
+  val for_xp     : xpath       eqntest
+  val for_mp     : mpath       eqntest
+  val for_instr  : instr       eqantest
+  val for_stmt   : stmt        eqantest
+  val for_expr   : expr        eqantest
+  val for_msig   : module_sig  eqntest
+  val for_mexpr  : env -> ?norm:bool -> ?body:bool -> module_expr -> module_expr -> bool
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool
@@ -64,6 +65,7 @@ type reduction_info = {
   beta    : bool;
   delta_p : (path  -> deltap); (* reduce operators *)
   delta_h : (ident -> bool);   (* reduce local definitions *)
+  delta_tc : bool;              (* reduce tc-operators *)
   zeta    : bool;              (* reduce let  *)
   iota    : bool;              (* reduce case *)
   eta     : bool;              (* reduce eta-expansion *)

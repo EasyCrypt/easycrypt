@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcAst
 open EcTypes
 open EcDecl
@@ -26,7 +27,7 @@ exception InconsistentSubst
 type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
-  sb_tyvar    : ty Mid.t;
+  sb_tyvar    : etyarg Mid.t;
   sb_elocal   : expr Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
@@ -137,17 +138,17 @@ let has_def (s : subst) (p : EcPath.path) =
   Mp.mem p s.sb_def
 
 (* -------------------------------------------------------------------- *)
-let add_tyvar (s : subst) (x : EcIdent.t) (ty : ty) =
+let add_tyvar (s : subst) (x : EcIdent.t) (ety : etyarg) =
   (* FIXME: check name clash *)
   let merger = function
-    | None   -> Some ty
+    | None   -> Some ety
     | Some _ -> raise (SubstNameClash (`Ident x))
   in
   { s with sb_tyvar = Mid.change merger x s.sb_tyvar }
 
 (* -------------------------------------------------------------------- *)
-let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
-  List.fold_left2 add_tyvar s xs tys
+let add_tyvars (s : subst) (xs : (EcIdent.t * etyarg) list) =
+  List.fold_left (fun s (x, ety) -> add_tyvar s x ety) s xs
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
@@ -156,23 +157,25 @@ let rec subst_ty (s : subst) (ty : ty) =
      tglob (EcPath.mget_ident (subst_mpath s (EcPath.mident mp)))
 
   | Tunivar _ ->
-     ty                         (* FIXME *)
+     ty
 
   | Tvar a ->
-     Mid.find_def ty a s.sb_tyvar
+       Mid.find_opt a s.sb_tyvar
+    |> Option.map fst
+    |> Option.value ~default:ty
 
   | Ttuple tys ->
      ttuple (subst_tys s tys)
 
-  | Tconstr (p, tys) -> begin
-      let tys = subst_tys s tys in
+  | Tconstr (p, etys) -> begin
+      let etys = subst_etyargs s etys in
 
       match Mp.find_opt p s.sb_tydef with
       | None ->
-         tconstr (subst_path s p) tys
+         tconstr_tc (subst_path s p) etys
 
       | Some (args, body) ->
-         let s = List.fold_left2 add_tyvar empty args tys in
+         let s = List.fold_left2 add_tyvar empty args etys in
          subst_ty s body
     end
 
@@ -182,6 +185,43 @@ let rec subst_ty (s : subst) (ty : ty) =
 (* -------------------------------------------------------------------- *)
 and subst_tys (s : subst) (tys : ty list) =
   List.map (subst_ty s) tys
+
+(* -------------------------------------------------------------------- *)
+and subst_etyarg (s : subst) ((ty, tcws) : etyarg) : etyarg =
+  (subst_ty s ty, subst_tcws s tcws)
+
+(* -------------------------------------------------------------------- *)
+and subst_etyargs (s : subst) (tyargs : etyarg list) : etyarg list =
+  List.map (subst_etyarg s) tyargs
+
+(* -------------------------------------------------------------------- *)
+and subst_tcw (s : subst) (tcw : tcwitness) =
+  match tcw with
+  | TCIUni _ ->
+    tcw
+
+  | TCIConcrete { etyargs; path } ->
+    let path = subst_path s path in
+    let etyargs = subst_etyargs s etyargs in
+    TCIConcrete { etyargs; path }
+
+  | TCIAbstract { support = `Var a; offset } ->
+       Mid.find_opt a s.sb_tyvar
+    |> Option.map snd
+    |> Option.map (fun tcs -> List.nth tcs offset)
+    |> Option.value ~default:tcw
+
+  | TCIAbstract ({ support = `Abs p  } as tcw) ->
+    match Mp.find_opt p s.sb_tydef with
+    | None ->
+      TCIAbstract { tcw with support = `Abs (subst_path s p) }
+
+    | Some _ ->
+      assert false (* FIXME:TC *)
+
+(* -------------------------------------------------------------------- *)
+and subst_tcws (s : subst) (tcws : tcwitness list) : tcwitness list =
+  List.map (subst_tcw s) tcws
 
 (* -------------------------------------------------------------------- *)
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
@@ -267,9 +307,9 @@ let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
 
-let add_tydef (s : subst) p (ids, ty) =
+let add_tydef (s : subst) p (typ, ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
-  { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
+  { s with sb_tydef = Mp.add p (typ, ty) s.sb_tydef }
 
 let add_opdef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
@@ -317,51 +357,80 @@ let subst_expr_lpattern (s : subst) (lp : lpattern) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_expr (s : subst) (e : expr) =
+  let mk (node : expr_node) =
+    let ty = subst_ty s e.e_ty in
+    mk_expr node ty in
+
   match e.e_node with
+  | Eint _ ->
+    mk e.e_node
+
   | Elocal id -> begin
       match Mid.find id s.sb_elocal with
       | aout -> aout
-      | exception Not_found -> e_local id (subst_ty s e.e_ty)
+      | exception Not_found -> mk (Elocal id)
     end
 
   | Evar pv ->
-     e_var (subst_progvar s pv) (subst_ty s e.e_ty)
+    mk (Evar (subst_progvar s pv))
 
-  | Eapp ({ e_node = Eop (p, tys) }, args) when has_opdef s p ->
-      let tys  = subst_tys s tys in
-      let ty   = subst_ty  s e.e_ty in
-      let body = oget (get_opdef s p) in
-      let args = List.map (subst_expr s) args in
-      subst_eop ty tys args body
+  | Eapp ({ e_node = Eop (p, tyargs) }, args) when has_opdef s p ->
+    let tyargs = subst_etyargs s tyargs in
+    let ty     = subst_ty s e.e_ty in
+    let body   = oget (get_opdef s p) in
+    let args   = List.map (subst_expr s) args in
+    subst_eop ty tyargs args body
 
-  | Eop (p, tys) when has_opdef s p ->
-      let tys  = subst_tys s tys in
-      let ty   = subst_ty  s e.e_ty in
-      let body = oget (get_opdef s p) in
-      subst_eop ty tys [] body
+  | Eapp (hd, args) ->
+    let hd = subst_expr s hd in
+    let args = List.map (subst_expr s) args in
+    mk (Eapp (hd, args))
 
-  | Eop (p, tys) ->
-      let p   = subst_path s p in
-      let tys = subst_tys s tys in
-      let ty  = subst_ty s e.e_ty in
-      e_op p tys ty
+  | Eop (p, tyargs) when has_opdef s p ->
+    let tys  = subst_etyargs s tyargs in
+    let ty   = subst_ty  s e.e_ty in
+    let body = oget (get_opdef s p) in
+    subst_eop ty tys [] body
+
+  | Eop (p, tyargs) ->
+    let p      = subst_path s p in
+    let tyargs = subst_etyargs s tyargs in
+    mk (Eop (p, tyargs))
+
+  | Eif (c, e1, e2) ->
+    let c = subst_expr s c in
+    let e1 = subst_expr s e1 in
+    let e2 = subst_expr s e2 in
+    mk (Eif (c, e1, e2))
+
+  | Ematch (c, bs, ty) ->
+    let c = subst_expr s c in
+    let bs = List.map (subst_expr s) bs in
+    let ty = subst_ty s ty in
+    mk (Ematch (c, bs, ty))
+
+  | Eproj (sube, (i : int)) ->
+    let sube = subst_expr s sube in
+    mk (Eproj (sube, i))
+
+  | Etuple es ->
+    let es = List.map (subst_expr s) es in
+    mk (Etuple es)
 
   | Elet (lp, e1, e2) ->
-      let e1 = subst_expr s e1 in
-      let s, lp = subst_expr_lpattern s lp in
-      let e2 = subst_expr s e2 in
-      e_let lp e1 e2
+    let e1 = subst_expr s e1 in
+    let s, lp = subst_expr_lpattern s lp in
+    let e2 = subst_expr s e2 in
+    mk (Elet (lp, e1, e2))
 
-  | Equant (q, b, e1) ->
-      let s, b = fresh_elocals s b in
-      let e1 = subst_expr s e1 in
-      e_quantif q b e1
-
-  | _ -> e_map (subst_ty s) (subst_expr s) e
+  | Equant (q, b, bd) ->
+    let s, b = fresh_elocals s b in
+    let bd = subst_expr s bd in
+    mk (Equant (q, b, bd))
 
 (* -------------------------------------------------------------------- *)
 and subst_eop ety tys args (tyids, e) =
-  let s = add_tyvars empty tyids tys in
+  let s = add_tyvars empty (List.combine tyids tys) in
 
   let (s, args, e) =
     match e.e_node with
@@ -475,166 +544,187 @@ let subst_form_lpattern (s : subst) (lp : lpattern) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_form (s : subst) (f : form) =
+  let mk (node : f_node) =
+    let ty = subst_ty s f.f_ty in
+    mk_form node ty in
+
   match f.f_node with
-  | Fquant (q, b, f1) ->
-      let s, b = fresh_glocals s b in
-      let e1 = subst_form s f1 in
-      f_quant q b e1
+  | Fint _ ->
+    mk (f.f_node)
+
+  | Fquant (q, b, bd) ->
+    let s, b = fresh_glocals s b in
+    let bd = subst_form s bd in
+    mk (Fquant (q, b, bd))
 
   | Fmatch (f, bs, ty) ->
-     let f = subst_form s f in
-     let bs = List.map (subst_form s) bs in
-     let ty = subst_ty s ty in
-     f_match f bs ty
+    let f = subst_form s f in
+    let bs = List.map (subst_form s) bs in
+    let ty = subst_ty s ty in
+    mk (Fmatch (f, bs, ty))
 
   | Flet (lp, f, body) ->
-      let f = subst_form s f in
-      let s, lp = subst_form_lpattern s lp in
-      let body = subst_form s body in
-      f_let lp f body
+    let f = subst_form s f in
+    let s, lp = subst_form_lpattern s lp in
+    let body = subst_form s body in
+    mk (Flet (lp, f, body))
 
   | Flocal x -> begin
-      match Mid.find x s.sb_flocal with
-      | aout -> aout
-      | exception Not_found -> f_local x (subst_ty s f.f_ty)
-    end
+    match Mid.find x s.sb_flocal with
+    | aout -> aout
+    | exception Not_found -> mk (Flocal x)
+  end
 
   | Fpvar (pv, m) ->
-     let pv = subst_progvar s pv in
-     let ty = subst_ty s f.f_ty in
-     let m = subst_mem s m in
-     f_pvar pv ty m
+    let pv = subst_progvar s pv in
+    let m = subst_mem s m in
+    mk (Fpvar (pv, m))
 
   | Fglob (mp, m) ->
-     let mp = EcPath.mget_ident (subst_mpath s (EcPath.mident mp)) in
-     let m = subst_mem s m in
-     f_glob mp m
+    let mp = EcPath.mget_ident (subst_mpath s (EcPath.mident mp)) in
+    let m = subst_mem s m in
+    mk (Fglob (mp, m))
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when has_def s p ->
-      let tys  = subst_tys s tys in
-      let ty   = subst_ty  s f.f_ty in
-      let body = oget (get_def s p) in
-      let args = List.map (subst_form s) args in
-      subst_fop ty tys args body
+  | Fapp ({ f_node = Fop (p, tyargs) }, args) when has_def s p ->
+    let tys  = subst_etyargs s tyargs in
+    let ty   = subst_ty  s f.f_ty in
+    let body = oget (get_def s p) in
+    let args = List.map (subst_form s) args in
+    subst_fop ty tys args body
 
-  | Fop (p, tys) when has_def s p ->
-      let tys  = subst_tys s tys in
-      let ty   = subst_ty  s f.f_ty in
-      let body = oget (get_def s p) in
-      subst_fop ty tys [] body
+  | Fapp (hd, args) ->
+    let hd = subst_form s hd in
+    let args = List.map (subst_form s) args in
+    mk (Fapp (hd, args))
 
-  | Fop (p, tys) ->
-      let p   = subst_path s p in
-      let tys = subst_tys s tys in
-      let ty  = subst_ty s f.f_ty in
-      f_op p tys ty
+  | Fop (p, tyargs) when has_def s p ->
+    let tyargs = subst_etyargs s tyargs in
+    let ty     = subst_ty s f.f_ty in
+    let body   = oget (get_def s p) in
+    subst_fop ty tyargs [] body
+
+  | Fop (p, tyargs) ->
+    let p      = subst_path s p in
+    let tyargs = subst_etyargs s tyargs in
+    mk (Fop (p, tyargs))
+
+  | Fif (c, f1, f2) ->
+    let c = subst_form s c in
+    let f1 = subst_form s f1 in
+    let f2 = subst_form s f2 in
+    mk (Fif (c, f1, f2))
+
+  | Ftuple fs ->
+    let fs = List.map (subst_form s) fs in
+    mk (Ftuple fs)
+
+  | Fproj (subf, (i : int)) ->
+    let subf = subst_form s subf in
+    mk (Fproj (subf, i))
 
   | FhoareF { hf_pr; hf_f; hf_po } ->
-     let hf_pr, hf_po =
-       let s = add_memory s mhr mhr in
-       let hf_pr = subst_form s hf_pr in
-       let hf_po = subst_form s hf_po in
-       (hf_pr, hf_po) in
-     let hf_f  = subst_xpath s hf_f in
-     f_hoareF hf_pr hf_f hf_po
+    let hf_pr, hf_po =
+      let s = add_memory s mhr mhr in
+      let hf_pr = subst_form s hf_pr in
+      let hf_po = subst_form s hf_po in
+      (hf_pr, hf_po) in
+    let hf_f  = subst_xpath s hf_f in
+    f_hoareF hf_pr hf_f hf_po
 
   | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
-     let hs_m, (hs_pr, hs_po) =
-       let s, hs_m = subst_memtype s hs_m in
-       let hs_pr = subst_form s hs_pr in
-       let hs_po = subst_form s hs_po in
-       hs_m, (hs_pr, hs_po) in
-     let hs_s = subst_stmt s hs_s in
-     f_hoareS hs_m hs_pr hs_s hs_po
+    let hs_m, (hs_pr, hs_po) =
+      let s, hs_m = subst_memtype s hs_m in
+      let hs_pr = subst_form s hs_pr in
+      let hs_po = subst_form s hs_po in
+      hs_m, (hs_pr, hs_po) in
+    let hs_s = subst_stmt s hs_s in
+    f_hoareS hs_m hs_pr hs_s hs_po
 
   | FbdHoareF { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd } ->
-     let bhf_pr, bhf_po =
-       let s = add_memory s mhr mhr in
-       let bhf_pr = subst_form s bhf_pr in
-       let bhf_po = subst_form s bhf_po in
-       (bhf_pr, bhf_po) in
-     let bhf_f  = subst_xpath s bhf_f in
-     let bhf_bd  = subst_form s bhf_bd in
-     f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
+    let bhf_pr, bhf_po =
+      let s = add_memory s mhr mhr in
+      let bhf_pr = subst_form s bhf_pr in
+      let bhf_po = subst_form s bhf_po in
+      (bhf_pr, bhf_po) in
+    let bhf_f  = subst_xpath s bhf_f in
+    let bhf_bd  = subst_form s bhf_bd in
+    f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
 
   | FbdHoareS { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd } ->
-     let bhs_m, (bhs_pr, bhs_po, bhs_bd) =
-       let s, bhs_m = subst_memtype s bhs_m in
-       let bhs_pr = subst_form s bhs_pr in
-       let bhs_po = subst_form s bhs_po in
-       let bhs_bd = subst_form s bhs_bd in
-       bhs_m, (bhs_pr, bhs_po, bhs_bd) in
-     let bhs_s = subst_stmt s bhs_s in
-     f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
+    let bhs_m, (bhs_pr, bhs_po, bhs_bd) =
+      let s, bhs_m = subst_memtype s bhs_m in
+      let bhs_pr = subst_form s bhs_pr in
+      let bhs_po = subst_form s bhs_po in
+      let bhs_bd = subst_form s bhs_bd in
+      bhs_m, (bhs_pr, bhs_po, bhs_bd) in
+    let bhs_s = subst_stmt s bhs_s in
+    f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
 
    | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
-     let ehf_pr, ehf_po =
-       let s = add_memory s mhr mhr in
-       let ehf_pr = subst_form s ehf_pr in
-       let ehf_po = subst_form s ehf_po in
-       (ehf_pr, ehf_po) in
-     let ehf_f  = subst_xpath s ehf_f in
-     f_eHoareF ehf_pr ehf_f ehf_po
+    let ehf_pr, ehf_po =
+      let s = add_memory s mhr mhr in
+      let ehf_pr = subst_form s ehf_pr in
+      let ehf_po = subst_form s ehf_po in
+      (ehf_pr, ehf_po) in
+    let ehf_f  = subst_xpath s ehf_f in
+    f_eHoareF ehf_pr ehf_f ehf_po
 
   | FeHoareS { ehs_m; ehs_pr; ehs_s; ehs_po } ->
-     let ehs_m, (ehs_pr, ehs_po) =
-       let s, ehs_m = subst_memtype s ehs_m in
-       let ehs_pr = subst_form s ehs_pr in
-       let ehs_po = subst_form s ehs_po in
-       ehs_m, (ehs_pr, ehs_po) in
-     let ehs_s = subst_stmt s ehs_s in
-     f_eHoareS ehs_m ehs_pr ehs_s ehs_po
+    let ehs_m, (ehs_pr, ehs_po) =
+      let s, ehs_m = subst_memtype s ehs_m in
+      let ehs_pr = subst_form s ehs_pr in
+      let ehs_po = subst_form s ehs_po in
+      ehs_m, (ehs_pr, ehs_po) in
+    let ehs_s = subst_stmt s ehs_s in
+    f_eHoareS ehs_m ehs_pr ehs_s ehs_po
 
   | FequivF { ef_pr; ef_fl; ef_fr; ef_po } ->
-     let ef_pr, ef_po =
-       let s = add_memory s mleft mleft in
-       let s = add_memory s mright mright in
-       let ef_pr = subst_form s ef_pr in
-       let ef_po = subst_form s ef_po in
-       (ef_pr, ef_po) in
-     let ef_fl = subst_xpath s ef_fl in
-     let ef_fr = subst_xpath s ef_fr in
-     f_equivF ef_pr ef_fl ef_fr ef_po
+    let ef_pr, ef_po =
+      let s = add_memory s mleft mleft in
+      let s = add_memory s mright mright in
+      let ef_pr = subst_form s ef_pr in
+      let ef_po = subst_form s ef_po in
+      (ef_pr, ef_po) in
+    let ef_fl = subst_xpath s ef_fl in
+    let ef_fr = subst_xpath s ef_fr in
+    f_equivF ef_pr ef_fl ef_fr ef_po
 
   | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } ->
-     let (es_ml, es_mr), (es_pr, es_po) =
-       let s, es_ml = subst_memtype s es_ml in
-       let s, es_mr = subst_memtype s es_mr in
-       let es_pr = subst_form s es_pr in
-       let es_po = subst_form s es_po in
-       (es_ml, es_mr), (es_pr, es_po) in
-     let es_sl = subst_stmt s es_sl in
-     let es_sr = subst_stmt s es_sr in
-     f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+    let (es_ml, es_mr), (es_pr, es_po) =
+      let s, es_ml = subst_memtype s es_ml in
+      let s, es_mr = subst_memtype s es_mr in
+      let es_pr = subst_form s es_pr in
+      let es_po = subst_form s es_po in
+      (es_ml, es_mr), (es_pr, es_po) in
+    let es_sl = subst_stmt s es_sl in
+    let es_sr = subst_stmt s es_sr in
+    f_equivS es_ml es_mr es_pr es_sl es_sr es_po
 
   | FeagerF { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po } ->
-     let eg_pr, eg_po =
-       let s = add_memory s mleft  mleft  in
-       let s = add_memory s mright mright in
-       let eg_pr = subst_form s eg_pr in
-       let eg_po = subst_form s eg_po in
-       (eg_pr, eg_po) in
-     let eg_sl = subst_stmt s eg_sl in
-     let eg_sr = subst_stmt s eg_sr in
-     let eg_fl = subst_xpath s eg_fl in
-     let eg_fr = subst_xpath s eg_fr in
-     f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+    let eg_pr, eg_po =
+      let s = add_memory s mleft  mleft  in
+      let s = add_memory s mright mright in
+      let eg_pr = subst_form s eg_pr in
+      let eg_po = subst_form s eg_po in
+      (eg_pr, eg_po) in
+    let eg_sl = subst_stmt s eg_sl in
+    let eg_sr = subst_stmt s eg_sr in
+    let eg_fl = subst_xpath s eg_fl in
+    let eg_fr = subst_xpath s eg_fr in
+    f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
   | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
-     let pr_mem = subst_mem s pr_mem in
-     let pr_fun = subst_xpath s pr_fun in
-     let pr_args = subst_form s pr_args in
-     let pr_event =
-       let s = add_memory s mhr mhr in
-       subst_form s pr_event in
-     f_pr pr_mem pr_fun pr_args pr_event
-
-  | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
-     f_map (subst_ty s) (subst_form s) f
+    let pr_mem = subst_mem s pr_mem in
+    let pr_fun = subst_xpath s pr_fun in
+    let pr_args = subst_form s pr_args in
+    let pr_event =
+      let s = add_memory s mhr mhr in
+      subst_form s pr_event in
+    f_pr pr_mem pr_fun pr_args pr_event
 
 (* -------------------------------------------------------------------- *)
 and subst_fop fty tys args (tyids, f) =
-  let s = add_tyvars empty tyids tys in
+  let s = add_tyvars empty (List.combine tyids tys) in
 
   let (s, args, f) =
     match f.f_node with
@@ -837,14 +927,19 @@ let subst_top_module (s : subst) (m : top_module_expr) =
     tme_loca = m.tme_loca; }
 
 (* -------------------------------------------------------------------- *)
-let subst_typeclass (s : subst) (tcs : Sp.t) =
-  Sp.map (subst_path s) tcs
+let subst_typeclass (s : subst) (tc : typeclass) =
+  { tc_name = subst_path s tc.tc_name;
+    tc_args = subst_etyargs s tc.tc_args; }
 
 (* -------------------------------------------------------------------- *)
 let fresh_tparam (s : subst) ((x, tcs) : ty_param) =
   let newx = EcIdent.fresh x in
-  let tcs  = subst_typeclass s tcs in
-  let s    = add_tyvar s x (tvar newx) in
+  let tcs  = List.map (subst_typeclass s) tcs in
+  let tcw  =
+    let mk (offset : int) =
+      TCIAbstract { support = `Var newx; offset; }
+    in List.mapi (fun i _ -> mk i) tcs in
+  let s    = add_tyvar s x (tvar newx, tcw) in
   (s, (newx, tcs))
 
 (* -------------------------------------------------------------------- *)
@@ -861,7 +956,7 @@ let subst_genty (s : subst) (tparams, ty) =
 let subst_tydecl_body (s : subst) (tyd : ty_body) =
   match tyd with
   | `Abstract tc ->
-      `Abstract (subst_typeclass s tc)
+      `Abstract (List.map (subst_typeclass s) tc)
 
   | `Concrete ty ->
       `Concrete (subst_ty s ty)
@@ -924,7 +1019,7 @@ and subst_op_body (s : subst) (bd : opbody) =
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }
 
-  | OP_TC -> OP_TC
+  | OP_TC (p, n) -> OP_TC (subst_path s p, n)
 
 and subst_branches (s : subst) = function
   | OPB_Leaf (locals, e) ->
@@ -1020,18 +1115,36 @@ let subst_field (s : subst) cr =
     f_div  = omap (subst_path s) cr.f_div; }
 
 (* -------------------------------------------------------------------- *)
-let subst_instance (s : subst) tci =
-  match tci with
-  | `Ring    cr -> `Ring  (subst_ring  s cr)
-  | `Field   cr -> `Field (subst_field s cr)
-  | `General p  -> `General (subst_path s p)
-
-(* -------------------------------------------------------------------- *)
 let subst_tc (s : subst) tc =
-  let tc_prt = omap (subst_path s) tc.tc_prt in
+  let s, tc_tparams = fresh_tparams s tc.tc_tparams in
+  let tc_prt = omap (subst_typeclass s) tc.tc_prt in
   let tc_ops = List.map (snd_map (subst_ty s)) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
-    { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
+  { tc_tparams; tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
+
+(* -------------------------------------------------------------------- *)
+let subst_tcibody (s : subst) (tci : tcibody) =
+  match tci with
+  | `Ring  cr -> `Ring  (subst_ring  s cr)
+  | `Field cr -> `Field (subst_field s cr)
+
+  | `General (tc, syms) ->
+     let tc   = subst_typeclass s tc in
+     let syms =
+       Option.map
+         (Mstr.map (fun (p, tys) -> (subst_path s p, subst_etyargs s tys)))
+         syms in
+     `General (tc, syms)
+
+
+(* -------------------------------------------------------------------- *)
+let subst_tcinstance (s : subst) (tci : tcinstance) =
+  let s, tci_params = fresh_tparams s tci.tci_params in
+  let tci_type = subst_ty s tci.tci_type in
+  let tci_instance = subst_tcibody s tci.tci_instance in
+  let tci_local = tci.tci_local in
+
+  { tci_params; tci_type; tci_instance; tci_local; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
@@ -1058,8 +1171,8 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_export (p, lc) ->
       Th_export (subst_path s p, lc)
 
-  | Th_instance (ty, tci, lc) ->
-      Th_instance (subst_genty s ty, subst_instance s tci, lc)
+  | Th_instance (x, tci) ->
+      Th_instance (x, subst_tcinstance s tci)
 
   | Th_typeclass (x, tc) ->
       Th_typeclass (x, subst_tc s tc)
@@ -1099,16 +1212,16 @@ and subst_theory_source (s : subst) (ths : thsource) =
   { ths_base = subst_path s ths.ths_base; }
 
 (* -------------------------------------------------------------------- *)
-let init_tparams (params : (EcIdent.t * ty) list) : subst =
-  List.fold_left (fun s (x, ty) -> add_tyvar s x ty) empty params
+let init_tparams (params : (EcIdent.t * etyarg) list) : subst =
+  add_tyvars empty params
 
 (* -------------------------------------------------------------------- *)
-let open_oper op tys =
+let open_oper (op : operator) (tys : etyarg list) : ty * operator_kind =
   let s = List.combine (List.fst op.op_tparams) tys in
   let s = init_tparams s in
   (subst_ty s op.op_ty, subst_op_kind s op.op_kind)
 
-let open_tydecl tyd tys =
+let open_tydecl (tyd : tydecl) (tys : etyarg list) : EcDecl.ty_body =
   let s = List.combine (List.fst tyd.tyd_params) tys in
   let s = init_tparams s in
   subst_tydecl_body s tyd.tyd_type

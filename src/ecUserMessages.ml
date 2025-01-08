@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
-open EcUid
 open EcPath
 open EcUtils
+open EcAst
 open EcTypes
 open EcCoreSubst
 open EcEnv
@@ -21,6 +21,7 @@ let set_ppo (newppo : pp_options) =
 module TypingError : sig
   open EcTyping
 
+  val pp_uniflags        : Format.formatter -> EcUnify.uniflags -> unit
   val pp_fxerror         : env -> Format.formatter -> fxerror -> unit
   val pp_tyerror         : env -> Format.formatter -> tyerror -> unit
   val pp_cnv_failure     : env -> Format.formatter -> tymod_cnv_failure -> unit
@@ -29,6 +30,16 @@ module TypingError : sig
   val pp_restr_error     : env -> Format.formatter -> restriction_error -> unit
 end = struct
   open EcTyping
+
+  let pp_uniflags (fmt : Format.formatter) ({ tyvars; tcvars; } : EcUnify.uniflags) =
+    let msg =
+      match tyvars, tcvars with
+      | false, false -> None
+      |  true, false -> Some "type"
+      | false,  true -> Some "type-class"
+      |  true,  true -> Some "type&type-class" in
+
+    Option.iter (Format.fprintf fmt "%s") msg
 
   let pp_mismatch_funsig env0 fmt error =
     let ppe0 = EcPrinting.PPEnv.ofenv env0 in
@@ -235,8 +246,10 @@ end = struct
     | UniVarNotAllowed ->
         msg "type place holders not allowed"
 
-    | FreeTypeVariables ->
-        msg "this expression contains free type variables"
+    | FreeUniVariables infos ->
+        msg
+          "this expression contains free %a variables"
+          pp_uniflags infos
 
     | TypeVarNotAllowed ->
         msg "type variables not allowed"
@@ -348,7 +361,7 @@ end = struct
 
     | MultipleOpMatch (name, tys, matches) -> begin
         let uvars = List.map Tuni.univars tys in
-        let uvars = List.fold_left Suid.union Suid.empty uvars in
+        let uvars = List.fold_left TyUni.Suid.union TyUni.Suid.empty uvars in
 
         begin match tys with
         | [] ->
@@ -366,7 +379,7 @@ end = struct
 
         let pp_op fmt ((op, inst), subue) =
           let uidmap = EcUnify.UniEnv.assubst subue in
-          let inst = Tuni.subst_dom uidmap inst in
+          let inst = Tuni.subst_dom uidmap (List.fst inst) in
 
           begin match inst with
           | [] ->
@@ -379,8 +392,8 @@ end = struct
           end;
 
           let myuvars = List.map Tuni.univars inst in
-          let myuvars = List.fold_left Suid.union uvars myuvars in
-          let myuvars = Suid.elements myuvars in
+          let myuvars = List.fold_left TyUni.Suid.union uvars myuvars in
+          let myuvars = TyUni.Suid.elements myuvars in
 
           let uidmap = EcUnify.UniEnv.assubst subue in
           let tysubst = ty_subst (Tuni.subst uidmap) in
@@ -506,6 +519,14 @@ end = struct
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
 
+    | TCArgsCountMismatch (_, typarams, tys) ->
+        msg "typeclass expects %d arguments, got %d"
+          (List.length typarams) (List.length tys)
+
+    | CannotInferTC (ty, tc) ->
+        msg "cannot infer typeclass `%a' for type `%a'"
+          (EcPrinting.pp_typeclass env) tc pp_type ty
+
     | NoDefaultMemRestr ->
       msg "no default sign for memory restriction. Use '+' or '-', or \
            set the %s pragma to retrieve the old behaviour"
@@ -613,8 +634,10 @@ end = struct
   let pp_tperror (env : env) fmt = function
   | TPE_Typing e ->
       TypingError.pp_tyerror env fmt e
-  | TPE_TyNotClosed ->
-      Format.fprintf fmt "this predicate type contains free type variables"
+  | TPE_TyNotClosed infos ->
+      Format.fprintf fmt
+        "this predicate type contains free %a variables"
+        TypingError.pp_uniflags infos
   | TPE_DuplicatedConstr x ->
       Format.fprintf fmt "duplicated constructor name: `%s'" x
 end
@@ -633,8 +656,10 @@ end = struct
     match error with
     | NTE_Typing e ->
        TypingError.pp_tyerror env fmt e
-    | NTE_TyNotClosed ->
-       msg "this notation type contains free type variables"
+    | NTE_TyNotClosed infos ->
+       msg
+        "this notation type contains free %a variables"
+        TypingError.pp_uniflags infos
     | NTE_DupIdent ->
        msg "an ident is bound several time"
     | NTE_UnknownBinder x ->

@@ -79,18 +79,21 @@ type locality = [`Declare | `Local | `Global]
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 
-type ptyparams = (psymbol * pqsymbol list) list
+(* -------------------------------------------------------------------- *)
+type ptcparam  = pqsymbol * pty list
+type ptyparam  = psymbol * ptcparam list
+type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
-  pty_name   : psymbol;
-  pty_tyvars : ptyparams;
-  pty_body   : ptydbody;
+  pty_name     : psymbol;
+  pty_tyvars   : ptyparams;
+  pty_body     : ptydbody;
   pty_locality : locality;
 }
 
 and ptydbody =
-  | PTYD_Abstract of pqsymbol list
+  | PTYD_Abstract of ptcparam list
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -104,7 +107,6 @@ type f_or_mod_ident =
   | FM_FunOrVar of pgamepath
   | FM_Mod of pmsymbol located
 
-
 type pmod_restr_mem_el =
   | PMPlus    of f_or_mod_ident
   | PMMinus   of f_or_mod_ident
@@ -114,7 +116,7 @@ type pmod_restr_mem_el =
 type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
-type pmemory   = psymbol
+type pmemory = psymbol
 
 type phoarecmp = EcFol.hoarecmp
 
@@ -345,9 +347,6 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-type ptyvardecls =
-  (psymbol * pqsymbol list) list
-
 type pop_def =
   | PO_abstr of pty
   | PO_concr of pty * pformula
@@ -369,7 +368,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
-  po_tyvars : ptyvardecls option;
+  po_tyvars : ptyparams option;
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
@@ -397,7 +396,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : (psymbol * pqsymbol list) list option;
+  pp_tyvars : ptyparams option;
   pp_def    : ppred_def;
   pp_locality  : locality;
 }
@@ -405,7 +404,7 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
-  nt_tv    : ptyvardecls option;
+  nt_tv    : ptyparams option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
   nt_codom : pty;
@@ -419,7 +418,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name  : psymbol;
-  ab_tv    : ptyvardecls option;
+  ab_tv    : ptyparams option;
   ab_args  : ptybindings;
   ab_def   : pty * pexpr;
   ab_opts  : abrvopts;
@@ -460,6 +459,7 @@ type pmpred_args = (osymbol * pformula) list
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
   pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdeltatc : bool;
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)
@@ -1027,7 +1027,7 @@ type mempred_binding = PT_MemPred of psymbol list
 type paxiom = {
   pa_name     : psymbol;
   pa_pvars    : mempred_binding option;
-  pa_tyvars   : (psymbol * pqsymbol list) list option;
+  pa_tyvars   : ptyparams option;
   pa_vars     : pgtybindings option;
   pa_formula  : pformula;
   pa_kind     : paxiom_kind;
@@ -1042,16 +1042,18 @@ type prealize = {
 
 (* -------------------------------------------------------------------- *)
 type ptypeclass = {
-  ptc_name : psymbol;
-  ptc_inth : pqsymbol option;
-  ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : (psymbol * pformula) list;
-  ptc_loca : is_local;
+  ptc_name   : psymbol;
+  ptc_params : ptyparams option;
+  ptc_inth   : ptcparam option;
+  ptc_ops    : (psymbol * pty) list;
+  ptc_axs    : (psymbol * pformula) list;
+  ptc_loca   : is_local;
 }
 
 type ptycinstance = {
-  pti_name : pqsymbol;
-  pti_type : (psymbol * pqsymbol list) list * pty;
+  pti_tc   : ptcparam;
+  pti_name : psymbol option;
+  pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;

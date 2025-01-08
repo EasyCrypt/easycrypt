@@ -71,17 +71,18 @@
 
   let mk_simplify l =
     if l = [] then
-      { pbeta  = true; pzeta  = true;
-        piota  = true; peta   = true;
-        plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+      { pbeta    = true; pzeta    = true;
+        piota    = true; peta     = true;
+        plogic   = true; pdelta   = None;
+        pdeltatc = true; pmodpath = true;
+        puser    = true; }
     else
       let doarg acc = function
         | `Delta l ->
             if   l = [] || acc.pdelta = None
             then { acc with pdelta = None }
             else { acc with pdelta = Some (oget acc.pdelta @ l) }
-
+        | `DeltaTC -> { acc with pdeltatc = true }
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
         | `Beta    -> { acc with pbeta    = true }
@@ -91,10 +92,11 @@
         | `User    -> { acc with puser    = true }
       in
         List.fold_left doarg
-          { pbeta  = false; pzeta  = false;
-            piota  = false; peta   = false;
-            plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+          { pbeta    = false; pzeta    = false;
+            piota    = false; peta     = false;
+            plogic   = false; pdelta   = Some [];
+            pdeltatc = false; pmodpath = false;
+            puser    = false; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
@@ -1558,6 +1560,7 @@ signature_item:
            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
 
 (* -------------------------------------------------------------------- *)
+(* EcTypes declarations / definitions *)
 %inline locality:
 | (* empty *) { `Global }
 | LOCAL       { `Local }
@@ -1572,12 +1575,13 @@ signature_item:
 %inline is_local:
 | lc=loc(locality) { locality_as_local lc }
 
-(* -------------------------------------------------------------------- *)
-(* EcTypes declarations / definitions                                   *)
+tcparam:
+| tys=ioption(type_args) x=lqident
+    { (x, odfl [] tys) }
 
 typaram:
 | x=tident { (x, []) }
-| x=tident LTCOLON tc=plist1(lqident, AMP) { (x, tc) }
+| x=tident LTCOLON tc=plist1(tcparam, AMP) { (x, tc) }
 
 typarams:
 | empty { []  }
@@ -1605,7 +1609,7 @@ typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
     { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
 
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(qident, COMMA)
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, AMP)
     { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
@@ -1620,17 +1624,15 @@ typedecl:
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| loca=is_local TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
-    { ptc_name = x;
-      ptc_inth = inth;
-      ptc_ops  = fst body;
-      ptc_axs  = snd body;
-      ptc_loca = loca;
-    }
+| loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident inth=prefix(LTCOLON, tcparam)?
+  EQ LBRACE body=tc_body RBRACE {
+    { ptc_name   = x;
+      ptc_params = tya;
+      ptc_inth   = inth;
+      ptc_ops    = fst body;
+      ptc_axs    = snd body;
+      ptc_loca   = loca; }
   }
-
-tc_inth:
-| LTCOLON x=lqident { x }
 
 tc_body:
 | ops=tc_op* axs=tc_ax* { (ops, axs) }
@@ -1644,29 +1646,22 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| loca=is_local INSTANCE x=qident
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+| loca=is_local INSTANCE tc=tcparam args=tyci_args?
+    name=prefix(AS, lident)? WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
-    { pti_name = x;
+    let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
+    { pti_tc   = tc;
+      pti_name = name;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
-      pti_args = None;
-      pti_loca = loca;
-    }
+      pti_args = args;
+      pti_loca = loca; }
   }
 
-| loca=is_local INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
-  {
-    { pti_name = x;
-      pti_type = (odfl [] typ, ty);
-      pti_ops  = ops;
-      pti_axs  = axs;
-      pti_args = Some (`Ring (c, p));
-      pti_loca = loca;
-    }
-  }
+tyci_args:
+| c=uoption(UINT) p=uoption(UINT)
+   { (c, p) }
 
 tyci_op:
 | OP x=oident EQ tg=qoident
@@ -2406,6 +2401,7 @@ genpattern:
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
+| CLASS            { `DeltaTC }
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }

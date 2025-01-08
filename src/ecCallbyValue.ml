@@ -216,7 +216,7 @@ and betared st s bd f args =
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_record_projection
-  (st : state) ((p, _tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, _tys) : EcPath.path * EcAst.etyarg list) (args : args)
 =
   let exception Bailout in
 
@@ -244,7 +244,7 @@ and try_reduce_record_projection
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_fixdef
-  (st : state) ((p, tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, tys) : EcPath.path * EcAst.etyarg list) (args : args)
 =
   let exception Bailout in
 
@@ -299,7 +299,10 @@ and try_reduce_fixdef
 
     let body = EcFol.form_of_expr EcFol.mhr body in
     let body =
-      Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
+      Tvar.f_subst
+        ~freshen:true
+        (List.combine (List.fst op.EcDecl.op_tparams) tys)
+        body in
 
     Some (cbv st subst body (Args.create ty eargs))
 
@@ -336,7 +339,12 @@ and reduce_user_delta st f1 p tys args =
     | #Op.redmode as mode when Op.reducible ~mode ~nargs st.st_env p ->
       let f = Op.reduce ~mode ~nargs st.st_env p tys in
       cbv st Subst.subst_id f args
-    | _ -> f2
+    | _ ->
+       if st.st_ri.delta_tc then begin
+          match Op.tc_reduce st.st_env p tys with
+          | f -> cbv st Subst.subst_id f args
+          | exception NotReducible -> f2
+       end else f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =

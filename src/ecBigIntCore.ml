@@ -62,6 +62,7 @@ module type TheInterface = sig
   val to_string : zint -> string
 
   val pp_print : Format.formatter -> zint -> unit
+  val pp_zint  : Format.formatter -> zint -> unit
 
   val to_why3 : zint -> Why3.BigInt.t
 end

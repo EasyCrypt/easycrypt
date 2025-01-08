@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcMaps
 open EcPath
 open EcAst
 open EcTypes
@@ -32,8 +33,8 @@ and theory_item_r =
   | Th_module    of top_module_expr
   | Th_theory    of (symbol * ctheory)
   | Th_export    of EcPath.path * is_local
-  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
-  | Th_typeclass of (symbol * typeclass)
+  | Th_instance  of (symbol option * tcinstance)
+  | Th_typeclass of (symbol * tc_decl)
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
@@ -50,8 +51,20 @@ and ctheory = {
   cth_source : thsource option;
 }
 
-and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
-and thmode     = [ `Abstract | `Concrete ]
+and tcinstance = {
+  tci_params   : ty_params;
+  tci_type     : ty;
+  tci_instance : tcibody;
+  tci_local    : locality;
+}
+
+and tcibody = [
+  | `Ring    of ring
+  | `Field   of field
+  | `General of typeclass * ((path * etyarg list) Mstr.t) option
+]
+
+and thmode = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
@@ -59,7 +72,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
+  [`Op of (EcPath.path * ty list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;

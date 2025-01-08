@@ -145,8 +145,8 @@ let process_rewrite_equiv info tc =
             let res = omap (fun v -> EcTyping.transexpcast subenv `InProc ue ret_ty v) pres in
             let es = e_subst (Tuni.subst (EcUnify.UniEnv.close ue)) in
             Some (List.map es args, omap (EcModules.lv_of_expr |- es) res)
-          with EcUnify.UninstanciateUni ->
-            EcTyping.tyerror (loc pargs) env EcTyping.FreeTypeVariables
+          with EcUnify.UninstanciateUni infos ->
+            EcTyping.tyerror (loc pargs) env (FreeUniVariables infos)
         end
   in
 

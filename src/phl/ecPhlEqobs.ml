@@ -249,7 +249,7 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
     let typr, _, tyinstr = oget (EcEnv.Ty.get_top_decl el.e_ty env) in
     let test =
       EcPath.p_equal typl typr &&
-        List.for_all2 (EcReduction.EqTest.for_type env) tyinstl tyinstr in
+        List.for_all2 (EcReduction.EqTest.for_etyarg env) tyinstl tyinstr in
     if not test then raise EqObsInError;
     let rsim = ref sim in
     let doit eqs1 (argsl,sl) (argsr, sr) =

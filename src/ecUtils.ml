@@ -117,6 +117,12 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a * 'a
 
 (* -------------------------------------------------------------------- *)
+module SmartPair = struct
+  let mk ((a, b) as p) a' b' =
+    if a == a' && b == b' then p else (a', b')
+end
+
+(* -------------------------------------------------------------------- *)
 let t2_map (f : 'a -> 'b) (x, y) =
   (f x, f y)
 
@@ -480,6 +486,17 @@ module List = struct
     match Exceptionless.last s with
     | None   -> failwith "List.last"
     | Some x -> x
+
+  let betail =
+    let rec aux (acc : 'a list) (s : 'a list) =
+      match s, acc with
+      | [], [] ->
+        failwith "List.betail"
+      | [], v :: vs->
+        List.rev vs, v
+      | x :: xs, _ ->
+        aux (x :: acc) xs
+    in fun s -> aux [] s
 
   let mbfilter (p : 'a -> bool) (s : 'a list) =
     match s with [] | [_] -> s | _ -> List.filter p s

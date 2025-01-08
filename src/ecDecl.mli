@@ -2,12 +2,16 @@
 open EcUtils
 open EcSymbols
 open EcBigInt
-open EcPath
 open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type typeclass = {
+  tc_name : EcPath.path;
+  tc_args : etyarg list;
+}
+
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -20,7 +24,7 @@ type tydecl = {
 
 and ty_body = [
   | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
+  | `Abstract of typeclass list
   | `Datatype of ty_dtype
   | `Record   of form * (EcSymbols.symbol * EcTypes.ty) list
 ]
@@ -32,13 +36,15 @@ and ty_dtype = {
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
-val tydecl_as_abstract : tydecl -> Sp.t option
+val tydecl_as_abstract : tydecl -> typeclass list option
 val tydecl_as_datatype : tydecl -> ty_dtype option
 val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
-val abs_tydecl : ?resolve:bool -> ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
+val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> locality -> tydecl
 
-val ty_instanciate : ty_params -> ty list -> ty -> ty
+val etyargs_of_tparams : ty_params -> etyarg list
+
+val ty_instanciate : ty_params -> etyarg list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -54,7 +60,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -112,6 +118,7 @@ val is_oper   : operator -> bool
 val is_ctor   : operator -> bool
 val is_proj   : operator -> bool
 val is_rcrd   : operator -> bool
+val is_tc_op  : operator -> bool
 val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
@@ -130,6 +137,7 @@ val operator_as_rcrd  : operator -> EcPath.path
 val operator_as_proj  : operator -> EcPath.path * int * int
 val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
+val operator_as_tc    : operator -> EcPath.path * string
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
@@ -149,20 +157,12 @@ val is_axiom  : axiom_kind -> bool
 val is_lemma  : axiom_kind -> bool
 
 (* -------------------------------------------------------------------- *)
-val axiomatized_op :
-     ?nargs: int
-  -> ?nosmt:bool
-  -> EcPath.path
-  -> (ty_params * form)
-  -> locality
-  -> axiom
-
-(* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * form) list;
-  tc_loca: is_local;
+type tc_decl = {
+  tc_tparams : ty_params;
+  tc_prt     : typeclass option;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
+  tc_loca    : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
