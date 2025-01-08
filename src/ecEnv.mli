@@ -313,6 +313,9 @@ module Op : sig
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
   val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> etyarg list -> form
 
+  val tc_reducible : env -> path -> etyarg list -> bool
+  val tc_reduce    : env -> path -> etyarg list -> form
+
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : ?nargs:int -> env -> path -> bool

@@ -666,52 +666,15 @@ let reduce_op ri env nargs p tys =
        Op.reduce ~mode ~nargs env p tys
      with NotReducible -> raise nohead
 
-let reduce_tc (env : EcEnv.env) (p : path) (tys : etyarg list) =
-  if not (EcEnv.Op.is_tc_op env p) then None else
-
-  (* Last type application if the TC parameter. We extract the type-class  *
-   * information from the witness.                                         *)
-  let _, (_, tcw) = List.betail tys in
-  let tcw = as_seq1 tcw in
-
-  match tcw with
-  | TCIUni _ ->
-    None
-
-  | TCIAbstract _ ->
-    None
-  
-  | TCIConcrete { path = tcipath; etyargs = tciargs; } ->
-    let tci = oget (EcEnv.TcInstance.by_path_opt tcipath env) in
-
-    match tci.tci_instance with
-    | `General (_, Some syms) ->
-      let subst =
-        List.fold_left
-          (fun subst (a, ety) ->
-            let ety = EcSubst.subst_etyarg subst ety in
-            EcSubst.add_tyvar subst a ety)
-          EcSubst.empty
-          (List.combine (List.fst tci.tci_params) tciargs)
-      in
-
-      let (_, opname) = EcDecl.operator_as_tc (EcEnv.Op.by_path p env) in
-      let optg, opargs = EcMaps.Mstr.find opname syms in
-      let opargs = List.map (EcSubst.subst_etyarg subst) opargs in
-      let optg_decl = EcEnv.Op.by_path optg env in
-      let tysubst = Tvar.init (List.combine (List.fst optg_decl.op_tparams) opargs) in
-    
-      Some (EcFol.f_op_tc optg opargs (Tvar.subst tysubst optg_decl.op_ty))
-    
-    | _ ->
-      None
-
-let may_reduce_tc (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyarg list) =
+let reduce_tc_op (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyarg list) =
   if ri.delta_tc then
-    oget ~exn:nohead (reduce_tc env p tys)
+    try
+      Op.tc_reduce env p tys
+    with NotReducible -> raise nohead
   else
     raise nohead
 
+(* -------------------------------------------------------------------- *)
 let is_record env f =
   match EcFol.destr_app f with
   | { f_node = Fop (p, _) }, _ -> EcEnv.Op.is_record_ctor env p
@@ -911,15 +874,26 @@ let reduce_logic ri env hyps f p args =
 (* -------------------------------------------------------------------- *)
 let reduce_delta ri env f =
   match f.f_node with
-  | Fop (p, tys) when ri.delta_tc && EcEnv.Op.is_tc_op env p ->
-    may_reduce_tc ri env p tys
-
   | Fop (p, tys) when ri.delta_p p <> `No ->
-      reduce_op ri env 0 p tys
+    reduce_op ri env 0 p tys
 
   | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
-      let op = reduce_op ri env (List.length args) p tys in
-      f_app_simpl op args f.f_ty
+    let op = reduce_op ri env (List.length args) p tys in
+    f_app_simpl op args f.f_ty
+
+  | _ -> raise nohead
+
+(* -------------------------------------------------------------------- *)
+let reduce_tc ri env f =
+  match f.f_node with
+  | Fop (p, etyargs) when ri.delta_tc && Op.tc_reducible env p etyargs ->
+    reduce_tc_op ri env p etyargs
+
+  | Fapp ({ f_node = Fop (p, etyargs) }, args)
+      when ri.delta_tc && Op.tc_reducible env p etyargs
+  ->
+    let op = reduce_tc_op ri env p etyargs in
+    f_app_simpl op args f.f_ty
 
   | _ -> raise nohead
 
@@ -1092,20 +1066,24 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> begin
-    try
-      reduce_user_gen simplify ri env hyps f
-    with NotRed _ ->
-      reduce_delta ri env f
-    end
+  | Fop _ ->
+    oget ~exn:nohead @@
+      List.find_map_opt
+        (fun cb -> try Some (cb f) with NotRed _ -> None)
+        [ reduce_user_gen simplify ri env hyps
+        ; reduce_delta ri env
+        ; reduce_tc ri env ]
 
-  | Fapp({ f_node = Fop(p,_); }, args) -> begin
-      try  reduce_logic ri env hyps f p args
-      with NotRed kind1 ->
-        try  reduce_user_gen simplify ri env hyps f
-        with NotRed kind2 ->
-          if kind1 = NoHead && kind2 = NoHead then reduce_delta ri env f
-          else raise needsubterm
+  | Fapp ({ f_node = Fop (p, _); }, args) -> begin
+    try
+      reduce_logic ri env hyps f p args
+    with NotRed _ ->
+      oget ~exn:needsubterm @@
+        List.find_map_opt
+          (fun cb -> try Some (cb f) with NotRed NoHead -> None)
+          [ reduce_user_gen simplify ri env hyps
+          ; reduce_delta ri env
+          ; reduce_tc ri env ]
     end
 
   | Ftuple _ -> begin
@@ -1206,9 +1184,18 @@ and reduce_head_top_force ri env onhead f =
     match reduce_head_sub ri env f with
     | f ->
       if onhead then reduce_head_top ri env ~onhead f else f
-    | exception (NotRed _) ->
-      try reduce_delta ri.ri env f
-      with NotRed _ -> RedTbl.set_norm ri.redtbl f; raise nohead
+    | exception (NotRed _) -> begin
+      match
+        List.find_map_opt
+          (fun cb -> try Some (cb ri.ri env f) with NotRed _ -> None)
+          [reduce_delta; reduce_tc]
+      with
+      | Some f ->
+        f
+      | None ->
+        RedTbl.set_norm ri.redtbl f;
+        raise nohead
+      end
   end
 
 and reduce_head_sub ri env f =

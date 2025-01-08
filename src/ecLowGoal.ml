@@ -976,7 +976,7 @@ let t_true (tc : tcenv1) =
 let t_reflex_s (f : form) (tc : tcenv1) =
   t_apply_s LG.p_eq_refl [f.f_ty] ~args:[f] tc
 
-let t_reflex ?(mode=`Conv) ?reduce (tc : tcenv1) =
+let t_reflex ?(mode = `Conv) ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFeq (f1, f2) ->

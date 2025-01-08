@@ -734,6 +734,12 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
             doit_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
 
+        | (Fop (op1, tys1), args1), _ when EcEnv.Op.tc_reducible env op1 tys1 ->
+            doit_tc_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
+  
+        | _, (Fop (op2, tys2), args2) when EcEnv.Op.tc_reducible env op2 tys2 ->
+            doit_tc_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
+
         | _, _ -> failure ()
 
     in
@@ -756,6 +762,12 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
   and doit_reduce env cb ty op tys args =
     let reduced =
       try  f_app (EcEnv.Op.reduce env op tys) args ty
+      with NotReducible -> raise MatchFailure in
+    cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
+
+  and doit_tc_reduce env cb ty op tys args =
+    let reduced =
+      try  f_app (EcEnv.Op.tc_reduce env op tys) args ty
       with NotReducible -> raise MatchFailure in
     cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 

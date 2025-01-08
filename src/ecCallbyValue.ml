@@ -341,9 +341,9 @@ and reduce_user_delta st f1 p tys args =
       cbv st Subst.subst_id f args
     | _ ->
        if st.st_ri.delta_tc then begin
-          match EcReduction.reduce_tc st.st_env p tys with
-          | None -> f2
-          | Some f -> cbv st Subst.subst_id f args
+          match Op.tc_reduce st.st_env p tys with
+          | f -> cbv st Subst.subst_id f args
+          | exception NotReducible -> f2
        end else f2
 
 (* -------------------------------------------------------------------- *)

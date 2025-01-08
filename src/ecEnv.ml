@@ -19,6 +19,7 @@ module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module Mint = EcMaps.Mint
+module Mstr = EcMaps.Mstr
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -2711,6 +2712,56 @@ module Op = struct
     Tvar.f_subst ~freshen:true
       (List.combine (List.fst op.op_tparams) tys)
       form
+
+  let tc_core_reduce (env : env) (p : path) (tys : etyarg list) =
+    let op = by_path p env in
+
+    if not (is_tc_op op) then
+      raise NotReducible;
+
+    (* Last type application if the TC parameter. We extract the type-class  *
+     * information from the witness.                                         *)
+    let _, (_, tcw) = List.betail tys in
+
+    match as_seq1 tcw with
+    | TCIConcrete { path = tcipath; etyargs = tciargs; } -> begin
+      let tci = TcInstance.by_path tcipath env in
+
+      match tci.tci_instance with
+      | `General (_, Some symbols) ->
+        (EcDecl.operator_as_tc op, (tciargs, (tci.tci_params, symbols)))
+
+      | _ -> raise NotReducible
+      end
+
+    | _ ->
+      raise NotReducible
+
+  let tc_reducible (env : env) (p : path) (tys : etyarg list) =
+    try
+      ignore (tc_core_reduce env p tys);
+      true
+    with NotReducible -> false
+
+  let tc_reduce (env : env) (p : path) (tys : etyarg list) =
+    let ((_, opname), (tciargs, (tciparams, symbols))) =
+      tc_core_reduce env p tys in
+  
+    let subst =
+      List.fold_left
+        (fun subst (a, ety) ->
+          let ety = EcSubst.subst_etyarg subst ety in
+          EcSubst.add_tyvar subst a ety)
+        EcSubst.empty
+        (List.combine (List.fst tciparams) tciargs)
+    in
+
+    let optg, opargs = EcMaps.Mstr.find opname symbols in
+    let opargs = List.map (EcSubst.subst_etyarg subst) opargs in
+    let optg_decl = by_path optg env in
+    let tysubst = Tvar.init (List.combine (List.fst optg_decl.op_tparams) opargs) in
+  
+    f_op_tc optg opargs (Tvar.subst tysubst optg_decl.op_ty)
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
