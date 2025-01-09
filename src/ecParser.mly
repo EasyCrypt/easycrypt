@@ -3699,14 +3699,25 @@ addrw:
 | local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
-hint:
-| local=is_local HINT EXACT base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = 0;
-        ht_base  = base ; ht_names = l; } }
+hintoption:
+| x=lident {
+    match unloc x with
+    | "rigid" -> `Rigid
+    | _ -> 
+        parse_error x.pl_loc
+            (Some ("invalid option: " ^ (unloc x)))
+  }
 
-| local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = i;
-        ht_base  = base ; ht_names = l; } }
+hint:
+| local=is_local
+    HINT opts=ioption(bracket(hintoption)+)
+    prio=ID(EXACT { 0 } | SOLVE i=word { i })
+    base=lident? COLON l=qident*
+    { { ht_local   = local;
+        ht_prio    = prio;
+        ht_base    = base ;
+        ht_names   = l; 
+        ht_options = odfl [] opts; } }
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)

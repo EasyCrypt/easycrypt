@@ -825,12 +825,12 @@ and replay_addrw
 
 (* -------------------------------------------------------------------- *)
 and replay_auto
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, lvl, base, ps, lc)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, at_base)
 =
   let env = EcSection.env (ove.ovre_hooks.henv scope) in
-  let ps = List.map (EcSubst.subst_path subst) ps in
-  let ps = List.filter (fun p -> Option.is_some (EcEnv.Ax.by_path_opt p env)) ps in
-  let scope = ove.ovre_hooks.hadd_item scope import (Th_auto (lvl, base, ps, lc)) in
+  let axioms = List.map (fst_map (EcSubst.subst_path subst)) at_base.axioms in
+  let axioms = List.filter (fun (p, _) -> Option.is_some (EcEnv.Ax.by_path_opt p env)) axioms in
+  let scope = ove.ovre_hooks.hadd_item scope import (Th_auto { at_base with axioms }) in
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -981,8 +981,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | Th_reduction rules ->
      replay_reduction ove (subst, ops, proofs, scope) (item.ti_import, rules)
 
-  | Th_auto (lvl, base, ps, lc) ->
-     replay_auto ove (subst, ops, proofs, scope) (item.ti_import, lvl, base, ps, lc)
+  | Th_auto at_base ->
+     replay_auto ove (subst, ops, proofs, scope) (item.ti_import, at_base)
 
   | Th_typeclass (x, tc) ->
      replay_typeclass ove (subst, ops, proofs, scope) (item.ti_import, x, tc)

@@ -499,6 +499,13 @@ let pp_rwname ppe fmt p =
 let pp_axname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
 
+let pp_axhnt ppe fmt (p, b) =
+  let b =
+    match b with
+    | `Default -> ""
+    | `Rigid -> " (rigid)" in
+  Format.fprintf fmt "%a%s" (pp_axname ppe) p b
+
 (* -------------------------------------------------------------------- *)
 let pp_thname ppe fmt p =
   EcSymbols.pp_qsymbol fmt (PPEnv.th_symb ppe p)
@@ -3020,23 +3027,31 @@ let pp_rwbase ppe fmt (p, rws) =
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
 
 (* -------------------------------------------------------------------- *)
-let pp_solvedb ppe fmt db =
+let pp_solvedb ppe fmt (db: (int * (P.path * _) list) list) =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
-      lvl (pp_list ", " (pp_axname ppe)) ps)
+      lvl 
+      (pp_list ", " (pp_axhnt ppe))
+      ps)
   db;
 
   let lemmas = List.flatten (List.map snd db) in
-  let lemmas = List.pmap (fun p ->
+  let lemmas = List.pmap (fun (p, ir) ->
       let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
-      (omap (fun ax -> (p, ax)) ax))
-    lemmas
+      (omap (fun ax -> (ir, (p, ax))) ax)
+    ) lemmas
   in
 
   if not (List.is_empty lemmas) then begin
     Format.fprintf fmt "\n%!";
     List.iter
-      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      (fun (ir, ax) ->
+        let ir =
+          match ir with
+          | `Default -> ""
+          | `Rigid -> " (rigid)" in
+        
+        Format.fprintf fmt "%a%s\n\n%!" (pp_axiom ppe) ax ir)
       lemmas
   end
 
@@ -3526,11 +3541,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
 
-  | EcTheory.Th_auto (lvl, base, p, lc) ->
+  | EcTheory.Th_auto { level; base; axioms; locality; } ->
       Format.fprintf fmt "%ahint solve %d %s : %a."
-        pp_locality lc
-        lvl (odfl "" base)
-        (pp_list "@ " (pp_axname ppe)) p
+        pp_locality locality
+        level (odfl "" base)
+        (pp_list "@ " (pp_axhnt ppe)) axioms
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

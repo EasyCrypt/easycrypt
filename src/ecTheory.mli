@@ -34,7 +34,7 @@ and theory_item_r =
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   (* reduction rule does not survive to section so no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
-  | Th_auto      of (int * symbol option * path list * is_local)
+  | Th_auto      of auto_rule
 
 and thsource = {
   ths_base : EcPath.path;
@@ -70,6 +70,13 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+}
+
+and auto_rule = {
+  level    : int;
+  base     : symbol option;
+  axioms   : (path * [`Rigid | `Default]) list;
+  locality : is_local;
 }
 
 val mkitem : import -> theory_item_r -> theory_item

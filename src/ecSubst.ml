@@ -1075,8 +1075,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
         List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
       in Th_reduction rules
 
-  | Th_auto (lvl, base, ps, lc) ->
-      Th_auto (lvl, base, List.map (subst_path s) ps, lc)
+  | Th_auto ({ axioms } as auto_rl) ->
+      Th_auto { auto_rl with axioms =
+        List.map (fst_map (subst_path s)) axioms }
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : subst) (items : theory) =

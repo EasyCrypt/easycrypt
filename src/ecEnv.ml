@@ -181,7 +181,7 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
-  env_atbase   : (path list Mint.t) Msym.t;
+  env_atbase   : atbase Msym.t;
   env_redbase  : mredinfo;
   env_ntbase   : ntbase Mop.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
@@ -220,6 +220,10 @@ and mredinfo = redinfo Mrd.t
 and env_notation = ty_params * EcDecl.notation
 
 and ntbase = (path * env_notation) list
+
+and atbase0 = path * [`Rigid | `Default]
+
+and atbase = atbase0 list Mint.t
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -1516,39 +1520,53 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto = struct
+  type base0 = path * [`Rigid | `Default]
+
   let dname : symbol = ""
 
-  let updatedb ~level ?base (ps : path list) (db : (path list Mint.t) Msym.t) =
+  let updatedb
+    ~(level : int)
+    ?(base  : symbol option)
+     (ps    : atbase0 list)
+     (db    : atbase Msym.t)
+  =
     let nbase = (odfl dname base) in
-    let ps' = Msym.find_def Mint.empty nbase db in
-    let ps' =
+    let base = Msym.find_def Mint.empty nbase db in
+    let levels =
       let doit x = Some (ofold (fun x ps -> ps @ x) ps x) in
-      Mint.change doit level ps' in
-    Msym.add nbase ps' db
+      Mint.change doit level base in
+    Msym.add nbase levels db
 
-  let add ?(import = import0) ~level ?base (ps : path list) lc (env : env) =
+  let add
+    ?(import   = import0)
+    ~(level    : int)
+    ?(base     : symbol option)
+     (axioms   : atbase0 list)
+     (locality : is_local)
+     (env      : env)
+  =
     let env =
       if import.im_immediate then
         { env with
-            env_atbase = updatedb ?base ~level ps env.env_atbase; }
+            env_atbase = updatedb ?base ~level axioms env.env_atbase; }
       else env
     in
       { env with env_item = mkitem import
-         (Th_auto (level, base, ps, lc)) :: env.env_item; }
+         (Th_auto { level; base; axioms; locality; }) :: env.env_item; }
 
-  let add1 ?import ~level ?base (p : path) lc (env : env) =
+  let add1 ?import ~level ?base (p : atbase0) lc (env : env) =
     add ?import ?base ~level [p] lc env
 
   let get_core ?base (env : env) =
     Msym.find_def Mint.empty (odfl dname base) env.env_atbase
 
-  let flatten_db (db : path list Mint.t) =
+  let flatten_db (db : atbase) =
     Mint.fold_left (fun ps _ ps' -> ps @ ps') [] db
 
   let get ?base (env : env) =
     flatten_db (get_core ?base env)
 
-  let getall (bases : symbol list) (env : env) =
+  let getall (bases : symbol list) (env : env) : atbase0 list =
     let dbs = List.map (fun base -> get_core ~base env) bases in
     let dbs = 
       List.fold_left (fun db mi ->
@@ -1560,7 +1578,7 @@ module Auto = struct
     let db = Msym.find_def Mint.empty base env.env_atbase in
     Mint.bindings db
 
-  let all (env : env) : path list =
+  let all (env : env) : atbase0 list =
     Msym.values env.env_atbase |> List.map flatten_db |> List.flatten
 end
 
@@ -2951,8 +2969,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_at_th =
     let for1 _path db = function
-      | Th_auto (level, base, ps, _) ->
-         Some (Auto.updatedb ?base ~level ps db)
+      | Th_auto {level; base; axioms; _} ->
+         Some (Auto.updatedb ?base ~level axioms db)
       | _ -> None
 
     in bind_base_th for1
@@ -3125,9 +3143,12 @@ module Theory = struct
             let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
 
-        | Th_auto (lvl, base, ps, lc) ->
-            let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-            if List.is_empty ps then None else Some (Th_auto (lvl, base, ps, lc))
+        | Th_auto ({ axioms } as auto_rl) ->
+            let axioms = List.filter (fun (p, _) ->
+              let p = oget (EcPath.prefix p) in
+              not (inclear p)
+            ) axioms in
+            if List.is_empty axioms then None else Some (Th_auto {auto_rl with axioms})
 
         | (Th_export (p, _)) as item ->
             if Sp.mem p cleared then None else Some item

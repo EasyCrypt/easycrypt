@@ -264,17 +264,22 @@ module HiPrinting = struct
     let ppe0 = EcPrinting.PPEnv.ofenv env in
     EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax  
 
-  (* ------------------------------------------------------------------ *)
   let pr_hint_solve (fmt : Format.formatter) (env : EcEnv.env) =
     let hint_solve = EcEnv.Auto.all env in
-    let hint_solve = List.map (fun p ->
-      (p, EcEnv.Ax.by_path p env)
+    let hint_solve = List.map (fun (p, mode) ->
+      let ax = EcEnv.Ax.by_path p env in
+      (p, (ax, mode))
     ) hint_solve in 
     
     let ppe = EcPrinting.PPEnv.ofenv env in
   
-    let pp_hint_solve ppe fmt pax =
-      Format.fprintf fmt "%a" (EcPrinting.pp_axiom ppe) pax
+    let pp_hint_solve ppe fmt = (fun (p, (ax, mode)) ->
+      let mode =
+        match mode with
+        | `Default -> ""
+        | `Rigid -> "(rigid)" in
+        Format.fprintf fmt "%a %s" (EcPrinting.pp_axiom ppe) (p, ax) mode
+      )
     in
     
     EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve    
