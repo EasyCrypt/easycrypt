@@ -1,4 +1,9 @@
-(dirs src theories examples scripts)
+(env
+ (dev     (flags -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69))
+ (release (flags -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69)
+          (ocamlopt_flags -O3 -unbox-closures)))
+
+(dirs src libs theories examples scripts)
 
 (install
   (section (site (easycrypt commands)))

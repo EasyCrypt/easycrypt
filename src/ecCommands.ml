@@ -783,6 +783,14 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_crbind (scope : EcScope.scope) (binding : pcrbinding) =
+  match binding.binding with
+  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring  scope binding.locality bs
+  | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
+  | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
+  | CRB_Circuit    cr -> EcScope.Circuit.add_circuit    scope binding.locality cr
+
+(* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -826,6 +834,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
+      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope bind)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

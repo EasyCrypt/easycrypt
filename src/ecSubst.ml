@@ -881,10 +881,11 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
   let s, tparams = fresh_tparams s tyd.tyd_params in
   let body = subst_tydecl_body s tyd.tyd_type in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_resolve = tyd.tyd_resolve;
-    tyd_loca    = tyd.tyd_loca; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_resolve  = tyd.tyd_resolve;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
@@ -1034,6 +1035,57 @@ let subst_tc (s : subst) tc =
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
 (* -------------------------------------------------------------------- *)
+let subst_crbinding (s : subst) (crb : crbinding) =
+  match crb with
+  | CRB_Bitstring bs ->
+    assert (not (Mp.mem bs.type_ s.sb_tydef));
+    assert (not (Mp.mem bs.from_ s.sb_def));
+    assert (not (Mp.mem bs.to_ s.sb_def));
+    assert (not (Mp.mem bs.touint s.sb_def));
+    assert (not (Mp.mem bs.tosint s.sb_def));
+    assert (not (Mp.mem bs.ofint s.sb_def));
+    CRB_Bitstring {
+      type_  = subst_path s bs.type_;
+      from_  = subst_path s bs.from_;
+      to_    = subst_path s bs.to_;
+      touint  = subst_path s bs.touint;
+      tosint  = subst_path s bs.tosint;
+      ofint  = subst_path s bs.ofint;
+      size   = bs.size;
+      theory = subst_path s bs.theory; }
+
+  | CRB_Array ba ->
+    assert (not (Mp.mem ba.type_ s.sb_tydef));
+    assert (not (Mp.mem ba.get s.sb_def));
+    assert (not (Mp.mem ba.set s.sb_def));
+    assert (not (Mp.mem ba.tolist s.sb_def));
+    assert (not (Mp.mem ba.oflist s.sb_def));
+    CRB_Array {
+      type_  = subst_path s ba.type_;
+      get    = subst_path s ba.get;
+      set    = subst_path s ba.set;
+      tolist = subst_path s ba.tolist;
+      oflist = subst_path s ba.oflist;
+      size   = ba.size;
+      theory = subst_path s ba.theory }
+
+  | CRB_BvOperator op ->
+    assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
+    assert (not (Mp.mem op.operator s.sb_def));
+    CRB_BvOperator {
+      kind     = op.kind;
+      types    = List.map (subst_path s) op.types;
+      operator = subst_path s op.operator;
+      theory   = subst_path s op.theory; }
+
+  | CRB_Circuit cr ->
+      assert (not (Mp.mem cr.operator s.sb_def));
+      CRB_Circuit {
+        name     = cr.name;
+        circuit  = cr.circuit;
+        operator = subst_path s cr.operator; }
+  
+(* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   match item with
@@ -1077,6 +1129,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_auto ({axioms} as auto_rl) ->
       Th_auto {auto_rl with axioms = List.map (fun (b, a) -> (b, (subst_path s a))) axioms}
+
+  | Th_crbinding (bd, lc) ->
+      Th_crbinding (subst_crbinding s bd, lc)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : subst) (items : theory) =
