@@ -434,6 +434,35 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
+let pp_long_short_path (lk: qsymbol -> (EcPath.path * 'a) option) fmt p =
+  let rec doit prefix (nm, x) =
+    match lk (nm, x) with
+    | Some (p', _) when EcPath.p_equal p p' ->
+        (nm, x)
+    | _ -> begin
+        match prefix with
+        | [] -> (nm, x)
+        | n :: prefix -> doit prefix (n :: nm, x)
+      end
+  in
+
+  let (nm, x) = EcPath.toqsymbol p in
+  let nm =
+    match nm with
+    | top :: nm when top = EcCoreLib.i_top ->
+        nm
+    | _ -> nm in
+
+  let nm', x' = doit (List.rev nm) ([], x) in
+  let plong, pshort = (nm, x), (nm', x') in
+  match plong, pshort with
+  | plong, pshort when plong = pshort -> Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
+  | plong, pshort -> 
+      Format.fprintf fmt "%a (shorten name: %a)" 
+      EcSymbols.pp_qsymbol plong 
+      EcSymbols.pp_qsymbol pshort
+
+(* -------------------------------------------------------------------- *)
 let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
   match mx with
   | [] ->
@@ -3518,6 +3547,60 @@ let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
 (* -------------------------------------------------------------------- *)
 let pp_stmt ?(lineno = false) =
   if lineno then pp_stmt_with_nums else pp_stmt
+
+(* -------------------------------------------------------------------- *)
+let pp_by_theory
+  (ppe0 : PPEnv.t)
+  (pp   : PPEnv.t -> (EcPath.path * 'a) pp)
+  (fmt  : Format.formatter)
+  (xs   : (EcPath.path * 'a) list)
+= 
+  let tr =
+    List.fold_left (fun tr ((p, _) as x) ->
+      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) x tr
+    ) Trie.empty xs
+  in
+
+  Trie.iter (fun prefix xs ->
+    let thpath =
+      match prefix with
+      | [] -> assert false
+      | name :: prefix -> (List.rev prefix, name) in
+
+    let thpath = EcPath.fromqsymbol thpath in
+
+    let ppe = PPEnv.enter_theory ppe0 thpath in
+
+    Format.fprintf fmt
+      "@.========== %a ==========@.@." (pp_thname ppe0) thpath;
+
+    List.iter (fun x ->
+      Format.fprintf fmt "%a@." (pp ppe) x
+    ) xs
+  ) tr
+
+(* -------------------------------------------------------------------- *)
+let rec pp_rule_pattern
+  (ppe  : PPEnv.t)
+  (fmt  : Format.formatter)
+  (rule : EcTheory.rule_pattern)
+=
+  match rule with
+  | Rule (`Tuple, args) ->
+    Format.fprintf fmt "(%a)" (pp_list ",@ " (pp_rule_pattern ppe)) args
+  | Rule (`Op (p, _), []) ->
+    Format.fprintf fmt "%a" (pp_opname ppe) p
+  | Rule (`Op (p, _), args) ->
+    Format.fprintf fmt "%a@ %a" (pp_opname ppe) p
+    (pp_list "@ " (pp_paren (pp_rule_pattern ppe))) args
+  | Rule (`Proj i, [arg]) ->
+    Format.fprintf fmt "(%a)`.%d" (pp_rule_pattern ppe) arg i
+  | Rule (`Proj _, _) ->
+    assert false
+  | Int z ->
+    Format.fprintf fmt "%s" (EcBigInt.to_string z)
+  | Var v ->
+    Format.fprintf fmt "%s" (EcIdent.name v)
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct

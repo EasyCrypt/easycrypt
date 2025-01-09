@@ -61,6 +61,7 @@ module type PrinterAPI = sig
   val pp_tyvar    : PPEnv.t -> ident pp
   val pp_tyunivar : PPEnv.t -> EcUid.uid pp
   val pp_path     : path pp
+  val pp_long_short_path : (qsymbol -> (EcPath.path * 'a) option) -> path pp
 
   (* ------------------------------------------------------------------ *)
   val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
@@ -97,6 +98,12 @@ module type PrinterAPI = sig
 
   val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
+
+  (* ------------------------------------------------------------------ *)
+  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
+
+  (* ------------------------------------------------------------------ *)
+  val pp_rule_pattern : PPEnv.t -> EcTheory.rule_pattern pp  
 
   (* ------------------------------------------------------------------ *)
   module ObjectInfo : sig

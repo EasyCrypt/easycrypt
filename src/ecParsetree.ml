@@ -1120,6 +1120,8 @@ type pprint =
   | Pr_glob of pmsymbol located
   | Pr_goal of int
   | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
+  | Pr_axioms
+  | Pr_hint of [`Simplify | `Rewrite | `Solve] option
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
@@ -1261,7 +1263,6 @@ type global_action =
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
-  | Gpaxiom
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)
