@@ -298,74 +298,124 @@ let process_print_ax (scope : EcScope.scope) =
   let env = EcScope.env scope in
   let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
 
-  let module Trie : sig
-    type ('a, 'b) t
-
-    val empty : ('a, 'b) t
-    val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
-    val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
-  end = struct
-    module Map = BatMap
-
-    type ('a, 'b) t =
-      { children : ('a, ('a, 'b) t) Map.t
-      ; value    : 'b list }
-
-    let empty : ('a, 'b) t =
-      { value = []; children = Map.empty; }
-
-    let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
-      let rec doit (path : 'a list) (t : ('a, 'b) t) =
-        match path with
-        | [] ->
-          { t with value = value :: t.value }
-        | v :: path ->
-          let children =
-            t.children |> Map.update_stdlib v (fun children ->
-              let subtrie = Option.value ~default:empty children in
-              Some (doit path subtrie)
-            )
-          in { t with children }
-      in doit path t
-
-    let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
-      let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
-        if not (List.is_empty t.value) then
-          f prefix t.value;
-        Map.iter (fun k v -> doit (k :: prefix) v) t.children
-      in
-      
-      doit [] t
-  end in
-
-  let ax =
-    List.fold_left (fun axs ((p, _) as ax) ->
-      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) ax axs
-    ) Trie.empty ax in
-
   let ppe0 = EcPrinting.PPEnv.ofenv env in
   let buffer = Buffer.create 0 in
   let fmt = Format.formatter_of_buffer buffer in
 
-  Trie.iter (fun prefix axs ->
-    let thpath =
-      match prefix with
-      | [] -> assert false
-      | name :: prefix -> (List.rev prefix, name) in
+  EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax;
+  
+  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
 
-    let thpath = EcPath.fromqsymbol thpath in
+(* -------------------------------------------------------------------- *)
+let process_print_hint_solve (scope : EcScope.scope) =
+  let env = EcScope.env scope in
+  let hint_solve   = EcEnv.Auto.all env in
+  let hint_solve   = List.map (fun (ir, p) -> (p, (EcEnv.Ax.by_path p env, ir))) hint_solve in 
+  
+  let ppe0 = EcPrinting.PPEnv.ofenv env in
+  let buffer = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buffer in
 
-    let ppe = EcPrinting.PPEnv.enter_theory ppe0 thpath in
-
-    Format.fprintf fmt
-      "@.========== %a ==========@.@." (EcPrinting.pp_thname ppe0) thpath;
-
-    List.iter (fun ax ->
-      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) ax
-    ) axs
-  ) ax;
+  let pp_hint_solve ppe fmt = (fun (p,  (hint_solve, ir)) ->
+      Format.fprintf fmt "%a%s" (EcPrinting.pp_axiom ppe) (p, hint_solve) 
+      (if ir then " (irreducible)" else " (reducible)")
+    )
+  in
+  
+  EcPrinting.pp_by_theory ppe0 pp_hint_solve fmt hint_solve;
 
   EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
+
+let process_print_hint_rewrite (scope : EcScope.scope) =
+  let env = EcScope.env scope in
+  let hint_rewrite = EcEnv.BaseRw.all env in
+  
+  let ppe0 = EcPrinting.PPEnv.ofenv env in
+  let buffer = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buffer in
+
+  let pp_hint_rewrite _ppe fmt = (fun (p,  sp) ->
+    let elems = EcPath.Sp.ntr_elements sp in
+    if List.is_empty elems then
+      Format.fprintf fmt "%s (empty)@." (EcPath.tostring p)
+    else
+      Format.fprintf fmt "%s = @.@[<b 2>%a@]@." (EcPath.tostring p) 
+        (EcPrinting.pp_list "@." (fun fmt p -> 
+          Format.fprintf fmt "%s" (EcPath.tostring p)))
+        (EcPath.Sp.ntr_elements sp)
+    )
+  in
+  
+  EcPrinting.pp_by_theory ppe0 pp_hint_rewrite fmt hint_rewrite;
+
+  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
+
+let process_print_hint_simplify (scope : EcScope.scope) =
+  let env = EcScope.env scope in
+  let open EcTheory in
+  let (hint_simplify: (EcEnv.Reduction.topsym * rule list) list) = EcEnv.Reduction.all env in
+  let hint_simplify = List.filter_map (fun (ts, rl) -> 
+    match ts with
+    | `Path p -> Some (p, rl) 
+    | _ -> None
+  ) hint_simplify 
+  in
+  
+  let ppe0 = EcPrinting.PPEnv.ofenv env in
+  let buffer = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buffer in
+
+  let rec pp_rule_pattern ppe fmt (rl_pt: rule_pattern) =
+    match rl_pt with
+    | Rule (trp, rp_list) -> pp_rule ppe fmt trp rp_list 
+    | Int z -> Format.fprintf fmt "%s" (EcBigInt.to_string z)
+    | Var v -> Format.fprintf fmt "%s" (EcIdent.name v)
+
+  and pp_rule_patterns ppe fmt (rl_pts: rule_pattern list) =
+    match rl_pts with
+    | [] -> ()
+    | rl_pts -> Format.fprintf fmt "(%a)" (EcPrinting.pp_list "," (pp_rule_pattern ppe)) rl_pts
+
+  and pp_rule ppe fmt trp rl_pts =
+    match trp with
+    | `Tuple -> Format.fprintf fmt "tuple%a" (pp_rule_patterns ppe) rl_pts
+    | `Op (p, _) -> Format.fprintf fmt "%a%a" (EcPrinting.pp_opname ppe) p (pp_rule_patterns ppe) rl_pts
+    | `Proj i -> if List.is_empty rl_pts then () else
+        Format.fprintf fmt "%a`%d" (pp_rule_patterns ppe) rl_pts i
+  in
+
+  let pp_hint_simplify ppe fmt = (fun (p,  (rls : rule list)) ->
+    Format.fprintf fmt "%s:@.@[<b 2>%a@]" (EcPath.tostring p) 
+      (EcPrinting.pp_list "@." (fun fmt rl ->
+        Format.fprintf fmt "Conditions: %a@.Target: %a@.Pattern: %a@."
+        (EcPrinting.pp_list "," (EcPrinting.pp_form ppe)) rl.rl_cond
+        (EcPrinting.pp_form ppe) rl.rl_tg
+        (pp_rule_pattern ppe) rl.rl_ptn
+      ))
+      rls
+    )
+  in
+  
+  EcPrinting.pp_by_theory ppe0 pp_hint_simplify fmt hint_simplify;
+
+  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
+
+let process_print_hint (scope: EcScope.scope) (ph: pprinthint) = 
+  if ph.solve then begin
+    EcScope.notify scope `Warning "Solve hints:@.";
+    process_print_hint_solve scope
+  end else ();
+
+  if ph.simplify then begin
+    EcScope.notify scope `Warning "Simplify hints:@.";
+    process_print_hint_simplify scope
+  end else ();
+
+  if ph.rewrite then begin
+    EcScope.notify scope `Warning "Rewrite hints:@.";
+    process_print_hint_rewrite scope
+  end else ()
+
 
 (* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset | `Restart]
@@ -735,6 +785,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gpaxiom           -> `Fct   (fun scope -> process_print_ax   scope; scope)
+      | Gphint       ph   -> `Fct   (fun scope -> process_print_hint scope  ph; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)

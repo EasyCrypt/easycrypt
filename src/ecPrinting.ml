@@ -476,9 +476,83 @@ let pp_rwname ppe fmt p =
 let pp_axname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
 
+let pp_axhnt ppe fmt (b, p) =
+  Format.fprintf fmt "%a%s" (pp_axname ppe) p (if b then " (irreducible)" else "")
+
 (* -------------------------------------------------------------------- *)
 let pp_thname ppe fmt p =
   EcSymbols.pp_qsymbol fmt (PPEnv.th_symb ppe p)
+
+(* -------------------------------------------------------------------- *)
+let pp_by_theory 
+  (ppe0: PPEnv.t) 
+  (pp: PPEnv.t -> (EcPath.path * 'a) pp) 
+  (fmt: Format.formatter) 
+  (xs: (EcPath.path * 'a) list)   
+= 
+  let module Trie : sig
+    type ('a, 'b) t
+
+    val empty : ('a, 'b) t
+    val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
+    val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
+  end = struct
+    module Map = BatMap
+
+    type ('a, 'b) t =
+      { children : ('a, ('a, 'b) t) Map.t
+      ; value    : 'b list }
+
+    let empty : ('a, 'b) t =
+      { value = []; children = Map.empty; }
+
+    let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
+      let rec doit (path : 'a list) (t : ('a, 'b) t) =
+        match path with
+        | [] ->
+          { t with value = value :: t.value }
+        | v :: path ->
+          let children =
+            t.children |> Map.update_stdlib v (fun children ->
+              let subtrie = Option.value ~default:empty children in
+              Some (doit path subtrie)
+            )
+          in { t with children }
+      in doit path t
+
+    let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
+      let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
+        if not (List.is_empty t.value) then
+          f prefix t.value;
+        Map.iter (fun k v -> doit (k :: prefix) v) t.children
+      in
+      
+      doit [] t
+  end in
+
+  let tr =
+    List.fold_left (fun tr ((p, _) as x) ->
+      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) x tr
+    ) Trie.empty xs 
+  in
+
+  Trie.iter (fun prefix xs ->
+    let thpath =
+      match prefix with
+      | [] -> assert false
+      | name :: prefix -> (List.rev prefix, name) in
+
+    let thpath = EcPath.fromqsymbol thpath in
+
+    let ppe = PPEnv.enter_theory ppe0 thpath in
+
+    Format.fprintf fmt
+      "@.========== %a ==========@.@." (pp_thname ppe0) thpath;
+
+    List.iter (fun x ->
+      Format.fprintf fmt "%a@." (pp ppe) x
+    ) xs
+  ) tr
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -2890,23 +2964,27 @@ let pp_rwbase ppe fmt (p, rws) =
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
 
 (* -------------------------------------------------------------------- *)
-let pp_solvedb ppe fmt db =
+let pp_solvedb ppe fmt (db: (int * (bool * P.path) list) list) =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
-      lvl (pp_list ", " (pp_axname ppe)) ps)
+      lvl 
+      (pp_list ", " (pp_axhnt ppe))
+      ps)
   db;
 
   let lemmas = List.flatten (List.map snd db) in
-  let lemmas = List.pmap (fun p ->
+  let lemmas = List.pmap (fun (ir, p) ->
       let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
-      (omap (fun ax -> (p, ax)) ax))
+      (omap (fun ax -> ((p, ax), ir)) ax))
     lemmas
   in
 
+  (* FIXME: maybe integrate irreducible print into pp_axiom *)
   if not (List.is_empty lemmas) then begin
     Format.fprintf fmt "\n%!";
     List.iter
-      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      (fun (ax, ir) -> Format.fprintf fmt "%a%s\n\n%!" (pp_axiom ppe) ax
+        (if ir then " (irreducible)" else ""))
       lemmas
   end
 
@@ -3391,11 +3469,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
 
-  | EcTheory.Th_auto (lvl, base, p, lc) ->
+  | EcTheory.Th_auto { level; base; axioms; locality} ->
       Format.fprintf fmt "%ahint solve %d %s : %a."
-        pp_locality lc
-        lvl (odfl "" base)
-        (pp_list "@ " (pp_axname ppe)) p
+        pp_locality locality
+        level (odfl "" base)
+        (pp_list "@ " (pp_axhnt ppe)) axioms
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

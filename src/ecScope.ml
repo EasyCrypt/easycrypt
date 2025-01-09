@@ -796,8 +796,8 @@ module Auto = struct
     let item = EcTheory.mkitem EcTheory.import0 (Th_addrw (base, l, local)) in
     { scope with sc_env =  EcSection.add_item item scope.sc_env }
 
-  let bind_hint scope ~local ~level ?base names =
-    let item = EcTheory.mkitem EcTheory.import0 (Th_auto (level, base, names, local)) in
+  let bind_hint scope ~local ~level ?base axioms =
+    let item = EcTheory.mkitem EcTheory.import0 (Th_auto { level; base; axioms; locality=local} ) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let add_hint scope hint =
@@ -806,6 +806,7 @@ module Auto = struct
     let names = List.map
       (fun l -> EcEnv.Ax.lookup_path (unloc l) env)
       hint.ht_names in
+    let names = List.map (fun p -> (hint.ht_irreducible, p)) names in
 
     bind_hint scope ~local:hint.ht_local ~level:hint.ht_prio ?base names
 end
@@ -1287,7 +1288,7 @@ module Op = struct
 
       List.fold_left
         (fun scope base ->
-            Auto.bind_hint ~local:(local_of_locality lc) ~level:0 ~base scope [axpath])
+            Auto.bind_hint ~local:(local_of_locality lc) ~level:0 ~base scope [(false, axpath)])
         scope bases
 
     in

@@ -183,6 +183,7 @@
     "local"       , LOCAL      ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)
+    "irreducible" , IRREDUCIBLE;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)

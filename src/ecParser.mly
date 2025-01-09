@@ -134,6 +134,9 @@
             fp_head = FPCut (None, None);
             fp_args = []; }) info
 
+  let mk_print_hint (simplify) (solve) (rewrite) =
+    {simplify; solve; rewrite}
+
   (* ------------------------------------------------------------------ *)
   let locality_as_local (lc : locality located) =
     match unloc lc with
@@ -482,6 +485,7 @@
 %token INTERLEAVE
 %token INSTANCE
 %token IOTA
+%token IRREDUCIBLE
 %token IS
 %token KILL
 %token LARROW
@@ -3763,9 +3767,15 @@ print:
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
 
+%inline phint:
+|          { mk_print_hint true  true  true  }
+| SIMPLIFY { mk_print_hint true  false false }
+| SOLVE    { mk_print_hint false true  false }
+| REWRITE  { mk_print_hint false false true  }
+
 coq_info:
 |           { None }
-| CHECK    { Some EcProvers.Check }
+| CHECK     { Some EcProvers.Check }
 | EDIT      { Some EcProvers.Edit }
 | FIX       { Some EcProvers.Fix }
 
@@ -3817,14 +3827,30 @@ addrw:
 | local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
+
+    (* FIXME: fix integration of irreducible optional keyword *)
 hint:
 | local=is_local HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
-        ht_base  = base ; ht_names = l; } }
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = false;         } }
 
 | local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
-        ht_base  = base ; ht_names = l; } }
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = false;         } }
+
+| local=is_local HINT IRREDUCIBLE EXACT base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = 0;
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = true;         } }
+
+| local=is_local HINT IRREDUCIBLE SOLVE i=word base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = i;
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = true;         } }
+
+
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
@@ -3888,6 +3914,7 @@ global_action:
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | PRINT AXIOM      { Gpaxiom         }
+| PRINT HINT ph=phint { Gphint    ph }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
