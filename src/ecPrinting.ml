@@ -143,7 +143,7 @@ module PPEnv = struct
             (fun env x -> EcEnv.Mod.bind_param x mty env)
             ppe.ppe_env xs; }
 
-  let p_shorten cond p =
+  let p_shorten cond (nm, x) =
     let rec shorten prefix (nm, x) =
       match cond (nm, x) with
       | true  -> (nm, x)
@@ -154,7 +154,6 @@ module PPEnv = struct
       end
     in
 
-    let (nm, x) = P.toqsymbol p in
     shorten (List.rev nm) ([], x)
 
   let ty_symb (ppe : t) p =
@@ -162,28 +161,28 @@ module PPEnv = struct
       try  EcPath.p_equal (EcEnv.Ty.lookup_path ~unique:true sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let tc_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.TypeClass.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let rw_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let op_symb (ppe : t) p info =
     let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
@@ -221,21 +220,21 @@ module PPEnv = struct
       (* FIXME: for special operators, do check `info` *)
       if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
       then ([], EcPath.basename p)
-      else p_shorten exists p
+      else p_shorten exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let th_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
     let (nm, x, p2) =
@@ -361,6 +360,18 @@ module PPEnv = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let shorten_path (cond : P.path -> qsymbol -> bool) (p : P.path) : qsymbol * qsymbol option =
+  let (nm, x) = EcPath.toqsymbol p in
+  let nm =
+    match nm with
+    | top :: nm when top = EcCoreLib.i_top -> nm
+    | _ -> nm in
+  let nm', x' = PPEnv.p_shorten (cond p) (nm, x) in
+  let plong, pshort = (nm, x), (nm', x') in
+
+  (plong, if plong = pshort then None else Some pshort)
+
+(* -------------------------------------xz------------------------------- *)
 let pp_id pp fmt x = Format.fprintf fmt "%a" pp x
 
 (* -------------------------------------------------------------------- *)
@@ -434,33 +445,16 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
-let pp_long_short_path (lk: qsymbol -> (EcPath.path * 'a) option) fmt p =
-  let rec doit prefix (nm, x) =
-    match lk (nm, x) with
-    | Some (p', _) when EcPath.p_equal p p' ->
-        (nm, x)
-    | _ -> begin
-        match prefix with
-        | [] -> (nm, x)
-        | n :: prefix -> doit prefix (n :: nm, x)
-      end
-  in
+let pp_shorten_path (cond : P.path -> qsymbol -> bool) (fmt : Format.formatter) (p : P.path) =
+  let plong, pshort  = shorten_path cond p in
 
-  let (nm, x) = EcPath.toqsymbol p in
-  let nm =
-    match nm with
-    | top :: nm when top = EcCoreLib.i_top ->
-        nm
-    | _ -> nm in
-
-  let nm', x' = doit (List.rev nm) ([], x) in
-  let plong, pshort = (nm, x), (nm', x') in
-  match plong, pshort with
-  | plong, pshort when plong = pshort -> Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
-  | plong, pshort -> 
-      Format.fprintf fmt "%a (shorten name: %a)" 
-      EcSymbols.pp_qsymbol plong 
-      EcSymbols.pp_qsymbol pshort
+  match pshort with
+  | None ->
+    Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
+  | Some pshort ->
+    Format.fprintf fmt "%a (shorten name: %a)" 
+    EcSymbols.pp_qsymbol plong 
+    EcSymbols.pp_qsymbol pshort
 
 (* -------------------------------------------------------------------- *)
 let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =

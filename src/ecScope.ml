@@ -2364,28 +2364,11 @@ module Search = struct
 
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
     let shorten lk p =
-      let rec doit prefix (nm, x) =
-        match lk (nm, x) (env scope) with
-        | Some (p', _) when EcPath.p_equal p p' ->
-            (nm, x)
-        | _ -> begin
-            match prefix with
-            | [] -> (nm, x)
-            | n :: prefix -> doit prefix (n :: nm, x)
-          end
-      in
-
-      let (nm, x) = EcPath.toqsymbol p in
-      let nm =
-        match nm with
-        | top :: nm when top = EcCoreLib.i_top ->
-            nm
-        | _ -> nm in
-
-      let nm', x' = doit (List.rev nm) ([], x) in
-      let plong, pshort = (nm, x), (nm', x') in
-
-      (plong, if plong = pshort then None else Some pshort)
+      let lk (p : path) (qs : qsymbol) =
+        match lk qs (env scope) with
+        | Some (p', _) -> p_equal p p'
+        | _ -> false in
+      EcPrinting.shorten_path lk p
     in
 
     let buffer = Buffer.create 0 in

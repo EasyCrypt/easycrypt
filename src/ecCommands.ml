@@ -284,14 +284,20 @@ module HiPrinting = struct
     let hint_rewrite = EcEnv.BaseRw.all env in
 
     let ppe = EcPrinting.PPEnv.ofenv env in
-    let pp_path = EcPrinting.pp_long_short_path (fun q -> EcEnv.Ax.lookup_opt q env) in
+
+    let pp_path =
+      EcPrinting.pp_shorten_path
+        (fun (p : EcPath.path) (q : EcSymbols.qsymbol) ->
+          Option.equal EcPath.p_equal
+            (Some p)
+            (Option.map fst (EcEnv.Ax.lookup_opt q env))) in
 
     let pp_hint_rewrite _ppe fmt = (fun (p,  sp) ->
       let elems = EcPath.Sp.ntr_elements sp in
       if List.is_empty elems then
         Format.fprintf fmt "%s (empty)@." (EcPath.basename p)
       else
-        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@." (EcPath.basename p) 
+        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p) 
           (EcPrinting.pp_list "@\n" (fun fmt p -> 
             Format.fprintf fmt "%a" pp_path p))
           (EcPath.Sp.ntr_elements sp)
@@ -320,7 +326,7 @@ module HiPrinting = struct
         (EcPrinting.pp_list "@\n" (fun fmt rl ->
           begin match rl.rl_cond with
           | [] -> Format.fprintf fmt "Conditions: None@\n"
-          | xs -> Format.fprintf fmt "Conditions: %a@\n" (EcPrinting.pp_list "," (EcPrinting.pp_form ppe)) xs
+          | xs -> Format.fprintf fmt "Conditions: %a@\n" (EcPrinting.pp_list ",@ " (EcPrinting.pp_form ppe)) xs
           end;
           Format.fprintf fmt "Target: %a@\nPattern: %a@\n"
           (EcPrinting.pp_form ppe) rl.rl_tg
