@@ -1985,8 +1985,13 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     List.exists (fun x ->
         if x.rqd_name = name.rqd_name then (
-          (* FIXME: raise an error message *)
-          assert (x.rqd_digest = name.rqd_digest);
+          if x.rqd_digest <> name.rqd_digest then begin
+            hierror "conflicting required file: %s (%s) [%s / %s]" x.rqd_name
+              (match x.rqd_namespace with
+               | None | Some `System -> "<system>"
+               | Some (`Named x) -> x)
+              x.rqd_digest name.rqd_digest
+          end;
           true)
         else false)
       scope.sc_required
