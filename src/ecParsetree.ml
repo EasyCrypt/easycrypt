@@ -1229,11 +1229,15 @@ type save = [ `Qed | `Admit | `Abort ]
 type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
+type phintoption = [ `Rigid ]
+
+(* -------------------------------------------------------------------- *)
 type phint = {
-  ht_local : is_local;
-  ht_prio  : int;
-  ht_base  : psymbol option;
-  ht_names : pqsymbol list;
+  ht_local   : is_local;
+  ht_prio    : int;
+  ht_base    : psymbol option;
+  ht_names   : pqsymbol list;
+  ht_options : phintoption list;
 }
 
 (* -------------------------------------------------------------------- *)

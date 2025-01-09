@@ -726,7 +726,7 @@ module Apply = struct
 
   exception NoInstance of (bool * reason * PT.pt_env * (form * form))
 
-  let t_apply_bwd_r ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
+  let t_apply_bwd_r ?(ri = EcReduction.full_compat) ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
     let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
 
     let noinstance ?(dpe = false) reason =
@@ -736,7 +736,7 @@ module Apply = struct
       match istop && PT.can_concretize pt.PT.ptev_env with
       | true ->
           let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
-          if   EcReduction.is_conv ~ri:EcReduction.full_compat hyps ax concl
+          if   EcReduction.is_conv ~ri hyps ax concl
           then pt
           else instantiate canview false pt
 
@@ -747,7 +747,7 @@ module Apply = struct
               noinstance `IncompleteInference;
             pt
           with EcMatching.MatchFailure ->
-            match TTC.destruct_product hyps pt.PT.ptev_ax with
+            match TTC.destruct_product ~reduce:(mode.fm_conv) hyps pt.PT.ptev_ax with
             | Some _ ->
                 (* FIXME: add internal marker *)
                 instantiate canview false (PT.apply_pterm_to_hole pt)
@@ -800,15 +800,15 @@ module Apply = struct
 
     t_apply pt tc
 
-  let t_apply_bwd ?mode ?canview pt (tc : tcenv1) =
+  let t_apply_bwd ?(ri : EcReduction.reduction_info option) ?mode ?canview pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps tc in
     let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
     let ptenv  = ptenv_of_penv hyps !!tc in
     let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
-    t_apply_bwd_r ?mode ?canview pt tc
+    t_apply_bwd_r ?ri ?mode ?canview pt tc
 
-  let t_apply_bwd_hi ?(dpe = true) ?mode ?canview pt (tc : tcenv1) =
-    try  t_apply_bwd ?mode ?canview pt tc
+  let t_apply_bwd_hi ?(ri : EcReduction.reduction_info option) ?(dpe = true) ?mode ?canview pt (tc : tcenv1) =
+    try  t_apply_bwd ?ri ?mode ?canview pt tc
     with (NoInstance (_, r, pt, f)) ->
       tc_error_exn !!tc (NoInstance (dpe, r, pt, f))
 end
@@ -2582,22 +2582,27 @@ let t_coq
 let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(mode = fmdelta) ?(depth = 1) (tc : tcenv1) =
   let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
 
-  let t_apply1 p tc =
-
+  let t_apply1 ((p, rigid): Auto.base0) tc =
+    let ri, mode =
+      match rigid with
+      | `Rigid   -> EcReduction.no_red, fmsearch
+      | `Default -> EcReduction.full_compat, mode in
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
     try
-      Apply.t_apply_bwd_r ~mode ~canview:false pt tc
-    with Apply.NoInstance _ -> t_fail tc in
+      Apply.t_apply_bwd_r ~ri ~mode ~canview:false pt tc
+    with Apply.NoInstance _ -> 
+      t_fail tc 
+  in
 
-  let rec t_apply ctn p tc =
+  let rec t_apply ctn ip tc =
     if   ctn > depth
     then t_fail tc
-    else (t_apply1 p @! t_trivial @! t_solve (ctn + 1) bases) tc
+    else (t_apply1 ip @! t_trivial @! t_solve (ctn + 1) bases) tc
 
   and t_solve ctn bases tc =
     match bases with
     | [] -> t_abort tc
-    | p::bases -> (FApi.t_or (t_apply ctn p) (t_solve ctn bases)) tc in
+    | ip::bases -> (FApi.t_or (t_apply ctn ip) (t_solve ctn bases)) tc in
 
   let t = t_solve 0 bases in
   let t = if canfail then FApi.t_try t else t in

@@ -1016,12 +1016,16 @@ let generalize_addrw to_gen (p, ps, lc) =
 
 let generalize_reduction to_gen _rl = to_gen, None
 
-let generalize_auto to_gen (n,s,ps,lc) =
-  if lc = `Local then to_gen, None
+let generalize_auto to_gen auto_rl =
+  if auto_rl.locality = `Local then
+    to_gen, None
   else
-    let ps = List.filter (fun p -> to_keep to_gen (`Ax p)) ps in
-    if ps = [] then to_gen, None
-    else to_gen, Some (Th_auto (n,s,ps,lc))
+    let axioms =
+      List.filter (fun (p, _) -> to_keep to_gen (`Ax p)) auto_rl.axioms in
+    if List.is_empty axioms then
+      to_gen, None
+    else
+      to_gen, Some (Th_auto {auto_rl with axioms})
 
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
@@ -1046,7 +1050,7 @@ let rec set_local_item item =
     | Th_baserw       (s,lc) -> Th_baserw    (s, set_local lc)
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
-    | Th_auto     (i,s,p,lc) -> Th_auto      (i, s, p, set_local lc)
+    | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_local auto_rl.locality}
 
   in { item with ti_item = lcitem }
 
@@ -1337,19 +1341,20 @@ let add_item_ (item : theory_item) (scenv:scenv) =
   let env = scenv.sc_env in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op) -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
-    | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
-    | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
+    | Th_type    (s,tyd)     -> EcEnv.Ty.bind s tyd env
+    | Th_operator (s,op)     -> EcEnv.Op.bind s op env
+    | Th_axiom   (s, ax)     -> EcEnv.Ax.bind s ax env
+    | Th_modtype (s, ms)     -> EcEnv.ModTy.bind s ms env
+    | Th_module       me     -> EcEnv.Mod.bind me.tme_expr.me_name me env
+    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind s tc env
+    | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
-    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
-    | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
-    | Th_reduction r     -> EcEnv.Reduction.add r env
-    | _                  -> assert false
+    | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add s lc env
+    | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
+    | Th_auto auto           -> EcEnv.Auto.add ~level:auto.level ?base:auto.base
+                                  auto.axioms auto.locality env
+    | Th_reduction r         -> EcEnv.Reduction.add r env
+    | _                      -> assert false
   in
   { scenv with
     sc_env = env;
@@ -1493,8 +1498,8 @@ let check_item scenv item =
   | Th_addrw (_,_,lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local hint rewrite can only be declared inside section";
-  | Th_auto (_, _, _, lc) ->
-    if (lc = `Local && not scenv.sc_insec) then
+  | Th_auto { locality } ->
+    if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
   | Th_theory  _   -> assert false
