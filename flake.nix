@@ -4,8 +4,8 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/23.11";
-    stable.url = "github:nixos/nixpkgs/23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/24.05";
+    stable.url = "github:nixos/nixpkgs/24.05";
     nixpkgs.follows = "opam-nix/nixpkgs";
 
     prover_cvc4_1_8 = {
@@ -40,12 +40,22 @@
         };
 
         query = devPackagesQuery // {
-          ocaml-base-compiler = "4.14.1";
+          ocaml-base-compiler = "4.14.2";
         };
 
         scope = on.buildOpamProject' { } ./. query;
 
         overlay = final: prev: {
+          conf-git = prev.conf-git.overrideAttrs (oa: {
+            buildInputs = oa.buildInputs ++ [ pkgs.git ];
+            nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.git ];
+          });
+
+          conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
+            buildInputs = oa.buildInputs ++ [ pkgs.pkg-config ];
+            nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.pkg-config ];
+          });
+
           ${package} = prev.${package}.overrideAttrs (oa: {
             nativeBuildInputs = oa.nativeBuildInputs
               ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.darwin.sigtool ];
@@ -56,7 +66,7 @@
           });
         };
 
-        scope' = scope.overrideScope' overlay;
+        scope' = scope.overrideScope overlay;
 
         # Packages from devPackagesQuery
         devPackages = builtins.attrValues
@@ -101,7 +111,7 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
-	       devPackages
+	             devPackages
             ++ [ scope'.why3 packages.provers ]
             ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
