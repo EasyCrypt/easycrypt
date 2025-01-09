@@ -482,6 +482,7 @@
 %token INTERLEAVE
 %token INSTANCE
 %token IOTA
+%token IRREDUCIBLE
 %token IS
 %token KILL
 %token LARROW
@@ -3817,14 +3818,30 @@ addrw:
 | local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
+
+    (* FIXME: fix integration of irreducible optional keyword *)
 hint:
 | local=is_local HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
-        ht_base  = base ; ht_names = l; } }
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = false;         } }
 
 | local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
-        ht_base  = base ; ht_names = l; } }
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = false;         } }
+
+| local=is_local HINT IRREDUCIBLE EXACT base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = 0;
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = true;         } }
+
+| local=is_local HINT IRREDUCIBLE SOLVE i=word base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = i;
+        ht_base  = base ; ht_names = l; 
+        ht_irreducible = true;         } }
+
+
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
@@ -3888,6 +3905,7 @@ global_action:
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | PRINT AXIOM      { Gpaxiom         }
+| PRINT HINT       { Gphint          }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

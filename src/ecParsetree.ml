@@ -1234,6 +1234,7 @@ type phint = {
   ht_prio  : int;
   ht_base  : psymbol option;
   ht_names : pqsymbol list;
+  ht_irreducible : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1264,6 +1265,7 @@ type global_action =
   | Ghint        of phint
   | Gprint       of pprint
   | Gpaxiom
+  | Gphint
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)

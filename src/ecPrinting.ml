@@ -3391,11 +3391,12 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
 
-  | EcTheory.Th_auto (lvl, base, p, lc) ->
-      Format.fprintf fmt "%ahint solve %d %s : %a."
-        pp_locality lc
-        lvl (odfl "" base)
-        (pp_list "@ " (pp_axname ppe)) p
+  | EcTheory.Th_auto { level; base; axioms; locality; irreducible } ->
+      Format.fprintf fmt "%ahint solve %s %d %s : %a."
+        pp_locality locality
+        (if irreducible then "(irreducible" else "")
+        level (odfl "" base)
+        (pp_list "@ " (pp_axname ppe)) axioms
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
@@ -3517,7 +3518,7 @@ module ObjectInfo = struct
       match q with
       | ([], q) -> begin
           match EcEnv.Auto.getx q env with
-          | [] -> raise NoObject | reds -> reds
+          | _, [] -> raise NoObject | _, reds -> reds
         end
       | _ -> raise NoObject in
 
