@@ -148,3 +148,44 @@ module Hdint = EHashtbl.Make(DInt)
 (* --------------------------------------------------------------------*)
 module Mstr = Map.Make(String)
 module Sstr = Set.MakeOfMap(Mstr)
+
+(* --------------------------------------------------------------------*)
+module Trie : sig
+  type ('a, 'b) t
+
+  val empty : ('a, 'b) t
+  val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
+  val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
+end = struct
+  module Map = BatMap
+
+  type ('a, 'b) t =
+    { children : ('a, ('a, 'b) t) Map.t
+    ; value    : 'b list }
+
+  let empty : ('a, 'b) t =
+    { value = []; children = Map.empty; }
+
+  let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
+    let rec doit (path : 'a list) (t : ('a, 'b) t) =
+      match path with
+      | [] ->
+        { t with value = value :: t.value }
+      | v :: path ->
+        let children =
+          t.children |> Map.update_stdlib v (fun children ->
+            let subtrie = Option.value ~default:empty children in
+            Some (doit path subtrie)
+          )
+        in { t with children }
+    in doit path t
+
+  let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
+    let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
+      if not (List.is_empty t.value) then
+        f prefix t.value;
+      Map.iter (fun k v -> doit (k :: prefix) v) t.children
+    in
+    
+    doit [] t
+end

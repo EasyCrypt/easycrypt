@@ -1447,6 +1447,13 @@ module BaseRw = struct
             (omap (fun s -> List.fold_left (fun s r -> Sp.add r s) s l))
             (IPPath p) env.env_rwbase;
         env_item = mkitem import (Th_addrw (p, l, lc)) :: env.env_item; }
+
+  let all env =
+    List.filter_map (fun (ip, sp) -> 
+      match ip with
+      | IPPath p -> Some (p, sp)
+      | _ -> None) @@
+    Mip.bindings env.env_rwbase
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1499,6 +1506,12 @@ module Reduction = struct
     Mrd.find_opt p env.env_redbase
     |> omap (fun x -> Lazy.force x.ri_list)
     |> odfl []
+
+  (* FIXME: handle other cases, right now only used for print hint *)
+  let all (env : env) = 
+    List.map (fun (ts, mr) -> 
+      (ts, Lazy.force mr.ri_list))
+    (Mrd.bindings env.env_redbase) 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1537,7 +1550,7 @@ module Auto = struct
 
   let getall (bases : symbol list) (env : env) =
     let dbs = List.map (fun base -> get_core ~base env) bases in
-    let dbs =
+    let dbs = 
       List.fold_left (fun db mi ->
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
@@ -1546,6 +1559,9 @@ module Auto = struct
   let getx (base : symbol) (env : env) =
     let db = Msym.find_def Mint.empty base env.env_atbase in
     Mint.bindings db
+
+  let all (env : env) : path list =
+    Msym.values env.env_atbase |> List.map flatten_db |> List.flatten
 end
 
 (* -------------------------------------------------------------------- *)

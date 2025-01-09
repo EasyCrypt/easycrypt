@@ -3622,6 +3622,11 @@ realize:
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
+phint:
+| SIMPLIFY { `Simplify }
+| SOLVE    { `Solve    }
+| REWRITE  { `Rewrite  }
+
 print:
 |             qs=qoident         { Pr_any  qs            }
 | STAR        qs=qoident         { Pr_any  qs            }
@@ -3637,10 +3642,12 @@ print:
 | GOAL        n=sword            { Pr_goal n             }
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
+| AXIOM                          { Pr_axioms             }
+| HINT        p=phint?           { Pr_hint p             }
 
 coq_info:
 |           { None }
-| CHECK    { Some EcProvers.Check }
+| CHECK     { Some EcProvers.Check }
 | EDIT      { Some EcProvers.Edit }
 | FIX       { Some EcProvers.Fix }
 
@@ -3762,7 +3769,6 @@ global_action:
 | hint             { Ghint        $1 }
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
-| PRINT AXIOM      { Gpaxiom         }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

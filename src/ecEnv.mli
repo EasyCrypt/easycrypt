@@ -398,6 +398,8 @@ module BaseRw : sig
 
   val add   : ?import:import -> symbol -> is_local -> env -> env
   val addto : ?import:import -> path -> path list -> is_local -> env -> env
+
+  val all : env -> (path * Sp.t) list 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -405,6 +407,7 @@ module Reduction : sig
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple | `Proj of int]
 
+  val all : env -> (topsym * rule list) list
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
@@ -417,7 +420,8 @@ module Auto : sig
   val add    : ?import:import -> level:int -> ?base:symbol -> path list -> is_local -> env -> env
   val get    : ?base:symbol -> env -> path list
   val getall : symbol list -> env -> path list
-  val getx   : symbol -> env ->  (int * path list) list
+  val getx   : symbol -> env -> (int * path list) list
+  val all    : env -> path list
 end
 
 (* -------------------------------------------------------------------- *)
