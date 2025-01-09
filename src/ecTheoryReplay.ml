@@ -828,8 +828,8 @@ and replay_auto
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, at_base)
 =
   let env = EcSection.env (ove.ovre_hooks.henv scope) in
-  let axioms = List.map (EcSubst.subst_path subst) at_base.axioms in
-  let axioms = List.filter (fun p -> Option.is_some (EcEnv.Ax.by_path_opt p env)) axioms in
+  let axioms = List.map (fun (ir, p) -> (ir, EcSubst.subst_path subst p)) at_base.axioms in
+  let axioms = List.filter (fun (_ir, p) -> Option.is_some (EcEnv.Ax.by_path_opt p env)) axioms in
   let scope = ove.ovre_hooks.hadd_item scope import (Th_auto {at_base with axioms}) in
   (subst, ops, proofs, scope)
 

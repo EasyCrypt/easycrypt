@@ -2506,33 +2506,29 @@ let t_coq
 let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(mode = fmdelta) ?(depth = 1) (tc : tcenv1) =
   let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
 
-  let do_base ((irred, bases): bool * path list) : FApi.backward = 
-    let ri = if irred then EcReduction.no_red else EcReduction.full_compat in
-    let mode = if irred then fmsearch else mode in
 
-    let t_apply1 p tc =
-      let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
-      try
-        Apply.t_apply_bwd_r ~ri ~mode ~canview:false pt tc
-      with Apply.NoInstance _ -> 
-        t_fail tc 
-    in
-
-    let rec t_apply ctn p tc =
-      if   ctn > depth
-      then t_fail tc
-      else (t_apply1 p @! t_trivial @! t_solve (ctn + 1) bases) tc
-
-    and t_solve ctn bases tc =
-      match bases with
-      | [] -> t_abort tc
-      | p::bases -> (FApi.t_or (t_apply ctn p) (t_solve ctn bases)) tc in
-
-    let t = t_solve 0 bases in
-    let t = if canfail then FApi.t_try t else t in
-    t
+  let t_apply1 ((ir, p): bool * path) tc =
+    let ri = if ir then EcReduction.no_red else EcReduction.full_compat in
+    let mode = if ir then fmsearch else mode in
+    let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
+    try
+      Apply.t_apply_bwd_r ~ri ~mode ~canview:false pt tc
+    with Apply.NoInstance _ -> 
+      t_fail tc 
   in
-  let t = List.fold_left FApi.t_or t_abort (List.map do_base bases) in
+
+  let rec t_apply ctn ip tc =
+    if   ctn > depth
+    then t_fail tc
+    else (t_apply1 ip @! t_trivial @! t_solve (ctn + 1) bases) tc
+
+  and t_solve ctn bases tc =
+    match bases with
+    | [] -> t_abort tc
+    | ip::bases -> (FApi.t_or (t_apply ctn ip) (t_solve ctn bases)) tc in
+
+  let t = t_solve 0 bases in
+  let t = if canfail then FApi.t_try t else t in
 
   t tc
 

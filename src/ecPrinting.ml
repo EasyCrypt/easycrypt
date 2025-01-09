@@ -476,6 +476,9 @@ let pp_rwname ppe fmt p =
 let pp_axname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
 
+let pp_axhnt ppe fmt (b, p) =
+  Format.fprintf fmt "%a%s" (pp_axname ppe) p (if b then " (irreducible)" else "")
+
 (* -------------------------------------------------------------------- *)
 let pp_thname ppe fmt p =
   EcSymbols.pp_qsymbol fmt (PPEnv.th_symb ppe p)
@@ -2890,23 +2893,27 @@ let pp_rwbase ppe fmt (p, rws) =
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
 
 (* -------------------------------------------------------------------- *)
-let pp_solvedb ppe fmt db =
+let pp_solvedb ppe fmt (db: (int * (bool * P.path) list) list) =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
-      lvl (pp_list ", " (pp_axname ppe)) ps)
+      lvl 
+      (pp_list ", " (pp_axhnt ppe))
+      ps)
   db;
 
   let lemmas = List.flatten (List.map snd db) in
-  let lemmas = List.pmap (fun p ->
+  let lemmas = List.pmap (fun (ir, p) ->
       let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
-      (omap (fun ax -> (p, ax)) ax))
+      (omap (fun ax -> ((p, ax), ir)) ax))
     lemmas
   in
 
+  (* FIXME: maybe integrate irreducible print into pp_axiom *)
   if not (List.is_empty lemmas) then begin
     Format.fprintf fmt "\n%!";
     List.iter
-      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      (fun (ax, ir) -> Format.fprintf fmt "%a%s\n\n%!" (pp_axiom ppe) ax
+        (if ir then " (irreducible)" else ""))
       lemmas
   end
 
@@ -3391,12 +3398,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
 
-  | EcTheory.Th_auto { level; base; axioms; locality; irreducible } ->
-      Format.fprintf fmt "%ahint solve %s %d %s : %a."
+  | EcTheory.Th_auto { level; base; axioms; locality} ->
+      Format.fprintf fmt "%ahint solve %d %s : %a."
         pp_locality locality
-        (if irreducible then "(irreducible" else "")
         level (odfl "" base)
-        (pp_list "@ " (pp_axname ppe)) axioms
+        (pp_list "@ " (pp_axhnt ppe)) axioms
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
@@ -3518,7 +3524,7 @@ module ObjectInfo = struct
       match q with
       | ([], q) -> begin
           match EcEnv.Auto.getx q env with
-          | _, [] -> raise NoObject | _, reds -> reds
+          | [] -> raise NoObject | reds -> reds
         end
       | _ -> raise NoObject in
 

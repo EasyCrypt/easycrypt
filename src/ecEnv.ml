@@ -181,7 +181,7 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
-  env_atbase   : atbase Msym.t; (* maybe rename to atbases? *)
+  env_atbase   : (bool * path) list Mint.t Msym.t; (* maybe rename to atbases? *)
   env_redbase  : mredinfo;
   env_ntbase   : ntbase Mop.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
@@ -221,10 +221,6 @@ and env_notation = ty_params * EcDecl.notation
 
 and ntbase = (path * env_notation) list
 
-and atbase = {
-  levels: path list Mint.t;
-  irreducible: bool;
-}
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -1507,55 +1503,50 @@ end
 module Auto = struct
   let dname : symbol = ""
 
-  type base = atbase
-
-  let empty_base : base = 
-    {irreducible = false; levels= Mint.empty}
-
-  let updatedb ~level ~irreducible ?base (ps : path list) (db : base Msym.t) =
+  let updatedb ~level ?base (ps : (bool * path) list) (db : (bool * path) list Mint.t Msym.t) =
     let nbase = (odfl dname base) in
-    (* TODO: maybe add a function giving an empty base? *)
-    let base = Msym.find_def empty_base nbase db in
+    let base = Msym.find_def Mint.empty nbase db in
     let levels =
       let doit x = Some (ofold (fun x ps -> ps @ x) ps x) in
-      Mint.change doit level base.levels in
-    Msym.add nbase {base with levels; irreducible} db
+      Mint.change doit level base in
+    Msym.add nbase levels db
 
-  let add ?(import = import0) ?(irreducible = false) ~level ?base (axioms : path list) locality (env : env) =
+  let add ?(import = import0) ~level ?base (axioms : (bool * path) list) locality (env : env) =
     let env =
       if import.im_immediate then
         { env with
-            env_atbase = updatedb ?base ~level ~irreducible axioms env.env_atbase; }
+            env_atbase = updatedb ?base ~level axioms env.env_atbase; }
       else env
     in
       { env with env_item = mkitem import
-         (Th_auto {level; base; axioms; locality; irreducible}) :: env.env_item; }
+         (Th_auto {level; base; axioms; locality}) :: env.env_item; }
 
-  let add1 ?import ?irreducible ~level ?base (p : path) lc (env : env) =
-    add ?import ?irreducible ?base ~level [p] lc env
+  let add1 ?import ~level ?base (p : (bool * path)) lc (env : env) =
+    add ?import ?base ~level [p] lc env
 
   let get_core ?base (env : env) =
-    Msym.find_def empty_base (odfl dname base) env.env_atbase
+    Msym.find_def Mint.empty (odfl dname base) env.env_atbase
 
-  let flatten_base ({irreducible; levels} : base) =
-    (irreducible, Mint.fold_left (fun ps _ ps' -> ps @ ps') [] levels)
+  let flatten_db (db : (bool * path) list Mint.t) =
+    Mint.fold_left (fun ps _ ps' -> ps @ ps') [] db
 
   let get ?base (env : env) =
-    flatten_base (get_core ?base env)
+    flatten_db (get_core ?base env)
 
-  let getall (bases : symbol list) (env : env) : (bool * path list) list =
+  let getall (bases : symbol list) (env : env) : (bool * path) list =
     let dbs = List.map (fun base -> get_core ~base env) bases in
-    List.map flatten_base dbs
+    let dbs = 
+      List.fold_left (fun db mi ->
+        Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
+        Mint.empty dbs
+    in flatten_db dbs
 
   let getx (base : symbol) (env : env) =
-    let {irreducible; levels} = Msym.find_def empty_base base env.env_atbase in
-    (irreducible, Mint.bindings levels)
+    let db = Msym.find_def Mint.empty base env.env_atbase in
+    Mint.bindings db
 
-  let all (env : env) =
-    Msym.values env.env_atbase |> List.map flatten_base
-
-  let irreducible (base: symbol) (env: env) : bool =
-    (get_core ~base env).irreducible
+  let all (env : env) : (bool * path) list =
+    Msym.values env.env_atbase |> List.map flatten_db |> List.flatten
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2945,8 +2936,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_at_th =
     let for1 _path db = function
-      | Th_auto {level; base; axioms; irreducible; _} ->
-         Some (Auto.updatedb ?base ~irreducible ~level axioms db)
+      | Th_auto {level; base; axioms; _} ->
+         Some (Auto.updatedb ?base ~level axioms db)
       | _ -> None
 
     in bind_base_th for1
@@ -3120,7 +3111,7 @@ module Theory = struct
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
 
         | Th_auto ({axioms} as auto_rl) ->
-            let axioms = List.filter ((not) |- inclear |- oget |- EcPath.prefix) axioms in
+            let axioms = List.filter (fun (_b, p) -> ((not) |- inclear |- oget |- EcPath.prefix) p) axioms in
             if List.is_empty axioms then None else Some (Th_auto {auto_rl with axioms})
 
         | (Th_export (p, _)) as item ->

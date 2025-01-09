@@ -78,9 +78,8 @@ and rule_option = {
 and auto_rule = {
   level : int;
   base : symbol option;
-  axioms : path list;
+  axioms : (bool * path) list;
   locality: is_local;
-  irreducible: bool;
 }
 
 let mkitem (import : import) (item : theory_item_r) =

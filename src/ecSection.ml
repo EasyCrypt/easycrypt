@@ -1019,7 +1019,7 @@ let generalize_reduction to_gen _rl = to_gen, None
 let generalize_auto to_gen auto_rl =
   if auto_rl.locality = `Local then to_gen, None
   else
-    let axioms = List.filter (fun p -> to_keep to_gen (`Ax p)) auto_rl.axioms in
+    let axioms = List.filter (fun (_b, p) -> to_keep to_gen (`Ax p)) auto_rl.axioms in
     if axioms = [] then to_gen, None
     else to_gen, Some (Th_auto {auto_rl with axioms})
 
@@ -1348,8 +1348,7 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_baserw   (s,lc)             -> EcEnv.BaseRw.add s lc env
     | Th_addrw (p,ps,lc)             -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto {level;  base; 
-               axioms; locality; 
-               irreducible}          -> EcEnv.Auto.add ~level ~irreducible ?base axioms locality env
+               axioms; locality;}    -> EcEnv.Auto.add ~level ?base axioms locality env
     | Th_reduction r                 -> EcEnv.Reduction.add r env
     | _                              -> assert false
   in

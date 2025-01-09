@@ -370,7 +370,6 @@ let process_print_ax (scope : EcScope.scope) =
 let process_print_hint (scope : EcScope.scope) =
   let env = EcScope.env scope in
   let ax  = EcEnv.Auto.all env in
-  let ax = List.map (fun (ir, ps) -> List.map (fun p -> (ir, p)) ps) ax |> List.flatten in
   let ax  = List.map (fun (ir, p) -> (p, (EcEnv.Ax.by_path p env, ir))) ax in 
 
   let module Trie : sig

@@ -413,15 +413,12 @@ end
 (* -------------------------------------------------------------------- *)
 module Auto : sig
   val dname  : symbol
-  type base  
-  val add1   : ?import:import -> ?irreducible:bool -> level:int -> ?base:symbol -> path -> is_local -> env -> env
-  val add    : ?import:import -> ?irreducible:bool -> level:int -> ?base:symbol -> path list -> is_local -> env -> env
-  val get    : ?base:symbol -> env -> bool * path list
-  val getall : symbol list -> env -> (bool * path list) list
-  val getx   : symbol -> env ->  bool * (int * path list) list
-  val all    : env -> (bool * path list) list
-
-  val irreducible : symbol -> env -> bool
+  val add1   : ?import:import -> level:int -> ?base:symbol -> (bool * path) -> is_local -> env -> env
+  val add    : ?import:import -> level:int -> ?base:symbol -> (bool * path) list -> is_local -> env -> env
+  val get    : ?base:symbol -> env -> (bool * path) list
+  val getall : symbol list -> env -> (bool * path) list
+  val getx   : symbol -> env -> (int * (bool * path) list) list
+  val all    : env -> (bool * path) list
 end
 
 (* -------------------------------------------------------------------- *)
