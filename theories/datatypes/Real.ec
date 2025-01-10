@@ -249,6 +249,26 @@ proof. smt(floor_bound). qed.
 lemma floor_mono (x y : real) : x <= y => floor x <= floor y.
 proof. smt(floor_bound). qed.
 
+op isint (x : real) = exists n, x = n%r.
+
+lemma ceil_eqP (x : real) : (ceil x)%r = x <=> isint x.
+proof. by split=> [/#|[n ->>]]; last by rewrite from_int_ceil. qed.
+
+lemma floor_eqP (x : real) : (floor x)%r = x <=> isint x.
+proof. by split=> [/#|[n ->>]]; last by rewrite from_int_floor. qed.
+
+lemma cBf_eq0P (x : real) : (ceil x - floor x = 0) <=> isint x.
+proof.
+split=> [|[n ->>]]; last by rewrite from_int_floor from_int_ceil.
+smt(ceil_bound floor_bound).
+qed.
+
+lemma cBf_eq1P (x : real) : (ceil x - floor x = 1) <=> !isint x.
+proof.
+move=> /=; case: (isint x) => /= [/cBf_eq0P -> //|].
+smt(ceil_bound floor_bound).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)
 lemma upto2_abs (x1 x2 x3 x4 x5:real):
