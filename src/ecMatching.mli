@@ -61,6 +61,7 @@ module Zipper : sig
     z_head : instr list;                (* instructions on my left (rev)       *)
     z_tail : instr list;                (* instructions on my right (me incl.) *)
     z_path : ipath ;                    (* path (zipper) leading to me         *)
+    z_env  : env option;                (* env with local vars from previous instructions *)
   }
 
   exception InvalidCPos
@@ -79,7 +80,7 @@ module Zipper : sig
   val offset_of_position : env -> codepos1 -> stmt -> int
 
   (* [zipper] soft constructor *)
-  val zipper : instr list -> instr list -> ipath -> zipper
+  val zipper : ?env : env -> instr list -> instr list -> ipath -> zipper
 
   (* Return the zipper for the stmt [stmt] at code position [codepos].
    * Raise [InvalidCPos] if [codepos] is not valid for [stmt]. It also
@@ -101,7 +102,8 @@ module Zipper : sig
    *)
   val after : strict:bool -> zipper -> instr list list
 
-  type ('a, 'state) folder = 'a -> 'state -> instr -> 'state * instr list
+  type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
+  type ('a, 'state) folder_tl = env -> 'a -> 'state -> instr -> instr list -> 'state * instr list
 
   (* [fold env v cpos f state s] create the zipper for [s] at [cpos], and apply
    * [f] to it, along with [v] and the state [state]. [f] must return the
@@ -111,6 +113,9 @@ module Zipper : sig
    * raised by [f].
    *)
   val fold : env -> 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
+
+  (* Same as above but using [folder_tl]. *)
+  val fold_tl : env -> 'a -> codepos -> ('a, 'state) folder_tl -> 'state -> stmt -> 'state * stmt
 
   (* [map cpos env f s] is a special case of [fold] where the state and the
    * out-of-band data are absent

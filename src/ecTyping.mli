@@ -81,6 +81,14 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidFun
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
@@ -147,6 +155,7 @@ type tyerror =
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
