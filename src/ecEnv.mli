@@ -398,6 +398,8 @@ module BaseRw : sig
 
   val add   : ?import:import -> symbol -> is_local -> env -> env
   val addto : ?import:import -> path -> path list -> is_local -> env -> env
+
+  val all : env -> (path * Sp.t) list 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -408,16 +410,19 @@ module Reduction : sig
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
+
+  val all : env -> (topsym * rule list) list
 end
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
   val dname  : symbol
-  val add1   : ?import:import -> level:int -> ?base:symbol -> path -> is_local -> env -> env
-  val add    : ?import:import -> level:int -> ?base:symbol -> path list -> is_local -> env -> env
-  val get    : ?base:symbol -> env -> path list
-  val getall : symbol list -> env -> path list
-  val getx   : symbol -> env ->  (int * path list) list
+  val add1   : ?import:import -> level:int -> ?base:symbol -> (bool * path) -> is_local -> env -> env
+  val add    : ?import:import -> level:int -> ?base:symbol -> (bool * path) list -> is_local -> env -> env
+  val get    : ?base:symbol -> env -> (bool * path) list
+  val getall : symbol list -> env -> (bool * path) list
+  val getx   : symbol -> env -> (int * (bool * path) list) list
+  val all    : env -> (bool * path) list
 end
 
 (* -------------------------------------------------------------------- *)

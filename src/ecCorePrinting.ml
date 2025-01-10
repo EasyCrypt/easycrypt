@@ -55,6 +55,8 @@ module type PrinterAPI = sig
   val pp_axname  : PPEnv.t -> path pp
   val pp_tcname  : PPEnv.t -> path pp
   val pp_thname  : PPEnv.t -> path pp
+  (* FIXME: where should this go? *)
+  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
 
   val pp_mem      : PPEnv.t -> EcIdent.t pp
   val pp_memtype  : PPEnv.t -> EcMemory.memtype pp

@@ -181,7 +181,7 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
-  env_atbase   : (path list Mint.t) Msym.t;
+  env_atbase   : (bool * path) list Mint.t Msym.t; (* maybe rename to atbases? *)
   env_redbase  : mredinfo;
   env_ntbase   : ntbase Mop.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
@@ -220,6 +220,7 @@ and mredinfo = redinfo Mrd.t
 and env_notation = ty_params * EcDecl.notation
 
 and ntbase = (path * env_notation) list
+
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -1444,6 +1445,13 @@ module BaseRw = struct
             (omap (fun s -> List.fold_left (fun s r -> Sp.add r s) s l))
             (IPPath p) env.env_rwbase;
         env_item = mkitem import (Th_addrw (p, l, lc)) :: env.env_item; }
+
+  let all env =
+    List.filter_map (fun (ip, sp) -> 
+      match ip with
+      | IPPath p -> Some (p, sp)
+      | _ -> None) @@
+    Mip.bindings env.env_rwbase
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1496,45 +1504,51 @@ module Reduction = struct
     Mrd.find_opt p env.env_redbase
     |> omap (fun x -> Lazy.force x.ri_list)
     |> odfl []
+
+  (* FIXME: handle other cases, right now only used for print hint *)
+  let all env = 
+    List.map (fun (ts, mr) -> 
+      (ts, Lazy.force mr.ri_list))
+    (Mrd.bindings env.env_redbase) 
 end
 
 (* -------------------------------------------------------------------- *)
 module Auto = struct
   let dname : symbol = ""
 
-  let updatedb ~level ?base (ps : path list) (db : (path list Mint.t) Msym.t) =
+  let updatedb ~level ?base (ps : (bool * path) list) (db : (bool * path) list Mint.t Msym.t) =
     let nbase = (odfl dname base) in
-    let ps' = Msym.find_def Mint.empty nbase db in
-    let ps' =
+    let base = Msym.find_def Mint.empty nbase db in
+    let levels =
       let doit x = Some (ofold (fun x ps -> ps @ x) ps x) in
-      Mint.change doit level ps' in
-    Msym.add nbase ps' db
+      Mint.change doit level base in
+    Msym.add nbase levels db
 
-  let add ?(import = import0) ~level ?base (ps : path list) lc (env : env) =
+  let add ?(import = import0) ~level ?base (axioms : (bool * path) list) locality (env : env) =
     let env =
       if import.im_immediate then
         { env with
-            env_atbase = updatedb ?base ~level ps env.env_atbase; }
+            env_atbase = updatedb ?base ~level axioms env.env_atbase; }
       else env
     in
       { env with env_item = mkitem import
-         (Th_auto (level, base, ps, lc)) :: env.env_item; }
+         (Th_auto {level; base; axioms; locality}) :: env.env_item; }
 
-  let add1 ?import ~level ?base (p : path) lc (env : env) =
+  let add1 ?import ~level ?base (p : (bool * path)) lc (env : env) =
     add ?import ?base ~level [p] lc env
 
   let get_core ?base (env : env) =
     Msym.find_def Mint.empty (odfl dname base) env.env_atbase
 
-  let flatten_db (db : path list Mint.t) =
+  let flatten_db (db : (bool * path) list Mint.t) =
     Mint.fold_left (fun ps _ ps' -> ps @ ps') [] db
 
   let get ?base (env : env) =
     flatten_db (get_core ?base env)
 
-  let getall (bases : symbol list) (env : env) =
+  let getall (bases : symbol list) (env : env) : (bool * path) list =
     let dbs = List.map (fun base -> get_core ~base env) bases in
-    let dbs =
+    let dbs = 
       List.fold_left (fun db mi ->
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
@@ -1543,6 +1557,9 @@ module Auto = struct
   let getx (base : symbol) (env : env) =
     let db = Msym.find_def Mint.empty base env.env_atbase in
     Mint.bindings db
+
+  let all (env : env) : (bool * path) list =
+    Msym.values env.env_atbase |> List.map flatten_db |> List.flatten
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2932,8 +2949,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_at_th =
     let for1 _path db = function
-      | Th_auto (level, base, ps, _) ->
-         Some (Auto.updatedb ?base ~level ps db)
+      | Th_auto {level; base; axioms; _} ->
+         Some (Auto.updatedb ?base ~level axioms db)
       | _ -> None
 
     in bind_base_th for1
@@ -3106,9 +3123,9 @@ module Theory = struct
             let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
 
-        | Th_auto (lvl, base, ps, lc) ->
-            let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-            if List.is_empty ps then None else Some (Th_auto (lvl, base, ps, lc))
+        | Th_auto ({axioms} as auto_rl) ->
+            let axioms = List.filter (fun (_b, p) -> ((not) |- inclear |- oget |- EcPath.prefix) p) axioms in
+            if List.is_empty axioms then None else Some (Th_auto {auto_rl with axioms})
 
         | (Th_export (p, _)) as item ->
             if Sp.mem p cleared then None else Some item
