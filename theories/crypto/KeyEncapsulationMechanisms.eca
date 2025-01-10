@@ -1,0 +1,4534 @@
+(*^
+  This library generically defines Key Encapsulation Mechanisms (KEMs)
+  and their properties (both correctness and security).
+  For convenience, it also provides some sensible defaults, particularly for oracles.
+  Most of the content is based on relevant literature.
+  More precisely, (almost) all of the content is extracted from 
+  one or more of the following papers (in no particular order):
+  - [Design and Analysis of Practical Public-Key Encryption Schemes Secure against Adaptive Chosen Ciphertext Attack](https://eprint.iacr.org/2001/108)
+  - [On the Equivalence of Several Security Notions of Key Encapsulation Mechanism](https://eprint.iacr.org/2006/268)
+  - [KEM/DEM: Necessary and Sufficient Conditions for Secure Hybrid Encryption](https://eprint.iacr.org/2006/265)
+  - [Anonymous, Robust Post-Quantum Public Key Encryption](https://eprint.iacr.org/2021/708)
+  - [Keeping Up with the KEMs: Stronger Security Notions for KEMs and Automated Analysis of KEM-based Protocols](https://eprint.iacr.org/2023/1933)
+  - [Unbindable Kemmy Schmidt: ML-KEM is neither MAL-BIND-K-CT nor MAL-BIND-K-PK](https://eprint.iacr.org/2024/523)
+  - [On the Complete Non-Malleability of the Fujisaki-Okamoto Transform](https://eprint.iacr.org/2022/1654)
+  (Missing properties: complete non-malleability)
+^*)
+
+(* Require/Import libraries *)
+require import AllCore List DBool.
+
+
+(* Types *)
+(** Public keys (asymmetric) **)
+type pk_t.
+
+(** Secret keys (asymmetric) **)
+type sk_t.
+
+(** Shared/session keys (symmetric) **)
+type key_t.
+
+(** Ciphertexts/Encapsulations **)
+type ctxt_t.
+
+
+(* Schemes *)
+(** KEM (interface) **)
+module type Scheme = {
+  proc keygen() : pk_t * sk_t
+  proc encaps(pk : pk_t) : key_t * ctxt_t
+  proc decaps(sk : sk_t, c : ctxt_t) : key_t option 
+}.
+
+
+(* Correctness*)
+(** Correctness program/game **)
+module Correctness (S : Scheme) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k : key_t;
+    var c : ctxt_t;
+    var k' : key_t option;
+    
+    (pk, sk) <@ S.keygen();
+    (k, c) <@ S.encaps(pk);
+    k' <@ S.decaps(sk, c);
+    
+    return k' = Some k;
+  }
+}.
+
+
+(* Security *)
+(* Attacker capabilities/models *)
+(* 
+  Chosen-Plaintext Attacks (CPA).
+  The adversary is given the considered public key and, hence, 
+  is able to produce encapsulations, i.e., (symmetric) key/ciphertext pairs. 
+  (Typically, this means the adversary can construct ciphertexts
+   corresponding to chosen (symmetric) keys.)
+*)
+
+(* 
+  non-adaptive Chosen-Ciphertext Attacks (CCA1)
+  The adversary is given the considered public key and access to a decryption oracle
+  *before* the stage in which it is expected to distinguish/return a break.
+  Hence, the adversary is able to produce encapsulations
+  *and* query for decryptions of chosen ciphertexts.
+*)
+(* Oracles *)
+(** Interface for oracles employed in CCA1 security games **)
+module type Oracles_CCA1i (S : Scheme) = {
+  proc init(sk_init : sk_t) : unit
+  proc decaps(c : ctxt_t) : key_t option
+}.
+
+(** 
+  A default implementation for the oracles employed in CCA1 security games 
+  (as well as the first stage of CCA2 games).
+**)
+module (O_CCA1_Default : Oracles_CCA1i) (S : Scheme) = {
+  var sk : sk_t
+  var qs : (ctxt_t * key_t option) list
+  
+  proc init(sk_init : sk_t) = {
+    sk <- sk_init;
+    qs <- [];
+  }
+  
+  proc decaps(c : ctxt_t) : key_t option = {
+    var k : key_t option;
+    
+    k <@ S.decaps(sk, c);
+    
+    qs <- rcons qs (c, k);
+    
+    return k;
+  }
+}.
+
+(** 
+  A duplicate of the default implementation for the oracles employed in CCA1 security games 
+  (as well as the first stage of CCA2 games). May be useful for security notions considering two
+  such (sets of) oracles.
+**)
+module (O_CCA1_DDefault : Oracles_CCA1i) (S : Scheme) = {
+  var sk : sk_t
+  var qs : (ctxt_t * key_t option) list
+  
+  proc init(sk_init : sk_t) = {
+    sk <- sk_init;
+    qs <- [];
+  }
+  
+  proc decaps(c : ctxt_t) : key_t option = {
+    var k : key_t option;
+    
+    k <@ S.decaps(sk, c);
+    
+    qs <- rcons qs (c, k);
+    
+    return k;
+  }
+}.
+
+
+(* 
+  adaptive Chosen-Ciphertext Attacks (Traditional: CCA2, Modern : CCA)
+  The adversary is given the considered public key and access to a decryption oracle throughout.  
+  Hence, the adversary is able to produce encapsulations
+  *and* query for decryptions of chosen ciphertexts (potentially barring ciphertexts
+  that are part of the challenge).
+  Traditionally, this was analogous to CCA2 security for PKE schemes, meaning there were
+  two adversary stages: one before receiving the challenge (given a public key and access to a 
+  non-restricted decapsulation oracle), and one after receiving the challenge (given access to a
+  restricted decapsulation oracle, i.e., one that prohibited querying the challenge).
+  Over time, the formalization shifted toward only considering the second adversary stage 
+  (providing the public key(s) to this stage as well).
+  Here, we denote the traditional one by CCA2 (as we do for PKE schemes), and the modern one by CCA.
+*)
+(** Interface for oracles employed in CCA2 (CCA) security games **)
+module type Oracles_CCA2i (S : Scheme) = {
+  proc init(sk_init : sk_t, c'_init : ctxt_t) : unit
+  proc decaps(c : ctxt_t) : key_t option
+}.
+
+(** A default implementation for the oracles employed in (the second stage of) CCA2 (CCA) security games **)
+module (O_CCA2_Default : Oracles_CCA2i) (S : Scheme) = {
+  var sk : sk_t
+  var c' : ctxt_t 
+  var qs : (ctxt_t * key_t option) list
+  
+  proc init(sk_init : sk_t, c'_init : ctxt_t) = {
+    sk <- sk_init;
+    c' <- c'_init;
+    qs <- [];
+  }
+  
+  proc decaps(c : ctxt_t) : key_t option = {
+    var k : key_t option;
+    
+    if (c <> c') {
+      k <@ S.decaps(sk, c);
+    } else {
+      k <- None;
+    }
+    
+    qs <- rcons qs (c, k);
+        
+    return k;
+  }
+}.
+
+(** 
+  A duplicate of the default implementation for the oracles employed in 
+  (the second stage of) CCA2 (CCA) security games. May be useful for security notions 
+  considering two such (sets of) oracles.
+**)
+module (O_CCA2_DDefault : Oracles_CCA2i) (S : Scheme) = {
+  var sk : sk_t
+  var c' : ctxt_t 
+  var qs : (ctxt_t * key_t option) list
+  
+  proc init(sk_init : sk_t, c'_init : ctxt_t) = {
+    sk <- sk_init;
+    c' <- c'_init;
+    qs <- [];
+  }
+  
+  proc decaps(c : ctxt_t) : key_t option = {
+    var k : key_t option;
+    
+    if (c <> c') {
+      k <@ S.decaps(sk, c);
+    } else {
+      k <- None;
+    }
+    
+    qs <- rcons qs (c, k);
+        
+    return k;
+  }
+}.
+
+
+(**
+  Interface for oracles given to the adversary in any CCA security games 
+  (i.e., CCA1, traditional CCA2, and modern CCA2) 
+**)
+module type Oracles_CCA = {
+  proc decaps(c : ctxt_t) : key_t option
+}.
+
+
+(* 
+  One-Wayness (OW).
+  The adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(*
+  One-Wayness under Chosen-Plaintext Attacks (OW-CPA).
+  In a CPA setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CPA **)
+module type Adv_OWCPA = {
+  proc find(pk : pk_t, c : ctxt_t) : key_t 
+}.
+
+(** OW-CPA security game **)
+module OW_CPA (S : Scheme) (A : Adv_OWCPA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    
+    k' <@ A.find(pk, c);
+    
+    return k' = k; 
+  }
+}.
+
+
+(*
+  One-Wayness under non-adaptive Chosen-Ciphertext Attacks (OW-CCA1).
+  In a CCA1 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA1 **)
+module type Adv_OWCCA1 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit { O.decaps } 
+  proc find(c : ctxt_t) : key_t { }
+}.
+
+(** OW-CCA1 security game **)
+module OW_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_OWCCA1) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    
+    k' <@ A(O(S)).find(c);
+    
+    return k' = k; 
+  }
+}.
+
+
+(*
+  One-Wayness under (traditional) adaptive Chosen-Ciphertext Attacks (OW-CCA2).
+  In a (traditional) CCA2 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA2 **)
+module type Adv_OWCCA2 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t) : key_t
+}.
+
+(** OW-CCA2 security game **)
+module OW_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_OWCCA2) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    O2(S).init(sk, c);
+    
+    k' <@ A(O2(S)).find(c);
+    
+    return k' = k; 
+  }
+}.
+
+
+(*
+  One-Wayness under (modern) adaptive Chosen-Ciphertext Attacks (OW-CCA).
+  In a (modern) CCA2 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA (i.e., modern OW-CCA2) **)
+module type Adv_OWCCA (O : Oracles_CCA) = { 
+  proc find(pk : pk_t, c : ctxt_t) : key_t
+}.
+
+(** OW-CCA (i.e., modern OW-CCA2) security game **)
+module OW_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_OWCCA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    O(S).init(sk, c);
+    
+    k' <@ A(O(S)).find(pk, c);
+    
+    return k' = k; 
+  }
+}.
+
+
+(**
+  (ciphertext) INDistinguishability (IND). 
+  The adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+**)
+abstract theory IND.
+(* Distributions *)
+(** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the key space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dkeym : pk_t -> key_t distr.
+
+
+(*
+  (ciphertext) INDistinguishability under Chosen-Plaintext Attacks (IND-CPA).
+  In a CPA setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CPA **)
+module type Adv_INDCPA = { 
+  proc distinguish(pk : pk_t, k : key_t, c : ctxt_t) : bool 
+}.
+
+(** IND-CPA security game (sampled bit) **)
+module IND_CPA (S : Scheme) (A : Adv_INDCPA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    b <$ {0,1};
+    
+    b' <@ A.distinguish(pk, if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+(** IND-CPA security game (provided bit) **)
+module IND_CPA_P (S : Scheme) (A : Adv_INDCPA) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    b' <@ A.distinguish(pk, if b then k' else k, c);
+    
+    return b'; 
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under non-adaptive Chosen-Ciphertext Attacks (IND-CCA1).
+  In a CCA1 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA1 **)
+module type Adv_INDCCA1 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit { O.decaps } 
+  proc distinguish(k : key_t, c : ctxt_t) : bool { }
+}.
+
+(** IND-CCA1 security game (sampled bit) **)
+module IND_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    b <$ {0,1};
+    
+    b' <@ A(O(S)).distinguish(if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+(** IND-CCA1 security game (provided bit) **)
+module IND_CCA1_P (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    b' <@ A(O(S)).distinguish(if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under (traditional) adaptive Chosen-Ciphertext Attacks (IND-CCA2).
+  In a (traditional) CCA2 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA2 **)
+module type Adv_INDCCA2 (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit
+  proc distinguish(k : key_t, c : ctxt_t) : bool
+}.
+
+(** IND-CCA2 security game (sampled bit) **)
+module IND_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O2(S).init(sk, c);
+    
+    b <$ {0,1};
+    
+    b' <@ A(O2(S)).distinguish(if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+(** IND-CCA2 security game (provided bit) **)
+module IND_CCA2_P (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_INDCCA2) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O2(S).init(sk, c);
+    
+    b' <@ A(O2(S)).distinguish(if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under (modern) adaptive Chosen-Ciphertext Attacks (IND-CCA2).
+  In a (modern) CCA2 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA (i.e., modern IND-CCA2) **)
+module type Adv_INDCCA (O : Oracles_CCA) = {
+  proc distinguish(pk : pk_t, k : key_t, c : ctxt_t) : bool
+}.
+
+(** IND-CCA (i.e., modern IND-CCA2) security game (sampled bit) **)
+module IND_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_INDCCA) = {
+  proc main() : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b, b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O(S).init(sk, c);
+    
+    b <$ {0,1};
+    
+    b' <@ A(O(S)).distinguish(pk, if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+(** IND-CCA (i.e., modern IND-CCA2) security game (provided bit) **)
+module IND_CCA_P (S : Scheme) (O : Oracles_CCA2i) (A : Adv_INDCCA) = {
+  proc main(b : bool) : bool = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var b' : bool;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O(S).init(sk, c);
+    
+    b' <@ A(O(S)).distinguish(pk, if b then k' else k, c);
+    
+    return b' = b; 
+  }
+}.
+
+end IND.
+
+
+(** 
+  (ciphertext) Non-Malleability (NM).
+  Given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+  
+  (ciphertext) Strong Non-Malleability (SNM)
+  As NM, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+  
+  Note that these notions only have a sensible definition with a provided bit, so 
+  no "sampled bit" variants are defined.
+**)
+abstract theory NM.
+(* Distributions *)
+(** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the key space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dkeym : pk_t -> key_t distr.
+
+
+(*
+  (ciphertext) Non-Malleability under Chosen-Plaintext Attacks (NM-CPA).
+  In a CPA setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CPA **)
+module type Adv_NMCPA = {
+  proc find(pk : pk_t, c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CPA security game **)
+module NM_CPA (S : Scheme) (A : Adv_NMCPA) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    (rel, cl) <@ A.find(pk, c);
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under Chosen-Plaintext Attacks (SNM-CPA).
+  As NM-CPA, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CPA **)
+module type Adv_SNMCPA = {
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** SNM-CPA security game **)
+module SNM_CPA (S : Scheme) (A : Adv_SNMCPA) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    var o : bool;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    o <$ {0,1};
+    (rel, cl) <@ A.find(pk, c, if o then (k', k) else (k, k'));
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under non-adaptive Chosen-Ciphertext Attacks (NM-CCA1).
+  In a CCA1 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA1 **)
+module type Adv_NMCCA1 (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit { O.decaps }
+  proc find(c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list { }
+}.
+
+(** NM-CCA1 security game **)
+module NM_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_NMCCA1) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    
+    (rel, cl) <@ A(O(S)).find(c);
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under non-adaptive Chosen-Ciphertext Attacks (SNM-CCA1).
+  As NM-CCA1, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CCA1 **)
+module type Adv_SNMCCA1 (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit { O.decaps }
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list { }
+}.
+
+(** SNM-CCA1 security game **)
+module SNM_CCA1 (S : Scheme) (O : Oracles_CCA1i) (A : Adv_SNMCCA1) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    var o : bool;
+    
+    (pk, sk) <@ S.keygen();
+    O(S).init(sk);
+    
+    A(O(S)).scout(pk);
+        
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+
+    o <$ {0,1};
+    (rel, cl) <@ A(O(S)).find(c, if o then (k', k) else (k, k'));
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under (traditional) adaptive Chosen-Ciphertext Attacks (NM-CCA2).
+  In a (traditional) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA2 **)
+module type Adv_NMCCA2 (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CCA2 security game **)
+module NM_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_NMCCA2) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+        
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O2(S).init(sk, c);
+    
+    (rel, cl) <@ A(O2(S)).find(c);
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under (traditional) adaptive Chosen-Ciphertext Attacks (SNM-CCA2).
+  As NM-CCA2, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CCA2 **)
+module type Adv_SNMCCA2 (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** SNM-CCA2 security game **)
+module SNM_CCA2 (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Adv_SNMCCA2) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    var o : bool;
+    
+    (pk, sk) <@ S.keygen();
+    O1(S).init(sk);
+    
+    A(O1(S)).scout(pk);
+
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O2(S).init(sk, c);
+
+    o <$ {0,1};
+    (rel, cl) <@ A(O2(S)).find(c, if o then (k', k) else (k, k'));
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under (modern) adaptive Chosen-Ciphertext Attacks (NM-CCA).
+  In a (modern) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA (i.e., modern NM-CCA2) **)
+module type Adv_NMCCA (O : Oracles_CCA) = {
+  proc find(pk : pk_t, c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CCA (i.e., modern NM-CCA2) security game **)
+module NM_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_NMCCA) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+        
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O(S).init(sk, c);
+    
+    (rel, cl) <@ A(O(S)).find(pk, c);
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under (modern) adaptive Chosen-Ciphertext Attacks (SNM-CCA).
+  As NM-CCA, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is 
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CCA (i.e., modern SNM-CCA2) **)
+module type Adv_SNMCCA (O : Oracles_CCA) = {
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** SNM-CCA (i.e., modern SNM-CCA2) security game **)
+module SNM_CCA (S : Scheme) (O : Oracles_CCA2i) (A : Adv_SNMCCA) = {
+  proc main(b : bool) = {
+    var pk : pk_t;
+    var sk : sk_t;
+    var k, k' : key_t;
+    var c : ctxt_t;
+    var rel : key_t -> key_t option list -> bool;
+    var cl : ctxt_t list;
+    var ko : key_t option;
+    var kol : key_t option list;
+    var o : bool;
+    
+    (pk, sk) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(pk);
+    k' <$ dkeym pk;
+    O(S).init(sk, c);
+
+    o <$ {0,1};
+    (rel, cl) <@ A(O(S)).find(pk, c, if o then (k', k) else (k, k'));
+    
+    kol <- [];
+    while (size kol < size cl) {
+      ko <@ S.decaps(sk, nth witness cl (size kol));
+      kol <- rcons kol ko;
+    }
+    
+    return !(c \in cl) /\ rel (if b then k' else k) kol;
+  }
+}.
+
+end NM.
+
+
+(* 
+  ANOnymity (ANO).
+  The adversary is given two (honestly generated) public keys and an encapsulation 
+  (i.e., ciphertext/key pair), and asked to determine which public key was used to
+  create the encapsulation.
+  
+  Weak ANOnymity (WANO).
+  As ANO, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(*
+  ANOnymity under Chosen-Plaintext Attacks (ANO-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys 
+  and an encapsulation (i.e., key/ciphertext pair), and asked to determine which 
+  public key was used to create the encapsulation.
+*)
+(** Adversary class considered for ANO-CPA **)
+module type Adv_ANOCPA = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool
+}.
+
+(** ANO-CPA security game (sampled bit) **)
+module ANO_CPA (S : Scheme) (A : Adv_ANOCPA) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var kc : key_t * ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    b <$ {0,1};
+    
+    kc <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A.distinguish(pk0, pk1, kc);
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CPA security game (provided bit) **)
+module ANO_CPA_P (S : Scheme) (A : Adv_ANOCPA) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var kc : key_t * ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    kc <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A.distinguish(pk0, pk1, kc);
+    
+    return b';
+  }
+}.
+
+(*
+  Weak ANOnymity under Chosen-Plaintext Attacks (WANO-CPA).
+  As ANO-CPA, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considered for WANO-CPA **)
+module type Adv_WANOCPA = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool
+}.
+
+(** WANO-CPA security game (sampled bit) **)
+module WANO_CPA (S : Scheme) (A : Adv_WANOCPA) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A.distinguish(pk0, pk1, c);
+    
+    return b' = b;
+  }
+}.
+
+(** WANO-CPA security game (provided bit) **)
+module WANO_CPA_P (S : Scheme) (A : Adv_WANOCPA) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A.distinguish(pk0, pk1, c);
+    
+    return b' = b;
+  }
+}.
+
+
+(*
+  ANOnymity under non-adaptive Chosen-Ciphertext Attacks (ANO-CCA1).
+  In a CCA1 setting, the adversary is given (in the first stage) two (honestly generated) public keys 
+  and (in the second stage) an encapsulation (i.e., key/ciphertext pair), and is 
+  asked to determine which public key was used to create the encapsulation.
+*)
+(** Adversary class considered for ANO-CCA1 **)
+module type Adv_ANOCCA1 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
+  proc distinguish(kc : key_t * ctxt_t) : bool { }
+}.
+
+(** ANO-CCA1 security game (sampled bit) **)
+module ANO_CCA1 (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var kc : key_t * ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    A(O0(S), O1(S)).scout(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    kc <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(kc);
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CCA1 security game (provided bit) **)
+module ANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_ANOCCA1) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var kc : key_t * ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    A(O0(S), O1(S)).scout(pk0, pk1);
+    
+    kc <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(kc);
+    
+    return b';
+  }
+}.
+
+
+(*
+  Weak ANOnymity under non-adaptive Chosen-Ciphertext Attacks (WANO-CCA1).
+  As ANO-CCA1, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considered for WANO-CCA1 **)
+module type Adv_WANOCCA1 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
+  proc distinguish(c : ctxt_t) : bool { }
+}.
+
+(** WANO-CCA1 security game (sampled bit) **)
+module WANO_CCA1 (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WANOCCA1) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    A(O0(S), O1(S)).scout(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** WANO-CCA1 security game (provided bit) **)
+module WANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WANOCCA1) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    A(O0(S), O1(S)).scout(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+
+(*
+  ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (ANO-CCA2).
+  In a (traditional) CCA2 setting, the adversary is given (in the first stage) two 
+  (honestly generated) public keys and (in the second stage) an encapsulation 
+  (i.e., key/ciphertext pair), and is asked to determine which public key 
+  was used to create the encapsulation.
+*)
+(** Adversary class considered for ANO-CCA2 **)
+module type Adv_ANOCCA2 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit
+  proc distinguish(kc : key_t * ctxt_t) : bool
+}.
+
+(** ANO-CCA2 security game (sampled bit) **)
+module ANO_CCA2 (S : Scheme)
+                (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                (A : Adv_ANOCCA2) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    A(O01(S), O11(S)).scout(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish((k, c));
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CCA2 security game (provided bit) **)
+module ANO_CCA2_P (S : Scheme)
+                  (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                  (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                  (A : Adv_ANOCCA2) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    A(O01(S), O11(S)).scout(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish((k, c));
+    
+    return b';
+  }
+}.
+
+(*
+  Weak ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (WANO-CCA2).
+  As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considered for WANO-CCA2 **)
+module type Adv_WANOCCA2 (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit
+  proc distinguish(c : ctxt_t) : bool
+}.
+
+(** WANO-CCA2 security game (sampled bit) **)
+module WANO_CCA2 (S : Scheme)
+                 (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                 (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                 (A : Adv_WANOCCA2) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    A(O01(S), O11(S)).scout(pk0, pk1);
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish(c);
+    
+    return b' = b;
+  }
+}.
+
+(** WANO-CCA2 security game (provided bit) **)
+module WANO_CCA2_P (S : Scheme)
+                   (O01 : Oracles_CCA1i) (O11 : Oracles_CCA1i)
+                   (O02 : Oracles_CCA2i) (O12 : Oracles_CCA2i)
+                   (A : Adv_WANOCCA2) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O01(S).init(sk0);
+    O11(S).init(sk1);
+    
+    A(O01(S), O11(S)).scout(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O02(S).init(sk0, c);
+    O12(S).init(sk1, c);
+    
+    b' <@ A(O02(S), O12(S)).distinguish(c);
+    
+    return b';
+  }
+}.
+
+
+(*
+  ANOnymity under (modern) adaptive Chosen-Ciphertext Attacks (ANO-CCA).
+  In a (modern) CCA setting, the adversary is given (in the first stage) two 
+  (honestly generated) public keys and (in the second stage) an encapsulation 
+  (i.e., key/ciphertext pair), and is 
+  asked to determine which public key was used to create the encapsulation.
+*)
+(** Adversary class considered for ANO-CCA (i.e., modern ANO-CCA2) **)
+module type Adv_ANOCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool
+}.
+
+(** ANO-CCA (i.e., modern ANO-CCA2) security game (sampled bit) **)
+module ANO_CCA (S : Scheme)
+               (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
+               (A : Adv_ANOCCA) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O0(S).init(sk0, c);
+    O1(S).init(sk1, c);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, (k, c));
+    
+    return b' = b;
+  }
+}.
+
+(** ANO-CCA (i.e., modern ANO-CCA2) security game (provided bit) **)
+module ANO_CCA_P (S : Scheme)
+                 (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
+                 (A : Adv_ANOCCA) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O0(S).init(sk0, c);
+    O1(S).init(sk1, c);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, (k, c));
+    
+    return b' = b;
+  }
+}.
+
+(*
+  Weak ANOnymity under (modern) adaptive Chosen-Plaintext Attacks (WANO-CCA).
+  As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considered for ANO-CCA (i.e., modern ANO-CCA2) **)
+module type Adv_WANOCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool
+}.
+
+(** WANO-CCA (i.e., modern WANO-CCA2) security game (sampled bit) **)
+module WANO_CCA (S : Scheme)
+                (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
+                (A : Adv_WANOCCA) = {
+  proc main() = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b, b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    b <$ {0,1};
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O0(S).init(sk0, c);
+    O1(S).init(sk1, c);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, c);
+    
+    return b' = b;
+  }
+}.
+
+(** WANO-CCA (i.e., modern WANO-CCA2) security game (provided bit) **)
+module WANO_CCA_P (S : Scheme)
+                  (O0 : Oracles_CCA2i) (O1 : Oracles_CCA2i)
+                  (A : Adv_WANOCCA) = {
+  proc main(b : bool) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b' : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    O0(S).init(sk0, c);
+    O1(S).init(sk1, c);
+    
+    b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, c);
+    
+    return b' = b;
+  }
+}.
+
+
+(*
+  Strong ROBustness (SROB).
+  The adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+  
+  Weak ROBustness (WROB).
+  The adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+  
+  Note, as there is no stage in which the adversary is given a distinct challenge artifact, it does
+  not make sense to have different CCA1/CCA2 settings for these properties. Instead,
+  we only consider a CPA setting (no decapsulation oracle) and a CCA setting (a decapsulation
+  oracle like in CCA1, i.e., no considered challenge).
+*)
+(*
+  Strong ROBustness under Chosen-Plaintext Attacks (SROB-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CPA **)
+module type Adv_SROBCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SROB-CPA security game **)
+module SROB_CPA (S : Scheme) (A : Adv_SROBCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k0, k1 : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c);
+    k1 <@ S.decaps(sk1, c);
+    
+    return k0 <> None /\ k1 <> None;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Plaintext Attacks (WROB-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+*)
+(** Adversary class considered for WROB-CPA **)
+module type Adv_WROBCPA = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WROB-CPA security game **)
+module WROB_CPA (S : Scheme) (A : Adv_WROBCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k : key_t;
+    var k' : key_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+
+    b <@ A.choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    
+    return k' <> None;
+  }
+}.
+
+
+(*
+  Strong ROBustness under Chosen-Ciphertext Attacks (SROB-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CCA **)
+module type Adv_SROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SROB-CCA security game **)
+module SROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SROBCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k0, k1 : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    c <@ A(O0(S), O1(S)).find(pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c);
+    k1 <@ S.decaps(sk1, c);
+    
+    return k0 <> None /\ k1 <> None;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Ciphertext Attacks (WROB-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+*)
+(** Adversary class considered for WROB-CCA **)
+module type Adv_WROBCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WROB-CCA security game **)
+module WROB_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WROBCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k : key_t;
+    var k' : key_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    b <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    
+    return k' <> None;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness (SCFR).
+  As SROB, but additionally requires the resulting symmetric keys to be
+  equal to eachother (instead of only requiring these keys to be valid).
+  
+  Weak Collision-FReeness (WCFR).
+  As WROB, but additionally requires the resulting symmetric keys to be
+  equal to eachother (instead of only requiring the final decapsulated key to be valid).
+*)
+(*
+  Strong Collision-FReeness under Chosen-Plaintext Attacks (SCFR-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to the same valid symmetric key under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CPA **)
+module type Adv_SCFRCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SCFR-CPA security game **)
+module SCFR_CPA (S : Scheme) (A : Adv_SCFRCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k0, k1 : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    
+    c <@ A.find(pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c);
+    k1 <@ S.decaps(sk1, c);
+    
+    return k0 <> None /\ k1 <> None /\ k0 = k1;
+  }
+}.
+
+(*
+  Weak Collision-FReeness under Chosen-Plaintext Attacks (WCFR-CPA).
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) returns
+  a valid symmetric key that is equal to the encapsulated one.
+*)
+(** Adversary class considered for WCFR-CPA **)
+module type Adv_WCFRCPA = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WCFR-CPA security game **)
+module WCFR_CPA (S : Scheme) (A : Adv_WCFRCPA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k : key_t;
+    var k' : key_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+
+    b <@ A.choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    
+    return k' = Some k;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness under Chosen-Ciphertext Attacks (SCFR-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to the same valid symmetric key under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CCA **)
+module type Adv_SCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SCFR-CCA security game **)
+module SCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_SCFRCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k0, k1 : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    c <@ A(O0(S), O1(S)).find(pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c);
+    k1 <@ S.decaps(sk1, c);
+    
+    return k0 <> None /\ k1 <> None /\ k0 = k1;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Ciphertext Attacks (WCFR-CCA).
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) returns
+  a valid symmetric key that is equal to the encapsulated one.
+*)
+(** Adversary class considered for WCFR-CCA **)
+module type Adv_WCFRCCA (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WCFR-CCA security game **)
+module WCFR_CCA (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_WCFRCCA) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var k : key_t;
+    var k' : key_t option;
+    var b : bool;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    b <@ A(O0(S), O1(S)).choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    
+    return k' = Some k;
+  }
+}.
+
+
+(*
+  BINDing (BIND).
+  Intuitively, binding properties capture to which extent certain artifacts (in a 
+  a non-failing KEM execution) determine other artifacts (in that same execution).
+  That is, informally, an artifact (e.g., symmetric key) binds another artifact (e.g., ciphertext)
+  if using/obtaining a certain value for the former implies a certain value for the latter 
+  (because it is hard to find another value for the latter without failing).
+  Depending on the adversarial model, the artifacts used as input to the KEM's procedures
+  are either honestly or maliciously generated.
+*)
+(* Types *)
+(** Binding configurations considered **)
+type bindconf = [
+    K_Binds_PK
+  | K_Binds_CT
+  | CT_Binds_K
+  | CT_Binds_PK
+  | KCT_Binds_PK
+  | PKK_Binds_CT
+  | PKCT_Binds_K
+].
+
+
+(* Operators *)
+(** 
+  Checks whether binding configuration considers
+  the public key as a binding source element 
+**)
+op is_pkbsc (bc : bindconf) =
+  bc = PKK_Binds_CT \/ bc = PKCT_Binds_K.
+
+(** 
+  Checks whether binding configuration considers
+  the public key as a binding source element 
+**)
+op is_pkbtc (bc : bindconf) =
+  bc = K_Binds_PK \/ bc = CT_Binds_PK \/ bc = KCT_Binds_PK.    
+
+(** 
+  Checks whether the provided values consitute a binding break w.r.t. the
+  given binding configuration.
+**)
+(** 
+  Specifically, if the configuration is P_Binds_Q, then the provided values consitute
+  a binding break iff the similarly-typed values (for the artifacts) in P are equal 
+  *and* there exist similarly-typed values (for the artifacts) in Q that are unequal. 
+**)
+(**
+  Note that this does not include the check concerning the validity of the (symmetric)
+  keys (i.e., success of the decapsulations); this is delegated to the security games.
+**)
+op is_bindbreak (bc : bindconf) (k0 k1 : key_t) (pk0 pk1 : pk_t) (c0 c1 : ctxt_t) =
+  with bc = K_Binds_PK => k0 = k1 /\ pk0 <> pk1
+  with bc = K_Binds_CT => k0 = k1 /\ c0 <> c1
+  with bc = CT_Binds_K => c0 = c1 /\ k0 <> k1  
+  with bc = CT_Binds_PK => c0 = c1 /\ pk0 <> pk1
+  with bc = KCT_Binds_PK => k0 = k1 /\ c0 = c1 /\ pk0 <> pk1
+  with bc = PKK_Binds_CT => pk0 = pk1 /\ k0 = k1 /\ c0 <> c1
+  with bc = PKCT_Binds_K => pk0 = pk1 /\ c0 = c1 /\ k0 <> k1.
+
+
+(* 
+  HONestly BINDing (HON-BIND).
+  Binding properties where the adversary is given two honestly generated public keys,
+  as well as a decapsulation oracle with which it can decapsulate
+  w.r.t. the corresponding secret keys.
+*)
+(** Adversary class considered for HON-BIND **)
+module type Adv_HONBIND (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool { }
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t
+}.
+
+(** HON-BIND security game (specific configuration is passed to the procedure) **)
+module HON_BIND (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_HONBIND) = {
+  proc main(bc : bindconf) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b : bool;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t option;
+    var no_fail: bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A(O0(S), O1(S)).choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    }
+    
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (c0, c1) <@ A(O0(S), O1(S)).find(bc, pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }
+}.
+
+
+(*
+  LEAKingly BINDing (LEAK-BIND).
+  Binding properties where the adversary is given two
+  honestly generated (asymmetric) key pairs.
+*)
+(** Adversary class considered for LEAK-BIND **)
+module type Adv_LEAKBIND = {
+  proc choose(bc : bindconf) : bool
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t
+}.
+
+(** LEAK-BIND security game (specific configuration is passed to the procedure) **)
+module LEAK_BIND (S : Scheme) (A : Adv_LEAKBIND) = {
+  proc main(bc : bindconf) = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b : bool;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t option;
+    var no_fail : bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A.choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    }
+    
+    (c0, c1) <@ A.find(bc, pk0, sk0, pk1, sk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }
+}.
+
+
+(**
+  MALiciously BINDing (MAL-BIND).
+  Binding properties where the adversary provides the 
+  considered (asymmetric) key material itself.
+**)
+abstract theory MALBIND.
+(* Operators *)
+(** Derives (honestly) the public key corresponding to a secret key **)
+(** 
+  Using this, we can let the adversary (in the MAL-BIND properties) only provide
+  the to-be-considered (asymmetric) secret keys, and then honestly compute
+  the corresponding public key ourselves. This allows
+  us to meaningfully include binding properties involving the public key.
+**)
+(** 
+  Note: for the properties to make sense, this operator 
+  should be instantiated to something that actually derives
+  public keys from (honestly generated) secret keys for the considered KEM. 
+**)
+op sk2pk : sk_t -> pk_t.
+
+
+(* 
+  MALiciously BINDing w.r.t. Decapsulation/Decapsulation (MAL-BIND-DD).
+  In a MAL-BIND setting, the adversary is asked to provide two ciphertext
+  (to be decapsulated) as to induce a binding break (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-DD **)
+module type Adv_MALBIND_DD = {
+  proc find(bc : bindconf) : sk_t * sk_t * ctxt_t * ctxt_t
+}.
+
+(** MAL-BIND-DD security game (specific configuration is passed to the procedure) **)
+module MAL_BIND_DD (S : Scheme) (A : Adv_MALBIND_DD) = {
+  proc main(bc : bindconf) : bool = {
+    var sk0, sk1 : sk_t;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t option;
+    var pk0, pk1 : pk_t;
+    var no_fail : bool;
+    
+    (sk0, sk1, c0, c1) <@ A.find(bc);
+    
+    pk0 <- sk2pk sk0;
+    pk1 <- sk2pk sk1;
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }
+}.
+
+
+(*
+  In the remaining MAL-BIND properties, the adversary is asked to provide 
+  the randomness used in encapsulation(s). That is, these properties need 
+  to consider "derandomized" encapsulation procedures, taking the randomness 
+  as additional input (instead of generating it on the fly).
+  To this end, we specify a module type for KEMs that is identical to the 
+  original one with an appropriately adjusted encapsulation procedure.
+  Be aware that the following properties only make sense for KEMs of which
+  the encapsulation procedure actually employs the provided randomness.
+  (This is not actually enforced by the module type.)
+*)
+(* Types *)
+(** Randomness (for encapsulation procedure) **)
+type rand_t.
+
+
+(* Module types *)
+(** "Derandomized" KEM (interface) **)
+module type SchemeDerand = {
+  include Scheme [-encaps]
+  proc encaps(pk : pk_t, r : rand_t) : key_t * ctxt_t
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. Encapsulation/Decapsulation (MAL-BIND-ED)
+  In a MAL-BIND setting, the adversary is asked to provide 
+  randomness and a ciphertext (to be used in encapsulation and 
+  decapsulation, respectively) as to induce a binding break 
+  (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-ED **)
+module type Adv_MALBIND_ED = {
+  proc find(bc : bindconf) : sk_t * sk_t * rand_t * ctxt_t
+}.
+
+(** MAL-BIND-ED security game (specific configuration is passed to the procedure) **)
+module MAL_BIND_ED (S : SchemeDerand, A : Adv_MALBIND_ED) = {
+  proc main(bc : bindconf) : bool = {
+    var sk0, sk1 : sk_t;
+    var r : rand_t;
+    var c0, c1 : ctxt_t;
+    var k0 : key_t;
+    var k1 : key_t option;
+    var pk0, pk1 : pk_t;
+    var no_fail : bool;
+    
+    (sk0, sk1, r, c1) <@ A.find(bc);
+    
+    pk0 <- sk2pk sk0;
+    pk1 <- sk2pk sk1;
+    
+    (k0, c0) <@ S.encaps(pk0, r);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc k0 (oget k1) pk0 pk1 c0 c1;
+  }
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. Encapsulation/Encapsulation (MAL-BIND-EE)
+  In a MAL-BIND setting, the adversary is asked to provide
+  randomness (to be used in encapsulations) as to induce a binding break 
+  (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-EE **)
+module type Adv_MALBIND_EE = {
+  proc find(bc : bindconf) : sk_t * sk_t * rand_t * rand_t
+}.
+
+(** MAL-BIND-EE security game (specific configuration is passed to the procedure) **)
+module MAL_BIND_EE (S : SchemeDerand, A : Adv_MALBIND_EE) = {
+  proc main(bc : bindconf) : bool = {
+    var sk0, sk1 : sk_t;
+    var r0, r1 : rand_t;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t;
+    var pk0, pk1 : pk_t;
+    
+    (sk0, sk1, r0, r1) <@ A.find(bc);
+    
+    pk0 <- sk2pk sk0;
+    pk1 <- sk2pk sk1;
+    
+    (k0, c0) <@ S.encaps(pk0, r0);
+    (k1, c1) <@ S.encaps(pk1, r1);
+
+    return is_bindbreak bc k0 k1 pk0 pk1 c0 c1;
+  }
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. any of DD, ED, or EE (MAL-BIND).
+  The adversary is asked to choose any of the MAL-BIND scenarios (DD, DE, or EE) 
+  and provide values that induce a binding break
+  (w.r.t. the considered configuration) for that scenario.
+*)
+(* Types *)
+(** Malicious binding scenarios **)
+type malbind_scenario = [
+    DECAPS_DECAPS
+  | ENCAPS_DECAPS
+  | ENCAPS_ENCAPS
+].
+
+(* Can potentially reuse things specific to MALBIND scenarios in general MALBIND game by tweaking interfaces, but may hurt readability quite a bit *)
+(** Adversary class considered for MAL-BIND **)
+module type Adv_MALBIND = {
+  proc choose(bc : bindconf) : malbind_scenario
+  proc find_dd() : sk_t * sk_t * ctxt_t * ctxt_t
+  proc find_ed() : sk_t * sk_t * rand_t * ctxt_t
+  proc find_ee() : sk_t * sk_t * rand_t * rand_t
+}.
+
+(** MAL-BIND security game (specific configuration is passed to the procedure) **)
+module MAL_BIND (S : SchemeDerand, A : Adv_MALBIND) = {
+  proc main(bc : bindconf) : bool = {
+    var mbs : malbind_scenario;
+    var sk0, sk1 : sk_t;
+    var r0, r1 : rand_t;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t;
+    var k0o, k1o : key_t option;
+    var pk0, pk1 : pk_t;
+    var no_fail, is_bb : bool;
+        
+    mbs <@ A.choose(bc);
+    
+    if (mbs = DECAPS_DECAPS) {
+      (sk0, sk1, c0, c1) <@ A.find_dd();
+    
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      k0o <@ S.decaps(sk0, c0);
+      k1o <@ S.decaps(sk1, c1);
+
+      no_fail <- k0o <> None /\ k1o <> None;
+      is_bb <- is_bindbreak bc (oget k0o) (oget k1o) pk0 pk1 c0 c1;
+    } elif (mbs = ENCAPS_DECAPS) {
+      (sk0, sk1, r0, c1) <@ A.find_ed();
+
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      (k0, c0) <@ S.encaps(pk0, r0);
+      k1o <@ S.decaps(sk1, c1);
+      
+      no_fail <- k1o <> None;
+      is_bb <- is_bindbreak bc k0 (oget k1o) pk0 pk1 c0 c1;
+    } else { (* mbs = ENCAPS_ENCAPS *)
+      (sk0, sk1, r0, r1) <@ A.find_ee();
+    
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      (k0, c0) <@ S.encaps(pk0, r0);
+      (k1, c1) <@ S.encaps(pk1, r1);
+      
+      no_fail <- true;
+      is_bb <- is_bindbreak bc k0 k1 pk0 pk1 c0 c1;
+    }
+
+    return no_fail /\ is_bb;
+  }
+}.
+
+end MALBIND.
+
+
+
+
+
+(** 
+  Generic relations between properties of KEMs.
+**)
+theory Relations.
+(* Clones and imports of theories for relevant security notions *)
+clone import IND.
+clone import NM.
+clone import MALBIND.
+
+(* 
+  Hierarchy concerning (traditional) CCA2, (traditional) CCA1, and CPA.
+  (CCA2 --> CCA1 --> CPA), as well as (modern) CCA and CPA (CCA --> CPA).
+*)
+(* Security goal: One-wayness *)
+(** 
+  Equivalence between OW_CCA1 and OW_CCA2 for an OW_CCA1 adversary 
+  (shows OW_CCA2 --> OW_CCA1). No reduction needed, because OW_CCA1 adversary satisfies
+  interface expected from OW_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)  
+lemma Eqv_OWCCA1_OWCCA2 (S <: Scheme) (O1 <: Oracles_CCA1i{-S}) (O2 <: Oracles_CCA2i)
+                        (A <: Adv_OWCCA1{-S, -O1, -O2}) :
+  islossless O2(S).init =>
+  equiv[OW_CCA1(S, O1, A).main ~ OW_CCA2(S, O1, O2, A).main : 
+          ={glob S, glob O1, glob A} ==> ={res}].
+proof. 
+move=> O2_init_ll. 
+proc; inline *. 
+call (: true); call{2} O2_init_ll; call (: true).
+call (: ={glob O1, glob S}); 1: by sim.
+call (: ={glob S}); 1..3: by sim.
+by call (: true).
+qed.
+
+
+(** Reduction adversary reducing OW-CCA1 to OW-CPA **)
+module (R_OWCCA1_OWCPA (A : Adv_OWCPA) : Adv_OWCCA1) (O : Oracles_CCA) = { 
+  var pkc : pk_t
+  
+  proc scout(pk : pk_t) : unit = {
+    pkc <- pk;
+  }
+  
+  proc find(c : ctxt_t) : key_t = {
+    var k : key_t;
+    
+    k <@ A.find(pkc, c);
+    
+    return k;
+  }
+}.
+
+(** 
+  Equivalence between OW_CPA (for arbitrary adversary) and OW_CCA1 
+  (with above reduction adverary). (Shows OW_CCA1 --> OW_CPA).
+**)
+lemma Eqv_OWCPA_OWCCA1 (S <: Scheme{-R_OWCCA1_OWCPA}) (O <: Oracles_CCA1i{-S})
+                       (A <: Adv_OWCPA{-R_OWCCA1_OWCPA, -S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[OW_CPA(S, A).main ~ OW_CCA1(S, O, R_OWCCA1_OWCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O_init_sl.
+proc; inline *.
+seq 1 1 : (#pre /\ ={pk, sk}); 1: by sim.
+wp; call (: true); wp; call (: true); wp.
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing OW-CCA to OW-CPA **)
+module (R_OWCCA_OWCPA (A : Adv_OWCPA) : Adv_OWCCA) (O : Oracles_CCA) = { 
+  proc find(pk : pk_t, c : ctxt_t) : key_t = {
+    var k : key_t;
+    
+    k <@ A.find(pk, c);
+    
+    return k;
+  }
+}.
+
+(** 
+  Equivalence between OW_CPA (for arbitrary adversary) and OW_CCA
+  (with above reduction adverary). (Shows OW_CCA --> OW_CPA).
+**)
+lemma Eqv_OWCPA_OWCCA (S <: Scheme) (O <: Oracles_CCA2i)
+                      (A <: Adv_OWCPA{-S, -O}) :
+  islossless O(S).init =>
+  equiv[OW_CPA(S, A).main ~ OW_CCA(S, O, R_OWCCA_OWCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O_init_ll.
+proc; inline *. 
+wp; call (: true); wp. 
+by call{2} O_init_ll; call (: true); call (: true).
+qed.
+
+
+(* Security goal: Indistinguishability *)
+(** 
+  Equivalence between IND_CCA1 and IND_CCA2 for an IND_CCA1 adversary 
+  (shows IND_CCA2 --> IND_CCA1). No reduction needed, because IND_CCA1 adversary satisfies
+  interface expected from IND_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)  
+lemma Eqv_INDCCA1_INDCCA2 (S <: Scheme) (O1 <: Oracles_CCA1i{-S}) (O2 <: Oracles_CCA2i)
+                          (A <: Adv_INDCCA1{-S, -O1, -O2}) :
+  islossless O2(S).init =>
+  equiv[IND_CCA1(S, O1, A).main ~ IND_CCA2(S, O1, O2, A).main : 
+          ={glob S, glob O1, glob A} ==> ={res}].
+proof.  
+move=> O2_init_ll. 
+proc; inline *. 
+call (: true); rnd; call{2} O2_init_ll. 
+rnd; call (: true); call (: ={glob O1, glob S}); 1: by sim.
+call (: ={glob S}); 1..3: by sim. 
+by call (: true).
+qed. 
+
+
+(** Reduction adversary reducing IND-CCA1 to IND-CPA **)
+module (R_INDCCA1_INDCPA (A : Adv_INDCPA) : Adv_INDCCA1) (O : Oracles_CCA) = {
+  var pkc : pk_t
+  
+  proc scout(pk : pk_t) : unit = {
+    pkc <- pk;
+  }
+    
+  proc distinguish(k : key_t, c : ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pkc, k, c);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between IND_CPA (for arbitrary adversary) and IND_CCA1 
+  (with above reduction adverary). (Shows IND_CCA1 --> IND_CPA).
+**)
+lemma Eqv_INDCPA_INDCCA1 (S <: Scheme{-R_INDCCA1_INDCPA}) (O <: Oracles_CCA1i{-S})
+                         (A <: Adv_INDCPA{-R_INDCCA1_INDCPA, -S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[IND_CPA(S, A).main ~ IND_CCA1(S, O, R_INDCCA1_INDCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O_init_sl.
+proc; inline *.
+seq 1 1 : (#pre /\ ={pk, sk}); 1: by call (: true).
+wp; call (: true); wp.
+rnd; rnd.
+call (: true); wp. 
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS).
+qed.
+
+
+(** Reduction adversary reducing IND-CCA to IND-CPA **)
+module (R_INDCCA_INDCPA (A : Adv_INDCPA) : Adv_INDCCA) (O : Oracles_CCA) = { 
+  proc distinguish(pk : pk_t, k : key_t, c : ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pk, k, c);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between IND_CPA (for arbitrary adversary) and IND_CCA
+  (with above reduction adverary). (Shows IND_CCA --> IND_CPA).
+**)
+lemma Eqv_INDCPA_INDCCA (S <: Scheme) (O <: Oracles_CCA2i)
+                        (A <: Adv_INDCPA{-S, -O}) :
+  islossless O(S).init =>
+  equiv[IND_CPA(S, A).main ~ IND_CCA(S, O, R_INDCCA_INDCPA(A)).main :
+    ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O_init_ll.
+proc; inline *.
+wp; call (: true); wp.
+rnd; call{2} O_init_ll; rnd.
+by call (: true); call (: true); skip.
+qed.
+
+
+(* Security goal: Non-malleability *)
+(** 
+  Equivalence between NM_CCA1 and NM_CCA2 for an NM_CCA1 adversary 
+  (shows NM_CCA2 --> NM_CCA1). No reduction needed, because NM_CCA1 adversary satisfies
+  interface expected from NM_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)  
+lemma Eqv_NMCCA1_NMCCA2 (S <: Scheme) (O1 <: Oracles_CCA1i{-S}) (O2 <: Oracles_CCA2i{-S})
+                        (A <: Adv_NMCCA1{-S, -O1, -O2}) :
+  (forall (GS : glob S), phoare[O2(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[NM_CCA1(S, O1, A).main ~ NM_CCA2(S, O1, O2, A).main : 
+          ={glob S, glob O1, glob A, arg} ==> ={res}].
+proof. 
+move=> O2_init_sl.
+proc; inline *.
+seq 5 5 : (={glob S, glob A, b, sk, k, c, k'}); [by sim | sim].  
+by exlim (glob S){2} => GS; call{2} (O2_init_sl GS).
+qed.
+
+
+(** Reduction adversary reducing NM-CCA1 to NM-CPA **)
+module (R_NMCCA1_NMCPA (A : Adv_NMCPA) : Adv_NMCCA1) (O : Oracles_CCA) = {
+  var pkc : pk_t
+  
+  proc scout(pk : pk_t) : unit = {
+    pkc <- pk;
+  }
+    
+  proc find(c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A.find(pkc, c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CPA (for arbitrary adversary) and NM_CCA1 
+  (with above reduction adverary). (Shows NM_CCA1 --> NM_CPA).
+**)
+lemma Eqv_NMCPA_NMCCA1 (S <: Scheme{-R_NMCCA1_NMCPA}) (O <: Oracles_CCA1i{-S})
+                       (A <: Adv_NMCPA{-S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[NM_CPA(S, A).main ~ NM_CCA1(S, O, R_NMCCA1_NMCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof. 
+move=> O_init_sl.
+proc; inline *.
+seq 1 1 : (={glob S, glob A, b, pk, sk}); [by call (: true) | sim]. 
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing NM-CCA to NM-CPA **)
+module (R_NMCCA_NMCPA (A : Adv_NMCPA) : Adv_NMCCA) (O : Oracles_CCA) = { 
+  proc find(pk : pk_t, c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A.find(pk, c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CPA (for arbitrary adversary) and NM_CCA
+  (with above reduction adverary). (Shows NM_CCA --> NM_CPA).
+**)
+lemma Eqv_NMCPA_NMCCA (S <: Scheme) (O <: Oracles_CCA2i{-S})
+                      (A <: Adv_NMCPA{-S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[NM_CPA(S, A).main ~ NM_CCA(S, O, R_NMCCA_NMCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof.
+move=> O_init_sl. 
+proc; inline *.
+seq 3 3 : (={glob S, glob A, b, pk, sk, k, c, k'}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS). 
+qed.
+
+
+(** 
+  Equivalence between SNM_CCA1 and SNM_CCA2 for an SNM_CCA1 adversary 
+  (shows SNM_CCA2 --> SNM_CCA1). No reduction needed, because SNM_CCA1 adversary satisfies
+  interface expected from SNM_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)  
+lemma Eqv_SNMCCA1_SNMCCA2 (S <: Scheme) (O1 <: Oracles_CCA1i{-S}) (O2 <: Oracles_CCA2i{-S})
+                          (A <: Adv_SNMCCA1{-S, -O1, -O2}) :
+  (forall (GS : glob S), phoare[O2(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[SNM_CCA1(S, O1, A).main ~ SNM_CCA2(S, O1, O2, A).main : 
+          ={glob S, glob O1, glob A, arg} ==> ={res}].
+proof. 
+move=> O2_init_sl.
+proc; inline *.
+seq 5 5 : (={glob S, glob A, b, sk, k, c, k'}); [by sim | sim]. 
+by exlim (glob S){2} => GS; call{2} (O2_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing SNM-CCA1 to SNM-CPA **)
+module (R_SNMCCA1_SNMCPA (A : Adv_SNMCPA) : Adv_SNMCCA1) (O : Oracles_CCA) = {
+  var pkc : pk_t
+  
+  proc scout(pk : pk_t) : unit = {
+    pkc <- pk;
+  }
+    
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A.find(pkc, c, kk);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between SNM_CPA (for arbitrary adversary) and SNM_CCA1 
+  (with above reduction adverary). (Shows SNM_CCA1 --> SNM_CPA).
+**)
+lemma Eqv_SNMCPA_SNMCCA1 (S <: Scheme{-R_SNMCCA1_SNMCPA}) (O <: Oracles_CCA1i{-S})
+                         (A <: Adv_SNMCPA{-R_SNMCCA1_SNMCPA, -S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[SNM_CPA(S, A).main ~ SNM_CCA1(S, O, R_SNMCCA1_SNMCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof.
+move=> O_init_sl. 
+proc; inline *. 
+seq 5 10 : (={glob S, b, sk, k, c, k'} /\ rel{1} = rel0{2} /\ cl{1} = cl0{2}); 2: by sim. 
+call (: true); wp; rnd; rnd; wp. 
+call (: true); wp. 
+seq 1 1 : (#pre /\ ={pk, sk}); 1: by call (: true).
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing SNM-CCA to SNM-CPA **)
+module (R_SNMCCA_SNMCPA (A : Adv_SNMCPA) : Adv_SNMCCA) (O : Oracles_CCA) = { 
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A.find(pk, c, kk);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between SNM_CPA (for arbitrary adversary) and SNM_CCA
+  (with above reduction adverary). (Shows SNM_CCA --> SNM_CPA.)
+**)
+lemma Eqv_SNMCPA_SNMCCA (S <: Scheme) (O <: Oracles_CCA2i{-S})
+                        (A <: Adv_SNMCPA{-S, -O}) :
+  (forall (GS : glob S), phoare[O(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[SNM_CPA(S, A).main ~ SNM_CCA(S, O, R_SNMCCA_SNMCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof.
+move=> O_init_sl.
+proc; inline *.
+swap{2} 5 -1.
+seq 4 4: (#pre /\ ={pk, sk, k, k', c, o}); [by sim | sim].
+call (: true); wp.
+by exlim (glob S){2} => GS; call{2} (O_init_sl GS).
+qed. 
+
+
+(* Security goal: Anonymity (Key-indistinguishability) *)
+(** 
+  Equivalence between ANO_CCA1 and ANO_CCA2 for an ANO_CCA1 adversary 
+  (shows ANO_CCA2 --> ANO_CCA1). No reduction needed, because ANO_CCA1 adversary satisfies
+  interface expected from ANO_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)  
+lemma Eqv_ANOCCA1_ANOCCA2 (S <: Scheme) 
+                          (O01 <: Oracles_CCA1i{-S}) (O11 <: Oracles_CCA1i{-S, -O01})
+                          (O02 <: Oracles_CCA2i) (O21 <: Oracles_CCA2i)
+                          (A <: Adv_ANOCCA1{-S, -O01, -O11, -O02, -O21}) :
+  islossless O02(S).init => islossless O21(S).init =>
+  equiv[ANO_CCA1(S, O01, O11, A).main ~ ANO_CCA2(S, O01, O11, O02, O21, A).main : 
+          ={glob S, glob O01, glob O11, glob A} ==> ={res}].
+proof.
+move=> O02_init_ll O21_init_ll.
+proc; inline *.
+call (: true); call{2} O21_init_ll; call{2} O02_init_ll.
+call (: true); rnd; call (: ={glob O01, glob O11, glob S}); 1,2: by sim.
+do 2! (call (: ={glob S}); 1..3: by sim).
+by do 2! call (: true); skip => /> b _ -[]. 
+qed.
+
+
+(** Reduction adversary reducing ANO-CCA1 to ANO-CPA **)
+module (R_ANOCCA1_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  var pkc0, pkc1 : pk_t
+  
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
+    pkc0 <- pk0;
+    pkc1 <- pk1;
+  }
+    
+  proc distinguish(kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pkc0, pkc1, kc);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between ANO_CPA (for arbitrary adversary) and ANO_CCA1 
+  (with above reduction adverary). (Shows ANO_CCA1 --> ANO_CPA).
+**)
+lemma Eqv_ANOCPA_ANOCCA1 (S <: Scheme{-R_ANOCCA1_ANOCPA}) 
+                         (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                         (A <: Adv_ANOCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[ANO_CPA(S, A).main ~ ANO_CCA1(S, O0, O1, R_ANOCCA1_ANOCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof. 
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, pk1}); [ by sim | sim ]. 
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing ANO-CCA to ANO-CPA **)
+module (R_ANOCCA_ANOCPA (A : Adv_ANOCPA) : Adv_ANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pk0, pk1, kc);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between ANO_CPA (for arbitrary adversary) and ANO_CCA
+  (with above reduction adverary). (Shows ANO_CCA --> ANO_CPA).
+**)
+lemma Eqv_ANOCPA_ANOCCA (S <: Scheme) 
+                        (O0 <: Oracles_CCA2i) (O1 <: Oracles_CCA2i)
+                        (A <: Adv_ANOCPA{-S, -O0, -O1}) :
+  islossless O0(S).init => islossless O1(S).init =>
+  equiv[ANO_CPA(S, A).main ~ ANO_CCA(S, O0, O1, R_ANOCCA_ANOCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O0_init_ll O1_init_ll.
+proc; inline *. 
+wp; call (: true); wp. 
+call{2} O1_init_ll; call{2} O0_init_ll; call (: true).
+by rnd; call (: true); call (: true); skip => /> b _ -[]. 
+qed. 
+
+
+(** 
+  Equivalence between WANO_CCA1 and WANO_CCA2 for an WANO_CCA1 adversary 
+  (shows WANO_CCA2 --> WANO_CCA1). No reduction needed, because WANO_CCA1 adversary satisfies
+  interface expected from WANO_CCA2 adversaries, but simply does not gain access to
+  oracle in second stage.
+**)
+lemma Eqv_WANOCCA1_WANOCCA2 (S <: Scheme) 
+                            (O01 <: Oracles_CCA1i{-S}) (O11 <: Oracles_CCA1i{-S, -O01})
+                            (O02 <: Oracles_CCA2i) (O21 <: Oracles_CCA2i)
+                            (A <: Adv_WANOCCA1{-S, -O01, -O11, -O02, -O21}) :
+  islossless O02(S).init => islossless O21(S).init =>
+  equiv[WANO_CCA1(S, O01, O11, A).main ~ WANO_CCA2(S, O01, O11, O02, O21, A).main : 
+          ={glob S, glob O01, glob O11, glob A} ==> ={res}].
+proof. 
+move=> O02_init_ll O21_init_ll.
+proc; inline *.
+call (: true); call{2} O21_init_ll; call{2} O02_init_ll.
+call (: true); rnd. 
+call (: ={glob O01, glob O11, glob S}); 1,2: by sim.
+do 2! (call (: ={glob S}); 1..3: by sim).
+by do 2! call (: true); skip => /> b _ -[]. 
+qed.
+
+
+(** Reduction adversary reducing WANO-CCA1 to WANO-CPA **)
+module (R_WANOCCA1_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  var pkc0, pkc1 : pk_t
+  
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
+    pkc0 <- pk0;
+    pkc1 <- pk1;
+  }
+    
+  proc distinguish(c : ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pkc0, pkc1, c);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CPA (for arbitrary adversary) and WANO_CCA1 
+  (with above reduction adverary). (Shows WANO_CCA1 --> WANO_CPA).
+**)
+lemma Eqv_WANOCPA_WANOCCA1 (S <: Scheme{-R_WANOCCA1_WANOCPA}) 
+                           (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                           (A <: Adv_WANOCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[WANO_CPA(S, A).main ~ WANO_CCA1(S, O0, O1, R_WANOCCA1_WANOCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, pk1}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed.
+
+
+(** Reduction adversary reducing WANO-CCA to WANO-CPA **)
+module (R_WANOCCA_WANOCPA (A : Adv_WANOCPA) : Adv_WANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pk0, pk1, c);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CPA (for arbitrary adversary) and WANO_CCA
+  (with above reduction adverary). (Shows WANO_CCA --> WANO_CPA).
+**)
+lemma Eqv_WANOCPA_WANOCCA (S <: Scheme) 
+                          (O0 <: Oracles_CCA2i) (O1 <: Oracles_CCA2i)
+                          (A <: Adv_WANOCPA{-S, -O0, -O1}) :
+  islossless O0(S).init => islossless O1(S).init =>
+  equiv[WANO_CPA(S, A).main ~ WANO_CCA(S, O0, O1, R_WANOCCA_WANOCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O0_init_ll O1_init_ll.
+proc; inline *. 
+wp; call (: true); wp. 
+call{2} O1_init_ll; call{2} O0_init_ll; call (: true).
+by rnd; call (: true); call (: true); skip => /> b _ -[]. 
+qed.
+
+
+(* Security goal: Robustness *)
+(** Reduction adversary reducing SROB-CCA to SROB-CPA **)
+module (R_SROBCCA_SROBCPA (A : Adv_SROBCPA) : Adv_SROBCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
+    var c : ctxt_t;
+    
+    c <@ A.find(pk0, pk1);
+    
+    return c;
+  }
+}.
+
+(** 
+  Equivalence between SROB_CPA (for arbitrary adversary) and SROB_CCA
+  (with above reduction adverary). (Shows SROB_CCA --> SROB_CPA).
+**)
+lemma Eqv_SROBCPA_SROBCCA (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                          (A <: Adv_SROBCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[SROB_CPA(S, A).main ~ SROB_CCA(S, O0, O1, R_SROBCCA_SROBCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, sk0, pk1, sk1}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed. 
+
+
+(** Reduction adversary reducing WROB-CCA to WROB-CPA **)
+module (R_WROBCCA_WROBCPA (A : Adv_WROBCPA) : Adv_WROBCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool = {
+    var b : bool;
+    
+    b <@ A.choose(pk0, pk1);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WROB_CPA (for arbitrary adversary) and WROB_CCA
+  (with above reduction adverary). (Shows WROB_CCA --> WROB_CPA).
+**)
+lemma Eqv_WROBCPA_WROBCCA (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                          (A <: Adv_WROBCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[WROB_CPA(S, A).main ~ WROB_CCA(S, O0, O1, R_WROBCCA_WROBCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof. 
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, sk0, pk1, sk1}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed.
+
+
+(* Security goal: Collision-freeness *)
+(** Reduction adversary reducing SCFR-CCA to SCFR-CPA **)
+module (R_SCFRCCA_SCFRCPA (A : Adv_SCFRCPA) : Adv_SCFRCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
+    var c : ctxt_t;
+    
+    c <@ A.find(pk0, pk1);
+    
+    return c;
+  }
+}.
+
+(** 
+  Equivalence between SCFR_CPA (for arbitrary adversary) and SCFR_CCA
+  (with above reduction adverary). (Shows SCFR_CCA --> SCFR_CPA.)
+**)
+lemma Eqv_SCFRCPA_SCFRCCA (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                          (A <: Adv_SCFRCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[SCFR_CPA(S, A).main ~ SCFR_CCA(S, O0, O1, R_SCFRCCA_SCFRCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof.
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, sk0, pk1, sk1}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed. 
+
+
+(** Reduction adversary reducing WCFR-CCA to WCFR-CPA **)
+module (R_WCFRCCA_WCFRCPA (A : Adv_WCFRCPA) : Adv_WCFRCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = { 
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool = {
+    var b : bool;
+    
+    b <@ A.choose(pk0, pk1);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WCFR_CPA (for arbitrary adversary) and WCFR_CCA
+  (with above reduction adverary). (Shows WCFR_CCA --> WCFR_CPA.)
+**)
+lemma Eqv_WCFRCPA_WCFRCCA (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S})
+                          (A <: Adv_WCFRCPA{-S, -O0, -O1}) :
+  (forall (GS : glob S), phoare[O0(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  (forall (GS : glob S), phoare[O1(S).init : glob S = GS ==> glob S = GS] = 1%r) =>
+  equiv[WCFR_CPA(S, A).main ~ WCFR_CCA(S, O0, O1, R_WCFRCCA_WCFRCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof.
+move=> O0_init_sl O1_init_sl.
+proc; inline *.
+seq 2 2 : (={glob S, glob A, pk0, sk0, pk1, sk1}); [ by sim | sim ].
+by exlim (glob S){2} => GS; call{2} (O1_init_sl GS); call{2} (O0_init_sl GS). 
+qed.
+
+
+(* 
+  Hierarchy concerning strong and weak (versions of) notions (strong --> weak).
+  Note, sometimes only one of these notions is explicitly named "strong" or "weak",
+  and the other will not have such an explicit adjective in its name. 
+  (The property without an explicit adjective is then typically the original/regular version.)
+*)
+(* Security goal: Non-malleability *)
+(** Reduction adversary reducing SNM-CPA to NM-CPA **)
+module R_SNMCPA_NMCPA (A : Adv_NMCPA) : Adv_SNMCPA = {
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A.find(pk, c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CPA (for arbitrary adversary) and SNM_CPA
+  (with above reduction adverary). (Shows SNM_CPA --> NM_CPA.)
+**)
+lemma Eqv_NMCPA_SNMCPA (S <: Scheme) (A <: Adv_NMCPA{-S}) :
+  equiv[NM_CPA(S, A).main ~ SNM_CPA(S, R_SNMCPA_NMCPA(A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof.
+proc; inline *. 
+seq 3 4 : (={glob S, glob A, b, pk, sk, k, c, k'}); 2: by sim.
+rnd{2}; rnd.
+by call (: true); call (: true).
+qed. 
+
+
+(** Reduction adversary reducing SNM-CCA1 to NM-CCA1 **)
+module (R_SNMCCA1_NMCCA1 (A : Adv_NMCCA1) : Adv_SNMCCA1) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit = {
+    A(O).scout(pk);
+  }
+  
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A(O).find(c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CCA1 (for arbitrary adversary) and SNM_CCA1
+  (with above reduction adverary). (Shows SNM_CCA1 --> NM_CCA1.)
+**)
+lemma Eqv_NMCCA1_SNMCCA1 (S <: Scheme) (O <: Oracles_CCA1i{-S})
+                         (A <: Adv_NMCCA1{-S, -O}) :
+  equiv[NM_CCA1(S, O, A).main ~ SNM_CCA1(S, O, R_SNMCCA1_NMCCA1(A)).main :
+          ={glob S, glob O, glob A, arg} ==> ={res}].
+proof.
+proc; inline *.
+seq 5 7 : (={glob S, glob A, b, sk, k, c, k'}); 2: by sim.
+rnd{2}; rnd.
+call (: true); call (: ={glob O, glob S}); 1: by sim.
+wp; call (: ={glob S}); 1..3: by sim.
+by call (: true). 
+qed. 
+
+
+(** Reduction adversary reducing SNM-CCA2 to NM-CCA2 **)
+module (R_SNMCCA2_NMCCA2 (A : Adv_NMCCA2) : Adv_SNMCCA2) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit = {
+    A(O).scout(pk);
+  }
+  
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A(O).find(c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CCA2 (for arbitrary adversary) and SNM_CCA2
+  (with above reduction adverary). (Shows SNM_CCA2 --> NM_CCA2.)
+**)
+lemma Eqv_NMCCA2_SNMCCA2 (S <: Scheme) (O1 <: Oracles_CCA1i{-S}) (O2 <: Oracles_CCA2i{-S, -O1})
+                         (A <: Adv_NMCCA2{-S, -O1, -O2}) :
+  equiv[NM_CCA2(S, O1, O2, A).main ~ SNM_CCA2(S, O1, O2, R_SNMCCA2_NMCCA2(A)).main :
+          ={glob S, glob O1, glob O2, glob A, arg} ==> ={res}].
+proof.
+proc; inline *.
+seq 7 11 : (={glob S, b, sk, k, c, k'} /\ rel{1} = rel0{2} /\ cl{1} = cl0{2}); 2: by sim.
+call (: ={glob O2, glob S}); 1: by sim.
+wp; rnd{2}. 
+call (: ={glob S}); 1..3: by sim. 
+rnd; call (: true).
+call (: ={glob O1, glob S}); 1: by sim.
+wp; call (: ={glob S}); 1..3: by sim.
+by call (: true).
+qed.
+
+
+(** Reduction adversary reducing SNM-CCA to NM-CCA **)
+module (R_SNMCCA_NMCCA (A : Adv_NMCCA) : Adv_SNMCCA) (O : Oracles_CCA) = {
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list = {
+    var rel : (key_t -> key_t option list -> bool);
+    var cl : ctxt_t list;
+    
+    (rel, cl) <@ A(O).find(pk, c);
+    
+    return (rel, cl);
+  }
+}.
+
+(** 
+  Equivalence between NM_CCA (for arbitrary adversary) and SNM_CCA
+  (with above reduction adverary). (Shows SNM_CCA --> NM_CCA.)
+**)
+lemma Eqv_NMCCA_SNMCCA (S <: Scheme) (O <: Oracles_CCA2i{-S})
+                       (A <: Adv_NMCCA{-S, -O}) :
+  equiv[NM_CCA(S, O, A).main ~ SNM_CCA(S, O, R_SNMCCA_NMCCA(A)).main :
+          ={glob S, glob O, glob A, arg} ==> ={res}].
+proof.
+proc; inline *.
+seq 4 4 : (={glob S, glob O, glob A, b, sk, pk, k, c, k'}); [ by sim | sim ]. 
+by rnd{2}.
+qed.
+
+
+(* Security goal: Anonymity (Key-indistinguishability) *)
+(** Reduction adversary reducing ANO-CPA to WANO-CPA **)
+module R_ANOCPA_WANOCPA (A : Adv_WANOCPA) : Adv_ANOCPA = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A.distinguish(pk0, pk1, kc.`2);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CPA (for arbitrary adversary) and ANO_CPA
+  (with above reduction adverary). (Shows ANO_CPA --> WANO_CPA.)
+**)
+lemma Eqv_WANOCPA_ANOCPA (S <: Scheme) 
+                         (A <: Adv_WANOCPA{-S}) :
+  equiv[WANO_CPA(S, A).main ~ ANO_CPA(S, R_ANOCPA_WANOCPA(A)).main :
+          ={glob S, glob A} ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: true); wp; call (: true); rnd.
+by call (: true); call (: true). 
+qed.
+
+
+(** Reduction adversary reducing ANO-CCA1 to WANO-CCA1 **)
+module (R_ANOCCA1_WANOCCA1 (A : Adv_WANOCCA1) : Adv_ANOCCA1) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
+    A(O0, O1).scout(pk0, pk1);
+  }
+  
+  proc distinguish(kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A(O0, O1).distinguish(kc.`2);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CCA1 (for arbitrary adversary) and ANO_CCA1
+  (with above reduction adverary). (Shows ANO_CCA1 --> WANO_CCA1.)
+**)
+lemma Eqv_WANOCCA1_ANOCCA1 (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S, -O0})
+                           (A <: Adv_WANOCCA1{-S, -O0, -O1}) :
+  equiv[WANO_CCA1(S, O0, O1, A).main ~ ANO_CCA1(S, O0, O1, R_ANOCCA1_WANOCCA1(A)).main :
+    ={glob S, glob O0, glob O1, glob A} ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: true); wp; call (: true); rnd.
+call (: ={glob O0, glob O1, glob S}); 1,2: by sim.
+wp; do 2! (call (: ={glob S}); 1..3: by sim).
+by do 2! call (: true). 
+qed.
+
+
+(** Reduction adversary reducing ANO-CCA2 to WANO-CCA2 **)
+module (R_ANOCCA2_WANOCCA2 (A : Adv_WANOCCA2) : Adv_ANOCCA2) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit = {
+    A(O0, O1).scout(pk0, pk1);
+  }
+  
+  proc distinguish(kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A(O0, O1).distinguish(kc.`2);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CCA2 (for arbitrary adversary) and ANO_CCA2
+  (with above reduction adverary). (Shows ANO_CCA2 --> WANO_CCA2.)
+**)
+lemma Eqv_WANOCCA2_ANOCCA2 (S <: Scheme)
+                           (O01 <: Oracles_CCA1i{-S}) (O11 <: Oracles_CCA1i{-S, -O01})
+                           (O02 <: Oracles_CCA2i{-S, -O01, -O11}) (O12 <: Oracles_CCA2i{-S, -O01, -O11, -O02})
+                           (A <: Adv_WANOCCA2{-S, -O01, -O11, -O02, -O12}) :
+  equiv[WANO_CCA2(S, O01, O11, O02, O12, A).main ~ ANO_CCA2(S, O01, O11, O02, O12, R_ANOCCA2_WANOCCA2(A)).main :
+          ={glob S, glob O01, glob O11, glob O02, glob O12, glob A} ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: ={glob O02, glob O12, glob S}); 1,2: by sim.
+wp; do 2! (call (: ={glob S}); 1..3: by sim).
+call (: true); rnd. 
+call (: ={glob O01, glob O11, glob S}); 1,2: by sim.
+wp; do 2! (call (: ={glob S}); 1..3: by sim).
+by do 2! call (: true). 
+qed.
+
+
+(** Reduction adversary reducing ANO-CCA to WANO-CCA **)
+module (R_ANOCCA_WANOCCA (A : Adv_WANOCCA) : Adv_ANOCCA) (O0 : Oracles_CCA) (O1 : Oracles_CCA)  = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool = {
+    var b : bool;
+    
+    b <@ A(O0, O1).distinguish(pk0, pk1, kc.`2);
+    
+    return b;
+  }
+}.
+
+(** 
+  Equivalence between WANO_CCA (for arbitrary adversary) and ANO_CCA
+  (with above reduction adverary). (Shows ANO_CCA --> WANO_CCA.)
+**)
+lemma Eqv_WANOCCA_ANOCCA (S <: Scheme) (O0 <: Oracles_CCA2i{-S}) (O1 <: Oracles_CCA2i{-S, -O0})
+                         (A <: Adv_WANOCCA{-S, -O0, -O1}) :
+  equiv[WANO_CCA(S, O0, O1, A).main ~ ANO_CCA(S, O0, O1, R_ANOCCA_WANOCCA(A)).main :
+          ={glob S, glob O0, glob O1, glob A} ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: ={glob O0, glob O1, glob S}); 1,2: by sim.
+wp; do 2! (call (: ={glob S}); 1..3: by sim).
+call (: true); rnd.
+by do 2! call (: true). 
+qed.
+
+
+(* Security goal: Robustness and Collision Freeness *)
+(** Reduction adversary reducing SROB-CPA to WROB-CPA **)
+module R_SROBCPA_WROBCPA (S : Scheme) (A : Adv_WROBCPA) : Adv_SROBCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
+    var b : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    b <@ A.choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    return c;
+  }
+}.
+
+(** Reduction adversary reducing SCFR-CPA to WCFR-CPA **)
+module R_SCFRCPA_WCFRCPA (S : Scheme) (A : Adv_WCFRCPA) : Adv_SCFRCPA = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t = {
+    var b : bool;
+    var k : key_t;
+    var c : ctxt_t;
+    
+    b <@ A.choose(pk0, pk1);
+    
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    
+    return c;
+  }
+}.
+
+section.
+(* General *)
+(* Declare arbitrary KEM S *)
+declare module S <: Scheme.
+
+(* Losslessness (i.e., termination) assumption on S's encapsulation *)
+declare axiom S_encaps_ll : islossless S.encaps.
+
+(* Statelessness (+ losslessness) assumptions on S's procedures *)
+declare axiom S_keygen_sl (GS : glob S) :
+  phoare[S.keygen : glob S = GS ==> glob S = GS] = 1%r. 
+declare axiom S_decaps_sl (GS : glob S) :
+  phoare[S.decaps : glob S = GS ==> glob S = GS] = 1%r. 
+  
+(* Declare arbitrary WROB-CPA adversary A *)
+declare module A <: Adv_WROBCPA{-S}.
+
+(* Losslessness (i.e., termination) assumptions on A *)
+declare axiom A_choose_ll : islossless A.choose.
+
+
+(* Losslessness of S's keygen and decaps procedures (without statelessness) *) 
+local lemma S_keygen_ll : islossless S.keygen.
+proof. 
+bypr=> &m _.
+apply StdOrder.RealOrder.ler_anti; split => [|_]; 1: by rewrite Pr[mu_le1].
+rewrite -(: Pr[S.keygen() @ &m : glob S = (glob S){m}] = 1%r). 
++ by byphoare (S_keygen_sl (glob S){m}).
+by byequiv => //=; proc true.
+qed.
+
+local lemma S_decaps_ll : islossless S.decaps.
+proof.
+bypr=> &m _.
+apply StdOrder.RealOrder.ler_anti; split => [|_]; 1: by rewrite Pr[mu_le1].
+rewrite -(: Pr[S.decaps(sk{m}, c{m}) @ &m : glob S = (glob S){m}] = 1%r). 
++ by byphoare (S_decaps_sl (glob S){m}).
+by byequiv => //=; proc true.
+qed.
+
+(* Auxiliary module used to prove equivalence between different orders of decapsulation *)
+local module Decaps_Order = {
+  proc main(sk, sk', c, c') : key_t option * key_t option = {
+    var k, k' : key_t option;
+    
+    k <@ S.decaps(sk, c);
+    k' <@ S.decaps(sk', c');
+    
+    return (k, k');
+  }
+}.
+
+(* Equality (of probability) relating Decaps_Order call and individual decapsulation calls *)
+local lemma EqPr_DecapsOrder &m skt skt' ct ct' kt kt' :
+  Pr[Decaps_Order.main(skt, skt', ct, ct') @ &m : (res.`1, res.`2) = (kt, kt')]
+  =
+  Pr[S.decaps(skt, ct) @ &m : res = kt] * Pr[S.decaps(skt', ct') @ &m : res = kt'].
+proof.
+pose pr_dec_skc := Pr[S.decaps(skt, ct) @ &m : res = kt]. 
+pose pr_dec_skcp := Pr[S.decaps(skt', ct') @ &m : res = kt']. 
+byphoare (: glob S = (glob S){m} /\ arg = (skt, skt', ct, ct') ==> _) => //.
+proc.
+seq 1 : (k = kt) pr_dec_skc pr_dec_skcp _ 0%r (#pre) => //.
++ call (: (glob S) = (glob S){m} ==> (glob S) = (glob S){m}); 2: by skip.
+  bypr=> /> &m' glS. 
+  rewrite Pr[mu_not] (: Pr[S.decaps(sk{m'}, c{m'}) @ &m' : true] = 1%r); 1: by byphoare S_decaps_ll => //.
+  by rewrite RField.subr_eq0 eq_sym; byphoare (S_decaps_sl (glob S){m}) => //. 
++ call (: glob S = (glob S){m} /\ arg = (skt, ct) ==> res = kt); 2: by skip.
+  rewrite /pr_dec_skc; bypr => /> &m' glS ->.
+  by byequiv => //; proc true. 
++ call (: glob S = (glob S){m} /\ arg = (skt', ct') ==> res = kt'); 2: by skip => />.
+  rewrite /pr_dec_skcp; bypr=> &m' [glS ->] /=.
+  by byequiv => //; proc true.
+by hoare; call (: true); skip => />. 
+qed.
+
+(* 
+  The output distribution of decapsulation is the same as long as 
+  the (initial) globals and arguments are the same.
+*)
+local lemma EqPr_Decaps &1 &2 skt ct kt:
+  (glob S){1} = (glob S){2} =>
+  Pr[S.decaps(skt, ct) @ &1 : res = kt]
+  =
+  Pr[S.decaps(skt, ct) @ &2 : res = kt].
+proof.  
+move=> eqgls.
+byequiv (: ={glob S, arg} ==> ={res}) => //.
+by proc true.
+qed.
+
+(* 
+  Equivalence stating relation between input and output order of Decaps_Order.
+  (i.e., if you swap public keys and secret keys in input, output keys will be swapped) 
+*)
+local equiv Eqv_DecapsOrder :
+  Decaps_Order.main ~ Decaps_Order.main : 
+    ={glob S} /\ arg{1} = (arg.`2, arg.`1, arg.`4, arg.`3){2} ==> res{1} = (res.`2, res.`1){2}.
+proof.
+bypr (res.`1, res.`2){1} (res.`2, res.`1){2} => [/#|]. 
+move=> /> &1 &2 [kt kt'] eqglS -> /=. 
+rewrite (EqPr_DecapsOrder &1 _ _ _ _ kt kt') andbC (EqPr_DecapsOrder &2 _ _ _ _ kt' kt). 
+by rewrite 2?(EqPr_Decaps &1 &2) 3:RField.mulrC.
+qed. 
+
+
+(* Robustness *)
+(* 
+  Auxiliary module equivalent to WROB_CPA, but with additional variables, and 
+  certain variables defined global instead of local (so we can refer to them in proofs)
+*)
+local module WROB_CPA_V = {
+  var b : bool
+  var k'' : key_t option
+  
+  proc main() : bool = {
+    var pk0 : pk_t;
+    var pk1 : pk_t;
+    var sk0 : sk_t;
+    var sk1 : sk_t;
+    var k : key_t;
+    var k' : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    b <@ A.choose(pk0, pk1);
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    k'' <@ S.decaps(if b then sk1 else sk0, c);
+    
+    return k' <> None;
+  }
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original WROB_CPA and (auxiliary) WROB_CPA_V.
+*)
+local lemma EqPr_WROBCPA_V &m :
+  Pr[WROB_CPA(S, A).main() @ &m : res]
+  =
+  Pr[WROB_CPA_V.main() @ &m : res].
+proof.
+byequiv => //.
+by proc; call{2} S_decaps_ll; by sim.
+qed.
+
+(** 
+  Relation between WROB_CPA (for arbitrary adversary) and SROB_CPA
+  (with above reduction adverary). However, only holds as long as a honest decapsulation
+  of a (honestly generated) ciphertext does not fail. This is implied by correctness (i.e.,
+  the probability of a honest execution being incorrect is low, a.k.a., the complement of the 
+  Correctness game has low probability). 
+  (Shows SROB_CPA + Correctness --> WROB_CPA.)
+**)
+lemma Bnd_WROBCPA_SROBCPA &m :
+  Pr[WROB_CPA(S, A).main() @ &m : res]
+  <=
+  Pr[SROB_CPA(S, R_SROBCPA_WROBCPA(S, A)).main() @ &m : res]
+  +
+  2%r * Pr[Correctness(S).main() @ &m : !res].
+proof.
+rewrite -RField.ofintR RField.mulrC RField.mul1r2z.
+rewrite EqPr_WROBCPA_V Pr[mu_split WROB_CPA_V.k'' <> None] StdOrder.RealOrder.ler_add /=; last first.
++ rewrite Pr[mu_split WROB_CPA_V.b] StdOrder.RealOrder.ler_add.
+  + byequiv => //.
+    proc.
+    seq 3 1 : (={glob S} /\ pk1{1} = pk{2} /\ sk1{1} = sk{2}).
+    + by call{1} A_choose_ll; call (: true); call{1} (S_keygen_sl (glob S){m}).
+    case (WROB_CPA_V.b{1}); last first.
+    + call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} S_encaps_ll.
+      by call{2} S_decaps_ll; call{2} S_encaps_ll.
+    seq 1 1 : (#pre /\ ={k, c}); 1: by call(: true); skip => />. 
+    by call (: true); exlim (glob S){1} => GS; call{1} (S_decaps_sl GS); skip => />.
+  byequiv => //.
+  proc.
+  seq 1 1 : (={glob S} /\ pk0{1} = pk{2} /\ sk0{1} = sk{2}); 1: by call (: true).
+  seq 2 0 : (#pre).
+  + by call{1} A_choose_ll; exlim (glob S){1} => GS; call{1} (S_keygen_sl GS).    
+  case (WROB_CPA_V.b{1}).
+  + call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} S_encaps_ll.
+    by call{2} S_decaps_ll; call{2} S_encaps_ll.
+  seq 1 1 : (#pre /\ ={k, c}); 1: by call(: true); skip => />. 
+  by call (: true); exlim (glob S){1} => GS; call{1} (S_decaps_sl GS); skip => />.
+byequiv => //.
+proc; inline *.
+seq 4 7 : (={glob S, sk0, sk1, c} /\ WROB_CPA_V.b{1} = b{2}). 
++ by wp; call (: true); call (: true); wp; do 2! call (: true).
+case (b{2}); last first.
++ transitivity{2} {(k0, k1) <@ Decaps_Order.main(sk1, sk0, c, c);} 
+                  (! WROB_CPA_V.b{1} /\ ={glob S, sk0, sk1, c} ==> k'{1} <> None /\ WROB_CPA_V.k''{1} <> None => k0{2} <> None /\ k1{2} <> None)
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k1{1} <> None => k0{2} <> None /\ k1{2} <> None); 1,2: smt().
+  + inline{2} 1.
+    by wp; call (: true); call (: true); wp; skip => />. 
+  transitivity{1} {(k0, k1) <@ Decaps_Order.main(sk0, sk1, c, c);} 
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k1{1} <> None => k0{2} <> None /\ k1{2} <> None)
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k1{1} <> None => k0{2} <> None /\ k1{2} <> None); 1,2: smt().  
+  + by call Eqv_DecapsOrder.
+  inline{1} 1.
+  by wp; call (: true); call (: true); wp; skip.
+by call (: true); call (: true); skip => />.
+qed.
+
+
+(* Collision Freeness *)
+(* 
+  Auxiliary module equivalent to WCFR_CPA, but with additional variables, and 
+  certain variables defined global instead of local (so we can refer to them in proofs)
+*)
+local module WCFR_CPA_V = {
+  var b : bool
+  var k : key_t
+  var k'' : key_t option
+  
+  proc main() : bool = {
+    var pk0 : pk_t;
+    var pk1 : pk_t;
+    var sk0 : sk_t;
+    var sk1 : sk_t;
+    var k' : key_t option;
+    var c : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+    b <@ A.choose(pk0, pk1);
+    (k, c) <@ S.encaps(if b then pk1 else pk0);
+    k' <@ S.decaps(if b then sk0 else sk1, c);
+    k'' <@ S.decaps(if b then sk1 else sk0, c);
+    
+    return k' = Some k;
+  }
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original WCFR_CPA and (auxiliary) WCFR_CPA_V.
+*)
+local lemma EqPr_WCFRCPA_V &m :
+  Pr[WCFR_CPA(S, A).main() @ &m : res]
+  =
+  Pr[WCFR_CPA_V.main() @ &m : res].
+proof.
+byequiv => //.
+by proc; call{2} S_decaps_ll; sim.
+qed.
+
+(** 
+  Relation between WCFR_CPA (for arbitrary adversary) and SCFR_CPA
+  (with above reduction adverary). However, only holds as long as a honest decapsulation
+  of a (honestly generated) ciphertext does not fail. This is implied by correctness (i.e.,
+  the probability of a honest execution being incorrect is low, a.k.a., the complement of the 
+  Correctness game has low probability). 
+  (Shows SCFR_CPA + Correctness --> WCFR_CPA.)
+**)
+lemma Bnd_WCFRCPA_SCFRCPA &m :
+  Pr[WCFR_CPA(S, A).main() @ &m : res]
+  <=
+  Pr[SCFR_CPA(S, R_SCFRCPA_WCFRCPA(S, A)).main() @ &m : res]
+  +
+  2%r * Pr[Correctness(S).main() @ &m : !res].
+proof.
+rewrite -RField.ofintR RField.mulrC RField.mul1r2z.
+rewrite EqPr_WCFRCPA_V Pr[mu_split WCFR_CPA_V.k'' = Some WCFR_CPA_V.k] StdOrder.RealOrder.ler_add /=; last first.
++ rewrite Pr[mu_split WCFR_CPA_V.b] StdOrder.RealOrder.ler_add.
+  + byequiv => //.
+    proc.
+    seq 3 1 : (={glob S} /\ pk1{1} = pk{2} /\ sk1{1} = sk{2}).
+    + by call{1} A_choose_ll; call (: true); call{1} (S_keygen_sl (glob S){m}).
+    case (WCFR_CPA_V.b{1}); last first.
+    + call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} S_encaps_ll.
+      by call{2} S_decaps_ll; call{2} S_encaps_ll.
+    seq 1 1 : (#pre /\ ={c} /\ WCFR_CPA_V.k{1} = k{2}); 1: by call(: true); skip => />. 
+    by call (: true); exlim (glob S){1} => GS; call{1} (S_decaps_sl GS); skip => />.
+  byequiv => //.
+  proc.
+  seq 1 1 : (={glob S} /\ pk0{1} = pk{2} /\ sk0{1} = sk{2}); 1: by call (: true).
+  seq 2 0 : (#pre).
+  + by call{1} A_choose_ll; exlim (glob S){1} => GS; call{1} (S_keygen_sl GS).    
+  case (WCFR_CPA_V.b{1}).
+  + call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} S_encaps_ll.
+    by call{2} S_decaps_ll; call{2} S_encaps_ll.
+  seq 1 1 : (#pre /\ ={c} /\ WCFR_CPA_V.k{1} = k{2}); 1: by call(: true); skip => />. 
+  by call (: true); exlim (glob S){1} => GS; call{1} (S_decaps_sl GS); skip => />.
+byequiv => //.
+proc; inline *.
+seq 4 7 : (={glob S, sk0, sk1, c} /\ WCFR_CPA_V.b{1} = b{2}). 
++ by wp; call (: true); call (: true); wp; do 2! call (: true).
+case (b{2}); last first.
++ transitivity{2} {(k0, k1) <@ Decaps_Order.main(sk1, sk0, c, c);} 
+                  (! WCFR_CPA_V.b{1} /\ ={glob S, sk0, sk1, c} ==> k'{1} <> None /\ k'{1} = WCFR_CPA_V.k''{1} => k0{2} <> None /\ k1{2} <> None /\ k0{2} = k1{2})
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k0{1} = k1{1} => k0{2} <> None /\ k0{2} = k1{2}); 1,2: smt().
+  + inline{2} 1.
+    by wp; call (: true); call (: true); wp; skip => />. 
+  transitivity{1} {(k0, k1) <@ Decaps_Order.main(sk0, sk1, c, c);} 
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k0{1} = k1{1} => k0{2} <> None /\ k0{2} = k1{2})
+                  (={glob S, sk0, sk1, c} ==> k0{1} <> None /\ k0{1} = k1{1} => k0{2} <> None /\ k0{2} = k1{2}); 1,2: smt().  
+  + by call Eqv_DecapsOrder; skip => /> /#. 
+  inline{1} 1.
+  by wp; call (: true); call (: true); wp; skip.
+by call (: true); call (: true); skip => />.
+qed.
+
+end section.
+
+
+(* 
+  Relations/Hierarchy concerning binding properties 
+  (e.g., MAL --> LEAK --> HON). 
+*)
+(** 
+  Auxiliary module capturing the probability of generating the same public-key
+  twice in a row. Required for proving implication between CT_Binds_PK and CT_Binds_K.  
+**)
+module Keygen_Equal_PK (S : Scheme) = {
+  proc main() : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    (pk1, sk1) <@ S.keygen();
+  
+    return pk0 = pk1;
+  }
+}.
+
+(** Reduction adversary reducing from LEAK-BIND to HON-BIND **)
+module R_LEAK_HON (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : Adv_HONBIND) : Adv_LEAKBIND = {
+  proc choose(bc : bindconf) : bool = {
+    var b : bool;
+    
+    b <@ A(O0(S), O1(S)).choose(bc);
+    
+    return b;
+  }
+   
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t = {
+    var c0, c1 : ctxt_t;
+    
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (c0, c1) <@ A(O0(S), O1(S)).find(bc, pk0, pk1);
+    
+    return (c0, c1);
+  }
+}.
+
+(** 
+  Equivalence between HON_BIND (for arbitrary adversary and any binding configuration)
+  and LEAK_BIND (with above reduction adverary). (Shows LEAK_BIND --> HON_BIND.)
+**)
+lemma Eqv_HONBIND_LEAKBIND (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S, -O0})
+                           (A <: Adv_HONBIND{-S, -O0, -O1}) :
+  equiv[HON_BIND(S, O0, O1, A).main ~ LEAK_BIND(S, R_LEAK_HON(S, O0, O1, A)).main :
+          ={glob S, glob O0, glob O1, glob A, arg} ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: true); call (: true).
+wp; call (: ={glob O0, glob O1, glob S}); 1,2: by sim. 
+do 2! (call (: ={glob S}); 1..3: by sim).  
+seq 1 1 : (#pre /\ ={pk0, sk0}); 1: by sim.
+wp; if => //=; 1: by wp. 
+if => //=; 1: by call (: true).
+seq 1 3 : (#pre /\ ={b}); 1: by wp; call (: true); wp.
+by if => //; [call (: true) | wp]. 
+qed.
+
+(** Reduction adversary reducing from MAL-BIND (Decaps Decaps case) to LEAK-BIND **)
+module R_MALDD_LEAK (S : Scheme) (A : Adv_LEAKBIND) : Adv_MALBIND_DD = {
+  proc find(bc : bindconf) : sk_t * sk_t * ctxt_t * ctxt_t = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b : bool;
+    var c0, c1 : ctxt_t;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A.choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    } 
+       
+    (c0, c1) <@ A.find(bc, pk0, sk0, pk1, sk1);
+    
+    return (sk0, sk1, c0, c1);
+  }
+}.
+
+(** 
+  Equivalence between LEAK_BIND (for arbitrary adversary and any binding configuration)
+  and MAL_BIND_DD (with above reduction adversary). 
+  (Shows MAL_BIND (in Decaps Decaps case) --> HON_BIND.)
+  Can straightforwardtly be extended to regular MAL_BIND game, but requires introducing 
+  derandomized version of considered scheme.
+**)
+lemma Eqv_LEAKBIND_MALBINDDD (S <: Scheme) (A <: Adv_LEAKBIND{-S}) :
+  hoare[S.keygen : true ==> sk2pk res.`2 = res.`1] =>
+  equiv[LEAK_BIND(S, A).main ~ MAL_BIND_DD(S, R_MALDD_LEAK(S, A)).main :
+          ={glob S, glob A, arg} ==> ={res}].
+proof.
+move=> kg_sem.
+proc; inline *.
+wp; call (: true); call (: true).
+wp; call (: true); sp 0 1.
+seq 1 1 : (#pre /\ pk0{1} = pk00{2} /\ sk0{1} = sk00{2} /\ sk2pk sk0{1} = pk0{1}). 
++ call (: ={glob S} ==> ={glob S, res} /\ sk2pk res{1}.`2 = res{1}.`1) => //.
+  by conseq (: ={glob S} ==> ={glob S, res}) kg_sem; proc true.
+if => //; 1: by wp.
+if => //=.
++ call (: ={glob S} ==> ={glob S, res} /\ sk2pk res{1}.`2 = res{1}.`1) => //.
+  + by conseq (: ={glob S} ==> ={glob S, res}) kg_sem; proc true.
+  by skip => /> /#. 
+seq 1 1 : (#pre /\ ={b}); 1: by wp; call (: true); wp.
+if => //; 2: by wp. 
+call (: ={glob S} ==> ={glob S, res} /\ sk2pk res{1}.`2 = res{1}.`1) => //.
++ by conseq (: ={glob S} ==> ={glob S, res}) kg_sem; proc true.
+by skip => /> /#.
+qed.
+
+(** Reduction adversary reducing HON-BIND-K-CT and HON-BIND-PKK-CT **)
+module (R_HON_K_PKK_CT (S : Scheme) (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool = {
+    return false;
+  }
+    
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t = {
+    var c0, c1 : ctxt_t;
+    
+    (c0, c1) <@ A(O0, O1).find(PKK_Binds_CT, pk0, pk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+(**
+  Equivalence between HON-BIND-PKK-CT (for arbitrary adversary)
+  and HON-BIND-K-CT (with above reduction adversary).
+  (Shows HON-BIND-K-CT --> HON-BIND-PKK-CT.) 
+**)
+lemma Eqv_HON_PKK_K_CT (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S, -O0})
+                       (A <: Adv_HONBIND{-S, -O0, -O1}):
+  equiv[HON_BIND(S, O0, O1, A).main ~ HON_BIND(S, O0, O1, R_HON_K_PKK_CT(S, A)).main :
+          ={glob S, glob O0, glob O1, glob A} /\ arg{1} = PKK_Binds_CT /\ arg{2} = K_Binds_CT ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: true); call (: true) => /=.
+wp; call (: ={glob S, glob O0, glob O1}); 1,2: by sim.
+wp; do 2! (call(: ={glob S}); 1..3: by sim).
+rcondt{1} 2; 1: by move=> &m; call (: true). 
+do 2! (rcondf{2} 2; 1: by move=> &m; call (: true)).  
+rcondf{2} 4; 1: by move=> &m; wp; call (: true).
+by wp; call (: true).
+qed.
+
+(** Reduction adversary reducing HON-BIND-K-PK and HON-BIND-CT-PK to HON-BIND-KCT-PK **)
+module (R_HON_K_CT_KCT_PK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool = {
+    return witness;
+  }
+  
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t = {
+    var c0, c1 : ctxt_t;
+    
+    (c0, c1) <@ A(O0, O1).find(KCT_Binds_PK, pk0, pk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+(**
+  Equivalence between HON-BIND-KCT-PK (for arbitrary adversary)
+  and HON-BIND-K-PK or HON-BIND-CT-PK (with above reduction adversary).
+  (Shows HON-BIND-K-PK --> HON-BIND-KCT-PK and HON-BIND-CT-PK --> HON-BIND-KCT-PK .) 
+**)
+lemma Eqv_HON_KCT_K_CT_PK (S <: Scheme) (O0 <: Oracles_CCA1i{-S}) (O1 <: Oracles_CCA1i{-S, -O0})
+                          (A <: Adv_HONBIND{-S, -O0, -O1}):
+  equiv[HON_BIND(S, O0, O1, A).main ~ HON_BIND(S, O0, O1, R_HON_K_CT_KCT_PK(A)).main :
+          ={glob S, glob O0, glob O1, glob A} /\ arg{1} = KCT_Binds_PK /\ (arg{2} = K_Binds_PK \/ arg{2} = CT_Binds_PK) 
+          ==> 
+          res{1} => res{2}].
+proof. 
+proc; inline *.
+wp; call (: true); call (: true).
+wp; call (: ={glob O0, glob O1, glob S}); 1,2: by sim.
+wp; do 2! (call (: ={glob S}); 1..3: by sim).
+seq 1 1 : (#pre /\ ={pk0, sk0}); 1: by call (: true).
+rcondf{1} 1; 1: by auto.
+rcondf{2} 1; 1: by auto => /> /#.
+rcondt{1} 1; 2: rcondt{2} 1; 1,2: by auto => /> /#. 
+by call (: true); skip => /> /#. 
+qed.  
+
+
+(** Reduction adversary reducing HON-BIND-CT-PK to HON-BIND-CT-K **)
+module (R_HON_CT_PK_K (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool = {
+    return witness;
+  }
+  
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t = {
+    var b : bool;
+    var c0, c1 : ctxt_t;
+    
+    b <@ A(O0, O1).choose(CT_Binds_K);
+    (c0, c1) <@ A(O0, O1).find(CT_Binds_K, pk0, pk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+section.
+
+(* Declare arbitrary KEM S *)
+declare module S <: Scheme.
+
+(* Losslessness (i.e., termination) assumption on S's decapsulation *)
+declare axiom S_keygen_ll : islossless S.keygen. 
+declare axiom S_decaps_ll : islossless S.decaps. 
+
+(* Determinism assumption on S's decapsulation *)
+declare op s_decaps : sk_t -> ctxt_t -> key_t option. 
+declare axiom S_decaps_det (sk' : sk_t) (c' : ctxt_t) : 
+  hoare[S.decaps : arg = (sk', c') ==> res = s_decaps sk' c'].
+
+(* Declare arbitrary CCA1 oracles O0 and O1 (with initialization) *)
+declare module O0 <: Oracles_CCA1i{-S}.
+declare module O1 <: Oracles_CCA1i{-S, -O0}.
+
+(* Losslessness (i.e., termination) assumption on the oracles' initialization *)
+declare axiom O0_init_ll : islossless O0(S).init.
+declare axiom O1_init_ll : islossless O1(S).init.
+
+(* Declare arbtirary HON-BIND adversary A *)
+declare module A <: Adv_HONBIND{-S, -O0, -O1}.
+
+(* Losslessness (i.e., termination) assumption on A's finding *)
+declare axiom A_choose_ll : islossless A(O0(S), O1(S)).choose. 
+declare axiom A_find_ll : islossless A(O0(S), O1(S)).find. 
+
+(* 
+  Auxiliary module equivalent to HON_BIND, but with certain variables 
+  defined global instead of local (so we can refer to them in proofs).
+*)
+local module HON_BIND_V = {
+  var pk0, pk1 : pk_t
+  var b : bool
+  
+  proc main(bc : bindconf) : bool = {
+    var sk0, sk1 : sk_t;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t option;
+    var no_fail : bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A(O0(S), O1(S)).choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    } 
+    
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (c0, c1) <@ A(O0(S), O1(S)).find(bc, pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }  
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original HON_BIND and (auxiliary) HON_BIND_V.
+*)
+local lemma EqPr_HONBIND_V &m (bc : bindconf) :
+  Pr[HON_BIND(S, O0, O1, A).main(bc) @ &m : res]
+  =
+  Pr[HON_BIND_V.main(bc) @ &m : res].
+proof. by byequiv => //; sim. qed.
+
+
+(**
+  Relation between HON-BIND-CT-K (for arbitrary adversary)
+  and HON-BIND-CT-PK (with above reduction adversary).
+  Requires generated public keys to be different.
+  (Shows HON-BIND-CT-PK + Different PKs --> HON-BIND-CT-K.) 
+**)
+lemma Bnd_HON_CT_K_PK &m :
+  Pr[HON_BIND(S, O0, O1, A).main(CT_Binds_K) @ &m : res]
+  <=
+  Pr[HON_BIND(S, O0, O1, R_HON_CT_PK_K(A)).main(CT_Binds_PK) @ &m : res]
+  +
+  Pr[Keygen_Equal_PK(S).main() @ &m : res].
+proof.
+rewrite EqPr_HONBIND_V Pr[mu_split HON_BIND_V.b].
+have -> /=:
+  Pr[HON_BIND_V.main(CT_Binds_K) @ &m : res /\ !HON_BIND_V.b] = 0%r. 
++ byphoare (: arg = CT_Binds_K ==> _) => //=. 
+  hoare; proc.
+  do 2! (rcondf 2; 1: by call (: true)). 
+  seq 2 : #pre; 1: by call (: true); call (: true). 
+  case HON_BIND_V.b; 1: by conseq (: _ ==> true) => />. 
+  rcondf 1 => //.
+  seq 4 : (#pre /\ sk0 = sk1 /\ HON_BIND_V.pk0 = HON_BIND_V.pk1).
+  + by sp 1; conseq (: _ ==> true) => />. 
+  case (c0 = c1); 2: by conseq (: _ ==> true) => />.
+  exlim sk0, c0 => skt ct. 
+  by wp; do 2! (call (S_decaps_det skt ct)).
+rewrite Pr[mu_split HON_BIND_V.pk0 <> HON_BIND_V.pk1] StdOrder.RealOrder.ler_add.
++ byequiv (: ={glob S, glob O0, glob O1, glob A} /\ bc{1} = CT_Binds_K /\ bc{2} = CT_Binds_PK ==> _) => //.
+  proc; inline *.
+  seq 1 1 : (#pre /\ ={sk0} /\ HON_BIND_V.pk0{1} = pk0{2}); 1: by call (: true).
+  do 2! (rcondf{1} 1; 1: by auto).
+  rcondf{2} 1; 1: by auto.
+  rcondt{2} 1; 1: by auto.
+  swap{2} 7 -6.
+  seq 1 1 : (#pre /\ HON_BIND_V.b{1} = b0{2}); 1: by call (: true). 
+  case (!HON_BIND_V.b{1}).
+  + conseq (: _ ==> true) => //.
+    rcondf{1} 1; 1: by auto.
+    wp; do 2! (call{1} S_decaps_ll; call{2} S_decaps_ll). 
+    wp; call{1} A_find_ll; call{2} A_find_ll. 
+    wp; call{1} O1_init_ll; call{2} O1_init_ll.
+    call{1} O0_init_ll; call{2} O0_init_ll.
+    by wp; call{2} S_keygen_ll.     
+  wp; call (: true); call (: true); wp.
+  call (: ={glob O0, glob O1, glob S}); 1,2: by sim.
+  wp; do 2! (call (: ={glob S}); 1..3: by sim).
+  rcondt{1} 1; 1: by auto.
+  by call (: true); skip => />.
+byequiv (: ={glob S} /\ bc{1} = CT_Binds_K ==> _) => //.
+proc; inline *.
+do 2! (rcondf{1} 2; 1: by move=> ?; call(: true)).
+swap{1} 2 -1; seq 1 0 : #pre; 1: by call{1} A_choose_ll.
+wp; call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} A_find_ll.
+call{1} O1_init_ll; call{1} O0_init_ll.
+seq 1 1 : (#pre /\ HON_BIND_V.pk0{1} = pk0{2}); 1: by call (: true). 
+case (!HON_BIND_V.b{1}).
++ conseq (: _ ==> true) => //.
+  rcondf{1} 1; 1: by auto. 
+  by wp; call{2} S_keygen_ll. 
+rcondt{1} 1; 1: by auto. 
+by call (: true).
+qed.
+
+end section.
+
+
+(** 
+  Reduction adversary reducing HON-BIND-K-CT (resp. HON-BIND-K,CT-PK) 
+  to HON-BIND-K-PK in the case of unequal ciphertexts (resp. equal ciphertexts)
+**)
+module (R_HON_KCT_KCTPK_KPK (A : Adv_HONBIND) : Adv_HONBIND) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool = {
+    return true;
+  }
+  
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t = {
+    var b : bool;
+    var c0, c1 : ctxt_t;
+
+    (c0, c1) <@ A(O0, O1).find(K_Binds_PK, pk0, pk1);
+    
+    return (c0, c1);
+  }
+}. 
+
+
+section.  
+
+(* Declare arbitrary KEM S *)
+declare module S <: Scheme.
+
+(* Declare arbitrary CCA1 oracles O0 and O1 (with initialization) *)
+declare module O0 <: Oracles_CCA1i{-S}.
+declare module O1 <: Oracles_CCA1i{-S, -O0}.
+
+(* Declare arbtirary HON-BIND adversary A *)
+declare module A <: Adv_HONBIND{-S, -O0, -O1}.
+
+(* 
+  Auxiliary module equivalent to HON_BIND, but with certain variables 
+  defined global instead of local (so we can refer to them in proofs).
+*)
+local module HON_BIND_V = {
+  var c0, c1 : ctxt_t
+    
+  proc main(bc : bindconf) : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b : bool;
+    var k0, k1 : key_t option;
+    var no_fail : bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A(O0(S), O1(S)).choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    } 
+    
+    O0(S).init(sk0);
+    O1(S).init(sk1);
+    
+    (c0, c1) <@ A(O0(S), O1(S)).find(bc, pk0, pk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }  
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original HON_BIND and (auxiliary) HON_BIND_V.
+*)
+local lemma EqPr_HONBIND_V &m (bc : bindconf) :
+  Pr[HON_BIND(S, O0, O1, A).main(bc) @ &m : res]
+  =
+  Pr[HON_BIND_V.main(bc) @ &m : res].
+proof. by byequiv => //; sim. qed.
+
+(**
+  Relation between HON-BIND-K-PK (for arbitrary adversary)
+  and HON-BIND-K-CT and HON-BIND-K,CT-PK (with above reduction adversary).
+  (Shows HON-BIND-K-CT + HON-BIND-K,CT-PK --> HON-BIND-K-PK.) 
+**)
+lemma Bnd_HON_KPK_KCT_KCTPK &m :
+  Pr[HON_BIND(S, O0, O1, A).main(K_Binds_PK) @ &m : res]
+  <=
+  Pr[HON_BIND(S, O0, O1, R_HON_KCT_KCTPK_KPK(A)).main(K_Binds_CT) @ &m : res]
+  + Pr[HON_BIND(S, O0, O1, R_HON_KCT_KCTPK_KPK(A)).main(KCT_Binds_PK) @ &m : res].
+proof.
+rewrite EqPr_HONBIND_V Pr[mu_split HON_BIND_V.c0 <> HON_BIND_V.c1] StdOrder.RealOrder.ler_add.
++ byequiv => //.
+  proc; inline R_HON_KCT_KCTPK_KPK. 
+  wp; do 2! call (: true).
+  wp; call (: ={glob S, glob O0, glob O1}); 1..2: by sim.
+  seq 1 1 : (   ={glob S, glob O0, glob O1, glob A, pk0, sk0}
+             /\ bc{1} = K_Binds_PK
+             /\ bc{2} = K_Binds_CT); 1: by call (: true).
+  wp => /=; do 2! (call (: ={glob S}); 1..3: by sim). 
+  rcondf{1} ^if; 1: by auto.
+  rcondf{2} ^if; 1: by auto.
+  rcondt{1} ^if; 1: by auto.
+  rcondf{2} ^if; 1: by auto.
+  rcondt{2} ^if; 1: by auto.
+  by call (: true); wp.  
+byequiv => //.
+proc; inline R_HON_KCT_KCTPK_KPK. 
+wp; do 2! call (: true).
+wp; call (: ={glob S, glob O0, glob O1}); 1..2: by sim.
+seq 1 1 : (   ={glob S, glob O0, glob O1, glob A, pk0, sk0}
+           /\ bc{1} = K_Binds_PK
+           /\ bc{2} = KCT_Binds_PK); 1: by call (: true).
+wp => /=; do 2! (call (: ={glob S}); 1..3: by sim). 
+rcondf{1} ^if; 1: by auto.
+rcondf{2} ^if; 1: by auto.
+rcondt{1} ^if; 1: by auto.
+rcondt{2} ^if; 1: by auto.
+by call (: true). 
+qed.
+
+end section.
+
+
+(** Reduction adversary reducing LEAK-BIND-K-CT to LEAK-BIND-PKK-CT **)
+module (R_LEAK_K_PKK_CT (A : Adv_LEAKBIND) : Adv_LEAKBIND) = {
+  proc choose(bc : bindconf) : bool = {
+    return false;
+  }
+    
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t = {
+    var c0, c1 : ctxt_t;
+    
+    (c0, c1) <@ A.find(PKK_Binds_CT, pk0, sk0, pk1, sk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+(**
+  Equivalence between LEAK-BIND-PKK-CT (for arbitrary adversary)
+  and LEAK-BIND-K-CT (with above reduction adversary).
+  (Shows LEAK-BIND-K-CT --> LEAK-BIND-PKK-CT.) 
+**)
+lemma Eqv_LEAK_PKK_K_CT (S <: Scheme) (A <: Adv_LEAKBIND{-S}):
+  equiv[LEAK_BIND(S, A).main ~ LEAK_BIND(S, R_LEAK_K_PKK_CT(A)).main :
+          ={glob S, glob A} /\ arg{1} = PKK_Binds_CT /\ arg{2} = K_Binds_CT ==> ={res}].
+proof.
+proc; inline *.
+wp; call (: true); call (: true) => /=.
+wp; call (: true); wp.
+rcondt{1} 2; 1: by move=> &m; call (: true). 
+do 2! (rcondf{2} 2; 1: by move=> &m; call (: true)).  
+rcondf{2} 4; 1: by move=> &m; wp; call (: true).
+by wp; call (: true).
+qed.
+
+
+(** Reduction adversary reducing LEAK-BIND-K-PK and LEAK-BIND-CT-PK to LEAK-BIND-KCT-PK **)
+module R_LEAK_K_CT_KCT_PK (A : Adv_LEAKBIND) : Adv_LEAKBIND = {
+  proc choose(bc : bindconf) : bool = {
+    return witness;
+  }
+   
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t = {
+    var c0, c1 : ctxt_t;
+    
+    (c0, c1) <@ A.find(KCT_Binds_PK, pk0, sk0, pk1, sk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+(**
+  Equivalence between LEAK-BIND-KCT-PK (for arbitrary adversary)
+  and LEAK-BIND-K-PK or LEAK-BIND-CT-PK (with above reduction adversary).
+  (Shows LEAK-BIND-K-PK --> LEAK-BIND-KCT-PK and LEAK-BIND-CT-PK --> LEAK-BIND-KCT-PK .) 
+**)
+lemma Eqv_LEAK_KCT_K_CT_PK (S <: Scheme) (A <: Adv_LEAKBIND{-S}):
+  equiv[LEAK_BIND(S, A).main ~ LEAK_BIND(S, R_LEAK_K_CT_KCT_PK(A)).main :
+          ={glob S, glob A} /\ arg{1} = KCT_Binds_PK /\ (arg{2} = K_Binds_PK \/ arg{2} = CT_Binds_PK) 
+          ==> 
+          res{1} => res{2}].
+proof.
+proc; inline *.
+wp; call (: true); call (: true).
+wp; call (: true); wp. 
+seq 1 1 : (#pre /\ ={pk0, sk0}); 1: by call (: true).
+rcondf{1} 1; 1: by auto.
+rcondf{2} 1; 1: by auto => /> /#.
+rcondt{1} 1; 2: rcondt{2} 1; 1,2: by auto => /> /#. 
+by call (: true); skip => /> /#.
+qed.
+
+
+(** Reduction adversary reducing LEAK-BIND-CT-PK to LEAK-BIND-CT-K **)
+module R_LEAK_CT_PK_K (A : Adv_LEAKBIND) : Adv_LEAKBIND = {
+  proc choose(bc : bindconf) : bool = {
+    return witness;
+  }
+  
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t = {
+    var b : bool;
+    var c0, c1 : ctxt_t;
+    
+    b <@ A.choose(CT_Binds_K);
+    (c0, c1) <@ A.find(CT_Binds_K, pk0, sk0, pk1, sk1);
+    
+    return (c0, c1);
+  } 
+}.
+
+section.
+
+(* Declare arbitrary KEM S *)
+declare module S <: Scheme.
+
+(* Losslessness (i.e., termination) assumption on S's decapsulation *)
+declare axiom S_keygen_ll : islossless S.keygen. 
+declare axiom S_decaps_ll : islossless S.decaps. 
+
+(* Determinism assumption on S's decapsulation *)
+declare op s_decaps : sk_t -> ctxt_t -> key_t option. 
+declare axiom S_decaps_det (sk' : sk_t) (c' : ctxt_t) : 
+  hoare[S.decaps : arg = (sk', c') ==> res = s_decaps sk' c'].
+  
+(* Declare arbtirary LEAK-BIND adversary A *)
+declare module A <: Adv_LEAKBIND{-S}.
+
+(* Losslessness (i.e., termination) assumption on A's choosing and finding *)
+declare axiom A_choose_ll : islossless A.choose. 
+declare axiom A_find_ll : islossless A.find. 
+
+(* 
+  Auxiliary module equivalent to LEAK_BIND, but with certain variables 
+  defined global instead of local (so we can refer to them in proofs).
+*)
+local module LEAK_BIND_V = {
+  var pk0, pk1 : pk_t
+  var b : bool
+  
+  proc main(bc : bindconf) : bool = {
+    var sk0, sk1 : sk_t;
+    var c0, c1 : ctxt_t;
+    var k0, k1 : key_t option;
+    var no_fail : bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A.choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    } 
+    
+    (c0, c1) <@ A.find(bc, pk0, sk0, pk1, sk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }  
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original LEAK_BIND and (auxiliary) LEAK_BIND_V.
+*)
+local lemma EqPr_LEAKBIND_V &m (bc : bindconf) :
+  Pr[LEAK_BIND(S, A).main(bc) @ &m : res]
+  =
+  Pr[LEAK_BIND_V.main(bc) @ &m : res].
+proof. by byequiv => //; sim. qed.
+
+
+(**
+  Relation between LEAK-BIND-CT-K (for arbitrary adversary)
+  and LEAK-BIND-CT-PK (with above reduction adversary).
+  Requires generated public keys to be different.
+  (Shows LEAK-BIND-CT-PK + Different PKs --> LEAK-BIND-K-PK.) 
+**)
+lemma Bnd_LEAK_CT_K_PK &m :
+  Pr[LEAK_BIND(S, A).main(CT_Binds_K) @ &m : res]
+  <=
+  Pr[LEAK_BIND(S, R_LEAK_CT_PK_K(A)).main(CT_Binds_PK) @ &m : res]
+  +
+  Pr[Keygen_Equal_PK(S).main() @ &m : res].
+proof.
+rewrite EqPr_LEAKBIND_V Pr[mu_split LEAK_BIND_V.b].
+have -> /=:
+  Pr[LEAK_BIND_V.main(CT_Binds_K) @ &m : res /\ !LEAK_BIND_V.b] = 0%r. 
++ byphoare (: arg = CT_Binds_K ==> _) => //=. 
+  hoare; proc.
+  do 2! (rcondf 2; 1: by call (: true)). 
+  seq 2 : #pre; 1: by call (: true); call (: true). 
+  case LEAK_BIND_V.b; 1: by conseq (: _ ==> true) => />. 
+  rcondf 1 => //.
+  seq 2 : (#pre /\ sk0 = sk1 /\ LEAK_BIND_V.pk0 = LEAK_BIND_V.pk1).
+  + by sp 1; conseq (: _ ==> true) => />. 
+  case (c0 = c1); 2: by conseq (: _ ==> true) => />.
+  exlim sk0, c0 => skt ct. 
+  by wp; do 2! (call (S_decaps_det skt ct)).
+rewrite Pr[mu_split LEAK_BIND_V.pk0 <> LEAK_BIND_V.pk1] StdOrder.RealOrder.ler_add.
++ byequiv (: ={glob S, glob A} /\ bc{1} = CT_Binds_K /\ bc{2} = CT_Binds_PK ==> _) => //.
+  proc; inline *.
+  seq 1 1 : (#pre /\ ={sk0} /\ LEAK_BIND_V.pk0{1} = pk0{2}); 1: by call (: true).
+  do 2! (rcondf{1} 1; 1: by auto).
+  rcondf{2} 1; 1: by auto.
+  rcondt{2} 1; 1: by auto.
+  swap{2} 7 -6.
+  seq 1 1 : (#pre /\ LEAK_BIND_V.b{1} = b0{2}); 1: by call (: true). 
+  case (!LEAK_BIND_V.b{1}).
+  + conseq (: _ ==> true) => //.
+    rcondf{1} 1; 1: by auto.
+    wp; do 2! (call{1} S_decaps_ll; call{2} S_decaps_ll). 
+    wp; call{1} A_find_ll; call{2} A_find_ll. 
+    by wp; call{2} S_keygen_ll.     
+  wp; call (: true); call (: true).
+  wp; call (: true).
+  rcondt{1} 1; 1: by auto.
+  by wp; call (: true); skip => />.
+byequiv (: ={glob S} /\ bc{1} = CT_Binds_K ==> _) => //.
+proc; inline *.
+do 2! (rcondf{1} 2; 1: by move=> ?; call(: true)).
+swap{1} 2 -1; seq 1 0 : #pre; 1: by call{1} A_choose_ll.
+wp; call{1} S_decaps_ll; call{1} S_decaps_ll; call{1} A_find_ll.
+seq 1 1 : (#pre /\ LEAK_BIND_V.pk0{1} = pk0{2}); 1: by call (: true). 
+case (!LEAK_BIND_V.b{1}).
++ conseq (: _ ==> true) => //.
+  rcondf{1} 1; 1: by auto. 
+  by wp; call{2} S_keygen_ll. 
+rcondt{1} 1; 1: by auto. 
+by call (: true).
+qed.
+
+end section.
+
+
+(** 
+  Reduction adversary reducing LEAK-BIND-K-CT (resp. LEAK-BIND-K,CT-PK) 
+  to LEAK-BIND-K-PK in the case of unequal ciphertexts (resp. equal ciphertexts)
+**)
+module R_LEAK_KCT_KCTPK_KPK (A : Adv_LEAKBIND) : Adv_LEAKBIND = {
+  proc choose(bc : bindconf) : bool = {
+    return true;
+  }
+  
+  proc find(bc : bindconf, pk0 : pk_t, sk0 : sk_t, pk1 : pk_t, sk1 : sk_t) : ctxt_t * ctxt_t = {
+    var b : bool;
+    var c0, c1 : ctxt_t;
+
+    (c0, c1) <@ A.find(K_Binds_PK, pk0, sk0, pk1, sk1);
+    
+    return (c0, c1);
+  }
+}. 
+
+
+section.  
+
+(* Declare arbitrary KEM S *)
+declare module S <: Scheme.
+
+(* Declare arbtirary LEAK-BIND adversary A *)
+declare module A <: Adv_LEAKBIND{-S}.
+
+(* 
+  Auxiliary module equivalent to LEAK_BIND, but with certain variables 
+  defined global instead of local (so we can refer to them in proofs).
+*)
+local module LEAK_BIND_V = {
+  var c0, c1 : ctxt_t
+    
+  proc main(bc : bindconf) : bool = {
+    var pk0, pk1 : pk_t;
+    var sk0, sk1 : sk_t;
+    var b : bool;
+    var k0, k1 : key_t option;
+    var no_fail : bool;
+    
+    (pk0, sk0) <@ S.keygen();
+    
+    if (is_pkbsc bc) { (* public key is binding source, equalize key pairs *)
+      (pk1, sk1) <- (pk0, sk0);
+    } elif (is_pkbtc bc) { (* public key is binding target, independently generate key pairs *)
+      (pk1, sk1) <@ S.keygen();
+    } else { (* neither of the above, let adversary choose what to do with key pairs *)
+      b <@ A.choose(bc);
+      if (b) {
+        (pk1, sk1) <@ S.keygen();
+      } else {
+        (pk1, sk1) <- (pk0, sk0);
+      }
+    } 
+    
+    (c0, c1) <@ A.find(bc, pk0, sk0, pk1, sk1);
+    
+    k0 <@ S.decaps(sk0, c0);
+    k1 <@ S.decaps(sk1, c1);
+    
+    no_fail <- k0 <> None /\ k1 <> None;
+    
+    return no_fail /\ is_bindbreak bc (oget k0) (oget k1) pk0 pk1 c0 c1;
+  }  
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original LEAK_BIND and (auxiliary) LEAK_BIND_V.
+*)
+local lemma EqPr_LEAKBIND_V &m (bc : bindconf) :
+  Pr[LEAK_BIND(S, A).main(bc) @ &m : res]
+  =
+  Pr[LEAK_BIND_V.main(bc) @ &m : res].
+proof. by byequiv => //; sim. qed.
+
+(**
+  Relation between LEAK-BIND-K-PK (for arbitrary adversary)
+  and LEAK-BIND-K-CT and LEAK-BIND-K,CT-PK (with above reduction adversary).
+  (Shows LEAK-BIND-K-CT + LEAK-BIND-K,CT-PK --> LEAK-BIND-K-PK.) 
+**)
+lemma Bnd_LEAK_KPK_KCT_KCTPK &m :
+  Pr[LEAK_BIND(S, A).main(K_Binds_PK) @ &m : res]
+  <=
+  Pr[LEAK_BIND(S, R_LEAK_KCT_KCTPK_KPK(A)).main(K_Binds_CT) @ &m : res]
+  + Pr[LEAK_BIND(S, R_LEAK_KCT_KCTPK_KPK(A)).main(KCT_Binds_PK) @ &m : res].
+proof.
+rewrite EqPr_LEAKBIND_V Pr[mu_split LEAK_BIND_V.c0 <> LEAK_BIND_V.c1] StdOrder.RealOrder.ler_add.
++ byequiv => //.
+  proc; inline R_LEAK_KCT_KCTPK_KPK. 
+  wp; do 2! call (: true).
+  wp; call (: true); wp => /=.
+  seq 1 1 : (   ={glob S, glob A, pk0, sk0}
+             /\ bc{1} = K_Binds_PK
+             /\ bc{2} = K_Binds_CT); 1: by call (: true).
+  rcondf{1} ^if; 1: by auto.
+  rcondf{2} ^if; 1: by auto.
+  rcondt{1} ^if; 1: by auto.
+  rcondf{2} ^if; 1: by auto.
+  rcondt{2} ^if; 1: by auto.
+  by call (: true); wp.  
+byequiv => //.
+proc; inline R_LEAK_KCT_KCTPK_KPK. 
+wp; do 2! call (: true).
+wp; call (: true); wp => /=.
+seq 1 1 : (   ={glob S, glob A, pk0, sk0}
+           /\ bc{1} = K_Binds_PK
+           /\ bc{2} = KCT_Binds_PK); 1: by call (: true).
+rcondf{1} ^if; 1: by auto.
+rcondf{2} ^if; 1: by auto.
+rcondt{1} ^if; 1: by auto.
+rcondt{2} ^if; 1: by auto.
+by call (: true). 
+qed.
+
+end section.
+
+
+(** Reduction adversary reducing MAL-BIND-K-CT to MAL-BIND-PKK-CT **)
+module R_MAL_K_PKK_CT (A : Adv_MALBIND) : Adv_MALBIND = {
+  proc choose(bc : bindconf) : malbind_scenario = {
+    var mbs : malbind_scenario;
+    
+    mbs <@ A.choose(PKK_Binds_CT);
+    
+    return mbs;
+  }
+  
+  proc find_dd() : sk_t * sk_t * ctxt_t * ctxt_t = {
+    var sk0, sk1 : sk_t;
+    var c0, c1 : ctxt_t;
+    
+    (sk0, sk1, c0, c1) <@ A.find_dd();
+    
+    return (sk0, sk1, c0, c1);
+  }
+
+  proc find_ed() : sk_t * sk_t * rand_t * ctxt_t = {
+    var sk0, sk1 : sk_t;
+    var r0 : rand_t;
+    var c1 : ctxt_t;
+    
+    (sk0, sk1, r0, c1) <@ A.find_ed();
+    
+    return (sk0, sk1, r0, c1);
+  }
+  
+  proc find_ee() : sk_t * sk_t * rand_t * rand_t = {
+    var sk0, sk1 : sk_t;
+    var r0, r1 : rand_t;
+    
+    (sk0, sk1, r0, r1) <@ A.find_ee();
+    
+    return (sk0, sk1, r0, r1);
+  }
+}.
+
+
+(**
+  Equivalence between MAL-BIND-PKK-CT (for arbitrary adversary)
+  and MAL-BIND-K-CT (with above reduction adversary).
+  (Shows MAL-BIND-K-CT --> MAL-BIND-PKK-CT.) 
+**)
+lemma Eqv_MAL_PKK_K_CT (S <: SchemeDerand) (A <: Adv_MALBIND{-S}) :
+  equiv[MAL_BIND(S, A).main ~ MAL_BIND(S, R_MAL_K_PKK_CT(A)).main :
+          ={glob S, glob A} /\ arg{1} = PKK_Binds_CT /\ arg{2} = K_Binds_CT
+          ==>
+          res{1} => res{2}].
+proof.  
+proc; inline *.
+seq 1 3 : (#pre /\ ={mbs}).
++ by wp; call (: true); wp.
+if => //.
++ wp; call (: true); call (: true).
+  by wp; call(: true); skip.
+if => //.  
++ wp; call (: true); call (: true).
+  by wp; call(: true); skip.
+wp; call (: true); call (: true).
+by wp; call(: true); skip.
+qed. 
+
+
+(** Reduction adversary reducing MAL-BIND-K-PK and MAL-BIND-CT-PK to MAL-BIND-KCT-PK **)
+module R_MAL_K_CT_KCT_PK (A : Adv_MALBIND) : Adv_MALBIND = {
+  proc choose(bc : bindconf) : malbind_scenario = {
+    var mbs : malbind_scenario;
+    
+    mbs <@ A.choose(KCT_Binds_PK);
+    
+    return mbs;
+  } 
+  
+  proc find_dd() : sk_t * sk_t * ctxt_t * ctxt_t = {
+    var sk0, sk1 : sk_t;
+    var c0, c1 : ctxt_t;
+    
+    (sk0, sk1, c0, c1) <@ A.find_dd();
+    
+    return (sk0, sk1, c0, c1);
+  }
+
+  proc find_ed() : sk_t * sk_t * rand_t * ctxt_t = {
+    var sk0, sk1 : sk_t;
+    var r0 : rand_t;
+    var c1 : ctxt_t;
+    
+    (sk0, sk1, r0, c1) <@ A.find_ed();
+    
+    return (sk0, sk1, r0, c1);
+  }
+  
+  proc find_ee() : sk_t * sk_t * rand_t * rand_t = {
+    var sk0, sk1 : sk_t;
+    var r0, r1 : rand_t;
+    
+    (sk0, sk1, r0, r1) <@ A.find_ee();
+    
+    return (sk0, sk1, r0, r1);
+  }
+}.
+
+(**
+  Equivalence between MAL-BIND-KCT-PK (for arbitrary adversary)
+  and MAL-BIND-K-PK or MAL-BIND-CT-PK (with above reduction adversary).
+  (Shows MAL-BIND-K-PK --> MAL-BIND-KCT-PK and MAL-BIND-CT-PK --> MAL-BIND-KCT-PK .) 
+**)
+lemma Eqv_MAL_KCT_K_CT_PK (S <: SchemeDerand) (A <: Adv_MALBIND{-S}):
+  equiv[MAL_BIND(S, A).main ~ MAL_BIND(S, R_MAL_K_CT_KCT_PK(A)).main :
+          ={glob S, glob A} /\ arg{1} = KCT_Binds_PK /\ (arg{2} = K_Binds_PK \/ arg{2} = CT_Binds_PK) 
+          ==> 
+          res{1} => res{2}].
+proof.  
+proc; inline *.
+seq 1 3 : (#pre /\ ={mbs}).
++ by wp; call (: true); wp.
+if => //.
++ wp; call (: true); call (: true).
+  by wp; call(: true); skip => /> /#. 
+if => //.  
++ wp; call (: true); call (: true).
+  by wp; call(: true); skip => /> /#. 
+wp; call (: true); call (: true).
+by wp; call(: true); skip => /> /#.
+qed. 
+
+
+(** 
+  Reduction adversary reducing MAL-BIND-K-CT (resp. MAL-BIND-K,CT-PK) 
+  to MAL-BIND-K-PK in the case of unequal ciphertexts (resp. equal ciphertexts)
+**)
+module R_MAL_KCT_KCTPK_KPK (A : Adv_MALBIND) : Adv_MALBIND = {
+  proc choose(bc : bindconf) : malbind_scenario = {
+    var mbs : malbind_scenario;
+    
+    mbs <@ A.choose(K_Binds_PK);
+    
+    return mbs;
+  }
+  
+  proc find_dd = A.find_dd
+  proc find_ed = A.find_ed
+  proc find_ee = A.find_ee
+}. 
+
+section.  
+
+(* Declare arbitrary KEM S *)
+declare module S <: SchemeDerand.
+
+(* Declare arbtirary MAL-BIND adversary A *)
+declare module A <: Adv_MALBIND{-S}.
+
+
+(* 
+  Auxiliary module equivalent to MAL_BIND, but with certain variables 
+  defined global instead of local (so we can refer to them in proofs).
+*)
+local module MAL_BIND_V = {
+  var c0, c1 : ctxt_t
+
+  proc main(bc : bindconf) : bool = {
+    var mbs : malbind_scenario;
+    var sk0, sk1 : sk_t;
+    var r0, r1 : rand_t;
+    var k0, k1 : key_t;
+    var k0o, k1o : key_t option;
+    var pk0, pk1 : pk_t;
+    var no_fail, is_bb : bool;
+        
+    mbs <@ A.choose(bc);
+    
+    if (mbs = DECAPS_DECAPS) {
+      (sk0, sk1, c0, c1) <@ A.find_dd();
+    
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      k0o <@ S.decaps(sk0, c0);
+      k1o <@ S.decaps(sk1, c1);
+
+      no_fail <- k0o <> None /\ k1o <> None;
+      is_bb <- is_bindbreak bc (oget k0o) (oget k1o) pk0 pk1 c0 c1;
+    } elif (mbs = ENCAPS_DECAPS) {
+      (sk0, sk1, r0, c1) <@ A.find_ed();
+
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      (k0, c0) <@ S.encaps(pk0, r0);
+      k1o <@ S.decaps(sk1, c1);
+      
+      no_fail <- k1o <> None;
+      is_bb <- is_bindbreak bc k0 (oget k1o) pk0 pk1 c0 c1;
+    } else { (* mbs = ENCAPS_ENCAPS *)
+      (sk0, sk1, r0, r1) <@ A.find_ee();
+    
+      pk0 <- sk2pk sk0;
+      pk1 <- sk2pk sk1;
+
+      (k0, c0) <@ S.encaps(pk0, r0);
+      (k1, c1) <@ S.encaps(pk1, r1);
+      
+      no_fail <- true;
+      is_bb <- is_bindbreak bc k0 k1 pk0 pk1 c0 c1;
+    }
+
+    return no_fail /\ is_bb;
+  }
+}.
+
+(* 
+  Equivalence (expressed as equality of probabilities) between 
+  original MAL_BIND and (auxiliary) MAL_BIND_V.
+*)
+local lemma EqPr_MALBIND_V &m (bc : bindconf) :
+  Pr[MAL_BIND(S, A).main(bc) @ &m : res]
+  =
+  Pr[MAL_BIND_V.main(bc) @ &m : res].
+proof. by byequiv => //; sim. qed.
+
+(**
+  Relation between MAL-BIND-K-PK (for arbitrary adversary)
+  and MAL-BIND-K-CT and MAL-BIND-K,CT-PK (with above reduction adversary).
+  (Shows MAL-BIND-K-CT + MAL-BIND-K,CT-PK --> MAL-BIND-K-PK.) 
+**)
+lemma Bnd_MAL_KPK_KCT_KCTPK &m :
+  Pr[MAL_BIND(S, A).main(K_Binds_PK) @ &m : res]
+  <=
+  Pr[MAL_BIND(S, R_MAL_KCT_KCTPK_KPK(A)).main(K_Binds_CT) @ &m : res]
+  + Pr[MAL_BIND(S, R_MAL_KCT_KCTPK_KPK(A)).main(KCT_Binds_PK) @ &m : res].
+proof.
+rewrite EqPr_MALBIND_V Pr[mu_split MAL_BIND_V.c0 <> MAL_BIND_V.c1] StdOrder.RealOrder.ler_add.
++ byequiv => //.
+  proc; inline R_MAL_KCT_KCTPK_KPK(A).choose.
+  seq 1 3 : (   ={glob S, glob A, mbs}
+             /\ bc{1} = K_Binds_PK
+             /\ bc{2} = K_Binds_CT); 1: by wp; call (: true); wp. 
+  if => //; 1: by wp; do 2! call (: true); wp; call (: true). 
+  by if => //; wp; do 2! call (: true); wp; call (: true).  
+byequiv => //.
+proc; inline R_MAL_KCT_KCTPK_KPK(A).choose.
+seq 1 3 : (   ={glob S, glob A, mbs}
+           /\ bc{1} = K_Binds_PK
+           /\ bc{2} = KCT_Binds_PK); 1: by wp; call (: true); wp. 
+if => //; 1: by wp; do 2! call (: true); wp; call (: true). 
+by if => //; wp; do 2! call (: true); wp; call (: true).    
+qed.
+
+end section.
+
+end Relations.
