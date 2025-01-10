@@ -1407,9 +1407,8 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_auto {level;  base; 
                axioms; locality;}    -> EcEnv.Auto.add ~level ?base axioms locality env
     | Th_reduction r                 -> EcEnv.Reduction.add r env
+    | Th_crbinding (bd, lc)          -> EcEnv.Circuit.bind_crbinding lc bd env
     | _                              -> assert false
-    | Th_crbinding (bd, lc)  -> EcEnv.Circuit.bind_crbinding lc bd env
-    | Th_theory _            -> assert false
   in
   { scenv with
     sc_env = env;
