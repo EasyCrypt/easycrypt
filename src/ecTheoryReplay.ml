@@ -1007,6 +1007,20 @@ and replay_instance
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_alias
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, target)
+=
+  let scenv = ove.ovre_hooks.henv scope in
+  let env = EcSection.env scenv in
+  let p = EcSubst.subst_path subst target in
+
+  if is_none (EcEnv.Theory.by_path_opt p env) then
+    (subst, ops, proofs, scope)
+  else
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_alias (name, target)) in
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   match item.ti_item with
   | Th_type (x, otyd) ->
@@ -1050,6 +1064,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_instance ((typ, ty), tc, lc) ->
      replay_instance ove (subst, ops, proofs, scope) (item.ti_import, (typ, ty), tc, lc)
+
+  | Th_alias (name, target) ->
+     replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in

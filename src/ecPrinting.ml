@@ -143,7 +143,25 @@ module PPEnv = struct
             (fun env x -> EcEnv.Mod.bind_param x mty env)
             ppe.ppe_env xs; }
 
-  let p_shorten cond (nm, x) =
+  let reverse_theory_alias (ppe : t) (path : P.path) : P.path =
+    let aliases = EcEnv.Theory.aliases ppe.ppe_env in
+
+    let rec reverse (suffix : symbol list) (p : P.path option) =
+      Option.bind p (fun prefix ->
+        match P.Mp.find_opt prefix aliases with
+        | None -> reverse (P.basename prefix :: suffix) (P.prefix prefix)
+        | Some prefix -> Some (EcPath.extend prefix suffix)
+      )
+    in Option.value ~default:path (reverse [] (Some path))
+
+  let p_shorten
+    ?(alias = true)
+    ?(istheory = false)
+     (ppe  : t)
+     (cond : qsymbol -> bool)
+     (p    : qsymbol)
+    : qsymbol
+  =
     let rec shorten prefix (nm, x) =
       match cond (nm, x) with
       | true  -> (nm, x)
@@ -154,35 +172,46 @@ module PPEnv = struct
       end
     in
 
+    let p = EcPath.fromqsymbol p in
+    let p =
+      if alias then begin
+        if istheory then
+          reverse_theory_alias ppe p
+        else
+          let thpath, base = P.prefix p, P.basename p in
+          let thpath = Option.map (reverse_theory_alias ppe) thpath in
+          P.pqoname thpath base
+      end else p in
+    let (nm, x) = EcPath.toqsymbol p in
     shorten (List.rev nm) ([], x)
 
   let ty_symb (ppe : t) p =
-      let exists sm =
+    let exists sm =
       try  EcPath.p_equal (EcEnv.Ty.lookup_path ~unique:true sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ppe exists (P.toqsymbol p)
 
   let tc_symb (ppe : t) p =
-      let exists sm =
+    let exists sm =
       try  EcPath.p_equal (EcEnv.TypeClass.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ppe exists (P.toqsymbol p)
 
   let rw_symb (ppe : t) p =
-      let exists sm =
+    let exists sm =
       try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ppe exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
-      let exists sm =
+    let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ppe exists (P.toqsymbol p)
 
   let op_symb (ppe : t) p info =
     let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
@@ -220,21 +249,21 @@ module PPEnv = struct
       (* FIXME: for special operators, do check `info` *)
       if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
       then ([], EcPath.basename p)
-      else p_shorten exists (P.toqsymbol p)
+      else p_shorten ppe exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ppe exists (P.toqsymbol p)
 
-  let th_symb (ppe : t) p =
+  let th_symb ?alias (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists (P.toqsymbol p)
+      p_shorten ?alias ~istheory:true ppe exists (P.toqsymbol p)
 
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
     let (nm, x, p2) =
@@ -360,13 +389,18 @@ module PPEnv = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let shorten_path (cond : P.path -> qsymbol -> bool) (p : P.path) : qsymbol * qsymbol option =
+let shorten_path
+  (ppe  : PPEnv.t)
+  (cond : P.path -> qsymbol -> bool)
+  (p    : P.path)
+  : qsymbol * qsymbol option
+=
   let (nm, x) = EcPath.toqsymbol p in
   let nm =
     match nm with
     | top :: nm when top = EcCoreLib.i_top -> nm
     | _ -> nm in
-  let nm', x' = PPEnv.p_shorten (cond p) (nm, x) in
+  let nm', x' = PPEnv.p_shorten ppe (cond p) (nm, x) in
   let plong, pshort = (nm, x), (nm', x') in
 
   (plong, if plong = pshort then None else Some pshort)
@@ -445,8 +479,13 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
-let pp_shorten_path (cond : P.path -> qsymbol -> bool) (fmt : Format.formatter) (p : P.path) =
-  let plong, pshort  = shorten_path cond p in
+let pp_shorten_path
+  (ppe  : PPEnv.t)
+  (cond : P.path -> qsymbol -> bool)
+  (fmt  : Format.formatter)
+  (p    : P.path)
+=
+  let plong, pshort = shorten_path ppe cond p in
 
   match pshort with
   | None ->
@@ -507,8 +546,8 @@ let pp_axhnt ppe fmt (p, b) =
   Format.fprintf fmt "%a%s" (pp_axname ppe) p b
 
 (* -------------------------------------------------------------------- *)
-let pp_thname ppe fmt p =
-  EcSymbols.pp_qsymbol fmt (PPEnv.th_symb ppe p)
+let pp_thname ?alias ppe fmt p =
+  EcSymbols.pp_qsymbol fmt (PPEnv.th_symb ?alias ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -3564,6 +3603,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         pp_locality locality
         level (odfl "" base)
         (pp_list "@ " (pp_axhnt ppe)) axioms
+
+  | EcTheory.Th_alias (name, target) ->
+      Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
