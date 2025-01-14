@@ -54,7 +54,7 @@ module type PrinterAPI = sig
   val pp_tyname  : PPEnv.t -> path pp
   val pp_axname  : PPEnv.t -> path pp
   val pp_tcname  : PPEnv.t -> path pp
-  val pp_thname  : PPEnv.t -> path pp
+  val pp_thname  : ?alias:bool -> PPEnv.t -> path pp
 
   val pp_mem      : PPEnv.t -> EcIdent.t pp
   val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
@@ -63,9 +63,9 @@ module type PrinterAPI = sig
   val pp_path     : path pp
   
   (* ------------------------------------------------------------------ *)
-  val shorten_path : (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
+  val shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
 
-  val pp_shorten_path : (path -> qsymbol -> bool) -> path pp
+  val pp_shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path pp
 
   (* ------------------------------------------------------------------ *)
   val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
