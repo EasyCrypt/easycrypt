@@ -188,8 +188,9 @@ val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> u
 (* -------------------------------------------------------------------- *)
 type typolicy
 
-val tp_tydecl : typolicy
-val tp_relax  : typolicy
+val tp_tydecl  : typolicy
+val tp_relax   : typolicy
+val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
