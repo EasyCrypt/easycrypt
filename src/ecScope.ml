@@ -1736,7 +1736,18 @@ module Theory = struct
               raise (ImportError (None, name.rqd_name, e))
         end
 
+  (* -------------------------------------------------------------------- *)
   let required scope = scope.sc_required
+
+  (* -------------------------------------------------------------------- *)
+  let alias (scope : scope) ?(import = EcTheory.import0) ((name, target) : psymbol * pqsymbol) =
+    let thpath = EcEnv.Theory.lookup_opt (unloc target) (env scope) in
+    let thpath, _ = ofdfl (fun () ->
+      hierror ~loc:(loc target) "unknown theory: %a" pp_qsymbol (unloc target)
+    ) thpath in
+    let item = EcTheory.mkitem import (Th_alias (unloc name, thpath)) in
+
+    { scope with sc_env = EcSection.add_item item scope.sc_env }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2382,8 +2393,7 @@ module Ty = struct
         failwith "unsupported"          (* FIXME *)
 end
 
-(* -------------------------------------------------------------------- *)
-module Search = struct
+(* -------------------------------------------------------------------- *)module Search = struct
   let search (scope : scope) qs =
     let env = env scope in
     let paths =
@@ -2445,12 +2455,14 @@ module Search = struct
     notify scope `Info "%s" (Buffer.contents buffer)
 
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
+    let ppe = EcPrinting.PPEnv.ofenv (env scope) in
+
     let shorten lk p =
       let lk (p : path) (qs : qsymbol) =
         match lk qs (env scope) with
         | Some (p', _) -> p_equal p p'
         | _ -> false in
-      EcPrinting.shorten_path lk p
+      EcPrinting.shorten_path ppe lk p
     in
 
     let buffer = Buffer.create 0 in

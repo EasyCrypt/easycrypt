@@ -175,6 +175,10 @@ module Theory : sig
   val add_clears : (pqsymbol option) list -> scope -> scope
 
   val required : scope -> required
+
+  (* [alias scope (name, thname)] create a theory alias [name] to
+   * [thname] *)
+  val alias : scope -> ?import:EcTheory.import -> psymbol * pqsymbol -> scope
 end
 
 (* -------------------------------------------------------------------- *)

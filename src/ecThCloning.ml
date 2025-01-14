@@ -457,6 +457,7 @@ end = struct
       | Th_addrw  _     -> (proofs, evc)
       | Th_reduction _  -> (proofs, evc)
       | Th_auto _       -> (proofs, evc)
+      | Th_alias _      -> (proofs, evc)
 
     and doit prefix (proofs, evc) dth =
       doit_r prefix (proofs, evc) dth.ti_item

@@ -1051,6 +1051,7 @@ let rec set_local_item item =
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
     | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_local auto_rl.locality}
+    | Th_alias         alias -> Th_alias     alias
 
   in { item with ti_item = lcitem }
 
@@ -1353,6 +1354,7 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
     | Th_auto auto           -> EcEnv.Auto.add ~level:auto.level ?base:auto.base
                                   auto.axioms auto.locality env
+    | Th_alias     (n,p) -> EcEnv.Theory.alias n p env
     | Th_reduction r         -> EcEnv.Reduction.add r env
     | _                      -> assert false
   in
@@ -1381,6 +1383,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
     | Th_auto hints      -> generalize_auto to_gen hints
+    | Th_alias _         -> (to_gen, None) (* FIXME:ALIAS *)
 
   in
 
@@ -1503,6 +1506,7 @@ let check_item scenv item =
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
   | Th_theory  _   -> assert false
+  | Th_alias _     -> () (* FIXME:ALIAS *)
 
 let rec add_item (item : theory_item) (scenv : scenv) =
   let item = if scenv.sc_loca = `Local then set_local_item item else item in

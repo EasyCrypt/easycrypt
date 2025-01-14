@@ -184,6 +184,7 @@ type preenv = {
   env_atbase   : atbase Msym.t;
   env_redbase  : mredinfo;
   env_ntbase   : ntbase Mop.t;
+  env_albase   : path Mp.t;             (* theory aliases   *)
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
@@ -312,6 +313,7 @@ let empty gstate =
     env_atbase   = Msym.empty;
     env_redbase  = Mrd.empty;
     env_ntbase   = Mop.empty;
+    env_albase   = Mp.empty;
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache;
@@ -636,9 +638,9 @@ module MC = struct
             (IPPath (root env))
             env.env_comps; }
 
-  let import up p obj env =
-    let name = ibasename p in
-      { env with env_current = up env.env_current name (p, obj) }
+  let import ?name up p obj env =
+    let name = odfl (ibasename p) name in
+    { env with env_current = up env.env_current name (p, obj) }
 
   (* -------------------------------------------------------------------- *)
   let lookup_var qnx env =
@@ -976,20 +978,20 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_th env p args, obj)
 
-  let import_theory p th env =
-    import (_up_theory true) (IPPath p) th env
+  let import_theory ?name p th env =
+    import ?name (_up_theory true) (IPPath p) th env
 
   (* -------------------------------------------------------------------- *)
-  let _up_mc candup mc p =
-    let name = ibasename p in
+  let _up_mc ?name candup mc p =
+    let name = odfl (ibasename p) name in
     if not candup && MMsym.last name mc.mc_components <> None then
       raise (DuplicatedBinding name);
     { mc with mc_components =
         MMsym.add name p mc.mc_components }
 
-  let import_mc p env =
-    let mc = _up_mc true env.env_current p in
-      { env with env_current = mc }
+  let import_mc ?name p env =
+    let mc = _up_mc ?name true env.env_current p in
+    { env with env_current = mc }
 
   (* ------------------------------------------------------------------ *)
   let rec mc_of_module_r (p1, args, p2, lc) me =
@@ -1108,6 +1110,10 @@ module MC = struct
 
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
+
+      | Th_alias _ ->
+          (* FIXME:ALIAS *)
+          (mc, None)
 
       | Th_export _ | Th_addrw _ | Th_instance _
       | Th_auto   _ | Th_reduction _ ->
@@ -2887,6 +2893,25 @@ module Theory = struct
       Option.get (Mp.find_opt p env.env_thenvs)
 
   (* ------------------------------------------------------------------ *)
+  let rebind_alias (name : symbol) (path : path) (env : env) =
+    let th = by_path path env in
+    let src = EcPath.pqname (root env) name in
+    let env = MC.import_theory ~name path th env in
+    let env = MC.import_mc ~name (IPPath path) env in
+    let env = { env with env_albase = Mp.add path src env.env_albase } in
+    env
+
+  (* ------------------------------------------------------------------ *)
+  let alias ?(import = import0) (name : symbol) (path : path) (env : env) =
+    let env =
+      if import.im_immediate then rebind_alias name path env else env in
+    { env with env_item = mkitem import (Th_alias (name, path)) :: env.env_item }
+
+  (* ------------------------------------------------------------------ *)
+  let aliases (env : env) =
+    env.env_albase
+
+  (* ------------------------------------------------------------------ *)
   let rec bind_instance_th path inst cth =
     List.fold_left (bind_instance_th_item path) inst cth
 
@@ -3087,6 +3112,9 @@ module Theory = struct
 
         | Th_baserw (x, _) ->
             MC.import_rwbase (xpath x) env
+
+        | Th_alias (name, path) ->
+            rebind_alias name path env
 
         | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
             env
