@@ -452,6 +452,24 @@ end = struct
     | InvalidModSig (MTS_DupArgName (f, x)) ->
         msg "duplicated proc. arg. name in signature: `%s.%s'" f x
 
+    | InvalidModUpdate MUE_Functor ->
+        msg "cannot update a functor"
+
+    | InvalidModUpdate MUE_AbstractFun ->
+        msg "cannot update an abstract function"
+
+    | InvalidModUpdate MUE_AbstractModule ->
+        msg "cannot update an abstract module"
+
+    | InvalidModUpdate MUE_InvalidFun ->
+        msg "unknown function"
+
+    | InvalidModUpdate MUE_InvalidCodePos->
+        msg "invalid code position"
+
+    | InvalidModUpdate MUE_InvalidTargetCond ->
+        msg "target instruction is not a conditional"
+
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
 

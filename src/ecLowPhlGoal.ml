@@ -578,7 +578,7 @@ type 'a zip_t =
 let t_fold f (cenv : code_txenv) (cpos : codepos) (_ : form * form) (state, s) =
   try
     let env = EcEnv.LDecl.toenv (snd cenv) in
-    let (me, f) = Zpr.fold env cenv cpos f state s in
+    let (me, f) = Zpr.fold env cenv cpos (fun _ -> f) state s in
       ((me, f, []) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 

@@ -36,6 +36,30 @@ type osymbol_r   = psymbol option
 type osymbol     = osymbol_r located
 
 (* -------------------------------------------------------------------- *)
+type pcp_match = [
+  | `If
+  | `While
+  | `Match
+  | `Assign of plvmatch
+  | `Sample of plvmatch
+  | `Call of plvmatch
+]
+
+and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
+
+type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
+
+type pbranch_select = [`Cond of bool | `Match of psymbol]
+type pcodepos1 = int * pcp_base
+type pcodepos  = (pcodepos1 * pbranch_select) list * pcodepos1
+type pdocodepos1 = pcodepos1 doption option
+
+type pcodeoffset1 = [
+  | `ByOffset   of int
+  | `ByPosition of pcodepos1
+]
+(* -------------------------------------------------------------------- *)
+
 type pty_r =
   | PTunivar
   | PTtuple  of pty list
@@ -305,6 +329,7 @@ and pmodule_params = (psymbol * pmodule_type) list
 and pmodule_expr_r =
   | Pm_ident  of pmsymbol
   | Pm_struct of pstructure
+  | Pm_update of pmsymbol * pupdate_var list * pupdate_fun list
 
 and pmodule_expr = pmodule_expr_r located
 
@@ -318,6 +343,21 @@ and pstructure_item =
   | Pst_include  of (pmsymbol located * bool * minclude_proc option)
   | Pst_import   of (pmsymbol located) list
 
+and pupdate_var = psymbol list * pty
+and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos located * pupdate_item) list * pexpr option)
+
+and pupdate_item =
+  | Pup_stmt of pupdate_stmt
+  | Pup_cond of pupdate_cond
+
+and pupdate_stmt =
+  | Pups_add of (pstmt * bool)
+  | Pups_del
+
+and pupdate_cond =
+  | Pupc_add of pexpr
+  | Pupc_mod of pexpr
+  | Pupc_del of pbranch_select
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -467,30 +507,6 @@ type preduction = {
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
 }
-
-(* -------------------------------------------------------------------- *)
-type pcp_match = [
-  | `If
-  | `While
-  | `Match
-  | `Assign of plvmatch
-  | `Sample of plvmatch
-  | `Call of plvmatch
-]
-
-and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
-
-type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
-
-type pbranch_select = [`Cond of bool | `Match of psymbol]
-type pcodepos1 = int * pcp_base
-type pcodepos  = (pcodepos1 * pbranch_select) list * pcodepos1
-type pdocodepos1 = pcodepos1 doption option
-
-type pcodeoffset1 = [
-  | `ByOffset   of int
-  | `ByPosition of pcodepos1
-]
 
 (* -------------------------------------------------------------------- *)
 type pswap_kind = {
