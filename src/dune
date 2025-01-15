@@ -29,4 +29,5 @@
 
 (menhir
  (modules ecParser)
- (flags --table --explain))
+ (explain true)
+ (flags --table))
