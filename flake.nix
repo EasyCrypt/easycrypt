@@ -4,8 +4,8 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/23.11";
-    stable.url = "github:nixos/nixpkgs/23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/24.05";
+    stable.url = "github:nixos/nixpkgs/24.05";
     nixpkgs.follows = "opam-nix/nixpkgs";
 
     prover_cvc4_1_8 = {
@@ -13,8 +13,8 @@
       flake = false;
     };
 
-    prover_cvc5_1_0_5 = {
-      url = "github:cvc5/cvc5/cvc5-1.0.5";
+    prover_cvc5_1_0_9 = {
+      url = "github:cvc5/cvc5/cvc5-1.0.9";
       flake = false;
     };
 
@@ -40,7 +40,7 @@
         };
 
         query = devPackagesQuery // {
-          ocaml-base-compiler = "4.14.1";
+          ocaml-base-compiler = "4.14.2";
         };
 
         scope = on.buildOpamProject' { } ./. query;
@@ -54,9 +54,12 @@
             '';
             doNixSupport = false;
           });
+          conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
+            nativeBuildInputs = oa.nativeBuildInputs ++ [pkgs.pkg-config];
+          });
         };
 
-        scope' = scope.overrideScope' overlay;
+        scope' = scope.overrideScope overlay;
 
         # Packages from devPackagesQuery
         devPackages = builtins.attrValues
@@ -75,15 +78,16 @@
             src = inputs."${"prover_" + pkg + "_" + builtins.replaceStrings ["."] ["_"] version}";
           });
 
-        mkAltErgo = version: (on.queryToScope { } (query // { alt-ergo = version; })).alt-ergo;
+        mkAltErgo = version:
+          ((on.queryToScope { } (query // { alt-ergo = version; })).overrideScope overlay).alt-ergo;
       in rec {
         legacyPackages = scope';
 
         packages = rec {
           z3 = mkProverPackage "z3" "4.12.6";
           cvc4 = mkProverPackage "cvc4" "1.8";
-          cvc5 = mkProverPackage "cvc5" "1.0.5";
-          altErgo = mkAltErgo "2.4.2";
+          cvc5 = mkProverPackage "cvc5" "1.0.9";
+          altErgo = mkAltErgo "2.4.3";
 
           provers = pkgs.symlinkJoin {
             name = "provers";
@@ -101,9 +105,9 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
-	       devPackages
-            ++ [ scope'.why3 packages.provers ]
-            ++ (with pkgs.python3Packages; [ pyyaml ]);
+              devPackages
+           ++ [ scope'.why3 packages.provers ]
+           ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
       });
 }

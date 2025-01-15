@@ -4,7 +4,7 @@ depends: [
   "batteries" {>= "3"}
   "camlp-streams" {>= "5"}
   "camlzip"
-  "dune" {>= "3.6" & >= "3.6"}
+  "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"
   "ocaml-inifiles" {>= "1.2"}
