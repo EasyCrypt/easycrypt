@@ -214,6 +214,23 @@ by case (y = x) => // ->>; apply/eq_sym/domNE.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma rng_set (m : ('a, 'b) fmap) (x : 'a) (y z : 'b) :
+  rng m.[x <- y] z <=> rng (rem m x) z \/ z = y.
+proof.
+rewrite !rngE /=; split.
++ move=> [] r; rewrite get_setE; case: (r = x)=> />.
+  by move=> r_neq_x m_r; left; exists r; rewrite remE r_neq_x /= m_r.
+case=> [[] r rem_m_x_r|->>] />.
++ by exists r; move: rem_m_x_r; rewrite get_setE remE; case: (r = x).
++ by exists x; rewrite get_set_sameE.
+qed.
+
+lemma rng_set_notin (m : ('a, 'b) fmap) (x : 'a) (y z : 'b) :
+     x \notin m
+  => rng m.[x <- y] z <=> rng m z \/ z = y.
+proof. by rewrite rng_set=> /rem_id ->. qed.
+
+(* -------------------------------------------------------------------- *)
 op eq_except ['a 'b] X (m1 m2 : ('a, 'b) fmap) =
   SmtMap.eq_except X (tomap m1) (tomap m2).
 
