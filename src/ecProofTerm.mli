@@ -166,6 +166,7 @@ type prept = [
   | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
   | `HD   of handle
+  | `PE   of pt_ev
   | `App  of prept * prept_arg list
 ]
 
@@ -177,6 +178,7 @@ and prept_arg =  [
   | `H_
 ]
 
+val pt_of_prept_r: pt_env -> prept -> pt_ev
 val pt_of_prept: tcenv1 -> prept -> pt_ev
 
 (* -------------------------------------------------------------------- *)

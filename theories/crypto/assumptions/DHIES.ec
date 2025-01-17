@@ -9,7 +9,9 @@ pragma -implicits.
 pragma +oldip.
 
 (* an "eval safe" version of [dlet] *)
-op dlet_locked ['a, 'b] = dlet<:'a, 'b> axiomatized by dlet_lockedE.
+op [opaque] dlet_locked ['a, 'b] = dlet<:'a, 'b>. 
+lemma dlet_lockedE: dlet_locked<:'a, 'b> = dlet<:'a, 'b>.
+proof. by rewrite/dlet_locked. qed.
 
 theory DHIES.
 

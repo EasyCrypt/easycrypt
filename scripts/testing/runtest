@@ -333,6 +333,10 @@ class Gather:
                 return True
         return False
 
+    @staticmethod
+    def is_file_statically_ignored(src):
+        return os.path.basename(src).startswith('.#')
+
     @classmethod
     def gather(cls, obj):
         try:
@@ -376,7 +380,11 @@ class Gather:
         dirs = map(cls.gather, dirs)
 
         files = list(itertools.chain.from_iterable(dirs))
-        files = [x for x in files if not cls.is_file_excluded(x.filename, scenario.fexclude)]
+        files = [
+            x for x in files if
+            not cls.is_file_statically_ignored(x.filename) and
+            not cls.is_file_excluded(x.filename, scenario.fexclude)
+        ]
 
         return files
 

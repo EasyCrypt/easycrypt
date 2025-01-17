@@ -638,7 +638,7 @@ type cutsolver = {
   smt   : FApi.backward;
   done_ : FApi.backward;
 }
-  
+
 (* -------------------------------------------------------------------- *)
 let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
@@ -1509,16 +1509,91 @@ let t_elim_iso_or ?reduce tc =
 
     let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
 
+
 (* -------------------------------------------------------------------- *)
-let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
+let t_split_and_i i b f1 f2 tc =
+  let i = i - 1 in
+  let rec destr acc_sym acc_f i f =
+    if i < 0 then
+      acc_sym, acc_f, f
+    else
+      match sform_of_form f with
+      | SFand (b, (f1, f2)) ->
+        destr (b :: acc_sym) (f1 :: acc_f) (i - 1) f2
+      | _ -> tc_error !!tc ~catchable:true  "not enought conjunctions" in
+
+  let l_sym , l_fsl, fsr = destr [b] [f1] i f2 in
+
+  let sym = List.hd l_sym in
+  let syms = List.tl l_sym in
+  let fsl = List.hd l_fsl in
+  let fsls = List.tl l_fsl in
+
+  let fsl =
+    List.fold_left2(fun acc sym f ->
+      match sym with
+      | `Asym -> f_anda f acc
+      | `Sym  -> f_and f acc
+    ) fsl syms fsls in
+
+  let tc = FApi.tcenv_of_tcenv1 tc in
+  let tc, gl = FApi.newgoal tc fsl in
+
+  let tc, gr =
+    match sym with
+    | `Asym ->
+      let fsr = f_imp fsl fsr in
+      let tc, gr = FApi.newgoal tc fsr in
+      tc,`App (`HD gr, [`Sub (`HD gl:>prept)])
+    | `Sym ->
+      let tc, gr = FApi.newgoal tc fsr in
+      tc,(`HD gr:>prept) in
+
+  let pelim (sym : [`Sym | `Asym]) (side : [`L | `R]) =
+    match sym, side with
+    | `Sym , `L -> LG.p_and_proj_l
+    | `Sym , `R -> LG.p_and_proj_r
+    | `Asym, `L -> LG.p_anda_proj_l
+    | `Asym, `R -> LG.p_anda_proj_rs in
+
+  let pte = ptenv_of_penv (FApi.tc_hyps tc) !$tc in
+
+  let proj, projs =
+    List.fold_left_map (fun h sym ->
+        let j : prept = `App (`G (pelim sym `L, []), [`H_; `H_; `Sub h]) in
+        let h : prept = `App (`G (pelim sym `R, []), [`H_; `H_; `Sub h]) in
+        let j = pt_of_prept_r pte j in
+        let h = pt_of_prept_r pte h in
+        (`PE h, (sym, `PE j))
+      ) (`HD gl :> prept) (List.rev syms) in
+
+  let projs = projs @ [sym, proj] in
+
+  let pintro (sym  : [`Sym | `Asym]) =
+    match sym with
+    | `Sym  -> LG.p_and_intro
+    | `Asym -> LG.p_anda_intro_s in
+
+  let pt =
+    List.fold_right
+      (fun (sym, ptproj) pt ->
+         `App (`G (pintro sym, []), [`H_; `H_; `Sub ptproj; `Sub pt]))
+      projs gr in
+
+  let pt = pt_of_prept_r pte pt in
+
+  FApi.t_first (Apply.t_apply_bwd_r pt) tc
+
+(* -------------------------------------------------------------------- *)
+let t_split ?(i = 0) ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let concl = FApi.tc1_goal tc in
 
     match sform_of_form fp with
     | SFtrue ->
         t_true tc
-    | SFand (b, (f1, f2)) when not closeonly ->
-        t_and_intro_s b (f1, f2) tc
+    | SFand (b, (f1,f2)) when not closeonly ->
+        t_split_and_i i b f1 f2 tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
@@ -2182,13 +2257,14 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     end
 
     | _ when options.pgo_split ->
-       let thesplit =
+       let (thesplit:tcenv1 -> tcenv) =
          match options.pgo_delta.pgod_split with
-         | true  -> t_split ~closeonly:false ~reduce:`Full
+         | true  -> (fun x -> t_split ~closeonly:false ~reduce:`Full x)
          | false ->
-             FApi.t_or
-               (t_split ~reduce:`NoDelta)
-               (t_split ~closeonly:true ~reduce:`Full) in
+           FApi.t_or
+             (t_split ~reduce:`NoDelta)
+             (t_split ~closeonly:true ~reduce:`Full)
+       in
 
         FApi.t_try (FApi.t_seq thesplit aux0) tc
 

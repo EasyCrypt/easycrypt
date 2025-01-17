@@ -5,7 +5,10 @@ depends: [
   "bitwuzla"
   "camlp-streams" {>= "5"}
   "camlzip"
+<<<<<<< HEAD
   "cmdliner"
+=======
+>>>>>>> main
   "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"

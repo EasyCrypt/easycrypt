@@ -25,9 +25,9 @@ proof. by []. qed.
 abbrev (\in)    ['a 'b] x (m : ('a, 'b) fmap) = (dom m x).
 abbrev (\notin) ['a 'b] x (m : ('a, 'b) fmap) = ! (dom m x).
 
-op rng ['a 'b] (m : ('a, 'b) fmap) =
-  fun y => exists x, m.[x] = Some y
-axiomatized by rngE.
+op [opaque] rng ['a 'b] (m : ('a, 'b) fmap) = fun y => exists x, m.[x] = Some y.
+lemma rngE (m : ('a, 'b) fmap): 
+  rng m = fun y => exists x, m.[x] = Some y by rewrite /rng.
 
 lemma get_none (m : ('a, 'b) fmap, x : 'a) :
   x \notin m => m.[x] = None.
@@ -458,8 +458,9 @@ case: (y = x) => [->|] /=; case: (p x b) => /=.
 qed.
 
 (* ==================================================================== *)
-op fdom ['a 'b] (m : ('a, 'b) fmap) =
-  oflist (to_seq (dom m)) axiomatized by fdomE.
+op [opaque] fdom ['a 'b] (m : ('a, 'b) fmap) = oflist (to_seq (dom m)).
+lemma fdomE (m : ('a, 'b) fmap): fdom m = oflist (to_seq (dom m)).
+proof. by rewrite/fdom. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_fdom ['a 'b] (m : ('a, 'b) fmap) (x : 'a) :
@@ -512,8 +513,9 @@ lemma mem_fdom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
 proof. by rewrite fdom_rem in_fsetD1. qed.
 
 (* ==================================================================== *)
-op frng ['a 'b] (m : ('a, 'b) fmap) =
-  oflist (to_seq (rng m)) axiomatized by frngE.
+op [opaque] frng ['a 'b] (m : ('a, 'b) fmap) = oflist (to_seq (rng m)).
+lemma frngE (m : ('a, 'b) fmap): frng m = oflist (to_seq (rng m)).
+proof. by rewrite/frng. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_frng ['a 'b] (m : ('a, 'b) fmap) (y : 'b) :
@@ -590,9 +592,10 @@ by apply/fsetP=> x; rewrite mem_fdom mem_join in_fsetU !mem_fdom.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op has (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  has (fun x=> P x (oget m.[x])) (elems (fdom m))
-axiomatized by hasE.
+op [opaque] has (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  has (fun x=> P x (oget m.[x])) (elems (fdom m)).
+lemma hasE (P : 'a -> 'b -> bool) m: 
+  has P m = has (fun x=>P x (oget m.[x])) (elems (fdom m)) by rewrite/has.
 
 (* -------------------------------------------------------------------- *)
 lemma hasP (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
@@ -604,9 +607,11 @@ by split=> [Pxy|/>]; exists y.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op find (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m)))
-axiomatized by findE.
+op [opaque] find (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m))).
+lemma findE (P : 'a -> 'b -> bool) m: find P m =
+  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m))).
+proof. by rewrite/find. qed.
 
 (* -------------------------------------------------------------------- *)
 

@@ -57,7 +57,10 @@ module Zipper = struct
   module P = EcPath
 
   type ('a, 'state) folder =
-    'a -> 'state -> instr -> 'state * instr list
+    env -> 'a -> 'state -> instr -> 'state * instr list
+
+  type ('a, 'state) folder_tl =
+    env -> 'a -> 'state -> instr -> instr list -> 'state * instr list
 
   type spath_match_ctxt = {
     locals : (EcIdent.t * ty) list;
@@ -71,18 +74,19 @@ module Zipper = struct
   | ZIfThen of expr * spath * stmt
   | ZIfElse of expr * stmt  * spath
   | ZMatch  of expr * spath * spath_match_ctxt
-  
+
   and spath = (instr list * instr list) * ipath
 
   type zipper = {
     z_head : instr list;                (* instructions on my left (rev)       *)
     z_tail : instr list;                (* instructions on my right (me incl.) *)
     z_path : ipath;                     (* path (zipper) leading to me         *)
+    z_env  : env option;
   }
 
   let cpos (i : int) : codepos1 = (0, `ByPos i)
 
-  let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
+  let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
 
   let find_by_cp_match
     (env     : EcEnv.env)
@@ -193,19 +197,19 @@ module Zipper = struct
     ((cp1, sub) : codepos1 * codepos_brsel)
     (s          : stmt)
     (zpr        : ipath)
-  : (ipath * stmt) * (codepos1 * codepos_brsel)
+  : (ipath * stmt) * (codepos1 * codepos_brsel) * env
   =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
-    let zpr =
+    let zpr, env =
       match i.i_node, sub with
       | Swhile (e, sw), `Cond true ->
-          (ZWhile (e, ((s1, s2), zpr)), sw)
+          (ZWhile (e, ((s1, s2), zpr)), sw), env
 
       | Sif (e, ifs1, ifs2), `Cond true ->
-          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
+          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1), env
 
       | Sif (e, ifs1, ifs2), `Cond false ->
-          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
+          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), env
 
       | Smatch (e, bs), `Match cn ->
           let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
@@ -216,19 +220,20 @@ module Zipper = struct
             with Not_found -> raise InvalidCPos
           in
           let prebr, (locals, body), postbr = List.pivot_at ix bs in
-          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body)
+          let env = EcEnv.Var.bind_locals locals env in
+          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), env
 
       | _ -> raise InvalidCPos
-    in zpr, ((0, `ByPos (1 + List.length s1)), sub)
+    in zpr, ((0, `ByPos (1 + List.length s1)), sub), env
 
   let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
-    let (zpr, s), nm =
+    let ((zpr, s), env), nm =
       List.fold_left_map
-        (fun (zpr, s) nm1 -> zipper_at_nm_cpos1 env nm1 s zpr)
-        (ZTop, s) nm in
+        (fun ((zpr, s), env) nm1 -> let zpr, s, env = zipper_at_nm_cpos1 env nm1 s zpr in (zpr, env), s)
+        ((ZTop, s), env) nm in
 
     let s1, i, s2 = find_by_cpos1 env cp1 s in
-    let zpr = zipper s1 (i :: s2) zpr in
+    let zpr = zipper ~env s1 (i :: s2) zpr in
 
     (zpr, (nm, (0, `ByPos (1 + List.length s1))))
 
@@ -274,21 +279,28 @@ module Zipper = struct
     in
       List.rev after
 
-  let fold env cenv cpos f state s =
+  let fold_tl env cenv cpos f state s =
     let zpr = zipper_of_cpos env cpos s in
 
       match zpr.z_tail with
       | []      -> raise InvalidCPos
       | i :: tl -> begin
-          match f cenv state i with
+          match f (odfl env zpr.z_env) cenv state i tl with
           | (state', [i']) when i == i' && state == state' -> (state, s)
-          | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
+          | (state', si  ) -> (state', zip { zpr with z_tail = si })
       end
+
+  let fold env cenv cpos f state s =
+    let f e ce st i tl =
+      let state', si = f e ce st i in
+      state', si @ tl
+    in
+    fold_tl env cenv cpos f state s
 
   let map env cpos f s =
     fst_map
       Option.get
-      (fold env () cpos (fun () _ i -> fst_map some (f i)) None s)
+      (fold env () cpos (fun _ () _ i -> fst_map some (f i)) None s)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -501,8 +513,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
     let var_form_match ((x, xty) : ident * ty) (f : form) =
       match EV.get x !ev.evm_form with
-      | None ->
-        failure ()
+      | None -> assert false
 
       | Some `Unset ->
         let f = norm f in
@@ -583,10 +594,10 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
-      | Flocal x, _ ->
+      | Flocal x, _ when EV.mem x !ev.evm_form ->
           var_form_match (x, f1.f_ty) f2
 
-      | _, Flocal y ->
+      | _, Flocal y when EV.mem y !ev.evm_form ->
           var_form_match (y, f2.f_ty) f1
 
       | Fapp (f1, fs1), Fapp (f2, fs2) ->

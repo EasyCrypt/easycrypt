@@ -60,11 +60,12 @@ lemma perm_eq_oflistP (s1 s2 : 'a list):
 proof. by split; [apply perm_eq_oflist | apply oflist_perm_eq_undup]. qed.
 
 (* -------------------------------------------------------------------- *)
-op card ['a] (s : 'a fset) = size (elems s) axiomatized by cardE.
+op [opaque] card ['a] (s : 'a fset) = size (elems s). 
+lemma cardE (s : 'a fset): card s = size (elems s) by rewrite/card.
 
 (* -------------------------------------------------------------------- *)
-op mem ['a] (s : 'a fset) (x : 'a) = mem (elems s) x
-  axiomatized by memE.
+op [opaque] mem ['a] (s : 'a fset) (x : 'a) = mem (elems s) x.
+lemma memE (s : 's fset) x: mem s x = mem (elems s) x by rewrite /mem.
 
 abbrev (\in)    (z : 'a) (s : 'a fset) =  mem s z.
 abbrev (\notin) (z : 'a) (s : 'a fset) = !mem s z.
@@ -84,17 +85,25 @@ by move=> x; rewrite -!memE h.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op fset0 ['a] = oflist [<:'a>] axiomatized by set0E.
-op fset1 ['a] (z : 'a) = oflist [z] axiomatized by set1E.
+op [opaque] fset0 ['a] = oflist [<:'a>]. 
+lemma set0E: fset0<:'a> = oflist [<:'a>] by rewrite/fset0.
 
-op (`|`) ['a] (s1 s2 : 'a fset) = oflist (elems s1 ++ elems s2)
-  axiomatized by setUE.
+op [opaque] fset1 ['a] (z : 'a) = oflist [z].
+lemma set1E (z : 'a): fset1 z = oflist [z] by rewrite/fset1.
 
-op (`&`) ['a] (s1 s2 : 'a fset) = oflist (filter (mem s2) (elems s1))
-  axiomatized by setIE.
+op [opaque] (`|`) ['a] (s1 s2 : 'a fset) = oflist (elems s1 ++ elems s2).
+lemma setUE (s1 s2 : 'a fset): s1 `|` s2 = oflist (elems s1 ++ elems s2).
+proof. by rewrite/(`|`). qed.
 
-op (`\`) ['a] (s1 s2 : 'a fset) = oflist (filter (predC (mem s2)) (elems s1))
-  axiomatized by setDE.
+op [opaque] (`&`) ['a] (s1 s2 : 'a fset) = 
+  oflist (filter (mem s2) (elems s1)).
+lemma setIE (s1 s2 : 'a fset): 
+  s1 `&` s2 = oflist (filter (mem s2) (elems s1)) by rewrite/(`&`).
+
+op [opaque] (`\`) ['a] (s1 s2 : 'a fset) = 
+  oflist (filter (predC (mem s2)) (elems s1)).
+lemma setDE (s1 s2 : 'a fset): 
+  s1 `\` s2 = oflist (filter (predC (mem s2)) (elems s1)) by rewrite/(`\`).
 
 (* -------------------------------------------------------------------- *)
 lemma in_fset0: forall x, mem fset0<:'a> x <=> false.
@@ -201,8 +210,8 @@ right; by rewrite all_xs_not_in_ys.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op pick ['a] (A : 'a fset) = head witness (elems A)
-axiomatized by pickE.
+op [opaque] pick ['a] (A : 'a fset) = head witness (elems A).
+lemma pickE (A : 'a fset): pick A = head witness (elems A) by rewrite/pick.
 
 lemma pick0: pick<:'a> fset0 = witness.
 proof. by rewrite pickE elems_fset0. qed.
@@ -214,9 +223,10 @@ by move=> /(mem_head_behead witness) <-.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op filter ['a] (p : 'a -> bool) (s : 'a fset) =
-  oflist (filter p (elems s))
-axiomatized by filterE.
+op [opaque] filter ['a] (p : 'a -> bool) (s : 'a fset) =
+  oflist (filter p (elems s)).
+lemma filterE (p: 'a -> bool) s: filter p s = oflist (filter p (elems s)).
+proof. by rewrite/filter. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma in_filter (p : 'a -> bool) (s : 'a fset):
@@ -612,8 +622,10 @@ by apply: contraL o_cA => ->; rewrite fcards0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op image (f: 'a -> 'b) (A : 'a fset): 'b fset = oflist (map f (elems A))
-  axiomatized by imageE.
+op [opaque] image (f: 'a -> 'b) (A : 'a fset): 'b fset = 
+  oflist (map f (elems A)).
+lemma imageE (f: 'a -> 'b) A: image f A = oflist (map f (elems A)).
+proof. by rewrite/image. qed.
 
 lemma imageP (f : 'a -> 'b) (A : 'a fset) (b : 'b):
   mem (image f A) b <=> (exists a, mem A a /\ f a = b).
@@ -686,9 +698,11 @@ by rewrite /image /card -(perm_eq_size _ _ uniq_f) size_map.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op product (A : 'a fset) (B : 'b fset): ('a * 'b) fset =
-  oflist (allpairs (fun x y => (x,y)) (elems A) (elems B))
-axiomatized by productE.
+op [opaque] product (A : 'a fset) (B : 'b fset): ('a * 'b) fset =
+  oflist (allpairs (fun x y => (x,y)) (elems A) (elems B)).
+lemma productE (A : 'a fset) (B : 'b fset):
+  product A B = oflist (allpairs (fun x y => (x,y)) (elems A) (elems B)).
+proof. by rewrite/product. qed.
 
 lemma productP (A : 'a fset) (B : 'b fset) (a : 'a) (b : 'b):
   (a, b) \in product A B <=> (a \in A) /\ (b \in B).
@@ -704,9 +718,10 @@ apply allpairs_uniq; smt(uniq_elems).
 qed.
 
 (* -------------------------------------------------------------------- *)
-op fold (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset) : 'b =
-  foldr f z (elems A)
-  axiomatized by foldE.
+op [opaque] fold (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset) : 'b =
+  foldr f z (elems A).
+lemma foldE (f : 'a -> 'b -> 'b) z A: fold f z A = foldr f z (elems A).
+proof. by rewrite/fold. qed.
 
 lemma fold0 (f : 'a -> 'b -> 'b) (z : 'b): fold f z fset0 = z.
 proof. by rewrite foldE elems_fset0. qed.

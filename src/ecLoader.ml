@@ -65,15 +65,16 @@ let rec addidir ?namespace ?(recursive = false) (idir : string) (ecl : ecloader)
   | None    -> ()
   | Some st -> begin
       let idx = (st.Unix.st_dev, st.Unix.st_ino) in
+      let idirs = List.filter (fun ((nm, _), _) -> nm = namespace) ecl.ecl_idirs in
 
       match Sys.os_type with
       | "Win32" ->
           let test ((_, name), _) = name = idir in
-          if not (List.exists test ecl.ecl_idirs) then
+          if not (List.exists test idirs) then
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
 
       | _ ->
-          if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
+          if not (List.exists ((=) idx |- snd) idirs) then
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
   end
 

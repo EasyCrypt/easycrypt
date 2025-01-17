@@ -452,6 +452,24 @@ end = struct
     | InvalidModSig (MTS_DupArgName (f, x)) ->
         msg "duplicated proc. arg. name in signature: `%s.%s'" f x
 
+    | InvalidModUpdate MUE_Functor ->
+        msg "cannot update a functor"
+
+    | InvalidModUpdate MUE_AbstractFun ->
+        msg "cannot update an abstract function"
+
+    | InvalidModUpdate MUE_AbstractModule ->
+        msg "cannot update an abstract module"
+
+    | InvalidModUpdate MUE_InvalidFun ->
+        msg "unknown function"
+
+    | InvalidModUpdate MUE_InvalidCodePos->
+        msg "invalid code position"
+
+    | InvalidModUpdate MUE_InvalidTargetCond ->
+        msg "target instruction is not a conditional"
+
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
 
@@ -518,6 +536,20 @@ end = struct
 
     | PositiveShouldBeBeforeNegative ->
         msg "positive restriction are only allowed before negative restriction"
+
+    | NotAnExpression `Unknown ->
+        msg "this expression contains form-like constructors"
+
+    | NotAnExpression ((`LL | `Pr | `Logic | `Glob | `MemSel) as what) -> begin
+        msg "expressions cannot contain a %s"
+        begin match what with
+        | `LL     -> "lossless statement"
+        | `Pr     -> "Pr[...] statement"
+        | `Logic  -> "program logic statement"
+        | `Glob   -> "glob statement"
+        | `MemSel -> "memory selector"
+      end
+    end
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

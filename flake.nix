@@ -13,8 +13,8 @@
       flake = false;
     };
 
-    prover_cvc5_1_0_5 = {
-      url = "github:cvc5/cvc5/cvc5-1.0.5";
+    prover_cvc5_1_0_9 = {
+      url = "github:cvc5/cvc5/cvc5-1.0.9";
       flake = false;
     };
 
@@ -64,6 +64,9 @@
             '';
             doNixSupport = false;
           });
+          conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
+            nativeBuildInputs = oa.nativeBuildInputs ++ [pkgs.pkg-config];
+          });
         };
 
         scope' = scope.overrideScope overlay;
@@ -85,15 +88,16 @@
             src = inputs."${"prover_" + pkg + "_" + builtins.replaceStrings ["."] ["_"] version}";
           });
 
-        mkAltErgo = version: (on.queryToScope { } (query // { alt-ergo = version; })).alt-ergo;
+        mkAltErgo = version:
+          ((on.queryToScope { } (query // { alt-ergo = version; })).overrideScope overlay).alt-ergo;
       in rec {
         legacyPackages = scope';
 
         packages = rec {
           z3 = mkProverPackage "z3" "4.12.6";
           cvc4 = mkProverPackage "cvc4" "1.8";
-          cvc5 = mkProverPackage "cvc5" "1.0.5";
-          altErgo = mkAltErgo "2.4.2";
+          cvc5 = mkProverPackage "cvc5" "1.0.9";
+          altErgo = mkAltErgo "2.4.3";
 
           provers = pkgs.symlinkJoin {
             name = "provers";
@@ -111,9 +115,15 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
+<<<<<<< HEAD
 	             devPackages
             ++ [ scope'.why3 packages.provers ]
             ++ (with pkgs.python3Packages; [ pyyaml ]);
+=======
+              devPackages
+           ++ [ scope'.why3 packages.provers ]
+           ++ (with pkgs.python3Packages; [ pyyaml ]);
+>>>>>>> main
         };
       });
 }

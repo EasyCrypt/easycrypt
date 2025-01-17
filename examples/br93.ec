@@ -83,7 +83,7 @@ import H.Lazy.
 (* BR93 is a module that, given access to an oracle H from type         *)
 (*   `from` to type `rand` (see `print Oracle.`), implements procedures *)
 (*   `keygen`, `enc` and `dec` as follows described below.              *)
-module BR93 (H:Oracle) = {
+module BR93 (H : Oracle) = {
   (* `keygen` simply samples a key pair in `dkeys` *)
   proc keygen() = {
     var kp;
@@ -183,14 +183,14 @@ qed.
 
 (* But we can't do it (yet) for IND-CPA because of the random oracle    *)
 (*             Instead, we define CPA for BR93 with that particular RO. *)
-module type Adv (ARO: POracle)  = {
+module type Adv (ARO : POracle)  = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
 
 (* We need to log the random oracle queries made to the adversary       *)
 (*                               in order to express the final theorem. *)
-module Log (H:Oracle) = {
+module Log (H : Oracle) = {
   var qs: rand list
 
   proc init() = {
@@ -251,23 +251,17 @@ declare axiom A_a1_ll (O <: POracle {-A}): islossless O.o => islossless A(O).a1.
 declare axiom A_a2_ll (O <: POracle {-A}): islossless O.o => islossless A(O).a2.
 
 (* Step 1: replace RO call with random sampling                         *)
-local module Game1 = {
-  var r: rand
+local module Game1 = BR93_CPA(A) with {
+  var r : rand
 
-  proc main() = {
-    var pk, sk, m0, m1, b, h, c, b';
-                Log(LRO).init();
-    (pk,sk)  <$ dkeys;
-    (m0,m1)  <@ A(Log(LRO)).a1(pk);
-    b        <$ {0,1};
-
-    r        <$ drand;
-    h        <$ dptxt;
-    c        <- ((f pk r),h +^ (b?m0:m1));
-
-    b'       <@ A(Log(LRO)).a2(c);
-    return b' = b;
-  }
+  proc main [
+    (* new local variable to store the sampled ptxt *)
+    var h : ptxt
+    (* inline key generation *)
+    ^ <@ {2} ~ { (pk, sk) <$ dkeys; }
+    (* inline challenge encryption and idealize RO call *)
+    ^ c<@ ~ { r <$ drand; h <$ dptxt; c <- (f pk r, h +^ (b ? m0 : m1)); }
+  ]
 }.
 
 local lemma pr_Game0_Game1 &m:
@@ -327,23 +321,11 @@ by move=> _ rR aL mL aR qsR mR h /h [] ->.
 qed.
 
 (* Step 2: replace h ^ m with h in the challenge encryption            *)
-local module Game2 = {
-  var r: rand
-
-  proc main() = {
-    var pk, sk, m0, m1, b, h, c, b';
-                Log(LRO).init();
-    (pk,sk)  <$ dkeys;
-    (m0,m1)  <@ A(Log(LRO)).a1(pk);
-    b        <$ {0,1};
-
-    r        <$ drand;
-    h        <$ dptxt;
-    c        <- ((f pk r),h);
-
-    b'       <@ A(Log(LRO)).a2(c);
-    return b' = b;
-  }
+local module Game2 = Game1 with {
+  proc main [
+    (* Challenge ciphertext is now produced uniformly at random *)
+    ^ c<- ~ { c <- (f pk r, h); }
+  ]
 }.
 
 local equiv eq_Game1_Game2: Game1.main ~ Game2.main:
@@ -402,12 +384,12 @@ local module OWr (I : Inverter) = {
 
 (* We can easily prove that it is strictly equivalent to OW              *)
 local lemma OW_OWr &m (I <: Inverter {-OWr}):
-  Pr[OW(I).main() @ &m: res]
+    Pr[OW(I).main() @ &m: res]
   = Pr[OWr(I).main() @ &m: res].
 proof. by byequiv=> //=; sim. qed.
 
 local lemma pr_Game2_OW &m:
-  Pr[Game2.main() @ &m: Game2.r \in Log.qs]
+     Pr[Game2.main() @ &m: Game2.r \in Log.qs]
   <= Pr[OW(I(A)).main() @ &m: res].
 proof.
 rewrite (OW_OWr &m (I(A))). (* Note: we proved it forall (abstract) I    *)
@@ -431,7 +413,7 @@ by auto=> /> [pk sk] ->.
 qed.
 
 lemma Reduction &m:
-  Pr[BR93_CPA(A).main() @ &m : res] - 1%r/2%r
+     Pr[BR93_CPA(A).main() @ &m : res] - 1%r/2%r
   <= Pr[OW(I(A)).main() @ &m: res].
 proof.
 smt(pr_Game0_Game1 pr_Game1_Game2 pr_bad_Game1_Game2 pr_Game2 pr_Game2_OW).
@@ -675,4 +657,3 @@ by move=> O O_o_ll; proc; call (A_a2_ll O O_o_ll).
 qed.
 
 end section.
-
