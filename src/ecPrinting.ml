@@ -3547,6 +3547,74 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         level (odfl "" base)
         (pp_list "@ " (pp_axhnt ppe)) axioms
 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
+      Format.fprintf fmt "%abind bitstring %a %a %a %d."
+        pp_locality lc
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        bs.size
+
+    | CRB_Array ba ->
+      Format.fprintf fmt "%abind array %a %a %a %a %a %d."
+        pp_locality lc
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
+        ba.size
+
+    | CRB_BvOperator op ->
+      let kind =
+        match op.kind with
+        | `Add      _            -> "add"
+        | `Sub      _            -> "sub"
+        | `Mul      _            -> "mul"
+        | `Div     (_,    false) -> "udiv"
+        | `Div     (_,    true ) -> "sdiv"
+        | `Rem     (_,    false) -> "urem"
+        | `Rem     (_,    true ) -> "srem"
+        | `Shl      _            -> "shl"
+        | `Rol      _            -> "rol"
+        | `Ror      _            -> "ror"
+        | `Shr     (_,    false) -> "shr"
+        | `Shr     (_,    true ) -> "ashr"
+        | `Not      _            -> "not"
+        | `And      _            -> "and"
+        | `Or       _            -> "or"
+        | `Xor      _            -> "xor"
+        | `Lt      (_,    false) -> "ult"
+        | `Lt      (_,    true ) -> "slt"
+        | `Le      (_,    false) -> "ule"
+        | `Le      (_,    true ) -> "sle"
+        | `Init     _            -> "init"
+        | `Get      _            -> "get"
+        | `AInit    _            -> "ainit"
+        | `Extend  (_, _, false) -> "zextend"
+        | `Extend  (_, _, true ) -> "sextend"
+        | `Extract  _            -> "extract"
+        | `Concat   _            -> "concat"
+        | `Truncate _            -> "truncate"
+        | `A2B      _            -> "a2b"
+        | `B2A      _            -> "b2a"
+        | `Map      _            -> "map"
+        | `ASliceGet _           -> "asliceget"
+        | `ASliceSet _           -> "asliceset"
+      in
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
+        pp_locality lc
+        (pp_list " & " (pp_tyname ppe)) op.types
+        (pp_opname ppe) op.operator
+        kind
+
+  | CRB_Circuit cr ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
+
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
   let ppnode = collect2_s ppe stmt.s_node [] in
@@ -3756,10 +3824,3 @@ module ObjectInfo = struct
     if !ok = 0 then
       Format.fprintf fmt "%s@." "no such object in any category"
 end
-
-(* ------------------------------------------------------------------ *)
-let () =
-  EcEnv.pp_debug_form :=
-    (fun env fmt f ->
-       let ppe = PPEnv.ofenv env in
-       pp_form ppe fmt f)
