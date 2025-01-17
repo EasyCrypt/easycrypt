@@ -143,7 +143,7 @@ module PPEnv = struct
             (fun env x -> EcEnv.Mod.bind_param x mty env)
             ppe.ppe_env xs; }
 
-  let p_shorten cond p =
+  let p_shorten cond (nm, x) =
     let rec shorten prefix (nm, x) =
       match cond (nm, x) with
       | true  -> (nm, x)
@@ -154,7 +154,6 @@ module PPEnv = struct
       end
     in
 
-    let (nm, x) = P.toqsymbol p in
     shorten (List.rev nm) ([], x)
 
   let ty_symb (ppe : t) p =
@@ -162,28 +161,28 @@ module PPEnv = struct
       try  EcPath.p_equal (EcEnv.Ty.lookup_path ~unique:true sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let tc_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.TypeClass.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let rw_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let op_symb (ppe : t) p info =
     let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
@@ -221,21 +220,21 @@ module PPEnv = struct
       (* FIXME: for special operators, do check `info` *)
       if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
       then ([], EcPath.basename p)
-      else p_shorten exists p
+      else p_shorten exists (P.toqsymbol p)
 
   let ax_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let th_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      p_shorten exists (P.toqsymbol p)
 
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
     let (nm, x, p2) =
@@ -361,6 +360,18 @@ module PPEnv = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let shorten_path (cond : P.path -> qsymbol -> bool) (p : P.path) : qsymbol * qsymbol option =
+  let (nm, x) = EcPath.toqsymbol p in
+  let nm =
+    match nm with
+    | top :: nm when top = EcCoreLib.i_top -> nm
+    | _ -> nm in
+  let nm', x' = PPEnv.p_shorten (cond p) (nm, x) in
+  let plong, pshort = (nm, x), (nm', x') in
+
+  (plong, if plong = pshort then None else Some pshort)
+
+(* -------------------------------------xz------------------------------- *)
 let pp_id pp fmt x = Format.fprintf fmt "%a" pp x
 
 (* -------------------------------------------------------------------- *)
@@ -434,6 +445,18 @@ let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
+let pp_shorten_path (cond : P.path -> qsymbol -> bool) (fmt : Format.formatter) (p : P.path) =
+  let plong, pshort  = shorten_path cond p in
+
+  match pshort with
+  | None ->
+    Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
+  | Some pshort ->
+    Format.fprintf fmt "%a (shorten name: %a)" 
+    EcSymbols.pp_qsymbol plong 
+    EcSymbols.pp_qsymbol pshort
+
+(* -------------------------------------------------------------------- *)
 let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
   match mx with
   | [] ->
@@ -475,6 +498,13 @@ let pp_rwname ppe fmt p =
 (* -------------------------------------------------------------------- *)
 let pp_axname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
+
+let pp_axhnt ppe fmt (p, b) =
+  let b =
+    match b with
+    | `Default -> ""
+    | `Rigid -> " (rigid)" in
+  Format.fprintf fmt "%a%s" (pp_axname ppe) p b
 
 (* -------------------------------------------------------------------- *)
 let pp_thname ppe fmt p =
@@ -2997,23 +3027,31 @@ let pp_rwbase ppe fmt (p, rws) =
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
 
 (* -------------------------------------------------------------------- *)
-let pp_solvedb ppe fmt db =
+let pp_solvedb ppe fmt (db: (int * (P.path * _) list) list) =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
-      lvl (pp_list ", " (pp_axname ppe)) ps)
+      lvl 
+      (pp_list ", " (pp_axhnt ppe))
+      ps)
   db;
 
   let lemmas = List.flatten (List.map snd db) in
-  let lemmas = List.pmap (fun p ->
+  let lemmas = List.pmap (fun (p, ir) ->
       let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
-      (omap (fun ax -> (p, ax)) ax))
-    lemmas
+      (omap (fun ax -> (ir, (p, ax))) ax)
+    ) lemmas
   in
 
   if not (List.is_empty lemmas) then begin
     Format.fprintf fmt "\n%!";
     List.iter
-      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      (fun (ir, ax) ->
+        let ir =
+          match ir with
+          | `Default -> ""
+          | `Rigid -> " (rigid)" in
+        
+        Format.fprintf fmt "%a%s\n\n%!" (pp_axiom ppe) ax ir)
       lemmas
   end
 
@@ -3503,11 +3541,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
 
-  | EcTheory.Th_auto (lvl, base, p, lc) ->
+  | EcTheory.Th_auto { level; base; axioms; locality; } ->
       Format.fprintf fmt "%ahint solve %d %s : %a."
-        pp_locality lc
-        lvl (odfl "" base)
-        (pp_list "@ " (pp_axname ppe)) p
+        pp_locality locality
+        level (odfl "" base)
+        (pp_list "@ " (pp_axhnt ppe)) axioms
 
   | EcTheory.Th_crbinding (binding, lc) -> begin
     match binding with
@@ -3586,6 +3624,60 @@ let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
 (* -------------------------------------------------------------------- *)
 let pp_stmt ?(lineno = false) =
   if lineno then pp_stmt_with_nums else pp_stmt
+
+(* -------------------------------------------------------------------- *)
+let pp_by_theory
+  (ppe0 : PPEnv.t)
+  (pp   : PPEnv.t -> (EcPath.path * 'a) pp)
+  (fmt  : Format.formatter)
+  (xs   : (EcPath.path * 'a) list)
+= 
+  let tr =
+    List.fold_left (fun tr ((p, _) as x) ->
+      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) x tr
+    ) Trie.empty xs
+  in
+
+  Trie.iter (fun prefix xs ->
+    let thpath =
+      match prefix with
+      | [] -> assert false
+      | name :: prefix -> (List.rev prefix, name) in
+
+    let thpath = EcPath.fromqsymbol thpath in
+
+    let ppe = PPEnv.enter_theory ppe0 thpath in
+
+    Format.fprintf fmt
+      "@.========== %a ==========@.@." (pp_thname ppe0) thpath;
+
+    List.iter (fun x ->
+      Format.fprintf fmt "%a@." (pp ppe) x
+    ) xs
+  ) tr
+
+(* -------------------------------------------------------------------- *)
+let rec pp_rule_pattern
+  (ppe  : PPEnv.t)
+  (fmt  : Format.formatter)
+  (rule : EcTheory.rule_pattern)
+=
+  match rule with
+  | Rule (`Tuple, args) ->
+    Format.fprintf fmt "(%a)" (pp_list ",@ " (pp_rule_pattern ppe)) args
+  | Rule (`Op (p, _), []) ->
+    Format.fprintf fmt "%a" (pp_opname ppe) p
+  | Rule (`Op (p, _), args) ->
+    Format.fprintf fmt "%a@ %a" (pp_opname ppe) p
+    (pp_list "@ " (pp_paren (pp_rule_pattern ppe))) args
+  | Rule (`Proj i, [arg]) ->
+    Format.fprintf fmt "(%a)`.%d" (pp_rule_pattern ppe) arg i
+  | Rule (`Proj _, _) ->
+    assert false
+  | Int z ->
+    Format.fprintf fmt "%s" (EcBigInt.to_string z)
+  | Var v ->
+    Format.fprintf fmt "%s" (EcIdent.name v)
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct

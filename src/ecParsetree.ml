@@ -1166,6 +1166,8 @@ type pprint =
   | Pr_glob of pmsymbol located
   | Pr_goal of int
   | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
+  | Pr_axioms
+  | Pr_hint of [`Simplify | `Rewrite | `Solve] option
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
@@ -1273,11 +1275,15 @@ type save = [ `Qed | `Admit | `Abort ]
 type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
+type phintoption = [ `Rigid ]
+
+(* -------------------------------------------------------------------- *)
 type phint = {
-  ht_local : is_local;
-  ht_prio  : int;
-  ht_base  : psymbol option;
-  ht_names : pqsymbol list;
+  ht_local   : is_local;
+  ht_prio    : int;
+  ht_base    : psymbol option;
+  ht_names   : pqsymbol list;
+  ht_options : phintoption list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1347,7 +1353,6 @@ type global_action =
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
-  | Gpaxiom
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)

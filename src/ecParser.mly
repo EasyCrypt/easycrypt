@@ -3710,6 +3710,11 @@ realize:
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
+phint:
+| SIMPLIFY { `Simplify }
+| SOLVE    { `Solve    }
+| REWRITE  { `Rewrite  }
+
 print:
 |             qs=qoident         { Pr_any  qs            }
 | STAR        qs=qoident         { Pr_any  qs            }
@@ -3725,10 +3730,12 @@ print:
 | GOAL        n=sword            { Pr_goal n             }
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
+| AXIOM                          { Pr_axioms             }
+| HINT        p=phint?           { Pr_hint p             }
 
 coq_info:
 |           { None }
-| CHECK    { Some EcProvers.Check }
+| CHECK     { Some EcProvers.Check }
 | EDIT      { Some EcProvers.Edit }
 | FIX       { Some EcProvers.Fix }
 
@@ -3780,14 +3787,25 @@ addrw:
 | local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
-hint:
-| local=is_local HINT EXACT base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = 0;
-        ht_base  = base ; ht_names = l; } }
+hintoption:
+| x=lident {
+    match unloc x with
+    | "rigid" -> `Rigid
+    | _ -> 
+        parse_error x.pl_loc
+            (Some ("invalid option: " ^ (unloc x)))
+  }
 
-| local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = i;
-        ht_base  = base ; ht_names = l; } }
+hint:
+| local=is_local
+    HINT opts=ioption(bracket(hintoption)+)
+    prio=ID(EXACT { 0 } | SOLVE i=word { i })
+    base=lident? COLON l=qident*
+    { { ht_local   = local;
+        ht_prio    = prio;
+        ht_base    = base ;
+        ht_names   = l; 
+        ht_options = odfl [] opts; } }
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
@@ -3873,7 +3891,6 @@ global_action:
 | cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
-| PRINT AXIOM      { Gpaxiom         }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

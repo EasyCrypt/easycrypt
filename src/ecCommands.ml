@@ -201,6 +201,7 @@ let process_locate scope x =
 
 (* -------------------------------------------------------------------- *)
 module HiPrinting = struct
+  (* ------------------------------------------------------------------ *)
   let pr_glob fmt env pm =
     let ppe = EcPrinting.PPEnv.ofenv env in
     let (p, _) = EcTyping.trans_msymbol env pm in
@@ -226,6 +227,7 @@ module HiPrinting = struct
       pv
 
 
+  (* ------------------------------------------------------------------ *)
   let pr_goal fmt scope n =
     match EcScope.xgoal scope with
     | None | Some { EcScope.puc_active = None} ->
@@ -255,6 +257,91 @@ module HiPrinting = struct
               fmt (goal, `One sz)
         end
     end
+
+  (* ------------------------------------------------------------------ *)
+  let pr_axioms (fmt : Format.formatter) (env : EcEnv.env) =
+    let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
+    let ppe0 = EcPrinting.PPEnv.ofenv env in
+    EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax  
+
+  let pr_hint_solve (fmt : Format.formatter) (env : EcEnv.env) =
+    let hint_solve = EcEnv.Auto.all env in
+    let hint_solve = List.map (fun (p, mode) ->
+      let ax = EcEnv.Ax.by_path p env in
+      (p, (ax, mode))
+    ) hint_solve in 
+    
+    let ppe = EcPrinting.PPEnv.ofenv env in
+  
+    let pp_hint_solve ppe fmt = (fun (p, (ax, mode)) ->
+      let mode =
+        match mode with
+        | `Default -> ""
+        | `Rigid -> "(rigid)" in
+        Format.fprintf fmt "%a %s" (EcPrinting.pp_axiom ppe) (p, ax) mode
+      )
+    in
+    
+    EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve    
+
+  (* ------------------------------------------------------------------ *)
+  let pr_hint_rewrite (fmt : Format.formatter) (env : EcEnv.env) =
+    let hint_rewrite = EcEnv.BaseRw.all env in
+
+    let ppe = EcPrinting.PPEnv.ofenv env in
+
+    let pp_path =
+      EcPrinting.pp_shorten_path
+        (fun (p : EcPath.path) (q : EcSymbols.qsymbol) ->
+          Option.equal EcPath.p_equal
+            (Some p)
+            (Option.map fst (EcEnv.Ax.lookup_opt q env))) in
+
+    let pp_hint_rewrite _ppe fmt = (fun (p,  sp) ->
+      let elems = EcPath.Sp.ntr_elements sp in
+      if List.is_empty elems then
+        Format.fprintf fmt "%s (empty)@." (EcPath.basename p)
+      else
+        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p) 
+          (EcPrinting.pp_list "@\n" (fun fmt p -> 
+            Format.fprintf fmt "%a" pp_path p))
+          (EcPath.Sp.ntr_elements sp)
+      )
+    in
+    
+    EcPrinting.pp_by_theory ppe pp_hint_rewrite fmt hint_rewrite
+
+  (* ------------------------------------------------------------------ *)
+  let pr_hint_simplify (fmt : Format.formatter) (env : EcEnv.env) =
+    let open EcTheory in
+
+    let (hint_simplify: (EcEnv.Reduction.topsym * rule list) list) = EcEnv.Reduction.all env in
+
+    let hint_simplify = List.filter_map (fun (ts, rl) -> 
+      match ts with
+      | `Path p -> Some (p, rl) 
+      | _ -> None
+    ) hint_simplify 
+    in
+    
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    
+    let pp_hint_simplify ppe fmt = (fun (p,  (rls : rule list)) ->
+      Format.fprintf fmt "@[<b 2>%s:@\n%a@]" (EcPath.basename p) 
+        (EcPrinting.pp_list "@\n" (fun fmt rl ->
+          begin match rl.rl_cond with
+          | [] -> Format.fprintf fmt "Conditions: None@\n"
+          | xs -> Format.fprintf fmt "Conditions: %a@\n" (EcPrinting.pp_list ",@ " (EcPrinting.pp_form ppe)) xs
+          end;
+          Format.fprintf fmt "Target: %a@\nPattern: %a@\n"
+          (EcPrinting.pp_form ppe) rl.rl_tg
+          (EcPrinting.pp_rule_pattern ppe) rl.rl_ptn
+        ))
+        rls
+      )
+    in
+    
+    EcPrinting.pp_by_theory ppe pp_hint_simplify fmt hint_simplify
 end
 
 (* -------------------------------------------------------------------- *)
@@ -280,6 +367,23 @@ let process_pr fmt scope p =
   | Pr_glob pm -> HiPrinting.pr_glob fmt env pm
   | Pr_goal n  -> HiPrinting.pr_goal fmt scope n
 
+  | Pr_axioms -> HiPrinting.pr_axioms fmt env
+
+  | Pr_hint (Some `Simplify) -> HiPrinting.pr_hint_simplify fmt env
+  | Pr_hint (Some `Solve) -> HiPrinting.pr_hint_solve fmt env
+  | Pr_hint (Some `Rewrite) -> HiPrinting.pr_hint_rewrite fmt env
+
+  | Pr_hint None ->
+    let printers = [
+      ("Solve"   , (fun fmt -> HiPrinting.pr_hint_solve fmt env));
+      ("Simplify", (fun fmt -> HiPrinting.pr_hint_simplify fmt env));
+      ("Rewrite" , (fun fmt -> HiPrinting.pr_hint_rewrite fmt env));
+    ] in
+
+    List.iter (fun (header, printer) ->
+      Format.fprintf fmt "%s hints:@.%t@." header printer
+    ) printers
+
 (* -------------------------------------------------------------------- *)
 let check_opname_validity (scope : EcScope.scope) (x : string) =
   if EcIo.is_binop x = `Invalid then
@@ -292,80 +396,6 @@ let check_opname_validity (scope : EcScope.scope) (x : string) =
 (* -------------------------------------------------------------------- *)
 let process_print scope p =
   process_pr Format.std_formatter scope p
-
-(* -------------------------------------------------------------------- *)
-let process_print_ax (scope : EcScope.scope) =
-  let env = EcScope.env scope in
-  let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
-
-  let module Trie : sig
-    type ('a, 'b) t
-
-    val empty : ('a, 'b) t
-    val add : 'a list -> 'b -> ('a, 'b) t -> ('a, 'b) t
-    val iter : ('a list -> 'b list -> unit) -> ('a, 'b) t -> unit
-  end = struct
-    module Map = BatMap
-
-    type ('a, 'b) t =
-      { children : ('a, ('a, 'b) t) Map.t
-      ; value    : 'b list }
-
-    let empty : ('a, 'b) t =
-      { value = []; children = Map.empty; }
-
-    let add (path : 'a list) (value : 'b) (t : ('a, 'b) t) =
-      let rec doit (path : 'a list) (t : ('a, 'b) t) =
-        match path with
-        | [] ->
-          { t with value = value :: t.value }
-        | v :: path ->
-          let children =
-            t.children |> Map.update_stdlib v (fun children ->
-              let subtrie = Option.value ~default:empty children in
-              Some (doit path subtrie)
-            )
-          in { t with children }
-      in doit path t
-
-    let iter (f : 'a list -> 'b list -> unit) (t : ('a, 'b) t) =
-      let rec doit (prefix : 'a list) (t : ('a, 'b) t) =
-        if not (List.is_empty t.value) then
-          f prefix t.value;
-        Map.iter (fun k v -> doit (k :: prefix) v) t.children
-      in
-      
-      doit [] t
-  end in
-
-  let ax =
-    List.fold_left (fun axs ((p, _) as ax) ->
-      Trie.add (EcPath.tolist (oget (EcPath.prefix p))) ax axs
-    ) Trie.empty ax in
-
-  let ppe0 = EcPrinting.PPEnv.ofenv env in
-  let buffer = Buffer.create 0 in
-  let fmt = Format.formatter_of_buffer buffer in
-
-  Trie.iter (fun prefix axs ->
-    let thpath =
-      match prefix with
-      | [] -> assert false
-      | name :: prefix -> (List.rev prefix, name) in
-
-    let thpath = EcPath.fromqsymbol thpath in
-
-    let ppe = EcPrinting.PPEnv.enter_theory ppe0 thpath in
-
-    Format.fprintf fmt
-      "@.========== %a ==========@.@." (EcPrinting.pp_thname ppe0) thpath;
-
-    List.iter (fun ax ->
-      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) ax
-    ) axs
-  ) ax;
-
-  EcScope.notify scope `Warning "%s" (Buffer.contents buffer)
 
 (* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset | `Restart]
@@ -742,7 +772,6 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
-      | Gpaxiom           -> `Fct   (fun scope -> process_print_ax   scope; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)

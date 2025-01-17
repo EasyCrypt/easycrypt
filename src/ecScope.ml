@@ -796,8 +796,8 @@ module Auto = struct
     let item = EcTheory.mkitem EcTheory.import0 (Th_addrw (base, l, local)) in
     { scope with sc_env =  EcSection.add_item item scope.sc_env }
 
-  let bind_hint scope ~local ~level ?base names =
-    let item = EcTheory.mkitem EcTheory.import0 (Th_auto (level, base, names, local)) in
+  let bind_hint scope ~local ~level ?base axioms =
+    let item = EcTheory.mkitem EcTheory.import0 (Th_auto { level; base; axioms; locality=local} ) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let add_hint scope hint =
@@ -806,6 +806,8 @@ module Auto = struct
     let names = List.map
       (fun l -> EcEnv.Ax.lookup_path (unloc l) env)
       hint.ht_names in
+    let mode = if List.mem `Rigid hint.ht_options then `Rigid else `Default in
+    let names = List.map (fun p -> (p, mode)) names in
 
     bind_hint scope ~local:hint.ht_local ~level:hint.ht_prio ?base names
 end
@@ -1287,7 +1289,9 @@ module Op = struct
 
       List.fold_left
         (fun scope base ->
-            Auto.bind_hint ~local:(local_of_locality lc) ~level:0 ~base scope [axpath])
+            Auto.bind_hint
+              ~local:(local_of_locality lc) ~level:0 ~base scope
+              [(axpath, `Default)])
         scope bases
 
     in
@@ -2824,28 +2828,11 @@ module Search = struct
 
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
     let shorten lk p =
-      let rec doit prefix (nm, x) =
-        match lk (nm, x) (env scope) with
-        | Some (p', _) when EcPath.p_equal p p' ->
-            (nm, x)
-        | _ -> begin
-            match prefix with
-            | [] -> (nm, x)
-            | n :: prefix -> doit prefix (n :: nm, x)
-          end
-      in
-
-      let (nm, x) = EcPath.toqsymbol p in
-      let nm =
-        match nm with
-        | top :: nm when top = EcCoreLib.i_top ->
-            nm
-        | _ -> nm in
-
-      let nm', x' = doit (List.rev nm) ([], x) in
-      let plong, pshort = (nm, x), (nm', x') in
-
-      (plong, if plong = pshort then None else Some pshort)
+      let lk (p : path) (qs : qsymbol) =
+        match lk qs (env scope) with
+        | Some (p', _) -> p_equal p p'
+        | _ -> false in
+      EcPrinting.shorten_path lk p
     in
 
     let buffer = Buffer.create 0 in
