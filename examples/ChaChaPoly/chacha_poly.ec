@@ -1123,8 +1123,8 @@ section PROOFS.
     ={glob A} ==> ={res, Mem.lc} /\ StLSke.gs{1} = RO.m{2}.
   proof.
     proc *.
-    transitivity*{1} { r <@ G3(StLSke(St)).main(); } => //; 1:smt(); 1: by sim.
-    transitivity* {2} { r <@ G3(OChaChaPoly(IFinRO)).main(); } => //; 1:smt().
+    transitivity* {1} { r <@ G3(StLSke(St)).main(); }; 1: by sim.
+    transitivity* {2} { r <@ G3(OChaChaPoly(IFinRO)).main(); }.
     + inline *; wp.
       call (_: StLSke.gs{1} = OCC.gs{2} /\ ={Mem.k, Mem.log, Mem.lc}).
       + by proc; inline *; auto => /> &2; case: (p{2}).

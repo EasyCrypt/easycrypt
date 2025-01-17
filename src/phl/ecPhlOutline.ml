@@ -8,95 +8,7 @@ open EcUnifyProc
 
 open EcCoreGoal
 open EcCoreGoal.FApi
-open EcLowGoal
 open EcLowPhlGoal
-
-(*---------------------------------------------------------------------------------------*)
-(*
-   Transitivity star with (ideally) lossless pre-conditions over the intermediate
-   programs, and automatic discharging of the first two goals.
-*)
-(* FIXME: Move to ecPhlTrans *)
-
-let t_equivS_trans_eq side s tc =
-  let env = tc1_env tc in
-  let es = tc1_as_equivS tc in
-  let c,m = match side with `Left -> es.es_sl, es.es_ml | `Right -> es.es_sr, es.es_mr in
-
-  let mem_pre = split_sided (EcMemory.memory m) es.es_pr in
-  let fv_pr  = EcPV.PV.fv env (EcMemory.memory m) es.es_pr in
-  let fv_po  = EcPV.PV.fv env (fst m) es.es_po in
-  let fv_r = EcPV.s_read env c in
-  let mk_eqs fv =
-    let vfv, gfv = EcPV.PV.elements fv in
-    let veq = List.map (fun (x,ty) -> f_eq (f_pvar x ty mleft) (f_pvar x ty mright)) vfv in
-    let geq = List.map (fun mp -> f_eqglob mp mleft mp mright) gfv in
-    f_ands (veq @ geq) in
-  let pre = mk_eqs (EcPV.PV.union (EcPV.PV.union fv_pr fv_po) fv_r) in
-  let pre = f_and pre (odfl f_true mem_pre) in
-  let post = mk_eqs fv_po in
-  let c1, c2 =
-    if side = `Left then (pre, post), (es.es_pr, es.es_po)
-    else (es.es_pr, es.es_po), (pre, post)
-  in
-
-  let exists_subtac (tc : tcenv1) =
-    (* Ideally these are guaranteed fresh *)
-    let pl = EcIdent.create "&p__1" in
-    let pr = EcIdent.create "&p__2" in
-    let h  = EcIdent.create "__" in
-    let tc = t_intros_i_1 [pl; pr; h] tc in
-    let goal = tc1_goal tc in
-
-    let p = match side with | `Left -> pl | `Right -> pr in
-    let b = match side with | `Left -> true | `Right -> false in
-
-    let handle_exists () =
-      (* Pairing up the correct variables for the exists intro *)
-      let vs, fm = EcFol.destr_exists goal in
-      let eqs_pre, _ =
-        let l, r = EcFol.destr_and fm in
-        if b then l, r else r, l
-      in
-      let eqs, _ = destr_and eqs_pre in
-      let eqs = destr_ands ~deep:false eqs in
-      let doit eq =
-        let l, r = destr_eq eq in
-        let l, r = if b then r, l else l, r in
-        let v = EcFol.destr_local l in
-        v, r
-      in
-      let eqs = List.map doit eqs in
-      let exvs =
-        List.map
-          (fun (id, _) ->
-            let v = List.assoc id eqs in
-            Fsubst.f_subst_mem (EcMemory.memory m) p v)
-          vs
-      in
-
-      as_tcenv1 (t_exists_intro_s (List.map paformula exvs) tc)
-    in
-
-    let tc =
-      if EcFol.is_exists goal then
-        handle_exists ()
-      else
-        tc
-    in
-
-    t_seq
-      (t_generalize_hyp ?clear:(Some `Yes) h)
-      EcHiGoal.process_done
-      tc
-  in
-
-  let tc = t_seqsub
-             (EcPhlTrans.t_equivS_trans (EcMemory.memtype m, s) c1 c2)
-             [exists_subtac; EcHiGoal.process_done; t_id; t_id]
-             tc
-  in
-  tc
 
 (*---------------------------------------------------------------------------------------*)
 (*
@@ -121,7 +33,7 @@ let t_outline_stmt side start_pos end_pos s tc =
   let code_pref, _, _ = s_split_i env start_pos (stmt rest) in
 
   let new_prog = s_seq (s_seq (stmt code_pref) s) (stmt code_suff) in
-  let tc = t_equivS_trans_eq side new_prog tc in
+  let tc = EcPhlTrans.t_equivS_trans_eq side new_prog tc in
 
   (* The middle goal, showing equivalence with the replaced code, ideally solves. *)
   let tp = match side with | `Left -> 1 | `Right -> 2 in

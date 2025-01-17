@@ -32,6 +32,11 @@ val t_equivF_trans :
   -> EcFol.form * EcFol.form
   -> EcCoreGoal.FApi.backward
 
+(*---------------------------------------------------------------------------------------*)
+(* Completely change the code of `side` *)
+val t_equivS_trans_eq :
+  side -> EcModules.stmt -> EcCoreGoal.FApi.backward
+
 (* -------------------------------------------------------------------- *)
 val process_equiv_trans :
   trans_kind * trans_formula -> backward
