@@ -509,7 +509,6 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-<<<<<<< HEAD
 type pcp_match = [
   | `If
   | `While
@@ -534,8 +533,6 @@ type pcodeoffset1 = [
 ]
 
 (* -------------------------------------------------------------------- *)
-=======
->>>>>>> main
 type pswap_kind = {
   interval : (pcodepos1 * pcodepos1 option) option;
   offset   : pcodeoffset1;

@@ -17,10 +17,7 @@
   bitwuzla
   (camlp-streams (>= 5))
   camlzip
-<<<<<<< HEAD
   cmdliner
-=======
->>>>>>> main
   dune
   dune-build-info
   dune-site

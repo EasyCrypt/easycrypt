@@ -3619,7 +3619,6 @@ and trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) :
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-<<<<<<< HEAD
 let trans_codeoffset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
   match o with
   | `ByOffset   i -> `ByOffset i
@@ -3627,9 +3626,6 @@ let trans_codeoffset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodeoffs
 
 (* -------------------------------------------------------------------- *)
 let trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
-=======
-and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
->>>>>>> main
   match bs with
   | `Cond b -> `Cond b
   | `Match { pl_desc = x } -> `Match x
