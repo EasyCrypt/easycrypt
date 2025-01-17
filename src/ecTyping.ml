@@ -3619,13 +3619,13 @@ and trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) :
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-let trans_codeoffset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+and trans_codeoffset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
   match o with
   | `ByOffset   i -> `ByOffset i
   | `ByPosition p -> `ByPosition (trans_codepos1 ?memory env p)
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
+and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   match bs with
   | `Cond b -> `Cond b
   | `Match { pl_desc = x } -> `Match x
