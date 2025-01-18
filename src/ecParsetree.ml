@@ -386,6 +386,15 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+type psubtype = {
+  pst_name    : psymbol;
+  pst_cname   : psymbol option;
+  pst_carrier : pty;
+  pst_pred    : (psymbol * pformula);
+  pst_rename  : (string * string) option;
+}
+
+(* -------------------------------------------------------------------- *)
 type ptyvardecls =
   (psymbol * pqsymbol list) list
 
@@ -1262,6 +1271,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gsubtype     of psubtype
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

@@ -116,7 +116,7 @@ module CI_Xreal = struct
   let mk_Rpbar = fun x -> EcPath.pqname p_Rpbar x
 
   let p_realp   = mk_Rp "realp"
-  let p_of_real = mk_Rp "of_real"
+  let p_of_real = mk_Rp "of_reald"
 
   let p_xreal   = mk_Rpbar "xreal"
   let p_rp      = mk_Rpbar "rp"

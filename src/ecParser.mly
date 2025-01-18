@@ -558,6 +558,7 @@
 %token SPLITWHILE
 %token STAR
 %token SUBST
+%token SUBTYPE
 %token SUFF
 %token SWAP
 %token SYMMETRY
@@ -1643,6 +1644,21 @@ typedecl:
 
 | locality=locality TYPE td=tyd_name EQ te=datatype_def
     { [mk_tydecl ~locality td (PTYD_Datatype te)] }
+
+(* -------------------------------------------------------------------- *)
+(* Subtypes                                                             *)
+subtype:
+| SUBTYPE name=lident cname=prefix(AS, uident)? EQ LBRACE
+    x=lident COLON carrier=loc(type_exp) PIPE pred=form
+  RBRACE rename=subtype_rename?
+  { { pst_name    = name;
+      pst_cname   = cname;
+      pst_carrier = carrier;
+      pst_pred    = (x, pred);
+      pst_rename  = rename; } }
+
+subtype_rename:
+| RENAME x=STRING COMMA y=STRING { (x, y) }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -3764,6 +3780,7 @@ global_action:
 | mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
+| subtype          { Gsubtype     $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
