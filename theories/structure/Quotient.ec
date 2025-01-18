@@ -87,23 +87,21 @@ apply/(eqv_trans (canon x)); first by apply/eqv_canon.
 by rewrite eq &(eqv_refl).
 qed.
 
-clone import Subtype with
-  type T  <- T,
-  op P  <- iscanon
-proof *.
+subtype qT as QSub = { x : T | iscanon x }.
+
 realize inhabited.
-smt(canonK).
-qed.
-    
-type qT = sT.
+proof. smt(canonK). qed.
+
+import QSub.
 
 clone include CoreQuotient with
   type T     <- T,
   type qT    <- qT,
-  op   pi    =  fun x => Subtype.insubd (canon x),
-  op   repr  =  fun x => Subtype.val x
+  op   pi    =  fun x => QSub.insubd (canon x),
+  op   repr  =  fun x => QSub.val x
 
   proof *.
+
 
 realize reprK. proof.
 by move=> q; rewrite /pi /repr /insubd canon_iscanon 1:valP valK.

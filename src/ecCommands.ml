@@ -412,6 +412,13 @@ and process_types (scope : EcScope.scope) tyds =
   List.fold_left process_type scope tyds
 
 (* -------------------------------------------------------------------- *)
+and process_subtype (scope : EcScope.scope) (subtype : psubtype located) =
+  EcScope.check_state `InTop "subtype" scope;
+  let scope = EcScope.Ty.add_subtype scope subtype in
+  EcScope.notify scope `Info "added subtype: `%s'" (unloc subtype.pl_desc.pst_name);
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
   EcScope.check_state `InTop "type class" scope;
   let scope = EcScope.Ty.add_class scope tcd in
@@ -743,6 +750,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
     match
       match g.pl_desc with
       | Gtype        t    -> `Fct   (fun scope -> process_types      scope  (List.map (mk_loc loc) t))
+      | Gsubtype     t    -> `Fct   (fun scope -> process_subtype    scope  (mk_loc loc t))
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
