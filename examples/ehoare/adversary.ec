@@ -74,7 +74,7 @@ proof.
     rewrite (eq_Ep _ _
        ((fun r => (inv p)%xr * (! test r)%xr) + (fun r => (1 + size log)%xr))).
     + move => x xx /=. rewrite of_realM; 1,2:smt(of_realM invr_ge0 ge0_mu). smt().
-    rewrite EpD EpC EpZ /=; 1: smt(invr_gt0 dr_mu_test of_realK).
+    rewrite EpD EpC EpZ /=; 1: smt(invr_gt0 dr_mu_test of_realdK).
     rewrite Ep_mu mu_not dr_ll /= -/p.
     rewrite !to_pos_pos; 1,2,3,4:smt(mu_bounded dr_mu_test size_ge0).
   by auto.

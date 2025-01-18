@@ -39,11 +39,23 @@ exception CloneError of EcEnv.env * clone_error
 
 val clone_error : EcEnv.env -> clone_error -> 'a
 
+(* ------------------------------------------------------------------ *)
+type xty_override =
+  [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xop_override =
+  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xpr_override =
+  [pr_override_def genoverride | `Direct of EcAst.form] * clmode
+
 (* -------------------------------------------------------------------- *)
 type evclone = {
-  evc_types    : (ty_override located) Msym.t;
-  evc_ops      : (op_override located) Msym.t;
-  evc_preds    : (pr_override located) Msym.t;
+  evc_types    : (xty_override located) Msym.t;
+  evc_ops      : (xop_override located) Msym.t;
+  evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
   evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
