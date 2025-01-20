@@ -50,8 +50,8 @@ and proof_state =
   PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
-  puc_visibility : EcDecl.ax_visibility;
-  puc_local      : bool;
+  puc_smt   : bool;
+  puc_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -120,7 +120,7 @@ module Ty : sig
 
   val add_subtype : scope -> psubtype located -> scope
   val add_class    : scope -> ptypeclass located -> scope
-  val add_instance : ?import:EcTheory.import -> scope -> Ax.proofmode -> ptycinstance located -> scope
+  val add_instance : scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -152,7 +152,8 @@ module Theory : sig
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
   val exit :
-       ?pempty:[`ClearOnly | `Full | `No]
+       ?import:bool
+    -> ?pempty:[`ClearOnly | `Full | `No]
     -> ?clears:(pqsymbol option) list
     -> scope -> symbol * scope
 
@@ -178,7 +179,7 @@ module Theory : sig
 
   (* [alias scope (name, thname)] create a theory alias [name] to
    * [thname] *)
-  val alias : scope -> ?import:EcTheory.import -> psymbol * pqsymbol -> scope
+  val alias : scope -> psymbol * pqsymbol -> scope
 end
 
 (* -------------------------------------------------------------------- *)

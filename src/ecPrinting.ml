@@ -2593,10 +2593,9 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
 
   let pp_decl fmt () =
     let vs =
-      match ax.ax_visibility with
-      | `Visible -> []
-      | `NoSmt   -> ["nosmt"]
-      | `Hidden  -> ["(* hidden *)"] in
+      match ax.ax_smt with
+      | true    -> []
+      | false   -> ["nosmt"] in
 
 
     Format.fprintf fmt "@[<hov 2>%a %t%t:@ %t.@]"
@@ -3503,8 +3502,8 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     (pp_list "@,@," (pp_th_item ppe path)) cth.cth_items
     basename
 
- and pp_th_item ppe p fmt item =
-  match item.ti_item with
+ and pp_th_item_r ppe p fmt item =
+  match item.EcTheory.ti_item with
   | EcTheory.Th_type (id, ty) ->
       pp_typedecl ppe fmt (EcPath.pqname p id,ty)
 
@@ -3607,6 +3606,12 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
 
   | EcTheory.Th_alias (name, target) ->
       Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
+
+(* -------------------------------------------------------------------- *)
+and pp_th_item ppe p fmt item =
+  Format.fprintf fmt "%s%a"
+    (if item.ti_import then "(* import *) " else "(* no import *) ")
+    (pp_th_item_r ppe p) item
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

@@ -786,8 +786,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let to_gen = { to_gen with tg_subst} in
     let tydecl = {
         tyd_params; tyd_type;
-        tyd_loca = `Global;
-        tyd_resolve = tydecl.tyd_resolve } in
+        tyd_loca = `Global; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->
@@ -1338,22 +1337,24 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | _ -> item
   in
   let env = scenv.sc_env in
+  let import = item.ti_import in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd)     -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op)     -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax)     -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms)     -> EcEnv.ModTy.bind s ms env
-    | Th_module       me     -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind s tc env
+    | Th_type    (s,tyd)     -> EcEnv.Ty.bind ~import s tyd env
+    | Th_operator (s,op)     -> EcEnv.Op.bind ~import s op env
+    | Th_axiom   (s, ax)     -> EcEnv.Ax.bind ~import s ax env
+    | Th_modtype (s, ms)     -> EcEnv.ModTy.bind ~import s ms env
+    | Th_module       me     -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
+    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind ~import s tc env
     | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
-    | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
-    | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
-    | Th_auto auto           -> EcEnv.Auto.add ~level:auto.level ?base:auto.base
+    | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance ~import tys i lc env (*FIXME: import? *)
+    | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add ~import s lc env
+    | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto ~import p ps lc env
+    | Th_auto auto           -> EcEnv.Auto.add
+                                  ~import ~level:auto.level ?base:auto.base
                                   auto.axioms auto.locality env
-    | Th_alias     (n,p) -> EcEnv.Theory.alias n p env
-    | Th_reduction r         -> EcEnv.Reduction.add r env
+    | Th_alias     (n,p)     -> EcEnv.Theory.alias ~import n p env
+    | Th_reduction r         -> EcEnv.Reduction.add ~import r env
     | _                      -> assert false
   in
   (item, { scenv with
@@ -1418,7 +1419,7 @@ and generalize_ctheory
     | Some compiled when List.is_empty compiled.ctheory.cth_items ->
       genenv
     | Some compiled ->
-      let scenv = add_th ~import:import0 compiled genenv.tg_env in
+      let scenv = add_th ~import:true compiled genenv.tg_env in
       { genenv with tg_env = scenv; }
 
 and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =

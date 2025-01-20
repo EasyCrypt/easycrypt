@@ -74,7 +74,7 @@ type evclone = {
   evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
-  evc_ths      : evclone Msym.t;
+  evc_ths      : (evclone * bool) Msym.t;
 }
 
 
@@ -104,7 +104,9 @@ let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone)
   | x :: nm ->
       let ths =
         Msym.change
-          (fun sub -> Some (evc_update upt nm (odfl evc_empty sub)))
+          (fun sub ->
+            let subevc, clear = odfl (evc_empty, false) sub in
+            Some (evc_update upt nm subevc, clear))
           x evc.evc_ths
       in
         { evc with evc_ths = ths }
@@ -114,8 +116,8 @@ let rec evc_get (nm : symbol list) (evc : evclone) =
   | []      -> Some evc
   | x :: nm ->
       match Msym.find_opt x evc.evc_ths with
-      | None     -> None
-      | Some evc -> evc_get nm evc
+      | None -> None
+      | Some (evc, _) -> evc_get nm evc
 
 (* -------------------------------------------------------------------- *)
 let find_mc =
@@ -405,6 +407,13 @@ end = struct
 
     let thd  = let thd = EcPath.toqsymbol sp in (fst thd @ [snd thd]) in
     let xdth = nm @ [x] in
+
+    assert (not (Msym.mem x evc.evc_ths));
+
+    let evc = { evc with
+      evc_ths = Msym.change (fun sub ->
+        let sub, clear = odfl (evc_empty, false) sub in
+        Some (sub, clear || (mode <> `Alias))) x evc.evc_ths } in
 
     let rec doit_r prefix (proofs, evc) dth =
       match dth with
