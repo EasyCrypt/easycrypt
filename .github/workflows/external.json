@@ -34,7 +34,7 @@
 
   { "name"       : "xsalsa20"
   , "repository" : "https://gitlab.com/fdupress/ec-xsalsa"
-  , "branch"     : "master"
+  , "branch"     : "ec-main"
   , "subdir"     : "."
   , "config"     : "config/tests.config"
   , "scenario"   : "xsalsa"
