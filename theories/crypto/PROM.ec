@@ -918,7 +918,7 @@ equiv RO_FinRO_D : MainD(D,RO).distinguish ~ MainD(D,FinRO).distinguish :
   ={glob D, arg} ==> ={res, glob D}.
 proof.
   proc *.
-  transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); } => //;1:smt().
+  transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); }.
   + inline MainD(D, RO).distinguish MainD(D, GenFinRO(LRO)).distinguish; wp.
     call (_: ={glob RO});2..4: by sim.
     + by apply RO_LFinRO_init.
@@ -989,7 +989,7 @@ proc.
 transitivity*{2} {
   Vars.r <@ S.sample(dout,FinFrom.enum);
   FunRO.f <- tofun Vars.r;
-}; 1,2: smt(); last first.
+}; last first.
 - inline*; rnd : *0 *0; skip => />.
   by split => *; rewrite dmap_id dfun_dmap.
 rewrite equiv[{2} 1 Sample_Loop_first_eq].
