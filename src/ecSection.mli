@@ -30,7 +30,7 @@ val import : EcPath.path -> scenv -> scenv
 
 val import_vars : EcPath.mpath -> scenv -> scenv
 
-val add_th  : import:import -> EcEnv.Theory.compiled_theory -> scenv -> scenv
+val add_th  : import:bool -> EcEnv.Theory.compiled_theory -> scenv -> scenv
 val require : EcEnv.Theory.compiled_theory -> scenv -> scenv
 
 val astop : scenv -> scenv

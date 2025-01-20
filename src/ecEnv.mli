@@ -161,7 +161,7 @@ module Ax : sig
   val lookup_path : qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
@@ -184,7 +184,7 @@ module Mod : sig
   val sp_lookup     : qsymbol -> env -> spt
   val sp_lookup_opt : qsymbol -> env -> spt option
 
-  val bind  : ?import:import -> symbol -> t -> env -> env
+  val bind  : ?import:bool -> symbol -> t -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
 
   val bind_local    : EcIdent.t -> mty_mr -> env -> env
@@ -215,7 +215,7 @@ module ModTy : sig
   val modtype : path -> env -> module_type
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val sig_of_mt : env -> module_type -> module_sig
 end
@@ -278,7 +278,7 @@ module Theory : sig
   val env_of_theory : path -> env -> env
 
   val add  : path -> env -> env
-  val bind : ?import:import -> compiled_theory -> env -> env
+  val bind : ?import:bool -> compiled_theory -> env -> env
 
  (* FIXME: section ? ctheory -> theory *)
   val require : compiled_theory -> env -> env
@@ -294,7 +294,7 @@ module Theory : sig
     -> EcTheory.thmode
     -> env -> compiled_theory option
 
-  val alias : ?import:import -> symbol -> path -> env -> env
+  val alias : ?import:bool -> symbol -> path -> env -> env
   val aliases : env -> path Mp.t
 end
 
@@ -311,7 +311,7 @@ module Op : sig
   val lookup_path : qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> operator -> env -> env
+  val bind : ?import:bool -> symbol -> operator -> env -> env
 
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
   val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
@@ -345,7 +345,7 @@ module Ty : sig
   val lookup_path : ?unique:bool -> qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
@@ -378,7 +378,7 @@ module TypeClass : sig
   type t = typeclass
 
   val add   : path -> env -> env
-  val bind  : ?import:import -> symbol -> t -> env -> env
+  val bind  : ?import:bool -> symbol -> t -> env -> env
   val graph : env -> EcTypeClass.graph
 
   val by_path     : path -> env -> t
@@ -387,7 +387,7 @@ module TypeClass : sig
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
 
-  val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
+  val add_instance  : ?import:bool -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
 end
 
@@ -399,8 +399,8 @@ module BaseRw : sig
   val lookup_path : qsymbol -> env -> path
   val is_base     : qsymbol -> env -> bool
 
-  val add   : ?import:import -> symbol -> is_local -> env -> env
-  val addto : ?import:import -> path -> path list -> is_local -> env -> env
+  val add   : ?import:bool -> symbol -> is_local -> env -> env
+  val addto : ?import:bool -> path -> path list -> is_local -> env -> env
 
   val all : env -> (path * Sp.t) list 
 end
@@ -412,7 +412,7 @@ module Reduction : sig
 
   val all : env -> (topsym * rule list) list
   val add1 : path * rule_option * rule option -> env -> env
-  val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env
+  val add  : ?import:bool -> (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
 end
 
@@ -421,8 +421,8 @@ module Auto : sig
   type base0 = path * [`Rigid | `Default]
 
   val dname  : symbol
-  val add1   : ?import:import -> level:int -> ?base:symbol -> base0 -> is_local -> env -> env
-  val add    : ?import:import -> level:int -> ?base:symbol -> base0 list -> is_local -> env -> env
+  val add1   : ?import:bool -> level:int -> ?base:symbol -> base0 -> is_local -> env -> env
+  val add    : ?import:bool -> level:int -> ?base:symbol -> base0 list -> is_local -> env -> env
   val get    : ?base:symbol -> env -> base0 list
   val getall : symbol list -> env -> base0 list
   val getx   : symbol -> env -> (int * base0 list) list

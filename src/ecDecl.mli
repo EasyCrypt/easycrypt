@@ -12,10 +12,9 @@ type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_resolve : bool;
+  tyd_params : ty_params;
+  tyd_type   : ty_body;
+  tyd_loca   : locality;
 }
 
 and ty_body = [
@@ -36,7 +35,7 @@ val tydecl_as_abstract : tydecl -> Sp.t option
 val tydecl_as_datatype : tydecl -> ty_dtype option
 val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
-val abs_tydecl : ?resolve:bool -> ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
+val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
 
 val ty_instanciate : ty_params -> ty list -> ty -> ty
 
@@ -135,14 +134,12 @@ val operator_as_prind : operator -> prind
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams    : ty_params;
-  ax_spec       : form;
-  ax_kind       : axiom_kind;
-  ax_loca       : locality;
-  ax_visibility : ax_visibility;
+  ax_tparams : ty_params;
+  ax_spec    : form;
+  ax_kind    : axiom_kind;
+  ax_loca    : locality;
+  ax_smt     : bool;
 }
-
-and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
 (* -------------------------------------------------------------------- *)
 val is_axiom  : axiom_kind -> bool

@@ -305,8 +305,8 @@ and proof_state =
   PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
-  puc_visibility : EcDecl.ax_visibility;
-  puc_local      : bool;
+  puc_smt   : bool;
+  puc_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -785,7 +785,7 @@ module Auto = struct
           hierror ~loc:base.pl_loc
             "cannot create rewrite hints out of its enclosing theory";
         let scope =
-          let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_baserw (ibase, local)) in
+          let item = EcTheory.mkitem ~import:true (EcTheory.Th_baserw (ibase, local)) in
           { scope with sc_env = EcSection.add_item item scope.sc_env; } in
         (scope, fst (EcEnv.BaseRw.lookup base.pl_desc (env scope)))
 
@@ -793,11 +793,11 @@ module Auto = struct
 
     let env = env scope in
     let l = List.map (fun l -> EcEnv.Ax.lookup_path (unloc l) env) l in
-    let item = EcTheory.mkitem EcTheory.import0 (Th_addrw (base, l, local)) in
+    let item = EcTheory.mkitem ~import:true (Th_addrw (base, l, local)) in
     { scope with sc_env =  EcSection.add_item item scope.sc_env }
 
   let bind_hint scope ~local ~level ?base axioms =
-    let item = EcTheory.mkitem EcTheory.import0 (Th_auto { level; base; axioms; locality=local} ) in
+    let item = EcTheory.mkitem ~import:true (Th_auto { level; base; axioms; locality=local} ) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let add_hint scope hint =
@@ -822,9 +822,9 @@ module Ax = struct
   type proofmode = Tactics.proofmode
 
   (* ------------------------------------------------------------------ *)
-  let bind ?(import = EcTheory.import0) (scope : scope) ((x, ax) : _ * axiom) =
+  let bind ?(import = true) (scope : scope) ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_axiom (x, ax)) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_axiom (x, ax)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
@@ -890,11 +890,11 @@ module Ax = struct
         | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
         | _ -> `Lemma
 
-      in { ax_tparams    = tparams;
-           ax_spec       = concl;
-           ax_kind       = kind;
-           ax_loca       = ax.pa_locality;
-           ax_visibility = `Visible; }
+      in { ax_tparams = tparams;
+           ax_spec    = concl;
+           ax_kind    = kind;
+           ax_loca    = ax.pa_locality;
+           ax_smt     = true; }
     in
 
     match ax.pa_kind with
@@ -906,7 +906,7 @@ module Ax = struct
           | `Global  -> false in
 
         let check    = Check_mode.check scope.sc_options in
-        let pucflags = { puc_visibility = axd.ax_visibility; puc_local = local; } in
+        let pucflags = { puc_smt = axd.ax_smt; puc_local = local; } in
         let pucflags = (([], None), pucflags) in
 
         match tc with
@@ -1060,7 +1060,7 @@ module Ax = struct
       in
         doit [] (fst puc.puc_cont)
     in
-    let pucflags = { puc_visibility = ax.ax_visibility; puc_local = false; } in
+    let pucflags = { puc_smt = ax.ax_smt; puc_local = false; } in
     let pucflags = ((proofs, snd puc.puc_cont), pucflags) in
     let check    = Check_mode.check scope.sc_options in
 
@@ -1085,9 +1085,9 @@ module Op = struct
   module TT  = EcTyping
   module EHI = EcHiInductive
 
-  let bind ?(import = EcTheory.import0) (scope : scope) ((x, op) : _ * operator) =
+  let bind ?(import = true) (scope : scope) ((x, op) : _ * operator) =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_operator (x, op)) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_operator (x, op)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env; }
 
   let add (scope : scope) (op : poperator located) =
@@ -1220,11 +1220,11 @@ module Op = struct
               (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
                List.combine axpm (List.map snd tparams)) in
           let ax =
-            { ax_tparams    = axpm;
-              ax_spec       = ax;
-              ax_kind       = `Axiom (Ssym.empty, false);
-              ax_loca       = lc;
-              ax_visibility = `Visible; }
+            { ax_tparams = axpm;
+              ax_spec    = ax;
+              ax_kind    = `Axiom (Ssym.empty, false);
+              ax_loca    = lc;
+              ax_smt     = true; }
           in Ax.bind scope (unloc rname, ax))
         scope refts
     in
@@ -1273,11 +1273,11 @@ module Op = struct
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams    = List.map (fun ty -> (ty, Sp.empty)) nparams;
-          ax_spec       = ax;
-          ax_kind       = `Axiom (Ssym.empty, false);
-          ax_loca       = lc;
-          ax_visibility = `Visible; } in
+        { ax_tparams = List.map (fun ty -> (ty, Sp.empty)) nparams;
+          ax_spec    = ax;
+          ax_kind    = `Axiom (Ssym.empty, false);
+          ax_loca    = lc;
+          ax_smt     = true; } in
 
       let scope, axname =
         let axname = Printf.sprintf "%s_%s" (unloc op.po_name) suffix in
@@ -1398,11 +1398,11 @@ module Op = struct
       in
 
       let prax = EcDecl.{
-        ax_tparams    = [];
-        ax_spec       = prax;
-        ax_kind       = `Lemma;
-        ax_loca       = op.ppo_locality;
-        ax_visibility = `Visible;
+        ax_tparams = [];
+        ax_spec    = prax;
+        ax_kind    = `Lemma;
+        ax_loca    = op.ppo_locality;
+        ax_smt     = true;
       } in
 
       Ax.bind scope (unloc op.ppo_name ^ "_opsem", prax) in
@@ -1431,11 +1431,11 @@ module Op = struct
          in
 
          let prax = EcDecl.{
-           ax_tparams    = [];
-           ax_spec       = hax;
-           ax_kind       = `Lemma;
-           ax_loca       = op.ppo_locality;
-           ax_visibility = `Visible;
+           ax_tparams = [];
+           ax_spec    = hax;
+           ax_kind    = `Lemma;
+           ax_loca    = op.ppo_locality;
+           ax_smt     = true;
          } in
 
          Ax.bind scope (unloc op.ppo_name ^ "_opsem_det", prax)
@@ -1475,9 +1475,9 @@ end
 module Mod = struct
   module TT = EcTyping
 
-  let bind ?(import = EcTheory.import0) (scope : scope) (m : top_module_expr) =
+  let bind ?(import = true) (scope : scope) (m : top_module_expr) =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_module m) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_module m) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let add_concrete (scope : scope) lc (ptm : pmodule_def) =
@@ -1534,11 +1534,11 @@ end
 (* -------------------------------------------------------------------- *)
 module ModType = struct
   let bind
-        ?(import = EcTheory.import0) (scope : scope)
+        ?(import = true) (scope : scope)
         ((x, tysig) : _ * top_module_sig)
   =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_modtype (x, tysig)) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_modtype (x, tysig)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let add (scope : scope) (intf : pinterface) =
@@ -1554,10 +1554,10 @@ module Theory = struct
   exception TopScope
 
   (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) (cth : thloaded) =
+  let bind ?(import = true) (scope : scope) (cth : thloaded) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_env = EcSection.add_th ~import:EcTheory.import0 cth scope.sc_env }
+        sc_env = EcSection.add_th ~import cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
@@ -1635,13 +1635,13 @@ module Theory = struct
       ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
-  let exit ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
+  let exit ?import ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
     assert (scope.sc_pr_uc = None);
 
     let cth = exit_r ~pempty (add_clears clears scope) in
     let ((cth, required), (name, _), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
-    let scope = ofold (fun cth scope -> bind scope cth) scope cth in
+    let scope = ofold (fun cth scope -> bind ?import scope cth) scope cth in
     (name, scope)
 
   (* ------------------------------------------------------------------ *)
@@ -1672,7 +1672,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let export_p scope (p, lc) =
-    let item = mkitem EcTheory.import0 (EcTheory.Th_export (p, lc)) in
+    let item = mkitem ~import:true (EcTheory.Th_export (p, lc)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   let export (scope : scope) (name : qsymbol) =
@@ -1740,12 +1740,12 @@ module Theory = struct
   let required scope = scope.sc_required
 
   (* -------------------------------------------------------------------- *)
-  let alias (scope : scope) ?(import = EcTheory.import0) ((name, target) : psymbol * pqsymbol) =
+  let alias (scope : scope) ((name, target) : psymbol * pqsymbol) =
     let thpath = EcEnv.Theory.lookup_opt (unloc target) (env scope) in
     let thpath, _ = ofdfl (fun () ->
       hierror ~loc:(loc target) "unknown theory: %a" pp_qsymbol (unloc target)
     ) thpath in
-    let item = EcTheory.mkitem import (Th_alias (unloc name, thpath)) in
+    let item = EcTheory.mkitem ~import:true (Th_alias (unloc name, thpath)) in
 
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 end
@@ -1788,7 +1788,7 @@ module Reduction = struct
 
     in
 
-    let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_reduction rules) in
+    let item = EcTheory.mkitem ~import:true (EcTheory.Th_reduction rules) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 end
 
@@ -1803,11 +1803,11 @@ module Cloning = struct
 
   (* ------------------------------------------------------------------ *)
   let hooks ~(override_locality: is_local option) : scope R.ovrhooks =
-    let thexit sc pempty = snd (Theory.exit ?clears:None ~pempty sc) in
-    let add_item scope import item =
-        let item = EcTheory.mkitem import item in
-        { scope with sc_env = EcSection.add_item ~override_locality item scope.sc_env }
-    in
+    let thexit sc ~import pempty =
+      snd (Theory.exit ~import ?clears:None ~pempty sc) in
+    let add_item scope ~import item =
+      let item = EcTheory.mkitem ~import item in
+      { scope with sc_env = EcSection.add_item ~override_locality item scope.sc_env } in
     { R.henv      = (fun scope -> scope.sc_env);
       R.hadd_item = add_item;
       R.hthenter  = Theory.enter;
@@ -1828,7 +1828,6 @@ module Cloning = struct
       List.fold_left merge1 opts specs
   end
 
-
   (* ------------------------------------------------------------------ *)
   let replay_proofs (scope : scope) (mode : Tactics.proofmode) (proofs : _) =
     proofs |> List.pmap (fun axc ->
@@ -1839,10 +1838,10 @@ module Cloning = struct
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in
+          let t = { pt_core = t; pt_intros = []; } in 
           let (x, ax) = axc.C.axc_axiom in
 
-          let pucflags = { puc_visibility = `Visible; puc_local = false; } in
+          let pucflags = { puc_smt = true; puc_local = false; } in
           let pucflags = (([], None), pucflags) in
           let check    = Check_mode.check scope.sc_options in
 
@@ -1880,7 +1879,7 @@ module Cloning = struct
       EcTheoryReplay.replay (hooks ~override_locality:thcl.pthc_local)
         ~abstract:opts.R.clo_abstract ~override_locality:thcl.pthc_local ~incl
         ~clears:ntclr ~renames:rnms ~opath ~npath ovrds
-        scope (name, oth.cth_items, oth.cth_loca)
+        scope (name, false, oth.cth_items, oth.cth_loca)
     in
 
     let proofs = replay_proofs scope mode proofs in
@@ -1891,7 +1890,7 @@ module Cloning = struct
         | `Import  ->
           { scope with sc_env = EcSection.import npath scope.sc_env; }
         | `Export  ->
-          let item = EcTheory.mkitem EcTheory.import0 (Th_export (npath, `Global)) in
+          let item = EcTheory.mkitem ~import:true (Th_export (npath, `Global)) in
           { scope with sc_env = EcSection.add_item item scope.sc_env; }
         | `Include -> scope)
         scope
@@ -1925,9 +1924,9 @@ module Ty = struct
       hierror ~loc:x.pl_loc "duplicated type/type-class name `%s'" x.pl_desc
 
   (* ------------------------------------------------------------------ *)
-  let bind ?(import = EcTheory.import0) (scope : scope) ((x, tydecl) : (_ * tydecl)) =
+  let bind ?(import = true) (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_type (x, tydecl)) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_type (x, tydecl)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
@@ -1968,7 +1967,7 @@ module Ty = struct
         record.ELI.rc_tparams, `Record (scheme, record.ELI.rc_fields)
     in
 
-    bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; tyd_resolve = true; })
+    bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; })
 
   (* ------------------------------------------------------------------ *)
   let add_subtype (scope : scope) ({ pl_desc = subtype } : psubtype located) =
@@ -1980,7 +1979,6 @@ module Ty = struct
         tyd_params  = [];
         tyd_type    = `Abstract Sp.empty;
         tyd_loca    = `Global; (* FIXME:SUBTYPE *)
-        tyd_resolve = true;
       } in bind scope (unloc subtype.pst_name, decl) in
 
     let carrier =
@@ -2037,6 +2035,7 @@ module Ty = struct
         evclone scope
         (
           Option.value ~default:(EcPath.basename cpath) cname,
+          false,
           theory.cth_items,
           theory.cth_loca
         ) in
@@ -2046,9 +2045,9 @@ module Ty = struct
     Ax.add_defer scope proofs
 
   (* ------------------------------------------------------------------ *)
-  let bindclass ?(import = EcTheory.import0) (scope : scope) (x, tc) =
+  let bindclass ?(import = true) (scope : scope) (x, tc) =
     assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem import (EcTheory.Th_typeclass(x, tc)) in
+    let item = EcTheory.mkitem ~import (EcTheory.Th_typeclass(x, tc)) in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
@@ -2074,8 +2073,7 @@ module Ty = struct
         let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
           { tyd_params  = [];
             tyd_type    = `Abstract body;
-            tyd_loca    = (lc :> locality);
-            tyd_resolve = true;  } in
+            tyd_loca    = (lc :> locality); } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
       (* Check for duplicated field names *)
@@ -2190,11 +2188,11 @@ module Ty = struct
         (fun (x, req) ->
            if not (Mstr.mem x symbs) then
              let ax = {
-               ax_tparams    = [];
-               ax_spec       = req;
-               ax_kind       = `Lemma;
-               ax_loca       = lc;
-               ax_visibility = `NoSmt;
+               ax_tparams = [];
+               ax_spec    = req;
+               ax_kind    = `Lemma;
+               ax_loca    = lc;
+               ax_smt     = false;
              } in Some ((None, ax), EcPath.psymbol x, scope.sc_env)
            else None)
         reqs in
@@ -2205,14 +2203,14 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = {
-              ax_tparams    = [];
-              ax_spec       = f;
-              ax_kind       = `Lemma;
-              ax_visibility = `NoSmt;
-              ax_loca       = lc;
+              ax_tparams = [];
+              ax_spec    = f;
+              ax_kind    = `Lemma;
+              ax_smt     = false;
+              ax_loca    = lc;
           } in
 
-          let pucflags = { puc_visibility = `Visible; puc_local = false; } in
+          let pucflags = { puc_smt = true; puc_local = false; } in
           let pucflags = (([], None), pucflags) in
           let check    = Check_mode.check scope.sc_options in
 
@@ -2271,7 +2269,7 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
     let add env p =
       let item = EcTheory.Th_instance (ty,`General p, tci.pti_loca) in
-      let item = EcTheory.mkitem import item in
+      let item = EcTheory.mkitem ~import item in
       EcSection.add_item item env in
 
     let scope   =
@@ -2279,7 +2277,7 @@ module Ty = struct
           List.fold_left add
             (let item =
                EcTheory.Th_instance (([], snd ty), `Ring cr, tci.pti_loca) in
-             let item = EcTheory.mkitem import item in
+             let item = EcTheory.mkitem ~import item in
              EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain] }
 
@@ -2313,7 +2311,7 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
     let add env p =
       let item = EcTheory.Th_instance(ty,`General p, tci.pti_loca) in
-      let item = EcTheory.mkitem import item in
+      let item = EcTheory.mkitem ~import item in
       EcSection.add_item item env in
     let scope   =
       { scope with
@@ -2321,7 +2319,7 @@ module Ty = struct
           List.fold_left add
             (let item =
                EcTheory.Th_instance (([], snd ty), `Field cr, tci.pti_loca) in
-             let item = EcTheory.mkitem import item in
+             let item = EcTheory.mkitem ~import item in
               EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain; p_field] }
 
@@ -2368,14 +2366,12 @@ module Ty = struct
 *)
 
   (* ------------------------------------------------------------------ *)
-  let add_instance
-    ?(import = EcTheory.import0) (scope : scope) mode ({ pl_desc = tci } as toptci)
-  =
+  let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
     | ([], "bring") -> begin
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
-        addring ~import scope mode (`Boolean, toptci)
+        addring ~import:true scope mode (`Boolean, toptci)
     end
 
     | ([], "ring") -> begin
@@ -2391,10 +2387,10 @@ module Ty = struct
                  && opt_equal BI.equal p (Some (BI.of_int 2))
             then `Boolean
             else `Modulus (c, p)
-      in addring ~import scope mode (kind, toptci)
+      in addring ~import:true scope mode (kind, toptci)
     end
 
-    | ([], "field") -> addfield ~import scope mode toptci
+    | ([], "field") -> addfield ~import:true scope mode toptci
 
     | _ ->
         if EcUtils.is_some tci.pti_args then

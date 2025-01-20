@@ -11,10 +11,9 @@ abstract theory PolyReduce.
 
 clone import PolyComRing as BasePoly with
   (* We currently don't care about inverting polynomials *)
-  pred PolyComRing.unit <= fun p => exists q, q * p = oner,
-  op PolyComRing.invr <= fun p => choiceb (fun q => q * p = oner) p
-  proof PolyComRing.mulVr, PolyComRing.unitP, PolyComRing.unitout
-  remove abbrev (+) remove abbrev ( * ) remove abbrev [-].
+  pred PolyComRing.unit <= fun p => exists q, polyM q p = oner,
+  op PolyComRing.invr <= fun p => choiceb (fun q => polyM q p = oner) p
+  proof PolyComRing.mulVr, PolyComRing.unitP, PolyComRing.unitout.
 realize PolyComRing.mulVr by smt(choicebP).
 realize PolyComRing.unitP by smt().
 realize PolyComRing.unitout by smt(choiceb_dfl).

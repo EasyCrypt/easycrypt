@@ -7,17 +7,11 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
-type import = { im_immediate : bool; im_atimport : bool; }
-
-val import0  : import
-val noimport : import
-
-(* -------------------------------------------------------------------- *)
 type theory = theory_item list
 
 and theory_item = {
   ti_item   : theory_item_r;
-  ti_import : import;
+  ti_import : bool;
 }
 
 and theory_item_r =
@@ -80,7 +74,7 @@ and auto_rule = {
   locality : is_local;
 }
 
-val mkitem : import -> theory_item_r -> theory_item
+val mkitem : import:bool -> theory_item_r -> theory_item
 
 (* -------------------------------------------------------------------- *)
 val module_expr_of_module_sig : EcIdent.t -> mty_mr -> module_sig -> module_expr
