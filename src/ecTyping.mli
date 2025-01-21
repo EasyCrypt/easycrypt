@@ -186,7 +186,7 @@ val tp_relax  : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtc:
-  env -> EcUnify.unienv -> ptcparam -> EcDecl.typeclass
+  env -> EcUnify.unienv -> ptcparam -> typeclass
 
 val transtyvars:
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv

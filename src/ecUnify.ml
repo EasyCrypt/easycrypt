@@ -127,7 +127,7 @@ module Unify = struct
   (* ------------------------------------------------------------------ *)
   let fresh
     ?(tcs : (typeclass * tcwitness option) list option)
-    ?(ty : ty option)
+    ?(ty  : ty option)
     ({ uf; tcenv } as uc : ucore)
   =
     let uid = TyUni.unique () in
@@ -139,7 +139,9 @@ module Unify = struct
           let ty, effects = UF.union uid id uf in
           assert (List.is_empty effects);
           ty
-      | (None | Some _) as ty -> UF.set uid ty uf
+
+      | (None | Some _) as ty ->
+          UF.set uid ty uf
     in
 
     let ty = Option.value ~default:(tuni uid) (UF.data uid uf) in
@@ -290,28 +292,6 @@ module Unify = struct
           let ty = check ty in
           let deps = !deps in
 
-          let check_tci (tci : EcTheory.tcinstance) : bool =
-            let exception Bailout in
-
-            try
-              begin
-                match tci.tci_instance with
-                | `General (tc', _) ->
-                  if not (List.is_empty tc'.tc_args) then
-                    raise Bailout;
-                  if not (EcPath.p_equal tc'.tc_name tc.tc_name) then
-                    raise Bailout
-                | _ -> raise Bailout
-              end;
-              if not (List.is_empty tci.tci_params) then
-                raise Bailout;
-              if not (EcCoreEqTest.for_type env ty tci.tci_type) then
-                raise Bailout;
-              true
-
-            with Bailout ->
-              false in
-
           if TyUni.Suid.is_empty deps then begin
             match ty.ty_node with
             | Tvar a ->
@@ -329,25 +309,11 @@ module Unify = struct
                   (!uc).tcenv.resolution
               } }
 
-            | _-> begin
-              let tci =
-                  EcEnv.TcInstance.get_all env
-                |> List.to_seq
-                |> Seq.filter_map (fun (p, tci) -> Option.map (fun p -> (p, tci)) p)
-                |> Seq.filter (fun (_, tci) -> check_tci tci)
-                |> Seq.uncons |> Option.map (fst |- fst) in
-
-              match tci with
-              | None ->
-                failure ()
-
-              | Some tci ->
-                uc := { !uc with tcenv = { (!uc).tcenv with resolution =
-                  TcUni.Muid.add uid (TCIConcrete {
-                    path = tci; etyargs = [];
-                  }) (!uc).tcenv.resolution
-                } }
-            end
+            | _->
+              let tci = ofdfl failure (EcTypeClass.infer env ty tc) in
+              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                TcUni.Muid.add uid tci (!uc).tcenv.resolution
+              } }
           end else begin
             TyUni.Suid.iter (fun tyvar ->
               uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
@@ -512,12 +478,23 @@ module UniEnv = struct
       | Some vd ->
           let vdmap = List.map (fun (x, _) -> (EcIdent.name x, x)) vd in
           let tvtc  = Mid.of_list vd in
-          { ue_uc = Unify.initial_ucore ~tvtc ()
+          { ue_uc     = Unify.initial_ucore ~tvtc ()
           ; ue_named  = Mstr.of_list vdmap
           ; ue_decl   = List.rev_map fst vd
           ; ue_closed = true;
           }
       in ref ue
+
+  let push ((x, tc) : ident * typeclass list) (ue : unienv)  =
+    assert (not (Mstr.mem (EcIdent.name x) (!ue).ue_named));
+    assert  ((!ue).ue_closed);
+
+    (* FIXME:TC use API for pushing a variable*)
+     ue :=
+      { ue_uc     = { (!ue).ue_uc with tvtc = Mid.add x tc (!ue).ue_uc.tvtc }
+      ; ue_named  = Mstr.add (EcIdent.name x) x (!ue).ue_named
+      ; ue_decl   = x :: (!ue).ue_decl
+      ; ue_closed = true }
 
   let xfresh
     ?(tcs : (typeclass * tcwitness option) list option)
@@ -633,7 +610,10 @@ module UniEnv = struct
     assubst ue
 
   let tparams (ue : unienv) =
-    let fortv x = odfl [] (Mid.find_opt x (!ue).ue_uc.tvtc) in
+    let subst = EcCoreSubst.f_subst_init ~tu:(assubst ue) () in
+    let fortv x =
+      let tvtc = odfl [] (Mid.find_opt x (!ue).ue_uc.tvtc) in
+      List.map (EcCoreSubst.tc_subst subst) tvtc in
     List.map (fun x -> (x, fortv x)) (List.rev (!ue).ue_decl)
 end
 

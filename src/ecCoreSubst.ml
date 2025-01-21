@@ -211,7 +211,7 @@ and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
        TcUni.Muid.find_opt uid s.fs_utc
     |> Option.value ~default:tcw
 
-| TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
+  | TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
     let etyargs = List.Smart.map (etyarg_subst s) etyargs0 in
     if etyargs ==(*phy*) etyargs0 then
       tcw
@@ -232,6 +232,11 @@ and etyarg_subst (s : f_subst) ((ty, tcws) as tyarg : etyarg) : etyarg =
   SmartPair.mk tyarg ty' tcws'
 
 (* -------------------------------------------------------------------- *)
+let tc_subst (s : f_subst) (tc : typeclass) : typeclass =
+  { tc_name = tc.tc_name;
+    tc_args = List.map (etyarg_subst s) tc.tc_args; }
+
+(* -------------------------------------------------------------------- *)
 let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
 
@@ -242,6 +247,10 @@ let etyarg_subst (s : f_subst) : etyarg -> etyarg =
 (* -------------------------------------------------------------------- *)
 let tcw_subst (s : f_subst) : tcwitness -> tcwitness =
   if is_ty_subst_id s then identity else tcw_subst s
+
+(* -------------------------------------------------------------------- *)
+let tc_subst (s : f_subst) : typeclass -> typeclass =
+  if is_ty_subst_id s then identity else tc_subst s
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
@@ -830,6 +839,9 @@ module Tvar = struct
 
   let subst_etyarg (s : etyarg Mid.t) (ety : etyarg) : etyarg =
     etyarg_subst { f_subst_id with fs_v = s } ety
+
+  let subst_tc (s : etyarg Mid.t) (tc : typeclass) : typeclass =
+    tc_subst { f_subst_id with fs_v = s } tc
 
   let f_subst ~(freshen : bool) (bds : (ident * etyarg) list) : form -> form =
     Fsubst.f_subst_tvar ~freshen (init bds)

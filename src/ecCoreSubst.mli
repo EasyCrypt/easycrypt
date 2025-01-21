@@ -46,6 +46,7 @@ module Tvar : sig
   val subst1       : (EcIdent.t * etyarg) -> ty -> ty
   val subst        : etyarg Mid.t -> ty -> ty
   val subst_etyarg : etyarg Mid.t -> etyarg -> etyarg
+  val subst_tc     : etyarg Mid.t -> typeclass -> typeclass
 
   val f_subst : freshen:bool -> (EcIdent.t * etyarg) list -> form -> form
 end
@@ -58,6 +59,7 @@ val bind_elocal : f_subst -> EcIdent.t -> expr -> f_subst
 (* -------------------------------------------------------------------- *)
 val ty_subst     : ty substitute
 val etyarg_subst : etyarg substitute
+val tc_subst     : typeclass substitute
 val e_subst      : expr substitute
 val s_subst      : stmt substitute
 

@@ -2,6 +2,7 @@
 open EcIdent
 open EcSymbols
 open EcTypes
+open EcAst
 open EcDecl
 
 (* ==================================================================== *)
@@ -36,9 +37,10 @@ module UniEnv : sig
   }
 
   val create     : (EcIdent.t * typeclass list) list option -> unienv
+  val push       : (EcIdent.t * typeclass list) -> unienv -> unit
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val xfresh     : ?tcs:(EcDecl.typeclass * EcTypes.tcwitness option) list -> ?ty:ty -> unienv -> etyarg
+  val xfresh     : ?tcs:(typeclass * EcTypes.tcwitness option) list -> ?ty:ty -> unienv -> etyarg
   val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty

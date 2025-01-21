@@ -1,16 +1,12 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcSymbols
 open EcBigInt
 open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_name : EcPath.path;
-  tc_args : etyarg list;
-}
-
 type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]

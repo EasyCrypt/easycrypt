@@ -10,11 +10,6 @@ module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_name : EcPath.path;
-  tc_args : etyarg list;
-}
-
 type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]

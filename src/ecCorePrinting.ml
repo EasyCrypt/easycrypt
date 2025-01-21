@@ -4,7 +4,7 @@ module type PrinterAPI = sig
   open EcIdent
   open EcSymbols
   open EcPath
-  open EcTypes
+  open EcAst
   open EcFol
   open EcDecl
   open EcModules
@@ -71,7 +71,7 @@ module type PrinterAPI = sig
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
-  val pp_typeclass   : PPEnv.t -> (EcDecl.typeclass               ) pp
+  val pp_typeclass   : PPEnv.t -> (typeclass                      ) pp
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
   val pp_added_op    : PPEnv.t -> operator pp
   val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp

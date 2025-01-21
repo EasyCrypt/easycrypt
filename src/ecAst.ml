@@ -82,6 +82,12 @@ and tcwitness =
   }
 
 (* -------------------------------------------------------------------- *)
+and typeclass = {
+  tc_name : EcPath.path;
+  tc_args : etyarg list;
+}
+
+(* -------------------------------------------------------------------- *)
 and ovariable = {
   ov_name : EcSymbols.symbol option;
   ov_type : ty;

@@ -1033,6 +1033,7 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
 
     let tvi = EcUnify.UniEnv.opentvi ue decl.tc_tparams None in
  
+    (* FIXME:TC can raise an exception *)
     List.iter2
       (fun (ty, _) aty -> EcUnify.unify env ue ty aty)
       tvi.args args;
@@ -1041,19 +1042,21 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
 
 (* -------------------------------------------------------------------- *)
 let transtyvars (env : EcEnv.env) (loc, (tparams : ptyparams option)) =
-  let tparams = tparams |> omap
-    (fun tparams ->
-        let for1 tyvars ({ pl_desc = x }, tc) =
-          let x  = EcIdent.create x in
-          let ue = UE.create (Some tyvars) in
-          let t  = List.map (transtc env ue) tc in
-          (x, t) :: tyvars
-        in
-          if not (List.is_unique (List.map (unloc |- fst) tparams)) then
-            tyerror loc env DuplicatedTyVar;
-          List.rev (List.fold_left for1 [] tparams))
-  in
-    UE.create tparams
+  match tparams with
+  | None ->
+    UE.create None
+
+  | Some tparams ->
+    let ue = UE.create (Some []) in
+
+    let for1 ({ pl_desc = x }, tc) =
+      let x  = EcIdent.create x in
+      let tc = List.map (transtc env ue) tc in
+      UE.push (x, tc) ue in
+    if not (List.is_unique (List.map (unloc |- fst) tparams)) then
+      tyerror loc env DuplicatedTyVar;
+    List.iter for1 tparams;
+    ue
 
 (* -------------------------------------------------------------------- *)
 let transpattern1 env ue (p : EcParsetree.plpattern) =

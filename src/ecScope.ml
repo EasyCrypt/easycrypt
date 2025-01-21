@@ -1123,6 +1123,7 @@ module Op = struct
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
+
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
@@ -1204,7 +1205,7 @@ module Op = struct
 
         try
           EcUnify.unify eenv tue ty tfun;
-          let msg = "this operator type is (unifiable) to a function type" in
+          let msg = "this operator type is (unifiable to) a function type" in
             hierror ~loc "%s" msg
         with EcUnify.UnificationFailure _ -> ()
     end;
