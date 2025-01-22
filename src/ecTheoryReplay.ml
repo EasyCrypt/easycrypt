@@ -379,12 +379,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                   let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
 
                   List.fold_left (fun subst (name, tyargs) ->
-                      let np = EcPath.pqoname (EcPath.prefix np) name in
-                      let newtyargs = List.map (CS.Tvar.subst tysubst) tyargs in
-                      EcSubst.add_opdef subst
-                        (xpath ove name)
-                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
-                    subst octors
+                    let np = EcPath.pqoname (EcPath.prefix np) name in
+                    let newtyargs =
+                      List.map
+                        (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
+                        tyargs in
+                    EcSubst.add_opdef subst
+                      (xpath ove name)
+                      (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                    ) subst octors
                 | _ -> subst
               end
             | _, _ -> subst
