@@ -35,6 +35,7 @@ and theory_item_r =
   (* reduction rule does not survive to section so no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of auto_rule
+  | Th_alias     of (symbol * path)
 
 and thsource = {
   ths_base : EcPath.path;

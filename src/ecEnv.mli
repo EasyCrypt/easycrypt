@@ -293,6 +293,9 @@ module Theory : sig
     -> EcTypes.is_local
     -> EcTheory.thmode
     -> env -> compiled_theory option
+
+  val alias : ?import:import -> symbol -> path -> env -> env
+  val aliases : env -> path Mp.t
 end
 
 (* -------------------------------------------------------------------- *)
