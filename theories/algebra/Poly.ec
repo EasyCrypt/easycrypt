@@ -23,18 +23,11 @@ op ispoly (p : prepoly) =
       (forall c, c < 0 => p c = zeror)
     /\ (exists d, forall c, (d < c)%Int => p c = zeror).
 
-clone include Subtype
-  with type T   <- prepoly,
-       op P   <- ispoly
-  rename "insub" as "to_poly"
-  rename "val"   as "of_poly"
-proof *.
+subtype poly = { p : prepoly | ispoly p }
+  rename "to_poly", "of_poly".
+
 realize inhabited.
-  exists (fun _, zeror).
-  rewrite /ispoly.
-  auto.
-qed.
-type poly = sT.
+proof. by exists (fun _ => zeror). qed.
 
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 

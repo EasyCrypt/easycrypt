@@ -492,7 +492,6 @@ proof.
                       (size (pad _p (hmac_sha256 _mk _p)))
                       (nth witness (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
                                    (size (pad _p (hmac_sha256 _mk _p)))).
-        smt().
       split=> //=.
       split; 1:by rewrite /mee_enc /= size_cbc_enc addzC.
       by rewrite take_size.
