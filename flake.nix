@@ -4,9 +4,10 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/23.11";
-    stable.url = "github:nixos/nixpkgs/23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/release-24.11";
+    stable.url = "github:nixos/nixpkgs/release-24.11";
     nixpkgs.follows = "opam-nix/nixpkgs";
+    emacs-overlay.url = "github:nix-community/emacs-overlay";
 
     prover_cvc4_1_8 = {
       url = "github:CVC4/CVC4-archived/1.8";
@@ -14,12 +15,12 @@
     };
 
     prover_cvc5_1_0_5 = {
-      url = "github:cvc5/cvc5/cvc5-1.0.5";
+      url = "github:cvc5/cvc5/cvc5-1.2.0";
       flake = false;
     };
 
     prover_z3_4_12_6 = {
-      url = "github:z3prover/z3/z3-4.12.6";
+      url = "github:z3prover/z3/z3-4.13.3";
       flake = false;
     };
   };
@@ -76,6 +77,26 @@
           });
 
         mkAltErgo = version: (on.queryToScope { } (query // { alt-ergo = version; })).alt-ergo;
+
+        devTools = 
+	  (let 
+	    overlays = [ (import inputs.emacs-overlay) ];
+	    pkgs = import nixpkgs {
+	      inherit system overlays;
+	    };
+	  in
+	    with pkgs; [
+	      (emacsWithPackagesFromUsePackage {
+		config = ''(setq easycrypt-prog-name "ec.native")'';
+		defaultInitFile = true;
+		alwaysEnsure = true;
+		package = pkgs.emacs-unstable;
+		extraEmacsPackages = epkgs: [ epkgs.proof-general ];
+	      })
+	      bashInteractive
+	      perf-tools
+	    ]
+	);
       in rec {
         legacyPackages = scope';
 
@@ -101,9 +122,23 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
-	       devPackages
+               devPackages
             ++ [ scope'.why3 packages.provers ]
             ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
+
+	devShells.withDevTools = pkgs.mkShell rec {
+	  inputsFrom = [ scope'.easycrypt ];
+	  buildInputs = 
+	      devPackages
+ 	   ++ devTools
+	   ++ [ scope'.why3 packages.provers ]
+	   ++ (with pkgs.python3Packages; [ pyyaml ]);
+	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
+	  shellHook = builtins.replaceStrings ["\n"] [" "] ''
+	    export SHELL=${SHELL} &&
+	    export PATH=$PATH:`realpath .`
+	  '';
+	};
       });
 }
