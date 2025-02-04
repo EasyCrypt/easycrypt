@@ -740,7 +740,7 @@ proof. by rewrite fcard_ge0. qed.
 lemma fsize_set (m : ('a, 'b) fmap) k v : 
   fsize m.[k <- v] = b2i (k \notin m) + fsize m.
 proof. by rewrite /fsize fdom_set fcardU1 mem_fdom. qed.
-  
+
 (* ==================================================================== *)
 
 (* f-collisions (i.e. collisions under some function f) *)
