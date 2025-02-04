@@ -734,10 +734,13 @@ op fsize (m : ('a,'b) fmap) : int = FSet.card (fdom m).
 lemma fsize_empty ['a 'b] : fsize<:'a,'b> empty = 0. 
 proof. by rewrite /fsize fdom0 fcards0. qed.
 
+lemma ge0_fsize (m : ('a, 'b) fmap) : 0 <= fsize m.
+proof. by rewrite fcard_ge0. qed. 
+
 lemma fsize_set (m : ('a, 'b) fmap) k v : 
   fsize m.[k <- v] = b2i (k \notin m) + fsize m.
 proof. by rewrite /fsize fdom_set fcardU1 mem_fdom. qed.
-
+  
 (* ==================================================================== *)
 
 (* f-collisions (i.e. collisions under some function f) *)
