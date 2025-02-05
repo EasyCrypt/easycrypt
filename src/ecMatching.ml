@@ -120,6 +120,9 @@ module Zipper = struct
             | LvVar (pv, _), `LvmVar pvm
                  when EcReduction.EqTest.for_pv env pv pvm
               -> i-1
+            | LvTuple pvs, `LvmVar pvm
+                  when List.exists (fun (pv, _) -> EcReduction.EqTest.for_pv env pv pvm) pvs
+              -> i-1
             | _ -> i
           end
 
