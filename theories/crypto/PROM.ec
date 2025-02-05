@@ -233,16 +233,16 @@ section ConditionalLL.
 declare axiom dout_ll x: is_lossless (dout x).
 
 lemma RO_get_ll : islossless RO.get.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 
 lemma FRO_get_ll : islossless FRO.get.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 
 lemma RO_sample_ll : islossless RO.sample.
 proof. by proc; call RO_get_ll. qed.
 
 lemma FRO_sample_ll : islossless FRO.sample.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 end section ConditionalLL.
 end section LL.
 

@@ -946,8 +946,7 @@ module FPosition = struct
                doit pos (`WithCtxt (ctxt, b :: fs))
 
           | Fquant (_, b, f) ->
-              let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
-              let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
+              let ctxt = List.fold_left ((^~) Sid.add) ctxt (List.fst b) in
               doit pos (`WithCtxt (ctxt, [f]))
 
           | Flet (lp, f1, f2) ->
