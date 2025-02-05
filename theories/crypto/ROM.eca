@@ -61,7 +61,7 @@ lemma LRO_init_ll : islossless LRO.init.
 proof. by proc; auto. qed.
 
 lemma LRO_o_ll : (forall x, is_lossless (dout x)) => islossless LRO.o.
-proof. by move=> dout_ll; proc; auto; rewrite dout_ll. qed.
+proof. by move=> dout_ll; proc; auto=> &0; rewrite dout_ll. qed.
 
 hoare LRO_initE : LRO.init : true ==> LRO.m = empty.
 proof. by proc; auto. qed.
