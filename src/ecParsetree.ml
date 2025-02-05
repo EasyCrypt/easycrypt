@@ -41,6 +41,7 @@ type pcp_match = [
   | `While
   | `Match
   | `Assign of plvmatch
+  | `AssignTuple of plvmatch
   | `Sample of plvmatch
   | `Call of plvmatch
 ]

@@ -452,8 +452,8 @@ let pp_shorten_path (cond : P.path -> qsymbol -> bool) (fmt : Format.formatter) 
   | None ->
     Format.fprintf fmt "%a" EcSymbols.pp_qsymbol plong
   | Some pshort ->
-    Format.fprintf fmt "%a (shorten name: %a)" 
-    EcSymbols.pp_qsymbol plong 
+    Format.fprintf fmt "%a (shorten name: %a)"
+    EcSymbols.pp_qsymbol plong
     EcSymbols.pp_qsymbol pshort
 
 (* -------------------------------------------------------------------- *)
@@ -940,7 +940,7 @@ let pp_tuple (type v)
 
 let pp_proji (type v)
   (ppe    : PPEnv.t)
-  (pp_sub : PPEnv.t -> opprec * iassoc -> v pp) 
+  (pp_sub : PPEnv.t -> opprec * iassoc -> v pp)
   (fmt    : Format.formatter)
   ((e, i) : v * int)
 =
@@ -1601,7 +1601,7 @@ and try_pp_chained_orderings
       let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       let i1  = Fsubst.f_subst sb i1 in
       let i2  = Fsubst.f_subst sb i2 in
-  
+
       (op, tvi), (i1, i2)
     end
 
@@ -1626,7 +1626,7 @@ and try_pp_chained_orderings
       le;
 
     let acc = (op, tvi, i2) :: acc in
-    
+
     Option.fold ~none:(i1, acc) ~some:(collect acc (Some i1)) f1
   in
     match collect [] None f with
@@ -1720,8 +1720,8 @@ and match_pp_notations
   let nts = EcEnv.Op.get_notations ~head ppe.PPEnv.ppe_env in
 
   List.find_map_opt try_notation nts
-          
-            
+
+
 and try_pp_notations
   (ppe   : PPEnv.t)
   (outer : opprec * iassoc)
@@ -2269,6 +2269,8 @@ let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos
             | `Call (`LvmVar pv) -> Format.asprintf "%a<@" (pp_pv ppe) pv
             | `Assign `LvmNone -> "<-"
             | `Assign (`LvmVar pv) -> Format.asprintf "%a<-" (pp_pv ppe) pv
+            | `AssignTuple `LvmNone -> "()<-"
+            | `AssignTuple (`LvmVar pv) -> Format.asprintf "(%a)<-" (pp_pv ppe) pv
           in Format.asprintf "^%s" k in
 
         match i with
@@ -2290,7 +2292,7 @@ let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoff
 (* -------------------------------------------------------------------- *)
 let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
   let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
-    let bs = 
+    let bs =
       match bs with
       | `Cond  true  -> "."
       | `Cond  false -> "?"
@@ -3030,7 +3032,7 @@ let pp_rwbase ppe fmt (p, rws) =
 let pp_solvedb ppe fmt (db: (int * (P.path * _) list) list) =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
-      lvl 
+      lvl
       (pp_list ", " (pp_axhnt ppe))
       ps)
   db;
@@ -3050,7 +3052,7 @@ let pp_solvedb ppe fmt (db: (int * (P.path * _) list) list) =
           match ir with
           | `Default -> ""
           | `Rigid -> " (rigid)" in
-        
+
         Format.fprintf fmt "%a%s\n\n%!" (pp_axiom ppe) ax ir)
       lemmas
   end
@@ -3563,7 +3565,7 @@ let pp_by_theory
   (pp   : PPEnv.t -> (EcPath.path * 'a) pp)
   (fmt  : Format.formatter)
   (xs   : (EcPath.path * 'a) list)
-= 
+=
   let tr =
     List.fold_left (fun tr ((p, _) as x) ->
       Trie.add (EcPath.tolist (oget (EcPath.prefix p))) x tr
