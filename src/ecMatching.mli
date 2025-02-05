@@ -16,6 +16,7 @@ module Position : sig
     | `While
     | `Match
     | `Assign of lvmatch
+    | `AssignTuple of lvmatch
     | `Sample of lvmatch
     | `Call   of lvmatch
   ]
