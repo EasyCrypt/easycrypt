@@ -2025,7 +2025,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
-  | Pm_update (m, vars, funs) ->
+  | Pm_update (m, delete_vars, vars, funs) ->
     let loc = me.pl_loc in
     let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = loc} in
 
@@ -2045,6 +2045,8 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           items)
         vars
     in
+
+    let delete_vars = List.map (fun v -> v.pl_desc) delete_vars in
 
     let me, _ = EcEnv.Mod.by_mpath mp env in
     let p = match mp.m_top with | `Concrete (p, _) -> p | _ -> assert false in
@@ -2084,32 +2086,39 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       let memenv = ref memenv in
 
       (* Semantics for stmt updating, `i` is the target of the update. *)
-      let eval_supdate env sup i =
+      let eval_supdate env sup si =
         match sup with
         | Pups_add (s, after) ->
           let ue  = UE.create (Some []) in
           let s = transstmt env ue s in
           let ts = Tuni.subst (UE.close ue) in
           if after then
-            i :: (s_subst ts s).s_node
+            si @ (s_subst ts s).s_node
           else
-            (s_subst ts s).s_node @ [i]
+            (s_subst ts s).s_node @ si
         | Pups_del -> []
       in
 
       (* Semantics for condition updating *)
-      (* `i` is the target of the update, and `tl` is the instr suffix. *)
-      let eval_cupdate cp_loc env cup i tl =
+      let eval_cupdate cp_loc env cup si =
+        (* NOTE: There will always be a head element *)
+        (* `i` is the target of the update, and `tl` is the instr suffix. *)
+        let i, tl = List.takedrop 1 si in
+        let i = List.hd i in
+
         match cup with
         (* Insert an if with condition `e` with body `tl` *)
-        | Pupc_add e ->
+        | Pupc_add (e, after) ->
           let loc = e.pl_loc in
           let ue  = UE.create (Some []) in
           let e, ty = transexp env `InProc ue e in
           let ts = Tuni.subst (UE.close ue) in
           let ty = ty_subst ts ty in
           unify_or_fail env ue loc ~expct:tbool ty;
-          i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+          if after then
+            i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+          else
+            [i_if (e_subst ts e, stmt (i :: tl), s_empty)]
 
         (* Change the condition expression to `e` for a conditional instr `i` *)
         | Pupc_mod e -> begin
@@ -2191,23 +2200,19 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       (* Apply each of updates in reverse *)
       (* NOTE: This is with the expectation that the user entered them in chronological order. *)
       let body =
-        List.fold_right (fun (cp, up) bd ->
-          let {pl_desc = cp; pl_loc = loc} = cp in
-          let cp = trans_codepos env cp in
+        List.fold_right (fun (cpr, up) bd ->
+          let {pl_desc = cpr; pl_loc = loc} = cpr in
+          let cp = trans_codepos_range env cpr in
           let change env si =
-            (* NOTE: There will always be a head element *)
-            let i, tl = List.takedrop 1 si in
-            let i = List.hd i in
-
             match up with
             | Pup_stmt sup ->
-              eval_supdate env sup i @ tl
+              eval_supdate env sup si
             | Pup_cond cup ->
-              eval_cupdate loc env cup i tl
+              eval_cupdate loc env cup si
           in
           let env = EcEnv.Memory.push_active !memenv env in
           try
-            EcMatching.Zipper.map_range env (cp, `Offset (EcMatching.Zipper.cpos (-1))) change bd
+            EcMatching.Zipper.map_range env cp change bd
           with
             | EcMatching.Zipper.InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
@@ -2250,7 +2255,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       | ME_Structure mb ->
         let doit (env, items) mi =
           match mi with
-          | MI_Variable v ->
+          | MI_Variable v when not (List.mem (v_name v) delete_vars) ->
             let env = EcEnv.Var.bind_pvglob v.v_name v.v_type env in
             env, items @ [mi]
           | MI_Function f  -> begin
@@ -2266,6 +2271,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           | MI_Module me ->
             let env = EcEnv.bind1 (me.me_name, `Module me) env in
             env, items @ [mi]
+          | _ -> env, items
         in
         List.fold_left doit (env, []) (items @ mb.ms_body)
 
@@ -3634,6 +3640,18 @@ and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepo
   let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
   let p = trans_codepos1 ?memory env p in
   (nm, p)
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos_range ?(memory : memory option) (env : EcEnv.env) ((cps, cpe) : pcodepos_range) : codepos_range =
+  let cps = trans_codepos ?memory env cps in
+  let cpe =
+    match cpe with
+    | `Base cp ->
+      `Base (trans_codepos ?memory env cp)
+    | `Offset cp ->
+      `Offset (trans_codepos1 ?memory env cp)
+  in
+  (cps, cpe)
 
 (* -------------------------------------------------------------------- *)
 and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
