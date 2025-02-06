@@ -35,6 +35,7 @@ module Position = struct
   type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
   type codepos1      = int * cp_base
   type codepos       = (codepos1 * codepos_brsel) list * codepos1
+  type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
 
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
@@ -60,8 +61,8 @@ module Zipper = struct
   type ('a, 'state) folder =
     env -> 'a -> 'state -> instr -> 'state * instr list
 
-  type ('a, 'state) folder_tl =
-    env -> 'a -> 'state -> instr -> instr list -> 'state * instr list
+  type ('a, 'state) folder_l =
+    env -> 'a -> 'state -> instr list -> 'state * instr list
 
   type spath_match_ctxt = {
     locals : (EcIdent.t * ty) list;
@@ -249,6 +250,17 @@ module Zipper = struct
   let zipper_of_cpos (env : EcEnv.env) (cp : codepos) (s : stmt) =
     fst (zipper_of_cpos_r env cp s)
 
+  let zipper_of_cpos_range env cpr s =
+    let top, bot = cpr in
+    let zpr = zipper_of_cpos env top s in
+    match bot with
+    | `Base cp ->
+      let path = (zipper_of_cpos env cp s).z_path in
+      if path <> zpr.z_path then
+        raise InvalidCPos;
+      zpr, snd cp
+    | `Offset cp1 -> zpr, cp1
+
   let split_at_cpos1 env cpos1 s =
     split_at_cpos1 ~after:`Auto env cpos1 s
 
@@ -288,23 +300,22 @@ module Zipper = struct
     in
       List.rev after
 
-  let fold_tl env cenv cpos f state s =
-    let zpr = zipper_of_cpos env cpos s in
+  let fold_range env cenv cpr f state s =
+    let zpr, cp = zipper_of_cpos_range env cpr s in
+    match zpr.z_tail with
+    | []      -> raise InvalidCPos
+    | i :: tl ->
+      let s, tl = split_at_cpos1 env cp (stmt tl) in
+      let env = odfl env zpr.z_env in
+      let state', si' = f env cenv state (i :: s) in
+      state', zip { zpr with z_tail = si' @ tl }
 
-      match zpr.z_tail with
-      | []      -> raise InvalidCPos
-      | i :: tl -> begin
-          match f (odfl env zpr.z_env) cenv state i tl with
-          | (state', [i']) when i == i' && state == state' -> (state, s)
-          | (state', si  ) -> (state', zip { zpr with z_tail = si })
-      end
+  let map_range env cpr f s =
+    snd (fold_range env () cpr (fun env () _ si -> (), f env si) () s)
 
-  let fold env cenv cpos f state s =
-    let f e ce st i tl =
-      let state', si = f e ce st i in
-      state', si @ tl
-    in
-    fold_tl env cenv cpos f state s
+  let fold env cenv cp f state s =
+    let f env cenv state si = f env cenv state (List.hd si) in
+    fold_range env cenv (cp, `Offset (cpos 0)) f state s
 
   let map env cpos f s =
     fst_map
