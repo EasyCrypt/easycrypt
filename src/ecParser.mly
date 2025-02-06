@@ -1453,12 +1453,13 @@ mod_update_fun:
 
 update_stmt:
 | PLUS s=brace(stmt){ [Pups_add (s, true)] }
-| MINUS s=brace(stmt){ [Pups_add (s, false)] }
+| PLUS HAT s=brace(stmt){ [Pups_add (s, false)] }
 | TILD s=brace(stmt) { [Pups_del; Pups_add (s, true)] }
 | MINUS { [Pups_del] }
 
 update_cond:
-| PLUS e=sexpr { Pupc_add e }
+| PLUS e=sexpr { Pupc_add (e, true) }
+| PLUS HAT e=sexpr { Pupc_add (e, false) }
 | TILD e=sexpr { Pupc_mod e }
 | MINUS bs=branch_select { Pupc_del bs }
 

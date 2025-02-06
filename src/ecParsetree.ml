@@ -356,7 +356,7 @@ and pupdate_stmt =
   | Pups_del
 
 and pupdate_cond =
-  | Pupc_add of pexpr
+  | Pupc_add of (pexpr * bool)
   | Pupc_mod of pexpr
   | Pupc_del of pbranch_select
 
