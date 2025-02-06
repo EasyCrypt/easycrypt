@@ -2102,14 +2102,17 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       let eval_cupdate cp_loc env cup i tl =
         match cup with
         (* Insert an if with condition `e` with body `tl` *)
-        | Pupc_add e ->
+        | Pupc_add (e, after) ->
           let loc = e.pl_loc in
           let ue  = UE.create (Some []) in
           let e, ty = transexp env `InProc ue e in
           let ts = Tuni.subst (UE.close ue) in
           let ty = ty_subst ts ty in
           unify_or_fail env ue loc ~expct:tbool ty;
-          i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+          if after then
+            i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+          else
+            [i_if (e_subst ts e, stmt (i :: tl), s_empty)]
 
         (* Change the condition expression to `e` for a conditional instr `i` *)
         | Pupc_mod e -> begin
