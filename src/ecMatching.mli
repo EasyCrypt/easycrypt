@@ -31,6 +31,7 @@ module Position : sig
   type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
   type codepos1      = int * cp_base
   type codepos       = (codepos1 * codepos_brsel) list * codepos1
+  type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
 
   val shift1 : offset:int -> codepos1 -> codepos1
@@ -92,6 +93,13 @@ module Zipper : sig
   val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * codepos
   val zipper_of_cpos : env -> codepos -> stmt -> zipper
 
+  (* Return the zipper for the stmt [stmt] from the start of the code position
+   * range [codepos_range]. It also returns a code position relative to
+   * the zipper that represents the final position in the range.
+   * Raise [InvalidCPos] if [codepos_range] is not a valid range for [stmt].
+   *)
+  val zipper_of_cpos_range : env -> codepos_range -> stmt -> zipper * codepos1
+
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
 
@@ -104,7 +112,7 @@ module Zipper : sig
   val after : strict:bool -> zipper -> instr list list
 
   type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
-  type ('a, 'state) folder_tl = env -> 'a -> 'state -> instr -> instr list -> 'state * instr list
+  type ('a, 'state) folder_l = env -> 'a -> 'state -> instr list -> 'state * instr list
 
   (* [fold env v cpos f state s] create the zipper for [s] at [cpos], and apply
    * [f] to it, along with [v] and the state [state]. [f] must return the
@@ -115,13 +123,15 @@ module Zipper : sig
    *)
   val fold : env -> 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
 
-  (* Same as above but using [folder_tl]. *)
-  val fold_tl : env -> 'a -> codepos -> ('a, 'state) folder_tl -> 'state -> stmt -> 'state * stmt
-
   (* [map cpos env f s] is a special case of [fold] where the state and the
    * out-of-band data are absent
    *)
   val map : env -> codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
+
+  (* Variants of the above but using code position ranges *)
+  val fold_range : env -> 'a -> codepos_range -> ('a, 'state) folder_l -> 'state -> stmt -> 'state * stmt
+  val map_range : env -> codepos_range -> (env -> instr list -> instr list) -> stmt -> stmt
+
 
 end
 

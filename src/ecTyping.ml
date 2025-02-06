@@ -2194,7 +2194,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         List.fold_right (fun (cp, up) bd ->
           let {pl_desc = cp; pl_loc = loc} = cp in
           let cp = trans_codepos env cp in
-          let change env _ _ i tl = (),
+          let change env si =
+            (* NOTE: There will always be a head element *)
+            let i, tl = List.takedrop 1 si in
+            let i = List.hd i in
+
             match up with
             | Pup_stmt sup ->
               eval_supdate env sup i @ tl
@@ -2203,8 +2207,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           in
           let env = EcEnv.Memory.push_active !memenv env in
           try
-            let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
-            s
+            EcMatching.Zipper.map_range env (cp, `Offset (EcMatching.Zipper.cpos (-1))) change bd
           with
             | EcMatching.Zipper.InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
