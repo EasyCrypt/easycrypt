@@ -977,3 +977,43 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
 
+
+let proc_op_equiv (hyps: hyps) (mem: memory) (proc: stmt) (op: psymbol) : bool =
+  let arg, op_circ = try
+    let env = toenv hyps in
+    let fpth, fo = EcEnv.Op.lookup ([] , op.pl_desc) env in
+    let f = EcTypesafeFol.fop_from_path env fpth in
+    let fc = circuit_of_form hyps f in
+    let fc = circuit_flatten fc in
+    let fc = circuit_aggregate_inps fc in
+    let arg = {
+      v_name = "arg"; 
+      v_type = match fo.op_ty.ty_node with
+      | Tfun (t1, _) -> t1 
+      | _ -> assert false;
+    }
+    in
+    arg, fc
+    
+  with BDepError err ->
+    raise (BDepError ("Failed to generate circuit for operator with error:\n" ^ err))
+  in
+  let pstate = EcCircuits.pstate_of_prog hyps mem proc.s_node [arg] in
+  let ret = "res" in
+  let circ = try 
+    Map.find ret pstate 
+    with Not_found ->
+      raise (BDepError "Output of program not found!")
+  in
+  circ_equiv ~strict:true circ op_circ None 
+
+
+let t_bdep_op (op: psymbol) (tc: tcenv1) =
+  match (FApi.tc1_goal tc).f_node with
+  | FhoareF sH -> assert false
+  | FhoareS sF -> 
+      if proc_op_equiv (FApi.tc1_hyps tc) (fst sF.hs_m) sF.hs_s op 
+      then FApi.close (!@ tc) VBdep
+      else assert false
+  | _ -> assert false
+

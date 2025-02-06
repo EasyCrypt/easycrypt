@@ -14,6 +14,8 @@ val t_bdepeq : variable list * variable list -> int -> (int * variable list * va
 
 val t_bdep_eval :  int ->  int ->  variable list ->  variable list ->  psymbol ->  form list -> bool -> tcenv1 -> tcenv
   
+val t_bdep_op : psymbol -> tcenv1 -> tcenv
+
 val process_bdep : bdep_info -> tcenv1 -> tcenv
 
 val process_bdepeq : bdepeq_info -> tcenv1 -> tcenv

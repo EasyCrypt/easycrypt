@@ -3190,6 +3190,10 @@ bdepeq_out_info:
     perm=oident?
   { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; } }
 
+| BDEP OP
+  op=oident
+  { Pbdepop op }
+
 | BDEP STAR
     in_ty=bracket(loc(simpl_type_exp))
     invs=bracket(bd_vars)
