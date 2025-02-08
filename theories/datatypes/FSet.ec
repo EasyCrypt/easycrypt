@@ -723,6 +723,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 op [opaque] fold (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset) : 'b =
   foldr f z (elems A).
+
 lemma foldE (f : 'a -> 'b -> 'b) z A: fold f z A = foldr f z (elems A).
 proof. by rewrite/fold. qed.
 
@@ -733,19 +734,28 @@ lemma fold1 (f : 'a -> 'b -> 'b) (z : 'b) (a : 'a):
   fold f z (fset1 a) = f a z.
 proof. by rewrite foldE elems_fset1. qed.
 
-lemma foldC (a : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
-  (forall a a' b, f a (f a' b) = f a' (f a b)) =>
-  mem A a =>
+lemma foldC_in (a : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
+  (forall a a' b, a \in A => a' \in A => f a (f a' b) = f a' (f a b)) =>
+  a \in A =>
   fold f z A = f a (fold f z (A `\` fset1 a)).
 proof.
-  move=> f_commutative a_in_A; rewrite !foldE (foldr_rem a)// 1:-memE//.
-  congr; apply/foldr_perm=> //.
-  rewrite setDE rem_filter 1:uniq_elems//.
-  have ->: predC (mem (fset1 a)) = predC1 a (* FIXME: views *)
-    by apply/fun_ext=> x; rewrite /predC /predC1 in_fset1.
-  rewrite -{1}(undup_id (filter (predC1 a) (elems A))) 2:oflistK//.
-  by apply/filter_uniq/uniq_elems.
+move=> f_commutative a_in_A; rewrite !foldE (foldr_rem_in a) //.
++ by move=> z0 x y; rewrite -!memE; exact:f_commutative.
++ by rewrite -memE.
+congr; apply/foldr_perm_in=> //.
++ move=> z0 x y /mem_rem + /mem_rem; rewrite -!memE; exact:f_commutative.
+rewrite setDE rem_filter 1:uniq_elems//.
+have ->: predC (mem (fset1 a)) = predC1 a (* FIXME: views *)
+  by apply/fun_ext=> x; rewrite /predC /predC1 in_fset1.
+rewrite -{1}(undup_id (filter (predC1 a) (elems A))) 2:oflistK//.
+by apply/filter_uniq/uniq_elems.
 qed.
+
+lemma foldC (a : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
+  (forall a a' b, f a (f a' b) = f a' (f a b)) =>
+  a \in A =>
+  fold f z A = f a (fold f z (A `\` fset1 a)).
+proof. by move=> f_commutative; apply: foldC_in=> + + + _ _. qed.
 
 (* -------------------------------------------------------------------- *)
 
