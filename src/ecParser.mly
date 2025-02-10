@@ -2905,7 +2905,8 @@ interleave_info:
 
 %inline outline_kind:
 | s=brace(stmt) { OKstmt(s) }
-| r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
+| TILD f=loc(fident) { OKproc(f, true) }
+| f=loc(fident) { OKproc(f, false) }
 
 %public phltactic:
 | PROC

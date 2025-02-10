@@ -254,15 +254,15 @@ theory DHIES.
   lemma mencrypt_def1: equiv [MEnc.mencrypt ~ Scheme.mencrypt: ={mpk, tag, ptxt} ==> ={res}].
   proof.
   symmetry; proc.
-  outline {1} [1] { cph <@ MEncrypt_map.S.sample(
+  transitivity* {1} { cph <@ MEncrypt_map.S.sample(
                        dlet_locked (mkeyDHIES (elems mpk))
                        (mencDHIES tag ptxt),
                        FMap.ofassoc <: Pk, group * Cph> ); }.
   + by inline*; auto; rewrite dlet_lockedE.
   rewrite equiv[{1} 1 MEncrypt_map.sample].
   inline*; swap{1} 2 1.
+  proc rewrite {1} ^d<- dlet_lockedE.
   outline {1} [1-2] {r1 <@ MEncDHIES_let.SampleDLet.sample(mkeyDHIES (elems mpk), mencDHIES tag ptxt); }.
-  + by inline*; auto; rewrite dlet_lockedE.
   rewrite equiv[{1} 1 -MEncDHIES_let.SampleDepDLet].
   inline*; swap{1} 2 1. 
   outline {1} [1-2] {t <@ MKey_map.S.sample(

@@ -123,7 +123,7 @@ section.
   rewrite equiv[{1} 1 -(iter_12_eq O) (i, i')].
   rewrite equiv[{1} 1 iter2_eq].
   rewrite equiv[{1} 1 (iter_21_eq O) ([i'; i])].
-  outline {1} [1-2] <@ Iter(O).iters.
+  outline {1} [1-2] Iter(O).iters.
   rewrite equiv[{1} 1 (iter_cat_cat O) ([i'], i :: (s1 ++ s2))].
   rewrite equiv[{1} 1 (iter_cat_cat O) ([i'], i :: s1 ++ s2)].
   inline Iter(O).iters; sp.

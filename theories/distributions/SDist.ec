@@ -335,7 +335,7 @@ have -> : Pr[Sample(A).main(d') @ &m : res] =
   byequiv => //; proc. 
   seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}).
   + by auto.
-  outline {2} [1] u <@ S.sample. 
+  outline {2} [1] ~ S.sample. 
   call (: d{2} = (F x){1} /\ (glob A){1} = (glob A){m} ==> ={res}).
   bypr (res{1}) (res{2}); 1:smt(). 
   move => &1 &2 a [-> eq_globA]; rewrite sampleE -(adv_mu1 A). 
@@ -540,7 +540,8 @@ have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
 eager proc H (={glob Var}) => //; 2: by sim.
     proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
 proc.
-outline {1} [1-2] r <@ Game(A, O1e).main.
+print Game.
+transitivity* {1} {r <@ Game(A, O1e).main(d);}.
 + by inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto.
 rewrite equiv[{1} 1 eq_main_O1e_O1l].
 inline*. 

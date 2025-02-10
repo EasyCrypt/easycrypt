@@ -153,7 +153,7 @@ section PROOFS.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
     seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      outline {2} [1-2] (r, r0) <@ S.sample2.
+      outline {2} [1-2] ~ S.sample2.
       rewrite equiv[{2} 1 -sample_sample2].
       inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
       + by move=> ??; rewrite ofpairK. 
