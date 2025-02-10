@@ -381,7 +381,7 @@ abstract theory Program.
     rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
     rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
     wp; rnd.
-    outline {1} [1] rs <@ Sample.sample.
+    outline {1} [1] ~ Sample.sample.
     rewrite equiv[{1} 1 ih].
     inline.
     by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().
@@ -389,16 +389,9 @@ abstract theory Program.
 
   equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={n} ==> ={res}.
   proof.
-    proc*. transitivity{1} { r <@ Sample.sample(n);
-                             r <- rev r;            }
-                           (={n} ==> ={r})
-                           (={n} ==> ={r})=> //=; 1:smt().
+    proc*. 
+    replace* {1} { x } by { x; r <- rev r; }.
       inline *; wp; rnd rev; auto.
-      move=> &1 &2 ->>; split=> /= [*|t {t}]; 1: by rewrite revK.
-      split.
-        move=> r; rewrite -/(support _ _); case (0 <= n{2})=> sign_n.
-          rewrite !dlist1E // (size_rev r)=> ?;congr;apply eq_big_perm.
-          by apply perm_eqP=> ?;rewrite count_rev. smt(dlist_rev).
       smt(revK dlist_rev).
     rewrite equiv[{1} 1 Sample_Loop_eq].
     inline *; wp; while (={i, n0} /\ rev l{1} = l{2}); auto => />.

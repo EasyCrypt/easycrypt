@@ -664,7 +664,7 @@ type inline_info = [
 (* -------------------------------------------------------------------- *)
 type outline_kind =
   | OKstmt of pstmt
-  | OKproc of pgamepath * pexpr option
+  | OKproc of pgamepath * bool
 
 type outline_info = {
     outline_side: side;
