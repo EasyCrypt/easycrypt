@@ -1193,9 +1193,36 @@ module type CBackend = sig
   val input_node : id:int -> int -> node
   val input_of_size : ?offset:int -> id:int -> int -> reg
 
-  val band : node -> node -> node
   val node_eq : node -> node -> node
+  val band : node -> node -> node
 
+  (* Base operations *)
+  (* FIXME: decide if boolean ops are going to be defined 
+     on registers or on nodes *)
+  val add : reg -> reg -> reg
+  val sub : reg -> reg -> reg
+  val mul : reg -> reg -> reg
+  val udiv : reg -> reg -> reg
+  val sdiv : reg -> reg -> reg
+  val umod : reg -> reg -> reg (* FIXME: mod or rem here? *)
+  val smod : reg -> reg -> reg
+  val lshl : reg -> reg -> reg
+  val lshr : reg -> reg -> reg
+  val ashr : reg -> reg -> reg
+  val rol : reg -> reg -> reg
+  val ror : reg -> reg -> reg
+  val land_ : reg -> reg -> reg
+  val lor_ : reg -> reg -> reg
+  val lxor_ : reg -> reg -> reg
+  val lnot_ : reg -> reg 
+  val ult: reg -> reg -> node
+  val slt : reg -> reg -> node
+  val ule : reg -> reg -> node
+  val sle : reg -> reg -> node
+  val uext : reg -> int -> reg
+  val sext : reg -> int -> reg
+  val trunc : reg -> int -> reg
+  val concat : reg -> reg -> reg
 end
 
 module TestBack : CBackend = struct
@@ -1220,6 +1247,32 @@ module TestBack : CBackend = struct
 
   let apply = assert false
   let circuit_from_spec = assert false
+
+  let add (r1: reg) (r2: reg) : reg = C.add_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let sub (r1: reg) (r2: reg) : reg = C.sub_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let mul (r1: reg) (r2: reg) : reg = C.umull (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let udiv (r1: reg) (r2: reg) : reg = C.udiv (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let sdiv (r1: reg) (r2: reg) : reg = C.sdiv (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  (* FIXME: mod or rem here? *)
+  let umod (r1: reg) (r2: reg) : reg  = C.umod (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let smod (r1: reg) (r2: reg) : reg = C.smod (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let lshl (r1: reg) (r2: reg) : reg = C.shift ~side:`L ~sign:`L (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let lshr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`L  (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let ashr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`A  (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let rol (r1: reg) (r2: reg) : reg = C.rol (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let ror (r1: reg) (r2: reg) : reg = C.ror (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let land_ (r1: reg) (r2: reg) : reg = C.land_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let lor_ (r1: reg) (r2: reg) : reg = C.lor_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let lxor_ (r1: reg) (r2: reg) : reg = C.lxor_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let lnot_ (r1: reg) : reg  = C.lnot_ (Array.to_list r1) |> Array.of_list
+  let ult (r1: reg) (r2: reg) : node = C.ugt (Array.to_list r2) (Array.to_list r1) 
+  let slt (r1: reg) (r2: reg) : node = C.sgt (Array.to_list r2) (Array.to_list r1)
+  let ule (r1: reg) (r2: reg) : node = C.uge (Array.to_list r2) (Array.to_list r1)
+  let sle (r1: reg) (r2: reg) : node = C.sge (Array.to_list r2) (Array.to_list r1)
+  let uext (r1: reg) (size: int) : reg = C.uextend ~size (Array.to_list r1) |> Array.of_list
+  let sext (r1: reg) (size: int) : reg = C.sextend ~size (Array.to_list r1) |> Array.of_list
+  let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
+  let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
 end
 
 (* Make this into a functor over some backend *)
@@ -1239,6 +1292,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   }
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun 
+
+  let (|->) ((a,b)) ((f,g)) = (f a, g b)
+  let idnt = fun x -> x
 
   (* arg for circuit construction *)
   module CArgs = struct
@@ -1285,6 +1341,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
   open LocalCache
 
+  let reg_of_circ (c: circ) : Backend.reg = 
+    match c with
+    | `CTuple (r, _) | `CArray (r, _) 
+    | `CBitstring r -> Backend.reg_of_node_array r
+    | `CBool r -> Backend.reg_of_node_array [| r |] 
+
   let cbool_of_circuit ?(strict : bool = false) (c: circuit) : (cbool * (cinp list)) = 
     match (fst c) with
     | `CArray (r, _) | `CTuple (r, _) | `CBitstring r 
@@ -1318,20 +1380,24 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CBool r when not strict -> `CTuple ([| r |], [ 1 ]), snd c
     | _ -> assert false
 
+  (* FIXME: maybe change name from inp -> input? *)
   let new_cbool_inp ?(name:string = "input") : cbool * cinp = 
     let id = EcIdent.create name |> tag in
     let inp = Backend.input_node ~id 0 in
     `CBool inp, { type_ = `CIBool; id; }
+
   let new_cbitstring_inp ?(name:string = "input") (sz: int) : cbitstring * cinp =
     let id = EcIdent.create name |> tag in
     let inp = Backend.input_of_size ~id sz in
     `CBitstring (Backend.node_array_of_reg inp), 
     { type_ = `CIBitstring sz; id; }
+
   let new_carray_inp ?(name:string = "input") (el_sz: int) (el_cnt: int) : carray * cinp = 
     let id = EcIdent.create name |> tag in
     let inp = Backend.input_of_size ~id (el_sz * el_cnt) in
     `CArray (Backend.node_array_of_reg inp, el_sz), 
     { type_ = `CIArray (el_sz, el_cnt); id; } 
+
   let new_ctuple_inp ?(name:string = "input") (szs: int list) : ctuple * cinp =
     let id = EcIdent.create name |> tag in
     let inp = Backend.input_of_size ~id (List.sum szs) in
@@ -1402,6 +1468,156 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let op_is_base : env -> path -> bool = assert false
   let circuit_of_op : env -> path -> circuit = assert false
   let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = assert false
+
+  module BaseOps = struct
+    let temp_symbol = "temp_circ_input"
+    
+    let is_of_int (env: env) (p: path) : bool = 
+      match EcEnv.Circuit.reverse_bitstring_operator env p with
+      | Some (_, `OfInt) -> true
+      | _ -> false
+
+    let circuit_of_baseop (env: env) (p: path) : circuit = 
+      match EcEnv.Circuit.lookup_bvoperator_path env p with
+      | Some { kind = `Add size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.add c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Sub size } ->
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.sub c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Mul  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.mul c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Div (size, false) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.udiv c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Div (size, true) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.sdiv c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Rem (size, false) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.umod c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Rem (size, true) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.smod c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+        (* Should this be mod or rem? TODO FIXME*)
+
+      | Some { kind = `Shl  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.lshl c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Shr  (size, false) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.lshr c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Shr  (size, true) } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.ashr c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Rol  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.rol c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Ror  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.ror c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `And  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.land_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Or   size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.lor_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Xor  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.lxor_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `Not  size } -> 
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        `CBitstring (Backend.lnot_ c1 |> Backend.node_array_of_reg), [inp1] 
+
+      | Some { kind = `Lt (size, false) } ->
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBool (Backend.ult c1 c2), [inp1; inp2] 
+      
+      | Some { kind = `Lt (size, true) } ->
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBool (Backend.slt c1 c2), [inp1; inp2] 
+
+      | Some { kind = `Le (size, false) } ->
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBool (Backend.ule c1 c2), [inp1; inp2] 
+
+      | Some { kind = `Le (size, true) } ->
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBool (Backend.sle c1 c2), [inp1; inp2] 
+
+      (* FIXME: should this be fully backend responsability or not?  *)
+      | Some { kind = `Extend (size, out_size, false) } ->
+        (* assert (size <= out_size); *)
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        `CBitstring (Backend.uext c1 out_size |> Backend.node_array_of_reg), [inp1] 
+
+      (* FIXME: should this be fully backend responsability or not?  *)
+      | Some { kind = `Extend (size, out_size, true) } ->
+        (* assert (size <= out_size); *)  
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        `CBitstring (Backend.sext c1 out_size |> Backend.node_array_of_reg), [inp1] 
+
+      (* FIXME: should this be fully backend responsability or not?  *)
+      | Some { kind = `Truncate (size, out_sz) } ->
+        (* assert (size >= out_sz); *)
+        let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        `CBitstring (Backend.trunc c1 out_sz |> Backend.node_array_of_reg), [inp1] 
+
+      (* FIXME: should this be fully backend responsability or not?  *)
+      | Some { kind = `Concat (sz1, sz2, szo) } ->
+        (* assert (sz1 + sz2 = szo); *)
+        let c1, inp1 = new_cbitstring_inp sz1 |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
+        let c2, inp2 = new_cbitstring_inp sz2 |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
+        `CBitstring (Backend.concat c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
+
+      | Some { kind = `A2B ((w, n), m)} ->
+        (* assert (n * w = m); *)
+        let c1, inp1 = new_carray_inp w n |-> ((fun (`CArray (r, _)) -> r), idnt) in  
+        `CBitstring c1, [inp1] 
+
+      | Some { kind = `B2A (m, (w, n))} ->
+        (* assert (n * w = m); *)
+        let c1, inp1 = new_cbitstring_inp m |-> ((fun (`CBitstring r) -> r), idnt) in  
+        `CArray (c1, w), [inp1] 
+
+      | _ -> raise @@ CircError "Failed to generate op"
+      
+  end
+
   (*
     let open AIG_Backend in
     match EcEnv.Circuit.reverse_operator env p with
