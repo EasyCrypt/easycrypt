@@ -1106,6 +1106,7 @@ module type CircuitInterface = sig
     val pstate_get : pstate -> symbol -> circuit 
     val pstate_get_all : pstate -> (symbol * circuit) list
     val empty_pstate : pstate
+    val map_pstate : (symbol -> circuit -> circuit) -> pstate -> pstate
   end
 
   module LocalCache : sig
@@ -1113,6 +1114,7 @@ module type CircuitInterface = sig
     val update_cache : cache -> lpattern -> circuit -> cache
     val cache_get : cache -> ident -> circuit
     val empty_cache : cache
+    val cache_map : (ident -> circuit -> circuit) -> cache -> cache
   end
 
   (* Type conversions *)
@@ -1122,10 +1124,10 @@ module type CircuitInterface = sig
   val ctuple_of_circuit : ?strict:bool -> circuit -> ctuple * cinp list
 
   (* Type constructors *)
-  val new_cbool_inp : ?name:string -> cbool * cinp
-  val new_cbitstring_inp : ?name:string -> int -> cbitstring * cinp
-  val new_carray_inp : ?name:string -> int -> int -> carray * cinp
-  val new_ctuple_inp : ?name:string -> int list -> ctuple * cinp
+  val new_cbool_inp : ?name:[`Str of string | `Idn of ident] -> cbool * cinp
+  val new_cbitstring_inp : ?name:[`Str of string | `Idn of ident] -> int -> cbitstring * cinp
+  val new_carray_inp : ?name:[`Str of string | `Idn of ident] -> int -> int -> carray * cinp
+  val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> int list -> ctuple * cinp
 
 
   (* Circuits representing booleans *)
@@ -1150,12 +1152,12 @@ module type CircuitInterface = sig
   val circuits_of_circuit_tuple : (ctuple * (cinp list)) -> (cbitstring * (cinp list)) list
 
   (* Circuit lambdas, for managing inputs *)
-  val open_circ_lambda : (ident * ty) list -> circuit list 
-  val open_circ_lambda_cache : LocalCache.cache -> (ident * ty) list -> LocalCache.cache 
-  val open_circ_lambda_pstate : PState.pstate -> (ident * ty) list -> PState.pstate 
-  val close_circ_lambda : (ident * ty) list -> circuit -> circuit 
-  val close_circ_lambda_cache : LocalCache.cache -> (ident * ty) list -> LocalCache.cache 
-  val close_circ_lambda_pstate : PState.pstate -> (ident * ty) list -> PState.pstate 
+  val open_circ_lambda : env -> (ident * ty) list -> circuit list 
+  val open_circ_lambda_cache : env -> LocalCache.cache -> (ident * ty) list -> LocalCache.cache 
+  val open_circ_lambda_pstate : env -> PState.pstate -> (ident * ty) list -> PState.pstate 
+  val close_circ_lambda : env -> (ident * ty) list -> circuit -> circuit 
+  val close_circ_lambda_cache : env -> LocalCache.cache -> (ident * ty) list -> LocalCache.cache 
+  val close_circ_lambda_pstate : env -> PState.pstate -> (ident * ty) list -> PState.pstate 
 
   (* Circuit equivalence call, should do some processing and then call some backend *)
   val circ_equiv : ?pcond:(cbool * (cinp list)) -> circuit -> circuit -> bool
@@ -1196,7 +1198,7 @@ module type CBackend = sig
   val node_eq : node -> node -> node
   val band : node -> node -> node
 
-  (* Base operations *)
+  (* SMTLib Base Operations *)
   (* FIXME: decide if boolean ops are going to be defined 
      on registers or on nodes *)
   val add : reg -> reg -> reg
@@ -1248,6 +1250,7 @@ module TestBack : CBackend = struct
   let apply = assert false
   let circuit_from_spec = assert false
 
+  (* SMTLib Base Ops *)
   let add (r1: reg) (r2: reg) : reg = C.add_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
   let sub (r1: reg) (r2: reg) : reg = C.sub_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
   let mul (r1: reg) (r2: reg) : reg = C.umull (Array.to_list r1) (Array.to_list r2) |> Array.of_list
@@ -1277,6 +1280,7 @@ end
 
 (* Make this into a functor over some backend *)
 module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = struct
+  (* Module Types *)
   type carray_type = Backend.node array * int 
   type cbitstring_type = Backend.node array
   type ctuple_type = Backend.node array * (int list)
@@ -1293,6 +1297,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun 
 
+  (* Helper functions *)
   let (|->) ((a,b)) ((f,g)) = (f a, g b)
   let idnt = fun x -> x
 
@@ -1328,19 +1333,23 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       Map.enum pstate |> List.of_enum
 
     let empty_pstate : pstate = assert false
+
+    let map_pstate : (symbol -> circuit -> circuit) -> pstate -> pstate =
+      Map.mapi
   end
   open PState
 
-  (* CACHE DEFINIITION *)
-  (*type cache  = (ident, (cinput * circuit)) Map.t*)
-  module LocalCache = struct
-    type cache
-    let update_cache : cache -> lpattern -> circuit -> cache = assert false
-    let cache_get : cache -> ident -> circuit = assert false
-    let empty_cache : cache = assert false
-  end
-  open LocalCache
+  (* Inputs helper functions *)
+  let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
+    cs @ ds
 
+  let merge_inputs_list (cs: cinp list list) : cinp list =
+    List.fold_right (merge_inputs) cs []
+
+  let merge_circuit_inputs (c: circuit) (d: circuit) : cinp list =
+    merge_inputs (snd c) (snd d)
+
+  (* Type conversions *)
   let reg_of_circ (c: circ) : Backend.reg = 
     match c with
     | `CTuple (r, _) | `CArray (r, _) 
@@ -1380,32 +1389,90 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CBool r when not strict -> `CTuple ([| r |], [ 1 ]), snd c
     | _ -> assert false
 
+  (* Circuit tuples *)
+  let circuit_tuple_proj ((`CTuple (r, ws)), inps: ctuple * (cinp list)) (i: int) =
+    let idx, w = List.takedrop i ws in
+    let w = List.hd w in
+    let idx = List.fold_left (+) 0 idx in
+    `CBitstring (Array.sub r idx w), inps
+
+  let circuit_tuple_of_circuits (cs: (cbitstring * (cinp list)) list) : ctuple * (cinp list) = 
+    let circ, lens = List.fold_left_map (fun acc (`CBitstring r) -> (Array.to_list r) @ acc, Array.length r) [] (List.fst cs) in 
+    let circ = Array.of_list (List.rev circ) in
+    let inps = List.snd cs in
+    `CTuple (circ, lens) , merge_inputs_list inps
+
+  let circuits_of_circuit_tuple : (ctuple * cinp list) -> (cbitstring * cinp list) list = assert false
+  
+  (* CACHE DEFINIITION *)
+  (*type cache  = (ident, (cinput * circuit)) Map.t*)
+  module LocalCache = struct
+    type cache = (ident, circuit) Map.t
+    let update_cache (cache: cache) (lp: lpattern) (c: circuit) : cache = 
+      match lp, c with
+      | LTuple vs, (`CTuple r1 as tp, inps) -> 
+          let comps = circuits_of_circuit_tuple (tp, inps) in
+          assert (List.compare_lengths vs comps = 0);
+          List.fold_left2 (fun cache (v, _t) c -> 
+            Map.add v c cache
+          )
+          cache vs (comps :> circuit list)
+      | LTuple _, _ | LRecord _, _ -> assert false
+      | LSymbol (idn, t), c -> Map.add idn c cache
+
+    let cache_get (cache: cache) (idn: ident) : circuit = 
+      try 
+        Map.find idn cache  
+      with Not_found -> 
+
+        assert false (* FIXME: Error handling *)
+    let empty_cache : cache = 
+      Map.empty
+
+    let cache_map : (ident -> circuit -> circuit) -> cache -> cache =
+      Map.mapi
+  end
+  open LocalCache
+
+  (* Input Helper Functions *)
   (* FIXME: maybe change name from inp -> input? *)
-  let new_cbool_inp ?(name:string = "input") : cbool * cinp = 
-    let id = EcIdent.create name |> tag in
+  let new_cbool_inp ?(name = `Str "input") : cbool * cinp = 
+    let id = match name with 
+    | `Str name -> EcIdent.create name |> tag 
+    | `Idn idn -> tag idn 
+    in
     let inp = Backend.input_node ~id 0 in
     `CBool inp, { type_ = `CIBool; id; }
 
-  let new_cbitstring_inp ?(name:string = "input") (sz: int) : cbitstring * cinp =
-    let id = EcIdent.create name |> tag in
+  let new_cbitstring_inp ?(name = `Str "input") (sz: int) : cbitstring * cinp =
+    let id = match name with 
+    | `Str name -> EcIdent.create name |> tag 
+    | `Idn idn -> tag idn 
+    in
     let inp = Backend.input_of_size ~id sz in
     `CBitstring (Backend.node_array_of_reg inp), 
     { type_ = `CIBitstring sz; id; }
 
-  let new_carray_inp ?(name:string = "input") (el_sz: int) (el_cnt: int) : carray * cinp = 
-    let id = EcIdent.create name |> tag in
-    let inp = Backend.input_of_size ~id (el_sz * el_cnt) in
+  let new_carray_inp ?(name = `Str "input") (el_sz: int) (arr_sz: int) : carray * cinp = 
+    let id = match name with 
+    | `Str name -> EcIdent.create name |> tag 
+    | `Idn idn -> tag idn 
+    in
+    let inp = Backend.input_of_size ~id (el_sz * arr_sz) in
     `CArray (Backend.node_array_of_reg inp, el_sz), 
-    { type_ = `CIArray (el_sz, el_cnt); id; } 
+    { type_ = `CIArray (el_sz, arr_sz); id; } 
 
-  let new_ctuple_inp ?(name:string = "input") (szs: int list) : ctuple * cinp =
-    let id = EcIdent.create name |> tag in
+  let new_ctuple_inp ?(name = `Str "input") (szs: int list) : ctuple * cinp =
+    let id = match name with 
+    | `Str name -> EcIdent.create name |> tag 
+    | `Idn idn -> tag idn 
+    in
     let inp = Backend.input_of_size ~id (List.sum szs) in
     `CTuple (Backend.node_array_of_reg inp, szs),
     { type_ = `CITuple szs;
       id; }
 
-  let circuit_true  = `CBool (Backend.true_), [] 
+  let circuit_true  = `CBool Backend.true_ , [] 
   let circuit_false = `CBool Backend.false_, []
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
@@ -1413,16 +1480,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     assert ((circuit_is_free t) && (circuit_is_free f) && (circuit_is_free (c :> circuit)));
     assert false
 
-  let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
-    cs @ ds
-
-  let merge_inputs_list (cs: cinp list list) : cinp list =
-    List.fold_right (merge_inputs) cs []
-
-  let merge_circuit_inputs (c: circuit) (d: circuit) : cinp list =
-    merge_inputs (snd c) (snd d)
-  
-  let circuit_eq (c: circuit) (d: circuit) : circuit =  
+    let circuit_eq (c: circuit) (d: circuit) : circuit =  
     match c, d with
     | (`CArray (r1, _), inps1), (`CArray (r2, _), inps2) 
     | (`CTuple (r1, _), inps1), (`CTuple (r2, _), inps2) 
@@ -1617,6 +1675,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | _ -> raise @@ CircError "Failed to generate op"
       
   end
+  open BaseOps
 
   (*
     let open AIG_Backend in
@@ -1770,29 +1829,52 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     assert false
   *)
 
-  (* Circuit tuples *)
-  let circuit_tuple_proj ((`CTuple (r, ws)), inps: ctuple * (cinp list)) (i: int) =
-    let idx, w = List.takedrop i ws in
-    let w = List.hd w in
-    let idx = List.fold_left (+) 0 idx in
-    `CBitstring (Array.sub r idx w), inps
 
+  let rec circ_lambda_one (env:env) (idn: ident) (t: ty) : cinp * circuit = 
+    match t.ty_node with
+    | Ttuple ts -> let szs = List.map (width_of_type env) ts in
+      let ctp, cinp = new_ctuple_inp ~name:(`Idn idn) szs in
+      cinp, ((ctp, []) :> circuit)
+    | Tconstr (_, _) -> begin match EcEnv.Circuit.lookup_array_and_bitstring env t with
+      | None -> begin try 
+        let bs_info = Option.get (EcEnv.Circuit.lookup_bitstring env t) in
+        let cbs, cinp = new_cbitstring_inp ~name:(`Idn idn) bs_info.size in
+        cinp, ((cbs, []) :> circuit)
+      with Invalid_argument _ -> assert false 
+      end
+      | Some ({size=arr_sz}, {size=el_sz}) ->
+          let ca, cinp = new_carray_inp ~name:(`Idn idn) el_sz arr_sz in
+          cinp, ((ca, []) :> circuit)
+    end
+    | Tfun (_, _) -> assert false
+    | Tglob _ -> assert false
+    | Tunivar _ -> assert false
+    | Tvar _ -> assert false
 
-  let circuit_tuple_of_circuits (cs: (cbitstring * (cinp list)) list) : ctuple * (cinp list) = 
-    let circ, lens = List.fold_left_map (fun acc (`CBitstring r) -> (Array.to_list r) @ acc, Array.length r) [] (List.fst cs) in 
-    let circ = Array.of_list (List.rev circ) in
-    let inps = List.snd cs in
-    `CTuple (circ, lens) , merge_inputs_list inps
+  let open_circ_lambda (env : env) (vs: (ident * ty) list) : circuit list = 
+    List.map (fun (idn, t) -> snd @@ circ_lambda_one env idn t) vs 
     
+  let open_circ_lambda_cache (env : env) (cache : cache) (vs : (ident * ty) list) : cache = 
+    List.fold_left (fun cache ((idn, t) as v) -> 
+      update_cache cache (LSymbol v) @@ snd @@ circ_lambda_one env idn t)
+    cache vs 
+    
+  let open_circ_lambda_pstate (env : env) (pstate : pstate) (vs: (ident * ty) list) : pstate = 
+    List.fold_left (fun pstate (idn, t) ->
+      update_pstate pstate (name idn) @@ snd @@ circ_lambda_one env idn t)
+    pstate vs
 
-  let circuits_of_circuit_tuple : (ctuple * cinp list) -> (cbitstring * cinp list) list = assert false
+  let close_circ_lambda (env : env) (vs : (ident * ty) list) (c: circuit) : circuit = 
+    let cinps = List.fst @@ (List.map (fun (idn, t) -> circ_lambda_one env idn t) vs) in
+    (fst c, merge_inputs cinps (snd c))
 
-  let open_circ_lambda : (ident * ty) list -> circuit list = assert false
-  let open_circ_lambda_cache : cache -> (ident * ty) list -> cache = assert false
-  let open_circ_lambda_pstate : pstate -> (ident * ty) list -> pstate = assert false
-  let close_circ_lambda : (ident * ty) list -> circuit -> circuit = assert false 
-  let close_circ_lambda_cache : cache -> (ident * ty) list -> cache = assert false 
-  let close_circ_lambda_pstate : pstate -> (ident * ty) list -> pstate = assert false 
+  let close_circ_lambda_cache (env : env) (cache : cache) (vs: (ident * ty) list) : cache = 
+    let cinps = List.fst @@ (List.map (fun (idn, t) -> circ_lambda_one env idn t) vs) in
+    cache_map (fun _ c -> (fst c, merge_inputs cinps (snd c))) cache 
+
+  let close_circ_lambda_pstate (env : env) (pstate : pstate) (vs: (ident * ty) list) : pstate =  
+    let cinps = List.fst @@ (List.map (fun (idn, t) -> circ_lambda_one env idn t) vs) in
+    map_pstate (fun _ c -> (fst c, merge_inputs cinps (snd c))) pstate
 
   let circ_equiv : ?pcond:(cbool * cinp list) -> circuit -> circuit -> bool = assert false
   let circuit_compose : circuit -> circuit list -> circuit = assert false
@@ -1894,47 +1976,8 @@ let circuit_of_form
         let c = cbool_of_circuit c in
         hyps, circuit_ite ~c ~t ~f
 
-        (*if (not @@ circuit_out_is_bool c_c) then raise (CircError "Condition circuit output size too big")*)
-
-        (*else*)
-
-        (*let c_c = List.hd (destr_bwcirc c_c.circ) in*)
-        (*(* inps = [] since we disallow definitions/quantifiers inside conditionals *)*)
-        (*begin*)
-        (*match t_c.circ, f_c.circ with*)
-        (*| BWCirc t_c, BWCirc f_c ->*)
-        (*hyps, {*)
-        (*  circ = BWCirc (C.ite c_c t_c f_c);*)
-        (*  inps = []; *)
-        (*}*)
-        (*| BWArray t_cs, BWArray f_cs when (Array.length t_cs = Array.length f_cs) ->*)
-        (*  hyps, {*)
-        (*    circ = BWArray (Array.map2 (C.ite c_c) t_cs f_cs);*)
-        (*    inps = []; *)
-        (*  }*)
-        (*| BWTuple t_tp, BWTuple f_tp when (List.compare_lengths t_tp f_tp = 0) ->*)
-        (*    hyps, {*)
-        (*    circ = BWTuple (List.map2 (C.ite c_c) t_tp f_tp);*)
-        (*    inps = [];*)
-        (*  }*)
-        (*| _ -> raise (CircError "Type mismatch between conditional arms")*)
-        (*(* EC should prevent this as equal EC types ==> equal circuit types *)*)
-        (*end*)
     | Flocal idn -> 
         hyps, cache_get cache idn
-      (*begin match Map.find_opt idn cache with*)
-      (*| Some (inp, circ) -> *)
-      (*  (* Check if we want = or equiv here FIXME *)*)
-      (*  if (cinput_equiv inp (cinput_of_type env f_.f_ty)) then*)
-      (*  hyps, circ*)
-      (*  else *)
-      (*    let err = Format.asprintf "Var binding shape %s for %s does not match shape of form type %s@."*)
-      (*     (cinput_to_string inp) idn.id_symb (cinput_of_type env f_.f_ty |> cinput_to_string) in*)
-      (*     raise @@ CircError err*)
-      (*| None -> *)
-      (*    let err = Format.asprintf "Var binding not found for %s@." idn.id_symb in *)
-      (*    raise @@ CircError err*)
-      (*end*)
     | Fop (pth, _) -> 
       begin
       match Mp.find_opt pth !op_cache with
@@ -2175,10 +2218,10 @@ let circuit_of_form
       
     | Fquant (qnt, binds, f) -> 
       let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t)) binds in
-      let cache = open_circ_lambda_cache cache binds in
+      let cache = open_circ_lambda_cache env cache binds in
       let hyps, circ = doit cache hyps f in
       begin match qnt with
-      | Llambda -> hyps, close_circ_lambda binds circ 
+      | Llambda -> hyps, close_circ_lambda env binds circ 
       | Lforall 
       | Lexists -> raise (CircError "Universal/Existential quantification not supported ")
       (* TODO: figure out how to handle quantifiers *)
@@ -2338,13 +2381,13 @@ let instrs_equiv
 
   let inputs = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) (rd @ wr) in
   let inputs = List.map (fun {v_name; v_type} -> (create v_name, v_type)) inputs in
-  let pstate = open_circ_lambda_pstate empty_pstate inputs in
+  let pstate = open_circ_lambda_pstate env empty_pstate inputs in
 
   let pstate1 = List.fold_left (process_instr hyps mem) pstate s1 in
   let pstate2 = List.fold_left (process_instr hyps mem) pstate s2 in
 
-  let pstate1 = close_circ_lambda_pstate pstate1 inputs in 
-  let pstate2 = close_circ_lambda_pstate pstate2 inputs in
+  let pstate1 = close_circ_lambda_pstate env pstate1 inputs in 
+  let pstate2 = close_circ_lambda_pstate env pstate2 inputs in
   (* FIXME: what was the intended behaviour for keep? *)
   match keep with
   | Some pv -> 
@@ -2370,13 +2413,14 @@ let instrs_equiv
 
 let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable list) : pstate =
   (*let inps, pstate = initial_pstate_of_vars (toenv hyps) (invs) in*)
+  let env = LDecl.toenv hyps in
   let invs = List.map (fun {v_name; v_type} -> (create v_name, v_type)) invs in
-  let pstate = open_circ_lambda_pstate empty_pstate invs in
+  let pstate = open_circ_lambda_pstate env empty_pstate invs in
 
   let pstate = 
     List.fold_left (process_instr hyps mem) pstate proc
   in
-  close_circ_lambda_pstate pstate invs
+  close_circ_lambda_pstate env pstate invs
 
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality
