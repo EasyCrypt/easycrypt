@@ -958,3 +958,49 @@ proof. by apply fmap_eqP=> z; rewrite mergeE // !get_setE mergeE // /#. qed.
 lemma mem_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x:
   (x \in pair_map m1 m2) = (x \in m1 /\ x \in m2).
 proof. by rewrite /dom mergeE // /#. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fmap_ind (p : ('a, 'b) fmap -> bool):
+     p empty
+  => (forall m k v, p (rem m k) => p m.[k <- v])
+  => forall m, p m.
+proof.
+move=> p_empty pS; elim/fmapW=> //.
+by move=> m k v; rewrite mem_fdom=> /rem_id {1}<- /pS ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op [opaque] fold (f : 'a -> 'b -> 'c -> 'c) z (m : ('a, 'b) fmap) =
+  fold (fun x s=> f x (oget m.[x]) s) z (fdom m).
+
+lemma foldE (f : 'a -> 'b -> 'c -> 'c) z m:
+  fold f z m = fold (fun x s=> f x (oget m.[x]) s) z (fdom m).
+proof. by rewrite /fold. qed.
+
+lemma fold0 (f : 'a -> 'b -> 'c -> 'c) z:
+  fold f z empty = z.
+proof. by rewrite foldE fdom0 fold0. qed.
+
+lemma fold1 (f : 'a -> 'b -> 'c -> 'c) z x y:
+  fold f z empty.[x <- y] = f x y z.
+proof. by rewrite foldE fdom_set fdom0 fset0U fold1 /= get_set_sameE. qed.
+
+lemma fold_set_neq (f : 'a -> 'b -> 'c -> 'c) z m x y:
+     (forall a a' z,
+           a \in m.[x <- y]
+        => a' \in m.[x <- y]
+        =>   f a (oget m.[x <- y].[a]) (f a' (oget m.[x <- y].[a']) z)
+           = f a' (oget m.[x <- y].[a']) (f a (oget m.[x <- y].[a]) z))
+  => x \notin m
+  => fold f z m.[x <- y] = f x y (fold f z m).
+proof.
+move=> fCA x_notin_m; rewrite foldE fdom_set.
+rewrite (foldC_in x) /=.
++ by move=> a a' b; smt(in_fsetU in_fset1 mem_set mem_fdom).
++ by move=> /=; rewrite in_fsetU in_fset1.
+rewrite get_set_sameE fsetDK /oget /=.
+rewrite -fdom_rem rem_id //.
+congr; rewrite foldE; apply: eq_in_fold.
+move=> a /mem_fdom a_in_m /=.
+by rewrite get_set_neqE // -negP=> <<-.
+qed.

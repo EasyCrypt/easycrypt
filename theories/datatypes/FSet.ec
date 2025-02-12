@@ -757,6 +757,14 @@ lemma foldC (a : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
   fold f z A = f a (fold f z (A `\` fset1 a)).
 proof. by move=> f_commutative; apply: foldC_in=> + + + _ _. qed.
 
+lemma eq_in_fold (f g : 'a -> 'b -> 'b) (z : 'b) (A : 'a fset):
+  (forall a, a \in A => f a = g a) =>
+  fold f z A = fold g z A.
+proof.
+move=> f_eq_in; rewrite !foldE.
+by apply: eq_in_foldr=> // x; rewrite -memE=> /f_eq_in.
+qed.
+
 (* -------------------------------------------------------------------- *)
 
 op rangeset (m n : int) = oflist (range m n).
