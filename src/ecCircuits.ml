@@ -1143,6 +1143,7 @@ module type CircuitInterface = sig
 
   (* Circuits from operators *)
   val op_is_base : env -> path -> bool 
+  val op_is_parametric_base : env -> path -> bool
   val circuit_of_op : env -> path -> circuit (* Fails if circuit takes a constant arg *)
   val circuit_of_op_with_args : env -> path -> arg list -> circuit
 
@@ -1167,7 +1168,7 @@ module type CircuitInterface = sig
 
   (* Wraps the backend call to deal with args/inputs *)
   module CircuitSpec : sig
-    val circuit_from_spec : env -> path -> circuit 
+    val circuit_from_spec : env -> [`Path of path | `Bind of EcDecl.crb_circuit] -> circuit 
     val op_has_spec : env -> path -> bool
   end
 end
@@ -1190,7 +1191,7 @@ module type CBackend = sig
   val reg_of_node_array : node array -> reg
 
   val apply : node -> (inp -> node option) -> node
-  val circuit_from_spec : env -> path -> reg list -> reg 
+  val circuit_from_spec : Lospecs.Ast.adef -> reg list -> reg 
 
   val input_node : id:int -> int -> node
   val input_of_size : ?offset:int -> id:int -> int -> reg
@@ -1523,10 +1524,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
  *)
 
-  let op_is_base : env -> path -> bool = assert false
-  let circuit_of_op : env -> path -> circuit = assert false
-  let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = assert false
+  let circuit_compose : circuit -> circuit list -> circuit = assert false
 
+  (* Should correspond to QF_ABV *)
+  let op_is_base (env: env) (p: path) : bool = 
+    not @@ List.is_empty @@ EcEnv.Circuit.reverse_operator env p 
+
+  let op_is_parametric_base (env: env) (p: path) : bool =
+    assert false
+ 
   module BaseOps = struct
     let temp_symbol = "temp_circ_input"
     
@@ -1535,144 +1541,219 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | Some (_, `OfInt) -> true
       | _ -> false
 
-    let circuit_of_baseop (env: env) (p: path) : circuit = 
-      match EcEnv.Circuit.lookup_bvoperator_path env p with
-      | Some { kind = `Add size } -> 
+
+    let circuit_of_parametric_base (env : env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) (args: arg list) : circuit =
+      let op = match op with
+      | `BvBind op -> op
+      | `Path p -> let op = match EcEnv.Circuit.lookup_bvoperator_path env p with
+        | Some op -> op
+        | None -> assert false
+        in op
+      in
+      match op with 
+      | { kind = `ASliceGet ((w, n), m) } -> 
+        begin match args with 
+        | [ `Circuit (`CArray (r, w'), cinps) ; `Constant i ] when w = w' ->
+            (`CBitstring (Array.sub r (BI.to_int i) m), cinps)
+        | _ -> assert false
+        end
+      | { kind = `ASliceSet ((w, n), m) } -> 
+          begin match args with 
+          | [ `Circuit (`CArray (arr, w'), arrinps) ; `Circuit (`CBitstring bs, bsinps) ; `Constant i ] when w = w' ->
+            let i = BI.to_int i in
+            ((`CArray 
+              (Array.init (w*n) (fun j -> 
+                if 0 <= j-i && j-i < m then 
+                  bs.(j-i)
+                else
+                  arr.(j)), 
+              w)), 
+            merge_inputs arrinps bsinps) 
+          | _ -> assert false
+          end
+      (* FIXME: what do we want for out of bounds extract? *)
+      | { kind = `Extract (w_in, w_out) } -> 
+        begin match args with
+        | [ `Circuit (`CBitstring r, cinps) ; `Constant i ] ->
+            (`CBitstring (Array.sub r (BI.to_int i) w_out), cinps) 
+        | _ -> assert false
+        end
+      | { kind = `Map (w_i, w_o, n) } -> 
+        begin match args with 
+        | [ `Circuit ((`CBitstring _, [{type_=`CIBitstring w_i'}; _]) as cf); `Circuit (`CArray (arr, w_i''), arr_inps) ] when (w_i' = w_i && w_i'' = w_i') && (Array.length arr / w_i = n) ->
+          let circs, inps = List.split @@ List.map (fun c -> 
+            match circuit_compose cf [c] with
+            | (`CBitstring res, inps) -> res, inps 
+            | _ -> assert false
+            ) 
+          (List.init n (fun i -> `CBitstring (Array.sub arr (i*w_i) w_i), []))
+          in
+          (assert (List.for_all ((=) (List.hd inps)) inps));
+          let inps = List.hd inps in
+          let circ = `CArray (Array.concat circs, w_o) in  
+          (circ, inps) 
+        | _ -> assert false
+        end
+      | { kind = `Get w_in } -> 
+        begin match args with
+        | [ `Circuit (`CBitstring bs, cinps); `Constant i ] ->
+          `CBool (bs.(BI.to_int i)), cinps
+        | _ -> assert false
+        end
+      | { kind = `AInit (n, w_o) } -> assert false
+      | { kind = `Init w } -> assert false
+      | _ -> assert false
+
+
+    let circuit_of_baseop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
+      let op = match op with
+      | `BvBind op -> op
+      | `Path p -> let op = match EcEnv.Circuit.lookup_bvoperator_path env p with
+        | Some op -> op
+        | None -> assert false
+        in op
+      in
+      match op with
+      | { kind = `Add size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.add c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Sub size } ->
+      | { kind = `Sub size } ->
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.sub c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Mul  size } -> 
+      | { kind = `Mul  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.mul c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Div (size, false) } -> 
+      | { kind = `Div (size, false) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.udiv c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Div (size, true) } -> 
+      | { kind = `Div (size, true) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.sdiv c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Rem (size, false) } -> 
+      | { kind = `Rem (size, false) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.umod c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Rem (size, true) } -> 
+      | { kind = `Rem (size, true) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.smod c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
         (* Should this be mod or rem? TODO FIXME*)
 
-      | Some { kind = `Shl  size } -> 
+      | { kind = `Shl  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.lshl c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Shr  (size, false) } -> 
+      | { kind = `Shr  (size, false) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.lshr c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Shr  (size, true) } -> 
+      | { kind = `Shr  (size, true) } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.ashr c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Rol  size } -> 
+      | { kind = `Rol  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.rol c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Ror  size } -> 
+      | { kind = `Ror  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.ror c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `And  size } -> 
+      | { kind = `And  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.land_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Or   size } -> 
+      | { kind = `Or   size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.lor_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Xor  size } -> 
+      | { kind = `Xor  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.lxor_ c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `Not  size } -> 
+      | { kind = `Not  size } -> 
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.lnot_ c1 |> Backend.node_array_of_reg), [inp1] 
 
-      | Some { kind = `Lt (size, false) } ->
+      | { kind = `Lt (size, false) } ->
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBool (Backend.ult c1 c2), [inp1; inp2] 
       
-      | Some { kind = `Lt (size, true) } ->
+      | { kind = `Lt (size, true) } ->
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBool (Backend.slt c1 c2), [inp1; inp2] 
 
-      | Some { kind = `Le (size, false) } ->
+      | { kind = `Le (size, false) } ->
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBool (Backend.ule c1 c2), [inp1; inp2] 
 
-      | Some { kind = `Le (size, true) } ->
+      | { kind = `Le (size, true) } ->
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBool (Backend.sle c1 c2), [inp1; inp2] 
 
       (* FIXME: should this be fully backend responsability or not?  *)
-      | Some { kind = `Extend (size, out_size, false) } ->
+      | { kind = `Extend (size, out_size, false) } ->
         (* assert (size <= out_size); *)
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.uext c1 out_size |> Backend.node_array_of_reg), [inp1] 
 
       (* FIXME: should this be fully backend responsability or not?  *)
-      | Some { kind = `Extend (size, out_size, true) } ->
+      | { kind = `Extend (size, out_size, true) } ->
         (* assert (size <= out_size); *)  
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.sext c1 out_size |> Backend.node_array_of_reg), [inp1] 
 
       (* FIXME: should this be fully backend responsability or not?  *)
-      | Some { kind = `Truncate (size, out_sz) } ->
+      | { kind = `Truncate (size, out_sz) } ->
         (* assert (size >= out_sz); *)
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.trunc c1 out_sz |> Backend.node_array_of_reg), [inp1] 
 
       (* FIXME: should this be fully backend responsability or not?  *)
-      | Some { kind = `Concat (sz1, sz2, szo) } ->
+      | { kind = `Concat (sz1, sz2, szo) } ->
         (* assert (sz1 + sz2 = szo); *)
         let c1, inp1 = new_cbitstring_inp sz1 |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         let c2, inp2 = new_cbitstring_inp sz2 |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBitstring (Backend.concat c1 c2 |> Backend.node_array_of_reg), [inp1; inp2] 
 
-      | Some { kind = `A2B ((w, n), m)} ->
+      | { kind = `A2B ((w, n), m)} ->
         (* assert (n * w = m); *)
         let c1, inp1 = new_carray_inp w n |-> ((fun (`CArray (r, _)) -> r), idnt) in  
         `CBitstring c1, [inp1] 
 
-      | Some { kind = `B2A (m, (w, n))} ->
+      | { kind = `B2A (m, (w, n))} ->
         (* assert (n * w = m); *)
         let c1, inp1 = new_cbitstring_inp m |-> ((fun (`CBitstring r) -> r), idnt) in  
         `CArray (c1, w), [inp1] 
 
-      | _ -> raise @@ CircError "Failed to generate op"
+      | { kind = `ASliceGet _ | `ASliceSet _ | `Extract _ | `Map _ | `AInit _ | `Get _ | `Init _  } -> assert false
+
+      (* | _ -> raise @@ CircError "Failed to generate op"  *)
+
+
       
   end
   open BaseOps
@@ -1877,14 +1958,19 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     map_pstate (fun _ c -> (fst c, merge_inputs cinps (snd c))) pstate
 
   let circ_equiv : ?pcond:(cbool * cinp list) -> circuit -> circuit -> bool = assert false
-  let circuit_compose : circuit -> circuit list -> circuit = assert false
 
   module CircuitSpec = struct
-    let circuit_from_spec env pth = 
-      let _, temp_name = (EcPath.toqsymbol pth) in
+    (* FIXME: do we ever have circuits coming from the spec that take or return arrays? *)
+    let circuit_from_spec env (c : [`Path of path | `Bind of EcDecl.crb_circuit ] ) = 
+      let c = match c with
+      | `Path p -> let c = EcEnv.Circuit.reverse_circuit env p in
+        if (Option.is_some c) then Option.get c else assert false
+      | `Bind c -> c
+      in
+      let _, temp_name = (EcPath.toqsymbol c.operator) in
       let temp_name = temp_name ^ "_spec_input" in
-      let circ = Backend.circuit_from_spec env pth in
-      let op = EcEnv.Op.by_path pth env in
+      let circ = Backend.circuit_from_spec c.circuit in
+      let op = EcEnv.Op.by_path c.operator env in
 
       let rec unroll_fty_rev (acc: ty list) (ty: ty) : ty list =
         try 
@@ -1907,6 +1993,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       Option.is_some @@ EcEnv.Circuit.reverse_circuit env pth
   end
   open CircuitSpec
+
+
+  let circuit_of_op (env: env) (p: path) : circuit = 
+    let op = try
+      EcEnv.Circuit.reverse_operator env p |> List.hd
+    with Failure _ -> 
+      assert false
+    in
+    match op with
+    | `Bitstring (bs, op) -> assert false 
+    | `Array _ -> assert false 
+    | `BvOperator _ -> assert false 
+    | `Circuit c -> circuit_from_spec env (`Bind c)
+    
+  let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = assert false
+
 end
 
 module ExampleInterface = MakeCircuitInterfaceFromCBackend(TestBack)
@@ -1915,17 +2017,11 @@ open PState
 open LocalCache
 open CircuitSpec
 open CArgs
-(* open AIG_Circuit *)
-(* open PState *)
-(* open LocalCache *)
-(* open CircuitSpec *)
-(* open CArgs *)
 (* FIXME: why are all these openings required? *)
 
-let type_is_registered : ty -> bool = assert false
-let op_is_basecase : path -> bool = assert false
-let op_takes_ints : path -> bool  = assert false
-
+let type_is_registered (env: env) (t: ty) : bool = 
+  (Option.is_some (EcEnv.Circuit.lookup_array_and_bitstring env t)) ||
+  (Option.is_some (EcEnv.Circuit.lookup_bitstring env t))
 
 let op_cache = ref Mp.empty
 let circuit_of_form 
@@ -1959,7 +2055,7 @@ let circuit_of_form
     let process_arg (hyps: hyps) (f: form) : hyps * arg = 
       match f.f_ty with
       | t when t = EcTypes.tint -> hyps, arg_of_zint (int_of_form f)
-      | t when type_is_registered t -> 
+      | t when type_is_registered (LDecl.toenv hyps) t -> 
           let hyps, f = doit cache hyps f in 
           hyps, arg_of_circuit f
       | _ -> assert false
@@ -1990,10 +2086,10 @@ let circuit_of_form
         let circ = circuit_of_op env pth in
         op_cache := Mp.add pth circ !op_cache;
         hyps, circ 
-      else if op_has_spec env pth then
+      (* else if op_has_spec env pth then
         let circ = circuit_from_spec env pth in
         op_cache := Mp.add pth circ !op_cache;
-        hyps, circ
+        hyps, circ *)
       else
         let hyps, circ = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper (Some (OP_Plain f)) -> 
@@ -2020,7 +2116,7 @@ let circuit_of_form
     let (f, fs) = EcCoreFol.destr_app f_ in
     let hyps, args = List.fold_left_map (process_arg) hyps fs in 
     begin match f with
-      | {f_node = Fop (pth, _)} when op_is_basecase pth -> hyps, circuit_of_op_with_args env pth args
+      | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> hyps, circuit_of_op_with_args env pth args
       | f ->
     let hyps, res = 
       (* Assuming correct types coming from EC *)
