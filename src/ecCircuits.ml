@@ -1190,14 +1190,22 @@ module type CBackend = sig
   val reg_of_node_list : node list -> reg
   val reg_of_node_array : node array -> reg
 
-  val apply : node -> (inp -> node option) -> node
+  val apply : (inp -> node option) -> node -> node
   val circuit_from_spec : Lospecs.Ast.adef -> reg list -> reg 
 
   val input_node : id:int -> int -> node
   val input_of_size : ?offset:int -> id:int -> int -> reg
 
   val node_eq : node -> node -> node
+  val ite : node -> node -> node -> node
+
   val band : node -> node -> node
+  val bor : node -> node -> node
+  val bxor : node -> node -> node
+  val bnot : node -> node
+  val bxnor : node -> node -> node
+  val bnand : node -> node -> node
+  val bnor : node -> node -> node
 
   (* SMTLib Base Operations *)
   (* FIXME: decide if boolean ops are going to be defined 
@@ -1241,8 +1249,29 @@ module TestBack : CBackend = struct
   let reg_of_node_list : node list -> reg = fun x -> Array.of_list x
   let reg_of_node_array : node array -> reg = fun x -> x
 
-  let node_eq (n1: C.node) (n2: C.node) = C.xnor n1 n2
-  let band (n1: C.node) (n2: C.node) = C.and_ n1 n2 
+  let node_eq (n1: node) (n2: node) = C.xnor n1 n2
+  let ite (c: node) (t: node) (f: node) = C.mux2 f t c 
+
+  let band : node -> node -> node = 
+    C.and_
+
+  let bor : node -> node -> node = 
+    C.or_
+
+  let bxor : node -> node -> node = 
+    C.xor
+
+  let bnot : node -> node = 
+    C.neg
+
+  let bxnor : node -> node -> node = 
+    C.xnor
+
+  let bnand : node -> node -> node = 
+    C.nand
+
+  let bnor : node -> node -> node = 
+    fun n1 n2 -> C.neg @@ C.or_ n1 n2 
 
   (* FIXME: maybe convert to BigInt? *)
   let input_node ~id i = C.input (id, i)
@@ -1282,9 +1311,11 @@ end
 (* Make this into a functor over some backend *)
 module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = struct
   (* Module Types *)
-  type carray_type = Backend.node array * int 
+  type count = int
+  type width = int
+  type carray_type = Backend.node array * width 
   type cbitstring_type = Backend.node array
-  type ctuple_type = Backend.node array * (int list)
+  type ctuple_type = Backend.node array * (width list)
   type cbool_type = Backend.node
   type carray = [`CArray of carray_type ]
   type cbool = [`CBool of cbool_type ]
@@ -1292,7 +1323,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   type ctuple = [`CTuple of ctuple_type ]
   type circ = [cbool | carray | cbitstring | ctuple]
   type cinp = {
-    type_ : [`CIArray of (int * int) | `CIBitstring of int | `CITuple of int list | `CIBool];
+    type_ : [`CIArray of (width * count) | `CIBitstring of width | `CITuple of width list | `CIBool];
     id : int;
   }
   type 'a cfun = 'a * (cinp list)
@@ -1306,7 +1337,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   module CArgs = struct
     type arg = 
     [ `Circuit of circuit
-    | `Constant of zint   ]
+    | `Constant of zint   
+    | `Init of int -> circuit]
     let arg_of_circuit c = 
       `Circuit c
     let arg_of_zint z =
@@ -1349,6 +1381,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let merge_circuit_inputs (c: circuit) (d: circuit) : cinp list =
     merge_inputs (snd c) (snd d)
+
+  let circuit_input_compatible ((c, _): circuit) (cinp: cinp) : bool =
+    match c, cinp with
+    | `CBitstring r, { type_ = `CIBitstring w } when Array.length r = w -> true
+    | `CArray (r, w), { type_ = `CIArray (w', n)} when Array.length r = w'*n && w = w' -> true
+    | `CTuple (r, szs), { type_ = `CITuple szs' } when szs = szs' -> true
+    | `CBool _, { type_ = `CIBool } -> true
+    | _ -> false
 
   (* Type conversions *)
   let reg_of_circ (c: circ) : Backend.reg = 
@@ -1403,7 +1443,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let inps = List.snd cs in
     `CTuple (circ, lens) , merge_inputs_list inps
 
-  let circuits_of_circuit_tuple : (ctuple * cinp list) -> (cbitstring * cinp list) list = assert false
+  let circuits_of_circuit_tuple ((`CTuple (tp, szs), tpinps) : (ctuple * cinp list)) : (cbitstring * cinp list) list = 
+    snd @@ List.fold_left_map 
+      (fun idx sz -> 
+        (idx + sz, 
+        (`CBitstring (Array.sub tp idx sz), tpinps)))
+      0 szs 
   
   (* CACHE DEFINIITION *)
   (*type cache  = (ident, (cinput * circuit)) Map.t*)
@@ -1425,8 +1470,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       try 
         Map.find idn cache  
       with Not_found -> 
-
         assert false (* FIXME: Error handling *)
+
     let empty_cache : cache = 
       Map.empty
 
@@ -1479,9 +1524,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let circuit_ite ~(c: cbool * (cinp list)) ~(t: circuit) ~(f: circuit) : circuit =
     assert ((circuit_is_free t) && (circuit_is_free f) && (circuit_is_free (c :> circuit)));
-    assert false
+    let (`CBool c) = (fst c) in
+    match (fst t, fst f) with
+    | `CBitstring rt, `CBitstring rf -> (`CBitstring (Array.map2 (Backend.ite c)  rt rf), [])   
+    | `CArray (rt, wt), `CArray (rf, wf) when wt = wf -> (`CArray (Array.map2 (Backend.ite c) rt rf, wt), []) 
+    | `CTuple (rt, szs_t), `CTuple (rf, szs_f) when szs_t = szs_f -> (`CTuple (Array.map2 (Backend.ite c) rt rf, szs_t), []) 
+    | `CBool t, `CBool f -> (`CBool (Backend.ite c t f) , [])
+    | _ -> assert false
 
-    let circuit_eq (c: circuit) (d: circuit) : circuit =  
+  let circuit_eq (c: circuit) (d: circuit) : circuit =  
     match c, d with
     | (`CArray (r1, _), inps1), (`CArray (r2, _), inps2) 
     | (`CTuple (r1, _), inps1), (`CTuple (r2, _), inps2) 
@@ -1524,7 +1575,35 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
  *)
 
-  let circuit_compose : circuit -> circuit list -> circuit = assert false
+  let circuit_compose (c: circuit) (args: circuit list) : circuit = 
+    (try
+      assert (List.for_all2 (fun c cinp -> circuit_input_compatible c cinp) args (snd c))
+    with 
+      Assert_failure _ -> assert false
+    | Invalid_argument _ -> assert false);
+    let map = List.fold_left2 (fun map {id} c -> Map.add id c map) Map.empty (snd c) (List.fst args) in
+    let map_ (id, idx) = 
+      let circ = Map.find_opt id map in
+      Option.bind circ (fun c -> 
+        match c with
+        | `CArray (r, _) | `CTuple (r, _) | `CBitstring r -> 
+          begin try
+            Some (r.(idx))
+          with Invalid_argument _ -> None 
+          end
+        | `CBool b when idx = 0 -> Some b
+        | _ -> None
+      ) 
+    in
+    let circ = match (fst c) with
+    | `CBool b -> `CBool (Backend.apply map_ b)
+    | `CArray (r, w) -> `CArray (Array.map (Backend.apply map_) r, w)
+    | `CBitstring r -> `CBitstring (Array.map (Backend.apply map_) r)
+    | `CTuple (r, szs) -> `CTuple (Array.map (Backend.apply map_) r, szs)
+    in
+    let inps = merge_inputs_list (List.snd args) in
+    (circ, inps)
+
 
   (* Should correspond to QF_ABV *)
   let op_is_base (env: env) (p: path) : bool = 
@@ -1540,7 +1619,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       match EcEnv.Circuit.reverse_bitstring_operator env p with
       | Some (_, `OfInt) -> true
       | _ -> false
-
 
     let circuit_of_parametric_base (env : env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) (args: arg list) : circuit =
       let op = match op with
@@ -1600,12 +1678,33 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           `CBool (bs.(BI.to_int i)), cinps
         | _ -> assert false
         end
-      | { kind = `AInit (n, w_o) } -> assert false
-      | { kind = `Init w } -> assert false
+      | { kind = `AInit (n, w_o) } -> 
+        begin match args with
+        | [ `Init init_f ] -> 
+          let circs, cinps = List.split @@ List.init n init_f in
+          let circs = List.map (function | `CBitstring r -> r | _ -> assert false) circs in
+          (assert (List.for_all ((=) (List.hd cinps)) cinps));
+          let cinps = List.hd cinps in
+          (`CArray (Array.concat circs, w_o), cinps) 
+        | _ -> assert false
+        end
+      | { kind = `Init w } -> 
+        begin match args with 
+        | [ `Init init_f ] ->
+          let circs, cinps = List.split @@ List.init w init_f in
+          let circs = List.map (function | `CBool b -> b | _ -> assert false) circs in
+          (assert (List.for_all ((=) (List.hd cinps)) cinps));
+          let cinps = List.hd cinps in
+          (`CBitstring (Array.of_list circs), cinps)
+        | _ -> assert false
+        end
       | _ -> assert false
 
 
-    let circuit_of_baseop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
+    let circuit_of_baseo (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit =
+      assert false
+
+    let circuit_of_bvop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
       let op = match op with
       | `BvBind op -> op
       | `Path p -> let op = match EcEnv.Circuit.lookup_bvoperator_path env p with
@@ -1757,6 +1856,46 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       
   end
   open BaseOps
+
+  module BitstringOps = struct
+    type binding = crb_bitstring_operator 
+
+    let circuit_of_bsop (env: env) (op: [`Path of path | `BSBinding of binding]) : circuit =
+      let op = match op with
+      | `BSBinding bnd -> bnd
+      | `Path p -> begin match EcEnv.Circuit.reverse_bitstring_operator env p with
+        | Some bnd -> bnd
+        | None -> assert false
+        end
+      in
+      match op with
+      | bs, `From -> assert false
+      | bs, `OfInt -> assert false 
+      | bs, `To -> assert false 
+      | bs, `ToSInt -> assert false 
+      | bs, `ToUInt -> assert false 
+  end
+  open BitstringOps
+
+  module ArrayOps = struct
+    type binding = crb_array_operator 
+
+    let circuit_of_bsop (env: env) (op: [`Path of path | `BSBinding of binding]) : circuit =
+      let op = match op with
+      | `BSBinding bnd -> bnd
+      | `Path p -> begin match EcEnv.Circuit.reverse_array_operator env p with
+        | Some bnd -> bnd
+        | None -> assert false
+        end
+      in
+      match op with
+      | (bs, `ToList) -> assert false
+      | (bs, `Get) -> assert false
+      | (bs, `OfList) -> assert false
+      | (bs, `Set) -> assert false
+  end
+  open ArrayOps
+
 
   (*
     let open AIG_Backend in
@@ -1911,6 +2050,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   *)
 
 
+  (* Circuit Lambda functions *)
   let rec circ_lambda_one (env:env) (idn: ident) (t: ty) : cinp * circuit = 
     match t.ty_node with
     | Ttuple ts -> let szs = List.map (width_of_type env) ts in
