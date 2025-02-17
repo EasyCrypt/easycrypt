@@ -48,7 +48,7 @@ module type SMTInstance = sig
 end
 
 module type SMTInterface = sig
-  val circ_equiv : reg -> reg -> node -> (int * int) list-> bool
+  val circ_equiv : ?inps:(int * int) list -> reg -> reg -> node ->  bool
 
   val circ_sat : node -> bool
 
@@ -58,7 +58,7 @@ end
 (* TODO Add model printing for circ_sat and circ_taut *)
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
-  let circ_equiv (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) (inps: (int * int) list) : bool =
+  let circ_equiv ?(inps: (int * int) list option) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
     if not ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0)) then
       (Format.eprintf "Sizes differ in circ_equiv"; false)
     else
@@ -101,15 +101,20 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
 
     let bvinpt1 = (bvterm_of_reg r1) in
     let bvinpt2 = (bvterm_of_reg r2) in
-    let inps = List.map (fun (id,sz) -> 
-      List.init sz (fun i -> ("BV_" ^ (id |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (i))))) inps in
-    let inps = List.map (List.map (fun name -> match Map.String.find_opt name !bvvars with
-    | Some bv -> bv
-    | None -> SMT.bvterm_of_name 1 name)) inps in
-    let bvinp = List.map (fun i -> List.reduce (SMT.bvterm_concat) (List.rev i)) inps in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = (bvterm_of_node pcond) in
- 
+
+    let inps = Option.map (fun inps ->
+      List.map (fun (id,sz) -> 
+      List.init sz (fun i -> ("BV_" ^ (id |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (i))))) inps 
+    ) inps in
+    let inps = Option.map (fun inps ->
+    List.map (List.map (fun name -> match Map.String.find_opt name !bvvars with
+    | Some bv -> bv
+    | None -> SMT.bvterm_of_name 1 name)) inps) inps
+    in
+    let bvinp = Option.map (fun inps -> List.map (fun i -> List.reduce (SMT.bvterm_concat) (List.rev i)) inps) inps in
+
 
     begin
       SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
@@ -117,9 +122,10 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       else begin
         Format.eprintf "bvout1: %a@."  SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
+        Option.may (fun bvinp ->
         List.iteri (fun i bv -> 
         Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
-        ) bvinp;
+        ) bvinp) bvinp;
         false
       end
     end
