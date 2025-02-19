@@ -498,7 +498,8 @@ module type CircuitInterface = sig
     type_ : [`CIArray of (int * int) | `CIBitstring of int | `CITuple of int list | `CIBool ];
     id: int
   }
-  type circuit = circ * (cinp list)
+  type 'a cfun = 'a * (cinp list)
+  type circuit = circ cfun 
   
   module CArgs : sig
     type arg 
@@ -576,6 +577,14 @@ module type CircuitInterface = sig
   (* Composition of circuit functions, should deal with inputs and call some backend *)
   val circuit_compose : circuit -> circuit list -> circuit
 
+  (* Computing the function given by a circuit *)
+  val compute : circuit -> arg list -> zint
+
+  (* Mapreduce/Dependecy analysis related functions *)
+  val is_decomposable : int -> int -> cbitstring cfun -> bool
+  val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list 
+  val permute : int -> (int -> int) -> cbitstring cfun -> cbitstring cfun
+
   (* Wraps the backend call to deal with args/inputs *)
   module CircuitSpec : sig
     val circuit_from_spec : env -> [`Path of path | `Bind of EcDecl.crb_circuit] -> circuit 
@@ -651,6 +660,23 @@ module type CBackend = sig
   val sext : reg -> int -> reg
   val trunc : reg -> int -> reg
   val concat : reg -> reg -> reg
+
+  module Deps : sig
+    type deps
+    type block_deps
+
+    val deps_of_reg : reg -> deps
+    val block_deps_of_deps : int -> deps -> block_deps 
+    val block_deps_of_reg : int -> reg -> block_deps
+
+    val pp_deps : Format.formatter -> deps -> unit
+    val pp_block_deps : Format.formatter -> block_deps -> unit
+
+    (* Assumes only one reg -> reg and parallel blocks *)
+    val is_splittable : int -> int -> deps -> bool
+
+    val are_independent : block_deps -> bool
+  end
 end
 
 module TestBack : CBackend = struct
@@ -699,26 +725,14 @@ module TestBack : CBackend = struct
     let module BWZ = (val makeBWZinterface ()) in
     BWZ.circ_equiv ?inps (node_list_of_reg r1) (node_list_of_reg r2) pcond  
 
-  let band : node -> node -> node = 
-    C.and_
-
-  let bor : node -> node -> node = 
-    C.or_
-
-  let bxor : node -> node -> node = 
-    C.xor
-
-  let bnot : node -> node = 
-    C.neg
-
-  let bxnor : node -> node -> node = 
-    C.xnor
-
-  let bnand : node -> node -> node = 
-    C.nand
-
-  let bnor : node -> node -> node = 
-    fun n1 n2 -> C.neg @@ C.or_ n1 n2 
+  (* Node operations *)
+  let band : node -> node -> node = C.and_
+  let bor : node -> node -> node = C.or_
+  let bxor : node -> node -> node = C.xor
+  let bnot : node -> node = C.neg
+  let bxnor : node -> node -> node = C.xnor
+  let bnand : node -> node -> node = C.nand
+  let bnor : node -> node -> node = fun n1 n2 -> C.neg @@ C.or_ n1 n2 
 
   (* FIXME: maybe convert to BigInt? *)
   let input_node ~id i = C.input (id, i)
@@ -753,6 +767,87 @@ module TestBack : CBackend = struct
   let sext (r1: reg) (size: int) : reg = C.sextend ~size (Array.to_list r1) |> Array.of_list
   let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
+
+  module Deps = struct 
+    type dep = (int, int Set.t) Map.t
+    type deps = dep array
+    type block_deps = (int * dep) array
+
+    let deps_of_reg = fun r -> HL.deps (node_list_of_reg r)
+    let block_deps_of_deps (w: int) (d: deps) : block_deps = 
+      assert (Array.length d mod w = 0);
+      Array.init (Array.length d / w) (fun i ->
+        let deps = Array.sub d (i*w) w in
+        let block = Array.fold_left (fun acc m ->
+          Map.merge (fun idx d1 d2 ->
+            match d1, d2 with
+            | None, None -> None
+            | None, Some d | Some d, None -> Some d
+            | Some d1, Some d2 -> Some (Set.union d1 d2)
+          ) acc m) Map.empty deps in
+        (w, block)
+      )
+
+    let block_deps_of_reg (w: int) (r: reg) : block_deps = 
+      let deps = deps_of_reg r in
+      block_deps_of_deps w deps
+
+    let pp_dep (fmt: Format.formatter) (d: dep) : unit =
+      Map.iter (fun id bits ->
+          Format.fprintf fmt "%d: " id;
+          Set.iter (fun bit -> Format.fprintf fmt "%d " bit) bits;
+          Format.fprintf fmt "@\n"
+        ) d
+
+    let pp_deps (fmt: Format.formatter) (d: deps) : unit =
+      Array.iteri (fun i d ->
+        Format.fprintf fmt "<hov 2>[%d]:@\n%a" i
+        pp_dep d
+      ) d
+        
+    let pp_block_deps (fmt: Format.formatter) (bd: block_deps) : unit =
+      ignore @@ Array.fold_left (fun idx (w, d) ->
+        Format.fprintf fmt "<hov 2>[%d..%d]:@\n%a" idx (idx + w - 1)
+        pp_dep d;
+        idx + w
+      ) 0 bd
+
+    (* Assumes only one reg -> reg and parallel blocks *)
+    let is_splittable (w_in: int) (w_out: int) (d: deps) : bool =
+      Array.for_all (fun dep -> 
+        Map.cardinal dep = 1 &&
+        Map.keys dep = Map.keys d.(0)
+      ) d && 
+      let blocks = block_deps_of_deps w_out d in
+      Array.for_all (fun (_, d) ->
+        let _, bits = Map.any d in
+        Set.is_empty bits ||
+        let base = Set.at_rank_exn 0 bits in
+        Set.for_all (fun bit ->
+          let dist = bit - base in
+          0 <= dist && dist < w_in
+        ) bits
+      ) blocks
+        
+
+    let are_independent (bd: block_deps) : bool =
+      let exception BreakOut in
+      try 
+        ignore @@ Array.fold_left (fun acc (_, d) ->
+          Map.merge (fun _ d1 d2 ->
+            match d1, d2 with
+            | None, None -> None
+            | Some d, None | None, Some d -> Some d
+            | Some d1, Some d2 ->
+              if not (Set.disjoint d1 d2) then raise BreakOut else
+              Some (Set.union d1 d2)
+          ) acc d
+        ) Map.empty bd;
+        true
+      with BreakOut ->
+        false
+  end
+
 end
 
 (* Make this into a functor over some backend *)
@@ -1523,6 +1618,48 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   end
   open CircuitSpec
 
+  (* Dependency analysis related functions. These assume one input/output and all bitstring types *)
+  (* For more complex circuits, we might be able to simulate this with a int -> (int, int) map *)
+  let is_decomposable (in_w: width) (out_w: width) ((`CBitstring r, inps): cbitstring cfun) : bool = 
+    match inps with
+    | {type_=`CIBitstring w} :: [] when w mod in_w = 0 && Array.length r mod out_w = 0 ->
+      let deps = Backend.Deps.deps_of_reg (Backend.reg_of_node_array r) in
+      Backend.Deps.is_splittable in_w out_w deps 
+    | _ -> false
+
+  let split_renamer (n: count) (in_w: width) (inp: cinp) : (cinp array) * (Backend.inp -> cbool_type option) =
+    match inp with
+    | {type_ = `CIBitstring w; id} when w mod in_w = 0 ->
+        let ids = Array.init n (fun i -> create ("split_" ^ (string_of_int i)) |> tag) in
+        Array.map (fun id -> {type_ = `CIBitstring in_w; id}) ids, 
+        (fun (id_, w) -> 
+          if id <> id_ then None else
+          let id_idx, bit_idx = (w / in_w), (w mod in_w) in
+          Some (Backend.input_node ~id:ids.(id_idx) bit_idx))
+    | _ -> assert false
+
+  let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
+    if not (is_decomposable in_w out_w c) then assert false else
+    let n = (Array.length r) / out_w in
+    let blocks = Array.init n (fun i -> 
+      Array.sub r (i*out_w) out_w) in
+    let cinps, renamer = split_renamer n in_w (List.hd inps) in
+    Array.map2 (fun r inp ->
+      let r = Array.map (Backend.apply renamer) r in
+      (`CBitstring r, [inp])
+    ) blocks cinps |> Array.to_list
+
+
+  let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
+    let r = Array.init (Array.length r) (fun i ->
+      let block_idx, bit_idx = (i / w), (i mod w) in
+      let idx = (perm block_idx)*w + bit_idx in
+      r.(idx)
+    ) in
+    `CBitstring r, inps
+
+  let compute = assert false
+    
 
   let circuit_of_op (env: env) (p: path) : circuit = 
     let op = try
