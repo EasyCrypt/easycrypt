@@ -566,6 +566,7 @@
 %token SPLITWHILE
 %token STAR
 %token SUBST
+%token SUBTYPE
 %token SUFF
 %token SWAP
 %token SYMMETRY
@@ -1474,9 +1475,9 @@ update_cond:
 | MINUS bs=branch_select { Pupc_del bs }
 
 fun_update:
-| cp=loc(codepos) sup=update_stmt 
+| cp=loc(codepos) sup=update_stmt
   { List.map (fun v -> (cp, Pup_stmt v)) sup }
-| cp=loc(codepos) cup=update_cond 
+| cp=loc(codepos) cup=update_cond
   { [(cp, Pup_cond cup)] }
 
 (* -------------------------------------------------------------------- *)
@@ -1655,6 +1656,21 @@ typedecl:
 
 | locality=locality TYPE td=tyd_name EQ te=datatype_def
     { [mk_tydecl ~locality td (PTYD_Datatype te)] }
+
+(* -------------------------------------------------------------------- *)
+(* Subtypes                                                             *)
+subtype:
+| SUBTYPE name=lident cname=prefix(AS, uident)? EQ LBRACE
+    x=lident COLON carrier=loc(type_exp) PIPE pred=form
+  RBRACE rename=subtype_rename?
+  { { pst_name    = name;
+      pst_cname   = cname;
+      pst_carrier = carrier;
+      pst_pred    = (x, pred);
+      pst_rename  = rename; } }
+
+subtype_rename:
+| RENAME x=STRING COMMA y=STRING { (x, y) }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -2498,6 +2514,7 @@ icodepos_r:
 | lvm=lvmatch LESAMPLE { (`Sample lvm :> pcp_match) }
 | lvm=lvmatch LEAT { (`Call lvm :> pcp_match) }
 | lvm=lvmatch LARROW { (`Assign lvm :> pcp_match) }
+| lvm=paren(lvmatch)  LARROW { (`AssignTuple lvm :> pcp_match) }
 
 lvmatch:
 | empty        { (`LvmNone  :> plvmatch) }
@@ -3795,7 +3812,7 @@ hintoption:
 | x=lident {
     match unloc x with
     | "rigid" -> `Rigid
-    | _ -> 
+    | _ ->
         parse_error x.pl_loc
             (Some ("invalid option: " ^ (unloc x)))
   }
@@ -3808,7 +3825,7 @@ hint:
     { { ht_local   = local;
         ht_prio    = prio;
         ht_base    = base ;
-        ht_names   = l; 
+        ht_names   = l;
         ht_options = odfl [] opts; } }
 
 (* -------------------------------------------------------------------- *)
@@ -3877,6 +3894,7 @@ global_action:
 | mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
+| subtype          { Gsubtype     $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }

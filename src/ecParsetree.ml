@@ -41,6 +41,7 @@ type pcp_match = [
   | `While
   | `Match
   | `Assign of plvmatch
+  | `AssignTuple of plvmatch
   | `Sample of plvmatch
   | `Call of plvmatch
 ]
@@ -383,6 +384,15 @@ let rec pf_ident ?(raw = false) f =
   | PFident ({ pl_desc = ([], x) }, _) -> Some x
   | PFtuple [f] when not raw -> pf_ident ~raw f
   | _ -> None
+
+(* -------------------------------------------------------------------- *)
+type psubtype = {
+  pst_name    : psymbol;
+  pst_cname   : psymbol option;
+  pst_carrier : pty;
+  pst_pred    : (psymbol * pformula);
+  pst_rename  : (string * string) option;
+}
 
 (* -------------------------------------------------------------------- *)
 type ptyvardecls =
@@ -1348,6 +1358,7 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gsubtype     of psubtype
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)

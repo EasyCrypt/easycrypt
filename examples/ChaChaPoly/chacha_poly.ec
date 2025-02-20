@@ -80,28 +80,26 @@ theory C.
 
   axiom gt0_max_counter : 0 < max_counter.
 
-  clone include Subtype with 
-    type T <- int,
-    op P <- fun (i:int) => 0 <= i < max_counter + 1
-    rename (* [type] "sT" as "counter" *) (* Gives error. *)
-           [op] "insubd" as "ofint"
-  proof *.
-  realize inhabited. exists 0. smt(gt0_max_counter). qed.
-  type counter = sT.
+  subtype counter =
+    { i : int | 0 <= i < max_counter + 1 }
+    rename "ofint", "toint".
+
+  realize inhabited.
+  proof. by exists 0; smt(gt0_max_counter). qed.
 
   clone FinType with 
     type t  = counter,
-    op enum = List.map ofint (iota_ 0 (max_counter + 1))
+    op enum = List.map ofintd (iota_ 0 (max_counter + 1))
     proof *.
   realize enum_spec.  
   proof.
     move=> c; rewrite count_uniq_mem.
     + apply map_inj_in_uniq; last by apply iota_uniq.
       move=> x y /mema_iota hx /mema_iota hy heq.
-      by rewrite -(insubdK x) 1:// -(insubdK y) 1:// heq.
+      by rewrite -(ofintdK x) 1:// -(ofintdK y) 1:// heq.
     have -> // : c \in enum.  
-    rewrite /enum mapP; exists (val c).
-    by rewrite mema_iota /= valP valKd.
+    rewrite /enum mapP; exists (toint c).
+    by rewrite mema_iota /= tointP tointKd.
   qed.
 
 end C.
@@ -116,18 +114,16 @@ abstract theory GenBlock.
   op block_size : int.
   axiom ge0_block_size : 0 <= block_size.
 
-  clone include Subtype with
-    type T <- bytes, 
-    op P <- fun (l:bytes) => size l = block_size
-    rename [op] "val" as "bytes_of_block"
-  proof *.
+  subtype block = { l : bytes | size l = block_size }
+    rename "block_of_bytes", "bytes_of_block".
+
   realize inhabited.
+  proof.
     exists (nseq block_size witness).
     smt(size_nseq ge0_block_size).
   qed.
-  type block = sT.
 
-  op dblock =  dmap (dlist dbyte block_size) insubd.
+  op dblock =  dmap (dlist dbyte block_size) block_of_bytesd.
 
   lemma dblock_ll : is_lossless dblock.
   proof. apply dmap_ll; apply dlist_ll; apply dbyte_ll. qed.
@@ -136,37 +132,37 @@ abstract theory GenBlock.
   proof. 
     apply dmap_uni_in_inj.
     + move=> x y hx hy heq.
-      rewrite -(insubdK x) 1:(supp_dlist_size _ _ _ ge0_block_size hx) //.
-      by rewrite -(insubdK y) 1:(supp_dlist_size _ _ _ ge0_block_size hy) // heq.
+      rewrite -(block_of_bytesdK x) 1:(supp_dlist_size _ _ _ ge0_block_size hx) //.
+      by rewrite -(block_of_bytesdK y) 1:(supp_dlist_size _ _ _ ge0_block_size hy) // heq.
     by apply dlist_uni; apply dbyte_uni.
   qed.
 
   lemma dblock_fu: is_full dblock.
   proof.
    move=> x; rewrite supp_dmap; exists (bytes_of_block x).
-   rewrite valKd /= -(valP x); apply dlist_fu => ??; apply dbyte_fu.
+   rewrite bytes_of_blockKd /= -(bytes_of_blockP x); apply dlist_fu => ??; apply dbyte_fu.
   qed.
  
   lemma dblock_funi: is_funiform dblock.
   proof. apply is_full_funiform; [apply dblock_fu | apply dblock_uni]. qed.
 
-  op zero = insubd (mkseq (fun _ => Byte.zero) block_size).
+  op zero = block_of_bytesd (mkseq (fun _ => Byte.zero) block_size).
 
   op (+^) (b1 b2:block) =
-     insubd (map2 (+^) (bytes_of_block b1) (bytes_of_block b2)).
+     block_of_bytesd (map2 (+^) (bytes_of_block b1) (bytes_of_block b2)).
  
   lemma nth_xor x y i :
      0 <= i < block_size =>
      nth Byte.zero (bytes_of_block (x +^ y)) i =
      nth Byte.zero (bytes_of_block x) i +^ nth Byte.zero (bytes_of_block y) i.
   proof. 
-    move=> hi; rewrite /(+^) !insubdK ?size_map2 ?valP //.
-    rewrite !(nth_map2 Byte.zero Byte.zero) ?valP //.
+    move=> hi; rewrite /(+^) !block_of_bytesdK ?size_map2 ?bytes_of_blockP //.
+    rewrite !(nth_map2 Byte.zero Byte.zero) ?bytes_of_blockP //.
   qed.
 
   lemma nth_zero i : nth Byte.zero (bytes_of_block zero) i = Byte.zero. 
   proof.
-    rewrite /zero insubdK ?size_mkseq; 1:smt (ge0_block_size).
+    rewrite /zero block_of_bytesdK ?size_mkseq; 1:smt (ge0_block_size).
     smt (nth_mkseq nth_neg nth_default size_mkseq).
   qed.
 
@@ -177,23 +173,27 @@ abstract theory GenBlock.
     proof *.
   realize Axioms.addmA.
   proof.
-    move=> x y z; apply val_inj; apply (eq_from_nth Byte.zero); rewrite !valP //.
+    move=> x y z; apply bytes_of_block_inj.
+    apply (eq_from_nth Byte.zero); rewrite !bytes_of_blockP //.
     by move=> i hi; rewrite !nth_xor // Byte.MB.addmA. 
   qed.
   realize Axioms.addmC.
   proof.
-    move=> x y; apply val_inj; apply (eq_from_nth Byte.zero); rewrite !valP //.
+    move=> x y; apply bytes_of_block_inj.
+    apply (eq_from_nth Byte.zero); rewrite !bytes_of_blockP //.
     by move=> i hi; rewrite !nth_xor // Byte.MB.addmC.
   qed.
   realize Axioms.add0m.
   proof.
-    move=> x; apply val_inj; apply (eq_from_nth Byte.zero); rewrite !valP //.
+    move=> x; apply bytes_of_block_inj.
+    apply (eq_from_nth Byte.zero); rewrite !bytes_of_blockP //.
     by move=> i hi; rewrite !nth_xor // nth_zero Byte.MB.add0m.
   qed.
 
   lemma addK b : b +^ b = zero.
   proof.
-    apply val_inj; apply (eq_from_nth Byte.zero); rewrite !valP //.
+    apply bytes_of_block_inj; apply (eq_from_nth Byte.zero);
+      rewrite !bytes_of_blockP //.
     by move=> i hi; rewrite nth_xor // Byte.addK nth_zero.
   qed.
 
@@ -229,13 +229,15 @@ hint solve 0 random : dblock_ll dblock_funi dblock_fu.
 axiom gt0_block_size : 0 < block_size.
 
 op extend (bs:bytes) : block = 
-  Block.insubd (take block_size bs ++ mkseq (fun _ => Byte.zero) (block_size - size bs)).
+  Block.block_of_bytesd
+    (take block_size bs ++ mkseq (fun _ => Byte.zero)
+    (block_size - size bs)).
 
 lemma nth_extend m i : 0 <= i < block_size => 
   nth Byte.zero (bytes_of_block (extend m)) i = 
     if i < size m then  nth Byte.zero m i else Byte.zero.
 proof.
-  move=> [h0i hi]; rewrite /extend Block.insubdK.
+  move=> [h0i hi]; rewrite /extend Block.block_of_bytesdK.
   + by rewrite size_cat size_mkseq size_take 1:ge0_block_size /#.
   rewrite nth_cat size_take 1:ge0_block_size; smt (nth_take nth_mkseq).
 qed.
@@ -248,7 +250,7 @@ op chacha20_block : key -> nonce -> C.counter -> block.
 
 op gen_ctr_round (merge: bytes -> block -> bytes) genblock (k:key) (n:nonce) (round_st : bytes * bytes * int) =
   let (cph,m,c) = round_st in
-  let stream = genblock k n (C.ofint c) in
+  let stream = genblock k n (C.ofintd c) in
   (cph ++ merge m stream, drop block_size m, c + 1).
 
 op gen_CTR_encrypt_bytes merge genblock key nonce counter m =
@@ -270,9 +272,10 @@ op chacha20_CTR_encrypt_bytes key nonce counter m =
 lemma take_xor_map2_xor m str: map2_xor m str = take_xor m str.
 proof.
   apply (eq_from_nth Byte.zero).
-  + by rewrite size_map2 Block.valP size_take 1:size_ge0 Block.valP.
-  rewrite size_map2 Block.valP => j hj.
-  rewrite (nth_map2 Byte.zero Byte.zero) ?Block.valP 1://.
+  + rewrite size_map2 Block.bytes_of_blockP.
+    by rewrite size_take 1:size_ge0 Block.bytes_of_blockP.
+  rewrite size_map2 Block.bytes_of_blockP => j hj.
+  rewrite (nth_map2 Byte.zero Byte.zero) ?Block.bytes_of_blockP 1://.
   rewrite nth_take 1:size_ge0 1:/# Block.nth_xor 1:/#; congr.
   smt (nth_extend).
 qed.
@@ -294,7 +297,7 @@ lemma iter_gen_ctr_round_S merge genblock k n c m i j:
   0 <= i =>
   iter (i + 1) round (c, m, j) = 
     let (c', m', j') = iter i round ([], drop block_size m, j + 1) in 
-    (c ++ merge m (genblock k n (C.ofint j)) ++ c', m', j').
+    (c ++ merge m (genblock k n (C.ofintd j)) ++ c', m', j').
 proof.  
   by move=> round hi; rewrite iterSr // {2}/round /gen_ctr_round /= iter_gen_ctr_round_nil_cat.
 qed.
@@ -319,7 +322,7 @@ qed.
 lemma gen_CTR_encrypt_bytes_cons merge genblock k n c m:
   (forall str, merge [] str = []) =>
   gen_CTR_encrypt_bytes merge genblock k n c m = 
-  merge m (genblock k n (C.ofint c)) ++ 
+  merge m (genblock k n (C.ofintd c)) ++ 
     gen_CTR_encrypt_bytes merge genblock k n (c+1) (drop block_size m).
 proof.
   move=> hm; rewrite /gen_CTR_encrypt_bytes /=; have h0s := size_ge0 m.
@@ -362,10 +365,13 @@ op poly1305 (r:poly_in) (s:poly_out) (p:polynomial) = s + poly1305_eval r p.
 
 op mk_rs (b:block) = 
   let b = take (poly_in_size + poly_out_size) (bytes_of_block b) in
-  (Poly_in.insubd (take poly_in_size b), Poly_out.insubd (drop poly_in_size b)).
+  (
+    Poly_in.poly_in_of_bytesd (take poly_in_size b),
+    Poly_out.poly_out_of_bytesd (drop poly_in_size b)
+  ).
 
 op genpoly1305 genblock (k:key) (n:nonce) (p:polynomial) = 
-  let (r,s) = mk_rs (genblock k n (C.ofint 0)) in
+  let (r,s) = mk_rs (genblock k n (C.ofintd 0)) in
   poly1305 r s p.
   
 axiom poly_out_sub_add (p1 p2: poly_out) : p1 = p1 - p2 + p2.
@@ -432,7 +438,7 @@ module ChaCha(CC:CC) = {
     c     <- [];
     i     <- 1;
     while (p <> []) {
-      z <@ CC.cc(k, n, C.ofint i);
+      z <@ CC.cc(k, n, C.ofintd i);
       c <- c ++ take (size p) (bytes_of_block (extend p +^ z));
       p <- drop block_size p;
       i <- i + 1;
@@ -444,7 +450,7 @@ module ChaCha(CC:CC) = {
 module Poly(CC:CC) = {
   proc mac(k:key, n: nonce, a: associated_data, c: message) : tag = {
     var b, r, s;
-    b     <@ CC.cc(k, n, C.ofint 0);
+    b     <@ CC.cc(k, n, C.ofintd 0);
     (r,s) <- mk_rs b; 
     return poly1305 r s (topol a c);
   }
@@ -659,7 +665,7 @@ module D(A:CCA_Adv, RO: Indist.Oracle) = {
         c     <- [];
         i     <- 1;
         while (p <> []) {
-          z <@ RO.f(n, C.ofint i);
+          z <@ RO.f(n, C.ofintd i);
           c <- c ++ take (size p) (bytes_of_block (extend p +^ z));
           p <- drop block_size p;
           i <- i + 1;
@@ -671,7 +677,7 @@ module D(A:CCA_Adv, RO: Indist.Oracle) = {
     module Poly = {
       proc mac(n: nonce, a: associated_data, c: message) : tag = {
         var b, r, s;
-        b     <@ RO.f(n, C.ofint 0);
+        b     <@ RO.f(n, C.ofintd 0);
         (r,s) <- mk_rs b; 
         return poly1305 r s (topol a c);
       }
@@ -727,7 +733,7 @@ module UFCMA_poly(A:CCA_Adv, RO:RO) = {
     i <- 0;
     while (i < size ns) {
       n  <- List.nth witness ns i;
-      bl <@ RO.get(n,C.ofint 0);
+      bl <@ RO.get(n,C.ofintd 0);
       (r,s) <- mk_rs bl; 
       forged <- forged || test_poly n Mem.lc r s;
       i <- i + 1;
@@ -789,23 +795,29 @@ proof.
   move=> hs; rewrite (gen_CTR_encrypt_bytes_cons _ _ _ _ _ p) 1:// gen_CTR_encrypt_bytes_cons 1://.
   case: (size p < block_size) => hsz.
   + rewrite drop_oversize 1:/# gen_CTR_encrypt_bytes0 1:// cats0 drop_oversize.
-    + by rewrite size_take // Block.valP /#.
+    + by rewrite size_take // Block.bytes_of_blockP /#.
     rewrite gen_CTR_encrypt_bytes0 1:// cats0. 
     rewrite -!take_xor_map2_xor; apply (eq_from_nth Byte.zero).
-    + by rewrite !size_map2 Block.valP /#.
-    move=> j; rewrite !size_map2 Block.valP => hj.
-    by rewrite !(nth_map2 Byte.zero Byte.zero) ?size_map2 ?Block.valP 1,2:/# -Byte.xorK1.
-  rewrite drop_size_cat;1: by rewrite size_take 1:// Block.valP /#.
+    + by rewrite !size_map2 Block.bytes_of_blockP /#.
+    move=> j; rewrite !size_map2 Block.bytes_of_blockP => hj.
+    by rewrite
+         !(nth_map2 Byte.zero Byte.zero) ?size_map2
+         ?Block.bytes_of_blockP 1,2:/# -Byte.xorK1.
+  rewrite drop_size_cat;1: by rewrite size_take 1:// Block.bytes_of_blockP /#.
   rewrite (hrec (size (drop block_size p))) 2://; 1: smt(size_drop gt0_block_size).
   rewrite -{4}(cat_take_drop block_size p); congr.
   rewrite -!take_xor_map2_xor; apply (eq_from_nth Byte.zero).
-  + smt (size_map2 Block.valP size_cat size_take gt0_block_size size_ge0).
+  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
   move=> j hj.
   have [hj1 hj2] : j < block_size /\ j < size p.
-  + smt (size_map2 Block.valP size_cat size_take gt0_block_size size_ge0).
-  rewrite (nth_map2 Byte.zero Byte.zero) ?(size_cat, size_map2, Block.valP) 1:#smt:(size_ge0).
-  rewrite nth_cat ?(size_cat, size_map2, Block.valP) /min hsz /= hj1.
-  by rewrite (nth_map2 Byte.zero Byte.zero) ?Block.valP 1:/# /= -Byte.xorK1 nth_take 1:ge0_block_size.
+  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
+  rewrite
+    (nth_map2 Byte.zero Byte.zero)
+    ?(size_cat, size_map2, Block.bytes_of_blockP) 1:#smt:(size_ge0).
+  rewrite nth_cat ?(size_cat, size_map2, Block.bytes_of_blockP) /min hsz /= hj1.
+  by rewrite
+       (nth_map2 Byte.zero Byte.zero)
+       ?Block.bytes_of_blockP 1:/# /= -Byte.xorK1 nth_take 1:ge0_block_size.
 qed.
 
 module St = {
@@ -825,38 +837,43 @@ clone Split as Split0 with
   proof *.
 
 clone import Split0.SplitDom as SplitD with
-  op test = fun p:nonce * C.counter => C.val p.`2 = 0.
+  op test = fun p:nonce * C.counter => C.toint p.`2 = 0.
 
 clone import Split0.SplitCodom as SplitC1 with
   type to1 <- poly,
   type to2 <- extra_block,
   op topair = fun (b:block) => 
      let bs = bytes_of_block b in
-     (TPoly.insubd (take poly_size bs), Extra_block.insubd (drop poly_size bs)),
+     (
+       TPoly.poly_of_bytesd (take poly_size bs),
+       Extra_block.extra_block_of_bytesd (drop poly_size bs)
+     ),
   op ofpair = fun (p:poly * extra_block) =>
-     Block.insubd (bytes_of_poly p.`1 ++ bytes_of_extra_block p.`2),
+     Block.block_of_bytesd (bytes_of_poly p.`1 ++ bytes_of_extra_block p.`2),
   op sampleto1 <- fun _ => dpoly,
   op sampleto2 <- fun _ => dextra_block
   proof *.
 realize topairK.
 proof.
   move=> x; rewrite /topair /ofpair /=.
-  rewrite -{3}(Block.valKd x); congr.
-  rewrite TPoly.insubdK. 
-  + rewrite size_take 1:ge0_poly_size Block.valP.
+  rewrite -{3}(Block.bytes_of_blockKd x); congr.
+  rewrite TPoly.poly_of_bytesdK. 
+  + rewrite size_take 1:ge0_poly_size Block.bytes_of_blockP.
     smt (ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
-  rewrite Extra_block.insubdK 2:cat_take_drop 2://.
-  rewrite size_drop 1:ge0_poly_size Block.valP.
+  rewrite Extra_block.extra_block_of_bytesdK 2:cat_take_drop 2://.
+  rewrite size_drop 1:ge0_poly_size Block.bytes_of_blockP.
   smt (ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
 qed.
 
 realize ofpairK.
 proof.
   move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite Block.insubdK.
-  + by rewrite size_cat TPoly.valP Extra_block.valP.
-  by rewrite take_size_cat 1:TPoly.valP 1:// drop_size_cat 1:TPoly.valP 1://
-     TPoly.valKd Extra_block.valKd.
+  rewrite Block.block_of_bytesdK.
+  + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
+  by rewrite
+       take_size_cat 1:TPoly.bytes_of_polyP 1:// drop_size_cat
+       1:TPoly.bytes_of_polyP 1:// TPoly.bytes_of_polyKd
+       Extra_block.bytes_of_extra_blockKd.
 qed.
 
 realize sample_spec.
@@ -871,17 +888,17 @@ proof.
   have s1 := supp_dlist_size dbyte _ _ ge0_poly_size h1.
   have s2 := supp_dlist_size dbyte _ _ ge0_extra_block_size h2.
   rewrite eq_iff /pred1 /topair //=; split=> />.
-  + rewrite insubdK 1:size_cat 1:s1 1:s2 //.
+  + rewrite block_of_bytesdK 1:size_cat 1:s1 1:s2 //.
     by rewrite take_size_cat // drop_size_cat.
-  move=> /(congr1 bytes_of_poly); rewrite insubdK=> // ->.
-  move=> /(congr1 bytes_of_extra_block); rewrite insubdK=> // ->.
-  rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_size valP /block_size /poly_size.
+  move=> /(congr1 bytes_of_poly); rewrite poly_of_bytesdK=> // ->.
+  move=> /(congr1 bytes_of_extra_block); rewrite extra_block_of_bytesdK=> // ->.
+  rewrite extra_block_of_bytesdK.
+  + rewrite size_drop 1:ge0_poly_size bytes_of_blockP /block_size /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
-  rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_size valP /poly_size /block_size.
+  rewrite poly_of_bytesdK.
+  + rewrite size_take 1:ge0_poly_size bytes_of_blockP /poly_size /block_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
-  by rewrite cat_take_drop valKd.
+  by rewrite cat_take_drop bytes_of_blockKd.
 qed.
 
 clone Split as Split1 with 
@@ -898,31 +915,36 @@ clone import Split1.SplitCodom as SplitC2 with
   type to2 <- poly_out,
   op topair = fun (b:poly) => 
      let bs = bytes_of_poly b in
-     (Poly_in.insubd (take poly_in_size bs), Poly_out.insubd (drop poly_in_size bs)),
+     (
+       Poly_in.poly_in_of_bytesd (take poly_in_size bs),
+       Poly_out.poly_out_of_bytesd (drop poly_in_size bs)
+     ),
   op ofpair = fun (p:poly_in * poly_out) =>
-     TPoly.insubd (bytes_of_poly_in p.`1 ++ bytes_of_poly_out p.`2),
+     TPoly.poly_of_bytesd (bytes_of_poly_in p.`1 ++ bytes_of_poly_out p.`2),
   op sampleto1 <- fun _ => dpoly_in,
   op sampleto2 <- fun _ => dpoly_out
   proof *.
 realize topairK.
 proof.
   move=> x; rewrite /topair /ofpair /=.
-  rewrite -{3}(TPoly.valKd x); congr.
-  rewrite Poly_in.insubdK. 
-  + rewrite size_take 1:ge0_poly_in_size TPoly.valP.
+  rewrite -{3}(TPoly.bytes_of_polyKd x); congr.
+  rewrite Poly_in.poly_in_of_bytesdK. 
+  + rewrite size_take 1:ge0_poly_in_size TPoly.bytes_of_polyP.
     smt (ge0_poly_in_size ge0_poly_out_size).
-  rewrite Poly_out.insubdK 2:cat_take_drop 2://.
-  rewrite size_drop 1:ge0_poly_in_size TPoly.valP.
+  rewrite Poly_out.poly_out_of_bytesdK 2:cat_take_drop 2://.
+  rewrite size_drop 1:ge0_poly_in_size TPoly.bytes_of_polyP.
   smt (ge0_poly_in_size ge0_poly_out_size).
 qed.
 
 realize ofpairK.
 proof.
   move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite TPoly.insubdK.
-  + by rewrite size_cat Poly_in.valP Poly_out.valP.
-  by rewrite take_size_cat 1:Poly_in.valP 1:// drop_size_cat 1:Poly_in.valP 1://
-     Poly_in.valKd Poly_out.valKd.
+  rewrite TPoly.poly_of_bytesdK.
+  + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
+  by rewrite
+       take_size_cat 1:Poly_in.bytes_of_poly_inP 1:// drop_size_cat
+       1:Poly_in.bytes_of_poly_inP 1:// Poly_in.bytes_of_poly_inKd
+       Poly_out.bytes_of_poly_outKd.
 qed.
 
 realize sample_spec.
@@ -937,17 +959,17 @@ proof.
   have s1 := supp_dlist_size dbyte _ _ ge0_poly_in_size h1.
   have s2 := supp_dlist_size dbyte _ _ ge0_poly_out_size h2.
   rewrite eq_iff /pred1 /topair //=; split=> />.
-  + rewrite insubdK 1:size_cat 1:s1 1:s2 //.
+  + rewrite poly_of_bytesdK 1:size_cat 1:s1 1:s2 //.
     by rewrite take_size_cat // drop_size_cat.
-  move=> /(congr1 bytes_of_poly_in); rewrite insubdK=> // ->.
-  move=> /(congr1 bytes_of_poly_out); rewrite insubdK=> // ->.
-  rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_in_size valP /poly_size.
+  move=> /(congr1 bytes_of_poly_in); rewrite poly_in_of_bytesdK=> // ->.
+  move=> /(congr1 bytes_of_poly_out); rewrite poly_out_of_bytesdK=> // ->.
+  rewrite poly_out_of_bytesdK.
+  + rewrite size_drop 1:ge0_poly_in_size bytes_of_polyP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
-  rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_in_size valP /poly_size.
+  rewrite poly_in_of_bytesdK.
+  + rewrite size_take 1:ge0_poly_in_size bytes_of_polyP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
-  by rewrite cat_take_drop valKd.
+  by rewrite cat_take_drop bytes_of_polyKd.
 qed.
 
 module G4 (A:CCA_Adv, RO:RO) = {
@@ -967,7 +989,7 @@ module G5_end(RO:RO) = {
     i <- 0;
     while (i < size ns) {
       n  <- List.nth witness ns i;
-      bl <@ RO.get(n,C.ofint 0);
+      bl <@ RO.get(n,C.ofintd 0);
       (r,s) <- mk_rs bl; 
       forged <- forged || test_poly n Mem.lc r s;
       i <- i + 1;
@@ -1123,8 +1145,8 @@ section PROOFS.
     ={glob A} ==> ={res, Mem.lc} /\ StLSke.gs{1} = RO.m{2}.
   proof.
     proc *.
-    transitivity*{1} { r <@ G3(StLSke(St)).main(); } => //; 1:smt(); 1: by sim.
-    transitivity* {2} { r <@ G3(OChaChaPoly(IFinRO)).main(); } => //; 1:smt().
+    transitivity* {1} { r <@ G3(StLSke(St)).main(); }; 1: by sim.
+    transitivity* {2} { r <@ G3(OChaChaPoly(IFinRO)).main(); }.
     + inline *; wp.
       call (_: StLSke.gs{1} = OCC.gs{2} /\ ={Mem.k, Mem.log, Mem.lc}).
       + by proc; inline *; auto => /> &2; case: (p{2}).
@@ -1147,7 +1169,7 @@ section PROOFS.
     wp;while{2} (0 <= i <= size ns /\ 
               forged = exists j, 0 <= j < i /\
                         let n = nth witness ns j in
-                        let bl = oget RO.m.[(n,C.ofint 0)] in
+                        let bl = oget RO.m.[(n,C.ofintd 0)] in
                         let (r,s) = mk_rs bl in
                         test_poly n Mem.lc r s){2} (size ns - i){2}.
     + by move=> _ z; inline *; auto => /> /#.
@@ -1160,7 +1182,7 @@ section PROOFS.
     have in_ns : n \in ns.
     + by rewrite mem_undup; apply (map_f _ _ (n,a,c,t)).
     move: hdec; rewrite in_ns /dec /genpoly1305 /test_poly /= /get nth_index 1://.
-    case: (mk_rs (oget RO.m{2}.[(n, C.ofint 0)])) => r s /=.
+    case: (mk_rs (oget RO.m{2}.[(n, C.ofintd 0)])) => r s /=.
     case: (t = poly1305 r s (topol a c)) => // heq _.
     apply List.hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
     by apply mapP; exists (n, a, c, t) => /=; apply List.mem_filter.
@@ -1376,12 +1398,13 @@ section PROOFS.
   local lemma mk_rs_ofpair r s e : 
     mk_rs (SplitC1.ofpair (SplitC2.ofpair (r, s), e)) = (r, s).
   proof.
-    rewrite /mk_rs /SplitC1.ofpair /SplitC2.ofpair /= insubdK.
-    + by rewrite size_cat TPoly.valP Extra_block.valP.
+    rewrite /mk_rs /SplitC1.ofpair /SplitC2.ofpair /= block_of_bytesdK.
+    + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
     have h1 : size (bytes_of_poly_in r ++ bytes_of_poly_out s) = poly_size.
-    + by rewrite size_cat Poly_in.valP Poly_out.valP.
-    rewrite TPoly.insubdK 1:// take_size_cat 1:// take_size_cat 2:drop_size_cat ?Poly_in.valP //.
-    by rewrite Poly_in.valKd Poly_out.valKd.
+    + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
+    rewrite TPoly.poly_of_bytesdK 1:// take_size_cat 1://.
+    rewrite take_size_cat 2:drop_size_cat ?Poly_in.bytes_of_poly_inP //.
+    by rewrite Poly_in.bytes_of_poly_inKd Poly_out.bytes_of_poly_outKd.
   qed.
 
   op inv_cpa (mr1 : (nonce*C.counter, poly_in) fmap) 
@@ -1415,7 +1438,7 @@ section PROOFS.
            size p{1} <= (C.max_counter - (i{1} - 1)) * block_size /\
            mr0 = ROin.m{1} /\ ms0 = ROout.m{1}  /\
            (forall n' c, (n',c) \in ROF.m => 
-                  if n{2} = n' then 1 <= C.val c < i else n' \in BNR.lenc){1}).
+                  if n{2} = n' then 1 <= C.toint c < i else n' \in BNR.lenc){1}).
     + inline{1} 1; inline{1} 4; wp.
       conseq (_ : (={i, c, n} /\ size c{1} + size p{1} = sz /\
                   size p{1} = size p{2} /\
@@ -1424,21 +1447,21 @@ section PROOFS.
                   mr0 = ROin.m{1} /\ ms0 = ROout.m{1}  /\
                   (forall (n' : nonce) (c1 : C.counter),
                     (n', c1) \in ROF.m{1} => 
-                    if n{2} = n' then 1 <= C.val c1 < i{1} else n' \in BNR.lenc{1})) /\
+                    if n{2} = n' then 1 <= C.toint c1 < i{1} else n' \in BNR.lenc{1})) /\
                   p{1} <> [] /\ p{2} <> [] /\
                   i{1} <= C.max_counter ==> _) => //.
       + move=> /> &1 &2 -> *.
         have h1 : 0 < size p{2} by smt (size_ge0 size_eq0).
         have : 0 < (C.max_counter - (i{2} - 1)) * block_size by smt().
         by rewrite (StdOrder.IntOrder.pmulr_lgt0 _ _ gt0_block_size) /#.
-      rcondf{1} ^if; 1: by auto; smt (C.insubdK).
-      inline{1} 5; rcondt{1} ^if; 1: by auto; smt (C.insubdK).
+      rcondf{1} ^if; 1: by auto; smt (C.ofintdK).
+      inline{1} 5; rcondt{1} ^if; 1: by auto; smt (C.ofintdK).
       wp; rnd (fun z => z +^ extend p{1}); auto => &1 &2 [#] 3!-> heq hs /= *;split.
       + move=> ??;apply xorK1.
       move=> h1 b ?; rewrite -h1 //= get_setE /= Block.MB.addmC /=.
       rewrite -!size_eq0 !size_drop 1,2:ge0_block_size hs /= 
-        size_cat size_take 1:size_ge0 -heq Block.valP; split;1: smt(); split; 1: smt().
-      split; 2: smt(mem_set C.insubdK).
+        size_cat size_take 1:size_ge0 -heq Block.bytes_of_blockP; split;1: smt(); split; 1: smt().
+      split; 2: smt(mem_set C.ofintdK).
       have := StdOrder.IntOrder.mulr_ge0 (C.max_counter - i{2}) block_size.
       smt (ge0_block_size).
     wp; skip=> &1 &2 [#] //= 4!->> h1 h2 h3 2!<<- //=.
@@ -1469,7 +1492,7 @@ section PROOFS.
       + by ecall (equ_cc n{1} ROin.m{1} ROout.m{1}); rewrite /check_plaintext; auto => /> /#.
       move=> {&m};inline{1} 5; inline{1} 8.
       rcondt{1} ^if.
-      + move=> &m; auto => />; rewrite /SplitD.test /= C.insubdK //=.
+      + move=> &m; auto => />; rewrite /SplitD.test /= C.ofintdK //=.
         smt(C.gt0_max_counter).
       inline{1} 9; wp.
       call{1} (_: true ==> true); 1: by islossless; apply dextra_block_ll.
@@ -1525,8 +1548,8 @@ section PROOFS.
         c <@ EncRnd.cc(n,p);   
         (* t <$ dp *)
         t <@ set_bad1(map (fun c:ciphertext => c.`4) (filter (fun (c:ciphertext) => c.`1 = n) Mem.lc));
-        ROin.sample(n,C.ofint 0);
-        ROout.set((n,C.ofint 0), witness); 
+        ROin.sample(n,C.ofintd 0);
+        ROout.set((n,C.ofintd 0), witness); 
         log.[n] <- (a,c,t);
         return (n,a,c,t);
       }
@@ -1552,15 +1575,15 @@ section PROOFS.
         i <- 0;
         while (i < size ns) {
           n  <- List.nth witness ns i;
-          if ((n,C.ofint 0) \in ROout.m) {
-            r <@ ROin.get(n,C.ofint 0);
+          if ((n,C.ofintd 0) \in ROout.m) {
+            r <@ ROin.get(n,C.ofintd 0);
             forged <- forged || test_poly_in n Mem.lc r (oget log.[n]);
           } else { 
-            r <@ ROin.get(n,C.ofint 0);
+            r <@ ROin.get(n,C.ofintd 0);
             t <@ set_bad2((map 
                 (fun c:ciphertext => c.`4 - poly1305_eval r (topol c.`2 c.`3)) 
                 (filter (fun c:ciphertext => c.`1 = n) Mem.lc)));
-            ROout.set((n,C.ofint 0), witness); 
+            ROout.set((n,C.ofintd 0), witness); 
           }
           i <- i + 1;
         }
@@ -1597,8 +1620,8 @@ section PROOFS.
      (forall n a c t, (n,a,c,t) \in lc1 => n \in nlog => nlog.[n] <> Some (a, c, t)) /\
      (forall n, n \in lenc1 => 
         let (a,c,t) = oget nlog.[n] in
-        let r = oget mr1.[(n,C.ofint 0)] in
-        let s = oget ms1.[(n,C.ofint 0)] in
+        let r = oget mr1.[(n,C.ofintd 0)] in
+        let s = oget ms1.[(n,C.ofintd 0)] in
         s = t - poly1305_eval r (topol a c)).
 
   local lemma step4_1 &m:
@@ -1646,7 +1669,7 @@ section PROOFS.
         + by ecall (equ_cc n{1} ROin.m{1} ROout.m{1}); rewrite /check_plaintext; auto => /> /#.
         inline{1} 5; inline{1} 8.
         rcondt{1} ^if.
-        + by move=> &m; auto => />; rewrite /SplitD.test /= C.insubdK //=; smt(C.gt0_max_counter).
+        + by move=> &m; auto => />; rewrite /SplitD.test /= C.ofintdK //=; smt(C.gt0_max_counter).
         inline{1} 9; wp.
         call{1} (_: true ==> true); 1: by islossless; apply dextra_block_ll.
         inline *.
@@ -1729,11 +1752,11 @@ section PROOFS.
             (forall j, 
               i{1} <= j < size ns{1} =>
               let n = nth witness ns{1} j in
-              (n, C.ofint 0) \in ROout.m{1} =>
+              (n, C.ofintd 0) \in ROout.m{1} =>
               let (a, c, t) = oget UFCMA.log{2}.[n] in
               !(n,a,c,t) \in Mem.lc{1} /\ valid_topol a c /\
-              let r = oget ROin.m{1}.[(n, C.ofint 0)] in 
-              let s = oget ROout.m{1}.[(n, C.ofint 0)] in 
+              let r = oget ROin.m{1}.[(n, C.ofintd 0)] in 
+              let s = oget ROout.m{1}.[(n, C.ofintd 0)] in 
               s = t - poly1305_eval r (topol a c))); last first.
     + auto => /> ; smt (undup_uniq size_undup size_map).
 
@@ -1761,7 +1784,7 @@ section PROOFS.
     (*     smt (undup_uniq size_undup size_map). *)
 
     inline{1} 2; rcondt{1} 3. 
-    + by move=> *;auto => />;rewrite /test /= C.insubdK; smt (C.gt0_max_counter).
+    + by move=> *;auto => />;rewrite /test /= C.ofintdK; smt (C.gt0_max_counter).
     inline{1} 3; inline{1} 4; sp 0 1; wp.
     call{1} (_: true ==> true); 1: by islossless.
     wp; inline *; if{2}.
@@ -1805,10 +1828,10 @@ section PROOFS.
     proof *.
 
   op sub_map (m1 : (nonce * C.counter, 'a) fmap) (m2 : (nonce * C.counter, 'a) fmap) i l =
-    (forall n, (n, C.ofint 0) \in m2 => (n,C.ofint 0) \in m1) /\
-    (forall n, (n, C.ofint 0) \in m2 => m1.[(n,C.ofint 0)] = m2.[(n,C.ofint 0)]) /\
-    (forall j, 0 <= j < i => (nth witness l j, C.ofint 0) \in m1) /\
-    (forall n, (n, C.ofint 0) \in m1 => (n, C.ofint 0) \in m2 \/ exists j, 0 <= j < i /\ n = nth witness l j).
+    (forall n, (n, C.ofintd 0) \in m2 => (n,C.ofintd 0) \in m1) /\
+    (forall n, (n, C.ofintd 0) \in m2 => m1.[(n,C.ofintd 0)] = m2.[(n,C.ofintd 0)]) /\
+    (forall j, 0 <= j < i => (nth witness l j, C.ofintd 0) \in m1) /\
+    (forall n, (n, C.ofintd 0) \in m1 => (n, C.ofintd 0) \in m2 \/ exists j, 0 <= j < i /\ n = nth witness l j).
 
 
   local module UF = {
@@ -1818,15 +1841,15 @@ section PROOFS.
   local module Orcl : Orcl = {
     proc f (n : nonce) : unit = {
       var r, t;
-      if ((n,C.ofint 0) \in ROout.m) {
-        r <@ ROIN.RO.get(n,C.ofint 0);
+      if ((n,C.ofintd 0) \in ROout.m) {
+        r <@ ROIN.RO.get(n,C.ofintd 0);
         UF.forged <- UF.forged || test_poly_in n Mem.lc r (oget UFCMA.log.[n]);
       } else { 
-        r <@ ROIN.RO.get(n,C.ofint 0);
+        r <@ ROIN.RO.get(n,C.ofintd 0);
         t <@ UFCMA(ROIN.RO).set_bad2((map 
                 (fun c:ciphertext => c.`4 - poly1305_eval r (topol c.`2 c.`3)) 
                 (filter (fun c:ciphertext => c.`1 = n) Mem.lc)));
-        ROout.set((n,C.ofint 0), witness); 
+        ROout.set((n,C.ofintd 0), witness); 
       }
     }
   }.
@@ -1850,8 +1873,8 @@ section PROOFS.
       UF.forged <- false;
       if (size Mem.lc <= qdec) {
         ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-        ns1 <- filter (fun n => (n,C.ofint 0) \in ROout.m) ns;
-        ns2 <- filter (fun n => (n,C.ofint 0) \notin ROout.m) ns;
+        ns1 <- filter (fun n => (n,C.ofintd 0) \in ROout.m) ns;
+        ns2 <- filter (fun n => (n,C.ofintd 0) \notin ROout.m) ns;
         Iter(Orcl).iter(ns1++ns2);
       }
       return UF.forged;
@@ -1878,19 +1901,19 @@ section PROOFS.
       UF.forged <- false;
       if (size Mem.lc <= qdec) {
         ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-        ns1 <- filter (fun n => (n,C.ofint 0) \in ROout.m) ns;
-        ns2 <- filter (fun n => (n,C.ofint 0) \notin ROout.m) ns;
+        ns1 <- filter (fun n => (n,C.ofintd 0) \in ROout.m) ns;
+        ns2 <- filter (fun n => (n,C.ofintd 0) \notin ROout.m) ns;
         i <- 0;
         while (i < size ns1) {
           n <- nth witness ns1 i;
-          r <@ ROin.get(n,C.ofint 0);
+          r <@ ROin.get(n,C.ofintd 0);
           UF.forged <- UF.forged || test_poly_in n Mem.lc r (oget UFCMA.log.[n]);
           i <- i + 1;
         }
         i <- 0;
         while (i < size ns2) {
           n <- nth witness ns2 i;
-          r <@ ROin.get(n,C.ofint 0);
+          r <@ ROin.get(n,C.ofintd 0);
           t <@ UFCMA(ROin).set_bad2((map 
                 (fun c:ciphertext => c.`4 - poly1305_eval r (topol c.`2 c.`3)) 
                 (filter (fun c:ciphertext => c.`1 = n) Mem.lc)));
@@ -1979,7 +2002,7 @@ section PROOFS.
       rewrite set_setE //= (eq_sym t2{2}) h /= => /> *. 
       by rewrite set_setE //= (eq_sym t2{2}) h /= => /> *; smt().
     move=> /> &2 *; pose l := undup _.
-    by have:=perm_filterC (fun n => (n,C.ofint 0) \in ROout.m{2}) l; rewrite /predC perm_eq_sym.
+    by have:=perm_filterC (fun n => (n,C.ofintd 0) \in ROout.m{2}) l; rewrite /predC perm_eq_sym.
   proc; sp.
   seq 2 2 : (={glob UFCMA2,RO.m}); 1: by sim.
   inline*; if; auto; sp.
@@ -1987,17 +2010,17 @@ section PROOFS.
   seq 1 1 : (={glob UFCMA2,RO.m,ns,ns1,ns2} /\
                l{1} = ns2{2} /\
                ns{2} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{2}) /\
-               ns1{2} = filter (fun (n0 : nonce) => (n0, C.ofint 0) \in ROout.m{2}) ns{2} /\
-               ns2{2} = filter (fun (n0 : nonce) => (n0, C.ofint 0) \notin ROout.m{2}) ns{2}).
+               ns1{2} = filter (fun (n0 : nonce) => (n0, C.ofintd 0) \in ROout.m{2}) ns{2} /\
+               ns2{2} = filter (fun (n0 : nonce) => (n0, C.ofintd 0) \notin ROout.m{2}) ns{2}).
   + move=> />.
     while(={glob UFCMA2, RO.m, ns, ns1, ns2} /\
         ns{2} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{2}) /\
-        ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \in ROout.m{2}) ns{2} /\
-        ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \notin ROout.m{2}) ns{2} /\
+        ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \in ROout.m{2}) ns{2} /\
+        ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \notin ROout.m{2}) ns{2} /\
         l{1} = drop i{2} ns1{2} ++ ns2{2} /\ 0 <= i{2});
       2: by auto=>/>; smt(drop0 size_eq0 size_ge0 size_cat drop_oversize).    
     sp=> />.
-    conseq(: n{2} = nth witness ns1{2} i{2} /\ x{2} = (n{2}, (C.ofint 0)%C) /\
+    conseq(: n{2} = nth witness ns1{2} i{2} /\ x{2} = (n{2}, (C.ofintd 0)%C) /\
              n{1} = head witness l{1} /\
              (((UF.forged{1}, UFCMA.bad2{1}, UFCMA.cbad2{1}, UFCMA.bad1{1}, UFCMA.cbad1{1}, RO.m{1}, UFCMA.log{1}, SplitC2.I2.RO.m{1},
                 SplitD.ROF.RO.m{1}, BNR.ndec{1}, BNR.lenc{1}, Mem.lc{1}, Mem.log{1}, (glob A){1}) =
@@ -2007,18 +2030,18 @@ section PROOFS.
                 (glob A){2}) /\
              ={RO.m, ns, ns1, ns2}) /\
              ns{2} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{2}) /\
-             ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \in ROout.m{2}) ns{2} /\
-             ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \notin ROout.m{2}) ns{2} /\
+             ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \in ROout.m{2}) ns{2} /\
+             ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \notin ROout.m{2}) ns{2} /\
              l{1} = drop i{2} ns1{2} ++ ns2{2} /\ 0 <= i{2}) /\
              (l{1} <> [] /\ size ns2{1} < size l{1}) /\ i{2} < size ns1{2} /\
-             ={n} /\ (forall j, 0 <= j < size ns1{2} => (nth witness ns1{2} j, C.ofint 0) \in ROout.m{2}) ==> _).
+             ={n} /\ (forall j, 0 <= j < size ns1{2} => (nth witness ns1{2} j, C.ofintd 0) \in ROout.m{2}) ==> _).
     - move=> /> &2.
       pose l := undup _; pose l1 := List.filter _ _; pose l2 := List.filter _ _.
       move=> H H0 H1 *.
       have:= H1; rewrite size_cat ltz_addr => h. 
       rewrite -nth0_head  nth_cat //= h /= nth_drop //= => *.
-      have:=allP (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \in SplitC2.I2.RO.m{2}) l1.
-      have->//=->//=:=filter_all (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \in SplitC2.I2.RO.m{2}) l.
+      have:=allP (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \in SplitC2.I2.RO.m{2}) l1.
+      have->//=->//=:=filter_all (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \in SplitC2.I2.RO.m{2}) l.
       by apply mem_nth.
     rcondt{1} 1; 1: by auto=> /#.
     wp 5 4.
@@ -2032,16 +2055,16 @@ section PROOFS.
   while(={UF.forged,UFCMA.bad2,UFCMA.cbad2,UFCMA.log,Mem.lc,Mem.log,RO.m,ns,ns1,ns2} /\
         l{1} = drop i{2} ns2{2} /\ 0 <= i{2} /\
         ns{2} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{2}) /\
-        ns1{2} = filter (fun (n0 : nonce) => (n0, C.ofint 0) \in ROout.m{2}) ns{2} /\
-        ns2{2} = filter (fun (n0 : nonce) => (n0, C.ofint 0) \notin ROout.m{2}) ns{2} /\
+        ns1{2} = filter (fun (n0 : nonce) => (n0, C.ofintd 0) \in ROout.m{2}) ns{2} /\
+        ns2{2} = filter (fun (n0 : nonce) => (n0, C.ofintd 0) \notin ROout.m{2}) ns{2} /\
         sub_map ROout.m{1} ROout.m{2} i{2} ns2{2}); 2: by auto; smt(drop0 size_eq0 size_ge0).
   sp.
-  conseq(: n{2} = nth witness ns2{2} i{2} /\ x0{2} = (n{2}, C.ofint 0) /\
+  conseq(: n{2} = nth witness ns2{2} i{2} /\ x0{2} = (n{2}, C.ofintd 0) /\
       n{1} = head witness l{1} /\
       (={UF.forged, UFCMA.bad2, UFCMA.cbad2, UFCMA.log, Mem.lc, Mem.log, RO.m, ns, ns1, ns2} /\
       l{1} = drop i{2} ns2{2} /\ 0 <= i{2} /\ ns{2} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{2}) /\
-      ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \in ROout.m{2}) ns{2} /\
-      ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofint 0)%C) \notin ROout.m{2}) ns{2} /\
+      ns1{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \in ROout.m{2}) ns{2} /\
+      ns2{2} = filter (fun (n0 : nonce) => (n0, (C.ofintd 0)%C) \notin ROout.m{2}) ns{2} /\
       sub_map ROout.m{1} ROout.m{2} i{2} ns2{2}) /\ l{1} <> [] /\ i{2} < size ns2{2} /\ ={n} ==> _).
   + by move=> /> *; rewrite (drop_nth witness) //=.
   rcondf{1} 1; 1: auto=> />.
@@ -2052,8 +2075,8 @@ section PROOFS.
     have/=:=H3 (nth witness l2 i{m}).
     apply absurd=> /= -> /=.
     rewrite negb_or negb_exists/=; split=> />.
-    - have:=allP (fun (n0 : nonce) => (n0, C.ofint 0) \notin SplitC2.I2.RO.m{m}) l2.
-      have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofint 0) \notin SplitC2.I2.RO.m{m}) l.
+    - have:=allP (fun (n0 : nonce) => (n0, C.ofintd 0) \notin SplitC2.I2.RO.m{m}) l2.
+      have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofintd 0) \notin SplitC2.I2.RO.m{m}) l.
       by rewrite mem_nth //=.
     move=> a; case: (0 <= a < i{m})=> //= [#]*.
     have := before_index witness (nth witness l2 i{m}) l2 a.
@@ -2064,10 +2087,10 @@ section PROOFS.
   pose l := undup _.
   pose l2 := List.filter _ _.
   move=> *.
-  have h1: forall j, 0 <= j < size l2 => (nth witness l2 j, C.ofint 0) \notin ROout.m{2}.
+  have h1: forall j, 0 <= j < size l2 => (nth witness l2 j, C.ofintd 0) \notin ROout.m{2}.
   + move=> j [#] *.
-    - have:=allP (fun (n0 : nonce) => (n0, C.ofint 0) \notin ROout.m{2}) l2.
-      have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofint 0) \notin SplitC2.I2.RO.m{2}) l.
+    - have:=allP (fun (n0 : nonce) => (n0, C.ofintd 0) \notin ROout.m{2}) l2.
+      have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofintd 0) \notin SplitC2.I2.RO.m{2}) l.
       by rewrite mem_nth //=.
   rewrite (drop_nth witness i{2} l2) //= drop0 //=; do ! split=> /> *.
   + smt().
@@ -2091,11 +2114,11 @@ section PROOFS.
       var n, r, ns, ns1;
 
       ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-      ns1 <- filter (fun n => (n,C.ofint 0) \in ROout.m) ns;
+      ns1 <- filter (fun n => (n,C.ofintd 0) \in ROout.m) ns;
       if (cforged < size ns1) {
         n <- nth witness ns1 cforged;
         r <$ dpoly_in;
-        ROin.set((n,C.ofint 0), r);
+        ROin.set((n,C.ofintd 0), r);
         UF.forged <- UF.forged ||
             test_poly_in n Mem.lc r (oget UFCMA.log.[n]);
         cforged <- cforged + 1;
@@ -2106,10 +2129,10 @@ section PROOFS.
       var n, r, ns, ns2, t;
 
       ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-      ns2 <- filter (fun n => (n,C.ofint 0) \notin ROout.m) ns;
+      ns2 <- filter (fun n => (n,C.ofintd 0) \notin ROout.m) ns;
       if (UFCMA.cbad2 < size ns2) {
         n <- nth witness ns2 UFCMA.cbad2;
-        r <@ ROin.get(n,C.ofint 0);
+        r <@ ROin.get(n,C.ofintd 0);
         t <$ dpoly_out;
         UFCMA.bad2 <- UFCMA.bad2 || 
               t \in (map (fun c:ciphertext => c.`4 - poly1305_eval r (topol c.`2 c.`3)) 
@@ -2124,7 +2147,7 @@ section PROOFS.
       UF.forged <- false;
       cforged <- 0;
       ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-      ns1 <- filter (fun n => (n,C.ofint 0) \in ROout.m) ns;
+      ns1 <- filter (fun n => (n,C.ofintd 0) \in ROout.m) ns;
 
       while (cforged < size ns1) {
         set_forged();
@@ -2137,7 +2160,7 @@ section PROOFS.
       UFCMA.bad2 <- false;
       UFCMA.cbad2 <- 0;
       ns <- undup (List.map (fun (p:ciphertext) => p.`1) Mem.lc);
-      ns2 <- filter (fun n => (n,C.ofint 0) \notin ROout.m) ns;
+      ns2 <- filter (fun n => (n,C.ofintd 0) \notin ROout.m) ns;
 
       while (UFCMA.cbad2 < size ns2) {
         set_bad2();
@@ -2182,7 +2205,7 @@ section PROOFS.
     if; auto; sp.
     while(={ns2, Mem.lc, RO.m, UFCMA.bad2, UF.forged, ROout.m} /\ i{1} = UFCMA.cbad2{2} /\ 
            ns{1} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{1}) /\
-           ns2{1} = filter (fun (n1 : nonce) => (n1, (C.ofint 0)%C) \notin ROout.m{1}) ns{1} /\
+           ns2{1} = filter (fun (n1 : nonce) => (n1, (C.ofintd 0)%C) \notin ROout.m{1}) ns{1} /\
            size Mem.lc{2} <= qdec).
     + sp; rcondt{2} 1; 1: auto=> />.
       sp; conseq(:_==> ={RO.m, UFCMA.bad2} /\ i{1} = UFCMA.cbad2{2})=>/>.
@@ -2191,9 +2214,9 @@ section PROOFS.
     conseq(:_==> ={Mem.lc,RO.m,UF.forged,ROout.m})=> />.
     while(={Mem.lc,RO.m,UF.forged,ROout.m, ns1, UFCMA.log} /\ i{1} = UFCMA4.cforged{2} /\ 
            size Mem.lc{2} <= qdec /\ 0 <= i{1} /\
-           (forall j, i{1} <= j < size ns1{1} => (nth witness ns1{1} j, C.ofint 0) \notin RO.m{1}) /\
+           (forall j, i{1} <= j < size ns1{1} => (nth witness ns1{1} j, C.ofintd 0) \notin RO.m{1}) /\
            ns{1} = undup (map (fun (p : ciphertext) => p.`1) Mem.lc{1}) /\
-           ns1{1} = filter (fun (n1 : nonce) => (n1, (C.ofint 0)%C) \in ROout.m{1}) ns{1}).
+           ns1{1} = filter (fun (n1 : nonce) => (n1, (C.ofintd 0)%C) \in ROout.m{1}) ns{1}).
     + sp; rcondt{2} 1; 1: by auto.
       rcondt{1} 2; 1: by auto=> /#.
       wp; auto=> /> &h.
@@ -2214,10 +2237,10 @@ section PROOFS.
     by hoare; auto; smt(ge0_qdec ge0_pr_zeropol).
   exists * Mem.lc, ROout.m; elim * => l roout.
   pose undupl := undup (map (fun (c:ciphertext) => c.`1) l).
-  pose l1 := filter (fun n => (n, C.ofint 0) \in roout) undupl. 
-  pose l2 := filter (fun n => (n, C.ofint 0) \notin roout) undupl.
-  pose n1 := size (filter (fun (c:ciphertext) => (c.`1, C.ofint 0) \in roout) l).
-  pose n2 := size (filter (fun (c:ciphertext) => (c.`1, C.ofint 0) \notin roout) l).
+  pose l1 := filter (fun n => (n, C.ofintd 0) \in roout) undupl. 
+  pose l2 := filter (fun n => (n, C.ofintd 0) \notin roout) undupl.
+  pose n1 := size (filter (fun (c:ciphertext) => (c.`1, C.ofintd 0) \in roout) l).
+  pose n2 := size (filter (fun (c:ciphertext) => (c.`1, C.ofintd 0) \notin roout) l).
   seq 1 : UF.forged (n1%r * pr_zeropol) 1%r 1%r (n2%r * pr1_poly_out)
     (l = Mem.lc /\ roout = ROout.m /\ 0 < size Mem.lc <= qdec); auto.
   + by inline*; auto=> />; while(true); auto.
@@ -2247,7 +2270,7 @@ section PROOFS.
     + by move=> c; proc; sp; inline*; sp; if; auto=> /#.
     + by move=> b c; proc; inline*; sp; rcondf 1; auto. 
     + (* compute sum of probabilities *)
-      have hn1: n1 = size (filter (fun n => (n, C.ofint 0) \in roout) (map (fun (c:ciphertext) => c.`1) l)).
+      have hn1: n1 = size (filter (fun n => (n, C.ofintd 0) \in roout) (map (fun (c:ciphertext) => c.`1) l)).
       + by rewrite /n1 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r 1:ge0_pr_zeropol -sumr_ofint le_fromint IntOrder.lerr_eq.
       rewrite hn1 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
@@ -2282,7 +2305,7 @@ section PROOFS.
     + move=> c; proc; inline*; sp; rcondt 1; 1: auto=> />.
       by wp -1=> />; conseq(:_==> true); auto; smt().
     + by move=> b c; proc; inline*; sp; rcondf 1; auto=> />.
-    + have hn2: n2 = size (filter (fun n => (n, C.ofint 0) \notin roout) (map (fun (c:ciphertext) => c.`1) l)).
+    + have hn2: n2 = size (filter (fun n => (n, C.ofintd 0) \notin roout) (map (fun (c:ciphertext) => c.`1) l)).
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
       rewrite -sumr_ofint le_fromint IntOrder.lerr_eq.
@@ -2326,8 +2349,8 @@ section PROOFS.
         c <@ EncRnd.cc(n,p);   
         (* t <$ dp *)
         t <@ set_bad1(map (fun c:ciphertext => c.`4) (filter (fun (c:ciphertext) => c.`1 = n) Mem.lc));
-        ROIN.RO.sample(n,C.ofint 0);
-        ROout.set((n,C.ofint 0), witness); 
+        ROIN.RO.sample(n,C.ofintd 0);
+        ROout.set((n,C.ofintd 0), witness); 
         UFCMA.log.[n] <- (a,c,t);
         return (n,a,c,t);
       }
@@ -2574,8 +2597,8 @@ section PROOFS.
         c <@ EncRnd.cc(n,p);   
         (* t <$ dp *)
         t <@ set_bad1(map (fun c:ciphertext => c.`4) (filter (fun (c:ciphertext) => c.`1 = n) Mem.lc));
-        ROIN.RO.sample(n,C.ofint 0);
-        ROout.set((n,C.ofint 0), witness); 
+        ROIN.RO.sample(n,C.ofintd 0);
+        ROout.set((n,C.ofintd 0), witness); 
         UFCMA.log.[n] <- (a,c,t);
         return (n,a,c,t);
       }

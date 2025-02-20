@@ -54,16 +54,29 @@ type axclone = {
 }
 
 (* ------------------------------------------------------------------ *)
+type xty_override =
+  [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xop_override =
+  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xpr_override =
+  [pr_override_def genoverride | `Direct of EcAst.form] * clmode
+
+(* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types    : (ty_override located) Msym.t;
-  evc_ops      : (op_override located) Msym.t;
-  evc_preds    : (pr_override located) Msym.t;
+  evc_types    : (xty_override located) Msym.t;
+  evc_ops      : (xop_override located) Msym.t;
+  evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
   evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : evclone Msym.t;
 }
+
 
 and evlemma = {
   ev_global  : (ptactic_core option * evtags option) list;
@@ -271,7 +284,8 @@ end = struct
         (fun evc ->
           if Msym.mem x evc.evc_types then
             clone_error oc.oc_env (CE_DupOverride (OVK_Type, name));
-          { evc with evc_types = Msym.add x (mk_loc lc tyd) evc.evc_types })
+          { evc with evc_types =
+              Msym.add x (mk_loc lc tyd :> xty_override located) evc.evc_types })
         nm evc
 
     in (proofs, evc)
@@ -288,13 +302,14 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_ops then
            clone_error oc.oc_env (CE_DupOverride (OVK_Operator, name));
-         { evc with evc_ops = Msym.add x (mk_loc lc opd) evc.evc_ops })
+         { evc with evc_ops = 
+            Msym.add x (mk_loc lc opd :> xop_override located) evc.evc_ops })
         nm evc
 
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let pr_ovrd oc ((proofs, evc) : state) name (prd : pr_override) =
+  let pr_ovrd oc ((proofs, evc) : state) name (prd : EcParsetree.pr_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
     if find_pr oc.oc_oth name = None then
@@ -305,7 +320,8 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_preds then
            clone_error oc.oc_env (CE_DupOverride (OVK_Predicate, name));
-         { evc with evc_preds = Msym.add x (mk_loc lc prd) evc.evc_preds })
+         { evc with evc_preds =
+            Msym.add x (mk_loc lc prd :> xpr_override located) evc.evc_preds })
         nm evc
 
     in (proofs, evc)

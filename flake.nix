@@ -115,9 +115,9 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
-	             devPackages
-            ++ [ scope'.why3 packages.provers ]
-            ++ (with pkgs.python3Packages; [ pyyaml ]);
+              devPackages
+           ++ [ pkgs.git scope'.why3 packages.provers ]
+           ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
       });
 }

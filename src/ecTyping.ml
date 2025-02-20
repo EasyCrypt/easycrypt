@@ -2194,7 +2194,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         List.fold_right (fun (cp, up) bd ->
           let {pl_desc = cp; pl_loc = loc} = cp in
           let cp = trans_codepos env cp in
-          let change env _ _ i tl = (),
+          let change env si =
+            (* NOTE: There will always be a head element *)
+            let i, tl = List.takedrop 1 si in
+            let i = List.hd i in
+
             match up with
             | Pup_stmt sup ->
               eval_supdate env sup i @ tl
@@ -2203,8 +2207,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           in
           let env = EcEnv.Memory.push_active !memenv env in
           try
-            let _, s = EcMatching.Zipper.fold_tl env () cp change () bd in
-            s
+            EcMatching.Zipper.map_range env (cp, `Offset (EcMatching.Zipper.cpos (-1))) change bd
           with
             | EcMatching.Zipper.InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
@@ -3081,7 +3084,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFdecimal (n, f) ->
         f_decimal (n, f)
 
-    | PFtuple pes ->        
+    | PFtuple pes ->
         let esig = List.map (fun _ -> EcUnify.UniEnv.fresh ue) pes in
         tt |> oiter (fun tt -> unify_or_fail env ue f.pl_loc  ~expct:tt (ttuple esig));
         let es = List.map2 (fun tt pe -> transf env ~tt pe) esig pes in
@@ -3608,6 +3611,8 @@ and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) :
     `Call (trans_lv_match ?memory env lv)
   | `Assign lv ->
     `Assign (trans_lv_match ?memory env lv)
+  | `AssignTuple lv ->
+    `AssignTuple (trans_lv_match ?memory env lv)
 (* -------------------------------------------------------------------- *)
 and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with

@@ -14,19 +14,16 @@ op wordw : t list = mkseq (fun _ => dchar) n.
 lemma size_wordw: size wordw = n.
 proof. by rewrite size_mkseq ler_maxr ?ge0_n. qed.
 
-clone include Subtype
-  with type T   <- t list,
-       op P   <- fun w => size w = n
-proof *.
-realize inhabited by exists wordw; exact size_wordw.
+subtype word = { w : t list | size w = n }.
 
-type word = sT.
+realize inhabited.
+proof. by exists wordw; exact: size_wordw. qed.
+
 (* default value chosen for backward compatibility *)
 op mkword x = odflt (insubd wordw) (insub x).
 op ofword = val.
 
 (* -------------------------------------------------------------------- *)
-
 lemma mkwordK : cancel ofword mkword.
 proof. smt(valK). qed.
 

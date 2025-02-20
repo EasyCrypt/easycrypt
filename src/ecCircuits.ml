@@ -8,7 +8,6 @@ open EcAst
 open EcCoreFol
 open EcIdent
 open LDecl
-open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map

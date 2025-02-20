@@ -246,22 +246,33 @@ let operator_compatible env oper1 oper2 =
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
-let check_evtags (tags : evtags) (src : symbol list) =
-  let module E = struct exception Reject end in
+let check_evtags ?(tags : evtags option) (src : symbol list) =
+  let exception Reject in
+
+  let explicit = "explicit" in
 
   try
-    let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
-    let stt =
-      List.map (fun src ->
-        let do1 status (mode, dst) =
-          match mode with
-          | `Exclude -> if sym_equal src dst then raise E.Reject; status
-          | `Include -> status || (sym_equal src dst)
-        in List.fold_left do1 dfl tags)
-        src
-    in List.mem true stt
+    match tags with
+    | None ->
+      if List.mem explicit src then
+        raise Reject;
+      true
 
-  with E.Reject -> false
+    | Some tags ->
+      let dfl =
+        not (List.mem explicit src) &&
+        not (List.exists (fun (mode, _) -> mode = `Include) tags) in
+      let stt =
+        List.map (fun src ->
+          let do1 status (mode, dst) =
+            match mode with
+            | `Exclude -> if sym_equal src dst then raise Reject; status
+            | `Include -> status || (sym_equal src dst)
+          in List.fold_left do1 dfl tags)
+          src
+      in List.mem true stt
+
+  with Reject -> false
 
 (* -------------------------------------------------------------------- *)
 let xpath ove x =
@@ -284,12 +295,23 @@ let string_of_renaming_kind = function
   | `Theory  -> "theory"
 
 (* -------------------------------------------------------------------- *)
-let rename ove subst (kind, name) =
+let rename ?(fold = true) ove subst (kind, name) =
   try
     let newname =
-      List.find_map
-        (fun rnm -> EcThCloning.rename rnm (kind, name))
-        ove.ovre_rnms in
+      match fold with
+      | false ->
+        List.find_map
+          (fun rnm -> EcThCloning.rename rnm (kind, name))
+          ove.ovre_rnms
+      | _ ->
+        let newname =
+          List.fold_left (* FIXME:parallel substitution *)
+            (fun name rnm ->
+              Option.value ~default:name (EcThCloning.rename rnm (kind, name)))
+            name ove.ovre_rnms in
+        if newname = name then raise Not_found;
+        newname
+    in
 
     let nameok =
       match kind with
@@ -399,6 +421,18 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
             | _ -> assert false
           end
+
+        | `Direct ty -> begin
+          assert (List.is_empty otyd.tyd_params);
+          let decl  =
+            { tyd_params   = [];
+              tyd_type     = `Concrete ty;
+              tyd_resolve  = otyd.tyd_resolve && (mode = `Alias);
+              tyd_loca     = otyd.tyd_loca;
+              tyd_clinline = otyd.tyd_clinline; }
+
+          in (decl, ty)
+    end
       in
 
       let subst, x =
@@ -423,12 +457,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                   let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
 
                   List.fold_left (fun subst (name, tyargs) ->
-                      let np = EcPath.pqoname (EcPath.prefix np) name in
-                      let newtyargs = List.map (CS.Tvar.subst tysubst) tyargs in
-                      EcSubst.add_opdef subst
-                        (xpath ove name)
-                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
-                    subst octors
+                    let np = EcPath.pqoname (EcPath.prefix np) name in
+                    let newtyargs =
+                      List.map
+                        (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
+                        tyargs in
+                    EcSubst.add_opdef subst
+                      (xpath ove name)
+                      (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                    ) subst octors
                 | _ -> subst
               end
             | _, _ -> subst
@@ -528,6 +565,15 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
 
             | _ -> clone_error env (CE_UnkOverride(OVK_Operator, EcPath.toqsymbol p))
           end
+
+          | `Direct body ->
+            assert (List.is_empty refop.op_tparams);
+            let newop =
+              mk_op
+                ~opaque:optransparent ~clinline:(opmode <> `Alias)
+                [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
+            (newop, body)
+  
         in
           match opmode with
           | `Alias ->
@@ -646,6 +692,18 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
 
           | _ -> clone_error env (CE_UnkOverride(OVK_Predicate, EcPath.toqsymbol p))
         end
+
+        | `Direct body ->
+          assert (List.is_empty refpr.op_tparams);
+          let newpr   =
+            { op_tparams  = [];
+              op_ty       = body.f_ty;
+              op_kind     = OB_pred (Some (PR_Plain body));
+              op_opaque   = oopr.op_opaque;
+              op_clinline = prmode <> `Alias;
+              op_loca     = refpr.op_loca;
+              op_unfold   = refpr.op_unfold; } in
+          (newpr, body)
       in
 
         match prmode with
@@ -723,9 +781,13 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
       match Msym.find_opt x (ove.ovre_ovrd.evc_lemmas.ev_bynames) with
       | Some (pt, hide, explicit) -> Some (pt, hide, explicit)
       | None when is_axiom ax.ax_kind ->
-          List.Exceptionless.find_map
-            (function (pt, None) -> Some (pt, `Alias, false) | (pt, Some pttags) ->
-               if check_evtags pttags (Ssym.elements tags) then
+          List.Exceptionless.find_map (function
+            | (pt, None) ->
+              if check_evtags (Ssym.elements tags) then
+                Some (pt, `Alias, false)
+              else None
+            | (pt, Some pttags) ->
+               if check_evtags ~tags:pttags (Ssym.elements tags) then
                  Some (pt, `Alias, false)
                else None)
             ove.ovre_glproof
