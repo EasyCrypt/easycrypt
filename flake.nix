@@ -46,6 +46,16 @@
         scope = on.buildOpamProject' { } ./. query;
 
         overlay = final: prev: {
+          conf-git = prev.conf-git.overrideAttrs (oa: {
+            buildInputs = oa.buildInputs ++ [ pkgs.git ];
+            nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.git ];
+          });
+
+          conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
+            buildInputs = oa.buildInputs ++ [ pkgs.pkg-config ];
+            nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.pkg-config ];
+          });
+
           ${package} = prev.${package}.overrideAttrs (oa: {
             nativeBuildInputs = oa.nativeBuildInputs
               ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.darwin.sigtool ];
