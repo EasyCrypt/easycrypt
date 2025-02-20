@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Core Int List StdRing StdOrder.
+require import Core Int List StdRing StdOrder Finite.
 (*---*) import IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -83,6 +83,9 @@ proof.
 split=> // h; apply/fset_eq/uniq_perm_eq; 1,2: exact/uniq_elems.
 by move=> x; rewrite -!memE h.
 qed.
+
+lemma finite_mem (s: 'a fset): is_finite (mem s).
+proof. apply mkfinite; exists (elems s) => /#. qed.
 
 (* -------------------------------------------------------------------- *)
 op [opaque] fset0 ['a] = oflist [<:'a>]. 
