@@ -101,7 +101,14 @@ proof.
 elim/fmapW : m; first by rewrite mu0_false; smt(mem_empty fsize_empty).
 move => m k v fresh_k IH H.
 rewrite (@mu_eq _ _ (predU (p k)
-  (fun (r : 'c) => exists (u : 'a), (u \in m) /\ p u r))); 1: smt(mem_set).
+  (fun (r : 'c) => exists (u : 'a), (u \in m) /\ p u r))).
++ move=> x; rewrite /predU /= eq_iff exists_orl /=; split.
+  + move=> [] u; rewrite mem_set=> - [] [].
+    + by move=> u_in_m pu_x; exists u; right.
+    + by move=> />.
+  + move=> [] u [].
+    + by move=> pk_x; exists k; rewrite mem_set.
+    + by move=> [] u_in_m pu_x; exists u; rewrite mem_set u_in_m pu_x.
 rewrite mu_or; apply ler_naddr; 1: smt(mu_bounded).
 by rewrite fsize_set -mem_fdom fresh_k fromintD mulrDl; smt(mem_set).
 qed.

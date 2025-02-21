@@ -164,8 +164,13 @@ section PROOFS.
         (={x} /\ (x0 = x /\ x1 = x){2} ==> r{1} = rr{2})
         (={x} /\ (x0 = x /\ x1 = x){2} ==> rr{1} = ofpair(r, r0){2}); 1,2,4: by auto => /#.
       rndsem*{2} 0.
-      auto => *. rewrite -dmap_dprodE sample_spec. by smt().
-    by auto => />; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
+      by auto => *; rewrite -dmap_dprodE sample_spec /#.
+    auto=> /> &2 eq_dom; move: (eq_dom x{2}); rewrite !eq_iff.
+    rewrite !mem_map !mem_pair_map !mapE !mergeE 1:/o_pair //.
+    case _: (x{2} \in I1.RO.m{2})=> />.
+    + by rewrite !domE; case: (I1.RO.m.[x]{2})=> />; case: (I2.RO.m.[x]{2}).
+    rewrite !get_set_sameE /= -(map_set (fun _=> ofpair)) set_pair_map /=.
+    by move=> + + x0; rewrite mem_map mem_pair_map !mem_set /#.
   qed.
 
   equiv RO_split: 

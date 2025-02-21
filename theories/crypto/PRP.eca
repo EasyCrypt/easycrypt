@@ -279,15 +279,15 @@ lemma collision_add (m:(D,D) fmap) x y:
   collision m.[x <- y] <=> collision m \/ rng m y.
 proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
-+ rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
++ rewrite !mem_set !get_setE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
   case (rng m y)=> //= y_notin_rngm.
-  by exists z z'; smt(@SmtMap).
+  by exists z z'; smt().
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
 + exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
   move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
   by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
 rewrite rngE=> - /= [x'] mx'_y.
-by exists x x'; smt(@SmtMap).
+by exists x x'; rewrite !get_setE !mem_set /#.
 qed.
 
 lemma collision_stable (m:(D,D) fmap) y y':
@@ -459,7 +459,8 @@ section Upto.
                 PRFi.m{2} = RP.m.[x <- r0]{1} /\
                 ((PRP_indirect_bad.bad \/ rng RP.m r0){1} <=> collision PRFi.m{2})).
     + auto => /> &1 &2 coll _ x_notin_m r _; split=> [|x0 x'].
-      + rewrite rngE /= /collision=> - [x'] mx'; exists x{2} x'; smt(domE get_setE).
+      + rewrite rngE /= /collision=> - [x'] mx'.
+        by exists x{2} x'; rewrite !mem_set !get_setE /#.
       smt (rngE get_setE).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
@@ -472,7 +473,9 @@ section Upto.
          [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
     by move=> &hr x_notin_m r_in_rng_m; apply excepted_lossless; exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
-    by proc; if; auto=> />; rewrite dD_ll //=; smt(domE get_setE).
+    proc; if; auto=> />; rewrite dD_ll //=.
+    move=> &0 x x' x'_neq_x x_in_m x'_in_m x_coll_x' x0_notin_m v _ _.
+    by exists x x'=> />; rewrite !mem_set x_in_m x'_in_m /= !get_set_neqE 1,2:/#.
   inline *; auto=> />; split=> [|_].
   + by rewrite no_collision=> x x'; rewrite mem_empty.
   move=> /> rL rR DL b mL DR mR [-> //| /#].
@@ -583,15 +586,24 @@ section CollisionProbability.
   proc; inline*; wp.
   call (_: ={PRFi.m} /\
            size Sample.l{1} = card (fdom PRFi.m){2} /\
-           (forall x, mem (frng PRFi.m) x <=> mem Sample.l x){1} /\
+           (forall x, rng PRFi.m x <=> mem Sample.l x){1} /\
            (collision PRFi.m{2} <=> !uniq Sample.l{1})).
   + proc; inline*.
     if => //=.
     auto => /> &1 &2 h1 h2 h3 h4 r _.
-    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4.
-    split; 1:smt(). 
-    split; smt(get_setE mem_frng rngE collision_add).    
-  auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
+    rewrite fdom_set fcardUI_indep 2:fcard1; 1:by rewrite fsetI1 mem_fdom h4.
+    split; 1:smt().
+    split.
+    + move=> v; rewrite -h2 !rngE /=; split.
+      + move=> [] x0; rewrite get_setE; case: (x0 = x{2})=> /> _ m_x0.
+        by right; exists x0.
+      + case=> />.
+        + by exists x{2}; rewrite get_set_sameE.
+        + move=> x0 m_x0; exists x0; rewrite get_set_neqE //.
+          rewrite domE in h4; rewrite -negP=> <<-.
+          by move: h4; rewrite m_x0.
+    + smt(collision_add).
+  by auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
   qed.
 
   local hoare IND_bounded : IND(PRFi,D).main : true ==> card (fdom PRFi.m) <= q.

@@ -965,7 +965,8 @@ lemma summable_inj (h : 'a -> 'b) (s : 'b -> real) :
   injective h => summable s => summable (s \o h).
 proof.
 move => inj_h [M] sum_s; exists M => J uniq_J. 
-have R := sum_s (map h J) _; 1: rewrite map_inj_in_uniq /#.
+have R := sum_s (map h J) _.
++ by rewrite map_inj_in_uniq=> // x y _ _ /inj_h.
 apply (ler_trans _ _ R) => {R}; rewrite big_map /(\o)/= big_mkcond.
 exact Bigreal.ler_sum.
 qed.
