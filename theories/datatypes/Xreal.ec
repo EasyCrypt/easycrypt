@@ -64,11 +64,22 @@ theory Rp.
 
 subtype realp = { x : real | 0.0 <= x }
   rename "of_real", "to_real".
-
 realize inhabited by exists 0%r.
 
 abbrev (%r) = to_real.
 abbrev (%rp) = of_reald.
+
+lemma of_realKd_ge0 (x : real): 0%r <= x => x%rp%r = x.
+proof. smt(of_realdK to_realP). qed.
+
+lemma of_reald_pinj (x y:real):
+  0%r <= x => 0%r <= y => x%rp = y%rp => x = y.
+proof.
+move=> ge0_x ge0_y.
+move: (of_realP x); rewrite ge0_x=> /= - [] xp [] xpP <-.
+move: (of_realP y); rewrite ge0_y=> /= - [] yp [] ypP <-.
+by rewrite !to_realKd.
+qed.
 
 theory IntNotation.
   abbrev (%rp) (n:int) = n%r%rp.
@@ -99,13 +110,70 @@ abbrev (/) (x y : realp) : realp = x * inv y.
 abbrev (<=) (x y : realp) = x%r <= y%r.
 abbrev (<) (x y : realp)  = x%r < y%r.
 
+lemma addrpA: associative Rp.(+).
+proof.
+move=> x y z; rewrite /(+).
+congr; rewrite !of_realKd_ge0 ?addr_ge0 //.
+exact: RField.addrA.
+qed.
+
+lemma addrpC: commutative Rp.(+).
+proof.
+move=> x y; rewrite /(+).
+by congr; exact: RField.addrC.
+qed.
+
+lemma add0rp: left_id 0%rp (+).
+proof. done. qed.
+
+lemma mulrpA: associative Rp.( * ).
+proof.
+move=> x y z; rewrite /( * ).
+congr; rewrite !of_realKd_ge0 ?mulr_ge0 //.
+exact: RField.mulrA.
+qed.
+
+lemma mulrpC: commutative Rp.( * ).
+proof.
+move=> x y; rewrite /( * ).
+by congr; exact: RField.mulrC.
+qed.
+
+lemma mul1rp: left_id 1%rp Rp.( * ).
+proof. done. qed.
+
+lemma one_neq0_rp: 1%rp <> 0%rp.
+proof. by rewrite -negP=> eq_10; move: (of_reald_pinj 1%r 0%r _ _). qed.
+
+lemma mulrpDl: left_distributive Rp.( * ) Rp.(+).
+proof.
+move=> x y z; rewrite /(+) /( * ).
+congr; rewrite !of_realKd_ge0 ?(addr_ge0, mulr_ge0) //.
+by rewrite RField.mulrDl.
+qed.
+
+lemma addrpI: right_injective Rp.(+).
+proof.
+move=> x y y'; rewrite /(+)=> /(congr1 to_real).
+rewrite !of_realKd_ge0 ?addr_ge0 //.
+by move=> /RField.addrI/to_real_inj.
+qed.
 clone include MonoidDI with
    type t  <- realp,
    op zero <- of_reald 0.0,
    op MulMonoid.one  <- of_reald 1.0,
    op ( + ) <- Rp.( + ),
-   op ( * ) <- Rp.( * )
-proof * by smt(of_realdK to_realP to_real_inj).
+   op ( * ) <- Rp.( * ),
+   lemma Axioms.addmA <- addrpA,
+   lemma Axioms.addmC <- addrpC,
+   lemma Axioms.add0m <- add0rp,
+   lemma MulMonoid.Axioms.mulmA <- mulrpA,
+   lemma MulMonoid.Axioms.mulmC <- mulrpC,
+   lemma MulMonoid.Axioms.mul1m <- mul1rp,
+   lemma one_neq0 <- one_neq0_rp,
+   lemma mulmDl <- mulrpDl,
+   lemma addmI <- addrpI
+proof *.
 
 lemma to_realD (x y:realp) : (x + y)%r = x%r + y%r.
 proof. smt (of_realdK to_realP). qed.
@@ -250,7 +318,7 @@ realize MulMonoid.Axioms.mulmA by move=> [x|] [y|] [z|] //=; apply Rp.MulMonoid.
 realize MulMonoid.Axioms.mulmC by move=> [x|] [y|] //=; apply Rp.MulMonoid.mulmC.
 realize MulMonoid.Axioms.mul1m by move=> [x|] //=; apply Rp.MulMonoid.mul0m.
 realize one_neq0 by apply/negP => /(congr1 to_real).
-realize mulmDl by move=> [x|] [y|] [z|] //=; apply Rp.mulmDl.
+realize mulmDl by move=> [x|] [y|] [z|] //=; apply Rp.mulrpDl.
 
 (* -------------------------------------------------------------- *)
 lemma xaddxoo x : x + oo = oo.
@@ -666,8 +734,9 @@ proof.
   rewrite /psuminf => h hg.
   case: (summable (to_real g)) => // hgs.
   have h1 : forall (x : 'a), 0%r <= to_real f x && to_real f x <= to_real g x by smt(Rp.to_realP).
-  have -> /= := summable_le_pos (to_real f) (to_real g) hgs h1. 
-  have /# := ler_sum_pos (to_real f) (to_real g) h1 hgs.
+  have -> /= := summable_le_pos (to_real f) (to_real g) hgs h1.
+  have:= ler_sum_pos (to_real f) (to_real g) h1 hgs.
+  exact: le_pos.
 qed.
 
 lemma eq_Ep ['a] (d : 'a distr) (f g : 'a -> xreal) :
@@ -946,7 +1015,7 @@ proof. by move=> h;apply xle_cxr => />. qed.
 
 (* TODO: move this *)
 lemma Rp_to_real_eq (x y : realp) : (x = y) <=> (to_real x = to_real y).
-proof. smt(to_realKd). qed.
+proof. by split=> [/>|/to_real_inj]. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma Ep_cxr (d:'a distr) (b:'a -> bool) (f:'a -> xreal) : 

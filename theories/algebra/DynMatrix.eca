@@ -73,7 +73,8 @@ lemma offunvK pv: tofunv (offunv pv) = vclamp pv.
 proof. by rewrite /tofunv /offunv eqv_repr vclamp_idemp. qed.
 
 lemma vectorW (P : vector -> bool): 
-  (forall pv, P (offunv pv)) => forall v, P v by smt(tofunvK).
+  (forall pv, P (offunv pv)) => forall v, P v.
+proof. by move=> P_pv v; rewrite -tofunvK; apply: P_pv. qed.
 
 (* Dimension of the vector *)
 op size v = (tofunv v).`2.
@@ -593,8 +594,10 @@ qed.
 lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d (size v)) v =
   BRM.bigi predT (fun i => mu1 d v.[i]) 0 (size v).
 proof.
-rewrite -{2}[v]tolistK dmapE /(\o) /pred1. 
-rewrite (@mu_eq _ _ (pred1 (tolist v))); 1: smt(oflist_inj).
+rewrite -{2}[v]tolistK dmapE /(\o) /pred1.
+rewrite (@mu_eq _ _ (pred1 (tolist v))).
++ move=> x; rewrite eq_iff /pred1 /=; split=> />.
+  exact: oflist_inj.
 rewrite dlist1E 1:/# size_tolist max0size /=.
 by rewrite BRM.big_mapT /(\o) &BRM.eq_big.
 qed.
@@ -694,7 +697,8 @@ proof. by rewrite /tofunm /offunm eqv_repr. qed.
 hint simplify offunmK.
 
 lemma matrixW (P : matrix -> bool) : (forall pm, P (offunm pm)) =>
-  forall m, P m by smt(tofunmK).
+  forall m, P m.
+proof. by move=> P_pm m; rewrite -tofunmK; exact: P_pm. qed.
 
 (* Number of rows and columns of matrices *)
 op rows m = (tofunm m).`2.
@@ -1451,16 +1455,17 @@ qed.
 lemma catmrA (m1 m2 m3: matrix): ((m1 || m2) || m3) = (m1 || (m2 || m3)).
 proof. 
 rewrite eq_matrixP. 
-split => [| i j bound]; 1: smt(size_catmr).
+split => [| i j bound]; 1:smt(size_catmr rows_catmr cols_catmr).
 rewrite 4!get_catmr cols_catmr // addrA. 
-algebra.
+by algebra.
 qed.
 
 lemma catmrDr (m1 m2 m3: matrix): m1 * (m2 || m3) = ((m1 * m2) || (m1 * m3)).
 proof.
 rewrite eq_matrixP.
 rewrite rows_mulmx cols_mulmx cols_catmr.
-split => [| i j bound]; 1: smt(size_mulmx size_catmr).
+split => [| i j bound].
++ by rewrite !size_catmr !rows_mulmx !cols_mulmx /#.
 rewrite get_catmr 3!get_mulmx. 
 case (j < cols m2) => bound2.
 - rewrite [col m3 _]col0E 1:/# dotpv0 addr0 !dotpE 2!size_col rows_catmr.
@@ -1667,7 +1672,9 @@ case (j < n) => j_bound.
   + smt(size_catmr size_subm).
   by rewrite addr0.
 - rewrite getm0E; 1: smt(size_catmr size_subm).
-  rewrite add0r get_subm; smt(size_catmr size_subm).
+  rewrite add0r get_subm; [3:smt()].
+  + smt(rows_catmr rows_subm).
+  + smt(cols_catmr cols_subm).
 qed.
 
 lemma subm_colmx (m: matrix) l : 
@@ -1908,7 +1915,8 @@ move => r_ge0 c_ge0; split => [m_supp|]; last first.
 - case => -[r_m c_m] m_d; rewrite /support -r_m -c_m dmatrix1E.
   apply prodr_gt0_seq => i i_row _ /=.
   by apply prodr_gt0_seq => j j_col _ /=; apply m_d; smt(mem_iota).
-have [r_m c_m] : size m = (r,c) by smt(size_dmatrix). 
+have [r_m c_m] : size m = (r,c).
++ exact: (size_dmatrix d).
 split => [//|i j range_ij]; move: m_supp. 
 rewrite -r_m -c_m /support dmatrix1E => gt0_big.
 pose G i0 := (fun (j0 : int) => mu1 d m.[i0, j0]).

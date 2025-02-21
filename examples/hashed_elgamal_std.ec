@@ -192,7 +192,7 @@ section Security.
             - Pr[ES1(ESAdv(A)).main() @ &m : res]|.
   proof.
   rewrite (cpa_ddh0 &m) (ddh1_es1 &m) (es0_Gb &m) (Gb_half &m).
-  smt(@Real).
+  smt(StdOrder.RealOrder.ler_dist_add).
   qed.
 end section Security.
 
