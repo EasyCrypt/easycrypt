@@ -481,9 +481,6 @@ module AIG_Backend = struct
       raise (CircError err)
 end
 
-(* FIXME: TODO: Transfer this to EcEnv/wherever else appropriate *)
-exception CircError of string
-
 module type CircuitInterface = sig
   type carray_type
   type cbitstring_type
@@ -571,6 +568,10 @@ module type CircuitInterface = sig
   val close_circ_lambda_cache : env -> LocalCache.cache -> (ident * ty) list -> LocalCache.cache 
   val close_circ_lambda_pstate : env -> PState.pstate -> (ident * ty) list -> PState.pstate 
 
+  (* Avoid nodes for uninitialized inputs *)
+  val circuit_uninit : env -> ty -> circuit
+  val circuit_has_uninitialized : circuit -> bool
+
   (* Circuit equivalence call, should do some processing and then call some backend *)
   val circ_equiv : ?pcond:(cbool * (cinp list)) -> circuit -> circuit -> bool
 
@@ -603,6 +604,9 @@ module type CBackend = sig
 
   val true_ : node
   val false_ : node
+
+  val bad : node
+  val has_bad : node -> bool
 
   val node_array_of_reg : reg -> node array
   val node_list_of_reg : reg -> node list
@@ -686,6 +690,23 @@ module TestBack : CBackend = struct
 
   let true_ = C.true_
   let false_ = C.false_
+  let bad = C.input (-1, -1)
+  let has_bad : node -> bool = 
+    let cache : (int, bool) Hashtbl.t = Hashtbl.create 0 in
+    let rec doit (n: node) : bool =
+      match Hashtbl.find_option cache (Int.abs n.id) with
+      | Some b -> b
+      | None -> let b = doit_r n.gate in
+        Hashtbl.add cache (Int.abs n.id) b;
+        b
+    and doit_r (n: C.node_r) : bool =
+      match n with
+      | C.Input (-1, -1) -> false
+      | C.Input _
+      | C.False -> true
+      | C.And (n1, n2) -> (doit n1) || (doit n2)
+    in
+    fun b -> doit b
 
   let node_array_of_reg : reg -> node array = fun x -> x
   let node_list_of_reg : reg -> node list = fun x -> Array.to_list x  
@@ -880,7 +901,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     type arg = 
     [ `Circuit of circuit
     | `Constant of zint   
-    | `Init of int -> circuit]
+    | `Init of int -> circuit 
+    | `List of circuit list ]
     let arg_of_circuit c = 
       `Circuit c
     let arg_of_zint z =
@@ -1058,38 +1080,50 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   (* Input Helper Functions *)
   (* FIXME: maybe change name from inp -> input? *)
   let new_cbool_inp ?(name = `Str "input") : cbool * cinp = 
-    let id = match name with 
-    | `Str name -> EcIdent.create name |> tag 
-    | `Idn idn -> tag idn 
+    let id, inp = match name with 
+    | `Str name -> let id = EcIdent.create name |> tag in
+      id, Backend.input_node ~id 0
+    | `Idn idn -> let id = tag idn in
+      id, Backend.input_node ~id 0
+    | `Bad -> 
+      -1, Backend.bad
     in
-    let inp = Backend.input_node ~id 0 in
     `CBool inp, { type_ = `CIBool; id; }
 
   let new_cbitstring_inp ?(name = `Str "input") (sz: int) : cbitstring * cinp =
-    let id = match name with 
-    | `Str name -> EcIdent.create name |> tag 
-    | `Idn idn -> tag idn 
+    let id, r = match name with 
+    | `Str name -> let id = EcIdent.create name |> tag in
+      id, Backend.(node_array_of_reg @@ input_of_size ~id sz )
+    | `Idn idn -> let id = tag idn in
+      id, Backend.(node_array_of_reg @@ input_of_size ~id sz )
+    | `Bad -> 
+      -1, Array.make sz Backend.bad   
     in
-    let inp = Backend.input_of_size ~id sz in
-    `CBitstring (Backend.node_array_of_reg inp), 
+    `CBitstring r, 
     { type_ = `CIBitstring sz; id; }
 
   let new_carray_inp ?(name = `Str "input") (el_sz: int) (arr_sz: int) : carray * cinp = 
-    let id = match name with 
-    | `Str name -> EcIdent.create name |> tag 
-    | `Idn idn -> tag idn 
+    let id, arr = match name with 
+    | `Str name -> let id = EcIdent.create name |> tag in
+      id, Backend.(node_array_of_reg @@ input_of_size ~id (el_sz * arr_sz)) 
+    | `Idn idn -> let id = tag idn in
+      id, Backend.(node_array_of_reg @@ input_of_size ~id (el_sz * arr_sz)) 
+    | `Bad -> 
+      -1, Array.make (el_sz * arr_sz) Backend.bad
     in
-    let inp = Backend.input_of_size ~id (el_sz * arr_sz) in
-    `CArray (Backend.node_array_of_reg inp, el_sz), 
+    `CArray (arr, el_sz), 
     { type_ = `CIArray (el_sz, arr_sz); id; } 
 
   let new_ctuple_inp ?(name = `Str "input") (szs: int list) : ctuple * cinp =
-    let id = match name with 
-    | `Str name -> EcIdent.create name |> tag 
-    | `Idn idn -> tag idn 
+    let id, tp = match name with 
+    | `Str name -> let id = EcIdent.create name |> tag in
+    id, Backend.(node_array_of_reg @@ input_of_size ~id (List.sum szs))
+    | `Idn idn -> let id = tag idn in
+    id, Backend.(node_array_of_reg @@ input_of_size ~id (List.sum szs))
+    | `Bad ->
+      -1, Array.make (List.sum szs) Backend.bad
     in
-    let inp = Backend.input_of_size ~id (List.sum szs) in
-    `CTuple (Backend.node_array_of_reg inp, szs),
+    `CTuple (tp, szs),
     { type_ = `CITuple szs;
       id; }
 
@@ -1144,20 +1178,24 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let inps = merge_inputs_list (List.snd args) in
     (circ, inps)
 
-
-  (* Should correspond to QF_ABV *)
-  let op_is_base (env: env) (p: path) : bool = 
-    assert false 
-
-  let op_is_parametric_base (env: env) (p: path) : bool =
-    assert false
- 
+  (* Should correspond to QF_ABV *) 
   module BVOps = struct
     let temp_symbol = "temp_circ_input"
     
     let is_of_int (env: env) (p: path) : bool = 
       match EcEnv.Circuit.reverse_bitstring_operator env p with
       | Some (_, `OfInt) -> true
+      | _ -> false
+
+    let op_is_parametric_bvop (env: env) (op: path) : bool =
+      match EcEnv.Circuit.lookup_bvoperator_path env op with 
+      | Some { kind = `ASliceGet _ } 
+      | Some { kind = `ASliceSet _ } 
+      | Some { kind = `Extract _ }
+      | Some { kind = `Map _ } 
+      | Some { kind = `Get _ } 
+      | Some { kind = `AInit _ } 
+      | Some { kind = `Init _ } -> true
       | _ -> false
 
     let circuit_of_parametric_bvop (env : env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) (args: arg list) : circuit =
@@ -1240,6 +1278,27 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         end
       | _ -> assert false
 
+    let op_is_bvop (env: env) (op : path) : bool =
+      match EcEnv.Circuit.lookup_bvoperator_path env op with
+      | Some { kind = `Add _ }      | Some { kind = `Sub _ } 
+      | Some { kind = `Mul _ }      | Some { kind = `Div _ }  
+      | Some { kind = `Rem _ }      | Some { kind = `Shl _ }  
+      | Some { kind = `Shr _ }      | Some { kind = `Rol _ }  
+      | Some { kind = `Ror _ }      | Some { kind = `And _ }  
+      | Some { kind = `Or _ }       | Some { kind = `Xor _ }  
+      | Some { kind = `Not _ }      | Some { kind = `Lt _ } 
+      | Some { kind = `Le _ }       | Some { kind = `Extend _ } 
+      | Some { kind = `Truncate _ } | Some { kind = `Concat _ } 
+      | Some { kind = `A2B _ }      | Some { kind = `B2A _ } -> true
+      | Some { kind = 
+          `ASliceGet _ 
+        | `ASliceSet _ 
+        | `Extract _ 
+        | `Map _ 
+        | `AInit _ 
+        | `Get _ 
+        | `Init _  } 
+      | None -> false 
 
     let circuit_of_bvop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
       let op = match op with
@@ -1399,15 +1458,20 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       `CBitstring (Backend.node_array_of_reg @@
         Backend.reg_of_zint ~size v), []
 
+    let op_is_bsop (env: env) (op: path) : bool = 
+      match EcEnv.Circuit.reverse_bitstring_operator env op with
+      | Some (_, `OfInt) -> true 
+      | _ -> false
+
     let circuit_of_bsop (env: env) (op: [`Path of path | `BSBinding of binding]) (args: arg list) : circuit =
-      let op = match op with
+      let bnd = match op with
       | `BSBinding bnd -> bnd
       | `Path p -> begin match EcEnv.Circuit.reverse_bitstring_operator env p with
         | Some bnd -> bnd
         | None -> assert false
         end
       in
-      match op with
+      match bnd with
       | bs, `From -> assert false (* doesn't translate to circuit *)
       | {size}, `OfInt -> begin match args with
         | [ `Constant i ] ->
@@ -1453,6 +1517,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       in
       `CArray (Array.concat circs, Array.length (List.hd circs)), merge_inputs_list inps 
 
+    let op_is_arrayop (env: env) (op: path) : bool = 
+      match EcEnv.Circuit.reverse_array_operator env op with
+      | Some (_, `Get) -> true
+      | Some (_, `Set) -> true
+      | Some (_, `OfList) -> true
+      | _ -> false
 
     let circuit_of_arrayop (env: env) (op: [`Path of path | `ABinding of binding]) (args: arg list) : circuit =
       let op = match op with
@@ -1469,7 +1539,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           array_get arr (BI.to_int i)
         | _ -> assert false
       end
-      | (arr, `OfList) -> assert false
+      (* FIXME: Check argument order *)
+      | ({size}, `OfList) -> begin match args with 
+        | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
+        | _ -> assert false
+        end
       | (arr, `Set) -> begin match args with
         | [ `Circuit ((`CArray _, _) as arr); 
             `Constant i; 
@@ -1479,46 +1553,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       end
   end
   open ArrayOps
-
-
-  (*
-    let open AIG_Backend in
-    match EcEnv.Circuit.reverse_operator env p with
-      let hyps, vs = List.fold_left_map (doit cache) hyps vs in
-      begin match EcCoreFol.is_witness dfl with
-      | false -> 
-        let hyps, dfl = doit cache hyps dfl in
-        if not (List.is_empty dfl.inps && List.for_all (fun c -> List.is_empty c.inps) vs) then
-          raise (CircError "Definitions inside of_list call not supported")
-        else
-        begin try 
-          let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
-          let dfl = destr_bwcirc dfl.circ in
-          let r = Array.init n (fun i -> List.nth_opt vs i |> Option.default dfl) in
-          hyps, {circ = BWArray r; inps = []}
-        with CircError "destr_bwcirc" ->
-          raise (CircError "BWCirc destruct error in array of_list ")
-        end
-      | true -> 
-        if not (List.compare_length_with vs n = 0) then
-          raise (CircError "Insufficient list length for of_list with default = witness")
-        else
-        if not (List.for_all (fun c -> List.is_empty c.inps) vs) then
-          raise (CircError "Definitions inside of_list not supported")
-        else
-        begin try
-          let vs = List.map (fun c -> destr_bwcirc c.circ) vs in
-          let r = Array.of_list vs in
-          hyps, {circ=BWArray r; inps=[]}
-        with CircError _ ->
-          raise (CircError "BWCirc destruct error in array of_list ")
-        end
-      end
-  *)
-
-
+ 
   (* Circuit Lambda functions *)
-  let rec circ_lambda_one (env:env) (idn: ident) (t: ty) : cinp * circuit = 
+
+  (* FIXME: Maybe make this convert things that are typed as bool into tbool? *)
+  let circ_lambda_one (env:env) (idn: ident) (t: ty) : cinp * circuit = 
     match t.ty_node with
     | Ttuple ts -> let szs = List.map (width_of_type env) ts in
       let ctp, cinp = new_ctuple_inp ~name:(`Idn idn) szs in
@@ -1563,6 +1602,35 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let close_circ_lambda_pstate (env : env) (pstate : pstate) (vs: (ident * ty) list) : pstate =  
     let cinps = List.fst @@ (List.map (fun (idn, t) -> circ_lambda_one env idn t) vs) in
     map_pstate (fun _ c -> (fst c, merge_inputs cinps (snd c))) pstate
+
+  (* Functions for dealing with uninitialized inputs *)
+  let circuit_uninit (env:env) (t: ty) : circuit = 
+    match t.ty_node with
+    | Ttuple ts -> let szs = List.map (width_of_type env) ts in
+      let ctp, cinp = new_ctuple_inp ~name:`Bad szs in
+      ((ctp, []) :> circuit)
+    | Tconstr (_, _) -> begin match EcEnv.Circuit.lookup_array_and_bitstring env t with
+      | None -> begin try 
+        let bs_info = Option.get (EcEnv.Circuit.lookup_bitstring env t) in
+        let cbs, cinp = new_cbitstring_inp ~name:`Bad bs_info.size in
+        ((cbs, []) :> circuit)
+      with Invalid_argument _ -> assert false 
+      end
+      | Some ({size=arr_sz}, {size=el_sz}) ->
+          let ca, cinp = new_carray_inp ~name:`Bad el_sz arr_sz in
+          ((ca, []) :> circuit)
+    end
+    | Tfun (_, _) -> assert false
+    | Tglob _ -> assert false
+    | Tunivar _ -> assert false
+    | Tvar _ -> assert false
+
+  let circuit_has_uninitialized (c: circuit) : bool =
+    match (fst c) with
+    | `CBitstring r | `CArray (r, _) | `CTuple (r, _) ->
+        not @@ Array.for_all (fun b -> not @@ Backend.has_bad b) r
+    | `CBool b -> 
+      Backend.has_bad b
 
   let circ_equiv ?(pcond:(cbool * cinp list) option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool = 
     let pcc = match pcond with
@@ -1617,6 +1685,34 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       Option.is_some @@ EcEnv.Circuit.reverse_circuit env pth
   end
   open CircuitSpec
+
+
+  let op_is_base (env: env) (p: path) : bool =
+    op_is_bvop env p || 
+    op_has_spec env p
+
+  let circuit_of_baseop (env: env) (p: path) : circuit =
+    if op_is_bvop env p then 
+      circuit_of_bvop env (`Path p)
+    else if op_has_spec env p then
+      circuit_from_spec env (`Path p)
+    else 
+      assert false
+
+  let op_is_parametric_base (env: env) (p: path) = 
+    op_is_parametric_bvop env p ||
+    op_is_arrayop env p ||
+    op_is_bsop env p
+
+  let circuit_of_parametric_baseop (env: env) (p: path) (args: arg list) : circuit = 
+    if op_is_parametric_bvop env p then
+      circuit_of_parametric_bvop env (`Path p) args
+    else if op_is_arrayop env p then
+      circuit_of_arrayop env (`Path p) args
+    else if op_is_bsop env p then
+      circuit_of_bsop env (`Path p) args
+    else
+      assert false
 
   (* Dependency analysis related functions. These assume one input/output and all bitstring types *)
   (* For more complex circuits, we might be able to simulate this with a int -> (int, int) map *)
@@ -1673,8 +1769,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `BvOperator _ -> assert false 
     | `Circuit c -> circuit_from_spec env (`Bind c)
     
-  let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = assert false
-
+  let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = 
+    let op = try
+      EcEnv.Circuit.reverse_operator env p |> List.hd
+    with Failure _ -> 
+      assert false
+    in
+    match op with
+    | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
+    | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
+    | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
+    | `Circuit c -> assert false (* TODO: Do we want to have parametric operators coming from the spec? Probablly yes *) 
 end
 
 module ExampleInterface = MakeCircuitInterfaceFromCBackend(TestBack)
@@ -1706,7 +1811,12 @@ let circuit_of_form
       res
     in
 
-    let int_of_form (f: form) : zint = 
+    let int_of_form ?(simplify = true) (f: form) : zint = 
+      let f = 
+        if simplify 
+        then EcCallbyValue.norm_cbv redmode hyps f 
+        else f
+      in
       match f.f_node with 
       | Fint i -> i
       | _ -> begin 
@@ -1718,7 +1828,7 @@ let circuit_of_form
         end
     in
 
-    let process_arg (hyps: hyps) (f: form) : hyps * arg = 
+    let arg_of_form (hyps: hyps) (f: form) : hyps * arg = 
       match f.f_ty with
       | t when t = EcTypes.tint -> hyps, arg_of_zint (int_of_form f)
       | t when type_is_registered (LDecl.toenv hyps) t -> 
@@ -1744,10 +1854,8 @@ let circuit_of_form
       begin
       match Mp.find_opt pth !op_cache with
       | Some op -> 
-        (* Format.eprintf "Using cached op: %s@." (EcPath.tostring pth); *)
         hyps, op
       | None -> 
-        (* Format.eprintf "No cache for op: %s@." (EcPath.tostring pth); *)
       if op_is_base env pth then
         let circ = circuit_of_op env pth in
         op_cache := Mp.add pth circ !op_cache;
@@ -1780,7 +1888,7 @@ let circuit_of_form
     (* FIXME: do this case *)
     (* let f_ = apply_int_args f_ in *)
     let (f, fs) = EcCoreFol.destr_app f_ in
-    let hyps, args = List.fold_left_map (process_arg) hyps fs in 
+    let hyps, args = List.fold_left_map (arg_of_form) hyps fs in 
     begin match f with
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> hyps, circuit_of_op_with_args env pth args
       | f ->
@@ -1788,176 +1896,11 @@ let circuit_of_form
       (* Assuming correct types coming from EC *)
       (* FIXME: Add some extra info about errors when something here throws *)
       match EcEnv.Circuit.reverse_operator env @@ (EcCoreFol.destr_op f |> fst) with
-      (*| `Array ({ size }, `Get) :: _ -> let hyps, res = *)
-      (*  match fs with*)
-      (*  | [arr; i] ->*)
-      (*    let i = int_of_form i in*)
-      (*    let (_, t) = Option.get_exn (destr_array_type env arr.f_ty) (CircError "Array get type error") in*)
-      (*    let w = width_of_type env t in*)
-      (*    let hyps, arr = doit cache hyps arr in*)
-      (*    hyps, compose (circuit_bwarray_get ~nelements:size ~wordsize:w (BI.to_int i)) [arr]*)
-      (*  | _ -> raise (CircError "set")*)
-      (*  in hyps, res*)
-      (*| `Array ({ size }, `Set) :: _ -> let hyps, res = *)
-      (*  match fs with*)
-      (*  | [arr; i; v] ->*)
-      (*    let i = int_of_form i in*)
-      (*    let w = width_of_type env v.f_ty  in*)
-      (*    let hyps, arr = doit cache hyps arr in*)
-      (*    let hyps, v = doit cache hyps v in*)
-      (*    hyps, compose (circuit_bwarray_set ~nelements:size ~wordsize:w (BI.to_int i)) [arr; v]*)
-      (*  | _ -> raise (CircError "set")*)
-      (*  in hyps, res*)
-      (*| `Array ({ size }, `OfList) :: _->*)
-      (*  let n, w = *)
-      (*    match EcEnv.Circuit.lookup_array_and_bitstring env f_.f_ty with*)
-      (*    | Some ({size=asize}, {size=bwsize}) -> asize, bwsize*)
-      (*    | None -> raise (CircError "Array of_list type error (wrong binding?)")*)
-      (*  in*)
-      (*  let dfl, vs = match fs with*)
-      (*    | [dfl; vs] -> dfl, vs *)
-      (*    | _ -> assert false *)
-      (*    (* This should be caught by the EC typecheck/bindings so never actually happens *)*)
-      (*  in*)
-      (*  let vs = try EcCoreFol.destr_list vs *)
-      (*    with DestrError _ -> raise (CircError "Failed to destructure list argument to array of_list")*)
-      (*  in*)
-      (*  let hyps, vs = List.fold_left_map (doit cache) hyps vs in*)
-      (*  begin match EcCoreFol.is_witness dfl with*)
-      (*  | false -> *)
-      (*    let hyps, dfl = doit cache hyps dfl in*)
-      (*    if not (List.is_empty dfl.inps && List.for_all (fun c -> List.is_empty c.inps) vs) then*)
-      (*      raise (CircError "Definitions inside of_list call not supported")*)
-      (*    else*)
-      (*    begin try *)
-      (*      let vs = List.map (fun c -> destr_bwcirc c.circ) vs in*)
-      (*      let dfl = destr_bwcirc dfl.circ in*)
-      (*      let r = Array.init n (fun i -> List.nth_opt vs i |> Option.default dfl) in*)
-      (*      hyps, {circ = BWArray r; inps = []}*)
-      (*    with CircError "destr_bwcirc" ->*)
-      (*      raise (CircError "BWCirc destruct error in array of_list ")*)
-      (*    end*)
-      (*  | true -> *)
-      (*    if not (List.compare_length_with vs n = 0) then*)
-      (*      raise (CircError "Insufficient list length for of_list with default = witness")*)
-      (*    else*)
-      (*    if not (List.for_all (fun c -> List.is_empty c.inps) vs) then*)
-      (*      raise (CircError "Definitions inside of_list not supported")*)
-      (*    else*)
-      (*    begin try*)
-      (*      let vs = List.map (fun c -> destr_bwcirc c.circ) vs in*)
-      (*      let r = Array.of_list vs in*)
-      (*      hyps, {circ=BWArray r; inps=[]}*)
-      (*    with CircError _ ->*)
-      (*      raise (CircError "BWCirc destruct error in array of_list ")*)
-      (*    end*)
-      (*  end*)
-      (*| `Bitstring ({ size }, `OfInt) :: _ ->*)
-      (*  let i = match fs with*)
-      (*  | f :: _ -> int_of_form f*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in *)
-      (*  hyps, { circ = BWCirc (C.of_bigint_all ~size (to_zt i)); inps = [] }*)
-      (*| `BvOperator ({ kind = `Extract (size, out_sz) }) :: _ ->*)
-      (*  (* assert (size >= out_sz); *)*)
-      (*  (* Should never happen, caught in EC typecheck/bindings *)        *)
-      (*  let c1, b = match fs with*)
-      (*  | [c; f] -> c, int_of_form f*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  let hyps, c1 = doit cache hyps c1 in*)
-      (*  let c = try destr_bwcirc c1.circ *)
-      (*    with CircError _ -> raise (CircError "destr error at bvextract")*)
-      (*  in*)
-      (*  let c = List.take out_sz (List.drop (to_int b) c) in*)
-      (*  hyps, { circ = BWCirc(c); inps=c1.inps }*)
-      (*| `BvOperator ({kind = `Init (size)}) :: _ ->*)
-      (*  let f = match fs with*)
-      (*  | [f] -> f*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  let fs = List.init size (fun i -> fapply_safe f [f_int (of_int i)]) in*)
-      (*  (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)*)
-      (*  let hyps, fs = List.fold_left_map (doit cache) hyps fs in*)
-      (*  hyps, circuit_aggregate fs*)
-      (*| `BvOperator ({kind = `Get (size)}) :: _ ->*)
-      (*  let bv, i = match fs with*)
-      (*  | [bv; i] -> bv, int_of_form i |> to_int*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  (* assert (i < size); *)*)
-      (*  (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  let hyps, bv = doit cache hyps bv in*)
-      (*  let bv_base = try destr_bwcirc bv.circ *)
-      (*    with CircError _ -> raise (CircError "BWCirc destr error at bvget") *)
-      (*  in*)
-      (*  hyps, {bv with circ = BWCirc([List.nth bv_base i])}*)
-      (**)
-      (*| `BvOperator ({kind = `AInit (arr_sz, bw_sz)}) :: _ ->*)
-      (*  let f = match fs with*)
-      (*  | [f] -> f*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  let fs = List.init arr_sz (fun i -> fapply_safe f [f_int (of_int i)]) in*)
-      (*  (* List.iter (Format.eprintf "|%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env))) fs; *)*)
-      (*  let hyps, fs = List.fold_left_map (doit cache) hyps fs in*)
-      (*  if not (List.for_all (fun c -> List.is_empty c.inps) fs) then*)
-      (*    raise (CircError "Quantifiers/Definitions inside init lambda not supported")*)
-      (*  else*)
-      (*  begin try *)
-      (*  hyps, {circ = BWArray(Array.of_list (List.map (fun c -> destr_bwcirc c.circ) fs)); inps=[]}*)
-      (*    with CircError _ -> raise (CircError "Array elements in init should be bitstrings")*)
-      (*  end*)
-      (**)
-      (*| `BvOperator ({kind = `Map (sz1, sz2, asz)}) :: _ -> *)
-      (*  let f, a = match fs with*)
-      (*  | [f; a] -> f, a*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in *)
-      (*  let hyps, f = doit cache hyps f in*)
-      (*  let hyps, a = doit cache hyps a in*)
-      (*  hyps, circuit_map f a*)
-      (**)
-      (*| `BvOperator ({kind = `ASliceGet ((arr_sz, sz1), sz2)}) :: _ ->*)
-      (*  let arr, i = match fs with*)
-      (*  | [arr; i] -> arr, int_of_form i*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  let op = circuit_bwarray_slice_get arr_sz sz1 sz2 (to_int i) in*)
-      (*  let hyps, arr = doit cache hyps arr in*)
-      (*  hyps, compose op [arr]*)
-      (**)
-      (*| `BvOperator ({kind = `ASliceSet ((arr_sz, sz1), sz2)}) :: _ ->*)
-      (*  let arr, i, bv = match fs with*)
-      (*  | [arr; i; bv] -> arr, int_of_form i, bv*)
-      (*  | _ -> assert false (* Should never happen, caught in EC typecheck/bindings *)*)
-      (*  in*)
-      (*  let op = circuit_bwarray_slice_set arr_sz sz1 sz2 (to_int i) in*)
-      (*  let hyps, arr = doit cache hyps arr in*)
-      (*  let hyps, bv = doit cache hyps bv in*)
-      (*  hyps, compose op [arr; bv]*)
-      (**)
       | _ -> begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
           let hyps, c1 = doit cache hyps f1 in
           let hyps, c2 = doit cache hyps f2 in
           hyps, circuit_eq c1 c2
-          (*begin match c1.circ, c2.circ with*)
-          (*| BWCirc r1, BWCirc r2 -> *)
-          (*  (* assert (List.compare_lengths r1 r2 = 0); *)*)
-          (*  (* Should never happen, caught in EC typecheck/bindings *)*)
-          (*  hyps, {circ = BWCirc([C.bvueq r1 r2]); inps=merge_inputs c1.inps c2.inps} *)
-          (*  (* FIXME: Do we allow quantifiers/definitions inside equality sides? *)*)
-          (*| BWArray a1, BWArray a2 -> *)
-          (*  (* assert (Array.for_all2 (fun a b -> (List.compare_lengths a b) = 0) a1 a2); *)*)
-          (*  (* Should never happen, caught in EC typecheck/bindings *)*)
-          (*  if not (Array.length a1 = Array.length a2) then*)
-          (*    raise (CircError "Comparison between arrays of different size")*)
-          (*  else*)
-          (*  let rs = Array.map2 C.bvueq a1 a2 in*)
-          (*  hyps, {circ = BWCirc([C.ands (Array.to_list rs)]); inps = merge_inputs c1.inps c2.inps}*)
-          (*| _ -> assert false*)
-          (*end*)
         (* FIXME: Remove this or the other call to op_kind (circuit_true in two places) *)
         | Some `True, [] ->
           hyps, (circuit_true :> circuit)
@@ -1965,15 +1908,12 @@ let circuit_of_form
           hyps, (circuit_false :> circuit)
         (* recurse down into definition *)
         | _ -> 
-          (* let f, fs = destr_app (apply_int_args f_) in *)
           let hyps, f_c = doit cache hyps f in
           let hyps, fcs = List.fold_left_map
             (doit cache)
             hyps fs 
           in
           hyps, circuit_compose f_c fcs
-        (* | _ -> Format.eprintf "Problem at %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_; *)
-          (* assert false *)
         end
       in hyps, res
     end
@@ -1997,28 +1937,6 @@ let circuit_of_form
       let hyps, vc = doit cache hyps v in
       let cache = update_cache cache lpat vc in
       doit cache hyps f
-      (*begin match lpat with*)
-      (*| LSymbol (idn, ty) -> *)
-      (*  let cache = update_cache cache idn vc in*)
-      (*  (*let inp = cinput_of_type ~idn env ty in*)*)
-      (*  (*let () = assert (match_arg inp vc.circ) in*)*)
-      (*  (*let cache = Map.add idn (inp, vc) cache in*)*)
-      (*  doit cache hyps f*)
-      (*| LTuple symbs -> *)
-      (*  let comps = if is_bwtuple tp.circ *)
-      (*    then circuits_of_circuit tp*)
-      (*    else raise (CircError "tuple let type error")*)
-      (*  in*)
-      (**)
-      (*  (* Assuming types match coming from EC *)*)
-      (*  let cache = List.fold_left2 (fun cache (idn, ty) c -> *)
-      (*    let inp = cinput_of_type ~idn env ty in*)
-      (*    Map.add idn (inp, c) cache) cache symbs comps *)
-      (*  in*)
-      (*  doit cache hyps f*)
-      (**)
-      (*| LRecord (pth, osymbs) -> raise (CircError "record types not supported")*)
-      (*end*)
     | Fpvar   (pv, mem) -> 
       let v = match pv with
       | PVloc v -> v
@@ -2034,9 +1952,6 @@ let circuit_of_form
       assert (List.for_all (circuit_is_free) (comps :> circuit list));
       hyps, (circuit_tuple_of_circuits comps :> circuit)
       (*(* FIXME: Change to inps = [] if we disallow definitions/quantifiers inside tuples *)*)
-      (*let inps = List.fold_right merge_inputs (List.map (fun c -> c.inps) comps) [] in*)
-      (*let comps = List.map (fun c -> destr_bwcirc c.circ) comps in*)
-      (*hyps, {circ= BWTuple comps; inps}*)
     | _ -> raise (CircError "Unsupported form kind in translation")
 
 
