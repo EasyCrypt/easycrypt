@@ -3249,7 +3249,7 @@ let pp_modsig ?(long=false) ppe fmt (p,ms) =
         Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
 
   Format.fprintf fmt
-    "@[<v>@[<hv 2>%amodule type %s%t@;<0 -2>@] = {@,  @[<v>%a@]@,}@]"
+    "@[<v>@[<hv 2>%amodule type %s%t@;<0 -2>@] = {@,  @[<v>%a@]@,}.@]"
     pp_long p
     (EcPath.basename p) pp
     (pp_list "@,@," (pp_sigitem (Some ms.mis_oinfos) ppe)) ms.mis_body
@@ -3257,7 +3257,7 @@ let pp_modsig ?(long=false) ppe fmt (p,ms) =
 (* Printing of a module signature with no restrictions. *)
 let pp_modsig_smpl ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.miss_params in
-  Format.fprintf fmt "@[<v>module type %s%t = {@,  @[<v>%a@]@,}@]"
+  Format.fprintf fmt "@[<v>module type %s%t = {@,  @[<v>%a@]@,}.@]"
     (EcPath.basename p) pp
     (pp_list "@,@," (pp_sigitem None ppe)) ms.miss_body
 
