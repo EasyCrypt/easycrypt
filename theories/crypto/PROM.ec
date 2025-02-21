@@ -287,12 +287,22 @@ fel 1 (fsize RO.m) (fun x => x%r * Pc) q (fcoll f RO.m)
 - inline*; auto; smt(fsize_empty mem_empty).
 - proc; inline*; (rcondt 2; first by auto); wp.
   rnd (fun r => exists u, u \in RO.m /\ f (oget RO.m.[u]) = f r).
-  skip => &hr; rewrite andaE => /> 3? I ?; split; 2: smt(get_setE).
-  apply mu_mem_le_fsize => u /I /(dmap_supp _ f) /fcollP /= /(_ x{hr}).
-  rewrite dmap1E. apply: StdOrder.RealOrder.ler_trans.
-  by apply mu_sub => /#.
+  auto=> /> &0 ge0_size_m ltq_size_m nocoll I x_notin_m; split=> [|_].
+  + apply mu_mem_le_fsize => u /I /(dmap_supp _ f) /fcollP /= /(_ x{0}).
+    rewrite dmap1E; apply: StdOrder.RealOrder.ler_trans.
+    by apply: mu_sub=> @/pred1 @/(\o) /> x ->.
+  move=> v _ i j; rewrite !mem_set.
+  move=> i_in_mVx j_in_mVx i_neq_j; rewrite !get_setE.
+  case: (i = x{0}); case: (j = x{0})=> />.
+  + by move=> _ coll_v; exists j=> /#.
+  + by move=> _ coll_v; exists i=> /#.
+  move=> j_neq_x i_neq_x eq_f.
+  move: nocoll=> /negb_exists /= /(_ i) /negb_exists /= /(_ j).
+  rewrite i_neq_j eq_f.
+  move: i_in_mVx; rewrite i_neq_x=> /= -> /=.
+  by move: j_in_mVx; rewrite j_neq_x=> /= -> /=.
 - move => c; proc; auto => />; smt(get_setE fsize_set).
-- move => b c. proc. by auto.
+- move => b c; proc; by auto.
 qed.
 
 end section Collision.
