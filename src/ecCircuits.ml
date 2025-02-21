@@ -47,215 +47,13 @@ let width_of_type (env: env) (t: ty) : int =
     | None -> let err = Format.asprintf "No bitvector binding for type %a@."
     (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
     raise (CircError err)
+  
+let destr_array_type (env: env) (t: ty) : (int * ty) option = 
+  match EcEnv.Circuit.lookup_array_and_bitstring env t with
+  | Some ({size}, {type_}) -> Some (size, EcTypes.tconstr type_ [])
+  | _ -> None
 
-module AIG_Backend = struct
-  type asize = { wordsize: int; nelements: width; }
-
-  type tpsize = { wordsizes : int list; npos : width; }
-
-  let size_of_asize (sz : asize) : int =
-    sz.wordsize * sz.nelements
-
-  let size_of_tpsize (sz : tpsize) : int =
-    List.sum sz.wordsizes
-
-
-  (* type deps = ((int * int) * int C.VarRange.t) list *)
-  (* Inputs to circuit functions: 
-     Either bitstring of fixed size
-     Or Array of fixed number of elements each of a fixed size *)
-  type cinput = 
-    (* Name of input + size *)
-    | BWInput of (ident * int)
-    (* Name of array + (array size x element size) *)
-    | BWAInput of (ident * asize)
-    (* Name of tuple, + (tuple size x element size) *)
-    | BWTInput of (ident * tpsize)
-
-  let asize_to_string (asize : asize) : string =
-    Format.sprintf "%d[%d]" asize.wordsize asize.nelements
-
-  let tpsize_to_string (tpsize : tpsize) : string =
-    match tpsize.wordsizes with
-    | [] -> "()"
-    | sz::szs ->
-      Format.asprintf "(%d%a)" sz (fun fmt szs -> List.iter (Format.fprintf fmt ", %d") szs) szs  
-
-  let cinput_to_string = function
-    | BWInput (idn, w) -> Format.sprintf "(%s(id=%d), %d)" (name idn) (tag idn) w
-    | BWAInput (idn, sz) -> Format.sprintf "(%s(id=%d), %s)" (name idn) (tag idn) (asize_to_string sz)
-    | BWTInput (idn, sz) -> Format.sprintf "(%s(id=%d), %s)" (name idn) (tag idn) (tpsize_to_string sz)
-
-  (* Checks whether inputs are the same up to renaming *)
-  let cinput_equiv (a: cinput) (b: cinput) : bool =
-    match a, b with
-    | BWInput (_, w1), BWInput (_, w2) -> w1 = w2 
-    | BWAInput (_, sz1), BWAInput (_, sz2) -> sz1 = sz2 
-    | BWTInput (_, sz1), BWTInput (_, sz2) -> 
-      sz1.npos = sz2.npos && 
-      (List.for_all2 (=) sz1.wordsizes sz2.wordsizes)
-    | _ -> false
-
-  let is_bwinput = function
-    | BWInput _ -> true
-    | _ -> false
-
-  let is_bwainput = function
-    | BWAInput _ -> true
-    | _ -> false
-
-  let destr_bwinput = function
-    | BWInput (idn, w) -> (idn, w)
-    | _ -> raise (CircError "destr_bwinput")
-
-  let destr_bwainput = function
-    | BWAInput (idn, sz) -> (idn, sz)
-    | _ -> raise (CircError "destr_bwainput")
-
-  let destr_tpinput = function
-    | BWTInput (idn, sz) -> (idn, sz)
-    | _ -> raise (CircError "destr_tpinput")
-
-  let bwinput_of_size (w : width) : cinput =
-    let name = "bw_input" in
-    BWInput (create name, w)
-
-  let bwainput_of_size ~(nelements : width) ~(wordsize : width) : cinput =
-    let name = "arr_input" in
-    BWAInput (create name, { nelements; wordsize; })
-
-  let bwtpinput_of_sizes ~(npos : width) ~(wordsizes : int list) : cinput =
-    let name = "tp_input" in
-    BWTInput (create name, { npos; wordsizes; })
-
-  (* # of total bits of input *)
-  let size_of_cinput = function
-    | BWInput (_, w) -> w
-    | BWAInput (_, sz) -> size_of_asize sz
-    | BWTInput (_, sz) -> size_of_tpsize sz
-
-  (* name of input *)
-  let ident_of_cinput = function
-    | BWInput (idn, _) -> idn
-    | BWAInput (idn, _) -> idn
-    | BWTInput (idn, _) -> idn
-
-  (* Base circuit, represents body of a circuit function *)
-  (* BWArray is homogeneous, BWTuple it not *)
-  type circ = 
-    | BWCirc of C.reg
-    | BWArray of C.reg array
-    | BWTuple of C.reg list
-
-  let is_bwcirc = function
-    | BWCirc _ -> true
-    | _ -> false
-
-  let is_bwarray = function
-    | BWArray _ -> true
-    | _ -> false
-
-  let is_bwtuple = function
-    | BWTuple _ -> true
-    | _ -> false
-
-  let destr_bwcirc = function
-    | BWCirc r -> r
-    | _ -> raise (CircError "destr_bwcirc")
-
-  let destr_bwarray = function
-    | BWArray a -> a
-    | _ -> raise (CircError "destr_bwarray")
-
-  let destr_bwtuple = function
-    | BWTuple tp -> tp
-    | _ -> raise (CircError "destr_bwtuple")
-
-  (* # of total bits of output *)
-  let size_of_circ = function
-    | BWCirc r -> List.length r
-    | BWArray a -> if Array.length a = 0 then 0 else
-      (Array.length a) * (List.length a.(0))
-    | BWTuple tp -> List.fold_left (+) 0 (List.map List.length tp)
-
-  (* Simple representation *)
-  let circ_to_string = function 
-    | BWCirc r -> Format.sprintf "BWCirc@%d" (List.length r)
-    | BWArray a -> Format.sprintf "BWArray[%d[%d]]" (a.(0) |> List.length) (Array.length a)
-    | BWTuple tp -> Format.asprintf "BWTuple(%a)" 
-      (fun fmt rs -> if List.is_empty rs then () 
-        else Format.fprintf fmt "%d" (List.hd rs); List.iter (Format.fprintf fmt ", %d") (List.tl rs)) 
-      (List.map (List.length) tp)
-
-  let circ_of_int (size: int) (z: zint) : circ =
-    BWCirc (C.of_bigint_all ~size (to_zt z))
-
-  let circ_array_of_ints (size: int) (zs: zint list) : circ = 
-    let cs = List.map (fun z -> C.of_bigint_all ~size (to_zt z)) zs in
-    BWArray (Array.of_list cs)
-
-  let circ_tuple_of_ints (size: int) (zs: zint list) : circ =
-    let cs = List.map (fun z -> C.of_bigint_all ~size (to_zt z)) zs in
-    BWTuple cs
-
-  (* Checks whether the output shapes are the same *)
-  let circ_shape_equal (c1: circ) (c2: circ) = 
-    match c1, c2 with
-    | BWArray r1, BWArray r2 -> 
-      Array.length r1 = Array.length r2 && 
-      (Array.length r1 = 0 || List.length r1.(0) = List.length r2.(0))
-    | BWCirc r1, BWCirc r2 -> List.compare_lengths r1 r2 = 0
-    | BWTuple tp1, BWTuple tp2 -> List.compare_lengths tp1 tp2 = 0 && List.for_all2 (fun a b -> List.compare_lengths a b = 0) tp1 tp2
-    | _ -> false
-
-  (* Circuit functions:
-      circ <- body with (input i) nodes for the inputs 
-      inps <- inputs to the function 
-  *)
-  type circuit = {
-    circ: circ;
-    inps: cinput list
-  }
-
-  (* Representation of body + inputs *)
-  let circuit_to_string (c: circuit) =
-    Format.sprintf "%s | %s" 
-      (circ_to_string c.circ)
-      (String.concat ", " (List.map cinput_to_string c.inps))
-
-  (* Takes a list of inputs and returns the identity function over those inputs *)
-  (* Useful for renaming or getting a given input shape for a circuit *)
-  let circ_ident (input: cinput) : circuit = 
-    match input with
-    | BWInput (idn, w) -> 
-      { circ = BWCirc (C.reg ~size:w ~name:(tag idn)); inps = [input]}
-    | BWAInput (idn, sz) -> 
-      let out = Array.init sz.nelements (fun ja ->
-        List.init sz.wordsize (fun j -> C.input (idn.id_tag, ja*sz.wordsize + j))) 
-      in
-      { circ = BWArray out; inps=[input]}
-    | BWTInput (idn, sz) ->
-      let out = List.fold_left_map 
-        (fun acc sz -> acc + sz, List.init sz (fun j -> C.input (idn.id_tag, acc + j))) 
-        0
-        sz.wordsizes
-        |> snd
-      in
-      {circ = BWTuple out; inps=[input]}
-
-
-  (* Checks whether the two circuits have the same inputs up to renaming *)
-  let input_shape_equal (f: circuit) (g: circuit) : bool = 
-    (List.compare_lengths f.inps g.inps = 0) && 
-    (List.for_all2 (cinput_equiv) (f.inps) (g.inps))
-
-  (* returns size of array and underlying element type if array type, otherwise None *)
-  let destr_array_type (env: env) (t: ty) : (int * ty) option = 
-    match EcEnv.Circuit.lookup_array_and_bitstring env t with
-    | Some ({size}, {type_}) -> Some (size, EcTypes.tconstr type_ [])
-    | _ -> None
-
-  let shape_of_array_type (env: env) (t: ty) : (int * int) = 
+let shape_of_array_type (env: env) (t: ty) : (int * int) = 
     match t.ty_node with
     | Tconstr (p, [et]) -> 
       begin match EcEnv.Circuit.lookup_array_path env p with
@@ -270,216 +68,30 @@ module AIG_Backend = struct
       (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in
       raise (CircError err)
 
-  (* Given an EC type with the correct bindings returns a circuit input
-     matching the shape of that type *)
-  let cinput_of_type ?(idn: ident option) (env: env) (t: ty) : cinput = 
-    let name = "from_type" in
-    let idn = match idn with
-    | Some idn -> idn
-    | None -> create name 
-    in
-    match EcEnv.Circuit.lookup_array_and_bitstring env t with
-    | None -> BWInput (idn, width_of_type env t)
-    | Some ({size=nelements}, {size=wordsize}) ->
-      BWAInput (idn, { nelements; wordsize })
-      
-  let compute ~(sign:bool) (f: circuit) (r: BI.zint list) : BI.zint = 
-    (* FIXME: can we remove the parenthesis around the try/with block? *)
-    (try
-      assert (List.compare_lengths f.inps r = 0)
-    with Assert_failure _ -> 
-      let err = Format.asprintf 
-      "Wrong # of arguments (%d provided, %d expected) for compute"
-      (List.length r)
-      (List.length f.inps)
-      in 
-      raise (CircError err));
-    let vs = List.map2 (fun inp r -> 
-      let _, size = destr_bwinput inp in
-      BWCirc(C.of_bigint_all ~size (BI.to_zt r))
-    ) f.inps r in
-    let apply _ _ = assert false in 
-    let res = apply f vs in
-    let res = destr_bwcirc res in 
-    let res = List.map (function | {C.gate = C.False; C.id = id} -> 
-      if id >= 0 then false
-      else true
-      | _ -> raise (CircError "Non-constant result in compute (not fully applied?)")
-    ) res in
-    (* conversion functions need to be reworked FIXME *)
-    if sign then 
-    C.sbigint_of_bools res |> BI.of_zt
-    else
-    C.ubigint_of_bools res |> BI.of_zt
+let specifications : (string, Lospecs.Ast.adef) Map.t Lazy.t =
+  Lazy.from_fun (fun () ->
+    let specs_avx2 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
+    let specs_avx2 = C.load_from_file ~filename:specs_avx2 in
+    let specs_armv7 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "armv7.spec" in
+    let specs_armv7 = C.load_from_file ~filename:specs_armv7 in
+    let specs = specs_armv7 @ specs_avx2 in
+    Map.of_seq (List.to_seq specs)
+  )
 
-    (* Given a list of inputs inp_i, returns a new input inp 
-     plus a list of circuit functions f_i such that 
-     f_i(inp) = inp_i (in shape) and all the f_i are independent *)
-  let bus_of_cinputs (inps: cinput list) : circ list * cinput =
-    let idn = create "bus" in
-    let bsize = List.map (size_of_cinput) inps |> List.sum in
-    let r = C.reg ~size:bsize ~name:(tag idn) in
-    let rec doit (r: C.reg) (cs: cinput list) : circ list =
-      match r, cs with
-      | [], [] -> []
-      | [], _ 
-      | _, [] -> assert false
-      | r, BWInput (_, w)::cs -> let r1, r2 = List.takedrop w r in
-        (BWCirc r1)::(doit r2 cs)
-      | r, BWAInput (_, sz)::cs -> let r1, r2 = List.takedrop (size_of_asize sz) r in
-        let r1 = List.chunkify sz.wordsize r1 |> Array.of_list in
-        (BWArray r1)::(doit r2 cs)
-      | r, BWTInput (_, sz)::cs ->
-        let r, tp = List.fold_left_map (fun r sz -> 
-          let comp, r = List.takedrop sz r in
-          r, comp
-        ) r sz.wordsizes
-        in
-        (BWTuple tp)::(doit r cs)
-    in
-    doit r inps, BWInput (idn, bsize)
+let get_specification_by_name (name : string) : Lospecs.Ast.adef option =
+  let lazy specifications = specifications in
+  Map.find_opt name specifications
 
-  (* Transforms the input for the circuit given into a big bitstring 
-     (by concat + flatten of the previous inputs) *)
-  let circuit_aggregate_inps (c: circuit) : circuit = 
-    match c.inps with
-    | [] -> c
-    | BWInput _ :: [] -> c
-    | inps -> 
-      let circs, inp = bus_of_cinputs inps in
-      let apply _ _ = assert false in 
-      {circ=apply c circs; inps=[inp]}
-      
-  let circuit_tuple_proj (c: circuit) (i: int) : circuit = 
-    match c.circ with
-    | BWTuple tp -> begin try
-      {c with circ=BWCirc (List.at tp i)}
-      with Invalid_argument e -> 
-        let err = Format.sprintf "Projection at component %d outside tuple size (%d)@." i (List.length tp) in
-        raise (CircError err)
-      end
-    | _ -> raise (CircError "Projection on non-tuple type")
+let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
+  (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
+  match EcEnv.Circuit.lookup_circuit_path env p with
+  | Some circuit ->
+    (fun regs -> C.circuit_of_specification regs circuit) 
+  | None -> let err = Format.sprintf "No operator for path: %s@."
+    (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b) in
+    raise (CircError err)
 
-  let circuit_ueq (c: circuit) (d: circuit) : circuit =
-    match c.circ, d.circ with
-    | BWCirc r1, BWCirc r2 -> {circ= BWCirc[C.bvueq r1 r2]; inps=c.inps @ d.inps}
-    | BWArray a1, BWArray a2 -> let elems = Array.map2 C.bvueq a1 a2 in
-      {circ= BWCirc[C.ands (Array.to_list elems)]; inps=c.inps @ d.inps}
-    | BWTuple t1, BWTuple t2 -> let elems = List.map2 C.bvueq t1 t2 in
-      {circ= BWCirc[C.ands elems]; inps=c.inps @ d.inps}
-    | _ -> raise (CircError "Mismatched types for ueq")
-  
-  
-  let circuit_split ?(perm: (int -> int) option) (f: circuit) (lane_in_w: int) (lane_out_w: int) : circuit list =
-    (* FIXME: Allow bdep for multiple inputs? *)
-    if (List.length f.inps <> 1) 
-    then raise (CircError "Multi input circuit split not supported")
-    else
 
-    try
-      let r = destr_bwcirc f.circ in
-      let inp_t, inp_w = List.hd f.inps |> destr_bwinput in 
-      (*assert ((inp_w mod lane_in_w = 0) && (List.length r mod lane_out_w = 0));*)
-      let rs = List.chunkify (lane_out_w) r in
-      let rs = match perm with
-        | Some perm -> List.filteri_map (fun i _ -> let idx = (perm i) in
-          if idx < 0 || idx > (List.length rs) then None else
-          Some (List.nth rs (idx))) rs
-        | None -> rs
-      in
-      let rs = List.mapi (fun lane_idx lane_circ -> 
-        let id = create ("split_" ^ (string_of_int lane_idx)) in
-        let map_ = (function 
-          | (v, j) when v = inp_t.id_tag 
-              && (0 <= (j - (lane_idx*lane_in_w)) && (j-(lane_in_w*lane_idx)) < lane_in_w) 
-              -> Some (C.input (id.id_tag, j - (lane_idx*lane_in_w))) 
-          | _ -> None
-          ) in
-        let circ = BWCirc(C.maps map_ lane_circ) in
-        {circ; inps=[BWInput(id, lane_in_w)]}
-      ) rs in
-      rs
-    with 
-    | CircError "destr_bwcirc" ->
-      raise (CircError "Cannot split array or tuple")
-    | CircError "destr_bwinput" ->
-      raise (CircError "Cannot split non bitstring input")
-      
-
-  (* Partitions into blocks of type n -> m *)
-  let circuit_mapreduce ?(perm: (int -> int) option) (c: circuit) (n:int) (m:int) : circuit list =
-    let tm = Unix.gettimeofday () in
-    Format.eprintf "[W] Beginning dependency analysis@.";
-    let const_inp = BWInput (create "const", n) in
-    let circuit_flatten c = assert false in (* FIXME: *)
-    let c = circuit_flatten c in
-    let c = circuit_aggregate_inps c in
-    let r = try destr_bwcirc c.circ 
-      with CircError _ -> raise (CircError "Cannot mapreduce on non-bitstring return type") 
-    in
-    let deps = HL.deps r in
-    let deps = HL.split_deps m deps in
-
-    if not ((HL.block_list_indep deps) && (List.for_all (HL.check_dep_width n) (List.snd deps)))
-    then
-      raise (CircError "Failed mapreduce split (dependency split condition not true)")
-    else
-
-    Format.eprintf "[W] Dependency analysis complete after %f seconds@."
-    (Unix.gettimeofday () -. tm);
-    
-    let cs = circuit_split ?perm c n m in
-    List.map (function
-      | {circ=BWCirc r; inps=[BWInput (idn, w)]}
-        -> {circ=BWCirc (C.uextend ~size:m r); inps=[BWInput (idn, n)]}
-      | {circ=BWCirc r; inps=[]}
-        -> {circ=BWCirc (C.uextend ~size:m r); inps=[const_inp]}
-      | c -> let err = Format.sprintf "Failed for %s@." (circuit_to_string c) in 
-        raise (CircError err))
-    cs
-
-  (* Build a circuit function that takes an input n bits wide and permutes 
-    it in blocks of w bits by the permutation given by f 
-    Expects that w | n and that f|[n/w] is a bijection *)
-  let circuit_permutation (n: int) (w: int) (f: int -> int) : circuit = 
-    if (n mod w <> 0) then
-      let err = Format.sprintf "In circuit permutation, block size (%d) does not divide circuit size (%d)@." w n in
-      raise (CircError err)
-    else
-    (* FIXME: Permutation check should come from EC *)
-    (* assert ( List.init (n/w) f |> Set.of_list |> Set.map f |> Set.cardinal = (n/w)); *)
-    let inp = bwinput_of_size n in
-    let inp_circ = circ_ident inp in
-    let cblocks = destr_bwcirc inp_circ.circ in 
-    let cblocks = List.chunkify w cblocks in 
-    let cblocks = List.mapi (fun i _ -> List.nth cblocks (f i)) cblocks |> List.flatten in
-    {circ=BWCirc(cblocks); inps=[inp]}
-    
-  (* -------------------------------------------------------------------- *)
-  (* Basis for hardcoded circuit gen *)
-  let specifications : (string, Lospecs.Ast.adef) Map.t Lazy.t =
-    Lazy.from_fun (fun () ->
-      let specs_avx2 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
-      let specs_avx2 = C.load_from_file ~filename:specs_avx2 in
-      let specs_armv7 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "armv7.spec" in
-      let specs_armv7 = C.load_from_file ~filename:specs_armv7 in
-      let specs = specs_armv7 @ specs_avx2 in
-      Map.of_seq (List.to_seq specs)
-    )
-
-  let get_specification_by_name (name : string) : Lospecs.Ast.adef option =
-    let lazy specifications = specifications in
-    Map.find_opt name specifications
-
-  let circuit_from_spec_ (env: env) (p : path) : C.reg list -> C.reg  =
-    (* | "OPP_8" -> C.opp (args |> registers_of_bargs env |> List.hd) (* FIXME: Needs to be in spec *) *)
-    match EcEnv.Circuit.lookup_circuit_path env p with
-    | Some circuit ->
-      (fun regs -> C.circuit_of_specification regs circuit) 
-    | None -> let err = Format.sprintf "No operator for path: %s@."
-      (let a,b = EcPath.toqsymbol p in List.fold_right (fun a b -> a ^ "." ^ b) a b) in
-      raise (CircError err)
-end
 
 module type CircuitInterface = sig
   type carray_type
@@ -537,6 +149,10 @@ module type CircuitInterface = sig
   val new_carray_inp : ?name:[`Str of string | `Idn of ident] -> int -> int -> carray * cinp
   val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> int list -> ctuple * cinp
 
+  (* Aggregation functions *)
+  val circuit_aggregate : circuit list -> circuit
+  val circuit_aggregate_inputs : circuit -> circuit
+
 
   (* Circuits representing booleans *)
   val circuit_true : (cbool * (cinp list)) 
@@ -579,7 +195,7 @@ module type CircuitInterface = sig
   val circuit_compose : circuit -> circuit list -> circuit
 
   (* Computing the function given by a circuit *)
-  val compute : circuit -> arg list -> zint
+  val compute : sign:bool -> cbitstring cfun -> arg list -> zint
 
   (* Mapreduce/Dependecy analysis related functions *)
   val is_decomposable : int -> int -> cbitstring cfun -> bool
@@ -759,8 +375,12 @@ module TestBack : CBackend = struct
   let input_node ~id i = C.input (id, i)
   let input_of_size ?(offset = 0) ~id (i: int) = Array.init i (fun i -> C.input (id, offset + i))
 
-  let apply = assert false
-  let circuit_from_spec = assert false
+  let apply (map_: inp -> node option) (n: node) : node= 
+    C.map map_ n
+
+  let circuit_from_spec (def: Lospecs.Ast.adef) (args: reg list) : reg = 
+    let args = List.map node_list_of_reg args in
+    reg_of_node_list (C.circuit_of_specification args def)
 
   (* SMTLib Base Ops *)
   let add (r1: reg) (r2: reg) : reg = C.add_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
@@ -929,7 +549,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let pstate_get_all (pstate: pstate) : (symbol * circuit) list = 
       Map.enum pstate |> List.of_enum
 
-    let empty_pstate : pstate = assert false
+    let empty_pstate : pstate = Map.empty 
 
     let map_pstate : (symbol -> circuit -> circuit) -> pstate -> pstate =
       Map.mapi
@@ -1227,7 +847,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
             merge_inputs arrinps bsinps) 
           | _ -> assert false
           end
-      (* FIXME: what do we want for out of bounds extract? *)
+      (* FIXME: what do we want for out of bounds extract? Decide later *)
       | { kind = `Extract (w_in, w_out) } -> 
         begin match args with
         | [ `Circuit (`CBitstring r, cinps) ; `Constant i ] ->
@@ -1409,25 +1029,21 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         let c2, inp2 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in 
         `CBool (Backend.sle c1 c2), [inp1; inp2] 
 
-      (* FIXME: should this be fully backend responsability or not?  *)
       | { kind = `Extend (size, out_size, false) } ->
         (* assert (size <= out_size); *)
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.uext c1 out_size |> Backend.node_array_of_reg), [inp1] 
 
-      (* FIXME: should this be fully backend responsability or not?  *)
       | { kind = `Extend (size, out_size, true) } ->
         (* assert (size <= out_size); *)  
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.sext c1 out_size |> Backend.node_array_of_reg), [inp1] 
 
-      (* FIXME: should this be fully backend responsability or not?  *)
       | { kind = `Truncate (size, out_sz) } ->
         (* assert (size >= out_sz); *)
         let c1, inp1 = new_cbitstring_inp size |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
         `CBitstring (Backend.trunc c1 out_sz |> Backend.node_array_of_reg), [inp1] 
 
-      (* FIXME: should this be fully backend responsability or not?  *)
       | { kind = `Concat (sz1, sz2, szo) } ->
         (* assert (sz1 + sz2 = szo); *)
         let c1, inp1 = new_cbitstring_inp sz1 |-> ((fun c -> reg_of_circ (c:>circ)), idnt) in  
@@ -1652,7 +1268,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     
 
   module CircuitSpec = struct
-    (* FIXME: do we ever have circuits coming from the spec that take or return arrays? *)
     let circuit_from_spec env (c : [`Path of path | `Bind of EcDecl.crb_circuit ] ) = 
       let c = match c with
       | `Path p -> let c = EcEnv.Circuit.reverse_circuit env p in
@@ -1745,7 +1360,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       (`CBitstring r, [inp])
     ) blocks cinps |> Array.to_list
 
-
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     let r = Array.init (Array.length r) (fun i ->
       let block_idx, bit_idx = (i / w), (i mod w) in
@@ -1754,8 +1368,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     ) in
     `CBitstring r, inps
 
-  let compute = assert false
-    
+  let compute ~(sign: bool) ((`CBitstring r, inps) as c: cbitstring cfun) (args: arg list) : zint = 
+    if List.compare_lengths args inps <> 0 then assert false else
+    let args = List.map2 (fun arg inp ->
+    match arg, inp with
+    | `Circuit c, inp when circuit_input_compatible c inp -> c
+    | `Constant i, {type_ = `CIBitstring size} -> `CBitstring (Backend.(node_array_of_reg @@ reg_of_zint ~size i)), []
+    | _ -> assert false
+    ) args inps 
+    in
+    match circuit_compose c args with
+    | `CBitstring r, [] -> 
+      let reg = Backend.reg_of_node_array r in
+      if sign 
+        then Backend.szint_of_reg reg
+        else Backend.uzint_of_reg reg
+    | _ -> assert false
 
   let circuit_of_op (env: env) (p: path) : circuit = 
     let op = try
@@ -1766,7 +1394,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     match op with
     | `Bitstring (bs, op) -> assert false 
     | `Array _ -> assert false 
-    | `BvOperator _ -> assert false 
+    | `BvOperator bvbnd -> circuit_of_bvop  env (`BvBind bvbnd)
     | `Circuit c -> circuit_from_spec env (`Bind c)
     
   let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  = 
@@ -1779,7 +1407,44 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
     | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
     | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
-    | `Circuit c -> assert false (* TODO: Do we want to have parametric operators coming from the spec? Probablly yes *) 
+    | `Circuit c -> assert false (* TODO: Do we want to have parametric operators coming from the spec? Yes *) 
+
+  let circuit_aggregate (cs: circuit list) : circuit =
+    let inps = List.snd cs in
+    let cs = List.map (fun c -> match cbitstring_of_circuit ~strict:false c with
+    | `CBitstring r, _ -> r) cs in
+    let c = Array.concat cs in
+    let inps = merge_inputs_list inps in
+    (`CBitstring c, inps)
+
+  let input_aggregate_renamer (inps: cinp list) : cinp * (Backend.inp -> cbool_type option) =
+    let new_id = create "aggregated" |> tag in
+    let (size, map) = List.fold_left (fun (size, map) inp ->
+      match inp with
+      | { type_ = `CIBitstring w; id} ->
+        (size + w, Map.add id (size, w) map) 
+      | _ -> assert false
+      ) (0, Map.empty) inps
+    in
+    {type_ = `CIBitstring size; id=new_id},
+    fun (id, bit) -> 
+      let base_sz = Map.find_opt id map in
+      Option.bind base_sz (fun (base, sz) ->
+        let idx = bit + base in
+        if bit >= 0 && bit < sz then 
+        Some (Backend.input_node ~id:new_id idx)
+        else None
+      ) 
+
+  let circuit_aggregate_inputs ((c, inps): circuit) : circuit =
+    let inp, renamer = input_aggregate_renamer inps in
+    match c with
+    | `CBitstring r -> `CBitstring (Array.map (Backend.apply renamer) r), [inp]
+    | `CArray (r, w) -> `CArray (Array.map (Backend.apply renamer) r, w), [inp]
+    | `CTuple (r, szs) -> `CTuple (Array.map (Backend.apply renamer) r, szs), [inp]
+    | `CBool b -> `CBool (Backend.apply renamer b), [inp]
+
+
 end
 
 module ExampleInterface = MakeCircuitInterfaceFromCBackend(TestBack)
@@ -1790,9 +1455,11 @@ open CircuitSpec
 open CArgs
 (* FIXME: why are all these openings required? *)
 
+(* FIXME: move this to module? *)
 let type_is_registered (env: env) (t: ty) : bool = 
   (Option.is_some (EcEnv.Circuit.lookup_array_and_bitstring env t)) ||
   (Option.is_some (EcEnv.Circuit.lookup_bitstring env t))
+
 
 let op_cache = ref Mp.empty
 let circuit_of_form 
@@ -1968,21 +1635,6 @@ let circuit_of_path (hyps: hyps) (p: path) : circuit =
   in
   circuit_of_form hyps f
 
-(* For program generation, input is passed outside of circuit since it is only set at end of generation *)
-(*let input_of_variable (env:env) (v: variable) : circuit * cinput =*)
-(*  let idn = create v.v_name in*)
-(*  let inp = cinput_of_type ~idn env v.v_type in*)
-(*  {(circ_ident inp) with inps=[]}, inp*)
-
-(*let pstate_of_variables ?(pstate = Map.empty) (env : env) (vars : variable list) =*)
-(*  let inps = List.map (input_of_variable env) vars in*)
-(*  let inpcs, inps = List.split inps in*)
-(*  let inpcs = List.combine inpcs @@ List.map (fun v -> v.v_name) vars in*)
-(*  let pstate = List.fold_left *)
-(*    (fun pstate (inp, v) -> Map.add v inp pstate)*)
-(*    pstate inpcs *)
-(*  in pstate, inps*)
-
 let vars_of_memtype ?pstate (env: env) (mt : memtype) =
   let Lmt_concrete lmt = mt in
   List.filter_map (function 
@@ -1992,17 +1644,7 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
   ) (Option.get lmt).lmt_decl 
   
 
-(*let pstate_of_memtype ?pstate (env: env) (mt : memtype) =*)
-(*  let Lmt_concrete lmt = mt in*)
-(*  let vars =*)
-(*    List.filter_map (function *)
-(*      | { ov_name = Some name; ov_type = ty } ->*)
-(*        Some { v_name = name; v_type = ty; }*)
-(*      | _ -> None*)
-(*    ) (Option.get lmt).lmt_decl in*)
-(*  pstate_of_variables ?pstate env vars*)
-
-let process_instr (hyps: hyps) (mem: memory) (pstate: _) (inst: instr) : pstate =
+let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : pstate =
   let env = toenv hyps in
   (* Format.eprintf "[W]Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst; *)
   (* let start = Unix.gettimeofday () in *)
@@ -2041,7 +1683,7 @@ let instrs_equiv
    (hyps       : hyps             )
    ((mem, mt)  : memenv           )
   ?(keep       : EcPV.PV.t option )
-  ?(pstate     : _ = Map.empty    )
+  ?(pstate     : _ = empty_pstate )
    (s1         : instr list       )
    (s2         : instr list       ) : bool
 =
@@ -2128,3 +1770,47 @@ let rec circ_simplify_form_bitstring_equality
       f_bool (circ_equiv ?pcond c1 c2)
     | _ -> f_map (fun ty -> ty) check f 
   in check f
+
+
+(* Mli stuff needed: *)
+let compute ~(sign: bool) (c: circuit) (args: zint list) : zint = 
+  compute ~sign (cbitstring_of_circuit ~strict:true c) (List.map (fun z -> arg_of_zint z) args)
+
+let circ_equiv ?(pcond: circuit option) c1 c2 = 
+  let pcond = match pcond with
+  | Some ((`CBool b, inps) as c) -> Some c
+  | None -> None
+  | _ -> assert false
+  in
+  circ_equiv ?pcond c1 c2
+
+let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
+  let c = match c with
+  | (`CBitstring r, inps) as c -> c
+  | _ -> assert false
+  in
+  (permute bsz perm c :> circuit)
+
+let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list = 
+  let c = match c, perm with 
+  | (`CBitstring _, inps) as c, None -> c
+  | (`CBitstring _, inps) as c, Some perm -> permute w_out perm c
+  | _ -> assert false
+  in
+  (decompose w_in w_out c :> circuit list)
+
+type circuit = ExampleInterface.circuit
+type pstate = ExampleInterface.PState.pstate
+let circuit_to_string (c: circuit) : string = assert false
+let pstate_get = pstate_get 
+let pstate_get_opt = pstate_get_opt
+let pstate_get_all = fun pstate -> List.snd (pstate_get_all pstate)
+let circuit_ueq = circuit_eq
+let circuit_aggregate = 
+  circuit_aggregate
+
+let circuit_aggregate_inps = 
+  circuit_aggregate_inputs
+
+let circuit_flatten (c: circuit) = 
+  (cbitstring_of_circuit ~strict:false c :> circuit)

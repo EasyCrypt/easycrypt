@@ -100,7 +100,7 @@ let mapreduce
   let tm = time tm "Program circuit generation done" in
 
   begin 
-    let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) 
+    let circs = List.map (fun v -> Option.get (pstate_get_opt pstate v)) 
       (List.map (fun v -> v.v_name) outvs) in
 
     (* This is required for now as we do not allow mapreduce with multiple arguments *)
@@ -121,7 +121,7 @@ let mapreduce
     let tm = time tm "circuit dependecy analysis + splitting done" in
 
     List.iteri (fun i c -> 
-    if circ_equiv ~strict:true (List.hd cs) c (Some pcondc) 
+    if circ_equiv ~pcond:pcondc (List.hd cs) c 
       then ()
       else let err = Format.sprintf "Equivalence check failed between lanes 0 and %d" (i+1) 
         in raise (BDepError err)) 
@@ -129,7 +129,7 @@ let mapreduce
 
     let tm = time tm "Program lanes equivs done" in
     
-    if circ_equiv (List.hd cs) fc (Some pcondc) then () 
+    if circ_equiv ~pcond:pcondc (List.hd cs) fc then () 
     else raise (BDepError "Equivalence failed between lane 0 and lane function");
 
     let _tm = time tm "Program to lane func equiv done" in
@@ -156,13 +156,13 @@ let prog_equiv_prod
   in
   let tm = Unix.gettimeofday () in
   
-  let pstate_l : (symbol, circuit) Map.t = try
+  let pstate_l : pstate = try
     EcCircuits.pstate_of_prog hyps meml proc_l.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
   let tm = time tm "Left program generation done" in
-  let pstate_r : (symbol, circuit) Map.t = try
+  let pstate_r : pstate = try
     EcCircuits.pstate_of_prog hyps memr proc_r.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
@@ -170,9 +170,9 @@ let prog_equiv_prod
   let tm = time tm "Right program generation done" in
 
   begin 
-    let circs_l = List.map (fun v -> Option.get (Map.find_opt v pstate_l)) 
+    let circs_l = List.map (fun v -> pstate_get pstate_l v) 
                   (List.map (fun v -> v.v_name) outvs_l) in
-    let circs_r = List.map (fun v -> Option.get (Map.find_opt v pstate_r)) 
+    let circs_r = List.map (fun v -> pstate_get pstate_r v) 
                   (List.map (fun v -> v.v_name) outvs_r) in
                 
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_l = 1); *)
@@ -204,20 +204,20 @@ let prog_equiv_prod
     if preprocess then
         begin
         (List.iteri (fun i c -> 
-          if circ_equiv ~strict:true (List.hd lanes_l) c pcond 
+          if circ_equiv ?pcond (List.hd lanes_l) c 
           then () 
           else let err = Format.sprintf "Left program lane equiv failed between lanes 0 and %d@." (i+i)
             in raise (BDepError err)) 
         (List.tl lanes_l)); 
         let tm = time tm "Left program lanes equiv done" in
         (List.iteri (fun i c -> 
-          if circ_equiv ~strict:true (List.hd lanes_r) c pcond 
+          if circ_equiv ?pcond (List.hd lanes_r) c 
           then () 
           else let err = Format.sprintf "Right program lane equiv failed between lanes 0 and %d@." (i+i)
             in raise (BDepError err)) 
         (List.tl lanes_r)); 
         let tm = time tm "Right program lanes equiv done" in
-        if (circ_equiv ~strict:true (List.hd lanes_l) (List.hd lanes_r) pcond) 
+        if (circ_equiv ?pcond (List.hd lanes_l) (List.hd lanes_r)) 
         then
           time tm "First lanes equiv done" |> ignore
         else
@@ -226,7 +226,7 @@ let prog_equiv_prod
     else
       begin
         List.iter2i (fun i c_l c_r -> 
-          if circ_equiv ~strict:true c_l c_r pcond
+          if circ_equiv ?pcond c_l c_r 
           then () 
           else let err = Format.sprintf "Lane equivalence failed between programs for lane %d@." i in
             raise (BDepError err)) lanes_l lanes_r;
@@ -289,7 +289,7 @@ let circ_form_eval_plus_equiv
     in
     
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
-    let pcond = match Map.find_opt v.v_name pstate with
+    let pcond = match pstate_get_opt pstate v.v_name with
       | Some circ -> begin try 
         Some (circuit_ueq circ (circuit_of_form hyps cur_val))
         with CircError err ->
@@ -340,7 +340,7 @@ let mapreduce_eval
   let tm = time tm "Program circuit generation done" in
 
   begin 
-    let circs = List.map (fun v -> Option.get (Map.find_opt v pstate)) (List.map (fun v -> v.v_name) outvs) in
+    let circs = List.map (fun v -> pstate_get pstate v) (List.map (fun v -> v.v_name) outvs) in
 
     let c = try 
       (circuit_aggregate circs)
@@ -357,7 +357,7 @@ let mapreduce_eval
     let tm = time tm "circuit dependecy analysis + splitting done" in
 
     List.iteri (fun i c -> 
-      if circ_equiv ~strict:true (List.hd cs) c None 
+      if circ_equiv (List.hd cs) c 
       then ()
       else let err = Format.sprintf "Equivalence failed between program lanes 0 and %d@." (i + 1) in
         raise (BDepError err)
