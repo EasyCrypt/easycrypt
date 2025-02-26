@@ -103,6 +103,10 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     let bvinpt2 = (bvterm_of_reg r2) in
     let formula = SMT.bvterm_equal bvinpt1 bvinpt2 in
     let pcond = (bvterm_of_node pcond) in
+    let inps = Option.bind inps (fun l -> 
+      if List.is_empty l then None
+      else Some l
+    ) in
 
     let inps = Option.map (fun inps ->
       List.map (fun (id,sz) -> 
@@ -113,8 +117,9 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     | Some bv -> bv
     | None -> SMT.bvterm_of_name 1 name)) inps) inps
     in
-    let bvinp = Option.map (fun inps -> List.map (fun i -> List.reduce (SMT.bvterm_concat) (List.rev i)) inps) inps in
-
+    let bvinp = Option.map (fun inps -> 
+      List.map (fun i -> List.reduce (SMT.bvterm_concat) i) inps) inps 
+    in
 
     begin
       SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
@@ -122,6 +127,9 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       else begin
         Format.eprintf "bvout1: %a@."  SMT.pp_term (SMT.get_value bvinpt1);
         Format.eprintf "bvout2: %a@."  SMT.pp_term (SMT.get_value bvinpt2);
+        Format.eprintf "Terms in formula: ";
+        List.iter (Format.eprintf "%s ") (List.of_enum @@ Map.String.keys !bvvars);
+        Format.eprintf "@\n";
         Option.may (fun bvinp ->
         List.iteri (fun i bv -> 
         Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
