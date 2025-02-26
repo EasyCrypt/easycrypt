@@ -9,6 +9,8 @@ realize eqP by admit.
 realize get_setP by admit.
 realize get_out by admit.
 
+export Array2.
+
 (* ----------- BEGIN BOOL BINDINGS ---------- *)
 op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.

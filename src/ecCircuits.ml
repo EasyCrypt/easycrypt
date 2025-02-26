@@ -456,11 +456,12 @@ module TestBack : CBackend = struct
 
     (* Assumes only one reg -> reg and parallel blocks *)
     let is_splittable (w_in: int) (w_out: int) (d: deps) : bool =
-      if Set.cardinal 
+      match Set.cardinal 
         (Array.fold_left (Set.union) Set.empty 
         (Array.map (fun dep -> Map.keys dep |> Set.of_enum) d)) 
-        = 1
-      then 
+      with 
+      | 0 -> true
+      | 1 ->
         let blocks = block_deps_of_deps w_out d in
         Array.for_all (fun (_, d) ->
           if Map.is_empty d then true
@@ -473,7 +474,7 @@ module TestBack : CBackend = struct
             0 <= dist && dist < w_in
           ) bits
         ) blocks
-      else
+      | _ -> 
         (Format.eprintf "Failed first check@\n"; 
         Format.eprintf "Map keys: ";
         Array.iteri (fun i dep ->
@@ -923,7 +924,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         begin match args with
         | [ `Init init_f ] -> 
           let circs, cinps = List.split @@ List.init n init_f in
-          let circs = List.map (function | `CBitstring r -> r | _ -> assert false) circs in
+          let circs = List.map (function | `CBitstring r when Array.length r = w_o -> r | _ -> assert false) circs in
           (assert (List.for_all ((=) (List.hd cinps)) cinps));
           let cinps = List.hd cinps in
           (`CArray (Array.concat circs, w_o), cinps) 
@@ -1152,8 +1153,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       with Invalid_argument _ ->
         assert false
 
-    let array_set ((`CArray (r, w), inps) : carray cfun) (i: int) ((`CBitstring bs, cinps): cbitstring cfun) : circuit =
+    let array_set ((`CArray (r, w), inps) : carray cfun) (pos: int) ((`CBitstring bs, cinps): cbitstring cfun) : circuit =
       try
+        let i = pos * w in 
         `CArray (Array.init (Array.length r)
           (fun idx -> 
             if (idx >= i && idx < i + w) 
@@ -1700,13 +1702,17 @@ let circuit_of_form
       (*(* FIXME: Change to inps = [] if we disallow definitions/quantifiers inside tuples *)*)
     | _ -> raise (CircError "Unsupported form kind in translation")
   in 
+(*
   let t0 = Unix.gettimeofday () in
   let () = Format.eprintf "Translating form %a@\n" (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
+*)
 
   let hyps, f_c = doit cache hyps f_ in
 
+(*
   let () = Format.eprintf "Took %.2f s to translate form : %a@." (Unix.gettimeofday () -. t0) 
   (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
+*)
 
   f_c
 
@@ -1730,13 +1736,15 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
 
 let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : pstate =
   let env = toenv hyps in
-  Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst; 
+(*   Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
+(*
       Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
+*)
       let pstate = update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
       (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate

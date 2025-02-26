@@ -193,6 +193,18 @@ let prog_equiv_prod
       with CircError _err ->
         raise (BDepError "Failed to aggregate right program outputs")
     in
+    let c_r = try 
+      (circuit_aggregate_inps c_r)
+      with CircError _err ->
+        raise (BDepError "Failed to aggregate right program outputs")
+    in
+    let c_l = try 
+      (circuit_aggregate_inps c_l)
+      with CircError _err ->
+        raise (BDepError "Failed to aggregate right program outputs")
+    in
+
+
     let tm = time tm "Preprocessing for mapreduce done" in
     let lanes_l = try 
       circuit_mapreduce c_l n m 
@@ -353,6 +365,12 @@ let mapreduce_eval
       with CircError _err ->
         raise (BDepError "Failed to concatenate program outputs")
     in
+    let c = try 
+      (circuit_aggregate_inps c)
+      with CircError _err ->
+        raise (BDepError "Failed to concatenate program outputs")
+    in
+
 
     let cs = try 
       circuit_mapreduce c n m 
