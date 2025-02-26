@@ -112,6 +112,12 @@ let mapreduce
         raise (BDepError "Failed to concatenate outputs")
     in
 
+    let c = try
+      (circuit_aggregate_inps c)
+      with CircError _ ->
+        raise (BDepError "Failed to concatenate outputs")
+    in
+
     let cs = try 
       circuit_mapreduce ?perm c n m 
       with CircError err ->
