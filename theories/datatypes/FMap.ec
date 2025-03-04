@@ -536,9 +536,9 @@ proof. by rewrite fdom_rem in_fsetD1. qed.
 op offset (s: 'a fset): ('a, unit) fmap = 
   ofmap (offun (fun e => if e \in s then Some () else None)).
 
-lemma mem_ofset (s: 'a fset) x: x \in (offset s) <=> x \in s.
+lemma mem_offset (s: 'a fset) x: x \in (offset s) <=> x \in s.
 proof.
-rewrite /dom getE /ofset ofmapK.
+rewrite /dom getE ofmapK.
 - move: (FSet.finite_mem s).
   apply/eq_ind/fun_ext => y.
   rewrite offunE /#.
@@ -555,10 +555,7 @@ rewrite offunE /#.
 qed.
 
 lemma offsetK: cancel offset fdom<:'a, unit>.
-proof. move => s; rewrite fsetP => x; by rewrite mem_fdom mem_ofset. qed.
-
-lemma mem_offset s (e: 'a): e \in offset s <=> e \in s.
-proof. by rewrite -{2}offsetK mem_fdom. qed.
+proof. move => s; rewrite fsetP => x; by rewrite mem_fdom mem_offset. qed.
 
 (* ==================================================================== *)
 op offsetmap (f: 'a -> 'b) (s: 'a fset) : ('a, 'b) fmap = 
