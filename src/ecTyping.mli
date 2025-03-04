@@ -213,7 +213,7 @@ val trans_gbinding : env -> EcUnify.unienv -> pgtybindings ->
 
 (* -------------------------------------------------------------------- *)
 val transexp :
-  env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
+  env -> ?tt:ty -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
 
 val transexpcast :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
