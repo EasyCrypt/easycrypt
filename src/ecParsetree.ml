@@ -148,7 +148,7 @@ type glob_or_var =
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr list
+  | PLvMap    of pqsymbol * ptyannot option * pty option * pexpr list
 
 and plvalue = plvalue_r located
 
