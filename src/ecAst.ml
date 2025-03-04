@@ -439,17 +439,7 @@ let ov_equal vd1 vd2 =
   EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name &&
   ty_equal vd1.ov_type vd2.ov_type
 
-let v_hash v =
-  Why3.Hashcons.combine
-    (Hashtbl.hash v.v_name)
-    (ty_hash v.v_type)
-
-let v_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  ty_equal vd1.v_type vd2.v_type
-
 (* -------------------------------------------------------------------- *)
-
 let mr_xpaths (mr : mod_restr) : mr_xpaths =
   { ur_pos = omap fst mr.ur_pos;
     ur_neg = fst mr.ur_neg; }
@@ -623,15 +613,6 @@ let b_hash (bs : bindings) =
     Why3.Hashcons.combine (EcIdent.tag x) (gty_hash ty)
   in
     Why3.Hashcons.combine_list b1_hash 0 bs
-
-(* -------------------------------------------------------------------- *)
-let i_equal   = ((==) : instr -> instr -> bool)
-let i_hash    = fun i -> i.i_tag
-let i_fv i    = i.i_fv
-
-let s_equal   = ((==) : stmt -> stmt -> bool)
-let s_hash    = fun s -> s.s_tag
-let s_fv      = fun s -> s.s_fv
 
 (*-------------------------------------------------------------------- *)
 let hf_equal hf1 hf2 =
