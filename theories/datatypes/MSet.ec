@@ -275,21 +275,6 @@ exact oflistK.
 qed.
 
 (* -------------------------------------------------------------------- *)
-abbrev disjoint (xs ys : 'a mset) = xs `&` ys = mset0.
-
-lemma disjointP (xs ys : 'a mset):
-  disjoint xs ys <=> forall (x : 'a), x \in xs => ! x \in ys.
-proof.
-split=> [disj_xs_ys x /mult_in_ge1 x_in_xs | all_xs_not_in_ys].
-- suff: ys.[x] = 0 by rewrite mult_in_ge1 => ->.
-  have /#:0 = min xs.[x] ys.[x] by rewrite -(mset0_mult x) -disj_xs_ys multE.
-apply mset_eqP => x.
-have := all_xs_not_in_ys x.
-rewrite !multE !mult_in_ge1.
-smt(mult_ge0).
-qed.
-
-(* -------------------------------------------------------------------- *)
 op [opaque] pick ['a] (A : 'a mset) = head witness (elems A).
 
 lemma pick0: pick<:'a> mset0 = witness.
@@ -547,6 +532,24 @@ rewrite mult_in_ge1 /(\subset) -b2i1 (eq_imp (x = x) true) // -(mset1_mult x).
 split => [->//|H y].
 case (x = y) => [//|].
 by rewrite mset1_mult => ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev disjoint (xs ys : 'a mset) = xs `&` ys = mset0.
+
+lemma disjointC (xs ys : 'a mset): disjoint xs ys => disjoint ys xs.
+proof. by rewrite msetIC. qed.
+
+lemma disjointP (xs ys : 'a mset):
+  disjoint xs ys <=> forall (x : 'a), x \in xs => ! x \in ys.
+proof.
+split=> [disj_xs_ys x /mult_in_ge1 x_in_xs | all_xs_not_in_ys].
+- suff: ys.[x] = 0 by rewrite mult_in_ge1 => ->.
+  have /#:0 = min xs.[x] ys.[x] by rewrite -(mset0_mult x) -disj_xs_ys multE.
+apply mset_eqP => x.
+have := all_xs_not_in_ys x.
+rewrite !multE !mult_in_ge1.
+smt(mult_ge0).
 qed.
 
 (* -------------------------------------------------------------------- *)
