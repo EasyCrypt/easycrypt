@@ -232,7 +232,8 @@ val t_rewrite_hyp :
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
-     ?kind:subst_kind
+     ?exn:exn
+  -> ?kind:subst_kind
   -> ?except:Sid.t
   -> ?clear:bool
   -> ?var:vsubst

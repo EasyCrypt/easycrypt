@@ -821,6 +821,22 @@ let pp_memtype (ppe : PPEnv.t) (fmt : Format.formatter) (mt : memtype) =
       Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty
 
 (* -------------------------------------------------------------------- *)
+type vsubst = [
+  | `Local of EcIdent.t
+  | `Glob  of EcIdent.t * EcMemory.memory
+  | `PVar  of EcTypes.prog_var * EcMemory.memory
+]
+
+let pp_vsubst (ppe : PPEnv.t) (fmt : Format.formatter) (v : vsubst) =
+  match v with
+  | `Local x ->
+      Format.fprintf fmt "%a" (pp_local ppe) x
+  | `Glob (mp, m) ->
+      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) (EcPath.mident mp) (pp_mem ppe) m
+  | `PVar (pv, m) ->
+      Format.fprintf fmt "%a{%a}" (pp_pv ppe) pv (pp_mem ppe) m
+
+(* -------------------------------------------------------------------- *)
 let pp_opname (fmt : Format.formatter) ((nm, op) : symbol list * symbol) =
   let op =
     if EcCoreLib.is_mixfix_op op then
