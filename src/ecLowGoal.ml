@@ -1937,7 +1937,7 @@ let t_rw_for_subst y togen concl side eqid tc =
             (* pre'; id: x = f |- (hpost => post => concl){x <- f} *)
             t_intros_i ids] tc
 
-let t_subst_x ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc : tcenv1) =
+let t_subst_x ?(exn = InvalidGoalShape) ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc : tcenv1) =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let subst_pre (subst, check, depend) moved (id, lk) =
@@ -2047,11 +2047,11 @@ let t_subst_x ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc
   in
 
   try  List.find_map try1 eqs
-  with Not_found -> raise InvalidGoalShape
+  with Not_found -> raise exn
 
-let t_subst ?kind ?except ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
+let t_subst ?exn ?kind ?except ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   let clear = if clear then SCall else SChyp in
-  fst (t_subst_x ?kind ?except ~clear ?var ?tside ?eqid tc)
+  fst (t_subst_x ?exn ?kind ?except ~clear ?var ?tside ?eqid tc)
 
 (* -------------------------------------------------------------------- *)
 let t_absurd_hyp ?(conv  = `AlphaEq) id tc =
