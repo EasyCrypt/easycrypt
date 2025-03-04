@@ -344,9 +344,6 @@ val hcmp_hash : hoarecmp hash
 val ov_equal : ovariable equality
 val ov_hash  : ovariable hash
 
-val v_equal : variable equality
-val v_hash : variable hash
-
 (* -------------------------------------------------------------------- *)
 val ur_equal : 'a equality -> 'a use_restr equality
 val ur_hash  : ('a -> 'b list) -> 'b hash -> 'a use_restr hash
@@ -389,18 +386,8 @@ val gty_hash  : gty hash
 val gty_fv    : gty fv
 
 (*-------------------------------------------------------------------- *)
-
 val b_equal : bindings equality
 val b_hash : bindings hash
-
-(* -------------------------------------------------------------------- *)
-val i_equal   : instr equality
-val i_hash    : instr hash
-val i_fv      : instr fv
-
-val s_equal   : stmt equality
-val s_hash    : stmt hash
-val s_fv      : stmt fv
 
 (*-------------------------------------------------------------------- *)
 val hf_equal  : sHoareF equality
