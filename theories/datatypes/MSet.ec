@@ -43,9 +43,9 @@ lemma mult_ge0 s (x: 'a): 0 <= s.[x] by rewrite/mult; apply count_ge0.
 hint exact : mult_ge0.
 
 lemma mset_eqP (s1 s2 : 'a mset):
-  (s1 = s2) <=> (forall x, s1.[x] = s2.[x]).
+  (forall x, s1.[x] = s2.[x]) => s1 = s2.
 proof.
-split=> // h; apply/mset_eq.
+move=> h; apply/mset_eq.
 rewrite/mult in h.
 by rewrite perm_eqP_pred1.
 qed.
@@ -70,23 +70,23 @@ by rewrite perm_eq_sym oflistK.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op selems (s: 'a mset): 'a fset = oflist (elems s).
+op [opaque] selems (s: 'a mset): 'a fset = oflist (elems s).
 
 lemma mem_selems s (e: 'a): e \in selems s <=> e \in s.
 proof. by rewrite /selems mem_oflist memE. qed.
 
-op offset' (s: 'a fset): 'a mset = oflist (elems s).
+op [opaque] offset (s: 'a fset): 'a mset = oflist (elems s).
 
-lemma offset_mult (s: 'a fset) x: (offset' s).[x] = b2i (x \in s).
+lemma offset_mult (s: 'a fset) x: (offset s).[x] = b2i (x \in s).
 proof. 
-rewrite /mult /multisetify.
+rewrite /mult /offset.
 have/perm_eqP_pred1<-:= (oflistK (elems s)).
 by rewrite count_uniq_mem ?uniq_elems /mem.
 qed.
 
 (* -------------------------------------------------------------------- *)
 
-op tofmap (s: 'a mset): ('a, int) fmap = offsetmap (fun e => s.[e]) (selems s).
+op [opaque] tofmap (s: 'a mset): ('a, int) fmap = offsetmap (fun e => s.[e]) (selems s).
 
 lemma tofmap_get (s: 'a mset) e: (tofmap s).[e] = if e \in s then Some(s.[e]) else None.
 proof.
@@ -96,7 +96,7 @@ case (e \in s) => e_in.
 by rewrite offsetmapN 1:mem_selems.
 qed.
 
-op offmap (m: ('a, int) fmap): 'a mset = 
+op [opaque] offmap (m: ('a, int) fmap): 'a mset = 
   oflist (flatten (FSet.elems (FMap.frng (FMap.map (fun (a: 'a) (n: int) => nseq n a) m)))).
 
 lemma mem_tofmap (s: 'a mset) e: e \in tofmap s <=> e \in s.
@@ -281,11 +281,9 @@ lemma disjointP (xs ys : 'a mset):
   disjoint xs ys <=> forall (x : 'a), x \in xs => ! x \in ys.
 proof.
 split=> [disj_xs_ys x /mult_in_ge1 x_in_xs | all_xs_not_in_ys].
-- have := mset_eqP (xs `&` ys) mset0.
-  rewrite mult_in_ge1 {1}disj_xs_ys /= => inI_eq0 {disj_xs_ys}.
-  have:= inI_eq0 x; clear inI_eq0.  
-  rewrite !multE /#.
-rewrite mset_eqP => x.
+- suff: ys.[x] = 0 by rewrite mult_in_ge1 => ->.
+  have /#:0 = min xs.[x] ys.[x] by rewrite -(mset0_mult x) -disj_xs_ys multE.
+apply mset_eqP => x.
 have := all_xs_not_in_ys x.
 rewrite !multE !mult_in_ge1.
 smt(mult_ge0).
@@ -318,14 +316,15 @@ proof. move=> le1 le2 x; exact (lez_trans _ _ _ (le1 x) (le2 x)). qed.
 lemma properP (s1 s2 : 'a mset) :
   s1 \proper s2 <=> s1 \subset s2 /\ exists x, s1.[x] < s2.[x].
 proof.
-rewrite /(\proper) &(andb_id2l) mset_eqP negb_forall /= => le_XY.
+rewrite /(\proper) &(andb_id2l)=> s1_sub_s2.
+have->:(s1<>s2 <=> exists x, s1.[x] <> s2.[x]) by smt(mset_eqP).
 apply/eqboolP/exists_eq => x /= /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eqEsubset (s1 s2 : 'a mset) : 
   (s1 = s2) <=> (s1 \subset s2) /\ (s2 \subset s1).
-proof. rewrite mset_eqP => /#. qed.
+proof. smt(mset_eqP). qed.
 
 lemma subset_msetU_id (A B : 'a mset) :
   A \subset B => A `|` B = B.
@@ -640,10 +639,9 @@ lemma subset_cardP (A B : 'a mset) :
 proof.
 move=> eqcAB; split=> [->//| A_leB].
 have/eq_sym B_eq:=subset_msetDadd _ _ A_leB.
-move: eqcAB; rewrite {1}B_eq mcard_add => H.
-have{H}/mcards0_eq/mset_eqP H: card (B `\`A) = 0 by smt().
-apply mset_eqP => x.
-have{H}:=H x; rewrite !multE /#.
+move: eqcAB; rewrite {1}B_eq mcard_add => H; move: B_eq.
+have{H}/mcards0_eq->: card (B `\`A) = 0 by smt().
+by rewrite add0s => ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -686,4 +684,3 @@ rewrite -/(mult _ _) rem_mult /mult.
 rewrite (eq_imp (count (pred1 x) (elems A) - b2i (a = x))); 1:smt(count_rem).
 smt(mem_count).
 qed.
-
