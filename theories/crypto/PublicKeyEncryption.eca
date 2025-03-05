@@ -438,7 +438,7 @@ module IND_CCA1_P (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
     
     b' <@ A(O(S)).distinguish(c);
     
-    return b' = b; 
+    return b'; 
   }
 }.
 
@@ -497,7 +497,7 @@ module IND_CCA2_P (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Ad
     
     b' <@ A(O2(S)).distinguish(c);
     
-    return b' = b;
+    return b';
   }
 }.
 
