@@ -478,7 +478,7 @@ module IND_CCA1_P (S : Scheme) (O : Oracles_CCA1i) (A : Adv_INDCCA1) = {
     
     b' <@ A(O(S)).distinguish(if b then k' else k, c);
     
-    return b' = b; 
+    return b'; 
   }
 }.
 
@@ -540,7 +540,7 @@ module IND_CCA2_P (S : Scheme) (O1 : Oracles_CCA1i) (O2 : Oracles_CCA2i) (A : Ad
     
     b' <@ A(O2(S)).distinguish(if b then k' else k, c);
     
-    return b' = b; 
+    return b'; 
   }
 }.
 
@@ -595,7 +595,7 @@ module IND_CCA_P (S : Scheme) (O : Oracles_CCA2i) (A : Adv_INDCCA) = {
     
     b' <@ A(O(S)).distinguish(pk, if b then k' else k, c);
     
-    return b' = b; 
+    return b'; 
   }
 }.
 
@@ -1100,7 +1100,7 @@ module WANO_CPA_P (S : Scheme) (A : Adv_WANOCPA) = {
     
     b' <@ A.distinguish(pk0, pk1, c);
     
-    return b' = b;
+    return b';
   }
 }.
 
@@ -1223,7 +1223,7 @@ module WANO_CCA1_P (S : Scheme) (O0 : Oracles_CCA1i) (O1 : Oracles_CCA1i) (A : A
     
     b' <@ A(O0(S), O1(S)).distinguish(c);
     
-    return b' = b;
+    return b';
   }
 }.
 
@@ -1431,7 +1431,7 @@ module ANO_CCA_P (S : Scheme)
     
     b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, (k, c));
     
-    return b' = b;
+    return b';
   }
 }.
 
@@ -1491,7 +1491,7 @@ module WANO_CCA_P (S : Scheme)
     
     b' <@ A(O0(S), O1(S)).distinguish(pk0, pk1, c);
     
-    return b' = b;
+    return b';
   }
 }.
 
