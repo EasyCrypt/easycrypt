@@ -18,7 +18,6 @@ exception InvalidProofTerm         (* invalid proof term *)
 type side    = [`Left|`Right]
 type lazyred = [`Full | `NoDelta | `None]
 
-
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
 val (@+) : FApi.backward -> FApi.backward list -> FApi.backward
@@ -219,7 +218,7 @@ val  full_subst_kind : subst_kind
 val empty_subst_kind : subst_kind
 
 type rwspec = [`LtoR|`RtoL] * ptnpos option
-type rwmode = [`Bool | `Eq]
+type rwmode = [`Bool | `Eq | `Setoid of EcSetoid.instance]
 
 val t_rewrite :
      ?xconv:xconv -> ?keyed:bool -> ?target:ident -> ?mode:rwmode -> ?donot:bool

@@ -1015,6 +1015,10 @@ let generalize_addrw to_gen (p, ps, lc) =
 
 let generalize_reduction to_gen _rl = to_gen, None
 
+let generalize_relation to_gen _rel = to_gen, None
+
+let generalize_morphism to_gen _m = to_gen, None
+
 let generalize_auto to_gen auto_rl =
   if auto_rl.locality = `Local then
     to_gen, None
@@ -1054,6 +1058,8 @@ let rec set_lc_item lc_override item =
     | Th_reduction       r   -> Th_reduction r
     | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_lc lc_override auto_rl.locality}
     | Th_alias         alias -> Th_alias     alias
+    | Th_relation        r   -> Th_relation r
+    | Th_morphism        m   -> Th_morphism m
 
   in { item with ti_item = lcitem }
 
@@ -1355,6 +1361,8 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
                                   auto.axioms auto.locality env
     | Th_alias     (n,p)     -> EcEnv.Theory.alias ~import n p env
     | Th_reduction r         -> EcEnv.Reduction.add ~import r env
+    | Th_relation r          -> EcEnv.Setoid.add_relation r env
+    | Th_morphism m          -> EcEnv.Setoid.add_morphism m env
     | _                      -> assert false
   in
   (item, { scenv with
@@ -1381,6 +1389,8 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
+    | Th_relation rel    -> generalize_relation to_gen rel
+    | Th_morphism m      -> generalize_morphism to_gen m
     | Th_auto hints      -> generalize_auto to_gen hints
     | Th_alias _         -> (to_gen, None) (* FIXME:ALIAS *)
 
@@ -1491,6 +1501,8 @@ let check_item scenv item =
     if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
+  | Th_relation _ -> ()
+  | Th_morphism _ -> ()
   | Th_theory  _   -> assert false
   | Th_alias _     -> () (* FIXME:ALIAS *)
 

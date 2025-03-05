@@ -439,7 +439,7 @@ module List = struct
             let (a, xs) = doit a xs1 xs2 in
             (a, x :: xs)
 
-        | _, _ -> invalid_arg "List.map_fold2"
+        | _, _ -> invalid_arg "List.fold_left_map2"
 
       in fun a xs1 xs2 -> doit a xs1 xs2
 
@@ -521,15 +521,15 @@ module List = struct
       | x :: xs -> aux (ocons (f x) acc) xs
     in aux [] xs
 
-  let mapi_fold f a xs =
-    let a  = ref a in
-    let xs = List.mapi (fun i b ->
-      let (a', b') = f i !a b in a := a'; b')
-      xs
-    in (!a, xs)
+  let fold_left_mapi (f : 'a -> int -> 'b -> 'a * 'c) (st : 'a) (s : 'b list) : 'a * 'c list =
+    let (st, _), s =
+      fold_left_map
+        (fun (st, i) v -> let st, v = f st i v in (st, i + 1), v)
+        (st, 0) s
+    in (st, s)
 
-  let map_fold f a xs =
-    mapi_fold (fun (_ : int) x -> f x) a xs
+  let fold_left_map (f : 'a -> 'b -> 'a * 'c) (st : 'a) (xs : 'b list) =
+    fold_left_mapi (fun (x : 'a) (_ : int) -> f x) st xs
 
   let rec fpick (xs : (unit -> 'a option) list) =
     match xs with
