@@ -74,6 +74,15 @@ module type PrinterAPI = sig
   val pp_codepos     : PPEnv.t -> EcMatching.Position.codepos pp
 
   (* ------------------------------------------------------------------ *)
+  type vsubst = [
+    | `Local of EcIdent.t
+    | `Glob  of EcIdent.t * EcMemory.memory
+    | `PVar  of EcTypes.prog_var * EcMemory.memory
+  ]
+  
+  val pp_vsubst : PPEnv.t -> vsubst pp
+
+  (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
   val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
   val pp_added_op    : PPEnv.t -> operator pp

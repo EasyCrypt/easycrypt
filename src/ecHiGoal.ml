@@ -1964,9 +1964,24 @@ let process_subst syms (tc : tcenv1) =
         "this formula is not subject to substitution"
   in
 
-  match List.map resolve syms with
-  | []   -> t_repeat t_subst tc
-  | syms -> FApi.t_seqs (List.map (fun var tc -> t_subst ~var tc) syms) tc
+  let exception NothingToSubstitute of vsubst in
+
+  try
+    match List.map resolve syms with
+    | []   -> t_repeat t_subst tc
+    | syms ->
+        FApi.t_seqs
+          (List.map
+            (fun var tc -> t_subst ~exn:(NothingToSubstitute var) ~var tc)
+            syms)
+          tc
+
+    with NothingToSubstitute v ->
+      tc_error_lazy !!tc (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "nothing to substitute for `%a'"
+        (EcPrinting.pp_vsubst ppe) v
+      )
 
 (* -------------------------------------------------------------------- *)
 type cut_t = intropattern * pformula * (ptactics located) option
