@@ -373,7 +373,7 @@ let add_lv_subst env lv m s =
 
   | LvTuple pvs ->
     let s, ids =
-      List.map_fold (fun s (pv,t) ->
+      List.fold_left_map (fun s (pv,t) ->
         let id = id_of_pv pv m in
         let s = PVM.add env pv m (f_local id t) s in
         s, (id,t)) s pvs in

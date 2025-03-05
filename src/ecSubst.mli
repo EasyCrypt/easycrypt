@@ -36,6 +36,7 @@ val add_elocals : subst -> EcIdent.t list -> expr list -> subst
 val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 
 (* -------------------------------------------------------------------- *)
+val fresh_tparams : subst -> ty_params -> subst * ty_params
 val freshen_type : (ty_params * ty) -> (ty_params * ty)
 
 (* -------------------------------------------------------------------- *)
