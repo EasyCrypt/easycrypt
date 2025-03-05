@@ -270,7 +270,28 @@ module LowRewrite = struct
           let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
           [(pt', `Eq, (f, f_false))]
 
-      | _ -> []
+      | _ -> begin
+        let exception NotASetoid in
+
+        try
+          let (oppath, _), args =
+            try  destr_op_app ax
+            with DestrError _ -> raise NotASetoid in
+
+          let op = EcEnv.Op.by_path oppath env in
+          let _rel = oget ~exn:NotASetoid (EcEnv.Setoid.get_relation env oppath) in
+
+          let nparams = List.length (fst (tyfun_flat op.op_ty)) - 2 in
+
+          if List.length args <> nparams + 2 then
+            raise NotASetoid;
+
+          let f1, f2 = as_seq2 (List.drop nparams args) in
+
+          [(pt, `Setoid, (f1, f2))]
+
+        with NotASetoid -> []
+      end
 
     and split ax =
       match EcFol.sform_of_form ax with
@@ -366,7 +387,7 @@ module LowRewrite = struct
            | PT.FindOccFailure `MatchFailure ->
               raise (RewriteError LRW_RPatternNoRuleMatch)
            | PT.FindOccFailure `IncompleteMatch ->
-               raise (RewriteError LRW_CannotInfer)
+              raise (RewriteError LRW_CannotInfer)
           end in
 
       if not occmode.k_keyed then begin

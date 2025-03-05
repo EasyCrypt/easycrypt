@@ -222,7 +222,44 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition : sig
+  open EcMemory
+
   type select = [`Accept of int | `Continue]
+
+  (* ------------------------------------------------------------------ *)
+  type ctxt1_r =
+  | CT_AppTop      of form list
+  | CT_AppArg      of form * (form list * form list)
+  | CT_Tuple       of form list * form list
+  | CT_LetVal      of lpattern * form
+  | CT_LetBody     of lpattern * form
+  | CT_Quant       of quantif * bindings
+  | CT_Proj        of int
+  | CT_IfCond      of form * form
+  | CT_IfBranch    of form * ([`Then | `Else] * form)
+  | CT_MatchCond   of ty * form list
+  | CT_MatchBranch of ty * form * (form list * form list)
+  | CT_PrArgs      of { pr_event: form; ctxt: prctxt; }
+  | CT_PrEvent     of { pr_args: form; ctxt: prctxt; }
+  | CT_HoareFPr    of { hf_po: form; ctxt: hoarectxt; }
+  | CT_HoareFPo    of { hf_pr: form; ctxt: hoarectxt; }
+  | CT_BdHoareFPr  of { bhf_po: form; bhf_bd: form; ctxt: bdhoarectxt; }
+  | CT_BdHoareFPo  of { bhf_pr: form; bhf_bd: form; ctxt: bdhoarectxt; }
+  | CT_BdHoareFBd  of { bhf_pr: form; bhf_po: form; ctxt: bdhoarectxt; }
+  | CT_EHoareFPr   of { ehf_po: form; ctxt: ehoarectxt; }
+  | CT_EHoareFPo   of { ehf_pr: form; ctxt: ehoarectxt; }
+  | CT_EquivFPr    of { ef_po: form; ctxt: equivctxt; }
+  | CT_EquivFPo    of { ef_pr: form; ctxt: equivctxt; }
+
+  and ctxt1 = { ctxt: ctxt1_r; ty: ty; }
+
+  and ctxt = ctxt1 list
+
+  and prctxt      = { pr_fun: EcPath.xpath;  pr_mem: memory; }
+  and hoarectxt   = { hf_f: EcPath.xpath; }
+  and bdhoarectxt = { bhf_f: EcPath.xpath; bhf_cmp: hoarecmp; }
+  and ehoarectxt  = { ehf_f: EcPath.xpath; }
+  and equivctxt   = { ef_fl: EcPath.xpath; ef_fr: EcPath.xpath; }
 
   val empty : ptnpos
 
@@ -242,6 +279,8 @@ module FPosition : sig
   val occurences : ptnpos -> int
 
   val filter : occ -> ptnpos -> ptnpos
+
+  val map_with_ctxt : ptnpos -> (ctxt Lazy.t -> form -> form) -> form -> form
 
   val map : ptnpos -> (form -> form) -> form -> form
 

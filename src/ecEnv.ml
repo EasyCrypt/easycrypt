@@ -19,6 +19,7 @@ module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module TC   = EcTypeClass
+module Sint = EcMaps.Sint
 module Mint = EcMaps.Mint
 
 (* -------------------------------------------------------------------- *)
@@ -183,6 +184,7 @@ type preenv = {
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : atbase Msym.t;
   env_redbase  : mredinfo;
+  env_stdbase  : setoid;
   env_ntbase   : ntbase Mop.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
@@ -224,6 +226,13 @@ and ntbase = (path * env_notation) list
 and atbase0 = path * [`Rigid | `Default]
 
 and atbase = atbase0 list Mint.t
+
+and setoid = setoid1 Mp.t
+
+and setoid1 = {
+  spec : path;
+  morphisms : (path Mint.t) Mp.t;
+}
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -311,6 +320,7 @@ let empty gstate =
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
     env_redbase  = Mrd.empty;
+    env_stdbase  = Mp.empty;
     env_ntbase   = Mop.empty;
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1110,7 +1120,8 @@ module MC = struct
           (add2mc _up_rwbase x (expath x) mc, None)
 
       | Th_export _ | Th_addrw _ | Th_instance _
-      | Th_auto   _ | Th_reduction _ ->
+      | Th_auto   _ | Th_reduction _ | Th_relation _
+      | Th_morphism _ ->
           (mc, None)
     in
 
@@ -1580,6 +1591,35 @@ module Auto = struct
 
   let all (env : env) : atbase0 list =
     Msym.values env.env_atbase |> List.map flatten_db |> List.flatten
+end
+
+(* -------------------------------------------------------------------- *)
+module Setoid = struct
+  type nonrec setoid1 = setoid1
+
+  let update_relation_db ((oppath, axpath) : path * path) (db : setoid) =
+    Mp.add oppath { spec = axpath; morphisms = Mp.empty; } db
+
+  let add_relation ((oppath, axpath) : path * path) (env : env) =
+    let item = mkitem import0 (Th_relation (oppath, axpath)) in
+    { env with
+        env_stdbase = update_relation_db (oppath, axpath) env.env_stdbase;
+        env_item    = item :: env.env_item; }
+
+  let get_relation (env : env) (oppath : path) : setoid1 option =
+    Mp.find_opt oppath env.env_stdbase
+
+  let update_morphism_db ((rel, op, ax, pos) : path * path * path * int) (db : setoid) =
+    Mp.change (fun db1 ->
+      Some { (oget db1) with morphisms =
+        Mp.change (fun m -> Some (Mint.add pos ax (odfl Mint.empty m))) op (oget db1).morphisms }
+    ) rel db
+
+  let add_morphism ((rel, op, ax, pos) : path * path * path * int) (env : env) =
+    let item = mkitem import0 (Th_morphism (rel, op, ax, pos)) in
+    { env with
+        env_stdbase = update_morphism_db (rel, op, ax, pos) env.env_stdbase;
+        env_item    = item :: env.env_item; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2976,6 +3016,17 @@ module Theory = struct
     in bind_base_th for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_std_th =
+    let for1 _path db = function
+      | Th_relation r ->
+        Some (Setoid.update_relation_db r db)
+      | Th_morphism m ->
+        Some (Setoid.update_morphism_db m db)
+      | _ -> None
+
+    in bind_base_th for1
+
+  (* ------------------------------------------------------------------ *)
   let bind_nt_th =
     let for1 path base = function
       | Th_operator (x, ({ op_kind = OB_nott _ } as op)) ->
@@ -3022,12 +3073,14 @@ module Theory = struct
           let env_tc      = bind_tc_th thname env.env_tc items in
           let env_rwbase  = bind_br_th thname env.env_rwbase items in
           let env_atbase  = bind_at_th thname env.env_atbase items in
+          let env_stdbase = bind_std_th thname env.env_stdbase items in
           let env_ntbase  = bind_nt_th thname env.env_ntbase items in
           let env_redbase = bind_rd_th thname env.env_redbase items in
           let env =
             { env with
                 env_tci   ; env_tc     ; env_rwbase;
-                env_atbase; env_ntbase; env_redbase; }
+                env_atbase; env_stdbase; env_ntbase;
+                env_redbase; }
           in
           add_restr_th thname env items
 
@@ -3088,7 +3141,12 @@ module Theory = struct
         | Th_baserw (x, _) ->
             MC.import_rwbase (xpath x) env
 
-        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
+        | Th_addrw _
+        | Th_instance _
+        | Th_auto _
+        | Th_reduction _
+        | Th_relation _
+        | Th_morphism _ ->
             env
 
       in
@@ -3241,6 +3299,7 @@ module Theory = struct
           env_tc      = bind_tc_th thpath env.env_tc cth.cth_items;
           env_rwbase  = bind_br_th thpath env.env_rwbase cth.cth_items;
           env_atbase  = bind_at_th thpath env.env_atbase cth.cth_items;
+          env_stdbase = bind_std_th thpath env.env_stdbase cth.cth_items;
           env_ntbase  = bind_nt_th thpath env.env_ntbase cth.cth_items;
           env_redbase = bind_rd_th thpath env.env_redbase cth.cth_items;
           env_thenvs  = Mp.set_union env.env_thenvs compiled.compiled; }

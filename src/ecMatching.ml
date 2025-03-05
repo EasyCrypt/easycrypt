@@ -886,6 +886,7 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition = struct
+  (* ------------------------------------------------------------------ *)
   type select = [`Accept of int | `Continue]
 
   (* ------------------------------------------------------------------ *)
@@ -1073,20 +1074,225 @@ module FPosition = struct
     in select ?o (test xconv) target
 
   (* ------------------------------------------------------------------ *)
-  let map (p : ptnpos) (tx : form -> form) (f : form) =
-    let rec doit1 p fp =
+  type ctxt1_r =
+  | CT_AppTop      of form list
+  | CT_AppArg      of form * (form list * form list)
+  | CT_Tuple       of form list * form list
+  | CT_LetVal      of lpattern * form
+  | CT_LetBody     of lpattern * form
+  | CT_Quant       of quantif * bindings
+  | CT_Proj        of int
+  | CT_IfCond      of form * form
+  | CT_IfBranch    of form * ([`Then | `Else] * form)
+  | CT_MatchCond   of ty * form list
+  | CT_MatchBranch of ty * form * (form list * form list)
+  | CT_PrArgs      of { pr_event: form; ctxt: prctxt; }
+  | CT_PrEvent     of { pr_args: form; ctxt: prctxt; }
+  | CT_HoareFPr    of { hf_po: form; ctxt: hoarectxt; }
+  | CT_HoareFPo    of { hf_pr: form; ctxt: hoarectxt; }
+  | CT_BdHoareFPr  of { bhf_po: form; bhf_bd: form; ctxt: bdhoarectxt; }
+  | CT_BdHoareFPo  of { bhf_pr: form; bhf_bd: form; ctxt: bdhoarectxt; }
+  | CT_BdHoareFBd  of { bhf_pr: form; bhf_po: form; ctxt: bdhoarectxt; }
+  | CT_EHoareFPr   of { ehf_po: form; ctxt: ehoarectxt; }
+  | CT_EHoareFPo   of { ehf_pr: form; ctxt: ehoarectxt; }
+  | CT_EquivFPr    of { ef_po: form; ctxt: equivctxt; }
+  | CT_EquivFPo    of { ef_pr: form; ctxt: equivctxt; }
+
+  and ctxt1 = { ctxt: ctxt1_r; ty: ty; }
+
+  and ctxt = ctxt1 list
+
+  and prctxt      = { pr_fun: EcPath.xpath;  pr_mem: memory; }
+  and hoarectxt   = { hf_f: EcPath.xpath; }
+  and bdhoarectxt = { bhf_f: EcPath.xpath; bhf_cmp: hoarecmp; }
+  and ehoarectxt  = { ehf_f: EcPath.xpath; }
+  and equivctxt   = { ef_fl: EcPath.xpath; ef_fr: EcPath.xpath; }
+
+  (* ------------------------------------------------------------------ *)
+  type path = int list
+
+  (* ------------------------------------------------------------------ *)
+  let zip_ctxt1 (ctxt : ctxt1) (f : form) =
+    let mk (node : f_node) = mk_form node ctxt.ty in
+
+    match ctxt.ctxt with
+    | CT_AppTop args ->
+      mk (Fapp (f, args))
+
+    | CT_AppArg (head, (largs, rargs)) ->
+      mk (Fapp (head, largs @ (f :: rargs)))
+
+    | CT_Tuple (largs, rargs) ->
+      mk (Ftuple (largs @ (f :: rargs)))
+
+    | CT_LetVal (lv, body) ->
+      mk (Flet (lv, f, body))
+
+    | CT_LetBody (lv, fbd) ->
+      mk (Flet (lv, fbd, f))
+
+    | CT_Quant (q, bds) ->
+      mk (Fquant (q, bds, f))
+
+    | CT_Proj i ->
+      mk (Fproj (f, i))
+
+    | CT_IfCond (ft, ff) ->
+      mk (Fif (f, ft, ff))
+
+    | CT_IfBranch (cond, (`Then, fb)) ->
+      mk (Fif (cond, f, fb))
+
+    | CT_IfBranch (cond, (`Else, fb)) ->
+      mk (Fif (cond, fb, f))
+
+    | CT_MatchCond (ty, bfs) ->
+      mk (Fmatch (f, bfs, ty))
+
+    | CT_MatchBranch (ty, cond, (lbs, rbs)) ->
+      mk (Fmatch (cond, lbs @ (f :: rbs), ty))
+
+    | CT_PrArgs { pr_event; ctxt = { pr_fun; pr_mem; }; } ->
+      mk (Fpr { pr_args = f; pr_event; pr_fun; pr_mem; })
+
+    | CT_PrEvent { pr_args; ctxt = { pr_fun; pr_mem; }; } ->
+      mk (Fpr { pr_event = f; pr_args; pr_fun; pr_mem; })
+
+    | CT_HoareFPr { hf_po; ctxt = { hf_f }} ->
+      mk (FhoareF { hf_pr = f; hf_po; hf_f; })
+
+    | CT_HoareFPo { hf_pr; ctxt = { hf_f }} ->
+      mk (FhoareF { hf_po = f; hf_pr; hf_f; })
+
+    | CT_BdHoareFPr { bhf_po; bhf_bd; ctxt = { bhf_f; bhf_cmp;  }} ->
+      mk (FbdHoareF { bhf_pr = f; bhf_po; bhf_bd; bhf_f; bhf_cmp; })
+
+    | CT_BdHoareFPo { bhf_pr; bhf_bd; ctxt = { bhf_f; bhf_cmp;  }} ->
+      mk (FbdHoareF { bhf_po = f; bhf_pr; bhf_bd; bhf_f; bhf_cmp; })
+
+    | CT_BdHoareFBd { bhf_pr; bhf_po; ctxt = { bhf_f; bhf_cmp;  }} ->
+      mk (FbdHoareF { bhf_bd = f; bhf_pr; bhf_po; bhf_f; bhf_cmp; })
+
+    | CT_EHoareFPr { ehf_po; ctxt = { ehf_f }} ->
+      mk (FeHoareF { ehf_pr = f; ehf_po; ehf_f; })
+
+    | CT_EHoareFPo { ehf_pr; ctxt = { ehf_f }} ->
+      mk (FeHoareF { ehf_po = f; ehf_pr; ehf_f; })
+
+    | CT_EquivFPr { ef_po; ctxt = { ef_fl; ef_fr; }} ->
+      mk (FequivF { ef_pr = f; ef_po; ef_fl; ef_fr; })
+
+    | CT_EquivFPo { ef_pr; ctxt = { ef_fl; ef_fr; }} ->
+      mk (FequivF { ef_po = f; ef_pr; ef_fl; ef_fr; })
+
+  (* ------------------------------------------------------------------ *)
+  let ctxt_of_path (f : form) (path : path) : ctxt =
+    let ctxt_of_pr ({ pr_fun; pr_mem; } : pr) : prctxt =
+      { pr_fun; pr_mem; }
+
+    and ctxt_of_hoare ({ hf_f } : sHoareF) : hoarectxt =
+      { hf_f }
+
+    and ctxt_of_bdhoare ({ bhf_f; bhf_cmp; } : bdHoareF) : bdhoarectxt =
+      { bhf_f; bhf_cmp; }
+
+    and ctxt_of_ehoare ({ ehf_f; } : eHoareF) : ehoarectxt =
+      { ehf_f }
+    
+    and ctxt_of_equiv ({ ef_fl; ef_fr; } : equivF) : equivctxt =
+        { ef_fl; ef_fr; }
+
+    in
+
+    let for1 (f : form) (i : int) =
+      let f, (ctxt : ctxt1_r) =
+        match f.f_node, i with
+        | Fapp (f, fs), 0 ->
+          f, CT_AppTop fs
+
+        | Fapp (top, fs), i when 0 < i && i <= List.length fs ->
+          let argsl, f, argsr = List.pivot_at (i - 1) fs in
+          f, CT_AppArg (top, (argsl, argsr))
+
+        | Ftuple args, i when 0 <= i && i < List.length args ->
+          let largs, f, rargs = List.pivot_at i args in
+          f, CT_Tuple (largs, rargs)
+
+        | Flet (lv, f1, f2), 0 -> f1, CT_LetVal (lv, f2)
+        | Flet (lv, f1, f2), 1 -> f2, CT_LetVal (lv, f1)
+
+        | Fquant (q, bds, f), 0 -> f, CT_Quant (q, bds)
+
+        | Fproj (f, i), 0 -> f, CT_Proj i
+
+        | Fif (c, f1, f2), 0 -> c, CT_IfCond (f1, f2)
+        | Fif (c, f1, f2), 1 -> f1, CT_IfBranch (c, (`Then, f2))
+        | Fif (c, f1, f2), 2 -> f2, CT_IfBranch (c, (`Then, f1))
+
+        | Fmatch (c, bs, ty), 0 -> c, CT_MatchCond (ty, bs)
+        | Fmatch (c, bs, ty), i when 0 < i && i <= List.length bs ->
+          let bsl, b, bsr = List.pivot_at (i - 1) bs in
+          b, CT_MatchBranch (ty, c, (bsl, bsr))
+
+        | Fpr ({ pr_args; pr_event; } as pr), 0 ->
+          pr_args, CT_PrArgs { pr_event; ctxt = ctxt_of_pr pr }
+
+        | Fpr ({ pr_args; pr_event; } as pr), 1 ->
+          pr_event, CT_PrEvent { pr_args; ctxt = ctxt_of_pr pr }
+
+        | FhoareF ({ hf_pr; hf_po } as hf), 0 ->
+          hf_pr, CT_HoareFPr { hf_po; ctxt = ctxt_of_hoare hf }
+
+        | FhoareF ({ hf_pr; hf_po } as hf), 1 ->
+          hf_po, CT_HoareFPo { hf_pr; ctxt = ctxt_of_hoare hf }
+
+        | FbdHoareF ({ bhf_pr; bhf_po; bhf_bd } as bhf), 0 ->
+          bhf_po, CT_BdHoareFPo { bhf_pr; bhf_bd; ctxt = ctxt_of_bdhoare bhf }
+
+        | FbdHoareF ({ bhf_pr; bhf_po; bhf_bd } as bhf), 1 ->
+          bhf_pr, CT_BdHoareFPr { bhf_po; bhf_bd; ctxt = ctxt_of_bdhoare bhf }
+  
+        | FbdHoareF ({ bhf_pr; bhf_po; bhf_bd } as bhf), 2 ->
+          bhf_bd, CT_BdHoareFBd { bhf_pr; bhf_po; ctxt = ctxt_of_bdhoare bhf }
+    
+        | FeHoareF ({ ehf_pr; ehf_po } as ehf), 0 ->
+          ehf_pr, CT_EHoareFPr { ehf_po; ctxt = ctxt_of_ehoare ehf }
+
+        | FeHoareF ({ ehf_pr; ehf_po } as ehf), 1 ->
+          ehf_po, CT_EHoareFPo { ehf_pr; ctxt = ctxt_of_ehoare ehf }
+
+        | FequivF ({ ef_pr; ef_po } as ef), 0 ->
+          ef_pr, CT_EquivFPr { ef_po; ctxt = ctxt_of_equiv ef }
+
+        | FequivF ({ ef_pr; ef_po } as ef), 1 ->
+          ef_po, CT_EquivFPo { ef_pr; ctxt = ctxt_of_equiv ef }
+
+        | _ ->
+          assert false
+
+      in f, { ctxt; ty = f.f_ty; }
+
+    in
+    snd (List.fold_left_map for1 f path)
+
+  (* ------------------------------------------------------------------ *)
+  let map_with_ctxt (p : ptnpos) (tx : ctxt Lazy.t -> form -> form) (f0 : form) =
+    let rec doit1 (path : path) (p : ptnpos1) (fp : form) =
+      let norm_path (path : path) : path = List.tl (List.rev path) in
+
       match p with
-      | `Select i when i < 0 -> tx fp
+      | `Select i when i < 0 ->
+        tx (lazy (ctxt_of_path f0 (norm_path path))) fp
 
       | `Select i -> begin
           let (f, fs) = EcFol.destr_app fp in
             if List.length fs < i then raise InvalidPosition;
             let (fs1, fs2) = List.takedrop i fs in
             let f' = f_app f fs1 (toarrow (List.map f_ty fs2) fp.f_ty) in
-              f_app (tx f') fs2 fp.f_ty
+            f_app (tx (lazy (ctxt_of_path f0 (norm_path path))) f') fs2 fp.f_ty
         end
 
-      | `Sub p    -> begin
+      | `Sub p -> begin
           match fp.f_node with
           | Flocal _ -> raise InvalidPosition
           | Fpvar  _ -> raise InvalidPosition
@@ -1095,56 +1301,51 @@ module FPosition = struct
           | Fint   _ -> raise InvalidPosition
 
           | Fquant (q, b, f) ->
-              let f' = as_seq1 (doit p [f]) in
-              f_quant q b f'
+              f_quant q b (as_seq1 (doit path p [f]))
 
-          | Fif (c, f1, f2)  ->
-              let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
-              f_if c' f1' f2'
+          | Fif (c, f1, f2) ->
+              let (c, f1, f2) = as_seq3 (doit path p [c; f1; f2]) in
+              f_if c f1 f2
 
           | Fmatch (b, fs, ty) ->
-              let bfs = doit p (b :: fs) in
+              let bfs = doit path p (b :: fs) in
               EcCoreFol.f_match (List.hd bfs) (List.tl bfs) ty
 
           | Fapp (f, fs) -> begin
-              match doit p (f :: fs) with
+              match doit path p (f :: fs) with
               | [] -> assert false
-              | f' :: fs' ->
-                f_app f' fs' (fp.f_ty)
+              | f :: fs -> f_app f fs (fp.f_ty)
           end
 
           | Ftuple fs ->
-              let fs' = doit p fs in
-              f_tuple fs'
+              f_tuple (doit path p fs)
 
           | Fproj (f, i) ->
-              f_proj (as_seq1 (doit p [f])) i fp.f_ty
+              f_proj (as_seq1 (doit path p [f])) i fp.f_ty
 
           | Flet (lv, f1, f2) ->
-              let (f1', f2') = as_seq2 (doit p [f1; f2]) in
-              f_let lv f1' f2'
+              let (f1, f2) = as_seq2 (doit path p [f1; f2]) in
+              f_let lv f1 f2
 
           | Fpr pr ->
-              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
-              f_pr pr.pr_mem pr.pr_fun args' event'
+              let (args, event) = as_seq2 (doit path p [pr.pr_args; pr.pr_event]) in
+              f_pr pr.pr_mem pr.pr_fun args event
 
           | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
+              let (hf_pr, hf_po) = as_seq2 (doit path p [hf.hf_pr; hf.hf_po]) in
               f_hoareF_r { hf with hf_pr; hf_po; }
 
           | FeHoareF hf ->
-              let (ehf_pr, ehf_po) =
-                as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
-              in
+              let (ehf_pr, ehf_po) = as_seq2 (doit path p [hf.ehf_pr; hf.ehf_po;]) in
               f_eHoareF_r { hf with ehf_pr; ehf_po; }
 
           | FbdHoareF hf ->
-              let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
+              let sub = doit path p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
               f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_bd; }
 
           | FequivF ef ->
-              let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
+              let (ef_pr, ef_po) = as_seq2 (doit path p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
           | FhoareS   _ -> raise InvalidPosition
@@ -1154,7 +1355,7 @@ module FPosition = struct
           | FeagerF   _ -> raise InvalidPosition
       end
 
-    and doit ps fps =
+    and doit (path : path) (ps : ptnpos) (fps : form list) =
       match Mint.is_empty ps with
       | true  -> fps
       | false ->
@@ -1162,12 +1363,17 @@ module FPosition = struct
           and imax = fst (Mint.max_binding ps) in
           if imin < 0 || imax >= List.length fps then
             raise InvalidPosition;
-          let fps = List.mapi (fun i x -> (x, Mint.find_opt i ps)) fps in
-          let fps = List.map (function (f, None) -> f | (f, Some p) -> doit1 p f) fps in
-            fps
+          fps |> List.mapi (fun i f ->
+            match Mint.find_opt i ps with
+            | None -> f
+            | Some p -> doit1 (i :: path) p f
+          )
 
-    in
-      as_seq1 (doit p [f])
+    in as_seq1 (doit [] p [f0])
+
+  (* ------------------------------------------------------------------ *)
+  let map (p : ptnpos) (tx : form -> form) (f : form) =
+    map_with_ctxt p (fun _ -> tx) f
 
   (* ------------------------------------------------------------------ *)
   let reroot (root : int list) (p : ptnpos) =

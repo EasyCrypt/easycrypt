@@ -1657,7 +1657,7 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
-type rwmode = [`Bool | `Eq]
+type rwmode = [`Bool | `Eq | `Setoid]
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite
@@ -1669,24 +1669,35 @@ let t_rewrite
   let env          = LDecl.toenv hyps in
   let (pt, ax)     = LowApply.check `Elim pt (`Tc (tc, target)) in
 
-  let (pt, left, right) =
+  let (left, right), setoid =
     let doit ax =
       match sform_of_form ax, mode with
-      | SFeq  (f1, f2), (None | Some `Eq) -> (pt, f1, f2)
-      | SFiff (f1, f2), (None | Some `Eq) -> (pt, f1, f2)
+      | SFeq  (f1, f2), (None | Some `Eq) -> (f1, f2), None
+      | SFiff (f1, f2), (None | Some `Eq) -> (f1, f2), None
 
       | SFnot f, (None | Some `Bool) when s = `LtoR && donot ->
-        let ptev_env = ptenv_of_penv hyps (RApi.tc_penv tc) in
-        let pt = { ptev_env; ptev_pt = pt; ptev_ax = ax } in
-        let pt' = pt_of_global_r ptev_env LG.p_negeqF [] in
-        let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
-        let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
-        let pt, _ = concretize pt' in
-        pt, f, f_false
+        (f, f_false), None
 
       | _, (None | Some `Bool) when
           s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-          -> (pt, ax, f_true)
+        -> (ax, f_true), None
+
+      | _, Some `Setoid ->
+        let (oppath, tyargs), args =
+          try  destr_op_app ax
+          with DestrError _ -> raise InvalidProofTerm in
+
+        let op = EcEnv.Op.by_path oppath env in
+        let _rel = oget ~exn:InvalidProofTerm (EcEnv.Setoid.get_relation env oppath) in
+
+        let nparams = List.length (fst (tyfun_flat op.op_ty)) - 2 in
+
+        if List.length args <> nparams + 2 then
+          raise InvalidProofTerm;
+
+        let f1, f2 = as_seq2 (List.drop nparams args) in
+
+        (f1, f2), Some (oppath, tyargs, List.take nparams args)
 
       | _ -> raise TTC.NoMatch
     in oget ~exn:InvalidProofTerm (TTC.lazy_destruct hyps doit ax)
@@ -1698,7 +1709,23 @@ let t_rewrite
     | `RtoL -> (right, left )
   in
 
-  let change f =
+  let change ctxt f =
+    setoid |> Option.iter (fun (eqv, ety, eparams) ->
+      let accept (ineqv : bool) (ctxt1 : FPosition.ctxt1) =
+        match ctxt1.ctxt with
+        | CT_AppArg ({ f_node = Fop (p, _)}, (largs, rargs)) when List.length rargs < 2 && EcPath.p_equal p eqv ->
+          true
+        | CT_AppArg ({ f_node = Fop _}, _) when ineqv ->
+          true
+        | _ ->
+          false in
+
+      let accept = List.fold_left accept false (Lazy.force ctxt) in
+
+      if not accept then
+        raise InvalidProofTerm
+    );
+
     if not (EcReduction.is_conv hyps f left) then
       raise InvalidGoalShape;
     right in
@@ -1708,9 +1735,8 @@ let t_rewrite
     | None     -> FPosition.select_form ?keyed ?xconv hyps None left tgfp
     | Some pos -> pos in
 
-
   let tgfp =
-    try  FPosition.map npos change tgfp
+    try  FPosition.map_with_ctxt npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
   in
 

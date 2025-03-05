@@ -1075,6 +1075,17 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
         List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
       in Th_reduction rules
 
+  | Th_relation (oppath, axpath) ->
+      let oppath = subst_path s oppath in
+      let axpath = subst_path s axpath in
+      Th_relation (oppath, axpath)
+
+  | Th_morphism (relpath, oppath, axpath, pos) ->
+      let relpath = subst_path s relpath in
+      let oppath = subst_path s oppath in
+      let axpath = subst_path s axpath in
+      Th_morphism (relpath, oppath, axpath, pos)
+
   | Th_auto ({ axioms } as auto_rl) ->
       Th_auto { auto_rl with axioms =
         List.map (fst_map (subst_path s)) axioms }
