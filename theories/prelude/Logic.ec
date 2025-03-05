@@ -340,8 +340,10 @@ lemma negbK    : involutive [!]  by [].
 lemma negbNE b : !!b => b        by [].
 
 lemma negb_inj : injective [!]      by smt().
-lemma negbLR b c : b = !c => !b = c by smt().
-lemma negbRL b c : !b = c => b = !c by smt().
+lemma negbLR b c :   b  = !c => (!b) =  c by smt().
+lemma negbRL b c : (!b) =  c =>   b  = !c by smt().
+lemma negbDL b c : !(b = c) <=> (!b) =  c by smt().
+lemma negbDR b c : !(b = c) <=>   b  = !c by smt().
 
 lemma contra   c b : (c => b) => !b => !c by smt().
 lemma contraL  c b : (c => !b) => b => !c by smt().
