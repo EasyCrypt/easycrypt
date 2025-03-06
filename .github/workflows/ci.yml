@@ -21,9 +21,10 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install EasyCrypt dependencies
       run: |
-        opam pin add -n easycrypt .
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
+        opam update
+        opam pin add --update-invariant -n easycrypt .
+        opam install --update-invariant --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+        opam install --update-invariant --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make PROFILE=ci
 
@@ -61,9 +62,10 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install EasyCrypt dependencies
       run: |
-        opam pin add -n easycrypt .
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
+        opam update
+        opam pin add --update-invariant -n easycrypt .
+        opam install --update-invariant --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+        opam install --update-invariant --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make
     - name: Detect SMT provers
@@ -129,9 +131,10 @@ jobs:
           project/${{ matrix.target.name }}
     - name: Install EasyCrypt dependencies
       run: |
-        opam pin add -n easycrypt easycrypt
-        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
-        opam install --deps-only easycrypt
+        opam update
+        opam pin add --update-invariant -n easycrypt easycrypt
+        opam install --update-invariant --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+        opam install --update-invariant --deps-only easycrypt
     - name: Compile & Install EasyCrypt
       run: opam exec -- make -C easycrypt build install
     - name: Detect SMT provers

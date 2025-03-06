@@ -12,7 +12,7 @@
  (name easycrypt)
  (sites (lib theories) (libexec commands) (lib config))
  (depends
-  (ocaml (>= 4.08.0))
+  (ocaml (>= 5.3))
   (batteries (>= 3))
   (camlp-streams (>= 5))
   camlzip

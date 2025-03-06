@@ -40,7 +40,7 @@
         };
 
         query = devPackagesQuery // {
-          ocaml-base-compiler = "4.14.2";
+          ocaml-base-compiler = "5.3.0";
         };
 
         scope = on.buildOpamProject' { } ./. query;
