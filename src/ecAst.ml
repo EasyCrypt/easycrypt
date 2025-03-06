@@ -854,8 +854,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     in
     Why3.Hashcons.combine_list b1_hash 0 bs
 
-  let hash e =
-    match e.e_node with
+  let hash_node (e : expr_node) =
+    match e with
     | Eint   i -> BI.hash i
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
@@ -888,6 +888,9 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eproj (e, i) ->
         Why3.Hashcons.combine (e_hash e) i
+
+  let hash (e : expr) =
+    Why3.Hashcons.combine (ty_hash e.e_ty) (hash_node e.e_node)
 
   let fv_node e =
     let union ex =
@@ -980,8 +983,8 @@ module Hsform = Why3.Hashcons.Make (struct
        ty_equal f1.f_ty f2.f_ty
     && equal_node f1.f_node f2.f_node
 
-  let hash f =
-    match f.f_node with
+  let hash_node (f : f_node) =
+    match f with
     | Fquant(q, b, f) ->
         Why3.Hashcons.combine2 (f_hash f) (b_hash b) (qt_hash q)
 
@@ -1027,6 +1030,9 @@ module Hsform = Why3.Hashcons.Make (struct
     | FequivS     es   -> es_hash es
     | FeagerF     eg   -> eg_hash eg
     | Fpr         pr   -> pr_hash pr
+
+  let hash (f : form) =
+    Why3.Hashcons.combine (ty_hash f.f_ty) (hash_node f.f_node)
 
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 
