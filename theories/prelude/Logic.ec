@@ -642,6 +642,7 @@ lemma  eq_sym   : forall (x y : 'a), x = y <=> y = x by [].
 lemma  eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
 lemma  eq_iff   : forall a b, (a = b) <=> (a <=> b) by [].
 
+lemma  eq_imp (y: 'a) x: x = y => x = y by done.
 lemma  eq_sym_imp : forall (x y : 'a), x = y => y = x by [].
 
 (* -------------------------------------------------------------------- *)
