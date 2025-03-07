@@ -883,7 +883,6 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
 
   { tyd_params  = tparams;
     tyd_type    = body;
-    tyd_resolve = tyd.tyd_resolve;
     tyd_loca    = tyd.tyd_loca; }
 
 (* -------------------------------------------------------------------- *)
@@ -976,11 +975,11 @@ let subst_ax (s : subst) (ax : axiom) =
   let s, tparams = fresh_tparams s ax.ax_tparams in
   let spec   = subst_form s ax.ax_spec in
 
-  { ax_tparams    = tparams;
-    ax_spec       = spec;
-    ax_kind       = ax.ax_kind;
-    ax_loca       = ax.ax_loca;
-    ax_visibility = ax.ax_visibility; }
+  { ax_tparams = tparams;
+    ax_spec    = spec;
+    ax_kind    = ax.ax_kind;
+    ax_loca    = ax.ax_loca;
+    ax_smt     = ax.ax_smt; }
 
 (* -------------------------------------------------------------------- *)
 let fresh_scparam (s : subst) ((x, ty) : EcIdent.t * ty) =
