@@ -456,6 +456,8 @@ end = struct
       | Th_baserw _     -> (proofs, evc)
       | Th_addrw  _     -> (proofs, evc)
       | Th_reduction _  -> (proofs, evc)
+      | Th_relation _   -> (proofs, evc)
+      | Th_morphism _   -> (proofs, evc)
       | Th_auto _       -> (proofs, evc)
 
     and doit prefix (proofs, evc) dth =

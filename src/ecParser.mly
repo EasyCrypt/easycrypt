@@ -484,6 +484,7 @@
 %token MINUS
 %token MODPATH
 %token MODULE
+%token MORPHISM
 %token MOVE
 %token NE
 %token NOT
@@ -517,6 +518,7 @@
 %token RCONDT
 %token REALIZE
 %token REFLEX
+%token RELATION
 %token REMOVE
 %token RENAME
 %token REPLACE
@@ -657,6 +659,8 @@ _lident:
 | CHECK      { "check"      }
 | EDIT       { "edit"       }
 | FIX        { "fix"        }
+| RELATION   { "relation"   }
+| MORPHISM   { "morphism"   }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -3778,6 +3782,20 @@ user_red_option:
   }
 
 (* -------------------------------------------------------------------- *)
+(* Setoid rewrite                                                       *)
+relation:
+| RELATION name=qident { {
+    prl_name = name;
+  } }
+
+morphism:
+| MORPHISM morphism=qoident SLASH position=word LONGARROW relation=qoident { {
+    prl_morphism = morphism;
+    prl_position = position;
+    prl_relation = relation;
+  } }
+
+(* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
 %inline search: x=sform_h { x }
 
@@ -3807,6 +3825,8 @@ global_action:
 | notation         { Gnotation    $1 }
 | abbreviation     { Gabbrev      $1 }
 | reduction        { Greduction   $1 }
+| relation         { Grelation    $1 }
+| morphism         { Gmorphism    $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | tactic_dump      { Gtcdump      $1 }
