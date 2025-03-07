@@ -218,8 +218,7 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
   | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
     sim, add_eqs sim local (remove sim lvl lvr eqo) el er
 
-  | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr)
-    when List.length argsl = List.length argsr ->
+  | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) ->
     let eqo = oremove sim lvl lvr eqo in
     let env = sim.sim_env in
     let modl, modr = f_write env fl, f_write env fr in
@@ -227,6 +226,22 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
     let outf = Mpv2.split_mod  env modl modr eqo in
     Mpv2.check_glob outf;
     let sim, eqi = f_eqobs_in fl fr sim outf in
+
+    let argsl, argsr =
+      match argsl, argsr with
+      | _, _ when List.length argsl = List.length argsr -> argsl, argsr
+      | [al], _ -> begin
+        match al.e_node with
+        | Etuple argsl -> argsl, argsr
+        | _ -> raise EqObsInError
+      end
+      | _, [ar] -> begin
+        match ar.e_node with
+        | Etuple argsr -> argsl, argsr
+        | _ -> raise EqObsInError
+      end
+      | _ -> raise EqObsInError
+    in
     let eqi = List.fold_left2 (add_eqs sim local) (Mpv2.union eqnm eqi) argsl argsr in
     sim, eqi
 
