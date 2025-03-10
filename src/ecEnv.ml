@@ -27,7 +27,6 @@ type 'a suspension = {
   sp_params : int * (EcIdent.t * module_type) list;
 }
 
-
 (* -------------------------------------------------------------------- *)
 let check_not_suspended (params, obj) =
   if not (List.for_all (fun x -> x = None) params) then
@@ -168,6 +167,35 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type crb_tyrev_binding = [
+  | `Bitstring of crb_bitstring
+  | `Array     of crb_array
+]
+
+type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToUInt | `ToSInt ]
+
+type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
+
+type crb_oprev_binding = [
+  | `Bitstring  of crb_bitstring_operator
+  | `Array      of crb_array_operator
+  | `BvOperator of crb_bvoperator
+  | `Circuit    of crb_circuit
+]
+  
+type crb_tyrev_map = crb_tyrev_binding list Mp.t
+type crb_oprev_map = crb_oprev_binding list Mp.t
+
+type crbindings = {
+  bitstrings  : crb_bitstring Mp.t;
+  arrays      : crb_array Mp.t;
+  bvoperators : crb_bvoperator Mp.t;
+  circuits    : crb_circuit Mp.t;
+  opreverse   : crb_oprev_map;
+  tyreverse   : crb_tyrev_map;
+}
+
+(* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -187,6 +215,7 @@ type preenv = {
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
+  env_crbds    : crbindings;
   (* Map theory paths to their env before just before theory was closed. *)
   (* The environment should be incuded for all theories, including       *)
   (* abstract ones. The purpose of this map is to simplify the code      *)
@@ -297,6 +326,14 @@ let empty gstate =
     let icomps = MMsym.add name (IPPath path) MMsym.empty in
     { (empty_mc None) with mc_components = icomps } in
 
+  let empty_crbindings : crbindings =
+    { bitstrings  = Mp.empty
+    ; arrays      = Mp.empty
+    ; bvoperators = Mp.empty
+    ; circuits    = Mp.empty
+    ; opreverse   = Mp.empty
+    ; tyreverse   = Mp.empty } in
+
   { env_top      = None;
     env_gstate   = gstate;
     env_scope    = { ec_path = path; ec_scope = `Theory; };
@@ -314,7 +351,8 @@ let empty gstate =
     env_ntbase   = Mop.empty;
     env_modlcs   = Sid.empty;
     env_item     = [];
-    env_norm     = ref empty_norm_cache;
+    env_norm     = ref empty_norm_cache; 
+    env_crbds    = empty_crbindings;
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -1109,9 +1147,12 @@ module MC = struct
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | Th_export _ | Th_addrw _ | Th_instance _
-      | Th_auto   _ | Th_reduction _ ->
-          (mc, None)
+      | Th_export    _
+      | Th_addrw     _
+      | Th_instance  _
+      | Th_auto      _
+      | Th_reduction _
+      | Th_crbinding _ -> (mc, None)
     in
 
     let (mc, submcs) =
@@ -2832,6 +2873,189 @@ module Algebra = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Circuit = struct
+  let push_tyreverse (reverse : crb_tyrev_map) (p : path) (v : crb_tyrev_binding) =
+    Mp.change
+      (fun vs -> Some (v :: Option.value ~default:[] vs))
+      p reverse
+
+  let push_all_tyreverse (reverse : crb_tyrev_map) (pvs : (path * crb_tyrev_binding) list) =
+    List.fold_left (fun rv (p, v) -> push_tyreverse rv p v) reverse pvs    
+
+  let push_opreverse (reverse : crb_oprev_map) (p : path) (v : crb_oprev_binding) =
+    Mp.change
+      (fun vs -> Some (v :: Option.value ~default:[] vs))
+      p reverse
+
+  let push_all_opreverse (reverse : crb_oprev_map) (pvs : (path * crb_oprev_binding) list) =
+    List.fold_left (fun rv (p, v) -> push_opreverse rv p v) reverse pvs
+
+  let rebind_bitstring_ (bs : crb_bitstring) (bindings : crbindings) =
+    { bindings with
+        bitstrings = Mp.add bs.type_ bs bindings.bitstrings;
+        tyreverse  = push_tyreverse bindings.tyreverse bs.type_ (`Bitstring bs);
+        opreverse  =
+          push_all_opreverse
+            bindings.opreverse
+            [ (bs.from_, `Bitstring (bs, `From ))
+            ; (bs.to_  , `Bitstring (bs, `To   ))
+            ; (bs.touint, `Bitstring (bs, `ToUInt))
+            ; (bs.tosint, `Bitstring (bs, `ToSInt))
+            ; (bs.ofint, `Bitstring (bs, `OfInt)) ]; }
+
+  let rebind_bitstring (bs : crb_bitstring) (env : env) : env =
+    { env with env_crbds = rebind_bitstring_ bs env.env_crbds }
+
+  let bind_bitstring ?(import = import0) (lc : is_local) (bs : crb_bitstring) (env : env) = 
+    let env = if import.im_immediate then rebind_bitstring bs env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Bitstring bs, lc)) :: env.env_item; }
+
+  let rebind_array_ (ba : crb_array) (bindings : crbindings) =
+    { bindings with
+        arrays    = Mp.add ba.type_ ba bindings.arrays;
+        tyreverse = push_tyreverse bindings.tyreverse ba.type_ (`Array ba);
+        opreverse =
+          push_all_opreverse
+            bindings.opreverse
+            [ (ba.set   , `Array (ba, `Set))
+            ; (ba.get   , `Array (ba, `Get))
+            ; (ba.tolist, `Array (ba, `ToList))
+            ; (ba.oflist, `Array (ba, `OfList)) ]}
+
+  let rebind_array (ba : crb_array) (env : env) : env =
+    { env with env_crbds = rebind_array_ ba env.env_crbds }
+
+  let bind_array ?(import = import0) (lc : is_local) (ba : crb_array) (env : env) =
+    let env = if import.im_immediate then rebind_array ba env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Array ba, lc)) :: env.env_item; }
+
+  let rebind_bvoperator_ (op : crb_bvoperator) (bindings : crbindings) =
+    { bindings with
+        bvoperators = Mp.add op.operator op bindings.bvoperators;
+        opreverse   = push_opreverse bindings.opreverse op.operator (`BvOperator op); }
+
+  let rebind_bvoperator (op : crb_bvoperator) (env : env) =
+    { env with env_crbds = rebind_bvoperator_ op env.env_crbds }
+
+  let bind_bvoperator ?(import = import0) (lc : is_local) (op : crb_bvoperator) (env : env) =
+    let env = if import.im_immediate then rebind_bvoperator op env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_BvOperator op, lc)) :: env.env_item; }
+  
+  let rebind_circuit_ (cr : crb_circuit) (bindings : crbindings) =
+    { bindings with
+        circuits  = Mp.add cr.operator cr bindings.circuits;
+        opreverse = push_opreverse bindings.opreverse cr.operator (`Circuit cr); }
+
+  let rebind_circuit (cr : crb_circuit) (env : env) =
+    { env with env_crbds = rebind_circuit_ cr env.env_crbds }
+
+  let bind_circuit ?(import = import0) (lc : is_local) (cr : crb_circuit) (env : env) = 
+    let env = if import.im_immediate then rebind_circuit cr env else env in
+    { env with env_item =
+        mkitem import (Th_crbinding (CRB_Circuit cr, lc)) :: env.env_item; }
+
+  let bind_crbinding ?import (lc : is_local) (crb : crbinding) (env : env) =
+    match crb with
+    | CRB_Bitstring  bs -> bind_bitstring  ?import lc bs env
+    | CRB_Array      ba -> bind_array      ?import lc ba env
+    | CRB_BvOperator op -> bind_bvoperator ?import lc op env
+    | CRB_Circuit    cr -> bind_circuit    ?import lc cr env
+
+  let rec lookup_bitstring_path (env : env) (k : path) : crb_bitstring option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
+    match Mp.find_opt k env.env_crbds.bitstrings with
+    | Some _ as bs -> bs
+    | None -> try lookup_bitstring env (Ty.unfold k [] env)
+      with LookupFailure _ -> None
+
+  and lookup_bitstring (env : env) (ty : ty) : crb_bitstring option =
+    match ty.ty_node with
+    | Tconstr (p, []) -> lookup_bitstring_path env p
+    | _ -> None
+    
+  let lookup_bitstring_size_path (env : env) (pth : path) : int option = 
+    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring_path env pth)
+  
+  let lookup_circuit_path (env : env) (v : path) : Lospecs.Ast.adef option = 
+    Mp.find_opt v env.env_crbds.circuits
+    |> Option.map (fun cr -> cr.circuit)
+
+  let lookup_bitstring_size (env : env) (ty : ty) : int option =
+    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)
+
+  let rec lookup_array_path (env : env) (pth : path) : crb_array option = 
+    let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
+    match Mp.find_opt k env.env_crbds.arrays with
+    | Some arr -> Some arr
+    | None -> try
+      lookup_array env (Ty.unfold pth [] env)
+      with LookupFailure e -> None
+
+  and lookup_array (env : env) (ty : ty) : crb_array option = 
+    match ty.ty_node with
+    | Tconstr (p, [w]) -> lookup_array_path env p
+    | _ -> None
+
+  let rec lookup_array_and_bitstring (env: env) (ty: ty) : (crb_array * crb_bitstring) option =
+    match ty.ty_node with
+    | Tconstr (p, [w]) -> 
+      let arr = lookup_array_path env p in
+      let bs = lookup_bitstring env w in
+      begin match arr, bs with
+      | Some arr, Some bs -> Some (arr, bs)
+      | _ -> None    
+      end
+    | Tconstr (p, []) -> (try
+      lookup_array_and_bitstring env (Ty.unfold p [] env)
+      with LookupFailure _ -> None)
+    | _ -> None
+
+  let lookup_array_size (env : env) (ty : ty) : int option = 
+    Option.map (fun c -> c.size) (lookup_array env ty)
+
+  let lookup_bvoperator_path (env : env) (v : path) : crb_bvoperator option = 
+    Mp.find_opt v env.env_crbds.bvoperators
+
+  let lookup_bvoperator (env : env) (o : qsymbol) : crb_bvoperator option =
+    let p, _o = Op.lookup o env in
+    lookup_bvoperator_path env p
+
+  let lookup_circuit (env : env) (o : qsymbol) : Lospecs.Ast.adef option =
+    let p, _o = Op.lookup o env in
+    lookup_circuit_path env p  
+
+  let reverse_type (env : env) (p : path) : crb_tyrev_binding list =
+    Mp.find_def [] p env.env_crbds.tyreverse
+
+  let reverse_operator (env: env) (p : path) : crb_oprev_binding list =
+    Mp.find_def [] p env.env_crbds.opreverse
+
+  let reverse_and_filter_operator
+    ~(filter : crb_oprev_binding -> 'a option) (env : env) (p : path)
+  =
+    List.find_map_opt filter (reverse_operator env p)
+
+  let reverse_bitstring_operator =
+    reverse_and_filter_operator
+      ~filter:(function `Bitstring x -> Some x | _ -> None)
+
+  let reverse_array_operator =
+    reverse_and_filter_operator
+      ~filter:(function `Array x -> Some x | _ -> None)
+
+  let reverse_bvoperator =
+    reverse_and_filter_operator
+      ~filter:(function `BvOperator x -> Some x | _ -> None)
+
+  let reverse_circuit =
+    reverse_and_filter_operator
+      ~filter:(function `Circuit x -> Some x | _ -> None)        
+end
+
+(* -------------------------------------------------------------------- *)
 module Theory = struct
   type t    = ctheory
   type mode = [`All | thmode]
@@ -3002,6 +3226,24 @@ module Theory = struct
     in bind_base_th for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_cr_th =
+    let for1 (_ : path) (bindings : crbindings) = function
+      | Th_crbinding (CRB_Bitstring bs, _) ->
+        Some (Circuit.rebind_bitstring_ bs bindings)
+
+      | Th_crbinding (CRB_Array ba, _) ->
+        Some (Circuit.rebind_array_ ba bindings)
+
+      | Th_crbinding (CRB_BvOperator op, _) ->
+        Some (Circuit.rebind_bvoperator_ op bindings)
+
+      | Th_crbinding (CRB_Circuit cr, _) ->
+        Some (Circuit.rebind_circuit_ cr bindings)
+
+      | _ -> None
+  in bind_base_th for1
+
+  (* ------------------------------------------------------------------ *)
   let bind
     ?(import = import0)
      (cth  : compiled_theory)
@@ -3024,10 +3266,12 @@ module Theory = struct
           let env_atbase  = bind_at_th thname env.env_atbase items in
           let env_ntbase  = bind_nt_th thname env.env_ntbase items in
           let env_redbase = bind_rd_th thname env.env_redbase items in
+          let env_crbds   = bind_cr_th thname env.env_crbds items in
           let env =
             { env with
-                env_tci   ; env_tc     ; env_rwbase;
-                env_atbase; env_ntbase; env_redbase; }
+                env_tci   ; env_tc    ; env_rwbase;
+                env_atbase; env_ntbase; env_redbase;
+                env_crbds ; }
           in
           add_restr_th thname env items
 
@@ -3088,9 +3332,11 @@ module Theory = struct
         | Th_baserw (x, _) ->
             MC.import_rwbase (xpath x) env
 
-        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
-            env
-
+        | Th_addrw     _
+        | Th_instance  _
+        | Th_auto      _
+        | Th_reduction _
+        | Th_crbinding _ -> env
       in
         List.fold_left import_th_item env th
 
@@ -3243,6 +3489,7 @@ module Theory = struct
           env_atbase  = bind_at_th thpath env.env_atbase cth.cth_items;
           env_ntbase  = bind_nt_th thpath env.env_ntbase cth.cth_items;
           env_redbase = bind_rd_th thpath env.env_redbase cth.cth_items;
+          env_crbds   = bind_cr_th thpath env.env_crbds cth.cth_items;
           env_thenvs  = Mp.set_union env.env_thenvs compiled.compiled; }
 end
 
@@ -3580,6 +3827,3 @@ module LDecl = struct
   let inv_memenv1 lenv =
     { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
 end
-
-
-let pp_debug_form = ref (fun _env _fmt _f -> assert false)
