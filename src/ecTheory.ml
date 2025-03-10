@@ -37,6 +37,8 @@ and theory_item_r =
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_relation  of (EcPath.path * EcPath.path)
+  | Th_morphism  of (EcPath.path * EcPath.path * EcPath.path * int)
   | Th_auto      of auto_rule
 
 and thsource = {

@@ -508,7 +508,7 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let xmutate (tc : tcenv) (vx : 'a) (fp : form list) =
-    let (tc, hds) = List.map_fold (fun tc fp -> newgoal tc fp) tc fp in
+    let (tc, hds) = List.fold_left_map (fun tc fp -> newgoal tc fp) tc fp in
     close tc (VExtern (vx, hds))
 
   (* ------------------------------------------------------------------ *)
@@ -518,7 +518,7 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let xmutate_hyps (tc : tcenv) (vx : 'a) subgoals =
     let (tc, hds) =
-      List.map_fold
+      List.fold_left_map
         (fun tc (hyps, fp) -> newgoal tc ~hyps fp)
         tc subgoals
     in
@@ -564,11 +564,11 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let on_sub1i_goals (tt : int -> backward) (hds : handle list) (pe : proofenv) =
-    let do1 i pe hd =
+    let do1 pe i hd =
       let tc = tt i (tcenv1_of_penv hd pe) in
       assert (tc.tce_tcenv.tce_ctxt = []);
       (tc_penv tc, tc_opened tc) in
-    List.mapi_fold do1 pe hds
+    List.fold_left_mapi do1 pe hds
 
   (* ------------------------------------------------------------------ *)
   let on_sub1_goals (tt : backward) (hds : handle list) (pe : proofenv) =
@@ -578,11 +578,11 @@ module FApi = struct
   let on_sub1i_map_goals
     (tt : int -> tcenv1 -> 'a * tcenv) (hds : handle list) (pe : proofenv)
   =
-    let do1 i pe hd =
+    let do1 pe i hd =
       let data, tc = tt i (tcenv1_of_penv hd pe) in
       assert (tc.tce_tcenv.tce_ctxt = []);
       (tc_penv tc, (tc_opened tc, data)) in
-    List.mapi_fold do1 pe hds
+    List.fold_left_mapi do1 pe hds
 
   (* ------------------------------------------------------------------ *)
   let on_sub1_map_goals
