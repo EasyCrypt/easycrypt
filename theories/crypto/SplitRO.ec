@@ -162,7 +162,12 @@ section PROOFS.
         by rewrite /pred1 /(\o) (can_eq _ _ ofpairK).
       move=> _ t; rewrite sample_spec supp_dmap => -[[t1 t2] []] + ->>.
       by rewrite topairK ofpairK => ->.
-    by auto => />; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
+    auto=> /> &2 eq_dom; move: (eq_dom x{2}); rewrite !eq_iff.
+    rewrite !mem_map !mem_pair_map !mapE !mergeE 1:/o_pair //.
+    case _: (x{2} \in I1.RO.m{2})=> />.
+    + by rewrite !domE; case: (I1.RO.m.[x]{2})=> />; case: (I2.RO.m.[x]{2}).
+    rewrite !get_set_sameE /= -(map_set (fun _=> ofpair)) set_pair_map /=.
+    by move=> + + x0; rewrite mem_map mem_pair_map !mem_set /#.
   qed.
 
   equiv RO_split: 
