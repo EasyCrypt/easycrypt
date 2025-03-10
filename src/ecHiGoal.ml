@@ -492,7 +492,13 @@ let process_exacttype qs (tc : tcenv1) =
   let tys =
     List.map (fun (a,_) -> EcTypes.tvar a)
       (EcEnv.LDecl.tohyps hyps).h_tvar in
-  EcLowGoal.t_apply_s p tys ~args:[] ~sk:0 tc
+  let pt = ptglobal ~tys p in
+
+  try
+    EcLowGoal.t_apply pt tc
+  with InvalidGoalShape ->
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
