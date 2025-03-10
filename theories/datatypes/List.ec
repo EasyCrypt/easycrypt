@@ -224,6 +224,14 @@ proof. by rewrite /nseq iter1. qed.
 lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
 proof. by move=> le0_n; rewrite /nseq iterS. qed.
 
+lemma nseq_eq (x y: 'a) n m: 
+  nseq n x = nseq m y => (x = y /\ n = m) \/ (n <= 0 /\ m <= 0).
+proof. 
+move => nseq_eq; have: max 0 n = max 0 m by smt(size_nseq).
+case (n <= 0) => [/#|]; case (m <= 0) => [/#|/=]/ltzNge mgt0/ltzNge ngt0 max_eq.
+move: nseq_eq; rewrite (nseqS (n-1)) 2:(nseqS (m-1)); smt(ltzW).
+qed.
+
 lemma nseqSr n (x : 'a): 0 <= n => nseq (n+1) x = rcons (nseq n x) x.
 proof.
 elim: n=> /= [|i ge0_i ih]; first by rewrite nseq0 nseq1.
@@ -692,6 +700,13 @@ lemma filter_pred1 x (s : 'a list) :
 proof.
 elim: s=> /= [|y s ih @/pred1]; first by rewrite nseq0.
 by case: (y = x)=> //; rewrite addzC nseqS ?count_ge0.
+qed.
+
+lemma count_nseq (x: 'a) n p: count p (nseq n x) = if p x then max 0 n else 0.
+proof.
+move: n; apply natind => n n_bound /=.
+- rewrite nseq0_le //= /#. 
+move => IH; rewrite nseqS //= lez_maxr /#.
 qed.
 
 lemma has_nseq a n (x : 'a) : has a (nseq n x) <=> (0 < n) /\ a x.
@@ -1262,6 +1277,13 @@ qed.
 
 lemma all_rem p (x : 'a) (s : 'a list): all p s => all p (rem x s).
 proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
+
+lemma count_remP ['a] (p : 'a -> bool) (s : 'a list) x :
+  count p (rem x s) = count p s - b2i (p x /\ x \in s).
+proof. 
+case (x \in s) => [/perm_to_rem/perm_eqP/(_ p)->/#|x_in].
+by rewrite rem_id.
+qed.
 
 lemma count_rem ['a] (p : 'a -> bool) (s : 'a list) x : x \in s =>
   count p s = b2i (p x) + count p (rem x s).
