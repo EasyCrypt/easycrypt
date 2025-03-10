@@ -45,11 +45,30 @@
   let pfapp_symb loc s ti es =
     PFapp(mk_pfid_symb loc s ti, es)
 
-  let pfget loc ti e1 e2    =
-    pfapp_symb loc EcCoreLib.s_get ti [e1;e2]
+  let pfget
+    (lc    : EcLocation.t)
+    (ti    : ptyannot option)
+    (codom : pty option)
+    (map   : pformula)
+    (k     : pformula)
+  =
+    ofold
+        (fun codom map -> PFcast (mk_loc lc map, codom))
+        (pfapp_symb lc EcCoreLib.s_get ti [map; k])
+        codom
 
-  let pfset loc ti e1 e2 e3 =
-    pfapp_symb loc EcCoreLib.s_set ti [e1;e2;e3]
+  let pfset
+    (lc    : EcLocation.t)
+    (ti    : ptyannot option)
+    (codom : pty option)
+    (map   : pformula)
+    (k     : pformula)
+    (v     : pformula)
+  =
+    let v =
+        ofold (fun codom v -> mk_loc (loc v) (PFcast (v, codom)))
+        v codom
+    in pfapp_symb lc EcCoreLib.s_set ti [map; k; v]
 
   let pf_nil loc ti =
     mk_pfid_symb loc EcCoreLib.s_nil ti
@@ -1053,15 +1072,19 @@ sform_u(P):
 | x=mident
    { PFmem x }
 
-| se=sform_r(P) DLBRACKET ti=tvars_app? e=loc(plist1(form_r(P), COMMA)) RBRACKET
+| se=sform_r(P) DLBRACKET
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e=loc(plist1(form_r(P), COMMA))
+  RBRACKET
    { let e = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e) (unloc e) in
-     pfget (EcLocation.make $startpos $endpos) ti se e }
+     pfget (EcLocation.make $startpos $endpos) ti codom se e }
 
 | se=sform_r(P) DLBRACKET
-    ti=tvars_app? e1=loc(plist1(form_r(P), COMMA))LARROW e2=form_r(P)
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e1=loc(plist1(form_r(P), COMMA)) LARROW e2=form_r(P)
   RBRACKET
    { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e1) (unloc e1) in
-     pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
+     pfset (EcLocation.make $startpos $endpos) ti codom se e1 e2 }
 
 | x=sform_r(P) s=pside_force
    { PFside (x, s) }
@@ -1296,8 +1319,11 @@ lvalue_u:
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=lvalue_var DLBRACKET ti=tvars_app? e=plist1(expr, COMMA) RBRACKET
-   { PLvMap (x, ti, e) }
+| x=lvalue_var DLBRACKET
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e=plist1(expr, COMMA)
+  RBRACKET
+   { PLvMap (x, ti, codom, e) }
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
