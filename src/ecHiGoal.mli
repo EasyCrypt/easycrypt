@@ -41,6 +41,7 @@ module LowRewrite : sig
   | LRW_IdRewriting
   | LRW_RPatternNoMatch
   | LRW_RPatternNoRuleMatch
+  | LRW_InvalidSetoidContext
 
   exception RewriteError of error
 
