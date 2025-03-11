@@ -65,7 +65,7 @@ qed.
 lemma contradiction: false.
   have H1: exists (B0<:BT) (A0 <: AT), (forall (x y:glob B0(A0)), x=y) /\ ! (forall (x y:glob A0), x=y).
     exists B A. 
-    rewrite singleton_unit singleton_int.
+    by rewrite singleton_unit singleton_int.
   elim H1 => B0 A0 [H2 H3].
   have H4: !(forall (x y:glob B0(A0)), x=y).
     (* This no longer applies since glob for abstract modules is not eagerly normalized *)

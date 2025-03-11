@@ -7,7 +7,9 @@ module Uses : sig
 end
 
 val ff_alpha_equal : functor_fun -> functor_fun -> bool
+val ff_ntr_compare : functor_fun -> functor_fun -> int
 
+val ff_norm_restr : env -> functor_fun -> mem_restr
 val ff_norm : env -> functor_fun -> memory -> form
 val ff_norm_ty : env -> functor_fun -> ty
 

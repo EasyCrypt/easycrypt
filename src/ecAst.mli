@@ -348,6 +348,11 @@ val ov_equal : ovariable equality
 val ov_hash  : ovariable hash
 
 (* -------------------------------------------------------------------- *)
+val ff_equal : functor_fun equality
+val ff_hash  : functor_fun hash
+val ff_fv    : functor_fun fv
+
+(* -------------------------------------------------------------------- *)
 val mr_equal : mem_restr equality
 val mr_hash  : mem_restr hash
 val mr_fv    : mem_restr fv

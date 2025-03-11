@@ -93,6 +93,10 @@ let funs_uses_core env params fs =
   let fuses = List.fold_left on_fun Uses.empty fs in
   env, fuses
 
+let ff_norm_restr env ff = 
+  let _, fuses = funs_uses_core env ff.ff_params [ff.ff_xp] in
+  Uses.to_mem_restr ff.ff_params fuses
+
 let ff_norm env ff mem =
   let _, fuses = funs_uses_core env ff.ff_params [ff.ff_xp] in
   Uses.to_form env ff.ff_params fuses mem
@@ -292,6 +296,14 @@ end)
 
 let ff_alpha_equal ff1 ff2 =
   compare_ff ff1 ff2 = 0
+
+let ff_ntr_compare (ff1 : functor_fun) (ff2 : functor_fun) =
+  match x_ntr_compare ff1.ff_xp ff2.ff_xp with
+  | 0 ->
+    List.compare
+      (fun (id1, _) (id2, _) -> EcIdent.id_ntr_compare id1 id2)
+      ff1.ff_params ff2.ff_params
+  | n -> n
 
 (* ---------------------------------------------------------------- *)
 type meta = int
