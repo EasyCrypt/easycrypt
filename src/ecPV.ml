@@ -942,7 +942,8 @@ module Mpv2 = struct
       let local = enter_local env local bds1 bds2 in
       add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
-    | Elocal x1, Elocal x2 when
+    | Elocal x1, Elocal x2
+     when EcIdent.id_equal x1 x2 ||
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
     | Evar pv1, Evar pv2
       when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty ->
