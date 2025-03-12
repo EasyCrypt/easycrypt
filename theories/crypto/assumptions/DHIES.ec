@@ -194,9 +194,9 @@ theory DHIES.
   lemma mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
   proof.
   proc.
-  outline {1} [1] { mcph <@ MEncDHIES_loop.S.sample(encDHIES tag ptxt, kks); }.
+  outline {1} 1 by { mcph <@ MEncDHIES_loop.S.sample(encDHIES tag ptxt, kks); }.
   rewrite equiv[{1} 1 MEncDHIES_loop.Sample_Loop_eq].
-  outline {2} [2] { cs <@ MEnc_loop.S.sample(fun k => enc k tag ptxt, skeys); }.
+  outline {2} 2 by { cs <@ MEnc_loop.S.sample(fun k => enc k tag ptxt, skeys); }.
   rewrite equiv[{2} 2 MEnc_loop.Sample_Loop_eq].
   inline*; wp.
   while ( ={i,kks,tag,ptxt} /\
@@ -205,7 +205,7 @@ theory DHIES.
            l{1} = map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
                       (zip (drop (i+1) kks) l){2}).
   + wp.
-    outline {1} [1] { r <@ EncDHIES_map.S.sample(enc (nth witness xs i).`2.`2 tag ptxt,
+    outline {1} 1 by { r <@ EncDHIES_map.S.sample(enc (nth witness xs i).`2.`2 tag ptxt,
                                                          fun c => ((nth witness xs i).`1,
                                                                   ((nth witness xs i).`2.`1,c))); }.
     rewrite equiv[{1} 1 EncDHIES_map.sample].
@@ -226,12 +226,12 @@ theory DHIES.
   lemma mrndkeys_def : equiv [MEnc.mrndkeys1 ~ MEnc.mrndkeys2: ={pkl} ==> ={res}].
   proof.
   proc.
-  outline {2} [2-3] { keys <@ MRnd_map.S.map(
+  outline {2} [2 .. 3] by { keys <@ MRnd_map.S.map(
                       dlist gen (size pkl),
                       fun (ks:K list) => amap (fun pk k => (g ^ x, k))
                                               (zip pkl ks)); }.
   rewrite equiv[{2} 2 -MRnd_map.sample].
-  outline {2} [1-2] { keys <@ MRnd_let.SampleDep.sample(dt,
+  outline {2} [1 .. 2] by { keys <@ MRnd_let.SampleDep.sample(dt,
                       fun x => dmap (dlist gen (size pkl))
                                     (fun ks => amap (fun pk k => (g ^ x, k))
                                                     (zip pkl ks))); }.
@@ -262,10 +262,10 @@ theory DHIES.
   rewrite equiv[{1} 1 MEncrypt_map.sample].
   inline*; swap{1} 2 1.
   proc rewrite {1} ^d<- dlet_lockedE.
-  outline {1} [1-2] {r1 <@ MEncDHIES_let.SampleDLet.sample(mkeyDHIES (elems mpk), mencDHIES tag ptxt); }.
+  outline {1} [1 .. 2] by { r1 <@ MEncDHIES_let.SampleDLet.sample(mkeyDHIES (elems mpk), mencDHIES tag ptxt); }.
   rewrite equiv[{1} 1 -MEncDHIES_let.SampleDepDLet].
   inline*; swap{1} 2 1. 
-  outline {1} [1-2] {t <@ MKey_map.S.sample(
+  outline {1} [1 .. 2] by {t <@ MKey_map.S.sample(
                             FD.dt,
                             (fun x =>
                                map (fun pk => (pk, (g ^ x, hash (pk ^ x))))
@@ -295,11 +295,11 @@ theory DHIES.
   proc*.
   rewrite equiv[{2} 1 -mencrypt_def1].
   inline.
-  outline {2} [7] { cphs <@ MEncDHIES_loop.S.sample(encDHIES tag ptxt, keys); }.
+  outline {2} 7 by { cphs <@ MEncDHIES_loop.S.sample(encDHIES tag ptxt, keys); }.
   rewrite equiv[{2} 7 MEncDHIES_loop.Sample_Loop_eq].
   inline*; wp.
   while (={mpk0,tag0,ptxt0,i} /\ pkl{1} = xs{2} /\ (d = encDHIES tag0 ptxt0){2} /\ cphList{1} = l{2}); last by auto.
-  outline {2} [1] {r0 <@ Enc_map.S.sample (
+  outline {2} 1 by {r0 <@ Enc_map.S.sample (
                        enc (nth witness xs i).`2.`2 tag0 ptxt0,
                        fun c =>((nth witness xs i).`1, ((nth witness xs i).`2.`1, c)));}.
   rewrite equiv[{2} 1 Enc_map.sample].
@@ -663,7 +663,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
   swap{2} 10 1.
   seq 1 10 : (#pre /\ keys{1} = hs{2} /\ (map fst hs = elems pks){2} /\
               (gygxlist = amap (fun pk (x:_*_) => x.`1) hs){2}).
-   outline {1} [1] { keys <@ MEnc.mrndkeys1(elems pks); }.
+   outline {1} 1 by { keys <@ MEnc.mrndkeys1(elems pks); }.
    rewrite equiv[{1} 1 mrndkeys_def].
    + inline*; wp; rnd; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
        by rewrite H.
@@ -849,14 +849,14 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
   simplify; swap{2} 12 1; swap{2} [8..10] 2; swap{2} 3 6; swap{2} [4..6] 1.
   seq 1 4 : (#pre /\ keys{1} = (zip (elems pks) (map (fun k=>(g^x,k)) new_keys)){2} /\
               (n = size (elems pks) /\ n = size new_keys){2}).
-   outline {1} [1] { keys <@ MEnc.mrndkeys1(elems pks); }.
+   outline {1} 1 by { keys <@ MEnc.mrndkeys1(elems pks); }.
    rewrite equiv[{1} 1 mrndkeys_def].
    + inline*; wp; rnd; wp; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
            by rewrite zip_mapr.
      smt (supp_dlist_size size_ge0).
   seq 1 4: (#pre /\ enclist{1} = (zip (elems pks) (map (fun k=>(g^x,k)) lctxt)){2} /\
             (size lctxt = size (elems pks) /\ aad = tag){2}).
-   outline {1} [1] { enclist <@ MEnc.mencDHIES1(tag,if MRPKE_lor.b then m1 else m0,keys); }.
+   outline {1} 1 by { enclist <@ MEnc.mencDHIES1(tag,if MRPKE_lor.b then m1 else m0,keys); }.
    rewrite equiv[{1} 1 mencDHIES_eq].
    + inline*; wp; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
      - apply eq_distr; congr.

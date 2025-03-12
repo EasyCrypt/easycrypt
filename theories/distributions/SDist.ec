@@ -335,7 +335,7 @@ have -> : Pr[Sample(A).main(d') @ &m : res] =
   byequiv => //; proc. 
   seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}).
   + by auto.
-  outline {2} [1] ~ S.sample. 
+  outline {2} 1 ~ S.sample.
   call (: d{2} = (F x){1} /\ (glob A){1} = (glob A){m} ==> ={res}).
   bypr (res{1}) (res{2}); 1:smt(). 
   move => &1 &2 a [-> eq_globA]; rewrite sampleE -(adv_mu1 A). 

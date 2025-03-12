@@ -381,7 +381,7 @@ abstract theory Program.
     rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
     rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
     wp; rnd.
-    outline {1} [1] ~ Sample.sample.
+    outline {1} 1 ~ Sample.sample.
     rewrite equiv[{1} 1 ih].
     inline.
     by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().

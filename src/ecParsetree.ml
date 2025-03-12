@@ -669,8 +669,7 @@ type outline_kind =
 
 type outline_info = {
     outline_side: side;
-    outline_start: pcodepos1;
-    outline_end: pcodepos1;
+    outline_range: pcodepos_range;
     outline_kind: outline_kind;
 }
 
