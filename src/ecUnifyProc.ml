@@ -134,27 +134,47 @@ let rec unify_instrs umap i1 i2 =
       | None, None -> umap
       | _, _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)));
     in
-    List.fold_left2 (fun umap e1 e2 -> unify_exprs umap e1 e2) umap args1 args2
+
+    let args1, args2 =
+      match args1, args2 with
+      | _, _ when List.length args1 = List.length args2 -> args1, args2
+      | [al], _ -> begin
+        match al.e_node with
+        | Etuple args1 -> args1, args2
+        | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+      end
+      | _, [ar] -> begin
+      match ar.e_node with
+        | Etuple args2 -> args1, args2
+        | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+      end
+      | _, _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+    in
+
+    List.fold_left (fun umap (e1, e2) -> unify_exprs umap e1 e2) umap (List.combine args1 args2)
+
   | Sif(e1, st1, sf1), Sif(e2, st2, sf2) ->
     let umap = unify_exprs umap e1 e2 in
     let umap = unify_stmts umap st1 st2 in
     unify_stmts umap sf1 sf2
+
   | Swhile(e1, s1), Swhile(e2, s2) ->
     let umap = unify_exprs umap e1 e2 in
     unify_stmts umap s1 s2
+
   | Smatch(e1, bs1), Smatch(e2, bs2) ->
     let umap = unify_exprs umap e1 e2 in
     List.fold_left2 (fun umap (p1, b1) (p2, b2) ->
       if List.length p1 <> List.length p2 then
         raise (UnificationError (UE_InstrNotInLockstep (i1, i2)));
       unify_stmts umap b1 b2
-    )
-      umap
-      bs1
-      bs2
+    ) umap bs1 bs2
+
   | Sassert e1, Sassert e2 ->
     unify_exprs umap e1 e2
+
   | Sabstract x1, Sabstract x2 when EcIdent.id_equal x1 x2 -> umap
+
   | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)));
 
 and unify_stmts (umap : umap) s1 s2 =
