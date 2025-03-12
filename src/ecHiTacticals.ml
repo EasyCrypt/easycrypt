@@ -192,6 +192,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Poutline info             -> EcPhlOutline.process_outline info
     | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
+    | Pefold info               -> EcPhlExprFold.process_efold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
