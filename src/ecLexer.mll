@@ -143,6 +143,7 @@
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "swap"        , SWAP       ;        (* KW: tactic *)
     "cfold"       , CFOLD      ;        (* KW: tactic *)
+    "efold"       , EFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
     "rndsem"      , RNDSEM     ;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)

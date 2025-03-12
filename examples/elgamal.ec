@@ -76,6 +76,14 @@ section Security.
       Pr[DDH0(DDHAdv(A)).main() @ &m : res].
   proof.
   byequiv=> //; proc; inline *.
+  proc rewrite {2} 5 expM.
+  efold {1} 2.
+wp.
+  sim.
+  efold {1} 2.
+  efold {1} 4.
+
+  case <- {1} 2.
   swap{1} 7 -5.
   auto; call (_:true).
   auto; call (_:true).
