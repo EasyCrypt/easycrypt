@@ -44,6 +44,7 @@ abstract theory BV.
 end BV.
 
 (* ==================================================================== *)
+(* FIXME: Missing of_list axiomatization *)
 abstract theory A.
   op size : int.
 
@@ -318,6 +319,27 @@ theory BVOperators.
     axiom bvextractP (bv : BV1.bv) (base : int) : 0 <= base => base + BV2.size <= BV1.size =>
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
+
+print List.mkseq.
+  
+(* ------------------------------------------------------------------ *)
+  abstract theory BVInsert.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] le_size : BV2.size <= BV1.size.
+
+    op bvinsert : BV1.bv -> int -> BV2.bv -> BV1.bv.
+
+    axiom bvinsertP (bv : BV1.bv) (base : int) (bvins: BV2.bv) : 0 <= base => base + BV2.size <= BV1.size =>
+    let orig = BV1.tolist bv in
+    let new = BV2.tolist bvins in
+      List.mkseq (fun i => if i < base || base + BV2.size <= i
+      then List.nth witness orig i
+      else List.nth witness new (i - base))
+      BV1.size
+        = BV1.tolist (bvinsert bv base bvins).
+  end BVInsert.
 
 (* ------------------------------------------------------------------ *)
   abstract theory BVGet.

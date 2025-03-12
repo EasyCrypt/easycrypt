@@ -856,6 +856,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | Some { kind = `ASliceGet _ } 
       | Some { kind = `ASliceSet _ } 
       | Some { kind = `Extract _ }
+      | Some { kind = `Insert _ }
       | Some { kind = `Map _ } 
       | Some { kind = `Get _ } 
       | Some { kind = `AInit _ } 
@@ -898,6 +899,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
             (`CBitstring (Array.sub r (BI.to_int i) w_out), cinps) 
         | _ -> assert false
         end
+      | { kind = `Insert (w_orig, w_ins) } -> 
+        begin match args with
+        | [ `Circuit (`CBitstring origbs, cinps) ; `Constant i ; `Circuit (`CBitstring newbs, cinps2) ] ->
+            let resbs = Array.copy origbs in 
+            (Array.blit newbs 0 (Array.copy origbs) (BI.to_int i) w_ins);
+            (`CBitstring resbs, merge_inputs cinps cinps2)
+        | _ -> assert false
+        end
+
       | { kind = `Map (w_i, w_o, n) } -> 
         begin match args with 
         | [ `Circuit ((`CBitstring _, [{type_=`CIBitstring w_i'}; _]) as cf); `Circuit (`CArray (arr, w_i''), arr_inps) ] when (w_i' = w_i && w_i'' = w_i') && (Array.length arr / w_i = n) ->
@@ -958,6 +968,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           `ASliceGet _ 
         | `ASliceSet _ 
         | `Extract _ 
+        | `Insert _ 
         | `Map _ 
         | `AInit _ 
         | `Get _ 
@@ -1104,7 +1115,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         let c1, inp1 = new_cbitstring_inp m |-> ((fun (`CBitstring r) -> r), idnt) in  
         `CArray (c1, w), [inp1] 
 
-      | { kind = `ASliceGet _ | `ASliceSet _ | `Extract _ | `Map _ | `AInit _ | `Get _ | `Init _  } -> assert false
+      | { kind = `ASliceGet _ | `ASliceSet _ | `Extract _ | `Insert _ | `Map _ | `AInit _ | `Get _ | `Init _  } -> assert false
 
       (* | _ -> raise @@ CircError "Failed to generate op"  *)
       
@@ -1536,7 +1547,7 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
       Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
       assert false
 
-let op_cache = ref Mp.empty
+let (op_cache : circuit Mp.t ref) = ref Mp.empty
 
 let circuit_of_form 
   ?(pstate  : pstate = empty_pstate) (* Program variable values *)
@@ -1564,11 +1575,49 @@ let circuit_of_form
       | Fint i -> i
       | _ -> begin 
         try destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
-        with DestrError "int" ->
+        with 
+          DestrError "int" 
+        | DestrError "destr_int" ->
           let err = Format.asprintf "Failed to reduce form | %a | to integer"
             (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
           raise (CircError err)
         end
+    in
+
+    (* Supposed to be called on an apply *)
+    let propagate_integer_arguments (op: form) (args: form list) : form =
+      let op = 
+        let pth, _ = destr_op op in
+        match (EcEnv.Op.by_path pth env).op_kind with
+        | OB_oper (Some (OP_Plain f)) -> 
+          f
+        | _ -> 
+          Format.eprintf "Failed to get body for op: %a\n" 
+          (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
+          assert false
+      in
+      Format.eprintf "Propagating arguments for op: %a@\n" 
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
+      let res = fapply_safe op args in 
+      Format.eprintf "Result: %a" 
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) res;
+      res
+      (*
+      let process_arg (arg: form) : form * (ident option) =
+        match arg.f_ty with
+        | t when t.ty_node = EcTypes.tint.ty_node ->
+          f_int (int_of_form arg), None
+        | t -> let id = create "temp" in
+          f_local id t, Some id
+      in
+      let apply_args = List.map process_arg args in
+      let new_binds = List.filter_map (function 
+        | (f, Some id) -> Some (id, GTty f.f_ty) 
+        | _ -> None
+      ) apply_args in 
+      let body = fapply_safe op (List.fst apply_args) in
+      f_app (f_quant Llambda new_binds body) (List.filter (fun arg -> Option.is_some (snd (process_arg arg))) args) ret_ty
+      *)
     in
 
     let arg_of_form (hyps: hyps) (f: form) : hyps * arg = 
@@ -1643,7 +1692,9 @@ let circuit_of_form
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
         let hyps, args = List.fold_left_map (arg_of_form) hyps fs in 
         hyps, circuit_of_op_with_args env pth args
-      | f -> 
+      | {f_node = Fop _} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+          doit cache hyps (propagate_integer_arguments f fs)
+      | {f_node = Fop _} -> 
       (* Assuming correct types coming from EC *)
       (* FIXME: Add some extra info about errors when something here throws *)
       begin match EcFol.op_kind (destr_op f |> fst), fs with
@@ -1664,6 +1715,13 @@ let circuit_of_form
         in
         hyps, circuit_compose f_c fcs
       end
+      | _ -> 
+        let hyps, f_c = doit cache hyps f in
+        let hyps, fcs = List.fold_left_map
+          (doit cache)
+          hyps fs 
+        in
+        hyps, circuit_compose f_c fcs
     end
       
     | Fquant (qnt, binds, f) -> 

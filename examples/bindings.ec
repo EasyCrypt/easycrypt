@@ -359,6 +359,7 @@ bind circuit W32.(`>>`) "RSHIFTL_32".
 bind circuit CoreInt.lt "LT_256".
 *)
 (* -- AVX2 VECTORIZED -- *)
+(* FIXME: Check new types
 bind circuit VPSUB_16u16 "VPSUB_16u16".
 bind circuit VPSRA_16u16 "VPSRA_16u16".
 bind circuit VPADD_16u16 "VPADD_16u16".
@@ -369,12 +370,11 @@ bind circuit VPMULHRS_16u16 "VPMULHRS_16u16".
 bind circuit VPACKUS_16u16 "VPACKUS_16u16".
 bind circuit VPMADDUBSW_256 "VPMADDUBSW_256".
 bind circuit VPERMD "VPERMD".
+*)
 
 
 bind op [bool & W16.t] W16.init "init".
 realize bvinitP by admit.
-
-print Array2.map.
 
 op map_test (f: W16.t -> W16.t) (arr: W16.t Array2.t) : W16.t Array2.t =
   Array2.map f arr.

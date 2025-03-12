@@ -2544,6 +2544,10 @@ module Circuit = struct
         let mk sz = let sz1, sz2 = as_seq2 sz in `Truncate (sz1, sz2) in
         mk, [`BV None; `BV None], "Truncate"
 
+      | "insert" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Insert (sz1, sz2) in
+        mk, [`BV None; `BV None], "Insert" 
+
       | "extract" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2) in
         mk, [`BV None; `BV None], "Extract"
