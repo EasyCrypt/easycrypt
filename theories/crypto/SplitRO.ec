@@ -153,7 +153,7 @@ section PROOFS.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
     seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      outline {2} [1-2] (r, r0) <@ S.sample2.
+      outline {2} [1 .. 2] ~ S.sample2.
       rewrite equiv[{2} 1 -sample_sample2].
       inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
       + by move=> ??; rewrite ofpairK. 
@@ -182,7 +182,7 @@ section PROOFS.
     + by proc; inline *; auto; smt (map_rem rem_merge mem_map mem_pair_map mem_rem).
     + proc *.
       inline {1} 1.
-      outline {2} [1] { RO_Pair(I1.RO, I2.RO).get(x); }.
+      outline {2} 1 by { RO_Pair(I1.RO, I2.RO).get(x); }.
       by call RO_get; auto.
     inline *; auto => />.
     have hn := o_pair_none <: from, to1, to2>. 
