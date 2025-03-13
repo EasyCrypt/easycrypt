@@ -524,13 +524,12 @@ module Fsubst = struct
       f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
     | Fpr pr ->
-      let pr_mem   = m_subst s pr.pr_mem in
       let pr_fun   = x_subst s pr.pr_fun in
       let pr_args  = f_subst ~tx s pr.pr_args in
-      let s = f_rem_mem s mhr in
+      let s = f_rem_mem s pr.pr_mem in
       let pr_event = f_subst ~tx s pr.pr_event in
 
-      f_pr pr_mem pr_fun pr_args pr_event
+      f_pr pr.pr_mem pr_fun pr_args pr_event
 
     | _ ->
       f_map (ty_subst s) (f_subst ~tx s) fp)
