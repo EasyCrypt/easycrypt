@@ -9,7 +9,7 @@ open EcMatching.Position
 (* -------------------------------------------------------------------- *)
 let process_cond (info : EcParsetree.pcond_info) tc =
   let default_if (i : codepos1 option) s =
-    ofdfl (fun _ -> Zpr.cpos (tc1_pos_last_if tc s)) i in
+    ofdfl (fun _ -> cpos (tc1_pos_last_if tc s)) i in
 
   match info with
   | `Head side ->

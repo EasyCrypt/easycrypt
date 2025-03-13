@@ -141,16 +141,16 @@ let process_ecall oside (l, tvi, fs) tc =
     match kind, oside with
     | `Hoare n, _ ->
         EcPhlApp.t_hoare_app
-          (Zpr.cpos (n-1)) p1 tc
+          (EcMatching.Position.cpos (n-1)) p1 tc
     | `Equiv (n1, n2), None ->
         EcPhlApp.t_equiv_app
-          (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
+          (EcMatching.Position.cpos (n1-1), EcMatching.Position.cpos (n2-1)) p1 tc
     | `Equiv (n1, n2), Some `Left ->
         EcPhlApp.t_equiv_app
-          (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
+          (EcMatching.Position.cpos (n1-1), EcMatching.Position.cpos n2) p1 tc
     | `Equiv(n1, n2), Some `Right ->
         EcPhlApp.t_equiv_app
-          (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
+          (EcMatching.Position.cpos n1, EcMatching.Position.cpos (n2-1)) p1 tc
   in
 
   let fs =

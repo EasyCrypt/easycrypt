@@ -54,7 +54,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
   tc |> match lls with
 
   | LL_WP ->
-      EcPhlWp.t_wp (Some (Single (Zpr.cpos (-1))))
+      EcPhlWp.t_wp (Some (Single (EcMatching.Position.cpos (-1))))
 
   | LL_RND ->
          EcPhlRnd.t_bdhoare_rnd PNoRndParams
@@ -66,7 +66,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
-           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (EcMatching.Position.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -82,7 +82,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       in
 
         ( EcPhlApp.t_bdhoare_app
-           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (EcMatching.Position.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -134,8 +134,8 @@ let t_lossless tc =
   | FbdHoareS _ -> t_single tc
 
   | FequivS _hs ->
-      ((EcPhlApp.t_equiv_app_onesided `Left (EcMatching.Zipper.cpos 0) f_true f_true) @+
-         [ (EcPhlApp.t_equiv_app_onesided `Right (EcMatching.Zipper.cpos 0) f_true f_true) @+
+      ((EcPhlApp.t_equiv_app_onesided `Left (EcMatching.Position.cpos 0) f_true f_true) @+
+         [ (EcPhlApp.t_equiv_app_onesided `Right (EcMatching.Position.cpos 0) f_true f_true) @+
              [ EcPhlSkip.t_skip @! t_trivial ;
                t_single
              ];

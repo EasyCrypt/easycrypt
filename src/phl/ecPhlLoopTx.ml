@@ -297,7 +297,7 @@ let process_unroll_for side cpos tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
+      ((t_rcond side (zs <> []) (EcMatching.Position.cpos pos)) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;
@@ -311,13 +311,13 @@ let process_unroll_for side cpos tc =
     if Array.length hds <= i then t_id tc else
     let (_h,pos,_z) = oget hds.(i) in
     if i = 0 then
-      (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
+      (EcPhlWp.t_wp (Some (Single (EcMatching.Position.cpos (pos - 2)))) @!
        t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
-        EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (f_eq x (f_int z')) @+
+        EcPhlWp.t_wp (Some (Single (EcMatching.Position.cpos (pos-2))));
+        EcPhlApp.t_hoare_app (EcMatching.Position.cpos (pos' - 1)) (f_eq x (f_int z')) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 

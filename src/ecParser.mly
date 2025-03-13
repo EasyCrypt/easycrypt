@@ -2972,7 +2972,7 @@ interleave_info:
 | CFOLD s=side? c=codepos n=word?
     { Pcfold (s, c, n) }
 
-| EFOLD s=side? c=codepos
+| EFOLD s=side? c=codepos?
     { Pefold (s, c) }
 
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?

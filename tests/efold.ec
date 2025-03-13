@@ -19,17 +19,13 @@ theory CfoldStopIf.
         c <- 1;
         b <- c;
       }
-      d <- 1;
       return c;
     }
   }.
-  
   lemma L : hoare[M.f : true ==> res = 0].
   proof.
   proc.
-  efold 5.
-  efold 4?2.
-  efold 4?1.
+  efold.
   proc rewrite ^if addzC.
   proc rewrite ^if /=.
   rcondt ^if; 1: by conseq (: _ ==> _: = 1%r); islossless.

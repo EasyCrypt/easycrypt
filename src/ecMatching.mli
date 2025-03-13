@@ -34,10 +34,15 @@ module Position : sig
   type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
 
+  (* Create a codepos1 from a top-level absolute position *)
+  val cpos : int -> codepos1
+
   val shift1 : offset:int -> codepos1 -> codepos1
   val shift  : offset:int -> codepos  -> codepos
 
   val resolve_offset : base:codepos1 -> offset:codeoffset1 -> codepos1
+
+  val tag_codepos : ?rev:bool -> env -> instr list -> (codepos * instr) list
 end
 
 (* -------------------------------------------------------------------- *)
@@ -67,9 +72,6 @@ module Zipper : sig
   }
 
   exception InvalidCPos
-
-  (* Create a codepos1 from a top-level absolute position *)
-  val cpos : int -> codepos1
 
   (* Split a statement from a top-level position (codepos1) *)
   val find_by_cpos1  : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr * instr list
