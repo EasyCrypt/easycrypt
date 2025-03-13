@@ -89,6 +89,9 @@ realize bvandP by admit.
 bind op W8.t W8.orw "or".
 realize bvorP by admit.
 
+bind op W8.t W8.(+^) "xor".
+realize bvxorP by admit.
+
 bind op W8.t W8.invw "not".
 realize bvnotP by admit.
 
@@ -149,6 +152,9 @@ realize bvandP by admit.
 bind op W16.t W16.orw "or".
 realize bvorP by admit.
 
+bind op W16.t W16.(+^) "xor".
+realize bvxorP by admit.
+
 bind op W16.t W16.invw "not".
 realize bvnotP by admit.
 
@@ -194,7 +200,6 @@ realize bvshlP by admit.
 
 
 (* ----------- BEGIN W32 BINDINGS ---------- *)
-
 bind bitstring W32.w2bits W32.bits2w W32.to_uint W32.to_sint W32.of_int W32.t 32.
 realize size_tolist by auto.
 realize tolistP by auto.
@@ -227,8 +232,14 @@ realize bvandP by admit.
 bind op W32.t W32.orw "or".
 realize bvorP by admit.
 
+bind op W32.t W32.(+^) "xor".
+realize bvxorP by admit.   
+
 bind op W32.t W32.invw "not".
 realize bvnotP by admit.
+
+bind op [W32.t & bool] W32."_.[_]" "get".
+realize bvgetP by admit.
 
 (* TODO: Add shifts once we have truncate/extend *)
 
@@ -266,6 +277,9 @@ realize bvandP by admit.
 
 bind op W64.t W64.orw "or".
 realize bvorP by admit.
+
+bind op W64.t W64.(+^) "xor".
+realize bvxorP by admit.
 
 bind op W64.t W64.invw "not".
 realize bvnotP by admit.
@@ -307,6 +321,9 @@ realize bvandP by admit.
 bind op W128.t W128.orw "or".
 realize bvorP by admit.
 
+bind op W128.t W128.(+^) "xor".
+realize bvxorP by admit.
+
 bind op W128.t W128.invw "not".
 realize bvnotP by admit.
 
@@ -346,6 +363,9 @@ realize bvandP by admit.
 bind op W256.t W256.orw "or".
 realize bvorP by admit.
 
+bind op W256.t W256.(+^) "xor".
+realize bvxorP by admit.
+
 bind op W256.t W256.invw "not".
 realize bvnotP by admit.
 
@@ -374,6 +394,9 @@ bind circuit VPERMD "VPERMD".
 
 
 bind op [bool & W16.t] W16.init "init".
+realize bvinitP by admit.
+
+bind op [bool & W32.t] W32.init "init".
 realize bvinitP by admit.
 
 op map_test (f: W16.t -> W16.t) (arr: W16.t Array2.t) : W16.t Array2.t =

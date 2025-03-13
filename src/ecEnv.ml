@@ -2928,6 +2928,7 @@ module Circuit = struct
     | CRB_Circuit    cr -> bind_circuit    ?import lc cr env
 
   let rec lookup_bitstring_path (env : env) (k : path) : crb_bitstring option = 
+(*     Format.eprintf "Looking up bitstring binding for type with path %s@." (EcPath.tostring k); *)
     let k, _  = Ty.lookup (EcPath.toqsymbol k) (env) in
     match Mp.find_opt k env.env_crbds.bitstrings with
     | Some _ as bs -> bs
@@ -2965,13 +2966,16 @@ module Circuit = struct
   let rec lookup_array_and_bitstring (env: env) (ty: ty) : (crb_array * crb_bitstring) option =
     match ty.ty_node with
     | Tconstr (p, [w]) -> 
+(*       Format.eprintf "Unfolding parametric type with path %s@." (EcPath.tostring p); *)
       let arr = lookup_array_path env p in
       let bs = lookup_bitstring env w in
       begin match arr, bs with
       | Some arr, Some bs -> Some (arr, bs)
       | _ -> None    
       end
-    | Tconstr (p, []) -> (try
+    | Tconstr (p, []) -> 
+(*       Format.eprintf "Unfolding non parametric type with path %s@." (EcPath.tostring p); *)
+      (try
       lookup_array_and_bitstring env (Ty.unfold p [] env)
       with LookupFailure _ -> None)
     | _ -> None

@@ -109,6 +109,8 @@ module CI_Int : sig
   val p_int_pow   : path
   val p_int_edivz : path
   val p_iteri     : path
+  val p_iter      : path
+  val p_fold      : path
 end
 
 (* -------------------------------------------------------------------- *)

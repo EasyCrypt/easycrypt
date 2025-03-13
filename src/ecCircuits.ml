@@ -1179,6 +1179,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
       let circs, inps = List.split circs in
       let dif = len - List.length circs in
+      Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif;
       let circs = circs @ (List.init dif (fun _ -> fst dfl)) in
       let inps = if dif > 0 then inps @ [snd dfl] else inps in
       let circs = List.map 
@@ -1234,13 +1235,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | Ttuple ts -> let szs = List.map (width_of_type env) ts in
       let ctp, cinp = new_ctuple_inp ~name:(`Idn idn) szs in
       cinp, ((ctp, []) :> circuit)
-    | Tconstr (_, _) -> begin match EcEnv.Circuit.lookup_array_and_bitstring env t with
-      | None -> begin try 
-        let bs_info = Option.get (EcEnv.Circuit.lookup_bitstring env t) in
-        let cbs, cinp = new_cbitstring_inp ~name:(`Idn idn) bs_info.size in
+    | Tconstr (p, _) -> begin match EcEnv.Circuit.lookup_array_and_bitstring env t with
+      | None -> 
+        let bs_info = 
+          begin try 
+            Option.get (EcEnv.Circuit.lookup_bitstring env t) 
+          with Invalid_argument _ -> 
+            Format.eprintf "Failed to fetch type binding for type %a (with path: %s) @\n" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t (EcPath.tostring p);
+            assert false
+          end 
+        in let cbs, cinp = new_cbitstring_inp ~name:(`Idn idn) bs_info.size in
         cinp, ((cbs, []) :> circuit)
-      with Invalid_argument _ -> assert false 
-      end
       | Some ({size=arr_sz}, {size=el_sz}) ->
           let ca, cinp = new_carray_inp ~name:(`Idn idn) el_sz arr_sz in
           cinp, ((ca, []) :> circuit)
@@ -1533,6 +1538,25 @@ let type_is_registered (env: env) (t: ty) : bool =
   (Option.is_some (EcEnv.Circuit.lookup_array_and_bitstring env t)) ||
   (Option.is_some (EcEnv.Circuit.lookup_bitstring env t))
 
+(* FIXME: Check if we need to reduce twice here *)
+let int_of_form (hyps: hyps) (f: form) : zint = 
+  let env = toenv hyps in
+  let redmode = circ_red hyps in
+  let f = 
+    EcCallbyValue.norm_cbv redmode hyps f 
+  in
+  match f.f_node with 
+  | Fint i -> i
+  | _ -> begin 
+    try destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+    with 
+      DestrError "int" 
+    | DestrError "destr_int" ->
+      let err = Format.asprintf "Failed to reduce form | %a | to integer"
+        (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
+      raise (CircError err)
+    end
+
 
 let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
   match destr_op_app f with
@@ -1546,6 +1570,48 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
   | _ -> 
       Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
       assert false
+
+let form_is_iter (f: form) : bool = 
+  match f.f_node with
+  | Fapp ({f_node = Fop (p, _)}, _) when
+    p = EcCoreLib.CI_Int.p_iter  ||
+    p = EcCoreLib.CI_Int.p_fold  ||
+    p = EcCoreLib.CI_Int.p_iteri -> true
+  | _ -> false
+
+(* Expands iter, fold and iteri (for integer arguments) *)
+let expand_iter_form (hyps: hyps) (f: form) : form = 
+  let redmode = circ_red hyps in
+  let (@!!) f fs = 
+    EcTypesafeFol.fapply_safe ~redmode hyps f fs
+  in
+
+  let res = match f.f_node with 
+  | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iteri -> 
+    let rep = int_of_form hyps rep in
+    let is = List.init (BI.to_int rep) BI.of_int in
+    Format.eprintf "Done generating functions!@.";
+    let f = List.fold_left (fun f i -> 
+      Format.eprintf "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f
+      ;
+      fn @!! [f_int i; f]
+    ) base is in
+    f
+  | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> 
+    let rep = int_of_form hyps rep in
+    let is = List.init (BI.to_int rep) BI.of_int in
+    let f = List.fold_left (fun f i -> fn @!! [f]) base is in
+    f
+  | Fapp ({f_node = Fop (p, _)}, [fn; base; rep]) when p = EcCoreLib.CI_Int.p_fold -> 
+    let rep = int_of_form hyps rep in
+    let is = List.init (BI.to_int rep) BI.of_int in
+    let f = List.fold_left (fun f i -> fn @!! [f]) base is in
+    f
+  | _ -> assert false
+  in
+  Format.eprintf "Expanded iter form: @.%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) res;
+  res
 
 let (op_cache : circuit Mp.t ref) = ref Mp.empty
 
@@ -1564,24 +1630,14 @@ let circuit_of_form
       let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
       res
     in
+(*
+    Format.eprintf "Translating form : %a (is iter form: %s)@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_
+    (if form_is_iter f_ then "yes" else "no")
+    ;
+*)
 
-    let int_of_form ?(simplify = true) (f: form) : zint = 
-      let f = 
-        if simplify 
-        then EcCallbyValue.norm_cbv redmode hyps f 
-        else f
-      in
-      match f.f_node with 
-      | Fint i -> i
-      | _ -> begin 
-        try destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
-        with 
-          DestrError "int" 
-        | DestrError "destr_int" ->
-          let err = Format.asprintf "Failed to reduce form | %a | to integer"
-            (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in
-          raise (CircError err)
-        end
+    let int_of_form (f: form) : zint = 
+      int_of_form hyps f
     in
 
     (* Supposed to be called on an apply *)
@@ -1596,11 +1652,15 @@ let circuit_of_form
           (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
           assert false
       in
+(*
       Format.eprintf "Propagating arguments for op: %a@\n" 
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
+*)
       let res = fapply_safe op args in 
+(*
       Format.eprintf "Result: %a" 
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) res;
+*)
       res
       (*
       let process_arg (arg: form) : form * (ident option) =
@@ -1692,30 +1752,35 @@ let circuit_of_form
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
         let hyps, args = List.fold_left_map (arg_of_form) hyps fs in 
         hyps, circuit_of_op_with_args env pth args
-      | {f_node = Fop _} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+
+      (* For dealing with iter cases: *)
+      | {f_node = Fop _} when form_is_iter f_ -> 
+        trans_iter cache hyps f fs
+      | {f_node = Fop (p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+(*           Format.eprintf "Attempting to propagate interger arguments for op with path %s@." (EcPath.tostring p); *)
           doit cache hyps (propagate_integer_arguments f fs)
       | {f_node = Fop _} -> 
       (* Assuming correct types coming from EC *)
       (* FIXME: Add some extra info about errors when something here throws *)
       begin match EcFol.op_kind (destr_op f |> fst), fs with
-      | Some `Eq, [f1; f2] -> 
-        let hyps, c1 = doit cache hyps f1 in
-        let hyps, c2 = doit cache hyps f2 in
-        hyps, (circuit_eq c1 c2 :> circuit)
-      (* FIXME: Should this be here on inside the module? *)
-      | Some `True, [] ->
-        hyps, (circuit_true :> circuit)
-      | Some `False, [] ->
-        hyps, (circuit_false :> circuit)
-      | _ -> (* recurse down into definition *)
-        let hyps, f_c = doit cache hyps f in
-        let hyps, fcs = List.fold_left_map
-          (doit cache)
-          hyps fs 
-        in
-        hyps, circuit_compose f_c fcs
+        | Some `Eq, [f1; f2] -> 
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
+          hyps, (circuit_eq c1 c2 :> circuit)
+        (* FIXME: Should this be here on inside the module? *)
+        | Some `True, [] ->
+          hyps, (circuit_true :> circuit)
+        | Some `False, [] ->
+          hyps, (circuit_false :> circuit)
+        | _ -> (* recurse down into definition *)
+          let hyps, f_c = doit cache hyps f in
+          let hyps, fcs = List.fold_left_map
+            (doit cache)
+            hyps fs 
+          in
+          hyps, circuit_compose f_c fcs
       end
-      | _ -> 
+      | _ -> (* recurse down into definition *)
         let hyps, f_c = doit cache hyps f in
         let hyps, fcs = List.fold_left_map
           (doit cache)
@@ -1759,6 +1824,29 @@ let circuit_of_form
       hyps, (circuit_tuple_of_circuits comps :> circuit)
       (*(* FIXME: Change to inps = [] if we disallow definitions/quantifiers inside tuples *)*)
     | _ -> raise (CircError "Unsupported form kind in translation")
+  
+
+  and trans_iter (cache: cache) (hyps: hyps) (f: form) (fs: form list) =
+    (* FIXME: move auxiliary function out of the definitions *)
+    let redmode = circ_red hyps in
+    let fapply_safe f fs = 
+      let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
+      res
+    in
+    match f, fs with
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iteri -> 
+      let rep = int_of_form hyps rep in
+      let fs = List.init (BI.to_int rep) (fun i ->
+        fapply_safe fn [f_int (BI.of_int i)]
+      ) in
+      List.fold_lefti (fun (hyps, f) i fn -> 
+        Format.eprintf "Translating iteri... Step #%d@." i;
+        let hyps, fn = doit cache hyps fn in
+        hyps, circuit_compose fn [f]
+      ) (doit cache hyps base) fs
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter  -> assert false
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold  -> assert false 
+    | _ -> assert false
   in 
 (*
   let t0 = Unix.gettimeofday () in

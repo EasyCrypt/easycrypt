@@ -116,9 +116,14 @@ let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   f_app op args rty
   
 let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: form) (fs: form list) : form =
+(*
+  Format.eprintf "Applying forms:@.%a@.To form: %a@."
+  (fun fmt fs -> List.iter (fun f -> Format.fprintf fmt "%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f) fs) fs 
+  (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f;
+*)
   match f.f_node with
   | Fop (pth, _) -> 
-    f_app_safe (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
+    f_app_safe ~full:false (LDecl.toenv hyps) pth fs |> EcCallbyValue.norm_cbv redmode hyps
   | Fapp (fop, args) -> 
     (* let new_args = args @ fs in *)
     (* let pp_form = EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) in *)
@@ -127,12 +132,12 @@ let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: for
     fapply_safe ~redmode hyps fop (args @ fs)
   | Fquant (Llambda, binds, f) ->
     assert (List.compare_lengths binds fs >= 0);
+    let subst_bnds, rem_bnds = List.takedrop (List.length fs) binds in
     let subst = 
       List.fold_left2  
-      (fun subst b f -> EcSubst.add_flocal subst (fst b) f) EcSubst.empty binds fs
+      (fun subst b f -> EcSubst.add_flocal subst (fst b) f) EcSubst.empty subst_bnds fs
     in
-    let binds = List.drop (List.length fs) binds in
-    let f = f_quant Llambda binds (EcSubst.subst_form subst f) in
+    let f = f_quant Llambda rem_bnds (EcSubst.subst_form subst f) in
     EcCallbyValue.norm_cbv redmode hyps f
   | Fquant  (qtf, _, _) -> assert false
   | Fif     (f, ft, ff) -> assert false
