@@ -137,14 +137,14 @@ let t_ehoare_call_core fpre fpost tc =
 let t_ehoare_call fpre fpost tc =
   let _, _, _, s, _, wppre, _ = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) wppre tc in
+    EcPhlApp.t_ehoare_app (EcMatching.Position.cpos (List.length s.s_node)) wppre tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   FApi.t_sub [t_ehoare_call_core fpre fpost; t_id] tcenv
 
 let t_ehoare_call_concave f fpre fpost tc =
   let _, _, _, s, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) (f_app_simpl f [wppre] txreal) tc in
+    EcPhlApp.t_ehoare_app (EcMatching.Position.cpos (List.length s.s_node)) (f_app_simpl f [wppre] txreal) tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   let t_call =
     FApi.t_seqsub (EcPhlConseq.t_ehoareS_concave f wppre wppost)

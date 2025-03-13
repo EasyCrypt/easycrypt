@@ -38,6 +38,8 @@ module Position = struct
   type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
 
+  let cpos (i : int) : codepos1 = (0, `ByPos i)
+
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
     (o + offset, p)
 
@@ -48,6 +50,41 @@ module Position = struct
     match offset with
     | `ByPosition pos -> pos
     | `ByOffset   off -> (off + fst base, snd base)
+
+  let rec tag_codepos_r ?(rev = false) env path si : (codepos * instr) list =
+    let v = List.fold_lefti (fun cps ix i ->
+      let ix = ix + 1 in
+      let i_cp = (path, cpos ix) in
+      let cps = (i_cp, i) :: cps in
+      match i.i_node with
+      | Sif (_, t, f) ->
+        let path_t = path @ [(cpos ix, `Cond true)] in
+        let path_f = path @ [(cpos ix, `Cond false)] in
+        let cps_t = tag_codepos_r env path_t t.s_node in
+        let cps_f = tag_codepos_r env path_f f.s_node in
+        cps_f @ cps_t @ cps
+      | Swhile (_, t) ->
+        let path_t = path @ [(cpos ix, `Cond true)] in
+        let cps_t = tag_codepos_r env path_t t.s_node in
+        cps_t @ cps
+      | Smatch (e, bs) ->
+        let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+        let indt = oget (EcDecl.tydecl_as_datatype indt) in
+        let cnames = List.fst indt.tydt_ctors in
+        let nbs = List.map2 (fun cn (_, s) -> cn, s) cnames bs in
+        let cps_bs = List.fold_left (fun acc (cn, s) ->
+          let path = path @ [(cpos ix, `Match cn)] in
+          tag_codepos_r env path s.s_node @ acc
+        ) [] nbs
+        in
+        cps_bs @ cps
+      | _ ->
+        cps
+    ) [] si
+    in
+    if rev then v else List.rev v
+
+  let tag_codepos ?rev env = tag_codepos_r ?rev env []
 end
 
 (* -------------------------------------------------------------------- *)
@@ -85,8 +122,6 @@ module Zipper = struct
     z_path : ipath;                     (* path (zipper) leading to me         *)
     z_env  : env option;
   }
-
-  let cpos (i : int) : codepos1 = (0, `ByPos i)
 
   let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
 
