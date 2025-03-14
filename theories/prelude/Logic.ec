@@ -648,20 +648,33 @@ lemma  eq_imp (y: 'a) x: x = y => x = y by done.
 lemma  eq_sym_imp : forall (x y : 'a), x = y => y = x by [].
 
 (* -------------------------------------------------------------------- *)
-op choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a.
+op choicebd ['a] (P : 'a -> bool) : 'a.
 
-axiom choicebP ['a] (P : 'a -> bool) (x0 : 'a):
+axiom choicebdP ['a] (P : 'a -> bool):
+  (exists x, P x) => P (choicebd P).
+
+op [opaque] choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a =
+  if exists x, P x then choicebd P else x0.
+
+lemma choicebP ['a] (P : 'a -> bool) (x0 : 'a):
   (exists x, P x) => P (choiceb P x0).
+proof.
+move => ex_Px; have:= choicebdP P ex_Px.
+by rewrite /choiceb ex_Px.
+qed.
 
-axiom choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
+lemma choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
   (forall x, !P x) => choiceb P x0 = x0.
+proof. by rewrite -negb_exists /choiceb => ->. qed.
 
 lemma eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
   (forall x, P x <=> Q x) => choiceb P x0 = choiceb Q x0.
-proof. smt(fun_ext). qed.
+proof. by move => eq_all; congr; apply fun_ext => x; rewrite eq_all. qed.
 
-axiom choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
+lemma choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
   (exists x, P x) => choiceb P x0 = choiceb P x1.
+proof. by rewrite /choiceb => ->. qed.
+
 
 (* -------------------------------------------------------------------- *)
 
@@ -683,9 +696,13 @@ proof. by move => inj_f @/pcansel x; smt(pinv_inv). qed.
 
 
 (* -------------------------------------------------------------------- *)
-axiom funchoice ['a 'b] (P : 'a -> 'b -> bool):
+lemma funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
+proof.
+move => existsy; exists (fun x => choicebd (P x)) => y /=. 
+apply/(choicebdP (P y))/existsy.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op sempty ['a] (E : 'a -> bool) =
