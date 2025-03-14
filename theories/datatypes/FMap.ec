@@ -200,6 +200,9 @@ lemma remE ['a 'b] (m : ('a, 'b) fmap) x y :
   (rem m x).[y] = if y = x then None else m.[y].
 proof. by rewrite /rem /"_.[_]" rem_valE SmtMap.get_setE. qed.
 
+lemma rem_set (m: ('a, 'b) fmap) x: x \in m => (rem m x).[x <- oget m.[x]] = m.
+proof. move => x_in; apply fmap_eqP => y; rewrite get_setE remE /#. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma mem_rem ['a 'b] (m : ('a, 'b) fmap) x y :
   y \in (rem m x) <=> (y \in m /\ y <> x).
@@ -530,6 +533,44 @@ lemma mem_fdom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
 proof. by rewrite fdom_rem in_fsetD1. qed.
 
 (* ==================================================================== *)
+op offset (s: 'a fset): ('a, unit) fmap = 
+  ofmap (offun (fun e => if e \in s then Some () else None)).
+
+lemma mem_offset (s: 'a fset) x: x \in (offset s) <=> x \in s.
+proof.
+rewrite /dom getE ofmapK.
+- move: (FSet.finite_mem s).
+  apply/eq_ind/fun_ext => y.
+  rewrite offunE /#.
+rewrite offunE /#.
+qed.
+
+lemma offset_get s (e: 'a): (offset s).[e] = if e \in s then Some () else None.
+proof.
+rewrite getE /ofset ofmapK.
+- move: (FSet.finite_mem s).
+  apply/eq_ind/fun_ext => y.
+  rewrite offunE /#.
+rewrite offunE /#.
+qed.
+
+lemma offsetK: cancel offset fdom<:'a, unit>.
+proof. move => s; rewrite fsetP => x; by rewrite mem_fdom mem_offset. qed.
+
+(* ==================================================================== *)
+op offsetmap (f: 'a -> 'b) (s: 'a fset) : ('a, 'b) fmap = 
+  map (fun x y => f x) (offset s).
+
+lemma offsetmapT (s: 'a fset) (f: 'a -> 'b) e: e \in s => (offsetmap f s).[e] = Some (f e).
+proof. by move => e_in; rewrite /offsetmap mapE offset_get e_in. qed.
+
+lemma offsetmapN (s: 'a fset) (f: 'a -> 'b) e: e \notin s => (offsetmap f s).[e] = None.
+proof. by move => e_in; rewrite /offsetmap mapE offset_get e_in. qed.
+
+lemma mem_offsetmap s (f: 'a -> 'b) e: e \in offsetmap f s <=> e \in s.
+proof. by rewrite /offsetmap mem_map mem_offset. qed.
+
+(* ==================================================================== *)
 op [opaque] frng ['a 'b] (m : ('a, 'b) fmap) = oflist (to_seq (rng m)).
 lemma frngE (m : ('a, 'b) fmap): frng m = oflist (to_seq (rng m)).
 proof. by rewrite/frng. qed.
@@ -740,6 +781,16 @@ proof. by rewrite fcard_ge0. qed.
 lemma fsize_set (m : ('a, 'b) fmap) k v : 
   fsize m.[k <- v] = b2i (k \notin m) + fsize m.
 proof. by rewrite /fsize fdom_set fcardU1 mem_fdom. qed.
+
+lemma fsize0_empty (m: ('a, 'b) fmap): fsize m = 0 => m = empty.
+proof.
+move: m; apply fmapW => [//| /= m k v].
+rewrite mem_fdom fsize_set =>->_/=. 
+smt(ge0_fsize).
+qed.
+
+lemma fsize_map m (f: 'a -> 'b -> 'c): fsize (map f m) = fsize m.
+proof. by rewrite /fsize fdom_map. qed.
 
 (* ==================================================================== *)
 

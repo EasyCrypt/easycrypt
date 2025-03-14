@@ -1291,6 +1291,15 @@ qed.
 lemma maxrC (x y : t) : maxr x y = maxr y x.
 proof. by rewrite !maxrE lerNgt ler_eqVlt; case: (x = y); case: (x < y). qed.
 
+lemma maxrA (x y z: t): maxr (maxr x y) z = maxr x (maxr y z).
+proof. 
+rewrite !maxrE.
+case (y <= x); case (z <= y); case (z <= x) => //
+  [/#||/#|/#|].
+- smt(ler_trans).
+- smt(ltr_trans ltrNge).
+qed.
+
 lemma maxrl (x y : t) : x <= maxr x y.
 proof. by rewrite maxrE; case: (y <= x) => [_|/ltrNge/ltrW]. qed.
 
@@ -1346,6 +1355,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma minrC (x y : t) : minr x y = minr y x.
 proof. by rewrite !minrE lerNgt ler_eqVlt; case: (y = x); case: (y < x). qed.
+
+lemma minrA (x y z: t): minr (minr x y) z = minr x (minr y z).
+proof. 
+rewrite !minrE.
+case (x <= y); case (y <= z); case (x <= z) => //
+  [/#||/#|/#|].
+- smt(ler_trans).
+- smt(ltr_trans ltrNge).
+qed.
 
 lemma minrl (x y : t) : minr x y <= x.
 proof. by rewrite minrE; case: (x <= y) => [_|/ltrNge/ltrW]. qed.
