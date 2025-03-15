@@ -653,7 +653,7 @@ op choicebd ['a] (P : 'a -> bool) : 'a.
 axiom choicebdP ['a] (P : 'a -> bool):
   (exists x, P x) => P (choicebd P).
 
-op [opaque] choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a =
+op [opaque smt_opaque] choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a =
   if exists x, P x then choicebd P else x0.
 
 lemma choicebP ['a] (P : 'a -> bool) (x0 : 'a):
