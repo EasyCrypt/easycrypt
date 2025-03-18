@@ -97,8 +97,16 @@ VPMULHRSU_16u16(w1@256, w2@256) -> @256 =
   )
 
 # Intel intrinsic: _mm256_srai_epi16
-VPSRA_16u16(w@256, count@8) -> @256 =
+VPSRA_16u16_orig(w@256, count@8) -> @256 =
   map<16, 16>(sra<16>(., count), w)
+
+VPSRA_16u16_new(w@256, count@128) -> @256 =
+  map<16, 16>(
+    fun w1@16 . 
+    let count = uge<128>(count, 0xf) ?
+      0xf : count[@8|0] 
+    in sra<16>(w1, count), 
+  w)
 
 # Intel intrinsic: _mm256_srli_epi16
 VPSRL_16u16(w@256, count@128) -> @256 =
