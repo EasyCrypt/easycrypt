@@ -518,14 +518,17 @@ module TestBack : CBackend = struct
       | 0 -> true
       | 1 ->
         let blocks = block_deps_of_deps w_out d in
+(*         Format.eprintf "Checking block width...@."; *)
         Array.for_all (fun (_, d) ->
           if Map.is_empty d then true
           else
           let _, bits = Map.any d in
           Set.is_empty bits ||
           let base = Set.at_rank_exn 0 bits in
+(*           Format.eprintf "Base for current block: %d@." base; *)
           Set.for_all (fun bit ->
             let dist = bit - base in
+(*             Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in; *)
             0 <= dist && dist < w_in
           ) bits
         ) blocks
@@ -595,13 +598,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let pp_circ (fmt : Format.formatter) (c: circ) : unit =
     match c with
-    | `CArray _ -> Format.eprintf "Circ(Array)"
-    | `CBitstring _ -> Format.eprintf "Circ(Bitstring)"
-    | `CTuple _ -> Format.eprintf "Circ(Tuple)"
+    | `CArray (r, w) -> Format.eprintf "Circ(Array[%d@%d])" (Backend.size_of_reg r) w
+    | `CBitstring r -> Format.eprintf "Circ(Bitstring[%d])" (Backend.size_of_reg r)
+    | `CTuple (_, ws) -> Format.eprintf "Circ(Tuple(%a))" (fun fmt szs ->
+        Format.fprintf fmt "%d" (List.hd szs); List.iter (Format.fprintf fmt ", %d") (List.tl szs)) ws
     | `CBool _ -> Format.eprintf "Circ(Bool)"
     
   let pp_circuit (fmt: Format.formatter) ((c, inps) : circuit) : unit =
-    Format.eprintf "@[<hov 2>%a: @\n%a@]@\n"
+    Format.eprintf "@[<hov 2>Circuit:@\nOut type %a@\nInputs: %a@]"
       pp_circ c
       (fun fmt inps -> List.iter (fun inp -> Format.fprintf fmt "%a@\n" pp_cinp inp) inps) inps
     
@@ -620,6 +624,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       `List cs
     let arg_of_init f =
       `Init f
+    let pp_arg fmt arg : unit = 
+      match arg with 
+      | `Circuit  c  -> Format.fprintf fmt "%a" pp_circuit c 
+      | `Constant i  -> Format.fprintf fmt "Constant: %s" (BI.to_string i) 
+      | `Init     f  -> Format.fprintf fmt "Init: Type of f(0): %a" pp_circuit (f 0) 
+      | `List     cs -> Format.fprintf fmt "@[<hov 2> Circuit list: @\n%a@]" 
+                          (fun fmt cs -> List.iter (Format.fprintf fmt "%a@\n" pp_circuit) cs) cs
   end
   open CArgs
 
@@ -931,19 +942,25 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         in op
       in
       match op with 
-      | { kind = `ASliceGet ((w, n), m) } -> 
+      | { kind = `ASliceGet ((n, w), m) } -> 
         begin match args with 
         | [ `Circuit (`CArray (r, w'), cinps) ; `Constant i ] when w = w' ->
-            (`CBitstring (Backend.slice r (BI.to_int i) m), cinps)
-        | _ -> assert false
+          (`CBitstring (Backend.slice r (BI.to_int i) m), cinps)
+        | args -> 
+          Format.eprintf "Bad arguments for array slice get: w = %d@.%a@." w
+          (fun fmt args -> List.iter (Format.fprintf fmt "%a@\n" pp_arg) args) args;
+          assert false
         end
-      | { kind = `ASliceSet ((w, n), m) } -> 
-          begin match args with 
-          | [ `Circuit (`CArray (arr, w'), arrinps) ; `Circuit (`CBitstring bs, bsinps) ; `Constant i ] when w = w' ->
-            let i = BI.to_int i in
-            (`CArray (Backend.insert arr i bs, w), merge_inputs arrinps bsinps) 
-          | _ -> assert false
-          end
+      | { kind = `ASliceSet ((n, w), m) } -> 
+        begin match args with 
+        | [ `Circuit (`CArray (arr, w'), arrinps) ; `Constant i ; `Circuit (`CBitstring bs, bsinps) ] when w = w' ->
+          let i = BI.to_int i in
+          (`CArray (Backend.insert arr i bs, w), merge_inputs arrinps bsinps) 
+        | args -> 
+          Format.eprintf "Bad arguments for array slice set:@.w=%d@.%a@." w
+          (fun fmt args -> List.iter (Format.fprintf fmt "%a@\n" pp_arg) args) args;
+          assert false
+        end
       (* FIXME: what do we want for out of bounds extract? Decide later *)
       | { kind = `Extract (w_in, w_out) } -> 
         begin match args with
@@ -1470,7 +1487,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
     if not (is_decomposable in_w out_w c) then 
       let deps = Backend.Deps.block_deps_of_reg out_w r in
-      Format.eprintf "Failed to decompose. Deps:@.%a" (Backend.Deps.pp_block_deps) deps;
+      Format.eprintf "Failed to decompose. in_w=%d out_w=%d Deps:@.%a" in_w out_w (Backend.Deps.pp_block_deps) deps;
       assert false 
     else
     let n = (Backend.size_of_reg r) / out_w in
