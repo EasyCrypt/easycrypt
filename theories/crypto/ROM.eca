@@ -265,7 +265,7 @@ have eq_RO_LRO': equiv[Exp'(H.RO).main ~ Exp'(H.LRO).main: ={glob D, arg} ==> ={
 proc*.
 rewrite equiv[{1} 1 eq_LRO_RO].
 rewrite equiv[{2} 1 eq_ERO_RO].
-outline {2} [1] { r <@ MainD(D', RO).distinguish(x); }.
+outline {2} 1 by { r <@ MainD(D', RO).distinguish(x); }.
 rewrite equiv[{2} 1 (FullEager.RO_LRO D' dout_ll)].
 by sim.
 qed.
