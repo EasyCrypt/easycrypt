@@ -2,9 +2,11 @@
 require import AllCore List FSet Distr DProd StdOrder StdBigop.
 (*---*) import Bigreal Bigreal.BRM MUnit.
 
-op dlist (d : 'a distr) (n : int): 'a list distr =
-  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
-  axiomatized by dlist_def.
+op [opaque] dlist (d : 'a distr) (n : int): 'a list distr =
+  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n.
+lemma dlist_def (d : 'a distr) n: dlist d n = fold 
+  (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) 
+  (dunit []) n by rewrite/dlist.
 
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
 proof. by move=> ge0_n; rewrite dlist_def foldle0. qed.

@@ -81,6 +81,14 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidFun
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
@@ -147,6 +155,7 @@ type tyerror =
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
@@ -166,6 +175,7 @@ type tyerror =
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
+| NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -178,8 +188,9 @@ val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> u
 (* -------------------------------------------------------------------- *)
 type typolicy
 
-val tp_tydecl : typolicy
-val tp_relax  : typolicy
+val tp_tydecl  : typolicy
+val tp_relax   : typolicy
+val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
@@ -223,6 +234,7 @@ val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
 val trans_codeoffset1 : ?memory:EcMemory.memory -> env -> pcodeoffset1 -> codeoffset1
+(* FIXME: trans_codeoffset to remove? *)
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref

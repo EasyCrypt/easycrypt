@@ -134,14 +134,13 @@ module Apply : sig
   exception NoInstance of (bool * reason * pt_env * (form * form))
 
   val t_apply_bwd_r :
-    ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
+    ?ri:EcReduction.reduction_info -> ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
 
   val t_apply_bwd :
-    ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+    ?ri:EcReduction.reduction_info -> ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
 
   val t_apply_bwd_hi:
-       ?dpe:bool -> ?mode:fmoptions -> ?canview:bool
-    -> proofterm -> FApi.backward
+     ?ri:EcReduction.reduction_info -> ?dpe:bool -> ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
 end
 
 (* -------------------------------------------------------------------- *)
@@ -160,7 +159,7 @@ val t_right : ?reduce:lazyred -> FApi.backward
 val t_or_intro_prind : ?reduce:lazyred -> side -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_split : ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
+val t_split : ?i: int -> ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
 val t_split_prind : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
@@ -233,7 +232,8 @@ val t_rewrite_hyp :
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
-     ?kind:subst_kind
+     ?exn:exn
+  -> ?kind:subst_kind
   -> ?except:Sid.t
   -> ?clear:bool
   -> ?var:vsubst

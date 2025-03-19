@@ -439,17 +439,7 @@ let ov_equal vd1 vd2 =
   EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name &&
   ty_equal vd1.ov_type vd2.ov_type
 
-let v_hash v =
-  Why3.Hashcons.combine
-    (Hashtbl.hash v.v_name)
-    (ty_hash v.v_type)
-
-let v_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  ty_equal vd1.v_type vd2.v_type
-
 (* -------------------------------------------------------------------- *)
-
 let mr_xpaths (mr : mod_restr) : mr_xpaths =
   { ur_pos = omap fst mr.ur_pos;
     ur_neg = fst mr.ur_neg; }
@@ -623,15 +613,6 @@ let b_hash (bs : bindings) =
     Why3.Hashcons.combine (EcIdent.tag x) (gty_hash ty)
   in
     Why3.Hashcons.combine_list b1_hash 0 bs
-
-(* -------------------------------------------------------------------- *)
-let i_equal   = ((==) : instr -> instr -> bool)
-let i_hash    = fun i -> i.i_tag
-let i_fv i    = i.i_fv
-
-let s_equal   = ((==) : stmt -> stmt -> bool)
-let s_hash    = fun s -> s.s_tag
-let s_fv      = fun s -> s.s_fv
 
 (*-------------------------------------------------------------------- *)
 let hf_equal hf1 hf2 =
@@ -873,8 +854,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     in
     Why3.Hashcons.combine_list b1_hash 0 bs
 
-  let hash e =
-    match e.e_node with
+  let hash_node (e : expr_node) =
+    match e with
     | Eint   i -> BI.hash i
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
@@ -907,6 +888,9 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eproj (e, i) ->
         Why3.Hashcons.combine (e_hash e) i
+
+  let hash (e : expr) =
+    Why3.Hashcons.combine (ty_hash e.e_ty) (hash_node e.e_node)
 
   let fv_node e =
     let union ex =
@@ -999,8 +983,8 @@ module Hsform = Why3.Hashcons.Make (struct
        ty_equal f1.f_ty f2.f_ty
     && equal_node f1.f_node f2.f_node
 
-  let hash f =
-    match f.f_node with
+  let hash_node (f : f_node) =
+    match f with
     | Fquant(q, b, f) ->
         Why3.Hashcons.combine2 (f_hash f) (b_hash b) (qt_hash q)
 
@@ -1046,6 +1030,9 @@ module Hsform = Why3.Hashcons.Make (struct
     | FequivS     es   -> es_hash es
     | FeagerF     eg   -> eg_hash eg
     | Fpr         pr   -> pr_hash pr
+
+  let hash (f : form) =
+    Why3.Hashcons.combine (ty_hash f.f_ty) (hash_node f.f_node)
 
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 

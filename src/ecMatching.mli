@@ -16,6 +16,7 @@ module Position : sig
     | `While
     | `Match
     | `Assign of lvmatch
+    | `AssignTuple of lvmatch
     | `Sample of lvmatch
     | `Call   of lvmatch
   ]
@@ -30,6 +31,7 @@ module Position : sig
   type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
   type codepos1      = int * cp_base
   type codepos       = (codepos1 * codepos_brsel) list * codepos1
+  type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
   type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
 
   val shift1 : offset:int -> codepos1 -> codepos1
@@ -61,6 +63,7 @@ module Zipper : sig
     z_head : instr list;                (* instructions on my left (rev)       *)
     z_tail : instr list;                (* instructions on my right (me incl.) *)
     z_path : ipath ;                    (* path (zipper) leading to me         *)
+    z_env  : env option;                (* env with local vars from previous instructions *)
   }
 
   exception InvalidCPos
@@ -79,7 +82,7 @@ module Zipper : sig
   val offset_of_position : env -> codepos1 -> stmt -> int
 
   (* [zipper] soft constructor *)
-  val zipper : instr list -> instr list -> ipath -> zipper
+  val zipper : ?env : env -> instr list -> instr list -> ipath -> zipper
 
   (* Return the zipper for the stmt [stmt] at code position [codepos].
    * Raise [InvalidCPos] if [codepos] is not valid for [stmt]. It also
@@ -89,6 +92,13 @@ module Zipper : sig
    *)
   val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * codepos
   val zipper_of_cpos : env -> codepos -> stmt -> zipper
+
+  (* Return the zipper for the stmt [stmt] from the start of the code position
+   * range [codepos_range]. It also returns a code position relative to
+   * the zipper that represents the final position in the range.
+   * Raise [InvalidCPos] if [codepos_range] is not a valid range for [stmt].
+   *)
+  val zipper_of_cpos_range : env -> codepos_range -> stmt -> zipper * codepos1
 
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt
@@ -101,7 +111,8 @@ module Zipper : sig
    *)
   val after : strict:bool -> zipper -> instr list list
 
-  type ('a, 'state) folder = 'a -> 'state -> instr -> 'state * instr list
+  type ('a, 'state) folder = env -> 'a -> 'state -> instr -> 'state * instr list
+  type ('a, 'state) folder_l = env -> 'a -> 'state -> instr list -> 'state * instr list
 
   (* [fold env v cpos f state s] create the zipper for [s] at [cpos], and apply
    * [f] to it, along with [v] and the state [state]. [f] must return the
@@ -116,6 +127,11 @@ module Zipper : sig
    * out-of-band data are absent
    *)
   val map : env -> codepos -> (instr -> 'a * instr list) -> stmt -> 'a * stmt
+
+  (* Variants of the above but using code position ranges *)
+  val fold_range : env -> 'a -> codepos_range -> ('a, 'state) folder_l -> 'state -> stmt -> 'state * stmt
+  val map_range : env -> codepos_range -> (env -> instr list -> instr list) -> stmt -> stmt
+
 
 end
 

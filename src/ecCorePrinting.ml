@@ -61,12 +61,26 @@ module type PrinterAPI = sig
   val pp_tyvar    : PPEnv.t -> ident pp
   val pp_tyunivar : PPEnv.t -> EcUid.uid pp
   val pp_path     : path pp
+  
+  (* ------------------------------------------------------------------ *)
+  val shorten_path : (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
+
+  val pp_shorten_path : (path -> qsymbol -> bool) -> path pp
 
   (* ------------------------------------------------------------------ *)
   val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
   val pp_codeoffset1 : PPEnv.t -> EcMatching.Position.codeoffset1 pp
 
   val pp_codepos     : PPEnv.t -> EcMatching.Position.codepos pp
+
+  (* ------------------------------------------------------------------ *)
+  type vsubst = [
+    | `Local of EcIdent.t
+    | `Glob  of EcIdent.t * EcMemory.memory
+    | `PVar  of EcTypes.prog_var * EcMemory.memory
+  ]
+  
+  val pp_vsubst : PPEnv.t -> vsubst pp
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
@@ -97,6 +111,12 @@ module type PrinterAPI = sig
 
   val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
+
+  (* ------------------------------------------------------------------ *)
+  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
+
+  (* ------------------------------------------------------------------ *)
+  val pp_rule_pattern : PPEnv.t -> EcTheory.rule_pattern pp  
 
   (* ------------------------------------------------------------------ *)
   module ObjectInfo : sig

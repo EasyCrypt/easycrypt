@@ -39,20 +39,8 @@
     in
       try Some (nm, unloc name) with E.Invalid -> None
 
-  let mk_peid_symb loc s ti =
-    mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
-
   let mk_pfid_symb loc s ti =
     mk_loc loc (PFident (pqsymb_of_symb loc s, ti))
-
-  let peapp_symb loc s ti es =
-    PEapp (mk_peid_symb loc s ti, es)
-
-  let peget loc ti e1 e2    =
-    peapp_symb loc EcCoreLib.s_get ti [e1;e2]
-
-  let peset loc ti e1 e2 e3 =
-    peapp_symb loc EcCoreLib.s_set ti [e1;e2;e3]
 
   let pfapp_symb loc s ti es =
     PFapp(mk_pfid_symb loc s ti, es)
@@ -62,15 +50,6 @@
 
   let pfset loc ti e1 e2 e3 =
     pfapp_symb loc EcCoreLib.s_set ti [e1;e2;e3]
-
-  let pe_nil loc ti =
-    mk_peid_symb loc EcCoreLib.s_nil ti
-
-  let pe_cons loc ti e1 e2 =
-    mk_loc loc (peapp_symb loc EcCoreLib.s_cons ti [e1; e2])
-
-  let pelist loc ti (es : pexpr list) : pexpr =
-    List.fold_right (fun e1 e2 -> pe_cons loc ti e1 e2) es (pe_nil loc ti)
 
   let pf_nil loc ti =
     mk_pfid_symb loc EcCoreLib.s_nil ti
@@ -587,6 +566,7 @@
 %token SPLITWHILE
 %token STAR
 %token SUBST
+%token SUBTYPE
 %token SUFF
 %token SWAP
 %token SYMMETRY
@@ -929,139 +909,8 @@ tyvar_annot:
 | LTCOLON k=loc(tyvar_annot) GT { k }
 
 (* -------------------------------------------------------------------- *)
-%inline sexpr: x=loc(sexpr_u) { x }
-%inline  expr: x=loc( expr_u) { x }
-
-sexpr_u:
-| e=sexpr PCENT p=uqident
-   { PEscope (p, e) }
-
-| e=sexpr p=loc(prefix(PCENT, _lident))
-   { if unloc p = "top" then
-       PEscope (pqsymb_of_symb p.pl_loc "<top>", e)
-     else
-       let p = lmap (fun x -> "%" ^ x) p in
-       PEapp (mk_loc (loc p) (PEident (pqsymb_of_psymb p, None)), [e]) }
-
-| LPAREN e=expr COLONTILD ty=loc(type_exp) RPAREN
-   { PEcast (e, ty) }
-
-| n=uint
-   { PEint n }
-
-| d=DECIMAL
-   { PEdecimal d }
-
-| x=qoident ti=tvars_app?
-   { PEident (x, ti) }
-
-| op=loc(numop) ti=tvars_app?
-    { peapp_symb op.pl_loc op.pl_desc ti [] }
-
-| se=sexpr DLBRACKET ti=tvars_app? e=loc(plist1(expr, COMMA)) RBRACKET
-   { let e = List.reduce1 (fun _ -> lmap (fun x -> PEtuple x) e) (unloc e) in
-     peget (EcLocation.make $startpos $endpos) ti se e }
-
-| se=sexpr DLBRACKET ti=tvars_app? e1=loc(plist1(expr, COMMA)) LARROW e2=expr RBRACKET
-   { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PEtuple x) e1) (unloc e1) in
-     peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
-
-| TICKPIPE ti=tvars_app? e=expr PIPE
-   { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
-
-| LBRACKET ti=tvars_app? es=loc(plist0(expr, SEMICOLON)) RBRACKET
-   { unloc (pelist es.pl_loc ti es.pl_desc) }
-
-| LBRACKET ti=tvars_app? e1=expr op=loc(DOTDOT) e2=expr RBRACKET
-   { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_dinter, ti)
-     in
-       PEapp(mk_loc op.pl_loc id, [e1; e2]) }
-
-| LPAREN es=plist0(expr, COMMA) RPAREN
-   { PEtuple es }
-
-| r=loc(RBOOL)
-   { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
-
-| LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PErecord (None, fields) }
-
-| LPBRACE b=sexpr WITH fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PErecord (Some b, fields) }
-
-| e=sexpr DOTTICK x=qident
-   { PEproj (e, x) }
-
-| e=sexpr DOTTICK n=loc(word)
-   { if n.pl_desc = 0 then
-       parse_error n.pl_loc (Some "tuple projection start at 1");
-     PEproji(e,n.pl_desc - 1) }
-
-expr_u:
-| e=sexpr_u { e }
-
-| e=sexpr args=sexpr+
-    { PEapp (e, args) }
-
-| op=loc(uniop) ti=tvars_app? e=expr
-    { peapp_symb op.pl_loc op.pl_desc ti [e] }
-
-| e=expr_chained_orderings %prec prec_below_order
-    { fst e }
-
-| e1=expr op=loc(binop) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-
-| c=expr QUESTION e1=expr COLON e2=expr %prec LOP2
-   { PEif (c, e1, e2) }
-
-| IF c=expr THEN e1=expr ELSE e2=expr
-   { PEif (c, e1, e2) }
-
-| MATCH e=expr WITH
-    PIPE? bs=plist0(p=mcptn(sbinop) IMPL be=expr { (p, be) }, PIPE)
-  END
-    { PEmatch (e, bs) }
-
-| LET p=lpattern EQ e1=expr IN e2=expr
-   { PElet (p, (e1, None), e2) }
-
-| LET p=lpattern COLON ty=loc(type_exp) EQ e1=expr IN e2=expr
-   { PElet (p, (e1, Some ty), e2) }
-
-| r=loc(RBOOL) TILD e=sexpr
-    { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
-      let loc = EcLocation.make $startpos $endpos in
-        PEapp (mk_loc loc id, [e]) }
-
-| FUN pd=ptybindings IMPL  e=expr
-| FUN pd=ptybindings COMMA e=expr { PElambda (pd, e) }
-
-| FORALL pd=ptybindings COMMA e=expr { PEforall (pd, e) }
-| EXIST  pd=ptybindings COMMA e=expr { PEexists (pd, e) }
-
-expr_field:
-| x=qident EQ e=expr
-    { { rf_name = x ; rf_tvi = None; rf_value = e; } }
-
-expr_ordering:
-| e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
-    { (op, ti, e1, e2) }
-
-expr_chained_orderings:
-| e=expr_ordering
-    { let (op, ti, e1, e2) = e in
-        (peapp_symb op.pl_loc (unloc op) ti [e1; e2], e2) }
-
-| e1=loc(expr_chained_orderings) op=loc(ordering_op) ti=tvars_app? e2=expr
-    { let (lce1, (e1, le)) = (e1.pl_loc, unloc e1) in
-      let loc = EcLocation.make $startpos $endpos in
-        (peapp_symb loc "&&" None
-           [EcLocation.mk_loc lce1 e1;
-            EcLocation.mk_loc loc
-              (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
-         e2) }
+%inline sexpr: f=sform { mk_loc f.pl_loc (Expr f) }
+%inline  expr: f=form  { mk_loc f.pl_loc (Expr f) }
 
 (* -------------------------------------------------------------------- *)
 bdident_:
@@ -1607,6 +1456,34 @@ mod_item:
 | IMPORT VAR ms=loc(mod_qident)+
     { Pst_import ms }
 
+mod_remove_var:
+| MINUS VAR xs=plist1(lident, COMMA) { xs }
+
+mod_update_var:
+| v=var_decl { v }
+
+mod_update_fun:
+| PROC x=lident LBRACKET lvs=var_decl* fups=fun_update+ RBRACKET res_up=option(RES TILD e=sexpr {e})
+  { (x, lvs, (List.flatten fups, res_up)) }
+
+update_stmt:
+| PLUS s=brace(stmt){ [Pups_add (s, true)] }
+| PLUS HAT s=brace(stmt){ [Pups_add (s, false)] }
+| TILD s=brace(stmt) { [Pups_del; Pups_add (s, true)] }
+| MINUS { [Pups_del] }
+
+update_cond:
+| PLUS e=sexpr { Pupc_add (e, true) }
+| PLUS HAT e=sexpr { Pupc_add (e, false) }
+| TILD e=sexpr { Pupc_mod e }
+| MINUS bs=branch_select { Pupc_del bs }
+
+fun_update:
+| cp=loc(codepos_or_range) sup=update_stmt
+  { List.map (fun v -> (cp, Pup_stmt v)) sup }
+| cp=loc(codepos_or_range) cup=update_cond
+  { [(cp, Pup_cond cup)] }
+
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
 
@@ -1616,6 +1493,9 @@ mod_body:
 
 | LBRACE stt=loc(mod_item)* RBRACE
     { Pm_struct stt }
+
+| m=mod_qident WITH LBRACE dvs=mod_remove_var? vs=mod_update_var* fs=mod_update_fun* RBRACE
+  { Pm_update (m, odfl [] dvs, vs, fs) }
 
 mod_def_or_decl:
 | locality=locality MODULE header=mod_header c=mod_cast? EQ ptm_body=loc(mod_body)
@@ -1780,6 +1660,21 @@ typedecl:
 
 | locality=locality TYPE td=tyd_name EQ te=datatype_def
     { [mk_tydecl ~locality td (PTYD_Datatype te)] }
+
+(* -------------------------------------------------------------------- *)
+(* Subtypes                                                             *)
+subtype:
+| SUBTYPE name=lident cname=prefix(AS, uident)? EQ LBRACE
+    x=lident COLON carrier=loc(type_exp) PIPE pred=form
+  RBRACE rename=subtype_rename?
+  { { pst_name    = name;
+      pst_cname   = cname;
+      pst_carrier = carrier;
+      pst_pred    = (x, pred);
+      pst_rename  = rename; } }
+
+subtype_rename:
+| RENAME x=STRING COMMA y=STRING { (x, y) }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -2623,6 +2518,7 @@ icodepos_r:
 | lvm=lvmatch LESAMPLE { (`Sample lvm :> pcp_match) }
 | lvm=lvmatch LEAT { (`Call lvm :> pcp_match) }
 | lvm=lvmatch LARROW { (`Assign lvm :> pcp_match) }
+| lvm=paren(lvmatch)  LARROW { (`AssignTuple lvm :> pcp_match) }
 
 lvmatch:
 | empty        { (`LvmNone  :> plvmatch) }
@@ -2656,6 +2552,14 @@ branch_select:
 codepos:
 | nm=rlist0(nm1_codepos, empty) i=codepos1
     { (nm, i) }
+
+codepos_range:
+| LBRACKET cps=codepos DOTDOT cpe=codepos RBRACKET { (cps, `Base cpe) }
+| LBRACKET cps=codepos MINUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
+
+codepos_or_range:
+| cp=codepos { (cp, `Offset (0, `ByPos 0)) }
+| cpr=codepos_range  { cpr }
 
 codeoffset1:
 | i=sword       { (`ByOffset   i :> pcodeoffset1) }
@@ -2802,8 +2706,14 @@ logtactic:
 | MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
    { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
+| CLEAR
+   { Pclear (`Exclude []) }
+
+| CLEAR MINUS l=loc(ipcore_name)+
+   { Pclear (`Exclude l) }
+
 | CLEAR l=loc(ipcore_name)+
-   { Pclear l }
+   { Pclear (`Include l) }
 
 | CONGR
    { Pcongr }
@@ -2820,8 +2730,8 @@ logtactic:
 | SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
-| SPLIT
-    { Psplit }
+| SPLIT i=word?
+    { Psplit i }
 
 | FIELD eqs=ident*
     { Pfield eqs }
@@ -3835,6 +3745,11 @@ realize:
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
+phint:
+| SIMPLIFY { `Simplify }
+| SOLVE    { `Solve    }
+| REWRITE  { `Rewrite  }
+
 print:
 |             qs=qoident         { Pr_any  qs            }
 | STAR        qs=qoident         { Pr_any  qs            }
@@ -3850,10 +3765,12 @@ print:
 | GOAL        n=sword            { Pr_goal n             }
 | REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
 | SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
+| AXIOM                          { Pr_axioms             }
+| HINT        p=phint?           { Pr_hint p             }
 
 coq_info:
 |           { None }
-| CHECK    { Some EcProvers.Check }
+| CHECK     { Some EcProvers.Check }
 | EDIT      { Some EcProvers.Edit }
 | FIX       { Some EcProvers.Fix }
 
@@ -3905,14 +3822,25 @@ addrw:
 | local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
-hint:
-| local=is_local HINT EXACT base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = 0;
-        ht_base  = base ; ht_names = l; } }
+hintoption:
+| x=lident {
+    match unloc x with
+    | "rigid" -> `Rigid
+    | _ ->
+        parse_error x.pl_loc
+            (Some ("invalid option: " ^ (unloc x)))
+  }
 
-| local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
-    { { ht_local = local; ht_prio  = i;
-        ht_base  = base ; ht_names = l; } }
+hint:
+| local=is_local
+    HINT opts=ioption(bracket(hintoption)+)
+    prio=ID(EXACT { 0 } | SOLVE i=word { i })
+    base=lident? COLON l=qident*
+    { { ht_local   = local;
+        ht_prio    = prio;
+        ht_base    = base ;
+        ht_names   = l;
+        ht_options = odfl [] opts; } }
 
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
@@ -3980,6 +3908,7 @@ global_action:
 | mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
+| subtype          { Gsubtype     $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
@@ -3998,7 +3927,6 @@ global_action:
 | cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
-| PRINT AXIOM      { Gpaxiom         }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }

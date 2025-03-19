@@ -289,8 +289,8 @@ proof.
         by rewrite restrS 1:/# Hjx Hof /= fset0U.
       smt (is_restrS is_restr_addS oflist_cons).
     + conseq H => />.
-      + move=> &hr ?? His Hof Hb.
-        rewrite restrS 1:/# (@negbRL _ _ Hb);case: (j0 = i{hr}) => /= [<<- | ?].
+      + move=> &hr ?? His Hof /negbDR->.
+        rewrite restrS 1:/#;case: (j0 = i{hr}) => /= [<<- | ?].
         + rewrite xorC xor_true /=.
           case (j0 \in x) => /= Hj0x /=.
           + by rewrite (@eq_sym (oflist s0)) (@is_restr_diff j0 (restr x j0) _ His).

@@ -14,19 +14,16 @@ op wordw : t list = mkseq (fun _ => dchar) n.
 lemma size_wordw: size wordw = n.
 proof. by rewrite size_mkseq ler_maxr ?ge0_n. qed.
 
-clone include Subtype
-  with type T   <- t list,
-       op P   <- fun w => size w = n
-proof *.
-realize inhabited by exists wordw; exact size_wordw.
+subtype word = { w : t list | size w = n }.
 
-type word = sT.
+realize inhabited.
+proof. by exists wordw; exact: size_wordw. qed.
+
 (* default value chosen for backward compatibility *)
 op mkword x = odflt (insubd wordw) (insub x).
 op ofword = val.
 
 (* -------------------------------------------------------------------- *)
-
 lemma mkwordK : cancel ofword mkword.
 proof. smt(valK). qed.
 
@@ -64,13 +61,17 @@ by rewrite -(@ofwordK s1) // -(@ofwordK s2) // eq_mkword.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op "_.[_]" (w : word) (i : int): t =
-  if 0 <= i < n then nth witness (ofword w) i else dchar
-axiomatized by getE.
+op [opaque] "_.[_]" (w : word) (i : int): t =
+  if 0 <= i < n then nth witness (ofword w) i else dchar.
+lemma getE w i: 
+  w.[i] = if 0 <= i < n then nth witness (ofword w) i else dchar.
+proof. by rewrite/"_.[_]". qed.
 
-op "_.[_<-_]" (w : word) (i : int) (x : t) : word =
-  mkword (mkseq (fun k => if i = k then x else w.[k]) n)
-axiomatized by setE.
+op [opaque] "_.[_<-_]" (w : word) (i : int) (x : t) : word =
+  mkword (mkseq (fun k => if i = k then x else w.[k]) n).
+lemma setE w i x: 
+  w.[i<-x] = mkword (mkseq (fun k => if i = k then x else w.[k]) n).
+proof. by rewrite/"_.[_<-_]". qed.
 
 (* -------------------------------------------------------------------- *)
 lemma wordP (w1 w2 : word):

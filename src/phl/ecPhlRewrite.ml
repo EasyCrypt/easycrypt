@@ -168,6 +168,7 @@ let process_rewrite
   | `Rw rw -> process_rewrite_rw side pos rw tc
   | `Simpl -> process_rewrite_simpl side pos tc
 
+(* FIXME: PR: Should this be kept? *)
 (* -------------------------------------------------------------------- *)
 let process_change_stmt 
   (side   : side option)

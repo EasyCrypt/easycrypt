@@ -36,6 +36,32 @@ type osymbol_r   = psymbol option
 type osymbol     = osymbol_r located
 
 (* -------------------------------------------------------------------- *)
+type pcp_match = [
+  | `If
+  | `While
+  | `Match
+  | `Assign of plvmatch
+  | `AssignTuple of plvmatch
+  | `Sample of plvmatch
+  | `Call of plvmatch
+]
+
+and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
+
+type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
+
+type pbranch_select = [`Cond of bool | `Match of psymbol]
+type pcodepos1 = int * pcp_base
+type pcodepos  = (pcodepos1 * pbranch_select) list * pcodepos1
+type pcodepos_range  = pcodepos * [`Base of pcodepos | `Offset of pcodepos1]
+type pdocodepos1 = pcodepos1 doption option
+
+type pcodeoffset1 = [
+  | `ByOffset   of int
+  | `ByPosition of pcodepos1
+]
+(* -------------------------------------------------------------------- *)
+
 type pty_r =
   | PTunivar
   | PTtuple  of pty list
@@ -65,59 +91,11 @@ type ppattern =
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
-and pexpr_r =
-  | PEcast   of pexpr * pty                       (* type cast          *)
-  | PEint    of zint                              (* int. literal       *)
-  | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
-  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp    of pexpr * pexpr list                (* op. application    *)
-  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
-  | PEtuple  of pexpr list                        (* tuple constructor  *)
-  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PEmatch  of pexpr * (ppattern * pexpr) list   (* match              *)
-  | PEforall of ptybindings * pexpr               (* forall quant.      *)
-  | PEexists of ptybindings * pexpr               (* exists quant.      *)
-  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord of pexpr option * pexpr rfield list  (* record             *)
-  | PEproj   of pexpr * pqsymbol                  (* projection         *)
-  | PEproji  of pexpr * int                       (* tuple projection   *)
-  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
-
-and pexpr = pexpr_r located
-and pexpr_wty = pexpr * pty option
-
 and 'a rfield = {
   rf_name  : pqsymbol;
   rf_tvi   : ptyannot option;
   rf_value : 'a;
 }
-
-(* -------------------------------------------------------------------- *)
-type plvalue_r =
-  | PLvSymbol of pqsymbol
-  | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr list
-
-and plvalue = plvalue_r located
-
-type pinstr_r =
-  | PSident  of psymbol
-  | PSasgn   of plvalue * pexpr
-  | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pgamepath * (pexpr list) located
-  | PSif     of pscond * pscond list * pstmt
-  | PSwhile  of pscond
-  | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
-
-and psmatch = [
-  | `Full of (ppattern * pstmt) list
-  | `If   of (ppattern * pstmt) * pstmt option
-]
-
-and pscond = pexpr * pstmt
-and pinstr = pinstr_r located
-and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type is_local = [ `Local | `Global]
@@ -170,7 +148,37 @@ type glob_or_var =
   | GVglob of pmsymbol located * pqsymbol list
   | GVvar  of pqsymbol
 
-type pformula  = pformula_r located
+(* -------------------------------------------------------------------- *)
+type plvalue_r =
+  | PLvSymbol of pqsymbol
+  | PLvTuple  of pqsymbol list
+  | PLvMap    of pqsymbol * ptyannot option * pexpr list
+
+and plvalue = plvalue_r located
+
+and pinstr_r =
+  | PSident  of psymbol
+  | PSasgn   of plvalue * pexpr
+  | PSrnd    of plvalue * pexpr
+  | PScall   of plvalue option * pgamepath * (pexpr list) located
+  | PSif     of pscond * pscond list * pstmt
+  | PSwhile  of pscond
+  | PSmatch  of pexpr * psmatch
+  | PSassert of pexpr
+
+and psmatch = [
+  | `Full of (ppattern * pstmt) list
+  | `If   of (ppattern * pstmt) * pstmt option
+]
+
+and pscond = pexpr * pstmt
+and pinstr = pinstr_r located
+and pstmt  = pinstr list
+
+and pexpr   = pexpr_r located
+and pexpr_r = Expr of pformula
+
+and pformula  = pformula_r located
 
 and pformula_r =
   | PFhole
@@ -323,6 +331,7 @@ and pmodule_params = (psymbol * pmodule_type) list
 and pmodule_expr_r =
   | Pm_ident  of pmsymbol
   | Pm_struct of pstructure
+  | Pm_update of pmsymbol * psymbol list * pupdate_var list * pupdate_fun list
 
 and pmodule_expr = pmodule_expr_r located
 
@@ -336,6 +345,21 @@ and pstructure_item =
   | Pst_include  of (pmsymbol located * bool * minclude_proc option)
   | Pst_import   of (pmsymbol located) list
 
+and pupdate_var = psymbol list * pty
+and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos_range located * pupdate_item) list * pexpr option)
+
+and pupdate_item =
+  | Pup_stmt of pupdate_stmt
+  | Pup_cond of pupdate_cond
+
+and pupdate_stmt =
+  | Pups_add of (pstmt * bool)
+  | Pups_del
+
+and pupdate_cond =
+  | Pupc_add of (pexpr * bool)
+  | Pupc_mod of pexpr
+  | Pupc_del of pbranch_select
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -361,6 +385,15 @@ let rec pf_ident ?(raw = false) f =
   | PFident ({ pl_desc = ([], x) }, _) -> Some x
   | PFtuple [f] when not raw -> pf_ident ~raw f
   | _ -> None
+
+(* -------------------------------------------------------------------- *)
+type psubtype = {
+  pst_name    : psymbol;
+  pst_cname   : psymbol option;
+  pst_carrier : pty;
+  pst_pred    : (psymbol * pformula);
+  pst_rename  : (string * string) option;
+}
 
 (* -------------------------------------------------------------------- *)
 type ptyvardecls =
@@ -485,30 +518,6 @@ type preduction = {
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
 }
-
-(* -------------------------------------------------------------------- *)
-type pcp_match = [
-  | `If
-  | `While
-  | `Match
-  | `Assign of plvmatch
-  | `Sample of plvmatch
-  | `Call   of plvmatch
-]
-
-and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
-
-type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
-
-type pbranch_select = [`Cond of bool | `Match of psymbol]
-type pcodepos1      = int * pcp_base
-type pcodepos       = (pcodepos1 * pbranch_select) list * pcodepos1
-type pdocodepos1    = pcodepos1 doption option
-
-type pcodeoffset1 = [
-  | `ByOffset   of int
-  | `ByPosition of pcodepos1
-]
 
 (* -------------------------------------------------------------------- *)
 type pswap_kind = {
@@ -996,6 +1005,12 @@ type apply_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type clear_info = [
+  | `Exclude of psymbol list
+  | `Include of psymbol list
+]
+
+(* -------------------------------------------------------------------- *)
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
@@ -1003,7 +1018,7 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
-  | Psplit
+  | Psplit      of int option
   | Pfield      of psymbol list
   | Pring       of psymbol list
   | Palg_norm
@@ -1017,7 +1032,7 @@ type logtactic =
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of prevertv
-  | Pclear      of psymbol list
+  | Pclear      of clear_info
   | Prewrite    of (rwarg list * osymbol_r)
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
@@ -1168,6 +1183,8 @@ type pprint =
   | Pr_glob of pmsymbol located
   | Pr_goal of int
   | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
+  | Pr_axioms
+  | Pr_hint of [`Simplify | `Rewrite | `Solve] option
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
@@ -1275,11 +1292,15 @@ type save = [ `Qed | `Admit | `Abort ]
 type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
+type phintoption = [ `Rigid ]
+
+(* -------------------------------------------------------------------- *)
 type phint = {
-  ht_local : is_local;
-  ht_prio  : int;
-  ht_base  : psymbol option;
-  ht_names : pqsymbol list;
+  ht_local   : is_local;
+  ht_prio    : int;
+  ht_base    : psymbol option;
+  ht_names   : pqsymbol list;
+  ht_options : phintoption list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1343,13 +1364,13 @@ type global_action =
   | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
+  | Gsubtype     of psubtype
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
-  | Gpaxiom
   | Gsearch      of pformula list
   | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)

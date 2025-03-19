@@ -25,9 +25,9 @@ proof. by []. qed.
 abbrev (\in)    ['a 'b] x (m : ('a, 'b) fmap) = (dom m x).
 abbrev (\notin) ['a 'b] x (m : ('a, 'b) fmap) = ! (dom m x).
 
-op rng ['a 'b] (m : ('a, 'b) fmap) =
-  fun y => exists x, m.[x] = Some y
-axiomatized by rngE.
+op [opaque] rng ['a 'b] (m : ('a, 'b) fmap) = fun y => exists x, m.[x] = Some y.
+lemma rngE (m : ('a, 'b) fmap): 
+  rng m = fun y => exists x, m.[x] = Some y by rewrite /rng.
 
 lemma get_none (m : ('a, 'b) fmap, x : 'a) :
   x \notin m => m.[x] = None.
@@ -200,6 +200,9 @@ lemma remE ['a 'b] (m : ('a, 'b) fmap) x y :
   (rem m x).[y] = if y = x then None else m.[y].
 proof. by rewrite /rem /"_.[_]" rem_valE SmtMap.get_setE. qed.
 
+lemma rem_set (m: ('a, 'b) fmap) x: x \in m => (rem m x).[x <- oget m.[x]] = m.
+proof. move => x_in; apply fmap_eqP => y; rewrite get_setE remE /#. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma mem_rem ['a 'b] (m : ('a, 'b) fmap) x y :
   y \in (rem m x) <=> (y \in m /\ y <> x).
@@ -212,6 +215,23 @@ proof.
 move=> x_notin_m; apply/fmap_eqP => y; rewrite remE.
 by case (y = x) => // ->>; apply/eq_sym/domNE.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rng_set (m : ('a, 'b) fmap) (x : 'a) (y z : 'b) :
+  rng m.[x <- y] z <=> rng (rem m x) z \/ z = y.
+proof.
+rewrite !rngE /=; split.
++ move=> [] r; rewrite get_setE; case: (r = x)=> />.
+  by move=> r_neq_x m_r; left; exists r; rewrite remE r_neq_x /= m_r.
+case=> [[] r rem_m_x_r|->>] />.
++ by exists r; move: rem_m_x_r; rewrite get_setE remE; case: (r = x).
++ by exists x; rewrite get_set_sameE.
+qed.
+
+lemma rng_set_notin (m : ('a, 'b) fmap) (x : 'a) (y z : 'b) :
+     x \notin m
+  => rng m.[x <- y] z <=> rng m z \/ z = y.
+proof. by rewrite rng_set=> /rem_id ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op eq_except ['a 'b] X (m1 m2 : ('a, 'b) fmap) =
@@ -458,8 +478,9 @@ case: (y = x) => [->|] /=; case: (p x b) => /=.
 qed.
 
 (* ==================================================================== *)
-op fdom ['a 'b] (m : ('a, 'b) fmap) =
-  oflist (to_seq (dom m)) axiomatized by fdomE.
+op [opaque] fdom ['a 'b] (m : ('a, 'b) fmap) = oflist (to_seq (dom m)).
+lemma fdomE (m : ('a, 'b) fmap): fdom m = oflist (to_seq (dom m)).
+proof. by rewrite/fdom. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_fdom ['a 'b] (m : ('a, 'b) fmap) (x : 'a) :
@@ -512,8 +533,47 @@ lemma mem_fdom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
 proof. by rewrite fdom_rem in_fsetD1. qed.
 
 (* ==================================================================== *)
-op frng ['a 'b] (m : ('a, 'b) fmap) =
-  oflist (to_seq (rng m)) axiomatized by frngE.
+op offset (s: 'a fset): ('a, unit) fmap = 
+  ofmap (offun (fun e => if e \in s then Some () else None)).
+
+lemma mem_offset (s: 'a fset) x: x \in (offset s) <=> x \in s.
+proof.
+rewrite /dom getE ofmapK.
+- move: (FSet.finite_mem s).
+  apply/eq_ind/fun_ext => y.
+  rewrite offunE /#.
+rewrite offunE /#.
+qed.
+
+lemma offset_get s (e: 'a): (offset s).[e] = if e \in s then Some () else None.
+proof.
+rewrite getE /ofset ofmapK.
+- move: (FSet.finite_mem s).
+  apply/eq_ind/fun_ext => y.
+  rewrite offunE /#.
+rewrite offunE /#.
+qed.
+
+lemma offsetK: cancel offset fdom<:'a, unit>.
+proof. move => s; rewrite fsetP => x; by rewrite mem_fdom mem_offset. qed.
+
+(* ==================================================================== *)
+op offsetmap (f: 'a -> 'b) (s: 'a fset) : ('a, 'b) fmap = 
+  map (fun x y => f x) (offset s).
+
+lemma offsetmapT (s: 'a fset) (f: 'a -> 'b) e: e \in s => (offsetmap f s).[e] = Some (f e).
+proof. by move => e_in; rewrite /offsetmap mapE offset_get e_in. qed.
+
+lemma offsetmapN (s: 'a fset) (f: 'a -> 'b) e: e \notin s => (offsetmap f s).[e] = None.
+proof. by move => e_in; rewrite /offsetmap mapE offset_get e_in. qed.
+
+lemma mem_offsetmap s (f: 'a -> 'b) e: e \in offsetmap f s <=> e \in s.
+proof. by rewrite /offsetmap mem_map mem_offset. qed.
+
+(* ==================================================================== *)
+op [opaque] frng ['a 'b] (m : ('a, 'b) fmap) = oflist (to_seq (rng m)).
+lemma frngE (m : ('a, 'b) fmap): frng m = oflist (to_seq (rng m)).
+proof. by rewrite/frng. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_frng ['a 'b] (m : ('a, 'b) fmap) (y : 'b) :
@@ -590,9 +650,10 @@ by apply/fsetP=> x; rewrite mem_fdom mem_join in_fsetU !mem_fdom.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op has (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  has (fun x=> P x (oget m.[x])) (elems (fdom m))
-axiomatized by hasE.
+op [opaque] has (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  has (fun x=> P x (oget m.[x])) (elems (fdom m)).
+lemma hasE (P : 'a -> 'b -> bool) m: 
+  has P m = has (fun x=>P x (oget m.[x])) (elems (fdom m)) by rewrite/has.
 
 (* -------------------------------------------------------------------- *)
 lemma hasP (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
@@ -604,9 +665,11 @@ by split=> [Pxy|/>]; exists y.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op find (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m)))
-axiomatized by findE.
+op [opaque] find (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m))).
+lemma findE (P : 'a -> 'b -> bool) m: find P m =
+  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m))).
+proof. by rewrite/find. qed.
 
 (* -------------------------------------------------------------------- *)
 
@@ -712,9 +775,22 @@ op fsize (m : ('a,'b) fmap) : int = FSet.card (fdom m).
 lemma fsize_empty ['a 'b] : fsize<:'a,'b> empty = 0. 
 proof. by rewrite /fsize fdom0 fcards0. qed.
 
+lemma ge0_fsize (m : ('a, 'b) fmap) : 0 <= fsize m.
+proof. by rewrite fcard_ge0. qed. 
+
 lemma fsize_set (m : ('a, 'b) fmap) k v : 
   fsize m.[k <- v] = b2i (k \notin m) + fsize m.
 proof. by rewrite /fsize fdom_set fcardU1 mem_fdom. qed.
+
+lemma fsize0_empty (m: ('a, 'b) fmap): fsize m = 0 => m = empty.
+proof.
+move: m; apply fmapW => [//| /= m k v].
+rewrite mem_fdom fsize_set =>->_/=. 
+smt(ge0_fsize).
+qed.
+
+lemma fsize_map m (f: 'a -> 'b -> 'c): fsize (map f m) = fsize m.
+proof. by rewrite /fsize fdom_map. qed.
 
 (* ==================================================================== *)
 

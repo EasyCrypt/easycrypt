@@ -163,17 +163,23 @@ let process_coq ~loc ~name (ttenv : ttenv) coqmode  pi (tc : tcenv1) =
     t_seq (t_simplify ~delta:`No) (t_coq ~loc ~name ~mode:(`Report (Some loc)) coqmode pi) tc
 
 (* -------------------------------------------------------------------- *)
-let process_clear symbols tc =
+let process_clear (info : clear_info) tc =
   let hyps = FApi.tc1_hyps tc in
-
   let toid s =
     if not (LDecl.has_name (unloc s) hyps) then
       tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
     fst (LDecl.by_name (unloc s) hyps)
   in
-
-  try  t_clears (List.map toid symbols) tc
-  with (ClearError _) as err -> tc_error_exn !!tc err
+  match info with
+  | `Include symbols -> begin
+    try  t_clears (List.map toid symbols) tc
+    with (ClearError _) as err -> tc_error_exn !!tc err
+  end
+  | `Exclude symbols -> 
+    let excluded = List.map toid symbols in
+    let hyp_ids = List.map fst (LDecl.tohyps hyps).h_local in
+    let clear_list = List.filter (fun x -> not (List.mem x excluded)) hyp_ids in
+    t_clears ~leniant:true clear_list tc
 
 (* -------------------------------------------------------------------- *)
 let process_algebra mode kind eqs (tc : tcenv1) =
@@ -486,7 +492,13 @@ let process_exacttype qs (tc : tcenv1) =
   let tys =
     List.map (fun (a,_) -> EcTypes.tvar a)
       (EcEnv.LDecl.tohyps hyps).h_tvar in
-  EcLowGoal.t_apply_s p tys ~args:[] ~sk:0 tc
+  let pt = ptglobal ~tys p in
+
+  try
+    EcLowGoal.t_apply pt tc
+  with InvalidGoalShape ->
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tc_error !!tc "cannot apply %a@." (EcPrinting.pp_axname ppe) p
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
@@ -1413,7 +1425,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     t_simplify_lg ~delta:`IfApplied (ttenv, logic) tc
 
   and intro1_clear (_ : ST.state) xs tc =
-    process_clear xs tc
+    process_clear (`Include xs) tc
 
   and intro1_case (st : ST.state) nointro pis gs =
     let onsub gs =
@@ -1826,7 +1838,7 @@ let rec process_mgenintros ?cf ttenv pis tc =
       | `Gen gn ->
          t_onall (
            t_seqs [
-               process_clear gn.pr_clear;
+               process_clear (`Include gn.pr_clear);
                process_generalize gn.pr_genp
            ]) tc
     in process_mgenintros ~cf:false ttenv pis tc
@@ -1838,7 +1850,7 @@ let process_genintros ?cf ttenv pis tc =
 (* -------------------------------------------------------------------- *)
 let process_move ?doeq views pr (tc : tcenv1) =
   t_seqs
-    [process_clear pr.pr_clear;
+    [process_clear (`Include pr.pr_clear);
      process_generalize ?doeq pr.pr_genp;
      process_view views]
     tc
@@ -1958,9 +1970,24 @@ let process_subst syms (tc : tcenv1) =
         "this formula is not subject to substitution"
   in
 
-  match List.map resolve syms with
-  | []   -> t_repeat t_subst tc
-  | syms -> FApi.t_seqs (List.map (fun var tc -> t_subst ~var tc) syms) tc
+  let exception NothingToSubstitute of vsubst in
+
+  try
+    match List.map resolve syms with
+    | []   -> t_repeat t_subst tc
+    | syms ->
+        FApi.t_seqs
+          (List.map
+            (fun var tc -> t_subst ~exn:(NothingToSubstitute var) ~var tc)
+            syms)
+          tc
+
+    with NothingToSubstitute v ->
+      tc_error_lazy !!tc (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "nothing to substitute for `%a'"
+        (EcPrinting.pp_vsubst ppe) v
+      )
 
 (* -------------------------------------------------------------------- *)
 type cut_t = intropattern * pformula * (ptactics located) option
@@ -2025,10 +2052,17 @@ let process_right (tc : tcenv1) =
     tc_error !!tc "cannot apply `right` on that goal"
 
 (* -------------------------------------------------------------------- *)
-let process_split (tc : tcenv1) =
-  try  t_ors [EcLowGoal.t_split; EcLowGoal.t_split_prind] tc
+let process_split ?(i : int option) (tc : tcenv1) =
+  let tactics : FApi.backward list =
+    match i with
+    | None -> [EcLowGoal.t_split; EcLowGoal.t_split_prind]
+    | Some i -> [EcLowGoal.t_split ~i] in
+
+  try  t_ors tactics tc
   with InvalidGoalShape ->
-    tc_error !!tc "cannot apply `split` on that goal"
+    tc_error !!tc
+      "cannot apply `split/%a` on that goal"
+      (EcPrinting.pp_opt Format.pp_print_int) i
 
 (* -------------------------------------------------------------------- *)
 let process_elim (pe, qs) tc =
@@ -2071,7 +2105,7 @@ let process_case ?(doeq = false) gp tc =
             | _ -> ()
           end;
           t_seqs
-            [process_clear gp.pr_rev.pr_clear; t_case f;
+            [process_clear (`Include gp.pr_rev.pr_clear); t_case f;
              t_simplify_with_info EcReduction.betaiota_red]
             tc
 
