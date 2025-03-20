@@ -11,6 +11,7 @@ module Map = Batteries.Map
 (* -------------------------------------------------------------------- *)
 type circuit 
 type pstate
+type cache
 
 (* -------------------------------------------------------------------- *)
 exception CircError of string
@@ -26,6 +27,11 @@ val get_specification_by_name : string -> Lospecs.Ast.adef option
 val pstate_get : pstate -> symbol -> circuit
 val pstate_get_opt : pstate -> symbol -> circuit option
 val pstate_get_all : pstate -> circuit list 
+
+(* Cache utilities *)
+val cache_get : cache -> ident -> circuit
+val cache_add : cache -> ident -> circuit -> cache
+val empty_cache : cache
 
 (* Transform circuits *)
 val circuit_ueq : circuit -> circuit -> circuit
@@ -43,7 +49,7 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?pstate:pstate -> hyps -> form -> circuit
+val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
 val circ_simplify_form_bitstring_equality :
   ?mem:EcMemory.memory ->
   ?pstate:pstate ->

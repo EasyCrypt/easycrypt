@@ -107,7 +107,7 @@ admit.
 admit.
 qed.
 
-lemma xor_left_eq_xor_right : forall (w: W8.t),  xor_left w = xor_right w.
+lemma xor_left_eq_xor_right (w: W8.t) : xor_left w = xor_right w.
     proof.
       bdep solve.
     qed.

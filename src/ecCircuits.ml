@@ -134,6 +134,7 @@ module type CircuitInterface = sig
     type cache
     val update_cache : cache -> lpattern -> circuit -> cache
     val cache_get : cache -> ident -> circuit
+    val cache_add : cache -> ident -> circuit -> cache
     val empty_cache : cache
     val cache_map : (ident -> circuit -> circuit) -> cache -> cache
   end
@@ -808,6 +809,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         Map.find idn cache  
       with Not_found -> 
         assert false (* FIXME: Error handling *)
+
+    let cache_add (cache: cache) (idn: ident) (c: circuit) : cache = 
+      Map.add idn c cache 
 
     let empty_cache : cache = 
       Map.empty
@@ -1706,10 +1710,10 @@ let (op_cache : circuit Mp.t ref) = ref Mp.empty
 
 let circuit_of_form 
   ?(pstate  : pstate = empty_pstate) (* Program variable values *)
+  ?(cache   : cache  = empty_cache)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
   : circuit =
-  let cache = empty_cache in
 
   let rec doit (cache: cache) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
@@ -2131,6 +2135,10 @@ let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (
 
 type circuit = ExampleInterface.circuit
 type pstate = ExampleInterface.PState.pstate
+type cache = ExampleInterface.LocalCache.cache
+let cache_get = cache_get
+let cache_add = cache_add
+let empty_cache = empty_cache 
 let circuit_to_string (c: circuit) : string = assert false
 let pstate_get = pstate_get 
 let pstate_get_opt = pstate_get_opt
