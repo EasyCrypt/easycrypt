@@ -44,9 +44,7 @@ let t_efold oside cpos tc =
         | [] -> [ai]
         | i :: si -> begin
           let writes = i_write env i in
-          let reads = i_read env i in
-          if (PV.indep env writes pvs && not (is_call i))
-          || (PV.indep env (PV.union reads writes) pvs && is_call i) then
+          if (PV.indep env writes pvs && not (is_call i)) then
             Mpv.isubst env subst i :: doit si
           else
             match i.i_node with
@@ -63,6 +61,13 @@ let t_efold oside cpos tc =
               let e = Mpv.esubst env subst e in
               let bs = List.map (fun (bs, s) -> bs, stmt <| doit s.s_node) bs in
               i_match (e, bs) :: si
+            | Scall (_, f, _) ->
+              let reads = f_read env f in
+              if PV.indep env (PV.union reads writes) pvs then
+                Mpv.isubst env subst i :: doit si
+              else
+                let i = if can_forward_subst then Mpv.isubst env subst i else i in
+                ai :: i :: si
             | _ ->
               let i = if can_forward_subst then Mpv.isubst env subst i else i in
               ai :: i :: si

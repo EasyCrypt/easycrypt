@@ -197,10 +197,12 @@ module He : EcMaps.EHashtbl.S with type key = expr
 val is_local     : expr -> bool
 val is_var       : expr -> bool
 val is_tuple_var : expr -> bool
+val is_tuple     : expr -> bool
 
 val destr_local     : expr -> EcIdent.t
 val destr_var       : expr -> prog_var
 val destr_app       : expr -> expr * expr list
+val destr_tuple     : expr -> expr list
 val destr_tuple_var : expr -> prog_var list
 
 (* -------------------------------------------------------------------- *)

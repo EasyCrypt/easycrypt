@@ -77,17 +77,11 @@ section Security.
   proof.
   byequiv=> //; proc; inline *.
   proc rewrite {2} 5 expM.
-  efold {1} 2.
-wp.
-  sim.
-  efold {1} 2.
-  efold {1} 4.
-
-  case <- {1} 2.
-  swap{1} 7 -5.
-  auto; call (_:true).
-  auto; call (_:true).
-  by auto=> /> sk _ y _ r b _; rewrite expM.
+  proc /> {1}.
+  proc /> {2}.
+  swap{1} ^y<$ @ 2. 
+  wp.
+  by sim.
   qed.
 
   local module Gb = {

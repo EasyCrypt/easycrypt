@@ -216,6 +216,16 @@ let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
+let hl_set_stmt_me (side : side option) (f : form) (s : stmt) (me : memenv) =
+  match side, f.f_node with
+  | None       , FhoareS   hs -> f_hoareS_r   { hs with hs_s  = s; hs_m  = me }
+  | None       , FeHoareS  hs -> f_eHoareS_r  { hs with ehs_s = s; ehs_m = me }
+  | None       , FbdHoareS hs -> f_bdHoareS_r { hs with bhs_s = s; bhs_m = me }
+  | Some `Left , FequivS   es -> f_equivS_r   { es with es_sl = s; es_ml = me }
+  | Some `Right, FequivS   es -> f_equivS_r   { es with es_sr = s; es_mr = me }
+  | _          , _            -> assert false
+
+(* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
   | FhoareF hf   -> Some (hf.hf_pr )

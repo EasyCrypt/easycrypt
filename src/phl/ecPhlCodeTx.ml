@@ -149,7 +149,7 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
         ) in
 
       match kind with
-      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, mk)
+      | `Sasgn | `Srnd | `Scall | `Sif | `Smatch -> (e, mk)
       | `Swhile -> tc_error pe "while loops not supported"
     in
 

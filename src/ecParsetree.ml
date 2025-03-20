@@ -777,6 +777,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
   | Pprocchange    of side option * pcodepos * pexpr
   | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Pprocsimp      of oside
 
     (* Eager *)
   | Peager_seq       of (eager_info * pcodepos1 pair * pformula)

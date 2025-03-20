@@ -234,12 +234,13 @@ let get_uninit_read (s : stmt) =
 
 
 (* -------------------------------------------------------------------- *)
-type instr_with_expr = [`Sasgn | `Srnd | `Sif | `Smatch | `Swhile]
+type instr_with_expr = [`Sasgn | `Srnd | `Scall | `Sif | `Smatch | `Swhile]
 
 let get_expression_of_instruction (i : instr) : (_ * instr_with_expr * _) option =
   match i.i_node with
   | Sasgn  (lv, e)     -> Some (e, `Sasgn , (fun e -> i_asgn  (lv, e)))
   | Srnd   (lv, e)     -> Some (e, `Srnd  , (fun e -> i_rnd   (lv, e)))
+  | Scall  (lv, f, es) -> Some (e_tuple es, `Scall  , (fun e -> let e = if is_tuple e then destr_tuple e else [e] in i_call  (lv, f, e)))
   | Sif    (e, s1, s2) -> Some (e, `Sif   , (fun e -> i_if    (e, s1, s2)))
   | Swhile (e, s)      -> Some (e, `Swhile, (fun e -> i_while (e, s)))
   | Smatch (e, bs)     -> Some (e, `Smatch, (fun e -> i_match (e, bs)))
