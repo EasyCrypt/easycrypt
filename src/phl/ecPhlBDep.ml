@@ -1008,27 +1008,7 @@ let t_bdep_solve
     let goal = (FApi.tc1_goal tc) in
     let ctxt = tohyps hyps in
     assert (ctxt.h_tvar = []);
-    let ctxt = ctxt.h_local in
-    let goal = List.fold_left (fun goal (id, lk) ->
-      match lk with
-      | EcBaseLogic.LD_var (t, Some f) -> 
-          begin try 
-            ignore (circuit_of_form hyps (f_forall [(id, GTty t)] f));
-            f_forall [(id, GTty t)] (f_and goal (f_eq (f_local id t) f))
-          with _ -> f_forall [(id, GTty t)] goal
-          end
-      | EcBaseLogic.LD_var (t, None) -> f_forall [(id, GTty t)] goal 
-      | EcBaseLogic.LD_hyp f -> 
-          begin try
-            ignore (circuit_of_form hyps f);
-            f_and f goal 
-          with _ -> goal 
-          end
-      | EcBaseLogic.LD_mem _ 
-      | EcBaseLogic.LD_modty _
-      | EcBaseLogic.LD_abs_st _ -> assert false
-    ) goal ctxt in
-    if circ_taut (circuit_of_form hyps goal) then
+    if circ_taut (circuit_of_form_with_hyps hyps goal) then
     FApi.close (!@ tc) VBdep
     else 
     tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  

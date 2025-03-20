@@ -157,8 +157,11 @@ module type CircuitInterface = sig
 
 
   (* Circuits representing booleans *)
-  val circuit_true : (cbool * (cinp list)) 
-  val circuit_false : (cbool * (cinp list)) 
+  val circuit_true : cbool cfun 
+  val circuit_false : cbool cfun 
+  val circuit_and : cbool cfun -> cbool cfun -> cbool cfun
+  val circuit_or  : cbool cfun -> cbool cfun -> cbool cfun
+  val circuit_not : cbool cfun -> cbool cfun
 
   (* <=> circuit has not inputs (every input is unbound) *)
   val circuit_is_free : circuit -> bool
@@ -877,6 +880,16 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let circuit_true  = `CBool Backend.true_ , [] 
   let circuit_false = `CBool Backend.false_, []
+
+  let circuit_and (`CBool c1, inps1) (`CBool c2, inps2) = 
+    `CBool (Backend.band c1 c2), merge_inputs inps1 inps2 
+
+  let circuit_or (`CBool c1, inps1) (`CBool c2, inps2) = 
+    `CBool (Backend.bor c1 c2), merge_inputs inps1 inps2 
+
+  let circuit_not (`CBool c, inps) =
+    `CBool (Backend.bnot c), inps 
+
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
   let circuit_ite ~(c: cbool * (cinp list)) ~(t: circuit) ~(f: circuit) : circuit =
@@ -1428,6 +1441,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     Backend.sat ~inps c 
     
   let circ_taut (c: circuit) : bool = 
+    Format.eprintf "Calling circ_taut on circuit: %a@." pp_circuit c;
     let `CBool c, inps = cbool_of_circuit ~strict:false c in
     let inps = List.map (function 
       | { type_ = `CIBool; id } -> (id, 1)
@@ -1863,6 +1877,31 @@ let circuit_of_form
           hyps, (circuit_true :> circuit)
         | Some `False, [] ->
           hyps, (circuit_false :> circuit)
+        | Some `Imp, [f1; f2] -> 
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
+          let c1 = cbool_of_circuit ~strict:false c1 in
+          let c2 = cbool_of_circuit ~strict:false c2 in
+          hyps, (circuit_or (circuit_not c1) c2 :> circuit)
+        | Some (`And _), [f1; f2] -> 
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
+          let c1 = cbool_of_circuit ~strict:false c1 in
+          let c2 = cbool_of_circuit ~strict:false c2 in
+          hyps, (circuit_and c1 c2 :> circuit)
+        | Some (`Or _), [f1; f2] -> 
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
+          let c1 = cbool_of_circuit ~strict:false c1 in
+          let c2 = cbool_of_circuit ~strict:false c2 in
+          hyps, (circuit_or c1 c2 :> circuit)
+        | Some `Iff, [f1; f2] -> 
+          let hyps, c1 = doit cache hyps f1 in
+          let hyps, c2 = doit cache hyps f2 in
+          let c1 = cbool_of_circuit ~strict:false c1 in
+          let c2 = cbool_of_circuit ~strict:false c2 in
+          hyps, (circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) :> circuit)
+(*         | Some `Not, [f] -> doit cache hyps (f_not f) *)
         | _ -> (* recurse down into definition *)
           let hyps, f_c = doit cache hyps f in
           let hyps, fcs = List.fold_left_map
@@ -2150,6 +2189,47 @@ let circuit_aggregate =
 let circuit_aggregate_inps = 
   circuit_aggregate_inputs
 
-
 let circuit_flatten (c: circuit) = 
   (cbitstring_of_circuit ~strict:false c :> circuit)
+
+(* TODO: get a better name and uniformize *)
+let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f =
+  let (pstate, cache, f), bnds = List.fold_left_map (fun (pstate, cache, goal) (id, lk) ->
+      Format.eprintf "Processing hyp: %s@." (id.id_symb);
+      match lk with
+      | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
+        let pstate, bnds = List.fold_left_map (fun pstate {ov_name; ov_type} -> 
+          match ov_name with
+          | Some v -> let id = create v in 
+          open_circ_lambda_pstate (toenv hyps) pstate [(id, ov_type)], Some (id, ov_type)
+          | None -> (pstate, None)
+        ) pstate decls in
+        (pstate, cache, goal), List.filter_map (fun i -> i) bnds 
+      | EcBaseLogic.LD_var (t, Some f) -> 
+          let cache = open_circ_lambda_cache (toenv hyps) cache [(id, t)] in
+          begin try 
+            ignore (circuit_of_form ~pstate ~cache hyps f);
+            (pstate, cache, (f_and goal (f_eq (f_local id t) f))), [(id, t)]
+          with _ -> (pstate, cache, f_forall [(id, GTty t)] goal), [(id, t)] (* FIXME: do we still add to cache here? *)
+          end
+      | EcBaseLogic.LD_var (t, None) -> 
+          (pstate, 
+          open_circ_lambda_cache (toenv hyps) cache [(id, t)],
+          goal), [(id, t)]
+      | EcBaseLogic.LD_hyp f_hyp -> 
+          begin try
+            ignore (circuit_of_form ~pstate ~cache hyps f_hyp);
+            (pstate, cache, f_imp f_hyp goal), []
+          with e -> 
+            Format.eprintf "Failed to convert hyp %a with error:@.%s@."
+            EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
+            (pstate, cache, goal), []
+          end
+
+      | _ -> (pstate, cache, goal), []
+  ) (pstate, cache, f) (List.rev (tohyps hyps).h_local)
+  in 
+  let bnds = List.flatten bnds in
+  Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
+  close_circ_lambda (toenv hyps) bnds @@
+  circuit_of_form ~pstate ~cache hyps f

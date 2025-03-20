@@ -60,3 +60,6 @@ val pstate_of_prog : hyps -> memory -> instr list -> variable list -> pstate
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
 val process_instr : hyps -> memory -> pstate -> instr -> pstate
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
+
+(* Temporary? *)
+val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit 

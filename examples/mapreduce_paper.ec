@@ -92,7 +92,7 @@ qed.
 lemma xor_left_corr_lanes (w: W8.t) :
     hoare [ M.xor_left_proc : w = w1 ==> res = xor_left w].
 proof.
-proc.
+  proc.
 bdep 1 1 [w] [w1] [w1] xor1_bool predT_bool.
 admit.
 admit.
@@ -111,3 +111,18 @@ lemma xor_left_eq_xor_right (w: W8.t) : xor_left w = xor_right w.
     proof.
       bdep solve.
     qed.
+
+lemma xor_left_corr_wp (w: W8.t) :
+    hoare [ M.xor_left_proc : w = w1 ==> res = xor_left w].
+proof.
+  proc.
+  wp; skip => &hr. by bdep solve.
+qed.
+
+lemma xor_left_corr_wp_alt (w: W8.t) :
+    hoare [ M.xor_left_proc : w = w1 ==> res = xor_left w].
+proof.
+  proc.
+  wp; skip => &hr eq. 
+  by bdep solve.
+qed.

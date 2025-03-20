@@ -182,7 +182,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
 
     let inps = Option.map (fun inps ->
       List.map (fun (id,sz) -> 
-      List.init sz (fun i -> ("BV_" ^ (id |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (i))))) inps 
+      List.init sz (fun i -> ("BV_" ^ (id |> string_of_int) ^ "_" ^ (Printf.sprintf "%05X" (i))))) inps 
     ) inps in
     let inps = Option.map (fun inps ->
     List.map (List.map (fun name -> match Map.String.find_opt name !bvvars with
@@ -197,17 +197,12 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       SMT.assert' @@ form;
       if SMT.check_sat () = true then 
       begin
-        let terms = Map.String.to_seq !bvvars in
-        let terms = List.of_seq terms |> List.sort (fun a b -> compare (fst a) (fst b))
-        |> List.map (fun a -> snd a) in
-        let term = List.reduce SMT.bvterm_concat terms in
-        Format.eprintf "input: %a@."     SMT.pp_term (SMT.get_value term);
-        Option.may (fun bvinp ->
-        List.iteri (fun i bv -> 
-        Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
+        Format.eprintf "Input BVVars: ";
+        let () = Enum.iter (Format.eprintf "%s, ") (Map.String.keys !bvvars) in
+        Format.eprintf "@.";
+        Option.may (fun bvinp -> List.iteri (fun i bv -> 
+            Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
         ) bvinp) bvinp;
-        (* Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1); *)
-        (* Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2); *)
         true 
       end
       else false
