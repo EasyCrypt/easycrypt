@@ -7,7 +7,6 @@
     nixpkgs.url = "github:nixos/nixpkgs/24.05";
     stable.url = "github:nixos/nixpkgs/24.05";
     nixpkgs.follows = "opam-nix/nixpkgs";
-    emacs-overlay.url = "github:nix-community/emacs-overlay";
 
     prover_cvc4_1_8 = {
       url = "github:CVC4/CVC4-archived/1.8";
@@ -20,7 +19,7 @@
     };
 
     prover_z3_4_12_6 = {
-      url = "github:z3prover/z3/z3-4.13.3";
+      url = "github:z3prover/z3/z3-4.12.6";
       flake = false;
     };
   };
@@ -110,19 +109,5 @@
            ++ [ pkgs.git scope'.why3 packages.provers ]
            ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
-
-	devShells.withDevTools = pkgs.mkShell rec {
-	  inputsFrom = [ scope'.easycrypt ];
-	  buildInputs = 
-	      devPackages
- 	   ++ devTools
-	   ++ [ scope'.why3 packages.provers ]
-	   ++ (with pkgs.python3Packages; [ pyyaml ]);
-	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
-	  shellHook = builtins.replaceStrings ["\n"] [" "] ''
-	    export SHELL=${SHELL} &&
-	    export PATH=$PATH:`realpath .`
-	  '';
-	};
       });
 }

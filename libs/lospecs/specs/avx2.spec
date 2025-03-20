@@ -431,3 +431,10 @@ VPSHUFB_128(w@128, widx@128) -> @128 =
     fun idx@8 . idx[7] ? 0 : w[@8|idx[@4|0]],
     widx
   )
+
+# MAPREDUCE EXAMPLE
+XOR_LEFT8(w@8) -> @8 =
+  xor<8>(xor<8>(w, 42@8), 213@8)
+
+XOR_RIGHT8(w@8) -> @8 =
+  xor<8>(w, xor<8>(42@8, 213@8))
