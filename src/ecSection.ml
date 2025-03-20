@@ -22,6 +22,7 @@ type cbarg = [
   | `ModuleType of path
   | `Typeclass  of path
   | `Instance   of tcinstance
+  | `Crbind     of crbinding * is_local
 ]
 
 type cb = cbarg -> unit
@@ -50,11 +51,20 @@ let pp_cbarg env fmt (who : cbarg) =
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
   | `Typeclass p ->
     Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tcname ppe) p
-  | `Instance tci ->
+  | `Instance tci -> begin
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"
     | `Field _ -> Format.fprintf fmt "field instance"
     | `General _ -> Format.fprintf fmt "instance"
+  end
+  | `Crbind (CRB_Bitstring  _, _) ->
+    Format.fprintf fmt "bitstring binding"
+  | `Crbind (CRB_Array      _, _) ->
+    Format.fprintf fmt "array binding"
+  | `Crbind (CRB_BvOperator _, _) ->
+    Format.fprintf fmt "bitstring operator binding"
+  | `Crbind (CRB_Circuit    _, _) ->
+    Format.fprintf fmt "circuit binding"
 
 let pp_locality fmt = function
   | `Local -> Format.fprintf fmt "local"
@@ -515,6 +525,7 @@ let locality (env : EcEnv.env) (who : cbarg) =
     | _         -> `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
+  | `Crbind (_, lc) -> (lc :> locality)
   | `Instance _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -787,7 +798,8 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tydecl = {
         tyd_params; tyd_type;
         tyd_loca = `Global;
-        tyd_resolve = tydecl.tyd_resolve } in
+        tyd_resolve = tydecl.tyd_resolve;
+        tyd_clinline = tydecl.tyd_clinline; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->
@@ -1027,6 +1039,11 @@ let generalize_auto to_gen auto_rl =
     else
       to_gen, Some (Th_auto {auto_rl with axioms})
 
+let generalize_crbinding (to_gen : to_gen) ((bd, lc) : crbinding * is_local) =
+  let item =
+    if lc = `Local then None else Some (Th_crbinding (bd, lc))
+  in to_gen, item
+
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
 
@@ -1050,6 +1067,7 @@ let rec set_local_item item =
     | Th_baserw       (s,lc) -> Th_baserw    (s, set_local lc)
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
+    | Th_crbinding (bd, lc)  -> Th_crbinding (bd, set_local lc)
     | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_local auto_rl.locality}
 
   in { item with ti_item = lcitem }
@@ -1067,9 +1085,7 @@ let sc_th_item t item =
 
 let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 
-
 (* ---------------------------------------------------------------- *)
-
 let is_abstract_ty = function
   | `Abstract _ -> true
   | _           -> false
@@ -1122,16 +1138,16 @@ let cd_glob =
     d_tc    = [`Global];
   }
 
-let can_depend (cd : can_depend) = function
+let can_depend (cd : can_depend) (who : cbarg) =
+  match who with
   | `Type       _ -> cd.d_ty
   | `Op         _ -> cd.d_op
   | `Ax         _ -> cd.d_ax
-  | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
   | `Instance   _ -> assert false
-
+  | `Crbind     _ -> assert false (* FIXME *)
 
 let cb scenv from cd who =
   let env = scenv.sc_env in
@@ -1314,6 +1330,47 @@ let check_instance scenv ty tci lc =
         let cd = { cd_glob with d_ty = [`Declare; `Global]; } in
         on_instance (cb scenv from cd) ty tci
 
+let check_crb_bitstring (scenv : scenv) ((bs, lc) : crb_bitstring * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Bitstring bs, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [bs.from_; bs.to_];
+    cb scenv from cd_glob (`Type bs.type_)
+  end
+
+let check_crb_array (scenv : scenv) ((ba, lc) : crb_array * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Array ba, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    List.iter (fun p -> cb scenv from cd_glob (`Op p)) [ba.get; ba.set; ba.tolist; ba.oflist];
+    cb scenv from cd_glob (`Type ba.type_)
+  end
+  
+let check_crb_bvoperator (scenv : scenv) ((op, lc) : crb_bvoperator * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_BvOperator op, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then begin
+    cb scenv from cd_glob (`Op op.operator);
+    List.iter (fun ty -> cb scenv from cd_glob (`Type ty)) op.types
+  end
+
+let check_crb_circuit (scenv : scenv) ((cr, lc) : crb_circuit * is_local) =
+  let from = (lc :> locality), `Crbind (CRB_Circuit cr, lc) in
+  if lc = `Local then
+    check_section scenv from
+  else if scenv.sc_insec then
+    cb scenv from cd_glob (`Op cr.operator)
+
+let check_crbinding (scenv : scenv) ((crb, lc) : crbinding * is_local) =
+  match crb with
+  | CRB_Bitstring  bs -> check_crb_bitstring  scenv (bs, lc)
+  | CRB_Array      ba -> check_crb_array      scenv (ba, lc)
+  | CRB_BvOperator op -> check_crb_bvoperator scenv (op, lc)
+  | CRB_Circuit    cr -> check_crb_circuit    scenv (cr, lc)
+
 (* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
   if not scenv.sc_insec && lc = `Local then
@@ -1351,6 +1408,8 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
     | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add s lc env
     | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
+    | Th_crbinding (bd, lc)  -> EcEnv.Circuit.bind_crbinding lc bd env
+    | Th_theory _            -> assert false
     | Th_auto auto           -> EcEnv.Auto.add ~level:auto.level ?base:auto.base
                                   auto.axioms auto.locality env
     | Th_reduction r         -> EcEnv.Reduction.add r env
@@ -1368,20 +1427,20 @@ let add_th ~import (cth : EcEnv.Theory.compiled_theory) scenv =
 let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_item) =
   let to_gen, item =
     match th_item.ti_item with
-    | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
-    | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
-    | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
-    | Th_modtype ms      -> generalize_modtype to_gen ms
-    | Th_module me       -> generalize_module  to_gen prefix me
-    | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
-    | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
-    | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
-    | Th_typeclass _     -> assert false
-    | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
-    | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
-    | Th_reduction rl    -> generalize_reduction to_gen rl
-    | Th_auto hints      -> generalize_auto to_gen hints
-
+    | Th_type tydecl        -> generalize_tydecl to_gen prefix tydecl
+    | Th_operator opdecl    -> generalize_opdecl to_gen prefix opdecl
+    | Th_axiom  ax          -> generalize_axiom  to_gen prefix ax
+    | Th_modtype ms         -> generalize_modtype to_gen ms
+    | Th_module me          -> generalize_module  to_gen prefix me
+    | Th_theory th          -> (generalize_ctheory to_gen prefix th, None)
+    | Th_export (p,lc)      -> generalize_export to_gen (p,lc)
+    | Th_instance tci       -> generalize_instance to_gen tci
+    | Th_typeclass _        -> assert false
+    | Th_baserw (s,lc)      -> generalize_baserw to_gen prefix (s,lc)
+    | Th_addrw (p,ps,lc)    -> generalize_addrw to_gen (p, ps, lc)
+    | Th_reduction rl       -> generalize_reduction to_gen rl
+    | Th_auto hints         -> generalize_auto to_gen hints
+    | Th_crbinding (bd, lc) -> generalize_crbinding to_gen (bd, lc)
   in
 
   let scenv =
@@ -1501,7 +1560,8 @@ let check_item scenv item =
   | Th_auto { locality } ->
     if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
-  | Th_reduction _ -> ()
+  | Th_reduction _ -> () (* FIXME *)
+  | Th_crbinding (crb, lc) -> check_crbinding scenv (crb, lc)
   | Th_theory  _   -> assert false
 
 let rec add_item (item : theory_item) (scenv : scenv) =
