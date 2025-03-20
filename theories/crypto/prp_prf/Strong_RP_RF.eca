@@ -145,7 +145,9 @@ proc; seq  1: (exists x, support uD x /\ !X x)=> //=.
 if=> //=.
 + rnd (predT); skip.
   move=> /> &0; rewrite dexceptedE predTI mu_not.
-  smt(notin_supportIP).
+  move=> x x_in_uD x_notin_X r_in_X.
+  apply/mulrV/ltr0_neq0/subr_gt0/notin_supportIP.
+  by exists x.
 by hoare; rnd=> //=; skip=> &hr ->.
 qed.
 
@@ -473,7 +475,9 @@ section CollisionProbability.
         + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        smt(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW leq_card_rng_dom).
+        apply: RealOrder.ler_wpmul2r.
+        + exact: ge0_mu.
+        + exact/le_fromint/(lez_trans _ _ _ (leq_card_rng_dom _)).
       - by move: H9; rewrite H1.
     * by hoare; auto; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
