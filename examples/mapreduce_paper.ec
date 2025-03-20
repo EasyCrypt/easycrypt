@@ -106,3 +106,8 @@ bdep 8 8 [w] [w1] [w1] xor_left_spec predT_W8.
 admit.
 admit.
 qed.
+
+lemma xor_left_eq_xor_right : forall (w: W8.t),  xor_left w = xor_right w.
+    proof.
+      bdep solve.
+    qed.

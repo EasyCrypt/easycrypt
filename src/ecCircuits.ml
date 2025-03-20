@@ -189,8 +189,10 @@ module type CircuitInterface = sig
   val circuit_uninit : env -> ty -> circuit
   val circuit_has_uninitialized : circuit -> bool
 
-  (* Circuit equivalence call, should do some processing and then call some backend *)
+  (* Logical reasoning over circuits *)
   val circ_equiv : ?pcond:(cbool * (cinp list)) -> circuit -> circuit -> bool
+  val circ_sat   : circuit -> bool 
+  val circ_taut  : circuit -> bool 
 
   (* Composition of circuit functions, should deal with inputs and call some backend *)
   val circuit_compose : circuit -> circuit list -> circuit
@@ -248,6 +250,8 @@ module type CBackend = sig
   val applys : (inp -> node option) -> reg -> reg
   val circuit_from_spec : Lospecs.Ast.adef -> reg list -> reg 
   val equiv : ?inps:inp list -> pcond:node -> reg -> reg -> bool
+  val sat : ?inps:inp list -> node -> bool 
+  val taut : ?inps:inp list -> node -> bool 
 
   val slice : reg -> int -> int -> reg
   val insert : reg -> int -> reg -> reg
@@ -394,6 +398,16 @@ module TestBack : CBackend = struct
     let open HL in
     let module BWZ = (val makeBWZinterface ()) in
     BWZ.circ_equiv ?inps (node_list_of_reg r1) (node_list_of_reg r2) pcond  
+
+  let sat ?(inps: inp list option) (n: node) : bool =
+    let open HL in
+    let module BWZ = (val makeBWZinterface ()) in
+    BWZ.circ_sat ?inps n 
+
+  let taut ?(inps: inp list option) (n: node) : bool =
+    let open HL in
+    let module BWZ = (val makeBWZinterface ()) in
+    BWZ.circ_taut ?inps n 
 
   let slice (r: reg) (idx: int) (len: int) : reg = 
     Array.sub r idx len
@@ -1397,7 +1411,28 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CBool b1, `CBool b2 ->
         Backend.equiv ~inps ~pcond:pcc (Backend.reg_of_node b1) (Backend.reg_of_node b2)
     | _ -> false
+
+  let circ_sat (c: circuit) : bool =
+    let `CBool c, inps = cbool_of_circuit ~strict:false c in
+    let inps = List.map (function 
+      | { type_ = `CIBool; id } -> (id, 1)
+      | { type_ = `CIBitstring w; id } -> (id, w) 
+      | { type_ = `CIArray (w1, w2); id } -> (id, w1*w2)
+      | { type_ = `CITuple szs; id } -> (id, List.sum szs) 
+
+    ) inps in
+    Backend.sat ~inps c 
     
+  let circ_taut (c: circuit) : bool = 
+    let `CBool c, inps = cbool_of_circuit ~strict:false c in
+    let inps = List.map (function 
+      | { type_ = `CIBool; id } -> (id, 1)
+      | { type_ = `CIBitstring w; id } -> (id, w) 
+      | { type_ = `CIArray (w1, w2); id } -> (id, w1*w2)
+      | { type_ = `CITuple szs; id } -> (id, List.sum szs) 
+
+    ) inps in
+    Backend.taut ~inps c 
 
   module CircuitSpec = struct
     let circuit_from_spec env (c : [`Path of path | `Bind of EcDecl.crb_circuit ] ) : [> `CBitstring of cbitstring_type] cfun = 
@@ -1788,10 +1823,8 @@ let circuit_of_form
         begin match EcFol.op_kind (destr_op f_ |> fst) with
           | Some `True -> 
             hyps, (circuit_true :> circuit)
-            (*hyps, {circ = BWCirc([C.true_]); inps=[]}*)
           | Some `False ->
             hyps, (circuit_false :> circuit)
-            (*hyps, {circ = BWCirc([C.false_]); inps=[]}*)
           | _ -> 
             let err = Format.sprintf "Unsupported op kind%s@." (EcPath.tostring pth) in
             raise (CircError err)
@@ -1848,8 +1881,8 @@ let circuit_of_form
       let cache = open_circ_lambda_cache env cache binds in
       let hyps, circ = doit cache hyps f in
       begin match qnt with
-      | Llambda -> hyps, close_circ_lambda env binds circ 
       | Lforall 
+      | Llambda -> hyps, close_circ_lambda env binds circ 
       | Lexists -> raise (CircError "Universal/Existential quantification not supported ")
       (* TODO: figure out how to handle quantifiers *)
       end
@@ -2077,6 +2110,9 @@ let circ_equiv ?(pcond: circuit option) c1 c2 =
   | None -> None
   in
   circ_equiv ?pcond c1 c2
+
+let circ_sat = circ_sat
+let circ_taut = circ_taut
 
 let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   let c = match c with

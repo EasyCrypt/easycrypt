@@ -1000,4 +1000,10 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
+let t_bdep_solve
+  (tc : tcenv1) =
+  if circ_taut (circuit_of_form (FApi.tc1_hyps tc) (FApi.tc1_goal tc)) then
+  FApi.close (!@ tc) VBdep
+  else 
+  tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  
 

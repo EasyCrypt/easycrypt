@@ -36,8 +36,10 @@ val circuit_permute : int -> (int -> int) -> circuit -> circuit
 val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list
 
 (* Use circuits *)
-val compute : sign:bool -> circuit -> BI.zint list -> BI.zint
+val compute    : sign:bool -> circuit -> BI.zint list -> BI.zint
 val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool
+val circ_sat   : circuit -> bool 
+val circ_taut  : circuit -> bool 
 
 (* Generate circuits *)
 (* Form processors *)

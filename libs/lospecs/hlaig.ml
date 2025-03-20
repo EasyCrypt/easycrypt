@@ -50,9 +50,9 @@ end
 module type SMTInterface = sig
   val circ_equiv : ?inps:(int * int) list -> reg -> reg -> node ->  bool
 
-  val circ_sat : node -> bool
+  val circ_sat : ?inps:(int * int) list -> node -> bool
 
-  val circ_taut : node -> bool
+  val circ_taut : ?inps:(int * int) list -> node -> bool
 end
 
 (* TODO Add model printing for circ_sat and circ_taut *)
@@ -139,7 +139,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     end
 
 
-  let circ_sat (n : Aig.node) : bool =
+  let circ_sat ?(inps: (int * int) list option) (n : Aig.node) : bool =
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
 
     let rec bvterm_of_node : Aig.node -> SMT.bvterm =
@@ -175,6 +175,24 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
   
     let form = bvterm_of_node n in 
 
+    let inps = Option.bind inps (fun l -> 
+      if List.is_empty l then None
+      else Some l
+    ) in
+
+    let inps = Option.map (fun inps ->
+      List.map (fun (id,sz) -> 
+      List.init sz (fun i -> ("BV_" ^ (id |> string_of_int) ^ "_" ^ (Printf.sprintf "%X" (i))))) inps 
+    ) inps in
+    let inps = Option.map (fun inps ->
+    List.map (List.map (fun name -> match Map.String.find_opt name !bvvars with
+    | Some bv -> bv
+    | None -> SMT.bvterm_of_name 1 name)) inps) inps
+    in
+    let bvinp = Option.map (fun inps -> 
+      List.map (fun i -> List.reduce (SMT.bvterm_concat) i) inps) inps 
+    in
+
     begin
       SMT.assert' @@ form;
       if SMT.check_sat () = true then 
@@ -184,7 +202,10 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
         |> List.map (fun a -> snd a) in
         let term = List.reduce SMT.bvterm_concat terms in
         Format.eprintf "input: %a@."     SMT.pp_term (SMT.get_value term);
-        
+        Option.may (fun bvinp ->
+        List.iteri (fun i bv -> 
+        Format.eprintf "input[%d]: %a@." i SMT.pp_term (SMT.get_value bv)        
+        ) bvinp) bvinp;
         (* Format.eprintf "fc: %a@."     SMT.pp_term (SMT.get_value bvinpt1); *)
         (* Format.eprintf "block: %a@."  SMT.pp_term (SMT.get_value bvinpt2); *)
         true 
@@ -192,8 +213,8 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
       else false
     end
   
-  let circ_taut (n: Aig.node) : bool =
-    not @@ circ_sat (Aig.neg n)
+  let circ_taut ?inps (n: Aig.node) : bool =
+    not @@ circ_sat ?inps (Aig.neg n)
 
 end
 

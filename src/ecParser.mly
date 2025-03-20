@@ -3264,6 +3264,9 @@ bdepeq_out_info:
 | BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
   { Pcirc (invs, f, (`Var v :> bdepvar)) }
 
+| BDEP SOLVE
+  { Pbdepsolve }
+
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
     { BDH_split_bop (b1,b2,b3) }
