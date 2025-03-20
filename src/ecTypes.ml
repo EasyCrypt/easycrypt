@@ -534,16 +534,26 @@ let destr_var e =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+let is_tuple e =
+  match e.e_node with
+  | Etuple _ -> true
+  | _ -> false
+
+(* -------------------------------------------------------------------- *)
 let is_tuple_var e =
   match e.e_node with
   | Etuple es -> List.for_all is_var es
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let destr_tuple_var e =
+let destr_tuple e =
    match e.e_node with
-  | Etuple es -> List.map destr_var es
+  | Etuple es -> es
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let destr_tuple_var e =
+  List.map destr_var (destr_tuple e)
 
 (* -------------------------------------------------------------------- *)
 let destr_app = function

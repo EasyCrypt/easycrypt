@@ -2,6 +2,8 @@
 open EcParsetree
 open EcCoreGoal.FApi
 
+val t_rewrite_simpl : side option -> EcMatching.Position.codepos -> backward
+
 (* -------------------------------------------------------------------- *)
 val process_change : side option -> pcodepos -> pexpr -> backward
 

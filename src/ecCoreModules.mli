@@ -80,7 +80,7 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> Sx.t
 
 (* -------------------------------------------------------------------- *)
-type instr_with_expr = [`Sasgn | `Srnd | `Sif | `Smatch | `Swhile]
+type instr_with_expr = [`Sasgn | `Srnd | `Scall | `Sif | `Smatch | `Swhile]
 
 val get_expression_of_instruction : instr -> (expr * instr_with_expr * (expr -> instr)) option
 

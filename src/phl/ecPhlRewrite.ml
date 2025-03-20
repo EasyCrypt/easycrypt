@@ -5,6 +5,7 @@ open EcCoreGoal
 open EcEnv
 open EcModules
 open EcFol
+open EcMatching
 
 (* -------------------------------------------------------------------- *)
 let t_change
@@ -131,9 +132,9 @@ let process_rewrite_rw
   FApi.t_first discharge tc
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite_simpl
+let t_rewrite_simpl
   (side : side option)
-  (pos  : pcodepos)
+  (pos  : Position.codepos)
   (tc   : tcenv1)
 =
 let ri = EcReduction.nodelta in
@@ -145,7 +146,6 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     (fst me, f), e
   in
 
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, f), tc = t_change side pos change tc in
 
   FApi.t_first (
@@ -155,6 +155,15 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
       EcLowGoal.t_reflex
     ]
   ) tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite_simpl
+  (side : side option)
+  (pos  : pcodepos)
+  (tc   : tcenv1)
+=
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  t_rewrite_simpl side pos tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite

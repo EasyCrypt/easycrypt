@@ -3180,6 +3180,9 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
+| PROC SLASHGT side=side?
+    { Pprocsimp side }
+
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
     { BDH_split_bop (b1,b2,b3) }
