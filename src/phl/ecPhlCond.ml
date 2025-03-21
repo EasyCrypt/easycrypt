@@ -12,7 +12,16 @@ module Sid = EcIdent.Sid
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
- let t_gen_cond side e tc =
+
+  let t_finalize h h1 h2 =
+     FApi.t_seqs [t_elim_hyp h;
+                        t_intros_i [h1;h2];
+                        t_apply_hyp h2]
+
+  let t_finalize_ehoare h _h1 _h2 tc =
+    t_apply_hyp h tc
+
+ let t_gen_cond ?(t_finalize=t_finalize) side e tc =
    let hyps  = FApi.tc1_hyps tc in
    let fresh = ["&m"; "&m"; "_"; "_"; "_"] in
    let fresh = LDecl.fresh_ids hyps fresh in
@@ -26,10 +35,7 @@ module LowInternal = struct
        (EcPhlRCond.t_rcond side b (Zpr.cpos 1))
        (FApi.t_seqs
           [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
-           FApi.t_seqs [t_elim_hyp h;
-                        t_intros_i [h1;h2];
-                        t_apply_hyp h2];
-           t_simplify])
+           t_finalize h h1 h2; t_simplify])
        tc
    in
    FApi.t_seqsub
@@ -47,7 +53,8 @@ let t_hoare_cond tc =
 let t_ehoare_cond tc =
   let hs = tc1_as_ehoareS tc in
   let (e,_,_) = fst (tc1_first_if tc hs.ehs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.ehs_m) e) tc
+  LowInternal.t_gen_cond ~t_finalize:LowInternal.t_finalize_ehoare
+    None (form_of_expr (EcMemory.memory hs.ehs_m) e) tc
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
