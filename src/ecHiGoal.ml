@@ -249,10 +249,11 @@ module LowRewrite = struct
   | LRW_IdRewriting
   | LRW_RPatternNoMatch
   | LRW_RPatternNoRuleMatch
+  | LRW_InvalidSetoidContext
 
   exception RewriteError of error
 
-  let rec find_rewrite_patterns ~inpred (dir : rwside) pt =
+  let rec find_rewrite_patterns ~inpred (dir : rwside) pt : (pt_ev * rwmode * (form * form)) list =
     let hyps = pt.PT.ptev_env.PT.pte_hy in
     let env  = LDecl.toenv hyps in
     let pt   = { pt with ptev_ax = snd (PT.concretize pt) } in
@@ -270,7 +271,13 @@ module LowRewrite = struct
           let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
           [(pt', `Eq, (f, f_false))]
 
-      | _ -> []
+      | _ -> begin
+        try
+             EcSetoid.as_instance env (destr_op_app ax)
+          |> Option.map (fun (instance, (f1, f2)) -> (pt, `Setoid instance, (f1, f2)))
+          |> Option.to_list
+        with DestrError _ -> []
+      end
 
     and split ax =
       match EcFol.sform_of_form ax with
@@ -329,7 +336,7 @@ module LowRewrite = struct
   type rwinfos = rwside * EcFol.form option * EcMatching.occ option
 
   let t_rewrite_r ?(mode = `Full) ?target ((s, prw, o) : rwinfos) pt tc =
-    let hyps, tgfp = FApi.tc1_flat ?target tc in
+    let env, hyps, tgfp = FApi.tc1_eflat ?target tc in
 
     let modes =
       match mode with
@@ -366,7 +373,7 @@ module LowRewrite = struct
            | PT.FindOccFailure `MatchFailure ->
               raise (RewriteError LRW_RPatternNoRuleMatch)
            | PT.FindOccFailure `IncompleteMatch ->
-               raise (RewriteError LRW_CannotInfer)
+              raise (RewriteError LRW_CannotInfer)
           end in
 
       if not occmode.k_keyed then begin
@@ -376,23 +383,42 @@ module LowRewrite = struct
       end;
 
       let pt = fst (PT.concretize pt) in
+
+      let exception InvalidSetoidContext in
+
       let cpos =
+        let postcheck (instance : EcSetoid.instance) (lazy ctxt) =
+          if not (EcSetoid.valid_setoid_context env instance ctxt) then
+            raise InvalidSetoidContext in
+
+        let postcheck =
+          match mode with
+          | `Setoid instance -> postcheck instance
+          | _ -> fun _ -> () in
+
         try  FPosition.select_form
+               ~postcheck:(fun _ ctxt _ -> postcheck ctxt; true)
                ~xconv:`AlphaEq ~keyed:occmode.k_keyed
                hyps o subf tgfp
-        with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
+        with
+        | InvalidOccurence ->
+          raise (RewriteError (LRW_InvalidOccurence))
+        | InvalidSetoidContext ->
+          raise (RewriteError (LRW_InvalidSetoidContext))
       in
 
       EcLowGoal.t_rewrite
         ~keyed:occmode.k_keyed ?target ~mode pt (s, Some cpos) tc in
 
     let rec do_first = function
-      | [] -> raise (RewriteError LRW_NothingToRewrite)
+      | [] ->
+        raise (RewriteError LRW_NothingToRewrite)
 
-      | (pt, mode, (f1, f2)) :: pts ->
-           try  for1 (pt, mode, (f1, f2))
-           with RewriteError _ ->
-             do_first pts
+      | [pt, mode, (f1, f2)] ->
+        for1 (pt, mode, (f1, f2))
+
+      | pt :: pts ->
+        try  do_first [pt] with RewriteError _ -> do_first pts
     in
 
     let pts = find_rewrite_patterns s pt in
@@ -596,6 +622,8 @@ let process_rewrite1_core ?mode ?(close = true) ?target (s, p, o) pt tc =
           tc_error !!tc "r-pattern does not match the goal"
       | LowRewrite.LRW_RPatternNoRuleMatch ->
           tc_error !!tc "r-pattern does not match the rewriting rule"
+      | LowRewrite.LRW_InvalidSetoidContext ->
+          tc_error !!tc "invalid setoid-rewrite position"
 
 (* -------------------------------------------------------------------- *)
 let process_delta ~und_delta ?target (s, o, p) tc =
@@ -2139,7 +2167,7 @@ let process_exists args (tc : tcenv1) =
           PT.check_pterm_arg pte (x, xty) f arg.ptea_arg
   in
 
-  let _concl, args = List.map_fold for1 (FApi.tc1_goal tc) args in
+  let _concl, args = List.fold_left_map for1 (FApi.tc1_goal tc) args in
 
   if not (PT.can_concretize pte) then
     tc_error !!tc "cannot infer all placeholders";
