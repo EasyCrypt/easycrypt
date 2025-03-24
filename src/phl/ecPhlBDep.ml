@@ -118,7 +118,7 @@ let mapreduce
         raise (BDepError "Failed to concatenate outputs")
     in
 
-    let cs = try 
+    let cs, mr_range = try 
       circuit_mapreduce ?perm c n m 
       with CircError err ->
         raise (BDepError err)
@@ -206,13 +206,13 @@ let prog_equiv_prod
 
 
     let tm = time tm "Preprocessing for mapreduce done" in
-    let lanes_l = try 
+    let lanes_l, mr_range_l = try 
       circuit_mapreduce c_l n m 
       with CircError err ->
         raise (BDepError ("Left program split step failed with error:\n" ^ err))
     in
     let tm = time tm "Left program deps + split done" in
-    let lanes_r = try 
+    let lanes_r, mr_range_r = try 
       circuit_mapreduce c_r n m 
       with CircError err ->
         raise (BDepError ("Right program split step failed with error:\n" ^ err))
@@ -372,7 +372,7 @@ let mapreduce_eval
     in
 
 
-    let cs = try 
+    let cs, mr_range = try 
       circuit_mapreduce c n m 
       with CircError err ->
         raise (BDepError ("Split step failed with error:\n" ^ err))

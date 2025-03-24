@@ -206,7 +206,7 @@ module type CircuitInterface = sig
 
   (* Mapreduce/Dependecy analysis related functions *)
   val is_decomposable : int -> int -> cbitstring cfun -> bool
-  val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list 
+  val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list * (int * int)
   val permute : int -> (int -> int) -> cbitstring cfun -> cbitstring cfun
 
   (* Wraps the backend call to deal with args/inputs *)
@@ -320,6 +320,10 @@ module type CBackend = sig
     val is_splittable : int -> int -> deps -> bool
 
     val are_independent : block_deps -> bool
+
+    val single_dep : deps -> bool
+    (* Assumes single_dep *)
+    val dep_range : deps -> int * int
   end
 end
 
@@ -425,11 +429,14 @@ module TestBack : CBackend = struct
   let get (r: reg) (idx: int) = r.(idx)
 
   let permute (w: int) (perm: int -> int) (r: reg) : reg =
+    Format.eprintf "Applying permutation to reg of size %d with block size of %d@." (size_of_reg r) w;
     Array.init (size_of_reg r) (fun i ->
-      let block_idx, bit_idx = (i / w), (i mod w) in
-      let idx = (perm block_idx)*w + bit_idx in
-      r.(idx)
-    ) 
+      let block_idx, bit_idx = perm (i / w), (i mod w) in
+      if block_idx < 0 then None 
+      else
+      let idx = block_idx*w + bit_idx in
+      Some r.(idx)
+    ) |> Array.filter_map (fun x -> x)
 
 
   (* Node operations *)
@@ -536,17 +543,17 @@ module TestBack : CBackend = struct
       | 0 -> true
       | 1 ->
         let blocks = block_deps_of_deps w_out d in
-(*         Format.eprintf "Checking block width...@."; *)
+        Format.eprintf "Checking block width...@.";
         Array.for_all (fun (_, d) ->
           if Map.is_empty d then true
           else
           let _, bits = Map.any d in
           Set.is_empty bits ||
           let base = Set.at_rank_exn 0 bits in
-(*           Format.eprintf "Base for current block: %d@." base; *)
+          Format.eprintf "Base for current block: %d@." base;
           Set.for_all (fun bit ->
             let dist = bit - base in
-(*             Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in; *)
+            Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in;
             0 <= dist && dist < w_in
           ) bits
         ) blocks
@@ -576,6 +583,28 @@ module TestBack : CBackend = struct
         true
       with BreakOut ->
         false
+
+
+    let single_dep (d: deps) : bool =
+      match Set.cardinal 
+        (Array.fold_left (Set.union) Set.empty 
+        (Array.map (fun dep -> Map.keys dep |> Set.of_enum) d)) 
+      with 
+      | 0 | 1 -> true
+      | _ -> false
+
+    (* Assumes single_dep, returns range (bot, top) such that valid idxs are bot <= i < top *)
+    let dep_range (d: deps) : int * int =
+      assert (single_dep d);
+      let idxs = 
+        Array.fold_left (fun acc d -> 
+        Set.union (Map.fold Set.union d Set.empty) acc) Set.empty d
+      in
+      Format.eprintf "%a@." pp_deps d;
+      Format.eprintf "Dep range for dependencies:@.";
+      Set.iter (fun i -> Format.eprintf "%d " i) idxs;
+      Format.eprintf "@.Min: %d | Max: %d@." (Set.min_elt idxs) (Set.max_elt idxs);
+      (Set.min_elt idxs, Set.max_elt idxs + 1)
   end
 
 end
@@ -1272,7 +1301,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
       let circs, inps = List.split circs in
       let dif = len - List.length circs in
-      Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif;
+(*       Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif; *)
       let circs = circs @ (List.init dif (fun _ -> fst dfl)) in
       let inps = if dif > 0 then inps @ [snd dfl] else inps in
       let circs = List.map 
@@ -1518,13 +1547,31 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   (* For more complex circuits, we might be able to simulate this with a int -> (int, int) map *)
   let is_decomposable (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : bool = 
     match inps with
-    | {type_=`CIBitstring w} :: [] when w mod in_w = 0 && Backend.size_of_reg r mod out_w = 0 ->
+    | {type_=`CIBitstring w} :: [] when (Backend.size_of_reg r mod out_w = 0) ->
       let deps = Backend.Deps.deps_of_reg r in
-      Backend.Deps.is_splittable in_w out_w deps 
+      Backend.Deps.is_splittable in_w out_w deps &&
+      let base, top = Backend.Deps.dep_range deps in
+      let () = Format.eprintf "Passed backend check, checking width of deps (top - base = %d | in_w = %d)@." (top - base) in_w in
+      (top - base) mod in_w = 0
     | _ -> 
         Format.eprintf "Failed decomposition type check@\n";
         Format.eprintf "In_w: %d | Out_w : %d | Circ: %a" in_w out_w pp_circuit c;
         false
+
+  (* TODO: Extend this for multiple inputs? *)
+  let align_renamer ((`CBitstring r, inps) : cbitstring cfun) : (int * int) * cinp * (Backend.inp -> Backend.inp option) = 
+    match inps with 
+    | [{type_ = `CIBitstring w; id}] ->
+      let d = Backend.Deps.deps_of_reg r in
+      assert (Backend.Deps.single_dep d);
+      let (start_idx, end_idx) as range = Backend.Deps.dep_range d in
+      range, 
+      {type_ = `CIBitstring (end_idx - start_idx); id},
+      (fun (id_, w) ->
+        if id <> id_ then None else
+        if w < start_idx || w >= end_idx then None
+        else Some (id_, w - start_idx))
+    | _ -> assert false
 
   let split_renamer (n: count) (in_w: width) (inp: cinp) : (cinp array) * (Backend.inp -> cbool_type option) =
     match inp with
@@ -1535,9 +1582,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           if id <> id_ then None else
           let id_idx, bit_idx = (w / in_w), (w mod in_w) in
           Some (Backend.input_node ~id:ids.(id_idx) bit_idx))
+    | {type_ = `CIBitstring w; id}  ->
+        Format.eprintf "Failed to build split renamer for n=%d in_w=%d w=%d@." n in_w w; 
+        assert false
     | _ -> assert false
 
-  let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
+  let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list * (int * int) = 
     if not (is_decomposable in_w out_w c) then 
       let deps = Backend.Deps.block_deps_of_reg out_w r in
       Format.eprintf "Failed to decompose. in_w=%d out_w=%d Deps:@.%a" in_w out_w (Backend.Deps.pp_block_deps) deps;
@@ -1546,11 +1596,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let n = (Backend.size_of_reg r) / out_w in
     let blocks = Array.init n (fun i -> 
       Backend.slice r (i*out_w) out_w) in
-    let cinps, renamer = split_renamer n in_w (List.hd inps) in
+    let range, cinp, aligner = align_renamer c in
+    let cinps, renamer = split_renamer n in_w cinp in
+    let renamer = fun i -> Option.bind (aligner i) renamer in 
     Array.map2 (fun r inp ->
       let r = Backend.applys renamer r in
       (`CBitstring r, [inp])
-    ) blocks cinps |> Array.to_list
+    ) blocks cinps |> Array.to_list, range
 
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     `CBitstring (Backend.permute w perm r), inps
@@ -2164,13 +2216,13 @@ let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   in
   (permute bsz perm c :> circuit)
 
-let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list = 
+let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list * (int * int) = 
   let c = match c, perm with 
   | (`CBitstring _, inps) as c, None -> c
   | (`CBitstring _, inps) as c, Some perm -> permute w_out perm c
   | _ -> assert false
   in
-  (decompose w_in w_out c :> circuit list)
+  (decompose w_in w_out c :> circuit list * (int * int))
 
 type circuit = ExampleInterface.circuit
 type pstate = ExampleInterface.PState.pstate
