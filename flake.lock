@@ -1,5 +1,24 @@
 {
   "nodes": {
+    "emacs-overlay": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "nixpkgs-stable": "nixpkgs-stable"
+      },
+      "locked": {
+        "lastModified": 1733156634,
+        "narHash": "sha256-YKPkdjUDUQxyQvBVlAV/e8z90RJT7PJHciSpzPyelHU=",
+        "owner": "nix-community",
+        "repo": "emacs-overlay",
+        "rev": "54d102696b787b0baf144fd71a377172b561af62",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "emacs-overlay",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -89,7 +108,7 @@
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils_2",
         "mirage-opam-overlays": "mirage-opam-overlays",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "opam-overlays": "opam-overlays",
         "opam-repository": "opam-repository",
         "opam2json": "opam2json"
@@ -198,22 +217,23 @@
     "prover_z3_4_12_6": {
       "flake": false,
       "locked": {
-        "lastModified": 1708814107,
-        "narHash": "sha256-X4wfPWVSswENV0zXJp/5u9SQwGJWocLKJ/CNv57Bt+E=",
+        "lastModified": 1728600730,
+        "narHash": "sha256-odwalnF00SI+sJGHdIIv4KapFcfVVKiQ22HFhXYtSvA=",
         "owner": "z3prover",
         "repo": "z3",
-        "rev": "fa2c0e027894a8d55d2b841e27cbeecc99692a3f",
+        "rev": "54d30f26f72ce62f5dcb5a5258f632f84858714f",
         "type": "github"
       },
       "original": {
         "owner": "z3prover",
-        "ref": "z3-4.12.6",
+        "ref": "z3-4.13.3",
         "repo": "z3",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
+        "emacs-overlay": "emacs-overlay",
         "flake-utils": "flake-utils",
         "nixpkgs": [
           "opam-nix",

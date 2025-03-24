@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcAst
 open EcModules
 open EcFol
@@ -223,7 +224,6 @@ let typing_wp env m s f =
 let () = EcTyping.wp := Some typing_wp
 
 (* -------------------------------------------------------------------- *)
-let process_wp pos tc =
-  let pos =
-    Option.map (EcTyping.trans_dcodepos1 (FApi.tc1_env tc)) pos
-  in t_wp pos tc
+let process_wp (k : pcodepos1 doption option) (tc : tcenv1) =
+  let k = Option.map (EcTyping.trans_dcodepos1 (FApi.tc1_env tc)) k in
+  t_wp k tc

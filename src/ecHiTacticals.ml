@@ -231,6 +231,13 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocchange (s, p, f)     -> EcPhlRewrite.process_change s p f
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
+    | Pchangestmt (s, p, c)     -> EcPhlRewrite.process_change_stmt s p c 
+    | Pbdep bdinfo              -> EcPhlBDep.process_bdep bdinfo
+    | Pbdepeval bdeinfo         -> EcPhlBDep.process_bdep_eval bdeinfo
+    | Pbdepeq bdeinfo           -> EcPhlBDep.process_bdepeq bdeinfo
+    | Pbdepsolve                -> EcPhlBDep.t_bdep_solve
+    | Pcirc (invs, f, v)        -> EcPhlBDep.process_bdep_form invs f v
+    | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
   in
 
   try  tx tc

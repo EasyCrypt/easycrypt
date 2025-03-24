@@ -123,6 +123,7 @@
 
   let bool_as_local b =
     if b then `Local else `Global
+
   (* ------------------------------------------------------------------ *)
   type prover =
     [ `Exclude | `Include | `Only] * psymbol
@@ -366,6 +367,7 @@
 %token ALIAS
 %token AMP
 %token APPLY
+%token ARRAY
 %token AS
 %token ASSERT
 %token ASSUMPTION
@@ -376,7 +378,11 @@
 %token AXIOMATIZED
 %token BACKS
 %token BACKSLASH
+%token BDEP
+%token BDEPEQ
 %token BETA
+%token BITSTRING
+%token BIND
 %token BY
 %token BYEQUIV
 %token BYPHOARE
@@ -385,6 +391,7 @@
 %token BYUPTO
 %token CALL
 %token CASE
+%token CIRCUIT
 %token CBV
 %token CEQ
 %token CFOLD
@@ -449,6 +456,7 @@
 %token HINT
 %token HOARE
 %token IDTAC
+%token IDASSIGN
 %token IF
 %token IFF
 %token IMPL
@@ -638,7 +646,10 @@ _lident:
 | x=LIDENT   { x }
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
+| ARRAY      { "array"      }
 | ASYNC      { "async"      }
+| BIND       { "bind"       }
+| BITSTRING  { "bitstring"  }
 | DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
@@ -693,6 +704,7 @@ _lident:
 
 %inline sword:
 |       n=word {  n }
+| PLUS  n=word {  n }
 | MINUS n=word { -n }
 
 (* -------------------------------------------------------------------- *)
@@ -3032,8 +3044,11 @@ interleave_info:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
-| UNROLL b=boption(FOR) s=side? o=codepos
-    { Punroll (s, o, b) }
+| UNROLL s=side? o=codepos
+    { Punroll (s, o, `While) }
+
+| UNROLL FOR b=boption(STAR) s=side? o=codepos
+    { Punroll (s, o, `For b) }
 
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
@@ -3170,11 +3185,87 @@ interleave_info:
 | PROC CHANGE side=side? pos=codepos COLON f=sexpr
     { Pprocchange (side, pos, f) }
 
+| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 COLON s=brace(stmt)
+    { if not (List.is_empty (fst (unloc pos))) then
+        parse_error (loc pos) (Some "only top-level positions are supported");
+      Pchangestmt (side, (snd (unloc pos), offset), s) }
+
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }
 
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
+
+| PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
+    { Prwprgm (`Change (o, b, w, s)) }
+
+| IDASSIGN o=codepos x=lvalue_var
+    { Prwprgm (`IdAssign (o, x)) }
+
+bd_vars:
+| vs=plist0(lident, SEMICOLON) 
+  { List.map (fun v -> (`Var v :> bdepvar)) vs }
+
+| v=lident COLON w=word
+  { [(`VarRange (v, w) :> bdepvar)] }
+
+bdepeq_out_info:
+| m=word COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bd_vars RBRACKET
+  { (m, outvs_l, outvs_r) }
+
+%public phltactic:
+| BDEP
+    n=word
+    m=word
+    invs=bracket(bd_vars)
+    inpvs=bracket(bd_vars)
+    outvs=bracket(bd_vars)
+    lane=oident
+    pcond=oident
+    perm=oident?
+  { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; } }
+
+| BDEP STAR
+    in_ty=bracket(loc(simpl_type_exp))
+    invs=bracket(bd_vars)
+    inpvs=bracket(bd_vars)
+    out_ty=bracket(loc(simpl_type_exp))
+    outvs=bracket(bd_vars)
+    lane=oident
+    range=sform
+  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=false } }
+
+| BDEP STAR STAR
+    in_ty=bracket(loc(simpl_type_exp))
+    invs=bracket(bd_vars)
+    inpvs=bracket(bd_vars)
+    out_ty=bracket(loc(simpl_type_exp))
+    outvs=bracket(bd_vars)
+    lane=oident
+    range=sform
+  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=true } }
+
+| BDEPEQ
+    n=word
+    inpvs_l=bracket(bd_vars)
+    inpvs_r=bracket(bd_vars)
+    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
+    pcond=oident?
+  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=false} }
+
+| BDEPEQ STAR
+    n=word
+    inpvs_l=bracket(bd_vars)
+    inpvs_r=bracket(bd_vars)
+    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
+    pcond=oident?
+  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=true} }
+
+| BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
+  { Pcirc (invs, f, (`Var v :> bdepvar)) }
+
+| BDEP SOLVE
+  { Pbdepsolve }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
@@ -3239,9 +3330,9 @@ eqobs_in_eqpost:
 
 eqobs_in:
 | pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
-    { sim_pos  = pos;
-      sim_hint = i;
-      sim_eqs  = p; }
+    { psim_pos  = pos;
+      psim_hint = i;
+      psim_eqs  = p; }
 }
 
 pgoptionkw:
@@ -3778,6 +3869,28 @@ user_red_option:
   }
 
 (* -------------------------------------------------------------------- *)
+(* Circuit & bo bindings                                                *)
+cr_binding_r:
+| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=loc(simpl_type_exp) size=uint
+  { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
+
+| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=uint
+  { CRB_Array { get; set; tolist; oflist; type_; size; } }
+  
+| BIND OP type_=qident operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types = [type_]; operator; name; } }
+
+| BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
+  { CRB_BvOperator { types; operator; name; } }
+
+| BIND CIRCUIT operator=qoident circuit=loc(STRING)
+  { CRB_Circuit { operator; circuit; } }
+
+%inline cr_binding:
+| locality=is_local binding=cr_binding_r
+  { { locality; binding; }}
+
+(* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
 %inline search: x=sform_h { x }
 
@@ -3814,6 +3927,7 @@ global_action:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 | hint             { Ghint        $1 }
+| cr_binding       { Gcrbinding   $1 } 
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | SEARCH x=search+ { Gsearch      x  }
