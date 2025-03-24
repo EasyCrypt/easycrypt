@@ -278,7 +278,7 @@ let f_hoareS hs_m hs_pr hs_s hs_po =
   f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
 
 let f_hoareF hf_pr hf_f hf_po =
-  f_hoareF_r { hf_pr; hf_f; hf_po; }
+  f_hoareF_r { hf_m=mhr; hf_pr; hf_f; hf_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool

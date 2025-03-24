@@ -231,6 +231,7 @@ and equivS = {
   es_po  : form; }
 
 and sHoareF = {
+  hf_m  : memory;
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;

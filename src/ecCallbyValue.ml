@@ -483,7 +483,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
     let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_r { hf_pr; hf_f; hf_po }
+    f_hoareF_r { hf_m= mhr; hf_pr; hf_f; hf_po }
 
   | FhoareS hs ->
     assert (Args.isempty args);
