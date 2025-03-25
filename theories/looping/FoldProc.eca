@@ -68,7 +68,7 @@ section.
             ={glob O', t1, t2} ==> ={glob O'}.
   proof.
   proc.
-  outline {1} [1-2] { O'.s <@ Fold(O).fold_12(O'.s, t1, t2); }.
+  outline {1} [1 .. 2] by { O'.s <@ Fold(O).fold_12(O'.s, t1, t2); }.
   by rewrite equiv[{1} 1 fold_swap12]; inline*; sim.
   qed.
 

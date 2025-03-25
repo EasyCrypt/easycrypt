@@ -230,6 +230,7 @@ type ismap = (instr list) EcMaps.Mstr.t
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
+val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> codepos_range
 val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption

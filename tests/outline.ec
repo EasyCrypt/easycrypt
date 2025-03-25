@@ -34,6 +34,7 @@ module M = {
   }
 }.
 
+
 module N = {
   proc g1() : unit = {
     M.f1();
@@ -79,49 +80,49 @@ module N = {
 equiv outline_no_args_no_ret: N.g1 ~ N.g1: true ==> true.
 proc.
 inline {1} 1.
-outline {1} [1] <@ M.f1.
+outline {1} 1 M.f1.
 by sim.
 qed.
 
 equiv outline_no_ret: N.g2 ~ N.g2: true ==> true.
 proc.
 inline {1} 1.
-outline {1} [2] <@ M.f2.
+outline {1} 2 M.f2.
 by inline*; auto.
 qed.
 
 equiv outline_no_body: N.g3 ~ N.g3: true ==> true.
 proc.
 inline {1} 1.
-outline {1} [3] <@ M.f3.
+outline {1} 3 M.f3.
 by inline*; auto.
 qed.
 
 equiv outline_slice: N.g4 ~ N.g4: true ==> true.
 proc.
-outline {1} [1-2] <@ M.f4.
+outline {1} [1 .. 2] M.f4.
 by inline*; auto.
 qed.
 
 equiv outline_explicit_ret: N.g5 ~ N.g5: true ==> true.
 proc.
-outline {1} [1] x <@ M.f5.
+outline {1} 1 ~ M.f5.
 by inline*; auto.
 qed.
 
 equiv outline_multi: N.g6 ~ N.g6: true ==> true.
 proof.
 proc.
-outline {1} [3-4] <@ N.g4.
-outline {1} [2] b <@ M.f5.
-outline {1} [1] a <@ M.f5.
+outline {1} 2 ~ M.f5.
+outline {1} [3 .. 4] N.g4.
+outline {1} 1 ~ M.f5.
 by inline*; auto.
 qed.
 
 equiv outline_stmt: N.g6 ~ N.g6: true ==> true.
 proof.
 proc.
-outline {1} [1-4] {
+outline {1} [1 .. 4] by {
   a <@ M.f5(dint);
   b <@ M.f5(dint);
   N.g4(a,b);
