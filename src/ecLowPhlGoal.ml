@@ -254,13 +254,13 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareF hf   -> f_hoareF_r { hf with hf_pr = pre } 
  | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
  | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
  | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }
- | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
+ | FbdHoareF hf -> f_bdHoareF_r { hf with bhf_pr = pre }
  | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
- | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
+ | FequivF ef   -> f_equivF_r { ef with ef_pr = pre }
  | FequivS es   -> f_equivS_r { es with es_pr = pre }
  | _            -> assert false
 

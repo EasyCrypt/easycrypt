@@ -7,6 +7,7 @@ open EcEnv
 open EcFol
 open EcReduction
 open EcBaseLogic
+open EcMemory
 module BI = EcBigInt
 
 (* -------------------------------------------------------------------- *)
@@ -479,11 +480,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FhoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s hf.hf_m));
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
     let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_r { hf_m= mhr; hf_pr; hf_f; hf_po }
+    let (hf_m,_)  = norm_me s (abstract hf.hf_m) in
+    f_hoareF_r { hf_m; hf_pr; hf_f; hf_po }
 
   | FhoareS hs ->
     assert (Args.isempty args);

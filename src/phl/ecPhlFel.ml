@@ -215,7 +215,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let pre = f_and_simpl pre inv in
       let post = f_int_lt old_cntr cntr in
       let post = f_and_simpl post inv in
-        f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post)
+        f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF mhr pre o post)
     in
     let cntr_stable_goal =
       let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
@@ -224,7 +224,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let post = f_and_simpl post inv in
         f_forall_simpl
           [old_b_id,GTty tbool; old_cntr_id,GTty tint]
-          (f_hoareF pre o post)
+          (f_hoareF mhr pre o post)
     in
     [not_F_to_F_goal;cntr_decr_goal;cntr_stable_goal]
   in

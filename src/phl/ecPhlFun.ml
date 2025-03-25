@@ -160,7 +160,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF mhr inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 

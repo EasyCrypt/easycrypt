@@ -536,7 +536,7 @@ let rec subst_form (s : subst) (f : form) =
        let hf_po = subst_form s hf_po in
        (hf_pr, hf_po) in
      let hf_f  = subst_xpath s hf_f in
-     f_hoareF hf_pr hf_f hf_po
+     f_hoareF mhr hf_pr hf_f hf_po
 
   | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
      let hs_m, (hs_pr, hs_po) =
