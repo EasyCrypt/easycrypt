@@ -13,6 +13,7 @@ val t_alias     : oside -> codepos -> psymbol option -> backward
 val t_set       : oside -> codepos -> bool * psymbol -> expr -> backward
 val t_set_match : oside -> codepos -> symbol -> unienv * mevmap * form -> backward
 val t_cfold     : oside -> codepos -> int option -> backward
+val t_case      : oside * codepos -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_kill      : oside * pcodepos * int option -> backward

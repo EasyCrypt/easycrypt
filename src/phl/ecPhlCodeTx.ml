@@ -235,11 +235,11 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
               | e, _ -> [e] in
 
             let lv = lv_to_ty_list lv in
-      
+
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
               Mpv.mem env pv subst0 && is_const_expression e
             ) (List.combine lv es) in
-            
+
             let subst =
               List.fold_left
                 (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
@@ -367,7 +367,7 @@ let process_set_match (side, cpos, id, pattern) tc =
   t_set_match side cpos (EcLocation.unloc id)
     (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
     tc
-  
+
 (* -------------------------------------------------------------------- *)
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
@@ -425,7 +425,7 @@ let process_weakmem (side, id, params) tc =
   FApi.xmutate1 tc `WeakenMem [concl]
 
 (* -------------------------------------------------------------------- *)
-let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
+let t_case ((side, pos) : side option * EcMatching.Position.codepos) (tc : tcenv1) =
   let (env, _, concl) = FApi.tc1_eflat tc in
 
   let change (i : instr) =
@@ -439,13 +439,15 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
     let lv  = lv_to_list lv in
 
     if not (EcPV.PV.indep env pvl pve) then
-      assert false;
+      tc_error !!tc "the expression and left-values should be independent";
 
     let e =
       match lv, e.e_node with
       | [_], _         -> [e]
       | _  , Etuple es -> es
-      | _  ,_          -> assert false in
+      | _  ,_          ->
+        tc_error !!tc "expression is not a simple tuple"
+    in
 
     let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
 
@@ -458,8 +460,11 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
     assert false;
 
   let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
+
+let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  t_case (side, pos) tc

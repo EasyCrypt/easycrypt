@@ -74,7 +74,8 @@ let t_efold oside cpos tc =
         end
       in
       doit s
-    | _ -> failwith "Must be an assignment"
+    | _ ->
+      failwith "Must be an assignment"
   in
   let s = Zipper.map_range env range doit s in
   let concl = hl_set_stmt oside (tc1_goal tc) s in
@@ -85,6 +86,12 @@ let t_efold_all oside tc =
   let _, s = tc1_get_stmt oside tc in
   let cps = Position.tag_codepos ~rev:true env s.s_node in
   let cps_asgn = List.filter (fun (_, i) -> is_asgn i) cps in
+  (* let ppe = EcPrinting.PPEnv.ofenv env in
+  let pp_cpi (cp, i) =
+    Format.printf "@[%a) %a@]" (EcPrinting.pp_codepos ppe) cp (EcPrinting.pp_instr ppe) i
+  in
+  List.iter pp_cpi cps_asgn;
+  *)
   let t = List.fold_right (fun (cp, _) t -> t_seq (t_try <| t_efold oside cp) t) cps_asgn EcLowGoal.t_id in
   t tc
 

@@ -60,12 +60,12 @@ module Position = struct
       | Sif (_, t, f) ->
         let path_t = path @ [(cpos ix, `Cond true)] in
         let path_f = path @ [(cpos ix, `Cond false)] in
-        let cps_t = tag_codepos_r env path_t t.s_node in
-        let cps_f = tag_codepos_r env path_f f.s_node in
+        let cps_t = tag_codepos_r ~rev env path_t t.s_node in
+        let cps_f = tag_codepos_r ~rev env path_f f.s_node in
         cps_f @ cps_t @ cps
       | Swhile (_, t) ->
         let path_t = path @ [(cpos ix, `Cond true)] in
-        let cps_t = tag_codepos_r env path_t t.s_node in
+        let cps_t = tag_codepos_r ~rev env path_t t.s_node in
         cps_t @ cps
       | Smatch (e, bs) ->
         let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
@@ -74,7 +74,7 @@ module Position = struct
         let nbs = List.map2 (fun cn (_, s) -> cn, s) cnames bs in
         let cps_bs = List.fold_left (fun acc (cn, s) ->
           let path = path @ [(cpos ix, `Match cn)] in
-          tag_codepos_r env path s.s_node @ acc
+          tag_codepos_r ~rev env path s.s_node @ acc
         ) [] nbs
         in
         cps_bs @ cps
