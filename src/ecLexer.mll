@@ -181,6 +181,7 @@
     "export"      , EXPORT     ;        (* KW: global *)
     "include"     , INCLUDE    ;        (* KW: global *)
     "local"       , LOCAL      ;        (* KW: global *)
+    "global"      , GLOBAL     ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)

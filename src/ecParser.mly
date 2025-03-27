@@ -114,15 +114,13 @@
             fp_args = []; }) info
 
   (* ------------------------------------------------------------------ *)
-  let locality_as_local (lc : locality located) =
+  let locality_as_local (lc : EcTypes.locality located) =
     match unloc lc with
     | `Global  -> `Global
     | `Local   -> `Local
     | `Declare -> parse_error (loc lc)
                    (Some "cannot mark with 'declare' this kind of objects ")
 
-  let bool_as_local b =
-    if b then `Local else `Global
   (* ------------------------------------------------------------------ *)
   type prover =
     [ `Exclude | `Include | `Only] * psymbol
@@ -443,6 +441,7 @@
 %token FWDS
 %token GEN
 %token GLOB
+%token GLOBAL
 %token GOAL
 %token HAT
 %token HAVE
@@ -657,6 +656,7 @@ _lident:
 | CHECK      { "check"      }
 | EDIT       { "edit"       }
 | FIX        { "fix"        }
+| GLOBAL     { "global"     }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -3497,8 +3497,13 @@ tactic_dump:
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
+%inline local_type:
+ | (* empty *) { None }
+ | GLOBAL      { Some `Global }
+ | LOCAL       { Some `Local }
+
 theory_clone:
-| local=is_local CLONE options=clone_opts?
+| local=local_type CLONE options=clone_opts?
     ip=clone_import? x=uqident y=prefix(AS, uident)? cw=clone_with?
     c=or3(clone_proof, clone_rename, clone_clear)*
 
