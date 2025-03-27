@@ -4,6 +4,7 @@ open EcMaps
 open EcSymbols
 open EcLocation
 open EcUtils
+open EcTypes
 
 (* -------------------------------------------------------------------- *)
 exception ParseError of EcLocation.t * string option
@@ -96,11 +97,6 @@ and 'a rfield = {
   rf_tvi   : ptyannot option;
   rf_value : 'a;
 }
-
-(* -------------------------------------------------------------------- *)
-type is_local = [ `Local | `Global]
-
-type locality = [`Declare | `Local | `Global]
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
@@ -1157,7 +1153,7 @@ type theory_cloning = {
   pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
   pthc_clears : theory_cloning_clear list;
-  pthc_local  : is_local;
+  pthc_local  : is_local option;
   pthc_import : [`Export | `Import | `Include] option;
 }
 

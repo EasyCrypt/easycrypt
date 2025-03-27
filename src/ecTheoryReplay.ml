@@ -28,7 +28,7 @@ type 'a ovrenv = {
   ovre_prefix   : (symbol list) pair;
   ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
-  ovre_local    : EcTypes.is_local;
+  ovre_local    : EcTypes.is_local option;
   ovre_hooks    : 'a ovrhooks;
 }
 
@@ -1084,7 +1084,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
       in
 
       let (subst, ops, proofs, subscope) =
-        let subscope = ove.ovre_hooks.hthenter scope thmode x ove.ovre_local in
+        let new_local = odfl cth.cth_loca ove.ovre_local in
+        let subscope = ove.ovre_hooks.hthenter scope thmode x new_local in
         let (subst, ops, proofs, subscope) =
           List.fold_left (replay1 subove)
             (subst, ops, proofs, subscope) cth.cth_items in
@@ -1096,8 +1097,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
 (* -------------------------------------------------------------------- *)
 let replay (hooks : 'a ovrhooks)
-  ~abstract ~local ~incl ~clears ~renames
-  ~opath ~npath ovrds (scope : 'a) (name, items)
+  ~abstract ~override_locality ~incl ~clears ~renames
+  ~opath ~npath ovrds (scope : 'a) (name, items, base_local)
 =
   let subst = EcSubst.add_path EcSubst.empty ~src:opath ~dst:npath in
   let ove   = {
@@ -1108,14 +1109,15 @@ let replay (hooks : 'a ovrhooks)
     ovre_npath    = npath;
     ovre_prefix   = ([], []);
     ovre_abstract = abstract;
-    ovre_local    = local;
+    ovre_local    = override_locality;
     ovre_hooks    = hooks;
     ovre_glproof  = ovrds.evc_lemmas.ev_global;
   } in
 
+  let mode  = if abstract then `Abstract else `Concrete in
+  let new_local = odfl base_local override_locality in
+  let scope = if incl then scope else hooks.hthenter scope mode name new_local in
   try
-    let mode  = if abstract then `Abstract else `Concrete in
-    let scope = if incl then scope else hooks.hthenter scope mode name local in
     let _, _, proofs, scope =
       List.fold_left (replay1 ove)
         (subst, Mp.empty, [], scope) items in

@@ -3496,7 +3496,8 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     | `Concrete -> "theory"
   in
 
-  Format.fprintf fmt "@[<v>%a%s %s.@,  @[<v>%a@]@,end %s.@]"
+  Format.fprintf fmt "@[<v>%a%a%s %s.@,  @[<v>%a@]@,end %s.@]"
+    pp_locality cth.cth_loca
     pp_clone cth.EcTheory.cth_source
     thkw basename
     (pp_list "@,@," (pp_th_item ppe path)) cth.cth_items

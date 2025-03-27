@@ -1802,11 +1802,12 @@ module Cloning = struct
   module R = EcTheoryReplay
 
   (* ------------------------------------------------------------------ *)
-  let hooks : scope R.ovrhooks =
+  let hooks ~(override_locality: is_local option) : scope R.ovrhooks =
     let thexit sc pempty = snd (Theory.exit ?clears:None ~pempty sc) in
     let add_item scope import item =
-      let item = EcTheory.mkitem import item in
-      { scope with sc_env = EcSection.add_item item scope.sc_env } in
+        let item = EcTheory.mkitem import item in
+        { scope with sc_env = EcSection.add_item ~override_locality item scope.sc_env }
+    in
     { R.henv      = (fun scope -> scope.sc_env);
       R.hadd_item = add_item;
       R.hthenter  = Theory.enter;
@@ -1876,10 +1877,10 @@ module Cloning = struct
     let npath = if incl then cpath else EcPath.pqname cpath name in
 
     let (proofs, scope) =
-      EcTheoryReplay.replay hooks
-        ~abstract:opts.R.clo_abstract ~local:thcl.pthc_local ~incl
+      EcTheoryReplay.replay (hooks ~override_locality:thcl.pthc_local)
+        ~abstract:opts.R.clo_abstract ~override_locality:thcl.pthc_local ~incl
         ~clears:ntclr ~renames:rnms ~opath ~npath ovrds
-        scope (name, oth.cth_items)
+        scope (name, oth.cth_items, oth.cth_loca)
     in
 
     let proofs = replay_proofs scope mode proofs in
@@ -1894,8 +1895,15 @@ module Cloning = struct
           { scope with sc_env = EcSection.add_item item scope.sc_env; }
         | `Include -> scope)
         scope
+    in
+    
+    if is_none thcl.pthc_local && oth.cth_loca = `Local then
+      notify scope `Info
+        "Theory `%s` has inherited `local` visibility. \
+         Use the `global` keyword if this is not wanted."
+        name;
 
-    in Ax.add_defer scope proofs
+    Ax.add_defer scope proofs
 
 end
 
@@ -2023,13 +2031,14 @@ module Ty = struct
       ] in
 
     let (proofs, scope) =
-      EcTheoryReplay.replay Cloning.hooks
-        ~abstract:false ~local:`Global ~incl:(Option.is_none cname)
+      EcTheoryReplay.replay (Cloning.hooks ~override_locality:None)
+        ~abstract:false ~override_locality:None ~incl:(Option.is_none cname)
         ~clears:Sp.empty ~renames ~opath:cpath ~npath
         evclone scope
         (
           Option.value ~default:(EcPath.basename cpath) cname,
-          theory.cth_items
+          theory.cth_items,
+          theory.cth_loca
         ) in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
