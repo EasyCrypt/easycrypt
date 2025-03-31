@@ -1705,9 +1705,9 @@ module Fun = struct
     let pre, post = hoareF_memenv mem path env in
     Memory.push_active pre env, Memory.push_active post env
 
-  let hoareS path env =
+  let hoareS mem path env =
     let fun_ = by_xpath path env in
-    let fd, memenv = actmem_body EcCoreFol.mhr fun_ in
+    let fd, memenv = actmem_body mem fun_ in
     memenv, fd, Memory.push_active memenv env
 
   let equivF_memenv path1 path2 env =

@@ -129,7 +129,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let ev = pr.pr_event in
 
   let memenv, (fsig, fdef), _ =
-    try  Fun.hoareS f env
+    try  Fun.hoareS mhr f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
