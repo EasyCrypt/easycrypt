@@ -55,7 +55,7 @@ let t_hoareF_conseq pre post tc =
   let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
   let concl2 = f_forall_mems [mpo] cond2 in
-  let concl3 = f_hoareF mhr pre hf.hf_f post in
+  let concl3 = f_hoareF_r { hf with hf_pr = pre; hf_po = post } in
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -610,8 +610,8 @@ let t_hoareF_conseq_conj pre post pre' post' tc =
     tc_error !!tc "invalid pre-condition";
   if not (f_equal hf.hf_po (f_and post' post)) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF mhr pre hf.hf_f post in
-  let concl2 = f_hoareF mhr pre' hf.hf_f post' in
+  let concl1 = f_hoareF_r { hf with hf_pr=pre; hf_po=post } in
+  let concl2 = f_hoareF_r { hf with hf_pr=pre'; hf_po=post' } in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -1248,7 +1248,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let fmake pre post c_or_bd =
           match c_or_bd with
           | None ->
-            f_hoareF mhr pre hf.hf_f post
+            f_hoareF_r { hf with hf_pr=pre; hf_po=post; }
           | Some (PCI_bd (cmp, bd)) ->
             f_bdHoareF pre hf.hf_f post (oget cmp) bd
 
