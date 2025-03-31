@@ -390,18 +390,18 @@ let process_call side info tc =
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, tbool, fun pre post -> f_hoareF mhr pre f post)
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, tbool, fun pre post ->
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
 
       | FbdHoareS _, Some _
@@ -417,7 +417,7 @@ let process_call side info tc =
       | FequivS es, Some side ->
           let fstmt = sideif side es.es_sl es.es_sr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, tbool, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
@@ -542,7 +542,7 @@ let process_call_concave (fc, info) tc =
       match concl.f_node  with
       | FeHoareS hs ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
 
       | _ -> tc_error !!tc "the conclusion is not a ehoare" in

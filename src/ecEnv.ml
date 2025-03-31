@@ -1694,15 +1694,15 @@ module Fun = struct
     let post = prF_memenv EcCoreFol.mhr path env in
     Memory.push_active post env
 
-  let hoareF_memenv path env =
+  let hoareF_memenv mem path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in
-    let pre  = actmem_pre EcCoreFol.mhr fun_ in
-    let post = actmem_post EcCoreFol.mhr fun_ in
+    let pre  = actmem_pre mem fun_ in
+    let post = actmem_post mem fun_ in
     pre, post
 
-  let hoareF path env =
-    let pre, post = hoareF_memenv path env in
+  let hoareF mem path env =
+    let pre, post = hoareF_memenv mem path env in
     Memory.push_active pre env, Memory.push_active post env
 
   let hoareS path env =
@@ -3566,8 +3566,9 @@ module LDecl = struct
   let push_all l lenv =
     { lenv with le_env = Memory.push_all l lenv.le_env }
 
-  let hoareF xp lenv =
-     let env1, env2 = Fun.hoareF xp lenv.le_env in
+(* Note: Not confident about this change. I don't understand what this function does *)
+  let hoareF mem xp lenv =
+     let env1, env2 = Fun.hoareF mem xp lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
   let equivF xp1 xp2 lenv =

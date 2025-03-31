@@ -51,7 +51,7 @@ let bd_goal tc fcmp fbd cmp bd =
 let t_hoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_hoareF tc in
-  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env in
   let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
   let concl2 = f_forall_mems [mpo] cond2 in
@@ -71,7 +71,7 @@ let t_hoareS_conseq pre post tc =
 let t_ehoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_ehoareF tc in
-  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.ehf_f env in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv mhr hf.ehf_f env in
   let cond1, cond2 =
     conseq_econd hf.ehf_pr hf.ehf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
@@ -102,7 +102,7 @@ let bdHoare_conseq_conds cmp pr po new_pr new_po =
 let t_bdHoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
-  let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv mhr bhf.bhf_f env in
   let cond1, cond2 =
     bdHoare_conseq_conds bhf.bhf_cmp bhf.bhf_pr bhf.bhf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
@@ -124,7 +124,7 @@ let t_bdHoareS_conseq pre post tc =
 let t_bdHoareF_conseq_bd cmp bd tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
-  let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
+  let mpr,_ = EcEnv.Fun.hoareF_memenv mhr bhf.bhf_f env in
   let bd_goal =  bd_goal tc bhf.bhf_cmp bhf.bhf_bd cmp bd in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = f_forall_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
@@ -260,16 +260,15 @@ let t_equivS_notmod post tc =
 let cond_hoareF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in
-  let f = hf.hf_f in
-  let mpr,mpo = Fun.hoareF_memenv f env in
-  let fsig = (Fun.by_xpath f env).f_sig in
+  let mpr,mpo = Fun.hoareF_memenv hf.hf_m hf.hf_f env in
+  let fsig = (Fun.by_xpath hf.hf_f env).f_sig in
   let pvres = pv_res in
   let vres = LDecl.fresh_id hyps "result" in
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
   let s = PVM.add env pvres m fres PVM.empty in
   let cond = PVM.subst env s cond in
-  let modi = f_write env f in
+  let modi = f_write env hf.hf_f in
   let cond,bdg,bde = generalize_mod_ env m modi cond in
   let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
   assert (fst mpr = m);
@@ -315,7 +314,7 @@ let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_bdhoareF tc in
   let f = hf.bhf_f in
-  let mpr,mpo = Fun.hoareF_memenv f env in
+  let mpr,mpo = Fun.hoareF_memenv mhr f env in
   let fsig = (Fun.by_xpath f env).f_sig in
   let pvres = pv_res in
   let vres = LDecl.fresh_id hyps "result" in
@@ -398,7 +397,7 @@ let t_ehoareF_concave fc pre post tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_ehoareF tc in
   let f = hf.ehf_f in
-  let mpr,mpo = Fun.hoareF_memenv f env in
+  let mpr,mpo = Fun.hoareF_memenv mhr f env in
   let fsig = (Fun.by_xpath f env).f_sig in
   let m = fst mpo in
   assert (fst mpr = m && fst mpo = m);
@@ -475,7 +474,7 @@ let t_ehoareF_conseq_nm pre post tc =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_ehoareF tc in
   let f = hf.ehf_f in
-  let _mpr,mpo = Fun.hoareF_memenv f env in
+  let _mpr,mpo = Fun.hoareF_memenv mhr f env in
   let fsig = (Fun.by_xpath f env).f_sig in
   let _cond1, cond2 = conseq_econd hf.ehf_pr hf.ehf_po pre post in
 
@@ -525,7 +524,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
       TTC.pf_process_form !!tc env (tfun txreal txreal) fc
 
     | FeHoareF hf ->
-      let _, env = LDecl.hoareF hf.ehf_f hyps in
+      let _, env = LDecl.hoareF mhr hf.ehf_f hyps in
       TTC.pf_process_form !!tc env (tfun txreal txreal) fc
 
     | _ -> tc_error !!tc "conseq concave: not a ehoare judgement"
@@ -540,7 +539,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
         (env, env, hs.ehs_pr, hs.ehs_po, fmake)
 
       | FeHoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.ehf_f hyps in
+        let penv, qenv = LDecl.hoareF mhr hf.ehf_f hyps in
         let fmake pre post =
           f_eHoareF_r { hf with ehf_pr = pre; ehf_po = post } in
         (penv, qenv, hf.ehf_pr, hf.ehf_po, fmake)
@@ -1001,7 +1000,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let post1  = hs0.bhf_po in
     let post   = hs.bhf_po in
     let posta  = f_and post hs2.hf_po in
-    let mpr,_ = EcEnv.Fun.hoareF_memenv hs0.bhf_f (FApi.tc1_env tc) in
+    let mpr,_ = EcEnv.Fun.hoareF_memenv mhr hs0.bhf_f (FApi.tc1_env tc) in
     let concl1 = f_forall_mems [mpr] (f_imp hs0.bhf_pr pre) in
 
     let tc = ( t_cut concl1 @+
@@ -1243,7 +1242,8 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         in (env, env, hs.hs_pr, hs.hs_po, tbool, fmake)
 
       | FhoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
+        (* not confident about this change by transitivity *)
+        let penv, qenv = LDecl.hoareF hf.hf_m hf.hf_f hyps in
 
         let fmake pre post c_or_bd =
           match c_or_bd with
@@ -1262,7 +1262,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         (env, env, hs.ehs_pr, hs.ehs_po, txreal, fmake)
 
       | FeHoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.ehf_f hyps in
+        let penv, qenv = LDecl.hoareF mhr hf.ehf_f hyps in
         let fmake pre post bd =
           ensure_none bd;
           f_eHoareF_r { hf with ehf_pr = pre; ehf_po = post } in
@@ -1287,7 +1287,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         (env, env, bhs.bhs_pr, bhs.bhs_po, tbool, fmake)
 
       | FbdHoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.bhf_f hyps in
+        let penv, qenv = LDecl.hoareF mhr hf.bhf_f hyps in
 
         let fmake pre post c_or_bd =
           match c_or_bd with
@@ -1336,13 +1336,14 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         in (env, env, hs.hs_pr, hs.hs_po, tbool, fmake)
 
       | FhoareF hf ->
-        let f, pr, po = match f1 with
-        | None -> hf.hf_f, hf.hf_pr, hf.hf_po
+        (* Not confident about this change by transitivity *)
+        let m, f, pr, po = match f1 with
+        | None -> hf.hf_m, hf.hf_f, hf.hf_pr, hf.hf_po
         | Some f1 -> match (snd f1).f_node with
-                     | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
-                     | _ -> hf.hf_f, hf.hf_pr, hf.hf_po
+                     | FequivF ef when side = `Left -> mhr, ef.ef_fr, f_true, f_true
+                     | _ -> hf.hf_m, hf.hf_f, hf.hf_pr, hf.hf_po
         in
-        let penv, qenv = LDecl.hoareF f hyps in
+        let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd; f_hoareF mhr pre f post in
         (penv, qenv, pr, po, tbool, fmake)
@@ -1356,7 +1357,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
                          ef.ef_fr, f_xreal_1, f_xreal_1
                      | _ -> hf.ehf_f, hf.ehf_pr, hf.ehf_po
         in
-        let penv, qenv = LDecl.hoareF f hyps in
+        let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd; f_eHoareF pre f post in
         (penv, qenv, pr, po, txreal, fmake)
@@ -1375,14 +1376,14 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
                      | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
                      | _ -> bhf.bhf_f, bhf.bhf_pr, bhf.bhf_po
         in
-        let penv, qenv = LDecl.hoareF f hyps in
+        let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd; f_hoareF mhr pre f post in
         (penv, qenv, pr, po, tbool, fmake)
 
       | FequivF ef ->
         let f = sideif side ef.ef_fl ef.ef_fr in
-        let penv, qenv = LDecl.hoareF f hyps in
+        let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_hoareF mhr pre f post in

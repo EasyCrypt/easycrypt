@@ -3449,7 +3449,8 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        (* TODO: Make mhr a fresh memory instead *)
+        let penv, qenv = EcEnv.Fun.hoareF mhr fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
@@ -3461,7 +3462,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF mhr fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
@@ -3473,7 +3474,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF mhr fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let bd'   = transf penv bd in

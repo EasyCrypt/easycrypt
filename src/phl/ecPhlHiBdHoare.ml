@@ -20,7 +20,7 @@ let process_bdhoare_split info tc =
           ((hyps, hyps), bhs.bhs_pr, bhs.bhs_po)
 
     | FbdHoareF bhf ->
-        (LDecl.hoareF bhf.bhf_f hyps, bhf.bhf_pr, bhf.bhf_po)
+        (LDecl.hoareF mhr bhf.bhf_f hyps, bhf.bhf_pr, bhf.bhf_po)
 
     | _ ->
         tc_error !!tc "the conclusion must be a bdhoare judgment" in

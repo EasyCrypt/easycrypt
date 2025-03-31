@@ -97,9 +97,9 @@ module Fun : sig
 
   val prF : xpath -> env -> env
 
-  val hoareF_memenv : xpath -> env -> memenv * memenv
+  val hoareF_memenv : memory -> xpath -> env -> memenv * memenv
 
-  val hoareF : xpath -> env -> env * env
+  val hoareF : memory -> xpath -> env -> env * env
 
   val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
 
@@ -502,7 +502,7 @@ module LDecl : sig
   val push_all    : memenv list -> hyps -> hyps
   val push_active : memenv -> hyps -> hyps
 
-  val hoareF : xpath -> hyps -> hyps * hyps
+  val hoareF : memory -> xpath -> hyps -> hyps * hyps
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
 
   val inv_memenv  : hyps -> hyps
