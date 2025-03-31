@@ -722,7 +722,7 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type bdepvar = [`Var of psymbol | `VarRange of psymbol * int]
+type bdepvar = [`Var of psymbol | `VarRange of psymbol * int | `Slice of psymbol * (pqsymbol * zint)]
 
 type bdep_info =
   { n     : int

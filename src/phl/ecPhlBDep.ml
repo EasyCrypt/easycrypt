@@ -64,8 +64,8 @@ let mapreduce
   (hyps : hyps) 
   ((mem, mt): memenv) 
   (proc: stmt) 
-  ((invs, n): variable list * int) 
-  ((outvs, m) : variable list * int) 
+  ((invs, n): (variable * (int * int) option) list * int) 
+  ((outvs, m) : (variable * (int * int) option) list * int) 
   (f: psymbol) 
   (pcond: psymbol)
   (perm: (int -> int) option)
@@ -91,8 +91,9 @@ let mapreduce
   
   let tm = time tm "Precondition circuit generation done" in
   
+  let pinvs = List.fst invs in
   let pstate = try 
-    EcCircuits.pstate_of_prog hyps mem proc.s_node invs 
+    EcCircuits.pstate_of_prog hyps mem proc.s_node pinvs 
   with CircError err ->
     raise (BDepError err)
   in
@@ -100,11 +101,31 @@ let mapreduce
   let tm = time tm "Program circuit generation done" in
 
   begin 
-    let circs = List.map (fun v -> Option.get (pstate_get_opt pstate v)) 
-      (List.map (fun v -> v.v_name) outvs) in
+    let circs = List.map (function 
+      | {v_name}, None -> Option.get (pstate_get_opt pstate v_name)
+      | {v_name}, Some (sz, offset) ->
+        circuit_slice (Option.get (pstate_get_opt pstate v_name)) sz offset
+      ) 
+      outvs in
 
     (* This is required for now as we do not allow mapreduce with multiple arguments *)
     (* assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1); *)    
+
+    let circs = 
+      try let slcs = (List.filter_map 
+        (function 
+        | (v, Some r) -> Some (v.v_name, r)
+        | _ -> None) 
+        invs)
+      in
+      if List.compare_length_with slcs 1 <> 0 then circs else 
+      List.map (fun c -> 
+      (circuit_align_inputs c slcs)
+      ) circs
+      with CircError _ -> 
+      raise (BDepError "Failed to align inputs to slice")
+    in
+
 
     let c = try 
       (circuit_aggregate circs)
@@ -409,28 +430,6 @@ let mapreduce_eval
     time tm "Program to lane func equiv done" |> ignore
   end 
 
-let w2bits_new (env: env) (ty: ty) (arg: form) : form = 
-  let (@@!) = EcTypesafeFol.f_app_safe env in
-  match EcEnv.Circuit.lookup_array env ty with
-  | Some {tolist;} -> let bty = match ty.ty_node with
-    | Tconstr (p, [bty]) -> bty
-    | _ -> raise (BDepError "Wrong type structure for array")
-    in let ptb, otb = 
-      match EcEnv.Circuit.lookup_bitstring env bty with
-      | Some {to_=tb; _} -> tb, EcEnv.Op.by_path tb env
-      | _ -> let err = Format.asprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in 
-        raise (BDepError err)
-    in EcCoreLib.CI_List.p_flatten @@! [
-      EcCoreLib.CI_List.p_map @@! [f_op ptb [] otb.op_ty; 
-      tolist @@! [arg]]
-    ]
-  | None -> 
-    begin match EcEnv.Circuit.lookup_bitstring env ty with
-      | Some {to_=tb; _} -> tb @@! [arg]
-      | _ -> let err = Format.asprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
-        raise (BDepError err)
-    end
-
 let w2bits (env: env) (ty: ty) (arg: form) : form = 
   let tb = match EcEnv.Circuit.lookup_bitstring env ty with
   | Some {to_=tb; _} -> tb
@@ -506,18 +505,19 @@ let reconstruct_from_bits_op (env: env) (t: ty) =
 let t_bdep 
   (n: int) 
   (m: int) 
-  (inpvs: variable list) 
-  (outvs: variable list) 
+  (inpvs: ((variable * (int * int) option) list))
+  (outvs: ((variable * (int * int) option) list)) 
   (pcond: psymbol) 
   (op: psymbol) 
   (perm: (int -> int) option) 
   (tc : tcenv1) =
-  (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
-  | FhoareS sF -> begin try mapreduce (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
+  | FhoareS sF -> if true then
+    begin try mapreduce (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
     | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" err
       end
+    else ()
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -526,23 +526,24 @@ let t_bdep
   in
   FApi.close (!@ tc) VBdep
 
-let get_var (v : bdepvar) (m : memenv) : variable list =
+let get_var (env: env) (v : bdepvar) (m : memenv) : (variable * ((qsymbol * BI.zint) option)) list =
   let get1 (v : symbol) =
     match EcMemory.lookup_me v m with
     | Some (v, None, _) -> v
     | _ -> let err = Format.asprintf "Couldn't locate variable %s@." v in
       raise (BDepError err)
   in
-
   match v with
   | `Var v ->
-      [get1 (unloc v)]
+    [get1 (unloc v), None]
   | `VarRange (v, n) ->
-      List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc v) n))
+    List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc v) n), None)
+  | `Slice (v, (arr_t, off)) ->
+    [get1 (unloc v), Some(unloc arr_t, off)]
+    
 
-let get_vars (vs : bdepvar list) (m : memenv) : variable list =
-  List.flatten (List.map (fun v -> get_var v m) vs)
-
+let get_vars (env: env) (vs : bdepvar list) (m : memenv) : (variable * ((qsymbol * BI.zint) option)) list =
+  List.flatten (List.map (fun v -> get_var env v m) vs)
 
 let blocks_from_vars (env: env) (vs: form list) (ty: ty) : form = 
     let (@@!) pth args = 
@@ -587,8 +588,9 @@ let permute_list (env: env) (perm: EcPath.path) (xs: form) : form =
       EcCoreLib.CI_List.p_size @@! [xs]
     ]
 
+(* FIXME: Add size checks for input and output *)
 let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
-  let { m; n; invs; inpvs; outvs; lane; pcond; perm } = bdinfo in
+  let { n; invs; inpvs; m; outvs; lane; pcond; perm } = bdinfo in
 
   let env = FApi.tc1_env tc in
   let pe = FApi.tc1_penv tc in
@@ -637,13 +639,56 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
   (* ------------------------------------------------------------------ *)
   let outvs = try
-    get_vars outvs hr.hs_m 
+    get_vars env outvs hr.hs_m 
     with BDepError err ->
       tc_error pe "get_vars (outvs) error: %s" err
   in
+
+  let out_size = List.sum (List.map 
+    (function 
+    | v, None -> width_of_type env (v.v_type)
+    | v, Some (t, _) -> 
+    let t = match v.v_type.ty_node with
+    | Tconstr (_, [bsty]) -> tconstr (EcEnv.Ty.lookup_path t env) [bsty]
+    | _ -> assert false
+    in width_of_type env t ) 
+  outvs) 
+  in 
+
+  assert (out_size mod m = 0);
+  let out_block_nr = out_size / m in
+  let out_block_nr = match fperm with 
+    | None -> out_block_nr
+    | Some fperm -> List.init out_block_nr (fun i -> if fperm i >= 0 then 1 else 0) |> List.sum 
+  in
+
+  let form_of_var (v: variable * (qsymbol * BI.zint) option) : form =
+    match v with
+    | v, None -> f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst)
+    | {v_type} as v, Some (t, off) -> 
+      let tpath = match EcEnv.Ty.lookup_opt t env with
+      | None -> 
+        assert false
+      | Some (path, decl) when List.length decl.tyd_params = 1 ->
+        path
+      | _ -> assert false
+      in
+      let v = f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst) in
+      let get = match EcEnv.Circuit.lookup_array env v_type with
+      | Some { get } -> get 
+      | None -> assert false
+      in
+      let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
+      in
+      let idx = create "i" in
+      let f = f_lambda [(idx, GTty tint)] 
+        (EcTypesafeFol.f_app_safe env get [v; f_int_add (f_local idx tint) (f_int off)]) 
+      in EcTypesafeFol.f_app_safe env init [f]
+  in
+
   let poutvs = try
     blocks_from_vars env 
-      (List.map (fun v -> f_pvar (PVloc v.v_name) v.v_type (hr.hs_m |> fst)) outvs) outbty
+      (List.map form_of_var outvs) outbty
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -658,31 +703,111 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   
   (* ------------------------------------------------------------------ *)
   let inpvs = try 
-    get_vars inpvs hr.hs_m 
+    get_vars env inpvs hr.hs_m 
     with BDepError err ->
       tc_error pe "Error in get_vars(inpvs): %s" err
   in
-  let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
+  let in_size = List.sum (List.map 
+  (function 
+    | v, None -> width_of_type env (v.v_type)
+    | v, Some (t, _) -> 
+    let t = match v.v_type.ty_node with
+    | Tconstr (_, [bsty]) -> tconstr (EcEnv.Ty.lookup_path t env) [bsty]
+    | _ -> assert false
+    in width_of_type env t ) 
+  inpvs) in 
 
-  let invs, inv_tys =
-    let lookup (x : bdepvar) : (ident * ty) list =
+  Format.eprintf "in_size : %d | block_size: %d@." in_size n;
+  assert (in_size mod n = 0);
+  let in_block_nr = in_size / n in
+  Format.eprintf "in_block_nr: %d | out_block_nr: %d@." in_block_nr out_block_nr;
+  assert (in_block_nr = out_block_nr);
+
+  let finpvs = List.map form_of_var inpvs in
+
+  let inpvs = List.map 
+    (function 
+    | v, None -> v, None 
+    | v, Some (t, offset) -> 
+        let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
+        | Some (_, { size }) -> size 
+        | None -> assert false
+        in
+        let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
+        | Some {size} -> size
+        | _ -> assert false
+        in
+        v, Some (bsz * asz, (BI.to_int offset) * bsz)
+    ) 
+  inpvs 
+  in
+
+  let outvs = List.map 
+    (function 
+    | v, None -> v, None 
+    | v, Some (t, offset) -> 
+        let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
+        | Some (_, { size }) -> size 
+        | None -> assert false
+        in
+        let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
+        | Some {size} -> size
+        | _ -> assert false
+        in
+        v, Some (asz * bsz, (BI.to_int offset) * bsz)
+    ) 
+  outvs 
+  in
+
+
+  let invs =
+    let lookup (x : bdepvar) : ((ident * ty) * (qsymbol * BI.zint) option) list =
       let get1 (v : symbol) =
-        EcEnv.Var.lookup_local v env in
-
+        EcEnv.Var.lookup_local v env 
+      in
       match x with
       | `Var x ->
-          [get1 (unloc x)]
+          [get1 (unloc x), None]
       | `VarRange (x, n) ->
-          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) in 
-    List.map lookup invs |> List.flatten |> List.split in
-  let inty = match List.collapse inv_tys with
+          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i), None) 
+      | `Slice (x, (arr_t, offset)) -> 
+          [get1 (unloc x), Some (unloc arr_t, offset)]
+    in 
+    List.map lookup invs |> List.flatten in
+  (* FIXME: Why was this needed? *)
+  (* let inty = match List.collapse inv_tys with
   | Some ty -> ty
   | None -> 
       let err = Format.sprintf "Failed to coallesce types for input@." 
       (* in raise (BDepError err) *)
       in tc_error pe "%s@." err
+  in *)
+
+  let form_of_lvar (v: ((ident * ty) * ((qsymbol * BI.zint) option))) = 
+    match v with
+    | (id, ty), None -> f_local id ty
+    | (id, ty), Some (t, offset) -> 
+      let tpath = match EcEnv.Ty.lookup_opt t env with
+      | None -> 
+        assert false
+      | Some (path, decl) when List.length decl.tyd_params = 1 ->
+        path
+      | _ -> assert false
+      in
+      let v = f_local id ty in 
+      let get = match EcEnv.Circuit.lookup_array env ty with
+      | Some { get } -> get 
+      | None -> assert false
+      in
+      let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
+      in
+      let idx = create "i" in
+      let f = f_lambda [(idx, GTty tint)] 
+        (EcTypesafeFol.f_app_safe env get [v; f_int_add (f_local idx tint) (f_int offset)]) 
+      in EcTypesafeFol.f_app_safe env init [f]
   in
-  let finvs = List.map (fun id -> f_local id inty) invs in
+
+  let finvs = List.map form_of_lvar invs in
   let pinvs = try
     blocks_from_vars env finvs inpbty
     with BDepError err -> 
@@ -746,10 +871,10 @@ let process_bdepeq
   (* ------------------------------------------------------------------ *)
   let process_block (outvsl: bdepvar list) (outvsr: bdepvar list) = 
     try 
-      let outvsl = get_vars outvsl mem_l in
+      let outvsl = get_vars env outvsl mem_l |> List.fst in
       let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
 
-      let outvsr = get_vars outvsr mem_r in
+      let outvsr = get_vars env outvsr mem_r |> List.fst in
       let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
       List.map2 f_eq poutvsl poutvsr |> f_ands, (outvsl, outvsr)
     with BDepError err -> 
@@ -758,7 +883,7 @@ let process_bdepeq
    
 
   let inpvsl = try 
-    get_vars inpvsl mem_l 
+    get_vars env inpvsl mem_l |> List.fst 
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -769,7 +894,7 @@ let process_bdepeq
   in
 
   let inpvsr = try 
-    get_vars inpvsr mem_r 
+    get_vars env inpvsr mem_r |> List.fst
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -841,8 +966,9 @@ let process_bdep_form
   : tcenv =
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
   let hyps = FApi.tc1_hyps tc in
-  let invs = get_vars invs hr.hs_m in
-  let v = get_var v hr.hs_m |> as_seq1 in
+  let env = toenv hyps in
+  let invs = get_vars env invs hr.hs_m |> List.fst in
+  let v = get_var env v hr.hs_m |> List.fst |> as_seq1 in
   let ue = EcUnify.UniEnv.create None in
   let env = (toenv hyps) in
   let env = Memory.push_active hr.hs_m env in
@@ -956,24 +1082,27 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let out_of_int = f_op out_of_int [] (tfun tint out_ty) in
   
   (* ------------------------------------------------------------------ *)
-  let outvs  = get_vars outvs hr.hs_m in
+  let outvs  = get_vars env outvs hr.hs_m |> List.fst in
   let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
   let poutvs = blocks_from_vars env poutvs out_ty in
   
   (* ------------------------------------------------------------------ *)
-  let inpvs = get_vars inpvs hr.hs_m in
+  let inpvs = get_vars env inpvs hr.hs_m |> List.fst in
   let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
   let invs, inv_tys =
     let lookup (x : bdepvar) : (ident * ty) list =
       let get1 (v : symbol) =
-        EcEnv.Var.lookup_local v env in
-
+        EcEnv.Var.lookup_local v env 
+      in
       match x with
       | `Var x ->
           [get1 (unloc x)]
       | `VarRange (x, n) ->
-          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) in 
-    List.map lookup invs |> List.flatten |> List.split in
+          List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) 
+      | `Slice _ -> assert false
+
+    in List.map lookup invs |> List.flatten |> List.split in
+
   let inty = match List.collapse inv_tys with
   | Some ty -> ty
   | None -> tc_error pe "Failed to coallesce types for input@." 

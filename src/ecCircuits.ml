@@ -208,6 +208,7 @@ module type CircuitInterface = sig
   val is_decomposable : int -> int -> cbitstring cfun -> bool
   val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list * (int * int)
   val permute : int -> (int -> int) -> cbitstring cfun -> cbitstring cfun
+  val align_inputs : circuit -> (int * int) list -> circuit
 
   (* Wraps the backend call to deal with args/inputs *)
   module CircuitSpec : sig
@@ -709,7 +710,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Inputs helper functions *)
   let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
-    cs @ ds
+    (* FIXME: hack *)
+    if cs = ds then cs 
+    else cs @ ds
 
   let merge_inputs_list (cs: cinp list list) : cinp list =
     List.fold_right (merge_inputs) cs []
@@ -1573,6 +1576,30 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         else Some (id_, w - start_idx))
     | _ -> assert false
 
+  let align_inputs ((c, inps): circuit) (slcs: (int * int) list) : circuit =
+    assert ((List.length inps = 1) && (List.length slcs = 1));
+    let (sz, offset) = List.hd slcs in
+    let inp = match inps with
+    | {type_ = `CIBitstring w_} as inp :: [] ->
+      {inp with type_ = `CIBitstring sz}
+    | {type_ = `CIArray (w, n)} as inp :: [] ->
+      assert (sz mod w = 0);
+      {inp with type_ = `CIArray (w, sz / w)}
+    | _ -> assert false
+    in
+    let aligner = 
+      (fun (id_, w) ->
+        Format.eprintf "Aligning id=%d w=%d offset=%d sz=%d@." id_ w offset sz;
+        if inp.id <> id_ then None else
+        if w < offset || w >= offset + sz then Some Backend.bad
+        else Some (Backend.input_node ~id:id_ (w - offset)))
+    in
+    match c with
+    | `CBitstring r -> (`CBitstring (Backend.applys aligner r), [inp])
+    | `CArray (r, w) -> (`CArray (Backend.applys aligner r, w), [inp])
+    | `CTuple (r, ws) -> (`CTuple (Backend.applys aligner r, ws), [inp])
+    | `CBool b -> (`CBool (Backend.apply aligner b), [inp])
+
   let split_renamer (n: count) (in_w: width) (inp: cinp) : (cinp array) * (Backend.inp -> cbool_type option) =
     match inp with
     | {type_ = `CIBitstring w; id} when w mod in_w = 0 ->
@@ -1596,13 +1623,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let n = (Backend.size_of_reg r) / out_w in
     let blocks = Array.init n (fun i -> 
       Backend.slice r (i*out_w) out_w) in
-    let range, cinp, aligner = align_renamer c in
+(*     let range, cinp, aligner = align_renamer c in *)
+    let cinp = (List.hd inps) in
     let cinps, renamer = split_renamer n in_w cinp in
-    let renamer = fun i -> Option.bind (aligner i) renamer in 
+(*     let renamer = fun i -> Option.bind (aligner i) renamer in  *)
     Array.map2 (fun r inp ->
       let r = Backend.applys renamer r in
       (`CBitstring r, [inp])
-    ) blocks cinps |> Array.to_list, range
+    ) blocks cinps |> Array.to_list, (0,0)
 
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     `CBitstring (Backend.permute w perm r), inps
@@ -2240,6 +2268,12 @@ let circuit_aggregate =
 
 let circuit_aggregate_inps = 
   circuit_aggregate_inputs
+
+let circuit_slice (c: circuit) (sz: int) (offset: int) = assert false
+
+(* FIXME: this should use ids instead of strings *)
+let circuit_align_inputs (c: circuit) (slcs: (symbol * (int * int)) list) = 
+  align_inputs c (List.snd slcs) 
 
 let circuit_flatten (c: circuit) = 
   (cbitstring_of_circuit ~strict:false c :> circuit)

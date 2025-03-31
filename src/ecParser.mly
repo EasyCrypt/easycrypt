@@ -3202,9 +3202,16 @@ interleave_info:
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
+bd_var:
+| s=lident LBRACKET t=qoident COLON j=uint RBRACKET
+  { `Slice (s, (t,j)) :> bdepvar }  
+
+| s=lident
+  { `Var s :> bdepvar }
+
 bd_vars:
-| vs=plist0(lident, SEMICOLON) 
-  { List.map (fun v -> (`Var v :> bdepvar)) vs }
+| vs=plist0(bd_var, SEMICOLON) 
+  { vs }
 
 | v=lident COLON w=word
   { [(`VarRange (v, w) :> bdepvar)] }
