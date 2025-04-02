@@ -112,18 +112,14 @@ let mapreduce
     (* assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1); *)    
 
     let circs = 
-      try let slcs = (List.filter_map 
-        (function 
-        | (v, Some r) -> Some (v.v_name, r)
-        | _ -> None) 
-        invs)
-      in
-      if List.compare_length_with slcs 1 <> 0 then circs else 
-      List.map (fun c -> 
-      (circuit_align_inputs c slcs)
-      ) circs
+      try 
+        let slcs = List.snd invs in
+(*         if List.for_all Option.is_none slcs then circs else  *)
+        List.map (fun c -> 
+            (circuit_align_inputs c slcs)
+          ) circs
       with CircError _ -> 
-      raise (BDepError "Failed to align inputs to slice")
+        raise (BDepError "Failed to align inputs to slice")
     in
 
 
