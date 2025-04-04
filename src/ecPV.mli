@@ -194,6 +194,7 @@ module Mpv2 : sig
   val split_nmod : env -> PV.t -> PV.t -> t -> t
   val split_mod : env -> PV.t -> PV.t -> t -> t
 
+  val is_mod_pv' : env -> prog_var -> t -> bool
   val mem_pv_l : env -> prog_var -> t -> bool
   val mem_pv_r : env -> prog_var -> t -> bool
 end
