@@ -529,14 +529,13 @@ let rec subst_form (s : subst) (f : form) =
       let ty  = subst_ty s f.f_ty in
       f_op p tys ty
 
-  | FhoareF { hf_pr; hf_f; hf_po } ->
+  | FhoareF { hf_m; hf_pr; hf_f; hf_po } ->
      let hf_pr, hf_po =
-       let s = add_memory s mhr mhr in
        let hf_pr = subst_form s hf_pr in
        let hf_po = subst_form s hf_po in
        (hf_pr, hf_po) in
      let hf_f  = subst_xpath s hf_f in
-     f_hoareF mhr hf_pr hf_f hf_po
+     f_hoareF hf_m hf_pr hf_f hf_po
 
   | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
      let hs_m, (hs_pr, hs_po) =
