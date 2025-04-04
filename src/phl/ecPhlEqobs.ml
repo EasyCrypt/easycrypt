@@ -112,12 +112,14 @@ let check_lvalue aux lv =
 let check_not_l sim lvl eqo =
   let aux pv =
     check sim pv sim.sim_ifvl &&
+      not (Mpv2.is_mod_pv' sim.sim_env pv eqo) &&
       not (Mpv2.mem_pv_l sim.sim_env pv eqo) in
   check_lvalue aux lvl
 
 let check_not_r sim lvr eqo =
   let aux pv =
     check sim pv sim.sim_ifvr &&
+      not (Mpv2.is_mod_pv' sim.sim_env pv eqo) &&
       not (Mpv2.mem_pv_r sim.sim_env pv eqo) in
   check_lvalue aux lvr
 

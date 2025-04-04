@@ -698,6 +698,15 @@ module Mpv2 = struct
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
+  let is_mod_pv' env pv eqo =
+    if is_glob pv then
+      let x = get_glob pv in
+      let check_mp mp =
+        let restr = NormMp.get_restr_use env mp in
+        not (NormMp.use_mem_xp x restr) in
+      Sm.exists check_mp eqo.s_gl
+    else false
+
   let is_mod_mp env mp mod_ =
     let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
