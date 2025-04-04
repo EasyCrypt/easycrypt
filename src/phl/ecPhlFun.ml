@@ -73,7 +73,7 @@ let subst_pre env fs (m : memory) s =
 let t_hoareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  assert (hf.hf_m <> mhr);
+  (* assert (hf.hf_m <> mhr); *)
   let f = NormMp.norm_xfun env hf.hf_f in
   check_concrete !!tc env f;
   let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
