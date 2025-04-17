@@ -19,6 +19,11 @@ open EcCoreLib.CI_Real
 let e_true  = expr_of_form mhr f_true
 let e_false = expr_of_form mhr f_false
 
+let warn_uptobad env s = 
+  EcEnv.notify ~immediate:true env `Warning
+            "Uptobad failed: %s" s
+        
+
 let is_lv_bad env bad x =
   match bad with
   | None -> false
@@ -27,14 +32,15 @@ let is_lv_bad env bad x =
 let is_bad be env bad x e =
    is_lv_bad env bad x && EqTest.for_expr env e be
 
+
 let is_bad_true = is_bad e_true
 
 let is_bad_false = is_bad e_false
 
 let check_not_bad env bad lv =
   match lv with
-  | LvVar _ -> not (is_lv_bad env bad lv)
-  | LvTuple xs -> not (List.exists (fun xt -> is_lv_bad env bad (LvVar xt)) xs)
+  | LvVar _ -> not (is_lv_bad env bad lv) 
+  | LvTuple xs -> not (List.exists (fun xt -> is_lv_bad env bad (LvVar xt)) xs) 
 
 let rec s_upto_r env alpha bad s1 s2 =
   match s1, s2 with
@@ -43,7 +49,7 @@ let rec s_upto_r env alpha bad s1 s2 =
           is_bad_true env bad x1 e1 && is_bad_true env bad x2 e2 -> true
   | i1 :: s1, i2 :: s2 ->
     i_upto env alpha bad i1 i2 && s_upto_r env alpha bad s1 s2
-  | _, _ -> false
+  | _, _ -> warn_uptobad env "functions do not have the same structure";false
 
 and s_upto env alpha bad s1 s2 = s_upto_r env alpha bad s1.s_node s2.s_node
 
@@ -54,7 +60,9 @@ and i_upto env alpha bad i1 i2 =
   | Srnd  (lv1, _), Srnd  (lv2, _) ->
     check_not_bad env bad lv1 &&
     check_not_bad env bad lv2 &&
-    EqTest.for_instr env ~alpha i1 i2
+    if EqTest.for_instr env ~alpha i1 i2
+    then true 
+    else (warn_uptobad env "instructions do not match"; false)
 
   | Scall (lv1, f1, e1), Scall (lv2, f2, e2) ->
     omap_dfl (check_not_bad env bad) true lv1 &&
@@ -64,12 +72,18 @@ and i_upto env alpha bad i1 i2 =
     f_upto env bad f1 f2
 
   | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
-    EqTest.for_expr env a1 a2 &&
+    (if EqTest.for_expr env a1 a2 
+     then true 
+     else (warn_uptobad env "if statement conditions do not match"; false)
+    )&&
     s_upto env alpha bad b1 b2 &&
     s_upto env alpha bad c1 c2
 
   | Swhile(a1,b1), Swhile(a2,b2) ->
-    EqTest.for_expr env a1 a2 &&
+    (if EqTest.for_expr env a1 a2 
+     then true 
+     else (warn_uptobad env "while statement conditions do not match"; false)
+    )&&
     s_upto env alpha bad b1 b2
 
   | Smatch(e1,bs1), Smatch(e2,bs2) when List.length bs1 = List.length bs2 -> begin
@@ -88,7 +102,7 @@ and i_upto env alpha bad i1 i2 =
     try
          EqTest.for_expr env ~alpha e1 e2
       && List.all2 (check_branch) bs1 bs2
-    with E.NotConv -> false
+    with E.NotConv -> warn_uptobad env "match statement mismatch";false
   end
 
   | Sassert a1, Sassert a2 ->
@@ -97,7 +111,7 @@ and i_upto env alpha bad i1 i2 =
   | Sabstract id1, Sabstract id2 ->
     EcIdent.id_equal id1 id2
 
-  | _, _ -> false
+  | _, _ -> warn_uptobad env "statement mismatch";false
 
 and f_upto env bad f1 f2 =
   let f1 = NormMp.norm_xfun env f1 in
@@ -121,7 +135,7 @@ and f_upto env bad f1 f2 =
       EcPV.PV.check_depend env fv (m_functor f1.x_top); true) true bad &&
     List.all2 (f_upto env bad) (OI.allowed o1) (OI.allowed o2)
 
-  | _, _ -> false
+  | _, _ -> warn_uptobad env "function kind mismatch";false
 
 let rec s_upto_init env alpha bad s1 s2 =
   match s1, s2 with
@@ -131,7 +145,7 @@ let rec s_upto_init env alpha bad s1 s2 =
       s_upto_r env alpha (Some bad) s1 s2
   | i1 :: s1, i2 :: s2 ->
     i_upto env alpha None i1 i2 && s_upto_init env alpha bad s1 s2
-  | _, _ -> false
+  | _, _ -> warn_uptobad env "entry point functions do not have the same structure";false
 
 let f_upto_init env bad f1 f2 =
   let f1 = NormMp.norm_xfun env f1 in
@@ -147,12 +161,12 @@ let f_upto_init env bad f1 f2 =
     let body1 = fd1.f_body and body2 = fd2.f_body in
     List.all2 check_param fd1.f_locals fd2.f_locals &&
     oall2 (EqTest.for_expr env) fd1.f_ret fd2.f_ret &&
-    ( s_upto_init env alpha bad body1.s_node body2.s_node ||
-      s_upto      env alpha (Some bad) body1 body2)
+    (s_upto_init env alpha bad body1.s_node body2.s_node ||
+     s_upto      env alpha (Some bad) body1 body2)
 
   | FBabs _, FBabs _ -> f_upto env (Some bad) f1 f2
 
-  | _, _ -> false
+  | _, _ -> warn_uptobad env "entry point function kind mismatch";false
 
 let destr_bad f =
   match destr_pvar f with
@@ -185,7 +199,7 @@ let t_uptobad_r tc =
       tc_error !!tc ~who:"byupto" "the event should have the form \"E /\ !bad\" or \"!bad\""
   in
   if not (f_upto_init env bad pr1.pr_fun pr2.pr_fun) then
-      tc_error !!tc ~who:"byupto" "the two function are not equal upto bad";
+      tc_error !!tc ~who:"byupto" "up to bad tactic failed";
   FApi.xmutate1 tc `HlUpto []
 
 let t_uptobad = FApi.t_low0 "upto-bad" t_uptobad_r
