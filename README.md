@@ -27,8 +27,6 @@ Table of Contents
     - [Table of Contents](#table-of-contents)
 * [Installation](#installation)
     - [Via OPAM (Recommended)](#via-opam-recommended)
-      - [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
-      - [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
     - [Via NIX](#via-nix)
     - [From Scratch](#installation-requirements)
         - [Installation requirements](#installation-requirements)
