@@ -3,18 +3,35 @@ EasyCrypt: Computer-Aided Cryptographic Proofs
 
 EasyCrypt is a toolset for reasoning about relational properties of
 probabilistic computations with adversarial code. Its main application
-is the construction and verification of game-based cryptographic
-proofs.
+is the construction and verification of code-based, game-playing
+cryptographic security proofs, but it's capable of more general formal verification tasks.
+Another important application of EasyCrypt is proving the functional correctness
+of low-level implementations—particularly those in
+[Jasmin](https://github.com/jasmin-lang/jasmin)—against high-level specifications.
+
+EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
+
+
+TODO: move this
+While using EasyCrypt directly from the command line can be sufficient for
+verifying existing proof scripts, it's highly recommended to install a suitable front-end
+when engaging in anything more than that (even for simply inspecting and interacting
+with proof scripts). At present, the only available front-end is based on Emacs's
+[Proof General](https://github.com/ProofGeneral/PG).
+However, a VSCode-based front-end is currently in development.
 
 Table of Contents
 --------------------------------------------------------------------
 
  * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
-    - [Installation requirements](#installation-requirements)
-    - [Via OPAM](#via-opam)
+    - [Table of Contents](#table-of-contents)
+* [Installation](#installation)
+    - [Via OPAM (Recommended)](#via-opam-recommended)
       - [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
       - [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
     - [Via NIX](#via-nix)
+    - [From Scratch](#installation-requirements)
+        - [Installation requirements](#installation-requirements)
  * [Configuring Why3](#configuring-why3)
     - [Note on prover versions](#note-on-prover-versions)
  * [Installing/Compiling EasyCrypt](#installingcompiling-easycrypt)
@@ -23,9 +40,205 @@ Table of Contents
     - [Installing from sources](#installing-from-sources)
 
 
-Installation requirements
+# Installation
 --------------------------------------------------------------------
+There are multiple ways of installing EasyCrypt and its [dependencies](#dependencies).
+The recommended way is by simply installing everything
+[via OPAM](#via-opam-recommended), a package manager for OCaml (the programming
+language in which EasyCrypt is written). Other installation methods we cover here
+are [via NIX](#via-nix) and [from scratch](#from-scratch).
 
+## Via OPAM (Recommended)
+Installation via OPAM consists of three steps:
+1. [Installing and initializing OPAM](#installing-and-initializing-opam)
+2. [Installing EasyCrypt's dependencies via OPAM](#installing-easycrypt-via-opam)
+3. [Installing EasyCrypt via OPAM](#installing-easycrypt-via-opam)
+
+If you already have a working installation of OPAM on your system, feel free to skip ahead
+to [installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)!
+
+### Installing and initializing OPAM
+*This section takes most of its instructions from the [official installation guide
+for OPAM](https://opam.ocaml.org/doc/Install.html) and
+[the installation guide for OCaml](https://ocaml.org/docs/installing-ocaml) .
+If you have any problems, make sure to check out those guides first.*
+
+On most operating systems, the recommended way to install and initialize OPAM is by first
+installing it via the package manager, and then initialize it manually; [we cover this
+approach first](#using-the-package-manager). Alternatively, OPAM provides a
+script that automatically installs and initializes the latest binary distribution for
+your operating system; [we cover this approach second](#using-opams-script).
+
+(For even more possible alternatives, consult the [official installation guide
+for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager))
+
+#### Using the package manager
+##### Installation
+Open up a terminal and issue the command listed below for your operating system.
+You might need elevated privileges to execute the command (which you might
+achieve by, e.g., prepending `sudo` to the command).
+If your operating system is not listed, consult the [official installation guide
+for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager),
+or consider [the alternative way of installing and initializing OPAM described below](#using-opams-script).
+
+* Debian/Ubuntu:
+
+```
+apt-get install opam
+```
+
+*Note, the Debian/Ubuntu package has the OCaml compiler as a recommended dependency, which is
+installed by default. If you don't want this, issue the following command instead of the above one.*
+
+```
+apt-get install --no-install-recommends opam
+```
+
+* Arch:
+
+```
+pacman -S opam
+```
+
+* Fedora/OpenSUSE:
+
+```
+dnf install opam
+```
+
+* macOS:
+  - Homebrew:
+
+  ```
+  brew install opam
+  ```
+  - MacPorts:
+
+  ```
+  port install opam
+  ```
+
+* OpenBSD:
+
+```
+pkg_add opam
+```
+
+* FreeBSD:
+
+```
+pkg install ocaml-opam
+```
+
+* Windows:
+
+```
+winget install Git.Git OCaml.opam
+```
+
+##### Initialization
+After installing OPAM, it has to be initialized.
+This is as simple as issuing the following command in your terminal.
+
+```
+opam init
+```
+
+This launches a script that may take several minutes to complete. This script will inform/prompt
+you about updating your configuration such that your environment will be setup
+correctly, both in the current and future sessions. So, make sure to read the script's
+output and follow its instructions!
+
+This may involve issuing more commands in the terminal, typically something along the lines of
+
+```
+eval $(opam env)
+```
+
+for Unix-like systems; something along the lines of
+
+```
+for /f \"tokens=*\" %i in ('opam env') do @%i
+```
+
+for Windows using Windows Command Prompt; and something along the lines of
+
+```
+(& opam env) -split '\r?\n' | ForEach-Object { Invoke-Expression $_ }
+```
+
+for Windows using PowerShell.
+
+After the script finishes running and you have followed its instructions, you are ready to
+proceed to [installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+
+#### Using OPAM's script
+An alternative to [installing OPAM via the package manager and initializing it manually](#using-the-package-manager)
+is using the script provided by OPAM to automatically perform both installation (of a binary distribution for your
+operating system) as well as initialization.
+
+Before proceeding, if you are on a Unix-like system (including macOS), you need to install the
+following software/system packages: `gcc`, `build-essential`, `curl`, `bubblewrap`, and `unzip`.
+(Depending on your system, these packages might be named slightly differently.)
+
+Then, open up a terminal and issue the command listed below for your situation/operating system.
+
+(If nothing matches your situation/operating system, consult the [official installation guide
+for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager) for other potential alternatives)
+
+* Unix-like system:
+
+```
+bash -c "sh <(curl -fsSL https://opam.ocaml.org/install.sh)"
+```
+
+* Windows (using PowerShell):
+
+```
+Invoke-Expression "& { $(Invoke-RestMethod https://opam.ocaml.org/install.ps1) }
+```
+
+If you are having trouble with fetching the script, simply download the relevant script
+from <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh> (for Unix-based systems)
+or <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.ps1> (for Windows systems), and run the script directly.
+
+After downloading the relevant binary distribution, this script will automatically start
+initializing OPAM, which may several minutes to complete. At this point, the script
+will inform/prompt you about updating your configuration such that your
+environment will be setup correctly, both in the current and future sessions.
+So, make sure to read the script's output and follow its instructions!
+
+This may involve issuing more commands in the terminal, typically something along the lines of
+
+```
+eval $(opam env)
+```
+
+for Unix-like systems; something along the lines of
+
+```
+for /f \"tokens=*\" %i in ('opam env') do @%i
+```
+
+for Windows using Windows Command Prompt; and something along the lines of
+
+```
+(& opam env) -split '\r?\n' | ForEach-Object { Invoke-Expression $_ }
+```
+
+for Windows using PowerShell.
+
+After the script finishes running and you have followed its instructions, you are ready to
+proceed to [installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+
+### Installing EasyCrypt's dependencies via OPAM
+
+### Installing EasyCrypt via OPAM
+
+## From scratch
+Dependencies
+--------------------------------------------------------------------
+TODO: Move this
 EasyCrypt uses the following third-party tools/libraries:
 
  * OCaml (>= 4.08)
