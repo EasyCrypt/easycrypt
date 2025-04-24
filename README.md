@@ -12,7 +12,8 @@ of low-level implementations—particularly those in
 EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
 
-TODO: move this
+TODO: move the following
+
 While using EasyCrypt directly from the command line can be sufficient for
 verifying existing proof scripts, it's highly recommended to install a suitable front-end
 when engaging in anything more than that (even for simply inspecting and interacting
