@@ -29,8 +29,8 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
         * [Installing EasyCrypt via OPAM](#installing-easycrypt-via-opam)
     * [Via NIX](#via-nix)
     * [From Source](#from-source)
-        * [Installation EasyCrypt's Dependencies From Source](#installing-easycrypts-dependencies-from-source)
-        * [Installation EasyCrypt From Source](#installing-easycrypt-from-source)
+        * [Installing EasyCrypt's Dependencies From Source](#installing-easycrypts-dependencies-from-source)
+        * [Installing EasyCrypt From Source](#installing-easycrypt-from-source)
 * [Setup and Configuration](#setup-and-configuration)
     * [Why3 and SMT Solvers](#why3-and-smt-solvers)
         * [Compatibility](#compatibility)
@@ -45,7 +45,7 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
 ---
 
-There are multiple ways of installing EasyCrypt and its [dependencies](#dependencies).
+There are multiple ways of installing EasyCrypt and its [dependencies](#installing-easycrypts-dependencies-from-source).
 The recommended way is by simply installing everything
 [via OPAM](#via-opam-recommended), a package manager for OCaml (the programming
 language in which EasyCrypt is written). Other installation methods we cover here
@@ -84,7 +84,7 @@ Use at your own risk.
    by running `opam switch create <switch-name> <compiler-version>`.
    (The compiler version may be left out if the default one suffices, i.e., has a version >=4.08.)
    2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch)
-   by running `opam  switch <switch-name>`.
+   by running `opam switch <switch-name>`.
 4. Add EasyCrypt's OPAM package by running
 `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`
 5. Install EasyCrypt's dependencies by running `opam install --deps-only easycrypt`.
@@ -307,6 +307,8 @@ Before proceeding, you need to ensure you have the following system packages:
 `gcc`, `build-essential`, `curl`, `bubblewrap`, and `unzip`.
 (Depending on your exact system, these packages might be named slightly differently).
 
+Then, launch OPAM's script by running the following command.
+
 ```
 bash -c "sh <(curl -fsSL https://opam.ocaml.org/install.sh)"
 ```
@@ -336,6 +338,8 @@ move on to [install EasyCrypt's dependencies via OPAM](#installing-easycrypts-de
 <details>
 
 <summary>Windows system (using PowerShell)</summary>
+
+Launch OPAM's script by running the following command.
 
 ```
 Invoke-Expression "& { $(Invoke-RestMethod https://opam.ocaml.org/install.ps1) }
@@ -435,11 +439,10 @@ So, make sure to read the command's output and follow its instructions!
 </details>
 
 Let OPAM discover and install all of EasyCrypt's dependencies by running
-the following command. Note that, if you have a version of OPAM
-greater than or equal to 2.1.X versions, this command will
-also discover and install any missing system dependencies. In this case, you might be
-informed/prompted about installing these dependencies via the appropriate
-mechanisms for your system (often your package manager).
+the following command. Note that, if you have an OPAM version >= 2.1,
+this command will also discover and install any missing system dependencies.
+In this case, you might be informed/prompted about installing these dependencies
+via the appropriate mechanisms for your system (often your package manager).
 So, make sure to read the command's output and follow its instructions!
 
 ```
@@ -483,11 +486,9 @@ opam install easycrypt
 ```
 
 If everything went according to plan, you now have everything you need to
-run EasyCrypt! However, before you get ahead of yourself, [configure Why3](#configuring-why3)
-to allow EasyCrypt to interface with the installed SMT solvers. Also, if you want
-to do anything more than merely verifying existing proof scripts from the command-line,
-it's highly recommended to [install a suitable front-end](#frontends) (even for
-simply inspecting and interacting with proof scripts).
+run EasyCrypt! However, before you get ahead of yourself, move to the
+[(post-installation) setup and configuration](#setup-and-configuration) to
+make sure everything works as it should.
 
 ## Via NIX
 
@@ -583,15 +584,26 @@ EasyCrypt binary is named `easycrypt`.
 
 ---
 
+After [installing EasyCrypt and its dependencies](#installation), some basic setup
+and configuration is still needed to make everything work properly.
+Specifically, if you didn't yet install at least one
+[suitable SMT solver, you should do that first](#compatibility).
+Then, it is crucial you [configure Why3](#configuring-why3)
+to allow EasyCrypt to interface with the installed SMT solvers.
+Lastly, if you want to do anything more than merely verifying existing
+proof scripts from the command-line, it's strongly recommended to
+[install a suitable front-end](#frontends) (even for very simple
+inspection and interaction with proof scripts).
+
 ## Why3 and SMT Solvers
 
 ---
 
+### Compatibility
+
 Why3 and SMT solvers are independent pieces of software with their
 own version-specific interactions. Obtaining a working setup may
 require installing specific versions of some of the solvers.
-
-### Compatibility
 
 At present, EasyCrypt depends on Why3 1.8, which (at least)
 supports the following (versions of) SMT solvers.
