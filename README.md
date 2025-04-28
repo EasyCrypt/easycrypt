@@ -11,16 +11,6 @@ of low-level implementations—particularly those in
 
 EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
-
-TODO: move the following
-
-While using EasyCrypt directly from the command line can be sufficient for
-verifying existing proof scripts, it's highly recommended to install a suitable front-end
-when engaging in anything more than that (even for simply inspecting and interacting
-with proof scripts). At present, the only available front-end is based on Emacs's
-[Proof General](https://github.com/ProofGeneral/PG).
-However, a VSCode-based front-end is currently in development.
-
 ## Table of Contents
 --------------------------------------------------------------------
 
@@ -56,6 +46,29 @@ Installation via OPAM consists of three steps:
 If you already have a working installation of OPAM on your system, you can skip ahead
 to [installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam).
 
+### Quick and Dirty Instructions
+For the impatient, the following is a short list of instructions without further explanations, nuances, or caveats (but lots of useful links!). Use at your own risk.
+
+1. [Install OPAM](https://opam.ocaml.org/doc/Install.html). Common methods are:
+   - [Via your package manager](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager) by running `<package-install-command> <opam-package>` (e.g., `apt-get install opam` for Debian/Ubuntu).
+   - [Via one of OPAM's installation scripts](https://opam.ocaml.org/doc/Install.html#Binary-distribution) by downloading and running [this script on Unix-like systems](https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh) or [this script on Windows systems using PowerShell](https://raw.githubusercontent.com/ocaml/opam/master/shell/install.ps1).
+2. [Initialize OPAM](https://opam.ocaml.org/doc/Usage.html#opam-init) by running `opam init`. (Make sure to read the output and follow the instructions!)
+3. Optional, but recommended:
+    1.  [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch) by running `opam switch create <switch-name> <compiler-version>`.
+    (The compiler version may be left out if the default one suffices, i.e., is greater than or equal to version 4.08.)
+    2. [Activate dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch) by running `opam  switch <switch-name>`.
+4. Add EasyCrypt's OPAM package by running `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`
+5. Install EasyCrypt's dependencies by running `opam install --deps-only easycrypt`.
+If you have an OPAM version below 2.1 (which you can find out by running `opam --version`),
+you have to precede this by running `opam install opam-depext`
+and `opam depext easycrypt`. (Make sure to read the output and follow the instructions!)
+6. Install SMT solvers that are compatible with the current version of Why3 used by EasyCrypt (i.e., version 1.8). For example, you can install Alt-Ergo version 2.5.2 by running `opam install alt-ergo.2.5.2`.
+7. Install EasyCrypt itself by running `opam install easycrypt`. Alternatively, if you want to have more control over the version you use, install EasyCrypt from source by cloning this repository and running `make` followed by `make install`.
+8. Configure Why3 by running `easycrypt why3config`.
+9. Install a front-end.
+
+Surely that worked out, right?
+
 ### Installing and initializing OPAM
 *This section takes most of its instructions from the [official installation guide
 for OPAM](https://opam.ocaml.org/doc/Install.html) and
@@ -73,81 +86,147 @@ for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package
 
 #### Using the package manager
 ##### Installation
-Open up a terminal and issue the command listed below for your operating system.
-You might need elevated privileges to execute the command (which may be achieved
-in several ways, depending on the system; e.g., prepending `sudo` to the command
-on Unix-like systems or opening the terminal using "Run as administrator" on
-Windows systems).
+Search for your operating system in the list below and expand its section to
+find the relevant instructions for installing OPAM.
 If your operating system is not listed, consult the [official installation guide
-for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager),
-and/or try [installing and initializing via OPAM's script](#using-opams-script).
+for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager).
 
-* Debian/Ubuntu:
+<details>
 
-*Note, the Debian/Ubuntu package has the OCaml compiler as a recommended dependency, which is
-installed by default. If you don't want this, issue `apt-get install --no-install-recommends opam` instead of
-following command.*
+<summary>Debian/Ubuntu</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is prepending `sudo` to the command).
+
+*Note, the Debian/Ubuntu package has the OCaml compiler as a recommended dependency,
+which will be installed by default. If you don't want this,
+run `apt-get install --no-install-recommends opam` instead of the following command.*
 
 ```
 apt-get install opam
 ```
 
-* Arch:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
+<details>
+
+<summary>Arch</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is prepending `sudo` to the command).
 
 ```
 pacman -S opam
 ```
 
-* Fedora/OpenSUSE:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+<details>
+
+<summary>Fedora/OpenSUSE</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is prepending `sudo` to the command).
 
 ```
 dnf install opam
 ```
 
-* macOS:
-  - Homebrew:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
+<details>
+
+<summary>macOS (Homebrew and MacPorts)</summary>
+
+Run one of the following commands to install OPAM. You might need elevated privileges to execute the command (which may be achieved in different ways; a common way is
+prepending `sudo` to the command).
+
+- Homebrew:
 
   ```
   brew install opam
   ```
-  - MacPorts:
+
+- MacPorts:
 
   ```
   port install opam
   ```
 
-* OpenBSD:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
+<details>
+
+<summary>OpenBSD</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is prepending `sudo` to the command).
 
 ```
 pkg_add opam
 ```
 
-* FreeBSD:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
+<details>
+
+<summary>FreeBSD</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is prepending `sudo` to the command).
 
 ```
 pkg install ocaml-opam
 ```
 
-* Windows:
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
+<details>
+
+<summary>Windows</summary>
+
+Run the following command to install OPAM. You might need elevated privileges
+to execute the command (which may be achieved in different ways; a common way
+is opening the terminal with "Run as administrator").
 
 ```
 winget install Git.Git OCaml.opam
 ```
 
+Once OPAM has been installed, move on to [initialize it](#initialization).
+
+</details>
+
 ##### Initialization
-After installing OPAM, it has to be initialized.
-This is as simple as issuing the following command in your terminal.
+After installing OPAM, it has to be initialized; this can be done by running
+the following command.
 
 ```
 opam init
 ```
 
-This launches a script that may take several minutes to complete. This script will inform/prompt
-you about things like updating your configuration such that your environment will be setup
-correctly (both in the current and future sessions). So, make sure to read the script's
-output and follow its instructions!
+This launches a program that may take several minutes to complete.
+This program will inform/prompt you about things like updating your
+configuration such that your environment will be setup
+correctly (both in the current and future sessions). So, make sure to read the
+program's output and follow its instructions!
 
-These instructions may involve issuing more commands in the terminal, typically including
+These instructions may involve running more commands, typically including
 something along the lines of
 
 ```
@@ -168,38 +247,33 @@ for Windows systems using Windows Command Prompt; and something along the lines 
 
 for Windows systems using PowerShell.
 
-Once the script has finished running *and* you have read and followed its instructions, move on to
-[installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+Once the program has finished running *and* you have read and followed its instructions,
+move on to [install EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
 
 #### Using OPAM's script
 An alternative to [installing OPAM via the package manager and initializing it manually](#using-the-package-manager)
-is using the script provided by OPAM to automatically perform both installation (of a binary distribution for your
-operating system) as well as initialization.
+is using the dedicated script provided by OPAM to automatically perform
+both installation (of a binary distribution for your operating system) and initialization.
 
-Before proceeding, if you are on a Unix-like system (including macOS), you need to install the
-following software/system packages: `gcc`, `build-essential`, `curl`, `bubblewrap`, and `unzip`.
-(Depending on your system, these packages might be named slightly differently.)
+Search for your operating system/situation in the list below and expand its
+section to find the relevant instructions for launching OPAM's script.
+(If nothing matches your operating system/situation, consult the [official installation guide
+for OPAM](https://opam.ocaml.org/doc/Install.html))
 
-Then, open up a terminal and issue the command listed below for your situation/operating system.
+<details>
 
-(If nothing matches your situation/operating system, consult the [official installation guide
-for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager) for other potential alternatives)
+<summary>Unix-like system (including macOS)</summary>
 
-* Unix-like system:
+Before proceeding, you need to ensure you have the following system packages:
+`gcc`, `build-essential`, `curl`, `bubblewrap`, and `unzip`.
+(Depending on your exact system, these packages might be named slightly differently).
 
 ```
 bash -c "sh <(curl -fsSL https://opam.ocaml.org/install.sh)"
 ```
 
-* Windows system (using PowerShell):
-
-```
-Invoke-Expression "& { $(Invoke-RestMethod https://opam.ocaml.org/install.ps1) }
-```
-
 Alternatively, simply download the relevant script
-from <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh> (for Unix-like systems)
-or <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.ps1> (for Windows systems using PowerShell),
+from <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh>
 and run it directly.
 
 After downloading the relevant binary distribution, this script will automatically start
@@ -208,23 +282,47 @@ will inform/prompt you about things like updating your configuration such that y
 environment will be setup correctly (both in the current and future sessions).
 So, make sure to read the script's output and follow its instructions!
 
-These instructions may involve issuing more commands in the terminal, typically including
-something along the lines of
+These instructions may involve running more commands, typically including
+something along the lines of the following.
 
 ```
 eval $(opam env)
 ```
 
-for Unix-like systems, and something along the lines of
+Once the script has finished running *and* you have read and followed its instructions,
+move on to [install EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+
+</details>
+
+<details>
+
+<summary>Windows system (using PowerShell)<summary>
+
+```
+Invoke-Expression "& { $(Invoke-RestMethod https://opam.ocaml.org/install.ps1) }
+```
+
+Alternatively, simply download the relevant script
+from <https://raw.githubusercontent.com/ocaml/opam/master/shell/install.ps1>
+and run it directly.
+
+After downloading the relevant binary distribution, this script will automatically start
+initializing OPAM, which may take several minutes to complete. At some point, the script
+will inform/prompt you about things like updating your configuration such that your
+environment will be setup correctly (both in the current and future sessions).
+So, make sure to read the script's output and follow its instructions!
+
+These instructions may involve running more commands, typically including
+something along the lines of the following.
 
 ```
 (& opam env) -split '\r?\n' | ForEach-Object { Invoke-Expression $_ }
 ```
 
-for Windows systems using PowerShell.
-
 Once the script has finished running *and* you have read and followed its instructions, move on to
-[installing EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+[install EasyCrypt's dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
+
+</details>
 
 ### Installing EasyCrypt's dependencies via OPAM
 If you followed the instructions [above](#installing-and-initializing-opam) (and didn't
@@ -260,7 +358,7 @@ command to add the EasyCrypt package.
 opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git
 ```
 
-The next step is to actually install all of EasyCrypt's (missing) dependencies.
+The next step will install all of EasyCrypt's (missing) dependencies.
 OPAM can both recognize and install everything automatically, including
 potentially missing system dependencies, but might need some additional
 setup depending on the version. To find out which version of OPAM you have,
@@ -270,241 +368,85 @@ issue the following command.
 opam --version
 ```
 
-Now, follow the instructions listed for your OPAM version below. If your version
-is not listed (i.e., you have a version greater than or equal to 2.1.X), you don't have
-to perform any additional setup and can skip over the list.
+If you have a version below 2.1 (i.e., 2.0.X or lower), expand the section below
+to find relevant instructions. *If you have a version greater than or equal to 2.1.X,
+you do not have to do this.*
 
-- 1.X.Y:
-  First, install `opam-depext` by issuing the following command.
+<details>
+
+<summary>OPAM version <2.1</summary>
+First, install OPAM's "system dependency manager plugin" by
+running the following command.
 
   ```
   opam install opam-depext
   ```
 
-  Then, let OPAM discover and install any missing *system* dependencies by issuing the following command.
-  Here, you might be informed/prompted about installing these dependencies via the appropriate mechanisms
-  for your system (typically your package manager). So, make sure to read the command's output and follow its instructions!
+Then, let OPAM discover and install any missing system dependencies by running
+the following command. Here, you might be informed/prompted about installing these dependencies via the appropriate mechanisms for your system (typically your package manager). So, make sure to read the command's output and follow its instructions!
 
   ```
   opam depext easycrypt
   ```
 
-- 2.0.X:
-  Let OPAM discover and install any missing *system* dependencies by issuing the following command.
-  Here, you might be informed/prompted about installing these dependencies via the appropriate mechanisms
-  for your system (typically your package manager). So, make sure to read the command's output and follow its instructions!
+</details>
 
-  ```
-  opam depext easycrypt
-  ```
-
-After completing the version-specific setup, issue the following command to install
-all of EasyCrypt's dependencies. Note that, if you have one of the newer OPAM versions (and didn't have
-to do any of the version-specific setup), this command will also discover and install any missing *system* dependencies.
-In this case, you might be informed/prompted about installing these dependencies via the appropriate mechanisms
-for your system (often your package manager). So, make sure to read the command's output
-and follow its instructions!
+Let OPAM discover and install all of EasyCrypt's dependencies by running
+the following command. Note that, if you have a version of OPAM
+greater than or equal to 2.1.X versions, this command will
+also discover and install any missing system dependencies. In this case, you might be
+informed/prompted about installing these dependencies via the appropriate
+mechanisms for your system (often your package manager).
+So, make sure to read the command's output and follow its instructions!
 
 ```
 opam install --deps-only easycrypt
 ```
 
-Finally, you will need at least one SMT solver compatible with the current version of
-Why3 used by EasyCrypt (which is version 1.8). One such solver is Alt-Ergo, which happens
-to be packaged by OPAM. While this is strictly speaking not a dependency of EasyCrypt,
-if you want to keep things simple, issue the following command to install
-(the right version of) Alt-Ergo via OPAM.
+Finally, install at least one SMT solver compatible with the current version of
+Why3 used by EasyCrypt (version 1.8). One such solver is Alt-Ergo, which happens
+to be packaged by OPAM. While this is strictly speaking not a dependency
+of EasyCrypt, you can run the following command
+to install (the right version of) Alt-Ergo via OPAM and keep things simple.
 
 ```
 opam install alt-ergo.2.5.2
 ```
 
-(If you accidentally installed a different version of Alt-Ergo, you can change to version 2.5.2
-by issuing `opam pin alt-ergo 2.5.2`)
+(If you accidentally installed a different version of Alt-Ergo, you can change
+to version 2.5.2 by running `opam pin alt-ergo 2.5.2`)
 
-At this point, you may move on to [installing EasyCrypt via OPAM](#installing-easycrypt-via-opam).
+At this point, you may move on to [install EasyCrypt via OPAM](#installing-easycrypt-via-opam).
 However, if you want, you can install additional SMT solvers,
-which allows you to pick-and-choose between solvers on the fly (or simply use them all simultaneously!).
-Besides Alt-Ergo version 2.5.2, common solvers that are compatible with Why3 version 1.8
-are [CVC4](https://cvc4.github.io/) version 1.8, [CVC5](https://cvc5.github.io/) version 1.0.8,
+which allows you to pick-and-choose between solvers on the fly
+(or use them all at the same time!).
+Besides Alt-Ergo version 2.5.2, see common solvers that are compatible
+with Why3 version 1.8 are [CVC4](https://cvc4.github.io/) version 1.8, [CVC5](https://cvc5.github.io/) version 1.0.8,
 and [Z3](https://github.com/Z3Prover/z3) version 4.12.X.
 
 ### Installing EasyCrypt via OPAM
-Having installed all of EasyCrypt's dependencies (and some SMT solver(s)),
-you might actually still consider [installing EasyCrypt from
-source](#installing-easycrypt-from-source) instead of via OPAM, even if you
+Having installed all of EasyCrypt's dependencies (and some suitable
+SMT solver(s)), you might actually still consider [installing EasyCrypt from
+source](#installing-easycrypt-from-source), even if you
 did all the rest via OPAM. The main reason for doing so is that this gives you
 more control over the version of EasyCrypt you use, as OPAM always installs
 the most development version.
-If this increase in control is something you want, skip the instructions in this section and
-proceed to the section on [installing EasyCrypt from source](#installing-easycrypt-from-source).
-Otherwise, installing EasyCrypt via OPAM can be done by issuing the following command.
+If this increase in control is something you want, disregard this section and
+proceed to [the section on installing EasyCrypt from source](#installing-easycrypt-from-source).
+Otherwise, install EasyCrypt (via OPAM) by running the following command.
 
 ```
 opam install easycrypt
 ```
 
 If everything went according to plan, you now have everything you need to
-run EasyCrypt! However, before you get ahead of yourself,
-follow [the instructions on configuring Why3](#configuring-why3) to actually
-get EasyCrypt to work properly. Also, if you want to do anything more than directly
-verifying existing proof scripts from the command-line, it's highly recommended to
-[install a suitable front-end](#frontends) (even for simply inspecting and interacting with proof scripts).
+run EasyCrypt! However, before you get ahead of yourself, [configure Why3](#configuring-why3) to allow EasyCrypt to interface with the
+installed SMT solvers. Also, if you want to do anything
+more than merely verifying existing proof scripts from the command-line,
+it's highly recommended to [install a suitable front-end](#frontends) (even for
+simply inspecting and interacting with proof scripts).
 
-## From scratch
-Dependencies
---------------------------------------------------------------------
-TODO: Move this
-EasyCrypt uses the following third-party tools/libraries:
-
- * OCaml (>= 4.08)
-
-     Available at https://ocaml.org/
-
- * OCamlbuild
-
- * Why3 (>= 1.7.x, < 1.8)
-
-     Available at <http://why3.lri.fr/>
-
-     Why3 must be installed with a set a provers.
-     See <http://why3.lri.fr/#provers>
-
-     Why3 libraries must be installed (make byte && make install-lib)
-
- * Menhir <http://gallium.inria.fr/~fpottier/menhir/>
-
- * OCaml Batteries Included <http://batteries.forge.ocamlcore.org/>
-
- * OCaml PCRE (>= 7) <https://github.com/mmottl/pcre-ocaml>
-
- * OCaml Zarith <https://forge.ocamlcore.org/projects/zarith>
-
- * OCaml ini-files <http://archive.ubuntu.com/ubuntu/pool/universe/o/ocaml-inifiles/>
-
-On POSIX/Win32 systems (GNU/Linux, *BSD, OS-X), we recommend that users
-install EasyCrypt and all its dependencies via `opam`.
-
-Via OPAM
---------------------------------------------------------------------
-
-### Installing requirements using OPAM 2 (POSIX systems)
-
-Opam can be easily installed from source or via your packages manager:
-
-  * On Ubuntu and derivatives:
-
-      ```
-      $> add-apt-repository ppa:avsm/ppa
-      $> apt-get update
-      $> apt-get install ocaml ocaml-native-compilers camlp4-extra opam
-      ```
-
-  * On Fedora/OpenSUSE:
-
-      ```
-      $> sudo dnf update
-      $> sudo dnf install ocaml ocaml-docs ocaml-camlp4-devel opam
-      ```
-
-  * On MacOSX using brew:
-
-      ```
-      $> brew install ocaml opam
-      ```
-
-Once `opam` and `ocaml` has been successfully installed run the following:
-
-```
-$> opam init
-$> eval $(opam env)
-```
-
-For any issues encountered installing `opam` see:
-
-  * [https://opam.ocaml.org/doc/Install.html] for detailed opam installation instructions.
-
-  * [https://opam.ocaml.org/doc/Usage.html] for how to initialize opam.
-
-You can then install all the needed dependencies via the opam OCaml
-packages manager.
-
-  0. Optionally, switch to a dedicated compiler for EasyCrypt:
-
-      ```
-      $> opam switch create easycrypt $OVERSION
-      ```
-
-      where `$OVERSION` is a valid OCaml version (e.g. ocaml-base-compiler.4.07.0)
-
-  1. Add the EasyCrypt package from repository:
-
-      ```
-      $> opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git
-      ```
-
-  2. Optionally, use opam to install the system dependencies:
-
-      ```
-      $> opam install opam-depext
-      $> opam depext easycrypt
-      ```
-
-  3. Install EasyCrypt's dependencies:
-
-      ```
-      $> opam install --deps-only easycrypt
-      $> opam install alt-ergo
-      ```
-
-     If you get errors about ocamlbuild failing because it's already
-     installed, the check can be skipped with the following:
-
-      ```
-      CHECK_IF_PREINSTALLED=false opam install --deps-only easycrypt
-      ```
-
-  4. You can download extra provers at the following URLs:
-
-     * Z3: [https://github.com/Z3Prover/z3]
-     * CVC4: [https://cvc4.github.io/]
-
-### Installing requirements using OPAM (non-POSIX systems)
-
-You can install all the needed dependencies via the opam OCaml packages manager.
-
-  1. Install the opam Ocaml packages manager, following the instructions at:
-
-     https://fdopen.github.io/opam-repository-mingw/installation/
-
-  2. Add the EasyCrypt package from repository:
-
-      ```
-      $> opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git
-      ```
-
-  3. Use opam to install the system dependencies:
-
-      ```
-      $> opam install depext depext-cygwinports
-      $> opam depext easycrypt
-      ```
-
-  4. Install EasyCrypt's dependencies:
-
-      ```
-      $> opam install --deps-only easycrypt
-      $> opam install alt-ergo
-      ```
-
-  5. You can download extra provers at the following URLs:
-
-     * Z3: [https://github.com/Z3Prover/z3]
-     * CVC4: [https://cvc4.github.io/]
-
-
-Via NIX
---------------------------------------------------------------------
+## Via NIX
 
 First, install the [Nix package manager](https://nixos.org/) by
 following [these instructions](https://nixos.org/manual/nix/stable/#chap-installation).
@@ -536,26 +478,38 @@ These will install all the required dependencies, a set of provers and
 will then drop you into a shell. From there, simply run `make` to
 compile EasyCrypt.
 
-Note on Prover Versions
---------------------------------------------------------------------
+## From Scratch
 
-Why3 and SMT solvers are independent pieces of software with their
-own version-specific interactions. Obtaining a working SMT setup may
-require installing specific versions of some of the provers.
+### Installing EasyCrypt's Dependencies
 
-At the time of writing, we depend on Why3 1.7.x, which supports the
-following prover versions:
+EasyCrypt uses the following third-party tools/libraries:
 
- * Alt-Ergo 2.5.2
- * CVC4 1.8
- * CVC5 1.0.8
- * Z3 4.12.x
+ * OCaml, version >= 4.08
 
-`alt-ergo` can be installed using opam, if you do you can use pins to
-select a specific version (e.g, `opam pin alt-ergo 2.5.2`).
+     Available at https://ocaml.org/
 
-Installing/Compiling EasyCrypt
-====================================================================
+ * OCamlbuild
+
+ * Why3, version 1.8
+
+     Available at <http://why3.lri.fr/>
+
+     Why3 must be installed with a set a provers.
+     See <http://why3.lri.fr/#provers>
+
+     Why3 libraries must be installed (make byte && make install-lib)
+
+ * Menhir <http://gallium.inria.fr/~fpottier/menhir/>
+
+ * OCaml Batteries Included <http://batteries.forge.ocamlcore.org/>
+
+ * OCaml PCRE (>= 7) <https://github.com/mmottl/pcre-ocaml>
+
+ * OCaml Zarith <https://forge.ocamlcore.org/projects/zarith>
+
+ * OCaml ini-files <http://archive.ubuntu.com/ubuntu/pool/universe/o/ocaml-inifiles/>
+
+### Installing EasyCrypt From Source
 
 If installing from source, running
 
@@ -578,15 +532,32 @@ $> opam install easycrypt
 installs EasyCrypt and its dependencies via opam. In that case, the
 EasyCrypt binary is named `easycrypt`.
 
-Configuring Why3
-====================================================================
+# Why3 and SMT Solvers
 
-Initially, and after the installation/removal/update of SMT provers,
-you need to (re)configure Why3 via the following `easycrypt` command:
+Why3 and SMT solvers are independent pieces of software with their
+own version-specific interactions. Obtaining a working setup may
+require installing specific versions of some of the solvers.
+
+## Compatibility
+At the time of writing, we depend on Why3 1.8, which supports the
+following SMT solvers.
+
+- Alt-Ergo 2.5.2
+- CVC4 1.8
+- CVC5 1.0.8
+- Z3 4.12.X
+
+`alt-ergo` can be installed using opam, if you do you can use pins to
+select a specific version (e.g, `opam pin alt-ergo 2.5.2`).
+
+## Configuring Why3
+After the installation, removal, and/or update of SMT provers you plan to use
+with EasyCrypt, you should (re)configure Why3 by running the following:
 
 ```
-$> easycrypt why3config
+easycrypt why3config
 ```
+
 
 EasyCrypt stores the Why3 configuration file under
 
@@ -604,13 +575,27 @@ $> easycrypt -why3 $WHY3CONF.conf
 
 where `$WHY3CONF` must be replaced by some custom location.
 
-Proof General Front-End
+# Front-Ends
 ====================================================================
+
+While using EasyCrypt directly from the command line can be sufficient for
+verifying existing proof scripts, it's highly recommended to install a suitable front-end
+when engaging in anything more than that (even for simply inspecting and interacting
+with proof scripts). At present, the only available front-end is based on Emacs's
+[Proof General](https://github.com/ProofGeneral/PG).
+However, a front-end for VSCode is currently in development.
+
+## Proof-General
 
 EasyCrypt mode has been integrated upstream. Please, go
 to <https://github.com/ProofGeneral/PG> and follow the instructions.
 
-Examples
+## VSCode
+
+Coming soon.
+
+
+# Examples
 ====================================================================
 
 Examples of how to use EasyCrypt are in the `examples` directory. You
