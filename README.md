@@ -49,7 +49,9 @@ There are multiple ways of installing EasyCrypt and its [dependencies](#dependen
 The recommended way is by simply installing everything
 [via OPAM](#via-opam-recommended), a package manager for OCaml (the programming
 language in which EasyCrypt is written). Other installation methods we cover here
-are [via NIX](#via-nix) and [from source](#from-source).
+are [via NIX](#via-nix) and [from source](#from-source). Whichever installation
+method you choose, don't forget to do the [(post-installation)
+setup and configuration](#setup-and-configuration)!
 
 ## Via OPAM (Recommended)
 
@@ -412,7 +414,8 @@ you do not have to do this.*
 
 <details>
 
-<summary>OPAM version <2.1</summary>
+<summary>Installing System Dependencies with OPAM version <2.1</summary>
+
 First, install OPAM's "system dependency manager plugin" by
 running the following command.
 
