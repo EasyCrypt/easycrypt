@@ -125,6 +125,8 @@ pacman -S opam
 
 Once OPAM has been installed, move on to [initialize it](#initialization).
 
+</details>
+
 <details>
 
 <summary>Fedora/OpenSUSE</summary>
