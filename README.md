@@ -77,7 +77,7 @@ Use at your own risk.
    1. [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch)
    by running `opam switch --empty create <switch-name>`.
    (Alternatively, you can run `opam switch create <switch-name> <compiler-version>` to pick a dedicated
-   compiler version to be used for the switch instead of having OPAM pick on itself
+   compiler version to be used for the switch instead of having OPAM pick one
    during the installation of EasyCrypt's dependencies.)
    2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch)
    by running `opam switch set <switch-name>`.
