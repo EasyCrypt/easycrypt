@@ -107,9 +107,9 @@ for OPAM](https://opam.ocaml.org/doc/Install.html) and
 If you have any problems, make sure to check out those guides first.*
 
 On most operating systems, the recommended way of installing OPAM is by using the
-package manager; [we cover this approach first](#using-the-package-manager).
+package manager; [we'll cover this approach first](#using-the-package-manager).
 Alternatively, OPAM provides a script that automatically installs the latest binary distribution for
-your system; [we cover this approach second](#using-opams-script).
+your system; [we'll cover this approach second](#using-opams-script).
 (For even more possible alternatives, consult the [official installation guide
 for OPAM](https://opam.ocaml.org/doc/Install.html#Using-your-system-39-s-package-manager))
 
