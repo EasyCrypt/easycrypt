@@ -15,16 +15,12 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
 ## Table of Contents
 
----
-
 * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
     * [Table of Contents](#table-of-contents)
 * [Installation](#installation)
     * [Via OPAM (Recommended)](#via-opam-recommended)
         * [Quick and Dirty](#quick-and-dirty)
         * [Installing and Initializing OPAM](#installing-and-initializing-opam)
-            * [Using the Package Manager](#using-the-package-manager)
-            * [Using OPAM's script](#using-opams-script)
         * [Installing EasyCrypt's Dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
         * [Installing EasyCrypt via OPAM](#installing-easycrypt-via-opam)
     * [Via NIX](#via-nix)
