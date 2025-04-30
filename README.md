@@ -82,9 +82,10 @@ Use at your own risk.
 3. Optional, but recommended:
    1. [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch)
    by running `opam switch create <switch-name> <compiler-version>`.
-   (The compiler version may be left out if the default one suffices, i.e., has a version >=4.08.)
+   (You can also leave out the compiler version and run `opam switch --empty create <switch-name>` instead.)
    2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch)
-   by running `opam switch <switch-name>`.
+   by running `opam switch set <switch-name>`.
+   (Make sure to read the output and follow the instructions!)
 4. Add EasyCrypt's OPAM package by running
 `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`
 5. Install EasyCrypt's dependencies by running `opam install --deps-only easycrypt`.
@@ -369,33 +370,40 @@ Once the script has finished running *and* you have read and followed its instru
 
 ### Installing EasyCrypt's Dependencies via OPAM
 
-If you followed the instructions [above](#installing-and-initializing-opam) (and didn't
-deviate from the defaults), you should have a working OPAM installation containing a
-single [switch](https://ocaml.org/docs/opam-switch-introduction). A switch is
-OPAM's take on an isolated environment, similar to Python's `virtualenv`.
+At this stage, you should have a working OPAM installation which, by default,
+contains a single [switch](https://ocaml.org/docs/opam-switch-introduction).[^1]
+A switch is OPAM's take on an isolated environment, similar to Python's `virtualenv`.
+
+[^1]: This should, e.g., be the case if you followed [our installation and initialization
+instructions](#installing-and-initializing-opam) and didn't
+deviate from the defaults.
 
 To ensure nothing interferes with your EasyCrypt installation (and your EasyCrypt
 installation doesn't interfere with anything else!),
-you can create a dedicated switch called `easycrypt` by issuing the following command
-in a terminal. (Optionally, you can specify a specific OCaml compiler to be used
-for the switch by appending the compiler identifier to the command; you can
-list the available compilers by issuing `opam switch list-available`.
-The default compiler should be fine though.)
+you can create a dedicated switch called `easycrypt` by running the following command.
+(Optionally, you can specify a specific OCaml compiler to be used
+for the switch by appending the compiler version to the command and leaving out the
+`--empty` option; you can list the available compilers by
+issuing `opam switch list-available`.)
 
 ```
-opam switch create easycrypt
+opam switch --empty create easycrypt
 ```
 
 Then, activate the switch by issuing the following command.
 
 ```
-opam switch easycrypt
+opam switch set easycrypt
 ```
 
-(You can check which switch is currently activated by issuing `opam switch list`.
-The currently activated switch will have an arrow in the left-most column of the output.)
+These commands might inform/prompt you about properly setting up
+the environment. Make sure to read the output and follow
+the instructions!
 
-Once you have activated the switch dedicated to EasyCrypt, issue the following
+(You can check which switch is currently active by issuing `opam switch list`.
+The currently active switch will have an arrow in the left-most column of the output.)
+
+Once you have activated the switch dedicated to EasyCrypt, run the following
 command to add the EasyCrypt package.
 
 ```
@@ -406,7 +414,7 @@ The next step will install all of EasyCrypt's (missing) dependencies.
 OPAM can both recognize and install everything automatically, including
 potentially missing system dependencies, but might need some additional
 setup depending on the version. To find out which version of OPAM you have,
-issue the following command.
+run the following command.
 
 ```
 opam --version
@@ -474,9 +482,9 @@ Common solvers that are
 Having installed all of EasyCrypt's dependencies (and some suitable
 SMT solver(s)), you might actually still consider [installing EasyCrypt from
 source](#installing-easycrypt-from-source), even if you
-did all the rest via OPAM. The main reason for doing so is that this gives you
+did the rest via OPAM. The main reason for doing so is that this gives you
 more control over the version of EasyCrypt you use, as OPAM always installs
-the most development version.
+the most recent development version.
 If this increase in control is something you want, disregard this section and
 proceed to [the section on installing EasyCrypt from source](#installing-easycrypt-from-source).
 Otherwise, install EasyCrypt (via OPAM) by running the following command.
