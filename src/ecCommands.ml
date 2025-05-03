@@ -904,6 +904,11 @@ let addnotifier (notifier : notifier) =
   ignore (EcGState.add_notifier notifier gstate)
 
 (* -------------------------------------------------------------------- *)
+let notify (level : EcGState.loglevel) fmt =
+  assert (EcUtils.is_some !context);
+  EcScope.notify (oget !context).ct_root level fmt
+
+(* -------------------------------------------------------------------- *)
 let current () =
   (oget !context).ct_current
 
