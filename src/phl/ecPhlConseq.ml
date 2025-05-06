@@ -1164,10 +1164,10 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       Some ((_, f2) as nf2),
       Some ((_, f3) as nf3)
     ->
-    let subst1 = Fsubst.f_subst_mem mhr mleft in
-    let subst2 = Fsubst.f_subst_mem mhr mright in
     let hs2    = pf_as_hoareF !!tc f2 in
     let hs3    = pf_as_hoareF !!tc f3 in
+    let subst1 = Fsubst.f_subst_mem hs2.hf_m mleft in
+    let subst2 = Fsubst.f_subst_mem hs3.hf_m mright in
     let pre    = f_ands [ef.ef_pr; subst1 hs2.hf_pr; subst2 hs3.hf_pr] in
     let post   = f_ands [ef.ef_po; subst1 hs2.hf_po; subst2 hs3.hf_po] in
     let tac    = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
@@ -1183,12 +1183,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* ------------------------------------------------------------------ *)
   (* equivF / ? / ? / ⊥                                                 *)
   | FequivF ef, Some _, Some _, None ->
+    (*let mhr = EcIdent.create "&foo" in*)
     let f3 = f_hoareF mhr f_true ef.ef_fr f_true in
     t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
 
   (* ------------------------------------------------------------------ *)
   (* equivF / ? / ⊥ / ?                                                 *)
   | FequivF ef, Some _, None, Some _ ->
+    (*let mhr = EcIdent.create "&foo" in*)
     let f2 = f_hoareF mhr f_true ef.ef_fl f_true in
     t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
@@ -1383,6 +1385,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
 
       | FequivF ef ->
         let f = sideif side ef.ef_fl ef.ef_fr in
+        (*let mhr = EcIdent.create "&foo" in*) (*Doing this makes conseq fail to eliminate first goal*)
         let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
@@ -1392,6 +1395,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
       | FequivS es ->
         let f = sideif side es.es_sl es.es_sr in
         let m = sideif side es.es_ml es.es_mr in
+        (*let mhr = EcIdent.create "&foo" in*)
         let m = (mhr, snd m) in
         let env = LDecl.push_active m hyps in
         let fmake pre post c_or_bd =
