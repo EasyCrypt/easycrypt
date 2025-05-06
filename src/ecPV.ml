@@ -187,7 +187,10 @@ module PVM = struct
         check_binding (fst es.es_ml) s;
         check_binding (fst es.es_mr) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FbdHoareF _ ->
+      | FhoareF hf ->
+        check_binding hf.hf_m s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FbdHoareF _ ->
         check_binding EcFol.mhr s;
         EcFol.f_map (fun ty -> ty) aux f
       | FhoareS hs ->

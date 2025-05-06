@@ -1925,7 +1925,7 @@ and pp_form_core_r
     end
 
   | FhoareF hf ->
-      let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
+      let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
@@ -1941,7 +1941,7 @@ and pp_form_core_r
         (pp_form ppe) hs.hs_po
 
   | FeHoareF hf ->
-      let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.ehf_f ppe.PPEnv.ppe_env in
+      let mepr, mepo = EcEnv.Fun.hoareF_memenv mhr hf.ehf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       Format.fprintf fmt
@@ -1993,7 +1993,7 @@ and pp_form_core_r
         (pp_form ppepo) eg.eg_po
 
   | FbdHoareF hf ->
-      let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.bhf_f ppe.PPEnv.ppe_env in
+      let mepr, mepo = EcEnv.Fun.hoareF_memenv mhr hf.bhf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
@@ -2942,7 +2942,7 @@ let pp_post (ppe : PPEnv.t) ?prpo fmt post =
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
-  let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
+  let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
@@ -2967,7 +2967,7 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
 
 (* -------------------------------------------------------------------- *)
 let pp_eHoareF (ppe : PPEnv.t) ?prpo fmt hf =
-  let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.ehf_f ppe.PPEnv.ppe_env in
+  let mepr, mepo = EcEnv.Fun.hoareF_memenv mhr hf.ehf_f ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
@@ -2999,7 +2999,7 @@ let string_of_hrcmp = function
 
 (* -------------------------------------------------------------------- *)
 let pp_bdhoareF (ppe : PPEnv.t) ?prpo fmt hf =
-  let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.bhf_f ppe.PPEnv.ppe_env in
+  let mepr, mepo = EcEnv.Fun.hoareF_memenv mhr hf.bhf_f ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 

@@ -22,7 +22,7 @@ let t_bdhoare_ppr_r tc =
   let bhf = tc1_as_bdhoareF tc in
   let f_xpath = bhf.bhf_f in
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
-  let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
+  let penv,_qenv = EcEnv.Fun.hoareF_memenv mhr f_xpath env in
   let m = EcIdent.create "&m" in
   let args = to_args fun_ (f_pvarg fun_.f_sig.fs_arg m) in
   (* Warning: currently no substitution on pre,post since penv is always mhr *)
@@ -99,7 +99,7 @@ let t_prbounded_r conseq tc =
   let (m, pr, po, cmp, bd) =
     match concl.f_node with
     | FbdHoareF hf ->
-        let m = fst (Fun.hoareF_memenv hf.bhf_f env) in
+        let m = fst (Fun.hoareF_memenv mhr hf.bhf_f env) in
           (m, hf.bhf_pr, hf.bhf_po, hf.bhf_cmp, hf.bhf_bd)
 
     | FbdHoareS hf ->
