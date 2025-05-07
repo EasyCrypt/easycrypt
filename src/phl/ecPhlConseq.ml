@@ -926,6 +926,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       as_seq4 (LDecl.fresh_ids (FApi.tc1_hyps tc) ["&m";"_";"_";"_"]) in
     let pre    = f_and hs.bhs_pr hs2.hs_pr in
     let mpre   = Fsubst.f_subst_mem mhr m pre in
+    (*let mpre   = Fsubst.f_subst_mem (fst hs2.hs_m) m mpre in*)
     let post1  = hs0.bhs_po in
     let post   = hs.bhs_po in
     let posta  = f_and post hs2.hs_po in
@@ -1183,14 +1184,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* ------------------------------------------------------------------ *)
   (* equivF / ? / ? / ⊥                                                 *)
   | FequivF ef, Some _, Some _, None ->
-    (*let mhr = EcIdent.create "&foo" in*)
+    let mhr = EcIdent.create "&foo" in
     let f3 = f_hoareF mhr f_true ef.ef_fr f_true in
     t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
 
   (* ------------------------------------------------------------------ *)
   (* equivF / ? / ⊥ / ?                                                 *)
   | FequivF ef, Some _, None, Some _ ->
-    (*let mhr = EcIdent.create "&foo" in*)
+    let mhr = EcIdent.create "&foo" in
     let f2 = f_hoareF mhr f_true ef.ef_fl f_true in
     t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
@@ -1378,6 +1379,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
                      | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
                      | _ -> bhf.bhf_f, bhf.bhf_pr, bhf.bhf_po
         in
+        (*let mhr = EcIdent.create "&foo" in*)
         let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd; f_hoareF mhr pre f post in
@@ -1385,7 +1387,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
 
       | FequivF ef ->
         let f = sideif side ef.ef_fl ef.ef_fr in
-        (*let mhr = EcIdent.create "&foo" in*) (*Doing this makes conseq fail to eliminate first goal*)
+        let mhr = EcIdent.create "&foo" in
         let penv, qenv = LDecl.hoareF mhr f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
@@ -1395,7 +1397,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
       | FequivS es ->
         let f = sideif side es.es_sl es.es_sr in
         let m = sideif side es.es_ml es.es_mr in
-        (*let mhr = EcIdent.create "&foo" in*)
+        let mhr = EcIdent.create "&foo" in
         let m = (mhr, snd m) in
         let env = LDecl.push_active m hyps in
         let fmake pre post c_or_bd =
