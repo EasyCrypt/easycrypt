@@ -865,23 +865,20 @@ proof.
   smt (ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
 qed.
 
-realize ofpairK.
-proof.
-  move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite Block.block_of_bytesdK.
-  + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
-  by rewrite
-       take_size_cat 1:TPoly.bytes_of_polyP 1:// drop_size_cat
-       1:TPoly.bytes_of_polyP 1:// TPoly.bytes_of_polyKd
-       Extra_block.bytes_of_extra_blockKd.
-qed.
-
 realize sample_spec.
 proof.
+  have ofpairK : cancel ofpair topair.
+  + move=> [x1 x2]; rewrite /topair /ofpair /=.
+    rewrite Block.block_of_bytesdK.
+    + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
+    by rewrite
+         take_size_cat 1:TPoly.bytes_of_polyP 1:// drop_size_cat
+         1:TPoly.bytes_of_polyP 1:// TPoly.bytes_of_polyKd
+         Extra_block.bytes_of_extra_blockKd.
   move=> _; rewrite /dblock; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly `*` dextra_block) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK ofpairK).
+  + congr; apply fun_ext; smt (topairK).
   rewrite dprod1E (_:block_size = poly_size + extra_block_size) //.
   rewrite dlist_add 1:ge0_poly_size 1:ge0_extra_block_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].
@@ -936,23 +933,20 @@ proof.
   smt (ge0_poly_in_size ge0_poly_out_size).
 qed.
 
-realize ofpairK.
-proof.
-  move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite TPoly.poly_of_bytesdK.
-  + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
-  by rewrite
-       take_size_cat 1:Poly_in.bytes_of_poly_inP 1:// drop_size_cat
-       1:Poly_in.bytes_of_poly_inP 1:// Poly_in.bytes_of_poly_inKd
-       Poly_out.bytes_of_poly_outKd.
-qed.
-
 realize sample_spec.
 proof.
+  have ofpairK : cancel ofpair topair.
+  + move=> [x1 x2]; rewrite /topair /ofpair /=.
+    rewrite TPoly.poly_of_bytesdK.
+    + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
+    by rewrite
+         take_size_cat 1:Poly_in.bytes_of_poly_inP 1:// drop_size_cat
+         1:Poly_in.bytes_of_poly_inP 1:// Poly_in.bytes_of_poly_inKd
+         Poly_out.bytes_of_poly_outKd.
   move=> _; rewrite /dpoly; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly_in `*` dpoly_out) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK ofpairK).
+  + congr; apply fun_ext; smt (topairK).
   rewrite dprod1E (_:poly_size = poly_in_size + poly_out_size) //.
   rewrite dlist_add 1:ge0_poly_in_size 1:ge0_poly_out_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].

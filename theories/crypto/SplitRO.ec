@@ -88,7 +88,6 @@ op topair : to -> to1 * to2.
 op ofpair : to1 * to2 -> to.
 
 axiom topairK: cancel topair ofpair.
-axiom ofpairK: cancel ofpair topair.
 
 op sampleto1 : from -> to1 distr.
 op sampleto2 : from -> to2 distr.
@@ -153,15 +152,19 @@ section PROOFS.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
     seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      outline {2} [1 .. 2] ~ S.sample2.
-      rewrite equiv[{2} 1 -sample_sample2].
-      inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
-      + by move=> ??; rewrite ofpairK. 
-      move=> _; split.
-      + move=> [t1 t2]?; rewrite sample_spec dmap1E; congr; apply fun_ext => p. 
-        by rewrite /pred1 /(\o) (can_eq _ _ ofpairK).
-      move=> _ t; rewrite sample_spec supp_dmap => -[[t1 t2] []] + ->>.
-      by rewrite topairK ofpairK => ->.
+      alias{2} 2 one = 1. swap{2} 2 1.
+      alias{2} 3 rr = ofpair (r, r0).
+      kill{2} 4 ! 1; first by auto.
+      transitivity{2}
+        {
+          r <$ sampleto1 x;
+          r0 <$ sampleto2 x;
+          rr <- ofpair (r, r0);
+        }
+        (={x} /\ (x0 = x /\ x1 = x){2} ==> r{1} = rr{2})
+        (={x} /\ (x0 = x /\ x1 = x){2} ==> rr{1} = ofpair(r, r0){2}); 1,2,4: by auto => /#.
+      rndsem*{2} 0.
+      auto => *. rewrite -dmap_dprodE sample_spec. by smt().
     by auto => />; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
   qed.
 
@@ -178,7 +181,7 @@ section PROOFS.
       by rewrite /pair_map merge_empty // map_empty /= => ?; rewrite !mem_empty. 
     + by conseq RO_get.
     + by proc; inline *; auto => />;
-       smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE ofpairK topairK).
+       smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE topairK).
     + by proc; inline *; auto; smt (map_rem rem_merge mem_map mem_pair_map mem_rem).
     + proc *.
       inline {1} 1.
