@@ -454,7 +454,7 @@ let add_adv env sign mv ff (st:local_state) =
     let sup = sup env ff in
     push st (mem true mv sup)
   else
-    let ff =
+    let ff' =
       let a = m_functor ff.ff_xp.x_top in
       let me, _ = Mod.by_mpath a env in
       match me.me_body with
@@ -465,7 +465,8 @@ let add_adv env sign mv ff (st:local_state) =
           xpath (m_apply a args) ff.ff_xp.x_sub in
         { ff_params = mty.mt_params; ff_xp = xp }
     in
-    set_mem sign mv ff st
+
+    set_mem sign mv ff' st
 
 let rec solve (env : env) (st : local_state) =
   if st.unsat then (Format.printf "UNSAT@."; ())

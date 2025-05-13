@@ -25,6 +25,8 @@ val module_uses : env -> mpath -> module_type option -> functor_params * EcModul
 
 val norm_globs_restrs : env -> form -> form
 
+val sup : env -> functor_fun -> mem_restr
+
 val equal    : env -> mem_restr -> mem_restr -> bool
 val subset   : env -> mem_restr -> mem_restr -> bool
 val disjoint : env -> mem_restr -> mem_restr -> bool

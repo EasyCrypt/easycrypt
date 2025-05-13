@@ -827,7 +827,7 @@ let pp_alias_clash env fmt = function
       let ppe = EcPrinting.PPEnv.ofenv env in
       Format.fprintf fmt
         "The module %a can write %a (maybe add restriction %a)"
-        (EcPrinting.pp_topmod ppe) mp
+        (EcPrinting.pp_functorfun ppe) mp
         (EcPrinting.pp_pv ppe) (pv_glob npv)
         (EcPrinting.pp_topmod ppe) top
 
@@ -835,12 +835,12 @@ let pp_alias_clash env fmt = function
     let ppe = EcPrinting.PPEnv.ofenv env in
     Format.fprintf fmt
       "The module %a can write %a (add restriction %a to %a, or %a to %a)"
-      (EcPrinting.pp_topmod ppe) mp
-      (EcPrinting.pp_topmod ppe) mp'
-      (EcPrinting.pp_topmod ppe) mp
-      (EcPrinting.pp_topmod ppe) mp'
-      (EcPrinting.pp_topmod ppe) mp'
-      (EcPrinting.pp_topmod ppe) mp
+      (EcPrinting.pp_functorfun ppe) mp
+      (EcPrinting.pp_functorfun ppe) mp'
+      (EcPrinting.pp_functorfun ppe) mp
+      (EcPrinting.pp_functorfun ppe) mp'
+      (EcPrinting.pp_functorfun ppe) mp'
+      (EcPrinting.pp_functorfun ppe) mp
 
 (* -------------------------------------------------------------------- *)
 module RedError : sig

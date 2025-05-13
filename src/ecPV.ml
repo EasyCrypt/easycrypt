@@ -7,16 +7,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
-
-open EcMaps
-
-module FFun = MakeMSH (struct
-  type t  = functor_fun
-  let tag = EcAst.ff_hash
-end)
-
-module Mff = FFun.M
-module Sff = FFun.S
+open EcCoreMemRestr
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
@@ -69,7 +60,7 @@ module Mpv = struct
   let empty = { s_pv = Mnpv.empty; s_gl = Mff.empty }
 
   let check_npv_mp env npv ff restr =
-    if EcMemRestr.is_mem env true npv restr then
+    if not (EcMemRestr.is_mem env false npv restr) then
       raise (AliasClash (env,AC_concrete_abstract(ff,npv)))
 
   let check_npv env npv m =
@@ -521,15 +512,13 @@ let rec f_write_r ?(except=Sx.empty) env w f =
     let mp = get_abs_functor f in
     List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
 
-  | FBdef fdef -> assert false
-  (*
+  | FBdef fdef ->
       let add x w =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty w in
-      List.fold_left folder
-        (EcPath.Sx.fold add fdef.f_uses.us_writes w )
+      Sx.fold_left folder
+        (EcPath.Sx.fold add fdef.f_uses.us_writes w)
         fdef.f_uses.us_calls
-    *)
 
 and is_write_r ?(except=Sx.empty) env w s =
   List.fold_left (i_write_r ~except env) w s
@@ -577,14 +566,12 @@ let rec f_read_r env r f =
       let mp = get_abs_functor f in
       List.fold_left (f_read_r env) (PV.add_glob env mp r) (OI.allowed oi)
 
-  | FBdef fdef -> assert false
-  (*
+  | FBdef fdef ->
       let add x r =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty r in
       let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
-      List.fold_left (f_read_r env) r fdef.f_uses.us_calls
-        *)
+      Sx.fold_left (f_read_r env) r fdef.f_uses.us_calls
 
 let rec e_read_r env r e =
   match e.e_node with
@@ -647,12 +634,12 @@ exception EqObsInError
 module Mpv2 = struct
   type t = {
     s_pv : (Snpv.t * ty) Mnpv.t;
-    s_gl : Sm.t;
+    s_gl : Sff.t
   }
 
   type local = EcIdent.t EcIdent.Mid.t
 
-  let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
+  let empty = { s_pv = Mnpv.empty; s_gl = Sff.empty }
   let empty_local = EcIdent.Mid.empty
 
   let add env ty pv1 pv2 eqs =
@@ -666,7 +653,8 @@ module Mpv2 = struct
           | Some(s,ty) -> Some (Snpv.add pv2 s, ty))
           pv1 eqs.s_pv }
 
-  let add_glob env mp1 mp2 eqs =
+  let add_glob env mp1 mp2 eqs = assert false
+  (*
     let mp1, mp2 = NormMp.norm_mpath env mp1, NormMp.norm_mpath env mp2 in
     (* FIXME error message *)
     if not (EcPath.m_equal mp1 mp2) then assert false;
@@ -675,7 +663,8 @@ module Mpv2 = struct
     | `Local _ -> ()
     | _ -> assert false
     end;
-    { eqs with s_gl = Sm.add mp1 eqs.s_gl }
+    { eqs with s_gl = Sff.add mp1 eqs.s_gl }
+    *)
 
 
   let remove env pv1 pv2 eqs =
@@ -690,28 +679,30 @@ module Mpv2 = struct
           if Snpv.is_empty s then None else raise EqObsInError)
           pv1 eqs.s_pv }
 
-  let remove_glob mp eqs =
+  let remove_glob mp eqs = assert false
+    (*
     begin match mp.m_top with
     | `Local _ -> ()
     | _ -> assert false
     end;
     { eqs with
       s_gl = Sm.remove mp eqs.s_gl }
+*)
 
   let union eqs1 eqs2 =
     { s_pv =
         Mnpv.union (fun _ (s1,ty) (s2,_) -> Some (Snpv.union s1 s2, ty))
           eqs1.s_pv eqs2.s_pv;
-      s_gl = Sm.union eqs1.s_gl eqs2.s_gl }
+      s_gl = Sff.union eqs1.s_gl eqs2.s_gl }
 
   let subset eqs1 eqs2 =
     Mnpv.submap (fun _ (s1,_) (s2,_) ->
       Snpv.subset s1 s2) eqs1.s_pv eqs2.s_pv &&
-    Sm.subset eqs1.s_gl eqs2.s_gl
+    Sff.subset eqs1.s_gl eqs2.s_gl
 
   let equal eqs1 eqs2 =
     Mnpv.equal (fun (s1,_) (s2,_) -> Snpv.equal s1 s2) eqs1.s_pv eqs2.s_pv &&
-    Sm.equal eqs1.s_gl eqs2.s_gl
+    Sff.equal eqs1.s_gl eqs2.s_gl
 
   let is_mod_pv env pv mod_ = assert false
     (*
@@ -747,7 +738,7 @@ module Mpv2 = struct
               Snpv.filter (fun pvr -> not (is_mod_pv env pvr modr)) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl =
-        Sm.filter
+        Sff.filter
           (fun m -> not (is_mod_mp env m modl) && not (is_mod_mp env m modr))
           eqo.s_gl }
 
@@ -760,7 +751,7 @@ module Mpv2 = struct
               Snpv.filter (fun pvr -> is_mod_pv env pvr modr) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl =
-        Sm.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modr)
+        Sff.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modr)
           eqo.s_gl }
 
   let subst_l env xl x eqs =
@@ -938,25 +929,25 @@ module Mpv2 = struct
     try Snpv.mem x2 (fst (Mnpv.find x1 t.s_pv))
     with Not_found -> false
 
-  let mem_glob m t = Sm.mem m t.s_gl
+  let mem_glob m t = Sff.mem m t.s_gl
 
   let iter fv fg t =
     Mnpv.iter (fun x1 (s,ty) -> Snpv.iter (fun x2 -> fv x1 x2 ty) s) t.s_pv;
-    Sm.iter fg t.s_gl
+    Sff.iter fg t.s_gl
 
   let eq_fv2 t =
     let pv = ref Mnpv.empty in
     let fv _ x2 ty = pv := Mnpv.add x2 (Snpv.singleton x2, ty) !pv in
-    let gl = ref Sm.empty in
-    let fg m = gl := Sm.add m !gl in
+    let gl = ref Sff.empty in
+    let fg m = gl := Sff.add m !gl in
     iter fv fg t;
     { s_pv = !pv; s_gl = !gl }
 
   let fv2 t =
     let pv = ref Mnpv.empty in
     let fv _ x2 ty = pv := Mnpv.add x2 ty !pv in
-    let gl = ref Sm.empty in
-    let fg m = gl := Sm.add m !gl in
+    let gl = ref Sff.empty in
+    let fg m = gl := Sff.add m !gl in
     iter fv fg t;
     { PV.s_pv = !pv; PV.s_gl = !gl }
 
@@ -964,9 +955,9 @@ module Mpv2 = struct
     let pv = ref Mnpv.empty in
     let fx x ty = pv := Mnpv.add x (Snpv.singleton x, ty) !pv in
     Mnpv.iter fx fv.PV.s_pv;
-    let gl = ref Sm.empty in
-    let fg m = gl := Sm.add m !gl in
-    Sm.iter fg fv.PV.s_gl;
+    let gl = ref Sff.empty in
+    let fg m = gl := Sff.add m !gl in
+    Sff.iter fg fv.PV.s_gl;
     { s_pv = !pv; s_gl = !gl }
 
 (*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the

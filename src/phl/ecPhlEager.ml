@@ -86,7 +86,7 @@ let pf_compat pf env modS modS' eqR eqIs eqXs =
         let ppe = EcPrinting.PPEnv.ofenv env in
         Format.fprintf fmt
           "equality of %a should be ensured by the swapping statement"
-          (EcPrinting.pp_topmod ppe) m)
+          (EcPrinting.pp_functorfun ppe) m)
 
   in
     Mpv2.iter check_pv check_glob eqR

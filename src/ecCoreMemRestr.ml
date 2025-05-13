@@ -1,6 +1,15 @@
 open EcIdent
 open EcPath
 open EcAst
+open EcMaps
+
+module FFun = MakeMSH (struct
+  type t  = functor_fun
+  let tag = EcAst.ff_hash
+end)
+
+module Mff = FFun.M
+module Sff = FFun.S
 
 let mr_empty = Empty
 let mr_full = All

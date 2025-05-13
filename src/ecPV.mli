@@ -6,11 +6,13 @@ open EcModules
 open EcMemory
 open EcEnv
 open EcFol
+open EcAst
+open EcCoreMemRestr
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * xpath
- | AC_abstract_abstract of mpath * mpath
+ | AC_concrete_abstract of Sff.elt * xpath
+ | AC_abstract_abstract of Sff.elt * Sff.elt
 
 exception AliasClash of env * alias_clash
 
@@ -36,19 +38,19 @@ module Mpv : sig
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 
-  val check_glob : env -> mpath -> ('a,'b) t -> unit
+  val check_glob : env -> functor_fun -> ('a,'b) t -> unit
 
   val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
 
   val remove : env -> prog_var -> ('a,'b) t -> ('a,'b) t
 
-  val add_glob : env -> mpath -> 'b -> ('a,'b) t -> ('a,'b) t
+  val add_glob : env -> functor_fun -> 'b -> ('a,'b) t -> ('a,'b) t
 
   val find : env -> prog_var -> ('a,'b) t -> 'a
 
   val mem : env -> prog_var -> ('a,'b) t -> bool
 
-  val find_glob : env -> mpath -> ('a,'b) t -> 'b
+  val find_glob : env -> functor_fun -> ('a,'b) t -> 'b
 
   val esubst : env -> (expr, unit) t -> expr -> expr 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
@@ -66,7 +68,7 @@ module PVM : sig
 
   val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
 
-  val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
+  val add_glob : env -> functor_fun -> EcIdent.t -> form -> subst -> subst
 
   val of_mpv : (form,form) Mpv.t -> EcIdent.t -> subst
 
@@ -85,7 +87,7 @@ module PV : sig
 
   val is_empty : t -> bool
 
-  val pick : t -> [`Global of mpath | `PV of prog_var] option
+  val pick : t -> [`Global of functor_fun | `PV of prog_var] option
 
   val add      : env -> prog_var -> ty -> t -> t
   val add_glob : env -> mpath -> t -> t
@@ -96,18 +98,18 @@ module PV : sig
 
   val interdep     : env -> t -> t -> t
   val indep        : env -> t -> t -> bool
-  val check_depend : env -> t -> mpath -> unit
-  val elements     : t -> (prog_var * ty) list * mpath list
-  val ntr_elements : t -> (prog_var * ty) list * mpath list
+  val check_depend : env -> t -> functor_fun -> unit
+  val elements     : t -> (prog_var * ty) list * functor_fun list
+  val ntr_elements : t -> (prog_var * ty) list * functor_fun list
 
   val mem_pv   : env -> prog_var -> t -> bool
-  val mem_glob : env -> mpath -> t -> bool
+  val mem_glob : env -> functor_fun -> t -> bool
 
   val fv : env -> EcMemory.memory -> form -> t
 
   val pp : env -> Format.formatter -> t -> unit
 
-  val iter : (prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
+  val iter : (prog_var -> ty -> unit) -> (functor_fun -> unit) -> t -> unit
 
   val check_notmod : EcEnv.env -> EcTypes.prog_var -> t -> bool
 end
@@ -174,12 +176,12 @@ module Mpv2 : sig
   (* [mem x1 x2 eq] return true if (x1,x2) is in eq.
      x1 and x2 are assumed in normal form *)
   val mem : prog_var -> prog_var -> t -> bool
-  val mem_glob : mpath -> t -> bool
+  val mem_glob : functor_fun -> t -> bool
 
   (* [iter fpv fabs eq] iterate fpv and fabs on all pair contained in eq.
      The argument given to both function are in normal form *)
   val iter :
-    (prog_var -> prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
+    (prog_var -> prog_var -> ty -> unit) -> (functor_fun -> unit) -> t -> unit
 
   val eq_refl : PV.t -> t
   val fv2 : t -> PV.t

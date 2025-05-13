@@ -308,8 +308,8 @@ and f_eqobs_in fl fr sim eqO =
             let inv = Mpv2.to_form mleft mright eqi sim.sim_inv in
             let fvl = PV.fv env mleft inv in
             let fvr = PV.fv env mright inv in
-            PV.check_depend env fvl topl;
-            PV.check_depend env fvr topr
+            assert false; (* PV.check_depend env fvl topl; *)
+            assert false; (* PV.check_depend env fvr topr; *)
           with TcError _ -> raise EqObsInError
         end;
         sim, (Mpv2.add_glob env top top eqi)

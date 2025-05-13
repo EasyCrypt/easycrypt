@@ -42,7 +42,7 @@ let t_kill_r side cpos olen tc =
       let ppe = EcPrinting.PPEnv.ofenv env in
         fun fmt x ->
           match x with
-          | `Global p -> EcPrinting.pp_topmod ppe fmt p
+          | `Global p -> EcPrinting.pp_functorfun ppe fmt p
           | `PV     p -> EcPrinting.pp_pv     ppe fmt p
     in
 

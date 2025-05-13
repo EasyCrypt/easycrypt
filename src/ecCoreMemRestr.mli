@@ -1,5 +1,13 @@
 open EcPath
+open EcMaps
 open EcAst
+
+module Mff : Map.S with type key = functor_fun
+
+module Sff: sig
+  include Set.S with module M = Map.MakeBase(Mff)
+end
+
 (* Nothing is allowed *)
 val mr_empty : mem_restr
 

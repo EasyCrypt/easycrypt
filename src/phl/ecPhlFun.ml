@@ -9,6 +9,8 @@ open EcMemory
 open EcModules
 open EcEnv
 open EcPV
+open EcCoreMemRestr
+open EcMemRestr
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -165,18 +167,18 @@ let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
   let hoareF_abs_spec _pf env f inv =
-    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (_, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    PV.check_depend env fv top;
+    PV.check_depend env fv (functor_fun [] f);
     let ospec o = f_hoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
   let ehoareF_abs_spec _pf env f inv =
-    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (_, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    PV.check_depend env fv top;
+    PV.check_depend env fv (functor_fun [] f);
     let ospec o = f_eHoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
@@ -186,7 +188,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
 
-    PV.check_depend env fv top;
+    PV.check_depend env fv (functor_fun [] f);
     let ospec o =
       check_oracle_use pf env top o;
       f_bdHoareF inv o inv FHeq f_r1 in
@@ -203,8 +205,8 @@ module FunAbsLow = struct
     let ml, mr = mleft, mright in
     let fvl = PV.fv env ml inv in
     let fvr = PV.fv env mr inv in
-    PV.check_depend env fvl topl;
-    PV.check_depend env fvr topr;
+    PV.check_depend env fvl (functor_fun [] fl);
+    PV.check_depend env fvr (functor_fun [] fl);
     let eqglob = assert false in (* f_eqglob topl ml topr mr in *)
 
     let ospec o_l o_r =
@@ -312,8 +314,8 @@ module UpToLow = struct
     let fvl = PV.fv env ml allinv in
     let fvr = PV.fv env mr allinv in
 
-    PV.check_depend env fvl topl;
-    PV.check_depend env fvr topr;
+    assert false; (* PV.check_depend env fvl topl; *)
+    assert false; (* PV.check_depend env fvr topr; *)
 
     (* FIXME: check there is only global variable *)
     let eqglob = assert false in (* f_eqglob topl ml topr mr in *)

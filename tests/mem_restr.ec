@@ -1,3 +1,19 @@
+module type M = {
+  proc p() : unit
+}.
+
+module A = {
+  var x : int
+}.
+
+module type N (O : M) = {
+  proc f() : unit
+}.
+
+
+lemma t (B <: N{-A.x}) (C <: M{-A.x}) v: hoare[B(C).f: A.x = v ==> A.x = v].
+proof.
+
 theory U.
 module type AT = {
   proc p():unit
@@ -137,8 +153,9 @@ section.
    from {}, i.e. for any C. *)
 
 lemma test (A <: T) (C <: T {-N(A)}) x: hoare [ C.p : glob A = x  ==>  glob A = x ].
-    admit.
+proc (M.x = 1).
 qed.
+
 end section.
 
 

@@ -2024,12 +2024,15 @@ and pp_orclinfos ppe fmt ois =
       (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
 
 (* -------------------------------------------------------------------- *)
+and pp_functorfun ppe fmt ff =
+  Format.fprintf fmt "GlobFun (%a)" (pp_pv ppe) (pv_glob ff.ff_xp)
+
 and pp_mem_restr ppe fmt mr =
   match mr with
   | Empty -> Format.fprintf fmt "Empty"
   | All -> Format.fprintf fmt "All"
   | Var x -> Format.fprintf fmt "Var (%a)" (pp_pv ppe) (pv_glob x)
-  | GlobFun ff -> Format.fprintf fmt "GlobFun (%a)" (pp_pv ppe) (pv_glob ff.ff_xp)
+  | GlobFun ff -> pp_functorfun ppe fmt ff
   | Inter (l, r) -> Format.fprintf fmt "Inter (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
   | Union (l, r) -> Format.fprintf fmt "Union (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
   | Diff (l, r) -> Format.fprintf fmt "Diff (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
