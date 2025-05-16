@@ -136,8 +136,8 @@ to do so—commonly by prefixing the command with `sudo`, though other methods
 may apply depending on your system.
 
 > **Note:** The Debian/Ubuntu `opam` package includes the OCaml compiler as a
-> *recommended* dependency, which is installed by default. If you wish to avoid this
-> run `apt-get install --no-install-recommends opam` instead.
+> *recommended* dependency, which is installed by default. If you wish to avoid 
+> this, run `apt-get install --no-install-recommends opam` instead.
 
 ```
 apt-get install opam
@@ -288,7 +288,7 @@ Be sure to read the output carefully and follow all instructions!
 
 > While the defaults usually suffice, exceptions exist.
 > For example, [on Ubuntu 24.04, you might want to set the
-> installation location to `/usr/bin`](https://github.com/ocaml/opam/issues/5968#issuecomment-2384914938))
+> installation location to `/usr/bin`](https://github.com/ocaml/opam/issues/5968#issuecomment-2384914938).
 
 Once the script has completed *and* you've followed any additional
 instructions, proceed to [initialize OPAM](#initialization).
@@ -479,41 +479,60 @@ opam install easycrypt
 If everything went according to plan, you now have everything you need to
 run EasyCrypt! But before you get ahead of yourself, make sure to complete the
 [(post-installation) setup and configuration](#setup-and-configuration) to
-ensure everyting works as expected.
+ensure everything works as expected.
 
 ## Via NIX
 
-First, install the [Nix package manager](https://nixos.org/) by
-following [these instructions](https://nixos.org/manual/nix/stable/#chap-installation).
+> **Note:** As this is not the recommended installation method and is
+> considered more advanced, we don't go into much detail here.
+> If you are looking for a more guided installation
+> process, consider [installing via OPAM](#via-opam-recommended) instead.
 
-Then, at the root of the EasyCrypt source tree, type:
+First, ensure you have [NIX's package manager](https://nixos.org/) installed.
+You can do so by following [the official installation guide](https://nixos.org/manual/nix/stable/#chap-installation).
 
-```
-$> make nix-build
-```
+Next, clone or download this repository and navigate to its root.
 
-Once completed, you will find the EasyCrypt binary in `result/bin`.
+At this point, you have a few options, listed below.
+Find the item that best matches your situation
+and expand the corresponding section to view the relevant
+instructions.
 
-You can also run
+<details>
 
-```
-$> make nix-build-with-provers
-```
+<summary>Build EasyCrypt without SMT solvers</summary>
 
-to install EasyCrypt along with a set of provers.
+To build EasyCrypt without any SMT solvers, run `make nix-build`.
+Once the build is complete, you'll find the EasyCrypt binary
+in the `result/bin` directory.
 
+</details>
 
-For getting a development environment, you can run:
+<details>
 
-```
-$> make nix-develop
-```
+<summary>Build EasyCrypt along with a set of SMT solvers</summary>
+To build EasyCrypt along with a set of SMT solvers, run
+`make nix-build-with-provers`. Once the build is complete, you'll find the
+EasyCrypt binary in the `result/bin` directory.
 
-These will install all the required dependencies, a set of provers and
-will then drop you into a shell. From there, simply run `make` to
-compile EasyCrypt.
+</details>
+
+<details>
+
+<summary>Setup a development environment with all required dependencies and SMT solvers</summary>
+  To setup a development environment, run `make nix-develop`.
+  This installs all required dependencies and SMT solvers, and drops you
+  in a shell afterward. From there, run `make` to build EasyCrypt.
+
+</details>
 
 ## From Source
+
+> **Note:** As this is not the recommended installation method and is
+> considered more advanced, we don't go into much detail here and primarily
+> refer to external sources. If you are looking for a more guided installation
+> process, consider [installing via OPAM](#via-opam-recommended) instead.
+
 
 ### Installing EasyCrypt's Dependencies From Source
 
@@ -627,13 +646,14 @@ and to `%HOME%\Local Settings\easycrypt\why3.conf` on Windows systems.
 
 If you'd prefer to store the configuration file elsewhere, pass
 the desired path to the `-why3` option:
-(Here, `<configuration-file>` is a placeholder for the path.)
 
 ```
 easycrypt why3config -why3 <configuration-file>
 ```
 
-Note that EasyCrypt does not remember custom configuration paths. Unless
+(Here, `<configuration-file>` is a placeholder for the path.)
+
+EasyCrypt does not remember custom configuration paths. Unless
 told otherwise, it will only search in some default locations (including the standard
 generation path and certain system-wide locations). To run EasyCrypt with a Why3
 configuration file stored in a non-default location, again use the `-why3` option
