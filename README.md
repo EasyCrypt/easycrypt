@@ -502,7 +502,12 @@ instructions.
 
 <summary>Build EasyCrypt without SMT solvers</summary>
 
-To build EasyCrypt without any SMT solvers, run `make nix-build`.
+To build EasyCrypt without any SMT solvers, run the following command:
+
+```
+make nix-build
+```
+
 Once the build is complete, you'll find the EasyCrypt binary
 in the `result/bin` directory.
 
@@ -511,18 +516,29 @@ in the `result/bin` directory.
 <details>
 
 <summary>Build EasyCrypt along with a set of SMT solvers</summary>
-To build EasyCrypt along with a set of SMT solvers, run
-`make nix-build-with-provers`. Once the build is complete, you'll find the
-EasyCrypt binary in the `result/bin` directory.
+
+To build EasyCrypt along with a set of SMT solvers, run the following command:
+
+```
+make nix-build-with-provers
+```
+
+Once the build is complete, you'll find the EasyCrypt binary
+in the `result/bin` directory.
 
 </details>
 
 <details>
 
 <summary>Setup a development environment with all required dependencies and SMT solvers</summary>
-  To setup a development environment, run `make nix-develop`.
-  This installs all required dependencies and SMT solvers, and drops you
-  in a shell afterward. From there, run `make` to build EasyCrypt.
+  To setup a development environment, run the following command:
+
+  ```
+  make nix-develop
+  ```
+
+  This installs all required dependencies and SMT solvers, and drops you in a
+  shell afterward. From there, run `make` to build EasyCrypt.
 
 </details>
 
