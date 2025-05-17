@@ -93,9 +93,9 @@ Use at your own risk!
 6. Install [compatible SMT solvers](#compatibility).  
    For example, to install Alt-Ergo version 2.5.2, run `opam install alt-ergo.2.5.2`.
 7. Install EasyCrypt.  
-   Run `opam install easycrypt`.
-   Alternatively, install from source by cloning or downloading this repository
-   and running `make` followed by `make install`.
+   Run `opam install easycrypt`.  
+   (Alternatively, install from source by cloning or downloading this repository,
+   navigating to its root, and running `make` followed by `make install`.)
 8. [Configure Why3](#configuring-why3).  
    Run `easycrypt why3config`.
 9. Install a [front-end](#front-ends).
