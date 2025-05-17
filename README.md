@@ -81,7 +81,7 @@ Use at your own risk!
    compiler version yourself, instead of letting OPAM pick one for you during the installation
    of EasyCrypt's dependencies.)
    2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).  
-   Run `opam switch set <switch-name>` (and make sure to read the output and follow any instructions!)
+   Run `opam switch set <switch-name>` (and make sure to read the output and follow any instructions).
 4. Add EasyCrypt's OPAM package.  
    Run `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`.
    (This requires `git`, so [make sure you have that installed first](https://git-scm.com/downloads).)
