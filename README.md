@@ -75,12 +75,12 @@ Use at your own risk!
 2. [Initialize OPAM](https://opam.ocaml.org/doc/Usage.html#opam-init).  
    Run `opam init` (and make sure to read the output and follow any instructions).
 3. Optional, but recommended:
-   1. [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).
+   1. [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).  
    Run `opam switch --empty create <switch-name>`.  
    (Alternatively, run `opam switch create <switch-name> <compiler-version>` to pick a specific
    compiler version yourself, instead of letting OPAM pick one for you during the installation
    of EasyCrypt's dependencies.)
-   2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).
+   2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).  
    Run `opam switch set <switch-name>` (and make sure to read the output and follow any instructions!)
 4. Add EasyCrypt's OPAM package.  
    Run `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`.
@@ -91,7 +91,7 @@ Use at your own risk!
      run `opam install opam-depext` and `opam depext easycrypt`, in that order
      (and make sure to read the output and follow any instructions).
 6. Install [compatible SMT solvers](#compatibility).  
-   For example, install Alt-Ergo version 2.5.2 by running `opam install alt-ergo.2.5.2`.
+   For example, to install Alt-Ergo version 2.5.2, run `opam install alt-ergo.2.5.2`.
 7. Install EasyCrypt.  
    Run `opam install easycrypt`.
    Alternatively, install from source by cloning or downloading this repository
