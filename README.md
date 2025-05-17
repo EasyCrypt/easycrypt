@@ -41,7 +41,7 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
 
 ---
 
-There are several ways to installing EasyCrypt and its [dependencies](#installing-easycrypts-dependencies-from-source).
+There are several ways to install EasyCrypt and its [dependencies](#installing-easycrypts-dependencies-from-source).
 The recommended method is to simply install everything
 [using OPAM](#via-opam-recommended), a package manager for OCaml (the programming
 language EasyCrypt is written in). Other installation methods include
@@ -73,7 +73,7 @@ Use at your own risk!
    Download and run [this script on Unix-like systems](https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)
    or [this script on Windows systems using PowerShell](https://raw.githubusercontent.com/ocaml/opam/master/shell/install.ps1).
 2. [Initialize OPAM](https://opam.ocaml.org/doc/Usage.html#opam-init).  
-   Run `opam init` (and make sure to read the output and follow the instructions).
+   Run `opam init` (and make sure to read the output and follow any instructions).
 3. Optional, but recommended:
    1. [Create a dedicated OPAM switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).
    Run `opam switch --empty create <switch-name>`.  
@@ -81,7 +81,7 @@ Use at your own risk!
    compiler version yourself, instead of letting OPAM pick one for you during the installation
    of EasyCrypt's dependencies.)
    2. [Activate the dedicated switch](https://ocaml.org/docs/opam-switch-introduction#creating-a-new-switch).
-   Run `opam switch set <switch-name>` (and make sure to read the output and follow the instructions!)
+   Run `opam switch set <switch-name>` (and make sure to read the output and follow any instructions!)
 4. Add EasyCrypt's OPAM package.  
    Run `opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git`.
    (This requires `git`, so [make sure you have that installed first](https://git-scm.com/downloads).)
@@ -89,13 +89,13 @@ Use at your own risk!
    Run `opam install --deps-only easycrypt`.
    - If your OPAM version is below 2.1 (which you can find out by running `opam --version`), first
      run `opam install opam-depext` and `opam depext easycrypt`, in that order
-     (and make sure to read the output and follow the instructions).
+     (and make sure to read the output and follow any instructions).
 6. Install [compatible SMT solvers](#compatibility).  
    For example, install Alt-Ergo version 2.5.2 by running `opam install alt-ergo.2.5.2`.
 7. Install EasyCrypt.  
    Run `opam install easycrypt`.
-   Alternatively, install from source by cloning this repository and running
-   `make` followed by `make install`.
+   Alternatively, install from source by cloning or downloading this repository
+   and running `make` followed by `make install`.
 8. [Configure Why3](#configuring-why3).  
    Run `easycrypt why3config`.
 9. Install a [front-end](#front-ends).
