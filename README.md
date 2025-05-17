@@ -23,7 +23,7 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
         * [Installing and Initializing OPAM](#installing-and-initializing-opam)
         * [Installing EasyCrypt's Dependencies via OPAM](#installing-easycrypts-dependencies-via-opam)
         * [Installing EasyCrypt via OPAM](#installing-easycrypt-via-opam)
-    * [Via NIX](#via-nix)
+    * [Via Nix](#via-nix)
     * [From Source](#from-source)
         * [Installing EasyCrypt's Dependencies From Source](#installing-easycrypts-dependencies-from-source)
         * [Installing EasyCrypt From Source](#installing-easycrypt-from-source)
@@ -45,7 +45,7 @@ There are several ways to installing EasyCrypt and its [dependencies](#installin
 The recommended method is to simply install everything
 [using OPAM](#via-opam-recommended), a package manager for OCaml (the programming
 language EasyCrypt is written in). Other installation methods include
-[using NIX](#via-nix) and [directly from source](#from-source). Whichever
+[using Nix](#via-nix) and [directly from source](#from-source). Whichever
 method you choose, be sure to follow the [(post-installation)
 setup and configuration instructions](#setup-and-configuration)!
 
@@ -87,7 +87,7 @@ Use at your own risk!
    (This requires `git`, so [make sure you have that installed first](https://git-scm.com/downloads).)
 5. Install EasyCrypt's dependencies.  
    Run `opam install --deps-only easycrypt`.
-   - If you have OPAM version <2.1 (which you can find out by running `opam --version`), first
+   - If your OPAM version is below 2.1 (which you can find out by running `opam --version`), first
      run `opam install opam-depext` and `opam depext easycrypt`, in that order
      (and make sure to read the output and follow the instructions).
 6. Install [compatible SMT solvers](#compatibility).  
@@ -368,7 +368,8 @@ it's recommended to create a dedicated switch.
 You can create a new switch called `easycrypt` by running the following command.
 (Optionally, you can specify a specific OCaml compiler for the switch by
 appending the compiler version to the command and leaving out the `--empty`
-option; you can list the available compilers by running `opam switch list-available`.)
+option; you can list the available compilers by running `opam switch list-available`.
+The compiler version must be >= 4.08 and < 5.0)
 
 ```
 opam switch --empty create easycrypt
@@ -407,7 +408,7 @@ you do not have to do this.*
 
 <details>
 
-<summary>Installing System Dependencies with OPAM Version <2.1</summary>
+<summary>Installing System Dependencies with OPAM Version < 2.1</summary>
 
 First, install OPAM's "system dependency manager plugin" with
 
@@ -481,19 +482,19 @@ run EasyCrypt! But before you get ahead of yourself, make sure to complete the
 [(post-installation) setup and configuration](#setup-and-configuration) to
 ensure everything works as expected.
 
-## Via NIX
+## Via Nix
 
 > **Note:** As this is not the recommended installation method and is
 > considered more advanced, we don't go into much detail here.
 > If you are looking for a more guided installation
 > process, consider [installing via OPAM](#via-opam-recommended) instead.
 
-First, ensure you have [NIX's package manager](https://nixos.org/) installed.
+Ensure you have [Nix's package manager](https://nixos.org/) installed.
 You can do so by following [the official installation guide](https://nixos.org/manual/nix/stable/#chap-installation).
 
 Next, clone or download this repository and navigate to its root.
 
-At this point, you have a few options, listed below.
+At this point, you have a few options.
 Find the item that best matches your situation
 and expand the corresponding section to view the relevant
 instructions.
@@ -549,43 +550,36 @@ in the `result/bin` directory.
 > refer to external sources. If you are looking for a more guided installation
 > process, consider [installing via OPAM](#via-opam-recommended) instead.
 
-
 ### Installing EasyCrypt's Dependencies From Source
 
 EasyCrypt uses the following third-party tools/libraries:
 
- * OCaml, version >= 4.08
-
-     Available at https://ocaml.org/
-
- * OCamlbuild
-
- * Why3, version 1.8
-
-     Available at <http://why3.lri.fr/>
-
-     Why3 must be installed with a set a provers.
-     See <http://why3.lri.fr/#provers>
-
-     Why3 libraries must be installed (make byte && make install-lib)
-
- * Menhir <http://gallium.inria.fr/~fpottier/menhir/>
-
- * OCaml Batteries Included <http://batteries.forge.ocamlcore.org/>
-
- * OCaml PCRE (>= 7) <https://github.com/mmottl/pcre-ocaml>
-
- * OCaml Zarith <https://forge.ocamlcore.org/projects/zarith>
-
- * OCaml ini-files <http://archive.ubuntu.com/ubuntu/pool/universe/o/ocaml-inifiles/>
+- [OCaml](https://github.com/ocaml/ocaml), version >= 4.08 and < 5.0
+  Further useful resources:
+  - <https://ocaml.org/install>.
+- [OCamlbuild](https://github.com/ocaml/ocamlbuild)  
+- [Why3](https://gitlab.inria.fr/why3/why3), version 1.8 and < 1.9
+  Why3's libraries are required as well (typically installed by running something like `make byte && make install-lib`).
+  Although not a strict dependency, you may want to already install
+  [some of the compatible SMT solvers](#compatible) as well (you'll need at least one in the end.)
+  Further useful resources:
+  - <https://www.why3.org/>
+  - <https://www.why3.org/#provers>
+- [Menhir](https://gitlab.inria.fr/fpottier/menhir/)  
+  Further useful resources:
+  - <https://gallium.inria.fr/~fpottier/menhir/>
+- [Caml Batteries Included](http://batteries.forge.ocamlcore.org/)
+- OCaml PCRE, version >= 7 <https://github.com/mmottl/pcre-ocaml>
+- OCaml Zarith <https://forge.ocamlcore.org/projects/zarith>
+- OCaml ini-files, version >= 1.2 <http://archive.ubuntu.com/ubuntu/pool/universe/o/ocaml-inifiles/>
 
 ### Installing EasyCrypt From Source
 
 If installing from source, running
 
 ```
-$> make
-$> make install
+make
+make install
 ```
 
 builds and install EasyCrypt (under the binary named `easycrypt`),
@@ -632,7 +626,7 @@ versions of SMT solvers:
 * [Alt-Ergo](https://alt-ergo.ocamlpro.com/), version 2.5.2
 * [CVC4](https://cvc4.github.io/), version 1.8
 * [CVC5](https://cvc5.github.io/), version 1.0.8
-* [Z3](https://github.com/Z3Prover/z3), version 4.12.X
+* [Z3](https://github.com/Z3Prover/z3), version 4.12.x
 
 Alt-Ergo is available via OPAM. To install version 2.5.2, run the following command:
 
@@ -641,11 +635,11 @@ opam install alt-ergo.2.5.2
 ```
 
 If you've installed a different version of Alt-Ergo, you can switch to version
-2.5.2 by running  `opam pin alt-ergo 2.5.2`.
+2.5.2 by running `opam pin alt-ergo 2.5.2`.
 
 ### Configuring Why3
 
-After installing, removing, or updating the SMT provers you plan to use with
+After installing, removing, or updating any SMT solvers you plan to use with
 EasyCrypt, you should (re)configure Why3 to reflect these changes.
 
 You can do this manually, or let EasyCrypt handle it using the `why3config`
@@ -661,27 +655,25 @@ back to `$HOME/.config/easycrypt/why3.conf` if `$XDG_CONFIG_HOME` is unset),
 and to `%HOME%\Local Settings\easycrypt\why3.conf` on Windows systems.
 
 If you'd prefer to store the configuration file elsewhere, pass
-the desired path to the `-why3` option:
+the desired path (represented by `<configuration-file>` below) to the `-why3` option:
 
 ```
 easycrypt why3config -why3 <configuration-file>
 ```
 
-(Here, `<configuration-file>` is a placeholder for the path.)
-
 EasyCrypt does not remember custom configuration paths. Unless
-told otherwise, it will only search in some default locations (including the standard
-generation path and certain system-wide locations). To run EasyCrypt with a Why3
-configuration file stored in a non-default location, again use the `-why3` option
-and provide the path:
+told otherwise, it will only search in some default locations
+(including the standard generation path and certain system-wide locations).
+To run EasyCrypt with a Why3 configuration file stored in a non-default location,
+again use the `-why3` option to pass the path to the file:
 
 ```
 easycrypt -why3 <configuration-file>
 ```
 
-(In this case, you’re not generating a new configuration, so you do not use the
-`why3config` sub-command—this simply runs EasyCrypt using the specified
-configuration file.)
+(In this case, you’re simply running EasyCrypt with
+the specified configuration file, not generating
+a new one—hence the omission of the `why3config` sub-command.)
 
 ## Front-Ends
 
