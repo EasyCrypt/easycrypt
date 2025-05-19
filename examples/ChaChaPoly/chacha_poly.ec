@@ -807,10 +807,13 @@ proof.
   rewrite (hrec (size (drop block_size p))) 2://; 1: smt(size_drop gt0_block_size).
   rewrite -{4}(cat_take_drop block_size p); congr.
   rewrite -!take_xor_map2_xor; apply (eq_from_nth Byte.zero).
-  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
+  + rewrite size_take 1:#smt:(gt0_block_size).
+    rewrite size_map2 size_cat size_map2 bytes_of_blockP.
+    by rewrite /min; smt(size_ge0).
   move=> j hj.
   have [hj1 hj2] : j < block_size /\ j < size p.
-  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
+  + move: hj; rewrite size_map2 size_cat size_map2 bytes_of_blockP /min.
+    smt(size_ge0).
   rewrite
     (nth_map2 Byte.zero Byte.zero)
     ?(size_cat, size_map2, Block.bytes_of_blockP) 1:#smt:(size_ge0).
@@ -878,7 +881,9 @@ proof.
   move=> _; rewrite /dblock; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly `*` dextra_block) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK).
+  + congr; apply: fun_ext=> x @/(\o) @/pred1.
+    rewrite -{3}topairK; case: (topair b)=> />.
+    by move: (can_inj _ _ ofpairK)=> /#.
   rewrite dprod1E (_:block_size = poly_size + extra_block_size) //.
   rewrite dlist_add 1:ge0_poly_size 1:ge0_extra_block_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].
@@ -946,7 +951,9 @@ proof.
   move=> _; rewrite /dpoly; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly_in `*` dpoly_out) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK).
+  + congr; apply: fun_ext=> x @/(\o) @/pred1.
+    rewrite -{3}(topairK b); case: (topair b)=> />.
+    by move: (can_inj _ _ ofpairK)=> /#.
   rewrite dprod1E (_:poly_size = poly_in_size + poly_out_size) //.
   rewrite dlist_add 1:ge0_poly_in_size 1:ge0_poly_out_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].
@@ -1752,7 +1759,30 @@ section PROOFS.
               let r = oget ROin.m{1}.[(n, C.ofintd 0)] in 
               let s = oget ROout.m{1}.[(n, C.ofintd 0)] in 
               s = t - poly1305_eval r (topol a c))); last first.
-    + auto => /> ; smt (undup_uniq size_undup size_map).
+    (** TODO DUPRESSOIR: CLEAN THIS UP **)
+    + auto=> /> &1 &2 + not_bad; rewrite not_bad=> />.
+      move=> inv_count inv_domRO inv_domSRO1 eq_domSRO2 inv_domSRO2 size_lenc inv_ndec inv_log inv_sc inv0 inv1 inv2 inv3 inv4.
+      split; 1:smt(undup_uniq).
+      split=> [/#|].
+      split; 1:smt(size_undup size_map).
+      split=> [/#|].
+      split=> [/#|].
+      move=> j ge0_j gtj_size lc_j x1 x2 x3.
+      pose n0 := nth witness (undup (map (fun (p : ciphertext)=> p.`1) Mem.lc{2})) j.
+      case _: (UFCMA.log.[n0]{2}).
+      + smt().
+      move=> /> log_nth.
+      split=> [/#|].
+      case _: (SplitC2.I2.RO.m{1}.[n0, C.ofintd 0]).
+      + smt().
+      case _: (RO.m{2}.[n0, C.ofintd 0]).
+      + smt().
+      move=> />.
+      move: (inv2 n0 _); 1:smt().
+      rewrite log_nth=> /> _ _ x0 m2_n0 x4 i2_n0.
+      move: (inv4 n0 _).
+      + exact: (inv_domSRO1 _ (C.ofintd 0)).
+      by rewrite log_nth i2_n0 m2_n0.
 
     (* + auto => /> *; have [#] * :=H H0. *)
     (*   rewrite H3/=. *)
@@ -2086,12 +2116,13 @@ section PROOFS.
     - have:=allP (fun (n0 : nonce) => (n0, C.ofintd 0) \notin ROout.m{2}) l2.
       have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofintd 0) \notin SplitC2.I2.RO.m{2}) l.
       by rewrite mem_nth //=.
-  rewrite (drop_nth witness i{2} l2) //= drop0 //=; do ! split=> /> *.
+  rewrite (drop_nth witness i{2} l2) //= drop0 //=; do ! split=> />.
   + smt().
   + smt(mem_set).
-  + rewrite get_set_neqE /=; smt(mem_nth).
+  + move=> *; rewrite get_set_neqE /=; smt(mem_nth).
   + smt(mem_set).
-  + smt(mem_set).
+  + move=> n0; rewrite mem_set; case=> [/#|/>].
+    by right; exists i{2}=> /#.
   + smt(mem_set size_drop size_ge0 size_eq0).
   + smt(mem_set size_drop size_ge0 size_eq0).
   qed.
