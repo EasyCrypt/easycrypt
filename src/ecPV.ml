@@ -54,7 +54,7 @@ end
 module Mpv = struct
   type ('a, 'b) t =
     { s_pv : 'a Mnpv.t;
-      s_gl : (mem_restr * 'b) Mff.t;  (* only abstract module *)
+      s_gl : (mem_restr * 'b) Mff.t;
     }
 
   let empty = { s_pv = Mnpv.empty; s_gl = Mff.empty }
@@ -89,7 +89,7 @@ module Mpv = struct
 
   let check_mp_mp env ff restr ff' restr' =
     if not (EcMemRestr.ff_alpha_equal ff ff') &&
-      not (EcMemRestr.disjoint env restr restr') then
+      (EcMemRestr.subset env restr restr' || EcMemRestr.subset env restr' restr) then
         raise (AliasClash(env,AC_abstract_abstract(ff,ff')))
 
   let check_glob env ff m =

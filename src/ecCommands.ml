@@ -204,13 +204,23 @@ module HiPrinting = struct
   (* ------------------------------------------------------------------ *)
   let pr_glob fmt env pm =
     match pm with
-    | FM_ff _ -> failwith "implement."
-    | FM_FunOrVar _ -> failwith "implement."
+    | FM_ff ff -> 
+      let ff = EcTyping.trans_pfunctor_fun env ff in
+      let mr = EcMemRestr.ff_norm_restr env ff in
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt "Restriction: @[%a@]@." (EcPrinting.pp_mem_restr ppe) mr
+    | FM_FunOrVar gp ->
+      let ff = EcTyping.trans_fun_or_var_ff env gp in
+      let mr = EcMemRestr.ff_norm_restr env ff in
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt "Restriction: @[%a@]@." (EcPrinting.pp_mem_restr ppe) mr
     | FM_Mod pm -> begin
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    let (p, _) = EcTyping.trans_msymbol env pm in
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      let (p, _) = EcTyping.trans_msymbol env pm in
+      let mr = EcMemRestr.module_uses_mr env p None in
+      Format.fprintf fmt "Restriction: @[%a@]@." (EcPrinting.pp_mem_restr ppe) mr;
+(*
     let _fp, us = EcMemRestr.module_uses env p None in
-
     Format.fprintf fmt "Calls [# = %d]:@."
       (EcPath.Sx.cardinal us.us_calls);
     EcPath.Sx.iter (fun xp -> 
@@ -238,6 +248,7 @@ module HiPrinting = struct
         (EcPrinting.pp_type ppe) ty
       )
       us.us_writes
+      *)
       end
 
   (* ------------------------------------------------------------------ *)

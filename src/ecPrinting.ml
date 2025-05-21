@@ -2025,17 +2025,18 @@ and pp_orclinfos ppe fmt ois =
 
 (* -------------------------------------------------------------------- *)
 and pp_functorfun ppe fmt ff =
-  Format.fprintf fmt "GlobFun (%a)" (pp_pv ppe) (pv_glob ff.ff_xp)
+  let _ppe, pp = pp_mod_params ppe ff.ff_params in
+  Format.fprintf fmt "{%t => %s}" pp (EcPath.x_tostring ff.ff_xp)
 
 and pp_mem_restr ppe fmt mr =
   match mr with
-  | Empty -> Format.fprintf fmt "Empty"
-  | All -> Format.fprintf fmt "All"
-  | Var x -> Format.fprintf fmt "Var (%a)" (pp_pv ppe) (pv_glob x)
+  | Empty -> Format.fprintf fmt "0"
+  | All -> Format.fprintf fmt " * "
+  | Var x -> Format.fprintf fmt "%a" (pp_pv ppe) (pv_glob x)
   | GlobFun ff -> pp_functorfun ppe fmt ff
-  | Inter (l, r) -> Format.fprintf fmt "Inter (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
-  | Union (l, r) -> Format.fprintf fmt "Union (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
-  | Diff (l, r) -> Format.fprintf fmt "Diff (%a, %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+  | Inter (l, r) -> Format.fprintf fmt "(%a ^ %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+  | Union (l, r) -> Format.fprintf fmt "(%a | %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
+  | Diff (l, r) -> Format.fprintf fmt "(%a - %a)" (pp_mem_restr ppe) l (pp_mem_restr ppe) r
 
   (*
   let pp_rx sign fmt rx =
@@ -2120,7 +2121,7 @@ and pp_mod_params ppe bms =
   let pp_mp ppe (id,mt) =
     let ppe1 = PPEnv.add_local ppe id in
     let pp fmt =
-      Format.fprintf fmt "%a : %a" (pp_local ppe1) id
+      Format.fprintf fmt "%s : %a" (EcIdent.tostring id)
         pp_msymbol (PPEnv.modtype_symb ppe mt) in
     ppe1, pp
   in

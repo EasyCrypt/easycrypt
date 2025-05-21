@@ -810,7 +810,8 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
 
 let trans_fun_or_var_ff env (gp: pgamepath) : functor_fun =
   let f = trans_gamepath env gp in
-  EcCoreMemRestr.functor_fun [] f
+  let ff = EcCoreMemRestr.functor_fun [] f in
+  ff
 
 let trans_pfunctor_fun env (pf : pfunctor_fun) : functor_fun =
   let margs =
@@ -819,7 +820,8 @@ let trans_pfunctor_fun env (pf : pfunctor_fun) : functor_fun =
       pf.pff_params
   in
   let env = EcEnv.Mod.bind_params margs env in
-  trans_fun_or_var_ff env pf.pff_xp
+  let f = trans_gamepath env pf.pff_xp in
+  EcCoreMemRestr.functor_fun margs f
 
 (* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =

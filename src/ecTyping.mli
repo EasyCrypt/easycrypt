@@ -193,6 +193,10 @@ val transtyvars:
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
+val trans_fun_or_var_ff : env -> pgamepath -> functor_fun
+val trans_pfunctor_fun : env -> pfunctor_fun -> functor_fun
+
+(* -------------------------------------------------------------------- *)
 val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty
 
 val transtys :

@@ -1,18 +1,109 @@
+theory TEST_proc_abs_inv.
+type t1, t2, t3, t4, t5, t6.
+
 module type M = {
-  proc p() : unit
+  proc f(_: t1) : t2
 }.
 
-module A = {
-  var x : int
+module type F (O : M) = {
+  proc g(_: t3) : t4
 }.
 
-module type N (O : M) = {
-  proc f() : unit
+module Mem = {
+  var v1 : t5
+  var v2 : t6
+  proc _init() = {
+    v1 <- witness;
+    v2 <- witness;
+  }
 }.
 
+module (H1 : F) (O : M) = {
+  proc g(x: t3) : t4 = {
+    return witness;
+  }
+}.
 
-lemma t (B <: N{-A.x}) (C <: M{-A.x}) v: hoare[B(C).f: A.x = v ==> A.x = v].
+module (H5 : F) (O : M) = {
+  var v : t1
+
+  proc g(x: t3) : t4 = {
+    v <- witness;
+    return witness;
+  }
+}.
+
+module (H2 : F) (O : M) = {
+  proc g(x: t3) : t4 = {
+    Mem.v1 <- witness;
+    return witness;
+  }
+}.
+
+module (H3 : F) (O : M) = {
+  proc g(x: t3) : t4 = {
+    O.f(witness);
+    return witness;
+  }
+}.
+
+module (H4 : F) (O : M) = {
+  proc g(x: t3) : t4 = {
+    O.f(witness);
+    Mem.v1 <- witness;
+    return witness;
+  }
+}.
+
+module N : M = {
+  proc f(x: t1) : t2 = {
+    Mem.v2 <- witness;
+    return witness;
+  }
+}.
+
+module O : M = {
+  proc f(x: t1) : t2 = {
+    Mem.v1 <- witness;
+    Mem.v2 <- witness;
+    return witness;
+  }
+}.
+
+lemma t: forall (G <: F{-Mem}), true.
+proof. trivial. qed.
+
+lemma f: false.
 proof.
+have := t H1.
+have := t H2.
+
+
+section.
+declare module N1 <: M. 
+declare module N2 <: M {-Mem.v1}. 
+declare module G1 <: F {0}.
+declare module N3 <: M {-G1}.
+
+phoare hr_proc_inv: [G1(N3).g: true ==> true] = 1.0.
+proof.
+print glob G1(N1).
+proc (true).
+fail proc (Mem.v1 = witness).
+(* fail proc (glob N1 = witness). *)
+(* fail proc (glob N1.f = witness). *)
+proc (true).
+abort.
+
+hoare hr_proc_inv: G1(N1).g: true ==> true.
+proof.
+fail proc (Mem.v1 = witness).
+fail proc (glob N1 = witness).
+fail proc (glob N1.f = witness).
+proc (true); expect 3.
+abort.
+
+
 
 theory U.
 module type AT = {

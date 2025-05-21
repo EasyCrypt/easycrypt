@@ -1840,8 +1840,12 @@ module Mod = struct
         (fun s (x, _) a -> EcSubst.add_module s x a)
         EcSubst.empty params args
     in
+    try
 
     f s o
+    with EcSubst.SubstNameClash (`Ident x) ->
+      let str = Printf.sprintf "%s" (EcIdent.tostring x) in
+      failwith str
 
   let clearparams n params =
     let _, remaining = List.takedrop n params in

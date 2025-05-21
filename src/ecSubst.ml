@@ -152,13 +152,19 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
 let add_flocal (s : subst) (x : EcIdent.t) (f : EcCoreFol.form) =
   { s with sb_flocal = Mid.add x f s.sb_flocal }
 
-let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
+let add_module ?(log = false) (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
-    | None   -> Some m
-    | Some mp -> 
-      Printf.printf "## Clash %s existed\n" (EcPath.m_tostring mp);
+    | None   ->
+      if log then
+        Printf.printf "## Fresh: %s => %s\n" (EcIdent.tostring x) (EcPath.m_tostring m);
       Some m
-      (* raise (SubstNameClash (`Ident x)) *)
+    | Some mp -> 
+      if log then
+        Printf.printf "## Clash: %s = %s => %s\n" (EcIdent.tostring x) (EcPath.m_tostring mp) (EcPath.m_tostring m);
+      raise (SubstNameClash (`Ident x))
+        (*
+      Some m
+      *)
   in
     { s with sb_module = Mid.change merger x s.sb_module }
 
@@ -214,8 +220,8 @@ and subst_modtype (s : subst) (modty : module_type) =
     ofdfl
       (fun () -> subst_path s modty.mt_name)
       (Mp.find_opt modty.mt_name s.sb_path) in
-  let s, mt_params = subst_mod_params s modty.mt_params in
-  { mt_params;
+  (* let s, mt_params = subst_mod_params s modty.mt_params in *)
+  { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
     mt_name   = mt_name;
     mt_args   = List.map (subst_mpath s) modty.mt_args; }
 
@@ -259,7 +265,7 @@ and fresh_glocal (s : subst) ((x, ty) : EcIdent.t * gty) =
   | GTmem _ ->
      s, (x, gty)
   | GTmodty _ ->
-     let s = add_module s x (EcPath.mident xfresh) in
+    let s = add_module s x (EcPath.mident xfresh) in
      s, (xfresh, gty)
 
 (* -------------------------------------------------------------------- *)
@@ -837,7 +843,6 @@ and subst_module_comps (s : subst) (comps : module_comps) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (m : module_expr) =
-  (* Printf.printf "** subst_module_start %s \n" m.me_name; *)
   let sbody, me_params = match m.me_params with
     | [] -> (s, [])
     | _  ->

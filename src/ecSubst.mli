@@ -23,7 +23,7 @@ val empty : subst
 val is_empty : subst -> bool
 
 (* -------------------------------------------------------------------- *)
-val add_module   : subst -> EcIdent.t -> mpath -> subst
+val add_module   : ?log:bool -> subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
 val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst

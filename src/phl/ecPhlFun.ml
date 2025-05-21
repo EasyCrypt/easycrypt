@@ -10,7 +10,6 @@ open EcModules
 open EcEnv
 open EcPV
 open EcCoreMemRestr
-open EcMemRestr
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -26,15 +25,11 @@ module TTC = EcProofTyping
  * See [ospec] in [equivF_abs_spec / equivF_abs_upto] *)
 
 (* -------------------------------------------------------------------- *)
-let check_oracle_use (_pf : proofenv) env adv o = assert false
-(*
-  let restr = mr_diff mr_full { mr_empty with
-                mr_mpaths = { mr_empty.mr_mpaths with
-                              ur_neg = Sm.singleton adv; }} in
+let check_oracle_use (_pf : proofenv) env adv_ff o =
+  let restr = mr_diff mr_full (EcMemRestr.ff_norm_restr env adv_ff) in
 
   (* This only checks the memory restrictions. *)
   EcTyping.check_mem_restr_fun env o restr
-  *)
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then
@@ -45,29 +40,21 @@ let check_concrete pf env f =
         (EcPrinting.pp_funname ppe) f)
 
 (* -------------------------------------------------------------------- *)
-let lossless_hyps env top sub = assert false
-(*
-  let clear_to_top =
-    let mr_mpaths = { (ur_empty Sm.empty) with ur_neg = Sm.singleton top } in
-    { mr_xpaths = ur_empty Sx.empty; mr_mpaths = mr_mpaths } in
+let lossless_hyps env ff =
+  let clear_to_top = mr_diff mr_full (EcMemRestr.ff_norm_restr env ff) in
 
-  let sig_ = EcEnv.NormMp.sig_of_mp env top in
+  let sig_ = EcEnv.NormMp.sig_of_mp env ff.ff_xp.x_top in
   let bd =
     List.map
       (fun (id, mt) ->
          (id, GTmodty (mt, clear_to_top))
-      ) sig_.mis_params
+      ) ff.ff_params
   in
   (* WARN: this implies that the oracle do not have access to top *)
-  let args  = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
-  let concl = f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
-  let calls =
-    let name = sub in
-    (EcSymbols.Msym.find name sig_.mis_oinfos) |> OI.allowed
-  in
+  let concl = f_losslessF ff.ff_xp in
+  let calls = (EcSymbols.Msym.find ff.ff_xp.x_sub sig_.mis_oinfos) |> OI.allowed in
   let hyps = List.map f_losslessF calls in
-    f_forall bd (f_imps hyps concl)
-  *)
+  f_forall bd (f_imps hyps concl)
 
 (* -------------------------------------------------------------------- *)
 let subst_pre env fs (m : memory) s =
@@ -169,16 +156,19 @@ module FunAbsLow = struct
   let hoareF_abs_spec _pf env f inv =
     let (_, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    PV.check_depend env fv (functor_fun [] f);
+    let ff = functor_fun [] f in
+    PV.check_depend env fv ff;
     let ospec o = f_hoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
   let ehoareF_abs_spec _pf env f inv =
-    let (_, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    PV.check_depend env fv (functor_fun [] f);
+    let me, _ = EcEnv.Mod.by_mpath top env in
+    let ff = functor_fun me.me_params f in
+    PV.check_depend env fv ff;
     let ospec o = f_eHoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
@@ -187,34 +177,37 @@ module FunAbsLow = struct
   let bdhoareF_abs_spec pf env f inv =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-
-    PV.check_depend env fv (functor_fun [] f);
+    let me, _ = EcEnv.Mod.by_mpath top env in
+    let ff = functor_fun me.me_params f in
+    PV.check_depend env fv ff;
     let ospec o =
-      check_oracle_use pf env top o;
+      check_oracle_use pf env ff o;
       f_bdHoareF inv o inv FHeq f_r1 in
 
     let sg = List.map ospec (OI.allowed oi) in
-    (inv, inv, lossless_hyps env top f.x_sub :: sg)
+    (inv, inv, lossless_hyps env ff :: sg)
 
   (* ------------------------------------------------------------------ *)
   let equivF_abs_spec pf env fl fr inv =
-    let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
+    let (_, _fl, oil, sigl), (_, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
     let ml, mr = mleft, mright in
     let fvl = PV.fv env ml inv in
     let fvr = PV.fv env mr inv in
-    PV.check_depend env fvl (functor_fun [] fl);
-    PV.check_depend env fvr (functor_fun [] fl);
-    let eqglob = assert false in (* f_eqglob topl ml topr mr in *)
+    let ffl = functor_fun [] fl in
+    let ffr = functor_fun [] fr in
+    PV.check_depend env fvl ffl;
+    PV.check_depend env fvr ffr;
+    let eqglob = f_eqglob ffl ml ffr mr in
 
     let ospec o_l o_r =
       let use =
         try
-          check_oracle_use pf env topl o_l;
+          check_oracle_use pf env ffl o_l;
           if   EcPath.x_equal o_l o_r
-          then check_oracle_use pf env topl o_r;
+          then check_oracle_use pf env ffl o_r;
           false
         with _ -> true
       in
@@ -304,7 +297,7 @@ let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 module UpToLow = struct
   (* ------------------------------------------------------------------ *)
   let equivF_abs_upto pf env fl fr bad invP invQ =
-    let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
+    let (_topl, _fl, oil, sigl), (_topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
@@ -313,17 +306,19 @@ module UpToLow = struct
     let allinv = f_ands [bad2; invP; invQ] in
     let fvl = PV.fv env ml allinv in
     let fvr = PV.fv env mr allinv in
+    let ffl = functor_fun [] fl in
+    let ffr = functor_fun [] fr in
 
-    assert false; (* PV.check_depend env fvl topl; *)
-    assert false; (* PV.check_depend env fvr topr; *)
+    PV.check_depend env fvl ffl;
+    PV.check_depend env fvr ffr;
 
     (* FIXME: check there is only global variable *)
-    let eqglob = assert false in (* f_eqglob topl ml topr mr in *)
+    let eqglob = f_eqglob ffl ml ffr mr in
 
     let ospec o_l o_r =
-      check_oracle_use pf env topl o_l;
+      check_oracle_use pf env ffl o_l;
       if   EcPath.x_equal o_l o_r
-      then check_oracle_use pf env topl o_r;
+      then check_oracle_use pf env ffl o_r;
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
@@ -353,7 +348,7 @@ module UpToLow = struct
 
     let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
     let sg = List.flatten sg in
-    let lossless_a = lossless_hyps env topl fl.x_sub in
+    let lossless_a = lossless_hyps env ffl in
     let sg = lossless_a :: sg in
 
     let eq_params =

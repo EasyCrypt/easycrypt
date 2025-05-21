@@ -165,6 +165,22 @@ let rec norm_mem_restr env mr =
   | Diff (s1, s2) -> mr_diff  (norm_mem_restr env s1) (norm_mem_restr env s2)
 
 
+let rec dump_mem_restr mr =
+  match mr with
+  | Empty -> "0"
+  | All -> " * "
+  | Var x -> Format.sprintf "%s" (EcPath.x_tostring x)
+  | GlobFun ff -> 
+    Format.sprintf "{%s => %s}" 
+      (String.concat "," <| List.map (fun (x, mt) ->
+        Format.sprintf "%s : %s" (EcIdent.tostring x) (EcPath.tostring mt.mt_name))
+        ff.ff_params)
+      (EcPath.x_tostring ff.ff_xp)
+  | Inter (l, r) -> Format.sprintf "(%s ^ %s)" (dump_mem_restr l) (dump_mem_restr r)
+  | Union (l, r) -> Format.sprintf "(%s | %s)" (dump_mem_restr l) (dump_mem_restr r)
+  | Diff (l, r) -> Format.sprintf "(%s - %s)" (dump_mem_restr l) (dump_mem_restr r)
+
+
 let rec norm_globs_restrs env f =
   let has_mod b =
     List.exists (fun (_,gty) ->
@@ -213,8 +229,9 @@ let rec norm_globs_restrs env f =
   | _ -> f
 
 let sup env ff =
+  let env' = EcEnv.Mod.bind_params ff.ff_params env in
   (* The xpath is know to be normalised so it is abstract *)
-  match (Fun.by_xpath ff.ff_xp env).f_def with
+  match (Fun.by_xpath ff.ff_xp env').f_def with
   | FBdef _ | FBalias _ -> assert false
   | FBabs oi ->
     let env, omr = funs_uses_mr env ff.ff_params oi.oi_calls in
@@ -225,7 +242,9 @@ let sup env ff =
       | ME_Alias _ | ME_Structure _ -> assert false
       | ME_Decl (_mty, mr) -> norm_mem_restr env mr
     in
-    mr_union amr omr
+    let mr = mr_union amr omr in
+    (* Printf.printf "SUP: %s\n" (dump_mem_restr mr); *)
+    mr
 
 let rec compare_modtype mty1 mty2 =
   let c = p_compare mty1.mt_name mty2.mt_name in
@@ -468,15 +487,29 @@ let add_adv env sign mv ff (st:local_state) =
 
     set_mem sign mv ff' st
 
-let rec solve (env : env) (st : local_state) =
-  if st.unsat then (Format.printf "UNSAT@."; ())
+
+let dump_var (v : meta_var) =
+  match v with
+  | Gvar x -> EcPath.x_tostring x
+  | Meta m -> string_of_int m
+
+let dump_mem r =
+  if r.sign then
+    Printf.sprintf "%s \\in %s" (dump_var r.var) (dump_mem_restr r.set) 
+  else
+    Printf.sprintf "%s \\notin %s" (dump_var r.var) (dump_mem_restr r.set) 
+
+let rec solve ?(depth = 0) (env : env) (st : local_state) =
+  if st.unsat then (Printf.printf "%d: UNSAT\n" depth; ())
   else match st.todo with
   | [] -> raise (SAT st)
   | r :: todo ->
-    process env r {st with todo}
+  Printf.printf "Processing %d: %s\n" depth (dump_mem r);
+  Printf.printf "Todo: %s\n" (String.concat " <| " (List.map dump_mem todo));
+    process depth env r {st with todo}
 
 (* precondition st.unsat = false *)
-and process (env : env) (r : mem) (st : local_state) =
+and process depth (env : env) (r : mem) (st : local_state) =
   let sts =
     match r.set with
     | Empty -> [set_unsat r.sign st]
@@ -516,21 +549,10 @@ and process (env : env) (r : mem) (st : local_state) =
          (* !(mv in s1 inter s2) = !(mv in s1) || !(mv in s2) *)
          [push st r1; push st r2]
   in
-  List.iter (solve env) sts
+  List.iteri (fun i -> solve ~depth:(depth + i) env) sts
 
 
 (* ------------------------------------------------------------------- *)
-
-let rec dump_mem_restr mr =
-  match mr with
-  | Empty -> "Empty"
-  | All -> "All"
-  | Var x -> Format.sprintf "Var (%s)" (EcPath.x_tostring x)
-  | GlobFun ff -> Format.sprintf "GlobFun (%s)" (EcPath.x_tostring ff.ff_xp)
-  | Inter (l, r) -> Format.sprintf "Inter (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
-  | Union (l, r) -> Format.sprintf "Union (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
-  | Diff (l, r) -> Format.sprintf "Diff (%s, %s)" (dump_mem_restr l) (dump_mem_restr r)
-
 (* /!\ Precondition s1 and s2 should have been normalised *)
 let core_subset env s1 s2 =
   (* add clause !(s1 subset s2)
@@ -546,6 +568,7 @@ let core_subset env s1 s2 =
 let subset env s1 s2 =
   let s1 = norm_mem_restr env s1 in
   let s2 = norm_mem_restr env s2 in
+
   core_subset env s1 s2
 
 let disjoint env s1 s2 = subset env (Inter(s1, s2)) Empty
