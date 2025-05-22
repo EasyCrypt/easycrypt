@@ -654,13 +654,10 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fint i1, Fint i2 ->
           if not (EcBigInt.equal i1 i2) then failure ();
 
-      | Fglob _, Fglob _ ->
-          assert false;
-        (*
-            if not (EcIdent.id_equal mp1 mp2) then
+      | Fglob (ff1, me1), Fglob (ff2, me2) ->
+            if not (EcMemRestr.ff_alpha_equal ff1 ff2) then
               failure ();
             doit_mem env mxs me1 me2
-          *)
 
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then

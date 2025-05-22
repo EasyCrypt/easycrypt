@@ -352,9 +352,9 @@ let t_call side ax tc =
 let mk_inv_spec (_pf : proofenv) env inv fl fr =
   match NormMp.is_abstract_fun fl env with
   | true ->
-    let (topl, _, _, sigl),
-      (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-    let eqglob = assert false in (* f_eqglob topl mleft topr mright in *)
+    let (ffl, _, _, sigl),
+      (ffr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
+    let eqglob = f_eqglob ffl mleft ffr mright in
     let lpre = [eqglob;inv] in
     let eq_params =
       f_eqparams
@@ -461,10 +461,10 @@ let process_call side info tc =
         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
         let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
-        let (topl,fl,_,sigl),
-            (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
+        let (ffl,fl,_,sigl),
+            (ffr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
         let bad2 = Fsubst.f_subst_mem mhr mright bad in
-        let eqglob = assert false in (* f_eqglob topl mleft topr mright in *)
+        let eqglob = f_eqglob ffl mleft ffr mright in
         let lpre = [eqglob;invP] in
         let eq_params =
           f_eqparams

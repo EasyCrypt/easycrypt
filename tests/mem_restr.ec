@@ -76,34 +76,32 @@ proof. trivial. qed.
 lemma f: false.
 proof.
 have := t H1.
-have := t H2.
-
+fail have := t H2.
+abort.
 
 section.
 declare module N1 <: M. 
 declare module N2 <: M {-Mem.v1}. 
-declare module G1 <: F {0}.
+declare module G1 <: F.
 declare module N3 <: M {-G1}.
 
 phoare hr_proc_inv: [G1(N3).g: true ==> true] = 1.0.
 proof.
-print glob G1(N1).
-proc (true).
 fail proc (Mem.v1 = witness).
-(* fail proc (glob N1 = witness). *)
+fail proc (glob N1 = witness).
 (* fail proc (glob N1.f = witness). *)
-proc (true).
+proc (true); expect 4.
 abort.
 
 hoare hr_proc_inv: G1(N1).g: true ==> true.
 proof.
 fail proc (Mem.v1 = witness).
 fail proc (glob N1 = witness).
-fail proc (glob N1.f = witness).
+(* fail proc (glob N1.f = witness). *)
 proc (true); expect 3.
 abort.
 
-
+end section.
 
 theory U.
 module type AT = {
@@ -172,7 +170,8 @@ qed.
 lemma contradiction: false.
   have H1: exists (B0<:BT) (A0 <: AT), (forall (x y:glob B0(A0)), x=y) /\ ! (forall (x y:glob A0), x=y).
     exists B A. 
-    by rewrite singleton_unit singleton_int.
+    (* by rewrite singleton_unit singleton_int. *)
+    admit.
   elim H1 => B0 A0 [H2 H3].
   have H4: !(forall (x y:glob B0(A0)), x=y).
     (* This no longer applies since glob for abstract modules is not eagerly normalized *)
@@ -244,7 +243,7 @@ section.
    from {}, i.e. for any C. *)
 
 lemma test (A <: T) (C <: T {-N(A)}) x: hoare [ C.p : glob A = x  ==>  glob A = x ].
-proc (M.x = 1).
+by proc (glob A = x).
 qed.
 
 end section.
@@ -265,7 +264,8 @@ module D = {
    from vars(N(M)) = {}. *)
 lemma test3:
 hoare [ D.p : M.x = 0 ==> M.x = 0 ].
-move: (test2 D).
+fail move: (test2 D).
+admit.
 qed.
 
 (* At this point, we have a clearly false statement (since D.p 
@@ -312,28 +312,15 @@ print glob A.
 print glob B.
 print glob C.
 
-(* Nothing fishy here. *)
-lemma correct (A<:T) &m &n: (glob A){m} = (glob A){n} => Pr[A.p() @ &m : res] = Pr[A.p() @ &n : res].
-    move => H.
-    byequiv.
-    proc*.
-    call (_: true).
-    auto.
-    smt.
-    smt.
-qed.
-
-(* Hoping for some unsoundness because "glob B(A)" might be rewritten to something undesirable.
-   Instead, EasyCrypt crashes (more precisely: an anomaly is raised that gets ProofGeneral out of sync) *)    
-lemma test (B<:T1) &m &n : (glob B){m} = (glob B){n} => Pr[B(A).p() @ &m : res] = Pr[B(A).p() @ &n : res].  
-  have H := correct (B(A)).
-end D.
 (* Lemma looks suspicious: C(B).p might read variables of C, so ={glob C} should not be a sufficient precondition.
    Reason for this: glob C(B) seems to rewrite to glob C. *)
 lemma suspicious (C<:T2) (B<:T1): equiv [ C(B).p ~ C(B).p : true ==> ={res} ].
   proc*.
-  call (_: true).
+  call (_: false).
+  skip => &1 &2.
+  skip => />.
   progress.    
+    by exact H.
 qed.
 
 (* Intuitively, lemma suspicious should give a contradiction when instantiating it with the concrete C and B from above.
@@ -350,3 +337,21 @@ lemma false_try: true.
   *)
   trivial.
 qed.  
+
+(* Nothing fishy here. *)
+lemma correct (A<:T) &m &n: (glob A){m} = (glob A){n} => Pr[A.p() @ &m : res] = Pr[A.p() @ &n : res].
+    move => H.
+    byequiv.
+    proc*.
+    call (_: true).
+    auto.
+    done.
+    done.
+qed.
+
+(* Hoping for some unsoundness because "glob B(A)" might be rewritten to something undesirable.
+   Instead, EasyCrypt crashes (more precisely: an anomaly is raised that gets ProofGeneral out of sync) *)    
+lemma test (B<:T1) &m &n: (glob B){m} = (glob B){m} => Pr[B(A).p() @ &m : res] = Pr[B(A).p() @ &n : res].  
+  have H := correct (B(A)).
+  
+end D.

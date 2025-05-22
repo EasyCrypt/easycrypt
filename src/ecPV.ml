@@ -653,18 +653,10 @@ module Mpv2 = struct
           | Some(s,ty) -> Some (Snpv.add pv2 s, ty))
           pv1 eqs.s_pv }
 
-  let add_glob env mp1 mp2 eqs = assert false
-  (*
-    let mp1, mp2 = NormMp.norm_mpath env mp1, NormMp.norm_mpath env mp2 in
+  let add_glob _env ff1 ff2 eqs =
     (* FIXME error message *)
-    if not (EcPath.m_equal mp1 mp2) then assert false;
-    if not (mp1.m_args = []) then assert false;
-    begin match mp1.m_top with
-    | `Local _ -> ()
-    | _ -> assert false
-    end;
-    { eqs with s_gl = Sff.add mp1 eqs.s_gl }
-    *)
+    if not (EcMemRestr.ff_alpha_equal ff1 ff2) then assert false;
+    { eqs with s_gl = Sff.add ff1 eqs.s_gl }
 
 
   let remove env pv1 pv2 eqs =
@@ -679,15 +671,9 @@ module Mpv2 = struct
           if Snpv.is_empty s then None else raise EqObsInError)
           pv1 eqs.s_pv }
 
-  let remove_glob mp eqs = assert false
-    (*
-    begin match mp.m_top with
-    | `Local _ -> ()
-    | _ -> assert false
-    end;
+  let remove_glob ff eqs =
     { eqs with
-      s_gl = Sm.remove mp eqs.s_gl }
-*)
+      s_gl = Sff.remove ff eqs.s_gl }
 
   let union eqs1 eqs2 =
     { s_pv =
@@ -704,30 +690,27 @@ module Mpv2 = struct
     Mnpv.equal (fun (s1,_) (s2,_) -> Snpv.equal s1 s2) eqs1.s_pv eqs2.s_pv &&
     Sff.equal eqs1.s_gl eqs2.s_gl
 
-  let is_mod_pv env pv mod_ = assert false
-    (*
+  let is_mod_pv env pv mod_ =
     if Mnpv.mem pv mod_.PV.s_pv then true
     else
       if is_glob pv then
         let x = get_glob pv in
-        let check_mp mp =
-          let restr = NormMp.get_restr_use env mp in
-          not (NormMp.use_mem_xp x restr) in
-        Sm.exists check_mp mod_.PV.s_gl
+        let check_ff ff =
+          let restr = EcMemRestr.ff_norm_restr env ff in
+          not (EcMemRestr.is_mem env true x restr) in
+        Sff.exists check_ff mod_.PV.s_gl
       else false
-  *)
 
-  let is_mod_mp env mp mod_ = assert false
-  (*
-    let restr = NormMp.get_restr_use env mp in
+  let is_mod_mp env ff mod_ =
+    let restr = EcMemRestr.ff_norm_restr env ff in
     let check_v pv _ty =
-      not (is_glob pv) || not (NormMp.use_mem_xp (get_glob pv) restr) in
-    let check_mp mp' =
-      not (NormMp.use_mem_gl mp' restr ||
-           NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
+      not (is_glob pv) || not (EcMemRestr.is_mem env true (get_glob pv) restr) in
+    let check_ff ff =
+      let restr' = EcMemRestr.ff_norm_restr env ff in
+      not (EcMemRestr.subset env restr restr' ||
+           EcMemRestr.subset env restr' restr) in
     Mnpv.exists check_v mod_.PV.s_pv ||
-    Sm.exists check_mp mod_.PV.s_gl
-  *)
+    Sff.exists check_ff mod_.PV.s_gl
 
   let split_nmod env modl modr eqo =
     { s_pv =
@@ -796,19 +779,16 @@ module Mpv2 = struct
     let x = pvm env x in
     Mnpv.exists (fun _ (s,_) -> Snpv.mem x s) eqs.s_pv
 
-  let to_form ml mr eqs inv = assert false
-  (*
+  let to_form ml mr eqs inv =
     let l =
-      Sm.fold (fun m l -> f_eqglob m ml m mr :: l) eqs.s_gl [] in
+      Sff.fold (fun ff l -> f_eqglob ff ml ff mr :: l) eqs.s_gl [] in
     let l =
       Mnpv.fold (fun pvl (s,ty) l ->
         Snpv.fold (fun pvr l -> f_eq (f_pvar pvl ty ml) (f_pvar pvr ty mr) :: l)
           s l) eqs.s_pv l in
     f_and_simpl (f_ands l) inv
-  *)
 
-  let of_form env ml mr f = assert false
-  (*
+  let of_form env ml mr f =
     let rec aux f eqs =
       match sform_of_form f with
       | SFtrue -> eqs
@@ -818,20 +798,19 @@ module Mpv2 = struct
       | SFeq ({ f_node = Fpvar(pvr,mr')},{f_node = Fpvar(pvl,ml');f_ty = ty})
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
         add env ty pvl pvr eqs
-      | SFeq(({f_node = Fglob(mpl, ml')}),
-             ({f_node = Fglob(mpr, mr')}))
+      | SFeq(({f_node = Fglob(ffl, ml')}),
+             ({f_node = Fglob(ffr, mr')}))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
-          add_glob env (EcPath.mident mpl) (EcPath.mident mpr) eqs
-      | SFeq(({f_node = Fglob(mpr, mr')}),
-             ({f_node = Fglob(mpl, ml')}))
+          add_glob env ffl ffr eqs
+      | SFeq(({f_node = Fglob(ffl, mr')}),
+             ({f_node = Fglob(ffr, ml')}))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
-          add_glob env (EcPath.mident mpl) (EcPath.mident mpr) eqs
+          add_glob env ffl ffr eqs
       | SFeq({f_node = Ftuple fs1}, {f_node = Ftuple fs2}) ->
         List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
       | _ -> raise Not_found in
     aux f empty
-  *)
 
   let enter_local env local ids1 ids2 =
     try
@@ -841,8 +820,7 @@ module Mpv2 = struct
       List.fold_left2 do1 local ids1 ids2
     with _ -> raise EqObsInError
 
-  let needed_eq env ml mr f = assert false
-    (*
+  let needed_eq env ml mr f =
 
     let rec add_eq local eqs f1 f2 =
       match f1.f_node, f2.f_node with
@@ -873,9 +851,9 @@ module Mpv2 = struct
       | Fglob(_,m2), Fglob(_,m1)
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
         add_eq local eqs f2 f1
-      | Fglob(mp1,m1), Fglob(mp2,m2)
+      | Fglob(ff1,m1), Fglob(ff2,m2)
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
-          add_glob env (EcPath.mident mp1) (EcPath.mident mp2) eqs
+          add_glob env ff1 ff2 eqs
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
           List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
@@ -918,7 +896,6 @@ module Mpv2 = struct
 
     try aux Mid.empty empty f
     with _ -> raise Not_found
-  *)
 
   let check_glob eqs =
     Mnpv.iter (fun pv (s,_)->

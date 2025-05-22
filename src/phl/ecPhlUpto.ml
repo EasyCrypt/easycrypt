@@ -114,12 +114,15 @@ and f_upto env bad f1 f2 =
     s_upto env EcIdent.Mid.empty bad fd1.f_body fd2.f_body
 
   | FBabs o1, FBabs o2 ->
+    (* NOTE: mildly inefficient *)
+    let (ff, _, _, _) = EcLowPhlGoal.abstract_info env f1 in
     f1.x_sub = f2.x_sub &&
     EcPath.mt_equal f1.x_top.m_top f2.x_top.m_top &&
     omap_dfl (fun bad ->
       let fv = EcPV.PV.add env bad tbool EcPV.PV.empty in
-      assert false; (* EcPV.PV.check_depend env fv (m_functor f1.x_top); *)
-      true) true bad &&
+      EcPV.PV.check_depend env fv ff;
+      true) true bad 
+    &&
     List.all2 (f_upto env bad) (OI.allowed o1) (OI.allowed o2)
 
   | _, _ -> false

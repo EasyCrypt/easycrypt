@@ -1,11 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcPath
-open EcTypes
-open EcModules
-open EcMemory
 open EcEnv
-open EcFol
 open EcAst
 open EcCoreMemRestr
 
@@ -37,6 +33,10 @@ module Mpv : sig
   val empty : ('a,'b) t
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
+
+  val check_npv_mp : env -> xpath -> functor_fun -> mem_restr -> unit
+
+  val check_mp_mp : env -> functor_fun -> mem_restr -> functor_fun -> mem_restr -> unit
 
   val check_glob : env -> functor_fun -> ('a,'b) t -> unit
 
@@ -162,8 +162,8 @@ module Mpv2 : sig
   val equal    : t -> t -> bool
   val remove : env -> prog_var -> prog_var -> t -> t
   (* remove_glob mp t, mp should be a top abstract functor *)
-  val remove_glob : mpath -> t -> t
-  val add_glob : env -> mpath -> mpath -> t -> t
+  val remove_glob : functor_fun -> t -> t
+  val add_glob : env -> functor_fun -> functor_fun -> t -> t
   val add_eqs_loc : env -> local -> t -> expr -> expr -> t
   val add_eqs : env -> expr -> expr -> t -> t
   val subst_l : env -> prog_var -> prog_var -> t -> t

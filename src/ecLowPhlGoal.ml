@@ -454,8 +454,7 @@ let subst_form_lv env m lv t f =
 
 (* -------------------------------------------------------------------- *)
 (* Remark: m is only used to create fresh name, id_of_pv *)
-let generalize_subst_ env m uelts uglob = assert false
-(*
+let generalize_subst_ env m uelts (uglob : functor_fun list) =
   let create (pv, ty) = id_of_pv pv m, GTty ty in
   let b = List.map create uelts in
   let s =
@@ -464,19 +463,17 @@ let generalize_subst_ env m uelts uglob = assert false
         Mpv.add env pv (f_local id ty) s)
       Mpv.empty uelts b
   in
-  let create mp = id_of_mp mp m, GTty (tglob (EcPath.mget_ident mp)) in
+  let create ff = id_of_mp ff.ff_xp.x_top m, GTty (EcMemRestr.ff_norm_ty env ff) in
   let b' = List.map create uglob in
   let s  =
     List.fold_left2
-      (fun s mp (id, _) ->
-        Mpv.add_glob env mp (f_local id (tglob (EcPath.mget_ident mp))) s)
+      (fun s ff (id, _) ->
+        Mpv.add_glob env ff (f_local id (EcMemRestr.ff_norm_ty env ff)) s)
       s uglob b'
   in
     (b', b, s)
-*)
 
-let generalize_mod_ env m modi f = assert false
-(*
+let generalize_mod_ env m modi f =
   let (melts, mglob) = PV.ntr_elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
@@ -496,27 +493,27 @@ let generalize_mod_ env m modi f = assert false
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)
   let restrs =
-    List.fold_left (fun r mp ->
-      let restr = NormMp.get_restr_use env mp in
-      EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
+    List.fold_left (fun r ff ->
+      let restr = EcMemRestr.ff_norm_restr env ff in
+      EcCoreMemRestr.Mff.add ff restr r) EcCoreMemRestr.Mff.empty mglob in
   List.iter (fun (npv,_) ->
     if is_glob npv then
-      let check1 mp restr =  Mpv.check_npv_mp env (get_glob npv) mp restr in
-      EcPath.Mm.iter check1 restrs) nelts;
-  List.iter (fun mp ->
-    let restr = NormMp.get_restr_use env mp in
+      let check1 (ff : functor_fun) (restr : mem_restr) = Mpv.check_npv_mp env (get_glob npv) ff restr in
+      EcCoreMemRestr.Mff.iter check1 restrs) nelts;
+  List.iter (fun ff ->
+    let restr = EcMemRestr.ff_norm_restr env ff in
     let check (npv,_) =
       if is_glob npv then
-        Mpv.check_npv_mp env (get_glob npv) mp restr in
+        Mpv.check_npv_mp env (get_glob npv) ff restr in
     List.iter check melts;
-    let check mp' restr' = Mpv.check_mp_mp env mp restr mp' restr' in
-    EcPath.Mm.iter check restrs) nglob;
+    let check ff' restr' = Mpv.check_mp_mp env ff restr ff' restr' in
+    EcCoreMemRestr.Mff.iter check restrs) nglob;
 
   (* 3.c. Perform the substitution *)
   let s = PVM.of_mpv s m in
   let f = PVM.subst env s f in
   f_forall_simpl (bd'@bd) f, (bd', uglob), (bd, uelts)
-    *)
+
 let generalize_subst env m uelts uglob =
   let (b',b,f) = generalize_subst_ env m uelts uglob in
   b'@b, f
@@ -528,7 +525,6 @@ let generalize_mod env m modi f =
 (* -------------------------------------------------------------------- *)
 let abstract_info env f1 =
   let f   = EcEnv.NormMp.norm_xfun env f1 in
-  let top = EcPath.m_functor f.EcPath.x_top in
   let def = EcEnv.Fun.by_xpath f env in
 
   let oi  =
@@ -546,26 +542,28 @@ let abstract_info env f1 =
             (EcPrinting.pp_funname ppe) f1
             (EcPrinting.pp_funname ppe) f
   in
-    (top, f, oi, def.f_sig)
+  let top = EcPath.m_functor f.EcPath.x_top in
+  let me, _ = EcEnv.Mod.by_mpath top env in
+  let top = EcPath.m_apply top (List.map (fun (x, _t) -> EcPath.mident x) me.me_params) in
+  let ff = EcCoreMemRestr.functor_fun me.me_params (EcPath.xpath top f.x_sub) in
+    (ff, f, oi, def.f_sig)
 
 (* -------------------------------------------------------------------- *)
 let abstract_info2 env fl' fr' =
-  let (topl, fl, oil, sigl) = abstract_info env fl' in
-  let (topr, fr, oir, sigr) = abstract_info env fr' in
-  let fl1 = EcPath.xpath topl fl.EcPath.x_sub in
-  let fr1 = EcPath.xpath topr fr.EcPath.x_sub in
-    if not (EcPath.x_equal fl1 fr1) then begin
+  let (ffl, fl, oil, sigl) = abstract_info env fl' in
+  let (ffr, fr, oir, sigr) = abstract_info env fr' in
+    if not (EcMemRestr.ff_alpha_equal ffl ffr) then begin
       let ppe = EcPrinting.PPEnv.ofenv env in
         EcCoreGoal.tacuerror
           "function %a reduces to %a and %a reduces to %a, %a and %a should be equal"
           (EcPrinting.pp_funname ppe) fl'
-          (EcPrinting.pp_funname ppe) fl1
+          (EcPrinting.pp_functorfun ppe) ffl
           (EcPrinting.pp_funname ppe) fr'
-          (EcPrinting.pp_funname ppe) fr1
-          (EcPrinting.pp_funname ppe) fl1
-          (EcPrinting.pp_funname ppe) fr1
+          (EcPrinting.pp_functorfun ppe) ffr
+          (EcPrinting.pp_functorfun ppe) ffl
+          (EcPrinting.pp_functorfun ppe) ffr
     end;
-    ((topl, fl, oil, sigl), (topr, fr, oir, sigr))
+    ((ffl, fl, oil, sigl), (ffr, fr, oir, sigr))
 
 (* -------------------------------------------------------------------- *)
 type code_txenv = proofenv * LDecl.hyps

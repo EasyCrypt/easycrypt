@@ -37,7 +37,8 @@ module EqTest_base = struct
     | Tfun (t1, t2), Tfun (t1', t2') ->
         for_type env t1 t1' && for_type env t2 t2'
 
-    | Tglob ff1, Tglob ff2 -> EcMemRestr.ff_alpha_equal ff1 ff2
+    | Tglob ff1, Tglob ff2 ->
+      EcMemRestr.ff_alpha_equal ff1 ff2
 
     | Tglob ff, _ -> 
       let t1' = EcMemRestr.ff_norm_ty env ff in

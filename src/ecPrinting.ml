@@ -1536,18 +1536,15 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
       if pv1 = pv2 then Some (`Var pv1) else None
 
-    | SFeq ({ f_node = Fglob (_x1, me1) },
-            { f_node = Fglob (_x2, me2) })
+    | SFeq ({ f_node = Fglob (x1, me1) },
+            { f_node = Fglob (x2, me2) })
         when (EcMemory.mem_equal me1 EcFol.mleft )
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
-      assert false
-        (*
-      let pv1 = (PPEnv.mod_symb ppe (EcPath.mident x1)) in
-      let pv2 = (PPEnv.mod_symb ppe (EcPath.mident x2)) in
+      let pv1 = (PPEnv.mod_symb ppe x1.ff_xp.x_top) in
+      let pv2 = (PPEnv.mod_symb ppe x2.ff_xp.x_top) in
 
       if pv1 = pv2 then Some (`Glob pv1) else None
-          *)
 
     | SFeq ({ f_node = Fproj (f1, i1); f_ty = ty1 },
             { f_node = Fproj (f2, i2); f_ty = ty2 }) -> begin

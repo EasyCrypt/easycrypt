@@ -154,9 +154,8 @@ let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
   let hoareF_abs_spec _pf env f inv =
-    let (_, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (ff, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    let ff = functor_fun [] f in
     PV.check_depend env fv ff;
     let ospec o = f_hoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
@@ -164,10 +163,8 @@ module FunAbsLow = struct
 
   (* ------------------------------------------------------------------ *)
   let ehoareF_abs_spec _pf env f inv =
-    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (ff, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    let me, _ = EcEnv.Mod.by_mpath top env in
-    let ff = functor_fun me.me_params f in
     PV.check_depend env fv ff;
     let ospec o = f_eHoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
@@ -175,10 +172,10 @@ module FunAbsLow = struct
 
   (* ------------------------------------------------------------------ *)
   let bdhoareF_abs_spec pf env f inv =
-    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let (ff, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
-    let me, _ = EcEnv.Mod.by_mpath top env in
-    let ff = functor_fun me.me_params f in
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    Format.printf "@[%a@]@." (EcPrinting.pp_functorfun ppe) ff;
     PV.check_depend env fv ff;
     let ospec o =
       check_oracle_use pf env ff o;
@@ -189,15 +186,13 @@ module FunAbsLow = struct
 
   (* ------------------------------------------------------------------ *)
   let equivF_abs_spec pf env fl fr inv =
-    let (_, _fl, oil, sigl), (_, _fr, oir, sigr) =
+    let (ffl, _fl, oil, sigl), (ffr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
     let ml, mr = mleft, mright in
     let fvl = PV.fv env ml inv in
     let fvr = PV.fv env mr inv in
-    let ffl = functor_fun [] fl in
-    let ffr = functor_fun [] fr in
     PV.check_depend env fvl ffl;
     PV.check_depend env fvr ffr;
     let eqglob = f_eqglob ffl ml ffr mr in

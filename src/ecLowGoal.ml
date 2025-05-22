@@ -1786,12 +1786,10 @@ module LowSubst = struct
 
     (* Substitution of globs *)
     | Fglob (mp, m), None when kind.sk_glob -> Some (`Glob (mp, m))
-    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob -> assert false
-      (*
-        if   EcIdent.id_equal mp mp'
-        then Some (`Glob (mp, m))
+    | Fglob (ff, m), Some (`Glob (ff', _)) when kind.sk_glob ->
+        if   EcMemRestr.ff_alpha_equal ff ff'
+        then Some (`Glob (ff, m))
         else None
-        *)
 
     | _, _ -> None
 
@@ -1840,12 +1838,11 @@ module LowSubst = struct
         if EcPV.PV.mem_pv env pv fv then None else Some aout
 
       (* Substitution of globs *)
-      | Some ((_, `Glob (mp, m), f) as aout) -> assert false
-        (*
+      | Some ((_, `Glob (ff, m), f) as aout) ->
         let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
-        if EcPV.PV.mem_glob env (EcPath.mident mp) fv then None else Some aout
-          *)
+        if EcPV.PV.mem_glob env ff fv then None else Some aout
+
             in
     match aout with
     | None -> None
@@ -1877,8 +1874,8 @@ module LowSubst = struct
         let check _tg = true in
         (subst f, check)
 
-    | `Glob (_ff, _m) ->
-        let subst _f = EcPV.PVM.subst env EcPV.PVM.empty in (* (EcPV.PVM.add_glob env (EcPath.mident mp) m f EcPV.PVM.empty) in *)
+    | `Glob (ff, m) ->
+        let subst f = EcPV.PVM.subst env (EcPV.PVM.add_glob env ff m f EcPV.PVM.empty) in
         (* FIXME *)
         let check _tg = true in
         (subst f, check)

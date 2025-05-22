@@ -287,14 +287,13 @@ and f_eqobs_in fl fr sim eqO =
     try
       match defl.f_def, defr.f_def with
       | FBabs oil, FBabs oir ->
-        let (topl,_,_,_), (topr,_,_,_) =
+        let (ffl,_,_,_), (ffr,_,_,_) =
           try EcLowPhlGoal.abstract_info2 env fl fr
           with TcError _ -> raise EqObsInError in
 
-        let top = EcPath.m_functor nfl.EcPath.x_top in
         let sim, eqi =
           (* Try to infer the good invariant for oracle *)
-          let eqo = Mpv2.remove_glob top outf in
+          let eqo = Mpv2.remove_glob ffl outf in
           let rec aux eqo =
             let sim, eqi =
               List.fold_left2
@@ -308,11 +307,11 @@ and f_eqobs_in fl fr sim eqO =
             let inv = Mpv2.to_form mleft mright eqi sim.sim_inv in
             let fvl = PV.fv env mleft inv in
             let fvr = PV.fv env mright inv in
-            assert false; (* PV.check_depend env fvl topl; *)
-            assert false; (* PV.check_depend env fvr topr; *)
+            PV.check_depend env fvl ffl;
+            PV.check_depend env fvr ffr;
           with TcError _ -> raise EqObsInError
         end;
-        sim, (Mpv2.add_glob env top top eqi)
+        sim, (Mpv2.add_glob env ffl ffl eqi)
 
       | FBdef funl, FBdef funr ->
         let local = Mpv2.empty_local in

@@ -849,7 +849,7 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
     WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
-and trans_glob _ _ _ = assert false
+and trans_glob _ _ _ = failwith "Implement smt translation for functor fun"
 
 (*
 and trans_glob ((genv, _) as env) m mem =
