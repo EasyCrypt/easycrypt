@@ -218,12 +218,18 @@ instance field with real
 
 (* -------------------------------------------------------------------- *)
 op floor : real -> int.
-op ceil  : real -> int.
+
+op [opaque smt_opaque] ceil (x : real) : int =
+  -(floor (Self.([-]) x)).
 
 axiom floor_bound (x:real) : x - 1%r < (floor x)%r <= x.
-axiom ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
-axiom from_int_ceil  n : ceil  n%r = n.
+
+lemma ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
+proof. by rewrite /ceil; smt(floor_bound). qed.
+
+lemma from_int_ceil  n : ceil  n%r = n.
+proof. by rewrite /ceil -fromintN from_int_floor oppzK. qed.
 
 lemma floor_gt x : x - 1%r < (floor x)%r.
 proof. by case: (floor_bound x). qed.
@@ -245,6 +251,12 @@ proof. smt(floor_bound). qed.
 
 lemma from_int_floor_addr n x : floor (x + n%r) = floor x + n.
 proof. smt(floor_bound). qed.
+
+lemma from_int_ceil_addl n x : ceil (n%r + x) = n + ceil x.
+proof. smt(ceil_bound). qed.
+
+lemma from_int_ceil_addr n x : ceil (x + n%r) = ceil x + n.
+proof. smt(ceil_bound). qed.
 
 lemma floor_mono (x y : real) : x <= y => floor x <= floor y.
 proof. smt(floor_bound). qed.
