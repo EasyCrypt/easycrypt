@@ -56,14 +56,17 @@ let wp2_call
   f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_call fpre fpost tc =
+let t_hoare_call fm fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let (lp,f,args),s = tc1_last_call tc hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF mhr fpre f fpost in
+  let f_concl = f_hoareF fm fpre f fpost in
+  (* substitute memories *)
+  let fpre = Fsubst.f_subst_mem fm m fpre in
+  let fpost = Fsubst.f_subst_mem fm m fpost in
   (* The wp *)
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
@@ -308,7 +311,7 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in
       if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
         call_error env tc hf.hf_f f;
-      t_hoare_call hf.hf_pr hf.hf_po tc
+      t_hoare_call hf.hf_m hf.hf_pr hf.hf_po tc
 
   | FeHoareF hf, FeHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
@@ -390,8 +393,8 @@ let process_call side info tc =
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let penv, qenv = LDecl.hoareF mhr f hyps in
-          (penv, qenv, tbool, fun pre post -> f_hoareF mhr pre f post)
+          let penv, qenv = LDecl.hoareF (fst hs.hs_m) f hyps in
+          (penv, qenv, tbool, fun pre post -> f_hoareF (fst hs.hs_m) pre f post)
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
@@ -431,7 +434,7 @@ let process_call side info tc =
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv -> f_hoareF mhr inv f inv)
+        (penv, tbool, fun inv -> f_hoareF (fst hs.hs_m) inv f inv)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
