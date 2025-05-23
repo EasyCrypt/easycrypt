@@ -2291,9 +2291,12 @@ type cstate = {
 }
 
 let t_debug ?(tag="") t tc =
-  Format.eprintf "%s" tag;
+  Format.eprintf "Before (tag: %s):" tag;
   pp_tc (FApi.tcenv_of_tcenv1 tc);
-  t tc
+  let r = t tc in
+  Format.eprintf "After (tag: %s):" tag;
+  pp_tc r;
+  r
 
 let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
