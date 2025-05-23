@@ -351,3 +351,10 @@ val t_solve :
   -> ?mode:EcMatching.fmoptions
   -> ?depth:int
   -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_debug :
+     ?tag:string (* for distinguishing prints *)
+  -> FApi.backward
+  -> FApi.backward
+[@@ocaml.alert debug "Debug function, remove uses before merging"]
