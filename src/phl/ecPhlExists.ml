@@ -99,11 +99,12 @@ let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
   let penv =
     match concl.f_node with
-    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
+    (* Not sure about this either *)
+    | FhoareF hf -> fst (LDecl.hoareF hf.hf_m hf.hf_f hyps)
     | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FeHoareF hf -> fst (LDecl.hoareF hf.ehf_f hyps)
+    | FeHoareF hf -> fst (LDecl.hoareF mhr hf.ehf_f hyps)
     | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
-    | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
+    | FbdHoareF bhf -> fst (LDecl.hoareF mhr bhf.bhf_f hyps)
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
     | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps

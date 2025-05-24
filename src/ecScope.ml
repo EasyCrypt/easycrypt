@@ -1417,7 +1417,7 @@ module Op = struct
 
            f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) locs)
-             (f_hoareF
+             (f_hoareF mhr
                 (f_eq
                    args
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))

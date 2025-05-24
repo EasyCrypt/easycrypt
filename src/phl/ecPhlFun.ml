@@ -73,9 +73,10 @@ let subst_pre env fs (m : memory) s =
 let t_hoareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
+  (*assert (hf.hf_m <> mhr);*)
   let f = NormMp.norm_xfun env hf.hf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres hf.hf_po in
@@ -89,7 +90,7 @@ let t_ehoareF_fun_def_r tc =
   let hf = tc1_as_ehoareF tc in
   let f = NormMp.norm_xfun env hf.ehf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS mhr f env in
   let m = EcMemory.memory memenv in
   let fres  = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post  = PVM.subst1 env pv_res m fres hf.ehf_po in
@@ -103,7 +104,7 @@ let t_bdhoareF_fun_def_r tc =
   let bhf = tc1_as_bdhoareF tc in
   let f = NormMp.norm_xfun env bhf.bhf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS mhr f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres bhf.bhf_po in
@@ -160,7 +161,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF mhr inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
