@@ -851,7 +851,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     ->
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-
     t_on1seq 2
       (tac (f_and hs.hf_pr hs2.hf_pr) (f_and hs.hf_po hs2.hf_po))
       (FApi.t_seqsub
@@ -1348,7 +1347,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         in
         let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
-          ensure_none c_or_bd; f_hoareF mhr pre f post in
+          ensure_none c_or_bd; f_hoareF hf.hf_m pre f post in
         (penv, qenv, pr, po, tbool, fmake)
 
       | FeHoareF hf ->
