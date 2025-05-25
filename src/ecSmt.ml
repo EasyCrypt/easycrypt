@@ -913,17 +913,25 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   in WTerm.t_app_infer fs_mu [d; wev]
 
 (* -------------------------------------------------------------------- *)
-and trans_gen ((genv, _) as env :  tenv * lenv) (fp : form) =
+and trans_gen ((genv, lenv) as env :  tenv * lenv) (fp : form) =
   match Hf.find_opt genv.te_gen fp with
   | None ->
     let name = WIdent.id_fresh "x" in
+    let argsty, args =
+      let fv = Mid.keys fp.f_fv in
+      let fv = List.pmap (fun x -> Mid.find_opt x lenv.le_lv) fv in
+      (
+        List.map (fun v -> v.WTerm.vs_ty) fv,
+        List.map WTerm.t_var fv
+      ) in
+
     let wty  =
       if   EcReduction.EqTest.is_bool genv.te_env fp.f_ty
       then None
       else Some (trans_ty env fp.f_ty) in
 
-    let lsym = WTerm.create_lsymbol name [] wty in
-    let term = WTerm.t_app_infer lsym [] in
+    let lsym = WTerm.create_lsymbol name argsty wty in
+    let term = WTerm.t_app_infer lsym args in
 
     genv.te_task <- WTask.add_param_decl genv.te_task lsym;
     Hf.add genv.te_gen fp term;
