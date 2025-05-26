@@ -14,6 +14,7 @@ CHECK     += --bin-args=-timeout --bin-args="$(ECTOUT)"
 CHECK     += $(foreach arg,$(ECARGS),--bin-args="$(arg)")
 CHECK     += $(ECEXTRA) config/tests.config
 NIX       ?= nix --extra-experimental-features "nix-command flakes"
+PROFILE   ?= dev
 
 # --------------------------------------------------------------------
 UNAME_P = $(shell uname -p)
@@ -29,7 +30,7 @@ default: build
 
 build:
 	rm -f src/ec.exe ec.native
-	dune build
+	$(DUNE) build --profile=$(PROFILE)
 	ln -sf src/ec.exe ec.native
 ifeq ($(UNAME_P)-$(UNAME_S),arm-Darwin)
 	-codesign -f -s - src/ec.exe

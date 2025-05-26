@@ -2,7 +2,7 @@
 
 prover [""].
 
-require import AllCore List MapAux SmtMap FSet Distr.
+require import AllCore List MapAux FMap FSet Distr.
 require IterProc.
 
 type flag = [ Unknown | Known ].  (* map setting known by distinguisher? *)

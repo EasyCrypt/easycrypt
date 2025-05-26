@@ -55,7 +55,8 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
 
   (* Extract the call statement and surrounding code *)
   let prefix, (llv, func, largs), suffix =
-    let p, i, s = s_split_i cp code in
+    let cp = EcProofTyping.tc1_process_codepos1 tc (Some side, cp) in
+    let p, i, s = s_split_i env cp code in
     if not (is_call i) then
       rwe_error RWE_InvalidPosition;
     stmt p, destr_call i, stmt s
@@ -70,7 +71,7 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
   let prog = s_call (rlv, new_func, rargs) in
   let prog = s_seq prefix (s_seq prog suffix) in
 
-  let tc = EcPhlOutline.t_equivS_trans_eq side prog tc in
+  let tc = EcPhlTrans.t_equivS_trans_eq side prog tc in
 
   (* One of the goals can be simplified, often fully, using the provided equiv *)
   let tp = match side with | `Left -> 1 | `Right -> 2 in

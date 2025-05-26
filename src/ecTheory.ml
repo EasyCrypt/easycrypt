@@ -37,7 +37,8 @@ and theory_item_r =
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
-  | Th_auto      of (int * symbol option * path list * is_local)
+  | Th_auto      of auto_rule
+  | Th_alias     of (symbol * path) (* FIXME: currently, only theories *)
 
 and thsource = {
   ths_base : EcPath.path;
@@ -59,7 +60,7 @@ and rule_pattern =
   | Var  of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple]
+  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple | `Proj of int]
 
 and rule = {
   rl_tyd   : EcDecl.ty_params;
@@ -73,6 +74,13 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+}
+
+and auto_rule = {
+  level    : int;
+  base     : symbol option;
+  axioms   : (path * [`Rigid | `Default]) list;
+  locality : is_local;
 }
 
 let mkitem (import : import) (item : theory_item_r) =

@@ -130,7 +130,10 @@ declare module B <:AdvLoop.
 equiv loop1_loopk : Loop(B).loop1 ~ Loop(B).loopk : 
   ={t, glob B} /\ n{1} = (k * n){2} /\ 0 < k{2} ==> ={res, glob B}.
 proof.
-  proc.
+  proc => /=.
+  case: (n{2} < 0).
+  + rcondf{1} ^while; 1: by auto => /> /#.
+    by rcondf{2} ^while; auto => /> /#.
   async while [ (fun r => i%r < r), (i{1}+k{2})%r ] 
               [ (fun r => i%r < r), (i{2} + 1)%r ]
               ( (i < n){1}) 
@@ -151,7 +154,7 @@ proof.
     by wp;skip => /> /#.
   + rcondf 1; skip => /#. 
   + rcondf 1; skip => /#. 
-  by auto.
+  auto => /> /#.
 qed.
 
 equiv loopk_loopc : Loop(B).loopk ~ Loop(B).loopc : ={n,t, glob B} /\ k{1} = c ==> ={res, glob B}.

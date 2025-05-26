@@ -1,4 +1,4 @@
-require import AllCore FSet List SmtMap Distr DBool.
+require import AllCore FSet List FMap Distr DBool.
 
 (*******************************************)
 (*           Multirecipient PKE            *)

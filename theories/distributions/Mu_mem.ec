@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet SmtMap Distr.
+require import AllCore List FSet FMap Distr.
 require import Ring Number StdRing StdOrder.
 (*---*) import RField RealOrder.
 

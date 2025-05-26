@@ -9,7 +9,7 @@ open EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_provers   : EcParsetree.pprover_infos option -> EcProvers.prover_infos;
   tt_smtmode   : [`Admit | `Strict | `Sloppy | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
@@ -71,8 +71,9 @@ val process_mgenintros  : ?cf:bool -> ttenv -> introgenpattern list -> tactical
 val process_genintros   : ?cf:bool -> ttenv -> introgenpattern list -> backward
 val process_generalize  : ?doeq:bool -> genpattern list -> backward
 val process_move        : ?doeq:bool -> ppterm list -> prevert -> backward
-val process_clear       : psymbol list -> backward
-val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
+val process_clear       : clear_info -> backward
+val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos option -> backward
+val process_coq         : loc:EcLocation.t -> name:string -> ttenv -> EcProvers.coq_mode option -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
 val process_delta       : und_delta:bool -> ?target:psymbol -> (rwside * rwocc * pformula) -> backward
 val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
@@ -81,7 +82,7 @@ val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
 val process_cutdef      : ttenv -> cutdef_t -> backward
 val process_left        : backward
 val process_right       : backward
-val process_split       : backward
+val process_split       : ?i:int -> backward
 val process_elim        : prevert * pqsymbol option -> backward
 val process_case        : ?doeq:bool -> prevertv -> backward
 val process_exists      : ppt_arg located list -> backward

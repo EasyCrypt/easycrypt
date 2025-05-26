@@ -640,7 +640,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let modir = s_write env cr in
     let post  = generalize_mod env mr modir post in
     let post  = generalize_mod env ml modil post in
-    f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = post; } in
+    f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = f_and inv post; } in
 
   FApi.t_onfsub (function
     | 6 -> Some (EcLowGoal.t_intros_n c1)

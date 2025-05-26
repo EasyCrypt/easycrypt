@@ -1,12 +1,14 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcSymbols
 open EcAst
 open EcTypes
 open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcMatching
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -14,6 +16,7 @@ open EcLowPhlGoal
 module Mid = EcIdent.Mid
 module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
+module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
 let t_kill_r side cpos olen tc =
@@ -136,99 +139,236 @@ let t_set_r side cpos (fresh, id) e tc =
   t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
-let cfold_stmt (pf, hyps) me olen zpr =
-  let env = LDecl.toenv hyps in
+let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
+  fun (pe, hyps) _ me z ->
+    let i, is = List.destruct z.Zpr.z_tail in
+    let e, mk =
+      let e, kind, mk =
+        get_expression_of_instruction i |> ofdfl (fun () ->
+          tc_error pe "targetted instruction should contain an expression"
+        ) in
 
-  let (asgn, i, tl) =
-    match zpr.Zpr.z_tail with
-    | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
-      let asgn =
-        match lv with
-        | LvVar (x, ty) -> [(x, ty, e)]
-        | LvTuple xs -> begin
-            match e.e_node with
-            | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
-            | _ -> assert false
-        end
-      in
-        (asgn, i, tl)
-    end
+      match kind with
+      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, mk)
+      | `Swhile -> tc_error pe "while loops not supported"
+    in
+
+    try
+      let ptev = EcProofTerm.ptenv pe hyps (ue, mev) in
+      let e = form_of_expr (fst me) e in
+      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e in
+
+      assert (EcProofTerm.can_concretize ptev);
+
+      let cpos =
+        EcMatching.FPosition.select_form
+          ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+          hyps None subf e in
+
+      let v = { ov_name = Some id; ov_type = subf.f_ty } in
+      let (me, id) = EcMemory.bind_fresh v me in
+      let pv = pv_loc (oget id.ov_name) in
+      let e = EcMatching.FPosition.map cpos (fun _ -> f_pvar pv (subf.f_ty) (fst me)) e in
+
+      let i1 = i_asgn (LvVar (pv, subf.f_ty), expr_of_form (fst me) subf) in
+      let i2 = mk (expr_of_form (fst me) e) in
+
+      (me, { z with z_tail = i1 :: i2 :: is }, [])
+
+    with EcProofTerm.FindOccFailure _ ->
+      tc_error pe "cannot find an occurrence of the pattern"
+
+let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
+  let tr = fun side -> `SetMatch (side, cpos) in
+  t_code_transform side ~bdhoare:true cpos tr
+    (t_zip (set_match_stmt id pattern)) tc
+
+(* -------------------------------------------------------------------- *)
+let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
+  let env =  LDecl.toenv hyps in
+
+  let simplify : expr -> expr =
+    if simplify then (fun e ->
+      let e = form_of_expr (fst me) e in
+      let e = EcReduction.simplify EcReduction.nodelta hyps e in
+      let e = expr_of_form (fst me) e in
+      e
+    ) else identity in
+
+  let is_const_expression (e : expr) =
+    PV.is_empty (e_read env e) in
+
+  let for_instruction ((subst as subst0) : (expr, unit) Mpv.t) (i : instr) =
+    let wr = EcPV.i_write env i in
+    let i = Mpv.isubst env subst i in
+
+    let (subst, asgn) =
+      List.fold_left_map (fun subst ((pv, _) as pvty) ->
+        match Mpv.find env pv subst with
+        | e -> Mpv.remove env pv subst, Some (pvty, e)
+        | exception Not_found -> subst, None
+      ) subst (fst (PV.elements wr)) in
+
+    let asgn = List.filter_map identity asgn in
+
+    let mk_asgn (lve : ((prog_var * ty) * expr) list) =
+      let lvs, es = List.split lve in
+      lv_of_list lvs
+      |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
+      |> Option.to_list in
+
+    let exception Interrupt in
+
+    try
+      let subst, aout =
+        let exception Default in
+
+        try
+          match i.i_node with
+          | Sasgn (lv, e) ->
+            (* We already removed the variables of `lv` from the substitution *)
+            (* We are only interested in the variables of `lv` that are in `wr` *)
+            let es =
+              match simplify e, lv with
+              | { e_node = Etuple es }, LvTuple _ -> es
+              | _, LvTuple _ -> raise Default
+              | e, _ -> [e] in
+
+            let lv = lv_to_ty_list lv in
+      
+            let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
+              Mpv.mem env pv subst0 && is_const_expression e
+            ) (List.combine lv es) in
+            
+            let subst =
+              List.fold_left
+                (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
+                subst tosubst in
+
+            let asgn =
+              List.filter
+                (fun ((pv, _), _) -> not (Mpv.mem env pv subst))
+                asgn in
+
+            (subst, mk_asgn asgn @ mk_asgn asgn2)
+
+          | Srnd _ ->
+            (subst, mk_asgn asgn @ [i])
+
+          | _ -> raise Default
+
+        with Default ->
+          if List.exists
+              (fun (pv, _) -> Mpv.mem env pv subst0)
+              (fst (PV.elements wr))
+          then raise Interrupt;
+          (subst, mk_asgn asgn @ [i])
+
+      in `Continue (subst, aout)
+
+    with Interrupt -> `Interrupt
+  in
+
+  let body, epilog =
+    match olen with
+    | None ->
+      (zpr.z_tail, [])
+    | Some olen ->
+      if List.length zpr.z_tail < olen+1 then
+        tc_error pf "expecting at least %d instructions" olen;
+      List.takedrop (olen+1) zpr.z_tail in
+
+  let lv, subst, body, rem =
+    match body with
+    | { i_node = Sasgn (lv, e) } :: is ->
+      let es =
+        match simplify e, lv with
+        | { e_node = Etuple es }, LvTuple _ -> es
+        | _, LvTuple _ ->
+            tc_error pf
+              "the left-value is a tuple but the right-hand expression \
+               is not a tuple expression";
+        | e, _ -> [e] in
+      let lv = lv_to_ty_list lv in
+
+      if not (List.for_all is_const_expression es) then
+        tc_error pf "right-values are not closed expressions";
+
+      if not (List.for_all (is_loc |- fst) lv) then
+        tc_error pf "left-values must be made of local variables only";
+
+      let subst =
+        List.fold_left
+          (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
+          Mpv.empty (List.combine lv es) in
+
+      let subst, is, rem =
+        List.fold_left_map_while for_instruction subst is in
+
+      lv, subst, List.flatten is, rem
 
     | _ ->
-        tc_error pf "cannot find a left-value assignment at given position"
+      tc_error pf "cannot find a left-value assignment at given position"
   in
 
-  let (tl1, tl2) =
-    match olen with
-    | None      -> (tl, [])
-    | Some olen ->
-        if List.length tl < olen then
-          tc_error pf "expecting at least %d instructions after assignment" olen;
-        List.takedrop olen tl
-  in
+  let lv, es =
+    List.filter_map (fun ((pv, _) as pvty) ->
+      match Mpv.find env pv subst with
+      | e -> Some (pvty, e)
+      | exception Not_found -> None
+    ) lv |> List.split in
 
-  List.iter
-    (fun (x, _, _) ->
-      if is_glob x then
-        tc_error pf "left-values must be local variables")
-    asgn;
+  let asgn =
+    lv_of_list lv
+    |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
+    |> Option.to_list in
 
-  List.iter
-    (fun (_, _, e) ->
-        if e_fv e <> Mid.empty || e_read env e <> PV.empty then
-          tc_error pf "right-values are not closed expression")
-    asgn;
+  let zpr = { zpr with Zpr.z_tail = body @ asgn @ rem @ epilog } in
+  (me, zpr, [])
 
-  let wrs = is_write env tl1 in
-  let asg = List.fold_left
-              (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
-              EcPV.PV.empty asgn
-  in
-
-  if not (EcPV.PV.indep env wrs asg) then
-    tc_error pf "cannot cfold non read-only local variables";
-
-  let subst =
-    List.fold_left
-      (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
-      Mpv.empty asgn
-  in
-
-  let tl1 = Mpv.issubst env subst tl1 in
-
-  let zpr =
-    { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
-  in
-    (me, zpr, [])
-
+(* -------------------------------------------------------------------- *)
 let t_cfold_r side cpos olen g =
   let tr = fun side -> `Fold (side, cpos, olen) in
   let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
   t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
-let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r
-let t_alias = FApi.t_low3 "code-tx-alias" t_alias_r
-let t_set   = FApi.t_low4 "code-tx-set"   t_set_r
-let t_cfold = FApi.t_low3 "code-tx-cfold" t_cfold_r
+let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
+let t_alias     = FApi.t_low3 "code-tx-alias"     t_alias_r
+let t_set       = FApi.t_low4 "code-tx-set"       t_set_r
+let t_set_match = FApi.t_low4 "code-tx-set-match" t_set_match_r
+let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
-
+let process_set_match (side, cpos, id, pattern) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let me, _ = tc1_get_stmt side tc in
+  let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
+  let ue  = EcProofTyping.unienv_of_hyps hyps in
+  let ptnmap = ref Mid.empty in
+  let pattern = EcTyping.trans_pattern (LDecl.toenv hyps) ptnmap ue pattern in
+  t_set_match side cpos (EcLocation.unloc id)
+    (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
+    tc
+  
 (* -------------------------------------------------------------------- *)
-
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
   let hyps = FApi.tc1_hyps tc in
@@ -285,7 +425,7 @@ let process_weakmem (side, id, params) tc =
   FApi.xmutate1 tc `WeakenMem [concl]
 
 (* -------------------------------------------------------------------- *)
-let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
+let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let (env, _, concl) = FApi.tc1_eflat tc in
 
   let change (i : instr) =
@@ -318,7 +458,8 @@ let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
     assert false;
 
   let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let goals, s = EcMatching.Zipper.map pos change s in
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])

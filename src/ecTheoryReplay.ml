@@ -28,7 +28,7 @@ type 'a ovrenv = {
   ovre_prefix   : (symbol list) pair;
   ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
-  ovre_local    : EcTypes.is_local;
+  ovre_local    : EcTypes.is_local option;
   ovre_hooks    : 'a ovrhooks;
 }
 
@@ -65,6 +65,10 @@ let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
 
 (* -------------------------------------------------------------------- *)
 let error_body exn b = if not b then raise exn
+
+(* -------------------------------------------------------------------- *)
+let ri_compatible =
+    { EcReduction.full_red with delta_p = (fun _-> `Force); user = false }
 
 (* -------------------------------------------------------------------- *)
 let constr_compatible exn env cs1 cs2 =
@@ -122,8 +126,7 @@ let tydecl_compatible env tyd1 tyd2 =
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
   let f2 = EcSubst.subst_form s (EcFol.form_of_expr EcFol.mhr e2) in
-  let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
-  error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
+  error_body exn (EcReduction.is_conv ~ri:ri_compatible (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
@@ -135,8 +138,7 @@ let get_open_oper exn env p tys =
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
   | OP_Plain f1, OP_Plain f2 ->
-    let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
-    error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
+    error_body exn (EcReduction.is_conv ~ri:ri_compatible (EcEnv.LDecl.init env []) f1 f2)
   | OP_Plain {f_node = Fop(p,tys)}, _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
@@ -244,22 +246,33 @@ let operator_compatible env oper1 oper2 =
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
-let check_evtags (tags : evtags) (src : symbol list) =
-  let module E = struct exception Reject end in
+let check_evtags ?(tags : evtags option) (src : symbol list) =
+  let exception Reject in
+
+  let explicit = "explicit" in
 
   try
-    let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
-    let stt =
-      List.map (fun src ->
-        let do1 status (mode, dst) =
-          match mode with
-          | `Exclude -> if sym_equal src dst then raise E.Reject; status
-          | `Include -> status || (sym_equal src dst)
-        in List.fold_left do1 dfl tags)
-        src
-    in List.mem true stt
+    match tags with
+    | None ->
+      if List.mem explicit src then
+        raise Reject;
+      true
 
-  with E.Reject -> false
+    | Some tags ->
+      let dfl =
+        not (List.mem explicit src) &&
+        not (List.exists (fun (mode, _) -> mode = `Include) tags) in
+      let stt =
+        List.map (fun src ->
+          let do1 status (mode, dst) =
+            match mode with
+            | `Exclude -> if sym_equal src dst then raise Reject; status
+            | `Include -> status || (sym_equal src dst)
+          in List.fold_left do1 dfl tags)
+          src
+      in List.mem true stt
+
+  with Reject -> false
 
 (* -------------------------------------------------------------------- *)
 let xpath ove x =
@@ -282,12 +295,23 @@ let string_of_renaming_kind = function
   | `Theory  -> "theory"
 
 (* -------------------------------------------------------------------- *)
-let rename ove subst (kind, name) =
+let rename ?(fold = true) ove subst (kind, name) =
   try
     let newname =
-      List.find_map
-        (fun rnm -> EcThCloning.rename rnm (kind, name))
-        ove.ovre_rnms in
+      match fold with
+      | false ->
+        List.find_map
+          (fun rnm -> EcThCloning.rename rnm (kind, name))
+          ove.ovre_rnms
+      | _ ->
+        let newname =
+          List.fold_left (* FIXME:parallel substitution *)
+            (fun name rnm ->
+              Option.value ~default:name (EcThCloning.rename rnm (kind, name)))
+            name ove.ovre_rnms in
+        if newname = name then raise Not_found;
+        newname
+    in
 
     let nameok =
       match kind with
@@ -353,6 +377,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
             | _ -> assert false
           end
+
+        | `Direct ty -> begin
+          assert (List.is_empty otyd.tyd_params);
+          let decl  =
+            { tyd_params  = [];
+              tyd_type    = `Concrete ty;
+              tyd_resolve = otyd.tyd_resolve && (mode = `Alias);
+              tyd_loca    = otyd.tyd_loca; }
+
+          in (decl, ty)
+    end
       in
 
       let subst, x =
@@ -377,12 +412,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
                   let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
 
                   List.fold_left (fun subst (name, tyargs) ->
-                      let np = EcPath.pqoname (EcPath.prefix np) name in
-                      let newtyargs = List.map (CS.Tvar.subst tysubst) tyargs in
-                      EcSubst.add_opdef subst
-                        (xpath ove name)
-                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
-                    subst octors
+                    let np = EcPath.pqoname (EcPath.prefix np) name in
+                    let newtyargs =
+                      List.map
+                        (CS.Tvar.subst tysubst -| EcSubst.subst_ty subst)
+                        tyargs in
+                    EcSubst.add_opdef subst
+                      (xpath ove name)
+                      (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype))
+                    ) subst octors
                 | _ -> subst
               end
             | _, _ -> subst
@@ -482,6 +520,15 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
 
             | _ -> clone_error env (CE_UnkOverride(OVK_Operator, EcPath.toqsymbol p))
           end
+
+          | `Direct body ->
+            assert (List.is_empty refop.op_tparams);
+            let newop =
+              mk_op
+                ~opaque:optransparent ~clinline:(opmode <> `Alias)
+                [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
+            (newop, body)
+  
         in
           match opmode with
           | `Alias ->
@@ -600,6 +647,18 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
 
           | _ -> clone_error env (CE_UnkOverride(OVK_Predicate, EcPath.toqsymbol p))
         end
+
+        | `Direct body ->
+          assert (List.is_empty refpr.op_tparams);
+          let newpr   =
+            { op_tparams  = [];
+              op_ty       = body.f_ty;
+              op_kind     = OB_pred (Some (PR_Plain body));
+              op_opaque   = oopr.op_opaque;
+              op_clinline = prmode <> `Alias;
+              op_loca     = refpr.op_loca;
+              op_unfold   = refpr.op_unfold; } in
+          (newpr, body)
       in
 
         match prmode with
@@ -675,19 +734,25 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
 
     let doproof =
       match Msym.find_opt x (ove.ovre_ovrd.evc_lemmas.ev_bynames) with
-      | Some (pt, hide) -> Some (pt, hide)
+      | Some (pt, hide, explicit) -> Some (pt, hide, explicit)
       | None when is_axiom ax.ax_kind ->
-          List.Exceptionless.find_map
-            (function (pt, None) -> Some (pt, `Alias) | (pt, Some pttags) ->
-               if check_evtags pttags (Ssym.elements tags) then
-                 Some (pt, `Alias)
+          List.Exceptionless.find_map (function
+            | (pt, None) ->
+              if check_evtags (Ssym.elements tags) then
+                Some (pt, `Alias, false)
+              else None
+            | (pt, Some pttags) ->
+               if check_evtags ~tags:pttags (Ssym.elements tags) then
+                 Some (pt, `Alias, false)
                else None)
             ove.ovre_glproof
       | _ -> None
     in
       match doproof with
       | None -> (ax, proofs, false)
-      | Some (pt, hide)  ->
+      | Some (pt, hide, explicit)  ->
+          if explicit && not (EcDecl.is_axiom ax.ax_kind) then
+            clone_error (EcSection.env scenv) (CE_ProofForLemma (snd ove.ovre_prefix, x));
           let ax  = { ax with
             ax_kind = `Lemma;
             ax_visibility = if hide <> `Alias then `Hidden else ax.ax_visibility
@@ -754,13 +819,7 @@ and replay_mod
 
       let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
 
-      let np =
-        match mp.m_top with
-        | `Concrete (p, None) -> p
-        | _ -> assert false
-      in
-
-      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:mp in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -770,12 +829,12 @@ and replay_mod
       if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
         clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
-      let (subst, _) =
+      let subst =
         match mode with
         | `Alias ->
-          rename ove subst (`Module, name)
+          fst (rename ove subst (`Module, name))
         | `Inline _ ->
-          substme, EcPath.basename np in
+          substme in
 
       let newme =
         if mode = `Alias || mode = `Inline `Keep then
@@ -827,12 +886,12 @@ and replay_addrw
 
 (* -------------------------------------------------------------------- *)
 and replay_auto
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, lvl, base, ps, lc)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, at_base)
 =
   let env = EcSection.env (ove.ovre_hooks.henv scope) in
-  let ps = List.map (EcSubst.subst_path subst) ps in
-  let ps = List.filter (fun p -> Option.is_some (EcEnv.Ax.by_path_opt p env)) ps in
-  let scope = ove.ovre_hooks.hadd_item scope import (Th_auto (lvl, base, ps, lc)) in
+  let axioms = List.map (fst_map (EcSubst.subst_path subst)) at_base.axioms in
+  let axioms = List.filter (fun (p, _) -> Option.is_some (EcEnv.Ax.by_path_opt p env)) axioms in
+  let scope = ove.ovre_hooks.hadd_item scope import (Th_auto { at_base with axioms }) in
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -948,6 +1007,20 @@ and replay_instance
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_alias
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, target)
+=
+  let scenv = ove.ovre_hooks.henv scope in
+  let env = EcSection.env scenv in
+  let p = EcSubst.subst_path subst target in
+
+  if is_none (EcEnv.Theory.by_path_opt p env) then
+    (subst, ops, proofs, scope)
+  else
+    let scope = ove.ovre_hooks.hadd_item scope import (Th_alias (name, target)) in
+    (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   match item.ti_item with
   | Th_type (x, otyd) ->
@@ -983,14 +1056,17 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | Th_reduction rules ->
      replay_reduction ove (subst, ops, proofs, scope) (item.ti_import, rules)
 
-  | Th_auto (lvl, base, ps, lc) ->
-     replay_auto ove (subst, ops, proofs, scope) (item.ti_import, lvl, base, ps, lc)
+  | Th_auto at_base ->
+     replay_auto ove (subst, ops, proofs, scope) (item.ti_import, at_base)
 
   | Th_typeclass (x, tc) ->
      replay_typeclass ove (subst, ops, proofs, scope) (item.ti_import, x, tc)
 
   | Th_instance ((typ, ty), tc, lc) ->
      replay_instance ove (subst, ops, proofs, scope) (item.ti_import, (typ, ty), tc, lc)
+
+  | Th_alias (name, target) ->
+     replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in
@@ -1008,7 +1084,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
       in
 
       let (subst, ops, proofs, subscope) =
-        let subscope = ove.ovre_hooks.hthenter scope thmode x ove.ovre_local in
+        let new_local = odfl cth.cth_loca ove.ovre_local in
+        let subscope = ove.ovre_hooks.hthenter scope thmode x new_local in
         let (subst, ops, proofs, subscope) =
           List.fold_left (replay1 subove)
             (subst, ops, proofs, subscope) cth.cth_items in
@@ -1020,8 +1097,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
 (* -------------------------------------------------------------------- *)
 let replay (hooks : 'a ovrhooks)
-  ~abstract ~local ~incl ~clears ~renames
-  ~opath ~npath ovrds (scope : 'a) (name, items)
+  ~abstract ~override_locality ~incl ~clears ~renames
+  ~opath ~npath ovrds (scope : 'a) (name, items, base_local)
 =
   let subst = EcSubst.add_path EcSubst.empty ~src:opath ~dst:npath in
   let ove   = {
@@ -1032,14 +1109,15 @@ let replay (hooks : 'a ovrhooks)
     ovre_npath    = npath;
     ovre_prefix   = ([], []);
     ovre_abstract = abstract;
-    ovre_local    = local;
+    ovre_local    = override_locality;
     ovre_hooks    = hooks;
     ovre_glproof  = ovrds.evc_lemmas.ev_global;
   } in
 
+  let mode  = if abstract then `Abstract else `Concrete in
+  let new_local = odfl base_local override_locality in
+  let scope = if incl then scope else hooks.hthenter scope mode name new_local in
   try
-    let mode  = if abstract then `Abstract else `Concrete in
-    let scope = if incl then scope else hooks.hthenter scope mode name local in
     let _, _, proofs, scope =
       List.fold_left (replay1 ove)
         (subst, Mp.empty, [], scope) items in

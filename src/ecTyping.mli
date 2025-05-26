@@ -10,6 +10,7 @@ open EcParsetree
 open EcTypes
 open EcModules
 open EcFol
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type wp = EcEnv.env -> EcMemory.memenv -> stmt -> EcFol.form -> EcFol.form option
@@ -80,6 +81,14 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidFun
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
@@ -146,6 +155,7 @@ type tyerror =
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
@@ -165,6 +175,7 @@ type tyerror =
 | NoDefaultMemRestr
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
+| NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -177,8 +188,9 @@ val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> u
 (* -------------------------------------------------------------------- *)
 type typolicy
 
-val tp_tydecl : typolicy
-val tp_relax  : typolicy
+val tp_tydecl  : typolicy
+val tp_relax   : typolicy
+val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
@@ -201,7 +213,7 @@ val trans_gbinding : env -> EcUnify.unienv -> pgtybindings ->
 
 (* -------------------------------------------------------------------- *)
 val transexp :
-  env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
+  env -> ?tt:ty -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
 
 val transexpcast :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
@@ -210,15 +222,24 @@ val transexpcast_opt :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
+val trans_pv : EcEnv.env -> pqsymbol -> prog_var * ty
+
+(* -------------------------------------------------------------------- *)
 type ismap = (instr list) EcMaps.Mstr.t
 
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
+val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> codepos_range
+val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
+val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
+val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
+
+(* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
 type metavs = EcFol.form Msym.t
 
-val transmem       : env -> EcSymbols.symbol located -> EcIdent.t
+val transmem : env -> EcSymbols.symbol located -> EcIdent.t
 
 val trans_form_opt :
   env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
@@ -258,7 +279,6 @@ val trans_args :
   -> expr list * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-
 (* This only checks the memory restrictions. *)
 val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit

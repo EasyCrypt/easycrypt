@@ -74,7 +74,7 @@ proof.
     rewrite (eq_Ep _ _
        ((fun r => (inv p)%xr * (! test r)%xr) + (fun r => (1 + size log)%xr))).
     + move => x xx /=. rewrite of_realM; 1,2:smt(of_realM invr_ge0 ge0_mu). smt().
-    rewrite EpD EpC EpZ /=; 1: smt(invr_gt0 dr_mu_test of_realK).
+    rewrite EpD EpC EpZ /=; 1: smt(invr_gt0 dr_mu_test of_realdK).
     rewrite Ep_mu mu_not dr_ll /= -/p.
     rewrite !to_pos_pos; 1,2,3,4:smt(mu_bounded dr_mu_test size_ge0).
   by auto.
@@ -91,7 +91,7 @@ proof.
   + auto => &hr /=.
     case: (O.c{hr} = Q) => [ -> /= | *].
     + rewrite Ep_mu (:(fun (a : r) => a \in O.log{hr}) = mem O.log{hr}); 1: by auto.
-      smt(mu_mem_le_mu1 size_ge0 mu_bounded dr_mu1).
+      rewrite -of_realM /=; smt(mu_mem_le_mu1 size_ge0 eps_ge0 dr_mu1).
     case: (Q < O.c{hr}); by smt().
   auto => &hr /=; apply xle_cxr => *; split; 1:smt().
   have -> /=: (Q < O.c{hr} + 1) = (Q <= O.c{hr}) by smt().

@@ -951,13 +951,44 @@ let generalize_modtype to_gen (name, ms) =
     let ms = EcSubst.subst_top_modsig to_gen.tg_subst ms in
     to_gen, Some (Th_modtype (name, ms))
 
-let generalize_module to_gen me =
+let generalize_module to_gen prefix me =
   match me.tme_loca with
   | `Local -> to_gen, None
-  | `Global ->
-    (* FIXME section: we can generalize declare module *)
+
+  | `Global -> begin
     let me = EcSubst.subst_top_module to_gen.tg_subst me in
-    to_gen, Some (Th_module me)
+
+    match me.tme_expr.me_body with
+    | ME_Alias (_, mp) -> begin
+      let bds = to_gen.tg_binds in
+      let bds = List.filter_map (function Binding (m, GTmodty _) -> Some m | _ -> None) bds in
+      let bds = Sid.of_list bds in
+
+      let exception Inline in
+
+      let check_gen (x : cbarg) =
+        match x with
+        | `Module { m_top = `Local x } ->
+          if Sid.mem x bds then raise Inline
+        | _ -> () in
+
+      try
+        on_mp check_gen mp;
+        to_gen, Some (Th_module me)
+
+      with Inline ->
+        let to_gen = { to_gen with tg_subst =
+          EcSubst.add_moddef
+            ~src:(EcPath.pqname prefix me.tme_expr.me_name)
+            ~dst:mp to_gen.tg_subst } in
+        to_gen, None
+    end
+
+    | _ ->
+      (* FIXME section: we can generalize declare module *)
+      to_gen, Some (Th_module me)
+  end
+
   | `Declare -> assert false (* should be a LC_decl_mod *)
 
 let generalize_export to_gen (p,lc) =
@@ -985,53 +1016,53 @@ let generalize_addrw to_gen (p, ps, lc) =
 
 let generalize_reduction to_gen _rl = to_gen, None
 
-let generalize_auto to_gen (n,s,ps,lc) =
-  if lc = `Local then to_gen, None
+let generalize_auto to_gen auto_rl =
+  if auto_rl.locality = `Local then
+    to_gen, None
   else
-    let ps = List.filter (fun p -> to_keep to_gen (`Ax p)) ps in
-    if ps = [] then to_gen, None
-    else to_gen, Some (Th_auto (n,s,ps,lc))
+    let axioms =
+      List.filter (fun (p, _) -> to_keep to_gen (`Ax p)) auto_rl.axioms in
+    if List.is_empty axioms then
+      to_gen, None
+    else
+      to_gen, Some (Th_auto {auto_rl with axioms})
 
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
 
-let set_local l =
-  match l with
-  | `Global -> `Local
-  | _ -> l
+let id_lc = function
+  | `Global -> `Global
+  | `Local -> `Local
 
-let rec set_local_item item =
+let set_lc lc = function
+  | `Global | `Local -> id_lc lc
+  | l -> l
+
+let rec set_lc_item lc_override item =
   let lcitem =
     match item.ti_item with
-    | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_local ty.tyd_loca })
-    | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_local op.op_loca   })
-    | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_local ax.ax_loca   })
-    | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_local ms.tms_loca  })
-    | Th_module          me  -> Th_module        { me with tme_loca = set_local me.tme_loca  }
-    | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_local tc.tc_loca   })
-    | Th_theory      (s, th) -> Th_theory    (s, set_local_th th)
-    | Th_export       (p,lc) -> Th_export    (p, set_local lc)
-    | Th_instance (ty,ti,lc) -> Th_instance  (ty,ti, set_local lc)
-    | Th_baserw       (s,lc) -> Th_baserw    (s, set_local lc)
-    | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
+    | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_lc lc_override ty.tyd_loca })
+    | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_lc lc_override op.op_loca   })
+    | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_lc lc_override ax.ax_loca   })
+    | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_lc lc_override ms.tms_loca  })
+    | Th_module          me  -> Th_module        { me with tme_loca = set_lc lc_override me.tme_loca  }
+    | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_lc lc_override tc.tc_loca   })
+    | Th_theory      (s, th) -> Th_theory    (s, set_local_th lc_override th)
+    | Th_export       (p,lc) -> Th_export    (p, set_lc lc_override lc)
+    | Th_instance (ty,ti,lc) -> Th_instance  (ty,ti, set_lc lc_override lc)
+    | Th_baserw       (s,lc) -> Th_baserw    (s, set_lc lc_override lc)
+    | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_lc lc_override lc)
     | Th_reduction       r   -> Th_reduction r
-    | Th_auto     (i,s,p,lc) -> Th_auto      (i, s, p, set_local lc)
+    | Th_auto       auto_rl  -> Th_auto      {auto_rl with locality=set_lc lc_override auto_rl.locality}
+    | Th_alias         alias -> Th_alias     alias
 
   in { item with ti_item = lcitem }
 
-and set_local_th th =
-  { th with cth_items = List.map set_local_item th.cth_items;
-            cth_loca  = set_local th.cth_loca; }
-
-let sc_th_item t item =
-  let item =
-    match get_locality t with
-    | `Global -> item
-    | `Local  -> set_local_item item in
-  SC_th_item item
+and set_local_th lc_override th =
+  { th with cth_items = List.map (set_lc_item lc_override) th.cth_items;
+            cth_loca  = set_lc lc_override th.cth_loca; }
 
 let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
-
 
 (* ---------------------------------------------------------------- *)
 
@@ -1285,7 +1316,7 @@ let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
      hierror "can not start a local theory outside of a section";
   { sc_env   = EcEnv.Theory.enter name scenv.sc_env;
     sc_top   = Some scenv;
-    sc_loca  = if lc = `Local then lc else scenv.sc_loca;
+    sc_loca  = lc;
     sc_abstr = scenv.sc_abstr || mode = `Abstract;
     sc_insec = scenv.sc_insec;
     sc_name  = Th (name, lc, mode);
@@ -1301,28 +1332,33 @@ let exit_theory ?clears ?pempty scenv =
     name, cth, scenv
 
 (* -----------------------------------------------------------*)
-let add_item_ (item : theory_item) (scenv:scenv) =
-  let item = if scenv.sc_loca = `Local then set_local_item item else item in
+let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
+  let item = match override_locality, scenv.sc_loca with
+    | Some lc, _ | None, (`Local as lc) -> set_lc_item lc item
+    | _ -> item
+  in
   let env = scenv.sc_env in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op) -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
-    | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
-    | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
+    | Th_type    (s,tyd)     -> EcEnv.Ty.bind s tyd env
+    | Th_operator (s,op)     -> EcEnv.Op.bind s op env
+    | Th_axiom   (s, ax)     -> EcEnv.Ax.bind s ax env
+    | Th_modtype (s, ms)     -> EcEnv.ModTy.bind s ms env
+    | Th_module       me     -> EcEnv.Mod.bind me.tme_expr.me_name me env
+    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind s tc env
+    | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance tys i lc env
-    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
-    | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
-    | Th_reduction r     -> EcEnv.Reduction.add r env
-    | _                  -> assert false
+    | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add s lc env
+    | Th_addrw (p,ps,lc)     -> EcEnv.BaseRw.addto p ps lc env
+    | Th_auto auto           -> EcEnv.Auto.add ~level:auto.level ?base:auto.base
+                                  auto.axioms auto.locality env
+    | Th_alias     (n,p) -> EcEnv.Theory.alias n p env
+    | Th_reduction r         -> EcEnv.Reduction.add r env
+    | _                      -> assert false
   in
-  { scenv with
+  (item, { scenv with
     sc_env = env;
-    sc_items = SC_th_item item :: scenv.sc_items}
+    sc_items = SC_th_item item :: scenv.sc_items})
 
 let add_th ~import (cth : EcEnv.Theory.compiled_theory) scenv =
   let env = EcEnv.Theory.bind ~import cth scenv.sc_env in
@@ -1336,7 +1372,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
     | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
     | Th_modtype ms      -> generalize_modtype to_gen ms
-    | Th_module me       -> generalize_module  to_gen me
+    | Th_module me       -> generalize_module  to_gen prefix me
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
@@ -1345,13 +1381,14 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
     | Th_auto hints      -> generalize_auto to_gen hints
+    | Th_alias _         -> (to_gen, None) (* FIXME:ALIAS *)
 
   in
 
   let scenv =
     item |> Option.fold ~none:to_gen.tg_env ~some:(fun item ->
       let item = { ti_import = th_item.ti_import; ti_item = item; } in
-      add_item_ item to_gen.tg_env
+      add_item_ item to_gen.tg_env |> snd
     )
   in
 
@@ -1368,25 +1405,12 @@ and generalize_ctheory
   if cth.cth_mode = `Abstract && cth.cth_loca = `Local then
     add_clear genenv (`Th path)
   else
-    let compiled =
-      let genenv =
-        let scenv =
-          enter_theory
-            name `Global cth.cth_mode
-            genenv.tg_env
-        in
-        { genenv with tg_env = scenv }
-      in
+    let scenv = enter_theory name `Global cth.cth_mode genenv.tg_env in
+    let genenv_tmp = List.fold_left
+      (fun x -> generalize_th_item x path)
+      { genenv with tg_env = scenv } cth.cth_items in
 
-      let genenv =
-        List.fold_left (fun genenv item ->
-          generalize_th_item genenv path item
-        ) genenv cth.cth_items in
-
-      let _, compiled, _ = exit_theory genenv.tg_env in
-
-      compiled
-    in        
+    let _, compiled, _ = exit_theory genenv_tmp.tg_env in
 
     match compiled with
     | None ->
@@ -1462,15 +1486,15 @@ let check_item scenv item =
   | Th_addrw (_,_,lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local hint rewrite can only be declared inside section";
-  | Th_auto (_, _, _, lc) ->
-    if (lc = `Local && not scenv.sc_insec) then
+  | Th_auto { locality } ->
+    if (locality = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
   | Th_theory  _   -> assert false
+  | Th_alias _     -> () (* FIXME:ALIAS *)
 
-let rec add_item (item : theory_item) (scenv : scenv) =
-  let item = if scenv.sc_loca = `Local then set_local_item item else item in
-  let scenv1 = add_item_ item scenv in
+let rec add_item ?(override_locality=None) (item : theory_item) (scenv : scenv) =
+  let item, scenv1 = add_item_ ~override_locality item scenv in
   begin match item.ti_item with
   | Th_theory (s,cth) ->
     if cth.cth_loca = `Local && not scenv.sc_insec then

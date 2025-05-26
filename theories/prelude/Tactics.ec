@@ -28,8 +28,10 @@ lemma andaW a b c : (a => b => c) => (a && b) => c by smt().
 
 lemma andaWl a b : (a && b) => a by smt().
 lemma andaWr a b : (a && b) => (a => b) by smt().
+lemma andaWrs a b : (a && b) => b by smt().
 
 lemma andaI a b : a => (a => b) => (a && b) by smt().
+lemma andaIs a b : a => b => (a && b) by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma oraW a b c : (a => c) => (!a => b => c) => (a || b) => c by smt().

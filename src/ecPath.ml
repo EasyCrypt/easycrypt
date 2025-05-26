@@ -90,6 +90,9 @@ let rec pappend p1 p2 =
   | Psymbol id -> pqname p1 id
   | Pqname(p2,id) -> pqname (pappend p1 p2) id
 
+let poappend (p1 : path) (p2 : path option) =
+  ofold ((^~) pappend) p1 p2
+
 let pqoname p id =
   match p with
   | None   -> psymbol id
@@ -260,6 +263,12 @@ let m_apply mp args =
 (* if args' = [] then mpath mp.m_top args
   else (assert (args = []); mp) *)
 
+let is_abstract (mp : mpath) =
+  match mp.m_top with `Local _ -> true | _ -> false
+
+let is_concrete (mp : mpath) =
+  match mp.m_top with `Concrete _ -> true | _ -> false
+  
 let m_functor mp =
   let top =
     match mp.m_top with

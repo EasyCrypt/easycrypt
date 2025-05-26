@@ -1,5 +1,5 @@
-require import AllCore List FSet SmtMap Distr DBool DList.
-(*require import AllCore Distr FSet SmtMap DBool. *)
+require import AllCore List FSet FMap Distr DBool DList.
+(*require import AllCore Distr FSet FMap DBool. *)
 
 type K.
 type Msg.

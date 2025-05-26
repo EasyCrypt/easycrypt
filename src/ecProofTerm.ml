@@ -62,11 +62,12 @@ exception ProofTermError of pterror
 (* -------------------------------------------------------------------- *)
 let argkind_of_parg arg : argkind option =
   match arg with
-  | EA_mod   _ -> Some `Mod
-  | EA_mem   _ -> Some `Mem
-  | EA_form  _ -> Some `Form
-  | EA_proof _ -> Some `PTerm
-  | EA_none    -> None
+  | EA_mod    _ -> Some `Mod
+  | EA_mem    _ -> Some `Mem
+  | EA_form   _ -> Some `Form
+  | EA_proof  _ -> Some `PTerm
+  | EA_tactic _ -> Some `PTerm
+  | EA_none     -> None
 
 (* -------------------------------------------------------------------- *)
 let argkind_of_ptarg arg : argkind =
@@ -133,7 +134,7 @@ let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
 
 and concretize_e_head ((CPTEnv subst) as cptenv) head =
   match head with
-  | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
+  | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
   | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
@@ -530,7 +531,7 @@ let process_pterm_cut ~prcut pe pt =
         | _ -> assert false
     end
 
-    | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
+    | FPCut fp -> let fp = prcut fp in (PTCut (fp, None), fp)
   in
 
   let pt = PTApply { pt_head = pt; pt_args = []; } in
@@ -546,8 +547,8 @@ let process_pterm pe pt =
   in process_pterm_cut ~prcut pe pt
 
 (* ------------------------------------------------------------------ *)
-let rec trans_pterm_arg_impl pe f =
-  let pt = { ptev_env = pe; ptev_pt = ptcut f; ptev_ax = f; } in
+let rec trans_pterm_arg_impl pe ?cutsolve f =
+  let pt = { ptev_env = pe; ptev_pt = ptcut ?cutsolve f; ptev_ax = f; } in
   { ptea_env = pe; ptea_arg = PVASub pt; }
 
 (* ------------------------------------------------------------------ *)
@@ -556,7 +557,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
   let name = name |> omap (Printf.sprintf "?%s") in
 
   match arg with
-  | EA_mod _ | EA_mem _ | EA_proof _ ->
+  | EA_mod _ | EA_mem _ | EA_proof _ | EA_tactic _ ->
       let ak = oget (argkind_of_parg arg) in
       tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Form))
 
@@ -591,7 +592,7 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
     | EA_none ->
        tc_pterm_apperror ~loc pe AE_CannotInferMod
 
-    | EA_mem _ | EA_proof _ ->
+    | EA_mem _ | EA_proof _ | EA_tactic _ ->
        let ak = oget (argkind_of_parg arg) in
        tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Mod))
 
@@ -621,7 +622,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg; pl_loc = loc; } =
   | EA_form { pl_loc = lc; pl_desc = (PFmem m) } ->
       trans_pterm_arg_mem pe ?name (mk_loc lc (EA_mem m))
 
-  | EA_mod  _ | EA_proof _ | EA_form _ ->
+  | EA_mod  _ | EA_proof _ | EA_form _ | EA_tactic _ ->
       let ak = oget (argkind_of_parg arg) in
       tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `Mem))
 
@@ -664,6 +665,9 @@ and process_pterm_arg
       | EA_mem _ | EA_mod _ ->
           let ak = oget (argkind_of_parg (unloc arg)) in
           tc_pterm_apperror ~loc pe (AE_WrongArgKind (ak, `PTerm))
+
+      | EA_tactic cutsolve ->
+          trans_pterm_arg_impl pe ~cutsolve f
   end
 
   | Some (`Forall (x, xty, _)) -> begin
@@ -742,7 +746,6 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
 
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
-
   match PT.destruct_product pe.pte_hy (get_head_symbol pe pt.ptev_ax) with
   | None   -> tc_pterm_apperror ?loc pe AE_NotFunctional
   | Some t ->
@@ -753,6 +756,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
             | PVASub arg -> begin
               try
                 pf_form_match ~mode:EcMatching.fmdelta pe ~ptn:f1 arg.ptev_ax;
+
                 (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
                 tc_pterm_apperror ?loc pe (AE_InvalidArgProof (arg.ptev_ax, f1))
@@ -907,6 +911,7 @@ type prept = [
   | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
   | `HD   of handle
+  | `PE   of pt_ev
   | `App  of prept * prept_arg list
 ]
 
@@ -919,14 +924,13 @@ and prept_arg =  [
 ]
 
 (* -------------------------------------------------------------------- *)
-let pt_of_prept tc (pt : prept) =
-  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
-
-  let rec build_pt = function
+let pt_of_prept_r (ptenv : pt_env) : prept -> pt_ev =
+  let rec build_pt : prept -> pt_ev = function
     | `Hy  id         -> pt_of_hyp_r ptenv id
     | `G   (p, tys)   -> pt_of_global_r ptenv p tys
     | `UG  p          -> pt_of_global_r ptenv p []
     | `HD  hd         -> pt_of_handle_r ptenv hd
+    | `PE  pe         -> pe
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
 
   and app_pt_ev pt_ev = function
@@ -936,7 +940,12 @@ let pt_of_prept tc (pt : prept) =
     | `Sub pt -> apply_pterm_to_arg_r pt_ev (PVASub (build_pt pt))
     | `H_     -> apply_pterm_to_hole pt_ev
 
-  in build_pt pt
+  in fun pt -> build_pt pt
+
+(* -------------------------------------------------------------------- *)
+let pt_of_prept (tc : tcenv1) (pt : prept) : pt_ev =
+  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
+  pt_of_prept_r ptenv pt
 
 (* -------------------------------------------------------------------- *)
 module Prept = struct

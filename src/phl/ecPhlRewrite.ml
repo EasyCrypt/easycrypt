@@ -7,31 +7,20 @@ open EcModules
 open EcFol
 
 (* -------------------------------------------------------------------- *)
-let get_expression_of_instruction (i : instr) =
-  match i.i_node with
-  | Sasgn  (lv, e)     -> Some (e, (fun e -> i_asgn  (lv, e)))
-  | Srnd   (lv, e)     -> Some (e, (fun e -> i_rnd   (lv, e)))
-  | Sif    (e, s1, s2) -> Some (e, (fun e -> i_if    (e, s1, s2)))
-  | Swhile (e, s)      -> Some (e, (fun e -> i_while (e, s)))
-  | Smatch (e, bs)     -> Some (e, (fun e -> i_match (e, bs)))
-  | _                  -> None
-
-(* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
-    (pos  : codepos)
+    (pos  : EcMatching.Position.codepos)
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =
   let hyps, concl = FApi.tc1_flat tc in
 
   let change (m : memenv) (i : instr) =
-    let e, mk =
+    let e, _, mk =
       EcUtils.ofdfl
         (fun () ->
            tc_error !!tc
-             "targeted instruction should be \
-             an assignment or random sampling")
+             "targetted instruction should contain an expression")
         (get_expression_of_instruction i)
     in
 
@@ -52,7 +41,8 @@ let t_change
       (hoare | ehoare | phoare | equiv)";
 
   let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let (data, goals), s = EcMatching.Zipper.map pos (change m) s in
+  let (data, goals), s =
+    EcMatching.Zipper.map (FApi.tc1_env tc) pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   data, FApi.xmutate1 tc `ProcChange (goals @ [concl])
@@ -60,10 +50,12 @@ let t_change
 (* -------------------------------------------------------------------- *)
 let process_change
     (side : side option)
-    (pos  : codepos)
+    (pos  : pcodepos)
     (form : pexpr)
     (tc   : tcenv1)
 =
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
     let hyps = LDecl.push_active m hyps in
     let e =
@@ -75,9 +67,9 @@ let process_change
   let (), tc = t_change side pos expr tc in tc
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite
+let process_rewrite_rw
     (side : side option)
-    (pos  : codepos)
+    (pos  : pcodepos)
     (pt   : ppterm)
     (tc   : tcenv1)
 =
@@ -121,11 +113,11 @@ let process_rewrite
         (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
         (List.find_map try1 pts) in
 
-    (m, data), expr_of_form mhr e
+    (m, data), expr_of_form (fst m) e
   in
 
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
-
   let cpos = EcMatching.FPosition.reroot [1] cpos in
 
   let discharge (tc : tcenv1) =
@@ -137,3 +129,40 @@ let process_rewrite
   in
 
   FApi.t_first discharge tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite_simpl
+  (side : side option)
+  (pos  : pcodepos)
+  (tc   : tcenv1)
+=
+let ri = EcReduction.nodelta in
+
+let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
+    let f = form_of_expr (fst me) e in
+    let f = EcCallbyValue.norm_cbv ri hyps f in
+    let e = expr_of_form (fst me) f in
+    (fst me, f), e
+  in
+
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let (m, f), tc = t_change side pos change tc in
+
+  FApi.t_first (
+    FApi.t_seqs [
+      EcLowGoal.t_intro_s (`Ident m);
+      EcLowGoal.t_change ~ri (f_eq f f);
+      EcLowGoal.t_reflex
+    ]
+  ) tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite
+  (side : side option)
+  (pos  : pcodepos)
+  (rw   : prrewrite)
+  (tc   : tcenv1)
+=
+  match rw with
+  | `Rw rw -> process_rewrite_rw side pos rw tc
+  | `Simpl -> process_rewrite_simpl side pos tc

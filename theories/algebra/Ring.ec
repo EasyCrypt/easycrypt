@@ -795,7 +795,7 @@ end IDomain.
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
 
-  clone include IDomain with pred unit (x : t) <- x <> zeror.
+  clone include IDomain with pred unit (x : t) <= x <> zeror.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
   proof. by apply/mulrV. qed.

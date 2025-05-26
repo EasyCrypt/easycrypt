@@ -64,12 +64,12 @@ and i_upto env alpha bad i1 i2 =
     f_upto env bad f1 f2
 
   | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
-    EqTest.for_expr env a1 a2 &&
+    EqTest.for_expr env ~alpha a1 a2 &&
     s_upto env alpha bad b1 b2 &&
     s_upto env alpha bad c1 c2
 
   | Swhile(a1,b1), Swhile(a2,b2) ->
-    EqTest.for_expr env a1 a2 &&
+    EqTest.for_expr env ~alpha a1 a2 &&
     s_upto env alpha bad b1 b2
 
   | Smatch(e1,bs1), Smatch(e2,bs2) when List.length bs1 = List.length bs2 -> begin

@@ -1,4 +1,4 @@
-require import AllCore FSet SmtMap Distr.
+require import AllCore FSet FMap Distr.
 (* Formalisation of collision resistance:
      CR : Collision resistance game 
      RealHash/IdealHash: 

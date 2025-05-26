@@ -1,15 +1,20 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
+open EcMatching.Position
 open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-val t_hoare_swap   : int -> int -> int -> backward
-val t_bdhoare_swap : int -> int -> int -> backward
-val t_equiv_swap   : side -> int -> int -> int -> backward
+type swap_kind = {
+  interval : (codepos1 * codepos1 option) option;
+  offset   : codeoffset1;
+}
 
 (* -------------------------------------------------------------------- *)
-val process_swap : (oside * swap_kind) located list -> backward
+val t_swap : oside -> swap_kind -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_swap : (oside * pswap_kind) located list -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_interleave : interleave_info located -> backward

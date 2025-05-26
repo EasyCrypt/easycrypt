@@ -3,6 +3,7 @@ open EcUtils
 open EcParsetree
 open EcFol
 open EcCoreGoal.FApi
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_eager_seq     : codepos1 -> codepos1 -> form -> EcIdent.t -> backward
@@ -13,7 +14,7 @@ val t_eager_fun_abs : EcFol.form -> EcIdent.t -> backward
 val t_eager_call    : form -> form -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_seq     : eager_info -> codepos1 pair -> pformula -> backward
+val process_seq     : eager_info -> pcodepos1 pair -> pformula -> backward
 val process_if      : backward
 val process_while   : eager_info -> backward
 val process_fun_def : backward

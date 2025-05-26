@@ -14,8 +14,9 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_app_r i phi tc =
+  let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let s1, s2 = s_split i hs.hs_s in
+  let s1, s2 = s_split env i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
   FApi.xmutate1 tc `HlApp [a; b]
@@ -24,8 +25,9 @@ let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
 
 (* -------------------------------------------------------------------- *)
 let t_ehoare_app_r i f tc =
+  let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
-  let s1, s2 = s_split i hs.ehs_s in
+  let s1, s2 = s_split env i hs.ehs_s in
   let a = f_eHoareS_r { hs with ehs_s = stmt s1; ehs_po = f }  in
   let b = f_eHoareS_r { hs with ehs_pr = f; ehs_s = stmt s2 } in
   FApi.xmutate1 tc `HlApp [a; b]
@@ -34,8 +36,9 @@ let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
+  let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
-  let s1, s2 = s_split i bhs.bhs_s in
+  let s1, s2 = s_split env i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
   let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
@@ -96,9 +99,10 @@ let t_bdhoare_app = FApi.t_low2 "bdhoare-app" t_bdhoare_app_r
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_app (i, j) phi tc =
+  let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
-  let sl1,sl2 = s_split i es.es_sl in
-  let sr1,sr2 = s_split j es.es_sr in
+  let sl1,sl2 = s_split env i es.es_sl in
+  let sr1,sr2 = s_split env j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
 
@@ -116,7 +120,7 @@ let t_equiv_app_onesided side i pre post tc =
     match side with
     | `Left  -> (i, Zpr.cpos (List.length s'. s_node))
     | `Right -> (Zpr.cpos (List.length s'. s_node), i) in
-  let _s1, s2 = s_split i s in
+  let _s1, s2 = s_split env i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
   let subst = Fsubst.f_subst_mem mhr (fst m) in
@@ -203,11 +207,13 @@ let process_app (side, dir, k, phi, bd_info) tc =
   | Single i, PAppNone when is_hoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
     t_hoare_app i phi tc
 
   | Single i, PAppNone when is_eHoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
+    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
     t_ehoare_app i phi tc
 
   | Single i, PAppNone when is_equivS concl ->
@@ -222,15 +228,21 @@ let process_app (side, dir, k, phi, bd_info) tc =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
+    let i = EcProofTyping.tc1_process_codepos1 tc (Some side, i) in
     t_equiv_app_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
+      check_side side;
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
+      let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
   | Double (i, j), PAppNone when is_equivS concl ->
+      check_side side;
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
+      let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left, i) in
+      let j = EcProofTyping.tc1_process_codepos1 tc (Some `Left, j) in
       t_equiv_app (i, j) phi tc
 
   | Single _, PAppNone

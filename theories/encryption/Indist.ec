@@ -300,7 +300,7 @@ lemma INDb_INDLR &m (p:glob A -> glob O -> int -> bool):
   = (  Pr[INDL(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c]
      - Pr[INDR(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c]) / 2%r.
 proof.
-have //= H:= Sample_bool WA &m (fun (g:glob WA), let (b,c,ga,go) = g in p ga go c).
+have //= H:= Sample_bool WA &m (fun (g:glob WA), let (ga,go,b,c) = g in p ga go c).
 have ->:   Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c]
          = Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) Count.c].
 + byequiv (: ={glob A,glob O}

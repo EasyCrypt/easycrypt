@@ -5,12 +5,34 @@ open EcEnv
 open EcProvers
 
 (* -------------------------------------------------------------------- *)
+type tenv
+
+(* -------------------------------------------------------------------- *)
 val check : ?notify:notify -> prover_infos -> LDecl.hyps -> form -> bool
 val dump_why3 : env -> string -> unit
 
-module Frequency : sig
+(* -------------------------------------------------------------------- *)
+val init :
+     EcEnv.LDecl.hyps
+  -> EcFol.form
+  -> EcEnv.env * EcBaseLogic.hyps * tenv * Why3.Decl.decl
 
-  (* -------------------------------------------------------------------- *)
+  val select :
+     EcEnv.env 
+  -> EcProvers.prover_infos
+  -> EcBaseLogic.hyps 
+  -> EcFol.form
+  -> ((EcPath.path * EcDecl.axiom) list -> bool option)
+  -> bool
+
+val make_task :
+     tenv
+  -> (EcPath.path * EcDecl.axiom) list
+  -> Why3.Decl.decl
+  -> Why3.Task.task
+
+(* -------------------------------------------------------------------- *)
+module Frequency : sig
   type relevant = Sp.t * Sx.t
 
   val r_empty : relevant
@@ -29,5 +51,4 @@ module Frequency : sig
   val f_ops : Sp.t -> form -> relevant
 
   val add : frequency -> EcFol.form -> unit
-
 end

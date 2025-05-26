@@ -82,3 +82,28 @@ theory ProcRewriteWhile.
   by rcondf ^while; auto.
   qed.
 end ProcRewriteWhile.
+
+(* -------------------------------------------------------------------- *)
+theory ProcRewritePrhl.
+  module M = {
+    proc f(a : int, b : int) : int = {
+      var c : int <- a * (a + b);
+      return c;
+    }
+
+    proc g(a: int, b:int) : int = {
+      var c : int <- (a * a) + (a * b);
+      return c;
+    }
+  }.
+  
+  lemma L a0 b0 : equiv[M.f ~ M.g : ={arg} /\ arg{1} = (a0, b0) ==> ={res} /\ res{1} = (b0 + a0) * a0].
+  proof.
+  proc.
+    proc rewrite {1} 1 addzC.
+  proc rewrite {2} 1 addzC.
+  proc rewrite {1} 1 mulzC.
+  auto=> />.
+  ring.
+  qed.
+end ProcRewritePrhl.

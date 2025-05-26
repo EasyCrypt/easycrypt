@@ -1613,18 +1613,7 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
   dump_tasks tenv.te_task filename
 
-(* -------------------------------------------------------------------- *)
-let cnt = Counter.create ()
-
-let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
-  let out_task filename task =
-    let stream = open_out filename in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
-        (Format.formatter_of_out_channel stream)
-        "%a@." Why3.Pretty.print_task task)
-      (fun () -> close_out stream) in
-
+let init hyps concl =
   let env   = LDecl.toenv hyps in
   let hyps  = LDecl.tohyps hyps in
   let task  = create_global_task () in
@@ -1635,39 +1624,11 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+  env,hyps,tenv,decl
 
-  let execute_task toadd =
-    if pi.P.pr_selected then begin
-      let buffer = Buffer.create 0 in
-      let fmt    = Format.formatter_of_buffer buffer in
-      let ppe    = EcPrinting.PPEnv.ofenv env in
-      let l      = List.map fst toadd in
-      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
-      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
-      notify |> oiter (fun notify -> notify `Warning
-        (lazy (Buffer.contents buffer)))
-    end;
+(* -------------------------------------------------------------------- *)
 
-    List.iter (trans_axiom tenv) toadd;
-    let task = WTask.add_decl tenv.te_task decl in
-    let tkid = Counter.next cnt in
-
-    let dumpin_opt =
-      match pi.pr_dumpin with
-      | None -> Os.getenv "EC_WHY3"
-      | Some filename -> Some (EcLocation.unloc filename)
-    in
-    ( dumpin_opt |> oiter (fun filename ->
-          Format.eprintf "dumping in %s" filename;
-      let filename = Printf.sprintf "%.4d-%s" tkid filename in
-      out_task filename task));
-    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
-
-    if 1 <= pi.P.pr_verbose then
-      notify |> oiter (fun notify -> notify `Warning (lazy (
-        Printf.sprintf "SMT done: %.5f\n%!" tp)));
-    res in
-
+let select env pi hyps concl execute_task =
   if pi.P.pr_all then
     let init_select p ax =
       ax.ax_visibility = `Visible && not (P.Hints.mem p pi.P.pr_unwanted) in
@@ -1712,3 +1673,54 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
           end
 
         in aux pi.P.pr_max other 4
+
+(* -------------------------------------------------------------------- *)
+let cnt = Counter.create ()
+
+let make_task tenv toadd decl=
+    List.iter (trans_axiom tenv) toadd;
+    WTask.add_decl tenv.te_task decl
+
+let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
+  let out_task filename task =
+    let stream = open_out filename in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task task)
+      (fun () -> close_out stream) in
+
+  let env,hyps,tenv,decl = init hyps concl in
+
+  let execute_task toadd =
+    if pi.P.pr_selected then begin
+      let buffer = Buffer.create 0 in
+      let fmt    = Format.formatter_of_buffer buffer in
+      let ppe    = EcPrinting.PPEnv.ofenv env in
+      let l      = List.map fst toadd in
+      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
+      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
+      notify |> oiter (fun notify -> notify `Warning
+        (lazy (Buffer.contents buffer)))
+    end;
+
+    let task = make_task tenv toadd decl in
+    let tkid = Counter.next cnt in
+
+    let dumpin_opt =
+      match pi.pr_dumpin with
+      | None -> Os.getenv "EC_WHY3"
+      | Some filename -> Some (EcLocation.unloc filename)
+    in
+    ( dumpin_opt |> oiter (fun filename ->
+          Format.eprintf "dumping in %s" filename;
+      let filename = Printf.sprintf "%.4d-%s" tkid filename in
+      out_task filename task));
+    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
+
+    if 1 <= pi.P.pr_verbose then
+      notify |> oiter (fun notify -> notify `Warning (lazy (
+        Printf.sprintf "SMT done: %.5f\n%!" tp)));
+    res
+  in
+  select env pi hyps concl execute_task

@@ -72,10 +72,19 @@ module Mpv = struct
     check_npv env pv m;
     { m with s_pv = Mnpv.add pv f m.s_pv }
 
+  let remove env pv m =
+    let pv = pvm env pv in
+    { m with s_pv = Mnpv.remove pv m.s_pv }
+
   let find env pv m =
     let pv = pvm env pv in
     try Mnpv.find pv m.s_pv
     with Not_found -> check_npv env pv m; raise Not_found
+
+  let mem env pv m =
+    match find env pv m with
+    | _ -> true
+    | exception Not_found -> false
 
   let check_mp_mp env mp restr mp' restr' =
     if not (EcPath.m_equal mp mp') &&
@@ -689,6 +698,15 @@ module Mpv2 = struct
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
+  let is_mod_pv' env pv eqo =
+    if is_glob pv then
+      let x = get_glob pv in
+      let check_mp mp =
+        let restr = NormMp.get_restr_use env mp in
+        not (NormMp.use_mem_xp x restr) in
+      Sm.exists check_mp eqo.s_gl
+    else false
+
   let is_mod_mp env mp mod_ =
     let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
@@ -933,7 +951,8 @@ module Mpv2 = struct
       let local = enter_local env local bds1 bds2 in
       add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
-    | Elocal x1, Elocal x2 when
+    | Elocal x1, Elocal x2
+     when EcIdent.id_equal x1 x2 ||
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
     | Evar pv1, Evar pv2
       when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty ->

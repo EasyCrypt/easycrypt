@@ -65,15 +65,16 @@ let rec addidir ?namespace ?(recursive = false) (idir : string) (ecl : ecloader)
   | None    -> ()
   | Some st -> begin
       let idx = (st.Unix.st_dev, st.Unix.st_ino) in
+      let idirs = List.filter (fun ((nm, _), _) -> nm = namespace) ecl.ecl_idirs in
 
       match Sys.os_type with
       | "Win32" ->
           let test ((_, name), _) = name = idir in
-          if not (List.exists test ecl.ecl_idirs) then
+          if not (List.exists test idirs) then
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
 
       | _ ->
-          if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
+          if not (List.exists ((=) idx |- snd) idirs) then
             ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
   end
 
@@ -97,17 +98,20 @@ let check_case idir name (dev, ino) =
 
   let check1 tname =
       match name = norm_name `Lower tname with
-      | false -> false
+      | false -> None
       | true  -> begin
           try
             let stat = Filename.concat idir tname in
             let stat = Unix.lstat stat in
-              stat.Unix.st_dev = dev && stat.Unix.st_ino = ino
-          with Unix.Unix_error _ -> false
+
+            if stat.Unix.st_dev = dev && stat.Unix.st_ino = ino then
+              Some tname
+            else None
+          with Unix.Unix_error _ -> None
       end
   in
-    try  List.exists check1 (EcUtils.Os.listdir idir)
-    with Unix.Unix_error _ -> false
+    try  List.find_map_opt check1 (EcUtils.Os.listdir idir)
+    with Unix.Unix_error _ -> None
 
 (* -------------------------------------------------------------------- *)
 let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
@@ -145,9 +149,8 @@ let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
         | None -> None
         | Some (stat, name) ->
           let stat = (stat.Unix.st_dev, stat.Unix.st_ino) in
-            if   not (check_case idir name stat)
-            then None
-            else Some (inamespace, Filename.concat idir name, kind)
+            check_case idir name stat
+            |> Option.map (fun name -> (inamespace, Filename.concat idir name, kind))
     in
 
     match

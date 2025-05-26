@@ -1738,9 +1738,10 @@ pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
 by apply/le1_sum_isdistr/undup_uniq.
 qed.
 
-op (`*`) (da : 'a distr) (db : 'b distr) =
-  mk (mprod (mu1 da) (mu1 db))
-axiomatized by dprod_def.
+op [opaque] (`*`) (da : 'a distr) (db : 'b distr) = 
+  mk (mprod (mu1 da) (mu1 db)).
+lemma dprod_def (da : 'a distr) (db : 'b distr):
+  da `*` db = mk (mprod (mu1 da) (mu1 db)) by rewrite/(`*`).
 
 lemma dprod1E (da : 'a distr) (db : 'b distr) a b:
   mu1 (da `*` db) (a,b) = mu1 da a * mu1 db b.
@@ -2019,11 +2020,13 @@ have := dprod_dmap_cross da db dc dd idfun idfun F1 idfun idfun F2 _.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op djoin (ds : 'a distr list) : 'a list distr =
+op [opaque] djoin (ds : 'a distr list) : 'a list distr =
  foldr
    (fun d1 dl => dapply (fun xy : _ * _ => xy.`1 :: xy.`2) (d1 `*` dl))
-   (dunit []) ds
- axiomatized by djoin_axE.
+   (dunit []) ds.
+lemma djoin_axE (ds : 'a distr list): djoin ds = foldr
+   (fun d1 dl => dapply (fun xy : _ * _ => xy.`1 :: xy.`2) (d1 `*` dl))
+   (dunit []) ds by rewrite/djoin.
 
 abbrev djoinmap ['a 'b] (d : 'a -> 'b distr) xs = djoin (map d xs).
 

@@ -14,6 +14,10 @@ let rec makedirs (x : string) =
   end
 
 (* -------------------------------------------------------------------- *)
+let safe_unlink ~(filename : string) : unit =
+  try Unix.unlink filename with Unix.Unix_error _ -> ()
+
+(* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
 
 (* -------------------------------------------------------------------- *)
@@ -274,6 +278,13 @@ type 'a doption =
   | Single of 'a
   | Double of ('a * 'a)
 
+module DOption = struct
+  let map (type a b) (f : a -> b) (x : a doption) : b doption =
+    match x with
+    | Single v -> Single (f v)
+    | Double (v1, v2) -> Double (f v1, f v2)
+end
+
 (* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 
@@ -457,6 +468,10 @@ module List = struct
   include Parallel
 
   (* ------------------------------------------------------------------ *)
+  let destruct (s : 'a list) =
+    match s with x :: xs -> (x, xs) | _ -> assert false
+
+  (* ------------------------------------------------------------------ *)
   let nth_opt (s : 'a list) (i : int) =
     try  Some (List.nth s i)
     with Failure _ | Invalid_argument _ -> None
@@ -582,6 +597,29 @@ module List = struct
 
   let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
+
+  (* Separate list into a prefix for which p is true and the rest *)
+  let takedrop_while (p: 'a -> bool) (xs : 'a list) = 
+    let rec doit (acc: 'a list) (xs : 'a list) =
+    match xs with
+    | [] -> (List.rev acc, [])
+    | x::xs -> if p x then doit (x::acc) xs else (List.rev acc, x::xs)
+    in doit [] xs
+
+
+  type 'a interruptible = [`Interrupt | `Continue of 'a]
+
+  let fold_left_map_while (f : 'a -> 'b -> ('a * 'c) interruptible) =
+    let rec aux (state : 'a) (acc : 'c list) (xs : 'b list) =
+      match xs with
+      | [] -> (state, List.rev acc, [])
+      | y :: ys -> begin
+        match f state y with
+        | `Continue (state, y) -> aux state (y :: acc) ys
+        | `Interrupt -> (state, List.rev acc, xs)
+      end
+
+    in fun state xs -> aux state [] xs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -681,7 +719,19 @@ module String = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module IO = BatIO
+module IO : sig
+  include module type of BatIO
+
+  val pp_to_file : filename:string -> (Format.formatter -> unit) -> unit
+end = struct
+  include BatIO
+
+  let pp_to_file ~(filename : string) (pp : Format.formatter -> unit) =
+    BatFile.with_file_out filename (fun channel ->
+      let fmt = BatFormat.formatter_of_output channel in
+      Format.fprintf fmt "%t@." pp
+    )
+  end
 
 (* -------------------------------------------------------------------- *)
 module File = struct

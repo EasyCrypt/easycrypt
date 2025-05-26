@@ -37,7 +37,7 @@ module Exp (H : Oracle) (D : Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 theory Lazy.
-require import SmtMap.
+require import FMap.
 
 module LRO : Oracle = {
   var m : (in_t, out_t) fmap
@@ -61,7 +61,7 @@ lemma LRO_init_ll : islossless LRO.init.
 proof. by proc; auto. qed.
 
 lemma LRO_o_ll : (forall x, is_lossless (dout x)) => islossless LRO.o.
-proof. by move=> dout_ll; proc; auto; rewrite dout_ll. qed.
+proof. by move=> dout_ll; proc; auto=> &0; rewrite dout_ll. qed.
 
 hoare LRO_initE : LRO.init : true ==> LRO.m = empty.
 proof. by proc; auto. qed.
@@ -92,7 +92,7 @@ end Lazy.
 
 (* -------------------------------------------------------------------- *)
 abstract theory FiniteEager.
-require import List SmtMap.
+require import List FMap.
 require import FinType.
 
 (** TODO: expose finiteness assumption **)
@@ -151,7 +151,7 @@ end FiniteEager.
 
 (* -------------------------------------------------------------------- *)
 abstract theory LazyEager.
-require import List SmtMap PROM.
+require import List FMap PROM.
 require import FinType.
 
 clone import FinType with
@@ -265,7 +265,7 @@ have eq_RO_LRO': equiv[Exp'(H.RO).main ~ Exp'(H.LRO).main: ={glob D, arg} ==> ={
 proc*.
 rewrite equiv[{1} 1 eq_LRO_RO].
 rewrite equiv[{2} 1 eq_ERO_RO].
-outline {2} [1] { r <@ MainD(D', RO).distinguish(x); }.
+outline {2} 1 by { r <@ MainD(D', RO).distinguish(x); }.
 rewrite equiv[{2} 1 (FullEager.RO_LRO D' dout_ll)].
 by sim.
 qed.
@@ -433,7 +433,7 @@ end SetLog.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ROM_BadCall.
-require import FSet SmtMap.
+require import FSet FMap.
 
 op qH : int.
 

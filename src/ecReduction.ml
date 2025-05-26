@@ -120,7 +120,9 @@ module EqTest_base = struct
       | _, _ -> raise E.NotConv in
 
     let rec aux alpha e1 e2 =
-      e_equal e1 e2 || aux_r alpha e1 e2
+      (* If alpha is not empty then the test e_equal can be wrong *)
+         (e_equal e1 e2 && Mid.is_empty alpha)
+      || aux_r alpha e1 e2
 
     and aux_r alpha e1 e2 =
       match e1.e_node, e2.e_node with
@@ -138,14 +140,14 @@ module EqTest_base = struct
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
-          noconv (aux alpha) e1 e2
+          aux alpha e1 e2
 
       | Eapp (f1, args1), Eapp (f2, args2) ->
           aux alpha f1 f2 && List.all2 (aux alpha) args1 args2
 
       | Elet (p1, f1', g1), Elet (p2, f2', g2) ->
           aux alpha f1' f2'
-            && noconv (aux (check_lpattern alpha p1 p2)) g1 g2
+            && aux (check_lpattern alpha p1 p2) g1 g2
 
       | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
 
@@ -156,9 +158,12 @@ module EqTest_base = struct
           for_type env ty1 ty2
             && List.all2 (aux alpha) (e1::es1) (e2::es2)
 
+      | Eproj (e1, i1), Eproj (e2, i2) ->
+          i1 = i2 && aux alpha e1 e2
+
       | _, _ -> false
 
-    in fun alpha e1 e2 -> aux alpha e1 e2
+    in fun alpha e1 e2 -> noconv (aux alpha) e1 e2
 
   (* ------------------------------------------------------------------ *)
   let for_lv env ~norm lv1 lv2 =
@@ -717,11 +722,12 @@ let eta_expand bd f ty =
 let reduce_user_gen simplify ri env hyps f =
   if not ri.user then raise nohead;
 
-  let p =
+  let p : EcEnv.Reduction.topsym =
     match f.f_node with
     | Fop (p, _)
     | Fapp ({ f_node = Fop (p, _) }, _) -> `Path p
     | Ftuple _   -> `Tuple
+    | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
   let rules = EcEnv.Reduction.get p env in
@@ -766,6 +772,9 @@ let reduce_user_gen simplify ri env hyps f =
 
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
             ()
+
+        | ({ f_node = Fproj (target, i)}, _), R.Rule (`Proj ai, [arg]) when i = ai ->
+            doit target arg
 
         | _, R.Var x ->
           check_pv x f
@@ -943,25 +952,38 @@ let reduce_head simplify ri env hyps f =
 
     (* ι-reduction (records projection) *)
   | Fapp ({ f_node = Fop (p, _); }, args)
-      when ri.iota && EcEnv.Op.is_projection env p ->
-      begin match args with
-      | mk :: args ->
-        begin match mk.f_node with
-        | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
-          if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
-          let v = oget (EcEnv.Op.by_path_opt p env) in
-          let v = proj3_2 (EcDecl.operator_as_proj v) in
-          let v = List.nth mkargs v in
-          f_app v args f.f_ty
+      when ri.iota && EcEnv.Op.is_projection env p -> begin
 
-        | _ -> raise needsubterm
-        end
-      | _ -> raise nohead
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed NoHead -> begin
+        begin match args with
+        | mk :: args ->
+          begin match mk.f_node with
+          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
+            if not (EcEnv.Op.is_record_ctor env mkp) then raise nohead;
+            let v = oget (EcEnv.Op.by_path_opt p env) in
+            let v = proj3_2 (EcDecl.operator_as_proj v) in
+            let v = List.nth mkargs v in
+            f_app v args f.f_ty
+
+          | _ -> raise needsubterm
+          end
+        | _ -> raise nohead
       end
+    end
+  end
 
     (* ι-reduction (tuples projection) *)
-  | Fproj(f1, i) when ri.iota ->
-    check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+  | Fproj(f1, i) -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with
+      | NotRed NoHead when ri.iota ->
+        check_reduced hyps needsubterm f (f_proj_simpl f1 i f.f_ty)
+      | NotRed _ as e ->
+        raise e
+    end
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
@@ -1048,7 +1070,12 @@ let reduce_head simplify ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fop _ -> reduce_delta ri env hyps f
+  | Fop _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ ->
+      reduce_delta ri env hyps f
+    end
 
   | Fapp({ f_node = Fop(p,_); }, args) -> begin
       try  reduce_logic ri env hyps f p args
@@ -1059,7 +1086,17 @@ let reduce_head simplify ri env hyps f =
           else raise needsubterm
     end
 
-  | Fapp(_, _) -> raise needsubterm
+  | Ftuple _ -> begin
+      try
+        reduce_user_gen simplify ri env hyps f
+      with NotRed _ -> raise needsubterm
+    end
+
+  | Fapp _ -> begin
+    try
+      reduce_user_gen simplify ri env hyps f
+    with NotRed _ -> raise needsubterm
+  end
 
   | Fquant((Lforall | Lexists), _, _) ->
     reduce_quant ri env hyps f
@@ -1660,6 +1697,8 @@ module User = struct
             R.Rule (`Op (p, tys), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
+        | { f_node = Fproj (target, i) }, [] ->
+            R.Rule (`Proj i, [rule target])
         | { f_node = Fint i }, [] ->
             R.Int i
         | { f_node = Flocal x }, [] ->
@@ -1684,7 +1723,8 @@ module User = struct
                       | { ty_node = Tvar a } -> Sid.add a ltyvars
                       | _ as ty -> ty_fold doit ltyvars ty in doit)
                   cst.cst_ty_vs tys
-              | `Tuple -> cst.cst_ty_vs in
+              | `Tuple -> cst.cst_ty_vs
+              | `Proj _ -> cst.cst_ty_vs in
             let cst = {cst with cst_ty_vs = ltyvars } in
             List.fold_left doit cst args
 

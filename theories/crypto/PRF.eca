@@ -31,7 +31,7 @@ module IND (F : PRF) (D : Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 abstract theory RF.
-require import SmtMap.
+require import FMap.
 
 op dR: { D -> R distr | forall x, is_lossless (dR x) } as dR_ll.
 

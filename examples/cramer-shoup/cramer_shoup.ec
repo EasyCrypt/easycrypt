@@ -492,7 +492,7 @@ section Security_Aux.
            Pr[Ad1.Main(G1).main() @ &m : res \/ G1.bad].
     + byequiv DDH1_G1 => //;1: smt ().
     (* print glob G1. *)
-    have /= := Ad1.pr_abs G1 _ _ &m (fun (b:bool) (x : glob G1) => b \/ x.`14).
+    have /= := Ad1.pr_abs G1 _ _ &m (fun (b:bool) (x : glob G1) => b \/ x.`2).
     + proc;auto => />; by rewrite dt_r_ll ?dt_ll.
     + proc;auto;call (guess_ll (<:G1.O) G1_dec_ll);auto.
       by call (choose_ll (<:G1.O) G1_dec_ll);auto; rewrite dk_ll  dt_ll DBool.dbool_ll.

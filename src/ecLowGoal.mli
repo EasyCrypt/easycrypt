@@ -83,14 +83,29 @@ module LowApply : sig
     | `Hyps of EcEnv.LDecl.hyps * proofenv
   ]
 
-  val check : [`Elim | `Intro] -> proofterm -> ckenv -> proofterm * form
+  val check :
+       [`Elim | `Intro]
+    -> proofterm
+    -> ckenv
+    -> proofterm * form
+
+  val check_with_cutsolve :
+       [`Elim | `Intro]
+    -> proofterm
+    -> ckenv
+    -> proofterm * form * (handle, cutsolve) EcMaps.DMap.t
 end
+
+type cutsolver = {
+  smt   : FApi.backward;
+  done_ : FApi.backward;
+}
 
 (* Main low-level MP tactic. Apply a fully constructed proof-term to
  * the focused goal. If the proof-term contains PTCut-terms, create the
  * related subgoals. Raise [InvalidProofTerm] is the proof-term is not
  * valid (not typable or not a proof of the focused goal). *)
-val t_apply : proofterm -> FApi.backward
+val t_apply : ?cutsolver:cutsolver -> proofterm -> FApi.backward
 
 (* Apply a proof term of the form [p<:ty1...tyn> f1...fp _ ... _]
  * constructed from the path, type parameters, and formulas given to
@@ -119,14 +134,13 @@ module Apply : sig
   exception NoInstance of (bool * reason * pt_env * (form * form))
 
   val t_apply_bwd_r :
-    ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
+    ?ri:EcReduction.reduction_info -> ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
 
   val t_apply_bwd :
-    ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+    ?ri:EcReduction.reduction_info -> ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
 
   val t_apply_bwd_hi:
-       ?dpe:bool -> ?mode:fmoptions -> ?canview:bool
-    -> proofterm -> FApi.backward
+     ?ri:EcReduction.reduction_info -> ?dpe:bool -> ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
 end
 
 (* -------------------------------------------------------------------- *)
@@ -145,7 +159,7 @@ val t_right : ?reduce:lazyred -> FApi.backward
 val t_or_intro_prind : ?reduce:lazyred -> side -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_split : ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
+val t_split : ?i: int -> ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
 val t_split_prind : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
@@ -218,7 +232,8 @@ val t_rewrite_hyp :
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
-     ?kind:subst_kind
+     ?exn:exn
+  -> ?kind:subst_kind
   -> ?except:Sid.t
   -> ?clear:bool
   -> ?var:vsubst
@@ -320,6 +335,14 @@ val t_congr : form pair -> form pair list * ty -> FApi.backward
 type smtmode = [`Sloppy | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
+
+val t_coq:
+     loc:EcLocation.t
+  -> name:string
+  -> mode:smtmode
+  -> coq_mode option
+  -> prover_infos
+  -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_solve :

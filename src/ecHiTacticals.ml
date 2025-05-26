@@ -128,8 +128,8 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     match unloc t with
     | Preflexivity        -> process_reflexivity
     | Passumption         -> process_assumption
-    | Psmt pi             -> process_smt ~loc:(loc t) ttenv pi
-    | Psplit              -> process_split
+    | Psmt pi             -> process_smt ~loc:(loc t) ttenv (Some pi)
+    | Psplit i            -> process_split ?i
     | Pfield st           -> process_algebra `Solve `Field st
     | Pring st            -> process_algebra `Solve `Ring  st
     | Palg_norm           -> EcStrongRing.t_alg_eq
@@ -154,6 +154,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pwlog (ids, b, f)   -> process_wlog ~suff:b ids f
     | Pgenhave gh         -> process_genhave ttenv gh
     | Prwnormal _         -> assert false
+    | Pcoq (m, n, pi)     -> process_coq ~loc:(loc t) ~name:n.pl_desc ttenv m pi
   in
     tx tc
 
@@ -173,9 +174,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp info                 -> EcPhlApp.process_app info
     | Pwp wp                    -> EcPhlWp.process_wp wp
-    | Psp sp                    -> EcPhlSp.t_sp sp
+    | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
-    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
+    | Prmatch (side, c, i)      -> EcPhlRCond.process_rcond_match side c i
     | Pcond info                -> EcPhlHiCond.process_cond info
     | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
@@ -195,6 +196,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
+    | Psetmatch info            -> EcPhlCodeTx.process_set_match info
     | Pweakmem info             -> EcPhlCodeTx.process_weakmem info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
     | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
@@ -235,8 +237,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   with (* PHL Specific low errors *)
   | EcLowPhlGoal.InvalidSplit cpos1 ->
       tc_error_lazy !!tc (fun fmt ->
-        Format.fprintf fmt "invalid split index: %s"
-          (EcPrinting.string_of_cpos1 cpos1))
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "invalid split index: %a"
+          (EcPrinting.pp_codepos1 ppe) cpos1)
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

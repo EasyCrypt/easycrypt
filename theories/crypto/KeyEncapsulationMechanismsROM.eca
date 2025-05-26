@@ -1,0 +1,1456 @@
+(*^
+  This library generically defines Key-Encapsulation Mechanisms (KEM) schemes
+  and their properties (both correctness and security) for proofs 
+  in the Random Oracle Model (ROM). In essence, these are the 
+  regular definitions (defined in KeyEncapsulationMechanisms.eca) extended
+  with a (single) random oracle (compatible with the ones in PROM.ec).
+  For further details about the definitions for KEMs and/or
+  random oracles, refer to the respective theories.
+^*)  
+(* Require/Import libraries *)
+require import AllCore List.
+require (*--*) KeyEncapsulationMechanisms.
+
+(* Types *)
+(** Public keys (asymmetric) **)
+type pk_t.
+
+(** Secret keys (asymmetric) **)
+type sk_t.
+
+(** Shared/session keys (symmetric) **)
+type key_t.
+
+(** Ciphertexts/Encapsulations **)
+type ctxt_t.
+
+(* Inputs to the random oracle *)
+type in_t.
+
+(* Outputs of the random oracle *)
+type out_t.
+
+
+(* Clones and imports *)
+(** Definitions and properties for KEMs (non-ROM) **)
+clone import KeyEncapsulationMechanisms as KEMs with
+  type pk_t <- pk_t,
+  type sk_t <- sk_t,
+  type key_t <- key_t,
+  type ctxt_t <- ctxt_t
+  
+  proof *.
+
+  
+(* 
+  (Random) Oracles.
+  The definitions in this file only require "regular" random oracles that provide 
+  an initialization functionality and a query functionality, i.e., no (re-)programmability.
+  Nevertheless, we do want the definitions to be compatible with the definitions used in
+  the main random oracle file of EC's standard library (PROM.ec). So, we simply take and
+  restrict the definitions from this file, limiting functionality.
+*)
+(* 
+  Type for (random) oracles used in security games, 
+  exposing both the initialization functionality and the query functionality 
+*)
+module type RandomOraclei = {
+  proc init() : unit
+  proc get(x : in_t) : out_t 
+}.
+
+(* 
+  Type for (random) oracles used in schemes and given to adversaries, 
+  exposing only the query functionality
+*)
+module type RandomOracle = {
+  include RandomOraclei [get]
+}.
+
+
+(* Schemes in ROM *)
+(** KEM in ROM **)
+module type Scheme_ROM (RO : RandomOracle) = {
+  include Scheme
+}.
+
+
+(* Correctness in ROM *)
+(** Correctness program/game in ROM **)
+module Correctness_ROM (RO : RandomOraclei) (S : Scheme_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ Correctness(S(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(* Security in ROM *)
+(* Attacker capabilities/models in ROM *)
+(* 
+  Chosen-Plaintext Attacks (CPA) in ROM.
+  The adversary is given the considered public key and, hence, 
+  is able to produce encapsulations, i.e., (symmetric) key/ciphertext pairs. 
+  (Typically, this means the adversary can construct ciphertexts
+   corresponding to chosen (symmetric) keys.)
+*)
+
+(* 
+  non-adaptive Chosen-Ciphertext Attacks (CCA1) in ROM.
+  The adversary is given the considered public key and access to a decryption oracle
+  *before* the stage in which it is expected to distinguish/return a break.
+  Hence, the adversary is able to produce encapsulations
+  *and* query for decryptions of chosen ciphertexts.
+*)
+(** Interface for oracles employed in CCA1 security games in ROM **)
+module type Oracles_CCA1i_ROM (RO : RandomOracle) (S : Scheme) = {
+  proc init(sk_init : sk_t) : unit
+  proc decaps(c : ctxt_t) : key_t option
+}.
+
+
+(* 
+  adaptive Chosen-Ciphertext Attacks (Traditional: CCA2, Modern : CCA) in ROM.
+  The adversary is given the considered public key and access to a decryption oracle throughout.  
+  Hence, the adversary is able to produce encapsulations
+  *and* query for decryptions of chosen ciphertexts (potentially barring ciphertexts
+  that are part of the challenge).
+  Traditionally, this was analogous to CCA2 security for PKE schemes, meaning there were
+  two adversary stages: one before receiving the challenge (given a public key and access to a 
+  non-restricted decapsulation oracle), and one after receiving the challenge (given access to a
+  restricted decapsulation oracle, i.e., one that prohibited querying the challenge).
+  Over time, the formalization shifted toward only considering the second adversary stage 
+  (provding the public key(s) to this stage as well).
+  Here, we denote the traditional one by CCA2 (as we do for PKE schemes), and the modern one by CCA.
+*)
+(** Interface for oracles employed in CCA2 (CCA) security games in ROM **)
+module type Oracles_CCA2i_ROM (RO : RandomOracle) (S : Scheme) = {
+  proc init(sk_init : sk_t, c'_init : ctxt_t) : unit
+  proc decaps(c : ctxt_t) : key_t option
+}.
+
+
+(* 
+  One-Wayness (OW) in ROM.
+  The adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(*
+  One-Wayness under Chosen-Plaintext Attacks (OW-CPA) in ROM.
+  In a CPA setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CPA in ROM **)
+module type Adv_OWCPA_ROM (RO : RandomOracle) = {
+  include Adv_OWCPA
+}.
+
+(** OW-CPA security game in ROM **)
+module OW_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_OWCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ OW_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  One-Wayness under non-adaptive Chosen-Ciphertext Attacks (OW-CCA1) in ROM.
+  In a CCA1 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA1 in ROM **)
+module type Adv_OWCCA1_ROM (RO : RandomOracle) (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit { O.decaps } 
+  proc find(c : ctxt_t) : key_t { }
+}.
+
+(** OW-CCA1 security game in ROM **)
+module OW_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA1i_ROM) (A : Adv_OWCCA1_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ OW_CCA1(S(RO), O(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  One-Wayness under (traditional) adaptive Chosen-Ciphertext Attacks (OW-CCA2) in ROM.
+  In a (traditional) CCA2 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA2 in ROM **)
+module type Adv_OWCCA2_ROM (RO : RandomOracle) (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t) : key_t
+}.
+
+(** OW-CCA2 security game in ROM **)
+module OW_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                   (O1 : Oracles_CCA1i_ROM) (O2 : Oracles_CCA2i_ROM) 
+                   (A : Adv_OWCCA2_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ OW_CCA2(S(RO), O1(RO), O2(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  One-Wayness under (modern) adaptive Chosen-Ciphertext Attacks (OW-CCA) in ROM.
+  In a (modern) CCA2 setting, the adversary is asked to produce the (symmetric) key
+  encapsulated by a given ciphertext.
+*)
+(** Adversary class considered for OW-CCA (i.e., modern OW-CCA2) in ROM **)
+module type Adv_OWCCA_ROM (RO : RandomOracle) (O : Oracles_CCA) = { 
+  proc find(pk : pk_t, c : ctxt_t) : key_t
+}.
+
+(** OW-CCA (i.e., modern OW-CCA2) security game in ROM **)
+module OW_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA2i_ROM) (A : Adv_OWCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ OW_CCA(S(RO), O(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(**
+  (ciphertext) INDistinguishability (IND) in ROM. 
+  The adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+**)
+abstract theory INDROM.
+(* Distributions *)
+(** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the key space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dkeym : pk_t -> key_t distr.
+
+
+(* Clone and import definitions from IND theory (in non-ROM KEM theory) *)
+clone import IND with 
+  op dkeym <- dkeym
+  
+  proof *.
+
+  
+(*
+  (ciphertext) INDistinguishability under Chosen-Plaintext Attacks (IND-CPA) in ROM.
+  In a CPA setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CPA in ROM **)
+module type Adv_INDCPA_ROM (RO : RandomOracle) = {
+  include Adv_INDCPA
+}.
+
+(** IND-CPA security game (sampled bit) in ROM **)
+module IND_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_INDCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** IND-CPA security game (provided bit) in ROM **)
+module IND_CPA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_INDCPA_ROM) = {
+  proc main(b : bool) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CPA_P(S(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under non-adaptive Chosen-Ciphertext Attacks (IND-CCA1) in ROM.
+  In a CCA1 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA1 in ROM **)
+module type Adv_INDCCA1_ROM (RO : RandomOracle) (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit { O.decaps } 
+  proc distinguish(k : key_t, c : ctxt_t) : bool { }
+}.
+
+(** IND-CCA1 security game (sampled bit) in ROM **)
+module IND_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA1i_ROM) (A : Adv_INDCCA1_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA1(S(RO), O(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** IND-CCA1 security game (provided bit) in ROM **)
+module IND_CCA1_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA1i_ROM) (A : Adv_INDCCA1_ROM) = {
+  proc main(b : bool) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA1_P(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under (traditional) adaptive Chosen-Ciphertext Attacks (IND-CCA2) in ROM.
+  In a (traditional) CCA2 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA2 in ROM **)
+module type Adv_INDCCA2_ROM (RO : RandomOracle) (O : Oracles_CCA) = { 
+  proc scout(pk : pk_t) : unit
+  proc distinguish(k : key_t, c : ctxt_t) : bool
+}.
+
+(** IND-CCA2 security game (sampled bit) in ROM **)
+module IND_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O1 : Oracles_CCA1i_ROM) (O2 : Oracles_CCA2i_ROM) 
+                    (A : Adv_INDCCA2_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA2(S(RO), O1(RO), O2(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** IND-CCA2 security game (provided bit) in ROM **)
+module IND_CCA2_P_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                      (O1 : Oracles_CCA1i_ROM) (O2 : Oracles_CCA2i_ROM)
+                      (A : Adv_INDCCA2_ROM) = {
+  proc main(b : bool) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA2_P(S(RO), O1(RO), O2(RO), A(RO)).main(b);
+    
+    return r; 
+  }
+}.
+
+
+(*
+  (ciphertext) INDistinguishability under (modern) adaptive Chosen-Ciphertext Attacks (IND-CCA2) in ROM.
+  In a (modern) CCA2 setting, the adversary is asked to determine whether a given
+  (symmetric) key is (1) encapsulated by a given ciphertext or (2) independently sampled.
+*)
+(** Adversary class considered for IND-CCA (i.e., modern IND-CCA2) in ROM **)
+module type Adv_INDCCA_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc distinguish(pk : pk_t, k : key_t, c : ctxt_t) : bool
+}.
+
+(** IND-CCA (i.e., modern IND-CCA2) security game (sampled bit) in ROM **)
+module IND_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA2i_ROM) (A : Adv_INDCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA(S(RO), O(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** IND-CCA (i.e., modern IND-CCA2) security game (provided bit) in ROM **)
+module IND_CCA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA2i_ROM) (A : Adv_INDCCA_ROM) = {
+  proc main(b : bool) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ IND_CCA_P(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+end INDROM.
+
+
+(** 
+  (ciphertext) Non-Malleability (NM) in ROM.
+  Given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled
+  at random.
+  
+  (ciphertext) Strong Non-Malleability (SNM)
+  As NM, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+  
+  Note that these notions only have a sensible definition with a provided bit, so 
+  no "sampled bit" variants are defined.
+**)
+abstract theory NMROM.
+(* Distributions *)
+(** (Sub-)Distribution over (symmetric) keys (may depend on public key) **)
+(** 
+  Dependence on public key may be used to, e.g., model cases where the key space
+  depends on the public key. (Currently, the more "direct" approach of having the actual
+  type change depending on the public key is not possible in EC.)
+**)
+op dkeym : pk_t -> key_t distr.
+
+
+(* Clone and import definitions from NM theory (in non-ROM KEM theory) *)
+clone import NM with 
+  op dkeym <- dkeym
+  
+  proof *.
+
+
+(*
+  (ciphertext) Non-Malleability under Chosen-Plaintext Attacks (NM-CPA) in ROM.
+  In a CPA setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CPA in ROM **)
+module type Adv_NMCPA_ROM (RO : RandomOracle) = {
+  include Adv_NMCPA
+}.
+
+(** NM-CPA security game in ROM **)
+module NM_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_NMCPA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ NM_CPA(S(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under Chosen-Plaintext Attacks (SNM-CPA) in ROM.
+  As NM-CPA, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CPA in ROM **)
+module type Adv_SNMCPA_ROM (RO : RandomOracle) = {
+  include Adv_SNMCPA
+}.
+
+(** SNM-CPA security game in ROM **)
+module SNM_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_SNMCPA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SNM_CPA(S(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under non-adaptive Chosen-Ciphertext Attacks (NM-CCA1) in ROM.
+  In a CCA1 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA1 in ROM **)
+module type Adv_NMCCA1_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit { O.decaps }
+  proc find(c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list { }
+}.
+
+(** NM-CCA1 security game in ROM **)
+module NM_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA1i_ROM) (A : Adv_NMCCA1_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ NM_CCA1(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under non-adaptive Chosen-Ciphertext Attacks (SNM-CCA1) in ROM.
+  As NM-CCA1, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CCA1 in ROM **)
+module type Adv_SNMCCA1_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit { O.decaps }
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list { }
+}.
+
+(** SNM-CCA1 security game in ROM **)
+module SNM_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA1i_ROM) (A : Adv_SNMCCA1_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SNM_CCA1(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under (traditional) adaptive Chosen-Ciphertext Attacks (NM-CCA2) in ROM.
+  In a (traditional) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA2 in ROM **)
+module type Adv_NMCCA2_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CCA2 security game in ROM **)
+module NM_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM)  
+                   (O1 : Oracles_CCA1i_ROM) (O2 : Oracles_CCA2i_ROM)
+                   (A : Adv_NMCCA2_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ NM_CCA2(S(RO), O1(RO), O2(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under (traditional) adaptive Chosen-Ciphertext Attacks (SNM-CCA2) in ROM.
+  As NM-CCA2, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled, and the other one is
+  encapsulated by the given ciphertext. (The order in which the keys appear in the pair
+  is chosen uniformly at random).
+*)
+(** Adversary class considered for SNM-CCA2 in ROM **)
+module type Adv_SNMCCA2_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc scout(pk : pk_t) : unit
+  proc find(c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** SNM-CCA2 security game in ROM **)
+module SNM_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM) 
+                    (O1 : Oracles_CCA1i_ROM) (O2 : Oracles_CCA2i_ROM)
+                    (A : Adv_SNMCCA2_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SNM_CCA2(S(RO), O1(RO), O2(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  (ciphertext) Non-Malleability under (modern) adaptive Chosen-Ciphertext Attacks (NM-CCA) in ROM.
+  In a (modern) CCA2 setting, given a ciphertext (encapsulating some key K), the adversary is 
+  asked to provide a relation R and a list of ciphertexts such that the (symmetric) keys 
+  resulting from decapsulating the ciphertexts (in the list) are related (through R) with
+  K (significantly) more often than with a (symmetric) key that is independently sampled.
+*)
+(** Adversary class considered for NM-CCA (i.e., modern NM-CCA2) in ROM **)
+module type Adv_NMCCA_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc find(pk : pk_t, c : ctxt_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** NM-CCA (i.e., modern NM-CCA2) security game in ROM **)
+module NM_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA2i_ROM) (A : Adv_NMCCA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ NM_CCA(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  (ciphertext) Strong Non-Malleability under (modern) adaptive Chosen-Ciphertext Attacks (SNM-CCA) in ROM.
+  As NM-CCA, but the adversary is additionally given a pair of (symmetric) keys of
+  which one is independently sampled at random, and the other is the one
+  encapsulated by the given ciphertext. (The order in which they appear in the pair
+  is (uniformly) random).
+*)
+(** Adversary class considered for SNM-CCA (i.e., modern SNM-CCA2) in ROM **)
+module type Adv_SNMCCA_ROM (RO : RandomOracle) (O : Oracles_CCA) = {
+  proc find(pk : pk_t, c : ctxt_t, kk : key_t * key_t) : (key_t -> key_t option list -> bool) * ctxt_t list
+}.
+
+(** SNM-CCA (i.e., modern SNM-CCA2) security game in ROM **)
+module SNM_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O : Oracles_CCA2i_ROM) (A : Adv_SNMCCA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SNM_CCA(S(RO), O(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+end NMROM.
+
+
+(* 
+  ANOnymity (ANO) in ROM.
+  The adversary is given two (honestly generated) public keys and an encapsulation 
+  (i.e., ciphertext/key pair), and asked to determine which public key was used to
+  create the encapsulation.
+  
+  Weak ANOnymity (WANO) in ROM.
+  As ANO, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(*
+  ANOnymity under Chosen-Plaintext Attacks (ANO-CPA) in ROM.
+  In a CPA setting, the adversary is given two (honestly generated) public keys 
+  and an encapsulation (i.e., key/ciphertext pair), and asked to determine which 
+  public key was used to create the encapsulation.
+*)
+(** Adversary class considerd for ANO-CPA in ROM **)
+module type Adv_ANOCPA_ROM (RO : RandomOracle) = {
+  include Adv_ANOCPA
+}.
+
+(** ANO-CPA security game (sampled bit) in ROM **)
+module ANO_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_ANOCPA_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** ANO-CPA security game (provided bit) in ROM **)
+module ANO_CPA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_ANOCPA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CPA_P(S(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ANOnymity under Chosen-Plaintext Attacks (WANO-CPA) in ROM.
+  As ANO-CPA, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considerd for WANO-CPA in ROM **)
+module type Adv_WANOCPA_ROM (RO : RandomOracle) = {
+  include Adv_WANOCPA
+}.
+
+(** WANO-CPA security game (sampled bit) in ROM **)
+module WANO_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_WANOCPA_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** WANO-CPA security game (provided bit) in ROM **)
+module WANO_CPA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_WANOCPA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CPA_P(S(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  ANOnymity under non-adaptive Chosen-Ciphertexts Attacks (ANO-CCA1) in ROM.
+  In a CCA1 setting, the adversary is given (in the first stage) two (honestly generated) public keys 
+  and (in the second stage) an encapsulation (i.e., key/ciphertext pair), and is 
+  asked to determine which public key was used to create the encapsulation.
+*)
+(** Adversary class considerd for ANO-CCA1 in ROM **)
+module type Adv_ANOCCA1_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
+  proc distinguish(kc : key_t * ctxt_t) : bool { }
+}.
+
+(** ANO-CCA1 security game (sampled bit) in ROM **)
+module ANO_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM) (A : Adv_ANOCCA1_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA1(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** ANO-CCA1 security game (provided bit) in ROM **)
+module ANO_CCA1_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM) (A : Adv_ANOCCA1_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA1_P(S(RO), O0(RO), O1(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  Weak ANOnymity under non-adaptive Chosen-Ciphertext Attacks (WANO-CCA1) in ROM.
+  As ANO-CCA1, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considerd for WANO-CCA1 in ROM **)
+module type Adv_WANOCCA1_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit{ O0.decaps, O1.decaps }
+  proc distinguish(c : ctxt_t) : bool { }
+}.
+
+(** WANO-CCA1 security game (sampled bit) in ROM **)
+module WANO_CCA1_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM) (A : Adv_WANOCCA1_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA1(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** WANO-CCA1 security game (provided bit) in ROM **)
+module WANO_CCA1_P_ROM (RO : RandomOraclei) (S : Scheme_ROM) (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM) (A : Adv_WANOCCA1_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA1_P(S(RO), O0(RO), O1(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (ANO-CCA2) in ROM.
+  In a (traditional) CCA2 setting, the adversary is given (in the first stage) two 
+  (honestly generated) public keys and (in the second stage) an encapsulation 
+  (i.e., key/ciphertext pair), and is 
+  asked to determine which public key was used to create the encapsulation.
+*)
+(** Adversary class considerd for ANO-CCA2 in ROM **)
+module type Adv_ANOCCA2_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit
+  proc distinguish(kc : key_t * ctxt_t) : bool
+}.
+
+(** ANO-CCA2 security game (sampled bit) in ROM **)
+module ANO_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O01 : Oracles_CCA1i_ROM) (O11 : Oracles_CCA1i_ROM)
+                    (O02 : Oracles_CCA2i_ROM) (O12 : Oracles_CCA2i_ROM)
+                    (A : Adv_ANOCCA2_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA2(S(RO), O01(RO), O11(RO), O02(RO), O12(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** ANO-CCA2 security game (provided bit) in ROM **)
+module ANO_CCA2_P_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                      (O01 : Oracles_CCA1i_ROM) (O11 : Oracles_CCA1i_ROM)
+                      (O02 : Oracles_CCA2i_ROM) (O12 : Oracles_CCA2i_ROM)
+                      (A : Adv_ANOCCA2_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA2_P(S(RO), O01(RO), O11(RO), O02(RO), O12(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ANOnymity under (traditional) adaptive Chosen-Ciphertext Attacks (WANO-CCA2) in ROM.
+  As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considerd for WANO-CCA2 in ROM **)
+module type Adv_WANOCCA2_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc scout(pk0 : pk_t, pk1 : pk_t) : unit
+  proc distinguish(c : ctxt_t) : bool
+}.
+
+(** WANO-CCA2 security game (sampled bit) in ROM **)
+module WANO_CCA2_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                     (O01 : Oracles_CCA1i_ROM) (O11 : Oracles_CCA1i_ROM)
+                     (O02 : Oracles_CCA2i_ROM) (O12 : Oracles_CCA2i_ROM)
+                     (A : Adv_WANOCCA2_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA2(S(RO), O01(RO), O11(RO), O02(RO), O12(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** WANO-CCA2 security game (provided bit) in ROM **)
+module WANO_CCA2_P_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                       (O01 : Oracles_CCA1i_ROM) (O11 : Oracles_CCA1i_ROM)
+                       (O02 : Oracles_CCA2i_ROM) (O12 : Oracles_CCA2i_ROM)
+                       (A : Adv_WANOCCA2_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA2_P(S(RO), O01(RO), O11(RO), O02(RO), O12(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  ANOnymity under (modern) adaptive Chosen-Ciphertext Attacks (ANO-CCA) in ROM.
+  In a (modern) CCA setting, the adversary is given (in the first stage) two 
+  (honestly generated) public keys and (in the second stage) an encapsulation 
+  (i.e., key/ciphertext pair), and is asked to determine which public key was 
+  used to create the encapsulation.
+*)
+(** Adversary class considerd for ANO-CCA (i.e., modern ANO-CCA2) in ROM **)
+module type Adv_ANOCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, kc : key_t * ctxt_t) : bool
+}.
+
+(** ANO-CCA (i.e., modern ANO-CCA2) security game (sampled bit) in ROM **)
+module ANO_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                   (O0 : Oracles_CCA2i_ROM) (O1 : Oracles_CCA2i_ROM)
+                   (A : Adv_ANOCCA_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** ANO-CCA (i.e., modern ANO-CCA2) security game (provided bit) in ROM **)
+module ANO_CCA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                     (O0 : Oracles_CCA2i_ROM) (O1 : Oracles_CCA2i_ROM)
+                     (A : Adv_ANOCCA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ ANO_CCA_P(S(RO), O0(RO), O1(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ANOnymity under (modern) adaptive Chosen-Plaintext attack (WANO-CCA) in ROM.
+  As ANO-CCA2, but the adversary is only given the ciphertext of the encapsulation 
+  (i.e., not the key).
+*)
+(** Adversary class considerd for ANO-CCA (i.e., modern ANO-CCA2) in ROM **)
+module type Adv_WANOCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc distinguish(pk0 : pk_t, pk1 : pk_t, c : ctxt_t) : bool
+}.
+
+(** WANO-CCA (i.e., modern WANO-CCA2) security game (sampled bit) in ROM **)
+module WANO_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O0 : Oracles_CCA2i_ROM) (O1 : Oracles_CCA2i_ROM)
+                    (A : Adv_WANOCCA_ROM) = {
+  proc main() = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(** WANO-CCA (i.e., modern WANO-CCA2) security game (provided bit) in ROM **)
+module WANO_CCA_P_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                      (O0 : Oracles_CCA2i_ROM) (O1 : Oracles_CCA2i_ROM)
+                      (A : Adv_WANOCCA_ROM) = {
+  proc main(b : bool) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WANO_CCA_P(S(RO), O0(RO), O1(RO), A(RO)).main(b);
+    
+    return r;
+  }
+}.
+
+
+(*
+  Strong ROBustness (SROB) in ROM.
+  The adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+  
+  Weak ROBustness (WROB) in ROM.
+  The adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+  
+  Note, as there is no stage in which the adversary is given a distinct challenge artifact, it does
+  not make sense to have different CCA1/CCA2 settings for these properties. Instead,
+  we only consider a CPA setting (no decapsulation oracle) and a CCA setting (a decapsulation
+  oracle like in CCA1, i.e., no considered challenge).
+*)
+(*
+  Strong ROBustness under Chosen-Plaintext Attacks (SROB-CPA) in ROM.
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CPA in ROM **)
+module type Adv_SROBCPA_ROM (RO : RandomOracle) = {
+  include Adv_SROBCPA
+}.
+
+(** SROB-CPA security game in ROM **)
+module SROB_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_SROBCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SROB_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Plaintext Attacks (WROB-CPA) in ROM.
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+*)
+(** Adversary class considered for WROB-CPA in ROM **)
+module type Adv_WROBCPA_ROM (RO : RandomOracle) = {
+  include Adv_WROBCPA
+}.
+
+(** WROB-CPA security game in ROM **)
+module WROB_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_WROBCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WROB_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  Strong ROBustness under Chosen-Ciphertext Attacks (SROB-CCA) in ROM.
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to valid symmetric keys under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SROB-CCA in ROM **)
+module type Adv_SROBCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SROB-CCA security game in ROM **)
+module SROB_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) 
+                    (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM)
+                    (A : Adv_SROBCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SROB_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Ciphertext Attacks (WROB-CCA) in ROM.
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) succeeds 
+  (i.e., returns a valid symmetric key).
+*)
+(** Adversary class considered for WROB-CCA in ROM **)
+module type Adv_WROBCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WROB-CCA security game in ROM **)
+module WROB_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM)
+                    (A : Adv_WROBCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WROB_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness (SCFR) in ROM.
+  As SROB, but additionally requires the resulting symmetric keys to be
+  equal to eachother (instead of only requiring these keys to be valid).
+  
+  Weak Collision-FReeness (WCFR) in ROM.
+  As WROB, but additionally requires the resulting symmetric keys to be
+  equal to eachother (instead of only requiring the final decapsulated key to be valid).
+*)
+(*
+  Strong Collision-FReeness under Chosen-Plaintext Attacks (SCFR-CPA) in ROM.
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to the same valid symmetric key under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CPA in ROM **)
+module type Adv_SCFRCPA_ROM (RO : RandomOracle) = {
+  include Adv_SCFRCPA
+}.
+
+(** SCFR-CPA security game in ROM **)
+module SCFR_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_SCFRCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SCFR_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(*
+  Weak Collision-FReeness under Chosen-Plaintext Attacks (WCFR-CPA) in ROM.
+  In a CPA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) returns
+  a valid symmetric key that is equal to the encapsulated one.
+*)
+(** Adversary class considered for WCFR-CPA in ROM **)
+module type Adv_WCFRCPA_ROM (RO : RandomOracle) = {
+  include Adv_WCFRCPA
+}.
+
+(** WCFR-CPA security game in ROM **)
+module WCFR_CPA_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_WCFRCPA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WCFR_CPA(S(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  Strong Collision-FReeness under Chosen-Ciphertext Attacks (SCFR-CCA) in ROM.
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to
+  provide a (single) ciphertext that decapsulates to the same valid symmetric key under both 
+  of the secret keys (corresponding to the provided public keys).
+*)
+(** Adversary class considered for SCFR-CCA in ROM **)
+module type Adv_SCFRCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc find(pk0 : pk_t, pk1 : pk_t) : ctxt_t
+}.
+
+(** SCFR-CCA security game in ROM **)
+module SCFR_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM)
+                    (A : Adv_SCFRCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ SCFR_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+(*
+  Weak ROBustness under Chosen-Ciphertext Attacks (WCFR-CCA) in ROM.
+  In a CCA setting, the adversary is given two (honestly generated) public keys and is asked to choose
+  which one to use for encapsulation and which one to use (the corresponding secret key of)
+  for decapsulation. Here, the goal is that the decapsulation (with the key appointed for
+  decapsulation) of the encapsulation (created with the key appointed for encapsulation) returns
+  a valid symmetric key that is equal to the encapsulated one.
+*)
+(** Adversary class considered for WCFR-CCA in ROM **)
+module type Adv_WCFRCCA_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(pk0 : pk_t, pk1 : pk_t) : bool
+}.
+
+(** WCFR-CCA security game **)
+module WCFR_CCA_ROM (RO : RandomOraclei) (S : Scheme_ROM) 
+                    (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM)
+                    (A : Adv_WCFRCCA_ROM) = {
+  proc main() : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ WCFR_CCA(S(RO), O0(RO), O1(RO), A(RO)).main();
+    
+    return r;
+  }
+}.
+
+
+(*
+  BINDing (BIND) in ROM.
+  Intuitively, binding properties capture to which extent certain artifacts (in a 
+  a non-failing KEM execution) determine other artifacts (in that same execution).
+  That is, informally, an artifact (e.g., symmetric key) binds another artifact (e.g., ciphertext)
+  if using/obtaining a certain value for the former implies a certain value for the latter
+  (because it is hard to find another value for the latter without failing).
+  Depending on the adversarial model, the artifacts used as input to the KEM's procedures
+  are either honestly or maliciously generated.
+*)
+(* 
+  HONestly BINDing (HON-BIND) in ROM.
+  Binding properties where the adversary is given two honestly generated public keys,
+  as well as a decapsulation oracle with which it can decapsulate
+  w.r.t. the corresponding secret keys.
+*)
+(** Adversary class considered for HON-BIND **)
+module type Adv_HONBIND_ROM (RO : RandomOracle) (O0 : Oracles_CCA) (O1 : Oracles_CCA) = {
+  proc choose(bc : bindconf) : bool { RO.get }
+  proc find(bc : bindconf, pk0 : pk_t, pk1 : pk_t) : ctxt_t * ctxt_t
+}.
+
+(** HON-BIND security game (specific configuration is passed to the procedure) **)
+module HON_BIND_ROM (RO : RandomOraclei) (S : Scheme_ROM)
+                    (O0 : Oracles_CCA1i_ROM) (O1 : Oracles_CCA1i_ROM)
+                    (A : Adv_HONBIND_ROM) = {
+  proc main(bc : bindconf) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ HON_BIND(S(RO), O0(RO), O1(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+
+(*
+  LEAKingly BINDing (LEAK-BIND) in ROM.
+  Binding properties where the adversary is given two
+  honestly generated (asymmetric) key pairs.
+*)
+(** Adversary class considered for LEAK-BIND **)
+module type Adv_LEAKBIND_ROM (RO : RandomOracle) = {
+  include Adv_LEAKBIND
+}.
+
+(** LEAK-BIND security game (specific configuration is passed to the procedure) **)
+module LEAK_BIND_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_LEAKBIND_ROM) = {
+  proc main(bc : bindconf) = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ LEAK_BIND(S(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+
+(**
+  MALiciously BINDing (MAL-BIND) in ROM.
+  Binding properties where the adversary provides the 
+  considered (asymmetric) key material itself.
+**)
+abstract theory MALBINDROM.
+(* Operators *)
+(** Derives (honestly) the public key corresponding to a secret key **)
+(** 
+  Using this, we can let the adversary (in the MAL-BIND properties) only provide
+  the to-be-considered (asymmetric) secret keys, and then honestly compute
+  the corresponding public key ourselves. This allows
+  us to meaningfully include binding properties involving the public key.
+**)
+(** 
+  Note: for the properties to make sense, this operator 
+  should be instantiated to something that actually derives
+  public keys from (honestly generated) secret keys for the considered KEM. 
+**)
+op sk2pk : sk_t -> pk_t.
+
+
+(* Clone and import definitions from MALBIND theory (in non-ROM KEM theory) *)
+clone import MALBIND with 
+  op sk2pk <- sk2pk
+  
+  proof *.
+  
+  
+(* 
+  MALiciously BINDing w.r.t. Decapsulation/Decapsulation (MAL-BIND-DD) in ROM.
+  In a MAL-BIND setting, the adversary is asked to provide two ciphertext
+  (to be decapsulated) as to induce a binding break (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-DD in ROM **)
+module type Adv_MALBIND_DD_ROM (RO : RandomOracle) = {
+  include Adv_MALBIND_DD
+}.
+
+(** MAL-BIND-DD security game (specific configuration is passed to the procedure) in ROM **)
+module MAL_BIND_DD_ROM (RO : RandomOraclei) (S : Scheme_ROM) (A : Adv_MALBIND_DD_ROM) = {
+  proc main(bc : bindconf) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ MAL_BIND_DD(S(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+
+(*
+  In the remaining MAL-BIND properties, the adversary is asked to provide 
+  the randomness used in encapsulation(s). That is, these properties need 
+  to consider "derandomized" encapsulation procedures, taking the randomness 
+  as additional input (instead of generating it on the fly).
+  To this end, we specify a module type for KEMs that is identical to the 
+  original one with an appropriately adjusted encapsulation procedure.
+  Be aware that the following properties only make sense for KEMs of which
+  the encapsulation procedure actually employs the provided randomness.
+  (This is not actually enforced by the module type.)
+*)
+(* Types *)
+(** Randomness (for encapsulation procedure) **)
+type rand_t.
+
+
+(* Module types *)
+(** "Derandomized" KEM (interface) in ROM **)
+module type SchemeDerand_ROM (RO : RandomOracle) = {
+  include SchemeDerand
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. Encapsulation/Decapsulation (MAL-BIND-ED) in ROM.
+  In a MAL-BIND setting, the adversary is asked to provide 
+  randomness and a ciphertext (to be used in encapsulation and 
+  decapsulation, respectively) as to induce a binding break 
+  (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-ED in ROM **)
+module type Adv_MALBIND_ED_ROM (RO : RandomOracle) = {
+  include Adv_MALBIND_ED
+}.
+
+(** MAL-BIND-ED security game (specific configuration is passed to the procedure) in ROM **)
+module MAL_BIND_ED_ROM (RO : RandomOraclei) (S : SchemeDerand_ROM) (A : Adv_MALBIND_ED_ROM) = {
+  proc main(bc : bindconf) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ MAL_BIND_ED(S(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. Encapsulation/Encapsulation (MAL-BIND-EE) in ROM.
+  In a MAL-BIND setting, the adversary is asked to provide
+  randomness (to be used in encapsulations) as to induce a binding break 
+  (w.r.t. the considered configuration).
+*)
+(** Adversary class considered for MAL-BIND-EE in ROM **)
+module type Adv_MALBIND_EE_ROM (RO : RandomOracle) = {
+  include Adv_MALBIND_EE
+}.
+
+(** MAL-BIND-EE security game (specific configuration is passed to the procedure) **)
+module MAL_BIND_EE_ROM (RO : RandomOraclei) (S : SchemeDerand_ROM) (A : Adv_MALBIND_EE_ROM) = {
+  proc main(bc : bindconf) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ MAL_BIND_EE(S(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+
+(*
+  MALiciously BINDing w.r.t. any of DD, ED, or EE (MAL-BIND) in ROM.
+  The adversary is asked to choose any of the MAL-BIND scenarios (DD, DE, or EE) 
+  and provide values that induce a binding break
+  (w.r.t. the considered configuration) for that scenario.
+*)
+(** Adversary class considered for MAL-BIND in ROM **)
+module type Adv_MALBIND_ROM (RO : RandomOracle) = {
+  include Adv_MALBIND
+}.
+
+(** MAL-BIND security game (specific configuration is passed to the procedure) in ROM **)
+module MAL_BIND_ROM (RO : RandomOraclei) (S : SchemeDerand_ROM) (A : Adv_MALBIND_ROM) = {
+  proc main(bc : bindconf) : bool = {
+    var r : bool;
+    
+    RO.init();
+    
+    r <@ MAL_BIND(S(RO), A(RO)).main(bc);
+    
+    return r;
+  }
+}.
+
+end MALBINDROM.

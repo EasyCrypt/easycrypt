@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Distr FSet SmtMap.
+require import AllCore List Distr FSet FMap.
 require import IntDiv Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.

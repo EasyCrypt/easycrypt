@@ -1,14 +1,18 @@
 #! /usr/bin/env python3
 
+#pyright: reportUnusedImport=warning
+#pyright: reportUnusedFunction=warning
+#pyright: reportUnusedVariable=warning
+
 # --------------------------------------------------------------------
 import abc
 import asyncio
-import collections
 import contextlib as clib
 import curses
 from   datetime import datetime, timezone
 import fnmatch
 import glob
+import logging
 import itertools
 import math
 import multiprocessing as mp
@@ -136,7 +140,11 @@ def _options():
     )
 
     config = cp.ConfigParser(defaults)
-    config.read(args[0])
+    try:
+        with open(args[0]) as cf:
+            config.read_file(cf)
+    except OSError as e:
+        parser.error(f'while reading configuration from \'{args[0]}\': {e.strerror}')
 
     def resolve_targets(names):
         targets = []
@@ -161,12 +169,6 @@ def _options():
 
     if cmdopt.bin_args:
         options.args.extend(cmdopt.bin_args)
-
-    def _parse_timeout(x):
-        m = re.search(r'^(.*):(\d+)$', x)
-        if m is None:
-            parse.parseerror('invalid timeout: %s' % (x,))
-        return (m.group(1), int(m.group(2)))
 
     for test in [x for x in config.sections() if x.startswith('test-')]:
         scenario = Object()
@@ -331,8 +333,12 @@ class Gather:
                 return True
         return False
 
+    @staticmethod
+    def is_file_statically_ignored(src):
+        return os.path.basename(src).startswith('.#')
+
     @classmethod
-    def gather(cls, obj, scenario):
+    def gather(cls, obj):
         try:
             scripts = os.listdir(obj.src)
         except OSError as e:
@@ -371,10 +377,14 @@ class Gather:
         dirs.extend([Object(src = x, valid = False, args = scenario.args) \
                          for x in expand(scenario.kodirs)])
         dirs = [x for x in dirs if not cls.is_dir_excluded(x.src, scenario.dexclude)]
-        dirs = map(lambda x : cls.gather(x, scenario), dirs)
+        dirs = map(cls.gather, dirs)
 
         files = list(itertools.chain.from_iterable(dirs))
-        files = [x for x in files if not cls.is_file_excluded(x.filename, scenario.fexclude)]
+        files = [
+            x for x in files if
+            not cls.is_file_statically_ignored(x.filename) and
+            not cls.is_file_excluded(x.filename, scenario.fexclude)
+        ]
 
         return files
 
@@ -603,9 +613,10 @@ class TermListener(Listener):
     @clib.contextmanager
     def start(self):
         self._mbar.term.echooff()
-        yield
-        self._mbar.term.echoon()
-
+        try:
+            yield
+        finally:
+            self._mbar.term.echoon()
 
 # --------------------------------------------------------------------
 class RawListener(Listener):
@@ -682,8 +693,7 @@ async def _run_all(options, allscripts, listener : Listener):
         async with semaphore:
             command = [options.bin] + options.args + config.args
             if options.timing:
-                tfilename = os.path.join(
-                    TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
+                tfilename = os.path.splitext(config.filename)[0] + '.stats'
                 os.makedirs(os.path.dirname(tfilename), exist_ok = True)
                 command.extend(['-tstats', tfilename])
 
@@ -775,7 +785,6 @@ def _dump_report(config, results, stream):
         grouped.setdefault(result.config.group, []).append(result)
 
     for gname, group in grouped.items():
-        ok   = [x for x in group if     x.success]
         ko   = [x for x in group if not x.success]
         node = {}
 

@@ -233,7 +233,6 @@ module NormMp : sig
   val norm_mpath    : env -> mpath -> mpath
   val norm_xfun     : env -> xpath -> xpath
   val norm_pvar     : env -> EcTypes.prog_var -> EcTypes.prog_var
-  val norm_form     : env -> form -> form
   val mod_use       : env -> mpath -> use
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
@@ -244,6 +243,8 @@ module NormMp : sig
   (* Return [true] if [x] is forbidden in [restr]. *)
   val use_mem_xp    : xpath -> use use_restr -> bool
   val use_mem_gl    : mpath -> use use_restr -> bool
+
+  val flatten_use : use -> EcIdent.t list * (xpath * ty) list
 
   val norm_glob     : env -> EcMemory.memory -> mpath -> form
   val norm_tglob    : env -> mpath -> EcTypes.ty
@@ -292,6 +293,9 @@ module Theory : sig
     -> EcTypes.is_local
     -> EcTheory.thmode
     -> env -> compiled_theory option
+
+  val alias : ?import:import -> symbol -> path -> env -> env
+  val aliases : env -> path Mp.t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -336,9 +340,9 @@ module Ty : sig
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option
-  val lookup      : qsymbol -> env -> path * t
-  val lookup_opt  : qsymbol -> env -> (path * t) option
-  val lookup_path : qsymbol -> env -> path
+  val lookup      : ?unique:bool -> qsymbol -> env -> path * t
+  val lookup_opt  : ?unique:bool -> qsymbol -> env -> (path * t) option
+  val lookup_path : ?unique:bool -> qsymbol -> env -> path
 
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> t -> env -> env
@@ -397,13 +401,16 @@ module BaseRw : sig
 
   val add   : ?import:import -> symbol -> is_local -> env -> env
   val addto : ?import:import -> path -> path list -> is_local -> env -> env
+
+  val all : env -> (path * Sp.t) list 
 end
 
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
   type rule   = EcTheory.rule
-  type topsym = [ `Path of path | `Tuple ]
+  type topsym = [ `Path of path | `Tuple | `Proj of int]
 
+  val all : env -> (topsym * rule list) list
   val add1 : path * rule_option * rule option -> env -> env
   val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
@@ -411,12 +418,15 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
+  type base0 = path * [`Rigid | `Default]
+
   val dname  : symbol
-  val add1   : ?import:import -> level:int -> ?base:symbol -> path -> is_local -> env -> env
-  val add    : ?import:import -> level:int -> ?base:symbol -> path list -> is_local -> env -> env
-  val get    : ?base:symbol -> env -> path list
-  val getall : symbol list -> env -> path list
-  val getx   : symbol -> env ->  (int * path list) list
+  val add1   : ?import:import -> level:int -> ?base:symbol -> base0 -> is_local -> env -> env
+  val add    : ?import:import -> level:int -> ?base:symbol -> base0 list -> is_local -> env -> env
+  val get    : ?base:symbol -> env -> base0 list
+  val getall : symbol list -> env -> base0 list
+  val getx   : symbol -> env -> (int * base0 list) list
+  val all    : env -> base0 list
 end
 
 (* -------------------------------------------------------------------- *)

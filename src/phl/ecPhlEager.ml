@@ -32,10 +32,11 @@ let pf_hSS pf hyps h =
 
 (* -------------------------------------------------------------------- *)
 let tc1_destr_eagerS tc s s' =
+  let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let c , c' = es.es_sl, es.es_sr in
-  let s1, c  = s_split (Zpr.cpos (List.length s.s_node)) c in
-  let c',s1' = s_split (Zpr.cpos (List.length c'.s_node - List.length s'.s_node)) c' in
+  let s1, c  = s_split env (Zpr.cpos (List.length s.s_node)) c in
+  let c',s1' = s_split env (Zpr.cpos (List.length c'.s_node - List.length s'.s_node)) c' in
 
   if not (List.all2 i_equal s1 s.s_node) then begin
     let ppe  = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
@@ -103,8 +104,8 @@ let t_eager_seq_r i j eqR h tc =
   pf_compat !!tc env (s_write env s) (s_write env s') seqR eqIs eqXs;
 
   let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) eC.es_po) in
-  let c1 ,c2  = s_split i c in
-  let c1',c2' = s_split j c' in
+  let c1 ,c2  = s_split env i c in
+  let c1',c2' = s_split env j c' in
 
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
 
@@ -613,6 +614,8 @@ let process_info info tc =
 let process_seq info (i, j) eqR tc =
   let eqR   = TTC.tc1_process_prhl_form tc tbool eqR in
   let gs, h = process_info info tc in
+  let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left , i) in
+  let j = EcProofTyping.tc1_process_codepos1 tc (Some `Right, j) in
   FApi.t_last (t_eager_seq i j eqR h) gs
 
 (* -------------------------------------------------------------------- *)

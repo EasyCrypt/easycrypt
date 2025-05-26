@@ -39,6 +39,7 @@ type clone_error =
 | CE_ModIncompatible   of qsymbol
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
+| CE_ProofForLemma     of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -53,10 +54,22 @@ type axclone = {
 }
 
 (* ------------------------------------------------------------------ *)
+type xty_override =
+  [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xop_override =
+  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+
+(* ------------------------------------------------------------------ *)
+type xpr_override =
+  [pr_override_def genoverride | `Direct of EcAst.form] * clmode
+
+(* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types    : (ty_override located) Msym.t;
-  evc_ops      : (op_override located) Msym.t;
-  evc_preds    : (pr_override located) Msym.t;
+  evc_types    : (xty_override located) Msym.t;
+  evc_ops      : (xop_override located) Msym.t;
+  evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
   evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
@@ -64,13 +77,14 @@ type evclone = {
   evc_ths      : evclone Msym.t;
 }
 
+
 and evlemma = {
   ev_global  : (ptactic_core option * evtags option) list;
   ev_bynames : evinfo Msym.t;
 }
 
 and evtags = ([`Include | `Exclude] * symbol) list
-and evinfo = ptactic_core option * clmode
+and evinfo = ptactic_core option * clmode * bool
 
 (*-------------------------------------------------------------------- *)
 let evc_empty =
@@ -270,7 +284,8 @@ end = struct
         (fun evc ->
           if Msym.mem x evc.evc_types then
             clone_error oc.oc_env (CE_DupOverride (OVK_Type, name));
-          { evc with evc_types = Msym.add x (mk_loc lc tyd) evc.evc_types })
+          { evc with evc_types =
+              Msym.add x (mk_loc lc tyd :> xty_override located) evc.evc_types })
         nm evc
 
     in (proofs, evc)
@@ -287,13 +302,14 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_ops then
            clone_error oc.oc_env (CE_DupOverride (OVK_Operator, name));
-         { evc with evc_ops = Msym.add x (mk_loc lc opd) evc.evc_ops })
+         { evc with evc_ops = 
+            Msym.add x (mk_loc lc opd :> xop_override located) evc.evc_ops })
         nm evc
 
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let pr_ovrd oc ((proofs, evc) : state) name (prd : pr_override) =
+  let pr_ovrd oc ((proofs, evc) : state) name (prd : EcParsetree.pr_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
     if find_pr oc.oc_oth name = None then
@@ -304,7 +320,8 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_preds then
            clone_error oc.oc_env (CE_DupOverride (OVK_Predicate, name));
-         { evc with evc_preds = Msym.add x (mk_loc lc prd) evc.evc_preds })
+         { evc with evc_preds =
+            Msym.add x (mk_loc lc prd :> xpr_override located) evc.evc_preds })
         nm evc
 
     in (proofs, evc)
@@ -440,6 +457,7 @@ end = struct
       | Th_addrw  _     -> (proofs, evc)
       | Th_reduction _  -> (proofs, evc)
       | Th_auto _       -> (proofs, evc)
+      | Th_alias _      -> (proofs, evc)
 
     and doit prefix (proofs, evc) dth =
       doit_r prefix (proofs, evc) dth.ti_item
@@ -511,7 +529,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Proofs : sig
-  val proof : octxt -> evclone -> theory_cloning_proof -> evclone
+  val proof : intheory:bool -> octxt -> evclone -> theory_cloning_proof -> evclone
 end = struct
   let all_proof oc evc (name, tags, tactics) =
     let tags =
@@ -550,12 +568,12 @@ end = struct
         in
           evc_update update1 (fst name) evc
 
-  let proof oc evc prf =
+  let proof ~intheory oc evc prf =
     match prf.pthp_mode with
     | `All (name, tags) ->
          all_proof oc evc (name, tags, prf.pthp_tactic)
     | `Named (name, hide) ->
-         name_proof oc evc (name, (prf.pthp_tactic, hide))
+         name_proof oc evc (name, (prf.pthp_tactic, hide, not intheory))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -576,8 +594,8 @@ let clone (scenv : EcSection.scenv) (thcl : theory_cloning) =
       ([], evc_empty) thcl.pthc_ext
   in
 
-  let ovrds =
-    List.fold_left (Proofs.proof oc) ovrds (genproofs @ thcl.pthc_prf) in
+  let ovrds = List.fold_left (Proofs.proof ~intheory:true oc) ovrds genproofs in
+  let ovrds = List.fold_left (Proofs.proof ~intheory:false oc) ovrds thcl.pthc_prf in
   let rename = List.map (Renaming.rename1 oc) thcl.pthc_rnm in
 
   let ntclr =

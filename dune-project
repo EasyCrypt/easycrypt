@@ -1,5 +1,5 @@
-(lang dune 3.6)
-(using menhir 2.0)
+(lang dune 3.13)
+(using menhir 3.0)
 (using dune_site 0.1)
 
 (wrapped_executables false)
@@ -16,12 +16,12 @@
   (batteries (>= 3))
   (camlp-streams (>= 5))
   camlzip
-  (dune (>= 3.6))
+  dune
   dune-build-info
   dune-site
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
-  (why3 (and (>= 1.7.0) (< 1.8)))
+  (why3 (and (>= 1.8.0) (< 1.9)))
   yojson
   (zarith (>= 1.10))
 ))

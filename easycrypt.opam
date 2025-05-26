@@ -4,12 +4,12 @@ depends: [
   "batteries" {>= "3"}
   "camlp-streams" {>= "5"}
   "camlzip"
-  "dune" {>= "3.6" & >= "3.6"}
+  "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"
   "ocaml-inifiles" {>= "1.2"}
   "pcre" {>= "7"}
-  "why3" {>= "1.7.0" & < "1.8"}
+  "why3" {>= "1.8.0" & < "1.9"}
   "yojson"
   "zarith" {>= "1.10"}
   "odoc" {with-doc}

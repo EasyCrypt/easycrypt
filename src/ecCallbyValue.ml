@@ -215,18 +215,17 @@ and betared st s bd f args =
      betared st s bd f args
 
 (* -------------------------------------------------------------------- *)
-and app_red st f1 args =
-  match f1.f_node with
-  (* β-reduction *)
-  | Fquant (Llambda, bd, f2) when not (Args.isempty args) && st.st_ri.beta ->
-      betared st Subst.subst_id bd f2 args
+and try_reduce_record_projection
+  (st : state) ((p, _tys) : EcPath.path * ty list) (args : args)
+=
+  let exception Bailout in
 
-  (* ι-reduction (records projection) *)
-  | Fop (p, _) when
-         st.st_ri.iota
+  try
+    if not (
+      st.st_ri.iota 
       && EcEnv.Op.is_projection st.st_env p
       && not (Args.isempty args)
-    -> begin
+    ) then raise Bailout;
 
     let mk, args1 = oget (Args.pop args) in
 
@@ -235,75 +234,92 @@ and app_red st f1 args =
         when (EcEnv.Op.is_record_ctor st.st_env mkp) ->
       let v = oget (EcEnv.Op.by_path_opt p st.st_env) in
       let v = proj3_2 (EcDecl.operator_as_proj v) in
-      app_red st (List.nth mkargs v) args1
+      Some (app_red st (List.nth mkargs v) args1)
 
     | _ ->
-      f_app f1 args.stack args.resty
-  end
+      None
 
-  (* ι-reduction (fix-def reduction) *)
-  | Fop (p, tys)
-      when st.st_ri.iota && EcEnv.Op.is_fix_def st.st_env p
-    -> begin
-    let module E = struct exception NoCtor end in
+  with Bailout ->
+    None
 
-    try
-      let Args.{ resty = ty; stack = args; } = args in
-      let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
-      let fix = EcDecl.operator_as_fix op in
+(* -------------------------------------------------------------------- *)
+and try_reduce_fixdef
+  (st : state) ((p, tys) : EcPath.path * ty list) (args : args)
+=
+  let exception Bailout in
 
-      if List.length args < snd (fix.EcDecl.opf_struct) then
-        raise E.NoCtor;
+  try
+    if not (st.st_ri.iota && EcEnv.Op.is_fix_def st.st_env p) then
+      raise Bailout;
 
-      let args, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) args in
+    let Args.{ resty = ty; stack = args; } = args in
+    let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
+    let fix = EcDecl.operator_as_fix op in
 
-      let vargs = Array.of_list args in
-      let pargs = List.fold_left (fun (opb, acc) v ->
-          let v = vargs.(v) in
+    if List.length args < snd (fix.EcDecl.opf_struct) then
+      raise Bailout;
 
-            match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
-            | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
-                let idx = EcEnv.Op.by_path p st.st_env in
-                let idx = snd (EcDecl.operator_as_ctor idx) in
-                  match opb with
-                  | EcDecl.OPB_Leaf   _  -> assert false
-                  | EcDecl.OPB_Branch bs ->
-                     ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
-              end
-            | _ -> raise E.NoCtor)
-        (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
-      in
+    let args, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) args in
 
-      let pargs, (bds, body) =
-        match pargs with
-        | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
-        | _ -> assert false
-      in
+    let vargs = Array.of_list args in
+    let pargs = List.fold_left (fun (opb, acc) v ->
+        let v = vargs.(v) in
 
-      let subst =
-        List.fold_left2
-          (fun subst (x, _) fa -> Subst.bind_local subst x fa)
-          Subst.subst_id fix.EcDecl.opf_args args in
+          match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
+          | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
+              let idx = EcEnv.Op.by_path p st.st_env in
+              let idx = snd (EcDecl.operator_as_ctor idx) in
+                match opb with
+                | EcDecl.OPB_Leaf   _  -> assert false
+                | EcDecl.OPB_Branch bs ->
+                  ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
+            end
+          | _ -> raise Bailout)
+      (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
+    in
 
-      let subst =
-        List.fold_left2
-          (fun subst bds cargs ->
-            List.fold_left2
-              (fun subst (x, _) fa -> Subst.bind_local subst x fa)
-              subst bds cargs)
-          subst bds pargs in
+    let pargs, (bds, body) =
+      match pargs with
+      | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
+      | _ -> assert false
+    in
 
-      let body = EcFol.form_of_expr EcFol.mhr body in
-      let body =
-        Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
+    let subst =
+      List.fold_left2
+        (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+        Subst.subst_id fix.EcDecl.opf_args args in
 
-      cbv st subst body (Args.create ty eargs)
-    with E.NoCtor ->
-      reduce_user_delta st f1 p tys args
-  end
+    let subst =
+      List.fold_left2
+        (fun subst bds cargs ->
+          List.fold_left2
+            (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+            subst bds cargs)
+        subst bds pargs in
 
-  | Fop(p, tys) ->
-    reduce_user_delta st f1 p tys args
+    let body = EcFol.form_of_expr EcFol.mhr body in
+    let body =
+      Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
+
+    Some (cbv st subst body (Args.create ty eargs))
+
+  with Bailout ->
+    None
+
+(* -------------------------------------------------------------------- *)
+and app_red st f1 args =
+  match f1.f_node with
+  (* β-reduction *)
+  | Fquant (Llambda, bd, f2) when not (Args.isempty args) && st.st_ri.beta ->
+      betared st Subst.subst_id bd f2 args
+
+  (* op reduction (ι-reduction / delta / user-defined rules) *)
+  | Fop (p, tys) ->
+    List.find_map_opt
+      (fun f -> f st (p, tys) args)
+      [ try_reduce_record_projection
+      ; try_reduce_fixdef]
+    |> ofdfl (fun () -> reduce_user_delta st f1 p tys args)
 
   | _ ->
     f_app f1 args.stack args.resty
@@ -451,14 +467,14 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Ftuple args1 ->
     assert (Args.isempty args);
-    f_tuple (List.map (cbv_init st s) args1)
+    reduce_user st (f_tuple (List.map (cbv_init st s) args1))
 
   | Fproj (f1, i) ->
     let f1 = cbv_init st s f1 in
     let f1 =
       match f1.f_node with
       | Ftuple args when st.st_ri.iota -> List.nth args i
-      | _ -> f_proj (norm_lambda st f1) i f.f_ty in
+      | _ -> reduce_user st (f_proj (norm_lambda st f1) i f.f_ty) in
     app_red st f1 args
 
   | FhoareF hf ->
