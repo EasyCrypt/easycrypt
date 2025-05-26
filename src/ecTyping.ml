@@ -3450,7 +3450,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let fpath = trans_gamepath env gp in
         (* TODO: Make mhr a fresh memory instead *)
-        (*let mhr = EcIdent.create "&foo" in*)
+        let mhr = EcIdent.create "&frmtrans" in
         let penv, qenv = EcEnv.Fun.hoareF mhr fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
