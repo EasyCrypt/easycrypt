@@ -387,7 +387,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let post = f_and eq_res inv in
         f_equivF pre fl fr post
 
-let process_call side info tc =
+let process_call (side : side option) (info : call_info gppterm) (tc : tcenv1) =
   let process_spec tc side =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
@@ -433,7 +433,7 @@ let process_call side info tc =
     match concl.f_node with
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
+        let penv = LDecl.inv_memenv1 ~mem:(fst hs.hs_m) hyps in
         (penv, tbool, fun inv -> f_hoareF (fst hs.hs_m) inv f inv)
 
     | FeHoareS hs ->
@@ -521,11 +521,15 @@ let process_call side info tc =
       tc_error !!tc "cannot infer all placeholders";
     PT.concretize pt in
 
+  let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+
+  Format.eprintf "@.@.[W]%a@." (EcPrinting.pp_form ppe) ax;
+
   FApi.t_seqsub
     (t_call side ax)
     [FApi.t_seqs
-       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-        !subtactic; t_trivial];
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]
+(*        !subtactic; t_trivial]; *);
      t_id]
     tc
 

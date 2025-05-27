@@ -523,12 +523,12 @@ let t_fun_to_code_r tc =
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
 (* -------------------------------------------------------------------- *)
-let t_fun_r inv tc =
+let t_fun_r ?mem inv tc =
   let th tc =
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.hf_f env
-      then t_hoareF_abs inv tc
+      then t_hoareF_abs ?mem inv tc
       else t_hoareF_fun_def tc
 
   and teh tc =

@@ -787,14 +787,14 @@ let pp_stype (ppe : PPEnv.t) (fmt : Format.formatter) (ty : ty) =
   pp_type_r ppe ((1 + fst t_prio_tpl, `NonAssoc), `NonAssoc) fmt ty
 
 (* -------------------------------------------------------------------- *)
-let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x : memory) =
+let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x as id : memory) =
   let x = Format.sprintf "%s" (PPEnv.local_symb ppe x) in
   let x =
     if   x <> "" && x.[0] = '&'
     then String.sub x 1 (String.length x - 1)
     else x
   in
-    Format.fprintf fmt "%s" x
+    Format.fprintf fmt "%s<%s>" x (EcIdent.tostring id)
 
 let pp_memtype (ppe : PPEnv.t) (fmt : Format.formatter) (mt : memtype) =
   match EcMemory.for_printing mt with
@@ -1811,7 +1811,7 @@ and pp_form_core_r
       Format.fprintf fmt "%a{%s%a}"
         (pp_pv ppe) x (if force then "!" else "") (pp_mem ppe) i in
 
-      let force =
+      let force = true || 
         match x with
         | PVloc  x -> Ssym.mem x ppe.ppe_inuse
         | PVglob _ -> false in
@@ -1889,15 +1889,17 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
         (pp_funname ppe) hf.hf_f
+        (pp_mem ppe) hf.hf_m
         (pp_form ppepr) hf.hf_pr
         (pp_form ppepo) hf.hf_po
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
+        (pp_mem ppe) (fst hs.hs_m)
         (pp_form ppe) hs.hs_pr
         (pp_form ppe) hs.hs_po
 
@@ -2908,7 +2910,7 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.hf_pr;
-  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
+  Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.hf_f (pp_mem ppe) hf.hf_m;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po
 
 (* -------------------------------------------------------------------- *)

@@ -178,6 +178,8 @@ section.
       by proc;sp;if;auto;call HS.     
     proc.
 call (_: size Sample.l <= Bounder.c <= q).
+
+
 admit.
 
 admit.
