@@ -157,11 +157,11 @@ let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 (* -------------------------------------------------------------------- *)
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
-  let hoareF_abs_spec _pf env f inv =
+  let hoareF_abs_spec _pf env mem f inv =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
-    let fv = PV.fv env mhr inv in
+    let fv = PV.fv env mem inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF mhr inv o inv in
+    let ospec o = f_hoareF mem inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -246,7 +246,7 @@ end
 let t_hoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
+  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_m hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
@@ -523,12 +523,12 @@ let t_fun_to_code_r tc =
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
 (* -------------------------------------------------------------------- *)
-let t_fun_r ?mem inv tc =
+let t_fun_r inv tc =
   let th tc =
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.hf_f env
-      then t_hoareF_abs ?mem inv tc
+      then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
 
   and teh tc =

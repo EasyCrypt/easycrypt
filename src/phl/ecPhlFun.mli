@@ -28,7 +28,7 @@ val process_fun_to_code   : FApi.backward
 (* -------------------------------------------------------------------- *)
 module FunAbsLow : sig
   val hoareF_abs_spec :
-       proofenv -> EcEnv.env -> xpath -> form
+       proofenv -> EcEnv.env -> memory -> xpath -> form
     -> form * form * form list
 
   val bdhoareF_abs_spec :
