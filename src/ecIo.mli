@@ -2,7 +2,7 @@
 type ecreader
 
 (* -------------------------------------------------------------------- *)
-val from_channel : name:string -> in_channel -> ecreader
+val from_channel : ?close:bool -> name:string -> in_channel -> ecreader
 val from_file    : string -> ecreader
 val from_string  : string -> ecreader
 

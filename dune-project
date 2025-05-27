@@ -19,6 +19,7 @@
   dune
   dune-build-info
   dune-site
+  markdown
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
   (why3 (and (>= 1.8.0) (< 1.9)))
