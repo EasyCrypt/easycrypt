@@ -528,8 +528,8 @@ let process_call (side : side option) (info : call_info gppterm) (tc : tcenv1) =
   FApi.t_seqsub
     (t_call side ax)
     [FApi.t_seqs
-       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]
-(*        !subtactic; t_trivial]; *);
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+        !subtactic; t_trivial];
      t_id]
     tc
 
