@@ -693,11 +693,11 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fglob (m,mem) -> trans_glob env m mem
 
-  | Fpr pr        -> trans_pr env pr
+  | Fpr pr -> trans_pr env pr
 
   | FeagerF _
   | FhoareF  _  | FhoareS   _
-  | FeHoareF   _ | FeHoareS   _
+  | FeHoareF  _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
     -> trans_gen env fp
