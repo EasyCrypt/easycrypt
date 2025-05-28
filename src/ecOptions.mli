@@ -5,7 +5,7 @@ type command = [
   | `Config
   | `Runtest of run_option
   | `Why3Config
-  | `GenDoc of doc_option
+  | `DocGen of doc_option
 ]
 
 and options = {
@@ -39,7 +39,7 @@ and run_option = {
 
 and doc_option = {
   doco_input     : string;
-  doco_outdirp   : string option;  
+  doco_outdirp   : string option;
 }
 
 and prv_options = {

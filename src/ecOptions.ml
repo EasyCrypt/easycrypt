@@ -9,7 +9,7 @@ type command = [
   | `Config
   | `Runtest of run_option
   | `Why3Config
-  | `GenDoc  of doc_option 
+  | `DocGen of doc_option
 ]
 
 and options = {
@@ -365,9 +365,9 @@ let specs = {
     ]);
 
     ("why3config", "Configure why3", []);
-    
-    ("gendoc", "Generate documentation", [
-      `Spec ("odir", `String, "Output documentation files in <dir>")
+
+    ("docgen", "Generate documentation", [
+      `Spec ("outdir", `String, "Output documentation files in <dir>")
     ]);
   ];
 
@@ -528,7 +528,7 @@ let runtest_options_of_values ini values (input, scenarios) =
 
 let doc_options_of_values values input =
   { doco_input     = input;
-    doco_outdirp   = get_string "odir" values; }
+    doco_outdirp   = get_string "outdir" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
@@ -589,12 +589,12 @@ let parse getini argv =
 
         (cmd, ini, true)
 
-    | "gendoc" -> 
+    | "docgen" ->
       begin
         match anons with
         | [input] ->
           let ini = getini None in
-          let cmd = `GenDoc (doc_options_of_values values input) in
+          let cmd = `DocGen (doc_options_of_values values input) in
             (cmd, ini, true)
 
         | _ ->
@@ -602,7 +602,7 @@ let parse getini argv =
       end
 
     | _ -> assert false
-    
+
   in {
     o_options = glb_options_of_values ~env ini values;
     o_command = command;

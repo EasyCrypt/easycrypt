@@ -52,6 +52,12 @@ a:hover {
   color: #3498db;
 }
 
+.sidebar-title-theory {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
 .sidebar-elems {
   padding: 20px;
 }
@@ -126,6 +132,8 @@ main {
   width: 200px;
   font-weight: bold;
   color: #2980b9;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .item-basic-desc {

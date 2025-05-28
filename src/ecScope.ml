@@ -376,8 +376,8 @@ let get_ldocentities (sc : scope) : docentity list =
 module DocState = struct
   let empty : docstate =
     { docentities = [];
-      subdocentbl = []; 
-      docstringbl = []; 
+      subdocentbl = [];
+      docstringbl = [];
       srcstringbl = [];
       currentname = None;
       currentkind = None;
@@ -393,17 +393,17 @@ module DocState = struct
         currentkind = Some kind;
         currentmode = Some md;
         currentproc = true }
-  
-  let prevent_process (state : docstate) : docstate = 
-    { state with 
+
+  let prevent_process (state : docstate) : docstate =
+    { state with
         currentname = None;
         currentkind = None;
         currentmode = None;
         currentproc = false }
-  
+
   let reinitialize_process (state : docstate) : docstate =
     { state with
-        docstringbl = []; 
+        docstringbl = [];
         srcstringbl = [];
         currentname = None;
         currentkind = None;
@@ -415,10 +415,10 @@ module DocState = struct
 
   let push_srcbl (state : docstate) (srcs : string) : docstate =
     { state with srcstringbl = state.srcstringbl @ [srcs] }
-  
+
   let add_entity (state : docstate) (docent : docentity) : docstate =
     { state with docentities = state.docentities @ [docent] }
-    
+
   let add_item (state : docstate) : docstate =
     let state =
       if state.currentproc
@@ -428,13 +428,12 @@ module DocState = struct
         state
     in
     reinitialize_process state
-  
 
   let add_sub (state : docstate) (substate : docstate) : docstate =
     let state =
       if state.currentproc
       then
-        add_entity state (SubDoc ((state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)), 
+        add_entity state (SubDoc ((state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)),
                                  (substate.docentities)))
       else
         state
@@ -815,16 +814,16 @@ module Tactics = struct
           hierror "[proof] can only be used at beginning of a proof script";
         { pac with puc_started = true }
       in
-        { scope with 
+        { scope with
             sc_pr_uc = Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct) };
-            sc_locdoc = 
-            match src with 
+            sc_locdoc =
+            match src with
             | Some src -> DocState.push_srcbl scope.sc_locdoc src
             | None -> scope.sc_locdoc; }
 
   let process_r ?(src : string option) ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
-    
+
     (* if src = None then assert false; *)
 
     let scope =
@@ -876,10 +875,10 @@ module Tactics = struct
 
         let pac = { pac with puc_jdg = PSCheck juc } in
         let puc = { puc with puc_active = Some (pac, pct); } in
-        let scope = { scope with 
+        let scope = { scope with
                         sc_pr_uc = Some puc;
-                        sc_locdoc = 
-                          match src with 
+                        sc_locdoc =
+                          match src with
                           | Some src -> DocState.push_srcbl scope.sc_locdoc src
                           | None -> scope.sc_locdoc; } in
         Some (penv, hds), scope
@@ -949,7 +948,7 @@ module Ax = struct
     { scope with
         sc_env = EcSection.add_item item scope.sc_env;
         sc_locdoc = DocState.add_item scope.sc_locdoc }
-  
+
   (* ------------------------------------------------------------------ *)
   let start_lemma scope (cont, axflags) check ?name (axd, ctxt) =
     let puc =
@@ -1142,11 +1141,11 @@ module Ax = struct
   (* ------------------------------------------------------------------ *)
   let save ?(src : string option) scope =
     check_state `InProof "save" scope;
-    
-    let scope = 
+
+    let scope =
       { scope with
-          sc_locdoc = 
-          match src with 
+          sc_locdoc =
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc; }
     in
@@ -1156,10 +1155,10 @@ module Ax = struct
   let admit ?(src : string option) scope =
     check_state `InProof "admitted" scope;
 
-    let scope = 
+    let scope =
       { scope with
-          sc_locdoc = 
-            match src with 
+          sc_locdoc =
+            match src with
             | Some src -> DocState.push_srcbl scope.sc_locdoc src
             | None -> scope.sc_locdoc; }
     in
@@ -1170,10 +1169,10 @@ module Ax = struct
   let abort ?(src : string option) scope =
     check_state `InProof "abort" scope;
 
-    let scope = 
+    let scope =
       { scope with
-          sc_locdoc = 
-          match src with 
+          sc_locdoc =
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc; }
     in
@@ -1183,26 +1182,26 @@ module Ax = struct
   (* ------------------------------------------------------------------ *)
   let add ?(src : string option) (scope : scope) (mode : proofmode) (ax : paxiom located) =
     let uax = unloc ax in
-    let kind = 
-      match uax.pa_kind with 
+    let kind =
+      match uax.pa_kind with
       | PLemma _ -> `Lemma
       | _ -> `Axiom
     in
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match uax.pa_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Abstract}
     in
     let scope =
-      { scope with 
-          sc_locdoc = 
-          match src with 
+      { scope with
+          sc_locdoc =
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
-          | None -> scope.sc_locdoc; } 
-    in 
+          | None -> scope.sc_locdoc; }
+    in
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
@@ -1267,22 +1266,22 @@ module Op = struct
 
   let add ?(src : string option) (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
-    
+
     let uop = unloc op in
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match uop.po_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Abstract}
     in
     let scope = {
-      scope with 
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
-          | None -> scope.sc_locdoc; } 
+          | None -> scope.sc_locdoc; }
     in
 
     let op = op.pl_desc and loc = op.pl_loc in
@@ -1512,23 +1511,23 @@ module Op = struct
 
   let add_opsem ?(src : string option) (scope : scope) (op : pprocop located) =
     let module Sem = EcProcSem in
-    
+
     let uop = unloc op in
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match uop.ppo_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Abstract}
     in
-    let scope = { 
-      scope with 
+    let scope = {
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc; }
-    in 
+    in
 
     let op = unloc op in
     let f  = EcTyping.trans_gamepath (env scope) op.ppo_target  in
@@ -1666,20 +1665,20 @@ module Pred = struct
 
     let upr = unloc pr in
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match upr.pp_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Abstract}
     in
-    let scope = { 
-      scope with 
+    let scope = {
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
           | None -> scope.sc_locdoc;  }
-    in 
+    in
 
     let typr  = EcHiPredicates.trans_preddecl (env scope) pr in
     let scope = Op.bind scope (unloc (unloc pr).pp_name, typr) in
@@ -1714,25 +1713,25 @@ module Mod = struct
 
     if lc = `Declare then
       hierror "cannot use [declare] for concrete modules";
-    
+
     let nm = unloc (EcParsetree.pcmhd_ident ptm.ptm_header) in
 
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match lc with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc nm `Module `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc nm `Module `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc nm `Module `Abstract}
     in
     let scope = {
-      scope with 
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
-          | None -> scope.sc_locdoc;  } 
+          | None -> scope.sc_locdoc;  }
     in
-  
+
     let m = TT.transmod (env scope) ~attop:true ptm in
     let ur = EcModules.get_uninit_read_of_module (path scope) m in
 
@@ -1794,18 +1793,18 @@ module ModType = struct
     assert (scope.sc_pr_uc = None);
 
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match intf.pi_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc intf.pi_name) `ModuleType `Specific } 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc intf.pi_name) `ModuleType `Specific }
     in
     let scope = {
-      scope with 
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
-          | None -> scope.sc_locdoc;  } 
+          | None -> scope.sc_locdoc;  }
     in
     let tysig = EcTyping.transmodsig (env scope) intf in
     bind scope (unloc intf.pi_name, tysig)
@@ -1845,12 +1844,12 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let enter ?(src : string option) (scope : scope) (mode : thmode) (name : symbol) =
     assert (scope.sc_pr_uc = None);
-    
+
     let scope =
       let sc_locdoc = scope.sc_locdoc in
       let sc_locdoc =
         let mode = match mode with `Concrete -> `Specific | `Abstract -> `Abstract in
-        DocState.start_process sc_locdoc name `Theory mode in 
+        DocState.start_process sc_locdoc name `Theory mode in
       let sc_locdoc =
         ofold ((^~) DocState.push_srcbl) sc_locdoc src in
       { scope with sc_locdoc } in
@@ -2173,7 +2172,7 @@ module Cloning = struct
         | `Include -> scope)
         scope
     in
-    
+
     if is_none thcl.pthc_local && oth.cth_loca = `Local then
       notify scope `Info
         "Theory `%s` has inherited `local` visibility. \
@@ -2213,19 +2212,19 @@ module Ty = struct
   let add ?(src : string option) scope (tyd : ptydecl located) =
     let utyd = unloc tyd in
     let scope =
-      { scope with 
-          sc_locdoc = 
+      { scope with
+          sc_locdoc =
           match utyd.pty_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
-          | `Global -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Specific 
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Specific
           | `Declare -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Abstract}
     in
     let scope = {
-      scope with 
+      scope with
         sc_locdoc =
-          match src with 
+          match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
-          | None -> scope.sc_locdoc;  } 
+          | None -> scope.sc_locdoc;  }
     in
 
     let loc = loc tyd in
@@ -2282,14 +2281,14 @@ module Ty = struct
     let carrier =
       let ue = EcUnify.UniEnv.create None in
       transty tp_tydecl env ue subtype.pst_carrier in
-    
+
     let pred =
       let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
       let env = EcEnv.Var.bind_local x carrier env in
       let ue = EcUnify.UniEnv.create None in
       let pred = EcTyping.trans_prop env ue (snd subtype.pst_pred) in
       if not (EcUnify.UniEnv.closed ue) then
-        hierror ~loc:(snd subtype.pst_pred).pl_loc 
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
       let uidmap = EcUnify.UniEnv.close ue in
       let fs = Tuni.subst uidmap in
@@ -2311,12 +2310,12 @@ module Ty = struct
             ev_bynames = Msym.empty;
             ev_global  =  [ (None, Some [`Include, "prove"]) ]
           } } in
- 
+
     let cname = Option.map unloc subtype.pst_cname in
     let npath = ofold ((^~) EcPath.pqname) (EcEnv.root env) cname in
     let cpath = EcPath.fromqsymbol ([EcCoreLib.i_top], "Subtype") in
     let theory = EcEnv.Theory.by_path ~mode:`Abstract cpath env in
-      
+
     let renames =
       match subtype.pst_rename with
       | None -> []
@@ -2338,7 +2337,7 @@ module Ty = struct
         ) in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
-    
+
     Ax.add_defer scope proofs
 
   (* ------------------------------------------------------------------ *)

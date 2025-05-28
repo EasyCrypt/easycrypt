@@ -392,7 +392,7 @@ let main () =
       interactive : bool;
       eco         : bool;
       gccompact   : int option;
-      gendoc      : bool;
+      docgen      : bool;
       outdirp     : string option;
     }
   end in
@@ -449,7 +449,7 @@ let main () =
         ; interactive = true
         ; eco         = false
         ; gccompact   = None
-        ; gendoc      = false 
+        ; docgen      = false
         ; outdirp     = None }
 
     end
@@ -478,7 +478,7 @@ let main () =
         ; interactive = false
         ; eco         = cmpopts.cmpo_noeco
         ; gccompact   = cmpopts.cmpo_compact
-        ; gendoc      = false
+        ; docgen      = false
         ; outdirp     = None }
 
       end
@@ -487,7 +487,7 @@ let main () =
         (* Eagerly executed *)
         assert false
     
-    | `GenDoc docopts -> begin
+    | `DocGen docopts -> begin
         let name = docopts.doco_input in
 
         begin try
@@ -521,7 +521,7 @@ let main () =
         ; interactive = false
         ; eco         = true
         ; gccompact   = None
-        ; gendoc      = true
+        ; docgen      = true
         ; outdirp     = docopts.doco_outdirp }
       end
 
@@ -720,7 +720,7 @@ let main () =
             T.finalize terminal;
             if not state.eco then
               finalize_input state.input (EcCommands.current ());
-            if state.gendoc then
+            if state.docgen then
               EcDoc.generate_html ?outdirp:state.outdirp state.input (EcCommands.current ());
             exit 0
           end;

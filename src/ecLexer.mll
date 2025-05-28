@@ -466,24 +466,14 @@ and comment = parse
   | _           { comment lexbuf }
 
 and doccomment kind buf = parse
-  | (['*' '^'] as c) "*)" {
-      if kind <> c then begin
-        lex_error
-          lexbuf
-          (Printf.sprintf "(*%c comment closed with %c*)" kind c);
-      end; buf
-  }
-
-  | eof {
-      unterminated_comment ()
-  }
-
+  | ['^' '*']? "*)" { buf }
+  | "(*" { comment lexbuf; doccomment kind buf lexbuf }
+  | eof { unterminated_comment () }
   | newline {
       Lexing.new_line lexbuf;
       Buffer.add_char buf '\n';
       doccomment kind buf lexbuf
   }
-
   | _ as c {
       Buffer.add_char buf c;
       doccomment kind buf lexbuf
