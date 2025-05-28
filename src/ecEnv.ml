@@ -1681,15 +1681,16 @@ module Fun = struct
       let locals = List.map ovar_of_var fd.f_locals in
       (fun_.f_sig,fd), adds_in_memenv mem locals
 
-  let inv_memory side =
-    let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
-    EcMemory.abstract id
+  let inv_memory (side : [`Left | `Right]) =
+    match side with
+    | `Left  -> EcMemory.abstract EcCoreFol.mleft
+    | `Right -> EcMemory.abstract EcCoreFol.mright
 
-  let inv_memenv env =
-    Memory.push_all [inv_memory `Left; inv_memory `Rigth] env
+  let inv_memenv ?(mem = [mleft; mright]) env =
+    Memory.push_all (List.map EcMemory.abstract mem) env
 
-  let inv_memenv1 env =
-    let mem  = EcMemory.abstract EcCoreFol.mhr in
+  let inv_memenv1 ?(mem = EcCoreFol.mhr) env =
+    let mem = EcMemory.abstract mem in
     Memory.push_active mem env
 
   let prF_memenv m path env =
@@ -1700,20 +1701,20 @@ module Fun = struct
     let post = prF_memenv EcCoreFol.mhr path env in
     Memory.push_active post env
 
-  let hoareF_memenv path env =
+  let hoareF_memenv mem path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in
-    let pre  = actmem_pre EcCoreFol.mhr fun_ in
-    let post = actmem_post EcCoreFol.mhr fun_ in
+    let pre  = actmem_pre mem fun_ in
+    let post = actmem_post mem fun_ in
     pre, post
 
-  let hoareF path env =
-    let pre, post = hoareF_memenv path env in
+  let hoareF mem path env =
+    let pre, post = hoareF_memenv mem path env in
     Memory.push_active pre env, Memory.push_active post env
 
-  let hoareS path env =
+  let hoareS mem path env =
     let fun_ = by_xpath path env in
-    let fd, memenv = actmem_body EcCoreFol.mhr fun_ in
+    let fd, memenv = actmem_body mem fun_ in
     memenv, fd, Memory.push_active memenv env
 
   let equivF_memenv path1 path2 env =
@@ -3594,19 +3595,20 @@ module LDecl = struct
   let push_all l lenv =
     { lenv with le_env = Memory.push_all l lenv.le_env }
 
-  let hoareF xp lenv =
-     let env1, env2 = Fun.hoareF xp lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
+(* Note: Not confident about this change. I don't understand what this function does *)
+  let hoareF mem xp lenv =
+     let env1, env2 = Fun.hoareF mem xp lenv.le_env in
+    { lenv with le_env = env1 }, { lenv with le_env = env2 }
 
   let equivF xp1 xp2 lenv =
     let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
+    { lenv with le_env = env1 }, { lenv with le_env = env2 }
 
-  let inv_memenv lenv =
-    { lenv with le_env = Fun.inv_memenv lenv.le_env }
+  let inv_memenv ?mem lenv =
+    { lenv with le_env = Fun.inv_memenv ?mem lenv.le_env }
 
-  let inv_memenv1 lenv =
-    { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
+  let inv_memenv1 ?mem lenv =
+    { lenv with le_env = Fun.inv_memenv1 ?mem lenv.le_env }
 end
 
 

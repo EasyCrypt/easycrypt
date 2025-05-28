@@ -97,18 +97,18 @@ module Fun : sig
 
   val prF : xpath -> env -> env
 
-  val hoareF_memenv : xpath -> env -> memenv * memenv
+  val hoareF_memenv : memory -> xpath -> env -> memenv * memenv
 
-  val hoareF : xpath -> env -> env * env
+  val hoareF : memory -> xpath -> env -> env * env
 
-  val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
+  val hoareS : memory -> xpath -> env -> memenv * (funsig * function_def) * env
 
   val actmem_body :  memory -> function_ -> (funsig * function_def) * memenv
   val actmem_post :  memory -> function_ -> memenv
 
   val inv_memory : [`Left|`Right] -> memenv
 
-  val inv_memenv : env -> env
+  val inv_memenv : ?mem:(memory list) -> env -> env
 
   val equivF_memenv : xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
@@ -505,11 +505,11 @@ module LDecl : sig
   val push_all    : memenv list -> hyps -> hyps
   val push_active : memenv -> hyps -> hyps
 
-  val hoareF : xpath -> hyps -> hyps * hyps
+  val hoareF : memory -> xpath -> hyps -> hyps * hyps
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
 
-  val inv_memenv  : hyps -> hyps
-  val inv_memenv1 : hyps -> hyps
+  val inv_memenv  : ?mem:(memory list) -> hyps -> hyps
+  val inv_memenv1 : ?mem:memory -> hyps -> hyps
 end
 
 val pp_debug_form : (env -> Format.formatter -> form -> unit) ref

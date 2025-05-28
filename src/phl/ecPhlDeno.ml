@@ -98,7 +98,7 @@ let t_ehoare_deno_r pre post tc =
 
   let pr = destr_pr f in
   let concl_e = f_eHoareF pre pr.pr_fun post in
-  let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_fun env in
+  let mpr, mpo = EcEnv.Fun.hoareF_memenv mhr pr.pr_fun env in
   (* pre <= bd *)
   (* building the substitution for the pre *)
   let sargs = PVM.add env pv_arg (fst mpr) pr.pr_args PVM.empty in
@@ -202,7 +202,7 @@ let process_phoare_deno info tc =
     in
 
     let { pr_fun = f; pr_event = event; } = destr_pr f in
-    let penv, qenv = LDecl.hoareF f hyps in
+    let penv, qenv = LDecl.hoareF mhr f hyps in
     let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_formula !!tc penv p) f_true in
     let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) event in
 
@@ -236,7 +236,7 @@ let process_ehoare_deno info tc =
     in
 
     let { pr_fun = f; pr_mem = m; pr_event = event; } = destr_pr f in
-    let penv, qenv = LDecl.hoareF f hyps in
+    let penv, qenv = LDecl.hoareF mhr f hyps in
     let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m mhr in
     let dpre = f_r2xr (Fsubst.f_subst smem bd) in
 
@@ -542,7 +542,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
   let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
 
   let bad1 =
-    let _, qenv = LDecl.hoareF fl hyps in
+    let _, qenv = LDecl.hoareF mhr fl hyps in
     TTC.pf_process_formula !!tc qenv bad1 in
 
   let process_cut (pre, post) =
