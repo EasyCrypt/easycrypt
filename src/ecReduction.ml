@@ -1453,7 +1453,10 @@ let rec conv ri env f1 f2 stk =
       conv_next ri env f1 stk
 
   | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
-    conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)
+    let subst = if id_equal hf1.hf_m hf2.hf_m then Fsubst.f_subst_id 
+      else Fsubst.f_bind_mem Fsubst.f_subst_id hf1.hf_m hf2.hf_m in
+    let subst = Fsubst.f_subst subst in
+      conv ri env hf1.hf_pr (subst hf2.hf_pr) (zhl f1 [hf1.hf_po] [subst hf2.hf_po] stk)
 
   | FhoareS hs1, FhoareS hs2
       when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->

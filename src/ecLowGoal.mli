@@ -358,3 +358,9 @@ val t_debug :
   -> FApi.backward
   -> FApi.backward
 [@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc :tcenv -> unit
+[@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc1 :tcenv1 -> unit
+[@@ocaml.alert debug "Debug function, remove uses before merging"]

@@ -677,6 +677,11 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | FhoareF hf1, FhoareF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
             failure ();
+          let subst =
+            if   id_equal hf1.hf_m hf2.hf_m
+            then subst
+            else Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
+          assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
           let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
           List.iter2 (doit env (subst, mxs))
             [hf1.hf_pr; hf1.hf_po] [hf2.hf_pr; hf2.hf_po]

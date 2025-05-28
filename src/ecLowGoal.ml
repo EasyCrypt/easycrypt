@@ -2290,6 +2290,9 @@ type cstate = {
   cs_sbeq : Sid.t;
 }
 
+let pp_tc1 tc =
+  pp_tc (FApi.tcenv_of_tcenv1 tc)
+
 let t_debug ?(tag="") t tc =
   Format.eprintf "Before (tag: %s):" tag;
   pp_tc (FApi.tcenv_of_tcenv1 tc);
