@@ -387,7 +387,7 @@ let rec pf_ident ?(raw = false) f =
     | Pmh_ident nm -> nm
     | Pmh_params x -> pcmhd_ident (fst (unloc x))
     | Pmh_cast (pmh, _) -> pcmhd_ident pmh
-    
+
 (* -------------------------------------------------------------------- *)
 type psubtype = {
   pst_name    : psymbol;

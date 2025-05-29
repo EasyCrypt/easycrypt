@@ -381,9 +381,9 @@ rule main = parse
       with Not_found -> [PUNIOP name]
   }
 
-  | "(*" (['*' '^'] as c) {
+  | "(*" (['&' '^'] as c) {
       let buffer = doccomment c (Buffer.create 0) lexbuf in
-      let kind = match c with '*' -> `Item | '^' -> `Global | _ -> assert false in
+      let kind = match c with '&' -> `Item | '^' -> `Global | _ -> assert false in
       [DOCCOMMENT (kind, Buffer.contents buffer)]
     }
 
@@ -466,7 +466,7 @@ and comment = parse
   | _           { comment lexbuf }
 
 and doccomment kind buf = parse
-  | ['^' '*']? "*)" { buf }
+  | ['&' '^']? "*)" { buf }
   | "(*" { comment lexbuf; doccomment kind buf lexbuf }
   | eof { unterminated_comment () }
   | newline {
