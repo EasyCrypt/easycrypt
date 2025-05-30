@@ -295,6 +295,27 @@ and pr = {
   pr_event : form;
 }
 
+val eg_pr : eagerF -> form
+val eg_po : eagerF -> form
+val ef_pr : equivF -> form
+val ef_po : equivF -> form
+val es_pr : equivS -> form
+val es_po : equivS -> form
+val hf_pr : sHoareF -> form
+val hf_po : sHoareF -> form
+val hs_pr : sHoareS -> form
+val hs_po : sHoareS -> form
+val ehf_pr : eHoareF -> form
+val ehf_po : eHoareF -> form
+val ehs_pr : eHoareS -> form
+val ehs_po : eHoareS -> form
+val bhf_pr : bdHoareF -> form
+val bhf_po : bdHoareF -> form
+val bhs_pr : bdHoareS -> form
+val bhs_po : bdHoareS -> form
+
+(* -------------------------------------------------------------------- *)
+
 type 'a equality = 'a -> 'a -> bool
 type 'a hash = 'a -> int
 type 'a fv   = 'a -> int EcIdent.Mid.t

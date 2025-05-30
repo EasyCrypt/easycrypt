@@ -281,6 +281,37 @@ and pr = {
 }
 
 (* ----------------------------------------------------------------- *)
+(* Accessors for program logic                                       *)
+(* ----------------------------------------------------------------- *)
+
+let eg_pr eg = eg.eg_pr
+let eg_po eg = eg.eg_po
+
+let ef_pr ef = ef.ef_pr
+let ef_po ef = ef.ef_po
+
+let es_pr es = es.es_pr
+let es_po es = es.es_po
+
+let hf_pr hf = hf.hf_pr
+let hf_po hf = hf.hf_po
+
+let hs_pr hs = hs.hs_pr
+let hs_po hs = hs.hs_po
+
+let ehf_pr ehf = ehf.ehf_pr
+let ehf_po ehf = ehf.ehf_po
+
+let ehs_pr ehs = ehs.ehs_pr
+let ehs_po ehs = ehs.ehs_po
+
+let bhf_pr bhf = bhf.bhf_pr
+let bhf_po bhf = bhf.bhf_po
+
+let bhs_pr bhs = bhs.bhs_pr
+let bhs_po bhs = bhs.bhs_po
+
+(* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
 (* ----------------------------------------------------------------- *)
 let ty_equal : ty -> ty -> bool = (==)
