@@ -1,7 +1,7 @@
 /* General Styling */
 /* Body */
 body {
-  font-family: "-apple-system", "BlinkMacSystemFont", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+  font-family: "-apple-system", "BlinkMacSystemFont", "Roboto", "Arial", sans-serif;
   line-height: 1.2;
   font-size: 16px;
   margin: 0;
@@ -22,7 +22,7 @@ pre {
 
 /* Inline code */
 code {
-  font-family: "Fira Code", "Consolas", "Courier New", monospace;
+  font-family: "Fira Code", "Consolas", monospace;
   font-size: 1rem;
   color: #d6336c;
 }
