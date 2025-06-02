@@ -207,6 +207,8 @@ and f_node =
   | Fpr of pr (* hr *)
 
 and eagerF = {
+  eg_ml : memory;
+  eg_mr : memory;
   eg_pr : form;
   eg_sl : stmt;  (* No local program variables *)
   eg_fl : EcPath.xpath;
@@ -216,6 +218,8 @@ and eagerF = {
 }
 
 and equivF = {
+  ef_ml : memory;
+  ef_mr : memory;
   ef_pr : form;
   ef_fl : EcPath.xpath;
   ef_fr : EcPath.xpath;
@@ -231,6 +235,7 @@ and equivS = {
   es_po  : form; }
 
 and sHoareF = {
+  hf_m  : memory;
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;
@@ -244,6 +249,7 @@ and sHoareS = {
 
 
 and eHoareF = {
+  ehf_m   : memory;
   ehf_pr  : form;
   ehf_f   : EcPath.xpath;
   ehf_po  : form;
@@ -257,6 +263,7 @@ and eHoareS = {
 }
 
 and bdHoareF = {
+  bhf_m   : memory;
   bhf_pr  : form;
   bhf_f   : EcPath.xpath;
   bhf_po  : form;

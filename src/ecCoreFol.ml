@@ -278,7 +278,7 @@ let f_hoareS hs_m hs_pr hs_s hs_po =
   f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
 
 let f_hoareF hf_pr hf_f hf_po =
-  f_hoareF_r { hf_pr; hf_f; hf_po; }
+  f_hoareF_r { hf_m=mhr;  hf_pr; hf_f; hf_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
@@ -288,7 +288,7 @@ let f_eHoareS ehs_m ehs_pr ehs_s ehs_po =
   f_eHoareS_r { ehs_m; ehs_pr; ehs_s; ehs_po; }
 
 let f_eHoareF ehf_pr ehf_f ehf_po =
-  f_eHoareF_r { ehf_pr; ehf_f; ehf_po; }
+  f_eHoareF_r { ehf_m=mhr; ehf_pr; ehf_f; ehf_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
@@ -299,7 +299,7 @@ let f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
     { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd; }
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
-  f_bdHoareF_r { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }
+  f_bdHoareF_r { bhf_m=mhr; bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }
 
 (* -------------------------------------------------------------------- *)
 let f_equivS_r es = mk_form (FequivS es) tbool
@@ -309,13 +309,13 @@ let f_equivS es_ml es_mr es_pr es_sl es_sr es_po =
    f_equivS_r { es_ml; es_mr; es_pr; es_sl; es_sr; es_po; }
 
 let f_equivF ef_pr ef_fl ef_fr ef_po =
-  f_equivF_r{ ef_pr; ef_fl; ef_fr; ef_po; }
+  f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
 
 let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
-  f_eagerF_r { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
+  f_eagerF_r { eg_ml=mleft; eg_mr=mright; eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal

@@ -204,6 +204,8 @@ and f_node =
 (* We use the alert system for privacy because we want to 
    permit access in *some* instances, and the other fields are fine *)
 and eagerF = {
+  eg_ml : memory;
+  eg_mr : memory;
   eg_pr : form;
   [@alert priv_pl "Use the accessor function `eg_pr` instead of the field"]
   eg_sl : stmt;  (* No local program variables *)
@@ -215,6 +217,8 @@ and eagerF = {
 }
 
 and equivF = {
+  ef_ml : memory;
+  ef_mr : memory;
   ef_pr : form;
   [@alert priv_pl "Use the accessor function `ef_pr` instead of the field"]
   ef_fl : EcPath.xpath;
@@ -235,6 +239,7 @@ and equivS = {
 }
 
 and sHoareF = {
+  hf_m : memory;
   hf_pr : form;
   [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
   hf_f  : EcPath.xpath;
@@ -253,6 +258,7 @@ and sHoareS = {
 
 
 and eHoareF = {
+  ehf_m  : memory;
   ehf_pr  : form;
   [@alert priv_pl "Use the accessor function `ehf_pr` instead of the field"]
   ehf_f   : EcPath.xpath;
@@ -270,6 +276,7 @@ and eHoareS = {
 }
 
 and bdHoareF = {
+  bhf_m   : memory;
   bhf_pr  : form;
   [@alert priv_pl "Use the accessor function `bhf_pr` instead of the field"]
   bhf_f   : EcPath.xpath;
