@@ -304,14 +304,19 @@ and pr = {
   pr_event : form;
 }
 
+type ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
 val eg_pr : eagerF -> form
 val eg_po : eagerF -> form
 val ef_pr : equivF -> form
 val ef_po : equivF -> form
 val es_pr : equivS -> form
 val es_po : equivS -> form
-val hf_pr : sHoareF -> form
-val hf_po : sHoareF -> form
+val hf_pr : sHoareF -> ss_inv
+val hf_po : sHoareF -> ss_inv
 val hs_pr : sHoareS -> form
 val hs_po : sHoareS -> form
 val ehf_pr : eHoareF -> form

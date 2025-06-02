@@ -1248,7 +1248,7 @@ let rec simplify ri env f =
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_hoareF hf.hf_pr hf_f hf.hf_po)
+      (f_hoareF_old hf.hf_pr hf_f hf.hf_po)
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
@@ -1350,7 +1350,7 @@ let zpop ri side f hd =
   | Ztuple, args       -> f_tuple args
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, [pr;po] ->
-    f_hoareF pr hf.hf_f po
+    f_hoareF_old pr hf.hf_f po
   | Zhl {f_node = FhoareS hs}, [pr;po] ->
     f_hoareS hs.hs_m pr hs.hs_s po
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->

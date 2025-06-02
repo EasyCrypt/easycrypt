@@ -291,6 +291,12 @@ and pr = {
 (* Accessors for program logic                                       *)
 (* ----------------------------------------------------------------- *)
 
+(** Single sided invariant or pre/postcondition *)
+type ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
 let eg_pr eg = eg.eg_pr
 let eg_po eg = eg.eg_po
 
@@ -300,8 +306,8 @@ let ef_po ef = ef.ef_po
 let es_pr es = es.es_pr
 let es_po es = es.es_po
 
-let hf_pr hf = hf.hf_pr
-let hf_po hf = hf.hf_po
+let hf_pr hf = {m=hf.hf_m; inv=hf.hf_pr}
+let hf_po hf = {m=hf.hf_m; inv=hf.hf_po}
 
 let hs_pr hs = hs.hs_pr
 let hs_po hs = hs.hs_po

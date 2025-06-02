@@ -17,7 +17,7 @@ let t_hoare_of_bdhoareF_r tc =
   let bhf = tc1_as_bdhoareF tc in
   if not (bhf.bhf_cmp = FHeq && f_equal bhf.bhf_bd f_r0) then
     tc_error !!tc "%s" "bound must be equal to 0%r";
-  let concl = f_hoareF bhf.bhf_pr bhf.bhf_f (f_not bhf.bhf_po) in
+  let concl = f_hoareF_old bhf.bhf_pr bhf.bhf_f (f_not bhf.bhf_po) in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -36,4 +36,4 @@ let t_bdhoare_of_hoareF_r tc =
 let t_hoare_of_bdhoareS = FApi.t_low0 "hoare-bdhoareS" t_hoare_of_bdhoareS_r
 let t_hoare_of_bdhoareF = FApi.t_low0 "hoare-bdhoareF" t_hoare_of_bdhoareF_r
 let t_bdhoare_of_hoareS = FApi.t_low0 "bdhoare-hoareS" t_bdhoare_of_hoareS_r
-let t_bdhoare_of_hoareF = FApi.t_low0 "bdhoare-hoareF" t_bdhoare_of_hoareF_r
+let t_bdhoare_of_hoareF_old = FApi.t_low0 "bdhoare-hoareF" t_bdhoare_of_hoareF_r

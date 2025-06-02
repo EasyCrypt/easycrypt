@@ -1137,7 +1137,7 @@ module FPosition = struct
 
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
-              f_hoareF hf_pr hf.hf_f hf_po
+              f_hoareF_old hf_pr hf.hf_f hf_po
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =
