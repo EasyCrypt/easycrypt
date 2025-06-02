@@ -451,11 +451,11 @@ module Fsubst = struct
       end
 
     | FhoareF hf ->
-      let hf_f  = x_subst s hf.hf_f in
-      let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.hf_pr in
-      let hf_po = f_subst ~tx s hf.hf_po in
-      f_hoareF_old hf_pr hf_f hf_po
+      let hf_f   = x_subst s hf.hf_f in
+      let (s, m) = add_m_binding s hf.hf_m in
+      let hf_pr  = f_subst ~tx s hf.hf_pr [@alert "-priv_pl"] in
+      let hf_po  = f_subst ~tx s hf.hf_po [@alert "-priv_pl"] in
+      f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
@@ -615,6 +615,16 @@ module Fsubst = struct
     s, params
 
   (* ------------------------------------------------------------------ *)
+  and add_m_binding (s : f_subst) (m : memory) : f_subst * memory =
+    let m'  = refresh s m in
+    if m == m' then
+      let s = f_rem_mem s m in
+      (s, m)
+    else
+      let s = f_bind_mem s m m' in
+      (s, m')
+  (* ------------------------------------------------------------------ *)
+
   and add_me_binding (s : f_subst) ((x, mt) as me : memenv) : f_subst * memenv =
     let mt' = EcMemory.mt_subst (ty_subst s) mt in
     let x'  = refresh s x in
@@ -724,3 +734,7 @@ module Tvar = struct
   let f_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : form -> form =
     Fsubst.f_subst_tvar ~freshen (init lv lt)
 end
+
+let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
+  let inv = Fsubst.f_subst (Fsubst.f_bind_mem f_subst_id m m') inv in
+  { inv; m = m' }

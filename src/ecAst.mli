@@ -309,6 +309,8 @@ type ss_inv = {
   inv : form;
 }
 
+val map_ss_inv : (form list -> form) -> ss_inv list -> ss_inv
+
 val eg_pr : eagerF -> form
 val eg_po : eagerF -> form
 val ef_pr : equivF -> form

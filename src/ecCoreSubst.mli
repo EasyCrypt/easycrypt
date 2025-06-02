@@ -108,3 +108,5 @@ module Fsubst : sig
   val oi_subst     : PreOI.t     substitute
   val gty_subst    : gty         substitute
 end
+
+val ss_inv_rebind : ss_inv -> memory -> ss_inv

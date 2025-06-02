@@ -449,6 +449,10 @@ let check_binding (env, subst) (x1, gty1) (x2, gty2) =
 let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2
 
+let check_m_binding env subst x1 x2 =
+  if id_equal x1 x2 then subst
+  else Fsubst.f_bind_mem subst x2 x1
+
 let check_me_binding env subst (x1,mt1) (x2,mt2) =
   check_memtype env mt1 mt2;
   if id_equal x1 x2 then subst
@@ -548,8 +552,9 @@ let is_alpha_eq hyps f1 f2 =
 
     | FhoareF hf1, FhoareF hf2 ->
       check_xp env subst hf1.hf_f hf2.hf_f;
-      aux env subst hf1.hf_pr hf2.hf_pr;
-      aux env subst hf1.hf_po hf2.hf_po
+      let subst = check_m_binding env subst hf1.hf_m hf2.hf_m in
+      aux env subst hf1.hf_pr hf2.hf_pr [@alert "-priv_pl"];
+      aux env subst hf1.hf_po hf2.hf_po [@alert "-priv_pl"]
 
     | FhoareS hs1, FhoareS hs2 ->
       check_s env subst hs1.hs_s hs2.hs_s;
@@ -1248,7 +1253,7 @@ let rec simplify ri env f =
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_hoareF_old hf.hf_pr hf_f hf.hf_po)
+      (f_hoareF (hf_pr hf) hf_f (hf_po hf))
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
@@ -1350,7 +1355,7 @@ let zpop ri side f hd =
   | Ztuple, args       -> f_tuple args
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, [pr;po] ->
-    f_hoareF_old pr hf.hf_f po
+    f_hoareF {inv=pr;m=hf.hf_m} hf.hf_f {inv=po;m=hf.hf_m}
   | Zhl {f_node = FhoareS hs}, [pr;po] ->
     f_hoareS hs.hs_m pr hs.hs_s po
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->

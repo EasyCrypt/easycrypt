@@ -479,11 +479,11 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FhoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
-    let hf_pr = norm st s hf.hf_pr in
-    let hf_po = norm st s hf.hf_po in
+    assert (not (Subst.has_mem s hf.hf_m));
+    let hf_pr = norm st s hf.hf_pr [@alert "-priv_pl"] in
+    let hf_po = norm st s hf.hf_po [@alert "-priv_pl"] in
     let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_old hf_pr hf_f hf_po
+    f_hoareF {m=hf.hf_m;inv=hf_pr} hf_f {m=hf.hf_m;inv=hf_po}
 
   | FhoareS hs ->
     assert (Args.isempty args);

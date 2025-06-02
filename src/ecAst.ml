@@ -297,6 +297,12 @@ type ss_inv = {
   inv : form;
 }
 
+let map_ss_inv (fn: form list -> form) (invs: ss_inv list): ss_inv = 
+  assert (List.length invs > 0);
+  let m' = (List.hd invs).m in
+  let inv = fn (List.map (fun {inv;m} -> assert (m = m'); inv) invs) in
+  { m = m'; inv = inv }
+
 let eg_pr eg = eg.eg_pr
 let eg_po eg = eg.eg_po
 
