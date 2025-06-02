@@ -109,25 +109,10 @@ let t_eager_seq_r i j eqR h tc =
 
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
 
-  let a = f_equivS_r { eC with
-    es_sl = stmt (s.s_node@c1);
-    es_sr = stmt (c1'@s'.s_node);
-    es_po = eqR;
-  }
-  and b = f_equivS_r { eC with
-    es_pr = eqR;
-    es_sl = stmt (s.s_node@c2);
-    es_sr = stmt (c2'@s'.s_node);
-  }
-  and c = f_equivS_r { eC with
-    es_ml = (fst eC.es_ml, snd eC.es_mr);
-    es_pr = to_form (Mpv2.eq_fv2 seqR);
-    es_sl = stmt c2';
-    es_sr = stmt c2';
-    es_po = to_form eqO2;
-  }
-
-  in
+  let a = f_equivS eC.es_ml eC.es_mr eC.es_pr (stmt (s.s_node@c1)) (stmt (c1'@s'.s_node)) eqR
+  and b = f_equivS eC.es_ml eC.es_mr eqR (stmt (s.s_node@c2)) (stmt (c2'@s'.s_node)) eC.es_po
+  and c = f_equivS (fst eC.es_ml, snd eC.es_mr) eC.es_mr (to_form (Mpv2.eq_fv2 seqR))
+    (stmt c2') (stmt c2') (to_form eqO2) in
 
   FApi.t_first
     (t_apply_hyp h)
@@ -215,21 +200,10 @@ let t_eager_while_r h tc =
       [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
       (f_imp eqI (f_eq e1 e2))
 
-  and bT = f_equivS_r { eC with
-    es_pr = f_and_simpl eqI e1;
-    es_sl = stmt (s.s_node@c.s_node);
-    es_sr = stmt (c'.s_node@s'.s_node);
-    es_po = eqI;
-  }
-
-  and cT = f_equivS_r { eC with
-    es_ml = (fst eC.es_ml, snd eC.es_mr);
-    es_pr = eqI2;
-    es_sl = c';
-    es_sr = c';
-    es_po = eqI2;
-  }
-
+  and bT = f_equivS eC.es_ml eC.es_mr (f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
+    (stmt (c'.s_node@s'.s_node)) eqI
+  
+  and cT = f_equivS (fst eC.es_ml, snd eC.es_mr) eC.es_mr eqI2 c' c' eqI2
   in
 
   let tsolve tc =
@@ -283,14 +257,7 @@ let t_eager_fun_def_r tc =
   let s = EcPhlFun.subst_pre env fsigr mr s in
   let pre = PVM.subst env s eg.eg_pr in
 
-  let cond = f_equivS_r {
-    es_ml = meml;
-    es_mr = memr;
-    es_sl = s_seq eg.eg_sl sfl;
-    es_sr = s_seq sfr eg.eg_sr;
-    es_pr = pre;
-    es_po = post;
-  } in
+  let cond = f_equivS meml memr pre (s_seq eg.eg_sl sfl) (s_seq sfr eg.eg_sr) post in
 
   FApi.xmutate1 tc `EagerFunDef [cond]
 
@@ -366,7 +333,7 @@ let t_eager_call_r fpre fpost tc =
 
      (lvr,fr,argsr) modir ml mr es.es_po hyps in
   let f_concl = f_eagerF fpre sl fl fr sr fpost in
-  let concl   = f_equivS_r { es with es_sl = stmt []; es_sr = stmt []; es_po = post; } in
+  let concl   = f_equivS es.es_ml es.es_mr es.es_pr (stmt []) (stmt []) post in
 
   FApi.xmutate1 tc `EagerCall [f_concl; concl]
 
@@ -565,11 +532,8 @@ let t_eager_r h inv tc =
   in
 
   let concl =
-    f_equivS_r { eC with
-      es_sl = stmt []; es_sr = stmt [];
-      es_po = Mpv2.to_form mleft mright eqi f_true;
-    }
-  in
+    f_equivS eC.es_ml eC.es_mr eC.es_pr (stmt []) (stmt [])
+      (Mpv2.to_form mleft mright eqi f_true) in
 
   let concls = List.map dof fhyps in
 

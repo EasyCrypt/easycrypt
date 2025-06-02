@@ -396,26 +396,26 @@ let process_weakmem (side, id, params) tc =
     match f.f_node with
     | FhoareS hs ->
       let me = bind hs.hs_m in
-      f_hoareS_r { hs with hs_m = me }
+      f_hoareS me hs.hs_pr hs.hs_s hs.hs_po
 
     | FeHoareS hs ->
       let me = bind hs.ehs_m in
-      f_eHoareS_r { hs with ehs_m = me }
+      f_eHoareS me hs.ehs_pr hs.ehs_s hs.ehs_po
 
     | FbdHoareS hs ->
       let me = bind hs.bhs_m in
-      f_bdHoareS_r { hs with bhs_m = me }
+      f_bdHoareS me hs.bhs_pr hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
 
     | FequivS es ->
-      let do_side side es =
-        let es_ml, es_mr = if side = `Left then bind es.es_ml, es.es_mr else es.es_ml, bind es.es_mr in
-        {es with es_ml; es_mr}
+      let do_side side (ml, mr) =
+        let es_ml, es_mr = if side = `Left then bind ml, mr else ml, bind mr in
+        (es_ml, es_mr)
       in
-      let es =
+      let (ml, mr) =
         match side with
-        | None -> do_side `Left (do_side `Right es)
-        | Some side -> do_side side es in
-      f_equivS_r es
+        | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
+        | Some side -> do_side side (es.es_ml, es.es_mr) in
+      f_equivS ml mr es.es_pr es.es_sl es.es_sr es.es_po
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc

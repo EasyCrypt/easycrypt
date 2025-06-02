@@ -148,7 +148,7 @@ module TacInternal = struct
       wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
+    let concl = f_hoareS hs.hs_m hs.hs_pr s post in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_ehoare_wp ?(uselet=true) i tc =
@@ -159,7 +159,7 @@ module TacInternal = struct
     let (s_wp, post) = ewp ~uselet env hs.ehs_m s_wp hs.ehs_po in
     check_wp_progress tc i hs.ehs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let concl = f_eHoareS_r { hs with ehs_s = s; ehs_po = post} in
+    let concl = f_eHoareS hs.ehs_m hs.ehs_pr s post in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_bdhoare_wp ?(uselet=true) i tc =
@@ -170,7 +170,7 @@ module TacInternal = struct
     let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
+    let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_equiv_wp ?(uselet=true) ij tc =
@@ -188,7 +188,7 @@ module TacInternal = struct
     check_wp_progress tc j es.es_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
     let sr = EcModules.stmt (s_hdr @ s_wpr) in
-    let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
+    let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr post in
     FApi.xmutate1 tc `Wp [concl]
 end
 

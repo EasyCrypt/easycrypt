@@ -8,6 +8,7 @@ open EcPV
 open EcMatching
 open EcTransMatching
 open EcMaps
+open EcAst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -45,19 +46,9 @@ module Low = struct
       transitivity_side_cond hyps
         m1 m3 m1 m3 es.es_pr es.es_po p1 q1 mt p2 q2 in
     let cond3 =
-      f_equivS_r { es with
-        es_mr = (mright,mt);
-        es_sr = c2;
-        es_pr = p1;
-        es_po = q1;
-      } in
+      f_equivS es.es_ml (mright, mt) p1 es.es_sl c2 q1 in
     let cond4 =
-      f_equivS_r { es with
-        es_ml = (mleft, mt);
-        es_sl = c2;
-        es_pr = p2;
-        es_po = q2;
-      } in
+      f_equivS (mleft, mt) es.es_mr p2 c2 es.es_sr q2 in
 
      FApi.xmutate1 tc `Trans [cond1; cond2; cond3; cond4]
 

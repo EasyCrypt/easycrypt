@@ -113,25 +113,14 @@ val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
-(* soft-constructors - hoare *)
-val f_hoareF_r : sHoareF -> form
-val f_hoareS_r : sHoareS -> form
-
 val f_hoareF : form -> xpath -> form -> form
 val f_hoareS : memenv -> form -> stmt -> form -> form
-
-(* soft-constructors - expected hoare *)
-val f_eHoareF_r : eHoareF -> form
-val f_eHoareS_r : eHoareS -> form
 
 val f_eHoareF : form -> xpath -> form -> form
 val f_eHoareS : memenv -> form -> EcCoreModules.stmt -> form -> form
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
-
-val f_bdHoareF_r : bdHoareF -> form
-val f_bdHoareS_r : bdHoareS -> form
 
 val f_bdHoareF : form -> xpath -> form -> hoarecmp -> form -> form
 val f_bdHoareS : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
@@ -140,11 +129,7 @@ val f_bdHoareS : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
 val f_equivS : memenv -> memenv -> form -> stmt -> stmt -> form -> form
 val f_equivF : form -> xpath -> xpath -> form -> form
 
-val f_equivS_r : equivS -> form
-val f_equivF_r : equivF -> form
-
 (* soft-constructors - eager *)
-val f_eagerF_r : eagerF -> form
 val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
 
 (* soft-constructors - Pr *)

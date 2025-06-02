@@ -90,7 +90,7 @@ let gen_S tactic =
       (bh, bh.bhs_po, bh.bhs_cmp, bh.bhs_bd)
 
   and mk_bdh (bh, po, cmp, b) =
-    f_bdHoareS_r { bh with bhs_po = po; bhs_cmp = cmp; bhs_bd = b; } in
+    f_bdHoareS bh.bhs_m bh.bhs_pr bh.bhs_s po cmp b in
 
   tactic t_bdHoareS_conseq_bd { as_bdh; mk_bdh; }
 

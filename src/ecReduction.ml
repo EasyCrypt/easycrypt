@@ -1247,25 +1247,30 @@ let rec simplify ri env f =
   match f.f_node with
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_hoareF_r { hf with hf_f })
+      f_map (fun ty -> ty) (simplify ri env) 
+      (f_hoareF hf.hf_pr hf_f hf.hf_po)
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_eHoareF_r { hf with ehf_f })
+      f_map (fun ty -> ty) (simplify ri env) 
+      (f_eHoareF hf.ehf_pr ehf_f hf.ehf_po)
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
-      f_map (fun ty -> ty) (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
+      f_map (fun ty -> ty) (simplify ri env) 
+      (f_bdHoareF hf.bhf_pr bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd)
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
-      f_map (fun ty -> ty) (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
+      f_map (fun ty -> ty) (simplify ri env) 
+      (f_equivF ef.ef_pr ef_fl ef_fr ef.ef_po)
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
       let eg_fr = EcEnv.NormMp.norm_xfun env eg.eg_fr in
-      f_map (fun ty -> ty) (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
+      f_map (fun ty -> ty) (simplify ri env)
+      (f_eagerF eg.eg_pr eg.eg_sl eg_fl eg_fr eg.eg_sr eg.eg_po)
 
   | Fpr pr when ri.ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun env pr.pr_fun in
@@ -1345,23 +1350,23 @@ let zpop ri side f hd =
   | Ztuple, args       -> f_tuple args
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, [pr;po] ->
-    f_hoareF_r {hf with hf_pr = pr; hf_po = po }
+    f_hoareF pr hf.hf_f po
   | Zhl {f_node = FhoareS hs}, [pr;po] ->
-    f_hoareS_r {hs with hs_pr = pr; hs_po = po }
+    f_hoareS hs.hs_m pr hs.hs_s po
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
-    f_eHoareF_r {hf with ehf_pr = pr; ehf_po = po }
+    f_eHoareF pr hf.ehf_f po
   | Zhl {f_node = FeHoareS hs}, [pr;po] ->
-    f_eHoareS_r {hs with ehs_pr = pr; ehs_po = po }
+    f_eHoareS hs.ehs_m pr hs.ehs_s po
   | Zhl {f_node = FbdHoareF hf}, [pr;po;bd] ->
-    f_bdHoareF_r {hf with bhf_pr = pr; bhf_po = po; bhf_bd = bd}
+    f_bdHoareF pr hf.bhf_f po hf.bhf_cmp bd
   | Zhl {f_node = FbdHoareS hs}, [pr;po;bd] ->
-    f_bdHoareS_r {hs with bhs_pr = pr; bhs_po = po; bhs_bd = bd}
-  | Zhl {f_node = FequivF hf}, [pr;po] ->
-    f_equivF_r {hf with ef_pr = pr; ef_po = po }
+    f_bdHoareS hs.bhs_m pr hs.bhs_s po hs.bhs_cmp bd
+    | Zhl {f_node = FequivF hf}, [pr;po] ->
+    f_equivF pr hf.ef_fr hf.ef_fl po
   | Zhl {f_node = FequivS hs}, [pr;po] ->
-    f_equivS_r {hs with es_pr = pr; es_po = po }
+    f_equivS hs.es_ml hs.es_mr pr hs.es_sl hs.es_sr po
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
-    f_eagerF_r {hs with eg_pr = pr; eg_po = po }
+    f_eagerF pr hs.eg_sl hs.eg_fl hs.eg_fr hs.eg_sr po
   | Zhl {f_node = Fpr hs}, [a;ev] ->
     f_pr_r {hs with pr_args = a; pr_event = ev }
   | _, _ -> assert false

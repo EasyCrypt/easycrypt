@@ -17,8 +17,8 @@ let t_hoare_app_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let s1, s2 = s_split env i hs.hs_s in
-  let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
-  let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
+  let a = f_hoareS hs.hs_m hs.hs_pr (stmt s1) phi in
+  let b = f_hoareS hs.hs_m phi (stmt s2) hs.hs_po in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
@@ -28,8 +28,8 @@ let t_ehoare_app_r i f tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s1, s2 = s_split env i hs.ehs_s in
-  let a = f_eHoareS_r { hs with ehs_s = stmt s1; ehs_po = f }  in
-  let b = f_eHoareS_r { hs with ehs_pr = f; ehs_s = stmt s2 } in
+  let a = f_eHoareS hs.ehs_m hs.ehs_pr (stmt s1) f in
+  let b = f_eHoareS hs.ehs_m f (stmt s2) hs.ehs_po in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
@@ -42,12 +42,10 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
   let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
-  let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd = f1; } in
-  let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd = g1; } in
-  let condf2 = f_bdHoareS_r
-    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR; bhs_bd = f2; } in
-  let condg2 = f_bdHoareS_r
-    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR; bhs_bd = g2; } in
+  let condf1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s1 pR bhs.bhs_cmp f1 in
+  let condg1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s1 nR bhs.bhs_cmp g1 in
+  let condf2 = f_bdHoareS bhs.bhs_m (f_and_simpl phi pR) s2 bhs.bhs_po bhs.bhs_cmp f2 in
+  let condg2 = f_bdHoareS bhs.bhs_m (f_and_simpl phi nR) s2 bhs.bhs_po bhs.bhs_cmp g2 in
   let bd =
     (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
   let condbd =
@@ -103,8 +101,8 @@ let t_equiv_app (i, j) phi tc =
   let es = tc1_as_equivS tc in
   let sl1,sl2 = s_split env i es.es_sl in
   let sr1,sr2 = s_split env j es.es_sr in
-  let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
-  let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
+  let a = f_equivS es.es_ml es.es_mr es.es_pr (stmt sl1) (stmt sr1) phi in
+  let b = f_equivS es.es_ml es.es_mr phi (stmt sl2) (stmt sr2) es.es_po in
 
   FApi.xmutate1 tc `HlApp [a; b]
 

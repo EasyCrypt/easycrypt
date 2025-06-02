@@ -76,7 +76,7 @@ let t_hoare_while_r inv tc =
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let concl = f_hoareS hs.hs_m hs.hs_pr s post in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -128,11 +128,7 @@ let t_bdhoare_while_r inv vrnt tc =
   let vrnt_lt_k = f_int_lt vrnt k in
   let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
   let b_post = f_and_simpl inv vrnt_lt_k in
-  let b_concl = f_bdHoareS_r
-    { bhs with
-        bhs_pr  = b_pre; bhs_s  = c; bhs_po = b_post;
-        bhs_cmp = FHeq ; bhs_bd = f_r1}
-  in
+  let b_concl = f_bdHoareS bhs.bhs_m b_pre c b_post FHeq f_r1 in
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
@@ -141,7 +137,7 @@ let t_bdhoare_while_r inv vrnt tc =
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
-  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
+  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -170,9 +166,9 @@ let t_bdhoare_while_rev_r inv tc =
   let body_concl =
     let while_s  = EcModules.stmt [EcModules.i_abstract w] in
     let unfolded_while_s = EcModules.s_seq lp_body while_s in
-    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s; } in
-    let unfolded_while_jgmt = f_bdHoareS_r
-      { bhs with bhs_pr = f_and inv lp_guard; bhs_s = unfolded_while_s; }
+    let while_jgmt = f_bdHoareS bhs.bhs_m inv while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let unfolded_while_jgmt = f_bdHoareS
+      bhs.bhs_m (f_and inv lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
     in
       f_imp while_jgmt unfolded_while_jgmt
   in
@@ -250,22 +246,18 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
       f_and
         (f_forall_mems [mem] (f_imp inv (f_real_lt f_r0 eps)))
         (f_forall_simpl [(k_id,GTty tint)]
-           (f_bdHoareS_r { bhs with
-             bhs_pr  = f_ands [inv;lp_guard;vrnt_eq_k];
-             bhs_po  = vrnt_lt_k;
-             bhs_s   = lp_body;
-             bhs_cmp = FHge;
-             bhs_bd  = eps }))
+           (f_bdHoareS 
+              bhs.bhs_m 
+              (f_ands [inv;lp_guard;vrnt_eq_k]) 
+              lp_body
+              vrnt_lt_k 
+              FHge
+              eps))
   in
 
   (* 5. Out invariant *)
   let inv_concl =
-    f_bdHoareS_r { bhs with
-      bhs_pr  = f_and inv lp_guard;
-      bhs_po  = inv;
-      bhs_s   = lp_body;
-      bhs_cmp = FHeq;
-      bhs_bd  = f_r1; }
+    f_bdHoareS bhs.bhs_m (f_and inv lp_guard) lp_body inv FHeq f_r1
   in
 
   (* 6. Out body *)
@@ -277,9 +269,9 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
     let while_s1 = EcModules.stmt [EcModules.i_abstract w] in
 
     let unfolded_while_s = EcModules.s_seq lp_body while_s1 in
-    let while_jgmt = f_bdHoareS_r { bhs with bhs_pr=b_pre; bhs_s=while_s1; } in
-    let unfolded_while_jgmt = f_bdHoareS_r
-      { bhs with bhs_pr=f_and b_pre lp_guard; bhs_s=unfolded_while_s; }
+    let while_jgmt = f_bdHoareS bhs.bhs_m b_pre while_s1 bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let unfolded_while_jgmt = f_bdHoareS
+      bhs.bhs_m (f_and b_pre lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
     in
     f_imp while_jgmt unfolded_while_jgmt
   in
@@ -333,8 +325,8 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let post = f_and_simpl inv post in
   let concl =
     match side with
-    | `Left  -> f_equivS_r { es with es_sl = s; es_po=post; }
-    | `Right -> f_equivS_r { es with es_sr = s; es_po=post; }
+    | `Left  -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr post
+    | `Right -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s post
   in
 
   FApi.xmutate1 tc `While [b_concl; concl]
@@ -363,7 +355,7 @@ let t_equiv_while_r inv tc =
   let post = generalize_mod env mr modir post in
   let post = generalize_mod env ml modil post in
   let post = f_and_simpl b_post post in
-  let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po = post; } in
+  let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr post in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -640,7 +632,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let modir = s_write env cr in
     let post  = generalize_mod env mr modir post in
     let post  = generalize_mod env ml modil post in
-    f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = f_and inv post; } in
+    f_equivS evs.es_ml evs.es_mr evs.es_pr sl sr (f_and inv post) in
 
   FApi.t_onfsub (function
     | 6 -> Some (EcLowGoal.t_intros_n c1)

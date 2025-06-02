@@ -36,7 +36,7 @@ module Core = struct
     let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+    let concl = f_hoareS hs.hs_m hs.hs_pr s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -51,7 +51,7 @@ module Core = struct
     let distr = EcFol.form_of_expr mem distr in
     let post = subst_form_lv env mem lv x hs.ehs_po in
     let post = f_Ep ty_distr distr (f_lambda [(x_id,GTty ty_distr)] post) in
-    let concl = f_eHoareS_r {hs with ehs_s=s; ehs_po=post } in
+    let concl = f_eHoareS hs.ehs_m hs.ehs_pr s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -78,8 +78,8 @@ module Core = struct
     let post  = f_anda (f_lossless ty_distr distr) post in
     let concl =
       match side with
-      | `Left  -> f_equivS_r { es with es_sl=s; es_po=post; }
-      | `Right -> f_equivS_r { es with es_sr=s; es_po=post; }
+      | `Left  -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr post
+      | `Right -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s post
     in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -135,7 +135,7 @@ module Core = struct
        f_forall_simpl [(xR_id, GTty tyR)] cond2;
        f_forall_simpl [(xL_id, GTty tyL)] cond3] in
 
-    let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=concl; } in
+    let concl = f_equivS es.es_ml es.es_mr es.es_pr sl' sr' concl in
 
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -199,7 +199,7 @@ module Core = struct
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
-          let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+          let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
           [concl]
         else
           let event = mk_event ty_distr in
@@ -214,15 +214,15 @@ module Core = struct
           (* event is true *)
           let event = mk_event ty_distr in
           let bounded_distr = f_eq (f_mu env distr event) f_r1 in
-          let concl = f_bdHoareS_r
-                        {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
+          let post = (f_and (bhs_po bhs) bounded_distr) in
+          let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
           [concl]
         else
           let event = mk_event ty_distr in
           let bounded_distr = f_cmp (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
+          let concl = f_bdHoareS bhs.bhs_m pre s post bhs.bhs_cmp f_r1 in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, FHle ->
@@ -238,7 +238,7 @@ module Core = struct
           let bounded_distr = f_cmp (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+          let concl = f_bdHoareS bhs.bhs_m pre s post FHeq f_r1 in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
@@ -246,13 +246,13 @@ module Core = struct
           | None -> mk_event ~simpl:false ty_distr | Some event -> event
         in
         let bd_sgoal = f_cmp (f_real_add (f_real_mul d1 d2) (f_real_mul d3 d4)) bhs.bhs_bd in
-        let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
+        let sgoal1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s phi bhs.bhs_cmp d1 in
         let sgoal2 =
           let bounded_distr = f_cmp (f_mu env distr event) d2 in
           let post = f_anda bounded_distr (mk_event_cond event) in
           f_forall_mems [bhs.bhs_m] (f_imp phi post)
         in
-        let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
+        let sgoal3 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s (f_not phi) bhs.bhs_cmp d3 in
         let sgoal4 =
           let bounded_distr = f_cmp (f_mu env distr event) d4 in
           let post = f_anda bounded_distr (mk_event_cond event) in
@@ -385,8 +385,8 @@ module Core = struct
         Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
       else None in
     let m, s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = { hs with hs_s = stmt (s1 @ s2); hs_m = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_hoareS_r concl]
+    let concl = f_hoareS m hs.hs_pr (stmt (s1 @ s2)) hs.hs_po in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
   let t_bdhoare_rndsem_r reduce pos tc =
@@ -398,8 +398,8 @@ module Core = struct
         Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
       else None in
     let m, s2 = semrnd tc bhs.bhs_m fv s2 in
-    let concl = { bhs with bhs_s = stmt (s1 @ s2); bhs_m = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_bdHoareS_r concl]
+    let concl = f_bdHoareS m bhs.bhs_pr (stmt (s1 @ s2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
   let t_equiv_rndsem_r reduce side pos tc =
@@ -418,9 +418,9 @@ module Core = struct
     let s = stmt (s1 @ s2) in
     let concl =
       match side with
-      | `Left  -> { es with es_sl = s; es_ml = m; }
-      | `Right -> { es with es_sr = s; es_mr = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
+      | `Left  -> f_equivS m es.es_mr es.es_pr s es.es_sr es.es_po
+      | `Right -> f_equivS es.es_ml m es.es_pr es.es_sl s es.es_po in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
 end (* Core *)
 

@@ -208,11 +208,11 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS_r   { hs with hs_s  = s }
-  | None       , FeHoareS  hs -> f_eHoareS_r  { hs with ehs_s = s }
-  | None       , FbdHoareS hs -> f_bdHoareS_r { hs with bhs_s = s }
-  | Some `Left , FequivS   es -> f_equivS_r   { es with es_sl = s }
-  | Some `Right, FequivS   es -> f_equivS_r   { es with es_sr = s }
+  | None       , FhoareS   hs -> f_hoareS hs.hs_m hs.hs_pr s hs.hs_po
+  | None       , FeHoareS  hs -> f_eHoareS hs.ehs_m hs.ehs_pr s hs.ehs_po
+  | None       , FbdHoareS hs -> f_bdHoareS hs.bhs_m hs.bhs_pr s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+  | Some `Left , FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr es.es_po
+  | Some `Right, FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s es.es_po
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -255,13 +255,13 @@ let tc1_get_post tc =
 let set_pre ~pre f =
   match f.f_node with
  | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
- | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
- | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
- | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }
+ | FhoareS hs   -> f_hoareS hs.hs_m pre hs.hs_s hs.hs_po
+ | FeHoareF hf  -> f_eHoareF pre hf.ehf_f hf.ehf_po
+ | FeHoareS hs  -> f_eHoareS hs.ehs_m pre hs.ehs_s hs.ehs_po
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
- | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
+ | FbdHoareS hs -> f_bdHoareS hs.bhs_m pre hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
  | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
- | FequivS es   -> f_equivS_r { es with es_pr = pre }
+ | FequivS es   -> f_equivS es.es_ml es.es_mr pre es.es_sl es.es_sr es.es_po
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -601,14 +601,14 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
           let pr, po = hoare.hs_pr, hoare.hs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
-          let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          let concl = f_hoareS me hoare.hs_pr stmt hoare.hs_po in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FbdHoareS bhs when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS_r { bhs with bhs_m = me; bhs_s = stmt; } in
+          let concl = f_bdHoareS me bhs.bhs_pr stmt bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
@@ -630,8 +630,8 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       let me, stmt, cs = tx (pf, hyps) cpos (pre, post) (me, stmt) in
       let concl =
         match side with
-        | `Left  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
-        | `Right -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+        | `Left  -> f_equivS me es.es_mr es.es_pr stmt es.es_sr es.es_po
+        | `Right -> f_equivS es.es_ml me es.es_pr es.es_sl stmt es.es_po
       in
 
       FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])

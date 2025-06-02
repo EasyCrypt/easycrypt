@@ -259,11 +259,10 @@ let t_equiv_match_same_constr tc =
     f_forall
       ( (List.map (snd_map gtty) bhl) @
         (List.map (snd_map gtty) bhr) )
-      ( f_equivS_r
-          { es with
-              es_sl = EcModules.stmt ((s_subst sb bl).s_node @ sl.s_node);
-              es_sr = EcModules.stmt ((s_subst sb br).s_node @ sr.s_node);
-              es_pr = pre; } )
+      ( f_equivS es.es_ml es.es_mr pre 
+        (EcModules.stmt ((s_subst sb bl).s_node @ sl.s_node)) 
+        (EcModules.stmt ((s_subst sb br).s_node @ sr.s_node))
+        es.es_po)
 
   in
 
@@ -321,11 +320,10 @@ let t_equiv_match_eq tc =
 
     f_forall
       (List.map (snd_map gtty) bh)
-      (f_equivS_r
-         { es with
-             es_sl = EcModules.stmt ((s_subst sb bl).s_node @ sl.s_node);
-             es_sr = EcModules.stmt ((s_subst sb br).s_node @ sr.s_node);
-             es_pr = pre; } )
+      (f_equivS es.es_ml es.es_mr pre
+        (EcModules.stmt ((s_subst sb bl).s_node @ sl.s_node))
+        (EcModules.stmt ((s_subst sb br).s_node @ sr.s_node))
+        es.es_po)
 
   in
 

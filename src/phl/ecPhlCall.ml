@@ -75,7 +75,7 @@ let t_hoare_call fpre fpost tc =
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let concl = f_hoareS hs.hs_m hs.hs_pr s post in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -209,17 +209,13 @@ let t_bdhoare_call fpre fpost opt_bd tc =
     | FHle, None ->
         f_hoareS bhs.bhs_m bhs.bhs_pr s post
     | FHeq, Some bd ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; }
+        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHeq, None ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_r1; }
+        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp f_r1
     | FHge, Some bd ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; }
+        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHge, None ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_cmp = FHeq; bhs_bd = f_r1; }
+        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post FHeq f_r1
     | _, _ -> assert false
   in
 
@@ -244,7 +240,7 @@ let t_equiv_call fpre fpost tc =
       ml mr es.es_po hyps
   in
   let concl =
-    f_equivS_r { es with es_sl = sl; es_sr = sr; es_po = post; } in
+    f_equivS es.es_ml es.es_mr es.es_pr sl sr post in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -283,9 +279,8 @@ let t_equiv_call1 side fpre fpost tc =
     f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
-    | `Left  -> { equiv with es_sl = fstmt; es_po = post; }
-    | `Right -> { equiv with es_sr = fstmt; es_po = post; } in
-  let concl  = f_equivS_r concl in
+    | `Left  -> f_equivS equiv.es_ml equiv.es_mr equiv.es_pr fstmt equiv.es_sr post
+    | `Right -> f_equivS equiv.es_ml equiv.es_mr equiv.es_pr equiv.es_sl fstmt post in
 
   FApi.xmutate1 tc `HlCall [fconcl; concl]
 

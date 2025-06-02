@@ -244,7 +244,7 @@ let t_sp_side pos tc =
       let stmt1, stmt2 = o_split ~rev:true env pos hs.hs_s in
       let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 hs.hs_pr in
       check_sp_progress pos stmt1;
-      let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
+      let subgoal = f_hoareS hs.hs_m hs_pr (stmt (stmt1@stmt2)) hs.hs_po in
       FApi.xmutate1 tc `Sp [subgoal]
 
 
@@ -254,7 +254,7 @@ let t_sp_side pos tc =
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
       let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
-      let subgoal = f_bdHoareS_r {bhs with bhs_s = stmt (stmt1@stmt2); bhs_pr; } in
+      let subgoal = f_bdHoareS bhs.bhs_m bhs_pr (stmt (stmt1@stmt2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
       FApi.xmutate1 tc `Sp [subgoal]
 
   | FequivS es, (None | Some (Double _))  ->
@@ -272,11 +272,7 @@ let t_sp_side pos tc =
       check_sp_progress ~side:`Left  pos stmtL1;
       check_sp_progress ~side:`Right pos stmtR1;
 
-      let subgoal = f_equivS_r { es with
-        es_sl = stmt (stmtL1@stmtL2);
-        es_sr = stmt (stmtR1@stmtR2);
-        es_pr =es_pr;
-      } in
+      let subgoal = f_equivS es.es_ml es.es_mr es_pr (stmt (stmtL1@stmtL2)) (stmt (stmtR1@stmtR2)) es.es_po in
 
       FApi.xmutate1 tc `Sp [subgoal]
 
