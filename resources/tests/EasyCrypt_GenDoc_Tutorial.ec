@@ -104,6 +104,8 @@ type w.
   (* This comment is excluded from the generated documentation file *)
   (*& This comment is excluded from the generated documentation file &*)
   (*^ This comment is excluded from the generated documentation file ^*)
+  However, anything outside these nested comments (but within
+  the documentation comment, of course) is included.
 &*)
 type x.
 
@@ -122,8 +124,9 @@ type y.
  formatted using (a non-standard dialect of) Markdown.
  The following is supported.
 
- As first non-blank character on a line:
- - \! indicates a heading;
+ As first non-blank character on a line (followed by a space):
+ - \! indicates a heading (one for largest heading, two for second-largest
+ heading, etc.);
  - \*, \+, or \- indicate an item of an unordered list;
  - \# indicates an item of an ordered list; and
  - \> indicates (a line of) a blockquote.
@@ -152,7 +155,7 @@ type z.
   - `Op` (or `Operator`),
   - `Ax` (or `Axiom`),
   - `Lem` (or `Lemma`),
-  -`ModTy` (or `ModuleType`),
+  - `ModTy` (or `ModuleType`),
   - `Mod` (or `Module`), and
   - `Th` (or `Theory`).
 

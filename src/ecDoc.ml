@@ -9,11 +9,13 @@ let styles_file : string =
   Filename.concat Sites.doc "styles.css"
 
 let stdlib_doc_dp (th : string) : string =
-  ""
+  match th with
+  | _ -> ""
 
 (* -------------------------------------------------------------------- *)
 let from_stdlib (th : string) : bool =
-  false
+  match th with
+  | _ -> false
 
 (* -------------------------------------------------------------------- *)
 let c_filename ?(ext : string option) (nms : string list) =
@@ -100,7 +102,8 @@ let md_href_format (rth : string) (env : EcEnv.env) (hr : Markdown.href) : Html_
          let rec try_lookup = function
            | [] -> failwith (Printf.sprintf "No item/entity found with name `%s'." tname)
            | ik :: iks ->
-              try itemkind_str_pl ik, itemkind_lookup_path ik tqs env with _ -> try_lookup iks
+              try itemkind_str_pl ik, itemkind_lookup_path ik tqs env
+              with EcEnv.LookupFailure _ -> try_lookup iks
          in
          let iks = [`Type; `Operator; `Axiom; `Lemma; `ModuleType; `Module; `Theory] in
          try_lookup iks
