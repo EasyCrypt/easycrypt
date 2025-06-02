@@ -412,6 +412,7 @@
 %token COLON
 %token COLONTILD
 %token COMMA
+%token COMMENT
 %token CONGR
 %token CONSEQ
 %token CONST

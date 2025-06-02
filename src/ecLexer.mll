@@ -387,7 +387,7 @@ rule main = parse
       [DOCCOMMENT (kind, Buffer.contents buffer)]
     }
 
-  | "(*" { comment lexbuf; main lexbuf }
+  | "(*" { comment lexbuf; [COMMENT] }
 
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 

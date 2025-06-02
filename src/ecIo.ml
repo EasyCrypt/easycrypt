@@ -36,6 +36,7 @@ type ecreader_r = {
   (*---*) ecr_lexbuf  : Lexing.lexbuf;
   (*---*) ecr_source  : Buffer.t;
   mutable ecr_atstart : bool;
+  mutable ecr_trim    : int;
   mutable ecr_tokens  : EcParser.token list;
 }
 
@@ -46,6 +47,7 @@ let ecreader_of_lexbuf (buffer : Buffer.t) (lexbuf : L.lexbuf) : ecreader_r =
   { ecr_lexbuf  = lexbuf;
     ecr_source  = buffer;
     ecr_atstart = true;
+    ecr_trim    = 0;
     ecr_tokens  = []; }
 
 (* -------------------------------------------------------------------- *)
@@ -102,8 +104,20 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
     | EcParser.FINAL _ -> true
     | _ -> false in
 
-  if List.is_empty (ecreader.ecr_tokens) then
-    ecreader.ecr_tokens <- EcLexer.main lexbuf;
+  if ecreader.ecr_atstart then
+    ecreader.ecr_trim <- ecreader.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum;
+
+  while List.is_empty (ecreader.ecr_tokens) do
+    match EcLexer.main lexbuf with
+    | [COMMENT] ->
+      if ecreader.ecr_atstart then
+        ecreader.ecr_trim <- (Lexing.lexeme_end_p ecreader.ecr_lexbuf).pos_cnum
+    | [DOCCOMMENT _] as tokens ->
+      if ecreader.ecr_atstart then
+        ecreader.ecr_tokens <- tokens
+    | tokens ->
+        ecreader.ecr_tokens <- tokens
+  done;
 
   let token, queue = List.destruct ecreader.ecr_tokens in
 
@@ -119,7 +133,16 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
   in
 
   ecreader.ecr_tokens  <- prequeue @ queue;
-  ecreader.ecr_atstart <- (isfinal token);
+
+  if isfinal token then
+    ecreader.ecr_atstart <- true
+  else
+    ecreader.ecr_atstart <- ecreader.ecr_atstart && (
+      match token with
+      | P.DOCCOMMENT _ | P.COMMENT -> true
+      | _ -> false
+    );
+
   (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
 
 (* -------------------------------------------------------------------- *)
@@ -161,6 +184,7 @@ let xparse (ecreader : ecreader) : string * EcParsetree.prog =
   let p1 = ecr.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum in
   let cd = parse ecreader in
   let p2 = ecr.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum in
+  let p1 = max p1 ecr.ecr_trim in
 
   (Buffer.sub ecr.ecr_source p1 (p2 - p1), cd)
 
