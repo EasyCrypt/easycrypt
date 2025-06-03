@@ -6,6 +6,7 @@ open EcFol
 open EcModules
 open EcMemory
 open EcCoreGoal
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: MOVE THIS! *)
@@ -28,8 +29,8 @@ val process_fun_to_code   : FApi.backward
 (* -------------------------------------------------------------------- *)
 module FunAbsLow : sig
   val hoareF_abs_spec :
-       proofenv -> EcEnv.env -> xpath -> form
-    -> form * form * form list
+       proofenv -> EcEnv.env -> xpath -> ss_inv
+    -> ss_inv * ss_inv * form list
 
   val bdhoareF_abs_spec :
        proofenv -> EcEnv.env -> xpath -> form
@@ -41,7 +42,7 @@ module FunAbsLow : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val t_hoareF_abs   : form -> FApi.backward
+val t_hoareF_abs   : ss_inv -> FApi.backward
 val t_bdhoareF_abs : form -> FApi.backward
 val t_equivF_abs   : form -> FApi.backward
 
@@ -54,4 +55,4 @@ val t_equivF_fun_def   : FApi.backward
 val t_equivF_abs_upto : form -> form -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_fun : form -> FApi.backward
+val t_fun : inv -> FApi.backward

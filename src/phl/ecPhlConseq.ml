@@ -7,6 +7,7 @@ open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -16,10 +17,11 @@ module PT  = EcProofTerm
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let conseq_cond pre post spre spost =
+let conseq_cond_old pre post spre spost =
   f_imp pre spre, f_imp spost post
 
-
+let conseq_cond_ss pre post spre spost =
+  map_ss_inv2 f_imp pre spre, map_ss_inv2 f_imp post spost
 (*
 { sF } c { sf }  sF <= F  f <= sf
 --------------------------------------------------------------------
@@ -52,16 +54,16 @@ let t_hoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_hoareF tc in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
-  let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
-  let concl1 = f_forall_mems [mpr] cond1 in
-  let concl2 = f_forall_mems [mpo] cond2 in
-  let concl3 = f_hoareF_old pre hf.hf_f post in
+  let cond1, cond2 = conseq_cond_ss (hf_pr hf) (hf_po hf) pre post in
+  let concl1 = f_forall_mems_ss_inv mpr cond1 in
+  let concl2 = f_forall_mems_ss_inv mpo cond2 in
+  let concl3 = f_hoareF pre hf.hf_f post in
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq pre post tc =
   let hs = tc1_as_hoareS tc in
-  let cond1, cond2 = conseq_cond hs.hs_pr hs.hs_po pre post in
+  let cond1, cond2 = conseq_cond_old hs.hs_pr hs.hs_po pre post in
   let concl1 = f_forall_mems [hs.hs_m] cond1 in
   let concl2 = f_forall_mems [hs.hs_m] cond2 in
   let concl3 = f_hoareS hs.hs_m pre hs.hs_s post in
@@ -91,7 +93,7 @@ let t_ehoareS_conseq pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let bdHoare_conseq_conds cmp pr po new_pr new_po =
-  let cond1, cond2 = conseq_cond pr po new_pr new_po in
+  let cond1, cond2 = conseq_cond_old pr po new_pr new_po in
   let cond2 = match cmp with
     | FHle -> f_imp po new_po
     | FHeq -> f_iff po new_po
@@ -144,7 +146,7 @@ let t_equivF_conseq pre post tc =
   let ef  = tc1_as_equivF tc in
   let (mprl,mprr), (mpol,mpor) =
     EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
-  let cond1, cond2 = conseq_cond ef.ef_pr ef.ef_po pre post in
+  let cond1, cond2 = conseq_cond_old ef.ef_pr ef.ef_po pre post in
   let concl1 = f_forall_mems [mprl;mprr] cond1 in
   let concl2 = f_forall_mems [mpol;mpor] cond2 in
   let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
@@ -156,7 +158,7 @@ let t_eagerF_conseq pre post tc =
   let eg = tc1_as_eagerF tc in
   let (mprl,mprr), (mpol,mpor) =
     EcEnv.Fun.equivF_memenv eg.eg_fl eg.eg_fr env in
-  let cond1, cond2 = conseq_cond eg.eg_pr eg.eg_po pre post in
+  let cond1, cond2 = conseq_cond_old eg.eg_pr eg.eg_po pre post in
   let concl1 = f_forall_mems [mprl;mprr] cond1 in
   let concl2 = f_forall_mems [mpol;mpor] cond2 in
   let concl3 = f_eagerF pre eg.eg_sl eg.eg_fl eg.eg_fr eg.eg_sr post in
@@ -165,7 +167,7 @@ let t_eagerF_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_equivS_conseq pre post tc =
   let es = tc1_as_equivS tc in
-  let cond1, cond2 = conseq_cond es.es_pr es.es_po pre post in
+  let cond1, cond2 = conseq_cond_old es.es_pr es.es_po pre post in
   let concl1 = f_forall_mems [es.es_ml;es.es_mr] cond1 in
   let concl2 = f_forall_mems [es.es_ml;es.es_mr] cond2 in
   let concl3 = f_equivS es.es_ml es.es_mr pre es.es_sl es.es_sr post in
@@ -173,16 +175,16 @@ let t_equivS_conseq pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let t_conseq pre post tc =
-  match (FApi.tc1_goal tc).f_node with
-  | FhoareF _   -> t_hoareF_conseq pre post tc
-  | FhoareS _   -> t_hoareS_conseq pre post tc
-  | FbdHoareF _ -> t_bdHoareF_conseq pre post tc
-  | FbdHoareS _ -> t_bdHoareS_conseq pre post tc
-  | FeHoareF _  -> t_ehoareF_conseq pre post tc
-  | FeHoareS _  -> t_ehoareS_conseq pre post tc
-  | FequivF _   -> t_equivF_conseq pre post tc
-  | FequivS _   -> t_equivS_conseq pre post tc
-  | FeagerF _   -> t_eagerF_conseq pre post tc
+  match (FApi.tc1_goal tc).f_node, pre, post with
+  | FhoareF _,   Inv_ss pre, Inv_ss post -> t_hoareF_conseq pre post tc
+  | FhoareS _,   Inv_ss pre, Inv_ss post -> t_hoareS_conseq pre.inv post.inv tc
+  | FbdHoareF _, Inv_ss pre, Inv_ss post -> t_bdHoareF_conseq pre.inv post.inv tc
+  | FbdHoareS _, Inv_ss pre, Inv_ss post -> t_bdHoareS_conseq pre.inv post.inv tc
+  | FeHoareF _ , Inv_ss pre, Inv_ss post -> t_ehoareF_conseq pre.inv post.inv tc
+  | FeHoareS _ , Inv_ss pre, Inv_ss post -> t_ehoareS_conseq pre.inv post.inv tc
+  | FequivF _  , Inv_ts pre, Inv_ts post -> t_equivF_conseq pre.inv post.inv tc
+  | FequivS _  , Inv_ts pre, Inv_ts post -> t_equivS_conseq pre.inv post.inv tc
+  | FeagerF _  , Inv_ts pre, Inv_ts post -> t_eagerF_conseq pre.inv post.inv tc
   | _           -> tc_error_noXhl !!tc
 
 (* -------------------------------------------------------------------- *)
@@ -257,7 +259,7 @@ let t_equivS_notmod post tc =
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let cond_hoareF_notmod ?(mk_other=false) tc cond =
+let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in
   let f = hf.hf_f in
@@ -267,12 +269,13 @@ let cond_hoareF_notmod ?(mk_other=false) tc cond =
   let vres = LDecl.fresh_id hyps "result" in
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
+  assert (cond.m = m);
   let s = PVM.add env pvres m fres PVM.empty in
-  let cond = PVM.subst env s cond in
+  let cond = PVM.subst env s cond.inv in
   let modi = f_write env f in
   let cond,bdg,bde = generalize_mod_ env m modi cond in
   let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
-  assert (fst mpr = m);
+  assert (hf.hf_m = m);
   let cond = f_forall_mems [mpr] (f_imp hf.hf_pr cond) in
   let bmem = [m] in
   let bother =
@@ -282,10 +285,10 @@ let cond_hoareF_notmod ?(mk_other=false) tc cond =
     else [] in
   cond, bmem, bother
 
-let t_hoareF_notmod post tc =
+let t_hoareF_notmod (post: ss_inv) tc =
   let hf = tc1_as_hoareF tc in
-  let cond1, _, _ = cond_hoareF_notmod tc (f_imp post hf.hf_po) in
-  let cond2 = f_hoareF_old hf.hf_pr hf.hf_f post in
+  let cond1, _, _ = cond_hoareF_notmod tc (map_ss_inv2 f_imp post (hf_po hf)) in
+  let cond2 = f_hoareF (hf_pr hf) hf.hf_f post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -379,7 +382,16 @@ let gen_conseq_nm tnm tc pre post =
     FApi.t_swap_goals 0 1 gs
   )
 
-let t_hoareF_conseq_nm   = gen_conseq_nm t_hoareF_notmod   t_hoareF_conseq
+let gen_conseq_nm_ss tnm tc (pre: ss_inv) (post: ss_inv) =
+    FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
+      let gs =
+        (tnm post @+
+          [ t_id;
+            tc pre post @+ [t_id; t_trivial; t_id] ]) g in
+      FApi.t_swap_goals 0 1 gs
+    )
+
+let t_hoareF_conseq_nm   = gen_conseq_nm_ss t_hoareF_notmod   t_hoareF_conseq
 let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq
 let t_equivF_conseq_nm   = gen_conseq_nm t_equivF_notmod   t_equivF_conseq
 let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
@@ -841,7 +853,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* hoareF / hoareF / ⊥ / ⊥                                            *)
   | FhoareF _, Some ((_, {f_node = FhoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-    t_on1 2 (t_apply_r nf1) (tac hs.hf_pr hs.hf_po tc)
+    t_on1 2 (t_apply_r nf1) (tac (hf_pr hs) (hf_po hs) tc)
 
   (* ------------------------------------------------------------------ *)
   (* hoareF / hoareF / hoareF / ⊥                                       *)
@@ -854,7 +866,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
 
     t_on1seq 2
-      (tac (f_and hs.hf_pr hs2.hf_pr) (f_and hs.hf_po hs2.hf_po))
+      (tac (map_ss_inv2 f_and (hf_pr hs) (hf_pr hs2)) 
+           (map_ss_inv2 f_and (hf_po hs) (hf_po hs2)))
       (FApi.t_seqsub
          (t_hoareF_conseq_conj hs2.hf_pr hs2.hf_po hs.hf_pr hs.hf_po)
          [t_apply_r nf2; t_apply_r nf1])
@@ -996,19 +1009,19 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
     let m,hi,hh, h0 =
       as_seq4 (LDecl.fresh_ids (FApi.tc1_hyps tc) ["&m";"_";"_";"_"]) in
-    let pre    = f_and hs.bhf_pr hs2.hf_pr in
-    let mpre   = Fsubst.f_subst_mem mhr m pre in
+    let pre    = map_ss_inv2 f_and (bhf_pr hs) (hf_pr hs2) in
+    let mpre   = Fsubst.f_subst_mem mhr m pre.inv in
     let post1  = hs0.bhf_po in
     let post   = hs.bhf_po in
     let posta  = f_and post hs2.hf_po in
     let mpr,_ = EcEnv.Fun.hoareF_memenv hs0.bhf_f (FApi.tc1_env tc) in
-    let concl1 = f_forall_mems [mpr] (f_imp hs0.bhf_pr pre) in
+    let concl1 = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp (bhf_pr hs0) pre) in
 
     let tc = ( t_cut concl1 @+
         [ t_id;   (* subgoal 1 : pre *)
           t_intro_i hi @!
-          t_cut (f_hoareF_old pre hs2.hf_f hs2.hf_po) @+ [
-            t_hoareF_conseq hs2.hf_pr hs2.hf_po @+
+          t_cut (f_hoareF pre hs2.hf_f (hf_po hs2)) @+ [
+            t_hoareF_conseq (hf_pr hs2) (hf_po hs2) @+
                 [ EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
@@ -1016,13 +1029,13 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
             (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd @+ [
               t_id; (* subgoal 3 : bound *)
               t_bdHoareF_conseq_conj ~add:false hs2.hf_po post1 @+ [
-                t_hoareF_conseq pre hs2.hf_po @+ [
+                t_hoareF_conseq pre (hf_po hs2) @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_apply_hyp hh];
-                tac pre posta @+ [
+                tac pre.inv posta @+ [
                   t_apply_hyp hi;
                   t_id; (* subgoal 4 : post *)
                   t_bdHoareF_conseq_conj ~add:true hs2.hf_po post @+ [
@@ -1466,12 +1479,12 @@ let t_conseqauto ?(delta = true) ?tsolve tc =
 
   let todo =
     match concl.f_node with
-    | FhoareF hf  -> Some (t_hoareF_notmod, cond_hoareF_notmod ~mk_other tc hf.hf_po)
-    | FhoareS hs  -> Some (t_hoareS_notmod, cond_hoareS_notmod ~mk_other tc hs.hs_po )
-    | FbdHoareF hf -> Some (t_bdHoareF_notmod, cond_bdHoareF_notmod ~mk_other tc hf.bhf_po)
-    | FbdHoareS hs -> Some (t_bdHoareS_notmod, cond_bdHoareS_notmod ~mk_other tc hs.bhs_po)
-    | FequivF ef   -> Some (t_equivF_notmod, cond_equivF_notmod ~mk_other tc ef.ef_po)
-    | FequivS es   -> Some (t_equivS_notmod, cond_equivS_notmod ~mk_other tc es.es_po )
+    | FhoareF hf  -> Some (lift_ss_inv t_hoareF_notmod, cond_hoareF_notmod ~mk_other tc (hf_po hf))
+    | FhoareS hs  -> Some (lift_inv_adapter t_hoareS_notmod, cond_hoareS_notmod ~mk_other tc hs.hs_po )
+    | FbdHoareF hf -> Some (lift_inv_adapter t_bdHoareF_notmod, cond_bdHoareF_notmod ~mk_other tc hf.bhf_po)
+    | FbdHoareS hs -> Some (lift_inv_adapter t_bdHoareS_notmod, cond_bdHoareS_notmod ~mk_other tc hs.bhs_po)
+    | FequivF ef   -> Some (lift_inv_adapter t_equivF_notmod, cond_equivF_notmod ~mk_other tc ef.ef_po)
+    | FequivS es   -> Some (lift_inv_adapter t_equivS_notmod, cond_equivS_notmod ~mk_other tc es.es_po )
     | _            -> None in
 
   match todo with
@@ -1510,6 +1523,11 @@ let t_conseqauto ?(delta = true) ?tsolve tc =
         let s = List.fold_left2 Fsubst.f_bind_mem s ms bdm in
         let s = List.fold_left2 Fsubst.f_bind_local s other (List.map snd bdo) in
         Fsubst.f_subst s concl in
+    let post =
+      match ms with
+      | [m] -> Inv_ss { inv = post; m}
+      | [ml; mr] -> Inv_ts { inv = post; ml; mr }
+      | _ -> failwith "posts should have 1 or 2 memory parameters" in
 
     let t_end = FApi.t_try (t_crush ~delta ?tsolve @! t_fail) in
     FApi.t_first t_end (t_notmod post tc)

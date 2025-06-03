@@ -3,6 +3,7 @@ open EcUtils
 open EcAst
 open EcFol
 open EcEnv
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -26,9 +27,10 @@ let get_to_gens fs =
 (* -------------------------------------------------------------------- *)
 let t_hr_exists_elim_r ?(bound : int option) (tc : tcenv1) =
   let pre = tc1_get_pre tc in
-  let bd, pre =
-    try  destr_exists_prenex ?bound pre
-    with DestrError _ -> [], pre in
+  let bd, pre' =
+    try  destr_exists_prenex ?bound (inv_of_inv pre)
+    with DestrError _ -> [], (inv_of_inv pre) in
+  let pre = map_inv1 (fun _ -> pre') pre in
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
 
@@ -48,8 +50,9 @@ let t_hr_exists_intro_r fs tc =
     | _ -> false in
   let pre   =
     if is_ehoare then
-      f_interp_ehoare_form (f_exists bd (f_ands eqs)) pre1
-    else f_exists bd (f_and (f_ands eqs) pre1) in
+      map_inv1 (fun pre1 -> f_interp_ehoare_form (f_exists bd (f_ands eqs)) pre1) pre1
+    else 
+      map_inv1 (fun pre1 -> f_exists bd (f_and (f_ands eqs) pre1)) pre1 in
 
   let h = LDecl.fresh_id hyps "h" in
   let ms, subst =
@@ -190,12 +193,12 @@ let process_ecall oside (l, tvi, fs) tc =
 
     let subst =
       List.fold_left2
-        (fun s id f -> Fsubst.f_bind_local s id f)
-        Fsubst.f_subst_id (List.fst ids) fs in
+        (fun s id f -> add_flocal s id f)
+        empty (List.fst ids) fs in
 
-    (nms, Fsubst.f_subst subst sub) in
+    (nms, subst_inv subst sub) in
 
-  let tc = t_local_seq p1 tc in
+  let tc = t_local_seq (inv_of_inv p1) tc in
   let tc = FApi.t_rotate `Left 1 tc in
   let tc = FApi.t_focus (t_hr_exists_intro_r fs) tc in
   let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) tc in

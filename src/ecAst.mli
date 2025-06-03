@@ -325,6 +325,20 @@ val map_ts_inv1 : (form -> form) -> ts_inv -> ts_inv
 val map_ts_inv2 : (form -> form -> form) -> ts_inv -> ts_inv -> ts_inv
 val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -> ts_inv
 
+type inv =
+  | Inv_ss of ss_inv
+  | Inv_ts of ts_inv
+
+val inv_of_inv : inv -> form
+
+val lift_ss_inv : (ss_inv -> 'a) -> inv -> 'a
+val lift_ts_inv : (ts_inv -> 'a) -> inv -> 'a
+val lift_inv_adapter : (form -> 'a) -> inv -> 'a
+
+val map_inv1 : (form -> form) -> inv -> inv
+val map_inv2 : (form -> form -> form) -> inv -> inv -> inv
+val map_inv3 : (form -> form -> form -> form) -> inv -> inv -> inv -> inv
+
 val eg_pr : eagerF -> ts_inv
 val eg_po : eagerF -> ts_inv
 val ef_pr : equivF -> ts_inv

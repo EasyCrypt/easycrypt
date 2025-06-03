@@ -219,14 +219,14 @@ let hl_set_stmt (side : side option) (f : form) (s : stmt) =
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_pr )
-  | FhoareS hs   -> Some (hs.hs_pr )
-  | FeHoareF hf  -> Some (hf.ehf_pr)
-  | FeHoareS hs  -> Some (hs.ehs_pr)
-  | FbdHoareF hf -> Some (hf.bhf_pr)
-  | FbdHoareS hs -> Some (hs.bhs_pr)
-  | FequivF ef   -> Some (ef.ef_pr )
-  | FequivS es   -> Some (es.es_pr )
+  | FhoareF hf   -> Some (Inv_ss (hf_pr hf))
+  | FhoareS hs   -> Some (Inv_ss (hs_pr hs))
+  | FeHoareF hf  -> Some (Inv_ss (ehf_pr hf))
+  | FeHoareS hs  -> Some (Inv_ss (ehs_pr hs))
+  | FbdHoareF hf -> Some (Inv_ss (bhf_pr hf))
+  | FbdHoareS hs -> Some (Inv_ss (bhs_pr hs))
+  | FequivF ef   -> Some (Inv_ts (ef_pr ef))
+  | FequivS es   -> Some (Inv_ts (es_pr es))
   | _            -> None
 
 let tc1_get_pre tc =
@@ -237,15 +237,16 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_po )
-  | FhoareS hs   -> Some (hs.hs_po )
-  | FeHoareF hf  -> Some (hf.ehf_po)
-  | FeHoareS hs  -> Some (hs.ehs_po)
-  | FbdHoareF hf -> Some (hf.bhf_po)
-  | FbdHoareS hs -> Some (hs.bhs_po)
-  | FequivF ef   -> Some (ef.ef_po )
-  | FequivS es   -> Some (es.es_po )
+  | FhoareF hf   -> Some (Inv_ss (hf_po hf))
+  | FhoareS hs   -> Some (Inv_ss (hs_po hs))
+  | FeHoareF hf  -> Some (Inv_ss (ehf_po hf))
+  | FeHoareS hs  -> Some (Inv_ss (ehs_po hs))
+  | FbdHoareF hf -> Some (Inv_ss (bhf_po hf))
+  | FbdHoareS hs -> Some (Inv_ss (bhs_po hs))
+  | FequivF ef   -> Some (Inv_ts (ef_po ef))
+  | FequivS es   -> Some (Inv_ts (es_po es))
   | _            -> None
+
 
 let tc1_get_post tc =
   match get_post (FApi.tc1_goal tc) with
@@ -254,16 +255,31 @@ let tc1_get_post tc =
 
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
-  match f.f_node with
- | FhoareF hf   -> let pre = ss_inv_rebind {m=mhr;inv=pre} hf.hf_m in
+  match f.f_node, pre with
+ | FhoareF hf, Inv_ss pre   -> 
+    let pre = ss_inv_rebind pre hf.hf_m in
     f_hoareF pre hf.hf_f (hf_po hf)
- | FhoareS hs   -> f_hoareS hs.hs_m pre hs.hs_s hs.hs_po
- | FeHoareF hf  -> f_eHoareF pre hf.ehf_f hf.ehf_po
- | FeHoareS hs  -> f_eHoareS hs.ehs_m pre hs.ehs_s hs.ehs_po
- | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
- | FbdHoareS hs -> f_bdHoareS hs.bhs_m pre hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
- | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
- | FequivS es   -> f_equivS es.es_ml es.es_mr pre es.es_sl es.es_sr es.es_po
+ | FhoareS hs, Inv_ss pre   -> 
+    let pre = ss_inv_rebind pre (fst hs.hs_m) in
+    f_hoareS hs.hs_m pre.inv hs.hs_s hs.hs_po
+ | FeHoareF hf, Inv_ss pre  -> 
+    let pre = ss_inv_rebind pre hf.ehf_m in
+    f_eHoareF pre.inv hf.ehf_f hf.ehf_po
+ | FeHoareS hs, Inv_ss pre  -> 
+    let pre = ss_inv_rebind pre (fst hs.ehs_m) in
+    f_eHoareS hs.ehs_m pre.inv hs.ehs_s hs.ehs_po
+ | FbdHoareF hf, Inv_ss pre ->
+    let pre = ss_inv_rebind pre hf.bhf_m in
+    f_bdHoareF pre.inv hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
+ | FbdHoareS hs, Inv_ss pre -> 
+    let pre = ss_inv_rebind pre (fst hs.bhs_m) in
+    f_bdHoareS hs.bhs_m pre.inv hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+ | FequivF ef, Inv_ts pre   -> 
+    let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
+    f_equivF pre.inv ef.ef_fl ef.ef_fr ef.ef_po
+ | FequivS es, Inv_ts pre   -> 
+    let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
+    f_equivS es.es_ml es.es_mr pre.inv es.es_sl es.es_sr es.es_po
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)

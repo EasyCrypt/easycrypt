@@ -351,6 +351,57 @@ type inv =
   | Inv_ss of ss_inv
   | Inv_ts of ts_inv
 
+(* TODO: Get rid of this after refactor *)
+let inv_of_inv (inv: inv) : form =
+  match inv with
+  | Inv_ss ss -> ss.inv
+  | Inv_ts ts -> ts.inv
+
+let lift_ss_inv (f: ss_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ss ss -> f ss
+  | Inv_ts _ -> failwith "expected single sided invariant" in
+  f
+
+let lift_ts_inv (f: ts_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ts ss -> f ss
+  | Inv_ss _ -> failwith "expected two sided invariant" in
+  f
+
+(* TODO: This should be removed after refactor is done *)
+let lift_inv_adapter (f: form -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ss ss -> f ss.inv
+  | Inv_ts ts -> f ts.inv in
+  f
+
+let map_inv1 (fn: form -> form) (inv: inv): inv =
+  match inv with
+  | Inv_ss ss ->
+      Inv_ss (map_ss_inv1 fn ss)
+  | Inv_ts ts ->
+      Inv_ts (map_ts_inv1 fn ts)
+
+let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
+  match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 ->
+      Inv_ss (map_ss_inv2 fn ss1 ss2)
+  | Inv_ts ts1, Inv_ts ts2 ->
+      Inv_ts (map_ts_inv2 fn ts1 ts2)
+  | _ ->
+      failwith "incompatible invariants for map_inv2"
+  
+let map_inv3 (fn: form -> form -> form -> form)
+    (inv1: inv) (inv2: inv) (inv3: inv): inv =
+  match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 ->
+      Inv_ss (map_ss_inv3 fn ss1 ss2 ss3)
+  | Inv_ts ts1, Inv_ts ts2, Inv_ts ts3 ->
+      Inv_ts (map_ts_inv3 fn ts1 ts2 ts3)
+  | _ ->
+      failwith "incompatible invariants for map_inv3"
+
 (* ----------------------------------------------------------------- *)
 (* Accessors for program logic                                       *)
 (* ----------------------------------------------------------------- *)

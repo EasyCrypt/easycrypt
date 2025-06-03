@@ -7,6 +7,7 @@ open EcModules
 open EcFol
 open EcEnv
 open EcPV
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -63,7 +64,10 @@ let t_hoare_call fpre fpost tc =
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF_old fpre f fpost in
+  let f_concl = f_hoareF fpre f fpost in
+  (* substitute memories *) (* Everything after this point happens in m *)
+  let fpre = (ss_inv_rebind fpre m).inv in
+  let fpost = (ss_inv_rebind fpost m).inv in
   (* The wp *)
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
@@ -303,7 +307,7 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in
       if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
         call_error env tc hf.hf_f f;
-      t_hoare_call hf.hf_pr hf.hf_po tc
+      t_hoare_call (hf_pr hf) (hf_po hf) tc
 
   | FeHoareF hf, FeHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
@@ -486,7 +490,7 @@ let process_call side info tc =
       let hyps, ty, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc hyps ty inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss {inv;m=mhr}) tc));
       fmake inv
 
     | CI_upto info ->
@@ -566,7 +570,7 @@ let process_call_concave (fc, info) tc =
       let env, ty, fmake = process_inv tc in
       let inv = TTC.pf_process_form !!tc env ty inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss {inv;m=mhr}) tc));
       fmake inv
 
     | _ ->

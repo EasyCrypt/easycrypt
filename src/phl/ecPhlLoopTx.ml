@@ -223,7 +223,7 @@ let process_splitwhile (b, side, cpos) tc =
 let process_unroll_for side cpos tc =
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
-  let _, c = EcLowPhlGoal.tc1_get_stmt side tc in
+  let (goal_m, _), c = EcLowPhlGoal.tc1_get_stmt side tc in
 
   if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
@@ -260,18 +260,18 @@ let process_unroll_for side cpos tc =
 
   (* Apply loop increment *)
   let incrz =
-    let fincr = form_of_expr mhr eincr in
+    let fincr = form_of_expr goal_m eincr in
     fun z0 ->
-      let f = PVM.subst1 env x mhr (f_int z0) fincr in
+      let f = PVM.subst1 env x goal_m (f_int z0) fincr in
       match (simplify full_red hyps f).f_node with
       | Fint z0 -> z0
       | _       -> tc_error !!tc "loop increment does not reduce to a constant" in
 
   (* Evaluate loop guard *)
   let test_cond =
-    let ftest = form_of_expr mhr t in
+    let ftest = form_of_expr goal_m t in
     fun z0 ->
-      let cond = PVM.subst1 env x mhr (f_int z0) ftest in
+      let cond = PVM.subst1 env x goal_m (f_int z0) ftest in
       match sform_of_form (simplify full_red hyps cond) with
       | SFtrue  -> true
       | SFfalse -> false
@@ -284,7 +284,7 @@ let process_unroll_for side cpos tc =
   let zs   = eval_cond z0 in
   let hds  = Array.make (List.length zs) None in
   let m    = LDecl.fresh_id hyps "&m" in
-  let x    = f_pvar x tint mhr in
+  let x    = {m=goal_m;inv=f_pvar x tint goal_m} in
 
   let t_set i pos z tc =
     hds.(i) <- Some (FApi.tc1_handle tc, pos, z); t_id tc in
@@ -299,12 +299,12 @@ let process_unroll_for side cpos tc =
     | z :: zs ->
       ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
       [FApi.t_try (t_intro_i m) @!
-       t_conseq (f_eq x (f_int z)) @!
+       t_conseq (Inv_ss (map_ss_inv1 (fun x -> f_eq x (f_int z)) x)) @!
        t_set i pos z;
        t_doit (i+1) (pos + blen) zs]) tc in
 
   let t_conseq_nm tc =
-    (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true @+
+    (EcPhlConseq.t_hoareS_conseq_nm (inv_of_inv (tc1_get_pre tc)) f_true @+
     [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
 
   let doi i tc =
@@ -312,12 +312,12 @@ let process_unroll_for side cpos tc =
     let (_h,pos,_z) = oget hds.(i) in
     if i = 0 then
       (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
-       t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
+       t_conseq (Inv_ss {inv=f_true;m=x.m}) @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
         EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (f_eq x (f_int z')) @+
+        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (f_eq x.inv (f_int z')) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 

@@ -3,6 +3,7 @@ open EcUtils
 open EcTypes
 open EcFol
 open EcEnv
+open EcAst
 
 open EcCoreGoal
 open EcLowGoal
@@ -175,8 +176,10 @@ end = struct
       let clean (tc : tcenv1) =
         let pre = oget (EcLowPhlGoal.get_pre (FApi.tc1_goal tc)) in
         let post = oget (EcLowPhlGoal.get_post (FApi.tc1_goal tc)) in
-        let eq, _, pre = destr_and3 pre in
-        let tc = EcPhlConseq.t_conseq (f_and eq pre) post tc in
+        let pre = map_inv1 (fun pre -> 
+          let eq, _, pre = destr_and3 pre in
+          f_and eq pre) pre in
+        let tc = EcPhlConseq.t_conseq pre post tc in
 
         FApi.t_onall
           (EcLowGoal.t_clears names)

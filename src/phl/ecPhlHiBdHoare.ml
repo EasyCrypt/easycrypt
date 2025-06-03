@@ -18,10 +18,10 @@ let process_bdhoare_split info tc =
     match concl.f_node with
     | FbdHoareS bhs ->
         let hyps = LDecl.push_active bhs.bhs_m hyps in
-          ((hyps, hyps), bhs.bhs_pr, bhs.bhs_po)
+          ((hyps, hyps), bhs_pr bhs, bhs_po bhs)
 
     | FbdHoareF bhf ->
-        (LDecl.hoareF bhf.bhf_f hyps, bhf.bhf_pr, bhf.bhf_po)
+        (LDecl.hoareF bhf.bhf_f hyps, bhf_pr bhf, bhf_po bhf)
 
     | _ ->
         tc_error !!tc "the conclusion must be a bdhoare judgment" in
@@ -29,8 +29,8 @@ let process_bdhoare_split info tc =
   match info with
   | EcParsetree.BDH_split_bop (b1, b2, b3) ->
       let t =
-             if is_and po then EcPhlBdHoare.t_bdhoare_and
-        else if is_or  po then EcPhlBdHoare.t_bdhoare_or
+             if is_and po.inv then EcPhlBdHoare.t_bdhoare_and
+        else if is_or  po.inv then EcPhlBdHoare.t_bdhoare_or
         else
           tc_error !!tc
             "the postcondition must be a conjunction or a disjunction"
@@ -59,17 +59,17 @@ let process_bdhoare_split info tc =
         in
 
         FApi.t_seqsub
-          (EcPhlConseq.t_conseq pr po)
+          (EcPhlConseq.t_conseq (Inv_ss pr) po)
           [t_true; rwtt; tactic]
       in
 
       t_conseq
-        (f_or (f_and f po) (f_and (f_not f) po))
+        (Inv_ss (map_ss_inv1 (fun po -> f_or (f_and f po) (f_and (f_not f) po)) po))
         (EcCoreLib.CI_Logic.mk_logic "orDandN")
         (FApi.t_on1seq 3
            (EcPhlBdHoare.t_bdhoare_or b1 b2 f_r0)
            (t_conseq
-              f_false
+              (Inv_ss {inv=f_false;m=mhr})
               (EcCoreLib.CI_Logic.mk_logic "andDorN")
               EcHiGoal.process_trivial))
         tc

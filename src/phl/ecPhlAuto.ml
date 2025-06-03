@@ -2,6 +2,7 @@
 open EcUtils
 open EcFol
 open EcModules
+open EcAst
 
 open EcCoreGoal
 open EcLowGoal
@@ -18,7 +19,7 @@ let t_exfalso_r tc =
   FApi.t_or
     EcPhlTAuto.t_core_exfalso
     (FApi.t_seqsub
-       (EcPhlConseq.t_conseq f_false post)
+       (EcPhlConseq.t_conseq (map_inv1 (fun _ -> f_false) post) post)
        [t_id; t_trivial; EcPhlTAuto.t_core_exfalso])
     tc
 

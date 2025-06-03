@@ -158,9 +158,9 @@ module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
   let hoareF_abs_spec _pf env f inv =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
-    let fv = PV.fv env mhr inv in
+    let fv = PV.fv env inv.m inv.inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF_old inv o inv in
+    let ospec o = f_hoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -522,8 +522,11 @@ let t_fun_to_code_r tc =
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
 (* -------------------------------------------------------------------- *)
-let t_fun_r inv tc =
+let t_fun_r (inv: inv) tc =
   let th tc =
+    let inv = match inv with
+      | Inv_ss inv -> inv
+      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.hf_f env
@@ -531,24 +534,33 @@ let t_fun_r inv tc =
       else t_hoareF_fun_def tc
 
   and teh tc =
+    let inv = match inv with
+      | Inv_ss inv -> inv
+      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_eHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.ehf_f env
-      then t_ehoareF_abs inv tc
+      then t_ehoareF_abs inv.inv tc
       else t_ehoareF_fun_def tc
 
   and tbh tc =
+    let inv = match inv with
+      | Inv_ss inv -> inv
+      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.bhf_f env
-      then t_bdhoareF_abs inv tc
+      then t_bdhoareF_abs inv.inv tc
       else t_bdhoareF_fun_def tc
 
   and te tc =
+    let inv = match inv with
+      | Inv_ts inv -> inv
+      | Inv_ss _ -> tc_error !!tc "expected a two sided invariant" in
     let env = FApi.tc1_env tc in
     let e   = destr_equivF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun e.ef_fl env
-      then t_equivF_abs inv tc
+      then t_equivF_abs inv.inv tc
       else t_equivF_fun_def tc
 
   in
@@ -594,7 +606,7 @@ let process_fun_abs inv tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_hoareF_abs inv tc
+    t_hoareF_abs {inv;m=mhr} tc
 
   and t_ehoare tc =
     let hyps = FApi.tc1_hyps tc in

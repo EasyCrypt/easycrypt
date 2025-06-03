@@ -1106,6 +1106,16 @@ let subst_ss_inv (s : subst) (inv : ss_inv) =
   let s = add_memory s inv.m inv.m in
   { inv = subst_form s inv.inv; m = inv.m; }
 
+let subst_ts_inv (s : subst) (inv : ts_inv) =
+  let s = add_memory s inv.ml inv.ml in
+  let s = add_memory s inv.mr inv.mr in
+  { inv = subst_form s inv.inv; ml = inv.ml; mr = inv.mr; }
+
+let subst_inv (s : subst) (inv : inv) =
+  match inv with
+  | Inv_ss inv -> Inv_ss (subst_ss_inv s inv)
+  | Inv_ts inv -> Inv_ts (subst_ts_inv s inv)
+
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * ty) list) : subst =
   List.fold_left (fun s (x, ty) -> add_tyvar s x ty) empty params
@@ -1128,5 +1138,23 @@ let freshen_type (tparams, ty) =
 
 (* -------------------------------------------------------------------- *)
 let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
-  let inv = subst_form (add_memory empty m m') inv in
-  { inv; m = m' }
+  if m' = m then
+    { inv; m }
+  else
+    let inv = subst_form (add_memory empty m m') inv in
+    { inv; m = m' }
+
+let f_forall_mems_ss_inv menv inv =
+  if fst menv = inv.m then
+    f_forall_mems [menv] inv.inv
+  else
+    f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+
+let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
+  if ml' = ml && mr' = mr then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty ml ml' in
+    let s = add_memory s mr mr' in
+    let inv = subst_form s inv in
+    { inv; ml = mr'; mr = mr' }

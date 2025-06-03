@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
+open EcAst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -40,7 +41,7 @@ let t_ehoare_zero = FApi.t_low0 "hoare-zero" t_ehoare_zero_r
 (* -------------------------------------------------------------------- *)
 let t_core_exfalso_r tc =
   let pre   = tc1_get_pre tc in
-    if not (f_equal pre f_false) then
+    if not (f_equal (inv_of_inv pre) f_false) then
       tc_error !!tc "pre-condition is not `false'";
     FApi.xmutate1 tc `ExFalso []
 
