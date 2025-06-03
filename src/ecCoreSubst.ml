@@ -734,7 +734,3 @@ module Tvar = struct
   let f_subst ~(freshen : bool) (lv : ident list) (lt : ty list) : form -> form =
     Fsubst.f_subst_tvar ~freshen (init lv lt)
 end
-
-let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
-  let inv = Fsubst.f_subst (Fsubst.f_bind_mem f_subst_id m m') inv in
-  { inv; m = m' }

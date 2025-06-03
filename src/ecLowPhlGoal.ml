@@ -10,6 +10,7 @@ open EcEnv
 open EcPV
 open EcCoreGoal
 open EcMatching.Position
+open EcSubst
 
 module Zpr = EcMatching.Zipper
 

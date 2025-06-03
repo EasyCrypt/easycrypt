@@ -529,14 +529,14 @@ let rec subst_form (s : subst) (f : form) =
       let ty  = subst_ty s f.f_ty in
       f_op p tys ty
 
-  | FhoareF { hf_pr; hf_f; hf_po } ->
+  | FhoareF hf ->
      let hf_pr, hf_po =
-       let s = add_memory s mhr mhr in
-       let hf_pr = subst_form s hf_pr in
-       let hf_po = subst_form s hf_po in
+       let s = add_memory s hf.hf_m hf.hf_m in
+       let hf_pr = subst_form s hf.hf_pr [@alert "-priv_pl"] in
+       let hf_po = subst_form s hf.hf_po [@alert "-priv_pl"] in
        (hf_pr, hf_po) in
-     let hf_f  = subst_xpath s hf_f in
-     f_hoareF_old hf_pr hf_f hf_po
+     let hf_f  = subst_xpath s hf.hf_f in
+     f_hoareF {inv=hf_pr; m=hf.hf_m} hf_f {inv=hf_po; m=hf.hf_m}
 
   | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
      let hs_m, (hs_pr, hs_po) =
@@ -1102,6 +1102,10 @@ and subst_ctheory (s : subst) (cth : ctheory) =
 and subst_theory_source (s : subst) (ths : thsource) =
   { ths_base = subst_path s ths.ths_base; }
 
+let subst_ss_inv (s : subst) (inv : ss_inv) =
+  let s = add_memory s inv.m inv.m in
+  { inv = subst_form s inv.inv; m = inv.m; }
+
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * ty) list) : subst =
   List.fold_left (fun s (x, ty) -> add_tyvar s x ty) empty params
@@ -1121,3 +1125,8 @@ let open_tydecl tyd tys =
 let freshen_type (tparams, ty) =
   let s, tparams = fresh_tparams empty tparams in
   (tparams, subst_ty s ty)
+
+(* -------------------------------------------------------------------- *)
+let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
+  let inv = subst_form (add_memory empty m m') inv in
+  { inv; m = m' }
