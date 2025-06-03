@@ -303,6 +303,25 @@ let map_ss_inv (fn: form list -> form) (invs: ss_inv list): ss_inv =
   let inv = fn (List.map (fun {inv;m} -> assert (m = m'); inv) invs) in
   { m = m'; inv = inv }
 
+let map_ss_inv1 (fn: form -> form) (inv: ss_inv): ss_inv =
+  let inv' = fn inv.inv in
+  { m = inv.m; inv = inv' }
+
+let map_ss_inv2 (fn: form -> form -> form) (inv1: ss_inv) (inv2: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m);
+  let inv' = fn inv1.inv inv2.inv in
+  { m = inv1.m; inv = inv' }
+
+let map_ss_inv3 (fn: form -> form -> form -> form)
+    (inv1: ss_inv) (inv2: ss_inv) (inv3: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m && inv2.m = inv3.m);
+  let inv' = fn inv1.inv inv2.inv inv3.inv in
+  { m = inv1.m; inv = inv' }
+
+(* ----------------------------------------------------------------- *)
+(* Accessors for program logic                                       *)
+(* ----------------------------------------------------------------- *)
+
 let eg_pr eg = eg.eg_pr
 let eg_po eg = eg.eg_po
 
@@ -324,8 +343,8 @@ let ehf_po ehf = ehf.ehf_po
 let ehs_pr ehs = ehs.ehs_pr
 let ehs_po ehs = ehs.ehs_po
 
-let bhf_pr bhf = bhf.bhf_pr
-let bhf_po bhf = bhf.bhf_po
+let bhf_pr bhf = {inv=bhf.bhf_pr; m=bhf.bhf_m}
+let bhf_po bhf = {inv=bhf.bhf_po; m=bhf.bhf_m}
 
 let bhs_pr bhs = bhs.bhs_pr
 let bhs_po bhs = bhs.bhs_po

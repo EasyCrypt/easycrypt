@@ -3,6 +3,7 @@ open EcFol
 
 open EcCoreGoal
 open EcLowPhlGoal
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_of_bdhoareS_r tc =
@@ -17,7 +18,8 @@ let t_hoare_of_bdhoareF_r tc =
   let bhf = tc1_as_bdhoareF tc in
   if not (bhf.bhf_cmp = FHeq && f_equal bhf.bhf_bd f_r0) then
     tc_error !!tc "%s" "bound must be equal to 0%r";
-  let concl = f_hoareF_old bhf.bhf_pr bhf.bhf_f (f_not bhf.bhf_po) in
+  let post = map_ss_inv1 f_not (bhf_po bhf) in
+  let concl = f_hoareF (bhf_pr bhf) bhf.bhf_f post in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)

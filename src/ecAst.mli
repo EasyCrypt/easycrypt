@@ -310,6 +310,9 @@ type ss_inv = {
 }
 
 val map_ss_inv : (form list -> form) -> ss_inv list -> ss_inv
+val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
+val map_ss_inv2 : (form -> form -> form) -> ss_inv -> ss_inv -> ss_inv
+val map_ss_inv3 : (form -> form -> form -> form) -> ss_inv -> ss_inv -> ss_inv -> ss_inv
 
 val eg_pr : eagerF -> form
 val eg_po : eagerF -> form
@@ -325,8 +328,8 @@ val ehf_pr : eHoareF -> form
 val ehf_po : eHoareF -> form
 val ehs_pr : eHoareS -> form
 val ehs_po : eHoareS -> form
-val bhf_pr : bdHoareF -> form
-val bhf_po : bdHoareF -> form
+val bhf_pr : bdHoareF -> ss_inv
+val bhf_po : bdHoareF -> ss_inv
 val bhs_pr : bdHoareS -> form
 val bhs_po : bdHoareS -> form
 
