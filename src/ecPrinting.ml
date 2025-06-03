@@ -388,6 +388,8 @@ module PPEnv = struct
     oget (Mint.find_opt i (fst !(ppe.ppe_univar)))
 end
 
+let debug_mode = true
+
 (* -------------------------------------------------------------------- *)
 let shorten_path
   (ppe  : PPEnv.t)
@@ -826,14 +828,17 @@ let pp_stype (ppe : PPEnv.t) (fmt : Format.formatter) (ty : ty) =
   pp_type_r ppe ((1 + fst t_prio_tpl, `NonAssoc), `NonAssoc) fmt ty
 
 (* -------------------------------------------------------------------- *)
-let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x : memory) =
+let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x as id : memory) =
   let x = Format.sprintf "%s" (PPEnv.local_symb ppe x) in
   let x =
     if   x <> "" && x.[0] = '&'
     then String.sub x 1 (String.length x - 1)
     else x
   in
-    Format.fprintf fmt "%s" x
+    if debug_mode then
+      Format.fprintf fmt "%s" x
+    else
+      Format.fprintf fmt "%s<%s>" x (EcIdent.tostring id)
 
 let pp_memtype (ppe : PPEnv.t) (fmt : Format.formatter) (mt : memtype) =
   match EcMemory.for_printing mt with
