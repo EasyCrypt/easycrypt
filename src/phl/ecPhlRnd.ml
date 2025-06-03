@@ -214,7 +214,7 @@ module Core = struct
           (* event is true *)
           let event = mk_event ty_distr in
           let bounded_distr = f_eq (f_mu env distr event) f_r1 in
-          let post = (f_and (bhs_po bhs) bounded_distr) in
+          let post = (f_and bhs.bhs_po bounded_distr) in
           let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
           [concl]
         else
