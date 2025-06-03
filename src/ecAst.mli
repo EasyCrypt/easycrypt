@@ -207,35 +207,35 @@ and eagerF = {
   eg_ml : memory;
   eg_mr : memory;
   eg_pr : form;
-  [@alert priv_pl "Use the accessor function `eg_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `eg_pr` instead of the field"]*)
   eg_sl : stmt;  (* No local program variables *)
   eg_fl : EcPath.xpath;
   eg_fr : EcPath.xpath;
   eg_sr : stmt;  (* No local program variables *)
   eg_po : form
-  [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `es_po` instead of the field"]*)
 }
 
 and equivF = {
   ef_ml : memory;
   ef_mr : memory;
   ef_pr : form;
-  [@alert priv_pl "Use the accessor function `ef_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ef_pr` instead of the field"]*)
   ef_fl : EcPath.xpath;
   ef_fr : EcPath.xpath;
   ef_po : form;
-  [@alert priv_pl "Use the accessor function `ef_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ef_po` instead of the field"]*)
 }
 
 and equivS = {
   es_ml  : memenv;
   es_mr  : memenv;
   es_pr  : form;
-  [@alert priv_pl "Use the accessor function `es_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `es_pr` instead of the field"]*)
   es_sl  : stmt;
   es_sr  : stmt;
   es_po  : form;
-  [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `es_po` instead of the field"]*)
 }
 
 and sHoareF = {
@@ -250,38 +250,38 @@ and sHoareF = {
 and sHoareS = {
   hs_m  : memenv;
   hs_pr : form;
-  [@alert priv_pl "Use the accessor function `hs_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `hs_pr` instead of the field"]*)
   hs_s  : stmt;
   hs_po : form;
-  [@alert priv_pl "Use the accessor function `hs_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `hs_po` instead of the field"]*)
 }
 
 
 and eHoareF = {
   ehf_m  : memory;
   ehf_pr  : form;
-  [@alert priv_pl "Use the accessor function `ehf_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ehf_pr` instead of the field"]*)
   ehf_f   : EcPath.xpath;
   ehf_po  : form;
-  [@alert priv_pl "Use the accessor function `ehf_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ehf_po` instead of the field"]*)
 }
 
 and eHoareS = {
   ehs_m   : memenv;
   ehs_pr  : form;
-  [@alert priv_pl "Use the accessor function `ehs_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ehs_pr` instead of the field"]*)
   ehs_s   : stmt;
   ehs_po  : form;
-  [@alert priv_pl "Use the accessor function `ehs_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `ehs_po` instead of the field"]*)
 }
 
 and bdHoareF = {
   bhf_m   : memory;
   bhf_pr  : form;
-  [@alert priv_pl "Use the accessor function `bhf_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `bhf_pr` instead of the field"]*)
   bhf_f   : EcPath.xpath;
   bhf_po  : form;
-  [@alert priv_pl "Use the accessor function `bhf_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `bhf_po` instead of the field"]*)
   bhf_cmp : hoarecmp;
   bhf_bd  : form;
 }
@@ -289,10 +289,10 @@ and bdHoareF = {
 and bdHoareS = {
   bhs_m   : memenv;
   bhs_pr  : form;
-  [@alert priv_pl "Use the accessor function `bhs_pr` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `bhs_pr` instead of the field"]*)
   bhs_s   : stmt;
   bhs_po  : form;
-  [@alert priv_pl "Use the accessor function `bhs_po` instead of the field"]
+  (*[@alert priv_pl "Use the accessor function `bhs_po` instead of the field"]*)
   bhs_cmp : hoarecmp;
   bhs_bd  : form;
 }
