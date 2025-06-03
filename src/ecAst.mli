@@ -314,24 +314,35 @@ val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
 val map_ss_inv2 : (form -> form -> form) -> ss_inv -> ss_inv -> ss_inv
 val map_ss_inv3 : (form -> form -> form -> form) -> ss_inv -> ss_inv -> ss_inv -> ss_inv
 
-val eg_pr : eagerF -> form
-val eg_po : eagerF -> form
-val ef_pr : equivF -> form
-val ef_po : equivF -> form
-val es_pr : equivS -> form
-val es_po : equivS -> form
+type ts_inv = {
+  ml  : memory;
+  mr  : memory;
+  inv : form;
+}
+
+val map_ts_inv : (form list -> form) -> ts_inv list -> ts_inv
+val map_ts_inv1 : (form -> form) -> ts_inv -> ts_inv
+val map_ts_inv2 : (form -> form -> form) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val eg_pr : eagerF -> ts_inv
+val eg_po : eagerF -> ts_inv
+val ef_pr : equivF -> ts_inv
+val ef_po : equivF -> ts_inv
+val es_pr : equivS -> ts_inv
+val es_po : equivS -> ts_inv
 val hf_pr : sHoareF -> ss_inv
 val hf_po : sHoareF -> ss_inv
-val hs_pr : sHoareS -> form
-val hs_po : sHoareS -> form
-val ehf_pr : eHoareF -> form
-val ehf_po : eHoareF -> form
-val ehs_pr : eHoareS -> form
-val ehs_po : eHoareS -> form
+val hs_pr : sHoareS -> ss_inv
+val hs_po : sHoareS -> ss_inv
+val ehf_pr : eHoareF -> ss_inv
+val ehf_po : eHoareF -> ss_inv
+val ehs_pr : eHoareS -> ss_inv
+val ehs_po : eHoareS -> ss_inv
 val bhf_pr : bdHoareF -> ss_inv
 val bhf_po : bdHoareF -> ss_inv
-val bhs_pr : bdHoareS -> form
-val bhs_po : bdHoareS -> form
+val bhs_pr : bdHoareS -> ss_inv
+val bhs_po : bdHoareS -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 
