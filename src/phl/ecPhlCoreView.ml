@@ -36,4 +36,4 @@ let t_bdhoare_of_hoareF_r tc =
 let t_hoare_of_bdhoareS = FApi.t_low0 "hoare-bdhoareS" t_hoare_of_bdhoareS_r
 let t_hoare_of_bdhoareF = FApi.t_low0 "hoare-bdhoareF" t_hoare_of_bdhoareF_r
 let t_bdhoare_of_hoareS = FApi.t_low0 "bdhoare-hoareS" t_bdhoare_of_hoareS_r
-let t_bdhoare_of_hoareF_old = FApi.t_low0 "bdhoare-hoareF" t_bdhoare_of_hoareF_r
+let t_bdhoare_of_hoareF = FApi.t_low0 "bdhoare-hoareF" t_bdhoare_of_hoareF_r

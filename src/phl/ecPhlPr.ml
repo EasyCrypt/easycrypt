@@ -41,7 +41,7 @@ let t_bdhoare_ppr_r tc =
 (* -------------------------------------------------------------------- *)
 let t_hoare_ppr_r tc =
   ignore (tc1_as_hoareF tc);
-  FApi.t_seq EcPhlCoreView.t_bdhoare_of_hoareF_old t_bdhoare_ppr_r tc
+  FApi.t_seq EcPhlCoreView.t_bdhoare_of_hoareF t_bdhoare_ppr_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_ppr_r ty phi_l phi_r tc =

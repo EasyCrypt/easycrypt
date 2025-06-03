@@ -3453,11 +3453,12 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let m = mhr in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF_old pre' fpath post'
+          f_hoareF {inv=pre';m} fpath {inv=post';m}
 
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then
