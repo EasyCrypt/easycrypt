@@ -430,24 +430,25 @@ let process_call side info tc =
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv -> f_hoareF_old inv f inv)
+        (penv, tbool, lift_ss_inv (fun inv -> f_hoareF inv f inv))
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, fun inv -> f_eHoareF inv f inv)
+        (penv, txreal, lift_inv_adapter (fun inv -> f_eHoareF inv f inv))
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      (penv, tbool, fun inv -> bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
+      let fmake inv = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None in
+      (penv, tbool, lift_inv_adapter fmake)
 
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, tbool, fun inv -> mk_inv_spec !!tc env inv fl fr)
+      (penv, tbool, lift_inv_adapter (fun inv -> mk_inv_spec !!tc env inv fl fr))
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
@@ -489,8 +490,12 @@ let process_call side info tc =
     | CI_inv inv ->
       let hyps, ty, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc hyps ty inv in
+      let inv = 
+        match tc1_get_pre tc with
+        | Inv_ss _ -> Inv_ss {inv; m=mhr}
+        | Inv_ts _ -> Inv_ts {inv; ml=mleft; mr=mright} in      
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss {inv;m=mhr}) tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
       fmake inv
 
     | CI_upto info ->
