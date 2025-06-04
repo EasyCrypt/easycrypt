@@ -179,25 +179,17 @@ module PVM = struct
           (try find env pv m s with Not_found -> f)
       | Fglob(mp,m) ->
           (try find_glob env (EcPath.mident mp) m s with Not_found -> f)
-      | FequivF _ ->
-        check_binding EcFol.mleft s;
-        check_binding EcFol.mright s;
+      | FequivF {ef_ml=ml;ef_mr=mr} 
+      | FequivS {es_ml=(ml,_); es_mr=(mr,_)} ->
+        check_binding ml s;
+        check_binding mr s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FequivS es ->
-        check_binding (fst es.es_ml) s;
-        check_binding (fst es.es_mr) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FbdHoareF _ ->
-        check_binding EcFol.mhr s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FhoareS hs ->
-        check_binding (fst hs.hs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FbdHoareS hs ->
-        check_binding (fst hs.bhs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | Fpr pr ->
-        check_binding pr.pr_mem s;
+      | FhoareF {hf_m=m}
+      | FhoareS {hs_m=(m,_)}
+      | FbdHoareF {bhf_m=m}
+      | FbdHoareS {bhs_m=(m,_)}
+      | Fpr {pr_mem=m} ->
+        check_binding m s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 =
