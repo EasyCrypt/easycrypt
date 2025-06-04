@@ -35,7 +35,7 @@ module EqTest : sig
   val is_int  : env -> ty -> bool
 end
 
-val is_alpha_eq : LDecl.hyps -> form -> form -> bool
+val is_alpha_eq : ?subst:f_subst -> LDecl.hyps -> form -> form -> bool
 
 (* -------------------------------------------------------------------- *)
 module User : sig

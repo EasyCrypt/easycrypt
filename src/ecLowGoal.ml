@@ -978,7 +978,7 @@ let alpha_find_in_hyps hyps f =
    LowAssumption.gen_find_in_hyps (EcReduction.is_alpha_eq hyps f) hyps
 
 let t_assumption mode (tc : tcenv1) =
-  let convs =
+  let (convs: (LDecl.hyps -> _) list) =
     match mode with
     | `Alpha -> [EcReduction.is_alpha_eq]
     | `Conv  -> [EcReduction.is_alpha_eq; EcReduction.is_conv]

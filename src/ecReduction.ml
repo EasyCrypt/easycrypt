@@ -470,7 +470,7 @@ let is_alpha_eq_e env e1 e2 =
   try check_e env Fsubst.f_subst_id e1 e2; true with NotConv -> false
 
 (* -------------------------------------------------------------------- *)
-let is_alpha_eq hyps f1 f2 =
+let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
   let env = LDecl.toenv hyps in
   let error () = raise NotConv in
   let ensure t = if not t then error () in
@@ -624,7 +624,7 @@ let is_alpha_eq hyps f1 f2 =
     | NotConv -> false
   in
 
-  test env Fsubst.f_subst_id f1 f2
+  test env subst f1 f2
 
 (* -------------------------------------------------------------------- *)
 type reduction_info = {

@@ -8,6 +8,7 @@ open EcFol
 open EcEnv
 open EcPV
 open EcSubst
+open EcReduction
 
 open EcCoreGoal
 open EcLowGoal
@@ -620,11 +621,15 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_conj pre post pre' post' tc =
-  let hf = tc1_as_hoareF tc in
-  if not (f_equal (hf_pr hf) (map_ss_inv2 f_and pre' pre)) then
-    tc_error !!tc "invalid pre-condition";
-  if not (f_equal (hf_po hf) (map_ss_inv2 f_and post' post)) then
-    tc_error !!tc "invalid post-condition";
+  let _, hyps, _ = FApi.tc1_eflat tc in
+  let hf = tc1_as_hoareF tc in (*EcReduction.alpha_conv*)
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id pre.m hf.hf_m in
+  if not (is_alpha_eq ~subst hyps (hf_pr hf).inv 
+            (map_ss_inv2 f_and pre' pre).inv) 
+  then tc_error !!tc "invalid pre-condition";
+  if not (is_alpha_eq ~subst hyps (hf_po hf).inv
+    (map_ss_inv2 f_and post' post).inv) 
+  then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF pre hf.hf_f post in
   let concl2 = f_hoareF pre' hf.hf_f post' in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
@@ -861,18 +866,21 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* ------------------------------------------------------------------ *)
   (* hoareF / hoareF / hoareF / ⊥                                       *)
   | FhoareF _,
-      Some ((_, {f_node = FhoareF hs}) as nf1),
+      Some ((_, {f_node = FhoareF hf}) as nf1),
       Some((_, f2) as nf2),
       None
     ->
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-
+    let pr1, po1 = hf_pr hf, hf_po hf in
+    let pr2 = ss_inv_rebind (hf_pr hs2) hf.hf_m in
+    let po2 = ss_inv_rebind (hf_po hs2) hf.hf_m in
+    (* check that the pre- and post-conditions are well formed *)
     t_on1seq 2
-      (tac (map_ss_inv2 f_and (hf_pr hs) (hf_pr hs2)) 
-           (map_ss_inv2 f_and (hf_po hs) (hf_po hs2)))
+      (tac (map_ss_inv2 f_and pr1 pr2) 
+           (map_ss_inv2 f_and po1 po2))
       (FApi.t_seqsub
-         (t_hoareF_conseq_conj hs2.hf_pr hs2.hf_po hs.hf_pr hs.hf_po)
+         (t_hoareF_conseq_conj pr2 po2 pr1 po2)
          [t_apply_r nf2; t_apply_r nf1])
       tc
 
