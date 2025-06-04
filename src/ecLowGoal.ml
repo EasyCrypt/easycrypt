@@ -2290,6 +2290,17 @@ type cstate = {
   cs_sbeq : Sid.t;
 }
 
+let pp_tc1 tc =
+   pp_tc (FApi.tcenv_of_tcenv1 tc)
+
+ let t_debug ?(tag="") t tc =
+   Format.eprintf "Before (tag: %s):" tag;
+   pp_tc (FApi.tcenv_of_tcenv1 tc);
+   let r = t tc in
+   Format.eprintf "After (tag: %s):" tag;
+   pp_tc r;
+   r
+
 let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
   let dtsolve =
@@ -2298,11 +2309,6 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
   let tsolve = odfl (FApi.t_ors dtsolve) tsolve in
 
   let tt = FApi.t_try (t_assumption `Alpha) in
-
-(*  let t_print s t tc =
-    Format.eprintf "%s@." s;
-    pp_tc (FApi.tcenv_of_tcenv1 tc);
-    t tc in *)
 
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry (st : cstate) = t_simplify ~delta:`No @! aux0 st
