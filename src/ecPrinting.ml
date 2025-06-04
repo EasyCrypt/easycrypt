@@ -836,9 +836,9 @@ let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x as id : memory) =
     else x
   in
     if debug_mode then
-      Format.fprintf fmt "%s" x
-    else
       Format.fprintf fmt "%s<%s>" x (EcIdent.tostring id)
+    else
+      Format.fprintf fmt "%s" x
 
 let pp_memtype (ppe : PPEnv.t) (fmt : Format.formatter) (mt : memtype) =
   match EcMemory.for_printing mt with
