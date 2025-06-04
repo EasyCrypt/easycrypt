@@ -53,6 +53,8 @@ let bd_goal tc fcmp fbd cmp bd =
 let t_hoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_hoareF tc in
+  let pre = ss_inv_rebind pre hf.hf_m in
+  let post = ss_inv_rebind post hf.hf_m in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env in
   let cond1, cond2 = conseq_cond_ss (hf_pr hf) (hf_po hf) pre post in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
@@ -287,6 +289,7 @@ let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
 
 let t_hoareF_notmod (post: ss_inv) tc =
   let hf = tc1_as_hoareF tc in
+  let post = ss_inv_rebind post hf.hf_m in
   let cond1, _, _ = cond_hoareF_notmod tc (map_ss_inv2 f_imp post (hf_po hf)) in
   let cond2 = f_hoareF (hf_pr hf) hf.hf_f post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
