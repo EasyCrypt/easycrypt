@@ -129,7 +129,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let ev = pr.pr_event in
 
   let memenv, (fsig, fdef), _ =
-    try  Fun.hoareS f env
+    try  Fun.hoareS mhr f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
@@ -272,7 +272,7 @@ let process_fel at_pos (infos : fel_info) tc =
   let process_pred (f,pre) =
     let env  = LDecl.toenv hyps in
     let f    = EcTyping.trans_gamepath env f in
-    let penv = fst (LDecl.hoareF f hyps) in
+    let penv = fst (LDecl.hoareF mhr f hyps) in
       (f, TTC.pf_process_form !!tc penv tbool pre)
   in
 

@@ -98,6 +98,7 @@ section.
   proof.
     byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
     conseq (_: _ ==> ={Sample.l}) _ (_: _ ==> size Sample.l <= q)=> //=;2:by sim.
+    proc. call A_bounded.
     by proc;call A_bounded;inline *;auto.
   qed.
 
