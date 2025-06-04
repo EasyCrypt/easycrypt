@@ -621,12 +621,12 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_conj pre post pre' post' tc =
   let hf = tc1_as_hoareF tc in
-  if not (f_equal hf.hf_pr (f_and pre' pre)) then
+  if not (f_equal (hf_pr hf) (map_ss_inv2 f_and pre' pre)) then
     tc_error !!tc "invalid pre-condition";
-  if not (f_equal hf.hf_po (f_and post' post)) then
+  if not (f_equal (hf_po hf) (map_ss_inv2 f_and post' post)) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF_old pre hf.hf_f post in
-  let concl2 = f_hoareF_old pre' hf.hf_f post' in
+  let concl1 = f_hoareF pre hf.hf_f post in
+  let concl2 = f_hoareF pre' hf.hf_f post' in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -1353,9 +1353,10 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
                      | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
                      | _ -> hf.hf_f, hf.hf_pr, hf.hf_po
         in
-        let penv, qenv = LDecl.hoareF hf.hf_m f hyps in
+        let m = hf.hf_m in
+        let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
-          ensure_none c_or_bd; f_hoareF_old pre f post in
+          ensure_none c_or_bd; f_hoareF {m; inv=pre} f {m; inv=post} in
         (penv, qenv, pr, po, tbool, fmake)
 
       | FeHoareF hf ->
