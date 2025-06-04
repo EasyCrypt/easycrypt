@@ -828,7 +828,7 @@ module Apply = struct
     let pt = instantiate canview true pt in
     let pt = fst (PT.concretize pt) in
 
-    t_debug (t_apply pt) tc
+    t_apply pt tc
 
   let t_apply_bwd ?(ri : EcReduction.reduction_info option) ?mode ?canview pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps tc in

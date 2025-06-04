@@ -2966,7 +2966,10 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.hf_pr;
-  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
+  if debug_mode then
+    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.hf_f (pp_mem ppe) hf.hf_m
+  else
+    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po
 
 (* -------------------------------------------------------------------- *)
