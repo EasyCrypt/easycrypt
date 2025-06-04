@@ -1394,7 +1394,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_hoareF_old pre f post in
+          f_hoareF {m;inv=pre} f {m;inv=post} in
         (penv, qenv, f_true, f_true, tbool, fmake)
 
       | FequivS es ->
