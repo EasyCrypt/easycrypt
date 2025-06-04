@@ -389,9 +389,10 @@ let process_call side info tc =
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let penv, qenv = LDecl.hoareF (fst hs.hs_m) f hyps in
+          let m = (fst hs.hs_m) in
+          let penv, qenv = LDecl.hoareF m f hyps in
           let fmake pre post =
-            f_hoareF {m=mhr;inv=pre} f {m=mhr;inv=post} in
+            f_hoareF {m;inv=pre} f {m;inv=post} in
           (penv, qenv, tbool, fmake)
 
       | FbdHoareS bhs, None ->

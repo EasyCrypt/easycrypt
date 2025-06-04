@@ -7,6 +7,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
+open EcSubst
 
 module BI = EcBigInt
 
@@ -1468,7 +1469,9 @@ let rec conv ri env f1 f2 stk =
       conv_next ri env f1 stk
 
   | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
-    conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)
+    let pr2 = (ss_inv_rebind (hf_pr hf2) hf1.hf_m).inv in
+    let po2 = (ss_inv_rebind (hf_po hf2) hf1.hf_m).inv in
+    conv ri env hf1.hf_pr pr2 (zhl f1 [hf1.hf_po] [po2] stk)
 
   | FhoareS hs1, FhoareS hs2
       when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
