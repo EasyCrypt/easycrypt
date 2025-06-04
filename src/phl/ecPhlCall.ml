@@ -390,18 +390,23 @@ let process_call side info tc =
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
           let penv, qenv = LDecl.hoareF (fst hs.hs_m) f hyps in
-          (penv, qenv, tbool, fun pre post -> f_hoareF_old pre f post)
+          let fmake pre post =
+            f_hoareF {m=mhr;inv=pre} f {m=mhr;inv=post} in
+          (penv, qenv, tbool, fmake)
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let penv, qenv = LDecl.hoareF (fst bhs.bhs_m) f hyps in
-          (penv, qenv, tbool, fun pre post ->
-            bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
+          let fmake pre post =
+            bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None in
+          (penv, qenv, tbool, fmake)
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
           let penv, qenv = LDecl.hoareF (fst hs.ehs_m) f hyps in
-          (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
+          let fmake pre post =
+            f_eHoareF pre f post in
+          (penv, qenv, txreal, fmake)
 
       | FbdHoareS _, Some _
       | FhoareS  _, Some _ ->
@@ -411,14 +416,18 @@ let process_call side info tc =
           let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
           let penv, qenv = LDecl.equivF fl fr hyps in
-          (penv, qenv, tbool, fun pre post -> f_equivF pre fl fr post)
+          let fmake pre post =
+            f_equivF pre fl fr post in
+          (penv, qenv, tbool, fmake)
 
       | FequivS es, Some side ->
           let fstmt = sideif side es.es_sl es.es_sr in
           let (m,_) = sideif side es.es_ml es.es_mr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF m f hyps in
-          (penv, qenv, tbool, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
+          let fmake pre post =
+            bdhoare_call_spec !!tc pre post f FHeq f_r1 None in
+          (penv, qenv, tbool, fmake)
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 

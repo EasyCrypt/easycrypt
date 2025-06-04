@@ -15,11 +15,41 @@ open EcCoreGoal
 open EcBaseLogic
 open EcProofTerm
 
+
 module EP  = EcParsetree
 module ER  = EcReduction
 module TTC = EcProofTyping
 module LG  = EcCoreLib.CI_Logic
 module PT  = EcProofTerm
+
+(* -------------------------------------------------------------------- *)
+
+let pp_tc tc =
+  let pr = proofenv_of_proof (proof_of_tcenv tc) in
+  let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
+  let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
+
+  match cl with [] -> () | hd :: tl ->
+
+  Format.eprintf "%a@."
+    (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc)) {prpo_pr = true; prpo_po = true})
+    (hd, `All tl)
+
+type cstate = {
+  cs_undosubst : Sid.t;
+  cs_sbeq : Sid.t;
+}
+
+let pp_tc1 tc =
+   pp_tc (FApi.tcenv_of_tcenv1 tc)
+
+let t_debug ?(tag="") t tc =
+   Format.eprintf "Before (tag: %s):" tag;
+   pp_tc (FApi.tcenv_of_tcenv1 tc);
+   let r = t tc in
+   Format.eprintf "After (tag: %s):" tag;
+   pp_tc r;
+   r
 
 (* -------------------------------------------------------------------- *)
 let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
@@ -798,7 +828,7 @@ module Apply = struct
     let pt = instantiate canview true pt in
     let pt = fst (PT.concretize pt) in
 
-    t_apply pt tc
+    t_debug (t_apply pt) tc
 
   let t_apply_bwd ?(ri : EcReduction.reduction_info option) ?mode ?canview pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps tc in
@@ -811,6 +841,7 @@ module Apply = struct
     try  t_apply_bwd ?ri ?mode ?canview pt tc
     with (NoInstance (_, r, pt, f)) ->
       tc_error_exn !!tc (NoInstance (dpe, r, pt, f))
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2271,35 +2302,6 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     | _ -> t_id tc
 
   in entry tc
-
-(* -------------------------------------------------------------------- *)
-
-let pp_tc tc =
-  let pr = proofenv_of_proof (proof_of_tcenv tc) in
-  let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
-  let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
-
-  match cl with [] -> () | hd :: tl ->
-
-  Format.eprintf "%a@."
-    (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc)) {prpo_pr = true; prpo_po = true})
-    (hd, `All tl)
-
-type cstate = {
-  cs_undosubst : Sid.t;
-  cs_sbeq : Sid.t;
-}
-
-let pp_tc1 tc =
-   pp_tc (FApi.tcenv_of_tcenv1 tc)
-
- let t_debug ?(tag="") t tc =
-   Format.eprintf "Before (tag: %s):" tag;
-   pp_tc (FApi.tcenv_of_tcenv1 tc);
-   let r = t tc in
-   Format.eprintf "After (tag: %s):" tag;
-   pp_tc r;
-   r
 
 let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 

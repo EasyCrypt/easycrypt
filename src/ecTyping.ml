@@ -3452,7 +3452,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let m = mhr in
+        let m = EcIdent.create "&frmtrans" in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in

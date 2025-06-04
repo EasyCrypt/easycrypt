@@ -1860,7 +1860,7 @@ and pp_form_core_r
         | PVloc  x -> Ssym.mem x ppe.ppe_inuse
         | PVglob _ -> false in
 
-      if force then default true else
+      if force || debug_mode then default true else
 
       match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
       | Some i' when EcMemory.mem_equal i i' ->
@@ -1933,17 +1933,31 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
-        (pp_funname ppe) hf.hf_f
-        (pp_form ppepr) hf.hf_pr
-        (pp_form ppepo) hf.hf_po
+      if debug_mode then
+        Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
+          (pp_funname ppe) hf.hf_f
+          (pp_mem ppe) hf.hf_m
+          (pp_form ppepr) hf.hf_pr
+          (pp_form ppepo) hf.hf_po
+      else
+        Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+          (pp_funname ppe) hf.hf_f
+          (pp_form ppepr) hf.hf_pr
+          (pp_form ppepo) hf.hf_po
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      if debug_mode then
+        Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
+        (pp_mem ppe) (fst hs.hs_m)
         (pp_form ppe) hs.hs_pr
         (pp_form ppe) hs.hs_po
+      else
+        Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+          (pp_stmt_for_form ppe) hs.hs_s
+          (pp_form ppe) hs.hs_pr
+          (pp_form ppe) hs.hs_po
 
   | FeHoareF hf ->
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.ehf_m hf.ehf_f ppe.PPEnv.ppe_env in
