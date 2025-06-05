@@ -621,14 +621,14 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_conj pre post pre' post' tc =
-  let _, hyps, _ = FApi.tc1_eflat tc in
+  let env, hyps, _ = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in (*EcReduction.alpha_conv*)
   let subst = Fsubst.f_bind_mem Fsubst.f_subst_id pre.m hf.hf_m in
   if not (is_alpha_eq ~subst hyps (hf_pr hf).inv 
             (map_ss_inv2 f_and pre' pre).inv) 
   then tc_error !!tc "invalid pre-condition";
-  if not (is_alpha_eq ~subst hyps (hf_po hf).inv
-    (map_ss_inv2 f_and post' post).inv) 
+  if not (is_alpha_eq ~subst hyps (hf_po hf).inv 
+            (map_ss_inv2 f_and post' post).inv)
   then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF pre hf.hf_f post in
   let concl2 = f_hoareF pre' hf.hf_f post' in
@@ -880,7 +880,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       (tac (map_ss_inv2 f_and pr1 pr2) 
            (map_ss_inv2 f_and po1 po2))
       (FApi.t_seqsub
-         (t_hoareF_conseq_conj pr2 po2 pr1 po2)
+         (t_hoareF_conseq_conj pr2 po2 pr1 po1)
          [t_apply_r nf2; t_apply_r nf1])
       tc
 

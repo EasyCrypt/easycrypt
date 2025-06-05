@@ -3845,4 +3845,9 @@ let () =
   EcEnv.pp_debug_form :=
     (fun env fmt f ->
        let ppe = PPEnv.ofenv env in
-       pp_form ppe fmt f)
+       Format.pp_print_newline fmt ();
+       Format.pp_print_newline fmt ();
+       pp_form ppe fmt f;
+       Format.pp_print_newline fmt ();
+       Format.pp_print_newline fmt ();
+       Format.pp_print_flush fmt (););
