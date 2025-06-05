@@ -877,8 +877,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let po2 = ss_inv_rebind (hf_po hs2) hf.hf_m in
     (* check that the pre- and post-conditions are well formed *)
     t_on1seq 2
-      (tac (map_ss_inv2 f_and pr1 pr2) 
-           (map_ss_inv2 f_and po1 po2))
+      ((tac (map_ss_inv2 f_and pr1 pr2) 
+           (map_ss_inv2 f_and po1 po2)))
       (FApi.t_seqsub
          (t_hoareF_conseq_conj pr2 po2 pr1 po1)
          [t_apply_r nf2; t_apply_r nf1])
@@ -1264,7 +1264,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_hoareS hs.hs_m pre hs.hs_s post
           | Some (PCI_bd (cmp, bd)) ->
             f_bdHoareS hs.hs_m pre hs.hs_s post (oget cmp) bd
-        in (env, env, hs.hs_pr, hs.hs_po, tbool, fmake)
+        in (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), tbool, lift_inv_adapter2 fmake)
 
       | FhoareF hf ->
         let penv, qenv = LDecl.hoareF hf.hf_m hf.hf_f hyps in
@@ -1272,25 +1272,25 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let fmake pre post c_or_bd =
           match c_or_bd with
           | None ->
-            f_hoareF_old pre hf.hf_f post
+            f_hoareF pre hf.hf_f post
           | Some (PCI_bd (cmp, bd)) ->
-            f_bdHoareF pre hf.hf_f post (oget cmp) bd
+            f_bdHoareF pre.inv hf.hf_f post.inv (oget cmp) bd
 
-        in (penv, qenv, hf.hf_pr, hf.hf_po, tbool, fmake)
+        in (penv, qenv, Inv_ss (hf_pr hf), Inv_ss (hf_po hf), tbool, lift_ss_inv2 fmake)
 
       | FeHoareS hs ->
         let env = LDecl.push_active hs.ehs_m hyps in
         let fmake pre post bd =
           ensure_none bd;
           f_eHoareS hs.ehs_m pre hs.ehs_s post in
-        (env, env, hs.ehs_pr, hs.ehs_po, txreal, fmake)
+        (env, env, Inv_ss (ehs_pr hs), Inv_ss (ehs_po hs), txreal, lift_inv_adapter2 fmake)
 
       | FeHoareF hf ->
         let penv, qenv = LDecl.hoareF hf.ehf_m hf.ehf_f hyps in
         let fmake pre post bd =
           ensure_none bd;
           f_eHoareF pre hf.ehf_f post in
-        (penv, qenv, hf.ehf_pr, hf.ehf_po, txreal, fmake)
+        (penv, qenv, Inv_ss (ehf_pr hf), Inv_ss (ehf_po hf), txreal, lift_inv_adapter2 fmake)
 
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
@@ -1303,7 +1303,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             let cmp = odfl bhs.bhs_cmp cmp in
             f_bdHoareS bhs.bhs_m pre bhs.bhs_s post cmp bd in
 
-        (env, env, bhs.bhs_pr, bhs.bhs_po, tbool, fmake)
+        (env, env, Inv_ss (bhs_pr bhs), Inv_ss (bhs_po bhs), tbool, lift_inv_adapter2 fmake)
 
       | FbdHoareF hf ->
         let penv, qenv = LDecl.hoareF hf.bhf_m hf.bhf_f hyps in
@@ -1317,31 +1317,36 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_bdHoareF pre hf.bhf_f post cmp bd
         in
 
-        (penv, qenv, hf.bhf_pr, hf.bhf_po, tbool, fmake)
+        (penv, qenv, Inv_ss (bhf_pr hf), Inv_ss (bhf_po hf), tbool, lift_inv_adapter2 fmake)
 
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_equivF pre ef.ef_fl ef.ef_fr post
-        in (penv, qenv, ef.ef_pr, ef.ef_po, tbool, fmake)
+        in (penv, qenv, Inv_ts (ef_pr ef), Inv_ts (ef_po ef), tbool, lift_inv_adapter2 fmake)
 
       | FequivS es ->
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_equivS es.es_ml es.es_mr pre es.es_sl es.es_sr post
-        in (env, env, es.es_pr, es.es_po, tbool, fmake)
+        in (env, env, Inv_ts (es_pr es), Inv_ts (es_po es), tbool, lift_inv_adapter2 fmake)
 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
-    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl gpre  in
-    let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl gpost in
+    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
+    let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
     let bd   = bd |> omap (process_info !!tc penv) in
 
-    fmake pre post bd
+    let (pre, post) = match gpre, gpost with
+    | Inv_ss gpre, Inv_ss gpost -> (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m})
+    | Inv_ts gpre, Inv_ts gpost -> (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
+                                    Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr})
+    | _ -> tc_error !!tc "conseq: pre and post must be of the same kind" in
 
+    fmake pre post bd
   in
 
   let process_cut2 side f1 ((pre, post), c_or_bd) =

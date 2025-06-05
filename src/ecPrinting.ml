@@ -3843,7 +3843,8 @@ end
 (* ------------------------------------------------------------------ *)
 let () =
   EcEnv.pp_debug_form :=
-    (fun env fmt f ->
+    (fun env f ->
+      let fmt = Format.std_formatter in
        let ppe = PPEnv.ofenv env in
        Format.pp_print_newline fmt ();
        Format.pp_print_newline fmt ();

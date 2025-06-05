@@ -512,4 +512,4 @@ module LDecl : sig
   val inv_memenv1 : hyps -> hyps
 end
 
-val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
+val pp_debug_form : (env -> form -> unit) ref

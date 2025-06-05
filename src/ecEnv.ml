@@ -3610,4 +3610,4 @@ module LDecl = struct
 end
 
 
-let pp_debug_form = ref (fun _env _fmt _f -> assert false)
+let pp_debug_form = ref (fun _env _f -> assert false)
