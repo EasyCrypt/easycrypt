@@ -522,6 +522,9 @@ proceed to [install EasyCrypt from Source](#installing-easycrypt-from-source).
 - [OCaml ini-files](https://opam.ocaml.org/packages/ocaml-inifiles/) (version >= 1.2)  
   Additional resources:
   - http://archive.ubuntu.com/ubuntu/pool/universe/o/ocaml-inifiles
+- [OCaml Markdown](https://github.com/gildor478/ocaml-markdown)  
+  Additional resources:
+  - https://opam.ocaml.org/packages/markdown
 - [Python3](https://www.python.org/downloads)  
   You also need to install the following libraries:
   - [Python3 YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
