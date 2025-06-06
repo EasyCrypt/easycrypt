@@ -276,7 +276,7 @@ let set_pre ~pre f =
     f_bdHoareS hs.bhs_m pre.inv hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
  | FequivF ef, Inv_ts pre   -> 
     let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
-    f_equivF pre.inv ef.ef_fl ef.ef_fr ef.ef_po
+    f_equivF_old pre.inv ef.ef_fl ef.ef_fr ef.ef_po
  | FequivS es, Inv_ts pre   -> 
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
     f_equivS es.es_ml es.es_mr pre.inv es.es_sl es.es_sr es.es_po

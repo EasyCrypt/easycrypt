@@ -338,6 +338,9 @@ val lift_ts_inv2 : (ts_inv -> ts_inv -> 'a) -> inv -> inv -> 'a
 val lift_inv_adapter : (form -> 'a) -> inv -> 'a
 val lift_inv_adapter2 : (form -> form -> 'a) -> inv -> inv -> 'a
 
+val ss_inv_generalize_left : ss_inv -> memory -> ts_inv
+val ss_inv_generalize_right : ss_inv -> memory -> ts_inv
+
 val map_inv1 : (form -> form) -> inv -> inv
 val map_inv2 : (form -> form -> form) -> inv -> inv -> inv
 val map_inv3 : (form -> form -> form -> form) -> inv -> inv -> inv -> inv

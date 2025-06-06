@@ -3552,7 +3552,9 @@ wp; call (: true); call (: true).
 wp; call (: true); sp 0 1.
 seq 1 1 : (#pre /\ pk0{1} = pk00{2} /\ sk0{1} = sk00{2} /\ sk2pk sk0{1} = pk0{1}). 
 + call (: ={glob S} ==> ={glob S, res} /\ sk2pk res{1}.`2 = res{1}.`1) => //.
-  by conseq (: ={glob S} ==> ={glob S, res}) kg_sem; proc true.
+  conseq (: ={glob S} ==> ={glob S, res}) kg_sem.
+  move => />.
+; proc true.
 if => //; 1: by wp.
 if => //=.
 + call (: ={glob S} ==> ={glob S, res} /\ sk2pk res{1}.`2 = res{1}.`1) => //.

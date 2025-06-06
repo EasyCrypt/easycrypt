@@ -373,7 +373,7 @@ let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
   let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
   let pre = f_and eq_params (Mpv2.to_form mleft mright eqi inv) in
   let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
-  f_equivF pre fl fr post
+  f_equivF_old pre fl fr post
 
 (* -------------------------------------------------------------------- *)
 let mk_inv_spec env inv (fl, fr, eqg) =

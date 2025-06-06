@@ -594,7 +594,7 @@ let rec subst_form (s : subst) (f : form) =
        (ef_pr, ef_po) in
      let ef_fl = subst_xpath s ef_fl in
      let ef_fr = subst_xpath s ef_fr in
-     f_equivF ef_pr ef_fl ef_fr ef_po
+     f_equivF_old ef_pr ef_fl ef_fr ef_po
 
   | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } ->
      let (es_ml, es_mr), (es_pr, es_po) =

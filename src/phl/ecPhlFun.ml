@@ -223,7 +223,7 @@ module FunAbsLow = struct
       let invs = if use then [eqglob; inv] else [inv] in
       let pre  = EcFol.f_ands (eq_params :: invs) in
       let post = EcFol.f_ands (eq_res :: invs) in
-      f_equivF pre o_l o_r post
+      f_equivF_old pre o_l o_r post
     in
 
     let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
@@ -327,7 +327,7 @@ module UpToLow = struct
 
       let pre   = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
       let post  = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
-      let cond1 = f_equivF pre o_l o_r post in
+      let cond1 = f_equivF_old pre o_l o_r post in
       let cond2 =
         let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
           f_forall[(mr, GTmem abstract_mt)]

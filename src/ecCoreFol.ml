@@ -312,8 +312,11 @@ let f_equivF_r ef = mk_form (FequivF ef) tbool
 let f_equivS es_ml es_mr es_pr es_sl es_sr es_po =
    f_equivS_r { es_ml; es_mr; es_pr; es_sl; es_sr; es_po; }
 
-let f_equivF ef_pr ef_fl ef_fr ef_po =
+let f_equivF_old ef_pr ef_fl ef_fr ef_po =
   f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
+
+let f_equivF pr ef_fl ef_fr po =
+  f_equivF_r { ef_ml=mleft; ef_mr=mright; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; }
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool

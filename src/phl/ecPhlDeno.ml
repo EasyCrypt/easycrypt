@@ -145,7 +145,7 @@ let t_equiv_deno_r pre post tc =
  in
 
   let (prl, prr) = (destr_pr f1, destr_pr f2) in
-  let concl_e = f_equivF pre prl.pr_fun prr.pr_fun post in
+  let concl_e = f_equivF_old pre prl.pr_fun prr.pr_fun post in
   let funl = EcEnv.Fun.by_xpath prl.pr_fun env in
   let funr = EcEnv.Fun.by_xpath prr.pr_fun env in
 
@@ -355,7 +355,7 @@ let t_equiv_deno_bad2 pre bad1 tc =
     let bad2 = subst_r bad2 in
     f_and (f_iff (subst_l bad1) bad2)
       (f_imp (f_not bad2) (f_iff (subst_l ev1) (subst_r ev2))) in
-  let equiv = f_equivF pre f1 f2 post in
+  let equiv = f_equivF_old pre f1 f2 post in
   let cpre = cond_pre env pr1 pr2 pre in
   let fpreb1 = f_pr_r {pr1 with pr_event = f_and ev1 bad1} in
   let fpren1 = f_pr_r {pr1 with pr_event = f_and ev1 (f_not bad1) } in
@@ -469,7 +469,7 @@ let process_equiv_deno1 info eq tc =
 
     let pre = process_pre tc hyps prl prr pre post in
 
-    f_equivF pre fl fr post
+    f_equivF_old pre fl fr post
   in
 
   let pt, ax =
@@ -505,7 +505,7 @@ let process_equiv_deno_bad info tc =
         f_imps [f_not bad;evl] evr in
     let pre = process_pre tc hyps prl prr pre post in
 
-    f_equivF pre fl fr post
+    f_equivF_old pre fl fr post
   in
 
   let pt, ax =
@@ -563,7 +563,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
 
     let pre = process_pre tc hyps prl prr pre post in
 
-    f_equivF pre fl fr post
+    f_equivF_old pre fl fr post
   in
 
   let pt, ax =

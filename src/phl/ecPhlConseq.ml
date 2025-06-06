@@ -152,7 +152,7 @@ let t_equivF_conseq pre post tc =
   let cond1, cond2 = conseq_cond_old ef.ef_pr ef.ef_po pre post in
   let concl1 = f_forall_mems [mprl;mprr] cond1 in
   let concl2 = f_forall_mems [mpol;mpor] cond2 in
-  let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
+  let concl3 = f_equivF_old pre ef.ef_fl ef.ef_fr post in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -234,7 +234,7 @@ let cond_equivF_notmod ?(mk_other=false) tc cond =
 let t_equivF_notmod post tc =
   let ef = tc1_as_equivF tc in
   let cond1, _, _ = cond_equivF_notmod tc (f_imp post ef.ef_po) in
-  let cond2 = f_equivF ef.ef_pr ef.ef_fl ef.ef_fr post in
+  let cond2 = f_equivF_old ef.ef_pr ef.ef_fl ef.ef_fr post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -621,14 +621,13 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_conj pre post pre' post' tc =
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let (_, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in (*EcReduction.alpha_conv*)
-  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id pre.m hf.hf_m in
-  if not (is_alpha_eq ~subst hyps (hf_pr hf).inv 
-            (map_ss_inv2 f_and pre' pre).inv) 
+  let pre'' = map_ss_inv2 f_and pre' pre in
+  let post'' = map_ss_inv2 f_and post' post in
+  if not (ss_inv_alpha_eq hyps (hf_pr hf) pre'') 
   then tc_error !!tc "invalid pre-condition";
-  if not (is_alpha_eq ~subst hyps (hf_po hf).inv 
-            (map_ss_inv2 f_and post' post).inv)
+  if not (ss_inv_alpha_eq hyps (hf_po hf) post'')
   then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF pre hf.hf_f post in
   let concl2 = f_hoareF pre' hf.hf_f post' in
@@ -676,20 +675,23 @@ let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
+  let (env, hyps, _) = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let subst1 = Fsubst.f_subst_mem mhr mleft in
-  let subst2 = Fsubst.f_subst_mem mhr mright in
-  let pre1'  = subst1 pre1 in
-  let post1' = subst1 post1 in
-  let pre2'  = subst2 pre2 in
-  let post2' = subst2 post2 in
-  if not (f_equal ef.ef_pr (f_ands [pre';pre1';pre2']) ) then
-    tc_error !!tc "invalid pre-condition";
-  if not (f_equal ef.ef_po (f_ands [post';post1';post2'])) then
-    tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF_old pre1 ef.ef_fl post1 in
-  let concl2 = f_hoareF_old pre2 ef.ef_fr post2 in
-  let concl3 = f_equivF pre' ef.ef_fl ef.ef_fr post' in
+  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 mleft) mright in
+  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 mleft) mright in
+  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mright) mleft in
+  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mright) mleft in
+  let pre'' = map_ts_inv f_ands [pre'; pre1'; pre2'] in
+  let post'' = map_ts_inv f_ands [post'; post1'; post2'] in
+  pp_debug_form.contents env post''.inv;
+  pp_debug_form.contents env (ef_po ef).inv;
+  if not (ts_inv_alpha_eq hyps (ef_pr ef) pre'') 
+  then tc_error !!tc "invalid pre-condition";
+  if not (ts_inv_alpha_eq hyps (ef_po ef) post'')
+  then tc_error !!tc "invalid post-condition";
+  let concl1 = f_hoareF pre1 ef.ef_fl post1 in
+  let concl2 = f_hoareF pre2 ef.ef_fr post2 in
+  let concl3 = f_equivF_old pre'.inv ef.ef_fl ef.ef_fr post'.inv in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -743,7 +745,7 @@ let transitivity_side_cond hyps prml poml pomr p q p2 q2 p1 q1 =
 let t_hoareF_conseq_equiv f2 p q p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let hf1 = tc1_as_hoareF tc in
-  let ef  = f_equivF p hf1.hf_f f2 q in
+  let ef  = f_equivF_old p hf1.hf_f f2 q in
   let hf2 = f_hoareF_old p2 f2 q2 in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv hf1.hf_f f2 env in
   let (cond1, cond2) =
@@ -753,7 +755,7 @@ let t_hoareF_conseq_equiv f2 p q p2 q2 tc =
 let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let hf1 = tc1_as_bdhoareF tc in
-  let ef  = f_equivF p hf1.bhf_f f2 q in
+  let ef  = f_equivF_old p hf1.bhf_f f2 q in
   let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp hf1.bhf_bd in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv hf1.bhf_f f2 env in
   let (cond1, cond2) =
@@ -764,7 +766,7 @@ let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
 let t_ehoareF_conseq_equiv f2 p q p2 q2 tc =
   let env = FApi.tc1_env tc in
   let hf1 = tc1_as_ehoareF tc in
-  let ef  = f_equivF p hf1.ehf_f f2 q in
+  let ef  = f_equivF_old p hf1.ehf_f f2 q in
   let hf2 = f_eHoareF p2 f2 q2 in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv hf1.ehf_f f2 env in
   let p1 = hf1.ehf_pr and q1 = hf1.ehf_po in
@@ -1196,12 +1198,11 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let pre    = f_ands [ef.ef_pr; subst1 hs2.hf_pr; subst2 hs3.hf_pr] in
     let post   = f_ands [ef.ef_po; subst1 hs2.hf_po; subst2 hs3.hf_po] in
     let tac    = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
-
     t_on1seq 2
       (tac pre post)
       (FApi.t_seqsub
          (t_equivF_conseq_conj
-            hs2.hf_pr hs2.hf_po hs3.hf_pr hs3.hf_po ef.ef_pr ef.ef_po)
+            (hf_pr hs2) (hf_po hs2) (hf_pr hs3) (hf_po hs3) (ef_pr ef) (ef_po ef))
          [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
       tc
 
@@ -1323,7 +1324,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_equivF pre ef.ef_fl ef.ef_fr post
+          f_equivF_old pre ef.ef_fl ef.ef_fr post
         in (penv, qenv, Inv_ts (ef_pr ef), Inv_ts (ef_po ef), tbool, lift_inv_adapter2 fmake)
 
       | FequivS es ->

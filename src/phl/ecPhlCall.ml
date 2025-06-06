@@ -234,7 +234,7 @@ let t_equiv_call fpre fpost tc =
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
   (* The functions satisfy their specification *)
-  let f_concl = f_equivF fpre fl fr fpost in
+  let f_concl = f_equivF_old fpre fl fr fpost in
   let modil = f_write env fl in
   let modir = f_write env fr in
   (* The wp *)
@@ -362,7 +362,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
     let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
-      f_equivF pre fl fr post
+      f_equivF_old pre fl fr post
 
   | false ->
       let defl = EcEnv.Fun.by_xpath fl env in
@@ -381,7 +381,7 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
       let pre = f_and eq_params inv in
       let post = f_and eq_res inv in
-        f_equivF pre fl fr post
+        f_equivF_old pre fl fr post
 
 let process_call side info tc =
   let process_spec tc side =
@@ -418,7 +418,7 @@ let process_call side info tc =
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
           let penv, qenv = LDecl.equivF fl fr hyps in
           let fmake pre post =
-            f_equivF pre fl fr post in
+            f_equivF_old pre fl fr post in
           (penv, qenv, tbool, fmake)
 
       | FequivS es, Some side ->
@@ -484,7 +484,7 @@ let process_call side info tc =
         let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
         let pre    = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
         let post   = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF pre fl fr post)
+        (bad,invP,invQ, f_equivF_old pre fl fr post)
 
     | _ -> tc_error !!tc "the conclusion is not an equiv" in
 

@@ -62,8 +62,8 @@ module Low = struct
       transitivity_side_cond
         hyps prml prmr poml pomr
         ef.ef_pr ef.ef_po p1 q1 pomt p2 q2 in
-    let cond3 = f_equivF p1 ef.ef_fl f q1 in
-    let cond4 = f_equivF p2 f ef.ef_fr q2 in
+    let cond3 = f_equivF_old p1 ef.ef_fl f q1 in
+    let cond4 = f_equivF_old p2 f ef.ef_fr q2 in
 
     FApi.xmutate1 tc `Trans [cond1; cond2; cond3; cond4]
 end

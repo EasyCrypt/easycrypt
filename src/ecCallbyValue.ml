@@ -540,7 +540,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let ef_po = norm st s ef.ef_po in
     let ef_fl = norm_xfun st s ef.ef_fl in
     let ef_fr = norm_xfun st s ef.ef_fr in
-    f_equivF ef_pr ef_fl ef_fr ef_po
+    f_equivF_old ef_pr ef_fl ef_fr ef_po
 
   | FequivS es ->
     assert (Args.isempty args);

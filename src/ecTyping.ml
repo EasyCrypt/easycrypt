@@ -3504,7 +3504,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let post' = transf qenv post in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_equivF pre' fpath1 fpath2 post'
+          f_equivF_old pre' fpath1 fpath2 post'
 
     | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
         if mode <> `Form then

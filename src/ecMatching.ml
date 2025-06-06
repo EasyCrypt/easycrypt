@@ -1158,7 +1158,7 @@ module FPosition = struct
 
           | FequivF ef ->
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
-              f_equivF ef_pr ef.ef_fl ef.ef_fr ef_po
+              f_equivF_old ef_pr ef.ef_fl ef.ef_fr ef_po
 
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition

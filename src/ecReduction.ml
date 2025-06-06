@@ -592,8 +592,10 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
     | FequivF ef1, FequivF ef2 ->
       check_xp env subst ef1.ef_fl ef2.ef_fl;
       check_xp env subst ef1.ef_fr ef2.ef_fr;
-      aux env subst ef1.ef_pr ef2.ef_pr;
-      aux env subst ef1.ef_po ef2.ef_po
+      let subst = check_m_binding env subst ef1.ef_ml ef2.ef_ml in
+      let subst = check_m_binding env subst ef1.ef_mr ef2.ef_mr in
+      aux env subst ef1.ef_pr ef2.ef_pr [@alert "-priv_pl"];
+      aux env subst ef1.ef_po ef2.ef_po [@alert "-priv_pl"]
 
     | FequivS es1, FequivS es2 ->
       check_s env subst es1.es_sl es2.es_sl;
@@ -1270,7 +1272,7 @@ let rec simplify ri env f =
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_equivF ef.ef_pr ef_fl ef_fr ef.ef_po)
+      (f_equivF_old ef.ef_pr ef_fl ef_fr ef.ef_po)
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
@@ -1368,7 +1370,7 @@ let zpop ri side f hd =
   | Zhl {f_node = FbdHoareS hs}, [pr;po;bd] ->
     f_bdHoareS hs.bhs_m pr hs.bhs_s po hs.bhs_cmp bd
     | Zhl {f_node = FequivF hf}, [pr;po] ->
-    f_equivF pr hf.ef_fr hf.ef_fl po
+    f_equivF_old pr hf.ef_fr hf.ef_fl po
   | Zhl {f_node = FequivS hs}, [pr;po] ->
     f_equivS hs.es_ml hs.es_mr pr hs.es_sl hs.es_sr po
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
@@ -1852,3 +1854,12 @@ let check_bindings env subst bd1 bd2 =
 let check_bindings exn env s bd1 bd2 =
   try check_bindings env s bd1 bd2
   with NotConv -> raise exn
+
+let ss_inv_alpha_eq hyps (inv1 : ss_inv) (inv2 : ss_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.m inv2.m in
+  is_alpha_eq ~subst hyps inv2.inv inv1.inv
+
+let ts_inv_alpha_eq hyps (inv1 : ts_inv) (inv2 : ts_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.ml inv2.ml in
+  let subst = Fsubst.f_bind_mem subst inv1.mr inv2.mr in
+  is_alpha_eq ~subst hyps inv2.inv inv1.inv

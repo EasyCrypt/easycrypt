@@ -395,10 +395,13 @@ let lift_inv_adapter2 (f: form -> form -> 'a) : inv -> inv -> 'a =
   | _ -> failwith "expected compatible invariants" in
   f
 
-(* ----------------------------------------------------------------- *)
-(* Mapping functions for invariants                                  *)
-(* ----------------------------------------------------------------- *)
+let ss_inv_generalize_left (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = m; mr = inv.m; inv = inv.inv }
 
+let ss_inv_generalize_right (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = inv.m; mr = m; inv = inv.inv }
+
+(* ----------------------------------------------------------------- *)
 let map_inv1 (fn: form -> form) (inv: inv): inv =
   match inv with
   | Inv_ss ss ->

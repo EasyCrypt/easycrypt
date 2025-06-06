@@ -501,7 +501,7 @@ module Fsubst = struct
       let s = f_rem_mem s mright in
       let ef_pr = f_subst ~tx s ef.ef_pr in
       let ef_po = f_subst ~tx s ef.ef_po in
-      f_equivF ef_pr ef_fl ef_fr ef_po
+      f_equivF_old ef_pr ef_fl ef_fr ef_po
 
     | FequivS es ->
       let es_sl = s_subst s es.es_sl in

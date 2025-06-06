@@ -283,7 +283,7 @@ let t_eager_fun_abs_r eqI h tc =
         f_true
     in
          f_eagerF ef.ef_pr s ef.ef_fl ef.ef_fr s' ef.ef_po
-      :: f_equivF (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
+      :: f_equivF_old (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
       :: sg
   in
 

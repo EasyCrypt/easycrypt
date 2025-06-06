@@ -127,8 +127,9 @@ val f_bdHoareF : form -> xpath -> form -> hoarecmp -> form -> form
 val f_bdHoareS : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
 
 (* soft-constructors - equiv *)
+val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
+val f_equivF_old : form -> xpath -> xpath -> form -> form
 val f_equivS : memenv -> memenv -> form -> stmt -> stmt -> form -> form
-val f_equivF : form -> xpath -> xpath -> form -> form
 
 (* soft-constructors - eager *)
 val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
