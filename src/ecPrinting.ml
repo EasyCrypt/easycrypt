@@ -1981,11 +1981,20 @@ and pp_form_core_r
         EcEnv.Fun.equivF_memenv eqv.ef_fl eqv.ef_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
-      Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+      if debug_mode then
+        Format.fprintf fmt "equiv[@[<hov 2>@ %a {%a} ~@ %a {%a} :@ @[%a ==>@ %a@]@]]"
         (pp_funname ppe) eqv.ef_fl
+        (pp_mem ppe) eqv.ef_ml
         (pp_funname ppe) eqv.ef_fr
+        (pp_mem ppe) eqv.ef_mr
         (pp_form ppepr) eqv.ef_pr
         (pp_form ppepo) eqv.ef_po
+      else
+        Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+          (pp_funname ppe) eqv.ef_fl
+          (pp_funname ppe) eqv.ef_fr
+          (pp_form ppepr) eqv.ef_pr
+          (pp_form ppepo) eqv.ef_po
 
   | FequivS es ->
       let ppef = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
@@ -3057,10 +3066,19 @@ let pp_equivF (ppe : PPEnv.t) ?prpo fmt ef =
   let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
   let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) ef.ef_pr;
-  Format.fprintf fmt "    %a ~ %a@\n%!"
-    (pp_funname ppe) ef.ef_fl
-    (pp_funname ppe) ef.ef_fr;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) ef.ef_po
+  if debug_mode then begin
+    Format.fprintf fmt "    %a {%a} ~ %a {%a}@\n%!"
+      (pp_funname ppe) ef.ef_fl
+      (pp_mem ppe) ef.ef_ml
+      (pp_funname ppe) ef.ef_fr
+      (pp_mem ppe) ef.ef_mr;
+    Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) ef.ef_po;
+  end else begin
+    Format.fprintf fmt "    %a ~ %a@\n%!"
+      (pp_funname ppe) ef.ef_fl
+      (pp_funname ppe) ef.ef_fr;
+    Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) ef.ef_po
+  end
 
 (* -------------------------------------------------------------------- *)
 let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =

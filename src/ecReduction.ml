@@ -1272,7 +1272,7 @@ let rec simplify ri env f =
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_equivF_old ef.ef_pr ef_fl ef_fr ef.ef_po)
+      (f_equivF (ef_pr ef) ef_fl ef_fr (ef_po ef))
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
