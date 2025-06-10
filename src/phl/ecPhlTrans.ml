@@ -66,7 +66,7 @@ module Low = struct
     let env, hyps, _ = FApi.tc1_eflat tc in
     let ef = tc1_as_equivF tc in
     let (prml, prmr), (poml, pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
-    let (_, pomt) = snd (Fun.hoareF_memenv f env) in
+    let (_, pomt) = snd (Fun.hoareF_memenv mhr f env) in
     let cond1, cond2 =
       transitivity_side_cond
         hyps prml prmr poml pomr
@@ -199,7 +199,7 @@ let process_trans_fun f p1 q1 p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
   let f = EcTyping.trans_gamepath env f in
-  let (_, prmt), (_, pomt) = Fun.hoareF_memenv f env in
+  let (_, prmt), (_, pomt) = Fun.hoareF_memenv mhr f env in
   let (prml, prmr), (poml, pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let process ml mr fo =
     TTC.pf_process_form !!tc (LDecl.push_all [ml; mr] hyps) tbool fo in

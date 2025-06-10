@@ -73,9 +73,10 @@ let subst_pre env fs (m : memory) s =
 let t_hoareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
+  (*assert (hf.hf_m <> mhr);*)
   let f = NormMp.norm_xfun env hf.hf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres hf.hf_po in
@@ -89,7 +90,7 @@ let t_ehoareF_fun_def_r tc =
   let hf = tc1_as_ehoareF tc in
   let f = NormMp.norm_xfun env hf.ehf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS mhr f env in
   let m = EcMemory.memory memenv in
   let fres  = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post  = PVM.subst1 env pv_res m fres hf.ehf_po in
@@ -103,7 +104,7 @@ let t_bdhoareF_fun_def_r tc =
   let bhf = tc1_as_bdhoareF tc in
   let f = NormMp.norm_xfun env bhf.bhf_f in
   check_concrete !!tc env f;
-  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let (memenv, (fsig, fdef), env) = Fun.hoareS mhr f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres bhf.bhf_po in
@@ -156,11 +157,11 @@ let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 (* -------------------------------------------------------------------- *)
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
-  let hoareF_abs_spec _pf env f inv =
+  let hoareF_abs_spec _pf env mem f inv =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
-    let fv = PV.fv env mhr inv in
+    let fv = PV.fv env mem inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF mem inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -245,7 +246,7 @@ end
 let t_hoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
+  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_m hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
@@ -418,9 +419,9 @@ let t_fun_to_code_hoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
   let f = hf.hf_f in
-  let m, st, r, a = ToCodeLow.to_code env f mhr in
-  let spr = ToCodeLow.add_var_tuple env pv_arg mhr a m PVM.empty in
-  let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
+  let m, st, r, a = ToCodeLow.to_code env f hf.hf_m in
+  let spr = ToCodeLow.add_var_tuple env pv_arg hf.hf_m a m PVM.empty in
+  let spo = ToCodeLow.add_var env pv_res hf.hf_m r m PVM.empty in
   let pre  = PVM.subst env spr hf.hf_pr in
   let post = PVM.subst env spo hf.hf_po in
   let concl = f_hoareS m pre st post in

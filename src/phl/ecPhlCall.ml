@@ -56,14 +56,17 @@ let wp2_call
   f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_call fpre fpost tc =
+let t_hoare_call fm fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let (lp,f,args),s = tc1_last_call tc hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF fpre f fpost in
+  let f_concl = f_hoareF fm fpre f fpost in
+  (* substitute memories *)
+  let fpre = Fsubst.f_subst_mem fm m fpre in
+  let fpost = Fsubst.f_subst_mem fm m fpost in
   (* The wp *)
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
@@ -308,7 +311,7 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in
       if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
         call_error env tc hf.hf_f f;
-      t_hoare_call hf.hf_pr hf.hf_po tc
+      t_hoare_call hf.hf_m hf.hf_pr hf.hf_po tc
 
   | FeHoareF hf, FeHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
@@ -384,24 +387,24 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let post = f_and eq_res inv in
         f_equivF pre fl fr post
 
-let process_call side info tc =
+let process_call (side : side option) (info : call_info gppterm) (tc : tcenv1) =
   let process_spec tc side =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, tbool, fun pre post -> f_hoareF pre f post)
+          let penv, qenv = LDecl.hoareF (fst hs.hs_m) f hyps in
+          (penv, qenv, tbool, fun pre post -> f_hoareF (fst hs.hs_m) pre f post)
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, tbool, fun pre post ->
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
 
       | FbdHoareS _, Some _
@@ -417,7 +420,7 @@ let process_call side info tc =
       | FequivS es, Some side ->
           let fstmt = sideif side es.es_sl es.es_sr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, tbool, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
@@ -430,8 +433,8 @@ let process_call side info tc =
     match concl.f_node with
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv -> f_hoareF inv f inv)
+        let penv = LDecl.inv_memenv1 ~mem:(fst hs.hs_m) hyps in
+        (penv, tbool, fun inv -> f_hoareF (fst hs.hs_m) inv f inv)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
@@ -518,6 +521,10 @@ let process_call side info tc =
       tc_error !!tc "cannot infer all placeholders";
     PT.concretize pt in
 
+  let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+
+  Format.eprintf "@.@.[W]%a@." (EcPrinting.pp_form ppe) ax;
+
   FApi.t_seqsub
     (t_call side ax)
     [FApi.t_seqs
@@ -542,7 +549,7 @@ let process_call_concave (fc, info) tc =
       match concl.f_node  with
       | FeHoareS hs ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
+          let penv, qenv = LDecl.hoareF mhr f hyps in
           (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
 
       | _ -> tc_error !!tc "the conclusion is not a ehoare" in

@@ -453,8 +453,8 @@ let process_done tc =
 
 (* -------------------------------------------------------------------- *)
 let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
-  let pt = PT.tc1_process_full_pterm ~implicits tc ff in
 
+  let pt = PT.tc1_process_full_pterm ~implicits tc ff in
   try
     match mode with
     | `Alpha ->
