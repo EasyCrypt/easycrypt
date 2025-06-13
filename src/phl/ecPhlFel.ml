@@ -203,7 +203,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let pre = f_and_simpl pre inv in
       let pre = f_and_simpl pre some_p in
       let post = f_event in
-      f_bdHoareF pre o post FHle bound
+      f_bdHoareF_old pre o post FHle bound
     in
     let old_cntr_id = EcIdent.create "c" in
     let old_b_id = EcIdent.create "b" in

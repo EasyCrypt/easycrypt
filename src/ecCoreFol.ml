@@ -303,6 +303,11 @@ let f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
     { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd; }
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
+  assert (bhf_pr.m = bhf_po.m);
+  f_bdHoareF_r { bhf_m=bhf_pr.m; bhf_pr=bhf_pr.inv; bhf_f; bhf_po=bhf_po.inv;
+                 bhf_cmp; bhf_bd; } [@alert "-priv_pl"]
+                 
+let f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
   f_bdHoareF_r { bhf_m=mhr; bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }
 
 (* -------------------------------------------------------------------- *)
@@ -316,7 +321,7 @@ let f_equivF_old ef_pr ef_fl ef_fr ef_po =
   f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
 
 let f_equivF pr ef_fl ef_fr po =
-  f_equivF_r { ef_ml=mleft; ef_mr=mright; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; }
+  f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; }
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool

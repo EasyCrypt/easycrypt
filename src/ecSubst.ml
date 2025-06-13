@@ -555,7 +555,7 @@ let rec subst_form (s : subst) (f : form) =
        (bhf_pr, bhf_po) in
      let bhf_f  = subst_xpath s bhf_f in
      let bhf_bd  = subst_form s bhf_bd in
-     f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
+     f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
 
   | FbdHoareS { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd } ->
      let bhs_m, (bhs_pr, bhs_po, bhs_bd) =
@@ -1145,16 +1145,42 @@ let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
     { inv; m = m' }
 
 let f_forall_mems_ss_inv menv inv =
-  if fst menv = inv.m then
-    f_forall_mems [menv] inv.inv
-  else
-    f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+  f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
 
-let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
-  if ml' = ml && mr' = mr then
+let ts_inv_rebind_left ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
+  if ml = m then
     { inv; ml; mr }
   else
-    let s = add_memory empty ml ml' in
+    let s = add_memory empty ml m in
+    let inv = subst_form s inv in
+    { inv; ml = m; mr }
+
+let ts_inv_rebind_right ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
+  if mr = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty mr m in
+    let inv = subst_form s inv in
+    { inv; ml; mr = m }
+
+let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
+  match ml' = ml, mr' = mr with
+  | true, true -> { inv; ml; mr }
+  | false, true -> ts_inv_rebind_left {inv;ml;mr} ml'
+  | true, false -> ts_inv_rebind_right {inv;ml;mr} mr'
+  | false, false -> begin let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = mr'; mr = mr' }
+  end
+
+let f_forall_mems_ts_inv menvl menvr inv = 
+  f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
+
+let ss_inv_forall_ml_ts_inv menvl inv =
+  let inv' = f_forall_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
+  { inv=inv'; m=inv.mr}
+
+let ss_inv_forall_mr_ts_inv menvr inv =
+  let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
+  { inv=inv'; m=inv.ml }

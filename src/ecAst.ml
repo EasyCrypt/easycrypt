@@ -347,6 +347,92 @@ let map_ts_inv3 (fn: form -> form -> form -> form)
   let inv' = fn inv1.inv inv2.inv inv3.inv in
   { ml = inv1.ml; mr = inv1.mr; inv = inv' }
 
+let map_ts_inv_left (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml;inv}) invs) in
+  { ml=inv.m; mr = mr'; inv = inv.inv }
+
+let map_ts_inv_left1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_left2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_left3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr;inv}) invs) in
+  { ml = ml'; mr = inv.m; inv = inv.inv }
+
+let map_ts_inv_right1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_right2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml; inv}) invs) in
+  { m = mr'; inv = inv }
+
+let ts_inv_lower_left1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { m = inv.mr; inv = inv' }
+
+let ts_inv_lower_left2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { m = inv1.mr; inv = inv' }
+  
+let ts_inv_lower_left3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { m = inv1.mr; inv = inv' }
+
+let ts_inv_lower_right (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr; inv}) invs) in
+  { m = ml'; inv = inv }
+
+let ts_inv_lower_right1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { m = inv.ml; inv = inv' }
+
+let ts_inv_lower_right2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { m = inv1.ml; inv = inv' }
+
+let ts_inv_lower_right3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { m = inv1.ml; inv = inv' }
+
+(* ----------------------------------------------------------------- *)
+
 type inv =
   | Inv_ss of ss_inv
   | Inv_ts of ts_inv

@@ -510,7 +510,7 @@ let process_eqobs_inF info tc =
     try f_eqobs_in fl fr sim eqo
     with EqObsInError -> tc_error !!tc "not able to process" in
   let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
-  (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
+  (EcPhlConseq.t_equivF_conseq (ef_pr ef') (ef_po ef') @+ [
     t_trivial;
     t_trivial;
      t_eqobs_inF sim eqo]) tc

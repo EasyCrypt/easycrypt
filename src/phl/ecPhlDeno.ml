@@ -54,7 +54,7 @@ let t_core_phoare_deno pre post tc =
   in
 
   let pr = destr_pr f in
-  let concl_e = f_bdHoareF pre pr.pr_fun post cmp bd in
+  let concl_e = f_bdHoareF_old pre pr.pr_fun post cmp bd in
   let fun_ = EcEnv.Fun.by_xpath pr.pr_fun env in
 
   (* building the substitution for the pre *)
@@ -206,7 +206,7 @@ let process_phoare_deno info tc =
     let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_formula !!tc penv p) f_true in
     let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) event in
 
-    f_bdHoareF pre f post cmp bd
+    f_bdHoareF_old pre f post cmp bd
   in
 
   let pt, ax =
@@ -513,16 +513,16 @@ let process_equiv_deno_bad info tc =
       ~prcut:process_cut tc info in
 
   let equiv = pf_as_equivF !!tc ax in
-  let pre = equiv.ef_pr in
+  let pre = (ef_pr equiv) in
 
   let torotate = ref 1 in
   let t_sub =
     FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
-      (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+
+      (EcPhlConseq.t_equivF_conseq pre (ef_po equiv) @+
          [t_true; (fun tc -> incr torotate;t_id tc);
           EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]) in
   let gs =
-    t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad pre tc)) in
+    t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad pre.inv tc)) in
   t_rotate `Left !torotate gs
 
 (* -------------------------------------------------------------------- *)
@@ -571,16 +571,16 @@ let process_equiv_deno_bad2 info eq bad1 tc =
       ~prcut:process_cut tc info in
 
   let equiv = pf_as_equivF !!tc ax in
-  let pre = equiv.ef_pr in
+  let pre = (ef_pr equiv) in
 
   let torotate = ref 1 in
   let t_sub =
     FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
-      (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+
+      (EcPhlConseq.t_equivF_conseq pre (ef_po equiv) @+
          [t_true; (fun tc -> incr torotate;t_id tc);
           EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]) in
   let gs =
-    t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre bad1 tc)) in
+    t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre.inv bad1 tc)) in
   t_rotate `Left !torotate gs
 
 (* -------------------------------------------------------------------- *)

@@ -3485,7 +3485,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
-          f_bdHoareF pre' fpath post' hcmp bd'
+          f_bdHoareF_old pre' fpath post' hcmp bd'
 
     | PFlsless gp ->
         if mode <> `Form then

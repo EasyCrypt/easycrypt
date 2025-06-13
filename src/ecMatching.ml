@@ -1154,7 +1154,7 @@ module FPosition = struct
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
-              f_bdHoareF bhf_pr hf.bhf_f bhf_po hf.bhf_cmp bhf_bd
+              f_bdHoareF_old bhf_pr hf.bhf_f bhf_po hf.bhf_cmp bhf_bd
 
           | FequivF ef ->
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in

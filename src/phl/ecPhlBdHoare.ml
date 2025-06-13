@@ -98,10 +98,10 @@ let gen_S tactic =
 let gen_F tactic =
   let as_bdh pf f =
     let bh = pf_as_bdhoareF pf f in
-      (bh, bh.bhf_po, bh.bhf_cmp, bh.bhf_bd)
+      (bh, (bhf_po bh), bh.bhf_cmp, bh.bhf_bd) in
 
-  and mk_bdh (bh, po, cmp, b) =
-    f_bdHoareF bh.bhf_pr bh.bhf_f po cmp b in
+  let mk_bdh (bh, po, cmp, b) =
+    f_bdHoareF (bhf_pr bh) bh.bhf_f po cmp b in
 
   tactic t_bdHoareF_conseq_bd { as_bdh; mk_bdh; }
 

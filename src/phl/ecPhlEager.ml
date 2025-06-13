@@ -288,7 +288,7 @@ let t_eager_fun_abs_r eqI h tc =
   in
 
   let sg   = List.fold_right do1 sg [] in
-  let seqI = Mpv2.of_form env mleft mright eqI in
+  let seqI = Mpv2.of_form env eqI.ml eqI.mr eqI.inv in
 
   (* check (e) and (f)*)
   pf_compat !!tc env (s_write env s) (s_write env s') seqI eqIs eqXs;
@@ -601,7 +601,7 @@ let process_fun_abs info eqI tc =
   let env   = LDecl.inv_memenv hyps in
   let eqI   = TTC.pf_process_form !!tc env tbool eqI in
   let gs, h = process_info info tc in
-  FApi.t_last (t_eager_fun_abs eqI h) gs
+  FApi.t_last (t_eager_fun_abs {inv=eqI;ml=mleft;mr=mright} h) gs
 
 (* -------------------------------------------------------------------- *)
 let process_call info tc =

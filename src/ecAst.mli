@@ -325,6 +325,34 @@ val map_ts_inv1 : (form -> form) -> ts_inv -> ts_inv
 val map_ts_inv2 : (form -> form -> form) -> ts_inv -> ts_inv -> ts_inv
 val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -> ts_inv
 
+val map_ts_inv_left : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
+val map_ts_inv_left1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
+val map_ts_inv_left2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+    ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val map_ts_inv_right : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
+val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
+val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+    ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
+val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv
+val ts_inv_lower_left2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
+val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+    ts_inv -> ts_inv -> ts_inv -> ss_inv
+
+val ts_inv_lower_right : (ss_inv list -> form) -> ts_inv list -> ss_inv
+val ts_inv_lower_right1 : (ss_inv -> form) -> ts_inv -> ss_inv
+val ts_inv_lower_right2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
+val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+    ts_inv -> ts_inv -> ts_inv -> ss_inv
+
+(* -------------------------------------------------------------------- *)
+(* Invariants                                                          *)
+(* -------------------------------------------------------------------- *)
+
 type inv =
   | Inv_ss of ss_inv
   | Inv_ts of ts_inv

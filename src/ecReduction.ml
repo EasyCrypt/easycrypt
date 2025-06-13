@@ -1266,7 +1266,7 @@ let rec simplify ri env f =
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_bdHoareF hf.bhf_pr bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd)
+      (f_bdHoareF_old hf.bhf_pr bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd)
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
@@ -1366,11 +1366,12 @@ let zpop ri side f hd =
   | Zhl {f_node = FeHoareS hs}, [pr;po] ->
     f_eHoareS hs.ehs_m pr hs.ehs_s po
   | Zhl {f_node = FbdHoareF hf}, [pr;po;bd] ->
-    f_bdHoareF pr hf.bhf_f po hf.bhf_cmp bd
+    f_bdHoareF_old pr hf.bhf_f po hf.bhf_cmp bd
   | Zhl {f_node = FbdHoareS hs}, [pr;po;bd] ->
     f_bdHoareS hs.bhs_m pr hs.bhs_s po hs.bhs_cmp bd
-    | Zhl {f_node = FequivF hf}, [pr;po] ->
-    f_equivF_old pr hf.ef_fr hf.ef_fl po
+  | Zhl {f_node = FequivF ef}, [pr;po] ->
+    f_equivF {inv=pr; ml=ef.ef_ml; mr=ef.ef_mr} ef.ef_fr ef.ef_fl 
+             {inv=po; ml=ef.ef_ml; mr=ef.ef_mr}
   | Zhl {f_node = FequivS hs}, [pr;po] ->
     f_equivS hs.es_ml hs.es_mr pr hs.es_sl hs.es_sr po
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
@@ -1515,7 +1516,9 @@ let rec conv ri env f1 f2 stk =
   | FequivF ef1, FequivF ef2
       when EqTest_i.for_xp env ef1.ef_fl ef2.ef_fl
         && EqTest_i.for_xp env ef1.ef_fr ef2.ef_fr ->
-    conv ri env ef1.ef_pr ef2.ef_pr (zhl f1 [ef1.ef_po] [ef2.ef_po] stk)
+    let pr2 = (ts_inv_rebind (ef_pr ef2) ef1.ef_ml ef1.ef_mr).inv in
+    let po2 = (ts_inv_rebind (ef_po ef2) ef1.ef_ml ef1.ef_mr).inv in
+    conv ri env ef1.ef_pr pr2 (zhl f1 [ef1.ef_po] [po2] stk)
 
   | FequivS es1, FequivS es2
       when EqTest_i.for_stmt env es1.es_sl es2.es_sl

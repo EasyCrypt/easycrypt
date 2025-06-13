@@ -3,6 +3,7 @@ open EcBigInt
 open EcPath
 open EcTypes
 open EcMemory
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 include module type of struct include EcCoreFol end
@@ -20,15 +21,30 @@ val f_eqparams:
   -> EcTypes.ty -> ovariable list -> memory
   -> form
 
+val ts_inv_eqparams:
+     EcTypes.ty -> ovariable list -> memory
+  -> EcTypes.ty -> ovariable list -> memory
+  -> ts_inv
+
 val f_eqres:
      EcTypes.ty -> memory
   -> EcTypes.ty -> memory
   -> form
 
+val ts_inv_eqres:
+     EcTypes.ty -> memory
+  -> EcTypes.ty -> memory
+  -> ts_inv
+
 val f_eqglob:
      mpath -> memory
   -> mpath -> memory
   -> form
+
+val ts_inv_eqglob:
+     mpath -> memory
+  -> mpath -> memory
+  -> ts_inv
 
 (* soft-constructors - ordering *)
 val f_int_le  : form -> form -> form

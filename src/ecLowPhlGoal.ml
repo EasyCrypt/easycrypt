@@ -270,7 +270,7 @@ let set_pre ~pre f =
     f_eHoareS hs.ehs_m pre.inv hs.ehs_s hs.ehs_po
  | FbdHoareF hf, Inv_ss pre ->
     let pre = ss_inv_rebind pre hf.bhf_m in
-    f_bdHoareF pre.inv hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
+    f_bdHoareF_old pre.inv hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
  | FbdHoareS hs, Inv_ss pre -> 
     let pre = ss_inv_rebind pre (fst hs.bhs_m) in
     f_bdHoareS hs.bhs_m pre.inv hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd

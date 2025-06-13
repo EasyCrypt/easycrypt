@@ -484,7 +484,7 @@ module Fsubst = struct
       let hf_pr = f_subst ~tx s hf.bhf_pr in
       let hf_po = f_subst ~tx s hf.bhf_po in
       let hf_bd = f_subst ~tx s hf.bhf_bd in
-      f_bdHoareF hf_pr hf_f hf_po hf.bhf_cmp hf_bd
+      f_bdHoareF_old hf_pr hf_f hf_po hf.bhf_cmp hf_bd
 
     | FbdHoareS hs ->
       let hs_s = s_subst s hs.bhs_s in

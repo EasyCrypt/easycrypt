@@ -167,11 +167,11 @@ let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
 
   match cmp, opt_bd with
   | FHle, Some _  -> tc_error pf "%s" msg
-  | FHle, None    -> f_bdHoareF fpre f fpost FHle bd
-  | FHeq, Some bd -> f_bdHoareF fpre f fpost FHeq bd
-  | FHeq, None    -> f_bdHoareF fpre f fpost FHeq bd
-  | FHge, Some bd -> f_bdHoareF fpre f fpost FHge bd
-  | FHge, None    -> f_bdHoareF fpre f fpost FHge bd
+  | FHle, None    -> f_bdHoareF_old fpre f fpost FHle bd
+  | FHeq, Some bd -> f_bdHoareF_old fpre f fpost FHeq bd
+  | FHeq, None    -> f_bdHoareF_old fpre f fpost FHeq bd
+  | FHge, Some bd -> f_bdHoareF_old fpre f fpost FHge bd
+  | FHge, None    -> f_bdHoareF_old fpre f fpost FHge bd
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_call fpre fpost opt_bd tc =
@@ -263,7 +263,7 @@ let t_equiv_call1 side fpre fpost tc =
   let fsig = (Fun.by_xpath f env).f_sig in
 
   (* The function satisfies its specification *)
-  let fconcl = f_bdHoareF fpre f fpost FHeq f_r1 in
+  let fconcl = f_bdHoareF_old fpre f fpost FHeq f_r1 in
 
   (* WP *)
   let pvres  = pv_res in
@@ -474,17 +474,17 @@ let process_call side info tc =
         let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
         let (topl,fl,_,sigl),
             (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-        let bad2 = Fsubst.f_subst_mem mhr mright bad in
-        let eqglob = f_eqglob topl mleft topr mright in
+        let bad2 = ss_inv_generalize_left bad mleft in
+        let eqglob = ts_inv_eqglob topl mleft topr mright in
         let lpre = [eqglob;invP] in
         let eq_params =
-          f_eqparams
+          ts_inv_eqparams
             sigl.fs_arg sigl.fs_anames mleft
             sigr.fs_arg sigr.fs_anames mright in
-        let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-        let pre    = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
-        let post   = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF_old pre fl fr post)
+        let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+        let pre    = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands (eq_params::lpre)) in
+        let post   = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
+        (bad,invP,invQ, f_equivF pre fl fr post)
 
     | _ -> tc_error !!tc "the conclusion is not an equiv" in
 

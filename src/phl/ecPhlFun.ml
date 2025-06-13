@@ -9,6 +9,7 @@ open EcMemory
 open EcModules
 open EcEnv
 open EcPV
+open EcSubst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -181,23 +182,23 @@ module FunAbsLow = struct
     PV.check_depend env fv top;
     let ospec o =
       check_oracle_use pf env top o;
-      f_bdHoareF inv o inv FHeq f_r1 in
+      f_bdHoareF_old inv o inv FHeq f_r1 in
 
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
 
   (* ------------------------------------------------------------------ *)
-  let equivF_abs_spec pf env fl fr inv =
+  let equivF_abs_spec pf env fl fr (inv: ts_inv) =
     let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
     let ml, mr = mleft, mright in
-    let fvl = PV.fv env ml inv in
-    let fvr = PV.fv env mr inv in
+    let fvl = PV.fv env inv.ml inv.inv in
+    let fvr = PV.fv env inv.mr inv.inv in
     PV.check_depend env fvl topl;
     PV.check_depend env fvr topr;
-    let eqglob = f_eqglob topl ml topr mr in
+    let eqglob = ts_inv_eqglob topl ml topr mr in
 
     let ospec o_l o_r =
       let use =
@@ -221,9 +222,9 @@ module FunAbsLow = struct
         f_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
 
       let invs = if use then [eqglob; inv] else [inv] in
-      let pre  = EcFol.f_ands (eq_params :: invs) in
-      let post = EcFol.f_ands (eq_res :: invs) in
-      f_equivF_old pre o_l o_r post
+      let pre  = map_ts_inv (fun invs -> EcFol.f_ands (eq_params :: invs)) invs in
+      let post = map_ts_inv (fun invs -> EcFol.f_ands (eq_res :: invs)) invs in
+      f_equivF pre o_l o_r post
     in
 
     let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
@@ -233,10 +234,10 @@ module FunAbsLow = struct
         sigl.fs_arg sigl.fs_anames ml
         sigr.fs_arg sigr.fs_anames mr in
 
-    let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
+    let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
     let lpre   = [eqglob;inv] in
-    let pre    = f_ands (eq_params::lpre) in
-    let post   = f_ands [eq_res; eqglob; inv] in
+    let pre    = map_ts_inv (fun lpre -> f_ands (eq_params::lpre)) lpre in
+    let post   = map_ts_inv f_ands [eq_res; eqglob; inv] in
 
     (pre, post, sg)
 end
@@ -293,22 +294,23 @@ let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 (* -------------------------------------------------------------------- *)
 module UpToLow = struct
   (* ------------------------------------------------------------------ *)
-  let equivF_abs_upto pf env fl fr bad invP invQ =
+  let equivF_abs_upto pf env fl fr (bad: ss_inv) (invP: ts_inv) (invQ: ts_inv) =
     let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
-    let ml, mr = mleft, mright in
-    let bad2 = Fsubst.f_subst_mem mhr mr bad in
-    let allinv = f_ands [bad2; invP; invQ] in
-    let fvl = PV.fv env ml allinv in
-    let fvr = PV.fv env mr allinv in
+    let ml, mr = invP.ml, invP.mr in
+    let bad2 = ss_inv_rebind bad invP.mr in
+    let bad2' = ss_inv_generalize_left bad2 invP.ml in
+    let allinv = map_ts_inv f_ands [bad2'; invP; invQ] in
+    let fvl = PV.fv env ml allinv.inv in
+    let fvr = PV.fv env mr allinv.inv in
 
     PV.check_depend env fvl topl;
     PV.check_depend env fvr topr;
 
     (* FIXME: check there is only global variable *)
-    let eqglob = f_eqglob topl ml topr mr in
+    let eqglob = ts_inv_eqglob topl ml topr mr in
 
     let ospec o_l o_r =
       check_oracle_use pf env topl o_l;
@@ -318,25 +320,23 @@ module UpToLow = struct
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
       let eq_params =
-        f_eqparams
+        ts_inv_eqparams
           fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames ml
           fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
 
       let eq_res =
-        f_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
+        ts_inv_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
 
-      let pre   = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
-      let post  = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
-      let cond1 = f_equivF_old pre o_l o_r post in
+      let pre   = map_ts_inv EcFol.f_ands [map_ts_inv1 EcFol.f_not bad2'; eq_params; invP] in
+      let post  = map_ts_inv3 EcFol.f_if_simpl bad2' invQ (map_ts_inv2 f_and eq_res invP) in
+      let cond1 = f_equivF pre o_l o_r post in
       let cond2 =
-        let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
-          f_forall[(mr, GTmem abstract_mt)]
-            (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
+        let concl = ts_inv_lower_right1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
+        f_forall_mems_ss_inv (ml, abstract_mt)
+          (map_ss_inv2 f_imp bad2 concl) in
       let cond3 =
-        let q  = Fsubst.f_subst_mem mr EcFol.mhr invQ in
-        let bq = f_and bad q in
-          f_forall [(ml, GTmem abstract_mt)]
-            (f_bdHoareF bq o_r bq FHeq f_r1) in
+        let bq = map_ts_inv_right1 (map_ss_inv2 f_and bad) invQ in
+          f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_bdHoareF bq o_r bq FHeq f_r1) bq) in
 
       [cond1; cond2; cond3]
     in
@@ -347,15 +347,15 @@ module UpToLow = struct
     let sg = lossless_a :: sg in
 
     let eq_params =
-      f_eqparams
+      ts_inv_eqparams
         sigl.fs_arg sigl.fs_anames ml
         sigr.fs_arg sigr.fs_anames mr in
 
-    let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
+    let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
 
     let pre  = [eqglob;invP] in
-    let pre  = f_if_simpl bad2 invQ (f_ands (eq_params::pre)) in
-    let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
+    let pre  = map_ts_inv3 f_if_simpl bad2' invQ (map_ts_inv f_ands (eq_params::pre)) in
+    let post = map_ts_inv3 f_if_simpl bad2' invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
 
     (pre, post, sg)
 end
@@ -560,7 +560,7 @@ let t_fun_r (inv: inv) tc =
     let env = FApi.tc1_env tc in
     let e   = destr_equivF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun e.ef_fl env
-      then t_equivF_abs inv.inv tc
+      then t_equivF_abs inv tc
       else t_equivF_fun_def tc
 
   in
@@ -593,7 +593,7 @@ let process_fun_upto_info (bad, p, q) tc =
     let env' = LDecl.push_active (EcMemory.abstract EcFol.mhr) hyps in
     TTC.pf_process_form !!tc env' tbool bad
   in
-    (bad, p, q)
+    ({inv=bad;m=mhr}, {inv=p;ml=mleft;mr=mright}, {inv=q;ml=mleft;mr=mright})
 
 (* -------------------------------------------------------------------- *)
 let process_fun_upto info g =
@@ -624,7 +624,7 @@ let process_fun_abs inv tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_equivF_abs inv tc
+    t_equivF_abs {inv;ml=mleft;mr=mright} tc
 
   in
   t_hF_or_bhF_or_eF ~th:t_hoare ~teh:t_ehoare ~tbh:t_bdhoare ~te:t_equiv tc

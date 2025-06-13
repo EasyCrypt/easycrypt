@@ -31,7 +31,7 @@ let t_bdhoare_of_hoareS_r tc =
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_of_hoareF_r tc =
   let hf = tc1_as_hoareF tc in
-  let concl = f_bdHoareF hf.hf_pr hf.hf_f (f_not hf.hf_po) FHeq f_r0 in
+  let concl = f_bdHoareF_old hf.hf_pr hf.hf_f (f_not hf.hf_po) FHeq f_r0 in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)

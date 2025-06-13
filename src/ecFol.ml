@@ -33,13 +33,25 @@ let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
              (f_tuple (f_pvlocs ty2 vs2 m2))
 
+let ts_inv_eqparams ty1 vs1 ml ty2 vs2 mr =
+  let inv = f_eqparams ty1 vs1 ml ty2 vs2 mr in
+  {inv; ml; mr}
+
 let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
+
+let ts_inv_eqres ty1 ml ty2 mr =
+  let inv = f_eqres ty1 ml ty2 mr in
+  {inv; ml; mr}
 
 let f_eqglob mp1 m1 mp2 m2 =
   let mp1 = EcPath.mget_ident mp1 in
   let mp2 = EcPath.mget_ident mp2 in
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
+
+let ts_inv_eqglob mp1 ml mp2 mr =
+  let inv = f_eqglob mp1 ml mp2 mr in
+  {inv; ml; mr}
 
 (* -------------------------------------------------------------------- *)
 let f_op_real_of_int = (* CORELIB *)
@@ -216,7 +228,7 @@ let f_dlet tya tyb d f =
   f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
-let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
+let f_losslessF f = f_bdHoareF_old f_true f f_true FHeq f_r1
 
 (* -------------------------------------------------------------------- *)
 let f_identity ?(name = "x") ty =

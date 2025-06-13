@@ -520,7 +520,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let bhf_po = norm st s hf.bhf_po in
     let bhf_f  = norm_xfun st s hf.bhf_f in
     let bhf_bd = norm st s hf.bhf_bd in
-    f_bdHoareF bhf_pr bhf_f bhf_po hf.bhf_cmp bhf_bd
+    f_bdHoareF_old bhf_pr bhf_f bhf_po hf.bhf_cmp bhf_bd
 
   | FbdHoareS bhs ->
     assert (Args.isempty args);

@@ -22,7 +22,7 @@ type p_upto_info = pformula * pformula * (pformula option)
 
 val process_fun_def       : FApi.backward
 val process_fun_abs       : pformula -> FApi.backward
-val process_fun_upto_info : p_upto_info -> tcenv1 -> form tuple3
+val process_fun_upto_info : p_upto_info -> tcenv1 -> ss_inv * ts_inv * ts_inv
 val process_fun_upto      : p_upto_info -> FApi.backward
 val process_fun_to_code   : FApi.backward
 
@@ -37,14 +37,14 @@ module FunAbsLow : sig
     -> form * form * form list
 
   val equivF_abs_spec :
-       proofenv -> EcEnv.env -> xpath -> xpath -> form
-    -> form * form * form list
+       proofenv -> EcEnv.env -> xpath -> xpath -> ts_inv
+    -> ts_inv * ts_inv * form list
 end
 
 (* -------------------------------------------------------------------- *)
 val t_hoareF_abs   : ss_inv -> FApi.backward
 val t_bdhoareF_abs : form -> FApi.backward
-val t_equivF_abs   : form -> FApi.backward
+val t_equivF_abs   : ts_inv -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_hoareF_fun_def   : FApi.backward
@@ -52,7 +52,7 @@ val t_bdhoareF_fun_def : FApi.backward
 val t_equivF_fun_def   : FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_equivF_abs_upto : form -> form -> form -> FApi.backward
+val t_equivF_abs_upto : ss_inv -> ts_inv -> ts_inv -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_fun : inv -> FApi.backward
