@@ -211,7 +211,7 @@ let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
   | None       , FhoareS   hs -> f_hoareS hs.hs_m hs.hs_pr s hs.hs_po
   | None       , FeHoareS  hs -> f_eHoareS hs.ehs_m hs.ehs_pr s hs.ehs_po
-  | None       , FbdHoareS hs -> f_bdHoareS hs.bhs_m hs.bhs_pr s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+  | None       , FbdHoareS hs -> f_bdHoareS_old hs.bhs_m hs.bhs_pr s hs.bhs_po hs.bhs_cmp hs.bhs_bd
   | Some `Left , FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr es.es_po
   | Some `Right, FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s es.es_po
   | _          , _            -> assert false
@@ -273,7 +273,7 @@ let set_pre ~pre f =
     f_bdHoareF_old pre.inv hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
  | FbdHoareS hs, Inv_ss pre -> 
     let pre = ss_inv_rebind pre (fst hs.bhs_m) in
-    f_bdHoareS hs.bhs_m pre.inv hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+    f_bdHoareS_old hs.bhs_m pre.inv hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
  | FequivF ef, Inv_ts pre   -> 
     let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
     f_equivF_old pre.inv ef.ef_fl ef.ef_fr ef.ef_po
@@ -626,7 +626,7 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS me bhs.bhs_pr stmt bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+          let concl = f_bdHoareS_old me bhs.bhs_pr stmt bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->

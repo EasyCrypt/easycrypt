@@ -111,7 +111,7 @@ let t_bdhoareF_fun_def_r tc =
   let spre = subst_pre env fsig m PVM.empty in
   let pre = PVM.subst env spre bhf.bhf_pr in
   let bd  = PVM.subst env spre bhf.bhf_bd in
-  let concl' = f_bdHoareS memenv pre fdef.f_body post bhf.bhf_cmp bd in
+  let concl' = f_bdHoareS_old memenv pre fdef.f_body post bhf.bhf_cmp bd in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
@@ -455,7 +455,7 @@ let t_fun_to_code_bdhoare_r tc =
   let pre  = PVM.subst env spr hf.bhf_pr in
   let post = PVM.subst env spo hf.bhf_po in
   let bd   = PVM.subst env spr hf.bhf_bd in
-  let concl = f_bdHoareS m pre st post hf.bhf_cmp bd in
+  let concl = f_bdHoareS_old m pre st post hf.bhf_cmp bd in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)

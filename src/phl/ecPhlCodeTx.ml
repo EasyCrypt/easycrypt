@@ -73,7 +73,7 @@ let t_kill_r side cpos olen tc =
             pp_of_name x
     end;
 
-    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+    let kslconcl = EcFol.f_bdHoareS_old me f_true (stmt ks) f_true FHeq f_r1 in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
@@ -404,7 +404,7 @@ let process_weakmem (side, id, params) tc =
 
     | FbdHoareS hs ->
       let me = bind hs.bhs_m in
-      f_bdHoareS me hs.bhs_pr hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+      f_bdHoareS_old me hs.bhs_pr hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
 
     | FequivS es ->
       let do_side side (ml, mr) =

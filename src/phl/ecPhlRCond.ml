@@ -61,7 +61,7 @@ module Low = struct
     let m  = EcMemory.memory bhs.bhs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
     let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
-    let concl2  = f_bdHoareS bhs.bhs_m bhs.bhs_pr s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let concl2  = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -244,7 +244,7 @@ module LowMatch = struct
     let pr = ofold f_and bhs.bhs_pr epr in
 
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr hd po1 in
-    let concl2 = f_bdHoareS me pr full bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let concl2 = f_bdHoareS_old me pr full bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 

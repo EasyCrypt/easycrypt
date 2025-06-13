@@ -199,7 +199,7 @@ module Core = struct
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
-          let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+          let concl = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
           [concl]
         else
           let event = mk_event ty_distr in
@@ -215,14 +215,14 @@ module Core = struct
           let event = mk_event ty_distr in
           let bounded_distr = f_eq (f_mu env distr event) f_r1 in
           let post = (f_and bhs.bhs_po bounded_distr) in
-          let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
+          let concl = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
           [concl]
         else
           let event = mk_event ty_distr in
           let bounded_distr = f_cmp (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS bhs.bhs_m pre s post bhs.bhs_cmp f_r1 in
+          let concl = f_bdHoareS_old bhs.bhs_m pre s post bhs.bhs_cmp f_r1 in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, FHle ->
@@ -238,7 +238,7 @@ module Core = struct
           let bounded_distr = f_cmp (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS bhs.bhs_m pre s post FHeq f_r1 in
+          let concl = f_bdHoareS_old bhs.bhs_m pre s post FHeq f_r1 in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
@@ -246,13 +246,13 @@ module Core = struct
           | None -> mk_event ~simpl:false ty_distr | Some event -> event
         in
         let bd_sgoal = f_cmp (f_real_add (f_real_mul d1 d2) (f_real_mul d3 d4)) bhs.bhs_bd in
-        let sgoal1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s phi bhs.bhs_cmp d1 in
+        let sgoal1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s phi bhs.bhs_cmp d1 in
         let sgoal2 =
           let bounded_distr = f_cmp (f_mu env distr event) d2 in
           let post = f_anda bounded_distr (mk_event_cond event) in
           f_forall_mems [bhs.bhs_m] (f_imp phi post)
         in
-        let sgoal3 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s (f_not phi) bhs.bhs_cmp d3 in
+        let sgoal3 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s (f_not phi) bhs.bhs_cmp d3 in
         let sgoal4 =
           let bounded_distr = f_cmp (f_mu env distr event) d4 in
           let post = f_anda bounded_distr (mk_event_cond event) in
@@ -398,7 +398,7 @@ module Core = struct
         Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
       else None in
     let m, s2 = semrnd tc bhs.bhs_m fv s2 in
-    let concl = f_bdHoareS m bhs.bhs_pr (stmt (s1 @ s2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let concl = f_bdHoareS_old m bhs.bhs_pr (stmt (s1 @ s2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)

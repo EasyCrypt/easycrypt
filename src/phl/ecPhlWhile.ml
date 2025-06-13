@@ -128,7 +128,7 @@ let t_bdhoare_while_r inv vrnt tc =
   let vrnt_lt_k = f_int_lt vrnt k in
   let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
   let b_post = f_and_simpl inv vrnt_lt_k in
-  let b_concl = f_bdHoareS bhs.bhs_m b_pre c b_post FHeq f_r1 in
+  let b_concl = f_bdHoareS_old bhs.bhs_m b_pre c b_post FHeq f_r1 in
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
@@ -137,7 +137,7 @@ let t_bdhoare_while_r inv vrnt tc =
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
-  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
+  let concl = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -166,8 +166,8 @@ let t_bdhoare_while_rev_r inv tc =
   let body_concl =
     let while_s  = EcModules.stmt [EcModules.i_abstract w] in
     let unfolded_while_s = EcModules.s_seq lp_body while_s in
-    let while_jgmt = f_bdHoareS bhs.bhs_m inv while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
-    let unfolded_while_jgmt = f_bdHoareS
+    let while_jgmt = f_bdHoareS_old bhs.bhs_m inv while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let unfolded_while_jgmt = f_bdHoareS_old
       bhs.bhs_m (f_and inv lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
     in
       f_imp while_jgmt unfolded_while_jgmt
@@ -246,7 +246,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
       f_and
         (f_forall_mems [mem] (f_imp inv (f_real_lt f_r0 eps)))
         (f_forall_simpl [(k_id,GTty tint)]
-           (f_bdHoareS 
+           (f_bdHoareS_old 
               bhs.bhs_m 
               (f_ands [inv;lp_guard;vrnt_eq_k]) 
               lp_body
@@ -257,7 +257,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
 
   (* 5. Out invariant *)
   let inv_concl =
-    f_bdHoareS bhs.bhs_m (f_and inv lp_guard) lp_body inv FHeq f_r1
+    f_bdHoareS_old bhs.bhs_m (f_and inv lp_guard) lp_body inv FHeq f_r1
   in
 
   (* 6. Out body *)
@@ -269,8 +269,8 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
     let while_s1 = EcModules.stmt [EcModules.i_abstract w] in
 
     let unfolded_while_s = EcModules.s_seq lp_body while_s1 in
-    let while_jgmt = f_bdHoareS bhs.bhs_m b_pre while_s1 bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
-    let unfolded_while_jgmt = f_bdHoareS
+    let while_jgmt = f_bdHoareS_old bhs.bhs_m b_pre while_s1 bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let unfolded_while_jgmt = f_bdHoareS_old
       bhs.bhs_m (f_and b_pre lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
     in
     f_imp while_jgmt unfolded_while_jgmt
@@ -312,7 +312,7 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let b_pre   = Fsubst.f_subst smem b_pre in
   let b_post  = f_and_simpl inv vrnt_lt_k in
   let b_post  = Fsubst.f_subst smem b_post in
-  let b_concl = f_bdHoareS (mhr, EcMemory.memtype m_side) b_pre c b_post FHeq f_r1 in
+  let b_concl = f_bdHoareS_old (mhr, EcMemory.memtype m_side) b_pre c b_post FHeq f_r1 in
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   let b_concl = f_forall_mems [m_other'] b_concl in
 
@@ -608,7 +608,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_mr) ml test in
         let c       = s_while (test, cl) in
         xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
+          (f_bdHoareS_old (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
 
       and ll2 =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
@@ -617,7 +617,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_ml) mr test in
         let c       = s_while (test, cr) in
         xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
+          (f_bdHoareS_old (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
 
       in (ll1, ll2)
 

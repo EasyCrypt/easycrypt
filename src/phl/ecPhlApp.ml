@@ -42,10 +42,10 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
   let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
-  let condf1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s1 pR bhs.bhs_cmp f1 in
-  let condg1 = f_bdHoareS bhs.bhs_m bhs.bhs_pr s1 nR bhs.bhs_cmp g1 in
-  let condf2 = f_bdHoareS bhs.bhs_m (f_and_simpl phi pR) s2 bhs.bhs_po bhs.bhs_cmp f2 in
-  let condg2 = f_bdHoareS bhs.bhs_m (f_and_simpl phi nR) s2 bhs.bhs_po bhs.bhs_cmp g2 in
+  let condf1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 pR bhs.bhs_cmp f1 in
+  let condg1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 nR bhs.bhs_cmp g1 in
+  let condf2 = f_bdHoareS_old bhs.bhs_m (f_and_simpl phi pR) s2 bhs.bhs_po bhs.bhs_cmp f2 in
+  let condg2 = f_bdHoareS_old bhs.bhs_m (f_and_simpl phi nR) s2 bhs.bhs_po bhs.bhs_cmp g2 in
   let bd =
     (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
   let condbd =

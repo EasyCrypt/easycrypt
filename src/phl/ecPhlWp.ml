@@ -170,7 +170,7 @@ module TacInternal = struct
     let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
+    let concl = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_equiv_wp ?(uselet=true) ij tc =

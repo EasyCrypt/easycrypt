@@ -298,9 +298,14 @@ let f_eHoareF ehf_pr ehf_f ehf_po =
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
 let f_bdHoareF_r bhf = mk_form (FbdHoareF bhf) tbool
 
-let f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
+let f_bdHoareS_old bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
   f_bdHoareS_r
     { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd; }
+
+let f_bdHoareS bhs_mt bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
+  assert (bhs_pr.m = bhs_po.m);
+  f_bdHoareS_r { bhs_m=(bhs_pr.m,bhs_mt); bhs_pr=bhs_pr.inv; bhs_s; 
+    bhs_po=bhs_po.inv; bhs_cmp; bhs_bd; } [@alert "-priv_pl"]
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
   assert (bhf_pr.m = bhf_po.m);
@@ -321,13 +326,19 @@ let f_equivF_old ef_pr ef_fl ef_fr ef_po =
   f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
 
 let f_equivF pr ef_fl ef_fr po =
+  assert (pr.ml = po.ml && pr.mr = po.mr);
   f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; }
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
 
-let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
+let f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
   f_eagerF_r { eg_ml=mleft; eg_mr=mright; eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
+
+let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
+  assert (eg_pr.ml = eg_po.ml && eg_pr.mr = eg_po.mr);
+  f_eagerF_r { eg_ml=eg_pr.ml; eg_mr=eg_pr.mr; eg_pr=eg_pr.inv;
+                eg_sl; eg_fl; eg_fr; eg_sr; eg_po=eg_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal

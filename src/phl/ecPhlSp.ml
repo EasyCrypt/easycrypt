@@ -254,7 +254,7 @@ let t_sp_side pos tc =
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
       let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
-      let subgoal = f_bdHoareS bhs.bhs_m bhs_pr (stmt (stmt1@stmt2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+      let subgoal = f_bdHoareS_old bhs.bhs_m bhs_pr (stmt (stmt1@stmt2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
       FApi.xmutate1 tc `Sp [subgoal]
 
   | FequivS es, (None | Some (Double _))  ->

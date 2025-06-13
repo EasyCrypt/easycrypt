@@ -492,7 +492,7 @@ module Fsubst = struct
       let hs_pr = f_subst ~tx s hs.bhs_pr in
       let hs_po = f_subst ~tx s hs.bhs_po in
       let hs_bd = f_subst ~tx s hs.bhs_bd in
-      f_bdHoareS hs_m hs_pr hs_s hs_po hs.bhs_cmp hs_bd
+      f_bdHoareS_old hs_m hs_pr hs_s hs_po hs.bhs_cmp hs_bd
 
     | FequivF ef ->
       let ef_fl = x_subst s ef.ef_fl in
@@ -521,7 +521,7 @@ module Fsubst = struct
       let s = f_rem_mem s mright in
       let eg_pr = f_subst ~tx s eg.eg_pr in
       let eg_po = f_subst ~tx s eg.eg_po in
-      f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+      f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
     | Fpr pr ->
       let pr_mem   = m_subst s pr.pr_mem in

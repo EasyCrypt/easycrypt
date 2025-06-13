@@ -282,7 +282,7 @@ let t_eager_fun_abs_r eqI h tc =
         (Mpv2.eq_refl (PV.fv env mright f))
         f_true
     in
-         f_eagerF ef.ef_pr s ef.ef_fl ef.ef_fr s' ef.ef_po
+         f_eagerF_old ef.ef_pr s ef.ef_fl ef.ef_fr s' ef.ef_po
       :: f_equivF_old (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
       :: sg
   in
@@ -332,7 +332,7 @@ let t_eager_call_r fpre fpost tc =
   let post  = EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl) modil
 
      (lvr,fr,argsr) modir ml mr es.es_po hyps in
-  let f_concl = f_eagerF fpre sl fl fr sr fpost in
+  let f_concl = f_eagerF_old fpre sl fl fr sr fpost in
   let concl   = f_equivS es.es_ml es.es_mr es.es_pr (stmt []) (stmt []) post in
 
   FApi.xmutate1 tc `EagerCall [f_concl; concl]
@@ -528,7 +528,7 @@ let t_eager_r h inv tc =
         sigl.fs_arg sigl.fs_anames mleft
         sigr.fs_arg sigr.fs_anames mright in
     let pre = f_and_simpl eq_params inv in
-    f_eagerF pre s fl fr s' post
+    f_eagerF_old pre s fl fr s' post
   in
 
   let concl =
@@ -620,7 +620,7 @@ let process_call info tc =
         let penv, qenv = LDecl.equivF fl fr hyps in
         let fpre  = TTC.pf_process_form !!tc penv tbool fpre  in
         let fpost = TTC.pf_process_form !!tc qenv tbool fpost in
-        f_eagerF fpre sl fl fr sr fpost
+        f_eagerF_old fpre sl fl fr sr fpost
 
     | _ -> tc_error !!tc "invalid arguments"
   in

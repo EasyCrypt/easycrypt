@@ -23,8 +23,8 @@ let t_ehoare_case_r ?(simplify = true) f tc =
 let t_bdhoare_case_r ?(simplify = true) f tc =
   let fand = if simplify then f_and_simpl else f_and in
   let bhs = tc1_as_bdhoareS tc in
-  let concl1 = f_bdHoareS bhs.bhs_m (fand bhs.bhs_pr f) bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
-  let concl2 = f_bdHoareS bhs.bhs_m
+  let concl1 = f_bdHoareS_old bhs.bhs_m (fand bhs.bhs_pr f) bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+  let concl2 = f_bdHoareS_old bhs.bhs_m
     (fand bhs.bhs_pr (f_not f)) bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 

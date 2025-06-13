@@ -42,13 +42,13 @@ let t_hoare_bd_hoare tc =
 
 (* -------------------------------------------------------------------- *)
 type 'a split_t = {
-  as_bdh : proofenv -> form -> 'a * form * hoarecmp * form;
-  mk_bdh : 'a * form * hoarecmp * form -> form;
+  as_bdh : proofenv -> form -> 'a * ss_inv * hoarecmp * form;
+  mk_bdh : 'a * ss_inv * hoarecmp * form -> form;
 }
 
 type 'a destr_t = {
-  as_bop : proofenv -> form -> form * form;
-  mk_bop : form -> form -> form;
+  as_bop : proofenv -> ss_inv -> ss_inv * ss_inv;
+  mk_bop : ss_inv -> ss_inv -> ss_inv;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -87,10 +87,10 @@ let bdhoare_kind tc =
 let gen_S tactic =
   let as_bdh pf f =
     let bh = pf_as_bdhoareS pf f in
-      (bh, bh.bhs_po, bh.bhs_cmp, bh.bhs_bd)
+      (bh, (bhs_po bh), bh.bhs_cmp, bh.bhs_bd)
 
   and mk_bdh (bh, po, cmp, b) =
-    f_bdHoareS bh.bhs_m bh.bhs_pr bh.bhs_s po cmp b in
+    f_bdHoareS (snd bh.bhs_m) (bhs_pr bh) bh.bhs_s po cmp b in
 
   tactic t_bdHoareS_conseq_bd { as_bdh; mk_bdh; }
 
@@ -108,11 +108,14 @@ let gen_F tactic =
 (* -------------------------------------------------------------------- *)
 let and_dt =
   let destr_and pf f =
-    try  destr_and f
+    try 
+      let f1 = map_ss_inv1 (fun f -> fst (destr_and f)) f in
+      let f2 = map_ss_inv1 (fun f -> snd (destr_and f)) f in
+      (f1, f2)
     with DestrError _ ->
       tc_error pf "the postcondition must be a conjunction"
   in
-    { as_bop = destr_and; mk_bop = f_or; }
+    { as_bop = destr_and; mk_bop = map_ss_inv2 f_or; }
 
 let t_bdhoareS_and = gen_S t_bdhoare_split_bop_conseq and_dt
 let t_bdhoareF_and = gen_F t_bdhoare_split_bop_conseq and_dt
@@ -125,11 +128,14 @@ let t_bdhoare_and b1 b2 b3 tc =
 (* -------------------------------------------------------------------- *)
 let or_dt =
   let destr_or pf f =
-    try  destr_or f
+    try 
+      let f1 = map_ss_inv1 (fun f -> fst (destr_or f)) f in
+      let f2 = map_ss_inv1 (fun f -> snd (destr_or f)) f in
+      (f1, f2)
     with DestrError _ ->
       tc_error pf "the postcondition must be a disjunction"
   in
-    { as_bop = destr_or; mk_bop = f_and; }
+    { as_bop = destr_or; mk_bop = map_ss_inv2 f_and; }
 
 let t_bdhoareS_or = gen_S t_bdhoare_split_bop_conseq or_dt
 let t_bdhoareF_or = gen_F t_bdhoare_split_bop_conseq or_dt
@@ -142,8 +148,8 @@ let t_bdhoare_or b1 b2 b3 tc =
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_split_not split b1 b2 tc =
   let bh, po, cmp, bd = split.as_bdh !!tc (FApi.tc1_goal tc) in
-  let g1 = split.mk_bdh (bh, f_true, cmp, b1) in
-  let g2 = split.mk_bdh (bh, f_not_simpl po, hoarecmp_opp cmp, b2) in
+  let g1 = split.mk_bdh (bh, map_ss_inv1 (fun _ -> f_true) po, cmp, b1) in
+  let g2 = split.mk_bdh (bh, map_ss_inv1 f_not_simpl po, hoarecmp_opp cmp, b2) in
   let nb = f_real_sub b1 b2 in
 
   assert (f_equal nb bd);

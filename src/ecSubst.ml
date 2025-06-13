@@ -565,7 +565,7 @@ let rec subst_form (s : subst) (f : form) =
        let bhs_bd = subst_form s bhs_bd in
        bhs_m, (bhs_pr, bhs_po, bhs_bd) in
      let bhs_s = subst_stmt s bhs_s in
-     f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
+     f_bdHoareS_old bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
 
    | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
      let ehf_pr, ehf_po =
@@ -618,7 +618,7 @@ let rec subst_form (s : subst) (f : form) =
      let eg_sr = subst_stmt s eg_sr in
      let eg_fl = subst_xpath s eg_fl in
      let eg_fr = subst_xpath s eg_fr in
-     f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+     f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
   | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
      let pr_mem = subst_mem s pr_mem in

@@ -3519,7 +3519,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let s2    = transstmt env ue s2 in
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-        f_eagerF pre' s1 fpath1 fpath2 s2 post'
+        f_eagerF_old pre' s1 fpath1 fpath2 s2 post'
 
   and transf_r opsc env ?tt pf =
     let f  = transf_r_tyinfo opsc env ?tt pf in

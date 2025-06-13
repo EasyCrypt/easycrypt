@@ -213,13 +213,13 @@ let t_bdhoare_call fpre fpost opt_bd tc =
     | FHle, None ->
         f_hoareS bhs.bhs_m bhs.bhs_pr s post
     | FHeq, Some bd ->
-        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHeq, None ->
-        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp f_r1
+        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp f_r1
     | FHge, Some bd ->
-        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHge, None ->
-        f_bdHoareS bhs.bhs_m bhs.bhs_pr s post FHeq f_r1
+        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post FHeq f_r1
     | _, _ -> assert false
   in
 

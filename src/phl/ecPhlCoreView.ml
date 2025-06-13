@@ -25,7 +25,7 @@ let t_hoare_of_bdhoareF_r tc =
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_of_hoareS_r tc =
   let hs = tc1_as_hoareS tc in
-  let concl = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
+  let concl = f_bdHoareS_old hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)

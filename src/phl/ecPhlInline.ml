@@ -187,7 +187,7 @@ let t_inline_ehoare_r ~use_tuple sp tc =
 let t_inline_bdhoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_bdhoareS tc in
   let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.bhs_m sp hoare.bhs_s in
-  let concl      = f_bdHoareS me hoare.bhs_pr stmt hoare.bhs_po hoare.bhs_cmp hoare.bhs_bd in
+  let concl      = f_bdHoareS_old me hoare.bhs_pr stmt hoare.bhs_po hoare.bhs_cmp hoare.bhs_bd in
 
 
   FApi.xmutate1 tc `Inline [concl]
