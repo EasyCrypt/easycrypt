@@ -1171,7 +1171,7 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   | false, false -> begin let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
-    { inv; ml = mr'; mr = mr' }
+    { inv; ml = ml'; mr = mr' }
   end
 
 let f_forall_mems_ts_inv menvl menvr inv = 

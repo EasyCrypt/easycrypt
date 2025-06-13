@@ -239,6 +239,7 @@ let cond_equivF_notmod ?(mk_other=false) tc (cond: ts_inv) =
 
 let t_equivF_notmod post tc =
   let ef = tc1_as_equivF tc in
+  let post = ts_inv_rebind post ef.ef_ml ef.ef_mr in
   let cond1, _, _ = cond_equivF_notmod tc (map_ts_inv2 f_imp post (ef_po ef)) in
   let cond2 = f_equivF (ef_pr ef) ef.ef_fl ef.ef_fr post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
