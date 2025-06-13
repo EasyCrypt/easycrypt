@@ -23,10 +23,10 @@ let conseq_cond_old pre post spre spost =
   f_imp pre spre, f_imp spost post
 
 let conseq_cond_ss pre post spre spost =
-  map_ss_inv2 f_imp pre spre, map_ss_inv2 f_imp post spost
+  map_ss_inv2 f_imp pre spre, map_ss_inv2 f_imp spost post
 
 let conseq_cond_ts pre post spre spost =
-  map_ts_inv2 f_imp pre spre, map_ts_inv2 f_imp post spost
+  map_ts_inv2 f_imp pre spre, map_ts_inv2 f_imp spost post
 
 (*
 { sF } c { sf }  sF <= F  f <= sf
@@ -1211,12 +1211,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       Some ((_, f2) as nf2),
       Some ((_, f3) as nf3)
     ->
-    let subst1 = Fsubst.f_subst_mem mhr mleft in
-    let subst2 = Fsubst.f_subst_mem mhr mright in
     let hs2    = pf_as_hoareF !!tc f2 in
     let hs3    = pf_as_hoareF !!tc f3 in
-    let pre    = map_ts_inv f_ands [ef_pr ef; ss_inv_generalize_right (hf_pr hs2) mright; ss_inv_generalize_left (hf_pr hs3) mleft] in
-    let post  = map_ts_inv f_ands [ef_po ef; ss_inv_generalize_right (hf_po hs2) mright; ss_inv_generalize_left (hf_po hs3) mleft] in
+    let hs2_pr = ss_inv_generalize_right (ss_inv_rebind (hf_pr hs2) ef.ef_ml) ef.ef_mr in
+    let hs3_pr = ss_inv_generalize_left (ss_inv_rebind (hf_pr hs3) ef.ef_mr) ef.ef_ml in
+    let pre    = map_ts_inv f_ands [ef_pr ef; hs2_pr; hs3_pr] in
+    let hs2_po = ss_inv_generalize_right (ss_inv_rebind (hf_po hs2) ef.ef_ml) ef.ef_mr in
+    let hs3_po = ss_inv_generalize_left (ss_inv_rebind (hf_po hs3) ef.ef_mr) ef.ef_ml in
+    let post  = map_ts_inv f_ands [ef_po ef; hs2_po; hs3_po] in
     let tac    = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
     t_on1seq 2
       (tac pre post)

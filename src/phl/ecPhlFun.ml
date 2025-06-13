@@ -283,7 +283,7 @@ let t_equivF_abs_r inv tc =
   in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
-  FApi.t_last tactic (EcPhlConseq.t_equivF_conseq pre post tc)
+    FApi.t_last tactic (EcPhlConseq.t_equivF_conseq pre post tc)
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_abs   = FApi.t_low1 "hoare-fun-abs"   t_hoareF_abs_r
