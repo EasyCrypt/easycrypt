@@ -475,6 +475,7 @@ let process_call side info tc =
         let (topl,fl,_,sigl),
             (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
         let bad2 = ss_inv_generalize_left bad mleft in
+        let bad2 = ts_inv_rebind bad2 invQ.ml invQ.mr in
         let eqglob = ts_inv_eqglob topl mleft topr mright in
         let lpre = [eqglob;invP] in
         let eq_params =

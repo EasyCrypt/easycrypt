@@ -300,9 +300,9 @@ module UpToLow = struct
     in
 
     let ml, mr = invP.ml, invP.mr in
-    let bad2 = ss_inv_rebind bad invP.mr in
-    let bad2' = ss_inv_generalize_left bad2 invP.ml in
-    let allinv = map_ts_inv f_ands [bad2'; invP; invQ] in
+    let bad = ss_inv_rebind bad invP.mr in
+    let bad2 = ss_inv_generalize_left bad invP.ml in
+    let allinv = map_ts_inv f_ands [bad2; invP; invQ] in
     let fvl = PV.fv env ml allinv.inv in
     let fvr = PV.fv env mr allinv.inv in
 
@@ -327,15 +327,15 @@ module UpToLow = struct
       let eq_res =
         ts_inv_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
 
-      let pre   = map_ts_inv EcFol.f_ands [map_ts_inv1 EcFol.f_not bad2'; eq_params; invP] in
-      let post  = map_ts_inv3 EcFol.f_if_simpl bad2' invQ (map_ts_inv2 f_and eq_res invP) in
+      let pre   = map_ts_inv EcFol.f_ands [map_ts_inv1 EcFol.f_not bad2; eq_params; invP] in
+      let post  = map_ts_inv3 EcFol.f_if_simpl bad2 invQ (map_ts_inv2 f_and eq_res invP) in
       let cond1 = f_equivF pre o_l o_r post in
       let cond2 =
-        let concl = ts_inv_lower_right1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
-        f_forall_mems_ss_inv (ml, abstract_mt)
-          (map_ss_inv2 f_imp bad2 concl) in
+        let concl = ts_inv_lower_left1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
+        f_forall_mems_ss_inv (mr, abstract_mt)
+          (map_ss_inv2 f_imp bad concl) in
       let cond3 =
-        let bq = map_ts_inv_right1 (map_ss_inv2 f_and bad) invQ in
+        let bq = map_ts_inv2 f_and bad2 invQ in
           f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_bdHoareF bq o_r bq FHeq f_r1) bq) in
 
       [cond1; cond2; cond3]
@@ -354,8 +354,8 @@ module UpToLow = struct
     let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
 
     let pre  = [eqglob;invP] in
-    let pre  = map_ts_inv3 f_if_simpl bad2' invQ (map_ts_inv f_ands (eq_params::pre)) in
-    let post = map_ts_inv3 f_if_simpl bad2' invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
+    let pre  = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands (eq_params::pre)) in
+    let post = map_ts_inv3 f_if_simpl bad2 invQ (map_ts_inv f_ands [eq_res;eqglob;invP]) in
 
     (pre, post, sg)
 end
