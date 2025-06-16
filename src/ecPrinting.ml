@@ -2988,7 +2988,8 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
   let ppnode = collect2_s ppef hs.hs_s.s_node [] in
   let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode
   in
-    Format.fprintf fmt "Context : %a@\n%!" (pp_memtype ppe) (snd hs.hs_m);
+    Format.fprintf fmt "Context : %a: %a@\n%!" (pp_mem ppe) (fst hs.hs_m) 
+                                               (pp_memtype ppe) (snd hs.hs_m);
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) hs.hs_pr;
     Format.fprintf fmt "@\n%!";
@@ -3013,7 +3014,8 @@ let pp_eHoareS (ppe : PPEnv.t) ?prpo fmt hs =
   let ppnode = collect2_s ppef hs.ehs_s.s_node [] in
   let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode
   in
-    Format.fprintf fmt "Context : %a@\n%!" (pp_memtype ppe) (snd hs.ehs_m);
+    Format.fprintf fmt "Context : %a: %a@\n%!" (pp_mem ppe) (fst hs.ehs_m) 
+                                               (pp_memtype ppe) (snd hs.ehs_m);
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) hs.ehs_pr;
     Format.fprintf fmt "@\n%!";
@@ -3049,8 +3051,8 @@ let pp_bdhoareS (ppe : PPEnv.t) ?prpo fmt hs =
   in
 
   let scmp = string_of_hrcmp hs.bhs_cmp in
-
-    Format.fprintf fmt "Context : %a@\n%!" (pp_memtype ppe) (snd hs.bhs_m);
+    Format.fprintf fmt "Context : %a: %a@\n%!" (pp_mem ppe) (fst hs.bhs_m)
+                                               (pp_memtype ppe) (snd hs.bhs_m);
     Format.fprintf fmt "Bound   : @[<hov 2>%s %a@]@\n%!" scmp (pp_form ppef) hs.bhs_bd;
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) hs.bhs_pr;
