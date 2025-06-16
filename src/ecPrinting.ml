@@ -3004,7 +3004,10 @@ let pp_eHoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.ehf_pr;
-  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.ehf_f;
+  if debug_mode then
+    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.ehf_f (pp_mem ppe) hf.ehf_m
+  else
+    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.ehf_f;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.ehf_po
 
 (* -------------------------------------------------------------------- *)
@@ -3039,7 +3042,10 @@ let pp_bdhoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let scmp = string_of_hrcmp hf.bhf_cmp in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.bhf_pr;
-  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.bhf_f;
+  if debug_mode then
+    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.bhf_f (pp_mem ppe) hf.bhf_m
+  else
+    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.bhf_f;  
   Format.fprintf fmt "    %s @[<hov 2>%a@]@\n%!" scmp (pp_form ppepr) hf.bhf_bd;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.bhf_po
 
