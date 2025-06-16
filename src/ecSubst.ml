@@ -536,36 +536,40 @@ let rec subst_form (s : subst) (f : form) =
        let hf_po = subst_form s hf.hf_po [@alert "-priv_pl"] in
        (hf_pr, hf_po) in
      let hf_f  = subst_xpath s hf.hf_f in
-     f_hoareF {inv=hf_pr; m=hf.hf_m} hf_f {inv=hf_po; m=hf.hf_m}
+     let m = hf.hf_m in
+     f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
 
-  | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
+  | FhoareS hs ->
      let hs_m, (hs_pr, hs_po) =
-       let s, hs_m = subst_memtype s hs_m in
-       let hs_pr = subst_form s hs_pr in
-       let hs_po = subst_form s hs_po in
+       let s, hs_m = subst_memtype s hs.hs_m in
+       let hs_pr = subst_form s hs.hs_pr in
+       let hs_po = subst_form s hs.hs_po in
        hs_m, (hs_pr, hs_po) in
-     let hs_s = subst_stmt s hs_s in
-     f_hoareS hs_m hs_pr hs_s hs_po
+     let hs_s = subst_stmt s hs.hs_s in
+     let m = fst hs_m in
+     f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
 
-  | FbdHoareF { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd } ->
+  | FbdHoareF bhf ->
      let bhf_pr, bhf_po =
-       let s = add_memory s mhr mhr in
-       let bhf_pr = subst_form s bhf_pr in
-       let bhf_po = subst_form s bhf_po in
+       let s = add_memory s bhf.bhf_m bhf.bhf_m in
+       let bhf_pr = subst_form s bhf.bhf_pr in
+       let bhf_po = subst_form s bhf.bhf_po in
        (bhf_pr, bhf_po) in
-     let bhf_f  = subst_xpath s bhf_f in
-     let bhf_bd  = subst_form s bhf_bd in
-     f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
+     let bhf_f  = subst_xpath s bhf.bhf_f in
+     let bhf_bd  = subst_form s bhf.bhf_bd in
+     let m = bhf.bhf_m in
+     f_bdHoareF {m;inv=bhf_pr} bhf_f {m;inv=bhf_po} bhf.bhf_cmp bhf_bd
 
-  | FbdHoareS { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd } ->
+  | FbdHoareS bhs ->
      let bhs_m, (bhs_pr, bhs_po, bhs_bd) =
-       let s, bhs_m = subst_memtype s bhs_m in
-       let bhs_pr = subst_form s bhs_pr in
-       let bhs_po = subst_form s bhs_po in
-       let bhs_bd = subst_form s bhs_bd in
+       let s, bhs_m = subst_memtype s bhs.bhs_m in
+       let bhs_pr = subst_form s bhs.bhs_pr in
+       let bhs_po = subst_form s bhs.bhs_po in
+       let bhs_bd = subst_form s bhs.bhs_bd in
        bhs_m, (bhs_pr, bhs_po, bhs_bd) in
-     let bhs_s = subst_stmt s bhs_s in
-     f_bdHoareS_old bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
+     let bhs_s = subst_stmt s bhs.bhs_s in
+     let m = fst bhs_m in
+     f_bdHoareS (snd bhs_m) {m;inv=bhs_pr} bhs_s {m;inv=bhs_po} bhs.bhs_cmp bhs_bd
 
    | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
      let ehf_pr, ehf_po =
@@ -585,16 +589,17 @@ let rec subst_form (s : subst) (f : form) =
      let ehs_s = subst_stmt s ehs_s in
      f_eHoareS ehs_m ehs_pr ehs_s ehs_po
 
-  | FequivF { ef_pr; ef_fl; ef_fr; ef_po } ->
+  | FequivF ef ->
      let ef_pr, ef_po =
-       let s = add_memory s mleft mleft in
-       let s = add_memory s mright mright in
-       let ef_pr = subst_form s ef_pr in
-       let ef_po = subst_form s ef_po in
+       let s = add_memory s ef.ef_ml ef.ef_ml in
+       let s = add_memory s ef.ef_mr ef.ef_mr in
+       let ef_pr = subst_form s ef.ef_pr in
+       let ef_po = subst_form s ef.ef_po in
        (ef_pr, ef_po) in
-     let ef_fl = subst_xpath s ef_fl in
-     let ef_fr = subst_xpath s ef_fr in
-     f_equivF_old ef_pr ef_fl ef_fr ef_po
+     let ef_fl = subst_xpath s ef.ef_fl in
+     let ef_fr = subst_xpath s ef.ef_fr in
+     let (ml, mr) = ef.ef_ml, ef.ef_mr in
+     f_equivF {ml;mr;inv=ef_pr} ef_fl ef_fr {ml;mr;inv=ef_po}
 
   | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } ->
      let (es_ml, es_mr), (es_pr, es_po) =
@@ -607,18 +612,19 @@ let rec subst_form (s : subst) (f : form) =
      let es_sr = subst_stmt s es_sr in
      f_equivS es_ml es_mr es_pr es_sl es_sr es_po
 
-  | FeagerF { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po } ->
+  | FeagerF eg ->
      let eg_pr, eg_po =
-       let s = add_memory s mleft  mleft  in
-       let s = add_memory s mright mright in
-       let eg_pr = subst_form s eg_pr in
-       let eg_po = subst_form s eg_po in
+       let s = add_memory s eg.eg_ml eg.eg_ml in
+       let s = add_memory s eg.eg_mr eg.eg_mr in
+       let eg_pr = subst_form s eg.eg_pr in
+       let eg_po = subst_form s eg.eg_po in
        (eg_pr, eg_po) in
-     let eg_sl = subst_stmt s eg_sl in
-     let eg_sr = subst_stmt s eg_sr in
-     let eg_fl = subst_xpath s eg_fl in
-     let eg_fr = subst_xpath s eg_fr in
-     f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+     let eg_sl = subst_stmt s eg.eg_sl in
+     let eg_sr = subst_stmt s eg.eg_sr in
+     let eg_fl = subst_xpath s eg.eg_fl in
+     let eg_fr = subst_xpath s eg.eg_fr in
+     let (ml, mr) = eg.eg_ml, eg.eg_mr in
+    f_eagerF {ml;mr;inv=eg_pr} eg_sl eg_fl eg_fr eg_sr {ml;mr;inv=eg_po}
 
   | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
      let pr_mem = subst_mem s pr_mem in

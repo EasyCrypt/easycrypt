@@ -274,8 +274,13 @@ let f_eqs fs1 fs2 =
 let f_hoareS_r hs = mk_form (FhoareS hs) tbool
 let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS hs_m hs_pr hs_s hs_po =
+let f_hoareS_old hs_m hs_pr hs_s hs_po =
   f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
+
+let f_hoareS hs_mt hs_pr hs_s hs_po =
+  assert (hs_pr.m = hs_po.m);
+  f_hoareS_r { hs_m=(hs_pr.m, hs_mt); hs_pr=hs_pr.inv; hs_s; 
+    hs_po=hs_po.inv; } [@alert "-priv_pl"]
 
 let f_hoareF pr hf_f po =
   assert (pr.m = po.m);

@@ -17,8 +17,8 @@ let t_hoare_app_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let s1, s2 = s_split env i hs.hs_s in
-  let a = f_hoareS hs.hs_m hs.hs_pr (stmt s1) phi in
-  let b = f_hoareS hs.hs_m phi (stmt s2) hs.hs_po in
+  let a = f_hoareS_old hs.hs_m hs.hs_pr (stmt s1) phi in
+  let b = f_hoareS_old hs.hs_m phi (stmt s2) hs.hs_po in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
@@ -41,7 +41,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let s1, s2 = s_split env i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
-  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
+  let cond_phi = f_hoareS_old bhs.bhs_m bhs.bhs_pr s1 phi in
   let condf1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 pR bhs.bhs_cmp f1 in
   let condg1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 nR bhs.bhs_cmp g1 in
   let condf2 = f_bdHoareS_old bhs.bhs_m (f_and_simpl phi pR) s2 bhs.bhs_po bhs.bhs_cmp f2 in
@@ -60,7 +60,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
     let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
-      (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in
+      (f_hoareS_old bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in
   let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in
   let conds =
     if   f_equal g1 f_r0

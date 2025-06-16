@@ -147,7 +147,7 @@ let t_eager_if_r tc =
 
     f_forall
       [(m2, GTmem (snd es.es_mr)); (b, GTty tbool)]
-      (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
+      (f_hoareS_old (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
 
   let cT =
     let pre = f_and es.es_pr (f_eq fel f_true) in

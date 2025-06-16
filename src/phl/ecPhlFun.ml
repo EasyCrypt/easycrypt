@@ -81,7 +81,7 @@ let t_hoareF_fun_def_r tc =
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres hf.hf_po in
   let pre  = PVM.subst env (subst_pre env fsig m PVM.empty) hf.hf_pr in
-  let concl' = f_hoareS memenv pre fdef.f_body post in
+  let concl' = f_hoareS_old memenv pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
@@ -423,7 +423,7 @@ let t_fun_to_code_hoare_r tc =
   let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
   let pre  = PVM.subst env spr hf.hf_pr in
   let post = PVM.subst env spo hf.hf_po in
-  let concl = f_hoareS m pre st post in
+  let concl = f_hoareS_old m pre st post in
 
   FApi.xmutate1 tc `FunToCode [concl]
 

@@ -171,7 +171,7 @@ end
 let t_inline_hoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_hoareS tc in
   let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.hs_m sp hoare.hs_s in
-  let concl      = f_hoareS me hoare.hs_pr stmt hoare.hs_po in
+  let concl      = f_hoareS_old me hoare.hs_pr stmt hoare.hs_po in
 
   FApi.xmutate1 tc `Inline [concl]
 

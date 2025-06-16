@@ -2024,12 +2024,21 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.bhf_m hf.bhf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
-        (pp_funname ppe) hf.bhf_f
-        (pp_form ppepr) hf.bhf_pr
-        (pp_form ppepo) hf.bhf_po
-        (string_of_hcmp hf.bhf_cmp)
-        (pp_form_r ppepr (max_op_prec,`NonAssoc)) hf.bhf_bd
+      if debug_mode then
+        Format.fprintf fmt "phoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]] %s %a"
+          (pp_funname ppe) hf.bhf_f
+          (pp_mem ppe) hf.bhf_m
+          (pp_form ppepr) hf.bhf_pr
+          (pp_form ppepo) hf.bhf_po
+          (string_of_hcmp hf.bhf_cmp)
+          (pp_form_r ppepr (max_op_prec,`NonAssoc)) hf.bhf_bd
+      else
+        Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
+          (pp_funname ppe) hf.bhf_f
+          (pp_form ppepr) hf.bhf_pr
+          (pp_form ppepo) hf.bhf_po
+          (string_of_hcmp hf.bhf_cmp)
+          (pp_form_r ppepr (max_op_prec,`NonAssoc)) hf.bhf_bd
 
   | FbdHoareS hs ->
       let ppef = PPEnv.push_mem ppe ~active:true hs.bhs_m in

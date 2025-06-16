@@ -1716,20 +1716,20 @@ module Fun = struct
     let fd, memenv = actmem_body mem fun_ in
     memenv, fd, Memory.push_active memenv env
 
-  let equivF_memenv path1 path2 env =
+  let equivF_memenv ml mr path1 path2 env =
     let (ip1, _) = oget (ipath_of_xpath path1) in
     let (ip2, _) = oget (ipath_of_xpath path2) in
 
     let fun1 = snd (oget (by_ipath ip1 env)) in
     let fun2 = snd (oget (by_ipath ip2 env)) in
-    let pre1 = actmem_pre EcCoreFol.mleft fun1 in
-    let pre2 = actmem_pre EcCoreFol.mright fun2 in
-    let post1 = actmem_post EcCoreFol.mleft fun1 in
-    let post2 = actmem_post EcCoreFol.mright fun2 in
+    let pre1 = actmem_pre ml fun1 in
+    let pre2 = actmem_pre mr fun2 in
+    let post1 = actmem_post ml fun1 in
+    let post2 = actmem_post mr fun2 in
     (pre1,pre2), (post1,post2)
 
-  let equivF path1 path2 env =
-    let (pre1,pre2),(post1,post2) = equivF_memenv path1 path2 env in
+  let equivF ml mr path1 path2 env =
+    let (pre1,pre2),(post1,post2) = equivF_memenv ml mr path1 path2 env in
     Memory.push_all [pre1; pre2] env,
     Memory.push_all [post1; post2] env
 
@@ -3598,8 +3598,8 @@ module LDecl = struct
      let env1, env2 = Fun.hoareF mem xp lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
-  let equivF xp1 xp2 lenv =
-    let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
+  let equivF ml mr xp1 xp2 lenv =
+    let env1, env2 = Fun.equivF ml mr xp1 xp2 lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
   let inv_memenv lenv =

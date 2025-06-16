@@ -228,7 +228,7 @@ let f_dlet tya tyb d f =
   f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
-let f_losslessF f = f_bdHoareF_old f_true f f_true FHeq f_r1
+let f_losslessF f = f_bdHoareF {m=mhr;inv=f_true} f {m=mhr;inv=f_true} FHeq f_r1
 
 (* -------------------------------------------------------------------- *)
 let f_identity ?(name = "x") ty =

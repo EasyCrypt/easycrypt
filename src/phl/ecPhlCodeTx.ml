@@ -396,7 +396,7 @@ let process_weakmem (side, id, params) tc =
     match f.f_node with
     | FhoareS hs ->
       let me = bind hs.hs_m in
-      f_hoareS me hs.hs_pr hs.hs_s hs.hs_po
+      f_hoareS_old me hs.hs_pr hs.hs_s hs.hs_po
 
     | FeHoareS hs ->
       let me = bind hs.ehs_m in

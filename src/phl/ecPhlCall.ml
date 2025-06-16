@@ -79,7 +79,7 @@ let t_hoare_call fpre fpost tc =
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
-  let concl = f_hoareS hs.hs_m hs.hs_pr s post in
+  let concl = f_hoareS_old hs.hs_m hs.hs_pr s post in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -211,7 +211,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   (* most of the above code is duplicated from t_hoare_call *)
   let concl = match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
-        f_hoareS bhs.bhs_m bhs.bhs_pr s post
+        f_hoareS_old bhs.bhs_m bhs.bhs_pr s post
     | FHeq, Some bd ->
         f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHeq, None ->
@@ -353,16 +353,16 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
   | true ->
     let (topl, _, _, sigl),
       (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-    let eqglob = f_eqglob topl mleft topr mright in
+    let eqglob = ts_inv_eqglob topl mleft topr mright in
     let lpre = [eqglob;inv] in
     let eq_params =
-      f_eqparams
+      ts_inv_eqparams
         sigl.fs_arg sigl.fs_anames mleft
         sigr.fs_arg sigr.fs_anames mright in
-    let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-    let pre    = f_ands (eq_params::lpre) in
-    let post   = f_ands [eq_res; eqglob; inv] in
-      f_equivF_old pre fl fr post
+    let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+    let pre    = map_ts_inv f_ands (eq_params::lpre) in
+    let post   = map_ts_inv f_ands [eq_res; eqglob; inv] in
+      f_equivF pre fl fr post
 
   | false ->
       let defl = EcEnv.Fun.by_xpath fl env in
@@ -375,13 +375,13 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
 
       if not testty then raise EqObsInError;
       let eq_params =
-        f_eqparams
+        ts_inv_eqparams
           sigl.fs_arg sigl.fs_anames mleft
           sigr.fs_arg sigr.fs_anames mright in
-      let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-      let pre = f_and eq_params inv in
-      let post = f_and eq_res inv in
-        f_equivF_old pre fl fr post
+      let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+      let pre = map_ts_inv2 f_and eq_params inv in
+      let post = map_ts_inv2 f_and eq_res inv in
+        f_equivF pre fl fr post
 
 let process_call side info tc =
   let process_spec tc side =
@@ -459,7 +459,7 @@ let process_call side info tc =
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, tbool, lift_inv_adapter (fun inv -> mk_inv_spec !!tc env inv fl fr))
+      (penv, tbool, lift_ts_inv (fun inv -> mk_inv_spec !!tc env inv fl fr))
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 

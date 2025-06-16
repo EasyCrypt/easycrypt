@@ -185,7 +185,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let pre = f_ands (eqparams :: (eqxs@eqgs)) in
     let p = f_and (f_not f_event) (f_eq cntr f_i0) in
     let p = f_and_simpl p inv in
-    f_hoareS memenv pre (stmt s_hd) p
+    f_hoareS_old memenv pre (stmt s_hd) p
   in
 
   let oracle_goal o =

@@ -3452,13 +3452,13 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let m = EcIdent.create "&frmtrans" in
+        let m = EcIdent.create "&hr" in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF {inv=pre';m} fpath {inv=post';m}
+          f_hoareF {m;inv=pre'} fpath {m;inv=post'}
 
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then
@@ -3475,7 +3475,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let m = mhr in
+        let m = EcIdent.create "&hr" in
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
@@ -3485,7 +3485,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
-          f_bdHoareF_old pre' fpath post' hcmp bd'
+          f_bdHoareF {m;inv=pre'} fpath {m;inv=post'} hcmp bd'
 
     | PFlsless gp ->
         if mode <> `Form then
@@ -3496,30 +3496,32 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFequivF (pre, (gp1, gp2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = EcIdent.create "&1" in
+        let mr = EcIdent.create "&2" in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_equivF_old pre' fpath1 fpath2 post'
+          f_equivF {ml;mr;inv=pre'} fpath1 fpath2 {ml;mr;inv=post'}
 
     | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = EcIdent.create "&1" in
+        let mr = EcIdent.create "&2" in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let s1    = transstmt env ue s1 in
         let s2    = transstmt env ue s2 in
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-        f_eagerF_old pre' s1 fpath1 fpath2 s2 post'
+        f_eagerF {ml;mr;inv=pre'} s1 fpath1 fpath2 s2 {ml;mr;inv=post'}
 
   and transf_r opsc env ?tt pf =
     let f  = transf_r_tyinfo opsc env ?tt pf in

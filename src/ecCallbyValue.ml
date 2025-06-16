@@ -494,7 +494,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_po = norm st s hs.hs_po in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
-    f_hoareS hs_m hs_pr hs_s hs_po
+    f_hoareS (snd hs_m) {m=fst hs_m; inv=hs_pr} hs_s {m=fst hs_m; inv=hs_po}
 
   | FeHoareF hf ->
     assert (Args.isempty args);
@@ -515,12 +515,13 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FbdHoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s hf.bhf_m));
     let bhf_pr = norm st s hf.bhf_pr in
     let bhf_po = norm st s hf.bhf_po in
     let bhf_f  = norm_xfun st s hf.bhf_f in
     let bhf_bd = norm st s hf.bhf_bd in
-    f_bdHoareF_old bhf_pr bhf_f bhf_po hf.bhf_cmp bhf_bd
+    let (m,_) = norm_me s (abstract hf.bhf_m) in
+    f_bdHoareF {m; inv=bhf_pr} bhf_f {m; inv=bhf_po} hf.bhf_cmp bhf_bd
 
   | FbdHoareS bhs ->
     assert (Args.isempty args);
@@ -530,17 +531,20 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let bhs_s  = norm_stmt s bhs.bhs_s in
     let bhs_bd = norm st s bhs.bhs_bd in
     let bhs_m  = norm_me s bhs.bhs_m in
-    f_bdHoareS_old bhs_m bhs_pr bhs_s bhs_po bhs.bhs_cmp bhs_bd
+    let m = fst bhs_m in
+    f_bdHoareS (snd bhs_m) {m; inv=bhs_pr} bhs_s {m; inv=bhs_po} bhs.bhs_cmp bhs_bd
 
   | FequivF ef ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mleft));
-    assert (not (Subst.has_mem s mright));
+    assert (not (Subst.has_mem s ef.ef_ml));
+    assert (not (Subst.has_mem s ef.ef_mr));
     let ef_pr = norm st s ef.ef_pr in
     let ef_po = norm st s ef.ef_po in
     let ef_fl = norm_xfun st s ef.ef_fl in
     let ef_fr = norm_xfun st s ef.ef_fr in
-    f_equivF_old ef_pr ef_fl ef_fr ef_po
+    let (ml,_) = norm_me s (abstract ef.ef_ml) in
+    let (mr,_) = norm_me s (abstract ef.ef_mr) in
+    f_equivF {ml;mr;inv=ef_pr} ef_fl ef_fr {ml;mr;inv=ef_po}
 
   | FequivS es ->
     assert (Args.isempty args);
@@ -564,7 +568,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let eg_fr = norm_xfun st s eg.eg_fr in
     let eg_sl = norm_stmt s eg.eg_sl in
     let eg_sr = norm_stmt s eg.eg_sr in
-    f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+    let (ml,_) = norm_me s (abstract eg.eg_ml) in
+    let (mr,_) = norm_me s (abstract eg.eg_mr) in
+    f_eagerF {ml;mr;inv=eg_pr} eg_sl eg_fl eg_fr eg_sr {ml;mr;inv=eg_po}
 
   | Fpr pr ->
     assert (Args.isempty args);

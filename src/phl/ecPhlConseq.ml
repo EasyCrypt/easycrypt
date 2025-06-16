@@ -9,7 +9,6 @@ open EcEnv
 open EcPV
 open EcSubst
 open EcReduction
-open EcCorePrinting
 
 open EcCoreGoal
 open EcLowGoal
@@ -74,7 +73,7 @@ let t_hoareS_conseq pre post tc =
   let cond1, cond2 = conseq_cond_old hs.hs_pr hs.hs_po pre post in
   let concl1 = f_forall_mems [hs.hs_m] cond1 in
   let concl2 = f_forall_mems [hs.hs_m] cond2 in
-  let concl3 = f_hoareS hs.hs_m pre hs.hs_s post in
+  let concl3 = f_hoareS_old hs.hs_m pre hs.hs_s post in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -321,7 +320,7 @@ let cond_hoareS_notmod ?(mk_other=false) tc cond =
 let t_hoareS_notmod post tc =
   let hs = tc1_as_hoareS tc in
   let cond1, _, _ = cond_hoareS_notmod tc (f_imp post hs.hs_po) in
-  let cond2 = f_hoareS hs.hs_m hs.hs_pr hs.hs_s post in
+  let cond2 = f_hoareS_old hs.hs_m hs.hs_pr hs.hs_s post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -631,8 +630,8 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
     tc_error !!tc "invalid pre-condition";
   if not (f_equal hs.hs_po (f_and post' post)) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS hs.hs_m pre hs.hs_s post in
-  let concl2 = f_hoareS hs.hs_m pre' hs.hs_s post' in
+  let concl1 = f_hoareS_old hs.hs_m pre hs.hs_s post in
+  let concl2 = f_hoareS_old hs.hs_m pre' hs.hs_s post' in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -656,7 +655,7 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
   let posth = if add then post' else f_and post' post in
   if not (f_equal hs.bhs_po postc) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS hs.bhs_m hs.bhs_pr hs.bhs_s post in
+  let concl1 = f_hoareS_old hs.bhs_m hs.bhs_pr hs.bhs_s post in
   let concl2 = f_bdHoareS_old hs.bhs_m hs.bhs_pr hs.bhs_s posth hs.bhs_cmp hs.bhs_bd in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
@@ -684,8 +683,8 @@ let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
     tc_error !!tc "invalid pre-condition";
   if not (f_equal es.es_po (f_ands [post';post1';post2'])) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS (mhr,snd es.es_ml) pre1 es.es_sl post1 in
-  let concl2 = f_hoareS (mhr,snd es.es_mr) pre2 es.es_sr post2 in
+  let concl1 = f_hoareS_old (mhr,snd es.es_ml) pre1 es.es_sl post1 in
+  let concl2 = f_hoareS_old (mhr,snd es.es_mr) pre2 es.es_sr post2 in
   let concl3 = f_equivS es.es_ml es.es_mr pre' es.es_sl es.es_sr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
@@ -983,7 +982,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = ( t_cut concl1 @+
         [ t_id;   (* subgoal 1 : pre *)
           t_intro_i hi @!
-          t_cut (f_hoareS hs2.hs_m pre hs2.hs_s hs2.hs_po) @+ [
+          t_cut (f_hoareS_old hs2.hs_m pre hs2.hs_s hs2.hs_po) @+ [
             t_hoareS_conseq hs2.hs_pr hs2.hs_po @+
                 [ EcLowGoal.t_trivial;
                   t_mytrivial;
@@ -1156,13 +1155,13 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* ------------------------------------------------------------------ *)
   (* equivS / ? / ? / ⊥                                                 *)
   | FequivS es, Some _, Some _, None ->
-    let f3 = f_hoareS (mhr, snd es.es_mr) f_true es.es_sr f_true in
+    let f3 = f_hoareS_old (mhr, snd es.es_mr) f_true es.es_sr f_true in
     t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
 
   (* ------------------------------------------------------------------ *)
   (* equivS / ? / ⊥ / ?                                                 *)
   | FequivS es, Some _, None, Some _ ->
-    let f2 = f_hoareS (mhr, snd es.es_ml) f_true es.es_sl f_true in
+    let f2 = f_hoareS_old (mhr, snd es.es_ml) f_true es.es_sl f_true in
     t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
   (* ------------------------------------------------------------------ *)
@@ -1285,7 +1284,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let fmake pre post c_or_bd =
           match c_or_bd with
           | None ->
-            f_hoareS hs.hs_m pre hs.hs_s post
+            f_hoareS_old hs.hs_m pre hs.hs_s post
           | Some (PCI_bd (cmp, bd)) ->
             f_bdHoareS_old hs.hs_m pre hs.hs_s post (oget cmp) bd
         in (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), tbool, lift_inv_adapter2 fmake)
@@ -1344,7 +1343,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         (penv, qenv, Inv_ss (bhf_pr hf), Inv_ss (bhf_po hf), tbool, lift_inv_adapter2 fmake)
 
       | FequivF ef ->
-        let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
+        let penv, qenv = LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_equivF_old pre ef.ef_fl ef.ef_fr post
@@ -1380,7 +1379,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let env = LDecl.push_active hs.hs_m hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_hoareS hs.hs_m pre hs.hs_s post
+          f_hoareS_old hs.hs_m pre hs.hs_s post
         in (env, env, hs.hs_pr, hs.hs_po, tbool, fmake)
 
       | FhoareF hf ->
@@ -1414,7 +1413,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let env = LDecl.push_active bhs.bhs_m hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_hoareS bhs.bhs_m pre bhs.bhs_s post
+          f_hoareS_old bhs.bhs_m pre bhs.bhs_s post
         in (env, env, bhs.bhs_pr, bhs.bhs_po, tbool, fmake)
 
       | FbdHoareF bhf ->
@@ -1454,7 +1453,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_bdHoareS_old m pre f post cmp bd
 
           | _, None ->
-            f_hoareS m pre f post
+            f_hoareS_old m pre f post
 
           | _, Some (PCI_bd (cmp,bd)) ->
             let cmp = odfl FHeq cmp in

@@ -36,7 +36,7 @@ module Core = struct
     let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let concl = f_hoareS hs.hs_m hs.hs_pr s post in
+    let concl = f_hoareS_old hs.hs_m hs.hs_pr s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -206,7 +206,7 @@ module Core = struct
           let bounded_distr = f_real_le (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let concl = f_hoareS_old bhs.bhs_m pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PNoRndParams, _ ->
@@ -230,7 +230,7 @@ module Core = struct
           let bounded_distr = f_real_le (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let concl = f_hoareS_old bhs.bhs_m pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, _ ->
@@ -385,7 +385,7 @@ module Core = struct
         Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
       else None in
     let m, s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = f_hoareS m hs.hs_pr (stmt (s1 @ s2)) hs.hs_po in
+    let concl = f_hoareS_old m hs.hs_pr (stmt (s1 @ s2)) hs.hs_po in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)

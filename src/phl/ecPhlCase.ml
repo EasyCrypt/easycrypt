@@ -7,8 +7,8 @@ open EcLowPhlGoal
 let t_hoare_case_r ?(simplify = true) f tc =
   let fand = if simplify then f_and_simpl else f_and in
   let hs = tc1_as_hoareS tc in
-  let concl1 = f_hoareS hs.hs_m (fand hs.hs_pr f) hs.hs_s hs.hs_po in
-  let concl2 = f_hoareS hs.hs_m (fand hs.hs_pr (f_not f)) hs.hs_s hs.hs_po in
+  let concl1 = f_hoareS_old hs.hs_m (fand hs.hs_pr f) hs.hs_s hs.hs_po in
+  let concl2 = f_hoareS_old hs.hs_m (fand hs.hs_pr (f_not f)) hs.hs_s hs.hs_po in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
