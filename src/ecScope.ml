@@ -370,9 +370,6 @@ let get_gdocstrings (sc : scope) : string list =
 let get_ldocentities (sc : scope) : docentity list =
   sc.sc_locdoc.docentities
 
-(* let extend_globdoc (sc : scope) (doc : string) : scope =
-  { sc with sc_globdoc = sc.sc_globdoc @ [doc] } *)
-
 module DocState = struct
   let empty : docstate =
     { docentities = [];
@@ -383,9 +380,6 @@ module DocState = struct
       currentkind = None;
       currentmode = None;
       currentproc = false; }
-
-  (* let push_global (state : docstate) (doc : string) : docstate =
-    { state with docentities = GlobalDoc doc :: state.docentities } *)
 
   let start_process (state : docstate) (name : string) (kind : itemkind) (md : mode): docstate =
     { state with
@@ -1274,10 +1268,10 @@ module Op = struct
           match uop.po_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Specific
-          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Abstract}
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Abstract }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
@@ -1519,10 +1513,10 @@ module Op = struct
           match uop.ppo_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Specific
-          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Abstract}
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Abstract }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
@@ -1670,10 +1664,10 @@ module Pred = struct
           match upr.pp_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Specific
-          | `Declare -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Abstract}
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Abstract }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
@@ -1722,10 +1716,10 @@ module Mod = struct
           match lc with
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc nm `Module `Specific
-          | `Declare -> DocState.start_process scope.sc_locdoc nm `Module `Abstract}
+          | `Declare -> DocState.start_process scope.sc_locdoc nm `Module `Abstract }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
@@ -1799,8 +1793,8 @@ module ModType = struct
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc (unloc intf.pi_name) `ModuleType `Specific }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src
@@ -1844,15 +1838,43 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let enter ?(src : string option) (scope : scope) (mode : thmode) (name : symbol) =
     assert (scope.sc_pr_uc = None);
+    let sc_locdoc = scope.sc_locdoc in
+    let sc_locdoc =
+      match src with
+      | None -> DocState.prevent_process scope.sc_locdoc
+      | Some src ->
+         let sc_locdoc =
+           DocState.start_process sc_locdoc name `Theory
+             (match mode with `Concrete -> `Specific | `Abstract -> `Abstract)
+         in
+         DocState.push_srcbl sc_locdoc src
+    in
+    let
+      scope = { scope with sc_locdoc }
+    in
+(* let scope = *)
+(*      let scope = *)
+(*   { scope with *)
+(*       sc_locdoc = *)
+(*       match uax.pa_locality with *)
+(*       | `Local -> DocState.prevent_process scope.sc_locdoc *)
+(*       | `Global -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Specific *)
+(*       | `Declare -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Abstract} *)
+(* in *)
+(* let scope = *)
+(*   { scope with *)
+(*       sc_locdoc = *)
+(*       match src with *)
+(*       | Some src -> DocState.push_srcbl scope.sc_locdoc src *)
+(*       | None -> scope.sc_locdoc; } *)
 
-    let scope =
-      let sc_locdoc = scope.sc_locdoc in
-      let sc_locdoc =
-        let mode = match mode with `Concrete -> `Specific | `Abstract -> `Abstract in
-        DocState.start_process sc_locdoc name `Theory mode in
-      let sc_locdoc =
-        ofold ((^~) DocState.push_srcbl) sc_locdoc src in
-      { scope with sc_locdoc } in
+      (* let sc_locdoc = scope.sc_locdoc in *)
+      (* let sc_locdoc = *)
+      (*   let mode = match mode with `Concrete -> `Specific | `Abstract -> `Abstract in *)
+      (*   DocState.start_process sc_locdoc name `Theory mode in *)
+      (* let sc_locdoc = *)
+      (*   ofold ((^~) DocState.push_srcbl) sc_locdoc src in *)
+      (* { scope with sc_locdoc } in *)
 
     subscope scope mode name
 
@@ -2217,10 +2239,10 @@ module Ty = struct
           match utyd.pty_locality with
           | `Local -> DocState.prevent_process scope.sc_locdoc
           | `Global -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Specific
-          | `Declare -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Abstract}
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Abstract }
     in
-    let scope = {
-      scope with
+    let scope =
+      { scope with
         sc_locdoc =
           match src with
           | Some src -> DocState.push_srcbl scope.sc_locdoc src

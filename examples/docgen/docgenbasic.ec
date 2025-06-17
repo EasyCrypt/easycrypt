@@ -1,9 +1,9 @@
 (*^
-  EasyCrypt_GenDoc_Tutorial.ec
+  EasyCrypt_DocGen_Tutorial.ec
 
   To generate documentation for a source file, run the following command:
   {{
-  <easycrypt-executable> gendoc [-outdir <output-directory>] <source-file>
+  <easycrypt-executable> docgen [-outdir <output-directory>] <source-file>
   }}
   Here, `<easycrypt-executable>` is the path to the EasyCrypt executable on your
   system, `<output-directory>` is the directory where the generated
@@ -26,7 +26,7 @@
   Regular, non-documentation comments like this one are excluded from the
   generated documentation file.
 *)
-require import AllCore.
+require import FinType.
 
 (*&
   This is a regular documentation comment, which is linked to the next
@@ -43,9 +43,9 @@ require import AllCore.
   - theories.
 
   Note that "scoped" items (those specified with, e.g., `local` or `declare`)
-  are not "documentable", even if their "non-scoped" versions are.
+  are not "documentable", even if their "non-scoped" versions would be.
 
-  In this case, this documentation comment is linked to `type t` below.
+  This documentation comment is linked to `type t` below.
 &*)
 type t.
 
@@ -247,12 +247,12 @@ type s.
 (*&
   Linking to items is done from the perspective of the outermost theory (`Top`),
   so names for items within (sub)theories that are not imported must be qualified.
-  In other words, if a (sub)theory is not imported by the outside-most theory,
+  In other words, if a (sub)theory is not imported by the outermost theory,
   linking requires the item name to be qualified properly, even within the
   (sub)theory itself. For example, to link to `type s` above, something along
   the lines of `[go to s in T](>|s)` __does not__ work, but
   `[go to s in T](>|T.s)` __does__ (proof: [go to s in T](>|T.s)).
-  However, if the (sub)theory would be mported at some point in the
+  However, if the (sub)theory would be imported at some point in the
   outermost theory, `[go to s in T](>|s)` __would work__, provided
   there are no naming collisions.
 &*)
@@ -289,16 +289,16 @@ section.
 declare op lf : t -> t.
 
 (*&
-  If a documentation comment precedes an item that is "undocumentable" due to
-  its scope, the comment will be dropped, effectively becoming a regular,
-  non-documentation comment.
+  If a documentation comment precedes (and would normally be linked to) an item
+  that is "undocumentable" (e.g., due to its scope), the comment is discarded,
+  effectively making it a regular, non-documentation comment.
 &*)
 local module M' = {
 
 }.
 
 (*&
-  This operator will be documented, but the previous documentation comment is
+  This operator is documented, but the previous documentation comment is
   not visible (indicating it has been dropped).
 &*)
 op foo = T.a.
@@ -306,6 +306,15 @@ op foo = T.a.
 end section.
 
 (*&
-  A documentation comment without any subsequent "documentable" item is
+  At present, similar to the previously discussed "scoped" items, clones are
+  "undocumentable" items. As such, any preceding (would-be-linked) documentation
+  comments are discarded, effectively making them regular, non-documentation
+  comments.
+&*)
+clone FinType as FT with
+  type t <- t.
+
+(*&
+  A documentation comment without any subsequent item is
   discarded, effectively making it a regular, non-documentation comment.
 &*)
