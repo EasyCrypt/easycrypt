@@ -340,11 +340,8 @@ section.
     by wp; rnd; wp; rnd{2}; auto; rewrite dseed_ll.
   (* presampling ~ postsampling *)
   seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
-  eager (H: Resample.resample(); ~ Resample.resample();
-    : ={glob Plog} ==> ={glob Plog})
-    : (={glob A, glob Plog, glob F})=> //;
-    first by sim.
-  eager proc H (={glob Plog, glob F})=> //.
+  eager call (: ={glob Plog, glob A, glob F}).
+  eager proc (={glob Plog, glob F}) => //; try sim.
   + eager proc; inline Resample.resample.
     swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
     swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
@@ -357,10 +354,9 @@ section.
       by wp; rnd{2}; auto=> />; smt (size_ge0).
     rcondt{2} 1; first by move=> &hr; auto=> /#.
     rcondf{2} 3; first by move=> &hr; auto=> /#.
-  + by sim.
-  + by sim.
+    by sim.
   + by eager proc; swap{1} 1 4; sim.
-  by sim.
+  by auto.
   qed.
 
   lemma P_PrgI &m:

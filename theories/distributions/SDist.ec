@@ -509,7 +509,7 @@ local module Gr(O : Oracle_i) = {
   }
 }.
 
-(* TOTHINK: Can this be strenthened by dropping the requirement that
+(* TOTHINK: Can this be strengthened by dropping the requirement that
 d1 and d2 are lossless? The current proof uses the eager tactics to
 swap the statement [if (Var.b) Var.x <$ Var.d;] over the call to the
 adversary, which only works if the distributions are lossless. *)
@@ -538,12 +538,11 @@ byequiv => //.
 have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
   ={arg, glob A} /\ arg{1} = d' ==> ={res}].
 + proc; inline *.
-    seq 6 6 : (={glob Var, glob A}); 1: by auto.
-    eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
-    : ={glob Var} ==> ={glob Var} )
-    : (={glob A,glob Var} ) => //; 1: by sim. 
-eager proc H (={glob Var}) => //; 2: by sim.
-    proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
+  seq 6 6 : (={glob Var, glob A}); 1: by auto.
+  eager call (: ={glob Var, glob A} ==> ={glob Var, glob A, res}) => //.
+  eager proc (={glob Var}) => //; try sim.
+  eager proc.
+  by inline*; rcondf{2} 6; [ by auto | by sp; if; auto].
 proc.
 transitivity* {1} {r <@ Game(A, O1e).main(d);}.
 + by inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto.
