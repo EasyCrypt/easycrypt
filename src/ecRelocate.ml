@@ -30,7 +30,7 @@ end
 module LocalSites() : Sites = struct
   let commands = local ["scripts"; "testing"]
   let theories = [local ["theories"]]
-  let doc = local ["resources"; "styles"]
+  let doc = local ["assets"; "styles"]
 end
 
 (* -------------------------------------------------------------------- *)

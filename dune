@@ -1,4 +1,4 @@
-(dirs src theories examples scripts resources)
+(dirs src theories examples scripts assets)
 
 (install
   (section (site (easycrypt commands)))
@@ -6,7 +6,7 @@
 
 (install
   (section (site (easycrypt doc)))
-  (files (resources/styles/styles.css as styles.css)))
+  (files (assets/styles/styles.css as styles.css)))
 
 (install
   (section (bin))
