@@ -392,6 +392,8 @@ let main () =
       interactive : bool;
       eco         : bool;
       gccompact   : int option;
+      docgen      : bool;
+      outdirp     : string option;
     }
   end in
 
@@ -446,7 +448,9 @@ let main () =
         ; terminal    = terminal
         ; interactive = true
         ; eco         = false
-        ; gccompact   = None }
+        ; gccompact   = None
+        ; docgen      = false
+        ; outdirp     = None }
 
     end
 
@@ -473,13 +477,55 @@ let main () =
         ; terminal    = terminal
         ; interactive = false
         ; eco         = cmpopts.cmpo_noeco
-        ; gccompact   = cmpopts.cmpo_compact }
+        ; gccompact   = cmpopts.cmpo_compact
+        ; docgen      = false
+        ; outdirp     = None }
 
       end
 
     | `Runtest _ ->
         (* Eagerly executed *)
         assert false
+    
+    | `DocGen docopts -> begin
+        let name = docopts.doco_input in
+
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+        let prvoff =  {
+          prvo_maxjobs = None;
+          prvo_timeout = None;
+          prvo_cpufactor = None;
+          prvo_provers = None;
+          prvo_pragmas = [];
+          prvo_ppwidth = None;
+          prvo_checkall = false;
+          prvo_profile = false;
+          prvo_iterate = false;
+          prvo_why3server = None; } 
+        in
+
+        let terminal =
+          lazy (T.from_channel ~name (open_in name))
+        in
+
+        { prvopts     = prvoff
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = true
+        ; gccompact   = None
+        ; docgen      = true
+        ; outdirp     = docopts.doco_outdirp }
+      end
+
+      
   in
 
   (match state.input with
@@ -609,11 +655,13 @@ let main () =
         oiter (T.setwidth terminal)
           (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
            match EcGState.getvalue "PP:width" gs with
-           | Some (`Int i) -> Some i | _ -> None);
+           | Some (`Int i) -> Some i | _ -> None);    
 
         begin
-          match EcLocation.unloc (T.next terminal) with
-          | EP.P_Prog (commands, locterm) ->
+          match snd_map EcLocation.unloc (T.next terminal) with
+          | (src, EP.P_Prog (commands, locterm)) ->
+              let src = String.strip src in
+              (* TODO REMOVE Format.eprintf "@.@.[W]%s@.@." src; *)
               terminate := locterm;
               List.iter
                 (fun p ->
@@ -622,7 +670,7 @@ let main () =
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
                      try
-                       let tdelta = EcCommands.process ~timed ~break p.EP.gl_action in
+                       let tdelta = EcCommands.process ~src ~timed ~break p.EP.gl_action in
                        if p.EP.gl_fail then begin
                          ignore_fail := true;
                          raise (EcScope.HiScopeError (None, "this command is expected to fail"))
@@ -649,11 +697,15 @@ let main () =
                    end)
                 commands
 
-          | EP.P_Undo i ->
+          | _, EP.P_DocComment doc ->
+             EcCommands.doc_comment doc
+
+          | _, EP.P_Undo i ->
               EcCommands.undo i
-          | EP.P_Exit ->
+          | _, EP.P_Exit ->
               terminate := true
         end;
+        
         T.finish `ST_Ok terminal;
 
         state.gccompact |> Option.iter (fun i ->
@@ -668,6 +720,8 @@ let main () =
             T.finalize terminal;
             if not state.eco then
               finalize_input state.input (EcCommands.current ());
+            if state.docgen then
+              EcDoc.generate_html ?outdirp:state.outdirp state.input (EcCommands.current ());
             exit 0
           end;
       with
