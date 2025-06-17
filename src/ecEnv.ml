@@ -2360,7 +2360,7 @@ module NormMp = struct
     match item with
     | MI_Module me -> mod_use env rm fdone us (EcPath.mqname mp me.me_name)
     | MI_Variable v -> add_var env (xpath mp v.v_name) us
-    | MI_Function f -> fun_use_aux env rm fdone us (xpath mp f.f_name)
+    | MI_Function f -> gen_fun_use env fdone rm us (xpath mp f.f_name)
 
   and body_use env rm fdone mp us comps body =
     match body with
@@ -2371,9 +2371,6 @@ module NormMp = struct
       List.fold_left (item_use env rm fdone mp) us comps
     | ME_Structure ms ->
       List.fold_left (item_use env rm fdone mp) us ms.ms_body
-
-  and fun_use_aux env rm fdone us f =
-    gen_fun_use env fdone rm us f
 
   let mod_use_top env mp =
     let mp = norm_mpath env mp in
