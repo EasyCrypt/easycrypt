@@ -211,9 +211,9 @@ let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
   | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
   | None       , FeHoareS  hs -> f_eHoareS_old hs.ehs_m hs.ehs_pr s hs.ehs_po
-  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp hs.bhs_bd
-  | Some `Left , FequivS   es -> f_equivS_old es.es_ml es.es_mr es.es_pr s es.es_sr es.es_po
-  | Some `Right, FequivS   es -> f_equivS_old es.es_ml es.es_mr es.es_pr es.es_sl s es.es_po
+  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+  | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s (es_po es)
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -270,10 +270,10 @@ let set_pre ~pre f =
     f_eHoareS_old hs.ehs_m pre.inv hs.ehs_s hs.ehs_po
  | FbdHoareF hf, Inv_ss pre ->
     let pre = ss_inv_rebind pre hf.bhf_m in
-    f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp hf.bhf_bd
+    f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf)
  | FbdHoareS hs, Inv_ss pre -> 
     let pre = ss_inv_rebind pre (fst hs.bhs_m) in
-    f_bdHoareS (snd hs.bhs_m) pre hs.bhs_s (bhs_po hs) hs.bhs_cmp hs.bhs_bd
+    f_bdHoareS (snd hs.bhs_m) pre hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
  | FequivF ef, Inv_ts pre   -> 
     let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
     f_equivF pre ef.ef_fl ef.ef_fr (ef_po ef)
@@ -626,7 +626,8 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) bhs.bhs_cmp bhs.bhs_bd in
+          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) 
+                      bhs.bhs_cmp (bhs_bd bhs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->

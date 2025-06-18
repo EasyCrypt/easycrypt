@@ -400,9 +400,10 @@ let t_equiv_deno_bad2 pre bad1 tc =
 (* -------------------------------------------------------------------- *)
 let process_pre tc hyps prl prr pre post =
   let fl = prl.pr_fun and fr = prr.pr_fun in
+  let ml, mr = prl.pr_mem, prr.pr_mem in
   match pre with
   | Some p ->
-    let penv, _ = LDecl.equivF fl fr hyps in
+    let penv, _ = LDecl.equivF ml mr fl fr hyps in
     TTC.pf_process_formula !!tc penv p
   | None ->
     let al = prl.pr_args and ar = prr.pr_args in
@@ -454,7 +455,7 @@ let process_equiv_deno1 info eq tc =
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
+        let _, qenv = LDecl.equivF mleft mright fl fr hyps in
         TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
@@ -495,7 +496,7 @@ let process_equiv_deno_bad info tc =
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
+        let _, qenv = LDecl.equivF mleft mright fl fr hyps in
         TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
@@ -550,7 +551,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
+        let _, qenv = LDecl.equivF mleft mright fl fr hyps in
         TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in

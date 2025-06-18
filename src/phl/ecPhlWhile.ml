@@ -103,11 +103,11 @@ let t_ehoare_while inv tc =
   let hs = tc1_as_ehoareS tc in
   let (e,_), _ = tc1_last_while tc hs.ehs_s in
   let m = EcMemory.memory hs.ehs_m in
-  let e = form_of_expr m e in
+  let e = {m;inv=form_of_expr m e} in
   let tc =
     FApi.t_rotate `Left 1 (EcPhlApp.t_ehoare_app (0, `ByPos (List.length hs.ehs_s.s_node - 1)) inv tc) in
   FApi.t_sub
-    [(EcPhlConseq.t_ehoareS_conseq inv (f_interp_ehoare_form (f_not e) inv)) @+
+    [(EcPhlConseq.t_ehoareS_conseq inv (map_ss_inv2 f_interp_ehoare_form (map_ss_inv1 f_not e) inv)) @+
        [t_trivial;
         t_id;
         t_ehoare_while_core ];
@@ -383,9 +383,9 @@ let process_while side winfos tc =
       | _    -> tc_error !!tc "invalid arguments"
     end
 
-  | FeHoareS _ ->
+  | FeHoareS es ->
       let _, inv = TTC.tc1_process_Xhl_formula_xreal tc phi in
-      t_ehoare_while inv tc
+      t_ehoare_while {m=fst es.ehs_m;inv} tc
 
   | FbdHoareS _ -> begin
       match vrnt, bds with

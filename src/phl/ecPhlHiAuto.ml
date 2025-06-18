@@ -57,12 +57,14 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       EcPhlWp.t_wp (Some (Single (Zpr.cpos (-1))))
 
   | LL_RND ->
+      let m = EcIdent.create "&hr" in 
          EcPhlRnd.t_bdhoare_rnd PNoRndParams
-      @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
+      @> EcPhlConseq.t_bdHoareS_conseq {m;inv=f_true} {m;inv=f_true}
       @~ FApi.t_on1 (-1) ~ttout:ll_trivial t_id
 
   | LL_CALL _ ->
-         EcPhlCall.t_bdhoare_call f_true f_true None
+      let m = EcIdent.create "&hr" in 
+         EcPhlCall.t_bdhoare_call {m;inv=f_true} {m;inv=f_true} None
 
   | LL_JUMP ->
         ( EcPhlApp.t_bdhoare_app
@@ -102,7 +104,8 @@ let t_lossless1_r tc =
     @~ FApi.t_onall (EcLowGoal.t_crush ~delta:true) in
 
   let tactic =
-    (EcPhlConseq.t_bdHoareS_conseq f_true f_true
+    let m = EcIdent.create "&hr" in 
+    (EcPhlConseq.t_bdHoareS_conseq {m;inv=f_true} {m;inv=f_true}
         @~ FApi.t_on1 (-1) ~ttout:ll_trivial
              (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1))
         @~ FApi.t_on1 (-1) ~ttout:ll_trivial

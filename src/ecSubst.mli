@@ -87,6 +87,8 @@ val ss_inv_rebind : ss_inv -> memory -> ss_inv
 val f_forall_mems_ss_inv : memenv -> ss_inv -> form
 
 val ts_inv_rebind : ts_inv -> memory -> memory -> ts_inv
+val ts_inv_rebind_left : ts_inv -> memory -> ts_inv
+val ts_inv_rebind_right : ts_inv -> memory -> ts_inv
 val f_forall_mems_ts_inv : memenv -> memenv -> ts_inv -> form
 
 val ss_inv_forall_ml_ts_inv : memenv -> ts_inv -> ss_inv

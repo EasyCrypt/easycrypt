@@ -5,6 +5,7 @@ open EcParsetree
 open EcTypes
 open EcModules
 open EcFol
+open EcAst
 
 open EcCoreGoal
 open EcLowGoal
@@ -17,8 +18,8 @@ let t_hoare_app_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let s1, s2 = s_split env i hs.hs_s in
-  let a = f_hoareS_old hs.hs_m hs.hs_pr (stmt s1) phi in
-  let b = f_hoareS_old hs.hs_m phi (stmt s2) hs.hs_po in
+  let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) phi in
+  let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
@@ -28,8 +29,8 @@ let t_ehoare_app_r i f tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s1, s2 = s_split env i hs.ehs_s in
-  let a = f_eHoareS_old hs.ehs_m hs.ehs_pr (stmt s1) f in
-  let b = f_eHoareS_old hs.ehs_m f (stmt s2) hs.ehs_po in
+  let a = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) (stmt s1) f in
+  let b = f_eHoareS (snd hs.ehs_m) f (stmt s2) (ehs_po hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
@@ -40,12 +41,13 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let bhs = tc1_as_bdhoareS tc in
   let s1, s2 = s_split env i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
-  let nR = f_not pR in
-  let cond_phi = f_hoareS_old bhs.bhs_m bhs.bhs_pr s1 phi in
-  let condf1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 pR bhs.bhs_cmp f1 in
-  let condg1 = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s1 nR bhs.bhs_cmp g1 in
-  let condf2 = f_bdHoareS_old bhs.bhs_m (f_and_simpl phi pR) s2 bhs.bhs_po bhs.bhs_cmp f2 in
-  let condg2 = f_bdHoareS_old bhs.bhs_m (f_and_simpl phi nR) s2 bhs.bhs_po bhs.bhs_cmp g2 in
+  let nR = map_ss_inv1 f_not pR in
+  let mt = snd bhs.bhs_m in
+  let cond_phi = f_hoareS mt (bhs_pr bhs) s1 phi in
+  let condf1 = f_bdHoareS mt (bhs_pr bhs) s1 pR bhs.bhs_cmp f1 in
+  let condg1 = f_bdHoareS mt (bhs_pr bhs) s1 nR bhs.bhs_cmp g1 in
+  let condf2 = f_bdHoareS mt (map_ss_inv2 f_and_simpl phi pR) s2 (bhs_po bhs) bhs.bhs_cmp f2 in
+  let condg2 = f_bdHoareS mt (map_ss_inv2 f_and_simpl phi nR) s2 (bhs_po bhs) bhs.bhs_cmp g2 in
   let bd =
     (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
   let condbd =
@@ -57,10 +59,11 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
   let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
   let condnm =
-    let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in
+    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2) 
+                                (map_ss_inv1 ((EcUtils.flip f_eq) r2) g2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
-      (f_hoareS_old bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in
+      (f_hoareS (snd bhs.bhs_m) (map_ss_inv2 f_and (bhs_pr bhs) eqs) s1 eqs) in
   let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in
   let conds =
     if   f_equal g1 f_r0
@@ -84,7 +87,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
 let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
-    let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true in
+    let tt1 = EcPhlConseq.t_hoareS_conseq_nm (hs_pr hs) {m=(fst hs.hs_m);inv=f_true} in
     let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in

@@ -128,9 +128,9 @@ val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
 
-val f_bdHoareF : ss_inv -> xpath -> ss_inv -> hoarecmp -> form -> form
+val f_bdHoareF : ss_inv -> xpath -> ss_inv -> hoarecmp -> ss_inv -> form
 val f_bdHoareF_old : form -> xpath -> form -> hoarecmp -> form -> form
-val f_bdHoareS : memtype -> ss_inv -> stmt -> ss_inv -> hoarecmp -> form -> form
+val f_bdHoareS : memtype -> ss_inv -> stmt -> ss_inv -> hoarecmp -> ss_inv -> form
 val f_bdHoareS_old : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
 
 (* soft-constructors - equiv *)

@@ -109,7 +109,7 @@ val f_dmap : ty -> ty -> form -> form -> form
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
-val split_sided : memory -> form -> form option
+val split_sided : memory -> ts_inv -> ss_inv option
 val one_sided_vs : memory -> form -> form list
 
 (* -------------------------------------------------------------------- *)

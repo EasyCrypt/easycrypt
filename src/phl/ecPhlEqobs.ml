@@ -459,7 +459,7 @@ let process_eqobs_inS info tc =
     | None ->
       try Mpv2.needed_eq env mleft mright es.es_po
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
-  let post = Mpv2.to_form mleft mright eqo inv in
+  let post = {ml=mleft; mr=mright; inv=Mpv2.to_form mleft mright eqo inv} in
   let sim = init_sim env spec inv in
   let t_main tc =
     match info.EcParsetree.sim_pos with
@@ -482,7 +482,7 @@ let process_eqobs_inS info tc =
             (EcPhlSkip.t_skip @! t_trivial)
             (t_eqobs_inS sim eqo tc)
       ]) tc in
-  (EcPhlConseq.t_equivS_conseq es.es_pr post @+
+  (EcPhlConseq.t_equivS_conseq (es_pr es) post @+
     [t_trivial;
      t_trivial;
      t_main]) tc

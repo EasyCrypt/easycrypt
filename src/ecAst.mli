@@ -371,6 +371,7 @@ val inv_of_inv : inv -> form
 
 val lift_ss_inv : (ss_inv -> 'a) -> inv -> 'a
 val lift_ss_inv2 : (ss_inv -> ss_inv -> 'a) -> inv -> inv -> 'a
+val lift_ss_inv3 : (ss_inv -> ss_inv -> ss_inv -> 'a) -> inv -> inv -> inv -> 'a
 val lift_ts_inv : (ts_inv -> 'a) -> inv -> 'a
 val lift_ts_inv2 : (ts_inv -> ts_inv -> 'a) -> inv -> inv -> 'a
 val lift_inv_adapter : (form -> 'a) -> inv -> 'a
@@ -399,8 +400,10 @@ val ehs_pr : eHoareS -> ss_inv
 val ehs_po : eHoareS -> ss_inv
 val bhf_pr : bdHoareF -> ss_inv
 val bhf_po : bdHoareF -> ss_inv
+val bhf_bd : bdHoareF -> ss_inv
 val bhs_pr : bdHoareS -> ss_inv
 val bhs_po : bdHoareS -> ss_inv
+val bhs_bd : bdHoareS -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 

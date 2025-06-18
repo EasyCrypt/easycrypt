@@ -108,7 +108,7 @@ let process_exists_intro ~(elim : bool) fs tc =
     | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
     | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_m bhf.bhf_f hyps)
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
-    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
+    | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps)
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps
     | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   in

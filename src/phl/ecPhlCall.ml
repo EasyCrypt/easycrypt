@@ -106,14 +106,14 @@ let ehoare_call_pre_post fpre fpost tc =
     | Some (LvTuple vs) -> Some (f_tuple (List.map (fun (v,ty) -> f_pvar v ty m) vs)) in
   let pvres = pv_res in
   let wppost =
-    omap_dfl (fun fres -> PVM.subst1 env pvres m fres fpost) fpost fres in
-  let fv = PV.fv env m wppost in
+    omap_dfl (fun fres -> map_ss_inv1 (PVM.subst1 env pvres m fres) fpost) fpost fres in
+  let fv = PV.fv env m wppost.inv in
   if PV.mem_pv env pv_res fv then
     tc_error !!tc
       "ehoare call core rule: the post condition of the function depend on res but the result is not assigned";
 
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let wppre = PVM.subst env spre fpre in
+  let wppre = map_ss_inv1 (PVM.subst env spre) fpre in
   hyps, env, hs, s, f, wppre, wppost
 
 
@@ -121,20 +121,20 @@ let t_ehoare_call_core fpre fpost tc =
   let hyps, env, hs, s, f, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   if not (List.is_empty s.s_node) then
     tc_error !!tc  "ehoare call core rule: only single call statements are accepted";
-  if not (EcReduction.is_conv hyps hs.ehs_po wppost) then
+  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) wppost) then
     (let env = EcEnv.Memory.push_active hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong post-condition %a instead %a"
-       (EcPrinting.pp_form ppe) hs.ehs_po (EcPrinting.pp_form ppe) wppost);
+       (EcPrinting.pp_form ppe) (ehs_po hs).inv (EcPrinting.pp_form ppe) wppost.inv);
 
-  if not (EcReduction.is_conv hyps hs.ehs_pr wppre) then
+  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_pr hs) wppre) then
     (let env = EcEnv.Memory.push_active hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong pre-condition %a instead %a"
-       (EcPrinting.pp_form ppe) hs.ehs_pr (EcPrinting.pp_form ppe) wppre);
+       (EcPrinting.pp_form ppe) (ehs_pr hs).inv (EcPrinting.pp_form ppe) wppre.inv);
 
   (* The function satisfies the specification *)
-  let f_concl = f_eHoareF_old fpre f fpost in
+  let f_concl = f_eHoareF fpre f fpost in
   FApi.xmutate1 tc `HlCall [f_concl]
 
 
@@ -148,7 +148,8 @@ let t_ehoare_call fpre fpost tc =
 let t_ehoare_call_concave f fpre fpost tc =
   let _, _, _, s, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) (f_app_simpl f [wppre] txreal) tc in
+    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) 
+     (map_ss_inv1 (fun wppre -> f_app_simpl f [wppre] txreal) wppre) tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   let t_call =
     FApi.t_seqsub (EcPhlConseq.t_ehoareS_concave f wppre wppost)
@@ -167,11 +168,11 @@ let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
 
   match cmp, opt_bd with
   | FHle, Some _  -> tc_error pf "%s" msg
-  | FHle, None    -> f_bdHoareF_old fpre f fpost FHle bd
-  | FHeq, Some bd -> f_bdHoareF_old fpre f fpost FHeq bd
-  | FHeq, None    -> f_bdHoareF_old fpre f fpost FHeq bd
-  | FHge, Some bd -> f_bdHoareF_old fpre f fpost FHge bd
-  | FHge, None    -> f_bdHoareF_old fpre f fpost FHge bd
+  | FHle, None    -> f_bdHoareF fpre f fpost FHle bd
+  | FHeq, Some bd -> f_bdHoareF fpre f fpost FHeq bd
+  | FHeq, None    -> f_bdHoareF fpre f fpost FHeq bd
+  | FHge, Some bd -> f_bdHoareF fpre f fpost FHge bd
+  | FHge, None    -> f_bdHoareF fpre f fpost FHge bd
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_call fpre fpost opt_bd tc =
@@ -187,39 +188,41 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
   let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres bhs.bhs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
+  let post = map_ss_inv1 (wp_asgn_call env m lp fres) (bhs_po bhs) in
+  let fpost = map_ss_inv1 (PVM.subst1 env pvres m fres) fpost in
   let modi = f_write env f in
   let post =
     match bhs.bhs_cmp with
-    | FHle -> f_imp_simpl   post fpost
-    | FHge -> f_imp_simpl  fpost  post
+    | FHle -> map_ss_inv2 f_imp_simpl   post fpost
+    | FHge -> map_ss_inv2 f_imp_simpl  fpost  post
 
     | FHeq when f_equal bhs.bhs_bd f_r0 ->
-        f_imp_simpl post fpost
+        map_ss_inv2 f_imp_simpl post fpost
 
     | FHeq when f_equal bhs.bhs_bd f_r1 ->
-        f_imp_simpl  fpost post
+        map_ss_inv2 f_imp_simpl  fpost post
 
-    | FHeq -> f_iff_simpl fpost  post in
+    | FHeq -> map_ss_inv2 f_iff_simpl fpost  post in
 
-  let post = generalize_mod env m modi post in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
+  let post = map_ss_inv1 (generalize_mod env m modi) post in
+  let post = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) post in
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-  let concl = match bhs.bhs_cmp, opt_bd with
+  let concl = 
+    let mt = snd bhs.bhs_m in
+    match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
-        f_hoareS_old bhs.bhs_m bhs.bhs_pr s post
+        f_hoareS mt (bhs_pr bhs) s post
     | FHeq, Some bd ->
-        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHeq, None ->
-        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp f_r1
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp f_r1
     | FHge, Some bd ->
-        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
     | FHge, None ->
-        f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post FHeq f_r1
+        f_bdHoareS mt (bhs_pr bhs) s post FHeq f_r1
     | _, _ -> assert false
   in
 
@@ -313,13 +316,13 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
       if not (EcEnv.NormMp.x_equal env hf.ehf_f f) then
         call_error env tc hf.ehf_f f;
-      t_ehoare_call hf.ehf_pr hf.ehf_po tc
+      t_ehoare_call (ehf_pr hf) (ehf_po hf) tc
 
   | FbdHoareF hf, FbdHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
       if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
         call_error env tc hf.bhf_f f;
-      t_bdhoare_call hf.bhf_pr hf.bhf_po None tc
+      t_bdhoare_call (bhf_pr hf) (bhf_po hf) None tc
 
   | FequivF ef, FequivS es ->
       let (_, fl, _), _ = tc1_last_call tc es.es_sl in
@@ -384,30 +387,32 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
         f_equivF pre fl fr post
 
 let process_call side info tc =
-  let process_spec tc side =
+  let process_spec tc side pre post =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
           let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
-          let fmake pre post =
-            f_hoareF {m;inv=pre} f {m;inv=post} in
-          (penv, qenv, tbool, fmake)
+          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+          let post = TTC.pf_process_form !!tc qenv tbool post in    
+          f_hoareF {m;inv=pre} f {m;inv=post}
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-          let penv, qenv = LDecl.hoareF (fst bhs.bhs_m) f hyps in
-          let fmake pre post =
-            bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None in
-          (penv, qenv, tbool, fmake)
+          let m = (EcIdent.create "&hr") in
+          let penv, qenv = LDecl.hoareF m f hyps in
+          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+          let post = TTC.pf_process_form !!tc qenv tbool post in   
+          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f bhs.bhs_cmp bhs.bhs_bd None
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF (fst hs.ehs_m) f hyps in
-          let fmake pre post =
-            f_eHoareF_old pre f post in
-          (penv, qenv, txreal, fmake)
+          let m = (EcIdent.create "&hr") in
+          let penv, qenv = LDecl.hoareF m f hyps in
+          let pre  = TTC.pf_process_form !!tc penv txreal pre  in
+          let post = TTC.pf_process_form !!tc qenv txreal post in   
+          f_eHoareF {m;inv=pre} f {m;inv=post}
 
       | FbdHoareS _, Some _
       | FhoareS  _, Some _ ->
@@ -418,22 +423,22 @@ let process_call side info tc =
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
           let (ml, mr) = (EcIdent.create "&1", EcIdent.create "&2") in
           let penv, qenv = LDecl.equivF ml mr fl fr hyps in
-          let fmake pre post =
-            f_equivF {ml;mr;inv=pre} fl fr {ml;mr;inv=post} in
-          (penv, qenv, tbool, fmake)
+          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+          let post = TTC.pf_process_form !!tc qenv tbool post in  
+          f_equivF {ml;mr;inv=pre} fl fr {ml;mr;inv=post}
 
       | FequivS es, Some side ->
           let fstmt = sideif side es.es_sl es.es_sr in
-          let (m,_) = sideif side es.es_ml es.es_mr in
+          let m = sideif side (EcIdent.create "&1") (EcIdent.create "&2") in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF m f hyps in
-          let fmake pre post =
-            bdhoare_call_spec !!tc pre post f FHeq f_r1 None in
-          (penv, qenv, tbool, fmake)
+          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+          let post = TTC.pf_process_form !!tc qenv tbool post in
+          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f FHeq f_r1 None
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
-  let process_inv tc side =
+  let process_inv tc side inv =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
@@ -442,25 +447,37 @@ let process_call side info tc =
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, lift_ss_inv (fun inv -> f_hoareF inv f inv))
+        let m = fst hs.hs_m in
+        let inv = TTC.pf_process_form !!tc hyps tbool inv in
+        let inv = {m; inv} in
+        (f_hoareF inv f inv, Inv_ss inv)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, lift_inv_adapter (fun inv -> f_eHoareF_old inv f inv))
+        let m = fst hs.ehs_m in
+        let inv = TTC.pf_process_form !!tc hyps txreal inv in
+        let inv = {m; inv} in
+        (f_eHoareF inv f inv, Inv_ss inv)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      let fmake inv = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None in
-      (penv, tbool, lift_inv_adapter fmake)
+      let m = fst bhs.bhs_m in
+      let inv = TTC.pf_process_form !!tc hyps txreal inv in
+      let inv = {m; inv} in
+      let f = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None in
+      (f, Inv_ss inv)
 
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
+      let ml, mr = (fst es.es_ml, fst es.es_mr) in
       let env  = LDecl.toenv hyps in
-      (penv, tbool, lift_ts_inv (fun inv -> mk_inv_spec !!tc env inv fl fr))
+      let inv = TTC.pf_process_form !!tc hyps tbool inv in
+      let inv = {ml;mr; inv} in
+      (mk_inv_spec !!tc env inv fl fr, Inv_ts inv)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
@@ -495,21 +512,12 @@ let process_call side info tc =
   let process_cut tc info =
     match info with
     | CI_spec (pre, post) ->
-      let penv,qenv,ty,fmake = process_spec tc side in
-      let pre  = TTC.pf_process_form !!tc penv ty pre  in
-      let post = TTC.pf_process_form !!tc qenv ty post in
-      fmake pre post
-
+      process_spec tc side pre post
     | CI_inv inv ->
-      let hyps, ty, fmake = process_inv tc side in
-      let inv = TTC.pf_process_form !!tc hyps ty inv in
-      let inv = 
-        match tc1_get_pre tc with
-        | Inv_ss _ -> Inv_ss {inv; m=mhr}
-        | Inv_ts _ -> Inv_ts {inv; ml=mleft; mr=mright} in      
+      let f, inv = process_inv tc side inv in
       subtactic := (fun tc ->
         FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
-      fmake inv
+      f
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in
@@ -618,7 +626,7 @@ let process_call_concave (fc, info) tc =
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
       if not (EcEnv.NormMp.x_equal env hf.ehf_f f) then
         call_error env tc hf.ehf_f f;
-      t_ehoare_call_concave fc hf.ehf_pr hf.ehf_po tc
+      t_ehoare_call_concave fc (ehf_pr hf) (ehf_po hf) tc
     | _, _ -> tc_error !!tc "call: invalid goal shape" in
 
   FApi.t_seqsub

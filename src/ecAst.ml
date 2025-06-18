@@ -287,11 +287,6 @@ and pr = {
   pr_event : form;
 }
 
-(* ----------------------------------------------------------------- *)
-(* Accessors for program logic                                       *)
-(* ----------------------------------------------------------------- *)
-
-
 type ss_inv = {
   m   : memory;
   inv : form;
@@ -419,10 +414,6 @@ let map_ts_inv_destr3 (fn: form -> form * form * form) (inv: ts_inv) =
   assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
   {ml;mr;inv=inv1}, {ml;mr;inv=inv2}, {ml;mr;inv=inv3}
 
-(* ----------------------------------------------------------------- *)
-(* Lowering of invariants                                            *)
-(* ----------------------------------------------------------------- *)
-
 let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
   assert (List.length invs > 0);
   let mr' = (List.hd invs).mr in
@@ -486,6 +477,12 @@ let lift_ss_inv (f: ss_inv -> 'a) : inv -> 'a =
 let lift_ss_inv2 (f: ss_inv -> ss_inv -> 'a) : inv -> inv -> 'a =
   let f inv1 inv2 = match inv1, inv2 with
   | Inv_ss ss1, Inv_ss ss2 -> f ss1 ss2
+  | _ -> failwith "expected only single sided invariants" in
+  f
+
+let lift_ss_inv3 (f: ss_inv -> ss_inv -> ss_inv -> 'a) : inv -> inv -> inv -> 'a =
+  let f inv1 inv2 inv3 = match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 -> f ss1 ss2 ss3
   | _ -> failwith "expected only single sided invariants" in
   f
 
@@ -575,9 +572,11 @@ let ehs_po ehs = {m=fst ehs.ehs_m; inv=ehs.ehs_po}
 
 let bhf_pr bhf = {m=bhf.bhf_m; inv=bhf.bhf_pr}
 let bhf_po bhf = {m=bhf.bhf_m; inv=bhf.bhf_po}
+let bhf_bd bhf = {m=bhf.bhf_m; inv=bhf.bhf_bd}
 
 let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
 let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
+let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)

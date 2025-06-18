@@ -37,11 +37,15 @@ let conseq_econd pre post spre spost =
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
-  | FHle, (FHle | FHeq) -> Some (f_real_le bd fbd)
-  | FHge, (FHge | FHeq) -> Some (f_real_le fbd bd)
-  | FHeq, FHeq          -> Some (f_eq bd fbd)
-  | FHeq, FHge          -> Some (f_and (f_eq fbd f_r1) (f_eq bd f_r1))
-  | FHeq, FHle          -> Some (f_and (f_eq fbd f_r0) (f_eq bd f_r0))
+  | FHle, (FHle | FHeq) -> Some (map_ss_inv2 f_real_le bd fbd)
+  | FHge, (FHge | FHeq) -> Some (map_ss_inv2 f_real_le fbd bd)
+  | FHeq, FHeq          -> Some (map_ss_inv2 f_eq bd fbd)
+  | FHeq, FHge          -> Some (map_ss_inv2 f_and 
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) fbd) 
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) bd))
+  | FHeq, FHle          -> Some (map_ss_inv2 f_and 
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) fbd) 
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) bd))
   | _   , _             -> None
 
 let bd_goal tc fcmp fbd cmp bd =
@@ -50,8 +54,8 @@ let bd_goal tc fcmp fbd cmp bd =
     let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
     tc_error !!tc
       "do not know how to change phoare[...]%s %a into phoare[...]%s %a"
-      (EcPrinting.string_of_hcmp fcmp) (EcPrinting.pp_form ppe) fbd
-      (EcPrinting.string_of_hcmp cmp) (EcPrinting.pp_form ppe) bd
+      (EcPrinting.string_of_hcmp fcmp) (EcPrinting.pp_form ppe) fbd.inv
+      (EcPrinting.string_of_hcmp cmp) (EcPrinting.pp_form ppe) bd.inv
   | Some fp -> fp
 
 (* -------------------------------------------------------------------- *)
@@ -127,7 +131,7 @@ let t_bdHoareF_conseq pre post tc =
     bdHoare_conseq_conds bhf.bhf_cmp (bhf_pr bhf) (bhf_po bhf) pre post in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
   let concl2 = f_forall_mems_ss_inv mpo cond2 in
-  let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
+  let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp (bhf_bd bhf) in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -137,7 +141,7 @@ let t_bdHoareS_conseq pre post tc =
     bdHoare_conseq_conds bhs.bhs_cmp (bhs_pr bhs) (bhs_po bhs) pre post in
   let concl1 = f_forall_mems_ss_inv bhs.bhs_m cond1 in
   let concl2 = f_forall_mems_ss_inv bhs.bhs_m cond2 in
-  let concl3 = f_bdHoareS (snd bhs.bhs_m) pre bhs.bhs_s post bhs.bhs_cmp bhs.bhs_bd in
+  let concl3 = f_bdHoareS (snd bhs.bhs_m) pre bhs.bhs_s post bhs.bhs_cmp (bhs_bd bhs) in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -145,18 +149,18 @@ let t_bdHoareF_conseq_bd cmp bd tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_m bhf.bhf_f env in
-  let bd_goal =  bd_goal tc bhf.bhf_cmp bhf.bhf_bd cmp bd in
+  let bd_goal =  bd_goal tc bhf.bhf_cmp (bhf_bd bhf) cmp bd in
   let concl = f_bdHoareF (bhf_pr bhf) bhf.bhf_f (bhf_po bhf) cmp bd in
-  let goal = map_ss_inv1 (fun pr -> f_imp pr bd_goal) (bhf_pr bhf) in
+  let goal = map_ss_inv2 f_imp (bhf_pr bhf) bd_goal in
   let bd_goal = f_forall_mems_ss_inv mpr goal in
   FApi.xmutate1 tc `HlConseq [bd_goal; concl]
 
 (* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq_bd cmp bd tc =
   let bhs = tc1_as_bdhoareS tc in
-  let bd_goal = bd_goal tc bhs.bhs_cmp bhs.bhs_bd cmp bd in
+  let bd_goal = bd_goal tc bhs.bhs_cmp (bhs_bd bhs) cmp bd in
   let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) bhs.bhs_s (bhs_po bhs) cmp bd in
-  let imp = map_ss_inv1 (fun pr -> f_imp pr bd_goal) (bhs_pr bhs) in
+  let imp = map_ss_inv2 f_imp (bhs_pr bhs) bd_goal in
   let bd_goal = f_forall_mems_ss_inv bhs.bhs_m imp in
   FApi.xmutate1 tc `HlConseq [bd_goal; concl]
 
@@ -370,7 +374,7 @@ let t_bdHoareF_notmod post tc =
   let _, cond =
     bdHoare_conseq_conds hf.bhf_cmp (bhf_pr hf) (bhf_po hf) (bhf_pr hf) post in
   let cond1, _, _ = cond_bdHoareF_notmod tc cond in
-  let cond2 = f_bdHoareF (bhf_pr hf) hf.bhf_f post hf.bhf_cmp hf.bhf_bd in
+  let cond2 = f_bdHoareF (bhf_pr hf) hf.bhf_f post hf.bhf_cmp (bhf_bd hf) in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -394,7 +398,7 @@ let t_bdHoareS_notmod post tc =
   let _, cond =
     bdHoare_conseq_conds hs.bhs_cmp (bhs_pr hs) (bhs_po hs) (bhs_pr hs) post in
   let cond1, _, _ = cond_bdHoareS_notmod tc cond in
-  let cond2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post hs.bhs_cmp hs.bhs_bd in
+  let cond2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post hs.bhs_cmp (bhs_bd hs) in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -634,12 +638,14 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_bdhoare tc =
   let hs = tc1_as_hoareS tc in
+  let f_r1 = {m=fst hs.hs_m; inv=f_r1} in
   let concl1 = f_bdHoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s (hs_po hs) FHeq f_r1 in
   FApi.xmutate1 tc `HlConseqBd [concl1]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_bdhoare tc =
   let hf = tc1_as_hoareF tc in
+  let f_r1 = {m=hf.hf_m; inv=f_r1} in
   let concl1 = f_bdHoareF (hf_pr hf) hf.hf_f (hf_po hf) FHeq f_r1 in
   FApi.xmutate1 tc `HlConseqBd [concl1]
 
@@ -680,7 +686,8 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
   if not (ss_inv_alpha_eq hyps (bhs_po hs) postc) then
     tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post in
-  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth hs.bhs_cmp hs.bhs_bd in
+  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth 
+                 hs.bhs_cmp (bhs_bd hs) in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -692,7 +699,7 @@ let t_bdHoareF_conseq_conj ~add post post' tc =
   if not (ss_inv_alpha_eq hyps (bhf_po hs) postc) then
     tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF (bhf_pr hs) hs.bhf_f post in
-  let concl2 = f_bdHoareF (bhf_pr hs) hs.bhf_f posth hs.bhf_cmp hs.bhf_bd in
+  let concl2 = f_bdHoareF (bhf_pr hs) hs.bhf_f posth hs.bhf_cmp (bhf_bd hs) in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -756,6 +763,7 @@ let t_equivS_conseq_bd side pr po tc =
     tc_error !!tc "invalid pre- or post-condition";
   if not (ts_inv_alpha_eq hyps pos (es_po es)) then
     tc_error !!tc "invalid pre- or post-condition";
+  let f_r1 = {m=fst m; inv=f_r1} in
   let g1 = f_bdHoareS (snd m) pr s po FHeq f_r1 in
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
@@ -804,7 +812,7 @@ let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let hf1 = tc1_as_bdhoareF tc in
   let ef  = f_equivF p hf1.bhf_f f2 q in
-  let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp hf1.bhf_bd in
+  let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp (bhf_bd hf1) in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv p.ml p.mr hf1.bhf_f f2 env in
   let (cond1, cond2) =
     transitivity_side_cond hyps prml poml pomr p q p2 q2 (bhf_pr hf1) (bhf_po hf1) in
@@ -906,7 +914,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     FApi.t_seq
       t_hoareS_conseq_bdhoare
       (t_on1seq 1
-         (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
+         (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs))
          (t_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_apply_r nf1)))
       tc
 
@@ -947,7 +955,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     FApi.t_seq
       t_hoareF_conseq_bdhoare
       (t_on1seq 1
-         (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+         (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs))
          (t_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_apply_r nf1)))
       tc
   (* ------------------------------------------------------------------ *)
@@ -986,7 +994,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
 
     t_on1seq 1
-      (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
+      (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs))
       (t_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_apply_r nf1))
       tc
 
@@ -1020,7 +1028,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_mytrivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
-            (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd @+ [
+            (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs) @+ [
               t_id; (* subgoal 3 : bound *)
               t_bdHoareS_conseq_conj ~add:false (hs_po hs2) post1 @+ [
                 t_hoareS_conseq pre (hs_po hs2) @+ [
@@ -1058,7 +1066,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
 
     t_on1seq 1
-      (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+      (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs))
       (t_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_apply_r nf1))
       tc
 
@@ -1091,7 +1099,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_mytrivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
-            (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd @+ [
+            (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs) @+ [
               t_id; (* subgoal 3 : bound *)
               t_bdHoareF_conseq_conj ~add:false (hf_po hs2) post1 @+ [
                 t_hoareF_conseq pre (hf_po hs2) @+ [

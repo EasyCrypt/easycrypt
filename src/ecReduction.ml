@@ -1364,9 +1364,11 @@ let zpop ri side f hd =
     let m = fst hs.hs_m in
     f_hoareS (snd hs.hs_m) {m;inv=pr} hs.hs_s {m;inv=po}
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
-    f_eHoareF_old pr hf.ehf_f po
+    let m = hf.ehf_m in
+    f_eHoareF {m;inv=pr} hf.ehf_f {m;inv=po}
   | Zhl {f_node = FeHoareS hs}, [pr;po] ->
-    f_eHoareS_old hs.ehs_m pr hs.ehs_s po
+    let m = fst hs.ehs_m in
+    f_eHoareS (snd hs.ehs_m) {m;inv=pr} hs.ehs_s {m;inv=po}
   | Zhl {f_node = FbdHoareF hf}, [pr;po;bd] ->
     let m = hf.bhf_m in
     f_bdHoareF {m;inv=pr} hf.bhf_f {m;inv=po} hf.bhf_cmp bd
@@ -1377,7 +1379,9 @@ let zpop ri side f hd =
     let (ml, mr) = (ef.ef_ml, ef.ef_mr) in
     f_equivF {ml;mr;inv=pr} ef.ef_fl ef.ef_fr {ml;mr;inv=po}
   | Zhl {f_node = FequivS hs}, [pr;po] ->
-    f_equivS_old hs.es_ml hs.es_mr pr hs.es_sl hs.es_sr po
+    let (ml, mr) = (fst hs.es_ml, fst hs.es_mr) in
+    f_equivS (snd hs.es_ml) (snd hs.es_mr) {ml;mr;inv=pr} hs.es_sl hs.es_sr
+      {ml;mr;inv=po}
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
     let (ml, mr) = (hs.eg_ml, hs.eg_mr) in
     f_eagerF {ml;mr;inv=pr}  hs.eg_sl hs.eg_fl hs.eg_fr hs.eg_sr {ml;mr;inv=po}

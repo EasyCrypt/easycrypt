@@ -503,8 +503,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let ehf_pr  = norm st s hf.ehf_pr  in
     let ehf_po  = norm st s hf.ehf_po  in
     let ehf_f   = norm_xfun st s hf.ehf_f in
-    let (_,m) = norm_me s (abstract hf.ehf_m) in
-    f_eHoareF ehf_pr ehf_f ehf_po
+    let (m,_) = norm_me s (abstract hf.ehf_m) in
+    f_eHoareF {m;inv=ehf_pr} ehf_f {m;inv=ehf_po}
 
   | FeHoareS hs ->
     assert (Args.isempty args);
@@ -512,8 +512,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let ehs_pr  = norm st s hs.ehs_pr in
     let ehs_po  = norm st s hs.ehs_po in
     let ehs_s   = norm_stmt s hs.ehs_s in
-    let ehs_m   = norm_me s hs.ehs_m in
-    f_eHoareS_old ehs_m ehs_pr ehs_s ehs_po
+    let (m,mt)   = norm_me s hs.ehs_m in
+    f_eHoareS mt {m;inv=ehs_pr} ehs_s {m;inv=ehs_po}
 
   | FbdHoareF hf ->
     assert (Args.isempty args);
@@ -523,7 +523,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let bhf_f  = norm_xfun st s hf.bhf_f in
     let bhf_bd = norm st s hf.bhf_bd in
     let (m,_) = norm_me s (abstract hf.bhf_m) in
-    f_bdHoareF {m; inv=bhf_pr} bhf_f {m; inv=bhf_po} hf.bhf_cmp bhf_bd
+    f_bdHoareF {m;inv=bhf_pr} bhf_f {m;inv=bhf_po} hf.bhf_cmp bhf_bd
 
   | FbdHoareS bhs ->
     assert (Args.isempty args);
@@ -532,9 +532,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let bhs_po = norm st s bhs.bhs_po in
     let bhs_s  = norm_stmt s bhs.bhs_s in
     let bhs_bd = norm st s bhs.bhs_bd in
-    let bhs_m  = norm_me s bhs.bhs_m in
-    let m = fst bhs_m in
-    f_bdHoareS (snd bhs_m) {m; inv=bhs_pr} bhs_s {m; inv=bhs_po} bhs.bhs_cmp bhs_bd
+    let (m,mt)  = norm_me s bhs.bhs_m in
+    f_bdHoareS mt {m;inv=bhs_pr} bhs_s {m;inv=bhs_po} bhs.bhs_cmp bhs_bd
 
   | FequivF ef ->
     assert (Args.isempty args);
@@ -556,9 +555,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let es_po = norm st s es.es_po in
     let es_sl = norm_stmt s es.es_sl in
     let es_sr = norm_stmt s es.es_sr in
-    let es_ml  = norm_me s es.es_ml in
-    let es_mr  = norm_me s es.es_mr in
-    f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po
+    let (ml,mlt)  = norm_me s es.es_ml in
+    let (mr,mrt)  = norm_me s es.es_mr in
+    f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
 
   | FeagerF eg ->
     assert (Args.isempty args);

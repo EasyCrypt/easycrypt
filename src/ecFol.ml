@@ -1072,20 +1072,19 @@ let rec one_sided mem fp =
   | _ -> false
 
 let rec split_sided mem fp =
-  if one_sided mem fp then
-    Some fp
+  if one_sided mem fp.inv then
+    Some {m=mem;inv=fp.inv}
   else
-    if is_and fp then
-      let (l, r) = destr_and fp in
+    if is_and fp.inv then
+      let (l, r) = map_ts_inv_destr2 destr_and fp in
       let fl = split_sided mem l in
       let fr = split_sided mem r in
-      if is_none fr then
-        fl
-      else
-        (match fl with
-        | Some f -> Some (f_and f (oget fr))
-        | None -> fr
-        )
+      match fl, fr with
+      | None, None -> None
+      | Some f, None -> Some f
+      | None, Some f -> Some f
+      | Some fl, Some fr ->
+        Some (map_ss_inv2 f_and fl fr)
     else
       None
 

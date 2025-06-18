@@ -15,7 +15,7 @@ val wp2_call :
   -> EcEnv.LDecl.hyps -> form
 
 val t_hoare_call   : ss_inv -> ss_inv -> backward
-val t_bdhoare_call : form -> form -> form option -> backward
+val t_bdhoare_call : ss_inv -> ss_inv -> form option -> backward
 val t_equiv_call   : form -> form -> backward
 val t_equiv_call1  : side -> form -> form -> backward
 val t_call         : oside -> form -> backward

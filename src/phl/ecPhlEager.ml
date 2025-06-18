@@ -169,41 +169,41 @@ let t_eager_while_r h tc =
 
   let tH, (_, s, s', eqIs, eqXs) = pf_hSS !!tc hyps h in
   let eC, wc, wc' = tc1_destr_eagerS tc s s' in
+  let ml, mr = fst eC.es_ml, fst eC.es_mr in
 
   let (e , c ), n  = pf_first_while !!tc wc  in
   let (e', c'), n' = pf_first_while !!tc wc' in
-
   if not (List.is_empty n.s_node && List.is_empty n'.s_node) then
     tc_error !!tc "no statements should followed the while loops";
 
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
 
-  let eqI  = eC.es_pr in
+  let eqI  = (es_pr eC) in
   let seqI =
     try
-      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI
+      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI.inv
     with Not_found ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe  = EcPrinting.PPEnv.ofenv env in
-        Format.fprintf fmt "recognize equalities in %a@." (EcPrinting.pp_form ppe) eqI)
+        Format.fprintf fmt "recognize equalities in %a@." (EcPrinting.pp_form ppe) eqI.inv)
   in
   let eqI2 = to_form (Mpv2.eq_fv2 seqI) in
-  let e1   = form_of_expr (fst eC.es_ml) e in
-  let e2   = form_of_expr (fst eC.es_mr) e' in
-  let post = Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) (Mpv2.union seqI eqXs) (f_not e1) in
+  let e1   = form_of_expr ml e in
+  let e2   = form_of_expr mr e' in
+  let e1 = {ml;mr;inv=e1} in
+  let e2 = {ml;mr;inv=e2} in
+  let post = map_ts_inv1 (Mpv2.to_form ml mr (Mpv2.union seqI eqXs)) (map_ts_inv1 f_not e1) in
 
   (* check (e) and (f) *)
   pf_compat !!tc env (s_write env s) (s_write env s') seqI eqIs eqXs;
 
-  let aT =
-    f_forall
-      [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
-      (f_imp eqI (f_eq e1 e2))
+  let aT = EcSubst.f_forall_mems_ts_inv eC.es_ml eC.es_mr
+      (map_ts_inv2 f_imp eqI (map_ts_inv2 f_eq e1 e2))
 
-  and bT = f_equivS_old eC.es_ml eC.es_mr (f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
+  and bT = f_equivS (snd eC.es_ml) (snd eC.es_mr) (map_ts_inv2 f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
     (stmt (c'.s_node@s'.s_node)) eqI
   
-  and cT = f_equivS_old (fst eC.es_ml, snd eC.es_mr) eC.es_mr eqI2 c' c' eqI2
+  and cT = f_equivS (snd eC.es_mr) (snd eC.es_mr) {ml;mr;inv=eqI2} c' c' {ml;mr;inv=eqI2}
   in
 
   let tsolve tc =

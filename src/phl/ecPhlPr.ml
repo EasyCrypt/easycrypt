@@ -50,7 +50,7 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let (fl, fr) = (ef.ef_fl, ef.ef_fr) in
   let funl = EcEnv.Fun.by_xpath fl env in
   let funr = EcEnv.Fun.by_xpath fr env in
-  let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv fl fr env in
+  let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr fl fr env in
   let argsl = to_args funl (f_pvarg funl.f_sig.fs_arg (fst penvl)) in
   let argsr = to_args funr (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
@@ -85,7 +85,7 @@ let process_ppr info tc =
   | Some (phi1, phi2) ->
       let hyps = FApi.tc1_hyps tc in
       let ef   = tc1_as_equivF tc in
-      let qenv = snd (LDecl.equivF ef.ef_fl ef.ef_fr hyps) in
+      let qenv = snd (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps) in
       let phi1 = TTC.pf_process_form_opt !!tc qenv None phi1 in
       let phi2 = TTC.pf_process_form_opt !!tc qenv None phi2 in
       if not (EcReduction.EqTest.for_type (LDecl.toenv qenv) phi1.f_ty phi2.f_ty) then
