@@ -470,14 +470,14 @@ module Fsubst = struct
       let (s, m) = add_m_binding s hf.ehf_m in
       let hf_pr = f_subst ~tx s hf.ehf_pr in
       let hf_po = f_subst ~tx s hf.ehf_po in
-      f_eHoareF hf_pr hf_f hf_po
+      f_eHoareF_old hf_pr hf_f hf_po
 
     | FeHoareS hs ->
       let hs_s    = s_subst s hs.ehs_s in
       let s, hs_m = add_me_binding s hs.ehs_m in
       let hs_pr   = f_subst ~tx s hs.ehs_pr in
       let hs_po   = f_subst ~tx s hs.ehs_po in
-      f_eHoareS hs_m hs_pr hs_s hs_po
+      f_eHoareS_old hs_m hs_pr hs_s hs_po
 
     | FbdHoareF hf ->
       let hf_f  = x_subst s hf.bhf_f in
@@ -512,7 +512,7 @@ module Fsubst = struct
       let s, es_mr = add_me_binding s es.es_mr in
       let es_pr = f_subst ~tx s es.es_pr in
       let es_po = f_subst ~tx s es.es_po in
-      f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+      f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po
 
     | FeagerF eg ->
       let eg_fl = x_subst s eg.eg_fl in

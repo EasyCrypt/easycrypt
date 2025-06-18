@@ -494,7 +494,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_po = norm st s hs.hs_po in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
-    f_hoareS (snd hs_m) {m=fst hs_m; inv=hs_pr} hs_s {m=fst hs_m; inv=hs_po}
+    let m = fst hs_m in
+    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
 
   | FeHoareF hf ->
     assert (Args.isempty args);
@@ -502,6 +503,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let ehf_pr  = norm st s hf.ehf_pr  in
     let ehf_po  = norm st s hf.ehf_po  in
     let ehf_f   = norm_xfun st s hf.ehf_f in
+    let (_,m) = norm_me s (abstract hf.ehf_m) in
     f_eHoareF ehf_pr ehf_f ehf_po
 
   | FeHoareS hs ->
@@ -511,7 +513,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let ehs_po  = norm st s hs.ehs_po in
     let ehs_s   = norm_stmt s hs.ehs_s in
     let ehs_m   = norm_me s hs.ehs_m in
-    f_eHoareS ehs_m ehs_pr ehs_s ehs_po
+    f_eHoareS_old ehs_m ehs_pr ehs_s ehs_po
 
   | FbdHoareF hf ->
     assert (Args.isempty args);
@@ -556,7 +558,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let es_sr = norm_stmt s es.es_sr in
     let es_ml  = norm_me s es.es_ml in
     let es_mr  = norm_me s es.es_mr in
-    f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+    f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po
 
   | FeagerF eg ->
     assert (Args.isempty args);

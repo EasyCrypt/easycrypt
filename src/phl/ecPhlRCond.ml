@@ -51,7 +51,7 @@ module Low = struct
       | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
 
     let concl1  = f_hoareS_old hs.ehs_m pre hd e in
-    let concl2  = f_eHoareS hs.ehs_m hs.ehs_pr s hs.ehs_po in
+    let concl2  = f_eHoareS_old hs.ehs_m hs.ehs_pr s hs.ehs_po in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -82,7 +82,7 @@ module Low = struct
       f_forall_mems [mo', EcMemory.memtype mo]
         (f_hoareS_old (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in
     let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
-    let concl2 = f_equivS es.es_ml es.es_mr es.es_pr sl sr es.es_po in
+    let concl2 = f_equivS_old es.es_ml es.es_mr es.es_pr sl sr es.es_po in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -230,8 +230,8 @@ module LowMatch = struct
 
     let pr = ofold f_and hs.ehs_pr epr in
 
-    let concl1  = f_eHoareS hs.ehs_m hs.ehs_pr hd po1 in
-    let concl2  = f_eHoareS me pr full hs.ehs_po in
+    let concl1  = f_eHoareS_old hs.ehs_m hs.ehs_pr hd po1 in
+    let concl2  = f_eHoareS_old me pr full hs.ehs_po in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
@@ -286,7 +286,7 @@ module LowMatch = struct
           (es.es_sl, full) in
 
     let concl2 =
-      f_equivS ml mr (ofold f_and es.es_pr epr) sl sr es.es_po in
+      f_equivS_old ml mr (ofold f_and es.es_pr epr) sl sr es.es_po in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)

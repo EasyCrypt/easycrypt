@@ -15,8 +15,8 @@ let t_hoare_case_r ?(simplify = true) f tc =
 let t_ehoare_case_r ?(simplify = true) f tc =
   let _ = simplify in
   let hs = tc1_as_ehoareS tc in
-  let concl1 = f_eHoareS hs.ehs_m (f_interp_ehoare_form f hs.ehs_pr) hs.ehs_s hs.ehs_po in
-  let concl2 = f_eHoareS hs.ehs_m (f_interp_ehoare_form (f_not f) hs.ehs_pr) hs.ehs_s hs.ehs_po in
+  let concl1 = f_eHoareS_old hs.ehs_m (f_interp_ehoare_form f hs.ehs_pr) hs.ehs_s hs.ehs_po in
+  let concl2 = f_eHoareS_old hs.ehs_m (f_interp_ehoare_form (f_not f) hs.ehs_pr) hs.ehs_s hs.ehs_po in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
@@ -32,8 +32,8 @@ let t_bdhoare_case_r ?(simplify = true) f tc =
 let t_equiv_case_r ?(simplify = true) f tc =
   let fand = if simplify then f_and_simpl else f_and in
   let es = tc1_as_equivS tc in
-  let concl1 = f_equivS es.es_ml es.es_mr (fand es.es_pr f) es.es_sl es.es_sr es.es_po in
-  let concl2 = f_equivS es.es_ml es.es_mr (fand es.es_pr (f_not f)) es.es_sl es.es_sr es.es_po in
+  let concl1 = f_equivS_old es.es_ml es.es_mr (fand es.es_pr f) es.es_sl es.es_sr es.es_po in
+  let concl2 = f_equivS_old es.es_ml es.es_mr (fand es.es_pr (f_not f)) es.es_sl es.es_sr es.es_po in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)

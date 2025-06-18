@@ -118,8 +118,12 @@ val f_hoareF_old : form -> xpath -> form -> form
 val f_hoareS : memtype -> ss_inv -> stmt -> ss_inv -> form
 val f_hoareS_old : memenv -> form -> stmt -> form -> form
 
-val f_eHoareF : form -> xpath -> form -> form
-val f_eHoareS : memenv -> form -> EcCoreModules.stmt -> form -> form
+val f_eHoareF_old : form -> xpath -> form -> form
+val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
+val f_eHoareS_old : memenv -> form -> EcCoreModules.stmt -> form -> form
+val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
+
+(* soft-constructors - eager *)
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
@@ -132,7 +136,8 @@ val f_bdHoareS_old : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
 (* soft-constructors - equiv *)
 val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivF_old : form -> xpath -> xpath -> form -> form
-val f_equivS : memenv -> memenv -> form -> stmt -> stmt -> form -> form
+val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
+val f_equivS_old : memenv -> memenv -> form -> stmt -> stmt -> form -> form
 
 (* soft-constructors - eager *)
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form

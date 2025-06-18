@@ -318,6 +318,20 @@ let map_ss_inv3 (fn: form -> form -> form -> form)
   let inv' = fn inv1.inv inv2.inv inv3.inv in
   { m = inv1.m; inv = inv' }
 
+let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
+  let inv1, inv2 = fn inv.inv in
+  let m = inv.m in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty); 
+  {m;inv=inv1}, {m;inv=inv2}
+
+let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let m = inv.m in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {m;inv=inv1}, {m;inv=inv2}, {m;inv=inv3}
+
 type ts_inv = {
   ml  : memory;
   mr  : memory;
@@ -388,6 +402,26 @@ let map_ts_inv_right3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
   assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
   let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
   { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_destr2 (fn: form -> form * form) (inv: ts_inv): ts_inv * ts_inv =
+  let inv1, inv2 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}
+
+let map_ts_inv_destr3 (fn: form -> form * form * form) (inv: ts_inv) =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}, {ml;mr;inv=inv3}
+
+(* ----------------------------------------------------------------- *)
+(* Lowering of invariants                                            *)
+(* ----------------------------------------------------------------- *)
 
 let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
   assert (List.length invs > 0);

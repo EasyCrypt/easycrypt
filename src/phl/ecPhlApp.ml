@@ -28,8 +28,8 @@ let t_ehoare_app_r i f tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s1, s2 = s_split env i hs.ehs_s in
-  let a = f_eHoareS hs.ehs_m hs.ehs_pr (stmt s1) f in
-  let b = f_eHoareS hs.ehs_m f (stmt s2) hs.ehs_po in
+  let a = f_eHoareS_old hs.ehs_m hs.ehs_pr (stmt s1) f in
+  let b = f_eHoareS_old hs.ehs_m f (stmt s2) hs.ehs_po in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
@@ -101,8 +101,8 @@ let t_equiv_app (i, j) phi tc =
   let es = tc1_as_equivS tc in
   let sl1,sl2 = s_split env i es.es_sl in
   let sr1,sr2 = s_split env j es.es_sr in
-  let a = f_equivS es.es_ml es.es_mr es.es_pr (stmt sl1) (stmt sr1) phi in
-  let b = f_equivS es.es_ml es.es_mr phi (stmt sl2) (stmt sr2) es.es_po in
+  let a = f_equivS_old es.es_ml es.es_mr es.es_pr (stmt sl1) (stmt sr1) phi in
+  let b = f_equivS_old es.es_ml es.es_mr phi (stmt sl2) (stmt sr2) es.es_po in
 
   FApi.xmutate1 tc `HlApp [a; b]
 

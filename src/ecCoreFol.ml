@@ -293,11 +293,26 @@ let f_hoareF_old hf_pr hf_f hf_po =
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
 let f_eHoareF_r hf = mk_form (FeHoareF hf) tbool
 
-let f_eHoareS ehs_m ehs_pr ehs_s ehs_po =
+let f_eHoareS_old ehs_m ehs_pr ehs_s ehs_po =
   f_eHoareS_r { ehs_m; ehs_pr; ehs_s; ehs_po; }
 
-let f_eHoareF ehf_pr ehf_f ehf_po =
+let f_eHoareS ehs_mt ehs_pr ehs_s ehs_po =
+  assert (ehs_pr.m = ehs_po.m);
+  f_eHoareS_r { ehs_m=(ehs_pr.m, ehs_mt); ehs_pr=ehs_pr.inv; ehs_s; 
+    ehs_po=ehs_po.inv; } [@alert "-priv_pl"]
+
+let f_eHoareF_old ehf_pr ehf_f ehf_po =
   f_eHoareF_r { ehf_m=mhr; ehf_pr; ehf_f; ehf_po; }
+
+let f_eHoareF ehf_pr ehf_f ehf_po =
+  assert (ehf_pr.m = ehf_po.m);
+  f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
+
+let f_eHoare ehf_pr ehf_f ehf_po =
+  assert (ehf_pr.m = ehf_po.m);
+  f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
@@ -324,8 +339,16 @@ let f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
 let f_equivS_r es = mk_form (FequivS es) tbool
 let f_equivF_r ef = mk_form (FequivF ef) tbool
 
-let f_equivS es_ml es_mr es_pr es_sl es_sr es_po =
+let f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po =
    f_equivS_r { es_ml; es_mr; es_pr; es_sl; es_sr; es_po; }
+
+let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
+  assert (es_pr.ml = es_po.ml && es_pr.mr = es_po.mr);
+  let es_ml, es_mr = (es_pr.ml, es_mtl), (es_pr.mr, es_mtr) in
+  f_equivS_r { es_ml; es_mr; es_pr=es_pr.inv;
+                es_sl; es_sr; es_po=es_po.inv; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
 
 let f_equivF_old ef_pr ef_fl ef_fr ef_po =
   f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
@@ -836,6 +859,16 @@ let destr_or  = destr_app2 ~name:"or"  is_op_or_any
 let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
+
+let destr_and_ts_inv inv = 
+  let c1 = map_ts_inv1 (fun po -> fst (destr_and po)) inv in
+  let c2 = map_ts_inv1 (fun po -> snd (destr_and po)) inv in
+  (c1, c2)
+
+let destr_and_ss_inv inv =
+  let c1 = map_ss_inv1 (fun po -> fst (destr_and po)) inv in
+  let c2 = map_ss_inv1 (fun po -> snd (destr_and po)) inv in
+  (c1, c2)
 
 let destr_and3 f =
   try

@@ -578,7 +578,7 @@ let rec subst_form (s : subst) (f : form) =
        let ehf_po = subst_form s ehf_po in
        (ehf_pr, ehf_po) in
      let ehf_f  = subst_xpath s ehf_f in
-     f_eHoareF ehf_pr ehf_f ehf_po
+     f_eHoareF_old ehf_pr ehf_f ehf_po
 
   | FeHoareS { ehs_m; ehs_pr; ehs_s; ehs_po } ->
      let ehs_m, (ehs_pr, ehs_po) =
@@ -587,7 +587,7 @@ let rec subst_form (s : subst) (f : form) =
        let ehs_po = subst_form s ehs_po in
        ehs_m, (ehs_pr, ehs_po) in
      let ehs_s = subst_stmt s ehs_s in
-     f_eHoareS ehs_m ehs_pr ehs_s ehs_po
+     f_eHoareS_old ehs_m ehs_pr ehs_s ehs_po
 
   | FequivF ef ->
      let ef_pr, ef_po =
@@ -610,7 +610,7 @@ let rec subst_form (s : subst) (f : form) =
        (es_ml, es_mr), (es_pr, es_po) in
      let es_sl = subst_stmt s es_sl in
      let es_sr = subst_stmt s es_sr in
-     f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+     f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po
 
   | FeagerF eg ->
      let eg_pr, eg_po =

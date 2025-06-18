@@ -95,7 +95,7 @@ let t_ehoareF_fun_def_r tc =
   let fres  = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post  = PVM.subst1 env pv_res m fres hf.ehf_po in
   let pre   = PVM.subst env (subst_pre env fsig m PVM.empty) hf.ehf_pr in
-  let concl' = f_eHoareS memenv pre fdef.f_body post in
+  let concl' = f_eHoareS_old memenv pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
@@ -134,7 +134,7 @@ let t_equivF_fun_def_r tc =
   let s = subst_pre env fsigl ml PVM.empty in
   let s = subst_pre env fsigr mr s in
   let pre = PVM.subst env s ef.ef_pr in
-  let concl' = f_equivS menvl menvr pre fdefl.f_body fdefr.f_body post in
+  let concl' = f_equivS_old menvl menvr pre fdefl.f_body fdefr.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* -------------------------------------------------------------------- *)
@@ -166,9 +166,9 @@ module FunAbsLow = struct
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
-  let ehoareF_abs_spec _pf env f inv =
+  let ehoareF_abs_spec _pf env f (inv: ss_inv) =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
-    let fv = PV.fv env mhr inv in
+    let fv = PV.fv env inv.m inv.inv in
     PV.check_depend env fv top;
     let ospec o = f_eHoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
@@ -177,12 +177,12 @@ module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
   let bdhoareF_abs_spec pf env f inv =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
-    let fv = PV.fv env mhr inv in
+    let fv = PV.fv env inv.m inv.inv in
 
     PV.check_depend env fv top;
     let ospec o =
       check_oracle_use pf env top o;
-      f_bdHoareF_old inv o inv FHeq f_r1 in
+      f_bdHoareF inv o inv FHeq f_r1 in
 
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
@@ -193,7 +193,7 @@ module FunAbsLow = struct
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
-    let ml, mr = mleft, mright in
+    let ml, mr = inv.ml, inv.mr in
     let fvl = PV.fv env inv.ml inv.inv in
     let fvr = PV.fv env inv.mr inv.inv in
     PV.check_depend env fvl topl;
@@ -440,7 +440,7 @@ let t_fun_to_code_ehoare_r tc =
 
   let post = PVM.subst env spo hf.ehf_po in
 
-  let concl = f_eHoareS m pre st post in
+  let concl = f_eHoareS_old m pre st post in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
@@ -477,7 +477,7 @@ let t_fun_to_code_equiv_r tc =
     s in
   let pre   = PVM.subst env spr ef.ef_pr in
   let post  = PVM.subst env spo ef.ef_po in
-  let concl = f_equivS ml mr pre sl sr post in
+  let concl = f_equivS_old ml mr pre sl sr post in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
@@ -500,7 +500,7 @@ let t_fun_to_code_eager_r tc =
   let pre   = PVM.subst env spr eg.eg_pr in
   let post  = PVM.subst env spo eg.eg_po in
   let concl =
-    f_equivS ml mr pre (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in
+    f_equivS_old ml mr pre (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -540,7 +540,7 @@ let t_fun_r (inv: inv) tc =
     let env = FApi.tc1_env tc in
     let h   = destr_eHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.ehf_f env
-      then t_ehoareF_abs inv.inv tc
+      then t_ehoareF_abs inv tc
       else t_ehoareF_fun_def tc
 
   and tbh tc =
@@ -550,7 +550,7 @@ let t_fun_r (inv: inv) tc =
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.bhf_f env
-      then t_bdhoareF_abs inv.inv tc
+      then t_bdhoareF_abs inv tc
       else t_bdhoareF_fun_def tc
 
   and te tc =
@@ -612,13 +612,13 @@ let process_fun_abs inv tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_xreal !!tc env' inv in
-    t_ehoareF_abs inv tc
+    t_ehoareF_abs {inv;m=mhr} tc
 
   and t_bdhoare tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_bdhoareF_abs inv tc
+    t_bdhoareF_abs {inv;m=mhr} tc
 
   and t_equiv tc =
     let hyps = FApi.tc1_hyps tc in

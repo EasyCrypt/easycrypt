@@ -51,7 +51,7 @@ module Core = struct
     let distr = EcFol.form_of_expr mem distr in
     let post = subst_form_lv env mem lv x hs.ehs_po in
     let post = f_Ep ty_distr distr (f_lambda [(x_id,GTty ty_distr)] post) in
-    let concl = f_eHoareS hs.ehs_m hs.ehs_pr s post in
+    let concl = f_eHoareS_old hs.ehs_m hs.ehs_pr s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -78,8 +78,8 @@ module Core = struct
     let post  = f_anda (f_lossless ty_distr distr) post in
     let concl =
       match side with
-      | `Left  -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr post
-      | `Right -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s post
+      | `Left  -> f_equivS_old es.es_ml es.es_mr es.es_pr s es.es_sr post
+      | `Right -> f_equivS_old es.es_ml es.es_mr es.es_pr es.es_sl s post
     in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -135,7 +135,7 @@ module Core = struct
        f_forall_simpl [(xR_id, GTty tyR)] cond2;
        f_forall_simpl [(xL_id, GTty tyL)] cond3] in
 
-    let concl = f_equivS es.es_ml es.es_mr es.es_pr sl' sr' concl in
+    let concl = f_equivS_old es.es_ml es.es_mr es.es_pr sl' sr' concl in
 
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -418,8 +418,8 @@ module Core = struct
     let s = stmt (s1 @ s2) in
     let concl =
       match side with
-      | `Left  -> f_equivS m es.es_mr es.es_pr s es.es_sr es.es_po
-      | `Right -> f_equivS es.es_ml m es.es_pr es.es_sl s es.es_po in
+      | `Left  -> f_equivS_old m es.es_mr es.es_pr s es.es_sr es.es_po
+      | `Right -> f_equivS_old es.es_ml m es.es_pr es.es_sl s es.es_po in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
 end (* Core *)
@@ -456,8 +456,8 @@ let wp_equiv_disj_rnd_r side tc =
 
   let tc = Core.wp_equiv_disj_rnd_r side tc in
   let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
-  let c1, c2 = destr_and es.es_po in
-  let newc1 = EcFol.f_forall_mems [es.es_ml; es.es_mr] c1 in
+  let (c1, c2) = map_ts_inv_destr2 destr_and (es_po es) in
+  let newc1 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr c1 in
 
   let subtc = tc in
   let subtc, hdc1 = solve 2 newc1 subtc in
@@ -481,7 +481,7 @@ let wp_equiv_disj_rnd_r side tc =
 
     | _ -> EcLowGoal.t_id)
     (FApi.t_first
-      (EcPhlConseq.t_equivS_conseq es.es_pr po)
+      (EcPhlConseq.t_equivS_conseq (es_pr es) po)
       subtc)
 
 (* -------------------------------------------------------------------- *)
@@ -489,12 +489,14 @@ let wp_equiv_rnd_r bij tc =
   let tc = Core.wp_equiv_rnd_r bij tc in
   let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
 
-  let c1, c2, c3 = destr_and3 es.es_po in
-  let (x, xty, c3) = destr_forall1 c3 in
-  let ind, (c3, c4) = snd_map destr_and (destr_imp c3) in
-  let newc2 = EcFol.f_forall_mems [es.es_ml; es.es_mr] c2 in
-  let newc3 = EcFol.f_forall_mems [es.es_ml; es.es_mr]
-                (f_forall [x, xty] (f_imp ind c3)) in
+  let c1, c2, c3 = map_ts_inv_destr3 destr_and3 (es_po es) in
+  let (x, xty, _) = destr_forall1 c3.inv in
+  let c3 = map_ts_inv1 (fun c3 -> let (_,_,d) = destr_forall1 c3 in d) c3 in
+  let (ind, c3) = map_ts_inv_destr2 destr_imp c3 in
+  let (c3, c4) = map_ts_inv_destr2 destr_and c3 in
+  let newc2 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr c2 in
+  let newc3 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr
+                (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c3)) in
 
   let subtc = tc in
   let subtc, hdc2 = solve 4 newc2 subtc in
@@ -503,9 +505,12 @@ let wp_equiv_rnd_r bij tc =
   let po =
     match hdc2, hdc3 with
     | None  , None   -> None
-    | Some _, Some _ -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind c4)))
-    | Some _, None   -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind (f_anda c3 c4))))
-    | None  , Some _ -> Some (f_andas [c1; c2; f_forall [x, xty] (f_imp ind c4)])
+    | Some _, Some _ -> 
+      Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)))
+    | Some _, None   -> 
+      Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind (map_ts_inv2 f_anda c3 c4))))
+    | None  , Some _ -> 
+      Some (map_ts_inv f_andas [c1; c2; map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)])
   in
 
   match po with None -> tc | Some po ->
@@ -557,7 +562,7 @@ let wp_equiv_rnd_r bij tc =
     | _ -> EcLowGoal.t_id)
 
     (FApi.t_first
-      (EcPhlConseq.t_equivS_conseq es.es_pr po)
+      (EcPhlConseq.t_equivS_conseq (es_pr es) po)
       subtc)
 
 (* -------------------------------------------------------------------- *)

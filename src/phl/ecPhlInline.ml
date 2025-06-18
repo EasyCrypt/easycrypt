@@ -179,7 +179,7 @@ let t_inline_hoare_r ~use_tuple sp tc =
 let t_inline_ehoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_ehoareS tc in
   let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.ehs_m sp hoare.ehs_s in
-  let concl      = f_eHoareS me hoare.ehs_pr stmt hoare.ehs_po in
+  let concl      = f_eHoareS_old me hoare.ehs_pr stmt hoare.ehs_po in
 
   FApi.xmutate1 tc `Inline [concl]
 
@@ -199,10 +199,10 @@ let t_inline_equiv_r ~use_tuple side sp tc =
     match side with
     | `Left  ->
         let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_ml sp equiv.es_sl in
-          f_equivS me equiv.es_mr equiv.es_pr stmt equiv.es_sr equiv.es_po
+          f_equivS_old me equiv.es_mr equiv.es_pr stmt equiv.es_sr equiv.es_po
     | `Right ->
         let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_mr sp equiv.es_sr in
-          f_equivS equiv.es_ml me equiv.es_pr equiv.es_sl stmt equiv.es_po
+          f_equivS_old equiv.es_ml me equiv.es_pr equiv.es_sl stmt equiv.es_po
   in
 
   FApi.xmutate1 tc `Inline [concl]

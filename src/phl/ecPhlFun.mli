@@ -33,8 +33,8 @@ module FunAbsLow : sig
     -> ss_inv * ss_inv * form list
 
   val bdhoareF_abs_spec :
-       proofenv -> EcEnv.env -> xpath -> form
-    -> form * form * form list
+       proofenv -> EcEnv.env -> xpath -> ss_inv
+    -> ss_inv * ss_inv * form list
 
   val equivF_abs_spec :
        proofenv -> EcEnv.env -> xpath -> xpath -> ts_inv
@@ -43,7 +43,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 val t_hoareF_abs   : ss_inv -> FApi.backward
-val t_bdhoareF_abs : form -> FApi.backward
+val t_bdhoareF_abs : ss_inv -> FApi.backward
 val t_equivF_abs   : ts_inv -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

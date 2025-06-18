@@ -272,7 +272,7 @@ let t_sp_side pos tc =
       check_sp_progress ~side:`Left  pos stmtL1;
       check_sp_progress ~side:`Right pos stmtR1;
 
-      let subgoal = f_equivS es.es_ml es.es_mr es_pr (stmt (stmtL1@stmtL2)) (stmt (stmtR1@stmtR2)) es.es_po in
+      let subgoal = f_equivS_old es.es_ml es.es_mr es_pr (stmt (stmtL1@stmtL2)) (stmt (stmtR1@stmtR2)) es.es_po in
 
       FApi.xmutate1 tc `Sp [subgoal]
 

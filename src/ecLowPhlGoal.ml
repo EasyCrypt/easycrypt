@@ -210,10 +210,10 @@ let tc1_get_stmt side tc =
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
   | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
-  | None       , FeHoareS  hs -> f_eHoareS hs.ehs_m hs.ehs_pr s hs.ehs_po
+  | None       , FeHoareS  hs -> f_eHoareS_old hs.ehs_m hs.ehs_pr s hs.ehs_po
   | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp hs.bhs_bd
-  | Some `Left , FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr es.es_po
-  | Some `Right, FequivS   es -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s es.es_po
+  | Some `Left , FequivS   es -> f_equivS_old es.es_ml es.es_mr es.es_pr s es.es_sr es.es_po
+  | Some `Right, FequivS   es -> f_equivS_old es.es_ml es.es_mr es.es_pr es.es_sl s es.es_po
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -264,10 +264,10 @@ let set_pre ~pre f =
     f_hoareS (snd hs.hs_m) pre hs.hs_s (hs_po hs)
  | FeHoareF hf, Inv_ss pre  -> 
     let pre = ss_inv_rebind pre hf.ehf_m in
-    f_eHoareF pre.inv hf.ehf_f hf.ehf_po
+    f_eHoareF_old pre.inv hf.ehf_f hf.ehf_po
  | FeHoareS hs, Inv_ss pre  -> 
     let pre = ss_inv_rebind pre (fst hs.ehs_m) in
-    f_eHoareS hs.ehs_m pre.inv hs.ehs_s hs.ehs_po
+    f_eHoareS_old hs.ehs_m pre.inv hs.ehs_s hs.ehs_po
  | FbdHoareF hf, Inv_ss pre ->
     let pre = ss_inv_rebind pre hf.bhf_m in
     f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp hf.bhf_bd
@@ -279,7 +279,7 @@ let set_pre ~pre f =
     f_equivF pre ef.ef_fl ef.ef_fr (ef_po ef)
  | FequivS es, Inv_ts pre   -> 
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
-    f_equivS es.es_ml es.es_mr pre.inv es.es_sl es.es_sr es.es_po
+    f_equivS_old es.es_ml es.es_mr pre.inv es.es_sl es.es_sr es.es_po
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -648,8 +648,8 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       let me, stmt, cs = tx (pf, hyps) cpos (pre, post) (me, stmt) in
       let concl =
         match side with
-        | `Left  -> f_equivS me es.es_mr es.es_pr stmt es.es_sr es.es_po
-        | `Right -> f_equivS es.es_ml me es.es_pr es.es_sl stmt es.es_po
+        | `Left  -> f_equivS_old me es.es_mr es.es_pr stmt es.es_sr es.es_po
+        | `Right -> f_equivS_old es.es_ml me es.es_pr es.es_sl stmt es.es_po
       in
 
       FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])

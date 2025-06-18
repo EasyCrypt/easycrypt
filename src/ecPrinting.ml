@@ -1978,7 +1978,7 @@ and pp_form_core_r
 
   | FequivF eqv ->
       let (meprl, meprr), (mepol,mepor) =
-        EcEnv.Fun.equivF_memenv eqv.ef_fl eqv.ef_fr ppe.PPEnv.ppe_env in
+        EcEnv.Fun.equivF_memenv eqv.ef_ml eqv.ef_mr eqv.ef_fl eqv.ef_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
       if debug_mode then
@@ -2008,7 +2008,7 @@ and pp_form_core_r
 
   | FeagerF eg ->
       let (meprl, meprr), (mepol,mepor) =
-        EcEnv.Fun.equivF_memenv eg.eg_fl eg.eg_fr ppe.PPEnv.ppe_env in
+        EcEnv.Fun.equivF_memenv eg.eg_ml eg.eg_mr eg.eg_fl eg.eg_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
       Format.fprintf fmt "eager[@[<hov 2>@ %a,@ %a ~@ %a,@ %a :@ @[%a ==>@ %a@]@]]"
@@ -3079,7 +3079,7 @@ let pp_bdhoareS (ppe : PPEnv.t) ?prpo fmt hs =
 (* -------------------------------------------------------------------- *)
 let pp_equivF (ppe : PPEnv.t) ?prpo fmt ef =
   let (meprl, meprr), (mepol,mepor) =
-    EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr ppe.PPEnv.ppe_env in
+    EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
   let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) ef.ef_pr;

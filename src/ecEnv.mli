@@ -110,7 +110,7 @@ module Fun : sig
 
   val inv_memenv : env -> env
 
-  val equivF_memenv : xpath -> xpath -> env ->
+  val equivF_memenv : memory -> memory -> xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
 
   val equivF : memory -> memory -> xpath -> xpath -> env -> env * env

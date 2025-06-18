@@ -304,8 +304,11 @@ let process_unroll_for side cpos tc =
        t_doit (i+1) (pos + blen) zs]) tc in
 
   let t_conseq_nm tc =
-    (EcPhlConseq.t_hoareS_conseq_nm (inv_of_inv (tc1_get_pre tc)) f_true @+
-    [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
+    match (tc1_get_pre tc) with
+    | Inv_ss inv -> 
+      (EcPhlConseq.t_hoareS_conseq_nm inv {m=inv.m;inv=f_true} @+
+      [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
+    | _ -> tc_error !!tc "expecting single sided precondition" in
 
   let doi i tc =
     if Array.length hds <= i then t_id tc else

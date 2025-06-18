@@ -3470,7 +3470,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
-          f_eHoareF pre' fpath post'
+          f_eHoareF_old pre' fpath post'
 
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         if mode <> `Form then

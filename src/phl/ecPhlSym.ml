@@ -22,7 +22,7 @@ let t_equivF_sym tc =
 let t_equivS_sym tc =
   let es    = tc1_as_equivS tc in
   let pr,po = build_sym (fst es.es_ml) (fst es.es_mr) es.es_pr es.es_po in
-  let cond  = f_equivS (fst es.es_ml, snd es.es_mr) (fst es.es_mr, snd es.es_ml) pr es.es_sr es.es_sl po in
+  let cond  = f_equivS_old (fst es.es_ml, snd es.es_mr) (fst es.es_mr, snd es.es_ml) pr es.es_sr es.es_sl po in
 
   FApi.xmutate1 tc `EquivSym [cond]
 

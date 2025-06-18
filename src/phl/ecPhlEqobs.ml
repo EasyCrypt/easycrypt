@@ -398,7 +398,7 @@ let t_eqobs_inS_r sim eqo tc =
     tc_error !!tc "cannot apply sim";
 
   let sg = List.map (mk_inv_spec env inv) sim.needed_spec in
-  let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
+  let concl = f_equivS_old es.es_ml es.es_mr es.es_pr sl sr pre in
 
   FApi.xmutate1 tc `EqobsIn (sg @ [concl])
 
@@ -498,7 +498,7 @@ let process_eqobs_inF info tc =
   let eqo =
     match info.EcParsetree.sim_eqs with
     | Some pf ->
-      let _,(ml,mr) = Fun.equivF_memenv fl fr env in
+      let _,(ml,mr) = Fun.equivF_memenv ef.ef_ml ef.ef_mr fl fr env in
       let hyps = LDecl.push_all [ml;mr] hyps in
       process_eqs env tc (TTC.pf_process_form !!tc hyps tbool pf)
     | None ->

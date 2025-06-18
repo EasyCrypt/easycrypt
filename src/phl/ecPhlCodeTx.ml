@@ -400,7 +400,7 @@ let process_weakmem (side, id, params) tc =
 
     | FeHoareS hs ->
       let me = bind hs.ehs_m in
-      f_eHoareS me hs.ehs_pr hs.ehs_s hs.ehs_po
+      f_eHoareS_old me hs.ehs_pr hs.ehs_s hs.ehs_po
 
     | FbdHoareS hs ->
       let me = bind hs.bhs_m in
@@ -415,7 +415,7 @@ let process_weakmem (side, id, params) tc =
         match side with
         | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
         | Some side -> do_side side (es.es_ml, es.es_mr) in
-      f_equivS ml mr es.es_pr es.es_sl es.es_sr es.es_po
+      f_equivS_old ml mr es.es_pr es.es_sl es.es_sr es.es_po
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc

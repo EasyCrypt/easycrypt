@@ -134,7 +134,7 @@ let t_ehoare_call_core fpre fpost tc =
        (EcPrinting.pp_form ppe) hs.ehs_pr (EcPrinting.pp_form ppe) wppre);
 
   (* The function satisfies the specification *)
-  let f_concl = f_eHoareF fpre f fpost in
+  let f_concl = f_eHoareF_old fpre f fpost in
   FApi.xmutate1 tc `HlCall [f_concl]
 
 
@@ -244,7 +244,7 @@ let t_equiv_call fpre fpost tc =
       ml mr es.es_po hyps
   in
   let concl =
-    f_equivS es.es_ml es.es_mr es.es_pr sl sr post in
+    f_equivS_old es.es_ml es.es_mr es.es_pr sl sr post in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -283,8 +283,8 @@ let t_equiv_call1 side fpre fpost tc =
     f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
-    | `Left  -> f_equivS equiv.es_ml equiv.es_mr equiv.es_pr fstmt equiv.es_sr post
-    | `Right -> f_equivS equiv.es_ml equiv.es_mr equiv.es_pr equiv.es_sl fstmt post in
+    | `Left  -> f_equivS_old equiv.es_ml equiv.es_mr equiv.es_pr fstmt equiv.es_sr post
+    | `Right -> f_equivS_old equiv.es_ml equiv.es_mr equiv.es_pr equiv.es_sl fstmt post in
 
   FApi.xmutate1 tc `HlCall [fconcl; concl]
 
@@ -389,7 +389,7 @@ let process_call side info tc =
       match concl.f_node, side with
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let m = (fst hs.hs_m) in
+          let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
           let fmake pre post =
             f_hoareF {m;inv=pre} f {m;inv=post} in
@@ -406,7 +406,7 @@ let process_call side info tc =
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
           let penv, qenv = LDecl.hoareF (fst hs.ehs_m) f hyps in
           let fmake pre post =
-            f_eHoareF pre f post in
+            f_eHoareF_old pre f post in
           (penv, qenv, txreal, fmake)
 
       | FbdHoareS _, Some _
@@ -416,9 +416,10 @@ let process_call side info tc =
       | FequivS es, None ->
           let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-          let penv, qenv = LDecl.equivF fl fr hyps in
+          let (ml, mr) = (EcIdent.create "&1", EcIdent.create "&2") in
+          let penv, qenv = LDecl.equivF ml mr fl fr hyps in
           let fmake pre post =
-            f_equivF_old pre fl fr post in
+            f_equivF {ml;mr;inv=pre} fl fr {ml;mr;inv=post} in
           (penv, qenv, tbool, fmake)
 
       | FequivS es, Some side ->
@@ -446,7 +447,7 @@ let process_call side info tc =
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, lift_inv_adapter (fun inv -> f_eHoareF inv f inv))
+        (penv, txreal, lift_inv_adapter (fun inv -> f_eHoareF_old inv f inv))
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
@@ -559,7 +560,7 @@ let process_call_concave (fc, info) tc =
       | FeHoareS hs ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
           let penv, qenv = LDecl.hoareF (fst hs.ehs_m) f hyps in
-          (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
+          (penv, qenv, txreal, fun pre post -> f_eHoareF_old pre f post)
 
       | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
@@ -569,7 +570,7 @@ let process_call_concave (fc, info) tc =
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, fun inv -> f_eHoareF inv f inv)
+        (penv, txreal, fun inv -> f_eHoareF_old inv f inv)
 
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 

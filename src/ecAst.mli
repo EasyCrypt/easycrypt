@@ -314,6 +314,9 @@ val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
 val map_ss_inv2 : (form -> form -> form) -> ss_inv -> ss_inv -> ss_inv
 val map_ss_inv3 : (form -> form -> form -> form) -> ss_inv -> ss_inv -> ss_inv -> ss_inv
 
+val map_ss_inv_destr2 : (form -> form * form) -> ss_inv -> ss_inv * ss_inv
+val map_ss_inv_destr3 : (form -> form * form * form) -> ss_inv -> ss_inv * ss_inv * ss_inv
+
 type ts_inv = {
   ml  : memory;
   mr  : memory;
@@ -336,6 +339,13 @@ val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
 val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
     ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val map_ts_inv_destr2 : (form -> form * form) -> ts_inv -> ts_inv * ts_inv
+val map_ts_inv_destr3 : (form -> form * form * form) -> ts_inv -> ts_inv * ts_inv * ts_inv
+
+(* -------------------------------------------------------------------- *)
+(* Lowering tactics                                                    *)
+(* -------------------------------------------------------------------- *)
 
 val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv

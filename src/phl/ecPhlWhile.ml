@@ -96,7 +96,7 @@ let t_ehoare_while_core tc =
     tc_error !!tc "ehoare while rule: wrong post-condition";
   (* the body preserves the invariant *)
   let b_pre  = f_interp_ehoare_form e hs.ehs_pr in
-  let b_concl = f_eHoareS hs.ehs_m b_pre c hs.ehs_pr in
+  let b_concl = f_eHoareS_old hs.ehs_m b_pre c hs.ehs_pr in
   FApi.xmutate1 tc `While [b_concl]
 
 let t_ehoare_while inv tc =
@@ -325,8 +325,8 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let post = f_and_simpl inv post in
   let concl =
     match side with
-    | `Left  -> f_equivS es.es_ml es.es_mr es.es_pr s es.es_sr post
-    | `Right -> f_equivS es.es_ml es.es_mr es.es_pr es.es_sl s post
+    | `Left  -> f_equivS_old es.es_ml es.es_mr es.es_pr s es.es_sr post
+    | `Right -> f_equivS_old es.es_ml es.es_mr es.es_pr es.es_sl s post
   in
 
   FApi.xmutate1 tc `While [b_concl; concl]
@@ -346,7 +346,7 @@ let t_equiv_while_r inv tc =
   (* 1. The body preserves the invariant *)
   let b_pre  = f_ands_simpl [inv; el] er in
   let b_post = f_and_simpl inv sync_cond in
-  let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
+  let b_concl = f_equivS_old es.es_ml es.es_mr b_pre cl cr b_post in
 
   (* 2. WP of the while *)
   let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
@@ -355,7 +355,7 @@ let t_equiv_while_r inv tc =
   let post = generalize_mod env mr modir post in
   let post = generalize_mod env ml modil post in
   let post = f_and_simpl b_post post in
-  let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr post in
+  let concl = f_equivS_old es.es_ml es.es_mr es.es_pr sl sr post in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -552,7 +552,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in
     let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in
     EcFol.f_forall [(v1, GTty f1.f_ty); (v2, GTty f2.f_ty)]
-      (f_equivS evs.es_ml evs.es_mr pr wl wr po)
+      (f_equivS_old evs.es_ml evs.es_mr pr wl wr po)
   in
 
   let hr1, hr2 =
@@ -632,7 +632,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let modir = s_write env cr in
     let post  = generalize_mod env mr modir post in
     let post  = generalize_mod env ml modil post in
-    f_equivS evs.es_ml evs.es_mr evs.es_pr sl sr (f_and inv post) in
+    f_equivS_old evs.es_ml evs.es_mr evs.es_pr sl sr (f_and inv post) in
 
   FApi.t_onfsub (function
     | 6 -> Some (EcLowGoal.t_intros_n c1)

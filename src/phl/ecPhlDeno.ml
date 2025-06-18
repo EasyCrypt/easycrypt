@@ -97,7 +97,7 @@ let t_ehoare_deno_r pre post tc =
   in
 
   let pr = destr_pr f in
-  let concl_e = f_eHoareF pre pr.pr_fun post in
+  let concl_e = f_eHoareF_old pre pr.pr_fun post in
   let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_mem pr.pr_fun env in
   (* pre <= bd *)
   (* building the substitution for the pre *)
@@ -243,7 +243,7 @@ let process_ehoare_deno info tc =
     let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc penv p) dpre  in
     let post = post |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc qenv p) (f_b2xr event) in
 
-    f_eHoareF pre f post
+    f_eHoareF_old pre f post
   in
 
   let pt, ax =
