@@ -328,9 +328,9 @@ let f_bdHoareS bhs_mt bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
     bhs_po=bhs_po.inv; bhs_cmp; bhs_bd=bhs_bd.inv; } [@alert "-priv_pl"]
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
-  assert (bhf_pr.m = bhf_po.m);
+  assert (bhf_pr.m = bhf_po.m && bhf_bd.m = bhf_po.m);
   f_bdHoareF_r { bhf_m=bhf_pr.m; bhf_pr=bhf_pr.inv; bhf_f; bhf_po=bhf_po.inv;
-                 bhf_cmp; bhf_bd; } [@alert "-priv_pl"]
+                 bhf_cmp; bhf_bd=bhf_bd.inv; } [@alert "-priv_pl"]
                  
 let f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
   f_bdHoareF_r { bhf_m=mhr; bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }

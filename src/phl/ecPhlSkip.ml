@@ -58,6 +58,8 @@ module LowInternal = struct
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_skip_r tc =
     let t_trivial = FApi.t_seqs [t_simplify ~delta:`No; t_split; t_fail] in
+    let bhs = tc1_as_bdhoareS tc in
+    let f_r1: EcAst.ss_inv = {m=fst bhs.bhs_m; inv=f_r1} in
     let t_conseq  = EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1 in
       FApi.t_internal
         (FApi.t_seqsub t_conseq

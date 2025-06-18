@@ -49,13 +49,13 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let condf2 = f_bdHoareS mt (map_ss_inv2 f_and_simpl phi pR) s2 (bhs_po bhs) bhs.bhs_cmp f2 in
   let condg2 = f_bdHoareS mt (map_ss_inv2 f_and_simpl phi nR) s2 (bhs_po bhs) bhs.bhs_cmp g2 in
   let bd =
-    (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
+    (map_ss_inv2 f_real_add_simpl (map_ss_inv2 f_real_mul_simpl f1 f2) (map_ss_inv2 f_real_mul_simpl g1 g2)) in
   let condbd =
     match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd in
-  let condbd = f_imp bhs.bhs_pr condbd in
+    | FHle -> map_ss_inv2 f_real_le bd (bhs_bd bhs)
+    | FHeq -> map_ss_inv2 f_eq bd (bhs_bd bhs)
+    | FHge -> map_ss_inv2 f_real_le (bhs_bd bhs) bd in
+  let condbd = map_ss_inv2 f_imp (bhs_pr bhs) condbd in
   let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
   let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
   let condnm =
@@ -64,18 +64,18 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
       (f_hoareS (snd bhs.bhs_m) (map_ss_inv2 f_and (bhs_pr bhs) eqs) s1 eqs) in
-  let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in
+  let conds = [EcSubst.f_forall_mems_ss_inv bhs.bhs_m condbd; condnm] in
   let conds =
-    if   f_equal g1 f_r0
+    if   f_equal g1.inv f_r0
     then condg1 :: conds
-    else if   f_equal g2 f_r0
+    else if   f_equal g2.inv f_r0
          then condg2 :: conds
          else condg1 :: condg2 :: conds in
 
   let conds =
-    if   f_equal f1 f_r0
+    if   f_equal f1.inv f_r0
     then condf1 :: conds
-    else if   f_equal f2 f_r0
+    else if   f_equal f2.inv f_r0
          then condf2 :: conds
          else condf1 :: condf2 :: conds in
 

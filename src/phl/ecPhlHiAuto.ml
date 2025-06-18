@@ -105,6 +105,7 @@ let t_lossless1_r tc =
 
   let tactic =
     let m = EcIdent.create "&hr" in 
+    let f_r1: EcAst.ss_inv = {m; inv = f_true} in
     (EcPhlConseq.t_bdHoareS_conseq {m;inv=f_true} {m;inv=f_true}
         @~ FApi.t_on1 (-1) ~ttout:ll_trivial
              (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1))

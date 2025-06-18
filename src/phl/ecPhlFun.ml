@@ -182,7 +182,7 @@ module FunAbsLow = struct
     PV.check_depend env fv top;
     let ospec o =
       check_oracle_use pf env top o;
-      f_bdHoareF inv o inv FHeq f_r1 in
+      f_bdHoareF inv o inv FHeq {m=inv.m;inv=f_r1} in
 
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
@@ -331,10 +331,12 @@ module UpToLow = struct
       let post  = map_ts_inv3 EcFol.f_if_simpl bad2 invQ (map_ts_inv2 f_and eq_res invP) in
       let cond1 = f_equivF pre o_l o_r post in
       let cond2 =
+        let f_r1 = {m=invQ.ml; inv=f_r1} in
         let concl = ts_inv_lower_left1 (fun bq -> (f_bdHoareF bq o_l bq FHeq f_r1)) invQ in
         f_forall_mems_ss_inv (mr, abstract_mt)
           (map_ss_inv2 f_imp bad concl) in
       let cond3 =
+        let f_r1 = {m=invQ.mr; inv=f_r1} in
         let bq = map_ts_inv2 f_and bad2 invQ in
           f_forall_mems_ss_inv (ml, abstract_mt) (ts_inv_lower_right1 (fun bq -> f_bdHoareF bq o_r bq FHeq f_r1) bq) in
 

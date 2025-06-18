@@ -182,7 +182,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let m = EcMemory.memory bhs.bhs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   let f_concl =
-    bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
+    bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp (bhs_bd bhs) opt_bd in
 
   (* The wp *)
   let pvres = pv_res in
@@ -211,18 +211,18 @@ let t_bdhoare_call fpre fpost opt_bd tc =
 
   (* most of the above code is duplicated from t_hoare_call *)
   let concl = 
-    let mt = snd bhs.bhs_m in
+    let m,mt = bhs.bhs_m in
     match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
         f_hoareS mt (bhs_pr bhs) s post
     | FHeq, Some bd ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (map_ss_inv2 f_real_div (bhs_bd bhs) bd)
     | FHeq, None ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp f_r1
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp {m;inv=f_r1}
     | FHge, Some bd ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (f_real_div bhs.bhs_bd bd)
+        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (map_ss_inv2 f_real_div (bhs_bd bhs) bd)
     | FHge, None ->
-        f_bdHoareS mt (bhs_pr bhs) s post FHeq f_r1
+        f_bdHoareS mt (bhs_pr bhs) s post FHeq {m;inv=f_r1}
     | _, _ -> assert false
   in
 
@@ -404,7 +404,7 @@ let process_call side info tc =
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
           let post = TTC.pf_process_form !!tc qenv tbool post in   
-          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f bhs.bhs_cmp bhs.bhs_bd None
+          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f bhs.bhs_cmp (bhs_bd bhs) None
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
@@ -434,6 +434,7 @@ let process_call side info tc =
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
           let post = TTC.pf_process_form !!tc qenv tbool post in
+          let f_r1 = {m; inv=f_r1} in
           bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f FHeq f_r1 None
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
@@ -466,7 +467,7 @@ let process_call side info tc =
       let m = fst bhs.bhs_m in
       let inv = TTC.pf_process_form !!tc hyps txreal inv in
       let inv = {m; inv} in
-      let f = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None in
+      let f = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp (bhs_bd bhs) None in
       (f, Inv_ss inv)
 
     | FequivS es ->
