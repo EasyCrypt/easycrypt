@@ -104,18 +104,26 @@ let t_equiv_app (i, j) phi tc =
   let es = tc1_as_equivS tc in
   let sl1,sl2 = s_split env i es.es_sl in
   let sr1,sr2 = s_split env j es.es_sr in
-  let a = f_equivS_old es.es_ml es.es_mr es.es_pr (stmt sl1) (stmt sr1) phi in
-  let b = f_equivS_old es.es_ml es.es_mr phi (stmt sl2) (stmt sr2) es.es_po in
+  let mtl, mtr = snd es.es_ml, snd es.es_mr in
+  let a = f_equivS mtl mtr (es_pr es) (stmt sl1) (stmt sr1) phi in
+  let b = f_equivS mtl mtr phi (stmt sl2) (stmt sr2) (es_po es) in
 
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_equiv_app_onesided side i pre post tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
-  let m, s, s' =
+  let (ml, mr) = fst es.es_ml, fst es.es_mr in
+  let m, s, s', p', q' =
     match side with
-    | `Left  -> es.es_ml, es.es_sl, es.es_sr
-    | `Right -> es.es_mr, es.es_sr, es.es_sl
+    | `Left  -> 
+      let p' = ss_inv_generalize_right (EcSubst.ss_inv_rebind pre ml) mr in
+      let q' = ss_inv_generalize_right (EcSubst.ss_inv_rebind post ml) mr in
+      es.es_ml, es.es_sl, es.es_sr, p', q'
+    | `Right -> 
+      let p' = ss_inv_generalize_left (EcSubst.ss_inv_rebind pre mr) ml in
+      let q' = ss_inv_generalize_left (EcSubst.ss_inv_rebind post mr) ml in
+      es.es_mr, es.es_sr, es.es_sl, p', q'
   in
   let ij =
     match side with
@@ -124,9 +132,7 @@ let t_equiv_app_onesided side i pre post tc =
   let _s1, s2 = s_split env i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
-  let subst = Fsubst.f_subst_mem mhr (fst m) in
-  let p' = subst pre and q' = subst post in
-  let r = f_and p' (generalize_mod env (fst m) modi (f_imp q' es.es_po)) in
+  let r = map_ts_inv2 f_and p' (map_ts_inv1 (generalize_mod env (fst m) modi) (map_ts_inv2 f_imp q' (es_po es))) in
   FApi.t_seqsub (t_equiv_app ij r)
     [t_id; (* s1 ~ s' : pr ==> r *)
      FApi.t_seqsub (EcPhlConseq.t_equivS_conseq_nm p' q')
@@ -207,30 +213,31 @@ let process_app (side, dir, k, phi, bd_info) tc =
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
     check_side side;
-    let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let (m,_), phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
     let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
-    t_hoare_app i phi tc
+    t_hoare_app i {m;inv=phi} tc
 
   | Single i, PAppNone when is_eHoareS concl ->
     check_side side;
-    let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
+    let (m,_), phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
     let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
-    t_ehoare_app i phi tc
+    t_ehoare_app i {m;inv=phi} tc
 
   | Single i, PAppNone when is_equivS concl ->
-    let pre, post =
+    let pre, post, m =
       match phi with
       | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
       | Double (pre, post) ->
-        let _, pre  = TTC.tc1_process_Xhl_formula ?side tc pre in
-        let _, post = TTC.tc1_process_Xhl_formula ?side tc post in
-        (pre, post) in
+        let (m,_), pre  = TTC.tc1_process_Xhl_formula ?side tc pre in
+        let (m',_), post = TTC.tc1_process_Xhl_formula ?side tc post in
+        assert (m = m');
+        (pre, post, m) in
     let side =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
     let i = EcProofTyping.tc1_process_codepos1 tc (Some side, i) in
-    t_equiv_app_onesided side i pre post tc
+    t_equiv_app_onesided side i {m;inv=pre} {m;inv=post} tc
 
   | Single i, _ when is_bdHoareS concl ->
       check_side side;

@@ -959,47 +959,50 @@ let equantif_of_quantif (qt : quantif) : equantif =
   | Lexists -> `EExists
 
 (* -------------------------------------------------------------------- *)
-let rec form_of_expr mem (e : expr) =
+let rec form_of_expr m (e : expr) =
   match e.e_node with
   | Eint n ->
-     f_int n
+     {m;inv=f_int n}
 
   | Elocal id ->
-     f_local id e.e_ty
+     {m;inv=f_local id e.e_ty}
 
   | Evar pv ->
-     f_pvar pv e.e_ty mem
+     {m;inv=f_pvar pv e.e_ty m}
 
   | Eop (op, tys) ->
-     f_op op tys e.e_ty
+     {m;inv=f_op op tys e.e_ty}
 
   | Eapp (ef, es) ->
-     f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
+     let f_app' f = f_app (List.hd f) (List.tl f) e.e_ty in
+     map_ss_inv f_app' ((form_of_expr m ef)::(List.map (form_of_expr m) es))
 
   | Elet (lpt, e1, e2) ->
-     f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
+     map_ss_inv2 (f_let lpt) (form_of_expr m e1) (form_of_expr m e2)
 
   | Etuple es ->
-     f_tuple (List.map (form_of_expr mem) es)
+     map_ss_inv f_tuple (List.map (form_of_expr m) es)
 
   | Eproj (e1, i) ->
-     f_proj (form_of_expr mem e1) i e.e_ty
+     let f_proj' f = f_proj f i e1.e_ty in
+     map_ss_inv1 f_proj' (form_of_expr m e1)
 
   | Eif (e1, e2, e3) ->
-     let e1 = form_of_expr mem e1 in
-     let e2 = form_of_expr mem e2 in
-     let e3 = form_of_expr mem e3 in
-     f_if e1 e2 e3
+     let e1 = form_of_expr m e1 in
+     let e2 = form_of_expr m e2 in
+     let e3 = form_of_expr m e3 in
+     map_ss_inv3 f_if e1 e2 e3
 
   | Ematch (b, fs, ty) ->
-     let b'  = form_of_expr mem b in
-     let fs' = List.map (form_of_expr mem) fs in
-     f_match b' fs' ty
+     let b'  = form_of_expr m b in
+     let fs' = List.map (form_of_expr m) fs in
+     let f_match' fl = f_match (List.hd fl) (List.tl fl) ty in
+     map_ss_inv f_match' (b'::fs')
 
   | Equant (qt, b, e) ->
      let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
-     let e = form_of_expr mem e in
-     f_quant (quantif_of_equantif qt) b e
+     let e = form_of_expr m e in
+     map_ss_inv1 (f_quant (quantif_of_equantif qt) b) e
 
 
 (* -------------------------------------------------------------------- *)

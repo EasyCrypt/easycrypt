@@ -321,7 +321,7 @@ val split_fun  : form -> bindings * form
 val split_args : form -> form * form list
 
 (* -------------------------------------------------------------------- *)
-val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
+val form_of_expr : EcMemory.memory -> EcTypes.expr -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 exception CannotTranslate

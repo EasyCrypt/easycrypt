@@ -1346,12 +1346,12 @@ module Op = struct
 
     let mode, aout = Sem.translate_s env cont body.f_body in
     let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
-    let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
+    let aout = map_ss_inv1 (f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids)) aout in
 
     let opdecl = EcDecl.{
       op_tparams  = [];
-      op_ty       = aout.f_ty;
-      op_kind     = OB_oper (Some (OP_Plain aout));
+      op_ty       = aout.inv.f_ty;
+      op_kind     = OB_oper (Some (OP_Plain aout.inv));
       op_loca     = op.ppo_locality;
       op_opaque   = optransparent;
       op_clinline = false;
@@ -2424,9 +2424,9 @@ end
                     let es = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
                     let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
-                    let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+                    let fp  = map_ss_inv1 (EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs)) bd in
 
-                    match fp.f_node with
+                    match fp.inv.f_node with
                     | Fop (pf, _) -> (pf :: paths, pts)
                     | _ -> (paths, (ps, ue, fp) ::pts)
                   end
@@ -2434,7 +2434,7 @@ end
                   | _ -> (p :: paths, pts) in
 
                 let paths, pts = List.fold_left for1 ([], []) paths in
-                let pts = List.map (fun (ps, ue, fp) -> `ByPattern ((ps, ue), fp)) pts in
+                let pts = List.map (fun (ps, ue, fp : _*_*ss_inv) -> `ByPattern ((ps, ue), fp.inv)) pts in
 
                 `ByOr (`ByPath (Sp.of_list paths) :: pts)
               end

@@ -65,18 +65,19 @@ let t_hoare_while_r inv tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let (e, c), s = tc1_last_while tc hs.hs_s in
-  let m = EcMemory.memory hs.hs_m in
+  let (m, mt) = hs.hs_m in
   let e = form_of_expr m e in
   (* the body preserves the invariant *)
-  let b_pre  = f_and_simpl inv e in
+  let b_pre  = map_ss_inv2 f_and_simpl inv e in
   let b_post = inv in
-  let b_concl = f_hoareS_old hs.hs_m b_pre c b_post in
+  let b_concl = f_hoareS mt b_pre c b_post in
   (* the wp of the while *)
-  let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
+  let f_imps_simpl' f = f_imps_simpl (List.tl f) (List.hd f) in
+  let post = map_ss_inv f_imps_simpl' [hs_po hs;map_ss_inv1 f_not_simpl e; inv]  in
   let modi = s_write env c in
-  let post = generalize_mod env m modi post in
-  let post = f_and_simpl inv post in
-  let concl = f_hoareS_old hs.hs_m hs.hs_pr s post in
+  let post = map_ss_inv1 (generalize_mod env m modi) post in
+  let post = map_ss_inv2 f_and_simpl inv post in
+  let concl = f_hoareS mt (hs_pr hs) s post in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -90,20 +91,21 @@ let t_ehoare_while_core tc =
   let hs = tc1_as_ehoareS tc in
   let (e, c), s = tc1_last_while tc hs.ehs_s in
   check_single_stmt tc s;
-  let m = EcMemory.memory hs.ehs_m in
+  let (m, mt) = hs.ehs_m in
   let e = form_of_expr m e in
-  if not (EcReduction.is_conv hyps hs.ehs_po (f_interp_ehoare_form (f_not e) hs.ehs_pr)) then
+  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) 
+      (map_ss_inv2 f_interp_ehoare_form (map_ss_inv1 f_not e) (ehs_pr hs))) then
     tc_error !!tc "ehoare while rule: wrong post-condition";
   (* the body preserves the invariant *)
-  let b_pre  = f_interp_ehoare_form e hs.ehs_pr in
-  let b_concl = f_eHoareS_old hs.ehs_m b_pre c hs.ehs_pr in
+  let b_pre  = map_ss_inv2 f_interp_ehoare_form e (ehs_pr hs) in
+  let b_concl = f_eHoareS mt b_pre c (ehs_pr hs) in
   FApi.xmutate1 tc `While [b_concl]
 
 let t_ehoare_while inv tc =
   let hs = tc1_as_ehoareS tc in
   let (e,_), _ = tc1_last_while tc hs.ehs_s in
   let m = EcMemory.memory hs.ehs_m in
-  let e = {m;inv=form_of_expr m e} in
+  let e = form_of_expr m e in
   let tc =
     FApi.t_rotate `Left 1 (EcPhlApp.t_ehoare_app (0, `ByPos (List.length hs.ehs_s.s_node - 1)) inv tc) in
   FApi.t_sub
@@ -119,25 +121,27 @@ let t_bdhoare_while_r inv vrnt tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
   let (e, c), s = tc1_last_while tc bhs.bhs_s in
-  let m = EcMemory.memory bhs.bhs_m in
+  let (m, mt) = bhs.bhs_m in
   let e = form_of_expr m e in
   (* the body preserves the invariant *)
   let k_id = EcIdent.create "z" in
-  let k = f_local k_id tint in
-  let vrnt_eq_k = f_eq vrnt k in
-  let vrnt_lt_k = f_int_lt vrnt k in
-  let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
-  let b_post = f_and_simpl inv vrnt_lt_k in
-  let b_concl = f_bdHoareS_old bhs.bhs_m b_pre c b_post FHeq f_r1 in
+  let k = {m;inv=f_local k_id tint} in
+  let vrnt_eq_k = map_ss_inv2 f_eq vrnt k in
+  let vrnt_lt_k = map_ss_inv2 f_int_lt vrnt k in
+  let b_pre  = map_ss_inv2 f_and_simpl (map_ss_inv2 f_and_simpl inv e) vrnt_eq_k in
+  let b_post = map_ss_inv2 f_and_simpl inv vrnt_lt_k in
+  let b_concl = f_bdHoareS mt b_pre c b_post FHeq {m;inv=f_r1} in
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   (* the wp of the while *)
-  let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
-  let term_condition = f_imps_simpl [inv;f_int_le vrnt f_i0] (f_not_simpl e) in
-  let post = f_and term_condition post in
+  let f_imps_simpl' f = f_imps_simpl (List.tl f) (List.hd f) in
+  let post = map_ss_inv f_imps_simpl' [bhs_po bhs; map_ss_inv1 f_not_simpl e; inv] in
+  let term_condition = map_ss_inv f_imps_simpl' 
+    [map_ss_inv1 f_not_simpl e; inv;map_ss_inv2 f_int_le vrnt {m;inv=f_i0}] in
+  let post = map_ss_inv2 f_and term_condition post in
   let modi = s_write env c in
-  let post = generalize_mod env m modi post in
-  let post = f_and_simpl inv post in
-  let concl = f_bdHoareS_old bhs.bhs_m bhs.bhs_pr s post bhs.bhs_cmp bhs.bhs_bd in
+  let post = map_ss_inv1 (generalize_mod env m modi) post in
+  let post = map_ss_inv2 f_and_simpl inv post in
+  let concl = f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (bhs_bd bhs) in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -150,10 +154,11 @@ let t_bdhoare_while_rev_r inv tc =
   if bhs.bhs_cmp <> FHle then
     tc_error !!tc "only judgments with an upper-bounded are supported";
 
-  let b_pre  = bhs.bhs_pr in
-  let b_post = bhs.bhs_po in
+  let b_pre  = (bhs_pr bhs) in
+  let b_post = (bhs_po bhs) in
   let mem    = bhs.bhs_m in
-  let bound  = bhs.bhs_bd in
+  let (m, mt) = mem in
+  let bound  = (bhs_bd bhs) in
 
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
   let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in
@@ -166,9 +171,9 @@ let t_bdhoare_while_rev_r inv tc =
   let body_concl =
     let while_s  = EcModules.stmt [EcModules.i_abstract w] in
     let unfolded_while_s = EcModules.s_seq lp_body while_s in
-    let while_jgmt = f_bdHoareS_old bhs.bhs_m inv while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
-    let unfolded_while_jgmt = f_bdHoareS_old
-      bhs.bhs_m (f_and inv lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
+    let while_jgmt = f_bdHoareS mt inv while_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
+    let unfolded_while_jgmt = f_bdHoareS
+      mt (map_ss_inv2 f_and inv lp_guard) unfolded_while_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs)
     in
       f_imp while_jgmt unfolded_while_jgmt
   in
@@ -176,12 +181,12 @@ let t_bdhoare_while_rev_r inv tc =
   (* 2. Sub-goal *)
   let rem_concl =
     let modi = s_write env lp_body in
-    let term_post = f_imp
-      (f_and inv (f_and (f_not lp_guard) b_post))
-      (f_eq bound f_r1) in
-    let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
-    let term_post = f_and inv term_post in
-    f_hoareS_old mem b_pre rem_s term_post
+    let term_post = map_ss_inv2 f_imp
+      (map_ss_inv2 f_and inv (map_ss_inv2 f_and (map_ss_inv1 f_not lp_guard) b_post))
+      (map_ss_inv2 f_eq bound {m;inv=f_r1}) in
+    let term_post = map_ss_inv1 (generalize_mod env (EcMemory.memory mem) modi) term_post in
+    let term_post = map_ss_inv2 f_and inv term_post in
+    f_hoareS mt b_pre rem_s term_post
   in
 
   FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
@@ -197,9 +202,10 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   if bhs.bhs_cmp = FHle then
     tc_error !!tc "only judgments with an lower/eq-bounded are supported";
 
-  let b_pre  = bhs.bhs_pr in
-  let b_post = bhs.bhs_po in
+  let b_pre  = bhs_pr bhs in
+  let b_post = bhs_po bhs in
   let mem    = bhs.bhs_m in
+  let (m, mt) = mem in
 
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
 
@@ -210,54 +216,56 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
 
   check_single_stmt tc rem_s;
 
-  let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in
-  let bound    = bhs.bhs_bd in
+  let lp_guard = form_of_expr m lp_guard_exp in
+  let bound    = bhs_bd bhs in
   let modi     = s_write env lp_body in
 
   (* 1. Pre-invariant *)
-  let pre_inv_concl = f_forall_mems [mem] (f_imp b_pre inv) in
+  let pre_inv_concl = EcSubst.f_forall_mems_ss_inv mem (map_ss_inv2 f_imp b_pre inv) in
 
   (* 2. Pre-bound *)
   let pre_bound_concl =
-    let term_post = [b_pre; f_not lp_guard] in
+    let term_post = [b_pre; map_ss_inv1 f_not lp_guard] in
     let concl =
       if bhs.bhs_cmp = FHeq then
-        f_eq bound (f_if b_post f_r1 f_r0)
-      else f_imp (f_not b_post) (f_eq bound f_r0) in
-    let term_post = f_imps term_post concl in
-    let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
-      f_forall_mems [mem] term_post
+        map_ss_inv2 f_eq bound (map_ss_inv3 f_if b_post {m;inv=f_r1} {m;inv=f_r0})
+      else map_ss_inv2 f_imp (map_ss_inv1 f_not b_post) (map_ss_inv2 f_eq bound {m;inv=f_r0}) in
+    let f_imps' f = f_imps (List.tl f) (List.hd f) in
+    let term_post = map_ss_inv f_imps' (concl::term_post) in
+    let term_post = map_ss_inv1 (generalize_mod env m modi) term_post in
+      EcSubst.f_forall_mems_ss_inv mem term_post
   in
 
   (* 3. Term-invariant *)
   let inv_term_concl =
-    let concl = f_imp (f_int_le vrnt f_i0) (f_not lp_guard) in
-    let concl = f_and (f_int_le vrnt k) concl in
-    let concl = f_imp inv concl in
-      f_forall_mems [mem] (generalize_mod env (EcMemory.memory mem) modi concl)
+    let concl = map_ss_inv2 f_imp (map_ss_inv2 f_int_le vrnt {m;inv=f_i0}) (map_ss_inv1 f_not lp_guard) in
+    let concl = map_ss_inv2 f_and (map_ss_inv2 f_int_le vrnt k) concl in
+    let concl = map_ss_inv2 f_imp inv concl in
+      EcSubst.f_forall_mems_ss_inv mem (map_ss_inv1 (generalize_mod env m modi) concl)
   in
 
   (* 4. Vrnt conclusion *)
   let vrnt_concl =
     let k_id = EcIdent.create "z" in
-    let k    = f_local k_id tint in
-    let vrnt_eq_k = f_eq vrnt k in
-    let vrnt_lt_k = f_int_lt vrnt k in
+    let k    = {m;inv=f_local k_id tint} in
+    let vrnt_eq_k = map_ss_inv2 f_eq vrnt k in
+    let vrnt_lt_k = map_ss_inv2 f_int_lt vrnt k in
       f_and
-        (f_forall_mems [mem] (f_imp inv (f_real_lt f_r0 eps)))
+        (EcSubst.f_forall_mems_ss_inv mem (map_ss_inv2 f_imp inv 
+          (map_ss_inv2 f_real_lt {m;inv=f_r0} {m;inv=eps})))
         (f_forall_simpl [(k_id,GTty tint)]
-           (f_bdHoareS_old 
-              bhs.bhs_m 
-              (f_ands [inv;lp_guard;vrnt_eq_k]) 
+           (f_bdHoareS
+              mt 
+              (map_ss_inv f_ands [inv;lp_guard;vrnt_eq_k]) 
               lp_body
               vrnt_lt_k 
               FHge
-              eps))
+              {m;inv=eps}))
   in
 
   (* 5. Out invariant *)
   let inv_concl =
-    f_bdHoareS_old bhs.bhs_m (f_and inv lp_guard) lp_body inv FHeq f_r1
+    f_bdHoareS mt (map_ss_inv2 f_and inv lp_guard) lp_body inv FHeq {m;inv=f_r1}
   in
 
   (* 6. Out body *)
@@ -269,9 +277,9 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
     let while_s1 = EcModules.stmt [EcModules.i_abstract w] in
 
     let unfolded_while_s = EcModules.s_seq lp_body while_s1 in
-    let while_jgmt = f_bdHoareS_old bhs.bhs_m b_pre while_s1 bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
-    let unfolded_while_jgmt = f_bdHoareS_old
-      bhs.bhs_m (f_and b_pre lp_guard) unfolded_while_s bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd
+    let while_jgmt = f_bdHoareS mt b_pre while_s1 (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
+    let unfolded_while_jgmt = f_bdHoareS
+      mt (map_ss_inv2 f_and b_pre lp_guard) unfolded_while_s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs)
     in
     f_imp while_jgmt unfolded_while_jgmt
   in
