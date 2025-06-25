@@ -557,7 +557,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
           let commands =
-            List.fold_left 
+            List.fold_left
               (fun scope g -> process_internal subld scope g.gl_action)
               iscope commands in
           commands)
@@ -829,7 +829,7 @@ type checkmode = {
   cm_iterate   : bool;
 }
 
-let initial ~checkmode ~boot =
+let initial ~checkmode ~boot ~checkproof =
   let checkall  = checkmode.cm_checkall  in
   let profile   = checkmode.cm_profile   in
   let poptions  = { EcScope.Prover.empty_options with
@@ -852,7 +852,14 @@ let initial ~checkmode ~boot =
                                  scope [tactics; prelude] in
 
   let scope = EcScope.Prover.set_default scope poptions in
-  let scope = if checkall then EcScope.Prover.full_check scope else scope in
+  let scope = if checkproof then
+                begin
+                  if checkall then
+                    EcScope.Prover.full_check scope
+                  else scope
+                end
+              else EcScope.Prover.check_proof scope false
+  in
 
   EcScope.freeze scope
 
@@ -892,10 +899,10 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
-let initialize ~restart ~undo ~boot ~checkmode =
+let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
-  context := Some (rootctxt ~undo (initial ~checkmode ~boot))
+  context := Some (rootctxt ~undo (initial ~checkmode ~boot ~checkproof))
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit

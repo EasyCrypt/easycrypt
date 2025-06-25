@@ -818,8 +818,6 @@ module Tactics = struct
   let process_r ?(src : string option) ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
-    (* if src = None then assert false; *)
-
     let scope =
       match (oget scope.sc_pr_uc).puc_active with
       | None -> hierror "no active lemma"
@@ -827,6 +825,13 @@ module Tactics = struct
           if   mark && not pac.puc_started
           then proof scope
           else scope
+    in
+
+    let scope = { scope with
+                  sc_locdoc =
+                    match src with
+                    | Some src -> DocState.push_srcbl scope.sc_locdoc src
+                    | None -> scope.sc_locdoc; }
     in
 
     let puc = oget (scope.sc_pr_uc) in
@@ -869,12 +874,7 @@ module Tactics = struct
 
         let pac = { pac with puc_jdg = PSCheck juc } in
         let puc = { puc with puc_active = Some (pac, pct); } in
-        let scope = { scope with
-                        sc_pr_uc = Some puc;
-                        sc_locdoc =
-                          match src with
-                          | Some src -> DocState.push_srcbl scope.sc_locdoc src
-                          | None -> scope.sc_locdoc; } in
+        let scope = { scope with sc_pr_uc = Some puc; } in
         Some (penv, hds), scope
 
   let process1_r mark mode scope t =
@@ -1852,29 +1852,6 @@ module Theory = struct
     let
       scope = { scope with sc_locdoc }
     in
-(* let scope = *)
-(*      let scope = *)
-(*   { scope with *)
-(*       sc_locdoc = *)
-(*       match uax.pa_locality with *)
-(*       | `Local -> DocState.prevent_process scope.sc_locdoc *)
-(*       | `Global -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Specific *)
-(*       | `Declare -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Abstract} *)
-(* in *)
-(* let scope = *)
-(*   { scope with *)
-(*       sc_locdoc = *)
-(*       match src with *)
-(*       | Some src -> DocState.push_srcbl scope.sc_locdoc src *)
-(*       | None -> scope.sc_locdoc; } *)
-
-      (* let sc_locdoc = scope.sc_locdoc in *)
-      (* let sc_locdoc = *)
-      (*   let mode = match mode with `Concrete -> `Specific | `Abstract -> `Abstract in *)
-      (*   DocState.start_process sc_locdoc name `Theory mode in *)
-      (* let sc_locdoc = *)
-      (*   ofold ((^~) DocState.push_srcbl) sc_locdoc src in *)
-      (* { scope with sc_locdoc } in *)
 
     subscope scope mode name
 

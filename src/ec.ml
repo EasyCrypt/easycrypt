@@ -486,7 +486,7 @@ let main () =
     | `Runtest _ ->
         (* Eagerly executed *)
         assert false
-    
+
     | `DocGen docopts -> begin
         let name = docopts.doco_input in
 
@@ -508,7 +508,7 @@ let main () =
           prvo_checkall = false;
           prvo_profile = false;
           prvo_iterate = false;
-          prvo_why3server = None; } 
+          prvo_why3server = None; }
         in
 
         let terminal =
@@ -525,7 +525,6 @@ let main () =
         ; outdirp     = docopts.doco_outdirp }
       end
 
-      
   in
 
   (match state.input with
@@ -536,9 +535,10 @@ let main () =
        | Some pwd -> EcCommands.addidir pwd);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  oiter
-    (fun input -> if EcCommands.check_eco input then exit 0)
-    state.input;
+  (if not state.docgen then
+    oiter
+      (fun input -> if EcCommands.check_eco input then exit 0)
+      state.input);
 
   let finalize_input input scope =
     match input with
@@ -631,8 +631,13 @@ let main () =
               EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
+            let checkproof = not state.docgen in
+
             EcCommands.initialize ~restart
-              ~undo:state.interactive ~boot:ldropts.ldro_boot ~checkmode;
+              ~undo:state.interactive
+              ~boot:ldropts.ldro_boot
+              ~checkmode
+              ~checkproof;
             (try
                List.iter EcCommands.apply_pragma state.prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
@@ -655,13 +660,12 @@ let main () =
         oiter (T.setwidth terminal)
           (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
            match EcGState.getvalue "PP:width" gs with
-           | Some (`Int i) -> Some i | _ -> None);    
+           | Some (`Int i) -> Some i | _ -> None);
 
         begin
           match snd_map EcLocation.unloc (T.next terminal) with
           | (src, EP.P_Prog (commands, locterm)) ->
               let src = String.strip src in
-              (* TODO REMOVE Format.eprintf "@.@.[W]%s@.@." src; *)
               terminate := locterm;
               List.iter
                 (fun p ->
@@ -705,7 +709,7 @@ let main () =
           | _, EP.P_Exit ->
               terminate := true
         end;
-        
+
         T.finish `ST_Ok terminal;
 
         state.gccompact |> Option.iter (fun i ->

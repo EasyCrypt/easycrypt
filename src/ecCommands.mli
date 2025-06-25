@@ -24,13 +24,14 @@ type checkmode = {
   cm_iterate  : bool;
 }
 
-val initial : checkmode:checkmode -> boot:bool -> EcScope.scope
+val initial : checkmode:checkmode -> boot:bool -> checkproof:bool -> EcScope.scope
 
 val initialize  :
      restart:bool
   -> undo:bool
   -> boot:bool
   -> checkmode:checkmode
+  -> checkproof:bool
   -> unit
 
 val current     : unit -> EcScope.scope
