@@ -376,6 +376,42 @@ qed.
 lemma mu_le_weight ['a] (d : 'a distr) p : mu d p <= weight d.
 proof. by apply/mu_le. qed.
 
+lemma mu_le_eq ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall p, mu d1 p <= mu d2 p) =>
+  d1 = d2.
+proof.
+rewrite eq_distr => d1_ll d1_leq_d2 x.
+case (mu1 d1 x = mu1 d2 x) => // *.
+suff: (weight d1 < weight d2) by smt(mu_bounded).
+have weight_decomp : forall d,
+  weight d = mu1 d x + mu d (predC (pred1 x)) by smt(mu_not).
+do 2 ! rewrite weight_decomp.
+by apply ltr_le_add => /#.
+qed.
+
+lemma mu1_le_eq ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall x, mu1 d1 x <= mu1 d2 x) =>
+  d1 = d2.
+proof.
+move => d1_ll d1_leq_d2.
+apply mu_le_eq => // p.
+rewrite muE muE.
+apply RealSeries.ler_sum; 2,3: exact summable_mu1_cond.
+move => x. case: (p x) => /> *.
+exact d1_leq_d2.
+qed.
+
+lemma mu1_le_eq_mu1 ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall x, mu1 d1 x <= mu1 d2 x) =>
+  forall x, mu1 d1 x = mu1 d2 x.
+proof.
+move => d1_ll d1_le_d2.
+by rewrite (mu1_le_eq d1_ll d1_le_d2).
+qed.
+
 (* -------------------------------------------------------------------- *)
 
 lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
