@@ -78,6 +78,9 @@ and check_f_bad_true env bad f =
       with BadAssign (None, i) -> raise (BadAssign(Some f, i))
     end
   | FBabs o ->
+    oiter (fun bad ->
+      let fv = EcPV.PV.add env bad tbool EcPV.PV.empty in
+      EcPV.PV.check_depend env fv (m_functor f.x_top)) bad;
     List.iter (check_f_bad_true env bad) (OI.allowed o)
 
 let rec s_upto_r env alpha bad s1 s2 =
