@@ -1,10 +1,7 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
 open EcParsetree
 open EcPath
-open EcFol
 open EcModules
-open EcMemory
 open EcCoreGoal
 open EcAst
 

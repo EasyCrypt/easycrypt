@@ -404,8 +404,8 @@ module Core = struct
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
       else None in
-    let m, s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = f_hoareS_old m hs.hs_pr (stmt (s1 @ s2)) hs.hs_po in
+    let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
+    let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
@@ -417,8 +417,8 @@ module Core = struct
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
       else None in
-    let m, s2 = semrnd tc bhs.bhs_m fv s2 in
-    let concl = f_bdHoareS_old m bhs.bhs_pr (stmt (s1 @ s2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+    let (_,mt), s2 = semrnd tc bhs.bhs_m fv s2 in
+    let concl = f_bdHoareS mt (bhs_pr bhs) (stmt (s1 @ s2)) (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
@@ -434,12 +434,12 @@ module Core = struct
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
       else None in
-    let m, s2 = semrnd tc m fv s2 in
+    let (_,mt), s2 = semrnd tc m fv s2 in
     let s = stmt (s1 @ s2) in
     let concl =
       match side with
-      | `Left  -> f_equivS_old m es.es_mr es.es_pr s es.es_sr es.es_po
-      | `Right -> f_equivS_old es.es_ml m es.es_pr es.es_sl s es.es_po in
+      | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+      | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl s (es_po es) in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
 end (* Core *)

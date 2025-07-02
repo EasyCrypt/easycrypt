@@ -1,11 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcPath
-open EcTypes
-open EcModules
-open EcMemory
 open EcEnv
-open EcFol
 open EcAst
 
 (* -------------------------------------------------------------------- *)

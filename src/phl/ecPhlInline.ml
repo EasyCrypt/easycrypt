@@ -169,40 +169,40 @@ end
 
 (* -------------------------------------------------------------------- *)
 let t_inline_hoare_r ~use_tuple sp tc =
-  let hoare      = tc1_as_hoareS tc in
-  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.hs_m sp hoare.hs_s in
-  let concl      = f_hoareS_old me hoare.hs_pr stmt hoare.hs_po in
+  let hs           = tc1_as_hoareS tc in
+  let (_,mt), stmt = LowInternal.inline ~use_tuple tc hs.hs_m sp hs.hs_s in
+  let concl        = f_hoareS mt (hs_pr hs) stmt (hs_po hs) in
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_inline_ehoare_r ~use_tuple sp tc =
-  let hoare      = tc1_as_ehoareS tc in
-  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.ehs_m sp hoare.ehs_s in
-  let concl      = f_eHoareS_old me hoare.ehs_pr stmt hoare.ehs_po in
+  let ehs          = tc1_as_ehoareS tc in
+  let (_,mt), stmt = LowInternal.inline ~use_tuple tc ehs.ehs_m sp ehs.ehs_s in
+  let concl        = f_eHoareS mt (ehs_pr ehs) stmt (ehs_po ehs) in
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_inline_bdhoare_r ~use_tuple sp tc =
-  let hoare      = tc1_as_bdhoareS tc in
-  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.bhs_m sp hoare.bhs_s in
-  let concl      = f_bdHoareS_old me hoare.bhs_pr stmt hoare.bhs_po hoare.bhs_cmp hoare.bhs_bd in
+  let bhs           = tc1_as_bdhoareS tc in
+  let (_, mt), stmt = LowInternal.inline ~use_tuple tc bhs.bhs_m sp bhs.bhs_s in
+  let concl         = f_bdHoareS mt (bhs_pr bhs) stmt (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
 
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_inline_equiv_r ~use_tuple side sp tc =
-  let equiv = tc1_as_equivS tc in
+  let es = tc1_as_equivS tc in
   let concl =
     match side with
     | `Left  ->
-        let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_ml sp equiv.es_sl in
-          f_equivS_old me equiv.es_mr equiv.es_pr stmt equiv.es_sr equiv.es_po
+        let ((_,mt), stmt) = LowInternal.inline ~use_tuple tc es.es_ml sp es.es_sl in
+          f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)
     | `Right ->
-        let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_mr sp equiv.es_sr in
-          f_equivS_old equiv.es_ml me equiv.es_pr equiv.es_sl stmt equiv.es_po
+        let ((_,mt), stmt) = LowInternal.inline ~use_tuple tc es.es_mr sp es.es_sr in
+          f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl stmt (es_po es)
   in
 
   FApi.xmutate1 tc `Inline [concl]

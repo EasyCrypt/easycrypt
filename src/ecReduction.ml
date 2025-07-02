@@ -450,7 +450,7 @@ let check_binding (env, subst) (x1, gty1) (x2, gty2) =
 let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2
 
-let check_m_binding env subst x1 x2 =
+let check_m_binding subst x1 x2 =
   if id_equal x1 x2 then subst
   else Fsubst.f_bind_mem subst x2 x1
 
@@ -553,7 +553,7 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
 
     | FhoareF hf1, FhoareF hf2 ->
       check_xp env subst hf1.hf_f hf2.hf_f;
-      let subst = check_m_binding env subst hf1.hf_m hf2.hf_m in
+      let subst = check_m_binding subst hf1.hf_m hf2.hf_m in
       aux env subst hf1.hf_pr hf2.hf_pr [@alert "-priv_pl"];
       aux env subst hf1.hf_po hf2.hf_po [@alert "-priv_pl"]
 
@@ -592,8 +592,8 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
     | FequivF ef1, FequivF ef2 ->
       check_xp env subst ef1.ef_fl ef2.ef_fl;
       check_xp env subst ef1.ef_fr ef2.ef_fr;
-      let subst = check_m_binding env subst ef1.ef_ml ef2.ef_ml in
-      let subst = check_m_binding env subst ef1.ef_mr ef2.ef_mr in
+      let subst = check_m_binding subst ef1.ef_ml ef2.ef_ml in
+      let subst = check_m_binding subst ef1.ef_mr ef2.ef_mr in
       aux env subst ef1.ef_pr ef2.ef_pr [@alert "-priv_pl"];
       aux env subst ef1.ef_po ef2.ef_po [@alert "-priv_pl"]
 
@@ -1261,7 +1261,7 @@ let rec simplify ri env f =
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
       f_map (fun ty -> ty) (simplify ri env) 
-      (f_eHoareF_old hf.ehf_pr ehf_f hf.ehf_po)
+      (f_eHoareF (ehf_pr hf) ehf_f (ehf_po hf))
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in

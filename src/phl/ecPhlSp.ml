@@ -245,7 +245,8 @@ let t_sp_side pos tc =
       let stmt1, stmt2 = o_split ~rev:true env pos hs.hs_s in
       let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 (hs_pr hs).inv in
       check_sp_progress pos stmt1;
-      let subgoal = f_hoareS_old hs.hs_m hs_pr (stmt (stmt1@stmt2)) hs.hs_po in
+      let m = fst hs.hs_m in
+      let subgoal = f_hoareS (snd hs.hs_m) {m;inv=hs_pr} (stmt (stmt1@stmt2)) (hs_po hs) in
       FApi.xmutate1 tc `Sp [subgoal]
 
 
@@ -255,7 +256,8 @@ let t_sp_side pos tc =
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
       let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 (bhs_pr bhs).inv in
       check_sp_progress pos stmt1;
-      let subgoal = f_bdHoareS_old bhs.bhs_m bhs_pr (stmt (stmt1@stmt2)) bhs.bhs_po bhs.bhs_cmp bhs.bhs_bd in
+      let m = fst bhs.bhs_m in
+      let subgoal = f_bdHoareS (snd bhs.bhs_m) {m;inv=bhs_pr} (stmt (stmt1@stmt2)) (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
       FApi.xmutate1 tc `Sp [subgoal]
 
   | FequivS es, (None | Some (Double _))  ->

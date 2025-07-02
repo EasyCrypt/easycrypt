@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
-open EcTypes
 open EcFol
 open EcModules
 open EcEnv

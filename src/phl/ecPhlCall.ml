@@ -236,8 +236,6 @@ let t_equiv_call fpre fpost tc =
   let es = tc1_as_equivS tc in
   let (lpl,fl,argsl),sl = tc1_last_call tc es.es_sl in
   let (lpr,fr,argsr),sr = tc1_last_call tc es.es_sr in
-  let ml = EcMemory.memory es.es_ml in
-  let mr = EcMemory.memory es.es_mr in
   (* The functions satisfy their specification *)
   let f_concl = f_equivF fpre fl fr fpost in
   let modil = f_write env fl in
@@ -460,7 +458,6 @@ let process_call side info tc =
     match concl.f_node with
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
         let m = fst hs.hs_m in
         let inv = TTC.pf_process_form !!tc hyps tbool inv in
         let inv = {m; inv} in
@@ -468,7 +465,6 @@ let process_call side info tc =
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
         let m = fst hs.ehs_m in
         let inv = TTC.pf_process_form !!tc hyps txreal inv in
         let inv = {m; inv} in
@@ -476,7 +472,6 @@ let process_call side info tc =
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-      let penv = LDecl.inv_memenv1 hyps in
       let m = fst bhs.bhs_m in
       let inv = TTC.pf_process_form !!tc hyps txreal inv in
       let inv = {m; inv} in
@@ -486,7 +481,6 @@ let process_call side info tc =
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-      let penv = LDecl.inv_memenv hyps in
       let ml, mr = (fst es.es_ml, fst es.es_mr) in
       let env  = LDecl.toenv hyps in
       let inv = TTC.pf_process_form !!tc hyps tbool inv in
@@ -577,22 +571,20 @@ let process_call_concave (fc, info) tc =
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
   let process_spec tc =
-    let (hyps, concl) = FApi.tc1_flat tc in
+    let _, concl = FApi.tc1_flat tc in
       match concl.f_node  with
       | FeHoareS hs ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF (fst hs.ehs_m) f hyps in
-          (penv, qenv, txreal, fun pre post -> f_eHoareF_old pre f post)
+          (txreal, fun pre post -> f_eHoareF pre f post)
 
       | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
   let process_inv tc =
-      let hyps, concl = FApi.tc1_flat tc in
+      let _, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, fun inv -> f_eHoareF_old inv f inv)
+        (txreal, fun inv -> f_eHoareF inv f inv)
 
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in
 
@@ -601,16 +593,16 @@ let process_call_concave (fc, info) tc =
   let process_cut tc info =
     match info with
     | CI_spec (pre, post) ->
-      let penv,qenv,ty,fmake = process_spec tc in
-      let pre  = TTC.pf_process_form !!tc penv ty pre  in
-      let post = TTC.pf_process_form !!tc qenv ty post in
+      let ty,fmake = process_spec tc in
+      let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
+      let _, post = TTC.tc1_process_Xhl_form tc ty post in
       fmake pre post
 
     | CI_inv inv ->
-      let env, ty, fmake = process_inv tc in
-      let inv = TTC.pf_process_form !!tc env ty inv in
+      let ty, fmake = process_inv tc in
+      let _, inv = TTC.tc1_process_Xhl_form tc ty inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss {inv;m=mhr}) tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun (Inv_ss inv) tc));
       fmake inv
 
     | _ ->

@@ -114,13 +114,10 @@ val f_lambda : bindings -> form -> form
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
 val f_hoareF : ss_inv -> xpath -> ss_inv -> form
-val f_hoareF_old : form -> xpath -> form -> form
 val f_hoareS : memtype -> ss_inv -> stmt -> ss_inv -> form
-val f_hoareS_old : memenv -> form -> stmt -> form -> form
 
 val f_eHoareF_old : form -> xpath -> form -> form
 val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
-val f_eHoareS_old : memenv -> form -> EcCoreModules.stmt -> form -> form
 val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
 
 (* soft-constructors - eager *)

@@ -329,32 +329,32 @@ module PV = struct
           aux env fv e
 
       | FhoareF hf ->
-          in_mem_scope env fv [mhr] [hf.hf_pr; hf.hf_po]
+          in_mem_scope env fv [hf.hf_m] [(hf_pr hf).inv; (hf_po hf).inv]
 
       | FhoareS hs ->
           in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
 
       | FeHoareF hf ->
-          in_mem_scope env fv [mhr] [hf.ehf_pr; hf.ehf_po]
+          in_mem_scope env fv [hf.ehf_m] [hf.ehf_pr; hf.ehf_po]
 
       | FeHoareS hs ->
           in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
 
       | FbdHoareF bhf ->
-          in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
+          in_mem_scope env fv [bhf.bhf_m] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
 
       | FbdHoareS bhs ->
           in_mem_scope env fv
             [fst bhs.bhs_m] [bhs.bhs_pr; bhs.bhs_po; bhs.bhs_bd]
 
       | FequivF ef ->
-          in_mem_scope env fv [mleft; mright] [ef.ef_pr; ef.ef_po]
+          in_mem_scope env fv [ef.ef_ml; ef.ef_mr] [ef.ef_pr; ef.ef_po]
 
       | FequivS es ->
           in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [es.es_pr; es.es_po]
 
       | FeagerF eg ->
-          in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
+          in_mem_scope env fv [eg.eg_ml; eg.eg_mr] [eg.eg_pr; eg.eg_po]
 
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in

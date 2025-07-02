@@ -1938,13 +1938,13 @@ and pp_form_core_r
         Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
           (pp_funname ppe) hf.hf_f
           (pp_mem ppe) hf.hf_m
-          (pp_form ppepr) hf.hf_pr
-          (pp_form ppepo) hf.hf_po
+          (pp_form ppepr) (hf_pr hf).inv
+          (pp_form ppepo) (hf_po hf).inv
       else
         Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
           (pp_funname ppe) hf.hf_f
-          (pp_form ppepr) hf.hf_pr
-          (pp_form ppepo) hf.hf_po
+          (pp_form ppepr) (hf_pr hf).inv
+          (pp_form ppepo) (hf_po hf).inv
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
@@ -2986,12 +2986,12 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
-  Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.hf_pr;
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (hf_pr hf).inv;
   if debug_mode then
     Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.hf_f (pp_mem ppe) hf.hf_m
   else
     Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po
+  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (hf_po hf).inv
 
 (* -------------------------------------------------------------------- *)
 

@@ -4,7 +4,6 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcAst
-open EcParsetree
 
 open EcCoreGoal
 open EcLowGoal

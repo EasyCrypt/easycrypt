@@ -3,7 +3,6 @@ open EcUtils
 open EcLocation
 open EcParsetree
 open EcTypes
-open EcModules
 open EcFol
 open EcAst
 
@@ -114,16 +113,16 @@ let t_equiv_app_onesided side i pre post tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let (ml, mr) = fst es.es_ml, fst es.es_mr in
-  let m, s, s', p', q' =
+  let s, s', p', q' =
     match side with
     | `Left  -> 
       let p' = ss_inv_generalize_right (EcSubst.ss_inv_rebind pre ml) mr in
       let q' = ss_inv_generalize_right (EcSubst.ss_inv_rebind post ml) mr in
-      es.es_ml, es.es_sl, es.es_sr, p', q'
+      es.es_sl, es.es_sr, p', q'
     | `Right -> 
       let p' = ss_inv_generalize_left (EcSubst.ss_inv_rebind pre mr) ml in
       let q' = ss_inv_generalize_left (EcSubst.ss_inv_rebind post mr) ml in
-      es.es_mr, es.es_sr, es.es_sl, p', q'
+      es.es_sr, es.es_sl, p', q'
   in
   let generalize_mod_side= sideif side generalize_mod_left generalize_mod_right in
   let ij =

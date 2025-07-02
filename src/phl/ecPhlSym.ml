@@ -2,6 +2,8 @@
 open EcFol
 open EcCoreGoal
 open EcLowPhlGoal
+open EcSubst
+open EcAst
 
 (*-------------------------------------------------------------------- *)
 let build_sym ml mr pr po =
@@ -14,15 +16,19 @@ let build_sym ml mr pr po =
 (*-------------------------------------------------------------------- *)
 let t_equivF_sym tc =
   let ef    = tc1_as_equivF tc in
-  let pr,po = build_sym mleft mright ef.ef_pr ef.ef_po in
-  let cond  = f_equivF_old pr ef.ef_fr ef.ef_fl po in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
+  let pr    = ts_inv_rebind (ef_pr ef) mr ml in
+  let po    = ts_inv_rebind (ef_po ef) mr ml in
+  let cond  = f_equivF pr ef.ef_fr ef.ef_fl po in
   FApi.xmutate1 tc `EquivSym [cond]
 
 (*-------------------------------------------------------------------- *)
 let t_equivS_sym tc =
   let es    = tc1_as_equivS tc in
-  let pr,po = build_sym (fst es.es_ml) (fst es.es_mr) es.es_pr es.es_po in
-  let cond  = f_equivS_old (fst es.es_ml, snd es.es_mr) (fst es.es_mr, snd es.es_ml) pr es.es_sr es.es_sl po in
+  let (ml, mtl), (mr, mtr) = es.es_ml, es.es_mr in
+  let pr    = ts_inv_rebind (es_pr es) mr ml in
+  let po    = ts_inv_rebind (es_po es) mr ml in
+  let cond  = f_equivS mtr mtl pr es.es_sr es.es_sl po in
 
   FApi.xmutate1 tc `EquivSym [cond]
 

@@ -274,9 +274,6 @@ let f_eqs fs1 fs2 =
 let f_hoareS_r hs = mk_form (FhoareS hs) tbool
 let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS_old hs_m hs_pr hs_s hs_po =
-  f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
-
 let f_hoareS hs_mt hs_pr hs_s hs_po =
   assert (hs_pr.m = hs_po.m);
   f_hoareS_r { hs_m=(hs_pr.m, hs_mt); hs_pr=hs_pr.inv; hs_s; 
@@ -286,15 +283,9 @@ let f_hoareF pr hf_f po =
   assert (pr.m = po.m);
   f_hoareF_r { hf_m=pr.m; hf_pr=pr.inv; hf_f; hf_po=po.inv; } [@alert "-priv_pl"]
 
-let f_hoareF_old hf_pr hf_f hf_po =
-  f_hoareF_r { hf_m=mhr;  hf_pr; hf_f; hf_po; }
-
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
 let f_eHoareF_r hf = mk_form (FeHoareF hf) tbool
-
-let f_eHoareS_old ehs_m ehs_pr ehs_s ehs_po =
-  f_eHoareS_r { ehs_m; ehs_pr; ehs_s; ehs_po; }
 
 let f_eHoareS ehs_mt ehs_pr ehs_s ehs_po =
   assert (ehs_pr.m = ehs_po.m);
@@ -506,9 +497,9 @@ let f_map gt g fp =
         f_proj f' i ty'
 
   | FhoareF hf ->
-      let pr' = g hf.hf_pr in
-      let po' = g hf.hf_po in
-        f_hoareF_r { hf with hf_pr = pr'; hf_po = po'; }
+      let pr' = map_ss_inv1 g (hf_pr hf) in
+      let po' = map_ss_inv1 g (hf_po hf) in
+        f_hoareF pr' hf.hf_f po'
 
   | FhoareS hs ->
       let pr' = g hs.hs_pr in
@@ -574,7 +565,7 @@ let f_iter g f =
   | Ftuple   es           -> List.iter g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF  hf   -> g hf.hf_pr; g hf.hf_po
+  | FhoareF  hf   -> g (hf_pr hf).inv; g (hf_po hf).inv
   | FhoareS  hs   -> g hs.hs_pr; g hs.hs_po
   | FeHoareF  hf  -> g hf.ehf_pr; g hf.ehf_po
   | FeHoareS  hs  -> g hs.ehs_pr; g hs.ehs_po
@@ -603,7 +594,7 @@ let form_exists g f =
   | Ftuple   es           -> List.exists g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF   hf -> g hf.hf_pr   || g hf.hf_po
+  | FhoareF   hf -> g (hf_pr hf).inv   || g (hf_po hf).inv
   | FhoareS   hs -> g hs.hs_pr   || g hs.hs_po
   | FeHoareF  hf  -> g hf.ehf_pr || g hf.ehf_po
   | FeHoareS  hs  -> g hs.ehs_pr || g hs.ehs_po
@@ -631,7 +622,7 @@ let form_forall g f =
   | Ftuple   es           -> List.for_all g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF  hf  -> g hf.hf_pr  && g hf.hf_po
+  | FhoareF  hf  -> g (hf_pr hf).inv  && g (hf_po hf).inv
   | FhoareS  hs  -> g hs.hs_pr  && g hs.hs_po
   | FbdHoareF bhf -> g bhf.bhf_pr && g bhf.bhf_po
   | FbdHoareS bhs -> g bhs.bhs_pr && g bhs.bhs_po

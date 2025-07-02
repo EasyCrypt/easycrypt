@@ -3463,14 +3463,14 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let m = mhr in
+        let m = EcIdent.create "&hr" in
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
-          f_eHoareF_old pre' fpath post'
+          f_eHoareF {m;inv=pre'} fpath {m;inv=post'}
 
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         if mode <> `Form then

@@ -385,7 +385,6 @@ let t_eqobs_inS_r sim eqo tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let sim = { sim with sim_env = env } in
   let es = tc1_as_equivS tc in
-  let ml = fst (es.es_ml) and mr = fst (es.es_mr) in
   let sl, sr, sim, eqi =
     try s_eqobs_in es.es_sl es.es_sr sim Mpv2.empty_local eqo
     with EqObsInError -> tc_error !!tc "cannot apply sim ..."
@@ -438,7 +437,6 @@ let process_eqs env tc f =
 (* -------------------------------------------------------------------- *)
 let process_hint tc hyps (feqs, inv) =
   let env = LDecl.toenv hyps in
-  let ienv = LDecl.inv_memenv hyps in
   let doinv pf = TTC.tc1_process_prhl_form tc tbool pf in
   let doeq pf = process_eqs env tc (doinv pf) in
   let dof g = omap (EcTyping.trans_gamepath env) g in

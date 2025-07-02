@@ -705,30 +705,31 @@ let t_bdHoareF_conseq_conj ~add post post' tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
+  let (_, hyps, _) = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let subst1 = Fsubst.f_subst_mem mhr mleft in
-  let subst2 = Fsubst.f_subst_mem mhr mright in
-  let pre1'  = subst1 pre1 in
-  let post1' = subst1 post1 in
-  let pre2'  = subst2 pre2 in
-  let post2' = subst2 post2 in
-  if not (f_equal es.es_pr (f_ands [pre';pre1';pre2'])) then
+  let (ml, mtl), (mr, mtr) = es.es_ml, es.es_mr in
+  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 ml) mr in
+  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 ml) mr in
+  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mr) ml in
+  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mr) ml in
+  if not (ts_inv_alpha_eq hyps (es_pr es) (map_ts_inv f_ands [pre';pre1';pre2'])) then
     tc_error !!tc "invalid pre-condition";
-  if not (f_equal es.es_po (f_ands [post';post1';post2'])) then
+  if not (ts_inv_alpha_eq hyps (es_po es) (map_ts_inv f_ands [post';post1';post2'])) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS_old (mhr,snd es.es_ml) pre1 es.es_sl post1 in
-  let concl2 = f_hoareS_old (mhr,snd es.es_mr) pre2 es.es_sr post2 in
-  let concl3 = f_equivS_old es.es_ml es.es_mr pre' es.es_sl es.es_sr post' in
+  let concl1 = f_hoareS mtl pre1 es.es_sl post1 in
+  let concl2 = f_hoareS mtr pre2 es.es_sr post2 in
+  let concl3 = f_equivS mtl mtr pre' es.es_sl es.es_sr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 mleft) mright in
-  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 mleft) mright in
-  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mright) mleft in
-  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mright) mleft in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
+  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 ml) mr in
+  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 ml) mr in
+  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mr) ml in
+  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mr) ml in
   let pre'' = map_ts_inv f_ands [pre'; pre1'; pre2'] in
   let post'' = map_ts_inv f_ands [post'; post1'; post2'] in
   if not (ts_inv_alpha_eq hyps (ef_pr ef) pre'') 
@@ -737,7 +738,7 @@ let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF pre1 ef.ef_fl post1 in
   let concl2 = f_hoareF pre2 ef.ef_fr post2 in
-  let concl3 = f_equivF_old pre'.inv ef.ef_fl ef.ef_fr post'.inv in
+  let concl3 = f_equivF pre' ef.ef_fl ef.ef_fr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -1169,7 +1170,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1seq 2 (tac pre post)
       (FApi.t_seqsub
          (t_equivS_conseq_conj
-            hs2.hs_pr hs2.hs_po hs3.hs_pr hs3.hs_po es.es_pr es.es_po)
+            (hs_pr hs2) (hs_po hs2) (hs_pr hs3) (hs_po hs3) (es_pr es) (es_po es))
          [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
       tc
 

@@ -1,13 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
-open EcTypes
-open EcFol
 open EcDecl
-open EcModules
 open EcEnv
 open EcCoreGoal
-open EcMemory
 open EcMatching.Position
 open EcAst
 

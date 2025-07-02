@@ -692,7 +692,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
             let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
           List.iter2 (doit env (subst, mxs))
-            [hf1.hf_pr; hf1.hf_po] [hf2.hf_pr; hf2.hf_po]
+            [(hf_pr hf1).inv; (hf_po hf1).inv] [(hf_pr hf2).inv; (hf_po hf2).inv]
       end
 
       | FbdHoareF hf1, FbdHoareF hf2 -> begin
@@ -994,12 +994,12 @@ module FPosition = struct
               doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
 
           | FhoareF hs ->
-              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
+              doit pos (`WithCtxt (Sid.add hs.hf_m ctxt, [(hf_pr hs).inv; (hf_po hs).inv]))
 
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
-              let subctxt = Sid.add EcFol.mhr ctxt in
+              let subctxt = Sid.add hs.bhf_m ctxt in
               doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
                                        (subctxt, hs.bhf_po);
                                        (   ctxt, hs.bhf_bd)]))
@@ -1142,7 +1142,7 @@ module FPosition = struct
               f_pr pr.pr_mem pr.pr_fun args' event'
 
           | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
+              let (hf_pr, hf_po) = as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv]) in
               let m = hf.hf_m in
               f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po}
 
@@ -1150,7 +1150,8 @@ module FPosition = struct
               let (ehf_pr, ehf_po) =
                 as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
               in
-              f_eHoareF_old ehf_pr hf.ehf_f ehf_po
+              let m = hf.ehf_m in
+              f_eHoareF {m;inv=ehf_pr} hf.ehf_f {m;inv=ehf_po}
 
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in

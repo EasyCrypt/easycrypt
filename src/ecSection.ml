@@ -219,13 +219,13 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcAst.Fpr       pr           -> on_pr  cb pr
 
   and on_hf cb hf =
-    on_form cb hf.EcAst.hf_pr;
-    on_form cb hf.EcAst.hf_po;
+    on_form cb (hf_pr hf).inv;
+    on_form cb (hf_po hf).inv;
     on_xp cb hf.EcAst.hf_f
 
   and on_hs cb hs =
-    on_form cb hs.EcAst.hs_pr;
-    on_form cb hs.EcAst.hs_po;
+    on_form cb (hs_pr hs).inv;
+    on_form cb (hs_po hs).inv;
     on_stmt cb hs.EcAst.hs_s;
     on_memenv cb hs.EcAst.hs_m
 

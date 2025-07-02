@@ -1,8 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
-open EcTypes
-open EcFol
 open EcCoreGoal.FApi
 open EcMatching.Position
 open EcAst

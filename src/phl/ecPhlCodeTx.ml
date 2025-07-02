@@ -72,8 +72,8 @@ let t_kill_r side cpos olen tc =
             "code writes variables (%a) used by the post-condition"
             pp_of_name x
     end;
-
-    let kslconcl = EcFol.f_bdHoareS_old me f_true (stmt ks) f_true FHeq f_r1 in
+    let (m, mt) = me in
+    let kslconcl = EcFol.f_bdHoareS mt {m;inv=f_true} (stmt ks) {m;inv=f_true} FHeq {m;inv=f_r1} in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
@@ -396,27 +396,27 @@ let process_weakmem (side, id, params) tc =
   let h =
     match f.f_node with
     | FhoareS hs ->
-      let me = bind hs.hs_m in
-      f_hoareS_old me hs.hs_pr hs.hs_s hs.hs_po
+      let _, mt = bind hs.hs_m in
+      f_hoareS mt (hs_pr hs) hs.hs_s (hs_po hs)
 
     | FeHoareS hs ->
-      let me = bind hs.ehs_m in
-      f_eHoareS_old me hs.ehs_pr hs.ehs_s hs.ehs_po
+      let _, mt = bind hs.ehs_m in
+      f_eHoareS mt (ehs_pr hs) hs.ehs_s (ehs_po hs)
 
     | FbdHoareS hs ->
-      let me = bind hs.bhs_m in
-      f_bdHoareS_old me hs.bhs_pr hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
+      let _, mt = bind hs.bhs_m in
+      f_bdHoareS mt (bhs_pr hs) hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
 
     | FequivS es ->
       let do_side side (ml, mr) =
         let es_ml, es_mr = if side = `Left then bind ml, mr else ml, bind mr in
         (es_ml, es_mr)
       in
-      let (ml, mr) =
+      let ((_, mtl), (_, mtr)) =
         match side with
         | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
         | Some side -> do_side side (es.es_ml, es.es_mr) in
-      f_equivS_old ml mr es.es_pr es.es_sl es.es_sr es.es_po
+      f_equivS mtl mtr (es_pr es) es.es_sl es.es_sr (es_po es)
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc
