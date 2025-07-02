@@ -684,7 +684,13 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | FhoareF hf1, FhoareF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
             failure ();
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          let subst =
+            if id_equal hf1.hf_m hf2.hf_m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
+            assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
+            let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
           List.iter2 (doit env (subst, mxs))
             [hf1.hf_pr; hf1.hf_po] [hf2.hf_pr; hf2.hf_po]
       end
@@ -1137,22 +1143,26 @@ module FPosition = struct
 
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
-              f_hoareF_r { hf with hf_pr; hf_po; }
+              let m = hf.hf_m in
+              f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po}
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =
                 as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
               in
-              f_eHoareF_r { hf with ehf_pr; ehf_po; }
+              f_eHoareF_old ehf_pr hf.ehf_f ehf_po
 
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
-              f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_bd; }
+              let m = hf.bhf_m in
+              f_bdHoareF {m;inv=bhf_pr} hf.bhf_f {m;inv=bhf_po} hf.bhf_cmp {m;inv=bhf_bd}
 
           | FequivF ef ->
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
-              f_equivF_r { ef with ef_pr; ef_po; }
+              let ml = ef.ef_ml in
+              let mr = ef.ef_mr in
+              f_equivF {ml;mr;inv=ef_pr} ef.ef_fl ef.ef_fr {ml;mr;inv=ef_po}
 
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition

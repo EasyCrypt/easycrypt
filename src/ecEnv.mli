@@ -97,11 +97,11 @@ module Fun : sig
 
   val prF : xpath -> env -> env
 
-  val hoareF_memenv : xpath -> env -> memenv * memenv
+  val hoareF_memenv : memory -> xpath -> env -> memenv * memenv
 
-  val hoareF : xpath -> env -> env * env
+  val hoareF : memory -> xpath -> env -> env * env
 
-  val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
+  val hoareS : memory -> xpath -> env -> memenv * (funsig * function_def) * env
 
   val actmem_body :  memory -> function_ -> (funsig * function_def) * memenv
   val actmem_post :  memory -> function_ -> memenv
@@ -110,10 +110,10 @@ module Fun : sig
 
   val inv_memenv : env -> env
 
-  val equivF_memenv : xpath -> xpath -> env ->
+  val equivF_memenv : memory -> memory -> xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
 
-  val equivF : xpath -> xpath -> env -> env * env
+  val equivF : memory -> memory -> xpath -> xpath -> env -> env * env
 
   val equivS : xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
@@ -246,7 +246,7 @@ module NormMp : sig
 
   val flatten_use : use -> EcIdent.t list * (xpath * ty) list
 
-  val norm_glob     : env -> EcMemory.memory -> mpath -> form
+  val norm_glob     : env -> EcMemory.memory -> mpath -> ss_inv
   val norm_tglob    : env -> mpath -> EcTypes.ty
 
   val is_abstract_fun : xpath -> env -> bool
@@ -505,11 +505,11 @@ module LDecl : sig
   val push_all    : memenv list -> hyps -> hyps
   val push_active : memenv -> hyps -> hyps
 
-  val hoareF : xpath -> hyps -> hyps * hyps
-  val equivF : xpath -> xpath -> hyps -> hyps * hyps
+  val hoareF : memory -> xpath -> hyps -> hyps * hyps
+  val equivF : memory -> memory -> xpath -> xpath -> hyps -> hyps * hyps
 
   val inv_memenv  : hyps -> hyps
   val inv_memenv1 : hyps -> hyps
 end
 
-val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
+val pp_debug_form : (env -> form -> unit) ref

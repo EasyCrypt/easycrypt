@@ -99,6 +99,8 @@ val snd_map : ('b -> 'c) -> 'a * 'b -> 'a * 'c
 
 val swap: 'a * 'b -> 'b * 'a
 
+val flip: ('a -> 'b -> 'c) -> 'b -> 'a -> 'c
+
 (* -------------------------------------------------------------------- *)
 type 'a eq  = 'a -> 'a -> bool
 type 'a cmp = 'a -> 'a -> int

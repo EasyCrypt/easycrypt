@@ -73,7 +73,7 @@ let t_kill_r side cpos olen tc =
             pp_of_name x
     end;
 
-    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+    let kslconcl = EcFol.f_bdHoareS_old me f_true (stmt ks) f_true FHeq f_r1 in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
@@ -155,23 +155,24 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
 
     try
       let ptev = EcProofTerm.ptenv pe hyps (ue, mev) in
-      let e = form_of_expr (fst me) e in
-      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e in
+      let e = ss_inv_of_expr (fst me) e in
+      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e.inv in
+      let subf = {m=e.m; inv= subf} in
 
       assert (EcProofTerm.can_concretize ptev);
 
       let cpos =
         EcMatching.FPosition.select_form
           ~xconv:`AlphaEq ~keyed:occmode.k_keyed
-          hyps None subf e in
+          hyps None subf.inv e.inv in
 
-      let v = { ov_name = Some id; ov_type = subf.f_ty } in
+      let v = { ov_name = Some id; ov_type = subf.inv.f_ty } in
       let (me, id) = EcMemory.bind_fresh v me in
       let pv = pv_loc (oget id.ov_name) in
-      let e = EcMatching.FPosition.map cpos (fun _ -> f_pvar pv (subf.f_ty) (fst me)) e in
+      let e = map_ss_inv2 (fun pv -> EcMatching.FPosition.map cpos (fun _ -> pv)) (f_pvar pv (subf.inv.f_ty) (fst me)) e  in
 
-      let i1 = i_asgn (LvVar (pv, subf.f_ty), expr_of_form (fst me) subf) in
-      let i2 = mk (expr_of_form (fst me) e) in
+      let i1 = i_asgn (LvVar (pv, subf.inv.f_ty), expr_of_ss_inv subf) in
+      let i2 = mk (expr_of_ss_inv e) in
 
       (me, { z with z_tail = i1 :: i2 :: is }, [])
 
@@ -189,9 +190,9 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
 
   let simplify : expr -> expr =
     if simplify then (fun e ->
-      let e = form_of_expr (fst me) e in
-      let e = EcReduction.simplify EcReduction.nodelta hyps e in
-      let e = expr_of_form (fst me) e in
+      let e = ss_inv_of_expr (fst me) e in
+      let e = map_ss_inv1 (EcReduction.simplify EcReduction.nodelta hyps) e in
+      let e = expr_of_ss_inv e in
       e
     ) else identity in
 
@@ -396,26 +397,26 @@ let process_weakmem (side, id, params) tc =
     match f.f_node with
     | FhoareS hs ->
       let me = bind hs.hs_m in
-      f_hoareS_r { hs with hs_m = me }
+      f_hoareS_old me hs.hs_pr hs.hs_s hs.hs_po
 
     | FeHoareS hs ->
       let me = bind hs.ehs_m in
-      f_eHoareS_r { hs with ehs_m = me }
+      f_eHoareS_old me hs.ehs_pr hs.ehs_s hs.ehs_po
 
     | FbdHoareS hs ->
       let me = bind hs.bhs_m in
-      f_bdHoareS_r { hs with bhs_m = me }
+      f_bdHoareS_old me hs.bhs_pr hs.bhs_s hs.bhs_po hs.bhs_cmp hs.bhs_bd
 
     | FequivS es ->
-      let do_side side es =
-        let es_ml, es_mr = if side = `Left then bind es.es_ml, es.es_mr else es.es_ml, bind es.es_mr in
-        {es with es_ml; es_mr}
+      let do_side side (ml, mr) =
+        let es_ml, es_mr = if side = `Left then bind ml, mr else ml, bind mr in
+        (es_ml, es_mr)
       in
-      let es =
+      let (ml, mr) =
         match side with
-        | None -> do_side `Left (do_side `Right es)
-        | Some side -> do_side side es in
-      f_equivS_r es
+        | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
+        | Some side -> do_side side (es.es_ml, es.es_mr) in
+      f_equivS_old ml mr es.es_pr es.es_sl es.es_sr es.es_po
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc

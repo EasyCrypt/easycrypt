@@ -116,7 +116,7 @@ let bind_mod (s : f_subst) (x : ident) (mp : mpath) (ex : mod_extra) : f_subst =
 let f_bind_absmod (s : f_subst) (m1 : ident) (m2 : ident) : f_subst =
   bind_mod
     s m1 (EcPath.mident m2)
-    { mex_tglob = tglob m2; mex_glob = (fun m -> f_glob m2 m); }
+    { mex_tglob = tglob m2; mex_glob = (fun m -> (f_glob m2 m).inv); }
 
 (* -------------------------------------------------------------------- *)
 let f_bind_mod (s : f_subst) (x : ident) (mp : mpath) (norm_mod : memory -> form) : f_subst =
@@ -441,67 +441,69 @@ module Fsubst = struct
       let pv' = pv_subst s pv in
       let m'  = m_subst s m in
       let ty' = ty_subst s fp.f_ty in
-      f_pvar pv' ty' m'
+      (f_pvar pv' ty' m').inv
 
     | Fglob (mid, m) ->
       let m'  = m_subst s m in
       begin match Mid.find_opt mid s.fs_mod with
-      | None -> f_glob mid m'
+      | None -> (f_glob mid m').inv
       | Some _ -> (Mid.find mid s.fs_modex).mex_glob m'
       end
 
     | FhoareF hf ->
-      let hf_f  = x_subst s hf.hf_f in
-      let s     = f_rem_mem s mhr in
-      let hf_pr = f_subst ~tx s hf.hf_pr in
-      let hf_po = f_subst ~tx s hf.hf_po in
-      f_hoareF hf_pr hf_f hf_po
+      let hf_f   = x_subst s hf.hf_f in
+      let (s, m) = add_m_binding s hf.hf_m in
+      let hf_pr  = f_subst ~tx s hf.hf_pr [@alert "-priv_pl"] in
+      let hf_po  = f_subst ~tx s hf.hf_po [@alert "-priv_pl"] in
+      f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
       let s, hs_m = add_me_binding s hs.hs_m in
+      let m = fst hs_m in
       let hs_pr   = f_subst ~tx s hs.hs_pr in
       let hs_po   = f_subst ~tx s hs.hs_po in
-      f_hoareS hs_m hs_pr hs_s hs_po
+      f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
 
     | FeHoareF hf ->
       let hf_f  = x_subst s hf.ehf_f in
-      let s     = f_rem_mem s mhr in
+      let (s, m) = add_m_binding s hf.ehf_m in
       let hf_pr = f_subst ~tx s hf.ehf_pr in
       let hf_po = f_subst ~tx s hf.ehf_po in
-      f_eHoareF hf_pr hf_f hf_po
+      f_eHoareF_old hf_pr hf_f hf_po
 
     | FeHoareS hs ->
       let hs_s    = s_subst s hs.ehs_s in
       let s, hs_m = add_me_binding s hs.ehs_m in
       let hs_pr   = f_subst ~tx s hs.ehs_pr in
       let hs_po   = f_subst ~tx s hs.ehs_po in
-      f_eHoareS hs_m hs_pr hs_s hs_po
+      f_eHoareS_old hs_m hs_pr hs_s hs_po
 
     | FbdHoareF hf ->
       let hf_f  = x_subst s hf.bhf_f in
-      let s     = f_rem_mem s mhr in
+      let (s, m) = add_m_binding s hf.bhf_m in
       let hf_pr = f_subst ~tx s hf.bhf_pr in
       let hf_po = f_subst ~tx s hf.bhf_po in
       let hf_bd = f_subst ~tx s hf.bhf_bd in
-      f_bdHoareF hf_pr hf_f hf_po hf.bhf_cmp hf_bd
+      f_bdHoareF {m;inv=hf_pr} hf_f {m;inv=hf_po} hf.bhf_cmp {m;inv=hf_bd}
 
     | FbdHoareS hs ->
       let hs_s = s_subst s hs.bhs_s in
       let s, hs_m = add_me_binding s hs.bhs_m in
+      let m = fst hs_m in
       let hs_pr = f_subst ~tx s hs.bhs_pr in
       let hs_po = f_subst ~tx s hs.bhs_po in
       let hs_bd = f_subst ~tx s hs.bhs_bd in
-      f_bdHoareS hs_m hs_pr hs_s hs_po hs.bhs_cmp hs_bd
+      f_bdHoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po} hs.bhs_cmp {m;inv=hs_bd}
 
     | FequivF ef ->
       let ef_fl = x_subst s ef.ef_fl in
       let ef_fr = x_subst s ef.ef_fr in
-      let s = f_rem_mem s mleft in
-      let s = f_rem_mem s mright in
+      let (s, ml) = add_m_binding s ef.ef_ml in
+      let (s, mr) = add_m_binding s ef.ef_mr in
       let ef_pr = f_subst ~tx s ef.ef_pr in
       let ef_po = f_subst ~tx s ef.ef_po in
-      f_equivF ef_pr ef_fl ef_fr ef_po
+      f_equivF {ml;mr;inv=ef_pr} ef_fl ef_fr {ml;mr;inv=ef_po}
 
     | FequivS es ->
       let es_sl = s_subst s es.es_sl in
@@ -510,18 +512,18 @@ module Fsubst = struct
       let s, es_mr = add_me_binding s es.es_mr in
       let es_pr = f_subst ~tx s es.es_pr in
       let es_po = f_subst ~tx s es.es_po in
-      f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+      f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po
 
     | FeagerF eg ->
       let eg_fl = x_subst s eg.eg_fl in
       let eg_fr = x_subst s eg.eg_fr in
       let eg_sl = s_subst s eg.eg_sl in
       let eg_sr = s_subst s eg.eg_sr in
-      let s = f_rem_mem s mleft in
-      let s = f_rem_mem s mright in
+      let (s, ml) = add_m_binding s eg.eg_ml in
+      let (s, mr) = add_m_binding s eg.eg_mr in
       let eg_pr = f_subst ~tx s eg.eg_pr in
       let eg_po = f_subst ~tx s eg.eg_po in
-      f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+      f_eagerF {ml;mr;inv=eg_pr} eg_sl eg_fl eg_fr eg_sr {ml;mr;inv=eg_po}
 
     | Fpr pr ->
       let pr_mem   = m_subst s pr.pr_mem in
@@ -615,6 +617,16 @@ module Fsubst = struct
     s, params
 
   (* ------------------------------------------------------------------ *)
+  and add_m_binding (s : f_subst) (m : memory) : f_subst * memory =
+    let m'  = refresh s m in
+    if m == m' then
+      let s = f_rem_mem s m in
+      (s, m)
+    else
+      let s = f_bind_mem s m m' in
+      (s, m')
+  (* ------------------------------------------------------------------ *)
+
   and add_me_binding (s : f_subst) ((x, mt) as me : memenv) : f_subst * memenv =
     let mt' = EcMemory.mt_subst (ty_subst s) mt in
     let x'  = refresh s x in

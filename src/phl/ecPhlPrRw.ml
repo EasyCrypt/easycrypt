@@ -72,10 +72,10 @@ let pr_sum env pr =
 
   let prx =
     let event =
-      f_and_simpl pr.pr_event (f_eq (f_pvar EcTypes.pv_res xty EcFol.mhr) fx)
-    in
-    f_pr pr.pr_mem pr.pr_fun pr.pr_args event
-  in
+      f_and_simpl
+        pr.pr_event
+        (f_eq (f_pvar EcTypes.pv_res xty EcFol.mhr).inv fx)
+    in f_pr pr.pr_mem pr.pr_fun pr.pr_args event in
 
   let prx =
     EcFol.f_app

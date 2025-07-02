@@ -1700,36 +1700,36 @@ module Fun = struct
     let post = prF_memenv EcCoreFol.mhr path env in
     Memory.push_active post env
 
-  let hoareF_memenv path env =
+  let hoareF_memenv mem path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in
-    let pre  = actmem_pre EcCoreFol.mhr fun_ in
-    let post = actmem_post EcCoreFol.mhr fun_ in
+    let pre  = actmem_pre mem fun_ in
+    let post = actmem_post mem fun_ in
     pre, post
 
-  let hoareF path env =
-    let pre, post = hoareF_memenv path env in
+  let hoareF mem path env =
+    let pre, post = hoareF_memenv mem path env in
     Memory.push_active pre env, Memory.push_active post env
 
-  let hoareS path env =
+  let hoareS mem path env =
     let fun_ = by_xpath path env in
-    let fd, memenv = actmem_body EcCoreFol.mhr fun_ in
+    let fd, memenv = actmem_body mem fun_ in
     memenv, fd, Memory.push_active memenv env
 
-  let equivF_memenv path1 path2 env =
+  let equivF_memenv ml mr path1 path2 env =
     let (ip1, _) = oget (ipath_of_xpath path1) in
     let (ip2, _) = oget (ipath_of_xpath path2) in
 
     let fun1 = snd (oget (by_ipath ip1 env)) in
     let fun2 = snd (oget (by_ipath ip2 env)) in
-    let pre1 = actmem_pre EcCoreFol.mleft fun1 in
-    let pre2 = actmem_pre EcCoreFol.mright fun2 in
-    let post1 = actmem_post EcCoreFol.mleft fun1 in
-    let post2 = actmem_post EcCoreFol.mright fun2 in
+    let pre1 = actmem_pre ml fun1 in
+    let pre2 = actmem_pre mr fun2 in
+    let post1 = actmem_post ml fun1 in
+    let post2 = actmem_post mr fun2 in
     (pre1,pre2), (post1,post2)
 
-  let equivF path1 path2 env =
-    let (pre1,pre2),(post1,post2) = equivF_memenv path1 path2 env in
+  let equivF ml mr path1 path2 env =
+    let (pre1,pre2),(post1,post2) = equivF_memenv ml mr path1 path2 env in
     Memory.push_all [pre1; pre2] env,
     Memory.push_all [post1; post2] env
 
@@ -2448,13 +2448,13 @@ module NormMp = struct
     let globs = List.map (fun id -> f_glob id m) globs in
     let pv = List.map (fun (xp, ty) -> f_pvar (pv_glob xp) ty m) pv in
 
-    f_tuple (globs @ pv)
+    map_ss_inv f_tuple (globs @ pv)
 
   let norm_glob env m mp = globals env m mp
 
   let norm_tglob env mp =
-    let g = (norm_glob env mhr mp) in
-    g.f_ty
+    let g = (norm_glob env (EcIdent.create "&dummy_shouldnotleak") mp) in
+    g.inv.f_ty
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -3594,12 +3594,12 @@ module LDecl = struct
   let push_all l lenv =
     { lenv with le_env = Memory.push_all l lenv.le_env }
 
-  let hoareF xp lenv =
-     let env1, env2 = Fun.hoareF xp lenv.le_env in
+  let hoareF mem xp lenv =
+     let env1, env2 = Fun.hoareF mem xp lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
-  let equivF xp1 xp2 lenv =
-    let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
+  let equivF ml mr xp1 xp2 lenv =
+    let env1, env2 = Fun.equivF ml mr xp1 xp2 lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
   let inv_memenv lenv =
@@ -3610,4 +3610,4 @@ module LDecl = struct
 end
 
 
-let pp_debug_form = ref (fun _env _fmt _f -> assert false)
+let pp_debug_form = ref (fun _env _f -> assert false)
