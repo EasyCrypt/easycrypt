@@ -975,7 +975,7 @@ let rec ss_inv_of_expr m (e : expr) =
      map_ss_inv f_tuple (List.map (ss_inv_of_expr m) es)
 
   | Eproj (e1, i) ->
-     let f_proj' f = f_proj f i e1.e_ty in
+     let f_proj' f = f_proj f i e.e_ty in
      map_ss_inv1 f_proj' (ss_inv_of_expr m e1)
 
   | Eif (e1, e2, e3) ->
@@ -1019,7 +1019,7 @@ let rec form_of_expr e =
         f_tuple (List.map form_of_expr es)
    
      | Eproj (e1, i) ->
-        f_proj (form_of_expr e1) i e1.e_ty
+        f_proj (form_of_expr e1) i e.e_ty
    
      | Eif (e1, e2, e3) ->
         let e1 = form_of_expr e1 in
