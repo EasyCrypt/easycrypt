@@ -24,13 +24,14 @@ type checkmode = {
   cm_iterate  : bool;
 }
 
-val initial : checkmode:checkmode -> boot:bool -> EcScope.scope
+val initial : checkmode:checkmode -> boot:bool -> checkproof:bool -> EcScope.scope
 
 val initialize  :
      restart:bool
   -> undo:bool
   -> boot:bool
   -> checkmode:checkmode
+  -> checkproof:bool
   -> unit
 
 val current     : unit -> EcScope.scope
@@ -44,7 +45,7 @@ val process_internal :
   -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
-val process : ?timed:bool -> ?break:bool ->
+val process : ?src:string -> ?timed:bool -> ?break:bool ->
   EcParsetree.global_action located -> float option
 
 val undo  : int  -> unit
@@ -53,6 +54,8 @@ val uuid  : unit -> int
 val mode  : unit -> string
 
 val check_eco : string -> bool
+
+val doc_comment : [`Global | `Item] * string -> unit
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : ?all:bool -> Format.formatter -> unit
