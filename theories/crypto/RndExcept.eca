@@ -141,8 +141,6 @@ abstract theory Adversary.
   proof.
     proc.
     call (_: SampleB.bad, ={SampleB.bad}, ={SampleB.bad}); 1: apply A_ll.
-    admit.
-    move => &m2. hsample.
     + proc=> /=; sp 1 1; if => //;inline *.
       seq 3 3 : (={r0,i0,X0,SampleB.bad} /\ (test i0 X0){1} /\ !SampleB.bad{2}); 1: by auto.
       wp;if{1}; 2 : by  auto => /#.
