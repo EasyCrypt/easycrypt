@@ -5,6 +5,7 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcCoreGoal
+open EcAst
 
 module Msym = EcSymbols.Msym
 
@@ -108,7 +109,9 @@ let tc1_process_prhl_form_opt tc oty pf =
 
   let hyps = LDecl.push_all [ml; mr] hyps in
   let mv = Msym.of_list [("pre", pr); ("post", po)] in
-  pf_process_form_opt ~mv !!tc hyps oty pf
+  let f = pf_process_form_opt ~mv !!tc hyps oty pf in
+  let ml, mr = fst ml, fst mr in
+  {ml;mr;inv=f}
 
 let tc1_process_prhl_form tc ty pf = tc1_process_prhl_form_opt tc (Some ty) pf
 
@@ -163,7 +166,7 @@ let tc1_process_Xhl_form ?side tc ty pf =
       mv
   in
 
-  (m, pf_process_form ?mv !!tc hyps ty pf)
+  (snd m, {m=fst m;inv=pf_process_form ?mv !!tc hyps ty pf})
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =

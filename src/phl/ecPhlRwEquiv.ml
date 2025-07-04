@@ -4,6 +4,7 @@ open EcParsetree
 open EcFol
 open EcModules
 open EcPath
+open EcAst
 
 open EcCoreGoal
 open EcCoreGoal.FApi
@@ -85,7 +86,7 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
        | `Right, `LtoR -> EcPhlSym.t_equiv_sym
        | `Right, `RtoL  -> t_id);
-      EcPhlCall.t_call None (f_equivF_r equiv);
+      EcPhlCall.t_call None (f_equivF (ef_pr equiv) equiv.ef_fl equiv.ef_fr (ef_po equiv));
       t_try (t_apply equiv_pt); (* FIXME: Can do better here, we know this applies to just the first sub goal of call *)
       t_try (t_seqs [
         EcPhlInline.process_inline (`ByName (None, None, ([], None)));
