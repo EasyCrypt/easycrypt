@@ -89,7 +89,7 @@ let pr_sum env pr =
 
 let pr_mu1_le_eq_mu1 m f args resv k fresh_id d =
   let kfresh = f_local fresh_id k.f_ty in
-  let f_ll = f_bdHoareF f_true f f_true FHeq f_r1
+  let f_ll = f_bdHoareF {m;inv=f_true} f {m;inv=f_true} FHeq {m;inv=f_r1}
   and f_le_mu1 = f_forall [ (fresh_id, gtty k.f_ty) ]
     (f_real_le (f_pr m f args (f_eq resv kfresh)) (f_mu_x d kfresh))
   and concl =
