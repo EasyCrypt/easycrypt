@@ -1010,8 +1010,7 @@ let rec form_of_expr e =
         f_op op tys e.e_ty
 
      | Eapp (ef, es) ->
-        let f_app' f = f_app (List.hd f) (List.tl f) e.e_ty in
-        f_app' ((form_of_expr ef)::(List.map form_of_expr es))
+        f_app (form_of_expr ef) (List.map form_of_expr es) e.e_ty
    
      | Elet (lpt, e1, e2) ->
         f_let lpt (form_of_expr e1) (form_of_expr e2)

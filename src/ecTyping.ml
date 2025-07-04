@@ -1593,13 +1593,14 @@ let form_of_opselect
              ((args @ List.map (curry f_local) xs, []), xs) in
 
          let flam  = List.map (snd_map gtty) flam in
-         let me    = odfl mhr (EcEnv.Memory.get_active env) in
-         let body  = ss_inv_of_expr me body in
+         let body = match (EcEnv.Memory.get_active env) with
+        | None -> form_of_expr body
+        | Some me -> (ss_inv_of_expr me body).inv in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
          let subst = Fsubst.f_subst_init ~freshen:true () in
          let subst =
            List.fold_left (fun s -> curry (Fsubst.f_bind_local s)) subst lcmap
-         in (f_lambda flam (Fsubst.f_subst subst body.inv), args)
+         in (f_lambda flam (Fsubst.f_subst subst body), args)
 
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
       | `Op (p, tys) -> f_op p tys ty
@@ -1609,7 +1610,8 @@ let form_of_opselect
 
     in (op, args)
 
-  in f_app op args codom
+  in 
+  f_app op args codom
 
 (* -------------------------------------------------------------------- *)
 
