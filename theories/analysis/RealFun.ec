@@ -35,7 +35,7 @@ proof. smt (). qed.
 
 lemma convexD f1 f2 a b:
   convex f1 a b => convex f2 a b => convex (fun x => f1 x + f2 x) a b.
-proof. smt (). qed.
+proof. by move=> + + x x_in01; smt(). qed.
 
 lemma convexZ c f a b: 0%r <= c =>
   convex f a b => convex (fun x => c * f x) a b.
