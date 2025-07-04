@@ -1365,10 +1365,10 @@ module Op = struct
     let scope =
       let prax =
         let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
-        let resx  = EcIdent.create "v" in
-        let prmem = EcIdent.create "&m" in
-        let resv  = f_local resx sig_.fs_ret in
         let res   = f_pvar pv_res sig_.fs_ret mhr in
+        let resx  = EcIdent.create "v" in
+        let resv  = f_local resx sig_.fs_ret in
+        let prmem = EcIdent.create "&m" in
 
         let mu =
           let sem =
