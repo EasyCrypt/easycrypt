@@ -1,9 +1,10 @@
 require import AllCore.
 
-op dint : int distr.
+type t = int.
+op dint : t distr.
 
 module M = {
-  var x : int
+  var x : t
 
   proc f1() : unit = {
     M.x <- 0;
