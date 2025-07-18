@@ -137,7 +137,8 @@ case (exists a, a \in m /\ nseq (oget m.[a]) a = nseq v k) =>
     subst e; rewrite get_set_sameE k_in /= lez_maxl // lez_maxl //.
   rewrite lP.
   split => [[a [/mem_set [a_in|->] ->]]|[a [a_in ->]]].
-  + by exists a; rewrite a_in /= get_set_neqE 1:/#. 
+  + exists a; rewrite a_in /= get_set_neqE //.
+    by rewrite -negP=> ->>; move: a_in; rewrite domE k_in.
   + by exists x; rewrite x_in /= get_set_sameE eq_nseq.
   have a_neq: a <> k.
   + rewrite -negP => a_eq; subst a.
@@ -309,7 +310,10 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma eqEsubset (s1 s2 : 'a mset) : 
   (s1 = s2) <=> (s1 \subset s2) /\ (s2 \subset s1).
-proof. smt(mset_eqP). qed.
+proof.
+split=> // - [] s1_sub_s2 s2_sub_s1.
+by apply: mset_eqP=> /#.
+qed.
 
 lemma subset_msetU_id (A B : 'a mset) :
   A \subset B => A `|` B = B.
