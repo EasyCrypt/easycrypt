@@ -990,7 +990,7 @@ and trans_fix (genv, lenv) (wdom, o) =
       | OPB_Leaf (locals, e) ->
           let ctors = List.rev ctors in
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
-          let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
+          let fe = EcCoreFol.form_of_expr e in
 
           let we = trans_app (genv, lenv) fe eargs in
 
@@ -1452,7 +1452,7 @@ module Frequency = struct
           r_union rs (f_ops unwanted_op f)
         | {op_kind = OB_oper (Some (OP_Fix e)) } ->
           let rec aux rs = function
-            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr e))
             | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
           in
           aux rs e.opf_branches

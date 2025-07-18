@@ -15,11 +15,41 @@ open EcCoreGoal
 open EcBaseLogic
 open EcProofTerm
 
+
 module EP  = EcParsetree
 module ER  = EcReduction
 module TTC = EcProofTyping
 module LG  = EcCoreLib.CI_Logic
 module PT  = EcProofTerm
+
+(* -------------------------------------------------------------------- *)
+
+let pp_tc tc =
+  let pr = proofenv_of_proof (proof_of_tcenv tc) in
+  let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
+  let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
+
+  match cl with [] -> () | hd :: tl ->
+
+  Format.eprintf "%a@."
+    (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc)) {prpo_pr = true; prpo_po = true})
+    (hd, `All tl)
+
+type cstate = {
+  cs_undosubst : Sid.t;
+  cs_sbeq : Sid.t;
+}
+
+let pp_tc1 tc =
+   pp_tc (FApi.tcenv_of_tcenv1 tc)
+
+let t_debug ?(tag="") t tc =
+   Format.eprintf "Before (tag: %s):" tag;
+   pp_tc (FApi.tcenv_of_tcenv1 tc);
+   let r = t tc in
+   Format.eprintf "After (tag: %s):" tag;
+   pp_tc r;
+   r
 
 (* -------------------------------------------------------------------- *)
 let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
@@ -811,6 +841,7 @@ module Apply = struct
     try  t_apply_bwd ?ri ?mode ?canview pt tc
     with (NoInstance (_, r, pt, f)) ->
       tc_error_exn !!tc (NoInstance (dpe, r, pt, f))
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -947,7 +978,7 @@ let alpha_find_in_hyps hyps f =
    LowAssumption.gen_find_in_hyps (EcReduction.is_alpha_eq hyps f) hyps
 
 let t_assumption mode (tc : tcenv1) =
-  let convs =
+  let (convs: (LDecl.hyps -> _) list) =
     match mode with
     | `Alpha -> [EcReduction.is_alpha_eq]
     | `Conv  -> [EcReduction.is_alpha_eq; EcReduction.is_conv]
@@ -2272,24 +2303,6 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
 
   in entry tc
 
-(* -------------------------------------------------------------------- *)
-
-let pp_tc tc =
-  let pr = proofenv_of_proof (proof_of_tcenv tc) in
-  let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
-  let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
-
-  match cl with [] -> () | hd :: tl ->
-
-  Format.eprintf "%a@."
-    (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc)) {prpo_pr = true; prpo_po = true})
-    (hd, `All tl)
-
-type cstate = {
-  cs_undosubst : Sid.t;
-  cs_sbeq : Sid.t;
-}
-
 let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
   let dtsolve =
@@ -2298,11 +2311,6 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
   let tsolve = odfl (FApi.t_ors dtsolve) tsolve in
 
   let tt = FApi.t_try (t_assumption `Alpha) in
-
-(*  let t_print s t tc =
-    Format.eprintf "%s@." s;
-    pp_tc (FApi.tcenv_of_tcenv1 tc);
-    t tc in *)
 
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry (st : cstate) = t_simplify ~delta:`No @! aux0 st

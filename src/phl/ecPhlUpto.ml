@@ -16,8 +16,8 @@ open EcCoreLib.CI_Real
 
 (* -------------------------------------------------------------------- *)
 (* Core tactic *)
-let e_true  = expr_of_form mhr f_true
-let e_false = expr_of_form mhr f_false
+let e_true  = expr_of_form f_true
+let e_false = expr_of_form f_false
 
 let is_lv_bad env bad x =
   match bad with
@@ -304,10 +304,11 @@ let destr_sub_maxr f1 f2 =
   let fe1, fe2 = DestrReal.sub f1 in
   let fe1b', fe2b' = destr_maxr f2 in
   let pre1, pre2, prb1_ = t3_map destr_pr (fe1, fe2, fe1b') in
+  let mpr = prb1_.pr_mem in
   let bad =
     let b = try snd (destr_and prb1_.pr_event) with DestrError _ -> prb1_.pr_event in
     destr_bad b in
-  let fbad = f_pvar bad tbool mhr in
+  let fbad = (f_pvar bad tbool mpr).inv in
   let e = pre1.pr_event in
   let fnbad = f_not fbad in
   let fenb = f_and e fnbad in
@@ -352,6 +353,7 @@ let process_uptobad tc =
   | SFop((o,_), [f1; f]) when EcPath.p_equal o p_real_le ->
     begin match sform_of_form f1 with
     | SFpr pr1 ->
+      let mpr = pr1.pr_mem in
       (* Pr[G1 : E] <= Pr[G2 : E [/\ !bad]] + Pr[G1: [E /\] bad] *)
       let f2, fb = DestrReal.add f in
         let pr2, e, bad =
@@ -365,7 +367,7 @@ let process_uptobad tc =
           pr2, e, bad
         with DestrError _ -> error_add tc in
 
-      let fbad = f_pvar bad tbool mhr in
+      let fbad = (f_pvar bad tbool mpr).inv in
       let fnbad = f_not fbad in
       let pr1b, pr1nb, pr2nb =
         f_pr_r {pr1 with pr_event = f_and e fbad},

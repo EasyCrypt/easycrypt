@@ -207,6 +207,8 @@ and f_node =
   | Fpr of pr (* hr *)
 
 and eagerF = {
+  eg_ml : memory;
+  eg_mr : memory;
   eg_pr : form;
   eg_sl : stmt;  (* No local program variables *)
   eg_fl : EcPath.xpath;
@@ -216,6 +218,8 @@ and eagerF = {
 }
 
 and equivF = {
+  ef_ml : memory;
+  ef_mr : memory;
   ef_pr : form;
   ef_fl : EcPath.xpath;
   ef_fr : EcPath.xpath;
@@ -231,6 +235,7 @@ and equivS = {
   es_po  : form; }
 
 and sHoareF = {
+  hf_m  : memory;
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;
@@ -244,6 +249,7 @@ and sHoareS = {
 
 
 and eHoareF = {
+  ehf_m   : memory;
   ehf_pr  : form;
   ehf_f   : EcPath.xpath;
   ehf_po  : form;
@@ -257,6 +263,7 @@ and eHoareS = {
 }
 
 and bdHoareF = {
+  bhf_m   : memory;
   bhf_pr  : form;
   bhf_f   : EcPath.xpath;
   bhf_po  : form;
@@ -279,6 +286,309 @@ and pr = {
   pr_args  : form;
   pr_event : form;
 }
+
+type ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
+let map_ss_inv (fn: form list -> form) (invs: ss_inv list): ss_inv = 
+  assert (List.length invs > 0);
+  let m' = (List.hd invs).m in
+  let inv = fn (List.map (fun {inv;m} -> assert (m = m'); inv) invs) in
+  { m = m'; inv = inv }
+
+let map_ss_inv1 (fn: form -> form) (inv: ss_inv): ss_inv =
+  let inv' = fn inv.inv in
+  { m = inv.m; inv = inv' }
+
+let map_ss_inv2 (fn: form -> form -> form) (inv1: ss_inv) (inv2: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m);
+  let inv' = fn inv1.inv inv2.inv in
+  { m = inv1.m; inv = inv' }
+
+let map_ss_inv3 (fn: form -> form -> form -> form)
+    (inv1: ss_inv) (inv2: ss_inv) (inv3: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m && inv2.m = inv3.m);
+  let inv' = fn inv1.inv inv2.inv inv3.inv in
+  { m = inv1.m; inv = inv' }
+
+let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
+  let inv1, inv2 = fn inv.inv in
+  let m = inv.m in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty); 
+  {m;inv=inv1}, {m;inv=inv2}
+
+let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let m = inv.m in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {m;inv=inv1}, {m;inv=inv2}, {m;inv=inv3}
+
+type ts_inv = {
+  ml  : memory;
+  mr  : memory;
+  inv : form;
+}
+
+let map_ts_inv (fn: form list -> form) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml' && mr = mr'); inv) invs) in
+  { ml = ml'; mr = mr'; inv = inv }
+
+let map_ts_inv1 (fn: form -> form) (inv: ts_inv): ts_inv =
+  let inv' = fn inv.inv in
+  { ml = inv.ml; mr = inv.mr; inv = inv' }
+
+let map_ts_inv2 (fn: form -> form -> form) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv1.mr = inv2.mr);
+  let inv' = fn inv1.inv inv2.inv in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv' }
+
+let map_ts_inv3 (fn: form -> form -> form -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml &&
+          inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn inv1.inv inv2.inv inv3.inv in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv' }
+
+let map_ts_inv_left (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml;inv}) invs) in
+  { ml=inv.m; mr = mr'; inv = inv.inv }
+
+let map_ts_inv_left1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_left2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_left3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr;inv}) invs) in
+  { ml = ml'; mr = inv.m; inv = inv.inv }
+
+let map_ts_inv_right1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_right2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_destr2 (fn: form -> form * form) (inv: ts_inv): ts_inv * ts_inv =
+  let inv1, inv2 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}
+
+let map_ts_inv_destr3 (fn: form -> form * form * form) (inv: ts_inv) =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  (* Everything should be boolean *)
+  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}, {ml;mr;inv=inv3}
+
+let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml; inv}) invs) in
+  { m = mr'; inv = inv }
+
+let ts_inv_lower_left1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { m = inv.mr; inv = inv' }
+
+let ts_inv_lower_left2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { m = inv1.mr; inv = inv' }
+  
+let ts_inv_lower_left3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { m = inv1.mr; inv = inv' }
+
+let ts_inv_lower_right (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr; inv}) invs) in
+  { m = ml'; inv = inv }
+
+let ts_inv_lower_right1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { m = inv.ml; inv = inv' }
+
+let ts_inv_lower_right2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { m = inv1.ml; inv = inv' }
+
+let ts_inv_lower_right3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { m = inv1.ml; inv = inv' }
+
+(* ----------------------------------------------------------------- *)
+
+type inv =
+  | Inv_ss of ss_inv
+  | Inv_ts of ts_inv
+
+(* TODO: Get rid of this after refactor *)
+let inv_of_inv (inv: inv) : form =
+  match inv with
+  | Inv_ss ss -> ss.inv
+  | Inv_ts ts -> ts.inv
+
+let lift_ss_inv (f: ss_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ss ss -> f ss
+  | Inv_ts _ -> failwith "expected single sided invariant" in
+  f
+
+let lift_ss_inv2 (f: ss_inv -> ss_inv -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 -> f ss1 ss2
+  | _ -> failwith "expected only single sided invariants" in
+  f
+
+let lift_ss_inv3 (f: ss_inv -> ss_inv -> ss_inv -> 'a) : inv -> inv -> inv -> 'a =
+  let f inv1 inv2 inv3 = match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 -> f ss1 ss2 ss3
+  | _ -> failwith "expected only single sided invariants" in
+  f
+
+let lift_ts_inv (f: ts_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ts ss -> f ss
+  | Inv_ss _ -> failwith "expected two sided invariant" in
+  f
+
+let lift_ts_inv2 (f: ts_inv -> ts_inv -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ts ss1, Inv_ts ss2 -> f ss1 ss2
+  | _ -> failwith "expected only two sided invariants" in
+  f
+
+(* TODO: This should be removed after refactor is done *)
+let lift_inv_adapter (f: form -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ss ss -> f ss.inv
+  | Inv_ts ts -> f ts.inv in
+  f
+
+let lift_inv_adapter2 (f: form -> form -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 -> f ss1.inv ss2.inv
+  | Inv_ts ts1, Inv_ts ts2 -> f ts1.inv ts2.inv
+  | _ -> failwith "expected compatible invariants" in
+  f
+
+let ss_inv_generalize_left (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = m; mr = inv.m; inv = inv.inv }
+
+let ss_inv_generalize_right (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = inv.m; mr = m; inv = inv.inv }
+
+(* ----------------------------------------------------------------- *)
+let map_inv (fn: form list -> form) (inv: inv list): inv =
+  assert (List.length inv > 0);
+  match List.hd inv with
+  | Inv_ss ss' ->
+      Inv_ss (map_ss_inv fn (List.map (function 
+        Inv_ss ss -> assert (ss.m = ss'.m); ss
+        | _ -> failwith "expected all invariants to have same kind") inv))
+  | Inv_ts ts' ->
+      Inv_ts (map_ts_inv fn (List.map (function 
+        Inv_ts ts -> assert (ts.ml = ts'.ml && ts.mr = ts'.mr); ts
+        | _ -> failwith "expected all invariants to have same kind") inv))
+
+let map_inv1 (fn: form -> form) (inv: inv): inv =
+  match inv with
+  | Inv_ss ss ->
+      Inv_ss (map_ss_inv1 fn ss)
+  | Inv_ts ts ->
+      Inv_ts (map_ts_inv1 fn ts)
+
+let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
+  match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 ->
+      Inv_ss (map_ss_inv2 fn ss1 ss2)
+  | Inv_ts ts1, Inv_ts ts2 ->
+      Inv_ts (map_ts_inv2 fn ts1 ts2)
+  | _ ->
+      failwith "incompatible invariants for map_inv2"
+  
+let map_inv3 (fn: form -> form -> form -> form)
+    (inv1: inv) (inv2: inv) (inv3: inv): inv =
+  match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 ->
+      Inv_ss (map_ss_inv3 fn ss1 ss2 ss3)
+  | Inv_ts ts1, Inv_ts ts2, Inv_ts ts3 ->
+      Inv_ts (map_ts_inv3 fn ts1 ts2 ts3)
+  | _ ->
+      failwith "incompatible invariants for map_inv3"
+
+(* ----------------------------------------------------------------- *)
+(* Accessors for program logic                                       *)
+(* ----------------------------------------------------------------- *)
+
+let eg_pr eg = {ml=eg.eg_ml; mr=eg.eg_mr; inv=eg.eg_pr}
+let eg_po eg = {ml=eg.eg_ml; mr=eg.eg_mr; inv=eg.eg_po}
+
+let ef_pr ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_pr}
+let ef_po ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_po}
+
+let es_pr es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_pr}
+let es_po es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_po}
+
+let hf_pr hf = {m=hf.hf_m; inv=hf.hf_pr}
+let hf_po hf = {m=hf.hf_m; inv=hf.hf_po}
+
+let hs_pr hs = {m=fst hs.hs_m; inv=hs.hs_pr}
+let hs_po hs = {m=fst hs.hs_m; inv=hs.hs_po}
+
+let ehf_pr ehf = {m=ehf.ehf_m; inv=ehf.ehf_pr}
+let ehf_po ehf = {m=ehf.ehf_m; inv=ehf.ehf_po}
+
+let ehs_pr ehs = {m=fst ehs.ehs_m; inv=ehs.ehs_pr}
+let ehs_po ehs = {m=fst ehs.ehs_m; inv=ehs.ehs_po}
+
+let bhf_pr bhf = {m=bhf.bhf_m; inv=bhf.bhf_pr}
+let bhf_po bhf = {m=bhf.bhf_m; inv=bhf.bhf_po}
+let bhf_bd bhf = {m=bhf.bhf_m; inv=bhf.bhf_bd}
+
+let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
+let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
+let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
