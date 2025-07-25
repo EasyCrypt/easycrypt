@@ -30,6 +30,7 @@ module HL = struct
 end
 
 exception BDepError of string
+exception BDepUninitializedInputs
 
 
 let int_of_form (hyps: hyps) (f: form) : BI.zint = 
@@ -106,7 +107,9 @@ let mapreduce
       | {v_name}, Some (sz, offset) ->
         circuit_slice (Option.get (pstate_get_opt pstate v_name)) sz offset
       ) 
-      outvs in
+      outvs 
+    in
+    if not (List.for_all (fun c -> not (circuit_has_uninitialized c)) circs) then raise BDepUninitializedInputs;
 
     (* This is required for now as we do not allow mapreduce with multiple arguments *)
     (* assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1); *)    
@@ -197,7 +200,12 @@ let prog_equiv_prod
                   (List.map (fun v -> v.v_name) outvs_l) in
     let circs_r = List.map (fun v -> pstate_get pstate_r v) 
                   (List.map (fun v -> v.v_name) outvs_r) in
-                
+
+    if not (
+      (List.for_all (fun c -> not (circuit_has_uninitialized c)) circs_l) ||
+      (List.for_all (fun c -> not (circuit_has_uninitialized c)) circs_r)         
+    ) then raise BDepUninitializedInputs;
+
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_l = 1); *)
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_r = 1);*)
     let c_l = try 
@@ -326,6 +334,7 @@ let circ_form_eval_plus_equiv
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
     let pcond = match pstate_get_opt pstate v.v_name with
       | Some circ -> begin try 
+        if circuit_has_uninitialized circ then raise BDepUninitializedInputs;
         Some (circuit_ueq circ (circuit_of_form hyps cur_val))
         with CircError err ->
           raise (BDepError ("Failed to generate circuit for current value precondition with error:\n" ^ err))
@@ -376,6 +385,8 @@ let mapreduce_eval
 
   begin 
     let circs = List.map (fun v -> pstate_get pstate v) (List.map (fun v -> v.v_name) outvs) in
+
+    if not (List.for_all (fun c -> not (circuit_has_uninitialized c)) circs) then raise BDepUninitializedInputs;
 
     let c = try 
       (circuit_aggregate circs)

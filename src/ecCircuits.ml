@@ -2037,7 +2037,12 @@ let circuit_of_form
       | PVloc v -> v
       (* FIXME: Should globals be supported? *)
       | _ -> raise (CircError "Global vars not supported")
-      in hyps, pstate_get pstate v
+      in 
+      let v = match pstate_get_opt pstate v with
+      | Some v -> v
+      | None -> circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
+      in
+      hyps, v
     | Fglob (id, mem) -> raise (CircError "glob not supported")
     | Ftuple comps -> 
       let hyps, comps = 
@@ -2279,6 +2284,7 @@ let pstate_get_all = fun pstate -> List.snd (pstate_get_all pstate)
 let circuit_ueq = (fun c1 c2 -> (circuit_eq c1 c2 :> circuit))
 let circuit_aggregate = 
   circuit_aggregate
+let circuit_has_uninitialized = circuit_has_uninitialized
 
 let circuit_aggregate_inps = 
   circuit_aggregate_inputs
