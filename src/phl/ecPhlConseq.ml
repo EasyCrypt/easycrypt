@@ -577,7 +577,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
     match concl.f_node with
     | FeHoareS hs ->
       let m = fst hs.ehs_m in
-      let env = LDecl.push_active hs.ehs_m hyps in
+      let env = LDecl.push_active_ss hs.ehs_m hyps in
       {m; inv=TTC.pf_process_form !!tc env (tfun txreal txreal) fc}
 
     | FeHoareF hf ->
@@ -592,7 +592,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
     let penv, qenv, gpre, gpost, fmake =
       match concl.f_node with
       | FeHoareS hs ->
-        let env = LDecl.push_active hs.ehs_m hyps in
+        let env = LDecl.push_active_ss hs.ehs_m hyps in
         let fmake pre post = f_eHoareS (snd hs.ehs_m) pre hs.ehs_s post in
         (env, env, (ehs_pr hs), (ehs_po hs), fmake)
 
@@ -1334,7 +1334,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
      let penv, qenv, gpre, gpost, ty, fmake =
       match concl.f_node with
       | FhoareS hs ->
-        let env = LDecl.push_active hs.hs_m hyps in
+        let env = LDecl.push_active_ss hs.hs_m hyps in
 
         let fmake pre post c_or_bd =
           match c_or_bd with
@@ -1357,7 +1357,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         in (penv, qenv, Inv_ss (hf_pr hf), Inv_ss (hf_po hf), tbool, lift_ss_inv2 fmake)
 
       | FeHoareS hs ->
-        let env = LDecl.push_active hs.ehs_m hyps in
+        let env = LDecl.push_active_ss hs.ehs_m hyps in
         let fmake pre post bd =
           ensure_none bd;
           f_eHoareS (snd hs.ehs_m) pre hs.ehs_s post in
@@ -1371,7 +1371,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         (penv, qenv, Inv_ss (ehf_pr hf), Inv_ss (ehf_po hf), txreal, lift_ss_inv2 fmake)
 
       | FbdHoareS bhs ->
-        let env = LDecl.push_active bhs.bhs_m hyps in
+        let env = LDecl.push_active_ss bhs.bhs_m hyps in
 
         let fmake pre post c_or_bd =
           match c_or_bd with
@@ -1435,7 +1435,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
     let penv, qenv, gpre, gpost, ty, fmake =
       match concl.f_node with
       | FhoareS hs ->
-        let env = LDecl.push_active hs.hs_m hyps in
+        let env = LDecl.push_active_ss hs.hs_m hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_hoareS (snd hs.hs_m) pre hs.hs_s post
@@ -1471,7 +1471,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         (penv, qenv, Inv_ss pr, Inv_ss po, txreal, lift_ss_inv2 fmake)
 
       | FbdHoareS bhs ->
-        let env = LDecl.push_active bhs.bhs_m hyps in
+        let env = LDecl.push_active_ss bhs.bhs_m hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_hoareS (snd bhs.bhs_m) pre bhs.bhs_s post
@@ -1504,7 +1504,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let f = sideif side es.es_sl es.es_sr in
         let m = sideif side es.es_ml es.es_mr in
         let m = (mhr, snd m) in
-        let env = LDecl.push_active m hyps in
+        let env = LDecl.push_active_ss m hyps in
         let fmake pre post c_or_bd =
           match info1, c_or_bd with
           | None, Some (PCI_bd (cmp,bd)) ->

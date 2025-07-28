@@ -273,7 +273,7 @@ let t_pr_rewrite (s, f) tc =
     let env, hyps, _ = FApi.tc1_eflat tc in
     let pr = destr_pr torw in
     let mp = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun env in
-    let hyps = LDecl.push_active mp hyps in
+    let hyps = LDecl.push_active_ss mp hyps in
     EcProofTyping.process_form hyps f ty
   in
   t_pr_rewrite_low (s, omap to_env f) tc

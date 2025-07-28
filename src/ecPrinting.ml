@@ -58,7 +58,7 @@ module PPEnv = struct
     | None   -> ppe
     | Some m ->
       { ppe with
-        ppe_env = EcEnv.Memory.set_active (fst m) ppe.ppe_env }
+        ppe_env = EcEnv.Memory.set_active_ss (fst m) ppe.ppe_env }
 
   let push_mem ppe ?(active = false) m =
     let ppe = { ppe with ppe_env = EcEnv.Memory.push m ppe.ppe_env } in
@@ -568,7 +568,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
   | PVglob xp ->
     let mem =
       let env = ppe.PPEnv.ppe_env in
-      obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env) in
+      obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active_ss env) in
 
     let exception Default in
 
@@ -598,7 +598,7 @@ let pp_pv ppe fmt p = pp_msymbol fmt (msymbol_of_pv ppe p)
 exception NoProjArg
 
 let get_projarg_for_var ppe x i =
-  let m = oget ~exn:NoProjArg (EcEnv.Memory.current ppe.PPEnv.ppe_env) in
+  let m = oget ~exn:NoProjArg (EcEnv.Memory.current_ss ppe.PPEnv.ppe_env) in
   if is_glob x then raise NoProjArg;
   oget ~exn:NoProjArg (EcMemory.get_name (get_loc x) (Some i) m)
 
@@ -1749,7 +1749,7 @@ and match_pp_notations
       let ue = EcUnify.UniEnv.create None in
       let ov = EcUnify.UniEnv.opentvi ue tv None in
       let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-      let bd = match (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) with
+      let bd = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
       | None -> form_of_expr nt.ont_body
       | Some m -> (ss_inv_of_expr m nt.ont_body).inv in
       let bd = Fsubst.f_subst_tvar ~freshen:true ov bd in
@@ -1863,7 +1863,7 @@ and pp_form_core_r
 
       if force || debug_mode then default true else
 
-      match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+      match EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env with
       | Some i' when EcMemory.mem_equal i i' ->
           Format.fprintf fmt "%a" (pp_pv ppe) x
       | _ ->
@@ -1871,7 +1871,7 @@ and pp_form_core_r
     end
 
   | Fglob (mp, i) -> begin
-    match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+    match EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
         Format.fprintf fmt "(glob %a)" (pp_topmod ppe) (EcPath.mident mp)
     | _ ->
@@ -2087,7 +2087,7 @@ and pp_form ppe fmt f =
   pp_form_r ppe (min_op_prec, `NonAssoc) fmt f
 
 and pp_expr ppe fmt e =
-  let f = match (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) with
+  let f = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
   | None -> form_of_expr e
   | Some m -> (ss_inv_of_expr m e).inv in
   pp_form ppe fmt f

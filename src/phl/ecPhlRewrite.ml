@@ -57,7 +57,7 @@ let process_change
   let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
 
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let hyps = LDecl.push_active m hyps in
+    let hyps = LDecl.push_active_ss m hyps in
     let e =
       EcProofTyping.pf_process_exp
         !!tc hyps `InProc (Some e.e_ty) form

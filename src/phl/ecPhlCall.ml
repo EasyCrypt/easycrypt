@@ -124,13 +124,13 @@ let t_ehoare_call_core fpre fpost tc =
   if not (List.is_empty s.s_node) then
     tc_error !!tc  "ehoare call core rule: only single call statements are accepted";
   if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) wppost) then
-    (let env = EcEnv.Memory.push_active hs.ehs_m env in
+    (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong post-condition %a instead %a"
        (EcPrinting.pp_form ppe) (ehs_po hs).inv (EcPrinting.pp_form ppe) wppost.inv);
 
   if not (EcReduction.ss_inv_alpha_eq hyps (ehs_pr hs) wppre) then
-    (let env = EcEnv.Memory.push_active hs.ehs_m env in
+    (let env = EcEnv.Memory.push_active_ss hs.ehs_m env in
      let ppe  = EcPrinting.PPEnv.ofenv env in
      tc_error !!tc "ehoare call core rule: wrong pre-condition %a instead %a"
        (EcPrinting.pp_form ppe) (ehs_pr hs).inv (EcPrinting.pp_form ppe) wppre.inv);
@@ -181,16 +181,21 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
   let (lp,f,args),s = tc1_last_call tc bhs.bhs_s in
-  let m = EcMemory.memory bhs.bhs_m in
+  let m =  fpre.m in
   let fsig = (Fun.by_xpath f env).f_sig in
+  let bhs_bd = ss_inv_rebind (bhs_bd bhs) m in
+  let bhs_po = ss_inv_rebind (bhs_po bhs) m in
+  let bhs_pr = ss_inv_rebind (bhs_pr bhs) m in
+
+  (* The function satisfies the specification *)
   let f_concl =
-    bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp (bhs_bd bhs) opt_bd in
+    bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs_bd opt_bd in
 
   (* The wp *)
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
   let fres = {m;inv=f_local vres fsig.fs_ret} in
-  let post = wp_asgn_call env lp fres (bhs_po bhs) in
+  let post = wp_asgn_call env lp fres bhs_po in
   let fpost = map_ss_inv2 (PVM.subst1 env pvres m) fres fpost in
   let modi = f_write env f in
   let post =
@@ -213,18 +218,18 @@ let t_bdhoare_call fpre fpost opt_bd tc =
 
   (* most of the above code is duplicated from t_hoare_call *)
   let concl = 
-    let m,mt = bhs.bhs_m in
+    let _,mt = bhs.bhs_m in
     match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
-        f_hoareS mt (bhs_pr bhs) s post
+        f_hoareS mt bhs_pr s post
     | FHeq, Some bd ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (map_ss_inv2 f_real_div (bhs_bd bhs) bd)
+        f_bdHoareS mt bhs_pr s post bhs.bhs_cmp (map_ss_inv2 f_real_div bhs_bd bd)
     | FHeq, None ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp {m;inv=f_r1}
+        f_bdHoareS mt bhs_pr s post bhs.bhs_cmp {m;inv=f_r1}
     | FHge, Some bd ->
-        f_bdHoareS mt (bhs_pr bhs) s post bhs.bhs_cmp (map_ss_inv2 f_real_div (bhs_bd bhs) bd)
+        f_bdHoareS mt bhs_pr s post bhs.bhs_cmp (map_ss_inv2 f_real_div bhs_bd bd)
     | FHge, None ->
-        f_bdHoareS mt (bhs_pr bhs) s post FHeq {m;inv=f_r1}
+        f_bdHoareS mt bhs_pr s post FHeq {m;inv=f_r1}
     | _, _ -> assert false
   in
 
@@ -565,7 +570,7 @@ let process_call_concave (fc, info) tc =
     let (hyps, concl) = FApi.tc1_flat tc in
     match concl.f_node  with
     | FeHoareS hs ->
-      let env = LDecl.push_active hs.ehs_m hyps in
+      let env = LDecl.push_active_ss hs.ehs_m hyps in
       {m=fst hs.ehs_m;inv=TTC.pf_process_form !!tc env (tfun txreal txreal) fc}
 
     | _ -> tc_error !!tc "the conclusion is not a ehoare" in

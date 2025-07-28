@@ -140,7 +140,7 @@ let process_rewrite_equiv info tc =
         begin
           try
             let proc = EcEnv.Fun.by_xpath new_func env in
-            let subenv = EcEnv.Memory.push_active mem env in
+            let subenv = EcEnv.Memory.push_active_ss mem env in
             let ue = EcUnify.UniEnv.create (Some []) in
             let args, ret_ty = EcTyping.trans_args subenv ue (loc pargs) proc.f_sig (unloc pargs) in
             let res = omap (fun v -> EcTyping.transexpcast subenv `InProc ue ret_ty v) pres in

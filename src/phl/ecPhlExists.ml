@@ -103,7 +103,7 @@ let process_exists_intro ~(elim : bool) fs tc =
       fst (LDecl.hoareF m f hyps), Inv_ss {m; inv = f_true}
     | FhoareS {hs_m=(m,_) as me} | FeHoareS {ehs_m=(m,_) as me}
     | FbdHoareS {bhs_m=(m,_) as me} -> 
-      LDecl.push_active me hyps, Inv_ss {m; inv = f_true}
+      LDecl.push_active_ss me hyps, Inv_ss {m; inv = f_true}
     | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps), 
         Inv_ts {ml=ef.ef_ml; mr=ef.ef_mr; inv=f_true}
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps, 
@@ -130,7 +130,7 @@ let process_ecall oside (l, tvi, fs) tc =
   let hyps, kind, f_tr =
     match concl.f_node with
     | FhoareS hs when is_none oside ->
-        LDecl.push_active hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node),
+        LDecl.push_active_ss hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node),
         Inv_ss {m = fst hs.hs_m; inv = f_true}
     | FequivS es ->
         let n1 = List.length es.es_sl.s_node in

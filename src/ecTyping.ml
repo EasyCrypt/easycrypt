@@ -407,7 +407,7 @@ let gen_select_op
 
   and pvs () : OpSelect.gopsel list =
     let me, pvs =
-      match EcEnv.Memory.get_active env, actonly with
+      match EcEnv.Memory.get_active_ss env, actonly with
       | None, true -> (None, [])
       | me  , _    -> (  me, select_pv env me name ue tvi psig)
     in List.map (fpv me) pvs
@@ -1593,7 +1593,7 @@ let form_of_opselect
              ((args @ List.map (curry f_local) xs, []), xs) in
 
          let flam  = List.map (snd_map gtty) flam in
-         let body = match (EcEnv.Memory.get_active env) with
+         let body = match (EcEnv.Memory.get_active_ss env) with
         | None -> form_of_expr body
         | Some me -> (ss_inv_of_expr me body).inv in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
@@ -2082,7 +2082,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       in
 
       let memenv = fundef_add_symbol env memenv locals in
-      let env = EcEnv.Memory.push_active memenv env in
+      let env = EcEnv.Memory.push_active_ss memenv env in
 
       let locals = ref locals in
       let memenv = ref memenv in
@@ -2212,7 +2212,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             | Pup_cond cup ->
               eval_cupdate loc env cup si
           in
-          let env = EcEnv.Memory.push_active !memenv env in
+          let env = EcEnv.Memory.push_active_ss !memenv env in
           try
             EcMatching.Zipper.map_range env cp change bd
           with
@@ -2527,7 +2527,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
 
   (* Type-check local variables / check for dups *)
   let add_local memenv local =
-    let env   = EcEnv.Memory.push_active memenv env in
+    let env   = EcEnv.Memory.push_active_ss memenv env in
     let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
     let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
     let ty =
@@ -2564,7 +2564,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
     memenv in
 
   let memenv = List.fold_left add_local memenv pbody.pfb_locals in
-  let env = EcEnv.Memory.push_active memenv env in
+  let env = EcEnv.Memory.push_active_ss memenv env in
 
   let body   = transstmt env ue pbody.pfb_body in
   let result =
@@ -2760,7 +2760,7 @@ and transinstr
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =
-  let side = EcEnv.Memory.get_active env in
+  let side = EcEnv.Memory.get_active_ss env in
   match EcEnv.Var.lookup_progvar_opt ?side x env with
   | None -> tyerror loc env (UnknownModVar x)
   | Some(pv,xty) ->
@@ -3030,7 +3030,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                         let trans1 (x, s) =
                           let mem =
                             match s with
-                            | None -> odfl mhr (EcEnv.Memory.get_active env)
+                            | None -> odfl mhr (EcEnv.Memory.get_active_ss env)
                             | Some s -> transmem env s
 
                           in (transpvar env mem x, mem) in
@@ -3083,7 +3083,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let mp = fst (trans_msymbol env gp) in
         let me =
-          match EcEnv.Memory.current env with
+          match EcEnv.Memory.current_ss env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
         in PFS.set_memused state;
@@ -3138,7 +3138,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let used, aout =
           PFS.new_memused
-            (transf (EcEnv.Memory.set_active me env))
+            (transf (EcEnv.Memory.set_active_ss me env))
             ~force state f
         in
         if not used then begin
@@ -3159,12 +3159,6 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) ->
             var_or_proj (fun x ty -> (f_pvar x ty me).inv) f_proj x ty
-        in
-
-        let check_mem loc me =
-          match EcEnv.Memory.byid me env with
-          | None -> tyerror loc env (UnknownMemName (EcIdent.name me))
-          | Some _ -> ()
         in
 
         let qual (mq : pmsymbol option) (x : pqsymbol) =
@@ -3211,8 +3205,6 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
               unify_or_fail env ue gp.pl_loc ~expct:x1.inv.f_ty x2.inv.f_ty;
               (map_ss_inv2 f_eq x1 x2).inv
         in
-          check_mem f.pl_loc EcFol.mleft;
-          check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map do1 xs)
 
     | PFeqf fs ->
@@ -3227,11 +3219,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         and do1 (me1, me2) f =
           let _, f1 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me1 env))
+              (transf (EcEnv.Memory.set_active_ss me1 env))
               ~force:false state f in
           let _, f2 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me2 env))
+              (transf (EcEnv.Memory.set_active_ss me2 env))
               ~force:false state f in
           unify_or_fail env ue f.pl_loc ~expct:f1.f_ty f2.f_ty;
           f_eq f1 f2
@@ -3564,7 +3556,7 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
 (* -------------------------------------------------------------------- *)
 and transexp env ?tt mode ue { pl_desc = Expr e; pl_loc = loc; } =
   let f = trans_form_or_pattern env (`Expr mode) ue e tt in
-  let m = Option.value ~default:mhr (EcEnv.Memory.get_active env) in
+  let m = Option.value ~default:mhr (EcEnv.Memory.get_active_ss env) in
   let e =
     try
       expr_of_ss_inv {m;inv=f}

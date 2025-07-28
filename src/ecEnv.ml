@@ -176,7 +176,8 @@ type preenv = {
   env_comps    : mc Mip.t;
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
   env_memories : EcMemory.memtype Mmem.t;
-  env_actmem   : EcMemory.memory option;
+  env_actmem_ss: EcMemory.memory option;
+  env_actmem_ts: (EcMemory.memory * EcMemory.memory) option;
   env_abs_st   : EcModules.abs_uses Mid.t;
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
@@ -305,7 +306,8 @@ let empty gstate =
     env_comps    = Mip.singleton (IPPath path) (empty_mc None);
     env_locals   = MMsym.empty;
     env_memories = Mmem.empty;
-    env_actmem   = None;
+    env_actmem_ss= None;
+    env_actmem_ts= None;
     env_abs_st   = Mid.empty;
     env_tci      = [];
     env_tc       = TC.Graph.empty;
@@ -1258,18 +1260,36 @@ module Memory = struct
     try Some (Mmem.bysym me env.env_memories)
     with Not_found -> None
 
-  let set_active (me : memory) (env : env) =
+  let set_active_ss (me : memory) (env : env) =
     match byid me env with
     | None   -> raise (MEError (UnknownMemory (`Memory me)))
-    | Some _ -> { env with env_actmem = Some me }
+    | Some _ -> { env with env_actmem_ss = Some me }
 
-  let get_active (env : env) =
-    env.env_actmem
+  let get_active_ss (env : env) =
+    env.env_actmem_ss
 
-  let current (env : env) =
-    match env.env_actmem with
+  let current_ss (env : env) =
+    match env.env_actmem_ss with
     | None    -> None
     | Some me -> byid me env
+  
+  let set_active_ts (ml: memory) (mr: memory) (env : env) =
+    match byid ml env, byid mr env with
+    | None, _ -> raise (MEError (UnknownMemory (`Memory ml)))
+    | _, None -> raise (MEError (UnknownMemory (`Memory mr)))
+    | Some _, Some _ ->
+        { env with env_actmem_ts = Some (ml, mr) }
+
+  let get_active_ts (env : env) =
+    env.env_actmem_ts
+
+  let current_ts (env : env) =
+    match env.env_actmem_ts with
+    | None -> None
+    | Some (ml, mr) ->
+        match byid ml env, byid mr env with
+        | Some mel, Some mer -> Some (mel, mer)
+        | _ -> None
 
   let update (me: EcMemory.memenv) (env : env) =
     { env with env_memories = Mmem.add (fst me) (snd me) env.env_memories; }
@@ -1284,9 +1304,13 @@ module Memory = struct
       (fun env m -> push m env)
       env memenvs
 
-  let push_active memenv env =
-    set_active (EcMemory.memory memenv)
+  let push_active_ss memenv env =
+    set_active_ss (EcMemory.memory memenv)
       (push memenv env)
+
+  let push_active_ts mel mer env =
+    set_active_ts (EcMemory.memory mel) (EcMemory.memory mer)
+      (push mer (push mel env))
 
 end
 
@@ -1690,7 +1714,7 @@ module Fun = struct
 
   let inv_memenv1 env =
     let mem  = EcMemory.abstract EcCoreFol.mhr in
-    Memory.push_active mem env
+    Memory.push_active_ss mem env
 
   let prF_memenv m path env =
     let fun_ = by_xpath path env in
@@ -1698,7 +1722,7 @@ module Fun = struct
 
   let prF path env =
     let post = prF_memenv EcCoreFol.mhr path env in
-    Memory.push_active post env
+    Memory.push_active_ss post env
 
   let hoareF_memenv mem path env =
     let (ip, _) = oget (ipath_of_xpath path) in
@@ -1709,12 +1733,12 @@ module Fun = struct
 
   let hoareF mem path env =
     let pre, post = hoareF_memenv mem path env in
-    Memory.push_active pre env, Memory.push_active post env
+    Memory.push_active_ss pre env, Memory.push_active_ss post env
 
   let hoareS mem path env =
     let fun_ = by_xpath path env in
     let fd, memenv = actmem_body mem fun_ in
-    memenv, fd, Memory.push_active memenv env
+    memenv, fd, Memory.push_active_ss memenv env
 
   let equivF_memenv ml mr path1 path2 env =
     let (ip1, _) = oget (ipath_of_xpath path1) in
@@ -3588,8 +3612,11 @@ module LDecl = struct
   let fresh_ids hyps s = snd (fresh_ids (tohyps hyps) s)
 
   (* ------------------------------------------------------------------ *)
-  let push_active m lenv =
-    { lenv with le_env = Memory.push_active m lenv.le_env }
+  let push_active_ss m lenv =
+    { lenv with le_env = Memory.push_active_ss m lenv.le_env }
+
+  let push_active_ts ml mr lenv =
+    { lenv with le_env = Memory.push_active_ts ml mr lenv.le_env }
 
   let push_all l lenv =
     { lenv with le_env = Memory.push_all l lenv.le_env }

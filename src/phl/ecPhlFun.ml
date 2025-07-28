@@ -594,7 +594,7 @@ let process_fun_upto_info (bad, p, q) tc =
   let p    = TTC.pf_process_form !!tc env' tbool p in
   let q    = q |> omap (TTC.pf_process_form !!tc env' tbool) |> odfl f_true in
   let bad  =
-    let env' = LDecl.push_active (EcMemory.abstract EcFol.mhr) hyps in
+    let env' = LDecl.push_active_ss (EcMemory.abstract EcFol.mhr) hyps in
     TTC.pf_process_form !!tc env' tbool bad
   in
     ({inv=bad;m=mhr}, {inv=p;ml=mleft;mr=mright}, {inv=q;ml=mleft;mr=mright})
