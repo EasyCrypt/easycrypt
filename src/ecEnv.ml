@@ -2448,7 +2448,7 @@ module NormMp = struct
     let globs = List.map (fun id -> f_glob id m) globs in
     let pv = List.map (fun (xp, ty) -> f_pvar (pv_glob xp) ty m) pv in
 
-    map_ss_inv f_tuple (globs @ pv)
+    map_ss_inv ~m f_tuple (globs @ pv)
 
   let norm_glob env m mp = globals env m mp
 

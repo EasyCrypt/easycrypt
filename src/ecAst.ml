@@ -292,9 +292,10 @@ type ss_inv = {
   inv : form;
 }
 
-let map_ss_inv (fn: form list -> form) (invs: ss_inv list): ss_inv = 
-  assert (List.length invs > 0);
-  let m' = (List.hd invs).m in
+let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv = 
+  let m' = match m with
+  | Some m -> m
+  | None -> (List.hd invs).m in
   let inv = fn (List.map (fun {inv;m} -> assert (m = m'); inv) invs) in
   { m = m'; inv = inv }
 
@@ -333,10 +334,13 @@ type ts_inv = {
   inv : form;
 }
 
-let map_ts_inv (fn: form list -> form) (invs: ts_inv list): ts_inv =
-  assert (List.length invs > 0);
-  let ml' = (List.hd invs).ml in
-  let mr' = (List.hd invs).mr in
+let map_ts_inv ?ml ?mr (fn: form list -> form) (invs: ts_inv list): ts_inv =
+  let ml' = match ml with 
+   | Some m -> m 
+   | None -> (List.hd invs).ml in
+  let mr' = match mr with 
+   | Some m -> m 
+   | None -> (List.hd invs).mr in
   let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml' && mr = mr'); inv) invs) in
   { ml = ml'; mr = mr'; inv = inv }
 

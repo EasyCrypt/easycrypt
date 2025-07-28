@@ -309,7 +309,7 @@ type ss_inv = {
   inv : form;
 }
 
-val map_ss_inv : (form list -> form) -> ss_inv list -> ss_inv
+val map_ss_inv : ?m:memory -> (form list -> form) -> ss_inv list -> ss_inv
 val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
 val map_ss_inv2 : (form -> form -> form) -> ss_inv -> ss_inv -> ss_inv
 val map_ss_inv3 : (form -> form -> form -> form) -> ss_inv -> ss_inv -> ss_inv -> ss_inv
@@ -323,7 +323,7 @@ type ts_inv = {
   inv : form;
 }
 
-val map_ts_inv : (form list -> form) -> ts_inv list -> ts_inv
+val map_ts_inv : ?ml:memory -> ?mr:memory -> (form list -> form) -> ts_inv list -> ts_inv
 val map_ts_inv1 : (form -> form) -> ts_inv -> ts_inv
 val map_ts_inv2 : (form -> form -> form) -> ts_inv -> ts_inv -> ts_inv
 val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -> ts_inv

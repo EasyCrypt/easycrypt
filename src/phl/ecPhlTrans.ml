@@ -98,7 +98,7 @@ let t_equivS_trans_eq side s tc =
     let xr x ty = ss_inv_generalize_left (f_pvar x ty mr) ml in
     let veq = List.map (fun (x,ty) -> map_ts_inv2 f_eq (xl x ty) (xr x ty)) vfv in
     let geq = List.map (fun mp -> ts_inv_eqglob mp ml mp mr) gfv in
-    map_ts_inv f_ands (veq @ geq) in
+    map_ts_inv ~ml ~mr f_ands (veq @ geq) in
   let pre = mk_eqs (EcPV.PV.union (EcPV.PV.union fv_pr fv_po) fv_r) in
   let pre = map_ts_inv2 f_and pre (odfl {ml=pre.ml;mr=pre.mr;inv=f_true} mem_pre) in
   let post = mk_eqs fv_po in

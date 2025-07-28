@@ -950,92 +950,57 @@ let equantif_of_quantif (qt : quantif) : equantif =
   | Lexists -> `EExists
 
 (* -------------------------------------------------------------------- *)
-let rec ss_inv_of_expr m (e : expr) =
+
+let rec form_of_expr_r ?m (e : expr) =
   match e.e_node with
   | Eint n ->
-     {m;inv=f_int n}
+     f_int n
 
   | Elocal id ->
-     {m;inv=f_local id e.e_ty}
+     f_local id e.e_ty
 
   | Evar pv ->
-     f_pvar pv e.e_ty m
+    begin
+     match m with
+     | None -> failwith "expecting memory"
+     | Some m -> (f_pvar pv e.e_ty m).inv
+    end
 
   | Eop (op, tys) ->
-     {m;inv=f_op op tys e.e_ty}
+     f_op op tys e.e_ty
 
   | Eapp (ef, es) ->
-     let f_app' f = f_app (List.hd f) (List.tl f) e.e_ty in
-     map_ss_inv f_app' ((ss_inv_of_expr m ef)::(List.map (ss_inv_of_expr m) es))
+     f_app (form_of_expr_r ?m ef) (List.map (form_of_expr_r ?m) es) e.e_ty
 
   | Elet (lpt, e1, e2) ->
-     map_ss_inv2 (f_let lpt) (ss_inv_of_expr m e1) (ss_inv_of_expr m e2)
+     f_let lpt (form_of_expr_r ?m e1) (form_of_expr_r ?m e2)
 
   | Etuple es ->
-     map_ss_inv f_tuple (List.map (ss_inv_of_expr m) es)
+     f_tuple (List.map (form_of_expr_r ?m) es)
 
   | Eproj (e1, i) ->
-     let f_proj' f = f_proj f i e.e_ty in
-     map_ss_inv1 f_proj' (ss_inv_of_expr m e1)
+     f_proj (form_of_expr_r ?m e1) i e.e_ty
 
   | Eif (e1, e2, e3) ->
-     let e1 = ss_inv_of_expr m e1 in
-     let e2 = ss_inv_of_expr m e2 in
-     let e3 = ss_inv_of_expr m e3 in
-     map_ss_inv3 f_if e1 e2 e3
+     let e1 = form_of_expr_r ?m e1 in
+     let e2 = form_of_expr_r ?m e2 in
+     let e3 = form_of_expr_r ?m e3 in
+     f_if e1 e2 e3
 
   | Ematch (b, fs, ty) ->
-     let b'  = ss_inv_of_expr m b in
-     let fs' = List.map (ss_inv_of_expr m) fs in
-     let f_match' fl = f_match (List.hd fl) (List.tl fl) ty in
-     map_ss_inv f_match' (b'::fs')
+     let b'  = form_of_expr_r ?m b in
+     let fs' = List.map (form_of_expr_r ?m) fs in
+     f_match b' fs' ty
 
   | Equant (qt, b, e) ->
      let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
-     let e = ss_inv_of_expr m e in
-     map_ss_inv1 (f_quant (quantif_of_equantif qt) b) e
+     let e = form_of_expr_r ?m e in
+     f_quant (quantif_of_equantif qt) b e
 
-let rec form_of_expr e = 
-  match e.e_node with
-     | Eint n ->
-        f_int n
-   
-     | Elocal id ->
-        f_local id e.e_ty
-   
-     | Evar _ ->
-        failwith "needs memory for program variable"
+let form_of_expr e = form_of_expr_r e
 
-     | Eop (op, tys) ->
-        f_op op tys e.e_ty
-
-     | Eapp (ef, es) ->
-        f_app (form_of_expr ef) (List.map form_of_expr es) e.e_ty
-   
-     | Elet (lpt, e1, e2) ->
-        f_let lpt (form_of_expr e1) (form_of_expr e2)
-   
-     | Etuple es ->
-        f_tuple (List.map form_of_expr es)
-   
-     | Eproj (e1, i) ->
-        f_proj (form_of_expr e1) i e.e_ty
-   
-     | Eif (e1, e2, e3) ->
-        let e1 = form_of_expr e1 in
-        let e2 = form_of_expr e2 in
-        let e3 = form_of_expr e3 in
-        f_if e1 e2 e3
-   
-     | Ematch (b, fs, ty) ->
-        let b'  = form_of_expr b in
-        let fs' = List.map form_of_expr fs in
-        f_match b' fs' ty
-   
-     | Equant (qt, b, e) ->
-        let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
-        let e = form_of_expr e in
-        f_quant (quantif_of_equantif qt) b e
+let ss_inv_of_expr m (e : expr) =
+  {m;inv=form_of_expr_r ~m e}
 
 (* -------------------------------------------------------------------- *)
 exception CannotTranslate

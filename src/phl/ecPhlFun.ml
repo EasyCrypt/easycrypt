@@ -68,7 +68,7 @@ let subst_pre env fs (m : memory) s =
     | Some v -> { v_name = v; v_type = ov.ov_type }
   in
   let v = List.map (fun v -> f_pvloc (fresh v) m) fs.fs_anames in
-  PVM.add env pv_arg m (map_ss_inv f_tuple v).inv s
+  PVM.add env pv_arg m (map_ss_inv ~m f_tuple v).inv s
 
 (* ------------------------------------------------------------------ *)
 let t_hoareF_fun_def_r tc =
