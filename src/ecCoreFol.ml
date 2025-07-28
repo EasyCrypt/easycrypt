@@ -179,7 +179,7 @@ let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
 let f_pvarg  ty m = f_pvar pv_arg ty m
 
 let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
-let f_glob   m mem   = {m;inv=mk_form (Fglob (m, mem)) (tglob m)}
+let f_glob   m mem   = {m=mem;inv=mk_form (Fglob (m, mem)) (tglob m)}
 
 (* -------------------------------------------------------------------- *)
 let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    [] tunit
