@@ -435,7 +435,7 @@ let process_eqs env tc f =
          (EcPrinting.pp_form ppe) f.inv)
 
 (* -------------------------------------------------------------------- *)
-let process_hint tc hyps (feqs, inv) =
+let process_hint ml mr tc hyps (feqs, inv) =
   let env = LDecl.toenv hyps in
   let doinv pf = TTC.tc1_process_prhl_form tc tbool pf in
   let doeq pf = process_eqs env tc (doinv pf) in
@@ -443,14 +443,15 @@ let process_hint tc hyps (feqs, inv) =
   let geqs =
     List.map (fun ((f1,f2),geq) -> dof f1, dof f2, doeq geq)
       feqs in
-  let ginv = odfl {ml=mleft;mr=mright;inv=f_true} (omap doinv inv) in
+  let ginv = odfl {ml;mr;inv=f_true} (omap doinv inv) in
   geqs, ginv
 
 (* -------------------------------------------------------------------- *)
 let process_eqobs_inS info tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let spec, inv = process_hint ml mr tc hyps info.EcParsetree.sim_hint in
   let eqo =
     match info.EcParsetree.sim_eqs with
     | Some pf ->
@@ -492,7 +493,8 @@ let process_eqobs_inF info tc =
     tc_error !!tc "no positions excepted";
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
+  let spec, inv = process_hint ml mr tc hyps info.EcParsetree.sim_hint in
   let fl = ef.ef_fl and fr = ef.ef_fr in
   let eqo =
     match info.EcParsetree.sim_eqs with

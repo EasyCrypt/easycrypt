@@ -191,6 +191,8 @@ let t_eagerF_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_equivS_conseq pre post tc =
   let es = tc1_as_equivS tc in
+  let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
+  let post = ts_inv_rebind post (fst es.es_ml) (fst es.es_mr) in
   let cond1, cond2 = conseq_cond_ts (es_pr es) (es_po es) pre post in
   let concl1 = f_forall_mems_ts_inv es.es_ml es.es_mr cond1 in
   let concl2 = f_forall_mems_ts_inv es.es_ml es.es_mr cond2 in
