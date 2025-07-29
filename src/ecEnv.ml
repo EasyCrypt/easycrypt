@@ -1753,9 +1753,9 @@ module Fun = struct
     (pre1,pre2), (post1,post2)
 
   let equivF ml mr path1 path2 env =
-    let (pre1,pre2),(post1,post2) = equivF_memenv ml mr path1 path2 env in
-    Memory.push_all [pre1; pre2] env,
-    Memory.push_all [post1; post2] env
+    let (prel,prer),(postl,postr) = equivF_memenv ml mr path1 path2 env in
+    Memory.push_active_ts prel prer env,
+    Memory.push_active_ts postl postr env
 
   let equivS path1 path2 env =
     let fun1 = by_xpath path1 env in

@@ -3030,7 +3030,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                         let trans1 (x, s) =
                           let mem =
                             match s with
-                            | None -> odfl mhr (EcEnv.Memory.get_active_ss env)
+                            | None -> oget (EcEnv.Memory.get_active_ss env)
                             | Some s -> transmem env s
 
                           in (transpvar env mem x, mem) in
@@ -3171,8 +3171,9 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
          let do1 = function
           | GVvar x ->
-              let x1 = lookup EcFol.mleft  (qual (om |> omap fst) x) in
-              let x2 = lookup EcFol.mright (qual (om |> omap snd) x) in
+              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let x1 = lookup ml (qual (om |> omap fst) x) in
+              let x2 = lookup mr (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
