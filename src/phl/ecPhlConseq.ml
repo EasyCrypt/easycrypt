@@ -1405,7 +1405,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         in (penv, qenv, Inv_ts (ef_pr ef), Inv_ts (ef_po ef), tbool, lift_ts_inv2 fmake)
 
       | FequivS es ->
-        let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
+        let env = LDecl.push_active_ts es.es_ml es.es_mr hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
           f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr post

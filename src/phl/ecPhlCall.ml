@@ -368,17 +368,18 @@ let t_call side ax tc =
 
 (* -------------------------------------------------------------------- *)
 let mk_inv_spec (_pf : proofenv) env inv fl fr =
+  let ml, mr = inv.ml, inv.mr in
   match NormMp.is_abstract_fun fl env with
   | true ->
     let (topl, _, _, sigl),
       (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-    let eqglob = ts_inv_eqglob topl mleft topr mright in
+    let eqglob = ts_inv_eqglob topl ml topr mr in
     let lpre = [eqglob;inv] in
     let eq_params =
       ts_inv_eqparams
-        sigl.fs_arg sigl.fs_anames mleft
-        sigr.fs_arg sigr.fs_anames mright in
-    let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+        sigl.fs_arg sigl.fs_anames ml
+        sigr.fs_arg sigr.fs_anames mr in
+    let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
     let pre    = map_ts_inv f_ands (eq_params::lpre) in
     let post   = map_ts_inv f_ands [eq_res; eqglob; inv] in
       f_equivF pre fl fr post
@@ -395,9 +396,9 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       if not testty then raise EqObsInError;
       let eq_params =
         ts_inv_eqparams
-          sigl.fs_arg sigl.fs_anames mleft
-          sigr.fs_arg sigr.fs_anames mright in
-      let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+          sigl.fs_arg sigl.fs_anames ml
+          sigr.fs_arg sigr.fs_anames mr in
+      let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
       let pre = map_ts_inv2 f_and eq_params inv in
       let post = map_ts_inv2 f_and eq_res inv in
         f_equivF pre fl fr post

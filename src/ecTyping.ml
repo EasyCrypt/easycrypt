@@ -3199,12 +3199,13 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                   @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
 
                 map_ss_inv f_tuple res in
-
-              let x1 = create EcFol.mleft  in
-              let x2 = create EcFol.mright in
+                  
+              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let x1 = ss_inv_generalize_right (create ml) mr in
+              let x2 = ss_inv_generalize_left (create mr) ml in
 
               unify_or_fail env ue gp.pl_loc ~expct:x1.inv.f_ty x2.inv.f_ty;
-              (map_ss_inv2 f_eq x1 x2).inv
+              (map_ts_inv2 f_eq x1 x2).inv
         in
           EcFol.f_ands (List.map do1 xs)
 
