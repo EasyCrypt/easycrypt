@@ -134,9 +134,6 @@ let t_equivF_fun_def_r tc =
   let s = subst_pre env fsigr mr s in
   let pre = map_ts_inv1 (PVM.subst env s) (ef_pr ef) in
   let concl' = f_equivS (snd menvl) (snd menvr) pre fdefl.f_body fdefr.f_body post in
-  !pp_debug_form env fresl.inv;
-  !pp_debug_form env post.inv;
-  !pp_debug_form env (ef_po ef).inv;
   FApi.xmutate1 tc `FunDef [concl']
 
 (* -------------------------------------------------------------------- *)
