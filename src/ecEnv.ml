@@ -1757,12 +1757,12 @@ module Fun = struct
     Memory.push_active_ts prel prer env,
     Memory.push_active_ts postl postr env
 
-  let equivS path1 path2 env =
+  let equivS ml mr path1 path2 env =
     let fun1 = by_xpath path1 env in
     let fun2 = by_xpath path2 env in
-    let fd1, mem1 = actmem_body EcCoreFol.mleft fun1 in
-    let fd2, mem2 = actmem_body EcCoreFol.mright fun2 in
-    mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
+    let fd1, mem1 = actmem_body ml fun1 in
+    let fd2, mem2 = actmem_body mr fun2 in
+    mem1, fd1, mem2, fd2, Memory.push_active_ts mem1 mem2 env
 end
 
 (* -------------------------------------------------------------------- *)

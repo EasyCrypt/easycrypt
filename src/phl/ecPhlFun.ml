@@ -118,16 +118,15 @@ let t_bdhoareF_fun_def_r tc =
 let t_equivF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let ef = tc1_as_equivF tc in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
   let fl = NormMp.norm_xfun env ef.ef_fl in
   let fr = NormMp.norm_xfun env ef.ef_fr in
   check_concrete !!tc env fl; check_concrete !!tc env fr;
-  let (menvl, eqsl, menvr, eqsr, env) = Fun.equivS fl fr env in
+  let (menvl, eqsl, menvr, eqsr, env) = Fun.equivS ml mr fl fr env in
   let (fsigl, fdefl) = eqsl in
   let (fsigr, fdefr) = eqsr in
-  let ml = EcMemory.memory menvl in
-  let mr = EcMemory.memory menvr in
   let fresl = odfl {m=ml;inv=f_tt} (omap (ss_inv_of_expr ml) fdefl.f_ret) in
-  let fresr = odfl {m=ml;inv=f_tt} (omap (ss_inv_of_expr mr) fdefr.f_ret) in
+  let fresr = odfl {m=mr;inv=f_tt} (omap (ss_inv_of_expr mr) fdefr.f_ret) in
   let s = PVM.add env pv_res ml fresl.inv PVM.empty in
   let s = PVM.add env pv_res mr fresr.inv s in
   let post = map_ts_inv1 (PVM.subst env s) (ef_po ef) in
@@ -135,6 +134,9 @@ let t_equivF_fun_def_r tc =
   let s = subst_pre env fsigr mr s in
   let pre = map_ts_inv1 (PVM.subst env s) (ef_pr ef) in
   let concl' = f_equivS (snd menvl) (snd menvr) pre fdefl.f_body fdefr.f_body post in
+  !pp_debug_form env fresl.inv;
+  !pp_debug_form env post.inv;
+  !pp_debug_form env (ef_po ef).inv;
   FApi.xmutate1 tc `FunDef [concl']
 
 (* -------------------------------------------------------------------- *)

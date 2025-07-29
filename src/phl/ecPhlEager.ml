@@ -215,6 +215,7 @@ let t_eager_while_r h tc =
 let t_eager_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let eg  = tc1_as_eagerF tc in
+  let ml, mr = eg.eg_ml, eg.eg_mr in
 
   let fl, fr =
     (NormMp.norm_xfun env eg.eg_fl,
@@ -225,7 +226,7 @@ let t_eager_fun_def_r tc =
   EcPhlFun.check_concrete !!tc env fr;
 
   let (memenvl, (fsigl,fdefl),
-       memenvr, (fsigr,fdefr), env) = Fun.equivS fl fr env in
+       memenvr, (fsigr,fdefr), env) = Fun.equivS ml mr fl fr env in
 
   let extend mem fdef =
     match fdef.f_ret with

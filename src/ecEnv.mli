@@ -119,7 +119,7 @@ module Fun : sig
 
   val equivF : memory -> memory -> xpath -> xpath -> env -> env * env
 
-  val equivS : xpath -> xpath -> env ->
+  val equivS : memory -> memory -> xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
 end
 
