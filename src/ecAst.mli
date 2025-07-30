@@ -405,6 +405,7 @@ val bhf_bd : bdHoareF -> ss_inv
 val bhs_pr : bdHoareS -> ss_inv
 val bhs_po : bdHoareS -> ss_inv
 val bhs_bd : bdHoareS -> ss_inv
+val pr_event : pr -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 

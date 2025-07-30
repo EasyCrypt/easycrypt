@@ -594,6 +594,8 @@ let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
 let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
 let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
+let pr_event pr = {m=pr.pr_mem; inv=pr.pr_event}
+
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
 (* ----------------------------------------------------------------- *)

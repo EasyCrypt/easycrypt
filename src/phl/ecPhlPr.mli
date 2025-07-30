@@ -4,11 +4,12 @@ open EcParsetree
 open EcTypes
 open EcFol
 open EcCoreGoal.FApi
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_ppr   : backward
 val t_bdhoare_ppr : backward
-val t_equiv_ppr   : ty -> form -> form -> backward
+val t_equiv_ppr   : ty -> ss_inv -> ss_inv -> backward
 
 (* -------------------------------------------------------------------- *)
 val t_prbounded : bool -> backward

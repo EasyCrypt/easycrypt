@@ -84,6 +84,8 @@ val open_tydecl : tydecl -> ty list -> ty_body
 
 (* -------------------------------------------------------------------- *)
 val ss_inv_rebind : ss_inv -> memory -> ss_inv
+val ss_inv_generalize_as_left : ss_inv -> memory -> memory -> ts_inv
+val ss_inv_generalize_as_right : ss_inv -> memory -> memory -> ts_inv
 val f_forall_mems_ss_inv : memenv -> ss_inv -> form
 
 val ts_inv_rebind : ts_inv -> memory -> memory -> ts_inv

@@ -6,6 +6,7 @@ open EcEnv
 open EcAst
 open EcCoreGoal
 open EcLowPhlGoal
+open EcSubst
 
 module TTC = EcProofTyping
 
@@ -31,7 +32,7 @@ let t_bdhoare_ppr_r tc =
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-  let concl = map_ss_inv2 fop (map_ss_inv2 (f_pr bhf.bhf_m f_xpath) args post) 
+  let concl = map_ss_inv2 fop (map_ss_inv1 (fun args -> f_pr f_xpath args post) args)
     (bhf_bd bhf) in
   let concl = map_ss_inv2 f_imp pre concl in
   let m = EcIdent.create "&m" in
@@ -55,20 +56,20 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let argsr = map_ss_inv1 (to_args funr) (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
-  let smem1 = Fsubst.f_bind_mem Fsubst.f_subst_id mleft mhr in
-  let smem2 = Fsubst.f_bind_mem Fsubst.f_subst_id mright mhr in
-  let phi1 = Fsubst.f_subst smem1 phi_l in
-  let phi2 = Fsubst.f_subst smem2 phi_r in
-  let pr1 = f_pr (fst penvl) fl argsl.inv (f_eq phi1 a_f) in
-  let pr2 = f_pr (fst penvr) fr argsr.inv (f_eq phi2 a_f) in
+  let m = EcIdent.create "&hr" in
+  let phi1 = ss_inv_rebind phi_l m in
+  let phi2 = ss_inv_rebind phi_r m in
+  let pr1 = f_pr fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi1) in
+  let pr2 = f_pr fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi2) in
   let concl_pr =
-    f_forall_mems [penvl; penvr]
-      (f_forall_simpl [a_id,GTty ty]
-         (f_imp_simpl ef.ef_pr (f_eq_simpl pr1 pr2))) in
-  let concl_po =
-    f_forall_mems [qenvl; qenvr]
+    f_forall_mems_ts_inv penvl penvr
+      (map_ts_inv1 (f_forall_simpl [a_id,GTty ty])
+         (map_ts_inv1 (fun pr -> f_imp_simpl pr (f_eq_simpl pr1 pr2)) (ef_pr ef))) in
+  let phi_l = ss_inv_generalize_right phi1 ef.ef_mr in
+  let phi_r = ss_inv_generalize_left phi2 ef.ef_ml in
+  let concl_po = f_forall_mems_ts_inv qenvl qenvr (map_ts_inv3 (fun phi_l phi_r po ->
       (f_forall_simpl [a_id, GTty ty]
-         (f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] ef.ef_po)) in
+         (f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] po))) phi_l phi_r (ef_po ef)) in
   FApi.xmutate1 tc `PPR [concl_po; concl_pr]
 
 (* -------------------------------------------------------------------- *)
@@ -92,7 +93,7 @@ let process_ppr info tc =
       let phi2 = TTC.pf_process_form_opt !!tc qenvr None phi2 in
       if not (EcReduction.EqTest.for_type (LDecl.toenv hyps) phi1.f_ty phi2.f_ty) then
         tc_error !!tc "formulas must have convertible types";
-      t_equiv_ppr phi1.f_ty phi1 phi2 tc
+      t_equiv_ppr phi1.f_ty {m=ef.ef_ml;inv=phi1} {m=ef.ef_mr;inv=phi2} tc
 
 (* -------------------------------------------------------------------- *)
 let t_prbounded_r conseq tc =

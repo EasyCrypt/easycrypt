@@ -528,10 +528,10 @@ module Fsubst = struct
       let pr_mem   = m_subst s pr.pr_mem in
       let pr_fun   = x_subst s pr.pr_fun in
       let pr_args  = f_subst ~tx s pr.pr_args in
-      let s = f_rem_mem s mhr in
+      let (s, m) = add_m_binding s pr_mem in
       let pr_event = f_subst ~tx s pr.pr_event in
 
-      f_pr pr_mem pr_fun pr_args pr_event
+      f_pr pr_fun pr_args {m;inv=pr_event}
 
     | _ ->
       f_map (ty_subst s) (f_subst ~tx s) fp)

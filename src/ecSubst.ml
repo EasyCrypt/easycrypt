@@ -609,7 +609,7 @@ let rec subst_form (s : subst) (f : form) =
      let pr_event =
        let s = add_memory s mhr mhr in
        subst_form s pr_event in
-     f_pr pr_mem pr_fun pr_args pr_event
+     f_pr pr_fun pr_args {m=pr_mem;inv=pr_event}
 
   | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
      f_map (subst_ty s) (subst_form s) f
@@ -1125,6 +1125,22 @@ let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
   else
     let inv = subst_form (add_memory empty m m') inv in
     { inv; m = m' }
+
+let ss_inv_generalize_as_left ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_inv =
+  if ml = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty m ml in
+    let inv = subst_form s inv in
+    { inv; ml; mr }
+
+let ss_inv_generalize_as_right ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_inv =
+  if mr = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty m mr in
+    let inv = subst_form s inv in
+    { inv; ml; mr }
 
 let f_forall_mems_ss_inv menv inv =
   f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv

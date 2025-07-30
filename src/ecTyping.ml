@@ -3441,7 +3441,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let env = EcEnv.Fun.prF fpath env in
         let event' = transf env event in
         unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
-        f_pr memid fpath (f_tuple args) event'
+        f_pr fpath (f_tuple args) {m=memid;inv=event'}
 
     | PFhoareF (pre, gp, post) ->
         if mode <> `Form then

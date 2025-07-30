@@ -362,7 +362,8 @@ let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal
 
-let f_pr pr_mem pr_fun pr_args pr_event =
+let f_pr pr_fun pr_args (pr_inv: ss_inv) =
+  let pr_event, pr_mem = pr_inv.inv, pr_inv.m in
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
