@@ -158,7 +158,7 @@ module Mpv2 : sig
   val to_form_ts_inv : t -> ts_inv -> ts_inv
   val to_form : t -> memory -> memory -> form -> form
   val of_form : env -> ts_inv -> t
-  val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
+  val needed_eq : env -> ts_inv -> t
   val union   : t -> t -> t
   val subset   : t -> t -> bool
   val equal    : t -> t -> bool

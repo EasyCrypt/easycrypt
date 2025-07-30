@@ -457,8 +457,8 @@ let process_eqobs_inS info tc =
     | Some pf ->
       process_eqs env tc (TTC.tc1_process_prhl_formula tc pf)
     | None ->
-      try Mpv2.needed_eq env mleft mright es.es_po
-      with _ -> tc_error !!tc "cannot infer the set of equalities" in
+      try Mpv2.needed_eq env (es_po es)
+      with Not_found -> tc_error !!tc "cannot infer the set of equalities" in
   let post = Mpv2.to_form_ts_inv eqo inv in
   let sim = init_sim env spec inv in
   let t_main tc =
@@ -501,7 +501,7 @@ let process_eqobs_inF info tc =
     | Some pf ->
       process_eqs env tc (TTC.tc1_process_prhl_form tc tbool pf)
     | None ->
-      try Mpv2.needed_eq env mleft mright ef.ef_po
+      try Mpv2.needed_eq env (ef_po ef)
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
   let eqo = Mpv2.remove env pv_res pv_res eqo in
   let sim = init_sim env spec inv in
@@ -519,7 +519,6 @@ let process_eqobs_in cm info tc =
   let prett cm tc =
     let dt, ts = EcHiGoal.process_crushmode cm in
       EcPhlConseq.t_conseqauto ~delta:dt ?tsolve:ts tc in
-
   let tt tc =
     let concl = FApi.tc1_goal tc in
     match concl.f_node with

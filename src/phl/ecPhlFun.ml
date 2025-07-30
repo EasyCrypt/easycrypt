@@ -425,8 +425,8 @@ let t_fun_to_code_hoare_r tc =
   let spo = ToCodeLow.add_var env pv_res m r me PVM.empty in
   let pre  = PVM.subst env spr (hf_pr hf).inv in
   let post = PVM.subst env spo (hf_po hf).inv in
-  let concl = f_hoareS (snd me) {m;inv=pre} st {m;inv=post} in
-
+  let m, mt = me in
+  let concl = f_hoareS mt {m;inv=pre} st {m;inv=post} in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -435,14 +435,14 @@ let t_fun_to_code_ehoare_r tc =
   let hf = tc1_as_ehoareF tc in
   let f = hf.ehf_f in
   let m = hf.ehf_m in
-  let (_,mt) as me, st, r, a = ToCodeLow.to_code env f m in
+  let me, st, r, a = ToCodeLow.to_code env f m in
   let spr = ToCodeLow.add_var_tuple env pv_arg m a me PVM.empty in
   let spo = ToCodeLow.add_var env pv_res mhr r me PVM.empty in
 
   let pre = PVM.subst env spr hf.ehf_pr in
 
   let post = PVM.subst env spo hf.ehf_po in
-
+  let m, mt = me in
   let concl = f_eHoareS mt {m;inv=pre} st {m;inv=post} in
 
   FApi.xmutate1 tc `FunToCode [concl]
@@ -451,59 +451,65 @@ let t_fun_to_code_ehoare_r tc =
 let t_fun_to_code_bdhoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_bdhoareF tc in
+  let m0 = hf.bhf_m in
   let f = hf.bhf_f in
-  let m, st, r, a = ToCodeLow.to_code env f mhr in
-  let spr = ToCodeLow.add_var_tuple env pv_arg mhr a m PVM.empty in
-  let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
+  let m, st, r, a = ToCodeLow.to_code env f m0 in
+  let spr = ToCodeLow.add_var_tuple env pv_arg m0 a m PVM.empty in
+  let spo = ToCodeLow.add_var env pv_res m0 r m PVM.empty in
   let pre  = PVM.subst env spr hf.bhf_pr in
   let post = PVM.subst env spo hf.bhf_po in
   let bd   = PVM.subst env spr hf.bhf_bd in
-  let concl = f_bdHoareS_old m pre st post hf.bhf_cmp bd in
+  let m, mt = m in
+  let concl = f_bdHoareS mt {m;inv=pre} st {m;inv=post} hf.bhf_cmp {m;inv=bd} in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_equiv_r tc =
   let env = FApi.tc1_env tc in
   let ef = tc1_as_equivF tc in
+  let ml0, mr0 = ef.ef_ml, ef.ef_mr in
   let (fl,fr) = ef.ef_fl, ef.ef_fr in
-  let ml, sl, rl, al = ToCodeLow.to_code env fl mleft in
-  let mr, sr, rr, ar = ToCodeLow.to_code env fr mright in
+  let ml, sl, rl, al = ToCodeLow.to_code env fl ml0 in
+  let mr, sr, rr, ar = ToCodeLow.to_code env fr mr0 in
   let spr =
     let s = PVM.empty in
-    let s = ToCodeLow.add_var_tuple env pv_arg mleft  al ml s in
-    let s = ToCodeLow.add_var_tuple env pv_arg mright ar mr s in
+    let s = ToCodeLow.add_var_tuple env pv_arg ml0  al ml s in
+    let s = ToCodeLow.add_var_tuple env pv_arg mr0 ar mr s in
     s in
   let spo =
     let s = PVM.empty in
-    let s = ToCodeLow.add_var env pv_res mleft  rl ml s in
-    let s = ToCodeLow.add_var env pv_res mright rr mr s in
+    let s = ToCodeLow.add_var env pv_res ml0  rl ml s in
+    let s = ToCodeLow.add_var env pv_res mr0 rr mr s in
     s in
   let pre   = PVM.subst env spr ef.ef_pr in
   let post  = PVM.subst env spo ef.ef_po in
-  let concl = f_equivS_old ml mr pre sl sr post in
+  let (ml, mlt), (mr, mrt) = ml, mr in
+  let concl = f_equivS mlt mrt {ml;mr;inv=pre} sl sr {ml;mr;inv=post} in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
 let t_fun_to_code_eager_r tc =
   let env = FApi.tc1_env tc in
   let eg = tc1_as_eagerF tc in
+  let ml0, mr0 = eg.eg_ml, eg.eg_mr in
   let (fl,fr) = eg.eg_fl, eg.eg_fr in
-  let ml, sl, rl, al = ToCodeLow.to_code env fl mleft in
-  let mr, sr, rr, ar = ToCodeLow.to_code env fr mright in
+  let ml, sl, rl, al = ToCodeLow.to_code env fl ml0 in
+  let mr, sr, rr, ar = ToCodeLow.to_code env fr mr0 in
   let spr =
     let s = PVM.empty in
-    let s = ToCodeLow.add_var_tuple env pv_arg mleft  al ml s in
-    let s = ToCodeLow.add_var_tuple env pv_arg mright ar mr s in
+    let s = ToCodeLow.add_var_tuple env pv_arg ml0  al ml s in
+    let s = ToCodeLow.add_var_tuple env pv_arg mr0 ar mr s in
     s in
   let spo =
     let s = PVM.empty in
-    let s = ToCodeLow.add_var env pv_res mleft  rl ml s in
-    let s = ToCodeLow.add_var env pv_res mright rr mr s in
+    let s = ToCodeLow.add_var env pv_res ml0  rl ml s in
+    let s = ToCodeLow.add_var env pv_res mr0 rr mr s in
     s in
   let pre   = PVM.subst env spr eg.eg_pr in
   let post  = PVM.subst env spo eg.eg_po in
+  let (ml, mlt), (mr, mrt) = ml, mr in
   let concl =
-    f_equivS_old ml mr pre (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in
+    f_equivS mlt mrt {ml;mr;inv=pre} (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) {ml;mr;inv=post} in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)

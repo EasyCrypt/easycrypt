@@ -47,7 +47,6 @@ module Low = struct
     let cond1, cond2 =
       transitivity_side_cond hyps
         m1 m3 m1 m3 (es_pr es) (es_po es) p1 q1 mt p2 q2 in
-    !pp_debug_form (FApi.tc1_env tc) cond1;
     let cond3 =
       f_equivS (snd es.es_ml) mt p1 es.es_sl c2 q1 in
     let cond4 =

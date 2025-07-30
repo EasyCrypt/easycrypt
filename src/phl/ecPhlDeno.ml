@@ -438,7 +438,7 @@ let post_iff ml mr eq env evl evr =
   try
     if not eq then raise Not_found;
     Mpv2.to_form
-      (Mpv2.needed_eq env ml mr post)  ml mr f_true
+      (Mpv2.needed_eq env {ml; mr; inv=post})  ml mr f_true
   with Not_found -> post
 
 (* -------------------------------------------------------------------- *)

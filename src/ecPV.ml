@@ -823,7 +823,8 @@ module Mpv2 = struct
       List.fold_left2 do1 local ids1 ids2
     with _ -> raise EqObsInError
 
-  let needed_eq env ml mr f =
+  let needed_eq env f =
+    let ml, mr = f.ml, f.mr in
 
     let rec add_eq local eqs f1 f2 =
       match f1.f_node, f2.f_node with
@@ -897,8 +898,7 @@ module Mpv2 = struct
         end
       | _ -> raise Not_found in
 
-    try aux Mid.empty empty f
-    with _ -> raise Not_found
+    aux Mid.empty empty f.inv
 
   let check_glob eqs =
     Mnpv.iter (fun pv (s,_)->

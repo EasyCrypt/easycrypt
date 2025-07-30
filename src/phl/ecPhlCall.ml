@@ -239,6 +239,10 @@ let t_bdhoare_call fpre fpost opt_bd tc =
 let t_equiv_call fpre fpost tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let fpre = ts_inv_rebind fpre ml mr in
+  let fpost = ts_inv_rebind fpost ml mr in
+
   let (lpl,fl,argsl),sl = tc1_last_call tc es.es_sl in
   let (lpr,fr,argsr),sr = tc1_last_call tc es.es_sr in
   (* The functions satisfy their specification *)
