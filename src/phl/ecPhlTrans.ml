@@ -25,9 +25,10 @@ module Low = struct
       let fv2 = PV.fv env p.ml p2.inv in
       let fv  = PV.union fv1 fv2 in
       let elts, glob = PV.ntr_elements fv in
-      let bd, s = generalize_subst env mhr elts glob in
-      let s1 = PVM.of_mpv s mright in
-      let s2 = PVM.of_mpv s mleft in
+      let m = EcIdent.create "&m" in
+      let bd, s = generalize_subst env m elts glob in
+      let s1 = PVM.of_mpv s p.mr in
+      let s2 = PVM.of_mpv s p.ml in
       let concl = map_ts_inv2 f_and (map_ts_inv1 (PVM.subst env s1) p1) (map_ts_inv1 (PVM.subst env s2) p2) in
       EcSubst.f_forall_mems_ts_inv prml prmr (map_ts_inv2 f_imp p (map_ts_inv1 (f_exists bd) concl)) in
     let cond2 =
@@ -46,6 +47,7 @@ module Low = struct
     let cond1, cond2 =
       transitivity_side_cond hyps
         m1 m3 m1 m3 (es_pr es) (es_po es) p1 q1 mt p2 q2 in
+    !pp_debug_form (FApi.tc1_env tc) cond1;
     let cond3 =
       f_equivS (snd es.es_ml) mt p1 es.es_sl c2 q1 in
     let cond4 =
