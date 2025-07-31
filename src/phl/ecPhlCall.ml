@@ -424,8 +424,9 @@ let process_call side info tc =
           let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in   
-          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f bhs.bhs_cmp (bhs_bd bhs) None
+          let post = TTC.pf_process_form !!tc qenv tbool post in
+          let bd = ss_inv_rebind (bhs_bd bhs) m in
+          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f bhs.bhs_cmp bd None
 
       | FeHoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
@@ -455,8 +456,7 @@ let process_call side info tc =
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
           let post = TTC.pf_process_form !!tc qenv tbool post in
-          let f_r1 = {m; inv=f_r1} in
-          bdhoare_call_spec !!tc {m;inv=pre} {m;inv=post} f FHeq f_r1 None
+          f_bdHoareF {m;inv=pre} f {m;inv=post} FHeq {m;inv=f_r1}
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
