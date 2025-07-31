@@ -24,9 +24,8 @@ let t_bdhoare_ppr_r tc =
   let f_xpath = bhf.bhf_f in
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
   let penv,_qenv = EcEnv.Fun.hoareF_memenv bhf.bhf_m f_xpath env in
-  let m = EcIdent.create "&m" in
+  let m = EcIdent.create "&hr" in
   let args = map_ss_inv1 (to_args fun_) (f_pvarg fun_.f_sig.fs_arg m) in
-  (* Warning: currently no substitution on pre,post since penv is always mhr *)
   let pre,post = (bhf_pr bhf), (bhf_po bhf) in
   let fop = match bhf.bhf_cmp with
     | FHle -> f_real_le
@@ -36,6 +35,7 @@ let t_bdhoare_ppr_r tc =
   let bd = ss_inv_rebind (bhf_bd bhf) m in
   let concl = map_ss_inv2 fop (map_ss_inv1 (fun args -> f_pr m f_xpath args post) args)
     bd in
+  let pre   = ss_inv_rebind pre m in
   let concl = map_ss_inv2 f_imp pre concl in
   let concl = EcSubst.f_forall_mems_ss_inv (m,snd penv) concl in
   FApi.xmutate1 tc `PPR [concl]

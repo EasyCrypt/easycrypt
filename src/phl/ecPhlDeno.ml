@@ -402,16 +402,15 @@ let t_equiv_deno_bad2 pre bad1 tc =
     ]) tc
 
 (* -------------------------------------------------------------------- *)
-let process_pre ml' mr' tc hyps prl prr pre post =
+let process_pre ml mr tc hyps prl prr pre post =
   let fl = prl.pr_fun and fr = prr.pr_fun in
-  let ml, mr = prl.pr_mem, prr.pr_mem in
   match pre with
   | Some p ->
     let penv, _ = LDecl.equivF ml mr fl fr hyps in
     {ml;mr;inv=TTC.pf_process_formula !!tc penv p}
   | None ->
     let al = prl.pr_args and ar = prr.pr_args in
-    let ml = prl.pr_mem and mr = prr.pr_mem in
+    let pml = prl.pr_mem and pmr = prr.pr_mem in
 
     let env = LDecl.toenv hyps in
     let eqs = ref [] in
@@ -429,9 +428,9 @@ let process_pre ml' mr' tc hyps prl prr pre post =
           push (map_ts_inv1 (fun f -> f_eq f a) (gen_o (f_pvarg a.f_ty m)))
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
-    let gen_r f = ss_inv_generalize_right f mr' in
-    let gen_l f = ss_inv_generalize_left  f ml' in
-    dof fl al ml' ml gen_r; dof fr ar mr' mr gen_l;
+    let gen_r f = ss_inv_generalize_right f pmr in
+    let gen_l f = ss_inv_generalize_left  f pml in
+    dof fl al ml pml gen_r; dof fr ar mr pmr gen_l;
     map_ts_inv f_ands !eqs
 
 (* -------------------------------------------------------------------- *)
