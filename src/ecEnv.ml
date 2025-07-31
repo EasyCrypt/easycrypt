@@ -1724,6 +1724,7 @@ module Fun = struct
     let post = prF_memenv m path env in
     Memory.push_active_ss post env
 
+  (* FIXME: This does not use the memory identifier except to return it *)
   let hoareF_memenv mem path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in

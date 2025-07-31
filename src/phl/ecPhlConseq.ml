@@ -18,9 +18,6 @@ module PT  = EcProofTerm
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let conseq_cond_old pre post spre spost =
-  f_imp pre spre, f_imp spost post
-
 let conseq_cond_ss pre post spre spost =
   map_ss_inv2 f_imp pre spre, map_ss_inv2 f_imp spost post
 
@@ -103,14 +100,6 @@ let t_ehoareS_conseq pre post tc =
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
-let bdHoare_conseq_conds_old cmp pr po new_pr new_po =
-  let cond1, cond2 = conseq_cond_old pr po new_pr new_po in
-  let cond2 = match cmp with
-    | FHle -> f_imp po new_po
-    | FHeq -> f_iff po new_po
-    | FHge -> cond2
-  in
-  cond1, cond2
 
 let bdHoare_conseq_conds cmp pr po new_pr new_po =
   let cond1, cond2 = conseq_cond_ss pr po new_pr new_po in
@@ -127,6 +116,8 @@ let t_bdHoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_m bhf.bhf_f env in
+  let pre = ss_inv_rebind pre bhf.bhf_m in
+  let post = ss_inv_rebind post bhf.bhf_m in
   let cond1, cond2 =
     bdHoare_conseq_conds bhf.bhf_cmp (bhf_pr bhf) (bhf_po bhf) pre post in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
@@ -137,6 +128,8 @@ let t_bdHoareF_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq pre post tc =
   let bhs = tc1_as_bdhoareS tc in
+  let pre = ss_inv_rebind pre (fst bhs.bhs_m) in
+  let post = ss_inv_rebind post (fst bhs.bhs_m) in
   let cond1, cond2 =
     bdHoare_conseq_conds bhs.bhs_cmp (bhs_pr bhs) (bhs_po bhs) pre post in
   let concl1 = f_forall_mems_ss_inv bhs.bhs_m cond1 in
@@ -170,6 +163,8 @@ let t_equivF_conseq pre post tc =
   let ef  = tc1_as_equivF tc in
   let (mprl,mprr), (mpol,mpor) =
     EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr env in
+  let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
+  let post = ts_inv_rebind post ef.ef_ml ef.ef_mr in
   let cond1, cond2 = conseq_cond_ts (ef_pr ef) (ef_po ef) pre post in
   let concl1 = f_forall_mems_ts_inv mprl mprr cond1 in
   let concl2 = f_forall_mems_ts_inv mpol mpor cond2 in
@@ -182,6 +177,8 @@ let t_eagerF_conseq pre post tc =
   let eg = tc1_as_eagerF tc in
   let (mprl,mprr), (mpol,mpor) =
     EcEnv.Fun.equivF_memenv eg.eg_ml eg.eg_mr eg.eg_fl eg.eg_fr env in
+  let pre = ts_inv_rebind pre eg.eg_ml eg.eg_mr in
+  let post = ts_inv_rebind post eg.eg_ml eg.eg_mr in
   let cond1, cond2 = conseq_cond_ts (eg_pr eg) (eg_po eg) pre post in
   let concl1 = f_forall_mems_ts_inv mprl mprr cond1 in
   let concl2 = f_forall_mems_ts_inv mpol mpor cond2 in

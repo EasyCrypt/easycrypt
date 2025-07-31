@@ -209,16 +209,18 @@ let process_trans_stmt tf s ?pat c tc =
 let process_trans_fun f p1 q1 p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
   let f = EcTyping.trans_gamepath env f in
-  let (_, prmt), (_, pomt) = Fun.hoareF_memenv mhr f env in
+  let m_mid = EcIdent.create "&hr" in
+  let (_, prmt), (_, pomt) = Fun.hoareF_memenv m_mid f env in
   let (prml, prmr), (poml, pomr) = Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr env in
   let process ml mr fo =
-    let inv = TTC.pf_process_form !!tc (LDecl.push_all [ml; mr] hyps) tbool fo in
+    let inv = TTC.pf_process_form !!tc (LDecl.push_active_ts ml mr hyps) tbool fo in
     {ml=fst ml;mr=fst mr;inv} in
-  let p1 = process prml (mright, prmt) p1 in
-  let q1 = process poml (mright, pomt) q1 in
-  let p2 = process (mleft,prmt) prmr p2 in
-  let q2 = process (mleft,pomt) pomr q2 in
+  let p1 = process prml (mr, prmt) p1 in
+  let q1 = process poml (mr, pomt) q1 in
+  let p2 = process (ml, prmt) prmr p2 in
+  let q2 = process (ml, pomt) pomr q2 in
   t_equivF_trans f (p1, q1) (p2, q2) tc
 
 (* -------------------------------------------------------------------- *)
