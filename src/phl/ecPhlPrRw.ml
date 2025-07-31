@@ -217,7 +217,7 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
         -> begin
           let { pr_mem = m ; pr_fun = f; pr_args = args } = pr1 in
           let ev1 = pr1.pr_event in
-          let ev2 = pr2.pr_event in
+          let ev2 = EcSubst.ss_inv_rebind pr2.pr_event ev1.m in
           match kind with
           | `MuEq  -> (pr_eq  env m f args ev1 ev2, 1)
           | `MuSub -> (pr_sub env m f args ev1 ev2, 1)
