@@ -112,7 +112,7 @@ let callable_oracles_stmt env modv =
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: do we have to subst more?                                     *)
-let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
+let t_failure_event_r (m_spec, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let env, _, concl = FApi.tc1_eflat tc in
 
   let (pr, bd) =
@@ -193,16 +193,16 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       pred_specs
         |> List.ofind (fun (o', _) -> o = o')
         |> omap snd
-        |> odfl f_true
+        |> odfl {m=m_spec; inv=f_true}
     in
 
     let not_F_to_F_goal =
-      let m = fst memenv in
+      let m = m_spec in
       let bound = f_app_simpl ash [cntr] treal in
       let pre = f_and (f_int_le f_i0 cntr) (f_int_lt cntr q) in
       let pre = f_and pre (f_not f_event) in
       let pre = f_and_simpl pre inv in
-      let pre = f_and_simpl pre some_p in
+      let pre = f_and_simpl pre some_p.inv in
       let post = f_event in
       f_bdHoareF {m;inv=pre} o {m; inv=post} FHle {m;inv=bound}
     in
@@ -213,7 +213,7 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
     let cntr_decr_goal =
       let m = fst memenv in
-      let pre  = f_and some_p (f_eq old_cntr cntr) in
+      let pre  = f_and some_p.inv (f_eq old_cntr cntr) in
       let pre = f_and_simpl pre inv in
       let post = f_int_lt old_cntr cntr in
       let post = f_and_simpl post inv in
@@ -221,7 +221,7 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     in
     let cntr_stable_goal =
       let m = fst memenv in
-      let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
+      let pre  = f_ands [f_not some_p.inv;f_eq f_event old_b;f_eq cntr old_cntr] in
       let pre  = f_and_simpl pre inv in
       let post = f_ands [f_eq f_event old_b; f_int_le old_cntr cntr] in
       let post = f_and_simpl post inv in
@@ -241,8 +241,8 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
 
 (* -------------------------------------------------------------------- *)
-let t_failure_event mhr at_pos cntr ash q f_event pred_specs inv tc =
-  let infos = (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) in
+let t_failure_event m at_pos cntr ash q f_event pred_specs inv tc =
+  let infos = (m, at_pos, cntr, ash, q, f_event, pred_specs, inv) in
   FApi.t_low1 "failure-event" t_failure_event_r infos tc
 
 (* -------------------------------------------------------------------- *)
@@ -272,14 +272,14 @@ let process_fel at_pos (infos : fel_info) tc =
       |> odfl f_true
   in
 
-  let mhr = EcIdent.create "&hr" in
+  let m = EcIdent.create "&hr" in
   let process_pred (f,pre) =
     let env  = LDecl.toenv hyps in
     let f    = EcTyping.trans_gamepath env f in
-    let penv = fst (LDecl.hoareF mhr f hyps) in
-      (f, TTC.pf_process_form !!tc penv tbool pre)
+    let penv = fst (LDecl.hoareF m f hyps) in
+      (f, {m;inv=TTC.pf_process_form !!tc penv tbool pre})
   in
 
   let pred_specs = List.map process_pred infos.pfel_specs in
 
-  t_failure_event mhr at_pos cntr ash q f_event pred_specs inv tc
+  t_failure_event m at_pos cntr ash q f_event pred_specs inv tc
