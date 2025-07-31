@@ -42,15 +42,15 @@ let t_core_phoare_deno pre post tc =
     match concl.f_node with
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (FHle, f, bd, fun ev -> map_ss_inv2 f_imp_simpl ev post)
+      (FHle, f, bd, fun ev po -> map_ss_inv2 f_imp_simpl ev po)
 
     | Fapp ({f_node = Fop (op, _)}, [bd; f])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (FHge, f, bd, fun ev -> map_ss_inv2 f_imp_simpl post ev)
+      (FHge, f, bd, fun ev po -> map_ss_inv2 f_imp_simpl po ev)
 
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
-      (FHeq, f, bd, map_ss_inv2 f_iff_simpl post)
+      (FHeq, f, bd, map_ss_inv2 f_iff_simpl)
 
     | _ -> tc_error !!tc "invalid goal shape"
   in
@@ -65,11 +65,10 @@ let t_core_phoare_deno pre post tc =
   let concl_pr = Fsubst.f_subst smem ((PVM.subst env sargs) pre.inv) in
 
   (* building the substitution for the post *)
-  (* FIXME:
-   * let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
-   * let ev   = Fsubst.f_subst smem_ ev in *)
-  let me = EcEnv.Fun.actmem_post m fun_ in
-  let concl_po = EcSubst.f_forall_mems_ss_inv me (concl_post pr.pr_event) in
+  let ev = pr.pr_event in
+  let me = EcEnv.Fun.actmem_post ev.m fun_ in
+  let post = ss_inv_rebind post ev.m in
+  let concl_po = EcSubst.f_forall_mems_ss_inv me (concl_post ev post) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
 

@@ -107,7 +107,7 @@ let tc1_process_prhl_form_opt tc oty pf =
     | _ -> assert false
   in
 
-  let hyps = LDecl.push_all [ml; mr] hyps in
+  let hyps = LDecl.push_active_ts ml mr hyps in
   let mv = Msym.of_list [("pre", pr); ("post", po)] in
   let f = pf_process_form_opt ~mv !!tc hyps oty pf in
   let ml, mr = fst ml, fst mr in
