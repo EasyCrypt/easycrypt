@@ -1390,10 +1390,10 @@ module Op = struct
           (f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) ((resx, sig_.fs_ret) :: locs))
              (f_eq
-                (f_pr
+                (f_pr prmem
                    f
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
-                   {inv=(f_eq res.inv resv);m=prmem})
+                   (map_ss_inv1 (fun r -> f_eq r resv) res))
                 mu))
       in
 

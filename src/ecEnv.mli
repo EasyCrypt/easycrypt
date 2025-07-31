@@ -97,9 +97,9 @@ module Fun : sig
   val add   : xpath -> env -> env
 
   (* ------------------------------------------------------------------ *)
-  val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
+  val prF_memenv : memory -> xpath -> env -> memenv
 
-  val prF : xpath -> env -> env
+  val prF : memory -> xpath -> env -> env
 
   val hoareF_memenv : memory -> xpath -> env -> memenv * memenv
 

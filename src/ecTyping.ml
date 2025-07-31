@@ -3428,7 +3428,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
-    | PFprob (gp, args, m, event) ->
+    | PFprob (gp, args, pr_m, event) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Pr);
 
@@ -3437,11 +3437,12 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let args,_ =
           transcall (fun f -> let f = transf env f in f, f.f_ty)
             env ue f.pl_loc fun_.f_sig args in
-        let memid = transmem env m in
-        let env = EcEnv.Fun.prF fpath env in
-        let event' = transf env event in
-        unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
-        f_pr fpath (f_tuple args) {m=memid;inv=event'}
+        let memid = transmem env pr_m in
+        let m = EcIdent.create "&hr" in
+        let env = EcEnv.Fun.prF m fpath env in
+        let event' = {m;inv=transf env event} in
+        unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
+        f_pr memid fpath (f_tuple args) event'
 
     | PFhoareF (pre, gp, post) ->
         if mode <> `Form then

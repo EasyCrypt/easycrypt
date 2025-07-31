@@ -362,8 +362,7 @@ let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal
 
-let f_pr pr_fun pr_args (pr_inv: ss_inv) =
-  let pr_event, pr_mem = pr_inv.inv, pr_inv.m in
+let f_pr pr_mem pr_fun pr_args (pr_event: ss_inv) =
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
@@ -546,8 +545,8 @@ let f_map gt g fp =
 
   | Fpr pr ->
       let args' = g pr.pr_args in
-      let ev'   = g pr.pr_event in
-      f_pr_r { pr with pr_args = args'; pr_event = ev'; }
+      let ev'   = g pr.pr_event.inv in
+      f_pr_r { pr with pr_args = args'; pr_event = {m=pr.pr_event.m; inv=ev'}; }
 
 (* -------------------------------------------------------------------- *)
 let f_iter g f =
@@ -575,7 +574,7 @@ let f_iter g f =
   | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args; g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args; g pr.pr_event.inv
 
 
 (* -------------------------------------------------------------------- *)
@@ -604,7 +603,7 @@ let form_exists g f =
   | FequivF   ef  -> g ef.ef_pr    || g ef.ef_po
   | FequivS   es  -> g es.es_pr    || g es.es_po
   | FeagerF   eg  -> g eg.eg_pr    || g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args  || g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args  || g pr.pr_event.inv
 
 (* -------------------------------------------------------------------- *)
 let form_forall g f =
@@ -630,7 +629,7 @@ let form_forall g f =
   | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
   | FequivS   es  -> g es.es_pr   && g es.es_po
   | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args && g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args && g pr.pr_event.inv
   | FeHoareF  hf  -> g hf.ehf_pr && g hf.ehf_po
   | FeHoareS  hs  -> g hs.ehs_pr && g hs.ehs_po
 

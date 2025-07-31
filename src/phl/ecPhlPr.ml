@@ -24,7 +24,8 @@ let t_bdhoare_ppr_r tc =
   let f_xpath = bhf.bhf_f in
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
   let penv,_qenv = EcEnv.Fun.hoareF_memenv bhf.bhf_m f_xpath env in
-  let args = map_ss_inv1 (to_args fun_) (f_pvarg fun_.f_sig.fs_arg bhf.bhf_m) in
+  let m = EcIdent.create "&m" in
+  let args = map_ss_inv1 (to_args fun_) (f_pvarg fun_.f_sig.fs_arg m) in
   (* Warning: currently no substitution on pre,post since penv is always mhr *)
   let pre,post = (bhf_pr bhf), (bhf_po bhf) in
   let fop = match bhf.bhf_cmp with
@@ -32,10 +33,10 @@ let t_bdhoare_ppr_r tc =
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-  let concl = map_ss_inv2 fop (map_ss_inv1 (fun args -> f_pr f_xpath args post) args)
-    (bhf_bd bhf) in
+  let bd = ss_inv_rebind (bhf_bd bhf) m in
+  let concl = map_ss_inv2 fop (map_ss_inv1 (fun args -> f_pr m f_xpath args post) args)
+    bd in
   let concl = map_ss_inv2 f_imp pre concl in
-  let m = EcIdent.create "&m" in
   let concl = EcSubst.f_forall_mems_ss_inv (m,snd penv) concl in
   FApi.xmutate1 tc `PPR [concl]
 
@@ -59,8 +60,8 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let m = EcIdent.create "&hr" in
   let phi1 = ss_inv_rebind phi_l m in
   let phi2 = ss_inv_rebind phi_r m in
-  let pr1 = f_pr fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi1) in
-  let pr2 = f_pr fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi2) in
+  let pr1 = f_pr (fst penvl) fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi1) in
+  let pr2 = f_pr (fst penvr) fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi2) in
   let concl_pr =
     f_forall_mems_ts_inv penvl penvr
       (map_ts_inv1 (f_forall_simpl [a_id,GTty ty])
@@ -150,9 +151,9 @@ let t_prfalse tc =
 
   (* the event is false *)
   let smem  = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
-  let ev    = Fsubst.f_subst smem ev in
+  let ev'    = Fsubst.f_subst smem ev.inv in
   let fun_  = EcEnv.Fun.by_xpath f env in
-  let me    = EcEnv.Fun.actmem_post mhr fun_ in
-  let concl_po = f_forall_mems [me] (f_imp f_false ev) in
+  let me    = EcEnv.Fun.actmem_post ev.m fun_ in
+  let concl_po = f_forall_mems [me] (f_imp f_false ev') in
 
   FApi.xmutate1 tc `PrFalse [is_zero; concl_po]

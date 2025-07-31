@@ -1125,7 +1125,7 @@ let rec dump_f f =
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
   | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x
-  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
+  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e.inv ^ "]"
   | FhoareF _ -> "HoareF"
   | FhoareS _ -> "HoareS"
   | FbdHoareF _ -> "bdHoareF"

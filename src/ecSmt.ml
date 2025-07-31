@@ -906,8 +906,8 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
 
   let wev =
-    let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
-    let wbody = trans_form_b (genv,lenv) pr_event in
+    let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
+    let wbody = trans_form_b (genv,lenv) pr_event.inv in
     trans_lambda genv [wbd] wbody
 
   in WTerm.t_app_infer fs_mu [d; wev]
@@ -1416,7 +1416,7 @@ module Frequency = struct
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
-        doit pr.pr_event; doit pr.pr_args in
+        doit pr.pr_event.inv; doit pr.pr_args in
     doit f;
     if not (Sx.is_empty !sf) then sp := Sp.add CI_Distr.p_mu !sp;
     !sp, !sf
@@ -1495,7 +1495,7 @@ module Frequency = struct
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e
-      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
+      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event.inv;add pr.pr_args
       | _ -> () in
     add form
 

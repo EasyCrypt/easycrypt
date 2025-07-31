@@ -606,10 +606,9 @@ let rec subst_form (s : subst) (f : form) =
      let pr_mem = subst_mem s pr_mem in
      let pr_fun = subst_xpath s pr_fun in
      let pr_args = subst_form s pr_args in
-     let pr_event =
-       let s = add_memory s mhr mhr in
-       subst_form s pr_event in
-     f_pr pr_fun pr_args {m=pr_mem;inv=pr_event}
+     let s = add_memory s pr_event.m pr_event.m in
+     let pr_event = map_ss_inv1 (subst_form s) pr_event in
+     f_pr pr_mem pr_fun pr_args pr_event
 
   | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
      f_map (subst_ty s) (subst_form s) f

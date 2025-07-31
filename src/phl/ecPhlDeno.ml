@@ -69,7 +69,7 @@ let t_core_phoare_deno pre post tc =
    * let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
    * let ev   = Fsubst.f_subst smem_ ev in *)
   let me = EcEnv.Fun.actmem_post m fun_ in
-  let concl_po = EcSubst.f_forall_mems_ss_inv me (concl_post {m;inv=pr.pr_event}) in
+  let concl_po = EcSubst.f_forall_mems_ss_inv me (concl_post pr.pr_event) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
 
@@ -109,7 +109,7 @@ let t_ehoare_deno_r pre post tc =
   let concl_pr = f_xreal_le pre (f_r2xr bd) in
 
   (* forall m, ev%r%xr <= post *)
-  let ev = pr_event pr in
+  let ev = pr.pr_event in
   let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
@@ -157,8 +157,8 @@ let t_equiv_deno_r pre post tc =
   let concl_pr = cond_pre env prl prr pre in
 
   (* building the substitution for the post *)
-  let evl = ss_inv_generalize_as_left (pr_event prl) ml mr in
-  let evr = ss_inv_generalize_as_right (pr_event prr) ml mr in
+  let evl = ss_inv_generalize_as_left prl.pr_event ml mr in
+  let evr = ss_inv_generalize_as_right prr.pr_event ml mr in
   let cmp   =
     match cmp with
     | `Eq -> map_ts_inv2 f_iff evl evr
@@ -203,8 +203,8 @@ let process_phoare_deno info tc =
     in
 
     let { pr_fun = f } as pr = destr_pr f in
-    let m = EcIdent.create "&hr" in
-    let event = ss_inv_rebind (pr_event pr) m in
+    let event = pr.pr_event in
+    let m = event.m in
     let penv, qenv = LDecl.hoareF m f hyps in
     let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_formula !!tc penv p) f_true in
     let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) event.inv in
@@ -239,9 +239,9 @@ let process_ehoare_deno info tc =
     in
 
     let { pr_fun = f } as pr = destr_pr f in
-    let m = EcIdent.create "&hr" in
+    let event = pr.pr_event in
+    let m = event.m in
     let penv, qenv = LDecl.hoareF m f hyps in
-    let event = ss_inv_rebind (pr_event pr) m in
     let smem = Fsubst.f_bind_mem Fsubst.f_subst_id pr.pr_mem m in
     let dpre = {m;inv=f_r2xr (Fsubst.f_subst smem bd)} in
 
@@ -287,7 +287,7 @@ let t_pr_pos tc =
       let _, fpr = DestrReal.le (tc1_goal tc) in
       destr_pr fpr
     with DestrError _ -> tc_error !!tc "invalid goal shape" in
-  let prf = f_pr_r {pr with pr_event = f_false} in
+  let prf = f_pr_r {pr with pr_event = {m=pr.pr_event.m; inv=f_false}} in
   (t_real_le_trans prf @+
     [ t_pr_rewrite ("mu_false", None) @! t_true;
       t_pr_rewrite ("mu_sub", None) @! t_true]) tc
@@ -297,15 +297,15 @@ let t_equiv_deno_bad pre tc =
   let env, _hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and prb = destr_pr fprb in
-  let fand = map_ss_inv2 f_and (pr_event pr2) (map_ss_inv1 f_not (pr_event prb)) in
-  let pro = f_pr pr2.pr_fun pr2.pr_args (map_ss_inv2 f_or fand (pr_event prb)) in
-  let pra = f_pr pr2.pr_fun pr2.pr_args fand in
+  let fand = map_ss_inv2 f_and pr2.pr_event (map_ss_inv1 f_not prb.pr_event) in
+  let pro = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_or fand prb.pr_event) in
+  let pra = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args fand in
   let t_false tc = t_apply_prept (`UG real_upto_false) tc in
   let ml, mr = pre.ml, pre.mr in
   let post =
-    let ev1 = ss_inv_generalize_as_left (pr_event pr1) ml mr in
-    let ev2 = ss_inv_generalize_as_right (pr_event pr2) ml mr in
-    let bad2 = ss_inv_generalize_as_right (pr_event prb) ml mr in
+    let ev1 = ss_inv_generalize_as_left pr1.pr_event ml mr in
+    let ev2 = ss_inv_generalize_as_right pr2.pr_event ml mr in
+    let bad2 = ss_inv_generalize_as_right prb.pr_event ml mr in
     map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) (map_ts_inv2 f_imp ev1 ev2) in
 
   (t_real_le_trans pro @+
@@ -351,8 +351,8 @@ let t_equiv_deno_bad2 pre bad1 tc =
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and
       prb = destr_pr fprb in
   let f1 = pr1.pr_fun and f2 = pr2.pr_fun in
-  let ev1 = (pr_event pr1) and ev2 = (pr_event pr2) in
-  let bad2 = (pr_event prb) in
+  let ev1 = pr1.pr_event and ev2 = pr2.pr_event in
+  let bad2 = prb.pr_event in
   let post =
     let bad1 = ss_inv_generalize_as_left bad1 ml mr in
     let ev1 = ss_inv_generalize_as_left ev1 ml mr in
@@ -362,10 +362,10 @@ let t_equiv_deno_bad2 pre bad1 tc =
       (map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) (map_ts_inv2 f_iff ev1 ev2)) in
   let equiv = f_equivF pre f1 f2 post in
   let cpre = cond_pre env pr1 pr2 pre in
-  let fpreb1 = f_pr pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 bad1) in
-  let fpren1 = f_pr pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 (map_ss_inv1 f_not bad1)) in
-  let fpreb2 = f_pr pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 bad2) in
-  let fpren2 = f_pr pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 (map_ss_inv1 f_not bad2)) in
+  let fpreb1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 bad1) in
+  let fpren1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 (map_ss_inv1 f_not bad1)) in
+  let fpreb2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 bad2) in
+  let fpren2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 (map_ss_inv1 f_not bad2)) in
   let fabs' =
     f_real_abs
       (f_real_sub (f_real_add fpreb1 fpren1) (f_real_add fpreb2 fpren2)) in
@@ -460,9 +460,9 @@ let process_equiv_deno1 info eq tc =
     let ml , mr = EcIdent.create "&1", EcIdent.create "&2" in
 
     let { pr_fun = fl } as prl = destr_pr f1 in
-    let evl = ss_inv_generalize_as_left (pr_event prl) ml mr in
+    let evl = ss_inv_generalize_as_left prl.pr_event ml mr in
     let { pr_fun = fr } as prr = destr_pr f2 in
-    let evr = ss_inv_generalize_as_right (pr_event prr) ml mr in
+    let evr = ss_inv_generalize_as_right prr.pr_event ml mr in
 
     let post =
       match post with
@@ -500,10 +500,8 @@ let process_equiv_deno_bad info tc =
     let env, hyps, concl = FApi.tc1_eflat tc in
     let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
 
-    let { pr_fun = fl } as prl = destr_pr fpr1 in
-    let evl = pr_event prl in
-    let { pr_fun = fr } as prr = destr_pr fpr2 in
-    let evr = pr_event prr in
+    let { pr_fun = fl ; pr_event = evl } as prl = destr_pr fpr1 in
+    let { pr_fun = fr ; pr_event = evr } as prr = destr_pr fpr2 in
 
     let ml , mr = EcIdent.create "&1", EcIdent.create "&2" in
 
@@ -515,7 +513,7 @@ let process_equiv_deno_bad info tc =
       | None ->
         let evl = ss_inv_generalize_as_left evl ml mr in
         let evr = ss_inv_generalize_as_right evr ml mr in
-        let bad = ss_inv_generalize_as_right (pr_event (destr_pr fprb)) ml mr in
+        let bad = ss_inv_generalize_as_right (destr_pr fprb).pr_event ml mr in
         let f_imps' l = f_imps (List.tl l) (List.hd l) in
         map_ts_inv f_imps' [evr; map_ts_inv1 f_not bad; evl] in
     let pre = process_pre ml mr tc hyps prl prr pre post in
@@ -553,10 +551,8 @@ let process_equiv_deno_bad2 info eq bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
 
-  let { pr_fun = fl; pr_mem = ml } as prl = destr_pr fpr1 in
-  let evl = pr_event prl in
-  let { pr_fun = fr; } as prr = destr_pr fpr2 in
-  let evr = pr_event prr in
+  let { pr_fun = fl; pr_mem = ml ; pr_event = evl } as prl = destr_pr fpr1 in
+  let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
 
   let ml' , mr' = EcIdent.create "&1", EcIdent.create "&2" in
 
@@ -575,7 +571,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
         let evl = ss_inv_generalize_as_left evl ml' mr' in
         let evr = ss_inv_generalize_as_right evr ml' mr' in
         let bad1 = ss_inv_generalize_as_left bad1 ml' mr' in
-        let bad2 = ss_inv_generalize_as_right (pr_event (destr_pr fprb)) ml' mr' in
+        let bad2 = ss_inv_generalize_as_right (destr_pr fprb).pr_event ml' mr' in
         let iff = post_iff ml' mr' eq env evl evr in
         map_ts_inv2 f_and (map_ts_inv2 f_iff bad1 bad2) (map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) iff) in
 

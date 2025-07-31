@@ -297,17 +297,18 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+and ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
 and pr = {
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
-  pr_event : form;
+  pr_event : ss_inv;
 }
 
-type ss_inv = {
-  m   : memory;
-  inv : form;
-}
 
 val map_ss_inv : ?m:memory -> (form list -> form) -> ss_inv list -> ss_inv
 val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
@@ -405,7 +406,6 @@ val bhf_bd : bdHoareF -> ss_inv
 val bhs_pr : bdHoareS -> ss_inv
 val bhs_po : bdHoareS -> ss_inv
 val bhs_bd : bdHoareS -> ss_inv
-val pr_event : pr -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 

@@ -278,7 +278,7 @@ let rec on_form (cb : cb) (f : EcFol.form) =
 
   and on_pr cb pr =
     on_xp cb pr.EcAst.pr_fun;
-    List.iter (on_form cb) [pr.EcAst.pr_event; pr.EcAst.pr_args]
+    List.iter (on_form cb) [pr.EcAst.pr_event.inv; pr.EcAst.pr_args]
 
   in
     on_ty cb f.EcAst.f_ty; fornode ()

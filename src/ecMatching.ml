@@ -723,8 +723,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;
           doit env (subst, mxs) pr1.pr_args pr2.pr_args;
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-          doit env (subst, mxs) pr1.pr_event pr2.pr_event;
+          let ev1, ev2 = pr1.pr_event, pr2.pr_event in
+          let mxs = Mid.add ev1.m ev2.m mxs in
+          doit env (subst, mxs) ev1.inv ev2.inv;
       end
 
       | _, _ -> failure ()
@@ -991,7 +992,8 @@ module FPosition = struct
 
           | Fpr pr ->
               let subctxt = Sid.add pr.pr_mem ctxt in
-              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
+              let subctxt = Sid.add pr.pr_event.m subctxt in
+              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event.inv)])
 
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add hs.hf_m ctxt, [(hf_pr hs).inv; (hf_po hs).inv]))
@@ -1005,8 +1007,8 @@ module FPosition = struct
                                        (   ctxt, hs.bhf_bd)]))
 
           | FequivF es ->
-              let ctxt = Sid.add EcFol.mleft  ctxt in
-              let ctxt = Sid.add EcFol.mright ctxt in
+              let ctxt = Sid.add es.ef_ml ctxt in
+              let ctxt = Sid.add es.ef_mr ctxt in
               doit pos (`WithCtxt (ctxt, [es.ef_pr; es.ef_po]))
 
           | _ -> None
@@ -1138,8 +1140,9 @@ module FPosition = struct
               f_let lv f1' f2'
 
           | Fpr pr ->
-              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
-              f_pr pr.pr_fun args' {m=pr.pr_mem;inv=event'}
+              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event.inv]) in
+              let m = pr.pr_event.m in
+              f_pr pr.pr_mem pr.pr_fun args' {m;inv=event'}
 
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv]) in

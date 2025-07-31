@@ -280,16 +280,16 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+and ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
 and pr = {
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
-  pr_event : form;
-}
-
-type ss_inv = {
-  m   : memory;
-  inv : form;
+  pr_event : ss_inv;
 }
 
 let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv = 
@@ -594,8 +594,6 @@ let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
 let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
 let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
-let pr_event pr = {m=pr.pr_mem; inv=pr.pr_event}
-
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
 (* ----------------------------------------------------------------- *)
@@ -884,6 +882,8 @@ let me_hash (mem, Lmt_concrete mt) =
     (EcIdent.id_hash mem)
     (Why3.Hashcons.combine_option lmt_hash mt)
 
+let mem_hash: memory -> _ = EcIdent.id_hash
+
 let mem_equal = EcIdent.id_equal
 
 let me_equal_gen ty_equal (m1,mt1) (m2,mt2) =
@@ -935,6 +935,7 @@ let hf_equal hf1 hf2 =
      f_equal hf1.hf_pr hf2.hf_pr
   && f_equal hf1.hf_po hf2.hf_po
   && EcPath.x_equal hf1.hf_f hf2.hf_f
+  && mem_equal hf1.hf_m hf2.hf_m
 
 let hs_equal hs1 hs2 =
      f_equal hs1.hs_pr hs2.hs_pr
@@ -946,6 +947,7 @@ let ehf_equal hf1 hf2 =
      f_equal hf1.ehf_pr  hf2.ehf_pr
   && f_equal hf1.ehf_po  hf2.ehf_po
   && EcPath.x_equal hf1.ehf_f hf2.ehf_f
+  && mem_equal hf1.ehf_m hf2.ehf_m
 
 let ehs_equal hs1 hs2 =
      f_equal hs1.ehs_pr  hs2.ehs_pr
@@ -959,6 +961,7 @@ let bhf_equal bhf1 bhf2 =
   && EcPath.x_equal bhf1.bhf_f bhf2.bhf_f
   && bhf1.bhf_cmp = bhf2.bhf_cmp
   && f_equal bhf1.bhf_bd bhf2.bhf_bd
+  && mem_equal bhf1.bhf_m bhf2.bhf_m
 
 let bhs_equal bhs1 bhs2 =
      f_equal bhs1.bhs_pr bhs2.bhs_pr
@@ -973,6 +976,8 @@ let eqf_equal ef1 ef2 =
   && f_equal ef1.ef_po ef2.ef_po
   && EcPath.x_equal ef1.ef_fl ef2.ef_fl
   && EcPath.x_equal ef1.ef_fr ef2.ef_fr
+  && mem_equal ef1.ef_ml ef2.ef_ml
+  && mem_equal ef1.ef_mr ef2.ef_mr
 
 let eqs_equal es1 es2 =
      f_equal es1.es_pr es2.es_pr
@@ -989,17 +994,20 @@ let egf_equal eg1 eg2 =
   && EcPath.x_equal eg1.eg_fl eg2.eg_fl
   && EcPath.x_equal eg1.eg_fr eg2.eg_fr
   && s_equal eg1.eg_sr eg2.eg_sr
+  && mem_equal eg1.eg_ml eg2.eg_ml
+  && mem_equal eg1.eg_mr eg2.eg_mr
 
 let pr_equal pr1 pr2 =
      EcIdent.id_equal pr1.pr_mem pr2.pr_mem
   && EcPath.x_equal   pr1.pr_fun pr2.pr_fun
-  && f_equal          pr1.pr_event pr2.pr_event
+  && f_equal          pr1.pr_event.inv pr2.pr_event.inv
   && f_equal          pr1.pr_args pr2.pr_args
+  && mem_equal        pr1.pr_event.m pr2.pr_event.m
 
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
-  Why3.Hashcons.combine2
-    (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f)
+  Why3.Hashcons.combine3
+    (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f) (mem_hash hf.hf_m)
 
 let hs_hash hs =
   Why3.Hashcons.combine3
@@ -1008,9 +1016,9 @@ let hs_hash hs =
     (me_hash hs.hs_m)
 
 let ehf_hash hf =
-  Why3.Hashcons.combine2
+  Why3.Hashcons.combine3
     (f_hash hf.ehf_pr) (f_hash hf.ehf_po)
-    (EcPath.x_hash hf.ehf_f)
+    (EcPath.x_hash hf.ehf_f) (mem_hash hf.ehf_m)
 
 let ehs_hash hs =
   Why3.Hashcons.combine3
@@ -1020,7 +1028,7 @@ let ehs_hash hs =
 
 let bhf_hash bhf =
   Why3.Hashcons.combine_list f_hash
-    (Why3.Hashcons.combine (hcmp_hash bhf.bhf_cmp) (EcPath.x_hash bhf.bhf_f))
+    (Why3.Hashcons.combine2 (hcmp_hash bhf.bhf_cmp) (EcPath.x_hash bhf.bhf_f) (mem_hash bhf.bhf_m))
     [bhf.bhf_pr;bhf.bhf_po;bhf.bhf_bd]
 
 let bhs_hash bhs =
@@ -1032,9 +1040,10 @@ let bhs_hash bhs =
     [bhs.bhs_pr;bhs.bhs_po;bhs.bhs_bd]
 
 let ef_hash ef =
-  Why3.Hashcons.combine3
-    (f_hash ef.ef_pr) (f_hash ef.ef_po)
-    (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
+  Why3.Hashcons.combine_list f_hash 
+    (Why3.Hashcons.combine3 (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
+      (mem_hash ef.ef_ml) (mem_hash ef.ef_mr))
+    [ef.ef_pr;ef.ef_po]
 
 let es_hash es =
   Why3.Hashcons.combine3
@@ -1046,17 +1055,19 @@ let es_hash es =
        (s_hash es.es_sr))
 
 let eg_hash eg =
-  Why3.Hashcons.combine3
-    (f_hash eg.eg_pr) (f_hash eg.eg_po)
-    (Why3.Hashcons.combine (s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
-    (Why3.Hashcons.combine (s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr))
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine3
+      (mem_hash eg.eg_ml) (mem_hash eg.eg_mr)
+       (Why3.Hashcons.combine (s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
+       (Why3.Hashcons.combine (s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr)))
+    [eg.eg_pr; eg.eg_po]
 
 let pr_hash pr =
   Why3.Hashcons.combine3
     (EcIdent.id_hash pr.pr_mem)
     (EcPath.x_hash   pr.pr_fun)
     (f_hash          pr.pr_args)
-    (f_hash          pr.pr_event)
+    (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))
 
 
 (* ----------------------------------------------------------------- *)
@@ -1426,7 +1437,7 @@ module Hsform = Why3.Hashcons.Make (struct
           (fv_union (s_fv eg.eg_sl) (s_fv eg.eg_sr))
 
     | Fpr pr ->
-        let fve = Mid.remove mhr (f_fv pr.pr_event) in
+        let fve = Mid.remove pr.pr_event.m (f_fv pr.pr_event.inv) in
         let fv  = EcPath.x_fv fve pr.pr_fun in
         fv_union (f_fv pr.pr_args) (fv_add pr.pr_mem fv)
 

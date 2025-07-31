@@ -358,7 +358,8 @@ module PV = struct
 
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in
-          in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
+          let ev = pr.pr_event in
+          in_mem_scope env fv [ev.m] [ev.inv]
 
     and in_mem_scope env fv mems fs =
       if   List.exists (EcIdent.id_equal m) mems

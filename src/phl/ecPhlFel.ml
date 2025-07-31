@@ -129,14 +129,14 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let ev = pr.pr_event in
 
   let memenv, (fsig, fdef), _ =
-    try  Fun.hoareS mhr f env
+    try  Fun.hoareS ev.m f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
   let s_hd, s_tl = EcLowPhlGoal.s_split env at_pos fdef.f_body in
-  let fve        = PV.fv env mhr f_event in
-  let fvc        = PV.fv env mhr cntr in
-  let fvi        = PV.fv env mhr inv in
+  let fve        = PV.fv env ev.m f_event in
+  let fvc        = PV.fv env ev.m cntr in
+  let fvi        = PV.fv env ev.m inv in
   let fv         = PV.union (PV.union fve fvc) fvi in
   let os         = callable_oracles_stmt env fv (stmt s_tl) in
 
@@ -159,8 +159,8 @@ let t_failure_event_r (mhr, at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   (* we must quantify over memories *)
   let mo = EcIdent.create "&m" in
   let post_goal =
-    let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mo in
-    let p = f_imps [ev;inv] (f_and f_event (f_int_le cntr q)) in
+    let subst = Fsubst.f_bind_mem Fsubst.f_subst_id ev.m mo in
+    let p = f_imps [ev.inv;inv] (f_and f_event (f_int_le cntr q)) in
     let p = Fsubst.f_subst subst p in
     f_forall_mems [mo, EcMemory.memtype m] p
   in

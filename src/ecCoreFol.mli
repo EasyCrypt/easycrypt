@@ -142,7 +142,7 @@ val f_eagerF_old   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
 
 (* soft-constructors - Pr *)
 val f_pr_r : pr -> form
-val f_pr   : xpath -> form -> ss_inv -> form
+val f_pr   : memory -> xpath -> form -> ss_inv -> form
 
 (* soft-constructors - unit *)
 val f_tt : form

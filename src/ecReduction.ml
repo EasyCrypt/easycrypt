@@ -608,6 +608,8 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
     | FeagerF eg1, FeagerF eg2 ->
       check_xp env subst eg1.eg_fl eg2.eg_fl;
       check_xp env subst eg1.eg_fr eg2.eg_fr;
+      let subst = check_m_binding subst eg1.eg_ml eg2.eg_ml in
+      let subst = check_m_binding subst eg1.eg_mr eg2.eg_mr in
       aux env subst eg1.eg_pr eg2.eg_pr;
       aux env subst eg1.eg_po eg2.eg_po;
       check_s env subst eg1.eg_sl eg2.eg_sl;
@@ -616,8 +618,9 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
     | Fpr pr1, Fpr pr2 ->
       check_mem subst pr1.pr_mem pr2.pr_mem;
       check_xp env subst pr1.pr_fun pr2.pr_fun;
+      let subst = check_m_binding subst pr1.pr_event.m pr2.pr_event.m in
       aux env subst pr1.pr_args pr2.pr_args;
-      aux env subst pr1.pr_event pr2.pr_event
+      aux env subst pr1.pr_event.inv pr2.pr_event.inv
 
     | _, _ -> error ()
 
@@ -1386,7 +1389,7 @@ let zpop ri side f hd =
     let (ml, mr) = (hs.eg_ml, hs.eg_mr) in
     f_eagerF {ml;mr;inv=pr}  hs.eg_sl hs.eg_fl hs.eg_fr hs.eg_sr {ml;mr;inv=po}
   | Zhl {f_node = Fpr hs}, [a;ev] ->
-    f_pr_r {hs with pr_args = a; pr_event = ev }
+    f_pr_r {hs with pr_args = a; pr_event = {m=hs.pr_event.m; inv=ev} }
   | _, _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -1544,14 +1547,17 @@ let rec conv ri env f1 f2 stk =
        && EqTest_i.for_xp env eg1.eg_fr eg2.eg_fr
        && EqTest_i.for_stmt env eg1.eg_sl eg2.eg_sl
        && EqTest_i.for_stmt env eg1.eg_sr eg2.eg_sr then
-      conv ri env eg1.eg_pr eg2.eg_pr (zhl f1 [eg1.eg_po] [eg2.eg_po] stk)
+      let pr2 = (ts_inv_rebind (eg_pr eg2) eg1.eg_ml eg1.eg_mr).inv in
+      let po2 = (ts_inv_rebind (eg_po eg2) eg1.eg_ml eg1.eg_mr).inv in
+      conv ri env eg1.eg_pr pr2 (zhl f1 [eg1.eg_po] [po2] stk)
     else
       force_head ri env f1 f2 stk
 
   | Fpr pr1, Fpr pr2 ->
     if EcMemory.mem_equal pr1.pr_mem pr2.pr_mem &&
          EqTest_i.for_xp env pr1.pr_fun pr2.pr_fun then
-      conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event] [pr2.pr_event] stk)
+      let ev2 = (ss_inv_rebind pr2.pr_event pr1.pr_event.m).inv in
+      conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event.inv] [ev2] stk)
     else
       force_head ri env f1 f2 stk
 

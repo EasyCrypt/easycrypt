@@ -2064,7 +2064,7 @@ and pp_form_core_r
          | _ ->
              (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
         (pp_local ppe) pr.pr_mem
-        (pp_form ppep) pr.pr_event
+        (pp_form ppep) pr.pr_event.inv
 
 and pp_form_r
   (ppe   : PPEnv.t)

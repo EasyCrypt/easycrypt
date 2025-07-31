@@ -1720,8 +1720,8 @@ module Fun = struct
     let fun_ = by_xpath path env in
     actmem_post m fun_
 
-  let prF path env =
-    let post = prF_memenv EcCoreFol.mhr path env in
+  let prF m path env =
+    let post = prF_memenv m path env in
     Memory.push_active_ss post env
 
   let hoareF_memenv mem path env =
