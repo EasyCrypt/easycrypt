@@ -468,21 +468,27 @@ let process_call side info tc =
     match concl.f_node with
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let m = fst hs.hs_m in
+        let m = EcIdent.create "&hr" in
+        let me = EcMemory.abstract m in
+        let hyps = LDecl.push_active_ss me hyps in
         let inv = TTC.pf_process_form !!tc hyps tbool inv in
         let inv = {m; inv} in
         (f_hoareF inv f inv, Inv_ss inv)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-        let m = fst hs.ehs_m in
+        let m = EcIdent.create "&hr" in
+        let me = EcMemory.abstract m in
+        let hyps = LDecl.push_active_ss me hyps in
         let inv = TTC.pf_process_form !!tc hyps txreal inv in
         let inv = {m; inv} in
         (f_eHoareF inv f inv, Inv_ss inv)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-      let m = fst bhs.bhs_m in
+      let m = EcIdent.create "&hr" in
+      let me = EcMemory.abstract m in
+      let hyps = LDecl.push_active_ss me hyps in
       let inv = TTC.pf_process_form !!tc hyps txreal inv in
       let inv = {m; inv} in
       let f = bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp (bhs_bd bhs) None in

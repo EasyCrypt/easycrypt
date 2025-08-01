@@ -7,11 +7,10 @@ open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_failure_event :
-     EcMemory.memory
-  -> codepos1
-  -> form -> form -> form -> form
+     codepos1
+  -> ss_inv -> form -> form -> ss_inv
   -> (xpath * ss_inv) list
-  -> form
+  -> ss_inv
   -> backward
 
 (* -------------------------------------------------------------------- *)
