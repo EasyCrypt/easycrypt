@@ -190,14 +190,14 @@ let process_trans_stmt tf s ?pat c tc =
   | TFform (p1, q1, p2, q2) ->
     let p1, q1 =
       let ml, mr = (fst es.es_ml), (EcIdent.create "&hr") in
-      let hyps = LDecl.push_all [es.es_ml; (mr, mt)] hyps in
-      let p1 = TTC.pf_process_form !!tc hyps tbool p1 in 
+      let hyps = LDecl.push_active_ts es.es_ml (mr, mt) hyps in
+      let p1 = TTC.pf_process_form !!tc hyps tbool p1 in
       let q1 = TTC.pf_process_form !!tc hyps tbool q1 in
       {ml;mr;inv=p1}, {ml;mr;inv=q1}
     in
     let p2, q2 =
       let ml, mr = (EcIdent.create "&hr"), (fst es.es_mr) in
-      let hyps = LDecl.push_all [(ml, mt); es.es_mr] hyps in
+      let hyps = LDecl.push_active_ts (ml, mt) es.es_mr hyps in
       let p2 = TTC.pf_process_form !!tc hyps tbool p2 in
       let q2 = TTC.pf_process_form !!tc hyps tbool q2 in
       {ml;mr;inv=p2}, {ml;mr;inv=q2} 
