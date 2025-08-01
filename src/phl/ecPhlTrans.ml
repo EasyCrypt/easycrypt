@@ -85,7 +85,7 @@ let t_equivS_trans_eq side s tc =
       let mem_pre = Option.map (fun mpre -> ss_inv_generalize_right mpre (fst es.es_mr)) mem_pre_ss in
       es.es_sl, es.es_ml, mem_pre
     | `Right -> 
-      let mem_pre_ss = EcFol.split_sided (fst es.es_mr) (es_po es) in
+      let mem_pre_ss = EcFol.split_sided (fst es.es_mr) (es_pr es) in
       let mem_pre = Option.map (fun mpre -> ss_inv_generalize_left mpre (fst es.es_ml)) mem_pre_ss in
       es.es_sr, es.es_mr, mem_pre in
 
