@@ -597,11 +597,13 @@ let process_fun_to_code tc =
 (* -------------------------------------------------------------------- *)
 let process_fun_upto_info (bad, p, q) tc =
   let hyps = FApi.tc1_hyps tc in
-  let env' = LDecl.inv_memenv hyps in
+  let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
+  let env' = LDecl.inv_memenv ml mr hyps in
   let p    = TTC.pf_process_form !!tc env' tbool p in
   let q    = q |> omap (TTC.pf_process_form !!tc env' tbool) |> odfl f_true in
   let bad  =
-    let env' = LDecl.push_active_ss (EcMemory.abstract EcFol.mhr) hyps in
+    let m = EcIdent.create "&bad" in
+    let env' = LDecl.push_active_ss (EcMemory.abstract m) hyps in
     TTC.pf_process_form !!tc env' tbool bad
   in
     ({inv=bad;m=mhr}, {inv=p;ml=mleft;mr=mright}, {inv=q;ml=mleft;mr=mright})
@@ -615,27 +617,31 @@ let process_fun_upto info g =
 let process_fun_abs inv tc =
   let t_hoare tc =
     let hyps = FApi.tc1_hyps tc in
-    let env' = LDecl.inv_memenv1 hyps in
+    let m = EcIdent.create "&hr" in
+    let env' = LDecl.inv_memenv1 m hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_hoareF_abs {inv;m=mhr} tc
+    t_hoareF_abs {inv;m} tc
 
   and t_ehoare tc =
     let hyps = FApi.tc1_hyps tc in
-    let env' = LDecl.inv_memenv1 hyps in
+    let m = EcIdent.create "&hr" in
+    let env' = LDecl.inv_memenv1 m hyps in
     let inv  = TTC.pf_process_xreal !!tc env' inv in
-    t_ehoareF_abs {inv;m=mhr} tc
+    t_ehoareF_abs {inv;m} tc
 
   and t_bdhoare tc =
     let hyps = FApi.tc1_hyps tc in
-    let env' = LDecl.inv_memenv1 hyps in
+    let m = EcIdent.create "&hr" in
+    let env' = LDecl.inv_memenv1 m hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_bdhoareF_abs {inv;m=mhr} tc
+    t_bdhoareF_abs {inv;m} tc
 
   and t_equiv tc =
     let hyps = FApi.tc1_hyps tc in
-    let env' = LDecl.inv_memenv hyps in
+    let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
+    let env' = LDecl.inv_memenv ml mr hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_equivF_abs {inv;ml=mleft;mr=mright} tc
+    t_equivF_abs {inv;ml;mr} tc
 
   in
   t_hF_or_bhF_or_eF ~th:t_hoare ~teh:t_ehoare ~tbh:t_bdhoare ~te:t_equiv tc

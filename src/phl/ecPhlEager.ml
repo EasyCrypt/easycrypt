@@ -590,11 +590,12 @@ let process_fun_def tc =
 
 (* -------------------------------------------------------------------- *)
 let process_fun_abs info eqI tc =
+  let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
   let hyps  = FApi.tc1_hyps tc in
-  let env   = LDecl.inv_memenv hyps in
+  let env   = LDecl.inv_memenv ml mr hyps in
   let eqI   = TTC.pf_process_form !!tc env tbool eqI in
   let gs, h = process_info info tc in
-  FApi.t_last (t_eager_fun_abs {inv=eqI;ml=mleft;mr=mright} h) gs
+  FApi.t_last (t_eager_fun_abs {inv=eqI;ml;mr} h) gs
 
 (* -------------------------------------------------------------------- *)
 let process_call info tc =

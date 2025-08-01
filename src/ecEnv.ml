@@ -1709,11 +1709,11 @@ module Fun = struct
     let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
     EcMemory.abstract id
 
-  let inv_memenv env =
-    Memory.push_all [inv_memory `Left; inv_memory `Rigth] env
+  let inv_memenv ml mr env =
+    Memory.push_active_ts (EcMemory.abstract ml) (EcMemory.abstract mr) env
 
-  let inv_memenv1 env =
-    let mem  = EcMemory.abstract EcCoreFol.mhr in
+  let inv_memenv1 m env =
+    let mem  = EcMemory.abstract m in
     Memory.push_active_ss mem env
 
   let prF_memenv m path env =
@@ -3630,11 +3630,11 @@ module LDecl = struct
     let env1, env2 = Fun.equivF ml mr xp1 xp2 lenv.le_env in
     { lenv with le_env = env1}, {lenv with le_env = env2 }
 
-  let inv_memenv lenv =
-    { lenv with le_env = Fun.inv_memenv lenv.le_env }
+  let inv_memenv ml mr lenv =
+    { lenv with le_env = Fun.inv_memenv ml mr lenv.le_env }
 
-  let inv_memenv1 lenv =
-    { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
+  let inv_memenv1 m lenv =
+    { lenv with le_env = Fun.inv_memenv1 m lenv.le_env }
 end
 
 

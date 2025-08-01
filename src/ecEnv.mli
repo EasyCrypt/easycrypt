@@ -112,7 +112,7 @@ module Fun : sig
 
   val inv_memory : [`Left|`Right] -> memenv
 
-  val inv_memenv : env -> env
+  val inv_memenv : memory -> memory -> env -> env
 
   val equivF_memenv : memory -> memory -> xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
@@ -513,8 +513,8 @@ module LDecl : sig
   val hoareF : memory -> xpath -> hyps -> hyps * hyps
   val equivF : memory -> memory -> xpath -> xpath -> hyps -> hyps * hyps
 
-  val inv_memenv  : hyps -> hyps
-  val inv_memenv1 : hyps -> hyps
+  val inv_memenv  : memory -> memory -> hyps -> hyps
+  val inv_memenv1 : memory ->hyps -> hyps
 end
 
 val pp_debug_form : (env -> form -> unit) ref

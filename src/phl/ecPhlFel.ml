@@ -259,8 +259,10 @@ let process_fel at_pos (infos : fel_info) tc =
       -> destr_pr pr
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" in
 
+
+  let m = EcIdent.create "&hr" in
   let at_pos  = EcTyping.trans_codepos1 env at_pos in
-  let hyps    = LDecl.inv_memenv1 hyps1 in
+  let hyps    = LDecl.inv_memenv1 m hyps1 in
   let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
   let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in
   let hypsq   = LDecl.push_active_ss (EcMemory.abstract pr.pr_mem) hyps1 in
@@ -272,7 +274,6 @@ let process_fel at_pos (infos : fel_info) tc =
       |> odfl f_true
   in
 
-  let m = EcIdent.create "&hr" in
   let process_pred (f,pre) =
     let env  = LDecl.toenv hyps in
     let f    = EcTyping.trans_gamepath env f in

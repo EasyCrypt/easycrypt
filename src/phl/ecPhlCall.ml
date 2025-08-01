@@ -491,7 +491,9 @@ let process_call side info tc =
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-      let ml, mr = (fst es.es_ml, fst es.es_mr) in
+      let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
+      let mel, mer = EcMemory.abstract ml, EcMemory.abstract mr in
+      let hyps = LDecl.push_active_ts mel mer hyps in
       let env  = LDecl.toenv hyps in
       let inv = TTC.pf_process_form !!tc hyps tbool inv in
       let inv = {ml;mr; inv} in
