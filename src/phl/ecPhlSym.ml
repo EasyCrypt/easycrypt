@@ -2,7 +2,6 @@
 open EcFol
 open EcCoreGoal
 open EcLowPhlGoal
-open EcSubst
 open EcAst
 
 (*-------------------------------------------------------------------- *)
