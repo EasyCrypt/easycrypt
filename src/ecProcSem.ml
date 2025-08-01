@@ -82,8 +82,8 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
      let tyb = body.e_ty in
 
      let aout =
-       let d    = form_of_expr mhr d in
-       let body = form_of_expr mhr body in
+       let d    = form_of_expr d in
+       let body = form_of_expr body in
        let body =
          let arg  = EcIdent.create "arg" in
          let body = f_let lv (f_local arg tya) body in
@@ -93,7 +93,7 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
        | `Det   -> f_dmap tya tyb d body
        | `Distr -> f_dlet_simpl tya (oget (as_tdistr tyb)) d body
 
-     in (`Distr, expr_of_form mhr aout)
+     in (`Distr, expr_of_form aout)
     end
 
   | Sif (e, bt, bf) ->
@@ -143,7 +143,7 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
           (cmode, e_let lv (e_if e bt bf) c)
 
        | `Distr, `Det ->
-          let body = form_of_expr mhr (e_if e bt bf) in
+          let body = form_of_expr (e_if e bt bf) in
           let tya  = oget (as_tdistr body.f_ty) in
           let v    = EcIdent.create "v" in
           let vx   = f_local v tya in
@@ -154,12 +154,12 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
               body
               (f_lambda
                  [v, GTty tya]
-                 (f_let lv vx (form_of_expr mhr c)))
+                 (f_let lv vx (form_of_expr c)))
 
-          in (`Distr, expr_of_form mhr aout)
+          in (`Distr, expr_of_form aout)
 
        | `Distr, `Distr ->
-          let body = form_of_expr mhr (e_if e bt bf) in
+          let body = form_of_expr (e_if e bt bf) in
           let tya  = oget (as_tdistr body.f_ty) in
           let tyb  = oget (as_tdistr c.e_ty) in
           let v    = EcIdent.create "v" in
@@ -171,9 +171,9 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
               body
               (f_lambda
                  [v, GTty tya]
-                 (f_let lv vx (form_of_expr mhr c)))
+                 (f_let lv vx (form_of_expr c)))
 
-          in (`Distr, expr_of_form mhr aout)
+          in (`Distr, expr_of_form aout)
 
      end
 
@@ -346,13 +346,13 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
        | ids ->
           LTuple ids in
 
-     let niter = form_of_expr mhr (translate_e env bd) in
+     let niter = form_of_expr (translate_e env bd) in
      let niter = f_proj_simpl (f_int_edivz_simpl niter (f_int inc)) 0 tint in
      let rem   = f_proj_simpl (f_int_edivz_simpl niter (f_int inc)) 1 tint in
      let outv  = f_int_add_simpl (f_int_mul_simpl niter (f_int inc)) rem in
 
-     let niter = expr_of_form mhr niter in
-     let outv  = expr_of_form mhr outv in
+     let niter = expr_of_form niter in
+     let outv  = expr_of_form outv in
 
      let mode, aout =
        match mode with
@@ -395,11 +395,11 @@ and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
           let aout =
             ctor
               aty c.e_ty
-              (form_of_expr mhr aout)
+              (form_of_expr aout)
               (f_lambda
                  [(arg, GTty aty)]
-                 (f_let lv (f_local arg aty) (form_of_expr mhr c))) in
-          (`Distr, expr_of_form mhr aout)
+                 (f_let lv (f_local arg aty) (form_of_expr c))) in
+          (`Distr, expr_of_form aout)
 
      in Some (mode, e_let (LSymbol (x, tint)) outv aout)
 

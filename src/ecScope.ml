@@ -1345,7 +1345,7 @@ module Op = struct
       (`Det, Sem.translate_e env ret) in
 
     let mode, aout = Sem.translate_s env cont body.f_body in
-    let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
+    let aout = form_of_expr aout in (* FIXME: translate to forms directly? *)
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
@@ -1393,7 +1393,7 @@ module Op = struct
                 (f_pr prmem
                    f
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
-                   (f_eq res resv))
+                   (map_ss_inv1 (fun r -> f_eq r resv) res))
                 mu))
       in
 
@@ -1418,16 +1418,16 @@ module Op = struct
            f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) locs)
              (f_hoareF
-                (f_eq
-                   args
-                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))
+                {m=mhr;inv=(f_eq
+                   args.inv
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))}
                 f
-                (f_eq
-                   res
+                {m=mhr;inv=(f_eq
+                   res.inv
                    (f_app
                       (f_op oppath [] opdecl.op_ty)
                       (List.map (fun (x, ty) -> f_local x ty) locs)
-                      sig_.fs_ret)))
+                      sig_.fs_ret))})
          in
 
          let prax = EcDecl.{
@@ -2423,7 +2423,7 @@ end
                     let tip = f_subst_init ~tv:tip () in
                     let es = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
-                    let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
+                    let bd  = EcFol.form_of_expr (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with
