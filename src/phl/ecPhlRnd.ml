@@ -68,7 +68,7 @@ module Core = struct
     in
     let subst_form_lv_side = sideif side subst_form_lv_left subst_form_lv_right in
     let ss_inv_generalize_other =
-      sideif side ss_inv_generalize_left ss_inv_generalize_right in
+      sideif side ss_inv_generalize_right ss_inv_generalize_left in
     (* FIXME: exception when not rnds found *)
     let (lv, distr), s = tc1_last_rnd tc s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
