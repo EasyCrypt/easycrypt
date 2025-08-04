@@ -248,7 +248,7 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
 
     | `MuSplit ->
       let pr = destr_pr torw in
-      let ev' = (oget dof) tc torw EcTypes.tbool in
+      let ev' = EcSubst.ss_inv_rebind ((oget dof) tc torw EcTypes.tbool) pr.pr_event.m in
       (pr_split pr.pr_mem pr.pr_fun pr.pr_args pr.pr_event ev', 0)
 
     | `MuGe0 -> begin
