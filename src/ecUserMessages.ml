@@ -187,10 +187,24 @@ end = struct
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
 
-  let pp_fxerror _env fmt error =
+  let pp_fix_match env =
+     let ppe = EcPrinting.PPEnv.ofenv env in
+     let ppo fmt = function
+       | None -> Format.fprintf fmt "_"
+       | Some op -> EcPrinting.pp_opname ppe fmt op in
+     let pp1 fmt (id, op) =
+       Format.fprintf fmt "%a = %a"
+          (EcPrinting.pp_local ppe) id
+          ppo op in
+     EcPrinting.pp_list ",@ " pp1
+
+  let pp_fxerror env fmt error =
     let msg x = Format.fprintf fmt x in
 
     match error with
+    | FXE_MatchWildcard ->
+        msg "pattern matching with wildcard not support"
+
     | FXE_EmptyMatch ->
         msg "this pattern matching has no branches"
 
@@ -209,8 +223,24 @@ end = struct
     | FXE_MatchDupBranches ->
         msg "this pattern matching contains duplicated branches"
 
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
+    | FXE_MatchPartial ids ->
+        msg "this pattern matching is non-exhaustive, %a are missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids
+
+    | FXE_FixPartial ids ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        let pp_match fmt ids =
+          Format.fprintf fmt "[%a]"
+            (EcPrinting.pp_list ",@" (EcPrinting.pp_opname ppe)) ids in
+        msg "this pattern matching is non-exhaustive, %a are missing"
+          (EcPrinting.pp_list ",@ " pp_match) ids
+
+    | FXE_FixRedundant fm ->
+        msg "this clause is useless: %a" (pp_fix_match env) fm
+
+    | FXE_FixDuplicate (previous, current) ->
+        msg "duplicate clause : %a, already covered by %a"
+          (pp_fix_match env) current (pp_fix_match env) previous
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"
@@ -306,6 +336,9 @@ end = struct
 
     | DuplicatedField name ->
         msg "duplicated field name: `%s'" name
+
+    |DuplicatedException name ->
+        msg "duplicated exception: %a" pp_qsymbol name
 
     | NonLinearPattern ->
         msg "non-linear pattern matching"
@@ -429,7 +462,10 @@ end = struct
         msg "unknown type name: %a" pp_qsymbol name
 
     | UnknownFunName name ->
-        msg "unknown procedure: %a" pp_qsymbol name
+      msg "unknown procedure: %a" pp_qsymbol name
+
+    | UnknownExceptionName name ->
+      msg "unknown exception: %a" pp_qsymbol name
 
     | UnknownModVar x ->
         msg "unknown module-level variable: %a" pp_qsymbol x
@@ -748,7 +784,7 @@ end = struct
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module"
+        msg "Cannot override theory `%s`: contains module or exception"
           (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
@@ -790,6 +826,9 @@ end = struct
         msg
           "cannot realized a (non-axiomatic) lemma: `%s'"
           (string_of_qsymbol x)
+    | CE_NoExceptions ->
+      msg
+        "Override of exceptions not allowed"
 end
 
 (* -------------------------------------------------------------------- *)

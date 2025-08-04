@@ -50,7 +50,7 @@ module LowSubst = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
-    | Sassert e          -> i_assert (esubst e)
+    | Sraise e           -> i_raise  (esubst e)
     | Sabstract _        -> i
 
   and issubst m (is : instr list) =
