@@ -91,8 +91,7 @@ and i_upto env alpha bad i1 i2 =
     with E.NotConv -> false
   end
 
-  | Sassert a1, Sassert a2 ->
-    EqTest.for_expr env ~alpha a1 a2
+  | Sraise (_e1,_es1), Sraise (_e2,_es2) -> assert false
 
   | Sabstract id1, Sabstract id2 ->
     EcIdent.id_equal id1 id2

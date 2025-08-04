@@ -41,8 +41,7 @@ let while_info env e s =
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
 
-    | Sassert e ->
-        (w, e_read_r env r e, c)
+    | Sraise _ -> assert false
 
     | Sabstract id ->
         let add_pv x (pv,ty) = PV.add env pv ty x in

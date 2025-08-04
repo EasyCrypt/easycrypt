@@ -99,6 +99,11 @@ module Op : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Except : sig
+  val add : scope -> pexception_decl located -> EcDecl.excep * scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Pred : sig
   val add : scope -> ppredicate located -> EcDecl.operator * scope
 end

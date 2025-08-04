@@ -115,7 +115,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcIdent.t * expr list
   | Sabstract of EcIdent.t
 
 and stmt = {
@@ -1162,8 +1162,9 @@ module Hinstr = Why3.Hashcons.Make (struct
           in List.all2 forbs bs1 bs2 && s_equal s1 s2
         in e_equal e1 e2 && List.all2 forb b1 b2
 
-    | Sassert e1, Sassert e2 ->
-        (e_equal e1 e2)
+    | Sraise (e1, es1), Sraise (e2, es2) ->
+        (EcIdent.id_equal e1 e2)
+        && (List.all2 e_equal es1 es2)
 
     | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
 
@@ -1201,7 +1202,10 @@ module Hinstr = Why3.Hashcons.Make (struct
           in Why3.Hashcons.combine_list forbs (s_hash s) bds
         in Why3.Hashcons.combine_list forb (e_hash e) b
 
-    | Sassert e -> e_hash e
+    | Sraise (e, tys) ->
+      Why3.Hashcons.combine_list e_hash
+          (EcIdent.id_hash e)
+          tys
 
     | Sabstract id -> EcIdent.id_hash id
 
@@ -1235,8 +1239,11 @@ module Hinstr = Why3.Hashcons.Make (struct
              (fun s b -> EcIdent.fv_union s (forb b))
              (e_fv e) b
 
-    | Sassert e    ->
-        e_fv e
+    | Sraise (e, args)    ->
+        let ffv = EcIdent.fv_singleton e in
+        List.fold_left
+          (fun s a -> EcIdent.fv_union s (e_fv a))
+          ffv args
 
     | Sabstract id ->
         EcIdent.fv_singleton id

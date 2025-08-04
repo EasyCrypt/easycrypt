@@ -111,7 +111,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcIdent.t * expr list
   | Sabstract of EcIdent.t
 
 and stmt = private {

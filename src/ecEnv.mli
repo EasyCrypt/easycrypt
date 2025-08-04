@@ -149,6 +149,16 @@ module Var : sig
   val bindall_pvglob : (EcSymbols.symbol * EcTypes.ty) list -> env -> env
 
 end
+(* -------------------------------------------------------------------- *)
+module Except : sig
+  type t = excep
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val add  : path -> env -> env
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val bind        : ?import:import -> symbol -> t -> env -> env
+end
 
 (* -------------------------------------------------------------------- *)
 module Ax : sig
@@ -402,7 +412,7 @@ module BaseRw : sig
   val add   : ?import:import -> symbol -> is_local -> env -> env
   val addto : ?import:import -> path -> path list -> is_local -> env -> env
 
-  val all : env -> (path * Sp.t) list 
+  val all : env -> (path * Sp.t) list
 end
 
 (* -------------------------------------------------------------------- *)

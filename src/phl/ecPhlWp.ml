@@ -70,10 +70,10 @@ module LowInternal = struct
         ([],post)
       end
 
-    | Sassert e when onesided ->
-        let phi = form_of_expr (EcMemory.memory memenv) e in
-        let lets, f = letsf in
-        (lets, EcFol.f_and_simpl phi f)
+    | Sraise _ when onesided -> assert false
+        (* let phi = form_of_expr (EcMemory.memory memenv) e in *)
+        (* let lets, f = letsf in *)
+        (* (lets, EcFol.f_and_simpl phi f) *)
 
     | _ -> raise No_wp
 

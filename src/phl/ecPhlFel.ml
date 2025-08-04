@@ -103,7 +103,7 @@ and callable_oracles_i env modv os i =
     | Smatch (_, b)      -> callable_oracles_sx env modv os (List.map snd b)
     | Sif    (_, s1, s2) -> callable_oracles_sx env modv os [s1; s2]
 
-    | Sasgn _ | Srnd _ | Sassert _ -> os
+    | Sasgn _ | Srnd _ | Sraise _ -> os
 
     | Sabstract _ -> assert false (* FIXME *)
 

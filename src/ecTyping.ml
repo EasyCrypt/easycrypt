@@ -157,6 +157,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -287,8 +288,8 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
         map
 
-    | Sassert e ->
-      se_inuse map e
+    | Sraise (_,args) ->
+      List.fold_left se_inuse map args
 
     | Sabstract _ ->
       assert false (* FIXME *)
@@ -2751,10 +2752,53 @@ and transinstr
       [ i_match (e, branches) ]
     end
 
-  | PSassert pe ->
-      let e, ety = transexp env `InProc ue pe in
-      unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_assert e ]
+  | PSraise (name, args) ->
+
+    let modsymb = List.map (unloc -| fst) (fst (unloc name))
+    and funsymb = unloc (snd (unloc name)) in
+    let path =
+      match EcEnv.Except.lookup_opt (modsymb, funsymb) env with
+      | None -> tyerror name.pl_loc env (UnknownExceptionName (modsymb, funsymb))
+      | Some (p,_) -> p
+    in
+    let esig  = (EcEnv.Except.by_path path env).e_typargs in
+    let args = unloc args in
+    let loc = name.pl_loc in
+    let aux (_,s) =
+      match Sp.elements s with
+      | [recp]    -> recp
+      | _ -> assert false
+    in
+
+    let paths = List.map aux esig in
+    let indty =
+      List.map (fun path ->
+          oget (EcEnv.Ty.by_path_opt path env)
+        ) paths
+    in
+    let ind =
+      List.map (fun typdecl ->
+          let x = oget (EcDecl.tydecl_as_datatype typdecl) in
+          match x.tydt_ctors with
+          | [(_,t)] -> t
+          | _ -> assert false
+        ) indty
+    in
+    let typs = List.flatten ind in
+
+    let args =
+      if List.length args <> List.length typs then
+        tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+      List.map2
+        (fun a ty ->
+           let loc = a.pl_loc in
+           let a, aty = transexp env `InProc ue a in
+           unify_or_fail env ue loc ~expct:ty aty; a) args typs
+    in
+
+    (*FiXME *)
+    let i = EcIdent.create funsymb in
+    [i_raise (i, args)]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =

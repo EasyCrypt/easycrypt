@@ -242,8 +242,8 @@ end) = struct
         with E.NotConv -> false
       end
 
-    | Sassert a1, Sassert a2 ->
-        for_expr env alpha ~norm a1 a2
+    | Sraise (_,es1), Sraise (_,es2) ->
+      List.all2 (for_expr env alpha ~norm) es1 es2
 
     | Sabstract id1, Sabstract id2 ->
         EcIdent.id_equal id1 id2

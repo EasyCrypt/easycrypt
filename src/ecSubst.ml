@@ -426,8 +426,9 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise (e,es) ->
+    let es' = List.map (subst_expr s) es in
+    i_raise (e,es')
 
   | Sabstract _ ->
      i
@@ -972,6 +973,14 @@ let subst_op (s : subst) (op : operator) =
     op_unfold   = op.op_unfold  ; }
 
 (* -------------------------------------------------------------------- *)
+let subst_excep (s : subst) (e : excep) =
+  let _, tparams = fresh_tparams s e.e_typargs in
+
+  { e_typargs  = tparams     ;
+    e_loca     = e.e_loca    ;
+  }
+
+(* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =
   let s, tparams = fresh_tparams s ax.ax_tparams in
   let spec   = subst_form s ax.ax_spec in
@@ -1042,6 +1051,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
+
+  | Th_exception (e, es) ->
+      Th_exception (e, subst_excep s es)
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
