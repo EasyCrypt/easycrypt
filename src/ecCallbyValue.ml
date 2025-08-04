@@ -223,7 +223,7 @@ and try_reduce_record_projection
 
   try
     if not (
-      st.st_ri.iota 
+      st.st_ri.iota
       && EcEnv.Op.is_projection st.st_env p
       && not (Args.isempty args)
     ) then raise Bailout;
@@ -485,7 +485,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hf_po = norm st s (hf_po hf).inv in
     let hf_f  = norm_xfun st s hf.hf_f in
     let (m,_) = norm_me s (abstract hf.hf_m) in
-    f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
+    let hf_poe  =
+      List.map
+        (fun (e,(f:ss_inv)) -> e, {m;inv=norm st s f.inv})
+        (hf_poe hf)
+    in
+    f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po} hf_poe
 
   | FhoareS hs ->
     assert (Args.isempty args);
@@ -495,7 +500,12 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     let m = fst hs_m in
-    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
+    let hs_poe  =
+      List.map
+        (fun (e,(f:ss_inv)) -> e, {m;inv=norm st s f.inv})
+        (hs_poe hs)
+    in
+    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po} hs_poe
 
   | FeHoareF hf ->
     assert (Args.isempty args);

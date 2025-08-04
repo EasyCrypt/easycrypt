@@ -39,11 +39,11 @@ let bd_goal_r fcmp fbd cmp bd =
   | FHle, (FHle | FHeq) -> Some (map_ss_inv2 f_real_le bd fbd)
   | FHge, (FHge | FHeq) -> Some (map_ss_inv2 f_real_le fbd bd)
   | FHeq, FHeq          -> Some (map_ss_inv2 f_eq bd fbd)
-  | FHeq, FHge          -> Some (map_ss_inv2 f_and 
-          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) fbd) 
+  | FHeq, FHge          -> Some (map_ss_inv2 f_and
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) fbd)
           (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) bd))
-  | FHeq, FHle          -> Some (map_ss_inv2 f_and 
-          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) fbd) 
+  | FHeq, FHle          -> Some (map_ss_inv2 f_and
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) fbd)
           (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) bd))
   | _   , _             -> None
 
@@ -58,28 +58,58 @@ let bd_goal tc fcmp fbd cmp bd =
   | Some fp -> fp
 
 (* -------------------------------------------------------------------- *)
-let t_hoareF_conseq pre post tc =
+
+let find_poe epost e =
+  snd (List.find (fun (e',_) -> EcPath.p_ntr_equal e e') epost)
+
+let conseq_conde_ss poe1 poe2 =
+  assert (List.length poe1 = List.length poe2);
+  List.map
+    (fun (e1,p1) -> map_ss_inv2 f_imp (find_poe poe2 e1) p1)
+    poe1
+
+let conseq_conde_conj_ss poe1 poe2 =
+  assert (List.length poe1 = List.length poe2);
+  List.map
+    (fun (e1,p1) -> e1,map_ss_inv2 f_and (find_poe poe2 e1) p1)
+    poe1
+
+let check_eq_poe tc hyps poe1 poe2 =
+  assert (List.length poe1 = List.length poe2);
+  List.iter
+    (fun (e,f) ->
+       if not (ss_inv_alpha_eq hyps (find_poe poe2 e) f)
+       then tc_error !!tc "invalid exception post-condition")
+    poe1
+
+let t_hoareF_conseq pre post epost tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_hoareF tc in
   let pre = ss_inv_rebind pre hf.hf_m in
   let post = ss_inv_rebind post hf.hf_m in
+  let epost = List.map (fun (e,f) -> e,ss_inv_rebind f hf.hf_m) epost in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env in
   let cond1, cond2 = conseq_cond_ss (hf_pr hf) (hf_po hf) pre post in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
   let concl2 = f_forall_mems_ss_inv mpo cond2 in
-  let concl3 = f_hoareF pre hf.hf_f post in
-  FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
+  let cond2e = conseq_conde_ss (hf_poe hf) epost in
+  let concl2e = List.map (f_forall_mems_ss_inv mpo) cond2e in
+  let concl3 = f_hoareF pre hf.hf_f post epost in
+  FApi.xmutate1 tc `Conseq ([concl1; concl2; concl3] @ concl2e)
 
 (* -------------------------------------------------------------------- *)
-let t_hoareS_conseq pre post tc =
+let t_hoareS_conseq pre post epost tc =
   let hs = tc1_as_hoareS tc in
   let pre = ss_inv_rebind pre (fst hs.hs_m) in
   let post = ss_inv_rebind post (fst hs.hs_m) in
+  let epost = List.map (fun (e,f) -> e,ss_inv_rebind f (fst hs.hs_m)) epost in
   let cond1, cond2 = conseq_cond_ss (hs_pr hs) (hs_po hs) pre post in
   let concl1 = f_forall_mems_ss_inv hs.hs_m cond1 in
   let concl2 = f_forall_mems_ss_inv hs.hs_m cond2 in
-  let concl3 = f_hoareS (snd hs.hs_m) pre hs.hs_s post in
-  FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
+  let cond2e = conseq_conde_ss (hs_poe hs) epost in
+  let concl2e = List.map (f_forall_mems_ss_inv hs.hs_m) cond2e in
+  let concl3 = f_hoareS (snd hs.hs_m) pre hs.hs_s post epost in
+  FApi.xmutate1 tc `HlConseq ([concl1; concl2; concl3] @ concl2e)
 
 (* -------------------------------------------------------------------- *)
 let t_ehoareF_conseq pre post tc =
@@ -205,8 +235,8 @@ let t_equivS_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_conseq pre post tc =
   match (FApi.tc1_goal tc).f_node, pre, post with
-  | FhoareF _,   Inv_ss pre, Inv_ss post -> t_hoareF_conseq pre post tc
-  | FhoareS _,   Inv_ss pre, Inv_ss post -> t_hoareS_conseq pre post tc
+  | FhoareF _,   Inv_ss pre, Inv_ss post -> t_hoareF_conseq pre post [] tc
+  | FhoareS _,   Inv_ss pre, Inv_ss post -> t_hoareS_conseq pre post [] tc
   | FbdHoareF _, Inv_ss pre, Inv_ss post -> t_bdHoareF_conseq pre post tc
   | FbdHoareS _, Inv_ss pre, Inv_ss post -> t_bdHoareS_conseq pre post tc
   | FeHoareF _ , Inv_ss pre, Inv_ss post -> t_ehoareF_conseq pre post tc
@@ -316,12 +346,19 @@ let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
     else [] in
   cond, bmem, bother
 
-let t_hoareF_notmod (post: ss_inv) tc =
+let t_hoareF_notmod (post: ss_inv) epost tc =
   let hf = tc1_as_hoareF tc in
   let post = ss_inv_rebind post hf.hf_m in
+  let epost = List.map (fun (e,f) -> e,ss_inv_rebind f hf.hf_m) epost in
   let cond1, _, _ = cond_hoareF_notmod tc (map_ss_inv2 f_imp post (hf_po hf)) in
-  let cond2 = f_hoareF (hf_pr hf) hf.hf_f post in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+  let econd1 = List.map (fun (e1,p1) ->
+      let f = map_ss_inv2 f_imp (find_poe epost e1) p1 in
+      let cond1 , _, _ = cond_hoareF_notmod tc f in
+      cond1
+    ) (hf_poe hf)
+  in
+  let cond2 = f_hoareF (hf_pr hf) hf.hf_f post epost in
+  FApi.xmutate1 tc `HlNotmod ([cond1; cond2] @econd1)
 
 (* -------------------------------------------------------------------- *)
 let cond_hoareS_notmod ?(mk_other=false) tc cond =
@@ -339,12 +376,19 @@ let cond_hoareS_notmod ?(mk_other=false) tc cond =
     else [] in
   cond, bmem, bother
 
-let t_hoareS_notmod post tc =
+let t_hoareS_notmod post epost tc =
   let hs = tc1_as_hoareS tc in
   let post = ss_inv_rebind post (fst hs.hs_m) in
+  let epost = List.map (fun (e,f) -> e,ss_inv_rebind f (fst hs.hs_m)) epost in
   let cond1, _, _ = cond_hoareS_notmod tc (map_ss_inv2 f_imp post (hs_po hs)) in
-  let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s post in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+  let econd1 = List.map (fun (e1,p1) ->
+      let f = map_ss_inv2 f_imp (find_poe epost e1) p1 in
+      let cond1 , _, _ = cond_hoareS_notmod tc f in
+      cond1
+    ) (hs_poe hs)
+  in
+  let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s post epost in
+  FApi.xmutate1 tc `HlNotmod ([cond1; cond2] @ econd1)
 
 (* -------------------------------------------------------------------- *)
 let cond_bdHoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
@@ -417,15 +461,6 @@ let gen_conseq_nm tnm tc pre post =
     FApi.t_swap_goals 0 1 gs
   )
 
-let gen_conseq_nm_ss tnm tc (pre: ss_inv) (post: ss_inv) =
-    FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
-      let gs =
-        (tnm post @+
-          [ t_id;
-            tc pre post @+ [t_id; t_trivial; t_id] ]) g in
-      FApi.t_swap_goals 0 1 gs
-    )
-
 let gen_conseq_nm_ts tnm tc (pre: ts_inv) (post: ts_inv) =
   FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
     let gs =
@@ -435,12 +470,23 @@ let gen_conseq_nm_ts tnm tc (pre: ts_inv) (post: ts_inv) =
     FApi.t_swap_goals 0 1 gs
   )
 
-let t_hoareF_conseq_nm   = gen_conseq_nm_ss t_hoareF_notmod   t_hoareF_conseq
-let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq
+let gen_conseq_nm_e tnm tc pre post epost =
+  let t_trivials = List.map (fun _ -> fun a -> t_trivial a) epost in
+  let t_ids = List.map (fun _ -> t_id) epost in
+  FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
+      let back = tc pre post epost @+ ([t_id; t_trivial; t_id] @ t_trivials) in
+      let gs =
+        (tnm post epost @+ ([t_id] @ [back] @ t_ids)) g
+      in
+      FApi.t_swap_goals 0 1 gs
+    )
+
+let t_hoareF_conseq_nm   = gen_conseq_nm_e  t_hoareF_notmod   t_hoareF_conseq
+let t_hoareS_conseq_nm   = gen_conseq_nm_e  t_hoareS_notmod   t_hoareS_conseq
 let t_equivF_conseq_nm   = gen_conseq_nm_ts t_equivF_notmod   t_equivF_conseq
-let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
-let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
-let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
+let t_equivS_conseq_nm   = gen_conseq_nm    t_equivS_notmod   t_equivS_conseq
+let t_bdHoareF_conseq_nm = gen_conseq_nm    t_bdHoareF_notmod t_bdHoareF_conseq
+let t_bdHoareS_conseq_nm = gen_conseq_nm    t_bdHoareS_notmod t_bdHoareS_conseq
 
 (* -------------------------------------------------------------------- *)
 (* concavity (jenhsen) : E(f g2) <= f (E g2)
@@ -614,7 +660,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
 
     let pre   = map_ss_inv1 (fun gpre -> pre |> omap (TTC.pf_process_form !!tc penv txreal) |> odfl gpre) gpre  in
     let post  = map_ss_inv1 (fun gpost -> post |> omap (TTC.pf_process_form !!tc qenv txreal) |> odfl gpost) gpost in
-    
+
     fmake pre post
 
   in
@@ -660,31 +706,35 @@ let t_hoareF_conseq_bdhoare tc =
   FApi.xmutate1 tc `HlConseqBd [concl1]
 
 (* -------------------------------------------------------------------- *)
-let t_hoareS_conseq_conj pre post pre' post' tc =
+let t_hoareS_conseq_conj pre post epost pre' post' epost' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let hs = tc1_as_hoareS tc in
   let pre'' = map_ss_inv2 f_and pre' pre in
   let post'' = map_ss_inv2 f_and post' post in
-  if not (ss_inv_alpha_eq hyps (hs_pr hs) pre'') 
-    then tc_error !!tc "invalid pre-condition";
-  if not (ss_inv_alpha_eq hyps (hs_po hs) post'') 
-    then tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS (snd hs.hs_m) pre hs.hs_s post in
-  let concl2 = f_hoareS (snd hs.hs_m) pre' hs.hs_s post' in
+  let poste'' = conseq_conde_conj_ss epost' epost in
+  if not (ss_inv_alpha_eq hyps (hs_pr hs) pre'')
+  then tc_error !!tc "invalid pre-condition";
+  if not (ss_inv_alpha_eq hyps (hs_po hs) post'')
+  then tc_error !!tc "invalid post-condition";
+  check_eq_poe tc hyps (hs_poe hs) poste'';
+  let concl1 = f_hoareS (snd hs.hs_m) pre hs.hs_s post epost in
+  let concl2 = f_hoareS (snd hs.hs_m) pre' hs.hs_s post' epost' in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
-let t_hoareF_conseq_conj pre post pre' post' tc =
+let t_hoareF_conseq_conj pre post epost pre' post' epost' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_hoareF tc in
   let pre'' = map_ss_inv2 f_and pre' pre in
   let post'' = map_ss_inv2 f_and post' post in
-  if not (ss_inv_alpha_eq hyps (hf_pr hf) pre'') 
+  let poste'' = conseq_conde_conj_ss epost' epost in
+  if not (ss_inv_alpha_eq hyps (hf_pr hf) pre'')
   then tc_error !!tc "invalid pre-condition";
   if not (ss_inv_alpha_eq hyps (hf_po hf) post'')
   then tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF pre hf.hf_f post in
-  let concl2 = f_hoareF pre' hf.hf_f post' in
+  check_eq_poe tc hyps (hf_poe hf) poste'';
+  let concl1 = f_hoareF pre hf.hf_f post epost in
+  let concl2 = f_hoareF pre' hf.hf_f post' epost' in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -695,8 +745,8 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
   let posth = if add then post' else map_ss_inv2 f_and post' post in
   if not (ss_inv_alpha_eq hyps (bhs_po hs) postc) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post in
-  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth 
+  let concl1 = f_hoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post [] in
+  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth
                  hs.bhs_cmp (bhs_bd hs) in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
@@ -710,7 +760,7 @@ let t_bdHoareF_conseq_conj ~add post post' tc =
   let posth = if add then post' else map_ss_inv2 f_and post' post in
   if not (ss_inv_alpha_eq hyps (bhf_po hs) postc) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF (bhf_pr hs) hs.bhf_f post in
+  let concl1 = f_hoareF (bhf_pr hs) hs.bhf_f post [] in
   let concl2 = f_bdHoareF (bhf_pr hs) hs.bhf_f posth hs.bhf_cmp (bhf_bd hs) in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
@@ -727,8 +777,8 @@ let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
     tc_error !!tc "invalid pre-condition";
   if not (ts_inv_alpha_eq hyps (es_po es) (map_ts_inv f_ands [post';post1';post2'])) then
     tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareS mtl pre1 es.es_sl post1 in
-  let concl2 = f_hoareS mtr pre2 es.es_sr post2 in
+  let concl1 = f_hoareS mtl pre1 es.es_sl post1 [] in
+  let concl2 = f_hoareS mtr pre2 es.es_sr post2 [] in
   let concl3 = f_equivS mtl mtr pre' es.es_sl es.es_sr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
@@ -743,12 +793,12 @@ let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mr) ml in
   let pre'' = map_ts_inv f_ands [pre'; pre1'; pre2'] in
   let post'' = map_ts_inv f_ands [post'; post1'; post2'] in
-  if not (ts_inv_alpha_eq hyps (ef_pr ef) pre'') 
+  if not (ts_inv_alpha_eq hyps (ef_pr ef) pre'')
   then tc_error !!tc "invalid pre-condition";
   if not (ts_inv_alpha_eq hyps (ef_po ef) post'')
   then tc_error !!tc "invalid post-condition";
-  let concl1 = f_hoareF pre1 ef.ef_fl post1 in
-  let concl2 = f_hoareF pre2 ef.ef_fr post2 in
+  let concl1 = f_hoareF pre1 ef.ef_fl post1 [] in
+  let concl2 = f_hoareF pre2 ef.ef_fr post2 [] in
   let concl3 = f_equivF pre' ef.ef_fl ef.ef_fr post' in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
@@ -763,7 +813,7 @@ let t_equivS_conseq_bd side pr po tc =
       let pos = ss_inv_generalize_right (ss_inv_rebind po ml) mr in
       let prs = ss_inv_generalize_right (ss_inv_rebind pr ml) mr in
       es.es_ml, es.es_sl, es.es_sr, prs, pos
-    | `Right -> 
+    | `Right ->
       let pos = ss_inv_generalize_left (ss_inv_rebind po mr) ml in
       let prs = ss_inv_generalize_left (ss_inv_rebind pr mr) ml in
       es.es_mr, es.es_sr, es.es_sl, prs, pos
@@ -814,8 +864,9 @@ let transitivity_side_cond hyps prml poml pomr p q p2 q2 p1 q1 =
 let t_hoareF_conseq_equiv f2 p q p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let hf1 = tc1_as_hoareF tc in
+  assert (hf_poe hf1 = []);
   let ef  = f_equivF p hf1.hf_f f2 q in
-  let hf2 = f_hoareF p2 f2 q2 in
+  let hf2 = f_hoareF p2 f2 q2 [] in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv p.ml p.mr hf1.hf_f f2 env in
   let (cond1, cond2) =
     transitivity_side_cond hyps prml poml pomr p q p2 q2 (hf_pr hf1) (hf_po hf1) in
@@ -897,7 +948,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* hoareS / hoareS / ⊥ / ⊥                                            *)
   | FhoareS _, Some ((_, {f_node = FhoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
-    t_on1 2 (t_apply_r nf1) (tac (hs_pr hs) (hs_po hs) tc)
+    t_on1 2 (t_apply_r nf1) (tac (hs_pr hs) (hs_po hs) (hs_poe hs) tc)
 
   (* ------------------------------------------------------------------ *)
   (* hoareS / hoareS / hoareS / ⊥                                       *)
@@ -909,11 +960,18 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let hs2 = pf_as_hoareS !!tc f2 in
     let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
 
+    let epost = conseq_conde_conj_ss (hs_poe hs) (hs_poe hs2) in
+
     t_on1seq 2
-      (tac (map_ss_inv2 f_and (hs_pr hs) (hs_pr hs2)) 
-            (map_ss_inv2 f_and (hs_po hs) (hs_po hs2)))
+      (tac
+         (map_ss_inv2 f_and (hs_pr hs) (hs_pr hs2))
+         (map_ss_inv2 f_and (hs_po hs) (hs_po hs2))
+         epost
+      )
       (FApi.t_seqsub
-         (t_hoareS_conseq_conj (hs_pr hs2) (hs_po hs2) (hs_pr hs) (hs_po hs))
+         (t_hoareS_conseq_conj
+            (hs_pr hs2) (hs_po hs2) (hs_poe hs2)
+            (hs_pr hs) (hs_po hs) (hs_poe hs))
          [t_apply_r nf2; t_apply_r nf1])
       tc
 
@@ -935,7 +993,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* hoareF / hoareF / ⊥ / ⊥                                            *)
   | FhoareF _, Some ((_, {f_node = FhoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-    t_on1 2 (t_apply_r nf1) (tac (hf_pr hs) (hf_po hs) tc)
+    t_on1 2 (t_apply_r nf1) (tac (hf_pr hs) (hf_po hs) (hf_poe hs) tc)
 
   (* ------------------------------------------------------------------ *)
   (* hoareF / hoareF / hoareF / ⊥                                       *)
@@ -946,20 +1004,26 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     ->
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-    let pr1, po1 = hf_pr hf, hf_po hf in
+    let pr1, po1, poe1 = hf_pr hf, hf_po hf, hf_poe hf in
     let pr2 = ss_inv_rebind (hf_pr hs2) hf.hf_m in
     let po2 = ss_inv_rebind (hf_po hs2) hf.hf_m in
+    let poe2 = List.map (fun (e,f) -> e,ss_inv_rebind f hf.hf_m) (hf_poe hs2) in
+    let epost = conseq_conde_conj_ss (hf_poe hf) poe2 in
+
     (* check that the pre- and post-conditions are well formed *)
     t_on1seq 2
-      ((tac (map_ss_inv2 f_and pr1 pr2) 
-           (map_ss_inv2 f_and po1 po2)))
+      ((tac
+          (map_ss_inv2 f_and pr1 pr2)
+          (map_ss_inv2 f_and po1 po2)
+          epost
+       ))
       (FApi.t_seqsub
-         (t_hoareF_conseq_conj pr2 po2 pr1 po1)
+         (t_hoareF_conseq_conj pr2 po2 poe2 pr1 po1 poe1)
          [t_apply_r nf2; t_apply_r nf1])
       tc
 
   (* ------------------------------------------------------------------ *)
-  (* hoareF / bdhoareF / ⊥ / ⊥                                            *)
+  (* hoareF / bdhoareF / ⊥ / ⊥                                          *)
   | FhoareF _, Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
 
@@ -981,19 +1045,19 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
 
   (* ------------------------------------------------------------------ *)
-  (* ehoareS / ehoareS / ⊥ / ⊥                                            *)
+  (* ehoareS / ehoareS / ⊥ / ⊥                                          *)
   | FeHoareS _, Some ((_, {f_node = FeHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_ehoareS_conseq_nm else t_ehoareS_conseq in
     FApi.t_last (t_apply_r nf1) (tac (ehs_pr hs) (ehs_po hs) tc)
 
   (* ------------------------------------------------------------------ *)
-  (* ehoareF / ehoareF / ⊥ / ⊥                                            *)
+  (* ehoareF / ehoareF / ⊥ / ⊥                                          *)
   | FeHoareF _, Some ((_, {f_node = FeHoareF hf}) as nf1), None, None ->
     let tac = if notmod then t_ehoareF_conseq_nm else t_ehoareF_conseq in
     FApi.t_last (t_apply_r nf1) (tac (ehf_pr hf) (ehf_po hf) tc)
 
   (* ------------------------------------------------------------------ *)
-  (* ehoareF / equivF / ehoareF                                           *)
+  (* ehoareF / equivF / ehoareF                                         *)
   | FeHoareF _,
     Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
     let hf2 = pf_as_ehoareF !!tc f2 in
@@ -1034,8 +1098,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = ( t_cut concl1 @+
         [ t_id;   (* subgoal 1 : pre *)
           t_intro_i hi @!
-          t_cut (f_hoareS (snd hs2.hs_m) pre hs2.hs_s (hs_po hs2)) @+ [
-            t_hoareS_conseq (hs_pr hs2) (hs_po hs2) @+
+          t_cut (f_hoareS (snd hs2.hs_m) pre hs2.hs_s (hs_po hs2) []) @+ [
+            t_hoareS_conseq (hs_pr hs2) (hs_po hs2) [] @+
                 [ EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
@@ -1043,7 +1107,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
             (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs) @+ [
               t_id; (* subgoal 3 : bound *)
               t_bdHoareS_conseq_conj ~add:false (hs_po hs2) post1 @+ [
-                t_hoareS_conseq pre (hs_po hs2) @+ [
+                t_hoareS_conseq pre (hs_po hs2) [] @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
@@ -1089,7 +1153,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       Some ((_, f2) as nf2),
       None
     ->
-
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
     let m,hi,hh, h0 =
@@ -1107,8 +1170,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = ( t_cut concl1 @+
         [ t_id;   (* subgoal 1 : pre *)
           t_intro_i hi @!
-          t_cut (f_hoareF pre hs2.hf_f (hf_po hs2)) @+ [
-            t_hoareF_conseq (hf_pr hs2) (hf_po hs2) @+
+          t_cut (f_hoareF pre hs2.hf_f (hf_po hs2) []) @+ [
+            t_hoareF_conseq (hf_pr hs2) (hf_po hs2) [] @+
                 [ EcLowGoal.t_trivial;
                   t_mytrivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
@@ -1116,7 +1179,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
             (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs) @+ [
               t_id; (* subgoal 3 : bound *)
               t_bdHoareF_conseq_conj ~add:false (hf_po hs2) post1 @+ [
-                t_hoareF_conseq pre (hf_po hs2) @+ [
+                t_hoareF_conseq pre (hf_po hs2) [] @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
@@ -1151,7 +1214,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
     let hf2 = pf_as_bdhoareF !!tc f2 in
     FApi.t_seqsub
-      (t_bdHoareF_conseq_equiv hf2.bhf_f (ef_pr ef) (ef_po ef) 
+      (t_bdHoareF_conseq_equiv hf2.bhf_f (ef_pr ef) (ef_po ef)
                                          (bhf_pr hf2) (bhf_po hf2))
       [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
 
@@ -1214,14 +1277,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* equivS / ? / ? / ⊥                                                 *)
   | FequivS es, Some _, Some _, None ->
     let m = EcIdent.create "&hr" in
-    let f3 = f_hoareS (snd es.es_mr) {m;inv=f_true} es.es_sr {m;inv=f_true} in
+    let f3 = f_hoareS (snd es.es_mr) {m;inv=f_true} es.es_sr {m;inv=f_true} [] in
     t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
 
   (* ------------------------------------------------------------------ *)
   (* equivS / ? / ⊥ / ?                                                 *)
   | FequivS es, Some _, None, Some _ ->
     let m = EcIdent.create "&hr" in
-    let f2 = f_hoareS (snd es.es_ml) {m;inv=f_true} es.es_sl {m;inv=f_true} in
+    let f2 = f_hoareS (snd es.es_ml) {m;inv=f_true} es.es_sl {m;inv=f_true} [] in
     t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
   (* ------------------------------------------------------------------ *)
@@ -1295,14 +1358,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* equivF / ? / ? / ⊥                                                 *)
   | FequivF ef, Some _, Some _, None ->
     let m = EcIdent.create "&hr" in
-    let f3 = f_hoareF {m;inv=f_true} ef.ef_fr {m;inv=f_true} in
+    let f3 = f_hoareF {m;inv=f_true} ef.ef_fr {m;inv=f_true} [] in
     t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
 
   (* ------------------------------------------------------------------ *)
   (* equivF / ? / ⊥ / ?                                                 *)
   | FequivF ef, Some _, None, Some _ ->
     let m = EcIdent.create "&hr" in
-    let f2 = f_hoareF {m;inv=f_true} ef.ef_fl {m;inv=f_true} in
+    let f2 = f_hoareF {m;inv=f_true} ef.ef_fl {m;inv=f_true} [] in
     t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
   | _ ->
@@ -1334,38 +1397,15 @@ type processed_conseq_info =
 let process_info pe hyps m = function
   | CQI_bd (cmp, bd) -> PCI_bd (cmp, {m; inv=TTC.pf_process_form pe hyps treal bd})
 
-let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
+let process_conseq_2 notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   let ensure_none o =
     if not (is_none o) then tc_error !!tc "cannot give a bound here" in
 
-  let process_cut1 ((pre, post), bd) =
+  let process_cut1 ((pre, post, poe), bd) =
      let penv, qenv, gpre, gpost, ty, fmake =
       match concl.f_node with
-      | FhoareS hs ->
-        let env = LDecl.push_active_ss hs.hs_m hyps in
-
-        let fmake pre post c_or_bd =
-          match c_or_bd with
-          | None ->
-            f_hoareS(snd hs.hs_m) pre hs.hs_s post
-          | Some (PCI_bd (cmp, bd)) ->
-            f_bdHoareS (snd hs.hs_m) pre hs.hs_s post (oget cmp) bd
-        in (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), tbool, lift_ss_inv2 fmake)
-
-      | FhoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.hf_m hf.hf_f hyps in
-
-        let fmake pre post c_or_bd =
-          match c_or_bd with
-          | None ->
-            f_hoareF pre hf.hf_f post
-          | Some (PCI_bd (cmp, bd)) ->
-            f_bdHoareF pre hf.hf_f post (oget cmp) bd
-
-        in (penv, qenv, Inv_ss (hf_pr hf), Inv_ss (hf_po hf), tbool, lift_ss_inv2 fmake)
-
       | FeHoareS hs ->
         let env = LDecl.push_active_ss hs.ehs_m hyps in
         let fmake pre post bd =
@@ -1424,54 +1464,37 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
-    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
-    let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
+    match poe with
+    | Some _ ->  assert false
+    | None ->
+      let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
+      let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
 
-    let (pre, post, bd) = match gpre, gpost with
-    | Inv_ss gpre, Inv_ss gpost ->
-        let bd = bd |> omap (process_info !!tc penv gpre.m) in
-        (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, bd)
-    | Inv_ts gpre, Inv_ts gpost ->
-        ensure_none bd;
-        (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
-         Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr},
-         None)
-    | _ -> tc_error !!tc "conseq: pre and post must be of the same kind" in
+      let (pre, post, bd) = match gpre, gpost with
+        | Inv_ss gpre, Inv_ss gpost ->
+          let bd = bd |> omap (process_info !!tc penv gpre.m) in
+          (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, bd)
+        | Inv_ts gpre, Inv_ts gpost ->
+          ensure_none bd;
+          (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
+           Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr},
+           None)
+        | _ -> tc_error !!tc "conseq: pre and post must be of the same kind" in
 
-    fmake pre post bd
+      fmake pre post bd
+
   in
 
-  let process_cut2 side f1 ((pre, post), c_or_bd) =
+  let process_cut2 side f1 ((pre, post, poe), c_or_bd) =
     let penv, qenv, gpre, gpost, ty, fmake =
       match concl.f_node with
-      | FhoareS hs ->
-        let env = LDecl.push_active_ss hs.hs_m hyps in
-        let fmake pre post c_or_bd =
-          ensure_none c_or_bd;
-          f_hoareS (snd hs.hs_m) pre hs.hs_s post
-        in (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), tbool, lift_ss_inv2 fmake)
-
-      | FhoareF hf ->
-        let m = hf.hf_m in
-        let f, pr, po = match f1 with
-        | None -> hf.hf_f, hf_pr hf, hf_po hf
-        | Some f1 -> match (snd f1).f_node with
-                     | FequivF ef when side = `Left -> 
-                      ef.ef_fr, {m; inv=f_true}, {m; inv=f_true}
-                     | _ -> hf.hf_f, hf_pr hf, hf_po hf
-        in
-        let penv, qenv = LDecl.hoareF m f hyps in
-        let fmake pre post c_or_bd =
-          ensure_none c_or_bd; f_hoareF pre f post in
-        (penv, qenv, Inv_ss pr, Inv_ss po, tbool, lift_ss_inv2 fmake)
-
       | FeHoareF hf ->
         let f, pr, po, m = match f1 with
         | None -> hf.ehf_f, ehf_pr hf, ehf_po hf, hf.ehf_m
         | Some f1 -> match (snd f1).f_node with
                      | FequivF ef when side = `Left ->
                          let f_xreal_1 = f_r2xr f_r1 in
-                         ef.ef_fr, {m=ef.ef_mr; inv=f_xreal_1}, 
+                         ef.ef_fr, {m=ef.ef_mr; inv=f_xreal_1},
                           {m=ef.ef_mr; inv=f_xreal_1}, ef.ef_mr
                      | _ -> hf.ehf_f, ehf_pr hf, ehf_po hf, hf.ehf_m
         in
@@ -1484,20 +1507,20 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let env = LDecl.push_active_ss bhs.bhs_m hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_hoareS (snd bhs.bhs_m) pre bhs.bhs_s post
+          f_hoareS (snd bhs.bhs_m) pre bhs.bhs_s post []
         in (env, env, Inv_ss (bhs_pr bhs), Inv_ss (bhs_po bhs), tbool, lift_ss_inv2 fmake)
 
       | FbdHoareF bhf ->
         let f, pr, po, m = match f1 with
         | None -> bhf.bhf_f, bhf_pr bhf, bhf_po bhf, bhf.bhf_m
         | Some f1 -> match (snd f1).f_node with
-                     | FequivF ef when side = `Left -> ef.ef_fr, 
+                     | FequivF ef when side = `Left -> ef.ef_fr,
                         {m=ef.ef_mr;inv=f_true}, {m=ef.ef_mr;inv=f_true}, ef.ef_mr
                      | _ -> bhf.bhf_f, bhf_pr bhf, bhf_po bhf, bhf.bhf_m
         in
         let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
-          ensure_none c_or_bd; f_hoareF pre f post in
+          ensure_none c_or_bd; f_hoareF pre f post [] in
         (penv, qenv, Inv_ss pr, Inv_ss po, tbool, lift_ss_inv2 fmake)
 
       | FequivF ef ->
@@ -1506,7 +1529,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
         let penv, qenv = LDecl.hoareF m f hyps in
         let fmake pre post c_or_bd =
           ensure_none c_or_bd;
-          f_hoareF pre f post in
+          f_hoareF pre f post [] in
         let f_true = {m; inv=f_true} in
         (penv, qenv, Inv_ss f_true, Inv_ss f_true, tbool, lift_ss_inv2 fmake)
 
@@ -1526,7 +1549,7 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_bdHoareS (snd m) pre f post cmp bd
 
           | _, None ->
-            f_hoareS (snd m) pre f post
+            f_hoareS (snd m) pre f post []
 
           | _, Some (PCI_bd (cmp,bd)) ->
             let cmp = odfl FHeq cmp in
@@ -1537,21 +1560,197 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
+    match poe with
+    | Some _ -> assert false
+    | None ->
+      let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
+      let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
+
+      let (pre, post, c_or_bd) = match gpre, gpost with
+        | Inv_ss gpre, Inv_ss gpost ->
+          let bd = c_or_bd |> omap (process_info !!tc penv gpre.m) in
+          (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, bd)
+        | Inv_ts gpre, Inv_ts gpost ->
+          ensure_none c_or_bd;
+          (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
+           Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr},
+           None)
+        | _ -> tc_error !!tc "conseq: pre and post must be of the same kind"
+      in
+      fmake pre post c_or_bd
+  in
+
+  if   List.for_all is_none [info1; info2; info3]
+  then t_id tc
+  else
+    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut1) tc) in
+    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut2 `Left f1) tc) in
+    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut2 `Right f1) tc) in
+
+    let ofalse = omap (fun (x, y) -> (Some x, y)) in
+
+    t_hi_conseq notmod (f1 |> ofalse) (f2 |> ofalse) (f3 |> ofalse) tc
+
+let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
+  let hyps, concl = FApi.tc1_flat tc in
+
+  let env  = LDecl.toenv hyps in
+
+  let ensure_none o =
+    if not (is_none o) then tc_error !!tc "cannot give a bound here" in
+
+  let process_conseq_e tc penv ty =
+    let aux (e,f) =
+      let _,e = EcTyping.except_genpath env e in
+      let f = TTC.pf_process_form !!tc penv ty f in
+      e,f
+    in
+    List.map aux
+  in
+
+  let process_cut1 ((pre, post, poe), c_or_bd) =
+     let penv, qenv, gpre, gpost, gpoe, ty, fmake =
+      match concl.f_node with
+      | FhoareS hs ->
+        let env = LDecl.push_active_ss hs.hs_m hyps in
+
+        let fmake pre post poe c_or_bd =
+          match c_or_bd with
+          | None ->
+            f_hoareS(snd hs.hs_m) pre hs.hs_s post poe
+          | Some (PCI_bd (cmp, bd)) ->
+            f_bdHoareS (snd hs.hs_m) pre hs.hs_s post (oget cmp) bd
+        in
+        (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), (hs_poe hs), tbool, lift_ss_inv2 fmake)
+
+      | FhoareF hf ->
+        let penv, qenv = LDecl.hoareF hf.hf_m hf.hf_f hyps in
+
+        let fmake pre post poe c_or_bd =
+          match c_or_bd with
+          | None ->
+            f_hoareF pre hf.hf_f post poe
+          | Some (PCI_bd (cmp, bd)) ->
+            f_bdHoareF pre hf.hf_f post (oget cmp) bd
+        in
+        (penv, qenv, Inv_ss (hf_pr hf), Inv_ss (hf_po hf), (hf_poe hf), tbool, lift_ss_inv2 fmake)
+
+      | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
+    in
+
     let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
     let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
 
-    let (pre, post, c_or_bd) = match gpre, gpost with
-    | Inv_ss gpre, Inv_ss gpost ->
+    let poe  = omap (process_conseq_e tc penv ty) poe in
+    let poe = match poe with
+        None -> gpoe
+      | Some poe ->
+        begin
+          if not (EcTyping.check_unique_epost poe) then assert false;
+          List.map
+            (fun (e,f) -> e,{inv=f;m=(find_poe gpoe e).m})
+            poe
+        end
+    in
+
+    let (pre, post, poe, c_or_bd) = match gpre, gpost with
+      | Inv_ss gpre, Inv_ss gpost ->
         let bd = c_or_bd |> omap (process_info !!tc penv gpre.m) in
-        (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, bd)
-    | Inv_ts gpre, Inv_ts gpost ->
+        (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, poe, bd)
+      | Inv_ts gpre, Inv_ts gpost ->
         ensure_none c_or_bd;
         (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
          Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr},
+         poe,
          None)
-    | _ -> tc_error !!tc "conseq: pre and post must be of the same kind" in
+      | _ ->
+        tc_error
+          !!tc
+          "conseq: pre, post and exception post must be of the same kind"
+    in
+    fmake pre post poe c_or_bd
 
-    fmake pre post c_or_bd
+  in
+
+  let process_cut2 side f1 ((pre, post, poe), c_or_bd) =
+    let penv, qenv, gpre, gpost, gpoe, ty, fmake =
+      match concl.f_node with
+      (* | FhoareS hs -> *)
+      (*   let env = LDecl.push_active hs.hs_m hyps in *)
+      (*   let fmake pre post poe c_or_bd = *)
+      (*     ensure_none c_or_bd; *)
+      (*     f_hoareS_r { hs with hs_pr = pre; hs_po = post; hs_poe = poe } *)
+      (*   in (env, env, hs.hs_pr, hs.hs_po, hs.hs_poe, tbool, fmake) *)
+
+      (* | FhoareF hf -> *)
+      (*   let f, pr, po, poe = match f1 with *)
+      (*   | None -> hf.hf_f, hf.hf_pr, hf.hf_po, hf.hf_poe *)
+      (*   | Some f1 -> match (snd f1).f_node with *)
+      (*                | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true, [] *)
+      (*                | _ -> hf.hf_f, hf.hf_pr, hf.hf_po, hf.hf_poe *)
+      (*   in *)
+      (*   let penv, qenv = LDecl.hoareF f hyps in *)
+      (*   let fmake pre post poe c_or_bd = *)
+      (*     ensure_none c_or_bd; f_hoareF pre f post poe in *)
+      (*   (penv, qenv, pr, po, poe, tbool, fmake) *)
+      | FhoareS hs ->
+        let env = LDecl.push_active_ss hs.hs_m hyps in
+        let fmake pre post poe  c_or_bd =
+          ensure_none c_or_bd;
+          f_hoareS (snd hs.hs_m) pre hs.hs_s post poe
+        in
+        (env, env, Inv_ss (hs_pr hs), Inv_ss (hs_po hs), (hs_poe hs), tbool, lift_ss_inv2 fmake)
+
+      | FhoareF hf ->
+        let m = hf.hf_m in
+        let f, pr, po, poe = match f1 with
+        | None -> hf.hf_f, hf_pr hf, hf_po hf, hf_poe hf
+        | Some f1 ->
+          match (snd f1).f_node with
+          | FequivF ef when side = `Left ->
+            ef.ef_fr, {m; inv=f_true}, {m; inv=f_true}, []
+          | _ -> hf.hf_f, hf_pr hf, hf_po hf, hf_poe hf
+        in
+        let penv, qenv = LDecl.hoareF m f hyps in
+        let fmake pre post poe c_or_bd =
+          ensure_none c_or_bd; f_hoareF pre f post poe
+        in
+        (penv, qenv, Inv_ss pr, Inv_ss po, poe, tbool, lift_ss_inv2 fmake)
+
+      | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
+    in
+
+    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
+    let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
+
+    let poe  = omap (process_conseq_e tc penv ty) poe in
+    let poe = match poe with
+        None -> gpoe
+      | Some poe ->
+        begin
+          if not (EcTyping.check_unique_epost poe) then assert false;
+          List.map
+            (fun (e,f) -> e,{inv=f;m=(find_poe gpoe e).m})
+            poe
+        end
+    in
+
+    let (pre, post, poe, c_or_bd) = match gpre, gpost with
+      | Inv_ss gpre, Inv_ss gpost ->
+        let bd = c_or_bd |> omap (process_info !!tc penv gpre.m) in
+        (Inv_ss {inv=pre;m=gpre.m}, Inv_ss {inv=post;m=gpost.m}, poe, bd)
+      | Inv_ts gpre, Inv_ts gpost ->
+        ensure_none c_or_bd;
+        (Inv_ts {inv=pre;ml=gpre.ml;mr=gpost.mr},
+         Inv_ts {inv=post;ml=gpost.ml;mr=gpost.mr},
+         poe,
+         None)
+      | _ -> tc_error !!tc "conseq: pre and post must be of the same kind"
+    in
+    fmake pre post poe c_or_bd
 
   in
 
@@ -1569,9 +1768,16 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
 
     t_hi_conseq notmod (f1 |> ofalse) (f2 |> ofalse) (f3 |> ofalse) tc
 
+let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
+  let _, concl = FApi.tc1_flat tc in
+
+  match concl.f_node with
+  | FhoareS _ | FhoareF _ -> process_conseq_1 notmod (info1, info2, info3) tc
+  | _ -> process_conseq_2 notmod (info1, info2, info3) tc
+
 (* -------------------------------------------------------------------- *)
 let process_bd_equiv side (pr, po) tc =
-  let info = FPCut ((Some pr, Some po), None) in
+  let info = FPCut ((Some pr, Some po, None), None) in
   let info = Some { fp_mode = `Implicit; fp_head = info; fp_args = []; } in
   let info2, info3 = sideif side (info, None) (None, info) in
   process_conseq true (None, info2, info3) tc
@@ -1600,6 +1806,9 @@ let process_conseq_opt cqopt infos tc =
 (* -------------------------------------------------------------------- *)
 let t_conseqauto ?(delta = true) ?tsolve tc =
   let (hyps, concl), mk_other = FApi.tc1_flat tc, true in
+
+  let t_hoareF_notmod f = t_hoareF_notmod f [] in
+  let t_hoareS_notmod f = t_hoareS_notmod f [] in
 
   let todo =
     match concl.f_node with

@@ -59,6 +59,14 @@ let rec p_ntr_compare (p1 : path) (p2 : path) =
       | n -> n
     end
 
+let rec p_ntr_equal (p1 : path) (p2 : path) =
+  match p1.p_node, p2.p_node with
+  | Psymbol x1, Psymbol x2 ->
+    String.equal x1 x2
+  | Pqname (p1, x1), Pqname (p2, x2) ->
+    p_ntr_equal p1 p2 && String.equal x1 x2
+  | _, _ -> false
+
 (* -------------------------------------------------------------------- *)
 module Mp = Path.M
 module Hp = Path.H
@@ -268,7 +276,7 @@ let is_abstract (mp : mpath) =
 
 let is_concrete (mp : mpath) =
   match mp.m_top with `Concrete _ -> true | _ -> false
-  
+
 let m_functor mp =
   let top =
     match mp.m_top with

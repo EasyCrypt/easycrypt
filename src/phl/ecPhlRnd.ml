@@ -37,7 +37,7 @@ module Core = struct
     let post = subst_form_lv env lv x (hs_po hs) in
     let post = map_ss_inv2 f_imp (map_ss_inv2 f_in_supp x distr) post in
     let post = map_ss_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
-    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
+    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post (hs_poe hs) in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -51,7 +51,7 @@ module Core = struct
     let m = fst hs.ehs_m in
     let distr = EcFol.ss_inv_of_expr m distr in
     let post = subst_form_lv env lv {m;inv=x} (ehs_po hs) in
-    let post = map_ss_inv2 (f_Ep ty_distr) distr 
+    let post = map_ss_inv2 (f_Ep ty_distr) distr
       (map_ss_inv1 (f_lambda [(x_id,GTty ty_distr)]) post) in
     let concl = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
@@ -211,7 +211,7 @@ module Core = struct
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
-          let concl = f_bdHoareS (snd bhs.bhs_m) 
+          let concl = f_bdHoareS (snd bhs.bhs_m)
             (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
           [concl]
         else
@@ -219,7 +219,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS (snd bhs.bhs_m) pre s post in
+          let concl = f_hoareS (snd bhs.bhs_m) pre s post [] in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PNoRndParams, _ ->
@@ -244,7 +244,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS (snd bhs.bhs_m) pre s post in
+          let concl = f_hoareS (snd bhs.bhs_m) pre s post [] in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, _ ->
@@ -273,7 +273,7 @@ module Core = struct
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
           f_forall_mems_ss_inv bhs.bhs_m (map_ss_inv2 f_imp (map_ss_inv1 f_not phi) post) in
         let sgoal5 =
-          let f_inbound x = 
+          let f_inbound x =
             let f_r1, f_r0 = {m;inv=f_r1}, {m;inv=f_r0} in
             map_ss_inv2 f_anda (map_ss_inv2 f_real_le f_r0 x) (map_ss_inv2 f_real_le x f_r1) in
           map_ss_inv f_ands (List.map f_inbound [d1; d2; d3; d4])
@@ -405,7 +405,9 @@ module Core = struct
         Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) (hs_po hs).inv)
       else None in
     let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
+    let concl =
+      f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) (hs_poe hs)
+    in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
@@ -525,11 +527,11 @@ let wp_equiv_rnd_r bij tc =
   let po =
     match hdc2, hdc3 with
     | None  , None   -> None
-    | Some _, Some _ -> 
+    | Some _, Some _ ->
       Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)))
-    | Some _, None   -> 
+    | Some _, None   ->
       Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind (map_ts_inv2 f_anda c3 c4))))
-    | None  , Some _ -> 
+    | None  , Some _ ->
       Some (map_ts_inv f_andas [c1; c2; map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)])
   in
 
@@ -590,7 +592,7 @@ let t_equiv_rnd_r side pos bij_info tc =
   match side, pos, bij_info with
   | Some side, None, (None, None) ->
     wp_equiv_disj_rnd_r side tc
-  | Some side, None, _ ->
+  | Some _, None, _ ->
     tc_error !!tc "one-sided rnd takes no arguments"
   | None, _, _ -> begin
       let pos =
@@ -692,7 +694,7 @@ let process_rnd side pos tac_info tc =
           Double ((b1, p1), (b2, p2))
     )
     in
-    
+
     t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"
