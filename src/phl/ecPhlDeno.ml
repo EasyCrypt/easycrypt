@@ -402,8 +402,9 @@ let t_equiv_deno_bad2 pre bad1 tc =
     ]) tc
 
 (* -------------------------------------------------------------------- *)
-let process_pre ml mr tc hyps prl prr pre post =
+let process_pre tc hyps prl prr pre post =
   let fl = prl.pr_fun and fr = prr.pr_fun in
+  let ml, mr = post.ml, post.mr in
   match pre with
   | Some p ->
     let penv, _ = LDecl.equivF ml mr fl fr hyps in
@@ -417,9 +418,9 @@ let process_pre ml mr tc hyps prl prr pre post =
     let push f = eqs := f :: !eqs in
 
     let dopv m mi gen_o x ty =
-      if is_glob x then push (map_ts_inv1 (fun f -> f_eq f (f_pvar x ty mi).inv) (gen_o (f_pvar x ty m))) in
+      if is_glob x then push (gen_o (map_ss_inv1 (fun f -> f_eq f (f_pvar x ty mi).inv) (f_pvar x ty m))) in
 
-    let doglob m mi gen_o g = push ((map_ts_inv1 (fun f -> f_eq f (NormMp.norm_glob env mi g).inv)) (gen_o (NormMp.norm_glob env m g))) in
+    let doglob m mi gen_o g = push (gen_o ((map_ss_inv1 (fun f -> f_eq f (NormMp.norm_glob env mi g).inv)) (NormMp.norm_glob env m g))) in
     let dof f a m mi gen_o =
       try
         let fv = PV.remove env pv_res (PV.fv env m post.inv) in
@@ -428,8 +429,8 @@ let process_pre ml mr tc hyps prl prr pre post =
           push (map_ts_inv1 (fun f -> f_eq f a) (gen_o (f_pvarg a.f_ty m)))
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
-    let gen_r f = ss_inv_generalize_right f pmr in
-    let gen_l f = ss_inv_generalize_left  f pml in
+    let gen_r f = ss_inv_generalize_right f mr in
+    let gen_l f = ss_inv_generalize_left  f ml in
     dof fl al ml pml gen_r; dof fr ar mr pmr gen_l;
     map_ts_inv f_ands !eqs
 
@@ -476,7 +477,7 @@ let process_equiv_deno1 info eq tc =
         | _ ->
            tc_error !!tc "not able to reconize a comparison operator" in
 
-    let pre = process_pre ml mr tc hyps prl prr pre post in
+    let pre = process_pre tc hyps prl prr pre post in
 
     f_equivF pre fl fr post
   in
@@ -514,7 +515,7 @@ let process_equiv_deno_bad info tc =
         let bad = ss_inv_generalize_as_right (destr_pr fprb).pr_event ml mr in
         let f_imps' l = f_imps (List.tl l) (List.hd l) in
         map_ts_inv f_imps' [evr; map_ts_inv1 f_not bad; evl] in
-    let pre = process_pre ml mr tc hyps prl prr pre post in
+    let pre = process_pre tc hyps prl prr pre post in
 
     f_equivF pre fl fr post
   in
@@ -573,7 +574,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
         let iff = post_iff ml' mr' eq env evl evr in
         map_ts_inv2 f_and (map_ts_inv2 f_iff bad1 bad2) (map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) iff) in
 
-    let pre = process_pre ml' mr' tc hyps prl prr pre post in
+    let pre = process_pre tc hyps prl prr pre post in
 
     f_equivF pre fl fr post
   in
