@@ -759,6 +759,12 @@ module MC = struct
     import (_up_operator true) (IPPath p) op env
 
   (* -------------------------------------------------------------------- *)
+  let lookup_except qnx env =
+    let (p, op) = lookup_operator qnx env in
+    if is_except op then p, operator_as_excep op
+    else lookup_error (`QSymbol qnx)
+
+  (* -------------------------------------------------------------------- *)
   let lookup_tydecl ?unique qnx env =
     match lookup ?unique (fun mc -> mc.mc_tydecls) qnx env with
     | None -> lookup_error (`QSymbol qnx)
@@ -1470,7 +1476,7 @@ module BaseRw = struct
         env_item = mkitem ~import (Th_addrw (p, l, lc)) :: env.env_item; }
 
   let all env =
-    List.filter_map (fun (ip, sp) -> 
+    List.filter_map (fun (ip, sp) ->
       match ip with
       | IPPath p -> Some (p, sp)
       | _ -> None) @@
@@ -1526,10 +1532,10 @@ module Reduction = struct
     |> odfl []
 
   (* FIXME: handle other cases, right now only used for print hint *)
-  let all (env : env) = 
-    List.map (fun (ts, mr) -> 
+  let all (env : env) =
+    List.map (fun (ts, mr) ->
       (ts, Lazy.force mr.ri_list))
-    (Mrd.bindings env.env_redbase) 
+    (Mrd.bindings env.env_redbase)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1578,7 +1584,7 @@ module Auto = struct
 
   let getall (bases : symbol list) (env : env) : atbase0 list =
     let dbs = List.map (fun base -> get_core ~base env) bases in
-    let dbs = 
+    let dbs =
       List.fold_left (fun db mi ->
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
@@ -2753,6 +2759,34 @@ module Op = struct
 
   let all ?check ?name (env : env) =
     gen_all (fun mc -> mc.mc_operators) MC.lookup_operators ?check ?name env
+end
+
+(* -------------------------------------------------------------------- *)
+
+module Except = struct
+  type t = excep
+
+  let by_path_opt (p : EcPath.path) (env : env) : t option =
+    match Op.by_path_opt p env with
+    | None -> None
+    | Some op ->
+      if is_except op then Some (operator_as_excep op)
+      else None
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let lookup qname (env : env) =
+    MC.lookup_except qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
 end
 
 (* -------------------------------------------------------------------- *)

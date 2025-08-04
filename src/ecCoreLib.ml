@@ -29,6 +29,10 @@ module CI_Witness = struct
   let p_witness = _Pervasive "witness"
 end
 
+module CI_Exn = struct
+  let p_exn = _Pervasive "exn"
+end
+
 (*-------------------------------------------------------------------- *)
 module CI_Bool = struct
   let i_Bool = "Bool"

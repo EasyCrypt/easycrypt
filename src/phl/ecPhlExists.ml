@@ -27,8 +27,10 @@ let get_to_gens fs =
       | Inv_ts f -> begin match f.inv.f_node with
           | Fpvar (pv, m) -> 
             id_of_pv ~mc:(f.ml, f.mr) pv m
-          | _             -> EcIdent.create "f" 
-        end in
+          | _             -> EcIdent.create "f"
+        end
+      | Inv_hs _ -> assert false
+    in
     id, f in
   List.map do_id fs
 
@@ -70,12 +72,16 @@ let t_hr_exists_intro_r fs tc =
   let ms =
     match pre1 with
     | Inv_ts _ -> [ml; mr]
-    | Inv_ss _ -> [m] in
+    | Inv_ss _ -> [m]
+    | Inv_hs _ -> assert false
+  in
 
   let inv_rebind f =
     match f with
     | Inv_ts f -> Inv_ts (ts_inv_rebind f ml mr)
-    | Inv_ss f -> Inv_ss (ss_inv_rebind f m) in
+    | Inv_ss f -> Inv_ss (ss_inv_rebind f m)
+    | Inv_hs f -> Inv_hs (hs_inv_rebind f m)
+  in
 
   let args =
     let do1 (_, f) = PAFormula (inv_of_inv (inv_rebind f)) in
@@ -155,6 +161,9 @@ let process_ecall oside (l, tvi, fs) tc =
     | `Hoare n, _, Inv_ss p1 ->
         EcPhlSeq.t_hoare_seq
           (Zpr.cpos (n-1)) p1 tc
+    | `Hoare n, _, Inv_hs p1 ->
+        EcPhlSeq.t_hoare_seq
+          (Zpr.cpos (n-1)) (lower_f p1) tc
     | `Equiv (n1, n2), None, Inv_ts p1 ->
         EcPhlSeq.t_equiv_seq
           (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
@@ -206,7 +215,6 @@ let process_ecall oside (l, tvi, fs) tc =
       List.fold_left2
         (fun s id f -> add_flocal s id (inv_of_inv f))
         empty (List.fst ids) fs in
-
     (nms, subst_inv subst sub) in
 
   let tc = t_local_seq p1 tc in

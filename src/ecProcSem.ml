@@ -191,7 +191,7 @@ let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
 
   | Swhile    _
   | Smatch    _
-  | Sassert   _
+  | Sraise   _
   | Sabstract _
   | Scall     _ ->
      raise SemNotSupported;

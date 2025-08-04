@@ -1617,6 +1617,14 @@ module Op = struct
            let res   = f_pvar pv_res sig_.fs_ret m in
            let args  = f_pvar pv_arg sig_.fs_arg m in
 
+           let post =
+             f_eq
+               res.inv
+               (f_app
+                  (f_op oppath [] opdecl.op_ty)
+                  (List.map (fun (x, ty) -> f_local x ty) locs)
+                  sig_.fs_ret)
+           in
            f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) locs)
              (f_hoareF
@@ -1624,12 +1632,7 @@ module Op = struct
                    args.inv
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))}
                 f
-                {m;inv=(f_eq
-                   res.inv
-                   (f_app
-                      (f_op oppath [] opdecl.op_ty)
-                      (List.map (fun (x, ty) -> f_local x ty) locs)
-                      sig_.fs_ret))})
+                {hsi_m=m;hsi_inv= empty_poe post})
          in
 
          let prax = EcDecl.{
@@ -1647,6 +1650,32 @@ module Op = struct
     in
 
     scope
+end
+
+(* -------------------------------------------------------------------- *)
+module Except = struct
+  module TT = EcTyping
+
+  let bind ?(import = true) (scope : scope) (x, e) =
+    assert (scope.sc_pr_uc = None);
+    let op = operator_of_excep e in
+    Op.bind ~import scope (x, op)
+
+  let add (scope : scope) (pe : pexception_decl located) =
+    assert (scope.sc_pr_uc = None);
+    let loc = loc pe in
+    let pe = pe.pl_desc in
+    let lc = pe.pe_locality in
+    let eenv = env scope in
+    let ue = TT.transtyvars eenv (loc, Some []) in
+    let e_dom = transtys tp_nothing eenv ue pe.pe_dom in
+    let tparams = EcUnify.UniEnv.tparams ue in
+    if tparams <> [] then
+      hierror ~loc "Polymorphic expression are not allowed";
+    let e   = EcDecl.mk_except lc e_dom in
+    let scope = bind scope (unloc pe.pe_name, e) in
+    e, scope
+
 end
 
 (* -------------------------------------------------------------------- *)

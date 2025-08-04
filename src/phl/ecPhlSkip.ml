@@ -16,7 +16,8 @@ module LowInternal = struct
     if not (List.is_empty hs.hs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
-    let concl = map_ss_inv2 f_imp (hs_pr hs) (hs_po hs) in
+    let post = lower_f (hs_po hs) in
+    let concl = map_ss_inv2 f_imp (hs_pr hs) post in
     let concl = EcSubst.f_forall_mems_ss_inv hs.hs_m concl in
 
     FApi.xmutate1 tc `Skip [concl]

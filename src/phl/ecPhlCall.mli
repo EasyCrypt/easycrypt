@@ -13,7 +13,7 @@ val wp2_call :
   -> ts_inv
   -> EcEnv.LDecl.hyps -> ts_inv
 
-val t_hoare_call   : ss_inv -> ss_inv -> backward
+val t_hoare_call   : ss_inv -> hs_inv -> backward
 val t_bdhoare_call : ss_inv -> ss_inv -> ss_inv option -> backward
 val t_equiv_call   : ts_inv -> ts_inv -> backward
 val t_equiv_call1  : side -> ss_inv -> ss_inv -> backward

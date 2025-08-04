@@ -67,7 +67,7 @@ let check_dslc pf =
     | Smatch (_, bs) ->
        List.iter (doit_s -| snd) bs
 
-    | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
+    | Srnd _ | Scall _ | Swhile _ | Sraise _  | Sabstract _ ->
        error ()
 
   and doit_s c =
@@ -306,8 +306,11 @@ let process_unroll_for side cpos tc =
   let t_conseq_nm tc =
     match (tc1_get_pre tc) with
     | Inv_ss inv ->
-      (EcPhlConseq.t_hoareS_conseq_nm inv {m=inv.m;inv=f_true} @+
-      [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
+      (EcPhlConseq.t_hoareS_conseq_nm
+         inv
+         {hsi_m=inv.m;hsi_inv=empty_poe f_true}
+       @+
+       [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
     | _ -> tc_error !!tc "expecting single sided precondition" in
 
   let doi i tc =

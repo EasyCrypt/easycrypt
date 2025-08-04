@@ -37,6 +37,7 @@ module Low = struct
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.hs_s in
+    let e = update_hs_ss e (hs_po hs) in
     let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd e in
     let concl2  = f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
@@ -52,6 +53,7 @@ module Low = struct
       | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
       | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
     let pre = map_ss_inv1 pre (ehs_pr hs) in
+    let e = lift_f e in
 
     let concl1  = f_hoareS (snd hs.ehs_m) pre hd e in
     let concl2  = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs) in
@@ -63,6 +65,8 @@ module Low = struct
     let bhs = tc1_as_bdhoareS tc in
     let m  = EcMemory.memory bhs.bhs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
+    let e = lift_f e in
+
     let concl1  = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd e in
     let concl2  = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
@@ -85,6 +89,7 @@ module Low = struct
           let mhs = EcIdent.create "&hr" in
           let pr = ss_inv_rebind pr mhs in
           let po = ss_inv_rebind po mhs in
+          let po = lift_f po in
           f_hoareS (snd m) pr hd po) (es_pr es) e) in
     let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
     let concl2 = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr (es_po es) in
@@ -221,6 +226,7 @@ module LowMatch = struct
       gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
 
     let pr = ofold (map_ss_inv2 f_and) (hs_pr hs) epr in
+    let po1 = update_hs_ss po1 (hs_po hs) in
 
     let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd po1 in
     let concl2  = f_hoareS (snd me) pr full (hs_po hs) in
@@ -247,6 +253,7 @@ module LowMatch = struct
       gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
 
     let pr = ofold (map_ss_inv2 f_and) (bhs_pr bhs) epr in
+    let po1 = lift_f po1 in
 
     let concl1 = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd po1 in
     let concl2 = f_bdHoareS (snd me) pr full (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
@@ -275,6 +282,7 @@ module LowMatch = struct
     let ts_inv_lower_side1 =
       sideif side ts_inv_lower_left1 ts_inv_lower_right1 in
 
+    let po1 = lift_f po1 in
     let concl1 =
       f_forall_mems_ss_inv mo
         (ts_inv_lower_side1 (fun pr -> f_hoareS (snd m) pr hd po1) (es_pr es)) in

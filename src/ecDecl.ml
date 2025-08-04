@@ -86,6 +86,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC
 
 and prbody =
@@ -153,6 +154,13 @@ let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
+
+type excep = {
+    e_loca : locality;
+    e_dom  : ty list;
+  }
+
+(* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
 
 let is_oper op =
@@ -183,6 +191,11 @@ let is_rcrd op =
 let is_fix op =
   match op.op_kind with
   | OB_oper (Some (OP_Fix _)) -> true
+  | _ -> false
+
+let is_except op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn _)) -> true
   | _ -> false
 
 let is_abbrev op =
@@ -216,6 +229,8 @@ let optransparent : opopaque =
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+
+let mk_except e_loca e_dom = { e_loca; e_dom }
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -252,6 +267,15 @@ let operator_as_prind (op : operator) =
   match op.op_kind with
   | OB_pred (Some (PR_Ind pri)) -> pri
   | _ -> assert false
+
+let operator_as_excep (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn e_dom)) -> {e_loca = op.op_loca; e_dom}
+  | _ -> assert false
+
+let operator_of_excep (ex: excep) =
+  let ty = EcTypes.toarrow ex.e_dom EcTypes.texn in
+  mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.e_dom)) ex.e_loca
 
 (* -------------------------------------------------------------------- *)
 let axiomatized_op 

@@ -112,6 +112,8 @@ module Fun : sig
 
   val inv_memenv : memory -> memory -> env -> env
 
+  val inv_memenv1 : memory -> env -> env
+
   val equivF_memenv : memory -> memory -> xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
 
@@ -150,6 +152,16 @@ module Var : sig
   val bind_pvglob    : symbol -> EcTypes.ty -> env -> env
   val bindall_pvglob : (EcSymbols.symbol * EcTypes.ty) list -> env -> env
 
+end
+(* -------------------------------------------------------------------- *)
+
+module Except : sig
+  type t = excep
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -403,7 +415,7 @@ module BaseRw : sig
   val add   : ?import:bool -> symbol -> is_local -> env -> env
   val addto : ?import:bool -> path -> path list -> is_local -> env -> env
 
-  val all : env -> (path * Sp.t) list 
+  val all : env -> (path * Sp.t) list
 end
 
 (* -------------------------------------------------------------------- *)
