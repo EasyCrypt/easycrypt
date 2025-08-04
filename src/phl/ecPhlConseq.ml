@@ -152,6 +152,7 @@ let t_bdHoareF_conseq_bd cmp bd tc =
 (* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq_bd cmp bd tc =
   let bhs = tc1_as_bdhoareS tc in
+  let bd = ss_inv_rebind bd (fst bhs.bhs_m) in
   let bd_goal = bd_goal tc bhs.bhs_cmp (bhs_bd bhs) cmp bd in
   let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) bhs.bhs_s (bhs_po bhs) cmp bd in
   let imp = map_ss_inv2 f_imp (bhs_pr bhs) bd_goal in
