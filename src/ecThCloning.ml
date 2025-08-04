@@ -435,6 +435,8 @@ end = struct
          let ovrd = (ovrd, mode) in
          nt_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
+      | Th_exception _ ->  (proofs, evc)
+
       | Th_axiom (x, _) ->
         let axd = loced (thd @ prefix, x) in
         let name = (loced (xdth @ prefix, x)) in

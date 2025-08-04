@@ -96,3 +96,6 @@ val f_forall_mems_ts_inv : memenv -> memenv -> ts_inv -> form
 
 val ss_inv_forall_ml_ts_inv : memenv -> ts_inv -> ss_inv
 val ss_inv_forall_mr_ts_inv : memenv -> ts_inv -> ss_inv
+
+(* -------------------------------------------------------------------- *)
+val hs_inv_rebind : hs_inv -> memory -> hs_inv

@@ -103,7 +103,7 @@ and callable_oracles_i env modv os i =
     | Smatch (_, b)      -> callable_oracles_sx env modv os (List.map snd b)
     | Sif    (_, s1, s2) -> callable_oracles_sx env modv os [s1; s2]
 
-    | Sasgn _ | Srnd _ | Sassert _ -> os
+    | Sasgn _ | Srnd _ | Sraise _ -> os
 
     | Sabstract _ -> assert false (* FIXME *)
 
@@ -188,7 +188,8 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let pre = map_ss_inv f_ands (eqparams :: (eqxs@eqgs)) in
     let p = map_ss_inv2 f_and (map_ss_inv1 f_not f_event) (map_ss_inv2 f_eq cntr {m=cntr.m;inv=f_i0}) in
     let p = map_ss_inv2 f_and_simpl p inv in
-    let p = EcSubst.ss_inv_rebind p pre.m in
+    let p = {hsi_m=p.m;hsi_inv=(empty_poe p.inv)} in
+    let p = EcSubst.hs_inv_rebind p pre.m in
     f_hoareS (snd memenv) pre (stmt s_hd) p
   in
 
@@ -220,7 +221,8 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let pre = map_ss_inv2 f_and_simpl pre inv in
       let post = map_ss_inv2 f_int_lt old_cntr cntr in
       let post = map_ss_inv2 f_and_simpl post inv in
-        f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post)
+      let post = {hsi_m=post.m;hsi_inv=(empty_poe post.inv)} in
+      f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post)
     in
     let cntr_stable_goal =
       let old_cntr = {m=cntr.m;inv=old_cntr} in
@@ -232,6 +234,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let pre  = map_ss_inv2 f_and_simpl pre inv in
       let post = map_ss_inv f_ands [map_ss_inv2 f_eq f_event old_b; map_ss_inv2 f_int_le old_cntr cntr] in
       let post = map_ss_inv2 f_and_simpl post inv in
+      let post = {hsi_m=post.m;hsi_inv=(empty_poe post.inv)} in
         f_forall_simpl
           [old_b_id,GTty tbool; old_cntr_id,GTty tint]
           (f_hoareF pre o post)

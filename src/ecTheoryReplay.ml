@@ -108,7 +108,7 @@ end = struct
     if rlen <> nlen then
       raise (Incompatible (NotSameNumberOfTyParam (rlen, nlen)))
 
-  let for_params 
+  let for_params
     (hyps : hyps)
     (s    : EcSubst.subst)
     (p1   : (EcIdent.ident * ty) list)
@@ -785,6 +785,14 @@ and replay_ntd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oont) =
       (subst, ops, proofs, scope)
   end
 
+
+(* -------------------------------------------------------------------- *)
+and replay_excep
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, excep)
+=
+  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_exception (name, excep)) in
+  (subst, ops, proofs, scope)
+
 (* -------------------------------------------------------------------- *)
 and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
   let scenv = ove.ovre_hooks.henv scope in
@@ -1056,6 +1064,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_operator (x, ({ op_kind = OB_nott _} as oont)) ->
      replay_ntd ove (subst, ops, proofs, scope) (import, x, oont)
+
+  | Th_exception (x, e) ->
+    replay_excep ove (subst, ops, proofs, scope) (import, x, e)
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (import, x, ax)

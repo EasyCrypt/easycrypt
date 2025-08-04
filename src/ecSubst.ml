@@ -426,8 +426,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise e -> i_raise e
 
   | Sabstract _ ->
      i
@@ -533,14 +532,14 @@ let rec subst_form (s : subst) (f : form) =
      let hf_f  = subst_xpath s hf.hf_f in
      let s = add_memory s hf.hf_m hf.hf_m in
      let hf_pr = map_ss_inv1 (subst_form s) (hf_pr hf) in
-     let hf_po = map_ss_inv1 (subst_form s) (hf_po hf) in
+     let hf_po = map_hs_inv1 (subst_form s) (hf_po hf) in
      f_hoareF hf_pr hf_f hf_po
 
   | FhoareS hs ->
      let hs_s = subst_stmt s hs.hs_s in
      let s, (_,mt) = subst_memtype s hs.hs_m in
      let hs_pr = map_ss_inv1 (subst_form s) (hs_pr hs) in
-     let hs_po = map_ss_inv1 (subst_form s) (hs_po hs) in
+     let hs_po = map_hs_inv1 (subst_form s) (hs_po hs) in
      f_hoareS mt hs_pr hs_s hs_po
 
   | FbdHoareF bhf ->
@@ -1024,6 +1023,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
 
+  | Th_exception (e, es) ->
+      Th_exception (e, es)
+
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
 
@@ -1092,10 +1094,16 @@ let subst_ts_inv (s : subst) (inv : ts_inv) =
   let s = add_memory s inv.mr inv.mr in
   { inv = subst_form s inv.inv; ml = inv.ml; mr = inv.mr; }
 
+let subst_hs_inv (s : subst) (inv : hs_inv) =
+  let s = add_memory s inv.hsi_m inv.hsi_m in
+  { hsi_inv = map_poe (subst_form s) inv.hsi_inv; hsi_m = inv.hsi_m }
+
+
 let subst_inv (s : subst) (inv : inv) =
   match inv with
   | Inv_ss inv -> Inv_ss (subst_ss_inv s inv)
   | Inv_ts inv -> Inv_ts (subst_ts_inv s inv)
+  | Inv_hs inv -> Inv_hs (subst_hs_inv s inv)
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * ty) list) : subst =
@@ -1182,3 +1190,11 @@ let ss_inv_forall_ml_ts_inv menvl inv =
 let ss_inv_forall_mr_ts_inv menvr inv =
   let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
   { inv=inv'; m=inv.ml }
+
+(* -------------------------------------------------------------------- *)
+let hs_inv_rebind ({hsi_inv;hsi_m}: hs_inv) (m': memory) : hs_inv =
+  if m' = hsi_m then
+    { hsi_inv; hsi_m }
+  else
+    let hsi_inv = map_poe (subst_form (add_memory empty hsi_m m')) hsi_inv in
+    { hsi_inv; hsi_m = m' }

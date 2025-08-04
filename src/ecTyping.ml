@@ -139,6 +139,7 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
+| DuplicatedException    of qsymbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -153,6 +154,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -283,8 +285,7 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
         map
 
-    | Sassert e ->
-      se_inuse map e
+    | Sraise _ -> map
 
     | Sabstract _ ->
       assert false (* FIXME *)
@@ -1465,6 +1466,12 @@ let trans_gamepath (env : EcEnv.env) gp =
         if _sig.miss_params <> [] then
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath mpath funsymb
+
+let except_genpath env name =
+  let symb = unloc name in
+  match EcEnv.Except.lookup_opt symb env with
+  | None -> tyerror name.pl_loc env (UnknownExceptionName symb)
+  | Some (p,_) -> symb, p
 
 (* -------------------------------------------------------------------- *)
 let trans_oracle (env : EcEnv.env) (m,f) =
@@ -2749,10 +2756,15 @@ and transinstr
       [ i_match (e, branches) ]
     end
 
-  | PSassert pe ->
+  | PSraise (name,pe) ->
+    let _,path = except_genpath env name in
+    match pe with
+    | None ->  [i_raise path]
+    | Some pe ->
       let e, ety = transexp env `InProc ue pe in
+      let e = e_not e in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_assert e ]
+      [i_if (e, stmt [i_raise path], stmt [])]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =
@@ -3442,7 +3454,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
-    | PFhoareF (m, pre, gp, post) ->
+    | PFhoareF (m, pre, gp, post, (eposts,dpost)) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
         let fpath = trans_gamepath env gp in
@@ -3451,9 +3463,28 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
-          unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
-          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF {m;inv=pre'} fpath {m;inv=post'}
+        let penv_e = EcEnv.Fun.inv_memenv1 m env in
+        let epost' =
+          List.fold
+            (fun m (e,f) ->
+               let s,p = except_genpath env e in
+               match DMap.find p m with
+               | exception Not_found -> DMap.add p (transf penv_e f) m
+               | _ -> tyerror f.pl_loc env (DuplicatedException s)
+            )
+            DMap.empty
+            eposts
+        in
+        let dpost' = omap (transf penv) dpost in
+
+        unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre'.f_ty;
+        unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+
+        let aux f = unify_or_fail penv_e ue post.pl_loc ~expct:tbool f.f_ty in
+        DMap.iter (fun _ -> aux) epost';
+        oiter aux dpost';
+
+        f_hoareF {m;inv=pre'} fpath {hsi_m=m;hsi_inv=(post',epost',dpost')}
 
     | PFehoareF (m, pre, gp, post) ->
         if mode <> `Form then
