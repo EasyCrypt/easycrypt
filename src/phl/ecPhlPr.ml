@@ -57,17 +57,14 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let argsr = map_ss_inv1 (to_args funr) (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
-  let m = EcIdent.create "&hr" in
-  let phi1 = ss_inv_rebind phi_l m in
-  let phi2 = ss_inv_rebind phi_r m in
-  let pr1 = f_pr (fst penvl) fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi1) in
-  let pr2 = f_pr (fst penvr) fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi2) in
+  let pr1 = f_pr (fst penvl) fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi_l) in
+  let pr2 = f_pr (fst penvr) fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi_r) in
   let concl_pr =
     f_forall_mems_ts_inv penvl penvr
       (map_ts_inv1 (f_forall_simpl [a_id,GTty ty])
          (map_ts_inv1 (fun pr -> f_imp_simpl pr (f_eq_simpl pr1 pr2)) (ef_pr ef))) in
-  let phi_l = ss_inv_generalize_right phi1 ef.ef_mr in
-  let phi_r = ss_inv_generalize_left phi2 ef.ef_ml in
+  let phi_l = ss_inv_generalize_as_left phi_l ef.ef_ml ef.ef_mr in
+  let phi_r = ss_inv_generalize_as_right phi_r ef.ef_ml ef.ef_mr in
   let concl_po = f_forall_mems_ts_inv qenvl qenvr (map_ts_inv3 (fun phi_l phi_r po ->
       (f_forall_simpl [a_id, GTty ty]
          (f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] po))) phi_l phi_r (ef_po ef)) in
