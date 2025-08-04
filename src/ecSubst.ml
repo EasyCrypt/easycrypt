@@ -426,8 +426,9 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise (e,es) ->
+    let es' = List.map (subst_expr s) es in
+    i_raise (e,es')
 
   | Sabstract _ ->
      i
@@ -529,23 +530,21 @@ let rec subst_form (s : subst) (f : form) =
       let ty  = subst_ty s f.f_ty in
       f_op p tys ty
 
-  | FhoareF { hf_pr; hf_f; hf_po } ->
-     let hf_pr, hf_po =
-       let s = add_memory s mhr mhr in
-       let hf_pr = subst_form s hf_pr in
-       let hf_po = subst_form s hf_po in
-       (hf_pr, hf_po) in
-     let hf_f  = subst_xpath s hf_f in
-     f_hoareF hf_pr hf_f hf_po
+  | FhoareF { hf_pr; hf_f; hf_po; hf_poe } ->
+    let s = add_memory s mhr mhr in
+    let hf_pr = subst_form s hf_pr in
+    let hf_po = subst_form s hf_po in
+    let hf_poe  = List.map (fun (e,f) -> e, subst_form s f) hf_poe in
+    let hf_f  = subst_xpath s hf_f in
+     f_hoareF hf_pr hf_f hf_po hf_poe
 
-  | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
-     let hs_m, (hs_pr, hs_po) =
-       let s, hs_m = subst_memtype s hs_m in
-       let hs_pr = subst_form s hs_pr in
-       let hs_po = subst_form s hs_po in
-       hs_m, (hs_pr, hs_po) in
-     let hs_s = subst_stmt s hs_s in
-     f_hoareS hs_m hs_pr hs_s hs_po
+  | FhoareS { hs_m; hs_pr; hs_s; hs_po; hs_poe } ->
+    let s, hs_m = subst_memtype s hs_m in
+    let hs_pr = subst_form s hs_pr in
+    let hs_po = subst_form s hs_po in
+    let hs_poe  = List.map (fun (e,f) -> e, subst_form s f) hs_poe in
+    let hs_s = subst_stmt s hs_s in
+    f_hoareS hs_m hs_pr hs_s hs_po hs_poe
 
   | FbdHoareF { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd } ->
      let bhf_pr, bhf_po =
@@ -971,6 +970,14 @@ let subst_op (s : subst) (op : operator) =
     op_unfold   = op.op_unfold  ; }
 
 (* -------------------------------------------------------------------- *)
+let subst_excep (s : subst) (e : excep) =
+  let _, tparams = fresh_tparams s e.e_typargs in
+
+  { e_typargs  = tparams     ;
+    e_loca     = e.e_loca    ;
+  }
+
+(* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =
   let s, tparams = fresh_tparams s ax.ax_tparams in
   let spec   = subst_form s ax.ax_spec in
@@ -1041,6 +1048,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
+
+  | Th_exception (e, es) ->
+      Th_exception (e, subst_excep s es)
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)

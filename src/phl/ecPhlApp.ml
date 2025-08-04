@@ -41,7 +41,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let s1, s2 = s_split env i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
-  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
+  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi [] in
   let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd = f1; } in
   let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd = g1; } in
   let condf2 = f_bdHoareS_r
@@ -62,7 +62,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
     let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
-      (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in
+      (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs []) in
   let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in
   let conds =
     if   f_equal g1 f_r0
@@ -86,7 +86,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
 let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
-    let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true in
+    let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true hs.hs_poe in
     let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in

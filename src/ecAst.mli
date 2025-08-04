@@ -111,7 +111,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcPath.path * expr list
   | Sabstract of EcIdent.t
 
 and stmt = private {
@@ -225,17 +225,22 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
+and post = (EcPath.path * form) list
+
 and sHoareF = {
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;
+  hf_poe : post;
 }
 
 and sHoareS = {
-  hs_m  : memenv;
-  hs_pr : form;
-  hs_s  : stmt;
-  hs_po : form; }
+  hs_m   : memenv;
+  hs_pr  : form;
+  hs_s   : stmt;
+  hs_po  : form;
+  hs_poe : post;
+}
 
 
 and eHoareF = {

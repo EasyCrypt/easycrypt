@@ -18,6 +18,7 @@ type cbarg = [
   | `Type       of path
   | `Op         of path
   | `Ax         of path
+  | `Ex         of path
   | `Module     of mpath
   | `ModuleType of path
   | `Typeclass  of path
@@ -39,6 +40,7 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
   | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
+  | `Ex   _p -> Format.fprintf fmt "TODO"
   | `Module mp ->
     let ppe =
       match mp.m_top with
@@ -157,8 +159,8 @@ let rec on_instr (cb : cb) (i : instr)=
       on_lv cb lv;
       on_expr cb e
 
-  | Sassert e ->
-      on_expr cb e
+  | Sraise (_,es) ->
+    List.iter (on_expr cb) es
 
   | Scall (lv, f, args) ->
       lv |> oiter (on_lv cb);
@@ -426,6 +428,10 @@ let on_axiom (cb : cb) (ax : axiom) =
   on_form cb ax.ax_spec
 
 (* -------------------------------------------------------------------- *)
+let on_except (cb : cb) (e : excep) =
+  on_typarams cb e.e_typargs
+
+(* -------------------------------------------------------------------- *)
 let on_modsig (cb:cb) (ms:module_sig) =
   List.iter (fun (_,mt) -> on_modty cb mt) ms.mis_params;
   List.iter (fun (Tys_function fs) ->
@@ -507,6 +513,7 @@ let locality (env : EcEnv.env) (who : cbarg) =
   | `Type p -> (EcEnv.    Ty.by_path p env).tyd_loca
   | `Op   p -> (EcEnv.    Op.by_path p env).op_loca
   | `Ax   p -> (EcEnv.    Ax.by_path p env).ax_loca
+  | `Ex   _p -> assert false
   | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
   | `Module mp    ->
     begin match EcEnv.Mod.by_mpath_opt mp env with
@@ -1042,6 +1049,7 @@ let rec set_lc_item lc_override item =
     match item.ti_item with
     | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_lc lc_override ty.tyd_loca })
     | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_lc lc_override op.op_loca   })
+    | Th_exception     (s,e) -> Th_exception (s, { e  with e_loca   = set_lc lc_override e.e_loca   })
     | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_lc lc_override ax.ax_loca   })
     | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_lc lc_override ms.tms_loca  })
     | Th_module          me  -> Th_module        { me with tme_loca = set_lc lc_override me.tme_loca  }
@@ -1101,6 +1109,7 @@ type can_depend = {
     d_ty    : locality list;
     d_op    : locality list;
     d_ax    : locality list;
+    d_ex    : locality list;
     d_sc    : locality list;
     d_mod   : locality list;
     d_modty : locality list;
@@ -1111,6 +1120,7 @@ let cd_glob =
   { d_ty    = [`Global];
     d_op    = [`Global];
     d_ax    = [`Global];
+    d_ex    = [`Global];
     d_sc    = [`Global];
     d_mod   = [`Global];
     d_modty = [`Global];
@@ -1121,6 +1131,7 @@ let can_depend (cd : can_depend) = function
   | `Type       _ -> cd.d_ty
   | `Op         _ -> cd.d_op
   | `Ax         _ -> cd.d_ax
+  | `Ex         _ -> cd.d_ex
   | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
@@ -1153,6 +1164,7 @@ let check_tyd scenv prefix name tyd =
         d_ty    = [`Declare; `Global];
         d_op    = [`Global];
         d_ax    = [];
+        d_ex    = [];
         d_sc    = [];
         d_mod   = [`Global];
         d_modty = [];
@@ -1199,6 +1211,7 @@ let check_op scenv prefix name op =
         d_ty    = [`Declare; `Global];
         d_op    = [`Declare; `Global];
         d_ax    = [];
+        d_ex    = [];
         d_sc    = [];
         d_mod   = [`Declare; `Global];
         d_modty = [];
@@ -1211,6 +1224,7 @@ let check_op scenv prefix name op =
         d_ty    = [`Declare; `Global];
         d_op    = [`Declare; `Global];
         d_ax    = [];
+        d_ex    = [];
         d_sc    = [];
         d_mod   = [`Global];
         d_modty = [];
@@ -1230,6 +1244,7 @@ let check_ax (scenv : scenv) (prefix : path) (name : symbol) (ax : axiom) =
       d_ty    = [`Declare; `Global];
       d_op    = [`Declare; `Global];
       d_ax    = [];
+      d_ex    = [];
       d_sc    = [];
       d_mod   = [`Declare; `Global];
       d_modty = [`Global];
@@ -1260,6 +1275,33 @@ let check_ax (scenv : scenv) (prefix : path) (name : symbol) (ax : axiom) =
         doit ax
       end
 
+let check_except (scenv : scenv) (prefix : path) (name : symbol) (e : excep) =
+  let path = EcPath.pqname prefix name in
+  let from = e.e_loca, `Ex path in
+  let cd = {
+      d_ty    = [`Declare; `Global];
+      d_op    = [`Declare; `Global];
+      d_ax    = [];
+      d_ex    = [];
+      d_sc    = [];
+      d_mod   = [`Declare; `Global];
+      d_modty = [`Global];
+      d_tc    = [`Global];
+    } in
+  let doit = on_except (cb scenv from cd) in
+
+  match e.e_loca with
+  | `Local ->
+    check_section scenv from
+
+  | `Declare ->
+    check_section scenv from;
+    check_polymorph scenv from e.e_typargs;
+    doit e
+
+  | `Global ->
+    if scenv.sc_insec then  doit e
+
 let check_modtype scenv prefix name ms =
   let path = pqname prefix name in
   let from = ((ms.tms_loca :> locality), `ModuleType path) in
@@ -1282,6 +1324,7 @@ let check_module scenv prefix tme =
         { d_ty    = [`Global];
           d_op    = [`Global];
           d_ax    = [];
+          d_ex    = [];
           d_sc    = [];
           d_mod   = [`Global]; (* FIXME section: add local *)
           d_modty = [`Global];
@@ -1343,6 +1386,7 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | Th_type    (s,tyd)     -> EcEnv.Ty.bind ~import s tyd env
     | Th_operator (s,op)     -> EcEnv.Op.bind ~import s op env
     | Th_axiom   (s, ax)     -> EcEnv.Ax.bind ~import s ax env
+    | Th_exception (s,e)     -> EcEnv.Except.bind ~import s e env
     | Th_modtype (s, ms)     -> EcEnv.ModTy.bind ~import s ms env
     | Th_module       me     -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
     | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind ~import s tc env
@@ -1371,6 +1415,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     match th_item.ti_item with
     | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
     | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
+    | Th_exception _     -> assert false
     | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
     | Th_modtype ms      -> generalize_modtype to_gen ms
     | Th_module me       -> generalize_module  to_gen prefix me
@@ -1442,7 +1487,7 @@ let genenv_of_scenv (scenv : scenv) : to_gen =
   ; tg_params = []
   ; tg_binds  = []
   ; tg_subst  = EcSubst.empty
-  ; tg_clear  = empty_locals } 
+  ; tg_clear  = empty_locals }
 
 let generalize_lc_items scenv  =
   let togen =
@@ -1451,7 +1496,7 @@ let generalize_lc_items scenv  =
       (EcEnv.root scenv.sc_env)
       (List.rev scenv.sc_items)
   in togen.tg_env
-  
+
 (* -----------------------------------------------------------*)
 let import p scenv =
   { scenv with sc_env = EcEnv.Theory.import p scenv.sc_env }
@@ -1475,6 +1520,7 @@ let check_item scenv item =
   match item.ti_item with
   | Th_type     (s,tyd) -> check_tyd scenv prefix s tyd
   | Th_operator  (s,op) -> check_op  scenv prefix s op
+  | Th_exception (s,e)  -> check_except scenv prefix s e
   | Th_axiom    (s, ax) -> check_ax  scenv prefix s ax
   | Th_modtype  (s, ms) -> check_modtype scenv prefix s ms
   | Th_module        me -> check_module  scenv prefix me
@@ -1520,6 +1566,7 @@ let add_decl_mod id mt scenv =
       d_ty    = [`Global];
       d_op    = [`Global];
       d_ax    = [];
+      d_ex    = [];
       d_sc    = [];
       d_mod   = [`Declare; `Global];
       d_modty = [`Global];

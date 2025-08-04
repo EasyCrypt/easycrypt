@@ -162,7 +162,7 @@ let t_eager_if_r tc =
 
     f_forall
       [(m2, GTmem (snd es.es_mr)); (b, GTty tbool)]
-      (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
+      (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb []) in
 
   let cT =
     let pre = f_and es.es_pr (f_eq fel f_true) in
@@ -505,13 +505,17 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         (* (h) is assumed *)
         (fhyps, eqi)
 
-    | Sassert el, Sassert er ->
-        check_args [el];
+    | Sraise (_,argsl), Sraise (_,argsr) ->
+        check_args argsl;
         let eqnm = Mpv2.split_nmod env modi modi' eqo in
         let eqm  = Mpv2.split_mod  env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
-        let eqi = Mpv2.union eqIs eqnm in
-        (fhyps, Mpv2.add_eqs env el er eqi)
+        let eqi =
+          List.fold_left2
+            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
+            eqnm argsl argsr
+        in
+        (fhyps,eqi)
 
     | Sabstract _, Sabstract _ -> assert false (* FIXME *)
 
@@ -643,7 +647,7 @@ let process_fun_abs info eqI tc =
 let process_call info tc =
   let process_cut info =
     match info with
-    | EcParsetree.CI_spec (fpre, fpost) ->
+    | EcParsetree.CI_spec (fpre, fpost, []) ->
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 

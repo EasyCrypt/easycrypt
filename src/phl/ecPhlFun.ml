@@ -79,8 +79,11 @@ let t_hoareF_fun_def_r tc =
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
   let post = PVM.subst1 env pv_res m fres hf.hf_po in
+  let epost =
+    List.map (fun (e,f) -> e,PVM.subst1 env pv_res m fres f) hf.hf_poe
+  in
   let pre  = PVM.subst env (subst_pre env fsig m PVM.empty) hf.hf_pr in
-  let concl' = f_hoareS memenv pre fdef.f_body post in
+  let concl' = f_hoareS memenv pre fdef.f_body post epost in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
@@ -160,7 +163,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env mhr inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF inv o inv [] in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -248,7 +251,7 @@ let t_hoareF_abs_r inv tc =
   let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
-  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
+  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post hf.hf_poe tc)
 
 let t_ehoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
@@ -423,7 +426,7 @@ let t_fun_to_code_hoare_r tc =
   let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
   let pre  = PVM.subst env spr hf.hf_pr in
   let post = PVM.subst env spo hf.hf_po in
-  let concl = f_hoareS m pre st post in
+  let concl = f_hoareS m pre st post hf.hf_poe in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
