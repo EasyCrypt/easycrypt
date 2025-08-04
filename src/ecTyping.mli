@@ -149,6 +149,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -257,6 +258,9 @@ val trans_memtype :
   env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
+val check_unique_epost: EcAst.post -> bool
+
+(* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
   env -> module_type -> pmod_restr option -> mty_mr
 
@@ -267,6 +271,7 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
+val except_genpath   : env -> pgamepath -> symbol * path
 val trans_oracle     : env -> psymbol * psymbol -> xpath
 val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 

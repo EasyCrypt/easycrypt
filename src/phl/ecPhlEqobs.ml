@@ -277,7 +277,25 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
     let eqs = List.fold_left2 doit Mpv2.empty bsl bsr in
     !rsim, add_eqs !rsim local eqs el er
 
-  | Sassert el, Sassert er -> sim, add_eqs sim local eqo el er
+  | Sraise (_,argsl), Sraise (_,argsr) ->
+    let argsl, argsr =
+      match argsl, argsr with
+      | _, _ when List.length argsl = List.length argsr -> argsl, argsr
+      | [al], _ -> begin
+          match al.e_node with
+          | Etuple argsl -> argsl, argsr
+          | _ -> raise EqObsInError
+        end
+      | _, [ar] -> begin
+          match ar.e_node with
+          | Etuple argsr -> argsl, argsr
+          | _ -> raise EqObsInError
+        end
+      | _ -> raise EqObsInError
+    in
+    let eqi = List.fold_left2 (add_eqs sim local) eqo argsl argsr in
+    sim, eqi
+
   | _, _ -> raise EqObsInError
 
 and s_eqobs_in_full sl sr sim local eqo =

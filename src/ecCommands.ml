@@ -262,17 +262,17 @@ module HiPrinting = struct
   let pr_axioms (fmt : Format.formatter) (env : EcEnv.env) =
     let ax  = EcEnv.Ax.all ~check:(fun _ ax -> EcDecl.is_axiom ax.ax_kind) env in
     let ppe0 = EcPrinting.PPEnv.ofenv env in
-    EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax  
+    EcPrinting.pp_by_theory ppe0 (EcPrinting.pp_axiom) fmt ax
 
   let pr_hint_solve (fmt : Format.formatter) (env : EcEnv.env) =
     let hint_solve = EcEnv.Auto.all env in
     let hint_solve = List.map (fun (p, mode) ->
       let ax = EcEnv.Ax.by_path p env in
       (p, (ax, mode))
-    ) hint_solve in 
-    
+    ) hint_solve in
+
     let ppe = EcPrinting.PPEnv.ofenv env in
-  
+
     let pp_hint_solve ppe fmt = (fun (p, (ax, mode)) ->
       let mode =
         match mode with
@@ -281,8 +281,8 @@ module HiPrinting = struct
         Format.fprintf fmt "%a %s" (EcPrinting.pp_axiom ppe) (p, ax) mode
       )
     in
-    
-    EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve    
+
+    EcPrinting.pp_by_theory ppe pp_hint_solve fmt hint_solve
 
   (* ------------------------------------------------------------------ *)
   let pr_hint_rewrite (fmt : Format.formatter) (env : EcEnv.env) =
@@ -302,13 +302,13 @@ module HiPrinting = struct
       if List.is_empty elems then
         Format.fprintf fmt "%s (empty)@." (EcPath.basename p)
       else
-        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p) 
-          (EcPrinting.pp_list "@\n" (fun fmt p -> 
+        Format.fprintf fmt "@[<b 2>%s = @\n%a@]@\n" (EcPath.basename p)
+          (EcPrinting.pp_list "@\n" (fun fmt p ->
             Format.fprintf fmt "%a" pp_path p))
           (EcPath.Sp.ntr_elements sp)
       )
     in
-    
+
     EcPrinting.pp_by_theory ppe pp_hint_rewrite fmt hint_rewrite
 
   (* ------------------------------------------------------------------ *)
@@ -317,17 +317,17 @@ module HiPrinting = struct
 
     let (hint_simplify: (EcEnv.Reduction.topsym * rule list) list) = EcEnv.Reduction.all env in
 
-    let hint_simplify = List.filter_map (fun (ts, rl) -> 
+    let hint_simplify = List.filter_map (fun (ts, rl) ->
       match ts with
-      | `Path p -> Some (p, rl) 
+      | `Path p -> Some (p, rl)
       | _ -> None
-    ) hint_simplify 
+    ) hint_simplify
     in
-    
+
     let ppe = EcPrinting.PPEnv.ofenv env in
-    
+
     let pp_hint_simplify ppe fmt = (fun (p,  (rls : rule list)) ->
-      Format.fprintf fmt "@[<b 2>%s:@\n%a@]" (EcPath.basename p) 
+      Format.fprintf fmt "@[<b 2>%s:@\n%a@]" (EcPath.basename p)
         (EcPrinting.pp_list "@\n" (fun fmt rl ->
           begin match rl.rl_cond with
           | [] -> Format.fprintf fmt "Conditions: None@\n"
@@ -340,7 +340,7 @@ module HiPrinting = struct
         rls
       )
     in
-    
+
     EcPrinting.pp_by_theory ppe pp_hint_simplify fmt hint_simplify
 end
 
@@ -455,6 +455,15 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_exception (scope :  EcScope.scope) (ed : pexception_decl located) =
+  EcScope.check_state `InTop "exception" scope;
+  let e, scope = EcScope.Except.add scope ed in
+  let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
+  EcScope.notify scope `Info "added exception %s %a"
+    (unloc ed.pl_desc.pe_name) (EcPrinting.pp_added_except ppe) e;
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_procop (scope : EcScope.scope) (pop : pprocop located) =
   EcScope.check_state `InTop "operator" scope;
   EcScope.Op.add_opsem scope pop
@@ -557,7 +566,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
           let commands =
-            List.fold_left 
+            List.fold_left
               (fun scope g -> process_internal subld scope g.gl_action)
               iscope commands in
           commands)
@@ -761,6 +770,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
+      | Gexception   e    -> `Fct   (fun scope -> process_exception  scope  (mk_loc loc e))
       | Gprocop      o    -> `Fct   (fun scope -> process_procop     scope  (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
       | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))

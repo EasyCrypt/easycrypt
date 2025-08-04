@@ -274,11 +274,11 @@ let f_eqs fs1 fs2 =
 let f_hoareS_r hs = mk_form (FhoareS hs) tbool
 let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS hs_m hs_pr hs_s hs_po =
-  f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
+let f_hoareS hs_m hs_pr hs_s hs_po hs_poe =
+  f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; hs_poe}
 
-let f_hoareF hf_pr hf_f hf_po =
-  f_hoareF_r { hf_pr; hf_f; hf_po; }
+let f_hoareF hf_pr hf_f hf_po hf_poe =
+  f_hoareF_r { hf_pr; hf_f; hf_po; hf_poe}
 
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
@@ -629,8 +629,8 @@ let decompose_exists ?(bound : int option) (f : form) =
   decompose_binder ?bound ~quantif:Lexists f
 
 let decompose_lambda ?(bound : int option) (f : form) =
-  decompose_binder ?bound ~quantif:Llambda f    
-  
+  decompose_binder ?bound ~quantif:Llambda f
+
 (* -------------------------------------------------------------------- *)
 let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
   let bds, f = decompose_binder ?bound ~quantif f in
@@ -641,10 +641,10 @@ let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
 
 let destr_forall ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lforall f
-  
+
 let destr_exists ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lexists f
-  
+
 let destr_lambda ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Llambda f
 
@@ -659,10 +659,10 @@ let destr_forall1 (f : form) =
 
 let destr_exists1 (f : form) =
   destr_binder1 ~quantif:Lexists f
-  
+
 let destr_lambda1 (f : form) =
   destr_binder1 ~quantif:Llambda f
-  
+
 (* -------------------------------------------------------------------- *)
 let destr_let f =
   match f.f_node with

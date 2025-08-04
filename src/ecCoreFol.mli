@@ -117,8 +117,8 @@ val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 val f_hoareF_r : sHoareF -> form
 val f_hoareS_r : sHoareS -> form
 
-val f_hoareF : form -> xpath -> form -> form
-val f_hoareS : memenv -> form -> stmt -> form -> form
+val f_hoareF : form -> xpath -> form -> (EcPath.path * form) list -> form
+val f_hoareS : memenv -> form -> stmt -> form -> (EcPath.path * form) list -> form
 
 (* soft-constructors - expected hoare *)
 val f_eHoareF_r : eHoareF -> form

@@ -157,6 +157,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -287,8 +288,8 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
         map
 
-    | Sassert e ->
-      se_inuse map e
+    | Sraise (_,args) ->
+      List.fold_left se_inuse map args
 
     | Sabstract _ ->
       assert false (* FIXME *)
@@ -1470,6 +1471,13 @@ let trans_gamepath (env : EcEnv.env) gp =
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath mpath funsymb
 
+let except_genpath env name =
+  let modsymb = List.map (unloc -| fst) (fst (unloc name))
+  and symb = unloc (snd (unloc name)) in
+  match EcEnv.Except.lookup_opt (modsymb, symb) env with
+  | None -> tyerror name.pl_loc env (UnknownExceptionName (modsymb, symb))
+  | Some (p,_) -> symb, p
+
 (* -------------------------------------------------------------------- *)
 let trans_oracle (env : EcEnv.env) (m,f) =
   let msymbol = mk_loc (loc m) [m,None] in
@@ -1684,6 +1692,10 @@ let top_is_mem_binding pf = match pf with
 let f_or_mod_ident_loc : f_or_mod_ident -> EcLocation.t = function
   | FM_FunOrVar x -> loc x
   | FM_Mod      x -> loc x
+
+(* -------------------------------------------------------------------- *)
+let check_unique_epost epost =
+  List.is_unique ~eq:(fun (e1,_) (e2,_) -> EcPath.p_ntr_equal e1 e2) epost
 
 (* -------------------------------------------------------------------- *)
 let trans_restr_mem env (r_mem : pmod_restr_mem) =
@@ -2751,10 +2763,43 @@ and transinstr
       [ i_match (e, branches) ]
     end
 
-  | PSassert pe ->
-      let e, ety = transexp env `InProc ue pe in
-      unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_assert e ]
+  | PSraise (name, args) ->
+    let _,path = except_genpath env name in
+    let esig  = (EcEnv.Except.by_path path env).e_typargs in
+    let aux (_,s) =
+      match Sp.elements s with
+      | [recp]    -> recp
+      | _ -> assert false
+    in
+    let paths = List.map aux esig in
+    let indty =
+      List.map (fun path ->
+          oget (EcEnv.Ty.by_path_opt path env)
+        ) paths
+    in
+    let ind =
+      List.map (fun typdecl ->
+          let x = oget (EcDecl.tydecl_as_datatype typdecl) in
+          match x.tydt_ctors with
+          | [(_,t)] -> t
+          | _ -> assert false
+        ) indty
+    in
+    let typs = List.flatten ind in
+
+    let args = unloc args in
+    let loc = name.pl_loc in
+    let args =
+      if List.length args <> List.length typs then
+        tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+      List.map2
+        (fun a ty ->
+           let loc = a.pl_loc in
+           let a, aty = transexp env `InProc ue a in
+           unify_or_fail env ue loc ~expct:ty aty; a) args typs
+    in
+
+    [i_raise (path, args)]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =
@@ -3447,7 +3492,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
-    | PFhoareF (pre, gp, post) ->
+    | PFhoareF (pre, gp, post, eposts) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
@@ -3455,9 +3500,21 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
-          unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
-          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF pre' fpath post'
+        let epost' =
+          List.map (fun (e,f) ->
+              let _,p = except_genpath env e in
+              p,transf penv f
+            ) eposts
+        in
+
+        unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre'.f_ty;
+        unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+        List.iter
+          (fun (_,f) -> unify_or_fail qenv ue post.pl_loc ~expct:tbool f.f_ty)
+          epost';
+        if check_unique_epost epost' then
+          f_hoareF pre' fpath post' epost'
+        else assert false
 
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then

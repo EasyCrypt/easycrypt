@@ -95,7 +95,7 @@ let pf_first_call   pe st = pf_first_gen  "call"   destr_call   pe st
 let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
 let pf_first_match  pe st = pf_first_gen  "match"  destr_match  pe st
 let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
-let pf_first_assert pe st = pf_first_gen  "assert" destr_assert pe st
+let pf_first_raise  pe st = pf_first_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
@@ -104,7 +104,7 @@ let pf_last_call   pe st = pf_last_gen  "call"   destr_call   pe st
 let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
 let pf_last_match  pe st = pf_last_gen  "match"  destr_match  pe st
 let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
-let pf_last_assert pe st = pf_last_gen  "assert" destr_assert pe st
+let pf_last_raise  pe st = pf_last_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -113,7 +113,7 @@ let tc1_first_call   tc st = pf_first_call   !!tc st
 let tc1_first_if     tc st = pf_first_if     !!tc st
 let tc1_first_match  tc st = pf_first_match  !!tc st
 let tc1_first_while  tc st = pf_first_while  !!tc st
-let tc1_first_assert tc st = pf_first_assert !!tc st
+let tc1_first_raise  tc st = pf_first_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
@@ -122,7 +122,7 @@ let tc1_last_call   tc st = pf_last_call   !!tc st
 let tc1_last_if     tc st = pf_last_if     !!tc st
 let tc1_last_match  tc st = pf_last_match  !!tc st
 let tc1_last_while  tc st = pf_last_while  !!tc st
-let tc1_last_assert tc st = pf_last_assert !!tc st
+let tc1_last_raise  tc st = pf_last_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
@@ -138,7 +138,7 @@ let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s
 let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s
 let pf_pos_last_match  pe s = pf_pos_last_gen "match"  is_match  pe s
 let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s
-let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s
+let pf_pos_last_raise pe s = pf_pos_last_gen "raise"  is_raise pe s
 
 
 let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s
@@ -147,7 +147,7 @@ let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s
 let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
 let tc1_pos_last_match  tc s = pf_pos_last_match  !!tc s
 let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s
-let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
+let tc1_pos_last_raise  tc s = pf_pos_last_raise  !!tc s
 
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
@@ -252,9 +252,21 @@ let tc1_get_post tc =
   | Some f -> f
 
 (* -------------------------------------------------------------------- *)
+let get_poste f =
+  match f.f_node with
+  | FhoareF hf   -> Some (hf.hf_poe )
+  | FhoareS hs   -> Some (hs.hs_poe )
+  | _            -> None
+
+let tc1_get_poste tc =
+  match get_poste (FApi.tc1_goal tc) with
+  | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+  | Some f -> f
+
+(* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po hf.hf_poe
  | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
  | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
  | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }
