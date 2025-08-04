@@ -1491,37 +1491,46 @@ let rec conv ri env f1 f2 stk =
   | FhoareS hs1, FhoareS hs2
       when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.hs_m hs2.hs_m with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env hs1.hs_pr (subst hs2.hs_pr) (zhl f1 [hs1.hs_po] [subst hs2.hs_po] stk)
+    | _subst ->
+      let pr2 = (ss_inv_rebind (hs_pr hs2) (fst hs1.hs_m)).inv in
+      let po2 = (ss_inv_rebind (hs_po hs2) (fst hs1.hs_m)).inv in
+      conv ri env hs1.hs_pr pr2 (zhl f1 [hs1.hs_po] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
   | FeHoareF hf1, FeHoareF hf2 when EqTest_i.for_xp env hf1.ehf_f hf2.ehf_f ->
-    conv ri env hf1.ehf_pr hf2.ehf_pr (zhl f1 [hf1.ehf_po] [hf2.ehf_po] stk)
+    let pr2 = (ss_inv_rebind (ehf_pr hf2) hf1.ehf_m).inv in
+    let po2 = (ss_inv_rebind (ehf_po hf2) hf1.ehf_m).inv in
+    conv ri env hf1.ehf_pr pr2 (zhl f1 [hf1.ehf_po] [po2] stk)
 
   | FeHoareS hs1, FeHoareS hs2
       when EqTest_i.for_stmt env hs1.ehs_s hs2.ehs_s ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.ehs_m hs2.ehs_m with
-    | subst ->
-        let subst = Fsubst.f_subst subst in
-        conv ri env hs1.ehs_pr (subst hs2.ehs_pr) (zhl f1 [hs1.ehs_po] [subst hs2.ehs_po] stk)
+    | _subst ->
+        let pr2 = (ss_inv_rebind (ehs_pr hs2) (fst hs1.ehs_m)).inv in
+        let po2 = (ss_inv_rebind (ehs_po hs2) (fst hs1.ehs_m)).inv in
+        conv ri env hs1.ehs_pr pr2 (zhl f1 [hs1.ehs_po] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
   | FbdHoareF hf1, FbdHoareF hf2
       when EqTest_i.for_xp env hf1.bhf_f hf2.bhf_f && hf1.bhf_cmp = hf2.bhf_cmp  ->
-    conv ri env hf1.bhf_pr hf2.bhf_pr
-      (zhl f1 [hf1.bhf_po;hf1.bhf_bd] [hf2.bhf_po; hf2.bhf_bd] stk)
+    let pr2 = (ss_inv_rebind (bhf_pr hf2) hf1.bhf_m).inv in
+    let po2 = (ss_inv_rebind (bhf_po hf2) hf1.bhf_m).inv in
+    let bd2 = (ss_inv_rebind (bhf_bd hf2) hf1.bhf_m).inv in
+    conv ri env hf1.bhf_pr pr2
+      (zhl f1 [hf1.bhf_po;hf1.bhf_bd] [po2; bd2] stk)
 
   | FbdHoareS hs1, FbdHoareS hs2
       when EqTest_i.for_stmt env hs1.bhs_s hs2.bhs_s
         && hs1.bhs_cmp = hs2.bhs_cmp ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.bhs_m hs2.bhs_m with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env hs1.bhs_pr (subst hs2.bhs_pr)
-        (zhl f1 [hs1.bhs_po;hs1.bhs_bd] (List.map subst [hs2.bhs_po; hs2.bhs_bd]) stk)
+    | _subst ->
+      let pr2 = (ss_inv_rebind (bhs_pr hs2) (fst hs1.bhs_m)).inv in
+      let po2 = (ss_inv_rebind (bhs_po hs2) (fst hs1.bhs_m)).inv in
+      let bd2 = (ss_inv_rebind (bhs_bd hs2) (fst hs1.bhs_m)).inv in
+      conv ri env hs1.bhs_pr pr2
+        (zhl f1 [hs1.bhs_po;hs1.bhs_bd] [po2; bd2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
@@ -1536,9 +1545,10 @@ let rec conv ri env f1 f2 stk =
       when EqTest_i.for_stmt env es1.es_sl es2.es_sl
         && EqTest_i.for_stmt env es1.es_sr es2.es_sr ->
     begin match check_me_bindings env Fsubst.f_subst_id [es1.es_ml; es1.es_mr] [es2.es_ml; es2.es_mr] with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env es1.es_pr (subst es2.es_pr) (zhl f1 [es1.es_po] [subst es2.es_po] stk)
+    | _subst ->
+      let pr2 = (ts_inv_rebind (es_pr es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
+      let po2 = (ts_inv_rebind (es_po es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
+      conv ri env es1.es_pr pr2 (zhl f1 [es1.es_po] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
