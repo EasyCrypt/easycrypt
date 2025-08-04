@@ -158,7 +158,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* we must quantify over memories *)
   let post_goal =
-    let lev = map_ss_inv2 f_and f_event (map_ss_inv1 (fun cnt -> f_int_le f_i0 cnt) cntr) in
+    let lev = map_ss_inv2 f_and f_event (map_ss_inv1 (fun cnt -> f_int_le cnt q) cntr) in
     let m = (EcIdent.create "&hr", snd pr_m) in
     let lev = EcSubst.ss_inv_rebind lev (fst m) in
     let ev = EcSubst.ss_inv_rebind ev (fst m) in
