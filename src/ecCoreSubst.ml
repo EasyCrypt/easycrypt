@@ -332,8 +332,9 @@ let rec s_subst_top (s : f_subst) : stmt -> stmt =
 
       i_match (e_subst e, List.Smart.map forb b)
 
-    | Sassert e ->
-      i_assert (e_subst e)
+    | Sraise (e,es) ->
+      let es' = List.Smart.map e_subst es in
+      i_raise (e, es')
 
     | Sabstract _ ->
       i
@@ -455,14 +456,24 @@ module Fsubst = struct
       let (s, m) = add_m_binding s hf.hf_m in
       let hf_pr  = f_subst ~tx s (hf_pr hf).inv in
       let hf_po  = f_subst ~tx s (hf_po hf).inv in
-      f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
+      let hf_poe  =
+        List.map
+          (fun (e,(f:ss_inv)) -> e,{m;inv=f_subst ~tx s f.inv})
+          (hf_poe hf)
+      in
+      f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po} hf_poe
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
       let s, (m, mt) = add_me_binding s hs.hs_m in
       let hs_pr   = f_subst ~tx s (hs_pr hs).inv in
       let hs_po   = f_subst ~tx s (hs_po hs).inv in
-      f_hoareS mt {m;inv=hs_pr} hs_s {m;inv=hs_po}
+      let hs_poe  =
+        List.map
+          (fun (e,(f:ss_inv)) -> e,{m;inv=f_subst ~tx s f.inv})
+          (hs_poe hs)
+      in
+      f_hoareS mt {m;inv=hs_pr} hs_s {m;inv=hs_po} hs_poe
 
     | FeHoareF hf ->
       let hf_f  = x_subst s hf.ehf_f in

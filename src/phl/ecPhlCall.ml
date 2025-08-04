@@ -59,14 +59,25 @@ let wp2_call
   map_ts_inv2 f_anda_simpl (map_ts_inv1 (PVM.subst env spre) fpre) post
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_call fpre fpost tc =
+let find_poe epost e =
+  snd (List.find (fun (e',_) -> EcPath.p_ntr_equal e e') epost)
+
+let call_conde env spre poe1 poe2 =
+  List.map
+    (fun (e1,p1) ->
+       let p2 = find_poe poe2 e1 in
+       let aux = map_ss_inv1 (PVM.subst env spre) in
+      map_ss_inv2 f_imp_simpl (aux p1) (aux p2))
+    poe1
+
+let t_hoare_call fpre fpost fepost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let (lp,f,args),s = tc1_last_call tc hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF fpre f fpost in
+  let f_concl = f_hoareF fpre f fpost fepost in
   (* substitute memories *)
   let fpre = (ss_inv_rebind fpre m) in
   let fpost = (ss_inv_rebind fpost m) in
@@ -81,10 +92,12 @@ let t_hoare_call fpre fpost tc =
   let post = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) post in
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
   let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
-  let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
-
+  let poe = List.map (fun (e,f) -> e, map_ss_inv1 (PVM.subst env spre) f) (hs_poe hs) in
+  let fepost = List.map (fun (e,f) -> e,ss_inv_rebind f m) fepost in
+  let poe = call_conde env spre fepost poe in
+  let post = List.fold (map_ss_inv2 f_anda_simpl) post poe in
+  let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post (hs_poe hs)in
   FApi.xmutate1 tc `HlCall [f_concl; concl]
-
 
 (* -------------------------------------------------------------------- *)
 let ehoare_call_pre_post fpre fpost tc =
@@ -152,7 +165,7 @@ let t_ehoare_call fpre fpost tc =
 let t_ehoare_call_concave f fpre fpost tc =
   let _, _, _, s, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) 
+    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node))
      (map_ss_inv2 (fun wppre f -> f_app_simpl f [wppre] txreal) wppre f) tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   let t_call =
@@ -219,11 +232,11 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-  let concl = 
+  let concl =
     let _,mt = bhs.bhs_m in
     match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
-        f_hoareS mt bhs_pr s post
+        f_hoareS mt bhs_pr s post []
     | FHeq, Some bd ->
         f_bdHoareS mt bhs_pr s post bhs.bhs_cmp (map_ss_inv2 f_real_div bhs_bd bd)
     | FHeq, None ->
@@ -332,7 +345,7 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in
       if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
         call_error env tc hf.hf_f f;
-      t_hoare_call (hf_pr hf) (hf_po hf) tc
+      t_hoare_call (hf_pr hf) (hf_po hf) (hf_poe hf) tc
 
   | FeHoareF hf, FeHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.ehs_s in
@@ -410,17 +423,9 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
         f_equivF pre fl fr post
 
 let process_call side info tc =
-  let process_spec tc side pre post =
+  let process_spec_2 tc side pre post =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side with
-      | FhoareS hs, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let m = (EcIdent.create "&hr") in
-          let penv, qenv = LDecl.hoareF m f hyps in
-          let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in    
-          f_hoareF {m;inv=pre} f {m;inv=post}
-
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let m = (EcIdent.create "&hr") in
@@ -435,7 +440,7 @@ let process_call side info tc =
           let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv txreal pre  in
-          let post = TTC.pf_process_form !!tc qenv txreal post in   
+          let post = TTC.pf_process_form !!tc qenv txreal post in
           f_eHoareF {m;inv=pre} f {m;inv=post}
 
       | FbdHoareS _, Some _
@@ -448,7 +453,7 @@ let process_call side info tc =
           let (ml, mr) = (EcIdent.create "&1", EcIdent.create "&2") in
           let penv, qenv = LDecl.equivF ml mr fl fr hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in  
+          let post = TTC.pf_process_form !!tc qenv tbool post in
           f_equivF {ml;mr;inv=pre} fl fr {ml;mr;inv=post}
 
       | FequivS es, Some side ->
@@ -462,21 +467,37 @@ let process_call side info tc =
 
       | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
-  let process_inv tc side inv =
+  let process_spec_1 tc side pre post poe =
+    let (hyps, concl) = FApi.tc1_flat tc in
+    match concl.f_node, side with
+    | FhoareS hs, None ->
+      let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+      let m = (EcIdent.create "&hr") in
+      let penv, qenv = LDecl.hoareF m f hyps in
+      let pre  = TTC.pf_process_form !!tc penv tbool pre  in
+      let post = TTC.pf_process_form !!tc qenv tbool post in
+      let env  = LDecl.toenv hyps in
+      let poe =
+        List.map
+          (fun (e,f) ->
+            let _,e = EcTyping.except_genpath env e in
+            let f = TTC.pf_process_form !!tc penv tbool f in
+            e,{m;inv=f})
+          poe
+      in
+      if EcTyping.check_unique_epost poe then
+        f_hoareF {m;inv=pre} f {m;inv=post} poe
+      else assert false
+
+    | _ -> tc_error !!tc "the conclusion is not a hoare" in
+
+
+  let process_inv_1 tc side inv =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
-    | FhoareS hs ->
-        let m = fst hs.hs_m in
-        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let me = EcMemory.abstract m in
-        let hyps = LDecl.push_active_ss me hyps in
-        let inv = TTC.pf_process_form !!tc hyps tbool inv in
-        let inv = {m; inv} in
-        (f_hoareF inv f inv, Inv_ss inv)
-
     | FeHoareS hs ->
         let m = fst hs.ehs_m in
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
@@ -508,6 +529,35 @@ let process_call side info tc =
       (mk_inv_spec !!tc env inv fl fr, Inv_ts inv)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
+
+  let process_inv_2 tc side inv poe =
+    if not (is_none side) then
+      tc_error !!tc "cannot specify side for call with invariants";
+
+    let hyps, concl = FApi.tc1_flat tc in
+    match concl.f_node with
+    | FhoareS hs ->
+      let m = fst hs.hs_m in
+      let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+      let me = EcMemory.abstract m in
+      let hyps = LDecl.push_active_ss me hyps in
+      let inv = TTC.pf_process_form !!tc hyps tbool inv in
+      let inv = {m; inv} in
+      let env  = LDecl.toenv hyps in
+      let poe =
+        List.map
+          (fun (e,f) ->
+             let _,e = EcTyping.except_genpath env e in
+             let f = TTC.pf_process_form !!tc hyps tbool f in
+             e,{m;inv=f})
+          poe
+      in
+      if EcTyping.check_unique_epost poe then
+        (f_hoareF inv f inv poe, Inv_ss inv)
+      else assert false
+
+    | _ -> tc_error !!tc "the conclusion is not a hoare" in
+
 
   let process_upto tc side info =
     if not (is_none side) then
@@ -541,13 +591,32 @@ let process_call side info tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post) ->
-      process_spec tc side pre post
-    | CI_inv inv ->
-      let f, inv = process_inv tc side inv in
-      subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
-      f
+    | CI_spec (pre, post, poe) ->
+      begin
+        let _, concl = FApi.tc1_flat tc in
+        match concl.f_node with
+        | FhoareS _ ->
+          process_spec_1 tc side pre post poe
+        | _ ->
+           process_spec_2 tc side pre post
+      end
+
+    | CI_inv (inv, poe) ->
+      begin
+        let _, concl = FApi.tc1_flat tc in
+        match concl.f_node with
+        | FhoareS _ ->
+          let f, inv = process_inv_2 tc side inv poe in
+          subtactic := (fun tc ->
+              FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+          f
+
+        | _ ->
+          let f, inv = process_inv_1 tc side inv in
+          subtactic := (fun tc ->
+              FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
+          f
+      end
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in
@@ -614,13 +683,13 @@ let process_call_concave (fc, info) tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post) ->
+    | CI_spec (pre, post, []) ->
       let ty,fmake = process_spec tc in
       let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
       let _, post = TTC.tc1_process_Xhl_form tc ty post in
       fmake pre post
 
-    | CI_inv inv ->
+    | CI_inv (inv, []) ->
       let ty, fmake = process_inv tc in
       let _, inv = TTC.tc1_process_Xhl_form tc ty inv in
       subtactic := (fun tc ->

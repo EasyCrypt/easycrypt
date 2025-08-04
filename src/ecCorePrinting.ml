@@ -61,7 +61,7 @@ module type PrinterAPI = sig
   val pp_tyvar    : PPEnv.t -> ident pp
   val pp_tyunivar : PPEnv.t -> EcUid.uid pp
   val pp_path     : path pp
-  
+
   (* ------------------------------------------------------------------ *)
   val shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
 
@@ -79,21 +79,22 @@ module type PrinterAPI = sig
     | `Glob  of EcIdent.t * EcMemory.memory
     | `PVar  of EcTypes.prog_var * EcMemory.memory
   ]
-  
+
   val pp_vsubst : PPEnv.t -> vsubst pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
-  val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
-  val pp_added_op    : PPEnv.t -> operator pp
-  val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
-  val pp_theory      : PPEnv.t -> (path * ctheory                 ) pp
-  val pp_modtype1    : PPEnv.t -> (module_type                    ) pp
-  val pp_modtype     : PPEnv.t -> (module_type                    ) pp
-  val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
-  val pp_moditem     : PPEnv.t -> (mpath * module_item            ) pp
-  val pp_modsig      : ?long:bool -> PPEnv.t -> (path * module_sig) pp
-  val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig         ) pp
+  val pp_typedecl     : PPEnv.t -> (path * tydecl                  ) pp
+  val pp_opdecl       : ?long:bool -> PPEnv.t -> (path * operator  ) pp
+  val pp_added_op     : PPEnv.t -> operator pp
+  val pp_added_except : PPEnv.t -> excep pp
+  val pp_axiom        : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
+  val pp_theory       : PPEnv.t -> (path * ctheory                 ) pp
+  val pp_modtype1     : PPEnv.t -> (module_type                    ) pp
+  val pp_modtype      : PPEnv.t -> (module_type                    ) pp
+  val pp_modexp       : PPEnv.t -> (mpath * module_expr            ) pp
+  val pp_moditem      : PPEnv.t -> (mpath * module_item            ) pp
+  val pp_modsig       : ?long:bool -> PPEnv.t -> (path * module_sig) pp
+  val pp_modsig_smpl  : PPEnv.t -> (path * module_smpl_sig         ) pp
 
   (* ------------------------------------------------------------------ *)
   val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> sHoareS  pp
@@ -113,10 +114,10 @@ module type PrinterAPI = sig
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
+  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_rule_pattern : PPEnv.t -> EcTheory.rule_pattern pp  
+  val pp_rule_pattern : PPEnv.t -> EcTheory.rule_pattern pp
 
   (* ------------------------------------------------------------------ *)
   module ObjectInfo : sig

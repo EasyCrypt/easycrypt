@@ -108,8 +108,9 @@ val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
-val f_hoareF : ss_inv -> xpath -> ss_inv -> form
-val f_hoareS : memtype -> ss_inv -> stmt -> ss_inv -> form
+val f_hoareF : ss_inv -> xpath -> ss_inv -> (EcPath.path * ss_inv) list -> form
+val f_hoareS :
+  memtype -> ss_inv -> stmt -> ss_inv -> (EcPath.path * ss_inv) list -> form
 
 val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
 val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form

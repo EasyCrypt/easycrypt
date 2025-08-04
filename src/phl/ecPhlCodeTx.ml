@@ -236,11 +236,11 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
               | e, _ -> [e] in
 
             let lv = lv_to_ty_list lv in
-      
+
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
               Mpv.mem env pv subst0 && is_const_expression e
             ) (List.combine lv es) in
-            
+
             let subst =
               List.fold_left
                 (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
@@ -368,7 +368,7 @@ let process_set_match (side, cpos, id, pattern) tc =
   t_set_match side cpos (EcLocation.unloc id)
     (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
     tc
-  
+
 (* -------------------------------------------------------------------- *)
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
@@ -397,7 +397,7 @@ let process_weakmem (side, id, params) tc =
     match f.f_node with
     | FhoareS hs ->
       let _, mt = bind hs.hs_m in
-      f_hoareS mt (hs_pr hs) hs.hs_s (hs_po hs)
+      f_hoareS mt (hs_pr hs) hs.hs_s (hs_po hs) (hs_poe hs)
 
     | FeHoareS hs ->
       let _, mt = bind hs.ehs_m in
