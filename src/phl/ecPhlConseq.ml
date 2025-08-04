@@ -141,6 +141,7 @@ let t_bdHoareS_conseq pre post tc =
 let t_bdHoareF_conseq_bd cmp bd tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
+  let bd = ss_inv_rebind bd bhf.bhf_m in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_m bhf.bhf_f env in
   let bd_goal =  bd_goal tc bhf.bhf_cmp (bhf_bd bhf) cmp bd in
   let concl = f_bdHoareF (bhf_pr bhf) bhf.bhf_f (bhf_po bhf) cmp bd in
@@ -335,6 +336,7 @@ let cond_hoareS_notmod ?(mk_other=false) tc cond =
 
 let t_hoareS_notmod post tc =
   let hs = tc1_as_hoareS tc in
+  let post = ss_inv_rebind post (fst hs.hs_m) in
   let cond1, _, _ = cond_hoareS_notmod tc (map_ss_inv2 f_imp post (hs_po hs)) in
   let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s post in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
@@ -368,6 +370,7 @@ let cond_bdHoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
 
 let t_bdHoareF_notmod post tc =
   let hf = tc1_as_bdhoareF tc in
+  let post = ss_inv_rebind post hf.bhf_m in
   let _, cond =
     bdHoare_conseq_conds hf.bhf_cmp (bhf_pr hf) (bhf_po hf) (bhf_pr hf) post in
   let cond1, _, _ = cond_bdHoareF_notmod tc cond in
@@ -392,6 +395,7 @@ let cond_bdHoareS_notmod ?(mk_other=false) tc (cond: ss_inv) =
 
 let t_bdHoareS_notmod post tc =
   let hs = tc1_as_bdhoareS tc in
+  let post = ss_inv_rebind post (fst hs.bhs_m) in
   let _, cond =
     bdHoare_conseq_conds hs.bhs_cmp (bhs_pr hs) (bhs_po hs) (bhs_pr hs) post in
   let cond1, _, _ = cond_bdHoareS_notmod tc cond in
