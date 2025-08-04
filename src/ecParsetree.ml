@@ -160,7 +160,7 @@ and pinstr_r =
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
+  | PSraise  of pqsymbol * pexpr option
 
 and psmatch = [
   | `Full of (ppattern * pstmt) list
@@ -201,8 +201,7 @@ and pformula_r =
   | PFeqf     of pformula list
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
-
-  | PFhoareF   of psymbol option * pformula * pgamepath * pformula
+  | PFhoareF   of psymbol option * pformula * pgamepath * pformula * ((pqsymbol * pformula) list * pformula option)
   | PFehoareF  of psymbol option * pformula * pgamepath * pformula
   | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
@@ -435,6 +434,11 @@ and pprocop = {
   ppo_locality : locality;
 }
 
+type pexception_decl = {
+    pe_name : psymbol;
+    pe_locality : locality;
+  }
+
 type ppred_def =
   | PPabstr of pty list
   | PPconcr of ptybindings * pformula
@@ -537,8 +541,10 @@ type pipattern =
 
 and pspattern = unit
 
+type excep_spec_preds = ((pqsymbol * pformula) list * pformula option)
+
 type call_info =
-  | CI_spec of (pformula * pformula)
+  | CI_spec of (pformula * pformula * excep_spec_preds)
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
@@ -691,7 +697,9 @@ type deno_ppterm = (pformula option pair) gppterm
 type conseq_info =
   | CQI_bd of phoarecmp option * pformula
 
-type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
+type conseq_contra = pformula option * pformula option * excep_spec_preds option
+
+type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
@@ -1279,6 +1287,7 @@ type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
+  | Gexception   of pexception_decl
   | Gprocop      of pprocop
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation

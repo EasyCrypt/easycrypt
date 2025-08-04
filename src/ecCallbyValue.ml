@@ -482,20 +482,20 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     assert (Args.isempty args);
     assert (not (Subst.has_mem s hf.hf_m));
     let hf_pr = norm st s (hf_pr hf).inv in
-    let hf_po = norm st s (hf_po hf).inv in
+    let hf_po = map_poe (norm st s) (hf_po hf).hsi_inv in
     let hf_f  = norm_xfun st s hf.hf_f in
     let (m,_) = norm_me s (abstract hf.hf_m) in
-    f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
+    f_hoareF {m;inv=hf_pr} hf_f {hsi_m=m;hsi_inv=hf_po}
 
   | FhoareS hs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.hs_m)));
     let hs_pr = norm st s (hs_pr hs).inv in
-    let hs_po = norm st s (hs_po hs).inv in
+    let hs_po = map_poe (norm st s) (hs_po hs).hsi_inv in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     let m = fst hs_m in
-    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
+    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {hsi_m=m;hsi_inv=hs_po}
 
   | FeHoareF hf ->
     assert (Args.isempty args);

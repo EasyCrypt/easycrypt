@@ -173,6 +173,7 @@ val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
+val e_not      : expr -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr

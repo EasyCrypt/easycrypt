@@ -83,17 +83,17 @@ module type PrinterAPI = sig
   val pp_vsubst : PPEnv.t -> vsubst pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
-  val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
-  val pp_added_op    : PPEnv.t -> operator pp
-  val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
-  val pp_theory      : PPEnv.t -> (path * ctheory                 ) pp
-  val pp_modtype1    : PPEnv.t -> (module_type                    ) pp
-  val pp_modtype     : PPEnv.t -> (module_type                    ) pp
-  val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
-  val pp_moditem     : PPEnv.t -> (mpath * module_item            ) pp
-  val pp_modsig      : ?long:bool -> PPEnv.t -> (path * module_sig) pp
-  val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig         ) pp
+  val pp_typedecl     : PPEnv.t -> (path * tydecl                  ) pp
+  val pp_opdecl       : ?long:bool -> PPEnv.t -> (path * operator  ) pp
+  val pp_added_op     : PPEnv.t -> operator pp
+  val pp_axiom        : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
+  val pp_theory       : PPEnv.t -> (path * ctheory                 ) pp
+  val pp_modtype1     : PPEnv.t -> (module_type                    ) pp
+  val pp_modtype      : PPEnv.t -> (module_type                    ) pp
+  val pp_modexp       : PPEnv.t -> (mpath * module_expr            ) pp
+  val pp_moditem      : PPEnv.t -> (mpath * module_item            ) pp
+  val pp_modsig       : ?long:bool -> PPEnv.t -> (path * module_sig) pp
+  val pp_modsig_smpl  : PPEnv.t -> (path * module_smpl_sig         ) pp
 
   (* ------------------------------------------------------------------ *)
   val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> sHoareS  pp

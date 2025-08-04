@@ -387,6 +387,9 @@ let e_app x args ty =
 let e_app_op ?(tyargs=[]) op args ty =
   e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
 
+let e_not e =
+  e_app (e_op EcCoreLib.CI_Bool.p_not [] tbool) [e] tbool
+
 (* -------------------------------------------------------------------- *)
 module Reals : sig
   val of_lit : EcBigInt.zint -> expr
