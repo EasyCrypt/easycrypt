@@ -45,6 +45,14 @@ val abs_tydecl : ?params:ty_pctor -> locality -> tydecl
 val ty_instantiate : ty_params -> ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
+type exception_ = {
+  exn_loca : locality;
+  exn_dom  : ty list;
+}
+
+val mk_exception : locality -> ty list -> exception_
+
+(* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
 
 type operator_kind =
@@ -58,6 +66,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC
 
 and prbody =
@@ -111,15 +120,16 @@ type operator = {
 
 and opopaque = { smt: bool; reduction: bool; }
 
-val op_ty     : operator -> ty
-val is_pred   : operator -> bool
-val is_oper   : operator -> bool
-val is_ctor   : operator -> bool
-val is_proj   : operator -> bool
-val is_rcrd   : operator -> bool
-val is_fix    : operator -> bool
-val is_abbrev : operator -> bool
-val is_prind  : operator -> bool
+val op_ty        : operator -> ty
+val is_pred      : operator -> bool
+val is_oper      : operator -> bool
+val is_ctor      : operator -> bool
+val is_proj      : operator -> bool
+val is_rcrd      : operator -> bool
+val is_fix       : operator -> bool
+val is_abbrev    : operator -> bool
+val is_prind     : operator -> bool
+val is_exception : operator -> bool
 
 val optransparent : opopaque
 
@@ -135,6 +145,9 @@ val operator_as_rcrd  : operator -> EcPath.path
 val operator_as_proj  : operator -> EcPath.path * int * int
 val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
+
+val operator_as_exception : operator -> exception_
+val operator_of_exception : exception_ -> operator
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]

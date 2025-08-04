@@ -277,7 +277,6 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
     let eqs = List.fold_left2 doit Mpv2.empty bsl bsr in
     !rsim, add_eqs !rsim local eqs el er
 
-  | Sassert el, Sassert er -> sim, add_eqs sim local eqo el er
   | _, _ -> raise EqObsInError
 
 and s_eqobs_in_full sl sr sim local eqo =
