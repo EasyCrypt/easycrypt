@@ -170,8 +170,24 @@ let rec unify_instrs env umap i1 i2 =
       unify_stmts env umap b1 b2
     ) umap bs1 bs2
 
-  | Sassert e1, Sassert e2 ->
-    unify_exprs env umap e1 e2
+  | Sraise (_,args1), Sraise (_,args2) ->
+    let args1, args2 =
+      match args1, args2 with
+      | _, _ when List.length args1 = List.length args2 -> args1, args2
+      | [al], _ -> begin
+        match al.e_node with
+        | Etuple args1 -> args1, args2
+        | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+      end
+      | _, [ar] -> begin
+      match ar.e_node with
+        | Etuple args2 -> args1, args2
+        | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+      end
+      | _, _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
+    in
+
+    List.fold_left (fun umap (e1, e2) -> unify_exprs env umap e1 e2) umap (List.combine args1 args2)
 
   | Sabstract x1, Sabstract x2 when EcIdent.id_equal x1 x2 -> umap
 
@@ -245,4 +261,3 @@ let unify_func env mode fname s =
       lv_of_list pvs
     in
     s_call (alias, fname, args)
-

@@ -384,7 +384,7 @@
 %token AMP
 %token APPLY
 %token AS
-%token ASSERT
+%token RAISE
 %token ASSUMPTION
 %token ASYNC
 %token AT
@@ -442,6 +442,7 @@
 %token EQUIV
 %token ETA
 %token EXACT
+%token EXCEP
 %token EXFALSO
 %token EXIST
 %token EXIT
@@ -1221,9 +1222,14 @@ hoare_bd_cmp :
 | EQ { EcAst.FHeq }
 | GE { EcAst.FHge }
 
+epost(P): x=lident COLON post=form_r(P)
+    { let loc = EcLocation.make $startpos $endpos in
+     (EcLocation.mk_loc loc ([], x),post)}
+
 hoare_body(P):
-  mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFhoareF (pre, mp, post) }
+    mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
+                                                 epost=splist(epost(P), PIPE)
+    { PFhoareF (pre, mp, post, epost) }
 
 ehoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW
@@ -1344,8 +1350,9 @@ base_instr:
 | f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
-| ASSERT LPAREN c=expr RPAREN
-    { PSassert c }
+  | RAISE x=lident
+    {let loc = EcLocation.make $startpos $endpos in
+     PSraise (EcLocation.mk_loc loc ([], x), EcLocation.mk_loc loc []) }
 
 instr:
 | bi=base_instr SEMICOLON
@@ -1752,6 +1759,7 @@ tyci_ax:
 | PROOF x=ident BY tg=tactic_core
     { (x, tg) }
 
+
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
 
@@ -1857,6 +1865,14 @@ mcptn(BOP):
 procop:
 | locality=locality PROC OP x=ident EQ f=loc(fident)
     { { ppo_name = x; ppo_target = f; ppo_locality = locality; } }
+
+(* -------------------------------------------------------------------- *)
+(* Exceptions                                                           *)
+excep:
+| locality=locality EXCEP x=oident
+   { { pe_name     = x;
+       pe_typargs   = None;
+       pe_locality = locality; } }
 
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
@@ -3841,6 +3857,7 @@ global_action:
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
+| excep            { Gexception   $1 }
 | procop           { Gprocop      $1 }
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
@@ -3928,6 +3945,11 @@ iplist1_r(X, S):
 
 %inline empty:
 | /**/ { () }
+
+(* -------------------------------------------------------------------- *)
+%inline splist(X, S):
+| /* empty */     { [] }
+| S xs=iplist1_r(X, S) { xs }
 
 (* -------------------------------------------------------------------- *)
 __rlist1(X, S):                         (* left-recursive *)

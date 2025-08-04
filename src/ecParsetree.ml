@@ -160,7 +160,7 @@ and pinstr_r =
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
+  | PSraise  of pgamepath * (pexpr list) located
 
 and psmatch = [
   | `Full of (ppattern * pstmt) list
@@ -202,7 +202,7 @@ and pformula_r =
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
 
-  | PFhoareF   of pformula * pgamepath * pformula
+  | PFhoareF   of pformula * pgamepath * pformula * (pgamepath * pformula) list
   | PFehoareF  of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
@@ -428,6 +428,12 @@ and pprocop = {
   ppo_target   : pgamepath;
   ppo_locality : locality;
 }
+
+type pexception_decl = {
+    pe_name : psymbol;
+    pe_typargs : (psymbol * pqsymbol list) list option;
+    pe_locality : locality;
+  }
 
 type ppred_def =
   | PPabstr of pty list
@@ -1267,6 +1273,7 @@ type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
+  | Gexception   of pexception_decl
   | Gprocop      of pprocop
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation

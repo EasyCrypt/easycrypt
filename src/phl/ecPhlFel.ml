@@ -103,7 +103,7 @@ and callable_oracles_i env modv os i =
     | Smatch (_, b)      -> callable_oracles_sx env modv os (List.map snd b)
     | Sif    (_, s1, s2) -> callable_oracles_sx env modv os [s1; s2]
 
-    | Sasgn _ | Srnd _ | Sassert _ -> os
+    | Sasgn _ | Srnd _ | Sraise _ -> os
 
     | Sabstract _ -> assert false (* FIXME *)
 
@@ -112,129 +112,130 @@ let callable_oracles_stmt env modv =
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: do we have to subst more?                                     *)
-let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
-  let env, _, concl = FApi.tc1_eflat tc in
+let t_failure_event_r (_at_pos, _cntr, _ash, _q, _f_event, _pred_specs, _inv) _tc =
+  assert false
+  (* let env, _, concl = FApi.tc1_eflat tc in *)
 
-  let (pr, bd) =
-    match concl.f_node with
-    | Fapp ({ f_node =Fop (op, _) }, [pr; bd])
-        when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
-      -> ((destr_pr pr), bd)
+  (* let (pr, bd) = *)
+  (*   match concl.f_node with *)
+  (*   | Fapp ({ f_node =Fop (op, _) }, [pr; bd]) *)
+  (*       when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le *)
+  (*     -> ((destr_pr pr), bd) *)
 
-    | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
-  in
+  (*   | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" *)
+  (* in *)
 
-  let m  = oget (Memory.byid pr.pr_mem env) in
-  let f  = NormMp.norm_xfun env pr.pr_fun in
-  let ev = pr.pr_event in
+  (* let m  = oget (Memory.byid pr.pr_mem env) in *)
+  (* let f  = NormMp.norm_xfun env pr.pr_fun in *)
+  (* let ev = pr.pr_event in *)
 
-  let memenv, (fsig, fdef), _ =
-    try  Fun.hoareS f env
-    with _ -> tc_error !!tc "not applicable to abstract functions"
-  in
+  (* let memenv, (fsig, fdef), _ = *)
+  (*   try  Fun.hoareS f env *)
+  (*   with _ -> tc_error !!tc "not applicable to abstract functions" *)
+  (* in *)
 
-  let s_hd, s_tl = EcLowPhlGoal.s_split env at_pos fdef.f_body in
-  let fve        = PV.fv env mhr f_event in
-  let fvc        = PV.fv env mhr cntr in
-  let fvi        = PV.fv env mhr inv in
-  let fv         = PV.union (PV.union fve fvc) fvi in
-  let os         = callable_oracles_stmt env fv (stmt s_tl) in
+  (* let s_hd, s_tl = EcLowPhlGoal.s_split env at_pos fdef.f_body in *)
+  (* let fve        = PV.fv env mhr f_event in *)
+  (* let fvc        = PV.fv env mhr cntr in *)
+  (* let fvi        = PV.fv env mhr inv in *)
+  (* let fv         = PV.union (PV.union fve fvc) fvi in *)
+  (* let os         = callable_oracles_stmt env fv (stmt s_tl) in *)
 
-  (* check that bad event, cntr and inv are only modified in oracles *)
-  let written_except_os = s_write ~except:os env (stmt s_tl) in
+  (* (\* check that bad event, cntr and inv are only modified in oracles *\) *)
+  (* let written_except_os = s_write ~except:os env (stmt s_tl) in *)
 
-  if not (PV.indep env written_except_os fv ) then
-    tc_error_lazy !!tc (fun fmt ->
-      Format.fprintf fmt
-        "%s@. @[%a@] is not disjoint from @[%a@]@."
-        "after initialization fail-event or invariant or counter is modified outside oracles"
-        (PV.pp env) written_except_os (PV.pp env) fv);
+  (* if not (PV.indep env written_except_os fv ) then *)
+  (*   tc_error_lazy !!tc (fun fmt -> *)
+  (*     Format.fprintf fmt *)
+  (*       "%s@. @[%a@] is not disjoint from @[%a@]@." *)
+  (*       "after initialization fail-event or invariant or counter is modified outside oracles" *)
+  (*       (PV.pp env) written_except_os (PV.pp env) fv); *)
 
-  (* subgoal on the bounds *)
-  let bound_goal =
-    let v = IFEL.felsum ash (f_i0, q) in
-    f_real_le v bd
-  in
+  (* (\* subgoal on the bounds *\) *)
+  (* let bound_goal = *)
+  (*   let v = IFEL.felsum ash (f_i0, q) in *)
+  (*   f_real_le v bd *)
+  (* in *)
 
-  (* we must quantify over memories *)
-  let mo = EcIdent.create "&m" in
-  let post_goal =
-    let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mo in
-    let p = f_imps [ev;inv] (f_and f_event (f_int_le cntr q)) in
-    let p = Fsubst.f_subst subst p in
-    f_forall_mems [mo, EcMemory.memtype m] p
-  in
+  (* (\* we must quantify over memories *\) *)
+  (* let mo = EcIdent.create "&m" in *)
+  (* let post_goal = *)
+  (*   let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mo in *)
+  (*   let p = f_imps [ev;inv] (f_and f_event (f_int_le cntr q)) in *)
+  (*   let p = Fsubst.f_subst subst p in *)
+  (*   f_forall_mems [mo, EcMemory.memtype m] p *)
+  (* in *)
 
-  (* not fail and cntr=0 and invariant holds at designated program point,
-     under the pre that the initial parameter values correspond to arguments,
-     and that the initial values of global read variables
-     are equal to the initial memory *)
+  (* (\* not fail and cntr=0 and invariant holds at designated program point, *)
+  (*    under the pre that the initial parameter values correspond to arguments, *)
+  (*    and that the initial values of global read variables *)
+  (*    are equal to the initial memory *\) *)
 
-  let init_goal =
-    let xs,gs = PV.ntr_elements (f_read env f) in
-    let mh = fst memenv in
-    let mi = pr.pr_mem in
-    let f_xeq (x,ty) = f_eq (f_pvar x ty mh) (f_pvar x ty mi) in
-    let eqxs = List.map f_xeq xs in
-    let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
-    let eqparams =
-      let vs = fsig.fs_anames in
-      let var_of_ovar ov = { v_name = oget ov.ov_name; v_type = ov.ov_type } in
-      let f_x x = assert (is_some x.ov_name); f_pvloc (var_of_ovar x) mh in
-      f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
-    let pre = f_ands (eqparams :: (eqxs@eqgs)) in
-    let p = f_and (f_not f_event) (f_eq cntr f_i0) in
-    let p = f_and_simpl p inv in
-    f_hoareS memenv pre (stmt s_hd) p
-  in
+  (* let init_goal = *)
+  (*   let xs,gs = PV.ntr_elements (f_read env f) in *)
+  (*   let mh = fst memenv in *)
+  (*   let mi = pr.pr_mem in *)
+  (*   let f_xeq (x,ty) = f_eq (f_pvar x ty mh) (f_pvar x ty mi) in *)
+  (*   let eqxs = List.map f_xeq xs in *)
+  (*   let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in *)
+  (*   let eqparams = *)
+  (*     let vs = fsig.fs_anames in *)
+  (*     let var_of_ovar ov = { v_name = oget ov.ov_name; v_type = ov.ov_type } in *)
+  (*     let f_x x = assert (is_some x.ov_name); f_pvloc (var_of_ovar x) mh in *)
+  (*     f_eq (f_tuple (List.map f_x vs)) pr.pr_args in *)
+  (*   let pre = f_ands (eqparams :: (eqxs@eqgs)) in *)
+  (*   let p = f_and (f_not f_event) (f_eq cntr f_i0) in *)
+  (*   let p = f_and_simpl p inv in *)
+  (*   f_hoareS memenv pre (stmt s_hd) p *)
+  (* in *)
 
-  let oracle_goal o =
-    let some_p =
-      pred_specs
-        |> List.ofind (fun (o', _) -> o = o')
-        |> omap snd
-        |> odfl f_true
-    in
+  (* let oracle_goal o = *)
+  (*   let some_p = *)
+  (*     pred_specs *)
+  (*       |> List.ofind (fun (o', _) -> o = o') *)
+  (*       |> omap snd *)
+  (*       |> odfl f_true *)
+  (*   in *)
 
-    let not_F_to_F_goal =
-      let bound = f_app_simpl ash [cntr] treal in
-      let pre = f_and (f_int_le f_i0 cntr) (f_int_lt cntr q) in
-      let pre = f_and pre (f_not f_event) in
-      let pre = f_and_simpl pre inv in
-      let pre = f_and_simpl pre some_p in
-      let post = f_event in
-      f_bdHoareF pre o post FHle bound
-    in
-    let old_cntr_id = EcIdent.create "c" in
-    let old_b_id = EcIdent.create "b" in
-    let old_cntr = f_local old_cntr_id tint in
-    let old_b = f_local old_b_id tbool in
+  (*   let not_F_to_F_goal = *)
+  (*     let bound = f_app_simpl ash [cntr] treal in *)
+  (*     let pre = f_and (f_int_le f_i0 cntr) (f_int_lt cntr q) in *)
+  (*     let pre = f_and pre (f_not f_event) in *)
+  (*     let pre = f_and_simpl pre inv in *)
+  (*     let pre = f_and_simpl pre some_p in *)
+  (*     let post = f_event in *)
+  (*     f_bdHoareF pre o post FHle bound *)
+  (*   in *)
+  (*   let old_cntr_id = EcIdent.create "c" in *)
+  (*   let old_b_id = EcIdent.create "b" in *)
+  (*   let old_cntr = f_local old_cntr_id tint in *)
+  (*   let old_b = f_local old_b_id tbool in *)
 
-    let cntr_decr_goal =
-      let pre  = f_and some_p (f_eq old_cntr cntr) in
-      let pre = f_and_simpl pre inv in
-      let post = f_int_lt old_cntr cntr in
-      let post = f_and_simpl post inv in
-        f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post)
-    in
-    let cntr_stable_goal =
-      let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
-      let pre  = f_and_simpl pre inv in
-      let post = f_ands [f_eq f_event old_b;f_int_le old_cntr cntr] in
-      let post = f_and_simpl post inv in
-        f_forall_simpl
-          [old_b_id,GTty tbool; old_cntr_id,GTty tint]
-          (f_hoareF pre o post)
-    in
-    [not_F_to_F_goal;cntr_decr_goal;cntr_stable_goal]
-  in
+  (*   let cntr_decr_goal = *)
+  (*     let pre  = f_and some_p (f_eq old_cntr cntr) in *)
+  (*     let pre = f_and_simpl pre inv in *)
+  (*     let post = f_int_lt old_cntr cntr in *)
+  (*     let post = f_and_simpl post inv in *)
+  (*       f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post) *)
+  (*   in *)
+  (*   let cntr_stable_goal = *)
+  (*     let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in *)
+  (*     let pre  = f_and_simpl pre inv in *)
+  (*     let post = f_ands [f_eq f_event old_b;f_int_le old_cntr cntr] in *)
+  (*     let post = f_and_simpl post inv in *)
+  (*       f_forall_simpl *)
+  (*         [old_b_id,GTty tbool; old_cntr_id,GTty tint] *)
+  (*         (f_hoareF pre o post) *)
+  (*   in *)
+  (*   [not_F_to_F_goal;cntr_decr_goal;cntr_stable_goal] *)
+  (* in *)
 
-  let os_goals =
-    List.concat (List.map oracle_goal (Sx.ntr_elements os)) in
+  (* let os_goals = *)
+  (*   List.concat (List.map oracle_goal (Sx.ntr_elements os)) in *)
 
-  let concls = bound_goal :: post_goal :: init_goal :: os_goals in
-  let res = FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls in
-  res
+  (* let concls = bound_goal :: post_goal :: init_goal :: os_goals in *)
+  (* let res = FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls in *)
+  (* res *)
 
 
 (* -------------------------------------------------------------------- *)

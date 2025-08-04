@@ -67,7 +67,7 @@ let check_dslc pf =
     | Smatch (_, bs) ->
        List.iter (doit_s |- snd) bs
 
-    | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
+    | Srnd _ | Scall _ | Swhile _ | Sraise _  | Sabstract _ ->
        error ()
 
   and doit_s c =
@@ -304,7 +304,7 @@ let process_unroll_for side cpos tc =
        t_doit (i+1) (pos + blen) zs]) tc in
 
   let t_conseq_nm tc =
-    (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true @+
+    (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true (tc1_get_poste tc) @+
     [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
 
   let doi i tc =

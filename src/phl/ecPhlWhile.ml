@@ -41,8 +41,7 @@ let while_info env e s =
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
 
-    | Sassert e ->
-        (w, e_read_r env r e, c)
+    | Sraise _ -> assert false
 
     | Sabstract id ->
         let add_pv x (pv,ty) = PV.add env pv ty x in
@@ -70,7 +69,7 @@ let t_hoare_while_r inv tc =
   (* the body preserves the invariant *)
   let b_pre  = f_and_simpl inv e in
   let b_post = inv in
-  let b_concl = f_hoareS hs.hs_m b_pre c b_post in
+  let b_concl = f_hoareS hs.hs_m b_pre c b_post [] in
   (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
   let modi = s_write env c in
@@ -185,7 +184,7 @@ let t_bdhoare_while_rev_r inv tc =
       (f_eq bound f_r1) in
     let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
     let term_post = f_and inv term_post in
-    f_hoareS mem b_pre rem_s term_post
+    f_hoareS mem b_pre rem_s term_post []
   in
 
   FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
@@ -654,7 +653,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
 
       let pre = f_ands [inv; form_of_expr mhr el; f_not p0; p1] in
       f_forall_mems [evs.es_mr]
-        (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv)
+        (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv [])
 
     and hr2 =
       let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
@@ -664,7 +663,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
 
       let pre = f_ands [inv; form_of_expr mhr er; f_not p0; f_not p1] in
       f_forall_mems [evs.es_ml]
-        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cr inv)
+        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cr inv [])
 
     in (hr1, hr2)
   in

@@ -155,6 +155,14 @@ val axiomatized_op :
   -> axiom
 
 (* -------------------------------------------------------------------- *)
+type excep = {
+  e_typargs : ty_params;
+  e_loca    : locality;
+}
+
+val mk_except : ty_params -> locality -> excep
+
+(* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_prt : EcPath.path option;
   tc_ops : (EcIdent.t * EcTypes.ty) list;

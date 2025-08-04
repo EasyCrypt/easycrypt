@@ -63,7 +63,7 @@ let t_hoare_call fpre fpost tc =
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
-  let f_concl = f_hoareF fpre f fpost in
+  let f_concl = f_hoareF fpre f fpost [] in
   (* The wp *)
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
@@ -207,7 +207,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   (* most of the above code is duplicated from t_hoare_call *)
   let concl = match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
-        f_hoareS bhs.bhs_m bhs.bhs_pr s post
+        f_hoareS bhs.bhs_m bhs.bhs_pr s post []
     | FHeq, Some bd ->
         f_bdHoareS_r { bhs with
           bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; }
@@ -391,7 +391,7 @@ let process_call side info tc =
       | FhoareS hs, None ->
           let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, tbool, fun pre post -> f_hoareF pre f post)
+          (penv, qenv, tbool, fun pre post -> f_hoareF pre f post hs.hs_poe)
 
       | FbdHoareS bhs, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
@@ -431,7 +431,7 @@ let process_call side info tc =
     | FhoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv -> f_hoareF inv f inv)
+        (penv, tbool, fun inv -> f_hoareF inv f inv hs.hs_poe)
 
     | FeHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
