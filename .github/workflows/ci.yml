@@ -125,8 +125,9 @@ jobs:
           -b ${{ steps.branch_name.outputs.REPO_BRANCH }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
-    - name: Install EasyCrypt dependencies
+    - name: Install Jasmin and EasyCrypt dependencies
       run: |
+        opam install jasmin
         opam pin add -n easycrypt easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
