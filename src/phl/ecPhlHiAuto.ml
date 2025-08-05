@@ -67,7 +67,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
          EcPhlCall.t_bdhoare_call {m;inv=f_true} {m;inv=f_true} None
 
   | LL_JUMP ->
-      let m = fst (tc1_as_hoareS tc).hs_m in
+      let m = EcIdent.create "&hr" in
         ( EcPhlApp.t_bdhoare_app
            (Zpr.cpos (-1)) ({m;inv=f_true}, {m;inv=f_true}, 
             {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
@@ -80,7 +80,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
         @~ FApi.t_rotate `Left 1
 
   | LL_COND (lls1, lls2) ->
-    let m = fst (tc1_as_hoareS tc).hs_m in
+    let m = EcIdent.create "&hr" in
       let condtc =
         EcPhlCond.t_bdhoare_cond
         @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]

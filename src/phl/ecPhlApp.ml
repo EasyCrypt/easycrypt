@@ -5,6 +5,7 @@ open EcParsetree
 open EcTypes
 open EcFol
 open EcAst
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -38,6 +39,13 @@ let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
 let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
+  let m = fst bhs.bhs_m in
+  let phi = ss_inv_rebind phi m in
+  let pR = ss_inv_rebind pR m in
+  let f1 = ss_inv_rebind f1 m in
+  let f2 = ss_inv_rebind f2 m in
+  let g1 = ss_inv_rebind g1 m in
+  let g2 = ss_inv_rebind g2 m in
   let s1, s2 = s_split env i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
   let nR = map_ss_inv1 f_not pR in
