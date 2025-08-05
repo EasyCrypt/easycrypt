@@ -348,9 +348,9 @@ module TestBack : CBackend = struct
         b
     and doit_r (n: C.node_r) : bool =
       match n with
-      | C.Input (-1, -1) -> false
+      | C.Input (-1, -1) -> true
       | C.Input _
-      | C.False -> true
+      | C.False -> false
       | C.And (n1, n2) -> (doit n1) || (doit n2)
     in
     fun b -> doit b
@@ -1298,7 +1298,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         assert (w = Backend.size_of_reg bs);
         `CArray (Backend.insert r (pos * w) bs, w),
         merge_inputs inps cinps
-      with Invalid_argument _ -> assert false 
+      with 
+        Invalid_argument _ -> assert false 
+      | Assert_failure e -> 
+        Format.eprintf "Array set size mismatch arr[%d (bits)@%d (block size)], w@%d@." 
+          (Backend.size_of_reg r) 
+          w 
+          (Backend.size_of_reg bs);
+        raise (Assert_failure e)
 
     (* FIXME: review this functiono | FIXME: Not axiomatized in QFABV.ec file *)
     let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
@@ -1342,7 +1349,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
         | _ -> assert false
         end
-      | (arr, `Set) -> begin match args with
+      | (_arr, `Set) -> begin match args with
         | [ `Circuit ((`CArray _, _) as arr); 
             `Constant i; 
             `Circuit ((`CBitstring _, _) as bs) ] ->
@@ -1917,6 +1924,11 @@ let circuit_of_form
         hyps, cache_get cache idn
     | Fop (pth, _) -> 
       begin
+      if pth = EcCoreLib.CI_Witness.p_witness then 
+          (Format.eprintf "Assigning witness to var of type %a@." 
+          EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty;
+          hyps, circuit_uninit env (f_.f_ty))
+      else
       match Mp.find_opt pth !op_cache with
       | Some op -> 
         hyps, op
@@ -1930,6 +1942,7 @@ let circuit_of_form
         | OB_oper (Some (OP_Plain f)) -> 
           doit cache hyps f
         | _ when pth = EcCoreLib.CI_Witness.p_witness ->
+          assert false;
           hyps, circuit_uninit env (f_.f_ty)
         | _ -> 
         begin match EcFol.op_kind (destr_op f_ |> fst) with
@@ -2040,7 +2053,9 @@ let circuit_of_form
       in 
       let v = match pstate_get_opt pstate v with
       | Some v -> v
-      | None -> circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
+      | None -> 
+          Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv (PPEnv.ofenv env)) pv EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty; 
+          circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
       in
       hyps, v
     | Fglob (id, mem) -> raise (CircError "glob not supported")
