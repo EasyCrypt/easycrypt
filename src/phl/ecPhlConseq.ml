@@ -700,6 +700,8 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
 let t_bdHoareF_conseq_conj ~add post post' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let hs = tc1_as_bdhoareF tc in
+  let post = ss_inv_rebind post hs.bhf_m in
+  let post' = ss_inv_rebind post' hs.bhf_m in
   let postc = if add then map_ss_inv2 f_and post' post else post' in
   let posth = if add then post' else map_ss_inv2 f_and post' post in
   if not (ss_inv_alpha_eq hyps (bhf_po hs) postc) then
@@ -1089,13 +1091,15 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
     let m,hi,hh, h0 =
       as_seq4 (LDecl.fresh_ids (FApi.tc1_hyps tc) ["&m";"_";"_";"_"]) in
-    let pre    = map_ss_inv2 f_and (bhf_pr hs) (hf_pr hs2) in
+    let hs_pr = ss_inv_rebind (bhf_pr hs) hs2.hf_m in
+    let hs0_pr = ss_inv_rebind (bhf_pr hs0) hs2.hf_m in
+    let pre    = map_ss_inv2 f_and hs_pr (hf_pr hs2) in
     let mpre   = Fsubst.f_subst_mem pre.m m pre.inv in
     let post1  = (bhf_po hs0) in
-    let post   = (bhf_po hs) in
+    let post   = ss_inv_rebind (bhf_po hs) hs2.hf_m in
     let posta  = map_ss_inv2 f_and post (hf_po hs2) in
     let mpr,_ = EcEnv.Fun.hoareF_memenv hs0.bhf_m hs0.bhf_f (FApi.tc1_env tc) in
-    let concl1 = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp (bhf_pr hs0) pre) in
+    let concl1 = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp hs0_pr pre) in
 
     let tc = ( t_cut concl1 @+
         [ t_id;   (* subgoal 1 : pre *)
