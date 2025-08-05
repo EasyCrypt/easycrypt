@@ -5,6 +5,7 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcCoreGoal
+open EcAst
 
 module Msym = EcSymbols.Msym
 
@@ -106,9 +107,11 @@ let tc1_process_prhl_form_opt tc oty pf =
     | _ -> assert false
   in
 
-  let hyps = LDecl.push_all [ml; mr] hyps in
+  let hyps = LDecl.push_active_ts ml mr hyps in
   let mv = Msym.of_list [("pre", pr); ("post", po)] in
-  pf_process_form_opt ~mv !!tc hyps oty pf
+  let f = pf_process_form_opt ~mv !!tc hyps oty pf in
+  let ml, mr = fst ml, fst mr in
+  {ml;mr;inv=f}
 
 let tc1_process_prhl_form tc ty pf = tc1_process_prhl_form_opt tc (Some ty) pf
 
@@ -119,7 +122,7 @@ let tc1_process_prhl_formula tc pf =
 (* ------------------------------------------------------------------ *)
 let tc1_process_stmt  ?map tc mt c =
   let hyps   = FApi.tc1_hyps tc in
-  let hyps   = LDecl.push_active (mhr,mt) hyps in
+  let hyps   = LDecl.push_active_ss (mhr,mt) hyps in
   let env    = LDecl.toenv hyps in
   let ue     = unienv_of_hyps hyps in
   let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
@@ -139,7 +142,7 @@ let tc1_process_Xhl_exp tc side ty e =
   let hyps, concl = FApi.tc1_flat tc in
   let m = fst (EcFol.destr_programS side concl) in
 
-  let hyps = LDecl.push_active m hyps in
+  let hyps = LDecl.push_active_ss m hyps in
   pf_process_exp !!tc hyps `InProc ty e
 
 (* ------------------------------------------------------------------ *)
@@ -155,7 +158,7 @@ let tc1_process_Xhl_form ?side tc ty pf =
     | _            -> None
   in
 
-  let hyps = LDecl.push_active m hyps in
+  let hyps = LDecl.push_active_ss m hyps in
 
   let mv =
     Option.map
@@ -163,7 +166,7 @@ let tc1_process_Xhl_form ?side tc ty pf =
       mv
   in
 
-  (m, pf_process_form ?mv !!tc hyps ty pf)
+  (snd m, {m=fst m;inv=pf_process_form ?mv !!tc hyps ty pf})
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =
@@ -177,21 +180,21 @@ let tc1_process_Xhl_formula_xreal tc pf =
 let tc1_process_codepos_range tc (side, cpr) =
   let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
   let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active me env in
+  let env = EcEnv.Memory.push_active_ss me env in
   EcTyping.trans_codepos_range env cpr
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos tc (side, cpos) =
   let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
   let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active me env in
+  let env = EcEnv.Memory.push_active_ss me env in
   EcTyping.trans_codepos env cpos
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos1 tc (side, cpos) =
   let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
   let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active me env in
+  let env = EcEnv.Memory.push_active_ss me env in
   EcTyping.trans_codepos1 env cpos
 
 (* ------------------------------------------------------------------ *)

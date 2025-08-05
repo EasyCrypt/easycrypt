@@ -1,17 +1,17 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
-open EcFol
 open EcCoreGoal.FApi
 open EcMatching.Position
+open EcAst
 
 (* -------------------------------------------------------------------- *)
-val t_eager_seq     : codepos1 -> codepos1 -> form -> EcIdent.t -> backward
+val t_eager_seq     : codepos1 -> codepos1 -> ts_inv -> EcIdent.t -> backward
 val t_eager_if      : backward
 val t_eager_while   : EcIdent.t -> backward
 val t_eager_fun_def : backward
-val t_eager_fun_abs : EcFol.form -> EcIdent.t -> backward
-val t_eager_call    : form -> form -> backward
+val t_eager_fun_abs : ts_inv -> EcIdent.t -> backward
+val t_eager_call    : ts_inv -> ts_inv -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_seq     : eager_info -> pcodepos1 pair -> pformula -> backward

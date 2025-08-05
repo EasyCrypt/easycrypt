@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
+open EcAst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -7,10 +8,10 @@ open EcLowPhlGoal
 (* -------------------------------------------------------------------- *)
 let t_hoare_true_r tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF hf when f_equal hf.hf_po f_true ->
+  | FhoareF hf when f_equal (hf_po hf).inv f_true ->
       FApi.xmutate1 tc `HoareTrue []
 
-  | FhoareS hs when f_equal hs.hs_po f_true ->
+  | FhoareS hs when f_equal (hs_po hs).inv f_true ->
       FApi.xmutate1 tc `HoareTrue []
 
   | _ ->
@@ -40,7 +41,7 @@ let t_ehoare_zero = FApi.t_low0 "hoare-zero" t_ehoare_zero_r
 (* -------------------------------------------------------------------- *)
 let t_core_exfalso_r tc =
   let pre   = tc1_get_pre tc in
-    if not (f_equal pre f_false) then
+    if not (f_equal (inv_of_inv pre) f_false) then
       tc_error !!tc "pre-condition is not `false'";
     FApi.xmutate1 tc `ExFalso []
 

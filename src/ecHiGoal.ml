@@ -1725,8 +1725,8 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
               let newconcl =
                 concl |> FPosition.map ptnpos (fun f ->
                   match f.f_node with
-                  | Fglob (a, _) -> f_glob a m'
-                  | Fpvar (p, _) -> f_pvar p f.f_ty m'
+                  | Fglob (a, _) -> (f_glob a m').inv
+                  | Fpvar (p, _) -> (f_pvar p f.f_ty m').inv
                   | Fpr   pr     -> f_pr_r { pr with pr_mem = m' }
                   | _            -> assert false
                 ) in
