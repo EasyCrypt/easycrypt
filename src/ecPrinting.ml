@@ -1612,7 +1612,7 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
       try
         let x1 = get_f_projarg ppe f1 i1 ty1 in
         let x2 = get_f_projarg ppe f2 i2 ty2 in
-        collect1 (map_ss_inv2 f_eq x1 x2).inv
+        collect1 (f_eq x1.inv x2.inv)
        with NoProjArg -> None
     end
 
