@@ -800,10 +800,8 @@ let transitivity_side_cond hyps prml poml pomr p q p2 q2 p1 q1 =
     let p1 = ss_inv_rebind p1 p.ml in
     f_forall_mems [prml] (f_imp p1.inv (f_exists bd concl)) in
   let cond2 =
-    let q1 = ss_inv_rebind q1 q.ml in
-    let q1 = ss_inv_generalize_right q1 q.mr in
-    let q2 = ss_inv_rebind q2 q.mr in
-    let q2 = ss_inv_generalize_left q2 q.ml in
+    let q1 = ss_inv_generalize_as_left q1 q.ml q.mr in
+    let q2 = ss_inv_generalize_as_right q2 q.ml q.mr in
     f_forall_mems_ts_inv poml pomr (map_ts_inv3 (fun q q2 q1 -> f_imps [q;q2] q1) q q2 q1) in
   (cond1, cond2)
 
@@ -836,13 +834,13 @@ let t_ehoareF_conseq_equiv f2 p q p2 q2 tc =
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv p.ml p.mr hf1.ehf_f f2 env in
   let p1 = (ehf_pr hf1) and q1 = (ehf_po hf1) in
   let cond1 =
-    let fv1 = PV.fv env mright p.inv in
-    let fv2 = PV.fv env mhr p2.inv in
+    let fv1 = PV.fv env p.mr p.inv in
+    let fv2 = PV.fv env p2.m p2.inv in
     let fv = PV.union fv1 fv2 in
     let elts, glob = PV.ntr_elements fv in
-    let bd, s = generalize_subst env mhr elts glob in
-    let s1 = PVM.of_mpv s mright in
-    let s2 = PVM.of_mpv s mhr in
+    let bd, s = generalize_subst env p2.m elts glob in
+    let s1 = PVM.of_mpv s p.mr in
+    let s2 = PVM.of_mpv s p2.m in
     let p1 = ss_inv_rebind p1 p.ml in
     let concl =
      f_or (f_eq p1.inv f_xreal_inf)

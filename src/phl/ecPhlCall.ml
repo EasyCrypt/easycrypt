@@ -92,6 +92,8 @@ let ehoare_call_pre_post fpre fpost tc =
   let hs = tc1_as_ehoareS tc in
   let (lp,f,args),s = tc1_last_call tc hs.ehs_s in
   let m = EcMemory.memory hs.ehs_m in
+  let fpre = ss_inv_rebind fpre m in
+  let fpost = ss_inv_rebind fpost m in
   (* Ensure that all asigned variables are locals *)
   let all_loc =
     match lp with
