@@ -99,7 +99,7 @@ jobs:
     needs: [compile-opam, fetch-external-matrix]
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:jasmin
     strategy:
       fail-fast: false
       matrix:
