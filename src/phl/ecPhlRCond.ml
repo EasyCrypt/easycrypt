@@ -40,50 +40,50 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_ehoare_rcond_r b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let hs = tc1_as_ehoareS tc in
-    let m  = EcMemory.memory hs.ehs_m in
-    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.ehs_s in
-    let pre =
-      match destr_app hs.ehs_pr with
-      | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
-      | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
+  let t_ehoare_rcond_r _b _at_pos _tc = assert false
+    (* let env = FApi.tc1_env tc in *)
+    (* let hs = tc1_as_ehoareS tc in *)
+    (* let m  = EcMemory.memory hs.ehs_m in *)
+    (* let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.ehs_s in *)
+    (* let pre = *)
+    (*   match destr_app hs.ehs_pr with *)
+    (*   | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre *)
+    (*   | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in *)
 
-    let concl1  = f_hoareS hs.ehs_m pre hd e in
-    let concl2  = f_eHoareS_r { hs with ehs_s = s } in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
-
-  (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_r b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let bhs = tc1_as_bdhoareS tc in
-    let m  = EcMemory.memory bhs.bhs_m in
-    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
-    let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
-    let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
+    (* let concl1  = f_hoareS hs.ehs_m pre hd e in *)
+    (* let concl2  = f_eHoareS_r { hs with ehs_s = s } in *)
+    (* FApi.xmutate1 tc `RCond [concl1; concl2] *)
 
   (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_r side b at_pos tc =
-    let env = FApi.tc1_env tc in
-    let es = tc1_as_equivS tc in
-    let m,mo,s =
-      match side with
-      | `Left  -> es.es_ml,es.es_mr, es.es_sl
-      | `Right -> es.es_mr,es.es_ml, es.es_sr in
-    let hd,_,e,s = gen_rcond (!!tc, env) b EcFol.mhr at_pos s in
-    let mo' = EcIdent.create "&m" in
-    let s1 = Fsubst.f_subst_id in
-    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
-    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in
-    let pre1 = Fsubst.f_subst s1 es.es_pr in
-    let concl1 =
-      f_forall_mems [mo', EcMemory.memtype mo]
-        (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in
-    let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
-    let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
+  let t_bdhoare_rcond_r _b _at_pos _tc = assert false
+    (* let env = FApi.tc1_env tc in *)
+    (* let bhs = tc1_as_bdhoareS tc in *)
+    (* let m  = EcMemory.memory bhs.bhs_m in *)
+    (* let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in *)
+    (* let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in *)
+    (* let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in *)
+    (* FApi.xmutate1 tc `RCond [concl1; concl2] *)
+
+  (* ------------------------------------------------------------------ *)
+  let t_equiv_rcond_r _side _b _at_pos _tc = assert false
+    (* let env = FApi.tc1_env tc in *)
+    (* let es = tc1_as_equivS tc in *)
+    (* let m,mo,s = *)
+    (*   match side with *)
+    (*   | `Left  -> es.es_ml,es.es_mr, es.es_sl *)
+    (*   | `Right -> es.es_mr,es.es_ml, es.es_sr in *)
+    (* let hd,_,e,s = gen_rcond (!!tc, env) b EcFol.mhr at_pos s in *)
+    (* let mo' = EcIdent.create "&m" in *)
+    (* let s1 = Fsubst.f_subst_id in *)
+    (* let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in *)
+    (* let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in *)
+    (* let pre1 = Fsubst.f_subst s1 es.es_pr in *)
+    (* let concl1 = *)
+    (*   f_forall_mems [mo', EcMemory.memtype mo] *)
+    (*     (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in *)
+    (* let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in *)
+    (* let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in *)
+    (* FApi.xmutate1 tc `RCond [concl1; concl2] *)
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
@@ -236,60 +236,60 @@ module LowMatch = struct
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_match_r c at_pos tc =
-    let bhs = tc1_as_bdhoareS tc in
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
+  let t_bdhoare_rcond_match_r _c _at_pos _tc = assert false
+    (* let bhs = tc1_as_bdhoareS tc in *)
+    (* let (epr, hd, po1), (me, full) = *)
+    (*   gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in *)
 
-    let pr = ofold f_and bhs.bhs_pr epr in
+    (* let pr = ofold f_and bhs.bhs_pr epr in *)
 
-    let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr hd po1 in
-    let concl2 = f_bdHoareS_r { bhs with bhs_pr = pr; bhs_m = me; bhs_s = full; } in
+    (* let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr hd po1 in *)
+    (* let concl2 = f_bdHoareS_r { bhs with bhs_pr = pr; bhs_m = me; bhs_s = full; } in *)
 
-    FApi.xmutate1 tc `RCondMatch [concl1; concl2]
+    (* FApi.xmutate1 tc `RCondMatch [concl1; concl2] *)
 
   (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_match_r side c at_pos tc =
-    let es = tc1_as_equivS tc in
+  let t_equiv_rcond_match_r _side _c _at_pos _tc = assert false
+    (* let es = tc1_as_equivS tc in *)
 
-    let m, mo, s =
-      match side with
-      | `Left  -> es.es_ml, es.es_mr, es.es_sl
-      | `Right -> es.es_mr, es.es_ml, es.es_sr in
+    (* let m, mo, s = *)
+    (*   match side with *)
+    (*   | `Left  -> es.es_ml, es.es_mr, es.es_sl *)
+    (*   | `Right -> es.es_mr, es.es_ml, es.es_sr in *)
 
-    let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c (EcFol.mhr, snd m) at_pos s in
+    (* let (epr, hd, po1), (me, full) = *)
+    (*   gen_rcond_full (!!tc, FApi.tc1_env tc) c (EcFol.mhr, snd m) at_pos s in *)
 
-    let mo'  = EcIdent.create "&m" in
-    let s1   = Fsubst.f_subst_id in
-    let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
-    let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in
-    let pre1 = Fsubst.f_subst s1 es.es_pr in
+    (* let mo'  = EcIdent.create "&m" in *)
+    (* let s1   = Fsubst.f_subst_id in *)
+    (* let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in *)
+    (* let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in *)
+    (* let pre1 = Fsubst.f_subst s1 es.es_pr in *)
 
-    let epr  = omap (fun epr ->
-      let se = Fsubst.f_subst_id in
-      let se = Fsubst.f_bind_mem se EcFol.mhr (EcMemory.memory m)  in
-      Fsubst.f_subst se epr) epr in
+    (* let epr  = omap (fun epr -> *)
+    (*   let se = Fsubst.f_subst_id in *)
+    (*   let se = Fsubst.f_bind_mem se EcFol.mhr (EcMemory.memory m)  in *)
+    (*   Fsubst.f_subst se epr) epr in *)
 
-    let concl1 =
-      f_forall_mems [mo', EcMemory.memtype mo]
-        (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd po1) in
+    (* let concl1 = *)
+    (*   f_forall_mems [mo', EcMemory.memtype mo] *)
+    (*     (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd po1) in *)
 
-    let (ml, mr), (sl, sr) =
-      match side with
-      | `Left ->
-          ((fst es.es_ml, snd me), es.es_mr),
-          (full, es.es_sr)
+    (* let (ml, mr), (sl, sr) = *)
+    (*   match side with *)
+    (*   | `Left -> *)
+    (*       ((fst es.es_ml, snd me), es.es_mr), *)
+    (*       (full, es.es_sr) *)
 
-      | `Right ->
-          (es.es_ml, (fst es.es_mr, snd me)),
-          (es.es_sl, full) in
+    (*   | `Right -> *)
+    (*       (es.es_ml, (fst es.es_mr, snd me)), *)
+    (*       (es.es_sl, full) in *)
 
-    let concl2 =
-      f_equivS_r { es with
-        es_pr = ofold f_and es.es_pr epr;
-        es_ml = ml; es_mr = mr; es_sl = sl; es_sr = sr } in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
+    (* let concl2 = *)
+    (*   f_equivS_r { es with *)
+    (*     es_pr = ofold f_and es.es_pr epr; *)
+    (*     es_ml = ml; es_mr = mr; es_sl = sl; es_sr = sr } in *)
+    (* FApi.xmutate1 tc `RCond [concl1; concl2] *)
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_match =

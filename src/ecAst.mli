@@ -225,17 +225,22 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
+and post = (memory * form) list
+
 and sHoareF = {
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;
+  hf_poe : post;
 }
 
 and sHoareS = {
-  hs_m  : memenv;
-  hs_pr : form;
-  hs_s  : stmt;
-  hs_po : form; }
+  hs_m   : memenv;
+  hs_pr  : form;
+  hs_s   : stmt;
+  hs_po  : form;
+  hs_poe : post;
+}
 
 
 and eHoareF = {

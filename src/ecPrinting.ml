@@ -1927,10 +1927,19 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      let ppepoe fmt l =
+        let aux fmt (e, f) =
+          Format.fprintf fmt " %a: %a" (pp_mem ppe) e (pp_form ppepo) f
+        in
+        match l with
+        | [] -> Format.fprintf fmt ""
+        | _ -> Format.fprintf fmt "| %a" (pp_list "|" aux) l
+      in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@ %a]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_form ppepr) hf.hf_pr
         (pp_form ppepo) hf.hf_po
+        ppepoe hf.hf_poe
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
@@ -2946,6 +2955,14 @@ let pp_post (ppe : PPEnv.t) ?prpo fmt post =
     fmt post None
 
 (* -------------------------------------------------------------------- *)
+let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) poe =
+  List.iter (fun ((e:memory),f) ->
+      pp_prpo ppe e.id_symb
+        (omap (fun x -> x.prpo_po) prpo |> odfl false)
+        fmt f None
+    ) poe
+
+(* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
@@ -2953,7 +2970,8 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.hf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po
+  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po;
+  Format.fprintf fmt "@\n%a%!" (pp_poe ppepo ?prpo) hf.hf_poe
 
 (* -------------------------------------------------------------------- *)
 

@@ -254,7 +254,7 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po hf.hf_poe
  | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
  | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
  | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }

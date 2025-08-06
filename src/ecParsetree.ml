@@ -202,7 +202,7 @@ and pformula_r =
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
 
-  | PFhoareF   of pformula * pgamepath * pformula
+  | PFhoareF   of pformula * pgamepath * pformula * (pgamepath * pformula) list
   | PFehoareF  of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula

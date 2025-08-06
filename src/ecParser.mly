@@ -1222,9 +1222,14 @@ hoare_bd_cmp :
 | EQ { EcAst.FHeq }
 | GE { EcAst.FHge }
 
+epost(P): x=lident COLON post=form_r(P)
+    { let loc = EcLocation.make $startpos $endpos in
+     (EcLocation.mk_loc loc ([], x),post)}
+
 hoare_body(P):
-  mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFhoareF (pre, mp, post) }
+    mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
+                                                 epost=splist(epost(P), PIPE)
+    { PFhoareF (pre, mp, post, epost) }
 
 ehoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW
@@ -3940,6 +3945,11 @@ iplist1_r(X, S):
 
 %inline empty:
 | /**/ { () }
+
+(* -------------------------------------------------------------------- *)
+%inline splist(X, S):
+| /* empty */     { [] }
+| S xs=iplist1_r(X, S) { xs }
 
 (* -------------------------------------------------------------------- *)
 __rlist1(X, S):                         (* left-recursive *)

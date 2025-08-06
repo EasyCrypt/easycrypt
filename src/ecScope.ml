@@ -1427,7 +1427,9 @@ module Op = struct
                    (f_app
                       (f_op oppath [] opdecl.op_ty)
                       (List.map (fun (x, ty) -> f_local x ty) locs)
-                      sig_.fs_ret)))
+                      sig_.fs_ret))
+                []
+             )
          in
 
          let prax = EcDecl.{

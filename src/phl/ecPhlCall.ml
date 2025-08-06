@@ -56,28 +56,28 @@ let wp2_call
   f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_call fpre fpost tc =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let (lp,f,args),s = tc1_last_call tc hs.hs_s in
-  let m = EcMemory.memory hs.hs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
-  (* The function satisfies the specification *)
-  let f_concl = f_hoareF fpre f fpost in
-  (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres hs.hs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+let t_hoare_call _fpre _fpost _tc = assert false
+  (* let env = FApi.tc1_env tc in *)
+  (* let hs = tc1_as_hoareS tc in *)
+  (* let (lp,f,args),s = tc1_last_call tc hs.hs_s in *)
+  (* let m = EcMemory.memory hs.hs_m in *)
+  (* let fsig = (Fun.by_xpath f env).f_sig in *)
+  (* (\* The function satisfies the specification *\) *)
+  (* let f_concl = f_hoareF fpre f fpost in *)
+  (* (\* The wp *\) *)
+  (* let pvres = pv_res in *)
+  (* let vres = EcIdent.create "result" in *)
+  (* let fres = f_local vres fsig.fs_ret in *)
+  (* let post = wp_asgn_call env m lp fres hs.hs_po in *)
+  (* let fpost = PVM.subst1 env pvres m fres fpost in *)
+  (* let modi = f_write env f in *)
+  (* let post = generalize_mod env m modi (f_imp_simpl fpost post) in *)
+  (* let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in *)
+  (* let spre = subst_args_call env m (e_tuple args) PVM.empty in *)
+  (* let post = f_anda_simpl (PVM.subst env spre fpre) post in *)
+  (* let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in *)
 
-  FApi.xmutate1 tc `HlCall [f_concl; concl]
+  (* FApi.xmutate1 tc `HlCall [f_concl; concl] *)
 
 
 (* -------------------------------------------------------------------- *)
@@ -170,60 +170,60 @@ let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
   | FHge, None    -> f_bdHoareF fpre f fpost FHge bd
 
 (* -------------------------------------------------------------------- *)
-let t_bdhoare_call fpre fpost opt_bd tc =
-  let env = FApi.tc1_env tc in
-  let bhs = tc1_as_bdhoareS tc in
-  let (lp,f,args),s = tc1_last_call tc bhs.bhs_s in
-  let m = EcMemory.memory bhs.bhs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
-  let f_concl =
-    bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
+let t_bdhoare_call _fpre _fpost _opt_bd _tc = assert false
+  (* let env = FApi.tc1_env tc in *)
+  (* let bhs = tc1_as_bdhoareS tc in *)
+  (* let (lp,f,args),s = tc1_last_call tc bhs.bhs_s in *)
+  (* let m = EcMemory.memory bhs.bhs_m in *)
+  (* let fsig = (Fun.by_xpath f env).f_sig in *)
+  (* let f_concl = *)
+  (*   bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in *)
 
-  (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres bhs.bhs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post =
-    match bhs.bhs_cmp with
-    | FHle -> f_imp_simpl   post fpost
-    | FHge -> f_imp_simpl  fpost  post
+  (* (\* The wp *\) *)
+  (* let pvres = pv_res in *)
+  (* let vres = EcIdent.create "result" in *)
+  (* let fres = f_local vres fsig.fs_ret in *)
+  (* let post = wp_asgn_call env m lp fres bhs.bhs_po in *)
+  (* let fpost = PVM.subst1 env pvres m fres fpost in *)
+  (* let modi = f_write env f in *)
+  (* let post = *)
+  (*   match bhs.bhs_cmp with *)
+  (*   | FHle -> f_imp_simpl   post fpost *)
+  (*   | FHge -> f_imp_simpl  fpost  post *)
 
-    | FHeq when f_equal bhs.bhs_bd f_r0 ->
-        f_imp_simpl post fpost
+  (*   | FHeq when f_equal bhs.bhs_bd f_r0 -> *)
+  (*       f_imp_simpl post fpost *)
 
-    | FHeq when f_equal bhs.bhs_bd f_r1 ->
-        f_imp_simpl  fpost post
+  (*   | FHeq when f_equal bhs.bhs_bd f_r1 -> *)
+  (*       f_imp_simpl  fpost post *)
 
-    | FHeq -> f_iff_simpl fpost  post in
+  (*   | FHeq -> f_iff_simpl fpost  post in *)
 
-  let post = generalize_mod env m modi post in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  (* let post = generalize_mod env m modi post in *)
+  (* let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in *)
+  (* let spre = subst_args_call env m (e_tuple args) PVM.empty in *)
+  (* let post = f_anda_simpl (PVM.subst env spre fpre) post in *)
 
-  (* most of the above code is duplicated from t_hoare_call *)
-  let concl = match bhs.bhs_cmp, opt_bd with
-    | FHle, None ->
-        f_hoareS bhs.bhs_m bhs.bhs_pr s post
-    | FHeq, Some bd ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; }
-    | FHeq, None ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_r1; }
-    | FHge, Some bd ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; }
-    | FHge, None ->
-        f_bdHoareS_r { bhs with
-          bhs_s = s; bhs_po = post; bhs_cmp = FHeq; bhs_bd = f_r1; }
-    | _, _ -> assert false
-  in
+  (* (\* most of the above code is duplicated from t_hoare_call *\) *)
+  (* let concl = match bhs.bhs_cmp, opt_bd with *)
+  (*   | FHle, None -> *)
+  (*       f_hoareS bhs.bhs_m bhs.bhs_pr s post *)
+  (*   | FHeq, Some bd -> *)
+  (*       f_bdHoareS_r { bhs with *)
+  (*         bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; } *)
+  (*   | FHeq, None -> *)
+  (*       f_bdHoareS_r { bhs with *)
+  (*         bhs_s = s; bhs_po = post; bhs_bd = f_r1; } *)
+  (*   | FHge, Some bd -> *)
+  (*       f_bdHoareS_r { bhs with *)
+  (*         bhs_s = s; bhs_po = post; bhs_bd = f_real_div bhs.bhs_bd bd; } *)
+  (*   | FHge, None -> *)
+  (*       f_bdHoareS_r { bhs with *)
+  (*         bhs_s = s; bhs_po = post; bhs_cmp = FHeq; bhs_bd = f_r1; } *)
+  (*   | _, _ -> assert false *)
+  (* in *)
 
-  FApi.xmutate1 tc `HlCall [f_concl; concl]
+  (* FApi.xmutate1 tc `HlCall [f_concl; concl] *)
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_call fpre fpost tc =
@@ -384,147 +384,147 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let post = f_and eq_res inv in
         f_equivF pre fl fr post
 
-let process_call side info tc =
-  let process_spec tc side =
-    let (hyps, concl) = FApi.tc1_flat tc in
-      match concl.f_node, side with
-      | FhoareS hs, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, tbool, fun pre post -> f_hoareF pre f post)
+let process_call _side _info _tc = assert false
+  (* let process_spec tc side = *)
+  (*   let (hyps, concl) = FApi.tc1_flat tc in *)
+  (*     match concl.f_node, side with *)
+  (*     | FhoareS hs, None -> *)
+  (*         let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in *)
+  (*         let penv, qenv = LDecl.hoareF f hyps in *)
+  (*         (penv, qenv, tbool, fun pre post -> f_hoareF pre f post) *)
 
-      | FbdHoareS bhs, None ->
-          let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, tbool, fun pre post ->
-            bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
+  (*     | FbdHoareS bhs, None -> *)
+  (*         let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in *)
+  (*         let penv, qenv = LDecl.hoareF f hyps in *)
+  (*         (penv, qenv, tbool, fun pre post -> *)
+  (*           bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None) *)
 
-      | FeHoareS hs, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-          let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post)
+  (*     | FeHoareS hs, None -> *)
+  (*         let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in *)
+  (*         let penv, qenv = LDecl.hoareF f hyps in *)
+  (*         (penv, qenv, txreal, fun pre post -> f_eHoareF pre f post) *)
 
-      | FbdHoareS _, Some _
-      | FhoareS  _, Some _ ->
-          tc_error !!tc "side can only be given for prhl judgements"
+  (*     | FbdHoareS _, Some _ *)
+  (*     | FhoareS  _, Some _ -> *)
+  (*         tc_error !!tc "side can only be given for prhl judgements" *)
 
-      | FequivS es, None ->
-          let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-          let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-          let penv, qenv = LDecl.equivF fl fr hyps in
-          (penv, qenv, tbool, fun pre post -> f_equivF pre fl fr post)
+  (*     | FequivS es, None -> *)
+  (*         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in *)
+  (*         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in *)
+  (*         let penv, qenv = LDecl.equivF fl fr hyps in *)
+  (*         (penv, qenv, tbool, fun pre post -> f_equivF pre fl fr post) *)
 
-      | FequivS es, Some side ->
-          let fstmt = sideif side es.es_sl es.es_sr in
-          let (_,f,_) = fst (tc1_last_call tc fstmt) in
-          let penv, qenv = LDecl.hoareF f hyps in
-          (penv, qenv, tbool, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
+  (*     | FequivS es, Some side -> *)
+  (*         let fstmt = sideif side es.es_sl es.es_sr in *)
+  (*         let (_,f,_) = fst (tc1_last_call tc fstmt) in *)
+  (*         let penv, qenv = LDecl.hoareF f hyps in *)
+  (*         (penv, qenv, tbool, fun pre post -> f_bdHoareF pre f post FHeq f_r1) *)
 
-      | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
+  (*     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in *)
 
-  let process_inv tc side =
-    if not (is_none side) then
-      tc_error !!tc "cannot specify side for call with invariants";
+  (* let process_inv tc side = *)
+  (*   if not (is_none side) then *)
+  (*     tc_error !!tc "cannot specify side for call with invariants"; *)
 
-    let hyps, concl = FApi.tc1_flat tc in
-    match concl.f_node with
-    | FhoareS hs ->
-        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
-        (penv, tbool, fun inv -> f_hoareF inv f inv)
+  (*   let hyps, concl = FApi.tc1_flat tc in *)
+  (*   match concl.f_node with *)
+  (*   | FhoareS hs -> *)
+  (*       let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in *)
+  (*       let penv = LDecl.inv_memenv1 hyps in *)
+  (*       (penv, tbool, fun inv -> f_hoareF inv f inv) *)
 
-    | FeHoareS hs ->
-        let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in
-        let penv = LDecl.inv_memenv1 hyps in
-        (penv, txreal, fun inv -> f_eHoareF inv f inv)
+  (*   | FeHoareS hs -> *)
+  (*       let (_,f,_) = fst (tc1_last_call tc hs.ehs_s) in *)
+  (*       let penv = LDecl.inv_memenv1 hyps in *)
+  (*       (penv, txreal, fun inv -> f_eHoareF inv f inv) *)
 
-    | FbdHoareS bhs ->
-      let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
-      let penv = LDecl.inv_memenv1 hyps in
-      (penv, tbool, fun inv -> bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
+  (*   | FbdHoareS bhs -> *)
+  (*     let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in *)
+  (*     let penv = LDecl.inv_memenv1 hyps in *)
+  (*     (penv, tbool, fun inv -> bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None) *)
 
-    | FequivS es ->
-      let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-      let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-      let penv = LDecl.inv_memenv hyps in
-      let env  = LDecl.toenv hyps in
-      (penv, tbool, fun inv -> mk_inv_spec !!tc env inv fl fr)
+  (*   | FequivS es -> *)
+  (*     let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in *)
+  (*     let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in *)
+  (*     let penv = LDecl.inv_memenv hyps in *)
+  (*     let env  = LDecl.toenv hyps in *)
+  (*     (penv, tbool, fun inv -> mk_inv_spec !!tc env inv fl fr) *)
 
-    | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
+  (*   | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in *)
 
-  let process_upto tc side info =
-    if not (is_none side) then
-      tc_error !!tc "cannot specify side for call with invariants";
-    let env, _, concl = FApi.tc1_eflat tc in
-      match concl.f_node with
-      | FequivS es ->
-        let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-        let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
-        let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
-        let (topl,fl,_,sigl),
-            (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-        let bad2 = Fsubst.f_subst_mem mhr mright bad in
-        let eqglob = f_eqglob topl mleft topr mright in
-        let lpre = [eqglob;invP] in
-        let eq_params =
-          f_eqparams
-            sigl.fs_arg sigl.fs_anames mleft
-            sigr.fs_arg sigr.fs_anames mright in
-        let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-        let pre    = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
-        let post   = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
-        (bad,invP,invQ, f_equivF pre fl fr post)
+  (* let process_upto tc side info = *)
+  (*   if not (is_none side) then *)
+  (*     tc_error !!tc "cannot specify side for call with invariants"; *)
+  (*   let env, _, concl = FApi.tc1_eflat tc in *)
+  (*     match concl.f_node with *)
+  (*     | FequivS es -> *)
+  (*       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in *)
+  (*       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in *)
+  (*       let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in *)
+  (*       let (topl,fl,_,sigl), *)
+  (*           (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in *)
+  (*       let bad2 = Fsubst.f_subst_mem mhr mright bad in *)
+  (*       let eqglob = f_eqglob topl mleft topr mright in *)
+  (*       let lpre = [eqglob;invP] in *)
+  (*       let eq_params = *)
+  (*         f_eqparams *)
+  (*           sigl.fs_arg sigl.fs_anames mleft *)
+  (*           sigr.fs_arg sigr.fs_anames mright in *)
+  (*       let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in *)
+  (*       let pre    = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in *)
+  (*       let post   = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in *)
+  (*       (bad,invP,invQ, f_equivF pre fl fr post) *)
 
-    | _ -> tc_error !!tc "the conclusion is not an equiv" in
+  (*   | _ -> tc_error !!tc "the conclusion is not an equiv" in *)
 
-  let subtactic = ref t_id in
+  (* let subtactic = ref t_id in *)
 
-  let process_cut tc info =
-    match info with
-    | CI_spec (pre, post) ->
-      let penv,qenv,ty,fmake = process_spec tc side in
-      let pre  = TTC.pf_process_form !!tc penv ty pre  in
-      let post = TTC.pf_process_form !!tc qenv ty post in
-      fmake pre post
+  (* let process_cut tc info = *)
+  (*   match info with *)
+  (*   | CI_spec (pre, post) -> *)
+  (*     let penv,qenv,ty,fmake = process_spec tc side in *)
+  (*     let pre  = TTC.pf_process_form !!tc penv ty pre  in *)
+  (*     let post = TTC.pf_process_form !!tc qenv ty post in *)
+  (*     fmake pre post *)
 
-    | CI_inv inv ->
-      let hyps, ty, fmake = process_inv tc side in
-      let inv = TTC.pf_process_form !!tc hyps ty inv in
-      subtactic := (fun tc ->
-        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
-      fmake inv
+  (*   | CI_inv inv -> *)
+  (*     let hyps, ty, fmake = process_inv tc side in *)
+  (*     let inv = TTC.pf_process_form !!tc hyps ty inv in *)
+  (*     subtactic := (fun tc -> *)
+  (*       FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc)); *)
+  (*     fmake inv *)
 
-    | CI_upto info ->
-      let bad, p, q, form = process_upto tc side info in
-      let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
-      subtactic := (fun tc ->
-        FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
-      form
+  (*   | CI_upto info -> *)
+  (*     let bad, p, q, form = process_upto tc side info in *)
+  (*     let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in *)
+  (*     subtactic := (fun tc -> *)
+  (*       FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc)); *)
+  (*     form *)
 
-  in
+  (* in *)
 
-  let pt = PT.tc1_process_full_pterm_cut ~prcut:(process_cut tc) tc info
-  in
+  (* let pt = PT.tc1_process_full_pterm_cut ~prcut:(process_cut tc) tc info *)
+  (* in *)
 
-  let pt =
-    let rec doit pt =
-      match TTC.destruct_product ~reduce:true (FApi.tc1_hyps tc) pt.PT.ptev_ax with
-      | None   -> pt
-      | Some _ -> doit (EcProofTerm.apply_pterm_to_hole pt)
-    in doit pt in
+  (* let pt = *)
+  (*   let rec doit pt = *)
+  (*     match TTC.destruct_product ~reduce:true (FApi.tc1_hyps tc) pt.PT.ptev_ax with *)
+  (*     | None   -> pt *)
+  (*     | Some _ -> doit (EcProofTerm.apply_pterm_to_hole pt) *)
+  (*   in doit pt in *)
 
-  let pt, ax =
-    if not (PT.can_concretize pt.PT.ptev_env) then
-      tc_error !!tc "cannot infer all placeholders";
-    PT.concretize pt in
+  (* let pt, ax = *)
+  (*   if not (PT.can_concretize pt.PT.ptev_env) then *)
+  (*     tc_error !!tc "cannot infer all placeholders"; *)
+  (*   PT.concretize pt in *)
 
-  FApi.t_seqsub
-    (t_call side ax)
-    [FApi.t_seqs
-       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-        !subtactic; t_trivial];
-     t_id]
-    tc
+  (* FApi.t_seqsub *)
+  (*   (t_call side ax) *)
+  (*   [FApi.t_seqs *)
+  (*      [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt; *)
+  (*       !subtactic; t_trivial]; *)
+  (*    t_id] *)
+  (*   tc *)
 
 (* -------------------------------------------------------------------- *)
 let process_call_concave (fc, info) tc =

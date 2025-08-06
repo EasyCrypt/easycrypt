@@ -60,24 +60,24 @@ let while_info env e s =
     EcModules.aus_calls  = Sx.ntr_elements c; }
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_while_r inv tc =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let (e, c), s = tc1_last_while tc hs.hs_s in
-  let m = EcMemory.memory hs.hs_m in
-  let e = form_of_expr m e in
-  (* the body preserves the invariant *)
-  let b_pre  = f_and_simpl inv e in
-  let b_post = inv in
-  let b_concl = f_hoareS hs.hs_m b_pre c b_post in
-  (* the wp of the while *)
-  let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
-  let modi = s_write env c in
-  let post = generalize_mod env m modi post in
-  let post = f_and_simpl inv post in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+let t_hoare_while_r _inv _tc = assert false
+  (* let env = FApi.tc1_env tc in *)
+  (* let hs = tc1_as_hoareS tc in *)
+  (* let (e, c), s = tc1_last_while tc hs.hs_s in *)
+  (* let m = EcMemory.memory hs.hs_m in *)
+  (* let e = form_of_expr m e in *)
+  (* (\* the body preserves the invariant *\) *)
+  (* let b_pre  = f_and_simpl inv e in *)
+  (* let b_post = inv in *)
+  (* let b_concl = f_hoareS hs.hs_m b_pre c b_post in *)
+  (* (\* the wp of the while *\) *)
+  (* let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in *)
+  (* let modi = s_write env c in *)
+  (* let post = generalize_mod env m modi post in *)
+  (* let post = f_and_simpl inv post in *)
+  (* let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in *)
 
-  FApi.xmutate1 tc `While [b_concl; concl]
+  (* FApi.xmutate1 tc `While [b_concl; concl] *)
 
 (* -------------------------------------------------------------------- *)
 let check_single_stmt tc s =
@@ -146,48 +146,48 @@ let t_bdhoare_while_r inv vrnt tc =
 
 (* -------------------------------------------------------------------- *)
 (* Rule for <= *)
-let t_bdhoare_while_rev_r inv tc =
-  let env, hyps, _ = FApi.tc1_eflat tc in
-  let bhs = tc1_as_bdhoareS tc in
+let t_bdhoare_while_rev_r _inv _tc = assert false
+  (* let env, hyps, _ = FApi.tc1_eflat tc in *)
+  (* let bhs = tc1_as_bdhoareS tc in *)
 
-  if bhs.bhs_cmp <> FHle then
-    tc_error !!tc "only judgments with an upper-bounded are supported";
+  (* if bhs.bhs_cmp <> FHle then *)
+  (*   tc_error !!tc "only judgments with an upper-bounded are supported"; *)
 
-  let b_pre  = bhs.bhs_pr in
-  let b_post = bhs.bhs_po in
-  let mem    = bhs.bhs_m in
-  let bound  = bhs.bhs_bd in
+  (* let b_pre  = bhs.bhs_pr in *)
+  (* let b_post = bhs.bhs_po in *)
+  (* let mem    = bhs.bhs_m in *)
+  (* let bound  = bhs.bhs_bd in *)
 
-  let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
-  let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in
+  (* let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in *)
+  (* let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in *)
 
-  let w_u   = while_info env lp_guard_exp lp_body in
-  let w     = EcEnv.LDecl.fresh_id hyps "w" in
-  let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
+  (* let w_u   = while_info env lp_guard_exp lp_body in *)
+  (* let w     = EcEnv.LDecl.fresh_id hyps "w" in *)
+  (* let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in *)
 
-  (* 1. Sub-goal *)
-  let body_concl =
-    let while_s  = EcModules.stmt [EcModules.i_abstract w] in
-    let unfolded_while_s = EcModules.s_seq lp_body while_s in
-    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s; } in
-    let unfolded_while_jgmt = f_bdHoareS_r
-      { bhs with bhs_pr = f_and inv lp_guard; bhs_s = unfolded_while_s; }
-    in
-      f_imp while_jgmt unfolded_while_jgmt
-  in
+  (* (\* 1. Sub-goal *\) *)
+  (* let body_concl = *)
+  (*   let while_s  = EcModules.stmt [EcModules.i_abstract w] in *)
+  (*   let unfolded_while_s = EcModules.s_seq lp_body while_s in *)
+  (*   let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s; } in *)
+  (*   let unfolded_while_jgmt = f_bdHoareS_r *)
+  (*     { bhs with bhs_pr = f_and inv lp_guard; bhs_s = unfolded_while_s; } *)
+  (*   in *)
+  (*     f_imp while_jgmt unfolded_while_jgmt *)
+  (* in *)
 
-  (* 2. Sub-goal *)
-  let rem_concl =
-    let modi = s_write env lp_body in
-    let term_post = f_imp
-      (f_and inv (f_and (f_not lp_guard) b_post))
-      (f_eq bound f_r1) in
-    let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
-    let term_post = f_and inv term_post in
-    f_hoareS mem b_pre rem_s term_post
-  in
+  (* (\* 2. Sub-goal *\) *)
+  (* let rem_concl = *)
+  (*   let modi = s_write env lp_body in *)
+  (*   let term_post = f_imp *)
+  (*     (f_and inv (f_and (f_not lp_guard) b_post)) *)
+  (*     (f_eq bound f_r1) in *)
+  (*   let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in *)
+  (*   let term_post = f_and inv term_post in *)
+  (*   f_hoareS mem b_pre rem_s term_post *)
+  (* in *)
 
-  FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
+  (* FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)] *)
 
 (* -------------------------------------------------------------------- *)
 (* Rule for = or >= *)
@@ -503,149 +503,149 @@ module ASyncWhile = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let process_async_while (winfos : EP.async_while_info) tc =
-  let e_and e1 e2 =
-    let p = EcCoreLib.CI_Bool.p_and in
-    e_app (e_op p [] (toarrow [tbool; tbool] tbool)) [e1; e2] tbool
-  in
+let process_async_while (_winfos : EP.async_while_info) _tc = assert false
+  (* let e_and e1 e2 = *)
+  (*   let p = EcCoreLib.CI_Bool.p_and in *)
+  (*   e_app (e_op p [] (toarrow [tbool; tbool] tbool)) [e1; e2] tbool *)
+  (* in *)
 
-  let { EP.asw_inv  = inv     ;
-        EP.asw_test = ((t1,f1), (t2,f2));
-        EP.asw_pred = (p0, p1); } = winfos in
+  (* let { EP.asw_inv  = inv     ; *)
+  (*       EP.asw_test = ((t1,f1), (t2,f2)); *)
+  (*       EP.asw_pred = (p0, p1); } = winfos in *)
 
-  let evs  = tc1_as_equivS tc in
-  let env  = FApi.tc1_env  tc in
-  let hyps = FApi.tc1_hyps tc in
+  (* let evs  = tc1_as_equivS tc in *)
+  (* let env  = FApi.tc1_env  tc in *)
+  (* let hyps = FApi.tc1_hyps tc in *)
 
-  let ml = EcMemory.memory evs.es_ml in
-  let mr = EcMemory.memory evs.es_mr in
+  (* let ml = EcMemory.memory evs.es_ml in *)
+  (* let mr = EcMemory.memory evs.es_mr in *)
 
-  let (el, cl), sl = tc1_last_while tc evs.es_sl in
-  let (er, cr), sr = tc1_last_while tc evs.es_sr in
+  (* let (el, cl), sl = tc1_last_while tc evs.es_sl in *)
+  (* let (er, cr), sr = tc1_last_while tc evs.es_sr in *)
 
-  let inv = TTC.tc1_process_prhl_formula tc inv in
-  let p0  = TTC.tc1_process_prhl_formula tc  p0 in
-  let p1  = TTC.tc1_process_prhl_formula tc  p1 in
-  let f1  = TTC.tc1_process_prhl_form_opt tc None f1 in
-  let f2  = TTC.tc1_process_prhl_form_opt tc None f2 in
-  let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some (tfun f1.f_ty tbool)) t1 in
-  let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some (tfun f2.f_ty tbool)) t2 in
-  let ft1 = form_of_expr ml t1 in
-  let ft2 = form_of_expr mr t2 in
-  let fe1 = form_of_expr ml el in
-  let fe2 = form_of_expr mr er in
-  let fe  = f_or fe1 fe2 in
+  (* let inv = TTC.tc1_process_prhl_formula tc inv in *)
+  (* let p0  = TTC.tc1_process_prhl_formula tc  p0 in *)
+  (* let p1  = TTC.tc1_process_prhl_formula tc  p1 in *)
+  (* let f1  = TTC.tc1_process_prhl_form_opt tc None f1 in *)
+  (* let f2  = TTC.tc1_process_prhl_form_opt tc None f2 in *)
+  (* let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some (tfun f1.f_ty tbool)) t1 in *)
+  (* let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some (tfun f2.f_ty tbool)) t2 in *)
+  (* let ft1 = form_of_expr ml t1 in *)
+  (* let ft2 = form_of_expr mr t2 in *)
+  (* let fe1 = form_of_expr ml el in *)
+  (* let fe2 = form_of_expr mr er in *)
+  (* let fe  = f_or fe1 fe2 in *)
 
-  let cond1 = f_forall_mems [evs.es_ml; evs.es_mr]
-    (f_imps [inv; fe; p0] (f_ands [fe1; fe2;
-                                   f_app ft1 [f1] tbool;
-                                   f_app ft2 [f2] tbool])) in
+  (* let cond1 = f_forall_mems [evs.es_ml; evs.es_mr] *)
+  (*   (f_imps [inv; fe; p0] (f_ands [fe1; fe2; *)
+  (*                                  f_app ft1 [f1] tbool; *)
+  (*                                  f_app ft2 [f2] tbool])) in *)
 
-  let cond2 = f_forall_mems [evs.es_ml; evs.es_mr]
-    (f_imps [inv; fe; f_not p0; p1] fe1) in
+  (* let cond2 = f_forall_mems [evs.es_ml; evs.es_mr] *)
+  (*   (f_imps [inv; fe; f_not p0; p1] fe1) in *)
 
-  let cond3 = f_forall_mems [evs.es_ml; evs.es_mr]
-    (f_imps [inv; fe; f_not p0; f_not p1] fe2) in
+  (* let cond3 = f_forall_mems [evs.es_ml; evs.es_mr] *)
+  (*   (f_imps [inv; fe; f_not p0; f_not p1] fe2) in *)
 
-  let xwh =
-    let v1, v2 = as_seq2 (EcEnv.LDecl.fresh_ids hyps ["v1_"; "v2_"]) in
-    let fv1 = f_local v1 f1.f_ty in
-    let fv2 = f_local v2 f2.f_ty in
-    let ev1 = e_local v1 f1.f_ty in
-    let ev2 = e_local v2 f2.f_ty in
-    let eq1 = f_eq fv1 f1 and eq2 = f_eq fv2 f2 in
-    let pr = f_ands [inv; fe; p0; eq1; eq2] in
-    let po = inv in
-    let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in
-    let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in
-    EcFol.f_forall [(v1, GTty f1.f_ty); (v2, GTty f2.f_ty)]
-      (f_equivS evs.es_ml evs.es_mr pr wl wr po)
-  in
+  (* let xwh = *)
+  (*   let v1, v2 = as_seq2 (EcEnv.LDecl.fresh_ids hyps ["v1_"; "v2_"]) in *)
+  (*   let fv1 = f_local v1 f1.f_ty in *)
+  (*   let fv2 = f_local v2 f2.f_ty in *)
+  (*   let ev1 = e_local v1 f1.f_ty in *)
+  (*   let ev2 = e_local v2 f2.f_ty in *)
+  (*   let eq1 = f_eq fv1 f1 and eq2 = f_eq fv2 f2 in *)
+  (*   let pr = f_ands [inv; fe; p0; eq1; eq2] in *)
+  (*   let po = inv in *)
+  (*   let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in *)
+  (*   let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in *)
+  (*   EcFol.f_forall [(v1, GTty f1.f_ty); (v2, GTty f2.f_ty)] *)
+  (*     (f_equivS evs.es_ml evs.es_mr pr wl wr po) *)
+  (* in *)
 
-  let hr1, hr2 =
-    let hr1 =
-      let subst = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
-      let inv   = Fsubst.f_subst subst inv in
-      let p0    = Fsubst.f_subst subst p0  in
-      let p1    = Fsubst.f_subst subst p1  in
+  (* let hr1, hr2 = *)
+  (*   let hr1 = *)
+  (*     let subst = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in *)
+  (*     let inv   = Fsubst.f_subst subst inv in *)
+  (*     let p0    = Fsubst.f_subst subst p0  in *)
+  (*     let p1    = Fsubst.f_subst subst p1  in *)
 
-      let pre = f_ands [inv; form_of_expr mhr el; f_not p0; p1] in
-      f_forall_mems [evs.es_mr]
-        (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv)
+  (*     let pre = f_ands [inv; form_of_expr mhr el; f_not p0; p1] in *)
+  (*     f_forall_mems [evs.es_mr] *)
+  (*       (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv) *)
 
-    and hr2 =
-      let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
-      let inv   = Fsubst.f_subst subst inv in
-      let p0    = Fsubst.f_subst subst p0  in
-      let p1    = Fsubst.f_subst subst p1  in
+  (*   and hr2 = *)
+  (*     let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in *)
+  (*     let inv   = Fsubst.f_subst subst inv in *)
+  (*     let p0    = Fsubst.f_subst subst p0  in *)
+  (*     let p1    = Fsubst.f_subst subst p1  in *)
 
-      let pre = f_ands [inv; form_of_expr mhr er; f_not p0; f_not p1] in
-      f_forall_mems [evs.es_ml]
-        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cr inv)
+  (*     let pre = f_ands [inv; form_of_expr mhr er; f_not p0; f_not p1] in *)
+  (*     f_forall_mems [evs.es_ml] *)
+  (*       (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cr inv) *)
 
-    in (hr1, hr2)
-  in
+  (*   in (hr1, hr2) *)
+  (* in *)
 
-  let xhyps =
-    let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in
+  (* let xhyps = *)
+  (*   let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in *)
 
-    fun m fp ->
-      let fp =
-        Mid.fold (fun mh pvs fp ->
-          let mty = Mid.find_opt mh mtypes in
-          let fp  =
-            EcPV.Mnpv.fold (fun pv (x, ty) fp ->
-              f_let1 x (f_pvar pv ty mh) fp)
-            (EcPV.PVMap.raw pvs) fp
-          in f_forall_mems [mh, oget mty] fp)
-        m fp
-      and cnt =
-        Mid.fold
-          (fun _ pvs i -> i + 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw pvs))
-          m 0
-      in (cnt, fp)
-  in
+  (*   fun m fp -> *)
+  (*     let fp = *)
+  (*       Mid.fold (fun mh pvs fp -> *)
+  (*         let mty = Mid.find_opt mh mtypes in *)
+  (*         let fp  = *)
+  (*           EcPV.Mnpv.fold (fun pv (x, ty) fp -> *)
+  (*             f_let1 x (f_pvar pv ty mh) fp) *)
+  (*           (EcPV.PVMap.raw pvs) fp *)
+  (*         in f_forall_mems [mh, oget mty] fp) *)
+  (*       m fp *)
+  (*     and cnt = *)
+  (*       Mid.fold *)
+  (*         (fun _ pvs i -> i + 1 + EcPV.Mnpv.cardinal (EcPV.PVMap.raw pvs)) *)
+  (*         m 0 *)
+  (*     in (cnt, fp) *)
+  (* in *)
 
-  let (c1, ll1), (c2, ll2) =
-    try
-      let ll1 =
-        let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
-        let inv     = Fsubst.f_subst subst inv in
-        let test    = f_ands [fe1; f_not p0; p1] in
-        let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_mr) ml test in
-        let c       = s_while (test, cl) in
-        xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
+  (* let (c1, ll1), (c2, ll2) = *)
+  (*   try *)
+  (*     let ll1 = *)
+  (*       let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in *)
+  (*       let inv     = Fsubst.f_subst subst inv in *)
+  (*       let test    = f_ands [fe1; f_not p0; p1] in *)
+  (*       let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_mr) ml test in *)
+  (*       let c       = s_while (test, cl) in *)
+  (*       xhyps m *)
+  (*         (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1) *)
 
-      and ll2 =
-        let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
-        let inv     = Fsubst.f_subst subst inv in
-        let test    = f_ands [fe1; f_not p0; f_not p1] in
-        let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_ml) mr test in
-        let c       = s_while (test, cr) in
-        xhyps m
-          (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
+  (*     and ll2 = *)
+  (*       let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in *)
+  (*       let inv     = Fsubst.f_subst subst inv in *)
+  (*       let test    = f_ands [fe1; f_not p0; f_not p1] in *)
+  (*       let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_ml) mr test in *)
+  (*       let c       = s_while (test, cr) in *)
+  (*       xhyps m *)
+  (*         (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1) *)
 
-      in (ll1, ll2)
+  (*     in (ll1, ll2) *)
 
-    with ASyncWhile.CannotTranslate ->
-      tc_error !!tc
-        "async-while linking predicates cannot be converted to expressions"
-  in
+  (*   with ASyncWhile.CannotTranslate -> *)
+  (*     tc_error !!tc *)
+  (*       "async-while linking predicates cannot be converted to expressions" *)
+  (* in *)
 
-  let concl =
-    let post  = f_imps [f_not fe1; f_not fe2; inv] evs.es_po in
-    let modil = s_write env cl in
-    let modir = s_write env cr in
-    let post  = generalize_mod env mr modir post in
-    let post  = generalize_mod env ml modil post in
-    f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = f_and inv post; } in
+  (* let concl = *)
+  (*   let post  = f_imps [f_not fe1; f_not fe2; inv] evs.es_po in *)
+  (*   let modil = s_write env cl in *)
+  (*   let modir = s_write env cr in *)
+  (*   let post  = generalize_mod env mr modir post in *)
+  (*   let post  = generalize_mod env ml modil post in *)
+  (*   f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = f_and inv post; } in *)
 
-  FApi.t_onfsub (function
-    | 6 -> Some (EcLowGoal.t_intros_n c1)
-    | 7 -> Some (EcLowGoal.t_intros_n c2)
-    | _ -> None)
+  (* FApi.t_onfsub (function *)
+  (*   | 6 -> Some (EcLowGoal.t_intros_n c1) *)
+  (*   | 7 -> Some (EcLowGoal.t_intros_n c2) *)
+  (*   | _ -> None) *)
 
-    (FApi.xmutate1
-       tc `AsyncWhile
-         [cond1; cond2; cond3; hr1; hr2; xwh; ll1; ll2; concl])
+  (*   (FApi.xmutate1 *)
+  (*      tc `AsyncWhile *)
+  (*        [cond1; cond2; cond3; hr1; hr2; xwh; ll1; ll2; concl]) *)

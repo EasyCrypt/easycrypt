@@ -134,49 +134,49 @@ let t_eager_seq_r i j eqR h tc =
     (FApi.xmutate1 tc `EagerSeq [tH; a; b; c])
 
 (* -------------------------------------------------------------------- *)
-let t_eager_if_r tc =
-  let hyps = FApi.tc1_hyps tc in
-  let es   = tc1_as_equivS tc in
+let t_eager_if_r _tc = assert false
+  (* let hyps = FApi.tc1_hyps tc in *)
+  (* let es   = tc1_as_equivS tc in *)
 
-  let (e , c1 , c2 ), s  = pf_last_if  !!tc es.es_sl in
-  let (e', c1', c2'), s' = pf_first_if !!tc es.es_sr in
+  (* let (e , c1 , c2 ), s  = pf_last_if  !!tc es.es_sl in *)
+  (* let (e', c1', c2'), s' = pf_first_if !!tc es.es_sr in *)
 
-  let fel = form_of_expr (fst es.es_ml) e in
-  let fer = form_of_expr (fst es.es_mr) e' in
-  let fe  = form_of_expr mhr e in
+  (* let fel = form_of_expr (fst es.es_ml) e in *)
+  (* let fer = form_of_expr (fst es.es_mr) e' in *)
+  (* let fe  = form_of_expr mhr e in *)
 
-  let m2 = as_seq1 (LDecl.fresh_ids hyps ["&m2"]) in
+  (* let m2 = as_seq1 (LDecl.fresh_ids hyps ["&m2"]) in *)
 
-  let aT =
-    f_forall
-      [(mleft, GTmem (snd es.es_ml)); (mright, GTmem (snd es.es_mr))]
-      (f_imp es.es_pr (f_eq fel fer)) in
+  (* let aT = *)
+  (*   f_forall *)
+  (*     [(mleft, GTmem (snd es.es_ml)); (mright, GTmem (snd es.es_mr))] *)
+  (*     (f_imp es.es_pr (f_eq fel fer)) in *)
 
-  let bT =
-    let b   = EcIdent.create "b1" in
-    let eqb = f_eq fe (f_local b tbool) in
-    let sub = Fsubst.f_subst_id in
-    let sub = Fsubst.f_bind_mem sub mleft  mhr in
-    let sub = Fsubst.f_bind_mem sub mright m2 in
-    let p   = Fsubst.f_subst sub es.es_pr in
+  (* let bT = *)
+  (*   let b   = EcIdent.create "b1" in *)
+  (*   let eqb = f_eq fe (f_local b tbool) in *)
+  (*   let sub = Fsubst.f_subst_id in *)
+  (*   let sub = Fsubst.f_bind_mem sub mleft  mhr in *)
+  (*   let sub = Fsubst.f_bind_mem sub mright m2 in *)
+  (*   let p   = Fsubst.f_subst sub es.es_pr in *)
 
-    f_forall
-      [(m2, GTmem (snd es.es_mr)); (b, GTty tbool)]
-      (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
+  (*   f_forall *)
+  (*     [(m2, GTmem (snd es.es_mr)); (b, GTty tbool)] *)
+  (*     (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in *)
 
-  let cT =
-    let pre = f_and es.es_pr (f_eq fel f_true) in
-    let st  = stmt (s.s_node @ c1.s_node) in
-    let st' = stmt (c1'.s_node @ s'.s_node) in
-    f_equivS es.es_ml es.es_mr pre st st' es.es_po in
+  (* let cT = *)
+  (*   let pre = f_and es.es_pr (f_eq fel f_true) in *)
+  (*   let st  = stmt (s.s_node @ c1.s_node) in *)
+  (*   let st' = stmt (c1'.s_node @ s'.s_node) in *)
+  (*   f_equivS es.es_ml es.es_mr pre st st' es.es_po in *)
 
-  let dT =
-    let pre = f_and es.es_pr (f_eq fel f_false) in
-    let st  = stmt (s.s_node @ c2.s_node) in
-    let st' = stmt (c2'.s_node @ s'.s_node) in
-    f_equivS es.es_ml es.es_mr pre st st' es.es_po in
+  (* let dT = *)
+  (*   let pre = f_and es.es_pr (f_eq fel f_false) in *)
+  (*   let st  = stmt (s.s_node @ c2.s_node) in *)
+  (*   let st' = stmt (c2'.s_node @ s'.s_node) in *)
+  (*   f_equivS es.es_ml es.es_mr pre st st' es.es_po in *)
 
-  FApi.xmutate1 tc `EagerIf [aT; bT; cT; dT]
+  (* FApi.xmutate1 tc `EagerIf [aT; bT; cT; dT] *)
 
 (* -------------------------------------------------------------------- *)
 let t_eager_while_r h tc =

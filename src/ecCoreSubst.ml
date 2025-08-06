@@ -456,14 +456,16 @@ module Fsubst = struct
       let s     = f_rem_mem s mhr in
       let hf_pr = f_subst ~tx s hf.hf_pr in
       let hf_po = f_subst ~tx s hf.hf_po in
-      f_hoareF hf_pr hf_f hf_po
+      let hf_poe  = List.map (fun (e,f) -> e, f_subst ~tx s f) hf.hf_poe in
+      f_hoareF hf_pr hf_f hf_po hf_poe
 
     | FhoareS hs ->
       let hs_s    = s_subst s hs.hs_s in
       let s, hs_m = add_me_binding s hs.hs_m in
       let hs_pr   = f_subst ~tx s hs.hs_pr in
       let hs_po   = f_subst ~tx s hs.hs_po in
-      f_hoareS hs_m hs_pr hs_s hs_po
+      let hs_poe  = List.map (fun (e,f) -> e, f_subst ~tx s f) hs.hs_poe in
+      f_hoareS hs_m hs_pr hs_s hs_po hs_poe
 
     | FeHoareF hf ->
       let hf_f  = x_subst s hf.ehf_f in

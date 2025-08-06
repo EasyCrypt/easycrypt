@@ -1471,6 +1471,13 @@ let trans_gamepath (env : EcEnv.env) gp =
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath mpath funsymb
 
+let except_genpath env name =
+  let modsymb = List.map (unloc -| fst) (fst (unloc name))
+  and symb = unloc (snd (unloc name)) in
+  match EcEnv.Except.lookup_opt (modsymb, symb) env with
+  | None -> tyerror name.pl_loc env (UnknownExceptionName (modsymb, symb))
+  | Some (p,_) -> symb, p
+
 (* -------------------------------------------------------------------- *)
 let trans_oracle (env : EcEnv.env) (m,f) =
   let msymbol = mk_loc (loc m) [m,None] in
@@ -2753,23 +2760,13 @@ and transinstr
     end
 
   | PSraise (name, args) ->
-
-    let modsymb = List.map (unloc -| fst) (fst (unloc name))
-    and funsymb = unloc (snd (unloc name)) in
-    let path =
-      match EcEnv.Except.lookup_opt (modsymb, funsymb) env with
-      | None -> tyerror name.pl_loc env (UnknownExceptionName (modsymb, funsymb))
-      | Some (p,_) -> p
-    in
+    let funsymb,path = except_genpath env name in
     let esig  = (EcEnv.Except.by_path path env).e_typargs in
-    let args = unloc args in
-    let loc = name.pl_loc in
     let aux (_,s) =
       match Sp.elements s with
       | [recp]    -> recp
       | _ -> assert false
     in
-
     let paths = List.map aux esig in
     let indty =
       List.map (fun path ->
@@ -2786,6 +2783,8 @@ and transinstr
     in
     let typs = List.flatten ind in
 
+    let args = unloc args in
+    let loc = name.pl_loc in
     let args =
       if List.length args <> List.length typs then
         tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
@@ -3491,7 +3490,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
-    | PFhoareF (pre, gp, post) ->
+    | PFhoareF (pre, gp, post, eposts) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
@@ -3499,9 +3498,19 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
-          unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
-          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF pre' fpath post'
+        let epost' =
+          List.map (fun (e,f) ->
+              let symb,_ = except_genpath env e in
+              EcIdent.create symb,transf qenv f
+            ) eposts
+        in
+
+        unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre'.f_ty;
+        unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+        List.iter
+          (fun (_,f) -> unify_or_fail qenv ue post.pl_loc ~expct:tbool f.f_ty)
+          epost';
+        f_hoareF pre' fpath post' epost'
 
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then
