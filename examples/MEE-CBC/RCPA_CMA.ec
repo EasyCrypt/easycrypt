@@ -336,7 +336,7 @@ theory EtM.
     type leaks           <- leaks,
     op   leak            <- leak,
     op   dC    (l:leaks) <- (dC l) `*` (MUnit.dunit witness<:tag>)
-  proof * by smt.
+  proof * by smt(dC_ll dprod_ll dunit_ll).
 
   (** The black-box construction is as follows **)
   module EtM(E:SKEa.Enc_Scheme, M:MACa.MAC_Scheme): Enc_Scheme = {
