@@ -196,19 +196,19 @@ module Core = struct
         bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)]
     in
     let subgoals = match tac_info, bhs.bhs_cmp with
-      | PNoRndParams, FHle -> assert false
-        (* if is_post_indep then *)
-        (*   (\* event is true *\) *)
-        (*   let concl = f_bdHoareS_r {bhs with bhs_s=s} in *)
-        (*   [concl] *)
-        (* else *)
-        (*   let event = mk_event ty_distr in *)
-        (*   let bounded_distr = f_real_le (f_mu env distr event) bound in *)
-        (*   let pre = f_and bhs.bhs_pr pre_bound in *)
-        (*   let post = f_anda bounded_distr (mk_event_cond event) in *)
-        (*   let concl = f_hoareS bhs.bhs_m pre s post in *)
-        (*   let concl = f_forall_simpl binders concl in *)
-          (* [concl] *)
+      | PNoRndParams, FHle ->
+        if is_post_indep then
+          (* event is true *)
+          let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+          [concl]
+        else
+          let event = mk_event ty_distr in
+          let bounded_distr = f_real_le (f_mu env distr event) bound in
+          let pre = f_and bhs.bhs_pr pre_bound in
+          let post = f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_hoareS bhs.bhs_m pre s post [] in
+          let concl = f_forall_simpl binders concl in
+          [concl]
       | PNoRndParams, _ ->
         if is_post_indep then
           (* event is true *)
@@ -225,14 +225,14 @@ module Core = struct
           let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
           let concl = f_forall_simpl binders concl in
           [concl]
-      | PSingleRndParam event, FHle -> assert false
-          (* let event = event ty_distr in *)
-          (* let bounded_distr = f_real_le (f_mu env distr event) bound in *)
-          (* let pre = f_and bhs.bhs_pr pre_bound in *)
-          (* let post = f_anda bounded_distr (mk_event_cond event) in *)
-          (* let concl = f_hoareS bhs.bhs_m pre s post in *)
-          (* let concl = f_forall_simpl binders concl in *)
-          (* [concl] *)
+      | PSingleRndParam event, FHle ->
+          let event = event ty_distr in
+          let bounded_distr = f_real_le (f_mu env distr event) bound in
+          let pre = f_and bhs.bhs_pr pre_bound in
+          let post = f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_hoareS bhs.bhs_m pre s post [] in
+          let concl = f_forall_simpl binders concl in
+          [concl]
       | PSingleRndParam event, _ ->
           let event = event ty_distr in
           let bounded_distr = f_cmp (f_mu env distr event) bound in

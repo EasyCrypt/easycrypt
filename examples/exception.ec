@@ -5,13 +5,16 @@ exception tata.
 
 module M ={
   proc truc (x:int) : int = {
-  raise toto;
+    if (x = 3)  {raise toto;} else{ x <- 5; }
   return x;
   }
 }.
 
 lemma truc :
-hoare [M.truc : true ==> (res = 1) | toto:(res = 1) |tata:(res=2) ].
+hoare [M.truc : true ==> (4 < res) | toto:(res = 3) |tata:(res=2) ].
     proof.
-    proc.
-    wp.
+      proc.
+      conseq (: _ ==> x = 5).
+      + smt.
+      + auto.
+    qed.

@@ -35,52 +35,52 @@ let t_ehoare_app_r i f tc =
 let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
 
 (* -------------------------------------------------------------------- *)
-let t_bdhoare_app_r_low _i (_phi, _pR, _f1, _f2, _g1, _g2) _tc = assert false
-  (* let env = FApi.tc1_env tc in *)
-  (* let bhs = tc1_as_bdhoareS tc in *)
-  (* let s1, s2 = s_split env i bhs.bhs_s in *)
-  (* let s1, s2 = stmt s1, stmt s2 in *)
-  (* let nR = f_not pR in *)
-  (* let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in *)
-  (* let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd = f1; } in *)
-  (* let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd = g1; } in *)
-  (* let condf2 = f_bdHoareS_r *)
-  (*   { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR; bhs_bd = f2; } in *)
-  (* let condg2 = f_bdHoareS_r *)
-  (*   { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR; bhs_bd = g2; } in *)
-  (* let bd = *)
-  (*   (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in *)
-  (* let condbd = *)
-  (*   match bhs.bhs_cmp with *)
-  (*   | FHle -> f_real_le bd bhs.bhs_bd *)
-  (*   | FHeq -> f_eq bd bhs.bhs_bd *)
-  (*   | FHge -> f_real_le bhs.bhs_bd bd in *)
-  (* let condbd = f_imp bhs.bhs_pr condbd in *)
-  (* let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in *)
-  (* let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in *)
-  (* let condnm = *)
-  (*   let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in *)
-  (*   f_forall *)
-  (*     [(ir1, GTty treal); (ir2, GTty treal)] *)
-  (*     (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in *)
-  (* let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in *)
-  (* let conds = *)
-  (*   if   f_equal g1 f_r0 *)
-  (*   then condg1 :: conds *)
-  (*   else if   f_equal g2 f_r0 *)
-  (*        then condg2 :: conds *)
-  (*        else condg1 :: condg2 :: conds in *)
+let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
+  let env = FApi.tc1_env tc in
+  let bhs = tc1_as_bdhoareS tc in
+  let s1, s2 = s_split env i bhs.bhs_s in
+  let s1, s2 = stmt s1, stmt s2 in
+  let nR = f_not pR in
+  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi [] in
+  let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd = f1; } in
+  let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd = g1; } in
+  let condf2 = f_bdHoareS_r
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR; bhs_bd = f2; } in
+  let condg2 = f_bdHoareS_r
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR; bhs_bd = g2; } in
+  let bd =
+    (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
+  let condbd =
+    match bhs.bhs_cmp with
+    | FHle -> f_real_le bd bhs.bhs_bd
+    | FHeq -> f_eq bd bhs.bhs_bd
+    | FHge -> f_real_le bhs.bhs_bd bd in
+  let condbd = f_imp bhs.bhs_pr condbd in
+  let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
+  let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
+  let condnm =
+    let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in
+    f_forall
+      [(ir1, GTty treal); (ir2, GTty treal)]
+      (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs []) in
+  let conds = [f_forall_mems [bhs.bhs_m] condbd; condnm] in
+  let conds =
+    if   f_equal g1 f_r0
+    then condg1 :: conds
+    else if   f_equal g2 f_r0
+         then condg2 :: conds
+         else condg1 :: condg2 :: conds in
 
-  (* let conds = *)
-  (*   if   f_equal f1 f_r0 *)
-  (*   then condf1 :: conds *)
-  (*   else if   f_equal f2 f_r0 *)
-  (*        then condf2 :: conds *)
-  (*        else condf1 :: condf2 :: conds in *)
+  let conds =
+    if   f_equal f1 f_r0
+    then condf1 :: conds
+    else if   f_equal f2 f_r0
+         then condf2 :: conds
+         else condf1 :: condf2 :: conds in
 
-  (* let conds = cond_phi :: conds in *)
+  let conds = cond_phi :: conds in
 
-  (* FApi.xmutate1 tc `HlApp conds *)
+  FApi.xmutate1 tc `HlApp conds
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_app_r i info tc =

@@ -17,26 +17,26 @@ module LowInternal = struct
       (let1::lets, f)
 
   let rec wp_stmt
-      onesided c_pre env memenv (stmt: EcModules.instr list) letsf
+      onesided c_pre env memenv (stmt: EcModules.instr list) letsf epost
   =
     match stmt with
     | [] -> (stmt, letsf)
     | i :: stmt' ->
         try
-          let letsf = wp_instr onesided c_pre env memenv i letsf in
-          wp_stmt onesided c_pre env memenv stmt' letsf
+          let letsf = wp_instr onesided c_pre env memenv i letsf epost in
+          wp_stmt onesided c_pre env memenv stmt' letsf epost
         with No_wp -> (stmt, letsf)
 
-  and wp_instr onesided c_pre env memenv i letsf =
+  and wp_instr onesided c_pre env memenv i letsf epost =
     match i.i_node with
     | Sasgn (lv,e) ->
       wp_asgn_aux c_pre memenv lv e letsf
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1) =
-          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf in
+          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf epost in
         let (r2,letsf2) =
-          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf in
+          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf epost in
         if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
@@ -49,7 +49,7 @@ module LowInternal = struct
     | Smatch (e, bs) -> begin
         let wps =
           let do1 (_, s) =
-            wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf in
+            wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf epost in
           List.map do1 bs
         in
 
@@ -70,10 +70,14 @@ module LowInternal = struct
         ([],post)
       end
 
-    | Sraise _ when onesided -> assert false
-        (* let phi = form_of_expr (EcMemory.memory memenv) e in *)
-        (* let lets, f = letsf in *)
-        (* (lets, EcFol.f_and_simpl phi f) *)
+    | Sraise (e,_) when onesided ->
+      let _,f =
+        List.find
+          (fun ((e',_):(memory * form)) ->
+             String.equal (EcIdent.name e) (EcIdent.name e'))
+          epost
+      in
+      ([], f)
 
     | _ -> raise No_wp
 
@@ -120,10 +124,10 @@ module LowInternal = struct
 
 end
 
-let wp ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
+let wp ?(uselet=true) ?(onesided=false) ?c_pre env m s post epost =
   let (r, letsf) =
     LowInternal.wp_stmt
-      onesided c_pre env m (List.rev s.s_node) ([], post)
+      onesided c_pre env m (List.rev s.s_node) ([], post) epost
   in
   let pre = mk_let_of_lv_substs ~uselet env letsf in
   List.rev r, pre
@@ -145,7 +149,7 @@ module TacInternal = struct
     let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
     let s_wp, post =
-      wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po in
+      wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po hs.hs_poe in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
@@ -167,7 +171,7 @@ module TacInternal = struct
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = o_split env i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
+    let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po [] in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
@@ -182,8 +186,8 @@ module TacInternal = struct
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
-    let s_wpl, post = wp ~uselet env meml s_wpl post in
-    let s_wpr, post = wp ~uselet env memr s_wpr post in
+    let s_wpl, post = wp ~uselet env meml s_wpl post [] in
+    let s_wpr, post = wp ~uselet env memr s_wpr post [] in
     check_wp_progress tc i es.es_sl s_wpl;
     check_wp_progress tc j es.es_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
@@ -217,7 +221,7 @@ let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
 
 (* -------------------------------------------------------------------- *)
 let typing_wp env m s f =
-  match wp ~onesided:true env m s f with
+  match wp ~onesided:true env m s f [] with
   | [], f -> Some f | _, _ -> None
 
 let () = EcTyping.wp := Some typing_wp
