@@ -209,6 +209,7 @@ module type CircuitInterface = sig
   val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list * (int * int)
   val permute : int -> (int -> int) -> cbitstring cfun -> cbitstring cfun
   val align_inputs : circuit -> (int * int) option list -> circuit
+  val circuit_slice : circuit -> int -> int -> circuit
 
   (* Wraps the backend call to deal with args/inputs *)
   module CircuitSpec : sig
@@ -1621,6 +1622,21 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CTuple (r, ws) -> (`CTuple (Backend.applys aligner r, ws), inps)
     | `CBool b -> (`CBool (Backend.apply aligner b), inps)
 
+  let circuit_slice ((c, inps): circuit) (sz: width) (offset: int) =
+    match c with 
+    | `CArray (r, w) when sz mod w = 0 && offset mod w = 0 -> `CArray (Backend.slice r offset sz, w), inps
+    | `CArray (r, w) -> 
+        Format.eprintf "Flattening array to bitstring in order to slice@.";
+        `CBitstring (Backend.slice r offset sz), inps
+    | `CBitstring r -> 
+        `CBitstring (Backend.slice r offset sz), inps
+    | `CTuple (r, szs) -> 
+        Format.eprintf "Cannot slice tuple circuit@.";
+        assert false
+    | `CBool b -> 
+        Format.eprintf "Cannot slice boolean circuit@.";
+        assert false
+
   let split_renamer (n: count) (in_w: width) (inp: cinp) : (cinp array) * (Backend.inp -> cbool_type option) =
     match inp with
     | {type_ = `CIBitstring w; id} when w mod in_w = 0 ->
@@ -1940,6 +1956,7 @@ let circuit_of_form
       else
         let hyps, circ = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper (Some (OP_Plain f)) -> 
+(*             Format.eprintf "[BDEP] Opening definition of function at path %s" (EcPath.tostring pth); *)
           doit cache hyps f
         | _ when pth = EcCoreLib.CI_Witness.p_witness ->
           assert false;
@@ -2304,7 +2321,8 @@ let circuit_has_uninitialized = circuit_has_uninitialized
 let circuit_aggregate_inps = 
   circuit_aggregate_inputs
 
-let circuit_slice (c: circuit) (sz: int) (offset: int) = assert false
+let circuit_slice (c: circuit) (sz: int) (offset: int) = 
+  circuit_slice c sz offset
 
 (* FIXME: this should use ids instead of strings *)
 let circuit_align_inputs = 
