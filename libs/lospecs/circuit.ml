@@ -692,7 +692,8 @@ let smod (s : reg) (t : reg) : reg =
 (* -------------------------------------------------------------------- *)
 let rol (r: reg) (s: reg) : reg =
   let size = List.length r in
-  let s = umod s (of_int ~size size) in
+  let s = umod s (of_int ~size size) in (* so 0 <= s < size *)
+  let s = List.take size s |> uextend ~size in (* by above, ln s < size *)
   lor_ (shift ~side:`L ~sign:`L r s) (shift ~side:`R ~sign:`L r (sub_dropc (of_int ~size size) s)) 
 
 (* -------------------------------------------------------------------- *)
