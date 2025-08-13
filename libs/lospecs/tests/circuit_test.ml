@@ -201,10 +201,15 @@ let test_rot ~(side : [`L | `R]) =
     let module M = (val Word.word ~sign:`U ~size) in
 
     let sim (v : int) (i : int) =
-      assert false
+      let i = i mod size in
+      let m = (1 lsl size) - 1 in
+      let v = v land m in
+      match side with
+      | `L -> ((v lsl i) lor (v lsr (size - i))) land m
+      | `R -> ((v lsr i) lor (v lsl (size - i))) land m
     in
 
-    { name = (Format.sprintf "shift<%s,%d>" str_side size)
+    { name = (Format.sprintf "rot<%s,%d>" str_side size)
     ; args = [(size, `U); (4, `U)]
     ; out  = `U
     ; mk   = (fun rs -> let x, y = as_seq2 rs in match side with

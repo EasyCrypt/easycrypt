@@ -679,15 +679,20 @@ let srem (s : reg) (t : reg) : reg =
 
 (* -------------------------------------------------------------------- *)
 let smod (s : reg) (t : reg) : reg =  
+  ite (iszero t) s @@
   let msb_s, _ = split_msb s in
   let msb_t, _ = split_msb t in
 
-  mux2_2reg
-    ~k00:(               (umod (    s) (    t))   )
-    ~k10:(add_dropc (opp (umod (opp s) (    t))) t)
-    ~k01:(add_dropc (opp (umod (    s) (opp t))) t)
-    ~k11:(               (umod (opp s) (opp t))   )
-    (msb_s, msb_t)
+  let u = umod (abs s) (abs t) in
+
+  ite (iszero u)
+  u
+  (mux2_2reg
+    ~k00:(               u   )
+    ~k10:(add_dropc (opp u) t)
+    ~k01:(add_dropc (    u) t)
+    ~k11:(          (opp u)  )
+    (msb_s, msb_t))
 
 (* -------------------------------------------------------------------- *)
 let rol (r: reg) (s: reg) : reg =
@@ -699,7 +704,8 @@ let rol (r: reg) (s: reg) : reg =
 (* -------------------------------------------------------------------- *)
 let ror (r: reg) (s: reg) : reg =
   let size = List.length r in
-  let s = umod s (of_int ~size size) in
+  let s = umod s (of_int ~size size) in (* so 0 <= s < size *)
+  let s = List.take size s |> uextend ~size in (* by above, ln s < size *)
   lor_ (shift ~side:`R ~sign:`L r s) (shift ~side:`L ~sign:`L r (sub_dropc (of_int ~size size) s)) 
 
 (* -------------------------------------------------------------------- *)
