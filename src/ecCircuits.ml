@@ -307,6 +307,7 @@ module type CBackend = sig
 
   val flatten : reg list -> reg
 
+
   module Deps : sig
     type deps
     type block_deps
@@ -326,6 +327,8 @@ module type CBackend = sig
     val single_dep : deps -> bool
     (* Assumes single_dep *)
     val dep_range : deps -> int * int
+    (* Checks if all the deps are in a given list of inputs *)
+    val check_inputs : reg -> (int * int) list -> bool
   end
 end
 
@@ -492,6 +495,8 @@ module TestBack : CBackend = struct
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
 
+
+
   module Deps = struct 
     type dep = (int, int Set.t) Map.t
     type deps = dep array
@@ -607,6 +612,18 @@ module TestBack : CBackend = struct
       Set.iter (fun i -> Format.eprintf "%d " i) idxs;
       Format.eprintf "@.Min: %d | Max: %d@." (Set.min_elt idxs) (Set.max_elt idxs);
       (Set.min_elt idxs, Set.max_elt idxs + 1)
+
+    (* Checks that all dependencies of r are in the set inps *)
+    (* Each elements of inps is (id, width) *)
+    let check_inputs (r: reg) (inps: (int * int) list) : bool = 
+      let ds = deps_of_reg r in
+      Array.for_all (fun d -> 
+        Map.for_all (fun id b ->
+          match List.find_opt (fun (id_, _) -> id = id_) inps with
+          | Some (_, b_) -> Set.for_all (fun b -> 0 <= b && b < b_) b
+          | None -> false
+        ) d
+      ) ds 
   end
 
 end
@@ -1651,6 +1668,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         assert false
     | _ -> assert false
 
+  let check_decomp_inputs ((`CBitstring r, inps): cbitstring cfun) : bool = 
+    let inps = List.map (function
+      | {type_ = `CIBitstring w; id} -> 
+        (id, w)
+      | _ -> assert false
+    ) inps in
+    Backend.Deps.check_inputs r inps
+
+  (* FIXME: what is the last return value for? *)
   let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list * (int * int) = 
     if not (is_decomposable in_w out_w c) then 
       let deps = Backend.Deps.block_deps_of_reg out_w r in
@@ -1664,10 +1690,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let cinp = (List.hd inps) in
     let cinps, renamer = split_renamer n in_w cinp in
 (*     let renamer = fun i -> Option.bind (aligner i) renamer in  *)
-    Array.map2 (fun r inp ->
+    let res = Array.map2 (fun r inp ->
       let r = Backend.applys renamer r in
       (`CBitstring r, [inp])
     ) blocks cinps |> Array.to_list, (0,0)
+    in
+    if not (List.for_all check_decomp_inputs (fst res)) then assert false else
+    res
 
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     `CBitstring (Backend.permute w perm r), inps
