@@ -16,6 +16,9 @@
 
 /* -------------------------------------------------------------------- */
 extern "C" {
+CAMLprim value caml_mm256_permutevar8x32_epi32(value, value);
+CAMLprim value caml_mm256_permute4x64_epi64_dyn(value, value);
+CAMLprim value caml_mm256_permute2x128_si256_dyn(value, value, value);
 CAMLprim value m64_of_32x2(value);
 CAMLprim value m64_to_32x2(value);
 CAMLprim value m32_of_16x2(value lohi);
@@ -34,17 +37,19 @@ CAMLprim value caml_mm256_packus_epi16(value, value);
 CAMLprim value caml_mm256_packs_epi16(value, value);
 CAMLprim value caml_mm256_mulhi_epu16(value, value);
 CAMLprim value caml_mm256_mulhrs_epi16(value, value);
-CAMLprim value caml_mm256_permutevar8x32_epi32(value, value);
-CAMLprim value caml_mm256_permute4x64_epi64_dyn(value, value);
 CAMLprim value caml_mm256_shuffle_epi8(value, value);
 CAMLprim value caml_mm256_srai_epi16(value, value);
 CAMLprim value caml_mm256_srli_epi16(value, value);
 CAMLprim value caml_mm256_cmpgt_epi16(value, value);
 CAMLprim value caml_mm256_movemask_epi8(value);
 CAMLprim value caml_mm256_unpacklo_epi8(value, value);
+CAMLprim value caml_mm256_unpacklo_epi64(value, value);
+CAMLprim value caml_mm256_unpackhi_epi64(value, value);
 CAMLprim value caml_mm256_inserti128_si256_dyn(value, value, value);
 CAMLprim value caml_mm256_extracti128_si256_dyn(value, value);
 CAMLprim value caml_mm256_blend_epi16_dyn(value, value, value);
+CAMLprim value caml_mm256_blend_epi32_dyn(value, value, value);
+CAMLprim value caml_mm256_moveldup_ps(value);
 }
 
 /* ==================================================================== */

@@ -8,6 +8,7 @@ type symbol = string
 module type S = sig
   val vpermd : reg -> reg -> reg
   val vpermq : reg -> int -> reg
+  val vperm2i128 : reg -> reg -> int -> reg
   val vpbroadcast_16u16 : reg -> reg
   val vpadd_16u16 : reg -> reg -> reg
   val vpadd_32u8 : reg -> reg -> reg
@@ -28,20 +29,24 @@ module type S = sig
   val vpcmpgt_16u16 : reg -> reg -> reg
   val vpmovmskb_u256u64 : reg -> reg
   val vpunpckl_32u8 : reg -> reg -> reg
+  val vpunpckl_4u64 : reg -> reg -> reg
+  val vpunpckh_4u64 : reg -> reg -> reg
   val vpextracti128 : reg -> int -> reg
   val vpinserti128 : reg -> reg -> int -> reg
   val vpblend_16u16 : reg -> reg -> int -> reg
+  val vpblend_8u32 : reg -> reg -> int -> reg
   val vpslldq_256 : reg -> int -> reg
   val vpsrldq_256 : reg -> int -> reg
   val vpslldq_128 : reg -> int -> reg
   val vpsrldq_128 : reg -> int -> reg
+  val vmovsldup_256 : reg -> reg
 end
 
 (* ==================================================================== *)
 module FromSpec () : S = struct
   (* ------------------------------------------------------------------ *)
   let specs =
-    let specs = Filename.concat (List.hd Config.Sites.specs) "avx2.spec" in
+    let specs = "/home/ubuntu/easycrypt/libs/lospecs/specs/avx2.spec" in (* Filename.concat (List.hd Config.Sites.specs) "avx2.spec" in *)
     let specs = Circuit_spec.load_from_file ~filename:specs in
     let specs = BatMap.of_seq (List.to_seq specs) in
     specs
@@ -60,6 +65,12 @@ module FromSpec () : S = struct
 
   let vpermq (r : reg) (i : int) : reg =
     Circuit_spec.circuit_of_specification [r; Circuit.w8 i] vpermq
+
+  (* ------------------------------------------------------------------ *)
+  let vperm2i128 = Option.get (get_specification "VPERM2I128")
+
+  let vperm2i128 (r1 : reg)  (r2 : reg) (i : int) : reg =
+    Circuit_spec.circuit_of_specification [r1; r2; Circuit.w8 i] vperm2i128
 
   (* ------------------------------------------------------------------ *)
   let vpbroadcast_16u16 = Option.get (get_specification "VPBROADCAST_16u16")
@@ -125,25 +136,25 @@ module FromSpec () : S = struct
   let vpsra_16u16 = Option.get (get_specification "VPSRA_16u16")
 
   let vpsra_16u16 (r : reg) (n : int) : reg =
-    Circuit_spec.circuit_of_specification [r; Circuit.w8 n] vpsra_16u16
+    Circuit_spec.circuit_of_specification [r; Circuit.w128 (string_of_int n)] vpsra_16u16
 
   (* ------------------------------------------------------------------ *)
   let vpsrl_16u16 = Option.get (get_specification "VPSRL_16u16")
 
   let vpsrl_16u16 (r : reg) (n : int) : reg =
-    Circuit_spec.circuit_of_specification [r; Circuit.w8 n] vpsrl_16u16
+    Circuit_spec.circuit_of_specification [r; Circuit.w128 (string_of_int n)] vpsrl_16u16
 
   (* ------------------------------------------------------------------ *)
   let vpsrl_4u64 = Option.get (get_specification "VPSRL_4u64")
 
   let vpsrl_4u64 (r : reg) (n : int) : reg =
-    Circuit_spec.circuit_of_specification [r; Circuit.w8 n] vpsrl_4u64
+    Circuit_spec.circuit_of_specification [r; Circuit.w128 (string_of_int n)] vpsrl_4u64
 
   (* ------------------------------------------------------------------ *)
   let vpsll_4u64 = Option.get (get_specification "VPSLL_4u64")
 
   let vpsll_4u64 (r : reg) (n : int) : reg =
-    Circuit_spec.circuit_of_specification [r; Circuit.w8 n] vpsll_4u64
+    Circuit_spec.circuit_of_specification [r; Circuit.w128 (string_of_int n)] vpsll_4u64
 
   (* ------------------------------------------------------------------ *)
   let vpslldq_256 = Option.get (get_specification "VPSLLDQ_256")
@@ -206,6 +217,18 @@ module FromSpec () : S = struct
     Circuit_spec.circuit_of_specification [r1; r2] vpunpckl_32u8
 
   (* ------------------------------------------------------------------ *)
+  let vpunpckl_4u64 = Option.get (get_specification "VPUNPCKL_4u64")
+
+  let vpunpckl_4u64 (r1 : reg) (r2 : reg): reg =
+    Circuit_spec.circuit_of_specification [r1; r2] vpunpckl_4u64
+
+  (* ------------------------------------------------------------------ *)
+  let vpunpckh_4u64 = Option.get (get_specification "VPUNPCKH_4u64")
+
+  let vpunpckh_4u64 (r1 : reg) (r2 : reg): reg =
+    Circuit_spec.circuit_of_specification [r1; r2] vpunpckh_4u64
+
+  (* ------------------------------------------------------------------ *)
   let vpextracti128 = Option.get (get_specification "VPEXTRACTI128")
 
   let vpextracti128 (r : reg) (i : int): reg =
@@ -222,4 +245,17 @@ module FromSpec () : S = struct
 
   let vpblend_16u16 (r1 : reg) (r2 : reg) (i : int): reg =
     Circuit_spec.circuit_of_specification [r1; r2; Circuit.w8 i] vpblend_16u16
+
+  (* ------------------------------------------------------------------ *)
+  let vpblend_8u32 = Option.get (get_specification "VPBLEND_8u32")
+
+  let vpblend_8u32 (r1 : reg) (r2 : reg) (i : int): reg =
+    Circuit_spec.circuit_of_specification [r1; r2; Circuit.w8 i] vpblend_8u32
+
+ (* ------------------------------------------------------------------ *)
+  let vmovsldup_256 = Option.get (get_specification "VMOVSLDUP_256")
+
+  let vmovsldup_256 (r : reg) : reg =
+    Circuit_spec.circuit_of_specification [r] vmovsldup_256
+
 end

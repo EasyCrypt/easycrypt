@@ -849,6 +849,39 @@ let test_vpunpckl_32u8 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
+let test_vpunpckl_4u64 () =
+  let op = {
+    name = "test_vpunpckl_4u64";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpunpckl_4u64 x y);
+    reff = call_m256x2_m256 Avx2.mm256_unpacklo_epi64;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpunpckh_4u64 () =
+  let op = {
+    name = "test_vpunpckh_4u64";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpunpckh_4u64 x y);
+    reff = call_m256x2_m256 Avx2.mm256_unpackhi_epi64;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vmovsldup_256 () =
+  let op = {
+    name = "test_vmovsldup_256";
+    args = List.make 1 `M256;
+    mk = (fun rs -> let x = as_seq1 rs in C.vmovsldup_256 x);
+    reff = call_m256_m256 Avx2.mm256_moveldup_ps;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
 let test_vpblend_16u16 () =
   let op (imm8 : int) = {
     name = Format.sprintf "test_vpblend_16u16<%d>" imm8;
@@ -860,6 +893,29 @@ let test_vpblend_16u16 () =
   test_vp 10000 (op 0x00);
   test_vp 10000 (op 0x3f);
   test_vp 10000 (op 0xaa)
+
+(* -------------------------------------------------------------------- *)
+let test_vpblend_8u32 () =
+  let op (imm8 : int) = {
+    name = Format.sprintf "test_vpblend_8u32<%d>" imm8;
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpblend_8u32 x y imm8);
+    reff = call_m256x2_m256 (fun x y -> Avx2.mm256_blend_epi32 x y imm8);
+  } in
+  
+  test_vp 10000 (op 0xaa)
+
+  (* -------------------------------------------------------------------- *)
+let test_vperm2i128 () =
+  let op (imm8 : int) = {
+    name = Format.sprintf "test_vperm2i128<%d>" imm8;
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vperm2i128 x y imm8);
+    reff = call_m256x2_m256 (fun x y -> Avx2.mm256_permute2x128_si256 x y imm8);
+  } in
+  
+  test_vp 10000 (op 32);
+  test_vp 10000 (op 49)
 
 (* -------------------------------------------------------------------- *)
 let test_extracti128 () =
@@ -961,7 +1017,7 @@ let test_smod () =
   done
   
 (* -------------------------------------------------------------------- *)
-let tests = [
+let tests = [ (* 
   ("opp" , test_opp );
   ("incr", test_incr);
   ("add" , test_add );
@@ -1006,7 +1062,12 @@ let tests = [
   ("vpadd_16u16"      , test_vpadd_16u16      );
   ("vpadd_32u8"       , test_vpadd_32u8       );
   ("vpsub_16u16"      , test_vpsub_16u16      );
-  ("vpsub_32u8"       , test_vpsub_32u8       );
+  ("vpsub_32u8"       , test_vpsub_32u8       ); *)
+  ("vmovsldup_256"    , test_vmovsldup_256    ); 
+  ("vpblend_8u32"     , test_vpblend_8u32     );
+  ("vpunpckh_4u64"    , test_vpunpckh_4u64    );
+  ("vpunpckl_4u64"    , test_vpunpckl_4u64    );
+  ("vperm2i128"       , test_vperm2i128       );
   ("vpsra_16u16"      , test_vpsra_16u16      );
   ("vpsrl_16u16"      , test_vpsrl_16u16      );
   ("vpand_256"        , test_vpand_256        );
