@@ -22,7 +22,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
-        opam install --deps-only easycrypt
+        opam install --deps-only --confirm-level=unsafe-yes easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make PROFILE=ci
 
@@ -61,7 +61,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
-        opam install --deps-only easycrypt
+        opam install --deps-only --confirm-level=unsafe-yes easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make
     - name: Detect SMT provers
@@ -128,7 +128,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt easycrypt
-        opam install --deps-only easycrypt
+        opam install --deps-only --confirm-level=unsafe-yes easycrypt
     - name: Compile & Install EasyCrypt
       run: opam exec -- make -C easycrypt build install
     - name: Detect SMT provers
