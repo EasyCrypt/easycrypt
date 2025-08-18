@@ -1,4 +1,4 @@
-(dirs src theories examples scripts)
+(dirs 3rdparty src theories examples scripts)
 
 (install
   (section (site (easycrypt commands)))

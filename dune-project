@@ -19,8 +19,7 @@
   dune
   dune-build-info
   dune-site
-  (ocaml-inifiles (>= 1.2))
-  (pcre (>= 7))
+  (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
   yojson
   (zarith (>= 1.10))
