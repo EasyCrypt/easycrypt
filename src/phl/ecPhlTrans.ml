@@ -21,8 +21,8 @@ module Low = struct
   let transitivity_side_cond hyps prml prmr poml pomr p q (p1: ts_inv) (q1: ts_inv) pomt (p2: ts_inv) (q2: ts_inv) =
     let env = LDecl.toenv hyps in
     let cond1 =
-      let fv1 = PV.fv env p.mr p1.inv in
-      let fv2 = PV.fv env p.ml p2.inv in
+      let fv1 = PV.fv env p1.mr p1.inv in
+      let fv2 = PV.fv env p2.ml p2.inv in
       let fv  = PV.union fv1 fv2 in
       let elts, glob = PV.ntr_elements fv in
       let m = EcIdent.create "&m" in
@@ -189,15 +189,15 @@ let process_trans_stmt tf s ?pat c tc =
       t_equivS_trans_eq s c tc
   | TFform (p1, q1, p2, q2) ->
     let p1, q1 =
-      let ml, mr = (fst es.es_ml), (EcIdent.create "&hr") in
-      let hyps = LDecl.push_active_ts es.es_ml (mr, mt) hyps in
+      let ml, mr = fst es.es_ml, fst es.es_mr in
+      let hyps = LDecl.push_active_ts es.es_ml es.es_mr hyps in
       let p1 = TTC.pf_process_form !!tc hyps tbool p1 in
       let q1 = TTC.pf_process_form !!tc hyps tbool q1 in
       {ml;mr;inv=p1}, {ml;mr;inv=q1}
     in
     let p2, q2 =
-      let ml, mr = (EcIdent.create "&hr"), (fst es.es_mr) in
-      let hyps = LDecl.push_active_ts (ml, mt) es.es_mr hyps in
+      let ml, mr = fst es.es_ml, fst es.es_mr in
+      let hyps = LDecl.push_active_ts es.es_ml es.es_mr hyps in
       let p2 = TTC.pf_process_form !!tc hyps tbool p2 in
       let q2 = TTC.pf_process_form !!tc hyps tbool q2 in
       {ml;mr;inv=p2}, {ml;mr;inv=q2} 
@@ -209,18 +209,15 @@ let process_trans_stmt tf s ?pat c tc =
 let process_trans_fun f p1 q1 p2 q2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let ml, mr = ef.ef_ml, ef.ef_mr in
   let f = EcTyping.trans_gamepath env f in
-  let m_mid = EcIdent.create "&hr" in
-  let (_, prmt), (_, pomt) = Fun.hoareF_memenv m_mid f env in
   let (prml, prmr), (poml, pomr) = Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr env in
   let process ml mr fo =
     let inv = TTC.pf_process_form !!tc (LDecl.push_active_ts ml mr hyps) tbool fo in
     {ml=fst ml;mr=fst mr;inv} in
-  let p1 = process prml (mr, prmt) p1 in
-  let q1 = process poml (mr, pomt) q1 in
-  let p2 = process (ml, prmt) prmr p2 in
-  let q2 = process (ml, pomt) pomr q2 in
+  let p1 = process prml prmr p1 in
+  let q1 = process poml pomr q1 in
+  let p2 = process prml prmr p2 in
+  let q2 = process poml pomr q2 in
   t_equivF_trans f (p1, q1) (p2, q2) tc
 
 (* -------------------------------------------------------------------- *)
