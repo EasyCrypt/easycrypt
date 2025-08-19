@@ -1,4 +1,3 @@
-
 (* ==================================================================== *)
 open Aig
 
@@ -40,6 +39,15 @@ let int32_of_bools (bs : bool list) : int32 =
          v)
     0l bs
 
+let int64_of_bools (bs : bool list) : int64 =
+  List.fold_lefti
+    (fun v i b ->
+      if b then
+        Int64.(logor (shift_left 1L i) v)
+      else
+        v)
+    0L bs
+
 let ubigint_of_bools (bs: bool list) : Z.t =
   List.fold_right 
     (fun b acc -> 
@@ -77,7 +85,15 @@ let bytes_of_bools (bs : bool list) : bytes =
   Bytes.of_seq bs
 
 (* -------------------------------------------------------------------- *)
-let pp_reg ~(size : int) (fmt : Format.formatter) (r : bool list) =
+let bools_of_reg (r: reg) : bool list =
+  List.map (function 
+    | { gate = False; id } when id > 0 -> false
+    | { gate = False; id } -> true
+    | _ -> raise (Invalid_argument "Can't convert non constant reg to bool list")
+  ) r
+
+(* -------------------------------------------------------------------- *)
+let pp_reg_ ~(size : int) (fmt : Format.formatter) (r : bool list) =
   assert (List.length r mod (size * 4) = 0);
 
   let r = explode ~size:(size * 4) r in
@@ -88,6 +104,10 @@ let pp_reg ~(size : int) (fmt : Format.formatter) (r : bool list) =
        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "_")
        (fun fmt -> Format.fprintf fmt "%0.8lx"))
     r
+
+let pp_reg ~(size: int) (fmt: Format.formatter) (r: reg) = 
+  assert (size mod 4 = 0);
+  pp_reg_ ~size:(size / 4) fmt (bools_of_reg r)
 
 (* ==================================================================== *)
 let bit ~(position : int) (v : int) : bool =
@@ -124,8 +144,6 @@ let of_bigint ~(size : int) (v : Z.t) : reg =
   assert (0 <= Z.compare v Z.zero);
   assert (Z.numbits v <= size);
   List.init size (fun i -> constant (Z.testbit v i))
-
-  
 
 (* -------------------------------------------------------------------- *)
 let of_string ~(size : int) (s : string) : reg =
@@ -214,6 +232,10 @@ let sextend ~(size : int) (r : reg) : reg =
       List.rev_append r (List.make (size - lr + 1) msb)
   else
     r
+
+(* -------------------------------------------------------------------- *)
+let trunc ~(size: int) (r: reg) : reg =
+  List.take size r
 
 (* -------------------------------------------------------------------- *)
 let mux2 (n1 : node) (n2 : node) (c : node) =
@@ -721,3 +743,14 @@ let of_bigint_all ~(size : int) (v : Z.t) : reg =
   let v = Z.rem v mod_ in
   let v = if Z.sign v < 0 then Z.add mod_ v else v in
   of_bigint ~size v
+
+(* Assumes input is list of 16 bit words *)
+let compute ?(input_block_size = 16) ?(output_block_size = 16) (r: reg) (inp: int array) : int array =
+  assert (input_block_size <= 32);
+  let m = (1 lsl input_block_size) - 1 in
+  let inp = Array.map (fun i -> i land m) inp in
+  let inp = Array.to_list inp |> List.map (of_int ~size:input_block_size) |> List.flatten |> Array.of_list in
+  maps (function 
+    | (0, i) -> Some (inp.(i))
+    | _ -> None) r |> bools_of_reg |> explode ~size:output_block_size |> List.map (uint_of_bools) |> Array.of_list
+

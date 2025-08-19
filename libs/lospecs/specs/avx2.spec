@@ -20,6 +20,10 @@ VPERMQ(w@256, i@8) -> @256 =
     permute(i[@2|3])
   )
 
+# CHECKME
+VPINSR_8u16(w1@128, w2@16, i@8) -> @128 =
+  w1[@16|i[@4|0] <- w2]
+
 #CHECKME
 # Intel intrinsic: _mm256_permute2x128_si256
 VPERM2I128(src1@256, src2@256, i@8) -> @256 =
@@ -29,24 +33,6 @@ VPERM2I128(src1@256, src2@256, i@8) -> @256 =
           let w1 = concat<256>(src1,src2) in
           let w2 = w1[@128|control[@2|0]] in w2,
       i)
-
-# Intel intrinsic: _mm256_broadcastw_epi16
-VPBROADCAST_16u16(w@16) -> @256 = 
-  repeat<16>(w[@16|0], 16)
-
-VPBROADCAST_8u32(w@32) -> @256 = 
-  repeat<32>(w[@32|0], 8)
-
-VPBROADCAST_4u64(w@64) -> @256 = 
-  repeat<64>(w[@64|0], 4)
-
-VPBROADCAST_2u128(w@128) -> @256 = 
-  repeat<128>(w[@128|0], 2)
-
-# CHECKME
-VPINSR_8u16(w1@128, w2@16, i@8) -> @128 =
-  w1[@16|i[@4|0] <- w2]
-
 
 
 # Intel intrinsic: _mm256_add_epi64
@@ -81,6 +67,18 @@ VPAND_256(w1@256, w2@256) -> @256 =
 VPNAND_256(w1@256, w2@256) -> @256 = 
   not<256>(and<256>(w1, w2))
 
+# Intel intrinsic: _mm256_broadcastw_epi16
+VPBROADCAST_16u16(w@16) -> @256 = 
+  repeat<16>(w[@16|0], 16)
+
+VPBROADCAST_8u32(w@32) -> @256 = 
+  repeat<32>(w[@32|0], 8)
+
+VPBROADCAST_4u64(w@64) -> @256 = 
+  repeat<64>(w[@64|0], 4)
+
+VPBROADCAST_2u128(w@128) -> @256 = 
+  repeat<128>(w[@128|0], 2)
   
 # Intel intrinsic: _mm256_mulhi_epi16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
@@ -314,7 +312,9 @@ VPBLEND_8u32(w1@256, w2@256, c@8) -> @256 =
   )
 
 # CHECKME
-VPBLENDVB_256(w1@256, w2@256, c@256) -> @256 =
+# Intel intrinsic: _mm256_blend_epi32
+# FIXME: we need an heterogeneous `map' combinator
+VPBLEND_32u8(w1@256, w2@256, c@256) -> @256 =
   map<8, 32>(
     fun c@8 w1@8 w2@8 . c[7] ? w2 : w1,
     c,
@@ -323,7 +323,9 @@ VPBLENDVB_256(w1@256, w2@256, c@256) -> @256 =
   )
 
 # CHECKME
-VPBLENDVB_128(w1@128, w2@128, c@128) -> @128 =
+# Intel intrinsic: _mm256_blend_epi32
+# FIXME: we need an heterogeneous `map' combinator
+VPBLEND_16u8(w1@128, w2@128, c@128) -> @128 =
   map<8, 16>(
     fun c@8 w1@8 w2@8 . c[7] ? w2 : w1,
     c,
@@ -359,13 +361,29 @@ VPBLENDW_128(w1@128, w2@128, c@8) -> @128 =
 VPBLENDW_256(w1@256, w2@256, c@8) -> @256 =
   let vpblend128(w1@128, w2@128)  =
     let c = map<1, 8>(uextend<1, 16>, c) in
-      map<16, 8>(
-       fun c@16 w1@16 w2@16 . c[0] ? w2 : w1,
-        c,
-        w1,
-        w2
-       ) in 
-  map<128, 2>(vpblend128,w1,w2)
+    map<16, 8>(
+     fun c@16 w1@16 w2@16 . c[0] ? w2 : w1,
+      c,
+      w1,
+      w2
+  ) in map<128, 2>(vpblend128,w1,w2)
+
+VPBLENDW_128(w1@128, w2@128, c@8) -> @128 =
+  let c = map<1, 8>(uextend<1, 16>, c) in
+  map<16, 8>(
+   fun c@16 w1@16 w2@16 . c[0] ? w2 : w1,
+    c,
+    w1,
+    w2
+  ) 
+
+VPBLENDVB_128(w1@128, w2@128, c@128) -> @128 =
+  map<8, 16>(
+    fun c@8 w1@8 w2@8 . c[7] ? w2 : w1,
+    c,
+    w1,
+    w2
+  )
 
 # Intel intrinsic: _mm256_cmpgt_epi16
 VPCMPGT_16u16(w1@256, w2@256) -> @256 =

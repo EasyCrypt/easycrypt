@@ -363,6 +363,7 @@
 %token ABSTRACT
 %token ADMIT
 %token ADMITTED
+%token AIG
 %token ALGNORM
 %token ALIAS
 %token AMP
@@ -3230,7 +3231,8 @@ bdepeq_out_info:
     lane=oident
     pcond=oident
     perm=oident?
-  { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; } }
+    debug=AIG?
+  { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; debug = Option.is_some debug} }
 
 | BDEP STAR
     in_ty=bracket(loc(simpl_type_exp))

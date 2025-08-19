@@ -216,6 +216,8 @@ module type CircuitInterface = sig
     val circuit_from_spec : env -> [`Path of path | `Bind of EcDecl.crb_circuit] -> circuit 
     val op_has_spec : env -> path -> bool
   end
+
+  val circuit_to_file : name:string -> circuit -> symbol
 end
 
 (* Backend implementing minimal functions needed for the translation *)
@@ -307,6 +309,7 @@ module type CBackend = sig
 
   val flatten : reg list -> reg
 
+  val reg_to_file : input_count:int -> ?inp_name_map:(int -> string) -> name:string -> reg -> symbol 
 
   module Deps : sig
     type deps
@@ -358,6 +361,7 @@ module TestBack : CBackend = struct
       | C.And (n1, n2) -> (doit n1) || (doit n2)
     in
     fun b -> doit b
+
   let have_bad : reg -> bool =
     fun r -> not (Array.for_all (fun n -> not (has_bad n)) r)
 
@@ -495,7 +499,8 @@ module TestBack : CBackend = struct
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
 
-
+  let reg_to_file ~(input_count: int) ?(inp_name_map: (int -> string) option) ~(name: string) (r: reg) : symbol =
+    C.write_aiger_bin_temp ~input_count ?inp_name_map ~name (node_list_of_reg r)
 
   module Deps = struct 
     type dep = (int, int Set.t) Map.t
@@ -551,19 +556,25 @@ module TestBack : CBackend = struct
       | 1 ->
         let blocks = block_deps_of_deps w_out d in
         Format.eprintf "Checking block width...@.";
-        Array.for_all (fun (_, d) ->
-          if Map.is_empty d then true
+        Array.fold_left_map (fun idx (width, d) ->
+          if Map.is_empty d then idx + width, true
           else
           let _, bits = Map.any d in
-          Set.is_empty bits ||
+          idx + width, Set.is_empty bits ||
           let base = Set.at_rank_exn 0 bits in
-          Format.eprintf "Base for current block: %d@." base;
-          Set.for_all (fun bit ->
+          if Set.for_all (fun bit ->
             let dist = bit - base in
-            Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in;
-            0 <= dist && dist < w_in
-          ) bits
-        ) blocks
+            if 0 <= dist && dist < w_in then true else false
+(*
+            (Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in; 
+            Format.eprintf "Base for current block: %d@." base;
+            false)
+*)
+          ) bits then true else
+          begin
+            Format.eprintf "Bad block: [%d..%d] %a@." idx (idx + width - 1) pp_dep d; false
+          end
+        ) 0 blocks |> snd |> Array.for_all (fun x -> x)
       | _ -> 
         (Format.eprintf "Failed first check@\n"; 
         Format.eprintf "Map keys: ";
@@ -1777,6 +1788,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CArray (r, w) -> `CArray (Backend.applys renamer r, w), [inp]
     | `CTuple (r, szs) -> `CTuple (Backend.applys renamer r, szs), [inp]
     | `CBool b -> `CBool (Backend.apply renamer b), [inp]
+
+  let circuit_to_file ~(name: string) ((c, inps) : circuit) : symbol =
+    match c, inps with
+    | `CBitstring r, {type_ = `CIBitstring w; id}::[] -> (* TODO: rename inputs? *)
+      Backend.reg_to_file ~input_count:w ~name (Backend.applys (fun (id_, i) -> if id_ = id then Some (Backend.input_node ~id:0 (i+1)) else None) r)
+    | _ -> Format.eprintf "Unsupported circuit for output, only one input one output supported@."; assert false
 end
 
 module ExampleInterface = MakeCircuitInterfaceFromCBackend(TestBack)
@@ -2346,6 +2363,8 @@ let circuit_ueq = (fun c1 c2 -> (circuit_eq c1 c2 :> circuit))
 let circuit_aggregate = 
   circuit_aggregate
 let circuit_has_uninitialized = circuit_has_uninitialized
+
+let circuit_to_file = circuit_to_file
 
 let circuit_aggregate_inps = 
   circuit_aggregate_inputs
