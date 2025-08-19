@@ -65,7 +65,7 @@ val process_instr : hyps -> memory -> pstate -> instr -> pstate
 val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit 
 
 (* Check for uninitialized inputs *)
-val circuit_has_uninitialized : circuit -> bool
+val circuit_has_uninitialized : circuit -> int option
 
 val circuit_slice : circuit -> int -> int -> circuit
 val circuit_align_inputs : circuit -> (int * int) option list -> circuit 

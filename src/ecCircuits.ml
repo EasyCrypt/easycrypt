@@ -191,7 +191,7 @@ module type CircuitInterface = sig
 
   (* Avoid nodes for uninitialized inputs *)
   val circuit_uninit : env -> ty -> circuit
-  val circuit_has_uninitialized : circuit -> bool
+  val circuit_has_uninitialized : circuit -> int option
 
   (* Logical reasoning over circuits *)
   val circ_equiv : ?pcond:(cbool * (cinp list)) -> circuit -> circuit -> bool
@@ -235,7 +235,7 @@ module type CBackend = sig
   val bad : node
   val bad_reg : int -> reg 
   val has_bad : node -> bool
-  val have_bad : reg -> bool
+  val have_bad : reg -> int option
 
   val node_array_of_reg : reg -> node array
   val node_list_of_reg : reg -> node list
@@ -362,8 +362,8 @@ module TestBack : CBackend = struct
     in
     fun b -> doit b
 
-  let have_bad : reg -> bool =
-    fun r -> not (Array.for_all (fun n -> not (has_bad n)) r)
+  let have_bad (r: reg) : int option =
+    Array.find_opt (fun (_, r) -> has_bad r) (Array.mapi (fun i r -> (i,r)) r) |> Option.map fst
 
   let node_array_of_reg : reg -> node array = fun x -> x
 
@@ -1463,12 +1463,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | Tunivar _ -> assert false
     | Tvar _ -> assert false
 
-  let circuit_has_uninitialized (c: circuit) : bool =
+  let circuit_has_uninitialized (c: circuit) : int option =
     match (fst c) with
     | `CBitstring r | `CArray (r, _) | `CTuple (r, _) ->
-       Backend.have_bad r 
+      Backend.have_bad r 
     | `CBool b -> 
-      Backend.has_bad b
+      if Backend.has_bad b then Some 0 else None
 
   let circ_equiv ?(pcond:(cbool * cinp list) option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool = 
 (*     let () = Format.eprintf "c1: %a@\nc2: %a@\n" pp_circuit  (c1, inps1) pp_circuit (c2, inps2) in *)
