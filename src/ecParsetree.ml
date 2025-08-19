@@ -732,7 +732,8 @@ type bdep_info =
   ; outvs : bdepvar list
   ; pcond : psymbol
   ; lane  : psymbol
-  ; perm  : psymbol option }
+  ; perm  : psymbol option 
+  ; debug : bool }
 
 type bdep_eval_info =
   { in_ty     : pty

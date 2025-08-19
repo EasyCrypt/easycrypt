@@ -344,3 +344,143 @@ let deps (r : reg) =
          in (r, vs)
        )
     |> List.sort (fun (r1, _) (r2, _) -> compare r1 r2)
+
+(* -------------------------------------------------------------------- *)
+(* SERIALIZATION *)
+(* Return map of indice renaming + list of and gates (increasing order) + (max variable index, and gate count, input gate count) *)
+let aiger_preprocess ~(input_count: int) (r: reg) : (node -> int) * (node list) * (int * int * int) =
+  let cache : (int, int) Hashtbl.t = Hashtbl.create 0 in
+  let count_and = ref 0 in
+  let and_gates = ref [] in 
+
+  let rec doit (n: node) : unit = 
+    match Hashtbl.find_option cache (abs n.id) with
+    | Some v -> ()
+    | None ->
+        let value = doit_force n in
+        Hashtbl.add cache (abs n.id) value
+
+  and doit_force (n: node) =
+    match n.gate with
+    | False -> 0
+    | Input (v, i) -> 64*v + i
+    | And (n1, n2) -> 
+        doit n1; doit n2;
+        incr count_and; 
+        and_gates := n::(!and_gates);
+        !count_and
+  in
+
+  List.iter doit r;
+  let and_cnt = !count_and in
+  let inp_cnt = input_count in
+  let id_map = 
+    Hashtbl.to_seq cache |> Map.of_seq
+  in
+  let id_map = (function 
+  | { gate = False; id } -> (if 0 < id then 0 else 1)
+  | { gate = And _; id } -> ((Map.find (abs id) id_map) + inp_cnt) lsl 1 + (if 0 < id then 0 else 1) 
+  | { gate = Input _; id } -> (Map.find (abs id) id_map) lsl 1 + (if 0 < id then 0 else 1)
+  ) in
+  id_map, 
+  List.sort (fun n1 n2 -> compare (id_map n1) (id_map n2)) !and_gates,
+  (and_cnt + inp_cnt, and_cnt, inp_cnt) 
+
+let aiger_serialize_int (id: int) : string =
+  assert (id > 0);
+  let mask = 0x7f in
+  let rec doit (id: int) : int list = 
+    if id < 0x80 then
+      [id]
+    else
+      ((id land mask) lor (0x80))::(doit (id lsr 7))
+  in
+
+  List.fold_left (fun acc id -> (Format.sprintf "%c" (char_of_int id)) ^ acc) "" (List.rev (doit id))
+
+let pp_aiger_int fmt (id: int) : unit =
+  Format.fprintf fmt "%s" (aiger_serialize_int id)
+
+let pp_aiger_and fmt ((gid, id1, id2): int * int * int) : unit =
+  if not (gid > id1 && id1 > id2) then Format.eprintf "gid : %d | id1: %d | id2: %d@." gid id1 id2;
+  assert (gid > id1 && id1 > id2);
+  let delta0 = gid - id1 in
+  let delta1 = id1 - id2 in
+  assert(delta0 > 0 && delta1 > 0);
+  assert(id1 = gid - delta0);
+  assert(gid - delta0 - delta1 = id2);
+  Format.fprintf fmt "%a%a" pp_aiger_int (gid - id1) pp_aiger_int (id1 - id2)
+
+(* 
+   mvi -> Max Variable Index
+   agc -> And    Gate Count
+   igc -> Input  Gate Count
+   lgc -> Latch  Gate Count
+   ogc -> Output Gate Count 
+*)
+let write_aiger_bin 
+  ~(input_count: int) 
+  ?(inp_name_map : int -> string = fun (i: int) -> "inp" ^ (string_of_int i))
+  oc 
+  (r: reg) =
+  let aiger_id_of_node, and_gates, (mvi, agc, igc) = aiger_preprocess ~input_count r in
+
+  let ogc = List.length r in
+  let lgc = 0 in
+  Printf.fprintf oc "aig %d %d %d %d %d\n" mvi igc lgc ogc agc;
+  List.iter (fun n -> Printf.fprintf oc "%d\n" (aiger_id_of_node n)) r;
+  List.iter (function 
+    | { gate = And (n1, n2); } as n -> 
+        let id  = aiger_id_of_node n  in
+        let id1 = aiger_id_of_node n1 in
+        let id2 = aiger_id_of_node n2 in
+        let id = id - (id land 1) in
+        let id1, id2 = if id1 > id2 then id1, id2 else id2, id1 in 
+        Printf.fprintf oc "%s" (Format.asprintf "%a" pp_aiger_and (id, id1, id2))
+    | _ -> assert false) and_gates;
+  for i = 0 to igc-1 do 
+    Printf.fprintf oc "i%d %s@\n" i (inp_name_map i)
+  done
+
+let write_aiger_bin_temp
+  ~(input_count: int)
+  ?(inp_name_map: (int -> string) option)
+  ?(name: string = "circuit")
+  (r: reg) =
+    let tf_name, tf_oc = Filename.open_temp_file ~mode:[Open_binary] name ".aig" in
+    let tf_oc = BatIO.output_channel ~cleanup:true tf_oc in
+    write_aiger_bin ~input_count ?inp_name_map tf_oc r;
+    tf_name
+
+(* Assumes inputs are already matched *)
+let abc_check_equiv 
+  ?(r1_name = "r1") 
+  ?(r2_name = "r2") 
+  ~(input_count: int) 
+  ?(inp_name_map: (int -> string) option) 
+  (r1: reg) (r2: reg) : bool = 
+
+  let tf1_name, tf1_oc = Filename.open_temp_file ~mode:[Open_binary] r1_name ".aig" in
+  let tf2_name, tf2_oc = Filename.open_temp_file ~mode:[Open_binary] r2_name ".aig" in
+  Format.eprintf "Created temp files (%s) (%s)!@." tf1_name tf2_name;
+  let tf1_oc = BatIO.output_channel ~cleanup:true tf1_oc in
+  let tf2_oc = BatIO.output_channel ~cleanup:true tf2_oc in
+  write_aiger_bin ~input_count ?inp_name_map tf1_oc r1;
+  write_aiger_bin ~input_count ?inp_name_map tf2_oc r2;
+  Format.eprintf "Wrote aig files!@.";
+  BatIO.close_out tf1_oc; BatIO.close_out tf2_oc;
+  let abc_command = Format.sprintf "cec %s %s" tf1_name tf2_name in
+  Format.eprintf "Abc command: %s@." abc_command;
+  let abc_output_c, abc_in = Unix.open_process "abc" in
+(*   let abc_in = BatIO.output_channel ~cleanup:true abc_in in *)
+  BatIO.write_string abc_in (abc_command ^ "\n");
+  BatIO.close_out abc_in;
+(*   let abc_output_c = BatIO.input_channel ~autoclose:true ~cleanup:true abc_output_c in *)
+  (* FIXME: Get the actual output in all cases from abc *)
+  let re = Str.regexp {|.*Networks are equivalent.*|} in
+  Format.eprintf "Before read@.";
+  let abc_output = BatIO.read_all abc_output_c in
+  Format.eprintf "====== BEGIN ABC OUTPUT =====@.%s@.======= END ABC OUTPUT =====@." abc_output;
+  let abc_output = String.replace_chars (function | '\n' -> "|" | c -> String.of_char c) abc_output in
+  if Str.string_match re abc_output 0 then true else false
+ 

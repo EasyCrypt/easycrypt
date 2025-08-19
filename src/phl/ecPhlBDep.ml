@@ -58,10 +58,11 @@ let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : circuit =
     fc
   with CircError err ->
     raise (BDepError err)
-  
-  
+ 
+
 (* -------------------------------------------------------------------- *)
 let mapreduce 
+  ?(debug: bool = false)
   (hyps : hyps) 
   ((mem, mt): memenv) 
   (proc: stmt) 
@@ -72,6 +73,7 @@ let mapreduce
   (perm: (int -> int) option)
   : unit =
 
+  if debug then Format.eprintf "[W] DEBUG@." else Format.eprintf "[W] NO DEBUG@.";
 
   let tm = Unix.gettimeofday () in
   
@@ -80,6 +82,7 @@ let mapreduce
     with BDepError err -> 
       raise (BDepError ("Lane function circuit generation failed with error:\n" ^ err))
   in
+  if debug then Format.eprintf "[W] Writing lane function to file %s...@." @@ circuit_to_file ~name:"lane_function" fc;
 
   let tm = time tm "Lane function circuit generation done" in
   
@@ -88,6 +91,7 @@ let mapreduce
     with BDepError err ->
       raise (BDepError ("Precondition circuit generation failed with error:\n" ^ err))
   in
+  if debug then Format.eprintf "[W] Writing precondition function to file %s...@." @@ circuit_to_file ~name:"pcond" pcondc;
 
   
   let tm = time tm "Precondition circuit generation done" in
@@ -138,6 +142,8 @@ let mapreduce
         raise (BDepError "Failed to concatenate outputs")
     in
 
+    if debug then Format.eprintf "[W] Writing program circuit before mapreduce to file %s...@." @@ circuit_to_file ~name:"prog_no_mapreduce" c;
+
     let cs, mr_range = try 
       circuit_mapreduce ?perm c n m 
       with CircError err ->
@@ -146,7 +152,10 @@ let mapreduce
 
     let tm = time tm "circuit dependecy analysis + splitting done" in
 
+    if debug then Format.eprintf "[W] Writing lane 0 circit to file %s...@." @@ circuit_to_file ~name:"lane_0" (List.hd cs);
+
     List.iteri (fun i c -> 
+    if debug then Format.eprintf "[W] Writing lane %d circit to file %s...@." (i+1) @@ circuit_to_file ~name:("lane_" ^ (string_of_int (i+1))) c;
     if circ_equiv ~pcond:pcondc (List.hd cs) c 
       then ()
       else let err = Format.sprintf "Equivalence check failed between lanes 0 and %d" (i+1) 
@@ -510,6 +519,7 @@ let reconstruct_from_bits_op (env: env) (t: ty) =
     bits2w_op env t
    
 let t_bdep 
+  ?(debug: bool = false)
   (n: int) 
   (m: int) 
   (inpvs: ((variable * (int * int) option) list))
@@ -521,7 +531,7 @@ let t_bdep
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareF sH -> assert false  
   | FhoareS sF -> if true then
-    begin try mapreduce (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
+    begin try mapreduce ~debug (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
     | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" err
       end
     else ()
@@ -597,7 +607,7 @@ let permute_list (env: env) (perm: EcPath.path) (xs: form) : form =
 
 (* FIXME: Add size checks for input and output *)
 let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
-  let { n; invs; inpvs; m; outvs; lane; pcond; perm } = bdinfo in
+  let { n; invs; inpvs; m; outvs; lane; pcond; perm; debug } = bdinfo in
 
   let env = FApi.tc1_env tc in
   let pe = FApi.tc1_penv tc in
@@ -832,7 +842,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
   let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
-  FApi.t_last (t_bdep n m inpvs outvs pcond lane fperm) tc 
+  FApi.t_last (t_bdep ~debug n m inpvs outvs pcond lane fperm) tc 
 
 
 
