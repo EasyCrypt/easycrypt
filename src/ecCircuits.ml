@@ -2201,6 +2201,16 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : ps
       let pstate = update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
       (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate
+    | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
+      let pstate = List.fold_left (fun pstate (v, e) ->
+        update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps)
+      ) pstate 
+        (List.combine 
+          (List.map (function 
+          | (PVloc v, _ty) -> v
+          | _ -> assert false) vs) 
+        es) in
+      pstate
     | Sasgn (LvTuple (vs), e) ->
       let tp = (form_of_expr mem e |> circuit_of_form ~pstate hyps) |> (ctuple_of_circuit ~strict:true) in
       let comps = circuits_of_circuit_tuple tp in
