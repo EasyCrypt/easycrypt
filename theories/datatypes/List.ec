@@ -264,6 +264,14 @@ lemma onth_nth (z : 'a) xs n:
   0 <= n < size xs => onth xs n = Some (nth z xs n).
 proof. by elim: xs n => //= /#. qed.
 
+lemma nth0 ['a] (x : 'a) :
+  nth witness [x] 0 = x.
+proof. by done. qed.
+
+lemma nth1 ['a] (x0 : 'a) (x : 'a) (i : int) :
+  nth x0 [x] i = if i = 0 then x else x0.
+proof. by done. qed.
+
 lemma nth0_head (z : 'a) xs: nth z xs 0 = head z xs.
 proof. by case: xs. qed.
 
@@ -999,6 +1007,10 @@ move=> n_ge0 i_ge0; case: (n < size s) => [lt_n_s|le_s_n].
 - by rewrite -{2}(cat_take_drop n s) nth_cat size_take //#.
 - by rewrite !(nth_out, drop_oversize) //#.
 qed.
+
+lemma head_drop ['a] (x0 : 'a) (n : int) (l : 'a list) :
+  0 <= n => nth x0 l n = head x0 (drop n l).
+proof. by move=> ge0_n; rewrite -nth0_head nth_drop. qed.
 
 lemma nth_take (x0 : 'a) n s i:
   0 <= n => i < n => nth x0 (take n s) i = nth x0 s i.
@@ -1803,6 +1815,10 @@ qed.
 op map (f : 'a -> 'b) xs =
   with xs = []      => []
   with xs = y :: ys => (f y) :: (map f ys).
+
+lemma map1 ['a 'b] (f: 'a -> 'b) (x : 'a) :
+  map f [x] = [f x].
+proof. by done. qed.
 
 lemma eq_map (f1 f2 : 'a -> 'b):
      (forall x, f1 x = f2 x)
