@@ -2510,8 +2510,8 @@ section PROOFS.
   call(: ={glob BNR, UFCMA.cbad1, UFCMA.cbad1, glob RO, Mem.log, Mem.lc} /\ 
     inv_lbad1 UFCMA_l.lbad1{2} BNR.lenc{2} UFCMA.log{2} Mem.log{2} Mem.lc{2} UFCMA.cbad1{2} BNR.ndec{2} /\
     (UFCMA.bad1{1} => exists (tt : tag * tag), (tt \in UFCMA_l.lbad1{2}) /\ tt.`1 = tt.`2)); first last.
-  + by proc; inline*; sp 1 1; if; auto; smt(in_cons make_lbad1_size_cons2 leq_make_lbad1). 
-  + by skip; smt( mem_empty ge0_qenc ge0_qdec). 
+  + proc; inline*; sp 1 1; if; auto => &1 &2 /> ?????????????; smt(in_cons make_lbad1_size_cons2 leq_make_lbad1).
+  + skip => &1 &2 />; rewrite ge0_qenc size_flatten /sumz /= ge0_qdec /=; smt(mem_empty).
   proc; sp; if; 1, 3: auto=> />.
   sp; wp=> /=.
   case: (UFCMA.cbad1{1} < qenc); last first.
@@ -2523,8 +2523,19 @@ section PROOFS.
     wp -7 -7=> />.
     move => />; smt (get_setE).
     conseq (: ={c1, t, RO.m, Mem.log}); [2:sim=> /> /#].
-    move => />.
-    smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
+    move => &1 &2 /> 9? X ?????? c1_R t_R.
+    do! split.
+    - smt().
+    - rewrite (make_lbad1_size_cons3) //; smt(leq_make_lbad1 size_ge0).
+    - smt(leq_make_lbad1).
+    - move => n D ad msg tag; rewrite get_setE.
+      case: D => />.
+      + by rewrite /dom get_setE.
+      smt(get_setE).
+    - move => n; rewrite /dom get_setE /#.
+    move => t t' tt'; case: (X _ _ tt') => /> n hn ht ad msg ht'.
+    case: (n = n{!2}); first smt().
+    move => _; exists n; rewrite get_setE /#.
   inline*; sp.
   rcondt{1} 5; 1: auto=> />.
   - conseq(:_==> true)=> />; 1: smt(size_map size_filter count_size).
@@ -2540,8 +2551,10 @@ section PROOFS.
   - smt().  
   - rewrite size_cat !size_map make_lbad1_size_cons3 //= /#.
   - smt(leq_make_lbad1).
-  - smt(get_setE).
-  - smt(get_setE).
+  - move => n D ad msg tag; rewrite get_setE; case: D => />; first by rewrite /dom get_setE.
+    smt(get_setE).
+  - move => n; case: (n = n{!2}) => />; first by rewrite /dom get_setE.
+    smt(get_setE).
   - move=> ? ? H15; have:=H15; rewrite mem_cat=> [#][] H16 *.
     + smt(get_setE).
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
@@ -2674,7 +2687,12 @@ section PROOFS.
       inv_lbad1_i UFCMA_l.lbad1{1} BNR.lenc{1} UFCMA.log{1} Mem.log{1} Mem.lc{1} UFCMA.cbad1{1} BNR.ndec{1} /\
       (((nth (w1,w2) UFCMA_l.lbad1{1} nth0).`1 =
         (nth (w1,w2) UFCMA_l.lbad1{1} nth0).`2) => UFCMA_li.badi{2})); first last.
-  + proc; sp; if; auto; inline*; auto; smt(make_lbad1_size_cons2 size_ge0 leq_make_lbad1).
+  + proc; sp; if; auto; inline*; auto => &1 &2 /> *; do !split.
+    - case: (c{2} \in Mem.log{2}); first smt().
+      rewrite make_lbad1_size_cons2 // /#.
+    - smt(leq_make_lbad1).
+    - smt().
+    - smt().
   + by auto; smt(neq_w1_w2 size_ge0 ge0_qdec size_flatten ge0_qenc).
   + proc; inline*; sp; if; 1, 3: auto; sp.
     swap [5..6] 7.
@@ -2763,8 +2781,8 @@ section PROOFS.
   proof.
   apply (RealOrder.ler_trans _ _ _ (step4_bad1_lbad1 &m)).
   apply (RealOrder.ler_trans _ _ _ (step4_lbad1_sum &m)).
-  apply (RealOrder.ler_trans _ _ _ (StdBigop.Bigreal.ler_sum_seq _ _ (fun _ => pr1_poly_out) _ _)); 
-    last by rewrite sumr_const count_predT size_iota; smt(ge0_qdec).
+  apply (RealOrder.ler_trans _ _ _ (StdBigop.Bigreal.ler_sum_seq _ _ (fun _ => pr1_poly_out) _ _));
+    last by rewrite sumr_const count_predT size_iota ler_maxr // ge0_qdec.
   move=> nth0; rewrite mem_iota /predT /= => [#] *.
   apply (RealOrder.ler_trans _ _ _ (step4_badi &m nth0 _))=> //.
   exact (pr_step4_badi &m).
