@@ -150,7 +150,6 @@ end = struct
         let+ tc = EcPhlSkip.t_skip tc in
         let+ tc = EcLowGoal.t_intro_s `Fresh tc in
         let+ tc = EcLowGoal.t_elim_and tc in
-
         let e = EcEnv.LDecl.fresh_id (FApi.tc1_hyps tc) "e" in
 
         let+ tc = EcLowGoal.t_intros_i [e] tc in
@@ -173,14 +172,36 @@ end = struct
       in
 
       let clean (tc : tcenv1) =
+        let discharge_pre tc =
+          let+ tc =
+            if   Option.is_some side
+            then EcLowGoal.t_intros_n 2 tc
+            else EcLowGoal.t_intros_n 1 tc
+          in
+          let+ tc = EcLowGoal.t_elim_and tc in
+          let+ tc = EcLowGoal.t_intro_s `Fresh tc in
+          let+ tc = EcLowGoal.t_elim_and tc in
+          let+ tc = EcLowGoal.t_intros_n ~clear:true 1 tc in
+          let+ tc = EcLowGoal.t_intro_s `Fresh tc in
+          tc
+            |> EcLowGoal.t_split
+            @! EcLowGoal.t_assumption `Alpha
+        in
+        let discharge_post tc =
+          let+ tc =
+            if   Option.is_some side
+            then EcLowGoal.t_intros_n 3 tc
+            else EcLowGoal.t_intros_n 2 tc
+          in
+          EcLowGoal.t_assumption `Alpha tc
+        in
+
         let pre = oget (EcLowPhlGoal.get_pre (FApi.tc1_goal tc)) in
         let post = oget (EcLowPhlGoal.get_post (FApi.tc1_goal tc)) in
         let eq, _, pre = destr_and3 pre in
-        let tc = EcPhlConseq.t_conseq (f_and eq pre) post tc in
-
-        FApi.t_onall
-          (EcLowGoal.t_clears names)
-          (FApi.t_firsts (EcLowGoal.t_trivial ~keep:false) 2 tc)
+        tc
+          |> EcPhlConseq.t_conseq (f_and eq pre) post
+          @+ [discharge_pre; discharge_post; EcLowGoal.t_clears names]
       in
 
       tc
