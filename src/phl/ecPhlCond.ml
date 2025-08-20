@@ -190,10 +190,12 @@ end = struct
         let discharge_post tc =
           let+ tc =
             if   Option.is_some side
-            then EcLowGoal.t_intros_n 3 tc
-            else EcLowGoal.t_intros_n 2 tc
+            then EcLowGoal.t_intros_n 2 tc
+            else EcLowGoal.t_intros_n 1 tc
           in
-          EcLowGoal.t_assumption `Alpha tc
+          let t_imp = EcLowGoal.t_intros_n 1 @! EcLowGoal.t_assumption `Alpha in
+          let t_iff = EcLowGoal.t_split @! t_imp in
+          tc |> FApi.t_or t_imp t_iff
         in
 
         let pre = oget (EcLowPhlGoal.get_pre (FApi.tc1_goal tc)) in
