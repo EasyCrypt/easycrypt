@@ -550,20 +550,20 @@ let process_info info tc =
       (t_id tc, fst (LDecl.hyp_by_name (unloc h) hyps))
 
   | EcParsetree.LE_todo (h, s1, s2, eqIs, eqXs) ->
-    let ml,mr =
+    let (ml, mlt) as mle, ((mr, mrt) as mre) =
       match (FApi.tc1_goal tc).f_node with
       | FeagerF {eg_ml=ml;eg_mr=mr} ->
         EcMemory.abstract ml, EcMemory.abstract mr
       | _ ->
         let es    = tc1_as_equivS tc in
         es.es_ml, es.es_mr in
-    let hyps = LDecl.push_active_ts ml mr hyps in
+    let hyps = LDecl.push_active_ts mle mre hyps in
     let process_formula = TTC.pf_process_form !!tc hyps tbool in
-    let eqIs  = process_formula eqIs in
-    let eqXs  = process_formula eqXs in
+    let eqIs  = {ml;mr;inv=process_formula eqIs} in
+    let eqXs  = {ml;mr;inv=process_formula eqXs} in
     let s1    = TTC.tc1_process_prhl_stmt tc `Left s1 in
     let s2    = TTC.tc1_process_prhl_stmt tc `Right s2 in
-    let f     = f_equivS_old ml mr eqIs s1 s2 eqXs in
+    let f     = f_equivS mlt mrt eqIs s1 s2 eqXs in
     let h     = LDecl.fresh_id hyps (unloc h) in
     (FApi.t_last (t_intros_i [h]) (t_cut f tc), h)
 
