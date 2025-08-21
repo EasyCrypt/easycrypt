@@ -270,12 +270,14 @@ let t_eager_fun_abs_r eqI h tc =
   let pre, post, sg =
     EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fl fr eqI in
 
+  let ml, mr = eg.eg_ml, eg.eg_mr in
+
   let do1 og sg =
     let ef = destr_equivF og in
     let torefl f =
       Mpv2.to_form_ts_inv
-        (Mpv2.eq_refl (PV.fv env mright f))
-        {ml=mleft;mr=mright;inv=f_true}
+        (Mpv2.eq_refl (PV.fv env mr f))
+        {ml;mr;inv=f_true}
     in
          f_eagerF (ef_pr ef) s ef.ef_fl ef.ef_fr s' (ef_po ef)
       :: f_equivF (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
@@ -300,6 +302,8 @@ let t_eager_fun_abs_r eqI h tc =
 let t_eager_call_r fpre fpost tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
+  let fpre = EcSubst.ts_inv_rebind fpre (fst es.es_ml) (fst es.es_mr) in
+  let fpost = EcSubst.ts_inv_rebind fpost (fst es.es_ml) (fst es.es_mr) in
 
   let (lvl, fl, argsl), sl = pf_last_call  !!tc es.es_sl in
   let (lvr, fr, argsr), sr = pf_first_call !!tc es.es_sr in
@@ -590,7 +594,8 @@ let process_fun_def tc =
 
 (* -------------------------------------------------------------------- *)
 let process_fun_abs info eqI tc =
-  let ml, mr = EcIdent.create "&1", EcIdent.create "&2" in
+  let eg    = EcLowPhlGoal.tc1_as_eagerF tc in
+  let ml, mr = eg.eg_ml, eg.eg_mr in
   let hyps  = FApi.tc1_hyps tc in
   let env   = LDecl.inv_memenv ml mr hyps in
   let eqI   = TTC.pf_process_form !!tc env tbool eqI in
@@ -611,7 +616,7 @@ let process_call info tc =
         check_only_global !!tc env sl;
         check_only_global !!tc env sr;
 
-        let (ml, mr) = (EcIdent.create "&1", EcIdent.create "&2") in
+        let (ml, mr) = fst es.es_ml, fst es.es_mr in
         let penv, qenv = LDecl.equivF ml mr fl fr hyps in
         let fpre  = TTC.pf_process_form !!tc penv tbool fpre  in
         let fpost = TTC.pf_process_form !!tc qenv tbool fpost in
