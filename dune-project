@@ -10,7 +10,7 @@
 
 (package
  (name easycrypt)
- (sites (lib theories) (libexec commands))
+ (sites (lib theories) (libexec commands) (lib doc))
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3))
@@ -19,6 +19,7 @@
   dune
   dune-build-info
   dune-site
+  markdown
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
   (why3 (and (>= 1.8.0) (< 1.9)))
