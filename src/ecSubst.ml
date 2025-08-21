@@ -1163,9 +1163,10 @@ let ts_inv_rebind_right ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
 let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   match ml' = ml, mr' = mr with
   | true, true -> { inv; ml; mr }
-  | false, true -> ts_inv_rebind_left {inv;ml;mr} ml'
-  | true, false -> ts_inv_rebind_right {inv;ml;mr} mr'
-  | false, false -> begin let s = add_memory empty ml ml' in
+  | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
+  | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
+  | false, false -> begin 
+    let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = ml'; mr = mr' }

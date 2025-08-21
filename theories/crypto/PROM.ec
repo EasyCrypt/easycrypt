@@ -820,7 +820,7 @@ transitivity M.main1
 + proc *; inline M.main1; wp; call (RO_FRO_D D); inline *.
   rcondf{2} 3.
   + auto=> />; apply/mem_eq0=> z; rewrite -memE mem_fdom dom_restr.
-    by rewrite /in_dom_with domE mapE //=; case: (RO.m.[z]{m}).
+    by rewrite /in_dom_with domE mapE //=; case: (RO.m.[z]{1}).
 + by auto=> /> &1; rewrite /noflags map_comp /= map_id.
 transitivity M.main2
    (={glob D, FRO.m, arg} ==> ={res, glob D})
