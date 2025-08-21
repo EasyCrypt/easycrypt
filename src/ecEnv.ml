@@ -1705,10 +1705,6 @@ module Fun = struct
       let locals = List.map ovar_of_var fd.f_locals in
       (fun_.f_sig,fd), adds_in_memenv mem locals
 
-  let inv_memory side =
-    let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
-    EcMemory.abstract id
-
   let inv_memenv ml mr env =
     Memory.push_active_ts (EcMemory.abstract ml) (EcMemory.abstract mr) env
 

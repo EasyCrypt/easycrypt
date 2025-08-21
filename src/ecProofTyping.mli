@@ -53,12 +53,11 @@ val tc1_process_prhl_form_opt: tcenv1 -> ty option -> pformula -> ts_inv
 val tc1_process_prhl_form    : tcenv1 -> ty -> pformula -> ts_inv
 val tc1_process_prhl_formula : tcenv1 -> pformula -> ts_inv
 
-val tc1_process_stmt :
-     ?map:EcTyping.ismap -> tcenv1 -> EcMemory.memtype
-  -> pstmt -> stmt
-
 val tc1_process_prhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> side -> pstmt -> stmt
+
+val tc1_process_Xhl_stmt :
+     ?map:EcTyping.ismap -> tcenv1 -> pstmt -> stmt
 
 val tc1_process_codepos_range : tcenv1 -> oside * pcodepos_range -> codepos_range
 val tc1_process_codepos : tcenv1 -> oside * pcodepos -> codepos
