@@ -100,9 +100,13 @@ lemma index_count x l: sorted (<=) l => uniq l => x \in l => index x l = count (
 proof.
   elim: l => // y l hrec /> hp hnin hu.
   case: (x = y) => [<<- _ | hne /= hin] /=.
-  + by rewrite index_cons /= count_pred0_eq_in //=; smt (order_path_min allP le_trans lt_nle).
+  + rewrite index_cons /= count_pred0_eq_in //=; 2:smt(lt_nle).
+    move=> x0 x0_in_l; move: (order_path_min (<=) le_trans x l hp).
+    by rewrite allP=> /(_ _ x0_in_l); rewrite lt_nle.
   rewrite index_cons hne /= hrec //; 1: by apply: path_sorted hp.
-  smt (order_path_min allP le_trans).
+  suff -> : y < x by smt().
+  have /allP := order_path_min _ le_trans _ _ hp.
+  move => /(_ _ hin) /#.
 qed.
 
 lemma sindex_countP (t: elem array) (lo hi p : int) : 
