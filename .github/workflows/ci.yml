@@ -22,6 +22,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make PROFILE=ci
@@ -61,6 +62,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make
@@ -128,6 +130,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt easycrypt
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
       run: opam exec -- make -C easycrypt build install
