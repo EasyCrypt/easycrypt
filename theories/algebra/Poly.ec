@@ -497,7 +497,7 @@ qed.
 lemma onep_neq0 : poly1 <> poly0.
 proof. by apply/negP => /poly_eqP /(_ 0); rewrite !polyCE /= oner_neq0. qed.
 
-clone import Ring.ComRing as PolyComRing with
+clone export Ring.ComRing as PolyComRing with
   type t      <= poly ,
     op zeror  <= poly0,
     op oner   <= poly1,
@@ -944,7 +944,7 @@ rewrite degM -1?deg_eq0 // => ME eq.
 have {eq}[]: deg p = 1 /\ deg q = 1 by smt(ge0_deg).
 move/deg_eq1=> [cp [nz_cp ->>]]; move/deg_eq1=> [cq [nz_cq ->>]].
 move/poly_eqP: ME => /(_ 0 _) //; rewrite polyCE /=.
-rewrite polyME BCA.big_int1 /= => /unitP @/unitp -> /=.
+rewrite polyME BCA.big_int1 /= => /IDCoeff.unitP @/unitp -> /=.
 by rewrite deg_eq1; exists cp.
 qed.
 
