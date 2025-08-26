@@ -26,6 +26,11 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
+
+(* -------------------------------------------------------------------- *)
+let debug : bool = false
+
+(* -------------------------------------------------------------------- *)
 let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
   {base_red with delta_p = (fun pth ->
   if (EcEnv.Circuit.reverse_operator (LDecl.toenv hyps) pth |> List.is_empty) then
@@ -438,7 +443,7 @@ module TestBack : CBackend = struct
   let get (r: reg) (idx: int) = r.(idx)
 
   let permute (w: int) (perm: int -> int) (r: reg) : reg =
-    Format.eprintf "Applying permutation to reg of size %d with block size of %d@." (size_of_reg r) w;
+    if debug then Format.eprintf "Applying permutation to reg of size %d with block size of %d@." (size_of_reg r) w;
     Array.init (size_of_reg r) (fun i ->
       let block_idx, bit_idx = perm (i / w), (i mod w) in
       if block_idx < 0 then None 
@@ -555,7 +560,7 @@ module TestBack : CBackend = struct
       | 0 -> true
       | 1 ->
         let blocks = block_deps_of_deps w_out d in
-        Format.eprintf "Checking block width...@.";
+        if debug then Format.eprintf "Checking block width...@.";
         Array.fold_left_map (fun idx (width, d) ->
           if Map.is_empty d then idx + width, true
           else
@@ -572,13 +577,13 @@ module TestBack : CBackend = struct
 *)
           ) bits then true else
           begin
-            Format.eprintf "Bad block: [%d..%d] %a@." idx (idx + width - 1) pp_dep d; false
+            if debug then Format.eprintf "Bad block: [%d..%d] %a@." idx (idx + width - 1) pp_dep d; false
           end
         ) 0 blocks |> snd |> Array.for_all (fun x -> x)
       | _ -> 
-        (Format.eprintf "Failed first check@\n"; 
-        Format.eprintf "Map keys: ";
-        Array.iteri (fun i dep ->
+        (if debug then Format.eprintf "Failed first check@\n"; 
+        if debug then Format.eprintf "Map keys: ";
+        if debug then Array.iteri (fun i dep ->
           Format.eprintf "Bit %d: " i;
           List.iter (Format.eprintf "%d") (Map.keys dep |> List.of_enum);
           Format.eprintf "@\n") d;
@@ -618,10 +623,10 @@ module TestBack : CBackend = struct
         Array.fold_left (fun acc d -> 
         Set.union (Map.fold Set.union d Set.empty) acc) Set.empty d
       in
-      Format.eprintf "%a@." pp_deps d;
-      Format.eprintf "Dep range for dependencies:@.";
-      Set.iter (fun i -> Format.eprintf "%d " i) idxs;
-      Format.eprintf "@.Min: %d | Max: %d@." (Set.min_elt idxs) (Set.max_elt idxs);
+      if debug then Format.eprintf "%a@." pp_deps d;
+      if debug then Format.eprintf "Dep range for dependencies:@.";
+      if debug then Set.iter (fun i -> Format.eprintf "%d " i) idxs;
+      if debug then Format.eprintf "@.Min: %d | Max: %d@." (Set.min_elt idxs) (Set.max_elt idxs);
       (Set.min_elt idxs, Set.max_elt idxs + 1)
 
     (* Checks that all dependencies of r are in the set inps *)
@@ -666,7 +671,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Pretty printers *)
   let pp_cinp (fmt: Format.formatter) (inp: cinp) : unit = 
-    Format.eprintf "Input(id: %d, type = %s)" inp.id 
+    Format.fprintf fmt "Input(id: %d, type = %s)" inp.id 
     (match inp.type_ with
     | `CIArray (w, n)  -> Format.sprintf "Array(%d@%d)" n w 
     | `CIBool -> "Bool"
@@ -675,14 +680,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let pp_circ (fmt : Format.formatter) (c: circ) : unit =
     match c with
-    | `CArray (r, w) -> Format.eprintf "Circ(Array[%d@%d])" (Backend.size_of_reg r) w
-    | `CBitstring r -> Format.eprintf "Circ(Bitstring[%d])" (Backend.size_of_reg r)
-    | `CTuple (_, ws) -> Format.eprintf "Circ(Tuple(%a))" (fun fmt szs ->
+    | `CArray (r, w) -> Format.fprintf fmt "Circ(Array[%d@%d])" (Backend.size_of_reg r) w
+    | `CBitstring r -> Format.fprintf fmt "Circ(Bitstring[%d])" (Backend.size_of_reg r)
+    | `CTuple (_, ws) -> Format.fprintf fmt "Circ(Tuple(%a))" (fun fmt szs ->
         Format.fprintf fmt "%d" (List.hd szs); List.iter (Format.fprintf fmt ", %d") (List.tl szs)) ws
-    | `CBool _ -> Format.eprintf "Circ(Bool)"
+    | `CBool _ -> Format.fprintf fmt "Circ(Bool)"
     
   let pp_circuit (fmt: Format.formatter) ((c, inps) : circuit) : unit =
-    Format.eprintf "@[<hov 2>Circuit:@\nOut type %a@\nInputs: %a@]"
+    Format.fprintf fmt "@[<hov 2>Circuit:@\nOut type %a@\nInputs: %a@]"
       pp_circ c
       (fun fmt inps -> List.iter (fun inp -> Format.fprintf fmt "%a@\n" pp_cinp inp) inps) inps
     
@@ -767,7 +772,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | {type_ = `CIBool; id=id_tgt},
         {type_ = `CIBool; id=id_orig} ->
           Map.add (id_orig, 0) (Backend.input_node ~id:id_tgt 0) map
-      | _ -> Format.eprintf "Mismatched inputs:@\nInp1: %a@\nInp2: %a@\n" pp_cinp inp1 pp_cinp inp2; assert false 
+      | _ -> if debug then Format.eprintf "Mismatched inputs:@\nInp1: %a@\nInp2: %a@\n" pp_cinp inp1 pp_cinp inp2; assert false 
     ) Map.empty target inps in
     fun inp -> Map.find_opt inp map
 
@@ -976,7 +981,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       assert (List.for_all2 (fun c cinp -> circuit_input_compatible c cinp) args (snd c))
     with 
       Assert_failure _ -> 
-        Format.eprintf "Error on application:@\nTarget:%a@\n@[<hov 2>Args:%a@]@\n"
+        if debug then Format.eprintf "Error on application:@\nTarget:%a@\n@[<hov 2>Args:%a@]@\n"
         pp_circuit c
         (fun fmt cs -> List.iter (Format.fprintf fmt "%a@\n" pp_circuit) cs) args;
         assert false
@@ -1039,7 +1044,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         | [ `Circuit (`CArray (r, w'), cinps) ; `Constant i ] when w = w' ->
           (`CBitstring (Backend.slice r (BI.to_int i) m), cinps)
         | args -> 
-          Format.eprintf "Bad arguments for array slice get: w = %d@.%a@." w
+          if debug then Format.eprintf "Bad arguments for array slice get: w = %d@.%a@." w
           (fun fmt args -> List.iter (Format.fprintf fmt "%a@\n" pp_arg) args) args;
           assert false
         end
@@ -1049,7 +1054,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let i = BI.to_int i in
           (`CArray (Backend.insert arr i bs, w), merge_inputs arrinps bsinps) 
         | args -> 
-          Format.eprintf "Bad arguments for array slice set:@.w=%d@.%a@." w
+          if debug then Format.eprintf "Bad arguments for array slice set:@.w=%d@.%a@." w
           (fun fmt args -> List.iter (Format.fprintf fmt "%a@\n" pp_arg) args) args;
           assert false
         end
@@ -1330,7 +1335,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       with 
         Invalid_argument _ -> assert false 
       | Assert_failure e -> 
-        Format.eprintf "Array set size mismatch arr[%d (bits)@%d (block size)], w@%d@." 
+          if debug then Format.eprintf "Array set size mismatch arr[%d (bits)@%d (block size)], w@%d@." 
           (Backend.size_of_reg r) 
           w 
           (Backend.size_of_reg bs);
@@ -1340,7 +1345,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
       let circs, inps = List.split circs in
       let dif = len - List.length circs in
-(*       Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif; *)
+(*       if debug then Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif; *)
       let circs = circs @ (List.init dif (fun _ -> fst dfl)) in
       let inps = if dif > 0 then inps @ [snd dfl] else inps in
       let circs = List.map 
@@ -1402,7 +1407,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           begin try 
             Option.get (EcEnv.Circuit.lookup_bitstring env t) 
           with Invalid_argument _ -> 
-            Format.eprintf "Failed to fetch type binding for type %a (with path: %s) @\n" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t (EcPath.tostring p);
+            if debug then Format.eprintf "Failed to fetch type binding for type %a (with path: %s) @\n" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t (EcPath.tostring p);
             assert false
           end 
         in let cbs, cinp = new_cbitstring_inp ~name:(`Idn idn) bs_info.size in
@@ -1471,7 +1476,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       if Backend.has_bad b then Some 0 else None
 
   let circ_equiv ?(pcond:(cbool * cinp list) option) ((c1, inps1): circuit) ((c2, inps2): circuit) : bool = 
-(*     let () = Format.eprintf "c1: %a@\nc2: %a@\n" pp_circuit  (c1, inps1) pp_circuit (c2, inps2) in *)
+(*     let () = if debug then Format.eprintf "c1: %a@\nc2: %a@\n" pp_circuit  (c1, inps1) pp_circuit (c2, inps2) in *)
     let pcc = match pcond with
     | Some (`CBool b, pcinps) -> 
         Backend.apply (unify_inputs_renamer inps1 pcinps) b
@@ -1509,7 +1514,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     Backend.sat ~inps c 
     
   let circ_taut (c: circuit) : bool = 
-    Format.eprintf "Calling circ_taut on circuit: %a@." pp_circuit c;
+    if debug then Format.eprintf "Calling circ_taut on circuit: %a@." pp_circuit c;
     let `CBool c, inps = cbool_of_circuit ~strict:false c in
     let inps = List.map (function 
       | { type_ = `CIBool; id } -> (id, 1)
@@ -1590,11 +1595,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let deps = Backend.Deps.deps_of_reg r in
       Backend.Deps.is_splittable in_w out_w deps &&
       let base, top = Backend.Deps.dep_range deps in
-      let () = Format.eprintf "Passed backend check, checking width of deps (top - base = %d | in_w = %d)@." (top - base) in_w in
+      let () = if debug then Format.eprintf "Passed backend check, checking width of deps (top - base = %d | in_w = %d)@." (top - base) in_w in
       (top - base) mod in_w = 0
     | _ -> 
-        Format.eprintf "Failed decomposition type check@\n";
-        Format.eprintf "In_w: %d | Out_w : %d | Circ: %a" in_w out_w pp_circuit c;
+        if debug then Format.eprintf "Failed decomposition type check@\n";
+        if debug then Format.eprintf "In_w: %d | Out_w : %d | Circ: %a" in_w out_w pp_circuit c;
         false
 
   (* TODO: Extend this for multiple inputs? *)
@@ -1632,7 +1637,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | None, _ -> fun (id_, w) -> None
       | Some (sz, offset), {id} ->
       (fun (id_, w) ->
-        Format.eprintf "Aligning id=%d w=%d offset=%d sz=%d@." id_ w offset sz;
+        if debug then Format.eprintf "Aligning id=%d w=%d offset=%d sz=%d@." id_ w offset sz;
         if id <> id_ then None else
         if w < offset || w >= offset + sz then Some Backend.bad
         else Some (Backend.input_node ~id (w - offset)))
@@ -1654,15 +1659,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     match c with 
     | `CArray (r, w) when sz mod w = 0 && offset mod w = 0 -> `CArray (Backend.slice r offset sz, w), inps
     | `CArray (r, w) -> 
-        Format.eprintf "Flattening array to bitstring in order to slice@.";
+        if debug then Format.eprintf "Flattening array to bitstring in order to slice@.";
         `CBitstring (Backend.slice r offset sz), inps
     | `CBitstring r -> 
         `CBitstring (Backend.slice r offset sz), inps
     | `CTuple (r, szs) -> 
-        Format.eprintf "Cannot slice tuple circuit@.";
+        if debug then Format.eprintf "Cannot slice tuple circuit@.";
         assert false
     | `CBool b -> 
-        Format.eprintf "Cannot slice boolean circuit@.";
+        if debug then Format.eprintf "Cannot slice boolean circuit@.";
         assert false
 
   let split_renamer (n: count) (in_w: width) (inp: cinp) : (cinp array) * (Backend.inp -> cbool_type option) =
@@ -1675,7 +1680,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let id_idx, bit_idx = (w / in_w), (w mod in_w) in
           Some (Backend.input_node ~id:ids.(id_idx) bit_idx))
     | {type_ = `CIBitstring w; id}  ->
-        Format.eprintf "Failed to build split renamer for n=%d in_w=%d w=%d@." n in_w w; 
+        if debug then Format.eprintf "Failed to build split renamer for n=%d in_w=%d w=%d@." n in_w w; 
         assert false
     | _ -> assert false
 
@@ -1691,7 +1696,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list * (int * int) = 
     if not (is_decomposable in_w out_w c) then 
       let deps = Backend.Deps.block_deps_of_reg out_w r in
-      Format.eprintf "Failed to decompose. in_w=%d out_w=%d Deps:@.%a" in_w out_w (Backend.Deps.pp_block_deps) deps;
+      if debug then Format.eprintf "Failed to decompose. in_w=%d out_w=%d Deps:@.%a" in_w out_w (Backend.Deps.pp_block_deps) deps;
       assert false 
     else
     let n = (Backend.size_of_reg r) / out_w in
@@ -1793,7 +1798,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     match c, inps with
     | `CBitstring r, {type_ = `CIBitstring w; id}::[] -> (* TODO: rename inputs? *)
       Backend.reg_to_file ~input_count:w ~name (Backend.applys (fun (id_, i) -> if id_ = id then Some (Backend.input_node ~id:0 (i+1)) else None) r)
-    | _ -> Format.eprintf "Unsupported circuit for output, only one input one output supported@."; assert false
+    | _ -> if debug then Format.eprintf "Unsupported circuit for output, only one input one output supported@."; assert false
 end
 
 module ExampleInterface = MakeCircuitInterfaceFromCBackend(TestBack)
@@ -1838,7 +1843,7 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-      Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
+      if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
       assert false
 
 let form_is_iter (f: form) : bool = 
@@ -1860,9 +1865,9 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
   | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iteri -> 
     let rep = int_of_form hyps rep in
     let is = List.init (BI.to_int rep) BI.of_int in
-    Format.eprintf "Done generating functions!@.";
+    if debug then Format.eprintf "Done generating functions!@.";
     let f = List.fold_left (fun f i -> 
-      Format.eprintf "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
+      if debug then Format.eprintf "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f
       ;
       fn @!! [f_int i; f]
@@ -1880,7 +1885,7 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
     f
   | _ -> assert false
   in
-  Format.eprintf "Expanded iter form: @.%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) res;
+  if debug then Format.eprintf "Expanded iter form: @.%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) res;
   res
 
 let (op_cache : circuit Mp.t ref) = ref Mp.empty
@@ -1901,7 +1906,7 @@ let circuit_of_form
       res
     in
 (*
-    Format.eprintf "Translating form : %a (is iter form: %s)@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_
+    if debug then Format.eprintf "Translating form : %a (is iter form: %s)@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_
     (if form_is_iter f_ then "yes" else "no")
     ;
 *)
@@ -1918,17 +1923,17 @@ let circuit_of_form
         | OB_oper (Some (OP_Plain f)) -> 
           f
         | _ -> 
-          Format.eprintf "Failed to get body for op: %a\n" 
+          if debug then Format.eprintf "Failed to get body for op: %a\n" 
           (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
           assert false
       in
 (*
-      Format.eprintf "Propagating arguments for op: %a@\n" 
+      if debug then Format.eprintf "Propagating arguments for op: %a@\n" 
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
 *)
       let res = fapply_safe op args in 
 (*
-      Format.eprintf "Result: %a" 
+      if debug then Format.eprintf "Result: %a" 
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) res;
 *)
       res
@@ -1987,7 +1992,7 @@ let circuit_of_form
     | Fop (pth, _) -> 
       begin
       if pth = EcCoreLib.CI_Witness.p_witness then 
-          (Format.eprintf "Assigning witness to var of type %a@." 
+          (if debug then Format.eprintf "Assigning witness to var of type %a@." 
           EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty;
           hyps, circuit_uninit env (f_.f_ty))
       else
@@ -2002,11 +2007,9 @@ let circuit_of_form
       else
         let hyps, circ = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper (Some (OP_Plain f)) -> 
-(*             Format.eprintf "[BDEP] Opening definition of function at path %s" (EcPath.tostring pth); *)
+(*             if debug then Format.eprintf "[BDEP] Opening definition of function at path %s" (EcPath.tostring pth); *)
           doit cache hyps f
-        | _ when pth = EcCoreLib.CI_Witness.p_witness ->
-          assert false;
-          hyps, circuit_uninit env (f_.f_ty)
+        | _ when pth = EcCoreLib.CI_Witness.p_witness -> assert false
         | _ -> 
         begin match EcFol.op_kind (destr_op f_ |> fst) with
           | Some `True -> 
@@ -2032,7 +2035,7 @@ let circuit_of_form
       | {f_node = Fop _} when form_is_iter f_ -> 
         trans_iter cache hyps f fs
       | {f_node = Fop (p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
-(*           Format.eprintf "Attempting to propagate interger arguments for op with path %s@." (EcPath.tostring p); *)
+(*           if debug then Format.eprintf "Attempting to propagate interger arguments for op with path %s@." (EcPath.tostring p); *)
           doit cache hyps (propagate_integer_arguments f fs)
       | {f_node = Fop _} -> 
       (* Assuming correct types coming from EC *)
@@ -2121,7 +2124,7 @@ let circuit_of_form
       let v = match pstate_get_opt pstate v with
       | Some v -> v
       | None -> 
-          Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv (PPEnv.ofenv env)) pv EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty; 
+          if debug then Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv (PPEnv.ofenv env)) pv EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty; 
           circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
       in
       hyps, v
@@ -2151,7 +2154,7 @@ let circuit_of_form
         fapply_safe fn [f_int (BI.of_int i)]
       ) in
       List.fold_lefti (fun (hyps, f) i fn -> 
-        Format.eprintf "Translating iteri... Step #%d@." i;
+        if debug then Format.eprintf "Translating iteri... Step #%d@." i;
         let hyps, fn = doit cache hyps fn in
         hyps, circuit_compose fn [f]
       ) (doit cache hyps base) fs
@@ -2161,13 +2164,13 @@ let circuit_of_form
   in 
 (*
   let t0 = Unix.gettimeofday () in
-  let () = Format.eprintf "Translating form %a@\n" (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
+  let () = if debug then Format.eprintf "Translating form %a@\n" (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
 *)
 
   let hyps, f_c = doit cache hyps f_ in
 
 (*
-  let () = Format.eprintf "Took %.2f s to translate form : %a@." (Unix.gettimeofday () -. t0) 
+  let () = if debug then Format.eprintf "Took %.2f s to translate form : %a@." (Unix.gettimeofday () -. t0) 
   (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
 *)
 
@@ -2193,17 +2196,17 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
 
 let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : pstate =
   let env = toenv hyps in
-(*   Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
+(*   if debug then Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
 (*
-      Format.eprintf "Assigning form %a to var %s@\n" 
+      if debug then Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
       let pstate = update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
-      (* Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
+      (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
       pstate
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let pstate = List.fold_left (fun pstate (v, e) ->
@@ -2322,7 +2325,7 @@ let rec circ_simplify_form_bitstring_equality
       ->
       let c1 = circuit_of_form ~pstate hyps f1 in
       let c2 = circuit_of_form ~pstate hyps f2 in
-      (*Format.eprintf "[W]Testing circuit equivalence for forms:*)
+      (*if debug then Format.eprintf "[W]Testing circuit equivalence for forms:*)
       (*%a@.%a@.With circuits: %s | %s@."*)
       (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1*)
       (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f2*)
@@ -2396,7 +2399,7 @@ let circuit_flatten (c: circuit) =
 (* TODO: get a better name and uniformize *)
 let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f =
   let (pstate, cache, f), bnds = List.fold_left_map (fun (pstate, cache, goal) (id, lk) ->
-      Format.eprintf "Processing hyp: %s@." (id.id_symb);
+      if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
       match lk with
       | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
         let pstate, bnds = List.fold_left_map (fun pstate {ov_name; ov_type} -> 
@@ -2422,7 +2425,7 @@ let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hy
             ignore (circuit_of_form ~pstate ~cache hyps f_hyp);
             (pstate, cache, f_imp f_hyp goal), []
           with e -> 
-            Format.eprintf "Failed to convert hyp %a with error:@.%s@."
+            if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
             EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
             (pstate, cache, goal), []
           end
@@ -2431,6 +2434,6 @@ let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hy
   ) (pstate, cache, f) (List.rev (tohyps hyps).h_local)
   in 
   let bnds = List.flatten bnds in
-  Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
+  if debug then Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
   close_circ_lambda (toenv hyps) bnds @@
   circuit_of_form ~pstate ~cache hyps f

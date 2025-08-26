@@ -42,9 +42,9 @@ let int_of_form (hyps: hyps) (f: form) : BI.zint =
       raise (BDepError err)
     end
 
-let time (t: float) (msg: string) : float =
+let time (env: env) (t: float) (msg: string) : float =
   let new_t = Unix.gettimeofday () in
-  Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
+  EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
   new_t
 
 let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : circuit =
@@ -73,28 +73,27 @@ let mapreduce
   (perm: (int -> int) option)
   : unit =
 
-  if debug then Format.eprintf "[W] DEBUG@." else Format.eprintf "[W] NO DEBUG@.";
-
   let tm = Unix.gettimeofday () in
+  let env = toenv hyps in
   
   let fc = try 
     circ_of_qsymbol hyps ([], f.pl_desc) 
     with BDepError err -> 
       raise (BDepError ("Lane function circuit generation failed with error:\n" ^ err))
   in
-  if debug then Format.eprintf "[W] Writing lane function to file %s...@." @@ circuit_to_file ~name:"lane_function" fc;
+  if debug then EcEnv.notify ~immediate:true env `Warning "Writing lane function to file %s...@." @@ circuit_to_file ~name:"lane_function" fc;
 
-  let tm = time tm "Lane function circuit generation done" in
+  let tm = time env tm "Lane function circuit generation done" in
   
   let pcondc = try 
     circ_of_qsymbol hyps ([], pcond.pl_desc) 
     with BDepError err ->
       raise (BDepError ("Precondition circuit generation failed with error:\n" ^ err))
   in
-  if debug then Format.eprintf "[W] Writing precondition function to file %s...@." @@ circuit_to_file ~name:"pcond" pcondc;
+  if debug then EcEnv.notify ~immediate:true env `Warning "Writing precondition function to file %s...@." @@ circuit_to_file ~name:"pcond" pcondc;
 
   
-  let tm = time tm "Precondition circuit generation done" in
+  let tm = time env tm "Precondition circuit generation done" in
   
   let pinvs = List.fst invs in
   let pstate = try 
@@ -103,7 +102,7 @@ let mapreduce
     raise (BDepError err)
   in
 
-  let tm = time tm "Program circuit generation done" in
+  let tm = time env tm "Program circuit generation done" in
 
   begin 
     let circs = List.map (function 
@@ -114,7 +113,7 @@ let mapreduce
       outvs 
     in
     List.iteri (fun i c -> match circuit_has_uninitialized c with
-      | Some j -> Format.eprintf "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
+      | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs;
 
     (* This is required for now as we do not allow mapreduce with multiple arguments *)
@@ -144,7 +143,7 @@ let mapreduce
         raise (BDepError "Failed to concatenate outputs")
     in
 
-    if debug then Format.eprintf "[W] Writing program circuit before mapreduce to file %s...@." @@ circuit_to_file ~name:"prog_no_mapreduce" c;
+    if debug then EcEnv.notify ~immediate:true env `Info "Writing program circuit before mapreduce to file %s...@." @@ circuit_to_file ~name:"prog_no_mapreduce" c;
 
     let cs, mr_range = try 
       circuit_mapreduce ?perm c n m 
@@ -152,26 +151,26 @@ let mapreduce
         raise (BDepError err)
     in
 
-    let tm = time tm "circuit dependecy analysis + splitting done" in
+    let tm = time env tm "circuit dependecy analysis + splitting done" in
 
-    if debug then Format.eprintf "[W] Writing lane 0 circit to file %s...@." @@ circuit_to_file ~name:"lane_0" (List.hd cs);
+    if debug then EcEnv.notify ~immediate:true env `Info "Writing lane 0 circit to file %s...@." @@ circuit_to_file ~name:"lane_0" (List.hd cs);
 
     List.iteri (fun i c -> 
-    if debug then Format.eprintf "[W] Writing lane %d circit to file %s...@." (i+1) @@ circuit_to_file ~name:("lane_" ^ (string_of_int (i+1))) c;
+    if debug then EcEnv.notify ~immediate:true env `Info "Writing lane %d circit to file %s...@." (i+1) @@ circuit_to_file ~name:("lane_" ^ (string_of_int (i+1))) c;
     if circ_equiv ~pcond:pcondc (List.hd cs) c 
       then ()
       else let err = Format.sprintf "Equivalence check failed between lanes 0 and %d" (i+1) 
         in raise (BDepError err)) 
     (List.tl cs);
 
-    let tm = time tm "Program lanes equivs done" in
+    let tm = time env tm "Program lanes equivs done" in
     
     if circ_equiv ~pcond:pcondc (List.hd cs) fc then () 
     else raise (BDepError "Equivalence failed between lane 0 and lane function");
 
-    let _tm = time tm "Program to lane func equiv done" in
+    let _tm = time env tm "Program to lane func equiv done" in
     
-    Format.eprintf "Success@."
+    EcEnv.notify ~immediate:true env `Info "Success@."
   end 
 
 
@@ -185,6 +184,7 @@ let prog_equiv_prod
   (pcond : form option)
   (preprocess : bool ): unit =
   
+  let env = toenv hyps in 
 
   let pcond = try 
     Option.map (circuit_of_form hyps) pcond 
@@ -198,13 +198,13 @@ let prog_equiv_prod
   with CircError err ->
     raise (BDepError err)
   in
-  let tm = time tm "Left program generation done" in
+  let tm = time env tm "Left program generation done" in
   let pstate_r : pstate = try
     EcCircuits.pstate_of_prog hyps memr proc_r.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
-  let tm = time tm "Right program generation done" in
+  let tm = time env tm "Right program generation done" in
 
   begin 
     let circs_l = List.map (fun v -> pstate_get pstate_l v) 
@@ -213,11 +213,11 @@ let prog_equiv_prod
                   (List.map (fun v -> v.v_name) outvs_r) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
-      | Some j -> Format.eprintf "Bit %d of input %d of the left program has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
+      | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d of the left program has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs_l;
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
-      | Some j -> Format.eprintf "Bit %d of input %d of the right program has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
+      | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d of the right program has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs_r;
 
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_l = 1); *)
@@ -244,19 +244,19 @@ let prog_equiv_prod
     in
 
 
-    let tm = time tm "Preprocessing for mapreduce done" in
+    let tm = time env tm "Preprocessing for mapreduce done" in
     let lanes_l, mr_range_l = try 
       circuit_mapreduce c_l n m 
       with CircError err ->
         raise (BDepError ("Left program split step failed with error:\n" ^ err))
     in
-    let tm = time tm "Left program deps + split done" in
+    let tm = time env tm "Left program deps + split done" in
     let lanes_r, mr_range_r = try 
       circuit_mapreduce c_r n m 
       with CircError err ->
         raise (BDepError ("Right program split step failed with error:\n" ^ err))
     in
-    let tm = time tm "Right program deps + split done" in
+    let tm = time env tm "Right program deps + split done" in
 
     if preprocess then
         begin
@@ -266,17 +266,17 @@ let prog_equiv_prod
           else let err = Format.sprintf "Left program lane equiv failed between lanes 0 and %d@." (i+i)
             in raise (BDepError err)) 
         (List.tl lanes_l)); 
-        let tm = time tm "Left program lanes equiv done" in
+        let tm = time env tm "Left program lanes equiv done" in
         (List.iteri (fun i c -> 
           if circ_equiv ?pcond (List.hd lanes_r) c 
           then () 
           else let err = Format.sprintf "Right program lane equiv failed between lanes 0 and %d@." (i+i)
             in raise (BDepError err)) 
         (List.tl lanes_r)); 
-        let tm = time tm "Right program lanes equiv done" in
+        let tm = time env tm "Right program lanes equiv done" in
         if (circ_equiv ?pcond (List.hd lanes_l) (List.hd lanes_r)) 
         then
-          time tm "First lanes equiv done" |> ignore
+          time env tm "First lanes equiv done" |> ignore
         else
           raise (BDepError "Lane equiv failed between first lane of left and right programs")
         end
@@ -287,7 +287,7 @@ let prog_equiv_prod
           then () 
           else let err = Format.sprintf "Lane equivalence failed between programs for lane %d@." i in
             raise (BDepError err)) lanes_l lanes_r;
-        time tm "Program lane equivs done" |> ignore
+        time env tm "Program lane equivs done" |> ignore
         end
   end 
 
@@ -323,7 +323,7 @@ let circ_form_eval_plus_equiv
       in raise (BDepError err)
   in
   let rec test_values (size: int) (cur: BI.zint) : bool =
-    Format.eprintf "[W] Testing for var = %s@." (BI.to_string cur);
+    EcEnv.notify ~immediate:true env `Info "Testing for var = %s@." (BI.to_string cur);
     if Z.numbits (BI.to_zt cur) > size then
     true
     else
@@ -348,20 +348,18 @@ let circ_form_eval_plus_equiv
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
     let pcond = match pstate_get_opt pstate v.v_name with
       | Some circ -> begin try 
-        Option.may (fun i -> Format.eprintf "Bit %d of precondition circuit has dependency on uninitialized inputs@." i) @@ circuit_has_uninitialized circ;
+        Option.may (fun i -> EcEnv.notify ~immediate:true env `Critical "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; assert false) @@ circuit_has_uninitialized circ;
         Some (circuit_ueq circ (circuit_of_form hyps cur_val))
         with CircError err ->
           raise (BDepError ("Failed to generate circuit for current value precondition with error:\n" ^ err))
         end
       | None -> None
     in
-    (*let () = Format.eprintf "Form before circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in*)
     let f = EcCallbyValue.norm_cbv redmode hyps f in
-    (*let () = Format.eprintf "Form after circuit simplify %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f in*)
     let f = EcCircuits.circ_simplify_form_bitstring_equality ~mem ~pstate ?pcond hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
     if f <> f_true then
-    (Format.eprintf "Got %a after reduction@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
+    (EcEnv.notify ~immediate:true env `Critical "Got %a after reduction@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
     false)
     else
     test_values size (BI.(add cur one))
@@ -387,7 +385,7 @@ let mapreduce_eval
   let fc = EcEnv.Op.lookup ([], f.pl_desc) env |> fst in
   let (@@!) = EcTypesafeFol.f_app_safe env in 
 
-  let tm = time tm "Lane function circuit generation done" in
+  let tm = time env tm "Lane function circuit generation done" in
   
   let pstate = try 
     EcCircuits.pstate_of_prog hyps mem proc.s_node invs 
@@ -395,13 +393,13 @@ let mapreduce_eval
     raise (BDepError err)
   in
 
-  let tm = time tm "Program circuit generation done" in
+  let tm = time env tm "Program circuit generation done" in
 
   begin 
     let circs = List.map (fun v -> pstate_get pstate v) (List.map (fun v -> v.v_name) outvs) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
-      | Some j -> Format.eprintf "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
+      | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs;
 
     let c = try 
@@ -422,7 +420,7 @@ let mapreduce_eval
         raise (BDepError ("Split step failed with error:\n" ^ err))
     in
 
-    let tm = time tm "circuit dependecy analysis + splitting done" in
+    let tm = time env tm "circuit dependecy analysis + splitting done" in
 
     List.iteri (fun i c -> 
       if circ_equiv (List.hd cs) c 
@@ -432,7 +430,7 @@ let mapreduce_eval
     )
     (List.tl cs);
 
-    let tm = time tm "Program lanes equivs done" in
+    let tm = time env tm "Program lanes equivs done" in
 
 
     List.iter (fun v ->
@@ -450,7 +448,7 @@ let mapreduce_eval
       in raise (BDepError err)
     ) range;
 
-    time tm "Program to lane func equiv done" |> ignore
+    time env tm "Program to lane func equiv done" |> ignore
   end 
 
 let w2bits (env: env) (ty: ty) (arg: form) : form = 
@@ -741,10 +739,10 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     in width_of_type env t ) 
   inpvs) in 
 
-  Format.eprintf "in_size : %d | block_size: %d@." in_size n;
+  EcEnv.notify ~immediate:true env `Info "in_size : %d | block_size: %d@." in_size n;
   assert (in_size mod n = 0);
   let in_block_nr = in_size / n in
-  Format.eprintf "in_block_nr: %d | out_block_nr: %d@." in_block_nr out_block_nr;
+  EcEnv.notify ~immediate:true env `Info "in_block_nr: %d | out_block_nr: %d@." in_block_nr out_block_nr;
   assert (in_block_nr = out_block_nr);
 
   let finpvs = List.map form_of_var inpvs in
