@@ -2042,6 +2042,10 @@ let circuit_of_form
           let hyps, c1 = doit cache hyps f1 in
           let hyps, c2 = doit cache hyps f2 in
           hyps, (circuit_eq c1 c2 :> circuit)
+        | Some `Not, [f] -> 
+          let hyps, c = doit cache hyps f in
+          let c = cbool_of_circuit c in
+          hyps, (circuit_not c :> circuit)
         (* FIXME: Should this be here on inside the module? *)
         | Some `True, [] ->
           hyps, (circuit_true :> circuit)
