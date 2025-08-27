@@ -304,12 +304,11 @@ let destr_sub_maxr f1 f2 =
   let fe1, fe2 = DestrReal.sub f1 in
   let fe1b', fe2b' = destr_maxr f2 in
   let pre1, pre2, prb1_ = t3_map destr_pr (fe1, fe2, fe1b') in
-  let mpr = prb1_.pr_mem in
   let bad =
     let b = try snd (map_ss_inv_destr2 destr_and prb1_.pr_event) with DestrError _ -> prb1_.pr_event in
     destr_bad b in
-  let fbad = f_pvar bad tbool mpr in
   let e = pre1.pr_event in
+  let fbad = f_pvar bad tbool e.m in
   let fnbad = map_ss_inv1 f_not fbad in
   let fenb = map_ss_inv2 f_and e fnbad in
   let feb   = map_ss_inv2 f_and e fbad in
@@ -353,10 +352,9 @@ let process_uptobad tc =
   | SFop((o,_), [f1; f]) when EcPath.p_equal o p_real_le ->
     begin match sform_of_form f1 with
     | SFpr pr1 ->
-      let mpr = pr1.pr_mem in
       (* Pr[G1 : E] <= Pr[G2 : E [/\ !bad]] + Pr[G1: [E /\] bad] *)
       let f2, fb = DestrReal.add f in
-        let pr2, e, bad =
+      let pr2, e, bad =
         try
           let pr2, prb = t2_map destr_pr (f2, fb) in
           let bad =
@@ -367,7 +365,7 @@ let process_uptobad tc =
           pr2, e, bad
         with DestrError _ -> error_add tc in
 
-      let fbad = (f_pvar bad tbool mpr) in
+      let fbad = (f_pvar bad tbool e.m) in
       let fnbad = map_ss_inv1 f_not fbad in
       let pr1b, pr1nb, pr2nb =
         f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and e fbad),

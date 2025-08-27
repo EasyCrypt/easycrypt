@@ -437,7 +437,8 @@ let process_eqs env tc f =
 (* -------------------------------------------------------------------- *)
 let process_hint ml mr tc hyps (feqs, inv) =
   let env = LDecl.toenv hyps in
-  let doinv pf = TTC.tc1_process_prhl_form tc tbool pf in
+  let ienv = LDecl.push_active_ts (EcMemory.abstract ml) (EcMemory.abstract mr) hyps in
+  let doinv pf = {ml;mr;inv=TTC.pf_process_form !!tc ienv tbool pf} in
   let doeq pf = process_eqs env tc (doinv pf) in
   let dof g = omap (EcTyping.trans_gamepath env) g in
   let geqs =
@@ -498,8 +499,10 @@ let process_eqobs_inF info tc =
   let fl = ef.ef_fl and fr = ef.ef_fr in
   let eqo =
     match info.EcParsetree.sim_eqs with
-    | Some pf ->
-      process_eqs env tc (TTC.tc1_process_prhl_form tc tbool pf)
+    | Some pf -> 
+      let _,(mle,mre) = Fun.equivF_memenv ml mr fl fr env in
+      let hyps = LDecl.push_active_ts mle mre hyps in
+      process_eqs env tc {ml; mr; inv=TTC.pf_process_form !!tc hyps tbool pf}
     | None ->
       try Mpv2.needed_eq env (ef_po ef)
       with _ -> tc_error !!tc "cannot infer the set of equalities" in

@@ -507,6 +507,7 @@ let t_eager_r h inv tc =
   check_only_global !!tc env s';
 
   let eC, c, c' = tc1_destr_eagerS tc s s' in
+  let ml, mr = fst eC.es_ml, fst eC.es_mr in
   let eqinv = Mpv2.of_form env inv in
   let eqO = Mpv2.of_form env (es_po eC) in
   let c1, c1', fhyps, eqi = eager !!tc env s s' eqinv eqIs eqXs c c' eqO in
@@ -518,19 +519,19 @@ let t_eager_r h inv tc =
     let defl = Fun.by_xpath fl env in
     let defr = Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
-    let eq_res = ts_inv_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+    let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
     let post = Mpv2.to_form_ts_inv eqo eq_res in
     let eq_params =
       ts_inv_eqparams
-        sigl.fs_arg sigl.fs_anames mleft
-        sigr.fs_arg sigr.fs_anames mright in
+        sigl.fs_arg sigl.fs_anames ml
+        sigr.fs_arg sigr.fs_anames mr in
     let pre = map_ts_inv2 f_and_simpl eq_params inv in
     f_eagerF pre s fl fr s' post
   in
 
   let concl =
     f_equivS (snd eC.es_ml) (snd eC.es_mr) (es_pr eC) (stmt []) (stmt [])
-      (Mpv2.to_form_ts_inv eqi {ml=mleft;mr=mright;inv=f_true}) in
+      (Mpv2.to_form_ts_inv eqi {ml;mr;inv=f_true}) in
 
   let concls = List.map dof fhyps in
 

@@ -296,14 +296,16 @@ let t_equiv_deno_bad pre tc =
   let env, _hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and prb = destr_pr fprb in
-  let fand = map_ss_inv2 f_and pr2.pr_event (map_ss_inv1 f_not prb.pr_event) in
+  let m = prb.pr_event.m in
+  let ev2 = ss_inv_rebind pr2.pr_event m in
+  let fand = map_ss_inv2 f_and ev2 (map_ss_inv1 f_not prb.pr_event) in
   let pro = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_or fand prb.pr_event) in
   let pra = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args fand in
   let t_false tc = t_apply_prept (`UG real_upto_false) tc in
   let ml, mr = pre.ml, pre.mr in
   let post =
     let ev1 = ss_inv_generalize_as_left pr1.pr_event ml mr in
-    let ev2 = ss_inv_generalize_as_right pr2.pr_event ml mr in
+    let ev2 = ss_inv_generalize_as_right ev2 ml mr in
     let bad2 = ss_inv_generalize_as_right prb.pr_event ml mr in
     map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) (map_ts_inv2 f_imp ev1 ev2) in
 

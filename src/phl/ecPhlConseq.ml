@@ -30,6 +30,8 @@ let conseq_cond_ts pre post spre spost =
 { F } c { f }
  *)
 let conseq_econd pre post spre spost =
+  let spre = ss_inv_rebind spre pre.m in
+  let spost = ss_inv_rebind spost post.m in
   map_ss_inv2 f_xreal_le spre pre, map_ss_inv2 f_xreal_le post spost
 
 let bd_goal_r fcmp fbd cmp bd =
@@ -773,6 +775,8 @@ let t_equivS_conseq_bd side pr po tc =
   if not (ts_inv_alpha_eq hyps pos (es_po es)) then
     tc_error !!tc "invalid pre- or post-condition";
   let f_r1 = {m=fst m; inv=f_r1} in
+  let pr = ss_inv_rebind pr (fst m) in
+  let po = ss_inv_rebind po (fst m) in
   let g1 = f_bdHoareS (snd m) pr s po FHeq f_r1 in
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
