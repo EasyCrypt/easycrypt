@@ -33,7 +33,7 @@ let why3dflconf = Filename.concat XDG.home "why3.conf"
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
-  pc_ini      : string option;
+  pc_ini      : string list;
   pc_loadpath : (EcLoader.namespace option * string) list;
 }
 
@@ -63,10 +63,17 @@ let print_config config =
   | Some f -> Format.eprintf "  %s@\n%!" f end;
 
   (* Print EC configuration file location *)
+  Format.eprintf "EasyCrypt system configuration directory@\n%!";
+  Format.eprintf "  %s@\n%!" Sites.config;
+
   Format.eprintf "EasyCrypt configuration file@\n%!";
   begin match config.pc_ini with
-  | None   -> Format.eprintf "  <none>@\n%!"
-  | Some f -> Format.eprintf "  %s@\n%!" f end;
+  | []    -> Format.eprintf "  <none>@\n%!"
+  | names ->
+      List.iter
+        (fun name -> Format.eprintf "  %s@\n%!" name)
+        names
+  end;
 
   (* Print list of known provers *)
   begin
@@ -117,8 +124,8 @@ let main () =
   let (module Sites) = EcRelocate.sites in
 
   (* Parse command line arguments *)
-  let conffile, options =
-    let conffile =
+  let conffiles, options =
+    let sysfile =
       let xdgini =
         XDG.Config.file
           ~exists:true ~mode:`All ~appname:EcVersion.app
@@ -130,6 +137,19 @@ let main () =
             let conffile = List.fold_left Filename.concat src ["etc"; confname] in
             if Sys.file_exists conffile then Some conffile else None) in
       List.Exceptionless.hd (Option.to_list localini @ xdgini) in
+
+    let partfiles =
+      if Sys.file_exists Sites.config then
+        Sys.readdir Sites.config
+        |> Array.to_seq
+        |> Seq.filter (fun name -> String.lowercase_ascii (Filename.extension name) = ".conf")
+        |> Seq.map (Filename.concat Sites.config)
+        |> Seq.filter (fun p -> Sys.file_exists p && not (Sys.is_directory p))
+        |> List.of_seq
+        |> List.sort String.compare
+      else [] in
+
+    let conffiles = List.ocons sysfile partfiles in
 
     let projfile (path : string option) =
       let rec find (path : string) : string option =
@@ -168,11 +188,12 @@ let main () =
 
     let getini (path : string option) =
       let inisys =
-        Option.bind conffile (fun conffile ->
-          Option.map
-            (fun ini -> { inic_ini = ini; inic_root = None; })
-            (read_ini_file conffile)
-        )
+        List.filter_map
+          (fun conffile ->
+            Option.map
+              (fun ini -> { inic_ini = ini; inic_root = None; })
+              (read_ini_file conffile))
+          conffiles
       in
 
       let iniproj =
@@ -186,9 +207,9 @@ let main () =
         )
       in
 
-      List.filter_map identity [iniproj; inisys] in
+      List.ocons iniproj inisys in
 
-    (conffile, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
+    (conffiles, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
 
   (* Execution of eager commands *)
   begin
@@ -400,7 +421,7 @@ let main () =
     | `Config ->
         let config = {
           pc_why3     = why3conf;
-          pc_ini      = conffile;
+          pc_ini      = conffiles;
           pc_loadpath = EcCommands.loadpath ();
         } in
 
