@@ -689,8 +689,8 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
               subst
             else 
               Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
-            assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
-            let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
+          assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
+          let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
           List.iter2 (doit env (subst, mxs))
             [(hf_pr hf1).inv; (hf_po hf1).inv] [(hf_pr hf2).inv; (hf_po hf2).inv]
       end
@@ -700,6 +700,12 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if hf1.bhf_cmp <> hf2.bhf_cmp then
             failure ();
+          let subst =
+            if id_equal hf1.bhf_m hf2.bhf_m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.bhf_m hf2.bhf_m in
+          assert (not (Mid.mem hf1.bhf_m mxs) && not (Mid.mem hf2.bhf_m mxs));
           let mxs = Mid.add hf1.bhf_m hf2.bhf_m mxs in
           List.iter2 (doit env (subst, mxs))
             [(bhf_pr hf1).inv; (bhf_po hf1).inv; (bhf_bd hf1).inv]
@@ -711,7 +717,19 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if not (EcReduction.EqTest.for_xp env hf1.ef_fr hf2.ef_fr) then
             failure();
+          let subst =
+            if id_equal hf1.ef_ml hf2.ef_ml then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.ef_ml hf2.ef_ml in
+          assert (not (Mid.mem hf1.ef_ml mxs) && not (Mid.mem hf2.ef_ml mxs));
           let mxs = Mid.add hf1.ef_ml hf2.ef_ml mxs in
+          let subst =
+            if id_equal hf1.ef_mr hf2.ef_mr then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.ef_mr hf2.ef_mr in
+          assert (not (Mid.mem hf1.ef_mr mxs) && not (Mid.mem hf2.ef_mr mxs));
           let mxs = Mid.add hf1.ef_mr hf2.ef_mr mxs in
           List.iter2
             (doit env (subst, mxs))
@@ -724,6 +742,12 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;
           doit env (subst, mxs) pr1.pr_args pr2.pr_args;
           let ev1, ev2 = pr1.pr_event, pr2.pr_event in
+          let subst =
+            if id_equal ev1.m ev2.m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst ev1.m ev2.m in
+          assert (not (Mid.mem ev1.m mxs) && not (Mid.mem ev2.m mxs));
           let mxs = Mid.add ev1.m ev2.m mxs in
           doit env (subst, mxs) ev1.inv ev2.inv;
       end
