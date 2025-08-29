@@ -872,14 +872,16 @@ let destr_cons form =
   | {f_node = Fop (p, _)}, [h;t] when is_op_cons p -> (h, t)
   | _ -> destr_error "cons"
 
-(* Returns empty list if not actually a list FIXME *)
 let destr_list form =
   let rec aux form = 
-    match try Some (destr_cons form) with DestrError _ -> None with
+    match try Some (destr_cons form) with DestrError "cons" -> None with
     | Some (h, t) -> h::(aux t)
     | None -> []
   in
-  aux form
+  try 
+    let h, t = destr_cons form in
+    h::(aux t)
+  with DestrError "cons" -> raise (DestrError "list")
 
 (* -------------------------------------------------------------------- *)
 let is_from_destr dt f =

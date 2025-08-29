@@ -88,16 +88,18 @@ let ttuple lt    =
 let toarrow dom ty =
   List.fold_right tfun dom ty
 
+exception TyDestrError of string
+
 let tfrom_tlist ty =
   let p_list = EcCoreLib.CI_List.p_list in
   match ty.ty_node with
   | Tconstr (p, [ty]) when p = p_list -> ty
-  | _ -> assert false
+  | _ -> raise (TyDestrError "list") 
 
 let tfrom_tfun2 ty =
   match ty.ty_node with
   | Tfun (a, b) -> (a, b)
-  | _ -> assert false
+  | _ -> raise (TyDestrError "fun") 
 
 let tpred t = tfun t tbool
 

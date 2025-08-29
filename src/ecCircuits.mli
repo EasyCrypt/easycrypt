@@ -4,14 +4,10 @@ open EcSymbols
 open EcAst
 open EcEnv
 open LDecl
+open EcLowCircuits
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
-
-(* -------------------------------------------------------------------- *)
-type circuit 
-type pstate
-type cache
 
 (* -------------------------------------------------------------------- *)
 exception CircError of string
@@ -21,7 +17,6 @@ exception CircError of string
 val circ_red : hyps -> EcReduction.reduction_info
 val width_of_type : env -> ty -> int 
 val circuit_to_string : circuit -> string
-val get_specification_by_name : string -> Lospecs.Ast.adef option
 
 (* Pstate utilities *)
 val pstate_get : pstate -> symbol -> circuit

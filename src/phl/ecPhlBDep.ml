@@ -9,6 +9,7 @@ open EcEnv
 open EcTypes
 open EcCoreGoal
 open EcFol
+open EcLowCircuits
 open EcCircuits
 open LDecl
 
@@ -615,6 +616,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let { n; invs; inpvs; m; outvs; lane; pcond; perm; debug } = bdinfo in
 
   let env = FApi.tc1_env tc in
+  let hyps = FApi.tc1_hyps tc in
   let pe = FApi.tc1_penv tc in
 
   
@@ -627,10 +629,43 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
       tc_error pe "%s" err
   in
 
+  (* FIXME: lookup is done twice here, should be easy to remove *)
+  let fperm_of_perm_op (perm: psymbol) : int -> int =
+    let pperm, bperm = EcEnv.Op.lookup ([], perm.pl_desc) env in
+    match bperm.op_kind with
+    | OB_oper (Some (OP_Plain 
+      {f_node = Fquant (Llambda, bnd::[], 
+        {f_node = Fapp ({f_node = Fop (pth, tys)}, [dfl; lst; idx])})})) when pth = EcCoreLib.CI_List.p_nth ->
+        if debug then Format.eprintf "[W] Taking the fast path for the permutation@.";
+        let elems = EcCoreFol.destr_list lst |> List.map (int_of_form hyps) |> List.map (BI.to_int) |> Array.of_list in
+        let idx_call = fun i -> (EcTypesafeFol.fapply_safe hyps (f_quant Llambda (bnd::[]) idx) ((f_int (BI.of_int i))::[])) |> int_of_form hyps |> BI.to_int in  
+        let dfl = int_of_form hyps dfl |> BI.to_int in
+        fun i -> begin
+          try 
+            elems.(idx_call i) 
+          with Invalid_argument _ ->
+            dfl
+        end
+    | _ -> 
+      Format.eprintf "[W] Taking the slow path for the permutation (op: %a)@." EcPrinting.(pp_opdecl (PPEnv.ofenv env)) (pperm, bperm);
+      (fun i ->
+      let arg = f_int (BI.of_int i) in
+      let call = EcTypesafeFol.f_app_safe env pperm [arg] in
+      let res = EcCallbyValue.norm_cbv (EcReduction.full_red) (FApi.tc1_hyps tc) call in
+      begin try
+        destr_int res |> BI.to_int
+      with DestrError _ ->
+        tc_error pe "Application of function %s failed" (EcPath.tostring pperm)
+      end
+    )
+  in
+
   let fperm, pperm = match perm with 
   | None -> None, None
   | Some perm -> 
     let pperm = EcEnv.Op.lookup ([], perm.pl_desc) env |> fst in
+    let fperm = fperm_of_perm_op perm in
+(*
     let fperm (i: int) = 
       let arg = f_int (BI.of_int i) in
       let call = EcTypesafeFol.f_app_safe env pperm [arg] in
@@ -641,6 +676,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
         tc_error pe "Application of function %s failed" (EcPath.tostring pperm)
       end
     in
+*)
     Some fperm, Some pperm
   in
 

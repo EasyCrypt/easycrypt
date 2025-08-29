@@ -195,6 +195,8 @@ type crbindings = {
   tyreverse   : crb_tyrev_map;
 }
 
+type circ_cache = EcLowCircuits.circuit Mp.t 
+
 (* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
@@ -216,6 +218,7 @@ type preenv = {
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
   env_crbds    : crbindings;
+  env_ccache   : circ_cache;
   (* Map theory paths to their env before just before theory was closed. *)
   (* The environment should be incuded for all theories, including       *)
   (* abstract ones. The purpose of this map is to simplify the code      *)
@@ -353,6 +356,7 @@ let empty gstate =
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
     env_crbds    = empty_crbindings;
+    env_ccache   = Mp.empty; 
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -2873,6 +2877,341 @@ module Algebra = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let initial gstate = empty gstate
+
+(* -------------------------------------------------------------------- *)
+type ebinding = [
+  | `Variable  of EcTypes.ty
+  | `Function  of function_
+  | `Module    of module_expr
+  | `ModType   of module_sig
+]
+
+(*  FIXME section :  Global ? *)
+let bind1 ((x, eb) : symbol * ebinding) (env : env) =
+  match eb with
+  | `Variable ty -> Var   .bind_pvglob x ty env
+  | `Function f  -> Fun   .bind x f env
+  | `Module   m  -> Mod   .bind x {tme_expr = m; tme_loca = `Global} env
+  | `ModType  i  -> ModTy .bind x {tms_sig  = i; tms_loca = `Global} env
+
+let bindall (items : (symbol * ebinding) list) (env : env) =
+  List.fold_left ((^~) bind1) env items
+
+(* -------------------------------------------------------------------- *)
+module LDecl = struct
+  type error =
+  | InvalidKind of EcIdent.t * [`Variable | `Hypothesis]
+  | CannotClear of EcIdent.t * EcIdent.t
+  | NameClash   of [`Ident of EcIdent.t | `Symbol of symbol]
+  | LookupError of [`Ident of EcIdent.t | `Symbol of symbol]
+
+  exception LdeclError of error
+
+  let pp_error fmt (exn : error) =
+    match exn with
+    | LookupError (`Symbol s) ->
+        Format.fprintf fmt "unknown symbol %s" s
+
+    | NameClash (`Symbol s) ->
+        Format.fprintf fmt
+          "an hypothesis or variable named `%s` already exists" s
+
+    | InvalidKind (x, `Variable) ->
+        Format.fprintf fmt "`%s` is not a variable" (EcIdent.name x)
+
+    | InvalidKind (x, `Hypothesis) ->
+        Format.fprintf fmt "`%s` is not an hypothesis" (EcIdent.name x)
+
+    | CannotClear (id1,id2) ->
+        Format.fprintf fmt "cannot clear %s as it is used in %s"
+        (EcIdent.name id1) (EcIdent.name id2)
+
+    | LookupError (`Ident id) ->
+        Format.fprintf fmt "unknown identifier `%s`, please report"
+        (EcIdent.tostring id)
+
+    | NameClash (`Ident id) ->
+        Format.fprintf fmt "name clash for `%s`, please report"
+        (EcIdent.tostring id)
+
+  let _ = EcPException.register (fun fmt exn ->
+    match exn with
+    | LdeclError e -> pp_error fmt e
+    | _ -> raise exn)
+
+  let error e = raise (LdeclError e)
+
+  (* ------------------------------------------------------------------ *)
+  let ld_subst s ld =
+    match ld with
+    | LD_var (ty, body) ->
+        LD_var (ty_subst s ty, body |> omap (Fsubst.f_subst s))
+
+    | LD_mem mt ->
+        LD_mem (EcMemory.mt_subst (ty_subst s) mt)
+
+    | LD_modty mty ->
+        LD_modty (Fsubst.mty_mr_subst s mty)
+
+    | LD_hyp f ->
+        LD_hyp (Fsubst.f_subst s f)
+
+    | LD_abs_st _ ->                    (* FIXME *)
+        assert false
+
+  (* ------------------------------------------------------------------ *)
+  let ld_fv = function
+  | LD_var (ty, None) ->
+      ty.ty_fv
+  | LD_var (ty,Some f) ->
+      EcIdent.fv_union ty.ty_fv f.f_fv
+  | LD_mem mt ->
+      EcMemory.mt_fv mt
+  | LD_hyp f ->
+      f.f_fv
+  | LD_modty p ->
+      gty_fv (GTmodty p)
+  | LD_abs_st us ->
+    let add fv (x,_) = match x with
+      | PVglob x -> EcPath.x_fv fv x
+      | PVloc _ -> fv in
+
+    let fv = Mid.empty in
+    let fv = List.fold_left add fv us.aus_reads in
+    let fv = List.fold_left add fv us.aus_writes in
+    List.fold_left EcPath.x_fv fv us.aus_calls
+
+  (* ------------------------------------------------------------------ *)
+  let by_name s hyps =
+    match List.ofind ((=) s |- EcIdent.name |- fst) hyps.h_local with
+    | None   -> error (LookupError (`Symbol s))
+    | Some h -> h
+
+  let by_id id hyps =
+    match List.ofind (EcIdent.id_equal id |- fst) hyps.h_local with
+    | None   -> error (LookupError (`Ident id))
+    | Some x -> snd x
+
+  (* ------------------------------------------------------------------ *)
+  let as_hyp = function
+    | (id, LD_hyp f) -> (id, f)
+    | (id, _) -> error (InvalidKind (id, `Hypothesis))
+
+  let as_var = function
+    | (id, LD_var (ty, _)) -> (id, ty)
+    | (id, _) -> error (InvalidKind (id, `Variable))
+
+  (* ------------------------------------------------------------------ *)
+  let hyp_by_name s hyps = as_hyp (by_name s hyps)
+  let var_by_name s hyps = as_var (by_name s hyps)
+
+  (* ------------------------------------------------------------------ *)
+  let hyp_by_id x hyps = as_hyp (x, by_id x hyps)
+  let var_by_id x hyps = as_var (x, by_id x hyps)
+
+  (* ------------------------------------------------------------------ *)
+  let has_gen dcast s hyps =
+    try  ignore (dcast (by_name s hyps)); true
+    with LdeclError (InvalidKind _ | LookupError _) -> false
+
+  let hyp_exists s hyps = has_gen as_hyp s hyps
+  let var_exists s hyps = has_gen as_var s hyps
+
+  (* ------------------------------------------------------------------ *)
+  let has_id x hyps =
+    try  ignore (by_id x hyps); true
+    with LdeclError (LookupError _) -> false
+
+  let has_inld s = function
+    | LD_mem mt -> is_bound s mt
+    | _ -> false
+
+  let has_name ?(dep = false) s hyps =
+    let test (id, k) =
+      EcIdent.name id = s || (dep && has_inld s k)
+    in List.exists test hyps.h_local
+
+  (* ------------------------------------------------------------------ *)
+  let can_unfold id hyps =
+    try  match by_id id hyps with LD_var (_, Some _) -> true | _ -> false
+    with LdeclError _ -> false
+
+  let unfold id hyps =
+    try
+      match by_id id hyps with
+      | LD_var (_, Some f) -> f
+      | _ -> raise NotReducible
+    with LdeclError _ -> raise NotReducible
+
+  (* ------------------------------------------------------------------ *)
+  let check_name_clash id hyps =
+    if   has_id id hyps
+    then error (NameClash (`Ident id))
+    else
+      let s = EcIdent.name id in
+      if s <> "_" && has_name ~dep:false s hyps then
+        error (NameClash (`Symbol s))
+
+  let add_local id ld hyps =
+    check_name_clash id hyps;
+    { hyps with h_local = (id, ld) :: hyps.h_local }
+
+  (* ------------------------------------------------------------------ *)
+  let fresh_id hyps s =
+    let s =
+      if   s = "_" || not (has_name ~dep:true s hyps)
+      then s
+      else
+        let rec aux n =
+          let s = Printf.sprintf "%s%d" s n in
+          if has_name ~dep:true s hyps then aux (n+1) else s
+        in aux 0
+
+    in EcIdent.create s
+
+  let fresh_ids hyps names =
+    let do1 hyps s =
+      let id = fresh_id hyps s in
+      (add_local id (LD_var (tbool, None)) hyps, id)
+    in List.map_fold do1  hyps names
+
+  (* ------------------------------------------------------------------ *)
+  type hyps = {
+    le_init : env;
+    le_env  : env;
+    le_hyps : EcBaseLogic.hyps;
+  }
+
+  let tohyps  lenv = lenv.le_hyps
+  let toenv   lenv = lenv.le_env
+  let baseenv lenv = lenv.le_init
+
+  let add_local_env x k env =
+    match k with
+    | LD_var (ty, _)  -> Var.bind_local x ty env
+    | LD_mem mt       -> Memory.push (x, mt) env
+    | LD_modty i -> Mod.bind_local x i env
+    | LD_hyp   _      -> env
+    | LD_abs_st us    -> AbsStmt.bind x us env
+
+  (* ------------------------------------------------------------------ *)
+  let add_local x k h =
+    let le_hyps = add_local x k (tohyps h) in
+    let le_env  = add_local_env x k h.le_env in
+    { h with le_hyps; le_env; }
+
+  (* ------------------------------------------------------------------ *)
+  let init env ?(locals = []) tparams =
+    let buildenv env =
+      List.fold_right
+        (fun (x, k) env -> add_local_env x k env)
+        locals env
+    in
+
+    { le_init = env;
+      le_env  = buildenv env;
+      le_hyps = { h_tvar = tparams; h_local = locals; }; }
+
+  (* ------------------------------------------------------------------ *)
+  let clear ?(leniant = false) ids hyps =
+    let rec filter ids hyps =
+      match hyps with [] -> [] | ((id, lk) as bd) :: hyps ->
+
+      let ids, bd =
+        if EcIdent.Sid.mem id ids then (ids, None) else
+
+        let fv = ld_fv lk in
+
+        if Mid.set_disjoint ids fv then
+          (ids, Some bd)
+        else
+          if leniant then
+            (Mid.set_diff ids fv, Some bd)
+          else
+            let inter = Mid.set_inter ids fv in
+            error (CannotClear (Sid.choose inter, id))
+      in List.ocons bd (filter ids hyps)
+    in
+
+    let locals = filter ids hyps.le_hyps.h_local in
+
+    init hyps.le_init ~locals hyps.le_hyps.h_tvar
+
+  (* ------------------------------------------------------------------ *)
+  let hyp_convert x check hyps =
+    let module E = struct exception NoOp end in
+
+    let init locals = init hyps.le_init ~locals hyps.le_hyps.h_tvar in
+
+    let rec doit locals =
+      match locals with
+      | (y, LD_hyp fp) :: locals when EcIdent.id_equal x y -> begin
+          let fp' = check (lazy (init locals)) fp in
+          if fp == fp' then raise E.NoOp else (x, LD_hyp fp') :: locals
+      end
+
+      | [] -> error (LookupError (`Ident x))
+      | ld :: locals -> ld :: (doit locals)
+
+    in (try Some (doit hyps.le_hyps.h_local) with E.NoOp -> None) |> omap init
+
+  (* ------------------------------------------------------------------ *)
+  let local_hyps x hyps =
+    let rec doit locals =
+      match locals with
+      | (y, _) :: locals ->
+          if EcIdent.id_equal x y then locals else doit locals
+      | [] ->
+          error (LookupError (`Ident x)) in
+
+    let locals = doit hyps.le_hyps.h_local in
+    init hyps.le_init ~locals hyps.le_hyps.h_tvar
+
+  (* ------------------------------------------------------------------ *)
+  let by_name s hyps = by_name s (tohyps hyps)
+  let by_id   x hyps = by_id   x (tohyps hyps)
+
+  let has_name s hyps = has_name ~dep:false s (tohyps hyps)
+  let has_id   x hyps = has_id x (tohyps hyps)
+
+  let hyp_by_name s hyps = hyp_by_name s (tohyps hyps)
+  let hyp_exists  s hyps = hyp_exists  s (tohyps hyps)
+  let hyp_by_id   x hyps = snd (hyp_by_id x (tohyps hyps))
+
+  let var_by_name s hyps = var_by_name s (tohyps hyps)
+  let var_exists  s hyps = var_exists  s (tohyps hyps)
+  let var_by_id   x hyps = snd (var_by_id x (tohyps hyps))
+
+  let can_unfold x hyps = can_unfold x (tohyps hyps)
+  let unfold     x hyps = unfold x (tohyps hyps)
+
+  let fresh_id  hyps s = fresh_id  (tohyps hyps) s
+  let fresh_ids hyps s = snd (fresh_ids (tohyps hyps) s)
+
+  (* ------------------------------------------------------------------ *)
+  let push_active m lenv =
+    { lenv with le_env = Memory.push_active m lenv.le_env }
+
+  let push_all l lenv =
+    { lenv with le_env = Memory.push_all l lenv.le_env }
+
+  let hoareF xp lenv =
+     let env1, env2 = Fun.hoareF xp lenv.le_env in
+    { lenv with le_env = env1}, {lenv with le_env = env2 }
+
+  let equivF xp1 xp2 lenv =
+    let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
+    { lenv with le_env = env1}, {lenv with le_env = env2 }
+
+  let inv_memenv lenv =
+    { lenv with le_env = Fun.inv_memenv lenv.le_env }
+
+  let inv_memenv1 lenv =
+    { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
+end
+
+(* -------------------------------------------------------------------- *)
 module Circuit = struct
   let push_tyreverse (reverse : crb_tyrev_map) (p : path) (v : crb_tyrev_binding) =
     Mp.change
@@ -3057,6 +3396,27 @@ module Circuit = struct
   let reverse_circuit =
     reverse_and_filter_operator
       ~filter:(function `Circuit x -> Some x | _ -> None)        
+
+  let add_circuit_cache (env: env) (pth: path) (c: EcLowCircuits.circuit) : env = 
+    {env with env_ccache = Mp.add pth c env.env_ccache}
+
+  let lookup_circuit_cache_opt (env: env) (pth: path) : EcLowCircuits.circuit option = 
+    Mp.find_opt pth env.env_ccache
+
+  let lookup_circuit_cache (env: env) (pth: path) : EcLowCircuits.circuit = 
+    Mp.find pth env.env_ccache
+
+  (* FIXME: check this *)
+  let add_circuit_cache_hyps (hyps: LDecl.hyps) (pth: path) (c: EcLowCircuits.circuit) : LDecl.hyps = 
+    {hyps with le_env = add_circuit_cache hyps.le_env pth c}
+
+  (* FIXME: check this *)
+  let lookup_circuit_cache_hyps_opt (hyps: LDecl.hyps) (pth: path) : EcLowCircuits.circuit option = 
+    Mp.find_opt pth hyps.le_env.env_ccache
+
+  (* FIXME: check this *)
+  let lookup_circuit_cache_hyps (hyps: LDecl.hyps) (pth: path) : EcLowCircuits.circuit = 
+    Mp.find pth hyps.le_env.env_ccache
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3497,337 +3857,3 @@ module Theory = struct
           env_thenvs  = Mp.set_union env.env_thenvs compiled.compiled; }
 end
 
-(* -------------------------------------------------------------------- *)
-let initial gstate = empty gstate
-
-(* -------------------------------------------------------------------- *)
-type ebinding = [
-  | `Variable  of EcTypes.ty
-  | `Function  of function_
-  | `Module    of module_expr
-  | `ModType   of module_sig
-]
-
-(*  FIXME section :  Global ? *)
-let bind1 ((x, eb) : symbol * ebinding) (env : env) =
-  match eb with
-  | `Variable ty -> Var   .bind_pvglob x ty env
-  | `Function f  -> Fun   .bind x f env
-  | `Module   m  -> Mod   .bind x {tme_expr = m; tme_loca = `Global} env
-  | `ModType  i  -> ModTy .bind x {tms_sig  = i; tms_loca = `Global} env
-
-let bindall (items : (symbol * ebinding) list) (env : env) =
-  List.fold_left ((^~) bind1) env items
-
-(* -------------------------------------------------------------------- *)
-module LDecl = struct
-  type error =
-  | InvalidKind of EcIdent.t * [`Variable | `Hypothesis]
-  | CannotClear of EcIdent.t * EcIdent.t
-  | NameClash   of [`Ident of EcIdent.t | `Symbol of symbol]
-  | LookupError of [`Ident of EcIdent.t | `Symbol of symbol]
-
-  exception LdeclError of error
-
-  let pp_error fmt (exn : error) =
-    match exn with
-    | LookupError (`Symbol s) ->
-        Format.fprintf fmt "unknown symbol %s" s
-
-    | NameClash (`Symbol s) ->
-        Format.fprintf fmt
-          "an hypothesis or variable named `%s` already exists" s
-
-    | InvalidKind (x, `Variable) ->
-        Format.fprintf fmt "`%s` is not a variable" (EcIdent.name x)
-
-    | InvalidKind (x, `Hypothesis) ->
-        Format.fprintf fmt "`%s` is not an hypothesis" (EcIdent.name x)
-
-    | CannotClear (id1,id2) ->
-        Format.fprintf fmt "cannot clear %s as it is used in %s"
-        (EcIdent.name id1) (EcIdent.name id2)
-
-    | LookupError (`Ident id) ->
-        Format.fprintf fmt "unknown identifier `%s`, please report"
-        (EcIdent.tostring id)
-
-    | NameClash (`Ident id) ->
-        Format.fprintf fmt "name clash for `%s`, please report"
-        (EcIdent.tostring id)
-
-  let _ = EcPException.register (fun fmt exn ->
-    match exn with
-    | LdeclError e -> pp_error fmt e
-    | _ -> raise exn)
-
-  let error e = raise (LdeclError e)
-
-  (* ------------------------------------------------------------------ *)
-  let ld_subst s ld =
-    match ld with
-    | LD_var (ty, body) ->
-        LD_var (ty_subst s ty, body |> omap (Fsubst.f_subst s))
-
-    | LD_mem mt ->
-        LD_mem (EcMemory.mt_subst (ty_subst s) mt)
-
-    | LD_modty mty ->
-        LD_modty (Fsubst.mty_mr_subst s mty)
-
-    | LD_hyp f ->
-        LD_hyp (Fsubst.f_subst s f)
-
-    | LD_abs_st _ ->                    (* FIXME *)
-        assert false
-
-  (* ------------------------------------------------------------------ *)
-  let ld_fv = function
-  | LD_var (ty, None) ->
-      ty.ty_fv
-  | LD_var (ty,Some f) ->
-      EcIdent.fv_union ty.ty_fv f.f_fv
-  | LD_mem mt ->
-      EcMemory.mt_fv mt
-  | LD_hyp f ->
-      f.f_fv
-  | LD_modty p ->
-      gty_fv (GTmodty p)
-  | LD_abs_st us ->
-    let add fv (x,_) = match x with
-      | PVglob x -> EcPath.x_fv fv x
-      | PVloc _ -> fv in
-
-    let fv = Mid.empty in
-    let fv = List.fold_left add fv us.aus_reads in
-    let fv = List.fold_left add fv us.aus_writes in
-    List.fold_left EcPath.x_fv fv us.aus_calls
-
-  (* ------------------------------------------------------------------ *)
-  let by_name s hyps =
-    match List.ofind ((=) s |- EcIdent.name |- fst) hyps.h_local with
-    | None   -> error (LookupError (`Symbol s))
-    | Some h -> h
-
-  let by_id id hyps =
-    match List.ofind (EcIdent.id_equal id |- fst) hyps.h_local with
-    | None   -> error (LookupError (`Ident id))
-    | Some x -> snd x
-
-  (* ------------------------------------------------------------------ *)
-  let as_hyp = function
-    | (id, LD_hyp f) -> (id, f)
-    | (id, _) -> error (InvalidKind (id, `Hypothesis))
-
-  let as_var = function
-    | (id, LD_var (ty, _)) -> (id, ty)
-    | (id, _) -> error (InvalidKind (id, `Variable))
-
-  (* ------------------------------------------------------------------ *)
-  let hyp_by_name s hyps = as_hyp (by_name s hyps)
-  let var_by_name s hyps = as_var (by_name s hyps)
-
-  (* ------------------------------------------------------------------ *)
-  let hyp_by_id x hyps = as_hyp (x, by_id x hyps)
-  let var_by_id x hyps = as_var (x, by_id x hyps)
-
-  (* ------------------------------------------------------------------ *)
-  let has_gen dcast s hyps =
-    try  ignore (dcast (by_name s hyps)); true
-    with LdeclError (InvalidKind _ | LookupError _) -> false
-
-  let hyp_exists s hyps = has_gen as_hyp s hyps
-  let var_exists s hyps = has_gen as_var s hyps
-
-  (* ------------------------------------------------------------------ *)
-  let has_id x hyps =
-    try  ignore (by_id x hyps); true
-    with LdeclError (LookupError _) -> false
-
-  let has_inld s = function
-    | LD_mem mt -> is_bound s mt
-    | _ -> false
-
-  let has_name ?(dep = false) s hyps =
-    let test (id, k) =
-      EcIdent.name id = s || (dep && has_inld s k)
-    in List.exists test hyps.h_local
-
-  (* ------------------------------------------------------------------ *)
-  let can_unfold id hyps =
-    try  match by_id id hyps with LD_var (_, Some _) -> true | _ -> false
-    with LdeclError _ -> false
-
-  let unfold id hyps =
-    try
-      match by_id id hyps with
-      | LD_var (_, Some f) -> f
-      | _ -> raise NotReducible
-    with LdeclError _ -> raise NotReducible
-
-  (* ------------------------------------------------------------------ *)
-  let check_name_clash id hyps =
-    if   has_id id hyps
-    then error (NameClash (`Ident id))
-    else
-      let s = EcIdent.name id in
-      if s <> "_" && has_name ~dep:false s hyps then
-        error (NameClash (`Symbol s))
-
-  let add_local id ld hyps =
-    check_name_clash id hyps;
-    { hyps with h_local = (id, ld) :: hyps.h_local }
-
-  (* ------------------------------------------------------------------ *)
-  let fresh_id hyps s =
-    let s =
-      if   s = "_" || not (has_name ~dep:true s hyps)
-      then s
-      else
-        let rec aux n =
-          let s = Printf.sprintf "%s%d" s n in
-          if has_name ~dep:true s hyps then aux (n+1) else s
-        in aux 0
-
-    in EcIdent.create s
-
-  let fresh_ids hyps names =
-    let do1 hyps s =
-      let id = fresh_id hyps s in
-      (add_local id (LD_var (tbool, None)) hyps, id)
-    in List.map_fold do1  hyps names
-
-  (* ------------------------------------------------------------------ *)
-  type hyps = {
-    le_init : env;
-    le_env  : env;
-    le_hyps : EcBaseLogic.hyps;
-  }
-
-  let tohyps  lenv = lenv.le_hyps
-  let toenv   lenv = lenv.le_env
-  let baseenv lenv = lenv.le_init
-
-  let add_local_env x k env =
-    match k with
-    | LD_var (ty, _)  -> Var.bind_local x ty env
-    | LD_mem mt       -> Memory.push (x, mt) env
-    | LD_modty i -> Mod.bind_local x i env
-    | LD_hyp   _      -> env
-    | LD_abs_st us    -> AbsStmt.bind x us env
-
-  (* ------------------------------------------------------------------ *)
-  let add_local x k h =
-    let le_hyps = add_local x k (tohyps h) in
-    let le_env  = add_local_env x k h.le_env in
-    { h with le_hyps; le_env; }
-
-  (* ------------------------------------------------------------------ *)
-  let init env ?(locals = []) tparams =
-    let buildenv env =
-      List.fold_right
-        (fun (x, k) env -> add_local_env x k env)
-        locals env
-    in
-
-    { le_init = env;
-      le_env  = buildenv env;
-      le_hyps = { h_tvar = tparams; h_local = locals; }; }
-
-  (* ------------------------------------------------------------------ *)
-  let clear ?(leniant = false) ids hyps =
-    let rec filter ids hyps =
-      match hyps with [] -> [] | ((id, lk) as bd) :: hyps ->
-
-      let ids, bd =
-        if EcIdent.Sid.mem id ids then (ids, None) else
-
-        let fv = ld_fv lk in
-
-        if Mid.set_disjoint ids fv then
-          (ids, Some bd)
-        else
-          if leniant then
-            (Mid.set_diff ids fv, Some bd)
-          else
-            let inter = Mid.set_inter ids fv in
-            error (CannotClear (Sid.choose inter, id))
-      in List.ocons bd (filter ids hyps)
-    in
-
-    let locals = filter ids hyps.le_hyps.h_local in
-
-    init hyps.le_init ~locals hyps.le_hyps.h_tvar
-
-  (* ------------------------------------------------------------------ *)
-  let hyp_convert x check hyps =
-    let module E = struct exception NoOp end in
-
-    let init locals = init hyps.le_init ~locals hyps.le_hyps.h_tvar in
-
-    let rec doit locals =
-      match locals with
-      | (y, LD_hyp fp) :: locals when EcIdent.id_equal x y -> begin
-          let fp' = check (lazy (init locals)) fp in
-          if fp == fp' then raise E.NoOp else (x, LD_hyp fp') :: locals
-      end
-
-      | [] -> error (LookupError (`Ident x))
-      | ld :: locals -> ld :: (doit locals)
-
-    in (try Some (doit hyps.le_hyps.h_local) with E.NoOp -> None) |> omap init
-
-  (* ------------------------------------------------------------------ *)
-  let local_hyps x hyps =
-    let rec doit locals =
-      match locals with
-      | (y, _) :: locals ->
-          if EcIdent.id_equal x y then locals else doit locals
-      | [] ->
-          error (LookupError (`Ident x)) in
-
-    let locals = doit hyps.le_hyps.h_local in
-    init hyps.le_init ~locals hyps.le_hyps.h_tvar
-
-  (* ------------------------------------------------------------------ *)
-  let by_name s hyps = by_name s (tohyps hyps)
-  let by_id   x hyps = by_id   x (tohyps hyps)
-
-  let has_name s hyps = has_name ~dep:false s (tohyps hyps)
-  let has_id   x hyps = has_id x (tohyps hyps)
-
-  let hyp_by_name s hyps = hyp_by_name s (tohyps hyps)
-  let hyp_exists  s hyps = hyp_exists  s (tohyps hyps)
-  let hyp_by_id   x hyps = snd (hyp_by_id x (tohyps hyps))
-
-  let var_by_name s hyps = var_by_name s (tohyps hyps)
-  let var_exists  s hyps = var_exists  s (tohyps hyps)
-  let var_by_id   x hyps = snd (var_by_id x (tohyps hyps))
-
-  let can_unfold x hyps = can_unfold x (tohyps hyps)
-  let unfold     x hyps = unfold x (tohyps hyps)
-
-  let fresh_id  hyps s = fresh_id  (tohyps hyps) s
-  let fresh_ids hyps s = snd (fresh_ids (tohyps hyps) s)
-
-  (* ------------------------------------------------------------------ *)
-  let push_active m lenv =
-    { lenv with le_env = Memory.push_active m lenv.le_env }
-
-  let push_all l lenv =
-    { lenv with le_env = Memory.push_all l lenv.le_env }
-
-  let hoareF xp lenv =
-     let env1, env2 = Fun.hoareF xp lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
-
-  let equivF xp1 xp2 lenv =
-    let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
-
-  let inv_memenv lenv =
-    { lenv with le_env = Fun.inv_memenv lenv.le_env }
-
-  let inv_memenv1 lenv =
-    { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
-end
