@@ -270,7 +270,7 @@ let lenv_of_tparams ts =
     let tv = WTy.create_tvsymbol (preid id) in
     { env with le_tv = Mid.add id (WTy.ty_var tv) env.le_tv }, tv
   in
-    List.map_fold trans_tv empty_lenv ts
+    List.fold_left_map trans_tv empty_lenv ts
 
 let lenv_of_tparams_for_hyp genv ts =
   let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
@@ -278,7 +278,7 @@ let lenv_of_tparams_for_hyp genv ts =
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
   in
-    List.map_fold trans_tv empty_lenv ts
+    List.fold_left_map trans_tv empty_lenv ts
 
 (* -------------------------------------------------------------------- *)
 let instantiate tparams ~textra targs tres tys =
@@ -487,7 +487,7 @@ let trans_binding genv lenv (x, xty) =
 
 (* -------------------------------------------------------------------- *)
 let trans_bindings genv lenv bds =
-  List.map_fold (trans_binding genv) lenv bds
+  List.fold_left_map (trans_binding genv) lenv bds
 
 (* -------------------------------------------------------------------- *)
 let trans_lvars genv lenv bds =
@@ -989,7 +989,7 @@ and trans_fix (genv, lenv) (wdom, o) =
 
       | OPB_Leaf (locals, e) ->
           let ctors = List.rev ctors in
-          let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
+          let lenv, cvs = List.fold_left_map (trans_lvars genv) lenv locals in
           let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
 
           let we = trans_app (genv, lenv) fe eargs in

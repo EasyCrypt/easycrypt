@@ -192,6 +192,8 @@
     "inductive"   , INDUCTIVE  ;        (* KW: global *)
     "notation"    , NOTATION   ;        (* KW: global *)
     "abbrev"      , ABBREV     ;        (* KW: global *)
+    "relation"    , RELATION   ;        (* KW: global *)
+    "morphism"    , MORPHISM   ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "abstract"    , ABSTRACT   ;        (* KW: global *)

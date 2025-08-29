@@ -250,6 +250,12 @@ module Reduction : sig
   val add_reduction : scope -> puserred -> scope
 end
 
+(*-------------------------------------------------------------------- *)
+module Setoid : sig
+  val add_relation : scope -> prelation -> scope
+  val add_morphism : scope -> pmorphism -> scope
+end
+
 (* -------------------------------------------------------------------- *)
 module Cloning : sig
   val clone : scope -> Ax.proofmode -> theory_cloning -> scope

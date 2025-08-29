@@ -600,7 +600,7 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)
   and add_bindings (s : f_subst) : bindings -> f_subst * bindings =
-    List.map_fold add_binding s
+    List.fold_left_map add_binding s
 
   (* ------------------------------------------------------------------ *)
   and add_mod_params (s : f_subst) (params : _) =

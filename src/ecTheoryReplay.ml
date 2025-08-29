@@ -914,6 +914,55 @@ and replay_reduction
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_relation (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (oppath, axpath)) =
+  let exception Removed in
+
+  try
+    let oppath = EcSubst.subst_path subst oppath in
+    let axpath = EcSubst.subst_path subst axpath in
+
+    let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
+    if is_none (EcEnv.Op.by_path_opt oppath env) then
+      raise Removed;
+    if is_none (EcEnv.Ax.by_path_opt axpath env) then
+      raise Removed;
+
+  let item = Th_relation (oppath, axpath) in
+  let scope = ove.ovre_hooks.hadd_item scope ~import item in
+
+  (subst, ops, proofs, scope)
+
+with Removed ->
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
+and replay_morphism (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (relpath, oppath, axpath, position)) =
+  let exception Removed in
+
+  try
+    let relpath = EcSubst.subst_path subst relpath in
+    let oppath  = EcSubst.subst_path subst oppath in
+    let axpath  = EcSubst.subst_path subst axpath in
+
+    let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
+    if is_none (EcEnv.Op.by_path_opt relpath env) then
+      raise Removed;
+    if is_none (EcEnv.Op.by_path_opt oppath env) then
+      raise Removed;
+    if is_none (EcEnv.Ax.by_path_opt axpath env) then
+      raise Removed;
+
+  let item = Th_morphism (relpath, oppath, axpath, position) in
+  let scope = ove.ovre_hooks.hadd_item scope ~import item in
+
+  (subst, ops, proofs, scope)
+
+with Removed ->
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay_typeclass
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, tc)
 =
@@ -1049,6 +1098,12 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_reduction rules ->
      replay_reduction ove (subst, ops, proofs, scope) (import, rules)
+
+  | Th_relation (oppath, axpath) ->
+     replay_relation ove (subst, ops, proofs, scope) (item.ti_import, (oppath, axpath))
+
+  | Th_morphism (relpath, oppath, axpath, pos) ->
+     replay_morphism ove (subst, ops, proofs, scope) (item.ti_import, (relpath, oppath, axpath, pos))
 
   | Th_auto at_base ->
      replay_auto ove (subst, ops, proofs, scope) (import, at_base)

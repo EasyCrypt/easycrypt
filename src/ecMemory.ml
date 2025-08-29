@@ -140,7 +140,7 @@ let bindall_fresh (vs : ovariable list) ((m, Lmt_concrete mt) : memenv) =
                 else x in
               for_idx 0 in
           Msym.add name (-1,v.ov_type) m, { v with ov_name = Some name } in
-    let _, vs = List.map_fold fresh_pv lmt.lmt_proj vs in
+    let _, vs = List.fold_left_map fresh_pv lmt.lmt_proj vs in
     let lmt = bindall_lmt vs lmt in
     (m, Lmt_concrete (Some lmt)), vs
 

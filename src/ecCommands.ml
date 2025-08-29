@@ -688,6 +688,14 @@ and process_reduction scope name =
   EcScope.Reduction.add_reduction scope name
 
 (* -------------------------------------------------------------------- *)
+and process_relation (scope : EcScope.scope) (rel : prelation) =
+  EcScope.Setoid.add_relation scope rel
+
+(* -------------------------------------------------------------------- *)
+and process_morphism (scope : EcScope.scope) (mph : pmorphism) =
+  EcScope.Setoid.add_morphism scope mph
+
+(* -------------------------------------------------------------------- *)
 and process_hint scope hint =
   EcScope.Auto.add_hint scope hint
 
@@ -789,6 +797,8 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
+      | Grelation    rel  -> `Fct   (fun scope -> process_relation   scope rel)
+      | Gmorphism    mph  -> `Fct   (fun scope -> process_morphism   scope mph)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
     with

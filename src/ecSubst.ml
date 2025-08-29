@@ -678,7 +678,7 @@ and subst_modsig ?params (s : subst) (comps : module_sig) =
         match comps.mis_params with
         | [] -> (s, [])
         | _  ->
-            List.map_fold
+            List.fold_left_map
               (fun (s : subst) (a, aty) ->
                 let a'   = EcIdent.fresh a in
                 let decl = (a', subst_modtype s aty) in
@@ -687,7 +687,7 @@ and subst_modsig ?params (s : subst) (comps : module_sig) =
     end
 
   | Some params ->
-      List.map_fold
+      List.fold_left_map
         (fun (s : subst) ((a, aty), a') ->
             let decl = (a', subst_modtype s aty) in
             add_module s a (EcPath.mident a'), decl)
@@ -814,7 +814,7 @@ and subst_module (s : subst) (m : module_expr) =
   let sbody, me_params = match m.me_params with
     | [] -> (s, [])
     | _  ->
-        List.map_fold
+        List.fold_left_map
           (fun (s : subst) (a, aty) ->
             let a'   = EcIdent.fresh a in
             let decl = (a', subst_modtype s aty) in
@@ -927,7 +927,7 @@ and subst_op_body (s : subst) (bd : opbody) =
 
 and subst_branches (s : subst) = function
   | OPB_Leaf (locals, e) ->
-      let (s, locals) = List.map_fold fresh_elocals s locals in
+      let (s, locals) = List.fold_left_map fresh_elocals s locals in
       OPB_Leaf (locals, subst_expr s e)
 
   | OPB_Branch bs ->
@@ -1073,6 +1073,17 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
       let rules =
         List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
       in Th_reduction rules
+
+  | Th_relation (oppath, axpath) ->
+      let oppath = subst_path s oppath in
+      let axpath = subst_path s axpath in
+      Th_relation (oppath, axpath)
+
+  | Th_morphism (relpath, oppath, axpath, pos) ->
+      let relpath = subst_path s relpath in
+      let oppath = subst_path s oppath in
+      let axpath = subst_path s axpath in
+      Th_morphism (relpath, oppath, axpath, pos)
 
   | Th_auto ({ axioms } as auto_rl) ->
       Th_auto { auto_rl with axioms =

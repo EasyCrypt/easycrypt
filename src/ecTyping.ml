@@ -1199,7 +1199,7 @@ let trans_binding env ue bd =
     let xs  = List.map (fun x -> ident_of_osymbol (unloc x), ty) xs in
     let env = EcEnv.Var.bind_locals xs env in
     env, xs in
-  let env, bd = List.map_fold trans_bd1 env bd in
+  let env, bd = List.fold_left_map trans_bd1 env bd in
   let bd = List.flatten bd in
   env, bd
 
@@ -2839,7 +2839,7 @@ and trans_gbinding env ue decl =
           let env = EcEnv.Mod.bind_local x mi env in
           (env, (x, ty))
 
-        in List.map_fold add1 env xs
+        in List.fold_left_map add1 env xs
 
       | PGTY_Mem pmt ->
         let mt = match pmt with
@@ -2851,9 +2851,9 @@ and trans_gbinding env ue decl =
           let env = EcEnv.Memory.push (x, mt) env in
           (env, (x, GTmem mt))
 
-        in List.map_fold add1 env xs
+        in List.fold_left_map add1 env xs
 
-  in snd_map List.flatten (List.map_fold trans1 env decl)
+  in snd_map List.flatten (List.fold_left_map trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
 and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
