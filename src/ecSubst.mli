@@ -74,7 +74,24 @@ val subst_stmt  : subst -> stmt -> stmt
 val subst_progvar : subst -> prog_var -> prog_var
 val subst_mem : subst -> EcIdent.t -> EcIdent.t
 val subst_flocal : subst -> form -> form
+val subst_ss_inv : subst -> ss_inv -> ss_inv
+val subst_ts_inv : subst -> ts_inv -> ts_inv
+val subst_inv : subst -> inv -> inv
 
 (* -------------------------------------------------------------------- *)
 val open_oper : operator -> ty list -> ty * operator_kind
 val open_tydecl : tydecl -> ty list -> ty_body
+
+(* -------------------------------------------------------------------- *)
+val ss_inv_rebind : ss_inv -> memory -> ss_inv
+val ss_inv_generalize_as_left : ss_inv -> memory -> memory -> ts_inv
+val ss_inv_generalize_as_right : ss_inv -> memory -> memory -> ts_inv
+val f_forall_mems_ss_inv : memenv -> ss_inv -> form
+
+val ts_inv_rebind : ts_inv -> memory -> memory -> ts_inv
+val ts_inv_rebind_left : ts_inv -> memory -> ts_inv
+val ts_inv_rebind_right : ts_inv -> memory -> ts_inv
+val f_forall_mems_ts_inv : memenv -> memenv -> ts_inv -> form
+
+val ss_inv_forall_ml_ts_inv : memenv -> ts_inv -> ss_inv
+val ss_inv_forall_mr_ts_inv : memenv -> ts_inv -> ss_inv

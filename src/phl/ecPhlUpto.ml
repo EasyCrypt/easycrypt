@@ -16,8 +16,8 @@ open EcCoreLib.CI_Real
 
 (* -------------------------------------------------------------------- *)
 (* Core tactic *)
-let e_true  = expr_of_form mhr f_true
-let e_false = expr_of_form mhr f_false
+let e_true  = expr_of_form f_true
+let e_false = expr_of_form f_false
 
 let is_lv_bad env bad x =
   match bad with
@@ -207,16 +207,16 @@ let f_upto_init env bad f1 f2 =
 
   | _, _ -> false
 
-let destr_bad f =
-  match destr_pvar f with
-  | (PVglob _ as bad, m) when EcIdent.id_equal m mhr -> bad
+let destr_bad (f: ss_inv) =
+  match destr_pvar f.inv with
+  | (PVglob _ as bad, m) when EcIdent.id_equal m f.m -> bad
   | _ -> destr_error ""
 
 let destr_not_bad f =
-  destr_bad (destr_not f)
+  destr_bad (map_ss_inv1 destr_not f)
 
 let destr_event f =
-  let b = try snd (destr_and f) with DestrError _ -> f in
+  let b = try snd (map_ss_inv_destr2 destr_and f) with DestrError _ -> f in
   destr_not_bad b
 
 let t_uptobad_r tc =
@@ -230,10 +230,10 @@ let t_uptobad_r tc =
     tc_error !!tc ~who:"byupto" "the initial memories should be equal";
   if not (is_conv ~ri:full_red hyps pr1.pr_args pr2.pr_args) then
     tc_error !!tc ~who:"byupto" "the initial arguments should be equal";
-  if not (is_conv ~ri:full_red hyps pr1.pr_event pr2.pr_event) then
+  if not (ss_inv_alpha_eq hyps pr1.pr_event pr2.pr_event) then
     tc_error !!tc ~who:"byupto" "the events should be equal";
   let bad =
-    try destr_event pr1.pr_event
+    try destr_event (pr1.pr_event)
     with DestrError _ ->
       tc_error !!tc ~who:"byupto" "the event should have the form \"E /\ !bad\" or \"!bad\""
   in
@@ -293,11 +293,11 @@ let destr_sub f1 f2 =
   let fe1, fe2 = DestrReal.sub f1 in
   let fe1b, fe2b = DestrReal.sub f2 in
   let pre1, pre2, prb1 = t3_map destr_pr (fe1, fe2, fe1b) in
-  let e, fbad = destr_and prb1.pr_event in
-  let fnbad = f_not fbad in
-  let fenb = f_and e fnbad in
-  let fe1nb = f_pr_r {pre1 with pr_event = fenb } in
-  let fe2nb = f_pr_r {pre2 with pr_event = fenb } in
+  let e, fbad = map_ss_inv_destr2 destr_and prb1.pr_event in
+  let fnbad = map_ss_inv1 f_not fbad in
+  let fenb = map_ss_inv2 f_and e fnbad in
+  let fe1nb = f_pr pre1.pr_mem pre1.pr_fun pre1.pr_args fenb in
+  let fe2nb = f_pr pre2.pr_mem pre2.pr_fun pre2.pr_args fenb in
   fe1, fe1b, fe1nb, fe2, fe2b, fe2nb, fbad
 
 let destr_sub_maxr f1 f2 =
@@ -305,17 +305,17 @@ let destr_sub_maxr f1 f2 =
   let fe1b', fe2b' = destr_maxr f2 in
   let pre1, pre2, prb1_ = t3_map destr_pr (fe1, fe2, fe1b') in
   let bad =
-    let b = try snd (destr_and prb1_.pr_event) with DestrError _ -> prb1_.pr_event in
+    let b = try snd (map_ss_inv_destr2 destr_and prb1_.pr_event) with DestrError _ -> prb1_.pr_event in
     destr_bad b in
-  let fbad = f_pvar bad tbool mhr in
   let e = pre1.pr_event in
-  let fnbad = f_not fbad in
-  let fenb = f_and e fnbad in
-  let feb   = f_and e fbad in
-  let fe1b  = f_pr_r { pre1 with pr_event = feb } in
-  let fe1nb = f_pr_r { pre1 with pr_event = fenb } in
-  let fe2b  = f_pr_r { pre2 with pr_event = feb } in
-  let fe2nb = f_pr_r { pre2 with pr_event = fenb } in
+  let fbad = f_pvar bad tbool e.m in
+  let fnbad = map_ss_inv1 f_not fbad in
+  let fenb = map_ss_inv2 f_and e fnbad in
+  let feb   = map_ss_inv2 f_and e fbad in
+  let fe1b  = f_pr pre1.pr_mem pre1.pr_fun pre1.pr_args feb in
+  let fe1nb = f_pr pre1.pr_mem pre1.pr_fun pre1.pr_args fenb in
+  let fe2b  = f_pr pre2.pr_mem pre2.pr_fun pre2.pr_args feb in
+  let fe2nb = f_pr pre2.pr_mem pre2.pr_fun pre2.pr_args fenb in
   fe1, fe1b, fe1nb, fe2, fe2b, fe2nb, fbad, fe1b', fe2b'
 
 let t_split_pr fbad =
@@ -354,23 +354,23 @@ let process_uptobad tc =
     | SFpr pr1 ->
       (* Pr[G1 : E] <= Pr[G2 : E [/\ !bad]] + Pr[G1: [E /\] bad] *)
       let f2, fb = DestrReal.add f in
-        let pr2, e, bad =
+      let pr2, e, bad =
         try
           let pr2, prb = t2_map destr_pr (f2, fb) in
           let bad =
-            try destr_bad prb.pr_event
-            with DestrError _ -> destr_bad (snd (destr_and prb.pr_event))
+            try destr_bad (prb.pr_event)
+            with DestrError _ -> destr_bad (snd (map_ss_inv_destr2 destr_and prb.pr_event))
           in
           let e = pr1.pr_event in
           pr2, e, bad
         with DestrError _ -> error_add tc in
 
-      let fbad = f_pvar bad tbool mhr in
-      let fnbad = f_not fbad in
+      let fbad = (f_pvar bad tbool e.m) in
+      let fnbad = map_ss_inv1 f_not fbad in
       let pr1b, pr1nb, pr2nb =
-        f_pr_r {pr1 with pr_event = f_and e fbad},
-        f_pr_r {pr1 with pr_event = f_and e fnbad},
-        f_pr_r {pr2 with pr_event = f_and e fnbad} in
+        f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and e fbad),
+        f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and e fnbad),
+        f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and e fnbad) in
       (t_apply_prept
         (`App (`UG upto_le,
           [`F f1; `F pr1b; `F pr1nb;
