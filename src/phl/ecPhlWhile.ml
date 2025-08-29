@@ -322,9 +322,12 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let b_pre   = map_ts_inv2 f_and_simpl (map_ts_inv2 f_and_simpl inv e) vrnt_eq_k in
   let b_post  = map_ts_inv2 f_and_simpl inv vrnt_lt_k in
   let b_concl = ts_inv_lower_side2 (fun pr po -> 
-  f_bdHoareS (snd m_side) pr c po FHeq {m=(fst m_side);inv=f_r1}) b_pre b_post in
+    let m = EcIdent.create "&hr" in
+    let pr = EcSubst.ss_inv_rebind pr m in
+    let po = EcSubst.ss_inv_rebind po m in
+    f_bdHoareS (snd m_side) pr c po FHeq {m;inv=f_r1}) b_pre b_post in
   let b_concl = map_ss_inv1 (f_forall_simpl [(k_id,GTty tint)]) b_concl in
-  let b_concl = EcSubst.f_forall_mems_ss_inv m_other b_concl in
+  let b_concl = EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd m_other) b_concl in
 
   (* 2. WP of the while *)
   let f_imps_simpl' fl = f_imps_simpl (List.tl fl) (List.hd fl) in
