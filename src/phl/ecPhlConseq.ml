@@ -73,6 +73,8 @@ let t_hoareF_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq pre post tc =
   let hs = tc1_as_hoareS tc in
+  let pre = ss_inv_rebind pre (fst hs.hs_m) in
+  let post = ss_inv_rebind post (fst hs.hs_m) in
   let cond1, cond2 = conseq_cond_ss (hs_pr hs) (hs_po hs) pre post in
   let concl1 = f_forall_mems_ss_inv hs.hs_m cond1 in
   let concl2 = f_forall_mems_ss_inv hs.hs_m cond2 in

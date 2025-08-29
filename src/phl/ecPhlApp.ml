@@ -17,6 +17,7 @@ module TTC = EcProofTyping
 let t_hoare_app_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
+  let phi = ss_inv_rebind phi (fst hs.hs_m) in
   let s1, s2 = s_split env i hs.hs_s in
   let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) phi in
   let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs) in
