@@ -80,8 +80,11 @@ module Low = struct
     let hd,_,e,s = gen_rcond (!!tc, env) b (fst m) at_pos s in
     let e = ss_inv_generalize_other e (fst mo) in
     let concl1 = 
-      EcSubst.f_forall_mems_ss_inv mo
+      EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd mo)
         (ts_inv_lower_side2 (fun pr po ->
+          let mhs = EcIdent.create "&hr" in
+          let pr = ss_inv_rebind pr mhs in
+          let po = ss_inv_rebind po mhs in
           f_hoareS (snd m) pr hd po) (es_pr es) e) in
     let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
     let concl2 = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr (es_po es) in
