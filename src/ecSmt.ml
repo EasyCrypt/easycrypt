@@ -1724,7 +1724,15 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
           Format.eprintf "dumping in %s" filename;
       let filename = Printf.sprintf "%.4d-%s" tkid filename in
       out_task filename task));
-    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
+    let (tp, res) = EcUtils.timed (fun task ->
+        if Sys.ocaml_release.major = 5 then begin
+          let control = Gc.get () in
+          Gc.set { control with space_overhead = min 20 control.space_overhead; };
+          EcUtils.try_finally
+            (fun () -> P.execute_task ?notify pi task)
+            (fun () -> Gc.set control)
+        end else P.execute_task ?notify pi task
+      ) task in
 
     if 1 <= pi.P.pr_verbose then
       notify |> oiter (fun notify -> notify `Warning (lazy (
