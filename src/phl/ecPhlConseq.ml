@@ -664,10 +664,10 @@ let t_hoareS_conseq_conj pre post pre' post' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let hs = tc1_as_hoareS tc in
   let pre'' = map_ss_inv2 f_and pre' pre in
-  let post' = map_ss_inv2 f_and post' post in
+  let post'' = map_ss_inv2 f_and post' post in
   if not (ss_inv_alpha_eq hyps (hs_pr hs) pre'') 
     then tc_error !!tc "invalid pre-condition";
-  if not (ss_inv_alpha_eq hyps (hs_po hs) post') 
+  if not (ss_inv_alpha_eq hyps (hs_po hs) post'') 
     then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareS (snd hs.hs_m) pre hs.hs_s post in
   let concl2 = f_hoareS (snd hs.hs_m) pre' hs.hs_s post' in
