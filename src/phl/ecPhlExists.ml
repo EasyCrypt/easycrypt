@@ -18,10 +18,17 @@ module PT  = EcProofTerm
 let get_to_gens fs =
   let do_id (f: inv) =
     let id =
-      match (inv_of_inv f).f_node with
-      | Fpvar (pv, m) -> 
-        id_of_pv pv m
-      | _             -> EcIdent.create "f" in
+      match f with
+      | Inv_ss f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv pv m
+          | _             -> EcIdent.create "f" 
+        end
+      | Inv_ts f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv ~mc:(f.ml, f.mr) pv m
+          | _             -> EcIdent.create "f" 
+        end in
     id, f in
   List.map do_id fs
 

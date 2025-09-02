@@ -49,7 +49,7 @@ module LowInternal = struct
   let isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let sp_asgn (memenv : EcMemory.memenv) env lv e (bds, assoc, pre) =
+  let sp_asgn ?mc (memenv : EcMemory.memenv) env lv e (bds, assoc, pre) =
     let m = fst memenv in
     let subst_in_assoc lv new_id_exp new_ids ((ass : assignables), f) =
       let replace_assignable var =
@@ -73,7 +73,7 @@ module LowInternal = struct
         | _ -> var
 
       in let ass = List.map replace_assignable ass in
-         let f   = (subst_form_lv env lv {m;inv=new_id_exp} {m;inv=f}).inv in
+         let f   = (subst_form_lv ?mc env lv {m;inv=new_id_exp} {m;inv=f}).inv in
          (ass, f)
     in
 
@@ -106,14 +106,14 @@ module LowInternal = struct
 
     let for_lvars vs =
         let m = EcMemory.memory memenv in
-        let fresh pv = EcIdent.create (EcIdent.name (id_of_pv pv m)) in
+        let fresh pv = EcIdent.create (EcIdent.name (id_of_pv ?mc pv m)) in
 
         let newids  = List.map (fst_map fresh) vs in
         let bds     = newids @ bds in
         let astuple = f_tuple (List.map (curry f_local) newids) in
-        let pre     = (subst_form_lv env lv {m;inv=astuple} {m;inv=pre}).inv in
+        let pre     = (subst_form_lv ?mc env lv {m;inv=astuple} {m;inv=pre}).inv in
         let e_form  = EcFol.ss_inv_of_expr m e in
-        let e_form  = (subst_form_lv env lv {m;inv=astuple} e_form).inv in
+        let e_form  = (subst_form_lv ?mc env lv {m;inv=astuple} e_form).inv in
 
         let assoc =
              (List.map (fun x -> APVar x) vs, e_form)
@@ -165,7 +165,7 @@ module LowInternal = struct
     EcFol.f_exists_simpl (List.map (snd_map (fun t -> GTty t)) bds) pre
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_stmt (memenv : EcMemory.memenv) env (bds, assoc, pre) stmt =
+  let rec sp_stmt ?mc (memenv : EcMemory.memenv) env (bds, assoc, pre) stmt =
     match stmt with
     | [] ->
         ([], (bds, assoc, pre))
@@ -173,15 +173,15 @@ module LowInternal = struct
     | i :: is ->
         try
           let bds, assoc, pre =
-            sp_instr memenv env (bds, assoc, pre) i in
-          sp_stmt memenv env (bds, assoc, pre) is
+            sp_instr ?mc memenv env (bds, assoc, pre) i in
+          sp_stmt ?mc memenv env (bds, assoc, pre) is
         with No_sp ->
           (stmt, (bds, assoc, pre))
 
-  and sp_instr (memenv : EcMemory.memenv) env (bds,assoc,pre) instr =
+  and sp_instr ?mc (memenv : EcMemory.memenv) env (bds,assoc,pre) instr =
     match instr.i_node with
     | Sasgn (lv, e) ->
-      let bds, assoc, pre = sp_asgn memenv env lv e (bds, assoc, pre) in
+      let bds, assoc, pre = sp_asgn ?mc memenv env lv e (bds, assoc, pre) in
 
       bds, assoc, pre
 
@@ -192,9 +192,9 @@ module LowInternal = struct
       let pre_f  =
         build_sp memenv bds assoc (f_and_simpl (f_not e_form) pre) in
       let stmt_t, (bds_t, assoc_t, pre_t) =
-        sp_stmt memenv env (bds, assoc, pre_t) s1.s_node in
+        sp_stmt ?mc memenv env (bds, assoc, pre_t) s1.s_node in
       let stmt_f, (bds_f, assoc_f, pre_f) =
-        sp_stmt memenv env (bds, assoc, pre_f) s2.s_node in
+        sp_stmt ?mc memenv env (bds, assoc, pre_f) s2.s_node in
       if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
@@ -202,9 +202,9 @@ module LowInternal = struct
 
     | _ -> raise No_sp
 
-  let sp_stmt (memenv : EcMemory.memenv) env stmt f =
+  let sp_stmt ?mc (memenv : EcMemory.memenv) env stmt f =
     let stmt, (bds, assoc, pre) =
-      sp_stmt memenv env ([], [], f) stmt in
+      sp_stmt ?mc memenv env ([], [], f) stmt in
     let pre = build_sp memenv bds assoc pre in
     stmt, pre
 end
@@ -269,8 +269,9 @@ let t_sp_side pos tc =
       let stmtR1, stmtR2 = o_split ~rev:true env posR es.es_sr in
 
       let         es_pr = (es_pr es) in
-      let stmtL1, es_pr = LI.sp_stmt es.es_ml env stmtL1 es_pr.inv in
-      let stmtR1, es_pr = LI.sp_stmt es.es_mr env stmtR1 es_pr in
+      let ml, mr = fst es.es_ml, fst es.es_mr in
+      let stmtL1, es_pr = LI.sp_stmt ~mc:(ml, mr) es.es_ml env stmtL1 es_pr.inv in
+      let stmtR1, es_pr = LI.sp_stmt ~mc:(ml, mr) es.es_mr env stmtR1 es_pr in
 
       let ml, mr = fst es.es_ml, fst es.es_mr in
 

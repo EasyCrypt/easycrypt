@@ -21,10 +21,6 @@ module EqTest = EcReduction.EqTest
 module NormMp = EcEnv.NormMp
 
 (* -------------------------------------------------------------------- *)
-type wp = EcEnv.env -> EcMemory.memenv -> stmt -> form -> form option
-let  wp = (ref (None : wp option))
-
-(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t

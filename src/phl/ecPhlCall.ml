@@ -17,14 +17,14 @@ module PT  = EcProofTerm
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let wp_asgn_call env lv res post =
+let wp_asgn_call ?mc env lv res post =
   assert (res.m = post.m);
   let m = post.m in
   match lv with
   | None -> post
   | Some lv ->
       let lets = lv_subst m lv res.inv in
-      {m;inv=mk_let_of_lv_substs env ([lets], post.inv)}
+      {m;inv=mk_let_of_lv_substs ?mc env ([lets], post.inv)}
 
 let subst_args_call env m e s =
   PVM.add env pv_arg m (ss_inv_of_expr m e).inv s
@@ -42,8 +42,8 @@ let wp2_call
   let vresr = LDecl.fresh_id hyps "result_R" in
   let fresl = {ml;mr; inv=f_local vresl fsigl.fs_ret} in
   let fresr = {ml;mr; inv=f_local vresr fsigr.fs_ret} in
-  let post = map_ts_inv_left2 (wp_asgn_call env lpl) fresl post in
-  let post = map_ts_inv_right2 (wp_asgn_call env lpr) fresr post in
+  let post = map_ts_inv_left2 (wp_asgn_call ~mc:(ml,mr) env lpl) fresl post in
+  let post = map_ts_inv_right2 (wp_asgn_call ~mc:(ml,mr) env lpr) fresr post in
   let s    = PVM.empty in
   let s    = PVM.add env pvresr mr fresr.inv s in
   let s    = PVM.add env pvresl ml fresl.inv s in
@@ -274,9 +274,9 @@ let t_equiv_call1 side fpre fpost tc =
     | `Left  -> (EcMemory.memory equiv.es_ml, equiv.es_sl)
     | `Right -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
   in
-  let wp_asgn_call_side env lv = sideif side 
-    (map_ts_inv_left2 (wp_asgn_call env lv))
-    (map_ts_inv_right2 (wp_asgn_call env lv))
+  let wp_asgn_call_side env lv = sideif side
+    (map_ts_inv_left2 (wp_asgn_call ~mc:(ml,mr) env lv))
+    (map_ts_inv_right2 (wp_asgn_call ~mc:(ml,mr) env lv))
   in
   let generalize_mod_side = sideif side
     generalize_mod_left generalize_mod_right in

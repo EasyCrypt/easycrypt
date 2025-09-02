@@ -16,30 +16,30 @@ module LowInternal = struct
     let let1 = lv_subst ?c_pre m lv (ss_inv_of_expr m e).inv in
       (let1::lets, f)
 
-  let rec wp_stmt
+  let rec wp_stmt ?mc
       onesided c_pre env memenv (stmt: EcModules.instr list) letsf
   =
     match stmt with
     | [] -> (stmt, letsf)
     | i :: stmt' ->
         try
-          let letsf = wp_instr onesided c_pre env memenv i letsf in
-          wp_stmt onesided c_pre env memenv stmt' letsf
+          let letsf = wp_instr ?mc onesided c_pre env memenv i letsf in
+          wp_stmt ?mc onesided c_pre env memenv stmt' letsf
         with No_wp -> (stmt, letsf)
 
-  and wp_instr onesided c_pre env memenv i letsf =
+  and wp_instr ?mc onesided c_pre env memenv i letsf =
     match i.i_node with
     | Sasgn (lv,e) ->
       wp_asgn_aux c_pre memenv lv e letsf
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1) =
-          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf in
+          wp_stmt ?mc onesided c_pre env memenv (List.rev s1.s_node) letsf in
         let (r2,letsf2) =
-          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf in
+          wp_stmt ?mc onesided c_pre env memenv (List.rev s2.s_node) letsf in
         if List.is_empty r1 && List.is_empty r2 then begin
-          let post1 = mk_let_of_lv_substs env letsf1 in
-          let post2 = mk_let_of_lv_substs env letsf2 in
+          let post1 = mk_let_of_lv_substs ?mc:mc env letsf1 in
+          let post2 = mk_let_of_lv_substs ?mc:mc env letsf2 in
           let m = EcMemory.memory memenv in
           let post  = f_if (ss_inv_of_expr m e).inv post1 post2 in
           let post  = f_and_simpl (odfl f_true c_pre) post in
@@ -49,7 +49,7 @@ module LowInternal = struct
     | Smatch (e, bs) -> begin
         let wps =
           let do1 (_, s) =
-            wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf in
+            wp_stmt ?mc onesided c_pre env memenv (List.rev s.s_node) letsf in
           List.map do1 bs
         in
 
@@ -120,12 +120,12 @@ module LowInternal = struct
 
 end
 
-let wp ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
+let wp ?mc ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
   let (r, letsf) =
-    LowInternal.wp_stmt
+    LowInternal.wp_stmt ?mc
       onesided c_pre env m (List.rev s.s_node) ([], post)
   in
-  let pre = mk_let_of_lv_substs ~uselet env letsf in
+  let pre = mk_let_of_lv_substs ?mc ~uselet env letsf in
   List.rev r, pre
 
 let ewp ?(uselet=true) env m s post =
@@ -179,19 +179,19 @@ module TacInternal = struct
   let t_equiv_wp ?(uselet=true) ij tc =
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
+    let ml, mr = (fst es.es_ml), (fst es.es_mr) in
     let i = omap fst ij and j = omap snd ij in
     let s_hdl,s_wpl = o_split env i es.es_sl in
     let s_hdr,s_wpr = o_split env j es.es_sr in
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
-    let s_wpl, post = wp ~uselet env meml s_wpl post in
-    let s_wpr, post = wp ~uselet env memr s_wpr post in
+    let s_wpl, post = wp ~mc:(ml,mr) ~uselet env meml s_wpl post in
+    let s_wpr, post = wp ~mc:(ml,mr) ~uselet env memr s_wpr post in
     check_wp_progress tc i es.es_sl s_wpl;
     check_wp_progress tc j es.es_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
     let sr = EcModules.stmt (s_hdr @ s_wpr) in
-    let ml, mr = (fst es.es_ml), (fst es.es_mr) in
     let concl = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr {ml;mr;inv=post} in
     FApi.xmutate1 tc `Wp [concl]
 end
@@ -218,13 +218,6 @@ let t_wp_r ?(uselet=true) k g =
   t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te g
 
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
-
-(* -------------------------------------------------------------------- *)
-let typing_wp env m s f =
-  match wp ~onesided:true env m s f with
-  | [], f -> Some f | _, _ -> None
-
-let () = EcTyping.wp := Some typing_wp
 
 (* -------------------------------------------------------------------- *)
 let process_wp pos tc =

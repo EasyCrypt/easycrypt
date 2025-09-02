@@ -336,25 +336,27 @@ let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
     in tc_error_noXhl ~kinds !!tc
 
 (* -------------------------------------------------------------------- *)
-let tag_sym_with_side name m =
-  if      EcIdent.id_equal m EcFol.mleft  then (name ^ "_L")
-  else if EcIdent.id_equal m EcFol.mright then (name ^ "_R")
-  else    name
+let tag_sym_with_side ?mc name m =
+  match mc with
+  | Some (ml, mr) -> if EcIdent.id_equal m ml  then (name ^ "_L")
+                  else if EcIdent.id_equal m mr then (name ^ "_R")
+                  else    name
+  | None -> name
 
 (* -------------------------------------------------------------------- *)
-let id_of_pv pv m =
+let id_of_pv ?mc pv m =
   let id = symbol_of_pv pv in
-  let id = tag_sym_with_side id m in
+  let id = tag_sym_with_side ?mc id m in
     EcIdent.create id
 
 (* -------------------------------------------------------------------- *)
-let id_of_mp mp m =
+let id_of_mp ?mc mp m =
   let name =
     match mp.EcPath.m_top with
     | `Local id -> EcIdent.name id
     | _ -> assert false
   in
-    EcIdent.create (tag_sym_with_side name m)
+    EcIdent.create (tag_sym_with_side ?mc name m)
 
 (* -------------------------------------------------------------------- *)
 let lv_subst ?c_pre m lv f = c_pre, lv, m, f
@@ -382,29 +384,29 @@ let mk_let_of_lv_substs_nolet env (lets, f) =
     let f = PVM.subst env s f in
     f_ands_simpl (List.rev ps) f
 
-let add_lv_subst env lv m s =
+let add_lv_subst ?mc env lv m s =
   match lv with
   | LvVar (pv,t) ->
-    let id = id_of_pv pv m in
+    let id = id_of_pv ?mc pv m in
     let s = PVM.add env pv m (f_local id t) s in
     LSymbol(id, t), s
 
   | LvTuple pvs ->
     let s, ids =
       List.map_fold (fun s (pv,t) ->
-        let id = id_of_pv pv m in
+        let id = id_of_pv ?mc pv m in
         let s = PVM.add env pv m (f_local id t) s in
         s, (id,t)) s pvs in
     LTuple ids, s
 
-let mk_let_of_lv_substs_let env (lets, f) =
+let mk_let_of_lv_substs_let ?mc env (lets, f) =
   if List.is_empty lets then f
   else
     let accu,s =
       List.fold_left (fun (accu,s) (c_pre, lv,m,f1) ->
         let c_pre = omap (PVM.subst env s) c_pre in
         let f1 = PVM.subst env s f1 in
-        let lv, s = add_lv_subst env lv m s in
+        let lv, s = add_lv_subst ?mc env lv m s in
         (c_pre,lv,f1)::accu, s) ([],PVM.empty) lets in
     (* accu is the sequence of let in reverse order *)
     let f = PVM.subst env s f in
@@ -461,35 +463,35 @@ let mk_let_of_lv_substs_let env (lets, f) =
       f_and_simpl c_pre f2) (Fsubst.f_subst s f) rlets
 
 
-let mk_let_of_lv_substs ?(uselet=true) env letsf =
-  if uselet then mk_let_of_lv_substs_let env letsf
+let mk_let_of_lv_substs ?(uselet=true) ?mc env letsf =
+  if uselet then mk_let_of_lv_substs_let ?mc env letsf
   else mk_let_of_lv_substs_nolet env letsf
 
 (* -------------------------------------------------------------------- *)
-let subst_form_lv env lv t f =
+let subst_form_lv ?mc env lv t f =
   let m = f.m in
   assert (f.m = t.m);
   let lets = lv_subst f.m lv t.inv in
-  {m; inv = mk_let_of_lv_substs env ([lets], f.inv)}
+  {m; inv = mk_let_of_lv_substs ?mc env ([lets], f.inv)}
 
 let subst_form_lv_left env lv t f =
   let ml, mr = f.ml, f.mr in
   assert (f.ml = t.ml);
   assert (f.mr = t.mr);
   let lets = lv_subst f.ml lv t.inv in
-  {ml;mr;inv=mk_let_of_lv_substs env ([lets], f.inv)}
+  {ml;mr;inv=mk_let_of_lv_substs ~mc:(ml, mr) env ([lets], f.inv)}
 
 let subst_form_lv_right env lv t f =
   let ml, mr = f.ml, f.mr in
   assert (f.mr = t.mr);
   assert (f.ml = t.ml);
   let lets = lv_subst f.mr lv t.inv in
-  {ml;mr;inv=mk_let_of_lv_substs env ([lets], f.inv)}
+  {ml;mr;inv=mk_let_of_lv_substs ~mc:(ml, mr) env ([lets], f.inv)}
 
 (* -------------------------------------------------------------------- *)
-(* Remark: m is only used to create fresh name, id_of_pv *)
-let generalize_subst_ env m uelts uglob =
-  let create (pv, ty) = id_of_pv pv m, GTty ty in
+(* Remark: m and mc are only used to create sensible fresh names with id_of_pv *)
+let generalize_subst_ ?mc env m uelts uglob =
+  let create (pv, ty) = id_of_pv ?mc pv m, GTty ty in
   let b = List.map create uelts in
   let s =
     List.fold_left2
@@ -497,7 +499,7 @@ let generalize_subst_ env m uelts uglob =
         Mpv.add env pv (f_local id ty) s)
       Mpv.empty uelts b
   in
-  let create mp = id_of_mp mp m, GTty (tglob (EcPath.mget_ident mp)) in
+  let create mp = id_of_mp ?mc mp m, GTty (tglob (EcPath.mget_ident mp)) in
   let b' = List.map create uglob in
   let s  =
     List.fold_left2
@@ -507,7 +509,7 @@ let generalize_subst_ env m uelts uglob =
   in
     (b', b, s)
 
-let generalize_mod__ env modi m f =
+let generalize_mod__ ?mc env modi m f =
   let (melts, mglob) = PV.ntr_elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
@@ -523,7 +525,7 @@ let generalize_mod__ env modi m f =
 
   (* 3.a. Add the global variables *)
 
-  let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
+  let (bd', bd, s ) = generalize_subst_ ?mc env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)
   let restrs =
@@ -558,13 +560,13 @@ let generalize_mod_ env modi f =
 let generalize_mod_left_ env modi f =
   let ml, mr = f.ml, f.mr in
   let res, bd', bd =
-    generalize_mod__ env modi ml f.inv in
+    generalize_mod__ ~mc:(ml, mr) env modi ml f.inv in
   ({ml; mr; inv=res.inv}, bd', bd)
 
 let generalize_mod_right_ env modi f =
   let ml, mr = f.ml, f.mr in
   let res, bd', bd =
-    generalize_mod__ env modi mr f.inv in
+    generalize_mod__ ~mc:(ml, mr) env modi mr f.inv in
   ({ml; mr; inv=res.inv}, bd', bd)
 
 let generalize_mod_ss_inv env modi f =
