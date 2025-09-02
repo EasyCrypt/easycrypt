@@ -82,6 +82,7 @@ module type CBackend = sig
   val taut : ?inps:inp list -> node -> bool 
 
   val slice : reg -> int -> int -> reg
+  val subcirc : reg -> (int list) -> reg
   val insert : reg -> int -> reg -> reg
   val get : reg -> int -> node
   val permute : int -> (int -> int) -> reg -> reg
@@ -152,6 +153,9 @@ module type CBackend = sig
     val dep_range : deps -> int * int
     (* Checks if all the deps are in a given list of inputs *)
     val check_inputs : reg -> (int * int) list -> bool
+
+    val forall_inputs : (int -> int -> bool) -> reg -> bool
+    val rename_inputs : ((int * int) -> (int * int) option) -> reg -> reg
   end
 end
 
@@ -250,6 +254,9 @@ module LospecsBack : CBackend = struct
 
   let slice (r: reg) (idx: int) (len: int) : reg = 
     Array.sub r idx len
+
+  let subcirc (r: reg) (outs: int list) : reg =
+    List.map (fun i -> r.(i)) outs |> Array.of_list
 
   let insert (r: reg) (idx: int) (r_in: reg) : reg =
     let ret = Array.copy r in
@@ -457,6 +464,18 @@ module LospecsBack : CBackend = struct
           | None -> false
         ) d
       ) ds 
+
+    let forall_inputs (check: int -> int -> bool) (r: reg) : bool =
+      let d = deps_of_reg r in
+      Array.for_all (fun d -> 
+        Map.for_all (fun id bs -> Set.for_all (check id) bs) d) 
+      d
+
+    let rename_inputs (renamer: (int * int) -> (int * int) option) (r: reg) : reg =
+      C.maps (fun (id, b) -> 
+        Option.map (fun (id, b) -> input_node ~id b) (renamer (id, b)) 
+      ) (node_list_of_reg r) |> (reg_of_node_list)
+
   end
 end
 
@@ -603,7 +622,7 @@ module type CircuitInterface = sig
 
   (* Mapreduce/Dependecy analysis related functions *)
   val is_decomposable : int -> int -> cbitstring cfun -> bool
-  val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list * (int * int)
+  val decompose : int -> int -> cbitstring cfun -> (cbitstring cfun) list
   val permute : int -> (int -> int) -> cbitstring cfun -> cbitstring cfun
   val align_inputs : circuit -> (int * int) option list -> circuit
   val circuit_slice : size:int -> circuit -> int -> circuit
@@ -1292,6 +1311,58 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     in
     if not (List.for_all check_decomp_inputs (fst res)) then assert false else
     res
+
+  (* General Mapreduce Procedure:
+     Assumes: 
+       Input bits start from 0
+     Input: 
+       Circuit: One Bitstring Input => One Bitstring Output
+       Lane Descriptions: Output Bit List/Set/Array /\ Input Bit Set
+     Output: 
+       Circuit List: One circuit for each lane, inputs renamed to be sequential
+     Throws:
+       CircuitError 
+       | -> When lane outputs do not fully cover circuit
+       | -> When lane dependency description does not fit circuit
+     *)
+  let general_decompose ((`CBitstring r, inps) as c: cbitstring cfun) (lanes: ((int list) * (int Set.t)) list): cbitstring cfun list = 
+
+    (* Check that outputs cover the circuit *)
+    let outputs = List.fst lanes |> List.flatten |> List.sort (Int.compare) in
+    assert (List.for_all2 (fun a b -> a = b) outputs (List.init (List.length outputs) (fun i -> i)));
+
+    let input = match inps with
+    | ({id; type_ = `CBitstring w} as inp)::[] -> inp
+    | _ -> raise (CircError "too many inputs for mapreduce")
+    in
+
+    (* Separate one lane *)
+    let doit ((outputs, inputs): int list * int Set.t) : cbitstring cfun =
+      let c = Backend.subcirc r outputs in
+      assert (Backend.Deps.forall_inputs (fun id b -> 
+        input.id = id && 
+        Set.mem b inputs) c);
+      let _, new_inp = new_cbitstring_inp (Set.cardinal inputs) in
+      let bit_renames = List.mapi (fun i b -> (b, i)) (Set.to_list inputs) in
+      let bit_renamer = Map.of_seq (List.to_seq bit_renames) in
+      let renamer (id, b) = 
+        if id = input.id then
+          Option.map (fun new_b -> (new_inp.id, new_b)) (Map.find_opt b bit_renamer)
+        else None
+      in `CBitstring (Backend.Deps.rename_inputs renamer c), [new_inp]
+    in
+    List.map doit lanes
+
+  let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
+    let n = Backend.size_of_reg r in
+    assert (n mod out_w = 0);
+    let n_lanes = n / out_w in
+    let inp = match inps with
+    | ({type_ = `CBitstring n'; id} as inp)::[] when n' mod in_w = 0 && n' / in_w = n_lanes -> inp
+    | _ -> raise (CircError "bad inputs in circ for mapreduce")
+    in
+    let lanes = List.map (fun i -> List.init out_w (fun j -> i*out_w + j), Set.of_list (List.init in_w (fun j -> i*in_w + j))) (List.init n_lanes (fun i -> i)) in
+    general_decompose c lanes
 
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     `CBitstring (Backend.permute w perm r), inps

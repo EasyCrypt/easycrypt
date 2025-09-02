@@ -871,13 +871,13 @@ let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   in
   (permute bsz perm c :> circuit)
 
-let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list * (int * int) = 
+let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list = 
   let c = match c, perm with 
   | (`CBitstring _, inps) as c, None -> c
   | (`CBitstring _, inps) as c, Some perm -> permute w_out perm c
   | _ -> assert false
   in
-  (decompose w_in w_out c :> circuit list * (int * int))
+  (decompose w_in w_out c :> circuit list)
 
 let cache_get = cache_get
 let cache_add = cache_add

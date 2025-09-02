@@ -34,7 +34,7 @@ val circuit_aggregate : circuit list -> circuit
 val circuit_aggregate_inps : circuit -> circuit
 val circuit_flatten : circuit -> circuit
 val circuit_permute : int -> (int -> int) -> circuit -> circuit 
-val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list * (int * int)
+val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list 
 
 (* Use circuits *)
 val compute    : sign:bool -> circuit -> BI.zint list -> BI.zint
