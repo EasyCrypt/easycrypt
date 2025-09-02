@@ -331,7 +331,6 @@ let f_int_add_simpl =
 
     | _, _ ->
         let simpls = [
-           (fun () -> try_add_opp f1 f2);
            (fun () -> try_add_opp f2 f1);
            (fun () -> i1 |> obind (try_addc^~ f2));
            (fun () -> i2 |> obind (try_addc^~ f1));
@@ -479,7 +478,6 @@ let f_real_add_simpl =
     | _, _ ->
         let simpls = [
            (fun () -> try_norm_rintdiv f1 f2);
-           (fun () -> try_add_opp f1 f2);
            (fun () -> try_add_opp f2 f1);
            (fun () -> r1 |> obind (try_addc^~ f2));
            (fun () -> r2 |> obind (try_addc^~ f1));
