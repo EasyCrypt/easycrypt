@@ -388,7 +388,7 @@ module PPEnv = struct
     oget (Mint.find_opt i (fst !(ppe.ppe_univar)))
 end
 
-let debug_mode = true
+let debug_mode = false
 
 (* -------------------------------------------------------------------- *)
 let shorten_path
