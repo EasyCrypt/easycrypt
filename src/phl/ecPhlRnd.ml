@@ -422,6 +422,48 @@ module Core = struct
       | `Right -> { es with es_sr = s; es_mr = m; } in
     FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
 
+  (* -------------------------------------------------------------------- *)
+  let t_equiv_coupling_rnd_r g tc =
+    (* process the following pRHL goal, where g is a coupling of g1 and g2 *)
+    (*                   {phi} x <$ g1 ~ y <$ g2 {psi}                     *)
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let (lvL, muL), _ = tc1_last_rnd tc es.es_sl in
+    let (lvR, muR), _ = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+    let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
+    let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
+
+    (* Subgoal 1: forall a b, phi => (a, b) \in supp(g) => psi[x -> a, y -> b] *)
+
+    (* Generate two free variables a and b and the pair (a, b) *)
+    let a_id = EcIdent.create "a" in
+    let b_id = EcIdent.create "b" in
+    let a = f_local a_id tyL in
+    let b = f_local b_id tyR in
+    let ab = f_tuple [a; b] in
+
+    (* Generate the coupling distribution type: (tyL * tyR) distr *)
+    let coupling_ty = ttuple [tyL; tyR] in
+    let g_app = f_app_simpl g [] (tdistr coupling_ty) in
+
+    (* Substitute in the postcondition *)
+    let post = es.es_po in
+    let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
+    let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR b post_subst in
+    
+    let subgoal1 = f_imp (f_in_supp ab g_app) post_subst in
+    let subgoal1 = f_imp es.es_pr subgoal1 in
+    let subgoal1 = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] subgoal1 in
+
+    (* Subgoal 2: iscoupling g muL muR *)
+    let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
+    let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
+    let subgoal2 = f_app (f_op iscoupling_op [tyL; tyR] iscoupling_ty) 
+                         [muL; muR; g_app] tbool in
+
+    FApi.xmutate1 tc `Rnd [subgoal1; subgoal2]
 end (* Core *)
 
 (* -------------------------------------------------------------------- *)
@@ -641,32 +683,66 @@ let process_rnd side pos tac_info tc =
       t_bdhoare_rnd tac_info tc
 
   | _, _, _ when is_equivS concl ->
-    let process_form f ty1 ty2 =
-      TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
+    (match tac_info with
+     | PSingleRndParam f ->
+         let env = FApi.tc1_env tc in
+         
+         (try
+            (* Try to type-check as coupling distribution first *)
+            let es = tc1_as_equivS tc in
+            let (_, muL), _ = tc1_last_rnd tc es.es_sl in (* extract left distribution *)
+            let (_, muR), _ = tc1_last_rnd tc es.es_sr in (* extract right distribution *)
+            let tyL = proj_distr_ty env (e_ty muL) in (* type of the left samples *)
+            let tyR = proj_distr_ty env (e_ty muR) in (* type of the right samples *)
+            let coupling_ty = ttuple [tyL; tyR] in (* type of the coupling *)
+            let g_form = TTC.tc1_process_prhl_form tc (tdistr coupling_ty) f in
+            Core.t_equiv_coupling_rnd_r g_form tc
+          with
+          | _ ->
+            (* If coupling fails, fall back to bijection *)
+            let process_form f ty1 ty2 =
+              TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
+            let bij_info = Some (process_form f), None in
+            let pos = pos |> Option.map (function
+              | Single (b, p) ->
+                  let p =
+                    if Option.is_some side then
+                      EcProofTyping.tc1_process_codepos1 tc (side, p)
+                    else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+                  in Single (b, p)
+              | Double ((b1, p1), (b2, p2)) ->
+                  let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
+                  let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+                  Double ((b1, p1), (b2, p2))
+            )
+            in
+            t_equiv_rnd side ?pos bij_info tc)
+     | _ ->
+         let process_form f ty1 ty2 =
+           TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 
-    let bij_info =
-      match tac_info with
-      | PNoRndParams -> None, None
-      | PSingleRndParam f -> Some (process_form f), None
-      | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
-      | _ -> tc_error !!tc "invalid arguments"
-    in
+         let bij_info =
+           match tac_info with
+           | PNoRndParams -> None, None
+           | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
+           | _ -> tc_error !!tc "invalid arguments"
+         in
 
-    let pos = pos |> Option.map (function
-      | Single (b, p) ->
-          let p =
-            if Option.is_some side then
-              EcProofTyping.tc1_process_codepos1 tc (side, p)
-            else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
-          in Single (b, p)
-      | Double ((b1, p1), (b2, p2)) ->
-          let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
-          let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
-          Double ((b1, p1), (b2, p2))
-    )
-    in
-    
-    t_equiv_rnd side ?pos bij_info tc
+         let pos = pos |> Option.map (function
+           | Single (b, p) ->
+               let p =
+                 if Option.is_some side then
+                   EcProofTyping.tc1_process_codepos1 tc (side, p)
+                 else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+               in Single (b, p)
+           | Double ((b1, p1), (b2, p2)) ->
+               let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
+               let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+               Double ((b1, p1), (b2, p2))
+         )
+         in
+         
+         t_equiv_rnd side ?pos bij_info tc)
 
   | _ -> tc_error !!tc "invalid arguments"
 
