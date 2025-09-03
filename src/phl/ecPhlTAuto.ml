@@ -26,10 +26,10 @@ let f_xr0 = f_r2xr f_r0
 
 let t_ehoare_zero_r tc =
   match (FApi.tc1_goal tc).f_node with
-  | FeHoareF hf when f_equal hf.ehf_po f_xr0 ->
+  | FeHoareF hf when f_equal (ehf_po hf).inv f_xr0 ->
        FApi.xmutate1 tc `eHoareZero []
 
-  | FeHoareS hs when f_equal hs.ehs_po f_xr0 ->
+  | FeHoareS hs when f_equal (ehs_po hs).inv f_xr0 ->
        FApi.xmutate1 tc `eHoareZero []
   | _ ->
     tc_error !!tc

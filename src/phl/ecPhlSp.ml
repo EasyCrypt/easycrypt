@@ -253,7 +253,7 @@ let t_sp_side pos tc =
     | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true env pos bhs.bhs_s in
-      check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
+      check_form_indep stmt1 bhs.bhs_m (bhs_bd bhs).inv;
       let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 (bhs_pr bhs).inv in
       check_sp_progress pos stmt1;
       let m = fst bhs.bhs_m in

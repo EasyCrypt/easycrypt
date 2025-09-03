@@ -922,7 +922,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FhoareS _, Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
 
-    check_is_detbound `First hs.bhs_bd;
+    check_is_detbound `First (bhs_bd hs).inv;
 
     FApi.t_seq
       t_hoareS_conseq_bdhoare
@@ -963,7 +963,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FhoareF _, Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
 
-    check_is_detbound `First hs.bhf_bd;
+    check_is_detbound `First (bhf_bd hs).inv;
 
     FApi.t_seq
       t_hoareF_conseq_bdhoare
@@ -1234,7 +1234,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let post = ss_inv_generalize_right (ss_inv_rebind (bhs_po hs) ml) mr in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    check_is_detbound `Second hs.bhs_bd;
+    check_is_detbound `Second (bhs_bd hs).inv;
 
     t_on1seq 2
      (tac pre post)
@@ -1252,7 +1252,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let post = ss_inv_generalize_left (ss_inv_rebind (bhs_po hs) mr) ml in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    check_is_detbound `Third hs.bhs_bd;
+    check_is_detbound `Third (bhs_bd hs).inv;
 
     t_on1seq 2
       (tac pre post)

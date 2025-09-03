@@ -196,7 +196,7 @@ module Core = struct
       else match lv with
            | LvVar (pv,_) ->
              f_lambda [x,GTty ty]
-               (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
+               (EcPV.PVM.subst1 env pv m (f_local x ty) (bhs_po bhs).inv)
            | _ -> tc_error !!tc "cannot infer a valid event, it must be provided"
     in
     let bound,pre_bound,binders =
@@ -402,7 +402,7 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) hs.hs_s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) (hs_po hs).inv)
       else None in
     let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
     let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
@@ -415,7 +415,7 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) bhs.bhs_s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) (bhs_po bhs).inv)
       else None in
     let (_,mt), s2 = semrnd tc bhs.bhs_m fv s2 in
     let concl = f_bdHoareS mt (bhs_pr bhs) (stmt (s1 @ s2)) (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
@@ -432,7 +432,7 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst m) (es_po es).inv)
       else None in
     let (_,mt), s2 = semrnd tc m fv s2 in
     let s = stmt (s1 @ s2) in

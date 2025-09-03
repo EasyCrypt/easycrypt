@@ -105,7 +105,7 @@ let t_eager_seq_r i j eqR h tc =
   (* check (d) and (e) *)
   pf_compat !!tc env (s_write env s) (s_write env s') seqR eqIs eqXs;
 
-  let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) eC.es_po) in
+  let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) (es_po eC).inv) in
   let c1 ,c2  = s_split env i c in
   let c1',c2' = s_split env j c' in
 
@@ -270,17 +270,15 @@ let t_eager_fun_abs_r eqI h tc =
   let pre, post, sg =
     EcPhlFun.FunAbsLow.equivF_abs_spec !!tc env fl fr eqI in
 
-  let ml, mr = eg.eg_ml, eg.eg_mr in
-
   let do1 og sg =
     let ef = destr_equivF og in
     let torefl f =
       Mpv2.to_form_ts_inv
-        (Mpv2.eq_refl (PV.fv env mr f))
-        {ml;mr;inv=f_true}
+        (Mpv2.eq_refl (PV.fv env f.mr f.inv))
+        {ml=f.ml;mr=f.mr;inv=f_true}
     in
          f_eagerF (ef_pr ef) s ef.ef_fl ef.ef_fr s' (ef_po ef)
-      :: f_equivF (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
+      :: f_equivF (torefl (ef_pr ef)) ef.ef_fr ef.ef_fr (torefl (ef_po ef))
       :: sg
   in
 

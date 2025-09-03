@@ -101,10 +101,10 @@ let t_prbounded_r conseq tc =
     match concl.f_node with
     | FbdHoareF hf ->
         let m = fst (Fun.hoareF_memenv hf.bhf_m hf.bhf_f env) in
-          (m, hf.bhf_pr, hf.bhf_po, hf.bhf_cmp, hf.bhf_bd)
+          (m, bhf_pr hf, bhf_po hf, hf.bhf_cmp, bhf_bd hf)
 
     | FbdHoareS hf ->
-        (hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd)
+        (hf.bhs_m, bhs_pr hf, bhs_po hf, hf.bhs_cmp, bhs_bd hf)
 
     | _ -> tc_error_noXhl ~kinds:[`PHoare `Any] !!tc
   in
@@ -112,11 +112,11 @@ let t_prbounded_r conseq tc =
   let cond =
     (* FIXME: use the [conseq] result when possible *)
     match cmp with
-    | FHle when f_equal bd f_r1 -> []
-    | FHge when f_equal bd f_r0 -> []
-    | _    when f_equal po f_false && f_equal bd f_r0 -> []
-    | FHle when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le f_r1 bd))]
-    | FHge when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le bd f_r0))]
+    | FHle when f_equal bd.inv f_r1 -> []
+    | FHge when f_equal bd.inv f_r0 -> []
+    | _    when f_equal po.inv f_false && f_equal bd.inv f_r0 -> []
+    | FHle when conseq -> [f_forall_mems_ss_inv m (map_ss_inv2 f_imp pr (map_ss_inv2 f_real_le {m=fst m;inv=f_r1} bd))]
+    | FHge when conseq -> [f_forall_mems_ss_inv m (map_ss_inv2 f_imp pr (map_ss_inv2 f_real_le bd {m=fst m;inv=f_r0}))]
 
     | _ -> tc_error !!tc "cannot solve the probabilistic judgement"
   in

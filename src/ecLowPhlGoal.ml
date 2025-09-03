@@ -662,16 +662,16 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
 
       match concl.f_node with
       | FhoareS hs ->
-          let pr, po = hs.hs_pr, hs.hs_po in
+          let pr, po = hs_pr hs, hs_po hs in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr, po) (hs.hs_m, hs.hs_s) in
+            tx (pf, hyps) cpos (pr.inv, po.inv) (hs.hs_m, hs.hs_s) in
           let concl = f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FbdHoareS bhs when bdhoare ->
-          let pr, po = bhs.bhs_pr, bhs.bhs_po in
+          let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
+            tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
           let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) 
                       bhs.bhs_cmp (bhs_bd bhs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
@@ -687,12 +687,12 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
   | Some side ->
       let hyps      = FApi.tc1_hyps tc in
       let es        = tc1_as_equivS tc in
-      let pre, post = es.es_pr, es.es_po in
+      let pre, post = es_pr es, es_po es in
       let me, stmt     =
         match side with
         | `Left  -> (es.es_ml, es.es_sl)
         | `Right -> (es.es_mr, es.es_sr) in
-      let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre, post) (me, stmt) in
+      let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre.inv, post.inv) (me, stmt) in
       let concl =
         match side with
         | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)

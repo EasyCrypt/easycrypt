@@ -104,12 +104,12 @@ let tc1_process_prhl_form_opt tc oty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let ml, mr, (pr, po) =
     match concl.f_node with
-    | FequivS es -> (es.es_ml, es.es_mr, (es.es_pr, es.es_po))
+    | FequivS es -> (es.es_ml, es.es_mr, (es_pr es, es_po es))
     | _ -> assert false
   in
 
   let hyps = LDecl.push_active_ts ml mr hyps in
-  let mv = Msym.of_list [("pre", pr); ("post", po)] in
+  let mv = Msym.of_list [("pre", pr.inv); ("post", po.inv)] in
   let f = pf_process_form_opt ~mv !!tc hyps oty pf in
   let ml, mr = fst ml, fst mr in
   {ml;mr;inv=f}
@@ -164,9 +164,9 @@ let tc1_process_Xhl_form ?side tc ty pf =
 
   let mv =
     match concl.f_node with
-    | FhoareS   hs -> Some (hs.hs_pr , hs.hs_po )
-    | FeHoareS  hs -> Some (hs.ehs_pr, hs.ehs_po)
-    | FbdHoareS hs -> Some (hs.bhs_pr, hs.bhs_po)
+    | FhoareS   hs -> Some ((hs_pr hs).inv , (hs_po hs).inv )
+    | FeHoareS  hs -> Some ((ehs_pr hs).inv, (ehs_po hs).inv)
+    | FbdHoareS hs -> Some ((bhs_pr hs).inv, (bhs_po hs).inv)
     | _            -> None
   in
 

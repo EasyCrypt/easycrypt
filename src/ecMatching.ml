@@ -1026,14 +1026,14 @@ module FPosition = struct
              it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
               let subctxt = Sid.add hs.bhf_m ctxt in
-              doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
-                                       (subctxt, hs.bhf_po);
-                                       (   ctxt, hs.bhf_bd)]))
+              doit pos (`WithSubCtxt ([(subctxt, (bhf_pr hs).inv);
+                                       (subctxt, (bhf_po hs).inv);
+                                       (   ctxt, (bhf_bd hs).inv)]))
 
           | FequivF es ->
               let ctxt = Sid.add es.ef_ml ctxt in
               let ctxt = Sid.add es.ef_mr ctxt in
-              doit pos (`WithCtxt (ctxt, [es.ef_pr; es.ef_po]))
+              doit pos (`WithCtxt (ctxt, [(ef_pr es).inv; (ef_po es).inv]))
 
           | _ -> None
         in
@@ -1175,19 +1175,19 @@ module FPosition = struct
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =
-                as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
+                as_seq2 (doit p [(ehf_pr hf).inv; (ehf_po hf).inv])
               in
               let m = hf.ehf_m in
               f_eHoareF {m;inv=ehf_pr} hf.ehf_f {m;inv=ehf_po}
 
           | FbdHoareF hf ->
-              let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
+              let sub = doit p [(bhf_pr hf).inv; (bhf_po hf).inv; (bhf_bd hf).inv] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
               let m = hf.bhf_m in
               f_bdHoareF {m;inv=bhf_pr} hf.bhf_f {m;inv=bhf_po} hf.bhf_cmp {m;inv=bhf_bd}
 
           | FequivF ef ->
-              let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
+              let (ef_pr, ef_po) = as_seq2 (doit p [(ef_pr ef).inv; (ef_po ef).inv]) in
               let ml = ef.ef_ml in
               let mr = ef.ef_mr in
               f_equivF {ml;mr;inv=ef_pr} ef.ef_fl ef.ef_fr {ml;mr;inv=ef_po}

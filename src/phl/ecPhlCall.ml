@@ -205,10 +205,10 @@ let t_bdhoare_call fpre fpost opt_bd tc =
     | FHle -> map_ss_inv2 f_imp_simpl   post fpost
     | FHge -> map_ss_inv2 f_imp_simpl  fpost  post
 
-    | FHeq when f_equal bhs.bhs_bd f_r0 ->
+    | FHeq when f_equal bhs_bd.inv f_r0 ->
         map_ss_inv2 f_imp_simpl post fpost
 
-    | FHeq when f_equal bhs.bhs_bd f_r1 ->
+    | FHeq when f_equal bhs_bd.inv f_r1 ->
         map_ss_inv2 f_imp_simpl  fpost post
 
     | FHeq -> map_ss_inv2 f_iff_simpl fpost  post in

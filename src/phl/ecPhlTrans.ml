@@ -89,8 +89,8 @@ let t_equivS_trans_eq side s tc =
       let mem_pre = Option.map (fun mpre -> ss_inv_generalize_left mpre (fst es.es_ml)) mem_pre_ss in
       es.es_sr, es.es_mr, mem_pre in
 
-  let fv_pr  = EcPV.PV.fv env (EcMemory.memory m) es.es_pr in
-  let fv_po  = EcPV.PV.fv env (fst m) es.es_po in
+  let fv_pr  = EcPV.PV.fv env (fst m) (es_pr es).inv in
+  let fv_po  = EcPV.PV.fv env (fst m) (es_po es).inv in
   let fv_r = EcPV.s_read env c in
   let ml, mr = (fst es.es_ml), (fst es.es_mr) in
   let mk_eqs fv =

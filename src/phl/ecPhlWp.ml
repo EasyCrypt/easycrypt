@@ -145,11 +145,11 @@ module TacInternal = struct
     let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
     let s_wp, post =
-      wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po in
+      wp ~uselet ~onesided:true env hs.hs_m s_wp (hs_po hs).inv in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst hs.hs_m in
-    let concl = f_hoareS (snd hs.hs_m) {m;inv=hs.hs_pr} s {m;inv=post} in
+    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s {m;inv=post} in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_ehoare_wp ?(uselet=true) i tc =
@@ -157,7 +157,7 @@ module TacInternal = struct
     let hs = tc1_as_ehoareS tc in
     let (s_hd, s_wp) = o_split env i hs.ehs_s in
     let s_wp = EcModules.stmt s_wp in
-    let (s_wp, post) = ewp ~uselet env hs.ehs_m s_wp hs.ehs_po in
+    let (s_wp, post) = ewp ~uselet env hs.ehs_m s_wp (ehs_po hs).inv in
     check_wp_progress tc i hs.ehs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst hs.ehs_m in
@@ -169,7 +169,7 @@ module TacInternal = struct
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = o_split env i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp,post = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
+    let s_wp,post = wp ~uselet env bhs.bhs_m s_wp (bhs_po bhs).inv in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst bhs.bhs_m in
@@ -185,8 +185,8 @@ module TacInternal = struct
     let s_hdr,s_wpr = o_split env j es.es_sr in
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
-    let post = es.es_po in
-    let s_wpl, post = wp ~mc:(ml,mr) ~uselet env meml s_wpl post in
+    let post = es_po es in
+    let s_wpl, post = wp ~mc:(ml,mr) ~uselet env meml s_wpl post.inv in
     let s_wpr, post = wp ~mc:(ml,mr) ~uselet env memr s_wpr post in
     check_wp_progress tc i es.es_sl s_wpl;
     check_wp_progress tc j es.es_sr s_wpr;

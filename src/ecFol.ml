@@ -1127,18 +1127,18 @@ let rec dump_f f =
   | FhoareF _ -> "HoareF"
   | FhoareS _ -> "HoareS"
   | FbdHoareF _ -> "bdHoareF"
-  | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
+  | FbdHoareS ({bhs_m = (m, _)} as hs) ->
      "bdHoareS [ ME = " ^ EcIdent.tostring m
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
-     ^ "; BD = " ^ dump_f bd ^ "]"
+     ^ "; PR = " ^ dump_f (bhs_pr hs).inv
+     ^ "; PO = " ^ dump_f (bhs_po hs).inv
+     ^ "; BD = " ^ dump_f (bhs_bd hs).inv ^ "]"
   | FeHoareS _ -> "eHoareS"
   | FeHoareF _ -> "eHoareF"
   | FequivF _ -> "equivF"
-  | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
+  | FequivS ({es_ml = (ml, _); es_mr = (mr, _)} as es) ->
      "equivS [ ML = " ^ EcIdent.tostring ml
      ^ "; MR = " ^ EcIdent.tostring mr
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
+     ^ "; PR = " ^ dump_f (es_pr es).inv
+     ^ "; PO = " ^ dump_f (es_po es).inv
      ^ "]"
   | FeagerF _ -> "eagerF"

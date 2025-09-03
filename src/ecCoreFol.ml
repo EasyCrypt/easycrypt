@@ -292,9 +292,6 @@ let f_eHoareS ehs_mt ehs_pr ehs_s ehs_po =
   f_eHoareS_r { ehs_m=(ehs_pr.m, ehs_mt); ehs_pr=ehs_pr.inv; ehs_s; 
     ehs_po=ehs_po.inv; } [@alert "-priv_pl"]
 
-let f_eHoareF_old ehf_pr ehf_f ehf_po =
-  f_eHoareF_r { ehf_m=mhr; ehf_pr; ehf_f; ehf_po; }
-
 let f_eHoareF ehf_pr ehf_f ehf_po =
   assert (ehf_pr.m = ehf_po.m);
   f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
@@ -309,9 +306,6 @@ let f_eHoare ehf_pr ehf_f ehf_po =
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
 let f_bdHoareF_r bhf = mk_form (FbdHoareF bhf) tbool
 
-let f_bdHoareS_old bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
-  f_bdHoareS_r
-    { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd; }
 
 let f_bdHoareS bhs_mt bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
   assert (bhs_pr.m = bhs_po.m && bhs_bd.m = bhs_po.m);
@@ -322,16 +316,10 @@ let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
   assert (bhf_pr.m = bhf_po.m && bhf_bd.m = bhf_po.m);
   f_bdHoareF_r { bhf_m=bhf_pr.m; bhf_pr=bhf_pr.inv; bhf_f; bhf_po=bhf_po.inv;
                  bhf_cmp; bhf_bd=bhf_bd.inv; } [@alert "-priv_pl"]
-                 
-let f_bdHoareF_old bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
-  f_bdHoareF_r { bhf_m=mhr; bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }
 
 (* -------------------------------------------------------------------- *)
 let f_equivS_r es = mk_form (FequivS es) tbool
 let f_equivF_r ef = mk_form (FequivF ef) tbool
-
-let f_equivS_old es_ml es_mr es_pr es_sl es_sr es_po =
-   f_equivS_r { es_ml; es_mr; es_pr; es_sl; es_sr; es_po; }
 
 let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
   assert (es_pr.ml = es_po.ml && es_pr.mr = es_po.mr);
@@ -341,18 +329,12 @@ let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
 
 (* -------------------------------------------------------------------- *)
 
-let f_equivF_old ef_pr ef_fl ef_fr ef_po =
-  f_equivF_r{ ef_ml=mleft; ef_mr=mright; ef_pr; ef_fl; ef_fr; ef_po; }
-
 let f_equivF pr ef_fl ef_fr po =
   assert (pr.ml = po.ml && pr.mr = po.mr);
-  f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; }
+  f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
-
-let f_eagerF_old eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
-  f_eagerF_r { eg_ml=mleft; eg_mr=mright; eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
 
 let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
   assert (eg_pr.ml = eg_po.ml && eg_pr.mr = eg_po.mr);
@@ -502,46 +484,46 @@ let f_map gt g fp =
         f_hoareF pr' hf.hf_f po'
 
   | FhoareS hs ->
-      let pr' = g hs.hs_pr in
-      let po' = g hs.hs_po in
-        f_hoareS_r { hs with hs_pr = pr'; hs_po = po'; }
+      let pr' = map_ss_inv1 g (hs_pr hs) in
+      let po' = map_ss_inv1 g (hs_po hs) in
+        f_hoareS (snd hs.hs_m) pr' hs.hs_s po'
 
   | FeHoareF hf ->
-      let pr' = g hf.ehf_pr  in
-      let po' = g hf.ehf_po  in
-      f_eHoareF_r { hf with ehf_pr = pr'; ehf_po = po' }
+      let pr' = map_ss_inv1 g (ehf_pr hf) in
+      let po' = map_ss_inv1 g (ehf_po hf) in
+        f_eHoareF pr' hf.ehf_f po'
 
   | FeHoareS hs ->
-      let pr' = g hs.ehs_pr  in
-      let po' = g hs.ehs_po  in
-        f_eHoareS_r { hs with ehs_pr = pr'; ehs_po = po'; }
+      let pr' = map_ss_inv1 g (ehs_pr hs) in
+      let po' = map_ss_inv1 g (ehs_po hs) in
+        f_eHoareS (snd hs.ehs_m) pr' hs.ehs_s po'
 
   | FbdHoareF bhf ->
-      let pr' = g bhf.bhf_pr in
-      let po' = g bhf.bhf_po in
-      let bd' = g bhf.bhf_bd in
-        f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
+      let pr' = map_ss_inv1 g (bhf_pr bhf) in
+      let po' = map_ss_inv1 g (bhf_po bhf) in
+      let bd' = map_ss_inv1 g (bhf_bd bhf) in
+        f_bdHoareF pr' bhf.bhf_f po' bhf.bhf_cmp bd'
 
   | FbdHoareS bhs ->
-      let pr' = g bhs.bhs_pr in
-      let po' = g bhs.bhs_po in
-      let bd' = g bhs.bhs_bd in
-        f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
+      let pr' = map_ss_inv1 g (bhs_pr bhs) in
+      let po' = map_ss_inv1 g (bhs_po bhs) in
+      let bd' = map_ss_inv1 g (bhs_bd bhs) in
+        f_bdHoareS (snd bhs.bhs_m) pr' bhs.bhs_s po' bhs.bhs_cmp bd'
 
   | FequivF ef ->
-      let pr' = g ef.ef_pr in
-      let po' = g ef.ef_po in
-        f_equivF_r { ef with ef_pr = pr'; ef_po = po'; }
+      let pr' = map_ts_inv1 g (ef_pr ef) in
+      let po' = map_ts_inv1 g (ef_po ef) in
+        f_equivF pr' ef.ef_fl ef.ef_fr po'
 
   | FequivS es ->
-      let pr' = g es.es_pr in
-      let po' = g es.es_po in
-        f_equivS_r { es with es_pr = pr'; es_po = po'; }
+      let pr' = map_ts_inv1 g (es_pr es) in
+      let po' = map_ts_inv1 g (es_po es) in
+        f_equivS (snd es.es_ml) (snd es.es_mr) pr' es.es_sl es.es_sr po'
 
   | FeagerF eg ->
-      let pr' = g eg.eg_pr in
-      let po' = g eg.eg_po in
-        f_eagerF_r { eg with eg_pr = pr'; eg_po = po'; }
+      let pr' = map_ts_inv1 g (eg_pr eg) in
+      let po' = map_ts_inv1 g (eg_po eg) in
+        f_eagerF pr' eg.eg_sl eg.eg_fl eg.eg_fr eg.eg_sr po'
 
   | Fpr pr ->
       let args' = g pr.pr_args in
@@ -566,14 +548,14 @@ let f_iter g f =
   | Fproj    (e, _)       -> g e
 
   | FhoareF  hf   -> g (hf_pr hf).inv; g (hf_po hf).inv
-  | FhoareS  hs   -> g hs.hs_pr; g hs.hs_po
-  | FeHoareF  hf  -> g hf.ehf_pr; g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr; g hs.ehs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po; g bhf.bhf_bd
-  | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po; g bhs.bhs_bd
-  | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
-  | FequivS   es  -> g es.es_pr; g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
+  | FhoareS  hs   -> g (hs_pr hs).inv; g (hs_po hs).inv
+  | FeHoareF  hf  -> g (ehf_pr hf).inv; g (ehf_po hf).inv
+  | FeHoareS  hs  -> g (ehs_pr hs).inv; g (ehs_po hs).inv
+  | FbdHoareF bhf -> g (bhf_pr bhf).inv; g (bhf_po bhf).inv; g (bhf_bd bhf).inv
+  | FbdHoareS bhs -> g (bhs_pr bhs).inv; g (bhs_po bhs).inv; g (bhs_bd bhs).inv
+  | FequivF   ef  -> g (ef_pr ef).inv; g (ef_po ef).inv
+  | FequivS   es  -> g (es_pr es).inv; g (es_po es).inv
+  | FeagerF   eg  -> g (eg_pr eg).inv; g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event.inv
 
 
@@ -595,14 +577,14 @@ let form_exists g f =
   | Fproj    (e, _)       -> g e
 
   | FhoareF   hf -> g (hf_pr hf).inv   || g (hf_po hf).inv
-  | FhoareS   hs -> g hs.hs_pr   || g hs.hs_po
-  | FeHoareF  hf  -> g hf.ehf_pr || g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr || g hs.ehs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr  || g bhf.bhf_po
-  | FbdHoareS bhs -> g bhs.bhs_pr  || g bhs.bhs_po
-  | FequivF   ef  -> g ef.ef_pr    || g ef.ef_po
-  | FequivS   es  -> g es.es_pr    || g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr    || g eg.eg_po
+  | FhoareS   hs -> g (hs_pr hs).inv   || g (hs_po hs).inv
+  | FeHoareF  hf  -> g (ehf_pr hf).inv || g (ehf_po hf).inv
+  | FeHoareS  hs  -> g (ehs_pr hs).inv || g (ehs_po hs).inv
+  | FbdHoareF bhf -> g (bhf_pr bhf).inv || g (bhf_po bhf).inv
+  | FbdHoareS bhs -> g (bhs_pr bhs).inv || g (bhs_po bhs).inv
+  | FequivF   ef  -> g (ef_pr ef).inv   || g (ef_po ef).inv
+  | FequivS   es  -> g (es_pr es).inv   || g (es_po es).inv
+  | FeagerF   eg  -> g (eg_pr eg).inv    || g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args  || g pr.pr_event.inv
 
 (* -------------------------------------------------------------------- *)
@@ -623,15 +605,15 @@ let form_forall g f =
   | Fproj    (e, _)       -> g e
 
   | FhoareF  hf  -> g (hf_pr hf).inv  && g (hf_po hf).inv
-  | FhoareS  hs  -> g hs.hs_pr  && g hs.hs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr && g bhf.bhf_po
-  | FbdHoareS bhs -> g bhs.bhs_pr && g bhs.bhs_po
-  | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
-  | FequivS   es  -> g es.es_pr   && g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
+  | FhoareS  hs  -> g (hs_pr hs).inv  && g (hs_po hs).inv
+  | FbdHoareF bhf -> g (bhf_pr bhf).inv && g (bhf_po bhf).inv
+  | FbdHoareS bhs -> g (bhs_pr bhs).inv && g (bhs_po bhs).inv
+  | FequivF   ef  -> g (ef_pr ef).inv   && g (ef_po ef).inv
+  | FequivS   es  -> g (es_pr es).inv   && g (es_po es).inv
+  | FeagerF   eg  -> g (eg_pr eg).inv   && g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event.inv
-  | FeHoareF  hf  -> g hf.ehf_pr && g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr && g hs.ehs_po
+  | FeHoareF  hf  -> g (ehf_pr hf).inv && g (ehf_po hf).inv
+  | FeHoareS  hs  -> g (ehs_pr hs).inv && g (ehs_po hs).inv
 
 
 (* -------------------------------------------------------------------- *)

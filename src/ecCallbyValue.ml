@@ -481,8 +481,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | FhoareF hf ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s hf.hf_m));
-    let hf_pr = norm st s hf.hf_pr [@alert "-priv_pl"] in
-    let hf_po = norm st s hf.hf_po [@alert "-priv_pl"] in
+    let hf_pr = norm st s (hf_pr hf).inv in
+    let hf_po = norm st s (hf_po hf).inv in
     let hf_f  = norm_xfun st s hf.hf_f in
     let (m,_) = norm_me s (abstract hf.hf_m) in
     f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
@@ -490,8 +490,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | FhoareS hs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.hs_m)));
-    let hs_pr = norm st s hs.hs_pr in
-    let hs_po = norm st s hs.hs_po in
+    let hs_pr = norm st s (hs_pr hs).inv in
+    let hs_po = norm st s (hs_po hs).inv in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     let m = fst hs_m in
@@ -499,9 +499,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FeHoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
-    let ehf_pr  = norm st s hf.ehf_pr  in
-    let ehf_po  = norm st s hf.ehf_po  in
+    assert (not (Subst.has_mem s hf.ehf_m));
+    let ehf_pr  = norm st s (ehf_pr hf).inv in
+    let ehf_po  = norm st s (ehf_po hf).inv in
     let ehf_f   = norm_xfun st s hf.ehf_f in
     let (m,_) = norm_me s (abstract hf.ehf_m) in
     f_eHoareF {m;inv=ehf_pr} ehf_f {m;inv=ehf_po}
@@ -509,8 +509,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | FeHoareS hs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.ehs_m)));
-    let ehs_pr  = norm st s hs.ehs_pr in
-    let ehs_po  = norm st s hs.ehs_po in
+    let ehs_pr  = norm st s (ehs_pr hs).inv in
+    let ehs_po  = norm st s (ehs_po hs).inv in
     let ehs_s   = norm_stmt s hs.ehs_s in
     let (m,mt)   = norm_me s hs.ehs_m in
     f_eHoareS mt {m;inv=ehs_pr} ehs_s {m;inv=ehs_po}
@@ -518,20 +518,20 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | FbdHoareF hf ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s hf.bhf_m));
-    let bhf_pr = norm st s hf.bhf_pr in
-    let bhf_po = norm st s hf.bhf_po in
+    let bhf_pr = norm st s (bhf_pr hf).inv in
+    let bhf_po = norm st s (bhf_po hf).inv in
     let bhf_f  = norm_xfun st s hf.bhf_f in
-    let bhf_bd = norm st s hf.bhf_bd in
+    let bhf_bd = norm st s (bhf_bd hf).inv in
     let (m,_) = norm_me s (abstract hf.bhf_m) in
     f_bdHoareF {m;inv=bhf_pr} bhf_f {m;inv=bhf_po} hf.bhf_cmp {m;inv=bhf_bd}
 
   | FbdHoareS bhs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst bhs.bhs_m)));
-    let bhs_pr = norm st s bhs.bhs_pr in
-    let bhs_po = norm st s bhs.bhs_po in
+    let bhs_pr = norm st s (bhs_pr bhs).inv in
+    let bhs_po = norm st s (bhs_po bhs).inv in
     let bhs_s  = norm_stmt s bhs.bhs_s in
-    let bhs_bd = norm st s bhs.bhs_bd in
+    let bhs_bd = norm st s (bhs_bd bhs).inv in
     let (m,mt)  = norm_me s bhs.bhs_m in
     f_bdHoareS mt {m;inv=bhs_pr} bhs_s {m;inv=bhs_po} bhs.bhs_cmp {m;inv=bhs_bd}
 
@@ -539,8 +539,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     assert (Args.isempty args);
     assert (not (Subst.has_mem s ef.ef_ml));
     assert (not (Subst.has_mem s ef.ef_mr));
-    let ef_pr = norm st s ef.ef_pr in
-    let ef_po = norm st s ef.ef_po in
+    let ef_pr = norm st s (ef_pr ef).inv in
+    let ef_po = norm st s (ef_po ef).inv in
     let ef_fl = norm_xfun st s ef.ef_fl in
     let ef_fr = norm_xfun st s ef.ef_fr in
     let (ml,_) = norm_me s (abstract ef.ef_ml) in
@@ -551,8 +551,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst es.es_ml)));
     assert (not (Subst.has_mem s (fst es.es_mr)));
-    let es_pr = norm st s es.es_pr in
-    let es_po = norm st s es.es_po in
+    let es_pr = norm st s (es_pr es).inv in
+    let es_po = norm st s (es_po es).inv in
     let es_sl = norm_stmt s es.es_sl in
     let es_sr = norm_stmt s es.es_sr in
     let (ml,mlt)  = norm_me s es.es_ml in
@@ -561,10 +561,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FeagerF eg ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mleft));
-    assert (not (Subst.has_mem s mright));
-    let eg_pr = norm st s eg.eg_pr in
-    let eg_po = norm st s eg.eg_po in
+    assert (not (Subst.has_mem s eg.eg_ml));
+    assert (not (Subst.has_mem s eg.eg_mr));
+    let eg_pr = norm st s (eg_pr eg).inv in
+    let eg_po = norm st s (eg_po eg).inv in
     let eg_fl = norm_xfun st s eg.eg_fl in
     let eg_fr = norm_xfun st s eg.eg_fr in
     let eg_sl = norm_stmt s eg.eg_sl in
@@ -575,7 +575,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Fpr pr ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s pr.pr_event.m));
     let pr_mem   = Subst.subst_m s pr.pr_mem in
     let pr_fun   = norm_xfun st s pr.pr_fun in
     let pr_args  = norm st s pr.pr_args in
