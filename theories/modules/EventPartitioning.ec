@@ -29,10 +29,19 @@ abstract theory ListPartitioning.
   move=> uniq_P. rewrite Pr[mu_split (mem P (phi i (glob M) res))]; congr.
   elim: P uniq_P=> /=; first by rewrite big_nil Pr[mu_false].
   move=> x xs ih [] x_notin_xs uniq_xs /=.
-  rewrite {1}andb_orr Pr[mu_or] andbCA !andbA andbb.
+  have->:Pr[M.f(i) @ &m :
+     E i (glob M) res /\
+     (phi i (glob M) res = x \/
+      phi i (glob M) res \in xs)] =
+    Pr[M.f(i) @ &m :
+     (E i (glob M) res /\
+      phi i (glob M) res = x) \/
+     ((E i (glob M) res /\ phi i (glob M) res \in xs))].
+  + byequiv => //; conseq (: ={glob M, arg} ==> ={glob M, res}) => //>; 1:smt(); sim.
+  rewrite Pr[mu_or]. 
   have ->: Pr[M.f(i) @ &m: (   E i (glob M) res
                             /\ phi i (glob M) res = x)
-                           /\ mem xs (phi i (glob M) res)]
+                           /\ ( E i (glob M) res /\ mem xs (phi i (glob M) res))]
            = Pr[M.f(i) @ &m: false].
   + by rewrite Pr[mu_eq] // => &hr /#.
   by rewrite Pr[mu_false] //= big_cons {1}/predT /=; congr; exact/ih.
