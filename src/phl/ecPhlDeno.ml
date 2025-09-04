@@ -8,6 +8,7 @@ open EcEnv
 open EcPV
 open EcPhlPrRw
 open EcHiGoal
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -34,40 +35,40 @@ let t_real_le_trans f2 tc =
 
 (* -------------------------------------------------------------------- *)
 let t_core_phoare_deno pre post tc =
+  let m = pre.m in
   let env, _, concl = FApi.tc1_eflat tc in
 
   let cmp, f, bd, concl_post =
     match concl.f_node with
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (FHle, f, bd, fun ev -> f_imp_simpl ev post)
+      (FHle, f, bd, fun ev po -> map_ss_inv2 f_imp_simpl ev po)
 
     | Fapp ({f_node = Fop (op, _)}, [bd; f])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (FHge, f, bd, fun ev -> f_imp_simpl post ev)
+      (FHge, f, bd, fun ev po -> map_ss_inv2 f_imp_simpl po ev)
 
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
-      (FHeq, f, bd, f_iff_simpl post)
+      (FHeq, f, bd, map_ss_inv2 f_iff_simpl)
 
     | _ -> tc_error !!tc "invalid goal shape"
   in
 
   let pr = destr_pr f in
-  let concl_e = f_bdHoareF pre pr.pr_fun post cmp bd in
+  let concl_e = f_bdHoareF pre pr.pr_fun post cmp {m;inv=bd} in
   let fun_ = EcEnv.Fun.by_xpath pr.pr_fun env in
 
   (* building the substitution for the pre *)
-  let sargs = PVM.add env pv_arg mhr pr.pr_args PVM.empty in
-  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr pr.pr_mem in
-  let concl_pr = Fsubst.f_subst smem (PVM.subst env sargs pre) in
+  let sargs = PVM.add env pv_arg m pr.pr_args PVM.empty in
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m pr.pr_mem in
+  let concl_pr = Fsubst.f_subst smem ((PVM.subst env sargs) pre.inv) in
 
   (* building the substitution for the post *)
-  (* FIXME:
-   * let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
-   * let ev   = Fsubst.f_subst smem_ ev in *)
-  let me = EcEnv.Fun.actmem_post mhr fun_ in
-  let concl_po = f_forall_mems [me] (concl_post pr.pr_event) in
+  let ev = pr.pr_event in
+  let me = EcEnv.Fun.actmem_post ev.m fun_ in
+  let post = ss_inv_rebind post ev.m in
+  let concl_po = EcSubst.f_forall_mems_ss_inv me (concl_post ev post) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
 
@@ -98,19 +99,18 @@ let t_ehoare_deno_r pre post tc =
 
   let pr = destr_pr f in
   let concl_e = f_eHoareF pre pr.pr_fun post in
-  let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_fun env in
+  let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_mem pr.pr_fun env in
   (* pre <= bd *)
   (* building the substitution for the pre *)
   let sargs = PVM.add env pv_arg (fst mpr) pr.pr_args PVM.empty in
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id (fst mpr) pr.pr_mem in
-  let pre = Fsubst.f_subst smem (PVM.subst env sargs pre) in
+  let pre = Fsubst.f_subst smem (PVM.subst env sargs pre.inv) in
   let concl_pr = f_xreal_le pre (f_r2xr bd) in
 
   (* forall m, ev%r%xr <= post *)
-  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst mpo) in
-  let ev = Fsubst.f_subst smem pr.pr_event in
-  let concl_po = f_xreal_le (f_b2xr ev) post in
-  let concl_po = f_forall_mems [mpo] concl_po in
+  let ev = pr.pr_event in
+  let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
+  let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
 
@@ -118,15 +118,17 @@ let t_ehoare_deno_r pre post tc =
 let cond_pre env prl prr pre =
   (* building the substitution for the pre *)
   (* we substitute param by args and left by ml and right by mr *)
-  let sargs = PVM.add env pv_arg mleft  prl.pr_args PVM.empty in
-  let sargs = PVM.add env pv_arg mright prr.pr_args sargs in
+  let ml, mr = pre.ml, pre.mr in
+  let sargs = PVM.add env pv_arg ml prl.pr_args PVM.empty in
+  let sargs = PVM.add env pv_arg mr prr.pr_args sargs in
   let smem  = Fsubst.f_subst_id in
-  let smem  = Fsubst.f_bind_mem smem mleft  prl.pr_mem in
-  let smem  = Fsubst.f_bind_mem smem mright prr.pr_mem in
-  Fsubst.f_subst smem (PVM.subst env sargs pre)
+  let smem  = Fsubst.f_bind_mem smem ml prl.pr_mem in
+  let smem  = Fsubst.f_bind_mem smem mr prr.pr_mem in
+  Fsubst.f_subst smem (PVM.subst env sargs pre.inv)
 
 let t_equiv_deno_r pre post tc =
   let env, _, concl = FApi.tc1_eflat tc in
+  let ml, mr = pre.ml, pre.mr in
 
   let cmp, f1, f2 =
     match concl.f_node with
@@ -154,19 +156,17 @@ let t_equiv_deno_r pre post tc =
   let concl_pr = cond_pre env prl prr pre in
 
   (* building the substitution for the post *)
-  let smeml = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mleft in
-  let smemr = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mright in
-  let evl   = Fsubst.f_subst smeml prl.pr_event in
-  let evr   = Fsubst.f_subst smemr prr.pr_event in
+  let evl = ss_inv_generalize_as_left prl.pr_event ml mr in
+  let evr = ss_inv_generalize_as_right prr.pr_event ml mr in
   let cmp   =
     match cmp with
-    | `Eq -> f_iff evl evr
-    | `Le -> f_imp evl evr
-    | `Ge -> f_imp evr evl in
+    | `Eq -> map_ts_inv2 f_iff evl evr
+    | `Le -> map_ts_inv2 f_imp evl evr
+    | `Ge -> map_ts_inv2 f_imp evr evl in
 
-  let mel = EcEnv.Fun.actmem_post mleft  funl in
-  let mer = EcEnv.Fun.actmem_post mright funr in
-  let concl_po = f_forall_mems [mel; mer] (f_imp post cmp) in
+  let mel = EcEnv.Fun.actmem_post ml funl in
+  let mer = EcEnv.Fun.actmem_post mr funr in
+  let concl_po = f_forall_mems_ts_inv mel mer (map_ts_inv2 f_imp post cmp) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
 
@@ -201,12 +201,14 @@ let process_phoare_deno info tc =
       | _ -> error ()
     in
 
-    let { pr_fun = f; pr_event = event; } = destr_pr f in
-    let penv, qenv = LDecl.hoareF f hyps in
+    let { pr_fun = f } as pr = destr_pr f in
+    let event = pr.pr_event in
+    let m = event.m in
+    let penv, qenv = LDecl.hoareF m f hyps in
     let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_formula !!tc penv p) f_true in
-    let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) event in
+    let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) event.inv in
 
-    f_bdHoareF pre f post cmp bd
+    f_bdHoareF {m;inv=pre} f {m;inv=post} cmp {m;inv=bd}
   in
 
   let pt, ax =
@@ -215,7 +217,7 @@ let process_phoare_deno info tc =
 
   let pre, post =
     let bhf = pf_as_bdhoareF !!tc ax in
-      (bhf.bhf_pr, bhf.bhf_po)
+      (bhf_pr bhf, bhf_po bhf)
   in
 
   FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_phoare_deno pre post tc)
@@ -235,13 +237,15 @@ let process_ehoare_deno info tc =
       | _ -> error ()
     in
 
-    let { pr_fun = f; pr_mem = m; pr_event = event; } = destr_pr f in
-    let penv, qenv = LDecl.hoareF f hyps in
-    let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m mhr in
-    let dpre = f_r2xr (Fsubst.f_subst smem bd) in
+    let { pr_fun = f } as pr = destr_pr f in
+    let event = pr.pr_event in
+    let m = event.m in
+    let penv, qenv = LDecl.hoareF m f hyps in
+    let smem = Fsubst.f_bind_mem Fsubst.f_subst_id pr.pr_mem m in
+    let dpre = {m;inv=f_r2xr (Fsubst.f_subst smem bd)} in
 
-    let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc penv p) dpre  in
-    let post = post |> omap_dfl (fun p -> TTC.pf_process_xreal !!tc qenv p) (f_b2xr event) in
+    let pre  = pre  |> omap_dfl (fun p -> {m;inv=TTC.pf_process_xreal !!tc penv p}) dpre  in
+    let post = post |> omap_dfl (fun p -> {m;inv=TTC.pf_process_xreal !!tc qenv p}) (map_ss_inv1 f_b2xr event) in
 
     f_eHoareF pre f post
   in
@@ -252,7 +256,7 @@ let process_ehoare_deno info tc =
 
   let pre, post =
     let hf = pf_as_ehoareF !!tc ax in
-      (hf.ehf_pr, hf.ehf_po)
+      (ehf_pr hf, ehf_po hf)
   in
 
   FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_ehoare_deno pre post tc)
@@ -282,7 +286,7 @@ let t_pr_pos tc =
       let _, fpr = DestrReal.le (tc1_goal tc) in
       destr_pr fpr
     with DestrError _ -> tc_error !!tc "invalid goal shape" in
-  let prf = f_pr_r {pr with pr_event = f_false} in
+  let prf = f_pr_r {pr with pr_event = {m=pr.pr_event.m; inv=f_false}} in
   (t_real_le_trans prf @+
     [ t_pr_rewrite ("mu_false", None) @! t_true;
       t_pr_rewrite ("mu_sub", None) @! t_true]) tc
@@ -292,18 +296,18 @@ let t_equiv_deno_bad pre tc =
   let env, _hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and prb = destr_pr fprb in
-  let fand = f_and pr2.pr_event (f_not prb.pr_event) in
-  let pro = f_pr_r { pr2 with pr_event = f_or fand prb.pr_event } in
-  let pra = f_pr_r { pr2 with pr_event = fand } in
+  let m = prb.pr_event.m in
+  let ev2 = ss_inv_rebind pr2.pr_event m in
+  let fand = map_ss_inv2 f_and ev2 (map_ss_inv1 f_not prb.pr_event) in
+  let pro = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_or fand prb.pr_event) in
+  let pra = f_pr pr2.pr_mem pr2.pr_fun pr2.pr_args fand in
   let t_false tc = t_apply_prept (`UG real_upto_false) tc in
-
+  let ml, mr = pre.ml, pre.mr in
   let post =
-    let subst_l = Fsubst.f_subst_mem mhr mleft in
-    let subst_r = Fsubst.f_subst_mem mhr mright in
-    let ev1 = subst_l pr1.pr_event in
-    let ev2 = subst_r pr2.pr_event in
-    let bad2 = subst_r prb.pr_event in
-    f_imp (f_not bad2) (f_imp ev1 ev2) in
+    let ev1 = ss_inv_generalize_as_left pr1.pr_event ml mr in
+    let ev2 = ss_inv_generalize_as_right ev2 ml mr in
+    let bad2 = ss_inv_generalize_as_right prb.pr_event ml mr in
+    map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) (map_ts_inv2 f_imp ev1 ev2) in
 
   (t_real_le_trans pro @+
      [t_equiv_deno pre post @+ [
@@ -342,25 +346,29 @@ let tc_destr_deno_bad2 tc env f =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno_bad2 pre bad1 tc =
+  let ml, mr = pre.ml, pre.mr in
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
   let pr1 = destr_pr fpr1 and pr2 = destr_pr fpr2 and
       prb = destr_pr fprb in
   let f1 = pr1.pr_fun and f2 = pr2.pr_fun in
   let ev1 = pr1.pr_event and ev2 = pr2.pr_event in
+  let ev1 = ss_inv_rebind ev1 bad1.m in
   let bad2 = prb.pr_event in
+  let bad2 = ss_inv_rebind bad2 ev2.m in
   let post =
-    let subst_l = Fsubst.f_subst_mem mhr mleft in
-    let subst_r = Fsubst.f_subst_mem mhr mright in
-    let bad2 = subst_r bad2 in
-    f_and (f_iff (subst_l bad1) bad2)
-      (f_imp (f_not bad2) (f_iff (subst_l ev1) (subst_r ev2))) in
+    let bad1 = ss_inv_generalize_as_left bad1 ml mr in
+    let ev1 = ss_inv_generalize_as_left ev1 ml mr in
+    let bad2 = ss_inv_generalize_as_right bad2 ml mr in
+    let ev2 = ss_inv_generalize_as_right ev2 ml mr in
+    map_ts_inv2 f_and (map_ts_inv2 f_iff bad1 bad2)
+      (map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) (map_ts_inv2 f_iff ev1 ev2)) in
   let equiv = f_equivF pre f1 f2 post in
   let cpre = cond_pre env pr1 pr2 pre in
-  let fpreb1 = f_pr_r {pr1 with pr_event = f_and ev1 bad1} in
-  let fpren1 = f_pr_r {pr1 with pr_event = f_and ev1 (f_not bad1) } in
-  let fpreb2 = f_pr_r {pr2 with pr_event = f_and ev2 bad2} in
-  let fpren2 = f_pr_r {pr2 with pr_event = f_and ev2 (f_not bad2) } in
+  let fpreb1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 bad1) in
+  let fpren1 = f_pr pr1.pr_mem pr1.pr_fun pr1.pr_args (map_ss_inv2 f_and ev1 (map_ss_inv1 f_not bad1)) in
+  let fpreb2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 bad2) in
+  let fpren2 = f_pr pr1.pr_mem pr2.pr_fun pr2.pr_args (map_ss_inv2 f_and ev2 (map_ss_inv1 f_not bad2)) in
   let fabs' =
     f_real_abs
       (f_real_sub (f_real_add fpreb1 fpren1) (f_real_add fpreb2 fpren2)) in
@@ -400,39 +408,43 @@ let t_equiv_deno_bad2 pre bad1 tc =
 (* -------------------------------------------------------------------- *)
 let process_pre tc hyps prl prr pre post =
   let fl = prl.pr_fun and fr = prr.pr_fun in
+  let ml, mr = post.ml, post.mr in
   match pre with
   | Some p ->
-    let penv, _ = LDecl.equivF fl fr hyps in
-    TTC.pf_process_formula !!tc penv p
+    let penv, _ = LDecl.equivF ml mr fl fr hyps in
+    {ml;mr;inv=TTC.pf_process_formula !!tc penv p}
   | None ->
     let al = prl.pr_args and ar = prr.pr_args in
-    let ml = prl.pr_mem and mr = prr.pr_mem in
+    let pml = prl.pr_mem and pmr = prr.pr_mem in
+
     let env = LDecl.toenv hyps in
     let eqs = ref [] in
     let push f = eqs := f :: !eqs in
 
-    let dopv m mi x ty =
-      if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi)) in
+    let dopv m mi gen_o x ty =
+      if is_glob x then push (gen_o (map_ss_inv1 (fun f -> f_eq f (f_pvar x ty mi).inv) (f_pvar x ty m))) in
 
-    let doglob m mi g = push (f_eq (NormMp.norm_glob env m g) (NormMp.norm_glob env mi g)) in
-    let dof f a m mi =
+    let doglob m mi gen_o g = push (gen_o ((map_ss_inv1 (fun f -> f_eq f (NormMp.norm_glob env mi g).inv)) (NormMp.norm_glob env m g))) in
+    let dof f a m mi gen_o =
       try
-        let fv = PV.remove env pv_res (PV.fv env m post) in
-        PV.iter (dopv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
+        let fv = PV.remove env pv_res (PV.fv env m post.inv) in
+        PV.iter (dopv m mi gen_o) (doglob m mi gen_o) (eqobs_inF_refl env f fv);
         if not (EcReduction.EqTest.for_type env a.f_ty tunit) then
-          push (f_eq (f_pvarg a.f_ty m) a)
+          push (map_ts_inv1 (fun f -> f_eq f a) (gen_o (f_pvarg a.f_ty m)))
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
-    dof fl al mleft ml; dof fr ar mright mr;
-    f_ands !eqs
+    let gen_r f = ss_inv_generalize_right f mr in
+    let gen_l f = ss_inv_generalize_left  f ml in
+    dof fl al ml pml gen_r; dof fr ar mr pmr gen_l;
+    map_ts_inv f_ands !eqs
 
 (* -------------------------------------------------------------------- *)
-let post_iff eq env evl evr =
-  let post = f_iff evl evr in
+let post_iff ml mr eq env evl evr =
+  let post = map_ts_inv2 f_iff evl evr in
   try
     if not eq then raise Not_found;
-    Mpv2.to_form mleft mright
-      (Mpv2.needed_eq env mleft mright post) f_true
+    {ml;mr;inv=Mpv2.to_form
+      (Mpv2.needed_eq env post) ml mr f_true}
   with Not_found -> post
 
 (* -------------------------------------------------------------------- *)
@@ -448,22 +460,24 @@ let process_equiv_deno1 info eq tc =
       | _ -> tc_error !!tc "invalid goal shape"
     in
 
-    let { pr_fun = fl; pr_event = evl } as prl = destr_pr f1 in
-    let { pr_fun = fr; pr_event = evr } as prr = destr_pr f2 in
+    let ml , mr = EcIdent.create "&1", EcIdent.create "&2" in
+
+    let { pr_fun = fl } as prl = destr_pr f1 in
+    let evl = ss_inv_generalize_as_left prl.pr_event ml mr in
+    let { pr_fun = fr } as prr = destr_pr f2 in
+    let evr = ss_inv_generalize_as_right prr.pr_event ml mr in
 
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
-        TTC.pf_process_formula !!tc qenv p
+        let _, qenv = LDecl.equivF ml mr fl fr hyps in
+        {ml;mr;inv=TTC.pf_process_formula !!tc qenv p}
       | None ->
-        let evl = Fsubst.f_subst_mem mhr mleft evl in
-        let evr = Fsubst.f_subst_mem mhr mright evr in
         match op with
         | _ when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
-           post_iff eq env evl evr
+           (post_iff ml mr eq env evl evr)
         | _ when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-           f_imp evl evr
+           map_ts_inv2 f_imp evl evr
         | _ ->
            tc_error !!tc "not able to reconize a comparison operator" in
 
@@ -478,7 +492,7 @@ let process_equiv_deno1 info eq tc =
 
   let pre, post =
     let ef = pf_as_equivF !!tc ax in
-      (ef.ef_pr, ef.ef_po)
+      (ef_pr ef, ef_po ef)
   in
 
   FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) (t_equiv_deno pre post tc)
@@ -489,20 +503,22 @@ let process_equiv_deno_bad info tc =
     let env, hyps, concl = FApi.tc1_eflat tc in
     let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
 
-    let { pr_fun = fl; pr_event = evl } as prl = destr_pr fpr1 in
-    let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
+    let { pr_fun = fl ; pr_event = evl } as prl = destr_pr fpr1 in
+    let { pr_fun = fr ; pr_event = evr } as prr = destr_pr fpr2 in
+
+    let ml , mr = EcIdent.create "&1", EcIdent.create "&2" in
 
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
-        TTC.pf_process_formula !!tc qenv p
+        let _, qenv = LDecl.equivF ml mr fl fr hyps in
+        {ml;mr;inv=TTC.pf_process_formula !!tc qenv p}
       | None ->
-        let evl = Fsubst.f_subst_mem mhr mleft evl in
-        let evr = Fsubst.f_subst_mem mhr mright evr in
-        let bad = (destr_pr fprb).pr_event in
-        let bad = Fsubst.f_subst_mem mhr mright bad in
-        f_imps [f_not bad;evl] evr in
+        let evl = ss_inv_generalize_as_left evl ml mr in
+        let evr = ss_inv_generalize_as_right evr ml mr in
+        let bad = ss_inv_generalize_as_right (destr_pr fprb).pr_event ml mr in
+        let f_imps' l = f_imps (List.tl l) (List.hd l) in
+        map_ts_inv f_imps' [evr; map_ts_inv1 f_not bad; evl] in
     let pre = process_pre tc hyps prl prr pre post in
 
     f_equivF pre fl fr post
@@ -513,12 +529,12 @@ let process_equiv_deno_bad info tc =
       ~prcut:process_cut tc info in
 
   let equiv = pf_as_equivF !!tc ax in
-  let pre = equiv.ef_pr in
+  let pre = (ef_pr equiv) in
 
   let torotate = ref 1 in
   let t_sub =
     FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
-      (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+
+      (EcPhlConseq.t_equivF_conseq pre (ef_po equiv) @+
          [t_true; (fun tc -> incr torotate;t_id tc);
           EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]) in
   let gs =
@@ -538,28 +554,29 @@ let process_equiv_deno_bad2 info eq bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
 
-  let { pr_fun = fl; pr_event = evl } as prl = destr_pr fpr1 in
+  let { pr_fun = fl; pr_mem = ml ; pr_event = evl } as prl = destr_pr fpr1 in
   let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
 
+  let ml' , mr' = EcIdent.create "&1", EcIdent.create "&2" in
+
   let bad1 =
-    let _, qenv = LDecl.hoareF fl hyps in
-    TTC.pf_process_formula !!tc qenv bad1 in
+    let _, qenv = LDecl.hoareF ml fl hyps in
+    {m=ml;inv=TTC.pf_process_formula !!tc qenv bad1} in
 
   let process_cut (pre, post) =
 
     let post =
       match post with
       | Some p ->
-        let _, qenv = LDecl.equivF fl fr hyps in
-        TTC.pf_process_formula !!tc qenv p
+        let _, qenv = LDecl.equivF ml' mr' fl fr hyps in
+        {ml=ml';mr=mr';inv=TTC.pf_process_formula !!tc qenv p}
       | None ->
-        let evl = Fsubst.f_subst_mem mhr mleft evl in
-        let evr = Fsubst.f_subst_mem mhr mright evr in
-        let bad1 = Fsubst.f_subst_mem mhr mleft bad1 in
-        let bad2 = (destr_pr fprb).pr_event in
-        let bad2 = Fsubst.f_subst_mem mhr mright bad2 in
-        let iff = post_iff eq env evl evr in
-        f_and (f_iff bad1 bad2) (f_imp (f_not bad2) iff) in
+        let evl = ss_inv_generalize_as_left evl ml' mr' in
+        let evr = ss_inv_generalize_as_right evr ml' mr' in
+        let bad1 = ss_inv_generalize_as_left bad1 ml' mr' in
+        let bad2 = ss_inv_generalize_as_right (destr_pr fprb).pr_event ml' mr' in
+        let iff = post_iff ml' mr' eq env evl evr in
+        map_ts_inv2 f_and (map_ts_inv2 f_iff bad1 bad2) (map_ts_inv2 f_imp (map_ts_inv1 f_not bad2) iff) in
 
     let pre = process_pre tc hyps prl prr pre post in
 
@@ -571,12 +588,12 @@ let process_equiv_deno_bad2 info eq bad1 tc =
       ~prcut:process_cut tc info in
 
   let equiv = pf_as_equivF !!tc ax in
-  let pre = equiv.ef_pr in
+  let pre = (ef_pr equiv) in
 
   let torotate = ref 1 in
   let t_sub =
     FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
-      (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+
+      (EcPhlConseq.t_equivF_conseq pre (ef_po equiv) @+
          [t_true; (fun tc -> incr torotate;t_id tc);
           EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt]) in
   let gs =

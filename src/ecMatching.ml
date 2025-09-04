@@ -684,9 +684,15 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | FhoareF hf1, FhoareF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
             failure ();
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          let subst =
+            if id_equal hf1.hf_m hf2.hf_m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
+          assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
+          let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
           List.iter2 (doit env (subst, mxs))
-            [hf1.hf_pr; hf1.hf_po] [hf2.hf_pr; hf2.hf_po]
+            [(hf_pr hf1).inv; (hf_po hf1).inv] [(hf_pr hf2).inv; (hf_po hf2).inv]
       end
 
       | FbdHoareF hf1, FbdHoareF hf2 -> begin
@@ -694,10 +700,16 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if hf1.bhf_cmp <> hf2.bhf_cmp then
             failure ();
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          let subst =
+            if id_equal hf1.bhf_m hf2.bhf_m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.bhf_m hf2.bhf_m in
+          assert (not (Mid.mem hf1.bhf_m mxs) && not (Mid.mem hf2.bhf_m mxs));
+          let mxs = Mid.add hf1.bhf_m hf2.bhf_m mxs in
           List.iter2 (doit env (subst, mxs))
-            [hf1.bhf_pr; hf1.bhf_po; hf1.bhf_bd]
-            [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
+            [(bhf_pr hf1).inv; (bhf_po hf1).inv; (bhf_bd hf1).inv]
+            [(bhf_pr hf2).inv; (bhf_po hf2).inv; (bhf_bd hf2).inv]
       end
 
       | FequivF hf1, FequivF hf2 -> begin
@@ -705,11 +717,23 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if not (EcReduction.EqTest.for_xp env hf1.ef_fr hf2.ef_fr) then
             failure();
-          let mxs = Mid.add EcFol.mleft  EcFol.mleft  mxs in
-          let mxs = Mid.add EcFol.mright EcFol.mright mxs in
+          let subst =
+            if id_equal hf1.ef_ml hf2.ef_ml then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.ef_ml hf2.ef_ml in
+          assert (not (Mid.mem hf1.ef_ml mxs) && not (Mid.mem hf2.ef_ml mxs));
+          let mxs = Mid.add hf1.ef_ml hf2.ef_ml mxs in
+          let subst =
+            if id_equal hf1.ef_mr hf2.ef_mr then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst hf1.ef_mr hf2.ef_mr in
+          assert (not (Mid.mem hf1.ef_mr mxs) && not (Mid.mem hf2.ef_mr mxs));
+          let mxs = Mid.add hf1.ef_mr hf2.ef_mr mxs in
           List.iter2
             (doit env (subst, mxs))
-            [hf1.ef_pr; hf1.ef_po] [hf2.ef_pr; hf2.ef_po]
+            [(ef_pr hf1).inv; (ef_po hf1).inv] [(ef_pr hf2).inv; (ef_po hf2).inv]
       end
 
       | Fpr pr1, Fpr pr2 -> begin
@@ -717,8 +741,15 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;
           doit env (subst, mxs) pr1.pr_args pr2.pr_args;
-          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-          doit env (subst, mxs) pr1.pr_event pr2.pr_event;
+          let ev1, ev2 = pr1.pr_event, pr2.pr_event in
+          let subst =
+            if id_equal ev1.m ev2.m then 
+              subst
+            else 
+              Fsubst.f_bind_mem subst ev1.m ev2.m in
+          assert (not (Mid.mem ev1.m mxs) && not (Mid.mem ev2.m mxs));
+          let mxs = Mid.add ev1.m ev2.m mxs in
+          doit env (subst, mxs) ev1.inv ev2.inv;
       end
 
       | _, _ -> failure ()
@@ -985,23 +1016,24 @@ module FPosition = struct
 
           | Fpr pr ->
               let subctxt = Sid.add pr.pr_mem ctxt in
-              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
+              let subctxt = Sid.add pr.pr_event.m subctxt in
+              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event.inv)])
 
           | FhoareF hs ->
-              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
+              doit pos (`WithCtxt (Sid.add hs.hf_m ctxt, [(hf_pr hs).inv; (hf_po hs).inv]))
 
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
-              let subctxt = Sid.add EcFol.mhr ctxt in
-              doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
-                                       (subctxt, hs.bhf_po);
-                                       (   ctxt, hs.bhf_bd)]))
+              let subctxt = Sid.add hs.bhf_m ctxt in
+              doit pos (`WithSubCtxt ([(subctxt, (bhf_pr hs).inv);
+                                       (subctxt, (bhf_po hs).inv);
+                                       (   ctxt, (bhf_bd hs).inv)]))
 
           | FequivF es ->
-              let ctxt = Sid.add EcFol.mleft  ctxt in
-              let ctxt = Sid.add EcFol.mright ctxt in
-              doit pos (`WithCtxt (ctxt, [es.ef_pr; es.ef_po]))
+              let ctxt = Sid.add es.ef_ml ctxt in
+              let ctxt = Sid.add es.ef_mr ctxt in
+              doit pos (`WithCtxt (ctxt, [(ef_pr es).inv; (ef_po es).inv]))
 
           | _ -> None
         in
@@ -1132,27 +1164,33 @@ module FPosition = struct
               f_let lv f1' f2'
 
           | Fpr pr ->
-              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
-              f_pr pr.pr_mem pr.pr_fun args' event'
+              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event.inv]) in
+              let m = pr.pr_event.m in
+              f_pr pr.pr_mem pr.pr_fun args' {m;inv=event'}
 
           | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
-              f_hoareF_r { hf with hf_pr; hf_po; }
+              let (hf_pr, hf_po) = as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv]) in
+              let m = hf.hf_m in
+              f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po}
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =
-                as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
+                as_seq2 (doit p [(ehf_pr hf).inv; (ehf_po hf).inv])
               in
-              f_eHoareF_r { hf with ehf_pr; ehf_po; }
+              let m = hf.ehf_m in
+              f_eHoareF {m;inv=ehf_pr} hf.ehf_f {m;inv=ehf_po}
 
           | FbdHoareF hf ->
-              let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
+              let sub = doit p [(bhf_pr hf).inv; (bhf_po hf).inv; (bhf_bd hf).inv] in
               let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
-              f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_bd; }
+              let m = hf.bhf_m in
+              f_bdHoareF {m;inv=bhf_pr} hf.bhf_f {m;inv=bhf_po} hf.bhf_cmp {m;inv=bhf_bd}
 
           | FequivF ef ->
-              let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
-              f_equivF_r { ef with ef_pr; ef_po; }
+              let (ef_pr, ef_po) = as_seq2 (doit p [(ef_pr ef).inv; (ef_po ef).inv]) in
+              let ml = ef.ef_ml in
+              let mr = ef.ef_mr in
+              f_equivF {ml;mr;inv=ef_pr} ef.ef_fl ef.ef_fr {ml;mr;inv=ef_po}
 
           | FhoareS   _ -> raise InvalidPosition
           | FeHoareS  _ -> raise InvalidPosition

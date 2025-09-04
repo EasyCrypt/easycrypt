@@ -44,6 +44,6 @@ apply (ler_trans (max Pr[G1.main() @ &m: A (glob Mem) res /\ F (glob Mem) res]
                       Pr[G2.main() @ &m: B (glob Mem) res /\ F (glob Mem) res])).
 + smt(ge0_mu).
 have -> //: forall (x y x' y':real), x <= x' => y <= y' => max x y <= max x' y' by smt().
-+ by rewrite -(Pr_split G1 Mem F A &m) andbC; smt(ge0_mu).
-by rewrite -(Pr_split G2 Mem F B &m) andbC; smt(ge0_mu).
++ by rewrite -(Pr_split G1 Mem F A &m); smt(ge0_mu).  
+by rewrite -(Pr_split G2 Mem F B &m); smt(ge0_mu).
 qed.
