@@ -70,7 +70,13 @@ abstract theory FSetPartitioning.
                    Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (elems P)
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem P (phi i (glob M) res)].
   proof.
-  by rewrite memE; exact/(@list_partitioning M i E phi (elems P) &m _)/uniq_elems.
+  have->: Pr[M.f(i) @ &m :
+      E i (glob M){hr} res{hr} /\ (phi i (glob M){hr} res{hr} \notin P)] =
+    Pr[M.f(i) @ &m :
+       E i (glob M){hr} res{hr} /\ !(phi i (glob M){hr} res{hr} \in (elems P))].
+  - byequiv (: ={glob M, arg} ==> ={glob M, res}) => //; 1:sim. 
+    by move => &1 &2; rewrite memE.
+  exact/(@list_partitioning M i E phi (elems P) &m _)/uniq_elems.
   qed.
   end section.
 end FSetPartitioning.
