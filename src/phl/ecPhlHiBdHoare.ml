@@ -66,7 +66,7 @@ let process_bdhoare_split info tc =
         (FApi.t_on1seq 3
            (EcPhlBdHoare.t_bdhoare_or b1 b2 {m=b1.m;inv=f_r0})
            (t_conseq
-              {inv=f_false;m=mhr}
+              {inv=f_false;m=b1.m}
               (EcCoreLib.CI_Logic.mk_logic "andDorN")
               EcHiGoal.process_trivial))
         tc
