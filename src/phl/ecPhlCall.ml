@@ -70,7 +70,7 @@ let t_hoare_call fpre fpost tc =
   let fres = f_local vres fsig.fs_ret in
   let post = wp_asgn_call env m lp fres hs.hs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
+  let modi = f_write ~local:true env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
@@ -185,7 +185,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let fres = f_local vres fsig.fs_ret in
   let post = wp_asgn_call env m lp fres bhs.bhs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
+  let modi = f_write ~local:true env f in
   let post =
     match bhs.bhs_cmp with
     | FHle -> f_imp_simpl   post fpost
@@ -235,8 +235,8 @@ let t_equiv_call fpre fpost tc =
   let mr = EcMemory.memory es.es_mr in
   (* The functions satisfy their specification *)
   let f_concl = f_equivF fpre fl fr fpost in
-  let modil = f_write env fl in
-  let modir = f_write env fr in
+  let modil = f_write ~local:true env fl in
+  let modir = f_write ~local:true env fr in
   (* The wp *)
   let post =
     wp2_call env fpre fpost
@@ -273,7 +273,7 @@ let t_equiv_call1 side fpre fpost tc =
   let subst  = PVM.add env pvres me fres PVM.empty in
   let msubst = Fsubst.f_bind_mem Fsubst.f_subst_id EcFol.mhr me in
   let fpost  = PVM.subst env subst (Fsubst.f_subst msubst fpost) in
-  let modi   = f_write env f in
+  let modi   = f_write ~local:true env f in
   let post   = f_imp_simpl fpost post in
   let post   = generalize_mod env me modi post in
   let post   = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in

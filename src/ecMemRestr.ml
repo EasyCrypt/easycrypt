@@ -235,6 +235,7 @@ let sup env ff =
   | FBdef _ | FBalias _ -> assert false
   | FBabs oi ->
     let env, omr = funs_uses_mr env ff.ff_params oi.oi_calls in
+    let omr = if List.length oi.oi_calls = 0 then mr_full else omr in
     let a = m_functor ff.ff_xp.x_top in
     let amr =
       let me, _ = Mod.by_mpath a env in
@@ -242,8 +243,7 @@ let sup env ff =
       | ME_Alias _ | ME_Structure _ -> assert false
       | ME_Decl (_mty, mr) -> norm_mem_restr env mr
     in
-    let mr = mr_union amr omr in
-    (* Printf.printf "SUP: %s\n" (dump_mem_restr mr); *)
+    let mr = mr_inter amr omr in
     mr
 
 let rec compare_modtype mty1 mty2 =
@@ -491,7 +491,7 @@ let add_adv env sign mv ff (st:local_state) =
 let dump_var (v : meta_var) =
   match v with
   | Gvar x -> EcPath.x_tostring x
-  | Meta m -> string_of_int m
+  | Meta m -> "v" ^ string_of_int m
 
 let dump_mem r =
   if r.sign then
@@ -500,12 +500,14 @@ let dump_mem r =
     Printf.sprintf "%s \\notin %s" (dump_var r.var) (dump_mem_restr r.set) 
 
 let rec solve ?(depth = 0) (env : env) (st : local_state) =
-  if st.unsat then (Printf.printf "%d: UNSAT\n" depth; ())
+  if st.unsat then ( (*Printf.printf "%d: UNSAT\n" depth;*) ())
   else match st.todo with
   | [] -> raise (SAT st)
   | r :: todo ->
+          (*
   Printf.printf "Processing %d: %s\n" depth (dump_mem r);
   Printf.printf "Todo: %s\n" (String.concat " <| " (List.map dump_mem todo));
+  *)
     process depth env r {st with todo}
 
 (* precondition st.unsat = false *)
@@ -549,6 +551,11 @@ and process depth (env : env) (r : mem) (st : local_state) =
          (* !(mv in s1 inter s2) = !(mv in s1) || !(mv in s2) *)
          [push st r1; push st r2]
   in
+
+  (*
+  if List.length sts <> 1 then
+      Printf.printf "SPLIT\n";
+  *)
   List.iteri (fun i -> solve ~depth:(depth + i) env) sts
 
 

@@ -9,6 +9,10 @@ module type F (O : M) = {
   proc g(_: t3) : t4
 }.
 
+module type G (O1 : M) (O2 : M) = {
+  proc g(_: t5) : t6
+}.
+
 module Mem = {
   var v1 : t5
   var v2 : t6
@@ -73,7 +77,7 @@ module O : M = {
 lemma t: forall (G <: F{-Mem}), true.
 proof. trivial. qed.
 
-lemma f: false.
+lemma f: true.
 proof.
 have := t H1.
 fail have := t H2.
@@ -82,23 +86,25 @@ abort.
 section.
 declare module N1 <: M. 
 declare module N2 <: M {-Mem.v1}. 
-declare module G1 <: F.
+declare module G1 <: F {-N1}.
 declare module N3 <: M {-G1}.
-
-phoare hr_proc_inv: [G1(N3).g: true ==> true] = 1.0.
-proof.
-fail proc (Mem.v1 = witness).
-fail proc (glob N1 = witness).
-(* fail proc (glob N1.f = witness). *)
-proc (true); expect 4.
-abort.
 
 hoare hr_proc_inv: G1(N1).g: true ==> true.
 proof.
 fail proc (Mem.v1 = witness).
-fail proc (glob N1 = witness).
-(* fail proc (glob N1.f = witness). *)
-proc (true); expect 3.
+proc (glob N1 = witness).
+abort.
+
+hoare hr_proc_inv: G1(N3).g: true ==> true.
+proof.
+fail proc (Mem.v1 = witness).
+proc ( glob N3.f = witness).
+abort.
+
+phoare hr_proc_inv: [G1(N3).g: true ==> true] = 1.0.
+proof.
+fail proc (Mem.v1 = witness).
+proc (glob N3.f = witness); expect 4.
 abort.
 
 end section.
@@ -205,6 +211,7 @@ module Bx(A0:AT) = {
 }.
 
 print glob A.     (* A.x - even though A.p doesn't actually access A.x *)
+print glob A'.     (* A.x - even though A.p doesn't actually access A.x *)
 print glob Bx(A). (* unit, presumably because A.p does not access A.x *)
 
 lemma contradiction : false.
@@ -314,13 +321,8 @@ print glob C.
 
 (* Lemma looks suspicious: C(B).p might read variables of C, so ={glob C} should not be a sufficient precondition.
    Reason for this: glob C(B) seems to rewrite to glob C. *)
-lemma suspicious (C<:T2) (B<:T1): equiv [ C(B).p ~ C(B).p : true ==> ={res} ].
-  proc*.
-  call (_: false).
-  skip => &1 &2.
-  skip => />.
-  progress.    
-    by exact H.
+lemma suspicious (C<:T2) (B<:T1): equiv [ C(B).p ~ C(B).p : ={glob C} ==> ={res} ].
+  by proc (true).
 qed.
 
 (* Intuitively, lemma suspicious should give a contradiction when instantiating it with the concrete C and B from above.
@@ -351,7 +353,11 @@ qed.
 
 (* Hoping for some unsoundness because "glob B(A)" might be rewritten to something undesirable.
    Instead, EasyCrypt crashes (more precisely: an anomaly is raised that gets ProofGeneral out of sync) *)    
-lemma test (B<:T1) &m &n: (glob B){m} = (glob B){m} => Pr[B(A).p() @ &m : res] = Pr[B(A).p() @ &n : res].  
-  have H := correct (B(A)).
-  
+lemma test (B<:T1) &m &n: (glob B(A)){m} = (glob B(A)){n} => Pr[B(A).p() @ &m : res] = Pr[B(A).p() @ &n : res].  
+  move => H.
+  apply (correct (B(A)) &m &n).
+  move : H.
+done.  qed.
+
+ 
 end D.

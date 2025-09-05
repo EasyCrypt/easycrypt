@@ -496,7 +496,7 @@ let lp_write_r env w lp =
   | LvTuple pvs ->
       List.fold_left add w pvs
 
-let rec f_write_r ?(except=Sx.empty) env w f =
+let rec f_write_r ?(except=Sx.empty) ?(local=false) env w f =
   let f    = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
 
@@ -509,16 +509,21 @@ let rec f_write_r ?(except=Sx.empty) env w f =
       assert false
 
   | FBabs oi ->
-    let mp = get_abs_functor f in
-    List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
+      if local then
+          w
+      else
+          let mp = get_abs_functor f in
+          List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x w =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty w in
-      Sx.fold_left folder
-        (EcPath.Sx.fold add fdef.f_uses.us_writes w)
-        fdef.f_uses.us_calls
+      let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
+      if local then
+          w
+      else
+          Sx.fold_left folder w fdef.f_uses.us_calls
 
 and is_write_r ?(except=Sx.empty) env w s =
   List.fold_left (i_write_r ~except env) w s
@@ -553,7 +558,7 @@ and i_write_r ?(except=Sx.empty) env w i =
       List.fold_left (f_write_r ~except env) w us.EcModules.aus_calls
 
 (* -------------------------------------------------------------------- *)
-let rec f_read_r env r f =
+let rec f_read_r ?(local=false) env r f =
   let f    = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
 
@@ -563,15 +568,21 @@ let rec f_read_r env r f =
       assert false
 
   | FBabs oi ->
-      let mp = get_abs_functor f in
-      List.fold_left (f_read_r env) (PV.add_glob env mp r) (OI.allowed oi)
+      if local then
+          r
+      else
+          let mp = get_abs_functor f in
+          List.fold_left (f_read_r env) (PV.add_glob env mp r) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x r =
         let ty = Var.by_xpath x env in
         PV.add env (pv_glob x) ty r in
       let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
-      Sx.fold_left (f_read_r env) r fdef.f_uses.us_calls
+      if local then
+          r
+      else
+          Sx.fold_left (f_read_r env) r fdef.f_uses.us_calls
 
 let rec e_read_r env r e =
   match e.e_node with
@@ -620,13 +631,13 @@ let lp_write env lp =
 let i_write  ?(except=Sx.empty) env i  = i_write_r  ~except env PV.empty i
 let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
 let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s
-let f_write  ?(except=Sx.empty) env f  = f_write_r  ~except env PV.empty f
+let f_write  ?(except=Sx.empty) ?(local=false) env f  = f_write_r  ~except ~local env PV.empty f
 
 let e_read  env e  = e_read_r  env PV.empty e
 let i_read  env i  = i_read_r  env PV.empty i
 let is_read env is = is_read_r env PV.empty is
 let s_read  env s  = s_read_r  env PV.empty s
-let f_read  env f  = f_read_r  env PV.empty f
+let f_read  ?(local=false) env f  = f_read_r  ~local env PV.empty f
 
 (* -------------------------------------------------------------------- *)
 exception EqObsInError
