@@ -349,8 +349,17 @@ lemma mu_not (d : 'a distr) (p : 'a -> bool):
   mu d (predC p) = weight d - mu d p.
 proof. by rewrite -(@predCU p) mu_disjointL // #ring. qed.
 
-axiom witness_support P (d : 'a distr) :
+lemma witness_support P (d : 'a distr) :
   0%r < mu d P <=> (exists x, P x /\ x \in d).
+proof.
+have ->: 0%r < mu d P <=> mu d P <> 0%r by smt(ge0_mu).
+split=> />.
++ apply: contraLR=> /= /negb_exists /> empty.
+  apply: mu0_false=> x x_in_D; move: (empty x).
+  by case: (P x).
+move=> x Px x_in_D; rewrite -negP=> /eq0_mu /=.
+by rewrite negb_forall; exists x=> /=; rewrite x_in_D Px.
+qed.
 
 lemma mu_and_weight ['a] P Q (d : 'a distr) : (* FIXME: name *)
   mu d P = weight d => mu d (predI P Q) = mu d Q.
