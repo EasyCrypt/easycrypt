@@ -4,52 +4,63 @@ require import Distr DBool DList.
 require import StdBigop.
 (*---*) import Bigreal Bigreal.BRA.
 
-module A = {
+type t.
+
+op test : t -> bool.
+op D : t distr.
+
+axiom D_ll : is_lossless D.
+
+module B = {
   proc f() : bool = {
-    var x : bool;
-    x <$ dbiased 0.25;
+    var x: bool;
+    x <$ dbiased (mu D test);
     return x;
   }
-  proc g() : bool list = {
-    var x : bool list;
-    x <$ dlist {0,1} 2;
-    return x;
-  }
-  proc h() : bool = {
-    var x : bool;
-    x <$ dbiased 0.25;
-    return x;
+  proc g() : t = {
+    var l: t;
+    l <$ D;
+    return l;
   }
 }.
 
-op m (t : bool * bool list) : real =
-  if t.`1 = false /\ t.`2 = [false; false] then 0.25
-  else if t.`1 = true /\ t.`2 = [true; true] then 0.75
-  else 0%r.
-
-op g : (bool * bool list) distr = (Distr.mk m).
-
-lemma l_coupling:
-  equiv [ A.f ~ A.g : true ==> res{1} <=> (res{2} = [true; true]) ].
+op c : (bool * t) distr = dmap D (fun x => (test x, x)).
+  
+lemma B_coupling:
+  equiv [ B.f ~ B.g : true ==> res{1} = test res{2} ].
 proof.
+(* bypr res{1} (test res{2}). *)
+(* + smt(). *)
+(* + move => &1 &2 b. *)
+(*   have ->: Pr[B.f() @ &1 : res = b] = mu1 (dbiased (mu D test)) b. *)
+(*   + byphoare => //. *)
+(*     proc; rnd; skip => />. *)
+(*   have -> //: Pr[B.g() @ &2 : test res = b] = mu1 (dbiased (mu D test)) b. *)
+(*   + byphoare => //. *)
+(*     proc; rnd; skip => />. *)
+(*     rewrite dbiased1E. *)
+(*     rewrite clamp_id. *)
+(*     + exact mu_bounded. *)
+(*     case b => _. *)
+(*     + apply mu_eq => x /#. *)
+(*     rewrite (mu_eq _ _ (predC test)). *)
+(*     + by smt(). *)
+(*     by rewrite mu_not D_ll.  *)  
 proc.
-rnd g.
-+ move => //= a b.
-  rewrite supportP.
-  rewrite muK //=.
-  + admit.
-  by smt().
-+ rewrite /iscoupling; split.
-  + admit.
-  + admit.
-qed.
-
-op f (x : bool) : bool = x.
-
-lemma l_bijection:
-  equiv [ A.f ~ A.h : true ==> res{1} <=> res{2} ].
-proof.
-proc.
-rnd f.
-by skip => />.
+rnd+ c.
++ move => a b />.
+  by rewrite /c => /supp_dmap [x] />.
+rewrite /iscoupling; split; last first.
++ by rewrite /c dmap_comp /(\o) /= dmap_id.
+rewrite /c dmap_comp /(\o) /=.
+apply eq_distr => b.
+rewrite dbiased1E.
+rewrite clamp_id.
++ exact mu_bounded.
+rewrite dmap1E /pred1 /(\o) /=.
+case b => _.
++ by apply mu_eq => x /#.
+rewrite (mu_eq _ _ (predC test)).
++ by smt().
+by rewrite mu_not D_ll.
 qed.

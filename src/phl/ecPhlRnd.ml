@@ -683,47 +683,13 @@ let process_rnd side pos tac_info tc =
       t_bdhoare_rnd tac_info tc
 
   | _, _, _ when is_equivS concl ->
-    (match tac_info with
-     | PSingleRndParam f ->
-         let env = FApi.tc1_env tc in
-         
-         (try
-            (* Try to type-check as coupling distribution first *)
-            let es = tc1_as_equivS tc in
-            let (_, muL), _ = tc1_last_rnd tc es.es_sl in (* extract left distribution *)
-            let (_, muR), _ = tc1_last_rnd tc es.es_sr in (* extract right distribution *)
-            let tyL = proj_distr_ty env (e_ty muL) in (* type of the left samples *)
-            let tyR = proj_distr_ty env (e_ty muR) in (* type of the right samples *)
-            let coupling_ty = ttuple [tyL; tyR] in (* type of the coupling *)
-            let g_form = TTC.tc1_process_prhl_form tc (tdistr coupling_ty) f in
-            Core.t_equiv_coupling_rnd_r g_form tc
-          with
-          | _ ->
-            (* If coupling fails, fall back to bijection *)
-            let process_form f ty1 ty2 =
-              TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
-            let bij_info = Some (process_form f), None in
-            let pos = pos |> Option.map (function
-              | Single (b, p) ->
-                  let p =
-                    if Option.is_some side then
-                      EcProofTyping.tc1_process_codepos1 tc (side, p)
-                    else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
-                  in Single (b, p)
-              | Double ((b1, p1), (b2, p2)) ->
-                  let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
-                  let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
-                  Double ((b1, p1), (b2, p2))
-            )
-            in
-            t_equiv_rnd side ?pos bij_info tc)
-     | _ ->
          let process_form f ty1 ty2 =
            TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 
          let bij_info =
            match tac_info with
            | PNoRndParams -> None, None
+           | PSingleRndParam f -> Some (process_form f), None
            | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
            | _ -> tc_error !!tc "invalid arguments"
          in
@@ -742,7 +708,7 @@ let process_rnd side pos tac_info tc =
          )
          in
          
-         t_equiv_rnd side ?pos bij_info tc)
+         t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"
 
@@ -764,3 +730,20 @@ let process_rndsem ~reduce side pos tc =
   | Some side when is_equivS concl ->
      t_equiv_rndsem reduce side pos tc
   | _ -> tc_error !!tc "invalid arguments"
+
+(* -------------------------------------------------------------------- *)
+let process_rndcoupling g tc =
+  let concl = FApi.tc1_goal tc in
+  
+  if not (is_equivS concl) then
+    tc_error !!tc "rnd+ can only be used on pRHL goals"
+  else
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let (_, muL), _ = tc1_last_rnd tc es.es_sl in
+    let (_, muR), _ = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+    let coupling_ty = ttuple [tyL; tyR] in
+    let g_form = TTC.tc1_process_prhl_form tc (tdistr coupling_ty) g in
+    Core.t_equiv_coupling_rnd_r g_form tc
