@@ -53,7 +53,10 @@ let ctype_of_ty (env: env) (ty: ty) : ctype =
     | Some ({size=size_arr}, {size=size_bs}) -> `CArray (size_bs, size_arr)
     | None -> begin match EcEnv.Circuit.lookup_bitstring_size env ty with
       | Some sz -> `CBitstring sz
-      | _ -> assert false
+      | _ ->
+          Format.eprintf "Missing binding for type %a@." 
+          EcPrinting.(pp_type (PPEnv.ofenv env)) ty;
+          assert false
     end
   end
 
@@ -397,7 +400,7 @@ let circuit_of_form
   ?(cache   : cache  = empty_cache)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
-  : circuit =
+  : hyps * circuit =
 
   let rec doit (cache: cache) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
@@ -685,10 +688,10 @@ let circuit_of_form
   (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
 *)
 
-  f_c
+  hyps, f_c
 
 
-let circuit_of_path (hyps: hyps) (p: path) : circuit =
+let circuit_of_path (hyps: hyps) (p: path) : hyps * circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
@@ -705,7 +708,7 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
   ) (Option.get lmt).lmt_decl 
   
 
-let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : pstate =
+let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hyps * pstate =
   let env = toenv hyps in
 (*   if debug then Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
@@ -716,13 +719,16 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : ps
       if debug then Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
-      let pstate = update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+      let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+      let pstate = update_pstate pstate v c in
+      hyps, pstate
       (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
-      pstate
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
-      let pstate = List.fold_left (fun pstate (v, e) ->
-        update_pstate pstate v (form_of_expr mem e |> circuit_of_form ~pstate hyps)
-      ) pstate 
+      let pstate = List.fold_left (fun (hyps, pstate) (v, e) ->
+        let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+        let pstate = update_pstate pstate v c in
+        hyps, pstate
+      ) (hyps, pstate)
         (List.combine 
           (List.map (function 
           | (PVloc v, _ty) -> v
@@ -730,7 +736,8 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : ps
         es) in
       pstate
     | Sasgn (LvTuple (vs), e) ->
-      let tp = (form_of_expr mem e |> circuit_of_form ~pstate hyps) |> (ctuple_of_circuit ~strict:true) in
+      let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+      let tp = (ctuple_of_circuit ~strict:true c) in
       let comps = circuits_of_circuit_tuple tp in
       let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
         let v = match pv with
@@ -740,7 +747,7 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : ps
         update_pstate pstate v c 
         ) pstate vs (comps :> circuit list)
       in 
-      pstate
+      hyps, pstate
     | _ -> 
       let err = Format.asprintf "Instruction not supported: %a@." 
       (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst in
@@ -777,8 +784,8 @@ let instrs_equiv
   let inputs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) inputs in
   let pstate = open_circ_lambda_pstate empty_pstate inputs in
 
-  let pstate1 = List.fold_left (process_instr hyps mem) pstate s1 in
-  let pstate2 = List.fold_left (process_instr hyps mem) pstate s2 in
+  let hyps, pstate1 = List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) s1 in
+  let hyps, pstate2 = List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) s2 in
 
   let pstate1 = close_circ_lambda_pstate pstate1 inputs in 
   let pstate2 = close_circ_lambda_pstate pstate2 inputs in
@@ -805,16 +812,16 @@ let instrs_equiv
     circ_equiv circ1 circ2 
   )
 
-let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable list) : pstate =
+let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable list) : hyps * pstate =
   (*let inps, pstate = initial_pstate_of_vars (toenv hyps) (invs) in*)
   let env = LDecl.toenv hyps in
   let invs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) invs in
   let pstate = open_circ_lambda_pstate empty_pstate invs in
 
-  let pstate = 
-    List.fold_left (process_instr hyps mem) pstate proc
+  let hyps, pstate = 
+    List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) proc
   in
-  close_circ_lambda_pstate pstate invs
+  hyps, close_circ_lambda_pstate pstate invs
 
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality
@@ -834,8 +841,8 @@ let rec circ_simplify_form_bitstring_equality
          when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
            || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty)
       ->
-      let c1 = circuit_of_form ~pstate hyps f1 in
-      let c2 = circuit_of_form ~pstate hyps f2 in
+      let hyps, c1 = circuit_of_form ~pstate hyps f1 in
+      let hyps, c2 = circuit_of_form ~pstate hyps f2 in
       (*if debug then Format.eprintf "[W]Testing circuit equivalence for forms:*)
       (*%a@.%a@.With circuits: %s | %s@."*)
       (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1*)
@@ -907,7 +914,7 @@ let circuit_flatten (c: circuit) =
   (cbitstring_of_circuit ~strict:false c :> circuit)
 
 (* TODO: get a better name and uniformize *)
-let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f =
+let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f : hyps * circuit =
   let env = toenv hyps in
   let (pstate, cache, f), bnds = List.fold_left_map (fun (pstate, cache, goal) (id, lk) ->
       if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
@@ -946,5 +953,5 @@ let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hy
   in 
   let bnds = List.flatten bnds in
   if debug then Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
-  close_circ_lambda bnds @@
-  circuit_of_form ~pstate ~cache hyps f
+  let hyps, c = circuit_of_form ~pstate ~cache hyps f in
+  hyps, close_circ_lambda bnds c 

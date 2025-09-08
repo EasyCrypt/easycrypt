@@ -48,15 +48,15 @@ let time (env: env) (t: float) (msg: string) : float =
   EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
   new_t
 
-let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : circuit =
+let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : hyps * circuit =
   try
     let env = toenv hyps in
     let fpth, _fo = EcEnv.Op.lookup qs env in
     let f = EcTypesafeFol.fop_from_path env fpth in
-    let fc = circuit_of_form hyps f in
+    let hyps, fc = circuit_of_form hyps f in
     let fc = circuit_flatten fc in
     let fc = circuit_aggregate_inps fc in
-    fc
+    hyps, fc
   with CircError err ->
     raise (BDepError err)
  
@@ -77,7 +77,7 @@ let mapreduce
   let tm = Unix.gettimeofday () in
   let env = toenv hyps in
   
-  let fc = try 
+  let hyps, fc = try 
     circ_of_qsymbol hyps ([], f.pl_desc) 
     with BDepError err -> 
       raise (BDepError ("Lane function circuit generation failed with error:\n" ^ err))
@@ -86,7 +86,7 @@ let mapreduce
 
   let tm = time env tm "Lane function circuit generation done" in
   
-  let pcondc = try 
+  let hyps, pcondc = try 
     circ_of_qsymbol hyps ([], pcond.pl_desc) 
     with BDepError err ->
       raise (BDepError ("Precondition circuit generation failed with error:\n" ^ err))
@@ -97,7 +97,7 @@ let mapreduce
   let tm = time env tm "Precondition circuit generation done" in
   
   let pinvs = List.fst invs in
-  let pstate = try 
+  let hyps, pstate = try 
     EcCircuits.pstate_of_prog hyps mem proc.s_node pinvs 
   with CircError err ->
     raise (BDepError err)
@@ -187,20 +187,24 @@ let prog_equiv_prod
   
   let env = toenv hyps in 
 
-  let pcond = try 
-    Option.map (circuit_of_form hyps) pcond 
+  let hyps, pcond = match pcond with
+    | Some pcond -> begin try 
+      let hyps, c = circuit_of_form hyps pcond in
+      hyps, Some c
     with CircError err ->
       raise (BDepError err)
+    end
+    | None -> hyps, None
   in
   let tm = Unix.gettimeofday () in
   
-  let pstate_l : pstate = try
+  let (hyps, pstate_l) : hyps * pstate = try
     EcCircuits.pstate_of_prog hyps meml proc_l.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
   let tm = time env tm "Left program generation done" in
-  let pstate_r : pstate = try
+  let (hyps, pstate_r) : hyps * pstate = try
     EcCircuits.pstate_of_prog hyps memr proc_r.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
@@ -340,21 +344,22 @@ let circ_form_eval_plus_equiv
       | _ -> i
       ) proc.s_node 
     in
-    let pstate = try
+    let hyps, pstate = try
       EcCircuits.pstate_of_prog hyps mem insts invs 
     with CircError err ->
       raise (BDepError err)
     in
     
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
-    let pcond = match pstate_get_opt pstate v.v_name with
+    let hyps, pcond = match pstate_get_opt pstate v.v_name with
       | Some circ -> begin try 
         Option.may (fun i -> EcEnv.notify ~immediate:true env `Critical "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; assert false) @@ circuit_has_uninitialized circ;
-        Some (circuit_ueq circ (circuit_of_form hyps cur_val))
+        let hyps, c = (circuit_of_form hyps cur_val) in
+        hyps, Some (circuit_ueq circ c)
         with CircError err ->
           raise (BDepError ("Failed to generate circuit for current value precondition with error:\n" ^ err))
         end
-      | None -> None
+      | None -> hyps, None
     in
     let f = EcCallbyValue.norm_cbv redmode hyps f in
     let f = EcCircuits.circ_simplify_form_bitstring_equality ~mem ~pstate ?pcond hyps f in
@@ -388,7 +393,7 @@ let mapreduce_eval
 
   let tm = time env tm "Lane function circuit generation done" in
   
-  let pstate = try 
+  let hyps, pstate = try 
     EcCircuits.pstate_of_prog hyps mem proc.s_node invs 
   with CircError err ->
     raise (BDepError err)
@@ -1195,7 +1200,7 @@ let t_bdep_solve
     let goal = (FApi.tc1_goal tc) in
     let ctxt = tohyps hyps in
     assert (ctxt.h_tvar = []);
-    if circ_taut (circuit_of_form_with_hyps hyps goal) then
+    if circ_taut (circuit_of_form_with_hyps hyps goal |> snd) then
     FApi.close (!@ tc) VBdep
     else 
     tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  

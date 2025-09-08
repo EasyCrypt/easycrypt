@@ -44,20 +44,20 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit
+val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit
 val circ_simplify_form_bitstring_equality :
   ?mem:EcMemory.memory ->
   ?pstate:pstate ->
   ?pcond:circuit -> hyps -> form -> form
  
 (* Proc processors *)
-val pstate_of_prog : hyps -> memory -> instr list -> variable list -> pstate 
+val pstate_of_prog : hyps -> memory -> instr list -> variable list -> hyps * pstate 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_instr : hyps -> memory -> pstate -> instr -> pstate
+val process_instr : hyps -> memory -> pstate -> instr -> hyps * pstate
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 (* Temporary? *)
-val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> circuit 
+val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option
