@@ -53,6 +53,7 @@ let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : hyps * circuit =
     let env = toenv hyps in
     let fpth, _fo = EcEnv.Op.lookup qs env in
     let f = EcTypesafeFol.fop_from_path env fpth in
+    let f = EcCallbyValue.norm_cbv (EcCircuits.circ_red hyps) hyps f in
     let hyps, fc = circuit_of_form hyps f in
     let fc = circuit_flatten fc in
     let fc = circuit_aggregate_inps fc in
