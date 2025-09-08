@@ -47,7 +47,7 @@ proof.
 (*     + by smt(). *)
 (*     by rewrite mu_not D_ll.  *)  
 proc.
-rnd+ c.
+rndpp c.
 + move => a b />.
   by rewrite /c => /supp_dmap [x] />.
 rewrite /iscoupling; split; last first.

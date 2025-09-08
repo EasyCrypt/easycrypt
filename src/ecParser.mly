@@ -544,6 +544,7 @@
 %token REWRITE
 %token RIGHT
 %token RND
+%token RNDP
 %token RNDPP
 %token RNDSEM
 %token RPAREN
@@ -3000,6 +3001,9 @@ interleave_info:
 
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
+
+| RNDP f=sform
+    { Prndp f }
 
 | RNDPP g=sform
     { Prndcoupling g }

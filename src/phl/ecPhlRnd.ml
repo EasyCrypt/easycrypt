@@ -428,8 +428,8 @@ module Core = struct
     (*                   {phi} x <$ g1 ~ y <$ g2 {psi}                     *)
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
-    let (lvL, muL), _ = tc1_last_rnd tc es.es_sl in
-    let (lvR, muR), _ = tc1_last_rnd tc es.es_sr in
+    let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
+    let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
     let tyL = proj_distr_ty env (e_ty muL) in
     let tyR = proj_distr_ty env (e_ty muR) in
     let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
@@ -456,6 +456,7 @@ module Core = struct
     let subgoal1 = f_imp (f_in_supp ab g_app) post_subst in
     let subgoal1 = f_imp es.es_pr subgoal1 in
     let subgoal1 = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] subgoal1 in
+    let subgoal1 = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=subgoal1; } in
 
     (* Subgoal 2: iscoupling g muL muR *)
     let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
@@ -464,6 +465,70 @@ module Core = struct
                          [muL; muR; g_app] tbool in
 
     FApi.xmutate1 tc `Rnd [subgoal1; subgoal2]
+  
+  (* -------------------------------------------------------------------- *)
+  let t_equiv_map_rnd_r f tc =
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
+    let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+    let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
+    let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
+
+    (* Generate free variables a and b *)
+    let a_id = EcIdent.create "a" in
+    let b_id = EcIdent.create "b" in
+    let a = f_local a_id tyL in
+    let b = f_local b_id tyR in
+
+    (* Apply function f to a *)
+    let f_app = f_app_simpl f [a] tyR in
+
+    (* Substitute in the postcondition: psi[x <- a, y <- f(a)] *)
+    let post = es.es_po in
+    let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
+    let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR f_app post_subst in
+    
+    (* Forall a, psi[x <- a, y <- f(a)] *)
+    let goal = f_forall_simpl [(a_id, GTty tyL)] post_subst in
+
+    (* Create the probability constraint: *)
+    (* sum_{a' : tyL} mu1_g1[a'] * (if f(a') = b then 1 else 0) = mu1_g2[b] *)
+    let a'_id = EcIdent.create "a'" in
+    let a' = f_local a'_id tyL in
+
+    let f_app_sum = f_app_simpl f [a'] tyR in
+    let eq_condition = f_eq f_app_sum b in
+    let prob_muL = f_app_simpl muL [a'] treal in (* mu1 muL a' *)
+    let b2r_op = EcPath.extend EcCoreLib.p_top ["Real"; "b2r"] in
+    let b2r_ty = tfun tbool treal in
+    let b2r_app = f_op b2r_op [] b2r_ty in
+    let b2r_condition = f_app_simpl b2r_app [eq_condition] treal in
+    
+    let summand = f_real_mul prob_muL b2r_condition in
+    let sum_func = f_lambda [(a'_id, GTty tyL)] summand in
+    
+    let bigreal_path = EcPath.extend EcCoreLib.p_top ["StdBigop"; "Bigreal"; "BRA"] in
+    let big_op = EcPath.extend bigreal_path ["big"] in
+    let predt_op = EcPath.extend EcCoreLib.p_top ["Logic"; "predT"] in
+    let predt_ty = tfun tyL tbool in
+    let predt_app = f_op predt_op [tyL] predt_ty in
+    let big_ty = tfun (tfun tyL tbool) (tfun (tfun tyL treal) treal) in
+    let big_app = f_op big_op [tyL] big_ty in
+    let sum_expr = f_app_simpl big_app [predt_app; sum_func] treal in
+    
+    (* The probability constraint: sum = mu1_g2[b] *)
+    let prob_muR_b = f_app_simpl muR [b] treal in (* mu1 muR b *)
+    let prob_constraint = f_eq sum_expr prob_muR_b in
+
+    (* forall b, constraint -> goal *)
+    let goal = f_imp prob_constraint goal in
+    let goal = f_forall_simpl [(b_id, GTty tyR)] goal in
+    let goal = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=goal; } in
+
+    FApi.xmutate1 tc `Rnd [goal]
 end (* Core *)
 
 (* -------------------------------------------------------------------- *)
@@ -732,6 +797,22 @@ let process_rndsem ~reduce side pos tc =
   | _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
+let process_rndp f tc =
+  let concl = FApi.tc1_goal tc in
+  
+  if not (is_equivS concl) then
+    tc_error !!tc "rndp can only be used on pRHL goals"
+  else
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let (_, muL), _ = tc1_last_rnd tc es.es_sl in
+    let (_, muR), _ = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+    let func_ty = tfun tyL tyR in
+    let f_form = TTC.tc1_process_prhl_form tc func_ty f in
+    Core.t_equiv_map_rnd_r f_form tc
+
 let process_rndcoupling g tc =
   let concl = FApi.tc1_goal tc in
   
