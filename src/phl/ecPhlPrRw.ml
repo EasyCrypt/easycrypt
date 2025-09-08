@@ -96,6 +96,35 @@ let pr_mu1_le_eq_mu1 m f args resv k fresh_id d =
     f_eq (f_pr m f args (f_eq resv k)) (f_mu_x d k) in
   f_imp f_ll (f_imp f_le_mu1 concl)
 
+let p_List = [EcCoreLib.i_top; "List"]
+let p_BRA  = [EcCoreLib.i_top; "StdBigop"; "Bigreal"; "BRA"]
+let p_list_has = EcPath.fromqsymbol (p_List, "has")
+let p_BRA_big = EcPath.fromqsymbol (p_BRA, "big")
+
+let destr_pr_has pr =
+  match pr.pr_event.f_node with
+  | Fapp ({ f_node = Fop(op, [ty_elem]) }, [f_f; f_l]) ->
+      if EcPath.p_equal p_list_has op then
+        Some(ty_elem, f_f, f_l)
+      else None
+  | _ -> None
+(*
+ lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
+   mu d (fun a => has (P a) s) <= BRA.big predT (fun b => mu d (fun a => P a b)) s.
+   Pr [f(args)@ &m : has P s] <= BRA.big predT (fun b => Pr [f(args) &m : P b])
+*)
+let pr_has_le f_pr =
+  let pr = destr_pr f_pr in
+  let ty_elem, f_f, f_l = oget (destr_pr_has pr) in
+  let idx = EcIdent.create "x" in
+  let x = f_local idx ty_elem in
+  let pr_event = f_app f_f [x] EcTypes.tbool in
+  let f_pr1 = f_pr_r {pr with pr_event} in
+  let f_fsum = f_lambda [idx, GTty ty_elem] f_pr1 in
+  let f_sum =
+    f_app (f_op p_BRA_big [ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l] EcTypes.treal in
+  f_real_le f_pr f_sum
+
 (* -------------------------------------------------------------------- *)
 exception FoundPr of form
 
@@ -140,6 +169,18 @@ let select_pr_le1 sid f =
       else false
   | _ -> false
 
+let select_pr_muhasle sid f =
+  match f.f_node with
+  | Fapp ({ f_node = Fop (op, _) }, [ { f_node = Fpr pr } as f_pr; _ ]) ->
+      if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op then
+        match destr_pr_has pr with
+        | Some (_, _, f_l) when
+          Mid.set_disjoint f_l.f_fv (Mid.add EcCoreFol.mhr () sid) ->
+            raise (FoundPr f_pr)
+        | _ -> false
+      else false
+  | _ -> false
+
 (* -------------------------------------------------------------------- *)
 let pr_rewrite_lemma =
   [
@@ -154,6 +195,7 @@ let pr_rewrite_lemma =
     ("mu_or", `MuOr);
     ("mu_split", `MuSplit);
     ("mu_sub", `MuSub);
+    ("mu_has_le", `MuHasLe)
   ]
 
 (* -------------------------------------------------------------------- *)
@@ -181,6 +223,7 @@ let t_pr_rewrite_low (s, dof) tc =
     | `MuSplit -> select_pr (fun _ev -> true)
     | `MuSub -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Real.p_real_le)
     | `MuSum -> select_pr (fun _ev -> true)
+    | `MuHasLe -> select_pr_muhasle
   in
 
   let select xs fp = if select xs fp then `Accept (-1) else `Continue in
@@ -193,7 +236,7 @@ let t_pr_rewrite_low (s, dof) tc =
 
   let lemma, args =
     match kind with
-    | `Mu1LeEqMu1 -> 
+    | `Mu1LeEqMu1 ->
       let { pr_mem; pr_fun; pr_args; pr_event } = destr_pr torw in
       let (resv, k) = destr_eq pr_event in
       let k_id = EcEnv.LDecl.fresh_id hyps "k" in
@@ -256,6 +299,9 @@ let t_pr_rewrite_low (s, dof) tc =
     | `MuSum ->
         (pr_sum env (destr_pr torw), 0)
 
+    | `MuHasLe ->
+        (pr_has_le torw, 0)
+
   in
 
   let rwpt = EcCoreGoal.ptcut ~args:(List.make args (PASub None)) lemma in
@@ -269,7 +315,7 @@ let t_pr_rewrite_i (s, f) tc =
   t_pr_rewrite_low (s, do_ev) tc
 
 let t_pr_rewrite (s, f) tc =
-  let to_env f tc torw ty = 
+  let to_env f tc torw ty =
     let env, hyps, _ = FApi.tc1_eflat tc in
     let pr = destr_pr torw in
     let mp = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun env in
