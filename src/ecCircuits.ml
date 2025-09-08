@@ -56,7 +56,7 @@ let ctype_of_ty (env: env) (ty: ty) : ctype =
       | _ ->
           Format.eprintf "Missing binding for type %a@." 
           EcPrinting.(pp_type (PPEnv.ofenv env)) ty;
-          assert false
+          raise (CircError "Failed to convert EC type to Circuit type")
     end
   end
 
@@ -291,7 +291,7 @@ let circuit_of_op (env: env) (p: path) : circuit =
   let op = try
     EcEnv.Circuit.reverse_operator env p |> List.hd
   with Failure _ -> 
-    assert false
+    raise (CircError "Failed reverse operator")
   in
   match op with
   | `Bitstring (bs, op) -> assert false 
@@ -303,7 +303,7 @@ let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  =
   let op = try
     EcEnv.Circuit.reverse_operator env p |> List.hd
   with Failure _ -> 
-    assert false
+    raise (CircError "Failed reverse operator")
   in
   match op with
   | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
@@ -430,7 +430,7 @@ let circuit_of_form
         | _ -> 
           if debug then Format.eprintf "Failed to get body for op: %a\n" 
           (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
-          assert false
+          raise (CircError "Failed to get body for op in propagate integer arg")
       in
 (*
       if debug then Format.eprintf "Propagating arguments for op: %a@\n" 
@@ -478,7 +478,8 @@ let circuit_of_form
             doit cache hyps f) hyps (form_list_of_form ~ppenv:(EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) f) 
           in
           hyps, arg_of_circuits cs
-      | _ -> assert false
+      | _ -> Format.eprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form (PPEnv.ofenv env)) f; 
+        raise (CircError "Failed to convert arg to form")
     in
 
     match f_.f_node with
@@ -506,7 +507,11 @@ let circuit_of_form
         hyps, op
       | None -> 
       if op_is_base env pth then
-        let circ = circuit_of_op env pth in
+        let circ = try 
+          circuit_of_op env pth 
+        with 
+        | CircError e -> Format.eprintf "(%s ->)" (EcPath.tostring pth); raise (CircError e)
+        in
         let hyps = EcEnv.Circuit.add_circuit_cache_hyps hyps pth circ in
         hyps, circ 
       else
@@ -529,7 +534,7 @@ let circuit_of_form
         let hyps = EcEnv.Circuit.add_circuit_cache_hyps hyps pth circ in
         hyps, circ
     end
-    | Fapp (f, fs) -> 
+    | Fapp (f, fs) -> begin try
     (* TODO: find a way to properly propagate int arguments. Done? *)
     begin match f with
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
@@ -600,6 +605,10 @@ let circuit_of_form
         in
         hyps, circuit_compose f_c fcs
     end
+    with CircError e ->
+      Format.eprintf "Call %a ->" EcPrinting.(pp_form (PPEnv.ofenv env)) f;
+      raise (CircError e)
+    end
       
     | Fquant (qnt, binds, f) -> 
       let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in
@@ -608,7 +617,7 @@ let circuit_of_form
       begin match qnt with
       | Lforall 
       | Llambda -> hyps, close_circ_lambda binds circ 
-      | Lexists -> raise (CircError "Universal/Existential quantification not supported ")
+      | Lexists -> raise (CircError "Universal/Existential quantification not supported")
       (* TODO: figure out how to handle quantifiers *)
       end
     | Fproj (f, i) ->
@@ -672,8 +681,8 @@ let circuit_of_form
         let hyps, fn = doit cache hyps fn in
         hyps, circuit_compose fn [f]
       ) (doit cache hyps base) fs
-    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter  -> assert false
-    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold  -> assert false 
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold -> assert false 
     | _ -> assert false
   in 
 (*

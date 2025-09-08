@@ -544,7 +544,7 @@ let t_bdep
   | FhoareF sH -> assert false  
   | FhoareS sF -> if true then
     begin try mapreduce ~debug (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
-    | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" err
+    | BDepError err -> tc_error ~catchable:false (FApi.tc1_penv tc) "%s" err
       end
     else ()
   | FbdHoareF _ -> assert false
