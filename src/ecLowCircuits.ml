@@ -1326,7 +1326,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
        | -> When lane dependency description does not fit circuit
      *)
   let general_decompose ((`CBitstring r, inps) as c: cbitstring cfun) (lanes: ((int list) * (int Set.t)) list): cbitstring cfun list = 
-
+    let exception DependencyError in
     (* Check that outputs cover the circuit *)
     let outputs = List.fst lanes |> List.flatten |> List.sort (Int.compare) in
     assert (List.for_all2 (fun a b -> a = b) outputs (List.init (List.length outputs) (fun i -> i)));
@@ -1339,9 +1339,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (* Separate one lane *)
     let doit ((outputs, inputs): int list * int Set.t) : cbitstring cfun =
       let c = Backend.subcirc r outputs in
-      assert (Backend.Deps.forall_inputs (fun id b -> 
+      if not @@ Backend.Deps.forall_inputs (fun id b -> 
         input.id = id && 
-        Set.mem b inputs) c);
+        Set.mem b inputs) c then raise DependencyError;
       let _, new_inp = new_cbitstring_inp (Set.cardinal inputs) in
       let bit_renames = List.mapi (fun i b -> (b, i)) (Set.to_list inputs) in
       let bit_renamer = Map.of_seq (List.to_seq bit_renames) in
@@ -1351,7 +1351,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         else None
       in `CBitstring (Backend.Deps.rename_inputs renamer c), [new_inp]
     in
-    List.map doit lanes
+    try List.map doit lanes 
+    with DependencyError -> 
+      (* FIXME: hack *)
+      let w = List.length (List.hd lanes |> fst) in
+      let d = Backend.Deps.block_deps_of_reg w r in
+      Format.eprintf "Dependencies:@.%a@." Backend.Deps.pp_block_deps d;
+      raise (CircError "Dep check fail")
 
   let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
     let n = Backend.size_of_reg r in
