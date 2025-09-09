@@ -1325,41 +1325,32 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
        | -> When lane outputs do not fully cover circuit
        | -> When lane dependency description does not fit circuit
      *)
-  let general_decompose ((`CBitstring r, inps) as c: cbitstring cfun) (lanes: ((int list) * (int Set.t)) list): cbitstring cfun list = 
+  let general_decompose ((`CBitstring r): cbitstring) (inp: cinp) (lanes: ((int list) * (int Set.t)) list): cbitstring cfun list = 
     let exception DependencyError in
     (* Check that outputs cover the circuit *)
     let outputs = List.fst lanes |> List.flatten |> List.sort (Int.compare) in
     assert (List.for_all2 (fun a b -> a = b) outputs (List.init (List.length outputs) (fun i -> i)));
 
-    let input = match inps with
-    | ({id; type_ = `CBitstring w} as inp)::[] -> inp
-    | _ -> raise (CircError "too many inputs for mapreduce")
-    in
-
     (* Separate one lane *)
     let doit ((outputs, inputs): int list * int Set.t) : cbitstring cfun =
       let c = Backend.subcirc r outputs in
       if not @@ Backend.Deps.forall_inputs (fun id b -> 
-        input.id = id && 
+        inp.id = id && 
         Set.mem b inputs) c then raise DependencyError;
       let _, new_inp = new_cbitstring_inp (Set.cardinal inputs) in
       let bit_renames = List.mapi (fun i b -> (b, i)) (Set.to_list inputs) in
       let bit_renamer = Map.of_seq (List.to_seq bit_renames) in
       let renamer (id, b) = 
-        if id = input.id then
+        if id = inp.id then
           Option.map (fun new_b -> (new_inp.id, new_b)) (Map.find_opt b bit_renamer)
         else None
       in `CBitstring (Backend.Deps.rename_inputs renamer c), [new_inp]
     in
     try List.map doit lanes 
     with DependencyError -> 
-      (* FIXME: hack *)
-      let w = List.length (List.hd lanes |> fst) in
-      let d = Backend.Deps.block_deps_of_reg w r in
-      Format.eprintf "Dependencies:@.%a@." Backend.Deps.pp_block_deps d;
-      raise (CircError "Dep check fail")
+      raise (CircError "dep_check_general_decompose")
 
-  let decompose (in_w: width) (out_w: width) ((`CBitstring r, inps) as c: cbitstring cfun) : cbitstring cfun list = 
+  let decompose (in_w: width) (out_w: width) ((`CBitstring r as c, inps): cbitstring cfun) : cbitstring cfun list = 
     let n = Backend.size_of_reg r in
     assert (n mod out_w = 0);
     let n_lanes = n / out_w in
@@ -1368,7 +1359,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | _ -> raise (CircError "bad inputs in circ for mapreduce")
     in
     let lanes = List.map (fun i -> List.init out_w (fun j -> i*out_w + j), Set.of_list (List.init in_w (fun j -> i*in_w + j))) (List.init n_lanes (fun i -> i)) in
-    general_decompose c lanes
+    try general_decompose c inp lanes
+    with CircError _ ->
+      let d = Backend.Deps.block_deps_of_reg out_w r in
+      Format.eprintf "Dependencies:@.%a@." Backend.Deps.pp_block_deps d;
+      raise (CircError "Split dependency check failed")
+
 
   let permute (w: width) (perm: (int -> int)) ((`CBitstring r, inps): cbitstring cfun) : cbitstring cfun =
     `CBitstring (Backend.permute w perm r), inps
