@@ -1563,7 +1563,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { kind = `Sub (_, Some size) } ->
         let c1, inp1 = new_cbitstring_inp_reg size in 
         let c2, inp2 = new_cbitstring_inp_reg size in
-        `CBitstring (Backend.add c1 (Backend.opp c2)), [inp1; inp2] 
+        `CBitstring (Backend.sub c1 c2), [inp1; inp2] 
 
       | { kind = `Mul  (_, Some size) } -> 
         let c1, inp1 = new_cbitstring_inp_reg size in 
