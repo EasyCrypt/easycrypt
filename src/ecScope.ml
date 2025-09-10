@@ -2620,7 +2620,7 @@ module Circuit = struct
       | "or"   -> (fun sz -> `Or   (as_seq1 sz       )), [`BV None], "Or"
       | "xor"  -> (fun sz -> `Xor  (as_seq1 sz       )), [`BV None], "Xor"
       | "not"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Not"
-      | "opp"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Opp"
+      | "opp"  -> (fun sz -> `Opp  (as_seq1 sz       )), [`BV None], "Opp"
 
       | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"
       | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLt"
