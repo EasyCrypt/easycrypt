@@ -2522,7 +2522,7 @@ module Circuit = struct
 
     let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) bs.size tint in
     let size_i = try 
-      Some (EcReduction.h_red EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
       with 
       | DestrError "int" -> None
       | EcEnv.NotReducible -> None 
@@ -2581,7 +2581,7 @@ module Circuit = struct
 
     let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) ba.size tint in
     let size_i = try 
-      Some (EcReduction.h_red EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
       with 
       | DestrError "int" -> None
       | EcEnv.NotReducible -> None
