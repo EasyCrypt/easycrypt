@@ -3239,6 +3239,14 @@ apply/subseqP; exists (m1 ++ m2); rewrite !size_cat.
 by rewrite !mask_cat // sz_m1 sz_m2.
 qed.
 
+lemma subseq_catR ['a] (s s1 s2 : 'a list) :
+  subseq s s1 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cats0 &(cat_subseq) // sub0seq. qed.
+
+lemma subseq_catL ['a] (s s1 s2 : 'a list) :
+  subseq s s2 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cat0s &(cat_subseq) // sub0seq. qed.
+
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
 
@@ -3258,8 +3266,42 @@ qed.
 lemma subseq_cons (s : 'a list) x : subseq s (x :: s).
 proof. by apply/(@cat_subseq [] s [x] s)=> //; apply/subseq_refl. qed.
 
+lemma subseq_consI ['a] (x : 'a) (s1 s2 : 'a list) :
+  subseq (x :: s1) s2 => subseq s1 s2.
+proof.
+case/subseqP=> m [eqsz h]; apply/subseqP.
+elim: m s2 eqsz h => [|b m ih] [|x2 s2] //=.
+move/addzI => eqsz; case: b => /= _.
+- by case=> <<- ->; exists (false :: m) => /#.
+by case/(ih _ eqsz) => m' [*]; exists (false :: m') => /= /#.
+qed.
+
 lemma subseq_rcons (s : 'a list) x : subseq s (rcons s x).
 proof. by rewrite -{1}(@cats0 s) -cats1 cat_subseq // subseq_refl. qed.
+
+lemma subseq_take ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (take i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catR) &(subseq_refl).
+qed.
+
+lemma subseq_drop ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catL) &(subseq_refl).
+qed.
+
+lemma subseq_drop_congr ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) (drop i s2).
+proof.
+elim/natind: i s1 s2 => [i le0_i|i ge0_i ih].
+- by move=> *; rewrite !drop_le0.
+case=> [|x1 s1]; [by move=> *; apply: sub0seq | case=> //= x2 s2 h].
+rewrite !(ifF (_ <= 0)) ~-1:/#; apply: ih => //.
+by move: h; case: (x2 = x1) => //= ? /subseq_consI.
+qed.
 
 lemma rem_subseq x (s : 'a list) : subseq (rem x s) s.
 proof.
