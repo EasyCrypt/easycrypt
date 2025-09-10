@@ -197,6 +197,8 @@ type field = {
 val field_equal : field -> field -> bool
 
 (* -------------------------------------------------------------------- *)
+type binding_size = form * (int option)
+
 type crb_bitstring =
   { type_  : EcPath.path
   ; from_  : EcPath.path
@@ -204,7 +206,7 @@ type crb_bitstring =
   ; ofint  : EcPath.path
   ; touint : EcPath.path
   ; tosint : EcPath.path
-  ; size   : int
+  ; size   : binding_size
   ; theory : EcPath.path }
   
 type crb_array =
@@ -213,38 +215,39 @@ type crb_array =
   ; set    : EcPath.path
   ; tolist : EcPath.path
   ; oflist : EcPath.path
-  ; size   : int
+  ; size   : binding_size
   ; theory : EcPath.path }
   
 type bv_opkind = [
-  | `Add      of int (* size *)
-  | `Sub      of int (* size *)
-  | `Mul      of int (* size *)
-  | `Div      of int * bool (* size + sign *)
-  | `Rem      of int * bool (* size + sign *)
-  | `Shl      of int (* size *)
-  | `Rol      of int (* size *)
-  | `Ror      of int (* size *)
-  | `Shr      of int * bool (* size + sign *)
-  | `And      of int (* size *)
-  | `Or       of int (* size *)
-  | `Xor       of int (* size *)
-  | `Not      of int (* size *)
-  | `Lt       of int * bool (* size + sign *) 
-  | `Le       of int * bool (* size + sign *)
-  | `Extend   of int * int * bool (* size in + size out + sign *)
-  | `Truncate of int * int (* size in + size out *)
-  | `Extract  of int * int (* size in + size out *)
-  | `Insert   of int * int (* size in + size out *)
-  | `Concat   of int * int * int (* size in1 + size in2 + size out *)
-  | `Init     of int (* size_out *)
-  | `Get      of int (* size_in *)
-  | `AInit    of int * int (* arr_sz + size_out *)
-  | `Map      of int * int * int (* size_in + size_out + arr_size *)
-  | `A2B      of (int * int) * int (* (arr_len, elem_sz), out_size *)
-  | `B2A      of int * (int * int) (* size in, (arr_len, elem_sz)  *)
-  | `ASliceGet of (int * int) * int (* arr_len + el_sz + sz_out *)
-  | `ASliceSet of (int * int) * int (* arr_len + el_sz + sz_in *)
+  | `Add      of binding_size (* size *)
+  | `Sub      of binding_size (* size *)
+  | `Mul      of binding_size (* size *)
+  | `Div      of binding_size * bool (* size + sign *)
+  | `Rem      of binding_size * bool (* size + sign *)
+  | `Shl      of binding_size (* size *)
+  | `Rol      of binding_size (* size *)
+  | `Ror      of binding_size (* size *)
+  | `Shr      of binding_size * bool (* size + sign *)
+  | `And      of binding_size (* size *)
+  | `Or       of binding_size (* size *)
+  | `Xor      of binding_size (* size *)
+  | `Not      of binding_size (* size *)
+  | `Opp      of binding_size (* size *)
+  | `Lt       of binding_size * bool (* size + sign *) 
+  | `Le       of binding_size * bool (* size + sign *)
+  | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
+  | `Truncate of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size (* size in + size out *)
+  | `Insert   of binding_size * binding_size (* size in + size out *)
+  | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
+  | `Init     of binding_size (* size_out *)
+  | `Get      of binding_size (* size_in *)
+  | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
+  | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
+  | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_in *)
 ]
   
 type crb_bvoperator =

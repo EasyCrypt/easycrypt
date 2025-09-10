@@ -1025,15 +1025,24 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
 
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+  let red f = try
+    Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
+  with 
+    | EcCoreFol.DestrError "int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
   try
     let to_    = forpath bs.to_ in
     let from_  = forpath bs.from_ in
     let touint  = forpath bs.touint in
     let tosint  = forpath bs.tosint in
     let ofint  = forpath bs.ofint in
-    let type_  = bs.type_ in (* FIXME *)
-    let theory = bs.theory in (* FIXME *)
-    let size   = bs.size in
+    let type_  = forpath bs.type_ in (* FIXME *)
+    let theory = forpath bs.theory in (* FIXME *)
+    let size   = EcSubst.subst_binding_size ~red subst bs.size in 
 
     let bs = CRB_Bitstring { to_; from_; touint; tosint; ofint; type_; theory; size; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (bs, lc)) in
@@ -1049,19 +1058,29 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
 
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+  let red f = try
+    Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
+  with 
+    | EcCoreFol.DestrError "int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
   try
     let get    = forpath ba.get in
     let set    = forpath ba.set in
     let tolist = forpath ba.tolist in
     let oflist = forpath ba.oflist in
     let type_  = ba.type_ in (* FIXME *)
-    let size   = ba.size in
+    let size   = EcSubst.subst_binding_size ~red subst ba.size in
     let theory = ba.theory in (* FIXME *)
 
     let ba = CRB_Array { get; set; tolist; oflist; type_; size; theory; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (ba, lc)) in
 
     (subst, ops, proofs, scope)
+
 
   with InvInstPath ->
     (subst, ops, proofs, scope)
@@ -1072,11 +1091,21 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
   let npath = ove.ovre_npath in
   let forpath = forpath ~npath ~opath ~ops in
 
+  let env = EcSection.env (ove.ovre_hooks.henv scope) in
+  let hyps = EcEnv.LDecl.init env [] in
+  let red f = try
+    Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
+  with 
+    | EcCoreFol.DestrError "int" -> None
+    | EcEnv.NotReducible -> None
+  in
+
+
   try
-    let kind     = op.kind in
+    let kind     = EcSubst.subst_bv_opkind ~red subst op.kind in
     let operator = forpath op.operator in
-    let types    = op.types in (* FIXME *)
-    let theory   = op.theory in (* FIXME *)
+    let types    = List.map forpath op.types in (* FIXME *)
+    let theory   = forpath op.theory in (* FIXME *)
 
     let op = CRB_BvOperator { kind; operator; types; theory; } in
     let scope = ove.ovre_hooks.hadd_item scope import (Th_crbinding (op, lc)) in

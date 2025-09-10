@@ -322,7 +322,9 @@ let circ_form_eval_plus_equiv
   (*let inps = List.map (EcCircuits.input_of_variable env) invs in*)
   (*let inpcs, inps = List.split inps in*)
   let size, of_int = match EcEnv.Circuit.lookup_bitstring env v.v_type with
-  | Some {size; ofint} -> size, ofint 
+  | Some {size=(_, Some size); ofint} -> size, ofint 
+  | Some {size=(_, None); ofint} -> 
+      raise (BDepError "No concrete binding bitstring size")
   | None -> 
       let err = Format.asprintf "Binding not found for variable %s of type %a@."
         v.v_name (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) v.v_type 
@@ -507,19 +509,23 @@ let reconstruct_from_bits (env: env) (f: form) (t: ty) =
   | _ -> false);
   let (@@!) = EcTypesafeFol.f_app_safe env in
   match EcEnv.Circuit.lookup_array_and_bitstring env t with
-  | Some ({ oflist }, {type_; size; ofint}) -> 
+  | Some ({ oflist }, {type_; size = (_, Some size); ofint}) -> 
     let base = tconstr type_ [] in
     oflist @@! [ ofint @@! [f_int (BI.of_int 0)];
     EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
     EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f]]]
+  | Some ({ oflist }, {type_; size = (_, None); ofint}) -> 
+    raise (BDepError "No concrete  binding for type in reconstruct_from_bits") (* FIXME: error messages *)
   | _ -> 
     bits2w env t f
+
+(* FIXME: review and cleanup this section *)
 
 let reconstruct_from_bits_op (env: env) (t: ty) =
   (* Check input is a bool list *)
   let (@@!) = EcTypesafeFol.f_app_safe env in
   match EcEnv.Circuit.lookup_array_and_bitstring env t with
-  | Some ({ oflist }, {type_; size; ofint}) -> 
+  | Some ({ oflist }, {type_; size = (_, Some size); ofint}) -> 
     let base = tconstr type_ [] in
     let temp = create "temp" in
     let bool_list = tconstr EcCoreLib.CI_List.p_list [tbool] in
@@ -527,6 +533,8 @@ let reconstruct_from_bits_op (env: env) (t: ty) =
     oflist @@! [ ofint @@! [f_int (BI.of_int 0)];
     EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
     EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f_local temp bool_list]]]
+  | Some ({ oflist }, {type_; size = (_, None); ofint}) -> 
+    raise (BDepError "No concrete  binding for type in reconstruct_from_bits_op") (* FIXME: error messages *)
   | _ -> 
     bits2w_op env t
    
@@ -794,11 +802,13 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | v, None -> v, None 
     | v, Some (t, offset) -> 
         let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
-        | Some (_, { size }) -> size 
+        | Some (_, { size = (_, Some size) }) -> size 
+        | Some (_, { size = (_, None) }) -> raise (BDepError "non concrete binding for input bitstring") 
         | None -> assert false
         in
         let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
-        | Some {size} -> size
+        | Some {size= (_, Some size)} -> size
+        | Some {size= (_, None)} -> raise (BDepError "non concrete binding for input array") 
         | _ -> assert false
         in
         v, Some (bsz * asz, (BI.to_int offset) * bsz)
@@ -811,14 +821,16 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | v, None -> v, None 
     | v, Some (t, offset) -> 
         let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
-        | Some (_, { size }) -> size 
+        | Some (_, { size = (_, Some size) }) -> size 
+        | Some (_, { size = (_, None) }) -> raise (BDepError "non concrete binding for input bitstring") 
         | None -> assert false
         in
         let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
-        | Some {size} -> size
+        | Some {size= (_, Some size)} -> size
+        | Some {size= (_, None)} -> raise (BDepError "non concrete binding for input array") 
         | _ -> assert false
         in
-        v, Some (asz * bsz, (BI.to_int offset) * bsz)
+        v, Some (bsz * asz, (BI.to_int offset) * bsz)
     ) 
   outvs 
   in
@@ -1132,15 +1144,18 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   in
 
 
-  let n, in_to_uint, in_to_sint,in_of_int = match EcEnv.Circuit.lookup_bitstring env in_ty with
-  | Some {size; touint; tosint; ofint} -> size, touint, tosint, ofint
-  | _ -> tc_error pe "No binding for type %a@." pp_type in_ty 
+  let n, in_to_uint, in_to_sint,in_of_int = 
+    match EcEnv.Circuit.lookup_bitstring env in_ty with
+    | Some {size = (_, Some size); touint; tosint; ofint} -> size, touint, tosint, ofint
+    | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for input")
+    | _ -> tc_error pe "No binding for type %a@." pp_type in_ty 
   in
   let in_to_uint = f_op in_to_uint [] (tfun in_ty tint) in
   let in_to_sint = f_op in_to_sint [] (tfun in_ty tint) in
   let in_of_int = f_op in_of_int [] (tfun tint in_ty) in
   let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
-  | Some {size; ofint} -> size, ofint 
+  | Some {size = (_, Some size); ofint} -> size, ofint 
+  | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for output") 
   | _ -> tc_error pe "No binding for type %a@." pp_type out_ty 
   in
   let out_of_int = f_op out_of_int [] (tfun tint out_ty) in

@@ -3317,14 +3317,14 @@ module Circuit = struct
     | _ -> None
     
   let lookup_bitstring_size_path (env : env) (pth : path) : int option = 
-    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring_path env pth)
+    Option.bind (Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring_path env pth)) snd
   
   let lookup_circuit_path (env : env) (v : path) : Lospecs.Ast.adef option = 
     Mp.find_opt v env.env_crbds.circuits
     |> Option.map (fun cr -> cr.circuit)
 
   let lookup_bitstring_size (env : env) (ty : ty) : int option =
-    Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)
+    Option.bind (Option.map (fun (c : crb_bitstring) -> c.size) (lookup_bitstring env ty)) snd
 
   let rec lookup_array_path (env : env) (pth : path) : crb_array option = 
     let k, _  = Ty.lookup (EcPath.toqsymbol pth) (env) in
@@ -3357,7 +3357,7 @@ module Circuit = struct
     | _ -> None
 
   let lookup_array_size (env : env) (ty : ty) : int option = 
-    Option.map (fun c -> c.size) (lookup_array env ty)
+    Option.bind (Option.map (fun c -> c.size) (lookup_array env ty)) snd
 
   let lookup_bvoperator_path (env : env) (v : path) : crb_bvoperator option = 
     Mp.find_opt v env.env_crbds.bvoperators

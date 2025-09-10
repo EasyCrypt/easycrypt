@@ -50,46 +50,38 @@ let ctype_of_ty (env: env) (ty: ty) : ctype =
   | Tconstr (pth, []) when pth = EcCoreLib.CI_Bool.p_bool -> `CBool
   | _ -> begin
     match EcEnv.Circuit.lookup_array_and_bitstring env ty with
-    | Some ({size=size_arr}, {size=size_bs}) -> `CArray (size_bs, size_arr)
-    | None -> begin match EcEnv.Circuit.lookup_bitstring_size env ty with
+    | Some ({size=(_, Some size_arr)}, {size=(_, Some size_bs)}) -> `CArray (size_bs, size_arr)
+    | None -> 
+      begin match EcEnv.Circuit.lookup_bitstring_size env ty with
       | Some sz -> `CBitstring sz
       | _ ->
           Format.eprintf "Missing binding for type %a@." 
           EcPrinting.(pp_type (PPEnv.ofenv env)) ty;
           raise (CircError "Failed to convert EC type to Circuit type")
     end
+    | Some ({size = (_, None)}, _) -> 
+        Format.eprintf "No concrete binding for array type@."; assert false
+    | Some (_, {size = (_, None)}) -> 
+        Format.eprintf "No concrete binding for bitstring type@."; assert false
   end
 
 
 let width_of_type (env: env) (t: ty) : int =
-  match EcEnv.Circuit.lookup_array_and_bitstring env t with
-  | Some ({size=size_arr}, {size=size_bs}) -> size_arr * size_bs
-  | _ -> match EcEnv.Circuit.lookup_bitstring_size env t with
-    | Some w -> w
-    | None -> let err = Format.asprintf "No bitvector binding for type %a@."
-    (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in 
-    raise (CircError err)
-  
+  let cty = ctype_of_ty env t in
+  EcLowCircuits.size_of_ctype cty
+    
+(* Requires concrete bindings for both types *)
 let destr_array_type (env: env) (t: ty) : (int * ty) option = 
   match EcEnv.Circuit.lookup_array_and_bitstring env t with
-  | Some ({size}, {type_}) -> Some (size, EcTypes.tconstr type_ [])
+  | Some ({size = (_, Some size)}, {type_; size = (_, Some _)}) -> Some (size, EcTypes.tconstr type_ [])
   | _ -> None
 
+(* FIXME: Fix an order for array size parameters, this one goes against the rest *)
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
-    match t.ty_node with
-    | Tconstr (p, [et]) -> 
-      begin match EcEnv.Circuit.lookup_array_path env p with
-      | Some {size; _} -> size, width_of_type env et
-      | None -> 
-        let err = Format.asprintf "Failed to lookup shape of array type %a@."
-        (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in
-        raise (CircError err)
-      end
-    | _ -> 
-      let err = Format.asprintf "Failed to lookup shape of array type %a@."
-      (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) t in
-      raise (CircError err)
-
+    match ctype_of_ty env t with
+    | `CArray (w, n) -> (n, w)
+    | _ -> raise (CircError "shape_of_array_type on non array type")
+    
 (* Should correspond to QF_ABV *) 
 module BVOps = struct
   let temp_symbol = "temp_circ_input"
@@ -132,7 +124,8 @@ module BVOps = struct
     | Some { kind = `Not _ }      | Some { kind = `Lt _ } 
     | Some { kind = `Le _ }       | Some { kind = `Extend _ } 
     | Some { kind = `Truncate _ } | Some { kind = `Concat _ } 
-    | Some { kind = `A2B _ }      | Some { kind = `B2A _ } -> true
+    | Some { kind = `A2B _ }      | Some { kind = `B2A _ } 
+    | Some { kind = `Opp _ } -> true
     | Some { kind = 
         `ASliceGet _ 
       | `ASliceSet _ 
@@ -174,11 +167,13 @@ module BitstringOps = struct
     in
     match bnd with
     | bs, `From -> assert false (* doesn't translate to circuit *)
-    | {size}, `OfInt -> begin match args with
+    | {size = (_, Some size)}, `OfInt -> begin match args with
       | [ `Constant i ] ->
         circuit_of_zint ~size i
       | _ -> assert false
     end
+    | {size = (_, None)}, `OfInt -> 
+        raise (CircError "No concrete binding for type of of_int@.") (* FIXME: error messages *)
     | bs, `To -> assert false (* doesn't translate to circuit *)
     | bs, `ToSInt -> assert false (* doesn't translate to circuit *) 
     | bs, `ToUInt -> assert false (* doesn't translate to circuit *)
@@ -212,10 +207,11 @@ module ArrayOps = struct
       | _ -> assert false
     end
     (* FIXME: Check argument order *)
-    | ({size}, `OfList) -> begin match args with 
+    | ({size = (_, Some size)}, `OfList) -> begin match args with 
       | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
       | _ -> assert false
       end
+    | ({size = (_, None)}, `OfList) -> raise (CircError "Array of list with non-concrete size")
     | (_arr, `Set) -> begin match args with
       | [ `Circuit ((`CArray _, _) as arr); 
           `Constant i; 

@@ -1040,6 +1040,8 @@ let generalize_auto to_gen auto_rl =
       to_gen, Some (Th_auto {auto_rl with axioms})
 
 let generalize_crbinding (to_gen : to_gen) ((bd, lc) : crbinding * is_local) =
+  (* FIXME: not complete? *)
+  let bd = EcSubst.subst_crbinding to_gen.tg_subst bd in
   let item =
     if lc = `Local then None else Some (Th_crbinding (bd, lc))
   in to_gen, item

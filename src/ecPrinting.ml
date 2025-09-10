@@ -3568,22 +3568,24 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
   | EcTheory.Th_crbinding (binding, lc) -> begin
     match binding with
     | CRB_Bitstring bs ->
-      Format.fprintf fmt "%abind bitstring %a %a %a %d."
+      Format.fprintf fmt "%abind bitstring %a %a %a %a%s."
         pp_locality lc
         (pp_opname ppe) bs.to_
         (pp_opname ppe) bs.from_
         (pp_tyname ppe) bs.type_
-        bs.size
+        (pp_form ppe) (fst bs.size)
+        (if Option.is_some (snd bs.size) then " (concrete)" else " (abstract)")
 
     | CRB_Array ba ->
-      Format.fprintf fmt "%abind array %a %a %a %a %a %d."
+      Format.fprintf fmt "%abind array %a %a %a %a %a %a%s."
         pp_locality lc
         (pp_tyname ppe) ba.type_
         (pp_opname ppe) ba.get
         (pp_opname ppe) ba.set
         (pp_opname ppe) ba.tolist
         (pp_opname ppe) ba.oflist
-        ba.size
+        (pp_form ppe) (fst ba.size)
+        (if Option.is_some (snd ba.size) then " (concrete)" else " (abstract)")
 
     | CRB_BvOperator op ->
       let kind =
@@ -3601,6 +3603,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         | `Shr     (_,    false) -> "shr"
         | `Shr     (_,    true ) -> "ashr"
         | `Not      _            -> "not"
+        | `Opp      _            -> "opp"
         | `And      _            -> "and"
         | `Or       _            -> "or"
         | `Xor      _            -> "xor"

@@ -1323,7 +1323,7 @@ type pbind_bitstring =
   ; tosint : pqsymbol
   ; ofint  : pqsymbol
   ; type_  : pty
-  ; size   : EcBigInt.zint }
+  ; size   : pformula }
   
 (* -------------------------------------------------------------------- *)
 type pbind_array =
@@ -1332,7 +1332,7 @@ type pbind_array =
   ; tolist : pqsymbol
   ; oflist : pqsymbol
   ; type_  : pqsymbol
-  ; size   : EcBigInt.zint }
+  ; size   : pformula }
 
 (* -------------------------------------------------------------------- *)
 type pbind_bvoperator =

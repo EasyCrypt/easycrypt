@@ -3880,10 +3880,10 @@ user_red_option:
 (* -------------------------------------------------------------------- *)
 (* Circuit & bo bindings                                                *)
 cr_binding_r:
-| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=loc(simpl_type_exp) size=uint
+| BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=loc(simpl_type_exp) size=sform
   { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
 
-| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=uint
+| BIND ARRAY get=qoident set=qoident tolist=qoident oflist=qoident type_=qoident size=form
   { CRB_Array { get; set; tolist; oflist; type_; size; } }
   
 | BIND OP type_=qident operator=qoident name=loc(STRING)

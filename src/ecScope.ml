@@ -2390,7 +2390,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit = struct
-  type preoperator = [`Path of path | `Int of BI.zint]
+  type preoperator = [`Path of path | `Form of pformula]
 
   type clone = {
     path      : EcPath.path;
@@ -2414,12 +2414,12 @@ module Circuit = struct
         let operator =
           match operator with
           | `Path name -> `ByPath name
-          | `Int  i    ->
+          | `Form f    ->
               `BySyntax
                 { opov_tyvars = None
                 ; opov_args   = []
                 ; opov_retty  = loced PTunivar
-                ; opov_body   = loced (PFint i) } 
+                ; opov_body   = f } 
         in (x, loced (operator, `Inline `Keep))
       in
 
@@ -2460,10 +2460,10 @@ module Circuit = struct
           evc_lemmas = {
             ev_bynames =
               clone.proofs
-                |> List.map (fun name -> (name, (Some (loced (Pby None)), `Alias, false)))
+                |> List.map (fun name -> (name, (Some (loced (Ptry (loced (Pby None)))), `Alias, false)))
                 |> Msym.of_list;
             ev_global  = 
-              [ (Some (loced (Pby None)), Some [`Include, "bydone"])
+              [ (None, None)
               ; (None, None) ]; } } in
 
     let npath = EcPath.pqname (EcEnv.root env) clone.name in
@@ -2496,12 +2496,12 @@ module Circuit = struct
           hierror ~loc:(bs.type_.pl_loc)
             "bit-string type must be a monomorphic named type" in
 
-    let from_, _ = EcEnv.Op.lookup bs.to_.pl_desc env in
-    let to_  , _ = EcEnv.Op.lookup bs.from_.pl_desc env in
+    let from_, _  = EcEnv.Op.lookup bs.to_.pl_desc env in
+    let to_  , _  = EcEnv.Op.lookup bs.from_.pl_desc env in
     let touint, _ = EcEnv.Op.lookup bs.touint.pl_desc env in
     let tosint, _ = EcEnv.Op.lookup bs.tosint.pl_desc env in
-    let ofint, _ = EcEnv.Op.lookup bs.ofint.pl_desc env in
-    let name     = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
+    let ofint, _  = EcEnv.Op.lookup bs.ofint.pl_desc env in
+    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
 
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
@@ -2510,7 +2510,7 @@ module Circuit = struct
       ; theories  = []
       ; types_    = ["bv", bspath]
       ; operators =
-          [ ("size"  , `Int bs.size)
+          [ ("size"  , `Form bs.size)
           ; ("tolist", `Path to_)
           ; ("oflist", `Path from_)
           ; ("touint", `Path touint)
@@ -2520,10 +2520,18 @@ module Circuit = struct
 
     let proofs, scope = doclone scope preclone in
 
+    let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) bs.size tint in
+    let size_i = try 
+      Some (EcReduction.h_red EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      with 
+      | DestrError "int" -> None
+      | EcEnv.NotReducible -> None 
+    in
+
     let item = CRB_Bitstring 
       { from_; to_; touint; tosint; ofint;
         type_  = bspath;
-        size   = BI.to_int bs.size;
+        size   = (size_f, size_i);
         theory = pqname (EcEnv.root env) name; } in
 
     let item = EcTheory.mkitem EcTheory.import0 (EcTheory.Th_crbinding (item, local)) in
@@ -2562,7 +2570,7 @@ module Circuit = struct
       ; theories  = []
       ; types_    = ["t", bspath]
       ; operators =
-          [ ("size"   , `Int ba.size)
+          [ ("size"   , `Form ba.size)
           ; ("get"    , `Path get)
           ; ("set"    , `Path set)
           ; ("to_list", `Path tolist)
@@ -2571,10 +2579,18 @@ module Circuit = struct
 
     let proofs, scope = doclone scope preclone in
 
+    let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) ba.size tint in
+    let size_i = try 
+      Some (EcReduction.h_red EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      with 
+      | DestrError "int" -> None
+      | EcEnv.NotReducible -> None
+    in
+
     let item = CRB_Array
       { get; set; tolist; oflist;
         type_  = bspath;
-        size   = BI.to_int ba.size;
+        size   = (size_f, size_i);
         theory = pqname (EcEnv.root env) name; } in
 
     let item = EcTheory.mkitem EcTheory.import0 (Th_crbinding (item, local)) in
@@ -2604,6 +2620,7 @@ module Circuit = struct
       | "or"   -> (fun sz -> `Or   (as_seq1 sz       )), [`BV None], "Or"
       | "xor"  -> (fun sz -> `Xor  (as_seq1 sz       )), [`BV None], "Xor"
       | "not"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Not"
+      | "opp"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Opp"
 
       | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"
       | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLt"
@@ -2698,14 +2715,21 @@ module Circuit = struct
           | None ->
             hierror ~loc:(ty.pl_loc)
               "this type is not bound to a bitstring type"
-          | Some bs ->
+          | Some {size = (_ , Some csize) as size; theory} ->
             osize |> Option.iter (fun osize ->
-              if osize <> bs.size then
+              if osize <> csize then
                 hierror ~loc:(ty.pl_loc)
                   "this type is not bound to a bitstring type of size %d (but of size %d)"
-                  osize bs.size
+                  osize csize
             );
-            (bs.size, bs.theory)
+            (size, theory)
+          | Some { size = (_, None) as size; theory} -> 
+            osize |> Option.iter (fun osize ->
+            hierror ~loc:(ty.pl_loc)
+              "This type is not bound to a concrete bitstring of size %d (it is abstract)"
+              osize
+            );
+            (size, theory)
           end
         | `A -> begin
           match EcEnv.Circuit.lookup_array_path env path with
@@ -2805,13 +2829,13 @@ module Circuit = struct
 
       List.iteri (fun position (ty, size) ->
         match EcEnv.Circuit.lookup_bitstring env ty with
-        | Some bitstring when bitstring.size = size -> ()
-        | Some bitstring ->
+        | Some {size = (_, Some bs_size)} when bs_size = size -> ()
+        | Some {size = (_, bs_size)} ->
           let ppe = EcPrinting.PPEnv.ofenv env in
           hierror ~loc:(loc pc.operator)
-            "%d-th argument (of type %a) must be a bitstring of size %d, not %d"
+            "%d-th argument (of type %a) must be a bitstring of size %d, not %s"
             (position + 1) (EcPrinting.pp_type ppe) ty
-            size bitstring.size
+            size (Option.value (Option.map string_of_int bs_size) ~default:("abstract")) 
         | None ->
           let ppe = EcPrinting.PPEnv.ofenv env in
           hierror ~loc:(loc pc.operator)
@@ -2821,12 +2845,13 @@ module Circuit = struct
 
       begin
         match EcEnv.Circuit.lookup_bitstring env codom with
-        | Some bitstring when bitstring.size = ret -> ()
-        | Some bitstring ->
+        | Some {size = (_, Some bs_size)} when bs_size = ret -> ()
+        | Some {size = (_, bs_size)} ->
           let ppe = EcPrinting.PPEnv.ofenv env in
           hierror ~loc:(loc pc.operator)
-            "operator return type (%a) must be a bitstring of size %d, not %d"
-            (EcPrinting.pp_type ppe) codom ret bitstring.size
+            "operator return type (%a) must be a bitstring of size %d, not %s"
+            (EcPrinting.pp_type ppe) codom ret 
+            (Option.value (Option.map string_of_int bs_size) ~default:("abstract"))
         | None ->
           let ppe = EcPrinting.PPEnv.ofenv env in
           hierror ~loc:(loc pc.operator)

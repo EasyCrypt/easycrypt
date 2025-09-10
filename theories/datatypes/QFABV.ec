@@ -96,6 +96,15 @@ theory BVOperators.
       touint (bvsub bv1 bv2) = (touint bv1 - touint bv2) %% 2^BV.size.
   end BVSub.
   
+  abstract theory BVOpp.
+    clone import BV.
+
+    op bvopp : bv -> bv.
+
+    axiom bvoppP (bv : bv) :
+      tosint (bvopp bv) = -(tosint bv).
+  end BVOpp.
+
   (* ------------------------------------------------------------------ *)
   abstract theory BVMul.
     clone import BV.
