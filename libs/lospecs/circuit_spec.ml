@@ -8,6 +8,10 @@ let load_from_file ~(filename : string) =
   let specs = Typing.tt_program Typing.Env.empty specs in
   specs
 
+(* FIXME: Duplicated from circuit.ml *)
+let split_at_arr (type t) (n: int) (r: t array) : t array * t array =
+  Array.sub r 0 n, Array.right r (Array.length r - n)
+
 (* ==================================================================== *)
 module Env : sig
   type env
@@ -64,7 +68,7 @@ type env = Env.env
 (* ==================================================================== *)
 let circuit_of_specification (rs : reg list) (p : adef) : reg =
   assert (List.length rs = List.length p.arguments);
-  assert (List.for_all2 (fun r (_, `W n) -> List.length r = n) rs p.arguments);
+  assert (List.for_all2 (fun r (_, `W n) -> Array.length r = n) rs p.arguments);
 
   let rec of_expr_ (env : env) (e : aexpr) : reg =
     match e.node with
@@ -108,7 +112,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
         | `S, `Ge -> Circuit.sge e1 e2
         | `U, `Gt -> Circuit.ugt e1 e2
         | `U, `Ge -> Circuit.uge e1 e2
-      in [c]
+      in [|c|]
 
     | ENot (_, e) ->
       Circuit.lnot_ (of_expr env e)
@@ -154,7 +158,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       let e = of_expr env e in
       let offset = offset * scale in
       let size = size * scale in
-      List.take size (List.drop offset e)
+      Array.sub e offset size
 
     | ESlice (e, (offset, size, scale)) ->
       let lgscale = Circuit.log2 scale in
@@ -163,19 +167,19 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       let e = of_expr env e in
       let offset = of_expr env offset in
 
-      let offset = List.make lgscale Aig.false_ @ offset in
+      let offset = Array.append (Array.make lgscale Aig.false_) offset in
       let size = size * scale in
 
-      List.take size (Circuit.lsr_ e offset)
+      Array.left (Circuit.lsr_ e offset) size
 
     | EAssign (e, ({ node = EInt offset }, size, scale), v) ->
       let e = of_expr env e in
       let v = of_expr env v in
       let offset = offset * scale in
       let size = size * scale in
-      let pre, e = List.split_at offset e in
-      let e, post = List.split_at size e in
-      pre @ v @ post
+      let pre, e = split_at_arr offset e in 
+      let e, post = split_at_arr size e in
+      Array.append pre (Array.append v post)
 
     | EAssign (e, (offset, size, scale), v) ->
       let esz = atype_as_aword e.type_ in
@@ -187,10 +191,10 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       let offset = of_expr env offset in
       let v = of_expr env v in
 
-      let offset = List.make lgscale Aig.false_ @ offset in
+      let offset = Array.append (Array.make lgscale Aig.false_) offset in
       let size = size * scale in
 
-      let m = List.make size Aig.true_ in
+      let m = Array.make size Aig.true_ in
       let m = Circuit.uextend ~size:esz m in
       let m = Circuit.lnot_ (Circuit.lsl_ m offset) in
 
@@ -200,23 +204,23 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       Circuit.lor_ (Circuit.land_ e m) v
 
     | EConcat (_, es) ->
-      List.flatten (List.map (of_expr env) es)
+      Array.reduce Array.append (List.map (of_expr env) es |> Array.of_list)
 
     | ERepeat (_, (e, n)) ->
-      List.flatten (List.make n (of_expr env e))
+      Array.reduce Array.append (Array.make n (of_expr env e))
 
     | EMap ((`W n, _), (a, f), es) ->
       let anames = List.map fst a in
       let es = List.map (of_expr env) es in
-      let es = List.map (Circuit.explode ~size:n) es in
-      let es = List.transpose es in
+      let es = List.map (Circuit.explode ~size:n %> Array.to_list) es in
+      let es = List.transpose es |> Array.of_list in
 
-      let es = es |> List.map (fun es ->
+      let es = es |> Array.map (fun es ->
           let env = Env.Var.bindall env (List.combine anames es) in
           of_expr env f
         )
 
-      in List.flatten es
+      in Array.reduce Array.append es
 
     | EApp (f, args) ->
       let a, f = Env.Fun.get env f in
@@ -255,8 +259,8 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
     begin
       match e.type_ with
       | `W n ->
-        if List.length r <> n then begin
-          Format.eprintf "%d %d@." (List.length r) n;
+        if Array.length r <> n then begin
+          Format.eprintf "%d %d@." (Array.length r) n;
           Format.eprintf "%a@."
             (Yojson.Safe.pretty_print ~std:true)
             (Ast.aexpr_to_yojson e);

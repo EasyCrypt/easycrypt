@@ -205,29 +205,19 @@ module LospecsBack : CBackend = struct
   let node_of_reg : reg -> node = fun x -> x.(0)
 
   let reg_of_zint ~(size: int) (v: zint) : reg = 
-    Array.of_list (C.of_bigint_all ~size (to_zt v))
+    C.of_bigint_all ~size (to_zt v)
 
   let bool_array_of_reg (r: reg) : bool array = 
-    Array.map (fun r -> 
-      match (r :> C.node) with 
-      | { gate = False; id } when id > 0 -> false
-      | { gate = False; id } when id < 0 -> true
-      | _ -> raise NonConstantCircuit 
-    ) r
-
-  let bool_list_of_reg (r: reg) : bool list = 
-    List.init (Array.length r) (fun i -> 
-      match r.(i) with 
-      | { gate = False; id } when id > 0 -> false
-      | { gate = False; id } when id < 0 -> true
-      | _ -> raise NonConstantCircuit
-    )
+    C.bools_of_reg r
+    
+  let bool_list_of_reg (r: reg) =
+    C.bool_list_of_reg r
 
   let szint_of_reg (r: reg) : zint = 
-    bool_list_of_reg r |> C.sbigint_of_bools |> of_zt 
+    C.bools_of_reg r |> C.sbigint_of_bools |> of_zt 
 
   let uzint_of_reg (r: reg) : zint = 
-    bool_list_of_reg r |> C.ubigint_of_bools |> of_zt
+    C.bools_of_reg r |> C.ubigint_of_bools |> of_zt
     
   let node_eq (n1: node) (n2: node) = C.xnor n1 n2
   let reg_eq (r1: reg) (r2: reg) = 
@@ -241,7 +231,7 @@ module LospecsBack : CBackend = struct
   let equiv ?(inps: inp list option) ~(pcond: node) (r1: reg) (r2: reg) : bool = 
     let open HL in
     let module BWZ = (val makeBWZinterface ()) in
-    BWZ.circ_equiv ?inps (node_list_of_reg r1) (node_list_of_reg r2) pcond  
+    BWZ.circ_equiv ?inps r1 r1 pcond  
 
   let sat ?(inps: inp list option) (n: node) : bool =
     let open HL in
@@ -298,47 +288,46 @@ module LospecsBack : CBackend = struct
     fun r -> Array.map (C.map map_) r
 
   let circuit_from_spec (def: Lospecs.Ast.adef) (args: reg list) : reg = 
-    let args = List.map node_list_of_reg args in
-    reg_of_node_list (C.circuit_of_specification args def)
+    C.circuit_of_specification args def
 
   (* SMTLib Base Ops *)
-  let add (r1: reg) (r2: reg) : reg = C.add_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let sub (r1: reg) (r2: reg) : reg = C.sub_dropc (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let opp (r: reg) : reg = C.opp (Array.to_list r) |> Array.of_list
-  let mul (r1: reg) (r2: reg) : reg = C.umull (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let udiv (r1: reg) (r2: reg) : reg = C.udiv (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let sdiv (r1: reg) (r2: reg) : reg = C.sdiv (Array.to_list r1) (Array.to_list r2) |> Array.of_list
+  let add (r1: reg) (r2: reg) : reg = C.add_dropc r1 r2 
+  let sub (r1: reg) (r2: reg) : reg = C.sub_dropc r1 r2 
+  let opp (r: reg) : reg = C.opp r 
+  let mul (r1: reg) (r2: reg) : reg = C.umull r1 r2 
+  let udiv (r1: reg) (r2: reg) : reg = C.udiv r1 r2 
+  let sdiv (r1: reg) (r2: reg) : reg = C.sdiv r1 r2 
   (* FIXME: mod or rem here? *)
-  let umod (r1: reg) (r2: reg) : reg  = C.umod (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let smod (r1: reg) (r2: reg) : reg = C.smod (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let lshl (r1: reg) (r2: reg) : reg = C.shift ~side:`L ~sign:`L (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let lshr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`L  (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let ashr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`A  (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let rol (r1: reg) (r2: reg) : reg = C.rol (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let ror (r1: reg) (r2: reg) : reg = C.ror (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let land_ (r1: reg) (r2: reg) : reg = C.land_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let lor_ (r1: reg) (r2: reg) : reg = C.lor_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let lxor_ (r1: reg) (r2: reg) : reg = C.lxor_ (Array.to_list r1) (Array.to_list r2) |> Array.of_list
-  let lnot_ (r1: reg) : reg  = C.lnot_ (Array.to_list r1) |> Array.of_list
-  let ult (r1: reg) (r2: reg) : node = C.ugt (Array.to_list r2) (Array.to_list r1) 
-  let slt (r1: reg) (r2: reg) : node = C.sgt (Array.to_list r2) (Array.to_list r1)
-  let ule (r1: reg) (r2: reg) : node = C.uge (Array.to_list r2) (Array.to_list r1)
-  let sle (r1: reg) (r2: reg) : node = C.sge (Array.to_list r2) (Array.to_list r1)
-  let uext (r1: reg) (size: int) : reg = C.uextend ~size (Array.to_list r1) |> Array.of_list
-  let sext (r1: reg) (size: int) : reg = C.sextend ~size (Array.to_list r1) |> Array.of_list
+  let umod (r1: reg) (r2: reg) : reg  = C.umod r1 r2 
+  let smod (r1: reg) (r2: reg) : reg = C.smod r1 r2 
+  let lshl (r1: reg) (r2: reg) : reg = C.shift ~side:`L ~sign:`L r1 r2 
+  let lshr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`L  r1 r2 
+  let ashr (r1: reg) (r2: reg) : reg = C.shift ~side:`R ~sign:`A  r1 r2 
+  let rol (r1: reg) (r2: reg) : reg = C.rol r1 r2 
+  let ror (r1: reg) (r2: reg) : reg = C.ror r1 r2 
+  let land_ (r1: reg) (r2: reg) : reg = C.land_ r1 r2 
+  let lor_ (r1: reg) (r2: reg) : reg = C.lor_ r1 r2 
+  let lxor_ (r1: reg) (r2: reg) : reg = C.lxor_ r1 r2 
+  let lnot_ (r1: reg) : reg  = C.lnot_ r1 
+  let ult (r1: reg) (r2: reg) : node = C.ugt r2 r1 
+  let slt (r1: reg) (r2: reg) : node = C.sgt r2 r1
+  let ule (r1: reg) (r2: reg) : node = C.uge r2 r1
+  let sle (r1: reg) (r2: reg) : node = C.sge r2 r1
+  let uext (r1: reg) (size: int) : reg = C.uextend ~size r1 
+  let sext (r1: reg) (size: int) : reg = C.sextend ~size r1 
   let trunc (r1: reg) (size: int) : reg = Array.sub r1 0 size  
   let concat (r1: reg) (r2: reg) : reg = Array.append r1 r2 
   let flatten (rs: reg list) : reg = Array.concat rs
 
   let reg_to_file ~(input_count: int) ?(inp_name_map: (int -> string) option) ~(name: string) (r: reg) : symbol =
-    C.write_aiger_bin_temp ~input_count ?inp_name_map ~name (node_list_of_reg r)
+    C.write_aiger_bin_temp ~input_count ?inp_name_map ~name r 
 
   module Deps = struct 
     type dep = (int, int Set.t) Map.t
     type deps = dep array
     type block_deps = (int * dep) array
 
-    let deps_of_reg = fun r -> HL.deps (node_list_of_reg r)
+    let deps_of_reg = fun r -> HL.deps r
     let block_deps_of_deps (w: int) (d: deps) : block_deps = 
       assert (Array.length d mod w = 0);
       Array.init (Array.length d / w) (fun i ->
@@ -476,7 +465,7 @@ module LospecsBack : CBackend = struct
     let rename_inputs (renamer: (int * int) -> (int * int) option) (r: reg) : reg =
       C.maps (fun (id, b) -> 
         Option.map (fun (id, b) -> input_node ~id b) (renamer (id, b)) 
-      ) (node_list_of_reg r) |> (reg_of_node_list)
+      ) r 
 
   end
 end

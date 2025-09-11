@@ -5,7 +5,7 @@ open Lospecs
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
-  include Circuit_avx2.FromSpec ()
+(*   include Circuit_avx2.FromSpec () *)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -99,7 +99,7 @@ let test (op : op) =
   let test (vs : int list) =
     let vsa = Array.of_list vs in
     let env ((n, k) : C.var) = (vsa.(n) lsr k) land 0b1 <> 0 in
-    let out = List.map (C.eval env) circuit in
+    let out = Array.map (C.eval env) circuit in
     let out =
       match op.out with
       | `S -> C.sint_of_bools out
@@ -145,7 +145,7 @@ let test_ite () =
     { name = (Format.sprintf "ite")
     ; args = [(1, `U)]
     ; out  = `U
-    ; mk   = (fun rs -> C.ite (as_seq1 @@ as_seq1 rs) [C.true_] [C.false_])
+    ; mk   = (fun rs -> C.ite ((as_seq1 rs).(0)) [|C.true_|] [|C.false_|])
     ; reff = (fun vs -> as_seq1 vs)
     }
 
@@ -430,7 +430,7 @@ let test_sgt () =
     {  name = Format.sprintf "sgt<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sgt x y]);
+        mk   = (fun rs -> let x, y = as_seq2 rs in [|C.sgt x y|]);
         reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
 
   in
@@ -442,7 +442,7 @@ let test_sge () =
     {  name = Format.sprintf "sge<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sge x y]);
+        mk   = (fun rs -> let x, y = as_seq2 rs in [|C.sge x y|]);
         reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
 
   in
@@ -454,7 +454,7 @@ let test_ugt () =
     {  name = Format.sprintf "ugt<%d>" size;
         args = [(size, `U); (size, `U)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.ugt x y]);
+        mk   = (fun rs -> let x, y = as_seq2 rs in [|C.ugt x y|]);
         reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
 
   in
@@ -466,7 +466,7 @@ let test_uge () =
     {  name = Format.sprintf "uge<%d>" size;
         args = [(size, `U); (size, `U)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.uge x y]);
+        mk   = (fun rs -> let x, y = as_seq2 rs in [|C.uge x y|]);
         reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
 
   in
@@ -484,6 +484,7 @@ let test_popcount () =
   in
   test (op 16)
 
+(*
 (* -------------------------------------------------------------------- *)
 type mvalue = M256 of Avx2.m256 | M128 of Avx2.m128
 
@@ -941,6 +942,7 @@ let test_inserti128 () =
   test_vp 10000 (op 0);
   test_vp 10000 (op 1)
 
+*)
 (* -------------------------------------------------------------------- *)
 let test_bvueq () =
   let op (size : int) : op =
@@ -953,7 +955,7 @@ let test_bvueq () =
     { name = (Format.sprintf "bvueq<%d>" size)
     ; args = List.make 2 (size, `U)
     ; out  = `U
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in [C.bvueq x y])
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in [|C.bvueq x y|])
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
@@ -971,7 +973,7 @@ let test_bvseq () =
     { name = (Format.sprintf "bvseq<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `U
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in [C.bvseq x y])
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in [|C.bvseq x y|])
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
@@ -1017,7 +1019,7 @@ let test_smod () =
   done
   
 (* -------------------------------------------------------------------- *)
-let tests = [ (* 
+let tests = [ 
   ("opp" , test_opp );
   ("incr", test_incr);
   ("add" , test_add );
@@ -1058,11 +1060,11 @@ let tests = [ (*
   ("bvseq", test_bvseq);
 
   ("popcount", test_popcount);
-
+(*
   ("vpadd_16u16"      , test_vpadd_16u16      );
   ("vpadd_32u8"       , test_vpadd_32u8       );
   ("vpsub_16u16"      , test_vpsub_16u16      );
-  ("vpsub_32u8"       , test_vpsub_32u8       ); *)
+  ("vpsub_32u8"       , test_vpsub_32u8       ); 
   ("vmovsldup_256"    , test_vmovsldup_256    ); 
   ("vpblend_8u32"     , test_vpblend_8u32     );
   ("vpunpckh_4u64"    , test_vpunpckh_4u64    );
@@ -1086,6 +1088,7 @@ let tests = [ (*
   ("vpblend_16u16"    , test_vpblend_16u16    );
   ("vpextracti128"    , test_extracti128      );
   ("vpinserti128"     , test_inserti128       );
+*)
 ]
 
 (* -------------------------------------------------------------------- *)

@@ -5,25 +5,29 @@ open Aig
 val log2 : int -> int
 
 (* ==================================================================== *)
-val explode : size:int -> 'a list -> 'a list list
+val explode : size:int -> 'a array -> 'a array array
 
 (* ==================================================================== *)
-val sint_of_bools : bool list -> int
+val sint_of_bools : bool array -> int
 
-val uint_of_bools : bool list -> int
+val uint_of_bools : bool array -> int
 
-val bytes_of_bools : bool list -> bytes
+val bytes_of_bools : bool array -> bytes
 
-val ubigint_of_bools : bool list -> Z.t
+val ubigint_of_bools : bool array -> Z.t
 
-val sbigint_of_bools : bool list -> Z.t
+val sbigint_of_bools : bool array -> Z.t
+
+val bools_of_reg : reg -> bool array
+
+val bool_list_of_reg : reg -> bool list
 
 (* ==================================================================== *)
 val of_int : size:int -> int -> reg
 
 val of_bigint : size:int -> Z.t -> reg
 
-val of_int32s : int32 list -> reg
+val of_int32s : int32 array -> reg
 
 (* ==================================================================== *)
 val w8 : int -> reg
@@ -43,7 +47,7 @@ val mux2 : node -> node -> node -> node
 
 val mux2_reg : reg -> reg -> node -> reg
 
-val mux_reg : (node * reg) list -> reg -> reg
+val mux_reg : (node * reg) array -> reg -> reg
 
 val ite : node -> reg -> reg -> reg
 
@@ -66,9 +70,9 @@ val lxor_ : reg -> reg -> reg
 
 val lxnor_ : reg -> reg -> reg
 
-val ors : node list -> node
+val ors : node array -> node
 
-val ands : node list -> node
+val ands : node array -> node
 
 (* ==================================================================== *)
 val arshift : offset:int -> reg -> reg

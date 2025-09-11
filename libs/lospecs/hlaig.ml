@@ -58,7 +58,7 @@ end
 (* Assumes circuit inputs have already been appropriately renamed *)
 module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
   let circ_equiv ?(inps: (int * int) list option) (r1 : Aig.reg) (r2 : Aig.reg) (pcond : Aig.node) : bool =
-    if not ((List.compare_length_with r1 0 > 0) && (List.compare_length_with r2 0 > 0)) then
+    if not ((Array.length r1 > 0) && (Array.length r2 > 0)) then
       (Format.eprintf "Sizes differ in circ_equiv"; false)
     else
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
@@ -95,7 +95,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     in 
   
     let bvterm_of_reg (r: Aig.reg) : _ =
-      List.map bvterm_of_node r |> Array.of_list |> Array.rev |> Array.reduce (SMT.bvterm_concat)
+      Array.map bvterm_of_node r |> Array.reduce (fun acc b -> SMT.bvterm_concat b acc)
     in 
 
     let bvinpt1 = (bvterm_of_reg r1) in
@@ -304,7 +304,7 @@ let rec inputs_of_node : _ -> Aig.var Set.t =
 
 (* ------------------------------------------------------------------------------- *)
 let inputs_of_reg (r : Aig.reg) : Aig.var Set.t =
-  List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
+  Array.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
 
 (* ==================================================================== *)
 let rec dep : _ -> tdeps = 
@@ -327,7 +327,7 @@ let rec dep : _ -> tdeps =
   in fun n -> doit n
 
 let deps (n: reg) : tdeps array = 
-  List.map dep n |> Array.of_list
+  Array.map dep n 
 
 let block_deps (d: tdeps array) : tdblock list =
   let drop_while_count (f: 'a -> bool) (l: 'a list) : int * ('a list) =
@@ -452,6 +452,6 @@ let pp_bdeps ?(oname="") ?(namer=string_of_int) (fmt: Format.formatter) (bs: tdb
 
 (* -------------------------------------------------------------------- *)
 let zpad (n: int) (r: Aig.reg)  = 
-  if List.length r < n then
-    List.append r (List.init (n - (List.length r)) (fun _ -> Aig.false_))
+  if Array.length r < n then
+    Array.append r (Array.init (n - (Array.length r)) (fun _ -> Aig.false_))
   else r

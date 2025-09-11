@@ -26,7 +26,7 @@ let fresh =
   fun () -> incr counter; !counter
 
 (* -------------------------------------------------------------------- *)
-type reg = node list
+type reg = node array
 [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
@@ -178,13 +178,13 @@ let map (env : var -> node option) : node -> node =
 
 (* -------------------------------------------------------------------- *)
 let maps (env : var -> node option) : reg -> reg =
-  fun r -> List.map (map env) r
+  fun r -> Array.map (map env) r
 
 (* ==================================================================== *)
 let equivs (inputs : (var * var) list) (c1 : reg) (c2 : reg) : bool =
   let inputs = Map.of_seq (List.to_seq inputs) in
   let env (v : var) = Option.map input (Map.find_opt v inputs) in
-  List.for_all2 (==) (maps env c1) c2
+  Array.for_all2 (==) (maps env c1) c2
 
 (* ==================================================================== *)
 let eval (env : var -> bool) =
@@ -334,7 +334,7 @@ let deps (r : reg) =
     | _ ->
       out := ((hi, hi), dhi) :: !out in
 
-  List.iteri push (List.map (deps_ ()) r);
+  Array.iteri push (Array.map (deps_ ()) r);
   !out
     |> List.rev_map (fun (r, vs) ->
          let vs =
@@ -371,7 +371,7 @@ let aiger_preprocess ~(input_count: int) (r: reg) : (node -> int) * (node list) 
         !count_and
   in
 
-  List.iter doit r;
+  Array.iter doit r;
   let and_cnt = !count_and in
   let inp_cnt = input_count in
   let id_map = 
@@ -425,10 +425,10 @@ let write_aiger_bin
   (r: reg) =
   let aiger_id_of_node, and_gates, (mvi, agc, igc) = aiger_preprocess ~input_count r in
 
-  let ogc = List.length r in
+  let ogc = Array.length r in
   let lgc = 0 in
   Printf.fprintf oc "aig %d %d %d %d %d\n" mvi igc lgc ogc agc;
-  List.iter (fun n -> Printf.fprintf oc "%d\n" (aiger_id_of_node n)) r;
+  Array.iter (fun n -> Printf.fprintf oc "%d\n" (aiger_id_of_node n)) r;
   List.iter (function 
     | { gate = And (n1, n2); } as n -> 
         let id  = aiger_id_of_node n  in
@@ -670,6 +670,6 @@ let load (inp : IO.input) : reg * (Set.String.t * string array) option =
   in
 
   (* Construct network *)
-  List.map (fun (b, i) ->
+  Array.map (fun (b, i) ->
     if b then (Map.find i gates).neg else Map.find i gates
-  ) (Array.to_list outputs), ainputs
+  ) outputs, ainputs
