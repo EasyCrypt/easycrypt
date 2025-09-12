@@ -747,6 +747,8 @@ type phltactic =
   | Pkill          of (oside * pcodepos * int option)
   | Pasgncase      of (oside * pcodepos)
   | Prnd           of oside * psemrndpos option * rnd_tac_info_f
+  | Prndcoupling   of pformula
+  | Prndp          of pformula
   | Prndsem        of bool * oside * pcodepos1
   | Palias         of (oside * pcodepos * osymbol_r)
   | Pweakmem       of (oside * psymbol * fun_params)
