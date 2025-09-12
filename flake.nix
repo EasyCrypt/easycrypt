@@ -4,22 +4,23 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/24.05";
-    stable.url = "github:nixos/nixpkgs/24.05";
+    nixpkgs.url = "github:nixos/nixpkgs/release-24.11";
+    stable.url = "github:nixos/nixpkgs/release-24.11";
     nixpkgs.follows = "opam-nix/nixpkgs";
+    emacs-overlay.url = "github:nix-community/emacs-overlay";
 
     prover_cvc4_1_8 = {
       url = "github:CVC4/CVC4-archived/1.8";
       flake = false;
     };
 
-    prover_cvc5_1_0_9 = {
-      url = "github:cvc5/cvc5/cvc5-1.0.9";
+    prover_cvc5_1_3_0 = {
+      url = "github:cvc5/cvc5/cvc5-1.3.0";
       flake = false;
     };
 
-    prover_z3_4_12_6 = {
-      url = "github:z3prover/z3/z3-4.12.6";
+    prover_z3_4_14_1 = {
+      url = "github:z3prover/z3/z3-4.14.1";
       flake = false;
     };
   };
@@ -40,7 +41,7 @@
         };
 
         query = devPackagesQuery // {
-          ocaml-base-compiler = "4.14.2";
+          ocaml-base-compiler = "4.14.1";
         };
 
         scope = on.buildOpamProject' { } ./. query;
@@ -54,9 +55,23 @@
             '';
             doNixSupport = false;
           });
-          conf-pkg-config = prev.conf-pkg-config.overrideAttrs (oa: {
-            nativeBuildInputs = oa.nativeBuildInputs ++ [pkgs.pkg-config];
+	  conf-zlib = prev.conf-zlib.overrideAttrs (finalAttrs: prevAttrs: rec {
+            nativeBuildInputs = prevAttrs.nativeBuildInputs 
+              ++ (with pkgs; [ pkg-config ]);
           });
+          conf-git = prev.conf-git.overrideAttrs (finalAttrs: prevAttrs: rec {
+            nativeBuildInputs = prevAttrs.nativeBuildInputs
+              ++ (with pkgs; [ git ]);
+            buildInputs = prevAttrs.buildInputs
+              ++ (with pkgs; [ git ]);
+          });
+          alt-ergo = prev.alt-ergo.overrideAttrs (finalAttrs: prevAttrs: rec {
+            nativeBuildInputs = prevAttrs.nativeBuildInputs
+            ++ (with pkgs; [ darwin.sigtool ]);
+          });
+	  frama-c = prev.frama-c.overrideAttrs (finalAttrs: prevAttrs: rec {
+	    configureFlags = (prevAttrs.configureFlags or []) ++  ["--prefix=${prev.frama-c}/lib"];
+	  });
         };
 
         scope' = scope.overrideScope overlay;
@@ -78,16 +93,37 @@
             src = inputs."${"prover_" + pkg + "_" + builtins.replaceStrings ["."] ["_"] version}";
           });
 
-        mkAltErgo = version:
-          ((on.queryToScope { } (query // { alt-ergo = version; })).overrideScope overlay).alt-ergo;
+        mkAltErgo = version: (on.queryToScope { } (query // { alt-ergo = version; })).alt-ergo;
+
+        devTools = 
+	  (let 
+	    overlays = [ (import inputs.emacs-overlay) ];
+	    pkgs = import nixpkgs {
+	      inherit system overlays;
+	    };
+	  in
+	    (with pkgs; [
+	      (emacsWithPackagesFromUsePackage {
+		config = ''(setq easycrypt-prog-name "ec.native")'';
+		defaultInitFile = true;
+		alwaysEnsure = true;
+		package = pkgs.emacs;
+		extraEmacsPackages = epkgs: [ epkgs.proof-general ];
+	      })
+	      bashInteractive
+	      
+	    ])
+	    ++
+	    pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [ pkgs.pperf-tools ]
+	);
       in rec {
         legacyPackages = scope';
 
         packages = rec {
-          z3 = mkProverPackage "z3" "4.12.6";
+          z3 = mkProverPackage "z3" "4.14.1";
           cvc4 = mkProverPackage "cvc4" "1.8";
-          cvc5 = mkProverPackage "cvc5" "1.0.9";
-          altErgo = mkAltErgo "2.4.3";
+          cvc5 = mkProverPackage "cvc5" "1.3.0";
+          altErgo = mkAltErgo "2.4.2";
 
           provers = pkgs.symlinkJoin {
             name = "provers";
@@ -102,12 +138,42 @@
           default = main;
         };
 
-        devShells.default = pkgs.mkShell {
+        devShells.barebones = pkgs.mkShell {
           inputsFrom = [ scope'.easycrypt ];
           buildInputs =
-              devPackages
-           ++ [ pkgs.git scope'.why3 packages.provers ]
-           ++ (with pkgs.python3Packages; [ pyyaml ]);
+            devPackages
+            ++ [ scope'.why3 ]
+            ++ (with pkgs.python3Packages; [ pyyaml ]);
         };
+
+	devShells.noProvers = pkgs.mkShell rec {
+	  inputsFrom = [ scope'.easycrypt ];
+	  buildInputs = 
+	     devPackages
+	  ++ devTools
+	  ++ (with pkgs; [ git difftastic ])
+	  ++ [ scope'.why3 ]
+	  ++ (with pkgs.python3Packages; [ pyyaml ]);
+	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
+	  shellHook = builtins.replaceStrings ["\n"] [" "] ''
+	    export SHELL=${SHELL} &&
+	    export PATH=$PATH:`realpath .`
+	  '';
+	};
+
+	devShells.withDevTools = pkgs.mkShell rec {
+	  inputsFrom = [ scope'.easycrypt ];
+	  buildInputs = 
+	     devPackages
+ 	  ++ devTools
+	  ++ (with pkgs; [ git ]) 
+	  ++ [ scope'.why3 packages.provers ]
+	  ++ (with pkgs.python3Packages; [ pyyaml ]);
+	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
+	  shellHook = builtins.replaceStrings ["\n"] [" "] ''
+	    export SHELL=${SHELL} &&
+	    export PATH=$PATH:`realpath .`
+	  '';
+	};
       });
 }
