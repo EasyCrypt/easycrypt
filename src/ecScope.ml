@@ -2479,7 +2479,8 @@ module Circuit = struct
                 |> List.map (fun name -> (name, (Some (loced (Ptry (loced (Pby None)))), `Alias, false)))
                 |> Msym.of_list;
             ev_global  = 
-              [ (None, None)
+              (* FIXME PR: get this to work *)
+              [ (Some (loced (Pby None)), Some [`Include, "bydone"])
               ; (None, None) ]; } } in
 
     let npath = EcPath.pqname (EcEnv.root env) clone.name in

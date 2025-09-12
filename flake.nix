@@ -111,7 +111,8 @@
 		extraEmacsPackages = epkgs: [ epkgs.proof-general ];
 	      })
 	      bashInteractive
-	      
+	      git 
+	      difftastic
 	    ])
 	    ++
 	    pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [ pkgs.pperf-tools ]
@@ -127,7 +128,12 @@
 
           provers = pkgs.symlinkJoin {
             name = "provers";
-            paths = [ altErgo z3 cvc4 cvc5 ];
+            paths = [ 
+	    #  altErgo 
+	      z3 
+	    #  cvc4 
+	      cvc5 
+	    ];
           };
 
           with_provers = pkgs.symlinkJoin {
@@ -151,7 +157,6 @@
 	  buildInputs = 
 	     devPackages
 	  ++ devTools
-	  ++ (with pkgs; [ git difftastic ])
 	  ++ [ scope'.why3 ]
 	  ++ (with pkgs.python3Packages; [ pyyaml ]);
 	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
@@ -166,7 +171,6 @@
 	  buildInputs = 
 	     devPackages
  	  ++ devTools
-	  ++ (with pkgs; [ git ]) 
 	  ++ [ scope'.why3 packages.provers ]
 	  ++ (with pkgs.python3Packages; [ pyyaml ]);
 	  SHELL = ''${pkgs.bashInteractive + "/bin/bash"}'';
