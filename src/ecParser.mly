@@ -45,11 +45,30 @@
   let pfapp_symb loc s ti es =
     PFapp(mk_pfid_symb loc s ti, es)
 
-  let pfget loc ti e1 e2    =
-    pfapp_symb loc EcCoreLib.s_get ti [e1;e2]
+  let pfget
+    (lc    : EcLocation.t)
+    (ti    : ptyannot option)
+    (codom : pty option)
+    (map   : pformula)
+    (k     : pformula)
+  =
+    ofold
+        (fun codom map -> PFcast (mk_loc lc map, codom))
+        (pfapp_symb lc EcCoreLib.s_get ti [map; k])
+        codom
 
-  let pfset loc ti e1 e2 e3 =
-    pfapp_symb loc EcCoreLib.s_set ti [e1;e2;e3]
+  let pfset
+    (lc    : EcLocation.t)
+    (ti    : ptyannot option)
+    (codom : pty option)
+    (map   : pformula)
+    (k     : pformula)
+    (v     : pformula)
+  =
+    let v =
+        ofold (fun codom v -> mk_loc (loc v) (PFcast (v, codom)))
+        v codom
+    in pfapp_symb lc EcCoreLib.s_set ti [map; k; v]
 
   let pf_nil loc ti =
     mk_pfid_symb loc EcCoreLib.s_nil ti
@@ -114,15 +133,12 @@
             fp_args = []; }) info
 
   (* ------------------------------------------------------------------ *)
-  let locality_as_local (lc : locality located) =
+  let locality_as_local (lc : EcTypes.locality located) =
     match unloc lc with
     | `Global  -> `Global
     | `Local   -> `Local
     | `Declare -> parse_error (loc lc)
                    (Some "cannot mark with 'declare' this kind of objects ")
-
-  let bool_as_local b =
-    if b then `Local else `Global
 
   (* ------------------------------------------------------------------ *)
   type prover =
@@ -451,6 +467,7 @@
 %token FWDS
 %token GEN
 %token GLOB
+%token GLOBAL
 %token GOAL
 %token HAT
 %token HAVE
@@ -669,6 +686,7 @@ _lident:
 | CHECK      { "check"      }
 | EDIT       { "edit"       }
 | FIX        { "fix"        }
+| GLOBAL     { "global"     }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1066,15 +1084,19 @@ sform_u(P):
 | x=mident
    { PFmem x }
 
-| se=sform_r(P) DLBRACKET ti=tvars_app? e=loc(plist1(form_r(P), COMMA)) RBRACKET
+| se=sform_r(P) DLBRACKET
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e=loc(plist1(form_r(P), COMMA))
+  RBRACKET
    { let e = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e) (unloc e) in
-     pfget (EcLocation.make $startpos $endpos) ti se e }
+     pfget (EcLocation.make $startpos $endpos) ti codom se e }
 
 | se=sform_r(P) DLBRACKET
-    ti=tvars_app? e1=loc(plist1(form_r(P), COMMA))LARROW e2=form_r(P)
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e1=loc(plist1(form_r(P), COMMA)) LARROW e2=form_r(P)
   RBRACKET
    { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e1) (unloc e1) in
-     pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
+     pfset (EcLocation.make $startpos $endpos) ti codom se e1 e2 }
 
 | x=sform_r(P) s=pside_force
    { PFside (x, s) }
@@ -1309,8 +1331,11 @@ lvalue_u:
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=lvalue_var DLBRACKET ti=tvars_app? e=plist1(expr, COMMA) RBRACKET
-   { PLvMap (x, ti, e) }
+| x=lvalue_var DLBRACKET
+    ti=tvars_app? codom=prefix(COLON, paren(loc(type_exp)))?
+    e=plist1(expr, COMMA)
+  RBRACKET
+   { PLvMap (x, ti, codom, e) }
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
@@ -1997,7 +2022,7 @@ theory_clear_items:
 | xs=theory_clear_item1* { xs }
 
 theory_open:
-| loca=is_local b=boption(ABSTRACT) THEORY x=uident
+| loca=is_local b=iboption(ABSTRACT) THEORY x=uident
     { (loca, b, x) }
 
 theory_close:
@@ -2917,8 +2942,9 @@ interleave_info:
    { (s, c1, c2 :: c3, k) }
 
 %inline outline_kind:
-| s=brace(stmt) { OKstmt(s) }
-| r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
+| BY s=brace(stmt) { OKstmt(s) }
+| TILD f=loc(fident) { OKproc(f, true) }
+| f=loc(fident) { OKproc(f, false) }
 
 %public phltactic:
 | PROC
@@ -2998,11 +3024,10 @@ interleave_info:
 | INLINE s=side? u=inlineopt? p=codepos
     { Pinline (`CodePos (s, u, p)) }
 
-| OUTLINE s=side LBRACKET st=codepos1 e=option(MINUS e=codepos1 {e}) RBRACKET k=outline_kind
+| OUTLINE s=side cpr=codepos_or_range k=outline_kind
     { Poutline {
 	  outline_side  = s;
-	  outline_start = st;
-	  outline_end   = odfl st e;
+	  outline_range = cpr;
 	  outline_kind  = k }
     }
 
@@ -3597,8 +3622,13 @@ tactic_dump:
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
+%inline local_type:
+ | (* empty *) { None }
+ | GLOBAL      { Some `Global }
+ | LOCAL       { Some `Local }
+
 theory_clone:
-| local=is_local CLONE options=clone_opts?
+| local=local_type CLONE options=clone_opts?
     ip=clone_import? x=uqident y=prefix(AS, uident)? cw=clone_with?
     c=or3(clone_proof, clone_rename, clone_clear)*
 
@@ -3754,6 +3784,13 @@ realize:
 
 | REALIZE x=qident BY bracket(empty)
     {  { pr_name = x; pr_proof = Some None; } }
+
+
+(* -------------------------------------------------------------------- *)
+(* Theory aliasing                                                      *)
+
+theory_alias: (* FIXME: THEORY ALIAS -> S/R conflict *)
+| THEORY name=uident EQ target=uqident { (name, target) }
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
@@ -3914,6 +3951,7 @@ global_action:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_clear     { GthClear     $1 }
+| theory_alias     { GthAlias     $1 }
 | module_import    { GModImport   $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }

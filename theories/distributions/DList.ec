@@ -185,7 +185,10 @@ case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
 rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
 rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
 elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
-rewrite !big_consT /#.
+rewrite !big_consT.
+move=> /= /> x_in_d all_in_d_xs y_in_d all_in_d_ys /addzI eq_size.
+rewrite (Hrec ys) //.
+by congr=> //; exact: Hu.
 qed.
 
 lemma dlist_dmap ['a 'b] (d : 'a distr) (f : 'a -> 'b) n :
@@ -199,7 +202,9 @@ qed.
 lemma dlist_rev (d:'a distr) n s:
   mu1 (dlist d n) (rev s) =  mu1 (dlist d n) s.
 proof.
-case (n <= 0) => [?|?]; first by rewrite !dlist0E //; 1:smt(revK).
+case (n <= 0) => [?|?].
++ rewrite !dlist0E // /pred1 /= -{1}rev_nil.
+  by congr; rewrite eq_iff; split=> />; exact: rev_inj.
 case (size s = n) => [<-|?]; 2: smt(dlist1E supp_dlist_size size_rev).
 by rewrite -{1}size_rev &(dlist_perm_eq) perm_eq_sym perm_eq_rev.
 qed.
@@ -381,7 +386,7 @@ abstract theory Program.
     rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
     rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
     wp; rnd.
-    outline {1} [1] rs <@ Sample.sample.
+    outline {1} 1 ~ Sample.sample.
     rewrite equiv[{1} 1 ih].
     inline.
     by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().
@@ -389,16 +394,9 @@ abstract theory Program.
 
   equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={n} ==> ={res}.
   proof.
-    proc*. transitivity{1} { r <@ Sample.sample(n);
-                             r <- rev r;            }
-                           (={n} ==> ={r})
-                           (={n} ==> ={r})=> //=; 1:smt().
+    proc*. 
+    replace* {1} { x } by { x; r <- rev r; }.
       inline *; wp; rnd rev; auto.
-      move=> &1 &2 ->>; split=> /= [*|t {t}]; 1: by rewrite revK.
-      split.
-        move=> r; rewrite -/(support _ _); case (0 <= n{2})=> sign_n.
-          rewrite !dlist1E // (size_rev r)=> ?;congr;apply eq_big_perm.
-          by apply perm_eqP=> ?;rewrite count_rev. smt(dlist_rev).
       smt(revK dlist_rev).
     rewrite equiv[{1} 1 Sample_Loop_eq].
     inline *; wp; while (={i, n0} /\ rev l{1} = l{2}); auto => />.

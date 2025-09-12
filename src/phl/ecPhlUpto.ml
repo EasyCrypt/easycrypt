@@ -36,11 +36,62 @@ let check_not_bad env bad lv =
   | LvVar _ -> not (is_lv_bad env bad lv)
   | LvTuple xs -> not (List.exists (fun xt -> is_lv_bad env bad (LvVar xt)) xs)
 
+
+exception BadAssign of xpath option * instr
+
+let badassign i env bad lv =
+  if not (check_not_bad env bad lv) then raise (BadAssign (None, i))
+
+let rec check_bad_true env bad s =
+  match s with
+  | [] -> ()
+  | i :: c ->
+    begin match i.i_node with
+    | Sasgn (lv, e) ->
+       if not (is_bad_true env bad lv e) then badassign i env bad lv
+    | Srnd  (lv, _) ->
+      badassign i env bad lv
+    | Scall (lv, f, _) ->
+       oiter (badassign i env bad) lv;
+       check_f_bad_true env bad f
+    | Sif (_, c1, c2) ->
+      check_bad_true env bad c1.s_node;
+      check_bad_true env bad c2.s_node
+    | Swhile(_,c) ->
+      check_bad_true env bad c.s_node
+    | Smatch(_,bs) ->
+      let check_branch (_, s) = check_bad_true env bad s.s_node in
+      List.iter (check_branch) bs
+    | Sassert _ -> ()
+    | Sabstract _ -> ()
+    end;
+    check_bad_true env bad c
+
+and check_f_bad_true env bad f =
+  let f = NormMp.norm_xfun env f in
+  let fd = Fun.by_xpath f env in
+  match fd.f_def with
+  | FBalias _ -> assert false
+  | FBdef fd ->
+    begin
+      try check_bad_true env bad fd.f_body.s_node
+      with BadAssign (None, i) -> raise (BadAssign(Some f, i))
+    end
+  | FBabs o ->
+    oiter (fun bad ->
+      let fv = EcPV.PV.add env bad tbool EcPV.PV.empty in
+      EcPV.PV.check_depend env fv (m_functor f.x_top)) bad;
+    List.iter (check_f_bad_true env bad) (OI.allowed o)
+
 let rec s_upto_r env alpha bad s1 s2 =
   match s1, s2 with
   | [], [] -> true
-  | {i_node = Sasgn(x1, e1)} :: _, {i_node = Sasgn (x2, e2)} :: _ when
-          is_bad_true env bad x1 e1 && is_bad_true env bad x2 e2 -> true
+  | {i_node = Sasgn(x1, e1)} :: s1, {i_node = Sasgn (x2, e2)} :: s2 when
+          is_bad_true env bad x1 e1 && is_bad_true env bad x2 e2 ->
+      check_bad_true env bad s1;
+      check_bad_true env bad s2;
+      true
+
   | i1 :: s1, i2 :: s2 ->
     i_upto env alpha bad i1 i2 && s_upto_r env alpha bad s1 s2
   | _, _ -> false
@@ -64,12 +115,12 @@ and i_upto env alpha bad i1 i2 =
     f_upto env bad f1 f2
 
   | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
-    EqTest.for_expr env a1 a2 &&
+    EqTest.for_expr env ~alpha a1 a2 &&
     s_upto env alpha bad b1 b2 &&
     s_upto env alpha bad c1 c2
 
   | Swhile(a1,b1), Swhile(a2,b2) ->
-    EqTest.for_expr env a1 a2 &&
+    EqTest.for_expr env ~alpha a1 a2 &&
     s_upto env alpha bad b1 b2
 
   | Smatch(e1,bs1), Smatch(e2,bs2) when List.length bs1 = List.length bs2 -> begin
@@ -128,6 +179,8 @@ let rec s_upto_init env alpha bad s1 s2 =
   | [], [] -> true
   | {i_node = Sasgn(x1, e1)} :: s1, {i_node = Sasgn (x2, e2)} :: s2 when
           is_bad_false env (Some bad) x1 e1 && is_bad_false env (Some bad) x2 e2 ->
+      check_bad_true env (Some bad) s1;
+      check_bad_true env (Some bad) s2;
       s_upto_r env alpha (Some bad) s1 s2
   | i1 :: s1, i2 :: s2 ->
     i_upto env alpha None i1 i2 && s_upto_init env alpha bad s1 s2
@@ -148,7 +201,7 @@ let f_upto_init env bad f1 f2 =
     List.all2 check_param fd1.f_locals fd2.f_locals &&
     oall2 (EqTest.for_expr env) fd1.f_ret fd2.f_ret &&
     ( s_upto_init env alpha bad body1.s_node body2.s_node ||
-      s_upto      env alpha (Some bad) body1 body2)
+      s_upto      env alpha (Some bad) body1 body2 )
 
   | FBabs _, FBabs _ -> f_upto env (Some bad) f1 f2
 
@@ -184,8 +237,17 @@ let t_uptobad_r tc =
     with DestrError _ ->
       tc_error !!tc ~who:"byupto" "the event should have the form \"E /\ !bad\" or \"!bad\""
   in
-  if not (f_upto_init env bad pr1.pr_fun pr2.pr_fun) then
-      tc_error !!tc ~who:"byupto" "the two function are not equal upto bad";
+  begin match f_upto_init env bad pr1.pr_fun pr2.pr_fun with
+  | false -> tc_error !!tc ~who:"byupto" "the two functions are not equal upto bad"
+  | true -> ()
+  | exception BadAssign (f, i) ->
+      let ppenv = EcPrinting.PPEnv.ofenv env in
+      let pp_fun fmt = function
+       | None -> ()
+       | Some f -> Format.fprintf fmt " in function %a" (EcPrinting.pp_funname ppenv) f in
+      tc_error !!tc ~who:"byupto" "bad is assigned after being set to true%a, %a"
+        pp_fun f (EcPrinting.pp_instr ppenv) i
+  end;
   FApi.xmutate1 tc `HlUpto []
 
 let t_uptobad = FApi.t_low0 "upto-bad" t_uptobad_r

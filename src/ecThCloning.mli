@@ -60,7 +60,7 @@ type evclone = {
   evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
-  evc_ths      : evclone Msym.t;
+  evc_ths      : (evclone * bool) Msym.t;
 }
 
 and evlemma = {

@@ -86,7 +86,6 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       tyd_params   = EcUnify.UniEnv.tparams ue;
       tyd_type     = `Abstract EcPath.Sp.empty;
       tyd_loca     = lc;
-      tyd_resolve  = true;
       tyd_clinline = false;
     } in
       EcEnv.Ty.bind (unloc name) myself env

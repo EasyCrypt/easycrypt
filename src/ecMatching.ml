@@ -252,13 +252,20 @@ module Zipper = struct
 
   let zipper_of_cpos_range env cpr s =
     let top, bot = cpr in
-    let zpr = zipper_of_cpos env top s in
+    let zpr, (_, pos) = zipper_of_cpos_r env top s in
     match bot with
-    | `Base cp ->
-      let path = (zipper_of_cpos env cp s).z_path in
-      if path <> zpr.z_path then
+    | `Base cp -> begin
+      let zpr', (_, pos') = zipper_of_cpos_r env cp s in
+      (* The two positions should identify the same block *)
+      if zpr'.z_path <> zpr.z_path then
         raise InvalidCPos;
-      zpr, snd cp
+
+      (* The end position should be after the start *)
+      match pos, pos' with
+      | (_, `ByPos x), (_, `ByPos y) when x <= y ->
+          zpr, (0, `ByPos (y - x))
+      | _ -> raise InvalidCPos
+    end
     | `Offset cp1 -> zpr, cp1
 
   let split_at_cpos1 env cpos1 s =

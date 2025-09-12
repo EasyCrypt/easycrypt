@@ -50,8 +50,8 @@ and proof_state =
   PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
-  puc_visibility : EcDecl.ax_visibility;
-  puc_local      : bool;
+  puc_smt   : bool;
+  puc_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -120,7 +120,7 @@ module Ty : sig
 
   val add_subtype : scope -> psubtype located -> scope
   val add_class    : scope -> ptypeclass located -> scope
-  val add_instance : ?import:EcTheory.import -> scope -> Ax.proofmode -> ptycinstance located -> scope
+  val add_instance : scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -152,7 +152,8 @@ module Theory : sig
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
   val exit :
-       ?pempty:[`ClearOnly | `Full | `No]
+       ?import:bool
+    -> ?pempty:[`ClearOnly | `Full | `No]
     -> ?clears:(pqsymbol option) list
     -> scope -> symbol * scope
 
@@ -175,6 +176,10 @@ module Theory : sig
   val add_clears : (pqsymbol option) list -> scope -> scope
 
   val required : scope -> required
+
+  (* [alias scope (name, thname)] create a theory alias [name] to
+   * [thname] *)
+  val alias : scope -> psymbol * pqsymbol -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -247,10 +252,10 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit : sig 
-  val add_bitstring  : scope -> is_local -> pbind_bitstring -> scope
-  val add_array      : scope -> is_local -> pbind_array -> scope
-  val add_bvoperator : scope -> is_local -> pbind_bvoperator -> scope
-  val add_circuit    : scope -> is_local -> pbind_circuit -> scope
+  val add_bitstring  : scope -> EcTypes.is_local -> pbind_bitstring -> scope
+  val add_array      : scope -> EcTypes.is_local -> pbind_array -> scope
+  val add_bvoperator : scope -> EcTypes.is_local -> pbind_bvoperator -> scope
+  val add_circuit    : scope -> EcTypes.is_local -> pbind_circuit -> scope
 end
 
 (* -------------------------------------------------------------------- *)

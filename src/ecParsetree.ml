@@ -4,6 +4,7 @@ open EcMaps
 open EcSymbols
 open EcLocation
 open EcUtils
+open EcTypes
 
 (* -------------------------------------------------------------------- *)
 exception ParseError of EcLocation.t * string option
@@ -98,11 +99,6 @@ and 'a rfield = {
 }
 
 (* -------------------------------------------------------------------- *)
-type is_local = [ `Local | `Global]
-
-type locality = [`Declare | `Local | `Global]
-
-(* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 
 type ptyparams = (psymbol * pqsymbol list) list
@@ -152,7 +148,7 @@ type glob_or_var =
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * ptyannot option * pexpr list
+  | PLvMap    of pqsymbol * ptyannot option * pty option * pexpr list
 
 and plvalue = plvalue_r located
 
@@ -665,12 +661,11 @@ type inline_info = [
 (* -------------------------------------------------------------------- *)
 type outline_kind =
   | OKstmt of pstmt
-  | OKproc of pgamepath * pexpr option
+  | OKproc of pgamepath * bool
 
 type outline_info = {
     outline_side: side;
-    outline_start: pcodepos1;
-    outline_end: pcodepos1;
+    outline_range: pcodepos_range;
     outline_kind: outline_kind;
 }
 
@@ -698,6 +693,8 @@ type psim_info = {
   psim_hint : (pgamepath option pair * pformula) list * pformula option;
   psim_eqs  : pformula option
 }
+(* FIXME PR: this was changed in bdep (vs main from where it came and current main *)
+(*           do we keep it?                                                        *)
 
 (* -------------------------------------------------------------------- *)
 type rw_eqv_info = {
@@ -1206,7 +1203,7 @@ type theory_cloning = {
   pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
   pthc_clears : theory_cloning_clear list;
-  pthc_local  : is_local;
+  pthc_local  : is_local option;
   pthc_import : [`Export | `Import | `Include] option;
 }
 
@@ -1382,6 +1379,7 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
+  | GthAlias     of (psymbol * pqsymbol)
   | GModImport   of pmsymbol located list
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r

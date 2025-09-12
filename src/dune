@@ -15,7 +15,7 @@
  (public_name easycrypt.ecLib)
  (foreign_stubs (language c) (names eunix))
  (modules :standard \ ec)
- (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith lospecs)
+ (libraries batteries camlp-streams dune-build-info dune-site inifiles pcre2 why3 yojson zarith lospecs)
 )
 
 (executable
@@ -23,7 +23,7 @@
  (name ec)
  (modules ec)
  (promote (until-clean))
- (libraries batteries camlp-streams dune-build-info dune-site inifiles why3 yojson zarith ecLib))
+ (libraries batteries camlp-streams dune-build-info dune-site inifiles pcre2 why3 yojson zarith ecLib))
 
 (ocamllex ecLexer)
 

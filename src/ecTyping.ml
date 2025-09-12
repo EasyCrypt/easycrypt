@@ -2779,14 +2779,17 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let ty = ttuple (List.map snd xs) in
       Lval (LvTuple xs), ty
 
-  | PLvMap (x, tvi, es) ->
+  | PLvMap (x, tvi, codom, es) ->
       let tvi = tvi |> omap (transtvi env ue) in
-      let codomty = UE.fresh ue in
+      let codom = Option.map (transty tp_relax env ue) codom in
+      let codom = ofdfl (fun () -> UE.fresh ue) codom in
       let pv, xty = trans_pv env x in
       let e, ety = List.split (List.map (transexp env `InProc ue) es) in
+
       let e, ety = e_tuple e, ttuple ety in
+
       let name = ([], EcCoreLib.s_set) in
-      let esig = [xty; ety; codomty] in
+      let esig = [xty; ety; codom] in
       let ops = select_exp_op env `InProc None name ue tvi (esig, None) in
 
       match ops with
@@ -2801,7 +2804,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.subst_dom uidmap esig in
           let esig = toarrow esig xty in
           unify_or_fail env ue lvalue.pl_loc ~expct:esig opty;
-          LvMap ((p, tys), pv, e, xty), codomty
+          LvMap ((p, tys), pv, e, xty), codom
 
       | [_] ->
           let uidmap = UE.assubst ue in
@@ -3063,7 +3066,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
     | PFcast (pf, pty) ->
         let ty = transty tp_relax env ue pty in
-        let aout = transf env pf in
+        let aout = transf env ~tt:ty pf in
         unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
@@ -3554,8 +3557,8 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
   List.fold_left add_decl mt pmemtype
 
 (* -------------------------------------------------------------------- *)
-and transexp env mode ue { pl_desc = Expr e; pl_loc = loc; } =
-  let f = trans_form_or_pattern env (`Expr mode) ue e None in
+and transexp env ?tt mode ue { pl_desc = Expr e; pl_loc = loc; } =
+  let f = trans_form_or_pattern env (`Expr mode) ue e tt in
   let m = Option.value ~default:mhr (EcEnv.Memory.get_active env) in
   let e =
     try

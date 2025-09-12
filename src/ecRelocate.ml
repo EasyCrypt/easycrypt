@@ -23,12 +23,14 @@ let local (name : string list) : string =
 module type Sites = sig
   val commands : string
   val theories : string list
+  val config   : string
 end
 
 (* -------------------------------------------------------------------- *)
 module LocalSites() : Sites = struct
   let commands = local ["scripts"; "testing"]
   let theories = [local ["theories"]]
+  let config   = local ["etc"]
 end
 
 (* -------------------------------------------------------------------- *)
@@ -39,6 +41,10 @@ module DuneSites() : Sites = struct
 
   let theories =
     EcDuneSites.Sites.theories
+
+  let config =
+    Option.value ~default:"etc"
+      (EcUtils.List.Exceptionless.hd EcDuneSites.Sites.config)
 end
 
 (* -------------------------------------------------------------------- *)

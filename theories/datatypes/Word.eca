@@ -30,7 +30,12 @@ proof. smt(valK). qed.
 lemma ofwordK :
   forall (s : t list), size s = n =>
     ofword (mkword s) = s.
-proof. smt(insubT). qed.
+proof.
+move=> s size_s. rewrite /ofword /mkword.
+have ->: odflt (insubd wordw) (insub s) = insubd s.
++ by move: (insubP s); rewrite {2}/insubd size_s=> /= - [] w [] ->.
+exact: insubdK.
+qed.
 
 lemma mkword_out :
   forall (s : t list), size s <> n =>

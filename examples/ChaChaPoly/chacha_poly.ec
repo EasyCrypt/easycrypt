@@ -807,10 +807,13 @@ proof.
   rewrite (hrec (size (drop block_size p))) 2://; 1: smt(size_drop gt0_block_size).
   rewrite -{4}(cat_take_drop block_size p); congr.
   rewrite -!take_xor_map2_xor; apply (eq_from_nth Byte.zero).
-  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
+  + rewrite size_take 1:#smt:(gt0_block_size).
+    rewrite size_map2 size_cat size_map2 bytes_of_blockP.
+    by rewrite /min; smt(size_ge0).
   move=> j hj.
   have [hj1 hj2] : j < block_size /\ j < size p.
-  + smt (size_map2 Block.bytes_of_blockP size_cat size_take gt0_block_size size_ge0).
+  + move: hj; rewrite size_map2 size_cat size_map2 bytes_of_blockP /min.
+    smt(size_ge0).
   rewrite
     (nth_map2 Byte.zero Byte.zero)
     ?(size_cat, size_map2, Block.bytes_of_blockP) 1:#smt:(size_ge0).
@@ -865,23 +868,22 @@ proof.
   smt (ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
 qed.
 
-realize ofpairK.
-proof.
-  move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite Block.block_of_bytesdK.
-  + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
-  by rewrite
-       take_size_cat 1:TPoly.bytes_of_polyP 1:// drop_size_cat
-       1:TPoly.bytes_of_polyP 1:// TPoly.bytes_of_polyKd
-       Extra_block.bytes_of_extra_blockKd.
-qed.
-
 realize sample_spec.
 proof.
+  have ofpairK : cancel ofpair topair.
+  + move=> [x1 x2]; rewrite /topair /ofpair /=.
+    rewrite Block.block_of_bytesdK.
+    + by rewrite size_cat TPoly.bytes_of_polyP Extra_block.bytes_of_extra_blockP.
+    by rewrite
+         take_size_cat 1:TPoly.bytes_of_polyP 1:// drop_size_cat
+         1:TPoly.bytes_of_polyP 1:// TPoly.bytes_of_polyKd
+         Extra_block.bytes_of_extra_blockKd.
   move=> _; rewrite /dblock; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly `*` dextra_block) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK ofpairK).
+  + congr; apply: fun_ext=> x @/(\o) @/pred1.
+    rewrite -{3}topairK; case: (topair b)=> />.
+    by move: (can_inj _ _ ofpairK)=> /#.
   rewrite dprod1E (_:block_size = poly_size + extra_block_size) //.
   rewrite dlist_add 1:ge0_poly_size 1:ge0_extra_block_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].
@@ -936,23 +938,22 @@ proof.
   smt (ge0_poly_in_size ge0_poly_out_size).
 qed.
 
-realize ofpairK.
-proof.
-  move=> [x1 x2]; rewrite /topair /ofpair /=.
-  rewrite TPoly.poly_of_bytesdK.
-  + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
-  by rewrite
-       take_size_cat 1:Poly_in.bytes_of_poly_inP 1:// drop_size_cat
-       1:Poly_in.bytes_of_poly_inP 1:// Poly_in.bytes_of_poly_inKd
-       Poly_out.bytes_of_poly_outKd.
-qed.
-
 realize sample_spec.
 proof.
+  have ofpairK : cancel ofpair topair.
+  + move=> [x1 x2]; rewrite /topair /ofpair /=.
+    rewrite TPoly.poly_of_bytesdK.
+    + by rewrite size_cat Poly_in.bytes_of_poly_inP Poly_out.bytes_of_poly_outP.
+    by rewrite
+         take_size_cat 1:Poly_in.bytes_of_poly_inP 1:// drop_size_cat
+         1:Poly_in.bytes_of_poly_inP 1:// Poly_in.bytes_of_poly_inKd
+         Poly_out.bytes_of_poly_outKd.
   move=> _; rewrite /dpoly; apply eq_distr => b.
   rewrite !dmap1E.
   apply (eq_trans _ (mu1 (dpoly_in `*` dpoly_out) ((topair b).`1, (topair b).`2))); last first.
-  + congr; apply fun_ext; smt (topairK ofpairK).
+  + congr; apply: fun_ext=> x @/(\o) @/pred1.
+    rewrite -{3}(topairK b); case: (topair b)=> />.
+    by move: (can_inj _ _ ofpairK)=> /#.
   rewrite dprod1E (_:poly_size = poly_in_size + poly_out_size) //.
   rewrite dlist_add 1:ge0_poly_in_size 1:ge0_poly_out_size dmapE.
   rewrite !dmap1E /(\o) -dprodE &(mu_eq_support) => -[l1 l2] /supp_dprod /= [h1 h2].
@@ -1758,31 +1759,18 @@ section PROOFS.
               let r = oget ROin.m{1}.[(n, C.ofintd 0)] in 
               let s = oget ROout.m{1}.[(n, C.ofintd 0)] in 
               s = t - poly1305_eval r (topol a c))); last first.
-    + auto => /> ; smt (undup_uniq size_undup size_map).
-
-    (* + auto => /> *; have [#] * :=H H0. *)
-    (*   rewrite H3/=. *)
-    (*   move:H4=> [][]->>[#] 3->> [#]*.  *)
-    (*   move:H6=> [#] ->> * /=. *)
-    (*   rewrite undup_uniq //=; do ! split=> //=. *)
-    (*   - smt (undup_uniq size_undup size_map). *)
-    (*   - smt (undup_uniq size_undup size_map). *)
-    (*   - smt (undup_uniq size_undup size_map). *)
-    (*   - move=> *. *)
-    (*     pose n1:= nth witness _ _. *)
-    (*     have* :=H5 _ _ H19. *)
-    (*     have:=H16 _ H21; rewrite H20 /= => -> //=.  *)
-    (*     rewrite/n1/=. *)
-    (*     pose l1:= List.map _ _. *)
-    (*     pose l := undup _. *)
-    (*     have:=mem_nth witness l j; rewrite H17 H18 /= =>*. *)
-    (*     move:H22; rewrite mem_undup mapP => [][] /= [] n2 y1 y2 y3 /= [] *. *)
-    (*     have:=H15 n1 x1 x2 x3. *)
-    (*     have:=H11 n1 x1 x2 x3. *)
-    (*     have := H19; rewrite -H8 => *.  *)
-    (*     have :=H13 n1 x1 x2 x3; rewrite H20 /= -H18/= get_some //= => -> //=. *)
-    (*     smt (undup_uniq size_undup size_map). *)
-
+    + auto=> /> &1 &2 + not_bad; rewrite not_bad=> />.
+      move=> inv_count inv_domRO inv_domSRO1 eq_domSRO2 inv_domSRO2.
+      move=> size_lenc inv_ndec inv_log inv_sc inv0 inv1 inv2 inv3 inv4.
+      do !split; [1..5:smt(undup_uniq size_undup size_map)].
+      move=> j ge0_j gtj_size lc_j x1 x2 x3.
+      pose n0 := nth _ _ _; case _: (UFCMA.log.[n0]{2})=> [/#|/> log_nth].
+      split=> [/#|]; case _: (SplitC2.I2.RO.m{1}.[n0, C.ofintd 0])=> [/#|].
+      case _: (RO.m{2}.[n0, C.ofintd 0])=> [/#|/>].
+      move: (inv2 n0 _); 1:by rewrite domE log_nth.
+      rewrite log_nth=> /> _ _ x0 m2_n0 x4 i2_n0.
+      move: (inv4 n0 _); 1:exact: (inv_domSRO1 _ (C.ofintd 0)).
+      by rewrite log_nth i2_n0 m2_n0.
     inline{1} 2; rcondt{1} 3. 
     + by move=> *;auto => />;rewrite /test /= C.ofintdK; smt (C.gt0_max_counter).
     inline{1} 3; inline{1} 4; sp 0 1; wp.
@@ -2092,12 +2080,13 @@ section PROOFS.
     - have:=allP (fun (n0 : nonce) => (n0, C.ofintd 0) \notin ROout.m{2}) l2.
       have-> /= -> //=:=filter_all (fun (n0 : nonce) => (n0, C.ofintd 0) \notin SplitC2.I2.RO.m{2}) l.
       by rewrite mem_nth //=.
-  rewrite (drop_nth witness i{2} l2) //= drop0 //=; do ! split=> /> *.
+  rewrite (drop_nth witness i{2} l2) //= drop0 //=; do ! split=> />.
   + smt().
   + smt(mem_set).
-  + rewrite get_set_neqE /=; smt(mem_nth).
+  + move=> *; rewrite get_set_neqE /=; smt(mem_nth).
   + smt(mem_set).
-  + smt(mem_set).
+  + move=> n0; rewrite mem_set; case=> [/#|/>].
+    by right; exists i{2}=> /#.
   + smt(mem_set size_drop size_ge0 size_eq0).
   + smt(mem_set size_drop size_ge0 size_eq0).
   qed.
@@ -2485,8 +2474,8 @@ section PROOFS.
   call(: ={glob BNR, UFCMA.cbad1, UFCMA.cbad1, glob RO, Mem.log, Mem.lc} /\ 
     inv_lbad1 UFCMA_l.lbad1{2} BNR.lenc{2} UFCMA.log{2} Mem.log{2} Mem.lc{2} UFCMA.cbad1{2} BNR.ndec{2} /\
     (UFCMA.bad1{1} => exists (tt : tag * tag), (tt \in UFCMA_l.lbad1{2}) /\ tt.`1 = tt.`2)); first last.
-  + by proc; inline*; sp 1 1; if; auto; smt(in_cons make_lbad1_size_cons2 leq_make_lbad1). 
-  + by skip; smt( mem_empty ge0_qenc ge0_qdec). 
+  + proc; inline*; sp 1 1; if; auto => &1 &2 /> ?????????????; smt(in_cons make_lbad1_size_cons2 leq_make_lbad1).
+  + skip => &1 &2 />; rewrite ge0_qenc size_flatten /sumz /= ge0_qdec /=; smt(mem_empty).
   proc; sp; if; 1, 3: auto=> />.
   sp; wp=> /=.
   case: (UFCMA.cbad1{1} < qenc); last first.
@@ -2498,8 +2487,19 @@ section PROOFS.
     wp -7 -7=> />.
     move => />; smt (get_setE).
     conseq (: ={c1, t, RO.m, Mem.log}); [2:sim=> /> /#].
-    move => />.
-    smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
+    move => &1 &2 /> 9? X ?????? c1_R t_R.
+    do! split.
+    - smt().
+    - rewrite (make_lbad1_size_cons3) //; smt(leq_make_lbad1 size_ge0).
+    - smt(leq_make_lbad1).
+    - move => n D ad msg tag; rewrite get_setE.
+      case: D => />.
+      + by rewrite /dom get_setE.
+      smt(get_setE).
+    - move => n; rewrite /dom get_setE /#.
+    move => t t' tt'; case: (X _ _ tt') => /> n hn ht ad msg ht'.
+    case: (n = n{!2}); first smt().
+    move => _; exists n; rewrite get_setE /#.
   inline*; sp.
   rcondt{1} 5; 1: auto=> />.
   - conseq(:_==> true)=> />; 1: smt(size_map size_filter count_size).
@@ -2515,8 +2515,10 @@ section PROOFS.
   - smt().  
   - rewrite size_cat !size_map make_lbad1_size_cons3 //= /#.
   - smt(leq_make_lbad1).
-  - smt(get_setE).
-  - smt(get_setE).
+  - move => n D ad msg tag; rewrite get_setE; case: D => />; first by rewrite /dom get_setE.
+    smt(get_setE).
+  - move => n; case: (n = n{!2}) => />; first by rewrite /dom get_setE.
+    smt(get_setE).
   - move=> ? ? H15; have:=H15; rewrite mem_cat=> [#][] H16 *.
     + smt(get_setE).
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
@@ -2649,7 +2651,12 @@ section PROOFS.
       inv_lbad1_i UFCMA_l.lbad1{1} BNR.lenc{1} UFCMA.log{1} Mem.log{1} Mem.lc{1} UFCMA.cbad1{1} BNR.ndec{1} /\
       (((nth (w1,w2) UFCMA_l.lbad1{1} nth0).`1 =
         (nth (w1,w2) UFCMA_l.lbad1{1} nth0).`2) => UFCMA_li.badi{2})); first last.
-  + proc; sp; if; auto; inline*; auto; smt(make_lbad1_size_cons2 size_ge0 leq_make_lbad1).
+  + proc; sp; if; auto; inline*; auto => &1 &2 /> *; do !split.
+    - case: (c{2} \in Mem.log{2}); first smt().
+      rewrite make_lbad1_size_cons2 // /#.
+    - smt(leq_make_lbad1).
+    - smt().
+    - smt().
   + by auto; smt(neq_w1_w2 size_ge0 ge0_qdec size_flatten ge0_qenc).
   + proc; inline*; sp; if; 1, 3: auto; sp.
     swap [5..6] 7.
@@ -2738,8 +2745,8 @@ section PROOFS.
   proof.
   apply (RealOrder.ler_trans _ _ _ (step4_bad1_lbad1 &m)).
   apply (RealOrder.ler_trans _ _ _ (step4_lbad1_sum &m)).
-  apply (RealOrder.ler_trans _ _ _ (StdBigop.Bigreal.ler_sum_seq _ _ (fun _ => pr1_poly_out) _ _)); 
-    last by rewrite sumr_const count_predT size_iota; smt(ge0_qdec).
+  apply (RealOrder.ler_trans _ _ _ (StdBigop.Bigreal.ler_sum_seq _ _ (fun _ => pr1_poly_out) _ _));
+    last by rewrite sumr_const count_predT size_iota ler_maxr // ge0_qdec.
   move=> nth0; rewrite mem_iota /predT /= => [#] *.
   apply (RealOrder.ler_trans _ _ _ (step4_badi &m nth0 _))=> //.
   exact (pr_step4_badi &m).

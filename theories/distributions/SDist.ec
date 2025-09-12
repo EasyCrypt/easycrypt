@@ -147,8 +147,9 @@ suff : maxr SEp (-SEn) <= Sp by smt().
 apply/ler_maxrP; split. 
 - (apply ler_sum; 1: smt()); 2: exact/summable_cond.
   exact/summable_cond/norm_summable/summable_sdist.
-- apply: ler_trans ler_Sn_Sp; 
-    rewrite -sumN; (apply ler_sum; 1: smt()); 2: exact/summable_cond.
+- apply: ler_trans ler_Sn_Sp.
+  rewrite -sumN.
+  apply: ler_sum; [1:by move=> @/predI @/predC /#|3:exact:summable_cond].
   exact/summableN/summable_cond/norm_summable/summable_sdist.
 qed.
 
@@ -172,8 +173,12 @@ pose Sp := sum (fun (x : 'a) =>
            if p x then (mu1 d1 x - mu1 d2 x) * mu (F x) E else 0%r).
 pose Sn := sum (fun (x : 'a) => 
            if !p x then (mu1 d1 x - mu1 d2 x) * mu (F x) E else 0%r).
-have Sp_ge0 : 0%r <= Sp by apply ge0_sum => /= x;smt(mu_bounded).
-have Sn_le0 : Sn <= 0%r by apply le0_sum => /= x;smt(mu_bounded).
+have Sp_ge0 : 0%r <= Sp.
++ apply: ge0_sum => /= x; case: (p x)=> /> @/p px.
+  by apply/mulr_ge0; [exact: subr_ge0 | exact: ge0_mu].
+have Sn_le0 : Sn <= 0%r.
++ apply: le0_sum=> /= x; case: (p x)=> /> @/p /ltrNge px.
+  by apply: nmulr_rle0; [exact:subr_lt0 | exact: ge0_mu].
 case : (`|Sp| >= `|Sn|) => H.
 + apply (ler_trans (2%r*Sp)); 1: smt().
   apply (ler_trans (2%r * sum (fun x => if p x then mu1 d1 x - mu1 d2 x else 0%r))).
@@ -335,7 +340,7 @@ have -> : Pr[Sample(A).main(d') @ &m : res] =
   byequiv => //; proc. 
   seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}).
   + by auto.
-  outline {2} [1] u <@ S.sample. 
+  outline {2} 1 ~ S.sample.
   call (: d{2} = (F x){1} /\ (glob A){1} = (glob A){m} ==> ={res}).
   bypr (res{1}) (res{2}); 1:smt(). 
   move => &1 &2 a [-> eq_globA]; rewrite sampleE -(adv_mu1 A). 
@@ -540,7 +545,8 @@ have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
 eager proc H (={glob Var}) => //; 2: by sim.
     proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
 proc.
-outline {1} [1-2] r <@ Game(A, O1e).main.
+print Game.
+transitivity* {1} {r <@ Game(A, O1e).main(d);}.
 + by inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto.
 rewrite equiv[{1} 1 eq_main_O1e_O1l].
 inline*. 

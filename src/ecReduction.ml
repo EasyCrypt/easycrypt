@@ -120,7 +120,9 @@ module EqTest_base = struct
       | _, _ -> raise E.NotConv in
 
     let rec aux alpha e1 e2 =
-      e_equal e1 e2 || aux_r alpha e1 e2
+      (* If alpha is not empty then the test e_equal can be wrong *)
+         (e_equal e1 e2 && Mid.is_empty alpha)
+      || aux_r alpha e1 e2
 
     and aux_r alpha e1 e2 =
       match e1.e_node, e2.e_node with
@@ -138,14 +140,14 @@ module EqTest_base = struct
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
-          noconv (aux alpha) e1 e2
+          aux alpha e1 e2
 
       | Eapp (f1, args1), Eapp (f2, args2) ->
           aux alpha f1 f2 && List.all2 (aux alpha) args1 args2
 
       | Elet (p1, f1', g1), Elet (p2, f2', g2) ->
           aux alpha f1' f2'
-            && noconv (aux (check_lpattern alpha p1 p2)) g1 g2
+            && aux (check_lpattern alpha p1 p2) g1 g2
 
       | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
 
@@ -156,9 +158,12 @@ module EqTest_base = struct
           for_type env ty1 ty2
             && List.all2 (aux alpha) (e1::es1) (e2::es2)
 
+      | Eproj (e1, i1), Eproj (e2, i2) ->
+          i1 = i2 && aux alpha e1 e2
+
       | _, _ -> false
 
-    in fun alpha e1 e2 -> aux alpha e1 e2
+    in fun alpha e1 e2 -> noconv (aux alpha) e1 e2
 
   (* ------------------------------------------------------------------ *)
   let for_lv env ~norm lv1 lv2 =

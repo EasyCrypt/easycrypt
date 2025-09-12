@@ -10,7 +10,7 @@
 
 (package
  (name easycrypt)
- (sites (lib theories) (lib specs) (libexec commands))
+ (sites (lib theories) (lib specs) (libexec commands) (lib config))
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3))
@@ -24,10 +24,10 @@
   hex
   iter
   (ocaml-inifiles (>= 1.2))
-  (pcre (>= 7))
   ppx_deriving
   ppx_deriving_yojson
   (progress (>= 0.2))
+  (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
   yojson
   (zarith (>= 1.10))

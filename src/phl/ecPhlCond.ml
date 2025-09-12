@@ -12,7 +12,16 @@ module Sid = EcIdent.Sid
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
- let t_gen_cond side e tc =
+
+  let t_finalize h h1 h2 =
+     FApi.t_seqs [t_elim_hyp h;
+                        t_intros_i [h1;h2];
+                        t_apply_hyp h2]
+
+  let t_finalize_ehoare h _h1 _h2 tc =
+    t_apply_hyp h tc
+
+ let t_gen_cond ?(t_finalize=t_finalize) side e tc =
    let hyps  = FApi.tc1_hyps tc in
    let fresh = ["&m"; "&m"; "_"; "_"; "_"] in
    let fresh = LDecl.fresh_ids hyps fresh in
@@ -26,10 +35,7 @@ module LowInternal = struct
        (EcPhlRCond.t_rcond side b (Zpr.cpos 1))
        (FApi.t_seqs
           [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
-           FApi.t_seqs [t_elim_hyp h;
-                        t_intros_i [h1;h2];
-                        t_apply_hyp h2];
-           t_simplify])
+           t_finalize h h1 h2; t_simplify])
        tc
    in
    FApi.t_seqsub
@@ -47,7 +53,8 @@ let t_hoare_cond tc =
 let t_ehoare_cond tc =
   let hs = tc1_as_ehoareS tc in
   let (e,_,_) = fst (tc1_first_if tc hs.ehs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.ehs_m) e) tc
+  LowInternal.t_gen_cond ~t_finalize:LowInternal.t_finalize_ehoare
+    None (form_of_expr (EcMemory.memory hs.ehs_m) e) tc
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
@@ -143,7 +150,6 @@ end = struct
         let+ tc = EcPhlSkip.t_skip tc in
         let+ tc = EcLowGoal.t_intro_s `Fresh tc in
         let+ tc = EcLowGoal.t_elim_and tc in
-
         let e = EcEnv.LDecl.fresh_id (FApi.tc1_hyps tc) "e" in
 
         let+ tc = EcLowGoal.t_intros_i [e] tc in
@@ -166,14 +172,38 @@ end = struct
       in
 
       let clean (tc : tcenv1) =
+        let discharge_pre tc =
+          let+ tc =
+            if   Option.is_some side
+            then EcLowGoal.t_intros_n 2 tc
+            else EcLowGoal.t_intros_n 1 tc
+          in
+          let+ tc = EcLowGoal.t_elim_and tc in
+          let+ tc = EcLowGoal.t_intro_s `Fresh tc in
+          let+ tc = EcLowGoal.t_elim_and tc in
+          let+ tc = EcLowGoal.t_intros_n ~clear:true 1 tc in
+          let+ tc = EcLowGoal.t_intro_s `Fresh tc in
+          tc
+            |> EcLowGoal.t_split
+            @! EcLowGoal.t_assumption `Alpha
+        in
+        let discharge_post tc =
+          let+ tc =
+            if   Option.is_some side
+            then EcLowGoal.t_intros_n 2 tc
+            else EcLowGoal.t_intros_n 1 tc
+          in
+          let t_imp = EcLowGoal.t_intros_n 1 @! EcLowGoal.t_assumption `Alpha in
+          let t_iff = EcLowGoal.t_split @! t_imp in
+          tc |> FApi.t_or t_imp t_iff
+        in
+
         let pre = oget (EcLowPhlGoal.get_pre (FApi.tc1_goal tc)) in
         let post = oget (EcLowPhlGoal.get_post (FApi.tc1_goal tc)) in
         let eq, _, pre = destr_and3 pre in
-        let tc = EcPhlConseq.t_conseq (f_and eq pre) post tc in
-
-        FApi.t_onall
-          (EcLowGoal.t_clears names)
-          (FApi.t_firsts (EcLowGoal.t_trivial ~keep:false) 2 tc)
+        tc
+          |> EcPhlConseq.t_conseq (f_and eq pre) post
+          @+ [discharge_pre; discharge_post; EcLowGoal.t_clears names]
       in
 
       tc
