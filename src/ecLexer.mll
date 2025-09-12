@@ -97,6 +97,8 @@
     "clear"       , CLEAR      ;        (* KW: tactic *)
     "wlog"        , WLOG       ;        (* KW: tactic *)
 
+    "idassign"    , IDASSIGN   ;        (* KW: tactic *)
+
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
@@ -166,7 +168,14 @@
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
-
+    
+    "array"       , ARRAY      ;        (* KW: global *)
+    "aig"         , AIG        ;        (* KW: global *)
+    "bdep"        , BDEP       ;        (* KW: global *)
+    "bdepeq"      , BDEPEQ     ;        (* KW: global *)
+    "bind"        , BIND       ;        (* KW: global *)
+    "circuit"     , CIRCUIT    ;        (* KW: global *)
+    "bitstring"   , BITSTRING  ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)

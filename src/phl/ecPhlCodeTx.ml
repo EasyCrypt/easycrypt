@@ -184,6 +184,7 @@ let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern
     (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: have a better handling of PV                                  *)
 let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
   let env =  LDecl.toenv hyps in
 
@@ -195,19 +196,23 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
       e
     ) else identity in
 
-  let is_const_expression (e : expr) =
-    PV.is_empty (e_read env e) in
-
   let for_instruction ((subst as subst0) : (expr, unit) Mpv.t) (i : instr) =
     let wr = EcPV.i_write env i in
     let i = Mpv.isubst env subst i in
 
     let (subst, asgn) =
-      List.fold_left_map (fun subst ((pv, _) as pvty) ->
-        match Mpv.find env pv subst with
-        | e -> Mpv.remove env pv subst, Some (pvty, e)
-        | exception Not_found -> subst, None
-      ) subst (fst (PV.elements wr)) in
+      List.fold_left_map (fun subst (pv, e) ->
+        let exception Remove in
+
+        try
+          if PV.mem_pv env pv wr then raise Remove;
+          let rd = EcPV.e_read env e in
+          if PV.mem_pv env pv rd then raise Remove;
+          subst, None
+
+        with Remove ->
+          Mpv.remove env pv subst, Some ((pv, e.e_ty), e)
+      ) subst (EcPV.Mnpv.bindings (Mpv.pvs subst)) in
 
     let asgn = List.filter_map identity asgn in
 
@@ -226,7 +231,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
         try
           match i.i_node with
           | Sasgn (lv, e) ->
-            (* We already removed the variables of `lv` from the substitution *)
+            (* We already removed the variables of `lv` & the rhs from the substitution *)
             (* We are only interested in the variables of `lv` that are in `wr` *)
             let es =
               match simplify e, lv with
@@ -237,7 +242,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
             let lv = lv_to_ty_list lv in
       
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
-              Mpv.mem env pv subst0 && is_const_expression e
+              Mpv.mem env pv subst0
             ) (List.combine lv es) in
             
             let subst =
@@ -290,9 +295,6 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
                is not a tuple expression";
         | e, _ -> [e] in
       let lv = lv_to_ty_list lv in
-
-      if not (List.for_all is_const_expression es) then
-        tc_error pf "right-values are not closed expressions";
 
       if not (List.for_all (is_loc |- fst) lv) then
         tc_error pf "left-values must be made of local variables only";
@@ -359,7 +361,7 @@ let process_set (side, cpos, fresh, id, e) tc =
 
 let process_set_match (side, cpos, id, pattern) tc =
   let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
-  let me, _ = tc1_get_stmt side tc in
+  let me, _ = tc1_get_stmt_with_memory side tc in
   let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
   let ue  = EcProofTyping.unienv_of_hyps hyps in
   let ptnmap = ref Mid.empty in
@@ -434,7 +436,14 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
 
     let lv, e = destr_asgn i in
 
-    let pvl = EcPV.lp_write env lv in
+    let pvl = (* FIXME: do we want to do this TCB-wise? *)
+      match lv with
+      | LvVar _ -> PV.empty
+      | LvTuple lvs ->
+        let lvs = List.tl (List.rev lvs) in
+        let lvs = Option.get (lv_of_list lvs) in
+        EcPV.lp_write env lvs in
+
     let pve = EcPV.e_read env e in
     let lv  = lv_to_list lv in
 
@@ -445,7 +454,11 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
       match lv, e.e_node with
       | [_], _         -> [e]
       | _  , Etuple es -> es
-      | _  ,_          -> assert false in
+      | _  ,_          ->
+        let tys =
+          match (EcEnv.Ty.hnorm e.e_ty env).ty_node with
+          | Ttuple tys -> tys | _ -> assert false in
+        List.mapi (fun i ty -> e_proj e i ty) tys in
 
     let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
 
@@ -457,7 +470,7 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   if not (EcLowPhlGoal.is_program_logic concl kinds) then
     assert false;
 
-  let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let s = EcLowPhlGoal.tc1_get_stmt side tc in
   let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
