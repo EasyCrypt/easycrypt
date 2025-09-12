@@ -206,7 +206,7 @@ module Core = struct
           let bounded_distr = f_real_le (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let concl = f_hoareS bhs.bhs_m pre s post [] in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PNoRndParams, _ ->
@@ -230,7 +230,7 @@ module Core = struct
           let bounded_distr = f_real_le (f_mu env distr event) bound in
           let pre = f_and bhs.bhs_pr pre_bound in
           let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let concl = f_hoareS bhs.bhs_m pre s post [] in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, _ ->
@@ -665,7 +665,7 @@ let process_rnd side pos tac_info tc =
           Double ((b1, p1), (b2, p2))
     )
     in
-    
+
     t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"

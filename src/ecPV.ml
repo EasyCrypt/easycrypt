@@ -129,7 +129,7 @@ module Mpv = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
-    | Sassert e          -> i_assert (esubst e)
+    | Sraise (e,es)      -> i_raise  (e, List.map esubst es)
     | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
@@ -517,7 +517,7 @@ and i_write_r ?(except=Sx.empty) env w i =
   match i.i_node with
   | Sasgn  (lp, _) -> lp_write_r env w lp
   | Srnd   (lp, _) -> lp_write_r env w lp
-  | Sassert _      -> w
+  | Sraise _      -> w
 
   | Scall(lp,f,_) ->
     if Sx.mem f except then w else
@@ -575,7 +575,8 @@ and i_read_r env r i =
   match i.i_node with
   | Sasgn   (_lp, e) -> e_read_r env r e
   | Srnd    (_lp, e) -> e_read_r env r e
-  | Sassert e       -> e_read_r env r e
+  | Sraise  (_e, es)  ->
+       List.fold_left (e_read_r env) r es
 
   | Scall (_lp, f, es) ->
       let r = List.fold_left (e_read_r env) r es in
@@ -1052,7 +1053,9 @@ and i_eqobs_in_refl env i eqo =
     let eqs = List.fold_left PV.union PV.empty eqs in
     add_eqs_refl env eqs e
 
-  | Sassert e -> add_eqs_refl env eqo e
+  | Sraise (_,es) ->
+    List.fold_left (add_eqs_refl env) eqo es
+
   | Sabstract _ -> assert false
 
 and eqobs_inF_refl env f' eqo =

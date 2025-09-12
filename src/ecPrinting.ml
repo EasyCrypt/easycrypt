@@ -1536,9 +1536,8 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
 
-  | Sassert e ->
-      Format.fprintf fmt "assert %a;"
-        (pp_expr ppe) e
+  | Sraise _ ->
+      Format.fprintf fmt "raise TODO;"
 
   | Swhile (e, _) ->
       Format.fprintf fmt "while (%a) {...}"
@@ -1928,10 +1927,19 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      let ppepoe fmt l =
+        let aux fmt (e, f) =
+          Format.fprintf fmt " %a: %a" (pp_mem ppe) e (pp_form ppepo) f
+        in
+        match l with
+        | [] -> Format.fprintf fmt ""
+        | _ -> Format.fprintf fmt "| %a" (pp_list "|" aux) l
+      in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@ %a]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_form ppepr) hf.hf_pr
         (pp_form ppepo) hf.hf_po
+        ppepoe hf.hf_poe
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
@@ -2553,6 +2561,12 @@ let pp_added_op (ppe : PPEnv.t) fmt op =
   | ts  ->
     Format.fprintf fmt "@[<hov 2>%a :@ %a.@]"
       (pp_tyvarannot ppe) ts (pp_type ppe) op.op_ty
+(* -------------------------------------------------------------------- *)
+let pp_added_except (ppe : PPEnv.t) fmt e =
+  let ppe = PPEnv.add_locals ppe (List.map fst e.e_typargs) in
+  match e.e_typargs with
+  | [] -> Format.fprintf fmt ": @[<hov 2>@]"
+  | ts  -> Format.fprintf fmt "@[<hov 2>%a@]" (pp_tyvarannot ppe) ts
 
 (* -------------------------------------------------------------------- *)
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
@@ -2610,7 +2624,7 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
 (* -------------------------------------------------------------------- *)
 type ppnode1 = [
   | `Asgn     of (EcModules.lvalue * EcTypes.expr)
-  | `Assert   of (EcTypes.expr)
+  | `Raise    of (EcIdent.t * EcTypes.expr list)
   | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
   | `Rnd      of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
@@ -2633,7 +2647,7 @@ let at (ppe : PPEnv.t) n i =
   | Sasgn (lv, e)    , 0 -> Some (`Asgn (lv, e)    , `P, [])
   | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , `P, [])
   | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
-  | Sassert e        , 0 -> Some (`Assert e        , `P, [])
+  | Sraise (e,es)    , 0 -> Some (`Raise (e,es)    , `P, [])
   | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
 
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
@@ -2721,8 +2735,8 @@ let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <-@ %a"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
-let pp_i_assert (ppe : PPEnv.t) fmt e =
-  Format.fprintf fmt "assert (%a)" (pp_expr ppe) e
+let pp_i_raise (_ppe : PPEnv.t) fmt ((e,_es):memory * expr list) =
+  Format.fprintf fmt "raise %s" e.id_symb
 
 let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
   match lv with
@@ -2769,7 +2783,7 @@ let pp_i_abstract (_ppe : PPEnv.t) fmt id =
 let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with
   | `Asgn     x -> c_split ~width (pp_i_asgn     ppe) x
-  | `Assert   x -> c_split ~width (pp_i_assert   ppe) x
+  | `Raise    x -> c_split ~width (pp_i_raise    ppe) x
   | `Call     x -> c_split ~width (pp_i_call     ppe) x
   | `Rnd      x -> c_split ~width (pp_i_rnd      ppe) x
   | `Abstract x -> c_split ~width (pp_i_abstract ppe) x
@@ -2940,6 +2954,14 @@ let pp_post (ppe : PPEnv.t) ?prpo fmt post =
     fmt post None
 
 (* -------------------------------------------------------------------- *)
+let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) poe =
+  List.iter (fun ((e:memory),f) ->
+      pp_prpo ppe e.id_symb
+        (omap (fun x -> x.prpo_po) prpo |> odfl false)
+        fmt f None
+    ) poe
+
+(* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_f ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
@@ -2947,22 +2969,25 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) hf.hf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po
+  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) hf.hf_po;
+  Format.fprintf fmt "@\n%a%!" (pp_poe ppepo ?prpo) hf.hf_poe
 
 (* -------------------------------------------------------------------- *)
 
 let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
   let ppef = PPEnv.push_mem ppe ~active:true hs.hs_m in
   let ppnode = collect2_s ppef hs.hs_s.s_node [] in
-  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode
-  in
-    Format.fprintf fmt "Context : %a@\n%!" (pp_memtype ppe) (snd hs.hs_m);
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) hs.hs_pr;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a" (pp_node `Left) ppnode;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppef ?prpo) hs.hs_po
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode in
+
+  Format.fprintf fmt "Context : %a@\n%!" (pp_memtype ppe) (snd hs.hs_m);
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) hs.hs_pr;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a" (pp_node `Left) ppnode;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_post ppef ?prpo) hs.hs_po;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_poe ppef ?prpo) hs.hs_poe
 
 (* -------------------------------------------------------------------- *)
 let pp_eHoareF (ppe : PPEnv.t) ?prpo fmt hf =
@@ -3348,9 +3373,8 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
       (pp_funname ppe) xp
       (pp_list ",@ " (pp_expr ppe)) args
 
-  | Sassert e ->
-    Format.fprintf fmt "@[<hov 2>assert %a@];"
-      (pp_expr ppe) e
+  | Sraise _ ->
+    Format.fprintf fmt "@[<hov 2>assert TODO@];"
 
   | Swhile (e, s) ->
     Format.fprintf fmt "@[<v>while (@[%a@])%a@]"
@@ -3394,7 +3418,7 @@ and pp_block ppe fmt s =
   | [] ->
     Format.fprintf fmt "{}"
 
-  | [ { i_node = (Sasgn _ | Srnd _ | Scall _ | Sassert _ | Sabstract _) } as i ] ->
+  | [ { i_node = (Sasgn _ | Srnd _ | Scall _ | Sraise _ | Sabstract _) } as i ] ->
     Format.fprintf fmt "@;<1 2>%a" (pp_instr ppe) i
 
   | _ ->
@@ -3509,6 +3533,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
 
   | EcTheory.Th_operator (id, op) ->
       pp_opdecl ppe fmt (EcPath.pqname p id, op)
+
+  | EcTheory.Th_exception (_id, _e) ->
+    Format.fprintf fmt "exception <FIXME>."
 
   | EcTheory.Th_axiom (id, ax) ->
       pp_axiom ppe fmt (EcPath.pqname p id, ax)
