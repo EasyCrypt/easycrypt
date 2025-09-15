@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcFol
+open EcAst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -15,8 +16,8 @@ module LowInternal = struct
     if not (List.is_empty hs.hs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
-    let concl = f_imp hs.hs_pr hs.hs_po in
-    let concl = f_forall_mems [hs.hs_m] concl in
+    let concl = map_ss_inv2 f_imp (hs_pr hs) (hs_po hs) in
+    let concl = EcSubst.f_forall_mems_ss_inv hs.hs_m concl in
 
     FApi.xmutate1 tc `Skip [concl]
 
@@ -29,8 +30,8 @@ module LowInternal = struct
     if not (List.is_empty hs.ehs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
-    let concl = f_xreal_le hs.ehs_po hs.ehs_pr in
-    let concl = f_forall_mems [hs.ehs_m] concl in
+    let concl = map_ss_inv2 f_xreal_le (ehs_po hs) (ehs_pr hs) in
+    let concl = EcSubst.f_forall_mems_ss_inv hs.ehs_m concl in
 
     FApi.xmutate1 tc `Skip [concl]
 
@@ -45,12 +46,12 @@ module LowInternal = struct
     if bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge then
       tc_error !!tc ~who:"skip" "";
 
-    let concl = f_imp bhs.bhs_pr bhs.bhs_po in
-    let concl = f_forall_mems [bhs.bhs_m] concl in
+    let concl = map_ss_inv2 f_imp (bhs_pr bhs) (bhs_po bhs) in
+    let concl = EcSubst.f_forall_mems_ss_inv bhs.bhs_m concl in
     let goals =
-      if   f_equal bhs.bhs_bd f_r1
+      if   f_equal (bhs_bd bhs).inv f_r1
       then [concl]
-      else [f_eq bhs.bhs_bd f_r1; concl]
+      else [f_eq (bhs_bd bhs).inv f_r1; concl]
     in
 
     FApi.xmutate1 tc `Skip goals
@@ -58,6 +59,8 @@ module LowInternal = struct
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_skip_r tc =
     let t_trivial = FApi.t_seqs [t_simplify ~delta:`No; t_split; t_fail] in
+    let bhs = tc1_as_bdhoareS tc in
+    let f_r1: EcAst.ss_inv = {m=fst bhs.bhs_m; inv=f_r1} in
     let t_conseq  = EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1 in
       FApi.t_internal
         (FApi.t_seqsub t_conseq
@@ -75,8 +78,8 @@ module LowInternal = struct
     if not (List.is_empty es.es_sr.s_node) then
       tc_error !!tc ~who:"skip" "right instruction list is not empty";
 
-    let concl = f_imp es.es_pr es.es_po in
-    let concl = f_forall_mems [es.es_ml; es.es_mr] concl in
+    let concl = map_ts_inv2 f_imp (es_pr es) (es_po es) in
+    let concl = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr concl in
     FApi.xmutate1 tc `Skip [concl]
 
   let t_equiv_skip = FApi.t_low0 "equiv-skip" t_equiv_skip_r

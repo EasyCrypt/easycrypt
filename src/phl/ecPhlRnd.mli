@@ -1,16 +1,14 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
-open EcTypes
-open EcFol
 open EcCoreGoal.FApi
 open EcMatching.Position
+open EcAst
 
 (* -------------------------------------------------------------------- *)
-type chl_infos_t = (form, form option, form) rnd_tac_info
-type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
+type bhl_infos_t = (ss_inv, ty -> ss_inv option, ty -> ss_inv) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
-type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
+type mkbij_t     = EcTypes.ty -> EcTypes.ty -> ts_inv
 
 (* -------------------------------------------------------------------- *)
 val wp_equiv_disj_rnd : side -> backward

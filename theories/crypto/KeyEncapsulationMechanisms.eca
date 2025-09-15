@@ -3238,7 +3238,15 @@ local equiv Eqv_DecapsOrder :
 proof.
 bypr (res.`1, res.`2){1} (res.`2, res.`1){2} => [/#|]. 
 move=> /> &1 &2 [kt kt'] eqglS -> /=. 
-rewrite (EqPr_DecapsOrder &1 _ _ _ _ kt kt') andbC (EqPr_DecapsOrder &2 _ _ _ _ kt' kt). 
+rewrite (EqPr_DecapsOrder &1 _ _ _ _ kt kt'). 
+have->: Pr[Decaps_Order.main(sk{2}, sk'{2}, c{2},
+                     c'{2}) @ &2 :
+   res.`2 = kt /\ res.`1 = kt'] =
+  Pr[Decaps_Order.main(sk{2}, sk'{2}, c{2},
+                     c'{2}) @ &2 :
+   res.`1 = kt' /\ res.`2 = kt].
+- byequiv => //; conseq (: ={glob Decaps_Order, arg} ==> ={glob Decaps_Order, res}) => //; 1:sim.
+rewrite (EqPr_DecapsOrder &2 _ _ _ _ kt' kt). 
 by rewrite 2?(EqPr_Decaps &1 &2) 3:RField.mulrC.
 qed. 
 

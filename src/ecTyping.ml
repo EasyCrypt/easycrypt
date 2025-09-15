@@ -21,10 +21,6 @@ module EqTest = EcReduction.EqTest
 module NormMp = EcEnv.NormMp
 
 (* -------------------------------------------------------------------- *)
-type wp = EcEnv.env -> EcMemory.memenv -> stmt -> form -> form option
-let  wp = (ref (None : wp option))
-
-(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
@@ -407,7 +403,7 @@ let gen_select_op
 
   and pvs () : OpSelect.gopsel list =
     let me, pvs =
-      match EcEnv.Memory.get_active env, actonly with
+      match EcEnv.Memory.get_active_ss env, actonly with
       | None, true -> (None, [])
       | me  , _    -> (  me, select_pv env me name ue tvi psig)
     in List.map (fpv me) pvs
@@ -1034,8 +1030,8 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
       tconstr p tyargs
     end
   | PTglob gp ->
-    let m,_ = trans_msymbol env gp in
-    EcEnv.NormMp.norm_tglob env m
+    let mo,_ = trans_msymbol env gp in
+    EcEnv.NormMp.norm_tglob env mo
 
 and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
@@ -1593,8 +1589,9 @@ let form_of_opselect
              ((args @ List.map (curry f_local) xs, []), xs) in
 
          let flam  = List.map (snd_map gtty) flam in
-         let me    = odfl mhr (EcEnv.Memory.get_active env) in
-         let body  = form_of_expr me body in
+         let body = match (EcEnv.Memory.get_active_ss env) with
+        | None -> form_of_expr body
+        | Some me -> (ss_inv_of_expr me body).inv in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
          let subst = Fsubst.f_subst_init ~freshen:true () in
          let subst =
@@ -1605,11 +1602,12 @@ let form_of_opselect
       | `Op (p, tys) -> f_op p tys ty
       | `Lc id       -> f_local id ty
       | `Pv (me, pv) ->
-        var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
+        var_or_proj (fun x ty -> (f_pvar x ty (oget me)).inv) f_proj pv ty
 
     in (op, args)
 
-  in f_app op args codom
+  in 
+  f_app op args codom
 
 (* -------------------------------------------------------------------- *)
 
@@ -2067,7 +2065,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       in
 
       let target_fun = EcSubst.subst_function subst (resolve_alias fun_) in
-      let (_fs, fd), memenv = EcEnv.Fun.actmem_body mhr target_fun in
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body (EcIdent.create "&hr") target_fun in
 
       let fun_ = EcSubst.subst_function subst fun_ in
 
@@ -2080,7 +2078,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       in
 
       let memenv = fundef_add_symbol env memenv locals in
-      let env = EcEnv.Memory.push_active memenv env in
+      let env = EcEnv.Memory.push_active_ss memenv env in
 
       let locals = ref locals in
       let memenv = ref memenv in
@@ -2210,7 +2208,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
             | Pup_cond cup ->
               eval_cupdate loc env cup si
           in
-          let env = EcEnv.Memory.push_active !memenv env in
+          let env = EcEnv.Memory.push_active_ss !memenv env in
           try
             EcMatching.Zipper.map_range env cp change bd
           with
@@ -2412,7 +2410,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
               v_name = checked_name s;
               v_type = transty tp_uni env ue pty}, s.pl_loc) decl.pfd_tyargs
       in
-      let memenv = EcMemory.empty_local ~witharg:false mhr in
+      let memenv = EcMemory.empty_local ~witharg:false (EcIdent.create "&hr") in
       let memenv = fundef_add_symbol env memenv params in
 
       (* Type-check body *)
@@ -2525,7 +2523,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
 
   (* Type-check local variables / check for dups *)
   let add_local memenv local =
-    let env   = EcEnv.Memory.push_active memenv env in
+    let env   = EcEnv.Memory.push_active_ss memenv env in
     let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
     let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
     let ty =
@@ -2562,7 +2560,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
     memenv in
 
   let memenv = List.fold_left add_local memenv pbody.pfb_locals in
-  let env = EcEnv.Memory.push_active memenv env in
+  let env = EcEnv.Memory.push_active_ss memenv env in
 
   let body   = transstmt env ue pbody.pfb_body in
   let result =
@@ -2758,7 +2756,7 @@ and transinstr
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =
-  let side = EcEnv.Memory.get_active env in
+  let side = EcEnv.Memory.get_active_ss env in
   match EcEnv.Var.lookup_progvar_opt ?side x env with
   | None -> tyerror loc env (UnknownModVar x)
   | Some(pv,xty) ->
@@ -3028,7 +3026,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                         let trans1 (x, s) =
                           let mem =
                             match s with
-                            | None -> odfl mhr (EcEnv.Memory.get_active env)
+                            | None -> oget (EcEnv.Memory.get_active_ss env)
                             | Some s -> transmem env s
 
                           in (transpvar env mem x, mem) in
@@ -3081,11 +3079,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let mp = fst (trans_msymbol env gp) in
         let me =
-          match EcEnv.Memory.current env with
+          match EcEnv.Memory.current_ss env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
         in PFS.set_memused state;
-           EcEnv.NormMp.norm_glob env me mp
+           (EcEnv.NormMp.norm_glob env me mp).inv
 
     | PFint n ->
         f_int n
@@ -3136,7 +3134,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let used, aout =
           PFS.new_memused
-            (transf (EcEnv.Memory.set_active me env))
+            (transf (EcEnv.Memory.set_active_ss me env))
             ~force state f
         in
         if not used then begin
@@ -3156,13 +3154,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) ->
-            var_or_proj (fun x ty -> f_pvar x ty me) f_proj x ty
-        in
-
-        let check_mem loc me =
-          match EcEnv.Memory.byid me env with
-          | None -> tyerror loc env (UnknownMemName (EcIdent.name me))
-          | Some _ -> ()
+            var_or_proj (fun x ty -> (f_pvar x ty me).inv) f_proj x ty
         in
 
         let qual (mq : pmsymbol option) (x : pqsymbol) =
@@ -3175,8 +3167,9 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
          let do1 = function
           | GVvar x ->
-              let x1 = lookup EcFol.mleft  (qual (om |> omap fst) x) in
-              let x2 = lookup EcFol.mright (qual (om |> omap snd) x) in
+              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let x1 = lookup ml (qual (om |> omap fst) x) in
+              let x2 = lookup mr (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
@@ -3201,16 +3194,15 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                     List.map (fun mid -> f_glob mid mem) gl
                   @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
 
-                f_tuple res in
+                map_ss_inv f_tuple res in
+                  
+              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let x1 = ss_inv_generalize_right (create ml) mr in
+              let x2 = ss_inv_generalize_left (create mr) ml in
 
-              let x1 = create EcFol.mleft  in
-              let x2 = create EcFol.mright in
-
-              unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
-              f_eq x1 x2
+              unify_or_fail env ue gp.pl_loc ~expct:x1.inv.f_ty x2.inv.f_ty;
+              (map_ts_inv2 f_eq x1 x2).inv
         in
-          check_mem f.pl_loc EcFol.mleft;
-          check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map do1 xs)
 
     | PFeqf fs ->
@@ -3225,19 +3217,20 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         and do1 (me1, me2) f =
           let _, f1 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me1 env))
+              (transf (EcEnv.Memory.set_active_ss me1 env))
               ~force:false state f in
           let _, f2 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me2 env))
+              (transf (EcEnv.Memory.set_active_ss me2 env))
               ~force:false state f in
           unify_or_fail env ue f.pl_loc ~expct:f1.f_ty f2.f_ty;
           f_eq f1 f2
 
         in
-          check_mem f.pl_loc EcFol.mleft;
-          check_mem f.pl_loc EcFol.mright;
-          EcFol.f_ands (List.map (do1 (EcFol.mleft, EcFol.mright)) fs)
+          let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+          check_mem f.pl_loc ml;
+          check_mem f.pl_loc mr;
+          EcFol.f_ands (List.map (do1 (ml, mr)) fs)
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) -> begin
       let try_trans ?tt pe =
@@ -3432,7 +3425,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
-    | PFprob (gp, args, m, event) ->
+    | PFprob (gp, args, pr_m, event) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Pr);
 
@@ -3441,10 +3434,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let args,_ =
           transcall (fun f -> let f = transf env f in f, f.f_ty)
             env ue f.pl_loc fun_.f_sig args in
-        let memid = transmem env m in
-        let env = EcEnv.Fun.prF fpath env in
-        let event' = transf env event in
-        unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
+        let memid = transmem env pr_m in
+        let m = EcIdent.create "&hr" in
+        let env = EcEnv.Fun.prF m fpath env in
+        let event' = {m;inv=transf env event} in
+        unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
     | PFhoareF (pre, gp, post) ->
@@ -3452,31 +3446,32 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror f.pl_loc env (NotAnExpression `Logic);
 
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let m = EcIdent.create "&hr" in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF pre' fpath post'
+          f_hoareF {m;inv=pre'} fpath {m;inv=post'}
 
     | PFehoareF (pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let m = EcIdent.create "&hr" in
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
-          f_eHoareF pre' fpath post'
+          f_eHoareF {m;inv=pre'} fpath {m;inv=post'}
 
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let m = EcIdent.create "&hr" in
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let bd'   = transf penv bd in
@@ -3484,7 +3479,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
-          f_bdHoareF pre' fpath post' hcmp bd'
+          f_bdHoareF {m;inv=pre'} fpath {m;inv=post'} hcmp {m;inv=bd'}
 
     | PFlsless gp ->
         if mode <> `Form then
@@ -3495,30 +3490,32 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFequivF (pre, (gp1, gp2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = EcIdent.create "&1" in
+        let mr = EcIdent.create "&2" in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_equivF pre' fpath1 fpath2 post'
+          f_equivF {ml;mr;inv=pre'} fpath1 fpath2 {ml;mr;inv=post'}
 
     | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = EcIdent.create "&1" in
+        let mr = EcIdent.create "&2" in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let s1    = transstmt env ue s1 in
         let s2    = transstmt env ue s2 in
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-        f_eagerF pre' s1 fpath1 fpath2 s2 post'
+        f_eagerF {ml;mr;inv=pre'} s1 fpath1 fpath2 s2 {ml;mr;inv=post'}
 
   and transf_r opsc env ?tt pf =
     let f  = transf_r_tyinfo opsc env ?tt pf in
@@ -3559,10 +3556,11 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
 (* -------------------------------------------------------------------- *)
 and transexp env ?tt mode ue { pl_desc = Expr e; pl_loc = loc; } =
   let f = trans_form_or_pattern env (`Expr mode) ue e tt in
-  let m = Option.value ~default:mhr (EcEnv.Memory.get_active env) in
   let e =
     try
-      expr_of_form m f
+      match (EcEnv.Memory.get_active_ss env) with
+      | None -> expr_of_form f
+      | Some m -> expr_of_ss_inv {m;inv=f}
     with CannotTranslate ->
       (* This should not happen. *)
       tyerror loc env (NotAnExpression `Unknown) in

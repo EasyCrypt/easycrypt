@@ -6,6 +6,7 @@ open EcEnv
 open EcAst
 open EcCoreGoal
 open EcLowPhlGoal
+open EcSubst
 
 module TTC = EcProofTyping
 
@@ -22,20 +23,21 @@ let t_bdhoare_ppr_r tc =
   let bhf = tc1_as_bdhoareF tc in
   let f_xpath = bhf.bhf_f in
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
-  let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
-  let m = EcIdent.create "&m" in
-  let args = to_args fun_ (f_pvarg fun_.f_sig.fs_arg m) in
-  (* Warning: currently no substitution on pre,post since penv is always mhr *)
-  let pre,post = bhf.bhf_pr, bhf.bhf_po in
+  let penv,_qenv = EcEnv.Fun.hoareF_memenv bhf.bhf_m f_xpath env in
+  let m = EcIdent.create "&hr" in
+  let args = map_ss_inv1 (to_args fun_) (f_pvarg fun_.f_sig.fs_arg m) in
+  let pre,post = (bhf_pr bhf), (bhf_po bhf) in
   let fop = match bhf.bhf_cmp with
     | FHle -> f_real_le
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-  let subst = Fsubst.f_subst_mem (fst penv) m in
-  let concl = fop (f_pr m f_xpath args post) (subst bhf.bhf_bd) in
-  let concl = f_imp (subst pre) concl in
-  let concl = f_forall_mems [m,snd penv] concl in
+  let bd = ss_inv_rebind (bhf_bd bhf) m in
+  let concl = map_ss_inv2 fop (map_ss_inv1 (fun args -> f_pr m f_xpath args post) args)
+    bd in
+  let pre   = ss_inv_rebind pre m in
+  let concl = map_ss_inv2 f_imp pre concl in
+  let concl = EcSubst.f_forall_mems_ss_inv (m,snd penv) concl in
   FApi.xmutate1 tc `PPR [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -50,25 +52,25 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let (fl, fr) = (ef.ef_fl, ef.ef_fr) in
   let funl = EcEnv.Fun.by_xpath fl env in
   let funr = EcEnv.Fun.by_xpath fr env in
-  let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv fl fr env in
-  let argsl = to_args funl (f_pvarg funl.f_sig.fs_arg (fst penvl)) in
-  let argsr = to_args funr (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
+  let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr fl fr env in
+  let m = EcIdent.create "&hr" in
+  let argsl = map_ss_inv1 (to_args funl) (f_pvarg funl.f_sig.fs_arg (fst penvl)) in
+  let argsr = map_ss_inv1 (to_args funr) (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
-  let smem1 = Fsubst.f_bind_mem Fsubst.f_subst_id mleft mhr in
-  let smem2 = Fsubst.f_bind_mem Fsubst.f_subst_id mright mhr in
-  let phi1 = Fsubst.f_subst smem1 phi_l in
-  let phi2 = Fsubst.f_subst smem2 phi_r in
-  let pr1 = f_pr (fst penvl) fl argsl (f_eq phi1 a_f) in
-  let pr2 = f_pr (fst penvr) fr argsr (f_eq phi2 a_f) in
+  let pr1_ev = EcSubst.ss_inv_rebind (map_ss_inv1 (fun p -> f_eq p a_f) phi_l) m in
+  let pr1 = f_pr (fst penvl) fl argsl.inv pr1_ev in
+  let pr2_ev = EcSubst.ss_inv_rebind (map_ss_inv1 (fun p -> f_eq p a_f) phi_r) m in
+  let pr2 = f_pr (fst penvr) fr argsr.inv pr2_ev in
   let concl_pr =
-    f_forall_mems [penvl; penvr]
-      (f_forall_simpl [a_id,GTty ty]
-         (f_imp_simpl ef.ef_pr (f_eq_simpl pr1 pr2))) in
-  let concl_po =
-    f_forall_mems [qenvl; qenvr]
+    f_forall_mems_ts_inv penvl penvr
+      (map_ts_inv1 (f_forall_simpl [a_id,GTty ty])
+         (map_ts_inv1 (fun pr -> f_imp_simpl pr (f_eq_simpl pr1 pr2)) (ef_pr ef))) in
+  let phi_l = ss_inv_generalize_as_left phi_l ef.ef_ml ef.ef_mr in
+  let phi_r = ss_inv_generalize_as_right phi_r ef.ef_ml ef.ef_mr in
+  let concl_po = f_forall_mems_ts_inv qenvl qenvr (map_ts_inv3 (fun phi_l phi_r po ->
       (f_forall_simpl [a_id, GTty ty]
-         (f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] ef.ef_po)) in
+         (f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] po))) phi_l phi_r (ef_po ef)) in
   FApi.xmutate1 tc `PPR [concl_po; concl_pr]
 
 (* -------------------------------------------------------------------- *)
@@ -85,12 +87,14 @@ let process_ppr info tc =
   | Some (phi1, phi2) ->
       let hyps = FApi.tc1_hyps tc in
       let ef   = tc1_as_equivF tc in
-      let qenv = snd (LDecl.equivF ef.ef_fl ef.ef_fr hyps) in
-      let phi1 = TTC.pf_process_form_opt !!tc qenv None phi1 in
-      let phi2 = TTC.pf_process_form_opt !!tc qenv None phi2 in
-      if not (EcReduction.EqTest.for_type (LDecl.toenv qenv) phi1.f_ty phi2.f_ty) then
+      let qenvl = snd (LDecl.hoareF ef.ef_ml ef.ef_fl hyps) in
+      let qenvr = snd (LDecl.hoareF ef.ef_mr ef.ef_fr hyps) in
+      (* TODO: These should be one-sided *)
+      let phi1 = TTC.pf_process_form_opt !!tc qenvl None phi1 in 
+      let phi2 = TTC.pf_process_form_opt !!tc qenvr None phi2 in
+      if not (EcReduction.EqTest.for_type (LDecl.toenv hyps) phi1.f_ty phi2.f_ty) then
         tc_error !!tc "formulas must have convertible types";
-      t_equiv_ppr phi1.f_ty phi1 phi2 tc
+      t_equiv_ppr phi1.f_ty {m=ef.ef_ml;inv=phi1} {m=ef.ef_mr;inv=phi2} tc
 
 (* -------------------------------------------------------------------- *)
 let t_prbounded_r conseq tc =
@@ -99,11 +103,11 @@ let t_prbounded_r conseq tc =
   let (m, pr, po, cmp, bd) =
     match concl.f_node with
     | FbdHoareF hf ->
-        let m = fst (Fun.hoareF_memenv hf.bhf_f env) in
-          (m, hf.bhf_pr, hf.bhf_po, hf.bhf_cmp, hf.bhf_bd)
+        let m = fst (Fun.hoareF_memenv hf.bhf_m hf.bhf_f env) in
+          (m, bhf_pr hf, bhf_po hf, hf.bhf_cmp, bhf_bd hf)
 
     | FbdHoareS hf ->
-        (hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd)
+        (hf.bhs_m, bhs_pr hf, bhs_po hf, hf.bhs_cmp, bhs_bd hf)
 
     | _ -> tc_error_noXhl ~kinds:[`PHoare `Any] !!tc
   in
@@ -111,11 +115,11 @@ let t_prbounded_r conseq tc =
   let cond =
     (* FIXME: use the [conseq] result when possible *)
     match cmp with
-    | FHle when f_equal bd f_r1 -> []
-    | FHge when f_equal bd f_r0 -> []
-    | _    when f_equal po f_false && f_equal bd f_r0 -> []
-    | FHle when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le f_r1 bd))]
-    | FHge when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le bd f_r0))]
+    | FHle when f_equal bd.inv f_r1 -> []
+    | FHge when f_equal bd.inv f_r0 -> []
+    | _    when f_equal po.inv f_false && f_equal bd.inv f_r0 -> []
+    | FHle when conseq -> [f_forall_mems_ss_inv m (map_ss_inv2 f_imp pr (map_ss_inv2 f_real_le {m=fst m;inv=f_r1} bd))]
+    | FHge when conseq -> [f_forall_mems_ss_inv m (map_ss_inv2 f_imp pr (map_ss_inv2 f_real_le bd {m=fst m;inv=f_r0}))]
 
     | _ -> tc_error !!tc "cannot solve the probabilistic judgement"
   in
@@ -146,10 +150,10 @@ let t_prfalse tc =
   let is_zero = f_real_le bd f_r0 in
 
   (* the event is false *)
-  let smem  = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
-  let ev    = Fsubst.f_subst smem ev in
+  let smem  = Fsubst.f_bind_mem Fsubst.f_subst_id ev.m ev.m in
+  let ev'    = Fsubst.f_subst smem ev.inv in
   let fun_  = EcEnv.Fun.by_xpath f env in
-  let me    = EcEnv.Fun.actmem_post mhr fun_ in
-  let concl_po = f_forall_mems [me] (f_imp f_false ev) in
+  let me    = EcEnv.Fun.actmem_post ev.m fun_ in
+  let concl_po = f_forall_mems [me] (f_imp f_false ev') in
 
   FApi.xmutate1 tc `PrFalse [is_zero; concl_po]

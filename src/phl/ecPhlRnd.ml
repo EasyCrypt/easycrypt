@@ -6,6 +6,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcPV
+open EcSubst
 
 open EcMatching.Position
 open EcCoreGoal
@@ -15,10 +16,9 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-type chl_infos_t = (form, form option, form) rnd_tac_info
-type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
+type bhl_infos_t = (ss_inv, ty -> ss_inv option, ty -> ss_inv) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
-type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
+type mkbij_t     = EcTypes.ty -> EcTypes.ty -> ts_inv
 type semrndpos   = (bool * codepos1) doption
 
 (* -------------------------------------------------------------------- *)
@@ -28,15 +28,16 @@ module Core = struct
   let t_hoare_rnd_r tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
+    let m = fst hs.hs_m in
     let (lv, distr), s = tc1_last_rnd tc hs.hs_s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
     let x_id = EcIdent.create (symbol_of_lv lv) in
-    let x = f_local x_id ty_distr in
-    let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
-    let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
-    let post = f_imp (f_in_supp x distr) post in
-    let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+    let x = {m; inv=f_local x_id ty_distr} in
+    let distr = EcFol.ss_inv_of_expr m distr in
+    let post = subst_form_lv env lv x (hs_po hs) in
+    let post = map_ss_inv2 f_imp (map_ss_inv2 f_in_supp x distr) post in
+    let post = map_ss_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
+    let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -47,39 +48,44 @@ module Core = struct
     let ty_distr = proj_distr_ty env (e_ty distr) in
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = f_local x_id ty_distr in
-    let mem = EcMemory.memory hs.ehs_m in
-    let distr = EcFol.form_of_expr mem distr in
-    let post = subst_form_lv env mem lv x hs.ehs_po in
-    let post = f_Ep ty_distr distr (f_lambda [(x_id,GTty ty_distr)] post) in
-    let concl = f_eHoareS_r {hs with ehs_s=s; ehs_po=post } in
+    let m = fst hs.ehs_m in
+    let distr = EcFol.ss_inv_of_expr m distr in
+    let post = subst_form_lv env lv {m;inv=x} (ehs_po hs) in
+    let post = map_ss_inv2 (f_Ep ty_distr) distr 
+      (map_ss_inv1 (f_lambda [(x_id,GTty ty_distr)]) post) in
+    let concl = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
   let wp_equiv_disj_rnd_r side tc =
     let env = FApi.tc1_env tc in
     let es  = tc1_as_equivS tc in
-    let m,s =
+    let ml, mr = fst es.es_ml, fst es.es_mr in
+    let m, mo, s =
       match side with
-      | `Left  -> es.es_ml, es.es_sl
-      | `Right -> es.es_mr, es.es_sr
+      | `Left  -> es.es_ml, fst es.es_mr, es.es_sl
+      | `Right -> es.es_mr, fst es.es_ml, es.es_sr
     in
-
+    let subst_form_lv_side = sideif side subst_form_lv_left subst_form_lv_right in
+    let ss_inv_generalize_other =
+      sideif side ss_inv_generalize_right ss_inv_generalize_left in
     (* FIXME: exception when not rnds found *)
     let (lv, distr), s = tc1_last_rnd tc s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
 
     let x_id = EcIdent.create (symbol_of_lv lv) in
-    let x    = f_local x_id ty_distr in
+    let x    = {ml; mr; inv=f_local x_id ty_distr} in
 
-    let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
-    let post  = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
-    let post  = f_imp (f_in_supp x distr) post in
-    let post  = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let post  = f_anda (f_lossless ty_distr distr) post in
+    let distr = EcFol.ss_inv_of_expr (EcMemory.memory m) distr in
+    let distr = ss_inv_generalize_other distr mo in
+    let post  = subst_form_lv_side env lv x (es_po es) in
+    let post  = map_ts_inv2 f_imp (map_ts_inv2 f_in_supp x distr) post in
+    let post  = map_ts_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
+    let post  = map_ts_inv2 f_anda (map_ts_inv1 (f_lossless ty_distr) distr) post in
     let concl =
       match side with
-      | `Left  -> f_equivS_r { es with es_sl=s; es_po=post; }
-      | `Right -> f_equivS_r { es with es_sr=s; es_po=post; }
+      | `Left  -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr post
+      | `Right -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s post
     in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -87,16 +93,17 @@ module Core = struct
   let wp_equiv_rnd_r bij tc =
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
+    let ml, mr = fst es.es_ml, fst es.es_mr in
     let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
     let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
     let tyL = proj_distr_ty env (e_ty muL) in
     let tyR = proj_distr_ty env (e_ty muR) in
     let xL_id = EcIdent.create (symbol_of_lv lvL ^ "L")
     and xR_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
-    let xL = f_local xL_id tyL in
-    let xR = f_local xR_id tyR in
-    let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
-    let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
+    let xL  = {ml;mr;inv=f_local xL_id tyL} in
+    let xR  = {ml;mr;inv=f_local xR_id tyR} in
+    let muL = EcFol.ss_inv_of_expr ml muL in
+    let muR = EcFol.ss_inv_of_expr mr muR in
 
     let tf, tfinv =
       match bij with
@@ -106,8 +113,8 @@ module Core = struct
           tc_error !!tc "%s, %s"
             "support are not compatible"
             "an explicit bijection is required";
-        (EcFol.f_identity ~name:"z" tyL,
-         EcFol.f_identity ~name:"z" tyR)
+        ({ml;mr;inv=EcFol.f_identity ~name:"z" tyL},
+         {ml;mr;inv=EcFol.f_identity ~name:"z" tyR})
     in
 
     (*     (∀ x₂, x₂ ∈ ℑ(D₂) ⇒ x₂ = f(f⁻¹(x₂))
@@ -115,27 +122,30 @@ module Core = struct
      *  && (∀ x₁, x₁ ∈ ℑ(D₁) ⇒ f(x₁) ∈ ℑ(D₂) && x₁ = f⁻¹(f(x₁)) && φ(x₁, f(x₁)))
      *)
 
-    let f    t = f_app_simpl tf    [t] tyR in
-    let finv t = f_app_simpl tfinv [t] tyL in
+    let f_app_simpl' ty f t = f_app_simpl f [t] ty in
+    let f    t = map_ts_inv2 (f_app_simpl' tyR) tf t in
+    let finv t = map_ts_inv2 (f_app_simpl' tyL) tfinv t in
 
-    let cond_fbij      = f_eq xL (finv (f xL)) in
-    let cond_fbij_inv  = f_eq xR (f (finv xR)) in
+    let post = subst_form_lv_left env lvL xL  (es_po es) in
+    let post = subst_form_lv_right env lvR (f xL) post in
 
-    let post = es.es_po in
-    let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL xL     post in
-    let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f xL) post in
+    let muL = ss_inv_generalize_right muL mr in
+    let muR = ss_inv_generalize_left muR ml in
 
-    let cond1 = f_imp (f_in_supp xR muR) cond_fbij_inv in
-    let cond2 = f_imp (f_in_supp xR muR) (f_eq (f_mu_x muR xR) (f_mu_x muL (finv xR))) in
-    let cond3 = f_andas [f_in_supp (f xL) muR; cond_fbij; post] in
-    let cond3 = f_imp (f_in_supp xL muL) cond3 in
+    let cond_fbij      = map_ts_inv2 f_eq xL (finv (f xL)) in
+    let cond_fbij_inv  = map_ts_inv2 f_eq xR (f (finv xR)) in
 
-    let concl = f_andas
-      [f_forall_simpl [(xR_id, GTty tyR)] cond1;
-       f_forall_simpl [(xR_id, GTty tyR)] cond2;
-       f_forall_simpl [(xL_id, GTty tyL)] cond3] in
+    let cond1 = map_ts_inv2 f_imp (map_ts_inv2 f_in_supp xR muR) cond_fbij_inv in
+    let cond2 = map_ts_inv2 f_imp (map_ts_inv2 f_in_supp xR muR) (map_ts_inv2 f_eq (map_ts_inv2 f_mu_x muR xR) (map_ts_inv2 f_mu_x muL (finv xR))) in
+    let cond3 = map_ts_inv f_andas [map_ts_inv2 f_in_supp (f xL) muR; cond_fbij; post] in
+    let cond3 = map_ts_inv2 f_imp (map_ts_inv2 f_in_supp xL muL) cond3 in
 
-    let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=concl; } in
+    let concl = map_ts_inv f_andas
+      [map_ts_inv1 (f_forall_simpl [(xR_id, GTty tyR)]) cond1;
+       map_ts_inv1 (f_forall_simpl [(xR_id, GTty tyR)]) cond2;
+       map_ts_inv1 (f_forall_simpl [(xL_id, GTty tyL)]) cond3] in
+
+    let concl = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl' sr' concl in
 
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -145,20 +155,22 @@ module Core = struct
     let bhs = tc1_as_bdhoareS tc in
     let (lv,distr),s = tc1_last_rnd tc bhs.bhs_s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
-    let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
+    let distr = EcFol.ss_inv_of_expr (EcMemory.memory bhs.bhs_m) distr in
     let m = fst bhs.bhs_m in
     let mk_event_cond event =
       let v_id = EcIdent.create "v" in
-      let v = f_local v_id ty_distr in
-      let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
-      let event_v = f_app event [v] tbool in
-      let v_in_supp = f_in_supp v distr in
-      f_forall_simpl [v_id,GTty ty_distr]
+      let v = {m; inv=f_local v_id ty_distr} in
+      let post_v = subst_form_lv env lv v (bhs_po bhs) in
+      let f_app' fl = f_app (List.hd fl) (List.tl fl) tbool in
+      let event_v = map_ss_inv f_app' [event ;v] in
+      let v_in_supp = map_ss_inv2 f_in_supp v distr in
+      map_ss_inv1 (f_forall_simpl [v_id,GTty ty_distr])
         begin
+          let f_imps_simpl' fl = f_imps_simpl  (List.tl fl) (List.hd fl) in
           match bhs.bhs_cmp with
-          | FHle -> f_imps_simpl [v_in_supp;post_v] event_v
-          | FHge -> f_imps_simpl [v_in_supp;event_v] post_v
-          | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
+          | FHle -> map_ss_inv f_imps_simpl' [event_v; v_in_supp;post_v]
+          | FHge -> map_ss_inv f_imps_simpl' [post_v; v_in_supp;event_v]
+          | FHeq -> map_ss_inv2 f_imp_simpl v_in_supp (map_ss_inv2 f_iff_simpl event_v post_v)
         end
     in
     let f_cmp = match bhs.bhs_cmp with
@@ -167,14 +179,14 @@ module Core = struct
       | FHeq -> f_eq
     in
     let is_post_indep =
-      let fv = EcPV.PV.fv env m bhs.bhs_po in
+      let fv = EcPV.PV.fv env (bhs_po bhs).m (bhs_po bhs).inv in
       match lv with
       | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
       | LvTuple pvs ->
         List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
     in
     let is_bd_indep =
-      let fv_bd = PV.fv env mhr bhs.bhs_bd in
+      let fv_bd = PV.fv env (bhs_bd bhs).m (bhs_bd bhs).inv in
       let modif_s = s_write env s in
       PV.indep env modif_s fv_bd
     in
@@ -184,83 +196,89 @@ module Core = struct
       else match lv with
            | LvVar (pv,_) ->
              f_lambda [x,GTty ty]
-               (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
+               (EcPV.PVM.subst1 env pv m (f_local x ty) (bhs_po bhs).inv)
            | _ -> tc_error !!tc "cannot infer a valid event, it must be provided"
     in
     let bound,pre_bound,binders =
       if is_bd_indep then
-        bhs.bhs_bd, f_true, []
+        bhs_bd bhs, {m;inv=f_true}, []
       else
         let bd_id = EcIdent.create "bd" in
-        let bd = f_local bd_id treal in
-        bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)]
+        let bd = {m;inv=f_local bd_id treal} in
+        bd, map_ss_inv2 f_eq (bhs_bd bhs) bd, [(bd_id,GTty treal)]
     in
     let subgoals = match tac_info, bhs.bhs_cmp with
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
-          let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+          let concl = f_bdHoareS (snd bhs.bhs_m) 
+            (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
           [concl]
         else
-          let event = mk_event ty_distr in
-          let bounded_distr = f_real_le (f_mu env distr event) bound in
-          let pre = f_and bhs.bhs_pr pre_bound in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let event = {m; inv=mk_event ty_distr} in
+          let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
+          let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PNoRndParams, _ ->
         if is_post_indep then
           (* event is true *)
-          let event = mk_event ty_distr in
-          let bounded_distr = f_eq (f_mu env distr event) f_r1 in
-          let concl = f_bdHoareS_r
-                        {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
+          let event = {m;inv=mk_event ty_distr} in
+          let f_r1 = {m;inv=f_r1} in
+          let bounded_distr = map_ss_inv2 f_eq (map_ss_inv2 (f_mu env) distr event) f_r1 in
+          let post = map_ss_inv2 f_and (bhs_po bhs) bounded_distr in
+          let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s post bhs.bhs_cmp (bhs_bd bhs) in
           [concl]
         else
-          let event = mk_event ty_distr in
-          let bounded_distr = f_cmp (f_mu env distr event) bound in
-          let pre = f_and bhs.bhs_pr pre_bound in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
+          let event = {m;inv=mk_event ty_distr} in
+          let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) bound in
+          let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_bdHoareS (snd bhs.bhs_m) pre s post bhs.bhs_cmp {m;inv=f_r1} in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, FHle ->
           let event = event ty_distr in
-          let bounded_distr = f_real_le (f_mu env distr event) bound in
-          let pre = f_and bhs.bhs_pr pre_bound in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_hoareS bhs.bhs_m pre s post in
+          let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
+          let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PSingleRndParam event, _ ->
           let event = event ty_distr in
-          let bounded_distr = f_cmp (f_mu env distr event) bound in
-          let pre = f_and bhs.bhs_pr pre_bound in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+          let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) bound in
+          let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let concl = f_bdHoareS (snd bhs.bhs_m) pre s post FHeq {m;inv=f_r1} in
           let concl = f_forall_simpl binders concl in
           [concl]
       | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
         let event = match event ty_distr with
-          | None -> mk_event ~simpl:false ty_distr | Some event -> event
+          | None -> {m;inv=mk_event ~simpl:false ty_distr} | Some event -> event
         in
-        let bd_sgoal = f_cmp (f_real_add (f_real_mul d1 d2) (f_real_mul d3 d4)) bhs.bhs_bd in
-        let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
+        let bd_sgoal = map_ss_inv2 f_cmp (map_ss_inv2 f_real_add (map_ss_inv2 f_real_mul d1 d2) (map_ss_inv2 f_real_mul d3 d4)) (bhs_bd bhs) in
+        let bd_sgoal = f_forall_mems_ss_inv (bhs.bhs_m) bd_sgoal in
+        let sgoal1 = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s phi bhs.bhs_cmp d1 in
         let sgoal2 =
-          let bounded_distr = f_cmp (f_mu env distr event) d2 in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          f_forall_mems [bhs.bhs_m] (f_imp phi post)
+          let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) d2 in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          f_forall_mems_ss_inv (bhs.bhs_m) (map_ss_inv2 f_imp phi post)
         in
-        let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
+        let sgoal3 = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s (map_ss_inv1 f_not phi) bhs.bhs_cmp d3 in
         let sgoal4 =
-          let bounded_distr = f_cmp (f_mu env distr event) d4 in
-          let post = f_anda bounded_distr (mk_event_cond event) in
-          f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post) in
+          let bounded_distr = map_ss_inv2 f_cmp (map_ss_inv2 (f_mu env) distr event) d4 in
+          let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          f_forall_mems_ss_inv bhs.bhs_m (map_ss_inv2 f_imp (map_ss_inv1 f_not phi) post) in
         let sgoal5 =
-          let f_inbound x = f_anda (f_real_le f_r0 x) (f_real_le x f_r1) in
-          f_ands (List.map f_inbound [d1; d2; d3; d4])
+          let f_inbound x = 
+            let f_r1, f_r0 = {m;inv=f_r1}, {m;inv=f_r0} in
+            map_ss_inv2 f_anda (map_ss_inv2 f_real_le f_r0 x) (map_ss_inv2 f_real_le x f_r1) in
+          map_ss_inv f_ands (List.map f_inbound [d1; d2; d3; d4])
         in
+        let sgoal5 = f_forall_mems_ss_inv (bhs.bhs_m) sgoal5 in
         [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4;sgoal5]
 
       | _, _ -> tc_error !!tc "invalid arguments"
@@ -310,61 +328,63 @@ module Core = struct
           compare (PVMap.find pv1 m) (PVMap.find pv2 m))
         wr in
 
-    let rec do1 (subst : PVM.subst) (s : instr list) =
+    let rec do1 (m: memory) (subst : PVM.subst) (s : instr list) =
       match s with
       | [] ->
          let tuple =
            List.map (fun (pv, _) ->
-             PVM.find env pv mhr subst) wr in
-         f_dunit (f_tuple tuple)
+             PVM.find env pv m subst) wr in
+         {m;inv=f_dunit (f_tuple tuple)}
 
       | { i_node = Sasgn (lv, e) } :: s ->
-         let e = form_of_expr mhr e in
-         let e = PVM.subst env subst e in
+         let e = ss_inv_of_expr m e in
+         let e = map_ss_inv1 (PVM.subst env subst) e in
          let subst =
            match lv with
            | LvVar (pv, _) ->
-              PVM.add env pv mhr e subst
+              PVM.add env pv m e.inv subst
            | LvTuple pvs ->
               List.fold_lefti (fun subst i (pv, ty) ->
-                PVM.add env pv mhr (f_proj e i ty) subst
+                PVM.add env pv m (f_proj e.inv i ty) subst
               ) subst pvs
          in
-         do1 subst s
+         do1 m subst s
 
       | { i_node = Srnd (lv, d) } :: s ->
-         let d = form_of_expr mhr d in
-         let d = PVM.subst env subst d in
+         let d = ss_inv_of_expr m d in
+         let d = map_ss_inv1 (PVM.subst env subst) d in
          let x = EcIdent.create (name_of_lv lv) in
          let subst, xty =
            match lv with
            | LvVar (pv, ty) ->
               let x = f_local x ty in
-              (PVM.add env pv mhr x subst, ty)
+              (PVM.add env pv m x subst, ty)
            | LvTuple pvs ->
               let ty = ttuple (List.snd pvs) in
               let x = f_local x ty in
               let subst =
                 List.fold_lefti (fun subst i (pv, ty) ->
-                  PVM.add env pv mhr (f_proj x i ty) subst
+                  PVM.add env pv m (f_proj x i ty) subst
                 ) subst pvs in
               (subst, ty)
          in
-         let body = do1 subst s in
+         let body = do1 m subst s in
 
-         f_dlet_simpl
+         map_ss_inv2
+         (f_dlet_simpl
            xty
-           (ttuple (List.snd wr))
+           (ttuple (List.snd wr)))
            d
-           (f_lambda [(x, GTty xty)] body)
+           (map_ss_inv1 (f_lambda [(x, GTty xty)]) body)
 
       | _ :: _ ->
          error ()
 
     in
 
-    let distr = do1 PVM.empty s in
-    let distr = expr_of_form mhr distr in
+    let mhr = EcIdent.create "&hr" in
+    let distr = do1 mhr PVM.empty s in
+    let distr = expr_of_ss_inv distr in
 
     match lv_of_list wr with
     | None ->
@@ -382,11 +402,11 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) hs.hs_s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) (hs_po hs).inv)
       else None in
-    let m, s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = { hs with hs_s = stmt (s1 @ s2); hs_m = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_hoareS_r concl]
+    let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
+    let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
   let t_bdhoare_rndsem_r reduce pos tc =
@@ -395,11 +415,11 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) bhs.bhs_s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) (bhs_po bhs).inv)
       else None in
-    let m, s2 = semrnd tc bhs.bhs_m fv s2 in
-    let concl = { bhs with bhs_s = stmt (s1 @ s2); bhs_m = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_bdHoareS_r concl]
+    let (_,mt), s2 = semrnd tc bhs.bhs_m fv s2 in
+    let concl = f_bdHoareS mt (bhs_pr bhs) (stmt (s1 @ s2)) (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)
   let t_equiv_rndsem_r reduce side pos tc =
@@ -412,15 +432,15 @@ module Core = struct
     let s1, s2 = o_split env (Some pos) s in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
+        Some (PV.fv (FApi.tc1_env tc) (fst m) (es_po es).inv)
       else None in
-    let m, s2 = semrnd tc m fv s2 in
+    let (_,mt), s2 = semrnd tc m fv s2 in
     let s = stmt (s1 @ s2) in
     let concl =
       match side with
-      | `Left  -> { es with es_sl = s; es_ml = m; }
-      | `Right -> { es with es_sr = s; es_mr = m; } in
-    FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
+      | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+      | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl s (es_po es) in
+    FApi.xmutate1 tc (`RndSem pos) [concl]
 
 end (* Core *)
 
@@ -456,8 +476,8 @@ let wp_equiv_disj_rnd_r side tc =
 
   let tc = Core.wp_equiv_disj_rnd_r side tc in
   let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
-  let c1, c2 = destr_and es.es_po in
-  let newc1 = EcFol.f_forall_mems [es.es_ml; es.es_mr] c1 in
+  let (c1, c2) = map_ts_inv_destr2 destr_and (es_po es) in
+  let newc1 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr c1 in
 
   let subtc = tc in
   let subtc, hdc1 = solve 2 newc1 subtc in
@@ -481,7 +501,7 @@ let wp_equiv_disj_rnd_r side tc =
 
     | _ -> EcLowGoal.t_id)
     (FApi.t_first
-      (EcPhlConseq.t_equivS_conseq es.es_pr po)
+      (EcPhlConseq.t_equivS_conseq (es_pr es) po)
       subtc)
 
 (* -------------------------------------------------------------------- *)
@@ -489,12 +509,14 @@ let wp_equiv_rnd_r bij tc =
   let tc = Core.wp_equiv_rnd_r bij tc in
   let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
 
-  let c1, c2, c3 = destr_and3 es.es_po in
-  let (x, xty, c3) = destr_forall1 c3 in
-  let ind, (c3, c4) = snd_map destr_and (destr_imp c3) in
-  let newc2 = EcFol.f_forall_mems [es.es_ml; es.es_mr] c2 in
-  let newc3 = EcFol.f_forall_mems [es.es_ml; es.es_mr]
-                (f_forall [x, xty] (f_imp ind c3)) in
+  let c1, c2, c3 = map_ts_inv_destr3 destr_and3 (es_po es) in
+  let (x, xty, _) = destr_forall1 c3.inv in
+  let c3 = map_ts_inv1 (fun c3 -> let (_,_,d) = destr_forall1 c3 in d) c3 in
+  let (ind, c3) = map_ts_inv_destr2 destr_imp c3 in
+  let (c3, c4) = map_ts_inv_destr2 destr_and c3 in
+  let newc2 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr c2 in
+  let newc3 = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr
+                (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c3)) in
 
   let subtc = tc in
   let subtc, hdc2 = solve 4 newc2 subtc in
@@ -503,9 +525,12 @@ let wp_equiv_rnd_r bij tc =
   let po =
     match hdc2, hdc3 with
     | None  , None   -> None
-    | Some _, Some _ -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind c4)))
-    | Some _, None   -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind (f_anda c3 c4))))
-    | None  , Some _ -> Some (f_andas [c1; c2; f_forall [x, xty] (f_imp ind c4)])
+    | Some _, Some _ -> 
+      Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)))
+    | Some _, None   -> 
+      Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind (map_ts_inv2 f_anda c3 c4))))
+    | None  , Some _ -> 
+      Some (map_ts_inv f_andas [c1; c2; map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)])
   in
 
   match po with None -> tc | Some po ->
@@ -557,7 +582,7 @@ let wp_equiv_rnd_r bij tc =
     | _ -> EcLowGoal.t_id)
 
     (FApi.t_first
-      (EcPhlConseq.t_equivS_conseq es.es_pr po)
+      (EcPhlConseq.t_equivS_conseq (es_pr es) po)
       subtc)
 
 (* -------------------------------------------------------------------- *)

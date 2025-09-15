@@ -42,7 +42,7 @@ let extend_body fsig body =
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
 type sim = {
   sim_env      : env;
-  sim_inv      : form;
+  sim_inv      : ts_inv;
   sim_ifvl     : PV.t;
   sim_ifvr     : PV.t;
   default_spec : EcPath.xpath -> EcPath.xpath -> Mpv2.t -> Mpv2.t;
@@ -81,8 +81,8 @@ let init_sim env spec inv =
 
   { sim_env  = env;
     sim_inv  = inv;
-    sim_ifvl = PV.fv env mleft inv;
-    sim_ifvr = PV.fv env mright inv;
+    sim_ifvl = PV.fv env inv.ml inv.inv;
+    sim_ifvr = PV.fv env inv.mr inv.inv;
     default_spec = default_spec;
     needed_spec  = [];
   }
@@ -322,9 +322,9 @@ and f_eqobs_in fl fr sim eqO =
           aux eqo in
         begin
           try
-            let inv = Mpv2.to_form mleft mright eqi sim.sim_inv in
-            let fvl = PV.fv env mleft inv in
-            let fvr = PV.fv env mright inv in
+            let inv = Mpv2.to_form_ts_inv eqi sim.sim_inv in
+            let fvl = PV.fv env inv.ml inv.inv in
+            let fvr = PV.fv env inv.mr inv.inv in
             PV.check_depend env fvl topl;
             PV.check_depend env fvr topr
           with TcError _ -> raise EqObsInError
@@ -359,6 +359,7 @@ and f_eqobs_in fl fr sim eqO =
 
 (* -------------------------------------------------------------------- *)
 let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
+  let ml, mr = inv.ml, inv.mr in
   let defl = Fun.by_xpath fl env in
   let defr = Fun.by_xpath fr env in
   let sigl, sigr = defl.f_sig, defr.f_sig in
@@ -367,12 +368,12 @@ let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
     && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret in
   if not testty then raise EqObsInError;
   let eq_params =
-    f_eqparams
-      sigl.fs_arg sigl.fs_anames mleft
-      sigr.fs_arg sigr.fs_anames mright in
-  let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-  let pre = f_and eq_params (Mpv2.to_form mleft mright eqi inv) in
-  let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
+    ts_inv_eqparams
+      sigl.fs_arg sigl.fs_anames ml
+      sigr.fs_arg sigr.fs_anames mr in
+  let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
+  let pre = map_ts_inv2 f_and eq_params (Mpv2.to_form_ts_inv eqi inv) in
+  let post = map_ts_inv2 f_and eq_res (Mpv2.to_form_ts_inv eqo inv) in
   f_equivF pre fl fr post
 
 (* -------------------------------------------------------------------- *)
@@ -384,21 +385,20 @@ let t_eqobs_inS_r sim eqo tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let sim = { sim with sim_env = env } in
   let es = tc1_as_equivS tc in
-  let ml = fst (es.es_ml) and mr = fst (es.es_mr) in
   let sl, sr, sim, eqi =
     try s_eqobs_in es.es_sl es.es_sr sim Mpv2.empty_local eqo
     with EqObsInError -> tc_error !!tc "cannot apply sim ..."
   in
   let inv = sim.sim_inv in
-  let post = Mpv2.to_form ml mr eqo inv in
-  let pre  = Mpv2.to_form ml mr eqi inv in
+  let post = Mpv2.to_form_ts_inv eqo inv in
+  let pre  = Mpv2.to_form_ts_inv eqi inv in
 
   let sl = stmt (List.rev sl) and sr = stmt (List.rev sr) in
-  if not (EcReduction.is_alpha_eq hyps post es.es_po) then
+  if not (EcReduction.ts_inv_alpha_eq hyps post (es_po es)) then
     tc_error !!tc "cannot apply sim";
 
   let sg = List.map (mk_inv_spec env inv) sim.needed_spec in
-  let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
+  let concl = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr pre in
 
   FApi.xmutate1 tc `EqobsIn (sg @ [concl])
 
@@ -426,40 +426,41 @@ let t_eqobs_inF = FApi.t_low2 "eqobs-in" t_eqobs_inF_r
 (* -------------------------------------------------------------------- *)
 let process_eqs env tc f =
    try
-      Mpv2.of_form env mleft mright f
+      Mpv2.of_form env f
    with Not_found ->
      tc_error_lazy !!tc (fun fmt ->
        let ppe = EcPrinting.PPEnv.ofenv env in
        Format.fprintf fmt
          "cannot recognize %a as a set of equalities"
-         (EcPrinting.pp_form ppe) f)
+         (EcPrinting.pp_form ppe) f.inv)
 
 (* -------------------------------------------------------------------- *)
-let process_hint tc hyps (feqs, inv) =
+let process_hint ml mr tc hyps (feqs, inv) =
   let env = LDecl.toenv hyps in
-  let ienv = LDecl.inv_memenv hyps in
-  let doinv pf = TTC.pf_process_form !!tc ienv tbool pf in
+  let ienv = LDecl.push_active_ts (EcMemory.abstract ml) (EcMemory.abstract mr) hyps in
+  let doinv pf = {ml;mr;inv=TTC.pf_process_form !!tc ienv tbool pf} in
   let doeq pf = process_eqs env tc (doinv pf) in
   let dof g = omap (EcTyping.trans_gamepath env) g in
   let geqs =
     List.map (fun ((f1,f2),geq) -> dof f1, dof f2, doeq geq)
       feqs in
-  let ginv = odfl f_true (omap doinv inv) in
+  let ginv = odfl {ml;mr;inv=f_true} (omap doinv inv) in
   geqs, ginv
 
 (* -------------------------------------------------------------------- *)
 let process_eqobs_inS info tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let spec, inv = process_hint ml mr tc hyps info.EcParsetree.sim_hint in
   let eqo =
     match info.EcParsetree.sim_eqs with
     | Some pf ->
       process_eqs env tc (TTC.tc1_process_prhl_formula tc pf)
     | None ->
-      try Mpv2.needed_eq env mleft mright es.es_po
-      with _ -> tc_error !!tc "cannot infer the set of equalities" in
-  let post = Mpv2.to_form mleft mright eqo inv in
+      try Mpv2.needed_eq env (es_po es)
+      with Not_found -> tc_error !!tc "cannot infer the set of equalities" in
+  let post = Mpv2.to_form_ts_inv eqo inv in
   let sim = init_sim env spec inv in
   let t_main tc =
     match info.EcParsetree.sim_pos with
@@ -475,14 +476,14 @@ let process_eqobs_inS info tc =
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in
-      (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form mleft mright eqi inv) @+ [
+      (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form_ts_inv eqi inv) @+ [
         t_id;
         fun tc ->
           FApi.t_last
             (EcPhlSkip.t_skip @! t_trivial)
             (t_eqobs_inS sim eqo tc)
       ]) tc in
-  (EcPhlConseq.t_equivS_conseq es.es_pr post @+
+  (EcPhlConseq.t_equivS_conseq (es_pr es) post @+
     [t_trivial;
      t_trivial;
      t_main]) tc
@@ -493,16 +494,17 @@ let process_eqobs_inF info tc =
     tc_error !!tc "no positions excepted";
   let env, hyps, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
-  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let ml, mr = ef.ef_ml, ef.ef_mr in
+  let spec, inv = process_hint ml mr tc hyps info.EcParsetree.sim_hint in
   let fl = ef.ef_fl and fr = ef.ef_fr in
   let eqo =
     match info.EcParsetree.sim_eqs with
-    | Some pf ->
-      let _,(ml,mr) = Fun.equivF_memenv fl fr env in
-      let hyps = LDecl.push_all [ml;mr] hyps in
-      process_eqs env tc (TTC.pf_process_form !!tc hyps tbool pf)
+    | Some pf -> 
+      let _,(mle,mre) = Fun.equivF_memenv ml mr fl fr env in
+      let hyps = LDecl.push_active_ts mle mre hyps in
+      process_eqs env tc {ml; mr; inv=TTC.pf_process_form !!tc hyps tbool pf}
     | None ->
-      try Mpv2.needed_eq env mleft mright ef.ef_po
+      try Mpv2.needed_eq env (ef_po ef)
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
   let eqo = Mpv2.remove env pv_res pv_res eqo in
   let sim = init_sim env spec inv in
@@ -510,7 +512,7 @@ let process_eqobs_inF info tc =
     try f_eqobs_in fl fr sim eqo
     with EqObsInError -> tc_error !!tc "not able to process" in
   let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
-  (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
+  (EcPhlConseq.t_equivF_conseq (ef_pr ef') (ef_po ef') @+ [
     t_trivial;
     t_trivial;
      t_eqobs_inF sim eqo]) tc
@@ -520,7 +522,6 @@ let process_eqobs_in cm info tc =
   let prett cm tc =
     let dt, ts = EcHiGoal.process_crushmode cm in
       EcPhlConseq.t_conseqauto ~delta:dt ?tsolve:ts tc in
-
   let tt tc =
     let concl = FApi.tc1_goal tc in
     match concl.f_node with
