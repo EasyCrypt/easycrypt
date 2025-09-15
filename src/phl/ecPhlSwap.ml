@@ -160,7 +160,7 @@ let rec process_swap1 (info : (oside * pswap_kind) located) (tc : tcenv1) =
     let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
 
     let process_codepos =
-      let env = EcEnv.Memory.push_active me env in
+      let env = EcEnv.Memory.push_active_ss me env in
       fun p -> EcTyping.trans_codepos1 env p in
 
     let process_codeoffset (o : pcodeoffset1) : codeoffset1 =

@@ -351,3 +351,15 @@ val t_solve :
   -> ?mode:EcMatching.fmoptions
   -> ?depth:int
   -> FApi.backward
+
+val t_debug :
+    ?tag:string (* for distinguishing prints *)
+  -> FApi.backward
+  -> FApi.backward
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc :tcenv -> unit
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc1 :tcenv1 -> unit
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]

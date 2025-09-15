@@ -6,6 +6,8 @@ open EcTypes
 open EcDecl
 open EcModules
 open EcFol
+open EcParsetree
+open EcSubst
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -24,8 +26,8 @@ module Low = struct
             Format.fprintf fmt
               "the targetted instruction is not a conditionnal")
     in
-    let f_e = form_of_expr m e in
-    let f_e = if b then f_e else f_not f_e in
+    let f_e = ss_inv_of_expr m e in
+    let f_e = if b then f_e else map_ss_inv1 f_not f_e in
 
     (stmt head, e, f_e, stmt (head @ s @ tail))
 
@@ -35,8 +37,8 @@ module Low = struct
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.hs_s in
-    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
-    let concl2  = f_hoareS_r { hs with hs_s = s } in
+    let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd e in
+    let concl2  = f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -45,13 +47,14 @@ module Low = struct
     let hs = tc1_as_ehoareS tc in
     let m  = EcMemory.memory hs.ehs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.ehs_s in
-    let pre =
-      match destr_app hs.ehs_pr with
+    let pre pr =
+      match destr_app pr with
       | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
       | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
+    let pre = map_ss_inv1 pre (ehs_pr hs) in
 
-    let concl1  = f_hoareS hs.ehs_m pre hd e in
-    let concl2  = f_eHoareS_r { hs with ehs_s = s } in
+    let concl1  = f_hoareS (snd hs.ehs_m) pre hd e in
+    let concl2  = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -60,8 +63,8 @@ module Low = struct
     let bhs = tc1_as_bdhoareS tc in
     let m  = EcMemory.memory bhs.bhs_m in
     let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
-    let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
-    let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
+    let concl1  = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd e in
+    let concl2  = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -72,17 +75,19 @@ module Low = struct
       match side with
       | `Left  -> es.es_ml,es.es_mr, es.es_sl
       | `Right -> es.es_mr,es.es_ml, es.es_sr in
-    let hd,_,e,s = gen_rcond (!!tc, env) b EcFol.mhr at_pos s in
-    let mo' = EcIdent.create "&m" in
-    let s1 = Fsubst.f_subst_id in
-    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
-    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in
-    let pre1 = Fsubst.f_subst s1 es.es_pr in
-    let concl1 =
-      f_forall_mems [mo', EcMemory.memtype mo]
-        (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in
+    let ts_inv_lower_side2 = sideif side ts_inv_lower_left2 ts_inv_lower_right2 in
+    let ss_inv_generalize_other = sideif side ss_inv_generalize_right ss_inv_generalize_left in
+    let hd,_,e,s = gen_rcond (!!tc, env) b (fst m) at_pos s in
+    let e = ss_inv_generalize_other e (fst mo) in
+    let concl1 = 
+      EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd mo)
+        (ts_inv_lower_side2 (fun pr po ->
+          let mhs = EcIdent.create "&hr" in
+          let pr = ss_inv_rebind pr mhs in
+          let po = ss_inv_rebind po mhs in
+          f_hoareS (snd m) pr hd po) (es_pr es) e) in
     let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
-    let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
+    let concl2 = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr (es_po es) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
@@ -143,7 +148,7 @@ module LowMatch = struct
               "the targetted instruction is not a match")
     in
 
-    let f = form_of_expr m e in
+    let f = ss_inv_of_expr m e in
 
     ((stmt head, subs, tail), (e, f), infos, cvars)
 
@@ -161,10 +166,10 @@ module LowMatch = struct
             else EcIdent.fresh x
           in (x, xty)) cvars in
       let vars = List.map (curry f_local) names in
-      let cty = toarrow (List.snd names) f.f_ty in
+      let cty = toarrow (List.snd names) f.inv.f_ty in
       let po = f_op cname (List.snd tyinst) cty in
-      let po = f_app po vars f.f_ty in
-      f_exists (List.map (snd_map gtty) names) (f_eq f po) in
+      let po = f_app po vars f.inv.f_ty in
+      map_ss_inv1 (f_exists (List.map (snd_map gtty) names)) (map_ss_inv2 f_eq f {m;inv=po}) in
 
     let me, pvs =
       let cvars =
@@ -191,9 +196,9 @@ module LowMatch = struct
     let epr, asgn =
     if frame then begin
       let vars = List.map (fun (pv, ty) -> f_pvar pv ty (fst me)) pvs in
-      let epr = f_op cname (List.snd tyinst) f.f_ty in
-      let epr = f_app epr vars f.f_ty in
-      Some (f_eq f epr), []
+      let epr = f_op cname (List.snd tyinst) f.inv.f_ty in
+      let epr = map_ss_inv ~m:f.m (fun vars -> f_app epr vars f.inv.f_ty) vars in
+      Some (map_ss_inv2 f_eq f epr), []
     end else begin
       let asgn =
         EcModules.lv_of_list pvs |> omap (fun lv ->
@@ -215,10 +220,10 @@ module LowMatch = struct
     let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.hs_m at_pos hs.hs_s in
 
-    let pr = ofold f_and hs.hs_pr epr in
+    let pr = ofold (map_ss_inv2 f_and) (hs_pr hs) epr in
 
-    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = po1; } in
-    let concl2  = f_hoareS_r { hs with hs_pr = pr; hs_m = me; hs_s = full; } in
+    let concl1  = f_hoareS (snd hs.hs_m) (hs_pr hs) hd po1 in
+    let concl2  = f_hoareS (snd me) pr full (hs_po hs) in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
@@ -228,10 +233,10 @@ module LowMatch = struct
     let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
 
-    let pr = ofold f_and hs.ehs_pr epr in
+    let pr = ofold (map_ss_inv2 f_and) (ehs_pr hs) epr in
 
-    let concl1  = f_eHoareS_r { hs with ehs_s = hd; ehs_po = po1; } in
-    let concl2  = f_eHoareS_r { hs with ehs_pr = pr; ehs_m = me; ehs_s = full; } in
+    let concl1  = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) hd po1 in
+    let concl2  = f_eHoareS (snd me) pr full (ehs_po hs) in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
@@ -241,16 +246,17 @@ module LowMatch = struct
     let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c bhs.bhs_m at_pos bhs.bhs_s in
 
-    let pr = ofold f_and bhs.bhs_pr epr in
+    let pr = ofold (map_ss_inv2 f_and) (bhs_pr bhs) epr in
 
-    let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr hd po1 in
-    let concl2 = f_bdHoareS_r { bhs with bhs_pr = pr; bhs_m = me; bhs_s = full; } in
+    let concl1 = f_hoareS (snd bhs.bhs_m) (bhs_pr bhs) hd po1 in
+    let concl2 = f_bdHoareS (snd me) pr full (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
 
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_equiv_rcond_match_r side c at_pos tc =
     let es = tc1_as_equivS tc in
+    let ml, mr = fst es.es_ml, fst es.es_mr in
 
     let m, mo, s =
       match side with
@@ -258,22 +264,20 @@ module LowMatch = struct
       | `Right -> es.es_mr, es.es_ml, es.es_sr in
 
     let (epr, hd, po1), (me, full) =
-      gen_rcond_full (!!tc, FApi.tc1_env tc) c (EcFol.mhr, snd m) at_pos s in
+      gen_rcond_full (!!tc, FApi.tc1_env tc) c m at_pos s in
 
-    let mo'  = EcIdent.create "&m" in
-    let s1   = Fsubst.f_subst_id in
-    let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
-    let s1   = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in
-    let pre1 = Fsubst.f_subst s1 es.es_pr in
+    let ss_inv_generalize_other inv = sideif side 
+      (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in
 
     let epr  = omap (fun epr ->
-      let se = Fsubst.f_subst_id in
-      let se = Fsubst.f_bind_mem se EcFol.mhr (EcMemory.memory m)  in
-      Fsubst.f_subst se epr) epr in
+      ss_inv_generalize_other (ss_inv_rebind epr (fst m))) epr in
+    
+    let ts_inv_lower_side1 =
+      sideif side ts_inv_lower_left1 ts_inv_lower_right1 in
 
     let concl1 =
-      f_forall_mems [mo', EcMemory.memtype mo]
-        (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd po1) in
+      f_forall_mems_ss_inv mo
+        (ts_inv_lower_side1 (fun pr -> f_hoareS (snd m) pr hd po1) (es_pr es)) in
 
     let (ml, mr), (sl, sr) =
       match side with
@@ -286,9 +290,7 @@ module LowMatch = struct
           (es.es_sl, full) in
 
     let concl2 =
-      f_equivS_r { es with
-        es_pr = ofold f_and es.es_pr epr;
-        es_ml = ml; es_mr = mr; es_sl = sl; es_sr = sr } in
+      f_equivS (snd ml) (snd mr) (ofold (map_ts_inv2 f_and) (es_pr es) epr) sl sr (es_po es) in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)

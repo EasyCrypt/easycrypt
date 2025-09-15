@@ -132,7 +132,6 @@ proof. by []. qed.
 lemma ideal_id0 : ideal id0.
 proof.
 rewrite /id0 /pred1; apply/idealP => //.
-- by move=> x y -> -> /=; rewrite subrr.
 - by move=> a x -> /=; rewrite mulr0.
 qed.
 

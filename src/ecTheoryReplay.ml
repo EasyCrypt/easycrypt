@@ -124,8 +124,8 @@ let tydecl_compatible env tyd1 tyd2 =
 
 (* -------------------------------------------------------------------- *)
 let expr_compatible exn env s e1 e2 =
-  let f1 = EcFol.form_of_expr EcFol.mhr e1 in
-  let f2 = EcSubst.subst_form s (EcFol.form_of_expr EcFol.mhr e2) in
+  let f1 = EcFol.form_of_expr e1 in
+  let f2 = (EcSubst.subst_form s) (EcFol.form_of_expr e2) in
   error_body exn (EcReduction.is_conv ~ri:ri_compatible (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
@@ -533,7 +533,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
           | `Inline _ ->
               let body =
                 try
-                  EcFol.expr_of_form EcFol.mhr body
+                  EcFol.expr_of_form body
                 with EcFol.CannotTranslate ->
                   clone_error env (CE_InlinedOpIsForm (snd ove.ovre_prefix, x))
               in

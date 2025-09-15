@@ -219,66 +219,66 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcAst.Fpr       pr           -> on_pr  cb pr
 
   and on_hf cb hf =
-    on_form cb hf.EcAst.hf_pr;
-    on_form cb hf.EcAst.hf_po;
+    on_form cb (hf_pr hf).inv;
+    on_form cb (hf_po hf).inv;
     on_xp cb hf.EcAst.hf_f
 
   and on_hs cb hs =
-    on_form cb hs.EcAst.hs_pr;
-    on_form cb hs.EcAst.hs_po;
+    on_form cb (hs_pr hs).inv;
+    on_form cb (hs_po hs).inv;
     on_stmt cb hs.EcAst.hs_s;
     on_memenv cb hs.EcAst.hs_m
 
   and on_ef cb ef =
-    on_form cb ef.EcAst.ef_pr;
-    on_form cb ef.EcAst.ef_po;
+    on_form cb (EcAst.ef_pr ef).inv;
+    on_form cb (EcAst.ef_po ef).inv;
     on_xp cb ef.EcAst.ef_fl;
     on_xp cb ef.EcAst.ef_fr
 
   and on_es cb es =
-    on_form cb es.EcAst.es_pr;
-    on_form cb es.EcAst.es_po;
+    on_form cb (EcAst.es_pr es).inv;
+    on_form cb (EcAst.es_po es).inv;
     on_stmt cb es.EcAst.es_sl;
     on_stmt cb es.EcAst.es_sr;
     on_memenv cb es.EcAst.es_ml;
     on_memenv cb es.EcAst.es_mr
 
   and on_eg cb eg =
-    on_form cb eg.EcAst.eg_pr;
-    on_form cb eg.EcAst.eg_po;
+    on_form cb (EcAst.eg_pr eg).inv;
+    on_form cb (EcAst.eg_po eg).inv;
     on_xp cb eg.EcAst.eg_fl;
     on_xp cb eg.EcAst.eg_fr;
     on_stmt cb eg.EcAst.eg_sl;
     on_stmt cb eg.EcAst.eg_sr;
 
   and on_ehf cb hf =
-    on_form cb hf.EcAst.ehf_pr;
-    on_form cb hf.EcAst.ehf_po;
+    on_form cb (EcAst.ehf_pr hf).inv;
+    on_form cb (EcAst.ehf_po hf).inv;
     on_xp cb hf.EcAst.ehf_f
 
   and on_ehs cb hs =
-    on_form cb hs.EcAst.ehs_pr;
-    on_form cb hs.EcAst.ehs_po;
+    on_form cb (EcAst.ehs_pr hs).inv;
+    on_form cb (EcAst.ehs_po hs).inv;
     on_stmt cb hs.EcAst.ehs_s;
     on_memenv cb hs.EcAst.ehs_m
 
   and on_bhf cb bhf =
-    on_form cb bhf.EcAst.bhf_pr;
-    on_form cb bhf.EcAst.bhf_po;
-    on_form cb bhf.EcAst.bhf_bd;
+    on_form cb (EcAst.bhf_pr bhf).inv;
+    on_form cb (EcAst.bhf_po bhf).inv;
+    on_form cb (EcAst.bhf_bd bhf).inv;
     on_xp cb bhf.EcAst.bhf_f
 
   and on_bhs cb bhs =
-    on_form cb bhs.EcAst.bhs_pr;
-    on_form cb bhs.EcAst.bhs_po;
-    on_form cb bhs.EcAst.bhs_bd;
+    on_form cb (EcAst.bhs_pr bhs).inv;
+    on_form cb (EcAst.bhs_po bhs).inv;
+    on_form cb (EcAst.bhs_bd bhs).inv;
     on_stmt cb bhs.EcAst.bhs_s;
     on_memenv cb bhs.EcAst.bhs_m
 
 
   and on_pr cb pr =
     on_xp cb pr.EcAst.pr_fun;
-    List.iter (on_form cb) [pr.EcAst.pr_event; pr.EcAst.pr_args]
+    List.iter (on_form cb) [pr.EcAst.pr_event.inv; pr.EcAst.pr_args]
 
   in
     on_ty cb f.EcAst.f_ty; fornode ()

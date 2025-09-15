@@ -20,10 +20,10 @@ module TTC = EcProofTyping
 let pf_destr_eqobsS pf env f =
   let es = destr_equivS f in
   let of_form =
-    try  Mpv2.of_form env (fst es.es_ml) (fst es.es_mr)
+    try  Mpv2.of_form env
     with Not_found -> tc_error pf "cannot reconize a set of equalities"
   in
-    (es, es.es_sl, es.es_sr, of_form es.es_pr, of_form es.es_po)
+    (es, es.es_sl, es.es_sr, of_form (es_pr es), of_form (es_po es))
 
 (* -------------------------------------------------------------------- *)
 let pf_hSS pf hyps h =
@@ -60,12 +60,14 @@ let tc1_destr_eagerS tc s s' =
 (* This ensure condition (d) and (e) of the eager_seq rule.             *)
 let pf_compat pf env modS modS' eqR eqIs eqXs =
   if not (Mpv2.subset eqIs eqR) then begin
-    let eqR  = Mpv2.to_form mleft mright eqR f_true in
-    let eqIs = Mpv2.to_form mleft mright eqIs f_true in
+    let ml, mr = EcIdent.create "&1_dummy", EcIdent.create "&2_dummy" in
+    let f_true = {ml; mr; inv=f_true} in
+    let eqR  = Mpv2.to_form_ts_inv eqR f_true in
+    let eqIs = Mpv2.to_form_ts_inv eqIs f_true in
       tc_error_lazy pf (fun fmt ->
         let ppe  = EcPrinting.PPEnv.ofenv env in
-        Format.fprintf fmt "%a should be include in %a"
-          (EcPrinting.pp_form ppe) eqIs (EcPrinting.pp_form ppe) eqR)
+        Format.fprintf fmt "%a should be included in %a"
+          (EcPrinting.pp_form ppe) eqIs.inv (EcPrinting.pp_form ppe) eqR.inv)
   end;
 
   let check_pv x1 x2 _ =
@@ -98,36 +100,21 @@ let t_eager_seq_r i j eqR h tc =
   (* h is a proof of (h) *)
   let tH, (_, s, s', eqIs, eqXs) = pf_hSS !!tc hyps h in
   let eC, c, c' = tc1_destr_eagerS tc s s' in
-  let seqR = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqR in
+  let seqR = Mpv2.of_form env eqR in
 
   (* check (d) and (e) *)
   pf_compat !!tc env (s_write env s) (s_write env s') seqR eqIs eqXs;
 
-  let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) eC.es_po) in
+  let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) (es_po eC).inv) in
   let c1 ,c2  = s_split env i c in
   let c1',c2' = s_split env j c' in
 
-  let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
+  let to_form eq = Mpv2.to_form_ts_inv eq {ml=(fst eC.es_ml); mr=(fst eC.es_mr); inv=f_true} in
 
-  let a = f_equivS_r { eC with
-    es_sl = stmt (s.s_node@c1);
-    es_sr = stmt (c1'@s'.s_node);
-    es_po = eqR;
-  }
-  and b = f_equivS_r { eC with
-    es_pr = eqR;
-    es_sl = stmt (s.s_node@c2);
-    es_sr = stmt (c2'@s'.s_node);
-  }
-  and c = f_equivS_r { eC with
-    es_ml = (fst eC.es_ml, snd eC.es_mr);
-    es_pr = to_form (Mpv2.eq_fv2 seqR);
-    es_sl = stmt c2';
-    es_sr = stmt c2';
-    es_po = to_form eqO2;
-  }
-
-  in
+  let a = f_equivS (snd eC.es_ml) (snd eC.es_mr) (es_pr eC) (stmt (s.s_node@c1)) (stmt (c1'@s'.s_node)) eqR
+  and b = f_equivS (snd eC.es_ml) (snd eC.es_mr) eqR (stmt (s.s_node@c2)) (stmt (c2'@s'.s_node)) (es_po eC)
+  and c = f_equivS (snd eC.es_mr) (snd eC.es_mr) (to_form (Mpv2.eq_fv2 seqR))
+    (stmt c2') (stmt c2') (to_form eqO2) in
 
   FApi.t_first
     (t_apply_hyp h)
@@ -135,46 +122,40 @@ let t_eager_seq_r i j eqR h tc =
 
 (* -------------------------------------------------------------------- *)
 let t_eager_if_r tc =
-  let hyps = FApi.tc1_hyps tc in
   let es   = tc1_as_equivS tc in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
 
   let (e , c1 , c2 ), s  = pf_last_if  !!tc es.es_sl in
   let (e', c1', c2'), s' = pf_first_if !!tc es.es_sr in
 
-  let fel = form_of_expr (fst es.es_ml) e in
-  let fer = form_of_expr (fst es.es_mr) e' in
-  let fe  = form_of_expr mhr e in
-
-  let m2 = as_seq1 (LDecl.fresh_ids hyps ["&m2"]) in
+  let fel = ss_inv_generalize_right (ss_inv_of_expr ml e) mr in
+  let fer = ss_inv_generalize_left (ss_inv_of_expr mr e') ml in
 
   let aT =
-    f_forall
-      [(mleft, GTmem (snd es.es_ml)); (mright, GTmem (snd es.es_mr))]
-      (f_imp es.es_pr (f_eq fel fer)) in
+    EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr
+      (map_ts_inv2 f_imp (es_pr es) (map_ts_inv2 f_eq fel fer)) in
 
   let bT =
     let b   = EcIdent.create "b1" in
-    let eqb = f_eq fe (f_local b tbool) in
-    let sub = Fsubst.f_subst_id in
-    let sub = Fsubst.f_bind_mem sub mleft  mhr in
-    let sub = Fsubst.f_bind_mem sub mright m2 in
-    let p   = Fsubst.f_subst sub es.es_pr in
+    let fe  = ss_inv_generalize_right (ss_inv_of_expr ml e) mr in
+    let eqb = map_ts_inv2 f_eq fe {ml;mr;inv=f_local b tbool} in
 
-    f_forall
-      [(m2, GTmem (snd es.es_mr)); (b, GTty tbool)]
-      (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
+    EcSubst.f_forall_mems_ss_inv es.es_mr   
+      (map_ss_inv1
+      (f_forall [(b, GTty tbool)])
+      (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd es.es_ml) pr s po) (map_ts_inv2 f_and (es_pr es) eqb) eqb)) in
 
   let cT =
-    let pre = f_and es.es_pr (f_eq fel f_true) in
+    let pre = map_ts_inv2 f_and (es_pr es) (map_ts_inv2 f_eq fel {ml;mr;inv=f_true}) in
     let st  = stmt (s.s_node @ c1.s_node) in
     let st' = stmt (c1'.s_node @ s'.s_node) in
-    f_equivS es.es_ml es.es_mr pre st st' es.es_po in
+    f_equivS (snd es.es_ml) (snd es.es_mr) pre st st' (es_po es) in
 
   let dT =
-    let pre = f_and es.es_pr (f_eq fel f_false) in
+    let pre = map_ts_inv2 f_and (es_pr es) (map_ts_inv2 f_eq fel {ml;mr;inv=f_false}) in
     let st  = stmt (s.s_node @ c2.s_node) in
     let st' = stmt (c2'.s_node @ s'.s_node) in
-    f_equivS es.es_ml es.es_mr pre st st' es.es_po in
+    f_equivS (snd es.es_ml) (snd es.es_mr) pre st st' (es_po es) in
 
   FApi.xmutate1 tc `EagerIf [aT; bT; cT; dT]
 
@@ -184,52 +165,39 @@ let t_eager_while_r h tc =
 
   let tH, (_, s, s', eqIs, eqXs) = pf_hSS !!tc hyps h in
   let eC, wc, wc' = tc1_destr_eagerS tc s s' in
+  let ml, mr = fst eC.es_ml, fst eC.es_mr in
 
   let (e , c ), n  = pf_first_while !!tc wc  in
   let (e', c'), n' = pf_first_while !!tc wc' in
-
   if not (List.is_empty n.s_node && List.is_empty n'.s_node) then
     tc_error !!tc "no statements should followed the while loops";
 
-  let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
+  let to_form eq = Mpv2.to_form_ts_inv eq {ml=(fst eC.es_ml);mr=(fst eC.es_mr);inv=f_true} in
 
-  let eqI  = eC.es_pr in
+  let eqI  = (es_pr eC) in
   let seqI =
     try
-      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI
+      Mpv2.of_form env eqI
     with Not_found ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe  = EcPrinting.PPEnv.ofenv env in
-        Format.fprintf fmt "recognize equalities in %a@." (EcPrinting.pp_form ppe) eqI)
+        Format.fprintf fmt "recognize equalities in %a@." (EcPrinting.pp_form ppe) eqI.inv)
   in
   let eqI2 = to_form (Mpv2.eq_fv2 seqI) in
-  let e1   = form_of_expr (fst eC.es_ml) e in
-  let e2   = form_of_expr (fst eC.es_mr) e' in
-  let post = Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) (Mpv2.union seqI eqXs) (f_not e1) in
+  let e1   = ss_inv_generalize_right (ss_inv_of_expr ml e) mr in
+  let e2   = ss_inv_generalize_left (ss_inv_of_expr mr e') ml in
+  let post = Mpv2.to_form_ts_inv (Mpv2.union seqI eqXs) (map_ts_inv1 f_not e1) in
 
   (* check (e) and (f) *)
   pf_compat !!tc env (s_write env s) (s_write env s') seqI eqIs eqXs;
 
-  let aT =
-    f_forall
-      [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
-      (f_imp eqI (f_eq e1 e2))
+  let aT = EcSubst.f_forall_mems_ts_inv eC.es_ml eC.es_mr
+      (map_ts_inv2 f_imp eqI (map_ts_inv2 f_eq e1 e2))
 
-  and bT = f_equivS_r { eC with
-    es_pr = f_and_simpl eqI e1;
-    es_sl = stmt (s.s_node@c.s_node);
-    es_sr = stmt (c'.s_node@s'.s_node);
-    es_po = eqI;
-  }
-
-  and cT = f_equivS_r { eC with
-    es_ml = (fst eC.es_ml, snd eC.es_mr);
-    es_pr = eqI2;
-    es_sl = c';
-    es_sr = c';
-    es_po = eqI2;
-  }
-
+  and bT = f_equivS (snd eC.es_ml) (snd eC.es_mr) (map_ts_inv2 f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
+    (stmt (c'.s_node@s'.s_node)) eqI
+  
+  and cT = f_equivS (snd eC.es_mr) (snd eC.es_mr) eqI2 c' c' eqI2
   in
 
   let tsolve tc =
@@ -247,6 +215,7 @@ let t_eager_while_r h tc =
 let t_eager_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let eg  = tc1_as_eagerF tc in
+  let ml, mr = eg.eg_ml, eg.eg_mr in
 
   let fl, fr =
     (NormMp.norm_xfun env eg.eg_fl,
@@ -257,11 +226,11 @@ let t_eager_fun_def_r tc =
   EcPhlFun.check_concrete !!tc env fr;
 
   let (memenvl, (fsigl,fdefl),
-       memenvr, (fsigr,fdefr), env) = Fun.equivS fl fr env in
+       memenvr, (fsigr,fdefr), env) = Fun.equivS ml mr fl fr env in
 
   let extend mem fdef =
     match fdef.f_ret with
-    | None -> f_tt, mem, fdef.f_body
+    | None -> {m=fst mem;inv=f_tt}, mem, fdef.f_body
     | Some e ->
       let v = { ov_name = Some "result"; ov_type = e.e_ty } in
       let mem, s = EcMemory.bind_fresh v mem in
@@ -275,22 +244,15 @@ let t_eager_fun_def_r tc =
   let er, memr, sfr = extend memenvr fdefr in
   let ml, mr = EcMemory.memory meml, EcMemory.memory memr in
   let s = PVM.empty in
-  let s = PVM.add env pv_res ml el s in
-  let s = PVM.add env pv_res mr er s in
-  let post = PVM.subst env s eg.eg_po in
+  let s = PVM.add env pv_res ml el.inv s in
+  let s = PVM.add env pv_res mr er.inv s in
+  let post = map_ts_inv1 (PVM.subst env s) (eg_po eg) in
   let s = PVM.empty in
   let s = EcPhlFun.subst_pre env fsigl ml s in
   let s = EcPhlFun.subst_pre env fsigr mr s in
-  let pre = PVM.subst env s eg.eg_pr in
+  let pre = map_ts_inv1 (PVM.subst env s) (eg_pr eg) in
 
-  let cond = f_equivS_r {
-    es_ml = meml;
-    es_mr = memr;
-    es_sl = s_seq eg.eg_sl sfl;
-    es_sr = s_seq sfr eg.eg_sr;
-    es_pr = pre;
-    es_po = post;
-  } in
+  let cond = f_equivS (snd meml) (snd memr) pre (s_seq eg.eg_sl sfl) (s_seq sfr eg.eg_sr) post in
 
   FApi.xmutate1 tc `EagerFunDef [cond]
 
@@ -311,17 +273,17 @@ let t_eager_fun_abs_r eqI h tc =
   let do1 og sg =
     let ef = destr_equivF og in
     let torefl f =
-      Mpv2.to_form mleft mright
-        (Mpv2.eq_refl (PV.fv env mright f))
-        f_true
+      Mpv2.to_form_ts_inv
+        (Mpv2.eq_refl (PV.fv env f.mr f.inv))
+        {ml=f.ml;mr=f.mr;inv=f_true}
     in
-         f_eagerF ef.ef_pr s ef.ef_fl ef.ef_fr s' ef.ef_po
-      :: f_equivF (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po)
+         f_eagerF (ef_pr ef) s ef.ef_fl ef.ef_fr s' (ef_po ef)
+      :: f_equivF (torefl (ef_pr ef)) ef.ef_fr ef.ef_fr (torefl (ef_po ef))
       :: sg
   in
 
   let sg   = List.fold_right do1 sg [] in
-  let seqI = Mpv2.of_form env mleft mright eqI in
+  let seqI = Mpv2.of_form env eqI in
 
   (* check (e) and (f)*)
   pf_compat !!tc env (s_write env s) (s_write env s') seqI eqIs eqXs;
@@ -338,6 +300,8 @@ let t_eager_fun_abs_r eqI h tc =
 let t_eager_call_r fpre fpost tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
+  let fpre = EcSubst.ts_inv_rebind fpre (fst es.es_ml) (fst es.es_mr) in
+  let fpost = EcSubst.ts_inv_rebind fpost (fst es.es_ml) (fst es.es_mr) in
 
   let (lvl, fl, argsl), sl = pf_last_call  !!tc es.es_sl in
   let (lvr, fr, argsr), sr = pf_first_call !!tc es.es_sr in
@@ -358,15 +322,13 @@ let t_eager_call_r fpre fpost tc =
 
   List.iter check_a argsl;
 
-  let ml = EcMemory.memory es.es_ml in
-  let mr = EcMemory.memory es.es_mr in
   let modil = PV.union (f_write env fl) swl in
   let modir = PV.union (f_write env fr) swr in
   let post  = EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl) modil
 
-     (lvr,fr,argsr) modir ml mr es.es_po hyps in
+     (lvr,fr,argsr) modir (es_po es) hyps in
   let f_concl = f_eagerF fpre sl fl fr sr fpost in
-  let concl   = f_equivS_r { es with es_sl = stmt []; es_sr = stmt []; es_po = post; } in
+  let concl   = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) (stmt []) (stmt []) post in
 
   FApi.xmutate1 tc `EagerCall [f_concl; concl]
 
@@ -543,8 +505,9 @@ let t_eager_r h inv tc =
   check_only_global !!tc env s';
 
   let eC, c, c' = tc1_destr_eagerS tc s s' in
-  let eqinv = Mpv2.of_form env mleft mright inv in
-  let eqO = Mpv2.of_form env mleft mright eC.es_po in
+  let ml, mr = fst eC.es_ml, fst eC.es_mr in
+  let eqinv = Mpv2.of_form env inv in
+  let eqO = Mpv2.of_form env (es_po eC) in
   let c1, c1', fhyps, eqi = eager !!tc env s s' eqinv eqIs eqXs c c' eqO in
 
   if c1 <> [] || c1' <> [] then
@@ -554,22 +517,19 @@ let t_eager_r h inv tc =
     let defl = Fun.by_xpath fl env in
     let defr = Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
-    let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
-    let post = Mpv2.to_form mleft mright eqo eq_res in
+    let eq_res = ts_inv_eqres sigl.fs_ret ml sigr.fs_ret mr in
+    let post = Mpv2.to_form_ts_inv eqo eq_res in
     let eq_params =
-      f_eqparams
-        sigl.fs_arg sigl.fs_anames mleft
-        sigr.fs_arg sigr.fs_anames mright in
-    let pre = f_and_simpl eq_params inv in
+      ts_inv_eqparams
+        sigl.fs_arg sigl.fs_anames ml
+        sigr.fs_arg sigr.fs_anames mr in
+    let pre = map_ts_inv2 f_and_simpl eq_params inv in
     f_eagerF pre s fl fr s' post
   in
 
   let concl =
-    f_equivS_r { eC with
-      es_sl = stmt []; es_sr = stmt [];
-      es_po = Mpv2.to_form mleft mright eqi f_true;
-    }
-  in
+    f_equivS (snd eC.es_ml) (snd eC.es_mr) (es_pr eC) (stmt []) (stmt [])
+      (Mpv2.to_form_ts_inv eqi {ml;mr;inv=f_true}) in
 
   let concls = List.map dof fhyps in
 
@@ -593,20 +553,20 @@ let process_info info tc =
       (t_id tc, fst (LDecl.hyp_by_name (unloc h) hyps))
 
   | EcParsetree.LE_todo (h, s1, s2, eqIs, eqXs) ->
-    let ml,mr =
+    let (ml, mlt) as mle, ((mr, mrt) as mre) =
       match (FApi.tc1_goal tc).f_node with
-      | FeagerF _ ->
-        EcEnv.Fun.inv_memory `Left, EcEnv.Fun.inv_memory `Right
+      | FeagerF {eg_ml=ml;eg_mr=mr} ->
+        EcMemory.abstract ml, EcMemory.abstract mr
       | _ ->
         let es    = tc1_as_equivS tc in
         es.es_ml, es.es_mr in
-    let hyps = LDecl.push_all [ml; mr] hyps in
+    let hyps = LDecl.push_active_ts mle mre hyps in
     let process_formula = TTC.pf_process_form !!tc hyps tbool in
-    let eqIs  = process_formula eqIs in
-    let eqXs  = process_formula eqXs in
-    let s1    = TTC.tc1_process_stmt tc (snd ml) s1 in
-    let s2    = TTC.tc1_process_stmt tc (snd mr) s2 in
-    let f     = f_equivS ml mr eqIs s1 s2 eqXs in
+    let eqIs  = {ml;mr;inv=process_formula eqIs} in
+    let eqXs  = {ml;mr;inv=process_formula eqXs} in
+    let s1    = TTC.tc1_process_prhl_stmt tc `Left s1 in
+    let s2    = TTC.tc1_process_prhl_stmt tc `Right s2 in
+    let f     = f_equivS mlt mrt eqIs s1 s2 eqXs in
     let h     = LDecl.fresh_id hyps (unloc h) in
     (FApi.t_last (t_intros_i [h]) (t_cut f tc), h)
 
@@ -633,11 +593,13 @@ let process_fun_def tc =
 
 (* -------------------------------------------------------------------- *)
 let process_fun_abs info eqI tc =
+  let eg    = EcLowPhlGoal.tc1_as_eagerF tc in
+  let ml, mr = eg.eg_ml, eg.eg_mr in
   let hyps  = FApi.tc1_hyps tc in
-  let env   = LDecl.inv_memenv hyps in
+  let env   = LDecl.inv_memenv ml mr hyps in
   let eqI   = TTC.pf_process_form !!tc env tbool eqI in
   let gs, h = process_info info tc in
-  FApi.t_last (t_eager_fun_abs eqI h) gs
+  FApi.t_last (t_eager_fun_abs {inv=eqI;ml;mr} h) gs
 
 (* -------------------------------------------------------------------- *)
 let process_call info tc =
@@ -653,10 +615,11 @@ let process_call info tc =
         check_only_global !!tc env sl;
         check_only_global !!tc env sr;
 
-        let penv, qenv = LDecl.equivF fl fr hyps in
+        let (ml, mr) = fst es.es_ml, fst es.es_mr in
+        let penv, qenv = LDecl.equivF ml mr fl fr hyps in
         let fpre  = TTC.pf_process_form !!tc penv tbool fpre  in
         let fpost = TTC.pf_process_form !!tc qenv tbool fpost in
-        f_eagerF fpre sl fl fr sr fpost
+        f_eagerF {ml;mr;inv=fpre} sl fl fr sr {ml;mr;inv=fpost}
 
     | _ -> tc_error !!tc "invalid arguments"
   in
@@ -666,14 +629,12 @@ let process_call info tc =
   let eg = pf_as_eagerF !!tc ax in
 
   FApi.t_on1seq 0
-    (t_eager_call eg.eg_pr eg.eg_po)
+    (t_eager_call (eg_pr eg) (eg_po eg))
     (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
     tc
 
 (* -------------------------------------------------------------------- *)
 let process_eager info inv tc =
-  let hyps  = FApi.tc1_hyps tc in
-  let penv  = LDecl.inv_memenv hyps in
-  let inv   = TTC.pf_process_formula !!tc penv inv in
+  let inv   = TTC.tc1_process_prhl_form tc tbool inv in
   let gs, h = process_info info tc in
   FApi.t_last (t_eager h inv) gs

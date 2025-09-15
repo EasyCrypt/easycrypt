@@ -7,6 +7,7 @@ open EcEnv
 open EcFol
 open EcReduction
 open EcBaseLogic
+open EcMemory
 module BI = EcBigInt
 
 (* -------------------------------------------------------------------- *)
@@ -297,7 +298,7 @@ and try_reduce_fixdef
             subst bds cargs)
         subst bds pargs in
 
-    let body = EcFol.form_of_expr EcFol.mhr body in
+    let body = EcFol.form_of_expr body in
     let body =
       Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
 
@@ -457,7 +458,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       if   st.st_ri.modpath
       then EcEnv.NormMp.norm_pvar st.st_env pv
       else pv in
-    app_red st (f_pvar pv f.f_ty m) args
+    app_red st (f_pvar pv f.f_ty m).inv args
 
   | Fop _ -> app_red st (Subst.subst s f) args
 
@@ -479,99 +480,108 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | FhoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
-    let hf_pr = norm st s hf.hf_pr in
-    let hf_po = norm st s hf.hf_po in
+    assert (not (Subst.has_mem s hf.hf_m));
+    let hf_pr = norm st s (hf_pr hf).inv in
+    let hf_po = norm st s (hf_po hf).inv in
     let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_r { hf_pr; hf_f; hf_po }
+    let (m,_) = norm_me s (abstract hf.hf_m) in
+    f_hoareF {m;inv=hf_pr} hf_f {m;inv=hf_po}
 
   | FhoareS hs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.hs_m)));
-    let hs_pr = norm st s hs.hs_pr in
-    let hs_po = norm st s hs.hs_po in
+    let hs_pr = norm st s (hs_pr hs).inv in
+    let hs_po = norm st s (hs_po hs).inv in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
-    f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+    let m = fst hs_m in
+    f_hoareS (snd hs_m) {m;inv=hs_pr} hs_s {m;inv=hs_po}
 
   | FeHoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
-    let ehf_pr  = norm st s hf.ehf_pr  in
-    let ehf_po  = norm st s hf.ehf_po  in
+    assert (not (Subst.has_mem s hf.ehf_m));
+    let ehf_pr  = norm st s (ehf_pr hf).inv in
+    let ehf_po  = norm st s (ehf_po hf).inv in
     let ehf_f   = norm_xfun st s hf.ehf_f in
-    f_eHoareF_r { ehf_pr; ehf_f; ehf_po; }
+    let (m,_) = norm_me s (abstract hf.ehf_m) in
+    f_eHoareF {m;inv=ehf_pr} ehf_f {m;inv=ehf_po}
 
   | FeHoareS hs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.ehs_m)));
-    let ehs_pr  = norm st s hs.ehs_pr in
-    let ehs_po  = norm st s hs.ehs_po in
+    let ehs_pr  = norm st s (ehs_pr hs).inv in
+    let ehs_po  = norm st s (ehs_po hs).inv in
     let ehs_s   = norm_stmt s hs.ehs_s in
-    let ehs_m   = norm_me s hs.ehs_m in
-    f_eHoareS_r { ehs_pr; ehs_po; ehs_s; ehs_m }
+    let (m,mt)   = norm_me s hs.ehs_m in
+    f_eHoareS mt {m;inv=ehs_pr} ehs_s {m;inv=ehs_po}
 
   | FbdHoareF hf ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
-    let bhf_pr = norm st s hf.bhf_pr in
-    let bhf_po = norm st s hf.bhf_po in
+    assert (not (Subst.has_mem s hf.bhf_m));
+    let bhf_pr = norm st s (bhf_pr hf).inv in
+    let bhf_po = norm st s (bhf_po hf).inv in
     let bhf_f  = norm_xfun st s hf.bhf_f in
-    let bhf_bd = norm st s hf.bhf_bd in
-    f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_f; bhf_bd }
+    let bhf_bd = norm st s (bhf_bd hf).inv in
+    let (m,_) = norm_me s (abstract hf.bhf_m) in
+    f_bdHoareF {m;inv=bhf_pr} bhf_f {m;inv=bhf_po} hf.bhf_cmp {m;inv=bhf_bd}
 
   | FbdHoareS bhs ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst bhs.bhs_m)));
-    let bhs_pr = norm st s bhs.bhs_pr in
-    let bhs_po = norm st s bhs.bhs_po in
+    let bhs_pr = norm st s (bhs_pr bhs).inv in
+    let bhs_po = norm st s (bhs_po bhs).inv in
     let bhs_s  = norm_stmt s bhs.bhs_s in
-    let bhs_bd = norm st s bhs.bhs_bd in
-    let bhs_m  = norm_me s bhs.bhs_m in
-    f_bdHoareS_r { bhs with bhs_m; bhs_pr; bhs_po; bhs_s; bhs_bd }
+    let bhs_bd = norm st s (bhs_bd bhs).inv in
+    let (m,mt)  = norm_me s bhs.bhs_m in
+    f_bdHoareS mt {m;inv=bhs_pr} bhs_s {m;inv=bhs_po} bhs.bhs_cmp {m;inv=bhs_bd}
 
   | FequivF ef ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mleft));
-    assert (not (Subst.has_mem s mright));
-    let ef_pr = norm st s ef.ef_pr in
-    let ef_po = norm st s ef.ef_po in
+    assert (not (Subst.has_mem s ef.ef_ml));
+    assert (not (Subst.has_mem s ef.ef_mr));
+    let ef_pr = norm st s (ef_pr ef).inv in
+    let ef_po = norm st s (ef_po ef).inv in
     let ef_fl = norm_xfun st s ef.ef_fl in
     let ef_fr = norm_xfun st s ef.ef_fr in
-    f_equivF_r {ef_pr; ef_fl; ef_fr; ef_po }
+    let (ml,_) = norm_me s (abstract ef.ef_ml) in
+    let (mr,_) = norm_me s (abstract ef.ef_mr) in
+    f_equivF {ml;mr;inv=ef_pr} ef_fl ef_fr {ml;mr;inv=ef_po}
 
   | FequivS es ->
     assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst es.es_ml)));
     assert (not (Subst.has_mem s (fst es.es_mr)));
-    let es_pr = norm st s es.es_pr in
-    let es_po = norm st s es.es_po in
+    let es_pr = norm st s (es_pr es).inv in
+    let es_po = norm st s (es_po es).inv in
     let es_sl = norm_stmt s es.es_sl in
     let es_sr = norm_stmt s es.es_sr in
-    let es_ml  = norm_me s es.es_ml in
-    let es_mr  = norm_me s es.es_mr in
-    f_equivS_r {es_ml; es_mr; es_pr; es_sl; es_sr; es_po }
+    let (ml,mlt)  = norm_me s es.es_ml in
+    let (mr,mrt)  = norm_me s es.es_mr in
+    f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
 
   | FeagerF eg ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mleft));
-    assert (not (Subst.has_mem s mright));
-    let eg_pr = norm st s eg.eg_pr in
-    let eg_po = norm st s eg.eg_po in
+    assert (not (Subst.has_mem s eg.eg_ml));
+    assert (not (Subst.has_mem s eg.eg_mr));
+    let eg_pr = norm st s (eg_pr eg).inv in
+    let eg_po = norm st s (eg_po eg).inv in
     let eg_fl = norm_xfun st s eg.eg_fl in
     let eg_fr = norm_xfun st s eg.eg_fr in
     let eg_sl = norm_stmt s eg.eg_sl in
     let eg_sr = norm_stmt s eg.eg_sr in
-    f_eagerF_r {eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po }
+    let (ml,_) = norm_me s (abstract eg.eg_ml) in
+    let (mr,_) = norm_me s (abstract eg.eg_mr) in
+    f_eagerF {ml;mr;inv=eg_pr} eg_sl eg_fl eg_fr eg_sr {ml;mr;inv=eg_po}
 
   | Fpr pr ->
     assert (Args.isempty args);
-    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s pr.pr_event.m));
     let pr_mem   = Subst.subst_m s pr.pr_mem in
     let pr_fun   = norm_xfun st s pr.pr_fun in
     let pr_args  = norm st s pr.pr_args in
-    let pr_event = norm st s pr.pr_event in
-    f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
+    let pr_event = norm st s pr.pr_event.inv in
+    let (m,_) = norm_me s (abstract pr.pr_event.m) in
+    f_pr pr_mem pr_fun pr_args {m;inv=pr_event}
 
 (* -------------------------------------------------------------------- *)
 (* FIXME : initialize the subst with let in hyps *)

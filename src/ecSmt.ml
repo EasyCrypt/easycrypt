@@ -888,7 +888,7 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
-  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
+  let _, mt = EcEnv.Fun.prF_memenv (EcIdent.create "&dummy") pr_fun genv.te_env in
   let mty = trans_memtype env mt in
   let tyr = ty_distr mty in
   let ls =
@@ -906,8 +906,8 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
 
   let wev =
-    let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
-    let wbody = trans_form_b (genv,lenv) pr_event in
+    let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
+    let wbody = trans_form_b (genv,lenv) pr_event.inv in
     trans_lambda genv [wbd] wbody
 
   in WTerm.t_app_infer fs_mu [d; wev]
@@ -990,7 +990,7 @@ and trans_fix (genv, lenv) (wdom, o) =
       | OPB_Leaf (locals, e) ->
           let ctors = List.rev ctors in
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
-          let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
+          let fe = EcCoreFol.form_of_expr e in
 
           let we = trans_app (genv, lenv) fe eargs in
 
@@ -1416,7 +1416,7 @@ module Frequency = struct
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
-        doit pr.pr_event; doit pr.pr_args in
+        doit pr.pr_event.inv; doit pr.pr_args in
     doit f;
     if not (Sx.is_empty !sf) then sp := Sp.add CI_Distr.p_mu !sp;
     !sp, !sf
@@ -1452,7 +1452,7 @@ module Frequency = struct
           r_union rs (f_ops unwanted_op f)
         | {op_kind = OB_oper (Some (OP_Fix e)) } ->
           let rec aux rs = function
-            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr e))
             | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
           in
           aux rs e.opf_branches
@@ -1495,7 +1495,7 @@ module Frequency = struct
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e
-      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
+      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event.inv;add pr.pr_args
       | _ -> () in
     add form
 

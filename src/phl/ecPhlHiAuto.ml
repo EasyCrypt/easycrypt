@@ -57,16 +57,20 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       EcPhlWp.t_wp (Some (Single (Zpr.cpos (-1))))
 
   | LL_RND ->
+      let m = EcIdent.create "&hr" in 
          EcPhlRnd.t_bdhoare_rnd PNoRndParams
-      @> EcPhlConseq.t_bdHoareS_conseq f_true f_true
+      @> EcPhlConseq.t_bdHoareS_conseq {m;inv=f_true} {m;inv=f_true}
       @~ FApi.t_on1 (-1) ~ttout:ll_trivial t_id
 
   | LL_CALL _ ->
-         EcPhlCall.t_bdhoare_call f_true f_true None
+      let m = EcIdent.create "&hr" in 
+         EcPhlCall.t_bdhoare_call {m;inv=f_true} {m;inv=f_true} None
 
   | LL_JUMP ->
+      let m = EcIdent.create "&hr" in
         ( EcPhlApp.t_bdhoare_app
-           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (Zpr.cpos (-1)) ({m;inv=f_true}, {m;inv=f_true}, 
+            {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -76,13 +80,14 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
         @~ FApi.t_rotate `Left 1
 
   | LL_COND (lls1, lls2) ->
+    let m = EcIdent.create "&hr" in
       let condtc =
         EcPhlCond.t_bdhoare_cond
         @+ [apply_ll_strategy lls1; apply_ll_strategy lls2]
       in
 
         ( EcPhlApp.t_bdhoare_app
-           (Zpr.cpos (-1)) (f_true, f_true, f_r1, f_r1, f_r0, f_r1)
+           (Zpr.cpos (-1)) ({m;inv=f_true}, {m;inv=f_true}, {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -102,7 +107,9 @@ let t_lossless1_r tc =
     @~ FApi.t_onall (EcLowGoal.t_crush ~delta:true) in
 
   let tactic =
-    (EcPhlConseq.t_bdHoareS_conseq f_true f_true
+    let m = EcIdent.create "&hr" in 
+    let f_r1: EcAst.ss_inv = {m; inv = f_r1} in
+    (EcPhlConseq.t_bdHoareS_conseq {m;inv=f_true} {m;inv=f_true}
         @~ FApi.t_on1 (-1) ~ttout:ll_trivial
              (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1))
         @~ FApi.t_on1 (-1) ~ttout:ll_trivial
@@ -133,9 +140,10 @@ let t_lossless tc =
 
   | FbdHoareS _ -> t_single tc
 
-  | FequivS _hs ->
-      ((EcPhlApp.t_equiv_app_onesided `Left (EcMatching.Zipper.cpos 0) f_true f_true) @+
-         [ (EcPhlApp.t_equiv_app_onesided `Right (EcMatching.Zipper.cpos 0) f_true f_true) @+
+  | FequivS hs ->
+    let ml, mr = fst hs.es_ml, fst hs.es_mr in
+      ((EcPhlApp.t_equiv_app_onesided `Left (EcMatching.Zipper.cpos 0) {m=ml;inv=f_true} {m=ml;inv=f_true}) @+
+         [ (EcPhlApp.t_equiv_app_onesided `Right (EcMatching.Zipper.cpos 0) {m=mr;inv=f_true} {m=mr;inv=f_true}) @+
              [ EcPhlSkip.t_skip @! t_trivial ;
                t_single
              ];
