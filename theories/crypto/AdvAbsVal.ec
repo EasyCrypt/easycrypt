@@ -38,6 +38,6 @@ lemma abs_val (P:real -> bool):
 proof.
 move=> HP &m A Hl.
 case (Pr[A.main() @ &m : res] <= 1%r / 2%r)=> Hle.
-+ by move: (HP &m (Neg_main(A))); rewrite (Neg_A_Pr_minus A &m) /#.
++ by move: (HP &m (Neg_main(A))); rewrite (Neg_A_Pr_minus A &m) //#.
 by move: (HP &m A)=> /#.
 qed.

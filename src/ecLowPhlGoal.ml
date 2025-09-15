@@ -10,6 +10,7 @@ open EcEnv
 open EcPV
 open EcCoreGoal
 open EcMatching.Position
+open EcSubst
 
 module Zpr = EcMatching.Zipper
 
@@ -208,24 +209,24 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS_r   { hs with hs_s  = s }
-  | None       , FeHoareS  hs -> f_eHoareS_r  { hs with ehs_s = s }
-  | None       , FbdHoareS hs -> f_bdHoareS_r { hs with bhs_s = s }
-  | Some `Left , FequivS   es -> f_equivS_r   { es with es_sl = s }
-  | Some `Right, FequivS   es -> f_equivS_r   { es with es_sr = s }
+  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
+  | None       , FeHoareS  hs -> f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
+  | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+  | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
+  | Some `Right, FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) es.es_sl s (es_po es)
   | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_pr )
-  | FhoareS hs   -> Some (hs.hs_pr )
-  | FeHoareF hf  -> Some (hf.ehf_pr)
-  | FeHoareS hs  -> Some (hs.ehs_pr)
-  | FbdHoareF hf -> Some (hf.bhf_pr)
-  | FbdHoareS hs -> Some (hs.bhs_pr)
-  | FequivF ef   -> Some (ef.ef_pr )
-  | FequivS es   -> Some (es.es_pr )
+  | FhoareF hf   -> Some (Inv_ss (hf_pr hf))
+  | FhoareS hs   -> Some (Inv_ss (hs_pr hs))
+  | FeHoareF hf  -> Some (Inv_ss (ehf_pr hf))
+  | FeHoareS hs  -> Some (Inv_ss (ehs_pr hs))
+  | FbdHoareF hf -> Some (Inv_ss (bhf_pr hf))
+  | FbdHoareS hs -> Some (Inv_ss (bhs_pr hs))
+  | FequivF ef   -> Some (Inv_ts (ef_pr ef))
+  | FequivS es   -> Some (Inv_ts (es_pr es))
   | _            -> None
 
 let tc1_get_pre tc =
@@ -236,15 +237,16 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_po )
-  | FhoareS hs   -> Some (hs.hs_po )
-  | FeHoareF hf  -> Some (hf.ehf_po)
-  | FeHoareS hs  -> Some (hs.ehs_po)
-  | FbdHoareF hf -> Some (hf.bhf_po)
-  | FbdHoareS hs -> Some (hs.bhs_po)
-  | FequivF ef   -> Some (ef.ef_po )
-  | FequivS es   -> Some (es.es_po )
+  | FhoareF hf   -> Some (Inv_ss (hf_po hf))
+  | FhoareS hs   -> Some (Inv_ss (hs_po hs))
+  | FeHoareF hf  -> Some (Inv_ss (ehf_po hf))
+  | FeHoareS hs  -> Some (Inv_ss (ehs_po hs))
+  | FbdHoareF hf -> Some (Inv_ss (bhf_po hf))
+  | FbdHoareS hs -> Some (Inv_ss (bhs_po hs))
+  | FequivF ef   -> Some (Inv_ts (ef_po ef))
+  | FequivS es   -> Some (Inv_ts (es_po es))
   | _            -> None
+
 
 let tc1_get_post tc =
   match get_post (FApi.tc1_goal tc) with
@@ -253,15 +255,31 @@ let tc1_get_post tc =
 
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
-  match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
- | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
- | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
- | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }
- | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
- | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
- | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
- | FequivS es   -> f_equivS_r { es with es_pr = pre }
+  match f.f_node, pre with
+ | FhoareF hf, Inv_ss pre   -> 
+    let pre = ss_inv_rebind pre hf.hf_m in
+    f_hoareF pre hf.hf_f (hf_po hf)
+ | FhoareS hs, Inv_ss pre   -> 
+    let pre = ss_inv_rebind pre (fst hs.hs_m) in
+    f_hoareS (snd hs.hs_m) pre hs.hs_s (hs_po hs)
+ | FeHoareF hf, Inv_ss pre  -> 
+    let pre = ss_inv_rebind pre hf.ehf_m in
+    f_eHoareF pre hf.ehf_f (ehf_po hf)
+ | FeHoareS hs, Inv_ss pre  -> 
+    let pre = ss_inv_rebind pre (fst hs.ehs_m) in
+    f_eHoareS (snd hs.ehs_m) pre hs.ehs_s (ehs_po hs)
+ | FbdHoareF hf, Inv_ss pre ->
+    let pre = ss_inv_rebind pre hf.bhf_m in
+    f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf)
+ | FbdHoareS hs, Inv_ss pre -> 
+    let pre = ss_inv_rebind pre (fst hs.bhs_m) in
+    f_bdHoareS (snd hs.bhs_m) pre hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
+ | FequivF ef, Inv_ts pre   -> 
+    let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
+    f_equivF pre ef.ef_fl ef.ef_fr (ef_po ef)
+ | FequivS es, Inv_ts pre   -> 
+    let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
+    f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr (es_po es)
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -318,25 +336,27 @@ let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
     in tc_error_noXhl ~kinds !!tc
 
 (* -------------------------------------------------------------------- *)
-let tag_sym_with_side name m =
-  if      EcIdent.id_equal m EcFol.mleft  then (name ^ "_L")
-  else if EcIdent.id_equal m EcFol.mright then (name ^ "_R")
-  else    name
+let tag_sym_with_side ?mc name m =
+  match mc with
+  | Some (ml, mr) -> if EcIdent.id_equal m ml  then (name ^ "_L")
+                  else if EcIdent.id_equal m mr then (name ^ "_R")
+                  else    name
+  | None -> name
 
 (* -------------------------------------------------------------------- *)
-let id_of_pv pv m =
+let id_of_pv ?mc pv m =
   let id = symbol_of_pv pv in
-  let id = tag_sym_with_side id m in
+  let id = tag_sym_with_side ?mc id m in
     EcIdent.create id
 
 (* -------------------------------------------------------------------- *)
-let id_of_mp mp m =
+let id_of_mp ?mc mp m =
   let name =
     match mp.EcPath.m_top with
     | `Local id -> EcIdent.name id
     | _ -> assert false
   in
-    EcIdent.create (tag_sym_with_side name m)
+    EcIdent.create (tag_sym_with_side ?mc name m)
 
 (* -------------------------------------------------------------------- *)
 let lv_subst ?c_pre m lv f = c_pre, lv, m, f
@@ -364,29 +384,29 @@ let mk_let_of_lv_substs_nolet env (lets, f) =
     let f = PVM.subst env s f in
     f_ands_simpl (List.rev ps) f
 
-let add_lv_subst env lv m s =
+let add_lv_subst ?mc env lv m s =
   match lv with
   | LvVar (pv,t) ->
-    let id = id_of_pv pv m in
+    let id = id_of_pv ?mc pv m in
     let s = PVM.add env pv m (f_local id t) s in
     LSymbol(id, t), s
 
   | LvTuple pvs ->
     let s, ids =
       List.map_fold (fun s (pv,t) ->
-        let id = id_of_pv pv m in
+        let id = id_of_pv ?mc pv m in
         let s = PVM.add env pv m (f_local id t) s in
         s, (id,t)) s pvs in
     LTuple ids, s
 
-let mk_let_of_lv_substs_let env (lets, f) =
+let mk_let_of_lv_substs_let ?mc env (lets, f) =
   if List.is_empty lets then f
   else
     let accu,s =
       List.fold_left (fun (accu,s) (c_pre, lv,m,f1) ->
         let c_pre = omap (PVM.subst env s) c_pre in
         let f1 = PVM.subst env s f1 in
-        let lv, s = add_lv_subst env lv m s in
+        let lv, s = add_lv_subst ?mc env lv m s in
         (c_pre,lv,f1)::accu, s) ([],PVM.empty) lets in
     (* accu is the sequence of let in reverse order *)
     let f = PVM.subst env s f in
@@ -443,19 +463,35 @@ let mk_let_of_lv_substs_let env (lets, f) =
       f_and_simpl c_pre f2) (Fsubst.f_subst s f) rlets
 
 
-let mk_let_of_lv_substs ?(uselet=true) env letsf =
-  if uselet then mk_let_of_lv_substs_let env letsf
+let mk_let_of_lv_substs ?(uselet=true) ?mc env letsf =
+  if uselet then mk_let_of_lv_substs_let ?mc env letsf
   else mk_let_of_lv_substs_nolet env letsf
 
 (* -------------------------------------------------------------------- *)
-let subst_form_lv env m lv t f =
-  let lets = lv_subst m lv t in
-  mk_let_of_lv_substs env ([lets], f)
+let subst_form_lv ?mc env lv t f =
+  let m = f.m in
+  assert (f.m = t.m);
+  let lets = lv_subst f.m lv t.inv in
+  {m; inv = mk_let_of_lv_substs ?mc env ([lets], f.inv)}
+
+let subst_form_lv_left env lv t f =
+  let ml, mr = f.ml, f.mr in
+  assert (f.ml = t.ml);
+  assert (f.mr = t.mr);
+  let lets = lv_subst f.ml lv t.inv in
+  {ml;mr;inv=mk_let_of_lv_substs ~mc:(ml, mr) env ([lets], f.inv)}
+
+let subst_form_lv_right env lv t f =
+  let ml, mr = f.ml, f.mr in
+  assert (f.mr = t.mr);
+  assert (f.ml = t.ml);
+  let lets = lv_subst f.mr lv t.inv in
+  {ml;mr;inv=mk_let_of_lv_substs ~mc:(ml, mr) env ([lets], f.inv)}
 
 (* -------------------------------------------------------------------- *)
-(* Remark: m is only used to create fresh name, id_of_pv *)
-let generalize_subst_ env m uelts uglob =
-  let create (pv, ty) = id_of_pv pv m, GTty ty in
+(* Remark: m and mc are only used to create sensible fresh names with id_of_pv *)
+let generalize_subst_ ?mc env m uelts uglob =
+  let create (pv, ty) = id_of_pv ?mc pv m, GTty ty in
   let b = List.map create uelts in
   let s =
     List.fold_left2
@@ -463,7 +499,7 @@ let generalize_subst_ env m uelts uglob =
         Mpv.add env pv (f_local id ty) s)
       Mpv.empty uelts b
   in
-  let create mp = id_of_mp mp m, GTty (tglob (EcPath.mget_ident mp)) in
+  let create mp = id_of_mp ?mc mp m, GTty (tglob (EcPath.mget_ident mp)) in
   let b' = List.map create uglob in
   let s  =
     List.fold_left2
@@ -473,7 +509,7 @@ let generalize_subst_ env m uelts uglob =
   in
     (b', b, s)
 
-let generalize_mod_ env m modi f =
+let generalize_mod__ ?mc env modi m f =
   let (melts, mglob) = PV.ntr_elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
@@ -489,7 +525,7 @@ let generalize_mod_ env m modi f =
 
   (* 3.a. Add the global variables *)
 
-  let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
+  let (bd', bd, s ) = generalize_subst_ ?mc env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)
   let restrs =
@@ -512,15 +548,43 @@ let generalize_mod_ env m modi f =
   (* 3.c. Perform the substitution *)
   let s = PVM.of_mpv s m in
   let f = PVM.subst env s f in
-  f_forall_simpl (bd'@bd) f, (bd', uglob), (bd, uelts)
+  {inv=f_forall_simpl (bd'@bd) f; m}, (bd', uglob), (bd, uelts)
 
 let generalize_subst env m uelts uglob =
   let (b',b,f) = generalize_subst_ env m uelts uglob in
   b'@b, f
 
-let generalize_mod env m modi f =
-  let res, _, _ = generalize_mod_ env m modi f in
+let generalize_mod_ env modi f =
+  generalize_mod__ env modi f.m f.inv
+
+let generalize_mod_left_ env modi f =
+  let ml, mr = f.ml, f.mr in
+  let res, bd', bd =
+    generalize_mod__ ~mc:(ml, mr) env modi ml f.inv in
+  ({ml; mr; inv=res.inv}, bd', bd)
+
+let generalize_mod_right_ env modi f =
+  let ml, mr = f.ml, f.mr in
+  let res, bd', bd =
+    generalize_mod__ ~mc:(ml, mr) env modi mr f.inv in
+  ({ml; mr; inv=res.inv}, bd', bd)
+
+let generalize_mod_ss_inv env modi f =
+  let res, _, _ = generalize_mod_ env modi f in
   res
+
+let generalize_mod_left env modi f =
+  let res, _, _ = generalize_mod_left_ env modi f in
+  res
+
+let generalize_mod_right env modi f =
+  let res, _, _ = generalize_mod_right_ env modi f in
+  res
+
+let generalize_mod_ts_inv env modil modir f =
+  let res = generalize_mod_right env modir f in
+  generalize_mod_left env modil res
+
 
 (* -------------------------------------------------------------------- *)
 let abstract_info env f1 =
@@ -597,18 +661,19 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       let (hyps, concl) = FApi.tc1_flat tc in
 
       match concl.f_node with
-      | FhoareS hoare ->
-          let pr, po = hoare.hs_pr, hoare.hs_po in
+      | FhoareS hs ->
+          let pr, po = hs_pr hs, hs_po hs in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
-          let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+            tx (pf, hyps) cpos (pr.inv, po.inv) (hs.hs_m, hs.hs_s) in
+          let concl = f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FbdHoareS bhs when bdhoare ->
-          let pr, po = bhs.bhs_pr, bhs.bhs_po in
+          let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS_r { bhs with bhs_m = me; bhs_s = stmt; } in
+            tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
+          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) 
+                      bhs.bhs_cmp (bhs_bd bhs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
@@ -622,16 +687,16 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
   | Some side ->
       let hyps      = FApi.tc1_hyps tc in
       let es        = tc1_as_equivS tc in
-      let pre, post = es.es_pr, es.es_po in
+      let pre, post = es_pr es, es_po es in
       let me, stmt     =
         match side with
         | `Left  -> (es.es_ml, es.es_sl)
         | `Right -> (es.es_mr, es.es_sr) in
-      let me, stmt, cs = tx (pf, hyps) cpos (pre, post) (me, stmt) in
+      let (_, mt), stmt, cs = tx (pf, hyps) cpos (pre.inv, post.inv) (me, stmt) in
       let concl =
         match side with
-        | `Left  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
-        | `Right -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+        | `Left  -> f_equivS mt (snd es.es_mr) (es_pr es) stmt es.es_sr (es_po es)
+        | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl stmt (es_po es)
       in
 
       FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])

@@ -1,10 +1,10 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
-open EcTypes
 open EcFol
 open EcModules
 open EcEnv
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
@@ -35,7 +35,7 @@ module EqTest : sig
   val is_int  : env -> ty -> bool
 end
 
-val is_alpha_eq : LDecl.hyps -> form -> form -> bool
+val is_alpha_eq : ?subst:f_subst -> LDecl.hyps -> form -> form -> bool
 
 (* -------------------------------------------------------------------- *)
 module User : sig
@@ -107,3 +107,6 @@ val check_bindings :
 type xconv = [`Eq | `AlphaEq | `Conv]
 
 val xconv : xconv -> LDecl.hyps -> form -> form -> bool
+
+val ss_inv_alpha_eq : LDecl.hyps -> ss_inv -> ss_inv -> bool
+val ts_inv_alpha_eq : LDecl.hyps -> ts_inv -> ts_inv -> bool

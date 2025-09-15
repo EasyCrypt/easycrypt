@@ -50,6 +50,8 @@ abstract theory ZModule.
   lemma subrr (x : t): x - x = zeror.
   proof. by rewrite addrN. qed.
 
+  hint simplify subrr.
+
   lemma addKr: left_loop [-] (+).
   proof. by move=> x y; rewrite addrA addNr add0r. qed.
 

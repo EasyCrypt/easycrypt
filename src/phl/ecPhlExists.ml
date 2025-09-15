@@ -3,6 +3,7 @@ open EcUtils
 open EcAst
 open EcFol
 open EcEnv
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
@@ -15,20 +16,29 @@ module PT  = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 let get_to_gens fs =
-  let do_id f =
+  let do_id (f: inv) =
     let id =
-      match f.f_node with
-      | Fpvar (pv, m) -> id_of_pv pv m
-      | _             -> EcIdent.create "f" in
+      match f with
+      | Inv_ss f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv pv m
+          | _             -> EcIdent.create "f" 
+        end
+      | Inv_ts f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv ~mc:(f.ml, f.mr) pv m
+          | _             -> EcIdent.create "f" 
+        end in
     id, f in
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
 let t_hr_exists_elim_r ?(bound : int option) (tc : tcenv1) =
   let pre = tc1_get_pre tc in
-  let bd, pre =
-    try  destr_exists_prenex ?bound pre
-    with DestrError _ -> [], pre in
+  let bd, pre' =
+    try  destr_exists_prenex ?bound (inv_of_inv pre)
+    with DestrError _ -> [], (inv_of_inv pre) in
+  let pre = map_inv1 (fun _ -> pre') pre in
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
 
@@ -38,38 +48,34 @@ let t_hr_exists_intro_r fs tc =
   let concl = FApi.tc1_goal tc in
   let pre1  = tc1_get_pre  tc in
   let post  = tc1_get_post tc in
-  let side  = is_equivS concl || is_equivF concl in
   let gen   = get_to_gens fs in
-  let eqs   = List.map (fun (id, f) -> f_eq (f_local id f.f_ty) f) gen in
-  let bd    = List.map (fun (id, f) -> (id, GTty f.f_ty)) gen in
+  let eqs   = List.map (fun (id, f) -> map_inv1 (f_eq (f_local id (inv_of_inv f).f_ty)) f) gen in
+  let bd    = List.map (fun (id, f) -> (id, GTty (inv_of_inv f).f_ty)) gen in
   let is_ehoare =
     match concl.f_node with
     | FeHoareF _ | FeHoareS _ -> true
     | _ -> false in
   let pre   =
     if is_ehoare then
-      f_interp_ehoare_form (f_exists bd (f_ands eqs)) pre1
-    else f_exists bd (f_and (f_ands eqs) pre1) in
+      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) (map_inv f_ands eqs)) pre1
+    else 
+      map_inv1 (f_exists bd) (map_inv2 f_and (map_inv f_ands eqs) pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
-  let ms, subst =
-    match side with
-    | true ->
-        let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
-        let s = Fsubst.f_subst_id in
-        let s = Fsubst.f_bind_mem s mleft ml in
-        let s = Fsubst.f_bind_mem s mright mr in
-        ([ml; mr], s)
+  let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
+  let m = LDecl.fresh_id hyps "&m" in
+  let ms =
+    match List.hd gen with
+    | (_, Inv_ts _) -> [ml; mr]
+    | (_, Inv_ss _) -> [m] in
 
-    | false ->
-        let m = LDecl.fresh_id hyps "&m" in
-        let s = Fsubst.f_subst_id in
-        let s = Fsubst.f_bind_mem s mhr m in
-        ([m], s)
-  in
+  let inv_rebind f =
+    match f with
+    | Inv_ts f -> Inv_ts (ts_inv_rebind f ml mr)
+    | Inv_ss f -> Inv_ss (ss_inv_rebind f m) in
 
   let args =
-    let do1 (_, f) = PAFormula (Fsubst.f_subst subst f) in
+    let do1 (_, f) = PAFormula (inv_of_inv (inv_rebind f)) in
     List.map do1 gen
   in
 
@@ -97,22 +103,24 @@ let t_hr_exists_intro = FApi.t_low1 "hr-exists-intro" t_hr_exists_intro_r
 (* -------------------------------------------------------------------- *)
 let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
-  let penv =
+  let penv, f_tr =
     match concl.f_node with
-    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
-    | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FeHoareF hf -> fst (LDecl.hoareF hf.ehf_f hyps)
-    | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
-    | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
-    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
-    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
-    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps
+    | FhoareF {hf_f=f;hf_m=m} | FeHoareF {ehf_f=f; ehf_m=m} 
+    | FbdHoareF {bhf_f=f; bhf_m=m} -> 
+      fst (LDecl.hoareF m f hyps), Inv_ss {m; inv = f_true}
+    | FhoareS {hs_m=(m,_) as me} | FeHoareS {ehs_m=(m,_) as me}
+    | FbdHoareS {bhs_m=(m,_) as me} -> 
+      LDecl.push_active_ss me hyps, Inv_ss {m; inv = f_true}
+    | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps), 
+        Inv_ts {ml=ef.ef_ml; mr=ef.ef_mr; inv=f_true}
+    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps, 
+        Inv_ts {ml=(fst es.es_ml); mr=(fst es.es_mr); inv=f_true}
     | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   in
 
   let fs =
     List.map
-      (fun f -> TTC.pf_process_form_opt !!tc penv None f)
+      (fun f -> map_inv1 (fun _ -> TTC.pf_process_form_opt !!tc penv None f) f_tr)
       fs
   in
 
@@ -126,41 +134,44 @@ let process_exists_intro ~(elim : bool) fs tc =
 let process_ecall oside (l, tvi, fs) tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
-  let hyps, kind =
+  let hyps, kind, f_tr =
     match concl.f_node with
     | FhoareS hs when is_none oside ->
-        (LDecl.push_active hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node))
+        LDecl.push_active_ss hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node),
+        Inv_ss {m = fst hs.hs_m; inv = f_true}
     | FequivS es ->
         let n1 = List.length es.es_sl.s_node in
         let n2 = List.length es.es_sr.s_node in
-        (LDecl.push_all [es.es_ml; es.es_mr] hyps, `Equiv (n1, n2))
+        LDecl.push_all [es.es_ml; es.es_mr] hyps, `Equiv (n1, n2),
+        Inv_ts {ml = fst es.es_ml; mr = fst es.es_mr; inv = f_true}
     | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
   in
 
   let t_local_seq p1 tc =
-    match kind, oside with
-    | `Hoare n, _ ->
+    match kind, oside, p1 with
+    | `Hoare n, _, Inv_ss p1 ->
         EcPhlApp.t_hoare_app
           (Zpr.cpos (n-1)) p1 tc
-    | `Equiv (n1, n2), None ->
+    | `Equiv (n1, n2), None, Inv_ts p1 ->
         EcPhlApp.t_equiv_app
           (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
-    | `Equiv (n1, n2), Some `Left ->
+    | `Equiv (n1, n2), Some `Left, Inv_ts p1 ->
         EcPhlApp.t_equiv_app
           (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
-    | `Equiv(n1, n2), Some `Right ->
+    | `Equiv(n1, n2), Some `Right, Inv_ts p1 ->
         EcPhlApp.t_equiv_app
           (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
+    | _ -> tc_error !!tc "mismatched sidedness or kind of conclusion"
   in
 
   let fs =
     List.map
-      (fun f -> TTC.pf_process_form_opt !!tc hyps None f)
+      (fun f -> map_inv1 (fun _ -> TTC.pf_process_form_opt !!tc hyps None f) f_tr)
       fs
   in
 
   let ids, p1 =
-    let sub = t_local_seq f_true tc in
+    let sub = t_local_seq f_tr tc in
 
     let sub = FApi.t_rotate `Left 1 sub in
     let sub = FApi.t_focus (t_hr_exists_intro_r fs) sub in
@@ -190,10 +201,10 @@ let process_ecall oside (l, tvi, fs) tc =
 
     let subst =
       List.fold_left2
-        (fun s id f -> Fsubst.f_bind_local s id f)
-        Fsubst.f_subst_id (List.fst ids) fs in
+        (fun s id f -> add_flocal s id (inv_of_inv f))
+        empty (List.fst ids) fs in
 
-    (nms, Fsubst.f_subst subst sub) in
+    (nms, subst_inv subst sub) in
 
   let tc = t_local_seq p1 tc in
   let tc = FApi.t_rotate `Left 1 tc in
