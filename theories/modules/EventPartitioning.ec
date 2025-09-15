@@ -128,7 +128,10 @@ theory ResultPartitioning.
     = big predT (fun a=> Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]) (undup (X i))
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem (X i) res].
   proof.
-  rewrite -mem_undup.
+print mem_undup.
+  have->:Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in X i)]=
+         Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in undup (X i))].
+  - smt(mem_undup).
   exact/(@list_partitioning M i E (fun _ _ x=> x) (undup (X i)) &m)/undup_uniq.
   qed.
   end section.
@@ -255,7 +258,7 @@ abstract theory SubuniformReference.
   move=> a_in_X. rewrite (@is_subuniform arg{1} X a &1 support_M a_in_X).
   byphoare (_: (i,xs) = (i,xs){2} ==> _)=> //=; proc; rnd (pred1 a); auto=> />.
   rewrite dscalar1E 1:ltrW 1:gt0_k.
-  + by rewrite duniform_ll 1:xs_def 1:Xi_neq0 //= le1_k.
+  +rewrite duniform_ll 1:xs_def 1:Xi_neq0 //= le1_k.
   by rewrite duniform1E i_def xs_def a_in_X.
   qed.
   end section.

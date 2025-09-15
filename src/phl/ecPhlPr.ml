@@ -53,12 +53,15 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let funl = EcEnv.Fun.by_xpath fl env in
   let funr = EcEnv.Fun.by_xpath fr env in
   let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr fl fr env in
+  let m = EcIdent.create "&hr" in
   let argsl = map_ss_inv1 (to_args funl) (f_pvarg funl.f_sig.fs_arg (fst penvl)) in
   let argsr = map_ss_inv1 (to_args funr) (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
-  let pr1 = f_pr (fst penvl) fl argsl.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi_l) in
-  let pr2 = f_pr (fst penvr) fr argsr.inv (map_ss_inv1 (fun p -> f_eq p a_f) phi_r) in
+  let pr1_ev = EcSubst.ss_inv_rebind (map_ss_inv1 (fun p -> f_eq p a_f) phi_l) m in
+  let pr1 = f_pr (fst penvl) fl argsl.inv pr1_ev in
+  let pr2_ev = EcSubst.ss_inv_rebind (map_ss_inv1 (fun p -> f_eq p a_f) phi_r) m in
+  let pr2 = f_pr (fst penvr) fr argsr.inv pr2_ev in
   let concl_pr =
     f_forall_mems_ts_inv penvl penvr
       (map_ts_inv1 (f_forall_simpl [a_id,GTty ty])
