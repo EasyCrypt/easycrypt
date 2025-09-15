@@ -15,7 +15,7 @@
   - [Machine-Checked Security for XMSS as in RFC 8391 and SPHINCS+](https://link.springer.com/chapter/10.1007/978-3-031-38554-4_14)
   - [A Tight Security Proof for SPHINCS+, Formally Verified](https://link.springer.com/chapter/10.1007/978-981-96-0894-2_2)
 
-  Many of the properties formalized in this library are actually variants of
+  Many of the properties formalized in this library are variants of
   some "base" property, differing from each other only in the number of
   considered functions or targets. That is, most "base" properties consider a
   single function and a single target, but have variants considering multiple
@@ -55,7 +55,6 @@ type out_t.
 op f : key_t -> in_t -> out_t.
 
 
-
 (* Properties *)
 (*&
   PREimage resistance (PRE).
@@ -81,11 +80,9 @@ abstract theory PRE.
       var x, x' : in_t;
       var y : out_t;
 
-      (* Sample key k and input x *)
       k <$ dkey;
       x <$ din;
 
-      (* Compute output y of hash function when given key k and input x *)
       y <- f k x;
 
       (* Ask adversary to find a preimage x' of y *)
@@ -127,13 +124,8 @@ abstract theory SMPRE.
       var yl : out_t list;
       var i : int;
 
-      (* Sample key k *)
       k <$ dkey;
 
-      (*
-        Construct list yl of size t containing outputs obtained
-        by applying f k to randomly sampled inputs
-      *)
       yl <- [];
       while (size yl < t) {
         x <$ din;
@@ -144,7 +136,6 @@ abstract theory SMPRE.
       (* Ask adversary to find a preimage x' of any output in yl *)
       (i, x') <@ A.find(k, yl);
 
-      (* Get key k and output y from yl at index i, as specified by the adversary *)
       y <- nth witness yl i;
 
       (*
@@ -189,12 +180,6 @@ abstract theory MMPRE.
       var kyl : (key_t * out_t) list;
       var i : int;
 
-      (*
-        Construct list kyl of t (key, output) pairs (k, y).
-        For each pair, key k is randomly sampled,
-        after which output y is obtained by applying f k
-        to a randomly sampled input
-      *)
       kyl <- [];
       while (size kyl < t) {
         k <$ dkey;
@@ -210,10 +195,8 @@ abstract theory MMPRE.
       *)
       (i, x') <@ A.find(kyl);
 
-      (* Get (key, output) pair ky from kyl at index i, as specified by adversary *)
       ky <- nth witness kyl i;
 
-      (* Extract key k and, respecively, output y from ky *)
       k <- ky.`1;
       y <- ky.`2;
 
@@ -255,20 +238,8 @@ abstract theory DMPRE.
       var yl : out_t list;
       var i : int;
 
-      (*
-        Ask adversary to provide a list kl of keys that will be used to index f.
-        As indicated in the return statement, this list must not contain duplicate
-        elements (so that indexing f with each element gives a distinct function)
-      *)
       kl <@ A.pick();
 
-      (*
-        Construct list yl of a size equal to the size of kl.
-        In yl, the element at index i is the mapping of a randomly sampled input
-        under the function obtained fromindexing f with the element of kl at index i.
-        That is, if the i-th element of kl is k, then the i-th element of
-        yl is obtained by applying f k to a randomly sampled input
-      *)
       yl <- [];
       while (size yl < size kl) {
         k <- nth witness kl (size yl);
@@ -283,10 +254,6 @@ abstract theory DMPRE.
       *)
       (i, x') <@ A.find(yl);
 
-      (*
-        Get key k and output y from kl and, respectively, yl at index i,
-        as specified by the adversary
-      *)
       k <- nth witness kl i;
       y <- nth witness yl i;
 
@@ -372,20 +339,16 @@ abstract theory SMSPR.
       var xl : in_t list;
       var i : int;
 
-      (* Sample key k *)
       k <$ dkey;
 
-      (* Construct list xl of t randomly sampled inputs *)
       xl <- [];
       while (size xl < t) {
         x <$ din;
         xl <- rcons xl x;
       }
 
-      (* Ask adversary to find second preimage for any input in xl *)
       (i, x') <@ A.find(k, xl);
 
-      (* Get input from xl at index i, as specified by the adversary *)
       x <- nth witness xl i;
 
       (*
@@ -404,7 +367,7 @@ end SMSPR.
 (*&
    Multi-function, Multi-target Second Preimage Resistance (MM_SPR).
    Given a list of key/input pairs `kxl`, it is hard to find an input `x'`
-   such that there is an `(k, x)` in `kxl` for which `x` is different from `x'`
+   such that there is a `(k, x)` in `kxl` for which `x` is different from `x'`
    _and_ `f k x = f k x'`.
 &*)
 abstract theory MMSPR.
@@ -431,11 +394,6 @@ abstract theory MMSPR.
       var kxl : (key_t * in_t) list;
       var i : int;
 
-      (*
-        Construct list kxl of size t containing (key, input) pairs (k, x).
-        For each pair, key k and input x are both randomly sampled from
-        their respective distributions
-      *)
       kxl <- [];
       while (size kxl < t) {
         k <$ dkey;
@@ -450,10 +408,8 @@ abstract theory MMSPR.
       *)
       (i, x') <@ A.find(kxl);
 
-      (* Get (key, input) pair kx from kxl at index i, as specified by the adversary *)
       kx <- nth witness kxl i;
 
-      (* Extract key k and, respectively, input x from kx *)
       k <- kx.`1;
       x <- kx.`2;
 
@@ -503,10 +459,6 @@ abstract theory DMSPR.
       *)
       kl <@ A.pick();
 
-      (*
-        Construct list xl of a size equal to the size of kl;
-        each element of xl is a randomly sampled input.
-      *)
       xl <- [];
       while (size xl < size kl) {
         x <$ din;
@@ -519,10 +471,6 @@ abstract theory DMSPR.
       *)
       (i, x') <@ A.find(xl);
 
-      (*
-        Get key k and input x from kl and, respectively, xl at index i,
-        as specified by the adversary
-      *)
       k <- nth witness kl i;
       x <- nth witness xl i;
 
@@ -545,24 +493,26 @@ end DMSPR.
   such that `f k x = f k x'`.
 &*)
 abstract theory CR.
-  (*& Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against CR *)
+  (*& Class of adversaries against CR &*)
   module type Adv_CR = {
     proc find(k : key_t) : in_t * in_t
   }.
 
-  (* CR game *)
+  (*& CR game &*)
   module CR(A : Adv_CR) = {
     proc main() : bool = {
       var k : key_t;
       var x, x' : in_t;
 
-      (* Sample key k *)
       k <$ dkey;
 
-      (* Ask adversary to find two values x and x' that collide w.r.t. to k (i.e., under f k) *)
+      (*
+        Ask adversary to find two values x and x' that collide w.r.t. to k
+        (i.e., under f k)
+      *)
       (x, x') <@ A.find(k);
 
       (*
@@ -575,19 +525,22 @@ abstract theory CR.
   }.
 end CR.
 
-
-(* - Target Collision Resistance (TCR) - *)
+(*&
+  Target Collision Resistance (TCR).
+  Given a key `k`, it is hard to find an input `x'` such that x' is
+  different from a previously chosen `x` _and_ `f k x = f k x'`.
+&*)
 abstract theory TCR.
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against TCR *)
+  (*& Class of adversaries against TCR &*)
   module type Adv_TCR = {
     proc pick() : in_t
     proc find(k : key_t) : in_t
   }.
 
-  (* TCR game *)
+  (*& TCR game &*)
   module TCR(A : Adv_TCR) = {
     proc main() : bool = {
       var k : key_t;
@@ -596,7 +549,6 @@ abstract theory TCR.
       (* Ask adversary to pick an input (the 'target') *)
       x <@ A.pick();
 
-      (* Sample key k *)
       k <$ dkey;
 
       (* Ask adversary to find a value x' that collides with x w.r.t k (i.e., under f k) *)
@@ -613,18 +565,22 @@ abstract theory TCR.
 end TCR.
 
 
-(* - Extended Target Collision Resistance (ETCR) - *)
+(*&
+  Extended Target Collision Resistance (ETCR).
+  Given a key `k`, it is hard to find a key `k'` and input `x'`
+  such that x' is different from a previously chosen `x` _and_ `f k x = f k x'`.
+&*)
 abstract theory ETCR.
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against ETCR *)
+  (*& Class of adversaries against ETCR &*)
   module type Adv_ETCR = {
     proc pick() : in_t
     proc find(k : key_t) : key_t * in_t
   }.
 
-  (* ETCR game *)
+  (*& ETCR game &*)
   module ETCR (A : Adv_ETCR) = {
     proc main() : bool = {
       var k, k' : key_t;
@@ -633,14 +589,13 @@ abstract theory ETCR.
       (* Ask adversary to pick an input (the 'target') *)
       x <@ A.pick();
 
-      (* Sample key k *)
       k <$ dkey;
 
-       (*
-         Ask adversary to find any pair (k', x') such that x under f k collides with
-         x' under f k'.
-         Note that k' may be any element from the domain of keys, including k
-       *)
+      (*
+        Ask adversary to find any pair (k', x') such that x under f k collides with
+        x' under f k'.
+        Note that k' may be any element from the domain of keys, including k
+      *)
       (k', x') <@ A.find(k);
 
       (*
@@ -648,18 +603,24 @@ abstract theory ETCR.
         (1) "x' <> x": x' does not equal x, and
         (2) "f k' x' = f k x": f k' maps x' to the same element as f k maps x
       *)
-      return x' <> x /\ f k x' = f k' x;
+      return x' <> x /\ f k' x' = f k x;
     }
   }.
 end ETCR.
 
 
-(* - Multi-target Extended Target Collision Resistance (M_ETCR) - *)
+(*&
+  Multi-target Extended Target Collision Resistance (M_ETCR).
+  Given a list of key/input pairs `kxl`, where the keys are
+  randomly sampled and the inputs (adaptively) chosen, it is hard
+  to find a key `k'` and input `x'` such that there is a `(k, x)`
+  in `kxl` for which `x'` is different from x _and_ `f k x = f k' x'`.
+&*)
 abstract theory METCR.
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Type for oracles used in M_ETCR game *)
+  (*& Type for oracles used in M_ETCR game &*)
   module type Oracle_METCRi_t = {
     proc init() : unit
     proc query(x : in_t) : key_t
@@ -667,12 +628,12 @@ abstract theory METCR.
     proc nr_targets() : int
   }.
 
-  (* Type for oracles given to adversary in M_ETCR game *)
+  (*& Type for oracles given to adversary in M_ETCR game &*)
   module type Oracle_METCR_t = {
     proc query(x : in_t) : key_t
   }.
 
-  (* Default implementation of an oracle for M_ETCR *)
+  (*& Default implementation of an oracle for M_ETCR &*)
   module O_METCR_Default : Oracle_METCRi_t = {
     var ts : (key_t * in_t) list
 
@@ -705,12 +666,12 @@ abstract theory METCR.
     }
   }.
 
-  (* Class of adversaries against M_ETCR *)
+  (*& Class of adversaries against M_ETCR &*)
   module type Adv_METCR(O : Oracle_METCR_t) = {
     proc find() : int * key_t * in_t { O.query }
   }.
 
-  (* M_ETCR game *)
+  (*& M_ETCR game &*)
   module M_ETCR (A : Adv_METCR, O : Oracle_METCRi_t) = {
     proc main() : bool = {
       var k, k' : key_t;
@@ -718,7 +679,6 @@ abstract theory METCR.
       var i : int;
       var nrts : int;
 
-      (* Initialize oracle O *)
       O.init();
 
       (*
@@ -730,13 +690,8 @@ abstract theory METCR.
       *)
       (i, k', x') <@ A(O).find();
 
-      (*
-        Get (key, input) pair (i.e., target) (k, x) from list of targets at index i,
-        as specified by the adversary
-      *)
       (k, x) <@ O.get(i);
 
-      (* Get number of elements in the list of targets specified by the adversary *)
       nrts <@ O.nr_targets();
 
       (*
@@ -761,17 +716,17 @@ abbrev spexists (k : key_t, x : in_t) =
 
 (*&
   Decisional Second Preimage Resistance (DSPR).
-  Given a key k and input x, it is hard to determine whether there exists an input x'
-  that is different from x such that f k x = f k x'
+  Given a key `k` and input `x`, it is hard to determine whether there exists an
+  input `x'` that is different from `x` such that `f k x = f k x'`.
 &*)
 abstract theory DSPR.
-  (* Proper distribution over input type *)
+  (*& Proper distribution over input type &*)
   op [lossless] din : in_t distr.
 
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against DSPR *)
+  (*& Class of adversaries against DSPR &*)
   module type Adv_DSPR = {
     proc guess(k : key_t, x : in_t) : bool
   }.
@@ -779,7 +734,7 @@ abstract theory DSPR.
   (*&
     Module used to represent the probability that a randomly sampled input
     has a second preimage under a randomly sampled function from the
-    hash function family f.
+    hash function family `f`.
     Denotes the probability that could trivially be obtained in the
     DSPR game by invariably returning 1.
   &*)
@@ -789,7 +744,6 @@ abstract theory DSPR.
       var x : in_t;
       var b : bool;
 
-      (* Sample key k and input x *)
       k <$ dkey;
       x <$ din;
 
@@ -801,47 +755,64 @@ abstract theory DSPR.
     }
   }.
 
-  (* DSPR game *)
+  (*& DSPR game &*)
   module DSPR(A : Adv_DSPR) = {
     proc main() : bool = {
       var k : key_t;
       var x : in_t;
       var b : bool;
 
-      (* Sample key k and input x *)
       k <$ dkey;
       x <$ din;
 
       (* Ask adversary to determine whether x has a preimage under f k *)
       b <@ A.guess(k, x);
 
-      (* Success iff adversary correctly determined whether x has a second preimage under f k *)
+      (*
+        Success iff adversary correctly determined whether x has a second
+        preimage under f k
+      *)
       return spexists k x = b;
     }
   }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_SMDSPR(A)
+    =
+    max 0 (Pr[SM_DSPR(A).main() @ &m : res] - Pr[SM_SPprob.main() @ &m : res]).
+  *)
 end DSPR.
 
 
-(* - Single-Function, Multi-Target Decisional Second Preimage Resistance (SM_DSPR) - *)
+(*&
+  Single-Function, Multi-Target Decisional Second Preimage Resistance (SM_DSPR).
+  Given a key `k` and a list of inputs `xl`, it is hard to determine whether
+  there exists an input `x'` that is different from some `x` in `xl` _and_
+  f k x = f k x'.
+&*)
 abstract theory SMDSPR.
-  (* Number of targets in SM_DSPR *)
+  (*& Number of targets in SM_DSPR &*)
   const t_smdspr : { int | 1 <= t_smdspr } as ge1_tsmdspr.
 
-  (* Proper distribution over input type *)
+  (*& Proper distribution over input type &*)
   op [lossless] din : in_t distr.
 
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against SM_DSPR *)
+  (*& Class of adversaries against SM_DSPR &*)
   module type Adv_SMDSPR = {
     proc guess(k : key_t, xl : in_t list) : int * bool
   }.
 
-  (*
-    Module used to denote the probability that could trivially be obtained in the
-    SM_DSPR game by invariably returning 1
-  *)
+  (*&
+    Module used to denote the probability that could trivially be obtained in
+    the SM_DSPR game by invariably returning 1
+  &*)
   module SM_SPprob(A : Adv_SMDSPR) = {
     proc main() = {
       var k : key_t;
@@ -850,11 +821,8 @@ abstract theory SMDSPR.
       var i : int;
       var b : bool;
 
-
-      (* Sample key k *)
       k <$ dkey;
 
-      (* Construct list xl of t_smdspr randomly sampled inputs *)
       xl <- [];
       while (size xl < t_smdspr) {
         x <$ din;
@@ -867,7 +835,6 @@ abstract theory SMDSPR.
       *)
       (i, b) <@ A.guess(k, xl);
 
-      (* Get input from xl at index i, as specified by the adversary *)
       x <- nth witness xl i;
 
       (*
@@ -881,7 +848,7 @@ abstract theory SMDSPR.
     }
   }.
 
-  (* SM_DSPR game *)
+  (*& SM_DSPR game &*)
   module SM_DSPR(A : Adv_SMDSPR) = {
     proc main() = {
       var k : key_t;
@@ -890,10 +857,8 @@ abstract theory SMDSPR.
       var i : int;
       var b : bool;
 
-      (* Sample key k *)
       k <$ dkey;
 
-      (* Construct list xl of t_smdspr randomly sampled inputs *)
       xl <- [];
       while (size xl < t_smdspr) {
         x <$ din;
@@ -906,7 +871,6 @@ abstract theory SMDSPR.
       *)
       (i, b) <@ A.guess(k, xl);
 
-      (* Get input from xl at index i, as specified by the adversary *)
       x <- nth witness xl i;
 
       (*
@@ -921,32 +885,39 @@ abstract theory SMDSPR.
   }.
 
   (*
-    In the above:
-    Adv_SMDSPR(A) = max 0 (Pr[SM_DSPR(A).main() @ &m : res] - Pr[SM_SPprob.main() @ &m : res]).
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_SMDSPR(A)
+    =
+    max 0 (Pr[SM_DSPR(A).main() @ &m : res] - Pr[SM_SPprob.main() @ &m : res]).
   *)
 end SMDSPR.
 
 
-(* - Multi-Function, Multi-Target Decisional Second Preimage Resistance (MM_DSPR) - *)
+(*&
+  Multi-Function, Multi-Target Decisional Second Preimage Resistance (MM_DSPR).
+&*)
 abstract theory MMDSPR.
-  (* Number of functions/targets in MM_DSPR *)
+  (*& Number of functions/targets in MM_DSPR &*)
   const t_mmdspr : { int | 1 <= t_mmdspr } as ge1_tmmdspr.
 
-  (* Proper distribution over input type *)
+  (*& Proper distribution over input type &*)
   op [lossless] din : in_t distr.
 
-  (* Proper distribution over (indexing) key type *)
+  (*& Proper distribution over (indexing) key type &*)
   op [lossless] dkey : key_t distr.
 
-  (* Class of adversaries against MM_DSPR *)
+  (*& Class of adversaries against MM_DSPR *)
   module type Adv_MMDSPR = {
     proc guess(kxl : (key_t * in_t) list) : int * bool
   }.
 
-  (*
+  (*&
     Module used to denote the probability that could trivially be obtained in the
     MM_DSPR game by invariably returning 1
-  *)
+  &*)
   module MM_SPprob(A : Adv_MMDSPR) = {
     proc main() = {
       var k : key_t;
@@ -956,11 +927,6 @@ abstract theory MMDSPR.
       var i : int;
       var b : bool;
 
-      (*
-        Construct list kxl of size t_mmdspr containing (key, input) pairs (k, x).
-        For each pair, key k and input x are both randomly sampled from
-        their respective distributions
-      *)
       kxl <- [];
       while (size kxl < t_mmdspr) {
         k <$ dkey;
@@ -975,10 +941,8 @@ abstract theory MMDSPR.
       *)
       (i, b) <@ A.guess(kxl);
 
-      (* Get (key, input) pair kx from kxl at index i, as specified by the adversary *)
       kx <- nth witness kxl i;
 
-      (* Extract key k and, respectively, input x from kx *)
       k <- kx.`1;
       x <- kx.`2;
 
@@ -992,7 +956,7 @@ abstract theory MMDSPR.
     }
   }.
 
-  (* MM_DSPR game *)
+  (*& MM_DSPR game &*)
   module MM_DSPR(A : Adv_MMDSPR) = {
     proc main() : bool = {
       var k : key_t;
@@ -1002,11 +966,6 @@ abstract theory MMDSPR.
       var i : int;
       var b : bool;
 
-      (*
-        Construct list kxl of size t_mmdspr containing (key, input) pairs (k, x).
-        For each pair, key k and input x are both randomly sampled from
-        their respective distributions
-      *)
       kxl <- [];
       while (size kxl < t_mmdspr) {
         k <$ dkey;
@@ -1021,10 +980,8 @@ abstract theory MMDSPR.
       *)
       (i, b) <@ A.guess(kxl);
 
-      (* Get (key, input) pair kx from kxl at index i, as specified by the adversary *)
       kx <- nth witness kxl i;
 
-      (* Extract key k and, respectively, input x from kx *)
       k <- kx.`1;
       x <- kx.`2;
 
@@ -1040,8 +997,13 @@ abstract theory MMDSPR.
   }.
 
   (*
-    In the above:
-    Adv_MMDSPR(A) = max 0 (Pr[MM_DSPR(A).main(t) @ &m : res] - Pr[MM_SPprob(A).main(t) @ &m : res])
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_MMDSPR(A)
+    =
+    max 0 (Pr[MM_DSPR(A).main(t) @ &m : res] - Pr[MM_SPprob(A).main(t) @ &m : res])
   *)
 end MMDSPR.
 
@@ -1164,21 +1126,22 @@ abstract theory DMDSPR.
   }.
 
   (*
-    In the above:
-    Adv_DMDSPR(A) = max 0 (Pr[DM_DSPR(A).main(t) @ &m : res] - Pr[DM_SPprob(A).main(t) @ &m : res])
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_DMDSPR(A)
+    =
+    max 0 (Pr[DM_DSPR(A).main(t) @ &m : res] - Pr[DM_SPprob(A).main(t) @ &m : res])
   *)
 end DMDSPR.
 
-
-(*
---
+(*&
   UnDetectability (UD).
   Given a key k and output y, it is hard to determine whether y was obtained by
   randomly sampling from the domain of outputs or by computing f k x where x is
-  randomly sampled from the domain of inputs
---
-*)
-(* - single-function, single-target UnDetectability (UD) - *)
+  randomly sampled from the domain of inputs.
+&*)
 abstract theory UD.
   (* Proper distribution over input type *)
   op [lossless] din : in_t distr.
