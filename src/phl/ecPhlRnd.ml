@@ -435,8 +435,6 @@ module Core = struct
     let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
     let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
 
-    (* Subgoal 1: forall a b, phi => (a, b) \in supp(g) => psi[x -> a, y -> b] *)
-
     (* Generate two free variables a and b and the pair (a, b) *)
     let a_id = EcIdent.create "a" in
     let b_id = EcIdent.create "b" in
@@ -448,21 +446,23 @@ module Core = struct
     let coupling_ty = ttuple [tyL; tyR] in
     let g_app = f_app_simpl g [] (tdistr coupling_ty) in
 
+    (* Subgoal 1: iscoupling g muL muR *)
+    let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
+    let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
+    let subgoal1 = f_app (f_op iscoupling_op [tyL; tyR] iscoupling_ty) 
+                         [muL; muR; g_app] tbool in
+
+    (* Subgoal 2: forall a b, phi => (a, b) \in supp(g) => psi[x -> a, y -> b] *)
+
     (* Substitute in the postcondition *)
     let post = es.es_po in
     let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
     let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR b post_subst in
     
-    let subgoal1 = f_imp (f_in_supp ab g_app) post_subst in
-    let subgoal1 = f_imp es.es_pr subgoal1 in
-    let subgoal1 = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] subgoal1 in
-    let subgoal1 = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=subgoal1; } in
-
-    (* Subgoal 2: iscoupling g muL muR *)
-    let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
-    let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
-    let subgoal2 = f_app (f_op iscoupling_op [tyL; tyR] iscoupling_ty) 
-                         [muL; muR; g_app] tbool in
+    let subgoal2 = f_imp (f_in_supp ab g_app) post_subst in
+    let subgoal2 = f_imp es.es_pr subgoal2 in
+    let subgoal2 = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] subgoal2 in
+    let subgoal2 = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=subgoal2; } in
 
     FApi.xmutate1 tc `Rnd [subgoal1; subgoal2]
   
