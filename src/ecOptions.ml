@@ -619,7 +619,7 @@ let parse_cmdline ?ini argv =
       parse (Option.value ~default:(fun _ -> []) ini) argv
     with
     | Arg.Bad  msg -> print_usage ~msg specs; exit 1
-    | Arg.Help _   -> print_usage specs; exit 1
+    | Arg.Help _   -> print_usage specs; exit 0
 
 (* -------------------------------------------------------------------- *)
 exception InvalidIniFile of (int * string)
