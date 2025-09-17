@@ -62,11 +62,11 @@ op f : key_t -> in_t -> out_t.
   `f k x = y`.
 &*)
 abstract theory PRE.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against PRE &*)
   module type Adv_PRE = {
@@ -104,11 +104,11 @@ abstract theory SMPRE.
   (*& Number of targets in SM_PRE &*)
   const t : { int | 1 <= t } as ge1_t.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against SM_PRE &*)
   module type Adv_SMPRE = {
@@ -159,11 +159,11 @@ abstract theory MMPRE.
   (*& Number of functions/targets in MM_PRE &*)
   const t : { int | 1 <= t } as ge1_t.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against MM_PRE &*)
   module type Adv_MMPRE = {
@@ -219,8 +219,8 @@ end MMPRE.
    that `f k x = y` for any `k` and corresponding `y` from `kl` and `yl`.
 &*)
 abstract theory DMPRE.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
   (*& Class of adversaries against DM_PRE &*)
   module type Adv_DMPRE = {
@@ -275,11 +275,11 @@ end DMPRE.
   from x such that `f k x = f k x'`.
 &*)
 abstract theory SPR.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against SPR &*)
   module type Adv_SPR = {
@@ -320,11 +320,11 @@ abstract theory SMSPR.
   (*& Number of targets in SM_SPR &*)
   const t : { int | 1 <= t } as ge1_t.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against SM_SPR &*)
   module type Adv_SMSPR = {
@@ -374,11 +374,11 @@ abstract theory MMSPR.
   (*& Number of functions/targets in MM_SPR &*)
   const t : { int | 1 <= t } as ge1_t.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against MM_SPR &*)
   module type Adv_MMSPR = {
@@ -434,8 +434,8 @@ end MMSPR.
    list of previously chosen, _distinct_ keys.
 &*)
 abstract theory DMSPR.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
   (*& Class of adversaries against DM_SPR &*)
   module type Adv_DMSPR = {
@@ -493,8 +493,8 @@ end DMSPR.
   such that `f k x = f k x'`.
 &*)
 abstract theory CR.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against CR &*)
   module type Adv_CR = {
@@ -531,8 +531,8 @@ end CR.
   different from a previously chosen `x` _and_ `f k x = f k x'`.
 &*)
 abstract theory TCR.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against TCR &*)
   module type Adv_TCR = {
@@ -571,8 +571,8 @@ end TCR.
   such that x' is different from a previously chosen `x` _and_ `f k x = f k x'`.
 &*)
 abstract theory ETCR.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against ETCR &*)
   module type Adv_ETCR = {
@@ -617,8 +617,8 @@ end ETCR.
   _and_ `f k x = f k' x'`.
 &*)
 abstract theory METCR.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Type for oracles used in M_ETCR game &*)
   module type Oracle_METCRi_t = {
@@ -720,11 +720,11 @@ abbrev spexists (k : key_t, x : in_t) =
   input `x'` that is different from `x` such that `f k x = f k x'`.
 &*)
 abstract theory DSPR.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against DSPR &*)
   module type Adv_DSPR = {
@@ -798,11 +798,11 @@ abstract theory SMDSPR.
   (*& Number of targets in SM_DSPR &*)
   const t_smdspr : { int | 1 <= t_smdspr } as ge1_tsmdspr.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against SM_DSPR &*)
   module type Adv_SMDSPR = {
@@ -906,11 +906,11 @@ abstract theory MMDSPR.
   (*& Number of functions/targets in MM_DSPR &*)
   const t_mmdspr : { int | 1 <= t_mmdspr } as ge1_tmmdspr.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against MM_DSPR *)
   module type Adv_MMDSPR = {
@@ -1019,8 +1019,8 @@ end MMDSPR.
   previously chosen, _distinct_ keys.
 &*)
 abstract theory DMDSPR.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
   (*& Class of adversaries against DM_DSPR &*)
   module type Adv_DMDSPR = {
@@ -1136,14 +1136,14 @@ end DMDSPR.
   randomly sampled input using `f k`.
 &*)
 abstract theory UD.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over output type &*)
-  op [lossless] dout : out_t distr.
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against UD &*)
   module type Adv_UD = {
@@ -1190,14 +1190,14 @@ abstract theory SMUD.
   (*& Number of targets in SM_UD &*)
   const t_smud : { int | 1 <= t_smud } as ge1_tsmud.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over output type &*)
-  op [lossless] dout : out_t distr.
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against SM_UD &*)
   module type Adv_SMUD = {
@@ -1251,14 +1251,14 @@ abstract theory MMUD.
   (*& Number of functions/targets in MM_UD &*)
   const t_mmud : { int | 1 <= t_mmud } as ge1_tmmud.
 
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over output type &*)
-  op [lossless] dout : out_t distr.
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against MM_UD &*)
   module type Adv_MMUD = {
@@ -1312,14 +1312,14 @@ end MMUD.
   from a list of previously chosen, _distinct_ keys.
 &*)
 abstract theory DMUD.
-  (*& Proper distribution over input type &*)
-  op [lossless] din : in_t distr.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
 
-  (*& Proper distribution over output type &*)
-  op [lossless] dout : out_t distr.
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
 
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Class of adversaries against DM_UD &*)
   module type Adv_DMUD = {
@@ -1379,8 +1379,8 @@ end DMUD.
   Does not admit a nice high-level intuition out of that context.
 &*)
 abstract theory ITSR.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*&
     Map from outputs of hash function to a list of tuples of the form
@@ -1497,8 +1497,8 @@ end ITSR.
   requires the indexing key to be secret.
 &*)
 abstract theory PRF.
-  (*& Proper distribution over (indexing) key type &*)
-  op [lossless] dkey : key_t distr.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
 
   (*& Function that maps inputs of type in_t to (proper) distributions over type out_t &*)
   op doutm : { in_t -> out_t distr | forall x, is_lossless (doutm x) } as doutm_ll.
@@ -1509,9 +1509,14 @@ abstract theory PRF.
     proc query(x : in_t) : out_t
   }.
 
+  (*& Type for oracles given to the adversary in PRF &*)
+  module type QOracle_PRF = {
+    include Oracle_PRF [query]
+  }.
+
   (*& Class of adversaries against PRF &*)
-  module type Adv_PRF(O : Oracle_PRF) = {
-    proc distinguish() : bool { O.query }
+  module type Adv_PRF(O : QOracle_PRF) = {
+    proc distinguish() : bool
   }.
 
   (*& Default implementation of an oracle for PRF &*)
