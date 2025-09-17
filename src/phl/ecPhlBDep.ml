@@ -356,7 +356,8 @@ let circ_form_eval_plus_equiv
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
     let hyps, pcond = match pstate_get_opt pstate v.v_name with
       | Some circ -> begin try 
-        Option.may (fun i -> EcEnv.notify ~immediate:true env `Critical "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; assert false) @@ circuit_has_uninitialized circ;
+        Option.may 
+        (fun i -> EcEnv.notify ~immediate:true env `Critical "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; raise (BDepError "Uninitialized input for circuit")) @@ circuit_has_uninitialized circ;
         let hyps, c = (circuit_of_form hyps cur_val) in
         hyps, Some (circuit_ueq circ c)
         with CircError err ->
@@ -549,12 +550,13 @@ let t_bdep
   (perm: (int -> int) option) 
   (tc : tcenv1) =
   let () = match (FApi.tc1_goal tc).f_node with
-  | FhoareF sH -> assert false  
   | FhoareS sF -> if true then
     begin try mapreduce ~debug (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
     | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" err
       end
     else ()
+  (* FIXME PR: Should these be guarded before call or do we just fail somehow if we hit it? *)
+  | FhoareF sH -> assert false  
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -632,6 +634,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let env = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
   let pe = FApi.tc1_penv tc in
+  let ppe = EcPrinting.PPEnv.ofenv env in
 
   
   let (@@!) pth args = 
@@ -722,12 +725,12 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | v, Some (t, _) -> 
     let t = match v.v_type.ty_node with
     | Tconstr (_, [bsty]) -> tconstr (EcEnv.Ty.lookup_path t env) [bsty]
-    | _ -> assert false
+    | _ -> tc_error pe "Failed to parse output type %a" EcPrinting.(pp_type ppe) v.v_type
     in width_of_type env t ) 
   outvs) 
   in 
 
-  assert (out_size mod m = 0);
+  if (out_size mod m <> 0) then tc_error pe "Output size (%d) not divisible by lane size (%d)" out_size m;
   let out_block_nr = out_size / m in
   let out_block_nr = match fperm with 
     | None -> out_block_nr
@@ -739,16 +742,18 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | v, None -> f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst)
     | {v_type} as v, Some (t, off) -> 
       let tpath = match EcEnv.Ty.lookup_opt t env with
-      | None -> 
-        assert false
+      | None -> tc_error pe "Failed to lookup type %s" (string_of_qsymbol t)
       | Some (path, decl) when List.length decl.tyd_params = 1 ->
         path
-      | _ -> assert false
+      | Some ((_path, decl) as tdecl) ->
+        tc_error pe "Type declaration (%a) has the wrong number of type parameters (expected %d, got %d)"
+          EcPrinting.(pp_typedecl ppe) tdecl
+          1 (List.length decl.tyd_params)
       in
       let v = f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst) in
       let get = match EcEnv.Circuit.lookup_array env v_type with
       | Some { get } -> get 
-      | None -> assert false
+      | None -> tc_error pe "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) v_type
       in
       let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
       in
@@ -785,8 +790,8 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | v, Some (t, _) -> 
     let t = match v.v_type.ty_node with
     | Tconstr (_, [bsty]) -> tconstr (EcEnv.Ty.lookup_path t env) [bsty]
-    | _ -> assert false
-    in width_of_type env t ) 
+    | _ -> tc_error pe "Failed to parse input type %a" EcPrinting.(pp_type ppe) v.v_type
+    in width_of_type env t) 
   inpvs) in 
 
   EcEnv.notify ~immediate:true env `Info "in_size : %d | block_size: %d@." in_size n;
@@ -801,16 +806,19 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     (function 
     | v, None -> v, None 
     | v, Some (t, offset) -> 
-        let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
-        | Some (_, { size = (_, Some size) }) -> size 
-        | Some (_, { size = (_, None) }) -> raise (BDepError "non concrete binding for input bitstring") 
-        | None -> assert false
+        let asz, bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
+        | Some ({size = (_, Some asz)}, { size = (_, Some bsz) }) -> asz, bsz 
+        | Some (_, { size = (_, None) }) -> tc_error pe "non concrete binding for input bitstring type (%a)" EcPrinting.(pp_type ppe) v.v_type
+        | Some ({size = (_, None)}, _) -> tc_error pe "non concrete binding for input array type (%a)" EcPrinting.(pp_type ppe) v.v_type
+        | None -> tc_error pe "Failed to lookup array or bitstring binding for input type (%a)" EcPrinting.(pp_type ppe) v.v_type
         in
-        let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
+        (* FIXME: Run this once to check that it is equal then remove block below *)
+        let asz2 = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
         | Some {size= (_, Some size)} -> size
-        | Some {size= (_, None)} -> raise (BDepError "non concrete binding for input array") 
+        | Some {size= (_, None)} -> assert false
         | _ -> assert false
         in
+        assert (asz = asz2);
         v, Some (bsz * asz, (BI.to_int offset) * bsz)
     ) 
   inpvs 
@@ -820,16 +828,19 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     (function 
     | v, None -> v, None 
     | v, Some (t, offset) -> 
-        let bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
-        | Some (_, { size = (_, Some size) }) -> size 
-        | Some (_, { size = (_, None) }) -> raise (BDepError "non concrete binding for input bitstring") 
-        | None -> assert false
+        let asz, bsz = match EcEnv.Circuit.lookup_array_and_bitstring env v.v_type with
+        | Some ({size = (_, Some asz)}, { size = (_, Some bsz) }) -> asz, bsz 
+        | Some (_, { size = (_, None) }) -> tc_error pe "non concrete binding for output bitstring type (%a)" EcPrinting.(pp_type ppe) v.v_type
+        | Some ({size = (_, None)}, _) -> tc_error pe "non concrete binding for output array type (%a)" EcPrinting.(pp_type ppe) v.v_type
+        | None -> tc_error pe "Failed to lookup array or bitstring binding for output type (%a)" EcPrinting.(pp_type ppe) v.v_type
         in
-        let asz = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
+        (* FIXME: Run this once to check that it is equal then remove block below *)
+        let asz2 = match EcEnv.Circuit.lookup_array_path env (EcPath.fromqsymbol t) with
         | Some {size= (_, Some size)} -> size
-        | Some {size= (_, None)} -> raise (BDepError "non concrete binding for input array") 
+        | Some {size= (_, None)} -> assert false
         | _ -> assert false
         in
+        assert (asz = asz2);
         v, Some (bsz * asz, (BI.to_int offset) * bsz)
     ) 
   outvs 
@@ -850,7 +861,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
           [get1 (unloc x), Some (unloc arr_t, offset)]
     in 
     List.map lookup invs |> List.flatten in
-  (* FIXME: Why was this needed? *)
+  (* FIXME: Why was this needed? Check that all input types were equal? *)
   (* let inty = match List.collapse inv_tys with
   | Some ty -> ty
   | None -> 
@@ -859,21 +870,24 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
       in tc_error pe "%s@." err
   in *)
 
+  (* FIXME: possible dup of form_of_var *)
   let form_of_lvar (v: ((ident * ty) * ((qsymbol * BI.zint) option))) = 
     match v with
     | (id, ty), None -> f_local id ty
     | (id, ty), Some (t, offset) -> 
       let tpath = match EcEnv.Ty.lookup_opt t env with
-      | None -> 
-        assert false
+      | None -> tc_error pe "Failed to lookup type %s" (string_of_qsymbol t)
       | Some (path, decl) when List.length decl.tyd_params = 1 ->
         path
-      | _ -> assert false
+      | Some ((_path, decl) as tdecl) -> 
+        tc_error pe "Type declaration (%a) has the wrong number of type parameters (expected %d, got %d)"
+          EcPrinting.(pp_typedecl ppe) tdecl
+          1 (List.length decl.tyd_params)
       in
       let v = f_local id ty in 
       let get = match EcEnv.Circuit.lookup_array env ty with
       | Some { get } -> get 
-      | None -> assert false
+      | None -> tc_error pe "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) ty
       in
       let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
       in
@@ -908,12 +922,13 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_blocks: (int * variable list * variable list) list) (pcond: form option) (preprocess: bool) (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
-  | FequivF sE -> assert false
   | FequivS sE -> begin try List.iter (fun (m, outvs_l, outvs_r) ->
     prog_equiv_prod (FApi.tc1_hyps tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond preprocess) out_blocks
     with BDepError err ->
       tc_error (FApi.tc1_penv tc) "Program equivalence failed with error: @.%s@." err
     end
+  (* FIXME PR: Do we throw a decent error here or should this be guarded before the call? *)
+  | FequivF sE -> assert false
   | FhoareF sH -> assert false  
   | FhoareS sF -> assert false
   | FbdHoareF _ -> assert false
@@ -1074,10 +1089,11 @@ let t_bdep_eval
   (tc : tcenv1) =
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
-  | FhoareF sH -> assert false  
   | FhoareS sF -> begin try mapreduce_eval (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op range sign with
     | BDepError err -> tc_error (FApi.tc1_penv tc) "Error in bdep eval: %s@." err
     end
+  (* FIXME PR: Do we throw a decent error here or should this be guarded before the call? *)
+  | FhoareF sH -> assert false  
   | FbdHoareF _ -> assert false
   | FbdHoareS _ -> assert false 
   | FeHoareF _ -> assert false
@@ -1178,7 +1194,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
           [get1 (unloc x)]
       | `VarRange (x, n) ->
           List.init n (fun i -> get1 (Format.sprintf "%s_%d" (unloc x) i)) 
-      | `Slice _ -> assert false
+      | `Slice _ -> tc_error pe "Input slice not currently supported" (* FIXME PR: Do we want to implement this ? *) 
 
     in List.map lookup invs |> List.flatten |> List.split in
 

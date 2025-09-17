@@ -2,13 +2,17 @@
 open Ptree
 open Ast
 
+exception DestrError of string
+
 (* -------------------------------------------------------------------- *)
 let as_seq1 (type t) (xs : t list) : t =
-  match xs with [ x ] -> x | _ -> assert false
+  match xs with [ x ] -> x | _ -> raise (DestrError "as_seq1") 
 
 (* -------------------------------------------------------------------- *)
 let as_seq2 (type t) (xs : t list) : t * t =
-  match xs with [ x; y ] -> (x, y) | _ -> assert false
+  match xs with [ x; y ] -> (x, y) | _ -> raise (DestrError "as_seq2") 
+
+(* FIXME: check where used and catch error if needed *)
 
 (* -------------------------------------------------------------------- *)
 module Env : sig

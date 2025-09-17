@@ -31,6 +31,7 @@ module Lc = struct
       rg_begin = min p1.rg_begin p2.rg_begin;
       rg_end   = max p1.rg_end   p2.rg_end; }
   
+  (* Dead code? FIXME PR *)
   let mergeall (p : range list) =
     match p with
     | [] -> assert false

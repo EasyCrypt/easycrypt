@@ -12,6 +12,8 @@ let load_from_file ~(filename : string) =
 let split_at_arr (type t) (n: int) (r: t array) : t array * t array =
   Array.sub r 0 n, Array.right r (Array.length r - n)
 
+exception CircuitSpecError of symbol (* FIXME PR: Rename? *)
+
 (* ==================================================================== *)
 module Env : sig
   type env
@@ -250,7 +252,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
     | EInt i -> begin
       match e.type_ with
       | `W n -> Circuit.of_int ~size:n i
-      | _ -> assert false
+      | _ -> raise (CircuitSpecError (Format.asprintf "Expected int got %a" pp_atype e.type_)) 
     end
 
   and of_expr (env : env) (e : aexpr) : reg =
@@ -264,7 +266,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
           Format.eprintf "%a@."
             (Yojson.Safe.pretty_print ~std:true)
             (Ast.aexpr_to_yojson e);
-          assert false
+          raise (CircuitSpecError (Format.asprintf "Bitstring length mismatch (expected %d, got %d)" n (Array.length r)))
         end
       | _ -> ()
     end; r

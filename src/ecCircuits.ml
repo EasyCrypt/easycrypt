@@ -60,9 +60,9 @@ let ctype_of_ty (env: env) (ty: ty) : ctype =
           raise (CircError "Failed to convert EC type to Circuit type")
     end
     | Some ({size = (_, None)}, _) -> 
-        Format.eprintf "No concrete binding for array type@."; assert false
+      raise (CircError ("No concrete binding for array type " ^ (Format.asprintf "%a" EcPrinting.(pp_type PPEnv.(ofenv env)) ty)))
     | Some (_, {size = (_, None)}) -> 
-        Format.eprintf "No concrete binding for bitstring type@."; assert false
+      raise (CircError ("No concrete binding for bitstring type " ^ (Format.asprintf "%a" EcPrinting.(pp_type PPEnv.(ofenv env)) ty)))
   end
 
 
@@ -106,10 +106,10 @@ module BVOps = struct
   let circuit_of_parametric_bvop (env : env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) (args: arg list) : circuit =
     let op = match op with
     | `BvBind op -> op
-    | `Path p -> let op = match EcEnv.Circuit.lookup_bvoperator_path env p with
+    | `Path p -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
       | Some op -> op
-      | None -> assert false
-      in op
+      | None -> raise (CircError ("No binding matching operator at path " ^ (EcPath.tostring p)) )
+    end
     in
     circuit_of_parametric_bvop op args
     
@@ -140,10 +140,10 @@ module BVOps = struct
   let circuit_of_bvop (env: env) (op: [`Path of path | `BvBind of EcDecl.crb_bvoperator]) : circuit = 
     let op = match op with
     | `BvBind op -> op
-    | `Path p -> let op = match EcEnv.Circuit.lookup_bvoperator_path env p with
+    | `Path p -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
       | Some op -> op
-      | None -> assert false
-      in op
+      | None -> raise (CircError ("No binding matching operator at path " ^ (EcPath.tostring p)) )      
+    end
     in
     circuit_of_bvop op
 end
@@ -162,15 +162,16 @@ module BitstringOps = struct
     | `BSBinding bnd -> bnd
     | `Path p -> begin match EcEnv.Circuit.reverse_bitstring_operator env p with
       | Some bnd -> bnd
-      | None -> assert false
+      | None -> raise (CircError ("No binding matching operator at path " ^ (EcPath.tostring p)))
       end
     in
+    (* assert false => should be guarded by a previous call to op_is_bsop *)
     match bnd with
     | bs, `From -> assert false (* doesn't translate to circuit *)
     | {size = (_, Some size)}, `OfInt -> begin match args with
       | [ `Constant i ] ->
         circuit_of_zint ~size i
-      | _ -> assert false
+      | args -> raise (CircError (Format.asprintf "Bad arguments for bitstring of_int: expected (int) got (%a)" EcPrinting.(pp_list ", " pp_arg) args))
     end
     | {size = (_, None)}, `OfInt -> 
         raise (CircError "No concrete binding for type of of_int@.") (* FIXME: error messages *)
@@ -196,20 +197,25 @@ module ArrayOps = struct
     | `ABinding bnd -> bnd
     | `Path p -> begin match EcEnv.Circuit.reverse_array_operator env p with
       | Some bnd -> bnd
-      | None -> assert false
-      end
+      | None -> raise (CircError ("No binding matching operator at path " ^ (EcPath.tostring p))) 
+    end
     in
+    (* assert false => should be guarded by a call to op_is_arrayop *)
     match op with
     | (arr, `ToList) -> assert false (* We do not translate this to circuit *)
     | (arr, `Get) -> begin match args with
       | [ `Circuit ((`CArray _, inps) as arr); `Constant i] ->
         array_get arr (BI.to_int i)
-      | _ -> assert false
+      | args -> 
+        let err = Format.asprintf "Bad inputs to arr get: Expected (arr, idx) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
+        raise (CircError err)
     end
     (* FIXME: Check argument order *)
     | ({size = (_, Some size)}, `OfList) -> begin match args with 
       | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
-      | _ -> assert false
+      | args -> 
+        let err = Format.asprintf "Bad inputs to arr of_list: Expected (default, list) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
+        raise (CircError err)
       end
     | ({size = (_, None)}, `OfList) -> raise (CircError "Array of list with non-concrete size")
     | (_arr, `Set) -> begin match args with
@@ -217,7 +223,9 @@ module ArrayOps = struct
           `Constant i; 
           `Circuit ((`CBitstring _, _) as bs) ] ->
         array_set arr (BI.to_int i) bs
-      | _ -> assert false
+      | args -> 
+        let err = Format.asprintf "Bad inputs to arr set: Expected (arr, idx, new_val) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
+        raise (CircError err)
     end
 end
 open ArrayOps
@@ -229,8 +237,10 @@ let circuit_uninit (env:env) (t: ty) : circuit =
 module CircuitSpec = struct
   let circuit_from_spec env (c : [`Path of path | `Bind of EcDecl.crb_circuit ] ) : circuit = 
     let c = match c with
-    | `Path p -> let c = EcEnv.Circuit.reverse_circuit env p in
-      if (Option.is_some c) then Option.get c else assert false
+    | `Path p -> begin match EcEnv.Circuit.reverse_circuit env p with
+      | Some c -> c
+      | None -> raise (CircError ("No spec binding for operator at path " ^ EcPath.(tostring p)))
+    end
     | `Bind c -> c
     in
     let _, name = (EcPath.toqsymbol c.operator) in
@@ -266,7 +276,7 @@ let circuit_of_baseop (env: env) (p: path) : circuit =
   else if op_has_spec env p then
     circuit_from_spec env (`Path p)
   else 
-    assert false
+    assert false (* Should be guarded by call to op_is_base *)
 
 let op_is_parametric_base (env: env) (p: path) = 
   op_is_parametric_bvop env p ||
@@ -281,7 +291,7 @@ let circuit_of_parametric_baseop (env: env) (p: path) (args: arg list) : circuit
   else if op_is_bsop env p then
     circuit_of_bsop env (`Path p) args
   else
-    assert false
+    assert false (* Should be guarded by call to op_is_parametric_base *)
 
 let circuit_of_op (env: env) (p: path) : circuit = 
   let op = try
@@ -290,8 +300,8 @@ let circuit_of_op (env: env) (p: path) : circuit =
     raise (CircError "Failed reverse operator")
   in
   match op with
-  | `Bitstring (bs, op) -> assert false 
-  | `Array _ -> assert false 
+  | `Bitstring (bs, op) -> assert false (* Should be guarded by a call to op_is_base *)
+  | `Array _ -> assert false  (* Should be guarded by a call to op_is_parametric_base *)
   | `BvOperator bvbnd -> circuit_of_bvop  env (`BvBind bvbnd)
   | `Circuit c -> circuit_from_spec env (`Bind c)
   
@@ -305,7 +315,7 @@ let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  =
   | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
   | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
   | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
-  | `Circuit c -> assert false (* TODO: Do we want to have parametric operators coming from the spec? Yes *) 
+  | `Circuit c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *) 
 (* ------------------------------ *)
 
 
@@ -347,7 +357,7 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
     h::(form_list_of_form t)
   | _ -> 
       if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
-      assert false
+      raise (CircError "Failed to destruct list")
 
 let form_is_iter (f: form) : bool = 
   match f.f_node with
@@ -360,6 +370,8 @@ let form_is_iter (f: form) : bool =
 (* Expands iter, fold and iteri (for integer arguments) *)
 let expand_iter_form (hyps: hyps) (f: form) : form = 
   let redmode = circ_red hyps in
+  let env = toenv hyps in
+  let ppenv = EcPrinting.PPEnv.ofenv env in
   let (@!!) f fs = 
     EcTypesafeFol.fapply_safe ~redmode hyps f fs
   in
@@ -386,9 +398,9 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
     let is = List.init (BI.to_int rep) BI.of_int in
     let f = List.fold_left (fun f i -> fn @!! [f]) base is in
     f
-  | _ -> assert false
+  | _ -> raise (CircError (Format.asprintf "Failed to destructure form for iter expansion %a" EcPrinting.(pp_form ppenv) f))
   in
-  if debug then Format.eprintf "Expanded iter form: @.%a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) res;
+  if debug then Format.eprintf "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
   res
 
 let circuit_of_form 
@@ -471,7 +483,14 @@ let circuit_of_form
           p = EcCoreLib.CI_List.p_list &&
           type_is_registered (LDecl.toenv hyps) t ->
           let hyps, cs = List.fold_left_map (fun hyps f ->
-            doit cache hyps f) hyps (form_list_of_form ~ppenv:(EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) f) 
+            doit cache hyps f) hyps 
+            (try 
+              (form_list_of_form ~ppenv:(EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) f)
+            with 
+              CircError _ -> 
+                raise (CircError 
+                  (Format.asprintf "Failed to destructure %a as list when attempting to convert it to an argument" 
+                  EcPrinting.(pp_form PPEnv.(ofenv env)) f)))
           in
           hyps, arg_of_circuits cs
       | _ -> Format.eprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form (PPEnv.ofenv env)) f; 
@@ -515,7 +534,6 @@ let circuit_of_form
         | OB_oper (Some (OP_Plain f)) -> 
 (*             if debug then Format.eprintf "[BDEP] Opening definition of function at path %s" (EcPath.tostring pth); *)
           doit cache hyps f
-        | _ when pth = EcCoreLib.CI_Witness.p_witness -> assert false
         | _ -> 
         begin match EcFol.op_kind (destr_op f_ |> fst) with
           | Some `True -> 
@@ -662,6 +680,8 @@ let circuit_of_form
   and trans_iter (cache: cache) (hyps: hyps) (f: form) (fs: form list) =
     (* FIXME: move auxiliary function out of the definitions *)
     let redmode = circ_red hyps in
+    let env = toenv hyps in
+    let ppenv = EcPrinting.PPEnv.ofenv env in
     let fapply_safe f fs = 
       let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
       res
@@ -677,9 +697,10 @@ let circuit_of_form
         let hyps, fn = doit cache hyps fn in
         hyps, circuit_compose fn [f]
       ) (doit cache hyps base) fs
-    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false
+    (* FIXME PR: this is currently being implemented directly on circuits, do we want this case as well? *)
+    | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false 
     | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold -> assert false 
-    | _ -> assert false
+    | _ -> raise (CircError (Format.asprintf "Failed to destr form %a to translate iter" EcPrinting.(pp_form ppenv) f))
   in 
 (*
   let t0 = Unix.gettimeofday () in
@@ -737,7 +758,7 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hy
         (List.combine 
           (List.map (function 
           | (PVloc v, _ty) -> v
-          | _ -> assert false) vs) 
+          | _ -> raise (CircError "Failed to parse tuple assignment")) vs) 
         es) in
       pstate
     | Sasgn (LvTuple (vs), e) ->
@@ -879,7 +900,7 @@ let circ_taut = circ_taut
 let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   let c = match c with
   | (`CBitstring r, inps) as c -> c
-  | _ -> assert false
+  | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (permute bsz perm c :> circuit)
 
@@ -887,14 +908,14 @@ let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (
   let c = match c, perm with 
   | (`CBitstring _, inps) as c, None -> c
   | (`CBitstring _, inps) as c, Some perm -> permute w_out perm c
-  | _ -> assert false
+  | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (decompose w_in w_out c :> circuit list)
 
 let cache_get = cache_get
 let cache_add = cache_add
 let empty_cache = empty_cache 
-let circuit_to_string (c: circuit) : string = assert false
+let circuit_to_string ((circ, inps): circuit) : string = Format.asprintf "(%a => %a)" EcPrinting.(pp_list ", " pp_cinp) inps pp_circ circ
 let pstate_get = pstate_get 
 let pstate_get_opt = pstate_get_opt
 let pstate_get_all = fun pstate -> List.snd (pstate_get_all pstate)

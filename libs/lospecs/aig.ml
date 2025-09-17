@@ -345,6 +345,8 @@ let deps (r : reg) =
        )
     |> List.sort (fun (r1, _) (r2, _) -> compare r1 r2)
 
+exception AigerError of string
+
 (* -------------------------------------------------------------------- *)
 (* SERIALIZATION *)
 (* Return map of indice renaming + list of and gates (increasing order) + (max variable index, and gate count, input gate count) *)
@@ -387,7 +389,7 @@ let aiger_preprocess ~(input_count: int) (r: reg) : (node -> int) * (node list) 
   (and_cnt + inp_cnt, and_cnt, inp_cnt) 
 
 let aiger_serialize_int (id: int) : string =
-  assert (id > 0);
+  if not (id > 0) then raise (AigerError "serialize_int");
   let mask = 0x7f in
   let rec doit (id: int) : int list = 
     if id < 0x80 then
@@ -401,6 +403,9 @@ let aiger_serialize_int (id: int) : string =
 let pp_aiger_int fmt (id: int) : unit =
   Format.fprintf fmt "%s" (aiger_serialize_int id)
 
+(* FIXME PR: Look at correction of this and after making sure it is correct   *)
+(*           we can remove or do something else with the asserts              *)
+(*           but they should not be triggered on a normal execution           *)
 let pp_aiger_and fmt ((gid, id1, id2): int * int * int) : unit =
   if not (gid > id1 && id1 > id2) then Format.eprintf "gid : %d | id1: %d | id2: %d@." gid id1 id2;
   assert (gid > id1 && id1 > id2);
@@ -437,7 +442,8 @@ let write_aiger_bin
         let id = id - (id land 1) in
         let id1, id2 = if id1 > id2 then id1, id2 else id2, id1 in 
         Printf.fprintf oc "%s" (Format.asprintf "%a" pp_aiger_and (id, id1, id2))
-    | _ -> assert false) and_gates;
+    | _ -> assert false (* Should not be triggered *)
+  ) and_gates;
   for i = 0 to igc-1 do 
     Printf.fprintf oc "i%d %s@\n" i (inp_name_map i)
   done

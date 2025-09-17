@@ -1,6 +1,9 @@
 (* -------------------------------------------------------------------- *)
 type symbol = Ptree.symbol [@@deriving yojson]
 
+(* FIXME PR: Maybe get a decl file to declare errors and other common things? *)
+exception DestrError of string
+
 (* -------------------------------------------------------------------- *)
 module Ident : sig
   type ident [@@deriving yojson]
@@ -83,7 +86,7 @@ type adef = {
 
 (* -------------------------------------------------------------------- *)
 let atype_as_aword (ty : atype) =
-  match ty with `W n -> n | _ -> assert false
+  match ty with `W n -> n | _ -> raise (DestrError "atype_as_aword") 
 
 (* -------------------------------------------------------------------- *)
 let get_size (`W w : aword) : int =
