@@ -621,7 +621,7 @@ abstract theory METCR.
   op dkey : key_t distr.
 
   (*& Type for oracles used in M_ETCR game &*)
-  module type Oracle_METCRi_t = {
+  module type Oraclei_METCR = {
     proc init() : unit
     proc query(x : in_t) : key_t
     proc get(i : int) : key_t * in_t
@@ -629,12 +629,12 @@ abstract theory METCR.
   }.
 
   (*& Type for oracles given to adversary in M_ETCR game &*)
-  module type Oracle_METCR_t = {
-    proc query(x : in_t) : key_t
+  module type Oracle_METCR = {
+    include Oraclei_METCR [query]
   }.
 
   (*& Default implementation of an oracle for M_ETCR &*)
-  module O_METCR_Default : Oracle_METCRi_t = {
+  module O_METCR_Default : Oraclei_METCR = {
     var ts : (key_t * in_t) list
 
     (* Initialize list of targets (i.e., (key, input) pairs) to the empty list *)
@@ -667,12 +667,12 @@ abstract theory METCR.
   }.
 
   (*& Class of adversaries against M_ETCR &*)
-  module type Adv_METCR(O : Oracle_METCR_t) = {
-    proc find() : int * key_t * in_t { O.query }
+  module type Adv_METCR(O : Oracle_METCR) = {
+    proc find() : int * key_t * in_t
   }.
 
   (*& M_ETCR game &*)
-  module M_ETCR (A : Adv_METCR, O : Oracle_METCRi_t) = {
+  module M_ETCR (A : Adv_METCR, O : Oraclei_METCR) = {
     proc main() : bool = {
       var k, k' : key_t;
       var x, x' : in_t;
@@ -1392,14 +1392,19 @@ abstract theory ITSR.
   op h (k : key_t) (x : in_t) : (int * int * int) list = g (f k x).
 
   (*& Type for oracles used in ITSR game &*)
-  module type Oracle_ITSR = {
+  module type Oraclei_ITSR = {
     proc init() : unit
     proc query(x : in_t) : key_t
     proc get_targets() : (key_t * in_t) list
   }.
 
+  (*& Type for oracles given to the adversary in the ITSR game &*)
+  module type Oracle_ITSR = {
+    include Oraclei_ITSR [query]
+  }.
+
   (*& Default implementation of an oracle for ITSR &*)
-  module O_ITSR_Default : Oracle_ITSR = {
+  module O_ITSR_Default : Oraclei_ITSR = {
     var ts : (key_t * in_t) list
 
     (* Initialize list of targets (i.e., (key, input) pairs) to the empty list *)
@@ -1428,11 +1433,11 @@ abstract theory ITSR.
 
   (*& Class of adversaries against ITSR &*)
   module type Adv_ITSR(O : Oracle_ITSR) = {
-    proc find() : key_t * in_t { O.query }
+    proc find() : key_t * in_t
   }.
 
   (*& ITSR game &*)
-  module ITSR(A : Adv_ITSR, O : Oracle_ITSR) = {
+  module ITSR(A : Adv_ITSR, O : Oraclei_ITSR) = {
     proc main() : bool = {
       var k : key_t;
       var x : in_t;
@@ -1504,23 +1509,23 @@ abstract theory PRF.
   op doutm : { in_t -> out_t distr | forall x, is_lossless (doutm x) } as doutm_ll.
 
   (*& Type for oracles used in PRF game &*)
-  module type Oracle_PRF = {
+  module type Oraclei_PRF = {
     proc init(b_init : bool) : unit
     proc query(x : in_t) : out_t
   }.
 
   (*& Type for oracles given to the adversary in PRF &*)
-  module type QOracle_PRF = {
-    include Oracle_PRF [query]
+  module type Oracle_PRF = {
+    include Oraclei_PRF [query]
   }.
 
   (*& Class of adversaries against PRF &*)
-  module type Adv_PRF(O : QOracle_PRF) = {
+  module type Adv_PRF(O : Oracle_PRF) = {
     proc distinguish() : bool
   }.
 
   (*& Default implementation of an oracle for PRF &*)
-  module O_PRF_Default : Oracle_PRF = {
+  module O_PRF_Default : Oraclei_PRF = {
     var b : bool
     var k : key_t
     var m : (in_t, out_t) fmap
@@ -1561,7 +1566,7 @@ abstract theory PRF.
   }.
 
   (*& PRF game &*)
-  module PRF(A : Adv_PRF, O : Oracle_PRF) = {
+  module PRF(A : Adv_PRF, O : Oraclei_PRF) = {
     proc main(b : bool) : bool = {
       var b' : bool;
 
