@@ -55,7 +55,7 @@ abstract theory SMDTPRE.
   op din : in_t distr.
 
   (*& Type for challenge oracle used in SM_DT_PRE &*)
-  module type Oracle_SMDTPRE = {
+  module type Oraclei_SMDTPRE = {
     proc init(pp_init : pp_t) : unit
     proc query(tw : tw_t) : out_t
     proc get(i : int) : tw_t * out_t
@@ -65,12 +65,12 @@ abstract theory SMDTPRE.
   }.
 
   (*& Type for challenge oracle given to the adversary in SM_DT_PRE &*)
-  module type COracle_SMDTPRE = {
-    include Oracle_SMDTPRE [query]
+  module type Oracle_SMDTPRE = {
+    include Oraclei_SMDTPRE [query]
   }.
 
   (*& Class of adversaries against SM_DT_PRE &*)
-  module type Adv_SMDTPRE(O : COracle_SMDTPRE) = {
+  module type Adv_SMDTPRE(O : Oracle_SMDTPRE) = {
     proc pick() : unit
     proc find(pp : pp_t) : int * in_t {}
   }.
@@ -79,7 +79,7 @@ abstract theory SMDTPRE.
     Default implementation of a SM_DT_PRE challenge oracle,
     including procedures for initialization and auxiliary tasks
   &*)
-  module O_SMDTPRE_Default : Oracle_SMDTPRE = {
+  module O_SMDTPRE_Default : Oraclei_SMDTPRE = {
     var pp : pp_t
     var ts : (tw_t * out_t) list
 
@@ -120,7 +120,7 @@ abstract theory SMDTPRE.
   }.
 
   (*& SM_DT_PRE game &*)
-  module SM_DT_PRE(A : Adv_SMDTPRE, O : Oracle_SMDTPRE) = {
+  module SM_DT_PRE(A : Adv_SMDTPRE, O : Oraclei_SMDTPRE) = {
     proc main() : bool = {
       var pp : pp_t;
       var tw : tw_t;
@@ -158,7 +158,7 @@ abstract theory SMDTOpenPRE.
   op din : in_t distr.
 
   (*& Type for opening oracle used in SM_DT_OpenPRE &*)
-  module type Oracle_SMDTOpenPRE = {
+  module type Oraclei_SMDTOpenPRE = {
     proc init(pp_init : pp_t, tws_init : tw_t list) : out_t list
     proc open(i : int) : in_t
     proc get(i : int) : tw_t * out_t
@@ -169,12 +169,12 @@ abstract theory SMDTOpenPRE.
   }.
 
   (*& Type for opening oracle given to the adversary in SM_DT_OpenPRE &*)
-  module type COracle_SMDTOpenPRE = {
-    include Oracle_SMDTOpenPRE [open]
+  module type Oracle_SMDTOpenPRE = {
+    include Oraclei_SMDTOpenPRE [open]
   }.
 
   (*& Class of adversaries against SM_DT_OpenPRE &*)
-  module type Adv_SMDTOpenPRE(O : COracle_SMDTOpenPRE) = {
+  module type Adv_SMDTOpenPRE(O : Oracle_SMDTOpenPRE) = {
     proc pick() : tw_t list {}
     proc find(pp : pp_t, ys : out_t list) : int * in_t
   }.
@@ -183,7 +183,7 @@ abstract theory SMDTOpenPRE.
     Default implementation of a SM_DT_OpenPRE opening oracle,
     including procedures for initialization and auxiliary tasks
   &*)
-  module O_SMDTOpenPRE_Default : Oracle_SMDTOpenPRE = {
+  module O_SMDTOpenPRE_Default : Oraclei_SMDTOpenPRE = {
     var pp : pp_t
     var ts : (tw_t * out_t) list
     var xs : in_t list
@@ -219,7 +219,6 @@ abstract theory SMDTOpenPRE.
 
     proc open(i : int) : in_t = {
       os <- rcons os i;
-
       return nth witness xs i;
     }
 
@@ -245,7 +244,7 @@ abstract theory SMDTOpenPRE.
   }.
 
   (*& SM_DT_OpenPRE game &*)
-  module SM_DT_OpenPRE(A : Adv_SMDTOpenPRE, O : Oracle_SMDTOpenPRE) = {
+  module SM_DT_OpenPRE(A : Adv_SMDTOpenPRE, O : Oraclei_SMDTOpenPRE) = {
     proc main() : bool = {
       var pp : pp_t;
       var tw : tw_t;
@@ -283,7 +282,7 @@ abstract theory SMDTTCR.
   const t : { int | 0 <= t } as ge0_t.
 
   (*& Type for challenge oracle used in SM_DT_TCR &*)
-  module type Oracle_SMDTTCR = {
+  module type Oraclei_SMDTTCR = {
     proc init(pp_init : pp_t) : unit
     proc query(tw : tw_t, x : in_t) : out_t
     proc get(i : int) : tw_t * in_t
@@ -293,8 +292,8 @@ abstract theory SMDTTCR.
   }.
 
   (*& Type for challenge oracle given to the adversary in SM_DT_TCR &*)
-  module type COracle_SMDTTCR = {
-    include Oracle_SMDTTCR [query]
+  module type Oracle_SMDTTCR = {
+    include Oraclei_SMDTTCR [query]
   }.
 
   (*& Class of adversaries against SM_DT_TCR &*)
@@ -307,7 +306,7 @@ abstract theory SMDTTCR.
     Default implementation of a SM_DT_TCR challenge oracle,
     including procedures for initialization and auxiliary tasks
   &*)
-  module O_SMDTTCR_Default : Oracle_SMDTTCR = {
+  module O_SMDTTCR_Default : Oraclei_SMDTTCR = {
     var pp : pp_t
     var ts : (tw_t * in_t) list
 
@@ -346,7 +345,7 @@ abstract theory SMDTTCR.
   }.
 
   (*& SM_DT_TCR game &*)
-  module SM_DT_TCR(A : Adv_SMDTTCR, O : Oracle_SMDTTCR) = {
+  module SM_DT_TCR(A : Adv_SMDTTCR, O : Oraclei_SMDTTCR) = {
     proc main() : bool = {
       var pp : pp_t;
       var tw : tw_t;
@@ -384,7 +383,7 @@ abstract theory SMDTDSPR.
   const t : { int | 0 <= t } as ge0_t.
 
   (*& Type for challenge oracle used in SM_DT_DSPR &*)
-  module type Oracle_SMDTDSPR = {
+  module type Oraclei_SMDTDSPR = {
     proc init(pp_init : pp_t) : unit
     proc query(tw : tw_t, x : in_t) : out_t
     proc get(i : int) : tw_t * in_t
@@ -394,8 +393,8 @@ abstract theory SMDTDSPR.
   }.
 
   (*& Type for challenge oracle given to the adversary in SM_DT_DSPR &*)
-  module type COracle_SMDTDSPR = {
-    include Oracle_SMDTDSPR [query]
+  module type Oracle_SMDTDSPR = {
+    include Oraclei_SMDTDSPR [query]
   }.
 
   (*& Class of adversaries against SM_DT_DSPR &*)
@@ -408,7 +407,7 @@ abstract theory SMDTDSPR.
     Default implementation of a SM_DT_DSPR challenge oracle,
     including procedures for initialization and auxiliary tasks
   &*)
-  module O_SMDTDSPR_Default : Oracle_SMDTDSPR = {
+  module O_SMDTDSPR_Default : Oraclei_SMDTDSPR = {
     var pp : pp_t
     var ts : (tw_t * in_t) list
 
@@ -450,7 +449,7 @@ abstract theory SMDTDSPR.
     Game used to denote the probability that could trivially be obtained in
     the SM_DSPR game by invariably returning 1
   &*)
-  module SM_DT_SPprob(A : Adv_SMDTDSPR, O : Oracle_SMDTDSPR) = {
+  module SM_DT_SPprob(A : Adv_SMDTDSPR, O : Oraclei_SMDTDSPR) = {
     proc main() : bool = {
       var pp : pp_t;
       var tw : tw_t;
@@ -476,9 +475,7 @@ abstract theory SMDTDSPR.
   }.
 
   (*& SM_DT_DSPR game &*)
-  module SM_DT_DSPR(A : Adv_SMDTDSPR, O : Oracle_SMDTDSPR) = {
-    module A = A(O)
-
+  module SM_DT_DSPR(A : Adv_SMDTDSPR, O : Oraclei_SMDTDSPR) = {
     proc main() : bool = {
       var pp : pp_t;
       var tw : tw_t;
@@ -492,8 +489,8 @@ abstract theory SMDTDSPR.
       pp <$ dpp;
       O.init(pp);
 
-      A.pick();
-      (i, b) <@ A.guess(pp);
+      A(O).pick();
+      (i, b) <@ A(O).guess(pp);
 
       (tw, x) <@ O.get(i);
 
@@ -530,7 +527,7 @@ op din : in_t distr.
 op dout : out_t distr.
 
 (*& Type for challenge oracle used in SM_DT_UD &*)
-module type Oracle_SMDTUD = {
+module type Oraclei_SMDTUD = {
   proc init(b_init : bool, pp_init : pp_t) : unit
   proc query(tw : tw_t) : out_t
   proc get_tweaks() : tw_t list
@@ -539,8 +536,8 @@ module type Oracle_SMDTUD = {
 }.
 
 (*& Type for challenge oracle given to the adversary in SM_DT_UD &*)
-module type COracle_SMDTUD = {
-  include Oracle_SMDTUD [query]
+module type Oracle_SMDTUD = {
+  include Oraclei_SMDTUD [query]
 }.
 
 (*& Class of adversaries against SM_DT_UD &*)
@@ -553,7 +550,7 @@ module type Adv_SMDTUD(O : Oracle_SMDTUD) = {
   Default implementation of a SM_DT_UD challenge oracle,
   including procedures for initialization and auxiliary tasks
 &*)
-module O_SMDTUD_Default : Oracle_SMDTUD = {
+module O_SMDTUD_Default : Oraclei_SMDTUD = {
   var b : bool
   var pp : pp_t
   var ts : tw_t list
@@ -594,9 +591,7 @@ module O_SMDTUD_Default : Oracle_SMDTUD = {
 }.
 
 (*& SM_DT_UD game &*)
-module SM_DT_UD(A : Adv_SMDTUD, O : Oracle_SMDTUD) = {
-  module A = A(O)
-
+module SM_DT_UD(A : Adv_SMDTUD, O : Oraclei_SMDTUD) = {
   proc main(b : bool) : bool = {
     var pp : pp_t;
     var b' : bool;
@@ -606,8 +601,8 @@ module SM_DT_UD(A : Adv_SMDTUD, O : Oracle_SMDTUD) = {
     pp <$ dpp;
     O.init(b, pp);
 
-    A.pick();
-    b' <@ A.distinguish(pp);
+    A(O).pick();
+    b' <@ A(O).distinguish(pp);
 
     nrts <@ O.nr_targets();
     dist <@ O.dist_tweaks();
@@ -649,7 +644,7 @@ abstract theory Collection.
     Type for collection oracle used in tweakable hash function properties
     for members of a collection
   &*)
-  module type Oracle_THFC = {
+  module type Oraclei_THFC = {
     proc init(pp_init : pp_t) : unit
     proc get_tweaks() : tw_t list
     proc query(tw : tw_t, x : in_t) : out_t
@@ -659,12 +654,12 @@ abstract theory Collection.
     Type for collection oracle given to adversaries in
     tweakable hash function properties  for members of a collection
   &*)
-  module type COracle_THFC = {
-    include Oracle_THFC [query]
+  module type Oracle_THFC = {
+    include Oraclei_THFC [query]
   }.
 
   (*& Default implementation of collection oracle &*)
-  module O_THFC_Default : Oracle_THFC = {
+  module O_THFC_Default : Oraclei_THFC = {
     var pp : pp_t
     var tws : tw_t list
 
@@ -698,13 +693,13 @@ abstract theory Collection.
     clone include SMDTPRE.
 
     (*& Class of adversaries against SM_DT_PRE_C &*)
-    module type Adv_SMDTPREC(O : COracle_SMDTPRE, OC : COracle_THFC) = {
+    module type Adv_SMDTPREC(O : Oracle_SMDTPRE, OC : Oracle_THFC) = {
       proc pick() : unit
       proc find(pp : pp_t) : int * in_t {}
     }.
 
     (*& SM_DT_PRE_C game &*)
-    module SM_DT_PRE_C(A : Adv_SMDTPREC, O : Oracle_SMDTPRE, OC : Oracle_THFC) = {
+    module SM_DT_PRE_C(A : Adv_SMDTPREC, O : Oraclei_SMDTPRE, OC : Oraclei_THFC) = {
       proc main() : bool = {
         var pp : pp_t;
         var tw : tw_t;
@@ -743,13 +738,13 @@ abstract theory Collection.
     clone include SMDTOpenPRE.
 
     (*& Class of adversaries against SM_DT_OpenPRE_C &*)
-    module type Adv_SMDTOpenPREC(O : COracle_SMDTOpenPRE, OC : COracle_THFC) = {
+    module type Adv_SMDTOpenPREC(O : Oracle_SMDTOpenPRE, OC : Oracle_THFC) = {
       proc pick() : tw_t list { OC.query }
       proc find(pp : pp_t, ys : out_t list) : int * in_t { O.open }
     }.
 
     (*& SM_DT_OpenPRE game &*)
-    module SM_DT_OpenPRE_C(A : Adv_SMDTOpenPREC, O : Oracle_SMDTOpenPRE, OC : Oracle_THFC) = {
+    module SM_DT_OpenPRE_C(A : Adv_SMDTOpenPREC, O : Oraclei_SMDTOpenPRE, OC : Oraclei_THFC) = {
       proc main() : bool = {
         var pp : pp_t;
         var tw : tw_t;
@@ -793,13 +788,13 @@ abstract theory Collection.
     clone include SMDTTCR.
 
     (*& Class of adversaries against SM_DT_TCR_C &*)
-    module type Adv_SMDTTCRC(O : COracle_SMDTTCR, OC : COracle_THFC) = {
+    module type Adv_SMDTTCRC(O : Oracle_SMDTTCR, OC : Oracle_THFC) = {
       proc pick() : unit
       proc find(pp : pp_t) : int * in_t {}
     }.
 
     (*& SM_DT_TCR_C game &*)
-    module SM_DT_TCR_C(A : Adv_SMDTTCRC, O : Oracle_SMDTTCR, OC : Oracle_THFC) = {
+    module SM_DT_TCR_C(A : Adv_SMDTTCRC, O : Oraclei_SMDTTCR, OC : Oraclei_THFC) = {
       proc main() : bool = {
         var pp : pp_t;
         var tw : tw_t;
@@ -839,7 +834,7 @@ abstract theory Collection.
     clone include SMDTDSPR.
 
     (*& Class of adversaries against SM_DT_DSPR_C &*)
-    module type Adv_SMDTDSPRC(O : COracle_SMDTDSPR, OC : COracle_THFC) = {
+    module type Adv_SMDTDSPRC(O : Oracle_SMDTDSPR, OC : Oracle_THFC) = {
       proc pick() : unit
       proc guess(pp : pp_t) : int * bool {}
     }.
@@ -848,7 +843,7 @@ abstract theory Collection.
       Game used to denote the probability that could trivially be obtained in
       the SM_DSPR_C game by invariably returning 1
     &*)
-    module SM_DT_SPprob_C(A : Adv_SMDTDSPRC, O : Oracle_SMDTDSPR, OC : Oracle_THFC) = {
+    module SM_DT_SPprob_C(A : Adv_SMDTDSPRC, O : Oraclei_SMDTDSPR, OC : Oraclei_THFC) = {
       proc main() : bool = {
         var pp : pp_t;
         var tw : tw_t;
@@ -879,7 +874,7 @@ abstract theory Collection.
     }.
 
     (*& SM_CT_DSPR_C game &*)
-    module SM_DT_DSPR_C(A : Adv_SMDTDSPRC, O : Oracle_SMDTDSPR, OC : Oracle_THFC) = {
+    module SM_DT_DSPR_C(A : Adv_SMDTDSPRC, O : Oraclei_SMDTDSPR, OC : Oraclei_THFC) = {
       proc main() : bool = {
         var pp : pp_t;
         var tw : tw_t;
@@ -918,13 +913,13 @@ abstract theory Collection.
     clone include SMDTUD.
 
     (*& Class of adversaries against SM_DT_UD_C &*)
-    module type Adv_SMDTUDC(O : COracle_SMDTUD, OC : COracle_THFC) = {
+    module type Adv_SMDTUDC(O : Oracle_SMDTUD, OC : Oracle_THFC) = {
       proc pick() : unit
       proc distinguish(pp : pp_t) :  bool {}
     }.
 
     (*& SM_DT_UD_C game &*)
-    module SM_DT_UD_C(A : Adv_SMDTUDC, O : Oracle_SMDTUD, OC : Oracle_THFC) = {
+    module SM_DT_UD_C(A : Adv_SMDTUDC, O : Oraclei_SMDTUD, OC : Oraclei_THFC) = {
       proc main(b : bool) : bool = {
         var pp : pp_t;
         var tw : tw_t;
