@@ -23,7 +23,7 @@ type dterror =
 | DTE_TypeError       of TT.tyerror
 | DTE_DuplicatedCtor  of symbol
 | DTE_InvalidCTorType of symbol * TT.tyerror
-| DTE_NonPositive
+| DTE_NonPositive     of symbol * ty
 | DTE_Empty
 
 type fxerror =
@@ -52,7 +52,7 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   Msym.odup unloc (List.map fst rc) |> oiter (fun (x, y) ->
     rcerror y.pl_loc env (RCE_DuplicatedField x.pl_desc));
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   if List.is_empty rc then
     rcerror loc env RCE_Empty;
 
@@ -106,7 +106,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       dt |> List.map for1
   in
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   begin
     let rec isempty_n (ctors : (ty list) list) =
       List.for_all isempty_1 ctors

@@ -593,6 +593,7 @@ end = struct
 
   let pp_dterror env fmt error =
     let msg x = Format.fprintf fmt x in
+    let env1  = EcPrinting.PPEnv.ofenv env in
 
     match error with
     | DTE_TypeError ee ->
@@ -605,8 +606,9 @@ end = struct
         msg "invalid constructor type: `%s`: %a'"
           name (pp_tyerror env) ee
 
-    | DTE_NonPositive ->
-        msg "the datatype does not respect the positivity condition"
+    | DTE_NonPositive (name, ty) ->
+        msg "non strictly-positive occurrence of type `%s` in `%a`"
+          name (EcPrinting.pp_type env1) ty
 
     | DTE_Empty ->
         msg "the datatype may be empty"
