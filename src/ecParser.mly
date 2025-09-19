@@ -416,6 +416,7 @@
 %token CONSEQ
 %token CONST
 %token COQ
+%token COUPLING
 %token CHECK
 %token EDIT
 %token FIX
@@ -544,8 +545,6 @@
 %token REWRITE
 %token RIGHT
 %token RND
-%token RNDP
-%token RNDPP
 %token RNDSEM
 %token RPAREN
 %token RPBRACE
@@ -3002,14 +3001,12 @@ interleave_info:
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
-| RNDP f=sform
-    { Prndp f }
-
-| RNDPP g=sform
-    { Prndcoupling g }
 
 | RNDSEM red=boption(STAR) s=side? c=codepos1
     { Prndsem (red, s, c) }
+
+| COUPLING s=side? f=sform
+    { Pcoupling (s, f) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
   { Pinline (`ByName(s, u, ([], o))) }

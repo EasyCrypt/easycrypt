@@ -36,8 +36,9 @@ lemma B_coupling:
   equiv [ B.f ~ B.g : true ==> res{1} = test res{2} ].
 proof.
 proc.
-rndpp c.
-+ wp; skip => /= a b.
+coupling c.
+wp; skip => /=; split; last first.
++ move => a b.
   by rewrite /c => /supp_dmap [x] />.
 rewrite /iscoupling; split; last first.
 + by rewrite /c dmap_comp /(\o) /= dmap_id.
@@ -82,10 +83,10 @@ op f (x : t) : bool = test x.
 lemma B_compress:
   equiv [ B.g ~ B.f : true ==> test res{1} = res{2} ].
 proof.
-(* fuck, shall we provide another parameter to indicate left/right? *)
 proc.
-rndp f.
+coupling{1} f.
 wp; skip => @/predT /=.
++ split.
 move => b ? a.
 smt().
 

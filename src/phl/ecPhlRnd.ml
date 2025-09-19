@@ -423,7 +423,7 @@ module Core = struct
     FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
 
   (* -------------------------------------------------------------------- *)
-  let t_equiv_coupling_rnd_r g tc =
+  let t_equiv_coupling_r side g tc =
     (* process the following pRHL goal, where g is a coupling of g1 and g2 *)
     (*                   {phi} x <$ g1 ~ y <$ g2 {psi}                     *)
     let env = FApi.tc1_env tc in
@@ -435,36 +435,65 @@ module Core = struct
     let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
     let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
 
-    (* Generate two free variables a and b and the pair (a, b) *)
-    let a_id = EcIdent.create "a" in
-    let b_id = EcIdent.create "b" in
-    let a = f_local a_id tyL in
-    let b = f_local b_id tyR in
-    let ab = f_tuple [a; b] in
+    let goal =
+      match side with
+      | None ->
+        (* Goal: iscoupling g muL muR => forall a b, (a, b) \in supp(g) => psi[x -> a, y -> b] *)
+        (* Generate two free variables a and b and the pair (a, b) *)
+        let a_id = EcIdent.create "a" in
+        let b_id = EcIdent.create "b" in
+        let a = f_local a_id tyL in
+        let b = f_local b_id tyR in
+        let ab = f_tuple [a; b] in
 
-    (* Generate the coupling distribution type: (tyL * tyR) distr *)
-    let coupling_ty = ttuple [tyL; tyR] in
-    let g_app = f_app_simpl g [] (tdistr coupling_ty) in
+        (* Generate the coupling distribution type: (tyL * tyR) distr *)
+        let coupling_ty = ttuple [tyL; tyR] in
+        let g_app = f_app_simpl g [] (tdistr coupling_ty) in
 
-    (* Subgoal 1: iscoupling g muL muR *)
-    let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
-    let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
-    let subgoal1 = f_app (f_op iscoupling_op [tyL; tyR] iscoupling_ty) 
-                         [muL; muR; g_app] tbool in
+        let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
+        let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
+        let iscoupling_pred = f_app (f_op iscoupling_op [tyL; tyR] iscoupling_ty) 
+                            [muL; muR; g_app] tbool in
 
-    (* Subgoal 2: forall a b, phi => (a, b) \in supp(g) => psi[x -> a, y -> b] *)
+        (* Substitute in the postcondition *)
+        let post = es.es_po in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR b post_subst in
+        
+        let goal = f_imp (f_in_supp ab g_app) post_subst in
+        let goal = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] goal in
+        f_and iscoupling_pred goal
+      | Some `Left  ->
+        (* Goal: dmap d1 g = d2 => forall a, psi[x -> a, y -> g(a)] *)
+        let dmap_op = EcPath.extend EcCoreLib.p_top ["Distr"; "dmap"] in
+        let dmap_ty = tfun (tdistr tyL) (tfun (tfun tyL tyR) (tdistr tyR)) in
+        let dmap_pred = f_app (f_op dmap_op [tyL; tyR] dmap_ty) [muL; g; muR] tbool in
 
-    (* Substitute in the postcondition *)
-    let post = es.es_po in
-    let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
-    let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR b post_subst in
-    
-    let subgoal2 = f_imp (f_in_supp ab g_app) post_subst in
-    let subgoal2 = f_imp es.es_pr subgoal2 in
-    let subgoal2 = f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)] subgoal2 in
-    let subgoal2 = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=subgoal2; } in
+        let a_id = EcIdent.create "a" in
+        let a = f_local a_id tyL in
+        let post = es.es_po in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL a post in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f_app_simpl g [a] tyR) post_subst in
 
-    FApi.xmutate1 tc `Rnd [subgoal1; subgoal2]
+        let goal = f_forall_simpl [(a_id, GTty tyL)] post_subst in
+        f_and dmap_pred goal
+      | Some `Right ->
+        (* Goal: dmap d2 g = d1 => forall b, psi[y -> b, y -> g(b)] *)
+        let dmap_op = EcPath.extend EcCoreLib.p_top ["Distr"; "dmap"] in
+        let dmap_ty = tfun (tdistr tyR) (tfun (tfun tyR tyL) (tdistr tyL)) in
+        let dmap_pred = f_app (f_op dmap_op [tyR; tyL] dmap_ty) [muR; g; muL] tbool in
+
+        let b_id = EcIdent.create "b" in
+        let b = f_local b_id tyR in
+        let post = es.es_po in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_ml) lvL (f_app_simpl g [b] tyL) post in
+        let post_subst = subst_form_lv env (EcMemory.memory es.es_mr) lvR b post_subst in
+        let goal = f_forall_simpl [(b_id, GTty tyR)] post_subst in
+        f_and dmap_pred goal
+    in
+    let goal = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=goal; } in
+
+    FApi.xmutate1 tc `Rnd [goal]
   
   (* -------------------------------------------------------------------- *)
   let t_equiv_map_rnd_r f tc =
@@ -813,11 +842,11 @@ let process_rndp f tc =
     let f_form = TTC.tc1_process_prhl_form tc func_ty f in
     Core.t_equiv_map_rnd_r f_form tc
 
-let process_rndcoupling g tc =
+let process_coupling side g tc =
   let concl = FApi.tc1_goal tc in
   
   if not (is_equivS concl) then
-    tc_error !!tc "rnd+ can only be used on pRHL goals"
+    tc_error !!tc "coupling can only be used on pRHL goals"
   else
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
@@ -825,6 +854,11 @@ let process_rndcoupling g tc =
     let (_, muR), _ = tc1_last_rnd tc es.es_sr in
     let tyL = proj_distr_ty env (e_ty muL) in
     let tyR = proj_distr_ty env (e_ty muR) in
-    let coupling_ty = ttuple [tyL; tyR] in
-    let g_form = TTC.tc1_process_prhl_form tc (tdistr coupling_ty) g in
-    Core.t_equiv_coupling_rnd_r g_form tc
+
+    let coupling_ty =
+      match side with
+      | None -> tdistr (ttuple [tyL; tyR])
+      | Some `Left -> tfun tyL tyR
+      | Some `Right -> tfun tyR tyL in
+    let g_form = TTC.tc1_process_prhl_form tc coupling_ty g in
+    Core.t_equiv_coupling_r side g_form tc
