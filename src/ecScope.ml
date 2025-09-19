@@ -2246,13 +2246,16 @@ module Ty = struct
         let body   = transty tp_tydecl env ue bd in
         EcUnify.UniEnv.tparams ue, Concrete body
 
-      | PTYD_Datatype dt ->
-        let datatype = EHI.trans_datatype env (mk_loc loc (args,name)) dt in
-        let tparams, tydt =
-          try ELI.datatype_as_ty_dtype datatype
-          with ELI.NonPositive -> EHI.dterror loc env EHI.DTE_NonPositive
-        in
-        tparams, Datatype tydt
+      | PTYD_Datatype dt -> (
+          let datatype = EHI.trans_datatype env (mk_loc loc (args, name)) dt in
+          let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
+          try
+            ELI.check_positivity ty_from_ctor datatype;
+            let tparams, tydt = ELI.datatype_as_ty_dtype datatype in
+            (tparams, Datatype tydt)
+          with ELI.NonPositive ctx ->
+            let symbol = basename datatype.dt_path in
+            EHI.dterror loc env (EHI.DTE_NonPositive (symbol, ctx)))
 
       | PTYD_Record rt ->
         let record  = EHI.trans_record env (mk_loc loc (args,name)) rt in

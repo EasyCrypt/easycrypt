@@ -43,7 +43,25 @@ val datatype_proj_name : symbol -> symbol
 val datatype_proj_path : path -> symbol -> path
 
 (* -------------------------------------------------------------------- *)
-exception NonPositive
+type non_positive_intype = Concrete | Record of symbol | Variant of symbol
+
+type non_positive_description =
+  | InType of EcIdent.ident option * non_positive_intype
+  | NonPositiveOcc of ty
+  | AbstractTypeRestriction
+  | TypePositionRestriction of ty
+
+type non_positive_context = (symbol * non_positive_description) list
+
+exception NonPositive of non_positive_context
+
+val check_positivity : (path -> tydecl) -> datatype -> unit
+(** Evaluates whether a given datatype protype satisfies the strict
+    positivity check. The first argument defines how to retrieve the
+    effective definition of a type constructor from its path.
+
+    raises the exception [NonPositive] if the check fails, otherwise
+    the function returns a unit value. *)
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
 
