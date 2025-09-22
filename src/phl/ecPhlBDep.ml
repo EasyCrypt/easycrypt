@@ -33,6 +33,7 @@ end
 exception BDepError of string
 exception BDepUninitializedInputs
 
+(* TODO: Refactor error printing and checking? Lots of duplicated code *)
 
 let int_of_form (hyps: hyps) (f: form) : BI.zint = 
   match f.f_node with 
@@ -51,9 +52,11 @@ let time (env: env) (t: float) (msg: string) : float =
 let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : hyps * circuit =
   try
     let env = toenv hyps in
+
     let fpth, _fo = EcEnv.Op.lookup qs env in
     let f = EcTypesafeFol.fop_from_path env fpth in
     let f = EcCallbyValue.norm_cbv (EcCircuits.circ_red hyps) hyps f in
+    
     let hyps, fc = circuit_of_form hyps f in
     let fc = circuit_flatten fc in
     let fc = circuit_aggregate_inps fc in
@@ -61,6 +64,30 @@ let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : hyps * circuit =
   with CircError err ->
     raise (BDepError err)
  
+(* 
+   f => arr_t.init (fun i => f.(i + offset)) 
+  Assumes f has an array type binding
+  Assumes f has enough positions so that 
+  arr_t.size + offset < size f (as array)
+*)
+let array_init_from_form (env: env) (f: form) ((arr_t, offset): qsymbol * BI.zint) : form =
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  let tpath = match EcEnv.Ty.lookup_opt arr_t env with
+  | None -> raise (BDepError "Failed to lookup type for input slice")
+  | Some (path, decl) when List.length decl.tyd_params = 1 ->
+    path
+  | Some ((_path, decl) as tdecl) ->
+    raise (BDepError (Format.asprintf "Type given to input slice (%a) does not look like an array type" EcPrinting.(pp_typedecl ppe) tdecl))
+  in
+  let get = match EcEnv.Circuit.lookup_array env f.f_ty with
+  | Some { get } -> get
+  | None -> raise (BDepError (Format.asprintf "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) f.f_ty))
+  in
+  let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env in
+  let idx = create "i" in
+  let f = f_lambda [(idx, GTty tint)] 
+    (EcTypesafeFol.f_app_safe env get [f; f_int_add (f_local idx tint) (f_int offset)]) 
+  in EcTypesafeFol.f_app_safe env init [f]
 
 (* -------------------------------------------------------------------- *)
 let mapreduce 
@@ -78,6 +105,7 @@ let mapreduce
   let tm = Unix.gettimeofday () in
   let env = toenv hyps in
   
+  (* ------------------------------------------------------------------ *)
   let hyps, fc = try 
     circ_of_qsymbol hyps ([], f.pl_desc) 
     with BDepError err -> 
@@ -87,16 +115,17 @@ let mapreduce
 
   let tm = time env tm "Lane function circuit generation done" in
   
+  (* ------------------------------------------------------------------ *)
   let hyps, pcondc = try 
     circ_of_qsymbol hyps ([], pcond.pl_desc) 
     with BDepError err ->
       raise (BDepError ("Precondition circuit generation failed with error:\n" ^ err))
   in
   if debug then EcEnv.notify ~immediate:true env `Warning "Writing precondition function to file %s...@." @@ circuit_to_file ~name:"pcond" pcondc;
-
-  
+ 
   let tm = time env tm "Precondition circuit generation done" in
   
+  (* ------------------------------------------------------------------ *)
   let pinvs = List.fst invs in
   let hyps, pstate = try 
     EcCircuits.pstate_of_prog hyps mem proc.s_node pinvs 
@@ -121,6 +150,7 @@ let mapreduce
     (* This is required for now as we do not allow mapreduce with multiple arguments *)
     (* assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs = 1); *)    
 
+    (* ------------------------------------------------------------------ *)
     let circs = 
       try 
         let slcs = List.snd invs in
@@ -133,6 +163,7 @@ let mapreduce
     in
 
 
+    (* ------------------------------------------------------------------ *)
     let c = try 
       (circuit_aggregate circs)
       with CircError _ ->
@@ -147,6 +178,7 @@ let mapreduce
 
     if debug then EcEnv.notify ~immediate:true env `Info "Writing program circuit before mapreduce to file %s...@." @@ circuit_to_file ~name:"prog_no_mapreduce" c;
 
+    (* ------------------------------------------------------------------ *)
     let cs = try 
       circuit_mapreduce ?perm c n m 
       with CircError err ->
@@ -157,6 +189,7 @@ let mapreduce
 
     if debug then EcEnv.notify ~immediate:true env `Info "Writing lane 0 circit to file %s...@." @@ circuit_to_file ~name:"lane_0" (List.hd cs);
 
+    (* ------------------------------------------------------------------ *)
     List.iteri (fun i c -> 
     if debug then EcEnv.notify ~immediate:true env `Info "Writing lane %d circit to file %s...@." (i+1) @@ circuit_to_file ~name:("lane_" ^ (string_of_int (i+1))) c;
     if circ_equiv ~pcond:pcondc (List.hd cs) c 
@@ -167,6 +200,7 @@ let mapreduce
 
     let tm = time env tm "Program lanes equivs done" in
     
+    (* ------------------------------------------------------------------ *)
     if circ_equiv ~pcond:pcondc (List.hd cs) fc then () 
     else raise (BDepError "Equivalence failed between lane 0 and lane function");
 
@@ -188,6 +222,7 @@ let prog_equiv_prod
   
   let env = toenv hyps in 
 
+  (* ------------------------------------------------------------------ *)
   let hyps, pcond = match pcond with
     | Some pcond -> begin try 
       let hyps, c = circuit_of_form hyps pcond in
@@ -199,12 +234,15 @@ let prog_equiv_prod
   in
   let tm = Unix.gettimeofday () in
   
+  (* ------------------------------------------------------------------ *)
   let (hyps, pstate_l) : hyps * pstate = try
     EcCircuits.pstate_of_prog hyps meml proc_l.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
   let tm = time env tm "Left program generation done" in
+
+  (* ------------------------------------------------------------------ *)
   let (hyps, pstate_r) : hyps * pstate = try
     EcCircuits.pstate_of_prog hyps memr proc_r.s_node invs_l 
   with CircError err ->
@@ -213,6 +251,7 @@ let prog_equiv_prod
   let tm = time env tm "Right program generation done" in
 
   begin 
+    (* ------------------------------------------------------------------ *)
     let circs_l = List.map (fun v -> pstate_get pstate_l v) 
                   (List.map (fun v -> v.v_name) outvs_l) in
     let circs_r = List.map (fun v -> pstate_get pstate_r v) 
@@ -228,6 +267,7 @@ let prog_equiv_prod
 
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_l = 1); *)
     (*assert (Set.cardinal @@ Set.of_list @@ List.map (fun c -> c.inps) circs_r = 1);*)
+    (* ------------------------------------------------------------------ *)
     let c_l = try 
       (circuit_aggregate circs_l)
       with CircError _err ->
@@ -238,25 +278,28 @@ let prog_equiv_prod
       with CircError _err ->
         raise (BDepError "Failed to aggregate right program outputs")
     in
+    (* ------------------------------------------------------------------ *)
     let c_r = try 
       (circuit_aggregate_inps c_r)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate right program outputs")
+        raise (BDepError "Failed to aggregate right program inputs")
     in
     let c_l = try 
       (circuit_aggregate_inps c_l)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate right program outputs")
+        raise (BDepError "Failed to aggregate right program inputs")
     in
 
-
     let tm = time env tm "Preprocessing for mapreduce done" in
+
+    (* ------------------------------------------------------------------ *)
     let lanes_l = try 
       circuit_mapreduce c_l n m 
       with CircError err ->
         raise (BDepError ("Left program split step failed with error:\n" ^ err))
     in
     let tm = time env tm "Left program deps + split done" in
+
     let lanes_r = try 
       circuit_mapreduce c_r n m 
       with CircError err ->
@@ -265,7 +308,8 @@ let prog_equiv_prod
     let tm = time env tm "Right program deps + split done" in
 
     if preprocess then
-        begin
+      begin
+        (* ------------------------------------------------------------------ *)
         (List.iteri (fun i c -> 
           if circ_equiv ?pcond (List.hd lanes_l) c 
           then () 
@@ -273,6 +317,7 @@ let prog_equiv_prod
             in raise (BDepError err)) 
         (List.tl lanes_l)); 
         let tm = time env tm "Left program lanes equiv done" in
+
         (List.iteri (fun i c -> 
           if circ_equiv ?pcond (List.hd lanes_r) c 
           then () 
@@ -280,6 +325,8 @@ let prog_equiv_prod
             in raise (BDepError err)) 
         (List.tl lanes_r)); 
         let tm = time env tm "Right program lanes equiv done" in
+        
+        (* ------------------------------------------------------------------ *)
         if (circ_equiv ?pcond (List.hd lanes_l) (List.hd lanes_r)) 
         then
           time env tm "First lanes equiv done" |> ignore
@@ -315,12 +362,16 @@ let circ_form_eval_plus_equiv
   (f: form) 
   (v : variable) 
   : bool = 
+
+  (* ------------------------------------------------------------------ *)
   assert(f.f_ty = tbool);
+
+  (* ------------------------------------------------------------------ *)
   let env = toenv hyps in
   let redmode = circ_red hyps in
   let (@@!) = EcTypesafeFol.f_app_safe env in
-  (*let inps = List.map (EcCircuits.input_of_variable env) invs in*)
-  (*let inpcs, inps = List.split inps in*)
+
+  (* ------------------------------------------------------------------ *)
   let size, of_int = match EcEnv.Circuit.lookup_bitstring env v.v_type with
   | Some {size=(_, Some size); ofint} -> size, ofint 
   | Some {size=(_, None); ofint} -> 
@@ -330,49 +381,65 @@ let circ_form_eval_plus_equiv
         v.v_name (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) v.v_type 
       in raise (BDepError err)
   in
+
   let rec test_values (size: int) (cur: BI.zint) : bool =
-    EcEnv.notify ~immediate:true env `Info "Testing for var = %s@." (BI.to_string cur);
-    if Z.numbits (BI.to_zt cur) > size then
-    true
-    else
-    let cur_val = of_int @@! [f_int cur] in 
+    if debug then EcEnv.notify ~immediate:true env `Info "Testing for var = %s@." (BI.to_string cur);
+
+    (* ------------------------------------------------------------------ *)
+    if Z.numbits (BI.to_zt cur) > size then true else (* If we reach the maximum value jump out *) 
+
+    (* ------------------------------------------------------------------ *)
+    let cur_bs = of_int @@! [f_int cur] in  (* Current testing value as a bitstring *)
+
     let insts = List.map (fun i -> 
       match i.i_node with
       | Sasgn (lv, e) -> 
         let f = form_of_expr mem e in
-        let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
+        let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
         let f = EcCallbyValue.norm_cbv redmode hyps f in
         let e = expr_of_form mem f in
-        EcCoreModules.i_asgn (lv,e)
+        EcCoreModules.i_asgn (lv, e)
       | _ -> i
       ) proc.s_node 
     in
+
     let hyps, pstate = try
       EcCircuits.pstate_of_prog hyps mem insts invs 
     with CircError err ->
       raise (BDepError err)
     in
     
-    let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_val f in
+    (* ------------------------------------------------------------------ *)
+    let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
     let hyps, pcond = match pstate_get_opt pstate v.v_name with
-      | Some circ -> begin try 
-        Option.may 
-        (fun i -> EcEnv.notify ~immediate:true env `Critical "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; raise (BDepError "Uninitialized input for circuit")) @@ circuit_has_uninitialized circ;
-        let hyps, c = (circuit_of_form hyps cur_val) in
-        hyps, Some (circuit_ueq circ c)
+      | Some circ -> 
+        begin try 
+          Option.may (fun i -> 
+            EcEnv.notify ~immediate:true env `Critical 
+              "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; 
+            raise (BDepError "Uninitialized input for circuit")) 
+          (circuit_has_uninitialized circ);
+          let hyps, c = (circuit_of_form hyps cur_bs) in
+          hyps, Some (circuit_ueq circ c)
         with CircError err ->
           raise (BDepError ("Failed to generate circuit for current value precondition with error:\n" ^ err))
         end
       | None -> hyps, None
     in
+
+    (* FIXME: how many times to reduce here ? *)
+    (* ------------------------------------------------------------------ *)
     let f = EcCallbyValue.norm_cbv redmode hyps f in
     let f = EcCircuits.circ_simplify_form_bitstring_equality ~mem ~pstate ?pcond hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
+
     if f <> f_true then
-    (EcEnv.notify ~immediate:true env `Critical "Got %a after reduction@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
-    false)
+      (EcEnv.notify ~immediate:true env `Critical 
+        "Got %a after reduction@." 
+        (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f;
+      false)
     else
-    test_values size (BI.(add cur one))
+      test_values size (BI.(add cur one))
   in
   test_values size (BI.zero)
 
@@ -391,12 +458,14 @@ let mapreduce_eval
 
   let tm = Unix.gettimeofday () in
   
+  (* ------------------------------------------------------------------ *)
   let env = toenv hyps in
   let fc = EcEnv.Op.lookup ([], f.pl_desc) env |> fst in
   let (@@!) = EcTypesafeFol.f_app_safe env in 
 
   let tm = time env tm "Lane function circuit generation done" in
   
+  (* ------------------------------------------------------------------ *)
   let hyps, pstate = try 
     EcCircuits.pstate_of_prog hyps mem proc.s_node invs 
   with CircError err ->
@@ -412,6 +481,7 @@ let mapreduce_eval
       | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs;
 
+    (* ------------------------------------------------------------------ *)
     let c = try 
       (circuit_aggregate circs)
       with CircError _err ->
@@ -423,7 +493,7 @@ let mapreduce_eval
         raise (BDepError "Failed to concatenate program outputs")
     in
 
-
+    (* ------------------------------------------------------------------ *)
     let cs = try 
       circuit_mapreduce c n m 
       with CircError err ->
@@ -432,6 +502,7 @@ let mapreduce_eval
 
     let tm = time env tm "circuit dependecy analysis + splitting done" in
 
+    (* ------------------------------------------------------------------ *)
     List.iteri (fun i c -> 
       if circ_equiv (List.hd cs) c 
       then ()
@@ -442,7 +513,7 @@ let mapreduce_eval
 
     let tm = time env tm "Program lanes equivs done" in
 
-
+    (* ------------------------------------------------------------------ *)
     List.iter (fun v ->
       let fv = v in
       let v = destr_int v in 
@@ -491,7 +562,6 @@ let bits2w_op (env: env) (ty: ty) : form =
   in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
   f_op fb [] fbo.op_ty 
 
-
 let flatten_to_bits (env: env) (f: form) = 
   let (@@!) = EcTypesafeFol.f_app_safe env in
   match EcEnv.Circuit.lookup_array_and_bitstring env f.f_ty with
@@ -524,16 +594,12 @@ let reconstruct_from_bits (env: env) (f: form) (t: ty) =
 
 let reconstruct_from_bits_op (env: env) (t: ty) =
   (* Check input is a bool list *)
-  let (@@!) = EcTypesafeFol.f_app_safe env in
   match EcEnv.Circuit.lookup_array_and_bitstring env t with
   | Some ({ oflist }, {type_; size = (_, Some size); ofint}) -> 
-    let base = tconstr type_ [] in
     let temp = create "temp" in
     let bool_list = tconstr EcCoreLib.CI_List.p_list [tbool] in
     f_quant Llambda [(temp, GTty bool_list)] @@
-    oflist @@! [ ofint @@! [f_int (BI.of_int 0)];
-    EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
-    EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f_local temp bool_list]]]
+    reconstruct_from_bits env (f_local temp bool_list) t
   | Some ({ oflist }, {type_; size = (_, None); ofint}) -> 
     raise (BDepError "No concrete  binding for type in reconstruct_from_bits_op") (* FIXME: error messages *)
   | _ -> 
@@ -636,7 +702,6 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let pe = FApi.tc1_penv tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
 
-  
   let (@@!) pth args = 
     try
       EcTypesafeFol.f_app_safe env pth args 
@@ -664,7 +729,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
             dfl
         end
     | _ -> 
-      Format.eprintf "[W] Taking the slow path for the permutation (op: %a)@." EcPrinting.(pp_opdecl (PPEnv.ofenv env)) (pperm, bperm);
+      if debug then Format.eprintf "[W] Taking the slow path for the permutation (op: %a)@." EcPrinting.(pp_opdecl (PPEnv.ofenv env)) (pperm, bperm);
       (fun i ->
       let arg = f_int (BI.of_int i) in
       let call = EcTypesafeFol.f_app_safe env pperm [arg] in
@@ -737,35 +802,17 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     | Some fperm -> List.init out_block_nr (fun i -> if fperm i >= 0 then 1 else 0) |> List.sum 
   in
 
-  let form_of_var (v: variable * (qsymbol * BI.zint) option) : form =
+  let post_form_of_pv (v: variable * (qsymbol * BI.zint) option) : form =
     match v with
     | v, None -> f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst)
-    | {v_type} as v, Some (t, off) -> 
-      let tpath = match EcEnv.Ty.lookup_opt t env with
-      | None -> tc_error pe "Failed to lookup type %s" (string_of_qsymbol t)
-      | Some (path, decl) when List.length decl.tyd_params = 1 ->
-        path
-      | Some ((_path, decl) as tdecl) ->
-        tc_error pe "Type declaration (%a) has the wrong number of type parameters (expected %d, got %d)"
-          EcPrinting.(pp_typedecl ppe) tdecl
-          1 (List.length decl.tyd_params)
-      in
-      let v = f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst) in
-      let get = match EcEnv.Circuit.lookup_array env v_type with
-      | Some { get } -> get 
-      | None -> tc_error pe "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) v_type
-      in
-      let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
-      in
-      let idx = create "i" in
-      let f = f_lambda [(idx, GTty tint)] 
-        (EcTypesafeFol.f_app_safe env get [v; f_int_add (f_local idx tint) (f_int off)]) 
-      in EcTypesafeFol.f_app_safe env init [f]
-  in
+    | {v_type} as v, Some (arr_t, offset) -> 
+      let f = f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst) in
+      array_init_from_form env f (arr_t, offset)
+    in
 
   let poutvs = try
     blocks_from_vars env 
-      (List.map form_of_var outvs) outbty
+      (List.map post_form_of_pv outvs) outbty
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -800,7 +847,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   EcEnv.notify ~immediate:true env `Info "in_block_nr: %d | out_block_nr: %d@." in_block_nr out_block_nr;
   assert (in_block_nr = out_block_nr);
 
-  let finpvs = List.map form_of_var inpvs in
+  let finpvs = List.map post_form_of_pv inpvs in
 
   let inpvs = List.map 
     (function 
@@ -870,41 +917,21 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
       in tc_error pe "%s@." err
   in *)
 
-  (* FIXME: possible dup of form_of_var *)
-  let form_of_lvar (v: ((ident * ty) * ((qsymbol * BI.zint) option))) = 
+  let post_form_of_lv (v: ((ident * ty) * ((qsymbol * BI.zint) option))) = 
     match v with
     | (id, ty), None -> f_local id ty
-    | (id, ty), Some (t, offset) -> 
-      let tpath = match EcEnv.Ty.lookup_opt t env with
-      | None -> tc_error pe "Failed to lookup type %s" (string_of_qsymbol t)
-      | Some (path, decl) when List.length decl.tyd_params = 1 ->
-        path
-      | Some ((_path, decl) as tdecl) -> 
-        tc_error pe "Type declaration (%a) has the wrong number of type parameters (expected %d, got %d)"
-          EcPrinting.(pp_typedecl ppe) tdecl
-          1 (List.length decl.tyd_params)
-      in
-      let v = f_local id ty in 
-      let get = match EcEnv.Circuit.lookup_array env ty with
-      | Some { get } -> get 
-      | None -> tc_error pe "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) ty
-      in
-      let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env 
-      in
-      let idx = create "i" in
-      let f = f_lambda [(idx, GTty tint)] 
-        (EcTypesafeFol.f_app_safe env get [v; f_int_add (f_local idx tint) (f_int offset)]) 
-      in EcTypesafeFol.f_app_safe env init [f]
+    | (id, ty), Some (arr_t, offset) -> 
+      let f = f_local id ty in
+      array_init_from_form env f (arr_t, offset)
   in
 
-  let finvs = List.map form_of_lvar invs in
+  let finvs = List.map post_form_of_lv invs in
   let pinvs = try
     blocks_from_vars env finvs inpbty
     with BDepError err -> 
       tc_error pe "Error while generating input variable expression for precondition:@.%s@." err
   in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
-  (* A REFACTOR EVERYTHING HERE A *)
   (* ------------------------------------------------------------------ *)
   let post = f_eq pinvs_post poutvs in
   let pre = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinvs] in
@@ -1105,12 +1132,14 @@ let t_bdep_eval
 let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign } = bdeinfo in
 
+  (* ------------------------------------------------------------------ *)
   let env = FApi.tc1_env tc in
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
   let hyps = FApi.tc1_hyps tc in
   let ppenv = EcPrinting.PPEnv.ofenv env in
   let pe = FApi.tc1_penv tc in
 
+  (* ------------------------------------------------------------------ *)
   let (@@!) pth args = 
     try
       EcTypesafeFol.f_app_safe env pth args 
@@ -1123,6 +1152,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
           fs) 
         args 
   in
+  (* ------------------------------------------------------------------ *)
   let (@@!!) pth args = 
     try
       EcTypesafeFol.f_app_safe ~full:false env pth args 
@@ -1131,17 +1161,22 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   in
 
   (* DEBUG SECTION *)
+  (* ------------------------------------------------------------------ *)
   let pp_type (fmt: Format.formatter) (ty: ty) =
     Format.fprintf fmt "%a" (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
   
+  (* ------------------------------------------------------------------ *)
   let plane, olane = EcEnv.Op.lookup ([], lane.pl_desc) env in
-  (* let inpbty, outbty = tfrom_tfun2 olane.op_ty in *)
+
+  (* ------------------------------------------------------------------ *)
   let in_ty =
     let ue = EcUnify.UniEnv.create None in
     let ty = EcTyping.transty EcTyping.tp_tydecl env ue in_ty in
     assert (EcUnify.UniEnv.closed ue);
     ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty 
   in
+
+  (* ------------------------------------------------------------------ *)
   let out_ty =
     let ue = EcUnify.UniEnv.create None in
     let ty = EcTyping.transty EcTyping.tp_tydecl env ue out_ty in
@@ -1149,8 +1184,11 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
     ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty 
   in
 
+  (* ------------------------------------------------------------------ *)
   let ue = EcUnify.UniEnv.create None in
   let env = Memory.push_active hr.hs_m env in
+
+  (* ------------------------------------------------------------------ *)
   let range = EcTyping.trans_form env ue range (tconstr EcCoreLib.CI_List.p_list [tint])in
   assert (EcUnify.UniEnv.closed ue);
   let range = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) range in
@@ -1160,15 +1198,19 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   in
 
 
+  (* ------------------------------------------------------------------ *)
   let n, in_to_uint, in_to_sint,in_of_int = 
     match EcEnv.Circuit.lookup_bitstring env in_ty with
     | Some {size = (_, Some size); touint; tosint; ofint} -> size, touint, tosint, ofint
     | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for input")
     | _ -> tc_error pe "No binding for type %a@." pp_type in_ty 
   in
+
   let in_to_uint = f_op in_to_uint [] (tfun in_ty tint) in
   let in_to_sint = f_op in_to_sint [] (tfun in_ty tint) in
   let in_of_int = f_op in_of_int [] (tfun tint in_ty) in
+
+  (* ------------------------------------------------------------------ *)
   let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
   | Some {size = (_, Some size); ofint} -> size, ofint 
   | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for output") 
