@@ -289,8 +289,6 @@ module List : sig
   val fpick      : (unit -> 'a option) list -> 'a option
   val pivot_at   : int -> 'a list -> 'a list * 'a * 'a list
   val find_pivot : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
-  val map_fold   : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
-  val mapi_fold  : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
   val pmapi      : (int -> 'a -> 'b option) -> 'a list -> 'b list
   val pmap       : ('a -> 'b option) -> 'a list -> 'b list
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
@@ -300,6 +298,9 @@ module List : sig
   val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
 
   val takedrop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  val fold_left_map  : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+  val fold_left_mapi : ('a -> int -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
   val fold_left_map_while :
        ('a -> 'b -> [`Interrupt | `Continue of 'a * 'c])

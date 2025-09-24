@@ -3174,7 +3174,7 @@ module PPGoal = struct
 
   let pp_goal1 ?(pphyps = true) ?prpo ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
     let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
-    let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
+    let ppe, pps = List.fold_left_map pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
 
     idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
 
@@ -3221,7 +3221,7 @@ let pp_hyps (ppe : PPEnv.t) fmt hyps =
   let hyps = EcEnv.LDecl.tohyps hyps in
   let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
   let ppe, pps =
-    List.map_fold PPGoal.pre_pp_hyp ppe
+    List.fold_left_map PPGoal.pre_pp_hyp ppe
                   (List.rev hyps.EcBaseLogic.h_local) in
 
   begin match hyps.EcBaseLogic.h_tvar with
@@ -3597,6 +3597,14 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
   | EcTheory.Th_reduction _ ->
       (* FIXME: section we should add the lemma in the reduction *)
       Format.fprintf fmt "hint simplify."
+
+  | EcTheory.Th_relation (oppath, axpath) ->
+      Format.fprintf fmt "relation %a. (* spec: %a *)"
+        (pp_opname ppe) oppath (pp_axname ppe) axpath
+
+  | EcTheory.Th_morphism (relpath, oppath, axpath, n) ->
+      Format.fprintf fmt "morphism %a / %d ==> %a. (* spec: %a *)"
+        (pp_opname ppe) oppath n (pp_opname ppe) relpath (pp_axname ppe) axpath
 
   | EcTheory.Th_auto { level; base; axioms; locality; } ->
       Format.fprintf fmt "%ahint solve %d %s : %a."

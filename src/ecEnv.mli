@@ -417,6 +417,21 @@ module Reduction : sig
 end
 
 (* -------------------------------------------------------------------- *)
+type setoid1 = {
+  spec : path;
+  morphisms : (path EcMaps.Mint.t) Mp.t;
+}
+
+module Setoid : sig
+  type nonrec setoid1 = setoid1
+
+  val add_relation : path * path -> env -> env
+  val get_relation : env -> path -> setoid1 option
+
+  val add_morphism : path * path * path * int -> env -> env
+end
+
+(* -------------------------------------------------------------------- *)
 module Auto : sig
   type base0 = path * [`Rigid | `Default]
 

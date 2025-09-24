@@ -1263,6 +1263,16 @@ type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
 
 (* -------------------------------------------------------------------- *)
+type prelation =
+  { prl_name : pqsymbol; }
+
+(* -------------------------------------------------------------------- *)
+type pmorphism =
+  { prl_morphism : pqsymbol;
+    prl_position : int;
+    prl_relation : pqsymbol; }
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
@@ -1278,6 +1288,8 @@ type global_action =
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred
+  | Grelation    of prelation
+  | Gmorphism    of pmorphism
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list

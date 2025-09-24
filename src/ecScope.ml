@@ -1793,6 +1793,162 @@ module Reduction = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Setoid = struct
+  let add_relation (scope as scope0 : scope) (rel : prelation) =
+    let env = env scope in
+    let oppath, op = EcEnv.Op.lookup (unloc rel.prl_name) env in
+
+    (* Check that the operator is of the form: ... -> a -> a -> bool *)
+    begin
+      let exception InvalidRelTy in
+
+      try
+        let dom, codom = tyfun_flat op.op_ty in
+
+        if not (EcReduction.EqTest.for_type env codom tbool) then
+          raise InvalidRelTy;
+
+        match List.rev dom with
+        | a1 :: a2 :: _ ->
+          if not (EcReduction.EqTest.for_type env a1 a2) then
+            raise InvalidRelTy
+
+        | _ ->
+          raise InvalidRelTy
+
+      with InvalidRelTy ->
+        hierror ~loc:(loc rel.prl_name)
+          "the operator must have a type of the form `... -> t -> t -> bool`"
+
+    end;
+
+    (* Check that the operator is an equivalence relation *)
+    let optp, opty = EcSubst.freshen_type (op.op_tparams, op.op_ty) in
+
+    let dom, codom = tyfun_flat opty in
+    let nparams = List.length dom - 2 in
+    let params = List.take nparams dom in
+    let tyl, tyr = as_seq2 (List.drop nparams dom) in
+    let params = List.map (fun ty -> (EcIdent.create "x", ty)) params in
+
+    let eqv, _ = EcEnv.Op.lookup ([], "iseqv") env in    
+    let eqv = f_op eqv [tyl] (tfun (toarrow [tyl; tyr] codom) tbool) in
+    let eqv =
+      let rel = f_op oppath (List.map (tvar |- fst) optp) opty in
+      let rel = f_app rel (List.map (fun (x, ty) -> f_local x ty) params) (toarrow [tyl; tyr] codom) in
+      f_app eqv [rel] tbool in
+    let eqv = f_forall (List.map (snd_map (fun ty -> GTty ty)) params) eqv in
+    let eqv = {
+      ax_tparams = optp;
+      ax_spec    = eqv;
+      ax_kind    = `Lemma;
+      ax_loca    = `Global;
+      ax_smt     = false; } in
+
+    let axname = Format.sprintf "%s_is_eqv" (EcPath.basename oppath) in
+    let axpath = EcPath.pqname (path scope) axname in
+
+    let scope = Ax.bind scope (axname, eqv) in
+    let proof = (None, eqv), axpath, scope0.sc_env in
+
+    (* Add theory item *)
+    let item = EcTheory.mkitem ~import:true (Th_relation (oppath, axpath)) in
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope [proof]
+
+  let add_morphism (scope as scope0 : scope) (mph : pmorphism) =
+    (* Check type-level compatibility *)
+    let env = env scope in
+
+    let mphp, mphop = EcEnv.Op.lookup (unloc mph.prl_morphism) env in
+    let mph_dom, mph_codom = tyfun_flat mphop.op_ty in
+
+    if not (0 < mph.prl_position && mph.prl_position <= List.length mph_dom) then
+      hierror ~loc:(loc mph.prl_morphism) "invalid argument position for morphism";
+
+    let relp, op = EcEnv.Op.lookup (unloc mph.prl_relation) env in
+    let dom, codom = tyfun_flat op.op_ty in
+    let nparams = List.length dom - 2 in
+    let paramsty = List.take nparams dom in
+    let t1, _ = as_seq2 (List.drop nparams dom) in
+
+    if List.length mphop.op_tparams <> List.length op.op_tparams then
+      hierror ~loc:(loc mph.prl_morphism)
+        "the morphism and relation must have compatible type parameters";
+
+    let tvars = List.map (tvar |- fst) mphop.op_tparams in
+    let tpsubst = EcCoreSubst.Tvar.init (List.fst op.op_tparams) tvars in
+
+    let othersty, argty =
+      let largs, arg, rargs = List.pivot_at (mph.prl_position - 1) mph_dom in
+      (largs @ rargs), arg in
+
+    if not (EcReduction.EqTest.for_type env argty (Tvar.subst tpsubst t1)) then
+      hierror ~loc:(loc mph.prl_morphism)
+        "the %d-th argument must be compatible with the equivalence relation"
+        mph.prl_position;
+
+    (* Construct morphism lemma *)
+    let params =
+      List.mapi
+        (fun i ty -> (EcIdent.create (Format.sprintf "p%d" (i + 1)), Tvar.subst tpsubst ty))
+        paramsty in
+
+    let eqv =
+      let params = List.map (fun (x, ty) -> f_local x ty) params in
+      fun f1 f2 ->
+        f_app
+          (f_op relp tvars (Tvar.subst tpsubst op.op_ty))
+          (params @ [f1; f2]) codom in
+
+    let otherargs =
+      List.mapi
+        (fun i ty -> (EcIdent.create (Format.sprintf "x_%d" (i + 1)), ty))
+        othersty in
+
+    let lothers, rothers = List.split_at (mph.prl_position - 1) otherargs in
+
+    let lothers = List.map (fun (x, ty) -> f_local x ty) lothers in
+    let rothers = List.map (fun (x, ty) -> f_local x ty) rothers in
+
+    let a1 = EcIdent.create "a1" in
+    let a2 = EcIdent.create "a2" in
+
+    let concl = eqv (f_local a1 argty) (f_local a2 argty) in
+    let concl =
+      let l = f_app (f_op mphp tvars mphop.op_ty) (lothers @ f_local a1 argty :: rothers) mph_codom in
+      let r = f_app (f_op mphp tvars mphop.op_ty) (lothers @ f_local a2 argty :: rothers) mph_codom in
+      f_imp concl (eqv l r) in
+    let concl =
+      let bindings = params @ otherargs @ [(a1, argty); (a2, argty)] in
+      let bindings = List.map (fun (x, ty) -> (x, GTty ty)) bindings in
+      f_forall bindings concl in
+
+    let concl = {
+        ax_tparams = mphop.op_tparams;
+        ax_spec    = concl;
+        ax_kind    = `Lemma;
+        ax_loca    = `Global;
+        ax_smt     = false; } in
+  
+    let axname =
+      Format.sprintf
+        "%s_is_morphism_for_%s_at_%d"
+        (EcPath.basename mphp) (EcPath.basename relp) (mph.prl_position) in
+    let axpath = EcPath.pqname (path scope) axname in
+    
+    let scope = Ax.bind scope (axname, concl) in
+    let proof = (None, concl), axpath, scope0.sc_env in
+    
+    (* Add theory item *)
+    let item = EcTheory.mkitem ~import:true (Th_morphism (relp, mphp, axpath, mph.prl_position)) in
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope [proof]
+end
+
+(* -------------------------------------------------------------------- *)
 module Cloning = struct
   (* ------------------------------------------------------------------ *)
   open EcTheory
@@ -2174,7 +2330,7 @@ module Ty = struct
   let check_tci_axioms scope mode axs reqs lc =
     let rmap = Mstr.of_list reqs in
     let symbs, axs =
-      List.map_fold
+      List.fold_left_map
         (fun m (x, t) ->
           if not (Mstr.mem (unloc x) rmap) then
             hierror ~loc:x.pl_loc "invalid axiom name: `%s'" (unloc x);
