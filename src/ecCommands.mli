@@ -35,6 +35,7 @@ val initialize  :
 
 val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
+val notify      : EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
 val process_internal :
