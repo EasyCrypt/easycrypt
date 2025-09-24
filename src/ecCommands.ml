@@ -748,6 +748,45 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_eval (scope : EcScope.scope) ((f, args, output) : pgamepath * pexpr list * string option) =
+  let env = EcScope.env scope in
+  let fpath = EcTyping.trans_gamepath env f in
+  let fun_  = EcEnv.Fun.by_xpath fpath env in
+  let args =
+    let ue = EcUnify.UniEnv.create None in
+    let args, _ = EcTyping.trans_args env ue f.pl_loc fun_.f_sig args in
+    if not (EcUnify.UniEnv.closed ue) then
+      EcScope.hierror "cannot infer all type variables";
+    let subst = EcUnify.UniEnv.close ue in
+    let subst = EcCoreSubst.Tuni.subst subst in
+    let args = List.map (EcCoreSubst.e_subst subst) args in
+    args
+  in
+
+  let aout = EcProcEval.eval env (fpath, args) in
+  
+  begin
+    match aout with
+    | None ->
+      EcScope.notify scope `Warning
+        "%s" "cannot compute a concrete value"
+
+  | Some aout -> begin
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    match output with
+    | None ->
+      EcScope.notify scope `Info "%a" (EcPrinting.pp_expr ppe) aout
+    | Some output ->
+      File.with_file_out output (fun stream ->
+        let fmt = BatFormat.formatter_of_output stream in
+        Format.fprintf fmt "%a@." (EcPrinting.pp_expr ppe) aout
+      )
+    end
+  end;
+
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -791,6 +830,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
+      | Geval        call -> `Fct   (fun scope -> process_eval       scope call)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

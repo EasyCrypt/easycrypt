@@ -257,6 +257,25 @@ val trans_memtype :
   env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
+val transcall :
+     ('a located -> 'b * ty)
+  -> EcEnv.env
+  -> EcUnify.unienv
+  -> EcLocation.t
+  -> EcModules.funsig
+  -> 'a located list
+  -> 'b list * ty
+
+(* -------------------------------------------------------------------- *)
+val trans_args :
+     EcEnv.env
+  -> EcUnify.unienv
+  -> EcLocation.t
+  -> EcModules.funsig
+  -> pexpr list
+  -> expr list * ty
+
+(* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
   env -> module_type -> pmod_restr option -> mty_mr
 
