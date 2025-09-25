@@ -437,12 +437,12 @@ and on_typarams (aenv : aenv) typarams =
 and on_tydecl (aenv : aenv) (tyd : tydecl) =
   on_typarams aenv tyd.tyd_params;
   match tyd.tyd_type with
-  | `Concrete ty -> on_ty aenv ty
-  | `Abstract s  -> on_typeclasses aenv s
-  | `Record (f, fds) ->
+  | Concrete ty -> on_ty aenv ty
+  | Abstract s  -> on_typeclasses aenv s
+  | Record (f, fds) ->
       on_form aenv f;
       List.iter (on_ty aenv |- snd) fds
-  | `Datatype dt ->
+  | Datatype dt ->
      List.iter (List.iter (on_ty aenv) |- snd) dt.tydt_ctors;
      List.iter (on_form aenv) [dt.tydt_schelim; dt.tydt_schcase]
 
@@ -652,7 +652,7 @@ let add_declared_ty to_gen path tydecl =
   assert (tydecl.tyd_params = []);
   let s =
     match tydecl.tyd_type with
-    | `Abstract s -> s
+    | Abstract s -> s
     | _ -> assert false in
 
   let name = "'" ^ basename path in
@@ -721,14 +721,14 @@ and fv_and_tvar_f f =
 let tydecl_fv tyd =
   let fv =
     match tyd.tyd_type with
-    | `Concrete ty -> ty_fv_and_tvar ty
-    | `Abstract _ -> Mid.empty
-    | `Datatype tydt ->
+    | Concrete ty -> ty_fv_and_tvar ty
+    | Abstract _ -> Mid.empty
+    | Datatype tydt ->
       List.fold_left (fun fv (_, l) ->
         List.fold_left (fun fv ty ->
             EcIdent.fv_union fv (ty_fv_and_tvar ty)) fv l)
         Mid.empty tydt.tydt_ctors
-    | `Record (_f, l) ->
+    | Record (_f, l) ->
       List.fold_left (fun fv (_, ty) ->
           EcIdent.fv_union fv (ty_fv_and_tvar ty)) Mid.empty l in
   List.fold_left (fun fv (id, _) -> Mid.remove id fv) fv tyd.tyd_params
@@ -817,9 +817,9 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tosubst = fst_params, tconstr path args in
     let tg_subst, tyd_type =
       match tydecl.tyd_type with
-      | `Concrete _ | `Abstract _ ->
+      | Concrete _ | Abstract _ ->
         EcSubst.add_tydef to_gen.tg_subst path tosubst, tydecl.tyd_type
-      | `Record (f, prs) ->
+      | Record (f, prs) ->
         let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
@@ -836,8 +836,8 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         in
         let prs = List.map add_op prs in
         let f = EcSubst.subst_form !rsubst f in
-        !rtg_subst, `Record (f, prs)
-      | `Datatype dt ->
+        !rtg_subst, Record (f, prs)
+      | Datatype dt ->
         let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
@@ -857,7 +857,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let tydt_ctors   = List.map add_op dt.tydt_ctors in
         let tydt_schelim = EcSubst.subst_form !rsubst dt.tydt_schelim in
         let tydt_schcase = EcSubst.subst_form !rsubst dt.tydt_schcase in
-        !rtg_subst, `Datatype {tydt_ctors; tydt_schelim; tydt_schcase }
+        !rtg_subst, Datatype {tydt_ctors; tydt_schelim; tydt_schcase }
 
     in
 
@@ -1145,7 +1145,7 @@ let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 (* ---------------------------------------------------------------- *)
 
 let is_abstract_ty = function
-  | `Abstract _ -> true
+  | Abstract _ -> true
   | _           -> false
 
 (*

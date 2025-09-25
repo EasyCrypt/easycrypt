@@ -84,7 +84,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let env0  =
     let myself = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = `Abstract EcPath.Sp.empty;
+      tyd_type    = Abstract EcPath.Sp.empty;
       tyd_loca    = lc;
     } in
       EcEnv.Ty.bind (unloc name) myself env
@@ -135,16 +135,16 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
         fun ty -> ty_instanciate tdecl.tyd_params targs ty in
 
       match tdecl.tyd_type with
-      | `Abstract _ ->
+      | Abstract _ ->
           List.exists isempty (targs)
 
-      | `Concrete ty ->
+      | Concrete ty ->
           isempty_1 [tyinst () ty]
 
-      | `Record (_, fields) ->
+      | Record (_, fields) ->
           isempty_1 (List.map (tyinst () |- snd) fields)
 
-      | `Datatype dt ->
+      | Datatype dt ->
           isempty_n (List.map (List.map (tyinst ()) |- snd) dt.tydt_ctors)
 
     in

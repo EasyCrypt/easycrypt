@@ -2720,7 +2720,7 @@ and transinstr
         match (EcEnv.ty_hnorm ety env).ty_node with
         | Tconstr (indp, _) -> begin
             match EcEnv.Ty.by_path indp env with
-            | { tyd_type = `Datatype dt } ->
+            | { tyd_type = Datatype dt } ->
                 Some (indp, dt)
             | _ -> None
           end
@@ -3329,7 +3329,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           match (EcEnv.ty_hnorm cfty env).ty_node with
           | Tconstr (indp, _) -> begin
               match EcEnv.Ty.by_path indp env with
-              | { tyd_type = `Datatype dt } ->
+              | { tyd_type = Datatype dt } ->
                   Some (indp, dt)
               | _ -> None
             end

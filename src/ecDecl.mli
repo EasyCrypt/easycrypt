@@ -11,29 +11,29 @@ type ty_param  = EcIdent.t * EcPath.Sp.t
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
+type ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+type ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
+type ty_dtype = {
+  tydt_ctors   : ty_dtype_ctor list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
+}
+
+type ty_body = 
+  | Concrete of EcTypes.ty
+  | Abstract of Sp.t
+  | Datatype of ty_dtype
+  | Record   of ty_record
+
+
 type tydecl = {
   tyd_params : ty_params;
   tyd_type   : ty_body;
   tyd_loca   : locality;
-}
-
-and ty_body = [
-  | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
-  | `Datatype of ty_dtype
-  | `Record   of ty_record
-]
-
-and ty_record =
-  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
-
-and ty_dtype_ctor =
-  EcSymbols.symbol * EcTypes.ty list
-
-and ty_dtype = {
-  tydt_ctors   : ty_dtype_ctor list;
-  tydt_schelim : EcCoreFol.form;
-  tydt_schcase : EcCoreFol.form;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
