@@ -841,21 +841,21 @@ let subst_genty (s : subst) (tparams, ty) =
 (* -------------------------------------------------------------------- *)
 let subst_tydecl_body (s : subst) (tyd : ty_body) =
   match tyd with
-  | `Abstract tc ->
-      `Abstract (subst_typeclass s tc)
+  | Abstract tc ->
+      Abstract (subst_typeclass s tc)
 
-  | `Concrete ty ->
-      `Concrete (subst_ty s ty)
+  | Concrete ty ->
+      Concrete (subst_ty s ty)
 
-  | `Datatype dtype ->
+  | Datatype dtype ->
       let dtype =
         { tydt_ctors   = List.map (snd_map (List.map (subst_ty s))) dtype.tydt_ctors;
           tydt_schelim = subst_form s dtype.tydt_schelim;
           tydt_schcase = subst_form s dtype.tydt_schcase; }
-      in `Datatype dtype
+      in Datatype dtype
 
-  | `Record (scheme, fields) ->
-      `Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
+  | Record (scheme, fields) ->
+      Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =

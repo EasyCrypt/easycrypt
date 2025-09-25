@@ -400,16 +400,16 @@ and trans_tydecl genv (p, tydecl) =
 
   let ts, opts, decl =
     match tydecl.tyd_type with
-    | `Abstract _ ->
+    | Abstract _ ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | `Concrete ty ->
+    | Concrete ty ->
         let ty = trans_ty (genv, lenv) ty in
         let ts = WTy.create_tysymbol pid tparams (WTy.Alias ty) in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | `Datatype dt ->
+    | Datatype dt ->
         let ncs  = List.length dt.tydt_ctors in
         let ts   = WTy.create_tysymbol pid tparams WTy.NoDef in
 
@@ -429,7 +429,7 @@ and trans_tydecl genv (p, tydecl) =
 
         (ts, opts, WDecl.create_data_decl [ts, wdtype])
 
-    | `Record (_, rc) ->
+    | Record (_, rc) ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
