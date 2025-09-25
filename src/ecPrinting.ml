@@ -1281,7 +1281,7 @@ let pp_opapp
       let recp = EcDecl.operator_as_rcrd op in
 
       match EcEnv.Ty.by_path_opt recp env with
-      | Some { tyd_type = `Record (_, fields) }
+      | Some { tyd_type = Record (_, fields) }
           when List.length fields = List.length es
         -> begin
           let wmap =
@@ -2280,12 +2280,12 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
   and pp_body fmt =
     match tyd.tyd_type with
-    | `Abstract _ -> ()                (* FIXME: TC HOOK *)
+    | Abstract _ -> ()                (* FIXME: TC HOOK *)
 
-    | `Concrete ty ->
+    | Concrete ty ->
         Format.fprintf fmt " =@ %a" (pp_type ppe) ty
 
-    | `Datatype { tydt_ctors = cs } ->
+    | Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] ->
@@ -2296,7 +2296,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
         in
           Format.fprintf fmt " =@ [@[<hov 2>%a@]]" (pp_list " |@ " pp_ctor) cs
 
-    | `Record (_, fields) ->
+    | Record (_, fields) ->
         let pp_field fmt (f, fty) =
           Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
         in
