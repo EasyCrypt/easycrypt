@@ -23,7 +23,7 @@ type dterror =
 | DTE_TypeError       of TT.tyerror
 | DTE_DuplicatedCtor  of symbol
 | DTE_InvalidCTorType of symbol * TT.tyerror
-| DTE_NonPositive     of symbol * ty
+| DTE_NonPositive     of symbol * EI.nonpositive_description
 | DTE_Empty
 
 type fxerror =

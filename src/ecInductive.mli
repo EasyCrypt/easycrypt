@@ -43,9 +43,13 @@ val datatype_proj_name : symbol -> symbol
 val datatype_proj_path : path -> symbol -> path
 
 (* -------------------------------------------------------------------- *)
-(** A failure raised during a strict-positivity check. The companion type
-    is the term responsible for the failure. *)
-exception NonPositive of ty
+type nonpositive_description =
+  | NonPositive of ty
+  | AbstractTypeRestriction of EcPath.path
+  | TypePositionRestriction of ty
+
+(** A failure raised during a strict-positivity check. *)
+exception NonPositive of nonpositive_description
 
 (** Evaluates whether a given datatype protype satisfies the strict
     positivity check. The first argument defines how to retrieve the
