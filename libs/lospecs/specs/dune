@@ -1,3 +1,0 @@
-(install
-  (section (site (easycrypt specs)))
-  (files (glob_files_rec *.spec)))

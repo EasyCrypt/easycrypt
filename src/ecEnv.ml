@@ -3397,6 +3397,9 @@ module Circuit = struct
   (* FIXME: check this *)
   let lookup_circuit_cache_hyps (hyps: LDecl.hyps) (pth: path) : EcLowCircuits.circuit = 
     Mp.find pth hyps.le_env.env_ccache
+
+  let get_specification_by_name (env : env) (name : symbol) : Lospecs.Ast.adef option =
+    None (* FIXME:merge-bdep *)
 end
 
 (* -------------------------------------------------------------------- *)

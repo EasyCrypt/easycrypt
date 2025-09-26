@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcBigInt
-open EcSymbols
 open EcPath
 open EcEnv
 open EcAst

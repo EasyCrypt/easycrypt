@@ -13,7 +13,7 @@
  (sites (lib theories) (lib specs) (libexec commands) (lib config))
  (depends
   (ocaml (>= 4.08.0))
-  (batteries (>= 3))
+  (batteries (>= 3.9))
   bitwuzla
   (camlp-streams (>= 5))
   camlzip

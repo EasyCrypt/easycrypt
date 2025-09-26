@@ -24,20 +24,6 @@ exception CircError of string
 
 let debug : bool = false
 
-let specifications : (string, Lospecs.Ast.adef) Map.t Lazy.t =
-  Lazy.from_fun (fun () ->
-    let specs_avx2 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "avx2.spec" in
-    let specs_avx2 = C.load_from_file ~filename:specs_avx2 in
-    let specs_armv7 = Filename.concat (List.hd Lospecs.Config.Sites.specs) "armv7.spec" in
-    let specs_armv7 = C.load_from_file ~filename:specs_armv7 in
-    let specs = specs_armv7 @ specs_avx2 in
-    Map.of_seq (List.to_seq specs)
-  )
-
-let get_specification_by_name (name : string) : Lospecs.Ast.adef option =
-  let lazy specifications = specifications in
-  Map.find_opt name specifications
-
 (* Backend implementing minimal functions needed for the translation *)
 (* Minimal expected functionality is QF_ABV *)
 (* Input are: some identifier + some bit *)
@@ -560,7 +546,7 @@ module type CircuitInterface = sig
   val ctuple_of_circuit : ?strict:bool -> circuit -> ctuple * cinp list
 
   (* Type constructors *)
-  val new_cbool_inp : ?name:[`Str of string | `Idn of ident] -> cbool * cinp
+  val new_cbool_inp : ?name:[`Str of string | `Idn of ident] -> unit -> cbool * cinp
   val new_cbitstring_inp : ?name:[`Str of string | `Idn of ident] -> int -> cbitstring * cinp
   val new_carray_inp : ?name:[`Str of string | `Idn of ident] -> int -> int -> carray * cinp
   val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> int list -> ctuple * cinp
@@ -948,7 +934,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Input Helper Functions *)
   (* FIXME: maybe change name from inp -> input? *)
-  let new_cbool_inp ?(name = `Str "input") : cbool * cinp = 
+  let new_cbool_inp ?(name = `Str "input") () : cbool * cinp = 
     let id, inp = match name with 
     | `Str name -> let id = EcIdent.create name |> tag in
       id, Backend.input_node ~id 0
@@ -1077,7 +1063,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let ctp, cinp = new_ctuple_inp ~name:(`Idn idn) szs in
       cinp, ((ctp, []) :> circuit)
     | `CBool ->
-      let c, cinp = new_cbool_inp ~name:(`Idn idn) in
+      let c, cinp = new_cbool_inp ~name:(`Idn idn) () in
       cinp, ((c, []) :> circuit)
     | `CArray (el_sz, arr_sz) ->
       let c, cinp = new_carray_inp ~name:(`Idn idn) el_sz arr_sz in
@@ -1124,7 +1110,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let c, cinp = new_cbitstring_inp ~name:`Bad sz in
       ((c, []) :> circuit)
     | `CBool ->
-      let c, inp = new_cbool_inp ~name:`Bad in
+      let c, inp = new_cbool_inp ~name:`Bad () in
       ((c, []) :> circuit)
     
   let circuit_has_uninitialized (c: circuit) : int option =

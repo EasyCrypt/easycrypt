@@ -2,7 +2,6 @@
 open EcParsetree
 open EcCoreGoal
 open EcAst
-open EcLowCircuits
 
 (* -------------------------------------------------------------------- *)
 (* val bdep : env -> stmt -> psymbol -> variable list -> int -> variable list -> int-> psymbol -> unit *)

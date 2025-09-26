@@ -1,16 +1,11 @@
-(generate_sites_module
- (module config)
- (sites easycrypt))
-
 (library
   (name lospecs)
   (public_name easycrypt.lospecs)
   (flags
     (:standard -open Batteries))
-  (modules :standard config)
   (preprocess
     (pps ppx_deriving_yojson))
-  (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime bitwuzla))
+  (libraries batteries bitwuzla menhirLib zarith))
 
 (ocamllex lexer)
 
