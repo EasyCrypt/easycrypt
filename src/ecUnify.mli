@@ -7,7 +7,7 @@ open EcDecl
 
 (* -------------------------------------------------------------------- *)
 exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
-exception UninstanciateUni
+exception UninstantiateUni
 
 type unienv
 

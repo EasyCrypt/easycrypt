@@ -68,7 +68,7 @@ let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
   { tyd_params = params; tyd_type = Abstract tc; tyd_loca = lc; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
+let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
   let subst = CS.Tvar.init (List.map fst params) args in
   CS.Tvar.subst subst ty
 
