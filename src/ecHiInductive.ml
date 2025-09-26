@@ -132,7 +132,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
       let tyinst () =
-        fun ty -> ty_instanciate tdecl.tyd_params targs ty in
+        fun ty -> ty_instantiate tdecl.tyd_params targs ty in
 
       match tdecl.tyd_type with
       | Abstract _ ->
