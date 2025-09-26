@@ -43,7 +43,7 @@ val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list)
 
 val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
 
-val ty_instanciate : ty_params -> ty list -> ty -> ty
+val ty_instantiate : ty_params -> ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list

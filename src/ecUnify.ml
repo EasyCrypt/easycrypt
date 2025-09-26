@@ -14,7 +14,7 @@ module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
 exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
-exception UninstanciateUni
+exception UninstantiateUni
 
 (* -------------------------------------------------------------------- *)
 type pb = [ `TyUni of ty * ty | `TcCtt of ty * Sp.t ]
@@ -376,7 +376,7 @@ module UniEnv = struct
     UF.closed (!ue).ue_uf
 
   let close (ue : unienv) =
-    if not (closed ue) then raise UninstanciateUni;
+    if not (closed ue) then raise UninstantiateUni;
     (subst_of_uf (!ue).ue_uf)
 
   let assubst ue = subst_of_uf (!ue).ue_uf

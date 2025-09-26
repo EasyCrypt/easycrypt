@@ -116,7 +116,7 @@ val f_ty_app : EcEnv.env -> form -> form list -> form
 
 (* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
- * that the quantified variables can be instanciated *)
+ * that the quantified variables can be instantiated *)
 
 val f_betared : form -> form
 

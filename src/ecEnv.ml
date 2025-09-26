@@ -2815,7 +2815,7 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instanciate p tys env =
+  let instantiate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
         Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f

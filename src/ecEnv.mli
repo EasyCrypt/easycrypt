@@ -168,7 +168,7 @@ module Ax : sig
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
-  val instanciate : path -> EcTypes.ty list -> env -> form
+  val instantiate : path -> EcTypes.ty list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
