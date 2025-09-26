@@ -5,16 +5,9 @@ depends: [
   "bitwuzla"
   "camlp-streams" {>= "5"}
   "camlzip"
-  "cmdliner"
   "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"
-  "hex"
-  "iter"
-  "ocaml-inifiles" {>= "1.2"}
-  "ppx_deriving"
-  "ppx_deriving_yojson"
-  "progress" {>= "0.2"}
   "pcre2" {>= "8"}
   "why3" {>= "1.8.0" & < "1.9"}
   "yojson"

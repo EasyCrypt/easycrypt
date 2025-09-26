@@ -1174,6 +1174,7 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_crbinding (bd, lc) ->
       Th_crbinding (subst_crbinding s bd, lc)
+
   | Th_alias (name, target) ->
       Th_alias (name, subst_path s target)
 

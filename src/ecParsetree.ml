@@ -693,8 +693,6 @@ type psim_info = {
   psim_hint : (pgamepath option pair * pformula) list * pformula option;
   psim_eqs  : pformula option
 }
-(* FIXME PR: this was changed in bdep (vs main from where it came and current main *)
-(*           do we keep it?                                                        *)
 
 (* -------------------------------------------------------------------- *)
 type rw_eqv_info = {

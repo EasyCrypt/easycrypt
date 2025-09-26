@@ -14,7 +14,7 @@ let t_change
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  let hyps, concl = FApi.tc1_flat tc in
 
   let change (m : memenv) (i : instr) =
     let e, _, mk =
