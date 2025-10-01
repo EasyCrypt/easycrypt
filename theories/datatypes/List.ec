@@ -3356,6 +3356,12 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
   map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
 
+lemma zip0l ['a 'b] (s : 'b list): zip<:'a, 'b> [] s = [].
+proof. by case: s. qed.
+
+lemma zip0r ['a 'b] (s : 'a list): zip<:'a, 'b> s [] = [].
+proof. by case: s. qed.
+
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
 proof. by elim: s => // -[x y s]. qed.
@@ -3491,6 +3497,28 @@ lemma onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
 proof.
 elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
 by case: (n = 0) => // _; apply/ih.
+qed.
+
+lemma take_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  take k (zip s1 s2) = zip (take k s1) (take k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !take_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
+qed.
+
+lemma drop_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  drop k (zip s1 s2) = zip (drop k s1) (drop k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !drop_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
 qed.
 
 lemma eq_keys_amap ['a, 'b1, 'b2, 'c]
