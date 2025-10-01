@@ -126,7 +126,7 @@ end = struct
   let t_gen_match (side : side option) (tc : tcenv1) : tcenv =
     let hyps   = FApi.tc1_hyps tc in
     let env    = LDecl.toenv hyps in
-    let me, st = EcLowPhlGoal.tc1_get_stmt side tc in
+    let me, st = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
 
     let (e, _), _ = tc1_first_match tc st in
     let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in

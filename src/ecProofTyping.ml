@@ -175,21 +175,21 @@ let tc1_process_Xhl_formula_xreal tc pf =
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos_range tc (side, cpr) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
+  let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
   let env = FApi.tc1_env tc in
   let env = EcEnv.Memory.push_active me env in
   EcTyping.trans_codepos_range env cpr
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
+  let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
   let env = FApi.tc1_env tc in
   let env = EcEnv.Memory.push_active me env in
   EcTyping.trans_codepos env cpos
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_codepos1 tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
+  let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
   let env = FApi.tc1_env tc in
   let env = EcEnv.Memory.push_active me env in
   EcTyping.trans_codepos1 env cpos

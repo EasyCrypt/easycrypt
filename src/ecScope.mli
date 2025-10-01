@@ -251,6 +251,14 @@ module Reduction : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Circuit : sig 
+  val add_bitstring  : scope -> EcTypes.is_local -> pbind_bitstring -> scope
+  val add_array      : scope -> EcTypes.is_local -> pbind_array -> scope
+  val add_bvoperator : scope -> EcTypes.is_local -> pbind_bvoperator -> scope
+  val add_circuit    : scope -> EcTypes.is_local -> pbind_circuit -> scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Cloning : sig
   val clone : scope -> Ax.proofmode -> theory_cloning -> scope
 end
