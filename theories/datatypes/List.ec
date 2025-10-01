@@ -3822,6 +3822,17 @@ rewrite -(perm_cat2l [x]) perm_eq_sym perm_catCl perm_catAC -catA /=.
 by rewrite -eqss (@perm_eq_trans s) // perm_sort.
 qed.
 
+lemma sorted_range m n : sorted (<) (range m n).
+proof.
+case: (n <= m); first by move=> ?; rewrite range_geq.
+move/ltzNge => lt_mn; rewrite range_ltn //=.
+suff: forall m, 0 <= m => forall b n, b < n => path (<) b (range n (n + m)).
+- by move=> /(_ (n - (m + 1)) _ m (m+1) _) /#.
+move=> {m n lt_mn}; elim=> /= [|m ge0_m ih] b n ?.
+- by rewrite range_geq.
+by rewrite addrA range_ltn 1:/# /= addrAC; split=> //#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                    retrieving a maximal element                      *)
 (* -------------------------------------------------------------------- *)
