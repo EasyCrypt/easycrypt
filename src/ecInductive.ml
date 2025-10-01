@@ -120,7 +120,6 @@ let rec check_positivity_in_decl fct p decl ident =
     match decl.tyd_type with
     | Concrete ty -> [ ty ]
     | Abstract _ ->
-        (* Abstract types cannot be polymorphic so this is unreachable for now *)
         raise (NonPositive (AbstractTypeRestriction p)) 
     | Datatype { tydt_ctors } -> List.flatten @@ List.map snd tydt_ctors
     | Record (_, tys) -> List.map snd tys
@@ -130,8 +129,7 @@ let rec check_positivity_in_decl fct p decl ident =
 (** Ensures all occurrences of type variable [ident] are positive in type [ty] *)
 and check_positivity_ident fct p params ident ty =
   match ty.ty_node with
-  | Tglob _ | Tunivar _ -> assert false
-  | Tvar _ -> ()
+  | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_ident fct p params ident) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
       if not (ty_params_compat args params) then
