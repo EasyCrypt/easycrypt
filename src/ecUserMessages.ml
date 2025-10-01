@@ -593,6 +593,7 @@ end = struct
 
   let pp_dterror env fmt error =
     let msg x = Format.fprintf fmt x in
+    let env1  = EcPrinting.PPEnv.ofenv env in
 
     match error with
     | DTE_TypeError ee ->
@@ -605,11 +606,23 @@ end = struct
         msg "invalid constructor type: `%s`: %a'"
           name (pp_tyerror env) ee
 
-    | DTE_NonPositive ->
-        msg "the datatype does not respect the positivity condition"
-
     | DTE_Empty ->
         msg "the datatype may be empty"
+
+    | DTE_NonPositive (name, desc) -> (
+        let prefix = Printf.sprintf "while defining type `%s`:" name in
+        match desc with
+        | NonPositive ty ->
+            msg "%s non strictly-positive occurrence in `%a`" prefix
+              (EcPrinting.pp_type env1) ty
+        | AbstractTypeRestriction p ->
+            msg "%s unauthorised use within abstract type `%a`" prefix
+              EcPrinting.pp_path p
+        | TypePositionRestriction ty ->
+            msg
+              "%s unauthorised use of type `%a`, which changes the position of \
+               its type parameters"
+              prefix (EcPrinting.pp_type env1) ty)
 
   let pp_fxerror env fmt error =
     match error with

@@ -14,7 +14,7 @@ type mod_extra = {
   mex_glob  : memory -> form;
 }
 
-type sc_instanciate = {
+type sc_instantiate = {
   sc_memtype : memtype;
   sc_mempred : mem_pr Mid.t;
   sc_expr    : expr Mid.t;

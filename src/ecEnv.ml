@@ -776,10 +776,10 @@ module MC = struct
       let loca    = tyd.tyd_loca in
 
       match tyd.tyd_type with
-      | `Concrete _  -> mc
-      | `Abstract _ -> mc
+      | Concrete _  -> mc
+      | Abstract _ -> mc
 
-      | `Datatype dtype ->
+      | Datatype dtype ->
           let cs      = dtype.tydt_ctors   in
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
@@ -823,7 +823,7 @@ module MC = struct
               _up_operator candup mc name (ipath name, op)
             ) mc projs
 
-      | `Record (scheme, fields) ->
+      | Record (scheme, fields) ->
           let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
           let nfields = List.length fields in
           let cfields =
@@ -2513,12 +2513,12 @@ module Ty = struct
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
-    | Some { tyd_type = `Concrete _ } -> true
+    | Some { tyd_type = Concrete _ } -> true
     | _ -> false
 
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
-    | Some ({ tyd_type = `Concrete body } as tyd) ->
+    | Some ({ tyd_type = Concrete body } as tyd) ->
         Tvar.subst
           (Tvar.init (List.map fst tyd.tyd_params) args)
           body
@@ -2554,14 +2554,15 @@ module Ty = struct
       match ty.ty_node with
       | Tconstr (p, tys) -> begin
           match by_path_opt p env with
-          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
+          | Some ({ tyd_type = (Datatype _ | Record _) as body }) ->
               let prefix   = EcPath.prefix   p in
               let basename = EcPath.basename p in
               let basename =
                 match body, mode with
-                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
-                | `Datatype _, `Ind           -> basename ^ "_ind"
-                | `Datatype _, `Case          -> basename ^ "_case"
+                | Record   _, (`Ind | `Case) -> basename ^ "_ind"
+                | Datatype _, `Ind           -> basename ^ "_ind"
+                | Datatype _, `Case          -> basename ^ "_case"
+                | _, _ -> assert false
               in
                 Some (EcPath.pqoname prefix basename, tys)
           | _ -> None
@@ -2577,7 +2578,7 @@ module Ty = struct
     let env = MC.bind_tydecl name ty env in
 
     match ty.tyd_type with
-    | `Abstract tc ->
+    | Abstract tc ->
         let myty =
           let myp = EcPath.pqname (root env) name in
           let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
@@ -2783,7 +2784,7 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instanciate p tys env =
+  let instantiate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
         Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f
@@ -2903,7 +2904,7 @@ module Theory = struct
 
     | Th_type (x, tyd) -> begin
         match tyd.tyd_type with
-        | `Abstract tc ->
+        | Abstract tc ->
             let myty =
               let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
                 (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
