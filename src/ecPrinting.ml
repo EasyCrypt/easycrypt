@@ -840,6 +840,10 @@ let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x as id : memory) =
     else
       Format.fprintf fmt "%s" x
 
+let pp_pl_mem_binding b ppe fmt m =
+  if b then
+    Format.fprintf fmt "{&%a}" (pp_mem ppe) m
+
 let pp_memtype (ppe : PPEnv.t) (fmt : Format.formatter) (mt : memtype) =
   match EcMemory.for_printing mt with
   | None -> Format.fprintf fmt "{}"
@@ -1936,46 +1940,40 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      if debug_mode then
-        Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
-          (pp_funname ppe) hf.hf_f
-          (pp_mem ppe) hf.hf_m
-          (pp_form ppepr) (hf_pr hf).inv
-          (pp_form ppepo) (hf_po hf).inv
-      else
-        Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
-          (pp_funname ppe) hf.hf_f
-          (pp_form ppepr) (hf_pr hf).inv
-          (pp_form ppepo) (hf_po hf).inv
+      let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]]"
+        (pp_funname ppe) hf.hf_f
+        (pp_pl_mem_binding pm ppe) hf.hf_m
+        (pp_form ppepr) (hf_pr hf).inv
+        (pp_form ppepo) (hf_po hf).inv
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-      if debug_mode then
-        Format.fprintf fmt "hoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]]"
+      let pm = debug_mode || (fst hs.hs_m).id_symb <> "&hr" in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
-        (pp_mem ppe) (fst hs.hs_m)
+        (pp_pl_mem_binding pm ppe) (fst hs.hs_m)
         (pp_form ppe) (hs_pr hs).inv
         (pp_form ppe) (hs_po hs).inv
-      else
-        Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
-          (pp_stmt_for_form ppe) hs.hs_s
-          (pp_form ppe) (hs_pr hs).inv
-          (pp_form ppe) (hs_po hs).inv
-
+    
   | FeHoareF hf ->
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.ehf_m hf.ehf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
+      let pm =  debug_mode || hf.ehf_m.id_symb <> "&hr" in
       Format.fprintf fmt
-        "ehoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+        "ehoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_funname ppe) hf.ehf_f
+        (pp_pl_mem_binding pm ppe) hf.ehf_m
         (pp_form ppepr) (ehf_pr hf).inv
         (pp_form ppepo) (ehf_po hf).inv
 
   | FeHoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.ehs_m in
-      Format.fprintf fmt "ehoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      let pm = debug_mode || (fst hs.ehs_m).id_symb <> "&hr" in
+      Format.fprintf fmt "ehoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.ehs_s
+        (pp_pl_mem_binding pm ppe) (fst hs.ehs_m)
         (pp_form ppe) (ehs_pr hs).inv
         (pp_form ppe) (ehs_po hs).inv
 
@@ -1984,28 +1982,27 @@ and pp_form_core_r
         EcEnv.Fun.equivF_memenv eqv.ef_ml eqv.ef_mr eqv.ef_fl eqv.ef_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
-      if debug_mode then
-        Format.fprintf fmt "equiv[@[<hov 2>@ %a {%a} ~@ %a {%a} :@ @[%a ==>@ %a@]@]]"
+      let pml = eqv.ef_ml.id_symb <> "&1" || debug_mode in
+      let pmr = eqv.ef_mr.id_symb <> "&2" || debug_mode in
+      Format.fprintf fmt "equiv[@[<hov 2>@ %a %a ~@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_funname ppe) eqv.ef_fl
-        (pp_mem ppe) eqv.ef_ml
+        (pp_pl_mem_binding pml ppe) eqv.ef_ml
         (pp_funname ppe) eqv.ef_fr
-        (pp_mem ppe) eqv.ef_mr
+        (pp_pl_mem_binding pmr ppe) eqv.ef_mr
         (pp_form ppepr) (ef_pr eqv).inv
         (pp_form ppepo) (ef_po eqv).inv
-      else
-        Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
-          (pp_funname ppe) eqv.ef_fl
-          (pp_funname ppe) eqv.ef_fr
-          (pp_form ppepr) (ef_pr eqv).inv
-          (pp_form ppepo) (ef_po eqv).inv
 
   | FequivS es ->
       let ppef = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
       let ppel = PPEnv.push_mem ppe ~active:true es.es_ml in
       let pper = PPEnv.push_mem ppe ~active:true es.es_mr in
-      Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+      let pml = (fst es.es_ml).id_symb <> "&1" || debug_mode in
+      let pmr = (fst es.es_mr).id_symb <> "&2" || debug_mode in
+      Format.fprintf fmt "equiv[@[<hov 2>@ %a %a ~@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppel) es.es_sl
+        (pp_pl_mem_binding pml ppe) (fst es.es_ml)
         (pp_stmt_for_form pper) es.es_sr
+        (pp_pl_mem_binding pmr ppe) (fst es.es_mr)
         (pp_form ppef) (es_pr es).inv
         (pp_form ppef) (es_po es).inv
 
@@ -2014,11 +2011,15 @@ and pp_form_core_r
         EcEnv.Fun.equivF_memenv eg.eg_ml eg.eg_mr eg.eg_fl eg.eg_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
-      Format.fprintf fmt "eager[@[<hov 2>@ %a,@ %a ~@ %a,@ %a :@ @[%a ==>@ %a@]@]]"
+      let pml = eg.eg_ml.id_symb <> "&1" || debug_mode in
+      let pmr = eg.eg_mr.id_symb <> "&2" || debug_mode in
+      Format.fprintf fmt "eager[@[<hov 2>@ %a,@ %a %a~@ %a,@ %a %a:@ @[%a ==>@ %a@]@]]"
         (pp_stmt_for_form ppe) eg.eg_sl
         (pp_funname ppe) eg.eg_fl
+        (pp_pl_mem_binding pml ppe) eg.eg_ml
         (pp_funname ppe) eg.eg_fr
         (pp_stmt_for_form ppe) eg.eg_sr
+        (pp_pl_mem_binding pmr ppe) eg.eg_mr
         (pp_form ppepr) (eg_pr eg).inv
         (pp_form ppepo) (eg_po eg).inv
 
@@ -2026,26 +2027,21 @@ and pp_form_core_r
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.bhf_m hf.bhf_f ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
-      if debug_mode then
-        Format.fprintf fmt "phoare[@[<hov 2>@ %a {%a} :@ @[%a ==>@ %a@]@]] %s %a"
-          (pp_funname ppe) hf.bhf_f
-          (pp_mem ppe) hf.bhf_m
-          (pp_form ppepr) (bhf_pr hf).inv
-          (pp_form ppepo) (bhf_po hf).inv
-          (string_of_hcmp hf.bhf_cmp)
-          (pp_form_r ppepr (max_op_prec,`NonAssoc)) (bhf_bd hf).inv
-      else
-        Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
-          (pp_funname ppe) hf.bhf_f
-          (pp_form ppepr) (bhf_pr hf).inv
-          (pp_form ppepo) (bhf_po hf).inv
-          (string_of_hcmp hf.bhf_cmp)
-          (pp_form_r ppepr (max_op_prec,`NonAssoc)) (bhf_bd hf).inv
+      let pm = debug_mode || hf.bhf_m.id_symb <> "&hr" in
+      Format.fprintf fmt "phoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]] %s %a"
+        (pp_funname ppe) hf.bhf_f
+        (pp_pl_mem_binding pm ppe) hf.bhf_m
+        (pp_form ppepr) (bhf_pr hf).inv
+        (pp_form ppepo) (bhf_po hf).inv
+        (string_of_hcmp hf.bhf_cmp)
+        (pp_form_r ppepr (max_op_prec,`NonAssoc)) (bhf_bd hf).inv
 
   | FbdHoareS hs ->
       let ppef = PPEnv.push_mem ppe ~active:true hs.bhs_m in
-      Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
+      let pm = debug_mode || (fst hs.bhs_m).id_symb <> "&hr" in
+      Format.fprintf fmt "phoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@]@]] %s %a"
         (pp_stmt_for_form ppef) hs.bhs_s
+        (pp_pl_mem_binding pm ppe) (fst hs.bhs_m)
         (pp_form ppef) (bhs_pr hs).inv
         (pp_form ppef) (bhs_po hs).inv
         (string_of_hcmp hs.bhs_cmp)
@@ -2053,9 +2049,9 @@ and pp_form_core_r
 
   | Fpr pr->
       let me = EcEnv.Fun.prF_memenv pr.pr_event.m pr.pr_fun ppe.PPEnv.ppe_env in
-
       let ppep = PPEnv.create_and_push_mem ppe ~active:true me in
-      Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
+      let pm = debug_mode || pr.pr_event.m.id_symb <> "&hr" in
+      Format.fprintf fmt "Pr[@[%a@[%t@] %a@@ %a :@ %a@]]"
         (pp_funname ppe) pr.pr_fun
         (match pr.pr_args.f_node with
          | Ftuple _ ->
@@ -2064,6 +2060,7 @@ and pp_form_core_r
              (fun fmt -> pp_string fmt "()")
          | _ ->
              (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
+        (pp_pl_mem_binding pm ppe) pr.pr_event.m
         (pp_local ppe) pr.pr_mem
         (pp_form ppep) pr.pr_event.inv
 
@@ -2987,10 +2984,8 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (hf_pr hf).inv;
-  if debug_mode then
-    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.hf_f (pp_mem ppe) hf.hf_m
-  else
-    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
+  let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
+  Format.fprintf fmt "    %a %a@\n%!" (pp_funname ppe) hf.hf_f (pp_pl_mem_binding pm ppe) hf.hf_m;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (hf_po hf).inv
 
 (* -------------------------------------------------------------------- *)
@@ -3016,10 +3011,8 @@ let pp_eHoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (ehf_pr hf).inv;
-  if debug_mode then
-    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.ehf_f (pp_mem ppe) hf.ehf_m
-  else
-    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.ehf_f;
+  let pm = debug_mode || hf.ehf_m.id_symb <> "&hr" in
+  Format.fprintf fmt "    %a %a@\n%!" (pp_funname ppe) hf.ehf_f (pp_pl_mem_binding pm ppe) hf.ehf_m;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (ehf_po hf).inv
 
 (* -------------------------------------------------------------------- *)
@@ -3054,10 +3047,8 @@ let pp_bdhoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let scmp = string_of_hrcmp hf.bhf_cmp in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (bhf_pr hf).inv;
-  if debug_mode then
-    Format.fprintf fmt "    %a {%a}@\n%!" (pp_funname ppe) hf.bhf_f (pp_mem ppe) hf.bhf_m
-  else
-    Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.bhf_f;  
+  let pm = debug_mode || hf.bhf_m.id_symb <> "&hr" in
+  Format.fprintf fmt "    %a %a@\n%!" (pp_funname ppe) hf.bhf_f (pp_pl_mem_binding pm ppe) hf.bhf_m;
   Format.fprintf fmt "    %s @[<hov 2>%a@]@\n%!" scmp (pp_form ppepr) (bhf_bd hf).inv;
   Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (bhf_po hf).inv
 
@@ -3086,19 +3077,14 @@ let pp_equivF (ppe : PPEnv.t) ?prpo fmt ef =
   let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
   let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (ef_pr ef).inv;
-  if debug_mode then begin
-    Format.fprintf fmt "    %a {%a} ~ %a {%a}@\n%!"
-      (pp_funname ppe) ef.ef_fl
-      (pp_mem ppe) ef.ef_ml
-      (pp_funname ppe) ef.ef_fr
-      (pp_mem ppe) ef.ef_mr;
-    Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (ef_po ef).inv;
-  end else begin
-    Format.fprintf fmt "    %a ~ %a@\n%!"
-      (pp_funname ppe) ef.ef_fl
-      (pp_funname ppe) ef.ef_fr;
-    Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (ef_po ef).inv
-  end
+  let pml = debug_mode || ef.ef_ml.id_symb <> "&1" in
+  let pmr = debug_mode || ef.ef_mr.id_symb <> "&2" in
+  Format.fprintf fmt "    %a %a~ %a %a@\n%!"
+    (pp_funname ppe) ef.ef_fl
+    (pp_pl_mem_binding pml ppe) ef.ef_ml
+    (pp_funname ppe) ef.ef_fr
+    (pp_pl_mem_binding pmr ppe) ef.ef_mr;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (ef_po ef).inv
 
 (* -------------------------------------------------------------------- *)
 let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
