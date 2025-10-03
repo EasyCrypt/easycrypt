@@ -200,6 +200,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Psetmatch info            -> EcPhlCodeTx.process_set_match info
     | Pweakmem info             -> EcPhlCodeTx.process_weakmem info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
+    | Pcoupling (side, f)       -> EcPhlRnd.process_coupling side f
     | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
