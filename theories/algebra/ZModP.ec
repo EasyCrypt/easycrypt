@@ -20,6 +20,13 @@ proof. by exists 0; smt(ge2_p). qed.
 op inzmod (z : int)  = Sub.insubd (z %% p).
 op asint  (z : zmod) = Sub.val z.
 
+(* Note that signed representatives of even values are heavier on the positive side *)
+op as_sint(z : zmod) = if p %/ 2 < asint z then asint z - p else asint z.
+
+lemma as_sint_odd z :
+    odd p
+ => as_sint z = if (p-1) %/ 2 < asint z then asint z - p else asint z by smt(ge2_p div2_odd).
+
 lemma inzmodK (z : int): asint (inzmod z) = z %% p.
 proof.
 rewrite /asint /inzmod Sub.insubdK //.
@@ -44,6 +51,27 @@ proof. by rewrite ge0_asint gtp_asint. qed.
 
 lemma asintK x : inzmod (asint x) = x.
 proof. by rewrite /inzmod pmod_small 1:rg_asint /insubd Sub.valK. qed.
+
+lemma as_sintK x: inzmod (as_sint x) = x.
+proof.
+have ge2_p := ge2_p.
+have rg_asint := rg_asint.
+rewrite /as_sint;case (p%/2 < asint x) => ?; last by rewrite asintK //.  
+rewrite -(oppzK (asint x - p)) /inzmod modNz 1,2:/#; apply (inj_eq Sub.val Sub.val_inj).
+rewrite Sub.insubdK /#.
+qed.
+
+
+lemma inzmodK_sint_small n:
+ -p %/ 2 + (if odd p then 0 else 1) <= n <= p %/ 2 => as_sint (inzmod n) = n.
+proof.
+case (odd p) => ?; 1:by rewrite /as_sint !(div2_odd p _);smt(ge2_p inzmodK).
+by smt(ge2_p inzmodK).
+qed.
+
+lemma as_sint_range x :
+  -p %/2 + (if odd p then 0 else 1) <= as_sint x <= p %/2
+    by smt(oddP ge2_p rg_asint).
 
 (* -------------------------------------------------------------------- *)
 abbrev zmodcgr (z1 z2 : int) = z1 %% p = z2 %% p.
@@ -224,6 +252,32 @@ proof. by rewrite -inzmod_mod inzmodN. qed.
 lemma inzmodB_mod (a b : int):
   inzmod ((a - b) %% p) = (inzmod a) + (- (inzmod b)).
 proof. by rewrite -inzmod_mod inzmodB. qed.
+
+(* -------------------------------------------------------------------- *)
+  
+lemma as_sint_bounded x y eps:
+`| asint x - asint y | <= eps
+ => `| as_sint (x-y) | <= eps.
+proof.
+have ?:= ge2_p.
+have ?:= rg_asint x.
+have ?:= rg_asint y.
+have ?:= rg_asint (x-y).
+rewrite !normN => ?;rewrite /as_sint !addE !oppE.
+case (asint y = 0) => Hy;1:   by rewrite Hy /=; smt().
+by rewrite modNz 1,2:/# /#.
+qed.
+ 
+abbrev absZq (x: zmod): int = `| as_sint x |.
+
+lemma absZqB x y eps:
+ `| asint x - asint y | <= eps => absZq (x-y) <= eps
+by apply as_sint_bounded.
+
+lemma absZqP x eps:
+ absZq x <= eps 
+ <=> (asint x <= eps \/ p - eps <= asint x)
+by smt(rg_asint).
 
 (* -------------------------------------------------------------------- *)
 lemma zmodcgrP (i j : int) : zmodcgr i j <=> p %| (i - j).
