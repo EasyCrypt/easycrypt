@@ -222,7 +222,7 @@ and try_reduce_record_projection
 
   try
     if not (
-      st.st_ri.iota 
+      st.st_ri.iota
       && EcEnv.Op.is_projection st.st_env p
       && not (Args.isempty args)
     ) then raise Bailout;
@@ -483,7 +483,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
     let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_r { hf_pr; hf_f; hf_po }
+    let hf_poe  = List.map (fun (e,f) -> e, norm st s f) hf.hf_poe in
+    f_hoareF_r { hf_pr; hf_f; hf_po; hf_poe}
 
   | FhoareS hs ->
     assert (Args.isempty args);
@@ -492,7 +493,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_po = norm st s hs.hs_po in
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
-    f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+    let hs_poe  = List.map (fun (e,f) -> e, norm st s f) hs.hs_poe in
+    f_hoareS_r { hs_pr; hs_po; hs_s; hs_m; hs_poe}
 
   | FeHoareF hf ->
     assert (Args.isempty args);

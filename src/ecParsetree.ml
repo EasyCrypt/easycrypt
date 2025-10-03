@@ -160,7 +160,7 @@ and pinstr_r =
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
+  | PSraise  of pgamepath * (pexpr list) located
 
 and psmatch = [
   | `Full of (ppattern * pstmt) list
@@ -202,7 +202,7 @@ and pformula_r =
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
 
-  | PFhoareF   of pformula * pgamepath * pformula
+  | PFhoareF   of pformula * pgamepath * pformula * (pgamepath * pformula) list
   | PFehoareF  of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
@@ -429,6 +429,12 @@ and pprocop = {
   ppo_locality : locality;
 }
 
+type pexception_decl = {
+    pe_name : psymbol;
+    pe_typargs : (psymbol * pqsymbol list) list option;
+    pe_locality : locality;
+  }
+
 type ppred_def =
   | PPabstr of pty list
   | PPconcr of ptybindings * pformula
@@ -531,9 +537,11 @@ type pipattern =
 
 and pspattern = unit
 
+type pfel_spec_preds = (pgamepath * pformula) list
+
 type call_info =
-  | CI_spec of (pformula * pformula)
-  | CI_inv of pformula
+  | CI_spec of (pformula * pformula * pfel_spec_preds)
+  | CI_inv of (pformula * pfel_spec_preds)
   | CI_upto of (pformula * pformula * pformula option)
 
 type p_app_xt_info =
@@ -553,8 +561,6 @@ type rnd_tac_info_f =
 type psemrndpos = (bool * pcodepos1) doption
 
 type tac_dir = Backs | Fwds
-
-type pfel_spec_preds = (pgamepath * pformula) list
 
 (* -------------------------------------------------------------------- *)
 type pim_repeat_kind =
@@ -685,7 +691,9 @@ type deno_ppterm = (pformula option pair) gppterm
 type conseq_info =
   | CQI_bd of phoarecmp option * pformula
 
-type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
+type conseq_contra = pformula option * pformula option * pfel_spec_preds option
+
+type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
@@ -1267,6 +1275,7 @@ type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
+  | Gexception   of pexception_decl
   | Gprocop      of pprocop
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation
