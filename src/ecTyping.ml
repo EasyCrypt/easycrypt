@@ -3425,7 +3425,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
-    | PFprob (gp, args, pr_m, event) ->
+    | PFprob (m, gp, args, pr_m, event) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Pr);
 
@@ -3435,18 +3435,19 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           transcall (fun f -> let f = transf env f in f, f.f_ty)
             env ue f.pl_loc fun_.f_sig args in
         let memid = transmem env pr_m in
-        let m = EcIdent.create "&hr" in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let env = EcEnv.Fun.prF m fpath env in
         let event' = {m;inv=transf env event} in
         unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
-    | PFhoareF (pre, gp, post) ->
+    | PFhoareF (m, pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
         let fpath = trans_gamepath env gp in
-        let m = EcIdent.create "&hr" in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
@@ -3454,10 +3455,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_hoareF {m;inv=pre'} fpath {m;inv=post'}
 
-    | PFehoareF (pre, gp, post) ->
+    | PFehoareF (m, pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let m = EcIdent.create "&hr" in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
@@ -3466,10 +3468,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
           f_eHoareF {m;inv=pre'} fpath {m;inv=post'}
 
-    | PFBDhoareF (pre, gp, post, hcmp, bd) ->
+    | PFBDhoareF (m, pre, gp, post, hcmp, bd) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let m = EcIdent.create "&hr" in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
@@ -3487,11 +3490,13 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let fpath = trans_gamepath env gp in
           f_losslessF fpath
 
-    | PFequivF (pre, (gp1, gp2), post) ->
+    | PFequivF (ml, mr, pre, (gp1, gp2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let ml = EcIdent.create "&1" in
-        let mr = EcIdent.create "&2" in
+        let ml = odfl "&1" (omap unloc ml) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc mr) in
+        let mr = EcIdent.create mr in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
         let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
@@ -3501,11 +3506,13 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_equivF {ml;mr;inv=pre'} fpath1 fpath2 {ml;mr;inv=post'}
 
-    | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
+    | PFeagerF (ml, mr, pre, (s1,gp1,gp2,s2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-        let ml = EcIdent.create "&1" in
-        let mr = EcIdent.create "&2" in
+        let ml = odfl "&1" (omap unloc ml) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc mr) in
+        let mr = EcIdent.create mr in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
         let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
