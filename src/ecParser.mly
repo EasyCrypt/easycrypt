@@ -1124,10 +1124,10 @@ sform_u(P):
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) m=brace(mident)? AT pn=mident
     COLON event=form_r(P)
   RBRACKET
-    { PFprob (mp, args, pn, event) }
+    { PFprob (m, mp, args, pn, event) }
 
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
@@ -1222,30 +1222,30 @@ hoare_bd_cmp :
 | GE { EcAst.FHge }
 
 hoare_body(P):
-  mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFhoareF (pre, mp, post) }
+  mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFhoareF (m, pre, mp, post) }
 
 ehoare_body(P):
-  mp=loc(fident) COLON pre=form_r(P) LONGARROW
+  mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW
                        post=form_r(P)
-    { PFehoareF (pre, mp, post) }
+    { PFehoareF (m, pre, mp, post) }
 
 phoare_body(P):
-  LBRACKET mp=loc(fident) COLON
+  LBRACKET mp=loc(fident) m=brace(mident)? COLON
     pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
     cmp=hoare_bd_cmp bd=sform_r(P)
-  { PFBDhoareF (pre, mp, post, cmp, bd) }
+  { PFBDhoareF (m, pre, mp, post, cmp, bd) }
 
 equiv_body(P):
-  mp1=loc(fident) TILD mp2=loc(fident)
+  mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) mr=brace(mident)?
   COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFequivF (pre, (mp1, mp2), post) }
+    { PFequivF (ml, mr, pre, (mp1, mp2), post) }
 
 eager_body(P):
-| s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
+| s1=stmt COMMA  mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) COMMA s2=stmt mr=brace(mident)?
     COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
+    { PFeagerF (ml, mr, pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
 | x=ptybinding1
