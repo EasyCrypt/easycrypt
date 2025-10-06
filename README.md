@@ -21,9 +21,9 @@ EasyCrypt is part of the [Formosa Crypto project](https://formosa-crypto.org/).
   - [Why3 and SMT Solvers](#why3-and-smt-solvers)
     - [Compatibility](#compatibility)
        - [Configuring Why3](#configuring-why3)
-    - [Front-Ends](#front-ends)
-      - [Proof General (Emacs)](#proof-general-emacs)
-      - [Visual Studio Code](#visual-studio-code)
+  - [Front-Ends](#front-ends)
+    - [Proof General (Emacs)](#proof-general-emacs)
+    - [Visual Studio Code](#visual-studio-code)
 - [Useful Resources](#useful-resources)
   - [Examples](#examples)
 

@@ -888,7 +888,7 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
-  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
+  let _, mt = EcEnv.Fun.prF_memenv (EcIdent.create "&dummy") pr_fun genv.te_env in
   let mty = trans_memtype env mt in
   let tyr = ty_distr mty in
   let ls =
@@ -906,24 +906,32 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
 
   let wev =
-    let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
-    let wbody = trans_form_b (genv,lenv) pr_event in
+    let lenv, wbd = trans_binding genv lenv (pr_event.m, GTmem mt) in
+    let wbody = trans_form_b (genv,lenv) pr_event.inv in
     trans_lambda genv [wbd] wbody
 
   in WTerm.t_app_infer fs_mu [d; wev]
 
 (* -------------------------------------------------------------------- *)
-and trans_gen ((genv, _) as env :  tenv * lenv) (fp : form) =
+and trans_gen ((genv, lenv) as env :  tenv * lenv) (fp : form) =
   match Hf.find_opt genv.te_gen fp with
   | None ->
     let name = WIdent.id_fresh "x" in
+    let argsty, args =
+      let fv = Mid.keys fp.f_fv in
+      let fv = List.pmap (fun x -> Mid.find_opt x lenv.le_lv) fv in
+      (
+        List.map (fun v -> v.WTerm.vs_ty) fv,
+        List.map WTerm.t_var fv
+      ) in
+
     let wty  =
       if   EcReduction.EqTest.is_bool genv.te_env fp.f_ty
       then None
       else Some (trans_ty env fp.f_ty) in
 
-    let lsym = WTerm.create_lsymbol name [] wty in
-    let term = WTerm.t_app_infer lsym [] in
+    let lsym = WTerm.create_lsymbol name argsty wty in
+    let term = WTerm.t_app_infer lsym args in
 
     genv.te_task <- WTask.add_param_decl genv.te_task lsym;
     Hf.add genv.te_gen fp term;
@@ -982,7 +990,7 @@ and trans_fix (genv, lenv) (wdom, o) =
       | OPB_Leaf (locals, e) ->
           let ctors = List.rev ctors in
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
-          let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
+          let fe = EcCoreFol.form_of_expr e in
 
           let we = trans_app (genv, lenv) fe eargs in
 
@@ -1408,7 +1416,7 @@ module Frequency = struct
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
-        doit pr.pr_event; doit pr.pr_args in
+        doit pr.pr_event.inv; doit pr.pr_args in
     doit f;
     if not (Sx.is_empty !sf) then sp := Sp.add CI_Distr.p_mu !sp;
     !sp, !sf
@@ -1444,7 +1452,7 @@ module Frequency = struct
           r_union rs (f_ops unwanted_op f)
         | {op_kind = OB_oper (Some (OP_Fix e)) } ->
           let rec aux rs = function
-            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+            | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr e))
             | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
           in
           aux rs e.opf_branches
@@ -1487,7 +1495,7 @@ module Frequency = struct
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e
-      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
+      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event.inv;add pr.pr_args
       | _ -> () in
     add form
 
@@ -1540,7 +1548,7 @@ let init_relevant env pi rs =
   let push e r = r := e :: !r in
   let do1 p ax =
     let wanted = wanted_ax p in
-    if wanted || (ax.ax_visibility = `Visible && not (unwanted_ax p)) then begin
+    if wanted || (ax.ax_smt && not (unwanted_ax p)) then begin
       Frequency.add fr ax.ax_spec;
       let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       let paxu = (p,ax), used in
@@ -1631,7 +1639,7 @@ let init hyps concl =
 let select env pi hyps concl execute_task =
   if pi.P.pr_all then
     let init_select p ax =
-      ax.ax_visibility = `Visible && not (P.Hints.mem p pi.P.pr_unwanted) in
+      ax.ax_smt && not (P.Hints.mem p pi.P.pr_unwanted) in
     (execute_task (EcEnv.Ax.all ~check:init_select env) = Some true)
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
@@ -1716,7 +1724,15 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
           Format.eprintf "dumping in %s" filename;
       let filename = Printf.sprintf "%.4d-%s" tkid filename in
       out_task filename task));
-    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
+    let (tp, res) = EcUtils.timed (fun task ->
+        if Sys.ocaml_release.major = 5 then begin
+          let control = Gc.get () in
+          Gc.set { control with space_overhead = min 20 control.space_overhead; };
+          EcUtils.try_finally
+            (fun () -> P.execute_task ?notify pi task)
+            (fun () -> Gc.set control)
+        end else P.execute_task ?notify pi task
+      ) task in
 
     if 1 <= pi.P.pr_verbose then
       notify |> oiter (fun notify -> notify `Warning (lazy (

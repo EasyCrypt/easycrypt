@@ -8,47 +8,22 @@ require import Ring StdOrder IntDiv ZModP Ideal Poly.
 
 (* ==================================================================== *)
 abstract theory PolyReduce.
+type coeff.
 
-clone import PolyComRing as BasePoly with
-  (* We currently don't care about inverting polynomials *)
-  pred PolyComRing.unit <= fun p => exists q, q * p = oner,
-  op PolyComRing.invr <= fun p => choiceb (fun q => q * p = oner) p
-  proof PolyComRing.mulVr, PolyComRing.unitP, PolyComRing.unitout
-  remove abbrev (+) remove abbrev ( * ) remove abbrev [-].
-realize PolyComRing.mulVr by smt(choicebP).
-realize PolyComRing.unitP by smt().
-realize PolyComRing.unitout by smt(choiceb_dfl).
+clone import ComRing as Coeff with type t <= coeff.
 
-(*-*) import Coeff PolyComRing BigPoly BigCf.
+clone export PolyComRing as BasePoly
+  with type   coeff <- coeff,
+       theory Coeff <- Coeff.
+
+import Coeff BigPoly BigCf.
 
 (* -------------------------------------------------------------------- *)
 clone import IdealComRing as PIdeal with
-  type t               <- BasePoly.poly,
-    op IComRing.zeror  <- BasePoly.poly0,
-    op IComRing.oner   <- BasePoly.poly1,
-    op IComRing.( + )  <- BasePoly.PolyComRing.( + ),
-    op IComRing.([-])  <- BasePoly.PolyComRing.([-]),
-    op IComRing.( * )  <- BasePoly.PolyComRing.( * ),
-    op IComRing.invr   <- BasePoly.PolyComRing.invr,
-  pred IComRing.unit   <- BasePoly.PolyComRing.unit,
-    op BigDom.BAdd.big <- BasePoly.BigPoly.PCA.big<:'a>,
-    op BigDom.BMul.big <- BasePoly.BigPoly.PCM.big<:'a>
-
-  proof IComRing.addrA     by exact: BasePoly.PolyComRing.addrA    ,
-        IComRing.addrC     by exact: BasePoly.PolyComRing.addrC    ,
-        IComRing.add0r     by exact: BasePoly.PolyComRing.add0r    ,
-        IComRing.addNr     by exact: BasePoly.PolyComRing.addNr    ,
-        IComRing.oner_neq0 by exact: BasePoly.PolyComRing.oner_neq0,
-        IComRing.mulrA     by exact: BasePoly.PolyComRing.mulrA    ,
-        IComRing.mulrC     by exact: BasePoly.PolyComRing.mulrC    ,
-        IComRing.mul1r     by exact: BasePoly.PolyComRing.mul1r    ,
-        IComRing.mulrDl    by exact: BasePoly.PolyComRing.mulrDl   ,
-        IComRing.mulVr     by exact: BasePoly.PolyComRing.mulVr    ,
-        IComRing.unitP     by exact: BasePoly.PolyComRing.unitP    ,
-        IComRing.unitout   by exact: BasePoly.PolyComRing.unitout
-
-  remove abbrev IComRing.(-)
-  remove abbrev IComRing.(/)
+    type t               <- BasePoly.poly,
+  theory IComRing        <- BasePoly.PolyComRing,
+      op BigDom.BAdd.big <- BasePoly.BigPoly.PCA.big<:'a>,
+      op BigDom.BMul.big <- BasePoly.BigPoly.PCM.big<:'a>
 
   remove abbrev BigDom.BAdd.bigi
   remove abbrev BigDom.BMul.bigi.
@@ -485,6 +460,7 @@ end PolyReduce.
 
 (* ==================================================================== *)
 abstract theory PolyReduceZp.
+type coeff.
 
 op p : { int | 2 <= p } as ge2_p.
 
@@ -492,49 +468,16 @@ clone import ZModRing as Zp with
     op    p     <= p
     proof ge2_p by exact/ge2_p.
 
-type Zp = zmod.
-
-clone include PolyReduce with
-    type BasePoly.coeff        <- Zp,
-    pred BasePoly.Coeff.unit   <- Zp.unit,
-    op   BasePoly.Coeff.zeror  <- Zp.zero,
-    op   BasePoly.Coeff.oner   <- Zp.one,
-    op   BasePoly.Coeff.( + )  <- Zp.( + ),
-    op   BasePoly.Coeff.([-])  <- Zp.([-]),
-    op   BasePoly.Coeff.( * )  <- Zp.( * ),
-    op   BasePoly.Coeff.invr   <- Zp.inv,
-    op   BasePoly.Coeff.ofint  <- Zp.ZModpRing.ofint,
-    op   BasePoly.Coeff.exp    <- Zp.ZModpRing.exp,
-    op   BasePoly.Coeff.intmul <- Zp.ZModpRing.intmul,
-    op   BasePoly.Coeff.lreg   <- Zp.ZModpRing.lreg
-  proof BasePoly.Coeff.addrA     by exact Zp.ZModpRing.addrA
-  proof BasePoly.Coeff.addrC     by exact Zp.ZModpRing.addrC
-  proof BasePoly.Coeff.add0r     by exact Zp.ZModpRing.add0r
-  proof BasePoly.Coeff.addNr     by exact Zp.ZModpRing.addNr
-  proof BasePoly.Coeff.oner_neq0 by exact Zp.ZModpRing.oner_neq0
-  proof BasePoly.Coeff.mulrA     by exact Zp.ZModpRing.mulrA
-  proof BasePoly.Coeff.mulrC     by exact Zp.ZModpRing.mulrC
-  proof BasePoly.Coeff.mul1r     by exact Zp.ZModpRing.mul1r
-  proof BasePoly.Coeff.mulrDl    by exact Zp.ZModpRing.mulrDl
-  proof BasePoly.Coeff.mulVr     by exact Zp.ZModpRing.mulVr
-  proof BasePoly.Coeff.unitP     by exact Zp.ZModpRing.unitP
-  proof BasePoly.Coeff.unitout   by exact Zp.ZModpRing.unitout
-  remove abbrev BasePoly.Coeff.(-)
-  remove abbrev BasePoly.Coeff.(/).
-
-clear [BasePoly.Coeff.*].
-clear [BasePoly.Coeff.AddMonoid.*].
-clear [BasePoly.Coeff.MulMonoid.*].
-
-(* -------------------------------------------------------------------- *)
-import BasePoly.
+clone import PolyReduce with
+    type coeff <- Zp.zmod,
+  theory Coeff <- ZModpRing.
 
 (* ==================================================================== *)
 (* We already know that polyXnD1 is finite. However, we prove here that *)
 (* we can build the full-uniform distribution over polyXnD1 by sampling *)
 (* uniformly each coefficient in the reduced form representation.       *)
 
-op dpolyX (dcoeff : Zp distr) : polyXnD1 distr =
+op dpolyX (dcoeff : zmod distr) : polyXnD1 distr =
   dmap (dpoly n dcoeff) pinject.
 
 lemma dpolyX_ll d : is_lossless d => is_lossless (dpolyX d).

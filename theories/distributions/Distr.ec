@@ -349,8 +349,17 @@ lemma mu_not (d : 'a distr) (p : 'a -> bool):
   mu d (predC p) = weight d - mu d p.
 proof. by rewrite -(@predCU p) mu_disjointL // #ring. qed.
 
-axiom witness_support P (d : 'a distr) :
+lemma witness_support P (d : 'a distr) :
   0%r < mu d P <=> (exists x, P x /\ x \in d).
+proof.
+have ->: 0%r < mu d P <=> mu d P <> 0%r by smt(ge0_mu).
+split=> />.
++ apply: contraLR=> /= /negb_exists /> empty.
+  apply: mu0_false=> x x_in_D; move: (empty x).
+  by case: (P x).
+move=> x Px x_in_D; rewrite -negP=> /eq0_mu /=.
+by rewrite negb_forall; exists x=> /=; rewrite x_in_D Px.
+qed.
 
 lemma mu_and_weight ['a] P Q (d : 'a distr) : (* FIXME: name *)
   mu d P = weight d => mu d (predI P Q) = mu d Q.
@@ -375,6 +384,42 @@ qed.
 
 lemma mu_le_weight ['a] (d : 'a distr) p : mu d p <= weight d.
 proof. by apply/mu_le. qed.
+
+lemma mu_le_eq ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall p, mu d1 p <= mu d2 p) =>
+  d1 = d2.
+proof.
+rewrite eq_distr => d1_ll d1_leq_d2 x.
+case (mu1 d1 x = mu1 d2 x) => // *.
+suff: (weight d1 < weight d2) by smt(mu_bounded).
+have weight_decomp : forall d,
+  weight d = mu1 d x + mu d (predC (pred1 x)) by smt(mu_not).
+do 2 ! rewrite weight_decomp.
+by apply ltr_le_add => /#.
+qed.
+
+lemma mu1_le_eq ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall x, mu1 d1 x <= mu1 d2 x) =>
+  d1 = d2.
+proof.
+move => d1_ll d1_leq_d2.
+apply mu_le_eq => // p.
+rewrite muE muE.
+apply RealSeries.ler_sum; 2,3: exact summable_mu1_cond.
+move => x. case: (p x) => /> *.
+exact d1_leq_d2.
+qed.
+
+lemma mu1_le_eq_mu1 ['a] (d1 d2 : 'a distr) :
+  is_lossless d1 =>
+  (forall x, mu1 d1 x <= mu1 d2 x) =>
+  forall x, mu1 d1 x = mu1 d2 x.
+proof.
+move => d1_ll d1_le_d2.
+by rewrite (mu1_le_eq d1_ll d1_le_d2).
+qed.
 
 (* -------------------------------------------------------------------- *)
 
@@ -516,20 +561,20 @@ qed.
 op p_max (p: 'a distr) = flub (mu1 p).
 
 lemma has_fub_mu1 (d: 'a distr) : has_fub (mu1 d).
-proof. by apply (@ler_has_fub _ (fun _ => 1%r)) => // /#. qed.
+proof. by apply: (@ler_has_fub _ (fun _=> 1%r))=> //; exists 1%r. qed.
 
 lemma pmax_ge0 (p: 'a distr) :
   0%r <= p_max p.
 proof.
 suff: mu1 p witness <= p_max p by smt(ge0_mu).
-apply (@flub_upper_bound (mu1 p)); smt(le1_mu).
+by apply: (@flub_upper_bound (mu1 p)); exists 1%r; smt(le1_mu).
 qed.
 
 lemma pmax_gt0 (p: 'a distr) x :
   x \in p => 0%r < p_max p.
 proof.
 move => in_xp; suff: p_max p >= mu1 p x by smt(ge0_mu).
-apply (@flub_upper_bound (mu1 p)); smt(le1_mu).
+apply: (@flub_upper_bound (mu1 p)); exists 1%r; smt(le1_mu).
 qed.
 
 lemma pmax_le1 (p: 'a distr) :
@@ -554,9 +599,11 @@ move => unif_d; apply eqr_le; split.
   apply divr_ge0; first exact ge0_weight.
   smt(size_ge0).
 - move => _; case (weight d = 0%r) => ?; first by smt(pmax_ge0).
-  have [x in_xd]: exists x, x \in d by smt(witness_support ge0_mu).
+  have [x in_xd]: exists x, x \in d.
+  + move: (witness_support predT d)=> /iffLR /(_ _); 1:smt(ge0_mu).
+    by rewrite /predT.
   have <-: mu1 d x = weight d / (size (to_seq (support d)))%r by smt(mu1_uni).
-  apply (@flub_upper_bound (mu1 d)) => /=; smt(le1_mu).
+  by apply: (@flub_upper_bound (mu1 d)) => /=; exists 1%r; smt(le1_mu).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1536,7 +1583,8 @@ lemma dscale_uni ['a] (d : 'a distr) :
 proof.
 case: (weight d = 0%r) => Hw.
 + by move=> _ x y _ _; rewrite !dscale1E Hw.
-apply dscalar_uni =>//; smt (ge0_weight @Real).
+apply: dscalar_uni=> //; split=> //.
+by apply: invr_gt0; smt(ge0_mu).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -2435,9 +2483,9 @@ qed.
 lemma dfun_unit (f : t -> 'u) : dfun (fun x => dunit (f x)) = dunit f. 
 proof.
 apply eq_distr => g; rewrite dunit1E dfun1E /=.
-case (f = g) => [<- | ?].
+case (f = g) => [<- | f_neq_g].
 + by rewrite BRM.big1 // => x _ /=; rewrite dunit1E.
-have [x hx]: exists x, f x <> g x by smt(). 
+move: f_neq_g; rewrite fun_ext negb_forall=> /= - [x hx].
 by rewrite (@BRM.bigD1 _ _ x) 1:FinT.enumP 1:FinT.enum_uniq /= dunit1E hx.
 qed.
 
@@ -2836,7 +2884,7 @@ proof.
 rewrite /hasE => Edf.
 apply (@summable_le (fun x => inv (mu d p) * (f x * mu1 d x))) => [|x /=].
 - exact/summableZ.
-- rewrite dcond1E /#.
+- by rewrite dcond1E; case: (p x)=> /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

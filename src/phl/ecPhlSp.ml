@@ -49,7 +49,8 @@ module LowInternal = struct
   let isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let sp_asgn (memenv : EcMemory.memenv) env lv e (bds, assoc, pre) =
+  let sp_asgn ?mc (memenv : EcMemory.memenv) env lv e (bds, assoc, pre) =
+    let m = fst memenv in
     let subst_in_assoc lv new_id_exp new_ids ((ass : assignables), f) =
       let replace_assignable var =
         match var with
@@ -72,7 +73,7 @@ module LowInternal = struct
         | _ -> var
 
       in let ass = List.map replace_assignable ass in
-         let f   = subst_form_lv env (EcMemory.memory memenv) lv new_id_exp f in
+         let f   = (subst_form_lv ?mc env lv {m;inv=new_id_exp} {m;inv=f}).inv in
          (ass, f)
     in
 
@@ -104,15 +105,15 @@ module LowInternal = struct
     in
 
     let for_lvars vs =
-        let mem = EcMemory.memory memenv in
-        let fresh pv = EcIdent.create (EcIdent.name (id_of_pv pv mem)) in
+        let m = EcMemory.memory memenv in
+        let fresh pv = EcIdent.create (EcIdent.name (id_of_pv ?mc pv m)) in
 
         let newids  = List.map (fst_map fresh) vs in
         let bds     = newids @ bds in
         let astuple = f_tuple (List.map (curry f_local) newids) in
-        let pre     = subst_form_lv env mem lv astuple pre in
-        let e_form  = EcFol.form_of_expr mem e in
-        let e_form  = subst_form_lv env mem lv astuple e_form in
+        let pre     = (subst_form_lv ?mc env lv {m;inv=astuple} {m;inv=pre}).inv in
+        let e_form  = EcFol.ss_inv_of_expr m e in
+        let e_form  = (subst_form_lv ?mc env lv {m;inv=astuple} e_form).inv in
 
         let assoc =
              (List.map (fun x -> APVar x) vs, e_form)
@@ -130,7 +131,7 @@ module LowInternal = struct
   (* ------------------------------------------------------------------ *)
   let build_sp (memenv : EcMemory.memenv) bds assoc pre =
     let f_assoc = function
-      | APVar  (pv, pv_ty) -> f_pvar pv pv_ty (EcMemory.memory memenv)
+      | APVar  (pv, pv_ty) -> (f_pvar pv pv_ty (EcMemory.memory memenv)).inv
       | ALocal (lv, lv_ty) -> f_local lv lv_ty
     in
 
@@ -164,7 +165,7 @@ module LowInternal = struct
     EcFol.f_exists_simpl (List.map (snd_map (fun t -> GTty t)) bds) pre
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_stmt (memenv : EcMemory.memenv) env (bds, assoc, pre) stmt =
+  let rec sp_stmt ?mc (memenv : EcMemory.memenv) env (bds, assoc, pre) stmt =
     match stmt with
     | [] ->
         ([], (bds, assoc, pre))
@@ -172,28 +173,28 @@ module LowInternal = struct
     | i :: is ->
         try
           let bds, assoc, pre =
-            sp_instr memenv env (bds, assoc, pre) i in
-          sp_stmt memenv env (bds, assoc, pre) is
+            sp_instr ?mc memenv env (bds, assoc, pre) i in
+          sp_stmt ?mc memenv env (bds, assoc, pre) is
         with No_sp ->
           (stmt, (bds, assoc, pre))
 
-  and sp_instr (memenv : EcMemory.memenv) env (bds,assoc,pre) instr =
+  and sp_instr ?mc (memenv : EcMemory.memenv) env (bds,assoc,pre) instr =
     match instr.i_node with
     | Sasgn (lv, e) ->
-      let bds, assoc, pre = sp_asgn memenv env lv e (bds, assoc, pre) in
+      let bds, assoc, pre = sp_asgn ?mc memenv env lv e (bds, assoc, pre) in
 
       bds, assoc, pre
 
     | Sif (e, s1, s2) ->
-      let e_form = EcFol.form_of_expr (EcMemory.memory memenv) e in
+      let e_form = (EcFol.ss_inv_of_expr (EcMemory.memory memenv) e).inv in
       let pre_t  =
         build_sp memenv bds assoc (f_and_simpl e_form pre) in
       let pre_f  =
         build_sp memenv bds assoc (f_and_simpl (f_not e_form) pre) in
       let stmt_t, (bds_t, assoc_t, pre_t) =
-        sp_stmt memenv env (bds, assoc, pre_t) s1.s_node in
+        sp_stmt ?mc memenv env (bds, assoc, pre_t) s1.s_node in
       let stmt_f, (bds_f, assoc_f, pre_f) =
-        sp_stmt memenv env (bds, assoc, pre_f) s2.s_node in
+        sp_stmt ?mc memenv env (bds, assoc, pre_f) s2.s_node in
       if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
@@ -201,9 +202,9 @@ module LowInternal = struct
 
     | _ -> raise No_sp
 
-  let sp_stmt (memenv : EcMemory.memenv) env stmt f =
+  let sp_stmt ?mc (memenv : EcMemory.memenv) env stmt f =
     let stmt, (bds, assoc, pre) =
-      sp_stmt memenv env ([], [], f) stmt in
+      sp_stmt ?mc memenv env ([], [], f) stmt in
     let pre = build_sp memenv bds assoc pre in
     stmt, pre
 end
@@ -242,19 +243,21 @@ let t_sp_side pos tc =
   | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true env pos hs.hs_s in
-      let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 hs.hs_pr in
+      let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 (hs_pr hs).inv in
       check_sp_progress pos stmt1;
-      let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
+      let m = fst hs.hs_m in
+      let subgoal = f_hoareS (snd hs.hs_m) {m;inv=hs_pr} (stmt (stmt1@stmt2)) (hs_po hs) in
       FApi.xmutate1 tc `Sp [subgoal]
 
 
     | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true env pos bhs.bhs_s in
-      check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
-      let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 bhs.bhs_pr in
+      check_form_indep stmt1 bhs.bhs_m (bhs_bd bhs).inv;
+      let stmt1, bhs_pr = LI.sp_stmt bhs.bhs_m env stmt1 (bhs_pr bhs).inv in
       check_sp_progress pos stmt1;
-      let subgoal = f_bdHoareS_r {bhs with bhs_s = stmt (stmt1@stmt2); bhs_pr; } in
+      let m = fst bhs.bhs_m in
+      let subgoal = f_bdHoareS (snd bhs.bhs_m) {m;inv=bhs_pr} (stmt (stmt1@stmt2)) (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
       FApi.xmutate1 tc `Sp [subgoal]
 
   | FequivS es, (None | Some (Double _))  ->
@@ -265,18 +268,17 @@ let t_sp_side pos tc =
       let stmtL1, stmtL2 = o_split ~rev:true env posL es.es_sl in
       let stmtR1, stmtR2 = o_split ~rev:true env posR es.es_sr in
 
-      let         es_pr = es.es_pr in
-      let stmtL1, es_pr = LI.sp_stmt es.es_ml env stmtL1 es_pr in
-      let stmtR1, es_pr = LI.sp_stmt es.es_mr env stmtR1 es_pr in
+      let         es_pr = (es_pr es) in
+      let ml, mr = fst es.es_ml, fst es.es_mr in
+      let stmtL1, es_pr = LI.sp_stmt ~mc:(ml, mr) es.es_ml env stmtL1 es_pr.inv in
+      let stmtR1, es_pr = LI.sp_stmt ~mc:(ml, mr) es.es_mr env stmtR1 es_pr in
+
+      let ml, mr = fst es.es_ml, fst es.es_mr in
 
       check_sp_progress ~side:`Left  pos stmtL1;
       check_sp_progress ~side:`Right pos stmtR1;
 
-      let subgoal = f_equivS_r { es with
-        es_sl = stmt (stmtL1@stmtL2);
-        es_sr = stmt (stmtR1@stmtR2);
-        es_pr =es_pr;
-      } in
+      let subgoal = f_equivS (snd es.es_ml) (snd es.es_mr) {ml;mr;inv=es_pr} (stmt (stmtL1@stmtL2)) (stmt (stmtR1@stmtR2)) (es_po es) in
 
       FApi.xmutate1 tc `Sp [subgoal]
 

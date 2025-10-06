@@ -264,6 +264,14 @@ lemma onth_nth (z : 'a) xs n:
   0 <= n < size xs => onth xs n = Some (nth z xs n).
 proof. by elim: xs n => //= /#. qed.
 
+lemma nth0 ['a] (x : 'a) :
+  nth witness [x] 0 = x.
+proof. by done. qed.
+
+lemma nth1 ['a] (x0 : 'a) (x : 'a) (i : int) :
+  nth x0 [x] i = if i = 0 then x else x0.
+proof. by done. qed.
+
 lemma nth0_head (z : 'a) xs: nth z xs 0 = head z xs.
 proof. by case: xs. qed.
 
@@ -1000,6 +1008,10 @@ move=> n_ge0 i_ge0; case: (n < size s) => [lt_n_s|le_s_n].
 - by rewrite !(nth_out, drop_oversize) //#.
 qed.
 
+lemma head_drop ['a] (x0 : 'a) (n : int) (l : 'a list) :
+  0 <= n => nth x0 l n = head x0 (drop n l).
+proof. by move=> ge0_n; rewrite -nth0_head nth_drop. qed.
+
 lemma nth_take (x0 : 'a) n s i:
   0 <= n => i < n => nth x0 (take n s) i = nth x0 s i.
 proof.
@@ -1633,7 +1645,15 @@ qed.
 
 lemma index_uniq z0 i (s : 'a list):
   0 <= i < size s => uniq s => index (nth z0 s i) s = i.
-proof. by elim: s i=> //=; smt(mem_nth). qed.
+proof.
+elim: s i=> //= [/#|x s ih i [] ge0_i].
+rewrite addzC=> /ltzS /lez_eqVlt le_i_sizeS.
+move=> [] x_notin_s uniq_s.
+case: (i = 0)=> /> i_neq_0.
+rewrite index_cons; case: (nth z0 s (i - 1) = x)=> [/>|_].
++ by move: x_notin_s; apply: contraLR=> _ /=; apply: mem_nth=> /#.
+by rewrite ih // /#.
+qed.
 
 lemma nth_uniq (s : 'a list) :
   (forall (i j : int), 0 <= i < size s => 0 <= j < size s => i <> j =>
@@ -1699,7 +1719,9 @@ qed.
 lemma uniq_le_perm_eq (s1 s2 : 'a list) :
   uniq s1 => mem s1 <= mem s2 => size s2 <= size s1 => perm_eq s1 s2.
 proof.
-  elim: s1 s2 => [| x l ih s2 /= [ninl uql] lemem le1sz]; 1: smt(size_ge0).
+  elim: s1 s2 => [| x l ih s2 /= [ninl uql] lemem le1sz].
+  + move=> s _ _ /= le0_size_s.
+    have -> //: s = [] by smt(size_ge0).
   move: (ih (rem x s2) uql _ _); 1,2: smt(mem_rem_neq size_rem).
   rewrite -(perm_cons x) => pxc; rewrite (perm_eq_trans _ _ _ pxc).
   by rewrite perm_eq_sym perm_to_rem /#.
@@ -1803,6 +1825,10 @@ qed.
 op map (f : 'a -> 'b) xs =
   with xs = []      => []
   with xs = y :: ys => (f y) :: (map f ys).
+
+lemma map1 ['a 'b] (f: 'a -> 'b) (x : 'a) :
+  map f [x] = [f x].
+proof. by done. qed.
 
 lemma eq_map (f1 f2 : 'a -> 'b):
      (forall x, f1 x = f2 x)
@@ -2111,7 +2137,14 @@ proof. exact: nth_mapi_rec. qed.
 lemma mapi_recP x0 (f : int -> 'a -> 'b) (s : 'a list) y m :
     y \in mapi_rec f s m <=>
     exists n, (0 <= n && n < size s) /\ y = f (n+m) (nth x0 s n).
-proof. elim: s m; smt(size_ge0). qed.
+proof.
+elim: s m; 1:smt(size_ge0).
+move=> x xs ih m /=; case: (y = f m x)=> [/>|/= y_neq_fmx].
++ by exists 0; smt(size_ge0).
+rewrite ih; split.
++ by move=> [] n hn; exists (n + 1)=> /#.
++ by move=> [] n hn; exists (n - 1)=> /#.
+qed.
 
 lemma mapiP x0 (f : int -> 'a -> 'b) (s : 'a list) y :
     y \in mapi f s <=>
@@ -3206,6 +3239,14 @@ apply/subseqP; exists (m1 ++ m2); rewrite !size_cat.
 by rewrite !mask_cat // sz_m1 sz_m2.
 qed.
 
+lemma subseq_catR ['a] (s s1 s2 : 'a list) :
+  subseq s s1 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cats0 &(cat_subseq) // sub0seq. qed.
+
+lemma subseq_catL ['a] (s s1 s2 : 'a list) :
+  subseq s s2 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cat0s &(cat_subseq) // sub0seq. qed.
+
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
 
@@ -3225,8 +3266,42 @@ qed.
 lemma subseq_cons (s : 'a list) x : subseq s (x :: s).
 proof. by apply/(@cat_subseq [] s [x] s)=> //; apply/subseq_refl. qed.
 
+lemma subseq_consI ['a] (x : 'a) (s1 s2 : 'a list) :
+  subseq (x :: s1) s2 => subseq s1 s2.
+proof.
+case/subseqP=> m [eqsz h]; apply/subseqP.
+elim: m s2 eqsz h => [|b m ih] [|x2 s2] //=.
+move/addzI => eqsz; case: b => /= _.
+- by case=> <<- ->; exists (false :: m) => /#.
+by case/(ih _ eqsz) => m' [*]; exists (false :: m') => /= /#.
+qed.
+
 lemma subseq_rcons (s : 'a list) x : subseq s (rcons s x).
 proof. by rewrite -{1}(@cats0 s) -cats1 cat_subseq // subseq_refl. qed.
+
+lemma subseq_take ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (take i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catR) &(subseq_refl).
+qed.
+
+lemma subseq_drop ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catL) &(subseq_refl).
+qed.
+
+lemma subseq_drop_congr ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) (drop i s2).
+proof.
+elim/natind: i s1 s2 => [i le0_i|i ge0_i ih].
+- by move=> *; rewrite !drop_le0.
+case=> [|x1 s1]; [by move=> *; apply: sub0seq | case=> //= x2 s2 h].
+rewrite !(ifF (_ <= 0)) ~-1:/#; apply: ih => //.
+by move: h; case: (x2 = x1) => //= ? /subseq_consI.
+qed.
 
 lemma rem_subseq x (s : 'a list) : subseq (rem x s) s.
 proof.
@@ -3280,6 +3355,12 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 
 abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
   map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
+
+lemma zip0l ['a 'b] (s : 'b list): zip<:'a, 'b> [] s = [].
+proof. by case: s. qed.
+
+lemma zip0r ['a 'b] (s : 'a list): zip<:'a, 'b> s [] = [].
+proof. by case: s. qed.
 
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
@@ -3416,6 +3497,28 @@ lemma onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
 proof.
 elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
 by case: (n = 0) => // _; apply/ih.
+qed.
+
+lemma take_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  take k (zip s1 s2) = zip (take k s1) (take k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !take_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
+qed.
+
+lemma drop_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  drop k (zip s1 s2) = zip (drop k s1) (drop k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !drop_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
 qed.
 
 lemma eq_keys_amap ['a, 'b1, 'b2, 'c]
@@ -3747,6 +3850,17 @@ rewrite -(perm_cat2l [x]) perm_eq_sym perm_catCl perm_catAC -catA /=.
 by rewrite -eqss (@perm_eq_trans s) // perm_sort.
 qed.
 
+lemma sorted_range m n : sorted (<) (range m n).
+proof.
+case: (n <= m); first by move=> ?; rewrite range_geq.
+move/ltzNge => lt_mn; rewrite range_ltn //=.
+suff: forall m, 0 <= m => forall b n, b < n => path (<) b (range n (n + m)).
+- by move=> /(_ (n - (m + 1)) _ m (m+1) _) /#.
+move=> {m n lt_mn}; elim=> /= [|m ge0_m ih] b n ?.
+- by rewrite range_geq.
+by rewrite addrA range_ltn 1:/# /= addrAC; split=> //#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                    retrieving a maximal element                      *)
 (* -------------------------------------------------------------------- *)
@@ -3800,13 +3914,23 @@ end section ListMax.
 lemma maxr_seq (f : 'a -> real) (s : 'a list) x0 :
   x0 \in s => exists x, x \in s /\ forall y, y \in s => f y <= f x.
 proof.
-by case: s => // x s _; elim: s x => {x0} [|y s IHs] x; smt().
+case: s => // x s _; elim: s x => {x0} [|y s IHs] x.
++ by exists x.
+case: (forall z, z = y \/ z \in s => f z <= f x).
++ by move=> z_is_min; exists x=> /#.
+move: (IHs y)=> - [] x1 /= hx1 x_not_max.
+by exists x1=> /#.
 qed.
 
 lemma maxz_seq (f : 'a -> int) (s : 'a list) x0 :
   x0 \in s => exists x, x \in s /\ forall y, y \in s => f y <= f x.
 proof.
-by case: s => // x s _; elim: s x => {x0} [|y s IHs] x; smt().
+case: s => // x s _; elim: s x => {x0} [|y s IHs] x.
++ by exists x.
+case: (forall z, z = y \/ z \in s => f z <= f x).
++ by move=> z_is_min; exists x=> /#.
+move: (IHs y)=> - [] x1 /= hx1 x_not_max.
+by exists x1=> /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

@@ -27,10 +27,10 @@ let t_change
     let data, e' = expr e (hyps, m) in
     let mid = EcMemory.memory m in
 
-    let f  = form_of_expr mid e in
-    let f' = form_of_expr mid e' in
+    let f  = ss_inv_of_expr mid e in
+    let f' = ss_inv_of_expr mid e' in
 
-    (data, [f_forall_mems [m] (f_eq f f')]), [mk e']
+    (data, [EcSubst.f_forall_mems_ss_inv m (map_ss_inv2 f_eq f f')]), [mk e']
   in
 
   let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
@@ -57,7 +57,7 @@ let process_change
   let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
 
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let hyps = LDecl.push_active m hyps in
+    let hyps = LDecl.push_active_ss m hyps in
     let e =
       EcProofTyping.pf_process_exp
         !!tc hyps `InProc (Some e.e_ty) form
@@ -80,26 +80,27 @@ let process_rewrite_rw
   let pts = EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
 
   let change (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let e = form_of_expr (fst m) e in
+    let e = ss_inv_of_expr (fst m) e in
 
     let try1 (pt, mode, (f1, f2)) =
       try
         let subf, occmode =
           EcProofTerm.pf_find_occurence_lazy
-            pt.EcProofTerm.ptev_env ~ptn:f1 e
+            pt.EcProofTerm.ptev_env ~ptn:f1 e.inv
         in
+        let subf = { m=e.m; inv=subf } in
 
         assert (EcProofTerm.can_concretize pt.ptev_env);
 
         let f2 = EcProofTerm.concretize_form pt.ptev_env f2 in
         let pt, _ = EcProofTerm.concretize pt in
 
-        let cpos =
+        let cpos = 
           EcMatching.FPosition.select_form
             ~xconv:`AlphaEq ~keyed:occmode.k_keyed
-            hyps None subf e in
+            hyps None subf.inv e.inv in
 
-        let e = EcMatching.FPosition.map cpos (fun _ -> f2) e in
+        let e = map_ss_inv1 (EcMatching.FPosition.map cpos (fun _ -> f2)) e in
 
         Some ((pt, mode, cpos), e)
 
@@ -113,7 +114,7 @@ let process_rewrite_rw
         (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
         (List.find_map try1 pts) in
 
-    (m, data), expr_of_form (fst m) e
+    (m, data), expr_of_ss_inv e
   in
 
   let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
@@ -139,9 +140,9 @@ let process_rewrite_simpl
 let ri = EcReduction.nodelta in
 
 let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
-    let f = form_of_expr (fst me) e in
-    let f = EcCallbyValue.norm_cbv ri hyps f in
-    let e = expr_of_form (fst me) f in
+    let f = ss_inv_of_expr (fst me) e in
+    let f = map_ss_inv1 (EcCallbyValue.norm_cbv ri hyps) f in
+    let e = expr_of_ss_inv f in
     (fst me, f), e
   in
 
@@ -151,7 +152,7 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
   FApi.t_first (
     FApi.t_seqs [
       EcLowGoal.t_intro_s (`Ident m);
-      EcLowGoal.t_change ~ri (f_eq f f);
+      EcLowGoal.t_change ~ri (map_ss_inv2 f_eq f f).inv;
       EcLowGoal.t_reflex
     ]
   ) tc

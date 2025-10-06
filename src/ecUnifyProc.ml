@@ -27,8 +27,8 @@ type u_value =
 type umap = u_value Msym.t
 
 (*---------------------------------------------------------------------------------------*)
-let rec unify_exprs umap e1 e2 =
-  if not (EcTypes.ty_equal e1.e_ty e2.e_ty) then
+let rec unify_exprs env umap e1 e2 =
+  if not (EcReduction.EqTest.for_type env e1.e_ty e2.e_ty) then
     raise (UnificationError (UE_TypeMismatch (e1, e2)));
 
   match e1.e_node, e2.e_node with
@@ -59,30 +59,30 @@ let rec unify_exprs umap e1 e2 =
   | Eop (p1, _), Eop (p2, _)
     when EcPath.p_equal p1 p2 -> umap
   | Eapp (f1, a1), Eapp (f2, a2) ->
-    let umap = unify_exprs umap f1 f2 in
+    let umap = unify_exprs env umap f1 f2 in
     if List.length a1 <> List.length a2 then
       raise (UnificationError (UE_ExprNotInLockstep (e1, e2)));
-    List.fold_left2 (fun umap e1 e2 -> unify_exprs umap e1 e2) umap a1 a2
+    List.fold_left2 (fun umap e1 e2 -> unify_exprs env umap e1 e2) umap a1 a2
   | Equant (q1, b1, e1), Equant (q2, b2, e2) when q1 = q2 ->
     if List.length b1 <> List.length b2 then
       raise (UnificationError (UE_ExprNotInLockstep (e1, e2)));
-    unify_exprs umap e1 e2
+    unify_exprs env umap e1 e2
   | Elet (_, e1, u1), Elet (_, e2, u2) ->
-    let umap = unify_exprs umap e1 e2 in
-    unify_exprs umap u1 u2
+    let umap = unify_exprs env umap e1 e2 in
+    unify_exprs env umap u1 u2
   | Etuple t1, Etuple t2 ->
-    List.fold_left (fun umap (e1, e2) -> unify_exprs umap e1 e2) umap (List.combine t1 t2)
+    List.fold_left (fun umap (e1, e2) -> unify_exprs env umap e1 e2) umap (List.combine t1 t2)
   | Eif (c1, t1, f1), Eif (c2, t2, f2) ->
-    let umap = unify_exprs umap c1 c2 in
-    let umap = unify_exprs umap t1 t2 in
-    unify_exprs umap f1 f2
+    let umap = unify_exprs env umap c1 c2 in
+    let umap = unify_exprs env umap t1 t2 in
+    unify_exprs env umap f1 f2
   | Ematch (c1, p1, _), Ematch (c2, p2, _) ->
-    let umap = unify_exprs umap c1 c2 in
+    let umap = unify_exprs env umap c1 c2 in
     if List.length p1 <> List.length p2 then
       raise (UnificationError (UE_ExprNotInLockstep (e1, e2)));
-    List.fold_left2 (fun umap e1 e2 -> unify_exprs umap e1 e2) umap p1 p2
+    List.fold_left2 (fun umap e1 e2 -> unify_exprs env umap e1 e2) umap p1 p2
   | Eproj (e1, x1), Eproj (e2, x2) when x1 = x2 ->
-    unify_exprs umap e1 e2
+    unify_exprs env umap e1 e2
   | _ -> raise (UnificationError (UE_ExprNotInLockstep (e1, e2)))
 
 (*---------------------------------------------------------------------------------------*)
@@ -120,12 +120,12 @@ let unify_lv umap lv1 lv2 =
   | _, _ -> raise (UnificationError (UE_LvNotInLockstep (lv1, lv2)))
 
 (*---------------------------------------------------------------------------------------*)
-let rec unify_instrs umap i1 i2 =
+let rec unify_instrs env umap i1 i2 =
  match i1.i_node, i2.i_node with
   | Sasgn(lv1, e1), Sasgn(lv2, e2)
   | Srnd(lv1, e1), Srnd(lv2, e2) ->
     let umap = unify_lv umap lv1 lv2 in
-    unify_exprs umap e1 e2
+    unify_exprs env umap e1 e2
 
   | Scall(olv1, xp1, args1), Scall(olv2, xp2, args2) when EcPath.x_equal xp1 xp2 ->
     let umap =
@@ -151,37 +151,37 @@ let rec unify_instrs umap i1 i2 =
       | _, _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)))
     in
 
-    List.fold_left (fun umap (e1, e2) -> unify_exprs umap e1 e2) umap (List.combine args1 args2)
+    List.fold_left (fun umap (e1, e2) -> unify_exprs env umap e1 e2) umap (List.combine args1 args2)
 
   | Sif(e1, st1, sf1), Sif(e2, st2, sf2) ->
-    let umap = unify_exprs umap e1 e2 in
-    let umap = unify_stmts umap st1 st2 in
-    unify_stmts umap sf1 sf2
+    let umap = unify_exprs env umap e1 e2 in
+    let umap = unify_stmts env umap st1 st2 in
+    unify_stmts env umap sf1 sf2
 
   | Swhile(e1, s1), Swhile(e2, s2) ->
-    let umap = unify_exprs umap e1 e2 in
-    unify_stmts umap s1 s2
+    let umap = unify_exprs env umap e1 e2 in
+    unify_stmts env umap s1 s2
 
   | Smatch(e1, bs1), Smatch(e2, bs2) ->
-    let umap = unify_exprs umap e1 e2 in
+    let umap = unify_exprs env umap e1 e2 in
     List.fold_left2 (fun umap (p1, b1) (p2, b2) ->
       if List.length p1 <> List.length p2 then
         raise (UnificationError (UE_InstrNotInLockstep (i1, i2)));
-      unify_stmts umap b1 b2
+      unify_stmts env umap b1 b2
     ) umap bs1 bs2
 
   | Sassert e1, Sassert e2 ->
-    unify_exprs umap e1 e2
+    unify_exprs env umap e1 e2
 
   | Sabstract x1, Sabstract x2 when EcIdent.id_equal x1 x2 -> umap
 
   | _ -> raise (UnificationError (UE_InstrNotInLockstep (i1, i2)));
 
-and unify_stmts (umap : umap) s1 s2 =
+and unify_stmts env (umap : umap) s1 s2 =
   let s1n, s2n = s1.s_node, s2.s_node in
   if List.length s1n <> List.length s2n then
     raise (UnificationError (UE_DifferentProgramLengths (s1, s2)));
-  List.fold_left2 (fun umap i1 i2 -> unify_instrs umap i1 i2) umap s1n s2n
+  List.fold_left2 (fun umap i1 i2 -> unify_instrs env umap i1 i2) umap s1n s2n
 
 (*---------------------------------------------------------------------------------------*)
 let unify_func env mode fname s =
@@ -209,14 +209,14 @@ let unify_func env mode fname s =
 
   match mode, fdef.f_ret with
   | `Exact, None ->
-    let umap = unify_stmts umap fdef.f_body s in
+    let umap = unify_stmts env umap fdef.f_body s in
     s_call (None, fname, close_args umap args)
   | `Exact, Some re -> begin
     match EcLowPhlGoal.s_last destr_asgn s with
     | None -> raise (UnificationError UE_InvalidRetInstr)
     | Some ((lv, e), s) ->
-      let umap = unify_stmts umap fdef.f_body s in
-      let umap = unify_exprs umap re e in
+      let umap = unify_stmts env umap fdef.f_body s in
+      let umap = unify_exprs env umap re e in
       let args = close_args umap args in
       s_call (Some lv, fname, args)
     end
@@ -225,7 +225,7 @@ let unify_func env mode fname s =
   | `Alias, Some e ->
     if not (is_tuple_var e || is_var e) then
       raise (UnificationError UE_AliasNotPv);
-    let umap = unify_stmts umap fdef.f_body s in
+    let umap = unify_stmts env umap fdef.f_body s in
     let args = close_args umap args in
     let alias =
       let pvs = lv_to_ty_list (lv_of_expr e) in

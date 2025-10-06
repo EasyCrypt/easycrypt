@@ -15,16 +15,16 @@ include EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
 let f_bind_mod s x mp env =
-  Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
+  Fsubst.f_bind_mod s x mp (fun mem -> (EcEnv.NormMp.norm_glob env mem mp).inv)
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   let f_pvlocs ty vs m =
     let arg = f_pvarg ty m in
-    if List.length vs = 1 then [arg]
+    if List.length vs = 1 then [arg.inv]
     else
       let t = Array.of_list vs in
-      let t = Array.mapi (fun i vd -> f_proj arg i vd.ov_type) t in
+      let t = Array.mapi (fun i vd -> f_proj arg.inv i vd.ov_type) t in
       Array.to_list t
   in
 
@@ -33,13 +33,25 @@ let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
              (f_tuple (f_pvlocs ty2 vs2 m2))
 
-let f_eqres ty1 m1 ty2 m2 =
-  f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
+let ts_inv_eqparams ty1 vs1 ml ty2 vs2 mr =
+  let inv = f_eqparams ty1 vs1 ml ty2 vs2 mr in
+  {inv; ml; mr}
+
+let f_eqres ty1 m1 ty2 m2 = (* TODO: deprecate in favor of `ts_inv_eqres` *)
+  f_eq (f_pvar pv_res ty1 m1).inv (f_pvar pv_res ty2 m2).inv
+
+let ts_inv_eqres ty1 ml ty2 mr =
+  let inv = f_eqres ty1 ml ty2 mr in
+  {inv; ml; mr}
 
 let f_eqglob mp1 m1 mp2 m2 =
   let mp1 = EcPath.mget_ident mp1 in
   let mp2 = EcPath.mget_ident mp2 in
-  f_eq (f_glob mp1 m1) (f_glob mp2 m2)
+  f_eq (f_glob mp1 m1).inv (f_glob mp2 m2).inv
+
+let ts_inv_eqglob mp1 ml mp2 mr =
+  let inv = f_eqglob mp1 ml mp2 mr in
+  {inv; ml; mr}
 
 (* -------------------------------------------------------------------- *)
 let f_op_real_of_int = (* CORELIB *)
@@ -216,7 +228,9 @@ let f_dlet tya tyb d f =
   f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
-let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
+let f_losslessF f = 
+  let m = EcIdent.create "&hr" in
+  f_bdHoareF {m;inv=f_true} f {m;inv=f_true} FHeq {m;inv=f_r1}
 
 (* -------------------------------------------------------------------- *)
 let f_identity ?(name = "x") ty =
@@ -319,7 +333,6 @@ let f_int_add_simpl =
 
     | _, _ ->
         let simpls = [
-           (fun () -> try_add_opp f1 f2);
            (fun () -> try_add_opp f2 f1);
            (fun () -> i1 |> obind (try_addc^~ f2));
            (fun () -> i2 |> obind (try_addc^~ f1));
@@ -467,7 +480,6 @@ let f_real_add_simpl =
     | _, _ ->
         let simpls = [
            (fun () -> try_norm_rintdiv f1 f2);
-           (fun () -> try_add_opp f1 f2);
            (fun () -> try_add_opp f2 f1);
            (fun () -> r1 |> obind (try_addc^~ f2));
            (fun () -> r2 |> obind (try_addc^~ f1));
@@ -1060,20 +1072,19 @@ let rec one_sided mem fp =
   | _ -> false
 
 let rec split_sided mem fp =
-  if one_sided mem fp then
-    Some fp
+  if one_sided mem fp.inv then
+    Some {m=mem;inv=fp.inv}
   else
-    if is_and fp then
-      let (l, r) = destr_and fp in
+    if is_and fp.inv then
+      let (l, r) = map_ts_inv_destr2 destr_and fp in
       let fl = split_sided mem l in
       let fr = split_sided mem r in
-      if is_none fr then
-        fl
-      else
-        (match fl with
-        | Some f -> Some (f_and f (oget fr))
-        | None -> fr
-        )
+      match fl, fr with
+      | None, None -> None
+      | Some f, None -> Some f
+      | None, Some f -> Some f
+      | Some fl, Some fr ->
+        Some (map_ss_inv2 f_and fl fr)
     else
       None
 
@@ -1114,22 +1125,22 @@ let rec dump_f f =
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
   | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x
-  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
+  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e.inv ^ "]"
   | FhoareF _ -> "HoareF"
   | FhoareS _ -> "HoareS"
   | FbdHoareF _ -> "bdHoareF"
-  | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
+  | FbdHoareS ({bhs_m = (m, _)} as hs) ->
      "bdHoareS [ ME = " ^ EcIdent.tostring m
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
-     ^ "; BD = " ^ dump_f bd ^ "]"
+     ^ "; PR = " ^ dump_f (bhs_pr hs).inv
+     ^ "; PO = " ^ dump_f (bhs_po hs).inv
+     ^ "; BD = " ^ dump_f (bhs_bd hs).inv ^ "]"
   | FeHoareS _ -> "eHoareS"
   | FeHoareF _ -> "eHoareF"
   | FequivF _ -> "equivF"
-  | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
+  | FequivS ({es_ml = (ml, _); es_mr = (mr, _)} as es) ->
      "equivS [ ML = " ^ EcIdent.tostring ml
      ^ "; MR = " ^ EcIdent.tostring mr
-     ^ "; PR = " ^ dump_f pr
-     ^ "; PO = " ^ dump_f po
+     ^ "; PR = " ^ dump_f (es_pr es).inv
+     ^ "; PO = " ^ dump_f (es_po es).inv
      ^ "]"
   | FeagerF _ -> "eagerF"

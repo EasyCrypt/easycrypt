@@ -165,3 +165,7 @@ qed.
 
 lemma size_map (f : 'a -> 'b) arr: size (map f arr) = size arr.
 proof. by rewrite size_mkarray size_map sizeE. qed.
+
+lemma map_comp (f1: 'b -> 'c) (f2: 'a -> 'b) arr :
+    map (f1 \o f2) arr = map f1 (map f2 arr).
+proof. by rewrite /map map_comp ofarrayK. qed.

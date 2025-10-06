@@ -64,16 +64,20 @@ type meerror =
 exception MEError of meerror
 
 module Memory : sig
-  val all         : env -> memenv list
-  val set_active  : memory -> env -> env
-  val get_active  : env -> memory option
+  val all           : env -> memenv list
+  val set_active_ss : memory -> env -> env
+  val get_active_ss : env -> memory option
+  val set_active_ts : memory -> memory -> env -> env
+  val get_active_ts : env -> (memory * memory) option
 
-  val byid        : memory -> env -> memenv option
-  val lookup      : symbol -> env -> memenv option
-  val current     : env -> memenv option
-  val push        : memenv -> env -> env
-  val push_all    : memenv list -> env -> env
-  val push_active : memenv -> env -> env
+  val byid          : memory -> env -> memenv option
+  val lookup        : symbol -> env -> memenv option
+  val current_ss    : env -> memenv option
+  val current_ts    : env -> (memenv * memenv) option
+  val push          : memenv -> env -> env
+  val push_all      : memenv list -> env -> env
+  val push_active_ss: memenv -> env -> env
+  val push_active_ts: memenv -> memenv -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -93,29 +97,27 @@ module Fun : sig
   val add   : xpath -> env -> env
 
   (* ------------------------------------------------------------------ *)
-  val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
+  val prF_memenv : memory -> xpath -> env -> memenv
 
-  val prF : xpath -> env -> env
+  val prF : memory -> xpath -> env -> env
 
-  val hoareF_memenv : xpath -> env -> memenv * memenv
+  val hoareF_memenv : memory -> xpath -> env -> memenv * memenv
 
-  val hoareF : xpath -> env -> env * env
+  val hoareF : memory -> xpath -> env -> env * env
 
-  val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
+  val hoareS : memory -> xpath -> env -> memenv * (funsig * function_def) * env
 
   val actmem_body :  memory -> function_ -> (funsig * function_def) * memenv
   val actmem_post :  memory -> function_ -> memenv
 
-  val inv_memory : [`Left|`Right] -> memenv
+  val inv_memenv : memory -> memory -> env -> env
 
-  val inv_memenv : env -> env
-
-  val equivF_memenv : xpath -> xpath -> env ->
+  val equivF_memenv : memory -> memory -> xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)
 
-  val equivF : xpath -> xpath -> env -> env * env
+  val equivF : memory -> memory -> xpath -> xpath -> env -> env * env
 
-  val equivS : xpath -> xpath -> env ->
+  val equivS : memory -> memory -> xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
 end
 
@@ -161,7 +163,7 @@ module Ax : sig
   val lookup_path : qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
@@ -184,7 +186,7 @@ module Mod : sig
   val sp_lookup     : qsymbol -> env -> spt
   val sp_lookup_opt : qsymbol -> env -> spt option
 
-  val bind  : ?import:import -> symbol -> t -> env -> env
+  val bind  : ?import:bool -> symbol -> t -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
 
   val bind_local    : EcIdent.t -> mty_mr -> env -> env
@@ -215,7 +217,7 @@ module ModTy : sig
   val modtype : path -> env -> module_type
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val sig_of_mt : env -> module_type -> module_sig
 end
@@ -246,7 +248,7 @@ module NormMp : sig
 
   val flatten_use : use -> EcIdent.t list * (xpath * ty) list
 
-  val norm_glob     : env -> EcMemory.memory -> mpath -> form
+  val norm_glob     : env -> EcMemory.memory -> mpath -> ss_inv
   val norm_tglob    : env -> mpath -> EcTypes.ty
 
   val is_abstract_fun : xpath -> env -> bool
@@ -278,7 +280,7 @@ module Theory : sig
   val env_of_theory : path -> env -> env
 
   val add  : path -> env -> env
-  val bind : ?import:import -> compiled_theory -> env -> env
+  val bind : ?import:bool -> compiled_theory -> env -> env
 
  (* FIXME: section ? ctheory -> theory *)
   val require : compiled_theory -> env -> env
@@ -294,7 +296,7 @@ module Theory : sig
     -> EcTheory.thmode
     -> env -> compiled_theory option
 
-  val alias : ?import:import -> symbol -> path -> env -> env
+  val alias : ?import:bool -> symbol -> path -> env -> env
   val aliases : env -> path Mp.t
 end
 
@@ -311,7 +313,7 @@ module Op : sig
   val lookup_path : qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> operator -> env -> env
+  val bind : ?import:bool -> symbol -> operator -> env -> env
 
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
   val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
@@ -345,7 +347,7 @@ module Ty : sig
   val lookup_path : ?unique:bool -> qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val bind : ?import:bool -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
@@ -378,7 +380,7 @@ module TypeClass : sig
   type t = typeclass
 
   val add   : path -> env -> env
-  val bind  : ?import:import -> symbol -> t -> env -> env
+  val bind  : ?import:bool -> symbol -> t -> env -> env
   val graph : env -> EcTypeClass.graph
 
   val by_path     : path -> env -> t
@@ -387,7 +389,7 @@ module TypeClass : sig
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
 
-  val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
+  val add_instance  : ?import:bool -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
 end
 
@@ -399,8 +401,8 @@ module BaseRw : sig
   val lookup_path : qsymbol -> env -> path
   val is_base     : qsymbol -> env -> bool
 
-  val add   : ?import:import -> symbol -> is_local -> env -> env
-  val addto : ?import:import -> path -> path list -> is_local -> env -> env
+  val add   : ?import:bool -> symbol -> is_local -> env -> env
+  val addto : ?import:bool -> path -> path list -> is_local -> env -> env
 
   val all : env -> (path * Sp.t) list 
 end
@@ -412,7 +414,7 @@ module Reduction : sig
 
   val all : env -> (topsym * rule list) list
   val add1 : path * rule_option * rule option -> env -> env
-  val add  : ?import:import -> (path * rule_option * rule option) list -> env -> env
+  val add  : ?import:bool -> (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
 end
 
@@ -421,8 +423,8 @@ module Auto : sig
   type base0 = path * [`Rigid | `Default]
 
   val dname  : symbol
-  val add1   : ?import:import -> level:int -> ?base:symbol -> base0 -> is_local -> env -> env
-  val add    : ?import:import -> level:int -> ?base:symbol -> base0 list -> is_local -> env -> env
+  val add1   : ?import:bool -> level:int -> ?base:symbol -> base0 -> is_local -> env -> env
+  val add    : ?import:bool -> level:int -> ?base:symbol -> base0 list -> is_local -> env -> env
   val get    : ?base:symbol -> env -> base0 list
   val getall : symbol list -> env -> base0 list
   val getx   : symbol -> env -> (int * base0 list) list
@@ -502,14 +504,15 @@ module LDecl : sig
 
   val clear : ?leniant:bool -> EcIdent.Sid.t -> hyps -> hyps
 
-  val push_all    : memenv list -> hyps -> hyps
-  val push_active : memenv -> hyps -> hyps
+  val push_all       : memenv list -> hyps -> hyps
+  val push_active_ss : memenv -> hyps -> hyps
+  val push_active_ts : memenv -> memenv -> hyps -> hyps
 
-  val hoareF : xpath -> hyps -> hyps * hyps
-  val equivF : xpath -> xpath -> hyps -> hyps * hyps
+  val hoareF : memory -> xpath -> hyps -> hyps * hyps
+  val equivF : memory -> memory -> xpath -> xpath -> hyps -> hyps * hyps
 
-  val inv_memenv  : hyps -> hyps
-  val inv_memenv1 : hyps -> hyps
+  val inv_memenv  : memory -> memory -> hyps -> hyps
+  val inv_memenv1 : memory -> hyps -> hyps
 end
 
-val pp_debug_form : (env -> Format.formatter -> form -> unit) ref
+val pp_debug_form : (env -> form -> unit) ref

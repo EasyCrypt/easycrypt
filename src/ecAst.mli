@@ -201,79 +201,211 @@ and f_node =
 
   | Fpr of pr (* hr *)
 
+(* We use the alert system for privacy because we want to 
+   permit access in *some* instances, and the other fields are fine *)
+(* This is to ensure that memory bindings are carried along with the invariants *)
 and eagerF = {
+  eg_ml : memory;
+  eg_mr : memory;
   eg_pr : form;
+  [@alert priv_pl "Use the accessor function `eg_pr` instead of the field"]
   eg_sl : stmt;  (* No local program variables *)
   eg_fl : EcPath.xpath;
   eg_fr : EcPath.xpath;
   eg_sr : stmt;  (* No local program variables *)
   eg_po : form
+  [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
 }
 
 and equivF = {
+  ef_ml : memory;
+  ef_mr : memory;
   ef_pr : form;
+  [@alert priv_pl "Use the accessor function `ef_pr` instead of the field"]
   ef_fl : EcPath.xpath;
   ef_fr : EcPath.xpath;
   ef_po : form;
+  [@alert priv_pl "Use the accessor function `ef_po` instead of the field"]
 }
 
 and equivS = {
   es_ml  : memenv;
   es_mr  : memenv;
   es_pr  : form;
+  [@alert priv_pl "Use the accessor function `es_pr` instead of the field"]
   es_sl  : stmt;
   es_sr  : stmt;
-  es_po  : form; }
+  es_po  : form;
+  [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
+}
 
 and sHoareF = {
+  hf_m : memory;
   hf_pr : form;
+  [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
   hf_f  : EcPath.xpath;
   hf_po : form;
+  [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
 }
 
 and sHoareS = {
   hs_m  : memenv;
   hs_pr : form;
+  [@alert priv_pl "Use the accessor function `hs_pr` instead of the field"]
   hs_s  : stmt;
-  hs_po : form; }
+  hs_po : form;
+  [@alert priv_pl "Use the accessor function `hs_po` instead of the field"]
+}
 
 
 and eHoareF = {
+  ehf_m  : memory;
   ehf_pr  : form;
+  [@alert priv_pl "Use the accessor function `ehf_pr` instead of the field"]
   ehf_f   : EcPath.xpath;
   ehf_po  : form;
+  [@alert priv_pl "Use the accessor function `ehf_po` instead of the field"]
 }
 
 and eHoareS = {
   ehs_m   : memenv;
   ehs_pr  : form;
+  [@alert priv_pl "Use the accessor function `ehs_pr` instead of the field"]
   ehs_s   : stmt;
   ehs_po  : form;
+  [@alert priv_pl "Use the accessor function `ehs_po` instead of the field"]
 }
 
 and bdHoareF = {
+  bhf_m   : memory;
   bhf_pr  : form;
+  [@alert priv_pl "Use the accessor function `bhf_pr` instead of the field"]
   bhf_f   : EcPath.xpath;
   bhf_po  : form;
+  [@alert priv_pl "Use the accessor function `bhf_po` instead of the field"]
   bhf_cmp : hoarecmp;
   bhf_bd  : form;
+  [@alert priv_pl "Use the accessor function `bhf_bd` instead of the field"]
 }
 
 and bdHoareS = {
   bhs_m   : memenv;
   bhs_pr  : form;
+  [@alert priv_pl "Use the accessor function `bhs_pr` instead of the field"]
   bhs_s   : stmt;
   bhs_po  : form;
+  [@alert priv_pl "Use the accessor function `bhs_po` instead of the field"]
   bhs_cmp : hoarecmp;
   bhs_bd  : form;
+  [@alert priv_pl "Use the accessor function `bhs_bd` instead of the field"]
+}
+
+and ss_inv = {
+  m   : memory;
+  inv : form;
 }
 
 and pr = {
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
-  pr_event : form;
+  pr_event : ss_inv;
 }
+
+(* -------------------------------------------------------------------- *)
+
+val map_ss_inv : ?m:memory -> (form list -> form) -> ss_inv list -> ss_inv
+val map_ss_inv1 : (form -> form) -> ss_inv -> ss_inv
+val map_ss_inv2 : (form -> form -> form) -> ss_inv -> ss_inv -> ss_inv
+val map_ss_inv3 : (form -> form -> form -> form) -> ss_inv -> ss_inv -> ss_inv -> ss_inv
+
+val map_ss_inv_destr2 : (form -> form * form) -> ss_inv -> ss_inv * ss_inv
+val map_ss_inv_destr3 : (form -> form * form * form) -> ss_inv -> ss_inv * ss_inv * ss_inv
+
+type ts_inv = {
+  ml  : memory;
+  mr  : memory;
+  inv : form;
+}
+
+val map_ts_inv : ?ml:memory -> ?mr:memory -> (form list -> form) -> ts_inv list -> ts_inv
+val map_ts_inv1 : (form -> form) -> ts_inv -> ts_inv
+val map_ts_inv2 : (form -> form -> form) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val map_ts_inv_left : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
+val map_ts_inv_left1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
+val map_ts_inv_left2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+    ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val map_ts_inv_right : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
+val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
+val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
+val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+    ts_inv -> ts_inv -> ts_inv -> ts_inv
+
+val map_ts_inv_destr2 : (form -> form * form) -> ts_inv -> ts_inv * ts_inv
+val map_ts_inv_destr3 : (form -> form * form * form) -> ts_inv -> ts_inv * ts_inv * ts_inv
+
+val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
+val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv
+val ts_inv_lower_left2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
+val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+    ts_inv -> ts_inv -> ts_inv -> ss_inv
+
+val ts_inv_lower_right : (ss_inv list -> form) -> ts_inv list -> ss_inv
+val ts_inv_lower_right1 : (ss_inv -> form) -> ts_inv -> ss_inv
+val ts_inv_lower_right2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
+val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+    ts_inv -> ts_inv -> ts_inv -> ss_inv
+
+(* -------------------------------------------------------------------- *)
+
+type inv =
+  | Inv_ss of ss_inv
+  | Inv_ts of ts_inv
+
+val inv_of_inv : inv -> form
+
+val lift_ss_inv : (ss_inv -> 'a) -> inv -> 'a
+val lift_ss_inv2 : (ss_inv -> ss_inv -> 'a) -> inv -> inv -> 'a
+val lift_ss_inv3 : (ss_inv -> ss_inv -> ss_inv -> 'a) -> inv -> inv -> inv -> 'a
+val lift_ts_inv : (ts_inv -> 'a) -> inv -> 'a
+val lift_ts_inv2 : (ts_inv -> ts_inv -> 'a) -> inv -> inv -> 'a
+val lift_inv_adapter : (form -> 'a) -> inv -> 'a
+val lift_inv_adapter2 : (form -> form -> 'a) -> inv -> inv -> 'a
+
+val ss_inv_generalize_left : ss_inv -> memory -> ts_inv
+val ss_inv_generalize_right : ss_inv -> memory -> ts_inv
+
+val map_inv : (form list -> form) -> inv list -> inv
+val map_inv1 : (form -> form) -> inv -> inv
+val map_inv2 : (form -> form -> form) -> inv -> inv -> inv
+val map_inv3 : (form -> form -> form -> form) -> inv -> inv -> inv -> inv
+
+val eg_pr : eagerF -> ts_inv
+val eg_po : eagerF -> ts_inv
+val ef_pr : equivF -> ts_inv
+val ef_po : equivF -> ts_inv
+val es_pr : equivS -> ts_inv
+val es_po : equivS -> ts_inv
+val hf_pr : sHoareF -> ss_inv
+val hf_po : sHoareF -> ss_inv
+val hs_pr : sHoareS -> ss_inv
+val hs_po : sHoareS -> ss_inv
+val ehf_pr : eHoareF -> ss_inv
+val ehf_po : eHoareF -> ss_inv
+val ehs_pr : eHoareS -> ss_inv
+val ehs_po : eHoareS -> ss_inv
+val bhf_pr : bdHoareF -> ss_inv
+val bhf_po : bdHoareF -> ss_inv
+val bhf_bd : bdHoareF -> ss_inv
+val bhs_pr : bdHoareS -> ss_inv
+val bhs_po : bdHoareS -> ss_inv
+val bhs_bd : bdHoareS -> ss_inv
+
+(* -------------------------------------------------------------------- *)
 
 type 'a equality = 'a -> 'a -> bool
 type 'a hash = 'a -> int
@@ -419,14 +551,6 @@ val eg_hash   : eagerF hash
 
 val pr_equal  : pr equality
 val pr_hash   : pr hash
-
-(* ----------------------------------------------------------------- *)
-(* Predefined memories                                               *)
-(* ----------------------------------------------------------------- *)
-
-val mhr    : memory
-val mleft  : memory
-val mright : memory
 
 (* ----------------------------------------------------------------- *)
 (* Hashconsing                                                       *)

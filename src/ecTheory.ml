@@ -11,17 +11,11 @@ open EcModules
 module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
-type import = { im_immediate : bool; im_atimport : bool; }
-
-let import0  = { im_immediate =  true; im_atimport =  true; }
-let noimport = { im_immediate = false; im_atimport = false; }
-
-(* -------------------------------------------------------------------- *)
 type theory = theory_item list
 
 and theory_item = {
   ti_item   : theory_item_r;
-  ti_import : import;
+  ti_import : bool;
 }
 
 and theory_item_r =
@@ -83,7 +77,7 @@ and auto_rule = {
   locality : is_local;
 }
 
-let mkitem (import : import) (item : theory_item_r) =
+let mkitem ~(import : bool) (item : theory_item_r) =
   { ti_import = import; ti_item = item; }
 
 (* -------------------------------------------------------------------- *)

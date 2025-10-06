@@ -202,12 +202,12 @@ and pformula_r =
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
 
-  | PFhoareF   of pformula * pgamepath * pformula
-  | PFehoareF  of pformula * pgamepath * pformula
-  | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
-  | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
-  | PFprob     of pgamepath * (pformula list) * pmemory * pformula
-  | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+  | PFhoareF   of psymbol option * pformula * pgamepath * pformula
+  | PFehoareF  of psymbol option * pformula * pgamepath * pformula
+  | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
+  | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
+  | PFprob     of psymbol option * pgamepath * (pformula list) * pmemory * pformula
+  | PFBDhoareF of psymbol option * pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list

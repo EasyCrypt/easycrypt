@@ -175,6 +175,8 @@ let pair_equal tx ty (x1, y1) (x2, y2) =
 
 let swap (x, y) = (y, x)
 
+let flip f x y = f y x
+
 (* -------------------------------------------------------------------- *)
 module Option = BatOption
 

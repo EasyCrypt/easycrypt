@@ -1,0 +1,98 @@
+(* Originally sourced from *)
+(*  Unruh, Firsov, "Reflection, rewinding, and coin-toss in EasyCrypt", 
+    CPP 2022, doi: 10.1145/3497775.35036 *)
+require import Distr Real List StdBigop ModuleStructure.
+(*---*) import Bigreal.BRA.
+
+clone import ModuleStructure.Proc.
+
+section.
+
+declare module P <: Proc.
+
+local module P2 = {
+   proc sampleFrom (d : (r * (glob P)) distr)  = {
+        var r; 
+        r <$ d;
+        return r;
+    }
+}.
+
+local lemma gen_fact &m a (l : (r * (glob P)) list): uniq l 
+ => Pr[ P.p(a) @ &m : (res , (glob P)) \in l ] 
+  = big predT (fun (x : (r * (glob P))) => 
+                    Pr[P.p(a) @ &m: res=x.`1 /\ (glob P) = x.`2]) 
+              l.
+proof. 
+move: l; apply list_ind => /= [|x l p1 [x_nin uniq_l]].
+- by rewrite Pr[mu_false] big_nil.
+rewrite Pr[mu_disjoint] 1:/# big_cons {1}/predT /= (p1 uniq_l).
+congr.
+rewrite Pr[mu_eq] /#. 
+qed.
+
+lemma reflection :
+    exists (D : (glob P) -> a -> (r * glob P) distr),
+    forall &m po a, mu (D (glob P){m} a) po = Pr[P.p(a) @ &m : po (res, glob P)].
+proof.
+pose PR := fun (g : glob P) (a : a) (x : r * glob P) => 
+                choicebd (fun p => forall &m, (glob P){m} = g => 
+                            Pr[P.p(a) @ &m : res=x.`1 /\ (glob P) = x.`2 ] = p).
+pose D := (fun (g : glob P) (a : a) => mk (PR g a)).
+exists D.
+move => &m po a.
+have PRP: (PR (glob P){m}) a = fun (x : (r * (glob P))) 
+                            => Pr[P.p(a) @ &m: res = x.`1 /\ (glob P) = x.`2 ]. 
+- apply fun_ext => x. 
+  have /=chs:=choicebdP (fun p =>
+    Pr[P.p(a) @ &m : res = x.`1 /\ (glob P) = x.`2] = p).
+  rewrite chs.
+  - by exists (Pr[P.p(a) @ &m : res = x.`1 /\ (glob P) = x.`2]).
+  rewrite /PR.
+  congr.
+  apply fun_ext => p.
+  rewrite eq_iff; split => [/#|<- &n gl_eq].
+  byequiv (_: ={arg, glob P} ==> ={res, glob P})=> //; 1:sim; smt().
+have distr_PR: isdistr (PR (glob P){m} a).
+- have : (forall (s : ((r * (glob P)) list)), uniq s => 
+      big predT (PR (glob P){m} a) s <= 1%r). 
+  + rewrite PRP.
+    apply list_ind => /=[|x l q1 q2].
+    * by rewrite big_nil.
+    by rewrite -(gen_fact &m a (x :: l)) 2:Pr[mu_le1]; 1:apply q2.
+  move => fact1.
+  have: (forall (x : r * (glob P)), 0%r <= PR (glob P){m} a x). 
+  + by move => x; rewrite PRP /= Pr[mu_ge0].
+  by move => fact2; split.
+have <-: Pr[ P2.sampleFrom((D (glob P){m} a)) @ &m  : po res ] 
+                   = mu (D (glob P){m} a) po.
+- byphoare (_ : d = (D (glob P){m} a) ==> _) => //.
+  proc; rnd; auto => &hr /=.
+byequiv => //.
+conseq (_: _ ==> res{1}.`1 = res{2} /\ res{1}.`2 = (glob P){2}); 1:smt().
+bypr (res{1}) (res, glob P){2} => // &1 &2 aa [->][gl_eq ->]. 
+have <-: Pr[P.p(a) @ &m : res = aa.`1 /\ (glob P) = aa.`2] 
+       = Pr[P.p(a) @ &2 : (res , glob P) = aa].
+- byequiv (_: ={arg, glob P} ==> ={res, glob P})=> //; 1:sim; smt().
+byphoare (_ : d = (D (glob P){m} a) ==> _) => //.
+proc; rnd; skip => &hr /= -> />.
+rewrite muK //#.
+qed.
+
+lemma reflection_glob : exists (D : (glob P) -> a -> (glob P) distr),
+    forall &m po a, mu (D (glob P){m} a) po = Pr[P.p(a) @ &m : po (glob P)].
+proof.
+elim reflection => /> D DP. 
+exists (fun ga i => dmap (D ga i) (fun (x : r * (glob P)) => x.`2)) => /> &m po a.
+by rewrite -(DP &m (fun (x : r * (glob P)) => po x.`2) a) dmapE. 
+qed.
+
+lemma reflection_res : exists (D : (glob P) -> a -> r distr),
+    forall &m po a, mu (D (glob P){m} a) po = Pr[P.p(a) @ &m : po res ].
+proof.
+elim reflection => /> D DP.
+exists (fun ga i => dmap (D ga i) (fun (x : r * (glob P)) => x.`1)) => /> &m po a.
+by rewrite -(DP &m (fun (x : r * (glob P)) => po x.`1) a) dmapE.
+qed.
+
+end section.

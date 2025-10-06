@@ -22,7 +22,13 @@ proof. by exists [] s. qed.
 
 lemma sxor2_cons (s s':int list) (i j:int):
   sxor2 s s' i => sxor2 (j::s) (j::s') i.
-proof. smt (). qed.
+proof.
+move=> [].
+  move=> [] s1 s2 [] -> ->.
+  by left; exists (j :: s1) s2.
++ move=> [] s1 s2 [] -> ->.
+  by right; exists (j :: s1) s2.
+qed.
 
 (* The database *)
 op a : int -> word.
@@ -72,7 +78,7 @@ proof.
     while (j <= N /\ if j <= i then PIR.s = PIR.s' else sxor2 PIR.s PIR.s' i).
     + wp;rnd;skip => /= &m [[_]] + HjN.
       have -> /= : j{m} + 1 <= N by smt ().
-      case: (j{m} <= i{m}) => Hji;2: by smt ().
+      case: (j{m} <= i{m})=> Hji; 2:smt(sxor2_cons).
       move=> -> b _;case: (j{m} = i{m}) => [->> | /#].
       by rewrite (_ : !(i{m}+1 <= i{m})) 1:/# /=; smt (sxor_cons).
     by auto => /#.
