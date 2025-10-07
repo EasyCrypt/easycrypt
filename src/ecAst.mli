@@ -7,6 +7,8 @@ module BI = EcBigInt
 
 type memory = EcIdent.t
 
+type 'a parray = 'a CCImmutArray.t
+
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
   | PVKglob
@@ -49,6 +51,7 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
+  | Tarray  of ty
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
@@ -84,6 +87,7 @@ and expr_node =
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
+  | Earray of expr parray                  (* arrays constructor    *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
@@ -183,6 +187,7 @@ and f_node =
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
+  | Farray  of form parray
   | Fproj   of form * int
 
   | FhoareF of sHoareF (* $hr / $hr *)

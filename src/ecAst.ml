@@ -9,6 +9,8 @@ module BI = EcBigInt
 
 type memory = EcIdent.t
 
+type 'a parray = 'a CCImmutArray.t
+
 type 'a equality = 'a -> 'a -> bool
 type 'a hash = 'a -> int
 type 'a fv   = 'a -> int EcIdent.Mid.t
@@ -54,6 +56,7 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
+  | Tarray  of ty
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
@@ -89,6 +92,7 @@ and expr_node =
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
+  | Earray of expr parray                  (* array constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
@@ -188,6 +192,7 @@ and f_node =
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
+  | Farray  of form parray
   | Fproj   of form * int
 
   | FhoareF of sHoareF (* $hr / $hr *)
@@ -1091,6 +1096,9 @@ module Hsty = Why3.Hashcons.Make (struct
     | Ttuple lt1, Ttuple lt2 ->
         List.all2 ty_equal lt1 lt2
 
+    | Tarray ty1, Tarray ty2 ->
+        ty_equal ty1 ty2
+
     | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
         EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
 
@@ -1105,6 +1113,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar u        -> u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
+    | Tarray  ty       -> Why3.Hashcons.combine 1 (ty_hash ty) (* FIXME *)
     | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
     | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
 
@@ -1117,6 +1126,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
+    | Tarray  ty       -> ty.ty_fv
     | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
 
@@ -1155,6 +1165,10 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Etuple es1, Etuple es2 ->
         List.all2 e_equal es1 es2
+
+    | Earray es1, Earray es2 ->
+        (* FIXME: do not convert to list *)
+        List.all2 e_equal (CCImmutArray.to_list es1) (CCImmutArray.to_list es2)
 
     | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
         (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
@@ -1201,6 +1215,9 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Etuple es ->
         Why3.Hashcons.combine_list e_hash 0 es
 
+    | Earray e ->
+        Why3.Hashcons.combine_list e_hash 0 (CCImmutArray.to_list e) (* FIXME: to not convert to list *)
+
     | Eif (c, e1, e2) ->
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
@@ -1232,6 +1249,7 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Eapp (e, es)      -> union e_fv (e :: es)
     | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
     | Etuple es         -> union e_fv es
+    | Earray es         -> CCImmutArray.fold (fun fv e -> fv_union (e_fv e) fv) Mid.empty es
     | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
     | Ematch (e, es, _) -> union e_fv (e :: es)
     | Equant (_, b, e)  -> List.fold_left (fun s (id, _) -> Mid.remove id s) (e_fv e) b
@@ -1285,6 +1303,12 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Ftuple args1, Ftuple args2 ->
         List.all2 f_equal args1 args2
+
+    | Farray args1, Farray args2 ->
+        List.all2
+          f_equal 
+          (CCImmutArray.to_list args1)
+          (CCImmutArray.to_list args2)
 
     | Fproj(f1,i1), Fproj(f2,i2) ->
       i1 = i2 && f_equal f1 f2
@@ -1340,6 +1364,10 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
+
+    | Farray args ->
+        Why3.Hashcons.combine_list f_hash 0 (CCImmutArray.to_list args)
+
     | Fproj(f,i) ->
         Why3.Hashcons.combine (f_hash f) i
 
@@ -1373,6 +1401,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Flocal id           -> fv_singleton id
     | Fapp (f, args)      -> union f_fv (f :: args)
     | Ftuple args         -> union f_fv args
+    | Farray args         -> CCImmutArray.fold (fun fv f -> fv_union fv (f_fv f)) Mid.empty args
     | Fproj(e, _)         -> f_fv e
     | Fif (f1, f2, f3)    -> union f_fv [f1; f2; f3]
     | Fmatch (b, fs, ty)  -> fv_union ty.ty_fv (union f_fv (b :: fs))
