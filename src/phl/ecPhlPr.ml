@@ -89,7 +89,6 @@ let process_ppr info tc =
       let ef   = tc1_as_equivF tc in
       let qenvl = snd (LDecl.hoareF ef.ef_ml ef.ef_fl hyps) in
       let qenvr = snd (LDecl.hoareF ef.ef_mr ef.ef_fr hyps) in
-      (* TODO: These should be one-sided *)
       let phi1 = TTC.pf_process_form_opt !!tc qenvl None phi1 in 
       let phi2 = TTC.pf_process_form_opt !!tc qenvr None phi2 in
       if not (EcReduction.EqTest.for_type (LDecl.toenv hyps) phi1.f_ty phi2.f_ty) then
