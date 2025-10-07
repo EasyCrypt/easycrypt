@@ -62,6 +62,7 @@
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)
+    "array"       , ARRAY      ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)
@@ -407,6 +408,8 @@ rule main = parse
   | "@"   { [AT        ] }
   | "{|"  { [LPBRACE   ] }
   | "|}"  { [RPBRACE   ] }
+  | "[&"  { [LPBRACKET ] }
+  | "&]"  { [RPBRACKET ] }
   | "`|"  { [TICKPIPE  ] }
   | "`{"  { [TICKBRACE ] }
   | "<$"  { [LESAMPLE  ] }

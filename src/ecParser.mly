@@ -383,6 +383,7 @@
 %token ALIAS
 %token AMP
 %token APPLY
+%token ARRAY
 %token AS
 %token ASSERT
 %token ASSUMPTION
@@ -498,6 +499,7 @@
 %token LOSSLESS
 %token LPAREN
 %token LPBRACE
+%token LPBRACKET
 %token MATCH
 %token MINUS
 %token MODPATH
@@ -547,6 +549,7 @@
 %token RNDSEM
 %token RPAREN
 %token RPBRACE
+%token RPBRACKET
 %token RRARROW
 %token RWNORMAL
 %token SEARCH
@@ -1107,6 +1110,9 @@ sform_u(P):
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
+| LPBRACKET fs=plist0(form_r(P), SEMICOLON) RPBRACKET
+   { PFarray fs }
+
 | f=sform_r(P) DOTTICK x=qident
     { PFproj (f, x) }
 
@@ -1267,12 +1273,13 @@ pgtybindings:
 (* Type expressions                                                     *)
 
 simpl_type_exp:
-| UNDERSCORE                  { PTunivar       }
-| x=qident                    { PTnamed x      }
-| x=tident                    { PTvar x        }
-| tya=type_args x=qident      { PTapp (x, tya) }
-| GLOB m=loc(mod_qident)      { PTglob m       }
-| LPAREN ty=type_exp RPAREN   { ty             }
+| UNDERSCORE                   { PTunivar       }
+| x=qident                     { PTnamed x      }
+| x=tident                     { PTvar x        }
+| tya=type_args x=qident       { PTapp (x, tya) }
+| GLOB m=loc(mod_qident)       { PTglob m       }
+| ty=loc(simpl_type_exp) ARRAY { PTarray ty     }
+| LPAREN ty=type_exp RPAREN    { ty             }
 
 type_args:
 | ty=loc(simpl_type_exp)                          { [ty] }

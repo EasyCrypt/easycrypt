@@ -66,6 +66,7 @@ type pcodeoffset1 = [
 type pty_r =
   | PTunivar
   | PTtuple  of pty list
+  | PTarray  of pty
   | PTnamed  of pqsymbol
   | PTvar    of psymbol
   | PTapp    of pqsymbol * pty list
@@ -182,6 +183,7 @@ and pformula_r =
   | PFint     of zint
   | PFdecimal of (zint * (int * zint))
   | PFtuple   of pformula list
+  | PFarray   of pformula list
   | PFident   of pqsymbol * ptyannot option
   | PFref     of psymbol * pffilter list
   | PFmem     of psymbol
