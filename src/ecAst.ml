@@ -466,7 +466,6 @@ type inv =
   | Inv_ss of ss_inv
   | Inv_ts of ts_inv
 
-(* TODO: Get rid of this after refactor *)
 let inv_of_inv (inv: inv) : form =
   match inv with
   | Inv_ss ss -> ss.inv
@@ -500,20 +499,6 @@ let lift_ts_inv2 (f: ts_inv -> ts_inv -> 'a) : inv -> inv -> 'a =
   let f inv1 inv2 = match inv1, inv2 with
   | Inv_ts ss1, Inv_ts ss2 -> f ss1 ss2
   | _ -> failwith "expected only two sided invariants" in
-  f
-
-(* TODO: This should be removed after refactor is done *)
-let lift_inv_adapter (f: form -> 'a) : inv -> 'a =
-  let f inv = match inv with
-  | Inv_ss ss -> f ss.inv
-  | Inv_ts ts -> f ts.inv in
-  f
-
-let lift_inv_adapter2 (f: form -> form -> 'a) : inv -> inv -> 'a =
-  let f inv1 inv2 = match inv1, inv2 with
-  | Inv_ss ss1, Inv_ss ss2 -> f ss1.inv ss2.inv
-  | Inv_ts ts1, Inv_ts ts2 -> f ts1.inv ts2.inv
-  | _ -> failwith "expected compatible invariants" in
   f
 
 let ss_inv_generalize_left (inv: ss_inv) (m: memory) : ts_inv =

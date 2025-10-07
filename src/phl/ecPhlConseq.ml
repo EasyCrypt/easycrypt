@@ -1024,7 +1024,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let m,hi,hh, h0 =
       as_seq4 (LDecl.fresh_ids (FApi.tc1_hyps tc) ["&m";"_";"_";"_"]) in
     let pre    = map_ss_inv2 f_and (bhs_pr hs) (hs_pr hs2) in
-    (* TODO: dubious *)
     let mpre   = Fsubst.f_subst_mem pre.m m pre.inv in
     let post1  = (bhs_po hs0) in
     let post   = (bhs_po hs) in
