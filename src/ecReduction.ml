@@ -1825,7 +1825,7 @@ module EqTest = struct
   include EqMod_base(struct
     let for_expr env ~norm:_ alpha e1 e2 =
       let convert e =
-        let f = form_of_expr e in
+        let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
 
         if Mid.is_empty alpha then f else
 
