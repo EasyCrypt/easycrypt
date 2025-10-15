@@ -15,36 +15,37 @@ type ty_param  = EcIdent.t * EcPath.Sp.t
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
+type ty_dtype = {
+  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
+}
+
+type ty_body = 
+  | Concrete of EcTypes.ty
+  | Abstract of Sp.t
+  | Datatype of ty_dtype
+  | Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+
 type tydecl = {
   tyd_params : ty_params;
   tyd_type   : ty_body;
   tyd_loca   : locality;
 }
 
-and ty_body = [
-  | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
-  | `Datatype of ty_dtype
-  | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
-]
-
-and ty_dtype = {
-  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
-  tydt_schelim : EcCoreFol.form;
-  tydt_schcase : EcCoreFol.form;
-}
 
 let tydecl_as_concrete (td : tydecl) =
-  match td.tyd_type with `Concrete x -> Some x | _ -> None
+  match td.tyd_type with Concrete x -> Some x | _ -> None
 
 let tydecl_as_abstract (td : tydecl) =
-  match td.tyd_type with `Abstract x -> Some x | _ -> None
+  match td.tyd_type with Abstract x -> Some x | _ -> None
 
 let tydecl_as_datatype (td : tydecl) =
-  match td.tyd_type with `Datatype x -> Some x | _ -> None
+  match td.tyd_type with Datatype x -> Some x | _ -> None
 
 let tydecl_as_record (td : tydecl) =
-  match td.tyd_type with `Record x -> Some x | _ -> None
+  match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
@@ -59,10 +60,10 @@ let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_loca = lc; }
+  { tyd_params = params; tyd_type = Abstract tc; tyd_loca = lc; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
+let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
   let subst = CS.Tvar.init (List.map fst params) args in
   CS.Tvar.subst subst ty
 

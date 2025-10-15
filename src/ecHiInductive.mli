@@ -16,7 +16,7 @@ type dterror =
 | DTE_TypeError       of EcTyping.tyerror
 | DTE_DuplicatedCtor  of symbol
 | DTE_InvalidCTorType of symbol * EcTyping.tyerror
-| DTE_NonPositive
+| DTE_NonPositive     of symbol * EcInductive.nonpositive_description
 | DTE_Empty
 
 type fxerror =

@@ -23,7 +23,7 @@ type dterror =
 | DTE_TypeError       of TT.tyerror
 | DTE_DuplicatedCtor  of symbol
 | DTE_InvalidCTorType of symbol * TT.tyerror
-| DTE_NonPositive
+| DTE_NonPositive     of symbol * EI.nonpositive_description
 | DTE_Empty
 
 type fxerror =
@@ -52,7 +52,7 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   Msym.odup unloc (List.map fst rc) |> oiter (fun (x, y) ->
     rcerror y.pl_loc env (RCE_DuplicatedField x.pl_desc));
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   if List.is_empty rc then
     rcerror loc env RCE_Empty;
 
@@ -84,7 +84,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let env0  =
     let myself = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = `Abstract EcPath.Sp.empty;
+      tyd_type    = Abstract EcPath.Sp.empty;
       tyd_loca    = lc;
     } in
       EcEnv.Ty.bind (unloc name) myself env
@@ -106,7 +106,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       dt |> List.map for1
   in
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   begin
     let rec isempty_n (ctors : (ty list) list) =
       List.for_all isempty_1 ctors
@@ -132,19 +132,19 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
       let tyinst () =
-        fun ty -> ty_instanciate tdecl.tyd_params targs ty in
+        fun ty -> ty_instantiate tdecl.tyd_params targs ty in
 
       match tdecl.tyd_type with
-      | `Abstract _ ->
+      | Abstract _ ->
           List.exists isempty (targs)
 
-      | `Concrete ty ->
+      | Concrete ty ->
           isempty_1 [tyinst () ty]
 
-      | `Record (_, fields) ->
+      | Record (_, fields) ->
           isempty_1 (List.map (tyinst () |- snd) fields)
 
-      | `Datatype dt ->
+      | Datatype dt ->
           isempty_n (List.map (List.map (tyinst ()) |- snd) dt.tydt_ctors)
 
     in

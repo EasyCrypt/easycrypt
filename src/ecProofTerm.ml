@@ -193,7 +193,7 @@ let pt_of_hyp_r ptenv x =
 (* -------------------------------------------------------------------- *)
 let pt_of_global pf hyps p tys =
   let ptenv = ptenv_of_penv hyps pf in
-  let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
+  let ax    = EcEnv.Ax.instantiate p tys (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys p;
@@ -202,7 +202,7 @@ let pt_of_global pf hyps p tys =
 (* -------------------------------------------------------------------- *)
 let pt_of_global_r ptenv p tys =
   let env = LDecl.toenv ptenv.pte_hy in
-  let ax  = EcEnv.Ax.instanciate p tys env in
+  let ax  = EcEnv.Ax.instantiate p tys env in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys p;
