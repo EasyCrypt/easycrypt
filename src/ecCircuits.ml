@@ -733,7 +733,7 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
   ) (Option.get lmt).lmt_decl 
   
 
-let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hyps * pstate =
+let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (inst: instr) : hyps * pstate =
   let env = toenv hyps in
 (*   if debug then Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
@@ -744,13 +744,13 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hy
       if debug then Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
-      let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+      let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
       let pstate = update_pstate pstate v c in
       hyps, pstate
       (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let pstate = List.fold_left (fun (hyps, pstate) (v, e) ->
-        let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+        let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
         let pstate = update_pstate pstate v c in
         hyps, pstate
       ) (hyps, pstate)
@@ -761,7 +761,7 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hy
         es) in
       pstate
     | Sasgn (LvTuple (vs), e) ->
-      let hyps, c = (form_of_expr mem e |> circuit_of_form ~pstate hyps) in
+      let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
       let tp = (ctuple_of_circuit ~strict:true c) in
       let comps = circuits_of_circuit_tuple tp in
       let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
@@ -789,6 +789,7 @@ let process_instr (hyps: hyps) (mem: memory) (pstate: pstate) (inst: instr) : hy
 let instrs_equiv
    (hyps       : hyps             )
    ((mem, mt)  : memenv           )
+  ?(cache      : _ = empty_cache  )
   ?(keep       : EcPV.PV.t option )
   ?(pstate     : _ = empty_pstate )
    (s1         : instr list       )
@@ -809,8 +810,8 @@ let instrs_equiv
   let inputs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) inputs in
   let pstate = open_circ_lambda_pstate empty_pstate inputs in
 
-  let hyps, pstate1 = List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) s1 in
-  let hyps, pstate2 = List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) s2 in
+  let hyps, pstate1 = List.fold_left (fun (hyps, pstate) -> process_instr ~cache hyps mem ~pstate) (hyps, pstate) s1 in
+  let hyps, pstate2 = List.fold_left (fun (hyps, pstate) -> process_instr ~cache hyps mem ~pstate) (hyps, pstate) s2 in
 
   let pstate1 = close_circ_lambda_pstate pstate1 inputs in 
   let pstate2 = close_circ_lambda_pstate pstate2 inputs in
@@ -837,14 +838,13 @@ let instrs_equiv
     circ_equiv circ1 circ2 
   )
 
-let pstate_of_prog (hyps: hyps) (mem: memory) (proc: instr list) (invs: variable list) : hyps * pstate =
-  (*let inps, pstate = initial_pstate_of_vars (toenv hyps) (invs) in*)
+let pstate_of_prog (hyps: hyps) (mem: memory) ?(cache: cache = empty_cache) (proc: instr list) (invs: variable list) : hyps * pstate =
   let env = LDecl.toenv hyps in
   let invs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) invs in
   let pstate = open_circ_lambda_pstate empty_pstate invs in
 
   let hyps, pstate = 
-    List.fold_left (fun (hyps, pstate) -> process_instr hyps mem pstate) (hyps, pstate) proc
+    List.fold_left (fun (hyps, pstate) -> process_instr hyps mem ~cache ~pstate) (hyps, pstate) proc
   in
   hyps, close_circ_lambda_pstate pstate invs
 
@@ -942,37 +942,36 @@ let circuit_flatten (c: circuit) =
 let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f : hyps * circuit =
   let env = toenv hyps in
   let (pstate, cache, f), bnds = List.fold_left_map (fun (pstate, cache, goal) (id, lk) ->
-      if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
-      match lk with
-      | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
-        let pstate, bnds = List.fold_left_map (fun pstate {ov_name; ov_type} -> 
-          match ov_name with
-          | Some v -> let id = create v in 
-          open_circ_lambda_pstate pstate [(id, ctype_of_ty env ov_type)], Some (id, ctype_of_ty env ov_type)
-          | None -> (pstate, None)
-        ) pstate decls in
-        (pstate, cache, goal), List.filter_map (fun i -> i) bnds 
-      | EcBaseLogic.LD_var (t, Some f) -> 
-          let cache = open_circ_lambda_cache cache [(id, ctype_of_ty env t)] in
-          begin try 
-            ignore (circuit_of_form ~pstate ~cache hyps f);
-            (pstate, cache, (f_and goal (f_eq (f_local id t) f))), [(id, ctype_of_ty env t)]
-          with _ -> (pstate, cache, f_forall [(id, GTty t)] goal), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
-          end
-      | EcBaseLogic.LD_var (t, None) -> 
-          (pstate, 
-          open_circ_lambda_cache cache [(id, ctype_of_ty env t)],
-          goal), [(id, ctype_of_ty env t)]
-      | EcBaseLogic.LD_hyp f_hyp -> 
-          begin try
-            ignore (circuit_of_form ~pstate ~cache hyps f_hyp);
-            (pstate, cache, f_imp f_hyp goal), []
-          with e -> 
-            if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
-            EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
-            (pstate, cache, goal), []
-          end
-
+    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
+    match lk with
+    | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
+      let pstate, bnds = List.fold_left_map (fun pstate {ov_name; ov_type} -> 
+        match ov_name with
+        | Some v -> let id = create v in 
+        open_circ_lambda_pstate pstate [(id, ctype_of_ty env ov_type)], Some (id, ctype_of_ty env ov_type)
+        | None -> (pstate, None)
+      ) pstate decls in
+      (pstate, cache, goal), List.filter_map (fun i -> i) bnds 
+    | EcBaseLogic.LD_var (t, Some f) -> 
+        let cache = open_circ_lambda_cache cache [(id, ctype_of_ty env t)] in
+        begin try 
+          ignore (circuit_of_form ~pstate ~cache hyps f);
+          (pstate, cache, (f_and goal (f_eq (f_local id t) f))), [(id, ctype_of_ty env t)]
+        with _ -> (pstate, cache, f_forall [(id, GTty t)] goal), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
+        end
+    | EcBaseLogic.LD_var (t, None) -> 
+        (pstate, 
+        open_circ_lambda_cache cache [(id, ctype_of_ty env t)],
+        goal), [(id, ctype_of_ty env t)]
+    | EcBaseLogic.LD_hyp f_hyp -> 
+        begin try
+          ignore (circuit_of_form ~pstate ~cache hyps f_hyp);
+          (pstate, cache, f_imp f_hyp goal), []
+        with e -> 
+          if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
+          EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
+          (pstate, cache, goal), []
+        end
       | _ -> (pstate, cache, goal), []
   ) (pstate, cache, f) (List.rev (tohyps hyps).h_local)
   in 
@@ -980,3 +979,40 @@ let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hy
   if debug then Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
   let hyps, c = circuit_of_form ~pstate ~cache hyps f in
   hyps, close_circ_lambda bnds c 
+
+(*
+(* FIXME : Review *)
+let circuit_state_of_hyps ?(cache = empty_cache) hyps : hyps * circuit =
+  let env = toenv hyps in
+  let cache, bnds = List.fold_left_map (fun (cache) (id, lk) ->
+    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
+    match lk with
+    | EcBaseLogic.LD_var (t, Some f) -> 
+      let cache = open_circ_lambda_cache cache [(id, ctype_of_ty env t)] in
+      begin try 
+        ignore (circuit_of_form ~cache hyps f); (* FIXME : Add info to translation *)
+        (cache), [(id, ctype_of_ty env t)]
+      with _ -> (cache), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
+      end
+    | EcBaseLogic.LD_var (t, None) -> 
+      (open_circ_lambda_cache cache [(id, ctype_of_ty env t)]), 
+      [(id, ctype_of_ty env t)]
+    | EcBaseLogic.LD_hyp f_hyp ->  (* FIXME: extract this to a pcond *)
+      begin try
+        ignore (circuit_of_form ~cache hyps f_hyp);
+        (cache), []
+      with e -> 
+        if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
+        EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
+        (cache), []
+      end
+    | _ -> (cache), []
+  ) cache (List.rev (tohyps hyps).h_local)
+  in 
+  let bnds = List.flatten bnds in
+
+
+  hyps, close_circ_lambda bnds c 
+
+
+*)

@@ -51,9 +51,9 @@ val circ_simplify_form_bitstring_equality :
   ?pcond:circuit -> hyps -> form -> form
  
 (* Proc processors *)
-val pstate_of_prog : hyps -> memory -> instr list -> variable list -> hyps * pstate 
-val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_instr : hyps -> memory -> pstate -> instr -> hyps * pstate
+val pstate_of_prog : hyps -> memory -> ?cache:cache -> instr list -> variable list -> hyps * pstate 
+val instrs_equiv : hyps -> memenv -> ?cache:cache -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
+val process_instr : hyps -> memory -> cache:cache -> pstate:pstate -> instr -> hyps * pstate
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 (* Temporary? *)

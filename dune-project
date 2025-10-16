@@ -22,6 +22,12 @@
   dune-site
   (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
+  ppx_deriving
+  ppx_deriving_yojson
+  hex
+  iter
+  cmdliner
+  progress
   yojson
   (zarith (>= 1.10))
 ))
