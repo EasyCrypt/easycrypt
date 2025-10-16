@@ -1018,6 +1018,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       `CBool (Backend.reg_eq r1 r2), merge_inputs inps1 inps2 
     | (`CBool b1, inps1), (`CBool b2, inps2) ->
       `CBool (Backend.node_eq b1 b2), merge_inputs inps1 inps2
+    | (`CBool b1, inps1), (`CBitstring r2, inps2) when Backend.size_of_reg r2 = 1 ->
+      let b2 = List.hd (Backend.node_list_of_reg r2) in
+      `CBool (Backend.node_eq b1 b2), merge_inputs inps1 inps2
+    | (`CBitstring r1, inps1), (`CBool b2, inps2) when Backend.size_of_reg r1 = 1 ->
+      let b1 = List.hd (Backend.node_list_of_reg r1) in
+      `CBool (Backend.node_eq b1 b2), merge_inputs inps1 inps2
     | _ -> raise (CircError (Format.asprintf "Invalid arguments for circuit_eq (%a)" Format.(pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") pp_ctype) (List.map (fun c -> ctype_of_circ (fst c)) [c; d])))
     
   let circuit_compose (c: circuit) (args: circuit list) : circuit = 
