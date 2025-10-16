@@ -2829,7 +2829,7 @@ module Circuit = struct
     if not (List.is_empty opdecl.op_tparams) then
       hierror ~loc:(loc pc.operator) "operator must be monomorphic";
 
-    match EcEnv.Circuit.get_specification_by_name env (unloc pc.circuit) with
+    match EcEnv.Circuit.get_specification_by_name env (unloc pc.filename) (unloc pc.circuit) with
     | None ->
       hierror ~loc:(loc pc.circuit)
         "unknown circuit: %s" (unloc pc.circuit)

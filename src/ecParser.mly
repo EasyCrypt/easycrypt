@@ -3932,8 +3932,8 @@ cr_binding_r:
 | BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
   { CRB_BvOperator { types; operator; name; } }
 
-| BIND CIRCUIT operator=qoident circuit=loc(STRING)
-  { CRB_Circuit { operator; circuit; } }
+| BIND CIRCUIT operator=qoident circuit=loc(STRING) FROM filename=loc(STRING)
+  { CRB_Circuit { operator; circuit; filename; } }
 
 %inline cr_binding:
 | locality=is_local binding=cr_binding_r

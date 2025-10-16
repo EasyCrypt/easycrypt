@@ -1338,7 +1338,8 @@ type pbind_bvoperator =
 (* -------------------------------------------------------------------- *)
 type pbind_circuit =
   { operator : pqsymbol
-  ; circuit  : string located }
+  ; circuit  : string located
+  ; filename : string located }
 
 (* -------------------------------------------------------------------- *)
 type pcrbinding_r =

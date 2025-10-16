@@ -571,5 +571,5 @@ module Circuit : sig
   val lookup_circuit_cache_hyps_opt : LDecl.hyps -> path -> EcLowCircuits.circuit option
   val lookup_circuit_cache_hyps : LDecl.hyps -> path -> EcLowCircuits.circuit
 
-  val get_specification_by_name : env -> symbol -> Lospecs.Ast.adef option
+  val get_specification_by_name : env -> filename:string -> symbol -> Lospecs.Ast.adef option
 end 
