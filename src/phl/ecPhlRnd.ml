@@ -10,6 +10,7 @@ open EcSubst
 
 open EcMatching.Position
 open EcCoreGoal
+open EcCoreFol
 open EcLowGoal
 open EcLowPhlGoal
 
@@ -442,6 +443,87 @@ module Core = struct
       | `Right -> f_equivS (snd es.es_ml) mt (es_pr es) es.es_sl s (es_po es) in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
+  (* -------------------------------------------------------------------- *)
+  let t_equiv_coupling_r side g tc =
+    (* process the following pRHL goal, where g is a coupling of g1 and g2 *)
+    (*                   {phi} c1; x <$ g1 ~ c2; y <$ g2 {psi}             *)
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let ml = fst es.es_ml in
+    let mr = fst es.es_mr in
+    let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
+    let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+    let muL = ss_inv_generalize_right (EcFol.ss_inv_of_expr ml muL) mr in
+    let muR = ss_inv_generalize_left (EcFol.ss_inv_of_expr mr muR) ml in
+
+    let goal =
+      match side with
+      | None ->
+        (* Goal: {phi} c1 ~ c2 {iscoupling g muL muR /\ (forall a b, (a, b) \in supp(g) => psi[x -> a, y -> b])} *)
+        (* Generate two free variables a and b and the pair (a, b) *)
+        let a_id = EcIdent.create "a" in
+        let b_id = EcIdent.create "b" in
+        let a = f_local a_id tyL in
+        let b = f_local b_id tyR in
+        let ab = f_tuple [a; b] in
+
+        (* Generate the coupling distribution type: (tyL * tyR) distr *)
+        let coupling_ty = ttuple [tyL; tyR] in
+        let g_app = map_ts_inv1 (fun g -> f_app_simpl g [] (tdistr coupling_ty)) g in
+
+        let iscoupling_op = EcPath.extend EcCoreLib.p_top ["Distr"; "iscoupling"] in
+        let iscoupling_ty = tfun (tdistr tyL) (tfun (tdistr tyR) (tfun (tdistr coupling_ty) tbool)) in
+        let iscoupling_pred = map_ts_inv (fun f_list ->
+                                                f_app
+                                                   (f_op iscoupling_op [tyL; tyR] iscoupling_ty)
+                                                   f_list
+                                          tbool)
+                                         [muL; muR; g_app] in
+
+        (* Substitute in the postcondition *)
+        let post = (es_po es) in
+        let post_subst = subst_form_lv_left env lvL {ml=ml;mr=mr;inv=a} post in
+        let post_subst = subst_form_lv_right env lvR {ml=ml;mr=mr;inv=b} post_subst in
+        
+        let goal = map_ts_inv2 f_imp (map_ts_inv1 (f_in_supp ab) g_app) post_subst in
+        let goal = map_ts_inv1 (f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)]) goal in
+        map_ts_inv2 f_and iscoupling_pred goal
+      | Some side ->
+        (* Goal (left):  {phi} c1 ~ c2 {dmap d1 g = d2 /\ forall a b, a \in supp(d1) -> b = g(a) => psi[x -> a, y -> b]} *)
+        (* Goal (right): {phi} c1 ~ c2 {d1 = dmap d2 g /\ forall a b, b \in supp(d2) -> a = g(b) => psi[x -> a, y -> b]} *)
+        let dmap_op = EcPath.extend EcCoreLib.p_top ["Distr"; "dmap"] in
+        let dmap_eq =
+          match side with
+          | `Left ->
+             let dmap_ty = tfun (tdistr tyL) (tfun (tfun tyL tyR) (tdistr tyR)) in
+             let dmap_pred = map_ts_inv (fun f_list -> f_app (f_op dmap_op [tyL; tyR] dmap_ty) f_list (tdistr tyR)) in
+             map_ts_inv2 f_eq (dmap_pred [muL ; g]) muR
+          | `Right -> 
+             let dmap_ty = tfun (tdistr tyR) (tfun (tfun tyR tyL) (tdistr tyL)) in
+             let dmap_pred = map_ts_inv (fun f_list -> f_app (f_op dmap_op [tyR; tyL] dmap_ty) f_list (tdistr tyL)) in
+             map_ts_inv2 f_eq muL (dmap_pred [muR ; g]) in
+
+        let a_id = EcIdent.create "a" in
+        let b_id = EcIdent.create "b" in
+        let a = f_local a_id tyL in
+        let b = f_local b_id tyR in
+        let post = (es_po es) in
+        let post_subst = subst_form_lv_left env lvL {ml=ml;mr=mr;inv=a} post in
+        let post_subst = subst_form_lv_right env lvR {ml=ml;mr=mr;inv=b} post_subst in
+
+        let goal = 
+          match side with
+          | `Left  -> map_ts_inv2 f_imp (map_ts_inv1 (f_in_supp a) muL) (map_ts_inv2 f_imp (map_ts_inv1 (fun g -> f_eq (f_app_simpl g [a] tyR) b) g) post_subst)
+          | `Right -> map_ts_inv2 f_imp (map_ts_inv1 (f_in_supp b) muR) (map_ts_inv2 f_imp (map_ts_inv1 (fun g -> f_eq a (f_app_simpl g [b] tyL)) g) post_subst) in
+
+        let goal = map_ts_inv1 (f_forall_simpl [(a_id, GTty tyL); (b_id, GTty tyR)]) goal in
+        map_ts_inv2 f_and dmap_eq goal
+    in
+    let goal = f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl' sr' goal in
+
+    FApi.xmutate1 tc `Rnd [goal]
 end (* Core *)
 
 (* -------------------------------------------------------------------- *)
@@ -666,32 +748,32 @@ let process_rnd side pos tac_info tc =
       t_bdhoare_rnd tac_info tc
 
   | _, _, _ when is_equivS concl ->
-    let process_form f ty1 ty2 =
-      TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
+         let process_form f ty1 ty2 =
+           TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 
-    let bij_info =
-      match tac_info with
-      | PNoRndParams -> None, None
-      | PSingleRndParam f -> Some (process_form f), None
-      | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
-      | _ -> tc_error !!tc "invalid arguments"
-    in
+         let bij_info =
+           match tac_info with
+           | PNoRndParams -> None, None
+           | PSingleRndParam f -> Some (process_form f), None
+           | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
+           | _ -> tc_error !!tc "invalid arguments"
+         in
 
-    let pos = pos |> Option.map (function
-      | Single (b, p) ->
-          let p =
-            if Option.is_some side then
-              EcProofTyping.tc1_process_codepos1 tc (side, p)
-            else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
-          in Single (b, p)
-      | Double ((b1, p1), (b2, p2)) ->
-          let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
-          let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
-          Double ((b1, p1), (b2, p2))
-    )
-    in
-    
-    t_equiv_rnd side ?pos bij_info tc
+         let pos = pos |> Option.map (function
+           | Single (b, p) ->
+               let p =
+                 if Option.is_some side then
+                   EcProofTyping.tc1_process_codepos1 tc (side, p)
+                 else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+               in Single (b, p)
+           | Double ((b1, p1), (b2, p2)) ->
+               let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
+               let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+               Double ((b1, p1), (b2, p2))
+         )
+         in
+         
+         t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"
 
@@ -713,3 +795,24 @@ let process_rndsem ~reduce side pos tc =
   | Some side when is_equivS concl ->
      t_equiv_rndsem reduce side pos tc
   | _ -> tc_error !!tc "invalid arguments"
+
+let process_coupling side g tc =
+  let concl = FApi.tc1_goal tc in
+  
+  if not (is_equivS concl) then
+    tc_error !!tc "coupling can only be used on pRHL goals"
+  else
+    let env = FApi.tc1_env tc in
+    let es = tc1_as_equivS tc in
+    let (_, muL), _ = tc1_last_rnd tc es.es_sl in
+    let (_, muR), _ = tc1_last_rnd tc es.es_sr in
+    let tyL = proj_distr_ty env (e_ty muL) in
+    let tyR = proj_distr_ty env (e_ty muR) in
+
+    let coupling_ty =
+      match side with
+      | None -> tdistr (ttuple [tyL; tyR])
+      | Some `Left -> tfun tyL tyR
+      | Some `Right -> tfun tyR tyL in
+    let g_form = TTC.tc1_process_prhl_form tc coupling_ty g in
+    Core.t_equiv_coupling_r side g_form tc
