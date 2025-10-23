@@ -771,6 +771,7 @@ type phltactic =
   | Psymmetry
   | Pbdhoare_split of bdh_split
   | Pprocchange    of side option * pcodepos * pexpr
+  | Pchangestmt    of side option * (pcodepos1 * pcodeoffset1) * pstmt
   | Pprocrewrite   of side option * pcodepos * prrewrite
 
     (* Eager *)
