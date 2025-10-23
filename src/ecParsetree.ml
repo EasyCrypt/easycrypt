@@ -773,6 +773,8 @@ type phltactic =
   | Pprocchange    of side option * pcodepos * pexpr
   | Pchangestmt    of side option * (pcodepos1 * pcodeoffset1) * pstmt
   | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Prwprgm of rwprgm
+
 
     (* Eager *)
   | Peager_seq       of (eager_info * pcodepos1 pair * pformula)
@@ -789,6 +791,11 @@ type phltactic =
     (* Automation *)
   | Pauto
   | Plossless
+
+and rwprgm = [
+  | `IdAssign of pcodepos * pqsymbol
+(*   | `Change   of pcodepos * ptybindings option * int * pstmt *)
+]
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]

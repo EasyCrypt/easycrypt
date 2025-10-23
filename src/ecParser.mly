@@ -466,6 +466,7 @@
 %token HAVE
 %token HINT
 %token HOARE
+%token IDASSIGN
 %token IDTAC
 %token IF
 %token IFF
@@ -3206,6 +3207,9 @@ interleave_info:
 
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
+
+| IDASSIGN o=codepos x=lvalue_var
+    { Prwprgm (`IdAssign (o, x)) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
