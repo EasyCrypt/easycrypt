@@ -436,7 +436,7 @@ let process_pre tc hyps prl prr pre post =
     let gen_r f = ss_inv_generalize_right f mr in
     let gen_l f = ss_inv_generalize_left  f ml in
     dof fl al ml pml gen_r; dof fr ar mr pmr gen_l;
-    map_ts_inv f_ands !eqs
+    map_ts_inv ~ml ~mr f_ands !eqs
 
 (* -------------------------------------------------------------------- *)
 let post_iff ml mr eq env evl evr =
