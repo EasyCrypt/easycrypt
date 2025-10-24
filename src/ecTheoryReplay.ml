@@ -98,14 +98,14 @@ let get_open_tydecl hyps p tys =
 
 let rec tybody_compatible exn hyps ty_body1 ty_body2 =
   match ty_body1, ty_body2 with
-  | `Abstract _, `Abstract _ -> () (* FIXME Sp.t *)
-  | `Concrete ty1   , `Concrete ty2 -> error_body exn (EcReduction.EqTest.for_type (EcEnv.LDecl.toenv hyps) ty1 ty2)
-  | `Datatype ty1   , `Datatype ty2 -> datatype_compatible exn hyps ty1 ty2
-  | `Record (f1,pr1), `Record(f2,pr2) -> record_compatible exn hyps f1 pr1 f2 pr2
-  | _, `Concrete {ty_node = Tconstr(p, tys) } ->
+  | Abstract _, Abstract _ -> () (* FIXME Sp.t *)
+  | Concrete ty1   , Concrete ty2 -> error_body exn (EcReduction.EqTest.for_type (EcEnv.LDecl.toenv hyps) ty1 ty2)
+  | Datatype ty1   , Datatype ty2 -> datatype_compatible exn hyps ty1 ty2
+  | Record (f1,pr1), Record(f2,pr2) -> record_compatible exn hyps f1 pr1 f2 pr2
+  | _, Concrete {ty_node = Tconstr(p, tys) } ->
     let ty_body2 = get_open_tydecl hyps p tys in
     tybody_compatible exn hyps ty_body1 ty_body2
-  | `Concrete{ty_node = Tconstr(p, tys) }, _ ->
+  | Concrete{ty_node = Tconstr(p, tys) }, _ ->
     let ty_body1 = get_open_tydecl hyps p tys in
     tybody_compatible exn hyps ty_body1 ty_body2
   | _, _ -> raise exn (* FIXME should we do more for concrete version other *)
@@ -119,7 +119,7 @@ let tydecl_compatible env tyd1 tyd2 =
   let exn  = Incompatible (TyBody(*tyd1,tyd2*)) in
   let hyps = EcEnv.LDecl.init env params in
   match ty_body1, ty_body2 with
-  | `Abstract _, _ -> () (* FIXME Sp.t *)
+  | Abstract _, _ -> () (* FIXME Sp.t *)
   | _, _ -> tybody_compatible exn hyps ty_body1 ty_body2
 
 (* -------------------------------------------------------------------- *)
@@ -358,7 +358,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
             let decl  =
               { tyd_params  = nargs;
-                tyd_type    = `Concrete ntyd;
+                tyd_type    = Concrete ntyd;
                 tyd_loca    = otyd.tyd_loca; }
 
             in (decl, ntyd)
@@ -368,7 +368,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | Some reftyd ->
                 let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) reftyd.tyd_params in
                 let body   = tconstr p tyargs in
-                let decl   = { reftyd with tyd_type = `Concrete body; } in
+                let decl   = { reftyd with tyd_type = Concrete body; } in
                 (decl, body)
 
             | _ -> assert false
@@ -378,7 +378,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
           assert (List.is_empty otyd.tyd_params);
           let decl  =
             { tyd_params  = [];
-              tyd_type    = `Concrete ty;
+              tyd_type    = Concrete ty;
               tyd_loca    = otyd.tyd_loca; }
 
           in (decl, ty)
@@ -398,9 +398,9 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
           let subst =
             (* FIXME: HACK *)
             match otyd.tyd_type, body.ty_node with
-            | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+            | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
-                | `Datatype { tydt_ctors = _ } ->
+                | Datatype { tydt_ctors = _ } ->
                   let newtparams = List.fst newtyd.tyd_params in
                   let newtparams_ty = List.map tvar newtparams in
                   let newdtype = tconstr np newtparams_ty in

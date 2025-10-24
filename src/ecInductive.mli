@@ -21,9 +21,9 @@ type ctor  = symbol * (EcTypes.ty list)
 type ctors = ctor list
 
 type datatype = {
-  dt_path    : path;
-  dt_tparams : ty_params;
-  dt_ctors   : ctors
+  dt_path       : path;
+  dt_tparams    : ty_params;
+  dt_ctors      : ctors
 }
 
 (* -------------------------------------------------------------------- *)
@@ -43,7 +43,21 @@ val datatype_proj_name : symbol -> symbol
 val datatype_proj_path : path -> symbol -> path
 
 (* -------------------------------------------------------------------- *)
-exception NonPositive
+type nonpositive_description =
+  | NonPositive of ty
+  | AbstractTypeRestriction of EcPath.path
+  | TypePositionRestriction of ty
+
+(** A failure raised during a strict-positivity check. *)
+exception NonPositive of nonpositive_description
+
+(** Evaluates whether a given datatype protype satisfies the strict
+    positivity check. The first argument defines how to retrieve the
+    effective definition of a type constructor from its path.
+
+    raises the exception [NonPositive] if the check fails, otherwise
+    the function returns a unit value. *)
+val check_positivity : (path -> tydecl) -> datatype -> unit
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
 
