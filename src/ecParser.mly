@@ -3194,9 +3194,6 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=codepos COLON f=sexpr
-    { Pprocchange (side, pos, f) }
-
 | PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 COLON s=brace(stmt)
    { if not (List.is_empty (fst (unloc pos))) then
        parse_error (loc pos) (Some "only top-level positions are supported");

@@ -171,19 +171,27 @@ let process_rewrite
 
  (* -------------------------------------------------------------------- *)
 let process_change_stmt
- (side   : side option)
- ((p, o) : pcodepos1 * pcodeoffset1)
- (s      : pstmt)
- (tc     : tcenv1)
+  (side   : side option)
+  ((p, o) : pcodepos1 * pcodeoffset1)
+  (s      : pstmt)
+  (tc     : tcenv1)
 =
- let env = FApi.tc1_env tc in
- let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+  Printexc.record_backtrace true;
+  (* FIXME: figure out how to disable tail recursion optimization *)
 
- let p, o =
+  let env = FApi.tc1_env tc in
+  (* FIXME: PR: throws a confusing error if 
+   no side given and goal is equiv or
+   side given and goal is hoare, maybe add
+   some indication that side might be missing
+   (or needed) in the error message?  *)
+  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+
+  let p, o =
    let env = EcEnv.Memory.push_active_ss me env in
-   let pos = EcTyping.trans_codepos1 env p in
+   let pos = EcTyping.trans_codepos1 ~memory:(fst me) env p in
    let off = match o with (* FIXME: maybe get the general function here ?*)
-   | `ByPosition pos -> `ByPosition (EcTyping.trans_codepos1 env pos)
+   | `ByPosition pos -> `ByPosition (EcTyping.trans_codepos1 ~memory:(fst me) env pos)
    | `ByOffset i -> `ByOffset i
     in 
    let off = EcMatching.Position.resolve_offset ~base:pos ~offset:off in
@@ -195,21 +203,25 @@ let process_change_stmt
      tc_error !!tc "end position cannot be before start position";
 
    (start - 1, end_ - start)
- in
+  in
 
- let stmt     = stmt.s_node in
- let hd, stmt = List.takedrop p stmt in
- let stmt, tl = List.takedrop o stmt in
 
- let s = EcProofTyping.tc1_process_Xhl_stmt tc s in
+  let stmt     = stmt.s_node in
+  let hd, stmt = List.takedrop p stmt in
+  let stmt, tl = List.takedrop o stmt in
 
- let pvs = EcPV.is_write env (stmt @ s.s_node) in
- let pvs, globs = EcPV.PV.elements pvs in
+  let s = match side with 
+  | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
+  | None -> EcProofTyping.tc1_process_Xhl_stmt tc s 
+  in
 
- let mleft = EcIdent.create "left" in (* FIXME: PR: is this how we want to do this? *)
- let mright = EcIdent.create "right" in
+  let pvs = EcPV.is_write env (stmt @ s.s_node) in
+  let pvs, globs = EcPV.PV.elements pvs in
 
- let eq =
+  let mleft = EcIdent.create "1" in (* FIXME: PR: is this how we want to do this? *)
+  let mright = EcIdent.create "2" in
+
+  let eq =
    List.map
      (fun (pv, ty) -> f_eq (f_pvar pv ty mleft).inv (f_pvar pv ty mright).inv)
      pvs
@@ -218,17 +230,17 @@ let process_change_stmt
      (fun mp -> f_eqglob mp mleft mp mright)
      globs in
 
- let goal1 =
+  let goal1 =
      f_equivS
        (snd me) (snd me)
-       {ml=mleft; mr=mright; inv=f_true}
+       {ml=mleft; mr=mright; inv=f_ands eq} (* FIXME: PR: check what we need here *)
        (EcAst.stmt stmt) s
        {ml=mleft; mr=mright; inv=f_ands eq}
- in
+  in
 
- let goal2 =
+  let goal2 =
    EcLowPhlGoal.hl_set_stmt
      side (FApi.tc1_goal tc)
      (EcAst.stmt (List.flatten [hd; s.s_node; tl])) in
 
- FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
+  FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]

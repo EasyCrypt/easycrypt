@@ -9,6 +9,7 @@ open EcAst
 type change_t = pcodepos * ptybindings option * int * pstmt
 
 (* -------------------------------------------------------------------- *)
+(* FIXME PR: Dead code? *)
 (*
 let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in

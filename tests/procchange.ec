@@ -11,10 +11,23 @@ theory ProcChangeAssign.
   lemma L : equiv[M.f ~ M.f : true ==> true].
   proof.
   proc.
-  proc change {1} 1 : x.
-  - smt().
+    proc change {1} 1 1 : { x <- x ; }. wp. skip. smt().
   abort.
 end ProcChangeAssign.
+
+theory ProcChangeAssignHoare.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 0;
+    }
+  }.
+  
+  lemma L : hoare[M.f : true ==> true].
+  proof.
+  proc.
+    proc change 1 1 : { x <- x ; }. wp. skip. smt().
+  abort.
+end ProcChangeAssignHoare.
 
 (* -------------------------------------------------------------------- *)
 theory ProcChangeSample.
