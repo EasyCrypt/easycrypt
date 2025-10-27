@@ -95,6 +95,7 @@ module PV : sig
   val remove   : env -> prog_var -> t -> t
   val union    : t -> t -> t
   val diff     : t -> t -> t
+  val inter    : t -> t -> t
   val subset   : t -> t -> bool
 
   val interdep     : env -> t -> t -> t
