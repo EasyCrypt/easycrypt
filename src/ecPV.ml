@@ -205,7 +205,6 @@ module PVM = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module PV = struct
 
   type t =
@@ -412,6 +411,10 @@ module PV = struct
   let diff fv1 fv2 =
     { s_pv = Mnpv.set_diff fv1.s_pv fv2.s_pv;
       s_gl = Sm.diff fv1.s_gl fv2.s_gl }
+
+  let inter fv1 fv2 = 
+    { s_pv = Mnpv.inter (fun _ _ t2 -> Some t2) fv1.s_pv fv2.s_pv;
+      s_gl = Sm.inter fv1.s_gl fv2.s_gl }
 
   let interdep env fv1 fv2 =
     let test_pv pv _ =

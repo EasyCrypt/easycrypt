@@ -466,6 +466,7 @@
 %token HAVE
 %token HINT
 %token HOARE
+%token IDASSIGN
 %token IDTAC
 %token IF
 %token IFF
@@ -3193,14 +3194,19 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=codepos COLON f=sexpr
-    { Pprocchange (side, pos, f) }
+| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 COLON s=brace(stmt)
+   { if not (List.is_empty (fst (unloc pos))) then
+       parse_error (loc pos) (Some "only top-level positions are supported");
+     Pchangestmt (side, (snd (unloc pos), offset), s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }
 
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
+
+| IDASSIGN o=codepos x=lvalue_var
+    { Prwprgm (`IdAssign (o, x)) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

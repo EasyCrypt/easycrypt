@@ -143,7 +143,7 @@ let tc1_process_prhl_stmt ?map tc side c =
   tc1_process_stmt hyps tc ?map c
 
 let tc1_process_Xhl_stmt ?map tc c =
-    let concl = FApi.tc1_goal tc in
+  let concl = FApi.tc1_goal tc in
   let m = match concl.f_node with FbdHoareS {bhs_m=m} | FhoareS {hs_m=m} -> m | _ -> assert false in
   let hyps   = FApi.tc1_hyps tc in
   let hyps   = LDecl.push_active_ss m hyps in
