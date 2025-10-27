@@ -470,6 +470,16 @@ proof.
   by case (hs = x) => /= _ //; rewrite addrC ltzS count_ge0.
 qed.
 
+lemma le_in_count ['a] (p1 p2 : 'a -> bool) (s : 'a list) :
+  (forall x, x \in s => p1 x => p2 x) =>
+  count p1 s <= count p2 s.
+proof. elim: s => //#. qed.
+
+lemma countU ['a] (p1 p2 p : 'a -> bool) (s : 'a list) :
+  (forall x, x \in s => p x => p1 x \/ p2 x) =>
+  count p s <= count p1 s + count p2 s.
+proof. elim s => //#. qed.
+
 op has (p : 'a -> bool) xs =
   with xs = []      => false
   with xs = y :: ys => (p y) \/ (has p ys).
@@ -1228,6 +1238,9 @@ proof.
   case: s1 => [|y []] //=; last smt(size_ge0).
   by move=> h; have := h x => /= ->.
 qed.
+
+lemma perm_eq_nil (s : 'a list): perm_eq s [] <=> s = [].
+proof. by split; first apply perm_eq_small. qed.
 
 lemma perm_eq_filter (p : 'a -> bool) (s1 s2 : 'a list):
   perm_eq s1 s2 => perm_eq (filter p s1) (filter p s2).
@@ -3110,6 +3123,23 @@ case=> a b; split => [ab_in_s|].
   by rewrite ab_in_s /= &(mapP); exists (a, b).
 case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
 by case=> a2 b2 /= [_ ->>]; rewrite mem_filter /=.
+qed.
+
+lemma perm_eq_flatten ['a] (s0 s1 : 'a list list) :
+  perm_eq s0 s1 => perm_eq (flatten s0) (flatten s1).
+proof.
+have hs: forall (s: 'a list list), !0 = 1+size s by smt(size_ge0).
+elim s0 s1.
++ by move => s1; rewrite flatten_nil perm_eq_sym perm_eq_nil.
+move => x0 s0 IH s1 h.
+have hx0: x0 \in s1 by rewrite -(perm_eq_mem _ _ h x0).
+rewrite flatten_cons (perm_eq_trans (x0 ++ flatten (rem x0 s1))).
++ by rewrite perm_cat2l IH -(perm_cons x0) (perm_eq_trans s1) 1:h perm_to_rem.
+move: hx0 => {h IH}.
+elim s1 => // x1 s1 IH.
+case (x1 = x0); first by move => ->; rewrite flatten_cons perm_eq_refl.
+move => hx; rewrite eq_sym hx /= => hxs.
+by rewrite !flatten_cons catA perm_catCAl -catA perm_cat2l IH.
 qed.
 
 (* -------------------------------------------------------------------- *)
