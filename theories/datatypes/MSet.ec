@@ -377,8 +377,6 @@ proof. by apply/mset_eqP => x; rewrite !multE; smt(mult_ge0). qed.
 lemma msetU0 (A : 'a mset) : A `|` mset0 = A.
 proof. by apply/mset_eqP => x; rewrite !multE; smt(mult_ge0). qed.
 
-print maxrC.
-
 lemma msetUA (A B C : 'a mset) : A `|` (B `|` C) = A `|` B `|` C.
 proof. by apply/mset_eqP => x; rewrite !multE maxrA. qed.
 
