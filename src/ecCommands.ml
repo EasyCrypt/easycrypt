@@ -401,15 +401,15 @@ let process_print scope p =
 exception Pragma of [`Reset | `Restart]
 
 (* -------------------------------------------------------------------- *)
-let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
+let rec process_type ?(src : string option) (scope : EcScope.scope) (tyd : ptydecl located) =
   EcScope.check_state `InTop "type" scope;
-  let scope  =  EcScope.Ty.add scope tyd in
+  let scope  =  EcScope.Ty.add ?src scope tyd in
   EcScope.notify scope `Info "added type: `%s'" (unloc tyd.pl_desc.pty_name);
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_types (scope : EcScope.scope) tyds =
-  List.fold_left process_type scope tyds
+and process_types ?(src : string option) (scope : EcScope.scope) tyds =
+  List.fold_left (process_type ?src) scope tyds
 
 (* -------------------------------------------------------------------- *)
 and process_subtype (scope : EcScope.scope) (subtype : psubtype located) =
@@ -431,19 +431,19 @@ and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.Ty.add_instance scope (Pragma.get ()).pm_check tci
 
 (* -------------------------------------------------------------------- *)
-and process_module (scope : EcScope.scope) m =
+and process_module ?(src : string option) (scope : EcScope.scope) m =
   EcScope.check_state `InTop "module" scope;
-  EcScope.Mod.add scope m
+  EcScope.Mod.add ?src scope m
 
 (* -------------------------------------------------------------------- *)
-and process_interface (scope : EcScope.scope) intf =
+and process_interface ?(src : string option) (scope : EcScope.scope) intf =
   EcScope.check_state `InTop "interface" scope;
-  EcScope.ModType.add scope intf
+  EcScope.ModType.add ?src scope intf
 
 (* -------------------------------------------------------------------- *)
-and process_operator (scope : EcScope.scope) (pop : poperator located) =
+and process_operator ?(src : string option) (scope : EcScope.scope) (pop : poperator located) =
   EcScope.check_state `InTop "operator" scope;
-  let op, axs, scope = EcScope.Op.add scope pop in
+  let op, axs, scope = EcScope.Op.add ?src scope pop in
   let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
   List.iter
     (fun { pl_desc = name } ->
@@ -455,14 +455,14 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_procop (scope : EcScope.scope) (pop : pprocop located) =
+and process_procop ?(src : string option) (scope : EcScope.scope) (pop : pprocop located) =
   EcScope.check_state `InTop "operator" scope;
-  EcScope.Op.add_opsem scope pop
+  EcScope.Op.add_opsem ?src scope pop
 
 (* -------------------------------------------------------------------- *)
-and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
+and process_predicate ?(src : string option) (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
-  let op, scope = EcScope.Pred.add scope p in
+  let op, scope = EcScope.Pred.add ?src scope p in
   let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
   EcScope.notify scope `Info "added predicate %s %a"
     (unloc p.pl_desc.pp_name) (EcPrinting.pp_added_op ppe) op;
@@ -486,9 +486,9 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
+and process_axiom ?(src : string option) (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add scope (Pragma.get ()).pm_check ax in
+  let (name, scope) = EcScope.Ax.add ?src scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -497,9 +497,9 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_th_open (scope : EcScope.scope) (loca, abs, name) =
+and process_th_open ?(src : string option) (scope : EcScope.scope) (loca, abs, name) =
   EcScope.check_state `InTop "theory" scope;
-  EcScope.Theory.enter scope (if abs then `Abstract else `Concrete) (unloc name) loca
+  EcScope.Theory.enter ?src scope (if abs then `Abstract else `Concrete) (unloc name) loca
 
 (* -------------------------------------------------------------------- *)
 and process_th_close (scope : EcScope.scope) (clears, name) =
@@ -557,7 +557,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
           let commands =
-            List.fold_left 
+            List.fold_left
               (fun scope g -> process_internal subld scope g.gl_action)
               iscope commands in
           commands)
@@ -614,19 +614,21 @@ and process_sct_close (scope : EcScope.scope) name =
   EcScope.Section.exit scope name
 
 (* -------------------------------------------------------------------- *)
-and process_tactics (scope : EcScope.scope) t =
+(* Add and store src for proofs *)
+and process_tactics ?(src : string option) (scope : EcScope.scope) t =
   let mode = (Pragma.get ()).pm_check in
   match t with
-  | `Actual t -> snd (EcScope.Tactics.process scope mode t)
-  | `Proof    -> EcScope.Tactics.proof scope
+  | `Actual t -> snd (EcScope.Tactics.process ?src scope mode t)
+  | `Proof    -> EcScope.Tactics.proof ?src scope
 
 (* -------------------------------------------------------------------- *)
-and process_save (scope : EcScope.scope) ed =
+(* Add and store src for proofs *)
+and process_save ?(src : string option) (scope : EcScope.scope) ed =
   let (oname, scope) =
     match unloc ed with
-    | `Qed   -> EcScope.Ax.save  scope
-    | `Admit -> EcScope.Ax.admit scope
-    | `Abort -> (None, EcScope.Ax.abort scope)
+    | `Qed   -> EcScope.Ax.save ?src scope
+    | `Admit -> EcScope.Ax.admit ?src scope
+    | `Abort -> (None, EcScope.Ax.abort ?src scope)
   in
     oname |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
@@ -748,25 +750,25 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process (ld : Loader.loader) (scope : EcScope.scope) g =
+and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
   let scope =
     match
       match g.pl_desc with
-      | Gtype        t    -> `Fct   (fun scope -> process_types      scope  (List.map (mk_loc loc) t))
+      | Gtype        t    -> `Fct   (fun scope -> process_types      ?src scope  (List.map (mk_loc loc) t))
       | Gsubtype     t    -> `Fct   (fun scope -> process_subtype    scope  (mk_loc loc t))
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
-      | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
-      | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
-      | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
-      | Gprocop      o    -> `Fct   (fun scope -> process_procop     scope  (mk_loc loc o))
-      | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
+      | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)
+      | Ginterface   i    -> `Fct   (fun scope -> process_interface  ?src scope i)
+      | Goperator    o    -> `Fct   (fun scope -> process_operator   ?src scope (mk_loc loc o))
+      | Gprocop      o    -> `Fct   (fun scope -> process_procop     ?src scope (mk_loc loc o))
+      | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  ?src scope (mk_loc loc p))
       | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))
       | Gabbrev      n    -> `Fct   (fun scope -> process_abbrev     scope  (mk_loc loc n))
-      | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
-      | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  name)
+      | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      ?src scope  (mk_loc loc a))
+      | GthOpen      name -> `Fct   (fun scope -> process_th_open    ?src scope  name)
       | GthClose     info -> `Fct   (fun scope -> process_th_close   scope  info)
       | GthClear     info -> `Fct   (fun scope -> process_th_clear   scope  info)
       | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
@@ -780,11 +782,11 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
-      | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Gtactics     t    -> `Fct   (fun scope -> process_tactics    ?src scope  t)
       | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
-      | Gsave        ed   -> `Fct   (fun scope -> process_save       scope  ed)
+      | Gsave        ed   -> `Fct   (fun scope -> process_save       ?src scope  ed)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
@@ -827,7 +829,7 @@ type checkmode = {
   cm_iterate   : bool;
 }
 
-let initial ~checkmode ~boot =
+let initial ~checkmode ~boot ~checkproof =
   let checkall  = checkmode.cm_checkall  in
   let profile   = checkmode.cm_profile   in
   let poptions  = { EcScope.Prover.empty_options with
@@ -850,7 +852,14 @@ let initial ~checkmode ~boot =
                                  scope [tactics; prelude] in
 
   let scope = EcScope.Prover.set_default scope poptions in
-  let scope = if checkall then EcScope.Prover.full_check scope else scope in
+  let scope = if checkproof then
+                begin
+                  if checkall then
+                    EcScope.Prover.full_check scope
+                  else scope
+                end
+              else EcScope.Prover.check_proof scope false
+  in
 
   EcScope.freeze scope
 
@@ -890,10 +899,10 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
-let initialize ~restart ~undo ~boot ~checkmode =
+let initialize ~restart ~undo ~boot ~checkmode ~checkproof =
   assert (restart || EcUtils.is_none !context);
   if restart then Pragma.set dpragma;
-  context := Some (rootctxt ~undo (initial ~checkmode ~boot))
+  context := Some (rootctxt ~undo (initial ~checkmode ~boot ~checkproof))
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
@@ -926,18 +935,29 @@ let undo (olduuid : int) =
     done
 
 (* -------------------------------------------------------------------- *)
+let doc_comment (doc : [`Global | `Item] * string) : unit =
+  let current = oget !context in
+  let scope   = current.ct_current in
+  let scope   = EcScope.DocComment.add scope doc in
+
+  context := Some (push_context scope current)
+
+(* -------------------------------------------------------------------- *)
 let reset () =
   context := Some (rootctxt (oget !context).ct_root)
 
 (* -------------------------------------------------------------------- *)
-let process ?(timed = false) ?(break = false) (g : global_action located) : float option =
+let process
+    ?(src : string option) ?(timed = false) ?(break = false)
+    (g : global_action located) : float option
+=
   ignore break;
 
   let current = oget !context in
   let scope   = current.ct_current in
 
   try
-    let (tdelta, oscope) = EcUtils.timed (process loader scope) g in
+    let (tdelta, oscope) = EcUtils.timed (process ?src loader scope) g in
     oscope |> oiter (fun scope -> context := Some (push_context scope current));
     if timed then
       EcScope.notify scope `Info "time: %f" tdelta;
