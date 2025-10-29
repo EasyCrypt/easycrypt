@@ -853,6 +853,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
               let (l,i) = opfix.opf_struct in
               (List.map (fun i -> i + nb_extra) l, i + nb_extra) in
             OP_Fix {
+                opf_recp     = opfix.opf_recp;
                 opf_args     = extra_a @ opfix.opf_args;
                 opf_resty    = opfix.opf_resty;
                 opf_struct;

@@ -899,7 +899,8 @@ and subst_op_body (s : subst) (bd : opbody) =
   | OP_Fix opfix ->
       let (es, args) = fresh_elocals s opfix.opf_args in
 
-      OP_Fix { opf_args     = args;
+      OP_Fix { opf_recp     = subst_path s opfix.opf_recp;
+               opf_args     = args;
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }

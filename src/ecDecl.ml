@@ -25,11 +25,17 @@ and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
   | `Datatype of ty_dtype
-  | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of ty_record
 ]
 
+and ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+and ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
 and ty_dtype = {
-  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
+  tydt_ctors   : ty_dtype_ctor list;
   tydt_schelim : EcCoreFol.form;
   tydt_schcase : EcCoreFol.form;
 }
@@ -87,6 +93,7 @@ and prbody =
   | PR_Ind   of prind
 
 and opfix = {
+  opf_recp     : EcPath.path;
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
