@@ -1143,6 +1143,7 @@ module Op = struct
       | `Plain e  -> Some (OP_Plain (fs e))
       | `Fix opfx ->
           Some (OP_Fix {
+            opf_recp     = EcPath.pqname (EcEnv.root eenv) (EcIdent.name opfx.EHI.mf_name);
             opf_args     = opfx.EHI.mf_args;
             opf_resty    = opfx.EHI.mf_codom;
             opf_struct   = (opfx.EHI.mf_recs, List.length opfx.EHI.mf_args);
