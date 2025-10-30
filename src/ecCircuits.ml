@@ -118,6 +118,7 @@ module BVOps = struct
     | Some { kind = `Mul _ }      | Some { kind = `Div _ }  
     | Some { kind = `Rem _ }      | Some { kind = `Shl _ }  
     | Some { kind = `Shr _ }      | Some { kind = `Rol _ }  
+    | Some { kind = `Shrs _ }     | Some { kind = `Shls _ }  
     | Some { kind = `Ror _ }      | Some { kind = `And _ }  
     | Some { kind = `Or _ }       | Some { kind = `Xor _ }  
     | Some { kind = `Not _ }      | Some { kind = `Lt _ } 

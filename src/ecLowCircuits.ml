@@ -1605,6 +1605,21 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         let c2, inp2 = new_cbitstring_inp_reg size in
         `CBitstring (Backend.ashr c1 c2), [inp1; inp2] 
 
+      | { kind = `Shls  ((_, Some size1), (_, Some size2)) } -> 
+        let c1, inp1 = new_cbitstring_inp_reg size1 in 
+        let c2, inp2 = new_cbitstring_inp_reg size2 in
+        `CBitstring (Backend.lshl c1 c2), [inp1; inp2] 
+
+      | { kind = `Shrs  ((_, Some size1), (_, Some size2), false) } -> 
+        let c1, inp1 = new_cbitstring_inp_reg size1 in 
+        let c2, inp2 = new_cbitstring_inp_reg size2 in
+        `CBitstring (Backend.lshr c1 c2), [inp1; inp2] 
+
+      | { kind = `Shrs  ((_, Some size1), (_, Some size2), true) } -> 
+        let c1, inp1 = new_cbitstring_inp_reg size1 in 
+        let c2, inp2 = new_cbitstring_inp_reg size2 in
+        `CBitstring (Backend.ashr c1 c2), [inp1; inp2] 
+
       | { kind = `Rol  (_, Some size) } -> 
         let c1, inp1 = new_cbitstring_inp_reg size in 
         let c2, inp2 = new_cbitstring_inp_reg size in

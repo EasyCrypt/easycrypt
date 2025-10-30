@@ -146,6 +146,59 @@ theory BVOperators.
   end BVSHL.
 
   (* ------------------------------------------------------------------ *)
+  abstract theory BVSHR.
+    clone import BV.
+  
+    op bvshr : bv -> bv -> bv.
+  
+    axiom bvshrP (bv1 bv2 : bv) : touint (bvshr bv1 bv2) =
+      touint bv1 %/ 2 ^ (touint bv2).
+  end BVSHR.
+  
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVASHR.
+    clone import BV.
+  
+    op bvashr : bv -> bv -> bv.
+  
+    axiom bvashrP (bv1 bv2 : bv) : tosint (bvashr bv1 bv2) =
+      tosint bv1 %/ 2 ^ (touint bv2).
+  end BVASHR.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVSHLS.
+    clone import BV as BV1.
+    clone import BV as BV2.
+  
+    op bvshls : BV1.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvshlsP (bv1 : BV1.bv) (bv2 : BV2.bv)  : touint (bvshls bv1 bv2) =
+      (touint bv1 * 2 ^ (touint bv2)) %% (2 ^ BV1.size).
+  end BVSHLS.
+
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVSHRS.
+    clone import BV as BV1.
+    clone import BV as BV2.
+  
+    op bvshrs : BV1.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvshrsP (bv1 : BV1.bv) (bv2 : BV2.bv) : touint (bvshrs bv1 bv2) =
+      touint bv1 %/ 2 ^ (touint bv2).
+  end BVSHRS.
+  
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVASHRS.
+    clone import BV as BV1.
+    clone import BV as BV2.
+  
+    op bvashrs : BV1.bv -> BV2.bv -> BV1.bv.
+  
+    axiom bvashrsP (bv1 : BV1.bv) (bv2 : BV2.bv) : tosint (bvashrs bv1 bv2) =
+      tosint bv1 %/ 2 ^ (touint bv2).
+  end BVASHRS.
+
+  (* ------------------------------------------------------------------ *)
   abstract theory BVROL.
     clone import BV.
   
@@ -171,26 +224,6 @@ theory BVOperators.
 
   end BVROR.
   
-  (* ------------------------------------------------------------------ *)
-  abstract theory BVSHR.
-    clone import BV.
-  
-    op bvshr : bv -> bv -> bv.
-  
-    axiom bvshrP (bv1 bv2 : bv) : touint (bvshr bv1 bv2) =
-      touint bv1 %/ 2 ^ (touint bv2).
-  end BVSHR.
-  
-  (* ------------------------------------------------------------------ *)
-  abstract theory BVASHR.
-    clone import BV.
-  
-    op bvashr : bv -> bv -> bv.
-  
-    axiom bvashrP (bv1 bv2 : bv) : tosint (bvashr bv1 bv2) =
-      tosint bv1 %/ 2 ^ (touint bv2).
-  end BVASHR.
-
   (* ------------------------------------------------------------------ *)
   abstract theory BVAnd.
     clone import BV.

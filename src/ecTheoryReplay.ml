@@ -1095,7 +1095,7 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
   let red f = try
     Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
   with 
-    | EcCoreFol.DestrError "int" -> None
+    | EcCoreFol.DestrError "destr_int" -> None
     | EcEnv.NotReducible -> None
   in
 
@@ -1128,7 +1128,7 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
   let red f = try
     Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
   with 
-    | EcCoreFol.DestrError "int" -> None
+    | EcCoreFol.DestrError "destr_int" -> None
     | EcEnv.NotReducible -> None
   in
 
@@ -1161,7 +1161,7 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
   let red f = try
     Some (EcCallbyValue.norm_cbv EcReduction.full_red hyps f |> EcCoreFol.destr_int |> BI.to_int)
   with 
-    | EcCoreFol.DestrError "int" -> None
+    | EcCoreFol.DestrError "destr_int" -> None
     | EcEnv.NotReducible -> None
   in
 

@@ -2543,7 +2543,7 @@ module Circuit = struct
     let size_i = try 
       Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
       with 
-      | DestrError "int" -> None
+      | DestrError "destr_int" -> None
       | EcEnv.NotReducible -> None 
     in
 
@@ -2602,7 +2602,7 @@ module Circuit = struct
     let size_i = try 
       Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
       with 
-      | DestrError "int" -> None
+      | DestrError "destr_int" -> None
       | EcEnv.NotReducible -> None
     in
 
@@ -2650,6 +2650,18 @@ module Circuit = struct
       | "get" -> (fun sz -> `Get (fst (as_seq2 sz))), [`BV None; `BV (Some 1)], "Get"
 
       | "ainit" -> (fun sz -> `AInit (as_seq2 (sz |> List.rev))), [`BV None; `A], "AInit"
+
+      | "shls"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shls (sz1, sz2) in
+          mk, [`BV None; `BV None], "SHLS"
+
+      | "shrs"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shrs (sz1, sz2, false) in
+          mk, [`BV None; `BV None], "SHRS"
+
+      | "ashrs"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shrs (sz1, sz2, true) in
+          mk, [`BV None; `BV None], "ASHLS"
 
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
