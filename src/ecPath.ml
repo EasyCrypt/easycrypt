@@ -306,7 +306,7 @@ let rec pp_m fmt mp =
       Format.fprintf fmt "@[(%a)@]" (pp_list "," pp_m) args in
   match mp.m_top with
   | `Local id ->
-    Format.fprintf fmt "%s%a" (EcIdent.tostring id) pp_args mp.m_args
+    Format.fprintf fmt "%s%a" (EcIdent.name id) pp_args mp.m_args
   | `Concrete(p,None) ->
     Format.fprintf fmt "%s%a" (tostring p) pp_args mp.m_args
   | `Concrete(p,Some sub) ->
@@ -375,7 +375,7 @@ end
 let rec m_tostring (m : mpath) =
   let top, sub =
     match m.m_top with
-    | `Local id -> (EcIdent.tostring id, "")
+    | `Local id -> (EcIdent.name id, "")
 
     | `Concrete (p, sub) ->
       let strsub =
