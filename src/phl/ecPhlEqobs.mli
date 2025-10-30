@@ -9,7 +9,7 @@ open EcCoreGoal.FApi
 (* -------------------------------------------------------------------- *)
 type sim_info = {
   sim_pos  : codepos1 pair option;
-  sim_hint : (xpath option * xpath option * EcPV.Mpv2.t) list * form option;
+  sim_hint : (xpath option * xpath option * EcPV.Mpv2.t) list * ts_inv option;
   sim_eqs  : EcPV.Mpv2.t option;
 }
 

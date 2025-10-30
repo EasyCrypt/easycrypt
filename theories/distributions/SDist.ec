@@ -545,7 +545,6 @@ have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
 eager proc H (={glob Var}) => //; 2: by sim.
     proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
 proc.
-print Game.
 transitivity* {1} {r <@ Game(A, O1e).main(d);}.
 + by inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto.
 rewrite equiv[{1} 1 eq_main_O1e_O1l].

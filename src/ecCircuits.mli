@@ -46,7 +46,6 @@ val circ_taut  : circuit -> bool
 (* Form processors *)
 val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit
 val circ_simplify_form_bitstring_equality :
-  ?mem:EcMemory.memory ->
   ?pstate:pstate ->
   ?pcond:circuit -> hyps -> form -> form
  

@@ -33,7 +33,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
       (mem, (EcTypes.pv_loc (oget x), ty)) (* FIXME *)
     ) hs.hs_m bindings in
 
-  let env = EcEnv.Memory.push_active mem env in
+  let env = EcEnv.Memory.push_active_ss mem env in
 
   let s =
     let ue = EcProofTyping.unienv_of_hyps (FApi.tc1_hyps tc) in
@@ -63,7 +63,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
     let target, tl = List.split_at i zp.z_tail in
 
     let keep = pvtail (EcPV.is_read env tl) zp.z_path in
-    let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) hs.hs_po) in
+    let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (EcAst.hs_po hs).inv) in
 
     begin
       try
@@ -76,7 +76,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
 
   let hs = { hs with hs_s = Zpr.zip zp; hs_m = mem; } in
 
-  FApi.xmutate1 tc `BChange [EcFol.f_hoareS_r hs]
+  FApi.xmutate1 tc `BChange EcAst.[EcFol.f_hoareS (hs.hs_m |> snd) (hs_pr hs) (hs.hs_s) (hs_po hs)]
 
 (* -------------------------------------------------------------------- *)
 type idassign_t = pcodepos * pqsymbol
@@ -85,7 +85,7 @@ type idassign_t = pcodepos * pqsymbol
 let process_idassign ((cpos, pv) : idassign_t) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
-  let env = EcEnv.Memory.push_active hs.hs_m env in
+  let env = EcEnv.Memory.push_active_ss hs.hs_m env in
 
   let cpos = EcTyping.trans_codepos env cpos in
   let pv, pvty = EcTyping.trans_pv env pv in
@@ -94,7 +94,7 @@ let process_idassign ((cpos, pv) : idassign_t) (tc : tcenv1) =
     let s = Zpr.zipper_of_cpos env cpos hs.hs_s in
     let s = { s with z_tail = sasgn :: s.z_tail } in
     { hs with hs_s = Zpr.zip s } in
-  FApi.xmutate1 tc `IdAssign [EcFol.f_hoareS_r hs]
+  FApi.xmutate1 tc `IdAssign EcAst.[EcFol.f_hoareS (hs.hs_m |> snd) (hs_pr hs) (hs.hs_s) (hs_po hs)]
 
 (* -------------------------------------------------------------------- *)
 let process_rw_prgm (mode : rwprgm) (tc : tcenv1) =
@@ -103,3 +103,4 @@ let process_rw_prgm (mode : rwprgm) (tc : tcenv1) =
     process_idassign (cpos, pv) tc
   | `Change (cpos, bindings, i, s) ->
     process_change (cpos, bindings, i, s) tc
+

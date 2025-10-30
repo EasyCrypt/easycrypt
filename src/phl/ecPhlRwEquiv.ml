@@ -6,6 +6,7 @@ open EcAst
 open EcFol
 open EcModules
 open EcPath
+open EcAst
 
 open EcCoreGoal
 open EcCoreGoal.FApi
@@ -95,7 +96,7 @@ let t_rewrite_equiv
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
        | `Right, `LtoR -> EcPhlSym.t_equiv_sym
        | `Right, `RtoL  -> t_id);
-      EcPhlCall.t_call None (f_equivF_r equiv);
+      EcPhlCall.t_call None (f_equivF (ef_pr equiv) equiv.ef_fl equiv.ef_fr (ef_po equiv));
       t_try (t_apply equiv_pt); (* FIXME: Can do better here, we know this applies to just the first sub goal of call *)
       t_try (t_seqs [
         EcPhlInline.process_inline (`ByName (None, None, ([], None)));
@@ -149,7 +150,7 @@ let process_rewrite_equiv info tc =
         begin
           try
             let proc = EcEnv.Fun.by_xpath new_func env in
-            let subenv = EcEnv.Memory.push_active mem env in
+            let subenv = EcEnv.Memory.push_active_ss mem env in
             let ue = EcUnify.UniEnv.create (Some []) in
             let args, ret_ty = EcTyping.trans_args subenv ue (loc pargs) proc.f_sig (unloc pargs) in
             let res = omap (fun v -> EcTyping.transexpcast subenv `InProc ue ret_ty v) pres in

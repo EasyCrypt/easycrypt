@@ -1,14 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
-open EcTypes
-open EcFol
 open EcDecl
-open EcModules
 open EcEnv
 open EcCoreGoal
-open EcMemory
 open EcMatching.Position
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -46,22 +43,21 @@ val tc1_process_exp      : tcenv1 -> [`InProc|`InOp] -> ty option -> pexpr -> ex
 val tc1_process_pattern  : tcenv1 -> pformula -> ptnenv * form
 
 (* Same as previous functions, but for *HL contexts *)
-val tc1_process_Xhl_form     : ?side:side -> tcenv1 -> ty -> pformula -> memenv * form
-val tc1_process_Xhl_formula  : ?side:side -> tcenv1 -> pformula -> memenv * form
-val tc1_process_Xhl_formula_xreal : tcenv1 -> pformula -> memenv * form
+val tc1_process_Xhl_form     : ?side:side -> tcenv1 -> ty -> pformula -> memtype * ss_inv
+val tc1_process_Xhl_formula  : ?side:side -> tcenv1 -> pformula -> memtype * ss_inv
+val tc1_process_Xhl_formula_xreal : tcenv1 -> pformula -> memtype * ss_inv
 
 val tc1_process_Xhl_exp      : tcenv1 -> oside -> ty option -> pexpr -> expr
 
-val tc1_process_prhl_form_opt: tcenv1 -> ty option -> pformula -> form
-val tc1_process_prhl_form    : tcenv1 -> ty -> pformula -> form
-val tc1_process_prhl_formula : tcenv1 -> pformula -> form
-
-val tc1_process_stmt :
-     ?map:EcTyping.ismap -> tcenv1 -> EcMemory.memtype
-  -> pstmt -> stmt
+val tc1_process_prhl_form_opt: tcenv1 -> ty option -> pformula -> ts_inv
+val tc1_process_prhl_form    : tcenv1 -> ty -> pformula -> ts_inv
+val tc1_process_prhl_formula : tcenv1 -> pformula -> ts_inv
 
 val tc1_process_prhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> side -> pstmt -> stmt
+
+val tc1_process_Xhl_stmt :
+     ?map:EcTyping.ismap -> tcenv1 -> pstmt -> stmt
 
 val tc1_process_codepos_range : tcenv1 -> oside * pcodepos_range -> codepos_range
 val tc1_process_codepos : tcenv1 -> oside * pcodepos -> codepos

@@ -355,13 +355,18 @@ let prog_equiv_prod
 *)
 
 let circ_form_eval_plus_equiv 
-  ?(mem = mhr) 
+  ?(mem: memory option) 
   (hyps: hyps) 
   (proc: stmt) 
   (invs: variable list) 
   (f: form) 
   (v : variable) 
   : bool = 
+
+  let mem = match mem with
+  | Some mem -> mem
+  | None -> EcIdent.create "&hr"
+  in
 
   (* ------------------------------------------------------------------ *)
   assert(f.f_ty = tbool);
@@ -394,10 +399,10 @@ let circ_form_eval_plus_equiv
     let insts = List.map (fun i -> 
       match i.i_node with
       | Sasgn (lv, e) -> 
-        let f = form_of_expr mem e in
+        let f = form_of_expr e in
         let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
         let f = EcCallbyValue.norm_cbv redmode hyps f in
-        let e = expr_of_form mem f in
+        let e = expr_of_form f in
         EcCoreModules.i_asgn (lv, e)
       | _ -> i
       ) proc.s_node 
@@ -430,7 +435,7 @@ let circ_form_eval_plus_equiv
     (* FIXME: how many times to reduce here ? *)
     (* ------------------------------------------------------------------ *)
     let f = EcCallbyValue.norm_cbv redmode hyps f in
-    let f = EcCircuits.circ_simplify_form_bitstring_equality ~mem ~pstate ?pcond hyps f in
+    let f = EcCircuits.circ_simplify_form_bitstring_equality ~pstate ?pcond hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
 
     if f <> f_true then
@@ -804,10 +809,10 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
 
   let post_form_of_pv (v: variable * (qsymbol * BI.zint) option) : form =
     match v with
-    | v, None -> f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst)
+    | v, None -> (f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst)).inv
     | {v_type} as v, Some (arr_t, offset) -> 
       let f = f_pvar (pv_loc v.v_name) v.v_type (hr.hs_m |> fst) in
-      array_init_from_form env f (arr_t, offset)
+      array_init_from_form env f.inv (arr_t, offset)
     in
 
   let poutvs = try
@@ -941,7 +946,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
-  let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
+  let tc = EcPhlConseq.t_hoareS_conseq_nm {inv=pre; m=(fst hr.hs_m)} {inv=post; m=(fst hr.hs_m)} tc in (* FIXME: check memory here*)
   FApi.t_last (t_bdep ~debug n m inpvs outvs pcond lane fperm) tc 
 
 
@@ -990,10 +995,10 @@ let process_bdepeq
   let process_block (outvsl: bdepvar list) (outvsr: bdepvar list) = 
     try 
       let outvsl = get_vars env outvsl mem_l |> List.fst in
-      let poutvsl = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) outvsl in
+      let poutvsl = List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)).inv) outvsl in
 
       let outvsr = get_vars env outvsr mem_r |> List.fst in
-      let poutvsr = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) outvsr in
+      let poutvsr = List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)).inv) outvsr in
       List.map2 f_eq poutvsl poutvsr |> f_ands, (outvsl, outvsr)
     with BDepError err -> 
       tc_error pe "Process block failed with error: %s@." err
@@ -1006,7 +1011,7 @@ let process_bdepeq
       tc_error pe "%s" err
   in
   let pinpvsl = try 
-    List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)) inpvsl 
+    List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)).inv) inpvsl 
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -1017,7 +1022,7 @@ let process_bdepeq
       tc_error pe "%s" err
   in
   let pinpvsr = try 
-    List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)) inpvsr 
+    List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)).inv) inpvsr 
     with BDepError err ->
       tc_error pe "%s" err
   in
@@ -1060,7 +1065,7 @@ let process_bdepeq
   let pre = f_and pre prepcond in
   
   (* ------------------------------------------------------------------ *)
-  let tc = EcPhlConseq.t_equivS_conseq_nm pre post tc in
+  let tc = EcPhlConseq.t_equivS_conseq_nm {inv=pre; mr=(fst mem_r); ml=(fst mem_l)} {inv=post; mr=(fst mem_r); ml=(fst mem_l)} tc in (* FIXME: check memory *)
   FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond preprocess) tc 
 
 let t_bdep_form 
@@ -1072,7 +1077,7 @@ let t_bdep_form
   match (FApi.tc1_goal tc).f_node with
   | FhoareS sF ->
     if circ_form_eval_plus_equiv ~mem:(fst sF.hs_m) (FApi.tc1_hyps tc) sF.hs_s invs f v then
-      FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcPhlConseq.t_hoareS_conseq_nm sF.hs_pr (f_and f sF.hs_po) tc)
+      FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcPhlConseq.t_hoareS_conseq_nm (hs_pr sF) {(hs_po sF) with inv=(f_and f sF.hs_po)} tc)
     else tc_error (FApi.tc1_penv tc) "Supplied formula is not always true@."
   | _ -> tc_error (FApi.tc1_penv tc) "Goal should be a Hoare judgement with inlined code@."
 
@@ -1089,7 +1094,7 @@ let process_bdep_form
   let v = get_var env v hr.hs_m |> List.fst |> as_seq1 in
   let ue = EcUnify.UniEnv.create None in
   let env = (toenv hyps) in
-  let env = Memory.push_active hr.hs_m env in
+  let env = Memory.push_active_ss hr.hs_m env in
   let f = EcTyping.trans_prop env ue f in
   assert (EcUnify.UniEnv.closed ue);
   let f = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) f in
@@ -1186,7 +1191,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
 
   (* ------------------------------------------------------------------ *)
   let ue = EcUnify.UniEnv.create None in
-  let env = Memory.push_active hr.hs_m env in
+  let env = Memory.push_active_ss hr.hs_m env in
 
   (* ------------------------------------------------------------------ *)
   let range = EcTyping.trans_form env ue range (tconstr EcCoreLib.CI_List.p_list [tint])in
@@ -1220,12 +1225,12 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   
   (* ------------------------------------------------------------------ *)
   let outvs  = get_vars env outvs hr.hs_m |> List.fst in
-  let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) outvs in
+  let poutvs = List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)).inv) outvs in
   let poutvs = blocks_from_vars env poutvs out_ty in
   
   (* ------------------------------------------------------------------ *)
   let inpvs = get_vars env inpvs hr.hs_m |> List.fst in
-  let finpvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)) inpvs in
+  let finpvs = List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst hr.hs_m)).inv) inpvs in
   let invs, inv_tys =
     let lookup (x : bdepvar) : (ident * ty) list =
       let get1 (v : symbol) =
@@ -1263,7 +1268,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let pre = f_ands (pre::(List.map2 (fun iv ipv -> f_eq iv ipv) finvs finpvs)) in
 
   (* let env, hyps, concl = FApi.tc1_eflat tc in *)
-  let tc = EcPhlConseq.t_hoareS_conseq_nm pre post tc in
+  let tc = EcPhlConseq.t_hoareS_conseq_nm {inv=pre; m=(fst hr.hs_m)} {inv=post; m=(fst hr.hs_m)} tc in
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
 (* TODO: Figure out how to not repeat computations here? *) 

@@ -138,7 +138,7 @@ end
 (* -------------------------------------------------------------------- *)
 let t_swap_r (side : oside) (info : swap_kind) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
-  let stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+  let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
   let stmt = LowInternal.swap_stmt !!tc env info stmt in
   FApi.xmutate1 tc `Swap [EcLowPhlGoal.hl_set_stmt side (FApi.tc1_goal tc) stmt]
 
@@ -157,10 +157,10 @@ let rec process_swap1 (info : (oside * pswap_kind) located) (tc : tcenv1) =
       tc
   else
     let env = FApi.tc1_env tc in
-    let me, _ = EcLowPhlGoal.tc1_get_stmt_with_memory side tc in
+    let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
 
     let process_codepos =
-      let env = EcEnv.Memory.push_active me env in
+      let env = EcEnv.Memory.push_active_ss me env in
       fun p -> EcTyping.trans_codepos1 env p in
 
     let process_codeoffset (o : pcodeoffset1) : codeoffset1 =

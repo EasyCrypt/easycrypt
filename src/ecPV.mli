@@ -1,11 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcPath
-open EcTypes
-open EcModules
-open EcMemory
 open EcEnv
-open EcFol
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
@@ -100,6 +97,7 @@ module PV : sig
   val remove   : env -> prog_var -> t -> t
   val union    : t -> t -> t
   val diff     : t -> t -> t
+  val inter    : t -> t -> t
   val subset   : t -> t -> bool
 
   val interdep     : env -> t -> t -> t
@@ -160,9 +158,10 @@ module Mpv2 : sig
   val empty_local : local
   val enter_local: env -> local -> (EcIdent.t * ty) list ->
                    (EcIdent.t * ty) list -> local
-  val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
-  val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
-  val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
+  val to_form_ts_inv : t -> ts_inv -> ts_inv
+  val to_form : t -> memory -> memory -> form -> form
+  val of_form : env -> ts_inv -> t
+  val needed_eq : env -> ts_inv -> t
   val union   : t -> t -> t
   val subset   : t -> t -> bool
   val equal    : t -> t -> bool

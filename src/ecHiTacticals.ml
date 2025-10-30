@@ -6,6 +6,7 @@ open EcParsetree
 open EcCoreGoal
 open EcCoreGoal.FApi
 open EcHiGoal
+open EcAst
 
 module TTC = EcProofTyping
 
@@ -81,7 +82,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     match (FApi.tc1_goal tc).f_node with
     | FbdHoareS _ | FhoareS _ | FeHoareS _ when not opts.cod_ambient ->
         let _, fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
-        EcPhlCase.t_hl_case fp tc
+        EcPhlCase.t_hl_case (Inv_ss fp) tc
 
     | FequivS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_prhl_formula tc (form_of_gp ()) in
@@ -229,7 +230,6 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
-    | Pprocchange (s, p, f)     -> EcPhlRewrite.process_change s p f
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
     | Pchangestmt (s, p, c)     -> EcPhlRewrite.process_change_stmt s p c 
     | Pbdep bdinfo              -> EcPhlBDep.process_bdep bdinfo

@@ -29,10 +29,19 @@ abstract theory ListPartitioning.
   move=> uniq_P. rewrite Pr[mu_split (mem P (phi i (glob M) res))]; congr.
   elim: P uniq_P=> /=; first by rewrite big_nil Pr[mu_false].
   move=> x xs ih [] x_notin_xs uniq_xs /=.
-  rewrite {1}andb_orr Pr[mu_or] andbCA !andbA andbb.
+  have->:Pr[M.f(i) @ &m :
+     E i (glob M) res /\
+     (phi i (glob M) res = x \/
+      phi i (glob M) res \in xs)] =
+    Pr[M.f(i) @ &m :
+     (E i (glob M) res /\
+      phi i (glob M) res = x) \/
+     ((E i (glob M) res /\ phi i (glob M) res \in xs))].
+  + byequiv => //; conseq (: ={glob M, arg} ==> ={glob M, res}) => //>; 1:smt(); sim.
+  rewrite Pr[mu_or]. 
   have ->: Pr[M.f(i) @ &m: (   E i (glob M) res
                             /\ phi i (glob M) res = x)
-                           /\ mem xs (phi i (glob M) res)]
+                           /\ ( E i (glob M) res /\ mem xs (phi i (glob M) res))]
            = Pr[M.f(i) @ &m: false].
   + by rewrite Pr[mu_eq] // => &hr /#.
   by rewrite Pr[mu_false] //= big_cons {1}/predT /=; congr; exact/ih.
@@ -61,7 +70,13 @@ abstract theory FSetPartitioning.
                    Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (elems P)
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem P (phi i (glob M) res)].
   proof.
-  by rewrite memE; exact/(@list_partitioning M i E phi (elems P) &m _)/uniq_elems.
+  have->: Pr[M.f(i) @ &m :
+      E i (glob M){hr} res{hr} /\ (phi i (glob M){hr} res{hr} \notin P)] =
+    Pr[M.f(i) @ &m :
+       E i (glob M){hr} res{hr} /\ !(phi i (glob M){hr} res{hr} \in (elems P))].
+  - byequiv (: ={glob M, arg} ==> ={glob M, res}) => //; 1:sim. 
+    by move => &1 &2; rewrite memE.
+  exact/(@list_partitioning M i E phi (elems P) &m _)/uniq_elems.
   qed.
   end section.
 end FSetPartitioning.
@@ -88,7 +103,10 @@ abstract theory FPredPartitioning.
                    Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (to_seq P)
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !P (phi i (glob M) res)].
   proof.
-  move=> /mem_to_seq <-.
+  move=> /mem_to_seq H.
+  have->:Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! P (phi i (glob M){hr} res{hr})]=
+         Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (phi i (glob M){hr} res{hr}) \in to_seq P].
+  - by smt().
   apply/(@list_partitioning M i E phi (to_seq P) &m)/uniq_to_seq.
   qed.
   end section.
@@ -110,7 +128,10 @@ theory ResultPartitioning.
     = big predT (fun a=> Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]) (undup (X i))
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem (X i) res].
   proof.
-  rewrite -mem_undup.
+print mem_undup.
+  have->:Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in X i)]=
+         Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in undup (X i))].
+  - smt(mem_undup).
   exact/(@list_partitioning M i E (fun _ _ x=> x) (undup (X i)) &m)/undup_uniq.
   qed.
   end section.
@@ -237,7 +258,7 @@ abstract theory SubuniformReference.
   move=> a_in_X. rewrite (@is_subuniform arg{1} X a &1 support_M a_in_X).
   byphoare (_: (i,xs) = (i,xs){2} ==> _)=> //=; proc; rnd (pred1 a); auto=> />.
   rewrite dscalar1E 1:ltrW 1:gt0_k.
-  + by rewrite duniform_ll 1:xs_def 1:Xi_neq0 //= le1_k.
+  +rewrite duniform_ll 1:xs_def 1:Xi_neq0 //= le1_k.
   by rewrite duniform1E i_def xs_def a_in_X.
   qed.
   end section.

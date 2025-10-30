@@ -744,13 +744,13 @@ let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (
       if debug then Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
-      let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
+      let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
       let pstate = update_pstate pstate v c in
       hyps, pstate
       (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let pstate = List.fold_left (fun (hyps, pstate) (v, e) ->
-        let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
+        let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
         let pstate = update_pstate pstate v c in
         hyps, pstate
       ) (hyps, pstate)
@@ -761,7 +761,7 @@ let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (
         es) in
       pstate
     | Sasgn (LvTuple (vs), e) ->
-      let hyps, c = (form_of_expr mem e |> circuit_of_form ~cache ~pstate hyps) in
+      let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
       let tp = (ctuple_of_circuit ~strict:true c) in
       let comps = circuits_of_circuit_tuple tp in
       let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
@@ -850,7 +850,6 @@ let pstate_of_prog (hyps: hyps) (mem: memory) ?(cache: cache = empty_cache) (pro
 
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality
-  ?(mem = mhr) 
   ?(pstate: pstate = empty_pstate) 
   ?(pcond: circuit option)
   (hyps: hyps) 
