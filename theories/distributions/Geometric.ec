@@ -2,7 +2,7 @@ require import AllCore Real RealSeq RealSeries Xreal StdOrder StdBigop List.
 import RField RealOrder Xreal Distr DBool Bigreal.BRA.
 
 section Parametrized.
-(* The main parameter, generially the probability of success *)
+(* The main parameter, generally the probability of success *)
 declare op p : { real | 0%r < p <= 1%r } as in01_p.
 
 (* Probability mass function. Note that this is the definition
@@ -12,7 +12,7 @@ op geometric = mk g_mass.
 
 local lemma summable_mass : summable g_mass.
 proof.
-apply (summable_from_bounded _ (fun i => Some i)); 1: smt(). 
+apply (summable_from_bounded _ (fun i => Some i)); 1: by split => /#. 
 exists 1%r => n.
 rewrite pmap_some map_id.
 rewrite /partial (@eq_big_seq _ (fun i => p * (1%r - p) ^ i)).
@@ -26,7 +26,8 @@ qed.
 
 local lemma sum_mass : sum g_mass = 1%r. 
 proof.
-rewrite (sumEw _ (fun i => Some i) (fun i => 0 <= i) _ _ summable_mass); 1,2: smt(). 
+rewrite (sumEw _ (fun i => Some i) (fun i => 0 <= i) _ _ summable_mass); 2: smt(). 
+- by split => /#.
 have -> : (fun n => big predT g_mass (pmap (fun i => Some i) (range 0 n))) =
   (fun n => if 0 <= n then (1%r - (1%r - p) ^ n) else 0%r).
 - apply/fun_ext => n. rewrite pmap_some map_id.
@@ -51,9 +52,7 @@ qed.
 
 lemma geometric_ll : is_lossless geometric.
 proof.
-rewrite /is_lossless mu_mass.
-have -> : (fun x => if predT x then mass geometric x else 0%r) = g_mass
-  by smt(massK isdistr_geometric).
+rewrite /is_lossless mu_mass (massK _ isdistr_geometric).
 exact sum_mass.
 qed.
 end section Parametrized.
@@ -104,14 +103,6 @@ rewrite Bernoulli.dbiasedE.
 by auto => />. 
 qed.
 
-local lemma Ep_bool d f :
-  Ep d f = mu1 d false ** f false + mu1 d true ** f true.
-proof.
-have -> := Ep_fin [false; true] d f _ _; 1,2: smt().
-rewrite /big.
-by have -> : map (d ** f) (filter predT [false; true]) =
-  [(d ** f) false; (d ** f) true].
-qed.
 
 local lemma rej_bound &m k :
   Pr[ M.rej() @ &m : res = k ] <= g_mass p k.
@@ -120,7 +111,7 @@ byehoare => //.
 proc.
 while ((-1 <= i /\ (b => 0 <= i)) `|` (if b then b2r (i = k) else
   if i < k then p * (1%r - p) ^ (k - i - 1) else 0%r)%xr); 1,3: by auto => /#. 
-wp. skip => /> &h. rewrite Ep_bool Bernoulli.dbiased1E Bernoulli.dbiased1E.
+wp. skip => /> &h. rewrite Ep_bool_gen Bernoulli.dbiased1E Bernoulli.dbiased1E.
 apply xle_cxr_r => /> *.
 have -> /= : -1 <= i{h} + 1 by smt().
 have -> /= : 0 <= i{h} + 1 by smt().
