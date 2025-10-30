@@ -346,7 +346,7 @@ let pp_lookup_failure fmt e =
     | `MPath   p -> EcPath.m_tostring p
     | `Path    p -> EcPath.tostring p
     | `QSymbol p -> string_of_qsymbol p
-    | `AbsStmt p -> EcIdent.tostring p
+    | `AbsStmt p -> EcIdent.name p
   in
     Format.fprintf fmt "unknown symbol: %s" p
 
@@ -3328,11 +3328,11 @@ module LDecl = struct
 
     | LookupError (`Ident id) ->
         Format.fprintf fmt "unknown identifier `%s`, please report"
-        (EcIdent.tostring id)
+        (EcIdent.tostring_internal id)
 
     | NameClash (`Ident id) ->
         Format.fprintf fmt "name clash for `%s`, please report"
-        (EcIdent.tostring id)
+        (EcIdent.tostring_internal id)
 
   let _ = EcPException.register (fun fmt exn ->
     match exn with
