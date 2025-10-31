@@ -217,7 +217,7 @@ module LospecsBack : CBackend = struct
   let equiv ?(inps: inp list option) ~(pcond: node) (r1: reg) (r2: reg) : bool = 
     let open HL in
     let module BWZ = (val makeBWZinterface ()) in
-    BWZ.circ_equiv ?inps r1 r1 pcond  
+    BWZ.circ_equiv ?inps r1 r2 pcond  
 
   let sat ?(inps: inp list option) (n: node) : bool =
     let open HL in
