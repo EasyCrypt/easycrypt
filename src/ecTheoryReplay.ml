@@ -1140,7 +1140,10 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
     let set    = forpath ba.set in
     let tolist = forpath ba.tolist in
     let oflist = forpath ba.oflist in
-    let type_  = ba.type_ in (* FIXME *)
+    let type_  = match (EcSubst.subst_ty subst (tconstr ba.type_ [tint])).ty_node with (* FIXME: hack *)
+    | Tconstr (p, x::[]) -> p
+    | _ -> assert false; forpath ba.type_
+    in 
     let size   = EcSubst.subst_binding_size ~red subst ba.size in
     let theory = ba.theory in (* FIXME *)
 

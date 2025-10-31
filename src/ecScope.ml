@@ -2482,7 +2482,9 @@ module Circuit = struct
                 |> Msym.of_list;
             ev_global  = 
               (* FIXME PR: get this to work *)
-              [ (Some (loced (Pby None)), Some [`Include, "bydone"])
+              [ 
+(*                 (Some (loced (Pby None)), Some [`Include, "bydone"]) *)
+                (None, None)
               ; (None, None) ]; } } in
 
     let npath = EcPath.pqname (EcEnv.root env) clone.name in
@@ -2661,7 +2663,7 @@ module Circuit = struct
 
       | "ashrs"  -> 
           let mk sz = let sz1, sz2 = as_seq2 sz in `Shrs (sz1, sz2, true) in
-          mk, [`BV None; `BV None], "ASHLS"
+          mk, [`BV None; `BV None], "ASHRS"
 
       | "zextend" ->
         let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in

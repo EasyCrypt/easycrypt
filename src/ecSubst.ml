@@ -1020,7 +1020,7 @@ let subst_binding_size ?(red: (form -> int option) option) (s: subst) (bsize: bi
   let fsize = subst_form s (fst bsize) in
   let csize = match red with
   | Some red when Option.is_none (snd bsize) -> red fsize
-  | _ -> Format.eprintf "Blah@."; (snd bsize) 
+  | _ -> (snd bsize) 
   in (fsize, csize)
 
 let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opkind) = 
