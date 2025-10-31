@@ -1105,7 +1105,10 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
     let touint = forpath bs.touint in
     let tosint = forpath bs.tosint in
     let ofint  = forpath bs.ofint in
-    let type_  = forpath bs.type_ in (* FIXME *)
+    let type_  = match (EcSubst.subst_ty subst (tconstr bs.type_ [])).ty_node with
+      | Tconstr (p, []) -> p
+      | _ -> forpath bs.type_ (* FIXME: fallback *)
+    in
     let theory = forpath bs.theory in (* FIXME *)
     let size   = EcSubst.subst_binding_size ~red subst bs.size in 
 
