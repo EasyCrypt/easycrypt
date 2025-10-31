@@ -276,7 +276,7 @@ module PPEnv = struct
                 let name = EcIdent.name x in
                   match EcEnv.Mod.sp_lookup_opt ([], name) ppe.ppe_env with
                   | Some (p, _, _) when EcPath.mt_equal mp.P.m_top p.P.m_top -> name
-                  | _ -> EcIdent.tostring x
+                  | _ -> EcIdent.name x
           in
             ([], name, None)
 
@@ -354,7 +354,7 @@ module PPEnv = struct
 
   let tyvar (ppe : t) x =
     match Mid.find_opt x ppe.ppe_locals with
-    | None   -> EcIdent.tostring x
+    | None   -> EcIdent.name x
     | Some x -> x
 
   exception FoundUnivarSym of symbol
@@ -620,7 +620,7 @@ let pp_modtype1 (ppe : PPEnv.t) fmt mty =
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
-  Format.fprintf fmt "%s" (EcIdent.tostring x)
+  Format.fprintf fmt "%s" (EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)
 let pp_local ?fv (ppe : PPEnv.t) fmt x =
@@ -836,7 +836,7 @@ let pp_mem (ppe : PPEnv.t) (fmt : Format.formatter) (x as id : memory) =
     else x
   in
     if debug_mode then
-      Format.fprintf fmt "%s<%s>" x (EcIdent.tostring id)
+      Format.fprintf fmt "%s<%s>" x (EcIdent.tostring_internal id)
     else
       Format.fprintf fmt "%s" x
 

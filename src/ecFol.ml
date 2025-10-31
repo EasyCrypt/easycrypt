@@ -1113,14 +1113,14 @@ let rec dump_f f =
   in
 
   match f.f_node with
-  | Fquant (q, bs, f) -> dump_quant q ^ " ( " ^ String.concat ", " (List.map EcIdent.tostring (List.fst bs)) ^ " )" ^ "." ^ dump_f f (* of quantif * bindings * form *)
+  | Fquant (q, bs, f) -> dump_quant q ^ " ( " ^ String.concat ", " (List.map EcIdent.tostring_internal (List.fst bs)) ^ " )" ^ "." ^ dump_f f (* of quantif * bindings * form *)
   | Fif    (c, t, f) -> "IF " ^ dump_f c ^ " THEN " ^ dump_f t ^ " ELSE " ^ dump_f f
   | Fmatch _ -> "MATCH"
   | Flet   (_, f, g) -> "LET _ = " ^ dump_f f ^ " IN " ^ dump_f g
   | Fint    x -> BI.to_string x
-  | Flocal  x -> EcIdent.tostring x
-  | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Flocal  x -> EcIdent.tostring_internal x
+  | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring_internal x ^ "}"
+  | Fglob   (mp, x) -> EcIdent.tostring_internal mp ^ "{" ^ EcIdent.tostring_internal x ^ "}"
   | Fop     (p, _) -> EcPath.tostring p
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
@@ -1130,7 +1130,7 @@ let rec dump_f f =
   | FhoareS _ -> "HoareS"
   | FbdHoareF _ -> "bdHoareF"
   | FbdHoareS ({bhs_m = (m, _)} as hs) ->
-     "bdHoareS [ ME = " ^ EcIdent.tostring m
+     "bdHoareS [ ME = " ^ EcIdent.tostring_internal m
      ^ "; PR = " ^ dump_f (bhs_pr hs).inv
      ^ "; PO = " ^ dump_f (bhs_po hs).inv
      ^ "; BD = " ^ dump_f (bhs_bd hs).inv ^ "]"
@@ -1138,8 +1138,8 @@ let rec dump_f f =
   | FeHoareF _ -> "eHoareF"
   | FequivF _ -> "equivF"
   | FequivS ({es_ml = (ml, _); es_mr = (mr, _)} as es) ->
-     "equivS [ ML = " ^ EcIdent.tostring ml
-     ^ "; MR = " ^ EcIdent.tostring mr
+     "equivS [ ML = " ^ EcIdent.tostring_internal ml
+     ^ "; MR = " ^ EcIdent.tostring_internal mr
      ^ "; PR = " ^ dump_f (es_pr es).inv
      ^ "; PO = " ^ dump_f (es_po es).inv
      ^ "]"

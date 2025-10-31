@@ -39,13 +39,13 @@ module Hty = MSHty.H
 let rec dump_ty ty =
   match ty.ty_node with
   | Tglob p ->
-      EcIdent.tostring p
+      EcIdent.tostring_internal p
 
   | Tunivar i ->
       Printf.sprintf "#%d" i
 
   | Tvar id ->
-      EcIdent.tostring id
+      EcIdent.tostring_internal id
 
   | Ttuple tys ->
       Printf.sprintf "(%s)" (String.concat ", " (List.map dump_ty tys))
