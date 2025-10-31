@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
+open EcUtils
 open EcAst
 open EcCoreGoal
 open EcEnv

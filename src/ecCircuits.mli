@@ -1,0 +1,67 @@
+(* -------------------------------------------------------------------- *)
+open EcIdent
+open EcSymbols
+open EcAst
+open EcEnv
+open LDecl
+open EcLowCircuits
+
+(* -------------------------------------------------------------------- *)
+module Map = Batteries.Map
+
+(* -------------------------------------------------------------------- *)
+exception CircError of string
+
+(* -------------------------------------------------------------------- *)
+(* Utilities (figure out better name) *)
+val circ_red : hyps -> EcReduction.reduction_info
+val width_of_type : env -> ty -> int 
+val circuit_to_string : circuit -> string
+
+(* Pstate utilities *)
+val pstate_get : pstate -> symbol -> circuit
+val pstate_get_opt : pstate -> symbol -> circuit option
+val pstate_get_all : pstate -> circuit list 
+
+(* Cache utilities *)
+val cache_get : cache -> ident -> circuit
+val cache_add : cache -> ident -> circuit -> cache
+val empty_cache : cache
+
+(* Transform circuits *)
+val circuit_ueq : circuit -> circuit -> circuit
+val circuit_aggregate : circuit list -> circuit
+val circuit_aggregate_inps : circuit -> circuit
+val circuit_flatten : circuit -> circuit
+val circuit_permute : int -> (int -> int) -> circuit -> circuit 
+val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list 
+
+(* Use circuits *)
+val compute    : sign:bool -> circuit -> BI.zint list -> BI.zint
+val circ_equiv : ?pcond:circuit -> circuit -> circuit -> bool
+val circ_sat   : circuit -> bool 
+val circ_taut  : circuit -> bool 
+
+(* Generate circuits *)
+(* Form processors *)
+val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit
+val circ_simplify_form_bitstring_equality :
+  ?pstate:pstate ->
+  ?pcond:circuit -> hyps -> form -> form
+ 
+(* Proc processors *)
+val pstate_of_prog : hyps -> memory -> ?cache:cache -> instr list -> variable list -> hyps * pstate 
+val instrs_equiv : hyps -> memenv -> ?cache:cache -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
+val process_instr : hyps -> memory -> cache:cache -> pstate:pstate -> instr -> hyps * pstate
+(* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
+
+(* Temporary? *)
+val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit 
+
+(* Check for uninitialized inputs *)
+val circuit_has_uninitialized : circuit -> int option
+
+val circuit_slice : circuit -> int -> int -> circuit
+val circuit_align_inputs : circuit -> (int * int) option list -> circuit 
+
+val circuit_to_file : name:string -> circuit -> symbol
