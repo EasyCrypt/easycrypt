@@ -594,7 +594,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ~opaque:optransparent ~clinline:(opmode <> `Alias)
                 [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
             (newop, body)
-  
+
         in
           match opmode with
           | `Alias ->
@@ -784,6 +784,14 @@ and replay_ntd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oont) =
     | `Inline `Clear ->
       (subst, ops, proofs, scope)
   end
+
+
+(* -------------------------------------------------------------------- *)
+and replay_excep
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, excep)
+=
+  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_exception (name, excep)) in
+  (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
 and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
@@ -1099,6 +1107,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_operator (x, ({ op_kind = OB_nott _} as oont)) ->
      replay_ntd ove (subst, ops, proofs, scope) (import, x, oont)
+
+  | Th_exception (x, e) ->
+    replay_excep ove (subst, ops, proofs, scope) (import, x, e)
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (import, x, ax)

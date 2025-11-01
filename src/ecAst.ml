@@ -115,7 +115,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcPath.path * expr list
   | Sabstract of EcIdent.t
 
 and stmt = {
@@ -234,19 +234,23 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
+and post = (EcPath.path * form) list
+
 and sHoareF = {
   hf_m  : memory;
   hf_pr : form;
   hf_f  : EcPath.xpath;
   hf_po : form;
+  hf_poe : post
 }
 
 and sHoareS = {
-  hs_m  : memenv;
-  hs_pr : form;
-  hs_s  : stmt;
-  hs_po : form; }
-
+  hs_m   : memenv;
+  hs_pr  : form;
+  hs_s   : stmt;
+  hs_po  : form;
+  hs_poe : post
+}
 
 and eHoareF = {
   ehf_m   : memory;
@@ -292,7 +296,7 @@ and pr = {
   pr_event : ss_inv;
 }
 
-let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv = 
+let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv =
   let m' = match m with
   | Some m -> m
   | None -> (List.hd invs).m in
@@ -318,7 +322,7 @@ let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
   let inv1, inv2 = fn inv.inv in
   let m = inv.m in
   (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty); 
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
   {m;inv=inv1}, {m;inv=inv2}
 
 let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
@@ -335,11 +339,11 @@ type ts_inv = {
 }
 
 let map_ts_inv ?ml ?mr (fn: form list -> form) (invs: ts_inv list): ts_inv =
-  let ml' = match ml with 
-   | Some m -> m 
+  let ml' = match ml with
+   | Some m -> m
    | None -> (List.hd invs).ml in
-  let mr' = match mr with 
-   | Some m -> m 
+  let mr' = match mr with
+   | Some m -> m
    | None -> (List.hd invs).mr in
   let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml' && mr = mr'); inv) invs) in
   { ml = ml'; mr = mr'; inv = inv }
@@ -432,7 +436,7 @@ let ts_inv_lower_left2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
   assert (inv1.mr = inv2.mr);
   let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
   { m = inv1.mr; inv = inv' }
-  
+
 let ts_inv_lower_left3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
     (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
   assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
@@ -512,11 +516,11 @@ let map_inv (fn: form list -> form) (inv: inv list): inv =
   assert (List.length inv > 0);
   match List.hd inv with
   | Inv_ss ss' ->
-      Inv_ss (map_ss_inv fn (List.map (function 
+      Inv_ss (map_ss_inv fn (List.map (function
         Inv_ss ss -> assert (ss.m = ss'.m); ss
         | _ -> failwith "expected all invariants to have same kind") inv))
   | Inv_ts ts' ->
-      Inv_ts (map_ts_inv fn (List.map (function 
+      Inv_ts (map_ts_inv fn (List.map (function
         Inv_ts ts -> assert (ts.ml = ts'.ml && ts.mr = ts'.mr); ts
         | _ -> failwith "expected all invariants to have same kind") inv))
 
@@ -535,7 +539,7 @@ let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
       Inv_ts (map_ts_inv2 fn ts1 ts2)
   | _ ->
       failwith "incompatible invariants for map_inv2"
-  
+
 let map_inv3 (fn: form -> form -> form -> form)
     (inv1: inv) (inv2: inv) (inv3: inv): inv =
   match inv1, inv2, inv3 with
@@ -559,11 +563,13 @@ let ef_po ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_po}
 let es_pr es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_pr}
 let es_po es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_po}
 
-let hf_pr hf = {m=hf.hf_m; inv=hf.hf_pr}
-let hf_po hf = {m=hf.hf_m; inv=hf.hf_po}
+let hf_pr hf =  {m=hf.hf_m; inv=hf.hf_pr}
+let hf_po hf =  {m=hf.hf_m; inv=hf.hf_po}
+let hf_poe hf = List.map (fun (e,f) -> e,{m=hf.hf_m; inv=f}) hf.hf_poe
 
 let hs_pr hs = {m=fst hs.hs_m; inv=hs.hs_pr}
 let hs_po hs = {m=fst hs.hs_m; inv=hs.hs_po}
+let hs_poe hs = List.map (fun (e,f) -> e,{m=fst hs.hs_m; inv=f}) hs.hs_poe
 
 let ehf_pr ehf = {m=ehf.ehf_m; inv=ehf.ehf_pr}
 let ehf_po ehf = {m=ehf.ehf_m; inv=ehf.ehf_po}
@@ -916,14 +922,26 @@ let b_hash (bs : bindings) =
     Why3.Hashcons.combine_list b1_hash 0 bs
 
 (*-------------------------------------------------------------------- *)
+
+let post_equal (e1, f1) (e2,f2) =
+  EcPath.p_equal e1 e2 &&
+  f_equal f1 f2
+
+let posts_equal posts1 posts2 =
+  List.equal post_equal posts1 posts2
+
+(*-------------------------------------------------------------------- *)
+
 let hf_equal hf1 hf2 =
      f_equal hf1.hf_pr hf2.hf_pr
+  && posts_equal hf1.hf_poe hf2.hf_poe
   && f_equal hf1.hf_po hf2.hf_po
   && EcPath.x_equal hf1.hf_f hf2.hf_f
   && mem_equal hf1.hf_m hf2.hf_m
 
 let hs_equal hs1 hs2 =
      f_equal hs1.hs_pr hs2.hs_pr
+  && posts_equal hs1.hs_poe hs2.hs_poe
   && f_equal hs1.hs_po hs2.hs_po
   && s_equal hs1.hs_s hs2.hs_s
   && me_equal hs1.hs_m hs2.hs_m
@@ -989,14 +1007,28 @@ let pr_equal pr1 pr2 =
   && f_equal          pr1.pr_args pr2.pr_args
   && mem_equal        pr1.pr_event.m pr2.pr_event.m
 
+(*-------------------------------------------------------------------- *)
+
+let post_hash (e, f) =
+Why3.Hashcons.combine
+  (EcPath.p_hash e)
+  (f_hash f)
+
+let posts_hash posts =
+  Why3.Hashcons.combine_list post_hash 0 posts
+
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
   Why3.Hashcons.combine3
-    (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f) (mem_hash hf.hf_m)
+  (f_hash hf.hf_pr)
+  (Why3.Hashcons.combine (f_hash hf.hf_po) (posts_hash hf.hf_poe))
+  (EcPath.x_hash hf.hf_f)
+  (mem_hash hf.hf_m)
 
 let hs_hash hs =
   Why3.Hashcons.combine3
-    (f_hash hs.hs_pr) (f_hash hs.hs_po)
+    (f_hash hs.hs_pr)
+    (Why3.Hashcons.combine (f_hash hs.hs_po) (posts_hash hs.hs_poe))
     (s_hash hs.hs_s)
     (me_hash hs.hs_m)
 
@@ -1025,7 +1057,7 @@ let bhs_hash bhs =
     [bhs.bhs_pr;bhs.bhs_po;bhs.bhs_bd]
 
 let ef_hash ef =
-  Why3.Hashcons.combine_list f_hash 
+  Why3.Hashcons.combine_list f_hash
     (Why3.Hashcons.combine3 (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
       (mem_hash ef.ef_ml) (mem_hash ef.ef_mr))
     [ef.ef_pr;ef.ef_po]
@@ -1344,6 +1376,11 @@ module Hsform = Why3.Hashcons.Make (struct
 
   let fv_mlr ml mr = Sid.add ml (Sid.singleton mr)
 
+  let posts_fv init posts =
+    List.fold
+      (fun acc (_,f) -> fv_union (f_fv f) acc)
+      init posts
+
   let fv_node f =
     let union ex nodes =
       List.fold_left (fun s a -> fv_union s (ex a)) Mid.empty nodes
@@ -1371,11 +1408,13 @@ module Hsform = Why3.Hashcons.Make (struct
       fv_union (f_fv f1) fv2
 
     | FhoareF hf ->
-      let fv = fv_union (f_fv hf.hf_pr) (f_fv hf.hf_po) in
+      let fv = f_fv hf.hf_po in
+      let fv = fv_union (f_fv hf.hf_pr) (posts_fv fv hf.hf_poe) in
       EcPath.x_fv (Mid.remove hf.hf_m fv) hf.hf_f
 
     | FhoareS hs ->
-      let fv = fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po) in
+      let fv = f_fv hs.hs_po in
+      let fv = fv_union (f_fv hs.hs_pr) (posts_fv fv hs.hs_poe) in
       fv_union (s_fv hs.hs_s) (Mid.remove (fst hs.hs_m) fv)
 
     | FeHoareF hf ->
@@ -1470,8 +1509,9 @@ module Hinstr = Why3.Hashcons.Make (struct
           in List.all2 forbs bs1 bs2 && s_equal s1 s2
         in e_equal e1 e2 && List.all2 forb b1 b2
 
-    | Sassert e1, Sassert e2 ->
-        (e_equal e1 e2)
+    | Sraise (e1, es1), Sraise (e2, es2) ->
+        (EcPath.p_equal e1 e2)
+        && (List.all2 e_equal es1 es2)
 
     | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
 
@@ -1509,7 +1549,10 @@ module Hinstr = Why3.Hashcons.Make (struct
           in Why3.Hashcons.combine_list forbs (s_hash s) bds
         in Why3.Hashcons.combine_list forb (e_hash e) b
 
-    | Sassert e -> e_hash e
+    | Sraise (e, tys) ->
+      Why3.Hashcons.combine_list e_hash
+          (EcPath.p_hash e)
+          tys
 
     | Sabstract id -> EcIdent.id_hash id
 
@@ -1543,8 +1586,10 @@ module Hinstr = Why3.Hashcons.Make (struct
              (fun s b -> EcIdent.fv_union s (forb b))
              (e_fv e) b
 
-    | Sassert e    ->
-        e_fv e
+    | Sraise (_, args)    ->
+      List.fold_left
+        (fun s a -> EcIdent.fv_union s (e_fv a))
+        Mid.empty args
 
     | Sabstract id ->
         EcIdent.fv_singleton id

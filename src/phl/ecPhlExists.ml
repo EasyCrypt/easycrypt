@@ -20,14 +20,14 @@ let get_to_gens fs =
     let id =
       match f with
       | Inv_ss f -> begin match f.inv.f_node with
-          | Fpvar (pv, m) -> 
+          | Fpvar (pv, m) ->
             id_of_pv pv m
-          | _             -> EcIdent.create "f" 
+          | _             -> EcIdent.create "f"
         end
       | Inv_ts f -> begin match f.inv.f_node with
-          | Fpvar (pv, m) -> 
+          | Fpvar (pv, m) ->
             id_of_pv ~mc:(f.ml, f.mr) pv m
-          | _             -> EcIdent.create "f" 
+          | _             -> EcIdent.create "f"
         end in
     id, f in
   List.map do_id fs
@@ -58,7 +58,7 @@ let t_hr_exists_intro_r fs tc =
   let pre   =
     if is_ehoare then
       map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) (map_inv f_ands eqs)) pre1
-    else 
+    else
       map_inv1 (f_exists bd) (map_inv2 f_and (map_inv f_ands eqs) pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
@@ -105,15 +105,15 @@ let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
   let penv, f_tr =
     match concl.f_node with
-    | FhoareF {hf_f=f;hf_m=m} | FeHoareF {ehf_f=f; ehf_m=m} 
-    | FbdHoareF {bhf_f=f; bhf_m=m} -> 
+    | FhoareF {hf_f=f;hf_m=m} | FeHoareF {ehf_f=f; ehf_m=m}
+    | FbdHoareF {bhf_f=f; bhf_m=m} ->
       fst (LDecl.hoareF m f hyps), Inv_ss {m; inv = f_true}
     | FhoareS {hs_m=(m,_) as me} | FeHoareS {ehs_m=(m,_) as me}
-    | FbdHoareS {bhs_m=(m,_) as me} -> 
+    | FbdHoareS {bhs_m=(m,_) as me} ->
       LDecl.push_active_ss me hyps, Inv_ss {m; inv = f_true}
-    | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps), 
+    | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps),
         Inv_ts {ml=ef.ef_ml; mr=ef.ef_mr; inv=f_true}
-    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps, 
+    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps,
         Inv_ts {ml=(fst es.es_ml); mr=(fst es.es_mr); inv=f_true}
     | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   in

@@ -19,8 +19,8 @@ let t_hoare_app_r i phi tc =
   let hs = tc1_as_hoareS tc in
   let phi = ss_inv_rebind phi (fst hs.hs_m) in
   let s1, s2 = s_split env i hs.hs_s in
-  let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) phi in
-  let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs) in
+  let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) phi (hs_poe hs) in
+  let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs) (hs_poe hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
@@ -51,7 +51,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let s1, s2 = stmt s1, stmt s2 in
   let nR = map_ss_inv1 f_not pR in
   let mt = snd bhs.bhs_m in
-  let cond_phi = f_hoareS mt (bhs_pr bhs) s1 phi in
+  let cond_phi = f_hoareS mt (bhs_pr bhs) s1 phi [] in
   let condf1 = f_bdHoareS mt (bhs_pr bhs) s1 pR bhs.bhs_cmp f1 in
   let condg1 = f_bdHoareS mt (bhs_pr bhs) s1 nR bhs.bhs_cmp g1 in
   let condf2 = f_bdHoareS mt (map_ss_inv2 f_and_simpl phi pR) s2 (bhs_po bhs) bhs.bhs_cmp f2 in
@@ -67,11 +67,11 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
   let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
   let condnm =
-    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2) 
+    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2)
                                 (map_ss_inv1 ((EcUtils.flip f_eq) r2) g2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
-      (f_hoareS (snd bhs.bhs_m) (map_ss_inv2 f_and (bhs_pr bhs) eqs) s1 eqs) in
+      (f_hoareS (snd bhs.bhs_m) (map_ss_inv2 f_and (bhs_pr bhs) eqs) s1 eqs []) in
   let conds = [EcSubst.f_forall_mems_ss_inv bhs.bhs_m condbd; condnm] in
   let conds =
     if   f_equal g1.inv f_r0
@@ -95,7 +95,12 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
 let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
-    let tt1 = EcPhlConseq.t_hoareS_conseq_nm (hs_pr hs) {m=(fst hs.hs_m);inv=f_true} in
+    let tt1 =
+      EcPhlConseq.t_hoareS_conseq_nm
+        (hs_pr hs)
+        {m=(fst hs.hs_m);inv=f_true}
+        (hs_poe hs)
+    in
     let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in
@@ -124,11 +129,11 @@ let t_equiv_app_onesided side i pre post tc =
   let (ml, mr) = fst es.es_ml, fst es.es_mr in
   let s, s', p', q' =
     match side with
-    | `Left  -> 
+    | `Left  ->
       let p' = ss_inv_generalize_right (EcSubst.ss_inv_rebind pre ml) mr in
       let q' = ss_inv_generalize_right (EcSubst.ss_inv_rebind post ml) mr in
       es.es_sl, es.es_sr, p', q'
-    | `Right -> 
+    | `Right ->
       let p' = ss_inv_generalize_left (EcSubst.ss_inv_rebind pre mr) ml in
       let q' = ss_inv_generalize_left (EcSubst.ss_inv_rebind post mr) ml in
       es.es_sr, es.es_sl, p', q'

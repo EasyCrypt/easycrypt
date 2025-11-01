@@ -426,8 +426,9 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise (e,es) ->
+    let es' = List.map (subst_expr s) es in
+    i_raise (e,es')
 
   | Sabstract _ ->
      i
@@ -534,14 +535,24 @@ let rec subst_form (s : subst) (f : form) =
      let s = add_memory s hf.hf_m hf.hf_m in
      let hf_pr = map_ss_inv1 (subst_form s) (hf_pr hf) in
      let hf_po = map_ss_inv1 (subst_form s) (hf_po hf) in
-     f_hoareF hf_pr hf_f hf_po
+     let hf_poe  =
+       List.map
+         (fun (e,f) -> e, map_ss_inv1 (subst_form s) f)
+         (hf_poe hf)
+     in
+     f_hoareF hf_pr hf_f hf_po hf_poe
 
   | FhoareS hs ->
      let hs_s = subst_stmt s hs.hs_s in
      let s, (_,mt) = subst_memtype s hs.hs_m in
      let hs_pr = map_ss_inv1 (subst_form s) (hs_pr hs) in
      let hs_po = map_ss_inv1 (subst_form s) (hs_po hs) in
-     f_hoareS mt hs_pr hs_s hs_po
+     let hs_poe  =
+       List.map
+         (fun (e,f) -> e, map_ss_inv1 (subst_form s) f)
+         (hs_poe hs)
+     in
+     f_hoareS mt hs_pr hs_s hs_po hs_poe
 
   | FbdHoareF bhf ->
      let bhf_f  = subst_xpath s bhf.bhf_f in
@@ -953,6 +964,14 @@ let subst_op (s : subst) (op : operator) =
     op_unfold   = op.op_unfold  ; }
 
 (* -------------------------------------------------------------------- *)
+let subst_excep (s : subst) (e : excep) =
+  let _, tparams = fresh_tparams s e.e_typargs in
+
+  { e_typargs  = tparams     ;
+    e_loca     = e.e_loca    ;
+  }
+
+(* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =
   let s, tparams = fresh_tparams s ax.ax_tparams in
   let spec   = subst_form s ax.ax_spec in
@@ -1023,6 +1042,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
 
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
+
+  | Th_exception (e, es) ->
+      Th_exception (e, subst_excep s es)
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
@@ -1165,14 +1187,14 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   | true, true -> { inv; ml; mr }
   | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
   | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
-  | false, false -> begin 
+  | false, false -> begin
     let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = ml'; mr = mr' }
   end
 
-let f_forall_mems_ts_inv menvl menvr inv = 
+let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
 let ss_inv_forall_ml_ts_inv menvl inv =

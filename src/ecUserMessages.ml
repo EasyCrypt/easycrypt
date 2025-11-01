@@ -423,7 +423,10 @@ end = struct
         msg "unknown type name: %a" pp_qsymbol name
 
     | UnknownFunName name ->
-        msg "unknown procedure: %a" pp_qsymbol name
+      msg "unknown procedure: %a" pp_qsymbol name
+
+    | UnknownExceptionName name ->
+      msg "unknown exception: %a" pp_qsymbol name
 
     | UnknownModVar x ->
         msg "unknown module-level variable: %a" pp_qsymbol x

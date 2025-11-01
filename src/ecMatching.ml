@@ -685,9 +685,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
             failure ();
           let subst =
-            if id_equal hf1.hf_m hf2.hf_m then 
+            if id_equal hf1.hf_m hf2.hf_m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
           assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
           let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
@@ -701,9 +701,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if hf1.bhf_cmp <> hf2.bhf_cmp then
             failure ();
           let subst =
-            if id_equal hf1.bhf_m hf2.bhf_m then 
+            if id_equal hf1.bhf_m hf2.bhf_m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.bhf_m hf2.bhf_m in
           assert (not (Mid.mem hf1.bhf_m mxs) && not (Mid.mem hf2.bhf_m mxs));
           let mxs = Mid.add hf1.bhf_m hf2.bhf_m mxs in
@@ -718,16 +718,16 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if not (EcReduction.EqTest.for_xp env hf1.ef_fr hf2.ef_fr) then
             failure();
           let subst =
-            if id_equal hf1.ef_ml hf2.ef_ml then 
+            if id_equal hf1.ef_ml hf2.ef_ml then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.ef_ml hf2.ef_ml in
           assert (not (Mid.mem hf1.ef_ml mxs) && not (Mid.mem hf2.ef_ml mxs));
           let mxs = Mid.add hf1.ef_ml hf2.ef_ml mxs in
           let subst =
-            if id_equal hf1.ef_mr hf2.ef_mr then 
+            if id_equal hf1.ef_mr hf2.ef_mr then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.ef_mr hf2.ef_mr in
           assert (not (Mid.mem hf1.ef_mr mxs) && not (Mid.mem hf2.ef_mr mxs));
           let mxs = Mid.add hf1.ef_mr hf2.ef_mr mxs in
@@ -743,9 +743,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           doit env (subst, mxs) pr1.pr_args pr2.pr_args;
           let ev1, ev2 = pr1.pr_event, pr2.pr_event in
           let subst =
-            if id_equal ev1.m ev2.m then 
+            if id_equal ev1.m ev2.m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst ev1.m ev2.m in
           assert (not (Mid.mem ev1.m mxs) && not (Mid.mem ev2.m mxs));
           let mxs = Mid.add ev1.m ev2.m mxs in
@@ -1169,9 +1169,16 @@ module FPosition = struct
               f_pr pr.pr_mem pr.pr_fun args' {m;inv=event'}
 
           | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv]) in
+              let (hf_pr, hf_po) =
+                as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv])
+              in
               let m = hf.hf_m in
-              f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po}
+              let hf_poe =
+                List.map
+                  (fun (e,(f:ss_inv)) -> e,{m;inv=as_seq1 (doit p [f.inv])})
+                  (hf_poe hf)
+              in
+              f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po} hf_poe
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =

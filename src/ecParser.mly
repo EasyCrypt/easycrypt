@@ -384,7 +384,7 @@
 %token AMP
 %token APPLY
 %token AS
-%token ASSERT
+%token RAISE
 %token ASSUMPTION
 %token ASYNC
 %token AT
@@ -442,6 +442,7 @@
 %token EQUIV
 %token ETA
 %token EXACT
+%token EXCEP
 %token EXFALSO
 %token EXIST
 %token EXIT
@@ -1222,9 +1223,14 @@ hoare_bd_cmp :
 | EQ { EcAst.FHeq }
 | GE { EcAst.FHge }
 
+epost(P): x=lident COLON post=form_r(P)
+    { let loc = EcLocation.make $startpos $endpos in
+     (EcLocation.mk_loc loc ([], x),post)}
+
 hoare_body(P):
   mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW post=form_r(P)
-    { PFhoareF (m, pre, mp, post) }
+                                                 epost=splist(epost(P), PIPE)
+    { PFhoareF (m, pre, mp, post, epost) }
 
 ehoare_body(P):
   mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW
@@ -1345,8 +1351,9 @@ base_instr:
 | f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
-| ASSERT LPAREN c=expr RPAREN
-    { PSassert c }
+  | RAISE x=lident
+    {let loc = EcLocation.make $startpos $endpos in
+     PSraise (EcLocation.mk_loc loc ([], x), EcLocation.mk_loc loc []) }
 
 instr:
 | bi=base_instr SEMICOLON
@@ -1753,6 +1760,7 @@ tyci_ax:
 | PROOF x=ident BY tg=tactic_core
     { (x, tg) }
 
+
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
 
@@ -1858,6 +1866,14 @@ mcptn(BOP):
 procop:
 | locality=locality PROC OP x=ident EQ f=loc(fident)
     { { ppo_name = x; ppo_target = f; ppo_locality = locality; } }
+
+(* -------------------------------------------------------------------- *)
+(* Exceptions                                                           *)
+excep:
+| locality=locality EXCEP x=oident
+   { { pe_name     = x;
+       pe_typargs   = None;
+       pe_locality = locality; } }
 
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
@@ -2508,17 +2524,36 @@ conseq:
 | UNDERSCORE LONGARROW f2=form    { None, Some f2 }
 | f1=form LONGARROW f2=form       { Some f1, Some f2 }
 
-conseq_xt:
-| c=conseq                                     { c, None }
-| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
-| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform  { (None, None), Some (CQI_bd (cmp, bd)) }
+epost_xt:
+| x=lident COLON f=form
+{ let loc = EcLocation.make $startpos $endpos in
+     (EcLocation.mk_loc loc ([], x), f)}
 
+epostl:
+| PIPE p=epost_xt              { [ p ] }
+| PIPE p=epost_xt a=epostl     { p :: a }
+
+conseq_epost:
+| empty         { None }
+| c=epostl      { Some c }
+
+conseq_xt:
+| c=conseq d=conseq_epost
+    { (fst c, snd c, d), None }
+| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform
+    { (fst c, snd c, None), Some (CQI_bd (cmp, bd)) }
+| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
+    { (None, None, None), Some (CQI_bd (cmp, bd)) }
+
+call_epost:
+| empty          { [] }
+| c=epostl       { c }
 
 call_info:
-| f1=form LONGARROW f2=form          { CI_spec (f1, f2) }
-| f=form                             { CI_inv  f }
-| bad=form COMMA p=form              { CI_upto (bad,p,None) }
-| bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
+| f1=form LONGARROW f2=form poe=call_epost { CI_spec (f1, f2, poe) }
+| f=form poe=call_epost                    { CI_inv  (f, poe) }
+| bad=form COMMA p=form                    { CI_upto (bad,p,None) }
+| bad=form COMMA p=form COMMA q=form       { CI_upto (bad,p,Some q) }
 
 tac_dir:
 | BACKS { Backs }
@@ -3847,6 +3882,7 @@ global_action:
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
+| excep            { Gexception   $1 }
 | procop           { Gprocop      $1 }
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
@@ -3934,6 +3970,11 @@ iplist1_r(X, S):
 
 %inline empty:
 | /**/ { () }
+
+(* -------------------------------------------------------------------- *)
+%inline splist(X, S):
+| /* empty */     { [] }
+| S xs=iplist1_r(X, S) { xs }
 
 (* -------------------------------------------------------------------- *)
 __rlist1(X, S):                         (* left-recursive *)
