@@ -1171,9 +1171,6 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
     | EcEnv.NotReducible -> None
   in
 
-  Format.eprintf "theory path: %s | subst path: %s@." (EcPath.tostring op.theory)
-  (EcPath.tostring @@ EcSubst.subst_path subst op.theory);
-
   try
     let kind     = EcSubst.subst_bv_opkind ~red subst op.kind in
     let operator = forpath op.operator in
