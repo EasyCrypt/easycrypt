@@ -3194,10 +3194,8 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=loc(codepos) offset=codeoffset1 COLON s=brace(stmt)
-   { if not (List.is_empty (fst (unloc pos))) then
-       parse_error (loc pos) (Some "only top-level positions are supported");
-     Pchangestmt (side, (snd (unloc pos), offset), s) }
+| PROC CHANGE side=side? pos=loc(codepos_or_range) COLON s=brace(stmt)
+    { Pchangestmt (side, (unloc pos), s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }

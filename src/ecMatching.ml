@@ -268,6 +268,14 @@ module Zipper = struct
     end
     | `Offset cp1 -> zpr, cp1
 
+  let zipper_and_split_of_cpos_range env cpr s =
+    let zpr, cp = zipper_of_cpos_range env cpr s in
+    match zpr.z_tail with
+    | []      -> raise InvalidCPos
+    | i :: tl ->
+      let s, tl = split_at_cpos1 ~after:`Auto env cp (stmt tl) in
+      (zpr, cp), ((i::s), tl)
+
   let split_at_cpos1 env cpos1 s =
     split_at_cpos1 ~after:`Auto env cpos1 s
 
@@ -308,14 +316,10 @@ module Zipper = struct
       List.rev after
 
   let fold_range env cenv cpr f state s =
-    let zpr, cp = zipper_of_cpos_range env cpr s in
-    match zpr.z_tail with
-    | []      -> raise InvalidCPos
-    | i :: tl ->
-      let s, tl = split_at_cpos1 env cp (stmt tl) in
-      let env = odfl env zpr.z_env in
-      let state', si' = f env cenv state (i :: s) in
-      state', zip { zpr with z_tail = si' @ tl }
+    let (zpr, _), (s, tl) = zipper_and_split_of_cpos_range env cpr s in
+    let env = odfl env zpr.z_env in
+    let state', si' = f env cenv state s in
+    state', zip { zpr with z_tail = si' @ tl }
 
   let map_range env cpr f s =
     snd (fold_range env () cpr (fun env () _ si -> (), f env si) () s)
