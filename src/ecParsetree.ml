@@ -1337,8 +1337,7 @@ type pbind_bvoperator =
 
 (* -------------------------------------------------------------------- *)
 type pbind_circuit =
-  { operator : pqsymbol
-  ; circuit  : string located
+  { bindings : (pqsymbol * string located) list
   ; filename : string located }
 
 (* -------------------------------------------------------------------- *)

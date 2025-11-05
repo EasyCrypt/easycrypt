@@ -255,7 +255,7 @@ module Circuit : sig
   val add_bitstring  : scope -> EcTypes.is_local -> pbind_bitstring -> scope
   val add_array      : scope -> EcTypes.is_local -> pbind_array -> scope
   val add_bvoperator : scope -> EcTypes.is_local -> pbind_bvoperator -> scope
-  val add_circuit    : scope -> EcTypes.is_local -> pbind_circuit -> scope
+  val add_circuits   : scope -> EcTypes.is_local -> pbind_circuit -> scope
 end
 
 (* -------------------------------------------------------------------- *)

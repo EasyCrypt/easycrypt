@@ -2837,18 +2837,18 @@ module Circuit = struct
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
     
     Ax.add_defer scope proofs
-    
-  let add_circuit (scope : scope) (local : is_local) (pc : pbind_circuit) : scope =
+  
+  let add_circuit1 ~filename (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
     let env = env scope in
-    let operator, opdecl = EcEnv.Op.lookup pc.operator.pl_desc env in
+    let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
 
     if not (List.is_empty opdecl.op_tparams) then
-      hierror ~loc:(loc pc.operator) "operator must be monomorphic";
+      hierror ~loc:(loc op) "operator must be monomorphic";
 
-    match EcEnv.Circuit.get_specification_by_name env (unloc pc.filename) (unloc pc.circuit) with
+    match EcEnv.Circuit.get_specification_by_name ~filename env (unloc circ) with
     | None ->
-      hierror ~loc:(loc pc.circuit)
-        "unknown circuit: %s" (unloc pc.circuit)
+      hierror ~loc:(loc circ)
+        "unknown circuit: %s" (unloc circ)
 
     | Some circuit ->
       let sig_ = List.map (fun (_, `W i) -> i) circuit.arguments in
@@ -2856,7 +2856,7 @@ module Circuit = struct
       let dom, codom = EcEnv.Ty.decompose_fun opdecl.op_ty env in
 
       if List.length dom <> List.length sig_ then
-        hierror ~loc:(loc pc.operator)
+        hierror ~loc:(loc op)
           "the given operator must take %d arguments"
           (List.length sig_);
 
@@ -2865,13 +2865,13 @@ module Circuit = struct
         | Some {size = (_, Some bs_size)} when bs_size = size -> ()
         | Some {size = (_, bs_size)} ->
           let ppe = EcPrinting.PPEnv.ofenv env in
-          hierror ~loc:(loc pc.operator)
+          hierror ~loc:(loc op)
             "%d-th argument (of type %a) must be a bitstring of size %d, not %s"
             (position + 1) (EcPrinting.pp_type ppe) ty
             size (Option.value (Option.map string_of_int bs_size) ~default:("abstract")) 
         | None ->
           let ppe = EcPrinting.PPEnv.ofenv env in
-          hierror ~loc:(loc pc.operator)
+          hierror ~loc:(loc op)
             "%d-th argument (of type %a) must be a bitstring"
             (position + 1) (EcPrinting.pp_type ppe) ty
       ) (List.combine dom sig_);
@@ -2881,23 +2881,28 @@ module Circuit = struct
         | Some {size = (_, Some bs_size)} when bs_size = ret -> ()
         | Some {size = (_, bs_size)} ->
           let ppe = EcPrinting.PPEnv.ofenv env in
-          hierror ~loc:(loc pc.operator)
+          hierror ~loc:(loc op)
             "operator return type (%a) must be a bitstring of size %d, not %s"
             (EcPrinting.pp_type ppe) codom ret 
             (Option.value (Option.map string_of_int bs_size) ~default:("abstract"))
         | None ->
           let ppe = EcPrinting.PPEnv.ofenv env in
-          hierror ~loc:(loc pc.operator)
+          hierror ~loc:(loc op)
             "operator return type (%a) must be a bitstring of size %d"
             (EcPrinting.pp_type ppe) codom ret
       end;
 
-      let item = CRB_Circuit { operator; circuit; name = unloc pc.circuit; } in
+      let item = CRB_Circuit { operator; circuit; name = unloc circ; } in
 
       let item =
           EcTheory.mkitem ~import:true
           (EcTheory.Th_crbinding (item, local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
+
+  let add_circuits (scope : scope) (local : is_local) (binds : pbind_circuit) : scope =
+    List.fold_left (fun scope bnd -> 
+      add_circuit1 ~filename:(unloc binds.filename) scope local bnd)
+      scope binds.bindings
 end
 
 (* -------------------------------------------------------------------- *)

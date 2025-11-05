@@ -3914,6 +3914,10 @@ user_red_option:
 
 (* FIXME:merge-bdep generic option parser *)
 
+spec_binding:
+| op=qoident LARROW circ=loc(STRING)
+  { (op, circ) }
+
 cr_binding_r:
 | BIND BITSTRING from_=qoident to_=qoident touint=qoident tosint=qoident ofint=qoident type_=loc(simpl_type_exp) size=sform
   { CRB_Bitstring { from_; to_; touint; tosint; ofint; type_; size; } }
@@ -3927,8 +3931,8 @@ cr_binding_r:
 | BIND OP types=bracket(plist1(qident, AMP)) operator=qoident name=loc(STRING)
   { CRB_BvOperator { types; operator; name; } }
 
-| BIND CIRCUIT operator=qoident circuit=loc(STRING) FROM filename=loc(STRING)
-  { CRB_Circuit { operator; circuit; filename; } }
+| BIND CIRCUIT bindings=plist1(spec_binding, COMMA) FROM filename=loc(STRING)
+  { CRB_Circuit { bindings; filename; } }
 
 %inline cr_binding:
 | locality=is_local binding=cr_binding_r
