@@ -770,9 +770,9 @@ type phltactic =
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Pchangestmt    of side option * (pcodepos1 * pcodeoffset1) * pstmt
-  | Pprocrewrite   of side option * pcodepos * prrewrite
   | Prwprgm of rwprgm
+  | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Pchangestmt    of side option * pcodepos_range * pstmt
 
 
     (* Eager *)

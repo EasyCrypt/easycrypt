@@ -172,12 +172,14 @@ let process_rewrite
 (* -------------------------------------------------------------------- *)
 let t_change_stmt
   (side : side option)
-  (hd, stmt, tl : instr list * instr list * instr list) 
+  (pos : EcMatching.Position.codepos_range) 
   (s : stmt)
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+
+  let (zpr, _), (stmt, epilog) = EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
 
   let pvs = EcPV.is_write env (stmt @ s.s_node) in
   let pvs, globs = EcPV.PV.elements pvs in
@@ -187,8 +189,8 @@ let t_change_stmt
     (EcPV.is_read env s.s_node)
   in
 
-  let mleft = EcIdent.create "1" in (* FIXME: PR: is this how we want to do this? *)
-  let mright = EcIdent.create "2" in
+  let mleft = EcIdent.create "&1" in (* FIXME: PR: is this how we want to do this? *)
+  let mright = EcIdent.create "&2" in
 
   let eq =
    List.map
@@ -217,17 +219,19 @@ let t_change_stmt
        {ml=mleft; mr=mright; inv=f_ands eq}
   in
 
+  let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
+
   let goal2 =
    EcLowPhlGoal.hl_set_stmt
      side (FApi.tc1_goal tc)
-     (EcAst.stmt (List.flatten [hd; s.s_node; tl])) in
+     stmt in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
 
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
-  ((p, o) : pcodepos1 * pcodeoffset1)
+  (pos    : pcodepos_range)
   (s      : pstmt)
   (tc     : tcenv1)
 =
@@ -249,30 +253,16 @@ let process_change_stmt
   | _ -> tc_error !!tc "Wrong goal shape, expecting hoare or equiv goal with inlined code"
   end;
 
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in 
 
-  let p, o =
-   let env = EcEnv.Memory.push_active_ss me env in
-   let pos = EcTyping.trans_codepos1 ~memory:(fst me) env p in
-   let off = EcTyping.trans_codeoffset1 ~memory:(fst me) env o in
-   let off = EcMatching.Position.resolve_offset ~base:pos ~offset:off in
-
-   let start = EcMatching.Zipper.offset_of_position env pos stmt in
-   let end_  = EcMatching.Zipper.offset_of_position env off stmt in
-
-   if (end_ < start) then
-     tc_error !!tc "end position cannot be before start position";
-
-   (start - 1, end_ - start)
+  let pos = 
+    let env = EcEnv.Memory.push_active_ss me env in
+    EcTyping.trans_codepos_range ~memory:(fst me) env pos 
   in
-
-  let stmt     = stmt.s_node in
-  let hd, stmt = List.takedrop p stmt in
-  let stmt, tl = List.takedrop o stmt in
 
   let s = match side with 
   | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
   | None -> EcProofTyping.tc1_process_Xhl_stmt tc s 
   in
 
-  t_change_stmt side (hd, stmt, tl) s tc
+  t_change_stmt side pos s tc
