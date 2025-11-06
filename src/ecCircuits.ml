@@ -26,7 +26,6 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
-
 (* -------------------------------------------------------------------- *)
 let debug : bool = EcLowCircuits.debug
 
@@ -204,7 +203,7 @@ module ArrayOps = struct
     match op with
     | (arr, `ToList) -> assert false (* We do not translate this to circuit *)
     | (arr, `Get) -> begin match args with
-      | [ `Circuit ((`CArray _, inps) as arr); `Constant i] ->
+      | [ `Circuit (({type_ = `CArray _}, inps) as arr); `Constant i] ->
         array_get arr (BI.to_int i)
       | args -> 
         let err = Format.asprintf "Bad inputs to arr get: Expected (arr, idx) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
@@ -219,9 +218,9 @@ module ArrayOps = struct
       end
     | ({size = (_, None)}, `OfList) -> raise (CircError "Array of list with non-concrete size")
     | (_arr, `Set) -> begin match args with
-      | [ `Circuit ((`CArray _, _) as arr); 
+      | [ `Circuit (({type_ = `CArray _}, _) as arr); 
           `Constant i; 
-          `Circuit ((`CBitstring _, _) as bs) ] ->
+          `Circuit (({type_ = `CBitstring _}, _) as bs) ] ->
         array_set arr (BI.to_int i) bs
       | args -> 
         let err = Format.asprintf "Bad inputs to arr set: Expected (arr, idx, new_val) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
@@ -404,13 +403,13 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
   res
 
 let circuit_of_form 
-  ?(pstate  : pstate = empty_pstate) (* Program variable values *)
-  ?(cache   : cache  = empty_cache)
+  ?(st  : state = empty_state) (* Program variable values *)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
   : hyps * circuit =
 
-  let rec doit (cache: cache) (hyps: hyps) (f_: form) : hyps * circuit = 
+  (* State does not get backward propagated so it is not returned *)
+  let rec doit (st: state) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
     let redmode = circ_red hyps in
     (* let redmode = {redmode with delta_p = fun _ -> `No} in *)
@@ -473,17 +472,17 @@ let circuit_of_form
       (* FIXME: check this *)
       | t when t.ty_node = EcTypes.tint.ty_node -> hyps, arg_of_zint (int_of_form f)
       | t when type_is_registered (LDecl.toenv hyps) t -> 
-          let hyps, f = doit cache hyps f in 
+          let hyps, f = doit st hyps f in 
           hyps, arg_of_circuit f
       | {ty_node = Tfun(i_t, c_t)} when 
           i_t.ty_node = EcTypes.tint.ty_node &&
           type_is_registered (LDecl.toenv hyps) c_t ->
-          hyps, arg_of_init (fun i -> snd @@ doit cache hyps (fapply_safe f [f_int (BI.of_int i)]))
+          hyps, arg_of_init (fun i -> snd @@ doit st hyps (fapply_safe f [f_int (BI.of_int i)]))
       | {ty_node = Tconstr(p, [t])} when 
           p = EcCoreLib.CI_List.p_list &&
           type_is_registered (LDecl.toenv hyps) t ->
           let hyps, cs = List.fold_left_map (fun hyps f ->
-            doit cache hyps f) hyps 
+            doit st hyps f) hyps 
             (try 
               (form_list_of_form ~ppenv:(EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)) f)
             with 
@@ -502,14 +501,14 @@ let circuit_of_form
 
     (* Assumes no quantifier bindings/new inputs within if *)
     | Fif (c_f, t_f, f_f) -> 
-        let hyps, t = doit cache hyps t_f in
-        let hyps, f = doit cache hyps f_f in
-        let hyps, c = doit cache hyps c_f in
-        let c = cbool_of_circuit c in
+        let hyps, t = doit st hyps t_f in
+        let hyps, f = doit st hyps f_f in
+        let hyps, c = doit st hyps c_f in
         hyps, circuit_ite ~c ~t ~f
 
     | Flocal idn -> 
-        hyps, cache_get cache idn
+        hyps, state_get st idn
+
     | Fop (pth, _) -> 
       begin
       if pth = EcCoreLib.CI_Witness.p_witness then 
@@ -533,7 +532,7 @@ let circuit_of_form
         let hyps, circ = match (EcEnv.Op.by_path pth env).op_kind with
         | OB_oper (Some (OP_Plain f)) -> 
 (*             if debug then Format.eprintf "[BDEP] Opening definition of function at path %s" (EcPath.tostring pth); *)
-          doit cache hyps f
+          doit st hyps f
         | _ -> 
         begin match EcFol.op_kind (destr_op f_ |> fst) with
           | Some `True -> 
@@ -557,64 +556,55 @@ let circuit_of_form
 
       (* For dealing with iter cases: *)
       | {f_node = Fop _} when form_is_iter f_ -> 
-        trans_iter cache hyps f fs
+        trans_iter st hyps f fs
       | {f_node = Fop (p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
 (*           if debug then Format.eprintf "Attempting to propagate interger arguments for op with path %s@." (EcPath.tostring p); *)
-          doit cache hyps (propagate_integer_arguments f fs)
+          doit st hyps (propagate_integer_arguments f fs)
       | {f_node = Fop _} -> 
       (* Assuming correct types coming from EC *)
       (* FIXME: Add some extra info about errors when something here throws *)
       begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
-          let hyps, c1 = doit cache hyps f1 in
-          let hyps, c2 = doit cache hyps f2 in
+          let hyps, c1 = doit st hyps f1 in
+          let hyps, c2 = doit st hyps f2 in
           hyps, (circuit_eq c1 c2 :> circuit)
         | Some `Not, [f] -> 
-          let hyps, c = doit cache hyps f in
-          let c = cbool_of_circuit c in
-          hyps, (circuit_not c :> circuit)
+          let hyps, c = doit st hyps f in
+          hyps, circuit_not c 
         (* FIXME: Should this be here on inside the module? *)
         | Some `True, [] ->
           hyps, (circuit_true :> circuit)
         | Some `False, [] ->
           hyps, (circuit_false :> circuit)
         | Some `Imp, [f1; f2] -> 
-          let hyps, c1 = doit cache hyps f1 in
-          let hyps, c2 = doit cache hyps f2 in
-          let c1 = cbool_of_circuit ~strict:false c1 in
-          let c2 = cbool_of_circuit ~strict:false c2 in
+          let hyps, c1 = doit st hyps f1 in
+          let hyps, c2 = doit st hyps f2 in
           hyps, (circuit_or (circuit_not c1) c2 :> circuit)
         | Some (`And _), [f1; f2] -> 
-          let hyps, c1 = doit cache hyps f1 in
-          let hyps, c2 = doit cache hyps f2 in
-          let c1 = cbool_of_circuit ~strict:false c1 in
-          let c2 = cbool_of_circuit ~strict:false c2 in
+          let hyps, c1 = doit st hyps f1 in
+          let hyps, c2 = doit st hyps f2 in
           hyps, (circuit_and c1 c2 :> circuit)
         | Some (`Or _), [f1; f2] -> 
-          let hyps, c1 = doit cache hyps f1 in
-          let hyps, c2 = doit cache hyps f2 in
-          let c1 = cbool_of_circuit ~strict:false c1 in
-          let c2 = cbool_of_circuit ~strict:false c2 in
+          let hyps, c1 = doit st hyps f1 in
+          let hyps, c2 = doit st hyps f2 in
           hyps, (circuit_or c1 c2 :> circuit)
         | Some `Iff, [f1; f2] -> 
-          let hyps, c1 = doit cache hyps f1 in
-          let hyps, c2 = doit cache hyps f2 in
-          let c1 = cbool_of_circuit ~strict:false c1 in
-          let c2 = cbool_of_circuit ~strict:false c2 in
+          let hyps, c1 = doit st hyps f1 in
+          let hyps, c2 = doit st hyps f2 in
           hyps, (circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) :> circuit)
-(*         | Some `Not, [f] -> doit cache hyps (f_not f) *)
+(*         | Some `Not, [f] -> doit st hyps (f_not f) *)
         | _ -> (* recurse down into definition *)
-          let hyps, f_c = doit cache hyps f in
+          let hyps, f_c = doit st hyps f in
           let hyps, fcs = List.fold_left_map
-            (doit cache)
+            (doit st)
             hyps fs 
           in
           hyps, circuit_compose f_c fcs
       end
       | _ -> (* recurse down into definition *)
-        let hyps, f_c = doit cache hyps f in
+        let hyps, f_c = doit st hyps f in
         let hyps, fcs = List.fold_left_map
-          (doit cache)
+          (doit st)
           hyps fs 
         in
         hyps, circuit_compose f_c fcs
@@ -626,58 +616,61 @@ let circuit_of_form
       
     | Fquant (qnt, binds, f) -> 
       let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in
-      let cache = open_circ_lambda_cache cache binds in
-      let hyps, circ = doit cache hyps f in
       begin match qnt with
       | Lforall 
-      | Llambda -> hyps, close_circ_lambda binds circ 
+      | Llambda -> circ_lambda_oneshot st binds (fun st -> doit st hyps f)
       | Lexists -> raise (CircError "Universal/Existential quantification not supported")
       (* TODO: figure out how to handle quantifiers *)
       end
+
     | Fproj (f, i) ->
-        let hyps, ftp = doit cache hyps f in
-        let ftp = ctuple_of_circuit ~strict:true ftp in 
+        let hyps, ftp = doit st hyps f in
         hyps, (circuit_tuple_proj ftp i :> circuit)
+
     | Fmatch  (f, fs, ty) -> raise (CircError "Match not supported")
+
     | Flet    (LSymbol (id, t), v, f) -> 
-      let hyps, vc = doit cache hyps v in
-      let cache = update_cache cache id vc in
-      doit cache hyps f
+      let hyps, vc = doit st hyps v in
+      let st = update_state st id vc in
+      doit st hyps f
+
     | Flet    (LTuple vs, v, f) -> 
-      let hyps, vc = doit cache hyps v in
-      let comps = (circuits_of_circuit_tuple (ctuple_of_circuit ~strict:true vc) :> circuit list) in
-      let cache = List.fold_left2 (fun cache (id, t) vc ->
-        update_cache cache id vc)
-        cache
+      let hyps, vc = doit st hyps v in
+      let comps = circuits_of_circuit_tuple vc in
+      let st = List.fold_left2 (fun st (id, t) vc ->
+        update_state st id vc)
+        st
         vs
         comps
-      in doit cache hyps f
+      in doit st hyps f
+
     | Fpvar   (pv, mem) -> 
       let v = match pv with
       | PVloc v -> v
       (* FIXME: Should globals be supported? *)
       | _ -> raise (CircError "Global vars not supported")
       in 
-      let v = match pstate_get_opt pstate v with
+      let v = match state_get_pv_opt st v with
       | Some v -> v
       | None -> 
           if debug then Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv (PPEnv.ofenv env)) pv EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty; 
           circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
       in
       hyps, v
+
     | Fglob (id, mem) -> raise (CircError "glob not supported")
+
     | Ftuple comps -> 
       let hyps, comps = 
-        List.fold_left_map (fun hyps comp -> doit cache hyps comp) hyps comps 
+        List.fold_left_map (fun hyps comp -> doit st hyps comp) hyps comps 
       in
-      let comps = List.map (cbitstring_of_circuit ~strict:true) comps in
       assert (List.for_all (circuit_is_free) (comps :> circuit list));
       hyps, (circuit_tuple_of_circuits comps :> circuit)
-      (*(* FIXME: Change to inps = [] if we disallow definitions/quantifiers inside tuples *)*)
+
     | _ -> raise (CircError "Unsupported form kind in translation")
   
 
-  and trans_iter (cache: cache) (hyps: hyps) (f: form) (fs: form list) =
+  and trans_iter (st: state) (hyps: hyps) (f: form) (fs: form list) =
     (* FIXME: move auxiliary function out of the definitions *)
     let redmode = circ_red hyps in
     let env = toenv hyps in
@@ -694,9 +687,9 @@ let circuit_of_form
       ) in
       List.fold_lefti (fun (hyps, f) i fn -> 
         if debug then Format.eprintf "Translating iteri... Step #%d@." i;
-        let hyps, fn = doit cache hyps fn in
+        let hyps, fn = doit st hyps fn in
         hyps, circuit_compose fn [f]
-      ) (doit cache hyps base) fs
+      ) (doit st hyps base) fs
     (* FIXME PR: this is currently being implemented directly on circuits, do we want this case as well? *)
     | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false 
     | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold -> assert false 
@@ -707,7 +700,7 @@ let circuit_of_form
   let () = if debug then Format.eprintf "Translating form %a@\n" (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) f_ in
 *)
 
-  let hyps, f_c = doit cache hyps f_ in
+  let hyps, f_c = doit st hyps f_ in
 
 (*
   let () = if debug then Format.eprintf "Took %.2f s to translate form : %a@." (Unix.gettimeofday () -. t0) 
@@ -725,7 +718,7 @@ let circuit_of_path (hyps: hyps) (p: path) : hyps * circuit =
   in
   circuit_of_form hyps f
 
-let vars_of_memtype ?pstate (env: env) (mt : memtype) =
+let vars_of_memtype ?st (env: env) (mt : memtype) =
   let Lmt_concrete lmt = mt in
   List.filter_map (function 
     | { ov_name = Some name; ov_type = ty } ->
@@ -734,7 +727,7 @@ let vars_of_memtype ?pstate (env: env) (mt : memtype) =
   ) (Option.get lmt).lmt_decl 
   
 
-let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (inst: instr) : hyps * pstate =
+let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : hyps * state =
   let env = toenv hyps in
 (*   if debug then Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
@@ -745,35 +738,34 @@ let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (
       if debug then Format.eprintf "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
-      let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
-      let pstate = update_pstate pstate v c in
-      hyps, pstate
+      let hyps, c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
+      let st = update_state_pv st v c in
+      hyps, st
       (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
-      let pstate = List.fold_left (fun (hyps, pstate) (v, e) ->
-        let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
-        let pstate = update_pstate pstate v c in
-        hyps, pstate
-      ) (hyps, pstate)
+      let st = List.fold_left (fun (hyps, st) (v, e) ->
+        let hyps, c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
+        let st = update_state_pv st v c in
+        hyps, st
+      ) (hyps, st)
         (List.combine 
           (List.map (function 
           | (PVloc v, _ty) -> v
           | _ -> raise (CircError "Failed to parse tuple assignment")) vs) 
         es) in
-      pstate
+      st
     | Sasgn (LvTuple (vs), e) ->
-      let hyps, c = (form_of_expr e |> circuit_of_form ~cache ~pstate hyps) in
-      let tp = (ctuple_of_circuit ~strict:true c) in
+      let hyps, tp = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
       let comps = circuits_of_circuit_tuple tp in
-      let pstate = List.fold_left2 (fun pstate (pv, _ty) c -> 
+      let st = List.fold_left2 (fun st (pv, _ty) c -> 
         let v = match pv with
         | PVloc v -> v
         | _ -> raise (CircError "Global variables not supported")
         in
-        update_pstate pstate v c 
-        ) pstate vs (comps :> circuit list)
+        update_state_pv st v c 
+        ) st vs (comps :> circuit list)
       in 
-      hyps, pstate
+      hyps, st
     | _ -> 
       let err = Format.asprintf "Instruction not supported: %a@." 
       (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst in
@@ -788,13 +780,12 @@ let process_instr (hyps: hyps) (mem: memory) ~(cache: cache) ~(pstate: pstate) (
       raise @@ CircError err
 
 let instrs_equiv
-   (hyps       : hyps             )
-   ((mem, mt)  : memenv           )
-  ?(cache      : _ = empty_cache  )
-  ?(keep       : EcPV.PV.t option )
-  ?(pstate     : _ = empty_pstate )
-   (s1         : instr list       )
-   (s2         : instr list       ) : bool
+   (hyps       : hyps                )
+   ((mem, mt)  : memenv              )
+  ?(keep       : EcPV.PV.t option    )
+  ?(st         : state = empty_state )
+   (s1         : instr list          )
+   (s2         : instr list          ) : bool
 =
   let env = LDecl.toenv hyps in
 
@@ -809,13 +800,13 @@ let instrs_equiv
 
   let inputs = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) (rd @ wr) in
   let inputs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) inputs in
-  let pstate = open_circ_lambda_pstate empty_pstate inputs in
+  let st = open_circ_lambda st inputs in
 
-  let hyps, pstate1 = List.fold_left (fun (hyps, pstate) -> process_instr ~cache hyps mem ~pstate) (hyps, pstate) s1 in
-  let hyps, pstate2 = List.fold_left (fun (hyps, pstate) -> process_instr ~cache hyps mem ~pstate) (hyps, pstate) s2 in
+  let hyps, st1 = List.fold_left (fun (hyps, st) -> process_instr hyps mem ~st) (hyps, st) s1 in
+  let hyps, st2 = List.fold_left (fun (hyps, st) -> process_instr hyps mem ~st) (hyps, st) s2 in
 
-  let pstate1 = close_circ_lambda_pstate pstate1 inputs in 
-  let pstate2 = close_circ_lambda_pstate pstate2 inputs in
+  let st1 = close_circ_lambda st1 in 
+  let st2 = close_circ_lambda st2 in
   (* FIXME: what was the intended behaviour for keep? *)
   match keep with
   | Some pv -> 
@@ -825,40 +816,40 @@ let instrs_equiv
       | _ -> raise (CircError "global variables not supported")
       ) vs 
     in List.for_all (fun (var, ty) -> 
-      let circ1 = pstate_get_opt pstate1 var in
-      let circ2 = pstate_get_opt pstate2 var in
+      let circ1 = state_get_pv_opt st1 var in
+      let circ2 = state_get_pv_opt st2 var in
       match circ1, circ2 with
       | None, None -> true
       | None, Some circ1
       | Some circ1, None -> false (* Variable only defined on one of the blocks (and not in the prelude) *)
       | Some circ1, Some circ2 -> circ_equiv circ1 circ2 
     ) vs
-  | None -> pstate_get_all pstate |> List.for_all (fun (var, _) -> 
-    let circ1 = pstate_get pstate1 var in
-    let circ2 = pstate_get pstate2 var in
+  | None -> state_get_all_pv st |> List.for_all (fun (var, _) -> 
+    let circ1 = state_get_pv st1 var in
+    let circ2 = state_get_pv st2 var in
     circ_equiv circ1 circ2 
   )
 
-let pstate_of_prog (hyps: hyps) (mem: memory) ?(cache: cache = empty_cache) (proc: instr list) (invs: variable list) : hyps * pstate =
+let state_of_prog (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list) (invs: variable list) : hyps * state =
   let env = LDecl.toenv hyps in
-  let invs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) invs in
-  let pstate = open_circ_lambda_pstate empty_pstate invs in
+  let invs = List.map (fun {v_name; v_type} -> (v_name, ctype_of_ty env v_type)) invs in
+  let st = open_circ_lambda_pv st invs in
 
-  let hyps, pstate = 
-    List.fold_left (fun (hyps, pstate) -> process_instr hyps mem ~cache ~pstate) (hyps, pstate) proc
+  let hyps, st = 
+    List.fold_left (fun (hyps, st) -> process_instr hyps mem ~st) (hyps, st) proc
   in
-  hyps, close_circ_lambda_pstate pstate invs
+  hyps, close_circ_lambda st 
 
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality
-  ?(pstate: pstate = empty_pstate) 
+  ?(st: state = empty_state) 
   ?(pcond: circuit option)
   (hyps: hyps) 
   (f: form)
   : form =
   let env = toenv hyps in
 
-  let pcond = Option.map cbool_of_circuit pcond in
+(*   let pcond = Option.map cbool_of_circuit pcond in *)
 
   let rec check (f : form) =
     match EcFol.sform_of_form f with
@@ -866,8 +857,8 @@ let rec circ_simplify_form_bitstring_equality
          when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
            || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty)
       ->
-      let hyps, c1 = circuit_of_form ~pstate hyps f1 in
-      let hyps, c2 = circuit_of_form ~pstate hyps f2 in
+      let hyps, c1 = circuit_of_form ~st hyps f1 in
+      let hyps, c2 = circuit_of_form ~st hyps f2 in
       (*if debug then Format.eprintf "[W]Testing circuit equivalence for forms:*)
       (*%a@.%a@.With circuits: %s | %s@."*)
       (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1*)
@@ -881,16 +872,11 @@ let rec circ_simplify_form_bitstring_equality
 
 (* Mli stuff needed: *)
 let compute ~(sign: bool) (c: circuit) (args: zint list) : zint = 
-  match compute ~sign (cbitstring_of_circuit ~strict:true c) (List.map (fun z -> arg_of_zint z) args) with
+  match compute ~sign c (List.map (fun z -> arg_of_zint z) args) with
   | Some z -> z
   | None -> raise (CircError "Failed to reduce circuit to constant in compute")
 
 let circ_equiv ?(pcond: circuit option) c1 c2 = 
-  let pcond = match pcond with
-  | Some c -> let c = cbool_of_circuit ~strict:false c in
-    Some c
-  | None -> None
-  in
   circ_equiv ?pcond c1 c2
 
 let circ_sat = circ_sat
@@ -898,26 +884,20 @@ let circ_taut = circ_taut
 
 let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   let c = match c with
-  | (`CBitstring r, inps) as c -> c
+  | ({ type_= `CBitstring _; reg = r}, inps) as c -> c
   | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (permute bsz perm c :> circuit)
 
 let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list = 
   let c = match c, perm with 
-  | (`CBitstring _, inps) as c, None -> c
-  | (`CBitstring _, inps) as c, Some perm -> permute w_out perm c
+  | ({type_ = `CBitstring _}, inps) as c, None -> c
+  | ({type_ = `CBitstring _}, inps) as c, Some perm -> permute w_out perm c
   | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (decompose w_in w_out c :> circuit list)
 
-let cache_get = cache_get
-let cache_add = cache_add
-let empty_cache = empty_cache 
 let circuit_to_string ((circ, inps): circuit) : string = Format.asprintf "(%a => %a)" EcPrinting.(pp_list ", " pp_cinp) inps pp_circ circ
-let pstate_get = pstate_get 
-let pstate_get_opt = pstate_get_opt
-let pstate_get_all = fun pstate -> List.snd (pstate_get_all pstate)
 let circuit_ueq = (fun c1 c2 -> (circuit_eq c1 c2 :> circuit))
 let circuit_aggregate = 
   circuit_aggregate
@@ -935,50 +915,52 @@ let circuit_slice (c: circuit) (size: int) (offset: int) =
 let circuit_align_inputs = 
   align_inputs 
 
-let circuit_flatten (c: circuit) = 
-  (cbitstring_of_circuit ~strict:false c :> circuit)
+let circuit_flatten ((circ, inps) as c: circuit) = 
+  convert_type (`CBitstring (size_of_ctype circ.type_)) c
+
+let state_get = state_get_pv
+let state_get_opt = state_get_pv_opt
+let state_get_all = fun st -> state_get_all_pv st |> List.snd
+
+(*   (cbitstring_of_circuit ~strict:false c :> circuit) *)
 
 (* TODO: get a better name and uniformize *)
-let circuit_of_form_with_hyps ?(pstate = empty_pstate) ?(cache = empty_cache) hyps f : hyps * circuit =
+let circuit_of_form_with_hyps ?(st = empty_state) hyps f : hyps * circuit =
   let env = toenv hyps in
-  let (pstate, cache, f), bnds = List.fold_left_map (fun (pstate, cache, goal) (id, lk) ->
+  let f, bnds = List.fold_left_map (fun goal (id, lk) ->
     if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
     match lk with
     | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
-      let pstate, bnds = List.fold_left_map (fun pstate {ov_name; ov_type} -> 
+      let bnds = List.map (fun {ov_name; ov_type} -> 
         match ov_name with
-        | Some v -> let id = create v in 
-        open_circ_lambda_pstate pstate [(id, ctype_of_ty env ov_type)], Some (id, ctype_of_ty env ov_type)
-        | None -> (pstate, None)
-      ) pstate decls in
-      (pstate, cache, goal), List.filter_map (fun i -> i) bnds 
+        | Some v -> let id = create v in Some (id, ctype_of_ty env ov_type)
+        | None -> None
+      ) decls in
+      goal, List.filter_map (fun i -> i) bnds 
     | EcBaseLogic.LD_var (t, Some f) -> 
-        let cache = open_circ_lambda_cache cache [(id, ctype_of_ty env t)] in
+        let st = open_circ_lambda st [(id, ctype_of_ty env t)] in (* Just to check if it is convertible *)
         begin try 
-          ignore (circuit_of_form ~pstate ~cache hyps f);
-          (pstate, cache, (f_and goal (f_eq (f_local id t) f))), [(id, ctype_of_ty env t)]
-        with _ -> (pstate, cache, f_forall [(id, GTty t)] goal), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
+          ignore (circuit_of_form ~st hyps f);
+          (f_and goal (f_eq (f_local id t) f)), [(id, ctype_of_ty env t)]
+        with _ -> (f_forall [(id, GTty t)] goal), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
         end
     | EcBaseLogic.LD_var (t, None) -> 
-        (pstate, 
-        open_circ_lambda_cache cache [(id, ctype_of_ty env t)],
-        goal), [(id, ctype_of_ty env t)]
+        goal, [(id, ctype_of_ty env t)]
     | EcBaseLogic.LD_hyp f_hyp -> 
         begin try
-          ignore (circuit_of_form ~pstate ~cache hyps f_hyp);
-          (pstate, cache, f_imp f_hyp goal), []
+          ignore (circuit_of_form ~st hyps f_hyp);
+          (f_imp f_hyp goal), []
         with e -> 
           if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
           EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
-          (pstate, cache, goal), []
+          (goal), []
         end
-      | _ -> (pstate, cache, goal), []
-  ) (pstate, cache, f) (List.rev (tohyps hyps).h_local)
+      | _ -> goal, []
+  ) f (List.rev (tohyps hyps).h_local)
   in 
   let bnds = List.flatten bnds in
   if debug then Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
-  let hyps, c = circuit_of_form ~pstate ~cache hyps f in
-  hyps, close_circ_lambda bnds c 
+  circ_lambda_oneshot st bnds (fun st -> circuit_of_form ~st hyps f) 
 
 (*
 (* FIXME : Review *)

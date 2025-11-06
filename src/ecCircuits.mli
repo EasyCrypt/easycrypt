@@ -19,14 +19,9 @@ val width_of_type : env -> ty -> int
 val circuit_to_string : circuit -> string
 
 (* Pstate utilities *)
-val pstate_get : pstate -> symbol -> circuit
-val pstate_get_opt : pstate -> symbol -> circuit option
-val pstate_get_all : pstate -> circuit list 
-
-(* Cache utilities *)
-val cache_get : cache -> ident -> circuit
-val cache_add : cache -> ident -> circuit -> cache
-val empty_cache : cache
+val state_get : state -> symbol -> circuit
+val state_get_opt : state -> symbol -> circuit option
+val state_get_all : state -> circuit list 
 
 (* Transform circuits *)
 val circuit_ueq : circuit -> circuit -> circuit
@@ -44,19 +39,19 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit
+val circuit_of_form : ?st:state -> hyps -> form -> hyps * circuit
 val circ_simplify_form_bitstring_equality :
-  ?pstate:pstate ->
+  ?st:state ->
   ?pcond:circuit -> hyps -> form -> form
  
 (* Proc processors *)
-val pstate_of_prog : hyps -> memory -> ?cache:cache -> instr list -> variable list -> hyps * pstate 
-val instrs_equiv : hyps -> memenv -> ?cache:cache -> ?keep:EcPV.PV.t -> ?pstate:pstate -> instr list -> instr list -> bool
-val process_instr : hyps -> memory -> cache:cache -> pstate:pstate -> instr -> hyps * pstate
+val state_of_prog : hyps -> memory -> ?st:state -> instr list -> variable list -> hyps * state 
+val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
+val process_instr : hyps -> memory -> st:state -> instr -> hyps * state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 (* Temporary? *)
-val circuit_of_form_with_hyps : ?pstate:pstate -> ?cache:cache -> hyps -> form -> hyps * circuit 
+val circuit_of_form_with_hyps : ?st:state -> hyps -> form -> hyps * circuit 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option

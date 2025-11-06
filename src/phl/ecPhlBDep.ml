@@ -127,8 +127,8 @@ let mapreduce
   
   (* ------------------------------------------------------------------ *)
   let pinvs = List.fst invs in
-  let hyps, pstate = try 
-    EcCircuits.pstate_of_prog hyps mem proc.s_node pinvs 
+  let hyps, st = try 
+    EcCircuits.state_of_prog hyps mem proc.s_node pinvs 
   with CircError err ->
     raise (BDepError err)
   in
@@ -137,12 +137,15 @@ let mapreduce
 
   begin 
     let circs = List.map (function 
-      | {v_name}, None -> Option.get (pstate_get_opt pstate v_name)
+      | {v_name}, None -> Option.get (state_get_opt st v_name)
       | {v_name}, Some (sz, offset) ->
-        circuit_slice (Option.get (pstate_get_opt pstate v_name)) sz offset
+        circuit_slice (Option.get (state_get_opt st v_name)) sz offset
       ) 
       outvs 
     in
+    Format.eprintf "Circs[0] = %a@." pp_circuit (List.hd circs);
+    Format.eprintf "Program variable names registered:@.";
+    List.iter (fun (v, _) -> Format.eprintf "%s@." v) (state_get_all_pv st);
     List.iteri (fun i c -> match circuit_has_uninitialized c with
       | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs;
@@ -235,16 +238,16 @@ let prog_equiv_prod
   let tm = Unix.gettimeofday () in
   
   (* ------------------------------------------------------------------ *)
-  let (hyps, pstate_l) : hyps * pstate = try
-    EcCircuits.pstate_of_prog hyps meml proc_l.s_node invs_l 
+  let (hyps, st_l) : hyps * state = try
+    EcCircuits.state_of_prog hyps meml proc_l.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
   let tm = time env tm "Left program generation done" in
 
   (* ------------------------------------------------------------------ *)
-  let (hyps, pstate_r) : hyps * pstate = try
-    EcCircuits.pstate_of_prog hyps memr proc_r.s_node invs_l 
+  let (hyps, st_r) : hyps * state = try
+    EcCircuits.state_of_prog hyps memr proc_r.s_node invs_l 
   with CircError err ->
     raise (BDepError err)
   in
@@ -252,9 +255,9 @@ let prog_equiv_prod
 
   begin 
     (* ------------------------------------------------------------------ *)
-    let circs_l = List.map (fun v -> pstate_get pstate_l v) 
+    let circs_l = List.map (fun v -> state_get st_l v) 
                   (List.map (fun v -> v.v_name) outvs_l) in
-    let circs_r = List.map (fun v -> pstate_get pstate_r v) 
+    let circs_r = List.map (fun v -> state_get st_r v) 
                   (List.map (fun v -> v.v_name) outvs_r) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
@@ -408,15 +411,15 @@ let circ_form_eval_plus_equiv
       ) proc.s_node 
     in
 
-    let hyps, pstate = try
-      EcCircuits.pstate_of_prog hyps mem insts invs 
+    let hyps, st = try
+      EcCircuits.state_of_prog hyps mem insts invs 
     with CircError err ->
       raise (BDepError err)
     in
     
     (* ------------------------------------------------------------------ *)
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
-    let hyps, pcond = match pstate_get_opt pstate v.v_name with
+    let hyps, pcond = match state_get_opt st v.v_name with
       | Some circ -> 
         begin try 
           Option.may (fun i -> 
@@ -435,7 +438,7 @@ let circ_form_eval_plus_equiv
     (* FIXME: how many times to reduce here ? *)
     (* ------------------------------------------------------------------ *)
     let f = EcCallbyValue.norm_cbv redmode hyps f in
-    let f = EcCircuits.circ_simplify_form_bitstring_equality ~pstate ?pcond hyps f in
+    let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ?pcond hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
 
     if f <> f_true then
@@ -471,8 +474,8 @@ let mapreduce_eval
   let tm = time env tm "Lane function circuit generation done" in
   
   (* ------------------------------------------------------------------ *)
-  let hyps, pstate = try 
-    EcCircuits.pstate_of_prog hyps mem proc.s_node invs 
+  let hyps, st = try 
+    EcCircuits.state_of_prog hyps mem proc.s_node invs 
   with CircError err ->
     raise (BDepError err)
   in
@@ -480,7 +483,7 @@ let mapreduce_eval
   let tm = time env tm "Program circuit generation done" in
 
   begin 
-    let circs = List.map (fun v -> pstate_get pstate v) (List.map (fun v -> v.v_name) outvs) in
+    let circs = List.map (fun v -> state_get st v) (List.map (fun v -> v.v_name) outvs) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
       | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
