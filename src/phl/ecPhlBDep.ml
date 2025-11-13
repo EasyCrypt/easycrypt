@@ -1274,12 +1274,90 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let tc = EcPhlConseq.t_hoareS_conseq_nm {inv=pre; m=(fst hr.hs_m)} {inv=post; m=(fst hr.hs_m)} tc in
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
+let process_pre (tc: tcenv1) (m: memenv) (f: form) = 
+  let env = FApi.tc1_env tc in
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  let hyps = FApi.tc1_hyps tc in (* FIXME: should target be specified here? *)
+
+  (* Maybe move this to be a parameter and just supply it from outside *)
+  let st = circuit_state_of_hyps hyps in
+
+  (* Takes in a form of the form /\_i f_i 
+     and returns a list of the conjunction terms [ f_i ]*)
+  let rec destr_conj (f: form) : form list = 
+    match f.f_node with
+    | Fapp ({f_node = Fop (p, _)}, fs) -> begin match EcFol.op_kind p with
+      | Some (`And _) -> List.flatten @@ List.map destr_conj fs
+      | _ -> f::[]
+    end
+    | _ -> f::[]
+  in
+
+  let fs = destr_conj f in
+
+  if debug then Format.eprintf "Destructured conj, obtained:@.%a@."
+    (EcPrinting.pp_list ";@\n" EcPrinting.(pp_form PPEnv.(ofenv env))) fs;
+
+  (* If f is of the form (a_ = a) (aka prog_var = log_var) 
+    then add it to the state, otherwise do nothing *)
+  let rec process_equality (s: state) (f: form) : state = 
+    match f.f_node with
+    | Fapp ({f_node = Fop (p, _);_}, [a; b]) -> begin match EcFol.op_kind p, (EcCallbyValue.norm_cbv (circ_red hyps) hyps a), (EcCallbyValue.norm_cbv (circ_red hyps) hyps b) with
+      | Some `Eq, {f_node = Fpvar (PVloc pv, m_); _}, ({f_node = Flocal id; f_ty; _} as fv)
+      | Some `Eq, ({f_node = Flocal id; f_ty; _} as fv), {f_node = Fpvar (PVloc pv, m_); _} when fst m = m_ -> 
+        if debug then Format.eprintf "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
+        update_state_pv s pv (circuit_of_form ~st hyps fv |> snd)
+      | _ -> s
+    end 
+    | _ -> s
+  in
+
+  let st = List.fold_left process_equality st fs in
+
+  (* If convertible to circuit then add to precondition conjunction.
+     Use state from previous as well *)
+  let rec process_form (f: form) : circuit option = 
+    if debug then
+    Format.eprintf "Processing form: %a@.Simplified version: %a@."
+      EcPrinting.(pp_form ppe) f
+      EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
+    try Some (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) |> snd) with
+    e -> begin if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
+      None end
+  in
+
+  let cs = List.filter_map process_form fs in
+  if debug then Format.eprintf "Translated as much as possible from pre to circuits, got:@.%a@\n"
+    (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
+
+  if debug then Format.eprintf  "In the context of the following bindings in the environment:@\n%a@\n"
+  (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.eprintf "%a@." pp_cinp cinp)) (state_lambdas st);
+
+  List.fold_left circuit_and circuit_true cs, st
+
+
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
   (tc : tcenv1) =
   begin 
     let hyps = (FApi.tc1_hyps tc) in
     let goal = (FApi.tc1_goal tc) in
+    match goal.f_node with 
+    | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
+      let cpre, st = process_pre tc hs_m hs_pr in
+      let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
+      let hyps, cpost = circuit_of_form ~st hyps hs_po in
+(*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
+      let cgoal = circuit_or (circuit_not cpre) cpost in
+      let cgoal = state_close_circuit st cgoal in
+      assert (Option.is_none @@ circuit_has_uninitialized cgoal);
+(*
+      if debug then Format.eprintf "circuit goal: %a@." pp_circuit cgoal;
+      if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
+*)
+      if (circ_taut cgoal) then FApi.close (!@ tc) VBdep else
+      raise (BDepError "Failed to verify postcondition")
+    | _ -> 
     let ctxt = tohyps hyps in
     assert (ctxt.h_tvar = []);
     if circ_taut (circuit_of_form_with_hyps hyps goal |> snd) then

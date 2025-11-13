@@ -33,6 +33,8 @@ module type CBackend = sig
   (* Id + offset, both assumed starting at 0 *)
   type inp = int * int
 
+  val pp_node : Format.formatter -> node -> unit
+
   exception NonConstantCircuit (* FIXME: Rename later *)
 
   val true_ : node
@@ -150,6 +152,9 @@ module LospecsBack : CBackend = struct
   type node = C.node
   type reg = C.node array
   type inp = int * int
+
+  let pp_node (fmt : Format.formatter) (n: node) = 
+    Format.fprintf fmt "%a" Lospecs.Aig.pp_node n
 
   exception NonConstantCircuit (* FIXME: Rename later *)
 
@@ -470,6 +475,8 @@ module type CircuitInterface = sig
   }
   type 'a cfun = 'a * (cinp list)
   type circuit = circ cfun 
+
+  val pp_flatcirc : Format.formatter -> flatcirc -> unit
   
   module CArgs : sig
     type arg = 
@@ -501,6 +508,9 @@ module type CircuitInterface = sig
     val state_get_opt : state -> ident -> circuit option
     val state_get : state -> ident -> circuit 
     val state_bindings : state -> (ident * circuit) list
+    val state_lambdas : state -> cinp list
+    val state_is_closed : state -> bool
+    val state_close_circuit : state -> circuit -> circuit 
     val map_state_var : (ident -> circuit -> circuit) -> state -> state
 
     (* Circuit lambdas, for managing inputs *)
@@ -550,6 +560,9 @@ module type CircuitInterface = sig
   val new_cbitstring_inp : ?name:[`Str of string | `Idn of ident] -> int -> circ * cinp
   val new_carray_inp : ?name:[`Str of string | `Idn of ident] -> int -> int -> circ * cinp
   val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> int list -> circ * cinp
+
+  (* Construct an input *)
+  val input_of_ctype : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circuit
 
   (* Aggregation functions *)
   val circuit_aggregate : circuit list -> circuit
@@ -629,6 +642,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let (|->) ((a,b)) ((f,g)) = (f a, g b)
   let idnt = fun x -> x
 
+  let pp_flatcirc fmt fc = 
+    let r = Backend.node_list_of_reg fc in
+    List.iter (fun n ->
+      Format.fprintf fmt "%a@." Backend.pp_node n
+    ) r
 
   let circ_of_zint ~(size: int) (i: zint) : circ = 
     {reg = Backend.reg_of_zint ~size i; type_= `CBitstring size }
@@ -724,6 +742,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let state_get_opt (st: state) (id: ident) : circuit option = Mid.find_opt id st.circs 
     let state_get (st: state) (id: ident) : circuit = Mid.find id st.circs 
     let state_bindings (st: state) : (ident * circuit) list = Mid.bindings st.circs 
+    let state_lambdas (st: state) : cinp list = st.lambdas |> List.rev |> List.flatten
+    let state_is_closed (st: state) : bool = List.is_empty st.lambdas
+    let state_close_circuit (st: state) ((c, inps): circuit) : circuit = 
+      c, List.fold_left (fun inps lamb -> lamb @ inps) inps st.lambdas
+
     let map_state_var (f: (ident -> circuit -> circuit)) (st: state) : state = 
       {st with circs = Mid.mapi f st.circs}
 
@@ -768,8 +791,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Inputs helper functions *)
   let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
-    (* FIXME: hack *)
-    if cs = ds then cs 
+(*
+    Format.eprintf "Comparing input lists: @.";
+    List.iter (Format.eprintf "%a " pp_cinp) cs;
+    Format.eprintf "@.";
+    List.iter (Format.eprintf "%a " pp_cinp) ds;
+    Format.eprintf "@.";
+*)
+    if List.for_all2 (fun {id=id1; type_=ct1} {id=id2; type_=ct2} -> id1 = id2 && ct1 = ct2) cs ds then cs 
     else cs @ ds
 
   let merge_inputs_list (cs: cinp list list) : cinp list =
@@ -924,6 +953,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = tp; type_ = `CTuple szs},
     { type_ = `CTuple szs; id; }
 
+  let input_of_ctype ?(name : [`Str of string | `Idn of ident | `Bad ] = `Str "input") (ct: ctype) : circuit = 
+    let id, c = match name with
+    | `Str name -> let id = EcIdent.create name |> tag in
+      id, Backend.input_of_size ~id (size_of_ctype ct)    
+    | `Idn idn -> let id = idn.id_tag in
+      id, Backend.input_of_size ~id (size_of_ctype ct)    
+    | `Bad ->
+      -1, Backend.bad_reg (size_of_ctype ct)
+    in
+    { reg = c; type_ = ct; }, [{ id; type_ = ct; }]
+
   let circuit_true  = {reg = Backend.reg_of_node Backend.true_; type_=`CBool}, [] 
   let circuit_false  = {reg = Backend.reg_of_node Backend.false_; type_=`CBool}, [] 
 
@@ -935,7 +975,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let circuit_or ((c, cinps): circuit) ((d, dinps): circuit) = 
     if c.type_ = d.type_ then
-      { reg = Backend.land_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
+      { reg = Backend.lor_ c.reg d.reg; type_ = c.type_ }, merge_inputs cinps dinps
     else
       raise (CircError "Cannot logical or circuits of different types ")
 
@@ -1074,7 +1114,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { type_ = `CTuple szs; id } -> (id, List.sum szs) 
 
     ) inps in
-    Backend.sat ~inps c 
+    Backend.taut ~inps c 
 
   (* Dependency analysis related functions. These assume one input/output and all bitstring types *)
   (* For more complex circuits, we might be able to simulate this with a int -> (int, int) map *)

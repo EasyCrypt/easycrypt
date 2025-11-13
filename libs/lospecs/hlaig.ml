@@ -138,8 +138,18 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     end
 
 
+  (* TODO: better encoding of smt terms ? *)
   let circ_sat ?(inps: (int * int) list option) (n : Aig.node) : bool =
     let bvvars : SMT.bvterm Map.String.t ref = ref Map.String.empty in
+
+    begin match inps with
+    | None -> ()
+    | Some inps -> List.iter (fun (id, sz) -> 
+      List.iter (fun i -> 
+        let name = ("BV_" ^ (string_of_int id) ^ "_" ^ (Printf.sprintf "%05X" i)) in
+        bvvars := Map.String.add name (SMT.bvterm_of_name 1 name) !bvvars) 
+        (List.init sz identity)) inps
+    end;
 
     let rec bvterm_of_node : Aig.node -> SMT.bvterm =
       let cache = Hashtbl.create 0 in

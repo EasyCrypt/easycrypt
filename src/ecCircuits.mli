@@ -17,11 +17,15 @@ exception CircError of string
 val circ_red : hyps -> EcReduction.reduction_info
 val width_of_type : env -> ty -> int 
 val circuit_to_string : circuit -> string
+val ctype_of_ty : env -> ty -> ctype
 
-(* Pstate utilities *)
+(* State utilities *)
 val state_get : state -> symbol -> circuit
 val state_get_opt : state -> symbol -> circuit option
 val state_get_all : state -> circuit list 
+
+(* Create circuits *)
+val input_of_type : name:[`Str of string | `Idn of ident | `Bad] -> env -> ty -> circuit
 
 (* Transform circuits *)
 val circuit_ueq : circuit -> circuit -> circuit
@@ -52,6 +56,7 @@ val process_instr : hyps -> memory -> st:state -> instr -> hyps * state
 
 (* Temporary? *)
 val circuit_of_form_with_hyps : ?st:state -> hyps -> form -> hyps * circuit 
+val circuit_state_of_hyps : ?st:state -> hyps -> state 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option

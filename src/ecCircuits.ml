@@ -79,6 +79,10 @@ let shape_of_array_type (env: env) (t: ty) : (int * int) =
     match ctype_of_ty env t with
     | `CArray (w, n) -> (n, w)
     | _ -> raise (CircError "shape_of_array_type on non array type")
+
+let input_of_type ~name (env: env) (t: ty) : circuit = 
+  let ct = ctype_of_ty env t in
+  input_of_ctype ~name ct 
     
 (* Should correspond to QF_ABV *) 
 module BVOps = struct
@@ -664,7 +668,7 @@ let circuit_of_form
       let hyps, comps = 
         List.fold_left_map (fun hyps comp -> doit st hyps comp) hyps comps 
       in
-      assert (List.for_all (circuit_is_free) (comps :> circuit list));
+(*       assert (List.for_all (circuit_is_free) (comps :> circuit list)); *)
       hyps, (circuit_tuple_of_circuits comps :> circuit)
 
     | _ -> raise (CircError "Unsupported form kind in translation")
@@ -924,7 +928,60 @@ let state_get_all = fun st -> state_get_all_pv st |> List.snd
 
 (*   (cbitstring_of_circuit ~strict:false c :> circuit) *)
 
-(* TODO: get a better name and uniformize *)
+(* Generally called without the optional argument, here just to see if we need it,
+   maybe remove later? FIXME *)
+let circuit_state_of_hyps ?(st = empty_state) hyps : state = 
+  let env = toenv hyps in
+  let st = List.fold_left (fun st (id, lk) ->
+    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
+    match lk with
+(*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
+      They are either given a value by assignment in the program or if they are used 
+      before that they are implicitly initialized to BAD 
+
+      if above is correct then remove whole comment block otherwise rework it
+    | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
+      let bnds = List.map (fun {ov_name; ov_type} -> 
+        match ov_name with
+        | Some v -> let id = create v in Some (id, ctype_of_ty env ov_type)
+        | None -> None
+      ) decls in
+      List.filter_map (fun i -> i) bnds 
+*)
+
+    (* Initialized variable. 
+       Check if body is convertible to circuit, if not just process it as uninitialized.
+       TODO: Maybe do a first pass on this, check convertibility and remove duplicates? *)
+    | EcBaseLogic.LD_var (t, Some f) -> 
+        begin try
+          update_state st id (circuit_of_form ~st hyps f |> snd)
+        with CircError _ -> 
+          open_circ_lambda st [(id, ctype_of_ty env t)]
+        end
+
+      (* Uninitialized variable.
+       Treat as input *)
+    | EcBaseLogic.LD_var (t, None) -> 
+        open_circ_lambda st [(id, ctype_of_ty env t)]
+
+    (* Some formula which we know to hold. Ignore for now? 
+       TODO: FIXME: What to do with this in general? Maybe process it separately in another function
+    | EcBaseLogic.LD_hyp f_hyp -> 
+        begin try
+          ignore (circuit_of_form ~st hyps f_hyp);
+          (f_imp f_hyp goal), []
+        with e -> 
+          if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
+          EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
+          (goal), []
+        end
+*)
+      | _ -> st 
+  ) st (List.rev (tohyps hyps).h_local)
+  in 
+  st
+
+(* FIXME: Remove this and replace with a call to above *)
 let circuit_of_form_with_hyps ?(st = empty_state) hyps f : hyps * circuit =
   let env = toenv hyps in
   let f, bnds = List.fold_left_map (fun goal (id, lk) ->
