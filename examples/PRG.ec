@@ -337,7 +337,7 @@ section.
     inline Resample.resample Psample.init F.init.
     rcondf{2} 7;
       first by move=> &hr; rnd; wp; conseq (_: _ ==> true) => //.
-    by wp; rnd; wp; rnd{2} predT; auto; rewrite dseed_ll.
+    by wp; rnd; wp; rnd{2}; auto; rewrite dseed_ll.
   (* presampling ~ postsampling *)
   seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
   eager (H: Resample.resample(); ~ Resample.resample();
