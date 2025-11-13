@@ -587,10 +587,10 @@ let wp_equiv_rnd_r bij tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_rnd_r side pos bij_info tc =
-  match side, pos with
-  | Some side, None ->
+  match side, pos, bij_info with
+  | Some side, None, (None, None) ->
      wp_equiv_disj_rnd_r side tc
-  | None, _ -> begin
+  | None, _, _ -> begin
       let pos =
         match pos with
         | None -> None
