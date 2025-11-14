@@ -465,7 +465,7 @@ end
 
 module type CircuitInterface = sig
   type flatcirc
-  type ctype = [`CArray of (int * int) | `CBitstring of int | `CTuple of int list | `CBool ]
+  type ctype = [`CArray of (int * int) | `CBitstring of int | `CTuple of ctype list | `CBool ]
   type cinp = {
     type_ : ctype;
     id: int
@@ -561,7 +561,7 @@ module type CircuitInterface = sig
   val new_cbool_inp : ?name:[`Str of string | `Idn of ident] -> unit -> circ * cinp
   val new_cbitstring_inp : ?name:[`Str of string | `Idn of ident] -> int -> circ * cinp
   val new_carray_inp : ?name:[`Str of string | `Idn of ident] -> int -> int -> circ * cinp
-  val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> int list -> circ * cinp
+  val new_ctuple_inp : ?name:[`Str of string | `Idn of ident] -> ctype list -> circ * cinp
 
   (* Construct an input *)
   val input_of_ctype : ?name:[`Str of string | `Idn of ident | `Bad] -> ctype -> circuit
@@ -627,7 +627,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   type ctype = [
     `CArray of (width * count) 
   | `CBitstring of width 
-  | `CTuple of width list 
+  | `CTuple of ctype list 
   | `CBool ]
   type circ = {
     reg: flatcirc; 
@@ -656,19 +656,19 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let circuit_of_zint ~(size: int) (i: zint) : circuit =
     ((circ_of_zint ~size i, []) :> circuit)
 
-  let size_of_ctype (t: ctype) : int = 
+  let rec size_of_ctype (t: ctype) : int = 
     match t with 
     | `CBitstring n -> n
     | `CArray (n, w) -> n*w
-    | `CTuple szs -> List.sum szs
+    | `CTuple tys -> List.sum (List.map size_of_ctype tys)
     | `CBool -> 1
 
   (* Pretty printers *)
-  let pp_ctype (fmt: Format.formatter) (t: ctype) : unit = 
+  let rec pp_ctype (fmt: Format.formatter) (t: ctype) : unit = 
     match t with
     | `CArray (w, n)  -> Format.fprintf fmt "Array(%d@%d)" n w 
     | `CBool -> Format.fprintf fmt "Bool"
-    | `CTuple szs -> Format.fprintf fmt "Tuple(%a)" (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") Format.pp_print_int) szs
+    | `CTuple szs -> Format.fprintf fmt "Tuple(%a)" (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") pp_ctype) szs
     | `CBitstring w -> Format.fprintf fmt "Bitstring@%d" w
 
   let pp_cinp (fmt: Format.formatter) (inp: cinp) : unit = 
@@ -825,9 +825,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         {type_ = `CArray (w', n'); id=id_orig} when w = w' && n = n' -> 
           List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
             map (List.init (w*n) (fun i -> i))
-      | {type_ = `CTuple szs ; id=id_tgt},
-        {type_ = `CTuple szs'; id=id_orig} when szs = szs' -> 
-          let w = List.sum szs in
+      | {type_ = `CTuple tys ; id=id_tgt},
+        {type_ = `CTuple tys'; id=id_orig} when List.for_all2 (=) tys tys' -> 
+          let w = List.sum (List.map size_of_ctype tys) in
           List.fold_left (fun map i -> Map.add (id_orig, i) (Backend.input_node ~id:id_tgt i) map) 
             map (List.init (w) (fun i -> i))
       | {type_ = `CBool; id=id_tgt},
@@ -853,23 +853,24 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | _ -> false
 
   (* Circuit tuples *)
-  let circuit_tuple_proj (({reg = r; type_= `CTuple ws}, inps): circuit) (i: int) =
-    let idx, w = List.takedrop i ws in
-    let w = List.hd w in
-    let idx = List.fold_left (+) 0 idx in
-    {reg = (Backend.slice r idx w); type_ = `CBitstring w}, inps
+  let circuit_tuple_proj (({reg = r; type_= `CTuple tys}, inps): circuit) (i: int) =
+    let idx, ty = List.takedrop i tys in
+    let ty = List.hd ty in
+    let idx = List.fold_left (+) 0 (List.map size_of_ctype idx) in
+    {reg = (Backend.slice r idx (size_of_ctype ty)); type_ = ty}, inps
 
   let circuit_tuple_of_circuits (cs: circuit list) : circuit = 
-    let lens = List.map (function (`CBitstring w) -> w | _ -> assert false) (List.map (fun (c : circuit) -> (fst c).type_) cs) in 
+    let tys = (List.map (fun (c : circuit) -> (fst c).type_) cs) in 
     let circ = Backend.flatten (List.map (fun (c : circuit) -> (fst c).reg) cs) in 
     let inps = List.snd cs in
-    {reg = circ; type_= `CTuple lens }, merge_inputs_list inps
+    {reg = circ; type_= `CTuple tys}, merge_inputs_list inps
 
   let circuits_of_circuit_tuple (({reg= tp; type_=`CTuple szs}, tpinps) : circuit) : circuit list = 
     snd @@ List.fold_left_map 
-      (fun idx sz -> 
+      (fun idx ty -> 
+        let sz = (size_of_ctype ty) in
         (idx + sz, 
-        ({reg = (Backend.slice tp idx sz); type_ = `CBitstring sz}, tpinps)))
+        ({reg = (Backend.slice tp idx sz); type_ = ty}, tpinps)))
       0 szs 
 
   (* Convert a circuit's output to a given circuit type *)
@@ -878,17 +879,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (* When types are the same, do nothing *)
     | (`CArray (w, n), `CArray (w', n')) when w = w' && n = n' -> circ 
     | (`CBitstring n, `CBitstring n') when n = n' -> circ
-    | (`CTuple szs, `CTuple szs') when szs = szs' -> circ
+    | (`CTuple tys, `CTuple tys') when List.for_all2 (=) tys tys' -> circ
     | (`CBool, `CBool) -> circ
 
     (* Bistring => Type conversions *)
     | (`CArray (w, n), `CBitstring n') when w * n = n' -> { c with type_ = t }, inps 
-    | (`CTuple szs, `CBitstring n) when List.sum szs = n -> { c with type_ = t}, inps 
+    | (`CTuple tys, `CBitstring n) when List.sum @@ List.map size_of_ctype tys = n -> { c with type_ = t}, inps 
     | (`CBool, `CBitstring 1) -> { c with type_ = t}, inps 
 
     (* Type => Bitstring conversions *)
     | (`CBitstring n, `CArray (w', n')) when n = w' * n' -> { c with type_ = t}, inps
-    | (`CBitstring n, `CTuple szs') when n = List.sum szs' -> { c with type_ = t}, inps
+    | (`CBitstring n, `CTuple tys') when n = List.sum @@ List.map size_of_ctype tys' -> { c with type_ = t}, inps
     | (`CBitstring 1, `CBool) -> {c with type_ = t}, inps
 
     (* Fail on everything else *)
@@ -949,17 +950,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = arr; type_ = `CArray (el_sz, arr_sz)}, 
     { type_ = `CArray (el_sz, arr_sz); id; } 
 
-  let new_ctuple_inp ?(name = `Str "input") (szs: int list) : circ * cinp =
+  let new_ctuple_inp ?(name = `Str "input") (tys: ctype list) : circ * cinp =
     let id, tp = match name with 
     | `Str name -> let id = EcIdent.create name |> tag in
-    id, Backend.input_of_size ~id (List.sum szs)
+    id, Backend.input_of_size ~id (List.sum @@ List.map size_of_ctype tys)
     | `Idn idn -> let id = tag idn in
-    id, Backend.input_of_size ~id (List.sum szs)
+    id, Backend.input_of_size ~id (List.sum @@ List.map size_of_ctype tys)
     | `Bad ->
-      -1, Backend.bad_reg (List.sum szs)
+      -1, Backend.bad_reg (List.sum @@ List.map size_of_ctype tys)
     in
-    { reg = tp; type_ = `CTuple szs},
-    { type_ = `CTuple szs; id; }
+    { reg = tp; type_ = `CTuple tys},
+    { type_ = `CTuple tys; id; }
 
   let input_of_ctype ?(name : [`Str of string | `Idn of ident | `Bad ] = `Str "input") (ct: ctype) : circuit = 
     let id, c = match name with
@@ -1087,7 +1088,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { type_ = `CBool; id } -> (id, 1)
       | { type_ = `CBitstring w; id } -> (id, w) 
       | { type_ = `CArray (w1, w2); id } -> (id, w1*w2)
-      | { type_ = `CTuple szs; id } -> (id, List.sum szs) 
+      | { type_ = `CTuple tys; id } -> (id, List.sum @@ List.map size_of_ctype tys) 
 
     ) inps1 in
     if (c1.type_ = c2.type_) then
@@ -1104,7 +1105,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { type_ = `CBool; id } -> (id, 1)
       | { type_ = `CBitstring w; id } -> (id, w) 
       | { type_ = `CArray (w1, w2); id } -> (id, w1*w2)
-      | { type_ = `CTuple szs; id } -> (id, List.sum szs) 
+      | { type_ = `CTuple tys; id } -> (id, List.sum @@ List.map size_of_ctype tys) 
 
     ) inps in
     Backend.sat ~inps c 
@@ -1119,7 +1120,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { type_ = `CBool; id } -> (id, 1)
       | { type_ = `CBitstring w; id } -> (id, w) 
       | { type_ = `CArray (w1, w2); id } -> (id, w1*w2)
-      | { type_ = `CTuple szs; id } -> (id, List.sum szs) 
+      | { type_ = `CTuple tys; id } -> (id, List.sum @@ List.map size_of_ctype tys) 
 
     ) inps in
     Backend.taut ~inps c 
@@ -1202,13 +1203,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | `CArray _ -> raise (CircError "Bad array slice")
     | `CBitstring w -> 
         { reg =  (Backend.slice c.reg offset size); type_ = `CBitstring size}, inps
-    | `CTuple szs ->
-        assert (List.length szs >= offset + size);
-        let offset, szs = List.takedrop offset szs in
-        let offset = List.sum offset in
-        let szs = (List.take size szs) in 
-        let sz = List.sum szs in
-        {reg = (Backend.slice c.reg offset sz); type_ = `CTuple szs}, inps
+    | `CTuple tys ->
+        assert (List.length tys >= offset + size);
+        let offset, tys = List.takedrop offset tys in
+        let offset = List.sum @@ List.map size_of_ctype offset in
+        let tys = (List.take size tys) in 
+        let sz = List.sum @@ List.map size_of_ctype tys in
+        {reg = (Backend.slice c.reg offset sz); type_ = `CTuple tys}, inps
     | `CBool -> 
         raise (CircError "Cannot slice boolean circuit")
 
@@ -1369,8 +1370,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         (size + w, Map.add id (size, w) map) 
       | { type_ = `CArray (w, n); id} ->
         (size + (w*n), Map.add id (size, w*n) map)
-      | { type_ = `CTuple szs; id} ->
-        let w = List.sum szs in
+      | { type_ = `CTuple tys; id} ->
+        let w = List.sum @@ List.map size_of_ctype tys in
         (size + w, Map.add id (size, w) map)
       | { type_ = `CBool; id} ->
         (size + 1, Map.add id (size, 1) map)

@@ -42,9 +42,9 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
 type width = int
 exception CircError of string
 
-let ctype_of_ty (env: env) (ty: ty) : ctype = 
+let rec ctype_of_ty (env: env) (ty: ty) : ctype = 
   match ty.ty_node with
-  | Ttuple tys -> `CTuple (List.map (fun t -> EcEnv.Circuit.lookup_bitstring_size env t |> Option.get) tys)
+  | Ttuple tys -> `CTuple (List.map (ctype_of_ty env) tys)
   | Tconstr (pth, []) when pth = EcCoreLib.CI_Bool.p_bool -> `CBool
   | _ -> begin
     match EcEnv.Circuit.lookup_array_and_bitstring env ty with
