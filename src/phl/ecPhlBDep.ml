@@ -137,15 +137,15 @@ let mapreduce
 
   begin 
     let circs = List.map (function 
-      | {v_name}, None -> Option.get (state_get_opt st v_name)
+      | {v_name}, None -> Option.get (state_get_opt st mem v_name)
       | {v_name}, Some (sz, offset) ->
-        circuit_slice (Option.get (state_get_opt st v_name)) sz offset
+        circuit_slice (Option.get (state_get_opt st mem v_name)) sz offset
       ) 
       outvs 
     in
     Format.eprintf "Circs[0] = %a@." pp_circuit (List.hd circs);
     Format.eprintf "Program variable names registered:@.";
-    List.iter (fun (v, _) -> Format.eprintf "%s@." v) (state_get_all_pv st);
+    List.iter (fun ((m, v), _) -> Format.eprintf "%s{%s}@." v (name m)) (state_get_all_pv st);
     List.iteri (fun i c -> match circuit_has_uninitialized c with
       | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
       | None -> ()) circs;
@@ -255,9 +255,9 @@ let prog_equiv_prod
 
   begin 
     (* ------------------------------------------------------------------ *)
-    let circs_l = List.map (fun v -> state_get st_l v) 
+    let circs_l = List.map (fun v -> state_get st_l meml v) 
                   (List.map (fun v -> v.v_name) outvs_l) in
-    let circs_r = List.map (fun v -> state_get st_r v) 
+    let circs_r = List.map (fun v -> state_get st_r memr v) 
                   (List.map (fun v -> v.v_name) outvs_r) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
@@ -419,7 +419,7 @@ let circ_form_eval_plus_equiv
     
     (* ------------------------------------------------------------------ *)
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
-    let hyps, pcond = match state_get_opt st v.v_name with
+    let hyps, pcond = match state_get_opt st mem v.v_name with
       | Some circ -> 
         begin try 
           Option.may (fun i -> 
@@ -483,7 +483,7 @@ let mapreduce_eval
   let tm = time env tm "Program circuit generation done" in
 
   begin 
-    let circs = List.map (fun v -> state_get st v) (List.map (fun v -> v.v_name) outvs) in
+    let circs = List.map (fun v -> state_get st mem v) (List.map (fun v -> v.v_name) outvs) in
 
     List.iteri (fun i c -> match circuit_has_uninitialized c with
       | Some j -> EcEnv.notify ~immediate:true env `Critical "Bit %d of input %d has a dependency on an unititialized input@." j i; raise BDepUninitializedInputs
@@ -1306,7 +1306,7 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) =
       | Some `Eq, {f_node = Fpvar (PVloc pv, m_); _}, ({f_node = Flocal id; f_ty; _} as fv)
       | Some `Eq, ({f_node = Flocal id; f_ty; _} as fv), {f_node = Fpvar (PVloc pv, m_); _} when fst m = m_ -> 
         if debug then Format.eprintf "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
-        update_state_pv s pv (circuit_of_form ~st hyps fv |> snd)
+        update_state_pv s m_ pv (circuit_of_form ~st hyps fv |> snd)
       | _ -> s
     end 
     | _ -> s
@@ -1360,7 +1360,10 @@ let t_bdep_solve
     | _ -> 
     let ctxt = tohyps hyps in
     assert (ctxt.h_tvar = []);
-    if circ_taut (circuit_of_form_with_hyps hyps goal |> snd) then
+    let st = circuit_state_of_hyps hyps in
+    let cgoal = (circuit_of_form ~st hyps goal |> snd |> state_close_circuit st) in
+    if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
+    if circ_taut cgoal then
     FApi.close (!@ tc) VBdep
     else 
     tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  

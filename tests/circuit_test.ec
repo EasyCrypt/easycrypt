@@ -51,7 +51,16 @@ module M = {
 
 lemma xor_0 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = of_int 0].
 proof.
-proc.
+  proc.
+  proc change 1 : { c <- b +^ a; }.
+  wp. skip. move => &h1 &h2.
+  have : a{h1} = a_ by admit.
+  have : b{h1} = b_ by admit.
+  move => A B [] C D.
+  have : a{h2} = a_ by smt().
+  have : b{h2} = b_ by smt().
+  (* move : A B C D. (* Comment or uncomment this line for different modes of working *) *)
+  bdep solve.
 bdep solve.
 qed.
 

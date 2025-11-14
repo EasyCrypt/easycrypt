@@ -20,8 +20,8 @@ val circuit_to_string : circuit -> string
 val ctype_of_ty : env -> ty -> ctype
 
 (* State utilities *)
-val state_get : state -> symbol -> circuit
-val state_get_opt : state -> symbol -> circuit option
+val state_get : state -> memory -> symbol -> circuit
+val state_get_opt : state -> memory -> symbol -> circuit option
 val state_get_all : state -> circuit list 
 
 (* Create circuits *)
@@ -54,8 +54,6 @@ val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list 
 val process_instr : hyps -> memory -> st:state -> instr -> hyps * state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
-(* Temporary? *)
-val circuit_of_form_with_hyps : ?st:state -> hyps -> form -> hyps * circuit 
 val circuit_state_of_hyps : ?st:state -> hyps -> state 
 
 (* Check for uninitialized inputs *)

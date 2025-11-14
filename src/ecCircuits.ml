@@ -654,7 +654,7 @@ let circuit_of_form
       (* FIXME: Should globals be supported? *)
       | _ -> raise (CircError "Global vars not supported")
       in 
-      let v = match state_get_pv_opt st v with
+      let v = match state_get_pv_opt st mem v with
       | Some v -> v
       | None -> 
           if debug then Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv (PPEnv.ofenv env)) pv EcPrinting.(pp_type (PPEnv.ofenv env)) f_.f_ty; 
@@ -743,13 +743,13 @@ let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : hyps *
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
       let hyps, c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
-      let st = update_state_pv st v c in
+      let st = update_state_pv st mem v c in
       hyps, st
       (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let st = List.fold_left (fun (hyps, st) (v, e) ->
         let hyps, c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
-        let st = update_state_pv st v c in
+        let st = update_state_pv st mem v c in
         hyps, st
       ) (hyps, st)
         (List.combine 
@@ -766,7 +766,7 @@ let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : hyps *
         | PVloc v -> v
         | _ -> raise (CircError "Global variables not supported")
         in
-        update_state_pv st v c 
+        update_state_pv st mem v c 
         ) st vs (comps :> circuit list)
       in 
       hyps, st
@@ -783,6 +783,7 @@ let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : hyps *
         bt in 
       raise @@ CircError err
 
+(* FIXME: check if memory is the right one in calls to state *)
 let instrs_equiv
    (hyps       : hyps                )
    ((mem, mt)  : memenv              )
@@ -820,23 +821,23 @@ let instrs_equiv
       | _ -> raise (CircError "global variables not supported")
       ) vs 
     in List.for_all (fun (var, ty) -> 
-      let circ1 = state_get_pv_opt st1 var in
-      let circ2 = state_get_pv_opt st2 var in
+      let circ1 = state_get_pv_opt st1 mem var in
+      let circ2 = state_get_pv_opt st2 mem var in
       match circ1, circ2 with
       | None, None -> true
       | None, Some circ1
       | Some circ1, None -> false (* Variable only defined on one of the blocks (and not in the prelude) *)
       | Some circ1, Some circ2 -> circ_equiv circ1 circ2 
     ) vs
-  | None -> state_get_all_pv st |> List.for_all (fun (var, _) -> 
-    let circ1 = state_get_pv st1 var in
-    let circ2 = state_get_pv st2 var in
+  | None -> state_get_all_memory st mem |> List.for_all (fun (var, _) -> 
+    let circ1 = state_get_pv st1 mem var in
+    let circ2 = state_get_pv st2 mem var in
     circ_equiv circ1 circ2 
   )
 
 let state_of_prog (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list) (invs: variable list) : hyps * state =
   let env = LDecl.toenv hyps in
-  let invs = List.map (fun {v_name; v_type} -> (v_name, ctype_of_ty env v_type)) invs in
+  let invs = List.map (fun {v_name; v_type} -> ((mem, v_name), ctype_of_ty env v_type)) invs in
   let st = open_circ_lambda_pv st invs in
 
   let hyps, st = 
@@ -932,6 +933,7 @@ let state_get_all = fun st -> state_get_all_pv st |> List.snd
    maybe remove later? FIXME *)
 let circuit_state_of_hyps ?(st = empty_state) hyps : state = 
   let env = toenv hyps in
+  let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
     if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
     match lk with
@@ -953,16 +955,35 @@ let circuit_state_of_hyps ?(st = empty_state) hyps : state =
        Check if body is convertible to circuit, if not just process it as uninitialized.
        TODO: Maybe do a first pass on this, check convertibility and remove duplicates? *)
     | EcBaseLogic.LD_var (t, Some f) -> 
-        begin try
-          update_state st id (circuit_of_form ~st hyps f |> snd)
-        with CircError _ -> 
-          open_circ_lambda st [(id, ctype_of_ty env t)]
-        end
+      if debug then Format.eprintf "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
+      begin try
+        update_state st id (circuit_of_form ~st hyps f |> snd)
+      with CircError _ -> 
+        open_circ_lambda st [(id, ctype_of_ty env t)]
+      end
 
       (* Uninitialized variable.
        Treat as input *)
     | EcBaseLogic.LD_var (t, None) -> 
-        open_circ_lambda st [(id, ctype_of_ty env t)]
+      open_circ_lambda st [(id, ctype_of_ty env t)]
+
+    (* For things of the form a_ = a{&hr}, we assume the local variable takes precedence *)
+    | EcBaseLogic.LD_hyp f -> 
+      if debug then Format.eprintf "Form hyp: %a@.Simplified: %a@."
+        EcPrinting.(pp_form ppe) f
+        EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f)
+      ;
+      begin match (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) with
+      | {f_node=Fapp ({f_node = Fop (p, _); _}, [{f_node = Fpvar (PVloc pv, m); _}; ({f_node = Flocal id} as floc)])} 
+      | {f_node=Fapp ({f_node = Fop (p, _); _}, [({f_node = Flocal id} as floc); {f_node = Fpvar (PVloc pv, m); _}])} when EcFol.op_kind p = Some `Eq ->
+        begin try
+          update_state_pv st m pv (circuit_of_form ~st hyps floc |> snd)
+        with CircError _ ->
+          st
+        end
+      | _ -> st
+      end
+        
 
     (* Some formula which we know to hold. Ignore for now? 
        TODO: FIXME: What to do with this in general? Maybe process it separately in another function
@@ -980,78 +1001,3 @@ let circuit_state_of_hyps ?(st = empty_state) hyps : state =
   ) st (List.rev (tohyps hyps).h_local)
   in 
   st
-
-(* FIXME: Remove this and replace with a call to above *)
-let circuit_of_form_with_hyps ?(st = empty_state) hyps f : hyps * circuit =
-  let env = toenv hyps in
-  let f, bnds = List.fold_left_map (fun goal (id, lk) ->
-    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
-    match lk with
-    | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
-      let bnds = List.map (fun {ov_name; ov_type} -> 
-        match ov_name with
-        | Some v -> let id = create v in Some (id, ctype_of_ty env ov_type)
-        | None -> None
-      ) decls in
-      goal, List.filter_map (fun i -> i) bnds 
-    | EcBaseLogic.LD_var (t, Some f) -> 
-        let st = open_circ_lambda st [(id, ctype_of_ty env t)] in (* Just to check if it is convertible *)
-        begin try 
-          ignore (circuit_of_form ~st hyps f);
-          (f_and goal (f_eq (f_local id t) f)), [(id, ctype_of_ty env t)]
-        with _ -> (f_forall [(id, GTty t)] goal), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
-        end
-    | EcBaseLogic.LD_var (t, None) -> 
-        goal, [(id, ctype_of_ty env t)]
-    | EcBaseLogic.LD_hyp f_hyp -> 
-        begin try
-          ignore (circuit_of_form ~st hyps f_hyp);
-          (f_imp f_hyp goal), []
-        with e -> 
-          if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
-          EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
-          (goal), []
-        end
-      | _ -> goal, []
-  ) f (List.rev (tohyps hyps).h_local)
-  in 
-  let bnds = List.flatten bnds in
-  if debug then Format.eprintf "Converting form %a@." EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f;
-  circ_lambda_oneshot st bnds (fun st -> circuit_of_form ~st hyps f) 
-
-(*
-(* FIXME : Review *)
-let circuit_state_of_hyps ?(cache = empty_cache) hyps : hyps * circuit =
-  let env = toenv hyps in
-  let cache, bnds = List.fold_left_map (fun (cache) (id, lk) ->
-    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
-    match lk with
-    | EcBaseLogic.LD_var (t, Some f) -> 
-      let cache = open_circ_lambda_cache cache [(id, ctype_of_ty env t)] in
-      begin try 
-        ignore (circuit_of_form ~cache hyps f); (* FIXME : Add info to translation *)
-        (cache), [(id, ctype_of_ty env t)]
-      with _ -> (cache), [(id, ctype_of_ty env t)] (* FIXME: do we still add to cache here? *)
-      end
-    | EcBaseLogic.LD_var (t, None) -> 
-      (open_circ_lambda_cache cache [(id, ctype_of_ty env t)]), 
-      [(id, ctype_of_ty env t)]
-    | EcBaseLogic.LD_hyp f_hyp ->  (* FIXME: extract this to a pcond *)
-      begin try
-        ignore (circuit_of_form ~cache hyps f_hyp);
-        (cache), []
-      with e -> 
-        if debug then Format.eprintf "Failed to convert hyp %a with error:@.%s@."
-        EcPrinting.(pp_form (PPEnv.ofenv (toenv hyps))) f_hyp (Printexc.to_string e);
-        (cache), []
-      end
-    | _ -> (cache), []
-  ) cache (List.rev (tohyps hyps).h_local)
-  in 
-  let bnds = List.flatten bnds in
-
-
-  hyps, close_circ_lambda bnds c 
-
-
-*)

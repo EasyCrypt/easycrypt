@@ -3,6 +3,7 @@ open EcUtils
 open EcSymbols
 open EcDecl
 open EcIdent
+open EcMemory
 
 (* -------------------------------------------------------------------- *)
 module C = struct
@@ -498,10 +499,11 @@ module type CircuitInterface = sig
 
     val empty_state : state
 
-    val update_state_pv : state -> symbol -> circuit -> state
-    val state_get_pv_opt : state -> symbol -> circuit option
-    val state_get_pv : state -> symbol -> circuit 
-    val state_get_all_pv : state -> (symbol * circuit) list
+    val update_state_pv : state -> memory -> symbol -> circuit -> state
+    val state_get_pv_opt : state -> memory -> symbol -> circuit option
+    val state_get_pv : state -> memory -> symbol -> circuit 
+    val state_get_all_memory : state -> memory -> (symbol * circuit) list
+    val state_get_all_pv : state -> ((memory * symbol) * circuit) list
 (*     val map_state_pv : (symbol -> circuit -> circuit) -> state -> state *)
 
     val update_state : state -> ident ->  circuit -> state
@@ -515,9 +517,9 @@ module type CircuitInterface = sig
 
     (* Circuit lambdas, for managing inputs *)
     val open_circ_lambda : state -> (ident * ctype) list -> state 
-    val open_circ_lambda_pv  : state -> (symbol * ctype) list -> state
+    val open_circ_lambda_pv  : state -> ((memory * symbol) * ctype) list -> state
     val close_circ_lambda : state -> state 
-    val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> 'a * circuit) -> 'a * circuit (* FIXME: rename *)
+    val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> 'a * circuit) -> 'a * circuit (* FIXME: rename or redo *)
   end
 
   module BVOps : sig
@@ -709,30 +711,34 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     type state = {
       circs    : circuit Mid.t;
       lambdas  : cinp list list; (* actually a stack *)
-      pv_ids   : ident Msym.t; (* can be changed to int Msym.t if needed *)
+      pv_ids   : (ident * symbol, ident) Map.t; (* can be changed to int Msym.t if needed *)
     }
 
     let empty_state : state = {
       circs = Mid.empty;
       lambdas = [];
-      pv_ids = Msym.empty; (* can be changed to int Msym.t if needed *)
+      pv_ids = Map.empty; (* can be changed to int Msym.t if needed *)
     }
 
-    let update_state_pv (st: state) (s: symbol) (c: circuit) : state = 
-      match Msym.find_opt s st.pv_ids with
+    let update_state_pv (st: state) (m: memory) (s: symbol) (c: circuit) : state = 
+      match Map.find_opt (m, s) st.pv_ids with
       | Some id -> {st with circs = Mid.add id c st.circs}
       | None -> let id = EcIdent.create s in
         { st with 
-            pv_ids = Msym.add s id st.pv_ids; 
+            pv_ids = Map.add (m, s) id st.pv_ids; 
             circs = Mid.add id c st.circs }
 
-    let state_get_pv_opt (st: state) (s: symbol) : circuit option = 
-      Option.bind (Msym.find_opt s st.pv_ids) (fun id -> Mid.find_opt id st.circs) 
+    let state_get_pv_opt (st: state) (m:memory) (s: symbol) : circuit option = 
+      Option.bind (Map.find_opt (m, s) st.pv_ids) (fun id -> Mid.find_opt id st.circs) 
 
-    let state_get_pv : state -> symbol -> circuit = (fun st s -> Option.get @@ state_get_pv_opt st s) (* FIXME *)
-    let state_get_all_pv (st: state) : (symbol * circuit) list = 
-      let pvs = Msym.bindings st.pv_ids in
+    let state_get_pv : state -> memory -> symbol -> circuit = (fun st m s -> Option.get @@ state_get_pv_opt st m s) (* FIXME *)
+    let state_get_all_pv (st: state) : ((memory * symbol) * circuit) list = 
+      let pvs = Map.bindings st.pv_ids in
       List.filter_map (fun (pv, id) -> match Mid.find_opt id st.circs with | None -> None | Some c -> Some (pv, c)) pvs 
+
+    let state_get_all_memory (st: state) (m: memory) : (symbol * circuit) list = 
+      List.filter_map (fun ((m_, s), c) -> if m = m_ then Some (s, c) else None) 
+        (state_get_all_pv st)
 
 (*     let map_state_pv : (symbol -> circuit -> circuit) -> state -> state = assert false *)
 
@@ -760,18 +766,20 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         
     (* Circuit lambdas, for managing inputs *)
     let open_circ_lambda (st: state) (bnds: (ident  * ctype) list) : state = 
-      let inps, cs = List.map (fun (id, t) -> let inp, c = cinput_of_type (`Idn id) t
+      let inps, cs = List.map (fun (id, t) -> 
+        if debug then Format.eprintf "Opening circuit lambda for ident: (%s, %d)@." (name id) (tag id);
+        let inp, c = cinput_of_type (`Idn id) t
         in inp, (id, c)) bnds |> List.split in
       {st with
         lambdas = inps::st.lambdas;
         circs = List.fold_left (fun circs (id, c) -> Mid.add id c circs) st.circs cs }
 
-    let open_circ_lambda_pv  (st: state) (bnds : (symbol * ctype) list) : state =
-      let st, bnds = List.fold_left_map (fun st (s, t) ->
-        match Msym.find_opt s st.pv_ids with
+    let open_circ_lambda_pv (st: state) (bnds : ((memory * symbol) * ctype) list) : state =
+      let st, bnds = List.fold_left_map (fun st ((m, s), t) ->
+        match Map.find_opt (m, s) st.pv_ids with
         | Some id -> st, (id, t) 
         | None -> let id = EcIdent.create s in
-          { st with pv_ids = Msym.add s id st.pv_ids}, (id, t)) st bnds
+          { st with pv_ids = Map.add (m, s) id st.pv_ids}, (id, t)) st bnds
       in open_circ_lambda st bnds 
 
     (* FIXME: should we remove id from the mapping? *)
