@@ -411,6 +411,8 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue (psi
 
   let filter oppath op =
     (* Filter operator based on given type variables instanciation *)
+    (* FIXME: Not doing error for this *)
+    (* Error would be: incompatible typaram instanciation *)
     let filter_on_tvi =
       match tvi with
       | None -> fun _ -> true
@@ -427,40 +429,52 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue (psi
             List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 
     in
-      filter oppath op && filter_on_tvi op
+    filter oppath op && filter_on_tvi op
   in
 
   let select (path, op) =
-    let module E = struct exception Failure end in
+    let module E = struct 
+      type cause = D.op_sel_rej_cause
+      
+      exception Failure of cause end 
+    in
 
     let subue = UniEnv.copy ue in
 
     try
-      begin try
+      begin
         match tvi with
         | None ->
             ()
 
         | Some (TVIunamed lt) ->
+          begin try
             List.iter2
               (fun ty (_, tc) -> hastc env subue ty tc)
               lt op.D.op_tparams
+          with UnificationFailure _ -> raise E.(Failure (`BadUnnamedTypeVarInstance (lt, op.D.op_tparams))) 
+          (* Above is incompatible argument type for unnamed type var instances *)
+          end
 
         | Some (TVInamed ls) ->
+          begin try
             let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
             let tparams = Msym.of_list tparams in
               List.iter (fun (x, ty) ->
                 hastc env subue ty (oget (Msym.find_opt x tparams)))
                 ls
-        with UnificationFailure _ -> raise E.Failure
+          with UnificationFailure _ -> raise E.(Failure (`BadNamedTypeVarInstance (ls, op.D.op_tparams)))
+          (* Above is incompatible argument type for named type var instances *)
+          end
       end;
 
       let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
       let top = ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue ?retty psig in
 
+      (* Return type check (maybe arg check as well when no explicit tvi?) *)
       (try  unify env subue top texpected
-       with UnificationFailure _ -> raise E.Failure);
+       with UnificationFailure _ -> raise E.(Failure (`WrongReturnType (top, texpected))));
 
       let bd =
         match op.D.op_kind with
@@ -474,9 +488,10 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue (psi
 
         | _ -> None
 
-      in Some ((path, tvs), top, subue, bd)
+      in Ok ((path, tvs), top, subue, bd)
 
-    with E.Failure -> None
+    with E.Failure cause -> Error (path, cause) 
 
   in
-    List.pmap select (EcEnv.Op.all ~check:filter ~name env)
+    List.pmap (fun arg -> match select arg with | Ok res -> Some res | _ -> None) (EcEnv.Op.all ~check:filter ~name env),
+    lazy (List.pmap (fun arg -> match select arg with | Error res -> Some res | _ -> None) (EcEnv.Op.all ~check:filter ~name env))

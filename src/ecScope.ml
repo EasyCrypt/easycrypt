@@ -2132,13 +2132,13 @@ module Ty = struct
         in
         let op =
           match selected with
-          | [] -> hierror ~loc:op.pl_loc "unknown operator"
-          | op1::op2::_ ->
+          | [], fails -> hierror ~loc:op.pl_loc "unknown operator"
+          | op1::op2::_, fails ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
                 (EcPath.tostring (fst (proj4_1 op1)))
                 (EcPath.tostring (fst (proj4_1 op2)))
-          | [((p, _), _, _, _)] ->
+          | [((p, _), _, _, _)], _fails ->
               let op   = EcEnv.Op.by_path p env in
               let opty =
                 Tvar.subst

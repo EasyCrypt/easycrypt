@@ -139,6 +139,12 @@ type operator = {
 
 and opopaque = { smt: bool; reduction: bool; }
 
+type op_sel_rej_cause = 
+  [ `WrongReturnType of (ty * ty)
+  | `BadUnnamedTypeVarInstance of (ty list * ty_params)
+  | `BadNamedTypeVarInstance of ((string * ty) list * ty_params)
+  | `WrongArgumentTypes ]
+
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 

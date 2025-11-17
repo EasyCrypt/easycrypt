@@ -286,13 +286,13 @@ let trans_matchfix
           let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
 
           match cts with
-          | [] ->
+          | [], fails ->
               fxerror cname.pl_loc env TT.FXE_CtorUnk
 
-          | _ :: _ :: _ ->
+          | _ :: _ :: _, fails ->
               fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
 
-          | [(cp, tvi), opty, subue, _] ->
+          | [(cp, tvi), opty, subue, _], _fails ->
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in

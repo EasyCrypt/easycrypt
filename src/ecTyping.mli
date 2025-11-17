@@ -140,7 +140,7 @@ type tyerror =
 | NotAFunction
 | NotAnInductive
 | AbbrevLowArgs
-| UnknownVarOrOp         of qsymbol * ty list
+| UnknownVarOrOp         of qsymbol * ty list * ((path * op_sel_rej_cause) list)
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol

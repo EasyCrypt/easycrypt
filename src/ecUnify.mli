@@ -49,4 +49,4 @@ val select_op :
   -> qsymbol
   -> unienv
   -> dom * ty option
-  -> ((EcPath.path * ty list) * ty * unienv * sbody option) list
+  -> (((EcPath.path * ty list) * ty * unienv * sbody option) list) * ((path * op_sel_rej_cause) list Lazy.t)

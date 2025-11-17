@@ -112,6 +112,12 @@ type operator = {
 
 and opopaque = { smt: bool; reduction: bool; }
 
+type op_sel_rej_cause = 
+  [ `WrongReturnType of (ty * ty)
+  | `BadUnnamedTypeVarInstance of (ty list * ty_params)
+  | `BadNamedTypeVarInstance of ((string * ty) list * ty_params)
+  | `WrongArgumentTypes ]
+
 val op_ty     : operator -> ty
 val is_pred   : operator -> bool
 val is_oper   : operator -> bool

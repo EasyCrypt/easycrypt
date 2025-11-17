@@ -338,13 +338,33 @@ end = struct
         msg "unknown program variable (in %a): `%a'"
           (EcPrinting.pp_mem env) mem pp_qsymbol p
 
-    | UnknownVarOrOp (name, []) ->
+    | UnknownVarOrOp (name, [], []) ->
         msg "unknown variable or constant: `%a'" pp_qsymbol name
 
-    | UnknownVarOrOp (name, tys) ->
+    | UnknownVarOrOp (name, tys, []) ->
         msg "no matching operator, named `%a', " pp_qsymbol name;
         msg "for the following parameters' type:@\n";
         List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys
+
+    | UnknownVarOrOp (name, tys, fails) ->
+        msg "no matching operator, named `%a', " pp_qsymbol name;
+        msg "for the following parameters' type:@\n";
+        List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys;
+        msg "Failed candidates: @\n";
+        List.iteri (fun i (pth, rej_cause) ->
+          msg "[%d]: %a => " (i + 1) EcPrinting.pp_path pth;
+          match rej_cause with
+          | `BadUnnamedTypeVarInstance (tvis, tparams) -> 
+            msg "Bad instantiations (%a) for type parameters (%a)"
+              (EcPrinting.(pp_list) ", " pp_type) tvis EcPrinting.(pp_list ", " Format.pp_print_string) (List.map (EcIdent.name) @@ List.fst tparams)
+          | `WrongArgumentTypes -> assert false (* FIXME: TODO *)
+          | `BadNamedTypeVarInstance (ntvis, tparams) -> 
+            msg "Bad instantiations (%a) for type parameters (%a)"
+              (EcPrinting.(pp_list) ", " (fun fmt (name, ty) -> Format.fprintf fmt "%s = %a" name pp_type ty)) ntvis 
+              EcPrinting.(pp_list ", " Format.pp_print_string) (List.map (EcIdent.name) @@ List.fst tparams)
+          | `WrongReturnType (act, exp) -> msg "Bad return type, expected %a, got %a" 
+            pp_type exp pp_type act
+        ) fails
 
     | MultipleOpMatch (name, tys, matches) -> begin
         let uvars = List.map Tuni.univars tys in
