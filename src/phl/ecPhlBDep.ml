@@ -1335,6 +1335,26 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) =
 
   List.fold_left circuit_and circuit_true cs, st
 
+let solve_post ~(st: state) ?(pre: circuit option) (hyps: hyps) (post: form) : bool =
+  Format.eprintf "Solving post: %a@." 
+  EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
+  match post.f_node with
+  | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> begin match EcFol.op_kind p with
+    | Some `Eq -> Format.eprintf "Filletting circuit...@.";
+      let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
+      let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
+      assert (Option.is_none @@ circuit_has_uninitialized c1);
+      assert (Option.is_none @@ circuit_has_uninitialized c2);
+      let cs1 = fillet_circuit c1 in
+      let cs2 = fillet_circuit c2 in
+      List.iter2 (fun c1 c2 ->
+        Format.eprintf "Proving equiv between %a @.and@. %a@."
+        pp_circuit c1 pp_circuit c2) cs1 cs2;
+      assert (List.for_all2 circ_equiv cs1 cs2);
+      assert false
+    | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
+  end
+  | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
 
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
@@ -1346,16 +1366,21 @@ let t_bdep_solve
     | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
       let cpre, st = process_pre tc hs_m hs_pr in
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
-      let hyps, cpost = circuit_of_form ~st hyps hs_po in
+(*       let hyps, cpost = circuit_of_form ~st hyps hs_po in *)
 (*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
+(*
       let cgoal = circuit_or (circuit_not cpre) cpost in
       let cgoal = state_close_circuit st cgoal in
       assert (Option.is_none @@ circuit_has_uninitialized cgoal);
+*)
 (*
       if debug then Format.eprintf "circuit goal: %a@." pp_circuit cgoal;
       if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
 *)
-      if (circ_taut cgoal) then FApi.close (!@ tc) VBdep else
+      if 
+(*         (circ_taut cgoal)  *)
+        solve_post ~st hyps hs_po
+      then FApi.close (!@ tc) VBdep else
       raise (BDepError "Failed to verify postcondition")
     | _ -> 
     let ctxt = tohyps hyps in

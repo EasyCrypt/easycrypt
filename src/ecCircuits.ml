@@ -44,14 +44,14 @@ exception CircError of string
 
 let rec ctype_of_ty (env: env) (ty: ty) : ctype = 
   match ty.ty_node with
-  | Ttuple tys -> `CTuple (List.map (ctype_of_ty env) tys)
-  | Tconstr (pth, []) when pth = EcCoreLib.CI_Bool.p_bool -> `CBool
+  | Ttuple tys -> CTuple (List.map (ctype_of_ty env) tys)
+  | Tconstr (pth, []) when pth = EcCoreLib.CI_Bool.p_bool -> CBool
   | _ -> begin
     match EcEnv.Circuit.lookup_array_and_bitstring env ty with
-    | Some ({size=(_, Some size_arr)}, {size=(_, Some size_bs)}) -> `CArray (size_bs, size_arr)
+    | Some ({size=(_, Some size_arr)}, {size=(_, Some size_bs)}) -> CArray {width=size_bs; count=size_arr}
     | None -> 
       begin match EcEnv.Circuit.lookup_bitstring_size env ty with
-      | Some sz -> `CBitstring sz
+      | Some sz -> CBitstring sz
       | _ ->
           Format.eprintf "Missing binding for type %a@." 
           EcPrinting.(pp_type (PPEnv.ofenv env)) ty;
@@ -77,7 +77,7 @@ let destr_array_type (env: env) (t: ty) : (int * ty) option =
 (* FIXME: Fix an order for array size parameters, this one goes against the rest *)
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
     match ctype_of_ty env t with
-    | `CArray (w, n) -> (n, w)
+    | CArray {width=w; count=n} -> (n, w)
     | _ -> raise (CircError "shape_of_array_type on non array type")
 
 let input_of_type ~name (env: env) (t: ty) : circuit = 
@@ -207,7 +207,7 @@ module ArrayOps = struct
     match op with
     | (arr, `ToList) -> assert false (* We do not translate this to circuit *)
     | (arr, `Get) -> begin match args with
-      | [ `Circuit (({type_ = `CArray _}, inps) as arr); `Constant i] ->
+      | [ `Circuit (({type_ = CArray _}, inps) as arr); `Constant i] ->
         array_get arr (BI.to_int i)
       | args -> 
         let err = Format.asprintf "Bad inputs to arr get: Expected (arr, idx) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
@@ -222,9 +222,9 @@ module ArrayOps = struct
       end
     | ({size = (_, None)}, `OfList) -> raise (CircError "Array of list with non-concrete size")
     | (_arr, `Set) -> begin match args with
-      | [ `Circuit (({type_ = `CArray _}, _) as arr); 
+      | [ `Circuit (({type_ = CArray _}, _) as arr); 
           `Constant i; 
-          `Circuit (({type_ = `CBitstring _}, _) as bs) ] ->
+          `Circuit (({type_ = CBitstring _}, _) as bs) ] ->
         array_set arr (BI.to_int i) bs
       | args -> 
         let err = Format.asprintf "Bad inputs to arr set: Expected (arr, idx, new_val) got (%a)" (EcPrinting.pp_list "," pp_arg) args in
@@ -889,15 +889,15 @@ let circ_taut = circ_taut
 
 let circuit_permute (bsz: int) (perm: int -> int) (c: circuit) : circuit =
   let c = match c with
-  | ({ type_= `CBitstring _; reg = r}, inps) as c -> c
+  | ({ type_= CBitstring _; reg = r}, inps) as c -> c
   | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (permute bsz perm c :> circuit)
 
 let circuit_mapreduce ?(perm : (int -> int) option) (c: circuit) (w_in: width) (w_out: width) : circuit list = 
   let c = match c, perm with 
-  | ({type_ = `CBitstring _}, inps) as c, None -> c
-  | ({type_ = `CBitstring _}, inps) as c, Some perm -> permute w_out perm c
+  | ({type_ = CBitstring _}, inps) as c, None -> c
+  | ({type_ = CBitstring _}, inps) as c, Some perm -> permute w_out perm c
   | _ -> assert false (* FIXME PR: currently only implemented for bitstring, do we want to expand this ? *)
   in
   (decompose w_in w_out c :> circuit list)
@@ -921,7 +921,7 @@ let circuit_align_inputs =
   align_inputs 
 
 let circuit_flatten ((circ, inps) as c: circuit) = 
-  convert_type (`CBitstring (size_of_ctype circ.type_)) c
+  convert_type (CBitstring (size_of_ctype circ.type_)) c
 
 let state_get = state_get_pv
 let state_get_opt = state_get_pv_opt

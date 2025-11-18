@@ -49,6 +49,7 @@ module M = {
   }
 }.
 
+(*
 lemma xor_0 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = of_int 0].
 proof.
   proc.
@@ -62,5 +63,13 @@ proof.
   (* move : A B C D. (* Comment or uncomment this line for different modes of working *) *)
   bdep solve.
 bdep solve.
+qed.
+*)
+    
+
+lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = b_ +^ a_].
+proof.
+  proc.
+  bdep solve.
 qed.
 

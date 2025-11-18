@@ -426,6 +426,38 @@ let collapse_blocks (d: tdblock list) : tdblock option =
     (Some h) t
 
 (* -------------------------------------------------------------------- *)
+(* Uses dependency analysis to realign inputs to start at 0             *)
+(* Corresponds to taking the relevant subcircuit to this output         *)
+(* Assumes that inputs are contiguous FIXME                             *)
+let realign_inputs ?(renamings: (int -> int option) option) (n: node) : node * (int, int * int) Map.t = 
+  let d = dep n in
+  let shifts = Map.map (fun s -> 
+    Set.min_elt_opt s |> Option.default 0,
+    Set.max_elt_opt s |> Option.default 0
+  ) d in
+  let map_ = 
+    match renamings with
+    | Some renamings -> begin fun (v, i) ->
+      let v' = renamings v |> Option.default v in
+      match Map.find_opt v shifts with
+      | None -> None
+      | Some (k, _) -> Some (Aig.input (v', i-k))
+    end
+    | None -> begin fun (v, i) ->
+      match Map.find_opt v shifts with
+      | None -> None
+      | Some (k, _) -> Some (Aig.input (v, i-k))
+    end
+  in
+  let shifts = match renamings with
+  | None -> shifts
+  | Some renamings ->  
+    Map.to_seq shifts |> Seq.map (fun (k, v) ->
+      Option.default k (renamings k), v) |> Map.of_seq
+  in
+  Aig.map map_ n, shifts
+
+(* -------------------------------------------------------------------- *)
 let rec pp_node ?(namer=string_of_int) (fmt : Format.formatter) (n : node) =
   let pp_node = pp_node ~namer in
   match n with
