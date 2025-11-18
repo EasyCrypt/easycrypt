@@ -56,18 +56,21 @@ let t_hr_exists_intro_r fs tc =
     | FeHoareF _ | FeHoareS _ -> true
     | _ -> false in
   let pre   =
+    let eqs = match eqs with 
+      | [] -> map_inv1 (fun _ -> f_true) pre1
+      | _ -> map_inv f_ands eqs in
     if is_ehoare then
-      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) (map_inv f_ands eqs)) pre1
+      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) eqs) pre1
     else 
-      map_inv1 (f_exists bd) (map_inv2 f_and (map_inv f_ands eqs) pre1) in
+      map_inv1 (f_exists bd) (map_inv2 f_and eqs pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
   let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
   let m = LDecl.fresh_id hyps "&m" in
   let ms =
-    match List.hd gen with
-    | (_, Inv_ts _) -> [ml; mr]
-    | (_, Inv_ss _) -> [m] in
+    match pre1 with
+    | Inv_ts _ -> [ml; mr]
+    | Inv_ss _ -> [m] in
 
   let inv_rebind f =
     match f with
