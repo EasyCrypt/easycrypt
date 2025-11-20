@@ -639,7 +639,7 @@ module type CircuitInterface = sig
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
   val fillet_tauts : circuit list -> circuit list -> bool
-  val batch_checks : circuit list -> circuit list
+  val batch_checks : ?sort:bool -> circuit list -> circuit list
 
   (* Wraps the backend call to deal with args/inputs *) 
   val circuit_to_file : name:string -> circuit -> symbol
@@ -1374,11 +1374,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
 
   (* Batches circuit checks by dependencies. Assumes equivalent checks are contiguous *)
-  let batch_checks (checks: circuit list) : circuit list =
+  let batch_checks ?(sort = true) (checks: circuit list) : circuit list =
     (* Order by dependencies *)
+    let checks = if sort then begin 
+
     let checks = List.map (fun (c, inps) ->
       (c, inps), Backend.(Deps.dep_of_node (node_of_reg c.reg))) checks in
-    let checks = List.sort (fun (_, d1) (_, d2) ->
+    let checks = List.stable_sort (fun (_, d1) (_, d2) ->
       let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt) in
       let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt) in
       let c1 = Int.compare m1 m2 in
@@ -1387,6 +1389,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       else
         c1
     ) checks in
+    checks 
+    end else
+      List.map (fun c ->
+        c, Backend.(Deps.dep_of_node (node_of_reg (fst c).reg))) checks
+    in
 
     let rec doit (acc: circuit list) (cur, d: circuit * Backend.Deps.dep) (cs: (circuit * Backend.Deps.dep) list) : circuit list =
       match cs with 
@@ -1449,24 +1456,28 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
     (* Remove structurally equal circuits *)
     (* FIXME: not working because you have to 0 align everything before *)
+    (* Assumes everything is single bit outputs *)
     let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
       match cs with
       | [] -> cur::acc
-      | c::cs ->
-        let c' = fillet_circuit c |> List.hd in
-        if (fst c').reg = (fst cur).reg then
+      | (({reg;_}, _) as c)::cs ->
+        let n', _ = Backend.node_of_reg reg |> Backend.Deps.excise_bit in
+        let n, _ = Backend.node_of_reg (fst cur).reg |> Backend.Deps.excise_bit in
+        if Backend.nodes_eq n n' then
           (if debug then Format.eprintf "Collapsing circuit@.";
           collapse acc cur cs)
         else 
           (if debug then Format.eprintf "Not collapsing circuit@.";
           collapse (cur::acc) c cs)
     in
+
     match posts with
     | [] -> true
     | post::posts ->
-      let posts = collapse [] post posts in
       assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) pres);
       assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) posts);
+      let posts = collapse [] post posts in
+      if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
       List.iteri (fun i post -> 
