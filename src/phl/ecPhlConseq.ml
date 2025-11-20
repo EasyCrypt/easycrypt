@@ -785,7 +785,7 @@ let t_equivS_conseq_bd side pr po tc =
 (* -------------------------------------------------------------------- *)
 
 (*
-(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2 /\ p m1 = q m2)
+(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2 /\ q m1 = p m2)
 (forall m1 m2, Q m1 m2 => Q2 m2 => Q1 m1)
 equiv M1 ~ M2 : P ==> Q   phoare M2 : P2 ==> Q2 R p.
 -----------------------------------------------
