@@ -41,6 +41,8 @@ module type CBackend = sig
   val true_ : node
   val false_ : node
 
+  val nodes_eq : node -> node -> bool
+
   val bad : node
   val bad_reg : int -> reg 
   val has_bad : node -> bool
@@ -123,13 +125,16 @@ module type CBackend = sig
   val reg_to_file : input_count:int -> ?inp_name_map:(int -> string) -> name:string -> reg -> symbol 
 
   module Deps : sig
-    type deps
+    type dep = (int, int Set.t) Map.t
+    type deps = dep array
     type block_deps
 
+    val dep_of_node : node -> dep
     val deps_of_reg : reg -> deps
     val block_deps_of_deps : int -> deps -> block_deps 
     val block_deps_of_reg : int -> reg -> block_deps
 
+    val pp_dep : Format.formatter -> dep -> unit
     val pp_deps : Format.formatter -> deps -> unit
     val pp_block_deps : Format.formatter -> block_deps -> unit
 
@@ -141,11 +146,14 @@ module type CBackend = sig
     val single_dep : deps -> bool
     (* Assumes single_dep *)
     val dep_range : deps -> int * int
+    (* Checks if first dep is a subset of second dep *) 
+    val dep_contained : dep -> dep -> bool
     (* Checks if all the deps are in a given list of inputs *)
     val check_inputs : reg -> (int * int) list -> bool
 
     val forall_inputs : (int -> int -> bool) -> reg -> bool
     val rename_inputs : ((int * int) -> (int * int) option) -> reg -> reg
+    (* TODO: Rename *)
     val excise_bit : ?renamings:(int -> int option) -> node -> node * (int, int * int) Map.t
   end
 end
@@ -162,6 +170,7 @@ module LospecsBack : CBackend = struct
 
   let true_ = C.true_
   let false_ = C.false_
+  let nodes_eq ({id=id1; _}: node) ({id=id2; _}: node) = id1 = id2
   let size_of_reg = Array.length
   let bad = C.input (-1, -1)
   let bad_reg = fun i -> Array.make i bad
@@ -320,6 +329,7 @@ module LospecsBack : CBackend = struct
     type deps = dep array
     type block_deps = (int * dep) array
 
+    let dep_of_node = fun n -> HL.dep n
     let deps_of_reg = fun r -> HL.deps r
     let block_deps_of_deps (w: int) (d: deps) : block_deps = 
       assert (Array.length d mod w = 0);
@@ -449,6 +459,13 @@ module LospecsBack : CBackend = struct
           | None -> false
         ) d
       ) ds 
+
+    let dep_contained (subd: dep) (superd: dep) : bool =
+      Map.for_all (fun id bits ->
+        match Map.find_opt id superd with
+        | None -> false
+        | Some superbits -> Set.subset bits superbits
+      ) subd
 
     let forall_inputs (check: int -> int -> bool) (r: reg) : bool =
       let d = deps_of_reg r in
@@ -590,6 +607,7 @@ module type CircuitInterface = sig
   (* Direct circuuit constructions *)
   val circuit_ite : c:circuit -> t:circuit -> f:circuit -> circuit
   val circuit_eq : circuit -> circuit -> circuit
+  val circuit_eqs : circuit -> circuit -> circuit list
 
 
   (* Circuit tuples *)
@@ -620,6 +638,8 @@ module type CircuitInterface = sig
   val circuit_slice : size:int -> circuit -> int -> circuit
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
+  val fillet_tauts : circuit list -> circuit list -> bool
+  val batch_checks : circuit list -> circuit list
 
   (* Wraps the backend call to deal with args/inputs *) 
   val circuit_to_file : name:string -> circuit -> symbol
@@ -1029,6 +1049,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | CBitstring 1, CBool ->
       {reg = (Backend.reg_eq (fst c).reg (fst d).reg |> Backend.reg_of_node); type_ = CBool}, merge_inputs (snd c) (snd d)
     | _ -> raise (CircError (Format.asprintf "Invalid arguments for circuit_eq (%a)" Format.(pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") pp_ctype) (List.map (fun (c : circuit) -> (fst c).type_) [c; d])))
+
+  (* Ignore types, do extensionally over bits, return the circuits evaluating to the condition *)
+  let circuit_eqs ((c, cinps): circuit) ((d, dinps): circuit) : circuit list = 
+    let inps = merge_inputs cinps dinps in
+    assert (size_of_ctype c.type_ = size_of_ctype d.type_);
+    let cs = Backend.node_list_of_reg c.reg in
+    let ds = Backend.node_list_of_reg d.reg in
+    List.map2 (fun c d ->
+      let r = Backend.node_eq c d |> Backend.reg_of_node in
+      {reg = r; type_ = CBool}, inps) cs ds
+
     
   let circuit_compose (c: circuit) (args: circuit list) : circuit = 
     (let exception InputIncompatible in
@@ -1284,7 +1315,165 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         type_ = CBool },
       new_inps
     ) r
+
+(*
+
+  Correct order is:
+  - Build two sided equality
+  - Dependency collapse (into lanes)
+    - Attach preconditions 
+  - Realign inputs
+  - Structural equality check
+  - SMT check
+*)
+
+
+(*
+  let fillet_circuit ((c, inps) : circuit) : circuit list = 
+    let rec collapse (acc: Backend.node list) (cur, d: Backend.node * Backend.Deps.dep) (cs: (Backend.node * Backend.Deps.dep) list) : Backend.node list =
+      match cs with 
+      | [] -> (cur::acc)
+      | (c, d')::cs -> 
+        if debug && false then Format.eprintf "Comparing deps:@.%a@.To deps:@.%a@."
+        Backend.Deps.pp_dep d 
+        Backend.Deps.pp_dep d';
+        if d = d' then 
+        collapse acc ((Backend.band cur c), d) cs
+        else
+        collapse (cur::acc) (c, d') cs
+    in
+
+
+    let r = c.reg |> Backend.node_list_of_reg in
+    let nbits = List.length r in
+(*     let r = List.take nbits r in *)
     
+
+    let r = List.map (fun n ->
+      n, Backend.Deps.dep_of_node n) r in
+
+    let r = match r with
+    | [] -> []
+    | n::ns -> collapse [] n ns
+    in
+
+    Format.eprintf "%d bits after collapsing (from %d initial)@." (List.length r) nbits;
+
+
+    let r = List.map Backend.Deps.excise_bit r in
+    let n1, s1 = List.hd r in
+    List.iteri (fun i (n, s) ->
+      Format.eprintf "Comparing node 0 to node %d => " i;
+      if Backend.nodes_eq n n1 then
+        Format.eprintf "Structurally equal@."
+      else 
+        Format.eprintf "Structurally different@."
+    ) r; assert false
+    
+*)
+
+
+  (* Batches circuit checks by dependencies. Assumes equivalent checks are contiguous *)
+  let batch_checks (checks: circuit list) : circuit list =
+    (* Order by dependencies *)
+    let checks = List.map (fun (c, inps) ->
+      (c, inps), Backend.(Deps.dep_of_node (node_of_reg c.reg))) checks in
+    let checks = List.sort (fun (_, d1) (_, d2) ->
+      let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt) in
+      let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt) in
+      let c1 = Int.compare m1 m2 in
+      if c1 = 0 then
+        Int.compare (Map.find m1 d1 |> Set.min_elt) (Map.find m1 d2 |> Set.min_elt)
+      else
+        c1
+    ) checks in
+
+    let rec doit (acc: circuit list) (cur, d: circuit * Backend.Deps.dep) (cs: (circuit * Backend.Deps.dep) list) : circuit list =
+      match cs with 
+      | [] -> (cur::acc)
+      | (c, d')::cs -> 
+        if debug && false then Format.eprintf "Comparing deps:@.%a@.To deps:@.%a@."
+        Backend.Deps.pp_dep d 
+        Backend.Deps.pp_dep d';
+        if d = d' then 
+        doit acc ((circuit_and cur c), d) cs
+        else
+        doit (cur::acc) (c, d') cs
+    in
+
+    match checks with
+    | [] -> []
+    | c::cs -> doit [] c cs
+
+   
+
+  (* Assumes all the pre and post have been split, takes all the pres and one post *) 
+  let fillet_taut (pres: (circuit * Backend.Deps.dep) list) ((post_circ, post_inps): circuit) : bool =
+    assert (List.for_all (fun ((_c, inps), _) -> inps = post_inps) pres);
+    assert (List.for_all (fun (({type_;reg}, _), _) -> type_ = CBool) pres);
+    assert (post_circ.type_ = CBool);
+    let d = Backend.(Deps.dep_of_node (node_of_reg post_circ.reg)) in
+    let compat_pres = List.filteri (fun i (c, pre_dep) ->
+      Backend.Deps.dep_contained pre_dep d
+    ) pres in
+    let compat_pres = List.fst compat_pres in
+    let node_post = Backend.node_of_reg post_circ.reg in
+    let nodes_pre = List.map (fun (c, _) -> Backend.node_of_reg c.reg) compat_pres in
+    let node_post, shifts = Backend.Deps.excise_bit node_post in
+    let inps = List.map (fun {id; type_} ->
+      let low, hi = Map.find id shifts in
+      {id; type_ = CBitstring (hi - low + 1)}
+    ) post_inps in
+    let inp_map = fun (id, v) ->
+      match Map.find_opt id shifts with
+      | Some (min, max) -> 
+          let new_id =  v - min in
+          assert (new_id <= max);
+          Some (id, v - min)
+      | None -> assert false
+    in
+    let nodes_pre = Backend.Deps.rename_inputs inp_map (Backend.reg_of_node_list nodes_pre) in
+    let pre = List.fold_left Backend.band Backend.true_ (Backend.node_list_of_reg nodes_pre) |> Backend.reg_of_node in
+    let pre = {reg = pre; type_ = CBool}, inps in
+    let post = Backend.reg_of_node node_post in
+    let post = {reg = post; type_ = CBool}, inps in
+    let cond = circuit_or (circuit_not pre) post in
+    circ_taut cond
+
+  (* 
+    - Attaches preconditions to postconditions
+    - Realigns inputs
+    - Checks for structural equality of circuits
+    - SMT check for any remainings ones
+   *)
+  let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
+    (* Remove structurally equal circuits *)
+    (* FIXME: not working because you have to 0 align everything before *)
+    let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
+      match cs with
+      | [] -> cur::acc
+      | c::cs ->
+        let c' = fillet_circuit c |> List.hd in
+        if (fst c').reg = (fst cur).reg then
+          (if debug then Format.eprintf "Collapsing circuit@.";
+          collapse acc cur cs)
+        else 
+          (if debug then Format.eprintf "Not collapsing circuit@.";
+          collapse (cur::acc) c cs)
+    in
+    match posts with
+    | [] -> true
+    | post::posts ->
+      let posts = collapse [] post posts in
+      assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) pres);
+      assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) posts);
+      let pres = List.map (fun ((c, _) as circ) -> circ,
+        Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
+      List.iteri (fun i post -> 
+        if debug then Format.eprintf "Checking equivalence for bit %d@." i; (* FIXME *)
+        assert (fillet_taut pres post)) posts;
+      true
+   
 
   (* General Mapreduce Procedure:
      Assumes: 

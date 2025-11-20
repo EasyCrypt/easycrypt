@@ -348,7 +348,6 @@ let int_of_form (hyps: hyps) (f: form) : zint =
       raise (CircError err)
     end
 
-
 let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
   match destr_op_app f with
   | (pc, _), [h; {f_node = Fop(p, _)}] when 

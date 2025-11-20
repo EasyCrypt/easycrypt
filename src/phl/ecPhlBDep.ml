@@ -1103,6 +1103,7 @@ let process_bdep_form
   let f = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) f in
   t_bdep_form invs f v tc
 
+(* FIXME: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
   match f.f_node with
   | Fapp ({f_node = Fop(p, _)}, [n; m]) when p = EcCoreLib.CI_List.p_iota ->
@@ -1112,6 +1113,21 @@ let form_list_from_iota (hyps: hyps) (f: form) : form list =
   | _ -> let err = Format.asprintf "Failed to get form list from iota expression %a@."
     (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f in
     raise (BDepError err)
+
+let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
+  match destr_op_app f with
+  | (pc, _), [h; {f_node = Fop(p, _)}] when 
+    pc = EcCoreLib.CI_List.p_cons && 
+    p = EcCoreLib.CI_List.p_empty ->
+    [h]
+  | (pc, _), [h; t] when
+    pc = EcCoreLib.CI_List.p_cons ->
+    h::(form_list_of_form t)
+  | _ -> 
+      if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
+      raise (CircError "Failed to destruct list")
+
+(* FIXME: move? A *)
 
 let t_bdep_eval
   (n: int) 
@@ -1274,7 +1290,15 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let tc = EcPhlConseq.t_hoareS_conseq_nm {inv=pre; m=(fst hr.hs_m)} {inv=post; m=(fst hr.hs_m)} tc in
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
-let process_pre (tc: tcenv1) (m: memenv) (f: form) = 
+(* Should return a list of circuits corresponding to the atomic parts of the pre *)
+(* 
+  This means: 
+  /\ p_i => [p_i]_i, 
+  a = b  => [a.[i] = b.[i]]_i 
+*)
+(* Returns _open_ circuits *)
+let process_pre (tc: tcenv1) (m: memenv) (f: form) : state * circuit list = 
+  let debug = false in
   let env = FApi.tc1_env tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let hyps = FApi.tc1_hyps tc in (* FIXME: should target be specified here? *)
@@ -1285,9 +1309,13 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) =
   (* Takes in a form of the form /\_i f_i 
      and returns a list of the conjunction terms [ f_i ]*)
   let rec destr_conj (f: form) : form list = 
+    let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
-    | Fapp ({f_node = Fop (p, _)}, fs) -> begin match EcFol.op_kind p with
-      | Some (`And _) -> List.flatten @@ List.map destr_conj fs
+    | Fapp ({f_node = Fop (p, _)}, fs) -> begin match (EcFol.op_kind p, fs) with
+      | Some (`And _), _ -> List.flatten @@ List.map destr_conj fs
+      | (None, [f;fs]) when p = EcCoreLib.CI_List.p_all -> 
+        let fs = form_list_from_iota hyps fs in
+        List.map (fun farg -> f_app f (farg::[]) tbool) fs
       | _ -> f::[]
     end
     | _ -> f::[]
@@ -1300,7 +1328,9 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) =
 
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
+  (* FIXME: are all the simplifications necessary ? *)
   let rec process_equality (s: state) (f: form) : state = 
+    let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [a; b]) -> begin match EcFol.op_kind p, (EcCallbyValue.norm_cbv (circ_red hyps) hyps a), (EcCallbyValue.norm_cbv (circ_red hyps) hyps b) with
       | Some `Eq, {f_node = Fpvar (PVloc pv, m_); _}, ({f_node = Flocal id; f_ty; _} as fv)
@@ -1316,35 +1346,65 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) =
 
   (* If convertible to circuit then add to precondition conjunction.
      Use state from previous as well *)
-  let rec process_form (f: form) : circuit option = 
-    if debug then
-    Format.eprintf "Processing form: %a@.Simplified version: %a@."
-      EcPrinting.(pp_form ppe) f
-      EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
-    try Some (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) |> snd) with
-    e -> begin if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
-      None end
+  let rec process_form (f: form) : circuit list = 
+    match f.f_node with
+    | Fapp ({f_node = Fop (p, _);_}, [f1; f2]) when EcFol.op_kind p = Some `Eq -> 
+      let hyps, c1 = circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f1) in
+      let hyps, c2 = circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f2) in
+      circuit_eqs c1 c2
+    | _ -> 
+      begin
+      if debug then
+      Format.eprintf "Processing form: %a@.Simplified version: %a@."
+        EcPrinting.(pp_form ppe) f
+        EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
+      try (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) |> snd)::[] with
+      e -> begin if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
+        [] end
+      end
   in
 
-  let cs = List.filter_map process_form fs in
+  let cs = List.fold_left (fun acc f -> List.rev_append (process_form f) acc) [] fs |> List.rev in
+(*
   if debug then Format.eprintf "Translated as much as possible from pre to circuits, got:@.%a@\n"
     (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
+*)
 
   if debug then Format.eprintf  "In the context of the following bindings in the environment:@\n%a@\n"
   (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.eprintf "%a@." pp_cinp cinp)) (state_lambdas st);
+  st, cs
 
-  List.fold_left circuit_and circuit_true cs, st
-
-let solve_post ~(st: state) ?(pre: circuit option) (hyps: hyps) (post: form) : bool =
+let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
   Format.eprintf "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
   | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> begin match EcFol.op_kind p with
-    | Some `Eq -> Format.eprintf "Filletting circuit...@.";
+    | Some `Eq -> if debug then Format.eprintf "Filletting circuit...@.";
       let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
       let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
+
+      (* Testing for structural equality *)
+(*
+      let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
+      let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
+      let c = circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) in
+      Format.eprintf "Circuit 1 generated@.";
+      let circs = fillet_circuit c in
+      assert false;
+*)
+
+      (* Above is not valid *)
+
+      let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
       assert (Option.is_none @@ circuit_has_uninitialized c1);
       assert (Option.is_none @@ circuit_has_uninitialized c2);
+      let posts = circuit_eqs c1 c2 in
+      if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
+      let posts = batch_checks posts in
+      if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
+      assert (fillet_tauts pres posts);
+      true
+(*
       let cs1 = fillet_circuit c1 in
       let cs2 = fillet_circuit c2 in
       List.iter2 (fun c1 c2 ->
@@ -1352,6 +1412,7 @@ let solve_post ~(st: state) ?(pre: circuit option) (hyps: hyps) (post: form) : b
         pp_circuit c1 pp_circuit c2) cs1 cs2;
       assert (List.for_all2 circ_equiv cs1 cs2);
       assert false
+*)
     | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
   end
   | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
@@ -1364,7 +1425,7 @@ let t_bdep_solve
     let goal = (FApi.tc1_goal tc) in
     match goal.f_node with 
     | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
-      let cpre, st = process_pre tc hs_m hs_pr in
+      let st, cpres = process_pre tc hs_m hs_pr in
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
 (*       let hyps, cpost = circuit_of_form ~st hyps hs_po in *)
 (*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
@@ -1379,7 +1440,7 @@ let t_bdep_solve
 *)
       if 
 (*         (circ_taut cgoal)  *)
-        solve_post ~st hyps hs_po
+        solve_post ~st ~pres:cpres hyps hs_po
       then FApi.close (!@ tc) VBdep else
       raise (BDepError "Failed to verify postcondition")
     | _ -> 
