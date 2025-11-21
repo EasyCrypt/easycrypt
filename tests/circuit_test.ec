@@ -67,7 +67,7 @@ qed.
 *)
     
 
-lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = b_ +^ a_].
+lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = b_ +^ a_].
 proof.
   proc.
   bdep solve.

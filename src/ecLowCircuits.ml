@@ -1403,9 +1403,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         Backend.Deps.pp_dep d 
         Backend.Deps.pp_dep d';
         if d = d' then 
-        doit acc ((circuit_and cur c), d) cs
-        else
-        doit (cur::acc) (c, d') cs
+          doit acc ((circuit_and cur c), d) cs
+        else begin
+          Format.eprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d;
+          doit (cur::acc) (c, d') cs
+        end
     in
 
     match checks with
@@ -1464,12 +1466,40 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         let n', _ = Backend.node_of_reg reg |> Backend.Deps.excise_bit in
         let n, _ = Backend.node_of_reg (fst cur).reg |> Backend.Deps.excise_bit in
         if Backend.nodes_eq n n' then
-          (if debug then Format.eprintf "Collapsing circuit@.";
-          collapse acc cur cs)
+          collapse acc cur cs
         else 
-          (if debug then Format.eprintf "Not collapsing circuit@.";
-          collapse (cur::acc) c cs)
+          collapse (cur::acc) c cs
     in
+
+    (* TODO: Integrate this with the actual code *)
+(*
+    let posts = List.map (fun (post, _pinps) ->
+      let d = Backend.(Deps.dep_of_node (node_of_reg post.reg)) in
+      let compat_pres = List.filteri (fun i (pre_c, pre_inp) ->
+        let pre_dep = Backend.(Deps.dep_of_node (node_of_reg pre_c.reg)) in
+        Backend.Deps.dep_contained pre_dep d
+      ) pres in
+
+      let node_post = Backend.node_of_reg post.reg in
+      let nodes_pre = List.map (fun (c, _) -> Backend.node_of_reg c.reg) compat_pres in
+      let node_post, shifts = Backend.Deps.excise_bit node_post in
+      let inp_map = fun (id, v) ->
+      match Map.find_opt id shifts with
+      | Some (min, max) -> 
+          let new_id =  v - min in
+          assert (new_id <= max);
+          Some (id, v - min)
+      | None -> assert false
+    in
+    let nodes_pre = Backend.Deps.rename_inputs inp_map (Backend.reg_of_node_list nodes_pre) |> Backend.node_list_of_reg in
+    let node_pre = List.fold_left Backend.band Backend.true_ nodes_pre in
+    let node_post = Backend.bor (Backend.bnot node_pre) node_post in
+    {reg = Backend.reg_of_node node_post; type_ = CBool},
+    List.map (fun (id, (low, hi)) ->
+      {id; type_ = CBitstring (hi - low + 1)}) 
+    (Map.bindings shifts)
+    ) posts in
+*)
 
     match posts with
     | [] -> true

@@ -3293,7 +3293,7 @@ bdepeq_out_info:
 | BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
   { Pcirc (invs, f, (`Var v :> bdepvar)) }
 
-| BDEP SOLVE
+| CIRCUIT
   { Pbdepsolve }
 
 bdhoare_split:

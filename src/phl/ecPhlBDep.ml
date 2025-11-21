@@ -1375,7 +1375,16 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) : state * circuit list =
   st, cs
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
-  Format.eprintf "Solving post: %a@." 
+  let time (env: env) (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+
+  let tm = Unix.gettimeofday () in
+  let env = toenv hyps in
+
+  if debug then Format.eprintf "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
   | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> begin match EcFol.op_kind p with
@@ -1383,27 +1392,25 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
       let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
       let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
 
-      (* Testing for structural equality *)
-(*
-      let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
-      let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
-      let c = circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) in
-      Format.eprintf "Circuit 1 generated@.";
-      let circs = fillet_circuit c in
-      assert false;
-*)
-
-      (* Above is not valid *)
-
       let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
       assert (Option.is_none @@ circuit_has_uninitialized c1);
       assert (Option.is_none @@ circuit_has_uninitialized c2);
       let posts = circuit_eqs c1 c2 in
+      let tm = time env tm "Done with postcondition circuit generation" in
+
+
       if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
       let posts = batch_checks posts in
       if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
-      assert (fillet_tauts pres posts);
-      true
+      let tm = time env tm "Done with lane compression" in
+      if fillet_tauts pres posts then begin
+        let tm = time env tm "Done with equivalence checking (structural equality + SMT)" in
+        true
+      end
+      else begin
+        let tm = time env tm "Failed equivalence check" in
+        false
+      end
 (*
       let cs1 = fillet_circuit c1 in
       let cs2 = fillet_circuit c2 in
@@ -1420,13 +1427,24 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve
   (tc : tcenv1) =
+  let time (env: env) (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+
+
   begin 
     let hyps = (FApi.tc1_hyps tc) in
     let goal = (FApi.tc1_goal tc) in
     match goal.f_node with 
     | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
+      let tm = Unix.gettimeofday () in
       let st, cpres = process_pre tc hs_m hs_pr in
+      let tm = time (toenv hyps) tm "Done with precondition processing" in
+
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
+      let tm = time (toenv hyps) tm "Done with program circuit gen" in
 (*       let hyps, cpost = circuit_of_form ~st hyps hs_po in *)
 (*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
 (*
