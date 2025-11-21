@@ -1317,7 +1317,7 @@ module Op = struct
 
     tyop, List.rev !axs, scope
 
-
+  (*-------------------------------------------------------------------------*)
   let add_opsem (scope : scope) (op : pprocop located) =
     let module Sem = EcProcSem in
 
@@ -1429,7 +1429,9 @@ module Op = struct
                    (f_app
                       (f_op oppath [] opdecl.op_ty)
                       (List.map (fun (x, ty) -> f_local x ty) locs)
-                      sig_.fs_ret))})
+                      sig_.fs_ret))}
+                []
+             )
          in
 
          let prax = EcDecl.{
@@ -1447,6 +1449,28 @@ module Op = struct
     in
 
     scope
+end
+
+(* -------------------------------------------------------------------- *)
+module Except = struct
+  module TT = EcTyping
+
+  let bind ?(import = true) (scope : scope) ((x, e) : _ * excep) =
+    assert (scope.sc_pr_uc = None);
+    let item = EcTheory.mkitem ~import (EcTheory.Th_exception (x, e)) in
+    { scope with sc_env = EcSection.add_item item scope.sc_env; }
+
+  let add (scope : scope) (pe : pexception_decl located) =
+    assert (scope.sc_pr_uc = None);
+    let pe = pe.pl_desc and loc = pe.pl_loc in
+    let eenv = env scope in
+    let ue = TT.transtyvars eenv (loc, pe.pe_typargs) in
+    let lc = pe.pe_locality in
+    let tparams = EcUnify.UniEnv.tparams ue in
+    let e   = EcDecl.mk_except tparams lc in
+    let scope = bind scope (unloc pe.pe_name, e) in
+    e, scope
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1840,7 +1864,7 @@ module Cloning = struct
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in 
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_smt = true; puc_local = false; } in
@@ -1897,7 +1921,7 @@ module Cloning = struct
         | `Include -> scope)
         scope
     in
-    
+
     if is_none thcl.pthc_local && oth.cth_loca = `Local then
       notify scope `Info
         "Theory `%s` has inherited `local` visibility. \
@@ -1986,14 +2010,14 @@ module Ty = struct
     let carrier =
       let ue = EcUnify.UniEnv.create None in
       transty tp_tydecl env ue subtype.pst_carrier in
-    
+
     let pred =
       let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
       let env = EcEnv.Var.bind_local x carrier env in
       let ue = EcUnify.UniEnv.create None in
       let pred = EcTyping.trans_prop env ue (snd subtype.pst_pred) in
       if not (EcUnify.UniEnv.closed ue) then
-        hierror ~loc:(snd subtype.pst_pred).pl_loc 
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
       let uidmap = EcUnify.UniEnv.close ue in
       let fs = Tuni.subst uidmap in
@@ -2015,12 +2039,12 @@ module Ty = struct
             ev_bynames = Msym.empty;
             ev_global  =  [ (None, Some [`Include, "prove"]) ]
           } } in
- 
+
     let cname = Option.map unloc subtype.pst_cname in
     let npath = ofold ((^~) EcPath.pqname) (EcEnv.root env) cname in
     let cpath = EcPath.fromqsymbol ([EcCoreLib.i_top], "Subtype") in
     let theory = EcEnv.Theory.by_path ~mode:`Abstract cpath env in
-      
+
     let renames =
       match subtype.pst_rename with
       | None -> []
@@ -2043,7 +2067,7 @@ module Ty = struct
         ) in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
-    
+
     Ax.add_defer scope proofs
 
   (* ------------------------------------------------------------------ *)

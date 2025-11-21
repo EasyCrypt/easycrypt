@@ -21,6 +21,7 @@ and theory_item = {
 and theory_item_r =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
+  | Th_exception of (symbol * excep)
   | Th_axiom     of (symbol * axiom)
   | Th_modtype   of (symbol * top_module_sig)
   | Th_module    of top_module_expr

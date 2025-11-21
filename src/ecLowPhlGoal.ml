@@ -96,7 +96,7 @@ let pf_first_call   pe st = pf_first_gen  "call"   destr_call   pe st
 let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
 let pf_first_match  pe st = pf_first_gen  "match"  destr_match  pe st
 let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
-let pf_first_assert pe st = pf_first_gen  "assert" destr_assert pe st
+let pf_first_raise  pe st = pf_first_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
@@ -105,7 +105,7 @@ let pf_last_call   pe st = pf_last_gen  "call"   destr_call   pe st
 let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
 let pf_last_match  pe st = pf_last_gen  "match"  destr_match  pe st
 let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
-let pf_last_assert pe st = pf_last_gen  "assert" destr_assert pe st
+let pf_last_raise  pe st = pf_last_gen  "raise"  destr_raise  pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -114,7 +114,7 @@ let tc1_first_call   tc st = pf_first_call   !!tc st
 let tc1_first_if     tc st = pf_first_if     !!tc st
 let tc1_first_match  tc st = pf_first_match  !!tc st
 let tc1_first_while  tc st = pf_first_while  !!tc st
-let tc1_first_assert tc st = pf_first_assert !!tc st
+let tc1_first_raise  tc st = pf_first_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
@@ -123,7 +123,7 @@ let tc1_last_call   tc st = pf_last_call   !!tc st
 let tc1_last_if     tc st = pf_last_if     !!tc st
 let tc1_last_match  tc st = pf_last_match  !!tc st
 let tc1_last_while  tc st = pf_last_while  !!tc st
-let tc1_last_assert tc st = pf_last_assert !!tc st
+let tc1_last_raise  tc st = pf_last_raise  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
@@ -139,7 +139,7 @@ let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s
 let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s
 let pf_pos_last_match  pe s = pf_pos_last_gen "match"  is_match  pe s
 let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s
-let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s
+let pf_pos_last_raise pe s = pf_pos_last_gen "raise"  is_raise pe s
 
 
 let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s
@@ -148,7 +148,7 @@ let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s
 let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
 let tc1_pos_last_match  tc s = pf_pos_last_match  !!tc s
 let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s
-let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
+let tc1_pos_last_raise  tc s = pf_pos_last_raise  !!tc s
 
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
@@ -209,7 +209,7 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
-  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs)
+  | None       , FhoareS   hs -> f_hoareS (snd hs.hs_m) (hs_pr hs) s (hs_po hs) (hs_poe hs)
   | None       , FeHoareS  hs -> f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s (ehs_po hs)
   | None       , FbdHoareS hs -> f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
   | Some `Left , FequivS   es -> f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s es.es_sr (es_po es)
@@ -254,30 +254,42 @@ let tc1_get_post tc =
   | Some f -> f
 
 (* -------------------------------------------------------------------- *)
+let get_poste f =
+  match f.f_node with
+  | FhoareF hf   -> Some (hf_poe hf)
+  | FhoareS hs   -> Some (hs_poe hs)
+  | _            -> None
+
+let tc1_get_poste tc =
+  match get_poste (FApi.tc1_goal tc) with
+  | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
+  | Some f -> f
+
+(* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node, pre with
- | FhoareF hf, Inv_ss pre   -> 
+ | FhoareF hf, Inv_ss pre   ->
     let pre = ss_inv_rebind pre hf.hf_m in
-    f_hoareF pre hf.hf_f (hf_po hf)
- | FhoareS hs, Inv_ss pre   -> 
+    f_hoareF pre hf.hf_f (hf_po hf) (hf_poe hf)
+ | FhoareS hs, Inv_ss pre   ->
     let pre = ss_inv_rebind pre (fst hs.hs_m) in
-    f_hoareS (snd hs.hs_m) pre hs.hs_s (hs_po hs)
- | FeHoareF hf, Inv_ss pre  -> 
+    f_hoareS (snd hs.hs_m) pre hs.hs_s (hs_po hs) (hs_poe hs)
+ | FeHoareF hf, Inv_ss pre  ->
     let pre = ss_inv_rebind pre hf.ehf_m in
     f_eHoareF pre hf.ehf_f (ehf_po hf)
- | FeHoareS hs, Inv_ss pre  -> 
+ | FeHoareS hs, Inv_ss pre  ->
     let pre = ss_inv_rebind pre (fst hs.ehs_m) in
     f_eHoareS (snd hs.ehs_m) pre hs.ehs_s (ehs_po hs)
  | FbdHoareF hf, Inv_ss pre ->
     let pre = ss_inv_rebind pre hf.bhf_m in
     f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf)
- | FbdHoareS hs, Inv_ss pre -> 
+ | FbdHoareS hs, Inv_ss pre ->
     let pre = ss_inv_rebind pre (fst hs.bhs_m) in
     f_bdHoareS (snd hs.bhs_m) pre hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
- | FequivF ef, Inv_ts pre   -> 
+ | FequivF ef, Inv_ts pre   ->
     let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
     f_equivF pre ef.ef_fl ef.ef_fr (ef_po ef)
- | FequivS es, Inv_ts pre   -> 
+ | FequivS es, Inv_ts pre   ->
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
     f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr (es_po es)
  | _            -> assert false
@@ -665,14 +677,16 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
           let pr, po = hs_pr hs, hs_po hs in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po.inv) (hs.hs_m, hs.hs_s) in
-          let concl = f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs) in
+          let concl =
+            f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs) (hs_poe hs)
+          in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FbdHoareS bhs when bdhoare ->
           let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) 
+          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs)
                       bhs.bhs_cmp (bhs_bd bhs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 

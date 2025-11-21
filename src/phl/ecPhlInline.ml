@@ -50,7 +50,7 @@ module LowSubst = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
-    | Sassert e          -> i_assert (esubst e)
+    | Sraise (e,es)      -> i_raise  (e, List.map esubst es)
     | Sabstract _        -> i
 
   and issubst m (is : instr list) =
@@ -171,7 +171,7 @@ end
 let t_inline_hoare_r ~use_tuple sp tc =
   let hs           = tc1_as_hoareS tc in
   let (_,mt), stmt = LowInternal.inline ~use_tuple tc hs.hs_m sp hs.hs_s in
-  let concl        = f_hoareS mt (hs_pr hs) stmt (hs_po hs) in
+  let concl        = f_hoareS mt (hs_pr hs) stmt (hs_po hs) (hs_poe hs) in
 
   FApi.xmutate1 tc `Inline [concl]
 

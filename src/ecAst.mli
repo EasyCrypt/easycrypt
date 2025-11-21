@@ -111,7 +111,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcPath.path * expr list
   | Sabstract of EcIdent.t
 
 and stmt = private {
@@ -201,7 +201,7 @@ and f_node =
 
   | Fpr of pr (* hr *)
 
-(* We use the alert system for privacy because we want to 
+(* We use the alert system for privacy because we want to
    permit access in *some* instances, and the other fields are fine *)
 (* This is to ensure that memory bindings are carried along with the invariants *)
 and eagerF = {
@@ -239,13 +239,17 @@ and equivS = {
   [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
 }
 
+and post = (EcPath.path * form) list
+
 and sHoareF = {
   hf_m : memory;
   hf_pr : form;
   [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
   hf_f  : EcPath.xpath;
   hf_po : form;
-  [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
+  [@alert priv_pl "Use the accessor function `hf_po` instead of the field"]
+  hf_poe : post;
+  [@alert priv_pl "Use the accessor function `hf_poe` instead of the field"]
 }
 
 and sHoareS = {
@@ -255,6 +259,8 @@ and sHoareS = {
   hs_s  : stmt;
   hs_po : form;
   [@alert priv_pl "Use the accessor function `hs_po` instead of the field"]
+  hs_poe : post;
+  [@alert priv_pl "Use the accessor function `hs_poe` instead of the field"]
 }
 
 
@@ -336,13 +342,13 @@ val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -
 val map_ts_inv_left : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_left1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_left2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_right : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_destr2 : (form -> form * form) -> ts_inv -> ts_inv * ts_inv
@@ -351,13 +357,13 @@ val map_ts_inv_destr3 : (form -> form * form * form) -> ts_inv -> ts_inv * ts_in
 val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_left2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 val ts_inv_lower_right : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_right1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_right2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 (* -------------------------------------------------------------------- *)
@@ -390,8 +396,10 @@ val es_pr : equivS -> ts_inv
 val es_po : equivS -> ts_inv
 val hf_pr : sHoareF -> ss_inv
 val hf_po : sHoareF -> ss_inv
+val hf_poe : sHoareF -> (EcPath.path * ss_inv) list
 val hs_pr : sHoareS -> ss_inv
 val hs_po : sHoareS -> ss_inv
+val hs_poe : sHoareS -> (EcPath.path * ss_inv) list
 val ehf_pr : eHoareF -> ss_inv
 val ehf_po : eHoareF -> ss_inv
 val ehs_pr : eHoareS -> ss_inv

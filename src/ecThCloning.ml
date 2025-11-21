@@ -304,7 +304,7 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_ops then
            clone_error oc.oc_env (CE_DupOverride (OVK_Operator, name));
-         { evc with evc_ops = 
+         { evc with evc_ops =
             Msym.add x (mk_loc lc opd :> xop_override located) evc.evc_ops })
         nm evc
 
@@ -436,6 +436,8 @@ end = struct
          let ovrd = EcPath.fromqsymbol (thd @ prefix, x) in
          let ovrd = (ovrd, mode) in
          nt_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+
+      | Th_exception _ -> (proofs, evc)
 
       | Th_axiom (x, _) ->
         let axd = loced (thd @ prefix, x) in

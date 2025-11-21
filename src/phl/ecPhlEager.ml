@@ -140,10 +140,10 @@ let t_eager_if_r tc =
     let fe  = ss_inv_generalize_right (ss_inv_of_expr ml e) mr in
     let eqb = map_ts_inv2 f_eq fe {ml;mr;inv=f_local b tbool} in
 
-    EcSubst.f_forall_mems_ss_inv es.es_mr   
+    EcSubst.f_forall_mems_ss_inv es.es_mr
       (map_ss_inv1
       (f_forall [(b, GTty tbool)])
-      (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd es.es_ml) pr s po) (map_ts_inv2 f_and (es_pr es) eqb) eqb)) in
+      (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd es.es_ml) pr s po []) (map_ts_inv2 f_and (es_pr es) eqb) eqb)) in
 
   let cT =
     let pre = map_ts_inv2 f_and (es_pr es) (map_ts_inv2 f_eq fel {ml;mr;inv=f_true}) in
@@ -196,7 +196,7 @@ let t_eager_while_r h tc =
 
   and bT = f_equivS (snd eC.es_ml) (snd eC.es_mr) (map_ts_inv2 f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
     (stmt (c'.s_node@s'.s_node)) eqI
-  
+
   and cT = f_equivS (snd eC.es_mr) (snd eC.es_mr) eqI2 c' c' eqI2
   in
 
@@ -467,13 +467,17 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         (* (h) is assumed *)
         (fhyps, eqi)
 
-    | Sassert el, Sassert er ->
-        check_args [el];
+    | Sraise (_,argsl), Sraise (_,argsr) ->
+        check_args argsl;
         let eqnm = Mpv2.split_nmod env modi modi' eqo in
         let eqm  = Mpv2.split_mod  env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
-        let eqi = Mpv2.union eqIs eqnm in
-        (fhyps, Mpv2.add_eqs env el er eqi)
+        let eqi =
+          List.fold_left2
+            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
+            eqnm argsl argsr
+        in
+        (fhyps,eqi)
 
     | Sabstract _, Sabstract _ -> assert false (* FIXME *)
 
@@ -605,7 +609,7 @@ let process_fun_abs info eqI tc =
 let process_call info tc =
   let process_cut info =
     match info with
-    | EcParsetree.CI_spec (fpre, fpost) ->
+    | EcParsetree.CI_spec (fpre, fpost, []) ->
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 

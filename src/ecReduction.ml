@@ -243,8 +243,8 @@ end) = struct
         with E.NotConv -> false
       end
 
-    | Sassert a1, Sassert a2 ->
-        for_expr env alpha ~norm a1 a2
+    | Sraise (_,es1), Sraise (_,es2) ->
+      List.all2 (for_expr env alpha ~norm) es1 es2
 
     | Sabstract id1, Sabstract id2 ->
         EcIdent.id_equal id1 id2
@@ -1258,23 +1258,23 @@ let rec simplify ri env f =
   match f.f_node with
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
-      f_map (fun ty -> ty) (simplify ri env) 
-      (f_hoareF (hf_pr hf) hf_f (hf_po hf))
+      f_map (fun ty -> ty) (simplify ri env)
+      (f_hoareF (hf_pr hf) hf_f (hf_po hf) (hf_poe hf))
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
-      f_map (fun ty -> ty) (simplify ri env) 
+      f_map (fun ty -> ty) (simplify ri env)
       (f_eHoareF (ehf_pr hf) ehf_f (ehf_po hf))
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
-      f_map (fun ty -> ty) (simplify ri env) 
+      f_map (fun ty -> ty) (simplify ri env)
       (f_bdHoareF (bhf_pr hf) bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf))
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
-      f_map (fun ty -> ty) (simplify ri env) 
+      f_map (fun ty -> ty) (simplify ri env)
       (f_equivF (ef_pr ef) ef_fl ef_fr (ef_po ef))
 
   | FeagerF eg when ri.ri.modpath ->
@@ -1362,10 +1362,10 @@ let zpop ri side f hd =
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, [pr;po] ->
     let m = hf.hf_m in
-    f_hoareF {m;inv=pr} hf.hf_f {m;inv=po}
+    f_hoareF {m;inv=pr} hf.hf_f {m;inv=po} (hf_poe hf)
   | Zhl {f_node = FhoareS hs}, [pr;po] ->
     let m = fst hs.hs_m in
-    f_hoareS (snd hs.hs_m) {m;inv=pr} hs.hs_s {m;inv=po}
+    f_hoareS (snd hs.hs_m) {m;inv=pr} hs.hs_s {m;inv=po} (hs_poe hs)
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
     let m = hf.ehf_m in
     f_eHoareF {m;inv=pr} hf.ehf_f {m;inv=po}

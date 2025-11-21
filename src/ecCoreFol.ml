@@ -269,14 +269,29 @@ let f_eqs fs1 fs2 =
 let f_hoareS_r hs = mk_form (FhoareS hs) tbool
 let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS hs_mt hs_pr hs_s hs_po =
+let f_hoareS hs_mt hs_pr hs_s hs_po hs_poe =
   assert (hs_pr.m = hs_po.m);
-  f_hoareS_r { hs_m=(hs_pr.m, hs_mt); hs_pr=hs_pr.inv; hs_s; 
-    hs_po=hs_po.inv; } [@alert "-priv_pl"]
+  List.iter (fun (_,f) -> assert (hs_pr.m = f.m)) hs_poe;
+  let hs_poe = List.map (fun (e,(f:ss_inv)) -> (e, f.inv)) hs_poe in
+  f_hoareS_r
+    { hs_m=(hs_pr.m, hs_mt);
+      hs_pr=hs_pr.inv;
+      hs_s;
+      hs_po=hs_po.inv;
+      hs_poe=hs_poe
+    } [@alert "-priv_pl"]
 
-let f_hoareF pr hf_f po =
+let f_hoareF pr hf_f po poe =
   assert (pr.m = po.m);
-  f_hoareF_r { hf_m=pr.m; hf_pr=pr.inv; hf_f; hf_po=po.inv; } [@alert "-priv_pl"]
+  List.iter (fun (_,f) -> assert (pr.m = f.m)) poe;
+  let hf_poe = List.map (fun (e,(f:ss_inv)) -> (e, f.inv)) poe in
+  f_hoareF_r
+    { hf_m=pr.m;
+      hf_pr=pr.inv;
+      hf_f;
+      hf_po=po.inv;
+      hf_poe=hf_poe
+    } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
@@ -284,7 +299,7 @@ let f_eHoareF_r hf = mk_form (FeHoareF hf) tbool
 
 let f_eHoareS ehs_mt ehs_pr ehs_s ehs_po =
   assert (ehs_pr.m = ehs_po.m);
-  f_eHoareS_r { ehs_m=(ehs_pr.m, ehs_mt); ehs_pr=ehs_pr.inv; ehs_s; 
+  f_eHoareS_r { ehs_m=(ehs_pr.m, ehs_mt); ehs_pr=ehs_pr.inv; ehs_s;
     ehs_po=ehs_po.inv; } [@alert "-priv_pl"]
 
 let f_eHoareF ehf_pr ehf_f ehf_po =
@@ -304,7 +319,7 @@ let f_bdHoareF_r bhf = mk_form (FbdHoareF bhf) tbool
 
 let f_bdHoareS bhs_mt bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
   assert (bhs_pr.m = bhs_po.m && bhs_bd.m = bhs_po.m);
-  f_bdHoareS_r { bhs_m=(bhs_pr.m,bhs_mt); bhs_pr=bhs_pr.inv; bhs_s; 
+  f_bdHoareS_r { bhs_m=(bhs_pr.m,bhs_mt); bhs_pr=bhs_pr.inv; bhs_s;
     bhs_po=bhs_po.inv; bhs_cmp; bhs_bd=bhs_bd.inv; } [@alert "-priv_pl"]
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
@@ -476,12 +491,22 @@ let f_map gt g fp =
   | FhoareF hf ->
       let pr' = map_ss_inv1 g (hf_pr hf) in
       let po' = map_ss_inv1 g (hf_po hf) in
-        f_hoareF pr' hf.hf_f po'
+      let poe' =
+        List.map
+          (fun (e,f) -> e, map_ss_inv1 g f)
+          (hf_poe hf)
+      in
+      f_hoareF pr' hf.hf_f po' poe'
 
   | FhoareS hs ->
       let pr' = map_ss_inv1 g (hs_pr hs) in
       let po' = map_ss_inv1 g (hs_po hs) in
-        f_hoareS (snd hs.hs_m) pr' hs.hs_s po'
+      let poe' =
+        List.map
+          (fun (e,f) -> e, map_ss_inv1 g f)
+          (hs_poe hs)
+      in
+      f_hoareS (snd hs.hs_m) pr' hs.hs_s po' poe'
 
   | FeHoareF hf ->
       let pr' = map_ss_inv1 g (ehf_pr hf) in
@@ -648,8 +673,8 @@ let decompose_exists ?(bound : int option) (f : form) =
   decompose_binder ?bound ~quantif:Lexists f
 
 let decompose_lambda ?(bound : int option) (f : form) =
-  decompose_binder ?bound ~quantif:Llambda f    
-  
+  decompose_binder ?bound ~quantif:Llambda f
+
 (* -------------------------------------------------------------------- *)
 let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
   let bds, f = decompose_binder ?bound ~quantif f in
@@ -660,10 +685,10 @@ let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
 
 let destr_forall ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lforall f
-  
+
 let destr_exists ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lexists f
-  
+
 let destr_lambda ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Llambda f
 
@@ -678,10 +703,10 @@ let destr_forall1 (f : form) =
 
 let destr_exists1 (f : form) =
   destr_binder1 ~quantif:Lexists f
-  
+
 let destr_lambda1 (f : form) =
   destr_binder1 ~quantif:Llambda f
-  
+
 (* -------------------------------------------------------------------- *)
 let destr_let f =
   match f.f_node with
@@ -828,7 +853,7 @@ let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
 
-let destr_and_ts_inv inv = 
+let destr_and_ts_inv inv =
   let c1 = map_ts_inv1 (fun po -> fst (destr_and po)) inv in
   let c2 = map_ts_inv1 (fun po -> snd (destr_and po)) inv in
   (c1, c2)
