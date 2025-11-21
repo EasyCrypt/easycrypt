@@ -90,7 +90,7 @@ let process_outline info tc =
   | UnificationError UE_InvalidRetInstr ->
      tc_error !!tc "Outline: return instruction must be an assign. Perhaps consider using the alias variant using `~`."
   | UnificationError (UE_DifferentProgramLengths (s1, s2)) ->
-     tc_error !!tc "Outline: body's are different lengths\n%a ~ %a." (EcPrinting.pp_stmt ppe) s1 (EcPrinting.pp_stmt ppe) s2
+     tc_error !!tc "Outline: bodies are different lengths\n%a ~ %a." (EcPrinting.pp_stmt ppe) s1 (EcPrinting.pp_stmt ppe) s2
   | UnificationError (UE_InstrNotInLockstep (i1, i2))->
      tc_error !!tc "outline: instructions not in sync\n%a ~ %a." (EcPrinting.pp_instr ppe) i1 (EcPrinting.pp_instr ppe) i2
   | UnificationError (UE_LvNotInLockstep (_lv1, _lv2))->

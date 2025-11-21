@@ -2085,10 +2085,10 @@ and pp_form ppe fmt f =
   pp_form_r ppe (min_op_prec, `NonAssoc) fmt f
 
 and pp_expr ppe fmt e =
-  let f = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
-  | None -> form_of_expr e
-  | Some m -> (ss_inv_of_expr m e).inv in
-  pp_form ppe fmt f
+  let m = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
+  | None -> EcIdent.create "&hr"
+  | Some m -> m in
+  pp_form ppe fmt (ss_inv_of_expr m e).inv
 
 and pp_tuple_expr ppe fmt e =
   match e.e_node with
