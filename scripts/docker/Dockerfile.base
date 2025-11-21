@@ -2,11 +2,11 @@
 
 FROM debian:stable
 
-MAINTAINER Pierre-Yves Strub <pierre-yves@strub.nu>
+LABEL org.opencontainers.image.maintainer="Pierre-Yves Strub <pierre-yves@strub.nu>"
 
 ARG user=charlie
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
 	apt-get -q -y update && \
