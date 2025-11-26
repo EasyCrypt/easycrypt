@@ -148,6 +148,8 @@ module type CBackend = sig
     val dep_range : deps -> int * int
     (* Checks if first dep is a subset of second dep *) 
     val dep_contained : dep -> dep -> bool
+    (* Checks if two dep sets are equal *)
+    val deps_equal : dep -> dep -> bool
     (* Checks if all the deps are in a given list of inputs *)
     val check_inputs : reg -> (int * int) list -> bool
 
@@ -466,6 +468,9 @@ module LospecsBack : CBackend = struct
         | None -> false
         | Some superbits -> Set.subset bits superbits
       ) subd
+
+    let deps_equal (d1: dep) (d2: dep) : bool =
+      (Map.equal (Set.equal) d1 d2)
 
     let forall_inputs (check: int -> int -> bool) (r: reg) : bool =
       let d = deps_of_reg r in
@@ -1381,11 +1386,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let checks = List.map (fun (c, inps) ->
       (c, inps), Backend.(Deps.dep_of_node (node_of_reg c.reg))) checks in
     let checks = List.stable_sort (fun (_, d1) (_, d2) ->
-      let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt) in
-      let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt) in
+      let m1 = (Map.keys d1 |> Set.of_enum |> Set.min_elt_opt) in 
+      let m2 = (Map.keys d2 |> Set.of_enum |> Set.min_elt_opt) in 
+      (* FIXME: Check this *)
+      match m1, m2 with
+      | None, None -> 0
+      | None, Some _ -> -1
+      | Some _, None -> 1
+      | Some m1, Some m2 ->
       let c1 = Int.compare m1 m2 in
-      if c1 = 0 then
-        Int.compare (Map.find m1 d1 |> Set.min_elt) (Map.find m1 d2 |> Set.min_elt)
+      if c1 = 0 then (* FIXME: check default value V V *)
+        Int.compare (Map.find m1 d1 |> Set.min_elt_opt |> Option.default (-1)) (Map.find m1 d2 |> Set.min_elt_opt |> Option.default (-1))
       else
         c1
     ) checks in
@@ -1402,7 +1413,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         if debug && false then Format.eprintf "Comparing deps:@.%a@.To deps:@.%a@."
         Backend.Deps.pp_dep d 
         Backend.Deps.pp_dep d';
-        if d = d' then 
+        if Backend.Deps.deps_equal d d' then 
           doit acc ((circuit_and cur c), d) cs
         else begin
           Format.eprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d;
@@ -1429,9 +1440,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let node_post = Backend.node_of_reg post_circ.reg in
     let nodes_pre = List.map (fun (c, _) -> Backend.node_of_reg c.reg) compat_pres in
     let node_post, shifts = Backend.Deps.excise_bit node_post in
-    let inps = List.map (fun {id; type_} ->
-      let low, hi = Map.find id shifts in
-      {id; type_ = CBitstring (hi - low + 1)}
+    let inps = List.filter_map (fun {id; type_} ->
+      match Map.find_opt id shifts with
+      | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1)}
+      | None -> None
     ) post_inps in
     let inp_map = fun (id, v) ->
       match Map.find_opt id shifts with
@@ -1500,6 +1512,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (Map.bindings shifts)
     ) posts in
 *)
+
+    let posts = List.filter_map (fun ((postc, _) as post) -> 
+      if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
+      else Some post
+    ) posts in
 
     match posts with
     | [] -> true

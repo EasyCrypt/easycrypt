@@ -1398,6 +1398,13 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
       let posts = circuit_eqs c1 c2 in
       let tm = time env tm "Done with postcondition circuit generation" in
 
+(*
+      if debug then begin
+        Format.eprintf "Got conditions:@.%a@."
+        EcPrinting.(pp_list "@." pp_flatcirc) 
+        (List.map (fun (c, _) -> c.reg) posts)
+      end;
+*)
 
       if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
       let posts = batch_checks posts in
