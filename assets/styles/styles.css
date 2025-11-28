@@ -1,0 +1,228 @@
+/* General Styling */
+/* Body */
+body {
+  font-family: "-apple-system", "BlinkMacSystemFont", "Roboto", "Arial", sans-serif;
+  line-height: 1.2;
+  font-size: 16px;
+  margin: 0;
+  padding: 0;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+/* Code blocks */
+pre {
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 1rem;
+  padding: 5px;
+  border-radius: 1px;
+  color: #2d2d2d;
+  background-color: #ecf0f1;
+}
+
+/* Inline code */
+code {
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 1rem;
+  color: #d6336c;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Roboto", "Arial", sans-serif;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 0.5em;
+}
+
+h1 {
+  font-size: 2.25rem;
+}
+h2 {
+  font-size: 2rem;
+}
+h3 {
+  font-size: 1.75rem;
+}
+h4 {
+  font-size: 1.5rem;
+}
+h5 {
+  font-size: 1.25rem;
+}
+h6 {
+  font-size: 1rem;
+}
+
+/* Links */
+a {
+  font-family: "Roboto", "Arial", sans-serif;
+  color: #007bff;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.serif-text {
+  font-family: "Times New Roman", "Times", serif;
+  font-size: 1rem;
+  color: #333;
+}
+
+/* Specific styling */
+
+/* Sidebar */
+.sidebar {
+  width: 200px;
+  background-color: #2c3e50;
+  color: #ecf0f1;
+  position: fixed;
+  height: 100%;
+  overflow: auto;
+}
+
+.sidebar-title {
+  padding: 20px;
+  color: #ecf0f1;
+  background-color: #34495e;
+  margin-bottom: 20px;
+}
+
+.sidebar-title h2 {
+  font-size: 1.5em;
+  margin-bottom: 5px;
+  color: #ecf0f1;
+}
+
+.sidebar-title .sidebar-title-theory {
+  font-size: 1.2em;
+  color: #3498db;
+}
+
+.sidebar-title-theory {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.sidebar-elems {
+  padding: 20px;
+}
+
+.sidebar-section-list {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar-section-list li {
+  margin: 15px 0;
+}
+
+.sidebar-section-list li a {
+  color: #ecf0f1;
+  font-weight: bold;
+}
+
+/* Main content */
+main {
+  margin-left: 220px;
+  padding: 20px;
+  max-width: 960px;
+}
+
+.page-heading-container {
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 5px;
+  margin-bottom: 20px;
+}
+
+.page-heading-container .page-heading {
+  margin-block-end: 5px;
+}
+
+.page-heading-container .page-subheading {
+  margin-block-start: 0px;
+  margin-block-end: 5px;
+  font-size: 1.2em;
+}
+
+/* Sections */
+.item-section {
+  margin-bottom: 40px;
+}
+
+.section-heading {
+  color: #34495e;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+/* Item lists */
+.item-list {
+  list-style: none;
+  padding: 0;
+}
+
+.item-entry {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.item-name-desc-container {
+  display: flex;
+  align-items: flex-start;
+}
+
+.item-name {
+  width: 200px;
+  font-weight: bold;
+  color: #2980b9;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.item-basic-desc {
+  flex: 1;
+  margin-left: 10px;
+}
+
+.item-basic-desc p {
+  margin-top: 0px;
+}
+
+.item-details {
+  margin-left: 210px;
+}
+
+.item-details summary {
+  cursor: pointer;
+  color: #3498db;
+  font-weight: bold;
+}
+
+.item-details summary:hover {
+  text-decoration: underline;
+}
+
+.item-details-par {
+  margin-top: 10px;
+}
+
+/* Source code */
+pre.source {
+  border: 2px solid #bdc3c7;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* Introduction section */
+.intro-section {
+  margin-bottom: 40px;
+}

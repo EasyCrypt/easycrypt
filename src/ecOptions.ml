@@ -9,6 +9,7 @@ type command = [
   | `Config
   | `Runtest of run_option
   | `Why3Config
+  | `DocGen of doc_option
 ]
 
 and options = {
@@ -38,6 +39,11 @@ and run_option = {
   runo_provers   : prv_options;
   runo_jobs      : int option;
   runo_rawargs   : string list;
+}
+
+and doc_option = {
+  doco_input     : string;
+  doco_outdirp   : string option;
 }
 
 and prv_options = {
@@ -359,6 +365,10 @@ let specs = {
     ]);
 
     ("why3config", "Configure why3", []);
+
+    ("docgen", "Generate documentation", [
+      `Spec ("outdir", `String, "Output documentation files in <dir>")
+    ]);
   ];
 
   xp_groups = [
@@ -516,6 +526,10 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_jobs      = get_int "jobs" values;
     runo_rawargs   = get_strings "raw-args" values; }
 
+let doc_options_of_values values input =
+  { doco_input     = input;
+    doco_outdirp   = get_string "outdir" values; }
+
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
   let (command, values, anons) = parse specs argv in
@@ -574,6 +588,18 @@ let parse getini argv =
         let cmd = `Why3Config in
 
         (cmd, ini, true)
+
+    | "docgen" ->
+      begin
+        match anons with
+        | [input] ->
+          let ini = getini None in
+          let cmd = `DocGen (doc_options_of_values values input) in
+            (cmd, ini, true)
+
+        | _ ->
+          raise (Arg.Bad "this command takes a single input file as argument")
+      end
 
     | _ -> assert false
 
