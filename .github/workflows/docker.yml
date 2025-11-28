@@ -1,0 +1,26 @@
+name: EasyCrypt Docker Containers Build and Publish
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'latest'
+    tags:
+      - 'r[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+jobs:
+  make-image:
+    name: Make and Publish Container Images
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        target: [base, build, test]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build ${{ matrix.target }} Image
+      run: TAG=${{ github.ref_name }} VARIANT=${{ matrix.target }} make -C scripts/docker
+    - name: Publish ${{ matrix.target }} Image
+      run: TAG=${{ github.ref_name }} VARIANT=${{ matrix.target }} make -C scripts/docker publish
+
