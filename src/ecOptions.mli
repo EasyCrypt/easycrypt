@@ -5,6 +5,7 @@ type command = [
   | `Config
   | `Runtest of run_option
   | `Why3Config
+  | `DocGen of doc_option
 ]
 
 and options = {
@@ -34,6 +35,11 @@ and run_option = {
   runo_provers   : prv_options;
   runo_jobs      : int option;
   runo_rawargs   : string list;
+}
+
+and doc_option = {
+  doco_input     : string;
+  doco_outdirp   : string option;
 }
 
 and prv_options = {

@@ -383,7 +383,14 @@ rule main = parse
       with Not_found -> [PUNIOP name]
   }
 
-  | "(*" { comment lexbuf; main lexbuf }
+  | "(*" (['&' '^'] as c) {
+      let buffer = doccomment c (Buffer.create 0) lexbuf in
+      let kind = match c with '&' -> `Item | '^' -> `Global | _ -> assert false in
+      [DOCCOMMENT (kind, Buffer.contents buffer)]
+    }
+
+  | "(*" { comment lexbuf; [COMMENT] }
+
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
   (* string symbols *)
@@ -459,6 +466,20 @@ and comment = parse
   | newline     { Lexing.new_line lexbuf; comment lexbuf }
   | eof         { unterminated_comment () }
   | _           { comment lexbuf }
+
+and doccomment kind buf = parse
+  | ['&' '^']? "*)" { buf }
+  | "(*" { comment lexbuf; doccomment kind buf lexbuf }
+  | eof { unterminated_comment () }
+  | newline {
+      Lexing.new_line lexbuf;
+      Buffer.add_char buf '\n';
+      doccomment kind buf lexbuf
+  }
+  | _ as c {
+      Buffer.add_char buf c;
+      doccomment kind buf lexbuf
+  }
 
 and string buf = parse
   | "\""          { buf }

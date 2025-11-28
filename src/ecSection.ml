@@ -1443,7 +1443,7 @@ let genenv_of_scenv (scenv : scenv) : to_gen =
   ; tg_params = []
   ; tg_binds  = []
   ; tg_subst  = EcSubst.empty
-  ; tg_clear  = empty_locals } 
+  ; tg_clear  = empty_locals }
 
 let generalize_lc_items scenv  =
   let togen =
@@ -1452,7 +1452,7 @@ let generalize_lc_items scenv  =
       (EcEnv.root scenv.sc_env)
       (List.rev scenv.sc_items)
   in togen.tg_env
-  
+
 (* -----------------------------------------------------------*)
 let import p scenv =
   { scenv with sc_env = EcEnv.Theory.import p scenv.sc_env }
