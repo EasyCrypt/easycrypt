@@ -5,6 +5,7 @@ on:
     branches:
       - 'stable'
       - 'testing'
+      - 'docker-builds-in-ci'
     tags:
       - 'r[0-9]+.[0-9]+'
   workflow_dispatch:
