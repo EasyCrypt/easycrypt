@@ -1290,6 +1290,19 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let tc = EcPhlConseq.t_hoareS_conseq_nm {inv=pre; m=(fst hr.hs_m)} {inv=post; m=(fst hr.hs_m)} tc in
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
+let rec destr_conj (hyps: hyps) (f: form) : form list = 
+  let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
+  match f.f_node with
+  | Fapp ({f_node = Fop (p, _)}, fs) -> begin match (EcFol.op_kind p, fs) with
+    | Some (`And _), _ -> List.flatten @@ List.map (destr_conj hyps) fs
+    | (None, [f;fs]) when p = EcCoreLib.CI_List.p_all -> 
+      let fs = form_list_from_iota hyps fs in
+      List.map (fun farg -> f_app f (farg::[]) tbool) fs
+    | _ -> f::[]
+  end
+  | _ -> f::[]
+
+
 (* Should return a list of circuits corresponding to the atomic parts of the pre *)
 (* 
   This means: 
@@ -1308,18 +1321,7 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) : state * circuit list =
 
   (* Takes in a form of the form /\_i f_i 
      and returns a list of the conjunction terms [ f_i ]*)
-  let rec destr_conj (f: form) : form list = 
-    let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
-    match f.f_node with
-    | Fapp ({f_node = Fop (p, _)}, fs) -> begin match (EcFol.op_kind p, fs) with
-      | Some (`And _), _ -> List.flatten @@ List.map destr_conj fs
-      | (None, [f;fs]) when p = EcCoreLib.CI_List.p_all -> 
-        let fs = form_list_from_iota hyps fs in
-        List.map (fun farg -> f_app f (farg::[]) tbool) fs
-      | _ -> f::[]
-    end
-    | _ -> f::[]
-  in
+  let destr_conj = destr_conj hyps in
 
   let fs = destr_conj f in
 
@@ -1384,6 +1386,11 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
   let tm = Unix.gettimeofday () in
   let env = toenv hyps in
 
+  let destr_conj = destr_conj hyps in
+
+  let posts = destr_conj post in
+
+  List.for_all (fun post ->
   if debug then Format.eprintf "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
@@ -1430,6 +1437,7 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
     | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
   end
   | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
+  ) posts
 
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve

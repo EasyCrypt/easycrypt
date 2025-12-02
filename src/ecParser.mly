@@ -2581,7 +2581,7 @@ codepos:
 
 codepos_range:
 | LBRACKET cps=codepos DOTDOT cpe=codepos RBRACKET { (cps, `Base cpe) }
-| LBRACKET cps=codepos MINUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
+| LBRACKET cps=codepos PLUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
 
 codepos_or_range:
 | cp=codepos { (cp, `Offset (0, `ByPos 0)) }
@@ -3208,8 +3208,8 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=loc(codepos_or_range) COLON s=brace(stmt)
-    { Pchangestmt (side, (unloc pos), s) }
+| PROC CHANGE side=side? pos=loc(codepos_or_range) COLON b=option(bracket(ptybindings)) s=brace(stmt)
+    { Pchangestmt (side, b, (unloc pos), s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }

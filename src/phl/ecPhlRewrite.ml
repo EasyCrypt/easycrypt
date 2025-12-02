@@ -7,6 +7,7 @@ open EcEnv
 open EcModules
 open EcFol
 open Batteries
+open EcLowPhlGoal
 
 (* -------------------------------------------------------------------- *)
 let t_change
@@ -170,25 +171,53 @@ let process_rewrite
   | `Rw rw -> process_rewrite_rw side pos rw tc
   | `Simpl -> process_rewrite_simpl side pos tc
 
+let rec pvtail (env: env) (pvs : EcPV.PV.t) (zp : Zpr.ipath) =
+    let parent =
+      match zp with
+      | Zpr.ZTop -> None
+      | Zpr.ZWhile (_, p) -> Some p
+      | Zpr.ZIfThen (e, p, _) -> Some p
+      | Zpr.ZIfElse (e, _, p) -> Some p
+      | Zpr.ZMatch (e, p, _) -> Some p in
+    match parent with
+    | None -> pvs
+    | Some ((_, tl), p) -> pvtail env (EcPV.PV.union pvs (EcPV.is_read env tl)) p
+
 (* -------------------------------------------------------------------- *)
 let t_change_stmt
   (side : side option)
   (pos : EcMatching.Position.codepos_range) 
+  ((me, bindings) : memenv * ovariable list)
   (s : stmt)
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let goal = (FApi.tc1_goal tc) in
+  let post = match goal.f_node with
+  | FhoareS { hs_po } -> hs_po
+  | FbdHoareS { bhs_po } -> bhs_po
+  | FeHoareS { ehs_po } -> ehs_po
+  | FequivS { es_po } -> es_po
+  | _ -> assert false
+  in
+  let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
 
-  let zpr, epos = EcMatching.Zipper.zipper_of_cpos_range env pos stmt in
+  let env = EcEnv.Memory.push_active_ts me me env in (* FIXME *)
+
+  let zpr, epos = Zpr.zipper_of_cpos_range env pos stmt in
   let stmt, epilog = match zpr.z_tail with
-  | [] -> raise EcMatching.Zipper.InvalidCPos
-  | i::tl -> let s, tl = EcMatching.Zipper.split_at_cpos1 env epos (EcAst.stmt tl) in
+  | [] -> raise Zpr.InvalidCPos
+  | i::tl -> let s, tl = Zpr.split_at_cpos1 env epos (EcAst.stmt tl) in
     (i::s), tl
   in
 
+  let keep = pvtail env (EcPV.is_read env epilog) zpr.z_path in
+  let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory me) post) in
+
   let pvs = EcPV.is_write env (stmt @ s.s_node) in
-  let pvs, globs = EcPV.PV.elements pvs in
+  let _pvs, globs = EcPV.PV.elements pvs in
+
+  let pvs, _ = EcPV.PV.elements keep in
 
   let pre_pvs, pre_globs = EcPV.PV.elements @@ EcPV.PV.inter 
     (EcPV.is_read env stmt) 
@@ -227,20 +256,26 @@ let t_change_stmt
 
   let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
 
-  let goal2 =
-   EcLowPhlGoal.hl_set_stmt
-     side (FApi.tc1_goal tc)
-     stmt in
+  let goal2 = match side, goal.f_node with
+  | None, FhoareS hs -> f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs)
+  | None, FbdHoareS bhs -> f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) (bhs.bhs_cmp) (bhs_bd bhs)
+  | None, FeHoareS ehs -> f_eHoareS (snd me) (ehs_pr ehs) stmt (ehs_po ehs)
+  | Some `Left, FequivS es -> f_equivS (snd me) (snd es.es_mr) (es_pr es) stmt (es.es_sr) (es_po es)
+  | Some `Right, FequivS es -> f_equivS (snd es.es_ml) (snd me) (es_pr es) (es.es_sl) stmt (es_po es)
+  | _ -> assert false
+  in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
 
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
+  (binds  : ptybindings option)
   (pos    : pcodepos_range)
   (s      : pstmt)
   (tc     : tcenv1)
 =
+  let hyps = FApi.tc1_hyps tc in
   let env = FApi.tc1_env tc in
 
   begin match side, (FApi.tc1_goal tc).f_node with
@@ -266,9 +301,41 @@ let process_change_stmt
     EcTyping.trans_codepos_range ~memory:(fst me) env pos 
   in
 
+(*
   let s = match side with 
   | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
   | None -> EcProofTyping.tc1_process_Xhl_stmt tc s 
   in
+*)
 
-  t_change_stmt side pos s tc
+  let bindings = 
+     binds
+  |> Option.default []
+  |> List.map (fun (xs, ty) -> List.map (fun x -> (x, ty)) xs)
+  |> List.flatten 
+  |> List.map (fun (x, ty) ->
+      let ue = EcUnify.UniEnv.create (Some (EcEnv.LDecl.tohyps hyps).h_tvar) in
+      let ty = EcTyping.transty EcTyping.tp_tydecl env ue ty in
+      assert (EcUnify.UniEnv.closed ue);
+      let ty =
+        let subst = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+        EcCoreSubst.ty_subst subst ty in
+      let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
+      let vr = EcAst.{ ov_name = x; ov_type = ty; } in
+      vr
+    )
+  in
+  let me, bindings = EcMemory.bindall_fresh bindings me in
+
+  let env = EcEnv.Memory.push_active_ss me env in
+  let s = 
+    let ue = EcProofTyping.unienv_of_hyps hyps in
+    let s = EcTyping.transstmt env ue s in
+
+    assert (EcUnify.UniEnv.closed ue);
+
+    let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+    EcCoreSubst.s_subst sb s 
+  in
+
+  t_change_stmt side pos (me, bindings) s tc
