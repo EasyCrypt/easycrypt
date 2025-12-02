@@ -25,4 +25,7 @@ val t_equiv_rnd   : ?pos:semrndpos -> oside -> (mkbij_t option) pair -> backward
 val process_rnd : oside -> psemrndpos option -> rnd_infos_t -> backward
 
 (* -------------------------------------------------------------------- *)
+val process_coupling : oside -> pformula -> backward
+
+(* -------------------------------------------------------------------- *)
 val process_rndsem : reduce:bool -> oside -> pcodepos1 -> backward
