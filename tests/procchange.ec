@@ -14,7 +14,7 @@ theory ProcChangeAssignEquiv.
   lemma L : equiv[M.f ~ M.f: true ==> true].
   proof.
   proc.
-    proc change {1} [1..3] : { x <- 3; }.
+    proc change {1} [1..3] : [y : int] { y <- 3; x <- y; }.
     
     wp. skip. smt().
   abort.

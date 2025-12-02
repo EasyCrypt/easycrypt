@@ -1310,7 +1310,7 @@ let rec destr_conj (hyps: hyps) (f: form) : form list =
   a = b  => [a.[i] = b.[i]]_i 
 *)
 (* Returns _open_ circuits *)
-let process_pre (tc: tcenv1) (m: memenv) (f: form) : state * circuit list = 
+let process_pre (tc: tcenv1) (f: form) : state * circuit list = 
   let debug = false in
   let env = FApi.tc1_env tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
@@ -1335,10 +1335,10 @@ let process_pre (tc: tcenv1) (m: memenv) (f: form) : state * circuit list =
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [a; b]) -> begin match EcFol.op_kind p, (EcCallbyValue.norm_cbv (circ_red hyps) hyps a), (EcCallbyValue.norm_cbv (circ_red hyps) hyps b) with
-      | Some `Eq, {f_node = Fpvar (PVloc pv, m_); _}, ({f_node = Flocal id; f_ty; _} as fv)
-      | Some `Eq, ({f_node = Flocal id; f_ty; _} as fv), {f_node = Fpvar (PVloc pv, m_); _} when fst m = m_ -> 
+      | Some `Eq, {f_node = Fpvar (PVloc pv, m); _}, fv
+      | Some `Eq, fv, {f_node = Fpvar (PVloc pv, m); _} -> 
         if debug then Format.eprintf "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
-        update_state_pv s m_ pv (circuit_of_form ~st hyps fv |> snd)
+        update_state_pv s m pv (circuit_of_form ~st hyps fv |> snd)
       | _ -> s
     end 
     | _ -> s
@@ -1455,11 +1455,11 @@ let t_bdep_solve
     match goal.f_node with 
     | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
       let tm = Unix.gettimeofday () in
-      let st, cpres = process_pre tc hs_m hs_pr in
+      let st, cpres = process_pre tc hs_pr in
       let tm = time (toenv hyps) tm "Done with precondition processing" in
 
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
-      let tm = time (toenv hyps) tm "Done with program circuit gen" in
+      let _tm = time (toenv hyps) tm "Done with program circuit gen" in
 (*       let hyps, cpost = circuit_of_form ~st hyps hs_po in *)
 (*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
 (*
@@ -1474,6 +1474,20 @@ let t_bdep_solve
       if 
 (*         (circ_taut cgoal)  *)
         solve_post ~st ~pres:cpres hyps hs_po
+      then FApi.close (!@ tc) VBdep else
+      raise (BDepError "Failed to verify postcondition")
+    | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } -> 
+      let tm = Unix.gettimeofday () in
+      let st, cpres = process_pre tc es_pr in
+      let tm = time (toenv hyps) tm "Done with precondition processing" in
+
+      (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
+      let hyps, st = state_of_prog hyps (fst es_ml) ~st es_sl.s_node [] in
+      let tm = time (toenv hyps) tm "Done with left program circuit gen" in
+      let hyps, st = state_of_prog hyps (fst es_mr) ~st es_sr.s_node [] in
+      let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
+
+      if solve_post ~st ~pres:cpres hyps es_po
       then FApi.close (!@ tc) VBdep else
       raise (BDepError "Failed to verify postcondition")
     | _ -> 

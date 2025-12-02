@@ -70,6 +70,8 @@ qed.
 lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = b_ +^ a_].
 proof.
   proc.
-  bdep solve.
+  proc change 1 : [ d : W8 ] { d <- of_int 0; d <- a +^ d; c <- d +^ b; }.
+  circuit.
+  circuit.
 qed.
 

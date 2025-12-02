@@ -775,6 +775,7 @@ let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : hyps *
       raise (CircError err)
   with 
   | e ->
+      (* FIXME: Bad handling *)
       let bt = Printexc.get_backtrace () in
       let err = Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@.BACKTRACE: %s@.@."
         (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
@@ -834,6 +835,7 @@ let instrs_equiv
     circ_equiv circ1 circ2 
   )
 
+(* FIXME: remove variable list from the arguments *)
 let state_of_prog (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list) (invs: variable list) : hyps * state =
   let env = LDecl.toenv hyps in
   let invs = List.map (fun {v_name; v_type} -> ((mem, v_name), ctype_of_ty env v_type)) invs in
