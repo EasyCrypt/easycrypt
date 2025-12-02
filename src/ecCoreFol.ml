@@ -987,7 +987,9 @@ let rec form_of_expr_r ?m (e : expr) =
   | Evar pv ->
     begin
      match m with
-     | None -> failwith "expecting memory"
+     | None -> 
+       Printexc.(get_callstack 100 |> print_raw_backtrace stderr);
+       failwith "expecting memory"
      | Some m -> (f_pvar pv e.e_ty m).inv
     end
 

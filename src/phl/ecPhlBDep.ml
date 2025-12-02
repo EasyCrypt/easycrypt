@@ -30,7 +30,7 @@ module HL = struct
   include Lospecs.Hlaig
 end
 
-exception BDepError of string
+exception BDepError of string Lazy.t
 exception BDepUninitializedInputs
 
 (* TODO: Refactor error printing and checking? Lots of duplicated code *)
@@ -39,8 +39,8 @@ let int_of_form (hyps: hyps) (f: form) : BI.zint =
   match f.f_node with 
   | Fint i -> i
   | _ -> begin try destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f with 
-    | DestrError _ -> let err = Format.asprintf "Failed to reduce form to int: %a@."
-      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f in
+    | DestrError _ -> let err = lazy (Format.asprintf "Failed to reduce form to int: %a@."
+      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f) in
       raise (BDepError err)
     end
 
@@ -73,15 +73,15 @@ let circ_of_qsymbol (hyps: hyps) (qs: qsymbol) : hyps * circuit =
 let array_init_from_form (env: env) (f: form) ((arr_t, offset): qsymbol * BI.zint) : form =
   let ppe = EcPrinting.PPEnv.ofenv env in
   let tpath = match EcEnv.Ty.lookup_opt arr_t env with
-  | None -> raise (BDepError "Failed to lookup type for input slice")
+  | None -> raise (BDepError (lazy "Failed to lookup type for input slice"))
   | Some (path, decl) when List.length decl.tyd_params = 1 ->
     path
   | Some ((_path, decl) as tdecl) ->
-    raise (BDepError (Format.asprintf "Type given to input slice (%a) does not look like an array type" EcPrinting.(pp_typedecl ppe) tdecl))
+    raise (BDepError (lazy (Format.asprintf "Type given to input slice (%a) does not look like an array type" EcPrinting.(pp_typedecl ppe) tdecl)))
   in
   let get = match EcEnv.Circuit.lookup_array env f.f_ty with
   | Some { get } -> get
-  | None -> raise (BDepError (Format.asprintf "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) f.f_ty))
+  | None -> raise (BDepError (lazy (Format.asprintf "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) f.f_ty)))
   in
   let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env in
   let idx = create "i" in
@@ -109,7 +109,7 @@ let mapreduce
   let hyps, fc = try 
     circ_of_qsymbol hyps ([], f.pl_desc) 
     with BDepError err -> 
-      raise (BDepError ("Lane function circuit generation failed with error:\n" ^ err))
+      raise (BDepError (lazy ("Lane function circuit generation failed with error:\n" ^ (Lazy.force err))))
   in
   if debug then EcEnv.notify ~immediate:true env `Warning "Writing lane function to file %s...@." @@ circuit_to_file ~name:"lane_function" fc;
 
@@ -119,7 +119,7 @@ let mapreduce
   let hyps, pcondc = try 
     circ_of_qsymbol hyps ([], pcond.pl_desc) 
     with BDepError err ->
-      raise (BDepError ("Precondition circuit generation failed with error:\n" ^ err))
+      raise (BDepError (lazy ("Precondition circuit generation failed with error:\n" ^ (Lazy.force err))))
   in
   if debug then EcEnv.notify ~immediate:true env `Warning "Writing precondition function to file %s...@." @@ circuit_to_file ~name:"pcond" pcondc;
  
@@ -162,7 +162,7 @@ let mapreduce
             (circuit_align_inputs c slcs)
           ) circs
       with CircError _ -> 
-        raise (BDepError "Failed to align inputs to slice")
+        raise (BDepError (lazy "Failed to align inputs to slice"))
     in
 
 
@@ -170,13 +170,13 @@ let mapreduce
     let c = try 
       (circuit_aggregate circs)
       with CircError _ ->
-        raise (BDepError "Failed to concatenate outputs")
+        raise (BDepError (lazy "Failed to concatenate outputs"))
     in
 
     let c = try
       (circuit_aggregate_inps c)
       with CircError _ ->
-        raise (BDepError "Failed to concatenate outputs")
+        raise (BDepError (lazy "Failed to concatenate outputs"))
     in
 
     if debug then EcEnv.notify ~immediate:true env `Info "Writing program circuit before mapreduce to file %s...@." @@ circuit_to_file ~name:"prog_no_mapreduce" c;
@@ -197,7 +197,7 @@ let mapreduce
     if debug then EcEnv.notify ~immediate:true env `Info "Writing lane %d circit to file %s...@." (i+1) @@ circuit_to_file ~name:("lane_" ^ (string_of_int (i+1))) c;
     if circ_equiv ~pcond:pcondc (List.hd cs) c 
       then ()
-      else let err = Format.sprintf "Equivalence check failed between lanes 0 and %d" (i+1) 
+      else let err = lazy (Format.sprintf "Equivalence check failed between lanes 0 and %d" (i+1))
         in raise (BDepError err)) 
     (List.tl cs);
 
@@ -205,7 +205,7 @@ let mapreduce
     
     (* ------------------------------------------------------------------ *)
     if circ_equiv ~pcond:pcondc (List.hd cs) fc then () 
-    else raise (BDepError "Equivalence failed between lane 0 and lane function");
+    else raise (BDepError (lazy "Equivalence failed between lane 0 and lane function"));
 
     let _tm = time env tm "Program to lane func equiv done" in
     
@@ -274,23 +274,23 @@ let prog_equiv_prod
     let c_l = try 
       (circuit_aggregate circs_l)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate left program outputs")
+        raise (BDepError (lazy "Failed to aggregate left program outputs"))
     in
     let c_r = try 
       (circuit_aggregate circs_r)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate right program outputs")
+        raise (BDepError (lazy "Failed to aggregate right program outputs"))
     in
     (* ------------------------------------------------------------------ *)
     let c_r = try 
       (circuit_aggregate_inps c_r)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate right program inputs")
+        raise (BDepError (lazy "Failed to aggregate right program inputs"))
     in
     let c_l = try 
       (circuit_aggregate_inps c_l)
       with CircError _err ->
-        raise (BDepError "Failed to aggregate right program inputs")
+        raise (BDepError (lazy "Failed to aggregate right program inputs"))
     in
 
     let tm = time env tm "Preprocessing for mapreduce done" in
@@ -299,14 +299,14 @@ let prog_equiv_prod
     let lanes_l = try 
       circuit_mapreduce c_l n m 
       with CircError err ->
-        raise (BDepError ("Left program split step failed with error:\n" ^ err))
+        raise (BDepError (lazy ("Left program split step failed with error:\n" ^ (Lazy.force err))))
     in
     let tm = time env tm "Left program deps + split done" in
 
     let lanes_r = try 
       circuit_mapreduce c_r n m 
       with CircError err ->
-        raise (BDepError ("Right program split step failed with error:\n" ^ err))
+        raise (BDepError (lazy ("Right program split step failed with error:\n" ^ (Lazy.force err))))
     in
     let tm = time env tm "Right program deps + split done" in
 
@@ -316,7 +316,7 @@ let prog_equiv_prod
         (List.iteri (fun i c -> 
           if circ_equiv ?pcond (List.hd lanes_l) c 
           then () 
-          else let err = Format.sprintf "Left program lane equiv failed between lanes 0 and %d@." (i+i)
+          else let err = lazy (Format.sprintf "Left program lane equiv failed between lanes 0 and %d@." (i+i))
             in raise (BDepError err)) 
         (List.tl lanes_l)); 
         let tm = time env tm "Left program lanes equiv done" in
@@ -324,7 +324,7 @@ let prog_equiv_prod
         (List.iteri (fun i c -> 
           if circ_equiv ?pcond (List.hd lanes_r) c 
           then () 
-          else let err = Format.sprintf "Right program lane equiv failed between lanes 0 and %d@." (i+i)
+          else let err = lazy (Format.sprintf "Right program lane equiv failed between lanes 0 and %d@." (i+i))
             in raise (BDepError err)) 
         (List.tl lanes_r)); 
         let tm = time env tm "Right program lanes equiv done" in
@@ -334,14 +334,14 @@ let prog_equiv_prod
         then
           time env tm "First lanes equiv done" |> ignore
         else
-          raise (BDepError "Lane equiv failed between first lane of left and right programs")
+          raise (BDepError (lazy "Lane equiv failed between first lane of left and right programs"))
         end
     else
       begin
         List.iter2i (fun i c_l c_r -> 
           if circ_equiv ?pcond c_l c_r 
           then () 
-          else let err = Format.sprintf "Lane equivalence failed between programs for lane %d@." i in
+          else let err = lazy (Format.sprintf "Lane equivalence failed between programs for lane %d@." i) in
             raise (BDepError err)) lanes_l lanes_r;
         time env tm "Program lane equivs done" |> ignore
         end
@@ -383,10 +383,10 @@ let circ_form_eval_plus_equiv
   let size, of_int = match EcEnv.Circuit.lookup_bitstring env v.v_type with
   | Some {size=(_, Some size); ofint} -> size, ofint 
   | Some {size=(_, None); ofint} -> 
-      raise (BDepError "No concrete binding bitstring size")
+      raise (BDepError (lazy "No concrete binding bitstring size"))
   | None -> 
-      let err = Format.asprintf "Binding not found for variable %s of type %a@."
-        v.v_name (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) v.v_type 
+      let err = lazy (Format.asprintf "Binding not found for variable %s of type %a@."
+        v.v_name (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) v.v_type)
       in raise (BDepError err)
   in
 
@@ -425,12 +425,12 @@ let circ_form_eval_plus_equiv
           Option.may (fun i -> 
             EcEnv.notify ~immediate:true env `Critical 
               "Bit %d of precondition circuit has dependency on uninitialized inputs@." i; 
-            raise (BDepError "Uninitialized input for circuit")) 
+            raise (BDepError (lazy "Uninitialized input for circuit")) )
           (circuit_has_uninitialized circ);
           let hyps, c = (circuit_of_form hyps cur_bs) in
           hyps, Some (circuit_ueq circ c)
         with CircError err ->
-          raise (BDepError ("Failed to generate circuit for current value precondition with error:\n" ^ err))
+          raise (BDepError (lazy ("Failed to generate circuit for current value precondition with error:\n" ^ (Lazy.force err))))
         end
       | None -> hyps, None
     in
@@ -493,19 +493,19 @@ let mapreduce_eval
     let c = try 
       (circuit_aggregate circs)
       with CircError _err ->
-        raise (BDepError "Failed to concatenate program outputs")
+        raise (BDepError (lazy "Failed to concatenate program outputs"))
     in
     let c = try 
       (circuit_aggregate_inps c)
       with CircError _err ->
-        raise (BDepError "Failed to concatenate program outputs")
+        raise (BDepError (lazy "Failed to concatenate program outputs"))
     in
 
     (* ------------------------------------------------------------------ *)
     let cs = try 
       circuit_mapreduce c n m 
       with CircError err ->
-        raise (BDepError ("Split step failed with error:\n" ^ err))
+        raise (BDepError (lazy ("Split step failed with error:\n" ^ (Lazy.force err))))
     in
 
     let tm = time env tm "circuit dependecy analysis + splitting done" in
@@ -514,7 +514,7 @@ let mapreduce_eval
     List.iteri (fun i c -> 
       if circ_equiv (List.hd cs) c 
       then ()
-      else let err = Format.sprintf "Equivalence failed between program lanes 0 and %d@." (i + 1) in
+      else let err = lazy (Format.sprintf "Equivalence failed between program lanes 0 and %d@." (i + 1)) in
         raise (BDepError err)
     )
     (List.tl cs);
@@ -530,10 +530,10 @@ let mapreduce_eval
       let circ_val = compute ~sign (List.hd cs) [v] in
       if circ_val = lane_val then () 
       else let err = 
-        Format.sprintf "Error on input %s@.Circ val:%s | Lane val: %s@." 
+        lazy (Format.sprintf "Error on input %s@.Circ val:%s | Lane val: %s@." 
           (BI.to_string v) 
           (BI.to_string circ_val)
-          (BI.to_string lane_val) 
+          (BI.to_string lane_val))
       in raise (BDepError err)
     ) range;
 
@@ -543,21 +543,21 @@ let mapreduce_eval
 let w2bits (env: env) (ty: ty) (arg: form) : form = 
   let tb = match EcEnv.Circuit.lookup_bitstring env ty with
   | Some {to_=tb; _} -> tb
-  | _ -> let err = Format.asprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  | _ -> let err = lazy (Format.asprintf "No w2bits for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty) in
     raise (BDepError err)
   in EcTypesafeFol.f_app_safe env tb [arg]
 
 let bits2w (env: env) (ty: ty) (arg: form) : form = 
   let fb = match EcEnv.Circuit.lookup_bitstring env ty with
   | Some {from_=fb; _} -> fb
-  | _ -> let err = Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  | _ -> let err = lazy (Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty) in
     raise (BDepError err)
   in EcTypesafeFol.f_app_safe env fb [arg]
 
 let w2bits_op (env: env) (ty: ty) : form = 
   let tb = match EcEnv.Circuit.lookup_bitstring env ty with
   | Some {to_=tb; _} -> tb
-  | _ -> let err = Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  | _ -> let err = lazy (Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty) in
       raise (BDepError err)
   in let tbp, tbo = EcEnv.Op.lookup (EcPath.toqsymbol tb) env in
   f_op tb [] tbo.op_ty 
@@ -565,7 +565,7 @@ let w2bits_op (env: env) (ty: ty) : form =
 let bits2w_op (env: env) (ty: ty) : form = 
   let fb = match EcEnv.Circuit.lookup_bitstring env ty with
   | Some {from_=fb; _} -> fb
-  | _ -> let err = Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty in
+  | _ -> let err = lazy (Format.asprintf "No bits2w for type %a@." (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) ty) in
       raise (BDepError err)
   in let fbp, fbo = EcEnv.Op.lookup (EcPath.toqsymbol fb) env in
   f_op fb [] fbo.op_ty 
@@ -594,7 +594,7 @@ let reconstruct_from_bits (env: env) (f: form) (t: ty) =
     EcCoreLib.CI_List.p_map @@! [ bits2w_op env base;
     EcCoreLib.CI_List.p_chunk @@! [(f_int (BI.of_int size)); f]]]
   | Some ({ oflist }, {type_; size = (_, None); ofint}) -> 
-    raise (BDepError "No concrete  binding for type in reconstruct_from_bits") (* FIXME: error messages *)
+    raise (BDepError (lazy "No concrete  binding for type in reconstruct_from_bits")) (* FIXME: error messages *)
   | _ -> 
     bits2w env t f
 
@@ -609,7 +609,7 @@ let reconstruct_from_bits_op (env: env) (t: ty) =
     f_quant Llambda [(temp, GTty bool_list)] @@
     reconstruct_from_bits env (f_local temp bool_list) t
   | Some ({ oflist }, {type_; size = (_, None); ofint}) -> 
-    raise (BDepError "No concrete  binding for type in reconstruct_from_bits_op") (* FIXME: error messages *)
+    raise (BDepError (lazy "No concrete  binding for type in reconstruct_from_bits_op")) (* FIXME: error messages *)
   | _ -> 
     bits2w_op env t
    
@@ -626,7 +626,7 @@ let t_bdep
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareS sF -> if true then
     begin try mapreduce ~debug (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op pcond perm with
-    | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" err
+    | BDepError err -> tc_error (FApi.tc1_penv tc) "%s" (Lazy.force err)
       end
     else ()
   (* FIXME PR: Should these be guarded before call or do we just fail somehow if we hit it? *)
@@ -643,7 +643,7 @@ let get_var (env: env) (v : bdepvar) (m : memenv) : (variable * ((qsymbol * BI.z
   let get1 (v : symbol) =
     match EcMemory.lookup_me v m with
     | Some (v, None, _) -> v
-    | _ -> let err = Format.asprintf "Couldn't locate variable %s@." v in
+    | _ -> let err = lazy (Format.asprintf "Couldn't locate variable %s@." v) in
       raise (BDepError err)
   in
   match v with
@@ -663,13 +663,13 @@ let blocks_from_vars (env: env) (vs: form list) (ty: ty) : form =
       try
         EcTypesafeFol.f_app_safe env pth args 
       with EcUnify.UnificationFailure _ ->
-        let err = Format.sprintf "Type mismatch in pre-post generation, check your lane and precondition types@." in
+        let err = lazy (Format.sprintf "Type mismatch in pre-post generation, check your lane and precondition types@.") in
         raise (BDepError err)
     in   
     let m = try
       width_of_type env ty
       with CircError err ->
-        raise (BDepError ("Error while constructing precondition: \n" ^ err))
+        raise (BDepError (lazy ("Error while constructing precondition: \n" ^ (Lazy.force err))))
     in
     (* let poutvs = List.map (fun v -> EcFol.f_pvar (pv_loc v.v_name) v.v_type mem) vs in *)
     let poutvs = List.map (flatten_to_bits env) vs in
@@ -689,7 +689,7 @@ let permute_list (env: env) (perm: EcPath.path) (xs: form) : form =
       try
         EcTypesafeFol.f_app_safe env pth args 
       with EcUnify.UnificationFailure _ ->
-        let err = Format.sprintf "Type mismatch in pre-post generation, check your lane and precondition types@." in
+        let err = lazy (Format.sprintf "Type mismatch in pre-post generation, check your lane and precondition types@.") in
         raise (BDepError err)
     in   
     let i = (create "i", GTty tint) in
@@ -789,7 +789,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let outvs = try
     get_vars env outvs hr.hs_m 
     with BDepError err ->
-      tc_error pe "get_vars (outvs) error: %s" err
+      tc_error pe "get_vars (outvs) error: %s" (Lazy.force err)
   in
 
   let out_size = List.sum (List.map 
@@ -822,14 +822,14 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
     blocks_from_vars env 
       (List.map post_form_of_pv outvs) outbty
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
 
   (* OPTIONAL PERMUTATION STEP *)
   let poutvs = try 
     Option.apply (Option.map (permute_list env) pperm) poutvs 
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
   
   
@@ -837,7 +837,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let inpvs = try 
     get_vars env inpvs hr.hs_m 
     with BDepError err ->
-      tc_error pe "Error in get_vars(inpvs): %s" err
+      tc_error pe "Error in get_vars(inpvs): %s" (Lazy.force err)
   in
   let in_size = List.sum (List.map 
   (function 
@@ -937,7 +937,7 @@ let process_bdep (bdinfo: bdep_info) (tc: tcenv1) =
   let pinvs = try
     blocks_from_vars env finvs inpbty
     with BDepError err -> 
-      tc_error pe "Error while generating input variable expression for precondition:@.%s@." err
+      tc_error pe "Error while generating input variable expression for precondition:@.%s@." (Lazy.force err)
   in
   let pinvs_post = EcCoreLib.CI_List.p_map @@! [(f_op plane [] olane.op_ty); pinvs] in
   (* ------------------------------------------------------------------ *)
@@ -960,7 +960,7 @@ let t_bdepeq (inpvs_l, inpvs_r: (variable list * variable list)) (n: int) (out_b
   | FequivS sE -> begin try List.iter (fun (m, outvs_l, outvs_r) ->
     prog_equiv_prod (FApi.tc1_hyps tc) (sE.es_ml, sE.es_mr) (sE.es_sl, sE.es_sr) (inpvs_l, inpvs_r, n) (outvs_l, outvs_r, m) pcond preprocess) out_blocks
     with BDepError err ->
-      tc_error (FApi.tc1_penv tc) "Program equivalence failed with error: @.%s@." err
+      tc_error (FApi.tc1_penv tc) "Program equivalence failed with error: @.%s@." (Lazy.force err)
     end
   (* FIXME PR: Do we throw a decent error here or should this be guarded before the call? *)
   | FequivF sE -> assert false
@@ -1004,30 +1004,30 @@ let process_bdepeq
       let poutvsr = List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)).inv) outvsr in
       List.map2 f_eq poutvsl poutvsr |> f_ands, (outvsl, outvsr)
     with BDepError err -> 
-      tc_error pe "Process block failed with error: %s@." err
+      tc_error pe "Process block failed with error: %s@." (Lazy.force err)
   in
    
 
   let inpvsl = try 
     get_vars env inpvsl mem_l |> List.fst 
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
   let pinpvsl = try 
     List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_l)).inv) inpvsl 
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
 
   let inpvsr = try 
     get_vars env inpvsr mem_r |> List.fst
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
   let pinpvsr = try 
     List.map (fun v -> (EcFol.f_pvar (pv_loc v.v_name) v.v_type (fst mem_r)).inv) inpvsr 
     with BDepError err ->
-      tc_error pe "%s" err
+      tc_error pe "%s" (Lazy.force err)
   in
 
   let pre = List.map2 f_eq pinpvsl pinpvsr |> f_ands in
@@ -1056,7 +1056,7 @@ let process_bdepeq
       let pinpl_blocks = try
         blocks_from_vars env pinpvsl opinty
         with BDepError err ->
-          tc_error pe "%s" err
+          tc_error pe "%s" (Lazy.force err)
       in
 
       let pre_l = EcCoreLib.CI_List.p_all @@! [(f_op ppcond [] opcond.op_ty); pinpl_blocks] in
@@ -1110,8 +1110,8 @@ let form_list_from_iota (hyps: hyps) (f: form) : form list =
     let n = int_of_form hyps n in
     let m = int_of_form hyps m in
     List.init (BI.to_int m) (fun i -> f_int (BI.(add n (of_int i))))
-  | _ -> let err = Format.asprintf "Failed to get form list from iota expression %a@."
-    (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f in
+  | _ -> let err = lazy (Format.asprintf "Failed to get form list from iota expression %a@."
+    (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f) in
     raise (BDepError err)
 
 let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
@@ -1125,7 +1125,7 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
     h::(form_list_of_form t)
   | _ -> 
       if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
-      raise (CircError "Failed to destruct list")
+      raise (BDepError (lazy "Failed to destruct list"))
 
 (* FIXME: move? A *)
 
@@ -1141,7 +1141,7 @@ let t_bdep_eval
   (* Run bdep and check that is works FIXME *)
   let () = match (FApi.tc1_goal tc).f_node with
   | FhoareS sF -> begin try mapreduce_eval (FApi.tc1_hyps tc) sF.hs_m sF.hs_s (inpvs, n) (outvs, m) op range sign with
-    | BDepError err -> tc_error (FApi.tc1_penv tc) "Error in bdep eval: %s@." err
+    | BDepError err -> tc_error (FApi.tc1_penv tc) "Error in bdep eval: %s@." (Lazy.force err)
     end
   (* FIXME PR: Do we throw a decent error here or should this be guarded before the call? *)
   | FhoareF sH -> assert false  
@@ -1218,7 +1218,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let range = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) range in
 
   let frange = try form_list_from_iota hyps range 
-    with BDepError err -> tc_error pe "%s" err
+    with BDepError err -> tc_error pe "%s" (Lazy.force err)
   in
 
 
@@ -1226,7 +1226,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   let n, in_to_uint, in_to_sint,in_of_int = 
     match EcEnv.Circuit.lookup_bitstring env in_ty with
     | Some {size = (_, Some size); touint; tosint; ofint} -> size, touint, tosint, ofint
-    | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for input")
+    | Some {size = (_, None); _} -> raise (BDepError (lazy "No concrete binding for input"))
     | _ -> tc_error pe "No binding for type %a@." pp_type in_ty 
   in
 
@@ -1237,7 +1237,7 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   (* ------------------------------------------------------------------ *)
   let m, out_of_int = match EcEnv.Circuit.lookup_bitstring env out_ty with
   | Some {size = (_, Some size); ofint} -> size, ofint 
-  | Some {size = (_, None); _} -> raise (BDepError "No concrete binding for output") 
+  | Some {size = (_, None); _} -> raise (BDepError (lazy "No concrete binding for output") )
   | _ -> tc_error pe "No binding for type %a@." pp_type out_ty 
   in
   let out_of_int = f_op out_of_int [] (tfun tint out_ty) in
@@ -1453,7 +1453,7 @@ let t_bdep_solve
     let hyps = (FApi.tc1_hyps tc) in
     let goal = (FApi.tc1_goal tc) in
     match goal.f_node with 
-    | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> 
+    | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> begin try
       let tm = Unix.gettimeofday () in
       let st, cpres = process_pre tc hs_pr in
       let tm = time (toenv hyps) tm "Done with precondition processing" in
@@ -1475,21 +1475,34 @@ let t_bdep_solve
 (*         (circ_taut cgoal)  *)
         solve_post ~st ~pres:cpres hyps hs_po
       then FApi.close (!@ tc) VBdep else
-      raise (BDepError "Failed to verify postcondition")
+      raise (BDepError (lazy "Failed to verify postcondition"))
+      with 
+      | BDepError le
+      | CircError le ->
+        tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
+    end
     | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } -> 
-      let tm = Unix.gettimeofday () in
-      let st, cpres = process_pre tc es_pr in
-      let tm = time (toenv hyps) tm "Done with precondition processing" in
+    begin 
+      try (
+        let tm = Unix.gettimeofday () in
+        let st, cpres = process_pre tc es_pr in
+        let tm = time (toenv hyps) tm "Done with precondition processing" in
 
-      (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
-      let hyps, st = state_of_prog hyps (fst es_ml) ~st es_sl.s_node [] in
-      let tm = time (toenv hyps) tm "Done with left program circuit gen" in
-      let hyps, st = state_of_prog hyps (fst es_mr) ~st es_sr.s_node [] in
-      let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
+        (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
+        let hyps, st = state_of_prog ~me:es_ml hyps (fst es_ml) ~st es_sl.s_node [] in
+        let tm = time (toenv hyps) tm "Done with left program circuit gen" in
+        let hyps, st = state_of_prog ~me:es_mr hyps (fst es_mr) ~st es_sr.s_node [] in
+        let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
 
-      if solve_post ~st ~pres:cpres hyps es_po
-      then FApi.close (!@ tc) VBdep else
-      raise (BDepError "Failed to verify postcondition")
+        (if solve_post ~st ~pres:cpres hyps es_po
+        then FApi.close (!@ tc) VBdep else
+        raise (BDepError (lazy "Failed to verify postcondition")))
+      )
+      with 
+      | BDepError le
+      | CircError le ->
+        tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
+    end
     | _ -> 
     let ctxt = tohyps hyps in
     assert (ctxt.h_tvar = []);

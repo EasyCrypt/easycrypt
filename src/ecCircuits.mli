@@ -10,7 +10,7 @@ open EcLowCircuits
 module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
-exception CircError of string
+exception CircError of string Lazy.t
 
 (* -------------------------------------------------------------------- *)
 (* Utilities (figure out better name) *)
@@ -49,9 +49,9 @@ val circ_simplify_form_bitstring_equality :
   ?pcond:circuit -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : hyps -> memory -> ?st:state -> instr list -> variable list -> hyps * state 
+val state_of_prog : ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> variable list -> hyps * state 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
-val process_instr : hyps -> memory -> st:state -> instr -> hyps * state
+val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> hyps * state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 val circuit_state_of_hyps : ?st:state -> hyps -> state 
