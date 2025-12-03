@@ -1291,7 +1291,8 @@ let process_bdep_eval (bdeinfo: bdep_eval_info) (tc: tcenv1) =
   FApi.t_last (t_bdep_eval n m inpvs outvs lane frange sign) tc 
 
 let rec destr_conj (hyps: hyps) (f: form) : form list = 
-  let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
+  let redmode = {(circ_red hyps) with zeta = false} in
+  let f = (EcCallbyValue.norm_cbv redmode hyps f) in
   match f.f_node with
   | Fapp ({f_node = Fop (p, _)}, fs) -> begin match (EcFol.op_kind p, fs) with
     | Some (`And _), _ -> List.flatten @@ List.map (destr_conj hyps) fs
