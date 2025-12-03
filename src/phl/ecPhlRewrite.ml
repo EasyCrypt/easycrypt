@@ -217,12 +217,24 @@ let t_change_stmt
   let pvs = EcPV.is_write env (stmt @ s.s_node) in
   let _pvs, globs = EcPV.PV.elements pvs in
 
-  let pvs, _ = EcPV.PV.elements keep in
+  let pvs, _ = EcPV.PV.elements (EcPV.PV.inter keep pvs) in
 
-  let pre_pvs, pre_globs = EcPV.PV.elements @@ EcPV.PV.inter 
+  let pre_pvs = EcPV.PV.inter 
     (EcPV.is_read env stmt) 
     (EcPV.is_read env s.s_node)
   in
+
+  (* FIXME: Check | Do we need this? *)
+(*
+  let pre_pvs = EcPV.PV.union pre_pvs (
+    pvtail env (EcPV.is_read env epilog) zpr.z_path
+  ) in
+*)
+
+  (* Do we need this? *)
+(*   let pre_pvs = EcPV.PV.union pre_pvs (EcPV.PV.fv env (EcMemory.memory me) post) in *)
+
+  let pre_pvs, pre_globs = EcPV.PV.elements pre_pvs in
 
   let mleft = EcIdent.create "&1" in (* FIXME: PR: is this how we want to do this? *)
   let mright = EcIdent.create "&2" in
