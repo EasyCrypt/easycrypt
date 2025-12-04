@@ -358,24 +358,20 @@ let prog_equiv_prod
 *)
 
 let circ_form_eval_plus_equiv 
-  ?(mem: memory option) 
+  ~(me: memenv) 
   (hyps: hyps) 
   (proc: stmt) 
-  (invs: variable list) 
   (f: form) 
   (v : variable) 
   : bool = 
-
-  let mem = match mem with
-  | Some mem -> mem
-  | None -> EcIdent.create "&hr"
-  in
 
   (* ------------------------------------------------------------------ *)
   assert(f.f_ty = tbool);
 
   (* ------------------------------------------------------------------ *)
   let env = toenv hyps in
+  let env = EcEnv.Memory.push_active_ss me env in
+  let mem, mt = me in
   let redmode = circ_red hyps in
   let (@@!) = EcTypesafeFol.f_app_safe env in
 
@@ -402,24 +398,29 @@ let circ_form_eval_plus_equiv
     let insts = List.map (fun i -> 
       match i.i_node with
       | Sasgn (lv, e) -> 
-        let f = form_of_expr e in
-        let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
-        let f = EcCallbyValue.norm_cbv redmode hyps f in
-        let e = expr_of_form f in
+        let f = (ss_inv_of_expr mem e) in
+        let fi = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f.inv in
+        let fi = EcCallbyValue.norm_cbv redmode hyps fi in
+        let e = try expr_of_ss_inv {f with inv=fi}
+          with CannotTranslate ->
+            Format.eprintf "Failed on form : %a@."
+            EcPrinting.(pp_form PPEnv.(ofenv env)) fi;
+            raise CannotTranslate
+        in
         EcCoreModules.i_asgn (lv, e)
       | _ -> i
       ) proc.s_node 
     in
 
     let hyps, st = try
-      EcCircuits.state_of_prog hyps mem insts invs 
+      EcCircuits.state_of_prog hyps mem insts [] 
     with CircError err ->
       raise (BDepError err)
     in
     
     (* ------------------------------------------------------------------ *)
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
-    let hyps, pcond = match state_get_opt st mem v.v_name with
+    let hyps, pres = match state_get_opt st mem v.v_name with
       | Some circ -> 
         begin try 
           Option.may (fun i -> 
@@ -428,7 +429,7 @@ let circ_form_eval_plus_equiv
             raise (BDepError (lazy "Uninitialized input for circuit")) )
           (circuit_has_uninitialized circ);
           let hyps, c = (circuit_of_form hyps cur_bs) in
-          hyps, Some (circuit_ueq circ c)
+          hyps, Some (circuit_eqs circ c)
         with CircError err ->
           raise (BDepError (lazy ("Failed to generate circuit for current value precondition with error:\n" ^ (Lazy.force err))))
         end
@@ -438,7 +439,7 @@ let circ_form_eval_plus_equiv
     (* FIXME: how many times to reduce here ? *)
     (* ------------------------------------------------------------------ *)
     let f = EcCallbyValue.norm_cbv redmode hyps f in
-    let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ?pcond hyps f in
+    let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ?pres hyps f in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
 
     if f <> f_true then
@@ -1072,20 +1073,18 @@ let process_bdepeq
   FApi.t_last (t_bdepeq (inpvsl, inpvsr) n outvs pcond preprocess) tc 
 
 let t_bdep_form 
-  (invs: variable list)
   (f: form)
   (v: variable)
   (tc : tcenv1)
   : tcenv =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS sF ->
-    if circ_form_eval_plus_equiv ~mem:(fst sF.hs_m) (FApi.tc1_hyps tc) sF.hs_s invs f v then
+    if circ_form_eval_plus_equiv ~me:sF.hs_m (FApi.tc1_hyps tc) sF.hs_s f v then
       FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcPhlConseq.t_hoareS_conseq_nm (hs_pr sF) {(hs_po sF) with inv=(f_and f sF.hs_po)} tc)
     else tc_error (FApi.tc1_penv tc) "Supplied formula is not always true@."
   | _ -> tc_error (FApi.tc1_penv tc) "Goal should be a Hoare judgement with inlined code@."
 
 let process_bdep_form 
-  (invs: bdepvar list)
   (f: pformula)
   (v: bdepvar)
   (tc : tcenv1)
@@ -1093,7 +1092,6 @@ let process_bdep_form
   let hr = EcLowPhlGoal.tc1_as_hoareS tc in
   let hyps = FApi.tc1_hyps tc in
   let env = toenv hyps in
-  let invs = get_vars env invs hr.hs_m |> List.fst in
   let v = get_var env v hr.hs_m |> List.fst |> as_seq1 in
   let ue = EcUnify.UniEnv.create None in
   let env = (toenv hyps) in
@@ -1101,7 +1099,7 @@ let process_bdep_form
   let f = EcTyping.trans_prop env ue f in
   assert (EcUnify.UniEnv.closed ue);
   let f = EcCoreSubst.Fsubst.f_subst (Tuni.subst (EcUnify.UniEnv.close ue)) f in
-  t_bdep_form invs f v tc
+  t_bdep_form f v tc
 
 (* FIXME: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
@@ -1378,17 +1376,7 @@ let process_pre (tc: tcenv1) (f: form) : state * circuit list =
   st, cs
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
-  let time (env: env) (t: float) (msg: string) : float =
-    let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
-    new_t
-  in
-
-  let tm = Unix.gettimeofday () in
-  let env = toenv hyps in
-
   let destr_conj = destr_conj hyps in
-
   let posts = destr_conj post in
 
   List.for_all (fun post ->
@@ -1396,45 +1384,8 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
   | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> begin match EcFol.op_kind p with
-    | Some `Eq -> if debug then Format.eprintf "Filletting circuit...@.";
-      let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
-      let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
-
-      let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
-      assert (Option.is_none @@ circuit_has_uninitialized c1);
-      assert (Option.is_none @@ circuit_has_uninitialized c2);
-      let posts = circuit_eqs c1 c2 in
-      let tm = time env tm "Done with postcondition circuit generation" in
-
-(*
-      if debug then begin
-        Format.eprintf "Got conditions:@.%a@."
-        EcPrinting.(pp_list "@." pp_flatcirc) 
-        (List.map (fun (c, _) -> c.reg) posts)
-      end;
-*)
-
-      if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
-      let posts = batch_checks posts in
-      if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
-      let tm = time env tm "Done with lane compression" in
-      if fillet_tauts pres posts then begin
-        let tm = time env tm "Done with equivalence checking (structural equality + SMT)" in
-        true
-      end
-      else begin
-        let tm = time env tm "Failed equivalence check" in
-        false
-      end
-(*
-      let cs1 = fillet_circuit c1 in
-      let cs2 = fillet_circuit c2 in
-      List.iter2 (fun c1 c2 ->
-        Format.eprintf "Proving equiv between %a @.and@. %a@."
-        pp_circuit c1 pp_circuit c2) cs1 cs2;
-      assert (List.for_all2 circ_equiv cs1 cs2);
-      assert false
-*)
+    | Some `Eq -> 
+      circuit_simplify_equality ~st ~hyps ~pres f1 f2 
     | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
   end
   | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut

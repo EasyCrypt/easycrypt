@@ -3290,8 +3290,8 @@ bdepeq_out_info:
     pcond=oident?
   { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=true} }
 
-| BDEP BITSTRING invs=bracket(bd_vars) f=bracket(form) v=lident 
-  { Pcirc (invs, f, (`Var v :> bdepvar)) }
+| CIRCUIT STAR f=bracket(form) v=lident 
+  { Pcirc (f, (`Var v :> bdepvar)) }
 
 | CIRCUIT
   { Pbdepsolve }

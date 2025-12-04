@@ -826,7 +826,7 @@ type phltactic =
   | Pbdep of bdep_info
   | Pbdepeval of bdep_eval_info
   | Pbdepeq of bdepeq_info
-  | Pcirc of (bdepvar list * pformula * bdepvar)
+  | Pcirc of (pformula * bdepvar)
   | Pbdepsolve
 
     (* Program rewriting *)

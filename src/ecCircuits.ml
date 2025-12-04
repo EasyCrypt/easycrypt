@@ -712,6 +712,39 @@ let circuit_of_form
 
   hyps, f_c
 
+let circuit_simplify_equality ?(do_time = debug) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
+  let tm = ref (Unix.gettimeofday ()) in
+  let env = toenv hyps in
+  let time (env: env) (t: float ref) (msg: string) : unit =
+    let new_t = Unix.gettimeofday () in
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t);
+    t := new_t
+  in
+
+  if debug then Format.eprintf "Filletting circuit...@.";
+  let c1 = circuit_of_form ~st hyps f1 |> snd |> state_close_circuit st in
+  if do_time then time env tm "Left side circuit generation done";
+  let c2 = circuit_of_form ~st hyps f2 |> snd |> state_close_circuit st in
+  if do_time then time env tm "Right side circuit generation done";
+
+  let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
+  assert (Option.is_none @@ circuit_has_uninitialized c1);
+  assert (Option.is_none @@ circuit_has_uninitialized c2);
+  let posts = circuit_eqs c1 c2 in
+  if do_time then time env tm "Done with postcondition circuit generation";
+
+  if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
+  let posts = batch_checks posts in
+  if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
+  if do_time then time env tm "Done with lane compression";
+  if fillet_tauts pres posts then begin
+    if do_time then time env tm "Done with equivalence checking (structural equality + SMT)";
+    true
+  end
+  else begin
+    if do_time then time env tm "Failed equivalence check";
+    false
+  end
 
 let circuit_of_path (hyps: hyps) (p: path) : hyps * circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
@@ -861,13 +894,11 @@ let state_of_prog ?me (hyps: hyps) (mem: memory) ?(st: state = empty_state) (pro
 (* FIXME: refactor this function *)
 let rec circ_simplify_form_bitstring_equality
   ?(st: state = empty_state) 
-  ?(pcond: circuit option)
+  ?(pres: circuit list = [])
   (hyps: hyps) 
   (f: form)
   : form =
   let env = toenv hyps in
-
-(*   let pcond = Option.map cbool_of_circuit pcond in *)
 
   let rec check (f : form) =
     match EcFol.sform_of_form f with
@@ -875,15 +906,7 @@ let rec circ_simplify_form_bitstring_equality
          when (Option.is_some @@ EcEnv.Circuit.lookup_bitstring env f1.f_ty)
            || (Option.is_some @@ EcEnv.Circuit.lookup_array env f1.f_ty)
       ->
-      let hyps, c1 = circuit_of_form ~st hyps f1 in
-      let hyps, c2 = circuit_of_form ~st hyps f2 in
-      (*if debug then Format.eprintf "[W]Testing circuit equivalence for forms:*)
-      (*%a@.%a@.With circuits: %s | %s@."*)
-      (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f1*)
-      (*(EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f2*)
-      (*(circuit_to_string c1)*)
-      (*(circuit_to_string c2);*)
-      f_bool (circ_equiv ?pcond c1 c2)
+      f_bool (circuit_simplify_equality ~st ~hyps ~pres f1 f2)
     | _ -> f_map (fun ty -> ty) check f 
   in check f
 
