@@ -236,7 +236,7 @@ let oif (test : 'a -> bool) (x : 'a option) =
 
 let oget ?exn (x : 'a option) =
   match x, exn with
-  | None  , None     -> 
+  | None  , None     ->  (* FIXME PR: Remove before merge *)
       Printexc.get_callstack 100 |> Printexc.print_raw_backtrace stderr; assert false
   | None  , Some exn -> raise exn
   | Some x, _        -> x

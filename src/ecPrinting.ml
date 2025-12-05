@@ -2086,7 +2086,7 @@ and pp_form ppe fmt f =
 
 and pp_expr ppe fmt e =
   let f = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
-  | None -> form_of_expr e
+  | None -> (ss_inv_of_expr (EcIdent.create "&fake") e).inv (* FIXME BAD *)
   | Some m -> (ss_inv_of_expr m e).inv in
   pp_form ppe fmt f
 
