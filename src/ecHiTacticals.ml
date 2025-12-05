@@ -54,6 +54,10 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_try (process1_core ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
+and process1_extens (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
+  FApi.t_extens (process1_core ttenv t) tc
+
+(* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
   EcLowGoal.t_admit tc
 
@@ -323,6 +327,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
+    | Pextens   t           -> `One (process1_extens   ttenv t)
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)

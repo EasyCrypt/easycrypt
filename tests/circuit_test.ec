@@ -28,6 +28,24 @@ realize tosintP by admit.
 realize ofintP by admit.
 realize size_tolist by admit.
 
+
+
+op bool2bits (b : bool) : bool list = [b].
+op bits2bool (b: bool list) : bool = List.nth false b 0.
+
+op i2b : int -> bool.
+op b2si (b: bool) = 0.
+
+bind bitstring bool2bits bits2bool b2i b2si i2b bool 1.
+realize size_tolist by auto.
+realize tolistP by auto.
+
+realize oflistP by rewrite /bool2bits /bits2bool;smt(size_eq1).
+realize ofintP by admit.
+realize touintP by admit.
+realize tosintP by move => bv => //. 
+realize gt0_size by done.
+    
 op (+^) : W -> W -> W.
 
 bind op W (+^) "xor".
@@ -48,6 +66,18 @@ module M = {
     return c;
   }
 }.
+
+op "_.[_]" : W8 -> int -> bool.
+
+bind op [W8 & bool] "_.[_]" "get".
+realize le_size by auto.
+realize eq1_size by auto.
+realize bvgetP by admit.
+
+lemma W8_ext (a: W8) : List.all (fun i => a.[i] = a.[i]) (iota_ 0 8).
+proof.
+extens circuit.
+qed.
 
 (*
 lemma xor_0 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = of_int 0].
