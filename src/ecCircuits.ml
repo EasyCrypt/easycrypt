@@ -618,7 +618,7 @@ let circuit_of_form
     end
       
     | Fquant (qnt, binds, f) -> 
-      let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in
+      let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in (* FIXME *)
       begin match qnt with
       | Lforall 
       | Llambda -> circ_lambda_oneshot st binds (fun st -> doit st hyps f)
@@ -964,10 +964,21 @@ let state_get_opt = state_get_pv_opt
 let state_get_all = fun st -> state_get_all_pv st |> List.snd
 
 (*   (cbitstring_of_circuit ~strict:false c :> circuit) *)
+let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
+  match mt with
+  | (Lmt_concrete Some {lmt_decl=decls}) ->
+      let bnds = List.map (fun {ov_name; ov_type} ->
+        match ov_name with
+        | Some v -> Some ((m, v), ctype_of_ty env ov_type)
+        | None -> None
+      ) decls in
+      open_circ_lambda_pv st (List.filter_map identity bnds)
+  | Lmt_concrete None -> st
+
 
 (* Generally called without the optional argument, here just to see if we need it,
    maybe remove later? FIXME *)
-let circuit_state_of_hyps ?(st = empty_state) hyps : state = 
+let circuit_state_of_hyps ?(use_mem = false) ?(st = empty_state) hyps : state = 
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
@@ -976,16 +987,9 @@ let circuit_state_of_hyps ?(st = empty_state) hyps : state =
 (*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
       They are either given a value by assignment in the program or if they are used 
       before that they are implicitly initialized to BAD 
-
-      if above is correct then remove whole comment block otherwise rework it
-    | EcBaseLogic.LD_mem (Lmt_concrete Some {lmt_decl=decls}) -> 
-      let bnds = List.map (fun {ov_name; ov_type} -> 
-        match ov_name with
-        | Some v -> let id = create v in Some (id, ctype_of_ty env ov_type)
-        | None -> None
-      ) decls in
-      List.filter_map (fun i -> i) bnds 
 *)
+
+    | EcBaseLogic.LD_mem mt when use_mem -> circuit_state_of_memenv ~st env (id, mt)
 
     (* Initialized variable. 
        Check if body is convertible to circuit, if not just process it as uninitialized.
@@ -1010,10 +1014,10 @@ let circuit_state_of_hyps ?(st = empty_state) hyps : state =
         EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f)
       ;
       begin match (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) with
-      | {f_node=Fapp ({f_node = Fop (p, _); _}, [{f_node = Fpvar (PVloc pv, m); _}; ({f_node = Flocal id} as floc)])} 
-      | {f_node=Fapp ({f_node = Fop (p, _); _}, [({f_node = Flocal id} as floc); {f_node = Fpvar (PVloc pv, m); _}])} when EcFol.op_kind p = Some `Eq ->
+      | {f_node=Fapp ({f_node = Fop (p, _); _}, [{f_node = Fpvar (PVloc pv, m); _}; fv])} 
+      | {f_node=Fapp ({f_node = Fop (p, _); _}, [fv; {f_node = Fpvar (PVloc pv, m); _}])} when EcFol.op_kind p = Some `Eq ->
         begin try
-          update_state_pv st m pv (circuit_of_form ~st hyps floc |> snd)
+          update_state_pv st m pv (circuit_of_form ~st hyps fv |> snd)
         with CircError _ ->
           st
         end

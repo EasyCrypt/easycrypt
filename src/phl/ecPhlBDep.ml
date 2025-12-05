@@ -412,8 +412,10 @@ let circ_form_eval_plus_equiv
       ) proc.s_node 
     in
 
+    let st = circuit_state_of_memenv ~st:empty_state env me in
+
     let hyps, st = try
-      EcCircuits.state_of_prog hyps mem insts [] 
+      EcCircuits.state_of_prog ~st hyps mem insts [] 
     with CircError err ->
       raise (BDepError err)
     in
@@ -431,7 +433,8 @@ let circ_form_eval_plus_equiv
           let hyps, c = (circuit_of_form hyps cur_bs) in
           hyps, Some (circuit_eqs circ c)
         with CircError err ->
-          raise (BDepError (lazy ("Failed to generate circuit for current value precondition with error:\n" ^ (Lazy.force err))))
+          raise (CircError err)
+(*           raise (BDepError (lazy ("Failed to generate circuit for current value precondition with error:\n" ^ (Lazy.force err)))) *)
         end
       | None -> hyps, None
     in
@@ -1078,10 +1081,16 @@ let t_bdep_form
   (tc : tcenv1)
   : tcenv =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareS sF ->
+  | FhoareS sF -> begin try
     if circ_form_eval_plus_equiv ~me:sF.hs_m (FApi.tc1_hyps tc) sF.hs_s f v then
       FApi.t_last (fun tc -> FApi.close (!@ tc) VBdep) (EcPhlConseq.t_hoareS_conseq_nm (hs_pr sF) {(hs_po sF) with inv=(f_and f sF.hs_po)} tc)
     else tc_error (FApi.tc1_penv tc) "Supplied formula is not always true@."
+  with 
+  | BDepError le ->
+    tc_error (FApi.tc1_penv tc) "BDepError: %s@." (Lazy.force le)
+  | CircError le ->
+      assert false
+  end
   | _ -> tc_error (FApi.tc1_penv tc) "Goal should be a Hoare judgement with inlined code@."
 
 let process_bdep_form 
