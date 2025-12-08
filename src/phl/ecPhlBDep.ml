@@ -1450,7 +1450,11 @@ let t_bdep_solve
     begin 
       try (
         let tm = Unix.gettimeofday () in
-        let st, cpres = process_pre tc es_pr in
+        (* FIXME: rework this *)
+        let st = circuit_state_of_memenv ~st:empty_state (FApi.tc1_env tc) es_ml in
+        let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es_mr in
+(*         let st = circuit_state_of_hyps ~st (FApi.tc1_hyps tc) in *)
+        let st, cpres = process_pre ~st tc es_pr in
         let tm = time (toenv hyps) tm "Done with precondition processing" in
 
         (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
