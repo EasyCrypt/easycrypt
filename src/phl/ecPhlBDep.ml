@@ -1611,7 +1611,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       | `Bitstring { ofint }::_ -> ofint
       | _ -> tc_error (tc1_penv tc) "FIXME: Unhandled case"
       in
-      List.init (min 5 (1 lsl size)) (fun i ->  (* FIXME FIXME this is bad *)
+      List.init (1 lsl size) (fun i ->  (* FIXME FIXME this is bad *)
         let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) m 
         (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
         in
