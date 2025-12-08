@@ -76,8 +76,37 @@ realize bvgetP by admit.
 
 lemma W8_ext (a: W8) : List.all (fun i => a.[i] = a.[i]) (iota_ 0 8).
 proof.
-extens circuit.
+extens : circuit.
 qed.
+
+
+
+lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
+proof.
+proc.
+extens [a] : (wp; skip; smt()). 
+qed.
+
+
+lemma W8_xor_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
+proof.
+proc.
+circuit simplify; trivial.
+qed.
+
+
+lemma W8_xor_ext2 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
+proof.
+proc.
+extens [a] : circuit. 
+qed.
+
+lemma W8_xor_ext_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
+proof.
+proc.
+extens [a] : by circuit simplify; trivial. (* FIXME: without by does not work *)
+qed.
+
 
 (*
 lemma xor_0 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = of_int 0].

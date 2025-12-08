@@ -438,8 +438,9 @@ let circuit_of_form
         | OB_oper (Some (OP_Plain f)) -> 
           f
         | _ -> 
-          if debug then Format.eprintf "Failed to get body for op: %a\n" 
-          (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
+          if debug then Format.eprintf "Failed to get body for op: %a (args: %a)\n" 
+          (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op
+          (EcPrinting.(pp_list "," (pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))))) args;
           raise (CircError (lazy "Failed to get body for op in propagate integer arg"))
       in
 (*
@@ -978,7 +979,7 @@ let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
 
 (* Generally called without the optional argument, here just to see if we need it,
    maybe remove later? FIXME *)
-let circuit_state_of_hyps ?(use_mem = false) ?(st = empty_state) hyps : state = 
+let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_state) hyps : state = 
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
@@ -999,13 +1000,19 @@ let circuit_state_of_hyps ?(use_mem = false) ?(st = empty_state) hyps : state =
       begin try
         update_state st id (circuit_of_form ~st hyps f |> snd)
       with CircError _ ->
-        open_circ_lambda st [(id, ctype_of_ty env t)]
+        try 
+          open_circ_lambda st [(id, ctype_of_ty env t)]
+        with (CircError _) as e ->
+          if strict then raise e else st
       end
 
       (* Uninitialized variable.
        Treat as input *)
     | EcBaseLogic.LD_var (t, None) -> 
-      open_circ_lambda st [(id, ctype_of_ty env t)]
+      begin try
+        open_circ_lambda st [(id, ctype_of_ty env t)]
+      with (CircError _) as e -> 
+        if strict then raise e else st end
 
     (* For things of the form a_ = a{&hr}, we assume the local variable takes precedence *)
     | EcBaseLogic.LD_hyp f -> 

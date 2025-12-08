@@ -827,7 +827,7 @@ type phltactic =
   | Pbdepeval of bdep_eval_info
   | Pbdepeq of bdepeq_info
   | Pcirc of (pformula * bdepvar)
-  | Pbdepsolve
+  | Pcircuit of circuit_mode
 
     (* Program rewriting *)
   | Prwprgm of rwprgm
@@ -835,6 +835,11 @@ type phltactic =
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
   | `Change   of pcodepos * ptybindings option * int * pstmt
+]
+
+and circuit_mode = [
+  | `Simplify
+  | `Solve
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -1052,7 +1057,7 @@ and ptactic_core_r =
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
-  | Pextens     of ptactic_core
+  | Pextens     of (ptactic_core * psymbol option)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option

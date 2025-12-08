@@ -3295,7 +3295,10 @@ bdepeq_out_info:
   { Pcirc (f, (`Var v :> bdepvar)) }
 
 | CIRCUIT
-  { Pbdepsolve }
+  { Pcircuit (`Solve ) }
+
+| CIRCUIT SIMPLIFY
+  { Pcircuit (`Simplify ) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
@@ -3464,8 +3467,8 @@ tactic_core_r:
     { Pcase (odfl false eq, odfl [] opts,
              { pr_view = vw; pr_rev = gp; } ) }
 
-| EXTENS t=tactic_core 
-  { Pextens t }
+| EXTENS v=option(bracket(lident)) COLON t=tactic_core
+  { Pextens (t, v) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)

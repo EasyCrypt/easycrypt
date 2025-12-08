@@ -788,59 +788,6 @@ module FApi = struct
     | `Failure _  -> tcenv_of_tcenv1 tc
     | `Success tc -> tc
 
-  let t_extens (tt : backward) (tc : tcenv1) =
-    (* Find goal shape 
-       -> generate one goal for each value
-       -> solve goal by applying the tactic
-     *)
-
-    let rec do_all (goals: form list) =
-      match goals with
-      | [] -> None
-      | goal::goals -> 
-        let tc = xmutate1 tc `VBdep [goal] |> as_tcenv1 in
-        match (t_try_base tt tc) with
-        | `Failure e -> Some goal
-        | `Success tc ->
-          match tc_opened tc with
-          | [] -> do_all goals
-          | _ -> Some goal
-    in
-
-    match (tc1_goal tc).f_node with 
-    | Fapp ({f_node = Fop (p, [tint]); _}, [fpred; flist]) when p = EcCoreLib.CI_List.p_all ->
-        Format.eprintf "[W] Found list all@.";
-        begin match flist.f_node with
-        | Fapp ({f_node = Fop (p, []); _}, [fstart; flen]) when p = EcCoreLib.CI_List.p_iota ->
-          let start = match fstart.f_node with
-          | Fint i -> EcBigInt.to_int i
-          | _ -> tc_error (tc1_penv tc) "Iota start should be constant"
-          in
-
-          let len = match flen.f_node with
-          | Fint i -> EcBigInt.to_int i
-          | _ -> tc_error (tc1_penv tc) "Iota length should be constant"
-          in
-
-          let goals = List.init len (fun i -> 
-            f_app_simpl fpred [f_int EcBigInt.(of_int (i + start))] tbool
-          ) in
-
-          Format.eprintf "[w] Got iota => [%d, %d)@.Goals: %a@." start len 
-          EcPrinting.(pp_list " | " (pp_form PPEnv.(ofenv (tc1_env tc)))) goals;
-
-          begin match do_all goals with
-          | None -> close (tcenv_of_tcenv1 tc) VBdep
-          | Some gfail ->
-            tc_error (tc1_penv tc) "Failed to close goal: %a@." 
-            EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) gfail
-              false
-          end
-        | _ -> tc_error (tc1_penv tc) "Unsupported List pattern"
-        end
-    | _ -> tc_error (tc1_penv tc) "Wrong goal shape@."
-    
-
   (* ------------------------------------------------------------------ *)
   let t_xswitch ?(on = `Focus) tt ~iffail tc =
     match on, t_try_base tt tc with

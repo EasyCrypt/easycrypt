@@ -421,6 +421,7 @@ let circ_form_eval_plus_equiv
     in
     
     (* ------------------------------------------------------------------ *)
+    (* FIXME: Suspicious *)
     let f = EcPV.PVM.subst1 env (PVloc v.v_name) mem cur_bs f in
     let hyps, pres = match state_get_opt st mem v.v_name with
       | Some circ -> 
@@ -1318,14 +1319,17 @@ let rec destr_conj (hyps: hyps) (f: form) : form list =
   a = b  => [a.[i] = b.[i]]_i 
 *)
 (* Returns _open_ circuits *)
-let process_pre (tc: tcenv1) (f: form) : state * circuit list = 
+let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit list = 
   let debug = false in
   let env = FApi.tc1_env tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let hyps = FApi.tc1_hyps tc in (* FIXME: should target be specified here? *)
 
   (* Maybe move this to be a parameter and just supply it from outside *)
-  let st = circuit_state_of_hyps hyps in
+  let st = match st with
+  | Some st -> st 
+  | None -> circuit_state_of_hyps hyps 
+  in
 
   (* Takes in a form of the form /\_i f_i 
      and returns a list of the conjunction terms [ f_i ]*)
@@ -1475,3 +1479,162 @@ let t_bdep_solve
     else 
     tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  
   end
+
+let t_bdep_simplify (tc: tcenv1) =
+  let time (env: env) (t: float) (msg: string) : float =
+    let new_t = Unix.gettimeofday () in
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
+    new_t
+  in
+  let hyps = (FApi.tc1_hyps tc) in
+  let goal = (FApi.tc1_goal tc) in
+  let env  = (FApi.tc1_env  tc) in
+  match goal.f_node with 
+  | FhoareS {hs_m=(m, me) as hs_m; hs_pr; hs_po; hs_s} -> 
+    let tm = Unix.gettimeofday () in
+    let st = circuit_state_of_hyps ~use_mem:true hyps in
+    let st = circuit_state_of_memenv ~st env hs_m in
+    let st, pres = process_pre ~st tc hs_pr in
+    let tm = time env tm "Done with precondition processing" in
+
+
+    let hyps, st = try
+      EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node [] 
+    with CircError (lazy err) ->
+      tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
+    in
+    let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
+    if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
+      EcPrinting.(pp_form PPEnv.(ofenv env)) post;
+    let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
+    let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
+    let new_goal = f_hoareS (snd hs_m) {inv=hs_pr; m} hs_s {inv=f; m} in
+    if debug then Format.eprintf "[W] Goal after simplify:@. %a@."
+      EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
+    FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
+  | _ -> assert false (* FIXME : TODO *)
+    
+
+
+(* ================ EXTENS TACTIC  ==================== *)
+(* FIXME: Maybe move later? *)
+open FApi
+let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
+    (* Find goal shape 
+       -> generate one goal for each value
+       -> solve goal by applying the tactic
+     *)
+
+    let open EcAst in
+
+    let rec do_all (goals: form list) =
+      match goals with
+      | [] -> None
+      | goal::goals -> 
+        let tc = mutate1 tc (fun _ -> VBdep) goal in
+        match (t_try_base tt tc) with
+        | `Failure e -> Some goal
+        | `Success tc ->
+          match tc_opened tc with
+          | [] -> do_all goals
+          | hd::_ -> 
+            Some (get_pregoal_by_id hd (tc_penv tc)).g_concl
+    in
+
+    let subst_pv_stmt ?(redmode: EcReduction.reduction_info option) (hyps: LDecl.hyps) (mem: memory) (sb: EcPV.PVM.subst) (s: stmt) =
+      let redmode = Option.default (circ_red hyps) redmode in 
+      let env = LDecl.toenv hyps in
+      stmt (List.map (fun i ->
+        match i.i_node with
+        | Sasgn (lv, e) ->
+        let f = (ss_inv_of_expr mem e) in
+        let fi = EcPV.PVM.subst env sb f.inv in
+        let fi = EcCallbyValue.norm_cbv redmode hyps fi in
+        let e = try expr_of_ss_inv {f with inv=fi}
+          with CannotTranslate ->
+            Format.eprintf "Failed on form : %a@."
+            EcPrinting.(pp_form PPEnv.(ofenv env)) fi;
+            raise CannotTranslate
+        in
+        EcCoreModules.i_asgn (lv, e)
+        | _ -> raise (CannotTranslate) (* FIXME: Errors *)
+
+      ) s.s_node)
+    in
+
+    let goals = match (tc1_goal tc).f_node, v with 
+    | Fapp ({f_node = Fop (p, [tint]); _}, [fpred; flist]), None when p = EcCoreLib.CI_List.p_all ->
+        Format.eprintf "[W] Found list all@.";
+        begin match flist.f_node with
+        | Fapp ({f_node = Fop (p, []); _}, [fstart; flen]) when p = EcCoreLib.CI_List.p_iota ->
+          let start = match fstart.f_node with
+          | Fint i -> EcBigInt.to_int i
+          | _ -> tc_error (tc1_penv tc) "Iota start should be constant"
+          in
+
+          let len = match flen.f_node with
+          | Fint i -> EcBigInt.to_int i
+          | _ -> tc_error (tc1_penv tc) "Iota length should be constant"
+          in
+
+          let goals = List.init len (fun i -> 
+            EcTypesafeFol.fapply_safe (tc1_hyps tc) fpred [f_int EcBigInt.(of_int (i + start))]
+          ) in
+
+          Format.eprintf "[w] Got iota => [%d, %d)@.Goals: %a@." start len 
+          EcPrinting.(pp_list " | " (pp_form PPEnv.(ofenv (tc1_env tc)))) goals;
+          goals
+
+          | _ -> tc_error (tc1_penv tc) "Unsupported List pattern"
+        end
+    | FhoareS ({ hs_m=(m, mt); hs_s; hs_pr; hs_po }), Some v -> 
+      let v = match EcMemory.lookup v mt with
+      | Some (v, _, _) -> v 
+      | None -> tc_error (tc1_penv tc) "Failed to find var %s in memory %s" v (EcIdent.name m)
+      in
+      (* FIXME: Assumes is not array, fix later *)
+      let size = match EcEnv.Circuit.lookup_bitstring_size (tc1_env tc) v.v_type with
+      | Some size -> size
+      | None -> tc_error (tc1_penv tc) "Failed to get size for type %a (is it finite and does it have a binding?)" 
+        EcPrinting.(pp_type PPEnv.(ofenv (tc1_env tc))) v.v_type
+      in
+      let tpath = match v.v_type.ty_node with
+      | Tconstr (p, _ ) -> p
+      | _ -> tc_error (tc1_penv tc) "Failed to destructure var type"
+      in
+      let of_int = match EcEnv.Circuit.reverse_type (tc1_env tc) tpath with
+      | [] -> tc_error (tc1_penv tc) "No bindings found for type of var"
+      | `Bitstring { ofint }::_ -> ofint
+      | _ -> tc_error (tc1_penv tc) "FIXME: Unhandled case"
+      in
+      List.init (min 5 (1 lsl size)) (fun i ->  (* FIXME FIXME this is bad *)
+        let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) m 
+        (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
+        in
+        let s = subst_pv_stmt (tc1_hyps tc) m subst hs_s in
+        let subst = EcPV.PVM.subst (tc1_env tc) subst in
+        let pr = subst hs_pr in
+        let po = subst hs_po in
+        let goal = f_hoareS mt ({inv=pr;m}) s ({inv=po;m}) in
+        if debug then 
+        (
+        Format.eprintf "[W] Generated goal %d@." i;
+(*
+        Format.eprintf "%a@." 
+        EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) goal
+*)
+        );
+        goal
+      )
+
+    | _ -> tc_error (tc1_penv tc) "Wrong goal shape@."
+    in
+
+    match do_all goals with
+    | None -> close (tcenv_of_tcenv1 tc) VBdep
+    | Some gfail ->
+      tc_error (tc1_penv tc) "Failed to close goal:@. %a@." 
+      EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) gfail
+        false
+
+

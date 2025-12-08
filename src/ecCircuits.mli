@@ -56,7 +56,7 @@ val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> hyps * 
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 val circuit_state_of_memenv : st:state -> env -> memenv -> state
-val circuit_state_of_hyps : ?use_mem:bool -> ?st:state -> hyps -> state 
+val circuit_state_of_hyps : ?strict:bool -> ?use_mem:bool -> ?st:state -> hyps -> state 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option
