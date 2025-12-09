@@ -587,10 +587,12 @@ let wp_equiv_rnd_r bij tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_rnd_r side pos bij_info tc =
-  match side, pos with
-  | Some side, None ->
-     wp_equiv_disj_rnd_r side tc
-  | None, _ -> begin
+  match side, pos, bij_info with
+  | Some side, None, (None, None) ->
+    wp_equiv_disj_rnd_r side tc
+  | Some side, None, _ ->
+    tc_error !!tc "one-sided rnd takes no arguments"
+  | None, _, _ -> begin
       let pos =
         match pos with
         | None -> None
@@ -617,7 +619,7 @@ let t_equiv_rnd_r side pos bij_info tc =
     end
 
   | _ ->
-     tc_error !!tc "invalid argument"
+    tc_error !!tc "two-sided rnd requires a bijection"
 
 (* -------------------------------------------------------------------- *)
 let wp_equiv_disj_rnd = FApi.t_low1 "wp-equiv-disj-rnd" wp_equiv_disj_rnd_r

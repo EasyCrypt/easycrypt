@@ -203,7 +203,7 @@ theory ProcChangeWhileHoare.
       x <- x + 1;
     }
   }.
-  admit. (* FIXME *)
+  proc rewrite {1} ^while /=; sim.
   abort.
 end ProcChangeWhileHoare.
 

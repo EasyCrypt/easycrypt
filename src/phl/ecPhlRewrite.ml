@@ -306,19 +306,12 @@ let process_change_stmt
   | _ -> tc_error !!tc "Wrong goal shape, expecting hoare or equiv goal with inlined code"
   end;
 
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in 
 
   let pos = 
     let env = EcEnv.Memory.push_active_ss me env in
     EcTyping.trans_codepos_range ~memory:(fst me) env pos 
   in
-
-(*
-  let s = match side with 
-  | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
-  | None -> EcProofTyping.tc1_process_Xhl_stmt tc s 
-  in
-*)
 
   let bindings = 
      binds
@@ -351,3 +344,4 @@ let process_change_stmt
   in
 
   t_change_stmt side pos (me, bindings) s tc
+
