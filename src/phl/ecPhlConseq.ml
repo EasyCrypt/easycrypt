@@ -1120,7 +1120,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
-                  t_mytrivial;
+                  t_mytrivial @! t_intros_i [m; h0] @! t_apply_hyp h0;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
