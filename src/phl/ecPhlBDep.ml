@@ -1508,13 +1508,17 @@ let t_bdep_simplify (tc: tcenv1) =
       tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
     in
     let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
+(*
     if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
       EcPrinting.(pp_form PPEnv.(ofenv env)) post;
+*)
     let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
     let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
     let new_goal = f_hoareS (snd hs_m) {inv=hs_pr; m} hs_s {inv=f; m} in
+(*
     if debug then Format.eprintf "[W] Goal after simplify:@. %a@."
       EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
+*)
     FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
   | _ -> assert false (* FIXME : TODO *)
     
