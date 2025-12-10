@@ -644,7 +644,7 @@ module type CircuitInterface = sig
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
   val fillet_tauts : circuit list -> circuit list -> bool
-  val batch_checks : ?sort:bool -> circuit list -> circuit list
+  val batch_checks : ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
 
   (* Wraps the backend call to deal with args/inputs *) 
   val circuit_to_file : name:string -> circuit -> symbol
@@ -1379,7 +1379,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
 
   (* Batches circuit checks by dependencies. Assumes equivalent checks are contiguous *)
-  let batch_checks ?(sort = true) (checks: circuit list) : circuit list =
+  let batch_checks ?(sort = true) ?(mode : [`ByEq | `BySub] = `ByEq) (checks: circuit list) : circuit list =
     (* Order by dependencies *)
     let checks = if sort then begin 
 
@@ -1413,11 +1413,16 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         if debug && false then Format.eprintf "Comparing deps:@.%a@.To deps:@.%a@."
         Backend.Deps.pp_dep d 
         Backend.Deps.pp_dep d';
-        if Backend.Deps.deps_equal d d' then 
-          doit acc ((circuit_and cur c), d) cs
-        else begin
-          Format.eprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d;
-          doit (cur::acc) (c, d') cs
+        begin match mode with
+          | `ByEq when Backend.Deps.deps_equal d d' -> 
+            doit acc ((circuit_and cur c), d) cs
+          | `BySub when Backend.Deps.(dep_contained d d') -> 
+            doit acc ((circuit_and cur c), d') cs
+          | `BySub when Backend.Deps.(dep_contained d' d) ->
+            doit acc ((circuit_and cur c), d) cs
+          | _ ->
+            Format.eprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d;
+            doit (cur::acc) (c, d') cs
         end
     in
 
@@ -1750,7 +1755,15 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { kind = `AInit ((_, Some n), (_, Some w_o)) } -> 
         begin match args with
         | [ `Init init_f ] -> 
-          let circs, cinps = List.split @@ List.init n init_f in
+          let circs, cinps = List.split @@ List.init n 
+          (if debug then (fun i ->  (* FIXME: Debug, remove later *)
+            let tm = Unix.gettimeofday () in
+            Format.eprintf "Generating lane %d of init, " i; 
+            let res = init_f i in
+            Format.eprintf "took %f seconds@." (Unix.gettimeofday () -. tm); 
+            res
+            ) else init_f) 
+          in
           let circs = List.map 
             (function 
               | {type_ = CBitstring _; reg = r} when Backend.size_of_reg r = w_o -> r 

@@ -411,6 +411,12 @@ let circuit_of_form
    (f_      : EcAst.form) 
   : hyps * circuit =
 
+  (* Form level cache, local to each high-level call *)
+  (* Forms are only cached the second time they are seen *)
+  (* Only cache function application for now *)
+  let cache : (int, circuit) Map.t ref = ref Map.empty in
+  let seen_forms : int Set.t ref = ref Set.empty in
+
   (* State does not get backward propagated so it is not returned *)
   let rec doit (st: state) (hyps: hyps) (f_: form) : hyps * circuit = 
     let env = toenv hyps in
@@ -420,11 +426,6 @@ let circuit_of_form
       let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
       res
     in
-(*
-    if debug then Format.eprintf "Translating form : %a (is iter form: %s)@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f_
-    (if form_is_iter f_ then "yes" else "no")
-    ;
-*)
 
     let int_of_form (f: form) : zint = 
       int_of_form hyps f
@@ -443,32 +444,8 @@ let circuit_of_form
           (EcPrinting.(pp_list "," (pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))))) args;
           raise (CircError (lazy "Failed to get body for op in propagate integer arg"))
       in
-(*
-      if debug then Format.eprintf "Propagating arguments for op: %a@\n" 
-      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) op;
-*)
       let res = fapply_safe op args in 
-(*
-      if debug then Format.eprintf "Result: %a" 
-      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) res;
-*)
       res
-      (*
-      let process_arg (arg: form) : form * (ident option) =
-        match arg.f_ty with
-        | t when t.ty_node = EcTypes.tint.ty_node ->
-          f_int (int_of_form arg), None
-        | t -> let id = create "temp" in
-          f_local id t, Some id
-      in
-      let apply_args = List.map process_arg args in
-      let new_binds = List.filter_map (function 
-        | (f, Some id) -> Some (id, GTty f.f_ty) 
-        | _ -> None
-      ) apply_args in 
-      let body = fapply_safe op (List.fst apply_args) in
-      f_app (f_quant Llambda new_binds body) (List.filter (fun arg -> Option.is_some (snd (process_arg arg))) args) ret_ty
-      *)
     in
 
     let arg_of_form (hyps: hyps) (f: form) : hyps * arg = 
@@ -552,6 +529,12 @@ let circuit_of_form
         hyps, circ
     end
     | Fapp (f, fs) -> begin try
+    begin match Map.find_opt f_.f_tag !cache with
+    | Some circ -> 
+        Format.eprintf "Cache hit for form: %a@."
+        EcPrinting.(pp_form PPEnv.(ofenv env)) f_;
+        hyps, circ
+    | None -> let hyps, circ =  
     (* TODO: find a way to properly propagate int arguments. Done? *)
     begin match f with
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
@@ -612,6 +595,11 @@ let circuit_of_form
           hyps fs 
         in
         hyps, circuit_compose f_c fcs
+    end 
+    in (if Set.mem f_.f_tag !seen_forms 
+      then cache := Map.add f_.f_tag circ !cache 
+      else seen_forms := Set.add f_.f_tag !seen_forms);
+      hyps, circ
     end
     with CircError le -> 
       let err = lazy (Format.asprintf "Call %a\n%s" EcPrinting.(pp_form (PPEnv.ofenv env)) f (Lazy.force le)) in
@@ -735,7 +723,7 @@ let circuit_simplify_equality ?(do_time = debug) ~(st: state) ~(hyps: hyps) ~(pr
   if do_time then time env tm "Done with postcondition circuit generation";
 
   if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
-  let posts = batch_checks posts in
+  let posts = batch_checks ~mode:`BySub posts in
   if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
   if do_time then time env tm "Done with lane compression";
   if fillet_tauts pres posts then begin
