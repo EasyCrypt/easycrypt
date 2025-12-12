@@ -38,6 +38,126 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
     `No)
 } 
 
+module AInvFHash = struct
+  let combine = Why3.Hashcons.combine
+
+  type t = form
+
+  let known_hashes : (int, int) Map.t ref = ref Map.empty
+
+  let clean_known : unit -> unit = 
+    fun () -> known_hashes := Map.empty
+
+  let bruijn_idents : (int, ident) Map.t ref = ref Map.empty
+
+  let clean_bruijn_idents : unit -> unit =
+    fun () -> bruijn_idents := Map.empty
+
+  let form_storage : (int, form) Map.t ref = ref Map.empty
+
+  let ident_of_debruijn_level (i: int) : ident = 
+    match Map.find_opt i !bruijn_idents with
+    | Some id -> id
+    | None -> let id = create (string_of_int i) in
+      bruijn_idents := Map.add i id !bruijn_idents;
+      id
+
+  type state = {
+    level: int;
+    subst: EcSubst.subst;
+  }
+
+
+  let add_to_state (id: ident) (ty: ty) (st: state) = 
+    let new_id = ident_of_debruijn_level st.level in
+    let level = st.level + 1 in
+    let subst = EcSubst.add_flocal st.subst id (f_local new_id ty) in
+    { level; subst }, new_id
+
+
+  let to_debruijn (f: form) : form =
+    let rec doit (st: state) (f: form) = 
+      match f.f_node with
+      | Fquant (qnt, bnds, f)  ->
+        let st, bnds = 
+          List.fold_left_map (fun st (orig_id, gty) ->
+            match gty with
+            | GTty ty ->
+              let st, new_id = add_to_state orig_id ty st in
+              st, (new_id, gty)
+            | _ -> 
+              st, (orig_id, gty)
+          ) st bnds 
+        in f_quant qnt bnds (doit st (EcSubst.subst_form st.subst f))
+      | Fif (cond, tb, fb)  -> 
+          let doit = doit st in
+          f_if (doit cond) (doit tb) (doit fb)
+      | Fmatch (_, _, _)  -> assert false
+      | Flet (lp, value, body)  -> 
+          begin match lp with
+          | LSymbol (orig_id, ty) -> 
+            let nval = doit st value in
+            let st, new_id = add_to_state orig_id ty st in
+            let nbody = doit st (EcSubst.subst_form st.subst body) in
+            f_let (LSymbol (new_id, ty)) nval nbody
+          | LTuple bnds -> 
+            let nval = doit st value in
+            let st, new_ids = List.fold_left_map (fun st (id, ty) -> add_to_state id ty st) st bnds in
+            let nbody = doit st (EcSubst.subst_form st.subst body) in
+            let nbinds = List.combine new_ids (List.snd bnds) in
+            f_let (LTuple nbinds) nval nbody
+          | LRecord (_, _) -> assert false
+          end
+      | Fapp (op, args)  -> 
+        let nargs = List.map (doit st) args in
+        let nop = doit st op in
+        f_app nop nargs f.f_ty
+      | Ftuple comps  -> 
+        f_tuple (List.map (doit st) comps)
+      | Fproj (tp, i)  -> 
+        f_proj (doit st tp) i f.f_ty
+      | FhoareF { hf_m; hf_pr; hf_f; hf_po }  -> 
+        let npre = doit st hf_pr in
+        let npo = doit st hf_po in
+        let m = hf_m in
+        f_hoareF {inv=npre;m} hf_f {inv=npo;m}
+      | FhoareS { hs_m=(m, me); hs_pr; hs_s; hs_po } -> 
+        let npre = doit st hs_pr in
+        let npo = doit st hs_po in
+        f_hoareS me {inv=npre;m} hs_s {inv=npo;m}
+      | FbdHoareF _  -> assert false
+      | FbdHoareS _  -> assert false
+      | FeHoareF _  -> assert false
+      | FeHoareS _  -> assert false
+      | FequivF { ef_ml; ef_mr; ef_pr; ef_fl; ef_fr; ef_po } -> 
+        let npre = doit st ef_pr in
+        let npo = doit st ef_po in
+        f_equivF {inv=npre;ml=ef_ml;mr=ef_mr} ef_fl ef_fr {inv=npo;ml=ef_ml;mr=ef_mr}
+      | FequivS { es_ml=(ml, mel); es_mr=(mr, mer); es_pr; es_sl; es_sr; es_po }  -> 
+        let npre = doit st es_pr in
+        let npo = doit st es_po in
+        f_equivS mel mer {inv=npre;ml;mr} es_sl es_sr {inv=npo;ml;mr}
+      | FeagerF _  -> assert false
+      | Fpr _ ->  assert false
+      | Fint _    
+      | Flocal _ 
+      | Fpvar (_, _) 
+      | Fglob (_, _)
+      | Fop (_, _)  -> f
+    in
+    doit {level = 0; subst = EcSubst.empty} f
+
+
+
+  let hash_form (f: form) = 
+    match Map.find_opt f.f_tag !known_hashes with
+    | Some hash -> hash
+    | None -> let fnorm = to_debruijn f in
+      form_storage := Map.add f.f_tag fnorm !form_storage;
+      known_hashes := Map.add f.f_tag fnorm.f_tag !known_hashes;
+      fnorm.f_tag
+end
+
 (* -------------------------------------------------------------------- *)
 type width = int
 exception CircError of string Lazy.t
@@ -415,7 +535,8 @@ let circuit_of_form
   (* Forms are only cached the second time they are seen *)
   (* Only cache function application for now *)
   let cache : (int, circuit) Map.t ref = ref Map.empty in
-  let seen_forms : int Set.t ref = ref Set.empty in
+(*   let seen_forms : int Set.t ref = ref Set.empty in *)
+  let fhash = AInvFHash.hash_form in
 
   (* State does not get backward propagated so it is not returned *)
   let rec doit (st: state) (hyps: hyps) (f_: form) : hyps * circuit = 
@@ -426,6 +547,10 @@ let circuit_of_form
       let res = EcTypesafeFol.fapply_safe ~redmode hyps f fs in
       res
     in
+(*
+    if debug then Format.eprintf "Recursing for form: %a (tag: %d, fhash: %d)@." 
+    EcPrinting.(pp_form PPEnv.(ofenv env)) f_ f_.f_tag (fhash f_);
+*)
 
     let int_of_form (f: form) : zint = 
       int_of_form hyps f
@@ -529,10 +654,12 @@ let circuit_of_form
         hyps, circ
     end
     | Fapp (f, fs) -> begin try
-    begin match Map.find_opt f_.f_tag !cache with
+    begin match Map.find_opt (fhash f_) !cache with
     | Some circ -> 
+(*
         Format.eprintf "Cache hit for form: %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) f_;
+*)
         hyps, circ
     | None -> let hyps, circ =  
     (* TODO: find a way to properly propagate int arguments. Done? *)
@@ -596,9 +723,11 @@ let circuit_of_form
         in
         hyps, circuit_compose f_c fcs
     end 
-    in (if Set.mem f_.f_tag !seen_forms 
-      then cache := Map.add f_.f_tag circ !cache 
-      else seen_forms := Set.add f_.f_tag !seen_forms);
+    in
+(*     in (if Set.mem (fhash f_) !seen_forms  *)
+(*       then *)
+      cache := Map.add (fhash f_) circ !cache;
+(*       else seen_forms := Set.add (fhash f_) !seen_forms); *)
       hyps, circ
     end
     with CircError le -> 
