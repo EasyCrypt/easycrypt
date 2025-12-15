@@ -830,12 +830,13 @@ let circuit_of_form
 
   hyps, f_c
 
-let circuit_simplify_equality ?(do_time = debug) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
+let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
   let tm = ref (Unix.gettimeofday ()) in
   let env = toenv hyps in
   let time (env: env) (t: float ref) (msg: string) : unit =
     let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t);
+(*     EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); *)
+    Format.eprintf "[W] %s, took %f s@." msg (new_t -. !t);
     t := new_t
   in
 
@@ -855,14 +856,16 @@ let circuit_simplify_equality ?(do_time = debug) ~(st: state) ~(hyps: hyps) ~(pr
   let posts = batch_checks ~mode:`BySub posts in
   if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
   if do_time then time env tm "Done with lane compression";
-  if fillet_tauts pres posts then begin
-    if do_time then time env tm "Done with equivalence checking (structural equality + SMT)";
-    true
-  end
-  else begin
-    if do_time then time env tm "Failed equivalence check";
-    false
-  end
+  if fillet_tauts pres posts then 
+    begin
+      if do_time then time env tm "Done with equivalence checking (structural equality + SMT)";
+      true
+    end
+  else 
+    begin
+      if do_time then time env tm "Failed equivalence check";
+      false
+    end
 
 let circuit_of_path (hyps: hyps) (p: path) : hyps * circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
@@ -1087,7 +1090,14 @@ let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
   | (Lmt_concrete Some {lmt_decl=decls}) ->
       let bnds = List.map (fun {ov_name; ov_type} ->
         match ov_name with
-        | Some v -> Some ((m, v), ctype_of_ty env ov_type)
+        | Some v -> 
+          begin try
+            Some ((m, v), ctype_of_ty env ov_type)
+          with CircError err ->
+            raise (CircError (lazy ( 
+              (Format.asprintf "Failed for decl for var %s@." v) ^ Lazy.force err
+            )))
+          end
         | None -> None
       ) decls in
       open_circ_lambda_pv st (List.filter_map identity bnds)

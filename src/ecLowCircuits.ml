@@ -1532,10 +1532,12 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
-      List.iteri (fun i post -> 
+      List.mapi (fun i post -> 
         if debug then Format.eprintf "Checking equivalence for bit %d@." i; (* FIXME *)
-        assert (fillet_taut pres post)) posts;
-      true
+        let res = fillet_taut pres post in 
+        if not res then Format.eprintf "Failed for bit %d@." i;
+        res) posts |>
+      List.for_all identity
    
 
   (* General Mapreduce Procedure:
@@ -1755,15 +1757,20 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       | { kind = `AInit ((_, Some n), (_, Some w_o)) } -> 
         begin match args with
         | [ `Init init_f ] -> 
-          let circs, cinps = List.split @@ List.init n 
-          (if debug then (fun i ->  (* FIXME: Debug, remove later *)
-            let tm = Unix.gettimeofday () in
-            Format.eprintf "Generating lane %d of init, " i; 
-            let res = init_f i in
-            Format.eprintf "took %f seconds@." (Unix.gettimeofday () -. tm); 
-            res
-            ) else init_f) 
+          let lanes = 
+(*
+            if debug then (fun i ->  (* FIXME: Debug, remove later *)
+              let tm = Unix.gettimeofday () in
+              Format.eprintf "Generating lane %d of init, " i; 
+              let res = init_f i in
+              Format.eprintf "took %f seconds@." (Unix.gettimeofday () -. tm); 
+              res
+              ) 
+            else 
+*)
+              init_f
           in
+          let circs, cinps = List.split @@ List.init n lanes in
           let circs = List.map 
             (function 
               | {type_ = CBitstring _; reg = r} when Backend.size_of_reg r = w_o -> r 
@@ -1954,7 +1961,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         try 
           { type_ = CBitstring w; reg = (Backend.slice c (i*w) w)}, inps  
         with Invalid_argument _ ->
-          raise (CircError (Format.asprintf "Bad index for bitstring get (expected < %d, got %d)" Backend.(size_of_reg c) i))
+          raise (CircError (Format.asprintf "Bad index for bitstring get (expected < %d, got %d)" n i))
 
       let array_set (({reg = arr; type_ =  CArray {width=w; count=n}}, inps) : circuit) (pos: int) (({reg = bs; type_ = CBitstring w'}, cinps): circuit) : circuit =
         let exception SizeMismatch in

@@ -1396,7 +1396,8 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
   if debug then Format.eprintf "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
-  | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> begin match EcFol.op_kind p with
+  | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> 
+    begin match EcFol.op_kind p with
     | Some `Eq -> 
       circuit_simplify_equality ~st ~hyps ~pres f1 f2 
     | _ -> circuit_of_form ~st hyps post |> snd |> state_close_circuit st |> circ_taut
@@ -1425,22 +1426,10 @@ let t_bdep_solve
 
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
       let _tm = time (toenv hyps) tm "Done with program circuit gen" in
-(*       let hyps, cpost = circuit_of_form ~st hyps hs_po in *)
-(*       if debug then Format.eprintf "cpost: %a@." pp_flatcirc (fst cpost).reg; *)
-(*
-      let cgoal = circuit_or (circuit_not cpre) cpost in
-      let cgoal = state_close_circuit st cgoal in
-      assert (Option.is_none @@ circuit_has_uninitialized cgoal);
-*)
-(*
-      if debug then Format.eprintf "circuit goal: %a@." pp_circuit cgoal;
-      if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
-*)
-      if 
-(*         (circ_taut cgoal)  *)
-        solve_post ~st ~pres:cpres hyps hs_po
-      then FApi.close (!@ tc) VBdep else
-      raise (BDepError (lazy "Failed to verify postcondition"))
+      if solve_post ~st ~pres:cpres hyps hs_po then 
+        FApi.close (!@ tc) VBdep 
+      else
+        raise (BDepError (lazy "Failed to verify postcondition"))
       with 
       | BDepError le
       | CircError le ->
@@ -1488,6 +1477,7 @@ let t_bdep_simplify (tc: tcenv1) =
   let time (env: env) (t: float) (msg: string) : float =
     let new_t = Unix.gettimeofday () in
     EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
+    Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
     new_t
   in
   let hyps = (FApi.tc1_hyps tc) in
@@ -1495,31 +1485,41 @@ let t_bdep_simplify (tc: tcenv1) =
   let env  = (FApi.tc1_env  tc) in
   match goal.f_node with 
   | FhoareS {hs_m=(m, me) as hs_m; hs_pr; hs_po; hs_s} -> 
-    let tm = Unix.gettimeofday () in
-    let st = circuit_state_of_hyps ~use_mem:true hyps in
-    let st = circuit_state_of_memenv ~st env hs_m in
-    let st, pres = process_pre ~st tc hs_pr in
-    let tm = time env tm "Done with precondition processing" in
+(*     begin try *)
+      let tm = Unix.gettimeofday () in
+      let st = circuit_state_of_hyps ~use_mem:true hyps in
+      let st = circuit_state_of_memenv ~st env hs_m in
+      let st, pres = process_pre ~st tc hs_pr in
+      let tm = time env tm "Done with precondition processing" in
 
 
-    let hyps, st = try
-      EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node [] 
-    with CircError (lazy err) ->
-      tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
-    in
-    let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
+      let hyps, st = try
+        EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node [] 
+      with CircError (lazy err) ->
+        tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
+      in
+      let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
+  (*
+      if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
+        EcPrinting.(pp_form PPEnv.(ofenv env)) post;
+  *)
+      let tm = time env tm "Done with first simplify" in
+      let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
+      let tm = time env tm "Done with circuit simplify" in
+      let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
+      let tm = time env tm "Done with second simplify" in
+      let new_goal = f_hoareS (snd hs_m) {inv=hs_pr; m} hs_s {inv=f; m} in
+  (*
+      if debug then Format.eprintf "[W] Goal after simplify:@. %a@."
+        EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
+  *)
+      
+      FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
 (*
-    if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
-      EcPrinting.(pp_form PPEnv.(ofenv env)) post;
+    with CircError err ->
+      tc_error (FApi.tc1_penv tc) "CircError: %s@." (Lazy.force err)
+    end
 *)
-    let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
-    let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
-    let new_goal = f_hoareS (snd hs_m) {inv=hs_pr; m} hs_s {inv=f; m} in
-(*
-    if debug then Format.eprintf "[W] Goal after simplify:@. %a@."
-      EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
-*)
-    FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
   | _ -> assert false (* FIXME : TODO *)
     
 
@@ -1535,18 +1535,26 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
 
     let open EcAst in
 
+    let tm = Unix.gettimeofday () in
+
+    let solved = ref 0 in
+
     let rec do_all (goals: form list) =
       match goals with
       | [] -> None
       | goal::goals -> 
-        let tc = mutate1 tc (fun _ -> VBdep) goal in
-        match (t_try_base tt tc) with
-        | `Failure e -> Some goal
-        | `Success tc ->
-          match tc_opened tc with
-          | [] -> do_all goals
+        let new_tc = mutate1 tc (fun _ -> VBdep) goal in
+        match (t_try_base tt new_tc) with
+        | `Failure e -> 
+            tc_error_exn (tc1_penv tc) e
+        | `Success new_tc ->
+          match tc_opened new_tc with
+          | [] -> 
+              incr solved;
+              EcEnv.notify ~immediate:true (tc1_env tc) `Warning "Solved goal %d@." !solved;
+              do_all goals
           | hd::_ -> 
-            Some (get_pregoal_by_id hd (tc_penv tc)).g_concl
+            Some (get_pregoal_by_id hd (tc_penv new_tc)).g_concl
     in
 
     let subst_pv_stmt ?(redmode: EcReduction.reduction_info option) (hyps: LDecl.hyps) (mem: memory) (sb: EcPV.PVM.subst) (s: stmt) =
@@ -1615,7 +1623,9 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       | `Bitstring { ofint }::_ -> ofint
       | _ -> tc_error (tc1_penv tc) "FIXME: Unhandled case"
       in
-      List.init (1 lsl size) (fun i ->  (* FIXME FIXME this is bad *)
+      let ngoals = 1 lsl size in
+(*       let ngoals = min ngoals 5 in *)
+      List.init ngoals (fun i ->  (* FIXME FIXME this is bad *)
         let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) m 
         (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
         in
@@ -1639,7 +1649,9 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     in
 
     match do_all goals with
-    | None -> close (tcenv_of_tcenv1 tc) VBdep
+    | None -> 
+      EcEnv.notify ~immediate:true (tc1_env tc) `Warning "[W] Extens took %f seconds@." (Unix.gettimeofday () -. tm);
+      close (tcenv_of_tcenv1 tc) VBdep
     | Some gfail ->
       tc_error (tc1_penv tc) "Failed to close goal:@. %a@." 
       EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) gfail
