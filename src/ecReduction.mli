@@ -91,7 +91,7 @@ val h_red     : reduction_info -> LDecl.hyps -> form -> form
 (* [hred_until test ri hyps f] performs head reduction on [f]
    until [test f] is true or that no more head reduction is possible. *)
 val h_red_until :
-  (form -> bool) -> reduction_info -> LDecl.hyps -> form -> form
+  ?until:(form -> bool) -> reduction_info -> LDecl.hyps -> form -> form
 
 val reduce_user_gen :
   (EcFol.form -> EcFol.form) ->

@@ -326,7 +326,7 @@ let call_error env tc f1 f2 =
 let t_call side ax tc =
   let env   = FApi.tc1_env  tc in
   let hyps, concl = FApi.tc1_flat tc in
-  let ax = EcReduction.h_red_until (fun _ -> false) EcReduction.full_red hyps ax in
+  let ax = EcReduction.h_red_until EcReduction.full_red hyps ax in
   match ax.f_node, concl.f_node with
   | FhoareF hf, FhoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in

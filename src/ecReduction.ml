@@ -1666,10 +1666,10 @@ let h_red_opt ri hyps f =
   try Some (h_red ri hyps f)
   with NotReducible -> None
 
-let rec h_red_until test ri hyps f =
-  if test f then f
+let rec h_red_until ?(until = fun _ -> true) ri hyps f =
+  if until f then f
   else match h_red ri hyps f with
-  | f -> h_red_until test ri hyps f
+  | f -> h_red_until ~until ri hyps f
   | exception NotReducible -> f
 
 (* -------------------------------------------------------------------- *)
