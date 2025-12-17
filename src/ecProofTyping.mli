@@ -4,7 +4,6 @@ open EcIdent
 open EcDecl
 open EcEnv
 open EcCoreGoal
-open EcMatching.Position
 open EcAst
 
 (* -------------------------------------------------------------------- *)
