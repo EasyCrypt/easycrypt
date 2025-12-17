@@ -32,6 +32,8 @@ type reg = node array
 (* -------------------------------------------------------------------- *)
 module HCons : sig
   val hashcons : node_r -> node
+
+  val clear : unit -> unit
 end = struct
   module H = Weak.Make(struct
     type t = node
@@ -60,6 +62,8 @@ end = struct
   let tag = ref 1
 
   let htable = H.create 5003
+
+  let clear = fun () -> H.clear htable
 
   let hashcons (n : node_r) =
     let rec pos = { gate = n; id =   !tag; neg = neg; }

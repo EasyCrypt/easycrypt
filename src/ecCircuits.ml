@@ -55,6 +55,15 @@ module AInvFHash = struct
 
   let form_storage : (int, form) Map.t ref = ref Map.empty
 
+  let clean_form_storage : unit -> unit =
+    fun () -> form_storage := Map.empty
+
+  let nuke_state_from_orbit : unit -> unit =
+    fun () ->
+      clean_known ();
+      clean_bruijn_idents ();
+      clean_form_storage () 
+
   let ident_of_debruijn_level (i: int) : ident = 
     match Map.find_opt i !bruijn_idents with
     | Some id -> id
@@ -1178,3 +1187,7 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
   ) st (List.rev (tohyps hyps).h_local)
   in 
   st
+
+let clear_translation_caches () =
+  EcLowCircuits.reset_backend_state ();
+  AInvFHash.nuke_state_from_orbit ()

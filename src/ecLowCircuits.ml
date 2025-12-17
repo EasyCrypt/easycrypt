@@ -14,6 +14,7 @@ end
 
 module HL = struct
   include Lospecs.Hlaig
+  include Lospecs.Hlaig.Deps
 end
 
 module Map = Batteries.Map
@@ -2027,3 +2028,7 @@ include CArgs
 include TranslationState
 include BVOps
 include ArrayOps
+
+let reset_backend_state () = 
+  C.HCons.clear ();
+  HL.reset_state ()

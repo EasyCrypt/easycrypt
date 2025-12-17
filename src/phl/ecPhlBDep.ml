@@ -1426,7 +1426,9 @@ let t_bdep_solve
 
       let hyps, st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node [] in
       let _tm = time (toenv hyps) tm "Done with program circuit gen" in
-      if solve_post ~st ~pres:cpres hyps hs_po then 
+      let res = solve_post ~st ~pres:cpres hyps hs_po in
+      EcCircuits.clear_translation_caches ();
+      if res then 
         FApi.close (!@ tc) VBdep 
       else
         raise (BDepError (lazy "Failed to verify postcondition"))

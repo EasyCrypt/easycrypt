@@ -65,3 +65,6 @@ val circuit_slice : circuit -> int -> int -> circuit
 val circuit_align_inputs : circuit -> (int * int) option list -> circuit 
 
 val circuit_to_file : name:string -> circuit -> symbol
+
+(* Imperative state clearing *)
+val clear_translation_caches : unit -> unit
