@@ -548,7 +548,7 @@ module type CircuitInterface = sig
     val open_circ_lambda : state -> (ident * ctype) list -> state 
     val open_circ_lambda_pv  : state -> ((memory * symbol) * ctype) list -> state
     val close_circ_lambda : state -> state 
-    val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> 'a * circuit) -> 'a * circuit (* FIXME: rename or redo *)
+    val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit (* FIXME: rename or redo *)
   end
 
   module BVOps : sig
@@ -643,7 +643,7 @@ module type CircuitInterface = sig
   val circuit_slice : size:int -> circuit -> int -> circuit
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
-  val fillet_tauts : circuit list -> circuit list -> bool
+  val fillet_tauts : ?mode:[`Seq | `Quad] -> circuit list -> circuit list -> bool
   val batch_checks : ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
 
   (* Wraps the backend call to deal with args/inputs *) 
@@ -823,11 +823,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         {st with lambdas = lambdas;
            circs = Mid.map (fun (c, cinps) -> (c, inps @ cinps)) st.circs }
 
-    let circ_lambda_oneshot (st: state) (bnds : (ident * ctype) list) (c: state -> 'a * circuit) : 'a * circuit = 
+    let circ_lambda_oneshot (st: state) (bnds : (ident * ctype) list) (c: state -> circuit) : circuit = 
       let st' = open_circ_lambda st bnds in
-      let x, (c, inps) = c st' in
-      x, (c, (List.hd st'.lambdas) @ inps)
-
+      let (c, inps) = c st' in
+      (c, (List.hd st'.lambdas) @ inps)
   end
 
   (* Inputs helper functions *)
@@ -1466,16 +1465,57 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let cond = circuit_or (circuit_not pre) post in
     circ_taut cond
 
+
+  let collapse_lanes (lanes: circuit list) =
+    (* Circuit structural equality after renaming *)
+    let (===) (c1: circ) (c2: circ) : bool = 
+      let n', _ = Backend.node_of_reg c1.reg |> Backend.Deps.excise_bit in
+      let n, _ = Backend.node_of_reg c2.reg |> Backend.Deps.excise_bit in
+      Backend.nodes_eq n n'
+    in
+    let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
+      match cs with
+      | [] -> cur::acc
+      | c::cs ->
+        if (fst c) === (fst cur) then
+          collapse acc cur cs
+        else 
+          collapse (cur::acc) c cs
+    in
+    (* FIXME: optimize later *)
+    let rec doit (cs: circuit list) : circuit list =
+      match cs with
+      | [] -> []
+      | c::[] -> c::[]
+      | c::cs -> begin try
+        let idx, _ = List.findi (fun _ c2 -> (fst c) === (fst c2)) cs in
+        let idx = idx + 1 in (* Length of the list to merge *)
+        if idx = 1 then 
+          doit (collapse [] c cs)
+        else
+          if (List.length (cs) + 1) mod idx != 0 then
+            (Format.eprintf "Cannot correctly infer lanes, defaulting to bruteforce checking@.";
+            (c::cs))
+          else
+            let cs = List.chunkify idx (c::cs) |> List.map (List.reduce circuit_and) in
+            doit cs
+        with Not_found ->
+          c::cs
+      end
+    in
+    doit lanes
+
   (* 
     - Attaches preconditions to postconditions
     - Realigns inputs
     - Checks for structural equality of circuits
     - SMT check for any remainings ones
    *)
-  let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
+  let fillet_tauts ?(mode: [`Seq | `Quad] = `Seq) (pres: circuit list) (posts: circuit list) : bool =
     (* Remove structurally equal circuits *)
     (* FIXME: not working because you have to 0 align everything before *)
     (* Assumes everything is single bit outputs *)
+(*
     let rec collapse (acc: circuit list) (cur: circuit) (cs: circuit list) : circuit list = 
       match cs with
       | [] -> cur::acc
@@ -1487,48 +1527,39 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         else 
           collapse (cur::acc) c cs
     in
-
-    (* TODO: Integrate this with the actual code *)
-(*
-    let posts = List.map (fun (post, _pinps) ->
-      let d = Backend.(Deps.dep_of_node (node_of_reg post.reg)) in
-      let compat_pres = List.filteri (fun i (pre_c, pre_inp) ->
-        let pre_dep = Backend.(Deps.dep_of_node (node_of_reg pre_c.reg)) in
-        Backend.Deps.dep_contained pre_dep d
-      ) pres in
-
-      let node_post = Backend.node_of_reg post.reg in
-      let nodes_pre = List.map (fun (c, _) -> Backend.node_of_reg c.reg) compat_pres in
-      let node_post, shifts = Backend.Deps.excise_bit node_post in
-      let inp_map = fun (id, v) ->
-      match Map.find_opt id shifts with
-      | Some (min, max) -> 
-          let new_id =  v - min in
-          assert (new_id <= max);
-          Some (id, v - min)
-      | None -> assert false
-    in
-    let nodes_pre = Backend.Deps.rename_inputs inp_map (Backend.reg_of_node_list nodes_pre) |> Backend.node_list_of_reg in
-    let node_pre = List.fold_left Backend.band Backend.true_ nodes_pre in
-    let node_post = Backend.bor (Backend.bnot node_pre) node_post in
-    {reg = Backend.reg_of_node node_post; type_ = CBool},
-    List.map (fun (id, (low, hi)) ->
-      {id; type_ = CBitstring (hi - low + 1)}) 
-    (Map.bindings shifts)
-    ) posts in
 *)
 
     let posts = List.filter_map (fun ((postc, _) as post) -> 
       if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
       else Some post
     ) posts in
+  
+    (* FIXME: V Testing V *)
+(*
+    Format.eprintf "Running new collapse lanes@.";
+    let tm = Unix.gettimeofday () in
+    let new_posts = collapse_lanes posts in
+    Format.eprintf "Done with new collapse, took %fs and collapsed down to %d lanes@." (Unix.gettimeofday () -. tm) (List.length new_posts);
+*)
+    
+    (* Quadratic check FIXME *)
+(*
+    List.iteri (fun i post -> 
+        let n', _ = Backend.node_of_reg (List.hd posts |> fst).reg |> Backend.Deps.excise_bit in
+        let n, _ = Backend.node_of_reg (fst post).reg |> Backend.Deps.excise_bit in
+        Format.eprintf "Checking structural equality for node 0 and node %d -> %s@." i
+        (if Backend.nodes_eq n n' then "EQ" else "Not EQ")
+    ) posts;
+*)
+    (* FIXME: A Testing A *)
 
     match posts with
     | [] -> true
-    | post::posts ->
+    | posts ->
       assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) pres);
       assert (List.for_all (fun ({type_;reg}, _) -> type_ = CBool) posts);
-      let posts = collapse [] post posts in
+(*       let posts = collapse [] post posts in *)
+      let posts = collapse_lanes posts in
       if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in

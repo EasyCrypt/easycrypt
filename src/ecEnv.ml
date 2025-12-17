@@ -200,8 +200,6 @@ type crbindings = {
   tyreverse   : crb_tyrev_map;
 }
 
-type circ_cache = EcLowCircuits.circuit Mp.t 
-
 (* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
@@ -224,7 +222,6 @@ type preenv = {
   env_item     : theory_item list;      (* in reverse order *)
   env_norm     : env_norm ref;
   env_crbds    : crbindings;
-  env_ccache   : circ_cache;
   (* Map theory paths to their env before just before theory was closed. *)
   (* The environment should be incuded for all theories, including       *)
   (* abstract ones. The purpose of this map is to simplify the code      *)
@@ -363,7 +360,6 @@ let empty gstate =
     env_item     = [];
     env_norm     = ref empty_norm_cache; 
     env_crbds    = empty_crbindings;
-    env_ccache   = Mp.empty; 
     env_thenvs   = Mp.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -3410,27 +3406,6 @@ module Circuit = struct
   let reverse_circuit =
     reverse_and_filter_operator
       ~filter:(function `Circuit x -> Some x | _ -> None)        
-
-  let add_circuit_cache (env: env) (pth: path) (c: EcLowCircuits.circuit) : env = 
-    {env with env_ccache = Mp.add pth c env.env_ccache}
-
-  let lookup_circuit_cache_opt (env: env) (pth: path) : EcLowCircuits.circuit option = 
-    Mp.find_opt pth env.env_ccache
-
-  let lookup_circuit_cache (env: env) (pth: path) : EcLowCircuits.circuit = 
-    Mp.find pth env.env_ccache
-
-  (* FIXME: check this *)
-  let add_circuit_cache_hyps (hyps: LDecl.hyps) (pth: path) (c: EcLowCircuits.circuit) : LDecl.hyps = 
-    {hyps with le_env = add_circuit_cache hyps.le_env pth c}
-
-  (* FIXME: check this *)
-  let lookup_circuit_cache_hyps_opt (hyps: LDecl.hyps) (pth: path) : EcLowCircuits.circuit option = 
-    Mp.find_opt pth hyps.le_env.env_ccache
-
-  (* FIXME: check this *)
-  let lookup_circuit_cache_hyps (hyps: LDecl.hyps) (pth: path) : EcLowCircuits.circuit = 
-    Mp.find pth hyps.le_env.env_ccache
 
   let get_specification_by_name (env : env) ~(filename : string) (name : symbol) : Lospecs.Ast.adef option =
     let specs = Lospecs.Circuit_spec.load_from_file ~filename in

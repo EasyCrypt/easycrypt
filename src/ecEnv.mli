@@ -566,14 +566,6 @@ module Circuit : sig
   val reverse_bvoperator : env -> path -> crb_bvoperator option
   val reverse_circuit : env -> path -> crb_circuit option
 
-  val add_circuit_cache : env -> path -> EcLowCircuits.circuit -> env 
-  val lookup_circuit_cache_opt : env -> path -> EcLowCircuits.circuit option
-  val lookup_circuit_cache : env -> path -> EcLowCircuits.circuit
-
-  val add_circuit_cache_hyps : LDecl.hyps -> path -> EcLowCircuits.circuit -> LDecl.hyps 
-  val lookup_circuit_cache_hyps_opt : LDecl.hyps -> path -> EcLowCircuits.circuit option
-  val lookup_circuit_cache_hyps : LDecl.hyps -> path -> EcLowCircuits.circuit
-
   val get_specification_by_name : env -> filename:string -> symbol -> Lospecs.Ast.adef option
 end 
 
