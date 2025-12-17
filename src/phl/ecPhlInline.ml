@@ -407,7 +407,7 @@ let process_inline_occs ~use_tuple side cond occs tc =
 let process_inline_codepos ~use_tuple side pos tc =
   let env = FApi.tc1_env tc in
   let concl = FApi.tc1_goal tc in
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
 
   try
     match concl.f_node, side with

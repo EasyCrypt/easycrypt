@@ -59,10 +59,6 @@ val tc1_process_prhl_stmt :
 val tc1_process_Xhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> pstmt -> stmt
 
-val tc1_process_codepos_range : tcenv1 -> oside * pcodepos_range -> codepos_range
-val tc1_process_codepos : tcenv1 -> oside * pcodepos -> codepos
-val tc1_process_codepos1 : tcenv1 -> oside * pcodepos1 -> codepos1
-
 (* -------------------------------------------------------------------- *)
 exception NoMatch
 

@@ -132,7 +132,7 @@ let tc1_process_stmt ?map hyps tc c =
 
 let tc1_process_prhl_stmt ?map tc side c =
   let concl = FApi.tc1_goal tc in
-  let ml, mr = match concl.f_node with 
+  let ml, mr = match concl.f_node with
     | FequivS {es_ml=ml; es_mr=mr} -> (ml, mr)
     | FeagerF {eg_ml=ml; eg_mr=mr} ->
         EcMemory.abstract ml, EcMemory.abstract mr
@@ -187,27 +187,6 @@ let tc1_process_Xhl_formula ?side tc pf =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula_xreal tc pf =
   tc1_process_Xhl_form tc txreal pf
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos_range tc (side, cpr) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos_range env cpr
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos env cpos
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos1 tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos1 env cpos
 
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
