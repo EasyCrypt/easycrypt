@@ -328,31 +328,33 @@ let t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te tc =
   | FeHoareS  _ when EcUtils.is_some teh -> (oget teh) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
-
   | _ ->
     let kinds = List.flatten [
-         if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
-         if EcUtils.is_some teh then [`EHoare `Stmt] else [];
-         if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
-         if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
-
+       if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+       if EcUtils.is_some teh then [`EHoare `Stmt] else [];
+       if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
+       if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
     in tc_error_noXhl ~kinds !!tc
 
 let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
-  match (FApi.tc1_goal tc).f_node with
-  | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
-  | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
-  | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
-  | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
-  | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
-  | _ ->
+  let texn tc =
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
          if EcUtils.is_some teh then [`EHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
-    in tc_error_noXhl ~kinds !!tc
+    in tc_error_noXhl ~kinds !!tc in
+  let tx f tc =
+    match f.f_node with
+    | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
+    | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
+    | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
+    | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
+    | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
+    | _ -> raise EcProofTyping.NoMatch in
+  EcLowGoal.t_lazy_match ~texn tx tc
+
 
 (* -------------------------------------------------------------------- *)
 let tag_sym_with_side ?mc name m =
