@@ -1,0 +1,949 @@
+(*^
+  TweakableHashFunctions.eca
+
+  Library for tweakable hash functions (THFs).
+
+  Formalizes the concept of THFs, collections of THFs, and several corresponding
+  properties. Conceptually, THFs are variants of keyed-hash functions (KHFs)
+  that explicitly consider contextual data (mostly for domain separation).
+  Most, if not all, material in this library is based on the relevant
+  literature. In partiular, this includes the following:
+
+  - [The SPHINCS+ Signature Framework](https://dl.acm.org/doi/10.1145/3319535.3363229)
+  - [Recovering the Tight Security Proof of SPHINCS+](https://link.springer.com/chapter/10.1007/978-3-031-22972-5_1)
+
+^*)
+
+(* Require/Import *)
+require import AllCore List Distr.
+
+
+(* Types *)
+(*& Type for public parameters ('keys') &*)
+type pp_t.
+
+(* Type for tweaks/context information *)
+type tw_t.
+
+(* Type for inputs ('messages') *)
+type in_t.
+
+(* Type for outputs ('message digests') *)
+type out_t.
+
+
+(* Operators *)
+(*& Tweakable hash function &*)
+op f : pp_t -> tw_t -> in_t -> out_t.
+
+
+(* Distributions *)
+(*& Distribution over the public parameter type &*)
+op dpp : pp_t distr.
+
+
+
+(* Properties *)
+(*&
+  Single-function, Multi-target, Distinct-Tweak PREimage resistance (SM_DT_PRE).
+&*)
+abstract theory SMDTPRE.
+  (*& Number of targets for SM_DT_PRE &*)
+  const t : { int | 0 <= t } as ge0_t.
+
+  (*& Distribution over the input type &*)
+  op din : in_t distr.
+
+  (*& Type for challenge oracle used in SM_DT_PRE &*)
+  module type Oraclei_SMDTPRE = {
+    proc init(pp_init : pp_t) : unit
+    proc query(tw : tw_t) : out_t
+    proc get(i : int) : tw_t * out_t
+    proc get_tweaks() : tw_t list
+    proc nr_targets() : int
+    proc dist_tweaks() : bool
+  }.
+
+  (*& Type for challenge oracle given to the adversary in SM_DT_PRE &*)
+  module type Oracle_SMDTPRE = {
+    include Oraclei_SMDTPRE [query]
+  }.
+
+  (*& Class of adversaries against SM_DT_PRE &*)
+  module type Adv_SMDTPRE(O : Oracle_SMDTPRE) = {
+    proc pick() : unit
+    proc find(pp : pp_t) : int * in_t {}
+  }.
+
+  (*&
+    Default implementation of a SM_DT_PRE challenge oracle,
+    including procedures for initialization and auxiliary tasks
+  &*)
+  module O_SMDTPRE_Default : Oraclei_SMDTPRE = {
+    var pp : pp_t
+    var ts : (tw_t * out_t) list
+
+    proc init(pp_init : pp_t) : unit = {
+      pp <- pp_init;
+      ts <- [];
+    }
+
+    proc query(tw : tw_t) : out_t = {
+      var x : in_t;
+      var y : out_t;
+      var twy : tw_t * out_t;
+
+      x <$ din;
+      y <- f pp tw x;
+
+      twy <- (tw, y);
+      ts <- rcons ts twy;
+
+      return y;
+    }
+
+    proc get(i : int) : tw_t * out_t = {
+      return nth witness ts i;
+    }
+
+    proc get_tweaks() : tw_t list = {
+      return unzip1 ts;
+    }
+
+    proc nr_targets() : int = {
+      return size ts;
+    }
+
+    proc dist_tweaks() : bool = {
+      return uniq (unzip1 ts);
+    }
+  }.
+
+  (*& SM_DT_PRE game &*)
+  module SM_DT_PRE(A : Adv_SMDTPRE, O : Oraclei_SMDTPRE) = {
+    proc main() : bool = {
+      var pp : pp_t;
+      var tw : tw_t;
+      var x : in_t;
+      var y : out_t;
+      var i : int;
+      var nrts : int;
+      var dist : bool;
+
+      pp <$ dpp;
+      O.init(pp);
+
+      A(O).pick();
+      (i, x) <@ A(O).find(pp);
+
+      (tw, y) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+      dist <@ O.dist_tweaks();
+
+      return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ f pp tw x = y;
+    }
+  }.
+end SMDTPRE.
+
+
+(*&
+  Single-function, Multi-target, Distinct-Tweak Open PREimage resistance (SM_DT_OpenPRE).
+&*)
+abstract theory SMDTOpenPRE.
+  (*& Number of targets for SM_DT_OpenPRE &*)
+  const t : { int | 0 <= t } as ge0_t.
+
+  (*& Distribution over the input type &*)
+  op din : in_t distr.
+
+  (*& Type for opening oracle used in SM_DT_OpenPRE &*)
+  module type Oraclei_SMDTOpenPRE = {
+    proc init(pp_init : pp_t, tws_init : tw_t list) : out_t list
+    proc open(i : int) : in_t
+    proc get(i : int) : tw_t * out_t
+    proc get_tweaks() : tw_t list
+    proc nr_targets() : int
+    proc dist_tweaks() : bool
+    proc opened(i : int) : bool
+  }.
+
+  (*& Type for opening oracle given to the adversary in SM_DT_OpenPRE &*)
+  module type Oracle_SMDTOpenPRE = {
+    include Oraclei_SMDTOpenPRE [open]
+  }.
+
+  (*& Class of adversaries against SM_DT_OpenPRE &*)
+  module type Adv_SMDTOpenPRE(O : Oracle_SMDTOpenPRE) = {
+    proc pick() : tw_t list {}
+    proc find(pp : pp_t, ys : out_t list) : int * in_t
+  }.
+
+  (*&
+    Default implementation of a SM_DT_OpenPRE opening oracle,
+    including procedures for initialization and auxiliary tasks
+  &*)
+  module O_SMDTOpenPRE_Default : Oraclei_SMDTOpenPRE = {
+    var pp : pp_t
+    var ts : (tw_t * out_t) list
+    var xs : in_t list
+    var os : int list
+
+    proc init(pp_init : pp_t, tws_init : tw_t list) : out_t list = {
+      var x : in_t;
+      var y : out_t;
+      var ys : out_t list;
+      var tw : tw_t;
+      var twy : tw_t * out_t;
+
+      pp <- pp_init;
+      ts <- [];
+      xs <- [];
+      os <- [];
+
+      ys <- [];
+      while (size ts < min (size tws_init) t) {
+        tw <- nth witness tws_init (size ts);
+        x <$ din;
+        y <- f pp tw x;
+
+        twy <- (tw, y);
+
+        xs <- rcons xs x;
+        ys <- rcons ys y;
+        ts <- rcons ts twy;
+      }
+
+      return ys;
+    }
+
+    proc open(i : int) : in_t = {
+      os <- rcons os i;
+      return nth witness xs i;
+    }
+
+    proc get(i : int) : tw_t * out_t = {
+      return nth witness ts i;
+    }
+
+    proc get_tweaks() : tw_t list = {
+      return unzip1 ts;
+    }
+
+    proc nr_targets() : int = {
+      return size ts;
+    }
+
+    proc dist_tweaks() : bool = {
+      return uniq (unzip1 ts);
+    }
+
+    proc opened(i : int) : bool = {
+      return i \in os;
+    }
+  }.
+
+  (*& SM_DT_OpenPRE game &*)
+  module SM_DT_OpenPRE(A : Adv_SMDTOpenPRE, O : Oraclei_SMDTOpenPRE) = {
+    proc main() : bool = {
+      var pp : pp_t;
+      var tw : tw_t;
+      var tws : tw_t list;
+      var x : in_t;
+      var y : out_t;
+      var ys : out_t list;
+      var i : int;
+      var nrts : int;
+      var opened, dist : bool;
+
+      pp <$ dpp;
+      tws <@ A(O).pick();
+      ys <@ O.init(pp, tws);
+
+      (i, x) <@ A(O).find(pp, ys);
+
+      (tw, y) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+      opened <@ O.opened(i);
+      dist <@ O.dist_tweaks();
+
+      return 0 <= i < nrts /\ 0 <= nrts <= t /\ !opened /\ dist /\ f pp tw x = y;
+    }
+  }.
+end SMDTOpenPRE.
+
+
+(*&
+  Single-function, Multi-target, Distinct-Tweak Target Collision Resistance (SM_DT_TCR).
+&*)
+abstract theory SMDTTCR.
+  (*& Number of targets for SM_DT_TCR &*)
+  const t : { int | 0 <= t } as ge0_t.
+
+  (*& Type for challenge oracle used in SM_DT_TCR &*)
+  module type Oraclei_SMDTTCR = {
+    proc init(pp_init : pp_t) : unit
+    proc query(tw : tw_t, x : in_t) : out_t
+    proc get(i : int) : tw_t * in_t
+    proc get_tweaks() : tw_t list
+    proc nr_targets() : int
+    proc dist_tweaks() : bool
+  }.
+
+  (*& Type for challenge oracle given to the adversary in SM_DT_TCR &*)
+  module type Oracle_SMDTTCR = {
+    include Oraclei_SMDTTCR [query]
+  }.
+
+  (*& Class of adversaries against SM_DT_TCR &*)
+  module type Adv_SMDTTCR(O : Oracle_SMDTTCR) = {
+    proc pick() : unit { O.query }
+    proc find(pp : pp_t) : int * in_t {}
+  }.
+
+  (*&
+    Default implementation of a SM_DT_TCR challenge oracle,
+    including procedures for initialization and auxiliary tasks
+  &*)
+  module O_SMDTTCR_Default : Oraclei_SMDTTCR = {
+    var pp : pp_t
+    var ts : (tw_t * in_t) list
+
+    proc init(pp_init : pp_t) : unit = {
+      pp <- pp_init;
+      ts <- [];
+    }
+
+    proc query(tw : tw_t, x : in_t) : out_t = {
+      var y : out_t;
+      var twx : tw_t * in_t;
+
+      y <- f pp tw x;
+
+      twx <- (tw, x);
+      ts <- rcons ts twx;
+
+      return y;
+    }
+
+    proc get(i : int) : tw_t * in_t = {
+      return nth witness ts i;
+    }
+
+    proc get_tweaks() : tw_t list = {
+      return unzip1 ts;
+    }
+
+    proc nr_targets() : int = {
+      return size ts;
+    }
+
+    proc dist_tweaks() : bool = {
+      return uniq (unzip1 ts);
+    }
+  }.
+
+  (*& SM_DT_TCR game &*)
+  module SM_DT_TCR(A : Adv_SMDTTCR, O : Oraclei_SMDTTCR) = {
+    proc main() : bool = {
+      var pp : pp_t;
+      var tw : tw_t;
+      var x, x' : in_t;
+      var i : int;
+      var nrts : int;
+      var dist : bool;
+
+      pp <$ dpp;
+      O.init(pp);
+
+      A(O).pick();
+      (i, x') <@ A(O).find(pp);
+
+      (tw, x) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+      dist <@ O.dist_tweaks();
+
+      return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ x <> x' /\ f pp tw x = f pp tw x';
+    }
+  }.
+end SMDTTCR.
+
+
+(*&
+  Single-function, Multi-target, Distinct-Tweak Decisional Second Preimage Resistance (SM_DT_DSPR).
+&*)
+abstract theory SMDTDSPR.
+  (* Predicate that checks whether there exists a second preimage for a given x under g pp tw *)
+  abbrev spexists (g : pp_t -> tw_t -> in_t -> out_t) (pp : pp_t) (tw : tw_t) (x : in_t) =
+    exists (x' : in_t), x <> x' /\ g pp tw x = g pp tw x'.
+
+  (*& Number of targets for SM_DT_DSPR &*)
+  const t : { int | 0 <= t } as ge0_t.
+
+  (*& Type for challenge oracle used in SM_DT_DSPR &*)
+  module type Oraclei_SMDTDSPR = {
+    proc init(pp_init : pp_t) : unit
+    proc query(tw : tw_t, x : in_t) : out_t
+    proc get(i : int) : tw_t * in_t
+    proc get_tweaks() : tw_t list
+    proc nr_targets() : int
+    proc dist_tweaks() : bool
+  }.
+
+  (*& Type for challenge oracle given to the adversary in SM_DT_DSPR &*)
+  module type Oracle_SMDTDSPR = {
+    include Oraclei_SMDTDSPR [query]
+  }.
+
+  (*& Class of adversaries against SM_DT_DSPR &*)
+  module type Adv_SMDTDSPR(O : Oracle_SMDTDSPR) = {
+    proc pick() : unit
+    proc guess(pp : pp_t) : int * bool {}
+  }.
+
+  (*&
+    Default implementation of a SM_DT_DSPR challenge oracle,
+    including procedures for initialization and auxiliary tasks
+  &*)
+  module O_SMDTDSPR_Default : Oraclei_SMDTDSPR = {
+    var pp : pp_t
+    var ts : (tw_t * in_t) list
+
+    proc init(pp_init : pp_t) : unit = {
+      pp <- pp_init;
+      ts <- [];
+    }
+
+    proc query(tw : tw_t, x : in_t) : out_t = {
+      var y : out_t;
+      var twx : tw_t * in_t;
+
+      y <- f pp tw x;
+
+      twx <- (tw, x);
+      ts <- rcons ts twx;
+
+      return y;
+    }
+
+    proc get(i : int) : tw_t * in_t = {
+      return nth witness ts i;
+    }
+
+    proc get_tweaks() : tw_t list = {
+      return unzip1 ts;
+    }
+
+    proc nr_targets() : int = {
+      return size ts;
+    }
+
+    proc dist_tweaks() : bool = {
+      return uniq (unzip1 ts);
+    }
+  }.
+
+  (*&
+    Game used to denote the probability that could trivially be obtained in
+    the SM_DSPR game by invariably returning 1
+  &*)
+  module SM_DT_SPprob(A : Adv_SMDTDSPR, O : Oraclei_SMDTDSPR) = {
+    proc main() : bool = {
+      var pp : pp_t;
+      var tw : tw_t;
+      var x : in_t;
+      var i : int;
+      var b : bool;
+      var nrts : int;
+      var dist : bool;
+
+      pp <$ dpp;
+      O.init(pp);
+
+      A(O).pick();
+      (i, b) <@ A(O).guess(pp);
+
+      (tw, x) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+      dist <@ O.dist_tweaks();
+
+      return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ spexists f pp tw x;
+    }
+  }.
+
+  (*& SM_DT_DSPR game &*)
+  module SM_DT_DSPR(A : Adv_SMDTDSPR, O : Oraclei_SMDTDSPR) = {
+    proc main() : bool = {
+      var pp : pp_t;
+      var tw : tw_t;
+      var x : in_t;
+      var twx : tw_t * in_t;
+      var i : int;
+      var b : bool;
+      var nrts : int;
+      var dist : bool;
+
+      pp <$ dpp;
+      O.init(pp);
+
+      A(O).pick();
+      (i, b) <@ A(O).guess(pp);
+
+      (tw, x) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+      dist <@ O.dist_tweaks();
+
+      return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ spexists f pp tw x = b;
+    }
+  }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_SMDTDSPR(A)
+    =
+    max 0 (Pr[SM_DT_DSPR(A).main() @ &m : res] - Pr[SM_DT_SPprob.main() @ &m : res]).
+  *)
+end SMDTDSPR.
+
+
+(*&
+  Single-function, Multi-target, Distinct-Tweak UnDetectability (SM_DT_UD).
+&*)
+abstract theory SMDTUD.
+(*& Number of targets for SM_DT_UD &*)
+const t : { int | 0 <= t } as ge0_t.
+
+(* Distribution over the input type *)
+op din : in_t distr.
+
+(* Distribution over the output type *)
+op dout : out_t distr.
+
+(*& Type for challenge oracle used in SM_DT_UD &*)
+module type Oraclei_SMDTUD = {
+  proc init(b_init : bool, pp_init : pp_t) : unit
+  proc query(tw : tw_t) : out_t
+  proc get_tweaks() : tw_t list
+  proc nr_targets() : int
+  proc dist_tweaks() : bool
+}.
+
+(*& Type for challenge oracle given to the adversary in SM_DT_UD &*)
+module type Oracle_SMDTUD = {
+  include Oraclei_SMDTUD [query]
+}.
+
+(*& Class of adversaries against SM_DT_UD &*)
+module type Adv_SMDTUD(O : Oracle_SMDTUD) = {
+  proc pick() : unit
+  proc distinguish(pp : pp_t) : bool {}
+}.
+
+(*&
+  Default implementation of a SM_DT_UD challenge oracle,
+  including procedures for initialization and auxiliary tasks
+&*)
+module O_SMDTUD_Default : Oraclei_SMDTUD = {
+  var b : bool
+  var pp : pp_t
+  var ts : tw_t list
+
+  proc init(b_init : bool, pp_init : pp_t) : unit = {
+    b <- b_init;
+    pp <- pp_init;
+    ts <- [];
+  }
+
+  proc query(tw : tw_t) : out_t = {
+    var x : in_t;
+    var y : out_t;
+
+    if (b) {
+      y <$ dout;
+    } else {
+      x <$ din;
+      y <- f pp tw x;
+    }
+
+    ts <- rcons ts tw;
+
+    return y;
+  }
+
+  proc get_tweaks() : tw_t list = {
+    return ts;
+  }
+
+  proc nr_targets() : int = {
+    return size ts;
+  }
+
+  proc dist_tweaks() : bool = {
+    return uniq ts;
+  }
+}.
+
+(*& SM_DT_UD game &*)
+module SM_DT_UD(A : Adv_SMDTUD, O : Oraclei_SMDTUD) = {
+  proc main(b : bool) : bool = {
+    var pp : pp_t;
+    var b' : bool;
+    var nrts : int;
+    var dist : bool;
+
+    pp <$ dpp;
+    O.init(b, pp);
+
+    A(O).pick();
+    b' <@ A(O).distinguish(pp);
+
+    nrts <@ O.nr_targets();
+    dist <@ O.dist_tweaks();
+
+    return 0 <= nrts <= t /\ dist /\ b';
+  }
+}.
+end SMDTUD.
+
+
+(*&
+  Tweakable hash function properties in the presence of an
+  encompassing collection.
+&*)
+abstract theory Collection.
+  (* Predicate that returns true iff the given lists do not share any elements *)
+  abbrev disj_lists (s1 s2 : 'a list) : bool = ! has (mem s2) s1.
+
+  (*&
+    Type for differentiating characteristic of input types. An example of a
+    differentiating characteristic is (message) length, in which case this type
+    should be instantiated as int.
+  &*)
+  type diff_t.
+
+  (*& Computes differentiating characteristic of an input value &*)
+  op get_diff : in_t -> diff_t.
+
+  (*& Tweakable hash function collection &*)
+  op fc : diff_t -> pp_t -> tw_t -> in_t -> out_t.
+
+  (*&
+    Tweakable hash function `f` is a member of the tweakable hash function
+    collection `fc`
+  &*)
+  axiom in_collection : exists (df : diff_t), fc df = f.
+
+  (*&
+    Type for collection oracle used in tweakable hash function properties
+    for members of a collection
+  &*)
+  module type Oraclei_THFC = {
+    proc init(pp_init : pp_t) : unit
+    proc get_tweaks() : tw_t list
+    proc query(tw : tw_t, x : in_t) : out_t
+  }.
+
+  (*&
+    Type for collection oracle given to adversaries in
+    tweakable hash function properties  for members of a collection
+  &*)
+  module type Oracle_THFC = {
+    include Oraclei_THFC [query]
+  }.
+
+  (*& Default implementation of collection oracle &*)
+  module O_THFC_Default : Oraclei_THFC = {
+    var pp : pp_t
+    var tws : tw_t list
+
+    proc init(pp_init : pp_t) : unit = {
+      pp <- pp_init;
+      tws <- [];
+    }
+
+    proc query(tw : tw_t, x : in_t) : out_t = {
+      var df : diff_t;
+      var y : out_t;
+
+      df <- get_diff x;
+      y <- fc df pp tw x;
+
+      tws <- rcons tws tw;
+
+      return y;
+    }
+
+    proc get_tweaks() : tw_t list = {
+      return tws;
+    }
+  }.
+
+  (*&
+    Single-function, Multi-target, Distinct-Tweak PREimage resistance for members
+    of a Collection (SM_DT_PRE_C).
+  &*)
+  abstract theory SMDTPREC.
+    clone include SMDTPRE.
+
+    (*& Class of adversaries against SM_DT_PRE_C &*)
+    module type Adv_SMDTPREC(O : Oracle_SMDTPRE, OC : Oracle_THFC) = {
+      proc pick() : unit
+      proc find(pp : pp_t) : int * in_t {}
+    }.
+
+    (*& SM_DT_PRE_C game &*)
+    module SM_DT_PRE_C(A : Adv_SMDTPREC, O : Oraclei_SMDTPRE, OC : Oraclei_THFC) = {
+      proc main() : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var x : in_t;
+        var y : out_t;
+        var i : int;
+        var nrts : int;
+        var dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+        O.init(pp);
+
+        A(O, OC).pick();
+        (i, x) <@ A(O, OC).find(pp);
+
+        (tw, y) <@ O.get(i);
+
+        nrts <@ O.nr_targets();
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ f pp tw x = y /\ disj_lists twsO twsOC;
+      }
+    }.
+  end SMDTPREC.
+
+  (*&
+    Single-function, Multi-target, Distinct-Tweak Open PREimage resistance
+    for members of a Collection (SM_DT_PRE_C).
+  &*)
+  abstract theory SMDTOpenPREC.
+    clone include SMDTOpenPRE.
+
+    (*& Class of adversaries against SM_DT_OpenPRE_C &*)
+    module type Adv_SMDTOpenPREC(O : Oracle_SMDTOpenPRE, OC : Oracle_THFC) = {
+      proc pick() : tw_t list { OC.query }
+      proc find(pp : pp_t, ys : out_t list) : int * in_t { O.open }
+    }.
+
+    (*& SM_DT_OpenPRE game &*)
+    module SM_DT_OpenPRE_C(A : Adv_SMDTOpenPREC, O : Oraclei_SMDTOpenPRE, OC : Oraclei_THFC) = {
+      proc main() : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var tws : tw_t list;
+        var x : in_t;
+        var y : out_t;
+        var ys : out_t list;
+        var i : int;
+        var nrts : int;
+        var opened, dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+
+        tws <@ A(O, OC).pick();
+
+        ys <@ O.init(pp, tws);
+
+        (i, x) <@ A(O, OC).find(pp, ys);
+
+        (tw, y) <@ O.get(i);
+
+        nrts <@ O.nr_targets();
+        opened <@ O.opened(i);
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= i < nrts /\ 0 <= nrts <= t /\ !opened /\ dist /\ f pp tw x = y /\ disj_lists twsO twsOC;
+      }
+    }.
+  end SMDTOpenPREC.
+
+  (*&
+    Single-function, Multi-target, Distinct-Tweak Target Collision Resistance for members
+    of a Collection (SM_DT_TCR_C).
+  &*)
+  abstract theory SMDTTCRC.
+    clone include SMDTTCR.
+
+    (*& Class of adversaries against SM_DT_TCR_C &*)
+    module type Adv_SMDTTCRC(O : Oracle_SMDTTCR, OC : Oracle_THFC) = {
+      proc pick() : unit
+      proc find(pp : pp_t) : int * in_t {}
+    }.
+
+    (*& SM_DT_TCR_C game &*)
+    module SM_DT_TCR_C(A : Adv_SMDTTCRC, O : Oraclei_SMDTTCR, OC : Oraclei_THFC) = {
+      proc main() : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var x, x' : in_t;
+        var y : out_t;
+        var i : int;
+        var nrts : int;
+        var dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+        O.init(pp);
+
+        A(O, OC).pick();
+        (i, x') <@ A(O, OC).find(pp);
+
+        (tw, x) <@ O.get(i);
+
+        nrts <@ O.nr_targets();
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ x <> x' /\ f pp tw x = f pp tw x' /\ disj_lists twsO twsOC;
+      }
+    }.
+  end SMDTTCRC.
+
+
+  (*&
+    Single-function, Multi-target, Distinct-Tweak Decisional Second Preimage Resistance for
+    members of a Collection (SM_DT_DSPR_C).
+  &*)
+  abstract theory SMDTDSPRC.
+    clone include SMDTDSPR.
+
+    (*& Class of adversaries against SM_DT_DSPR_C &*)
+    module type Adv_SMDTDSPRC(O : Oracle_SMDTDSPR, OC : Oracle_THFC) = {
+      proc pick() : unit
+      proc guess(pp : pp_t) : int * bool {}
+    }.
+
+    (*&
+      Game used to denote the probability that could trivially be obtained in
+      the SM_DSPR_C game by invariably returning 1
+    &*)
+    module SM_DT_SPprob_C(A : Adv_SMDTDSPRC, O : Oraclei_SMDTDSPR, OC : Oraclei_THFC) = {
+      proc main() : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var x : in_t;
+        var i : int;
+        var b : bool;
+        var nrts : int;
+        var dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+        O.init(pp);
+
+        A(O, OC).pick();
+        (i, b) <@ A(O, OC).guess(pp);
+
+        (tw, x) <@ O.get(i);
+
+        nrts <@ O.nr_targets();
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ spexists f pp tw x /\ disj_lists twsO twsOC;
+      }
+    }.
+
+    (*& SM_CT_DSPR_C game &*)
+    module SM_DT_DSPR_C(A : Adv_SMDTDSPRC, O : Oraclei_SMDTDSPR, OC : Oraclei_THFC) = {
+      proc main() : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var x : in_t;
+        var i : int;
+        var b : bool;
+        var nrts : int;
+        var dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+        O.init(pp);
+
+        A(O, OC).pick();
+        (i, b) <@ A(O, OC).guess(pp);
+
+        (tw, x) <@ O.get(i);
+
+        nrts <@ O.nr_targets();
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= i < nrts /\ 0 <= nrts <= t /\ dist /\ spexists f pp tw x = b /\ disj_lists twsO twsOC;
+      }
+    }.
+  end SMDTDSPRC.
+
+  (*&
+    Single-function, Multi-target, Distinct-Tweak Undetectability for
+    members of a Collection (SM_DT_UD_C).
+  &*)
+  abstract theory SMDTUDC.
+    clone include SMDTUD.
+
+    (*& Class of adversaries against SM_DT_UD_C &*)
+    module type Adv_SMDTUDC(O : Oracle_SMDTUD, OC : Oracle_THFC) = {
+      proc pick() : unit
+      proc distinguish(pp : pp_t) :  bool {}
+    }.
+
+    (*& SM_DT_UD_C game &*)
+    module SM_DT_UD_C(A : Adv_SMDTUDC, O : Oraclei_SMDTUD, OC : Oraclei_THFC) = {
+      proc main(b : bool) : bool = {
+        var pp : pp_t;
+        var tw : tw_t;
+        var x : in_t;
+        var b' : bool;
+        var nrts : int;
+        var dist : bool;
+        var twsO, twsOC : tw_t list;
+
+        pp <$ dpp;
+        OC.init(pp);
+        O.init(b, pp);
+
+        A(O, OC).pick();
+        b' <@ A(O, OC).distinguish(pp);
+
+        nrts <@ O.nr_targets();
+        dist <@ O.dist_tweaks();
+
+        twsO <@ O.get_tweaks();
+        twsOC <@ OC.get_tweaks();
+
+        return 0 <= nrts <= t /\ dist /\ b' /\ disj_lists twsO twsOC;
+       }
+    }.
+  end SMDTUDC.
+end Collection.

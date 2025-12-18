@@ -10,7 +10,7 @@
 
 (package
  (name easycrypt)
- (sites (lib theories) (libexec commands) (lib config))
+ (sites (lib theories) (libexec commands) (lib doc) (lib config))
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3.9))
@@ -20,6 +20,7 @@
   dune
   dune-build-info
   dune-site
+  markdown
   (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
   ppx_deriving

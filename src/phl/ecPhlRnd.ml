@@ -51,7 +51,7 @@ module Core = struct
     let m = fst hs.ehs_m in
     let distr = EcFol.ss_inv_of_expr m distr in
     let post = subst_form_lv env lv {m;inv=x} (ehs_po hs) in
-    let post = map_ss_inv2 (f_Ep ty_distr) distr 
+    let post = map_ss_inv2 (f_Ep ty_distr) distr
       (map_ss_inv1 (f_lambda [(x_id,GTty ty_distr)]) post) in
     let concl = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
@@ -211,7 +211,7 @@ module Core = struct
       | PNoRndParams, FHle ->
         if is_post_indep then
           (* event is true *)
-          let concl = f_bdHoareS (snd bhs.bhs_m) 
+          let concl = f_bdHoareS (snd bhs.bhs_m)
             (bhs_pr bhs) s (bhs_po bhs) bhs.bhs_cmp (bhs_bd bhs) in
           [concl]
         else
@@ -273,7 +273,7 @@ module Core = struct
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
           f_forall_mems_ss_inv bhs.bhs_m (map_ss_inv2 f_imp (map_ss_inv1 f_not phi) post) in
         let sgoal5 =
-          let f_inbound x = 
+          let f_inbound x =
             let f_r1, f_r0 = {m;inv=f_r1}, {m;inv=f_r0} in
             map_ss_inv2 f_anda (map_ss_inv2 f_real_le f_r0 x) (map_ss_inv2 f_real_le x f_r1) in
           map_ss_inv f_ands (List.map f_inbound [d1; d2; d3; d4])
@@ -525,11 +525,11 @@ let wp_equiv_rnd_r bij tc =
   let po =
     match hdc2, hdc3 with
     | None  , None   -> None
-    | Some _, Some _ -> 
+    | Some _, Some _ ->
       Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)))
-    | Some _, None   -> 
+    | Some _, None   ->
       Some (map_ts_inv2 f_anda c1 (map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind (map_ts_inv2 f_anda c3 c4))))
-    | None  , Some _ -> 
+    | None  , Some _ ->
       Some (map_ts_inv f_andas [c1; c2; map_ts_inv1 (f_forall [x, xty]) (map_ts_inv2 f_imp ind c4)])
   in
 
@@ -587,10 +587,12 @@ let wp_equiv_rnd_r bij tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_rnd_r side pos bij_info tc =
-  match side, pos with
-  | Some side, None ->
-     wp_equiv_disj_rnd_r side tc
-  | None, _ -> begin
+  match side, pos, bij_info with
+  | Some side, None, (None, None) ->
+    wp_equiv_disj_rnd_r side tc
+  | Some _side, None, _ ->
+    tc_error !!tc "one-sided rnd takes no arguments"
+  | None, _, _ -> begin
       let pos =
         match pos with
         | None -> None
@@ -617,7 +619,7 @@ let t_equiv_rnd_r side pos bij_info tc =
     end
 
   | _ ->
-     tc_error !!tc "invalid argument"
+    tc_error !!tc "two-sided rnd requires a bijection"
 
 (* -------------------------------------------------------------------- *)
 let wp_equiv_disj_rnd = FApi.t_low1 "wp-equiv-disj-rnd" wp_equiv_disj_rnd_r
@@ -681,16 +683,16 @@ let process_rnd side pos tac_info tc =
       | Single (b, p) ->
           let p =
             if Option.is_some side then
-              EcProofTyping.tc1_process_codepos1 tc (side, p)
+              EcLowPhlGoal.tc1_process_codepos1 tc (side, p)
             else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
           in Single (b, p)
       | Double ((b1, p1), (b2, p2)) ->
-          let p1 = EcProofTyping.tc1_process_codepos1 tc (Some `Left , p1) in
-          let p2 = EcProofTyping.tc1_process_codepos1 tc (Some `Right, p2) in
+          let p1 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left , p1) in
+          let p2 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, p2) in
           Double ((b1, p1), (b2, p2))
     )
     in
-    
+
     t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"
@@ -703,7 +705,7 @@ let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 (* -------------------------------------------------------------------- *)
 let process_rndsem ~reduce side pos tc =
   let concl = FApi.tc1_goal tc in
-  let pos = EcProofTyping.tc1_process_codepos1 tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, pos) in
 
   match side with
   | None when is_hoareS concl ->

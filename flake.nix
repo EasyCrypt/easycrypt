@@ -4,7 +4,7 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    nixpkgs.url = "github:nixos/nixpkgs/release-24.11";
+    # nixpkgs.url = "github:nixos/nixpkgs/release-24.11";
     stable.url = "github:nixos/nixpkgs/release-24.11";
     nixpkgs.follows = "opam-nix/nixpkgs";
     emacs-overlay.url = "github:nix-community/emacs-overlay";
@@ -115,7 +115,8 @@
 	      difftastic
 	    ])
 	    ++
-	    pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [ pkgs.pperf-tools ]
+            (with pkgs; 
+	    lib.optionals (!stdenv.isDarwin) [ perf-tools ])
 	);
       in rec {
         legacyPackages = scope';

@@ -171,4 +171,3 @@ let process_rewrite_equiv info tc =
       tc_error !!tc "rewrite equiv: function mismatch\nExpected %s but got %s" (x_tostring wanted) (x_tostring got)
   | RwEquivError RWE_InvalidPosition ->
       tc_error !!tc "rewrite equiv: targetted instruction is not a function call"
-

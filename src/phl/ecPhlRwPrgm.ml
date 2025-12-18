@@ -12,7 +12,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let env = EcEnv.LDecl.toenv hyps in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
-  let cpos = EcProofTyping.tc1_process_codepos tc (None, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (None, cpos) in
 
   let mem, _ =
     let bindings =

@@ -205,18 +205,18 @@ let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
 (* -------------------------------------------------------------------- *)
 let process_fission (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fission side cpos infos tc
 
 let process_fusion (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fusion side cpos infos tc
 
 let process_splitwhile (b, side, cpos) tc =
   let b =
     try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
     with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement" in
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_splitwhile b side cpos tc
 
 (* -------------------------------------------------------------------- *)
@@ -228,7 +228,7 @@ let process_unroll_for ~cfold side cpos tc =
   if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
 
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
@@ -338,7 +338,7 @@ let process_unroll_for ~cfold side cpos tc =
 let process_unroll (side, cpos, for_) tc =
   match for_ with
   | `While ->
-    let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+    let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
     t_unroll side cpos tc
 
   | `For cfold ->

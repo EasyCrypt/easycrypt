@@ -8,6 +8,7 @@ depends: [
   "dune" {>= "3.13"}
   "dune-build-info"
   "dune-site"
+  "markdown"
   "pcre2" {>= "8"}
   "why3" {>= "1.8.0" & < "1.9"}
   "ppx_deriving"

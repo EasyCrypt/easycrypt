@@ -15,7 +15,7 @@ type loglevel = EcGState.loglevel
 class type terminal =
 object
   method interactive : bool
-  method next        : EcParsetree.prog
+  method next        : string * EcParsetree.prog
   method notice      : immediate:bool -> loglevel -> string -> unit
   method finish      : status -> unit
   method finalize    : unit
@@ -70,7 +70,7 @@ object(self)
     end;
 
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
-    EcIo.parse iparser
+    EcIo.xparse iparser
 
   method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
     match immediate with
@@ -116,7 +116,7 @@ object
   method next =
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.drain iparser;
-    EcIo.parse iparser
+    EcIo.xparse iparser
 
   method notice ~(immediate:bool) (_ : loglevel) (msg : string) =
     ignore immediate;
@@ -271,8 +271,8 @@ class from_channel
   method interactive = false
 
   method next =
-    let aout = EcIo.parse iparser in
-    loc <- aout.LC.pl_loc;
+    let aout = EcIo.xparse iparser in
+    loc <- (snd aout).LC.pl_loc;
     self#_update_progress; aout
 
   method notice ~immediate lvl msg =

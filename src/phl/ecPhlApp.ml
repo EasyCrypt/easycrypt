@@ -67,7 +67,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
   let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
   let condnm =
-    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2) 
+    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2)
                                 (map_ss_inv1 ((EcUtils.flip f_eq) r2) g2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
@@ -124,11 +124,11 @@ let t_equiv_app_onesided side i pre post tc =
   let (ml, mr) = fst es.es_ml, fst es.es_mr in
   let s, s', p', q' =
     match side with
-    | `Left  -> 
+    | `Left  ->
       let p' = ss_inv_generalize_right (EcSubst.ss_inv_rebind pre ml) mr in
       let q' = ss_inv_generalize_right (EcSubst.ss_inv_rebind post ml) mr in
       es.es_sl, es.es_sr, p', q'
-    | `Right -> 
+    | `Right ->
       let p' = ss_inv_generalize_left (EcSubst.ss_inv_rebind pre mr) ml in
       let q' = ss_inv_generalize_left (EcSubst.ss_inv_rebind post mr) ml in
       es.es_sr, es.es_sl, p', q'
@@ -227,13 +227,13 @@ let process_app (side, dir, k, phi, bd_info) tc =
   | Single i, PAppNone when is_hoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
     t_hoare_app i phi tc
 
   | Single i, PAppNone when is_eHoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
-    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
     t_ehoare_app i phi tc
 
   | Single i, PAppNone when is_equivS concl ->
@@ -248,21 +248,21 @@ let process_app (side, dir, k, phi, bd_info) tc =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
-    let i = EcProofTyping.tc1_process_codepos1 tc (Some side, i) in
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some side, i) in
     t_equiv_app_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
       check_side side;
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
-      let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
+      let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
   | Double (i, j), PAppNone when is_equivS concl ->
       check_side side;
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left, i) in
-      let j = EcProofTyping.tc1_process_codepos1 tc (Some `Left, j) in
+      let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, i) in
+      let j = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, j) in
       t_equiv_app (i, j) phi tc
 
   | Single _, PAppNone

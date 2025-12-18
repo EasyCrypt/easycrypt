@@ -3,11 +3,15 @@
  (release (flags -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69)
           (ocamlopt_flags -O3 -unbox-closures)))
 
-(dirs 3rdparty src etc libs theories examples scripts)
+(dirs 3rdparty src etc libs theories examples assets scripts)
 
 (install
   (section (site (easycrypt commands)))
   (files (scripts/testing/runtest as runtest)))
+
+(install
+  (section (site (easycrypt doc)))
+  (files (assets/styles/styles.css as styles.css)))
 
 (install
   (section (bin))

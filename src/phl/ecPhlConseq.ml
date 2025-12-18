@@ -785,26 +785,35 @@ let t_equivS_conseq_bd side pr po tc =
 (* -------------------------------------------------------------------- *)
 
 (*
-(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2)
+(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2 /\ q m1 = p m2)
 (forall m1 m2, Q m1 m2 => Q2 m2 => Q1 m1)
-equiv M1 ~ M2 : P ==> Q   hoare M2 : P2 ==> Q2.
+equiv M1 ~ M2 : P ==> Q   phoare M2 : P2 ==> Q2 R p.
 -----------------------------------------------
-hoare M1 : P1 ==> Q1.
+phoare M1 : P1 ==> Q1 R q.
 *)
 
-let transitivity_side_cond hyps prml poml pomr p q p2 q2 p1 q1 =
+let transitivity_side_cond ?bds hyps prml poml pomr p q p2 q2 p1 q1 =
   let env = LDecl.toenv hyps in
   let cond1 =
     let fv1 = PV.fv env p.mr p.inv in
     let fv2 = PV.fv env p2.m p2.inv in
     let fv = PV.union fv1 fv2 in
+    let fv = match bds with
+    | Some (_, bd2) ->
+        let fvbd2 = PV.fv env bd2.m bd2.inv in
+        PV.union fv fvbd2
+    | None -> fv in
     let elts, glob = PV.ntr_elements fv in
     let bd, s = generalize_subst env p2.m elts glob in
     let s1 = PVM.of_mpv s p.mr in
     let s2 = PVM.of_mpv s p2.m in
-    let concl = f_and (PVM.subst env s1 p.inv) (PVM.subst env s2 p2.inv) in
-    let p1 = ss_inv_rebind p1 p.ml in
-    f_forall_mems [prml] (f_imp p1.inv (f_exists bd concl)) in
+    let concl = {m=p1.m; inv=f_and (PVM.subst env s1 p.inv) (PVM.subst env s2 p2.inv)} in
+    let concl = match bds with
+    | Some (bd1, bd2) ->
+        let sbd = PVM.of_mpv s bd2.m in
+        map_ss_inv2 f_and concl (map_ss_inv1 (fun bd1 -> f_eq bd1 (PVM.subst env sbd bd2.inv)) bd1)
+    | None -> concl in
+    f_forall_mems_ss_inv prml (map_ss_inv2 f_imp p1 (map_ss_inv1 (f_exists bd) concl)) in
   let cond2 =
     let q1 = ss_inv_generalize_as_left q1 q.ml q.mr in
     let q2 = ss_inv_generalize_as_right q2 q.ml q.mr in
@@ -821,14 +830,14 @@ let t_hoareF_conseq_equiv f2 p q p2 q2 tc =
     transitivity_side_cond hyps prml poml pomr p q p2 q2 (hf_pr hf1) (hf_po hf1) in
   FApi.xmutate1 tc `HoareFConseqEquiv [cond1; cond2; ef; hf2]
 
-let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
+let t_bdHoareF_conseq_equiv f2 p q p2 q2 bd2 tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let hf1 = tc1_as_bdhoareF tc in
   let ef  = f_equivF p hf1.bhf_f f2 q in
-  let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp (bhf_bd hf1) in
+  let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp bd2 in
   let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv p.ml p.mr hf1.bhf_f f2 env in
   let (cond1, cond2) =
-    transitivity_side_cond hyps prml poml pomr p q p2 q2 (bhf_pr hf1) (bhf_po hf1) in
+    transitivity_side_cond ~bds:(bhf_bd hf1, bd2) hyps prml poml pomr p q p2 q2 (bhf_pr hf1) (bhf_po hf1) in
   FApi.xmutate1 tc `BdHoareFConseqEquiv [cond1; cond2; ef; hf2]
 
 
@@ -1120,7 +1129,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
-                  t_mytrivial;
+                  t_mytrivial @! t_intros_i [m; h0] @! t_apply_hyp h0;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -1152,7 +1161,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let hf2 = pf_as_bdhoareF !!tc f2 in
     FApi.t_seqsub
       (t_bdHoareF_conseq_equiv hf2.bhf_f (ef_pr ef) (ef_po ef) 
-                                         (bhf_pr hf2) (bhf_po hf2))
+                                         (bhf_pr hf2) (bhf_po hf2) (bhf_bd hf2))
       [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
 
   (* ------------------------------------------------------------------ *)
