@@ -140,7 +140,7 @@ let t_eager_if_r tc =
     let fe  = ss_inv_generalize_right (ss_inv_of_expr ml e) mr in
     let eqb = map_ts_inv2 f_eq fe {ml;mr;inv=f_local b tbool} in
 
-    EcSubst.f_forall_mems_ss_inv es.es_mr   
+    EcSubst.f_forall_mems_ss_inv es.es_mr
       (map_ss_inv1
       (f_forall [(b, GTty tbool)])
       (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd es.es_ml) pr s po) (map_ts_inv2 f_and (es_pr es) eqb) eqb)) in
@@ -196,7 +196,7 @@ let t_eager_while_r h tc =
 
   and bT = f_equivS (snd eC.es_ml) (snd eC.es_mr) (map_ts_inv2 f_and_simpl eqI e1) (stmt (s.s_node@c.s_node))
     (stmt (c'.s_node@s'.s_node)) eqI
-  
+
   and cT = f_equivS (snd eC.es_mr) (snd eC.es_mr) eqI2 c' c' eqI2
   in
 
@@ -574,8 +574,8 @@ let process_info info tc =
 let process_seq info (i, j) eqR tc =
   let eqR   = TTC.tc1_process_prhl_form tc tbool eqR in
   let gs, h = process_info info tc in
-  let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left , i) in
-  let j = EcProofTyping.tc1_process_codepos1 tc (Some `Right, j) in
+  let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left , i) in
+  let j = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, j) in
   FApi.t_last (t_eager_seq i j eqR h) gs
 
 (* -------------------------------------------------------------------- *)

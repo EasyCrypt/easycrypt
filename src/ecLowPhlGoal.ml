@@ -206,6 +206,27 @@ let tc1_get_stmt side tc =
   | _            ->
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
 
+(* ------------------------------------------------------------------ *)
+let tc1_process_codepos_range tc (side, cpr) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codepos_range env cpr
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_codepos tc (side, cpos) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codepos env cpos
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_codepos1 tc (side, cpos) =
+  let me, _ = tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active_ss me env in
+  EcTyping.trans_codepos1 env cpos
+
 (* -------------------------------------------------------------------- *)
 let hl_set_stmt (side : side option) (f : form) (s : stmt) =
   match side, f.f_node with
@@ -256,28 +277,28 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node, pre with
- | FhoareF hf, Inv_ss pre   -> 
+ | FhoareF hf, Inv_ss pre   ->
     let pre = ss_inv_rebind pre hf.hf_m in
     f_hoareF pre hf.hf_f (hf_po hf)
- | FhoareS hs, Inv_ss pre   -> 
+ | FhoareS hs, Inv_ss pre   ->
     let pre = ss_inv_rebind pre (fst hs.hs_m) in
     f_hoareS (snd hs.hs_m) pre hs.hs_s (hs_po hs)
- | FeHoareF hf, Inv_ss pre  -> 
+ | FeHoareF hf, Inv_ss pre  ->
     let pre = ss_inv_rebind pre hf.ehf_m in
     f_eHoareF pre hf.ehf_f (ehf_po hf)
- | FeHoareS hs, Inv_ss pre  -> 
+ | FeHoareS hs, Inv_ss pre  ->
     let pre = ss_inv_rebind pre (fst hs.ehs_m) in
     f_eHoareS (snd hs.ehs_m) pre hs.ehs_s (ehs_po hs)
  | FbdHoareF hf, Inv_ss pre ->
     let pre = ss_inv_rebind pre hf.bhf_m in
     f_bdHoareF pre hf.bhf_f (bhf_po hf) hf.bhf_cmp (bhf_bd hf)
- | FbdHoareS hs, Inv_ss pre -> 
+ | FbdHoareS hs, Inv_ss pre ->
     let pre = ss_inv_rebind pre (fst hs.bhs_m) in
     f_bdHoareS (snd hs.bhs_m) pre hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
- | FequivF ef, Inv_ts pre   -> 
+ | FequivF ef, Inv_ts pre   ->
     let pre = ts_inv_rebind pre ef.ef_ml ef.ef_mr in
     f_equivF pre ef.ef_fl ef.ef_fr (ef_po ef)
- | FequivS es, Inv_ts pre   -> 
+ | FequivS es, Inv_ts pre   ->
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
     f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr (es_po es)
  | _            -> assert false
@@ -307,33 +328,33 @@ let t_hS_or_bhS_or_eS ?th ?teh ?tbh ?te tc =
   | FeHoareS  _ when EcUtils.is_some teh -> (oget teh) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
-
   | _ ->
     let kinds = List.flatten [
-         if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
-         if EcUtils.is_some teh then [`EHoare `Stmt] else [];
-         if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
-         if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
-
+       if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+       if EcUtils.is_some teh then [`EHoare `Stmt] else [];
+       if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
+       if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
     in tc_error_noXhl ~kinds !!tc
 
 let t_hF_or_bhF_or_eF ?th ?teh ?tbh ?te ?teg tc =
-  match (FApi.tc1_goal tc).f_node with
-  | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
-  | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
-  | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
-  | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
-  | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
-
-  | _ ->
+  let texn tc =
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
          if EcUtils.is_some teh then [`EHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
+    in tc_error_noXhl ~kinds !!tc in
+  let tx f tc =
+    match f.f_node with
+    | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
+    | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
+    | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
+    | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
+    | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
+    | _ -> raise EcProofTyping.NoMatch in
+  EcLowGoal.t_lazy_match ~texn tx tc
 
-    in tc_error_noXhl ~kinds !!tc
 
 (* -------------------------------------------------------------------- *)
 let tag_sym_with_side ?mc name m =
@@ -672,7 +693,7 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
           let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) 
+          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs)
                       bhs.bhs_cmp (bhs_bd bhs) in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 

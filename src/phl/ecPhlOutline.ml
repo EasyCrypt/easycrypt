@@ -59,7 +59,7 @@ let process_outline info tc =
   let ppe = EcPrinting.PPEnv.ofenv env in
 
   let range =
-    EcProofTyping.tc1_process_codepos_range tc
+    EcLowPhlGoal.tc1_process_codepos_range tc
       (Some side, info.outline_range) in
 
   try

@@ -69,7 +69,7 @@ val t_change  : ?ri:EcReduction.reduction_info -> ?target:ident -> form -> FApi.
 
 (* -------------------------------------------------------------------- *)
 val t_lazy_match:
-  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward
+  ?reduce:lazyred -> ?texn:EcCoreGoal.FApi.backward -> (form -> FApi.backward)-> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?mode:[`Alpha | `Conv] -> ?reduce:lazyred -> FApi.backward

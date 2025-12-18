@@ -79,7 +79,7 @@ module Low = struct
     let ss_inv_generalize_other = sideif side ss_inv_generalize_right ss_inv_generalize_left in
     let hd,_,e,s = gen_rcond (!!tc, env) b (fst m) at_pos s in
     let e = ss_inv_generalize_other e (fst mo) in
-    let concl1 = 
+    let concl1 =
       EcSubst.f_forall_mems_ss_inv (EcIdent.create "&m", snd mo)
         (ts_inv_lower_side2 (fun pr po ->
           let mhs = EcIdent.create "&hr" in
@@ -112,7 +112,7 @@ let t_rcond side b at_pos tc =
     Low.t_equiv_rcond side b at_pos tc
 
 let process_rcond side b at_pos tc =
-  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
+  let at_pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, at_pos) in
   t_rcond side b at_pos tc
 
 (* -------------------------------------------------------------------- *)
@@ -266,12 +266,12 @@ module LowMatch = struct
     let (epr, hd, po1), (me, full) =
       gen_rcond_full (!!tc, FApi.tc1_env tc) c m at_pos s in
 
-    let ss_inv_generalize_other inv = sideif side 
+    let ss_inv_generalize_other inv = sideif side
       (ss_inv_generalize_right inv mr) (ss_inv_generalize_left inv ml) in
 
     let epr  = omap (fun epr ->
       ss_inv_generalize_other (ss_inv_rebind epr (fst m))) epr in
-    
+
     let ts_inv_lower_side1 =
       sideif side ts_inv_lower_left1 ts_inv_lower_right1 in
 
@@ -319,5 +319,5 @@ let t_rcond_match side c at_pos tc =
 
 (* -------------------------------------------------------------------- *)
 let process_rcond_match side c at_pos tc =
-  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
+  let at_pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, at_pos) in
   t_rcond_match side c at_pos tc
