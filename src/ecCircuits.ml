@@ -574,7 +574,7 @@ let circuit_of_form
     let res = fapply_safe op args in 
     res
   in
-  let rec arg_of_form (f: form) : arg = 
+  let rec arg_of_form (st: state) (f: form) : arg = 
     match f.f_ty with
     (* FIXME: check this *)
     | t when t.ty_node = EcTypes.tint.ty_node -> arg_of_zint (int_of_form f)
@@ -683,7 +683,7 @@ let circuit_of_form
     (* TODO: find a way to properly propagate int arguments. Done? *)
     begin match f with
       | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
-        let args = List.map (arg_of_form) fs in 
+        let args = List.map (arg_of_form st) fs in 
         circuit_of_op_with_args env pth args
 
       (* For dealing with iter cases: *)

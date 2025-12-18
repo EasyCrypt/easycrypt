@@ -1553,7 +1553,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
           match tc_opened new_tc with
           | [] -> 
               incr solved;
-              EcEnv.notify ~immediate:true (tc1_env tc) `Warning "Solved goal %d@." !solved;
+              (* EcEnv.notify ~immediate:true (tc1_env tc) `Warning "Solved goal %d@." !solved; *)
               do_all goals
           | hd::_ -> 
             Some (get_pregoal_by_id hd (tc_penv new_tc)).g_concl
