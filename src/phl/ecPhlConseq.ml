@@ -719,10 +719,10 @@ let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
   let (ml, mtl), (mr, mtr) = es.es_ml, es.es_mr in
-  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 ml) mr in
-  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 ml) mr in
-  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mr) ml in
-  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mr) ml in
+  let pre1' = ss_inv_generalize_as_left pre1 ml mr in
+  let post1' = ss_inv_generalize_as_left post1 ml mr in
+  let pre2' = ss_inv_generalize_as_right pre2 ml mr in
+  let post2' = ss_inv_generalize_as_right post2 ml mr in
   if not (ts_inv_alpha_eq hyps (es_pr es) (map_ts_inv f_ands [pre';pre1';pre2'])) then
     tc_error !!tc "invalid pre-condition";
   if not (ts_inv_alpha_eq hyps (es_po es) (map_ts_inv f_ands [post';post1';post2'])) then
@@ -737,15 +737,17 @@ let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let (_, hyps, _) = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
   let ml, mr = ef.ef_ml, ef.ef_mr in
-  let pre1' = ss_inv_generalize_right (ss_inv_rebind pre1 ml) mr in
-  let post1' = ss_inv_generalize_right (ss_inv_rebind post1 ml) mr in
-  let pre2' = ss_inv_generalize_left (ss_inv_rebind pre2 mr) ml in
-  let post2' = ss_inv_generalize_left (ss_inv_rebind post2 mr) ml in
-  let pre'' = map_ts_inv f_ands [pre'; pre1'; pre2'] in
-  let post'' = map_ts_inv f_ands [post'; post1'; post2'] in
-  if not (ts_inv_alpha_eq hyps (ef_pr ef) pre'') 
+  let pre1' = ss_inv_generalize_as_left pre1 ml mr in
+  let post1' = ss_inv_generalize_as_left post1 ml mr in
+  let pre2' = ss_inv_generalize_as_right pre2 ml mr in
+  let post2' = ss_inv_generalize_as_right post2 ml mr in
+  let pre'' = ts_inv_rebind pre' ml mr in
+  let pre_and = map_ts_inv f_ands [pre''; pre1'; pre2'] in
+  let post'' = ts_inv_rebind post' ml mr in
+  let post_and = map_ts_inv f_ands [post''; post1'; post2'] in
+  if not (ts_inv_alpha_eq hyps (ef_pr ef) pre_and)
   then tc_error !!tc "invalid pre-condition";
-  if not (ts_inv_alpha_eq hyps (ef_po ef) post'')
+  if not (ts_inv_alpha_eq hyps (ef_po ef) post_and)
   then tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF pre1 ef.ef_fl post1 in
   let concl2 = f_hoareF pre2 ef.ef_fr post2 in
@@ -760,12 +762,12 @@ let t_equivS_conseq_bd side pr po tc =
   let m,s,s',prs,pos =
     match side with
     | `Left  ->
-      let pos = ss_inv_generalize_right (ss_inv_rebind po ml) mr in
-      let prs = ss_inv_generalize_right (ss_inv_rebind pr ml) mr in
+      let pos = ss_inv_generalize_as_left po ml mr in
+      let prs = ss_inv_generalize_as_left pr ml mr in
       es.es_ml, es.es_sl, es.es_sr, prs, pos
     | `Right -> 
-      let pos = ss_inv_generalize_left (ss_inv_rebind po mr) ml in
-      let prs = ss_inv_generalize_left (ss_inv_rebind pr mr) ml in
+      let pos = ss_inv_generalize_as_right po ml mr in
+      let prs = ss_inv_generalize_as_right pr ml mr in
       es.es_mr, es.es_sr, es.es_sl, prs, pos
   in
   if not (List.is_empty s'.s_node) then begin
@@ -1180,10 +1182,10 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let hs2    = pf_as_hoareS !!tc f2 in
     let hs3    = pf_as_hoareS !!tc f3 in
     let (ml, mr) = (fst es.es_ml, fst es.es_mr) in
-    let hs2_pr = ss_inv_generalize_right (ss_inv_rebind (hs_pr hs2) ml) mr in
-    let hs2_po = ss_inv_generalize_right (ss_inv_rebind (hs_po hs2) ml) mr in
-    let hs3_pr = ss_inv_generalize_left (ss_inv_rebind (hs_pr hs3) mr) ml in
-    let hs3_po = ss_inv_generalize_left (ss_inv_rebind (hs_po hs3) mr) ml in
+    let hs2_pr = ss_inv_generalize_as_left (hs_pr hs2) ml mr in
+    let hs2_po = ss_inv_generalize_as_left (hs_po hs2) ml mr in
+    let hs3_pr = ss_inv_generalize_as_right (hs_pr hs3) ml mr in
+    let hs3_po = ss_inv_generalize_as_right (hs_po hs3) ml mr in
     let pre    = map_ts_inv f_ands [es_pr es; hs2_pr; hs3_pr] in
     let post   = map_ts_inv f_ands [es_po es; hs2_po; hs3_po] in
     let tac    = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
@@ -1238,8 +1240,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FequivS es, None, Some ((_, f2) as nf2), None ->
     let hs = pf_as_bdhoareS !!tc f2 in
     let (ml, mr) = (fst es.es_ml, fst es.es_mr) in
-    let pre = ss_inv_generalize_right (ss_inv_rebind (bhs_pr hs) ml) mr in
-    let post = ss_inv_generalize_right (ss_inv_rebind (bhs_po hs) ml) mr in
+    let pre = ss_inv_generalize_as_left (bhs_pr hs) ml mr in
+    let post = ss_inv_generalize_as_left (bhs_po hs) ml mr in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
     check_is_detbound `Second (bhs_bd hs).inv;
@@ -1256,8 +1258,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FequivS es, None, None, Some ((_, f3) as nf3) ->
     let hs = pf_as_bdhoareS !!tc f3 in
     let (ml, mr) = (fst es.es_ml, fst es.es_mr) in
-    let pre = ss_inv_generalize_left (ss_inv_rebind (bhs_pr hs) mr) ml in
-    let post = ss_inv_generalize_left (ss_inv_rebind (bhs_po hs) mr) ml in
+    let pre = ss_inv_generalize_as_right (bhs_pr hs) ml mr in
+    let post = ss_inv_generalize_as_right (bhs_po hs) ml mr in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
     check_is_detbound `Third (bhs_bd hs).inv;
@@ -1285,11 +1287,11 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let hs2    = pf_as_hoareF !!tc f2 in
     let hs3    = pf_as_hoareF !!tc f3 in
     let (ml, mr) = (ef.ef_ml, ef.ef_mr) in
-    let hs2_pr = ss_inv_generalize_right (ss_inv_rebind (hf_pr hs2) ml) mr in
-    let hs3_pr = ss_inv_generalize_left (ss_inv_rebind (hf_pr hs3) mr) ml in
+    let hs2_pr = ss_inv_generalize_as_left (hf_pr hs2) ml mr in
+    let hs3_pr = ss_inv_generalize_as_right (hf_pr hs3) ml mr in
     let pre    = map_ts_inv f_ands [ef_pr ef; hs2_pr; hs3_pr] in
-    let hs2_po = ss_inv_generalize_right (ss_inv_rebind (hf_po hs2) ml) mr in
-    let hs3_po = ss_inv_generalize_left (ss_inv_rebind (hf_po hs3) mr) ml in
+    let hs2_po = ss_inv_generalize_as_left (hf_po hs2) ml mr in
+    let hs3_po = ss_inv_generalize_as_right (hf_po hs3) ml mr in
     let post  = map_ts_inv f_ands [ef_po ef; hs2_po; hs3_po] in
     let tac    = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
     t_on1seq 2
