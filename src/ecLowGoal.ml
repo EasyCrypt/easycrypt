@@ -406,7 +406,8 @@ let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
+let rec t_lazy_match ?(reduce = `Full) ?(texn = fun _ -> raise InvalidGoalShape)
+                    (tx : form -> FApi.backward)
   (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
   try tx concl tc
@@ -416,7 +417,7 @@ let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
       | `None    -> raise InvalidGoalShape
       | `Full    -> EcReduction.full_red
       | `NoDelta -> EcReduction.nodelta in
-    FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
+    FApi.t_seq (FApi.t_or (t_hred_with_info strategy) texn) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
 type smode = [ `Cbv | `Cbn ]
@@ -2598,8 +2599,8 @@ let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(mode = fmdelta) ?(
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
     try
       Apply.t_apply_bwd_r ~ri ~mode ~canview:false pt tc
-    with Apply.NoInstance _ -> 
-      t_fail tc 
+    with Apply.NoInstance _ ->
+      t_fail tc
   in
 
   let rec t_apply ctn ip tc =
