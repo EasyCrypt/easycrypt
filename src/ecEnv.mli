@@ -17,7 +17,25 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
+type crb_tyrev_binding = [
+  | `Bitstring of crb_bitstring
+  | `Array     of crb_array
+]
+
+type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToUInt | `ToSInt ]
+
+type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]
+
+type crb_oprev_binding = [
+  | `Bitstring  of crb_bitstring_operator
+  | `Array      of crb_array_operator
+  | `BvOperator of crb_bvoperator
+  | `Circuit    of crb_circuit
+]
+
+(* -------------------------------------------------------------------- *)
 type env
+
 type scope = [
   | `Theory
   | `Module of EcPath.mpath
@@ -514,5 +532,41 @@ module LDecl : sig
   val inv_memenv  : memory -> memory -> hyps -> hyps
   val inv_memenv1 : memory -> hyps -> hyps
 end
+
+(* -------------------------------------------------------------------- *)
+module Circuit : sig  
+  val bind_bitstring  : ?import:bool -> is_local -> crb_bitstring -> env -> env
+  val bind_array      : ?import:bool -> is_local -> crb_array -> env -> env
+  val bind_bvoperator : ?import:bool -> is_local -> crb_bvoperator -> env -> env
+  val bind_circuit    : ?import:bool -> is_local -> crb_circuit -> env -> env
+  val bind_crbinding  : ?import:bool -> is_local -> crbinding -> env -> env
+
+  val lookup_bitstring           : env -> ty      -> crb_bitstring option
+  val lookup_bitstring_path      : env -> path    -> crb_bitstring option
+  val lookup_bitstring_size      : env -> ty      -> int option
+  val lookup_bitstring_size_path : env -> path    -> int option
+
+  val lookup_bvoperator_path     : env -> path    -> crb_bvoperator option
+  val lookup_bvoperator          : env -> qsymbol -> crb_bvoperator option
+
+  val lookup_array      : env -> ty -> crb_array option
+  val lookup_array_path : env -> path -> crb_array option
+  val lookup_array_size : env -> ty -> int option
+
+  val lookup_array_and_bitstring : env -> ty -> (crb_array * crb_bitstring) option
+
+  val lookup_circuit             : env -> qsymbol -> Lospecs.Ast.adef option
+  val lookup_circuit_path        : env -> path    -> Lospecs.Ast.adef option
+
+  val reverse_type     : env -> path -> crb_tyrev_binding list
+  val reverse_operator : env -> path -> crb_oprev_binding list
+
+  val reverse_bitstring_operator : env -> path -> crb_bitstring_operator option
+  val reverse_array_operator : env -> path -> crb_array_operator option
+  val reverse_bvoperator : env -> path -> crb_bvoperator option
+  val reverse_circuit : env -> path -> crb_circuit option
+
+  val get_specification_by_name : env -> filename:string -> symbol -> Lospecs.Ast.adef option
+end 
 
 val pp_debug_form : (env -> form -> unit) ref

@@ -21,11 +21,13 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
+  cmpo_specs   : spec_options;
 }
 
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
+  clio_specs   : spec_options;
 }
 
 and run_option = {
@@ -35,6 +37,7 @@ and run_option = {
   runo_provers   : prv_options;
   runo_jobs      : int option;
   runo_rawargs   : string list;
+  runo_specs     : spec_options;
 }
 
 and doc_option = {
@@ -53,6 +56,10 @@ and prv_options = {
   prvo_profile    : bool;
   prvo_iterate    : bool;
   prvo_why3server : string option;
+}
+
+and spec_options = {
+  files : string list;
 }
 
 and ldr_options = {
@@ -76,6 +83,7 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
+  ini_specs    : string list;
 }
 
 type ini_context = {

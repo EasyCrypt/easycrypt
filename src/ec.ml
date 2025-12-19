@@ -415,6 +415,7 @@ let main () =
       gccompact   : int option;
       docgen      : bool;
       outdirp     : string option;
+      specs       : spec_options;
     }
   end in
 
@@ -471,7 +472,8 @@ let main () =
         ; eco         = false
         ; gccompact   = None
         ; docgen      = false
-        ; outdirp     = None }
+        ; outdirp     = None 
+        ; specs       = cliopts.clio_specs; }
 
     end
 
@@ -500,7 +502,8 @@ let main () =
         ; eco         = cmpopts.cmpo_noeco
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
-        ; outdirp     = None }
+        ; outdirp     = None 
+        ; specs       = cmpopts.cmpo_specs; }
 
       end
 
@@ -536,6 +539,10 @@ let main () =
           lazy (T.from_channel ~name (open_in name))
         in
 
+        let nospec = {
+          files = [];
+        } in
+
         { prvopts     = prvoff
         ; input       = Some name
         ; terminal    = terminal
@@ -543,7 +550,8 @@ let main () =
         ; eco         = true
         ; gccompact   = None
         ; docgen      = true
-        ; outdirp     = docopts.doco_outdirp }
+        ; outdirp     = docopts.doco_outdirp 
+        ; specs       = nospec; }
       end
 
   in
@@ -650,6 +658,7 @@ let main () =
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
               EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
+              EcCommands.cm_specs     = state.specs.files;
             } in
 
             let checkproof = not state.docgen in
