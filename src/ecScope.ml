@@ -339,6 +339,7 @@ type scope = {
   sc_options  : GenOptions.options;
   sc_globdoc  : string list;
   sc_locdoc   : docstate;
+  sc_specs    : string list;
 }
 
 and docstate = {
@@ -449,7 +450,8 @@ let empty (gstate : EcGState.gstate) =
     sc_pr_uc      = None;
     sc_options    = GenOptions.freeze ();
     sc_globdoc    = [];
-    sc_locdoc     = DocState.empty; }
+    sc_locdoc     = DocState.empty; 
+    sc_specs      = []; }
 
 (* -------------------------------------------------------------------- *)
 let env (scope : scope) =
@@ -570,7 +572,8 @@ let for_loading (scope : scope) =
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_loading scope.sc_options;
     sc_globdoc    = [];
-    sc_locdoc     = DocState.empty; }
+    sc_locdoc     = DocState.empty; 
+    sc_specs      = scope.sc_specs; } (* FIXME: is this correct? *)
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
@@ -587,6 +590,7 @@ let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
     sc_options    = GenOptions.for_subscope scope.sc_options;
     sc_globdoc    = [];
     sc_locdoc     = DocState.empty;
+    sc_specs      = scope.sc_specs;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -3129,19 +3133,23 @@ module Circuit = struct
     
     Ax.add_defer scope proofs
   
-  let add_circuit1 ~filename (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
+  let add_circuit1 (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
 
     if not (List.is_empty opdecl.op_tparams) then
       hierror ~loc:(loc op) "operator must be monomorphic";
 
-    match EcEnv.Circuit.get_specification_by_name ~filename env (unloc circ) with
-    | None ->
+    let matches = List.filteri_map (fun i filename ->
+      EcEnv.Circuit.get_specification_by_name ~filename env (unloc circ)) scope.sc_specs 
+    in
+
+    match matches with
+    | [] ->
       hierror ~loc:(loc circ)
         "unknown circuit: %s" (unloc circ)
 
-    | Some circuit ->
+    | circuit::[] ->
       let sig_ = List.map (fun (_, `W i) -> i) circuit.arguments in
       let ret  = Lospecs.Ast.get_size circuit.rettype in
       let dom, codom = EcEnv.Ty.decompose_fun opdecl.op_ty env in
@@ -3189,10 +3197,16 @@ module Circuit = struct
           EcTheory.mkitem ~import:true
           (EcTheory.Th_crbinding (item, local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
+  | circs -> Format.eprintf "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ); assert false 
+    (* FIXME *)
+
+  (* FIXME: Decide if we want set or append here *)
+  let register_spec_files (scope : scope) (files : string list) : scope =
+    { scope with sc_specs = files }
 
   let add_circuits (scope : scope) (local : is_local) (binds : pbind_circuit) : scope =
     List.fold_left (fun scope bnd -> 
-      add_circuit1 ~filename:(unloc binds.filename) scope local bnd)
+      add_circuit1 scope local bnd)
       scope binds.bindings
 end
 

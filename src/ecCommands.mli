@@ -22,6 +22,7 @@ type checkmode = {
   cm_provers  : string list option;
   cm_profile  : bool;
   cm_iterate  : bool;
+  cm_specs    : string list;
 }
 
 val initial : checkmode:checkmode -> boot:bool -> checkproof:bool -> EcScope.scope

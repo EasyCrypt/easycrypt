@@ -272,6 +272,8 @@ module Circuit : sig
   val add_array      : scope -> EcTypes.is_local -> pbind_array -> scope
   val add_bvoperator : scope -> EcTypes.is_local -> pbind_bvoperator -> scope
   val add_circuits   : scope -> EcTypes.is_local -> pbind_circuit -> scope
+
+  val register_spec_files : scope -> string list -> scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -836,6 +836,7 @@ type checkmode = {
   cm_provers   : string list option;
   cm_profile   : bool;
   cm_iterate   : bool;
+  cm_specs     : string list;
 }
 
 let initial ~checkmode ~boot ~checkproof =
@@ -861,6 +862,7 @@ let initial ~checkmode ~boot ~checkproof =
                                  scope [tactics; prelude] in
 
   let scope = EcScope.Prover.set_default scope poptions in
+  let scope = EcScope.Circuit.register_spec_files scope checkmode.cm_specs in
   let scope = if checkproof then
                 begin
                   if checkall then
