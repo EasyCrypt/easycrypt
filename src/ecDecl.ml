@@ -153,6 +153,10 @@ let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
+
+type excep = {e_loca    : locality;}
+
+(* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
 
 let is_oper op =
@@ -216,6 +220,12 @@ let optransparent : opopaque =
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+
+let gen_excep lc = {
+  e_loca    = lc;
+}
+
+let mk_except lc = gen_excep lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {

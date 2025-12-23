@@ -42,8 +42,7 @@ let while_info env e s =
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
 
-    | Sassert e ->
-        (w, e_read_r env r e, c)
+    | Sraise _ -> assert false
 
     | Sabstract id ->
         let add_pv x (pv,ty) = PV.add env pv ty x in
@@ -70,15 +69,19 @@ let t_hoare_while_r inv tc =
   let e = ss_inv_of_expr m e in
   (* the body preserves the invariant *)
   let b_pre  = map_ss_inv2 f_and_simpl inv e in
-  let b_post = inv in
+  let inv = EcSubst.ss_inv_rebind inv (hs_po hs).hsi_m in
+  let b_post = update_hs_ss inv (hs_po hs) in
   let b_concl = f_hoareS mt b_pre c b_post in
   (* the wp of the while *)
   let f_imps_simpl' f = f_imps_simpl (List.tl f) (List.hd f) in
-  let post = map_ss_inv f_imps_simpl' [hs_po hs;map_ss_inv1 f_not_simpl e; inv]  in
+  let post =
+    map_ss_inv f_imps_simpl' [lower_f (hs_po hs);map_ss_inv1 f_not_simpl e; inv]
+  in
   let modi = s_write env c in
   let post = generalize_mod_ss_inv env modi post in
   let post = map_ss_inv2 f_and_simpl inv post in
-  let concl = f_hoareS mt (hs_pr hs) s post in
+  let post = update_hs_ss post (hs_po hs) in
+  let concl = f_hoareS mt (hs_pr hs) s post  in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -187,7 +190,8 @@ let t_bdhoare_while_rev_r inv tc =
       (map_ss_inv2 f_eq bound {m;inv=f_r1}) in
     let term_post = generalize_mod_ss_inv env modi term_post in
     let term_post = map_ss_inv2 f_and inv term_post in
-    f_hoareS mt b_pre rem_s term_post
+    let post = {hsi_m=term_post.m;hsi_inv=empty_poe term_post.inv} in
+    f_hoareS mt b_pre rem_s post
   in
 
   FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
@@ -662,13 +666,13 @@ let process_async_while (winfos : EP.async_while_info) tc =
       let el = ss_inv_generalize_right (ss_inv_of_expr ml el) mr in
       let pre = map_ts_inv f_ands [inv; el ; map_ts_inv1 f_not p0; p1] in
       EcSubst.f_forall_mems_ss_inv evs.es_mr
-        (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd evs.es_ml) pr cl po) pre inv)
+        (ts_inv_lower_left2 (fun pr po -> f_hoareS (snd evs.es_ml) pr cl (lift_f po)) pre inv)
 
     and hr2 =
       let er = ss_inv_generalize_left (ss_inv_of_expr mr er) ml in
       let pre = map_ts_inv f_ands [inv; er; map_ts_inv1 f_not p0; map_ts_inv1 f_not p1] in
       EcSubst.f_forall_mems_ss_inv evs.es_ml
-        (ts_inv_lower_right2 (fun pr po -> f_hoareS (snd evs.es_mr) pr cr po) pre inv)
+        (ts_inv_lower_right2 (fun pr po -> f_hoareS (snd evs.es_mr) pr cr (lift_f po)) pre inv)
 
     in (hr1, hr2)
   in

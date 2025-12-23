@@ -186,6 +186,6 @@ end = struct
         f prefix t.value;
       Map.iter (fun k v -> doit (k :: prefix) v) t.children
     in
-    
+
     doit [] t
 end
