@@ -21,7 +21,7 @@ hoare [M'.truc : _x = x ==> false | assume:p1 _x | assert: !(p1 _x /\ p2 _x)].
     proof.
       proc.
       wp.
-      auto => &hr <- />. smt.
+      auto => &hr <- /> /#.
      qed.
 
 lemma assert_assume (_x:int):
@@ -29,7 +29,7 @@ hoare [M'.truc : _x = x ==> false | assume:p2 _x | assert: !(p2 _x /\ p1 _x) ].
     proof.
       proc.
       wp.
-      auto => &hr <- />. smt.
+      auto => &hr <- /> /#.
      qed.
 
 lemma assert_assume' ( _x:int)  :
@@ -82,7 +82,7 @@ hoare [M.f1 : _x = x ==> (res <= 5) | e1:_x <= 3 | pd1].
     proof.
       proc.
        conseq (: _ ==> x = 5 | e1: _x = 3 | e2: pe | pd2).
-      + move => &hr h x. smt.
+      + move => &hr h x. smt(a1 a2).
       + wp. auto.
     qed.
 
@@ -94,9 +94,9 @@ hoare [M.f2 : _x = x ==> res < 6 | e1: _x < 4 | e2:pe3 | e3: pe4 | pd2 ].
       + call (: _x = x ==> res = 5 | e1 : 3 = _x | e2: pd2 | pd2).
        + proc.
          wp. auto.
-      wp. auto. smt.
+      wp. auto. smt(a4 a3).
       call (l_f1 _x).
-      auto. smt.
+      auto. smt(a5 a3 a4).
   qed.
 
 module M1 ={

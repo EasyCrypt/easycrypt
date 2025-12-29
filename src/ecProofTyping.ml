@@ -268,24 +268,3 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     | _ -> raise NoMatch
   in
     lazy_destruct ~reduce hyps doit fp
-
-(* -------------------------------------------------------------------- *)
-let merge2_poe_list f (poe1,d1) (poe2,d2) =
-  let get_default d =
-    match d with
-    | Some d -> d
-    | None ->  failwith "no default exception"
-  in
-  let aux _ a b =
-    match a,b with
-    | Some a, Some b -> Some (f b a)
-    | Some a, None -> Some (f (get_default d2) a)
-    | None, Some b -> Some (f b (get_default d1))
-    | None, None -> assert false
-  in
-  let epost = DMap.merge aux poe1 poe2 in
-  let poe = List.map snd ( DMap.bindings epost) in
-  match d2, d1 with
-  | None, _ -> poe
-  | Some d2, Some d1 -> f d2 d1 :: poe
-  | _, _ -> failwith "no default exception"

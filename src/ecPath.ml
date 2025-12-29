@@ -17,7 +17,6 @@ and path_node =
 (* -------------------------------------------------------------------- *)
 let p_equal   = ((==) : path -> path -> bool)
 let p_hash    = fun p -> p.p_tag
-let p_node    = fun p -> p.p_node
 let p_compare = fun p1 p2 -> p_hash p1 - p_hash p2
 
 module Hspath = Why3.Hashcons.Make (struct
@@ -59,14 +58,6 @@ let rec p_ntr_compare (p1 : path) (p2 : path) =
       | 0 -> String.compare x1 x2
       | n -> n
     end
-
-let rec p_ntr_equal (p1 : path) (p2 : path) =
-  match p1.p_node, p2.p_node with
-  | Psymbol x1, Psymbol x2 ->
-    String.equal x1 x2
-  | Pqname (p1, x1), Pqname (p2, x2) ->
-    p_ntr_equal p1 p2 && String.equal x1 x2
-  | _, _ -> false
 
 (* -------------------------------------------------------------------- *)
 module Mp = Path.M

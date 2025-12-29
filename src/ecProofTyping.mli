@@ -81,11 +81,3 @@ type dexists = [
 
 val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct option
 val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
-
-(* -------------------------------------------------------------------- *)
-
-val merge2_poe_list :
-  (form -> form -> form) ->
-  (EcPath.path, form) DMap.t * form option ->
-  (EcPath.path, form) DMap.t * form option ->
-  form list

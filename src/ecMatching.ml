@@ -695,8 +695,16 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
               Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
           assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
           let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
-          let lf1 = poe_to_list (hf_po hf1).hsi_inv in
-          let lf2 = poe_to_list (hf_po hf2).hsi_inv in
+          let poe2 =
+            EcAst.map2_poe
+              (fun a b -> (a,b))
+              (hf_po hf1).hsi_inv
+              (hf_po hf2).hsi_inv
+          in
+          let lpoe2 = poe_to_list poe2 in
+          let lf1 = List.map fst lpoe2 in
+          let lf2 = List.map snd lpoe2 in
+
           List.iter2 (doit env (subst, mxs))
             ((hf_pr hf1).inv :: lf1) ((hf_pr hf2).inv :: lf2)
       end
