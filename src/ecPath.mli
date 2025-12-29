@@ -22,7 +22,6 @@ val poappend : path -> path option -> path
 
 val p_equal       : path -> path -> bool
 val p_compare     : path -> path -> int
-val p_ntr_equal   : path -> path -> bool
 val p_ntr_compare : path -> path -> int
 val p_hash        : path -> int
 

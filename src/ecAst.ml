@@ -496,10 +496,9 @@ let lift_ss_inv2 (f: ss_inv -> ss_inv -> 'a) : inv -> inv -> 'a =
 
 let lift_hs_ss_inv (f: ss_inv -> hs_inv -> 'a) : inv -> inv -> 'a =
   let f inv1 inv2 = match inv1, inv2 with
-  | Inv_ss ss1, Inv_hs ss2 -> f ss1 ss2
-  | _ -> failwith "expected only single sided invariants" in
+  | Inv_ss ss_inv, Inv_hs hs_inv -> f ss_inv hs_inv
+  | _ -> failwith "expected single sided invariants and hoare invariant" in
   f
-
 
 let lift_ss_inv3 (f: ss_inv -> ss_inv -> ss_inv -> 'a) : inv -> inv -> inv -> 'a =
   let f inv1 inv2 inv3 = match inv1, inv2, inv3 with
@@ -537,15 +536,15 @@ let map_inv (fn: form list -> form) (inv: inv list): inv =
       Inv_ts (map_ts_inv fn (List.map (function
         Inv_ts ts -> assert (ts.ml = ts'.ml && ts.mr = ts'.mr); ts
         | _ -> failwith "expected all invariants to have same kind") inv))
-  | _ ->  failwith  "Patch Inv_hs"
+  | _ ->  failwith  "Exceptions are not supported"
 
 let map_inv1 (fn: form -> form) (inv: inv): inv =
   match inv with
   | Inv_ss ss ->
       Inv_ss (map_ss_inv1 fn ss)
   | Inv_ts ts ->
-    Inv_ts (map_ts_inv1 fn ts)
-  | _ -> failwith  "Patch Inv_hs2"
+      Inv_ts (map_ts_inv1 fn ts)
+  | _ -> failwith  "Exceptions are not supported"
 
 let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
   match inv1, inv2 with
@@ -604,9 +603,9 @@ let map2_poe f (p1,m1,d1) (p2,m2,d2) =
     | _ , _ -> failwith "missing entry in exception map"
   in
   let m = DMap.merge aux m1 m2 in
-  match d2, d1 with
+  match d1, d2 with
   | None, None -> (p, m, None)
-  | Some d2, Some d1 -> (p, m, Some (f d2 d1))
+  | Some d1, Some d2 -> (p, m, Some (f d1 d2))
   | _, _ -> failwith "missing default exception"
 
 let map_hs_inv2
@@ -642,11 +641,37 @@ let iter_poe f (p, m,d) =
 
 let iter2_poe f (p1,m1,d1) (p2,m2,d2) =
   f p1 p2;
-  DMap.iter (fun e1 p1 -> f (DMap.find e1 m2) p1) m1;
+  let aux _ a b =
+    match a, b with
+    | Some a, Some b -> Some (a,b)
+    | _ , _ -> failwith "missing entry in exception map"
+  in
+  let m = DMap.merge aux m1 m2 in
+  DMap.iter (fun _ (p1,p2) -> f p1 p2) m;
   match d2, d1 with
   | None, None -> ()
-  | Some d2, Some d1 -> f d2 d1
+  | Some d1, Some d2 -> f d1 d2
   | _, _ -> failwith "missing default exception"
+
+let merge2_poe_list f (poe1,d1) (poe2,d2) =
+  let get_default d =
+    match d with
+    | Some d -> d
+    | None ->  failwith "no default exception"
+  in
+  let aux _ a b =
+    match a,b with
+    | Some a, Some b -> Some (f b a)
+    | Some a, None -> Some (f (get_default d2) a)
+    | None, Some b -> Some (f b (get_default d1))
+    | None, None -> assert false
+  in
+  let epost = DMap.merge aux poe1 poe2 in
+  let poe = List.map snd ( DMap.bindings epost) in
+  match d2, d1 with
+  | None, _ -> poe
+  | Some d2, Some d1 -> f d2 d1 :: poe
+  | _, _ -> failwith "no default exception"
 
 (* ----------------------------------------------------------------- *)
 (* Accessors for program logic                                       *)

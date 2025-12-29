@@ -426,7 +426,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sraise e -> i_raise e
+  | Sraise e -> i_raise (subst_path s e)
 
   | Sabstract _ ->
      i
@@ -1023,8 +1023,8 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
 
-  | Th_exception (e, es) ->
-      Th_exception (e, es)
+  | Th_exception (x, es) ->
+      Th_exception (x, es)
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
@@ -1096,7 +1096,15 @@ let subst_ts_inv (s : subst) (inv : ts_inv) =
 
 let subst_hs_inv (s : subst) (inv : hs_inv) =
   let s = add_memory s inv.hsi_m inv.hsi_m in
-  { hsi_inv = map_poe (subst_form s) inv.hsi_inv; hsi_m = inv.hsi_m }
+  let (p,poe,d) = inv.hsi_inv in
+  let p = subst_form s p in
+  let d = omap (subst_form s) d in
+  let b = EcMaps.DMap.bindings poe in
+  let b = List.map (fun (a,b) -> subst_path s a, subst_form s b) b in
+  let poe =
+    List.fold (fun m (a,b) -> EcMaps.DMap.add a b m) EcMaps.DMap.empty b
+  in
+  { hsi_inv = (p,poe,d); hsi_m = inv.hsi_m }
 
 
 let subst_inv (s : subst) (inv : inv) =

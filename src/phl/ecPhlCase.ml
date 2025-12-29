@@ -81,7 +81,7 @@ let t_hl_case_r ?simplify f tc =
       ~tbh:err
       ~te:(t_equiv_case ?simplify f)
       tc
-  | _ -> tc_error !!tc "exception are not supported"
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let t_hl_case ?simplify = FApi.t_low1 "hl-case" (t_hl_case_r ?simplify)

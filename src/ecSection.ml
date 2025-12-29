@@ -40,7 +40,7 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
   | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
-  | `Ex   _p -> Format.fprintf fmt "TODO"
+  | `Ex   p -> Format.fprintf fmt "exception %a" (EcPrinting.pp_axname ppe) p
   | `Module mp ->
     let ppe =
       match mp.m_top with
@@ -508,7 +508,7 @@ let locality (env : EcEnv.env) (who : cbarg) =
   | `Type p -> (EcEnv.    Ty.by_path p env).tyd_loca
   | `Op   p -> (EcEnv.    Op.by_path p env).op_loca
   | `Ax   p -> (EcEnv.    Ax.by_path p env).ax_loca
-  | `Ex   _p -> assert false
+  | `Ex   p -> (EcEnv.    Except.by_path p env).e_loca
   | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
   | `Module mp    ->
     begin match EcEnv.Mod.by_mpath_opt mp env with

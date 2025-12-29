@@ -470,7 +470,8 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         (* (h) is assumed *)
         (fhyps, eqi)
 
-    | Sraise _e1, Sraise _e2 -> assert false (* FIXME *)
+    | Sraise _e1, Sraise _e2 ->
+      tc_error pf "Raising exceptions are not supported"
 
     | Sabstract _, Sabstract _ -> assert false (* FIXME *)
 

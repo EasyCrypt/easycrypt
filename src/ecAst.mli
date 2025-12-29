@@ -378,13 +378,21 @@ val lower_f : hs_inv -> ss_inv
 val update_hs_ss : ss_inv -> hs_inv -> hs_inv
 val map_poe : (form -> form) -> post -> post
 val map_hs_inv1 : (form -> form) -> hs_inv -> hs_inv
+val map2_poe :
+  (form -> form -> 'a) -> post -> post -> 'a * (EcPath.path, 'a) DMap.t * 'a option
 val map_hs_inv2 : (form -> form -> form) -> hs_inv -> hs_inv -> hs_inv
 val exists_poe : (form -> bool) -> post -> bool
 val forall_poe : (form -> bool) -> post -> bool
 val forall2_poe : (form -> form -> bool) -> post -> post -> bool
-val poe_to_list : post -> form list
+val poe_to_list : 'a * (EcPath.path, 'a) DMap.t * 'a option -> 'a list
 val iter_poe : (form -> unit) -> post -> unit
 val iter2_poe : (form -> form -> unit) -> post -> post -> unit
+val merge2_poe_list :
+  (form -> form -> form) ->
+  (EcPath.path, form) DMap.t * form option ->
+  (EcPath.path, form) DMap.t * form option ->
+  form list
+
 
 (* -------------------------------------------------------------------- *)
 
