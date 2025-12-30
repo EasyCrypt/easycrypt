@@ -2,6 +2,7 @@
 open EcSymbols
 open EcIdent
 open EcPath
+open EcMaps
 
 module BI = EcBigInt
 
@@ -111,7 +112,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of EcPath.path
   | Sabstract of EcIdent.t
 
 and stmt = private {
@@ -239,13 +240,15 @@ and equivS = {
   [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
 }
 
+and post = (form * (EcPath.path, form) DMap.t * form option)
+
 and sHoareF = {
   hf_m : memory;
   hf_pr : form;
   [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
   hf_f  : EcPath.xpath;
-  hf_po : form;
-  [@alert priv_pl "Use the accessor function `hf_pr` instead of the field"]
+  hf_po : post;
+  [@alert priv_pl "Use the accessor function `hf_po` instead of the field"]
 }
 
 and sHoareS = {
@@ -253,7 +256,7 @@ and sHoareS = {
   hs_pr : form;
   [@alert priv_pl "Use the accessor function `hs_pr` instead of the field"]
   hs_s  : stmt;
-  hs_po : form;
+  hs_po : post;
   [@alert priv_pl "Use the accessor function `hs_po` instead of the field"]
 }
 
@@ -362,9 +365,41 @@ val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
 
 (* -------------------------------------------------------------------- *)
 
+type hs_inv = {
+  hsi_m : memory;
+  hsi_inv : post;
+}
+
+val empty_poe : form -> post
+val empty_hs : ss_inv -> hs_inv
+val is_empty_poe : post -> bool
+val lift_f : ss_inv -> hs_inv
+val lower_f : hs_inv -> ss_inv
+val update_hs_ss : ss_inv -> hs_inv -> hs_inv
+val map_poe : (form -> form) -> post -> post
+val map_hs_inv1 : (form -> form) -> hs_inv -> hs_inv
+val map2_poe :
+  (form -> form -> 'a) -> post -> post -> 'a * (EcPath.path, 'a) DMap.t * 'a option
+val map_hs_inv2 : (form -> form -> form) -> hs_inv -> hs_inv -> hs_inv
+val exists_poe : (form -> bool) -> post -> bool
+val forall_poe : (form -> bool) -> post -> bool
+val forall2_poe : (form -> form -> bool) -> post -> post -> bool
+val poe_to_list : 'a * (EcPath.path, 'a) DMap.t * 'a option -> 'a list
+val iter_poe : (form -> unit) -> post -> unit
+val iter2_poe : (form -> form -> unit) -> post -> post -> unit
+val merge2_poe_list :
+  (form -> form -> form) ->
+  (EcPath.path, form) DMap.t * form option ->
+  (EcPath.path, form) DMap.t * form option ->
+  form list
+
+
+(* -------------------------------------------------------------------- *)
+
 type inv =
   | Inv_ss of ss_inv
   | Inv_ts of ts_inv
+  | Inv_hs of hs_inv
 
 val inv_of_inv : inv -> form
 
@@ -373,6 +408,8 @@ val lift_ss_inv2 : (ss_inv -> ss_inv -> 'a) -> inv -> inv -> 'a
 val lift_ss_inv3 : (ss_inv -> ss_inv -> ss_inv -> 'a) -> inv -> inv -> inv -> 'a
 val lift_ts_inv : (ts_inv -> 'a) -> inv -> 'a
 val lift_ts_inv2 : (ts_inv -> ts_inv -> 'a) -> inv -> inv -> 'a
+
+val lift_hs_ss_inv : (ss_inv -> hs_inv -> 'a) -> inv -> inv -> 'a
 
 val ss_inv_generalize_left : ss_inv -> memory -> ts_inv
 val ss_inv_generalize_right : ss_inv -> memory -> ts_inv
@@ -389,9 +426,9 @@ val ef_po : equivF -> ts_inv
 val es_pr : equivS -> ts_inv
 val es_po : equivS -> ts_inv
 val hf_pr : sHoareF -> ss_inv
-val hf_po : sHoareF -> ss_inv
+val hf_po : sHoareF -> hs_inv
 val hs_pr : sHoareS -> ss_inv
-val hs_po : sHoareS -> ss_inv
+val hs_po : sHoareS -> hs_inv
 val ehf_pr : eHoareF -> ss_inv
 val ehf_po : eHoareF -> ss_inv
 val ehs_pr : eHoareS -> ss_inv

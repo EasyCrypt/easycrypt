@@ -455,6 +455,14 @@ and process_operator ?(src : string option) (scope : EcScope.scope) (pop : poper
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_exception (scope :  EcScope.scope) (ed : pexception_decl located) =
+  let _, scope = EcScope.Except.add scope ed in
+  EcScope.check_state `InTop "exception" scope;
+  EcScope.notify scope `Info "added exception %s"
+    (unloc ed.pl_desc.pe_name);
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_procop ?(src : string option) (scope : EcScope.scope) (pop : pprocop located) =
   EcScope.check_state `InTop "operator" scope;
   EcScope.Op.add_opsem ?src scope pop
@@ -763,6 +771,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  ?src scope i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   ?src scope (mk_loc loc o))
+      | Gexception   e    -> `Fct   (fun scope -> process_exception  scope  (mk_loc loc e))
       | Gprocop      o    -> `Fct   (fun scope -> process_procop     ?src scope (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  ?src scope (mk_loc loc p))
       | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))

@@ -5,6 +5,7 @@ open EcDecl
 open EcEnv
 open EcCoreGoal
 open EcAst
+open EcMaps
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -32,6 +33,7 @@ val pf_process_xreal    : proofenv -> ?mv:metavs -> LDecl.hyps -> pformula -> fo
 
 val pf_process_exp      : proofenv -> LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val pf_process_pattern  : proofenv -> LDecl.hyps -> pformula -> ptnenv * form
+val pf_process_poe      : tcenv1 -> LDecl.hyps -> ty -> excep_spec_preds -> (EcPath.path, form) DMap.t * form option
 
 (* Typing in the [proofenv] implies for the [tcenv].
  * Typing exceptions are recasted in the proof env. context *)
