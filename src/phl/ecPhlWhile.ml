@@ -42,7 +42,7 @@ let while_info env e s =
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
 
-    | Sraise _ -> assert false
+    | Sraise _ -> tacuerror "exception are not supported";
 
     | Sabstract id ->
         let add_pv x (pv,ty) = PV.add env pv ty x in

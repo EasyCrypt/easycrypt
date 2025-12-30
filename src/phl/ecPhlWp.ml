@@ -17,7 +17,8 @@ module LowInternal = struct
     | Not_found ->
       match d with
       | Some d -> d
-      | None -> tacuerror "unknow exception %a" EcPrinting.pp_path e
+      | None ->
+        tacuerror "missing postcondition for exception %a" EcPrinting.pp_path e
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in

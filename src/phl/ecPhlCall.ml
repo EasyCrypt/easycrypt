@@ -422,6 +422,8 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let post = map_ts_inv2 f_and eq_res inv in
         f_equivF pre fl fr post
 
+let ensure_none_poe tc poe =
+  if not (is_none poe) then tc_error !!tc "exception are not supported"
 
 let process_call side info tc =
   let process_spec_2 tc side pre post =
@@ -569,9 +571,11 @@ let process_call side info tc =
         let _, concl = FApi.tc1_flat tc in
         match concl.f_node with
         | FhoareS _ ->
+          let poe = odfl ([],None) poe in
           process_spec_1 tc side pre post poe
         | _ ->
-           process_spec_2 tc side pre post
+          ensure_none_poe tc poe;
+          process_spec_2 tc side pre post
       end
 
     | CI_inv inv ->
@@ -647,7 +651,8 @@ let process_call_concave (fc, info) tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post, ([],None)) ->
+    | CI_spec (pre, post, poe) ->
+      ensure_none_poe tc poe;
       let ty,fmake = process_spec tc in
       let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
       let _, post = TTC.tc1_process_Xhl_form tc ty post in
