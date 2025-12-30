@@ -544,7 +544,7 @@ and pspattern = unit
 type excep_spec_preds = ((pqsymbol * pformula) list * pformula option)
 
 type call_info =
-  | CI_spec of (pformula * pformula * excep_spec_preds)
+  | CI_spec of (pformula * pformula * excep_spec_preds option)
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 

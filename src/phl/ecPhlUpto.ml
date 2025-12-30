@@ -62,7 +62,7 @@ let rec check_bad_true env bad s =
     | Smatch(_,bs) ->
       let check_branch (_, s) = check_bad_true env bad s.s_node in
       List.iter (check_branch) bs
-    | Sraise _ -> assert false
+    | Sraise _ -> tacuerror "exception are not supported"
     | Sabstract _ -> ()
     end;
     check_bad_true env bad c
@@ -142,7 +142,7 @@ and i_upto env alpha bad i1 i2 =
     with E.NotConv -> false
   end
 
-  | Sraise e1, Sraise e2 -> EcPath.p_equal e1 e2
+  | Sraise _, Sraise _ -> tacuerror "exception are not supported"
 
   | Sabstract id1, Sabstract id2 ->
     EcIdent.id_equal id1 id2

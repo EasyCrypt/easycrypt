@@ -384,6 +384,7 @@
 %token AMP
 %token APPLY
 %token AS
+%token ENSURE
 %token RAISE
 %token ASSUMPTION
 %token ASYNC
@@ -1361,8 +1362,11 @@ base_instr:
 | f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
-| RAISE e=paren(expr)? x=qident
-     { PSraise (x, e) }
+| ENSURE e=paren(expr) x=qident
+     { PSraise (x, Some e) }
+
+| RAISE x=qident
+     { PSraise (x, None) }
 
 instr:
 | bi=base_instr SEMICOLON
@@ -2551,15 +2555,11 @@ conseq_xt:
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
     { (None, None, None), Some (CQI_bd (cmp, bd)) }
 
-call_epost:
-| empty             { ([],None) }
-| c=epostl_xt       { c }
-
 call_info:
-| f1=form LONGARROW f2=form poe=call_epost { CI_spec (f1, f2, poe) }
-| f=form                                   { CI_inv  (f) }
-| bad=form COMMA p=form                    { CI_upto (bad,p,None) }
-| bad=form COMMA p=form COMMA q=form       { CI_upto (bad,p,Some q) }
+| f1=form LONGARROW f2=form poe=conseq_epost { CI_spec (f1, f2, poe) }
+| f=form                                     { CI_inv  (f) }
+| bad=form COMMA p=form                      { CI_upto (bad,p,None) }
+| bad=form COMMA p=form COMMA q=form         { CI_upto (bad,p,Some q) }
 
 tac_dir:
 | BACKS { Backs }
