@@ -386,12 +386,6 @@ val forall2_poe : (form -> form -> bool) -> post -> post -> bool
 val poe_to_list : 'a * 'a Mp.t * 'a option -> 'a list
 val iter_poe : (form -> unit) -> post -> unit
 val iter2_poe : (form -> form -> unit) -> post -> post -> unit
-val merge2_poe_list :
-  (form -> form -> form) ->
-  form Mp.t * form option ->
-  form Mp.t * form option ->
-  form list
-
 
 (* -------------------------------------------------------------------- *)
 

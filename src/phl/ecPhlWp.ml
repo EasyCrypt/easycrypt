@@ -18,7 +18,7 @@ module LowInternal = struct
     let f = EcReduction.h_red_until EcReduction.full_red hyps f in
     let (ex, _tys), args = destr_op_app f in
     match Mp.find ex epost with
-    | f -> f_app f args EcTypes.tbool
+    | f -> f_app_simpl f args EcTypes.tbool
     | exception Not_found ->
       match d with
       | Some d -> d

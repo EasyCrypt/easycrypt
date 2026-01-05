@@ -88,7 +88,7 @@ let t_hoare_call fpre fpost tc =
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
   let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
 
-  let poe = merge2_poe_list f_imp_simpl (epost,d) (fepost,fd) in
+  let poe = TTC.merge2_poe_list (epost,d) (fepost,fd) in
   let poe = List.map (fun inv -> {m;inv}) poe in
   let penv_e = EcEnv.Fun.inv_memenv1 m env in
   let poe = List.map (generalize_mod_ss_inv penv_e modi) poe in

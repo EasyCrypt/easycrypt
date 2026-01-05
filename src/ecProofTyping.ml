@@ -263,7 +263,7 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     lazy_destruct ~reduce hyps doit fp
 
 (* -------------------------------------------------------------------- *)
-let merge2_poe_list f (poe1,d1) (poe2,d2) =
+let merge2_poe_list (poe1,d1) (poe2,d2) =
   let get_default d =
     match d with
     | Some d -> d
@@ -271,14 +271,22 @@ let merge2_poe_list f (poe1,d1) (poe2,d2) =
   in
   let aux _ a b =
     match a,b with
-    | Some a, Some b -> Some (f b a)
-    | Some a, None -> Some (f (get_default d2) a)
-    | None, Some b -> Some (f b (get_default d1))
+    | Some a, Some b ->
+      let bd, body = decompose_lambda a in
+      let args = List.map (fun (x, gty) -> f_local x (gty_as_ty gty)) bd in
+      Some (f_forall bd (f_imp (f_app_simpl b args tbool) body))
+
+    | Some a, None ->
+      let bd, body = decompose_lambda a in
+      Some (f_forall bd (f_imp (get_default d2) body))
+    | None, Some b ->
+      let bd, body = decompose_lambda b in
+      Some (f_forall bd (f_imp body (get_default d1)))
     | None, None -> assert false
   in
   let epost = Mp.merge aux poe1 poe2 in
   let poe = List.map snd (Mp.bindings epost) in
   match d2, d1 with
   | None, _ -> poe
-  | Some d2, Some d1 -> f d2 d1 :: poe
+  | Some d2, Some d1 -> f_imp d2 d1 :: poe
   | _, _ -> failwith "no default exception"

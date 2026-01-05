@@ -107,12 +107,14 @@ proof.
   auto. smt(a5 a3 a4).
 qed.
 
+op o : exn = e2.
+
 module M1 ={
   var i:int
 
   proc f1 (x:int) : int = {
     i <- 0;
-    raise e2;
+    raise o;
     return x;
   }
 
@@ -128,7 +130,7 @@ lemma test (_x: int):
 proof.
   proc.
   call (: true ==> true | e2 => M1.i = 0).
-  + by proc; auto.
+  + proc. wp. auto.
   by auto.
 qed.
 
@@ -167,3 +169,30 @@ proof.
   ecall(test3 x).
   auto.
 qed.
+
+exception arg1 of int.
+
+module M3 = {
+  proc f () = {
+    raise (arg1 3);
+  }
+
+}.
+
+lemma test5 : 
+  hoare [M3.f : true ==> false | arg1 x => x = 3].
+proof.
+  proc. wp. skip => //.
+qed.
+
+lemma test6 : 
+  hoare [M3.f : true ==> false | arg1 x => x = 3].
+proof.
+  conseq (: _ ==> _ | arg1 x => 3 = x).
+  + done.
+  proc. wp. skip => //.
+qed.
+
+
+
+

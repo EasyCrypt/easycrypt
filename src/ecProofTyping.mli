@@ -86,7 +86,6 @@ val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  optio
 (* -------------------------------------------------------------------- *)
 
 val merge2_poe_list :
-  (form -> form -> form) ->
   form Mp.t * form option ->
   form Mp.t * form option ->
   form list

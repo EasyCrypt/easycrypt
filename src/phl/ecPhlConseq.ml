@@ -71,7 +71,7 @@ let t_hoareF_conseq pre post tc =
   let cond1, cond2 =
     conseq_cond_ss (hf_pr hf) {m;inv=fpost} pre {m;inv=post}
   in
-  let cond2e = merge2_poe_list f_imp (fepost,fd) (epost,d) in
+  let cond2e = TTC.merge2_poe_list (fepost,fd) (epost,d) in
   let cond2 = List.fold f_and cond2.inv cond2e in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
   let concl2 = f_forall_mems_ss_inv mpo {m;inv=cond2} in
@@ -79,6 +79,7 @@ let t_hoareF_conseq pre post tc =
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
+
 let t_hoareS_conseq pre post tc =
   let hs = tc1_as_hoareS tc in
   let pre = ss_inv_rebind pre (fst hs.hs_m) in
@@ -89,7 +90,7 @@ let t_hoareS_conseq pre post tc =
   let cond1, cond2 =
     conseq_cond_ss (hs_pr hs) {m;inv=fpost} pre {m;inv=post}
   in
-  let cond2e = merge2_poe_list f_imp (fepost,fd) (epost,d) in
+  let cond2e = TTC.merge2_poe_list (fepost,fd) (epost,d) in
   let cond2 = List.fold f_and cond2.inv cond2e in
   let concl1 = f_forall_mems_ss_inv hs.hs_m cond1 in
   let concl2 = f_forall_mems_ss_inv hs.hs_m {m=fst hs.hs_m;inv=cond2} in
@@ -351,7 +352,7 @@ let t_hoareF_notmod post tc =
   let (post, epost, d) = p.hsi_inv in
   let (fpost, fepost,fd) = (hf_po hf).hsi_inv in
   let cond = f_imp post fpost in
-  let econd1 = merge2_poe_list f_imp (fepost,fd) (epost,d) in
+  let econd1 = TTC.merge2_poe_list (fepost,fd) (epost,d) in
   let cond1 = List.fold f_and cond econd1 in
   let cond1, _, _ = cond_hoareF_notmod tc {m=hf.hf_m;inv=cond1} in
   let cond2 = f_hoareF (hf_pr hf) hf.hf_f p in
@@ -379,7 +380,7 @@ let t_hoareS_notmod post tc =
   let (post, epost, d) = p.hsi_inv in
   let (fpost, fepost,fd) = (hs_po hs).hsi_inv in
   let cond = f_imp post fpost in
-  let econd1 = merge2_poe_list f_imp (fepost,fd) (epost,d) in
+  let econd1 = TTC.merge2_poe_list (fepost,fd) (epost,d) in
   let cond1 = List.fold f_and cond econd1 in
   let cond1, _, _ = cond_hoareS_notmod tc {m=fst hs.hs_m;inv=cond1} in
   let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s p in
