@@ -2,7 +2,6 @@
 open EcSymbols
 open EcIdent
 open EcPath
-open EcMaps
 
 module BI = EcBigInt
 
@@ -112,7 +111,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sraise    of EcPath.path
+  | Sraise    of expr
   | Sabstract of EcIdent.t
 
 and stmt = private {
@@ -202,7 +201,7 @@ and f_node =
 
   | Fpr of pr (* hr *)
 
-(* We use the alert system for privacy because we want to 
+(* We use the alert system for privacy because we want to
    permit access in *some* instances, and the other fields are fine *)
 (* This is to ensure that memory bindings are carried along with the invariants *)
 and eagerF = {
@@ -240,7 +239,7 @@ and equivS = {
   [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
 }
 
-and post = (form * (EcPath.path, form) DMap.t * form option)
+and post = (form * form Mp.t * form option)
 
 and sHoareF = {
   hf_m : memory;
@@ -339,13 +338,13 @@ val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -
 val map_ts_inv_left : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_left1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_left2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_right : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_destr2 : (form -> form * form) -> ts_inv -> ts_inv * ts_inv
@@ -354,13 +353,13 @@ val map_ts_inv_destr3 : (form -> form * form * form) -> ts_inv -> ts_inv * ts_in
 val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_left2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 val ts_inv_lower_right : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_right1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_right2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 (* -------------------------------------------------------------------- *)
@@ -379,18 +378,18 @@ val update_hs_ss : ss_inv -> hs_inv -> hs_inv
 val map_poe : (form -> form) -> post -> post
 val map_hs_inv1 : (form -> form) -> hs_inv -> hs_inv
 val map2_poe :
-  (form -> form -> 'a) -> post -> post -> 'a * (EcPath.path, 'a) DMap.t * 'a option
+  (form -> form -> 'a) -> post -> post -> 'a * 'a Mp.t * 'a option
 val map_hs_inv2 : (form -> form -> form) -> hs_inv -> hs_inv -> hs_inv
 val exists_poe : (form -> bool) -> post -> bool
 val forall_poe : (form -> bool) -> post -> bool
 val forall2_poe : (form -> form -> bool) -> post -> post -> bool
-val poe_to_list : 'a * (EcPath.path, 'a) DMap.t * 'a option -> 'a list
+val poe_to_list : 'a * 'a Mp.t * 'a option -> 'a list
 val iter_poe : (form -> unit) -> post -> unit
 val iter2_poe : (form -> form -> unit) -> post -> post -> unit
 val merge2_poe_list :
   (form -> form -> form) ->
-  (EcPath.path, form) DMap.t * form option ->
-  (EcPath.path, form) DMap.t * form option ->
+  form Mp.t * form option ->
+  form Mp.t * form option ->
   form list
 
 

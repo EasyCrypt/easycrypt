@@ -41,6 +41,7 @@ val ty_fv_and_tvar : ty -> int Mid.t
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
+val texn    : ty   (* type of exception *)
 val txint   : ty
 val treal   : ty
 val tdistr  : ty -> ty

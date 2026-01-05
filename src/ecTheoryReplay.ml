@@ -594,7 +594,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ~opaque:optransparent ~clinline:(opmode <> `Alias)
                 [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
             (newop, body)
-  
+
         in
           match opmode with
           | `Alias ->
@@ -987,6 +987,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
+                | OB_oper (Some (OP_Exn    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->

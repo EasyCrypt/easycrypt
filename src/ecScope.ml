@@ -1664,9 +1664,16 @@ module Except = struct
 
   let add (scope : scope) (pe : pexception_decl located) =
     assert (scope.sc_pr_uc = None);
+    let loc = loc pe in
     let pe = pe.pl_desc in
     let lc = pe.pe_locality in
-    let e   = EcDecl.mk_except lc in
+    let eenv = env scope in
+    let ue = TT.transtyvars eenv (loc, Some []) in
+    let e_dom = transtys tp_nothing eenv ue pe.pe_dom in
+    let tparams = EcUnify.UniEnv.tparams ue in
+    if tparams <> [] then
+      hierror ~loc "Polymorphic expression are not allowed";
+    let e   = EcDecl.mk_except lc e_dom in
     let scope = bind scope (unloc pe.pe_name, e) in
     e, scope
 
@@ -2135,7 +2142,7 @@ module Cloning = struct
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in 
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_smt = true; puc_local = false; } in

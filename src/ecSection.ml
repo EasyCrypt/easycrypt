@@ -159,7 +159,8 @@ let rec on_instr (cb : cb) (i : instr)=
       on_lv cb lv;
       on_expr cb e
 
-  | Sraise _ -> ()
+  | Sraise e ->
+      on_expr cb e
 
   | Scall (lv, f, args) ->
       lv |> oiter (on_lv cb);
@@ -402,7 +403,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
    | OB_oper None   -> ()
    | OB_oper Some b ->
      match b with
-     | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
+     | OP_Constr _ | OP_Record _ | OP_Proj   _ | OP_Exn _ -> assert false
      | OP_TC -> assert false
      | OP_Plain  f -> on_form cb f
      | OP_Fix    f ->
@@ -661,7 +662,7 @@ let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain f -> EcIdent.fv_union fv (fv_and_tvar_f f)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC | OP_Exn _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -844,7 +845,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
           match body with
-          | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
+          | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_Exn _ -> assert false
           | OP_TC -> assert false (* ??? *)
           | OP_Plain f ->
             OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f)

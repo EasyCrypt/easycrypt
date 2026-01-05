@@ -384,8 +384,6 @@
 %token AMP
 %token APPLY
 %token AS
-%token ENSURE
-%token RAISE
 %token ASSUMPTION
 %token ASYNC
 %token AT
@@ -439,6 +437,7 @@
 %token ELIM
 %token ELSE
 %token END
+%token ENSURE
 %token EOF
 %token EQ
 %token EQUIV
@@ -531,6 +530,7 @@
 %token PROVER
 %token QED
 %token QUESTION
+%token RAISE
 %token RARROW
 %token RBOOL
 %token RBRACE
@@ -1141,6 +1141,10 @@ sform_u(P):
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) }
 
+match_body(P):
+| bs=plist0(p=mcptn(sbinop) IMPL bf=form_r(P) { (p, bf) }, PIPE)
+  { bs }
+
 form_u(P):
 | GLOB mp=loc(mod_qident) { PFglob mp }
 
@@ -1161,8 +1165,8 @@ form_u(P):
     { PFif (c, e1, e2) }
 
 | MATCH f=form_r(P) WITH
-    PIPE? bs=plist0(p=mcptn(sbinop) IMPL bf=form_r(P) { (p, bf) }, PIPE)
-  END
+    PIPE? bs=match_body(P)
+    END
     { PFmatch (f, bs) }
 
 | EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
@@ -1226,22 +1230,20 @@ hoare_bd_cmp :
 | EQ { EcAst.FHeq }
 | GE { EcAst.FHge }
 
-epost(P): x=qident COLON post=form_r(P)
-    { (x,post) }
+_hoare_epost(P):
+| PIPE bs=match_body(P) { bs }
+| empty { [] }
 
-epostl(P):
-| PIPE f=form_r(P)              { [], Some f }
-| PIPE p=epost(P)               { [ p ], None }
-| PIPE p=epost(P) a=epostl(P)   { p :: fst a, snd a }
+%inline hoare_epost(P): x=loc(_hoare_epost(P)) { x }
 
-hoare_epost(P):
-| empty            { ([],None) }
-| c=epostl(P)      { c }
+hoare_epost_option(P):
+| PIPE bs=loc(match_body(P)) { Some bs }
+| empty { None }
 
 hoare_body(P):
   mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW post=form_r(P)
                                                  epost=hoare_epost(P)
-    { PFhoareF (m, pre, mp, post, epost) }
+    { PFhoareF (m, pre, mp, { pnormal = post; pexcept = epost} ) }
 
 ehoare_body(P):
   mp=loc(fident) m=brace(mident)? COLON pre=form_r(P) LONGARROW
@@ -1362,11 +1364,11 @@ base_instr:
 | f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
-| ENSURE e=paren(expr) x=qident
-     { PSraise (x, Some e) }
+| RAISE ex=expr
+    { PSraise (ex, None) }
 
-| RAISE x=qident
-     { PSraise (x, None) }
+| ENSURE e=expr RARROW ex=expr
+    { PSraise (ex, Some e) }
 
 instr:
 | bi=base_instr SEMICOLON
@@ -1873,6 +1875,9 @@ mcptn(BOP):
 | x1=bdident op=loc(ordering_op) tvi=tvars_app? x2=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
 
+| UNDERSCORE
+    { PPAny }
+
 (* -------------------------------------------------------------------- *)
 (* Proc operators                                                       *)
 procop:
@@ -1882,8 +1887,9 @@ procop:
 (* -------------------------------------------------------------------- *)
 (* Exceptions                                                           *)
 excep:
-| locality=locality EXCEP x=ident
-   { { pe_name     = x;
+| locality=locality EXCEP ex=dt_ctor_def
+   { { pe_name     = fst ex;
+       pe_dom      = snd ex;
        pe_locality = locality; } }
 
 (* -------------------------------------------------------------------- *)
@@ -2535,31 +2541,19 @@ conseq:
 | UNDERSCORE LONGARROW f2=form    { None, Some f2 }
 | f1=form LONGARROW f2=form       { Some f1, Some f2 }
 
-epost_xt:
-| x=qident COLON f=form      { (x, f) }
-
-epostl_xt:
-| PIPE f=form                   { [], Some f }
-| PIPE p=epost_xt               { [ p ], None }
-| PIPE p=epost_xt a=epostl_xt   { p :: fst a, snd a }
-
-conseq_epost:
-| empty            { None }
-| c=epostl_xt      { Some c }
-
 conseq_xt:
-| c=conseq d=conseq_epost
+| c=conseq d=hoare_epost_option(none)
     { (fst c, snd c, d), None }
-| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform
+| c=conseq  COLON cmp=hoare_bd_cmp? bd=sform
     { (fst c, snd c, None), Some (CQI_bd (cmp, bd)) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
     { (None, None, None), Some (CQI_bd (cmp, bd)) }
 
 call_info:
-| f1=form LONGARROW f2=form poe=conseq_epost { CI_spec (f1, f2, poe) }
-| f=form                                     { CI_inv  (f) }
-| bad=form COMMA p=form                      { CI_upto (bad,p,None) }
-| bad=form COMMA p=form COMMA q=form         { CI_upto (bad,p,Some q) }
+| f1=form LONGARROW f2=form poe=hoare_epost(none) { CI_spec (f1, { pnormal = f2; pexcept = poe}) }
+| f=form                                   { CI_inv  (f) }
+| bad=form COMMA p=form                    { CI_upto (bad,p,None) }
+| bad=form COMMA p=form COMMA q=form       { CI_upto (bad,p,Some q) }
 
 tac_dir:
 | BACKS { Backs }

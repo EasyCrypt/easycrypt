@@ -98,7 +98,7 @@ type fxerror =
 | FXE_MatchParamsUnk
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
-| FXE_MatchPartial
+| FXE_MatchPartial of string list
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
@@ -250,6 +250,12 @@ val trans_prop     :
   env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.form
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
+
+val trans_poe :
+  EcEnv.env ->
+  EcUnify.unienv ->
+  EcParsetree.phoare_except ->
+  EcFol.form EcPath.Mp.t * EcFol.form option
 
 (* -------------------------------------------------------------------- *)
 val trans_memtype :

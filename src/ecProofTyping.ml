@@ -2,12 +2,13 @@
 open EcUtils
 open EcIdent
 open EcTypes
+open EcPath
 open EcFol
 open EcEnv
 open EcCoreGoal
 open EcAst
 open EcParsetree
-open EcMaps
+
 
 module Msym = EcSymbols.Msym
 
@@ -84,20 +85,12 @@ let pf_process_exp pe hyps mode oty e =
 let pf_process_pattern pe hyps fp =
   Exn.recast_pe pe hyps (fun () -> process_pattern hyps fp)
 
-let pf_process_poe tc hyps ty (epost,d)=
+let pf_process_poe hyps poe =
   let env  = LDecl.toenv hyps in
-  let aux acc (e,f) =
-    let _,p = EcTyping.except_genpath env e in
-    match DMap.find p acc with
-    | exception Not_found ->
-      let f = pf_process_form !!tc hyps ty f in
-      DMap.add p f acc
-    | _ -> tc_error !!tc "duplicated exception"
-  in
-  let epost = List.fold aux DMap.empty epost in
-  match d with
-  | None -> (epost, None)
-  | Some d -> (epost, Some (pf_process_form !!tc hyps ty d))
+  let ue = unienv_of_hyps hyps in
+  let m, d = EcTyping.trans_poe env ue poe in
+  let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
+  Mp.map (EcFol.Fsubst.f_subst ts) m, omap (EcFol.Fsubst.f_subst ts) d
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt ?mv tc oty pf =
@@ -268,3 +261,24 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     | _ -> raise NoMatch
   in
     lazy_destruct ~reduce hyps doit fp
+
+(* -------------------------------------------------------------------- *)
+let merge2_poe_list f (poe1,d1) (poe2,d2) =
+  let get_default d =
+    match d with
+    | Some d -> d
+    | None ->  failwith "no default exception"
+  in
+  let aux _ a b =
+    match a,b with
+    | Some a, Some b -> Some (f b a)
+    | Some a, None -> Some (f (get_default d2) a)
+    | None, Some b -> Some (f b (get_default d1))
+    | None, None -> assert false
+  in
+  let epost = Mp.merge aux poe1 poe2 in
+  let poe = List.map snd (Mp.bindings epost) in
+  match d2, d1 with
+  | None, _ -> poe
+  | Some d2, Some d1 -> f d2 d1 :: poe
+  | _, _ -> failwith "no default exception"

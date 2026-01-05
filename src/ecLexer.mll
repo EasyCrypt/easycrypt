@@ -36,6 +36,7 @@
     "admitted"    , ADMITTED   ;        (* KW: dangerous *)
 
     "forall"      , FORALL     ;        (* KW: prog *)
+    "ensure"      , ENSURE     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "fun"         , FUN        ;        (* KW: prog *)
     "glob"        , GLOB       ;        (* KW: prog *)

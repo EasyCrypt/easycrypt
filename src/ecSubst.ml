@@ -426,7 +426,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sraise e -> i_raise (subst_path s e)
+  | Sraise e -> i_raise (subst_expr s e)
 
   | Sabstract _ ->
      i
@@ -903,7 +903,7 @@ and subst_op_body (s : subst) (bd : opbody) =
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }
-
+  | OP_Exn tys -> OP_Exn (List.map (subst_ty s) tys)
   | OP_TC -> OP_TC
 
 and subst_branches (s : subst) = function
@@ -1099,10 +1099,10 @@ let subst_hs_inv (s : subst) (inv : hs_inv) =
   let (p,poe,d) = inv.hsi_inv in
   let p = subst_form s p in
   let d = omap (subst_form s) d in
-  let b = EcMaps.DMap.bindings poe in
+  let b = Mp.bindings poe in
   let b = List.map (fun (a,b) -> subst_path s a, subst_form s b) b in
   let poe =
-    List.fold (fun m (a,b) -> EcMaps.DMap.add a b m) EcMaps.DMap.empty b
+    List.fold (fun m (a,b) -> Mp.add a b m) Mp.empty b
   in
   { hsi_inv = (p,poe,d); hsi_m = inv.hsi_m }
 
@@ -1181,14 +1181,14 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   | true, true -> { inv; ml; mr }
   | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
   | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
-  | false, false -> begin 
+  | false, false -> begin
     let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = ml'; mr = mr' }
   end
 
-let f_forall_mems_ts_inv menvl menvr inv = 
+let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
 let ss_inv_forall_ml_ts_inv menvl inv =

@@ -39,11 +39,11 @@ let bd_goal_r fcmp fbd cmp bd =
   | FHle, (FHle | FHeq) -> Some (map_ss_inv2 f_real_le bd fbd)
   | FHge, (FHge | FHeq) -> Some (map_ss_inv2 f_real_le fbd bd)
   | FHeq, FHeq          -> Some (map_ss_inv2 f_eq bd fbd)
-  | FHeq, FHge          -> Some (map_ss_inv2 f_and 
-          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) fbd) 
+  | FHeq, FHge          -> Some (map_ss_inv2 f_and
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) fbd)
           (map_ss_inv1 ((EcUtils.flip f_eq) f_r1) bd))
-  | FHeq, FHle          -> Some (map_ss_inv2 f_and 
-          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) fbd) 
+  | FHeq, FHle          -> Some (map_ss_inv2 f_and
+          (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) fbd)
           (map_ss_inv1 ((EcUtils.flip f_eq) f_r0) bd))
   | _   , _             -> None
 
@@ -654,7 +654,7 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
 
     let pre   = map_ss_inv1 (fun gpre -> pre |> omap (TTC.pf_process_form !!tc penv txreal) |> odfl gpre) gpre  in
     let post  = map_ss_inv1 (fun gpost -> post |> omap (TTC.pf_process_form !!tc qenv txreal) |> odfl gpost) gpost in
-    
+
     fmake pre post
 
   in
@@ -743,7 +743,7 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
     tc_error !!tc "invalid post-condition";
   let post = empty_hs post in
   let concl1 = f_hoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s post in
-  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth 
+  let concl2 = f_bdHoareS (snd hs.bhs_m) (bhs_pr hs) hs.bhs_s posth
                  hs.bhs_cmp (bhs_bd hs) in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
@@ -818,7 +818,7 @@ let t_equivS_conseq_bd side pr po tc =
       let pos = ss_inv_generalize_as_left po ml mr in
       let prs = ss_inv_generalize_as_left pr ml mr in
       es.es_ml, es.es_sl, es.es_sr, prs, pos
-    | `Right -> 
+    | `Right ->
       let pos = ss_inv_generalize_as_right po ml mr in
       let prs = ss_inv_generalize_as_right pr ml mr in
       es.es_mr, es.es_sr, es.es_sl, prs, pos
@@ -1540,7 +1540,7 @@ let process_conseq_2 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
         | Some f1 -> match (snd f1).f_node with
                      | FequivF ef when side = `Left ->
                          let f_xreal_1 = f_r2xr f_r1 in
-                         ef.ef_fr, {m=ef.ef_mr; inv=f_xreal_1}, 
+                         ef.ef_fr, {m=ef.ef_mr; inv=f_xreal_1},
                           {m=ef.ef_mr; inv=f_xreal_1}, ef.ef_mr
                      | _ -> hf.ehf_f, ehf_pr hf, ehf_po hf, hf.ehf_m
         in
@@ -1693,7 +1693,7 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
 
     let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre) in
     let post  = post  |> omap (TTC.pf_process_form !!tc qenv ty) in
-    let poe  = poe |> omap (TTC.pf_process_poe tc env_e ty) in
+    let poe  = poe |> omap (TTC.pf_process_poe env_e)  in
 
     let (pre, post, bd) = match gpre, gpost with
       | Inv_ss gpre, Inv_hs gpost ->
@@ -1745,7 +1745,7 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
 
     let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
     let post  = post  |> omap (TTC.pf_process_form !!tc qenv ty) in
-    let poe  = poe |> omap (TTC.pf_process_poe tc env_e ty) in
+    let poe  = poe |> omap (TTC.pf_process_poe env_e) in
 
     let (pre, post, bd) = match gpre, gpost with
       | Inv_ss gpre, Inv_hs gpost ->

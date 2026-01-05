@@ -332,7 +332,7 @@ let rec s_subst_top (s : f_subst) : stmt -> stmt =
 
       i_match (e_subst e, List.Smart.map forb b)
 
-    | Sraise e -> i_raise e
+    | Sraise e -> i_raise (e_subst e)
 
     | Sabstract _ ->
       i

@@ -129,7 +129,7 @@ module Mpv = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
-    | Sraise e           -> i_raise  e
+    | Sraise e           -> i_raise  (esubst e)
     | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
@@ -179,7 +179,7 @@ module PVM = struct
           (try find env pv m s with Not_found -> f)
       | Fglob(mp,m) ->
           (try find_glob env (EcPath.mident mp) m s with Not_found -> f)
-      | FequivF {ef_ml=ml;ef_mr=mr} 
+      | FequivF {ef_ml=ml;ef_mr=mr}
       | FequivS {es_ml=(ml,_); es_mr=(mr,_)} ->
         check_binding ml s;
         check_binding mr s;
@@ -573,7 +573,7 @@ and i_read_r env r i =
   match i.i_node with
   | Sasgn   (_lp, e) -> e_read_r env r e
   | Srnd    (_lp, e) -> e_read_r env r e
-  | Sraise  _        -> PV.empty
+  | Sraise  e        -> e_read_r env r e
 
   | Scall (_lp, f, es) ->
       let r = List.fold_left (e_read_r env) r es in
@@ -792,12 +792,12 @@ module Mpv2 = struct
           s l) eqs.s_pv l in
     f_and_simpl (f_ands l) inv
 
-  
+
   let to_form_ts_inv eqs inv =
     map_ts_inv1 (to_form eqs inv.ml inv.mr) inv
 
   let of_form env f =
-    let ml, mr = f.ml, f.mr in 
+    let ml, mr = f.ml, f.mr in
     let rec aux f eqs =
       match sform_of_form f with
       | SFtrue -> eqs
@@ -1056,7 +1056,7 @@ and i_eqobs_in_refl env i eqo =
     let eqs = List.fold_left PV.union PV.empty eqs in
     add_eqs_refl env eqs e
 
-  | Sraise _ -> PV.empty
+  | Sraise e -> add_eqs_refl env PV.empty e
 
   | Sabstract _ -> assert false
 

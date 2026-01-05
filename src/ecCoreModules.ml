@@ -223,8 +223,8 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
       let ws, rs = List.split wrs in
       (Ssym.union w (Ssym.big_inter ws), Ssym.big_union (r :: rs))
 
-  | Sraise _ ->
-      (w, Ssym.empty)
+  | Sraise e ->
+      (w, Ssym.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->
       (w, Ssym.empty)

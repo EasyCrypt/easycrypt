@@ -1,11 +1,12 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
+open EcPath
 open EcDecl
 open EcEnv
 open EcCoreGoal
 open EcAst
-open EcMaps
+
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -33,7 +34,7 @@ val pf_process_xreal    : proofenv -> ?mv:metavs -> LDecl.hyps -> pformula -> fo
 
 val pf_process_exp      : proofenv -> LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val pf_process_pattern  : proofenv -> LDecl.hyps -> pformula -> ptnenv * form
-val pf_process_poe      : tcenv1 -> LDecl.hyps -> ty -> excep_spec_preds -> (EcPath.path, form) DMap.t * form option
+val pf_process_poe      : LDecl.hyps -> phoare_except -> form Mp.t * form option
 
 (* Typing in the [proofenv] implies for the [tcenv].
  * Typing exceptions are recasted in the proof env. context *)
@@ -81,3 +82,11 @@ type dexists = [
 
 val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct option
 val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
+
+(* -------------------------------------------------------------------- *)
+
+val merge2_poe_list :
+  (form -> form -> form) ->
+  form Mp.t * form option ->
+  form Mp.t * form option ->
+  form list

@@ -209,8 +209,9 @@ end = struct
     | FXE_MatchDupBranches ->
         msg "this pattern matching contains duplicated branches"
 
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
+    | FXE_MatchPartial ids ->
+        msg "this pattern matching is non-exhaustive, %a are missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"

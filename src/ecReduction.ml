@@ -243,7 +243,8 @@ end) = struct
         with E.NotConv -> false
       end
 
-    | Sraise e1, Sraise e2 -> EcPath.p_equal e1 e2
+    | Sraise e1, Sraise e2 ->
+        for_expr env alpha ~norm e1 e2
 
     | Sabstract id1, Sabstract id2 ->
         EcIdent.id_equal id1 id2
@@ -1350,10 +1351,10 @@ let zpoe (_,epost,d) dpoe =
     | _ ,h::q -> Some h, q
     | _, _ -> assert false
   in
-  let key = List.map fst (EcMaps.DMap.bindings epost) in
+  let key = List.map fst (Mp.bindings epost) in
   let poe = List.fold_left2
-    (fun m a b -> EcMaps.DMap.add a b m)
-    EcMaps.DMap.empty
+    (fun m a b -> Mp.add a b m)
+    Mp.empty
     key
     dpoe
   in
@@ -1507,7 +1508,7 @@ let rec conv ri env f1 f2 stk =
     let po2 = (hs_inv_rebind (hf_po hf2) hf1.hf_m).hsi_inv in
     let aux (post,poe,d) =
       let poe =
-        List.map snd (EcMaps.DMap.bindings poe)
+        List.map snd (Mp.bindings poe)
       in
       match d with None -> post :: poe | Some d -> post :: d :: poe
     in
@@ -1523,7 +1524,7 @@ let rec conv ri env f1 f2 stk =
       let po2 = (hs_inv_rebind (hs_po hs2) (fst hs1.hs_m)).hsi_inv in
       let aux (post,poe,d) =
         let poe =
-          List.map snd (EcMaps.DMap.bindings poe)
+          List.map snd (Mp.bindings poe)
         in
         match d with None -> post :: poe | Some d -> post :: d :: poe
       in

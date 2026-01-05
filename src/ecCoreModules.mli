@@ -42,7 +42,7 @@ val i_call     : lvalue option * xpath * expr list -> instr
 val i_if       : expr * stmt * stmt -> instr
 val i_while    : expr * stmt -> instr
 val i_match    : expr * ((EcIdent.t * ty) list * stmt) list -> instr
-val i_raise    : EcPath.path  -> instr
+val i_raise    : expr  -> instr
 val i_abstract : EcIdent.t -> instr
 
 val s_asgn     : lvalue * expr -> stmt
@@ -51,7 +51,7 @@ val s_call     : lvalue option * xpath * expr list -> stmt
 val s_if       : expr * stmt * stmt -> stmt
 val s_while    : expr * stmt -> stmt
 val s_match    : expr * ((EcIdent.t * ty) list * stmt) list -> stmt
-val s_raise    : EcPath.path -> stmt
+val s_raise    : expr -> stmt
 val s_abstract : EcIdent.t -> stmt
 val s_seq      : stmt -> stmt -> stmt
 val s_empty    : stmt
@@ -66,7 +66,7 @@ val destr_call   : instr -> lvalue option * xpath * expr list
 val destr_if     : instr -> expr * stmt * stmt
 val destr_while  : instr -> expr * stmt
 val destr_match  : instr -> expr * ((EcIdent.t * ty) list * stmt) list
-val destr_raise  : instr ->  EcPath.path
+val destr_raise  : instr -> expr
 
 val is_asgn   : instr -> bool
 val is_rnd    : instr -> bool

@@ -67,6 +67,7 @@ let tglob m      = mk_ty (Tglob m)
 (* -------------------------------------------------------------------- *)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
 let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let texn       = tconstr EcCoreLib.CI_Exn  .p_exn    []
 let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
 let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
 

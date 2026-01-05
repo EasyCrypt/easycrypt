@@ -4,7 +4,6 @@ open EcSymbols
 open EcIdent
 open EcPath
 open EcUid
-open EcMaps
 
 module BI = EcBigInt
 
@@ -116,7 +115,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sraise    of EcPath.path
+  | Sraise    of expr
   | Sabstract of EcIdent.t
 
 and stmt = {
@@ -235,7 +234,7 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
-and post = (form * (EcPath.path, form) DMap.t * form option)
+and post = (form * form Mp.t * form option)
 
 and sHoareF = {
   hf_m  : memory;
@@ -295,7 +294,7 @@ and pr = {
   pr_event : ss_inv;
 }
 
-let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv = 
+let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv =
   let m' = match m with
   | Some m -> m
   | None -> (List.hd invs).m in
@@ -321,7 +320,7 @@ let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
   let inv1, inv2 = fn inv.inv in
   let m = inv.m in
   (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty); 
+  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
   {m;inv=inv1}, {m;inv=inv2}
 
 let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
@@ -338,11 +337,11 @@ type ts_inv = {
 }
 
 let map_ts_inv ?ml ?mr (fn: form list -> form) (invs: ts_inv list): ts_inv =
-  let ml' = match ml with 
-   | Some m -> m 
+  let ml' = match ml with
+   | Some m -> m
    | None -> (List.hd invs).ml in
-  let mr' = match mr with 
-   | Some m -> m 
+  let mr' = match mr with
+   | Some m -> m
    | None -> (List.hd invs).mr in
   let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml' && mr = mr'); inv) invs) in
   { ml = ml'; mr = mr'; inv = inv }
@@ -435,7 +434,7 @@ let ts_inv_lower_left2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
   assert (inv1.mr = inv2.mr);
   let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
   { m = inv1.mr; inv = inv' }
-  
+
 let ts_inv_lower_left3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
     (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
   assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
@@ -554,7 +553,7 @@ let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
       Inv_ts (map_ts_inv2 fn ts1 ts2)
   | _ ->
       failwith "incompatible invariants for map_inv2"
-  
+
 let map_inv3 (fn: form -> form -> form -> form)
     (inv1: inv) (inv2: inv) (inv3: inv): inv =
   match inv1, inv2, inv3 with
@@ -566,14 +565,14 @@ let map_inv3 (fn: form -> form -> form -> form)
       failwith "incompatible invariants for map_inv3"
 
 (* ----------------------------------------------------------------- *)
-let empty_poe f = (f, DMap.empty, None)
+let empty_poe f = (f, Mp.empty, None)
 
 let empty_hs f =
   {hsi_m=f.m;hsi_inv = empty_poe f.inv}
 
 let is_empty_poe poe =
   match poe with
-  | (_,m,None) when DMap.is_empty m-> true
+  | (_,m,None) when Mp.is_empty m-> true
   | _ -> false
 
 let lift_f f = {hsi_m=f.m;hsi_inv=empty_poe f.inv}
@@ -589,7 +588,7 @@ let update_hs_ss f p =
 
 let map_poe f (p,m,d) =
   let p = f p in
-  let m = DMap.map f m in
+  let m = Mp.map f m in
   let d = omap f d in
   (p, m, d)
 
@@ -602,7 +601,7 @@ let map2_poe f (p1,m1,d1) (p2,m2,d2) =
     | Some a, Some b -> Some (f a b)
     | _ , _ -> failwith "missing entry in exception map"
   in
-  let m = DMap.merge aux m1 m2 in
+  let m = Mp.merge aux m1 m2 in
   match d1, d2 with
   | None, None -> (p, m, None)
   | Some d1, Some d2 -> (p, m, Some (f d1 d2))
@@ -615,20 +614,20 @@ let map_hs_inv2
   { hsi_m = inv1.hsi_m; hsi_inv = inv' }
 
 let exists_poe f (p,m,d) =
-  f p || DMap.exists (fun _ -> f) m || omap_dfl f false d
+  f p || Mp.exists (fun _ -> f) m || omap_dfl f false d
 
 let forall_poe f (p,m,d) =
-  f p && DMap.for_all (fun _ -> f) m && omap_dfl f true d
+  f p && Mp.for_all (fun _ -> f) m && omap_dfl f true d
 
 let forall2_poe f (p1,m1,d1) (p2,m2,d2) =
   let b1 = f p1 p2 in
-  let b2 = DMap.equal f m1 m2 in
+  let b2 = Mp.equal f m1 m2 in
   b1 && b2 && oeq f d1 d2
 
 let poe_to_list (post,poe,d) =
   let l =
-    DMap.fold
-      (fun p1 a -> p1 :: a)
+    Mp.fold
+      (fun _ p1 a -> p1 :: a)
       poe
       [post]
   in
@@ -636,7 +635,7 @@ let poe_to_list (post,poe,d) =
 
 let iter_poe f (p, m,d) =
   f p;
-  DMap.iter (fun _ -> f) m;
+  Mp.iter (fun _ -> f) m;
   oiter f d
 
 let iter2_poe f (p1,m1,d1) (p2,m2,d2) =
@@ -646,8 +645,8 @@ let iter2_poe f (p1,m1,d1) (p2,m2,d2) =
     | Some a, Some b -> Some (a,b)
     | _ , _ -> failwith "missing entry in exception map"
   in
-  let m = DMap.merge aux m1 m2 in
-  DMap.iter (fun _ (p1,p2) -> f p1 p2) m;
+  let m = Mp.merge aux m1 m2 in
+  Mp.iter (fun _ (p1,p2) -> f p1 p2) m;
   match d2, d1 with
   | None, None -> ()
   | Some d1, Some d2 -> f d1 d2
@@ -666,8 +665,8 @@ let merge2_poe_list f (poe1,d1) (poe2,d2) =
     | None, Some b -> Some (f b (get_default d1))
     | None, None -> assert false
   in
-  let epost = DMap.merge aux poe1 poe2 in
-  let poe = List.map snd ( DMap.bindings epost) in
+  let epost = Mp.merge aux poe1 poe2 in
+  let poe = List.map snd (Mp.bindings epost) in
   match d2, d1 with
   | None, _ -> poe
   | Some d2, Some d1 -> f d2 d1 :: poe
@@ -1046,7 +1045,7 @@ let b_hash (bs : bindings) =
 
 let posts_equal (post1, eposts1, d1) (post2, eposts2, d2) =
   let b = f_equal post1 post2 in
-  let b =  b && DMap.equal f_equal eposts1 eposts2 in
+  let b =  b && Mp.equal f_equal eposts1 eposts2 in
   b &&
   match d1, d2 with
   | Some f1, Some f2 -> f_equal f1 f2
@@ -1134,7 +1133,7 @@ let post_hash e f = Why3.Hashcons.combine (EcPath.p_hash e) (f_hash f)
 
 let posts_hash (post, posts,d) =
   let h = Why3.Hashcons.combine (f_hash post) (omap_dfl f_hash 0 d) in
-  DMap.foldi
+  Mp.fold
     (fun e f a -> Why3.Hashcons.combine a (post_hash e f))
     posts h
 
@@ -1178,7 +1177,7 @@ let bhs_hash bhs =
     [bhs.bhs_pr;bhs.bhs_po;bhs.bhs_bd]
 
 let ef_hash ef =
-  Why3.Hashcons.combine_list f_hash 
+  Why3.Hashcons.combine_list f_hash
     (Why3.Hashcons.combine3 (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
       (mem_hash ef.ef_ml) (mem_hash ef.ef_mr))
     [ef.ef_pr;ef.ef_po]
@@ -1500,8 +1499,8 @@ module Hsform = Why3.Hashcons.Make (struct
   let posts_fv (post, posts, d) =
     let fv = f_fv post in
     let fv = d |> omap f_fv |> odfl fv in
-    DMap.fold
-      (fun f acc -> fv_union (f_fv f) acc)
+    Mp.fold
+      (fun _ f acc -> fv_union (f_fv f) acc)
        posts fv
 
   let fv_node f =
@@ -1630,7 +1629,7 @@ module Hinstr = Why3.Hashcons.Make (struct
           in List.all2 forbs bs1 bs2 && s_equal s1 s2
         in e_equal e1 e2 && List.all2 forb b1 b2
 
-    | Sraise e1, Sraise e2 -> EcPath.p_equal e1 e2
+    | Sraise e1, Sraise e2 -> e_equal e1 e2
 
     | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
 
@@ -1668,7 +1667,7 @@ module Hinstr = Why3.Hashcons.Make (struct
           in Why3.Hashcons.combine_list forbs (s_hash s) bds
         in Why3.Hashcons.combine_list forb (e_hash e) b
 
-    | Sraise e -> EcPath.p_hash e
+    | Sraise e -> e_hash e
 
     | Sabstract id -> EcIdent.id_hash id
 
@@ -1702,7 +1701,7 @@ module Hinstr = Why3.Hashcons.Make (struct
              (fun s b -> EcIdent.fv_union s (forb b))
              (e_fv e) b
 
-    | Sraise _ -> Mid.empty
+    | Sraise e -> e_fv e
 
     | Sabstract id ->
         EcIdent.fv_singleton id

@@ -1,9 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcPath
 open EcAst
 open EcModules
 open EcFol
-open EcMaps
 
 open EcCoreGoal
 open EcLowPhlGoal
@@ -12,13 +12,18 @@ open EcLowPhlGoal
 module LowInternal = struct
   exception No_wp
 
-  let find_poe (epost,d) (e:EcPath.path) =
-    try DMap.find e epost with
-    | Not_found ->
+  let find_poe hyps memenv (epost,d) (e:EcTypes.expr) =
+    let m = EcMemory.memory memenv in
+    let f = form_of_expr ~m e in
+    let f = EcReduction.h_red_until EcReduction.full_red hyps f in
+    let (ex, _tys), args = destr_op_app f in
+    match Mp.find ex epost with
+    | f -> f_app f args EcTypes.tbool
+    | exception Not_found ->
       match d with
       | Some d -> d
-      | None ->
-        tacuerror "missing postcondition for exception %a" EcPrinting.pp_path e
+      | None -> tacuerror "missing postcondition for exception %a" EcPrinting.pp_path ex
+
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in
@@ -26,27 +31,28 @@ module LowInternal = struct
       (let1::lets, f)
 
   let rec wp_stmt ?mc
-      onesided c_pre env memenv (stmt: EcModules.instr list) letsf epost
+      onesided c_pre hyps memenv (stmt: EcModules.instr list) letsf epost
   =
     match stmt with
     | [] -> (stmt, letsf)
     | i :: stmt' ->
         try
-          let letsf = wp_instr ?mc onesided c_pre env memenv i letsf epost in
-          wp_stmt ?mc onesided c_pre env memenv stmt' letsf epost
+          let letsf = wp_instr ?mc onesided c_pre hyps memenv i letsf epost in
+          wp_stmt ?mc onesided c_pre hyps memenv stmt' letsf epost
         with No_wp -> (stmt, letsf)
 
-  and wp_instr ?mc onesided c_pre env memenv i letsf epost =
+  and wp_instr ?mc onesided c_pre (hyps:EcEnv.LDecl.hyps) memenv i letsf epost =
     match i.i_node with
     | Sasgn (lv,e) ->
       wp_asgn_aux c_pre memenv lv e letsf
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1) =
-          wp_stmt ?mc onesided c_pre env memenv (List.rev s1.s_node) letsf epost in
+          wp_stmt ?mc onesided c_pre hyps memenv (List.rev s1.s_node) letsf epost in
         let (r2,letsf2) =
-          wp_stmt ?mc onesided c_pre env memenv (List.rev s2.s_node) letsf epost in
+          wp_stmt ?mc onesided c_pre hyps memenv (List.rev s2.s_node) letsf epost in
         if List.is_empty r1 && List.is_empty r2 then begin
+          let env = EcEnv.LDecl.toenv hyps in
           let post1 = mk_let_of_lv_substs ?mc:mc env letsf1 in
           let post2 = mk_let_of_lv_substs ?mc:mc env letsf2 in
           let m = EcMemory.memory memenv in
@@ -58,7 +64,7 @@ module LowInternal = struct
     | Smatch (e, bs) -> begin
         let wps =
           let do1 (_, s) =
-            wp_stmt ?mc onesided c_pre env memenv (List.rev s.s_node) letsf epost in
+            wp_stmt ?mc onesided c_pre hyps memenv (List.rev s.s_node) letsf epost in
           List.map do1 bs
         in
 
@@ -67,7 +73,7 @@ module LowInternal = struct
         let pbs =
           List.map2
             (fun (bds, _) (_, letsf) ->
-              let post = mk_let_of_lv_substs env letsf in
+              let post = mk_let_of_lv_substs (EcEnv.LDecl.toenv hyps) letsf in
               f_lambda (List.map (snd_map gtty) bds) post)
             bs wps
         in
@@ -79,7 +85,7 @@ module LowInternal = struct
         ([],post)
       end
 
-    | Sraise e when onesided -> ([], find_poe epost e)
+    | Sraise e when onesided -> ([], find_poe hyps memenv epost e)
 
     | _ -> raise No_wp
 
@@ -126,12 +132,12 @@ module LowInternal = struct
 
 end
 
-let wp ?mc ?(uselet=true) ?(onesided=false) ?c_pre env m s (post,epost,d) =
+let wp ?mc ?(uselet=true) ?(onesided=false) ?c_pre hyps m s (post,epost,d) =
   let (r, letsf) =
     LowInternal.wp_stmt ?mc
-      onesided c_pre env m (List.rev s.s_node) ([], post) (epost,d)
+      onesided c_pre hyps m (List.rev s.s_node) ([], post) (epost,d)
   in
-  let pre = mk_let_of_lv_substs ?mc ~uselet env letsf in
+  let pre = mk_let_of_lv_substs ?mc ~uselet (EcEnv.LDecl.toenv hyps) letsf in
   List.rev r, pre
 
 let ewp ?(uselet=true) env m s post =
@@ -146,13 +152,14 @@ module TacInternal = struct
       tc_error !!tc "remaining %i instruction(s)" (List.length rm)
 
   let t_hoare_wp ?(uselet=true) i tc =
-    let env = FApi.tc1_env tc in
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let hs = tc1_as_hoareS tc in
     let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
     let (_, eposts,d) as post = (hs_po hs).hsi_inv in
     let s_wp, post =
-      wp ~uselet ~onesided:true env hs.hs_m s_wp post in
+      wp ~uselet ~onesided:true hyps hs.hs_m s_wp post in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst hs.hs_m in
@@ -173,12 +180,13 @@ module TacInternal = struct
     FApi.xmutate1 tc `Wp [concl]
 
   let t_bdhoare_wp ?(uselet=true) i tc =
-    let env = FApi.tc1_env tc in
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = o_split env i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp,post =
-      wp ~uselet env bhs.bhs_m s_wp (empty_poe (bhs_po bhs).inv)
+    let s_wp, post =
+      wp ~uselet hyps bhs.bhs_m s_wp (empty_poe (bhs_po bhs).inv)
     in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
@@ -187,7 +195,8 @@ module TacInternal = struct
     FApi.xmutate1 tc `Wp [concl]
 
   let t_equiv_wp ?(uselet=true) ij tc =
-    let env = FApi.tc1_env tc in
+    let hyps = FApi.tc1_hyps tc in
+    let env = EcEnv.LDecl.toenv hyps in
     let es = tc1_as_equivS tc in
     let ml, mr = (fst es.es_ml), (fst es.es_mr) in
     let i = omap fst ij and j = omap snd ij in
@@ -197,10 +206,10 @@ module TacInternal = struct
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es_po es in
     let s_wpl, post =
-      wp ~mc:(ml,mr) ~uselet env meml s_wpl (empty_poe post.inv)
+      wp ~mc:(ml,mr) ~uselet hyps meml s_wpl (empty_poe post.inv)
     in
     let s_wpr, post =
-      wp ~mc:(ml,mr) ~uselet env memr s_wpr (empty_poe post)
+      wp ~mc:(ml,mr) ~uselet hyps memr s_wpr (empty_poe post)
     in
     check_wp_progress tc i es.es_sl s_wpl;
     check_wp_progress tc j es.es_sr s_wpr;

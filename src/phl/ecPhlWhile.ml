@@ -43,6 +43,8 @@ let while_info env e s =
         (w, r, Sx.add f c)
 
     | Sraise _ -> tacuerror "exception are not supported";
+      (* FIXME, I think it is correct but it is over approximated *)
+      (* (w, e_read_r env r e, c) *)
 
     | Sabstract id ->
         let add_pv x (pv,ty) = PV.add env pv ty x in
@@ -97,7 +99,7 @@ let t_ehoare_while_core tc =
   check_single_stmt tc s;
   let (m, mt) = hs.ehs_m in
   let e = ss_inv_of_expr m e in
-  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs) 
+  if not (EcReduction.ss_inv_alpha_eq hyps (ehs_po hs)
       (map_ss_inv2 f_interp_ehoare_form (map_ss_inv1 f_not e) (ehs_pr hs))) then
     tc_error !!tc "ehoare while rule: wrong post-condition";
   (* the body preserves the invariant *)
@@ -139,7 +141,7 @@ let t_bdhoare_while_r inv vrnt tc =
   (* the wp of the while *)
   let f_imps_simpl' f = f_imps_simpl (List.tl f) (List.hd f) in
   let post = map_ss_inv f_imps_simpl' [bhs_po bhs; map_ss_inv1 f_not_simpl e; inv] in
-  let term_condition = map_ss_inv f_imps_simpl' 
+  let term_condition = map_ss_inv f_imps_simpl'
     [map_ss_inv1 f_not_simpl e; inv;map_ss_inv2 f_int_le vrnt {m;inv=f_i0}] in
   let post = map_ss_inv2 f_and term_condition post in
   let modi = s_write env c in
@@ -256,14 +258,14 @@ let t_bdhoare_while_rev_geq_r inv vrnt k (eps: ss_inv) tc =
     let vrnt_eq_k = map_ss_inv2 f_eq vrnt k in
     let vrnt_lt_k = map_ss_inv2 f_int_lt vrnt k in
       f_and
-        (EcSubst.f_forall_mems_ss_inv mem (map_ss_inv2 f_imp inv 
+        (EcSubst.f_forall_mems_ss_inv mem (map_ss_inv2 f_imp inv
           (map_ss_inv2 f_real_lt {m;inv=f_r0} eps)))
         (f_forall_simpl [(k_id,GTty tint)]
            (f_bdHoareS
-              mt 
-              (map_ss_inv f_ands [inv;lp_guard;vrnt_eq_k]) 
+              mt
+              (map_ss_inv f_ands [inv;lp_guard;vrnt_eq_k])
               lp_body
-              vrnt_lt_k 
+              vrnt_lt_k
               FHge
               eps))
   in
@@ -301,7 +303,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k (eps: ss_inv) tc =
 let t_equiv_while_disj_r side vrnt inv tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
-  let ss_inv_generalize_other f = 
+  let ss_inv_generalize_other f =
     match side with
     | `Left  -> ss_inv_generalize_right f (fst es.es_mr)
     | `Right -> ss_inv_generalize_left f (fst es.es_ml) in
@@ -325,7 +327,7 @@ let t_equiv_while_disj_r side vrnt inv tc =
 
   let b_pre   = map_ts_inv2 f_and_simpl (map_ts_inv2 f_and_simpl inv e) vrnt_eq_k in
   let b_post  = map_ts_inv2 f_and_simpl inv vrnt_lt_k in
-  let b_concl = ts_inv_lower_side2 (fun pr po -> 
+  let b_concl = ts_inv_lower_side2 (fun pr po ->
     let m = EcIdent.create "&hr" in
     let pr = EcSubst.ss_inv_rebind pr m in
     let po = EcSubst.ss_inv_rebind po m in
@@ -336,7 +338,7 @@ let t_equiv_while_disj_r side vrnt inv tc =
   (* 2. WP of the while *)
   let f_imps_simpl' fl = f_imps_simpl (List.tl fl) (List.hd fl) in
   let post = map_ts_inv f_imps_simpl' [es_po es; map_ts_inv1 f_not_simpl e; inv] in
-  let term_condition = map_ts_inv 
+  let term_condition = map_ts_inv
     f_imps_simpl' [map_ts_inv1 f_not_simpl e; inv;map_ts_inv2 f_int_le vrnt {ml;mr;inv=f_i0}] in
   let post = map_ts_inv2 f_and term_condition post in
   let modi = s_write env c in
@@ -492,7 +494,7 @@ let t_equiv_ll_while_disj_r side inv tc =
   let post = map_ts_inv2 f_and_simpl inv post in
   let concl =
     let sl, sr = sideif side (s, es.es_sr) (es.es_sl, s) in
-    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr post 
+    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) sl sr post
   in
 
   FApi.xmutate1 tc `While [b_concl; ll; concl]
@@ -517,7 +519,7 @@ let t_equiv_while_r inv tc =
 
   (* 2. WP of the while *)
   let f_imps_simpl' f = f_imps_simpl (List.tl f) (List.hd f) in
-  let post = map_ts_inv f_imps_simpl' [es_po es; 
+  let post = map_ts_inv f_imps_simpl' [es_po es;
     map_ts_inv1 f_not_simpl el; map_ts_inv1 f_not_simpl er; inv]  in
   let modil = s_write env cl in
   let modir = s_write env cr in
@@ -637,7 +639,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
   let cond1 = EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr
     (map_ts_inv f_imps' [map_ts_inv f_ands [fe1; fe2;
     map_ts_inv f_app' [ft1; f1];
-    map_ts_inv f_app' [ft2; f2]]; 
+    map_ts_inv f_app' [ft2; f2]];
     inv; fe; p0]) in
 
   let cond2 = EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr

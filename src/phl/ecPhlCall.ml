@@ -481,7 +481,7 @@ let process_call side info tc =
       let pre  = TTC.pf_process_form !!tc penv tbool pre  in
       let post = TTC.pf_process_form !!tc qenv tbool post in
       let env_e = LDecl.inv_memenv1 m hyps in
-      let (poe,d) = TTC.pf_process_poe tc env_e tbool poe in
+      let (poe,d) = TTC.pf_process_poe env_e poe in
       f_hoareF {m;inv=pre} f {hsi_m=m;hsi_inv=(post,poe,d)}
 
     | _ -> tc_error !!tc "the conclusion is not a hoare" in
@@ -566,16 +566,14 @@ let process_call side info tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post, poe) ->
+    | CI_spec (pre, epost) ->
       begin
         let _, concl = FApi.tc1_flat tc in
         match concl.f_node with
         | FhoareS _ ->
-          let poe = odfl ([],None) poe in
-          process_spec_1 tc side pre post poe
+          process_spec_1 tc side pre epost.pnormal epost.pexcept
         | _ ->
-          ensure_none_poe tc poe;
-          process_spec_2 tc side pre post
+           process_spec_2 tc side pre epost.pnormal
       end
 
     | CI_inv inv ->
@@ -651,11 +649,10 @@ let process_call_concave (fc, info) tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post, poe) ->
-      ensure_none_poe tc poe;
+    | CI_spec (pre, epost) ->
       let ty,fmake = process_spec tc in
       let _, pre = TTC.tc1_process_Xhl_form tc ty pre in
-      let _, post = TTC.tc1_process_Xhl_form tc ty post in
+      let _, post = TTC.tc1_process_Xhl_form tc ty epost.pnormal in
       fmake pre post
 
     | CI_inv inv ->

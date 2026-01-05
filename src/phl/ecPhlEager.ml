@@ -603,7 +603,8 @@ let process_fun_abs info eqI tc =
 let process_call info tc =
   let process_cut info =
     match info with
-    | EcParsetree.CI_spec (fpre, fpost, None) ->
+    | EcParsetree.CI_spec (fpre, epost) when EcLocation.unloc epost.pexcept = [] ->
+
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 
@@ -616,7 +617,7 @@ let process_call info tc =
         let (ml, mr) = fst es.es_ml, fst es.es_mr in
         let penv, qenv = LDecl.equivF ml mr fl fr hyps in
         let fpre  = TTC.pf_process_form !!tc penv tbool fpre  in
-        let fpost = TTC.pf_process_form !!tc qenv tbool fpost in
+        let fpost = TTC.pf_process_form !!tc qenv tbool epost.pnormal in
         f_eagerF {ml;mr;inv=fpre} sl fl fr sr {ml;mr;inv=fpost}
 
     | _ -> tc_error !!tc "invalid arguments"

@@ -302,7 +302,7 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_ops then
            clone_error oc.oc_env (CE_DupOverride (OVK_Operator, name));
-         { evc with evc_ops = 
+         { evc with evc_ops =
             Msym.add x (mk_loc lc opd :> xop_override located) evc.evc_ops })
         nm evc
 

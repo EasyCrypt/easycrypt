@@ -154,6 +154,7 @@ module Var : sig
 
 end
 (* -------------------------------------------------------------------- *)
+
 module Except : sig
   type t = excep
   val by_path     : path -> env -> t
@@ -417,7 +418,7 @@ module BaseRw : sig
   val add   : ?import:bool -> symbol -> is_local -> env -> env
   val addto : ?import:bool -> path -> path list -> is_local -> env -> env
 
-  val all : env -> (path * Sp.t) list 
+  val all : env -> (path * Sp.t) list
 end
 
 (* -------------------------------------------------------------------- *)

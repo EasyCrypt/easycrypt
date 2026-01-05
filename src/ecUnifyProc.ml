@@ -170,7 +170,8 @@ let rec unify_instrs env umap i1 i2 =
       unify_stmts env umap b1 b2
     ) umap bs1 bs2
 
-  | Sraise e1, Sraise e2 when EcPath.p_equal e1 e2 -> umap
+  | Sraise e1, Sraise e2 ->
+    unify_exprs env umap e1 e2
 
   | Sabstract x1, Sabstract x2 when EcIdent.id_equal x1 x2 -> umap
 
@@ -244,4 +245,3 @@ let unify_func env mode fname s =
       lv_of_list pvs
     in
     s_call (alias, fname, args)
-
