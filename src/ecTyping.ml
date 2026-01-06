@@ -2822,15 +2822,10 @@ and transinstr
       [ i_match (e, branches) ]
     end
 
-  | PSraise (pex,pe) ->
+  | PSraise (pex) ->
     let ex, exty = transexp env `InProc ue pex in
     unify_or_fail env ue pex.pl_loc ~expct:texn exty;
-    match pe with
-    | None ->  [i_raise ex]
-    | Some pe ->
-      let e, ety = transexp env `InProc ue pe in
-      unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [i_if (e_not e, stmt [i_raise ex], stmt [])]
+    [i_raise ex]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =

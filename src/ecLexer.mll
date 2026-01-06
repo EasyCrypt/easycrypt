@@ -36,7 +36,6 @@
     "admitted"    , ADMITTED   ;        (* KW: dangerous *)
 
     "forall"      , FORALL     ;        (* KW: prog *)
-    "ensure"      , ENSURE     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "fun"         , FUN        ;        (* KW: prog *)
     "glob"        , GLOB       ;        (* KW: prog *)
@@ -54,7 +53,6 @@
     "match"       , MATCH      ;        (* KW: prog *)
     "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
-    "ensure"      , ENSURE     ;        (* KW: prog *)
     "raise"       , RAISE      ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)

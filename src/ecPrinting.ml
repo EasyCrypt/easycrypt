@@ -2679,7 +2679,6 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
 type ppnode1 = [
   | `Asgn     of (EcModules.lvalue * EcTypes.expr)
   | `Raise    of EcTypes.expr
-  | `ERaise   of (EcTypes.expr * EcTypes.expr)
   | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
   | `Rnd      of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
@@ -2708,10 +2707,6 @@ let at (ppe : PPEnv.t) n i =
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
   | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
-  | Sif (e, {s_node=[{i_node=Sraise p}]}, {s_node= []}), 0 ->
-    Some (`ERaise (p,e), `P, [])
-  | Sif (_, {s_node=[{i_node=Sraise _}]}, {s_node= []}), 1 ->
-    None
   | Sif (e, s, _ ), 0 -> Some (`If e, `P, s.s_node)
   | Sif (_, _, s ), 1 -> begin
       match s.s_node with
@@ -2804,10 +2799,6 @@ let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
 let pp_i_raise (ppe : PPEnv.t) fmt (e : expr) =
   Format.fprintf fmt "raise %a" (pp_expr ppe) e
 
-let pp_i_eraise (ppe : PPEnv.t) fmt (p,e) =
-  Format.fprintf fmt "ensure %a -> %a"
-    (pp_expr ppe) (add_not e) (pp_expr ppe) p
-
 let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
   match lv with
   | None ->
@@ -2854,7 +2845,6 @@ let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with
   | `Asgn     x -> c_split ~width (pp_i_asgn     ppe) x
   | `Raise    x -> c_split ~width (pp_i_raise    ppe) x
-  | `ERaise   x -> c_split ~width (pp_i_eraise   ppe) x
   | `Call     x -> c_split ~width (pp_i_call     ppe) x
   | `Rnd      x -> c_split ~width (pp_i_rnd      ppe) x
   | `Abstract x -> c_split ~width (pp_i_abstract ppe) x
@@ -3481,11 +3471,10 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     Format.fprintf fmt "@[<v>while (@[%a@])%a@]"
       (pp_expr ppe) e (pp_block ppe) s
 
-  | Sif (e, {s_node=[{i_node=Sraise p}]}, {s_node= []})->
-    Format.fprintf fmt "@[<hov 2>ensure@ @[%a@]@ ->@ %a@];"
-      (pp_expr ppe) (add_not e) (pp_expr ppe) p
-
   | Sif (e, s1, s2) ->
+    let pp_then ppe fmt s =
+      if s.s_node = [] then ()
+      else pp_block ppe fmt s in
     let pp_else ppe fmt s =
       match s.s_node with
       | []  -> ()
@@ -3493,7 +3482,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
       | _   -> Format.fprintf fmt "@ else %a" (pp_block ppe) s
     in
       Format.fprintf fmt "@[<v>if (@[%a@]) %a%a@]"
-      (pp_expr ppe) e (pp_block ppe) s1 (pp_else ppe) s2
+      (pp_expr ppe) e (pp_then ppe) s1 (pp_else ppe) s2
 
   | Smatch (e, ps) ->
     let p, tyd, typ = oget (EcEnv.Ty.get_top_decl e.e_ty ppe.PPEnv.ppe_env) in

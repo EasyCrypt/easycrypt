@@ -437,7 +437,6 @@
 %token ELIM
 %token ELSE
 %token END
-%token ENSURE
 %token EOF
 %token EQ
 %token EQUIV
@@ -1365,10 +1364,7 @@ base_instr:
     { PScall (None, f, es) }
 
 | RAISE ex=expr
-    { PSraise (ex, None) }
-
-| ENSURE e=expr RARROW ex=expr
-    { PSraise (ex, Some e) }
+    { PSraise ex }
 
 instr:
 | bi=base_instr SEMICOLON
@@ -1387,8 +1383,8 @@ instr:
    { PSmatch (e, `If ((c, b1), b2)) }
 
 %inline if_expr:
-| IF c=paren(expr) b=block el=if_else_expr
-   { PSif ((c, b), fst el, snd el) }
+| IF c=paren(expr) b=block? el=if_else_expr
+   { PSif ((c, odfl [] b), fst el, snd el) }
 
 if_else_expr:
 |  /* empty */ { ([], []) }
