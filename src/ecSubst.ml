@@ -1108,7 +1108,9 @@ let subst_hs_inv (s : subst) (inv : hs_inv) =
   let b = Mp.bindings poe in
   let b = List.map (fun (a,b) -> subst_path s a, subst_form s b) b in
   let poe =
-    List.fold (fun m (a,b) -> Mp.add a b m) Mp.empty b
+    List.fold (fun m (a,b) ->
+        assert (not (Mp.mem a m));
+        Mp.add a b m) Mp.empty b
   in
   { hsi_inv = (p,poe,d); hsi_m = inv.hsi_m }
 
