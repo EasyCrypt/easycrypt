@@ -1185,7 +1185,7 @@ type theory_cloning = {
 }
 
 and theory_renaming_kind =
-  [ `Lemma | `Op | `Pred | `Type | `Module | `ModType | `Theory]
+  [ `Lemma | `Op | `Pred | `Type | `Module | `ModType | `Theory | `Exn]
 
 and theory_renaming =
   (theory_renaming_kind list * string located pair)

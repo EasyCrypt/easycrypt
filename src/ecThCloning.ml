@@ -217,6 +217,7 @@ and rk_categories = {
   rkc_module  : bool;
   rkc_modtype : bool;
   rkc_theory  : bool;
+  rkc_exn     : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -231,6 +232,7 @@ let rename ((rk, (rex, itempl)) : renaming) (k, x) =
     | `Selected { rkc_module  = true }, `Module  -> true
     | `Selected { rkc_modtype = true }, `ModType -> true
     | `Selected { rkc_theory  = true }, `Theory  -> true
+    | `Selected { rkc_exn     = true }, `Exn     -> true
     | _, _ -> false in
 
   let newx =
@@ -385,10 +387,12 @@ end = struct
       | Some ({cth_mode = `Concrete} as th) -> th
     in
 
+    (* FIXME improve error message *)
     let rec contains_module cth =
       let doit it =
         match it.ti_item with
         | Th_module _ -> true
+        | Th_exception _ -> true
         | Th_theory (_, cth) -> contains_module cth
         | _ -> false
       in
@@ -435,7 +439,7 @@ end = struct
          let ovrd = (ovrd, mode) in
          nt_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-      | Th_exception _ ->  (proofs, evc)
+      | Th_exception _ -> (proofs, evc)
 
       | Th_axiom (x, _) ->
         let axd = loced (thd @ prefix, x) in
@@ -524,12 +528,13 @@ end = struct
           | `Pred    -> { rk with rkc_preds   = true; }
           | `Module  -> { rk with rkc_module  = true; }
           | `ModType -> { rk with rkc_modtype = true; }
-          | `Theory  -> { rk with rkc_theory  = true; } in
+          | `Theory  -> { rk with rkc_theory  = true; }
+          | `Exn     -> { rk with rkc_exn     = true; } in
 
         let init = {
           rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
           rkc_preds   = false; rkc_module  = false; rkc_modtype = false;
-          rkc_theory  = false; } in
+          rkc_theory  = false; rkc_exn     = false } in
 
         `Selected (List.fold_left update init k)
 

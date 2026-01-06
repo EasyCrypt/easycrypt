@@ -716,7 +716,7 @@ end = struct
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module"
+        msg "Cannot override theory `%s`: contains module or exception"
           (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->

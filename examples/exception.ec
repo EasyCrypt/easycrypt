@@ -8,6 +8,7 @@ op p2: int -> bool.
 
 module M' ={
   proc truc (x:int) : int = {
+  if (! p1 x \/ ! p2 x) else raise assume; 
   ensure (! p1 x \/ ! p2 x) -> assume;
   if (!p1 x \/ !p2 x) { raise assert;}
   return x;
@@ -172,9 +173,11 @@ qed.
 
 exception arg1 of int.
 
+op toto i = arg1 i.
+
 module M3 = {
   proc f () = {
-    raise (arg1 3);
+    raise (toto 3);
   }
 
 }.
@@ -193,6 +196,8 @@ proof.
   proc. wp. skip => //.
 qed.
 
+exception return ['a] 
 
 
 
+exception arg ['a] of 'a.

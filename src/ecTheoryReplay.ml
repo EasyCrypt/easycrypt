@@ -364,6 +364,7 @@ let string_of_renaming_kind = function
   | `Module  -> "module"
   | `ModType -> "module type"
   | `Theory  -> "theory"
+  | `Exn     -> "exception"
 
 (* -------------------------------------------------------------------- *)
 let rename ?(fold = true) ove subst (kind, name) =
@@ -386,7 +387,7 @@ let rename ?(fold = true) ove subst (kind, name) =
 
     let nameok =
       match kind with
-      | `Lemma | `Type ->
+      | `Lemma | `Type | `Exn ->
           EcIo.is_sym_ident newname
       | `Op | `Pred ->
           EcIo.is_op_ident newname
@@ -787,11 +788,11 @@ and replay_ntd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oont) =
 
 
 (* -------------------------------------------------------------------- *)
-and replay_excep
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, excep)
-=
-  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_exception (name, excep)) in
-  (subst, ops, proofs, scope)
+and replay_exception (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, excep) =
+  let subst, name = rename ove subst (`Exn, name) in
+  let excep = EcSubst.subst_excep subst excep in
+  let item = Th_exception (name, excep) in
+  (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import item)
 
 (* -------------------------------------------------------------------- *)
 and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
@@ -1067,7 +1068,7 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
      replay_ntd ove (subst, ops, proofs, scope) (import, x, oont)
 
   | Th_exception (x, e) ->
-    replay_excep ove (subst, ops, proofs, scope) (import, x, e)
+    replay_exception ove (subst, ops, proofs, scope) (import, x, e)
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (import, x, ax)

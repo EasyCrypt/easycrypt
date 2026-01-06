@@ -47,6 +47,7 @@ val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_tc      : subst -> typeclass -> typeclass
 val subst_theory  : subst -> theory -> theory
 val subst_branches : subst -> opbranches -> opbranches
+val subst_excep   : subst -> excep -> excep
 
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path

@@ -1013,6 +1013,12 @@ let subst_tc (s : subst) tc =
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
+
+(* -------------------------------------------------------------------- *)
+let subst_excep (s : subst) (ex : excep) =
+  { e_loca = ex.e_loca;
+    e_dom = subst_tys s ex.e_dom }
+
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
@@ -1023,8 +1029,8 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_operator (x, op) ->
       Th_operator (x, subst_op s op)
 
-  | Th_exception (x, es) ->
-      Th_exception (x, es)
+  | Th_exception (x, ex) ->
+      Th_exception (x, subst_excep s ex)
 
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
