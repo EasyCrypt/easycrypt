@@ -108,7 +108,7 @@ end = struct
     if rlen <> nlen then
       raise (Incompatible (NotSameNumberOfTyParam (rlen, nlen)))
 
-  let for_params 
+  let for_params
     (hyps : hyps)
     (s    : EcSubst.subst)
     (p1   : (EcIdent.ident * ty) list)
@@ -364,6 +364,7 @@ let string_of_renaming_kind = function
   | `Module  -> "module"
   | `ModType -> "module type"
   | `Theory  -> "theory"
+  | `Exn     -> "exception"
 
 (* -------------------------------------------------------------------- *)
 let rename ?(fold = true) ove subst (kind, name) =
@@ -386,7 +387,7 @@ let rename ?(fold = true) ove subst (kind, name) =
 
     let nameok =
       match kind with
-      | `Lemma | `Type ->
+      | `Lemma | `Type | `Exn ->
           EcIo.is_sym_ident newname
       | `Op | `Pred ->
           EcIo.is_op_ident newname
@@ -594,7 +595,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ~opaque:optransparent ~clinline:(opmode <> `Alias)
                 [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
             (newop, body)
-  
+
         in
           match opmode with
           | `Alias ->
@@ -784,6 +785,14 @@ and replay_ntd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oont) =
     | `Inline `Clear ->
       (subst, ops, proofs, scope)
   end
+
+
+(* -------------------------------------------------------------------- *)
+and replay_exception (ove : _ ovrenv) (subst, ops, proofs, scope) (import, name, excep) =
+  let subst, name = rename ove subst (`Exn, name) in
+  let excep = EcSubst.subst_excep subst excep in
+  let item = Th_exception (name, excep) in
+  (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import item)
 
 (* -------------------------------------------------------------------- *)
 and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
@@ -979,6 +988,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
+                | OB_oper (Some (OP_Exn    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->
@@ -1056,6 +1066,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_operator (x, ({ op_kind = OB_nott _} as oont)) ->
      replay_ntd ove (subst, ops, proofs, scope) (import, x, oont)
+
+  | Th_exception (x, e) ->
+    replay_exception ove (subst, ops, proofs, scope) (import, x, e)
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (import, x, ax)

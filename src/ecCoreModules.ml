@@ -93,7 +93,7 @@ let i_call     (lv, m, tys) = mk_instr (Scall (lv, m, tys))
 let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while    (c, s)       = mk_instr (Swhile (c, s))
 let i_match    (e, b)       = mk_instr (Smatch (e, b))
-let i_assert   e            = mk_instr (Sassert e)
+let i_raise    e            = mk_instr (Sraise e)
 let i_abstract id           = mk_instr (Sabstract id)
 
 let s_seq      s1 s2        = stmt (s1.s_node @ s2.s_node)
@@ -105,7 +105,7 @@ let s_call     arg = stmt [i_call arg]
 let s_if       arg = stmt [i_if arg]
 let s_while    arg = stmt [i_while arg]
 let s_match    arg = stmt [i_match arg]
-let s_assert   arg = stmt [i_assert arg]
+let s_raise    arg = stmt [i_raise arg]
 let s_abstract arg = stmt [i_abstract arg]
 
 (* -------------------------------------------------------------------- *)
@@ -133,8 +133,8 @@ let get_match = function
   | { i_node = Smatch (e, b) } -> Some (e, b)
   | _ -> None
 
-let get_assert = function
-  | { i_node = Sassert e } -> Some e
+let get_raise = function
+  | { i_node = Sraise e } -> Some e
   | _ -> raise Not_found
 
 (* -------------------------------------------------------------------- *)
@@ -147,7 +147,7 @@ let destr_call   = _destr_of_get get_call
 let destr_if     = _destr_of_get get_if
 let destr_while  = _destr_of_get get_while
 let destr_match  = _destr_of_get get_match
-let destr_assert = _destr_of_get get_assert
+let destr_raise = _destr_of_get get_raise
 
 (* -------------------------------------------------------------------- *)
 let _is_of_get (get : instr -> 'a option) (i : instr) =
@@ -159,7 +159,7 @@ let is_call   = _is_of_get get_call
 let is_if     = _is_of_get get_if
 let is_while  = _is_of_get get_while
 let is_match  = _is_of_get get_match
-let is_assert = _is_of_get get_assert
+let is_raise  = _is_of_get get_raise
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
@@ -223,7 +223,7 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
       let ws, rs = List.split wrs in
       (Ssym.union w (Ssym.big_inter ws), Ssym.big_union (r :: rs))
 
-  | Sassert e ->
+  | Sraise e ->
       (w, Ssym.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->

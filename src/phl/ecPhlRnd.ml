@@ -34,9 +34,14 @@ module Core = struct
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = {m; inv=f_local x_id ty_distr} in
     let distr = EcFol.ss_inv_of_expr m distr in
-    let post = subst_form_lv env lv x (hs_po hs) in
+    if (not (is_empty_poe (hs_po hs).hsi_inv)) then
+      tc_error !!tc "exceptions are not supported";
+    let (post, _, _) = (hs_po hs).hsi_inv in
+    let post ={m=(hs_po hs).hsi_m; inv=post}in
+    let post = subst_form_lv env lv x post in
     let post = map_ss_inv2 f_imp (map_ss_inv2 f_in_supp x distr) post in
     let post = map_ss_inv1 (f_forall_simpl [(x_id,GTty ty_distr)]) post in
+    let post = lift_f post in
     let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -219,6 +224,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let post = lift_f post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
@@ -244,6 +250,7 @@ module Core = struct
           let bounded_distr = map_ss_inv2 f_real_le (map_ss_inv2 (f_mu env) distr event) bound in
           let pre = map_ss_inv2 f_and (bhs_pr bhs) pre_bound in
           let post = map_ss_inv2 f_anda bounded_distr (mk_event_cond event) in
+          let post = lift_f post in
           let concl = f_hoareS (snd bhs.bhs_m) pre s post in
           let concl = f_forall_simpl binders concl in
           [concl]
@@ -400,12 +407,17 @@ module Core = struct
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
     let s1, s2 = o_split env (Some pos) hs.hs_s in
+    if (not (is_empty_poe (hs_po hs).hsi_inv)) then
+      tc_error !!tc "exceptions are not supported";
+    let post = lower_f (hs_po hs) in
     let fv =
       if reduce then
-        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) (hs_po hs).inv)
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) post.inv)
       else None in
     let (_, mt), s2 = semrnd tc hs.hs_m fv s2 in
-    let concl = f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs) in
+    let concl =
+      f_hoareS mt (hs_pr hs) (stmt (s1 @ s2)) (hs_po hs)
+    in
     FApi.xmutate1 tc (`RndSem pos) [concl]
 
  (* -------------------------------------------------------------------- *)

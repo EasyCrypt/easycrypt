@@ -515,6 +515,7 @@ module MC = struct
   let _downpath_for_tydecl    = _downpath_for_th
   let _downpath_for_modsig    = _downpath_for_th
   let _downpath_for_operator  = _downpath_for_th
+  let _downpath_for_except    = _downpath_for_th
   let _downpath_for_axiom     = _downpath_for_th
   let _downpath_for_typeclass = _downpath_for_th
   let _downpath_for_rwbase    = _downpath_for_th
@@ -757,6 +758,19 @@ module MC = struct
 
   let import_operator p op env =
     import (_up_operator true) (IPPath p) op env
+
+  (* -------------------------------------------------------------------- *)
+  let lookup_except qnx env =
+    let (p, op) = lookup_operator qnx env in
+    if is_except op then p, operator_as_excep op
+    else lookup_error (`QSymbol qnx)
+
+  let _up_except candup mc x obj =
+    let op = operator_of_excep (snd obj) in
+    _up_operator candup mc x (fst obj, op)
+
+  let import_except p e env =
+    import (_up_except true) (IPPath p) e env
 
   (* -------------------------------------------------------------------- *)
   let lookup_tydecl ?unique qnx env =
@@ -1086,6 +1100,9 @@ module MC = struct
       | Th_operator (xop, op) ->
           (add2mc _up_operator xop op mc, None)
 
+      | Th_exception (xop, e) ->
+          (add2mc _up_except xop e mc, None)
+
       | Th_axiom (xax, ax) ->
           (add2mc _up_axiom xax ax mc, None)
 
@@ -1184,6 +1201,9 @@ module MC = struct
 
   and bind_axiom x ax env =
     bind _up_axiom x ax env
+
+  and bind_except x e env =
+    bind _up_except x e env
 
   and bind_operator x op env =
     bind _up_operator x op env
@@ -1478,7 +1498,7 @@ module BaseRw = struct
         env_item = mkitem ~import (Th_addrw (p, l, lc)) :: env.env_item; }
 
   let all env =
-    List.filter_map (fun (ip, sp) -> 
+    List.filter_map (fun (ip, sp) ->
       match ip with
       | IPPath p -> Some (p, sp)
       | _ -> None) @@
@@ -1534,10 +1554,10 @@ module Reduction = struct
     |> odfl []
 
   (* FIXME: handle other cases, right now only used for print hint *)
-  let all (env : env) = 
-    List.map (fun (ts, mr) -> 
+  let all (env : env) =
+    List.map (fun (ts, mr) ->
       (ts, Lazy.force mr.ri_list))
-    (Mrd.bindings env.env_redbase) 
+    (Mrd.bindings env.env_redbase)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1586,7 +1606,7 @@ module Auto = struct
 
   let getall (bases : symbol list) (env : env) : atbase0 list =
     let dbs = List.map (fun base -> get_core ~base env) bases in
-    let dbs = 
+    let dbs =
       List.fold_left (fun db mi ->
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
@@ -2781,6 +2801,42 @@ module Op = struct
 end
 
 (* -------------------------------------------------------------------- *)
+
+module Except = struct
+  type t = excep
+
+  let by_path_opt (p : EcPath.path) (env : env) : t option =
+    match Op.by_path_opt p env with
+    | None -> None
+    | Some op ->
+      if is_except op then Some (operator_as_excep op)
+      else None
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+    MC.import_except p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_except qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let bind ?(import = true) name e env =
+    let env = MC.bind_except name e env in
+    { env with env_item = mkitem ~import (Th_exception (name, e)) :: env.env_item }
+
+end
+
+(* -------------------------------------------------------------------- *)
 module Ax = struct
   type t = axiom
 
@@ -3085,6 +3141,9 @@ module Theory = struct
 
         | Th_operator (x, op) ->
             MC.import_operator (xpath x) op env
+
+        | Th_exception (x, e) ->
+            MC.import_except (xpath x) e env
 
         | Th_axiom (x, ax) ->
             MC.import_axiom (xpath x) ax env
