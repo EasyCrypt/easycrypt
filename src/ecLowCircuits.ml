@@ -17,6 +17,10 @@ module HL = struct
   include Lospecs.Hlaig.Deps
 end
 
+module CSMT = struct
+  include Lospecs.Smt
+end
+
 module Map = Batteries.Map
 module Hashtbl = Batteries.Hashtbl
 module Set = Batteries.Set
@@ -229,17 +233,17 @@ module LospecsBack : CBackend = struct
   let reg_ite (c: node) = Array.map2 (node_ite c) 
 
   let equiv ?(inps: inp list option) ~(pcond: node) (r1: reg) (r2: reg) : bool = 
-    let open HL in
+    let open CSMT in
     let module BWZ = (val makeBWZinterface ()) in
     BWZ.circ_equiv ?inps r1 r2 pcond  
 
   let sat ?(inps: inp list option) (n: node) : bool =
-    let open HL in
+    let open CSMT in
     let module BWZ = (val makeBWZinterface ()) in
     BWZ.circ_sat ?inps n 
 
   let taut ?(inps: inp list option) (n: node) : bool =
-    let open HL in
+    let open CSMT in
     let module BWZ = (val makeBWZinterface ()) in
     BWZ.circ_taut ?inps n 
 
