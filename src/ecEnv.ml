@@ -3407,6 +3407,7 @@ module Circuit = struct
     reverse_and_filter_operator
       ~filter:(function `Circuit x -> Some x | _ -> None)        
 
+  (* FIXME: Remove env argument? *)
   let get_specification_by_name (env : env) ~(filename : string) (name : symbol) : Lospecs.Ast.adef option =
     let specs = Lospecs.Circuit_spec.load_from_file ~filename in
     List.Exceptionless.assoc name specs

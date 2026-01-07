@@ -379,7 +379,6 @@
 %token ABSTRACT
 %token ADMIT
 %token ADMITTED
-%token AIG
 %token ALGNORM
 %token ALIAS
 %token AMP
@@ -395,8 +394,6 @@
 %token AXIOMATIZED
 %token BACKS
 %token BACKSLASH
-%token BDEP
-%token BDEPEQ
 %token BETA
 %token BITSTRING
 %token BIND
@@ -3073,6 +3070,8 @@ interleave_info:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
+(* FIXME CIRCUIT PR: Do we keep this separated or do we take the 
+   version from main? *)
 | UNROLL s=side? o=codepos
     { Punroll (s, o, `While) }
 

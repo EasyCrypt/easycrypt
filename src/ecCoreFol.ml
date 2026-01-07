@@ -184,6 +184,7 @@ let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
 (* TODO: check types here *)
+(* FIXME CIRCUIT PR: do we want to keep this? *)
 let ty_ftlist1 ty = toarrow (List.make 1 ty) (tlist ty)
 let ty_ftlist2 ty = toarrow ([ty; (tlist ty)]) (tlist ty)
 let ty_flist1 ty = toarrow (List.make 1 (tlist ty)) (tlist ty)
@@ -988,7 +989,6 @@ let rec form_of_expr_r ?m (e : expr) =
     begin
      match m with
      | None -> 
-       Printexc.(get_callstack 100 |> print_raw_backtrace stderr);
        failwith "expecting memory"
      | Some m -> (f_pvar pv e.e_ty m).inv
     end

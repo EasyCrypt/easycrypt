@@ -54,6 +54,7 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_try (process1_core ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: Maybe move the extens tactic to this file as well? *)
 and process1_extens (ttenv : ttenv) ((t, v) : ptactic_core * psymbol option) (tc : tcenv1) =
   let v = Option.map unloc v in
   EcPhlBDep.t_extens v (process1_core ttenv t) tc

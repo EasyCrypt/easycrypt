@@ -3133,6 +3133,7 @@ module Circuit = struct
     
     Ax.add_defer scope proofs
   
+  (* FIXME CIRCUIT PR: decide how we want to handle multiple spec files in easycrypt.project(s) *)
   let add_circuit1 (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in

@@ -171,9 +171,6 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
     
     "array"       , ARRAY      ;        (* KW: global *)
-    "aig"         , AIG        ;        (* KW: global *)
-    "bdep"        , BDEP       ;        (* KW: global *)
-    "bdepeq"      , BDEPEQ     ;        (* KW: global *)
     "bind"        , BIND       ;        (* KW: global *)
     "circuit"     , CIRCUIT    ;        (* KW: global *)
     "bitstring"   , BITSTRING  ;        (* KW: global *)

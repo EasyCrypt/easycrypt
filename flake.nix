@@ -104,7 +104,10 @@
 	  in
 	    (with pkgs; [
 	      (emacsWithPackagesFromUsePackage {
-		config = ''(setq easycrypt-prog-name "ec.native")'';
+		config = ''
+                  (setq easycrypt-prog-name "ec.native")
+                  (electric-indent-mode -1)
+                '';
 		defaultInitFile = true;
 		alwaysEnsure = true;
 		package = pkgs.emacs;
