@@ -8,7 +8,7 @@ op p2: int -> bool.
 
 module M' ={
   proc truc (x:int) : int = {
-  if (! p1 x \/ ! p2 x) else raise assume; 
+  if (! p1 x \/ ! p2 x) else raise assume;
   if (!p1 x \/ !p2 x) { raise assert;}
   return x;
   }
@@ -17,7 +17,7 @@ module M' ={
 print M'.
 
 lemma assume_assert (_x:int):
-  hoare [M'.truc : _x = x ==> 
+  hoare [M'.truc : _x = x ==>
            false | assume => p1 _x | assert => !(p1 _x /\ p2 _x)
         ].
 proof.
@@ -29,8 +29,8 @@ qed.
 print assume_assert.
 
 lemma assert_assume (_x:int):
-  hoare [M'.truc : _x = x ==> 
-           false | assume => p2 _x | assert => !(p2 _x /\ p1 _x) 
+  hoare [M'.truc : _x = x ==>
+           false | assume => p2 _x | assert => !(p2 _x /\ p1 _x)
         ].
 proof.
   proc.
@@ -39,7 +39,7 @@ proof.
 qed.
 
 lemma assert_assume' ( _x:int)  :
-  hoare [M'.truc : _x = x ==> 
+  hoare [M'.truc : _x = x ==>
            false | assume => p1 _x /\ p2 _x | assert => !(p2 _x /\ p1 _x) ].
 proof.
   conseq (assume_assert _x) (assert_assume _x).
@@ -101,7 +101,7 @@ proof.
   + call (: _x = x ==> res = 5 | e1 => 3 = _x | e2 => pd2 | _ => pd2).
     + proc.
       by auto.
-    auto. 
+    auto.
     smt(a3 a4).
   call (l_f1 _x).
   auto. smt(a5 a3 a4).
@@ -181,13 +181,13 @@ module M3 = {
 
 }.
 
-lemma test5 : 
+lemma test5 :
   hoare [M3.f : true ==> false | arg1 x => x = 3].
 proof.
   proc. wp. skip => //.
 qed.
 
-lemma test6 : 
+lemma test6 :
   hoare [M3.f : true ==> false | arg1 x => x = 3].
 proof.
   conseq (: _ ==> _ | arg1 x => 3 = x).
@@ -195,8 +195,4 @@ proof.
   proc. wp. skip => //.
 qed.
 
-
-
-
-
-exception arg ['a] of 'a.
+(* exception arg ['a] of 'a. *)
