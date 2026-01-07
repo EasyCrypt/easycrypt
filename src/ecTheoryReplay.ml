@@ -868,54 +868,11 @@ and replay_modtype
 and replay_mod
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (me : top_module_expr))
 =
-  match Msym.find_opt me.tme_expr.me_name ove.ovre_ovrd.evc_modexprs with
-  | None ->
-      let subst, name = rename ove subst (`Module, me.tme_expr.me_name) in
-      let me = EcSubst.subst_top_module subst me in
-      let me = { me with tme_expr = { me.tme_expr with me_name = name } } in
-      let item = (Th_module me) in
-      (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import item)
-
-  | Some { pl_desc = (newname, mode) } ->
-      let name  = me.tme_expr.me_name in
-      let env   = EcSection.env (ove.ovre_hooks.henv scope) in
-
-      let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
-
-      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:mp in
-
-      let me    = EcSubst.subst_top_module substme me in
-      let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
-      let newme = { newme with me_name = name } in
-      let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
-
-      if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
-        clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
-
-      let subst =
-        match mode with
-        | `Alias ->
-          fst (rename ove subst (`Module, name))
-        | `Inline _ ->
-          substme in
-
-      let newme =
-        if mode = `Alias || mode = `Inline `Keep then
-          let alias = ME_Alias (
-              List.length newme.tme_expr.me_params,
-              EcPath.m_apply
-                mp
-                (List.map (fun (id, _) -> EcPath.mident id) newme.tme_expr.me_params)
-          )
-          in { newme with tme_expr = { newme.tme_expr with me_body = alias } }
-        else newme in
-
-      let scope =
-        if   keep_of_mode mode
-        then ove.ovre_hooks.hadd_item scope ~import (Th_module newme)
-        else scope in
-
-      (subst, ops, proofs, scope)
+    let subst, name = rename ove subst (`Module, me.tme_expr.me_name) in
+    let me = EcSubst.subst_top_module subst me in
+    let me = { me with tme_expr = { me.tme_expr with me_name = name } } in
+    let item = (Th_module me) in
+    (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import item)
 
 (* -------------------------------------------------------------------- *)
 and replay_export
