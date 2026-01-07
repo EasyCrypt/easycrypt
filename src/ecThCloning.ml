@@ -71,7 +71,6 @@ type evclone = {
   evc_ops      : (xop_override located) Msym.t;
   evc_preds    : (xpr_override located) Msym.t;
   evc_abbrevs  : (nt_override located) Msym.t;
-  evc_modexprs : (me_override located) Msym.t;
   evc_modtypes : (mt_override located) Msym.t;
   evc_lemmas   : evlemma;
   evc_ths      : (evclone * bool) Msym.t;
@@ -93,7 +92,6 @@ let evc_empty =
       evc_ops      = Msym.empty;
       evc_preds    = Msym.empty;
       evc_abbrevs  = Msym.empty;
-      evc_modexprs = Msym.empty;
       evc_modtypes = Msym.empty;
       evc_lemmas   = evl;
       evc_ths      = Msym.empty; }
