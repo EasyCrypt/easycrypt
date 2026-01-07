@@ -29,11 +29,7 @@ val input_of_type : name:[`Str of string | `Idn of ident | `Bad] -> env -> ty ->
 
 (* Transform circuits *)
 val circuit_ueq : circuit -> circuit -> circuit
-val circuit_aggregate : circuit list -> circuit
-val circuit_aggregate_inps : circuit -> circuit
 val circuit_flatten : circuit -> circuit
-val circuit_permute : int -> (int -> int) -> circuit -> circuit 
-val circuit_mapreduce : ?perm:(int -> int)  -> circuit -> int -> int -> circuit list 
 
 (* Use circuits *)
 val compute    : sign:bool -> circuit -> BI.zint list -> BI.zint
@@ -43,16 +39,16 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?st:state -> hyps -> form -> hyps * circuit
+val circuit_of_form : ?st:state -> hyps -> form -> circuit
 val circuit_simplify_equality : ?do_time:bool -> st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
 val circ_simplify_form_bitstring_equality :
   ?st:state ->
   ?pres:circuit list -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> variable list -> hyps * state 
+val state_of_prog : ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> state 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
-val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> hyps * state
+val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 val circuit_state_of_memenv : st:state -> env -> memenv -> state
@@ -62,7 +58,6 @@ val circuit_state_of_hyps : ?strict:bool -> ?use_mem:bool -> ?st:state -> hyps -
 val circuit_has_uninitialized : circuit -> int option
 
 val circuit_slice : circuit -> int -> int -> circuit
-val circuit_align_inputs : circuit -> (int * int) option list -> circuit 
 
 val circuit_to_file : name:string -> circuit -> symbol
 

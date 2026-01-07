@@ -139,11 +139,6 @@ module type CBackend = sig
     val pp_deps : Format.formatter -> deps -> unit
     val pp_block_deps : Format.formatter -> block_deps -> unit
 
-    (* Assumes only one reg -> reg and parallel blocks *)
-    val is_splittable : int -> int -> deps -> bool
-
-    val are_independent : block_deps -> bool
-
     val single_dep : deps -> bool
     (* Assumes single_dep *)
     val dep_range : deps -> int * int
@@ -371,65 +366,7 @@ module LospecsBack : CBackend = struct
         pp_dep d;
         idx + w
       ) 0 bd
-
-    (* Assumes only one reg -> reg and parallel blocks *)
-    let is_splittable (w_in: int) (w_out: int) (d: deps) : bool =
-      match Set.cardinal 
-        (Array.fold_left (Set.union) Set.empty 
-        (Array.map (fun dep -> Map.keys dep |> Set.of_enum) d)) 
-      with 
-      | 0 -> true
-      | 1 ->
-        let blocks = block_deps_of_deps w_out d in
-        if debug then Format.eprintf "Checking block width...@.";
-        Array.fold_left_map (fun idx (width, d) ->
-          if Map.is_empty d then idx + width, true
-          else
-          let _, bits = Map.any d in
-          idx + width, Set.is_empty bits ||
-          let base = Set.at_rank_exn 0 bits in
-          if Set.for_all (fun bit ->
-            let dist = bit - base in
-            if 0 <= dist && dist < w_in then true else false
-(*
-            (Format.eprintf "Current bit: %d | Current dist: %d | Limit: %d@." bit dist w_in; 
-            Format.eprintf "Base for current block: %d@." base;
-            false)
-*)
-          ) bits then true else
-          begin
-            if debug then Format.eprintf "Bad block: [%d..%d] %a@." idx (idx + width - 1) pp_dep d; false
-          end
-        ) 0 blocks |> snd |> Array.for_all (fun x -> x)
-      | _ -> begin
-        if debug then Format.eprintf "Failed first check@\n"; 
-        if debug then Format.eprintf "Map keys: ";
-        if debug then Array.iteri (fun i dep ->
-          Format.eprintf "Bit %d: " i;
-          List.iter (Format.eprintf "%d") (Map.keys dep |> List.of_enum);
-          Format.eprintf "@\n") d;
-        false
-      end
-        
-
-    let are_independent (bd: block_deps) : bool =
-      let exception BreakOut in
-      try 
-        ignore @@ Array.fold_left (fun acc (_, d) ->
-          Map.merge (fun _ d1 d2 ->
-            match d1, d2 with
-            | None, None -> None
-            | Some d, None | None, Some d -> Some d
-            | Some d1, Some d2 ->
-              if not (Set.disjoint d1 d2) then raise BreakOut else
-              Some (Set.union d1 d2)
-          ) acc d
-        ) Map.empty bd;
-        true
-      with BreakOut ->
-        false
-
-
+    
     let single_dep (d: deps) : bool =
       match Set.cardinal 
         (Array.fold_left (Set.union) Set.empty 
@@ -534,7 +471,6 @@ module type CircuitInterface = sig
     val state_get_pv : state -> memory -> symbol -> circuit 
     val state_get_all_memory : state -> memory -> (symbol * circuit) list
     val state_get_all_pv : state -> ((memory * symbol) * circuit) list
-(*     val map_state_pv : (symbol -> circuit -> circuit) -> state -> state *)
 
     val update_state : state -> ident ->  circuit -> state
     val state_get_opt : state -> ident -> circuit option
@@ -577,15 +513,6 @@ module type CircuitInterface = sig
   (* General utilities *)
   val circ_of_zint : size:int -> zint -> circ
   val circuit_of_zint : size:int -> zint -> circuit 
-
-  (* Type conversions *)
-  (* TODO: Redo this *)
-(*
-  val cbool_of_circuit : ?strict:bool -> circuit -> circuit
-  val cbitstring_of_circuit : ?strict:bool -> circuit -> circuit
-  val carray_of_circuit : ?strict:bool -> circuit -> circuit
-  val ctuple_of_circuit : ?strict:bool -> circuit -> circuit
-*)
 
   (* Type constructors *)
   val new_cbool_inp : ?name:[`Str of string | `Idn of ident] -> unit -> circ * cinp
@@ -637,10 +564,6 @@ module type CircuitInterface = sig
   val compute : sign:bool -> circuit -> arg list -> zint option
 
   (* Mapreduce/Dependecy analysis related functions *)
-  val is_decomposable : int -> int -> circuit -> bool
-  val decompose : int -> int -> circuit -> circuit list
-  val permute : int -> (int -> int) -> circuit -> circuit
-  val align_inputs : circuit -> (int * int) option list -> circuit
   val circuit_slice : size:int -> circuit -> int -> circuit
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
@@ -765,7 +688,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let state_get_pv_opt (st: state) (m:memory) (s: symbol) : circuit option = 
       Option.bind (Map.find_opt (m, s) st.pv_ids) (fun id -> Mid.find_opt id st.circs) 
 
-    let state_get_pv : state -> memory -> symbol -> circuit = (fun st m s -> Option.get @@ state_get_pv_opt st m s) (* FIXME *)
+    (* FIXME : Error handling *)
+    let state_get_pv : state -> memory -> symbol -> circuit = (fun st m s -> Option.get @@ state_get_pv_opt st m s) 
     let state_get_all_pv (st: state) : ((memory * symbol) * circuit) list = 
       let pvs = Map.bindings st.pv_ids in
       List.filter_map (fun (pv, id) -> match Mid.find_opt id st.circs with | None -> None | Some c -> Some (pv, c)) pvs 
@@ -773,8 +697,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let state_get_all_memory (st: state) (m: memory) : (symbol * circuit) list = 
       List.filter_map (fun ((m_, s), c) -> if m = m_ then Some (s, c) else None) 
         (state_get_all_pv st)
-
-(*     let map_state_pv : (symbol -> circuit -> circuit) -> state -> state = assert false *)
 
     let update_state (st: state) (id: ident) (c: circuit) : state = 
       { st with circs = Mid.add id c st.circs }
@@ -832,14 +754,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Inputs helper functions *)
   let merge_inputs (cs: cinp list) (ds: cinp list) : cinp list =
-(*
-    Format.eprintf "Comparing input lists: @.";
-    List.iter (Format.eprintf "%a " pp_cinp) cs;
-    Format.eprintf "@.";
-    List.iter (Format.eprintf "%a " pp_cinp) ds;
-    Format.eprintf "@.";
-*)
-    if List.for_all2 (fun {id=id1; type_=ct1} {id=id2; type_=ct2} -> id1 = id2 && ct1 = ct2) cs ds then cs 
+(*     if List.for_all2 (fun {id=id1; type_=ct1} {id=id2; type_=ct2} -> id1 = id2 && ct1 = ct2) cs ds then cs  *)
+    if cs = ds then cs 
     else cs @ ds
 
   let merge_inputs_list (cs: cinp list list) : cinp list =
@@ -966,7 +882,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     { reg = r; type_ = CBitstring sz},
     { type_ = CBitstring sz; id; }
 
-  (* TODO: maybe remove? *)
   let new_cbitstring_inp_reg ?name (sz: int) : flatcirc * cinp =
     let c, inp = new_cbitstring_inp ?name sz in
     (c.reg, inp)
@@ -1168,74 +1083,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
     ) inps in
     Backend.taut ~inps c 
-
-  (* Dependency analysis related functions. These assume one input/output and all bitstring types *)
-  (* For more complex circuits, we might be able to simulate this with a int -> (int, int) map *)
-  let is_decomposable (in_w: width) (out_w: width) ((r, inps) as c: circuit) : bool = 
-    match r, inps with
-    | {type_= CBitstring w; reg = r}, {type_=CBitstring w'} :: [] when (w mod out_w = 0) ->
-      let deps = Backend.Deps.deps_of_reg r in
-      Backend.Deps.is_splittable in_w out_w deps &&
-      let base, top = Backend.Deps.dep_range deps in
-      let () = if debug then Format.eprintf "Passed backend check, checking width of deps (top - base = %d | in_w = %d)@." (top - base) in_w in
-      (top - base) mod in_w = 0
-    | _ -> 
-        if debug then Format.eprintf "Failed decomposition type check@\n";
-        if debug then Format.eprintf "In_w: %d | Out_w : %d | Circ: %a" in_w out_w pp_circuit c;
-        false
-
-  (* TODO: Extend this for multiple inputs? *)
-  let align_renamer ((r, inps) : circuit) : (int * int) * cinp * (Backend.inp -> Backend.inp option) = 
-    begin match r.type_ with
-    | CBitstring _ -> ()
-    | _ -> assert false (* TODO: FIXME *)
-    end;
-    match inps with 
-    | [{type_ = CBitstring w; id}] ->
-      let d = Backend.Deps.deps_of_reg r.reg in
-      assert (Backend.Deps.single_dep d);
-      let (start_idx, end_idx) as range = Backend.Deps.dep_range d in
-      range, 
-      {type_ = CBitstring (end_idx - start_idx); id},
-      (fun (id_, w) ->
-        if id <> id_ then None else
-        if w < start_idx || w >= end_idx then None
-        else Some (id_, w - start_idx))
-    | _ -> raise (CircError "Failed to rename inputs in align_renamer")
-
-  let align_inputs ((c, inps): circuit) (slcs: (int * int) option list) : circuit =
-    assert (List.compare_lengths inps slcs = 0);
-    let alignment = List.combine slcs inps in
-    let inps = List.map 
-    (function
-    | None, inp -> inp
-    | Some (sz, offset), ({type_ = CBitstring w_} as inp) ->
-      {inp with type_ = CBitstring sz}
-    | Some (sz, offset), ({type_ = CArray {width=w; count=n}} as inp) ->
-      assert (sz mod w = 0);
-      {inp with type_ = CArray {width=w; count=sz / w}}
-    | _ -> raise (CircError "Failed to align inputs") 
-    ) alignment
-    in
-    let aligners = 
-      List.map
-      (function 
-      | None, _ -> fun (id_, w) -> None
-      | Some (sz, offset), {id} ->
-      (fun (id_, w) ->
-        if debug then Format.eprintf "Aligning id=%d w=%d offset=%d sz=%d@." id_ w offset sz;
-        if id <> id_ then None else
-        if w < offset || w >= offset + sz then Some Backend.bad
-        else Some (Backend.input_node ~id (w - offset)))
-      ) alignment
-    in
-    let aligner = List.fold_left (fun f1 f2 ->
-      fun inp -> match f1 inp with
-      | Some _ as res -> res
-      | None -> f2 inp
-    ) (fun (id_, w) -> None) aligners
-    in
-    {c with reg = Backend.applys aligner c.reg}, inps
 
   (* Inputs mean different things depending on circuit type *)
   (* FIXME PR: maybe differentiate the two functions ? *)
@@ -1610,30 +1457,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     try List.map doit lanes 
     with DependencyError -> 
       raise (CircError "dep_check_general_decompose")
-
-  let decompose (in_w: width) (out_w: width) ((c, inps): circuit) : circuit list = 
-    let n = Backend.size_of_reg c.reg in
-    assert (n mod out_w = 0);
-    let n_lanes = n / out_w in
-    let inp = match inps with
-    | ({type_ = CBitstring n'; id} as inp)::[] when n' mod in_w = 0 && n' / in_w = n_lanes -> inp
-    | _ -> raise (CircError "bad inputs in circ for mapreduce")
-    in
-    let lanes = List.map (fun i -> List.init out_w (fun j -> i*out_w + j), Set.of_list (List.init in_w (fun j -> i*in_w + j))) (List.init n_lanes (fun i -> i)) in
-    try general_decompose c inp lanes
-    with CircError _ ->
-      let d = Backend.Deps.block_deps_of_reg out_w c.reg in
-      Format.eprintf "Dependencies:@.%a@." Backend.Deps.pp_block_deps d;
-      raise (CircError "Split dependency check failed")
-
-
-  (* FIXME: different things based on input or just fix bitstrings? *)
-  let permute (w: width) (perm: (int -> int)) ((r, inps): circuit) : circuit =
-    begin match r.type_ with
-    | CBitstring _ -> ()
-    | _ -> assert false (* TODO: FIXME *)
-    end;
-    assert false; {r with reg = (Backend.permute w perm r.reg)}, inps
 
   let compute ~(sign: bool) ((r, inps) as c: circuit) (args: arg list) : zint option = 
     begin match r.type_ with

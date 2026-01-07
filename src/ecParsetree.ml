@@ -829,10 +829,6 @@ type phltactic =
   | Plossless
 
     (* Map-reduce *)
-  | Pbdep of bdep_info
-  | Pbdepeval of bdep_eval_info
-  | Pbdepeq of bdepeq_info
-  | Pcirc of (pformula * bdepvar)
   | Pcircuit of circuit_mode
 
     (* Program rewriting *)

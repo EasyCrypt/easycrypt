@@ -3226,76 +3226,7 @@ interleave_info:
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
-bd_var:
-| s=lident LBRACKET t=qoident COLON j=uint RBRACKET
-  { `Slice (s, (t,j)) :> bdepvar }  
-
-| s=lident
-  { `Var s :> bdepvar }
-
-bd_vars:
-| vs=plist0(bd_var, SEMICOLON) 
-  { vs }
-
-| v=lident COLON w=word
-  { [(`VarRange (v, w) :> bdepvar)] }
-
-bdepeq_out_info:
-| m=word COLON LBRACKET outvs_l=bd_vars TILD outvs_r=bd_vars RBRACKET
-  { (m, outvs_l, outvs_r) }
-
 %public phltactic:
-| BDEP
-    n=word
-    m=word
-    invs=bracket(bd_vars)
-    inpvs=bracket(bd_vars)
-    outvs=bracket(bd_vars)
-    lane=oident
-    pcond=oident
-    perm=oident?
-    debug=AIG?
-  { Pbdep { n; m; invs; inpvs; outvs; pcond; lane; perm; debug = Option.is_some debug} }
-
-| BDEP STAR
-    in_ty=bracket(loc(simpl_type_exp))
-    invs=bracket(bd_vars)
-    inpvs=bracket(bd_vars)
-    out_ty=bracket(loc(simpl_type_exp))
-    outvs=bracket(bd_vars)
-    lane=oident
-    range=sform
-  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=false } }
-
-| BDEP STAR STAR
-    in_ty=bracket(loc(simpl_type_exp))
-    invs=bracket(bd_vars)
-    inpvs=bracket(bd_vars)
-    out_ty=bracket(loc(simpl_type_exp))
-    outvs=bracket(bd_vars)
-    lane=oident
-    range=sform
-  { Pbdepeval { in_ty; out_ty; invs; inpvs; outvs; lane; range; sign=true } }
-
-| BDEPEQ
-    n=word
-    inpvs_l=bracket(bd_vars)
-    inpvs_r=bracket(bd_vars)
-    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
-    pcond=oident?
-  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=false} }
-
-| BDEPEQ STAR
-    n=word
-    inpvs_l=bracket(bd_vars)
-    inpvs_r=bracket(bd_vars)
-    out_blocks=brace(plist0(bdepeq_out_info, SEMICOLON))
-    pcond=oident?
-  { Pbdepeq { n; inpvs_l; inpvs_r; out_blocks; pcond; preprocess=true} }
-
-| CIRCUIT STAR f=bracket(form) v=lident 
-  { Pcirc (f, (`Var v :> bdepvar)) }
-
 | CIRCUIT
   { Pcircuit (`Solve ) }
 
