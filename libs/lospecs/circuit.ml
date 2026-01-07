@@ -148,6 +148,21 @@ let of_bigint ~(size : int) (v : Z.t) : reg =
   assert (Z.numbits v <= size);
   Array.init size (fun i -> constant (Z.testbit v i))
 
+(* FIXME: Check *)
+let of_bigint_all ~(size : int) (v : Z.t) : reg =
+  let mod_ = Z.(lsl) Z.one (size) in
+  let v = Z.rem v mod_ in
+  let v = if Z.sign v < 0 then Z.add mod_ v else v in
+  of_bigint ~size v
+
+(* FIXME: Check *)
+let of_bigint_repr_size (v : Z.t) : reg =
+  let size = Z.numbits v + (if Z.sign v <= 0 then 1 else 0) in
+  of_bigint_all ~size v
+
+let of_int_repr_size (v: int) : reg =
+  of_bigint_repr_size (Z.of_int v)
+
 (* -------------------------------------------------------------------- *)
 let of_string ~(size : int) (s : string) : reg =
   of_bigint ~size (Z.of_string s)
@@ -745,14 +760,8 @@ let popcount ~(size : int) (r : reg) : reg =
   ) (Array.make size Aig.false_) r
 
 (* -------------------------------------------------------------------- *)
-(* FIXME: redo this *)
-let of_bigint_all ~(size : int) (v : Z.t) : reg =
-  let mod_ = Z.(lsl) Z.one (size) in
-  let v = Z.rem v mod_ in
-  let v = if Z.sign v < 0 then Z.add mod_ v else v in
-  of_bigint ~size v
-
 (* Assumes input is array of 16 bit words *)
+(* FIXME: Maybe do something a bit more principled here? *)
 let compute ?(input_block_size = 16) ?(output_block_size = 16) (r: reg) (inp: int array) : int array =
   assert (input_block_size <= 32);
   let m = (1 lsl input_block_size) - 1 in

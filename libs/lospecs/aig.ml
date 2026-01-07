@@ -75,7 +75,8 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec pp_node (fmt : Format.formatter) (n : node) =
+let rec pp_node ?(input_namer : int -> string =string_of_int) (fmt : Format.formatter) (n : node) =
+  let pp_node = pp_node ~input_namer in
   match n with
   | { gate = False; id } when 0 < id ->
     Format.fprintf fmt "⊥"
@@ -84,8 +85,9 @@ let rec pp_node (fmt : Format.formatter) (n : node) =
     Format.fprintf fmt "⊤"
 
   | { gate = Input (n, i); id; } ->
-    Format.fprintf fmt "%s%d#%0.4x"
-      (if 0 < id then "" else "¬") n i
+    let s = input_namer n in
+    Format.fprintf fmt "%s%s#%0.4x"
+      (if 0 < id then "" else "¬") s i
 
   | { gate = And (n1, n2); id; } when 0 < id ->
     Format.fprintf fmt "(%a) ∧ (%a)" pp_node n1 pp_node n2

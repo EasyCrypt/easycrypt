@@ -20,16 +20,6 @@ module Set = Batteries.Set
 module Option = Batteries.Option
 
 (* -------------------------------------------------------------------- *)
-module C = struct
-  include Lospecs.Aig
-  include Lospecs.Circuit
-  include Lospecs.Circuit_spec
-end
-
-module HL = struct
-  include Lospecs.Hlaig
-end
-
 exception BDepError of string Lazy.t
 exception BDepUninitializedInputs
 

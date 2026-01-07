@@ -1,196 +1,200 @@
-(* -------------------------------------------------------------------- *)
-open Ast
+open Aig
 
-(* -------------------------------------------------------------------- *)
-type symbol = string
+module Hashtbl = Batteries.Hashtbl
 
-(* -------------------------------------------------------------------- *)
-type dep1 = Set.Int.t IdentMap.t
-type deps = dep1 Map.Int.t
+(* ------------------------------------------------------------------------------- *)
+(* FIXME: CHECK THIS *)
+let rec inputs_of_node : _ -> Aig.var Set.t =
+  let cache : (int, Aig.var Set.t) Hashtbl.t = Hashtbl.create 0 in
+  
+  let rec doit (n : Aig.node) : Aig.var Set.t =
+    match Hashtbl.find_option cache (Int.abs n.id) with
+    | None ->
+      let mn = doit_r n.gate in
+      Hashtbl.add cache (Int.abs n.id) mn;
+      mn
+    | Some mn -> 
+      mn
 
-(* -------------------------------------------------------------------- *)
-let eq_dep1 (d1 : dep1) (d2 : dep1) : bool =
-  IdentMap.equal Set.Int.equal d1 d2
+  and doit_r (n : Aig.node_r) = 
+    match n with
+    | False -> Set.empty
+    | Input v -> Set.singleton v
+    | And (n1, n2) -> Set.union (doit n1) (doit n2)
 
-(* -------------------------------------------------------------------- *)
-let eq_deps (d1 : deps) (d2 : deps) : bool = Map.Int.equal eq_dep1 d1 d2
+  in fun n -> doit n
 
-(* -------------------------------------------------------------------- *)
-let empty ~(size : int) : deps =
-  0 --^ size |> Enum.map (fun i -> (i, IdentMap.empty)) |> Map.Int.of_enum
+(* ------------------------------------------------------------------------------- *)
+let inputs_of_reg (r : Aig.reg) : Aig.var Set.t =
+  Array.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
 
-(* -------------------------------------------------------------------- *)
-let enlarge ~(min : int) ~(max : int) (d : deps) : deps =
-  let change = function None -> Some IdentMap.empty | Some _ as v -> v in
+(* tdeps : int -> int set ; dependency for a single output bit 
+           i |->  {j | output depends on bit j of var i }*)
+type tdeps = (int, int Set.t) Map.t
+(* tdblock (n, d) = merged dependencies as above for n bits 
+  aka, the tdep represents dependencies for n bits rather than 1
+*)
+type tdblock = (int * tdeps)
 
-  min --^ max |> Enum.fold (fun d i -> Map.Int.modify_opt i change d) d
 
-(* -------------------------------------------------------------------- *)
-let clearout ~(min : int) ~(max : int) (d : deps) : deps =
-  Map.Int.filter_map
-    (fun i d1 -> Some (if min <= i && i < max then d1 else IdentMap.empty))
-    d
+let cache : (int, tdeps) Hashtbl.t = Hashtbl.create 5003 
 
-(* -------------------------------------------------------------------- *)
-let restrict ~(min : int) ~(max : int) (d : deps) : deps =
-  Map.Int.filter (fun i _ -> min <= i && i < max) d
-
-(* -------------------------------------------------------------------- *)
-let recast ~(min : int) ~(max : int) (d : deps) : deps =
-  d |> restrict ~min ~max |> enlarge ~min ~max
-
-(* -------------------------------------------------------------------- *)
-let merge1 (d1 : dep1) (d2 : dep1) : dep1 =
-  IdentMap.merge
-    (fun _ i1 i2 ->
-      Some (Set.Int.union (i1 |? Set.Int.empty) (i2 |? Set.Int.empty)))
-    d1 d2
-
-(* -------------------------------------------------------------------- *)
-let merge (d1 : deps) (d2 : deps) : deps =
-  Map.Int.merge
-    (fun _ m1 m2 ->
-      Some (merge1 (m1 |? IdentMap.empty) (m2 |? IdentMap.empty)))
-    d1 d2
-
-(* -------------------------------------------------------------------- *)
-let merge1_all (ds : dep1 Enum.t) : dep1 = Enum.reduce merge1 ds
-
-(* -------------------------------------------------------------------- *)
-let merge_all (ds : deps Enum.t) : deps = Enum.reduce merge ds
-
-(* -------------------------------------------------------------------- *)
-let copy ~(offset : int) ~(size : int) (x : ident) : deps =
-  0 --^ size
-  |> Enum.map (fun i ->
-         let di = IdentMap.singleton x (Set.Int.singleton (i + offset)) in
-         (i, di))
-  |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let chunk ~(csize : int) ~(count : int) (d : deps) : deps =
-  0 --^ count
-  |> Enum.map (fun ci ->
-         let d1 =
-           0 --^ csize
-           |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default IdentMap.empty)
-           |> merge1_all
-         in
-         0 --^ csize |> Enum.map (fun i -> (i + (ci * csize), d1)))
-  |> Enum.flatten |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let perm ~(csize : int) ~(perm : int list) (d : deps) : deps =
-  List.enum perm
-  |> Enum.mapi (fun ci x ->
-         Enum.map
-           (fun i -> (i + (ci * csize), Map.Int.find_opt (i + (x * csize)) d |> Option.default IdentMap.empty))
-           (0 --^ csize))
-  |> Enum.flatten |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let collapse ~(csize : int) ~(count : int) (d : deps) : deps =
-  0 --^ count
-  |> Enum.map (fun ci ->
-         let d1 =
-           0 --^ csize
-           |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default IdentMap.empty)
-           |> merge1_all
-         in
-         (ci, d1))
-  |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let merge_all_deps (d : deps) : dep1 =
-  Map.Int.enum d |> Enum.map snd |> merge1_all
-
-(* -------------------------------------------------------------------- *)
-let constant ~(size : int) (d : dep1) : deps =
-  0 --^ size |> Enum.map (fun i -> (i, d)) |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let offset ~(offset : int) (d : deps) : deps =
-  Map.Int.enum d |> Enum.map (fun (i, x) -> (i + offset, x)) |> Map.Int.of_enum
-
-(* -------------------------------------------------------------------- *)
-let split ~(csize : int) ~(count : int) (d : deps) : deps Enum.t =
-  0 --^ count
-  |> Enum.map (fun i ->
-         Map.Int.filter (fun x _ -> csize * i <= x && x < csize * (i + 1)) d
-         |> offset ~offset:(-i * csize))
-
-(* -------------------------------------------------------------------- *)
-let aggregate ~(csize : int) (ds : deps Enum.t) =
-  Enum.foldi
-    (fun i d1 d -> merge (offset ~offset:(i * csize) d1) d)
-    (empty ~size:0) ds
+let reset_state : unit -> unit = fun () -> Hashtbl.reset cache
 
 (* ==================================================================== *)
-type 'a pp = Format.formatter -> 'a -> unit
+let rec dep : _ -> tdeps = 
+  let cache : (int, tdeps) Hashtbl.t = Hashtbl.create 0 in
 
-(* -------------------------------------------------------------------- *)
-let pp_bitset (fmt : Format.formatter) (d : Set.Int.t) =
-  Format.fprintf fmt "{%a}"
-    (Format.pp_print_list
-       ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
-       Format.pp_print_int)
-    (Set.Int.elements d)
+  let rec doit (n: Aig.node) : tdeps = 
+    match Hashtbl.find_option cache (Int.abs n.id) with
+    | None -> let mn = doit_r n.gate in
+      Hashtbl.add cache (Int.abs n.id) mn;
+      mn 
+    | Some mn -> 
+      mn
 
-(* -------------------------------------------------------------------- *)
-let pp_bitintv (fmt : Format.formatter) (d : (int * int) list) =
-  Format.fprintf fmt "%a"
-    (Format.pp_print_list
-       ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
-       (fun fmt (i, j) -> Format.fprintf fmt "[%d..%d](%d)" i j (j - i + 1)))
-    d
+  and doit_r (n: Aig.node_r) =
+    match n with
+    | False -> Map.empty
+    | Input (v, i) -> Map.add v (Set.add i (Set.empty)) Map.empty
+    | And (n1, n2) -> Map.union_stdlib (fun k s1 s2 -> Some (Set.union s1 s2)) (doit n1) (doit n2)
 
-(* -------------------------------------------------------------------- *)
-let bitintv_of_bitset (d : Set.Int.t) =
-  let aout = ref [] in
-  let current = ref None in
+  in (fun n -> 
+    let res = doit n in
+    Hashtbl.clear cache; 
+    res)
 
-  d
-  |> Set.Int.iter (fun i ->
-         match !current with
-         | None -> current := Some (i, i)
-         | Some (v1, v2) ->
-             if i = v2 + 1 then current := Some (v1, i)
-             else (
-               aout := (v1, v2) :: !aout;
-               current := Some (i, i)));
+let deps (n: reg) : tdeps array = 
+  Array.map dep n 
 
-  Option.may (fun (v1, v2) -> aout := (v1, v2) :: !aout) !current;
-
-  List.rev !aout
-
-(* -------------------------------------------------------------------- *)
-let pp_dep1 (fmt : Format.formatter) (d : dep1) =
-  IdentMap.iter
-    (fun x bits ->
-      Format.fprintf fmt "%s.%d -> %a@\n" (Ident.name x) (Ident.id x) pp_bitintv (bitintv_of_bitset bits))
-    d
-
-(* -------------------------------------------------------------------- *)
-let pp_deps (fmt : Format.formatter) (d : deps) =
-  let display (v1, v2, d) =
-    Format.fprintf fmt "[%d..%d](%d) -> @[@\n%a@]@\n" v1 v2
-      (v2 - v1 + 1)
-      pp_dep1 d
+let block_deps (d: tdeps array) : tdblock list =
+  let drop_while_count (f: 'a -> bool) (l: 'a list) : int * ('a list) =
+    let rec doit (n: int) (l: 'a list) = 
+      match l with
+      | [] -> (n, [])
+      | a::l' -> if f a then doit (n+1) l' else (n, l)
+    in
+    let n, tl = doit 0 l in
+    (n, tl)
   in
+  let rec decompose (l: tdeps list) : tdblock list =
+    match l with
+    | [] -> []
+    | h::_ -> let n, l' = 
+      (drop_while_count (fun a -> Map.equal (Set.equal) h a) l) in
+      (n, h)::(decompose l')
+  in
+  decompose (Array.to_list d)
 
-  let current = ref None in
+let blocks_indep ((_,b):tdblock) ((_,d):tdblock) : bool =
+  let keys = Set.intersect (Set.of_enum @@ Map.keys b) (Set.of_enum @@ Map.keys d) in
+  let intersects = Set.map (fun k -> 
+    let b1 = Map.find k b in
+    let d1 = Map.find k d in
+    (Set.cardinal @@ Set.intersect b1 d1) = 0
+  ) keys in
+  Set.fold (&&) intersects true
 
-  Map.Int.iter
-    (fun i d ->
-      match !current with
-      | None -> current := Some (i, i, d)
-      | Some (v1, v2, d') ->
-          if i = v2 + 1 && eq_dep1 d d' then current := Some (v1, i, d')
-          else (
-            display (v1, v2, d');
-            current := Some (i, i, d)))
-    d;
+let block_list_indep (bs: tdblock list) : bool =
+  let rec doit (bs: tdblock list) (acc: tdblock list) : bool =
+   match bs with
+   | [] -> true
+   | b::bs -> List.for_all (blocks_indep b) acc && doit bs (b::acc)
+  in
+  doit bs []
 
-  Option.may display !current
+let merge_deps (d1: tdeps) (d2: tdeps) : tdeps = 
+    Map.union_stdlib (fun _ a b -> Option.some (Set.union a b)) d1 d2
+
+let split_deps (n: int) (d: tdeps array) : tdblock list =
+  assert (Array.length d mod n = 0);
+  let combine (d: tdeps list) : tdeps =
+    List.reduce merge_deps d
+  in
+  let rec aggregate (acc: tdblock list) (d: tdeps array) : tdblock list =
+    match d with
+    | [| |] -> acc
+    | _ -> (aggregate ((n, combine (Array.head d n |> Array.to_list))::acc) (Array.tail d n))
+  in
+  List.rev @@ aggregate [] d
+
+let check_dep_width ?(eq=false) (n: int) (d: tdeps) : bool =
+  Map.fold (fun s acc -> let m = (Set.cardinal s) in
+    if eq then
+      acc && (n = m)
+    else
+      acc && (m <= n)
+    ) d true
+
+(* maybe optimize this? *)
+let tdblock_of_tdeps (d: tdeps list) : tdblock =
+  (List.length d, List.reduce merge_deps d)
+
+(* 
+  Take a list of blocks and drop all but the first block if the 
+  sizes are the same and the dependecy amounts are the same
+*)
+let compare_dep_size (a: tdeps) (b: tdeps) : bool =
+  (Map.fold (fun s acc -> acc + (Set.cardinal s)) a 0) =
+  (Map.fold (fun s acc -> acc + (Set.cardinal s)) b 0)   
+
+let compare_tdblocks ((na, da): tdblock) ((nb, db): tdblock) : bool =
+  (na = nb) && compare_dep_size da db
+
+let collapse_blocks (d: tdblock list) : tdblock option = 
+  match d with
+  | [] -> None
+  | h::t -> 
+    List.fold_left 
+    (fun a b -> 
+      match a with
+      | None -> None
+      | Some a -> if compare_tdblocks a b 
+                  then Some a else None) 
+    (Some h) t
+
+(* -------------------------------------------------------------------- *)
+(* Uses dependency analysis to realign inputs to start at 0             *)
+(* Corresponds to taking the relevant subcircuit to this output         *)
+(* Assumes that inputs are contiguous FIXME                             *)
+let realign_inputs ?(renamings: (int -> int option) option) (n: node) : node * (int, int * int) Map.t = 
+  let d = dep n in
+  let shifts = Map.map (fun s -> 
+    Set.min_elt_opt s |> Option.default 0,
+    Set.max_elt_opt s |> Option.default 0
+  ) d in
+  let map_ = 
+    match renamings with
+    | Some renamings -> begin fun (v, i) ->
+      let v' = renamings v |> Option.default v in
+      match Map.find_opt v shifts with
+      | None -> None
+      | Some (k, _) -> Some (Aig.input (v', i-k))
+    end
+    | None -> begin fun (v, i) ->
+      match Map.find_opt v shifts with
+      | None -> None
+      | Some (k, _) -> Some (Aig.input (v, i-k))
+    end
+  in
+  let shifts = match renamings with
+  | None -> shifts
+  | Some renamings ->  
+    Map.to_seq shifts |> Seq.map (fun (k, v) ->
+      Option.default k (renamings k), v) |> Map.of_seq
+  in
+  Aig.map map_ n, shifts
+
+let pp_dep ?(namer = string_of_int) (fmt : Format.formatter) (d: tdeps) : unit =
+  let print_set fmt s = Set.iter (Format.fprintf fmt "%d ") s in
+  Map.iter (fun id ints -> Format.fprintf fmt "%s: %a@." (namer id) print_set ints) d
+
+let pp_deps ?(namer = string_of_int) (fmt: Format.formatter) (ds: tdeps list) : unit = 
+  List.iteri (fun i d -> Format.fprintf fmt "Output #%d:@.%a@." i (pp_dep ~namer) d) ds
+
+let pp_bdep ?(start_index = 0) ?(oname="") ?(namer=string_of_int) (fmt: Format.formatter) ((n, d): tdblock) : unit =
+  Format.fprintf fmt "[%d-%d]%s:@." start_index (start_index+n-1) oname;
+  pp_dep ~namer fmt d
+
+let pp_bdeps ?(oname="") ?(namer=string_of_int) (fmt: Format.formatter) (bs: tdblock list) : unit =
+  List.fold_left (fun acc (n,d) -> (pp_bdep ~start_index:acc ~oname ~namer fmt (n,d)); acc + n) 0 bs |> ignore

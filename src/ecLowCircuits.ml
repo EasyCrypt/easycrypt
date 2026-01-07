@@ -12,9 +12,8 @@ module C = struct
   include Lospecs.Circuit_spec
 end
 
-module HL = struct
-  include Lospecs.Hlaig
-  include Lospecs.Hlaig.Deps
+module CDeps = struct
+  include Lospecs.Deps
 end
 
 module CSMT = struct
@@ -166,7 +165,7 @@ module LospecsBack : CBackend = struct
   type inp = int * int
 
   let pp_node (fmt : Format.formatter) (n: node) = 
-    Format.fprintf fmt "%a" Lospecs.Aig.pp_node n
+    Format.fprintf fmt "%a" (fun fmt -> Lospecs.Aig.pp_node fmt) n
 
   exception NonConstantCircuit (* FIXME: Rename later *)
 
@@ -331,8 +330,8 @@ module LospecsBack : CBackend = struct
     type deps = dep array
     type block_deps = (int * dep) array
 
-    let dep_of_node = fun n -> HL.dep n
-    let deps_of_reg = fun r -> HL.deps r
+    let dep_of_node = fun n -> CDeps.dep n
+    let deps_of_reg = fun r -> CDeps.deps r
     let block_deps_of_deps (w: int) (d: deps) : block_deps = 
       assert (Array.length d mod w = 0);
       Array.init (Array.length d / w) (fun i ->
@@ -426,7 +425,7 @@ module LospecsBack : CBackend = struct
       ) r 
 
     let excise_bit ?renamings (n: node) : node * (int, int * int) Map.t =
-      HL.realign_inputs ?renamings n
+      CDeps.realign_inputs ?renamings n
   end
 end
 
@@ -1858,4 +1857,4 @@ include ArrayOps
 
 let reset_backend_state () = 
   C.HCons.clear ();
-  HL.reset_state ()
+  CDeps.reset_state ()
