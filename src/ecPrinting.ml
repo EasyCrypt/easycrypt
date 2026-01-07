@@ -620,7 +620,7 @@ let pp_modtype1 (ppe : PPEnv.t) fmt mty =
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
-  Format.fprintf fmt "%s" (EcIdent.name x)
+  Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
 let pp_local ?fv (ppe : PPEnv.t) fmt x =
