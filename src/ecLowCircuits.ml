@@ -837,6 +837,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
   let unify_inputs (target: cinp list) ((c, inps): circuit) : circ = 
     let map_ = unify_inputs_renamer target inps in
     {c with reg = Backend.applys map_ c.reg}
+
+  let inputs_contained (subi: cinp list) (supi: cinp list) : bool =
+    List.compare_lengths subi supi < 0 &&
+    List.for_all2 (=) (subi) (List.take (List.length subi) supi)
     
   let circuit_input_compatible ?(strict = false) ((c, _): circuit) (cinp: cinp) : bool =
     match c.type_, cinp with
@@ -1262,6 +1266,11 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   (* Assumes all the pre and post have been split, takes all the pres and one post *) 
   let fillet_taut (pres: (circuit * Backend.Deps.dep) list) ((post_circ, post_inps): circuit) : bool =
+    let pres = List.map (fun ((c, inps), d) -> 
+      assert (inputs_contained inps post_inps);
+      ((c, post_inps), d)
+    ) pres in
+    (* FIXME: removable *)
     assert (List.for_all (fun ((_c, inps), _) -> inps = post_inps) pres);
     assert (List.for_all (fun (({type_;reg}, _), _) -> type_ = CBool) pres);
     assert (post_circ.type_ = CBool);
