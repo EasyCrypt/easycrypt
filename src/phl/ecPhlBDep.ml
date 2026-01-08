@@ -25,14 +25,7 @@ exception BDepUninitializedInputs
 
 (* TODO: Refactor error printing and checking? Lots of duplicated code *)
 
-let int_of_form (hyps: hyps) (f: form) : BI.zint = 
-  match f.f_node with 
-  | Fint i -> i
-  | _ -> begin try destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f with 
-    | DestrError _ -> let err = lazy (Format.asprintf "Failed to reduce form to int: %a@."
-      (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f) in
-      raise (BDepError err)
-    end
+let int_of_form = EcCircuits.int_of_form
 
 let time (env: env) (t: float) (msg: string) : float =
   let new_t = Unix.gettimeofday () in

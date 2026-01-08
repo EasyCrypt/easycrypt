@@ -30,8 +30,6 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
 (* FIXME: should change to a decent direct hash of this + store the forms *)
 (* also move the cache here? *)
 module AInvFHash = struct
-  let combine = Why3.Hashcons.combine
-
   type t = form
 
   let known_hashes : (int, int) Map.t ref = ref Map.empty
@@ -147,6 +145,7 @@ module AInvFHash = struct
     in
     doit {level = 0; subst = EcSubst.empty} f
 
+  (* FIXME: Check that this does not incur false positives *)
   let hash_form (f: form) = 
     match Map.find_opt f.f_tag !known_hashes with
     | Some hash -> hash
@@ -159,6 +158,30 @@ end
 (* -------------------------------------------------------------------- *)
 type width = int
 exception CircError of string Lazy.t
+exception MissingTyBinding of ty
+exception AbstractTyBinding of ty
+exception InvalidArgument
+exception MissingOpBinding of path
+exception MissingOpSpec of path
+exception IntConversionFailure 
+exception DestrError of string (* FIXME: change this one *)
+exception MissingOpBody (* FIXME: rename? *)
+exception BadFormForArg (* FIXME: rename *)
+exception CantConvertToConstant
+exception CantConvertToCirc of 
+  [`Int 
+  | `OpK of EcFol.op_kind 
+  | `Op of path 
+  | `Quantif of quantif
+  | `Match
+  | `Glob
+  | `Record
+  | `Hoare
+  | `Instr
+] 
+
+let ty_of_path (p: path) : ty =
+  EcTypes.tconstr p []
 
 let rec ctype_of_ty (env: env) (ty: ty) : ctype = 
   match ty.ty_node with
@@ -171,14 +194,12 @@ let rec ctype_of_ty (env: env) (ty: ty) : ctype =
       begin match EcEnv.Circuit.lookup_bitstring_size env ty with
       | Some sz -> CBitstring sz
       | _ ->
-          Format.eprintf "Missing binding for type %a@." 
-          EcPrinting.(pp_type (PPEnv.ofenv env)) ty;
-          raise (CircError (lazy "Failed to convert EC type to Circuit type"))
+          raise (MissingTyBinding ty)
     end
     | Some ({size = (_, None)}, _) -> 
-      raise (CircError (lazy ("No concrete binding for array type " ^ (Format.asprintf "%a" EcPrinting.(pp_type PPEnv.(ofenv env)) ty))))
+      raise (AbstractTyBinding ty)
     | Some (_, {size = (_, None)}) -> 
-      raise (CircError (lazy ("No concrete binding for bitstring type " ^ (Format.asprintf "%a" EcPrinting.(pp_type PPEnv.(ofenv env)) ty))))
+      raise (AbstractTyBinding ty)
   end
 
 let width_of_type (env: env) (t: ty) : int =
@@ -189,7 +210,7 @@ let width_of_type (env: env) (t: ty) : int =
 let shape_of_array_type (env: env) (t: ty) : (int * int) = 
     match ctype_of_ty env t with
     | CArray {width=w; count=n} -> (n, w)
-    | _ -> raise (CircError (lazy "shape_of_array_type on non array type"))
+    | _ -> raise InvalidArgument
 
 let input_of_type ~name (env: env) (t: ty) : circuit = 
   let ct = ctype_of_ty env t in
@@ -221,7 +242,7 @@ module BVOps = struct
     | `BvBind op -> op
     | `Path p -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
       | Some op -> op
-      | None -> raise (CircError (lazy ("No binding matching operator at path " ^ (EcPath.tostring p)) ))
+      | None -> raise (MissingOpBinding p)
     end
     in
     circuit_of_parametric_bvop op args
@@ -256,7 +277,7 @@ module BVOps = struct
     | `BvBind op -> op
     | `Path p -> begin match EcEnv.Circuit.lookup_bvoperator_path env p with
       | Some op -> op
-      | None -> raise (CircError (lazy ("No binding matching operator at path " ^ (EcPath.tostring p))))
+      | None -> raise (MissingOpBinding p)
     end
     in
     circuit_of_bvop op
@@ -276,7 +297,7 @@ module BitstringOps = struct
     | `BSBinding bnd -> bnd
     | `Path p -> begin match EcEnv.Circuit.reverse_bitstring_operator env p with
       | Some bnd -> bnd
-      | None -> raise (CircError (lazy ("No binding matching operator at path " ^ (EcPath.tostring p))))
+      | None -> raise (MissingOpBinding p)
       end
     in
     (* assert false => should be guarded by a previous call to op_is_bsop *)
@@ -285,10 +306,10 @@ module BitstringOps = struct
     | {size = (_, Some size)}, `OfInt -> begin match args with
       | [ `Constant i ] ->
         circuit_of_zint ~size i
-      | args -> raise (CircError (lazy (Format.asprintf "Bad arguments for bitstring of_int: expected (int) got (%a)" EcPrinting.(pp_list ", " pp_arg) args)))
+      | args -> raise InvalidArgument
     end
-    | {size = (_, None)}, `OfInt -> 
-        raise (CircError (lazy "No concrete binding for type of of_int@.")) (* FIXME: error messages *)
+    | {size = (_, None); type_=ty}, `OfInt -> 
+      raise (AbstractTyBinding (ty_of_path ty)) (* FIXME: check this, might want to add generic path -> ty conversion *)
     | bs, `To -> assert false (* doesn't translate to circuit *)
     | bs, `ToSInt -> assert false (* doesn't translate to circuit *) 
     | bs, `ToUInt -> assert false (* doesn't translate to circuit *)
@@ -311,7 +332,7 @@ module ArrayOps = struct
     | `ABinding bnd -> bnd
     | `Path p -> begin match EcEnv.Circuit.reverse_array_operator env p with
       | Some bnd -> bnd
-      | None -> raise (CircError (lazy ("No binding matching operator at path " ^ (EcPath.tostring p))) )
+      | None -> raise (MissingOpBinding p)
     end
     in
     (* assert false => should be guarded by a call to op_is_arrayop *)
@@ -320,25 +341,19 @@ module ArrayOps = struct
     | (arr, `Get) -> begin match args with
       | [ `Circuit (({type_ = CArray _}, inps) as arr); `Constant i] ->
         array_get arr (BI.to_int i)
-      | args -> 
-        let err = lazy (Format.asprintf "Bad inputs to arr get: Expected (arr, idx) got (%a)" (EcPrinting.pp_list "," pp_arg) args) in
-        raise (CircError err)
+      | args -> raise InvalidArgument
     end
     | ({size = (_, Some size)}, `OfList) -> begin match args with 
       | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
-      | args -> 
-        let err = lazy (Format.asprintf "Bad inputs to arr of_list: Expected (default, list) got (%a)" (EcPrinting.pp_list "," pp_arg) args) in
-        raise (CircError err)
+      | args -> raise InvalidArgument
       end
-    | ({size = (_, None)}, `OfList) -> raise (CircError (lazy "Array of list with non-concrete size"))
+    | ({size = (_, None); type_=ty}, `OfList) -> raise (AbstractTyBinding (ty_of_path ty))
     | (_arr, `Set) -> begin match args with
       | [ `Circuit (({type_ = CArray _}, _) as arr); 
           `Constant i; 
           `Circuit (({type_ = CBitstring _}, _) as bs) ] ->
         array_set arr (BI.to_int i) bs
-      | args -> 
-        let err = lazy (Format.asprintf "Bad inputs to arr set: Expected (arr, idx, new_val) got (%a)" (EcPrinting.pp_list "," pp_arg) args) in
-        raise (CircError err)
+      | args -> raise InvalidArgument
     end
 end
 open ArrayOps
@@ -352,7 +367,7 @@ module CircuitSpec = struct
     let c = match c with
     | `Path p -> begin match EcEnv.Circuit.reverse_circuit env p with
       | Some c -> c
-      | None -> raise (CircError (lazy ("No spec binding for operator at path " ^ EcPath.(tostring p))))
+      | None -> raise (MissingOpSpec p)
     end
     | `Bind c -> c
     in
@@ -410,7 +425,7 @@ let circuit_of_op (env: env) (p: path) : circuit =
   let op = try
     EcEnv.Circuit.reverse_operator env p |> List.hd
   with Failure _ -> 
-    raise (CircError (lazy "Failed reverse operator"))
+    raise (MissingOpBinding p)
   in
   match op with
   | `Bitstring (bs, op) -> assert false (* Should be guarded by a call to op_is_base *)
@@ -422,7 +437,7 @@ let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  =
   let op = try
     EcEnv.Circuit.reverse_operator env p |> List.hd
   with Failure _ -> 
-    raise (CircError (lazy "Failed reverse operator"))
+    raise (MissingOpBinding p)
   in
   match op with
   | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
@@ -440,13 +455,10 @@ let int_of_form ?(redmode = EcReduction.full_red) (hyps: hyps) (f: form) : zint 
   | Fint i -> i
   | _ -> 
     begin try 
-      destr_int @@ EcCallbyValue.norm_cbv EcReduction.full_red hyps f
+      destr_int @@ EcCallbyValue.norm_cbv redmode hyps f
     with 
       DestrError "int" 
-    | DestrError "destr_int" ->
-      let err = lazy (Format.asprintf "Failed to reduce form | %a | to integer"
-        (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f) in
-      raise (CircError err)
+    | DestrError "destr_int" -> raise IntConversionFailure
     end
 
 let rec form_list_of_form ?(ppe: EcPrinting.PPEnv.t option) (f: form) : form list =
@@ -460,7 +472,7 @@ let rec form_list_of_form ?(ppe: EcPrinting.PPEnv.t option) (f: form) : form lis
     h::(form_list_of_form t)
   | _ -> 
       if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppe;
-      raise (CircError (lazy "Failed to destruct list"))
+      raise (DestrError "list")
 
 let form_is_iter (f: form) : bool = 
   match f.f_node with
@@ -501,7 +513,7 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
     let is = List.init (BI.to_int rep) BI.of_int in
     let f = List.fold_left (fun f i -> fn @!! [f]) base is in
     f
-  | _ -> raise (CircError (lazy (Format.asprintf "Failed to destructure form for iter expansion %a" EcPrinting.(pp_form ppenv) f)))
+  | _ -> raise (DestrError "iter")
   in
   if debug then Format.eprintf "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
   res
@@ -538,7 +550,7 @@ let circuit_of_form
         if debug then Format.eprintf "Failed to get body for op: %a (args: %a)\n" 
         (EcPrinting.pp_form ppe) op
         (EcPrinting.(pp_list "," (pp_form ppe))) args;
-        raise (CircError (lazy "Failed to get body for op in propagate integer arg"))
+        raise MissingOpBody
     in
     let res = fapply_safe op args in 
     res
@@ -555,30 +567,20 @@ let circuit_of_form
         type_has_bindings env c_t ->
         arg_of_init (fun i -> 
           let f = (fapply_safe f [f_int (BI.of_int i)]) in
-          let res = doit st f in
-          res
+          doit st f 
         )
     | {ty_node = Tconstr(p, [t])} when 
         p = EcCoreLib.CI_List.p_list &&
         type_has_bindings env t ->
-        let cs = List.map (fun f ->
-          doit st f) 
-          (try 
-            (form_list_of_form ~ppe f)
-          with 
-            CircError _ -> 
-              raise (CircError 
-              (lazy (Format.asprintf "Failed to destructure %a as list when attempting to convert it to an argument" 
-                EcPrinting.(pp_form ppe) f))))
-        in
+        let cs = List.map (fun f -> doit st f) (form_list_of_form ~ppe f) in
         arg_of_circuits cs
     | _ -> Format.eprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form ppe) f; 
-      raise (CircError (lazy "Failed to convert arg to form"))
+      raise BadFormForArg
 
   (* State does not get backward propagated so it is not returned *)
   and doit (st: state) (f_: form) : circuit =  
     match f_.f_node with
-    | Fint z -> raise (CircError (lazy "Translation encountered unexpected integer value"))
+    | Fint z -> raise (CantConvertToCirc `Int)
 
     | Fif (c_f, t_f, f_f) -> 
         let t = doit st t_f in
@@ -618,9 +620,8 @@ let circuit_of_form
             (circuit_true :> circuit)
           | Some `False ->
             (circuit_false :> circuit)
-          | _ -> 
-            let err = lazy (Format.sprintf "Unsupported op kind%s@." (EcPath.tostring pth)) in
-            raise (CircError err)
+          | Some opk -> raise (CantConvertToCirc (`OpK opk))
+          | None -> raise (CantConvertToCirc (`Op (destr_op f_ |> fst))) 
         end
         in 
         op_cache := Mp.add pth circ !op_cache;
@@ -689,9 +690,11 @@ let circuit_of_form
       cache := Map.add (fhash f_) circ !cache;
       circ
     end
-    with CircError le -> 
+    (* FIXME: Redo call chain on error *)
+    (* with CircError le -> 
       let err = lazy (Format.asprintf "Call %a\n%s" EcPrinting.(pp_form ppe) f (Lazy.force le)) in
-      raise (CircError err)
+      raise (CircError err) *)
+      with e -> raise e
     end
       
     | Fquant (qnt, binds, f) -> 
@@ -699,7 +702,7 @@ let circuit_of_form
       begin match qnt with
       | Lforall 
       | Llambda -> circ_lambda_oneshot st binds (fun st -> doit st f) (* FIXME: look at this interaction *)
-      | Lexists -> raise (CircError (lazy "Universal/Existential quantification not supported"))
+      | Lexists -> raise (CantConvertToCirc (`Quantif qnt))
       (* TODO: figure out how to handle quantifiers. Maybe just dont? *)
       end
 
@@ -707,7 +710,7 @@ let circuit_of_form
         let ftp = doit st f in
         (circuit_tuple_proj ftp i :> circuit)
 
-    | Fmatch  (f, fs, ty) -> raise (CircError (lazy "Match not supported"))
+    | Fmatch  (f, fs, ty) -> raise (CantConvertToCirc `Match)
 
     | Flet    (LSymbol (id, t), v, f) -> 
       let vc = doit st v in
@@ -724,11 +727,13 @@ let circuit_of_form
         comps
       in doit st f
 
+    | Flet (LRecord _, _, _) -> raise (CantConvertToCirc `Record)
+
     | Fpvar   (pv, mem) -> 
       let v = match pv with
       | PVloc v -> v
       (* FIXME: Should globals be supported? *)
-      | _ -> raise (CircError (lazy "Global vars not supported"))
+      | _ -> raise (CantConvertToCirc `Glob)
       in 
       let v = match state_get_pv_opt st mem v with
       | Some v -> v
@@ -738,7 +743,7 @@ let circuit_of_form
       in
       v
 
-    | Fglob (id, mem) -> raise (CircError (lazy "glob not supported"))
+    | Fglob (id, mem) -> raise (CantConvertToCirc `Glob)
 
     | Ftuple comps -> 
       let comps = 
@@ -746,8 +751,16 @@ let circuit_of_form
       in
       (circuit_tuple_of_circuits comps :> circuit)
 
-    | _ -> raise (CircError (lazy "Unsupported form kind in translation"))
-  
+    | FhoareF  _
+    | FhoareS  _
+    | FbdHoareF  _
+    | FbdHoareS  _
+    | FeHoareF  _
+    | FeHoareS  _
+    | FequivF  _
+    | FequivS  _
+    | FeagerF  _
+    | Fpr _ -> raise (CantConvertToCirc `Hoare)
 
   and trans_iter (st: state) (hyps: hyps) (f: form) (fs: form list) : circuit =
     (* FIXME: move auxiliary function out of the definitions *)
@@ -772,7 +785,7 @@ let circuit_of_form
     (* FIXME PR: this is currently being implemented directly on circuits, do we want this case as well? *)
     | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false 
     | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold -> assert false 
-    | _ -> raise (CircError (lazy (Format.asprintf "Failed to destr form %a to translate iter" EcPrinting.(pp_form ppenv) f)))
+    | _ -> raise (DestrError "iter")
   in 
   doit st f_ 
 
@@ -813,15 +826,16 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
       false
     end
 
+(* FIXME: add support for spec bindings for abstract/opaque operators *)
 let circuit_of_path (hyps: hyps) (p: path) : circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
-  | _ -> raise (CircError (lazy "Invalid operator type"))
+  | _ -> raise MissingOpBody
   in
   circuit_of_form hyps f
 
-let vars_of_memtype ?st (env: env) (mt : memtype) =
+let vars_of_memtype (mt : memtype) =
   let Lmt_concrete lmt = mt in
   List.filter_map (function 
     | { ov_name = Some name; ov_type = ty } ->
@@ -858,7 +872,7 @@ let process_instr ?me (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : st
         (List.combine 
           (List.map (function 
           | (PVloc v, _ty) -> v
-          | _ -> raise (CircError (lazy "Failed to parse tuple assignment"))) vs) 
+          | _ -> raise (CantConvertToCirc `Glob)) vs) 
         es) in
       st
     | Sasgn (LvTuple (vs), e) ->
@@ -867,26 +881,17 @@ let process_instr ?me (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : st
       let st = List.fold_left2 (fun st (pv, _ty) c -> 
         let v = match pv with
         | PVloc v -> v
-        | _ -> raise (CircError (lazy "Global variables not supported"))
+        | _ -> raise (CantConvertToCirc `Glob)
         in
         update_state_pv st mem v c 
         ) st vs (comps :> circuit list)
       in 
       st
     | _ -> 
-      let err = lazy (Format.asprintf "Instruction not supported: %a@." 
-      (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst) in
-      raise (CircError err)
+      raise (CantConvertToCirc `Instr)
   with 
-  | CircError le ->
-      let err = lazy (
-      Format.asprintf "BDep failed on instr: %a@.CircError:@.%s@.BACKTRACE: %s@.@."
-      (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
-      (Lazy.force le)
-      (Printexc.get_backtrace ())) in 
-    raise (CircError err)
   | e ->
-    (* FIXME: Bad handling *)
+    (* FIXME: Bad handling, use new exceptions *)
     let err = lazy (
       Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@.BACKTRACE: %s@.@."
       (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
@@ -929,15 +934,15 @@ let instrs_equiv
     let vs = EcPV.PV.elements pv |> fst in
     let vs = List.map (function 
       | (PVloc v, ty) -> (v, ty)
-      | _ -> raise (CircError (lazy "global variables not supported"))
+      | _ -> raise (CantConvertToCirc `Glob)
       ) vs 
     in List.for_all (fun (var, ty) -> 
       let circ1 = state_get_pv_opt st1 mem var in
       let circ2 = state_get_pv_opt st2 mem var in
       match circ1, circ2 with
       | None, None -> true
-      | None, Some circ1
-      | Some circ1, None -> false (* Variable only defined on one of the blocks (and not in the prelude) *)
+      | None, Some _
+      | Some _, None -> false (* Variable only defined on one of the blocks (and not in the prelude) *)
       | Some circ1, Some circ2 -> circ_equiv circ1 circ2 
     ) vs
   | None -> state_get_all_memory st mem |> List.for_all (fun (var, _) -> 
@@ -977,7 +982,7 @@ let rec circ_simplify_form_bitstring_equality
 let compute ~(sign: bool) (c: circuit) (args: zint list) : zint = 
   match compute ~sign c (List.map (fun z -> arg_of_zint z) args) with
   | Some z -> z
-  | None -> raise (CircError (lazy "Failed to reduce circuit to constant in compute"))
+  | None -> raise CantConvertToConstant
 
 let circ_equiv ?(pcond: circuit option) c1 c2 = 
   circ_equiv ?pcond c1 c2
@@ -1009,10 +1014,11 @@ let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
         | Some v -> 
           begin try
             Some ((m, v), ctype_of_ty env ov_type)
-          with CircError err ->
-            raise (CircError (lazy ( 
+          with e ->
+            raise e (* FIXME *)
+            (* (CircError (lazy ( 
               (Format.asprintf "Failed for decl for var %s@." v) ^ Lazy.force err
-            )))
+            ))) *)
           end
         | None -> None
       ) decls in
@@ -1030,6 +1036,8 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
 (*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
       They are either given a value by assignment in the program or if they are used 
       before that they are implicitly initialized to BAD 
+
+      FIXME: Find a good way to handle this
 *)
 
     | EcBaseLogic.LD_mem mt when use_mem -> circuit_state_of_memenv ~st env (id, mt)

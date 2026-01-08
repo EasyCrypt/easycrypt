@@ -177,6 +177,7 @@ type crb_tyrev_binding = [
   | `Array     of crb_array
 ]
 
+(* FIXME: rename `To ? *)
 type crb_bitstring_operator = crb_bitstring * [`From | `To | `OfInt | `ToUInt | `ToSInt ]
 
 type crb_array_operator = crb_array * [`Get | `Set | `ToList | `OfList]

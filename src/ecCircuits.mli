@@ -18,6 +18,7 @@ val circ_red : hyps -> EcReduction.reduction_info
 val width_of_type : env -> ty -> int 
 val circuit_to_string : circuit -> string
 val ctype_of_ty : env -> ty -> ctype
+val int_of_form : ?redmode:EcReduction.reduction_info -> hyps -> form -> BI.zint
 
 (* State utilities *)
 val state_get : state -> memory -> symbol -> circuit
