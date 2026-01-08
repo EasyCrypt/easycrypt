@@ -4,6 +4,7 @@ open EcSymbols
 open EcAst
 open EcEnv
 open LDecl
+open EcPath
 open EcLowCircuits
 
 (* -------------------------------------------------------------------- *)
@@ -11,6 +12,27 @@ module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
 exception CircError of string Lazy.t
+exception MissingTyBinding of ty
+exception AbstractTyBinding of ty
+exception InvalidArgument
+exception MissingOpBinding of path
+exception MissingOpSpec of path
+exception IntConversionFailure 
+exception DestrError of string (* FIXME: change this one *)
+exception MissingOpBody (* FIXME: rename? *)
+exception BadFormForArg (* FIXME: rename *)
+exception CantConvertToConstant
+exception CantConvertToCirc of 
+  [`Int 
+  | `OpK of EcFol.op_kind 
+  | `Op of path 
+  | `Quantif of quantif
+  | `Match
+  | `Glob
+  | `Record
+  | `Hoare
+  | `Instr
+] 
 
 (* -------------------------------------------------------------------- *)
 (* Utilities (figure out better name) *)

@@ -22,6 +22,9 @@ module Option = Batteries.Option
 (* -------------------------------------------------------------------- *)
 exception BDepError of string Lazy.t
 exception BDepUninitializedInputs
+exception BadTypeForConstructor
+exception TyLookupError
+exception BDepVerifyFail
 
 (* TODO: Refactor error printing and checking? Lots of duplicated code *)
 
@@ -41,15 +44,15 @@ let time (env: env) (t: float) (msg: string) : float =
 let array_init_from_form (env: env) (f: form) ((arr_t, offset): qsymbol * BI.zint) : form =
   let ppe = EcPrinting.PPEnv.ofenv env in
   let tpath = match EcEnv.Ty.lookup_opt arr_t env with
-  | None -> raise (BDepError (lazy "Failed to lookup type for input slice"))
+  | None -> raise TyLookupError
   | Some (path, decl) when List.length decl.tyd_params = 1 ->
     path
   | Some ((_path, decl) as tdecl) ->
-    raise (BDepError (lazy (Format.asprintf "Type given to input slice (%a) does not look like an array type" EcPrinting.(pp_typedecl ppe) tdecl)))
+    raise BadTypeForConstructor
   in
   let get = match EcEnv.Circuit.lookup_array env f.f_ty with
   | Some { get } -> get
-  | None -> raise (BDepError (lazy (Format.asprintf "Failed to lookup array binding for type %a" EcPrinting.(pp_type ppe) f.f_ty)))
+  | None -> raise (MissingTyBinding f.f_ty)
   in
   let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env in
   let idx = create "i" in
@@ -64,9 +67,8 @@ let form_list_from_iota (hyps: hyps) (f: form) : form list =
     let n = int_of_form hyps n in
     let m = int_of_form hyps m in
     List.init (BI.to_int m) (fun i -> f_int (BI.(add n (of_int i))))
-  | _ -> let err = lazy (Format.asprintf "Failed to get form list from iota expression %a@."
-    (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f) in
-    raise (BDepError err)
+  | _ -> 
+    raise (DestrError "iota") 
 
 let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
   match destr_op_app f with
@@ -78,8 +80,7 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-      if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppenv;
-      raise (BDepError (lazy "Failed to destruct list"))
+      raise (DestrError "list")
 
 (* FIXME: move? A *)
 
@@ -158,7 +159,8 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
         EcPrinting.(pp_form ppe) f
         EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
       try (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f))::[] with
-      e -> begin if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
+      e -> begin 
+        if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
         [] end
       end
   in
@@ -215,8 +217,9 @@ let t_bdep_solve
       if res then 
         FApi.close (!@ tc) VBdep 
       else
-        raise (BDepError (lazy "Failed to verify postcondition"))
+        raise BDepVerifyFail (* FIXME: this is tactic failure, maybe should be done differently? *)
       with 
+      (* FIXME: not catching anything, redo *)
       | BDepError le
       | CircError le ->
         tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
@@ -240,9 +243,10 @@ let t_bdep_solve
 
         (if solve_post ~st ~pres:cpres hyps es_po
         then FApi.close (!@ tc) VBdep else
-        raise (BDepError (lazy "Failed to verify postcondition")))
+        raise BDepVerifyFail)
       )
       with 
+      (* FIXME: not catching anything, redo *)
       | BDepError le
       | CircError le ->
         tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
@@ -281,6 +285,7 @@ let t_bdep_simplify (tc: tcenv1) =
 
       let st = try
         EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node 
+      (* FIXME: not catching anything, redo *)
       with CircError (lazy err) ->
         tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
       in
