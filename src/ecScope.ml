@@ -2239,25 +2239,30 @@ module Ty = struct
             (fun tc -> fst (EcEnv.TypeClass.lookup (unloc tc) env))
             tcs  in
         let ue = TT.transtyvars env (loc, Some args) in
-        EcUnify.UniEnv.tparams ue, `Abstract (Sp.of_list tcs)
+        EcUnify.UniEnv.tparams ue, Abstract (Sp.of_list tcs)
 
       | PTYD_Alias    bd ->
         let ue     = TT.transtyvars env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
-        EcUnify.UniEnv.tparams ue, `Concrete body
+        EcUnify.UniEnv.tparams ue, Concrete body
 
-      | PTYD_Datatype dt ->
-        let datatype = EHI.trans_datatype env (mk_loc loc (args,name)) dt in
-        let tparams, tydt =
-          try ELI.datatype_as_ty_dtype datatype
-          with ELI.NonPositive -> EHI.dterror loc env EHI.DTE_NonPositive
-        in
-        tparams, `Datatype tydt
+      | PTYD_Datatype dt -> (
+          let datatype = EHI.trans_datatype env (mk_loc loc (args, name)) dt in
+          (* Maybe this is not _the_ one way to build it, compare to
+             ecHiInductive.ml#L132-L134 *)
+          let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
+          try
+            ELI.check_positivity ty_from_ctor datatype;
+            let tparams, tydt = ELI.datatype_as_ty_dtype datatype in
+            (tparams, Datatype tydt)
+          with ELI.NonPositive ty ->
+            EHI.dterror loc env
+              (EHI.DTE_NonPositive (basename datatype.dt_path, ty)))
 
       | PTYD_Record rt ->
         let record  = EHI.trans_record env (mk_loc loc (args,name)) rt in
         let scheme  = ELI.indsc_of_record record in
-        record.ELI.rc_tparams, `Record (scheme, record.ELI.rc_fields)
+        record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)
     in
 
     bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; })
@@ -2270,7 +2275,7 @@ module Ty = struct
     let scope =
       let decl = EcDecl.{
         tyd_params  = [];
-        tyd_type    = `Abstract Sp.empty;
+        tyd_type    = Abstract Sp.empty;
         tyd_loca    = `Global; (* FIXME:SUBTYPE *)
       } in bind scope (unloc subtype.pst_name, decl) in
 
@@ -2365,7 +2370,7 @@ module Ty = struct
       let asty  =
         let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
           { tyd_params  = [];
-            tyd_type    = `Abstract body;
+            tyd_type    = Abstract body;
             tyd_loca    = (lc :> locality); } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
