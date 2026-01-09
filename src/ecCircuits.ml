@@ -579,6 +579,7 @@ let circuit_of_form
 
   (* State does not get backward propagated so it is not returned *)
   and doit (st: state) (f_: form) : circuit =  
+    try begin
     match f_.f_node with
     | Fint z -> raise (CantConvertToCirc `Int)
 
@@ -761,6 +762,13 @@ let circuit_of_form
     | FequivS  _
     | FeagerF  _
     | Fpr _ -> raise (CantConvertToCirc `Hoare)
+    end
+    with
+    | (CantConvertToCirc _) as e -> 
+      Format.eprintf "Failed on form %a with error %s@."
+      EcPrinting.(pp_form ppe) f_ 
+      (Printexc.to_string e);
+      assert false
 
   and trans_iter (st: state) (hyps: hyps) (f: form) (fs: form list) : circuit =
     (* FIXME: move auxiliary function out of the definitions *)
