@@ -2847,34 +2847,24 @@ logtactic:
 | WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
    { Pwlog (ids, b, f) }
 
-eager_info:
-| h=ident
-    { LE_done h }
-
-| LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
-    { LE_todo (h, s1, s2, pr, po) }
-
 eager_tac:
-| SEQ n1=codepos1 n2=codepos1 i=eager_info COLON p=sform
-    { Peager_seq (i, (n1, n2), p) }
+| SEQ n1=codepos1 n2=codepos1 COLON s=stmt COLON p=form_or_double_form
+    { Peager_seq ((n1, n2), s, p) }
 
 | IF
     { Peager_if }
 
-| WHILE i=eager_info
+| WHILE i=sform
     { Peager_while i }
 
 | PROC
     { Peager_fun_def }
 
-| PROC i=eager_info f=sform
-    { Peager_fun_abs (i, f) }
+| PROC f=sform
+    { Peager_fun_abs f }
 
 | CALL info=gpterm(call_info)
     { Peager_call info }
-
-| info=eager_info COLON p=sform
-    { Peager (info, p) }
 
 form_or_double_form:
 | f=sform

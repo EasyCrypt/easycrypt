@@ -603,11 +603,6 @@ type trans_info =
   trans_kind * trans_formula
 
 (* -------------------------------------------------------------------- *)
-type eager_info =
-  | LE_done of psymbol
-  | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
-
-(* -------------------------------------------------------------------- *)
 type bdh_split =
   | BDH_split_bop     of pformula * pformula * pformula option
   | BDH_split_or_case of pformula * pformula * pformula
@@ -782,13 +777,12 @@ type phltactic =
 
 
     (* Eager *)
-  | Peager_seq       of (eager_info * pcodepos1 pair * pformula)
+  | Peager_seq       of (pcodepos1 pair * pstmt * pformula doption)
   | Peager_if
-  | Peager_while     of (eager_info)
+  | Peager_while     of pformula
   | Peager_fun_def
-  | Peager_fun_abs   of (eager_info * pformula)
-  | Peager_call      of (call_info gppterm)
-  | Peager           of (eager_info * pformula)
+  | Peager_fun_abs   of pformula
+  | Peager_call      of call_info gppterm
 
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)
