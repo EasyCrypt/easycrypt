@@ -16,9 +16,10 @@ type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params   : ty_params;
+  tyd_type     : ty_body;
+  tyd_loca     : locality;
+  tyd_clinline : bool;
 }
 
 and ty_body = [
@@ -65,7 +66,10 @@ let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_loca = lc; }
+  { tyd_params   = params
+  ; tyd_type     = `Abstract tc
+  ; tyd_loca     = lc
+  ; tyd_clinline = false }
 
 (* -------------------------------------------------------------------- *)
 let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
@@ -348,3 +352,77 @@ let field_equal f1 f2 =
      ring_equal f1.f_ring f2.f_ring
   && EcPath.p_equal f1.f_inv f2.f_inv
   && EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div
+
+(* -------------------------------------------------------------------- *)
+type binding_size = form * (int option)
+
+type crb_bitstring =
+  { type_  : EcPath.path
+  ; from_  : EcPath.path
+  ; to_    : EcPath.path
+  ; ofint  : EcPath.path
+  ; touint : EcPath.path
+  ; tosint : EcPath.path
+  ; size   : binding_size
+  ; theory : EcPath.path }
+  
+type crb_array =
+  { type_  : EcPath.path
+  ; get    : EcPath.path
+  ; set    : EcPath.path
+  ; tolist : EcPath.path
+  ; oflist : EcPath.path
+  ; size   : binding_size
+  ; theory : EcPath.path }
+  
+type bv_opkind = [
+  | `Add      of binding_size (* size *)
+  | `Sub      of binding_size (* size *)
+  | `Mul      of binding_size (* size *)
+  | `Div      of binding_size * bool (* size + sign *)
+  | `Rem      of binding_size * bool (* size + sign *)
+  | `Shl      of binding_size (* size *)
+  | `Shr      of binding_size * bool (* size + sign *)
+  | `Shls     of binding_size * binding_size (* size *)
+  | `Shrs     of binding_size * binding_size * bool (* size + sign *)
+  | `Rol      of binding_size (* size *)
+  | `Rol      of binding_size (* size *)
+  | `Ror      of binding_size (* size *)
+  | `And      of binding_size (* size *)
+  | `Or       of binding_size (* size *)
+  | `Xor      of binding_size (* size *)
+  | `Not      of binding_size (* size *)
+  | `Opp      of binding_size (* size *)
+  | `Lt       of binding_size * bool (* size + sign *) 
+  | `Le       of binding_size * bool (* size + sign *)
+  | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
+  | `Truncate of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size (* size in + size out *)
+  | `Insert   of binding_size * binding_size (* size in + size out *)
+  | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
+  | `Init     of binding_size (* size_out *)
+  | `Get      of binding_size (* size_in *)
+  | `AInit    of binding_size * binding_size (* arr_len + size_out *)
+  | `Map      of binding_size * binding_size * binding_size (* size_in + size_out + arr_size *)
+  | `A2B      of (binding_size * binding_size) * binding_size (* (arr_len, elem_sz), out_size *)
+  | `B2A      of binding_size * (binding_size * binding_size) (* size in, (arr_len, elem_sz)  *)
+  | `ASliceGet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_out *)
+  | `ASliceSet of (binding_size * binding_size) * binding_size (* arr_len + el_sz + sz_in *)
+]
+  
+type crb_bvoperator =
+  { kind     : bv_opkind
+  ; types    : EcPath.path list
+  ; operator : EcPath.path
+  ; theory   : EcPath.path }
+  
+type crb_circuit =
+{ name     : string
+; circuit  : Lospecs.Ast.adef
+; operator : EcPath.path }
+
+type crbinding =
+| CRB_Bitstring  of crb_bitstring
+| CRB_Array      of crb_array
+| CRB_BvOperator of crb_bvoperator
+| CRB_Circuit    of crb_circuit
