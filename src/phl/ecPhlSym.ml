@@ -20,7 +20,7 @@ let t_equivS_sym tc =
   let (ml, mtl), (mr, mtr) = es.es_ml, es.es_mr in
   let pr    = {ml;mr;inv=(ts_inv_rebind (es_pr es) mr ml).inv} in
   let po    = {ml;mr;inv=(ts_inv_rebind (es_po es) mr ml).inv} in
-  let cond  = f_equivS mtl mtr pr es.es_sr es.es_sl po in
+  let cond  = f_equivS mtr mtl pr es.es_sr es.es_sl po in
   FApi.xmutate1 tc `EquivSym [cond]
 
 (*-------------------------------------------------------------------- *)
