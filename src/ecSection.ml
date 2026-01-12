@@ -42,7 +42,10 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Module mp ->
     let ppe =
       match mp.m_top with
-      | `Local id -> EcPrinting.PPEnv.add_locals ppe [id]
+      | `Local id ->
+        if EcEnv.Mod.is_declared id env then
+          ppe
+        else EcPrinting.PPEnv.add_locals ppe [id]
       | _ -> ppe in
     Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
@@ -153,7 +156,7 @@ and on_ty (aenv : aenv) (ty : ty) =
   match ty.ty_node with
   | Tunivar _        -> ()
   | Tvar    _        -> ()
-  | Tglob   _        -> ()
+  | Tglob   m        -> aenv.cb (`Module (mident m))
   | Ttuple tys       -> List.iter (on_ty aenv) tys
   | Tconstr (p, tys) -> on_tyname aenv p; List.iter (on_ty aenv) tys
   | Tfun (ty1, ty2)  -> List.iter (on_ty aenv) [ty1; ty2]
@@ -380,10 +383,10 @@ and on_module (aenv : aenv) (me : module_expr) =
 
 (* -------------------------------------------------------------------- *)
 and on_mstruct (aenv : aenv) (st : module_structure) =
-  List.iter (on_mpath_mstruct1 aenv) st.ms_body
+  List.iter (on_mstruct1 aenv) st.ms_body
 
 (* -------------------------------------------------------------------- *)
-and on_mpath_mstruct1 (aenv : aenv) (item : module_item) =
+and on_mstruct1 (aenv : aenv) (item : module_item) =
   match item with
   | MI_Module   me -> on_module aenv me
   | MI_Variable x  -> on_ty aenv x.v_type
@@ -578,15 +581,16 @@ let pp_thname scenv =
 (* -------------------------------------------------------------------- *)
 let locality (env : EcEnv.env) (who : cbarg) =
   match who with
-  | `Type p -> (EcEnv.    Ty.by_path p env).tyd_loca
-  | `Op   p -> (EcEnv.    Op.by_path p env).op_loca
-  | `Ax   p -> (EcEnv.    Ax.by_path p env).ax_loca
-  | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
-  | `Module mp    ->
-    begin match EcEnv.Mod.by_mpath_opt mp env with
+  | `Type p -> (EcEnv.Ty.by_path p env).tyd_loca
+  | `Op   p -> (EcEnv.Op.by_path p env).op_loca
+  | `Ax   p -> (EcEnv.Ax.by_path p env).ax_loca
+  | `Typeclass p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
+  | `Module mp -> begin
+    match EcEnv.Mod.by_mpath_opt mp env with
     | Some (_, Some lc) -> lc
-     (* in this case it should be a quantified module *)
-    | _         -> `Global
+    | _ ->
+      let id = EcPath.mget_ident mp in
+      if EcEnv.Mod.is_declared id env then `Declare else `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
   | `Instance _ -> assert false
@@ -1332,17 +1336,19 @@ let check_module scenv prefix tme =
   match tme.tme_loca with
   | `Local -> check_section scenv from
   | `Global ->
-    if scenv.sc_insec then
+    if scenv.sc_insec then begin
+      let isalias = EcModules.is_me_body_alias tme.tme_expr.me_body in
       let cd =
         { d_ty    = [`Global];
           d_op    = [`Global];
           d_ax    = [];
           d_sc    = [];
-          d_mod   = [`Global]; (* FIXME section: add local *)
+          d_mod   = [`Global] @ (if isalias then [`Declare] else []);
           d_modty = [`Global];
           d_tc    = [`Global];
         } in
       on_module (mkaenv scenv.sc_env (cb scenv from cd)) me
+    end
   | `Declare -> (* Should be SC_decl_mod ... *)
     assert false
 
