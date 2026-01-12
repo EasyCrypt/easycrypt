@@ -1515,8 +1515,12 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_rw (_ : ST.state) (o, s) tc =
     let h = EcIdent.create "_" in
     let rwt tc =
-      let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
-      process_rewrite1_core ~close:false (s, None, o) pt tc
+      match LDecl.by_id h (FApi.tc1_hyps tc) with
+      | LD_hyp _ ->
+        let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
+        process_rewrite1_core ~close:false (s, None, o) pt tc
+      | _ ->
+        tc_error !!tc "top assumption is not an hypothesis";
     in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
 
   and intro1_unfold (_ : ST.state) (s, o) p tc =
