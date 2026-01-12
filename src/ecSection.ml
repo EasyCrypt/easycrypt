@@ -98,12 +98,13 @@ type aenv = {
 }
 
 and acache = {
-  op : Sp.t;                  (* Operator declaration already handled *)
+  op    : Sp.t;               (* Operator declaration already handled *)
+  type_ : Sp.t;               (* Type declaration already handled *) 
 }
 
 (* -------------------------------------------------------------------- *)
 let empty_acache : acache =
-  { op = Sp.empty; }
+  { op = Sp.empty; type_ = Sp.empty; }
 
 (* -------------------------------------------------------------------- *)
 let mkaenv (env : EcEnv.env) (cb : cb) : aenv = 
@@ -154,8 +155,17 @@ and on_ty (aenv : aenv) (ty : ty) =
   | Tvar    _        -> ()
   | Tglob   _        -> ()
   | Ttuple tys       -> List.iter (on_ty aenv) tys
-  | Tconstr (p, tys) -> aenv.cb (`Type p); List.iter (on_ty aenv) tys
+  | Tconstr (p, tys) -> on_tyname aenv p; List.iter (on_ty aenv) tys
   | Tfun (ty1, ty2)  -> List.iter (on_ty aenv) [ty1; ty2]
+
+(* -------------------------------------------------------------------- *)
+and on_tyname (aenv : aenv) (p : path) =
+  aenv.cb (`Type p);
+  if not (Sp.mem p !(aenv.cache).type_) then begin
+    let cache = { !(aenv.cache) with type_ = Sp.add p !(aenv.cache).type_ } in
+    aenv.cache := cache;
+    on_tydecl aenv (EcEnv.Ty.by_path p aenv.env)
+  end
 
 (* -------------------------------------------------------------------- *)
 and on_opname (aenv : aenv) (p : EcPath.path) =
