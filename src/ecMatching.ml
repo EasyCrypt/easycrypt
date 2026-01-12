@@ -837,19 +837,20 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
     cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 
   and doit_mem _env mxs m1 m2 =
-    match EV.get m1 !ev.evm_mem with
-    | None ->
-        if not (EcMemory.mem_equal m1 m2) then
+    if not (EcMemory.mem_equal m1 m2) then begin
+      match EV.get m1 !ev.evm_mem with
+      | None ->
           raise MatchFailure
 
-    | Some `Unset ->
-        if Mid.mem m2 mxs then
-          raise MatchFailure;
-        ev := { !ev with evm_mem = EV.set m1 m2 !ev.evm_mem }
+      | Some `Unset ->
+          if Mid.mem m2 mxs then
+            raise MatchFailure;
+          ev := { !ev with evm_mem = EV.set m1 m2 !ev.evm_mem }
 
-    | Some (`Set m1) ->
-        if not (EcMemory.mem_equal m1 m2) then
-          raise MatchFailure
+      | Some (`Set m1) ->
+          if not (EcMemory.mem_equal m1 m2) then
+            raise MatchFailure
+  end
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
