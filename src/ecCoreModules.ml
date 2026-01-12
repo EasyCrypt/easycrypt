@@ -494,6 +494,9 @@ type top_module_expr = {
   tme_loca : locality;
 }
 
+let is_me_body_alias (body : module_body) =
+  match body with ME_Alias _ -> true | _ -> false
+
 (* -------------------------------------------------------------------- *)
 let ur_hash = EcAst.ur_hash
 
