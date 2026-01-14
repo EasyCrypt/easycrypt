@@ -151,6 +151,8 @@ module type CBackend = sig
     val dep_contained : dep -> dep -> bool
     (* Checks if two dep sets are equal *)
     val deps_equal : dep -> dep -> bool
+    (* Checks if two dep sets intersect *)
+    val deps_intersect : dep -> dep -> bool
     (* Checks if all the deps are in a given list of inputs *)
     val check_inputs : reg -> (int * int) list -> bool
 
@@ -432,6 +434,12 @@ module LospecsBack : CBackend = struct
 
     let deps_equal (d1: dep) (d2: dep) : bool =
       (Map.equal (Set.equal) d1 d2)
+
+    let deps_intersect (d1: dep) (d2: dep) : bool =
+      not @@ Map.for_all (fun id bits1 ->
+        match Map.find_opt id d2 with 
+        | None -> true
+        | Some bits2 -> Set.is_empty @@ Set.intersect bits1 bits2) d1
 
     let forall_inputs (check: int -> int -> bool) (r: reg) : bool =
       let d = deps_of_reg r in
@@ -1263,6 +1271,17 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | c::cs -> doit [] c cs
 
    
+  let attach_compatible_pres ?(mode: [`Cont | `Eq | `Int] = `Cont) (pres: (circuit * Backend.Deps.dep) list) ((post_circ, _) as post: circuit) : circuit =
+    let d = Backend.(Deps.dep_of_node (node_of_reg post_circ.reg)) in
+    let compat_pres = List.filteri (fun _i (_c, pre_dep) ->
+      match mode with
+      | `Cont -> Backend.Deps.dep_contained pre_dep d
+      | `Eq -> Backend.Deps.deps_equal pre_dep d
+      | `Int -> Backend.Deps.deps_intersect pre_dep d
+    ) pres in
+    let compat_pres = List.fst compat_pres in
+    let pre = List.fold_left circuit_and circuit_true compat_pres in
+    circuit_or (circuit_not pre) post
 
   (* Assumes all the pre and post have been split, takes all the pres and one post *) 
   let fillet_taut (pres: (circuit * Backend.Deps.dep) list) ((post_circ, post_inps): circuit) : bool =
@@ -1365,14 +1384,20 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       if (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = CBool) pres))
       || (not (List.for_all (fun ({type_;reg=_}, _) -> type_ = CBool) posts)) then
         raise CircSmtNonBoolCirc;
-      let posts = collapse_lanes posts in
-      if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
+      let posts = List.map (attach_compatible_pres ~mode:`Int pres) posts in
+      let posts = collapse_lanes posts in
+
+      if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
+
       List.mapi (fun i post -> 
         if debug then Format.eprintf "Checking equivalence for bit %d@." i; (* FIXME *)
-        let res = fillet_taut pres post in 
+
+(*         let res = fillet_taut pres post in  *)
+        let res = circ_taut post in
         if not res then Format.eprintf "Failed for bit %d@." i;
+
         res) posts |>
       List.for_all identity
    
