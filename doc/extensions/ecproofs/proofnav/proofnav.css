@@ -1,0 +1,233 @@
+/* Scope everything under the directive wrapper to avoid theme conflicts */
+.proofnav-sphinx .proofnav-rtd{
+  --pn-panel: #fcfcfc;
+  --pn-border: #e1e4e5;
+  --pn-text: #404040;
+  --pn-muted: #6a6a6a;
+
+  /* more visible highlights */
+  --pn-doneBg: #e6edf3;
+  --pn-curBg:  #cfe3ff;
+  --pn-hoverBg:#e8f2ff;
+
+  --pn-radius: 4px;
+  --pn-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+             "Liberation Mono", "Courier New", monospace;
+
+  font: inherit;
+  color: var(--pn-text);
+}
+
+.proofnav-sphinx .proofnav-rtd.proofnav {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.proofnav-sphinx .proofnav-rtd .panel{
+  border: 1px solid var(--pn-border);
+  border-radius: var(--pn-radius);
+  overflow: hidden;
+  background: var(--pn-panel);
+  min-width: 0;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__body{
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 12px;
+}
+
+.proofnav-sphinx .proofnav-rtd.pn-collapsed .proofnav__body{
+  display: none;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__btnToggle{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__btnToggle{
+  padding: 4px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__sr{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__chev{
+  transition: transform 120ms ease;
+}
+
+.proofnav-sphinx .proofnav-rtd.pn-collapsed .proofnav__chev{
+  transform: rotate(-90deg);
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__sentencebar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pn-border);
+  background: #fff;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__header{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pn-border);
+  background: #fff;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__title{
+  font-weight: 600;
+  font-size: 14px;
+  color: #2d2d2d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__title{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__subtitle{
+  font-size: 12px;
+  color: var(--pn-muted);
+  margin-left: 10px;
+  font-weight: 500;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__controls{
+  display:flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.proofnav-sphinx .proofnav-rtd .proofnav__btn{
+  appearance: none;
+  border: 1px solid var(--pn-border);
+  background: #fff;
+  color: var(--pn-text);
+  padding: 6px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+.proofnav-sphinx .proofnav-rtd .proofnav__btn:hover{ background: #f7f7f7; }
+
+.proofnav-sphinx .proofnav-rtd .proofnav__editor{
+  height: auto;
+  background: #fff;
+  overflow: hidden;
+}
+
+.proofnav-sphinx .proofnav-rtd .infoBody{
+  padding: 10px;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.proofnav-sphinx .proofnav-rtd .box{
+  border: 1px solid var(--pn-border);
+  border-radius: var(--pn-radius);
+  padding: 8px 10px;
+  background: #fff;
+  min-width: 0;
+}
+
+.proofnav-sphinx .proofnav-rtd .tabs{
+  display:flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.proofnav-sphinx .proofnav-rtd .tab{
+  border: 1px solid var(--pn-border);
+  background: #fff;
+  color: var(--pn-text);
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.proofnav-sphinx .proofnav-rtd .tab[aria-selected="true"]{
+  background: #e8f0ff;
+  border-color: #c9d7ff;
+}
+
+.proofnav-sphinx .proofnav-rtd .goal-sep{
+  border-top: 1px solid var(--pn-border);
+  margin: 6px 0 8px 0;
+}
+
+.proofnav-sphinx .proofnav-rtd pre{
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--pn-mono);
+  font-size: 11.5px;
+  color: var(--pn-text);
+}
+
+.proofnav-sphinx .proofnav-rtd .empty{
+  color: var(--pn-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* sentence highlights */
+.proofnav-sphinx .proofnav-rtd .cm-sentenceDone{ background: var(--pn-doneBg); }
+.proofnav-sphinx .proofnav-rtd .cm-sentenceHover{ background: var(--pn-hoverBg); }
+.proofnav-sphinx .proofnav-rtd .cm-sentenceCurrent{
+  background: var(--pn-curBg) !important;
+  box-shadow: inset 3px 0 0 rgba(32,94,255,.35);
+}
+
+/* active sentence gutter */
+.proofnav-sphinx .proofnav-rtd .cm-activeSentenceGutter{
+  background: #fbfbfb;
+  border-right: 1px solid var(--pn-border);
+  color: #2d2d2d;
+}
+
+.proofnav-sphinx .proofnav-rtd .cm-activeSentenceMarker{
+  width: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  user-select: none;
+}
+
+/* pointer cursor only when hovering a sentence */
+.proofnav-sphinx .proofnav-rtd.pn-hovering .cm-content,
+.proofnav-sphinx .proofnav-rtd.pn-hovering .cm-line,
+.proofnav-sphinx .proofnav-rtd.pn-hovering .cm-gutters{
+  cursor: pointer;
+}

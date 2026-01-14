@@ -1,0 +1,115 @@
+name: Build documentation
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: "refman"
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install npm dependencies
+        run: |
+          make -C doc ecproof-deps
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: |
+          make -C doc sphinx-deps
+
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.4
+          opam-disable-sandboxing: true
+          dune-cache: true
+
+      - name: Install EasyCrypt dependencies
+        run: |
+          opam pin add -n easycrypt .
+          opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
+          opam install --deps-only easycrypt
+
+      - name: Compile & Install EasyCrypt
+        run: |
+          opam exec -- make PROFILE=release install
+
+      - name: Build Sphinx HTML
+        run: |
+          opam exec -- make -C doc ecproof-bundle sphinx-html
+
+      - name: Upload documentation (artifact)
+        uses: actions/upload-artifact@v6
+        with:
+          name: refman
+          path: doc/_build/html
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: "refman"
+      cancel-in-progress: false
+
+    steps:
+    - name: Download documentation (artifact)
+      uses: actions/download-artifact@v7
+      with:
+        name: refman
+        path: _refman
+  
+    - name: Deploy documentation
+      env:
+        PAGES_TOKEN: ${{ secrets.PAGES_REPO_TOKEN }}
+        PAGES_REPO: EasyCrypt/refman
+        TARGET_DIR: refman
+        BUILD_DIR: _refman
+
+      run: |
+        set -euo pipefail
+
+        git config --global user.name  "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+        git clone --depth 1 https://x-access-token:${PAGES_TOKEN}@github.com/${PAGES_REPO}.git pages-repo
+
+        rm -rf "pages-repo/${TARGET_DIR}"
+        mkdir -p "pages-repo/${TARGET_DIR}"
+        touch "pages-repo/${TARGET_DIR}"/.keep
+
+        cp -a "${BUILD_DIR}/." "pages-repo/${TARGET_DIR}/"
+
+        git -C pages-repo add -A
+
+        if git -C pages-repo diff --cached --quiet; then
+          echo "No changes to deploy."
+          exit 0
+        fi
+
+        git -C pages-repo commit -m "Update docs: ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+        git -C pages-repo push origin main
