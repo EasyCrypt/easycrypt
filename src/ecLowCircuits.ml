@@ -569,7 +569,7 @@ module type CircuitInterface = sig
   val circuit_is_free : circuit -> bool
   
   (* Direct circuuit constructions *)
-  val circuit_ite : c:circuit -> t:circuit -> f:circuit -> circuit
+  val circuit_ite : ?strict:bool -> c:circuit -> t:circuit -> f:circuit -> circuit
   val circuit_eq : circuit -> circuit -> circuit
   val circuit_eqs : circuit -> circuit -> circuit list
 
@@ -999,18 +999,22 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
   let circuit_is_free (f: circuit) : bool = List.is_empty @@ snd f 
 
-  let circuit_ite ~(c: circuit) ~(t: circuit) ~(f: circuit) : circuit =
-    assert ((circuit_is_free t) && (circuit_is_free f) && (circuit_is_free c));
+  let circuit_ite ?(strict = false) ~(c: circuit) ~(t: circuit) ~(f: circuit) : circuit =
+    let inps = match c, t, f with
+    | (_, []), (_, []), (_, []) when strict -> []
+    | (_, cinps), (_, tinps), (_, finps) when (not strict) && cinps = tinps && cinps = finps -> cinps
+    | _ -> assert false
+    in
     let c = match (fst c).type_ with
     | CBool -> Backend.node_of_reg (fst c).reg
     | _ -> assert false
     in
     let res_r = Backend.reg_ite c (fst t).reg (fst f).reg in
     match ((fst t).type_, (fst f).type_) with
-    | CBitstring nt, CBitstring nf when nt = nf -> {reg = res_r; type_ = (fst t).type_}, []   
-    | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, []  
-    | CTuple szs_t, CTuple szs_f when List.all2 (=) szs_t szs_f -> {reg = res_r; type_ = (fst t).type_}, [] 
-    | CBool, CBool -> {reg = res_r; type_ = (fst t).type_}, []
+    | CBitstring nt, CBitstring nf when nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps
+    | CArray {width=wt; count=nt}, CArray {width=wf; count=nf} when wt = wf && nt = nf -> {reg = res_r; type_ = (fst t).type_}, inps  
+    | CTuple szs_t, CTuple szs_f when List.all2 (=) szs_t szs_f -> {reg = res_r; type_ = (fst t).type_}, inps 
+    | CBool, CBool -> {reg = res_r; type_ = (fst t).type_}, inps
     | _ -> raise CircConstructorInvalidArguments
 
   (* TODO: type check? *)

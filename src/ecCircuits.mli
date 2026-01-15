@@ -69,7 +69,7 @@ val circ_simplify_form_bitstring_equality :
   ?pres:circuit list -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> state 
+val state_of_prog : ?close:bool -> ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> state 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
 val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)

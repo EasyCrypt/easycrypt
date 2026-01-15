@@ -587,7 +587,7 @@ let circuit_of_form
         let t = doit st t_f in
         let f = doit st f_f in
         let c = doit st c_f in
-        circuit_ite ~c ~t ~f
+        circuit_ite ~strict:true ~c ~t ~f
 
     | Flocal idn -> 
         state_get st idn
@@ -767,6 +767,11 @@ let circuit_of_form
     | (CantConvertToCirc _) as e -> 
       Format.eprintf "Failed on form %a with error %s@."
       EcPrinting.(pp_form ppe) f_ 
+      (Printexc.to_string e);
+      assert false
+    | e ->
+      Format.eprintf "Failed on %a with exception %s@." 
+      EcPrinting.(pp_form ppe) f_
       (Printexc.to_string e);
       assert false
 
@@ -961,11 +966,13 @@ let instrs_equiv
 
 (* FIXME: remove variable list from the arguments *)
 (* FIXME: change memory -> memenv                 *)
-let state_of_prog ?me (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list)  : state =
+let state_of_prog ?(close = false) ?me (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list)  : state =
   let st = 
     List.fold_left (fun st -> process_instr ?me hyps mem ~st) st proc
   in
+  if close then 
   close_circ_lambda st 
+  else st
 
 let rec circ_simplify_form_bitstring_equality
   ?(st: state = empty_state) 

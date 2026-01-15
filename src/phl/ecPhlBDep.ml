@@ -210,8 +210,10 @@ let t_bdep_solve
       let st, cpres = process_pre tc hs_pr in
       let tm = time (toenv hyps) tm "Done with precondition processing" in
 
+      (* Get open state *)
       let st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node in
       let _tm = time (toenv hyps) tm "Done with program circuit gen" in
+
       let res = solve_post ~st ~pres:cpres hyps hs_po in
       EcCircuits.clear_translation_caches ();
       if res then 

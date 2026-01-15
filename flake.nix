@@ -133,7 +133,7 @@
           provers = pkgs.symlinkJoin {
             name = "provers";
             paths = [ 
-	    #  altErgo 
+	      altErgo 
 	      z3 
 	    #  cvc4 
 	      cvc5 
