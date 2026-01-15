@@ -53,9 +53,6 @@ end Axioms.
 
 clear [Axioms.*].
 
-lemma normN (x : int) eps :
-  `|x| <= eps <=> -eps <= x <= eps by smt().
-
 lemma ler_norm_add (x y : t): `|x + y| <= `|x| + `|y|.
 proof. by apply/Axioms.ler_norm_add. qed.
 

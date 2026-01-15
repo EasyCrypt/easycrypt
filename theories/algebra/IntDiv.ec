@@ -240,7 +240,6 @@ qed.
 lemma oddPn z: !odd z <=> (z %% 2 = 0).
 proof. by rewrite oddP /#. qed.
 
-
 (* -------------------------------------------------------------------- *)
 lemma modz_mod m d : m %% d %% d = m %% d.
 proof.
@@ -297,15 +296,6 @@ proof. by move=> d_nz; rewrite mulrC mulzK. qed.
 (* -------------------------------------------------------------------- *)
 lemma modz1 x : x %% 1 = 0.
 proof. by have /= := ltz_pmod x 1; rewrite (@ltzS _ 0) leqn0 1:modz_ge0. qed.
-
-(* -------------------------------------------------------------------- *)
-
-lemma div2_odd z : 0 < z => odd z => z %/ 2 = (z-1) %/ 2.
-proof.
-move => gt2_z oddp; have := divz_eq z 2.
-have /= -> := modz2 z;rewrite oddp /b2i /=. 
-move => ?; have -> : z - 1 = z %/ 2 * 2; smt(mulzK).
-qed.
 
 (* -------------------------------------------------------------------- *)
 lemma divz1 x : x %/ 1 = x.
