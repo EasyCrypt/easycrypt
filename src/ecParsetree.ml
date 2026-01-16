@@ -285,6 +285,7 @@ and minclude_proc = [
 and pmodule_sig_item = [
   | `Include      of pmodule_type * minclude_proc option * qident_inparam list option
   | `FunctionDecl of pfunction_decl
+  | `QFunctionDecl of pqfunction_decl
 ]
 
 and pvariable_decl = {
@@ -301,6 +302,13 @@ and pfunction_decl = {
   pfd_uses     : pmod_restr_el;
 }
 
+and pqfunction_decl = {
+  pfd_name     : psymbol;
+  pfd_tyargs   : fun_params;
+  pfd_tyresult : pty;
+  pfd_uses     : pmod_restr_el;
+}
+
 (* -------------------------------------------------------------------- *)
 and pmodule_def_or_decl = {
   ptm_locality : locality;
@@ -308,6 +316,11 @@ and pmodule_def_or_decl = {
 }
 
 and pmodule_decl = {
+  ptm_name  : psymbol;
+  ptm_modty : pmodule_type_restr;
+}
+
+and pqmodule_decl = {
   ptm_name  : psymbol;
   ptm_modty : pmodule_type_restr;
 }
@@ -1277,6 +1290,7 @@ type threquire =
 (* -------------------------------------------------------------------- *)
 type global_action =
   | Gmodule      of pmodule_def_or_decl
+  | Gqmodule     of pqmodule_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
   | Gprocop      of pprocop

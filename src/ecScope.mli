@@ -147,6 +147,12 @@ module Mod : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module QMod : sig
+  val add : ?src:string -> scope -> pqmodule_decl -> scope
+  val declare : scope -> pqmodule_decl -> scope
+end
+
+(* -------------------------------------------------------------------- *)
 module ModType : sig
   val add : ?src:string -> scope -> pinterface -> scope
 end

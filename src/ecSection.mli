@@ -15,6 +15,7 @@ val initial : env -> scenv
 
 val add_item     : ?override_locality:EcTypes.is_local option -> theory_item -> scenv -> scenv
 val add_decl_mod : EcIdent.t -> mty_mr -> scenv -> scenv
+val add_decl_qmod : EcIdent.t -> mty_mr -> scenv -> scenv
 
 val enter_section : EcSymbols.symbol option -> scenv -> scenv
 val exit_section  : EcSymbols.symbol option -> scenv -> scenv

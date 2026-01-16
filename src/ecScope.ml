@@ -1771,6 +1771,39 @@ module Mod = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module QMod = struct
+  module TT = EcTyping
+(* 
+  let bind ?(import = true) (scope : scope) (m : top_module_expr) =
+    assert (scope.sc_pr_uc = None);
+    let item = EcTheory.mkitem ~import (EcTheory.Th_module m) in
+    { scope with
+        sc_env = EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
+*)
+  let declare (scope : scope) (m : pqmodule_decl) =
+    let modty = m.ptm_modty in
+    let name  = EcIdent.create (unloc m.ptm_name) in
+    let tysig = fst (TT.transmodtype (env scope) modty.pmty_pq) in
+    (* We modify tysig restrictions according if necessary. *)
+    let tysig = trans_restr_for_modty (env scope) tysig modty.pmty_mem in
+
+    { scope with
+        sc_env = EcSection.add_decl_qmod name tysig scope.sc_env }
+
+  let add ?(src : string option) (scope : scope) (m : pqmodule_decl) =
+    ignore src;
+      declare scope m
+(* 
+  let import (scope : scope) (m : pmsymbol located) : scope =
+    let m, _ = EcTyping.trans_msymbol (env scope) m in
+    { scope with sc_env = EcSection.import_vars m scope.sc_env }
+*)
+end
+
+
+
+(* -------------------------------------------------------------------- *)
 module ModType = struct
   let bind
         ?(import = true) (scope : scope)

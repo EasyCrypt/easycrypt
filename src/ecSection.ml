@@ -19,6 +19,7 @@ type cbarg = [
   | `Op         of path
   | `Ax         of path
   | `Module     of mpath
+  | `QModule    of mpath
   | `ModuleType of path
   | `Typeclass  of path
   | `Instance   of tcinstance
@@ -48,6 +49,15 @@ let pp_cbarg env fmt (who : cbarg) =
         else EcPrinting.PPEnv.add_locals ppe [id]
       | _ -> ppe in
     Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
+  | `QModule mp ->
+    let ppe =
+      match mp.m_top with
+      | `Local id ->
+        if EcEnv.Mod.is_declared id env then
+          ppe
+        else EcPrinting.PPEnv.add_locals ppe [id]
+      | _ -> ppe in
+    Format.fprintf fmt "qmodule %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
     let mty = EcEnv.ModTy.modtype p env in
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
@@ -586,6 +596,13 @@ let locality (env : EcEnv.env) (who : cbarg) =
   | `Ax   p -> (EcEnv.Ax.by_path p env).ax_loca
   | `Typeclass p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
   | `Module mp -> begin
+    match EcEnv.Mod.by_mpath_opt mp env with
+    | Some (_, Some lc) -> lc
+    | _ ->
+      let id = EcPath.mget_ident mp in
+      if EcEnv.Mod.is_declared id env then `Declare else `Global
+    end
+  | `QModule mp -> begin
     match EcEnv.Mod.by_mpath_opt mp env with
     | Some (_, Some lc) -> lc
     | _ ->
@@ -1202,6 +1219,7 @@ let can_depend (cd : can_depend) = function
   | `Ax         _ -> cd.d_ax
   | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
+  | `QModule    _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
   | `Instance   _ -> assert false
@@ -1592,6 +1610,27 @@ let add_decl_mod id mt scenv =
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
+
+let add_decl_qmod id mt scenv =
+  match scenv.sc_name with
+  | Th _ | Top ->
+    hierror "declare module are only allowed inside section"
+  | Sc _ ->
+    let cd = {
+      d_ty    = [`Global];
+      d_op    = [`Global];
+      d_ax    = [];
+      d_sc    = [];
+      d_mod   = [`Declare; `Global];
+      d_modty = [`Global];
+      d_tc    = [`Global];
+    } in
+    let from = `Declare, `QModule (mpath_abs id []) in
+    on_mty_mr (mkaenv scenv.sc_env (cb scenv from cd)) mt;
+    { scenv with
+      sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
+      sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
+
 
 (* -----------------------------------------------------------*)
 let enter_section (name : symbol option) (scenv : scenv) =

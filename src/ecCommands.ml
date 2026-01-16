@@ -435,6 +435,11 @@ and process_module ?(src : string option) (scope : EcScope.scope) m =
   EcScope.check_state `InTop "module" scope;
   EcScope.Mod.add ?src scope m
 
+  (* -------------------------------------------------------------------- *)
+and process_qmodule ?(src : string option) (scope : EcScope.scope) m =
+  EcScope.check_state `InTop "qmodule" scope;
+  EcScope.QMod.add ?src scope m
+
 (* -------------------------------------------------------------------- *)
 and process_interface ?(src : string option) (scope : EcScope.scope) intf =
   EcScope.check_state `InTop "interface" scope;
@@ -761,6 +766,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)
+      | Gqmodule     m    -> `Fct   (fun scope -> process_qmodule    ?src scope m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  ?src scope i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   ?src scope (mk_loc loc o))
       | Gprocop      o    -> `Fct   (fun scope -> process_procop     ?src scope (mk_loc loc o))

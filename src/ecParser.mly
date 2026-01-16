@@ -504,6 +504,7 @@
 %token MINUS
 %token MODPATH
 %token MODULE
+%token QMODULE
 %token MOVE
 %token NE
 %token NOT
@@ -524,6 +525,7 @@
 %token PRED
 %token PRINT
 %token PROC
+%token QPROC
 %token PROGRESS
 %token PROOF
 %token PROVER
@@ -598,6 +600,7 @@
 %token UNDO
 %token UNROLL
 %token VAR
+%token QVAR
 %token WEAKMEM
 %token WHILE
 %token WHY3
@@ -1397,6 +1400,7 @@ var_decl:
 | VAR xs=plist1(lident, COMMA) COLON ty=loc(type_exp)
    { (xs, ty) }
 
+
 loc_decl_names:
 | x=plist1(lident, COMMA) { (`Single, x) }
 
@@ -1418,6 +1422,23 @@ loc_decl_r:
 loc_decl:
 | x=loc_decl_r SEMICOLON { x }
 
+loc_qdecl_r:
+  (* FIXME: WE ONLY CONSIDER QUANTUM LOCAL VARIABLES FOR NOW *)
+| QVAR x=loc(loc_decl_names)
+    { { pfl_names = x; pfl_type = None; pfl_init = None; } }
+
+| QVAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
+
+| QVAR x=loc(loc_decl_names) COLON ty=loc(type_exp) LARROW e=expr
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
+
+| QVAR x=loc(loc_decl_names) LARROW e=expr
+    { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
+
+loc_qdecl:
+| x=loc_qdecl_r SEMICOLON { x }
+
 memtype_decl:
 | x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { x,ty }
@@ -1435,6 +1456,13 @@ ret_stmt:
 fun_def_body:
 | LBRACE decl=loc_decl* s=stmt rs=ret_stmt RBRACE
     { { pfb_locals = decl;
+        pfb_body   = s   ;
+        pfb_return = rs  ; }
+    }
+
+fun_def_qbody:
+| LBRACE qdecl=loc_qdecl* s=stmt rs=ret_stmt RBRACE
+    { { pfb_locals = qdecl;
         pfb_body   = s   ;
         pfb_return = rs  ; }
     }
@@ -1460,6 +1488,11 @@ mod_item:
     { Pst_mod (x, odfl [] c, m) }
 
 | PROC decl=loc(fun_decl) EQ body=fun_def_body {
+    let { pl_desc = decl; } = decl in
+    Pst_fun (decl, body)
+  }
+
+| QPROC decl=loc(fun_decl) EQ body=fun_def_qbody {
     let { pl_desc = decl; } = decl in
     Pst_fun (decl, body)
   }
@@ -1523,6 +1556,12 @@ mod_def_or_decl:
 | locality=locality MODULE ptm_name=uident LTCOLON ptm_modty=mod_type_with_restr
     { { ptm_def      = `Abstract { ptm_name; ptm_modty; };
         ptm_locality = locality; } }
+
+qmod_decl:
+| locality=locality QMODULE ptm_name=uident LTCOLON ptm_modty=mod_type_with_restr
+    { { ptm_def      = `Abstract { ptm_name; ptm_modty; };
+        ptm_locality = locality; } }
+
 
 mod_header:
 | x=uident                  { Pmh_ident x }
@@ -1613,6 +1652,13 @@ signature_item:
 
 | PROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
     { `FunctionDecl
+         { pfd_name     = x;
+           pfd_tyargs   = pd;
+           pfd_tyresult = ty;
+           pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
+
+| QPROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
+    { `QFunctionDecl
          { pfd_name     = x;
            pfd_tyargs   = pd;
            pfd_tyresult = ty;
@@ -3841,6 +3887,7 @@ global_action:
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | mod_def_or_decl  { Gmodule      $1 }
+| qmod_decl        { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }
