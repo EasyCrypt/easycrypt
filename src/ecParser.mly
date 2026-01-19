@@ -1651,18 +1651,18 @@ signature_item:
       in `Include (i, xs, qs) }
 
 | PROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
-    { `FunctionDecl
-         { pfd_name     = x;
-           pfd_tyargs   = pd;
-           pfd_tyresult = ty;
-           pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
+    { (`FunctionDecl
+         ({ pfd_name     = x;
+            pfd_tyargs   = pd;
+            pfd_tyresult = ty;
+            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } : pfunction_decl) : pmodule_sig_item) }
 
 | QPROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
-    { `QFunctionDecl
-         { pfd_name     = x;
-           pfd_tyargs   = pd;
-           pfd_tyresult = ty;
-           pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
+    { (`QFunctionDecl
+         ({ pfd_name     = x;
+            pfd_tyargs   = pd;
+            pfd_tyresult = ty;
+            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } : pqfunction_decl) : pmodule_sig_item) }
 
 (* -------------------------------------------------------------------- *)
 %inline locality:

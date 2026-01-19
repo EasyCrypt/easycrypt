@@ -1843,8 +1843,45 @@ and transmodsig_body
 
   let names = ref [] in
 
-  let transsig1 ois = function
+  let transsig1 ois (item : pmodule_sig_item) = match item with
     | `FunctionDecl f ->
+      let name = f.pfd_name in
+      names := name::!names;
+      let tyargs =
+        let tyargs =
+          List.map
+            (fun (x, ty) -> {
+                 ov_name = omap unloc x.pl_desc;
+                 ov_type = transty_for_decl env ty }) f.pfd_tyargs
+        in
+
+        let args = List.fold_left (fun names (x, _) ->
+          match unloc x with
+          | None   -> names
+          | Some x -> x :: names) [] f.pfd_tyargs
+        in
+
+        Msym.odup unloc args |> oiter (fun (_, a) ->
+          tyerror name.pl_loc env
+          (InvalidModSig (MTS_DupArgName (unloc name, unloc a))));
+
+        tyargs
+      in
+
+      let resty = transty_for_decl env f.pfd_tyresult in
+
+      let rname, calls = trans_restr_fun env env sa f.pfd_uses in
+
+      assert (rname = name.pl_desc);
+
+      let sig_ = { fs_name   = name.pl_desc;
+                   fs_arg    = ttuple (List.map ov_type tyargs);
+                   fs_anames = tyargs;
+                   fs_ret    = resty; }
+      and ois = EcModules.change_oicalls ois name.pl_desc calls in
+      [Tys_function sig_], ois
+
+    | `QFunctionDecl f ->
       let name = f.pfd_name in
       names := name::!names;
       let tyargs =
