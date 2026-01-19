@@ -1326,6 +1326,18 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     let cond = circuit_or (circuit_not pre) post in
     circ_taut cond
 
+  let sublimate_inputs ((c, cinps): circuit) : circuit = 
+    assert (c.type_ = CBool);
+    let node_c = Backend.node_of_reg c.reg in
+    let node_c, shifts = Backend.Deps.excise_bit node_c in
+    let inps = List.filter_map (fun {id; type_} ->
+      match Map.find_opt id shifts with
+      | Some (low, hi) -> Some {id; type_ = CBitstring (hi - low + 1)}
+      | None -> None 
+    ) cinps in 
+    let c = Backend.reg_of_node node_c in
+    { reg = c; type_ = CBool}, inps
+
 
     (* Review later? *)
   let collapse_lanes (lanes: circuit list) =
@@ -1399,6 +1411,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         if debug then Format.eprintf "Checking equivalence for bit %d@." i; (* FIXME *)
 
 (*         let res = fillet_taut pres post in  *)
+        let post = sublimate_inputs post in
         let res = circ_taut post in
         if not res then Format.eprintf "Failed for bit %d@." i;
 
