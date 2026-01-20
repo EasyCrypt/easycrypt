@@ -68,6 +68,7 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
+    "extens"      , EXTENS     ;        (* KW: tactical *)
 
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
@@ -168,7 +169,11 @@
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
-
+    
+    "array"       , ARRAY      ;        (* KW: global *)
+    "bind"        , BIND       ;        (* KW: global *)
+    "circuit"     , CIRCUIT    ;        (* KW: global *)
+    "bitstring"   , BITSTRING  ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)

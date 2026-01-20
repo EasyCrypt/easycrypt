@@ -1,6 +1,8 @@
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcLocation
 open EcParsetree
+open EcAst
 open EcFol
 open EcModules
 open EcPath
@@ -11,7 +13,7 @@ open EcCoreGoal.FApi
 open EcLowGoal
 open EcLowPhlGoal
 
-(*---------------------------------------------------------------------------------------*)
+(* -------------------------------------------------------------------- *)
 type rwe_error =
   | RWE_InvalidFunction of xpath * xpath
   | RWE_InvalidPosition
@@ -20,7 +22,7 @@ exception RwEquivError of rwe_error
 
 let rwe_error e = raise (RwEquivError e)
 
-(*---------------------------------------------------------------------------------------*)
+(* -------------------------------------------------------------------- *)
 (*
   `rewrite equiv` - replace a call to a procedure with an equivalent call, using an equiv
 
@@ -34,7 +36,15 @@ let rwe_error e = raise (RwEquivError e)
              and return value.
 *)
 (* FIXME: What is a good interface for this tactic? *)
-let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
+let t_rewrite_equiv
+  (side : side)
+  (dir : [`LtoR | `RtoL])
+  (cp : EcMatching.Position.codepos1)
+  (equiv : equivF)
+  (equiv_pt : proofterm)
+  (rargslv : (expr list * lvalue option) option)
+  (tc : tcenv1)
+=
   let env = tc1_env tc in
   let goal = tc1_as_equivS tc in
 
@@ -56,7 +66,6 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
 
   (* Extract the call statement and surrounding code *)
   let prefix, (llv, func, largs), suffix =
-    let cp = EcLowPhlGoal.tc1_process_codepos1 tc (Some side, cp) in
     let p, i, s = s_split_i env cp code in
     if not (is_call i) then
       rwe_error RWE_InvalidPosition;
@@ -80,7 +89,8 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
   t_onselect
     p
     (t_seqs [
-      EcPhlEqobs.process_eqobs_in none {sim_pos = some (cp, cp); sim_hint = ([], none); sim_eqs = none};
+      EcPhlEqobs.t_eqobs_in
+        None EcPhlEqobs.{ empty_sim_info with sim_pos = Some (cp, cp) };
       (match side, dir with
        | `Left, `LtoR  -> t_id
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
@@ -96,7 +106,7 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
     ])
     tc
 
-(*---------------------------------------------------------------------------------------*)
+(* -------------------------------------------------------------------- *)
 (* Proccess a user call to rewrite equiv *)
 
 let process_rewrite_equiv info tc =
@@ -150,6 +160,8 @@ let process_rewrite_equiv info tc =
             EcTyping.tyerror (loc pargs) env EcTyping.FreeTypeVariables
         end
   in
+
+  let cp = EcTyping.trans_codepos1 env cp in
 
   (* Offload to the tactic *)
   try
