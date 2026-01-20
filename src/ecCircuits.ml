@@ -157,7 +157,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 type width = int
-exception CircError of string Lazy.t
 exception MissingTyBinding of ty
 exception AbstractTyBinding of ty
 exception InvalidArgument
@@ -168,8 +167,9 @@ exception DestrError of string (* FIXME: change this one *)
 exception MissingOpBody (* FIXME: rename? *)
 exception BadFormForArg (* FIXME: rename *)
 exception CantConvertToConstant
+exception CantReadWriteGlobs
 exception CantConvertToCirc of 
-  [`Int 
+  [ `Int 
   | `OpK of EcFol.op_kind 
   | `Op of path 
   | `Quantif of quantif
@@ -302,17 +302,17 @@ module BitstringOps = struct
     in
     (* assert false => should be guarded by a previous call to op_is_bsop *)
     match bnd with
-    | bs, `From -> assert false (* doesn't translate to circuit *)
+    | _bs, `From -> assert false (* doesn't translate to circuit *)
     | {size = (_, Some size)}, `OfInt -> begin match args with
       | [ `Constant i ] ->
         circuit_of_zint ~size i
-      | args -> raise InvalidArgument
+      | _args -> raise InvalidArgument
     end
     | {size = (_, None); type_=ty}, `OfInt -> 
       raise (AbstractTyBinding (ty_of_path ty)) (* FIXME: check this, might want to add generic path -> ty conversion *)
-    | bs, `To -> assert false (* doesn't translate to circuit *)
-    | bs, `ToSInt -> assert false (* doesn't translate to circuit *) 
-    | bs, `ToUInt -> assert false (* doesn't translate to circuit *)
+    | _bs, `To -> assert false (* doesn't translate to circuit *)
+    | _bs, `ToSInt -> assert false (* doesn't translate to circuit *) 
+    | _bs, `ToUInt -> assert false (* doesn't translate to circuit *)
 end
 open BitstringOps
 
@@ -337,15 +337,15 @@ module ArrayOps = struct
     in
     (* assert false => should be guarded by a call to op_is_arrayop *)
     match op with
-    | (arr, `ToList) -> assert false (* We do not translate this to circuit *)
-    | (arr, `Get) -> begin match args with
-      | [ `Circuit (({type_ = CArray _}, inps) as arr); `Constant i] ->
+    | (_arr, `ToList) -> assert false (* We do not translate this to circuit *)
+    | (_arr, `Get) -> begin match args with
+      | [ `Circuit (({type_ = CArray _}, _inps) as arr); `Constant i] ->
         array_get arr (BI.to_int i)
-      | args -> raise InvalidArgument
+      | _args -> raise InvalidArgument
     end
     | ({size = (_, Some size)}, `OfList) -> begin match args with 
       | [ `Circuit dfl; `List cs ] -> array_oflist cs dfl size
-      | args -> raise InvalidArgument
+      | _args -> raise InvalidArgument
       end
     | ({size = (_, None); type_=ty}, `OfList) -> raise (AbstractTyBinding (ty_of_path ty))
     | (_arr, `Set) -> begin match args with
@@ -353,7 +353,7 @@ module ArrayOps = struct
           `Constant i; 
           `Circuit (({type_ = CBitstring _}, _) as bs) ] ->
         array_set arr (BI.to_int i) bs
-      | args -> raise InvalidArgument
+      | _args -> raise InvalidArgument
     end
 end
 open ArrayOps
@@ -428,7 +428,7 @@ let circuit_of_op (env: env) (p: path) : circuit =
     raise (MissingOpBinding p)
   in
   match op with
-  | `Bitstring (bs, op) -> assert false (* Should be guarded by a call to op_is_base *)
+  | `Bitstring (_bs, _op) -> assert false (* Should be guarded by a call to op_is_base *)
   | `Array _ -> assert false  (* Should be guarded by a call to op_is_parametric_base *)
   | `BvOperator bvbnd -> circuit_of_bvop  env (`BvBind bvbnd)
   | `Circuit c -> circuit_from_spec env (`Bind c)
@@ -443,7 +443,7 @@ let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  =
   | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
   | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
   | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
-  | `Circuit c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *) 
+  | `Circuit _c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *) 
 
 
 let type_has_bindings (env: env) (t: ty) : bool = 
@@ -506,12 +506,12 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
   | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> 
     let rep = int_of_form hyps rep in
     let is = List.init (BI.to_int rep) BI.of_int in
-    let f = List.fold_left (fun f i -> fn @!! [f]) base is in
+    let f = List.fold_left (fun f _i -> fn @!! [f]) base is in
     f
   | Fapp ({f_node = Fop (p, _)}, [fn; base; rep]) when p = EcCoreLib.CI_Int.p_fold -> 
     let rep = int_of_form hyps rep in
     let is = List.init (BI.to_int rep) BI.of_int in
-    let f = List.fold_left (fun f i -> fn @!! [f]) base is in
+    let f = List.fold_left (fun f _i -> fn @!! [f]) base is in
     f
   | _ -> raise (DestrError "iter")
   in
@@ -581,7 +581,7 @@ let circuit_of_form
   and doit (st: state) (f_: form) : circuit =  
     try begin
     match f_.f_node with
-    | Fint z -> raise (CantConvertToCirc `Int)
+    | Fint _z -> raise (CantConvertToCirc `Int)
 
     | Fif (c_f, t_f, f_f) -> 
         let t = doit st t_f in
@@ -641,7 +641,7 @@ let circuit_of_form
       | {f_node = Fop _} when form_is_iter f_ -> 
         trans_iter st hyps f fs
 
-      | {f_node = Fop (p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+      | {f_node = Fop (_p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
           doit st (propagate_integer_arguments f fs)
 
       | {f_node = Fop _} -> 
@@ -711,9 +711,9 @@ let circuit_of_form
         let ftp = doit st f in
         (circuit_tuple_proj ftp i :> circuit)
 
-    | Fmatch  (f, fs, ty) -> raise (CantConvertToCirc `Match)
+    | Fmatch  (_f, _fs, _ty) -> raise (CantConvertToCirc `Match)
 
-    | Flet    (LSymbol (id, t), v, f) -> 
+    | Flet    (LSymbol (id, _t), v, f) -> 
       let vc = doit st v in
       let st = update_state st id vc in
       doit st f
@@ -721,7 +721,7 @@ let circuit_of_form
     | Flet    (LTuple vs, v, f) -> 
       let vc = doit st v in
       let comps = circuits_of_circuit_tuple vc in
-      let st = List.fold_left2 (fun st (id, t) vc ->
+      let st = List.fold_left2 (fun st (id, _t) vc ->
         update_state st id vc)
         st
         vs
@@ -744,7 +744,7 @@ let circuit_of_form
       in
       v
 
-    | Fglob (id, mem) -> raise (CantConvertToCirc `Glob)
+    | Fglob (_id, _mem) -> raise (CantConvertToCirc `Glob)
 
     | Ftuple comps -> 
       let comps = 
@@ -768,6 +768,11 @@ let circuit_of_form
       Format.eprintf "Failed on form %a with error %s@."
       EcPrinting.(pp_form ppe) f_ 
       (Printexc.to_string e);
+      assert false
+    | (MissingTyBinding ty) ->
+      Format.eprintf "Failed on form %a because of missing type binding for type %a@."
+      EcPrinting.(pp_form ppe) f_ 
+      EcPrinting.(pp_type ppe) ty;
       assert false
     | e ->
       Format.eprintf "Failed on %a with exception %s@." 
@@ -905,12 +910,11 @@ let process_instr ?me (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : st
   with 
   | e ->
     (* FIXME: Bad handling, use new exceptions *)
-    let err = lazy (
-      Format.asprintf "BDep failed on instr: %a@.Exception thrown: %s@.BACKTRACE: %s@.@."
+      Format.eprintf "BDep failed on instr: %a@.Exception thrown: %s@.BACKTRACE: %s@.@."
       (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst
       (Printexc.to_string e)
-      (Printexc.get_backtrace ())) in 
-    raise (CircError err)
+      (Printexc.get_backtrace ());
+    raise e
 
 (* FIXME: check if memory is the right one in calls to state *)
 let instrs_equiv
@@ -927,10 +931,10 @@ let instrs_equiv
   let wr, wglobs = EcPV.PV.elements (EcPV.is_write env (s1 @ s2)) in
 
   if not (List.is_empty rglobs && List.is_empty wglobs) then
-    raise (CircError (lazy "the statements should not read/write globs"));
+    raise CantReadWriteGlobs;
 
   if not (List.for_all (EcTypes.is_loc |- fst) (rd @ wr)) then
-    raise (CircError (lazy "the statements should not read/write global variables"));
+    raise CantReadWriteGlobs;
 
   let inputs = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) (rd @ wr) in
   let inputs = List.map (fun {v_name; v_type} -> (create v_name, ctype_of_ty env v_type)) inputs in
@@ -1064,10 +1068,12 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
       if debug then Format.eprintf "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
       begin try
         update_state st id (circuit_of_form ~st hyps f)
-      with CircError _ ->
+      (* FIXME PR: Should only catch circuit translation errors, hack *)
+      with e ->
         try 
           open_circ_lambda st [(id, ctype_of_ty env t)]
-        with (CircError _) as e ->
+        (* FIXME PR: Should only catch circuit translation errors, hack *)
+        with e ->
           if strict then raise e else st
       end
 
@@ -1076,7 +1082,8 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
     | EcBaseLogic.LD_var (t, None) -> 
       begin try
         open_circ_lambda st [(id, ctype_of_ty env t)]
-      with (CircError _) as e -> 
+      (* FIXME PR: Should only catch circuit translation errors, hack *)
+      with e -> 
         if strict then raise e else st end
 
     (* For things of the form a_ = a{&hr}, we assume the local variable takes precedence *)
@@ -1090,7 +1097,8 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
       | {f_node=Fapp ({f_node = Fop (p, _); _}, [fv; {f_node = Fpvar (PVloc pv, m); _}])} when EcFol.op_kind p = Some `Eq ->
         begin try
           update_state_pv st m pv (circuit_of_form ~st hyps fv)
-        with CircError _ ->
+        (* FIXME PR: Should only catch circuit translation errors, hack *)
+        with e ->
           st
         end
       | _ -> st

@@ -222,8 +222,7 @@ let t_bdep_solve
         raise BDepVerifyFail (* FIXME: this is tactic failure, maybe should be done differently? *)
       with 
       (* FIXME: not catching anything, redo *)
-      | BDepError le
-      | CircError le ->
+      | BDepError le ->
         tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
     end
     | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } -> 
@@ -249,8 +248,7 @@ let t_bdep_solve
       )
       with 
       (* FIXME: not catching anything, redo *)
-      | BDepError le
-      | CircError le ->
+      | BDepError le ->
         tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
     end
     | _ -> 
@@ -285,12 +283,8 @@ let t_bdep_simplify (tc: tcenv1) =
       let tm = time env tm "Done with precondition processing" in
 
 
-      let st = try
-        EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node 
-      (* FIXME: not catching anything, redo *)
-      with CircError (lazy err) ->
-        tc_error (FApi.tc1_penv tc) "CircError: @.%s" err
-      in
+      (* FIXME: line below throws, should handle exceptions *)
+      let st = EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node in
       let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
   (*
       if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
