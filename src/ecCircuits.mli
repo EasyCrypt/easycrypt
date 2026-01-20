@@ -11,7 +11,6 @@ open EcLowCircuits
 module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
-exception CircError of string Lazy.t
 exception MissingTyBinding of ty
 exception AbstractTyBinding of ty
 exception InvalidArgument

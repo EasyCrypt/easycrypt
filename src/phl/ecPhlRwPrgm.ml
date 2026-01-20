@@ -69,8 +69,8 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
       try
         if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem target s.s_node) then
           tc_error !!tc "statements are not circuit-equivalent"
-        with EcCircuits.CircError s ->
-          tc_error !!tc "circuit-equivalence checker error: %s" (Lazy.force s)
+        with e ->
+          tc_error !!tc "circuit-equivalence checker error: %s" (Printexc.to_string e)
     end;
     { zp with z_tail = s.s_node @ tl } in
 
