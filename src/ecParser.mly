@@ -417,6 +417,7 @@
 %token CONSEQ
 %token CONST
 %token COQ
+%token COUPLING
 %token CHECK
 %token EDIT
 %token FIX
@@ -3005,6 +3006,9 @@ interleave_info:
 
 | RNDSEM red=boption(STAR) s=side? c=codepos1
     { Prndsem (red, s, c) }
+
+| COUPLING s=side? f=sform
+    { Pcoupling (s, f) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
   { Pinline (`ByName(s, u, ([], o))) }
