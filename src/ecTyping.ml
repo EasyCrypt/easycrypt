@@ -2790,7 +2790,7 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
 (* -------------------------------------------------------------------- *)
 
 
-and transstmt?(map : ismap = Mstr.empty) (env : EcEnv.env) ue stmt : stmt
+and transstmt ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (stmt : pstmt) : stmt
 =
   let l_start =
     Mstr.find_def [] EcTransMatching.default_start_name map in
@@ -2801,7 +2801,7 @@ and transstmt?(map : ismap = Mstr.empty) (env : EcEnv.env) ue stmt : stmt
   let instr_list_list = l_start :: instr_list_list in
   EcModules.stmt (List.flatten instr_list_list)
 
-and transqstmt ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue stmt : stmt
+and transqstmt ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (stmt : pqstmt) : stmt
 = 
   let l_start =
     Mstr.find_def [] EcTransMatching.default_start_name map in
