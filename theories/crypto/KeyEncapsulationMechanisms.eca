@@ -3205,7 +3205,7 @@ seq 1 : (k = kt) pr_dec_skc pr_dec_skcp _ 0%r (#pre) => //.
   rewrite Pr[mu_not] (: Pr[S.decaps(sk{m'}, c{m'}) @ &m' : true] = 1%r); 1: by byphoare S_decaps_ll => //.
   by rewrite RField.subr_eq0 eq_sym; byphoare (S_decaps_sl (glob S){m}) => //. 
 + call (: glob S = (glob S){m} /\ arg = (skt, ct) ==> res = kt); 2: by skip.
-  rewrite /pr_dec_skc; bypr => /> &m' glS ->.
+  rewrite /pr_dec_skc; bypr => /> &m' glS.
   by byequiv => //; proc true. 
 + call (: glob S = (glob S){m} /\ arg = (skt', ct') ==> res = kt'); 2: by skip => />.
   rewrite /pr_dec_skcp; bypr=> &m' [glS ->] /=.
@@ -3237,7 +3237,7 @@ local equiv Eqv_DecapsOrder :
     ={glob S} /\ arg{1} = (arg.`2, arg.`1, arg.`4, arg.`3){2} ==> res{1} = (res.`2, res.`1){2}.
 proof.
 bypr (res.`1, res.`2){1} (res.`2, res.`1){2} => [/#|]. 
-move=> /> &1 &2 [kt kt'] eqglS -> /=. 
+move=> /> &1 &2 [kt kt'] eqglS /=. 
 rewrite (EqPr_DecapsOrder &1 _ _ _ _ kt kt'). 
 have->: Pr[Decaps_Order.main(sk{2}, sk'{2}, c{2},
                      c'{2}) @ &2 :

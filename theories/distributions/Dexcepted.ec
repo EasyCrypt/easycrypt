@@ -582,8 +582,8 @@ proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} P). qed.
 equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample :
   ={i} /\ is_lossless (dt i{1}) ==> ={res}.
 proof.
-bypr (res{1}) (res{2})=> /> &m1 &m2 a <- dt_ll.
-by rewrite (@pr_sampleE &m1 i{m1} (pred1 a)) (@pr_sampleI &m2 i{m1} (pred1 a)).
+bypr (res{1}) (res{2}) => /> &m1 &m2 a dt_ll.
+by rewrite (@pr_sampleE &m1 i{m2} (pred1 a)) (@pr_sampleI &m2 i{m2} (pred1 a)).
 qed.
 
 lemma sampleE_sampleI_pr &m x P:
@@ -594,9 +594,9 @@ proof. by move=> dt_ll; byequiv sampleE_sampleI. qed.
 equiv sampleE_sampleWi : SampleE.sample ~ SampleWi.sample :
   ={i} /\ is_lossless (dt i{1}) /\ test i{2} r{2} ==> ={res}.
 proof.
-bypr (res{1}) (res{2})=> /> &m1 &m2 a <- dt_ll Htr.
-rewrite (@pr_sampleE &m1 i{m1} (pred1 a)).
-by rewrite (@pr_sampleWi &m2 i{m1} r{m2} (pred1 a)) // Htr.
+bypr (res{1}) (res{2})=> /> &m1 &m2 a dt_ll Htr.
+rewrite (@pr_sampleE &m1 i{m2} (pred1 a)).
+by rewrite (@pr_sampleWi &m2 i{m2} r{m2} (pred1 a)) // Htr.
 qed.
 
 lemma sampleE_sampleWi_pr &m x y P:
@@ -608,8 +608,8 @@ proof. by move=> dt_ll test_i_r; byequiv sampleE_sampleWi. qed.
 equiv sampleE_sampleW : SampleE.sample ~ SampleW.sample :
   ={i} /\ is_lossless (dt i{1}) ==> ={res}.
 proof.
-bypr (res{1}) (res{2})=> /> &m1 &m2 a <- dt_ll.
-by rewrite (@pr_sampleE &m1 i{m1} (pred1 a)) (@pr_sampleW &m2 i{m1} (pred1 a)).
+bypr (res{1}) (res{2})=> /> &m1 &m2 a dt_ll.
+by rewrite (@pr_sampleE &m1 i{m2} (pred1 a)) (@pr_sampleW &m2 i{m2} (pred1 a)).
 qed.
 
 lemma sampleE_sampleW_pr &m x P:
