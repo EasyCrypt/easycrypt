@@ -90,7 +90,7 @@ object(self)
           | EcScope.TopError (loc, e) -> (loc, e)
           | _ -> (LC._dummy, e)
         in
-          Format.fprintf Format.err_formatter
+          Format.fprintf Format.std_formatter
             "[error-%d-%d]%s\n%!"
             (max 0 (loc.LC.loc_bchar - startpos))
             (max 0 (loc.LC.loc_echar - startpos))
