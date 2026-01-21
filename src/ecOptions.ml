@@ -6,10 +6,12 @@ open EcMaps
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
+  | `Lsp
 ]
 
 and options = {
@@ -356,6 +358,9 @@ let specs = {
       `Group "provers";
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
 
+    ("lsp", "Run EasyCrypt LSP server", [
+      `Spec  ("-stdio"  , `Flag  , "<for internal use>")]);
+
     ("config", "Print EasyCrypt configuration", []);
 
     ("runtest", "Run a test-suite", [
@@ -603,6 +608,15 @@ let parse getini argv =
         | _ ->
           raise (Arg.Bad "this command takes a single input file as argument")
       end
+
+    | "lsp" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Lsp in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 
