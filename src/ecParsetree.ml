@@ -171,6 +171,14 @@ and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
 and pstmt  = pinstr list
 
+and pqinstr_r =
+  | PQSident  of psymbol
+  | PQSasgn   of plvalue * pexpr
+  | PQScall   of plvalue option * pgamepath * (pexpr list) located
+
+and pqinstr = pqinstr_r located
+and pqstmt  = pqinstr list
+
 and pexpr   = pexpr_r located
 and pexpr_r = Expr of pformula
 
@@ -350,6 +358,7 @@ and pstructure_item =
   | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
   | Pst_var      of (psymbol list * pty)
   | Pst_fun      of (pfunction_decl * pfunction_body)
+  | Pst_qfun     of (pqfunction_decl * pqfunction_body)
   | Pst_alias    of (psymbol * pgamepath)
   | Pst_include  of (pmsymbol located * bool * minclude_proc option)
   | Pst_import   of (pmsymbol located) list
@@ -380,6 +389,12 @@ and pfunction_local = {
   pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
+}
+
+and pqfunction_body = {
+  pfb_locals : pfunction_local list;
+  pfb_qbody  : pqstmt;
+  pfb_return : pexpr option;
 }
 
 type pinterface = {
