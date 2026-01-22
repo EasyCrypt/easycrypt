@@ -13,6 +13,7 @@ type 'a equality = 'a -> 'a -> bool
 type 'a hash = 'a -> int
 type 'a fv   = 'a -> int EcIdent.Mid.t
 
+type quantum = [ `Classical | `Quantum ]
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
   | PVKglob

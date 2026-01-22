@@ -1373,41 +1373,6 @@ instr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
 
-base_qinstr:
-| x=lident
-    { PQSident x }
-(*
-| x=lvalue LESAMPLE  e=expr
-    { PSrnd (x, e) }
-*)
-| x=lvalue LARROW e=expr
-    { PQSasgn (x, e) }
-
-| x=lvalue LEAT f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
-    { PQScall (Some x, f, es) }
-(*
-| f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
-    { PScall (None, f, es) }
-
-| ASSERT LPAREN c=expr RPAREN
-    { PSassert c }
-*)
-qinstr:
-| bi=base_qinstr SEMICOLON
-   { bi }
-
-(*| i=if_expr
-   { i }
-
-| WHILE LPAREN c=expr RPAREN b=block
-   { PSwhile (c, b) }
-
-| MATCH e=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
-   { PSmatch (e, `Full bs) }
-
-| IF LPAREN e=expr IS c=opptn RPAREN b1=block b2=option(prefix(ELSE, block))
-   { PSmatch (e, `If ((c, b1), b2)) } *)
-
 
 if_else_expr:
 |  /* empty */ { ([], []) }
@@ -1429,7 +1394,6 @@ block:
 
 stmt: aout=loc(instr)* { aout }
 
-qstmt: aout=loc(qinstr)* { aout }
 
 (* -------------------------------------------------------------------- *)
 (* Module definition                                                    *)
@@ -1499,9 +1463,9 @@ fun_def_body:
     }
 
 fun_def_qbody:
-| LBRACE qdecl=loc_qdecl* s=qstmt rs=ret_stmt RBRACE
+| LBRACE qdecl=loc_qdecl* s=stmt rs=ret_stmt RBRACE
     { { pfb_locals = qdecl;
-        pfb_qbody   = s   ;
+        pfb_body   = s   ;
         pfb_return = rs  ; }
     }
 
@@ -1699,17 +1663,17 @@ signature_item:
 
 | PROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
     { `FunctionDecl
-         ({ pfd_name     = x;
+         { pfd_name     = x;
             pfd_tyargs   = pd;
             pfd_tyresult = ty;
-            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } : pfunction_decl)  }
+            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } }  }
 
 | QPROC x=lident pd=param_decl COLON ty=loc(type_exp) orcls=option(oracle_restr)
     { `QFunctionDecl
-         ({ pfd_name     = x;
+         { pfd_name     = x;
             pfd_tyargs   = pd;
             pfd_tyresult = ty;
-            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } : pqfunction_decl)  }
+            pfd_uses     = { pmre_name = x; pmre_orcls = orcls; } } }
 (* -------------------------------------------------------------------- *)
 %inline locality:
 | (* empty *) { `Global }

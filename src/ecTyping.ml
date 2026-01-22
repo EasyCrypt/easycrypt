@@ -180,6 +180,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| InvalidInstrForQProc
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -2432,7 +2433,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
       [], items
 
-  | Pst_fun (decl, body) -> begin
+  | Pst_fun (decl, body) | Pst_qfun (decl, body) as variant -> begin
+      let is_qfun = match variant with
+        | Pst_qfun _ -> true
+        | _          -> false
+      in
       let ue  = UE.create (Some []) in
       let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
 
@@ -2453,68 +2458,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       (* Type-check body *)
       let retty = transty tp_uni env ue decl.pfd_tyresult in
       let (env, stmt, result, prelude, locals) =
-        transbody ue memenv env retty (mk_loc st.pl_loc body)
-      in
-      (* Close all types *)
-      let ts      = Tuni.subst (UE.assubst ue) in
-      let retty   = fundef_check_type (ty_subst ts) env None (retty, decl.pfd_tyresult.pl_loc) in
-      let params  = List.map (fundef_check_decl (ty_subst ts) env) params in
-      let locals  = List.map (fundef_check_decl (ty_subst ts) env) locals in
-      let prelude = List.map (fundef_check_iasgn ts env) prelude in
-
-      if not (UE.closed ue) then
-        tyerror st.pl_loc env (OnlyMonoTypeAllowed None);
-
-      let clsubst = ts in
-      let stmt    = s_subst clsubst stmt
-      and result  = result |> omap (e_subst clsubst) in
-      let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
-
-      (* Computes reads/writes/calls *)
-      let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
-
-      (* Compose all results *)
-      let fun_ =
-        { f_name   = decl.pfd_name.pl_desc;
-          f_sig    = {
-            fs_name   = decl.pfd_name.pl_desc;
-            fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
-            fs_anames = List.map ovar_of_var params;
-            fs_ret    = retty;
-          };
-          f_def = FBdef {
-            f_locals = locals;
-            f_body   = stmt;
-            f_ret    = result;
-            f_uses   = uses;
-          };
-        }
-      in
-        [], [(decl.pfd_name.pl_desc, MI_Function fun_)]
-    end
-  
-  | Pst_qfun (decl, body) -> begin
-      let ue  = UE.create (Some []) in
-      let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
-
-      (* Type-check function parameters / check for dups *)
-      let params =
-        let checked_name os =
-          match unloc os with
-          | None    -> tyerror os.pl_loc env NoConcreteAnonParams
-          | Some os -> unloc os
-        in
-        List.map (fun (s,pty) -> {
-              v_name = checked_name s;
-              v_type = transty tp_uni env ue pty}, s.pl_loc) decl.pfd_tyargs
-      in
-      let memenv = EcMemory.empty_local ~witharg:false (EcIdent.create "&hr") in
-      let memenv = fundef_add_symbol env memenv params in
-
-      (* Type-check body *)
-      let retty = transty tp_uni env ue decl.pfd_tyresult in
-      let (env, stmt, result, prelude, locals) =
-        transqbody ue memenv env retty (mk_loc st.pl_loc body)
+        transbody ue memenv env retty (mk_loc st.pl_loc body) is_qfun
       in
       (* Close all types *)
       let ts      = Tuni.subst (UE.assubst ue) in
@@ -2614,7 +2558,7 @@ and transstruct1_alias env name f =
 
 (* -------------------------------------------------------------------- *)
 
-and transbody ue memenv (env : EcEnv.env) retty pbody =
+and transbody ue memenv (env : EcEnv.env) retty pbody is_qfun =
   let { pl_loc = loc; pl_desc = pbody; } = pbody in
 
   let prelude = ref []
@@ -2661,72 +2605,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
   let memenv = List.fold_left add_local memenv pbody.pfb_locals in
   let env = EcEnv.Memory.push_active_ss memenv env in
 
-  let body   = transstmt env ue pbody.pfb_body in
-  let result =
-    match pbody.pfb_return with
-    | None ->
-        begin
-          try  EcUnify.unify env ue tunit retty
-          with EcUnify.UnificationFailure _ ->
-            tyerror loc env NonUnitFunWithoutReturn
-        end;
-        None
-
-    | Some pe ->
-        let (e, ety) = transexp env `InProc ue pe in
-        unify_or_fail env ue pe.pl_loc ~expct:retty ety;
-        Some e
-  in
-    (env, body, result, List.rev !prelude, List.flatten (List.rev !locals))
-
-and transqbody ue memenv (env : EcEnv.env) retty pbody =
-  let { pl_loc = loc; pl_desc = pbody; } = pbody in
-
-  let prelude = ref []
-  and locals  = ref [] in
-
-  (* Type-check local variables / check for dups *)
-  let add_local memenv local =
-    let env   = EcEnv.Memory.push_active_ss memenv env in
-    let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
-    let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
-    let ty =
-      match ty, init with
-      | None   , None   -> None
-      | Some ty, None   -> Some ty
-      | None   , Some e -> Some e.e_ty
-      | Some ty, Some e -> begin
-          let loc =  (oget local.pfl_init).pl_loc in
-            unify_or_fail env ue loc ~expct:ty e.e_ty; Some ty
-      end
-    in
-
-    let xs     = snd (unloc local.pfl_names) in
-    let mode   = fst (unloc local.pfl_names) in
-
-    let xsvars = List.map (fun _ -> UE.fresh ue) xs in
-    begin
-      ty |> oiter (fun ty ->
-        match mode with
-        | `Single -> List.iter (fun a -> EcUnify.unify env ue a ty) xsvars
-        | `Tuple  -> unify_or_fail env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
-    end;
-
-    (* building the list of locals *)
-    let xs = List.map2 (fun x ty -> {v_name = x.pl_desc; v_type = ty}, x.pl_loc) xs xsvars in
-    let memenv = fundef_add_symbol env memenv xs in
-    locals := xs :: !locals;
-    init |> oiter
-     (fun init ->
-       let doit (v,_) = pv_loc v.v_name, v.v_type in
-       let iasgn = List.map doit xs in
-       prelude := ((mode, iasgn), init, _dummy) :: !prelude);
-    memenv in
-
-  let memenv = List.fold_left add_local memenv pbody.pfb_locals in
-  let env = EcEnv.Memory.push_active_ss memenv env in
-
-  let body   = transqstmt env ue pbody.pfb_qbody in
+  let body   = transstmt ~is_qfun env ue pbody.pfb_body in
   let result =
     match pbody.pfb_return with
     | None ->
@@ -2790,30 +2669,20 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
 (* -------------------------------------------------------------------- *)
 
 
-and transstmt ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (stmt : pstmt) : stmt
+and transstmt ?(map : ismap = Mstr.empty) ?(is_qfun = false) (env : EcEnv.env) ue (stmt : pstmt) : stmt
 =
   let l_start =
     Mstr.find_def [] EcTransMatching.default_start_name map in
   let l_end =
     Mstr.find_def [] EcTransMatching.default_end_name   map in
-  let instr_list_list = List.map (transinstr ~map env ue) stmt in
+  let instr_list_list = List.map (transinstr ~map env is_qfun ue) stmt in
   let instr_list_list = instr_list_list @ [l_end] in
   let instr_list_list = l_start :: instr_list_list in
   EcModules.stmt (List.flatten instr_list_list)
 
-and transqstmt ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (stmt : pqstmt) : stmt
-= 
-  let l_start =
-    Mstr.find_def [] EcTransMatching.default_start_name map in
-  let l_end =
-    Mstr.find_def [] EcTransMatching.default_end_name   map in
-  let instr_list_list = List.map (transqinstr ~map env ue) stmt in
-  let instr_list_list = instr_list_list @ [l_end] in
-  let instr_list_list = l_start :: instr_list_list in
-  EcModules.stmt (List.flatten instr_list_list)
 (* -------------------------------------------------------------------- *)
 and transinstr
-  ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (i : pinstr)
+  ?(map : ismap = Mstr.empty) (env : EcEnv.env) is_qfun ue (i : pinstr) : instr list
 =
   let transcall name args =
     let fpath = trans_gamepath env name in
@@ -2852,6 +2721,8 @@ and transinstr
     end
 
   | PSrnd (plvalue, prvalue) ->
+      if is_qfun then
+        tyerror i.pl_loc env (InvalidInstrForQProc);
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
@@ -2868,6 +2739,8 @@ and transinstr
       [ i_call_lv i.pl_loc env lvalue fpath args ]
 
   | PSif ((pe, s), cs, sel) -> begin
+      if is_qfun then
+        tyerror i.pl_loc env (InvalidInstrForQProc);
       let rec for1_i (pe, s) sel =
         let e, ety = transexp env `InProc ue pe in
         let s = transstmt env ue s in
@@ -2881,12 +2754,16 @@ and transinstr
   end
 
   | PSwhile (pe, pbody) ->
+      if is_qfun then
+        tyerror i.pl_loc env (InvalidInstrForQProc);
       let e, ety = transexp env `InProc ue pe in
       let body = transstmt env ue pbody in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       [ i_while (e, body) ]
 
   | PSmatch (pe, pbranches) -> begin
+      if is_qfun then
+        tyerror i.pl_loc env (InvalidInstrForQProc);
       let e, ety = transexp env `InProc ue pe in
       let uidmap = EcUnify.UniEnv.assubst ue in
       let ety = ty_subst (Tuni.subst uidmap) ety in
@@ -2925,57 +2802,12 @@ and transinstr
     end
 
   | PSassert pe ->
+      if is_qfun then
+        tyerror i.pl_loc env (InvalidInstrForQProc);
       let e, ety = transexp env `InProc ue pe in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       [ i_assert e ]
 
-and transqinstr
-  ?(map : ismap = Mstr.empty) (env : EcEnv.env) ue (i : pqinstr)
-=
-  let transcall name args =
-    let fpath = trans_gamepath env name in
-    let fsig  = (EcEnv.Fun.by_xpath fpath env).f_sig in
-    let (args, ty) =
-      transcall (transexp env `InProc ue) env ue name.pl_loc fsig args
-    in
-      (fpath, args, ty)
-  in
-
-  match i.pl_desc with
-  | PQSident x -> begin
-      match Mstr.find_opt (unloc x) map with
-      | Some x -> x
-      | None ->
-          tyerror (loc x) env (UnknownInstrMetaVar (unloc x))
-    end
-
-  | PQSasgn (plvalue, prvalue) -> begin
-      let handle_unknown_op = function
-        | Expr { pl_desc = PFapp ({ pl_desc = PFident (f, None) }, _) }
-            when EcEnv.Fun.lookup_opt (unloc f) env <> None
-          -> tyerror prvalue.pl_loc env (ProcAssign (unloc f))
-        | _ -> ()
-      in
-
-      let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty =
-        try transexp env `InProc ue prvalue with
-        | TyError (l, e, exn) ->
-            handle_unknown_op (unloc prvalue);
-            tyerror l e exn
-      in
-      unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-      [ i_asgn_lv i.pl_loc env lvalue rvalue ]
-    end
-
-  | PQScall (None, _, _) ->
-      assert false
-
-  | PQScall (Some lvalue, name, args) ->
-      let lvalue, lty = translvalue ue env lvalue in
-      let (fpath, args, rty) = transcall name (unloc args) in
-      unify_or_fail env ue name.pl_loc ~expct:lty rty;
-      [ i_call_lv i.pl_loc env lvalue fpath args ]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =

@@ -7,6 +7,7 @@ module BI = EcBigInt
 
 type memory = EcIdent.t
 
+type quantum = [ `Classical | `Quantum ]
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
   | PVKglob

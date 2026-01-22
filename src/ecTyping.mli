@@ -172,6 +172,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| InvalidInstrForQProc
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -223,7 +224,7 @@ val trans_pv : EcEnv.env -> pqsymbol -> prog_var * ty
 (* -------------------------------------------------------------------- *)
 type ismap = (instr list) EcMaps.Mstr.t
 
-val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
+val transstmt : ?map:ismap -> ?is_qfun:bool -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> codepos_range

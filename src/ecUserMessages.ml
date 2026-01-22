@@ -550,6 +550,10 @@ end = struct
         | `MemSel -> "memory selector"
       end
     end
+    | InvalidInstrForQProc ->
+        msg "instruction not allowed in quantum procedure"
+
+
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

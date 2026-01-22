@@ -199,6 +199,7 @@ type function_body =
 | FBabs   of PreOI.t
 
 type function_ = {
+  (*f_quantum : quantum; *)
   f_name   : symbol;
   f_sig    : funsig;
   f_def    : function_body;
