@@ -41,18 +41,18 @@ let time (env: env) (t: float) (msg: string) : float =
   Assumes f has enough positions so that 
   arr_t.size + offset < size f (as array)
 *)
+(* FIXME: error handdling for this function *)
 let array_init_from_form (env: env) (f: form) ((arr_t, offset): qsymbol * BI.zint) : form =
-  let ppe = EcPrinting.PPEnv.ofenv env in
   let tpath = match EcEnv.Ty.lookup_opt arr_t env with
   | None -> raise TyLookupError
   | Some (path, decl) when List.length decl.tyd_params = 1 ->
     path
-  | Some ((_path, decl) as tdecl) ->
+  | Some _ ->
     raise BadTypeForConstructor
   in
   let get = match EcEnv.Circuit.lookup_array env f.f_ty with
   | Some { get } -> get
-  | None -> raise (MissingTyBinding f.f_ty)
+  | None -> circ_error (MissingTyBinding (`Ty f.f_ty))
   in
   let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env in
   let idx = create "i" in
@@ -70,7 +70,7 @@ let form_list_from_iota (hyps: hyps) (f: form) : form list =
   | _ -> 
     raise (DestrError "iota") 
 
-let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form list =
+let rec form_list_of_form (f: form) : form list =
   match destr_op_app f with
   | (pc, _), [h; {f_node = Fop(p, _)}] when 
     pc = EcCoreLib.CI_List.p_cons && 
@@ -80,7 +80,8 @@ let rec form_list_of_form ?(ppenv: EcPrinting.PPEnv.t option) (f: form) : form l
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-      raise (DestrError "list")
+    (* FIXME: Bad error? *)
+    raise (DestrError "list")
 
 (* FIXME: move? A *)
 
@@ -106,7 +107,6 @@ let rec destr_conj (hyps: hyps) (f: form) : form list =
 *)
 (* Returns _open_ circuits *)
 let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit list = 
-  let debug = false in
   let env = FApi.tc1_env tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let hyps = FApi.tc1_hyps tc in (* FIXME: should target be specified here? *)
@@ -123,19 +123,19 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   let fs = destr_conj f in
 
-  if debug then Format.eprintf "Destructured conj, obtained:@.%a@."
+  EcEnv.notify env EcGState.(`Debug) "Destructured conj, obtained:@.%a@."
     (EcPrinting.pp_list ";@\n" EcPrinting.(pp_form PPEnv.(ofenv env))) fs;
 
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
   (* FIXME: are all the simplifications necessary ? *)
-  let rec process_equality (s: state) (f: form) : state = 
+  let process_equality (s: state) (f: form) : state = 
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [a; b]) -> begin match EcFol.op_kind p, (EcCallbyValue.norm_cbv (circ_red hyps) hyps a), (EcCallbyValue.norm_cbv (circ_red hyps) hyps b) with
       | Some `Eq, {f_node = Fpvar (PVloc pv, m); _}, fv
       | Some `Eq, fv, {f_node = Fpvar (PVloc pv, m); _} -> 
-        if debug then Format.eprintf "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
+        EcEnv.notify env EcGState.(`Debug) "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
         update_state_pv s m pv (circuit_of_form ~st hyps fv)
       | _ -> s
     end 
@@ -146,7 +146,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   (* If convertible to circuit then add to precondition conjunction.
      Use state from previous as well *)
-  let rec process_form (f: form) : circuit list = 
+  let process_form (f: form) : circuit list = 
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [f1; f2]) when EcFol.op_kind p = Some `Eq -> 
       let c1 = circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f1) in
@@ -154,13 +154,13 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
       circuit_eqs c1 c2
     | _ -> 
       begin
-      if debug then
-      Format.eprintf "Processing form: %a@.Simplified version: %a@."
+      EcEnv.notify env EcGState.(`Debug) 
+      "Processing form: %a@.Simplified version: %a@."
         EcPrinting.(pp_form ppe) f
         EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
       try (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f))::[] with
       e -> begin 
-        if debug then Format.eprintf "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
+        EcEnv.notify env EcGState.(`Debug) "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
         [] end
       end
   in
@@ -171,8 +171,8 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
     (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
 *)
 
-  if debug then Format.eprintf  "In the context of the following bindings in the environment:@\n%a@\n"
-  (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.eprintf "%a@." pp_cinp cinp)) (state_lambdas st);
+  EcEnv.notify env EcGState.(`Debug) "In the context of the following bindings in the environment:@\n%a@\n"
+  (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.fprintf fmt "%a@." pp_cinp cinp)) (state_lambdas st);
   st, cs
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
@@ -180,7 +180,7 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
   let posts = destr_conj post in
 
   List.for_all (fun post ->
-  if debug then Format.eprintf "Solving post: %a@." 
+  EcEnv.notify (toenv hyps) EcGState.(`Debug) "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
   | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> 
@@ -201,112 +201,111 @@ let t_bdep_solve
     new_t
   in
 
-  begin 
-    let hyps = (FApi.tc1_hyps tc) in
-    let goal = (FApi.tc1_goal tc) in
-    match goal.f_node with 
-    | FhoareS {hs_m; hs_pr; hs_po; hs_s} -> begin try
+  let hyps = (FApi.tc1_hyps tc) in
+  let goal = (FApi.tc1_goal tc) in
+  let env  = (FApi.tc1_env tc) in
+  match goal.f_node with 
+  | FhoareS hs -> begin try
+    let tm = Unix.gettimeofday () in
+    let st, cpres = process_pre tc (hs_pr hs).inv in
+    let tm = time (toenv hyps) tm "Done with precondition processing" in
+
+    (* Get open state *)
+    let st = state_of_prog hyps (fst hs.hs_m) ~st hs.hs_s.s_node in
+    let _tm = time (toenv hyps) tm "Done with program circuit gen" in
+
+    let res = solve_post ~st ~pres:cpres hyps (hs_po hs).inv in
+    EcCircuits.clear_translation_caches ();
+    if res then 
+      FApi.close (!@ tc) VBdep 
+    else
+      tc_error (FApi.tc1_penv tc) "failed to verify postcondition"
+    with 
+    (* FIXME: not catching anything, redo *)
+    | CircError err ->
+      tc_error (FApi.tc1_penv tc) "circuit solve failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
+    end
+  | FequivS es -> begin try
       let tm = Unix.gettimeofday () in
-      let st, cpres = process_pre tc hs_pr in
+
+      (* FIXME: rework this *)
+      let st = circuit_state_of_memenv ~st:empty_state (FApi.tc1_env tc) es.es_ml in
+      let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es.es_mr in
+  (*         let st = circuit_state_of_hyps ~st (FApi.tc1_hyps tc) in *)
+
+      let st, cpres = process_pre ~st tc (es_pr es).inv in
       let tm = time (toenv hyps) tm "Done with precondition processing" in
 
-      (* Get open state *)
-      let st = state_of_prog hyps (fst hs_m) ~st hs_s.s_node in
-      let _tm = time (toenv hyps) tm "Done with program circuit gen" in
+      (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
+      let st = state_of_prog hyps (fst es.es_ml) ~st es.es_sl.s_node in
+      let tm = time (toenv hyps) tm "Done with left program circuit gen" in
+      let st = state_of_prog hyps (fst es.es_mr) ~st es.es_sr.s_node in
+      let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
 
-      let res = solve_post ~st ~pres:cpres hyps hs_po in
-      EcCircuits.clear_translation_caches ();
-      if res then 
+      if solve_post ~st ~pres:cpres hyps (es_po es).inv
+      then 
         FApi.close (!@ tc) VBdep 
       else
-        raise BDepVerifyFail (* FIXME: this is tactic failure, maybe should be done differently? *)
-      with 
-      (* FIXME: not catching anything, redo *)
-      | BDepError le ->
-        tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
-    end
-    | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } -> 
-    begin 
-      try (
-        let tm = Unix.gettimeofday () in
-        (* FIXME: rework this *)
-        let st = circuit_state_of_memenv ~st:empty_state (FApi.tc1_env tc) es_ml in
-        let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es_mr in
-(*         let st = circuit_state_of_hyps ~st (FApi.tc1_hyps tc) in *)
-        let st, cpres = process_pre ~st tc es_pr in
-        let tm = time (toenv hyps) tm "Done with precondition processing" in
-
-        (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
-        let st = state_of_prog ~me:es_ml hyps (fst es_ml) ~st es_sl.s_node in
-        let tm = time (toenv hyps) tm "Done with left program circuit gen" in
-        let st = state_of_prog ~me:es_mr hyps (fst es_mr) ~st es_sr.s_node in
-        let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
-
-        (if solve_post ~st ~pres:cpres hyps es_po
-        then FApi.close (!@ tc) VBdep else
-        raise BDepVerifyFail)
-      )
-      with 
-      (* FIXME: not catching anything, redo *)
-      | BDepError le ->
-        tc_error (FApi.tc1_penv tc) "%s" (Lazy.force le)
-    end
-    | _ -> 
-    let ctxt = tohyps hyps in
-    assert (ctxt.h_tvar = []);
-    let st = circuit_state_of_hyps hyps in
-    let cgoal = (circuit_of_form ~st hyps goal |> state_close_circuit st) in
-    if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
-    if circ_taut cgoal then
-    FApi.close (!@ tc) VBdep
-    else 
-    tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  
+        tc_error (FApi.tc1_penv tc) "failed to verify postcondition"
+    with CircError err ->
+      tc_error (FApi.tc1_penv tc) "circuit solve failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
   end
+  | _ -> 
+    begin try
+      let ctxt = tohyps hyps in
+      assert (ctxt.h_tvar = []);
+      let st = circuit_state_of_hyps hyps in
+      let cgoal = (circuit_of_form ~st hyps goal |> state_close_circuit st) in
+      if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
+      if circ_taut cgoal then
+      FApi.close (!@ tc) VBdep
+      else 
+      tc_error (FApi.tc1_penv tc) "Failed to solve goal through circuit reasoning@\n"  
+    with CircError err ->
+      tc_error (FApi.tc1_penv tc) "circuit solve failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
+    end
 
 let t_bdep_simplify (tc: tcenv1) =
   let time (env: env) (t: float) (msg: string) : float =
     let new_t = Unix.gettimeofday () in
     EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
-    Format.eprintf "[W] %s, took %f s@." msg (new_t -. t);
+    (* Format.eprintf "[W] %s, took %f s@." msg (new_t -. t); *)
     new_t
   in
   let hyps = (FApi.tc1_hyps tc) in
   let goal = (FApi.tc1_goal tc) in
   let env  = (FApi.tc1_env  tc) in
   match goal.f_node with 
-  | FhoareS {hs_m=(m, me) as hs_m; hs_pr; hs_po; hs_s} -> 
-(*     begin try *)
+  | FhoareS hs -> 
+    begin try
+      let m = fst hs.hs_m in
       let tm = Unix.gettimeofday () in
       let st = circuit_state_of_hyps ~use_mem:true hyps in
-      let st = circuit_state_of_memenv ~st env hs_m in
-      let st, pres = process_pre ~st tc hs_pr in
+      let st = circuit_state_of_memenv ~st env hs.hs_m in
+      let st, pres = process_pre ~st tc (hs_pr hs).inv in
       let tm = time env tm "Done with precondition processing" in
 
-
       (* FIXME: line below throws, should handle exceptions *)
-      let st = EcCircuits.state_of_prog ~st hyps (fst hs_m) hs_s.s_node in
-      let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps hs_po in
-  (*
-      if debug then Format.eprintf "[W] Post after simplify (before circuit pass):@. %a@."
+      let st = EcCircuits.state_of_prog ~st hyps (fst hs.hs_m) hs.hs_s.s_node in
+      let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps (hs_po hs).inv in
+
+      EcEnv.notify env EcGState.(`Debug) "[W] Post after simplify (before circuit pass):@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) post;
-  *)
+
       let tm = time env tm "Done with first simplify" in
       let f = EcCircuits.circ_simplify_form_bitstring_equality ~st ~pres hyps post in
       let tm = time env tm "Done with circuit simplify" in
       let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
       let _tm = time env tm "Done with second simplify" in
-      let new_goal = f_hoareS (snd hs_m) {inv=hs_pr; m} hs_s {inv=f; m} in
-  (*
-      if debug then Format.eprintf "[W] Goal after simplify:@. %a@."
+      let new_goal = f_hoareS (snd hs.hs_m) {inv=(hs_pr hs).inv; m} hs.hs_s {inv=f; m} in
+
+      EcEnv.notify env EcGState.(`Debug) "[W] Goal after simplify:@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
-  *)
       
       FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
-(*
     with CircError err ->
-      tc_error (FApi.tc1_penv tc) "CircError: %s@." (Lazy.force err)
+      tc_error (FApi.tc1_penv tc) "Circuit simplify failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
-*)
   | _ -> assert false (* FIXME : TODO *)
 
 (* ================ EXTENS TACTIC  ==================== *)
@@ -364,7 +363,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
     in
 
     let goals = match (tc1_goal tc).f_node, v with 
-    | Fapp ({f_node = Fop (p, [tint]); _}, [fpred; flist]), None when p = EcCoreLib.CI_List.p_all ->
+    | Fapp ({f_node = Fop (p, [tp]); _}, [fpred; flist]), None when p = EcCoreLib.CI_List.p_all && tp = tint->
         Format.eprintf "[W] Found list all@.";
         begin match flist.f_node with
         | Fapp ({f_node = Fop (p, []); _}, [fstart; flen]) when p = EcCoreLib.CI_List.p_iota ->

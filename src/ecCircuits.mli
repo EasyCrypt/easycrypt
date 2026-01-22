@@ -11,27 +11,43 @@ open EcLowCircuits
 module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
-exception MissingTyBinding of ty
-exception AbstractTyBinding of ty
-exception InvalidArgument
-exception MissingOpBinding of path
-exception MissingOpSpec of path
-exception IntConversionFailure 
-exception DestrError of string (* FIXME: change this one *)
-exception MissingOpBody (* FIXME: rename? *)
-exception BadFormForArg (* FIXME: rename *)
-exception CantConvertToConstant
-exception CantConvertToCirc of 
-  [`Int 
+type circuit_conversion_call = [
+  | `Convert of form
+  | `ToArg of form
+  | `ExpandIter of form * form list
+  | `Instr of instr
+]
+
+type circuit_error =
+| MissingTyBinding of [`Ty of ty | `Path of path]
+| AbstractTyBinding of [`Ty of ty | `Path of path]
+| InvalidArgument
+| MissingOpBinding of path
+| MissingOpSpec of path
+| IntConversionFailure
+| DestrError of string (* FIXME: change this one *)
+| MissingOpBody of path (* FIXME: rename? *)
+| CantConvertToConstant
+| CantReadWriteGlobs
+| BadFormForArg of form
+| CantConvertToCirc of 
+  [ `Int 
   | `OpK of EcFol.op_kind 
   | `Op of path 
   | `Quantif of quantif
   | `Match
   | `Glob
+  | `ModGlob
   | `Record
   | `Hoare
   | `Instr
 ] 
+| PropagateError of circuit_conversion_call * circuit_error (* FIXME: make this lazy *)
+
+exception CircError of circuit_error
+
+val circ_error : circuit_error -> 'a
+val pp_circ_error : EcPrinting.PPEnv.t -> Format.formatter -> circuit_error -> unit
 
 (* -------------------------------------------------------------------- *)
 (* Utilities (figure out better name) *)
@@ -68,9 +84,9 @@ val circ_simplify_form_bitstring_equality :
   ?pres:circuit list -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : ?close:bool -> ?me:memenv -> hyps -> memory -> ?st:state -> instr list -> state 
+val state_of_prog : ?close:bool -> hyps -> memory -> ?st:state -> instr list -> state 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
-val process_instr : ?me:memenv -> hyps -> memory -> st:state -> instr -> state
+val process_instr : hyps -> memory -> st:state -> instr -> state
 (* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 val circuit_state_of_memenv : st:state -> env -> memenv -> state
