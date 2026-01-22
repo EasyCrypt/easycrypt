@@ -608,11 +608,9 @@ end
 module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = struct
   (* Module Types *)
   type flatcirc = Backend.reg
-  type width = int
-  type count = int
   type ctype = 
     CArray of {width: int; count: int; } 
-  | CBitstring of width 
+  | CBitstring of int 
   | CTuple of ctype list 
   | CBool
   type circ = {
@@ -1665,6 +1663,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           let circs, cinps = List.split @@ List.init w init_f in
           let circs = List.map 
             (function 
+            (* FIXME: bad abstraction, fix after PR *)
+            | {type_ = CBitstring 1; reg = b}
             | {type_ = CBool; reg = b} -> Backend.node_of_reg b 
             (* Return type should be bool (= bit) for components *)
             | _ -> assert false) (* Should be caught by EC typechecking + binding correctness *)
