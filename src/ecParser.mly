@@ -1569,9 +1569,9 @@ mod_def_or_decl:
         ptm_locality = locality; } }
 
 qmod_decl:
-| locality=locality QMODULE ptm_name=uident LTCOLON ptm_modty=mod_type_with_restr ptm_qbounds=qmod_querybounds
-    { { ptm_def      = `QAbstract { ptm_name; ptm_modty; ptm_qbounds; };
-        ptm_locality = locality; } }
+| locality=locality QMODULE ptqm_name=uident LTCOLON ptqm_modty=mod_type_with_restr ptqm_qbounds=qmod_querybounds
+    { { ptqm_def      = { ptqm_name; ptqm_modty; ptqm_qbounds; };
+        ptqm_locality = locality; } }
 
 qmod_querybound:
 | f=loc(fident) EQ i=word  { (f, i) }
@@ -3902,7 +3902,7 @@ global_action:
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | mod_def_or_decl  { Gmodule      $1 }
-| qmod_decl        { Gmodule      $1 }
+| qmod_decl        { Gqmodule     $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }

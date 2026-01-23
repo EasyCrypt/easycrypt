@@ -1764,11 +1764,6 @@ module Mod = struct
         hierror "use declare for abstract module";
       declare scope decl
 
-    | { ptm_locality = lc; ptm_def = `QAbstract decl } ->
-      if lc <> `Declare then
-        hierror "use declare for abstract module";
-      declare scope decl
-
   let import (scope : scope) (m : pmsymbol located) : scope =
     let m, _ = EcTyping.trans_msymbol (env scope) m in
     { scope with sc_env = EcSection.import_vars m scope.sc_env }
@@ -1787,9 +1782,17 @@ module QMod = struct
         sc_locdoc = DocState.add_item scope.sc_locdoc; }
 *)
   let declare (scope : scope) (m : pqmodule_decl) =
-    let modty = m.ptm_modty in
-    let name  = EcIdent.create (unloc m.ptm_name) in
+    if m.ptqm_locality <> `Declare then
+      hierror "use declare for quantum abstract module";
+    let modty = m.ptqm_def.ptqm_modty in
+    let name  = EcIdent.create (unloc m.ptqm_def.ptqm_name) in
     let tysig = fst (TT.transmodtype (env scope) modty.pmty_pq) in
+
+    (* FIXME: check that qbounds is well-formed, i.e. that it contains
+     * a bound for all oracles (inferred from the module type) and only
+     * for them. *)
+    let qbounds = m.ptqm_def.ptqm_qbounds in
+
     (* We modify tysig restrictions according if necessary. *)
     let tysig = trans_restr_for_modty (env scope) tysig modty.pmty_mem in
 
