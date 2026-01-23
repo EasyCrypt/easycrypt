@@ -1,0 +1,773 @@
+(* ==================================================================== *)
+open Aig
+
+(* ==================================================================== *)
+let rec log2 n =
+  if n <= 1 then 0 else 1 + log2 (n lsr 1)
+
+(* ==================================================================== *)
+let sint_of_bools (bs : bool array) : int =
+  assert (Array.length bs <= Sys.int_size);
+
+  let bs =
+    match Array.length bs with
+    | 0 ->
+      Array.make Sys.int_size false
+    | n ->
+      Array.append (Array.left bs (n - 1)) (Array.make (Sys.int_size - (n-1)) (bs.(n - 1))) 
+  in
+
+  Array.fold_lefti
+    (fun v i b -> if b then (1 lsl i) lor v else v)
+    0 bs
+
+let split_at_arr (type t) (n: int) (r: t array) : t array * t array =
+  Array.sub r 0 n, Array.right r (Array.length r - n)
+
+(* -------------------------------------------------------------------- *)
+let uint_of_bools (bs : bool array) : int =
+  assert (Array.length bs <= Sys.int_size - 1);
+
+  Array.fold_lefti
+    (fun v i b -> if b then (1 lsl i) lor v else v)
+    0 bs
+
+(* -------------------------------------------------------------------- *)
+let int32_of_bools (bs : bool array) : int32 =
+  Array.fold_lefti
+    (fun v i b ->
+       if b then
+         Int32.logor (Int32.shift_left 1l i) v
+       else
+         v)
+    0l bs
+
+let int64_of_bools (bs : bool array) : int64 =
+  Array.fold_lefti
+    (fun v i b ->
+      if b then
+        Int64.(logor (shift_left 1L i) v)
+      else
+        v)
+    0L bs
+
+let ubigint_of_bools (bs: bool array) : Z.t =
+  Array.fold_right 
+    (fun b acc -> 
+    Z.(+) (Z.shift_left acc 1) (if b then Z.one else Z.zero)) 
+    bs 
+    Z.zero
+
+(* FIXME: Check this *)
+let sbigint_of_bools (bs: bool array) : Z.t = 
+  let bs = Array.rev bs in
+  let msb = bs.(0) in
+  Array.fold_left 
+    (fun acc b -> 
+    Z.(+) (Z.shift_left acc 1) (if b then Z.one else Z.zero)) 
+    (if msb then Z.neg Z.one else Z.zero)
+    bs
+
+(* -------------------------------------------------------------------- *)
+let explode (type t) ~(size : int) (r : t array) =
+  assert (Array.length r mod size == 0);
+
+  Array.init ((Array.length r) / size) (fun i ->
+    Array.init size (fun j -> r.(i * size + j)))
+
+
+(* -------------------------------------------------------------------- *)
+let bytes_of_bools (bs : bool array) : bytes =
+  let bs = (Array.to_seq (explode ~size:8 bs)) in
+  let bs = Seq.map (uint_of_bools %> Char.chr) bs in
+  Bytes.of_seq bs
+
+(* -------------------------------------------------------------------- *)
+let bools_of_reg (r: reg) : bool array =
+  Array.map (function 
+    | { gate = False; id } when id > 0 -> false
+    | { gate = False; id } -> true
+    | _ -> raise (Invalid_argument "Can't convert non constant reg to bool array")
+  ) r
+
+let bool_list_of_reg : reg -> bool list = fun r -> bools_of_reg r |> Array.to_list
+
+(* -------------------------------------------------------------------- *)
+let pp_reg_ ~(size : int) (fmt : Format.formatter) (r : bool array) =
+  assert (Array.length r mod (size * 4) = 0);
+
+  let r = explode ~size:(size * 4) r in
+(*   let r = explode ~size:(size * 4) r in *)
+  let r = Array.map int32_of_bools r in
+
+  Format.fprintf fmt "%a"
+  (fun fmt arr -> Array.iteri (fun i x ->
+    Format.fprintf fmt "%0.8lx" x;
+    if i < Array.length arr - 1 then 
+    Format.fprintf fmt "_"
+   ) arr)
+  r
+
+let pp_reg ~(size: int) (fmt: Format.formatter) (r: reg) = 
+  assert (size mod 4 = 0);
+  pp_reg_ ~size:(size / 4) fmt (bools_of_reg r)
+
+(* ==================================================================== *)
+let bit ~(position : int) (v : int) : bool =
+  (v lsr position) land 0b1 <> 0
+
+(* -------------------------------------------------------------------- *)
+let bit32 ~(position : int) (v : int32) : bool =
+  let open Int32 in
+  logand (shift_right v position) 0b1l <> 0l
+
+(* -------------------------------------------------------------------- *)
+let bit64 ~(position : int) (v : int64) : bool =
+  let open Int64 in
+  logand (shift_right v position) 0b1L <> 0L
+
+(* ==================================================================== *)
+let of_int ~(size : int) (v : int) : reg =
+  Array.init size (fun i -> constant (bit ~position:i v))
+
+(* -------------------------------------------------------------------- *)
+let of_int32 (v : int32) : reg =
+  Array.init 32 (fun i -> constant (bit32 ~position:i v))
+
+(* -------------------------------------------------------------------- *)
+let of_int64 (v : int64) : reg =
+  Array.init 64 (fun i -> constant (bit64 ~position:i v))
+
+(* -------------------------------------------------------------------- *)
+let of_int32s (vs : int32 array) : reg =
+  Array.reduce Array.append (Array.map of_int32 vs)
+
+(* -------------------------------------------------------------------- *)
+let of_bigint ~(size : int) (v : Z.t) : reg =
+  assert (0 <= Z.compare v Z.zero);
+  assert (Z.numbits v <= size);
+  Array.init size (fun i -> constant (Z.testbit v i))
+
+(* FIXME: Check *)
+let of_bigint_all ~(size : int) (v : Z.t) : reg =
+  let mod_ = Z.(lsl) Z.one (size) in
+  let v = Z.rem v mod_ in
+  let v = if Z.sign v < 0 then Z.add mod_ v else v in
+  of_bigint ~size v
+
+(* FIXME: Check *)
+let of_bigint_repr_size (v : Z.t) : reg =
+  let size = Z.numbits v + (if Z.sign v <= 0 then 1 else 0) in
+  of_bigint_all ~size v
+
+let of_int_repr_size (v: int) : reg =
+  of_bigint_repr_size (Z.of_int v)
+
+(* -------------------------------------------------------------------- *)
+let of_string ~(size : int) (s : string) : reg =
+  of_bigint ~size (Z.of_string s)
+
+(* ==================================================================== *)
+let w8 (i : int) : reg =
+  of_int ~size:8 i
+
+(* -------------------------------------------------------------------- *)
+let w16 (i : int) : reg =
+  of_int ~size:16 i
+
+(* -------------------------------------------------------------------- *)
+let w32 (i : int32) : reg =
+  of_int32 i
+
+(* -------------------------------------------------------------------- *)
+let w64 (i : int64) : reg =
+  of_int64 i
+
+(* -------------------------------------------------------------------- *)
+let w128 (s : string) : reg =
+  of_string ~size:128 s
+
+(* -------------------------------------------------------------------- *)
+let w256 (s : string) : reg =
+  of_string ~size:256 s
+
+(* ==================================================================== *)
+let reg ~(size : int) ~(name : int) : reg =
+  Array.init size (fun i -> input (name, i))
+
+(* ==================================================================== *)
+let split_msb (r : reg) : node * reg =
+  let n = Array.length r in
+  let msb = r.(n-1) in
+  let r = Array.sub r 0 (n-1) in
+  msb, r
+
+(* ==================================================================== *)
+let lnot_ (r : reg) : reg =
+  Array.map neg r
+
+(* -------------------------------------------------------------------- *)
+let lor_ (r1 : reg) (r2 : reg) : reg =
+  Array.map2 or_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let lxor_ (r1 : reg) (r2 : reg) : reg =
+  Array.map2 xor r1 r2
+
+(* -------------------------------------------------------------------- *)
+let lxnor_ (r1 : reg) (r2 : reg) : reg =
+  Array.map2 xnor r1 r2
+
+(* -------------------------------------------------------------------- *)
+let land_ (r1 : reg) (r2 : reg) : reg =
+  Array.map2 and_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let ors (r : node array) : node =
+  Array.fold_left or_ false_ r
+
+(* -------------------------------------------------------------------- *)
+let ands (r : node array) : node =
+  Array.fold_left and_ true_ r
+
+(* -------------------------------------------------------------------- *)
+let lshift ~(offset : int) (r : reg) : reg =
+  Array.append (Array.make offset false_) r
+
+(* -------------------------------------------------------------------- *)
+let uextend ~(size : int) (r : reg) : reg =
+  Array.append r @@ Array.make (max 0 (size - Array.length r)) false_
+
+(* -------------------------------------------------------------------- *)
+let sextend ~(size : int) (r : reg) : reg =
+  let lr = Array.length r in
+
+  if size > lr then
+    match Array.length r with
+    | 0 ->
+      Array.make size false_
+    | _ ->
+      Array.append r (Array.make (size - lr) (r.(lr - 1)))
+  else
+    r
+
+(* -------------------------------------------------------------------- *)
+let trunc ~(size: int) (r: reg) : reg =
+  Array.sub r 0 size 
+
+(* -------------------------------------------------------------------- *)
+let mux2 (n1 : node) (n2 : node) (c : node) =
+  or_ (and_ (neg c) n1) (and_ c n2)
+
+(* -------------------------------------------------------------------- *)
+let mux2_reg (r1 : reg) (r2 : reg) (c : node) =
+  assert (Array.length r1 = Array.length r2);
+  Array.map2 (fun n1 n2 -> mux2 n1 n2 c) r1 r2
+
+(* -------------------------------------------------------------------- *)
+let mux2_2
+  ~(k00 : node)
+  ~(k01 : node)
+  ~(k10 : node)
+  ~(k11 : node)
+  ((c1, c2) : node * node)
+=
+  mux2
+    (mux2 k00 k01 c2)
+    (mux2 k10 k11 c2)
+    c1
+
+(* -------------------------------------------------------------------- *)
+let mux2_2reg
+  ~(k00 : reg)
+  ~(k01 : reg)
+  ~(k10 : reg)
+  ~(k11 : reg)
+  ((c1, c2) : node * node)
+=
+  mux2_reg
+    (mux2_reg k00 k01 c2)
+    (mux2_reg k10 k11 c2)
+    c1
+
+(* -------------------------------------------------------------------- *)
+let mux_reg (cr : (node * reg) array) (r : reg) : reg =
+  Array.fold_right (fun (c, r) s -> mux2_reg s r c) cr r
+
+(* -------------------------------------------------------------------- *)
+let ite (c : node) (t : reg) (f : reg) : reg =
+  mux2_reg f t c
+
+(* -------------------------------------------------------------------- *)
+let c_rshift ~(lg2o : int) ~(sign : node) (c : node) (r : reg) =
+  let len   = Array.length r in
+  let clamp = log2 len in
+  let s =
+    if lg2o > clamp then
+      Array.make len sign
+    else
+      let offset = 1 lsl lg2o in
+      Array.append (Array.sub r (min offset len) (len - (min offset len))) (Array.make (min offset len) sign)
+  in
+    Array.map2 (fun r1 s1 -> mux2 r1 s1 c) r s
+
+(* TODO: change array appends into inits *)
+
+(* -------------------------------------------------------------------- *)
+let arshift ~(offset : int) (r : reg) =
+  let sign = if Array.length r = 0 then false_ else r.(Array.length r - 1) in
+  let l = Array.length r in
+  Array.append (Array.sub r (min offset l) (l - (min offset l))) (Array.make (min offset l) sign)
+
+(* -------------------------------------------------------------------- *)
+let lsr_ (r as r0 : reg) (s : reg) : reg =
+  let _, r =
+    Array.fold_left (fun (i, r) c ->
+      (i+1, c_rshift ~lg2o:i ~sign:false_ c r)
+    ) (0, r) s
+  in assert (Array.length r = Array.length r0); r
+
+(* -------------------------------------------------------------------- *)
+let lsl_ (r : reg) (s : reg) : reg =
+  Array.rev (lsr_ (Array.rev r) s)
+
+(* -------------------------------------------------------------------- *)
+let asl_ (r : reg) (s : reg) : reg =
+  lsl_ r s
+
+(* -------------------------------------------------------------------- *)
+let asr_ (r : reg) (s : reg) : reg =
+  let sign =
+    if Array.length r = 0 then false_ else r.(Array.length r - 1)
+  in
+  let _, r =
+    Array.fold_left (fun (i, r) c ->
+      (i+1, c_rshift ~lg2o:i ~sign c r)
+    ) (0, r) s
+  in r
+
+(* -------------------------------------------------------------------- *)
+let shift ~(side : [`L | `R]) ~(sign : [`L | `A]) =
+  match side, sign with
+  | `L, `L -> lsl_
+  | `R, `L -> lsr_
+  | `L, `A -> asl_
+  | `R, `A -> asr_
+
+
+(* -------------------------------------------------------------------- *)
+let halfadder (a : node) (b : node) : node * node =
+  (and_ a b, xor a b)
+
+(* -------------------------------------------------------------------- *)
+let incr (r : reg) : node * reg =
+  Array.fold_left_map halfadder true_ r
+
+(* -------------------------------------------------------------------- *)
+let incrc (r : reg) : reg =
+  let c, r = incr r in Array.append r [|c|]
+
+(* -------------------------------------------------------------------- *)
+let incr_dropc (r : reg) : reg =
+  snd (Array.fold_left_map halfadder true_ r)
+
+(* -------------------------------------------------------------------- *)
+let opp (r : reg) : reg =
+  incr_dropc (lnot_ r)
+
+(* -------------------------------------------------------------------- *)
+let fulladder (c : node) (a : node) (b : node) : node * node =
+  let c1, s = halfadder a b in
+  let c2, s = halfadder c s in
+  (or_ c1 c2, s)
+
+(* -------------------------------------------------------------------- *)
+let addsub (m : node) (r1 : reg) (r2 : reg) : node * reg =
+  assert(Array.length r1 = Array.length r2);
+
+  Array.fold_left_map
+    (fun carry (a, b) -> fulladder carry a (xor b m))
+    m (Array.combine r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let add (r1 : reg) (r2 : reg) : node * reg =
+  addsub false_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let addc (r1 : reg) (r2 : reg) : reg =
+    let c, r = add r1 r2 in Array.append r [|c|]
+
+(* -------------------------------------------------------------------- *)
+let add_dropc (r1 : reg) (r2 : reg) : reg =
+  snd (add r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let sub (r1 : reg) (r2 : reg) : node * reg =
+  addsub true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let sub_dropc (r1 : reg) (r2 : reg) : reg =
+  snd (sub r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let bmul (n : node) (r : reg) : reg =
+  Array.map (fun n' -> and_ n n') r
+
+(* -------------------------------------------------------------------- *)
+let umul (r1 : reg) (r2 : reg) : reg =
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+
+  let prods = Array.mapi (fun i n -> lshift ~offset:i (bmul n r2)) r1 in
+
+  let out = Array.fold_left addc (Array.make n2 false_) prods in
+  let out = Array.sub out 0 (n1 + n2) in
+
+  out
+
+(* -------------------------------------------------------------------- *)
+let umul_ (r1 : reg) (r2 : reg) : reg * reg =
+  let n = Array.length r2 in
+  let r = umul r1 r2 in
+  
+  split_at_arr n r
+
+(* -------------------------------------------------------------------- *)
+let umull (r1 : reg) (r2 : reg) : reg =
+  fst (umul_ r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let umulh (r1 : reg) (r2 : reg) : reg =
+  snd (umul_ r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let smul (r1 : reg) (r2 : reg) : reg =
+  let nm, (r1, r2) =
+    let n1 = Array.length r1 in
+    let n2 = Array.length r2 in
+    let nm = max n1 n2 in
+
+    let r1 = sextend ~size:nm r1 in
+    let r2 = sextend ~size:nm r2 in
+
+    (nm, (r1, r2)) in
+
+  let sbmul_r2 (n : node) =
+    Array.mapi (fun i n' ->
+      let out = and_ n n' in
+      if i+1 = nm then neg out else out
+    ) r2 in
+
+  let prods = Array.mapi (fun i n ->
+    let out = sbmul_r2 n in
+    let out =
+      match () with
+      | _ when i = 0 -> Array.append out [|true_|]
+      | _ when i+1 = nm -> Array.append (lnot_ out) [|true_|]
+      | _ -> Array.append out [|false_|]
+    in
+    lshift ~offset:i out
+  ) r1 in
+
+  let out = Array.fold_left addc (Array.make (nm+1) false_) prods in
+
+  Array.left out (2 * nm)
+
+(* -------------------------------------------------------------------- *)
+let smul_ (r1 : reg) (r2 : reg) : reg * reg =
+  let nm = max (Array.length r1) (Array.length r2) in
+  let s = smul r1 r2 in 
+  split_at_arr nm s
+
+(* -------------------------------------------------------------------- *)
+let smull (r1 : reg) (r2 : reg) : reg =
+  fst (smul_ r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let smulh (r1 : reg) (r2 : reg) : reg =
+  snd (smul_ r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let ssat ~(size : int) (r : reg) : reg =
+  assert (0 < size);
+  assert (size < Array.length r);
+
+  let rl, rh = split_at_arr (size - 1) r in
+  let rh, msb = Array.sub rh 0 (Array.length rh - 1), rh.(Array.length rh - 1) in
+
+  let rm = Array.append (Array.make (size - 1) false_) [|true_ |] in
+  let rM = Array.append (Array.make (size - 1) true_ ) [|false_|] in
+  let ro = Array.append rl [|msb|] in
+
+  let cm = and_ msb (neg (ands rh)) in
+  let cM = and_ (neg msb) (ors rh) in
+
+  mux_reg [|(cm, rm); (cM, rM)|] ro
+
+(* -------------------------------------------------------------------- *)
+let usat ~(size : int) (r : reg) : reg =
+  assert (size < Array.length r);
+
+  let rl, rh = split_at_arr size r in 
+  let rh, msb = Array.left rh (Array.length rh - 1), rh.(Array.length rh - 1) in
+
+  let rm = Array.make size false_ in
+  let rM = Array.make size true_ in
+  let ro = rl in
+
+  let cm = msb in
+  let cM = and_ (neg msb) (ors rh) in
+
+  mux_reg [|(cm, rm); (cM, rM)|] ro
+
+(* -------------------------------------------------------------------- *)
+let sat ~(signed : bool) ~(size : int) (r : reg) : reg =
+  match signed with
+  | true  -> ssat ~size r
+  | false -> usat ~size r
+
+(* -------------------------------------------------------------------- *)
+let ssadd (r1 : reg) (r2 : reg) : reg =
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+  let n = max n1 n2 in
+
+  let r1 = sextend ~size:(n+1) r1 in
+  let r2 = sextend ~size:(n+1) r2 in
+
+  ssat ~size:n (add_dropc r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let usadd (r1 : reg) (r2 : reg) : reg =
+  let r = addc r1 r2 in
+  usat ~size:(Array.length r - 1) r
+
+(* -------------------------------------------------------------------- *)
+let usmul (r1 : reg) (r2 : reg) : reg =
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+  let nm = max n1 n2 in
+
+  let r1 = uextend ~size:(2*nm) r1 in
+  let r2 = sextend ~size:(2*nm) r2 in
+
+  smull r1 r2
+
+(* -------------------------------------------------------------------- *)
+let ugte (eq : node) (r1 : reg) (r2 : reg) : node =
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+  let n  = max n1 n2 in
+  let r1 = uextend ~size:n r1 in
+  let r2 = uextend ~size:n r2 in
+
+  Array.fold_left (fun ct (c1, c2) ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.true_
+      ~k11:ct
+  ) eq (Array.combine r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let sgte (eq : node) (r1 : reg) (r2 : reg) : node =
+  let msb1, r1 = split_msb r1 in
+  let msb2, r2 = split_msb r2 in
+
+  mux2_2 (msb1, msb2)
+    ~k00:(ugte eq r1 r2)
+    ~k01:Aig.true_
+    ~k10:Aig.false_
+    ~k11:(ugte eq r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let bvueq (r1 : reg) (r2 : reg) : node = 
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+  let n = max n1 n2 in
+  let r1 = uextend ~size:n r1 in
+  let r2 = uextend ~size:n r2 in
+
+  Array.fold_left (fun ct (c1, c2) ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.false_
+      ~k11:ct
+  ) Aig.true_ (Array.combine r1 r2)
+  
+(* -------------------------------------------------------------------- *)
+let bvseq (r1 : reg) (r2 : reg) : node = 
+  let n1 = Array.length r1 in
+  let n2 = Array.length r2 in
+  let n = max n1 n2 in
+  let r1 = sextend ~size:n r1 in
+  let r2 = sextend ~size:n r2 in
+
+  Array.fold_left (fun ct (c1, c2) ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.false_
+      ~k11:ct
+  ) Aig.true_ (Array.combine r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let ugt (r1 : reg) (r2 : reg) : node =
+  ugte Aig.false_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let uge (r1 : reg) (r2 : reg) : node =
+  ugte Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let ult (r1: reg) (r2 : reg) : node =
+  ugt r2 r1
+
+(* -------------------------------------------------------------------- *)
+let ule (r1 : reg) (r2 : reg) : node =
+  uge r2 r1
+
+(* -------------------------------------------------------------------- *)
+let sgt (r1 : reg) (r2 : reg) : node =
+  sgte Aig.false_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let sge (r1 : reg) (r2 : reg) : node =
+  sgte Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let slt (r1 : reg) (r2 : reg) : node =
+  sgt r2 r1
+
+(* -------------------------------------------------------------------- *)
+let sle (r1 : reg) (r2 : reg) : node =
+  sge r2 r1
+
+(* -------------------------------------------------------------------- *)
+let iszero (r : reg) : node =
+  bvueq r (Array.map (fun _ -> false_) r)
+
+(* -------------------------------------------------------------------- *)
+let abs (a : reg) : reg =
+  let msb_a, _ = split_msb a in
+  ite (msb_a) (opp a) a
+
+(* -------------------------------------------------------------------- *)
+let udiv_ (a : reg) (b : reg) : reg * reg =
+  assert (Array.length a >= Array.length b);
+
+  let n = Array.length b in
+
+  let pu (a : node) (b : node) (cin : node) : node * (node -> node) =
+    let cout, s = fulladder cin (neg b) a in
+    let out (cc : node) = mux2 a s cc in
+    (cout, out)
+  in
+
+  let create_line (i : int) (d : node) (a : reg) : node * reg =
+    let a = Array.append [|d|] (if i = n then a else snd (split_msb a)) in
+    let b = if i < n then b else Array.append b [|Aig.false_|] in
+
+    let c, pus =
+      Array.fold_left_map
+        (fun c (a, b) -> pu a b c)
+        Aig.true_ (Array.combine a b)
+    in (c, Array.map (fun pu -> pu c) pus)
+  in
+
+  Array.fold_lefti (fun (q, a) i d ->
+    let q', a = create_line i d a in (Array.append [|q'|] q, a)
+  ) ([||], Array.make n false_) (Array.rev a)
+
+(* -------------------------------------------------------------------- *)
+let udiv (a : reg) (b : reg) : reg =
+  let m = max (Array.length a) (Array.length b) in
+  let a = uextend ~size:m a in
+  let b = uextend ~size:m b in
+  ite (iszero b) a (fst (udiv_ a b))
+
+(* -------------------------------------------------------------------- *)
+let sdiv (s : reg) (t : reg) : reg =
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+
+  mux2_2reg
+    ~k00:(    (udiv (    s) (    t)))
+    ~k10:(opp (udiv (opp s) (    t)))
+    ~k01:(opp (udiv (    s) (opp t)))
+    ~k11:(    (udiv (opp s) (opp t)))
+    (msb_s, msb_t)
+
+(* -------------------------------------------------------------------- *)
+let umod (a : reg) (b : reg) : reg =
+  let m = max (Array.length a) (Array.length b) in
+  let a = uextend ~size:m a in
+  let b = uextend ~size:m b in
+
+  ite
+    (iszero b)
+    (Array.map (fun _ -> false_) b)
+    (uextend ~size:m (snd (udiv_ a b)))
+
+(* -------------------------------------------------------------------- *)
+let srem (s : reg) (t : reg) : reg =
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+
+  mux2_2reg
+    ~k00:(    (umod (    s) (    t)))
+    ~k10:(opp (umod (opp s) (    t)))
+    ~k01:(opp (umod (    s) (opp t)))
+    ~k11:(    (umod (opp s) (opp t)))
+    (msb_s, msb_t)
+
+(* -------------------------------------------------------------------- *)
+let smod (s : reg) (t : reg) : reg =  
+  ite (iszero t) s @@
+  let msb_s, _ = split_msb s in
+  let msb_t, _ = split_msb t in
+
+  let u = umod (abs s) (abs t) in
+
+  ite (iszero u)
+  u
+  (mux2_2reg
+    ~k00:(               u   )
+    ~k10:(add_dropc (opp u) t)
+    ~k01:(add_dropc (    u) t)
+    ~k11:(          (opp u)  )
+    (msb_s, msb_t))
+
+(* -------------------------------------------------------------------- *)
+let rol (r: reg) (s: reg) : reg =
+  let size = Array.length r in
+  let s = umod s (of_int ~size size) in (* so 0 <= s < size *)
+  let s = Array.left s size |> uextend ~size in (* by above, ln s < size *)
+  lor_ (shift ~side:`L ~sign:`L r s) (shift ~side:`R ~sign:`L r (sub_dropc (of_int ~size size) s)) 
+
+(* -------------------------------------------------------------------- *)
+let ror (r: reg) (s: reg) : reg =
+  let size = Array.length r in
+  let s = umod s (of_int ~size size) in (* so 0 <= s < size *)
+  let s = Array.left s size |> uextend ~size in (* by above, ln s < size *)
+  lor_ (shift ~side:`R ~sign:`L r s) (shift ~side:`L ~sign:`L r (sub_dropc (of_int ~size size) s)) 
+
+(* -------------------------------------------------------------------- *)
+let popcount ~(size : int) (r : reg) : reg =
+  Array.fold_left (fun aout node ->
+    ite node (incr_dropc aout) aout
+  ) (Array.make size Aig.false_) r
+
+(* -------------------------------------------------------------------- *)
+(* Assumes input is array of 16 bit words *)
+(* FIXME: Maybe do something a bit more principled here? *)
+let compute ?(input_block_size = 16) ?(output_block_size = 16) (r: reg) (inp: int array) : int array =
+  assert (input_block_size <= 32);
+  let m = (1 lsl input_block_size) - 1 in
+  let inp = Array.map (fun i -> i land m) inp in
+  let inp = Array.map (of_int ~size:input_block_size) inp |> Array.reduce Array.append in
+  maps (function 
+    | (0, i) -> Some (inp.(i))
+    | _ -> None) r |> bools_of_reg |> explode ~size:output_block_size |> Array.map (uint_of_bools)
+

@@ -28,6 +28,7 @@ and theory_item_r =
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   (* reduction rule does not survive to section so no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_crbinding of crbinding * is_local
   | Th_auto      of auto_rule
   | Th_alias     of (symbol * path)
 

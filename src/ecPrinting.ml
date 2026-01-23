@@ -3656,6 +3656,80 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         level (odfl "" base)
         (pp_list "@ " (pp_axhnt ppe)) axioms
 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
+      Format.fprintf fmt "%abind bitstring %a %a %a %a%s."
+        pp_locality lc
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        (pp_form ppe) (fst bs.size)
+        (if Option.is_some (snd bs.size) then " (concrete)" else " (abstract)")
+
+    | CRB_Array ba ->
+      Format.fprintf fmt "%abind array %a %a %a %a %a %a%s."
+        pp_locality lc
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
+        (pp_form ppe) (fst ba.size)
+        (if Option.is_some (snd ba.size) then " (concrete)" else " (abstract)")
+
+    | CRB_BvOperator op ->
+      let kind =
+        match op.kind with
+        | `Add      _            -> "add"
+        | `Sub      _            -> "sub"
+        | `Mul      _            -> "mul"
+        | `Div     (_,    false) -> "udiv"
+        | `Div     (_,    true ) -> "sdiv"
+        | `Rem     (_,    false) -> "urem"
+        | `Rem     (_,    true ) -> "srem"
+        | `Shl      _            -> "shl"
+        | `Shls      _           -> "shls"
+        | `Rol      _            -> "rol"
+        | `Ror      _            -> "ror"
+        | `Shr     (_,    false) -> "shr"
+        | `Shr     (_,    true ) -> "ashr"
+        | `Shrs    (_, _, false) -> "shrs"
+        | `Shrs    (_, _, true ) -> "ashrs"
+        | `Not      _            -> "not"
+        | `Opp      _            -> "opp"
+        | `And      _            -> "and"
+        | `Or       _            -> "or"
+        | `Xor      _            -> "xor"
+        | `Lt      (_,    false) -> "ult"
+        | `Lt      (_,    true ) -> "slt"
+        | `Le      (_,    false) -> "ule"
+        | `Le      (_,    true ) -> "sle"
+        | `Init     _            -> "init"
+        | `Get      _            -> "get"
+        | `AInit    _            -> "ainit"
+        | `Extend  (_, _, false) -> "zextend"
+        | `Extend  (_, _, true ) -> "sextend"
+        | `Extract  _            -> "extract"
+        | `Insert   _            -> "insert"
+        | `Concat   _            -> "concat"
+        | `Truncate _            -> "truncate"
+        | `A2B      _            -> "a2b"
+        | `B2A      _            -> "b2a"
+        | `Map      _            -> "map"
+        | `ASliceGet _           -> "asliceget"
+        | `ASliceSet _           -> "asliceset"
+      in
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
+        pp_locality lc
+        (pp_list " & " (pp_tyname ppe)) op.types
+        (pp_opname ppe) op.operator
+        kind
+
+  | CRB_Circuit cr ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
   | EcTheory.Th_alias (name, target) ->
       Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
 
