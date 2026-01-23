@@ -305,7 +305,7 @@ and pfunction_decl = {
 (* -------------------------------------------------------------------- *)
 and pmodule_def_or_decl = {
   ptm_locality : locality;
-  ptm_def      : [`Concrete of pmodule_def | `Abstract of pmodule_decl];
+  ptm_def      : [`Concrete of pmodule_def | `Abstract of pmodule_decl | `QAbstract of pqmodule_decl];
 }
 
 and pmodule_decl = {
@@ -316,6 +316,7 @@ and pmodule_decl = {
 and pqmodule_decl = {
   ptm_name  : psymbol;
   ptm_modty : pmodule_type_restr;
+  ptm_qbounds : (pgamepath * int) list;
 }
 
 and pmodule_def = {

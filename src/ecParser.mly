@@ -1569,10 +1569,15 @@ mod_def_or_decl:
         ptm_locality = locality; } }
 
 qmod_decl:
-| locality=locality QMODULE ptm_name=uident LTCOLON ptm_modty=mod_type_with_restr
-    { { ptm_def      = `Abstract { ptm_name; ptm_modty; };
+| locality=locality QMODULE ptm_name=uident LTCOLON ptm_modty=mod_type_with_restr ptm_qbounds=qmod_querybounds
+    { { ptm_def      = `QAbstract { ptm_name; ptm_modty; ptm_qbounds; };
         ptm_locality = locality; } }
 
+qmod_querybound:
+| f=loc(fident) EQ i=word  { (f, i) }
+
+qmod_querybounds:
+| LBRACKET qbl=rlist0(qmod_querybound,COMMA) RBRACKET { qbl }
 
 mod_header:
 | x=uident                  { Pmh_ident x }

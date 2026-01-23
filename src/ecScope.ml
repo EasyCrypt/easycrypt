@@ -1764,6 +1764,11 @@ module Mod = struct
         hierror "use declare for abstract module";
       declare scope decl
 
+    | { ptm_locality = lc; ptm_def = `QAbstract decl } ->
+      if lc <> `Declare then
+        hierror "use declare for abstract module";
+      declare scope decl
+
   let import (scope : scope) (m : pmsymbol located) : scope =
     let m, _ = EcTyping.trans_msymbol (env scope) m in
     { scope with sc_env = EcSection.import_vars m scope.sc_env }

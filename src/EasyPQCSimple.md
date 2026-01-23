@@ -9,3 +9,12 @@
 - only rule that can be applied to quantum adversaries is of the type:
 
 $$ \frac{U_f = U_{g}}{ \\{ qstate_{A_l}^i = qstate_{A_r}^i \\} \ A_l^{U_f} \sim A_r^{U_{g}} \ \\{ qstate_{A_l}^f = qstate_{A_r}^f \\} } $$
+
+
+# To Dos
+- handle restrictions on qproc body differently on type checking => 
+     first type-check as proc and then run extra checks
+- ADD query bounds to type of adv
+- introduce qmodule type and make this required for qmodules
+- Make sure you cannot declare module (i.e. classical)
+- that accesses qprocs 
