@@ -98,7 +98,7 @@ type fxerror =
 | FXE_MatchParamsUnk
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
-| FXE_MatchPartial
+| FXE_MatchPartial of string list
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
@@ -131,6 +131,7 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
+| DuplicatedException    of qsymbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -145,6 +146,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -249,6 +251,12 @@ val trans_prop     :
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
+val trans_poe :
+  EcEnv.env ->
+  EcUnify.unienv ->
+  EcParsetree.phoare_except ->
+  EcFol.form EcPath.Mp.t * EcFol.form option
+
 (* -------------------------------------------------------------------- *)
 val trans_memtype :
   env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
@@ -264,6 +272,7 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
+val except_genpath   : env -> qsymbol located -> qsymbol * path
 val trans_oracle     : env -> psymbol * psymbol -> xpath
 val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 

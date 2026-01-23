@@ -243,8 +243,8 @@ end) = struct
         with E.NotConv -> false
       end
 
-    | Sassert a1, Sassert a2 ->
-        for_expr env alpha ~norm a1 a2
+    | Sraise e1, Sraise e2 ->
+        for_expr env alpha ~norm e1 e2
 
     | Sabstract id1, Sabstract id2 ->
         EcIdent.id_equal id1 id2
@@ -555,13 +555,13 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
       check_xp env subst hf1.hf_f hf2.hf_f;
       let subst = check_m_binding subst hf1.hf_m hf2.hf_m in
       aux env subst (hf_pr hf1).inv (hf_pr hf2).inv;
-      aux env subst (hf_po hf1).inv (hf_po hf2).inv
+      iter2_poe (aux env subst) (hf_po hf1).hsi_inv (hf_po hf2).hsi_inv
 
     | FhoareS hs1, FhoareS hs2 ->
       check_s env subst hs1.hs_s hs2.hs_s;
       let subst = check_me_binding env subst hs1.hs_m hs2.hs_m in
       aux env subst (hs_pr hs1).inv (hs_pr hs2).inv;
-      aux env subst (hs_po hs1).inv (hs_po hs2).inv
+      iter2_poe (aux env subst) (hs_po hs1).hsi_inv (hs_po hs2).hsi_inv
 
     | FeHoareF hf1, FeHoareF hf2 ->
       check_xp env subst hf1.ehf_f hf2.ehf_f;
@@ -1344,6 +1344,22 @@ let ztuple args1 args2 ty stk = zpush Ztuple [] args1 args2 ty stk
 let zproj i ty stk = zpush (Zproj i) [] [] [] ty stk
 let zhl f fs1 fs2 stk = zpush (Zhl f) [] fs1 fs2 f.f_ty stk
 
+let zpoe (_,epost,d) dpoe =
+  let d,dpoe =
+    match d,dpoe with
+    | None,_ -> None,dpoe
+    | _ ,h::q -> Some h, q
+    | _, _ -> assert false
+  in
+  let key = List.map fst (Mp.bindings epost) in
+  let poe = List.fold_left2
+    (fun m a b -> Mp.add a b m)
+    Mp.empty
+    key
+    dpoe
+  in
+  (poe,d)
+
 let zpop ri side f hd =
   let args =
     match side with
@@ -1360,12 +1376,14 @@ let zpop ri side f hd =
   | Zapp, f1::args     -> f_app f1 args hd.se_ty
   | Ztuple, args       -> f_tuple args
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
-  | Zhl {f_node = FhoareF hf}, [pr;po] ->
+  | Zhl {f_node = FhoareF hf}, (pr :: po :: dpoe) ->
     let m = hf.hf_m in
-    f_hoareF {m;inv=pr} hf.hf_f {m;inv=po}
-  | Zhl {f_node = FhoareS hs}, [pr;po] ->
+    let poe,d = zpoe (hf_po hf).hsi_inv dpoe in
+    f_hoareF {m;inv=pr} hf.hf_f {hsi_m = m;hsi_inv=(po,poe,d)}
+  | Zhl {f_node = FhoareS hs}, (pr :: po :: dpoe) ->
     let m = fst hs.hs_m in
-    f_hoareS (snd hs.hs_m) {m;inv=pr} hs.hs_s {m;inv=po}
+    let poe,d = zpoe (hs_po hs).hsi_inv dpoe in
+    f_hoareS (snd hs.hs_m) {m;inv=pr} hs.hs_s {hsi_m=m;hsi_inv=(po,poe,d)}
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
     let m = hf.ehf_m in
     f_eHoareF {m;inv=pr} hf.ehf_f {m;inv=po}
@@ -1483,18 +1501,37 @@ let rec conv ri env f1 f2 stk =
         && EcMemory.mem_equal mem1 mem2 ->
       conv_next ri env f1 stk
 
-  | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
+  | FhoareF hf1, FhoareF hf2
+    when EqTest_i.for_xp env hf1.hf_f hf2.hf_f &&
+    forall2_poe (fun _ _ -> true) (hf_po hf1).hsi_inv (hf_po hf2).hsi_inv ->
     let pr2 = (ss_inv_rebind (hf_pr hf2) hf1.hf_m).inv in
-    let po2 = (ss_inv_rebind (hf_po hf2) hf1.hf_m).inv in
-    conv ri env (hf_pr hf1).inv pr2 (zhl f1 [(hf_po hf1).inv] [po2] stk)
+    let po2 = (hs_inv_rebind (hf_po hf2) hf1.hf_m).hsi_inv in
+    let aux (post,poe,d) =
+      let poe =
+        List.map snd (Mp.bindings poe)
+      in
+      match d with None -> post :: poe | Some d -> post :: d :: poe
+    in
+    let lf1 = aux (hf_po hf1).hsi_inv in
+    let lf2 = aux po2 in
+    let stk = (zhl f1 lf1 lf2 stk) in
+    conv ri env (hf_pr hf1).inv pr2 stk
 
-  | FhoareS hs1, FhoareS hs2
-      when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
+  | FhoareS hs1, FhoareS hs2 when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.hs_m hs2.hs_m with
     | _subst ->
       let pr2 = (ss_inv_rebind (hs_pr hs2) (fst hs1.hs_m)).inv in
-      let po2 = (ss_inv_rebind (hs_po hs2) (fst hs1.hs_m)).inv in
-      conv ri env (hs_pr hs1).inv pr2 (zhl f1 [(hs_po hs1).inv] [po2] stk)
+      let po2 = (hs_inv_rebind (hs_po hs2) (fst hs1.hs_m)).hsi_inv in
+      let aux (post,poe,d) =
+        let poe =
+          List.map snd (Mp.bindings poe)
+        in
+        match d with None -> post :: poe | Some d -> post :: d :: poe
+      in
+      let lf1 = aux (hs_po hs1).hsi_inv in
+      let lf2 = aux po2 in
+      let stk = (zhl f1 lf1 lf2 stk) in
+      conv ri env (hs_pr hs1).inv pr2 stk
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
@@ -1825,6 +1862,11 @@ let ts_inv_alpha_eq hyps (inv1 : ts_inv) (inv2 : ts_inv) =
   let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.ml inv2.ml in
   let subst = Fsubst.f_bind_mem subst inv1.mr inv2.mr in
   is_alpha_eq ~subst hyps inv2.inv inv1.inv
+
+let hs_inv_alpha_eq hyps (inv1 : hs_inv) (inv2 : hs_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.hsi_m inv2.hsi_m in
+  forall2_poe (is_alpha_eq ~subst hyps) inv2.hsi_inv inv1.hsi_inv
+
 module EqTest = struct
   include EqTest_base
 

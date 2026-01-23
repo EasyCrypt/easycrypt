@@ -163,8 +163,12 @@ module CaseMap : sig
 
   val create  : EcPath.path list list -> t
   val add     : (int * locals) list -> expr -> t -> bool
-  val resolve : t -> opbranches option
+  val resolve : t -> opbranches
+  exception PartialMatch of EcSymbols.symbol
+
 end = struct
+  exception PartialMatch of EcSymbols.symbol
+
   type locals = (EcIdent.t * ty) list
 
   type t = [
@@ -205,7 +209,10 @@ end = struct
       match m with
       | `Case t ->
           let for1 i =
-            let (cp, bs) = snd_map resolve_r t.(i) in
+            let (cp, bs) =
+              try snd_map resolve_r t.(i)
+              with E.NotFull -> raise (PartialMatch (EcPath.basename (fst t.(i))))
+            in
               { opb_ctor = (cp, i); opb_sub = bs; }
           in
             OPB_Branch (Parray.init (Array.length t) for1)
@@ -217,8 +224,8 @@ end = struct
       end
   in
     fun m ->
-      try  Some (resolve_r m)
-      with E.NotFull -> None
+      try  resolve_r m
+      with E.NotFull -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -280,8 +287,12 @@ let trans_matchfix
       let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
         let trans1 ((xpos, x, xty) : _ * EcIdent.t * ty) =
           let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
+
           let filter = fun _ op -> EcDecl.is_ctor op in
-          let PPApp ((cname, tvi), cargs) = pb.pop_pattern in
+          let ((cname, tvi), cargs) =
+            match pb.pop_pattern with
+            | PPApp ((cname, tvi), cargs) -> ((cname, tvi), cargs)
+            | PPAny -> assert false (* FIXME *) in
           let tvi = tvi |> omap (TT.transtvi env ue) in
           let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
 
@@ -386,10 +397,8 @@ let trans_matchfix
              fxerror loc env TT.FXE_MatchDupBranches)
       pbs;
 
-    match CaseMap.resolve casemap with
-    | None   -> fxerror loc env TT.FXE_MatchPartial
-    | Some x -> x
-
+    try CaseMap.resolve casemap
+    with CaseMap.PartialMatch s -> fxerror loc env (TT.FXE_MatchPartial [s])
   in
 
   let aout =
