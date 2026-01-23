@@ -26,12 +26,13 @@ let t_hoare_app_r i phi tc =
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
 
 (* -------------------------------------------------------------------- *)
-let t_ehoare_app_r i f tc =
+let t_ehoare_app_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s1, s2 = s_split env i hs.ehs_s in
-  let a = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) (stmt s1) f in
-  let b = f_eHoareS (snd hs.ehs_m) f (stmt s2) (ehs_po hs) in
+  let phi = ss_inv_rebind phi (fst hs.ehs_m) in
+  let a = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) (stmt s1) phi in
+  let b = f_eHoareS (snd hs.ehs_m) phi (stmt s2) (ehs_po hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r

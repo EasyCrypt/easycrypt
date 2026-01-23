@@ -86,8 +86,8 @@ let t_phoare_deno_r pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let t_ehoare_deno_r pre post tc =
-  assert (pre.m = post.m);
   let m = pre.m in
+  assert (m = post.m);
   let env, _, concl = FApi.tc1_eflat tc in
 
   let f, bd =
@@ -111,6 +111,7 @@ let t_ehoare_deno_r pre post tc =
 
   (* forall m, ev%r%xr <= post *)
   let ev = pr.pr_event in
+  let ev = ss_inv_rebind ev m in
   let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 
