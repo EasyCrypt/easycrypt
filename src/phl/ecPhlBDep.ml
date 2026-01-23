@@ -167,7 +167,7 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   let cs = List.fold_left (fun acc f -> List.rev_append (process_form f) acc) [] fs |> List.rev in
 (*
-  if debug then Format.eprintf "Translated as much as possible from pre to circuits, got:@.%a@\n"
+  EcEnv.notify env EcGState.(`Debug) "Translated as much as possible from pre to circuits, got:@.%a@\n"
     (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
 *)
 
@@ -256,7 +256,7 @@ let t_bdep_solve
       assert (ctxt.h_tvar = []);
       let st = circuit_state_of_hyps hyps in
       let cgoal = (circuit_of_form ~st hyps goal |> state_close_circuit st) in
-      if debug then Format.eprintf "goal: %a@." pp_flatcirc (fst cgoal).reg;
+      EcEnv.notify env EcGState.(`Debug) "goal: %a@." pp_flatcirc (fst cgoal).reg;
       if circ_taut cgoal then
       FApi.close (!@ tc) VBdep
       else 
@@ -387,7 +387,8 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
 
           | _ -> tc_error (tc1_penv tc) "Unsupported List pattern"
         end
-    | FhoareS ({ hs_m=(m, mt); hs_s; hs_pr; hs_po }), Some v -> 
+    | FhoareS hs, Some v -> 
+      let m, mt = hs.hs_m in
       let v = match EcMemory.lookup v mt with
       | Some (v, _, _) -> v 
       | None -> tc_error (tc1_penv tc) "Failed to find var %s in memory %s" v (EcIdent.name m)
@@ -410,22 +411,18 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       let ngoals = 1 lsl size in
 (*       let ngoals = min ngoals 5 in *)
       List.init ngoals (fun i ->  (* FIXME FIXME this is bad *)
-        let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) m 
+        let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) (fst hs.hs_m) 
         (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
         in
-        let s = subst_pv_stmt (tc1_hyps tc) m subst hs_s in
+        let s = subst_pv_stmt (tc1_hyps tc) m subst hs.hs_s in
         let subst = EcPV.PVM.subst (tc1_env tc) subst in
-        let pr = subst hs_pr in
-        let po = subst hs_po in
+        let pr = subst (hs_pr hs).inv in
+        let po = subst (hs_po hs).inv in
         let goal = f_hoareS mt ({inv=pr;m}) s ({inv=po;m}) in
-        if debug then 
-        (
-        Format.eprintf "[W] Generated goal %d@." i;
-(*
-        Format.eprintf "%a@." 
-        EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) goal
-*)
-        );
+        EcEnv.notify (FApi.tc1_env tc) EcGState.(`Debug) 
+        
+        "[W] Generated goal %d => %a@." i
+          EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) goal;
         goal
       )
 

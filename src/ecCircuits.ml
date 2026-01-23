@@ -541,7 +541,7 @@ let int_of_form ?(redmode = EcReduction.full_red) (hyps: hyps) (f: form) : zint 
     | DestrError "destr_int" -> circ_error IntConversionFailure
     end
 
-let rec form_list_of_form ?(ppe: EcPrinting.PPEnv.t option) (f: form) : form list =
+let rec form_list_of_form ?(env: env option) (f: form) : form list =
   match destr_op_app f with
   | (pc, _), [h; {f_node = Fop(p, _)}] when 
     pc = EcCoreLib.CI_List.p_cons && 
@@ -551,8 +551,9 @@ let rec form_list_of_form ?(ppe: EcPrinting.PPEnv.t option) (f: form) : form lis
     pc = EcCoreLib.CI_List.p_cons ->
     h::(form_list_of_form t)
   | _ -> 
-      if debug then Option.may (fun ppenv -> Format.eprintf "Failed to destructure claimed list: %a@." (EcPrinting.pp_form ppenv) f) ppe;
-      raise (DestrError "list")
+    Option.may (fun env -> 
+      EcEnv.notify env EcGState.(`Debug) "Failed to destructure claimed list: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f) env;
+    raise (DestrError "list")
 
 let form_is_iter (f: form) : bool = 
   match f.f_node with
@@ -575,9 +576,9 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
   | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iteri -> 
     let rep = int_of_form hyps rep in
     let is = List.init (BI.to_int rep) BI.of_int in
-    if debug then Format.eprintf "Done generating functions!@.";
+    EcEnv.notify env EcGState.(`Debug) "Done generating functions!@.";
     let f = List.fold_left (fun f i -> 
-      if debug then Format.eprintf "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
+      EcEnv.notify env EcGState.(`Debug) "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f
       ;
       fn @!! [f_int i; f]
@@ -595,7 +596,7 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
     f
   | _ -> raise (DestrError "iter")
   in
-  if debug then Format.eprintf "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
+  EcEnv.notify env EcGState.(`Debug) "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
   res
 
 let circuit_of_form 
@@ -650,7 +651,7 @@ let circuit_of_form
       | {ty_node = Tconstr(p, [t])} when 
           p = EcCoreLib.CI_List.p_list &&
           type_has_bindings env t ->
-          let cs = List.map (fun f -> doit st f) (form_list_of_form ~ppe f) in
+          let cs = List.map (fun f -> doit st f) (form_list_of_form ~env f) in
           arg_of_circuits cs
       | _ -> Format.eprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form ppe) f; 
         circ_error (BadFormForArg f)
@@ -675,7 +676,7 @@ let circuit_of_form
     | Fop (pth, _) -> 
       begin
       if pth = EcCoreLib.CI_Witness.p_witness then 
-          (if debug then Format.eprintf "Assigning witness to var of type %a@." 
+          (EcEnv.notify env EcGState.(`Debug) "Assigning witness to var of type %a@." 
           EcPrinting.(pp_type ppe) f_.f_ty;
           circuit_uninit env (f_.f_ty))
       else
@@ -819,7 +820,7 @@ let circuit_of_form
       let v = match state_get_pv_opt st mem v with
       | Some v -> v
       | None -> 
-          if debug then Format.eprintf "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv ppe) pv EcPrinting.(pp_type ppe) f_.f_ty; 
+          EcEnv.notify env EcGState.(`Debug) "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv ppe) pv EcPrinting.(pp_type ppe) f_.f_ty; 
           circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
       in
       v
@@ -862,13 +863,19 @@ let circuit_of_form
           fapply_safe fn [f_int (BI.of_int i)]
         ) in
         List.fold_lefti (fun f i fn -> 
-          if debug then Format.eprintf "Translating iteri... Step #%d@." i;
+          EcEnv.notify env EcGState.(`Debug) "Translating iteri... Step #%d@." i;
           let fn = doit st fn in
           circuit_compose fn [f]
         ) (doit st base) fs
-      (* FIXME PR: this is currently being implemented directly on circuits, do we want this case as well? *)
-      | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false 
-      | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_fold -> assert false 
+      (* This is defined in terms of iteri, so it should get expanded and use the case above *)
+      (* | ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iter -> assert false  *)
+      | ({f_node = Fop (p, _)}, [fn; start_val; reps]) when p = EcCoreLib.CI_Int.p_fold -> 
+        let reps = int_of_form reps |> BI.to_int in
+        let fn = doit st fn in
+        let start_val = doit st start_val in
+        List.fold_left (fun acc f ->
+          circuit_compose f [acc]
+        ) start_val (List.make reps fn)
       | _ -> raise (DestrError "iter")
     with CircError e ->
       propagate_circ_error (`ExpandIter (f, fs)) e
@@ -880,12 +887,11 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
   let env = toenv hyps in
   let time (env: env) (t: float ref) (msg: string) : unit =
     let new_t = Unix.gettimeofday () in
-(*     EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); *)
-    Format.eprintf "[W] %s, took %f s@." msg (new_t -. !t);
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); 
     t := new_t
   in
 
-  if debug then Format.eprintf "Filletting circuit...@.";
+  EcEnv.notify env EcGState.(`Debug) "Filletting circuit...@.";
   let c1 = circuit_of_form ~st hyps f1 |> state_close_circuit st in
   if do_time then time env tm "Left side circuit generation done";
   let c2 = circuit_of_form ~st hyps f2 |> state_close_circuit st in
@@ -897,9 +903,9 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
   let posts = circuit_eqs c1 c2 in
   if do_time then time env tm "Done with postcondition circuit generation";
 
-  if debug then Format.eprintf "Number of checks before batching: %d@." (List.length posts);
+  EcEnv.notify env EcGState.(`Debug) "Number of checks before batching: %d@." (List.length posts);
   let posts = batch_checks ~mode:`BySub posts in
-  if debug then Format.eprintf "Number of checks after batching: %d@." (List.length posts);
+  EcEnv.notify env EcGState.(`Debug) "Number of checks after batching: %d@." (List.length posts);
   if do_time then time env tm "Done with lane compression";
   if fillet_tauts pres posts then 
     begin
@@ -931,19 +937,19 @@ let vars_of_memtype (mt : memtype) =
   
 
 let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : state =
-(*   if debug then Format.eprintf "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
+(*   EcEnv.notify env EcGState.(`Debug) "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
 (*
-      if debug then Format.eprintf "Assigning form %a to var %s@\n" 
+      EcEnv.notify env EcGState.(`Debug) "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
       let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
       let st = update_state_pv st mem v c in
       st
-      (* if debug then Format.eprintf "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
+      (* EcEnv.notify env EcGState.(`Debug) "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let st = List.fold_left (fun st (v, e) ->
         let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
@@ -1107,7 +1113,7 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
-    if debug then Format.eprintf "Processing hyp: %s@." (id.id_symb);
+    EcEnv.notify env EcGState.(`Debug) "Processing hyp: %s@." (id.id_symb);
     match lk with
 (*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
       They are either given a value by assignment in the program or if they are used 
@@ -1122,7 +1128,7 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
        Check if body is convertible to circuit, if not just process it as uninitialized.
        TODO: Maybe do a first pass on this, check convertibility and remove duplicates? *)
     | EcBaseLogic.LD_var (t, Some f) -> 
-      if debug then Format.eprintf "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
+      EcEnv.notify env EcGState.(`Debug) "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
       begin try
         update_state st id (circuit_of_form ~st hyps f)
       (* FIXME PR: Should only catch circuit translation errors, hack *)

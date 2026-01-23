@@ -5,6 +5,9 @@ open EcDecl
 open EcIdent
 open EcMemory
 
+(* FIXME: find a solution for the "if debug then" prints here,
+   since it cannot depend on EcEnv *)
+
 (* -------------------------------------------------------------------- *)
 module C = struct
   include Lospecs.Aig

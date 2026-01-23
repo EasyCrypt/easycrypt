@@ -1,5 +1,4 @@
 open Aig
-open Circuit
 
 module type SMTInstance = sig
   type bvterm
