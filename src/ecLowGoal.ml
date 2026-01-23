@@ -2425,7 +2425,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
                 | _, _        -> `LtoR
             in
             try t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
-            with _ -> 
+            with InvalidGoalShape -> 
               let tside = if tside = `LtoR then `RtoL else `LtoR in
               t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
         in
