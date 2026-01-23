@@ -86,6 +86,7 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) (ois : oracle_inf
     | Tys_function funsig ->
       let oi = Msym.find funsig.fs_name ois in
         MI_Function {
+          f_quantum = `Classical;
           f_name = funsig.fs_name;
           f_sig  = funsig;
           f_def  = FBabs oi;

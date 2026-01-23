@@ -748,7 +748,8 @@ and subst_function (s : subst) (f : function_) =
     | FBdef def -> FBdef (subst_function_def s def)
     | FBalias f -> FBalias (subst_xpath s f)
     | FBabs oi  -> FBabs (subst_oracle_info s oi) in
-  { f_name = f.f_name;
+  { f_quantum = f.f_quantum;
+    f_name = f.f_name;
     f_sig  = sig';
     f_def  = def' }
 

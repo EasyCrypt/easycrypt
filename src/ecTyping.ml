@@ -2480,10 +2480,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
       (* Compose all results *)
       let fun_ =
-        { f_name   = decl.pfd_name.pl_desc;
+        { f_quantum = if is_qfun then `Quantum else `Classical;
+          f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
             fs_name   = decl.pfd_name.pl_desc;
-            fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
+            fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);         
             fs_anames = List.map ovar_of_var params;
             fs_ret    = retty;
           };
@@ -2524,7 +2525,8 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
     let mk_fun (Tys_function fs) =
       (fs.fs_name,
-       MI_Function { f_name = fs.fs_name;
+       MI_Function { f_quantum = `Classical;
+                     f_name = fs.fs_name;
                      f_sig  = fs;
                      f_def  = FBalias (EcPath.xpath mo fs.fs_name) }) in
 
@@ -2550,6 +2552,7 @@ and transstruct1_alias env name f =
   let f = trans_gamepath env f in
   let sig_ = (EcEnv.Fun.by_xpath f env).f_sig in
   let fun_ = {
+      f_quantum = `Classical;
       f_name = name;
       f_sig = { sig_ with fs_name = name };
       f_def = FBalias f;
@@ -2557,7 +2560,6 @@ and transstruct1_alias env name f =
   (name, MI_Function fun_)
 
 (* -------------------------------------------------------------------- *)
-
 and transbody ue memenv (env : EcEnv.env) retty pbody is_qfun =
   let { pl_loc = loc; pl_desc = pbody; } = pbody in
 
@@ -2667,9 +2669,8 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
     List.map (fun lv -> i_asgn (lv, init)) pl
 
 (* -------------------------------------------------------------------- *)
-
-
-and transstmt ?(map : ismap = Mstr.empty) ?(is_qfun = false) (env : EcEnv.env) ue (stmt : pstmt) : stmt
+and transstmt
+  ?(map : ismap = Mstr.empty) ?(is_qfun = false) (env : EcEnv.env) ue (stmt : pstmt) : stmt
 =
   let l_start =
     Mstr.find_def [] EcTransMatching.default_start_name map in

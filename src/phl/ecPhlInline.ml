@@ -80,6 +80,12 @@ module LowInternal = struct
                   (EcPrinting.pp_funname ppe) p)
         end
       in
+      if f.f_quantum = `Quantum then
+        tc_error_lazy !!tc (fun fmt ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+            Format.fprintf fmt
+              "quantum function `%a' cannot be inlined"
+              (EcPrinting.pp_funname ppe) p);
       let _params =
         let named_arg ov =
           match ov.ov_name with
