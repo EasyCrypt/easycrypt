@@ -150,18 +150,12 @@ section PROOFS.
   proof.
     proc; inline *.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
-    seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
+    alias{2} 3 rr = ofpair (r, r0).
+    seq 1 3 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      alias{2} 2 one = 1. swap{2} 2 1.
-      alias{2} 3 rr = ofpair (r, r0).
-      kill{2} 4 ! 1; first by auto.
       transitivity{2}
-        {
-          r <$ sampleto1 x;
-          r0 <$ sampleto2 x;
-          rr <- ofpair (r, r0);
-        }
-        (={x} /\ (x0 = x /\ x1 = x){2} ==> r{1} = rr{2})
+        { r <$ sampleto1 x; r0 <$ sampleto2 x; rr <- ofpair (r, r0); }
+        (={x} ==> r{1} = rr{2})
         (={x} /\ (x0 = x /\ x1 = x){2} ==> rr{1} = ofpair(r, r0){2}); 1,2,4: by auto => /#.
       rndsem*{2} 0.
       by auto => *; rewrite -dmap_dprodE sample_spec /#.
