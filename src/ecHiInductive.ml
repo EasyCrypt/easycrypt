@@ -308,7 +308,7 @@ let trans_matchfix
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in
               let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-              let ctorsym, ctorty = List.nth ind ctoridx in
+              let _ctorsym, ctorty = List.nth ind ctoridx in
 
               let args_exp = List.length ctorty in
               let args_got = List.length cargs in
@@ -338,12 +338,12 @@ let trans_matchfix
               let pvars = List.map (create |- unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
-              (pb, (indp, ind, (ctorsym, ctoridx)), pvars, xpos)
+              (pb, (indp, ind), (ctoridx, pvars), xpos)
         in
 
         let ptns = List.map trans1 mpty in
         let env  =
-          List.fold_left (fun env (_, _, pvars, _) ->
+          List.fold_left (fun env (_, _, (_, pvars), _) ->
             EcEnv.Var.bind_locals pvars env)
             env ptns
         in
@@ -351,7 +351,7 @@ let trans_matchfix
         let body = TT.transexpcast env `InOp ue codom body in
 
         let rec check_body =
-          let (_, _, pvars, pos) =
+          let (_, _, (_, pvars), pos) =
             List.max
               ~cmp:(fun p1 p2 -> Stdlib.compare (proj4_4 p1) (proj4_4 p2))
               ptns in
@@ -376,7 +376,7 @@ let trans_matchfix
         List.map trans_b pbsmap
     in
 
-    let inds = (fun (_, (indp, ind, _), _, _) -> (indp, ind)) in
+    let inds = fun (_, indp_ind, _, _) -> indp_ind in
     let inds = List.map inds (fst (oget (List.ohead pbs))) in
     let inds =
       List.map (fun (indp, ctors) ->
@@ -390,8 +390,10 @@ let trans_matchfix
 
     List.iter
       (fun (ptns, be) ->
-         let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars, _) ->
-           (ctor, pvars)) ptns
+         let ptns =
+           List.map
+             (fun (_, _, (ctor, pvars), _) -> (ctor, pvars))
+             ptns
          in
            if not (CaseMap.add ptns be casemap) then
              fxerror loc env TT.FXE_MatchDupBranches)
