@@ -6,10 +6,12 @@ open EcMaps
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
+  | `Lsp
 ]
 
 and options = {
@@ -25,6 +27,7 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
+  cmpo_trace   : bool;
   cmpo_specs   : spec_options;
 }
 
@@ -366,12 +369,16 @@ let specs = {
       `Spec  ("tstats" , `String, "Save timing statistics to <file>");
       `Spec  ("script" , `Flag  , "Computer-friendly output");
       `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
+      `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
       `Spec  ("compact", `Int   , "<internal>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
+
+    ("lsp", "Run EasyCrypt LSP server", [
+      `Spec  ("-stdio"  , `Flag  , "<for internal use>")]);
 
     ("config", "Print EasyCrypt configuration", []);
 
@@ -540,9 +547,10 @@ let cmp_options_of_values ini values input =
     cmpo_compact = get_int "compact" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
-    cmpo_script  = get_flag "script" values; 
+    cmpo_script  = get_flag "script" values;
+    cmpo_trace   = get_flag "trace" values; 
     cmpo_specs   = spec_options_of_values ini values;
-  }
+}
 
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
@@ -628,6 +636,15 @@ let parse getini argv =
         | _ ->
           raise (Arg.Bad "this command takes a single input file as argument")
       end
+
+    | "lsp" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Lsp in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 

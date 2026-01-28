@@ -2,6 +2,7 @@
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
@@ -21,6 +22,7 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
+  cmpo_trace   : bool;
   cmpo_specs   : spec_options;
 }
 

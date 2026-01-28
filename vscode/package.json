@@ -1,0 +1,178 @@
+{
+  "name": "easycrypt-vscode",
+  "displayName": "EasyCrypt",
+  "publisher": "easycrypt",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": [
+    "onLanguage:easycrypt",
+    "onCommand:easycrypt.proof.step",
+    "onCommand:easycrypt.proof.back",
+    "onCommand:easycrypt.proof.restart",
+    "onCommand:easycrypt.proof.jumpToCursor",
+    "onCommand:easycrypt.proof.goals",
+    "onCommand:easycrypt.lsp.restart"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "easycrypt",
+        "aliases": ["EasyCrypt", "easycrypt"],
+        "extensions": [".ec"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "easycrypt",
+        "scopeName": "source.easycrypt",
+        "path": "./syntaxes/easycrypt.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "easycrypt.proof.step",
+        "title": "Step",
+        "icon": { "light": "assets/step.svg", "dark": "assets/step.svg" }
+      },
+      {
+        "command": "easycrypt.proof.back",
+        "title": "Back",
+        "icon": { "light": "assets/back.svg", "dark": "assets/back.svg" }
+      },
+      {
+        "command": "easycrypt.proof.restart",
+        "title": "Restart",
+        "icon": { "light": "assets/refresh.svg", "dark": "assets/refresh.svg" }
+      },
+      {
+        "command": "easycrypt.proof.jumpToCursor",
+        "title": "Jump To Cursor",
+        "icon": { "light": "assets/jump.svg", "dark": "assets/jump.svg" }
+      },
+      {
+        "command": "easycrypt.proof.goals",
+        "title": "Show Goals",
+        "icon": { "light": "assets/goals.svg", "dark": "assets/goals.svg" }
+      },
+      {
+        "command": "easycrypt.lsp.restart",
+        "title": "Restart LSP"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "easycrypt.proof.step",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'navigation'",
+          "group": "navigation.easycrypt@3"
+        },
+        {
+          "command": "easycrypt.proof.step",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'inline'",
+          "group": "inline.easycrypt@3"
+        },
+        {
+          "command": "easycrypt.proof.back",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'navigation'",
+          "group": "navigation.easycrypt@1"
+        },
+        {
+          "command": "easycrypt.proof.back",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'inline'",
+          "group": "inline.easycrypt@1"
+        },
+        {
+          "command": "easycrypt.proof.jumpToCursor",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'navigation'",
+          "group": "navigation.easycrypt@2"
+        },
+        {
+          "command": "easycrypt.proof.jumpToCursor",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'inline'",
+          "group": "inline.easycrypt@2"
+        },
+        {
+          "command": "easycrypt.proof.goals",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'navigation'",
+          "group": "navigation.easycrypt@4"
+        },
+        {
+          "command": "easycrypt.proof.goals",
+          "when": "resourceLangId == easycrypt && config.easycrypt.ui.editorToolbarGroup == 'inline'",
+          "group": "inline.easycrypt@4"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "easycrypt.proof.step",
+        "key": "ctrl+alt+down",
+        "mac": "cmd+alt+down",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.back",
+        "key": "ctrl+alt+up",
+        "mac": "cmd+alt+up",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.jumpToCursor",
+        "key": "ctrl+alt+enter",
+        "mac": "cmd+alt+enter",
+        "when": "editorLangId == easycrypt"
+      },
+      {
+        "command": "easycrypt.proof.goals",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "editorLangId == easycrypt"
+      }
+    ],
+    "configuration": {
+      "title": "EasyCrypt",
+      "properties": {
+        "easycrypt.cli.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the EasyCrypt CLI (easycrypt or ec.native)."
+        },
+        "easycrypt.cli.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments passed to the EasyCrypt CLI when running in proof mode."
+        },
+        "easycrypt.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace LSP communication to the Output panel."
+        },
+        "easycrypt.ui.editorToolbarGroup": {
+          "type": "string",
+          "enum": ["navigation", "inline"],
+          "default": "navigation",
+          "description": "Editor title toolbar group for EasyCrypt buttons."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

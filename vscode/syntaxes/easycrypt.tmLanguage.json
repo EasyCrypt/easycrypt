@@ -1,0 +1,101 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "EasyCrypt",
+  "scopeName": "source.easycrypt",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.easycrypt",
+          "begin": "\\(\\*",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.easycrypt" }
+          },
+          "end": "\\*\\)",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.comment.easycrypt" }
+          },
+          "patterns": [
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.easycrypt",
+          "begin": "\"",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.string.begin.easycrypt" }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.easycrypt" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.easycrypt",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.easycrypt.bytac",
+          "match": "\\b(assumption|by|check|coq|done|edit|exact|fix|reflexivity|smt|solve)\\b"
+        },
+        {
+          "name": "keyword.other.easycrypt.dangerous",
+          "match": "\\b(admit|admitted)\\b"
+        },
+        {
+          "name": "keyword.control.easycrypt.global",
+          "match": "\\b(Pr|Self|Top|abbrev|abort|abstract|as|axiom|axiomatized|class|clone|const|declare|dump|end|exit|export|from|global|goal|hint|import|include|inductive|instance|lemma|local|locate|module|notation|of|op|pred|print|proof|prover|qed|realize|remove|rename|require|search|section|subtype|theory|timeout|type|why3|with)\\b"
+        },
+        {
+          "name": "keyword.other.easycrypt.internal",
+          "match": "\\b(debug|fail|pragma|time|undo)\\b"
+        },
+        {
+          "name": "keyword.operator.easycrypt.prog",
+          "match": "\\b(assert|async|ehoare|elif|else|equiv|exists|for|for|forall|fun|glob|hoare|if|in|is|islossless|let|match|match|phoare|proc|res|return|then|var|while)\\b"
+        },
+        {
+          "name": "keyword.control.easycrypt.tactic",
+          "match": "\\b(algebra|alias|apply|auto|beta|byehoare|byequiv|byphoare|bypr|byupto|call|case|cbv|cfold|change|clear|congr|conseq|delta|eager|ecall|elim|eta|exfalso|exlim|fel|field|fieldeq|fission|fusion|gen|have|idassign|idtac|inline|interleave|iota|kill|left|logic|modpath|move|outline|pose|pr_bounded|progress|rcondf|rcondt|replace|rewrite|right|ring|ringeq|rnd|rndsem|rwnormal|seq|sim|simplify|skip|sp|split|splitwhile|subst|suff|swap|symmetry|transitivity|trivial|unroll|weakmem|wlog|wp|zeta)\\b"
+        },
+        {
+          "name": "keyword.control.easycrypt.tactical",
+          "match": "\\b(do|expect|first|last|try)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.easycrypt",
+          "match": "\\b(bool|int|real|unit)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.easycrypt",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    }
+  }
+}

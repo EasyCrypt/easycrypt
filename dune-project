@@ -20,6 +20,10 @@
   dune
   dune-build-info
   dune-site
+  fmt
+  logs
+  lsp
+  lwt
   markdown
   (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
