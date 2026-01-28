@@ -171,6 +171,16 @@ module PVM = struct
 
   let has_mod b =
     List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b
+  
+  let has_globs m (s: subst) =
+    try
+      let mpv = Mid.find m s in
+      let has_abstract_globs = not (Mm.is_empty mpv.s_gl) in
+      let has_concrete_globs =
+        let check pv _ = is_glob pv in
+        Mnpv.exists check mpv.s_pv in
+      has_abstract_globs || has_concrete_globs
+    with Not_found -> false
 
   let rec subst env (s : subst) =
     Hf.memo_rec 107 (fun aux f ->
@@ -187,9 +197,14 @@ module PVM = struct
       | FhoareF {hf_m=m}
       | FhoareS {hs_m=(m,_)}
       | FbdHoareF {bhf_m=m}
-      | FbdHoareS {bhs_m=(m,_)}
-      | Fpr {pr_mem=m} ->
+      | FbdHoareS {bhs_m=(m,_)} ->
         check_binding m s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fpr {pr_mem; pr_event={m}}  ->
+        check_binding m s;
+        (* Substituting globals using the memory of the pr may erase information *)
+        if has_globs pr_mem s then
+          raise MemoryClash;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 =

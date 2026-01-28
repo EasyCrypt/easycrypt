@@ -35,7 +35,7 @@ seq 1: (v = x) (mu1 d v) pr 1%r 0%r ((glob A) = (glob A){m})=> //.
 + by rnd; auto=> />; rewrite pred1E.
 + call (: (glob A) = (glob A){m} /\ x = v
           ==> ev v (glob A) res)=> //.
-  rewrite /pr; bypr=> /> &0 eqGlob <<-.
+  rewrite /pr; bypr=> /> &0 eqGlob.
   by byequiv (: ={glob A, x} ==> ={res, glob A})=> //; proc true.
 by hoare => /=; call (: true); auto=> /#.
 qed.
