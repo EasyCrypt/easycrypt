@@ -497,8 +497,15 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
+<<<<<<< HEAD
+        ; trace       = None 
+        ; specs       = cliopts.clio_specs; }
+||||||| b46c8c70a
+        ; trace       = None }
+=======
         ; specs       = cliopts.clio_specs
         ; trace       = None }
+>>>>>>> origin/bdep_ecCircuitsRefactor
 
     end
 
@@ -533,8 +540,16 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
+<<<<<<< HEAD
+        ; trace       = trace0 
+        ; specs       = cmpopts.cmpo_specs; }
+||||||| b46c8c70a
+        ; trace       = trace0 }
+=======
         ; specs       = cmpopts.cmpo_specs
         ; trace       = trace0 }
+>>>>>>> origin/bdep_ecCircuitsRefactor
+
       end
 
     | `Runtest _ ->
@@ -584,8 +599,15 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
+<<<<<<< HEAD
+        ; trace       = None 
+        ; specs       = nospec; }
+||||||| b46c8c70a
+        ; trace       = None }
+=======
         ; specs       = nospec
         ; trace       = None }
+>>>>>>> origin/bdep_ecCircuitsRefactor
       end
 
   in

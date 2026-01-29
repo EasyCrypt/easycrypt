@@ -3132,6 +3132,19 @@ module Circuit = struct
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
     
     Ax.add_defer scope proofs
+
+  let find_duplicate_specs (scope : scope) : symbol list =
+    let specs = List.map (fun filename -> 
+      Lospecs.Circuit_spec.load_from_file ~filename |> List.fst
+    ) scope.sc_specs 
+    in
+    
+    let module Set = Batteries.Set in 
+    List.fold_left (fun (acc, dups) next -> 
+      let cur = Set.of_list next in
+      let new_dup = Set.intersect cur acc in
+      (Set.union acc cur), (Set.union dups new_dup)
+    ) (Set.empty, Set.empty) specs |> snd |> Set.to_list
   
   (* FIXME CIRCUIT PR: decide how we want to handle multiple spec files in easycrypt.project(s) *)
   let add_circuit1 (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
@@ -3141,7 +3154,7 @@ module Circuit = struct
     if not (List.is_empty opdecl.op_tparams) then
       hierror ~loc:(loc op) "operator must be monomorphic";
 
-    let matches = List.filteri_map (fun i filename ->
+    let matches = List.filteri_map (fun _i filename ->
       EcEnv.Circuit.get_specification_by_name ~filename env (unloc circ)) scope.sc_specs 
     in
 
@@ -3201,9 +3214,12 @@ module Circuit = struct
   | circs -> Format.eprintf "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ); assert false 
     (* FIXME *)
 
-  (* FIXME: Decide if we want set or append here *)
   let register_spec_files (scope : scope) (files : string list) : scope =
-    { scope with sc_specs = files }
+    let sc = { scope with sc_specs = files } in
+    match find_duplicate_specs sc with
+    | [] -> sc
+    | dups -> hierror "duplicate spec definitions: %a" 
+      EcPrinting.(pp_list ", " pp_symbol) dups
 
   let add_circuits (scope : scope) (local : is_local) (binds : pbind_circuit) : scope =
     List.fold_left (fun scope bnd -> 

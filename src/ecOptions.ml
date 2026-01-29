@@ -27,8 +27,8 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
-  cmpo_trace   : bool;
   cmpo_specs   : spec_options;
+  cmpo_trace   : bool;
 }
 
 and cli_option = {
@@ -548,7 +548,7 @@ let cmp_options_of_values ini values input =
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values;
-    cmpo_trace   = get_flag "trace" values; 
+    cmpo_trace   = get_flag "trace" values;
     cmpo_specs   = spec_options_of_values ini values;
 }
 
