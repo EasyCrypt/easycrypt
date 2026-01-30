@@ -197,6 +197,12 @@ assumption on the guard.
 Variant: ``if`` (eHL)
 ------------------------------------------------------------------------
 
+In expectation Hoare logic, the ``if`` tactic behaves similarly to standard
+Hoare logic. Two subgoals are generated, where the pre-expection is addtionally
+guarded by the branch condition and its negation, respectively. This naturally
+splits the goal of proving the upper-bound into two cases along the control
+flow.
+
 .. ecproof::
    :title: Expectation Hoare logic example
    
@@ -216,12 +222,12 @@ Variant: ``if`` (eHL)
      }
    }.
    
-   lemma L : ehoare[M.f : 0%xr ==> (0 <= res)%xr].
+   lemma L : ehoare[M.f : 0%xr ==> (!0 <= res)%xr].
    proof.
      proc.
      (*$*) if.
      (* First goal: (x < 0) holds *)
-     - wp; skip. admit.          (* FIXME *)
+     - wp; skip. smt().
      (* Second goal: (x < 0) does not hold *)
-     - wp; skip. admit.          (* FIXME *)
+     - wp; skip. smt().
    qed.
