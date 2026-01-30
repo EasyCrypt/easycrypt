@@ -135,7 +135,6 @@ module Ty : sig
   val add : ?src:string -> scope -> ptydecl located -> scope
 
   val add_subtype : scope -> psubtype located -> scope
-  val add_class    : scope -> ptypeclass located -> scope
   val add_instance : scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 

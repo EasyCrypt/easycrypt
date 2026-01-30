@@ -427,18 +427,15 @@ and on_oi (aenv : aenv) (oi : OI.t) =
   List.iter (on_xp aenv) (OI.allowed oi)
 
 (* -------------------------------------------------------------------- *)
-and on_typeclasses (aenv : aenv) s =
-  Sp.iter (fun p -> aenv.cb (`Typeclass p)) s
-
-and on_typarams (aenv : aenv) typarams =
-    List.iter (fun (_,s) -> on_typeclasses aenv s) typarams
+and on_typarams (_aenv : aenv) (_typarams : ty_params) =
+  ()
 
 (* -------------------------------------------------------------------- *)
 and on_tydecl (aenv : aenv) (tyd : tydecl) =
   on_typarams aenv tyd.tyd_params;
   match tyd.tyd_type with
   | Concrete ty -> on_ty aenv ty
-  | Abstract s  -> on_typeclasses aenv s
+  | Abstract    -> ()
   | Record (f, fds) ->
       on_form aenv f;
       List.iter (on_ty aenv |- snd) fds
@@ -603,7 +600,7 @@ type to_clear =
 
 type to_gen =
   { tg_env     : scenv;
-    tg_params  : (EcIdent.t * Sp.t) list;
+    tg_params  : ty_params;
     tg_binds   : bind list;
     tg_subst   : EcSubst.subst;
     tg_clear   : to_clear; }
@@ -650,15 +647,10 @@ let add_declared_mod to_gen id modty =
 
 let add_declared_ty to_gen path tydecl =
   assert (tydecl.tyd_params = []);
-  let s =
-    match tydecl.tyd_type with
-    | Abstract s -> s
-    | _ -> assert false in
-
   let name = "'" ^ basename path in
   let id = EcIdent.create name in
   { to_gen with
-    tg_params = to_gen.tg_params @ [id, s];
+    tg_params = to_gen.tg_params @ [id];
     tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], tvar id);
   }
 
@@ -722,7 +714,7 @@ let tydecl_fv tyd =
   let fv =
     match tyd.tyd_type with
     | Concrete ty -> ty_fv_and_tvar ty
-    | Abstract _ -> Mid.empty
+    | Abstract -> Mid.empty
     | Datatype tydt ->
       List.fold_left (fun fv (_, l) ->
         List.fold_left (fun fv ty ->
@@ -731,7 +723,7 @@ let tydecl_fv tyd =
     | Record (_f, l) ->
       List.fold_left (fun fv (_, ty) ->
           EcIdent.fv_union fv (ty_fv_and_tvar ty)) Mid.empty l in
-  List.fold_left (fun fv (id, _) -> Mid.remove id fv) fv tyd.tyd_params
+  List.fold_left (fun fv id -> Mid.remove id fv) fv tyd.tyd_params
 
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
@@ -776,7 +768,7 @@ let notation_fv nota =
       EcIdent.fv_union (Mid.remove id fv) (ty_fv_and_tvar ty)) fv nota.ont_args
 
 let generalize_extra_ty to_gen fv =
-  List.filter (fun (id,_) -> Mid.mem id fv) to_gen.tg_params
+  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params
 
 let rec generalize_extra_args binds fv =
   match binds with
@@ -812,12 +804,12 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let fv = tydecl_fv tydecl in
     let extra = generalize_extra_ty to_gen fv in
     let tyd_params = extra @ tydecl.tyd_params in
-    let args = List.map (fun (id, _) -> tvar id) tyd_params in
-    let fst_params = List.map fst tydecl.tyd_params in
-    let tosubst = fst_params, tconstr path args in
+    let args = List.map tvar tyd_params in
+    let params = tydecl.tyd_params in
+    let tosubst = params, tconstr path args in
     let tg_subst, tyd_type =
       match tydecl.tyd_type with
-      | Concrete _ | Abstract _ ->
+      | Concrete _ | Abstract ->
         EcSubst.add_tydef to_gen.tg_subst path tosubst, tydecl.tyd_type
       | Record (f, prs) ->
         let subst    = EcSubst.empty in
@@ -829,7 +821,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let tin = tconstr path args in
         let add_op (s, ty) =
           let p = pqname prefix s in
-          let tosubst = fst_params, e_op p args (tfun tin ty) in
+          let tosubst = params, e_op p args (tfun tin ty) in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst;
           s, ty
@@ -850,7 +842,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
           let tys = List.map subst_ty tys in
           let p = pqname prefix s in
           let pty = toarrow tys tout in
-          let tosubst = fst_params, e_op p args pty in
+          let tosubst = params, e_op p args pty in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst ;
           s, tys in
@@ -884,9 +876,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let extra = generalize_extra_ty to_gen fv in
         let tparams = extra @ operator.op_tparams in
         let opty = operator.op_ty in
-        let args = List.map (fun (id, _) -> tvar id) tparams in
-        let tosubst = (List.map fst operator.op_tparams,
-                       e_op path args opty) in
+        let args = List.map tvar tparams in
+        let tosubst = (operator.op_tparams, e_op path args opty) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -896,9 +887,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let extra = generalize_extra_ty to_gen fv in
         let tparams = extra @ operator.op_tparams in
         let opty = operator.op_ty in
-        let args = List.map (fun (id, _) -> tvar id) tparams in
-        let tosubst = (List.map fst operator.op_tparams,
-                       f_op path args opty) in
+        let args = List.map tvar tparams in
+        let tosubst = (operator.op_tparams, f_op path args opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -909,13 +899,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let opty = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args = List.map (fun (id, _) -> tvar id) tparams in
+        let t_args = List.map tvar tparams in
         let eop = e_op path t_args opty in
         let e   =
           e_app eop (List.map (fun (id,ty) -> e_local id ty) extra_a)
             operator.op_ty in
-        let tosubst =
-          (List.map fst operator.op_tparams, e) in
+        let tosubst = (operator.op_tparams, e) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
@@ -948,13 +937,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let op_tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let op_ty   = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args  = List.map (fun (id, _) -> tvar id) op_tparams in
+        let t_args  = List.map tvar op_tparams in
         let fop = f_op path t_args op_ty in
         let f   =
           f_app fop (List.map (fun (id,ty) -> f_local id ty) extra_a)
             operator.op_ty in
-        let tosubst =
-          (List.map fst operator.op_tparams, f) in
+        let tosubst = (operator.op_tparams, f) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         let body =
@@ -1124,7 +1112,6 @@ let rec set_lc_item lc_override item =
     | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_lc lc_override ax.ax_loca   })
     | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_lc lc_override ms.tms_loca  })
     | Th_module          me  -> Th_module        { me with tme_loca = set_lc lc_override me.tme_loca  }
-    | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_lc lc_override tc.tc_loca   })
     | Th_theory      (s, th) -> Th_theory    (s, set_local_th lc_override th)
     | Th_export       (p,lc) -> Th_export    (p, set_lc lc_override lc)
     | Th_instance (ty,ti,lc) -> Th_instance  (ty,ti, set_lc lc_override lc)
@@ -1145,8 +1132,8 @@ let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 (* ---------------------------------------------------------------- *)
 
 let is_abstract_ty = function
-  | Abstract _ -> true
-  | _           -> false
+  | Abstract -> true
+  | _        -> false
 
 (*
 let rec check_glob_mp_ty s scenv mp =
@@ -1407,7 +1394,6 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | Th_axiom   (s, ax)     -> EcEnv.Ax.bind ~import s ax env
     | Th_modtype (s, ms)     -> EcEnv.ModTy.bind ~import s ms env
     | Th_module       me     -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
-    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind ~import s tc env
     | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance ~import tys i lc env (*FIXME: import? *)
     | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add ~import s lc env
@@ -1439,7 +1425,6 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
-    | Th_typeclass _     -> assert false
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
@@ -1540,7 +1525,6 @@ let check_item scenv item =
   | Th_axiom    (s, ax) -> check_ax  scenv prefix s ax
   | Th_modtype  (s, ms) -> check_modtype scenv prefix s ms
   | Th_module        me -> check_module  scenv prefix me
-  | Th_typeclass (s,tc) -> check_typeclass scenv prefix s tc
   | Th_export   (_, lc) -> assert (lc = `Global || scenv.sc_insec);
   | Th_instance  (ty,tci,lc) -> check_instance scenv ty tci lc
   | Th_baserw (_,lc) ->

@@ -2,12 +2,11 @@
 open EcUtils
 open EcSymbols
 open EcBigInt
-open EcPath
 open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type ty_param  = EcIdent.t
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -25,7 +24,7 @@ type ty_dtype = {
 
 type ty_body = 
   | Concrete of EcTypes.ty
-  | Abstract of Sp.t
+  | Abstract
   | Datatype of ty_dtype
   | Record   of ty_record
 
@@ -37,11 +36,11 @@ type tydecl = {
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
-val tydecl_as_abstract : tydecl -> Sp.t option
+val tydecl_as_abstract : tydecl -> unit option
 val tydecl_as_datatype : tydecl -> ty_dtype option
 val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
-val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
+val abs_tydecl : ?params:ty_pctor -> locality -> tydecl
 
 val ty_instantiate : ty_params -> ty list -> ty -> ty
 

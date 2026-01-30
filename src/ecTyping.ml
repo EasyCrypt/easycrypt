@@ -206,8 +206,6 @@ let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 =
        let tyinst = ty_subst (Tuni.subst uidmap) in
        tyerror loc env (TypeMismatch ((tyinst ty1, tyinst ty2),
                                       (tyinst  t1, tyinst  t2)))
-    | `TcCtt _ ->
-        tyerror loc env TypeClassMismatch
 
 (* -------------------------------------------------------------------- *)
 let add_glob (m:Sx.t) (x:prog_var) : Sx.t =
@@ -486,8 +484,8 @@ let transtcs (env : EcEnv.env) tcs =
 let transtyvars (env : EcEnv.env) (loc, tparams) =
   let tparams = tparams |> omap
     (fun tparams ->
-        let for1 ({ pl_desc = x }, tc) = (EcIdent.create x, transtcs env tc) in
-          if not (List.is_unique (List.map (unloc |- fst) tparams)) then
+        let for1 ({ pl_desc = x }) = (EcIdent.create x) in
+          if not (List.is_unique (List.map unloc tparams)) then
             tyerror loc env DuplicatedTyVar;
           List.map for1 tparams)
   in
@@ -1089,7 +1087,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
 
       let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
       let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
-      let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+      let reccty = tconstr recp (List.map tvar recty.tyd_params) in
       let reccty, rectvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
       let fields =
         List.fold_left
@@ -1229,9 +1227,9 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
 
   let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
   let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
-  let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+  let reccty = tconstr recp (List.map tvar recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
-  let tysopn = Tvar.init (List.map fst recty.tyd_params) rtvi in
+  let tysopn = Tvar.init recty.tyd_params rtvi in
 
   let fields =
     List.fold_left

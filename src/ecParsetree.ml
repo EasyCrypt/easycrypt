@@ -101,7 +101,8 @@ and 'a rfield = {
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 
-type ptyparams = (psymbol * pqsymbol list) list
+type ptyparam  = psymbol
+type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
@@ -112,7 +113,7 @@ type ptydecl = {
 }
 
 and ptydbody =
-  | PTYD_Abstract of pqsymbol list
+  | PTYD_Abstract
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -399,7 +400,7 @@ type psubtype = {
 
 (* -------------------------------------------------------------------- *)
 type ptyvardecls =
-  (psymbol * pqsymbol list) list
+  psymbol list
 
 type pop_def =
   | PO_abstr of pty
@@ -450,7 +451,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : (psymbol * pqsymbol list) list option;
+  pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
   pp_locality  : locality;
 }
@@ -1061,7 +1062,7 @@ type mempred_binding = PT_MemPred of psymbol list
 type paxiom = {
   pa_name     : psymbol;
   pa_pvars    : mempred_binding option;
-  pa_tyvars   : (psymbol * pqsymbol list) list option;
+  pa_tyvars   : ptyparams option;
   pa_vars     : pgtybindings option;
   pa_formula  : pformula;
   pa_kind     : paxiom_kind;
@@ -1075,17 +1076,9 @@ type prealize = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptypeclass = {
-  ptc_name : psymbol;
-  ptc_inth : pqsymbol option;
-  ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : (psymbol * pformula) list;
-  ptc_loca : is_local;
-}
-
 type ptycinstance = {
   pti_name : pqsymbol;
-  pti_type : (psymbol * pqsymbol list) list * pty;
+  pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;
@@ -1280,7 +1273,6 @@ type global_action =
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
   | Gsubtype     of psubtype
-  | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred

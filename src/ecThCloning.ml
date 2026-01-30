@@ -458,7 +458,6 @@ end = struct
            (loced (thd @ prefix, x), mode)
 
       | Th_instance _   -> (proofs, evc)
-      | Th_typeclass _  -> (proofs, evc)
 
       | Th_baserw _     -> (proofs, evc)
       | Th_addrw  _     -> (proofs, evc)

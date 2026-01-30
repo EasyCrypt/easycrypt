@@ -406,7 +406,6 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -1637,13 +1636,18 @@ signature_item:
 (* EcTypes declarations / definitions                                   *)
 
 typaram:
-| x=tident { (x, []) }
-| x=tident LTCOLON tc=plist1(lqident, AMP) { (x, tc) }
+| x=tident
+    { (x : ptyparam) }
 
 typarams:
-| empty { []  }
-| x=tident { [(x, [])] }
-| xs=paren(plist1(typaram, COMMA)) { xs }
+| empty
+    { ([] : ptyparams) }
+
+| x=tident
+    { ([x] : ptyparams) }
+
+| xs=paren(plist1(typaram, COMMA))
+    { (xs : ptyparams) }
 
 %inline tyd_name:
 | tya=typarams x=ident { (tya, x) }
@@ -1656,7 +1660,7 @@ dt_ctor_def:
 | LBRACKET PIPE? ctors=plist1(dt_ctor_def, PIPE) RBRACKET { ctors }
 
 rec_field_def:
-| x=ident COLON ty=loc(type_exp) { (x, ty); }
+| x=ident COLON ty=loc(type_exp) { (x, ty) }
 
 %inline record_def:
 | LBRACE fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON? RBRACE
@@ -1664,10 +1668,7 @@ rec_field_def:
 
 typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
-    { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
-
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(qident, COMMA)
-    { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
+    { List.map (fun x -> mk_tydecl ~locality x PTYD_Abstract) td }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
     { [mk_tydecl ~locality td (PTYD_Alias te)] }
@@ -1692,30 +1693,6 @@ subtype:
 
 subtype_rename:
 | RENAME x=STRING COMMA y=STRING { (x, y) }
-
-(* -------------------------------------------------------------------- *)
-(* Type classes                                                         *)
-typeclass:
-| loca=is_local TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
-    { ptc_name = x;
-      ptc_inth = inth;
-      ptc_ops  = fst body;
-      ptc_axs  = snd body;
-      ptc_loca = loca;
-    }
-  }
-
-tc_inth:
-| LTCOLON x=lqident { x }
-
-tc_body:
-| ops=tc_op* axs=tc_ax* { (ops, axs) }
-
-tc_op:
-| OP x=oident COLON ty=loc(type_exp) { (x, ty) }
-
-tc_ax:
-| AXIOM x=ident COLON ax=form { (x, ax) }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
@@ -1770,10 +1747,8 @@ pred_tydom:
 
 tyvars_decl:
 | LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET
+| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
     { tyvars }
-
-| LBRACKET tyvars=rlist2(tident , empty) RBRACKET
-    { List.map (fun x -> (x, [])) tyvars }
 
 op_or_const:
 | OP    { `Op    }
@@ -3834,7 +3809,6 @@ global_action:
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }
-| typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | procop           { Gprocop      $1 }
