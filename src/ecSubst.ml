@@ -150,6 +150,10 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
   List.fold_left2 add_tyvar s xs tys
 
 (* -------------------------------------------------------------------- *)
+let subst_tindex (_s : subst) (ti : tindex) =
+  ti
+
+(* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
   | Tglob mp ->
@@ -162,17 +166,17 @@ let rec subst_ty (s : subst) (ty : ty) =
      Mid.find_def ty a s.sb_tyvar
 
   | Ttuple tys ->
-     ttuple (subst_tys s tys)
+     ttuple (List.map (subst_ty s) tys)
 
-  | Tconstr (p, tys) -> begin
-      let tys = subst_tys s tys in
+  | Tconstr (p, ta) -> begin
+      let ta = subst_targs s ta in
 
       match Mp.find_opt p s.sb_tydef with
       | None ->
-         tconstr (subst_path s p) tys
+         tconstr_r (subst_path s p) ta
 
       | Some (args, body) ->
-         let s = List.fold_left2 add_tyvar empty args tys in
+         let s = List.fold_left2 add_tyvar empty args ta.types in
          subst_ty s body
     end
 
@@ -180,8 +184,10 @@ let rec subst_ty (s : subst) (ty : ty) =
      tfun (subst_ty s t1) (subst_ty s t2)
 
 (* -------------------------------------------------------------------- *)
-and subst_tys (s : subst) (tys : ty list) =
-  List.map (subst_ty s) tys
+and subst_targs (s : subst) (ta : targs) : targs =
+  let types = List.map (subst_ty s) ta.types in
+  let indices = List.map (subst_tindex s) ta.indices in
+  { types; indices; }
 
 (* -------------------------------------------------------------------- *)
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
@@ -327,24 +333,24 @@ let rec subst_expr (s : subst) (e : expr) =
   | Evar pv ->
      e_var (subst_progvar s pv) (subst_ty s e.e_ty)
 
-  | Eapp ({ e_node = Eop (p, tys) }, args) when has_opdef s p ->
-      let tys  = subst_tys s tys in
+  | Eapp ({ e_node = Eop (p, ta) }, args) when has_opdef s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s e.e_ty in
       let body = oget (get_opdef s p) in
       let args = List.map (subst_expr s) args in
-      subst_eop ty tys args body
+      subst_eop ty ta args body
 
-  | Eop (p, tys) when has_opdef s p ->
-      let tys  = subst_tys s tys in
+  | Eop (p, ta) when has_opdef s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s e.e_ty in
       let body = oget (get_opdef s p) in
-      subst_eop ty tys [] body
+      subst_eop ty ta [] body
 
-  | Eop (p, tys) ->
-      let p   = subst_path s p in
-      let tys = subst_tys s tys in
-      let ty  = subst_ty s e.e_ty in
-      e_op p tys ty
+  | Eop (p, ta) ->
+      let p  = subst_path s p in
+      let ta = subst_targs s ta in
+      let ty = subst_ty s e.e_ty in
+      e_op_r p ta ty
 
   | Elet (lp, e1, e2) ->
       let e1 = subst_expr s e1 in
@@ -360,8 +366,13 @@ let rec subst_expr (s : subst) (e : expr) =
   | _ -> e_map (subst_ty s) (subst_expr s) e
 
 (* -------------------------------------------------------------------- *)
-and subst_eop ety tys args (tyids, e) =
-  let s = add_tyvars empty tyids tys in
+and subst_eop
+  (ety : ty)
+  (ta : targs)
+  (args : expr list)
+  ((tyids, e) : EcIdent.t list * expr)
+=
+  let s = add_tyvars empty tyids ta.types in
 
   let (s, args, e) =
     match e.e_node with
@@ -510,24 +521,24 @@ let rec subst_form (s : subst) (f : form) =
      let m = subst_mem s m in
      (f_glob mp m).inv
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when has_def s p ->
-      let tys  = subst_tys s tys in
+  | Fapp ({ f_node = Fop (p, ta) }, args) when has_def s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
       let args = List.map (subst_form s) args in
-      subst_fop ty tys args body
+      subst_fop ty ta args body
 
-  | Fop (p, tys) when has_def s p ->
-      let tys  = subst_tys s tys in
+  | Fop (p, ta) when has_def s p ->
+      let ta   = subst_targs s ta in
       let ty   = subst_ty  s f.f_ty in
       let body = oget (get_def s p) in
-      subst_fop ty tys [] body
+      subst_fop ty ta [] body
 
-  | Fop (p, tys) ->
+  | Fop (p, ta) ->
       let p   = subst_path s p in
-      let tys = subst_tys s tys in
+      let ta  = subst_targs s ta in
       let ty  = subst_ty s f.f_ty in
-      f_op p tys ty
+      f_op_r p ta ty
 
   | FhoareF hf ->
      let hf_f  = subst_xpath s hf.hf_f in
@@ -614,8 +625,13 @@ let rec subst_form (s : subst) (f : form) =
      f_map (subst_ty s) (subst_form s) f
 
 (* -------------------------------------------------------------------- *)
-and subst_fop fty tys args (tyids, f) =
-  let s = add_tyvars empty tyids tys in
+and subst_fop
+  (fty : ty)
+  (ta : targs)
+  (args : form list)
+  ((tyids, f) : EcIdent.t list * form)
+=
+  let s = add_tyvars empty tyids ta.types in
 
   let (s, args, f) =
     match f.f_node with

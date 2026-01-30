@@ -182,6 +182,23 @@ let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
 
 (* -------------------------------------------------------------------- *)
+let tindex_subst (s : f_subst) (ti : tindex) =
+  ti (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
+let targs_subst (s : f_subst) (ta : targs) : targs =
+  let indices = List.Smart.map (tindex_subst s) ta.indices in
+  let types   = List.Smart.map (ty_subst s) ta.types in
+
+  if indices == ta.indices && types == ta.types then
+    ta
+  else { indices; types }
+
+(* -------------------------------------------------------------------- *)
+let targs_subst (s : f_subst) : targs -> targs =
+  if is_ty_subst_id s then identity else targs_subst s
+
+(* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
      not s.fs_freshen
   && is_ty_subst_id s
@@ -255,10 +272,10 @@ let rec e_subst (s : f_subst) (e : expr) : expr =
     let ty' = ty_subst s e.e_ty in
     e_var pv' ty'
 
-  | Eop (p, tys) ->
-    let tys' = List.Smart.map (ty_subst s) tys in
+  | Eop (p, ta) ->
+    let ta'  = targs_subst s ta in
     let ty'  = ty_subst s e.e_ty in
-    e_op p tys' ty'
+    e_op_r p ta' ty'
 
   | Elet (lp, e1, e2) ->
     let e1' = e_subst s e1 in
@@ -432,10 +449,10 @@ module Fsubst = struct
         f_local id ty'
     end
 
-    | Fop (p, tys) ->
-      let ty'  = ty_subst s fp.f_ty in
-      let tys' = List.Smart.map (ty_subst s) tys in
-      f_op p tys' ty'
+    | Fop (p, ta) ->
+      let ty' = ty_subst s fp.f_ty in
+      let ta' = targs_subst s ta in
+      f_op_r p ta' ty'
 
     | Fpvar (pv, m) ->
       let pv' = pv_subst s pv in

@@ -55,7 +55,7 @@ let ts_inv_eqglob mp1 ml mp2 mr =
 
 (* -------------------------------------------------------------------- *)
 let f_op_real_of_int = (* CORELIB *)
-  f_op CI.CI_Real.p_real_of_int [] (tfun tint treal)
+  f_op CI.CI_Real.p_real_of_int (tfun tint treal)
 
 let f_real_of_int f  = f_app f_op_real_of_int [f] treal
 let f_rint n         = f_real_of_int (f_int n)
@@ -75,15 +75,15 @@ let destr_rint f =
   | _ -> destr_error "destr_rint"
 
 (* -------------------------------------------------------------------- *)
-let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
-let fop_int_lt     = f_op CI.CI_Int .p_int_lt    [] (toarrow [tint ; tint ] tbool)
-let fop_real_le    = f_op CI.CI_Real.p_real_le   [] (toarrow [treal; treal] tbool)
-let fop_real_lt    = f_op CI.CI_Real.p_real_lt   [] (toarrow [treal; treal] tbool)
-let fop_real_add   = f_op CI.CI_Real.p_real_add  [] (toarrow [treal; treal] treal)
-let fop_real_opp   = f_op CI.CI_Real.p_real_opp  [] (toarrow [treal] treal)
-let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
-let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        treal)
-let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
+let fop_int_le     = f_op CI.CI_Int .p_int_le    (toarrow [tint ; tint ] tbool)
+let fop_int_lt     = f_op CI.CI_Int .p_int_lt    (toarrow [tint ; tint ] tbool)
+let fop_real_le    = f_op CI.CI_Real.p_real_le   (toarrow [treal; treal] tbool)
+let fop_real_lt    = f_op CI.CI_Real.p_real_lt   (toarrow [treal; treal] tbool)
+let fop_real_add   = f_op CI.CI_Real.p_real_add  (toarrow [treal; treal] treal)
+let fop_real_opp   = f_op CI.CI_Real.p_real_opp  (toarrow [treal] treal)
+let fop_real_mul   = f_op CI.CI_Real.p_real_mul  (toarrow [treal; treal] treal)
+let fop_real_inv   = f_op CI.CI_Real.p_real_inv  (toarrow [treal]        treal)
+let fop_real_abs   = f_op CI.CI_Real.p_real_abs  (toarrow [treal]        treal)
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
@@ -119,25 +119,31 @@ let f_decimal (n, (l, f)) =
   else f_real_add (f_real_of_int (f_int n)) fct
 
 (* soft-constructor - xreal *)
-let fop_xreal_le = f_op CI.CI_Xreal.p_xle [] (toarrow [txreal; txreal] tbool)
+let fop_xreal_le = f_op CI.CI_Xreal.p_xle (toarrow [txreal; txreal] tbool)
 let fop_interp_ehoare_form =
-  f_op CI.CI_Xreal.p_interp_form [] (toarrow [tbool; txreal] txreal)
+  f_op CI.CI_Xreal.p_interp_form (toarrow [tbool; txreal] txreal)
 
-let is_interp_ehoare_form_op (p, tys) = EcPath.p_equal p CI.CI_Xreal.p_interp_form && tys = []
+let is_interp_ehoare_form_op (p, ta) =
+  EcPath.p_equal p CI.CI_Xreal.p_interp_form
+  && List.is_empty ta.types
+  && List.is_empty ta.indices
 
 let fop_Ep ty =
-  f_op CI.CI_Xreal.p_Ep [ty] (toarrow [tdistr ty; toarrow [ty] txreal] txreal)
+  f_op
+    CI.CI_Xreal.p_Ep
+    ~tyargs:[ty]
+    (toarrow [tdistr ty; toarrow [ty] txreal] txreal)
 
 let f_xreal_le f1 f2 = f_app fop_xreal_le [f1; f2] tbool
 let f_interp_ehoare_form f1 f2 = f_app fop_interp_ehoare_form [f1; f2] txreal
 let f_Ep ty d f = f_app (fop_Ep ty) [d; f] txreal
 
 
-let fop_concave_incr = f_op CI.CI_Xreal.p_concave_incr [] (tfun (tfun txreal txreal) tbool)
+let fop_concave_incr = f_op CI.CI_Xreal.p_concave_incr (tfun (tfun txreal txreal) tbool)
 let f_concave_incr f = f_app fop_concave_incr [f] tbool
 
-let f_op_rp2xr = f_op CI.CI_Xreal.p_rp [] (tfun trealp txreal)
-let f_op_of_real  = f_op CI.CI_Xreal.p_of_real [] (tfun treal trealp)
+let f_op_rp2xr = f_op CI.CI_Xreal.p_rp (tfun trealp txreal)
+let f_op_of_real  = f_op CI.CI_Xreal.p_of_real (tfun treal trealp)
 
 let f_rp2xr f = f_app f_op_rp2xr [f] txreal
 let f_r2rp  f = f_app f_op_of_real [f] trealp
@@ -145,21 +151,22 @@ let f_r2xr  f = f_rp2xr (f_r2rp f)
 let f_b2r   b = f_if b f_r1 f_r0
 let f_b2xr  b = f_r2xr (f_b2r b)
 
-
-let f_xreal_inf = f_op CI.CI_Xreal.p_inf [] txreal
+let f_xreal_inf = f_op CI.CI_Xreal.p_inf txreal
 
 (* -------------------------------------------------------------------- *)
-let tmap aty bty =
-  tconstr CI.CI_Map.p_map [aty; bty]
+let tmap (aty : ty) (bty : ty) =
+  tconstr ~tyargs:[aty; bty] ?indices:None CI.CI_Map.p_map
 
-let fop_map_cst aty bty =
-  f_op CI.CI_Map.p_cst [aty; bty] (toarrow [bty] (tmap aty bty))
+let fop_map_cst (aty : ty) (bty : ty) =
+  f_op CI.CI_Map.p_cst ~tyargs:[aty; bty]
+    (toarrow [bty] (tmap aty bty))
 
 let fop_map_get aty bty =
-  f_op CI.CI_Map.p_get [aty; bty] (toarrow [tmap aty bty; aty] bty)
+  f_op CI.CI_Map.p_get ~tyargs:[aty; bty]
+    (toarrow [tmap aty bty; aty] bty)
 
 let fop_map_set aty bty =
-  f_op CI.CI_Map.p_set [aty; bty]
+  f_op CI.CI_Map.p_set ~tyargs:[aty; bty]
     (toarrow [tmap aty bty; aty; bty] (tmap aty bty))
 
 let f_map_cst aty f =
@@ -172,59 +179,73 @@ let f_map_set m x e =
   f_app (fop_map_set x.f_ty e.f_ty) [m;x;e] (tmap x.f_ty e.f_ty)
 
 (* -------------------------------------------------------------------- *)
-let f_predT     ty = f_op CI.CI_Pred.p_predT [ty] (tcpred ty)
-let fop_pred1   ty = f_op CI.CI_Pred.p_pred1 [ty] (toarrow [ty; ty] tbool)
+let f_predT (ty : ty) =
+  f_op CI.CI_Pred.p_predT ~tyargs:[ty] (tcpred ty)
 
-let fop_support ty =
-  f_op CI.CI_Distr.p_support  [ty] (toarrow [tdistr ty; ty] tbool)
-let fop_mu      ty =
-  f_op CI.CI_Distr.p_mu       [ty] (toarrow [tdistr ty; tcpred ty] treal)
-let fop_lossless ty =
-  f_op CI.CI_Distr.p_lossless [ty] (toarrow [tdistr ty] tbool)
+let fop_pred1 (ty : ty) =
+  f_op CI.CI_Pred.p_pred1 ~tyargs:[ty] (tfun ty (tcpred ty))
 
-let f_support f1 f2 = f_app (fop_support f2.f_ty) [f1; f2] tbool
-let f_in_supp f1 f2 = f_support f2 f1
-let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] (toarrow [f1.f_ty] tbool)
+let fop_support (ty : ty) =
+  f_op CI.CI_Distr.p_support ~tyargs:[ty]
+    (toarrow [tdistr ty; ty] tbool)
 
-let f_mu_x    f1 f2 =
+let fop_mu (ty : ty) =
+  f_op CI.CI_Distr.p_mu ~tyargs:[ty]
+    (toarrow [tdistr ty; tcpred ty] treal)
+
+let fop_lossless (ty : ty) =
+  f_op CI.CI_Distr.p_lossless ~tyargs:[ty]
+    (toarrow [tdistr ty] tbool)
+
+let f_support (f1 : form) (f2 : form) =
+  f_app (fop_support f2.f_ty) [f1; f2] tbool
+
+let f_in_supp (f1 : form) (f2 : form) =
+  f_support f2 f1
+
+let f_pred1 (f1 : form) =
+  f_app (fop_pred1 f1.f_ty) [f1] (toarrow [f1.f_ty] tbool)
+
+let f_mu_x (f1 : form) (f2 : form) =
   f_app (fop_mu f2.f_ty) [f1; (f_pred1 f2)] treal
 
-let proj_distr_ty env ty =
+let proj_distr_ty (env : EcEnv.env) (ty : ty) =
    match (EcEnv.Ty.hnorm ty env).ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  ->
-    List.hd lty
+  | Tconstr(p, { indices = []; types = [dom] })
+      when EcPath.p_equal p EcCoreLib.CI_Distr.p_Distr ->
+    dom
   | _ -> assert false
 
-let f_mu env f1 f2 =
+let f_mu (env : EcEnv.env) (f1 : form) (f2 : form) =
   f_app (fop_mu (proj_distr_ty env f1.f_ty)) [f1; f2] treal
 
-let f_weight ty d =
+let f_weight (ty : ty) (d : form) =
   f_app (fop_mu ty) [d; f_predT ty] treal
 
-let f_lossless ty d =
+let f_lossless (ty : ty) (d : form) =
   f_app (fop_lossless ty) [d] tbool
 
 (* -------------------------------------------------------------------- *)
-let fop_dunit ty =
-  f_op EcCoreLib.CI_Distr.p_dunit [ty] (tfun ty (tdistr ty))
+let fop_dunit (ty : ty) =
+  f_op EcCoreLib.CI_Distr.p_dunit ~tyargs:[ty] (tfun ty (tdistr ty))
 
-let f_dunit f =
+let f_dunit (f : form) =
   f_app (fop_dunit f.f_ty) [f] (tdistr f.f_ty)
 
 (* -------------------------------------------------------------------- *)
-let fop_dmap tya tyb =
-  f_op EcCoreLib.CI_Distr.p_dmap [tya; tyb]
+let fop_dmap (tya : ty) (tyb : ty) =
+  f_op EcCoreLib.CI_Distr.p_dmap ~tyargs:[tya; tyb]
     (toarrow [tdistr tya; tfun tya tyb] (tdistr tyb))
 
-let f_dmap tya tyb d f =
+let f_dmap (tya : ty) (tyb : ty) (d : form) (f : form) =
   f_app (fop_dmap tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
-let fop_dlet tya tyb =
-  f_op EcCoreLib.CI_Distr.p_dlet [tya; tyb]
+let fop_dlet (tya : ty) (tyb : ty) =
+  f_op EcCoreLib.CI_Distr.p_dlet ~tyargs:[tya; tyb]
     (toarrow [tdistr tya; tfun tya (tdistr tyb)] (tdistr tyb))
 
-let f_dlet tya tyb d f =
+let f_dlet (tya : ty) (tyb : ty) (d : form) (f : form) =
   f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
@@ -716,8 +737,8 @@ let rec f_iff_simpl f1 f2 =
   else if is_false f2    then f_not_simpl f1
   else
     match f1.f_node, f2.f_node with
-    | Fapp ({f_node = Fop (op1, [])}, [f1]),
-      Fapp ({f_node = Fop (op2, [])}, [f2]) when
+    | Fapp ({f_node = Fop (op1, _)}, [f1]),
+      Fapp ({f_node = Fop (op2, _)}, [f2]) when
         (EcPath.p_equal op1 CI.CI_Bool.p_not &&
          EcPath.p_equal op2 CI.CI_Bool.p_not)
         -> f_iff_simpl f1 f2
@@ -740,7 +761,7 @@ let rec f_eq_simpl f1 f2 =
       when f_equal op1 f_op_real_of_int &&
            f_equal op2 f_op_real_of_int
     -> f_false
-  | Fop (op1, []), Fop (op2, []) when
+  | Fop (op1, _), Fop (op2, _) when
          (EcPath.p_equal op1 CI.CI_Bool.p_true  &&
           EcPath.p_equal op2 CI.CI_Bool.p_false  )
       || (EcPath.p_equal op2 CI.CI_Bool.p_true  &&
@@ -854,7 +875,7 @@ type sform =
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
-  | SFop    of (EcPath.path * ty list) * (form list)
+  | SFop    of (EcPath.path * targs) * (form list)
 
   | SFhoareF  of sHoareF
   | SFhoareS  of sHoareS
@@ -922,10 +943,10 @@ let int_of_form =
     | SFint x ->
         x
 
-    | SFop ((op, []), [a]) when op_kind op = Some `Int_opp ->
+    | SFop ((op, _), [a]) when op_kind op = Some `Int_opp ->
         BI.neg (doit a)
 
-    | SFop ((op, []), [a1; a2]) -> begin
+    | SFop ((op, _), [a1; a2]) -> begin
         match op_kind op with
         | Some `Int_add -> BI.add (doit a1) (doit a2)
         | Some `Int_mul -> BI.mul (doit a1) (doit a2)
@@ -938,7 +959,7 @@ let int_of_form =
 
 let real_of_form f =
   match sform_of_form f with
-  | SFop ((op, []), [a]) ->
+  | SFop ((op, _), [a]) ->
       if   EcPath.p_equal op CI.CI_Real.p_real_of_int
       then int_of_form a
       else None

@@ -54,8 +54,19 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * targs
   | Tfun    of ty * ty
+
+and tindex =
+  | TIVar   of EcIdent.t
+  | TIConst of EcBigInt.zint
+  | TIAdd   of tindex * tindex
+  | TIMul   of tindex * tindex
+
+and targs = {
+  indices : tindex list;
+  types   : ty list;
+}
 
 (* -------------------------------------------------------------------- *)
 and ovariable = {
@@ -84,7 +95,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * targs          (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -185,7 +196,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * targs
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -1054,10 +1065,41 @@ let pr_hash pr =
     (f_hash          pr.pr_args)
     (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))
 
-
 (* ----------------------------------------------------------------- *)
 (* Hashconsing                                                       *)
 (* ----------------------------------------------------------------- *)
+let rec tindex_equal (ti1 : tindex) (ti2 : tindex) : bool =
+  match ti1, ti2 with
+  | TIVar n1, TIVar n2 ->
+    EcIdent.id_equal n1 n2
+
+  | TIConst n1, TIConst n2 ->
+    EcBigInt.equal n1 n2
+
+  | TIAdd (l1, r1), TIAdd (l2, r2)
+  | TIMul (l1, r1), TIMul (l2, r2) ->
+    tindex_equal l1 l2 && tindex_equal r1 r2
+
+  | _, _ ->
+    false
+
+let targs_equal (ta1 : targs) (ta2 : targs) : bool =
+  List.all2 tindex_equal ta1.indices ta2.indices
+  && List.all2 ty_equal ta1.types ta2.types
+    
+let targs_fv (ta : targs) =
+  List.fold_left
+    (fun ids ty -> fv_union ids (ty_fv ty))
+    Mid.empty ta.types
+
+let tindex_hash (ti : tindex) =
+  Hashtbl.hash ti
+
+let targ_hash (init : int) (ta : targs) =
+  let aout = init in
+  let aout = Why3.Hashcons.combine_list ty_hash aout ta.types in
+  let aout = Why3.Hashcons.combine_list tindex_hash aout ta.indices in
+  aout
 
 module Hsty = Why3.Hashcons.Make (struct
   type t = ty
@@ -1076,8 +1118,8 @@ module Hsty = Why3.Hashcons.Make (struct
     | Ttuple lt1, Ttuple lt2 ->
         List.all2 ty_equal lt1 lt2
 
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+    | Tconstr (p1, ta1), Tconstr (p2, ta2) ->
+        EcPath.p_equal p1 p2 && targs_equal ta1 ta2
 
     | Tfun (d1, c1), Tfun (d2, c2)->
         ty_equal d1 d2 && ty_equal c1 c2
@@ -1090,7 +1132,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar u        -> u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tconstr (p, ta)  -> targ_hash p.p_tag ta
     | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
 
   let fv ty =
@@ -1102,7 +1144,7 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
-    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
+    | Tconstr (_, tas) -> targs_fv tas
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
 
   let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
@@ -1127,9 +1169,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x1, Elocal x2 -> EcIdent.id_equal x1 x2
     | Evar   x1, Evar   x2 -> pv_equal x1 x2
 
-    | Eop (p1, tys1), Eop (p2, tys2) ->
-           (EcPath.p_equal p1 p2)
-        && (List.all2 ty_equal tys1 tys2)
+    | Eop (p1, ta1), Eop (p2, ta2) ->
+        (EcPath.p_equal p1 p2) && targs_equal ta1 ta2
 
     | Eapp (e1, es1), Eapp (e2, es2) ->
            (e_equal e1 e2)
@@ -1172,9 +1213,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
 
-    | Eop (p, tys) ->
-        Why3.Hashcons.combine_list ty_hash
-          (EcPath.p_hash p) tys
+    | Eop (p, ta) ->
+        targ_hash (EcPath.p_hash p) ta
 
     | Eapp (e, es) ->
         Why3.Hashcons.combine_list e_hash (e_hash e) es
@@ -1211,7 +1251,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     match e with
     | Eint _            -> Mid.empty
-    | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
+    | Eop (_, ta)       -> targs_fv ta
     | Evar v            -> pv_fv v
     | Elocal id         -> fv_singleton id
     | Eapp (e, es)      -> union e_fv (e :: es)
@@ -1262,8 +1302,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fglob(mp1,m1), Fglob(mp2,m2) ->
       EcIdent.id_equal mp1 mp2 && EcIdent.id_equal m1 m2
 
-    | Fop(p1,lty1), Fop(p2,lty2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
+    | Fop(p1,ta1), Fop(p2,ta2) ->
+        EcPath.p_equal p1 p2 && targs_equal ta1 ta2
 
     | Fapp(f1,args1), Fapp(f2,args2) ->
         f_equal f1 f2 && List.all2 f_equal args1 args2
@@ -1317,8 +1357,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fglob(mp, m) ->
         Why3.Hashcons.combine (EcIdent.id_hash mp) (EcIdent.id_hash m)
 
-    | Fop(p, lty) ->
-        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
+    | Fop(p, ta) ->
+      targ_hash (EcPath.p_hash p) ta
 
     | Fapp(f, args) ->
         Why3.Hashcons.combine_list f_hash (f_hash f) args
@@ -1351,7 +1391,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     match f with
     | Fint _              -> Mid.empty
-    | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
+    | Fop (_, ta)         -> targs_fv ta
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
     | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
     | Fglob (mp,m)        -> fv_add mp (fv_add m Mid.empty)

@@ -39,7 +39,7 @@ let datatype_proj_path (p : EP.path) (x : symbol) =
 (* -------------------------------------------------------------------- *)
 let indsc_of_record (rc : record) =
   let targs  = List.map tvar rc.rc_tparams in
-  let recty  = tconstr rc.rc_path targs in
+  let recty  = tconstr_r rc.rc_path targs in
   let recx   = fresh_id_of_ty recty in
   let recfm  = FL.f_local recx recty in
   let predty = tfun recty tbool in
@@ -158,12 +158,13 @@ and check_positivity_ident fct p params ident ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_ident fct p params ident) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      if not (ty_params_compat args params) then
+      assert (List.is_empty args.indexes);
+      if not (ty_params_compat args.types params) then
         non_positive p (TypePositionRestriction ty)
   | Tconstr (q, args) ->
       let decl = fct q in
-      List.iter (check_positivity_ident fct p params ident) args;
-      List.combine args decl.tyd_params
+      List.iter (check_positivity_ident fct p params ident) args.types;
+      List.combine args.types decl.tyd_params
       |> List.filter_map (fun (arg, ident') ->
              if EcTypes.var_mem ident arg then Some ident' else None)
       |> List.iter (check_positivity_in_decl fct q decl)
@@ -177,12 +178,14 @@ let rec check_positivity_path fct p ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_path fct p) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      if List.exists (occurs p) args then non_positive p (NonPositiveOcc ty)
+      assert (List.is_empty args.indexes);
+      if List.exists (occurs p) args.types then
+        non_positive p (NonPositiveOcc ty)
   | Tconstr (q, args) ->
       let decl = fct q in
-      List.iter (check_positivity_path fct p) args;
-      List.combine args decl.tyd_params
-      |> List.filter_map (fun (arg, ident) ->
+      List.iter (check_positivity_path fct p) args.types;
+      List.combine args.types decl.tyd_params
+      |> List.filter_map (fun (arg, ident)) ->
              if occurs p arg then Some ident else None)
       |> List.iter (check_positivity_in_decl fct q decl)
   | Tfun (from, to_) ->

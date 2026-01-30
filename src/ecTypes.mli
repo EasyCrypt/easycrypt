@@ -13,9 +13,15 @@ type is_local  =           [ `Local | `Global ]
 val local_of_locality : locality -> is_local
 
 (* -------------------------------------------------------------------- *)
-type ty = EcAst.ty
+type ty      = EcAst.ty
 type ty_node = EcAst.ty_node
+type tindex  = EcAst.tindex
+type targs   = EcAst.targs
 
+(* -------------------------------------------------------------------- *)
+val mk_targs : ?indices:tindex list -> ?tyargs:ty list -> unit -> targs
+
+(* -------------------------------------------------------------------- *)
 module Mty : Map.S with type key = ty
 module Sty : Set.S with module M = Map.MakeBase(Mty)
 module Hty : EcMaps.EHashtbl.S with type key = ty
@@ -27,13 +33,14 @@ val dump_ty : ty -> string
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int
 
-val tuni    : EcUid.uid -> ty
-val tvar    : EcIdent.t -> ty
-val ttuple  : ty list -> ty
-val tconstr : EcPath.path -> ty list -> ty
-val tfun    : ty -> ty -> ty
-val tglob   : EcIdent.t -> ty
-val tpred   : ty -> ty
+val tuni      : EcUid.uid -> ty
+val tvar      : EcIdent.t -> ty
+val ttuple    : ty list -> ty
+val tconstr   : EcPath.path -> ?indices:tindex list -> ?tyargs:ty list -> ty
+val tconstr_r : EcPath.path -> targs -> ty
+val tfun      : ty -> ty -> ty
+val tglob     : EcIdent.t -> ty
+val tpred     : ty -> ty
 
 val ty_fv_and_tvar : ty -> int Mid.t
 
@@ -173,7 +180,8 @@ val e_int      : zint -> expr
 val e_decimal  : zint * (int * zint) -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
-val e_op       : EcPath.path -> ty list -> ty -> expr
+val e_op       : EcPath.path -> ?indices:tindex list -> ?tyargs:ty list -> ty -> expr
+val e_op_r     : EcPath.path -> targs -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr

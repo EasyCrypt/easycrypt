@@ -49,8 +49,19 @@ and ty_node =
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
+  | Tconstr of EcPath.path * targs
   | Tfun    of ty * ty
+
+and tindex =
+  | TIVar   of EcIdent.t
+  | TIConst of EcBigInt.zint
+  | TIAdd   of tindex * tindex
+  | TIMul   of tindex * tindex
+
+and targs = {
+  indices : tindex list;
+  types   : ty list;
+}
 
 (* -------------------------------------------------------------------- *)
 and ovariable = {
@@ -79,7 +90,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * targs          (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -180,7 +191,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of prog_var * memory
   | Fglob   of EcIdent.t * memory
-  | Fop     of EcPath.path * ty list
+  | Fop     of EcPath.path * targs
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
