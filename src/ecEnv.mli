@@ -380,7 +380,6 @@ module TypeClass : sig
   type t = typeclass
 
   val add   : path -> env -> env
-  val bind  : ?import:bool -> symbol -> t -> env -> env
   val graph : env -> EcTypeClass.graph
 
   val by_path     : path -> env -> t

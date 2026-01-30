@@ -44,7 +44,6 @@ val subst_ax      : subst -> axiom -> axiom
 val subst_op      : subst -> operator -> operator
 val subst_op_body : subst -> opbody -> opbody
 val subst_tydecl  : subst -> tydecl -> tydecl
-val subst_tc      : subst -> typeclass -> typeclass
 val subst_theory  : subst -> theory -> theory
 val subst_branches : subst -> opbranches -> opbranches
 

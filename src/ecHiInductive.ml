@@ -84,7 +84,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let env0  =
     let myself = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = Abstract EcPath.Sp.empty;
+      tyd_type    = Abstract;
       tyd_loca    = lc;
     } in
       EcEnv.Ty.bind (unloc name) myself env
@@ -134,7 +134,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       let tyinst = ty_instantiate tdecl.tyd_params targs in
 
       match tdecl.tyd_type with
-      | Abstract _ ->
+      | Abstract ->
           List.exists isempty targs
 
       | Concrete ty ->
@@ -402,7 +402,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams)
+      let opexpr   = e_op opexpr (List.map tvar tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr
