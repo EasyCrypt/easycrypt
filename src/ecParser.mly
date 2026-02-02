@@ -391,7 +391,6 @@
 %token AUTO
 %token AXIOM
 %token AXIOMATIZED
-%token BACKS
 %token BACKSLASH
 %token BETA
 %token BY
@@ -457,7 +456,6 @@
 %token FROM
 %token FUN
 %token FUSION
-%token FWDS
 %token GEN
 %token GLOB
 %token GLOBAL
@@ -2497,11 +2495,6 @@ call_info:
 | bad=form COMMA p=form              { CI_upto (bad,p,None) }
 | bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
 
-tac_dir:
-| BACKS { Backs }
-| FWDS  { Fwds }
-| empty { Backs }
-
 icodepos_r:
 | IF       { (`If     :> pcp_match) }
 | WHILE    { (`While  :> pcp_match) }
@@ -2672,13 +2665,13 @@ dbhint:
 
 app_bd_info:
 | empty
-    { PAppNone }
+    { PSeqNone }
 
 | f=sform
-    { PAppSingle f }
+    { PSeqSingle f }
 
 | f=prod_form g=prod_form s=sform?
-    { PAppMult (s, fst f, snd f, fst g, snd g) }
+    { PSeqMult (s, fst f, snd f, fst g, snd g) }
 
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
@@ -2915,8 +2908,8 @@ interleave_info:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? d=tac_dir pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
-   { Papp (s, d, pos, p, f) }
+| SEQ s=side? pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
+   { Pseq (s, pos, p, f) }
 
 | WP n=s_codepos1?
    { Pwp n }
