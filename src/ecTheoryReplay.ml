@@ -159,16 +159,16 @@ end = struct
 
   let rec tybody (hyps : EcEnv.LDecl.hyps) (ty_body1 : ty_body) (ty_body2 : ty_body) =
     match ty_body1, ty_body2 with
-    | `Abstract _   ,  `Abstract _   -> () (* FIXME Sp.t *)
-    | `Concrete ty1 , `Concrete ty2  -> check (EcReduction.EqTest.for_type (toenv hyps) ty1 ty2)
-    | `Datatype ty1 , `Datatype ty2  -> for_datatype hyps ty1 ty2
-    | `Record   rec1, `Record   rec2 -> for_record hyps rec1 rec2
+    | Abstract     ,  Abstract     -> ()
+    | Concrete ty1 , Concrete ty2  -> check (EcReduction.EqTest.for_type (toenv hyps) ty1 ty2)
+    | Datatype ty1 , Datatype ty2  -> for_datatype hyps ty1 ty2
+    | Record   rec1, Record   rec2 -> for_record hyps rec1 rec2
 
-    | _, `Concrete { ty_node = Tconstr (p, tys) } ->
+    | _, Concrete { ty_node = Tconstr (p, tys) } ->
       let ty_body2 = get_open_tydecl (toenv hyps) p tys in
       tybody hyps ty_body1 ty_body2
 
-    | `Concrete{ ty_node = Tconstr (p, tys) }, _ ->
+    | Concrete{ ty_node = Tconstr (p, tys) }, _ ->
       let ty_body1 = get_open_tydecl (toenv hyps) p tys in
       tybody hyps ty_body1 ty_body2
 
@@ -180,14 +180,15 @@ end = struct
 
       for_tparams params tyd2.tyd_params;
 
-      let tparams = List.map (fun (id,_) -> tvar id) params in
+      let tparams = List.map tvar params in
       let ty_body1 = tyd1.tyd_type in
       let ty_body2 = EcSubst.open_tydecl tyd2 tparams in
 
       let hyps = EcEnv.LDecl.init env params in
 
       match ty_body1, ty_body2 with
-      | `Abstract _, _ -> () (* FIXME Sp.t *)
+      | Abstract, _ -> ()
+
       | _, _ -> tybody hyps ty_body1 ty_body2
 
     with CoreIncompatible -> raise (Incompatible TyBody)
@@ -296,7 +297,7 @@ end = struct
     for_tparams oper1.op_tparams oper2.op_tparams;
 
     let oty1, okind1 = oper1.op_ty, oper1.op_kind in
-    let tparams = List.map (fun (id,_) -> tvar id) params in
+    let tparams = List.map tvar params in
     let oty2, okind2 = EcSubst.open_oper oper2 tparams in
 
     if not (EcReduction.EqTest.for_type env oty1 oty2) then
@@ -457,14 +458,14 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
       let newtyd, body =
         match tydov with
         | `BySyntax (nargs, ntyd) ->
-            let nargs = List.map2
-                          (fun (_, tc) x -> (EcIdent.create (unloc x), tc))
-                          otyd.tyd_params nargs in
+            let nargs = List.map
+                          (fun x -> (EcIdent.create (unloc x)))
+                          nargs in
             let ue    = EcUnify.UniEnv.create (Some nargs) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
             let decl  =
               { tyd_params   = nargs;
-                tyd_type     = `Concrete ntyd;
+                tyd_type     = Concrete ntyd;
                 tyd_loca     = otyd.tyd_loca;
                 tyd_clinline = (mode <> `Alias); }
 
@@ -476,15 +477,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
               let body =
                 if reftyd.tyd_clinline then
                   (match reftyd.tyd_type with
-                  | `Concrete body -> body
+                  | Concrete body -> body
                   | _ -> assert false)
                 else
                   let tyargs =
-                    List.map (fun (x, _) -> EcTypes.tvar x) reftyd.tyd_params in
+                    List.map tvar reftyd.tyd_params in
                   tconstr p tyargs in
                 let decl   =
                   { reftyd with
-                      tyd_type     = `Concrete body;
+                      tyd_type     = Concrete body;
                       tyd_clinline = (mode <> `Alias); } in
                 (decl, body)
 
@@ -495,7 +496,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
           assert (List.is_empty otyd.tyd_params);
           let decl  =
             { tyd_params   = [];
-              tyd_type     = `Concrete ty;
+              tyd_type     = Concrete ty;
               tyd_loca     = otyd.tyd_loca; 
               tyd_clinline = false; (* FIXME: check value here tyd_clinline PR *)
             }
@@ -511,18 +512,18 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
         | `Inline _ ->
           let subst =
             EcSubst.add_tydef
-              subst (xpath ove x) (List.map fst newtyd.tyd_params, body) in
+              subst (xpath ove x) (newtyd.tyd_params, body) in
 
           let subst =
             (* FIXME: HACK *)
             match otyd.tyd_type, body.ty_node with
-            | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+            | Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
-                | `Datatype { tydt_ctors = _ } ->
-                  let newtparams = List.fst newtyd.tyd_params in
+                | Datatype { tydt_ctors = _ } ->
+                  let newtparams = newtyd.tyd_params in
                   let newtparams_ty = List.map tvar newtparams in
                   let newdtype = tconstr np newtparams_ty in
-                  let tysubst = CS.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+                  let tysubst = CS.Tvar.init otyd.tyd_params newtparams_ty in
 
                   List.fold_left (fun subst (name, tyargs) ->
                     let np = EcPath.pqoname (EcPath.prefix np) name in
@@ -583,7 +584,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
         let newop, body =
           match opov with
           | `BySyntax opov ->
-              let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
+              let tp = opov.opov_tyvars in
               let ue = EcTyping.transtyvars env (loc, tp) in
               let tp = EcTyping.tp_relax in
               let (ty, body) =
@@ -595,8 +596,8 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               in
               begin
                 try Compatible.for_ty env ue
-                    (List.map fst reftyvars, refty)
-                    (List.map fst (EcUnify.UniEnv.tparams ue), ty)
+                    (reftyvars, refty)
+                    (EcUnify.UniEnv.tparams ue, ty)
                 with Incompatible err ->
                   clone_error env (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
               end;
@@ -618,7 +619,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
           | `ByPath p -> begin
             match EcEnv.Op.by_path_opt p env with
             | Some ({ op_kind = OB_oper _ } as refop) ->
-                let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) refop.op_tparams in
+                let tyargs = List.map tvar refop.op_tparams in
                 let body =
                   if refop.op_clinline then
                     (match refop.op_kind with
@@ -655,7 +656,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 with EcFol.CannotTranslate ->
                   clone_error env (CE_InlinedOpIsForm (snd ove.ovre_prefix, x))
               in
-              let subst1 = (List.map fst newop.op_tparams, body) in
+              let subst1 = (newop.op_tparams, body) in
               let subst  = EcSubst.add_opdef subst (xpath ove x) subst1
               in  (newop, subst, x, false)
       in
@@ -705,7 +706,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
       let newpr, body =
         match prov with
         | `BySyntax prov ->
-            let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
+            let tp = prov.prov_tyvars in
             let ue = EcTyping.transtyvars env (loc, tp) in
             let body =
               let env, xs = EcTyping.trans_binding env ue prov.prov_args in
@@ -718,8 +719,8 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
             begin
               try
                 Compatible.for_ty env ue
-                  (List.map fst reftyvars, refty)
-                  (List.map fst (EcUnify.UniEnv.tparams ue), body.f_ty)
+                  (reftyvars, refty)
+                  (EcUnify.UniEnv.tparams ue, body.f_ty)
               with Incompatible err ->
                 clone_error env
                   (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
@@ -745,7 +746,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
         | `ByPath p -> begin
           match EcEnv.Op.by_path_opt p env with
           | Some ({ op_kind = OB_pred _ } as refop) ->
-              let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) refop.op_tparams in
+              let tyargs = List.map tvar refop.op_tparams in
               let body   =
                 if refop.op_clinline then
                   (match refop.op_kind with
@@ -780,7 +781,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
           (newpr, subst, x)
 
         | `Inline _ ->
-            let subst1 = (List.map fst newpr.op_tparams, body) in
+            let subst1 = (newpr.op_tparams, body) in
             let subst  = EcSubst.add_pddef subst (xpath ove x) subst1 in
             (newpr, subst, x)
 
@@ -986,14 +987,6 @@ and replay_reduction
   let rules = List.map for1 rules in
   let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction rules) in
 
-  (subst, ops, proofs, scope)
-
-(* -------------------------------------------------------------------- *)
-and replay_typeclass
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, tc)
-=
-  let tc = EcSubst.subst_tc subst tc in
-  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_typeclass (x, tc)) in
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -1230,9 +1223,6 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
 
   | Th_auto at_base ->
      replay_auto ove (subst, ops, proofs, scope) (import, at_base)
-
-  | Th_typeclass (x, tc) ->
-     replay_typeclass ove (subst, ops, proofs, scope) (import, x, tc)
 
   | Th_instance ((typ, ty), tc, lc) ->
      replay_instance ove (subst, ops, proofs, scope) (import, (typ, ty), tc, lc)

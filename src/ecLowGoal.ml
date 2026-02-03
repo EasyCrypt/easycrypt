@@ -168,7 +168,7 @@ module LowApply = struct
     | PTGlobal (p, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instanciate p tys env, subgoals)
+        (pt, EcEnv.Ax.instantiate p tys env, subgoals)
 
     | PTTerm pt ->
       let pt, ax, subgoals = check_ `Elim pt subgoals tc in
@@ -2424,7 +2424,10 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
                 | _, `Local _ -> `RtoL
                 | _, _        -> `LtoR
             in
-            t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
+            try t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
+            with InvalidGoalShape -> 
+              let tside = if tside = `LtoR then `RtoL else `LtoR in
+              t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
         in
 
 (*      let _, _, side = gen in

@@ -1064,7 +1064,7 @@ let reduce_head simplify ri env hyps f =
       let body = EcFol.form_of_expr body in
       (* FIXME subst-refact can we do both subst in once *)
       let body =
-        Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
+        Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1780,7 +1780,7 @@ module User = struct
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list (List.map fst ax.ax_tparams) in
+    and s_tybds = Sid.of_list ax.ax_tparams in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.

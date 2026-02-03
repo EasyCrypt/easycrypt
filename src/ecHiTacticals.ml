@@ -229,9 +229,8 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager_if                 -> EcPhlEager.process_if
     | Peager_while info         -> EcPhlEager.process_while info
     | Peager_fun_def            -> EcPhlEager.process_fun_def
-    | Peager_fun_abs infos      -> curry EcPhlEager.process_fun_abs infos
+    | Peager_fun_abs infos      -> EcPhlEager.process_fun_abs infos
     | Peager_call info          -> EcPhlEager.process_call info
-    | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless

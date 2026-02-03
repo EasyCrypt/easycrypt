@@ -490,7 +490,7 @@ let process_exacttype qs (tc : tcenv1) =
       tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
   in
   let tys =
-    List.map (fun (a,_) -> EcTypes.tvar a)
+    List.map (fun a -> EcTypes.tvar a)
       (EcEnv.LDecl.tohyps hyps).h_tvar in
   let pt = ptglobal ~tys p in
 
@@ -700,7 +700,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
               (* FIXME: TC HOOK *)
-              let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
+              let body  = Tvar.f_subst ~freshen:true tparams tvi body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body
@@ -723,7 +723,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   | `RtoL ->
     let fp =
       (* FIXME: TC HOOK *)
-      let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
+      let body  = Tvar.f_subst ~freshen:true tparams tvi body in
       let fp    = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
         with EcEnv.NotReducible -> fp

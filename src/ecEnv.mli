@@ -186,7 +186,7 @@ module Ax : sig
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
-  val instanciate : path -> EcTypes.ty list -> env -> form
+  val instantiate : path -> EcTypes.ty list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -398,7 +398,6 @@ module TypeClass : sig
   type t = typeclass
 
   val add   : path -> env -> env
-  val bind  : ?import:bool -> symbol -> t -> env -> env
   val graph : env -> EcTypeClass.graph
 
   val by_path     : path -> env -> t
@@ -566,7 +565,7 @@ module Circuit : sig
   val reverse_bvoperator : env -> path -> crb_bvoperator option
   val reverse_circuit : env -> path -> crb_circuit option
 
-  val get_specification_by_name : env -> filename:string -> symbol -> Lospecs.Ast.adef option
+  val get_specification_by_name : filename:string -> symbol -> Lospecs.Ast.adef option
 end 
 
 val pp_debug_form : (env -> form -> unit) ref
