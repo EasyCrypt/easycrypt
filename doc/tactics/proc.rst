@@ -232,7 +232,9 @@ may differ.
 
 .. admonition:: Syntax
 
-  ``proc {formulaB}? {formulaI} {formulaJ}?``
+  - ``proc {formulaI}``
+  - ``proc {formulaB} {formulaI}``
+  - ``proc {formulaB} {formulaI} {formulaJ}``
 
 Here: 
 
