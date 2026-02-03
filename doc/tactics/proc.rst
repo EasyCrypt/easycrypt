@@ -15,6 +15,9 @@ The abstract variant is a bit different for probabilistic relational
 Hoare logic compared to the other program logics, so we describe it
 separately.
 
+.. contents::
+   :local:
+
 ------------------------------------------------------------------------
 Variant: Concrete procedure(s)
 ------------------------------------------------------------------------
