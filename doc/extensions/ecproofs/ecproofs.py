@@ -9,9 +9,11 @@ import sphinx.errors      as se
 import sphinx.util        as su
 
 import bisect
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess as subp
 import tempfile
 
@@ -20,7 +22,15 @@ import tempfile
 ROOT = os.path.dirname(__file__)
 
 # ======================================================================
-logger = su.logging.getLogger(__name__)
+logger       = su.logging.getLogger('ecproofs')
+store_logger = su.logging.getLogger('ecproofs.store')
+cache_logger = su.logging.getLogger('ecproofs.cache')
+
+# ======================================================================
+def resolve_output_dir(path: str, outdir: str) -> str:
+  if os.path.isabs(path):
+    return path
+  return os.path.join(outdir, path)
 
 # ======================================================================
 class ProofnavNode(du.nodes.General, du.nodes.Element):
@@ -49,7 +59,7 @@ class EasyCryptError(se.SphinxError):
 # ======================================================================
 class EasyCrypt:
   @staticmethod
-  def run(cmd, *, location: Any | None = None, warn_only: bool = True):
+  def run(cmd, *, location: Any | None = None):
     try:
       proc = subp.run(
         cmd, check = True, text = True, capture_output = True,
@@ -78,6 +88,173 @@ class EasyCrypt:
       raise EasyCryptError(msg) from e
 
 # ======================================================================
+class EasyCryptCache:
+  ENV_KEY = "ecproofs_cache"
+
+  def __init__(self, cache_dir: str, outdir: str):
+    self.cache_root = resolve_output_dir(cache_dir, outdir)
+
+  @staticmethod
+  def get_cache(app: sa.Sphinx) -> "EasyCryptCache | None":
+    key = EasyCryptCache.ENV_KEY
+    if not hasattr(app.env, key):
+      setattr(app.env, key, EasyCryptCache.create_cache(app))
+    return getattr(app.env, key)
+
+  @staticmethod
+  def create_cache(app: sa.Sphinx) -> "EasyCryptCache | None":
+    cache_dir = app.config.ecproofs_cache_dir
+    if cache_dir is None:
+      return None
+    return EasyCryptCache(cache_dir, app.outdir)
+
+  def _relpath(self, path: str) -> str:
+    try:
+      return os.path.relpath(path, self.cache_root)
+    except ValueError:
+      return path
+
+  def load(self, source: str, *, location: Any | None = None):
+    cache_path = self.path_for_source(source)
+
+    if not os.path.exists(cache_path):
+      return None
+
+    try:
+      with open(cache_path) as ecostream:
+        eco = json.load(ecostream)
+      cache_logger.info(
+        "Loaded EasyCrypt cache %s", self._relpath(cache_path),
+        location = location
+      )
+      return eco
+
+    except OSError as e:
+      cache_logger.warning(
+        "Failed to read EasyCrypt cache %s: %s", self._relpath(cache_path), e,
+        location = location
+      )
+      return None
+
+  def store(self, source: str, eco: Any, *, location: Any | None = None):
+    cache_path = self.path_for_source(source)
+    os.makedirs(os.path.dirname(cache_path), exist_ok = True)
+
+    try:
+      with open(cache_path, 'w') as outstream:
+        json.dump(eco, outstream)
+      cache_logger.info(
+        "Stored EasyCrypt cache %s", self._relpath(cache_path),
+        location = location
+      )
+
+    except OSError as e:
+      cache_logger.warning(
+        "Failed to write EasyCrypt cache %s: %s", self._relpath(cache_path), e,
+        location = location
+      )
+
+  def path_for_source(self, source: str) -> str:
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    first  = digest[0:2]
+    second = digest[2:4]
+
+    return os.path.join(self.cache_root, first, second, f"{digest}.eco")
+
+# ======================================================================
+class EasyCryptScriptStore:
+  ENV_KEY = "ecproofs_script_store"
+
+  def __init__(self, scripts_dir: str, outdir: str):
+    self.scripts_root = resolve_output_dir(scripts_dir, outdir)
+    self._counters = {}
+
+  @staticmethod
+  def get_store(app: sa.Sphinx) -> "EasyCryptScriptStore | None":
+    key = EasyCryptScriptStore.ENV_KEY
+    if not hasattr(app.env, key):
+      setattr(app.env, key, EasyCryptScriptStore.create_store(app))
+    return getattr(app.env, key)
+
+  @staticmethod
+  def create_store(app: sa.Sphinx) -> "EasyCryptScriptStore | None":
+    scripts_dir = app.config.ecproofs_scripts_dir
+    if scripts_dir is None:
+      return None
+    return EasyCryptScriptStore(scripts_dir, app.outdir)
+
+  @staticmethod
+  def source_basename(source_path: str) -> str:
+    return os.path.splitext(os.path.basename(source_path))[0] or "document"
+
+  def _relpath(self, path: str) -> str:
+    try:
+      return os.path.relpath(path, self.scripts_root)
+    except ValueError:
+      return path
+
+  def _next_script_index(self, source_path: str) -> int:
+    index = self._counters.get(source_path, 0) + 1
+    self._counters[source_path] = index
+    return index
+
+  def save(self, source: str, source_path: str, *, location: Any | None = None):
+    base     = self.source_basename(source_path)
+    index    = self._next_script_index(source_path)
+    filename = f"{base}-{index:03d}.ec"
+    outdir   = os.path.join(self.scripts_root, base)
+    outpath  = os.path.join(outdir, filename)
+
+    os.makedirs(outdir, exist_ok = True)
+
+    try:
+      with open(outpath, 'w') as outstream:
+        outstream.write(source)
+      store_logger.info(
+        "Saved EasyCrypt script %s", self._relpath(outpath),
+        location = location
+      )
+      return outpath
+
+    except OSError as e:
+      store_logger.warning(
+        "Failed to write EasyCrypt script %s: %s", outpath, e,
+        location = location
+      )
+
+  def clear_for_source(
+    self,
+    source_path: str,
+    *,
+    location: Any | None = None,
+  ):
+    base = self.source_basename(source_path)
+    target_dir = os.path.join(self.scripts_root, base)
+
+    # Defensive: only remove directories under scripts_root.
+    abs_target = os.path.realpath(target_dir)
+    abs_root = os.path.realpath(self.scripts_root)
+    try:
+      if os.path.commonpath([abs_target, abs_root]) != abs_root:
+        return
+    except ValueError:
+      return
+
+    if os.path.exists(target_dir):
+      try:
+        shutil.rmtree(target_dir)
+        store_logger.info(
+          "Cleared EasyCrypt scripts: %s", self._relpath(target_dir),
+          location = location
+        )
+
+      except OSError as e:
+        store_logger.warning(
+          "Failed to clear EasyCrypt scripts: %s: %s", target_dir, e,
+          location = location
+        )
+
+# ======================================================================
 class EasyCryptProofDirective(su.docutils.SphinxDirective):
   TRAP_RE = r'\(\*\s*\$\s*\*\)\s*'
 
@@ -88,7 +265,7 @@ class EasyCryptProofDirective(su.docutils.SphinxDirective):
   }
 
   def find_trap(self, source: str):
-    location = (self.state.document.current_source, self.lineno)
+    location = (self.env.docname, self.lineno)
 
     if (trap := re.search(self.TRAP_RE, source, re.MULTILINE)) is None:
       logger.error(
@@ -99,7 +276,13 @@ class EasyCryptProofDirective(su.docutils.SphinxDirective):
     return trap
 
   def run_easycrypt(self, source: str):
-    location = (self.state.document.current_source, self.lineno)
+    location = (self.env.docname, self.lineno)
+
+    cache = EasyCryptCache.get_cache(self.env.app)
+    if cache is not None:
+      cached = cache.load(source, location = location)
+      if cached is not None:
+        return cached
 
     with tempfile.TemporaryDirectory(delete = False) as tmpdir:
       ecfile  = os.path.join(tmpdir, 'input.ec')
@@ -108,13 +291,23 @@ class EasyCryptProofDirective(su.docutils.SphinxDirective):
       with open(ecfile, 'w') as ecstream:
         ecstream.write(source)
 
+      logger.info(
+        "Running EasyCrypt command: %s",
+        " ".join(['easycrypt', 'compile', '-script', '-pragmas', 'Proofs:weak', '-trace', ecfile]),
+        location = location
+      )
       EasyCrypt.run(
         ['easycrypt', 'compile', '-script', '-pragmas', 'Proofs:weak', '-trace', ecfile],
         location = location
       )
 
       with open(ecofile) as ecostream:
-        return json.load(ecostream)
+        eco = json.load(ecostream)
+
+      if cache is not None:
+        cache.store(source, eco, location = location)
+
+      return eco
 
   def create_widget(self, code: str, sentence: int, eco: Any):
     serial = self.state.document.settings.env.new_serialno("proofnav")
@@ -157,6 +350,15 @@ class EasyCryptProofDirective(su.docutils.SphinxDirective):
       ]
       sentence = bisect.bisect_left(sentences, trap.start())
 
+      # Save script for later inspection
+      script_store = EasyCryptScriptStore.get_store(self.env.app)
+      if script_store is not None:
+        script_store.save(
+          code,
+          self.state.document.current_source,
+          location = (self.env.docname, self.lineno),
+        )
+
       # Run EasyCrypt and extract the proof trace
       eco = self.run_easycrypt(code)
 
@@ -192,6 +394,13 @@ def on_builder_inited(app: sa.Sphinx):
   su.fileutil.copy_asset(css, out_dir)
 
 # ======================================================================
+def on_source_read(app: sa.Sphinx, docname: str, source: list[str]):
+  if (script_store := EasyCryptScriptStore.get_store(app)) is None:
+    return
+  source_path = app.env.doc2path(docname)
+  script_store.clear_for_source(source_path, location = (docname, None))
+
+# ======================================================================
 def setup(app: sa.Sphinx) -> su.typing.ExtensionMetadata:
   app.add_node(
     ProofnavNode,
@@ -201,10 +410,14 @@ def setup(app: sa.Sphinx) -> su.typing.ExtensionMetadata:
     )
   )
 
+  app.add_config_value("ecproofs_cache_dir", "_ecproofs_cache", "env")
+  app.add_config_value("ecproofs_scripts_dir", "_ecproofs_scripts", "env")
+
   app.add_js_file("proofnav/proofnav.bundle.js", defer = "defer")
   app.add_css_file("proofnav/proofnav.css")
 
   app.connect("builder-inited", on_builder_inited)
+  app.connect("source-read", on_source_read)
 
   app.add_directive('ecproof', EasyCryptProofDirective)
 

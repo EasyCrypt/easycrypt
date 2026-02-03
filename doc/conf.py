@@ -3,8 +3,12 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import logging
+import os
 import pathlib
 import sys
+
+from sphinx.util import logging as sphinx_logging
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -31,6 +35,21 @@ highlight_language = 'easycrypt'
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+# -- EasyCrypt proofs -------------------------------------------------------
+
+ecproofs_cache_dir = '../ecproofs/cache'
+ecproofs_scripts_dir = '../ecproofs/scripts'
+
+# -- EasyCrypt proofs logging ----------------------------------------------
+
+_ecproofs_store_level = os.getenv('ECPROOFS_STORE_LOG_LEVEL', 'INFO').upper()
+_ecproofs_store_logger = sphinx_logging.getLogger('ecproofs.store')
+_ecproofs_store_logger.setLevel(getattr(logging, _ecproofs_store_level, logging.INFO))
+
+_ecproofs_cache_level = os.getenv('ECPROOFS_CACHE_LOG_LEVEL', 'INFO').upper()
+_ecproofs_cache_logger = sphinx_logging.getLogger('ecproofs.cache')
+_ecproofs_cache_logger.setLevel(getattr(logging, _ecproofs_cache_level, logging.INFO))
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
