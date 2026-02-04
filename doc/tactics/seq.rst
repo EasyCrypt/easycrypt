@@ -73,7 +73,7 @@ Variant: Probabilistic relation Hoare logic (two-sided)
    ``seq {codepos} {codepos} : {formula}``
 
 Here, the first ``{codepos}`` specifies where to split the left-hand
-program, and the second {codepos} specifies where to split the right-hand
+program, and the second ``{codepos}`` specifies where to split the right-hand
 program. The formula ``{formula}`` is the intermediate *relational* assertion
 that must hold between the two memories after execution of the first parts.
 
