@@ -142,9 +142,13 @@ let unify_core (env : EcEnv.env) (uf : UF.t) pb =
                 Queue.push (`TyUni (t1, t1')) pb;
                 Queue.push (`TyUni (t2, t2')) pb
 
-            | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
-                if List.length lt1 <> List.length lt2 then failure ();
-                List.iter2 (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb) lt1 lt2
+            | Tconstr (p1, ta1), Tconstr (p2, ta2) when EcPath.p_equal p1 p2 ->
+                if List.all2 tindex_equal ta1.indices ta2.indices then
+                  failure (); (* FIXME *)
+                if List.length ta1.types <> List.length ta2.types then failure ();
+                List.iter2
+                  (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb)
+                  ta1.types ta2.types
 
             | Tconstr (p, lt), _ when EcEnv.Ty.defined p env ->
                 Queue.push (`TyUni (EcEnv.Ty.unfold p lt env, t2)) pb

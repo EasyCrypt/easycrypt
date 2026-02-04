@@ -11,9 +11,12 @@ module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t
-type ty_params = ty_param list
-type ty_pctor  = [ `Int of int | `Named of ty_params ]
+type ty_params = {
+  idxvars : EcIdent.t list;
+  tyvars  : EcIdent.t list;
+}
+
+type ty_pctor = [ `Int of int | `Named of ty_params ]
 
 type ty_record =
   EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
@@ -53,16 +56,19 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(params = `Int 0) lc =
-  let params =
+let abs_tydecl ?(params : ty_pctor = `Int 0) (lc : locality) =
+  let params : ty_params =
     match params with
     | `Named params ->
         params
+
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
-        List.map
-          (fun x -> (EcIdent.create x))
-          (EcUid.NameGen.bulk ~fmt n)
+        let tyvars =
+          List.map
+            (fun x -> EcIdent.create x)
+            (EcUid.NameGen.bulk ~fmt n)
+        in { tyvars; idxvars = []; }
   in
 
   { tyd_params = params; tyd_type = Abstract; tyd_loca = lc; }
@@ -195,15 +201,24 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
-  op_tparams  = tparams;
-  op_ty       = ty;
-  op_kind     = kind;
-  op_loca     = lc;
-  op_opaque   = opaque;
-  op_clinline = clinline;
-  op_unfold   = unfold;
-}
+let gen_op
+  ?(clinline  : bool = false)
+  ?(unfold    : int option)
+  ~(opaque    : opopaque)
+  ~(locality  : locality)
+  ~(typarams  : typarams)
+  ~(idxparams : idxparams)
+  ~(resty     : ty)
+   (kind      : _)
+=
+  { op_params   = tparams
+  ; op_ty       = ty
+  ; op_kind     = kind
+  ; op_loca     = lc
+  ; op_opaque   = opaque
+  ; op_clinline = clinline
+  ; op_unfold   = unfold
+  }
 
 let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let kind = OB_pred body in
@@ -213,9 +228,18 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
 let optransparent : opopaque =
   { smt = false; reduction = false; }
 
-let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
-  let kind = OB_oper body in
-  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+let mk_op
+  ?(clinline  : bool option)
+  ?(unfold    : int option)
+  ~(opaque    : opopaque)
+  ~(locality  : locality)
+  ?(typarams  : typarams)
+  ?(idxparams : idxparams)
+  ~(resty     : ty)
+   (body      : opbody option)
+=
+  gen_op
+    ?clinline ?unfold ~opaque ~locality ?typarams ?idxparams ~resty (OB_oper body)
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -279,7 +303,7 @@ let axiomatized_op
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map EcTypes.tvar axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
+  let op     = f_op path ~tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 

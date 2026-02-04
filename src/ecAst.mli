@@ -27,7 +27,6 @@ type quantif =
 type hoarecmp = FHle | FHeq | FHge
 
 (* -------------------------------------------------------------------- *)
-
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)
   ur_neg : 'a;          (* Cannot use element in this set. *)
@@ -103,7 +102,6 @@ and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 
 (* -------------------------------------------------------------------- *)
-
 and lvalue =
   | LvVar   of (prog_var * ty)
   | LvTuple of (prog_var * ty) list
@@ -419,6 +417,9 @@ val bhs_bd : bdHoareS -> ss_inv
 type 'a equality = 'a -> 'a -> bool
 type 'a hash = 'a -> int
 type 'a fv   = 'a -> int EcIdent.Mid.t
+
+val tindex_equal : tindex equality
+val targs_equal  : targs  equality
 
 val ty_equal : ty equality
 val ty_hash  : ty hash

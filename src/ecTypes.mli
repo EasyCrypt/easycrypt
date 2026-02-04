@@ -19,7 +19,7 @@ type tindex  = EcAst.tindex
 type targs   = EcAst.targs
 
 (* -------------------------------------------------------------------- *)
-val mk_targs : ?indices:tindex list -> ?tyargs:ty list -> unit -> targs
+val mk_targs : ?indices:tindex list -> ?types:ty list -> unit -> targs
 
 (* -------------------------------------------------------------------- *)
 module Mty : Map.S with type key = ty
@@ -36,7 +36,7 @@ val ty_hash  : ty -> int
 val tuni      : EcUid.uid -> ty
 val tvar      : EcIdent.t -> ty
 val ttuple    : ty list -> ty
-val tconstr   : EcPath.path -> ?indices:tindex list -> ?tyargs:ty list -> ty
+val tconstr   : ?indices:tindex list -> ?tyargs:ty list -> EcPath.path -> ty
 val tconstr_r : EcPath.path -> targs -> ty
 val tfun      : ty -> ty -> ty
 val tglob     : EcIdent.t -> ty

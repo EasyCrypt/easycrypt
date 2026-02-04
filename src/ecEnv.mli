@@ -316,7 +316,7 @@ module Op : sig
   val bind : ?import:bool -> symbol -> operator -> env -> env
 
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
-  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
+  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> targs -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
@@ -350,7 +350,7 @@ module Ty : sig
   val bind : ?import:bool -> symbol -> t -> env -> env
 
   val defined : path -> env -> bool
-  val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
+  val unfold  : path -> targs -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
   val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
 

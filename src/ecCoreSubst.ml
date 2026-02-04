@@ -182,7 +182,7 @@ let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
 
 (* -------------------------------------------------------------------- *)
-let tindex_subst (s : f_subst) (ti : tindex) =
+let tindex_subst (_ : f_subst) (ti : tindex) =
   ti (* FIXME *)
 
 (* -------------------------------------------------------------------- *)

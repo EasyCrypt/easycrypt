@@ -237,13 +237,13 @@ val destr_forall1  : form -> ident * gty * form
 val destr_exists1  : form -> ident * gty * form
 val destr_lambda1  : form -> ident * gty * form
 
-val destr_op        : form -> EcPath.path * ty list
+val destr_op        : form -> EcPath.path * targs
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
-val destr_op_app    : form -> (EcPath.path * ty list) * form list
+val destr_op_app    : form -> (EcPath.path * targs) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form
