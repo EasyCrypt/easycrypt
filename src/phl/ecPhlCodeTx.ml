@@ -295,7 +295,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
       if not (List.for_all is_const_expression es) then
         tc_error pf "right-values are not closed expressions";
 
-      if not (List.for_all (is_loc |- fst) lv) then
+      if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
       let subst =

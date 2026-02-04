@@ -278,7 +278,7 @@ let (_i_inuse, s_inuse, se_inuse) =
 
     | Smatch (e, bs) ->
       let map = se_inuse map e in
-      let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
+      let map = List.fold_left (fun map -> s_inuse map -| snd) map bs in
         map
 
     | Sassert e ->
@@ -1056,7 +1056,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
         (LTuple (List.combine xs subtys), ttuple subtys)
 
   | LPRecord fields ->
-      let xs = List.map (unloc |- snd) fields in
+      let xs = List.map (unloc -| snd) fields in
       if not (List.is_unique xs) then
         tyerror p.pl_loc env NonLinearPattern;
 
@@ -1077,7 +1077,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
         in
           List.map for1 fields in
 
-      let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+      let recp = Sp.of_list (List.map (fst -| proj3_1) fields) in
       let recp =
         match Sp.elements recp with
         | []        -> assert false
@@ -1217,7 +1217,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     in
       List.map for1 fields in
 
-  let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+  let recp = Sp.of_list (List.map (fst -| proj3_1) fields) in
   let recp =
     match Sp.elements recp with
     | []        -> assert false
@@ -1334,7 +1334,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
       unify_or_fail env ue loc ~expct:pty gindty;
 
       let create o = EcIdent.create (omap_dfl unloc "_" o) in
-      let pvars = List.map (create |- unloc) cargs in
+      let pvars = List.map (create -| unloc) cargs in
       let pvars = List.combine pvars ctorty in
 
       (ctorsym, (pvars, body))
@@ -2292,7 +2292,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
 (* Module parameters must have been added to the environment            *)
 and get_oi_calls env (params, items) =
   let mparams =
-    let mparams = List.map (mident |- fst) params in
+    let mparams = List.map (mident -| fst) params in
     Sm.of_list mparams in
 
   let comp_oi oi it = match it with
@@ -2458,7 +2458,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
     [], [transstruct1_alias env name f]
 
   | Pst_import ms ->
-    (List.map (fst |- trans_msymbol env) ms), []
+    (List.map (fst -| trans_msymbol env) ms), []
 
   | Pst_include (m, imp, procs) -> begin
     let (mo, ms) = trans_msymbol env m in
@@ -2969,7 +2969,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
               | PFMatchBuild (deep, xs, ptg, ppt) ->
                   let f    = f_ands (flatten deep f) in
-                  let xs   = List.map (EcIdent.create |- unloc) xs in
+                  let xs   = List.map (EcIdent.create -| unloc) xs in
                   let xst  = List.map (fun x -> (x, tbool)) xs in
                   let lenv = EcEnv.Var.bind_locals xst env in
                   let tg   = trans_prop lenv ue ptg in
@@ -3160,7 +3160,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           | None    -> x
           | Some qs ->
               let (nm, name) = x.pl_desc in
-              { x with pl_desc = ((List.map (unloc |- fst) qs)@nm, name) }
+              { x with pl_desc = ((List.map (unloc -| fst) qs)@nm, name) }
         in
 
          let do1 = function

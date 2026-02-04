@@ -285,7 +285,7 @@
     List.iter (curry (Hashtbl.add table)) _operators; table
 
   let opre =
-    let ops = List.map fst (List.filter (snd |- snd) _operators) in
+    let ops = List.map fst (List.filter (snd -| snd) _operators) in
     let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
     let ops = String.join "|" (List.map EcRegexp.quote ops) in
     let ops = Printf.sprintf "(%s)" ops in

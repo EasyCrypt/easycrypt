@@ -65,7 +65,7 @@ let check_dslc pf =
        List.iter doit_s [c1; c2]
 
     | Smatch (_, bs) ->
-       List.iter (doit_s |- snd) bs
+       List.iter (doit_s -| snd) bs
 
     | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
        error ()
