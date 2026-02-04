@@ -8,7 +8,9 @@ import os
 import pathlib
 import sys
 
+from docutils.parsers.rst import roles
 from sphinx.util import logging as sphinx_logging
+from sphinx.roles import code_role
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -32,6 +34,7 @@ extensions = [
 ]
 
 highlight_language = 'easycrypt'
+default_role = 'easycrypt'
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
@@ -56,3 +59,16 @@ _ecproofs_cache_logger.setLevel(getattr(logging, _ecproofs_cache_level, logging.
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+html_css_files = [
+  'easycrypt.css',
+]
+
+# -- EasyCrypt role ----------------------------------------------------------
+def _easycrypt_role(name, rawtext, text, lineno, inliner, options=None, content=()):
+  options = {} if options is None else options.copy()
+  options['language'] = 'easycrypt'
+  return code_role(name, rawtext, text, lineno, inliner, options, content)
+
+# -- Setup app ---------------------------------------------------------------
+def setup(app):
+  app.add_role('easycrypt', _easycrypt_role)
