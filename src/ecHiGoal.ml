@@ -758,14 +758,14 @@ let process_rewrite1_r ttenv ?target ri tc =
         match simpl with
         | Some logic ->
            let hyps   = FApi.tc1_hyps tc in
-           let target = target |> omap (fst -| LDecl.hyp_by_name^~ hyps -| unloc) in
+           let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
            t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
-      let target = target |> omap (fst -| LDecl.hyp_by_name^~ hyps -| unloc) in
+      let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
       t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
   | RWDelta ((s, r, o, px), p) -> begin
@@ -782,7 +782,7 @@ let process_rewrite1_r ttenv ?target ri tc =
   | RWRw (((s : rwside), r, o, p), pts) -> begin
       let do1 (mode : [`Full | `Light]) ((subs : rwside), pt) tc =
         let hyps   = FApi.tc1_hyps tc in
-        let target = target |> omap (fst -| LDecl.hyp_by_name^~ hyps -| unloc) in
+        let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
         let hyps   = FApi.tc1_hyps ?target tc in
 
         let ptenv, prw =
