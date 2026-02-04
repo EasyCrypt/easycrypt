@@ -543,10 +543,10 @@ type call_info =
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
-type p_app_xt_info =
-  | PAppNone
-  | PAppSingle of pformula
-  | PAppMult   of (pformula option) tuple5
+type p_seq_xt_info =
+  | PSeqNone
+  | PSeqSingle of pformula
+  | PSeqMult   of (pformula option) tuple5
 
 type ('a, 'b, 'c) rnd_tac_info =
   | PNoRndParams
@@ -558,8 +558,6 @@ type rnd_tac_info_f =
   (pformula, pformula option, pformula) rnd_tac_info
 
 type psemrndpos = (bool * pcodepos1) doption
-
-type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath * pformula) list
 
@@ -618,8 +616,8 @@ type fun_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type app_info =
-  oside * tac_dir * pcodepos1 doption * pformula doption * p_app_xt_info
+type seq_info =
+  oside * pcodepos1 doption * pformula doption * p_seq_xt_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
@@ -726,7 +724,7 @@ type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
-  | Papp           of app_info
+  | Pseq           of seq_info
   | Pwp            of pdocodepos1
   | Psp            of pdocodepos1
   | Pwhile         of (oside * while_info)

@@ -261,8 +261,6 @@
     ("+"   , (PLUS             , false));
     ("-"   , (MINUS            , false));
     ("*"   , (STAR             , false));
-    ("<<"  , (BACKS            , false));
-    (">>"  , (FWDS             , false));
     ("<:"  , (LTCOLON          , false));
     ("==>" , (LONGARROW        , false));
     ("="   , (EQ               , false));
