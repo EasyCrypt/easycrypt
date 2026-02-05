@@ -283,7 +283,6 @@ module LospecsBack : CBackend = struct
       raise GetOutOfRange
 
   let permute (w: int) (perm: int -> int) (r: reg) : reg =
-    if debug then Format.eprintf "Applying permutation to reg of size %d with block size of %d@." (size_of_reg r) w;
     Array.init (size_of_reg r) (fun i ->
       let block_idx, bit_idx = perm (i / w), (i mod w) in
       if block_idx < 0 then None 
@@ -520,6 +519,7 @@ module type CircuitInterface = sig
     val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit (* FIXME: rename or redo *)
 
     val set_logger : state -> (string -> unit) -> state
+    val log : state -> string -> unit
   end
 
   module BVOps : sig
@@ -602,8 +602,8 @@ module type CircuitInterface = sig
   val circuit_slice : size:int -> circuit -> int -> circuit
   val circuit_slice_insert : circuit -> int -> circuit -> circuit 
   val fillet_circuit : circuit -> circuit list
-  val fillet_tauts : circuit list -> circuit list -> bool
-  val batch_checks : ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
+  val fillet_tauts : ?logger:(string -> unit) -> circuit list -> circuit list -> bool
+  val batch_checks : ?logger:(string -> unit) -> ?sort:bool -> ?mode:[`ByEq | `BySub ] -> circuit list -> circuit list
 
   (* Wraps the backend call to deal with args/inputs *) 
   val circuit_to_file : name:string -> circuit -> symbol
@@ -802,7 +802,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     (* Circuit lambdas, for managing inputs *)
     let open_circ_lambda (st: state) (bnds: (ident  * ctype) list) : state = 
       let inps, cs = List.map (fun (id, t) -> 
-        if debug then Format.eprintf "Opening circuit lambda for ident: (%s, %d)@." (name id) (tag id);
+        st.logger @@ Format.asprintf "Opening circuit lambda for ident: (%s, %d)@." (name id) (tag id);
         let inp, c = cinput_of_type (`Idn id) t
         in inp, (id, c)) bnds |> List.split in
       {st with
@@ -833,6 +833,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
     let set_logger (st: state) (logger: string -> unit) : state = 
       { st with logger; } 
+
+    let log (st: state) (s: string) : unit = 
+      st.logger s
   end
 
   (* Inputs helper functions *)
@@ -1157,7 +1160,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     else false
     
   let circ_sat ((c, inps): circuit) : bool =
-    if debug then Format.eprintf "Calling circ_sat on circuit: %a@." pp_circuit (c, inps);
     let c = match c with 
     | {type_ = CBool; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
@@ -1172,7 +1174,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     Backend.sat ~inps c 
     
   let circ_taut ((c, inps): circuit) : bool = 
-    if debug then Format.eprintf "Calling circ_taut on circuit: %a@." pp_circuit (c, inps);
     let c = match c with 
     | {type_ = CBool; reg} -> Backend.node_of_reg reg
     | _ -> lowcircerror CircSmtNonBoolCirc
@@ -1292,7 +1293,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         Does not affect current examples => MLKEM
 *)
   (* Batches circuit checks by dependencies. Assumes equivalent checks are contiguous *)
-  let batch_checks ?(sort = true) ?(mode : [`ByEq | `BySub] = `ByEq) (checks: circuit list) : circuit list =
+  let batch_checks 
+    ?(logger : (string -> unit) option) 
+    ?(sort = true) 
+    ?(mode : [`ByEq | `BySub] = `ByEq) 
+     (checks: circuit list) 
+    : circuit list 
+  =
     (* Order by dependencies *)
     let checks = if sort then begin 
 
@@ -1323,9 +1330,13 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       match cs with 
       | [] -> (cur::acc)
       | (c, d')::cs -> 
-        if debug && false then Format.eprintf "Comparing deps:@.%a@.To deps:@.%a@."
-        Backend.Deps.pp_dep d 
-        Backend.Deps.pp_dep d';
+(*
+        FIXME: do we keep this? also add log levels *)
+        Option.may (fun f -> f @@ 
+          Format.asprintf "Comparing deps:@.%a@.To deps:@.%a@."
+          Backend.Deps.pp_dep d 
+          Backend.Deps.pp_dep d') 
+        logger;
         begin match mode with
           | `ByEq when Backend.Deps.deps_equal d d' -> 
             doit acc ((circuit_and cur c), d) cs
@@ -1334,7 +1345,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           | `BySub when Backend.Deps.(dep_contained d' d) ->
             doit acc ((circuit_and cur c), d) cs
           | _ ->
-            Format.eprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d;
+            Option.may (fun f -> f @@ Format.asprintf "Consolidated lane deps: %a@." Backend.Deps.pp_dep d) logger;
             doit (cur::acc) (c, d') cs
         end
     in
@@ -1413,7 +1424,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 
 
     (* Review later? *)
-  let collapse_lanes (lanes: circuit list) =
+  let collapse_lanes ?(logger : (string -> unit) option) (lanes: circuit list) =
     (* Circuit structural equality after renaming *)
     let (===) (c1: circ) (c2: circ) : bool = 
       let n', _ = Backend.node_of_reg c1.reg |> Backend.Deps.excise_bit in
@@ -1441,7 +1452,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
           doit (collapse [] c cs)
         else
           if (List.length (cs) + 1) mod idx != 0 then
-            (Format.eprintf "Cannot correctly infer lanes, defaulting to bruteforce checking@.";
+            (Option.may (fun f -> f "Cannot correctly infer lanes, defaulting to bruteforce checking@.") logger;
             (c::cs))
           else
             let cs = List.chunkify idx (c::cs) |> List.map (List.reduce circuit_and) in
@@ -1460,7 +1471,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
    *)
   (* FIXME: current lane collapse is always quadratic, add toggle option? 
                                                         or remove arg     *)
-  let fillet_tauts (pres: circuit list) (posts: circuit list) : bool =
+  let fillet_tauts ?(logger: (string -> unit) option) (pres: circuit list) (posts: circuit list) : bool =
     (* Assumes everything is single bit outputs. FIXME: does it? *)
     let posts = List.filter_map (fun ((postc, _) as post) -> 
       if Backend.nodes_eq (Backend.node_of_reg postc.reg) Backend.true_ then None
@@ -1476,18 +1487,18 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let pres = List.map (fun ((c, _) as circ) -> circ,
         Backend.Deps.dep_of_node (Backend.node_of_reg c.reg)) pres in
       let posts = List.map (attach_compatible_pres ~mode:`Int pres) posts in
-      let posts = collapse_lanes posts in
+      let posts = collapse_lanes ?logger posts in
 
-      if debug then Format.eprintf "%d conditions to check after structural equality collapse@." (List.length posts);
+      Option.may (fun f -> f @@ Format.asprintf "%d conditions to check after structural equality collapse@." (List.length posts)) logger;
 
       List.mapi (fun i post -> 
-        if debug then Format.eprintf "Checking equivalence for bit %d@." i; (* FIXME *)
+        Option.may (fun f -> f @@ Format.asprintf "Checking equivalence for bit %d@." i) logger;
 
 (*         let res = fillet_taut pres post in  *)
         let post = sublimate_inputs post in
         let res = circ_taut post in
-        if not res then Format.eprintf "Failed for bit %d@." i;
-
+        if not res then 
+          Option.may (fun f -> f @@ Format.asprintf "Failed for bit %d@." i) logger;
         res) posts |>
       List.for_all identity
    
@@ -1892,7 +1903,6 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =
         let circs, inps = List.split circs in
         let dif = len - List.length circs in assert (dif >= 0);
-  (*       if debug then Format.eprintf "Len, Dif in array_oflist: %d, %d@." len dif; *)
         let circs = circs @ (List.init dif (fun _ -> fst dfl)) in
         let inps = if dif > 0 then inps @ [snd dfl] else inps in
         let circs = List.map 

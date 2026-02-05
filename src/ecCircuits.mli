@@ -13,10 +13,13 @@ module Map = Batteries.Map
 (* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
   | `Convert of form
+  | `Op of path
   | `ToArg of form
   | `ExpandIter of form * form list
   | `Instr of instr
+  | `Memenv of memenv
 ]
+
 
 type circuit_error =
 | MissingTyBinding of [`Ty of ty | `Path of path]

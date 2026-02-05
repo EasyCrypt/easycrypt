@@ -159,9 +159,11 @@ end
 (* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
   | `Convert of form
+  | `Op of path
   | `ToArg of form
   | `ExpandIter of form * form list
   | `Instr of instr
+  | `Memenv of memenv
 ]
 
 type circuit_error =
@@ -257,8 +259,10 @@ let rec pp_circ_error ppe fmt (err: circuit_error) =
     begin match call with
     | `Convert f -> Format.fprintf fmt "conversion of form %a" (pp_form ppe) f
     | `ToArg f -> Format.fprintf fmt "conversion to arg of form %a" (pp_form ppe) f
-    | `ExpandIter (f, args) -> Format.eprintf "expansion of iter %a(%a)" (pp_form ppe) f (pp_list ", " (pp_form ppe)) args
-    | `Instr inst -> Format.eprintf "processing of instruction %a" (pp_instr ppe) inst
+    | `ExpandIter (f, args) -> Format.fprintf fmt "expansion of iter %a(%a)" (pp_form ppe) f (pp_list ", " (pp_form ppe)) args
+    | `Instr inst -> Format.fprintf fmt "processing of instruction %a" (pp_instr ppe) inst
+    | `Op pth -> Format.fprintf fmt "translating operator at path %a" pp_path pth
+    | `Memenv (m, mt) -> Format.fprintf fmt "entering memory %a : %a" (pp_mem ppe) m (pp_memtype ppe) mt
     end
     
 
@@ -649,7 +653,7 @@ let circuit_of_form
           type_has_bindings env t ->
           let cs = List.map (fun f -> doit st f) (form_list_of_form ~env f) in
           arg_of_circuits cs
-      | _ -> Format.eprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form ppe) f; 
+      | _ -> EcLowCircuits.log st @@ Format.asprintf "Failed to convert form to arg: %a@." EcPrinting.(pp_form ppe) f; 
         circ_error (BadFormForArg f)
     with CircError e ->
       propagate_circ_error (`ToArg f) e
@@ -684,7 +688,7 @@ let circuit_of_form
         let circ = try 
           circuit_of_op env pth 
         with 
-        | CircError le -> Format.eprintf "(%s ->)" (EcPath.tostring pth); raise (CircError le)
+        | CircError err -> propagate_circ_error (`Op pth) err
         in
         op_cache := Mp.add pth circ !op_cache;
         circ 
@@ -769,10 +773,7 @@ let circuit_of_form
       circ
     end
     (* FIXME: Redo call chain on error *)
-    (* with CircError le -> 
-      let err = lazy (Format.asprintf "Call %a\n%s" EcPrinting.(pp_form ppe) f (Lazy.force le)) in
-      raise (CircError err) *)
-      with e -> raise e
+      with CircError err -> propagate_circ_error (`Convert f_) err
     end
       
     | Fquant (qnt, binds, f) -> 
@@ -1084,7 +1085,7 @@ let state_get = state_get_pv
 let state_get_opt = state_get_pv_opt
 let state_get_all = fun st -> state_get_all_pv st |> List.snd
 
-let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
+let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt) as me: memenv) : state =
   match mt with
   | (Lmt_concrete Some {lmt_decl=decls}) ->
       let bnds = List.map (fun {ov_name; ov_type} ->
@@ -1092,11 +1093,7 @@ let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt): memenv) : state =
         | Some v -> 
           begin try
             Some ((m, v), ctype_of_ty env ov_type)
-          with e ->
-            raise e (* FIXME *)
-            (* (CircError (lazy ( 
-              (Format.asprintf "Failed for decl for var %s@." v) ^ Lazy.force err
-            ))) *)
+          with CircError err -> propagate_circ_error (`Memenv me) err
           end
         | None -> None
       ) decls in

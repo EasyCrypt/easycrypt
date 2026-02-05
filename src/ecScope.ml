@@ -3140,8 +3140,7 @@ module Circuit = struct
           EcTheory.mkitem ~import:true
           (EcTheory.Th_crbinding (item, local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
-  | circs -> Format.eprintf "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ); assert false 
-    (* FIXME *)
+  | circs -> hierror "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ)
 
   let register_spec_files (scope : scope) (files : string list) : scope =
     let sc = { scope with sc_specs = files } in
