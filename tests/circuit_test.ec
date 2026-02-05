@@ -28,7 +28,8 @@ realize tosintP by admit.
 realize ofintP by admit.
 realize size_tolist by admit.
 
-
+op zero : W = of_int 0.
+op one  : W = of_int 1.
 
 op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.
@@ -69,6 +70,8 @@ module M = {
 
 op "_.[_]" : W8 -> int -> bool.
 
+op non_translate : W8 -> W8.
+
 bind op [W8 & bool] "_.[_]" "get".
 realize le_size by auto.
 realize eq1_size by auto.
@@ -84,15 +87,29 @@ qed.
 lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-(* extens [a] : (wp; skip; smt()). *)
-(* FIXME : while debugging fhash *) admit.
+extens [a] : (wp; skip; smt()). 
+(* FIXME : while debugging fhash  admit. *)
 qed.
 
 
 lemma W8_xor_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-(* circuit simplify; trivial. *) admit.
+circuit simplify. trivial. (* admit. *)
+qed.
+
+
+
+lemma W8_xor_fail_equiv (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ zero].
+proof.
+proc.
+circuit. (* Fails *)
+qed.
+
+lemma W8_xor_fail_translate (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ non_translate zero].
+proof.
+proc.
+circuit. (* Fails *)
 qed.
 
 
