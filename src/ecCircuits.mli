@@ -77,7 +77,7 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?st:state -> hyps -> form -> circuit
+val circuit_of_form : state -> hyps -> form -> circuit
 val circuit_simplify_equality : ?do_time:bool -> st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
 val circ_simplify_form_bitstring_equality :
   ?st:state ->
@@ -85,9 +85,8 @@ val circ_simplify_form_bitstring_equality :
  
 (* Proc processors *)
 val state_of_prog : ?close:bool -> hyps -> memory -> ?st:state -> instr list -> state 
-val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
+val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> state -> instr list -> instr list -> bool
 val process_instr : hyps -> memory -> st:state -> instr -> state
-(* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
 val circuit_state_of_memenv : st:state -> env -> memenv -> state
 val circuit_state_of_hyps : ?strict:bool -> ?use_mem:bool -> ?st:state -> hyps -> state 

@@ -242,7 +242,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
 
             let lv = lv_to_ty_list lv in
 
-            let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
+            let tosubst, asgn2 = List.partition (fun ((pv, _), _) ->
               Mpv.mem env pv subst0
             ) (List.combine lv es) in
 

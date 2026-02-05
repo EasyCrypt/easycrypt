@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcUtils
 open EcAst
 open EcCoreGoal
 open EcEnv
@@ -176,9 +175,9 @@ let rec pvtail (env: env) (pvs : EcPV.PV.t) (zp : Zpr.ipath) =
       match zp with
       | Zpr.ZTop -> None
       | Zpr.ZWhile (_, p) -> Some p
-      | Zpr.ZIfThen (e, p, _) -> Some p
-      | Zpr.ZIfElse (e, _, p) -> Some p
-      | Zpr.ZMatch (e, p, _) -> Some p in
+      | Zpr.ZIfThen (_, p, _) -> Some p
+      | Zpr.ZIfElse (_, _, p) -> Some p
+      | Zpr.ZMatch (_, p, _) -> Some p in
     match parent with
     | None -> pvs
     | Some ((_, tl), p) -> pvtail env (EcPV.PV.union pvs (EcPV.is_read env tl)) p
@@ -187,17 +186,17 @@ let rec pvtail (env: env) (pvs : EcPV.PV.t) (zp : Zpr.ipath) =
 let t_change_stmt
   (side : side option)
   (pos : EcMatching.Position.codepos_range) 
-  ((me, bindings) : memenv * ovariable list)
+  ((me, _bindings) : memenv * ovariable list) (* FIXME: might not be needed, check before merge *)
   (s : stmt)
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
   let goal = (FApi.tc1_goal tc) in
   let post = match goal.f_node with
-  | FhoareS { hs_po } -> hs_po
-  | FbdHoareS { bhs_po } -> bhs_po
-  | FeHoareS { ehs_po } -> ehs_po
-  | FequivS { es_po } -> es_po
+  | FhoareS hs -> (hs_po hs).inv
+  | FbdHoareS bhs -> (bhs_po bhs).inv
+  | FeHoareS ehs -> (ehs_po ehs).inv
+  | FequivS es -> (es_po es).inv
   | _ -> assert false
   in
   let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 

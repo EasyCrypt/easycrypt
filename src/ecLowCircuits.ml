@@ -28,7 +28,7 @@ module Hashtbl = Batteries.Hashtbl
 module Set = Batteries.Set
 module Option = Batteries.Option
 
-let debug : bool = true
+let debug : bool = false
 
 (* Backend implementing minimal functions needed for the translation *)
 (* Minimal expected functionality is QF_ABV *)
@@ -518,9 +518,12 @@ module type CircuitInterface = sig
     val open_circ_lambda_pv  : state -> ((memory * symbol) * ctype) list -> state
     val close_circ_lambda : state -> state 
     val circ_lambda_oneshot : state -> (ident * ctype) list -> (state -> circuit) -> circuit (* FIXME: rename or redo *)
+
+    val set_logger : state -> (string -> unit) -> state
   end
 
   module BVOps : sig
+    val bvget : circuit -> int -> circuit 
     val circuit_of_bvop : EcDecl.crb_bvoperator -> circuit  
     val circuit_of_parametric_bvop : EcDecl.crb_bvoperator -> arg list -> circuit
   end
@@ -638,9 +641,8 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     | ASliceTy of ctype
     | SliceSet of { slice_size: int; bitstring_size: int; offset: int }
     | AGet of { container_size: int; index: int }
-    | Get of { bitstring_size: int; index: int }
     | ASet of { container_size: int; index: int }
-    | Set of { bitstring_size: int; index: int }
+    | Get of { bitstring_size: int; index: int }
     | And 
     | Or
     | Ite   
@@ -740,12 +742,14 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       circs    : circuit Mid.t;
       lambdas  : cinp list list; (* actually a stack *)
       pv_ids   : (ident * symbol, ident) Map.t; (* can be changed to int Msym.t if needed *)
+      logger   : string -> unit;
     }
 
     let empty_state : state = {
       circs = Mid.empty;
       lambdas = [];
       pv_ids = Map.empty; (* can be changed to int Msym.t if needed *)
+      logger = fun _ -> ();
     }
 
     let update_state_pv (st: state) (m: memory) (s: symbol) (c: circuit) : state = 
@@ -826,6 +830,9 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
       let st' = open_circ_lambda st bnds in
       let (c, inps) = c st' in
       (c, (List.hd st'.lambdas) @ inps)
+
+    let set_logger (st: state) (logger: string -> unit) : state = 
+      { st with logger; } 
   end
 
   (* Inputs helper functions *)
@@ -1574,6 +1581,19 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
 (*     { reg = c; CBitstring c, inps) |> convert_type ret_ty *)
 
     module BVOps = struct
+      let bvget (c: circuit) (i: int) : circuit = 
+        match c with 
+        | {reg; type_ = CBitstring n}, inps when 0 <= i && i < n -> 
+          begin try
+            {reg = Backend.reg_of_node (Backend.get reg i); type_ = CBool}, inps
+          with Backend.GetOutOfRange ->
+            lowcircerror (CircConstructorInvalidArguments (Get {
+              bitstring_size = n;
+              index = i;
+            }))
+          end
+        | _ -> assert false (* programming error *)
+
       let circuit_of_parametric_bvop (op: EcDecl.crb_bvoperator) (args: arg list) : circuit =
       match op with 
       | { kind = `ASliceGet (((_, Some _), (_, Some _)), (_, Some m)) } -> 
@@ -1637,8 +1657,7 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         end
       | { kind = `Get (_, Some _) } -> 
         begin match args with
-        | [ `Circuit ({reg = bs; type_ = CBitstring _}, cinps); `Constant i ] ->
-          {type_ = CBool; reg = Backend.reg_of_node (Backend.get bs (to_int i))}, cinps
+        | [ `Circuit c; `Constant i ] -> bvget c (EcBigInt.to_int i)
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | { kind = `AInit ((_, Some n), (_, Some w_o)) } -> 
@@ -1842,25 +1861,32 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
     end
 
     module ArrayOps = struct
-      let array_get (({reg = c; type_ = CArray {width=w; count=n}}, inps) : circuit) (i: int) : circuit = 
-        try 
-          { type_ = CBitstring w; reg = (Backend.slice c (i*w) w)}, inps  
-        with Backend.BadSlice `Get ->
-          lowcircerror @@ CircConstructorInvalidArguments (AGet {
-            container_size = n;
-            index = i;
-          })
+      let array_get (c: circuit) (i: int) : circuit = 
+        match c with 
+        | ({reg = c; type_ = CArray {width=w; count=n}}, inps) -> 
+          begin try
+            { type_ = CBitstring w; reg = (Backend.slice c (i*w) w)}, inps  
+          with Backend.BadSlice `Get ->
+            lowcircerror @@ CircConstructorInvalidArguments (AGet {
+              container_size = n;
+              index = i;
+            }) end
+        | _ -> assert false (* Programming error *)
 
-      let array_set (({reg = arr; type_ =  CArray {width=w; count=n}}, inps) : circuit) (pos: int) (({reg = bs; type_ = CBitstring w'}, cinps): circuit) : circuit =
-        try
-          assert (w = w');
-          { type_ = CArray {width=w; count=n}; reg = (Backend.insert arr (pos * w) bs)},
-          merge_inputs inps cinps
-        with Backend.BadSlice `Set -> 
-          lowcircerror @@ CircConstructorInvalidArguments (ASet {
-            container_size = n;
-            index = pos;
-          })
+      let array_set (a: circuit) (pos: int) (bs: circuit) : circuit =
+        match a, bs with 
+        | (({reg = arr; type_ =  CArray {width=w; count=n}}, inps) : circuit), (({reg = bs; type_ = CBitstring w'}, cinps): circuit) -> 
+          begin try
+            assert (w = w');
+            { type_ = CArray {width=w; count=n}; reg = (Backend.insert arr (pos * w) bs)},
+            merge_inputs inps cinps
+          with Backend.BadSlice `Set -> 
+            lowcircerror @@ CircConstructorInvalidArguments (ASet {
+              container_size = n;
+              index = pos;
+            })
+          end
+        | _ -> assert false (* Programming error *)
 
     (* FIXME: review this functiono | FIXME: Not axiomatized in QFABV.ec file *)
       let array_oflist (circs : circuit list) (dfl: circuit) (len: int) : circuit =

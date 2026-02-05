@@ -156,7 +156,6 @@ val f_append  : form -> form -> ty -> form
 val f_cons    : form -> form -> ty -> form
 val f_flatten : form -> ty -> form 
 val f_lmap    : form -> form -> ty -> ty -> form
-val f_chunk   : form -> int -> ty -> form
 val f_all     : form -> form -> ty -> form
 
 

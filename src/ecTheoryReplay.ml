@@ -1091,8 +1091,8 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
     let tolist = forpath ba.tolist in
     let oflist = forpath ba.oflist in
     let type_  = match (EcSubst.subst_ty subst (tconstr ba.type_ [tint])).ty_node with (* FIXME: hack *)
-    | Tconstr (p, x::[]) -> p
-    | _ -> assert false; forpath ba.type_
+    | Tconstr (p, _::[]) -> p
+    | _ -> assert false (* FIXME: do we always get a good type here? *)
     in 
     let size   = EcSubst.subst_binding_size ~red subst ba.size in
     let theory = EcSubst.subst_path subst ba.theory in (* FIXME *)

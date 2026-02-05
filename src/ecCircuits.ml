@@ -30,8 +30,6 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
 (* FIXME: should change to a decent direct hash of this + store the forms *)
 (* also move the cache here? *)
 module AInvFHash = struct
-  type t = form
-
   let known_hashes : (int, int) Map.t ref = ref Map.empty
 
   let clean_known : unit -> unit = 
@@ -159,8 +157,6 @@ module AInvFHash = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type width = int
-
 type circuit_conversion_call = [
   | `Convert of form
   | `ToArg of form
@@ -552,7 +548,7 @@ let rec form_list_of_form ?(env: env option) (f: form) : form list =
     h::(form_list_of_form t)
   | _ -> 
     Option.may (fun env -> 
-      EcEnv.notify env EcGState.(`Debug) "Failed to destructure claimed list: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f) env;
+      EcEnv.notify env `Debug "Failed to destructure claimed list: %a@." (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv env)) f) env;
     raise (DestrError "list")
 
 let form_is_iter (f: form) : bool = 
@@ -576,9 +572,9 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
   | Fapp ({f_node = Fop (p, _)}, [rep; fn; base]) when p = EcCoreLib.CI_Int.p_iteri -> 
     let rep = int_of_form hyps rep in
     let is = List.init (BI.to_int rep) BI.of_int in
-    EcEnv.notify env EcGState.(`Debug) "Done generating functions!@.";
+    EcEnv.notify env `Debug "Done generating functions!@.";
     let f = List.fold_left (fun f i -> 
-      EcEnv.notify env EcGState.(`Debug) "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
+      EcEnv.notify env `Debug "Expanding iter... Step #%d@.Form: %a@." (BI.to_int i)
       (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (toenv hyps))) f
       ;
       fn @!! [f_int i; f]
@@ -596,11 +592,11 @@ let expand_iter_form (hyps: hyps) (f: form) : form =
     f
   | _ -> raise (DestrError "iter")
   in
-  EcEnv.notify env EcGState.(`Debug) "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
+  EcEnv.notify env `Debug "Expanded iter form: @.%a@." EcPrinting.(pp_form ppenv) res;
   res
 
 let circuit_of_form 
-  ?(st  : state = empty_state) (* Program variable values *)
+   (st      : state) (* Program variable values *)
    (hyps    : hyps) 
    (f_      : EcAst.form) 
   : circuit =
@@ -676,7 +672,7 @@ let circuit_of_form
     | Fop (pth, _) -> 
       begin
       if pth = EcCoreLib.CI_Witness.p_witness then 
-          (EcEnv.notify env EcGState.(`Debug) "Assigning witness to var of type %a@." 
+          (EcEnv.notify env `Debug "Assigning witness to var of type %a@." 
           EcPrinting.(pp_type ppe) f_.f_ty;
           circuit_uninit env (f_.f_ty))
       else
@@ -820,7 +816,7 @@ let circuit_of_form
       let v = match state_get_pv_opt st mem v with
       | Some v -> v
       | None -> 
-          EcEnv.notify env EcGState.(`Debug) "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv ppe) pv EcPrinting.(pp_type ppe) f_.f_ty; 
+          EcEnv.notify env `Debug "Assigning unassigned program variable %a of type %a@." EcPrinting.(pp_pv ppe) pv EcPrinting.(pp_type ppe) f_.f_ty; 
           circuit_uninit env f_.f_ty (* Allow uninitialized program variables *)
       in
       v
@@ -863,7 +859,7 @@ let circuit_of_form
           fapply_safe fn [f_int (BI.of_int i)]
         ) in
         List.fold_lefti (fun f i fn -> 
-          EcEnv.notify env EcGState.(`Debug) "Translating iteri... Step #%d@." i;
+          EcEnv.notify env `Debug "Translating iteri... Step #%d@." i;
           let fn = doit st fn in
           circuit_compose fn [f]
         ) (doit st base) fs
@@ -891,10 +887,10 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
     t := new_t
   in
 
-  EcEnv.notify env EcGState.(`Debug) "Filletting circuit...@.";
-  let c1 = circuit_of_form ~st hyps f1 |> state_close_circuit st in
+  EcEnv.notify env `Debug "Filletting circuit...@.";
+  let c1 = circuit_of_form st hyps f1 |> state_close_circuit st in
   if do_time then time env tm "Left side circuit generation done";
-  let c2 = circuit_of_form ~st hyps f2 |> state_close_circuit st in
+  let c2 = circuit_of_form st hyps f2 |> state_close_circuit st in
   if do_time then time env tm "Right side circuit generation done";
 
   let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
@@ -903,9 +899,9 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
   let posts = circuit_eqs c1 c2 in
   if do_time then time env tm "Done with postcondition circuit generation";
 
-  EcEnv.notify env EcGState.(`Debug) "Number of checks before batching: %d@." (List.length posts);
+  EcEnv.notify env `Debug "Number of checks before batching: %d@." (List.length posts);
   let posts = batch_checks ~mode:`BySub posts in
-  EcEnv.notify env EcGState.(`Debug) "Number of checks after batching: %d@." (List.length posts);
+  EcEnv.notify env `Debug "Number of checks after batching: %d@." (List.length posts);
   if do_time then time env tm "Done with lane compression";
   if fillet_tauts pres posts then 
     begin
@@ -919,13 +915,13 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
     end
 
 (* FIXME: add support for spec bindings for abstract/opaque operators *)
-let circuit_of_path (hyps: hyps) (p: path) : circuit =
+let circuit_of_path (st: state) (hyps: hyps) (p: path) : circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
   let f = match f.op_kind with
   | OB_oper (Some (OP_Plain f)) -> f
   | _ -> circ_error (MissingOpBody p)
   in
-  circuit_of_form hyps f
+  circuit_of_form st hyps f
 
 let vars_of_memtype (mt : memtype) =
   let Lmt_concrete lmt = mt in
@@ -937,22 +933,22 @@ let vars_of_memtype (mt : memtype) =
   
 
 let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : state =
-(*   EcEnv.notify env EcGState.(`Debug) "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
+(*   EcEnv.notify env `Debug "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
 (*
-      EcEnv.notify env EcGState.(`Debug) "Assigning form %a to var %s@\n" 
+      EcEnv.notify env `Debug "Assigning form %a to var %s@\n" 
         (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
 *)
-      let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
+      let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
       let st = update_state_pv st mem v c in
       st
-      (* EcEnv.notify env EcGState.(`Debug) "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
+      (* EcEnv.notify env `Debug "[W] Took %f seconds@." (Unix.gettimeofday() -. start); *)
     | Sasgn (LvTuple (vs), {e_node = Etuple es; _}) when List.compare_lengths vs es = 0 ->
       let st = List.fold_left (fun st (v, e) ->
-        let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
+        let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
         let st = update_state_pv st mem v c in
         st
       ) st
@@ -963,7 +959,7 @@ let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : state 
         es) in
       st
     | Sasgn (LvTuple (vs), e) ->
-      let tp = ((ss_inv_of_expr mem e).inv |> circuit_of_form ~st hyps) in
+      let tp = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
       let comps = circuits_of_circuit_tuple tp in
       let st = List.fold_left2 (fun st (pv, _ty) c -> 
         let v = match pv with
@@ -985,7 +981,7 @@ let instrs_equiv
    (hyps       : hyps                )
    ((mem, _mt) : memenv              )
   ?(keep       : EcPV.PV.t option    )
-  ?(st         : state = empty_state )
+   (st         : state               )
    (s1         : instr list          )
    (s2         : instr list          ) : bool
 =
@@ -1113,7 +1109,7 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
-    EcEnv.notify env EcGState.(`Debug) "Processing hyp: %s@." (id.id_symb);
+    EcEnv.notify env `Debug "Processing hyp: %s@." (id.id_symb);
     match lk with
 (*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
       They are either given a value by assignment in the program or if they are used 
@@ -1128,12 +1124,12 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
        Check if body is convertible to circuit, if not just process it as uninitialized.
        TODO: Maybe do a first pass on this, check convertibility and remove duplicates? *)
     | EcBaseLogic.LD_var (t, Some f) -> 
-      EcEnv.notify env EcGState.(`Debug) "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
+      EcEnv.notify env `Debug "Assigning %a to %a@." EcPrinting.(pp_form ppe) f EcIdent.pp_ident id;
       begin try
-        update_state st id (circuit_of_form ~st hyps f)
+        update_state st id (circuit_of_form st hyps f)
       (* FIXME PR: Should only catch circuit translation errors, hack *)
       with CircError e ->
-        EcEnv.notify env EcGState.(`Debug) "Failed to translate hypothesis for var %s with error %a, skipping@." (tostring_internal id) (pp_circ_error ppe) e;
+        EcEnv.notify env `Debug "Failed to translate hypothesis for var %s with error %a, skipping@." (tostring_internal id) (pp_circ_error ppe) e;
         try 
           open_circ_lambda st [(id, ctype_of_ty env t)]
         (* FIXME PR: Should only catch circuit translation errors, hack *)
@@ -1160,15 +1156,15 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
       | {f_node=Fapp ({f_node = Fop (p, _); _}, [{f_node = Fpvar (PVloc pv, m); _}; fv])} 
       | {f_node=Fapp ({f_node = Fop (p, _); _}, [fv; {f_node = Fpvar (PVloc pv, m); _}])} when EcFol.op_kind p = Some `Eq ->
         begin try
-          update_state_pv st m pv (circuit_of_form ~st hyps fv)
+          update_state_pv st m pv (circuit_of_form st hyps fv)
         (* FIXME PR: Should only catch circuit translation errors, hack *)
         with CircError e ->
-          EcEnv.notify env EcGState.(`Debug) "Failed to translate hypothesis %s => %a@\nWith error: %a@\nSkipping...@\n" 
+          EcEnv.notify env `Debug "Failed to translate hypothesis %s => %a@\nWith error: %a@\nSkipping...@\n" 
             id.id_symb EcPrinting.(pp_form ppe) f (pp_circ_error ppe) e;
           st
         end
       | _ -> 
-        EcEnv.notify env EcGState.(`Debug) "Hypothesis %s: %a does not match any circuit translation patterns, skipping...@\n"
+        EcEnv.notify env `Debug "Hypothesis %s: %a does not match any circuit translation patterns, skipping...@\n"
           id.id_symb EcPrinting.(pp_form ppe) f;
         st
       end

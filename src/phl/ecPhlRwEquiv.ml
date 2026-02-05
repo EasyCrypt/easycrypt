@@ -2,7 +2,6 @@
 open EcUtils
 open EcLocation
 open EcParsetree
-open EcAst
 open EcFol
 open EcModules
 open EcPath
