@@ -141,14 +141,14 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
           isempty_1 [ tyinst ty ]
 
       | Record (_, fields) ->
-          isempty_1 (List.map (tyinst |- snd) fields)
+          isempty_1 (List.map (tyinst -| snd) fields)
 
       | Datatype dt ->
           (* FIXME: Inspecting all constructors recursively causes
              non-termination in some cases. One can have the same
              limitation as is done for positivity in order to limit this
              unfolding to well-behaved cases. *)
-          isempty_n (List.map (List.map tyinst |- snd) dt.tydt_ctors)
+          isempty_n (List.map (List.map tyinst -| snd) dt.tydt_ctors)
 
     in
 
@@ -327,7 +327,7 @@ let trans_matchfix
 
               let create o =
                 EcIdent.create (omap_dfl unloc "_" o) in
-              let pvars = List.map (create |- unloc) cargs in
+              let pvars = List.map (create -| unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
               (pb, (indp, ind, (ctorsym, ctoridx)), pvars, xpos)

@@ -1759,7 +1759,7 @@ operator:
 
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
-      mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
+      mk_loc (b |> omap (loc -| fst) |> odfl gloc) PTunivar) in
 
     { po_kind     = k;
       po_name     = List.hd x;
@@ -1767,7 +1767,7 @@ operator:
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
       po_args     = odfl ([], None) args;
-      po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
+      po_def      = opdef_of_opbody sty (omap (unloc -| fst) b);
       po_ax       = obind snd b;
       po_locality = locality; } }
 

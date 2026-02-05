@@ -1663,7 +1663,7 @@ and try_pp_chained_orderings
     match match_pp_notations ~filter:(fun (p, _) -> is_ordering_op p) ppe f with
     | Some ((op, (tvi, _)), ue, ev, ov, [i1; i2]) -> begin
       let ti  = Tvar.subst ov in
-      let tvi = List.map (ti |- tvar) tvi in
+      let tvi = List.map (ti -| tvar) tvi in
       let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       let i1  = Fsubst.f_subst sb i1 in
       let i2  = Fsubst.f_subst sb i2 in
@@ -1802,8 +1802,8 @@ and try_pp_notations
   | Some ((p, (tv, nt)), ue, ev, ov, eargs) ->
     let ti   = Tvar.subst ov in
     let rty  = ti nt.ont_resty in
-    let tv   = List.map (ti |- tvar) tv in
-    let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
+    let tv   = List.map (ti -| tvar) tv in
+    let args = List.map (curry f_local -| snd_map ti) nt.ont_args in
     let f    = f_op p tv (toarrow tv rty) in
     let f    = f_app f args rty in
     let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in

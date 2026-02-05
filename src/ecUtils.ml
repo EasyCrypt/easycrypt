@@ -57,7 +57,7 @@ let predT (_ : 'a) = true
 let (^~) f = fun x y -> f y x
 
 let (-|) f g = fun x -> f (g x)
-let (|-) g f = fun x -> g (f x)
+let (|-) g f = fun x -> f (g x)
 
 let (|>) x f = f x
 let (<|) f x = f x

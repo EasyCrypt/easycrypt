@@ -1370,7 +1370,7 @@ module Op = struct
           | OB_oper (Some (OP_Plain bd)) ->
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
-                let nargs = List.sum (List.map (List.length |- fst) args) in
+                let nargs = List.sum (List.map (List.length -| fst) args) in
                   EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = { reduction = true; smt = false; }} in
               let scope = bind scope (unloc op.po_name, tyop) in
