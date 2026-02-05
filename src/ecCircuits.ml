@@ -709,7 +709,7 @@ let circuit_of_form
         op_cache := Mp.add pth circ !op_cache;
         circ
     end
-    | Fapp (f, fs) -> begin try
+    | Fapp (f, fs) -> 
     begin match Map.find_opt (fhash f_) !cache with (* TODO: Maybe add cache statistics? *)
     | Some circ -> circ
     | None -> let circ =  
@@ -771,9 +771,6 @@ let circuit_of_form
     in
       cache := Map.add (fhash f_) circ !cache;
       circ
-    end
-    (* FIXME: Redo call chain on error *)
-      with CircError err -> propagate_circ_error (`Convert f_) err
     end
       
     | Fquant (qnt, binds, f) -> 
