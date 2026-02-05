@@ -3163,6 +3163,9 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
+| HOARE SPLIT
+    { Phoaresplit }
+
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
