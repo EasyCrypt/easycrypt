@@ -44,22 +44,66 @@
   ,
 
   { "name"       : "xmss-acai"
-  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
-  , "branch"     : "master"
-  , "subdir"     : "."
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
   , "config"     : "config/tests.config"
-  , "scenario"   : "xmss-acai"
+  , "scenario"   : "acai"
   , "options"    : ""
   }
 
   ,
 
   { "name"       : "xmss-fsai"
-  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
-  , "branch"     : "master"
-  , "subdir"     : "."
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
   , "config"     : "config/tests.config"
-  , "scenario"   : "xmss-fsai"
+  , "scenario"   : "fsai"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-common-spec"
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
+  , "config"     : "config/tests.config"
+  , "scenario"   : "common-spec"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-spec"
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-spec"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmssmt-spec"
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
+  , "config"     : "config/tests.config"
+  , "scenario"   : "xmss-mt-spec"
+  , "options"    : ""
+  }
+
+  ,
+
+  { "name"       : "xmss-spec-extra"
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
+  , "config"     : "config/tests.config"
+  , "scenario"   : "spec-extra"
   , "options"    : ""
   }
 
