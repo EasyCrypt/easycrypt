@@ -773,7 +773,7 @@ type phltactic =
   | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pchangestmt    of side option * pcodepos_range * pstmt
-
+  | Phoaresplit
 
     (* Eager *)
   | Peager_seq       of (pcodepos1 pair * pstmt * pformula doption)
