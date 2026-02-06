@@ -118,7 +118,7 @@ If the conclusion is a probabilistic Hoare logic statement judgement whose progr
     weakest precondition of the random assignment.
 
     This weakest precondition is defined with respect to an event `E`,
-    which can be provided explicitly. When $E$ is not
+    which can be provided explicitly. When `E`` is not
     specified, it is inferred from the current postcondition.
 
 .. ecproof::
@@ -274,4 +274,32 @@ the sampling statement on the `{side}` program.
 Variant: `rnd` (eHL)
 ------------------------------------------------------------------------
 
-To do.
+If the conclusion is an expectation Hoare logic statement judgement whose program ends
+with a random assignment, then `rnd` consumes that random assignment,
+and replaces the postcondition by the expectation over the distribution of the sampled variable 
+of the original postcondition.
+
+.. ecproof::
+   :title: Expectation Hoare logic example 
+
+   require import AllCore Distr DBool Real Xreal.
+
+   module M = {
+     proc f(x : bool) : bool = {
+       var y : bool;
+
+       y <$ {0,1};
+
+       return (x = y);
+     }
+   }.
+
+   pred p : glob M.
+
+   lemma L : ehoare [M.f : (1%r/2%r)%xr ==>  res%xr].
+   proof.
+     proc.
+     (*$*)rnd.
+        (* The post is now an expectation. *)
+     skip => *;rewrite Ep_dbool;smt().
+   qed.
