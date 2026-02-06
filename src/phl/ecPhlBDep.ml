@@ -125,6 +125,12 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
   (* FIXME: are all the simplifications necessary ? *)
+  (* Processes explicit equations *)
+  (* FIXME PR: Make sure this works with things of the form
+     a{hr} = b{hr} /\ b{hr} = a{hr}
+     or even
+     a{hr} = b{hr} /\ b{hr} = c{hr} /\ c{hr} = a{hr}
+  *)
   let process_equality (s: state) (f: form) : state = 
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
@@ -203,7 +209,9 @@ let t_bdep_solve
   match goal.f_node with 
   | FhoareS hs -> begin try
     let tm = Unix.gettimeofday () in
-    let st, cpres = process_pre tc (hs_pr hs).inv in
+    let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
+    let st = circuit_state_of_hyps ~use_mem:true ~st hyps in
+    let st, cpres = process_pre ~st tc (hs_pr hs).inv in
     let tm = time (toenv hyps) tm "Done with precondition processing" in
 
     (* Get open state *)
