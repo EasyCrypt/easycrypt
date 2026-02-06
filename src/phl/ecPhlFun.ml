@@ -181,7 +181,7 @@ module FunAbsLow = struct
     PV.check_depend env fv top;
     let ospec o =
       check_oracle_use pf env top o;
-      f_bdHoareF inv o inv FHeq {m=inv.m;inv=f_r1} in
+      f_bdHoareF inv o inv FHge {m=inv.m;inv=f_r1} in
 
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
@@ -259,19 +259,32 @@ let t_ehoareF_abs_r inv tc =
   FApi.t_last tactic (EcPhlConseq.t_ehoareF_conseq pre post tc)
 
 (* ------------------------------------------------------------------ *)
-let t_bdhoareF_abs_r inv tc =
+let t_bdhoareF_abs_ge_r inv tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
 
   match bhf.bhf_cmp with
-  | FHeq when f_equal (bhf_bd bhf).inv f_r1 ->
+  | FHge when f_equal (bhf_bd bhf).inv f_r1 ->
       let pre, post, sg =
         FunAbsLow.bdhoareF_abs_spec !!tc env bhf.bhf_f inv
       in
       let tactic tc = FApi.xmutate1 tc `FunAbs sg in
       FApi.t_last tactic (EcPhlConseq.t_bdHoareF_conseq pre post tc)
 
-  | _ -> tc_error !!tc "bound must of \"= 1\""
+  | _ -> tc_error !!tc "bound must \">= 1%%r\""
+
+let t_bdhoareF_abs_r inv tc =
+  let bhf = tc1_as_bdhoareF tc in
+
+  match bhf.bhf_cmp with
+  | FHeq when f_equal (bhf_bd bhf).inv f_r1 ->
+    let tc = FApi.t_seqsub (EcPhlConseq.t_bdHoareF_conseq_bd FHge (bhf_bd bhf)) [EcLowGoal.t_close EcLowGoal.t_trivial; t_bdhoareF_abs_ge_r inv] tc in
+    let pl_goal_count = FApi.tc_count tc - 3 in
+    assert (pl_goal_count >= 0);
+    FApi.t_lasts (EcPhlConseq.t_bdHoareF_conseq_bd FHeq (bhf_bd bhf) |- FApi.t_first (EcLowGoal.t_close EcLowGoal.t_trivial)) pl_goal_count tc
+  | FHge when f_equal (bhf_bd bhf).inv f_r1 ->
+      t_bdhoareF_abs_ge_r inv tc
+  | _ -> tc_error !!tc "bound must \"= 1%%r\" or \">= 1%%r\""
 
 (* ------------------------------------------------------------------ *)
 let t_equivF_abs_r inv tc =
