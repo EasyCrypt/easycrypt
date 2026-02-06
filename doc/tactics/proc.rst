@@ -139,9 +139,10 @@ of the procedure under consideration.
    lemma L (M <: MT {-O}): hoare[M(O).f : p x ==> q res].
    proof.
      (*$*) proc (inv O.y).
-     - admit.
-     - admit.
-     - admit.
+     - admit. (* Invariant holds initially *)
+     - admit. (* Invariant implies postcondition *)
+     - admit. (* Procedure g1 preserves invariant *)
+     (* Procedure g2 preserves invariant *)
    abort.
 
 .. ecproof::
@@ -177,10 +178,11 @@ of the procedure under consideration.
    lemma L (M <: MT {-O}): phoare[M(O).f : p x ==> q res] = 1%r.
    proof.
      (*$*) proc (inv O.y).
-     - admit.
-     - admit.
-     - admit.
-     - admit.
+     - admit. (* Invariant holds initially *)
+     - admit. (* Invariant implies postcondition *)
+     - admit. (* Losslessness of M(O).f *)
+     - admit. (* Procedure g1 preserves invariant *)
+     (* Procedure g2 preserves invariant *)
    abort.
 
 .. ecproof::
@@ -216,9 +218,10 @@ of the procedure under consideration.
    lemma L (M <: MT {-O}): ehoare[M(O).f : p x ==> q res].
    proof.
      (*$*) proc (inv O.y).
-     - admit.
-     - admit.
-     - admit.
+     - admit. (* Invariant holds initially *)
+     - admit. (* Invariant implies postcondition *)
+     - admit. (* Procedure g1 preserves invariant *)
+     (* Procedure g2 preserves invariant *)
    abort.
 
 
@@ -305,9 +308,10 @@ and yield equal results when called on equal arguments.
    lemma L (M <: MT {-O1, -O2}): equiv[M(O1).f ~ M(O2).f: p x{1} x{2} ==> q res{1} res{2}].
    proof.
      (*$*) proc (inv O1.y{1} O2.y{2}).
-     - admit.
-     - admit.
-     - admit.
+     - admit. (* Invariant holds initially *)
+     - admit. (* Invariant implies postcondition *)
+     - admit. (* Procedure g1 preserves invariant *)
+     (* Procedure g2 preserves invariant *)
    abort.
 
 When ``{formulaB}`` and ``{formulaJ}`` are provided, the equality of 
@@ -370,9 +374,10 @@ two programs using the ``sym`` tactic before applying ``proc``.
    lemma L (M <: MT {-O1, -O2}): equiv[M(O1).f ~ M(O2).f: p x{1} x{2} ==> q res{1} res{2}].
    proof.
      (*$*) proc (bad O2.y) (inv O1.y{1} O2.y{2}) (inv2 O1.y{1} O2.y{2}).
-     - admit.
-     - admit.
-     - admit.
-     - admit.
-     - admit.
+     - admit. (* Connecting precondition to invariants *)
+     - admit. (* Connecting invariants to postcondition *)
+     - admit. (* Losslessness of M(O).f *)
+     - admit. (* Relating O1.g and O2.g during synchronization *)
+     - admit. (* Behaviour of O1.g after bad event *)
+     (* Behaviour of O2.g after bad event *)
    abort.
