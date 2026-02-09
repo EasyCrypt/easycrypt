@@ -27,8 +27,6 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
     `No)
 } 
 
-(* FIXME: should change to a decent direct hash of this + store the forms *)
-(* also move the cache here? *)
 module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struct
   type t = form
 
@@ -149,7 +147,6 @@ module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struc
     let res = doit {level = 0; subst = EcSubst.empty} f in
     clean_bruijn_idents ();
     res
-  
 end)
 
 (* -------------------------------------------------------------------- *)
@@ -164,12 +161,10 @@ type circuit_conversion_call = [
 type circuit_error =
 | MissingTyBinding of [`Ty of ty | `Path of path]
 | AbstractTyBinding of [`Ty of ty | `Path of path]
-| InvalidArgument
 | MissingOpBinding of path
 | MissingOpSpec of path
 | IntConversionFailure
-| DestrError of string (* FIXME: change this one *)
-| MissingOpBody of path (* FIXME: rename? *)
+| MissingOpBody of path 
 | CantConvertToConstant
 | CantReadWriteGlobs
 | BadFormForArg of form
@@ -185,7 +180,7 @@ type circuit_error =
   | `Hoare
   | `Instr
 ] 
-| PropagateError of circuit_conversion_call * circuit_error (* FIXME: make this lazy *)
+| PropagateError of circuit_conversion_call * circuit_error 
 
 exception CircError of circuit_error
 
@@ -194,6 +189,37 @@ let circ_error (err: circuit_error) =
 
 let propagate_circ_error (call: circuit_conversion_call) (err: circuit_error) = 
   raise (CircError (PropagateError (call, err)))
+
+(* FIXME: move this to EcPrinting maybe? *)
+let pp_op_kind (fmt: Format.formatter) (opk: EcFol.op_kind) : unit =
+  Format.fprintf fmt "%s"
+  (match opk with
+  | `Map_set -> "Map_set"
+  | `Real_le -> "Real_le"
+  | `Int_le -> "Int_le"
+  | `Iff -> "Iff"
+  | `Int_opp -> "Int_opp"
+  | `Int_lt -> "Int_lt"
+  | `Int_pow -> "Int_pow"
+  | `And `Asym -> "And (&&)"
+  | `And `Sym -> "And (/\\)"
+  | `Map_cst -> "Map_cst"
+  | `False -> "False"
+  | `Eq -> "Eq"
+  | `True -> "True"
+  | `Int_mul -> "Int_mul"
+  | `Real_inv -> "Real_inv"
+  | `Real_add -> "Real_add"
+  | `Int_edivz -> "Int_edivz"
+  | `Or `Asym -> "Or (||)"
+  | `Or `Sym -> "Or (\\/)"
+  | `Not -> "Not"
+  | `Int_add -> "Int_add"
+  | `Map_get -> "Map_get"
+  | `Real_lt -> "Real_lt"
+  | `Real_opp -> "Real_opp"
+  | `Real_mul -> "Real_mul"
+  | `Imp -> "Imp")
 
 let rec pp_circ_error ppe fmt (err: circuit_error) =
   let open EcPrinting in
@@ -210,7 +236,6 @@ let rec pp_circ_error ppe fmt (err: circuit_error) =
     | `Path pth -> Format.fprintf fmt "type at path %a" pp_path pth
     | `Ty ty -> Format.fprintf fmt "type %a" (pp_type ppe) ty
     end
-  | InvalidArgument -> assert false
   | MissingOpBinding pth ->
     Format.fprintf fmt "Missing op binding for operator at path %a" pp_path pth
   | MissingOpSpec pth -> 
@@ -218,7 +243,6 @@ let rec pp_circ_error ppe fmt (err: circuit_error) =
   | IntConversionFailure ->
     (* FIXME: check that this actually prints the form, otherwise add it *)
     Format.fprintf fmt "Failed to convert form to concrete integer"
-  | DestrError _ -> assert false
   | MissingOpBody pth -> 
     Format.fprintf fmt "No body for operator at path %a" pp_path pth
   | CantConvertToConstant ->
@@ -231,16 +255,9 @@ let rec pp_circ_error ppe fmt (err: circuit_error) =
     Format.fprintf fmt "Failed circuit conversion due to: ";
     begin match reason with
     | `Int -> Format.fprintf fmt "Encountered unexpected integer (maybe you are missing a binding?)"
-    | `OpK opk -> Format.fprintf fmt "Don't know how to translate op kind: %a" (fun _ _ -> assert false) opk
+    | `OpK opk -> Format.fprintf fmt "Don't know how to translate op kind: %a" pp_op_kind opk
     | `Op pth -> Format.fprintf fmt "Don't know how to convert operator at path %a to circuit (not concrete and does not match any known operator kind)" pp_path pth
-    | `Quantif qnt -> 
-      Format.fprintf fmt "Encountered unexpected quantifier %s"
-      (* FIXME: put into pp_quantif function *)
-      begin match qnt with
-      | Lforall -> "Forall"
-      | Lexists -> "Exists"
-      | Llambda -> "Lambda"
-      end
+    | `Quantif qnt -> Format.fprintf fmt "Encountered unexpected quantifier %s" (string_of_quant qnt)
     | `Match -> Format.fprintf fmt "Conversion of match statements not supported"
     | `Glob -> Format.fprintf fmt "Global variables not supported in conversion"
     | `ModGlob -> Format.fprintf fmt "Conversion of module globals not supported"
@@ -383,7 +400,7 @@ module BitstringOps = struct
       | _args -> assert false (* Should be caught by EC typechecking + binding correctness *)
     end
     | {size = (_, None); type_=ty}, `OfInt -> 
-      circ_error (AbstractTyBinding (`Path ty)) (* FIXME: check this, might want to add generic path -> ty conversion *)
+      circ_error (AbstractTyBinding (`Path ty)) 
     | _bs, `To -> assert false (* doesn't translate to circuit *)
     | _bs, `ToSInt -> assert false (* doesn't translate to circuit *) 
     | _bs, `ToUInt -> assert false (* doesn't translate to circuit *)
@@ -517,7 +534,7 @@ let circuit_of_op_with_args (env: env) (p: path) (args: arg list) : circuit  =
   | `Bitstring bsbnd -> circuit_of_bsop env (`BSBinding bsbnd) args
   | `Array abnd -> circuit_of_arrayop env (`ABinding abnd) args 
   | `BvOperator bvbnd -> circuit_of_parametric_bvop env (`BvBind bvbnd) args 
-  | `Circuit _c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *) 
+  | `Circuit _c -> assert false (* FIXME PR: Do we want to have parametric operators coming from the spec?  *)
 
 
 let type_has_bindings (env: env) (t: ty) : bool = 
@@ -623,7 +640,7 @@ let circuit_of_form
       | OB_oper (Some (OP_Plain f)) -> 
         f
       | _ -> 
-        circ_error (MissingOpBody pth) (* FIXME: how to actually print this? *)
+        circ_error (MissingOpBody pth) 
     in
     let res = fapply_safe op args in 
     res
@@ -632,8 +649,7 @@ let circuit_of_form
   let rec arg_of_form (st: state) (f: form) : arg = 
     try
       match f.f_ty with
-      (* FIXME: check this (does this corrently detect ints?) *)
-      | t when t.ty_node = EcTypes.tint.ty_node -> arg_of_zint (int_of_form f)
+      | t when EcReduction.EqTest.is_int env t -> arg_of_zint (int_of_form f)
       | t when type_has_bindings env t -> 
           let f = doit st f in 
           arg_of_circuit f
@@ -721,7 +737,6 @@ let circuit_of_form
 
       | {f_node = Fop _} -> 
       (* Assuming correct types coming from EC *)
-      (* FIXME: Add some extra info about errors when something here throws *)
       begin match EcFol.op_kind (destr_op f |> fst), fs with
         | Some `Eq, [f1; f2] -> 
           let c1 = doit st f1 in
@@ -768,12 +783,13 @@ let circuit_of_form
     end
       
     | Fquant (qnt, binds, f) -> 
-      let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in (* FIXME *)
+      (* FIXME Does this type conversion make sense? *)
+      let binds = List.map (fun (idn, t) -> (idn, gty_as_ty t |> ctype_of_ty env)) binds in 
       begin match qnt with
       | Lforall 
       | Llambda -> circ_lambda_oneshot st binds (fun st -> doit st f) (* FIXME: look at this interaction *)
       | Lexists -> circ_error (CantConvertToCirc (`Quantif qnt))
-      (* TODO: figure out how to handle quantifiers. Maybe just dont? *)
+      (* FIXME: Do we want to handle existentials? *)
       end
 
     | Fproj (f, i) ->
@@ -830,7 +846,10 @@ let circuit_of_form
     | FequivF  _
     | FequivS  _
     | FeagerF  _
-    | Fpr _ -> circ_error (CantConvertToCirc `Hoare) (* FIXME: do we want to allow conversion of hoare statements? *)
+    | Fpr _ -> circ_error (CantConvertToCirc `Hoare) 
+    (* FIXME: do we want to allow conversion of hoare statements? 
+        Probably not at this point
+     *)
     end
     with
     | CircError e ->
@@ -906,7 +925,8 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
       false
     end
 
-(* FIXME: add support for spec bindings for abstract/opaque operators *)
+(* FIXME: add support for spec bindings for abstract/opaque operators 
+    = convert from Fop rather than from op body *)
 let circuit_of_path (st: state) (hyps: hyps) (p: path) : circuit =
   let f = EcEnv.Op.by_path p (toenv hyps) in
   let f = match f.op_kind with
@@ -925,15 +945,11 @@ let vars_of_memtype (mt : memtype) =
   
 
 let process_instr (hyps: hyps) (mem: memory) ~(st: state) (inst: instr) : state =
-(*   EcEnv.notify env `Debug "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv env)) inst;  *)
+  EcEnv.notify (toenv hyps) `Debug "[W] Processing : %a@." (EcPrinting.pp_instr (EcPrinting.PPEnv.ofenv (toenv hyps))) inst;
   (* let start = Unix.gettimeofday () in *)
   try
     match inst.i_node with
     | Sasgn (LvVar (PVloc v, _ty), e) -> 
-(*
-      EcEnv.notify env `Debug "Assigning form %a to var %s@\n" 
-        (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps))) (form_of_expr mem e) v;
-*)
       let c = ((ss_inv_of_expr mem e).inv |> circuit_of_form st hyps) in
       let st = update_state_pv st mem v c in
       st
@@ -1020,8 +1036,8 @@ let instrs_equiv
     circ_equiv circ1 circ2 
   )
 
-(* FIXME: change memory -> memenv                 *)
-let state_of_prog ?(close = false) (hyps: hyps) (mem: memory) ?(st: state = empty_state) (proc: instr list)  : state =
+(* FIXME: change memory -> memenv Why?            *)
+let state_of_prog ?(close = false) (hyps: hyps) (mem: memory) ~(st: state) (proc: instr list)  : state =
   let st = 
     List.fold_left (fun st -> process_instr hyps mem ~st) st proc
   in
@@ -1076,7 +1092,7 @@ let state_get = state_get_pv
 let state_get_opt = state_get_pv_opt
 let state_get_all = fun st -> state_get_all_pv st |> List.snd
 
-let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt) as me: memenv) : state =
+let circuit_state_of_memenv ?(st: state = empty_state) (env:env) ((m, mt) as me: memenv) : state =
   match mt with
   | (Lmt_concrete Some {lmt_decl=decls}) ->
       let bnds = List.map (fun {ov_name; ov_type} ->
@@ -1091,22 +1107,14 @@ let circuit_state_of_memenv ~(st: state) (env:env) ((m, mt) as me: memenv) : sta
       open_circ_lambda_pv st (List.filter_map identity bnds)
   | Lmt_concrete None -> st
 
-(* Generally called without the optional argument, here just to see if we need it,
-   maybe remove later? FIXME *)
-let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_state) hyps : state = 
+let circuit_state_of_hyps ?(st: state = empty_state) ?(strict = false) (hyps: hyps) : state = 
   let env = toenv hyps in
   let ppe = EcPrinting.PPEnv.ofenv env in
   let st = List.fold_left (fun st (id, lk) ->
     EcEnv.notify env `Debug "Processing hyp: %s@." (id.id_symb);
     match lk with
-(*  FIXME: Reasoning here is that we do not directly process program variables in the hyps
-      They are either given a value by assignment in the program or if they are used 
-      before that they are implicitly initialized to BAD 
-
-      FIXME: Find a good way to handle this
-*)
-
-    | EcBaseLogic.LD_mem mt when use_mem -> circuit_state_of_memenv ~st env (id, mt)
+    (* If there is a memory, add all the variables from that memory into the translation state *)
+    | EcBaseLogic.LD_mem mt -> circuit_state_of_memenv ~st env (id, mt)
 
     (* Initialized variable. 
        Check if body is convertible to circuit, if not just process it as uninitialized.

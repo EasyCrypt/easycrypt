@@ -23,12 +23,10 @@ type circuit_conversion_call = [
 type circuit_error =
 | MissingTyBinding of [`Ty of ty | `Path of path]
 | AbstractTyBinding of [`Ty of ty | `Path of path]
-| InvalidArgument
 | MissingOpBinding of path
 | MissingOpSpec of path
 | IntConversionFailure
-| DestrError of string (* FIXME: change this one *)
-| MissingOpBody of path (* FIXME: rename? *)
+| MissingOpBody of path 
 | CantConvertToConstant
 | CantReadWriteGlobs
 | BadFormForArg of form
@@ -86,12 +84,12 @@ val circ_simplify_form_bitstring_equality :
   ?pres:circuit list -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : ?close:bool -> hyps -> memory -> ?st:state -> instr list -> state 
+val state_of_prog : ?close:bool -> hyps -> memory -> st:state -> instr list -> state 
 val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> state -> instr list -> instr list -> bool
 val process_instr : hyps -> memory -> st:state -> instr -> state
 
-val circuit_state_of_memenv : st:state -> env -> memenv -> state
-val circuit_state_of_hyps : ?strict:bool -> ?use_mem:bool -> ?st:state -> hyps -> state 
+val circuit_state_of_memenv : ?st:state -> env -> memenv -> state
+val circuit_state_of_hyps : ?st:state -> ?strict:bool -> hyps -> state 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option
