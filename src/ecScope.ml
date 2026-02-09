@@ -3004,7 +3004,7 @@ module Circuit = struct
 
     let operator, _ = EcEnv.Op.lookup op.operator.pl_desc env in
     let name =
-      let suffix = List.map (EcPath.tolist |- proj3_1) types in
+      let suffix = List.map (EcPath.tolist -| proj3_1) types in
       let suffix = List.flatten suffix in
       String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME: not stable*) in
 

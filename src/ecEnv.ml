@@ -3706,7 +3706,7 @@ module Theory = struct
             Some (Th_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
 
         | Th_addrw (p, ps, lc) ->
-            let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+            let ps = List.filter ((not) -| inclear -| oget -| EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
 
         | Th_auto ({ axioms } as auto_rl) ->

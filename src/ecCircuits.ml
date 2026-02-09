@@ -155,7 +155,6 @@ end)
 (* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
   | `Convert of form
-  | `Op of path
   | `ToArg of form
   | `ExpandIter of form * form list
   | `Instr of instr
@@ -257,7 +256,6 @@ let rec pp_circ_error ppe fmt (err: circuit_error) =
     | `ToArg f -> Format.fprintf fmt "conversion to arg of form %a" (pp_form ppe) f
     | `ExpandIter (f, args) -> Format.fprintf fmt "expansion of iter %a(%a)" (pp_form ppe) f (pp_list ", " (pp_form ppe)) args
     | `Instr inst -> Format.fprintf fmt "processing of instruction %a" (pp_instr ppe) inst
-    | `Op pth -> Format.fprintf fmt "translating operator at path %a" pp_path pth
     | `Memenv (m, mt) -> Format.fprintf fmt "entering memory %a : %a" (pp_mem ppe) m (pp_memtype ppe) mt
     end
     
@@ -630,6 +628,7 @@ let circuit_of_form
     let res = fapply_safe op args in 
     res
   in
+
   let rec arg_of_form (st: state) (f: form) : arg = 
     try
       match f.f_ty with
@@ -682,11 +681,7 @@ let circuit_of_form
         op
       | None -> 
       if op_is_base env pth then
-        let circ = try 
-          circuit_of_op env pth 
-        with 
-        | CircError err -> propagate_circ_error (`Op pth) err
-        in
+        let circ = circuit_of_op env pth in
         op_cache := Mp.add pth circ !op_cache;
         circ 
       else
@@ -990,7 +985,7 @@ let instrs_equiv
   if not (List.is_empty rglobs && List.is_empty wglobs) then
     circ_error CantReadWriteGlobs;
 
-  if not (List.for_all (EcTypes.is_loc |- fst) (rd @ wr)) then
+  if not (List.for_all (EcTypes.is_loc -| fst) (rd @ wr)) then
     circ_error CantReadWriteGlobs;
 
   let inputs = List.map (fun (pv, ty) -> { v_name = EcTypes.get_loc pv; v_type = ty; }) (rd @ wr) in
