@@ -108,7 +108,7 @@ let t_ehoare_while inv tc =
   let m = EcMemory.memory hs.ehs_m in
   let e = ss_inv_of_expr m e in
   let tc =
-    FApi.t_rotate `Left 1 (EcPhlApp.t_ehoare_app (0, `ByPos (List.length hs.ehs_s.s_node - 1)) inv tc) in
+    FApi.t_rotate `Left 1 (EcPhlSeq.t_ehoare_seq (0, `ByPos (List.length hs.ehs_s.s_node - 1)) inv tc) in
   FApi.t_sub
     [(EcPhlConseq.t_ehoareS_conseq inv (map_ss_inv2 f_interp_ehoare_form (map_ss_inv1 f_not e) inv)) @+
        [t_trivial;

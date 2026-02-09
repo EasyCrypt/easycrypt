@@ -179,7 +179,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp info                 -> EcPhlApp.process_app info
+    | Pseq info                 -> EcPhlSeq.process_seq info
     | Pwp wp                    -> EcPhlWp.process_wp wp
     | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i

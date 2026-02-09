@@ -65,7 +65,7 @@ let check_dslc pf =
        List.iter doit_s [c1; c2]
 
     | Smatch (_, bs) ->
-       List.iter (doit_s |- snd) bs
+       List.iter (doit_s -| snd) bs
 
     | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
        error ()
@@ -320,7 +320,7 @@ let process_unroll_for ~cfold side cpos tc =
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
         EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
+        EcPhlSeq.t_hoare_seq (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 

@@ -1916,7 +1916,7 @@ module Mod = struct
         let me_params = clearparams (List.length args) me.me_params in
 
         let me_oinfos =
-          let keep = List.map (EcPath.mident |- fst) me_params in
+          let keep = List.map (EcPath.mident -| fst) me_params in
           let keep = Sm.of_list keep in
           Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) me.me_oinfos in
 
@@ -2177,7 +2177,7 @@ module ModTy = struct
     let ois = EcSubst.subst_oracle_infos subst sig_.mis_oinfos in
     let params = mt.mt_params in
 
-    let keep = List.map (EcPath.mident |- fst) params in
+    let keep = List.map (EcPath.mident -| fst) params in
     let keep = Sm.of_list keep in
     let ois = Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) ois in
 
@@ -2967,12 +2967,12 @@ module LDecl = struct
 
   (* ------------------------------------------------------------------ *)
   let by_name s hyps =
-    match List.ofind ((=) s |- EcIdent.name |- fst) hyps.h_local with
+    match List.ofind ((=) s -| EcIdent.name -| fst) hyps.h_local with
     | None   -> error (LookupError (`Symbol s))
     | Some h -> h
 
   let by_id id hyps =
-    match List.ofind (EcIdent.id_equal id |- fst) hyps.h_local with
+    match List.ofind (EcIdent.id_equal id -| fst) hyps.h_local with
     | None   -> error (LookupError (`Ident id))
     | Some x -> snd x
 

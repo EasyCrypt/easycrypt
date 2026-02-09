@@ -498,7 +498,7 @@ let t_eqobs_inS_ (info : sim_info) (tc : tcenv1) =
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in
-      (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form_ts_inv eqi inv) @+ [
+      (EcPhlSeq.t_equiv_seq (p1, p2) (Mpv2.to_form_ts_inv eqi inv) @+ [
         t_id;
         fun tc ->
           FApi.t_last

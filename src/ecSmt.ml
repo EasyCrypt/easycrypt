@@ -287,7 +287,7 @@ let instantiate tparams ~textra targs tres tys =
       (fun mtv tv ty -> WTy.Mtv.add tv ty mtv)
       WTy.Mtv.empty tparams tys in
   let textra = List.map (WTy.ty_inst mtv) textra in
-  let targs = List.map (some |- WTy.ty_inst mtv) targs in
+  let targs = List.map (some -| WTy.ty_inst mtv) targs in
   let tres  = tres |> omap (WTy.ty_inst mtv) in
   (textra, targs, tres)
 

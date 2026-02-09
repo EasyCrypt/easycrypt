@@ -297,7 +297,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
         | e, _ -> [e] in
       let lv = lv_to_ty_list lv in
 
-      if not (List.for_all (is_loc |- fst) lv) then
+      if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
       let subst =

@@ -758,14 +758,14 @@ let process_rewrite1_r ttenv ?target ri tc =
         match simpl with
         | Some logic ->
            let hyps   = FApi.tc1_hyps tc in
-           let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+           let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
            t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
-      let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+      let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
       t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
   | RWDelta ((s, r, o, px), p) -> begin
@@ -782,7 +782,7 @@ let process_rewrite1_r ttenv ?target ri tc =
   | RWRw (((s : rwside), r, o, p), pts) -> begin
       let do1 (mode : [`Full | `Light]) ((subs : rwside), pt) tc =
         let hyps   = FApi.tc1_hyps tc in
-        let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+        let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
         let hyps   = FApi.tc1_hyps ?target tc in
 
         let ptenv, prw =
@@ -916,7 +916,7 @@ let process_rewrite ttenv ?target ri tc =
       else process_rewrite1 ttenv ri tc
     in
 
-    match fc |> omap ((process_tfocus tc) |- unloc) with
+    match fc |> omap ((process_tfocus tc) -| unloc) with
     | None    -> FApi.t_onalli dorw tc
     | Some fc -> FApi.t_onselecti fc dorw tc
 
@@ -1160,7 +1160,7 @@ let process_view1 pe tc =
         in
 
         let discharge tc =
-          let intros = List.map (EcIdent.name |- fst |- snd) ids in
+          let intros = List.map (EcIdent.name -| fst -| snd) ids in
           let intros = LDecl.fresh_ids hyps intros in
 
           let for1 evm (x, idty) id =
@@ -1217,7 +1217,7 @@ let process_view1 pe tc =
 
 (* -------------------------------------------------------------------- *)
 let process_view pes tc =
-  let views = List.map (t_last |- process_view1) pes in
+  let views = List.map (t_last -| process_view1) pes in
   List.fold_left (fun tc tt -> tt tc) (FApi.tcenv_of_tcenv1 tc) views
 
 (* -------------------------------------------------------------------- *)

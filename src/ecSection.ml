@@ -151,7 +151,7 @@ and on_lp (aenv : aenv) (lp : lpattern) =
   match lp with
   | LSymbol (_, ty) -> on_ty aenv ty
   | LTuple  xs      -> List.iter (fun (_, ty) -> on_ty aenv ty) xs
-  | LRecord (_, xs) -> List.iter (on_ty aenv |- snd) xs
+  | LRecord (_, xs) -> List.iter (on_ty aenv -| snd) xs
 
 (* -------------------------------------------------------------------- *)
 and on_binding (aenv : aenv) ((_, ty) : (EcIdent.t * ty)) =
@@ -246,7 +246,7 @@ and on_instr (aenv : aenv) (i : instr)=
 
   | Smatch (e, b) ->
       let forb (bs, s) =
-        List.iter (on_ty aenv |- snd) bs;
+        List.iter (on_ty aenv -| snd) bs;
         on_stmt aenv s
       in on_expr aenv e; List.iter forb b
 
@@ -448,9 +448,9 @@ and on_tydecl (aenv : aenv) (tyd : tydecl) =
   | Abstract    -> ()
   | Record (f, fds) ->
       on_form aenv f;
-      List.iter (on_ty aenv |- snd) fds
+      List.iter (on_ty aenv -| snd) fds
   | Datatype dt ->
-     List.iter (List.iter (on_ty aenv) |- snd) dt.tydt_ctors;
+     List.iter (List.iter (on_ty aenv) -| snd) dt.tydt_ctors;
      List.iter (on_form aenv) [dt.tydt_schelim; dt.tydt_schcase]
 
 and on_typeclass (aenv : aenv) tc =
@@ -476,7 +476,7 @@ and on_opdecl (aenv : aenv) (opdecl : operator) =
        pri.pri_ctors
 
    | OB_nott nott ->
-     List.iter (on_ty aenv |- snd) nott.ont_args;
+     List.iter (on_ty aenv -| snd) nott.ont_args;
      on_ty aenv nott.ont_resty;
      on_expr aenv nott.ont_body
 

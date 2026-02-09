@@ -65,7 +65,7 @@ module LowInternal = struct
           | LvTuple vs, _ -> begin
               let aux = List.map2 (fun x y -> (fst x, fst y)) vs new_ids in
               try
-                let new_id = snd (List.find (NormMp.pv_equal env pv' |- fst) aux) in
+                let new_id = snd (List.find (NormMp.pv_equal env pv' -| fst) aux) in
                 ALocal (new_id, ty)
               with Not_found -> var
             end
@@ -96,7 +96,7 @@ module LowInternal = struct
               let subst = EcFol.Fsubst.f_subst_id in
               let subst = EcFol.Fsubst.f_bind_local subst id f in
               (List.map (snd_map (EcFol.Fsubst.f_subst subst)) assoc,
-               List.filter ((<>) id |- fst) bds,
+               List.filter ((<>) id -| fst) bds,
                EcFol.Fsubst.f_subst subst pre)
 
           | _ -> ((a, f) :: assoc, bds, pre)

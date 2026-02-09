@@ -127,7 +127,7 @@ let unify_core (env : EcEnv.env) (uf : UF.t) pb =
             match t1.ty_node, t2.ty_node with
             | Tunivar id1, Tunivar id2 -> begin
                 if not (uid_equal id1 id2) then
-                  let effects = reffold (swap |- UF.union id1 id2) uf in
+                  let effects = reffold (swap -| UF.union id1 id2) uf in
                     List.iter (Queue.push^~ pb) effects
             end
 
