@@ -29,27 +29,15 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
 
 (* FIXME: should change to a decent direct hash of this + store the forms *)
 (* also move the cache here? *)
-module AInvFHash = struct
-  let known_hashes : (int, int) Map.t ref = ref Map.empty
+module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struct
+  type t = form
 
-  let clean_known : unit -> unit = 
-    fun () -> known_hashes := Map.empty
+  let equal f1 f2 = EcReduction.is_alpha_eq Ctxt.hyps f1 f2
 
   let bruijn_idents : (int, ident) Map.t ref = ref Map.empty
 
   let clean_bruijn_idents : unit -> unit =
     fun () -> bruijn_idents := Map.empty
-
-  let form_storage : (int, form) Map.t ref = ref Map.empty
-
-  let clean_form_storage : unit -> unit =
-    fun () -> form_storage := Map.empty
-
-  let nuke_state_from_orbit : unit -> unit =
-    fun () ->
-      clean_known ();
-      clean_bruijn_idents ();
-      clean_form_storage () 
 
   let ident_of_debruijn_level (i: int) : ident = 
     match Map.find_opt i !bruijn_idents with
@@ -63,7 +51,6 @@ module AInvFHash = struct
     subst: EcSubst.subst;
   }
 
-
   let add_to_state (id: ident) (ty: ty) (st: state) = 
     let new_id = ident_of_debruijn_level st.level in
     let level = st.level + 1 in
@@ -71,9 +58,9 @@ module AInvFHash = struct
     { level; subst }, new_id
 
 
-  let to_debruijn (f: form) : form =
-    let rec doit (st: state) (f: form) = 
-      match f.f_node with
+  let hash (f: form) : int =
+    let rec doit (st: state) (f: form) : int = 
+      let hnode = match f.f_node with
       | Fquant (qnt, bnds, f)  ->
         let st, bnds = 
           List.fold_left_map (fun st (orig_id, gty) ->
@@ -84,77 +71,86 @@ module AInvFHash = struct
             | _ -> 
               st, (orig_id, gty)
           ) st bnds 
-        in f_quant qnt bnds (doit st (EcSubst.subst_form st.subst f))
+        in Why3.Hashcons.combine2 (qt_hash qnt) (b_hash bnds) (doit st (EcSubst.subst_form st.subst f))
       | Fif (cond, tb, fb)  -> 
           let doit = doit st in
-          f_if (doit cond) (doit tb) (doit fb)
+          Why3.Hashcons.combine2 (doit cond) (doit tb) (doit fb)
       | Fmatch (_, _, _)  -> assert false
       | Flet (lp, value, body)  -> 
           begin match lp with
           | LSymbol (orig_id, ty) -> 
-            let nval = doit st value in
+            let hval = doit st value in
             let st, new_id = add_to_state orig_id ty st in
-            let nbody = doit st (EcSubst.subst_form st.subst body) in
-            f_let (LSymbol (new_id, ty)) nval nbody
+            let hbody = doit st (EcSubst.subst_form st.subst body) in
+            let hlp = lp_hash (LSymbol (new_id, ty)) in
+            Why3.Hashcons.combine2 hlp hval hbody
           | LTuple bnds -> 
-            let nval = doit st value in
+            let hval = doit st value in
             let st, new_ids = List.fold_left_map (fun st (id, ty) -> add_to_state id ty st) st bnds in
-            let nbody = doit st (EcSubst.subst_form st.subst body) in
-            let nbinds = List.combine new_ids (List.snd bnds) in
-            f_let (LTuple nbinds) nval nbody
+            let hbody = doit st (EcSubst.subst_form st.subst body) in
+            let hbinds = lp_hash @@ LTuple (List.combine new_ids (List.snd bnds)) in
+            Why3.Hashcons.combine2 hbinds hval hbody
           | LRecord (_, _) -> assert false
           end
       | Fapp (op, args)  -> 
-        let nargs = List.map (doit st) args in
-        let nop = doit st op in
-        f_app nop nargs f.f_ty
+        let hop = doit st op in
+        Why3.Hashcons.combine_list (doit st) hop args
       | Ftuple comps  -> 
-        f_tuple (List.map (doit st) comps)
+        Why3.Hashcons.combine_list (doit st) 0 comps
       | Fproj (tp, i)  -> 
-        f_proj (doit st tp) i f.f_ty
-      | FhoareF hf  -> 
-        let npre = doit st (hf_pr hf).inv in
-        let npo = doit st (hf_po hf).inv in
-        let m = hf.hf_m in
-        f_hoareF {inv=npre;m} hf.hf_f {inv=npo;m}
-      | FhoareS hs -> 
-        let m, me = hs.hs_m in
-        let npre = doit st (hs_pr hs).inv in
-        let npo = doit st (hs_po hs).inv in
+        Why3.Hashcons.combine (doit st tp) i 
+      | FhoareF _hF -> 
+          assert false
+(*      FIXME: do we want this case and the one below?
+        let hpre = doit st (hf_pr hF).inv in
+        let hpo = doit st (hf_po hF).inv in
+        let hf = x_hash hF.hf_f in
+        let hm = id_hash hF.hf_m in
+        Why3.Hashcons.combine3 hpre hpo hf hm
+*)
+      | FhoareS _hS -> 
+          assert false
+(*
+        let hme = me_hash hS.hs_m in
+        let hpre = doit st (hs_pr hS).inv in
+        let hpo = doit st (hs_po hS).inv in
+        let hs = s_hash
         f_hoareS me {inv=npre;m} hs.hs_s {inv=npo;m}
+*)
       | FbdHoareF _  -> assert false
       | FbdHoareS _  -> assert false
       | FeHoareF _  -> assert false
       | FeHoareS _  -> assert false
-      | FequivF ef -> 
+      | FequivF _ef -> 
+        assert false
+(*      FIXME: do we want these cases? 
         let npre = doit st (ef_pr ef).inv in
         let npo = doit st (ef_po ef).inv in
         f_equivF {inv=npre;ml=ef.ef_ml;mr=ef.ef_mr} ef.ef_fl ef.ef_fr {inv=npo;ml=ef.ef_ml;mr=ef.ef_mr}
-      | FequivS es  -> 
+*)
+      | FequivS _es  -> 
+        assert false
+(*
         let ml, mel = es.es_ml in
         let mr, mer = es.es_mr in
         let npre = doit st (es_pr es).inv in
         let npo = doit st (es_po es).inv in
         f_equivS mel mer {inv=npre;ml;mr} es.es_sl es.es_sr {inv=npo;ml;mr}
+*)
       | FeagerF _  -> assert false
       | Fpr _ ->  assert false
-      | Fint _    
+      | Fint _ 
       | Flocal _ 
       | Fpvar (_, _) 
       | Fglob (_, _)
-      | Fop (_, _)  -> f
+      | Fop (_, _) -> f_hash f (* FIXME: maybe do these cases as well? *)
+      in Why3.Hashcons.combine hnode (ty_hash f.f_ty)
     in
-    doit {level = 0; subst = EcSubst.empty} f
-
-  (* FIXME: Check that this does not incur false positives *)
-  let hash_form (f: form) = 
-    match Map.find_opt f.f_tag !known_hashes with
-    | Some hash -> hash
-    | None -> let fnorm = to_debruijn f in
-      form_storage := Map.add f.f_tag fnorm !form_storage;
-      known_hashes := Map.add f.f_tag fnorm.f_tag !known_hashes;
-      fnorm.f_tag
-end
+    let res = doit {level = 0; subst = EcSubst.empty} f in
+    clean_bruijn_idents ();
+    res
+  
+end)
 
 (* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
@@ -605,9 +601,10 @@ let circuit_of_form
    (f_      : EcAst.form) 
   : circuit =
 
+  let module Htbl = AInvFHashtbl(struct let hyps = hyps end) in
+
   (* Form level cache, local to each high-level call *)
-  let cache : (int, circuit) Map.t ref = ref Map.empty in
-  let fhash = AInvFHash.hash_form in
+  let cache : circuit Htbl.t = Htbl.create 700 in
   let op_cache : circuit Mp.t ref = ref Mp.empty in
   let redmode = circ_red hyps in
   let env = toenv hyps in
@@ -710,7 +707,9 @@ let circuit_of_form
         circ
     end
     | Fapp (f, fs) -> 
-    begin match Map.find_opt (fhash f_) !cache with (* TODO: Maybe add cache statistics? *)
+    (* TODO: Maybe add cache statistics? *)
+    (* TODO: Maybe cache all forms       *)
+    begin match Htbl.find_opt cache f_ with 
     | Some circ -> circ
     | None -> let circ =  
     begin match f with
@@ -769,7 +768,7 @@ let circuit_of_form
         circuit_compose f_c fcs
     end 
     in
-      cache := Map.add (fhash f_) circ !cache;
+      Htbl.add cache f_ circ;
       circ
     end
       
@@ -1170,4 +1169,3 @@ let circuit_state_of_hyps ?(strict = false) ?(use_mem = false) ?(st = empty_stat
 
 let clear_translation_caches () =
   EcLowCircuits.reset_backend_state ();
-  AInvFHash.nuke_state_from_orbit ()
