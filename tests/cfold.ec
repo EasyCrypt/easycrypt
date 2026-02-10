@@ -111,3 +111,21 @@ theory CfoldWhileUnroll.
   by auto => />.
   qed.
 end CfoldWhileUnroll.
+
+module CfoldSymbolic = {
+  proc f(a : int) = {
+    var x, y : int;
+
+    x <- a + 1;
+    y <- 2 * x;
+    x <- 3 * y;
+
+    return x;
+  }
+}.
+
+lemma L : hoare[CfoldSymbolic.f : witness a ==> witness res].
+proof.
+proc.
+cfold 1.
+abort.
