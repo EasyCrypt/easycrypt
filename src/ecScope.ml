@@ -1974,6 +1974,20 @@ module Theory = struct
         "end-of-file while processing proof %s" (fst scope.sc_name)
 
   (* -------------------------------------------------------------------- *)
+  let require_start (scope : scope) (thname : symbol) (mode : thmode)
+        : scope =
+    let new_ = enter (for_loading scope) mode thname `Global in
+    { new_ with sc_env = EcSection.astop new_.sc_env }
+
+  let require_finish ?(old : scope option = None) ~(new_ : scope)
+      (ri : required_info) : scope =
+    let (cth, rqs), (name1, _), new_ = exit_r ~pempty:`No new_ in
+    assert (ri.rqd_name = name1);
+    let scope =
+      { (odfl new_ old) with sc_loaded =
+          Msym.add ri.rqd_name (oget cth, rqs) new_.sc_loaded; } in
+    bump_prelude (require_loaded ri scope)
+
   let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
@@ -1984,24 +1998,13 @@ module Theory = struct
     end else
       match Msym.find_opt name.rqd_name scope.sc_loaded with
       | Some _ -> require_loaded name scope
-
       | None ->
         try
-          let imported = enter (for_loading scope) mode name.rqd_name `Global in
-          let imported = { imported with sc_env = EcSection.astop imported.sc_env } in
+          let imported = require_start scope name.rqd_name mode in
           let thname   = fst imported.sc_name in
           let imported = loader imported in
-
           check_end_required imported thname;
-
-          let cth = exit_r ~pempty:`No imported in
-          let (cth, rqs), (name1, _), imported = cth in
-          assert (name.rqd_name = name1);
-          let scope = { scope with sc_loaded =
-            Msym.add name.rqd_name (oget cth, rqs) imported.sc_loaded; } in
-
-          bump_prelude (require_loaded name scope)
-
+          require_finish ~old:(Some scope) ~new_:imported name
         with e -> begin
           match toperror_of_exn_r e with
           | Some (l, e) when not (EcLocation.isdummy l) ->
@@ -2112,7 +2115,7 @@ module Cloning = struct
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in 
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_smt = true; puc_local = false; } in
