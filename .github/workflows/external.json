@@ -43,23 +43,12 @@
 
   ,
 
-  { "name"       : "xmss-acai"
-  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
-  , "branch"     : "master"
-  , "subdir"     : "."
+  { "name"       : "xmss-security"
+  , "repository" : "https://github.com/formosa-crypto/formosa-xmss"
+  , "branch"     : "main"
+  , "subdir"     : "proof"
   , "config"     : "config/tests.config"
-  , "scenario"   : "xmss-acai"
-  , "options"    : ""
-  }
-
-  ,
-
-  { "name"       : "xmss-fsai"
-  , "repository" : "https://github.com/MM45/FV-XMSS-EC"
-  , "branch"     : "master"
-  , "subdir"     : "."
-  , "config"     : "config/tests.config"
-  , "scenario"   : "xmss-fsai"
+  , "scenario"   : "security"
   , "options"    : ""
   }
 
