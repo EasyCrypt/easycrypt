@@ -32,31 +32,33 @@ module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struc
 
   let equal f1 f2 = EcReduction.is_alpha_eq Ctxt.hyps f1 f2
 
-  let bruijn_idents : (int, ident) Map.t ref = ref Map.empty
-
-  let clean_bruijn_idents : unit -> unit =
-    fun () -> bruijn_idents := Map.empty
-
-  let ident_of_debruijn_level (i: int) : ident = 
-    match Map.find_opt i !bruijn_idents with
-    | Some id -> id
-    | None -> let id = create (string_of_int i) in
-      bruijn_idents := Map.add i id !bruijn_idents;
-      id
-
   type state = {
     level: int;
     subst: EcSubst.subst;
-  }
-
-  let add_to_state (id: ident) (ty: ty) (st: state) = 
-    let new_id = ident_of_debruijn_level st.level in
-    let level = st.level + 1 in
-    let subst = EcSubst.add_flocal st.subst id (f_local new_id ty) in
-    { level; subst }, new_id
-
+  } 
 
   let hash (f: form) : int =
+    let bruijn_idents : (int, ident) Map.t ref = ref Map.empty in
+
+    let clean_bruijn_idents : unit -> unit =
+      fun () -> bruijn_idents := Map.empty
+    in
+
+    let ident_of_debruijn_level (i: int) : ident = 
+      match Map.find_opt i !bruijn_idents with
+      | Some id -> id
+      | None -> let id = create (string_of_int i) in
+        bruijn_idents := Map.add i id !bruijn_idents;
+        id
+    in
+
+    let add_to_state (id: ident) (ty: ty) (st: state) = 
+      let new_id = ident_of_debruijn_level st.level in
+      let level = st.level + 1 in
+      let subst = EcSubst.add_flocal st.subst id (f_local new_id ty) in
+      { level; subst }, new_id
+    in
+
     let rec doit (st: state) (f: form) : int = 
       let hnode = match f.f_node with
       | Fquant (qnt, bnds, f)  ->
