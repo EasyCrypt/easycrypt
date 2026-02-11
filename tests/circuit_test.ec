@@ -1,6 +1,5 @@
 require import AllCore List QFABV IntDiv.
 
-
 theory FakeWord.
 type W.
 op size : int.
@@ -30,6 +29,12 @@ realize size_tolist by admit.
 
 op zero : W = of_int 0.
 op one  : W = of_int 1.
+op (+^) : W -> W -> W.
+
+bind op W (+^) "xor".
+realize bvxorP by admit.
+
+end FakeWord.
 
 op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.
@@ -47,12 +52,7 @@ realize touintP by admit.
 realize tosintP by done. 
 realize gt0_size by done.
     
-op (+^) : W -> W -> W.
 
-bind op W (+^) "xor".
-realize bvxorP by admit.
-
-end FakeWord.
 
 type W8.
 
