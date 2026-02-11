@@ -13,7 +13,8 @@ or concrete (i.e., defined with a body of code).
 
 The abstract variant is a bit different for probabilistic relational 
 Hoare logic compared to the other program logics, so we describe it
-separately.
+separately. When one of the two procedures is abstract and the other is
+concrete the ``proc*`` tactic can be used instead.
 
 .. contents::
    :local:
