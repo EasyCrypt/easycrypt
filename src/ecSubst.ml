@@ -857,9 +857,10 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
   let s, tparams = fresh_tparams s tyd.tyd_params in
   let body = subst_tydecl_body s tyd.tyd_type in
 
-  { tyd_params  = tparams;
-    tyd_type    = body;
-    tyd_loca    = tyd.tyd_loca; }
+  { tyd_params   = tparams;
+    tyd_type     = body;
+    tyd_loca     = tyd.tyd_loca;
+    tyd_clinline = tyd.tyd_clinline; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =
@@ -1009,6 +1010,101 @@ let subst_tc (s : subst) tc =
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
+let subst_binding_size ?(red: (form -> int option) option) (s: subst) (bsize: binding_size) = 
+  (* FIXME: add reduction? *)
+  let fsize = subst_form s (fst bsize) in
+  let csize = match red with
+  | Some red when Option.is_none (snd bsize) -> red fsize
+  | _ -> (snd bsize) 
+  in (fsize, csize)
+
+let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opkind) = 
+  let ssize = subst_binding_size ?red s in
+  match opk with
+  | `Extend (s1, s2, sgn) -> `Extend (ssize s1, ssize s2, sgn) 
+  | `Rem (s, sgn) -> `Rem (ssize s, sgn)  
+  | `Div (s, sgn) -> `Div (ssize s, sgn) 
+  | `Add (s) -> `Add (ssize s) 
+  | `Lt (s, sgn) -> `Lt (ssize s, sgn) 
+  | `Shl (s) -> `Shl (ssize s) 
+  | `Shls (s1, s2) -> `Shls (ssize s1, ssize s2) 
+  | `ASliceSet ((s1, s2), s3) -> `ASliceSet ((ssize s1, ssize s2), ssize s3) 
+  | `And s -> `And (ssize s) 
+  | `Extract (s1, s2) -> `Extract (ssize s1, ssize s2) 
+  | `Map (s1, s2, s3) -> `Map (ssize s1, ssize s2, ssize s3) 
+  | `AInit (s1, s2) -> `AInit (ssize s1, ssize s2) 
+  | `Sub s -> `Sub (ssize s) 
+  | `Get s -> `Get (ssize s) 
+  | `Ror s -> `Ror (ssize s) 
+  | `Le (s, sgn) -> `Le (ssize s, sgn) 
+  | `Concat (s1, s2, s3) -> `Concat (ssize s1, ssize s2, ssize s3) 
+  | `Truncate (s1, s2) -> `Truncate (ssize s1, ssize s2) 
+  | `Not (s) -> `Not (ssize s) 
+  | `Opp (s) -> `Opp (ssize s) 
+  | `Or (s) -> `Or (ssize s) 
+  | `Init (s) -> `Init (ssize s) 
+  | `Insert (s1, s2) -> `Insert (ssize s1, ssize s2) 
+  | `Xor (s) -> `Xor (ssize s) 
+  | `Shr (s, sgn) -> `Shr (ssize s, sgn) 
+  | `Shrs (s1, s2, sgn) -> `Shrs (ssize s1, ssize s2, sgn) 
+  | `Mul (s) -> `Mul (ssize s) 
+  | `Rol (s) -> `Rol (ssize s) 
+  | `A2B ((s1, s2), s3) -> `A2B ((ssize s1, ssize s2), ssize s3) 
+  | `ASliceGet ((s1, s2), s3) -> `ASliceGet ((ssize s1, ssize s2), ssize s3) 
+  | `B2A (s1, (s2, s3)) -> `B2A (ssize s1, (ssize s2, ssize s3)) 
+
+(* -------------------------------------------------------------------- *)
+let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbinding) =
+  match crb with
+  | CRB_Bitstring bs ->
+    assert (not (Mp.mem bs.type_ s.sb_tydef));
+    assert (not (Mp.mem bs.from_ s.sb_def));
+    assert (not (Mp.mem bs.to_ s.sb_def));
+    assert (not (Mp.mem bs.touint s.sb_def));
+    assert (not (Mp.mem bs.tosint s.sb_def));
+    assert (not (Mp.mem bs.ofint s.sb_def));
+    (* FIXME : maybe add an assert here? *)
+    CRB_Bitstring {
+      type_  = subst_path s bs.type_;
+      from_  = subst_path s bs.from_;
+      to_    = subst_path s bs.to_;
+      touint  = subst_path s bs.touint;
+      tosint  = subst_path s bs.tosint;
+      ofint  = subst_path s bs.ofint;
+      size   = subst_binding_size ?red s bs.size;
+      theory = subst_path s bs.theory; }
+
+  | CRB_Array ba ->
+    assert (not (Mp.mem ba.type_ s.sb_tydef));
+    assert (not (Mp.mem ba.get s.sb_def));
+    assert (not (Mp.mem ba.set s.sb_def));
+    assert (not (Mp.mem ba.tolist s.sb_def));
+    assert (not (Mp.mem ba.oflist s.sb_def));
+    CRB_Array {
+      type_  = subst_path s ba.type_;
+      get    = subst_path s ba.get;
+      set    = subst_path s ba.set;
+      tolist = subst_path s ba.tolist;
+      oflist = subst_path s ba.oflist;
+      size   = subst_binding_size ?red s ba.size;
+      theory = subst_path s ba.theory }
+
+  | CRB_BvOperator op ->
+    assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
+    assert (not (Mp.mem op.operator s.sb_def));
+    CRB_BvOperator {
+      kind     = subst_bv_opkind ?red s op.kind;
+      types    = List.map (subst_path s) op.types;
+      operator = subst_path s op.operator;
+      theory   = subst_path s op.theory; }
+
+  | CRB_Circuit cr ->
+      assert (not (Mp.mem cr.operator s.sb_def));
+      CRB_Circuit {
+        name     = cr.name;
+        circuit  = cr.circuit;
+        operator = subst_path s cr.operator; }
+  
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
@@ -1051,6 +1147,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_auto ({ axioms } as auto_rl) ->
       Th_auto { auto_rl with axioms =
         List.map (fst_map (subst_path s)) axioms }
+
+  | Th_crbinding (bd, lc) ->
+      Th_crbinding (subst_crbinding s bd, lc)
 
   | Th_alias (name, target) ->
       Th_alias (name, subst_path s target)

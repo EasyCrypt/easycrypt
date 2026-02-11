@@ -183,6 +183,32 @@ let f_false  = f_op EcCoreLib.CI_Bool.p_false [] tbool
 let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
+(* TODO: check types here *)
+(* FIXME CIRCUIT PR: do we want to keep this? *)
+let ty_ftlist1 ty = toarrow (List.make 1 ty) (tlist ty)
+let ty_ftlist2 ty = toarrow ([ty; (tlist ty)]) (tlist ty)
+let ty_flist1 ty = toarrow (List.make 1 (tlist ty)) (tlist ty)
+let ty_flist2 ty = toarrow (List.make 2 (tlist ty)) (tlist ty)
+let ty_fllist ty = toarrow (List.make 1 (tlist @@ tlist ty)) (tlist ty)
+let ty_lmap ty1 ty2 = toarrow ([toarrow [ty1] ty2; tlist ty1]) (tlist ty2) 
+let ty_chunk ty = toarrow [tint; tlist ty] (tlist @@ tlist ty)
+let ty_all ty = toarrow [(toarrow [ty] tbool); tlist ty] tbool
+
+let fop_empty ty = f_op EcCoreLib.CI_List.p_empty [ty] (tlist ty)
+let fop_cons ty = f_op EcCoreLib.CI_List.p_cons [ty] (ty_ftlist2 ty)
+let fop_append ty = f_op EcCoreLib.CI_List.p_append [ty] (ty_flist2 ty)
+let fop_flatten ty = f_op EcCoreLib.CI_List.p_flatten [ty] (ty_fllist ty)
+let fop_lmap ty1 ty2 = f_op EcCoreLib.CI_List.p_map [ty2; ty1] (ty_lmap ty1 ty2)
+let fop_chunk ty = f_op EcCoreLib.CI_List.p_chunk [ty] (ty_chunk ty)
+let fop_all ty = f_op EcCoreLib.CI_List.p_all [ty] (ty_all ty)
+
+let f_append a b ty = f_app (fop_append ty) [a; b] (tlist ty)
+let f_cons a b ty = f_app (fop_cons ty) [a; b] (tlist ty)
+let f_flatten a ty = f_app (fop_flatten ty) [a] (tlist ty)
+let f_lmap f a ty1 ty2 = f_app (fop_lmap ty1 ty2) [f;a] (tlist ty2)
+let f_all f a ty = f_app (fop_all ty) [f; a] tbool
+
+(* -------------------------------------------------------------------- *)
 let f_tuple args =
   match args with
   | []  -> f_tt
@@ -785,6 +811,8 @@ let is_op_not      p = EcPath.p_equal EcCoreLib.CI_Bool.p_not p
 let is_op_imp      p = EcPath.p_equal EcCoreLib.CI_Bool.p_imp p
 let is_op_iff      p = EcPath.p_equal EcCoreLib.CI_Bool.p_iff p
 let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
+let is_op_cons     p = EcPath.p_equal EcCoreLib.CI_List.p_cons p
+let is_op_witness  p = EcPath.p_equal EcCoreLib.CI_Witness.p_witness p
 
 (* -------------------------------------------------------------------- *)
 let destr_op = function
@@ -866,6 +894,22 @@ let destr_nots form =
     | Some form -> aux (not b) form
   in aux true form
 
+let destr_cons form = 
+  match destr_app form with
+  | {f_node = Fop (p, _)}, [h;t] when is_op_cons p -> (h, t)
+  | _ -> destr_error "cons"
+
+let destr_list form =
+  let rec aux form = 
+    match try Some (destr_cons form) with DestrError "cons" -> None with
+    | Some (h, t) -> h::(aux t)
+    | None -> []
+  in
+  try 
+    let h, t = destr_cons form in
+    h::(aux t)
+  with DestrError "cons" -> raise (DestrError "list")
+
 (* -------------------------------------------------------------------- *)
 let is_from_destr dt f =
   try ignore (dt f); true with DestrError _ -> false
@@ -899,6 +943,8 @@ let is_bdHoareS  f = is_from_destr destr_bdHoareS  f
 let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
 let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
+
+let is_witness   f = is_from_destr (fun f -> destr_op f |> fst |> is_op_witness) f
 
 (* -------------------------------------------------------------------- *)
 let split_args f =
@@ -939,7 +985,8 @@ let rec form_of_expr_r ?m (e : expr) =
   | Evar pv ->
     begin
      match m with
-     | None -> failwith "expecting memory"
+     | None -> 
+       failwith "expecting memory"
      | Some m -> (f_pvar pv e.e_ty m).inv
     end
 
