@@ -36,11 +36,16 @@ module CI_Unit : sig
   val p_unit : path
   val p_tt   : path
 end
+
 (*-------------------------------------------------------------------- *)
 module CI_Witness : sig
   val p_witness : path
 end
 
+(*-------------------------------------------------------------------- *)
+module CI_Exn : sig
+  val p_exn : path
+end
 (* -------------------------------------------------------------------- *)
 module CI_Option : sig
   val p_option : path

@@ -246,7 +246,13 @@ let t_sp_side pos tc =
       let stmt1, hs_pr = LI.sp_stmt hs.hs_m env stmt1 (hs_pr hs).inv in
       check_sp_progress pos stmt1;
       let m = fst hs.hs_m in
-      let subgoal = f_hoareS (snd hs.hs_m) {m;inv=hs_pr} (stmt (stmt1@stmt2)) (hs_po hs) in
+      let subgoal =
+        f_hoareS
+          (snd hs.hs_m)
+          {m;inv=hs_pr}
+          (stmt (stmt1@stmt2))
+          (hs_po hs)
+      in
       FApi.xmutate1 tc `Sp [subgoal]
 
 

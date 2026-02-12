@@ -37,7 +37,14 @@ let pp_cbarg env fmt (who : cbarg) =
   let ppe = EcPrinting.PPEnv.ofenv env in
   match who with
   | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
-  | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
+  | `Op   p ->
+    begin
+      let op = EcEnv.Op.by_path p env in
+      match op.op_kind with
+      | OB_oper (Some (OP_Exn _)) ->
+        Format.fprintf fmt "exception %a" (EcPrinting.pp_opname ppe) p
+      | _ -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
+    end
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
   | `Module mp ->
     let ppe =
@@ -218,7 +225,7 @@ and on_instr (aenv : aenv) (i : instr)=
       on_lv aenv lv;
       on_expr aenv e
 
-  | Sassert e ->
+  | Sraise e ->
       on_expr aenv e
 
   | Scall (lv, f, args) ->
@@ -273,7 +280,6 @@ and on_form (aenv : aenv) (f : EcFol.form) =
     | EcAst.FbdHoareS bhs          -> on_bhs  aenv bhs
     | EcAst.FbdHoareF bhf          -> on_bhf  aenv bhf
     | EcAst.Fpr       pr           -> on_pr   aenv pr
-
     | EcAst.Fop (p, tys) -> begin
       on_opname aenv p;
       List.iter (on_ty aenv) tys;
@@ -281,12 +287,12 @@ and on_form (aenv : aenv) (f : EcFol.form) =
 
   and on_hf (aenv : aenv) hf =
     on_form aenv (hf_pr hf).inv;
-    on_form aenv (hf_po hf).inv;
+    iter_poe (on_form aenv) (hf_po hf).hsi_inv;
     on_xp aenv hf.EcAst.hf_f
 
   and on_hs (aenv : aenv) hs =
     on_form aenv (hs_pr hs).inv;
-    on_form aenv (hs_po hs).inv;
+    iter_poe (on_form aenv) (hs_po hs).hsi_inv;
     on_stmt aenv hs.EcAst.hs_s;
     on_memenv aenv hs.EcAst.hs_m
 
@@ -473,6 +479,7 @@ and on_opdecl (aenv : aenv) (opdecl : operator) =
    | OB_oper None   -> ()
    | OB_oper Some b ->
      match b with
+     | OP_Exn ty -> List.iter (on_ty aenv) ty
      | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> ()
      | OP_Plain  f -> on_form aenv f
      | OP_Fix    f ->
@@ -729,7 +736,7 @@ let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain f -> EcIdent.fv_union fv (fv_and_tvar_f f)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC | OP_Exn _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -909,7 +916,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
           match body with
-          | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
+          | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_Exn _ -> assert false
           | OP_TC -> assert false (* ??? *)
           | OP_Plain f ->
             OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f)

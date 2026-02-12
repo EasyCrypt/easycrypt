@@ -40,6 +40,7 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -302,7 +303,7 @@ end = struct
         (fun evc ->
          if Msym.mem x evc.evc_ops then
            clone_error oc.oc_env (CE_DupOverride (OVK_Operator, name));
-         { evc with evc_ops = 
+         { evc with evc_ops =
             Msym.add x (mk_loc lc opd :> xop_override located) evc.evc_ops })
         nm evc
 
@@ -385,6 +386,7 @@ end = struct
       | Some ({cth_mode = `Concrete} as th) -> th
     in
 
+    (* FIXME improve error message *)
     let rec contains_module cth =
       let doit it =
         match it.ti_item with
@@ -526,7 +528,7 @@ end = struct
         let init = {
           rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
           rkc_preds   = false; rkc_module  = false; rkc_modtype = false;
-          rkc_theory  = false; } in
+          rkc_theory  = false } in
 
         `Selected (List.fold_left update init k)
 

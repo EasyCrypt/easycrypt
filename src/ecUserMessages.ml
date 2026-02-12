@@ -191,6 +191,9 @@ end = struct
     let msg x = Format.fprintf fmt x in
 
     match error with
+    | FXE_MatchWildcard ->
+        msg "pattern matching with wildcard not support"
+
     | FXE_EmptyMatch ->
         msg "this pattern matching has no branches"
 
@@ -209,8 +212,9 @@ end = struct
     | FXE_MatchDupBranches ->
         msg "this pattern matching contains duplicated branches"
 
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
+    | FXE_MatchPartial ids ->
+        msg "this pattern matching is non-exhaustive, %a are missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"
@@ -300,6 +304,9 @@ end = struct
 
     | DuplicatedField name ->
         msg "duplicated field name: `%s'" name
+
+    |DuplicatedException name ->
+        msg "duplicated exception: %a" pp_qsymbol name
 
     | NonLinearPattern ->
         msg "non-linear pattern matching"
@@ -423,7 +430,10 @@ end = struct
         msg "unknown type name: %a" pp_qsymbol name
 
     | UnknownFunName name ->
-        msg "unknown procedure: %a" pp_qsymbol name
+      msg "unknown procedure: %a" pp_qsymbol name
+
+    | UnknownExceptionName name ->
+      msg "unknown exception: %a" pp_qsymbol name
 
     | UnknownModVar x ->
         msg "unknown module-level variable: %a" pp_qsymbol x
@@ -739,7 +749,7 @@ end = struct
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module"
+        msg "Cannot override theory `%s`: contains module or exception"
           (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
@@ -781,6 +791,9 @@ end = struct
         msg
           "cannot realized a (non-axiomatic) lemma: `%s'"
           (string_of_qsymbol x)
+    | CE_NoExceptions ->
+      msg
+        "Override of exceptions not allowed"
 end
 
 (* -------------------------------------------------------------------- *)

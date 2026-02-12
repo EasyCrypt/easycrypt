@@ -695,8 +695,18 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
               Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
           assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
           let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
+          let poe2 =
+            EcAst.map2_poe
+              (fun a b -> (a,b))
+              (hf_po hf1).hsi_inv
+              (hf_po hf2).hsi_inv
+          in
+          let lpoe2 = poe_to_list poe2 in
+          let lf1 = List.map fst lpoe2 in
+          let lf2 = List.map snd lpoe2 in
+
           List.iter2 (doit env (subst, mxs))
-            [(hf_pr hf1).inv; (hf_po hf1).inv] [(hf_pr hf2).inv; (hf_po hf2).inv]
+            ((hf_pr hf1).inv :: lf1) ((hf_pr hf2).inv :: lf2)
       end
 
       | FbdHoareF hf1, FbdHoareF hf2 -> begin
@@ -1025,7 +1035,8 @@ module FPosition = struct
               doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event.inv)])
 
           | FhoareF hs ->
-              doit pos (`WithCtxt (Sid.add hs.hf_m ctxt, [(hf_pr hs).inv; (hf_po hs).inv]))
+            let lf = poe_to_list (hf_po hs).hsi_inv in
+            doit pos (`WithCtxt (Sid.add hs.hf_m ctxt, (hf_pr hs).inv :: lf))
 
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
@@ -1174,9 +1185,14 @@ module FPosition = struct
               f_pr pr.pr_mem pr.pr_fun args' {m;inv=event'}
 
           | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [(hf_pr hf).inv; (hf_po hf).inv]) in
+              let hf_pr = as_seq1 (doit p [(hf_pr hf).inv]) in
+              let hf_po =
+                map_poe
+                  (fun f -> as_seq1 (doit p [f]))
+                  (hf_po hf).hsi_inv
+              in
               let m = hf.hf_m in
-              f_hoareF {m;inv=hf_pr} hf.hf_f {m;inv=hf_po}
+              f_hoareF {m;inv=hf_pr} hf.hf_f {hsi_m= m;hsi_inv=hf_po}
 
           | FeHoareF hf ->
               let (ehf_pr, ehf_po) =

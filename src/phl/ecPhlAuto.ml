@@ -14,12 +14,13 @@ let tc_noauto_error pf ?loc () =
 
 (* -------------------------------------------------------------------- *)
 let t_exfalso_r tc =
+  let pre = tc1_get_pre tc in
   let post = tc1_get_post tc in
 
   FApi.t_or
     EcPhlTAuto.t_core_exfalso
     (FApi.t_seqsub
-       (EcPhlConseq.t_conseq (map_inv1 (fun _ -> f_false) post) post)
+       (EcPhlConseq.t_conseq (map_inv1 (fun _ -> f_false) pre) post)
        [t_id; t_trivial; EcPhlTAuto.t_core_exfalso])
     tc
 

@@ -108,8 +108,8 @@ val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
-val f_hoareF : ss_inv -> xpath -> ss_inv -> form
-val f_hoareS : memtype -> ss_inv -> stmt -> ss_inv -> form
+val f_hoareF : ss_inv -> xpath -> hs_inv -> form
+val f_hoareS : memtype -> ss_inv -> stmt -> hs_inv -> form
 
 val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
 val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
@@ -307,7 +307,7 @@ val split_fun  : form -> bindings * form
 val split_args : form -> form * form list
 
 (* -------------------------------------------------------------------- *)
-val form_of_expr : EcTypes.expr -> form
+val form_of_expr : ?m:EcMemory.memory -> EcTypes.expr -> form
 val ss_inv_of_expr : EcMemory.memory -> EcTypes.expr -> ss_inv
 
 (* -------------------------------------------------------------------- *)

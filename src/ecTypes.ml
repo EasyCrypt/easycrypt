@@ -67,6 +67,7 @@ let tglob m      = mk_ty (Tglob m)
 (* -------------------------------------------------------------------- *)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
 let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let texn       = tconstr EcCoreLib.CI_Exn  .p_exn    []
 let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
 let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
 
@@ -392,6 +393,9 @@ let e_app x args ty =
 
 let e_app_op ?(tyargs=[]) op args ty =
   e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
+
+let e_not e =
+  e_app (e_op EcCoreLib.CI_Bool.p_not [] tbool) [e] tbool
 
 (* -------------------------------------------------------------------- *)
 module Reals : sig

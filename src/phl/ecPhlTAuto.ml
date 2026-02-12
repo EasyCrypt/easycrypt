@@ -6,12 +6,13 @@ open EcCoreGoal
 open EcLowPhlGoal
 
 (* -------------------------------------------------------------------- *)
+
 let t_hoare_true_r tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF hf when f_equal (hf_po hf).inv f_true ->
+  | FhoareF hf when forall_poe (f_equal f_true) (hf_po hf).hsi_inv ->
       FApi.xmutate1 tc `HoareTrue []
 
-  | FhoareS hs when f_equal (hs_po hs).inv f_true ->
+  | FhoareS hs when forall_poe (f_equal f_true) (hs_po hs).hsi_inv ->
       FApi.xmutate1 tc `HoareTrue []
 
   | _ ->

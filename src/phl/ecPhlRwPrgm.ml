@@ -23,10 +23,11 @@ let process_idassign ((cpos, pv) : idassign_t) (tc : tcenv1) =
     let s = Zpr.zipper_of_cpos env cpos hs.hs_s in
     let s = { s with z_tail = sasgn :: s.z_tail } in
     { hs with hs_s = Zpr.zip s } in
-  FApi.xmutate1 tc `IdAssign [EcFol.f_hoareS (snd hs.hs_m) (hs_pr hs) (hs.hs_s) (hs_po hs)]
+  FApi.xmutate1 tc `IdAssign
+    [EcFol.f_hoareS (snd hs.hs_m) (hs_pr hs) (hs.hs_s) (hs_po hs)]
 
 (* -------------------------------------------------------------------- *)
 let process_rw_prgm (mode : rwprgm) (tc : tcenv1) =
-  match mode with 
+  match mode with
   | `IdAssign (cpos, pv) ->
     process_idassign (cpos, pv) tc

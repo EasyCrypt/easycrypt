@@ -203,7 +203,8 @@ let t_eager_if_r tc =
     let eqb = f_eq fe (f_local b tbool) in
     let pre = { m = ml; inv = f_and pr_inv eqb } in
     let post = { m = ml; inv = eqb } in
-    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ] (f_hoareS ml_ty pre s post)
+    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ]
+      (f_hoareS ml_ty pre s (empty_hs post))
   in
 
   let cT =
@@ -258,7 +259,8 @@ let t_eager_while_r i tc =
     let eqb = f_eq el.inv (f_local b tbool) in
     let pre = { m = ml; inv = f_and pr_inv eqb } in
     let post = { m = ml; inv = eqb } in
-    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ] (f_hoareS ml_ty pre s post)
+    f_forall [ (mr, GTmem mr_ty); (b, GTty tbool) ]
+      (f_hoareS ml_ty pre s (empty_hs post))
   and dT = f_equivS ml_ty mr_ty eqMem1 c' c' i
   and eT = f_equivS ml_ty mr_ty i c c i
   and fT =
@@ -456,7 +458,7 @@ let process_call info tc =
     f_eagerF { ml; mr; inv = fpre } sl fl fr sr { ml; mr; inv = fpost }
   in
   let process_cut = function
-    | EcParsetree.CI_spec (fpre, fpost) -> process_cut' fpre fpost
+    | EcParsetree.CI_spec (fpre, fpost) -> process_cut' fpre fpost.pnormal
     | CI_inv inv -> process_cut' inv inv
     | _ -> tc_error !!tc "eager: invalid call specification"
   in

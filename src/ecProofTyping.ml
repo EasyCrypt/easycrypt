@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcTypes
+open EcPath
 open EcFol
 open EcEnv
 open EcCoreGoal
@@ -84,6 +85,13 @@ let pf_process_exp pe hyps mode oty e =
 let pf_process_pattern pe hyps fp =
   Exn.recast_pe pe hyps (fun () -> process_pattern hyps fp)
 
+let pf_process_poe hyps poe =
+  let env  = LDecl.toenv hyps in
+  let ue = unienv_of_hyps hyps in
+  let m, d = EcTyping.trans_poe env ue poe in
+  let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
+  Mp.map (EcFol.Fsubst.f_subst ts) m, omap (EcFol.Fsubst.f_subst ts) d
+
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt ?mv tc oty pf =
   Exn.recast_tc1 tc (fun hyps -> process_form_opt ?mv hyps pf oty)
@@ -165,7 +173,9 @@ let tc1_process_Xhl_form ?side tc ty pf =
 
   let mv =
     match concl.f_node with
-    | FhoareS   hs -> Some ((hs_pr hs).inv , (hs_po hs).inv )
+    | FhoareS   hs ->
+      let (po, _, _) = (hs_po hs).hsi_inv in
+      Some ((hs_pr hs).inv , po )
     | FeHoareS  hs -> Some ((ehs_pr hs).inv, (ehs_po hs).inv)
     | FbdHoareS hs -> Some ((bhs_pr hs).inv, (bhs_po hs).inv)
     | _            -> None
@@ -251,3 +261,32 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     | _ -> raise NoMatch
   in
     lazy_destruct ~reduce hyps doit fp
+
+(* -------------------------------------------------------------------- *)
+let merge2_poe_list (poe1,d1) (poe2,d2) =
+  let get_default d =
+    match d with
+    | Some d -> d
+    | None ->  failwith "no default exception"
+  in
+  let aux _ a b =
+    match a,b with
+    | Some a, Some b ->
+      let bd, body = decompose_lambda a in
+      let args = List.map (fun (x, gty) -> f_local x (gty_as_ty gty)) bd in
+      Some (f_forall bd (f_imp (f_app_simpl b args tbool) body))
+
+    | Some a, None ->
+      let bd, body = decompose_lambda a in
+      Some (f_forall bd (f_imp (get_default d2) body))
+    | None, Some b ->
+      let bd, body = decompose_lambda b in
+      Some (f_forall bd (f_imp body (get_default d1)))
+    | None, None -> assert false
+  in
+  let epost = Mp.merge aux poe1 poe2 in
+  let poe = List.map snd (Mp.bindings epost) in
+  match d2, d1 with
+  | None, _ -> poe
+  | Some d2, Some d1 -> f_imp d2 d1 :: poe
+  | _, _ -> failwith "no default exception"

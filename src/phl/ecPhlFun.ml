@@ -79,8 +79,11 @@ let t_hoareF_fun_def_r tc =
   let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
   let m = EcMemory.memory memenv in
   let fres = odfl {m;inv=f_tt} (omap (ss_inv_of_expr m) fdef.f_ret) in
-  let post = map_ss_inv2 (PVM.subst1 env pv_res m) fres (hf_po hf) in
+  let (post,epost,d) = (hf_po hf).hsi_inv in
+  let post = {m=(hf_po hf).hsi_m;inv=post} in
+  let post = map_ss_inv2 (PVM.subst1 env pv_res m) fres  post in
   let pre  = map_ss_inv1 (PVM.subst env (subst_pre env fsig m PVM.empty)) (hf_pr hf) in
+  let post = {hsi_m=post.m;hsi_inv=(post.inv,epost,d)} in
   let concl' = f_hoareS (snd memenv) pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -160,7 +163,7 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let fv = PV.fv env inv.m inv.inv in
     PV.check_depend env fv top;
-    let ospec o = f_hoareF inv o inv in
+    let ospec o = f_hoareF inv o (lift_f inv) in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -248,7 +251,7 @@ let t_hoareF_abs_r inv tc =
   let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
-  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
+  FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre (lift_f post) tc)
 
 let t_ehoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
@@ -438,8 +441,8 @@ let t_fun_to_code_hoare_r tc =
   let spr = ToCodeLow.add_var_tuple env pv_arg m a m PVM.empty in
   let spo = ToCodeLow.add_var env pv_res m r m PVM.empty in
   let pre  = PVM.subst env spr (hf_pr hf).inv in
-  let post = PVM.subst env spo (hf_po hf).inv in
-  let concl = f_hoareS mt {m;inv=pre} st {m;inv=post} in
+  let post = map_poe (PVM.subst env spo) (hf_po hf).hsi_inv in
+  let concl = f_hoareS mt {m;inv=pre} st {hsi_m=m;hsi_inv=post} in
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -549,7 +552,7 @@ let t_fun_r (inv: inv) tc =
   let th tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      | _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.hf_f env
@@ -559,7 +562,7 @@ let t_fun_r (inv: inv) tc =
   and teh tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      |  _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_eHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.ehf_f env
@@ -569,7 +572,7 @@ let t_fun_r (inv: inv) tc =
   and tbh tc =
     let inv = match inv with
       | Inv_ss inv -> inv
-      | Inv_ts _ -> tc_error !!tc "expected a single sided invariant" in
+      |  _ -> tc_error !!tc "expected a single sided invariant" in
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.bhf_f env
@@ -579,7 +582,7 @@ let t_fun_r (inv: inv) tc =
   and te tc =
     let inv = match inv with
       | Inv_ts inv -> inv
-      | Inv_ss _ -> tc_error !!tc "expected a two sided invariant" in
+      | _ -> tc_error !!tc "expected a two sided invariant" in
     let env = FApi.tc1_env tc in
     let e   = destr_equivF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun e.ef_fl env

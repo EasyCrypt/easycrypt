@@ -88,6 +88,7 @@ and plpattern = plpattern_r located
 
 type ppattern =
 | PPApp of (pqsymbol * ptyannot option) * osymbol list
+| PPAny
 
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
@@ -161,7 +162,7 @@ and pinstr_r =
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch
-  | PSassert of pexpr
+  | PSraise  of pexpr
 
 and psmatch = [
   | `Full of (ppattern * pstmt) list
@@ -176,6 +177,12 @@ and pexpr   = pexpr_r located
 and pexpr_r = Expr of pformula
 
 and pformula  = pformula_r located
+
+and phoare_except = (ppattern * pformula) list located
+
+and phoare_post =
+  { pnormal : pformula;
+    pexcept  : phoare_except }
 
 and pformula_r =
   | PFhole
@@ -202,8 +209,7 @@ and pformula_r =
   | PFeqf     of pformula list
   | PFlsless  of pgamepath
   | PFscope   of pqsymbol * pformula
-
-  | PFhoareF   of psymbol option * pformula * pgamepath * pformula
+  | PFhoareF   of psymbol option * pformula * pgamepath * phoare_post
   | PFehoareF  of psymbol option * pformula * pgamepath * pformula
   | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
@@ -436,6 +442,12 @@ and pprocop = {
   ppo_locality : locality;
 }
 
+type pexception_decl = {
+    pe_name     : psymbol;
+    pe_dom      : pty list;
+    pe_locality : locality;
+  }
+
 type ppred_def =
   | PPabstr of pty list
   | PPconcr of ptybindings * pformula
@@ -539,7 +551,7 @@ type pipattern =
 and pspattern = unit
 
 type call_info =
-  | CI_spec of (pformula * pformula)
+  | CI_spec of (pformula * phoare_post)
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
@@ -685,7 +697,10 @@ type deno_ppterm = (pformula option pair) gppterm
 type conseq_info =
   | CQI_bd of phoarecmp option * pformula
 
-type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
+type conseq_contra =
+  pformula option * pformula option * phoare_except option
+
+type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
@@ -1264,6 +1279,7 @@ type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
+  | Gexception   of pexception_decl
   | Gprocop      of pprocop
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation
