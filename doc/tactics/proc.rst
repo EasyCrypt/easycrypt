@@ -1,20 +1,20 @@
 ========================================================================
-Tactic: ``proc``
+Tactic: `proc`
 ========================================================================
 
-The ``proc`` tactic applies to program-logic goals where the procedure(s)
+The `proc` tactic applies to program-logic goals where the procedure(s)
 under consideration are referred to by name rather than content. It is
 typically the first tactic applied when reasoning about procedure calls
 or top level program logic statements.
 
-There are two variants of the ``proc`` tactic, depending on whether the 
+There are two variants of the `proc` tactic, depending on whether the 
 procedure(s) in question are abstract (i.e., declared but not defined)
 or concrete (i.e., defined with a body of code).
 
 The abstract variant is a bit different for probabilistic relational 
 Hoare logic compared to the other program logics, so we describe it
 separately. When one of the two procedures is abstract and the other is
-concrete the ``proc*`` tactic can be used instead.
+concrete the :ref:`proc* <procstar-tactic>` tactic can be used instead.
 
 .. contents::
    :local:
@@ -25,9 +25,9 @@ Variant: Concrete procedure(s)
 
 .. admonition:: Syntax
 
-  ``proc``
+  `proc`
 
-The ``proc`` tactic, when applied to concrete procedures, unfolds the 
+The `proc` tactic, when applied to concrete procedures, unfolds the 
 procedure definition(s) at hand, replacing the procedure call(s)
 with the body(ies) of the corresponding procedure(s). The proof goal is
 then updated accordingly.
@@ -88,9 +88,9 @@ Variant: Abstract procedure (non-relational)
 
 .. admonition:: Syntax
 
-  ``proc {formulaI}``
+  `proc {formulaI}`
 
-Here, ``{formulaI}`` is an invariant that should be preserved by the 
+Here, `{formulaI}` is an invariant that should be preserved by the 
 procedure. The invariant can refer to global variables not being modified 
 by the procedure. To ensure that variables of interest cannot be modified,
 it may be necessary to add restrictions to the module type of the abstract procedure, specifying which globals are not accessed.
@@ -230,34 +230,34 @@ of the procedure under consideration.
 Variant: Abstract procedure (relational)
 ------------------------------------------------------------------------
 
-The relational variant of the ``proc`` tactic for abstract procedures
+The relational variant of the `proc` tactic for abstract procedures
 requires both procedures to be the same, though their module arguments
 may differ.
 
 .. admonition:: Syntax
 
-  - ``proc {formulaI}``
-  - ``proc {formulaB} {formulaI}``
-  - ``proc {formulaB} {formulaI} {formulaJ}``
+  - `proc {formulaI}`
+  - `proc {formulaB} {formulaI}`
+  - `proc {formulaB} {formulaI} {formulaJ}`
 
 Here: 
 
-- ``{formulaI}`` is a two-sided invariant that should be preserved by the
+- `{formulaI}` is a two-sided invariant that should be preserved by the
   pair of procedures.
-- ``{formulaB}`` is an optional formula representing a bad event on the 
+- `{formulaB}` is an optional formula representing a bad event on the 
   right side after which the invariant need no longer hold.
-- ``{formulaJ}`` is an optional formula representing the invariant after
-  the bad event has occurred. This is optional even if ``{formulaB}`` is 
-  provided; in which case the invariant is taken to be ``true`` after the 
+- `{formulaJ}` is an optional formula representing the invariant after
+  the bad event has occurred. This is optional even if `{formulaB}` is 
+  provided; in which case the invariant is taken to be `true` after the 
   bad event.
 
 The tactic can be thought of as keeping both procedures in sync using 
-``{formulaI}`` until the bad event ``{formulaB}`` occurs on the right 
-side, after which they are no longer kept in sync. Instead ``{formulaJ}`` 
+`{formulaI}` until the bad event `{formulaB}` occurs on the right 
+side, after which they are no longer kept in sync. Instead `{formulaJ}` 
 is then preserved by the left and right procedures individually, no matter 
 the order in which the two sides make progress.
 
-When only ``{formulaI}`` is provided, the tactic works similarly to the 
+When only `{formulaI}` is provided, the tactic works similarly to the 
 non-relational variants, generating proof obligations to ensure that
 the invariant, equality of the globals of the module containing the 
 procedure and equality of arguments holds and that equality of the 
@@ -315,11 +315,11 @@ and yield equal results when called on equal arguments.
      (* Procedure g2 preserves invariant *)
    abort.
 
-When ``{formulaB}`` and ``{formulaJ}`` are provided, the equality of 
-arguments, results, globals and ``{formulaI}`` obligations are modified to 
+When `{formulaB}` and `{formulaJ}` are provided, the equality of 
+arguments, results, globals and `{formulaI}` obligations are modified to 
 only hold/need to hold conditional on the bad event not having occurred on 
 the right side. When the bad event has occurred, we instead require that 
-``{formulaJ}`` holds without any additional equality requirements. Since 
+`{formulaJ}` holds without any additional equality requirements. Since 
 the behavior of the two sides is no longer synchronized after the bad 
 event, an obligation is generated to ensure that the procedure is lossless 
 when the procedures in its module arguments are lossless, to avoid the 
@@ -327,18 +327,18 @@ weights diverging after the bad event.
 
 For every procedure of every module argument to the abstract procedure on 
 the left, an additional proof obligation is generated to ensure that the 
-when the bad event has happened and ``{formulaJ}`` holds for some right 
+when the bad event has happened and `{formulaJ}` holds for some right 
 memory, then it is guaranteed to still hold for that right memory after 
 running the procedure of the argument on the left. Similarly, for every 
 procedure of every module argument to the abstract procedure on the right, 
 an additional proof obligation is generated to ensure that when the bad 
-event has happened and ``{formulaJ}`` holds for some left memory, then the 
-bad event on the right and the two-sided invariant ``{formulaJ}`` is 
+event has happened and `{formulaJ}` holds for some left memory, then the 
+bad event on the right and the two-sided invariant `{formulaJ}` is 
 guaranteed to still hold for the left memory after running the procedure 
 of the argument on the right.
 
 If you want the bad event to be on the left side instead, you can swap the 
-two programs using the ``sym`` tactic before applying ``proc``.
+two programs using the `sym` tactic before applying `proc`.
 
 .. ecproof::
    :title: Probabilistic Relational Hoare logic example with bad event
