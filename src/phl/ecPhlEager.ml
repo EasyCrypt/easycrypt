@@ -96,7 +96,7 @@ let destruct_on_op id_op tc =
   let env = FApi.tc1_env tc and es = tc1_as_equivS tc in
   let s =
     try
-      let s, _ = split_at_cpos1 env (-1, `ByMatch (None, id_op)) es.es_sl
+      let s, _ = split_at_cpos1 env (-1, `ByMatch (Some (-1), id_op)) es.es_sl
       (* ensure the right statement also contains an [id_op]: *)
       and _, _ = split_at_cpos1 env (1, `ByMatch (None, id_op)) es.es_sr in
       s
@@ -237,7 +237,7 @@ let t_eager_while_r i tc =
     subst_expr (add_memory empty mr ml)
   in
 
-  if (not (e_equal e (sub_to_left_mem _e))) then
+  if (not (ER.EqTest.for_expr env e (sub_to_left_mem _e))) then
     tc_error !!tc "eager: both while guards must be syntactically equal";
   
   let eqMem1 = eq_on_form_and_stmt env i c' and eqI = eq_on_sided_form env i in
@@ -317,7 +317,7 @@ let t_eager_fun_def_r tc =
 let t_eager_fun_abs_r i tc =
   let env, _, _ = FApi.tc1_eflat tc and eg = tc1_as_eagerF tc in
 
-  if not (s_equal eg.eg_sl eg.eg_sr) then
+  if not (ER.EqTest.for_stmt env eg.eg_sl eg.eg_sr) then
     tc_error !!tc "eager: both swapping statements must be identical";
 
   if not (ensure_eq_shape tc i.ml i.mr i.inv) then
