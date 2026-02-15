@@ -5,7 +5,7 @@ Tactic: `hoare split`
 The `hoare split` tactic applies to **Hoare-logic goals only** whose
 postcondition is a conjunction.
 
-In this situation, the program is required to establish *all* components of
+In this situation, the program is required to establish *both* components of
 the postcondition. The `hoare split` tactic makes this explicit by splitting
 the original goal into independent Hoare goals, one for each conjunct.
 
@@ -16,6 +16,10 @@ only decomposes the logical structure of the postcondition.
 
    The `hoare split` tactic is new and subject to change. Its interface and
    behavior may evolve in future versions of EasyCrypt.
+
+   Currently, it only splits the top-most conjunction into two conjuncts. 
+   If you have nested conjunctions in the postcondition, you can 
+   apply `hoare split` multiple times to fully decompose the postcondition.
 
 .. contents::
    :local:
