@@ -174,3 +174,5 @@ proof.
 circuit.
 qed.
 
+bind circuit 
+  (+^) <- "BVXOR_8".
