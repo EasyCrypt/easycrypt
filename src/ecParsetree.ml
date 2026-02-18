@@ -1193,7 +1193,7 @@ and op_override = op_override_def genoverride * clmode
 and pr_override = pr_override_def genoverride * clmode
 and me_override = pqsymbol * clmode
 and mt_override = pqsymbol * clmode
-and th_override = pqsymbol * clmode
+and th_override = pqsymbol * clmode * theory_renaming list
 and ax_override = pqsymbol * clmode
 and nt_override = EcPath.path * clmode
 
