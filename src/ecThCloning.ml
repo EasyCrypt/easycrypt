@@ -220,6 +220,53 @@ and rk_categories = {
 }
 
 (* -------------------------------------------------------------------- *)
+type octxt = {
+  oc_env : EcEnv.env;
+  oc_oth : ctheory;
+}
+
+(* -------------------------------------------------------------------- *)
+module Renaming : sig
+  val rename1 : octxt -> theory_renaming -> renaming
+end = struct
+  let rename1 oc (k, (r1, r2)) : renaming =
+    let e1 =
+      try  EcRegexp.regexp (unloc r1)
+      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r1)) in
+    let e2 =
+      try  EcRegexp.subst (unloc r2)
+      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r2)) in
+
+    Array.iter
+      (fun m ->
+        if EcRegexp.match_ (`S "^0+$") (oget m.(1)) then
+          clone_error oc.oc_env (CE_InvalidRE (unloc r2)))
+      (try  EcRegexp.extract (`S "\\$([0-9]+)") (unloc r2)
+       with Not_found -> [||]);
+
+    let k =
+      if List.is_empty k then `All else
+
+        let update rk = function
+          | `Lemma   -> { rk with rkc_lemmas  = true; }
+          | `Type    -> { rk with rkc_types   = true; }
+          | `Op      -> { rk with rkc_ops     = true; }
+          | `Pred    -> { rk with rkc_preds   = true; }
+          | `Module  -> { rk with rkc_module  = true; }
+          | `ModType -> { rk with rkc_modtype = true; }
+          | `Theory  -> { rk with rkc_theory  = true; } in
+
+        let init = {
+          rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
+          rkc_preds   = false; rkc_module  = false; rkc_modtype = false;
+          rkc_theory  = false; } in
+
+        `Selected (List.fold_left update init k)
+
+    in (k, (e1, e2))
+end
+
+(* -------------------------------------------------------------------- *)
 let rename ((rk, (rex, itempl)) : renaming) (k, x) =
   let selected =
     match rk, k with
@@ -238,12 +285,6 @@ let rename ((rk, (rex, itempl)) : renaming) (k, x) =
     with Failure _ -> x in
 
   if x = newx then None else Some newx
-
-(* -------------------------------------------------------------------- *)
-type octxt = {
-  oc_env : EcEnv.env;
-  oc_oth : ctheory;
-}
 
 (* -------------------------------------------------------------------- *)
 module OVRD : sig
@@ -373,7 +414,9 @@ end = struct
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let th_ovrd oc ((proofs, evc) : state) name ((thd, mode) : th_override) =
+  let th_ovrd oc ((proofs, evc) : state) name ((thd, mode, prerenames) : th_override) =
+    let prerenames = List.map (Renaming.rename1 oc) prerenames in
+
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
     let loced x = mk_loc lc x in
@@ -406,6 +449,11 @@ end = struct
     let thd  = let thd = EcPath.toqsymbol sp in (fst thd @ [snd thd]) in
     let xdth = nm @ [x] in
 
+    let rename (kind, name) =
+      try
+        List.find_map (fun rnm -> rename rnm (kind, name)) prerenames
+      with Not_found -> name in
+
     assert (not (Msym.mem x evc.evc_ths));
 
     let evc = { evc with
@@ -413,35 +461,41 @@ end = struct
         let sub, clear = odfl (evc_empty, false) sub in
         Some (sub, clear || (mode <> `Alias))) x evc.evc_ths } in
 
-    let rec doit_r prefix (proofs, evc) dth =
+    let rec doit_r (prefix, tgprefix) (proofs, evc) dth =
+      let dtpath (x : symbol) =
+        loced (xdth @ prefix, x) in
+
+      let tgpath ?kind (x : symbol) =
+        let x = Option.fold ~none:x ~some:(fun k -> rename (k, x)) kind in
+        EcPath.fromqsymbol (thd @ tgprefix, x) in
+
       match dth with
       | Th_type (x, _) ->
-         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
-         let ovrd = (ovrd, mode) in
-         ty_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+         let ovrd = `ByPath (tgpath ~kind:`Type x), mode in
+         ty_ovrd oc (proofs, evc) (dtpath x) ovrd
 
       | Th_operator (x, ({ op_kind = OB_oper _ })) ->
-         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
-         let ovrd = (ovrd, mode) in
-         op_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+         let ovrd = (`ByPath (tgpath ~kind:`Op x), mode) in
+         op_ovrd oc (proofs, evc) (dtpath x) ovrd
 
       | Th_operator (x, ({ op_kind = OB_pred _ })) ->
-         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
-         let ovrd = (ovrd, mode) in
-         pr_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+         let ovrd = (`ByPath (tgpath ~kind:`Pred x), mode) in
+         pr_ovrd oc (proofs, evc) (dtpath x) ovrd
 
       | Th_operator (x, {op_kind=OB_nott _; _ }) ->
-         let ovrd = EcPath.fromqsymbol (thd @ prefix, x) in
-         let ovrd = (ovrd, mode) in
-         nt_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+         let ovrd = (tgpath x, mode) in
+         nt_ovrd oc (proofs, evc) (dtpath x) ovrd
 
       | Th_axiom (x, _) ->
-        let axd = loced (thd @ prefix, x) in
-        let name = (loced (xdth @ prefix, x)) in
-        ax_ovrd oc (proofs, evc) name  (axd, mode)
+        let axd  = loced (EcPath.toqsymbol (tgpath ~kind:`Axiom x)) in
+        ax_ovrd oc (proofs, evc) (dtpath x) (axd, mode)
 
       | Th_theory (x, dth) when dth.cth_mode = `Concrete ->
-         List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_items
+        let tgx = rename (`Theory, x) in
+         List.fold_left
+          (doit (prefix @ [x], tgprefix @ [tgx]))
+          (proofs, evc)
+          dth.cth_items
 
       | Th_theory (_, _) ->
           (proofs, evc)
@@ -453,9 +507,9 @@ end = struct
          (proofs, evc)
 
       | Th_modtype (x, _) ->
-         modtype_ovrd
-           oc (proofs, evc) (loced (xdth @ prefix, x))
-           (loced (thd @ prefix, x), mode)
+        let ovrd = loced (EcPath.toqsymbol (tgpath ~kind:`ModType x)) in
+        modtype_ovrd
+          oc (proofs, evc) (dtpath x) (ovrd, mode)
 
       | Th_instance _   -> (proofs, evc)
 
@@ -468,7 +522,7 @@ end = struct
     and doit prefix (proofs, evc) dth =
       doit_r prefix (proofs, evc) dth.ti_item
 
-    in List.fold_left (doit []) (proofs, evc) dth.cth_items
+    in List.fold_left (doit ([], [])) (proofs, evc) dth.cth_items
 
   (* ------------------------------------------------------------------ *)
   let ovrd oc state name (ovrd : theory_override) =
@@ -490,47 +544,6 @@ end = struct
 
      | PTHO_Theory thd ->
         th_ovrd oc state name thd
-end
-
-(* -------------------------------------------------------------------- *)
-module Renaming : sig
-  val rename1 : octxt -> theory_renaming -> renaming
-end = struct
-  let rename1 oc (k, (r1, r2)) : renaming =
-    let e1 =
-      try  EcRegexp.regexp (unloc r1)
-      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r1)) in
-    let e2 =
-      try  EcRegexp.subst (unloc r2)
-      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r2)) in
-
-    Array.iter
-      (fun m ->
-        if EcRegexp.match_ (`S "^0+$") (oget m.(1)) then
-          clone_error oc.oc_env (CE_InvalidRE (unloc r2)))
-      (try  EcRegexp.extract (`S "\\$([0-9]+)") (unloc r2)
-       with Not_found -> [||]);
-
-    let k =
-      if List.is_empty k then `All else
-
-        let update rk = function
-          | `Lemma   -> { rk with rkc_lemmas  = true; }
-          | `Type    -> { rk with rkc_types   = true; }
-          | `Op      -> { rk with rkc_ops     = true; }
-          | `Pred    -> { rk with rkc_preds   = true; }
-          | `Module  -> { rk with rkc_module  = true; }
-          | `ModType -> { rk with rkc_modtype = true; }
-          | `Theory  -> { rk with rkc_theory  = true; } in
-
-        let init = {
-          rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
-          rkc_preds   = false; rkc_module  = false; rkc_modtype = false;
-          rkc_theory  = false; } in
-
-        `Selected (List.fold_left update init k)
-
-    in (k, (e1, e2))
 end
 
 (* -------------------------------------------------------------------- *)
