@@ -510,7 +510,7 @@ let rec pp_msymbol (fmt : Format.formatter) (mx : msymbol) =
     Format.fprintf fmt "@[<hov 2>%s(@,%a)@]" x (pp_list ",@ " pp_msymbol) args
 
   | mx1 :: mx ->
-    Format.fprintf fmt "%a.@,%a" pp_msymbol [mx1] pp_msymbol mx
+    Format.fprintf fmt "%a.%a" pp_msymbol [mx1] pp_msymbol mx
 
 (* -------------------------------------------------------------------- *)
 let pp_topmod ppe fmt p =

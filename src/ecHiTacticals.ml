@@ -240,6 +240,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve
     | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
+    | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
 
   try  tx tc

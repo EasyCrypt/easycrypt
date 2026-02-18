@@ -3180,6 +3180,9 @@ interleave_info:
 | PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
     { Prwprgm (`Change (o, b, w, s)) }
 
+| HOARE SPLIT
+    { Phoaresplit }
+
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 

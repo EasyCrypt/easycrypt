@@ -804,7 +804,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pchangestmt    of side option * ptybindings option * pcodepos_range * pstmt
-
+  | Phoaresplit
 
     (* Eager *)
   | Peager_seq       of (pcodepos1 pair * pstmt * pformula doption)

@@ -188,6 +188,22 @@ module Theory : sig
    * theory. *)
   val require : scope -> (required_info * thmode) -> (scope -> scope) -> scope
 
+  (* start/finish adding a new top-level required theory, not using loader
+   *
+   * [require_start] enters the theory, with the given name and theory mode,
+   * starting from the initial scope
+   *
+   * [require_finish old new_ ri] exits the top-level theory of [new_],
+   * resulting in a new scope, new', and a new loaded theory, th, and then
+   * forms a loaded theory map from the map of new', adding the binding of
+   * ri.rqd_name -> th
+   *   if old is supplied, it requires ri in the result of replacing
+       the loaded theories of old with the updated map
+   *   otherwise, it requires ri in the result of replacing the
+       the loaded theories of new' with the updated map *)
+  val require_start  : scope -> symbol -> thmode -> scope
+  val require_finish : ?old:scope option -> new_:scope -> required_info -> scope
+
   val add_clears : (pqsymbol option) list -> scope -> scope
 
   val required : scope -> required
