@@ -86,6 +86,8 @@ let t_phoare_deno_r pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let t_ehoare_deno_r pre post tc =
+  let m = pre.m in
+  assert (m = post.m);
   let env, _, concl = FApi.tc1_eflat tc in
 
   let f, bd =
@@ -99,16 +101,17 @@ let t_ehoare_deno_r pre post tc =
 
   let pr = destr_pr f in
   let concl_e = f_eHoareF pre pr.pr_fun post in
-  let mpr, mpo = EcEnv.Fun.hoareF_memenv pr.pr_mem pr.pr_fun env in
+  let _, mpo = EcEnv.Fun.hoareF_memenv m pr.pr_fun env in
   (* pre <= bd *)
   (* building the substitution for the pre *)
-  let sargs = PVM.add env pv_arg (fst mpr) pr.pr_args PVM.empty in
-  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id (fst mpr) pr.pr_mem in
+  let sargs = PVM.add env pv_arg m pr.pr_args PVM.empty in
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id m pr.pr_mem in
   let pre = Fsubst.f_subst smem (PVM.subst env sargs pre.inv) in
   let concl_pr = f_xreal_le pre (f_r2xr bd) in
 
   (* forall m, ev%r%xr <= post *)
   let ev = pr.pr_event in
+  let ev = ss_inv_rebind ev m in
   let concl_po = map_ss_inv2 f_xreal_le (map_ss_inv1 f_b2xr ev) post in
   let concl_po = f_forall_mems_ss_inv mpo concl_po in
 

@@ -1,9 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcIdent
-open EcSymbols
-open EcLocation
-open EcParsetree
 open EcAst
 open EcEnv
 open EcTypes
@@ -20,45 +16,12 @@ module Set = Batteries.Set
 module Option = Batteries.Option
 
 (* -------------------------------------------------------------------- *)
-exception BDepError of string Lazy.t
-exception BDepUninitializedInputs
-exception BadTypeForConstructor
-exception TyLookupError
-exception BDepVerifyFail
-
-(* TODO: Refactor error printing and checking? Lots of duplicated code *)
-
 let int_of_form = EcCircuits.int_of_form
 
 let time (env: env) (t: float) (msg: string) : float =
   let new_t = Unix.gettimeofday () in
   EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
   new_t
-
-(* 
-   f => arr_t.init (fun i => f.(i + offset)) 
-  Assumes f has an array type binding
-  Assumes f has enough positions so that 
-  arr_t.size + offset < size f (as array)
-*)
-(* FIXME: error handdling for this function *)
-let array_init_from_form (env: env) (f: form) ((arr_t, offset): qsymbol * BI.zint) : form =
-  let tpath = match EcEnv.Ty.lookup_opt arr_t env with
-  | None -> raise TyLookupError
-  | Some (path, decl) when List.length decl.tyd_params = 1 ->
-    path
-  | Some _ ->
-    raise BadTypeForConstructor
-  in
-  let get = match EcEnv.Circuit.lookup_array env f.f_ty with
-  | Some { get } -> get
-  | None -> circ_error (MissingTyBinding (`Ty f.f_ty))
-  in
-  let init = EcEnv.Op.lookup_path (fst (tpath |> EcPath.toqsymbol), "init") env in
-  let idx = create "i" in
-  let f = f_lambda [(idx, GTty tint)] 
-    (EcTypesafeFol.f_app_safe env get [f; f_int_add (f_local idx tint) (f_int offset)]) 
-  in EcTypesafeFol.f_app_safe env init [f]
 
 (* FIXME: move? V *)
 let form_list_from_iota (hyps: hyps) (f: form) : form list =
@@ -109,7 +72,7 @@ let rec destr_conj (hyps: hyps) (f: form) : form list =
 let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit list = 
   let env = FApi.tc1_env tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
-  let hyps = FApi.tc1_hyps tc in (* FIXME: should target be specified here? *)
+  let hyps = FApi.tc1_hyps tc in 
 
   (* Maybe move this to be a parameter and just supply it from outside *)
   let st = match st with
@@ -123,20 +86,26 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
 
   let fs = destr_conj f in
 
-  EcEnv.notify env EcGState.(`Debug) "Destructured conj, obtained:@.%a@."
+  EcEnv.notify env `Debug "Destructured conj, obtained:@.%a@."
     (EcPrinting.pp_list ";@\n" EcPrinting.(pp_form PPEnv.(ofenv env))) fs;
 
   (* If f is of the form (a_ = a) (aka prog_var = log_var) 
     then add it to the state, otherwise do nothing *)
   (* FIXME: are all the simplifications necessary ? *)
+  (* Processes explicit equations *)
+  (* FIXME PR: Make sure this works with things of the form
+     a{hr} = b{hr} /\ b{hr} = a{hr}
+     or even
+     a{hr} = b{hr} /\ b{hr} = c{hr} /\ c{hr} = a{hr}
+  *)
   let process_equality (s: state) (f: form) : state = 
     let f = (EcCallbyValue.norm_cbv (circ_red hyps) hyps f) in
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [a; b]) -> begin match EcFol.op_kind p, (EcCallbyValue.norm_cbv (circ_red hyps) hyps a), (EcCallbyValue.norm_cbv (circ_red hyps) hyps b) with
       | Some `Eq, {f_node = Fpvar (PVloc pv, m); _}, fv
       | Some `Eq, fv, {f_node = Fpvar (PVloc pv, m); _} -> 
-        EcEnv.notify env EcGState.(`Debug) "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
-        update_state_pv s m pv (circuit_of_form ~st hyps fv)
+        EcEnv.notify env `Debug "Adding equality to known information for translation: %a@." EcPrinting.(pp_form PPEnv.(ofenv env)) f;
+        update_state_pv s m pv (circuit_of_form st hyps fv)
       | _ -> s
     end 
     | _ -> s
@@ -149,29 +118,29 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
   let process_form (f: form) : circuit list = 
     match f.f_node with
     | Fapp ({f_node = Fop (p, _);_}, [f1; f2]) when EcFol.op_kind p = Some `Eq -> 
-      let c1 = circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f1) in
-      let c2 = circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f2) in
+      let c1 = circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f1) in
+      let c2 = circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f2) in
       circuit_eqs c1 c2
     | _ -> 
       begin
-      EcEnv.notify env EcGState.(`Debug) 
+      EcEnv.notify env `Debug 
       "Processing form: %a@.Simplified version: %a@."
         EcPrinting.(pp_form ppe) f
         EcPrinting.(pp_form ppe) (EcCallbyValue.norm_cbv (circ_red hyps) hyps f);
-      try (circuit_of_form ~st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f))::[] with
+      try (circuit_of_form st hyps (EcCallbyValue.norm_cbv (circ_red hyps) hyps f))::[] with
       e -> begin 
-        EcEnv.notify env EcGState.(`Debug) "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
+        EcEnv.notify env `Debug "Encountered exception when converting part of the pre to circuit: %s@." (Printexc.to_string e);
         [] end
       end
   in
 
   let cs = List.fold_left (fun acc f -> List.rev_append (process_form f) acc) [] fs |> List.rev in
 (*
-  EcEnv.notify env EcGState.(`Debug) "Translated as much as possible from pre to circuits, got:@.%a@\n"
+  EcEnv.notify env `Debug "Translated as much as possible from pre to circuits, got:@.%a@\n"
     (EcPrinting.pp_list "@\n@\n" pp_circuit) cs;
 *)
 
-  EcEnv.notify env EcGState.(`Debug) "In the context of the following bindings in the environment:@\n%a@\n"
+  EcEnv.notify env `Debug "In the context of the following bindings in the environment:@\n%a@\n"
   (EcPrinting.pp_list "@\n@\n" (fun fmt cinp -> Format.fprintf fmt "%a@." pp_cinp cinp)) (state_lambdas st);
   st, cs
 
@@ -180,16 +149,16 @@ let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bo
   let posts = destr_conj post in
 
   List.for_all (fun post ->
-  EcEnv.notify (toenv hyps) EcGState.(`Debug) "Solving post: %a@." 
+  EcEnv.notify (toenv hyps) `Debug "Solving post: %a@." 
   EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
   match post.f_node with
   | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> 
     begin match EcFol.op_kind p with
     | Some `Eq -> 
       circuit_simplify_equality ~st ~hyps ~pres f1 f2 
-    | _ -> circuit_of_form ~st hyps post |> state_close_circuit st |> circ_taut
+    | _ -> circuit_of_form st hyps post |> state_close_circuit st |> circ_taut
   end
-  | _ -> circuit_of_form ~st hyps post |> state_close_circuit st |> circ_taut
+  | _ -> circuit_of_form st hyps post |> state_close_circuit st |> circ_taut
   ) posts
 
 (* TODO: Figure out how to not repeat computations here? *) 
@@ -207,7 +176,9 @@ let t_bdep_solve
   match goal.f_node with 
   | FhoareS hs -> begin try
     let tm = Unix.gettimeofday () in
-    let st, cpres = process_pre tc (hs_pr hs).inv in
+    let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
+    let st = circuit_state_of_hyps ~st hyps in
+    let st, cpres = process_pre ~st tc (hs_pr hs).inv in
     let tm = time (toenv hyps) tm "Done with precondition processing" in
 
     (* Get open state *)
@@ -221,17 +192,17 @@ let t_bdep_solve
     else
       tc_error (FApi.tc1_penv tc) "failed to verify postcondition"
     with 
-    (* FIXME: not catching anything, redo *)
     | CircError err ->
       tc_error (FApi.tc1_penv tc) "circuit solve failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
   | FequivS es -> begin try
       let tm = Unix.gettimeofday () in
 
-      (* FIXME: rework this *)
-      let st = circuit_state_of_memenv ~st:empty_state (FApi.tc1_env tc) es.es_ml in
+      let st = set_logger empty_state (EcEnv.notify env `Debug "%s") in
+
+      let st = circuit_state_of_hyps ~st hyps in
+      let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es.es_ml in
       let st = circuit_state_of_memenv ~st (FApi.tc1_env tc) es.es_mr in
-  (*         let st = circuit_state_of_hyps ~st (FApi.tc1_hyps tc) in *)
 
       let st, cpres = process_pre ~st tc (es_pr es).inv in
       let tm = time (toenv hyps) tm "Done with precondition processing" in
@@ -239,6 +210,7 @@ let t_bdep_solve
       (* Circuits from pvars are tagged by memory so we can just put everything in one state *)
       let st = state_of_prog hyps (fst es.es_ml) ~st es.es_sl.s_node in
       let tm = time (toenv hyps) tm "Done with left program circuit gen" in
+
       let st = state_of_prog hyps (fst es.es_mr) ~st es.es_sr.s_node in
       let _tm = time (toenv hyps) tm "Done with right program circuit gen" in
 
@@ -255,8 +227,8 @@ let t_bdep_solve
       let ctxt = tohyps hyps in
       assert (ctxt.h_tvar = []);
       let st = circuit_state_of_hyps hyps in
-      let cgoal = (circuit_of_form ~st hyps goal |> state_close_circuit st) in
-      EcEnv.notify env EcGState.(`Debug) "goal: %a@." pp_flatcirc (fst cgoal).reg;
+      let cgoal = (circuit_of_form st hyps goal |> state_close_circuit st) in
+      EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg;
       if circ_taut cgoal then
       FApi.close (!@ tc) VBdep
       else 
@@ -268,8 +240,8 @@ let t_bdep_solve
 let t_bdep_simplify (tc: tcenv1) =
   let time (env: env) (t: float) (msg: string) : float =
     let new_t = Unix.gettimeofday () in
-    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. t);
-    (* Format.eprintf "[W] %s, took %f s@." msg (new_t -. t); *)
+    (* FIXME: change log level to debug? maybe not *)
+    EcEnv.notify ~immediate:true env `Info "%s, took %f s@." msg (new_t -. t);
     new_t
   in
   let hyps = (FApi.tc1_hyps tc) in
@@ -280,16 +252,15 @@ let t_bdep_simplify (tc: tcenv1) =
     begin try
       let m = fst hs.hs_m in
       let tm = Unix.gettimeofday () in
-      let st = circuit_state_of_hyps ~use_mem:true hyps in
+      let st = circuit_state_of_hyps hyps in
       let st = circuit_state_of_memenv ~st env hs.hs_m in
       let st, pres = process_pre ~st tc (hs_pr hs).inv in
       let tm = time env tm "Done with precondition processing" in
 
-      (* FIXME: line below throws, should handle exceptions *)
       let st = EcCircuits.state_of_prog ~st hyps (fst hs.hs_m) hs.hs_s.s_node in
       let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps (hs_po hs).inv in
 
-      EcEnv.notify env EcGState.(`Debug) "[W] Post after simplify (before circuit pass):@. %a@."
+      EcEnv.notify env `Debug "[W] Post after simplify (before circuit pass):@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) post;
 
       let tm = time env tm "Done with first simplify" in
@@ -299,14 +270,14 @@ let t_bdep_simplify (tc: tcenv1) =
       let _tm = time env tm "Done with second simplify" in
       let new_goal = f_hoareS (snd hs.hs_m) {inv=(hs_pr hs).inv; m} hs.hs_s {inv=f; m} in
 
-      EcEnv.notify env EcGState.(`Debug) "[W] Goal after simplify:@. %a@."
+      EcEnv.notify env `Debug "[W] Goal after simplify:@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
       
       FApi.mutate1 tc (fun _ -> VBdep) new_goal |> FApi.tcenv_of_tcenv1
     with CircError err ->
       tc_error (FApi.tc1_penv tc) "Circuit simplify failed with error: %a" (pp_circ_error EcPrinting.PPEnv.(ofenv env)) err
     end
-  | _ -> assert false (* FIXME : TODO *)
+  | _ -> assert false (* FIXME : Do we want to handle other cases before merge? *)
 
 (* ================ EXTENS TACTIC  ==================== *)
 (* FIXME: Maybe move later? *)
@@ -352,7 +323,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
         let fi = EcCallbyValue.norm_cbv redmode hyps fi in
         let e = try expr_of_ss_inv {f with inv=fi}
           with CannotTranslate ->
-            Format.eprintf "Failed on form : %a@."
+            EcEnv.notify env `Debug "Failed on form : %a@."
             EcPrinting.(pp_form PPEnv.(ofenv env)) fi;
             raise CannotTranslate
         in
@@ -364,7 +335,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
 
     let goals = match (tc1_goal tc).f_node, v with 
     | Fapp ({f_node = Fop (p, [tp]); _}, [fpred; flist]), None when p = EcCoreLib.CI_List.p_all && tp = tint->
-        Format.eprintf "[W] Found list all@.";
+        EcEnv.notify (tc1_env tc) `Debug "Found list all@.";
         begin match flist.f_node with
         | Fapp ({f_node = Fop (p, []); _}, [fstart; flen]) when p = EcCoreLib.CI_List.p_iota ->
           let start = match fstart.f_node with
@@ -381,7 +352,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
             EcTypesafeFol.fapply_safe (tc1_hyps tc) fpred [f_int EcBigInt.(of_int (i + start))]
           ) in
 
-          Format.eprintf "[w] Got iota => [%d, %d)@.Goals: %a@." start len 
+          EcEnv.notify (tc1_env tc) `Debug "Got iota => [%d, %d)@.Goals: %a@." start len 
           EcPrinting.(pp_list " | " (pp_form PPEnv.(ofenv (tc1_env tc)))) goals;
           goals
 
@@ -410,7 +381,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
       in
       let ngoals = 1 lsl size in
 (*       let ngoals = min ngoals 5 in *)
-      List.init ngoals (fun i ->  (* FIXME FIXME this is bad *)
+      List.init ngoals (fun i ->
         let subst = EcPV.PVM.(add (tc1_env tc) (PVloc v.v_name) (fst hs.hs_m) 
         (EcTypesafeFol.f_app_safe (tc1_env tc) of_int [f_int BI.(of_int i)]) empty)
         in
@@ -419,7 +390,7 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
         let pr = subst (hs_pr hs).inv in
         let po = subst (hs_po hs).inv in
         let goal = f_hoareS mt ({inv=pr;m}) s ({inv=po;m}) in
-        EcEnv.notify (FApi.tc1_env tc) EcGState.(`Debug) 
+        EcEnv.notify (FApi.tc1_env tc) `Debug 
         
         "[W] Generated goal %d => %a@." i
           EcPrinting.(pp_form PPEnv.(ofenv (tc1_env tc))) goal;

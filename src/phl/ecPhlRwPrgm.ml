@@ -51,9 +51,9 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
       match zp with
       | Zpr.ZTop -> None
       | Zpr.ZWhile (_, p) -> Some p
-      | Zpr.ZIfThen (e, p, _) -> Some p
-      | Zpr.ZIfElse (e, _, p) -> Some p
-      | Zpr.ZMatch (e, p, _) -> Some p in
+      | Zpr.ZIfThen (_, p, _) -> Some p
+      | Zpr.ZIfElse (_, _, p) -> Some p
+      | Zpr.ZMatch (_, p, _) -> Some p in
     match parent with
     | None -> pvs
     | Some ((_, tl), p) -> pvtail (EcPV.PV.union pvs (EcPV.is_read env tl)) p
@@ -64,10 +64,11 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
 
     let keep = pvtail (EcPV.is_read env tl) zp.z_path in
     let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (EcAst.hs_po hs).inv) in
+    let st = EcLowCircuits.(set_logger empty_state EcEnv.(notify env `Debug "%s")) in
 
     begin
       try
-        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem target s.s_node) then
+        if not (EcCircuits.instrs_equiv (FApi.tc1_hyps tc) ~keep mem st target s.s_node) then
           tc_error !!tc "statements are not circuit-equivalent"
         with e ->
           tc_error !!tc "circuit-equivalence checker error: %s" (Printexc.to_string e)

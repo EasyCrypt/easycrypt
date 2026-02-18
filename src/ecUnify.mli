@@ -6,8 +6,8 @@ open EcTypes
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
-exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
-exception UninstanciateUni
+exception UnificationFailure of [`TyUni of ty * ty]
+exception UninstantiateUni
 
 type unienv
 
@@ -19,10 +19,10 @@ type tvi = tvar_inst option
 type uidmap = uid -> ty option
 
 module UniEnv : sig
-  val create     : (EcIdent.t * Sp.t) list option -> unienv
+  val create     : ty_params option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val fresh      : ?tc:EcPath.Sp.t -> ?ty:ty -> unienv -> ty
+  val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty
   val opentvi    : unienv -> ty_params -> tvi -> ty EcIdent.Mid.t
@@ -35,11 +35,12 @@ module UniEnv : sig
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
-val hastc : EcEnv.env -> unienv -> ty -> Sp.t -> unit
 
 val tfun_expected : unienv -> ?retty:ty -> EcTypes.ty list -> EcTypes.ty
 
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
+
+type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
 
 val select_op :
      ?hidden:bool
@@ -49,4 +50,4 @@ val select_op :
   -> qsymbol
   -> unienv
   -> dom * ty option
-  -> ((EcPath.path * ty list) * ty * unienv * sbody option) list
+  -> select_result list

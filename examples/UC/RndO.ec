@@ -681,8 +681,7 @@ lemma eager_D :
          D(RRO).distinguish, RRO.resample(); :
          ={glob D, FRO.m} ==> ={FRO.m, glob D} /\ ={res}].
 proof.
-  eager proc (H_: RRO.resample(); ~ RRO.resample();: ={FRO.m} ==> ={FRO.m})
-             (={FRO.m}) =>//; try by sim.
+  eager proc (={FRO.m}) => //; try by sim.
   + by apply eager_init. + by apply eager_get. + by apply eager_set. 
   + by apply eager_rem. + by apply eager_sample. 
   + by apply eager_in_dom. + by apply eager_restrK. 

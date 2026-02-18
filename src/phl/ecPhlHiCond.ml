@@ -26,7 +26,7 @@ let process_cond (info : EcParsetree.pcond_info) tc =
     let i2 = Option.map (fun i2 -> EcLowPhlGoal.tc1_process_codepos1 tc (side, i2)) i2 in
     let n1 = default_if i1 es.es_sl in
     let n2 = default_if i2 es.es_sr in
-    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1, n2) f)
+    FApi.t_seqsub (EcPhlSeq.t_equiv_seq (n1, n2) f)
       [ t_id; t_equiv_cond side ] tc
 
   | `SeqOne (s, i, f1, f2) ->
@@ -36,7 +36,7 @@ let process_cond (info : EcParsetree.pcond_info) tc =
     let _, f1 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f1 in
     let _, f2 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f2 in
     FApi.t_seqsub
-      (EcPhlApp.t_equiv_app_onesided s n f1 f2)
+      (EcPhlSeq.t_equiv_seq_onesided s n f1 f2)
       [ t_id; t_bdhoare_cond] tc
 
 (* -------------------------------------------------------------------- *)

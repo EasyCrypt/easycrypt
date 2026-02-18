@@ -293,7 +293,7 @@ module Zipper = struct
     | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
     | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
     | ZMatch (e, sp, mpi) ->
-      zip (Some (i_match (e, mpi.prebr @ (mpi.locals, s) :: mpi.postbr))) sp
+      zip (Some (i_match (e, List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)))) sp
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
@@ -915,7 +915,7 @@ let f_match opts hyps (ue, ev) f1 f2 =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstanciateUni -> raise MatchFailure
+      with EcUnify.UninstantiateUni -> raise MatchFailure
     in
       (ue, clue, ev)
 

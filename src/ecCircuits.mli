@@ -16,17 +16,17 @@ type circuit_conversion_call = [
   | `ToArg of form
   | `ExpandIter of form * form list
   | `Instr of instr
+  | `Memenv of memenv
 ]
+
 
 type circuit_error =
 | MissingTyBinding of [`Ty of ty | `Path of path]
 | AbstractTyBinding of [`Ty of ty | `Path of path]
-| InvalidArgument
 | MissingOpBinding of path
 | MissingOpSpec of path
 | IntConversionFailure
-| DestrError of string (* FIXME: change this one *)
-| MissingOpBody of path (* FIXME: rename? *)
+| MissingOpBody of path 
 | CantConvertToConstant
 | CantReadWriteGlobs
 | BadFormForArg of form
@@ -77,20 +77,19 @@ val circ_taut  : circuit -> bool
 
 (* Generate circuits *)
 (* Form processors *)
-val circuit_of_form : ?st:state -> hyps -> form -> circuit
+val circuit_of_form : state -> hyps -> form -> circuit
 val circuit_simplify_equality : ?do_time:bool -> st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
 val circ_simplify_form_bitstring_equality :
   ?st:state ->
   ?pres:circuit list -> hyps -> form -> form
  
 (* Proc processors *)
-val state_of_prog : ?close:bool -> hyps -> memory -> ?st:state -> instr list -> state 
-val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> ?st:state -> instr list -> instr list -> bool
+val state_of_prog : ?close:bool -> hyps -> memory -> st:state -> instr list -> state 
+val instrs_equiv : hyps -> memenv -> ?keep:EcPV.PV.t -> state -> instr list -> instr list -> bool
 val process_instr : hyps -> memory -> st:state -> instr -> state
-(* val pstate_of_memtype : ?pstate:pstate -> env -> memtype -> pstate * cinput list *)
 
-val circuit_state_of_memenv : st:state -> env -> memenv -> state
-val circuit_state_of_hyps : ?strict:bool -> ?use_mem:bool -> ?st:state -> hyps -> state 
+val circuit_state_of_memenv : ?st:state -> env -> memenv -> state
+val circuit_state_of_hyps : ?st:state -> ?strict:bool -> hyps -> state 
 
 (* Check for uninitialized inputs *)
 val circuit_has_uninitialized : circuit -> int option

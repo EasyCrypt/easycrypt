@@ -468,7 +468,7 @@ let pre_eqobs (cm : crushmode) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_eqobs_inS_ (info : sim_info) (tc : tcenv1) =
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let env, _, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
   let spec, inv = info.sim_hint in
 
@@ -498,7 +498,7 @@ let t_eqobs_inS_ (info : sim_info) (tc : tcenv1) =
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in
-      (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form_ts_inv eqi inv) @+ [
+      (EcPhlSeq.t_equiv_seq (p1, p2) (Mpv2.to_form_ts_inv eqi inv) @+ [
         t_id;
         fun tc ->
           FApi.t_last
@@ -537,7 +537,7 @@ let process_eqobs_inS (cm : crushmode option) (info : psim_info) (tc : tcenv1) =
 let t_eqobs_inF_ (info : sim_info) (tc : tcenv1) =
   assert (Option.is_none info.sim_pos);  
 
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let env, _, _ = FApi.tc1_eflat tc in
   let ef = tc1_as_equivF tc in
   let fl = ef.ef_fl and fr = ef.ef_fr in
 

@@ -1,6 +1,5 @@
 require import AllCore List QFABV IntDiv.
 
-
 theory FakeWord.
 type W.
 op size : int.
@@ -28,7 +27,14 @@ realize tosintP by admit.
 realize ofintP by admit.
 realize size_tolist by admit.
 
+op zero : W = of_int 0.
+op one  : W = of_int 1.
+op (+^) : W -> W -> W.
 
+bind op W (+^) "xor".
+realize bvxorP by admit.
+
+end FakeWord.
 
 op bool2bits (b : bool) : bool list = [b].
 op bits2bool (b: bool list) : bool = List.nth false b 0.
@@ -43,15 +49,10 @@ realize tolistP by auto.
 realize oflistP by rewrite /bool2bits /bits2bool;smt(size_eq1).
 realize ofintP by admit.
 realize touintP by admit.
-realize tosintP by move => bv => //. 
+realize tosintP by done. 
 realize gt0_size by done.
     
-op (+^) : W -> W -> W.
 
-bind op W (+^) "xor".
-realize bvxorP by admit.
-
-end FakeWord.
 
 type W8.
 
@@ -69,6 +70,8 @@ module M = {
 
 op "_.[_]" : W8 -> int -> bool.
 
+op non_translate : W8 -> W8.
+
 bind op [W8 & bool] "_.[_]" "get".
 realize le_size by auto.
 realize eq1_size by auto.
@@ -85,47 +88,44 @@ lemma W8_xor_ext (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ 
 proof.
 proc.
 (* extens [a] : (wp; skip; smt()). *)
-(* FIXME : while debugging fhash *) admit.
+(* FIXME : while debugging fhash *) 
+admit. (* *)
+qed.
+
+lemma W8_xor_circuit (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
+proof. by proc; circuit.
 qed.
 
 
 lemma W8_xor_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
-proc.
-(* circuit simplify; trivial. *) admit.
+by proc; circuit simplify; trivial. 
 qed.
 
+lemma W8_xor_fail_equiv (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ zero].
+proof.
+proc.
+fail circuit. (* Fails *)
+abort.
+
+
+lemma W8_xor_fail_translate (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ non_translate zero].
+proof.
+proc.
+fail circuit. (* Fails *)
+abort.
 
 lemma W8_xor_ext2 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
-proc.
-admit.
-(* extens [a] : circuit.  *)
+by proc; extens [a] : circuit. 
 qed.
 
 lemma W8_xor_ext_simp (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b ==> res = a_ +^ b_].
 proof.
 proc.
-(* extens [a] : by circuit simplify; trivial. (* FIXME: without by does not work *) *) admit.
+extens [a] : by circuit simplify; trivial. (* FIXME: without by does not work *)
 qed.
 
-
-(*
-lemma xor_0 (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = of_int 0].
-proof.
-  proc.
-  proc change 1 : { c <- b +^ a; }.
-  wp. skip. move => &h1 &h2.
-  have : a{h1} = a_ by admit.
-  have : b{h1} = b_ by admit.
-  move => A B [] C D.
-  have : a{h2} = a_ by smt().
-  have : b{h2} = b_ by smt().
-  (* move : A B C D. (* Comment or uncomment this line for different modes of working *) *)
-  bdep solve.
-bdep solve.
-qed.
-*)
     
 
 lemma xor_com (a_ b_ : W8) : hoare[M.test : a_ = a /\ b_ = b /\ a_ = b_ ==> res = b_ +^ a_].
@@ -174,3 +174,5 @@ proof.
 circuit.
 qed.
 
+bind circuit 
+  (+^) <- "BVXOR_8".

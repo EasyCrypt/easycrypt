@@ -101,7 +101,8 @@ and 'a rfield = {
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 
-type ptyparams = (psymbol * pqsymbol list) list
+type ptyparam  = psymbol
+type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
@@ -112,7 +113,7 @@ type ptydecl = {
 }
 
 and ptydbody =
-  | PTYD_Abstract of pqsymbol list
+  | PTYD_Abstract
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -399,7 +400,7 @@ type psubtype = {
 
 (* -------------------------------------------------------------------- *)
 type ptyvardecls =
-  (psymbol * pqsymbol list) list
+  psymbol list
 
 type pop_def =
   | PO_abstr of pty
@@ -450,7 +451,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : (psymbol * pqsymbol list) list option;
+  pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
   pp_locality  : locality;
 }
@@ -542,10 +543,10 @@ type call_info =
   | CI_inv of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
-type p_app_xt_info =
-  | PAppNone
-  | PAppSingle of pformula
-  | PAppMult   of (pformula option) tuple5
+type p_seq_xt_info =
+  | PSeqNone
+  | PSeqSingle of pformula
+  | PSeqMult   of (pformula option) tuple5
 
 type ('a, 'b, 'c) rnd_tac_info =
   | PNoRndParams
@@ -557,8 +558,6 @@ type rnd_tac_info_f =
   (pformula, pformula option, pformula) rnd_tac_info
 
 type psemrndpos = (bool * pcodepos1) doption
-
-type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath * pformula) list
 
@@ -603,11 +602,6 @@ type trans_info =
   trans_kind * trans_formula
 
 (* -------------------------------------------------------------------- *)
-type eager_info =
-  | LE_done of psymbol
-  | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
-
-(* -------------------------------------------------------------------- *)
 type bdh_split =
   | BDH_split_bop     of pformula * pformula * pformula option
   | BDH_split_or_case of pformula * pformula * pformula
@@ -622,8 +616,8 @@ type fun_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type app_info =
-  oside * tac_dir * pcodepos1 doption * pformula doption * p_app_xt_info
+type seq_info =
+  oside * pcodepos1 doption * pformula doption * p_seq_xt_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
@@ -762,7 +756,7 @@ type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
-  | Papp           of app_info
+  | Pseq           of seq_info
   | Pwp            of pdocodepos1
   | Psp            of pdocodepos1
   | Pwhile         of (oside * while_info)
@@ -810,16 +804,15 @@ type phltactic =
   | Pbdhoare_split of bdh_split
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pchangestmt    of side option * ptybindings option * pcodepos_range * pstmt
-
+  | Phoaresplit
 
     (* Eager *)
-  | Peager_seq       of (eager_info * pcodepos1 pair * pformula)
+  | Peager_seq       of (pcodepos1 pair * pstmt * pformula doption)
   | Peager_if
-  | Peager_while     of (eager_info)
+  | Peager_while     of pformula
   | Peager_fun_def
-  | Peager_fun_abs   of (eager_info * pformula)
-  | Peager_call      of (call_info gppterm)
-  | Peager           of (eager_info * pformula)
+  | Peager_fun_abs   of pformula
+  | Peager_call      of call_info gppterm
 
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)
@@ -1111,7 +1104,7 @@ type mempred_binding = PT_MemPred of psymbol list
 type paxiom = {
   pa_name     : psymbol;
   pa_pvars    : mempred_binding option;
-  pa_tyvars   : (psymbol * pqsymbol list) list option;
+  pa_tyvars   : ptyparams option;
   pa_vars     : pgtybindings option;
   pa_formula  : pformula;
   pa_kind     : paxiom_kind;
@@ -1125,17 +1118,9 @@ type prealize = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptypeclass = {
-  ptc_name : psymbol;
-  ptc_inth : pqsymbol option;
-  ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : (psymbol * pformula) list;
-  ptc_loca : is_local;
-}
-
 type ptycinstance = {
   pti_name : pqsymbol;
-  pti_type : (psymbol * pqsymbol list) list * pty;
+  pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;
@@ -1369,7 +1354,6 @@ type global_action =
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
   | Gsubtype     of psubtype
-  | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred

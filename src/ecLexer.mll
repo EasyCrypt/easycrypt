@@ -205,7 +205,6 @@
     "section"     , SECTION    ;        (* KW: global *)
     "subtype"     , SUBTYPE    ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
-    "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
@@ -267,8 +266,6 @@
     ("+"   , (PLUS             , false));
     ("-"   , (MINUS            , false));
     ("*"   , (STAR             , false));
-    ("<<"  , (BACKS            , false));
-    (">>"  , (FWDS             , false));
     ("<:"  , (LTCOLON          , false));
     ("==>" , (LONGARROW        , false));
     ("="   , (EQ               , false));
@@ -293,7 +290,7 @@
     List.iter (curry (Hashtbl.add table)) _operators; table
 
   let opre =
-    let ops = List.map fst (List.filter (snd |- snd) _operators) in
+    let ops = List.map fst (List.filter (snd -| snd) _operators) in
     let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
     let ops = String.join "|" (List.map EcRegexp.quote ops) in
     let ops = Printf.sprintf "(%s)" ops in

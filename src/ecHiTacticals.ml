@@ -179,7 +179,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp info                 -> EcPhlApp.process_app info
+    | Pseq info                 -> EcPhlSeq.process_seq info
     | Pwp wp                    -> EcPhlWp.process_wp wp
     | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
@@ -229,9 +229,8 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager_if                 -> EcPhlEager.process_if
     | Peager_while info         -> EcPhlEager.process_while info
     | Peager_fun_def            -> EcPhlEager.process_fun_def
-    | Peager_fun_abs infos      -> curry EcPhlEager.process_fun_abs infos
+    | Peager_fun_abs infos      -> EcPhlEager.process_fun_abs infos
     | Peager_call info          -> EcPhlEager.process_call info
-    | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless
@@ -241,6 +240,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve
     | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
+    | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
 
   try  tx tc

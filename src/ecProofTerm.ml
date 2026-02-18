@@ -193,7 +193,7 @@ let pt_of_hyp_r ptenv x =
 (* -------------------------------------------------------------------- *)
 let pt_of_global pf hyps p tys =
   let ptenv = ptenv_of_penv hyps pf in
-  let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
+  let ax    = EcEnv.Ax.instantiate p tys (LDecl.toenv hyps) in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys p;
@@ -202,7 +202,7 @@ let pt_of_global pf hyps p tys =
 (* -------------------------------------------------------------------- *)
 let pt_of_global_r ptenv p tys =
   let env = LDecl.toenv ptenv.pte_hy in
-  let ax  = EcEnv.Ax.instanciate p tys env in
+  let ax  = EcEnv.Ax.instantiate p tys env in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys p;
@@ -225,7 +225,7 @@ let pt_of_uglobal_r ptenv p =
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
   let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys:typ p;
@@ -515,7 +515,7 @@ let process_named_pterm pe (tvi, fp) =
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
   let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
 
   (p, (typ, ax))
 

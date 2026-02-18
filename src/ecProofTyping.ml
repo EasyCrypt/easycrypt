@@ -7,6 +7,7 @@ open EcEnv
 open EcCoreGoal
 open EcAst
 open EcParsetree
+open EcUnify
 
 module Msym = EcSymbols.Msym
 
@@ -27,7 +28,7 @@ let process_form_opt ?mv hyps pf oty =
     let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
-  with EcUnify.UninstanciateUni ->
+  with EcUnify.UninstantiateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
       (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
@@ -192,7 +193,7 @@ let tc1_process_Xhl_formula_xreal tc pf =
 (* FIXME: factor out to typing module                                 *)
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)
-let pf_check_tvi (pe : proofenv) typ tvi =
+let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
   match tvi with
   | None -> ()
 
@@ -203,7 +204,7 @@ let pf_check_tvi (pe : proofenv) typ tvi =
           (List.length tyargs) (List.length typ)
 
   | Some (EcUnify.TVInamed tyargs) ->
-      let typnames = List.map (EcIdent.name |- fst) typ in
+      let typnames = List.map EcIdent.name typ in
       List.iter
         (fun (x, _) ->
           if not (List.mem x typnames) then

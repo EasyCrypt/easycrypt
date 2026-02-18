@@ -419,13 +419,6 @@ and process_subtype (scope : EcScope.scope) (subtype : psubtype located) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
-  EcScope.check_state `InTop "type class" scope;
-  let scope = EcScope.Ty.add_class scope tcd in
-    EcScope.notify scope `Info "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
-    scope
-
-(* -------------------------------------------------------------------- *)
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
   EcScope.Ty.add_instance scope (Pragma.get ()).pm_check tci
@@ -766,7 +759,6 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       match g.pl_desc with
       | Gtype        t    -> `Fct   (fun scope -> process_types      ?src scope  (List.map (mk_loc loc) t))
       | Gsubtype     t    -> `Fct   (fun scope -> process_subtype    scope  (mk_loc loc t))
-      | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     ?src scope m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  ?src scope i)

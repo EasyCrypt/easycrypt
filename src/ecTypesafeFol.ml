@@ -73,26 +73,25 @@ let rec sub_ty_tyargs (vals: (ty, ty) Map.t) (ty: ty) : ty =
 let open_oper_ue op ue =
   (* Maybe list map works fine because ue is imperative? *)
   let open EcDecl in
-  let ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
+  let _ue, tys = List.fold_left_map (fun ue _ -> (ue, EcUnify.UniEnv.fresh ue)) ue op.op_tparams in
   (tys, open_oper op tys)
 
 let fop_from_path (env: env) (f: EcPath.path) : form = 
   let ue = UE.create None in
-  let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
+  let _p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
   let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
   f_op f tvars newt
 
 let f_app_safe ?(full=true) (env: env) (f: EcPath.path) (args: form list) =
   let ue = UE.create None in
   let p_f, o_f = EcEnv.Op.lookup (EcPath.toqsymbol f) env in
-  let tvars,(newt,f_kind) = open_oper_ue o_f ue in
+  let tvars,(newt, _f_kind) = open_oper_ue o_f ue in
   let rty = UE.fresh ue in
   let fty = toarrow (List.map (fun f -> f.f_ty) args) rty in
   let () = begin
   try
   (EcUnify.unify env ue fty newt)
   with 
-  | UnificationFailure (`TcCtt (ty, sp)) -> raise (UnificationFailure (`TcCtt (ty, sp)))
   | UnificationFailure (`TyUni (ty1, ty2)) -> 
     let pp_type = (EcPrinting.pp_type (EcPrinting.PPEnv.ofenv env)) in
     Format.eprintf "Failed to unify types (%a, %a) in call to %s@." pp_type ty1 pp_type ty2 
@@ -139,6 +138,7 @@ let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: for
     in
     let f = f_quant Llambda rem_bnds (EcSubst.subst_form subst f) in
     EcCallbyValue.norm_cbv redmode hyps f
+(* FIXME PR
   | Fquant  (qtf, _, _) -> assert false
   | Fif     (f, ft, ff) -> assert false
   | Fmatch  (f, fs, t) -> assert false
@@ -149,4 +149,5 @@ let rec fapply_safe ?(redmode = EcReduction.full_red) (hyps: LDecl.hyps) (f: for
   | Fglob   (id, m) -> assert false
   | Ftuple  (fs) -> assert false
   | Fproj   (f, i) -> assert false
+*)
   | _ -> assert false

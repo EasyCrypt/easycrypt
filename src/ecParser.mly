@@ -392,7 +392,6 @@
 %token AUTO
 %token AXIOM
 %token AXIOMATIZED
-%token BACKS
 %token BACKSLASH
 %token BETA
 %token BITSTRING
@@ -410,7 +409,6 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -463,7 +461,6 @@
 %token FROM
 %token FUN
 %token FUSION
-%token FWDS
 %token GEN
 %token GLOB
 %token GLOBAL
@@ -1646,13 +1643,18 @@ signature_item:
 (* EcTypes declarations / definitions                                   *)
 
 typaram:
-| x=tident { (x, []) }
-| x=tident LTCOLON tc=plist1(lqident, AMP) { (x, tc) }
+| x=tident
+    { (x : ptyparam) }
 
 typarams:
-| empty { []  }
-| x=tident { [(x, [])] }
-| xs=paren(plist1(typaram, COMMA)) { xs }
+| empty
+    { ([] : ptyparams) }
+
+| x=tident
+    { ([x] : ptyparams) }
+
+| xs=paren(plist1(typaram, COMMA))
+    { (xs : ptyparams) }
 
 %inline tyd_name:
 | tya=typarams x=ident { (tya, x) }
@@ -1665,7 +1667,7 @@ dt_ctor_def:
 | LBRACKET PIPE? ctors=plist1(dt_ctor_def, PIPE) RBRACKET { ctors }
 
 rec_field_def:
-| x=ident COLON ty=loc(type_exp) { (x, ty); }
+| x=ident COLON ty=loc(type_exp) { (x, ty) }
 
 %inline record_def:
 | LBRACE fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON? RBRACE
@@ -1673,10 +1675,7 @@ rec_field_def:
 
 typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
-    { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
-
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(qident, COMMA)
-    { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
+    { List.map (fun x -> mk_tydecl ~locality x PTYD_Abstract) td }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
     { [mk_tydecl ~locality td (PTYD_Alias te)] }
@@ -1701,30 +1700,6 @@ subtype:
 
 subtype_rename:
 | RENAME x=STRING COMMA y=STRING { (x, y) }
-
-(* -------------------------------------------------------------------- *)
-(* Type classes                                                         *)
-typeclass:
-| loca=is_local TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
-    { ptc_name = x;
-      ptc_inth = inth;
-      ptc_ops  = fst body;
-      ptc_axs  = snd body;
-      ptc_loca = loca;
-    }
-  }
-
-tc_inth:
-| LTCOLON x=lqident { x }
-
-tc_body:
-| ops=tc_op* axs=tc_ax* { (ops, axs) }
-
-tc_op:
-| OP x=oident COLON ty=loc(type_exp) { (x, ty) }
-
-tc_ax:
-| AXIOM x=ident COLON ax=form { (x, ax) }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
@@ -1779,10 +1754,8 @@ pred_tydom:
 
 tyvars_decl:
 | LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET
+| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
     { tyvars }
-
-| LBRACKET tyvars=rlist2(tident , empty) RBRACKET
-    { List.map (fun x -> (x, [])) tyvars }
 
 op_or_const:
 | OP    { `Op    }
@@ -1795,7 +1768,7 @@ operator:
 
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
-      mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
+      mk_loc (b |> omap (loc -| fst) |> odfl gloc) PTunivar) in
 
     { po_kind     = k;
       po_name     = List.hd x;
@@ -1803,7 +1776,7 @@ operator:
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
       po_args     = odfl ([], None) args;
-      po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
+      po_def      = opdef_of_opbody sty (omap (unloc -| fst) b);
       po_ax       = obind snd b;
       po_locality = locality; } }
 
@@ -2531,11 +2504,6 @@ call_info:
 | bad=form COMMA p=form              { CI_upto (bad,p,None) }
 | bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
 
-tac_dir:
-| BACKS { Backs }
-| FWDS  { Fwds }
-| empty { Backs }
-
 icodepos_r:
 | IF       { (`If     :> pcp_match) }
 | WHILE    { (`While  :> pcp_match) }
@@ -2706,13 +2674,13 @@ dbhint:
 
 app_bd_info:
 | empty
-    { PAppNone }
+    { PSeqNone }
 
 | f=sform
-    { PAppSingle f }
+    { PSeqSingle f }
 
 | f=prod_form g=prod_form s=sform?
-    { PAppMult (s, fst f, snd f, fst g, snd g) }
+    { PSeqMult (s, fst f, snd f, fst g, snd g) }
 
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
@@ -2856,34 +2824,24 @@ logtactic:
 | WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
    { Pwlog (ids, b, f) }
 
-eager_info:
-| h=ident
-    { LE_done h }
-
-| LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
-    { LE_todo (h, s1, s2, pr, po) }
-
 eager_tac:
-| SEQ n1=codepos1 n2=codepos1 i=eager_info COLON p=sform
-    { Peager_seq (i, (n1, n2), p) }
+| SEQ n1=codepos1 n2=codepos1 COLON s=stmt COLON p=form_or_double_form
+    { Peager_seq ((n1, n2), s, p) }
 
 | IF
     { Peager_if }
 
-| WHILE i=eager_info
+| WHILE i=sform
     { Peager_while i }
 
 | PROC
     { Peager_fun_def }
 
-| PROC i=eager_info f=sform
-    { Peager_fun_abs (i, f) }
+| PROC f=sform
+    { Peager_fun_abs f }
 
 | CALL info=gpterm(call_info)
     { Peager_call info }
-
-| info=eager_info COLON p=sform
-    { Peager (info, p) }
 
 form_or_double_form:
 | f=sform
@@ -2959,8 +2917,8 @@ interleave_info:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? d=tac_dir pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
-   { Papp (s, d, pos, p, f) }
+| SEQ s=side? pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
+   { Pseq (s, pos, p, f) }
 
 | WP n=s_codepos1?
    { Pwp n }
@@ -3221,6 +3179,9 @@ interleave_info:
 
 | PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
     { Prwprgm (`Change (o, b, w, s)) }
+
+| HOARE SPLIT
+    { Phoaresplit }
 
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
@@ -3900,7 +3861,6 @@ global_action:
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }
-| typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | procop           { Gprocop      $1 }

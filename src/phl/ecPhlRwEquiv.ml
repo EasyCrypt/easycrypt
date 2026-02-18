@@ -2,7 +2,6 @@
 open EcUtils
 open EcLocation
 open EcParsetree
-open EcAst
 open EcFol
 open EcModules
 open EcPath
@@ -155,8 +154,8 @@ let process_rewrite_equiv info tc =
             let args, ret_ty = EcTyping.trans_args subenv ue (loc pargs) proc.f_sig (unloc pargs) in
             let res = omap (fun v -> EcTyping.transexpcast subenv `InProc ue ret_ty v) pres in
             let es = e_subst (Tuni.subst (EcUnify.UniEnv.close ue)) in
-            Some (List.map es args, omap (EcModules.lv_of_expr |- es) res)
-          with EcUnify.UninstanciateUni ->
+            Some (List.map es args, omap (EcModules.lv_of_expr -| es) res)
+          with EcUnify.UninstantiateUni ->
             EcTyping.tyerror (loc pargs) env EcTyping.FreeTypeVariables
         end
   in

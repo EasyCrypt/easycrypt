@@ -242,7 +242,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
 
             let lv = lv_to_ty_list lv in
 
-            let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
+            let tosubst, asgn2 = List.partition (fun ((pv, _), _) ->
               Mpv.mem env pv subst0
             ) (List.combine lv es) in
 
@@ -297,7 +297,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
         | e, _ -> [e] in
       let lv = lv_to_ty_list lv in
 
-      if not (List.for_all (is_loc |- fst) lv) then
+      if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
       let subst =

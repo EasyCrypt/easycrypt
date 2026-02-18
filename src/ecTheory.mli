@@ -23,7 +23,6 @@ and theory_item_r =
   | Th_theory    of (symbol * ctheory)
   | Th_export    of EcPath.path * is_local
   | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
-  | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   (* reduction rule does not survive to section so no locality *)
