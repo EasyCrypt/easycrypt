@@ -189,6 +189,11 @@ let f_tuple args =
   | [x] -> x
   | _   -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
+let f_array args =
+  match args with
+  | [] -> assert false (* FIXME *)
+  | x :: _ -> mk_form (Farray (CCImmutArray.of_list args)) (tarray (f_ty x))
+
 let f_quant q b f =
   if List.is_empty b then f else
     let (q, b, f) =
@@ -468,6 +473,10 @@ let f_map gt g fp =
       let fs' = List.Smart.map g fs in
         f_tuple fs'
 
+  | Farray fs ->
+      let fs' = CCImmutArray.map g fs in
+      f_array (CCImmutArray.to_list fs')
+
   | Fproj (f, i) ->
       let f'  = g f in
       let ty' = gt fp.f_ty in
@@ -540,6 +549,7 @@ let f_iter g f =
   | Flet     (_, f1, f2)  -> g f1;g f2
   | Fapp     (e, es)      -> List.iter g (e :: es)
   | Ftuple   es           -> List.iter g es
+  | Farray   es           -> CCImmutArray.iter g es
   | Fproj    (e, _)       -> g e
 
   | FhoareF  hf   -> g (hf_pr hf).inv; g (hf_po hf).inv
@@ -569,6 +579,7 @@ let form_exists g f =
   | Flet     (_, f1, f2)  -> g f1 || g f2
   | Fapp     (e, es)      -> List.exists g (e :: es)
   | Ftuple   es           -> List.exists g es
+  | Farray   es           -> CCImmutArray.exists g es
   | Fproj    (e, _)       -> g e
 
   | FhoareF   hf -> g (hf_pr hf).inv   || g (hf_po hf).inv
@@ -597,6 +608,7 @@ let form_forall g f =
   | Flet     (_, f1, f2)  -> g f1 && g f2
   | Fapp     (e, es)      -> List.for_all g (e :: es)
   | Ftuple   es           -> List.for_all g es
+  | Farray   es           -> CCImmutArray.for_all g es
   | Fproj    (e, _)       -> g e
 
   | FhoareF  hf  -> g (hf_pr hf).inv  && g (hf_po hf).inv
@@ -955,6 +967,9 @@ let rec form_of_expr_r ?m (e : expr) =
   | Etuple es ->
      f_tuple (List.map (form_of_expr_r ?m) es)
 
+  | Earray es ->
+     f_array (List.map (form_of_expr_r ?m) (CCImmutArray.to_list es))
+
   | Eproj (e1, i) ->
      f_proj (form_of_expr_r ?m e1) i e.e_ty
 
@@ -992,6 +1007,7 @@ let expr_of_ss_inv f =
     | Fop  (p, tys) -> e_op p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
+    | Farray fs     -> e_array (CCImmutArray.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
 
     | Fif (c, f1, f2) ->
@@ -1034,6 +1050,7 @@ let expr_of_form f =
     | Fop  (p, tys) -> e_op p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
+    | Farray fs     -> e_array (CCImmutArray.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
 
     | Fif (c, f1, f2) ->

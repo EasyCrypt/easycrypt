@@ -998,6 +998,9 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   | PTtuple tys   ->
       ttuple (transtys tp env ue tys)
 
+  | PTarray ty ->
+      tarray (transty tp env ue ty)
+
   | PTnamed { pl_desc = name } -> begin
       match EcEnv.Ty.lookup_opt name env with
       | None ->
@@ -1661,6 +1664,7 @@ let top_is_mem_binding pf = match pf with
   | PFint     _
   | PFdecimal _
   | PFtuple   _
+  | PFarray   _
   | PFident   _
   | PFref     _
   | PFmem     _
@@ -3096,6 +3100,12 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         tt |> oiter (fun tt -> unify_or_fail env ue f.pl_loc  ~expct:tt (ttuple esig));
         let es = List.map2 (fun tt pe -> transf env ~tt pe) esig pes in
         f_tuple es
+
+    | PFarray pes ->
+        let esig = List.map (fun _ -> EcUnify.UniEnv.fresh ue) pes in
+        tt |> oiter (fun tt -> unify_or_fail env ue f.pl_loc  ~expct:tt (ttuple esig));
+        let es = List.map2 (fun tt pe -> transf env ~tt pe) esig pes in
+        f_array es
 
     | PFident ({ pl_desc = name; pl_loc = loc }, tvi) ->
         let tvi = tvi |> omap (transtvi env ue) in

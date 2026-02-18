@@ -3,6 +3,7 @@ open EcBigInt
 open EcMaps
 open EcSymbols
 open EcIdent
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: section: move me *)
@@ -30,6 +31,7 @@ val ty_hash  : ty -> int
 val tuni    : EcUid.uid -> ty
 val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
+val tarray  : ty -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
 val tglob   : EcIdent.t -> ty
@@ -175,6 +177,7 @@ val e_op       : EcPath.path -> ty list -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
+val e_array    : expr parray -> expr
 val e_if       : expr -> expr -> expr -> expr
 val e_match    : expr -> expr list -> ty -> expr
 val e_lam      : (EcIdent.t * ty) list -> expr -> expr

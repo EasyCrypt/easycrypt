@@ -50,6 +50,9 @@ let rec dump_ty ty =
   | Ttuple tys ->
       Printf.sprintf "(%s)" (String.concat ", " (List.map dump_ty tys))
 
+  | Tarray ty ->
+      Printf.sprintf "[&%s&]" (dump_ty ty)
+
   | Tconstr (p, tys) ->
       Printf.sprintf "%s[%s]" (EcPath.tostring p)
         (String.concat ", " (List.map dump_ty tys))
@@ -60,6 +63,7 @@ let rec dump_ty ty =
 (* -------------------------------------------------------------------- *)
 let tuni uid     = mk_ty (Tunivar uid)
 let tvar id      = mk_ty (Tvar id)
+let tarray ty    = mk_ty (Tarray ty)
 let tconstr p lt = mk_ty (Tconstr (p, lt))
 let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
@@ -119,6 +123,9 @@ let ty_map f t =
   | Ttuple lty ->
      ttuple (List.Smart.map f lty)
 
+  | Tarray ty -> 
+     tarray (f ty)
+
   | Tconstr (p, lty) ->
      let lty = List.Smart.map f lty in
      tconstr p lty
@@ -130,6 +137,7 @@ let ty_fold f s ty =
   match ty.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> s
   | Ttuple lty -> List.fold_left f s lty
+  | Tarray t -> f s t
   | Tconstr(_, lty) -> List.fold_left f s lty
   | Tfun(t1,t2) -> f (f s t1) t2
 
@@ -137,6 +145,7 @@ let ty_sub_exists f t =
   match t.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
+  | Tarray ty -> f ty
   | Tconstr (_, lty) -> List.exists f lty
   | Tfun (t1, t2) -> f t1 || f t2
 
@@ -144,6 +153,7 @@ let ty_iter f t =
   match t.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple lty -> List.iter f lty
+  | Tarray ty -> f ty
   | Tconstr (_, lty) -> List.iter f lty
   | Tfun (t1,t2) -> f t1; f t2
 
@@ -161,6 +171,7 @@ let symbol_of_ty (ty : ty) =
   | Tunivar _      -> "u"
   | Tvar    _      -> "x"
   | Ttuple  _      -> "x"
+  | Tarray  _      -> "a" (* TODO: validate *)
   | Tfun    _      -> "f"
   | Tconstr (p, _) ->
       let x = EcPath.basename p in
@@ -348,6 +359,12 @@ let e_tuple = fun es ->
   | []  -> e_tt
   | [x] -> x
   | _   -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
+let e_array = fun es ->
+  if CCImmutArray.length es > 0 then
+    let e = CCImmutArray.get es 0 in
+    mk_expr (Earray es) (tarray e.e_ty)
+  else 
+    assert false (* FIXME *)
 
 let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 let e_match = fun e es ty -> mk_expr (Ematch (e, es, ty)) ty
@@ -462,6 +479,10 @@ let e_map fty fe e =
       let le' = List.Smart.map fe le in
         e_tuple le'
 
+  | Earray le ->
+      let le' = CCImmutArray.map fe le in
+      e_array le'
+
   | Eproj (e1, i) ->
       let e' = fe e1 in
       let ty = fty e.e_ty in
@@ -496,6 +517,7 @@ let e_fold (fe : 'a -> expr -> 'a) (state : 'a) (e : expr) =
   | Eapp (e, args)        -> List.fold_left fe (fe state e) args
   | Elet (_, e1, e2)      -> List.fold_left fe state [e1; e2]
   | Etuple es             -> List.fold_left fe state es
+  | Earray es             -> CCImmutArray.fold fe state es
   | Eproj(e,_)            -> fe state e
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
   | Ematch (e, es, _)     -> List.fold_left fe state (e :: es)
