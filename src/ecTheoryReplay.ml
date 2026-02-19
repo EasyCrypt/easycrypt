@@ -1221,8 +1221,11 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
   | Th_alias (name, target) ->
      replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
 
-  | Th_crbinding (binding, lc) ->
+  | Th_crbinding (binding, lc) when not hidden ->
      replay_crbinding ove (subst, ops, proofs, scope) (item.ti_import, binding, lc)
+
+  | Th_crbinding _ ->
+     (subst, ops, proofs, scope)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in
