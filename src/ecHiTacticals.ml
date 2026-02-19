@@ -54,6 +54,12 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_try (process1_core ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: Maybe move the extens tactic to this file as well? *)
+and process1_extens (ttenv : ttenv) ((t, v) : ptactic_core * psymbol option) (tc : tcenv1) =
+  let v = Option.map unloc v in
+  EcPhlBDep.t_extens v (process1_core ttenv t) tc
+
+(* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
   EcLowGoal.t_admit tc
 
@@ -230,7 +236,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
-    | Pchangestmt (s, p, c)     -> EcPhlRewrite.process_change_stmt s p c
+    | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
+    | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve
+    | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
     | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
@@ -318,6 +326,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
+    | Pextens   (t, v)      -> `One (process1_extens   ttenv (t, v))
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)

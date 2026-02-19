@@ -30,6 +30,7 @@ and theory_item_r =
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_crbinding of crbinding * is_local
   | Th_auto      of auto_rule
   | Th_alias     of (symbol * path) (* FIXME: currently, only theories *)
 

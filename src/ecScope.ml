@@ -339,6 +339,7 @@ type scope = {
   sc_options  : GenOptions.options;
   sc_globdoc  : string list;
   sc_locdoc   : docstate;
+  sc_specs    : string list;
 }
 
 and docstate = {
@@ -449,7 +450,8 @@ let empty (gstate : EcGState.gstate) =
     sc_pr_uc      = None;
     sc_options    = GenOptions.freeze ();
     sc_globdoc    = [];
-    sc_locdoc     = DocState.empty; }
+    sc_locdoc     = DocState.empty; 
+    sc_specs      = []; }
 
 (* -------------------------------------------------------------------- *)
 let env (scope : scope) =
@@ -570,7 +572,8 @@ let for_loading (scope : scope) =
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_loading scope.sc_options;
     sc_globdoc    = [];
-    sc_locdoc     = DocState.empty; }
+    sc_locdoc     = DocState.empty; 
+    sc_specs      = scope.sc_specs; } (* FIXME: is this correct? *)
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
@@ -587,6 +590,7 @@ let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
     sc_options    = GenOptions.for_subscope scope.sc_options;
     sc_globdoc    = [];
     sc_locdoc     = DocState.empty;
+    sc_specs      = scope.sc_specs;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -2262,7 +2266,11 @@ module Ty = struct
         record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)
     in
 
-    bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; })
+    let tydecl =
+      { tyd_params; tyd_type; tyd_loca;
+        tyd_clinline = false; } in
+
+    bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
   let add_subtype (scope : scope) ({ pl_desc = subtype } : psubtype located) =
@@ -2271,9 +2279,10 @@ module Ty = struct
 
     let scope =
       let decl = EcDecl.{
-        tyd_params  = [];
-        tyd_type    = Abstract;
-        tyd_loca    = `Global; (* FIXME:SUBTYPE *)
+        tyd_params   = [];
+        tyd_type     = Abstract;
+        tyd_loca     = `Global; (* FIXME:SUBTYPE *)
+        tyd_clinline = false; (* FIXME: tyd_clinline PR *)
       } in bind scope (unloc subtype.pst_name, decl) in
 
     let carrier =
@@ -2624,7 +2633,533 @@ module Ty = struct
         failwith "unsupported"          (* FIXME *)
 end
 
-(* -------------------------------------------------------------------- *)module Search = struct
+(* -------------------------------------------------------------------- *)
+module Circuit = struct
+  type preoperator = [`Path of path | `Form of pformula]
+
+  type clone = {
+    path      : EcPath.path;
+    name      : symbol;
+    local     : is_local;
+    theories  : (symbol * path) list;
+    types_    : (symbol * path) list;
+    operators : (symbol * preoperator) list;
+    proofs    : symbol list;
+  }
+
+  let doclone (scope : scope) (clone : clone) =
+    let loced x = mk_loc _dummy x in
+    let env = env scope in
+
+    let evclone =
+      let do_type ((x, type_) : symbol * path) : symbol * ty_override located =
+        (x, loced (`ByPath type_, `Inline `Keep)) in
+
+      let do_operator ((x, operator) : symbol * preoperator) : symbol * op_override located =
+        let operator =
+          match operator with
+          | `Path name -> `ByPath name
+          | `Form f    ->
+              `BySyntax
+                { opov_tyvars = None
+                ; opov_args   = []
+                ; opov_retty  = loced PTunivar
+                ; opov_body   = f } 
+        in (x, loced (operator, `Inline `Keep))
+      in
+
+      let do_theory (x : symbol) (theory : path) : EcThCloning.evclone =
+        let thenv = EcEnv.Theory.env_of_theory clone.path env in
+        let atheory = EcEnv.Theory.by_path (pqname clone.path x) thenv in
+
+        List.fold_left (fun (evc : EcThCloning.evclone) (item : EcTheory.theory_item) ->
+          match item.ti_item with
+          | Th_operator (x, opdecl) -> begin
+            match opdecl.op_kind with
+            | OB_oper None ->
+              let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
+              { evc with evc_ops = Msym.add x (loced ovrd) evc.evc_ops }
+            | _ -> evc
+            end
+          | Th_type (x, _) ->
+            let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
+            { evc with evc_types = Msym.add x (loced ovrd) evc.evc_types }
+          | Th_axiom (x, _) ->         
+            let evc_lemmas =
+              let proof = loced (EcPath.toqsymbol (pqname theory x)) in
+              let proof = Papply (`ExactType proof, None) in
+              let proof = loced (Plogic proof) in              
+              let proof = (Some proof, `Inline `Clear, false) in
+              { evc.evc_lemmas with
+                  ev_bynames = Msym.add x proof evc.evc_lemmas.ev_bynames }
+            in { evc with evc_lemmas }
+          | _ -> assert false
+        ) EcThCloning.evc_empty atheory.cth_items in
+
+      { EcThCloning.evc_empty with
+          (* FIXME: PR: what to do here? *)
+          evc_types  = (Msym.of_list (List.map do_type clone.types_) :> (EcThCloning.xty_override located MSym.t));
+          (* FIXME: PR: what to do here? *)
+          evc_ops    = (Msym.of_list (List.map do_operator clone.operators) :> (EcThCloning.xop_override located MSym.t));
+          evc_ths    = Msym.of_list (List.map (fun (x, th) -> (x, (do_theory x th, false))) clone.theories); (* FIXME PR: is the false here correct? *)
+          evc_lemmas = {
+            ev_bynames =
+              clone.proofs
+                |> List.map (fun name -> (name, (Some (loced (Ptry (loced (Pby None)))), `Alias, false)))
+                |> Msym.of_list;
+            ev_global  = 
+              (* FIXME PR: get this to work *)
+              [ 
+(*                 (Some (loced (Pby None)), Some [`Include, "bydone"]) *)
+                (None, None)
+              ; (None, None) ]; } } in
+
+    let npath = EcPath.pqname (EcEnv.root env) clone.name in
+    let theory = EcEnv.Theory.by_path clone.path env in
+
+    let (proofs, scope) =
+      EcTheoryReplay.replay (Cloning.hooks ~override_locality:(Some clone.local))
+        ~abstract:false ~override_locality:(Some clone.local) ~incl:false
+        ~clears:Sp.empty ~renames:[] ~opath:clone.path ~npath
+        evclone scope (EcPath.basename npath, false, theory.cth_items, clone.local) (* FIXME PR: check extra arguments here *)
+    in
+
+    let proofs = Cloning.replay_proofs scope `Check proofs in
+    
+    (proofs, scope)
+
+  let add_bitstring (scope : scope) (local : is_local) (bs : pbind_bitstring) : scope = 
+    let env = env scope in
+
+    let type_ =
+      let ue = EcUnify.UniEnv.create None in
+      let ty = EcTyping.transty tp_tydecl env ue bs.type_ in
+      assert (EcUnify.UniEnv.closed ue);
+      ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty in
+
+    let bspath =
+      match (EcEnv.ty_hnorm type_ env).ty_node with
+      | Tconstr (p, []) -> p
+      | _ ->
+          hierror ~loc:(bs.type_.pl_loc)
+            "bit-string type must be a monomorphic named type" in
+
+    let from_, _  = EcEnv.Op.lookup bs.to_.pl_desc env in
+    let to_  , _  = EcEnv.Op.lookup bs.from_.pl_desc env in
+    let touint, _ = EcEnv.Op.lookup bs.touint.pl_desc env in
+    let tosint, _ = EcEnv.Op.lookup bs.tosint.pl_desc env in
+    let ofint, _  = EcEnv.Op.lookup bs.ofint.pl_desc env in
+    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) (* FIXME: not stable*) in
+
+    let preclone =
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
+      ; name      = name
+      ; local     = local
+      ; theories  = []
+      ; types_    = ["bv", bspath]
+      ; operators =
+          [ ("size"  , `Form bs.size)
+          ; ("tolist", `Path to_)
+          ; ("oflist", `Path from_)
+          ; ("touint", `Path touint)
+          ; ("tosint", `Path tosint)
+          ; ("ofint" , `Path ofint) ]
+      ; proofs    = [] } in
+
+    let proofs, scope = doclone scope preclone in
+
+    let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) bs.size tint in
+    let size_i = try 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      with 
+      | DestrError "destr_int" -> None
+      | EcEnv.NotReducible -> None 
+    in
+
+    let item = CRB_Bitstring 
+      { from_; to_; touint; tosint; ofint;
+        type_  = bspath;
+        size   = (size_f, size_i);
+        theory = pqname (EcEnv.root env) name; } in
+
+    let item = EcTheory.mkitem ~import:true (EcTheory.Th_crbinding (item, local)) in
+
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope proofs
+
+  let add_array (scope : scope) (local : is_local) (ba : pbind_array) : scope = 
+    let env = env scope in
+
+    let bspath =
+      match EcEnv.Ty.lookup_opt (unloc ba.type_) env with
+      | None ->
+        hierror ~loc:(loc ba.type_)
+          "cannot find named type: `%s'"
+          (string_of_qsymbol (unloc ba.type_))
+     
+      | Some (path, decl) -> (* FIXME: normalize? *)
+        if List.length decl.tyd_params <> 1 then
+          hierror ~loc:(loc ba.type_)
+            "type constructor should take exactly one parameter: `%s'"
+            (string_of_qsymbol (unloc ba.type_));
+        path in
+
+    let get   , _ = EcEnv.Op.lookup ba.get.pl_desc env in
+    let set   , _ = EcEnv.Op.lookup ba.set.pl_desc env in      
+    let tolist, _ = EcEnv.Op.lookup ba.tolist.pl_desc env in
+    let oflist, _ = EcEnv.Op.lookup ba.oflist.pl_desc env in
+    let name      = String.concat "_" ("BVA" :: EcPath.tolist bspath) in
+
+    let preclone =
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
+      ; name      = name
+      ; local     = local
+      ; theories  = []
+      ; types_    = ["t", bspath]
+      ; operators =
+          [ ("size"   , `Form ba.size)
+          ; ("get"    , `Path get)
+          ; ("set"    , `Path set)
+          ; ("to_list", `Path tolist)
+          ; ("of_list", `Path oflist) ]
+      ; proofs    = [] } in
+
+    let proofs, scope = doclone scope preclone in
+
+    let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) ba.size tint in
+    let size_i = try 
+      Some (EcCallbyValue.norm_cbv EcReduction.full_red (EcEnv.LDecl.init env []) size_f |> destr_int |> BI.to_int) 
+      with 
+      | DestrError "destr_int" -> None
+      | EcEnv.NotReducible -> None
+    in
+
+    let item = CRB_Array
+      { get; set; tolist; oflist;
+        type_  = bspath;
+        size   = (size_f, size_i);
+        theory = pqname (EcEnv.root env) name; } in
+
+    let item = EcTheory.mkitem ~import:true (Th_crbinding (item, local)) in
+
+    let scope = { scope with sc_env = EcSection.add_item item scope.sc_env } in
+
+    Ax.add_defer scope proofs
+  
+  let add_bvoperator (scope : scope) (local : is_local) (op : pbind_bvoperator) : scope =
+    let env = env scope in
+
+    let (kind, sig_, subname) : (_ -> EcDecl.bv_opkind) * _ * _ =
+      match unloc op.name with
+      | "add"  -> (fun sz -> `Add  (as_seq1 sz       )), [`BV None], "Add"
+      | "sub"  -> (fun sz -> `Sub  (as_seq1 sz       )), [`BV None], "Sub"
+      | "mul"  -> (fun sz -> `Mul  (as_seq1 sz       )), [`BV None], "Mul"
+      | "udiv" -> (fun sz -> `Div  (as_seq1 sz, false)), [`BV None], "UDiv"
+      | "sdiv" -> (fun sz -> `Div  (as_seq1 sz, true )), [`BV None], "SDiv"
+      | "urem" -> (fun sz -> `Rem  (as_seq1 sz, false)), [`BV None], "URem"
+      | "srem" -> (fun sz -> `Rem  (as_seq1 sz, true )), [`BV None], "SRem"
+      | "shl"  -> (fun sz -> `Shl  (as_seq1 sz       )), [`BV None], "SHL"
+      | "rol"  -> (fun sz -> `Rol  (as_seq1 sz       )), [`BV None], "ROL"
+      | "ror"  -> (fun sz -> `Ror  (as_seq1 sz       )), [`BV None], "ROR"
+      | "shr"  -> (fun sz -> `Shr  (as_seq1 sz, false)), [`BV None], "SHR"
+      | "ashr" -> (fun sz -> `Shr  (as_seq1 sz, true )), [`BV None], "ASHR"
+      | "and"  -> (fun sz -> `And  (as_seq1 sz       )), [`BV None], "And"
+      | "or"   -> (fun sz -> `Or   (as_seq1 sz       )), [`BV None], "Or"
+      | "xor"  -> (fun sz -> `Xor  (as_seq1 sz       )), [`BV None], "Xor"
+      | "not"  -> (fun sz -> `Not  (as_seq1 sz       )), [`BV None], "Not"
+      | "opp"  -> (fun sz -> `Opp  (as_seq1 sz       )), [`BV None], "Opp"
+
+      | "ult"  -> (fun sz -> `Lt  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULt"
+      | "slt"  -> (fun sz -> `Lt  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLt"
+      | "ule"  -> (fun sz -> `Le  (snd (as_seq2 sz), false)), [`BV (Some 1); `BV None], "ULe"
+      | "sle"  -> (fun sz -> `Le  (snd (as_seq2 sz), true )), [`BV (Some 1); `BV None], "SLe"
+
+      | "init" -> (fun sz -> `Init (snd (as_seq2 sz))), [`BV (Some 1); `BV None], "Init"
+      | "get" -> (fun sz -> `Get (fst (as_seq2 sz))), [`BV None; `BV (Some 1)], "Get"
+
+      | "ainit" -> (fun sz -> `AInit (as_seq2 (sz |> List.rev))), [`BV None; `A], "AInit"
+
+      | "shls"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shls (sz1, sz2) in
+          mk, [`BV None; `BV None], "SHLS"
+
+      | "shrs"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shrs (sz1, sz2, false) in
+          mk, [`BV None; `BV None], "SHRS"
+
+      | "ashrs"  -> 
+          let mk sz = let sz1, sz2 = as_seq2 sz in `Shrs (sz1, sz2, true) in
+          mk, [`BV None; `BV None], "ASHRS"
+
+      | "zextend" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, false) in
+        mk, [`BV None; `BV None], "ZExtend"
+
+      | "sextend" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extend (sz1, sz2, true) in
+        mk, [`BV None; `BV None], "SExtend"
+
+      | "truncate" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Truncate (sz1, sz2) in
+        mk, [`BV None; `BV None], "Truncate"
+
+      | "insert" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Insert (sz1, sz2) in
+        mk, [`BV None; `BV None], "Insert" 
+
+      | "extract" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2) in
+        mk, [`BV None; `BV None], "Extract"
+
+      | "asliceget" ->
+        let mk sz = let sz1, sz2, arr_sz = as_seq3 sz in `ASliceGet ((arr_sz, sz1), sz2) in
+        mk, [`BV None; `BV None; `A], "ASliceGet"
+
+      | "asliceset" ->
+        let mk sz = let sz1, sz2, arr_sz = as_seq3 sz in `ASliceSet ((arr_sz, sz1), sz2) in
+        mk, [`BV None; `BV None; `A], "ASliceSet"
+
+      | "concat" ->
+        let mk sz = let sz1, sz2, sz3 = as_seq3 sz in  `Concat (sz1, sz2, sz3) in
+        mk, [`BV None; `BV None; `BV None], "Concat"
+
+      | "a2b" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `A2B ((sz2, asz), sz1) in
+        mk, [`BV None; `BV None; `A], "A2B"
+
+      | "b2a" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `B2A (sz1, (sz2, asz)) in
+        mk, [`BV None; `BV None; `A], "B2A"
+
+      | "map" ->
+        let mk sz =
+          let sz1, sz2, asz = as_seq3 sz in `Map (sz1, sz2, asz) in
+        mk, [`BV None; `BV None; `A], "Map"
+  
+      | _ ->
+        hierror ~loc:(loc op.name)
+          "invalid bv operator name: %s" (unloc op.name) in
+
+    if List.compare_lengths sig_ op.types <> 0 then
+      hierror ~loc:(loc op.operator)
+        "%d type(s) should be provided" (List.length sig_);
+
+    let check_type (mode : [`BV of int option | `A]) (ty : pqsymbol) =
+      let path =
+        match EcEnv.Ty.lookup_opt (unloc ty) env, mode with
+        | None, _ ->
+          hierror ~loc:(loc ty)
+            "cannot find named type: `%s'"
+            (string_of_qsymbol (unloc ty))
+      
+        | Some (path, decl), `BV _ -> (* FIXME: normalize? *)
+          if List.length decl.tyd_params <> 0 then
+            hierror ~loc:(loc ty)
+              "a bit-string type must be a monomorphic named type";
+          path
+
+        | Some (path, decl), `A ->
+          if List.length decl.tyd_params <> 1 then
+            hierror ~loc:(ty.pl_loc)
+              "an array type must be a 1-polymorphic named type";
+          path
+      in
+      
+      let (size, theory) =
+        match mode with
+        | `BV osize -> begin
+          match EcEnv.Circuit.lookup_bitstring_path env path with
+          | None ->
+            hierror ~loc:(ty.pl_loc)
+              "this type is not bound to a bitstring type"
+          | Some {size = (_ , Some csize) as size; theory} ->
+            osize |> Option.iter (fun osize ->
+              if osize <> csize then
+                hierror ~loc:(ty.pl_loc)
+                  "this type is not bound to a bitstring type of size %d (but of size %d)"
+                  osize csize
+            );
+            (size, theory)
+          | Some { size = (_, None) as size; theory} -> 
+            osize |> Option.iter (fun osize ->
+            hierror ~loc:(ty.pl_loc)
+              "This type is not bound to a concrete bitstring of size %d (it is abstract)"
+              osize
+            );
+            (size, theory)
+          end
+        | `A -> begin
+          match EcEnv.Circuit.lookup_array_path env path with
+          | None ->
+            hierror ~loc:(ty.pl_loc)
+              "this type is not bound to an array type"
+          | Some ba -> (ba.size, ba.theory)
+          end
+      in (path, size, (mode, theory))
+
+    in
+
+    let types = List.map2 check_type sig_ op.types in
+    let subname = "BV" ^ subname in
+
+    let operator, _ = EcEnv.Op.lookup op.operator.pl_desc env in
+    let name =
+      let suffix = List.map (EcPath.tolist -| proj3_1) types in
+      let suffix = List.flatten suffix in
+      String.concat "_" ("BVA" :: unloc op.name :: suffix) (* FIXME: not stable*) in
+
+    let _, cltheories =
+      let string_of_mode = function `A -> "A" | `BV -> "BV" in
+      let strip_mode_arg = function `A -> `A | `BV _ -> `BV in
+
+      let counts0 =
+          [`A; `BV]
+      |> List.to_seq
+      |> Seq.map (fun mode -> (mode, 0))
+      |> BatMap.of_seq in
+
+     let maxs =
+        List.fold_left (fun counts mode ->
+          let mode = strip_mode_arg mode in
+          BatMap.modify mode ((+) 1) counts
+        ) counts0 sig_ in
+
+      List.fold_left_map (fun counts (_, _, (mode, theory)) ->
+        let mode = strip_mode_arg mode in
+        let prefix = string_of_mode mode in
+
+        let counts, name =
+        if BatMap.find mode maxs < 2 then
+          (counts, prefix)
+        else
+          let counts = BatMap.modify mode ((+) 1) counts in
+          let name = Format.sprintf "%s%d" prefix (BatMap.find mode counts) in
+          (counts, name)
+        in (counts, (name, theory))
+      ) counts0 types in
+
+    let preclone =
+      { path      = EcPath.fromqsymbol (["Top"; "QFABV"; "BVOperators"], subname)
+      ; name      = name
+      ; local     = local
+      ; theories  = cltheories
+      ; types_    = []
+      ; operators = ["bv" ^ unloc op.name, `Path operator]
+      ; proofs    = [] } in
+
+      let proofs, scope = doclone scope preclone in
+
+    let item = CRB_BvOperator
+      { kind     = kind (List.map proj3_2 types);
+        types    = List.map proj3_1 types;
+        operator = operator;
+        theory   = EcPath.pqname (EcEnv.root env) subname; } in
+
+    let item = EcTheory.mkitem ~import:true (Th_crbinding (item, local)) in
+  
+    let scope =
+      { scope with sc_env = EcSection.add_item item scope.sc_env } in
+    
+    Ax.add_defer scope proofs
+
+  let find_duplicate_specs (scope : scope) : symbol list =
+    let specs = List.map (fun filename -> 
+      Lospecs.Circuit_spec.load_from_file ~filename |> List.fst
+    ) scope.sc_specs 
+    in
+    
+    let module Set = Batteries.Set in 
+    List.fold_left (fun (acc, dups) next -> 
+      let cur = Set.of_list next in
+      let new_dup = Set.intersect cur acc in
+      (Set.union acc cur), (Set.union dups new_dup)
+    ) (Set.empty, Set.empty) specs |> snd |> Set.to_list
+  
+  (* FIXME CIRCUIT PR: decide how we want to handle multiple spec files in easycrypt.project(s) *)
+  let add_circuit1 (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
+    let env = env scope in
+    let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
+
+    if not (List.is_empty opdecl.op_tparams) then
+      hierror ~loc:(loc op) "operator must be monomorphic";
+
+    let matches = List.filteri_map (fun _i filename ->
+      EcEnv.Circuit.get_specification_by_name ~filename (unloc circ)) scope.sc_specs 
+    in
+
+    match matches with
+    | [] ->
+      hierror ~loc:(loc circ)
+        "unknown circuit: %s" (unloc circ)
+
+    | circuit::[] ->
+      let sig_ = List.map (fun (_, `W i) -> i) circuit.arguments in
+      let ret  = Lospecs.Ast.get_size circuit.rettype in
+      let dom, codom = EcEnv.Ty.decompose_fun opdecl.op_ty env in
+
+      if List.length dom <> List.length sig_ then
+        hierror ~loc:(loc op)
+          "the given operator must take %d arguments"
+          (List.length sig_);
+
+      List.iteri (fun position (ty, size) ->
+        match EcEnv.Circuit.lookup_bitstring env ty with
+        | Some {size = (_, Some bs_size)} when bs_size = size -> ()
+        | Some {size = (_, bs_size)} ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc op)
+            "%d-th argument (of type %a) must be a bitstring of size %d, not %s"
+            (position + 1) (EcPrinting.pp_type ppe) ty
+            size (Option.value (Option.map string_of_int bs_size) ~default:("abstract")) 
+        | None ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc op)
+            "%d-th argument (of type %a) must be a bitstring"
+            (position + 1) (EcPrinting.pp_type ppe) ty
+      ) (List.combine dom sig_);
+
+      begin
+        match EcEnv.Circuit.lookup_bitstring env codom with
+        | Some {size = (_, Some bs_size)} when bs_size = ret -> ()
+        | Some {size = (_, bs_size)} ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc op)
+            "operator return type (%a) must be a bitstring of size %d, not %s"
+            (EcPrinting.pp_type ppe) codom ret 
+            (Option.value (Option.map string_of_int bs_size) ~default:("abstract"))
+        | None ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          hierror ~loc:(loc op)
+            "operator return type (%a) must be a bitstring of size %d"
+            (EcPrinting.pp_type ppe) codom ret
+      end;
+
+      let item = CRB_Circuit { operator; circuit; name = unloc circ; } in
+
+      let item =
+          EcTheory.mkitem ~import:true
+          (EcTheory.Th_crbinding (item, local)) in
+      { scope with sc_env = EcSection.add_item item scope.sc_env }  
+  | circs -> hierror "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ)
+
+  let register_spec_files (scope : scope) (files : string list) : scope =
+    let sc = { scope with sc_specs = files } in
+    match find_duplicate_specs sc with
+    | [] -> sc
+    | dups -> hierror "duplicate spec definitions: %a" 
+      EcPrinting.(pp_list ", " pp_symbol) dups
+
+  let add_circuits (scope : scope) (local : is_local) (binds : pbind_circuit) : scope =
+    List.fold_left (fun scope bnd -> 
+      add_circuit1 scope local bnd)
+      scope binds.bindings
+end
+
+(* -------------------------------------------------------------------- *)
+module Search = struct
   let search (scope : scope) qs =
     let env = env scope in
     let paths =

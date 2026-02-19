@@ -1890,6 +1890,13 @@ lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
   map (f1 \o f2) s = map f1 (map f2 s).
 proof. by elim: s => //= x s ->. qed.
 
+lemma map_nseq ['a 'b] (x : 'b) (s : 'a list) :
+  map (fun _ => x) s = nseq (size s) x.
+proof.
+elim: s => /= [|s ih]; first by rewrite nseq0.
+by rewrite addzC nseqS 1:size_ge0 ih.
+qed.
+
 lemma map_id (s : 'a list): map idfun s = s.
 proof. by elim: s => //= x s ->. qed.
 

@@ -13,7 +13,8 @@
  (sites (lib theories) (libexec commands) (lib doc) (lib config))
  (depends
   (ocaml (>= 4.08.0))
-  (batteries (>= 3))
+  (batteries (>= 3.9))
+  bitwuzla
   (camlp-streams (>= 5))
   camlzip
   dune
@@ -22,6 +23,12 @@
   markdown
   (pcre2 (>= 8))
   (why3 (and (>= 1.8.0) (< 1.9)))
+  ppx_deriving
+  ppx_deriving_yojson
+  hex
+  iter
+  cmdliner
+  progress
   yojson
   (zarith (>= 1.10))
 ))

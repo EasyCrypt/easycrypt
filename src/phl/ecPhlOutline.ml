@@ -7,12 +7,46 @@ open EcCoreGoal.FApi
 open EcLowPhlGoal
 
 (*---------------------------------------------------------------------------------------*)
+(* FIXME PR: Remove? *)
+let t_outline_stmt side start_pos end_pos s tc =
+  let env = FApi.tc1_env tc in
+  let goal = tc1_as_equivS tc in
+
+  (* Check which memory/program we are outlining *)
+  let code = match side with
+    | `Left  -> goal.es_sl
+    | `Right -> goal.es_sr
+  in
+
+  (* Extract the program prefix and suffix *)
+  let rest, code_suff  = s_split env end_pos code in
+  let code_pref, _, _ = s_split_i env start_pos (stmt rest) in
+
+  let new_prog = s_seq (s_seq (stmt code_pref) s) (stmt code_suff) in
+  let tc = EcPhlTrans.t_equivS_trans_eq side new_prog tc in
+
+  (* The middle goal, showing equivalence with the replaced code, ideally solves. *)
+  let tp = match side with | `Left -> 1 | `Right -> 2 in
+  let p = EcHiGoal.process_tfocus tc (Some [Some tp, Some tp], None) in
+  let tc =
+    t_onselect
+      p
+      (t_try (
+           t_seqs [
+               EcPhlInline.process_inline (`ByName (None, None, ([], None)));
+               EcPhlEqobs.t_eqobs_in None EcPhlEqobs.empty_sim_info;
+               EcPhlAuto.t_auto;
+               EcHiGoal.process_done;
+         ]))
+      tc
+  in
+  tc
 
 (* `by inline; sim; auto=> />` *)
 let t_auto_equiv_sim =
   t_seqs [
     EcPhlInline.process_inline (`ByName (None, None, ([], None)));
-    EcPhlEqobs.process_eqobs_in None {sim_pos = None; sim_hint = ([], None); sim_eqs = None};
+    EcPhlEqobs.process_eqobs_in None {psim_pos = None; psim_hint = ([], None); psim_eqs = None};
     EcPhlAuto.t_auto;
     EcLowGoal.t_crush;
     EcHiGoal.process_done;

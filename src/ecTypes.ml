@@ -65,13 +65,14 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
-let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
+let tunit      = tconstr EcCoreLib.CI_Unit.p_unit    []
+let tbool      = tconstr EcCoreLib.CI_Bool.p_bool    []
+let tint       = tconstr EcCoreLib.CI_Int.p_int     []
+let txint      = tconstr EcCoreLib.CI_xint.p_xint    []
 
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
 let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
+let tlist ty   = tconstr EcCoreLib.CI_List.p_list     [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
@@ -86,6 +87,18 @@ let ttuple lt    =
 
 let toarrow dom ty =
   List.fold_right tfun dom ty
+
+exception TyDestrError of string
+
+let tfrom_tlist ty =
+  match ty.ty_node with
+  | Tconstr (p, [ty]) when EcPath.p_equal p EcCoreLib.CI_List.p_list -> ty
+  | _ -> raise (TyDestrError "list") 
+
+let tfrom_tfun2 ty =
+  match ty.ty_node with
+  | Tfun (a, b) -> (a, b)
+  | _ -> raise (TyDestrError "fun") 
 
 let tpred t = tfun t tbool
 

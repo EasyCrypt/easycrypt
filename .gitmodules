@@ -1,0 +1,3 @@
+[submodule "libs/lospecs/tests/simde"]
+	path = libs/lospecs/tests/simde
+	url = git@github.com:simd-everywhere/simde.git
