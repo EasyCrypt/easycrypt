@@ -370,10 +370,11 @@ let string_of_renaming_kind = function
 let rename ove subst (kind, name) =
   try
     let newname =
-      List.find_map
-        (fun rnm -> EcThCloning.rename rnm (kind, name))
-        ove.ovre_rnms
-    in
+      List.fold_left (* FIXME:parallel substitution *)
+        (fun name rnm ->
+            Option.value ~default:name (EcThCloning.rename rnm (kind, name)))
+            name ove.ovre_rnms in
+    if newname = name then raise Not_found;
 
     let nameok =
       match kind with

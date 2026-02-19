@@ -507,10 +507,9 @@ end = struct
          (proofs, evc)
 
       | Th_modtype (x, _) ->
-        let x = rename (`Modtype, x) in
-         modtype_ovrd
-           oc (proofs, evc) (loced (xdth @ prefix, x))
-           (loced (thd @ prefix, x), mode)
+        let ovrd = loced (EcPath.toqsymbol (tgpath ~kind:`ModType x)) in
+        modtype_ovrd
+          oc (proofs, evc) (dtpath x) (ovrd, mode)
 
       | Th_instance _   -> (proofs, evc)
 
