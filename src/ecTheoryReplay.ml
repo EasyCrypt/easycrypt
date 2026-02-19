@@ -1053,20 +1053,27 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) (hidden, item) =
   | Th_export (p, lc) ->
      replay_export ove (subst, ops, proofs, scope) (import, p, lc)
 
-  | Th_baserw (x, lc) ->
+  | Th_baserw (x, lc) when not hidden ->
      replay_baserw ove (subst, ops, proofs, scope) (import, x, lc)
 
-  | Th_addrw (p, l, lc) ->
+  | Th_addrw (p, l, lc) when not hidden ->
      replay_addrw ove (subst, ops, proofs, scope) (import, p, l, lc)
 
-  | Th_reduction rules ->
+  | Th_reduction rules when not hidden ->
      replay_reduction ove (subst, ops, proofs, scope) (import, rules)
 
-  | Th_auto at_base ->
+  | Th_auto at_base when not hidden ->
      replay_auto ove (subst, ops, proofs, scope) (import, at_base)
 
-  | Th_instance ((typ, ty), tc, lc) ->
+  | Th_instance ((typ, ty), tc, lc) when not hidden ->
      replay_instance ove (subst, ops, proofs, scope) (import, (typ, ty), tc, lc)
+
+  | Th_baserw _
+  | Th_addrw _
+  | Th_reduction _
+  | Th_auto _
+  | Th_instance _ ->
+    (subst, ops, proofs, scope)
 
   | Th_alias (name, target) ->
      replay_alias ove (subst, ops, proofs, scope) (item.ti_import, name, target)
