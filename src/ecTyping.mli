@@ -108,6 +108,10 @@ type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
 
+
+type goal_shape_error = 
+| GSE_ExpectedTwoSided
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -172,6 +176,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| UnexpectedGoalShape    of goal_shape_error
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
