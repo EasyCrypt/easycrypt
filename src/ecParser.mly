@@ -3019,8 +3019,11 @@ interleave_info:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
-| UNROLL b=boption(FOR) s=side? o=codepos
-    { Punroll (s, o, b) }
+| UNROLL s=side? o=codepos
+    { Punroll (s, o, `While) }
+
+| UNROLL FOR b=boption(STAR) s=side? o=codepos
+    { Punroll (s, o, `For (not b)) }
 
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
