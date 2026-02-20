@@ -429,10 +429,10 @@ let pp_opt pp_el fmt = function
   | Some x -> Format.fprintf fmt "Some %a" pp_el x
 
 (* -------------------------------------------------------------------- *)
-let rec pp_list sep pp fmt xs =
+let rec pp_list ?(on_empty: unit pp = fun _ () -> ()) sep pp fmt xs =
   let pp_list = pp_list sep pp in
     match xs with
-    | []      -> ()
+    | []      -> on_empty fmt ()
     | [x]     -> Format.fprintf fmt "%a" pp x
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
@@ -479,6 +479,9 @@ let pp_string fmt x =
 (* -------------------------------------------------------------------- *)
 let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
+
+let pp_xpath fmt (xp: P.xpath) = 
+  Format.fprintf fmt "%s" (P.x_tostring xp)
 
 (* -------------------------------------------------------------------- *)
 let pp_shorten_path
@@ -2802,6 +2805,16 @@ let pp_i_blk (_ppe : PPEnv.t) fmt _ =
 let pp_i_abstract (_ppe : PPEnv.t) fmt id =
   Format.fprintf fmt "%s" (EcIdent.name id)
 
+let pp_abs_uses (ppe : PPEnv.t) fmt (aus: abs_uses) = 
+  let pp_pv_ty ppe fmt (pv, ty) = 
+    Format.fprintf fmt "(%a : %a)" (pp_pv ppe) pv (pp_type ppe) ty 
+  in
+  let on_empty fmt () = Format.fprintf fmt "None" in
+  Format.fprintf fmt "{ calls: %a, reads: %a, writes: %a }"
+  (pp_list ~on_empty ", " pp_xpath) aus.aus_calls
+  (pp_list ~on_empty ", " (pp_pv_ty ppe)) aus.aus_reads
+  (pp_list ~on_empty ", " (pp_pv_ty ppe)) aus.aus_writes
+
 (* -------------------------------------------------------------------- *)
 let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with
@@ -3213,8 +3226,9 @@ module PPGoal = struct
         | EcBaseLogic.LD_hyp f ->
             (None, fun fmt -> pp_form ppe fmt f)
 
-        | EcBaseLogic.LD_abs_st _ ->
-            (None, fun fmt -> Format.fprintf fmt "statement") (* FIXME *)
+        | EcBaseLogic.LD_abs_st aus ->
+            (None, fun fmt -> Format.fprintf fmt "statement %a" 
+             (pp_abs_uses ppe) aus)
 
     in (ppe, (id, pdk))
 
