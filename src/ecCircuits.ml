@@ -27,22 +27,18 @@ let circ_red (hyps: hyps) = let base_red = EcReduction.full_red in
     `No)
 } 
 
-module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struct
-  type t = form
+module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = struct 
+    type state = {
+      level: int;
+      subst: EcSubst.subst;
+    } 
 
-  let equal f1 f2 = EcReduction.is_alpha_eq Ctxt.hyps f1 f2
+    let empty_state : state = {level = 0; subst = EcSubst.empty}
 
-  type state = {
-    level: int;
-    subst: EcSubst.subst;
-  } 
-
-  let hash (f: form) : int =
-    let bruijn_idents : (int, ident) Map.t ref = ref Map.empty in
+    let bruijn_idents : (int, ident) Map.t ref = ref Map.empty 
 
     let clean_bruijn_idents : unit -> unit =
       fun () -> bruijn_idents := Map.empty
-    in
 
     let ident_of_debruijn_level (i: int) : ident = 
       match Map.find_opt i !bruijn_idents with
@@ -50,16 +46,15 @@ module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struc
       | None -> let id = create (string_of_int i) in
         bruijn_idents := Map.add i id !bruijn_idents;
         id
-    in
 
     let add_to_state (id: ident) (ty: ty) (st: state) = 
       let new_id = ident_of_debruijn_level st.level in
       let level = st.level + 1 in
       let subst = EcSubst.add_flocal st.subst id (f_local new_id ty) in
       { level; subst }, new_id
-    in
 
-    let rec doit (st: state) (f: form) : int = 
+    (* FIXME: maybe don't allow external calls with a state argument *)
+    let rec hash (st:state) (f: form) : int =
       let hnode = match f.f_node with
       | Fquant (qnt, bnds, f)  ->
         let st, bnds = 
@@ -71,34 +66,34 @@ module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struc
             | _ -> 
               st, (orig_id, gty)
           ) st bnds 
-        in Why3.Hashcons.combine2 (qt_hash qnt) (b_hash bnds) (doit st (EcSubst.subst_form st.subst f))
+        in Why3.Hashcons.combine2 (qt_hash qnt) (b_hash bnds) (hash st (EcSubst.subst_form st.subst f))
       | Fif (cond, tb, fb)  -> 
-          let doit = doit st in
-          Why3.Hashcons.combine2 (doit cond) (doit tb) (doit fb)
+          let hash = hash st in
+          Why3.Hashcons.combine2 (hash cond) (hash tb) (hash fb)
       | Fmatch (_, _, _)  -> assert false
       | Flet (lp, value, body)  -> 
           begin match lp with
           | LSymbol (orig_id, ty) -> 
-            let hval = doit st value in
+            let hval = hash st value in
             let st, new_id = add_to_state orig_id ty st in
-            let hbody = doit st (EcSubst.subst_form st.subst body) in
+            let hbody = hash st (EcSubst.subst_form st.subst body) in
             let hlp = lp_hash (LSymbol (new_id, ty)) in
             Why3.Hashcons.combine2 hlp hval hbody
           | LTuple bnds -> 
-            let hval = doit st value in
+            let hval = hash st value in
             let st, new_ids = List.fold_left_map (fun st (id, ty) -> add_to_state id ty st) st bnds in
-            let hbody = doit st (EcSubst.subst_form st.subst body) in
+            let hbody = hash st (EcSubst.subst_form st.subst body) in
             let hbinds = lp_hash @@ LTuple (List.combine new_ids (List.snd bnds)) in
             Why3.Hashcons.combine2 hbinds hval hbody
           | LRecord (_, _) -> assert false
           end
       | Fapp (op, args)  -> 
-        let hop = doit st op in
-        Why3.Hashcons.combine_list (doit st) hop args
+        let hop = hash st op in
+        Why3.Hashcons.combine_list (hash st) hop args
       | Ftuple comps  -> 
-        Why3.Hashcons.combine_list (doit st) 0 comps
+        Why3.Hashcons.combine_list (hash st) 0 comps
       | Fproj (tp, i)  -> 
-        Why3.Hashcons.combine (doit st tp) i 
+        Why3.Hashcons.combine (hash st tp) i 
       | FhoareF _hF -> 
           assert false
 (*      FIXME: do we want this case and the one below?
@@ -145,11 +140,21 @@ module AInvFHashtbl(Ctxt: sig val hyps: hyps end) = Batteries.Hashtbl.Make(struc
       | Fglob (_, _)
       | Fop (_, _) -> f_hash f (* FIXME: maybe do these cases as well? *)
       in Why3.Hashcons.combine hnode (ty_hash f.f_ty)
-    in
-    let res = doit {level = 0; subst = EcSubst.empty} f in
+
+    module Htbl = Batteries.Hashtbl.Make(struct
+    type t = form
+
+    let equal f1 f2 = EcReduction.is_alpha_eq Ctxt.hyps f1 f2
+
+    let hash f = hash empty_state f
+
+    end)
+
+  let clear htbl = 
     clean_bruijn_idents ();
-    res
-end)
+    Htbl.clear htbl
+end
+
 
 (* -------------------------------------------------------------------- *)
 type circuit_conversion_call = [
@@ -618,10 +623,10 @@ let circuit_of_form
    (f_      : EcAst.form) 
   : circuit =
 
-  let module Htbl = AInvFHashtbl(struct let hyps = hyps end) in
+  let module AIFH = AInvFHashtbl(struct let hyps = hyps end) in
 
   (* Form level cache, local to each high-level call *)
-  let cache : circuit Htbl.t = Htbl.create 700 in
+  let cache : circuit AIFH.Htbl.t = AIFH.Htbl.create 700 in
   let op_cache : circuit Mp.t ref = ref Mp.empty in
   let redmode = circ_red hyps in
   let env = toenv hyps in
@@ -722,67 +727,66 @@ let circuit_of_form
     | Fapp (f, fs) -> 
     (* TODO: Maybe add cache statistics? *)
     (* TODO: Maybe cache all forms       *)
-    begin match Htbl.find_opt cache f_ with 
+    begin match AIFH.Htbl.find_opt cache f_ with 
     | Some circ -> circ
-    | None -> let circ =  
-    begin match f with
-      | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
-        let args = List.map (arg_of_form st) fs in 
-        circuit_of_op_with_args env pth args
+    | None -> 
+      let circ = begin match f with
+        | {f_node = Fop (pth, _)} when op_is_parametric_base env pth -> 
+          let args = List.map (arg_of_form st) fs in 
+          circuit_of_op_with_args env pth args
 
-      (* For dealing with iter cases: *)
-      | {f_node = Fop _} when form_is_iter f_ -> 
-        trans_iter st hyps f fs
+        (* For dealing with iter cases: *)
+        | {f_node = Fop _} when form_is_iter f_ -> 
+          trans_iter st hyps f fs
 
-      | {f_node = Fop (_p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
-          doit st (propagate_integer_arguments f fs)
+        | {f_node = Fop (_p, _)} when not (List.for_all (fun f -> f.f_ty.ty_node <> EcTypes.tint.ty_node) fs) ->
+            doit st (propagate_integer_arguments f fs)
 
-      | {f_node = Fop _} -> 
-      (* Assuming correct types coming from EC *)
-      begin match EcFol.op_kind (destr_op f |> fst), fs with
-        | Some `Eq, [f1; f2] -> 
-          let c1 = doit st f1 in
-          let c2 = doit st f2 in
-          (circuit_eq c1 c2 :> circuit)
-        | Some `Not, [f] -> 
-          let c = doit st f in
-          circuit_not c 
-        | Some `True, [] ->
-          (circuit_true :> circuit)
-        | Some `False, [] ->
-          (circuit_false :> circuit)
-        | Some `Imp, [f1; f2] -> 
-          let c1 = doit st f1 in
-          let c2 = doit st f2 in
-          (circuit_or (circuit_not c1) c2 :> circuit)
-        | Some (`And _), [f1; f2] -> 
-          let c1 = doit st f1 in
-          let c2 = doit st f2 in
-          (circuit_and c1 c2 :> circuit)
-        | Some (`Or _), [f1; f2] -> 
-          let c1 = doit st f1 in
-          let c2 = doit st f2 in
-          (circuit_or c1 c2 :> circuit)
-        | Some `Iff, [f1; f2] -> 
-          let c1 = doit st f1 in
-          let c2 = doit st f2 in
-          (circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) :> circuit)
+        | {f_node = Fop _} -> 
+        (* Assuming correct types coming from EC *)
+        begin match EcFol.op_kind (destr_op f |> fst), fs with
+          | Some `Eq, [f1; f2] -> 
+            let c1 = doit st f1 in
+            let c2 = doit st f2 in
+            (circuit_eq c1 c2 :> circuit)
+          | Some `Not, [f] -> 
+            let c = doit st f in
+            circuit_not c 
+          | Some `True, [] ->
+            (circuit_true :> circuit)
+          | Some `False, [] ->
+            (circuit_false :> circuit)
+          | Some `Imp, [f1; f2] -> 
+            let c1 = doit st f1 in
+            let c2 = doit st f2 in
+            (circuit_or (circuit_not c1) c2 :> circuit)
+          | Some (`And _), [f1; f2] -> 
+            let c1 = doit st f1 in
+            let c2 = doit st f2 in
+            (circuit_and c1 c2 :> circuit)
+          | Some (`Or _), [f1; f2] -> 
+            let c1 = doit st f1 in
+            let c2 = doit st f2 in
+            (circuit_or c1 c2 :> circuit)
+          | Some `Iff, [f1; f2] -> 
+            let c1 = doit st f1 in
+            let c2 = doit st f2 in
+            (circuit_or (circuit_and c1 c2) (circuit_and (circuit_not c1) (circuit_not c2)) :> circuit)
+          (* Recurse down into definition *)
+          | _ -> 
+            let f_c = doit st f in
+            let fcs = List.map (doit st) fs in
+            circuit_compose f_c fcs
+        end
         (* Recurse down into definition *)
         | _ -> 
           let f_c = doit st f in
           let fcs = List.map (doit st) fs in
           circuit_compose f_c fcs
+      end in
+        AIFH.Htbl.add cache f_ circ;
+        circ
       end
-      (* Recurse down into definition *)
-      | _ -> 
-        let f_c = doit st f in
-        let fcs = List.map (doit st) fs in
-        circuit_compose f_c fcs
-    end 
-    in
-      Htbl.add cache f_ circ;
-      circ
-    end
       
     | Fquant (qnt, binds, f) -> 
       (* FIXME Does this type conversion make sense? *)
@@ -893,7 +897,7 @@ let circuit_of_form
   (* State cleanup *)
   begin
     op_cache := Mp.empty;
-    Htbl.clear cache
+    AIFH.clear cache
   end;
   res
   
