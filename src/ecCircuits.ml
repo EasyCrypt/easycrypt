@@ -889,7 +889,14 @@ let circuit_of_form
     with CircError e ->
       propagate_circ_error (`ExpandIter (f, fs)) e
   in 
-  doit st f_ 
+  let res = doit st f_  in
+  (* State cleanup *)
+  begin
+    op_cache := Mp.empty;
+    Htbl.clear cache
+  end;
+  res
+  
 
 let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
   let tm = ref (Unix.gettimeofday ()) in
