@@ -48,6 +48,11 @@ else:
     yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
+class DirError(Exception):
+    def __init__(self, message):
+      super().__init__(message)
+
+# --------------------------------------------------------------------
 @clib.asynccontextmanager
 async def awaitable(the):
     try:
@@ -361,11 +366,16 @@ class Gather:
             def for1(x):
                 aout = []
                 if x.startswith('!'):
+                    if not os.path.isdir(x[1:]):
+                        raise DirError("directory `%s' does not exist" % x[1:])
                     aout.append(x[1:])
                     for root, dnames, _ in os.walk(x[1:]):
                         aout.extend([os.path.join(root, x) for x in dnames])
                 else:
-                    aout.extend(glob.glob(x))
+                    xs = glob.glob(x)
+                    if xs == []:
+                        raise DirError("no directory matching `%s' exists" % x)
+                    aout.extend(xs)
                 return aout
 
             dirs = [for1(x) for x in re.split(r'\s+', dirs)]
@@ -838,7 +848,11 @@ async def _main():
             )
             exit(1)
 
-    allscripts = Gather.gatherall(options.scenarios, options.targets)
+    try:
+      allscripts = Gather.gatherall(options.scenarios, options.targets)
+    except DirError as e:
+        logging.error(e)
+        exit(2)
 
     listener = None
     if sys.stdout.isatty():
