@@ -48,6 +48,11 @@ else:
     yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
+class RuntestError(Exception):
+    def __init__(self, message):
+      super().__init__(message)
+
+# --------------------------------------------------------------------
 @clib.asynccontextmanager
 async def awaitable(the):
     try:
@@ -172,6 +177,7 @@ def _options():
 
     for test in [x for x in config.sections() if x.startswith('test-')]:
         scenario = Object()
+        scenario.name     = test
         scenario.args     = config.get(test, 'args').split()
         scenario.okdirs   = config.get(test, 'okdirs')
         scenario.kodirs   = config.get(test, 'kodirs')
@@ -342,8 +348,7 @@ class Gather:
         try:
             scripts = os.listdir(obj.src)
         except OSError as e:
-            logging.warning("cannot scan `%s': %s" % (obj.src, e))
-            return []
+            raise RuntestError(f"cannot scan `{obj.src}': {e}")
         scripts = sorted([x for x in scripts if re.search(r'\.eca?$', x)])
 
         def config(filename):
@@ -361,14 +366,24 @@ class Gather:
             def for1(x):
                 aout = []
                 if x.startswith('!'):
+                    if not os.path.isdir(x[1:]):
+                        raise RuntestError(
+                            f"in scenario `{scenario.name}', directory `{x[1:]}' does not exist"
+                        )
                     aout.append(x[1:])
                     for root, dnames, _ in os.walk(x[1:]):
                         aout.extend([os.path.join(root, x) for x in dnames])
                 else:
-                    aout.extend(glob.glob(x))
+                    xs = glob.glob(x)
+                    if not xs:
+                        raise RuntestError(
+                            f"in scenario `{scenario.name}', no match for `%s'" % x
+                        )
+                    aout.extend(xs)
                 return aout
 
-            dirs = [for1(x) for x in re.split(r'\s+', dirs)]
+            dirs = filter(lambda s: s != "", re.split(r'\s+', dirs))
+            dirs = [for1(x) for x in dirs]
             return list(itertools.chain.from_iterable(dirs))
 
         dirs = []
@@ -838,7 +853,11 @@ async def _main():
             )
             exit(1)
 
-    allscripts = Gather.gatherall(options.scenarios, options.targets)
+    try:
+      allscripts = Gather.gatherall(options.scenarios, options.targets)
+    except RuntestError as e:
+        logging.error(e)
+        exit(2)
 
     listener = None
     if sys.stdout.isatty():
