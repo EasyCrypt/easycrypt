@@ -101,7 +101,7 @@ jobs:
     needs: [compile-opam, fetch-external-matrix]
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:jasmin
     strategy:
       fail-fast: false
       matrix:
@@ -127,8 +127,9 @@ jobs:
           -b ${{ steps.branch_name.outputs.REPO_BRANCH }} \
           ${{ matrix.target.repository }} \
           project/${{ matrix.target.name }}
-    - name: Install EasyCrypt dependencies
+    - name: Install Jasmin and EasyCrypt dependencies
       run: |
+        opam install jasmin
         opam pin add -n easycrypt easycrypt
         opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
