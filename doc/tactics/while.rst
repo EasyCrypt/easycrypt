@@ -7,9 +7,9 @@ statement to reason about is a ``while`` loop.
 
 Applying ``while`` replaces the original goal with proof obligations that let
 you reason about the loop via an invariant (and, in some variants, a
-termination variant). Intuitively, you prove that the invariant is preserved
-by one iteration of the loop, and you then use the invariant to justify what
-follows once the loop condition becomes false.
+termination variant). Intuitively, you prove that the invariant is initially
+true, is preserved by one iteration of the loop, and you then use the invariant
+to justify what follows once the loop condition becomes false.
 
 .. contents::
    :local:
@@ -22,7 +22,9 @@ Variant: Hoare logic
 
    ``while ({formula})``
 
-The formula is a loop invariant. It may reference variables of the program.
+The formula is a loop invariant that must hold whenever the loop condition is
+evaluated (at the start of each iteration). It may reference variables of the
+program.
 
 Applying this form of ``while`` generates (at least) the following goals:
 
@@ -69,14 +71,14 @@ Variant: Probabilistic relational Hoare logic (one-sided)
    ``while {side} {formula} {expr}``
 
 Here `{formula}` is a relational invariant, and `{expr}` is an integer-valued
-termination variant. This variant applies when the designated program by
+termination variant. This variant applies when the program designated by
 ``{side}`` ends with a `while` loop.
 
 Applying this form of ``while`` generates two main goals:
 
 - **Loop-body goal (designated side):** assuming the invariant holds and the
   loop condition is true, executing the loop body re-establishes the
-  invariant and decreases the variant.
+  invariant and decreases the variant with probability 1.
 
 - **Remaining relational goal:** the loop is removed from the designated
   program, and the postcondition is strengthened with the invariant together
