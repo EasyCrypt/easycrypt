@@ -56,18 +56,21 @@ let t_hr_exists_intro_r fs tc =
     | FeHoareF _ | FeHoareS _ -> true
     | _ -> false in
   let pre   =
+    let eqs = match eqs with 
+      | [] -> map_inv1 (fun _ -> f_true) pre1
+      | _ -> map_inv f_ands eqs in
     if is_ehoare then
-      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) (map_inv f_ands eqs)) pre1
+      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) eqs) pre1
     else 
-      map_inv1 (f_exists bd) (map_inv2 f_and (map_inv f_ands eqs) pre1) in
+      map_inv1 (f_exists bd) (map_inv2 f_and eqs pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
   let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
   let m = LDecl.fresh_id hyps "&m" in
   let ms =
-    match List.hd gen with
-    | (_, Inv_ts _) -> [ml; mr]
-    | (_, Inv_ss _) -> [m] in
+    match pre1 with
+    | Inv_ts _ -> [ml; mr]
+    | Inv_ss _ -> [m] in
 
   let inv_rebind f =
     match f with
@@ -150,16 +153,16 @@ let process_ecall oside (l, tvi, fs) tc =
   let t_local_seq p1 tc =
     match kind, oside, p1 with
     | `Hoare n, _, Inv_ss p1 ->
-        EcPhlApp.t_hoare_app
+        EcPhlSeq.t_hoare_seq
           (Zpr.cpos (n-1)) p1 tc
     | `Equiv (n1, n2), None, Inv_ts p1 ->
-        EcPhlApp.t_equiv_app
+        EcPhlSeq.t_equiv_seq
           (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
     | `Equiv (n1, n2), Some `Left, Inv_ts p1 ->
-        EcPhlApp.t_equiv_app
+        EcPhlSeq.t_equiv_seq
           (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
     | `Equiv(n1, n2), Some `Right, Inv_ts p1 ->
-        EcPhlApp.t_equiv_app
+        EcPhlSeq.t_equiv_seq
           (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
     | _ -> tc_error !!tc "mismatched sidedness or kind of conclusion"
   in

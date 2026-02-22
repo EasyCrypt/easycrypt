@@ -2,14 +2,32 @@
 open EcUtils
 open EcSymbols
 open EcBigInt
-open EcPath
 open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type ty_param  = EcIdent.t
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
+
+type ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+type ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
+type ty_dtype = {
+  tydt_ctors   : ty_dtype_ctor list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
+}
+
+type ty_body = 
+  | Concrete of EcTypes.ty
+  | Abstract
+  | Datatype of ty_dtype
+  | Record   of ty_record
+
 
 type tydecl = {
   tyd_params : ty_params;
@@ -17,33 +35,14 @@ type tydecl = {
   tyd_loca   : locality;
 }
 
-and ty_body = [
-  | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
-  | `Datatype of ty_dtype
-  | `Record   of ty_record
-]
-
-and ty_record =
-  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
-
-and ty_dtype_ctor =
-  EcSymbols.symbol * EcTypes.ty list
-
-and ty_dtype = {
-  tydt_ctors   : ty_dtype_ctor list;
-  tydt_schelim : EcCoreFol.form;
-  tydt_schcase : EcCoreFol.form;
-}
-
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
-val tydecl_as_abstract : tydecl -> Sp.t option
+val tydecl_as_abstract : tydecl -> unit option
 val tydecl_as_datatype : tydecl -> ty_dtype option
 val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
-val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> locality -> tydecl
+val abs_tydecl : ?params:ty_pctor -> locality -> tydecl
 
-val ty_instanciate : ty_params -> ty list -> ty -> ty
+val ty_instantiate : ty_params -> ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list

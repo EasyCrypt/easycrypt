@@ -781,14 +781,14 @@ module MC = struct
       let loca    = tyd.tyd_loca in
 
       match tyd.tyd_type with
-      | `Concrete _  -> mc
-      | `Abstract _ -> mc
+      | Concrete _  -> mc
+      | Abstract    -> mc
 
-      | `Datatype dtype ->
+      | Datatype dtype ->
           let cs      = dtype.tydt_ctors   in
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
-          let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
+          let params  = List.map tvar tyd.tyd_params in
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
@@ -828,8 +828,8 @@ module MC = struct
               _up_operator candup mc name (ipath name, op)
             ) mc projs
 
-      | `Record (scheme, fields) ->
-          let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
+      | Record (scheme, fields) ->
+          let params  = List.map tvar tyd.tyd_params in
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
@@ -911,7 +911,7 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
-            mk_op ~opaque:optransparent [(self, Sp.singleton mypath)]
+            mk_op ~opaque:optransparent [(self)]
               optype (Some OP_TC) loca
           in (opid, xpath opname, optype, opdecl)
         in
@@ -931,7 +931,7 @@ module MC = struct
         List.map
           (fun (x, ax) ->
             let ax = EcSubst.subst_form fsubst ax in
-              (x, { ax_tparams = [(self, Sp.singleton mypath)];
+              (x, { ax_tparams = [(self)];
                     ax_spec    = ax;
                     ax_kind    = `Lemma;
                     ax_loca    = loca;
@@ -1106,9 +1106,6 @@ module MC = struct
             (add2mc _up_theory xsubth cth mc, Some submcs)
         else
           (add2mc _up_theory xsubth cth mc, None)
-
-      | Th_typeclass (x, tc) ->
-          (add2mc _up_typeclass x tc mc, None)
 
       | Th_baserw (x, _) ->
           (add2mc _up_rwbase x (expath x) mc, None)
@@ -1405,11 +1402,6 @@ module TypeClass = struct
       | Some prt ->
           let myself = EcPath.pqname (root env) name in
             { env with env_tc = TC.Graph.add ~src:myself ~dst:prt env.env_tc }
-
-  let bind ?(import = true) name tc env =
-    let env = rebind name tc env in
-    let item = Th_typeclass (name, tc) in
-    { env with env_item = mkitem ~import item :: env.env_item }
 
   let lookup qname (env : env) =
     MC.lookup_typeclass qname env
@@ -1883,7 +1875,7 @@ module Mod = struct
         let me_params = clearparams (List.length args) me.me_params in
 
         let me_oinfos =
-          let keep = List.map (EcPath.mident |- fst) me_params in
+          let keep = List.map (EcPath.mident -| fst) me_params in
           let keep = Sm.of_list keep in
           Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) me.me_oinfos in
 
@@ -2144,7 +2136,7 @@ module ModTy = struct
     let ois = EcSubst.subst_oracle_infos subst sig_.mis_oinfos in
     let params = mt.mt_params in
 
-    let keep = List.map (EcPath.mident |- fst) params in
+    let keep = List.map (EcPath.mident -| fst) params in
     let keep = Sm.of_list keep in
     let ois = Msym.map (OI.filter (fun f -> Sm.mem (f.x_top) keep)) ois in
 
@@ -2360,7 +2352,7 @@ module NormMp = struct
     match item with
     | MI_Module me -> mod_use env rm fdone us (EcPath.mqname mp me.me_name)
     | MI_Variable v -> add_var env (xpath mp v.v_name) us
-    | MI_Function f -> fun_use_aux env rm fdone us (xpath mp f.f_name)
+    | MI_Function f -> gen_fun_use env fdone rm us (xpath mp f.f_name)
 
   and body_use env rm fdone mp us comps body =
     match body with
@@ -2371,9 +2363,6 @@ module NormMp = struct
       List.fold_left (item_use env rm fdone mp) us comps
     | ME_Structure ms ->
       List.fold_left (item_use env rm fdone mp) us ms.ms_body
-
-  and fun_use_aux env rm fdone us f =
-    gen_fun_use env fdone rm us f
 
   let mod_use_top env mp =
     let mp = norm_mpath env mp in
@@ -2544,14 +2533,14 @@ module Ty = struct
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
-    | Some { tyd_type = `Concrete _ } -> true
+    | Some { tyd_type = Concrete _ } -> true
     | _ -> false
 
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
-    | Some ({ tyd_type = `Concrete body } as tyd) ->
+    | Some ({ tyd_type = Concrete body } as tyd) ->
         Tvar.subst
-          (Tvar.init (List.map fst tyd.tyd_params) args)
+          (Tvar.init tyd.tyd_params args)
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2585,14 +2574,15 @@ module Ty = struct
       match ty.ty_node with
       | Tconstr (p, tys) -> begin
           match by_path_opt p env with
-          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
+          | Some ({ tyd_type = (Datatype _ | Record _) as body }) ->
               let prefix   = EcPath.prefix   p in
               let basename = EcPath.basename p in
               let basename =
                 match body, mode with
-                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
-                | `Datatype _, `Ind           -> basename ^ "_ind"
-                | `Datatype _, `Case          -> basename ^ "_case"
+                | Record   _, (`Ind | `Case) -> basename ^ "_ind"
+                | Datatype _, `Ind           -> basename ^ "_ind"
+                | Datatype _, `Case          -> basename ^ "_case"
+                | _, _ -> assert false
               in
                 Some (EcPath.pqoname prefix basename, tys)
           | _ -> None
@@ -2605,22 +2595,7 @@ module Ty = struct
     | _ -> None
 
   let rebind name ty env =
-    let env = MC.bind_tydecl name ty env in
-
-    match ty.tyd_type with
-    | `Abstract tc ->
-        let myty =
-          let myp = EcPath.pqname (root env) name in
-          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
-        let instr =
-          Sp.fold
-            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-            tc env.env_tci
-        in
-          { env with env_tci = instr }
-
-    | _ -> env
+    MC.bind_tydecl name ty env
 
   let bind ?(import = true) name ty env =
     let env = rebind name ty env in
@@ -2724,7 +2699,7 @@ module Op = struct
 
   let reduce ?mode ?nargs env p tys =
     let op, f = core_reduce ?mode ?nargs env p in
-    Tvar.f_subst ~freshen:true (List.map fst op.op_tparams) tys f
+    Tvar.f_subst ~freshen:true op.op_tparams tys f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2814,10 +2789,10 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instanciate p tys env =
+  let instantiate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f
+        Tvar.f_subst ~freshen:true ax.ax_tparams tys f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -2932,20 +2907,6 @@ module Theory = struct
     | Th_theory (x, cth) when cth.cth_mode = `Concrete ->
         bind_instance_th (xpath x) inst cth.cth_items
 
-    | Th_type (x, tyd) -> begin
-        match tyd.tyd_type with
-        | `Abstract tc ->
-            let myty =
-              let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
-                (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
-            in
-              Sp.fold
-                (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-                tc inst
-
-        | _ -> inst
-    end
-
     | _ -> inst
 
   (* ------------------------------------------------------------------ *)
@@ -2965,17 +2926,6 @@ module Theory = struct
         | `Abstract -> base
       end
     | _ -> odfl base (tx path base item.ti_item)
-
-  (* ------------------------------------------------------------------ *)
-  let bind_tc_th =
-    let for1 path base = function
-      | Th_typeclass (x, tc) ->
-          tc.tc_prt |> omap (fun prt ->
-            let src = EcPath.pqname path x in
-            TC.Graph.add ~src ~dst:prt base)
-      | _ -> None
-
-    in bind_base_th for1
 
   (* ------------------------------------------------------------------ *)
   let bind_br_th =
@@ -3049,14 +2999,13 @@ module Theory = struct
       | _, `Concrete ->
           let thname      = EcPath.pqname (root env) cth.name in
           let env_tci     = bind_instance_th thname env.env_tci items in
-          let env_tc      = bind_tc_th thname env.env_tc items in
           let env_rwbase  = bind_br_th thname env.env_rwbase items in
           let env_atbase  = bind_at_th thname env.env_atbase items in
           let env_ntbase  = bind_nt_th thname env.env_ntbase items in
           let env_redbase = bind_rd_th thname env.env_redbase items in
           let env =
             { env with
-                env_tci   ; env_tc     ; env_rwbase;
+                env_tci   ; env_rwbase;
                 env_atbase; env_ntbase; env_redbase; }
           in
           add_restr_th thname env items
@@ -3107,9 +3056,6 @@ module Theory = struct
 
         | Th_theory (x, ({cth_mode = `Abstract} as th)) ->
             MC.import_theory (xpath x) th env
-
-        | Th_typeclass (x, tc) ->
-            MC.import_typeclass (xpath x) tc env
 
         | Th_baserw (x, _) ->
             MC.import_rwbase (xpath x) env
@@ -3169,7 +3115,7 @@ module Theory = struct
             Some (Th_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
 
         | Th_addrw (p, ps, lc) ->
-            let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+            let ps = List.filter ((not) -| inclear -| oget -| EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
 
         | Th_auto ({ axioms } as auto_rl) ->
@@ -3267,7 +3213,6 @@ module Theory = struct
     | `Concrete ->
       { env with
           env_tci     = bind_instance_th thpath env.env_tci cth.cth_items;
-          env_tc      = bind_tc_th thpath env.env_tc cth.cth_items;
           env_rwbase  = bind_br_th thpath env.env_rwbase cth.cth_items;
           env_atbase  = bind_at_th thpath env.env_atbase cth.cth_items;
           env_ntbase  = bind_nt_th thpath env.env_ntbase cth.cth_items;
@@ -3383,12 +3328,12 @@ module LDecl = struct
 
   (* ------------------------------------------------------------------ *)
   let by_name s hyps =
-    match List.ofind ((=) s |- EcIdent.name |- fst) hyps.h_local with
+    match List.ofind ((=) s -| EcIdent.name -| fst) hyps.h_local with
     | None   -> error (LookupError (`Symbol s))
     | Some h -> h
 
   let by_id id hyps =
-    match List.ofind (EcIdent.id_equal id |- fst) hyps.h_local with
+    match List.ofind (EcIdent.id_equal id -| fst) hyps.h_local with
     | None   -> error (LookupError (`Ident id))
     | Some x -> snd x
 

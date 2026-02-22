@@ -145,14 +145,14 @@ let t_ehoare_call_core fpre fpost tc =
 let t_ehoare_call fpre fpost tc =
   let _, _, _, s, _, wppre, _ = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) wppre tc in
+    EcPhlSeq.t_ehoare_seq (EcMatching.Zipper.cpos (List.length s.s_node)) wppre tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   FApi.t_sub [t_ehoare_call_core fpre fpost; t_id] tcenv
 
 let t_ehoare_call_concave f fpre fpost tc =
   let _, _, _, s, _, wppre, wppost = ehoare_call_pre_post fpre fpost tc in
   let tcenv =
-    EcPhlApp.t_ehoare_app (EcMatching.Zipper.cpos (List.length s.s_node)) 
+    EcPhlSeq.t_ehoare_seq (EcMatching.Zipper.cpos (List.length s.s_node))
      (map_ss_inv2 (fun wppre f -> f_app_simpl f [wppre] txreal) wppre f) tc in
   let tcenv = FApi.t_swap_goals 0 1 tcenv in
   let t_call =
@@ -219,7 +219,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-  let concl = 
+  let concl =
     let _,mt = bhs.bhs_m in
     match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
@@ -325,8 +325,8 @@ let call_error env tc f1 f2 =
 
 let t_call side ax tc =
   let env   = FApi.tc1_env  tc in
-  let concl = FApi.tc1_goal tc in
-
+  let hyps, concl = FApi.tc1_flat tc in
+  let ax = EcReduction.h_red_until EcReduction.full_red hyps ax in
   match ax.f_node, concl.f_node with
   | FhoareF hf, FhoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.hs_s in
@@ -418,7 +418,7 @@ let process_call side info tc =
           let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in    
+          let post = TTC.pf_process_form !!tc qenv tbool post in
           f_hoareF {m;inv=pre} f {m;inv=post}
 
       | FbdHoareS bhs, None ->
@@ -435,7 +435,7 @@ let process_call side info tc =
           let m = (EcIdent.create "&hr") in
           let penv, qenv = LDecl.hoareF m f hyps in
           let pre  = TTC.pf_process_form !!tc penv txreal pre  in
-          let post = TTC.pf_process_form !!tc qenv txreal post in   
+          let post = TTC.pf_process_form !!tc qenv txreal post in
           f_eHoareF {m;inv=pre} f {m;inv=post}
 
       | FbdHoareS _, Some _
@@ -448,7 +448,7 @@ let process_call side info tc =
           let (ml, mr) = (EcIdent.create "&1", EcIdent.create "&2") in
           let penv, qenv = LDecl.equivF ml mr fl fr hyps in
           let pre  = TTC.pf_process_form !!tc penv tbool pre  in
-          let post = TTC.pf_process_form !!tc qenv tbool post in  
+          let post = TTC.pf_process_form !!tc qenv tbool post in
           f_equivF {ml;mr;inv=pre} fl fr {ml;mr;inv=post}
 
       | FequivS es, Some side ->

@@ -79,6 +79,8 @@ val ty_sub_exists : (ty -> bool) -> ty -> bool
 val ty_fold : ('a -> ty -> 'a) -> 'a -> ty -> 'a
 val ty_iter : (ty -> unit) -> ty -> unit
 
+val var_mem : ?check_glob:bool -> EcIdent.t -> ty -> bool
+
 (* -------------------------------------------------------------------- *)
 val symbol_of_ty   : ty -> string
 val fresh_id_of_ty : ty -> EcIdent.t

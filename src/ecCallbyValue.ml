@@ -300,7 +300,7 @@ and try_reduce_fixdef
 
     let body = EcFol.form_of_expr body in
     let body =
-      Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
+      Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
 
     Some (cbv st subst body (Args.create ty eargs))
 

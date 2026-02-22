@@ -168,7 +168,7 @@ module LowApply = struct
     | PTGlobal (p, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instanciate p tys env, subgoals)
+        (pt, EcEnv.Ax.instantiate p tys env, subgoals)
 
     | PTTerm pt ->
       let pt, ax, subgoals = check_ `Elim pt subgoals tc in
@@ -406,7 +406,8 @@ let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
+let rec t_lazy_match ?(reduce = `Full) ?(texn = fun _ -> raise InvalidGoalShape)
+                    (tx : form -> FApi.backward)
   (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
   try tx concl tc
@@ -416,7 +417,7 @@ let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
       | `None    -> raise InvalidGoalShape
       | `Full    -> EcReduction.full_red
       | `NoDelta -> EcReduction.nodelta in
-    FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
+    FApi.t_seq (FApi.t_or (t_hred_with_info strategy) texn) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
 type smode = [ `Cbv | `Cbn ]
@@ -620,7 +621,7 @@ let t_intro_s (id : iname) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_intros_i_x (ids : EcIdent.t list) (tc : tcenv1) =
-  t_intros_x (List.map (notag |- some) ids) tc
+  t_intros_x (List.map (notag -| some) ids) tc
 
 (* -------------------------------------------------------------------- *)
 let t_intros_i (ids : EcIdent.t list) (tc : tcenv1) =
@@ -1109,8 +1110,8 @@ let gen_tuple_intro tys =
     ((x, fx), (y, fy), f_eq fx fy) in
 
   let eqs   = List.mapi eq tys in
-  let concl = f_eq (f_tuple (List.map (snd |- proj3_1) eqs))
-                   (f_tuple (List.map (snd |- proj3_2) eqs)) in
+  let concl = f_eq (f_tuple (List.map (snd -| proj3_1) eqs))
+                   (f_tuple (List.map (snd -| proj3_2) eqs)) in
   let concl = f_imps (List.map proj3_3 eqs) concl in
   let concl =
     let bindings =
@@ -1248,8 +1249,8 @@ let gen_tuple_eq_elim (tys : ty list) : form =
     ((x, fx), (y, fy), f_eq fx fy) in
 
   let eqs   = List.mapi eq tys in
-  let concl = f_eq (f_tuple (List.map (snd |- proj3_1) eqs))
-                   (f_tuple (List.map (snd |- proj3_2) eqs)) in
+  let concl = f_eq (f_tuple (List.map (snd -| proj3_1) eqs))
+                   (f_tuple (List.map (snd -| proj3_2) eqs)) in
   let concl = f_imps [f_imps (List.map proj3_3 eqs) fp; concl] fp in
   let concl =
     let bindings =
@@ -1274,7 +1275,7 @@ let t_elim_eq_tuple_r_n ((_, sf) : form * sform) concl tc =
       let tc   = RApi.rtcenv_of_tcenv1 tc in
       let hyps = RApi.tc_hyps tc in
       let fs   = List.combine (destr_tuple a1) (destr_tuple a2) in
-      let tys  = List.map (f_ty |- fst) fs in
+      let tys  = List.map (f_ty -| fst) fs in
       let hd   = RApi.bwd_of_fwd (pf_gen_tuple_eq_elim tys hyps) tc in
       let args = List.flatten (List.map (fun (x, y) -> [x; y]) fs) in
       let args = concl :: args in
@@ -2018,7 +2019,7 @@ let t_subst_x ?(exn = InvalidGoalShape) ?kind ?(except = Sid.empty) ?(clear = SC
             y, f_local y f.f_ty in
           let subst, check = LowSubst.build_subst env var fy in
           let post, (id', _), pre =
-            try  List.find_pivot (id_equal id |- fst) (LDecl.tohyps hyps).h_local
+            try  List.find_pivot (id_equal id -| fst) (LDecl.tohyps hyps).h_local
             with Not_found -> assert false
           in
 
@@ -2245,7 +2246,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     match sform_of_form concl with
     | SFquant (Lforall, _, _) ->
       let bd  = fst (destr_forall concl) in
-      let ids = List.map (EcIdent.name |- fst) bd in
+      let ids = List.map (EcIdent.name -| fst) bd in
       let ids = LDecl.fresh_ids hyps ids in
       FApi.t_seq (t_intros_i ids) aux0 tc
 
@@ -2325,7 +2326,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     match sform_of_form concl with
     | SFquant (Lforall, _, _) ->
       let bd  = fst (destr_forall concl) in
-      let ids = List.map (EcIdent.name |- fst) bd in
+      let ids = List.map (EcIdent.name -| fst) bd in
       let ids = LDecl.fresh_ids hyps ids in
       let st = { st with cs_undosubst = Sid.of_list (List.map fst (LDecl.tohyps hyps).h_local) } in
       FApi.t_seqs
@@ -2423,7 +2424,10 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
                 | _, `Local _ -> `RtoL
                 | _, _        -> `LtoR
             in
-            t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
+            try t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
+            with InvalidGoalShape -> 
+              let tside = if tside = `LtoR then `RtoL else `LtoR in
+              t_subst_x ~clear:SCnone ~kind:sk ~tside ~eqid:eqid ~except:st.cs_sbeq tc
         in
 
 (*      let _, _, side = gen in
@@ -2598,8 +2602,8 @@ let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(mode = fmdelta) ?(
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
     try
       Apply.t_apply_bwd_r ~ri ~mode ~canview:false pt tc
-    with Apply.NoInstance _ -> 
-      t_fail tc 
+    with Apply.NoInstance _ ->
+      t_fail tc
   in
 
   let rec t_apply ctn ip tc =

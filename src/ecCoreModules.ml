@@ -21,7 +21,7 @@ let symbol_of_lv = function
       EcTypes.symbol_of_pv pv
 
   | LvTuple pvs ->
-      String.concat "" (List.map (EcTypes.symbol_of_pv |- fst) pvs)
+      String.concat "" (List.map (EcTypes.symbol_of_pv -| fst) pvs)
 
 let ty_of_lv = function
   | LvVar   (_, ty)       -> ty
@@ -45,7 +45,7 @@ let name_of_lv lv =
   | LvVar (pv, _) ->
      EcTypes.name_of_pvar pv
   | LvTuple pvs ->
-     String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
+     String.concat "_" (List.map (EcTypes.name_of_pvar -| fst) pvs)
 
 let lv_of_expr e =
   match e.e_node with
@@ -184,7 +184,7 @@ let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
       Ssym.union (sx_of_pv x) w
 
   | LvTuple xs ->
-      let w' = List.map (sx_of_pv |- fst) xs in
+      let w' = List.map (sx_of_pv -| fst) xs in
       Ssym.big_union (w :: w')
 
 and s_get_uninit_read (w : Ssym.t) (s : stmt) =
@@ -493,6 +493,9 @@ type top_module_expr = {
   tme_expr : module_expr;
   tme_loca : locality;
 }
+
+let is_me_body_alias (body : module_body) =
+  match body with ME_Alias _ -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
 let ur_hash = EcAst.ur_hash

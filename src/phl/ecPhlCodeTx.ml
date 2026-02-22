@@ -236,11 +236,11 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
               | e, _ -> [e] in
 
             let lv = lv_to_ty_list lv in
-      
+
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
               Mpv.mem env pv subst0 && is_const_expression e
             ) (List.combine lv es) in
-            
+
             let subst =
               List.fold_left
                 (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
@@ -295,7 +295,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
       if not (List.for_all is_const_expression es) then
         tc_error pf "right-values are not closed expressions";
 
-      if not (List.for_all (is_loc |- fst) lv) then
+      if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
       let subst =
@@ -342,24 +342,24 @@ let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
 let process_set_match (side, cpos, id, pattern) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   let me, _ = tc1_get_stmt side tc in
   let hyps = LDecl.push_active_ss me (FApi.tc1_hyps tc) in
   let ue  = EcProofTyping.unienv_of_hyps hyps in
@@ -368,7 +368,7 @@ let process_set_match (side, cpos, id, pattern) tc =
   t_set_match side cpos (EcLocation.unloc id)
     (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
     tc
-  
+
 (* -------------------------------------------------------------------- *)
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
@@ -459,7 +459,7 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
     assert false;
 
   let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 

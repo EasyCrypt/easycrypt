@@ -226,6 +226,12 @@ end = struct
     | FXE_SynCheckFailure ->
         msg "syntactic termination check failure"
 
+  let pp_gse_error _env fmt error =
+    let msg = Format.fprintf fmt in
+    match error with
+    | GSE_ExpectedTwoSided -> 
+        msg "expected two sided goal"
+
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
     let msg x = Format.fprintf fmt x in
@@ -551,6 +557,9 @@ end = struct
       end
     end
 
+    | UnexpectedGoalShape gse ->
+        msg "unexpected goal shape %a" (pp_gse_error env) gse
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
@@ -573,6 +582,7 @@ module InductiveError : sig
   val pp_fxerror : env -> Format.formatter -> fxerror -> unit
 end = struct
   open EcHiInductive
+  open EcInductive
   open TypingError
 
   let pp_rcerror env fmt error =
@@ -591,8 +601,38 @@ end = struct
     | RCE_Empty ->
         msg "this record type is empty"
 
+  let format_intype fmt p (tyvar, ctx) =
+    (match ctx with
+    | Concrete -> Format.fprintf fmt "... in type %s" p
+    | Record s -> Format.fprintf fmt "... in record field %s of type %s" s p
+    | Variant s -> Format.fprintf fmt "... in variant %s of type %s" s p);
+    let subty tyvar =
+      Format.fprintf fmt " (in an instance of type variable %a)"
+        EcIdent.pp_ident tyvar
+    in
+    Option.iter subty tyvar
+
+let format_context pp fmt (p, ctx) = match ctx with
+  | InType (tyvar, ctx) -> format_intype fmt p (tyvar, ctx)
+  | NonPositiveOcc ty ->
+      Format.fprintf fmt "non-positive occurrence of %s in type %a"
+        p (EcPrinting.pp_type pp) ty
+  | AbstractTypeRestriction ->
+      Format.fprintf fmt "unauthorised abstract type constructor %s" p
+  | TypePositionRestriction ty ->
+      Format.fprintf fmt
+        "recursive occurrence %a in the definition of %s has different \
+         arguments, which is not allowed."
+        (EcPrinting.pp_type pp) ty p
+
+let format_context_list p l pp fmt =
+  Format.fprintf fmt "Could not verify strict positivity of type %s:@.@;<0 2>@[<v>" p;
+  Format.pp_print_list (format_context pp) fmt l;
+  Format.fprintf fmt "@;@]"
+
   let pp_dterror env fmt error =
     let msg x = Format.fprintf fmt x in
+    let env1  = EcPrinting.PPEnv.ofenv env in
 
     match error with
     | DTE_TypeError ee ->
@@ -605,11 +645,10 @@ end = struct
         msg "invalid constructor type: `%s`: %a'"
           name (pp_tyerror env) ee
 
-    | DTE_NonPositive ->
-        msg "the datatype does not respect the positivity condition"
-
     | DTE_Empty ->
         msg "the datatype may be empty"
+
+    | DTE_NonPositive (s, ctx) -> format_context_list s ctx env1 fmt
 
   let pp_fxerror env fmt error =
     match error with

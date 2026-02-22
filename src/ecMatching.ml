@@ -268,6 +268,14 @@ module Zipper = struct
     end
     | `Offset cp1 -> zpr, cp1
 
+  let zipper_and_split_of_cpos_range env cpr s =
+    let zpr, cp = zipper_of_cpos_range env cpr s in
+    match zpr.z_tail with
+    | []      -> raise InvalidCPos
+    | i :: tl ->
+      let s, tl = split_at_cpos1 ~after:`Auto env cp (stmt tl) in
+      (zpr, cp), ((i::s), tl)
+
   let split_at_cpos1 env cpos1 s =
     split_at_cpos1 ~after:`Auto env cpos1 s
 
@@ -285,7 +293,7 @@ module Zipper = struct
     | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
     | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
     | ZMatch (e, sp, mpi) ->
-      zip (Some (i_match (e, mpi.prebr @ (mpi.locals, s) :: mpi.postbr))) sp
+      zip (Some (i_match (e, List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)))) sp
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
@@ -308,14 +316,10 @@ module Zipper = struct
       List.rev after
 
   let fold_range env cenv cpr f state s =
-    let zpr, cp = zipper_of_cpos_range env cpr s in
-    match zpr.z_tail with
-    | []      -> raise InvalidCPos
-    | i :: tl ->
-      let s, tl = split_at_cpos1 env cp (stmt tl) in
-      let env = odfl env zpr.z_env in
-      let state', si' = f env cenv state (i :: s) in
-      state', zip { zpr with z_tail = si' @ tl }
+    let (zpr, _), (s, tl) = zipper_and_split_of_cpos_range env cpr s in
+    let env = odfl env zpr.z_env in
+    let state', si' = f env cenv state s in
+    state', zip { zpr with z_tail = si' @ tl }
 
   let map_range env cpr f s =
     snd (fold_range env () cpr (fun env () _ si -> (), f env si) () s)
@@ -833,19 +837,20 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
     cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 
   and doit_mem _env mxs m1 m2 =
-    match EV.get m1 !ev.evm_mem with
-    | None ->
-        if not (EcMemory.mem_equal m1 m2) then
+    if not (EcMemory.mem_equal m1 m2) then begin
+      match EV.get m1 !ev.evm_mem with
+      | None ->
           raise MatchFailure
 
-    | Some `Unset ->
-        if Mid.mem m2 mxs then
-          raise MatchFailure;
-        ev := { !ev with evm_mem = EV.set m1 m2 !ev.evm_mem }
+      | Some `Unset ->
+          if Mid.mem m2 mxs then
+            raise MatchFailure;
+          ev := { !ev with evm_mem = EV.set m1 m2 !ev.evm_mem }
 
-    | Some (`Set m1) ->
-        if not (EcMemory.mem_equal m1 m2) then
-          raise MatchFailure
+      | Some (`Set m1) ->
+          if not (EcMemory.mem_equal m1 m2) then
+            raise MatchFailure
+  end
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
@@ -910,7 +915,7 @@ let f_match opts hyps (ue, ev) f1 f2 =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstanciateUni -> raise MatchFailure
+      with EcUnify.UninstantiateUni -> raise MatchFailure
     in
       (ue, clue, ev)
 

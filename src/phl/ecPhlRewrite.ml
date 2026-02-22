@@ -55,7 +55,7 @@ let process_change
     (form : pexpr)
     (tc   : tcenv1)
 =
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
 
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
     let hyps = LDecl.push_active_ss m hyps in
@@ -96,7 +96,7 @@ let process_rewrite_rw
         let f2 = EcProofTerm.concretize_form pt.ptev_env f2 in
         let pt, _ = EcProofTerm.concretize pt in
 
-        let cpos = 
+        let cpos =
           EcMatching.FPosition.select_form
             ~xconv:`AlphaEq ~keyed:occmode.k_keyed
             hyps None subf.inv e.inv in
@@ -118,7 +118,7 @@ let process_rewrite_rw
     (m, data), expr_of_ss_inv e
   in
 
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
   let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
   let cpos = EcMatching.FPosition.reroot [1] cpos in
 
@@ -147,7 +147,7 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     (fst me, f), e
   in
 
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
   let (m, f), tc = t_change side pos change tc in
 
   FApi.t_first (
@@ -172,23 +172,25 @@ let process_rewrite
 (* -------------------------------------------------------------------- *)
 let t_change_stmt
   (side : side option)
-  (hd, stmt, tl : instr list * instr list * instr list) 
+  (pos : EcMatching.Position.codepos_range)
   (s : stmt)
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+
+  let (zpr, _), (stmt, epilog) = EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
 
   let pvs = EcPV.is_write env (stmt @ s.s_node) in
   let pvs, globs = EcPV.PV.elements pvs in
 
-  let pre_pvs, pre_globs = EcPV.PV.elements @@ EcPV.PV.inter 
-    (EcPV.is_read env stmt) 
+  let pre_pvs, pre_globs = EcPV.PV.elements @@ EcPV.PV.inter
+    (EcPV.is_read env stmt)
     (EcPV.is_read env s.s_node)
   in
 
-  let mleft = EcIdent.create "1" in (* FIXME: PR: is this how we want to do this? *)
-  let mright = EcIdent.create "2" in
+  let mleft = EcIdent.create "&1" in (* FIXME: PR: is this how we want to do this? *)
+  let mright = EcIdent.create "&2" in
 
   let eq =
    List.map
@@ -199,7 +201,7 @@ let t_change_stmt
      (fun mp -> f_eqglob mp mleft mp mright)
      globs in
 
-  let pre_eq = 
+  let pre_eq =
     List.map
       (fun (pv, ty) -> f_eq (f_pvar pv ty mleft).inv (f_pvar pv ty mright).inv)
       pre_pvs
@@ -212,67 +214,55 @@ let t_change_stmt
   let goal1 =
      f_equivS
        (snd me) (snd me)
-       {ml=mleft; mr=mright; inv=f_ands pre_eq} 
+       {ml=mleft; mr=mright; inv=f_ands pre_eq}
        (EcAst.stmt stmt) s
        {ml=mleft; mr=mright; inv=f_ands eq}
   in
 
+  let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
+
   let goal2 =
    EcLowPhlGoal.hl_set_stmt
      side (FApi.tc1_goal tc)
-     (EcAst.stmt (List.flatten [hd; s.s_node; tl])) in
+     stmt in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
 
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
-  ((p, o) : pcodepos1 * pcodeoffset1)
+  (pos    : pcodepos_range)
   (s      : pstmt)
   (tc     : tcenv1)
 =
   let env = FApi.tc1_env tc in
 
   begin match side, (FApi.tc1_goal tc).f_node with
-  | _, FhoareF _ 
+  | _, FhoareF _
   | _, FeHoareF _
   | _, FequivF _
   | _, FbdHoareF _ -> tc_error !!tc "Expecting goal with inlined program code"
-  | Some _, FhoareS _ 
+  | Some _, FhoareS _
   | Some _, FeHoareS _
   | Some _, FbdHoareS _-> tc_error !!tc "Tactic should not receive side for non-relational goal"
   | None, FequivS _ -> tc_error !!tc "Tactic requires side selector for relational goal"
-  | None, FhoareS _ 
+  | None, FhoareS _
   | None, FeHoareS _
   | None, FbdHoareS _
   | Some _ , FequivS _ -> ()
   | _ -> tc_error !!tc "Wrong goal shape, expecting hoare or equiv goal with inlined code"
   end;
 
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
+  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
 
-  let p, o =
-   let env = EcEnv.Memory.push_active_ss me env in
-   let pos = EcTyping.trans_codepos1 ~memory:(fst me) env p in
-   let off = EcTyping.trans_codeoffset1 ~memory:(fst me) env o in
-   let off = EcMatching.Position.resolve_offset ~base:pos ~offset:off in
-
-   let start = EcMatching.Zipper.offset_of_position env pos stmt in
-   let end_  = EcMatching.Zipper.offset_of_position env off stmt in
-
-   if (end_ < start) then
-     tc_error !!tc "end position cannot be before start position";
-
-   (start - 1, end_ - start)
+  let pos =
+    let env = EcEnv.Memory.push_active_ss me env in
+    EcTyping.trans_codepos_range ~memory:(fst me) env pos
   in
 
-  let stmt     = stmt.s_node in
-  let hd, stmt = List.takedrop p stmt in
-  let stmt, tl = List.takedrop o stmt in
-
-  let s = match side with 
+  let s = match side with
   | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
-  | None -> EcProofTyping.tc1_process_Xhl_stmt tc s 
+  | None -> EcProofTyping.tc1_process_Xhl_stmt tc s
   in
 
-  t_change_stmt side (hd, stmt, tl) s tc
+  t_change_stmt side pos s tc

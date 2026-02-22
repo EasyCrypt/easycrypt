@@ -11,9 +11,28 @@ module Ssym = EcSymbols.Ssym
 module CS   = EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type ty_param  = EcIdent.t
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
+
+type ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+type ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
+type ty_dtype = {
+  tydt_ctors   : ty_dtype_ctor list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
+}
+
+type ty_body = 
+  | Concrete of EcTypes.ty
+  | Abstract
+  | Datatype of ty_dtype
+  | Record   of ty_record
+
 
 type tydecl = {
   tyd_params : ty_params;
@@ -21,39 +40,20 @@ type tydecl = {
   tyd_loca   : locality;
 }
 
-and ty_body = [
-  | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
-  | `Datatype of ty_dtype
-  | `Record   of ty_record
-]
-
-and ty_record =
-  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
-
-and ty_dtype_ctor =
-  EcSymbols.symbol * EcTypes.ty list
-
-and ty_dtype = {
-  tydt_ctors   : ty_dtype_ctor list;
-  tydt_schelim : EcCoreFol.form;
-  tydt_schcase : EcCoreFol.form;
-}
-
 let tydecl_as_concrete (td : tydecl) =
-  match td.tyd_type with `Concrete x -> Some x | _ -> None
+  match td.tyd_type with Concrete x -> Some x | _ -> None
 
 let tydecl_as_abstract (td : tydecl) =
-  match td.tyd_type with `Abstract x -> Some x | _ -> None
+  match td.tyd_type with Abstract -> Some () | _ -> None
 
 let tydecl_as_datatype (td : tydecl) =
-  match td.tyd_type with `Datatype x -> Some x | _ -> None
+  match td.tyd_type with Datatype x -> Some x | _ -> None
 
 let tydecl_as_record (td : tydecl) =
-  match td.tyd_type with `Record x -> Some x | _ -> None
+  match td.tyd_type with Record (x, y) -> Some (x, y) | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
+let abs_tydecl ?(params = `Int 0) lc =
   let params =
     match params with
     | `Named params ->
@@ -61,15 +61,15 @@ let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) lc =
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
         List.map
-          (fun x -> (EcIdent.create x, Sp.empty))
+          (fun x -> (EcIdent.create x))
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_loca = lc; }
+  { tyd_params = params; tyd_type = Abstract; tyd_loca = lc; }
 
 (* -------------------------------------------------------------------- *)
-let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init (List.map fst params) args in
+let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
+  let subst = CS.Tvar.init params args in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -254,12 +254,19 @@ let operator_as_prind (op : operator) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
+let axiomatized_op 
+  ?(nargs = 0) 
+  ?(nosmt = false) 
+  (path : EcPath.path)
+  ((tparams, axbd) : ty_params * form)
+  (lc : locality)
+  : axiom
+=
   let axbd, axpm =
-    let bdpm = List.map fst tparams in
+    let bdpm = tparams in
     let axpm = List.map EcIdent.fresh bdpm in
       (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
-       List.combine axpm (List.map snd tparams))
+       axpm)
   in
 
   let args, axbd =
@@ -271,7 +278,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
   in
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
-  let tyargs = List.map (EcTypes.tvar |- fst) axpm in
+  let tyargs = List.map EcTypes.tvar axpm in
   let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in

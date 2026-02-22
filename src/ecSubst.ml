@@ -818,15 +818,10 @@ let subst_top_module (s : subst) (m : top_module_expr) =
     tme_loca = m.tme_loca; }
 
 (* -------------------------------------------------------------------- *)
-let subst_typeclass (s : subst) (tcs : Sp.t) =
-  Sp.map (subst_path s) tcs
-
-(* -------------------------------------------------------------------- *)
-let fresh_tparam (s : subst) ((x, tcs) : ty_param) =
+let fresh_tparam (s : subst) (x : ty_param) =
   let newx = EcIdent.fresh x in
-  let tcs  = subst_typeclass s tcs in
   let s    = add_tyvar s x (tvar newx) in
-  (s, (newx, tcs))
+  (s, newx)
 
 (* -------------------------------------------------------------------- *)
 let fresh_tparams (s : subst) (tparams : ty_params) =
@@ -841,21 +836,21 @@ let subst_genty (s : subst) (tparams, ty) =
 (* -------------------------------------------------------------------- *)
 let subst_tydecl_body (s : subst) (tyd : ty_body) =
   match tyd with
-  | `Abstract tc ->
-      `Abstract (subst_typeclass s tc)
+  | Abstract ->
+      Abstract
 
-  | `Concrete ty ->
-      `Concrete (subst_ty s ty)
+  | Concrete ty ->
+      Concrete (subst_ty s ty)
 
-  | `Datatype dtype ->
+  | Datatype dtype ->
       let dtype =
         { tydt_ctors   = List.map (snd_map (List.map (subst_ty s))) dtype.tydt_ctors;
           tydt_schelim = subst_form s dtype.tydt_schelim;
           tydt_schcase = subst_form s dtype.tydt_schcase; }
-      in `Datatype dtype
+      in Datatype dtype
 
-  | `Record (scheme, fields) ->
-      `Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
+  | Record (scheme, fields) ->
+      Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =
@@ -1042,9 +1037,6 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_instance (ty, tci, lc) ->
       Th_instance (subst_genty s ty, subst_instance s tci, lc)
 
-  | Th_typeclass (x, tc) ->
-      Th_typeclass (x, subst_tc s tc)
-
   | Th_baserw _ ->
       item
 
@@ -1103,12 +1095,12 @@ let init_tparams (params : (EcIdent.t * ty) list) : subst =
 
 (* -------------------------------------------------------------------- *)
 let open_oper op tys =
-  let s = List.combine (List.fst op.op_tparams) tys in
+  let s = List.combine op.op_tparams tys in
   let s = init_tparams s in
   (subst_ty s op.op_ty, subst_op_kind s op.op_kind)
 
 let open_tydecl tyd tys =
-  let s = List.combine (List.fst tyd.tyd_params) tys in
+  let s = List.combine tyd.tyd_params tys in
   let s = init_tparams s in
   subst_tydecl_body s tyd.tyd_type
 

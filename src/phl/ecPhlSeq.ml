@@ -14,7 +14,7 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_app_r i phi tc =
+let t_hoare_seq_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let phi = ss_inv_rebind phi (fst hs.hs_m) in
@@ -23,21 +23,22 @@ let t_hoare_app_r i phi tc =
   let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
-let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
+let t_hoare_seq = FApi.t_low2 "hoare-seq" t_hoare_seq_r
 
 (* -------------------------------------------------------------------- *)
-let t_ehoare_app_r i f tc =
+let t_ehoare_seq_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s1, s2 = s_split env i hs.ehs_s in
-  let a = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) (stmt s1) f in
-  let b = f_eHoareS (snd hs.ehs_m) f (stmt s2) (ehs_po hs) in
+  let phi = ss_inv_rebind phi (fst hs.ehs_m) in
+  let a = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) (stmt s1) phi in
+  let b = f_eHoareS (snd hs.ehs_m) phi (stmt s2) (ehs_po hs) in
   FApi.xmutate1 tc `HlApp [a; b]
 
-let t_ehoare_app = FApi.t_low2 "hoare-app" t_ehoare_app_r
+let t_ehoare_seq = FApi.t_low2 "hoare-seq" t_ehoare_seq_r
 
 (* -------------------------------------------------------------------- *)
-let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
+let t_bdhoare_seq_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
   let m = fst bhs.bhs_m in
@@ -67,7 +68,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let (ir1, ir2) = EcIdent.create "r", EcIdent.create "r" in
   let (r1 , r2 ) = f_local ir1 treal, f_local ir2 treal in
   let condnm =
-    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2) 
+    let eqs = map_ss_inv2 f_and (map_ss_inv1 ((EcUtils.flip f_eq) r1) f2)
                                 (map_ss_inv1 ((EcUtils.flip f_eq) r2) g2) in
     f_forall
       [(ir1, GTty treal); (ir2, GTty treal)]
@@ -92,7 +93,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   FApi.xmutate1 tc `HlApp conds
 
 (* -------------------------------------------------------------------- *)
-let t_bdhoare_app_r i info tc =
+let t_bdhoare_seq_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
     let tt1 = EcPhlConseq.t_hoareS_conseq_nm (hs_pr hs) {m=(fst hs.hs_m);inv=f_true} in
@@ -102,12 +103,12 @@ let t_bdhoare_app_r i info tc =
 
   FApi.t_last
     (FApi.t_try (t_intros_s_seq (`Symbol ["_"; "_"]) tactic))
-    (t_bdhoare_app_r_low i info tc)
+    (t_bdhoare_seq_r_low i info tc)
 
-let t_bdhoare_app = FApi.t_low2 "bdhoare-app" t_bdhoare_app_r
+let t_bdhoare_seq = FApi.t_low2 "bdhoare-seq" t_bdhoare_seq_r
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_app (i, j) phi tc =
+let t_equiv_seq (i, j) phi tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let sl1,sl2 = s_split env i es.es_sl in
@@ -118,19 +119,19 @@ let t_equiv_app (i, j) phi tc =
 
   FApi.xmutate1 tc `HlApp [a; b]
 
-let t_equiv_app_onesided side i pre post tc =
+let t_equiv_seq_onesided side i pre post tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let (ml, mr) = fst es.es_ml, fst es.es_mr in
   let s, s', p', q' =
     match side with
     | `Left  -> 
-      let p' = ss_inv_generalize_right (EcSubst.ss_inv_rebind pre ml) mr in
-      let q' = ss_inv_generalize_right (EcSubst.ss_inv_rebind post ml) mr in
+      let p' = ss_inv_generalize_as_left pre ml mr in
+      let q' = ss_inv_generalize_as_left post ml mr in
       es.es_sl, es.es_sr, p', q'
     | `Right -> 
-      let p' = ss_inv_generalize_left (EcSubst.ss_inv_rebind pre mr) ml in
-      let q' = ss_inv_generalize_left (EcSubst.ss_inv_rebind post mr) ml in
+      let p' = ss_inv_generalize_as_right pre ml mr in
+      let q' = ss_inv_generalize_as_right post ml mr in
       es.es_sr, es.es_sl, p', q'
   in
   let generalize_mod_side= sideif side generalize_mod_left generalize_mod_right in
@@ -142,7 +143,7 @@ let t_equiv_app_onesided side i pre post tc =
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
   let r = map_ts_inv2 f_and p' (generalize_mod_side env modi (map_ts_inv2 f_imp q' (es_po es))) in
-  FApi.t_seqsub (t_equiv_app ij r)
+  FApi.t_seqsub (t_equiv_seq ij r)
     [t_id; (* s1 ~ s' : pr ==> r *)
      FApi.t_seqsub (EcPhlConseq.t_equivS_conseq_nm p' q')
        [(* r => forall mod, post => post' *) t_trivial;
@@ -152,31 +153,23 @@ let t_equiv_app_onesided side i pre post tc =
     ] tc
 
 (* -------------------------------------------------------------------- *)
-let process_phl_bd_info dir bd_info tc =
+let process_phl_bd_info bd_info tc =
   match bd_info with
-  | PAppNone ->
+  | PSeqNone ->
       let hs = tc1_as_bdhoareS tc in
       let m = fst hs.bhs_m in
-      let f1, f2 =
-         match dir with
-        | Backs -> bhs_bd hs, {m;inv=f_r1}
-        | Fwds  -> {m;inv=f_r1}, bhs_bd hs
-      in
+      let f1, f2 = bhs_bd hs, {m;inv=f_r1} in
         (* The last argument will not be used *)
         ({m;inv=f_true}, f1, f2, {m;inv=f_r0}, {m;inv=f_r1})
 
-  | PAppSingle f ->
+  | PSeqSingle f ->
       let hs = tc1_as_bdhoareS tc in
       let m = fst hs.bhs_m in
       let f  = snd (TTC.tc1_process_Xhl_form tc treal f) in
-      let f1, f2 =
-        match dir with
-        | Backs  -> (map_ss_inv2 f_real_div (bhs_bd hs) f, f)
-        | Fwds   -> (f, map_ss_inv2 f_real_div (bhs_bd hs) f)
-      in
+      let f1, f2 = (map_ss_inv2 f_real_div (bhs_bd hs) f, f) in
         ({m;inv=f_true}, f1, f2, {m;inv=f_r0}, {m;inv=f_r1})
 
-  | PAppMult (phi, f1, f2, g1, g2) ->
+  | PSeqMult (phi, f1, f2, g1, g2) ->
     let hs = tc1_as_bdhoareS tc in
     let m = fst hs.bhs_m in
       let phi =
@@ -211,7 +204,7 @@ let process_phl_bd_info dir bd_info tc =
       (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
-let process_app (side, dir, k, phi, bd_info) tc =
+let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
 
   let get_single phi =
@@ -224,19 +217,19 @@ let process_app (side, dir, k, phi, bd_info) tc =
       tc_error !!tc "seq: no side information expected" in
 
   match k, bd_info with
-  | Single i, PAppNone when is_hoareS concl ->
+  | Single i, PSeqNone when is_hoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
-    t_hoare_app i phi tc
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+    t_hoare_seq i phi tc
 
-  | Single i, PAppNone when is_eHoareS concl ->
+  | Single i, PSeqNone when is_eHoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
-    let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
-    t_ehoare_app i phi tc
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+    t_ehoare_seq i phi tc
 
-  | Single i, PAppNone when is_equivS concl ->
+  | Single i, PSeqNone when is_equivS concl ->
     let pre, post =
       match phi with
       | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
@@ -248,25 +241,25 @@ let process_app (side, dir, k, phi, bd_info) tc =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
-    let i = EcProofTyping.tc1_process_codepos1 tc (Some side, i) in
-    t_equiv_app_onesided side i pre post tc
+    let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some side, i) in
+    t_equiv_seq_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
       check_side side;
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-      let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
-      let i = EcProofTyping.tc1_process_codepos1 tc (side, i) in
-      t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
+      let (ra, f1, f2, f3, f4) = process_phl_bd_info bd_info tc in
+      let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+      t_bdhoare_seq i (ra, pia, f1, f2, f3, f4) tc
 
-  | Double (i, j), PAppNone when is_equivS concl ->
+  | Double (i, j), PSeqNone when is_equivS concl ->
       check_side side;
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      let i = EcProofTyping.tc1_process_codepos1 tc (Some `Left, i) in
-      let j = EcProofTyping.tc1_process_codepos1 tc (Some `Left, j) in
-      t_equiv_app (i, j) phi tc
+      let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, i) in
+      let j = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, j) in
+      t_equiv_seq (i, j) phi tc
 
-  | Single _, PAppNone
-  | Double _, PAppNone ->
+  | Single _, PSeqNone
+  | Double _, PSeqNone ->
       tc_error !!tc "invalid `position' parameter"
 
   | _, _ ->

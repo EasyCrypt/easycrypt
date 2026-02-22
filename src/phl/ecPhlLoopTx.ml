@@ -20,7 +20,7 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 type fission_t    = oside * pcodepos * (int * (int * int))
 type fusion_t     = oside * pcodepos * (int * (int * int))
-type unroll_t     = oside * pcodepos * bool
+type unroll_t     = oside * pcodepos * [`While | `For of bool]
 type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
@@ -65,7 +65,7 @@ let check_dslc pf =
        List.iter doit_s [c1; c2]
 
     | Smatch (_, bs) ->
-       List.iter (doit_s |- snd) bs
+       List.iter (doit_s -| snd) bs
 
     | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
        error ()
@@ -205,22 +205,22 @@ let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
 (* -------------------------------------------------------------------- *)
 let process_fission (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fission side cpos infos tc
 
 let process_fusion (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fusion side cpos infos tc
 
 let process_splitwhile (b, side, cpos) tc =
   let b =
     try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
     with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement" in
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_splitwhile b side cpos tc
 
 (* -------------------------------------------------------------------- *)
-let process_unroll_for side cpos tc =
+let process_unroll_for ~cfold side cpos tc =
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
   let (goal_m, _), c = EcLowPhlGoal.tc1_get_stmt side tc in
@@ -228,7 +228,7 @@ let process_unroll_for side cpos tc =
   if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
 
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
@@ -305,7 +305,7 @@ let process_unroll_for side cpos tc =
 
   let t_conseq_nm tc =
     match (tc1_get_pre tc) with
-    | Inv_ss inv -> 
+    | Inv_ss inv ->
       (EcPhlConseq.t_hoareS_conseq_nm inv {m=inv.m;inv=f_true} @+
       [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
     | _ -> tc_error !!tc "expecting single sided precondition" in
@@ -320,23 +320,26 @@ let process_unroll_for side cpos tc =
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
         EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
+        EcPhlSeq.t_hoare_seq (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
   let tcenv = t_doit 0 pos zs tc in
   let tcenv = FApi.t_onalli doi tcenv in
 
-  let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
-  let clen = blen * (List.length zs - 1) in
+  if cfold then begin
+    let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+    let clen = blen * (List.length zs - 1) in
 
-  FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+    FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+  end else tcenv
 
 (* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =
-  if for_ then
-    process_unroll_for side cpos tc
-  else begin
-    let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  match for_ with
+  | `While ->
+    let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
     t_unroll side cpos tc
-  end
+
+  | `For cfold ->
+    process_unroll_for ~cfold side cpos tc

@@ -7,6 +7,7 @@ open EcEnv
 open EcCoreGoal
 open EcAst
 open EcParsetree
+open EcUnify
 
 module Msym = EcSymbols.Msym
 
@@ -27,7 +28,7 @@ let process_form_opt ?mv hyps pf oty =
     let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
-  with EcUnify.UninstanciateUni ->
+  with EcUnify.UninstantiateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
       (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
@@ -132,7 +133,7 @@ let tc1_process_stmt ?map hyps tc c =
 
 let tc1_process_prhl_stmt ?map tc side c =
   let concl = FApi.tc1_goal tc in
-  let ml, mr = match concl.f_node with 
+  let ml, mr = match concl.f_node with
     | FequivS {es_ml=ml; es_mr=mr} -> (ml, mr)
     | FeagerF {eg_ml=ml; eg_mr=mr} ->
         EcMemory.abstract ml, EcMemory.abstract mr
@@ -189,31 +190,10 @@ let tc1_process_Xhl_formula_xreal tc pf =
   tc1_process_Xhl_form tc txreal pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_codepos_range tc (side, cpr) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos_range env cpr
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos env cpos
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos1 tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active_ss me env in
-  EcTyping.trans_codepos1 env cpos
-
-(* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)
-let pf_check_tvi (pe : proofenv) typ tvi =
+let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
   match tvi with
   | None -> ()
 
@@ -224,7 +204,7 @@ let pf_check_tvi (pe : proofenv) typ tvi =
           (List.length tyargs) (List.length typ)
 
   | Some (EcUnify.TVInamed tyargs) ->
-      let typnames = List.map (EcIdent.name |- fst) typ in
+      let typnames = List.map EcIdent.name typ in
       List.iter
         (fun (x, _) ->
           if not (List.mem x typnames) then

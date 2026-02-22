@@ -23,7 +23,7 @@ type dterror =
 | DTE_TypeError       of TT.tyerror
 | DTE_DuplicatedCtor  of symbol
 | DTE_InvalidCTorType of symbol * TT.tyerror
-| DTE_NonPositive
+| DTE_NonPositive     of symbol * EI.non_positive_context
 | DTE_Empty
 
 type fxerror =
@@ -52,7 +52,7 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   Msym.odup unloc (List.map fst rc) |> oiter (fun (x, y) ->
     rcerror y.pl_loc env (RCE_DuplicatedField x.pl_desc));
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   if List.is_empty rc then
     rcerror loc env RCE_Empty;
 
@@ -84,7 +84,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let env0  =
     let myself = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = `Abstract EcPath.Sp.empty;
+      tyd_type    = Abstract;
       tyd_loca    = lc;
     } in
       EcEnv.Ty.bind (unloc name) myself env
@@ -106,7 +106,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       dt |> List.map for1
   in
 
-  (* Check for emptyness *)
+  (* Check for emptiness *)
   begin
     let rec isempty_n (ctors : (ty list) list) =
       List.for_all isempty_1 ctors
@@ -131,21 +131,24 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
-      let tyinst () =
-        fun ty -> ty_instanciate tdecl.tyd_params targs ty in
+      let tyinst = ty_instantiate tdecl.tyd_params targs in
 
       match tdecl.tyd_type with
-      | `Abstract _ ->
-          List.exists isempty (targs)
+      | Abstract ->
+          List.exists isempty targs
 
-      | `Concrete ty ->
-          isempty_1 [tyinst () ty]
+      | Concrete ty ->
+          isempty_1 [ tyinst ty ]
 
-      | `Record (_, fields) ->
-          isempty_1 (List.map (tyinst () |- snd) fields)
+      | Record (_, fields) ->
+          isempty_1 (List.map (tyinst -| snd) fields)
 
-      | `Datatype dt ->
-          isempty_n (List.map (List.map (tyinst ()) |- snd) dt.tydt_ctors)
+      | Datatype dt ->
+          (* FIXME: Inspecting all constructors recursively causes
+             non-termination in some cases. One can have the same
+             limitation as is done for positivity in order to limit this
+             unfolding to well-behaved cases. *)
+          isempty_n (List.map (List.map tyinst -| snd) dt.tydt_ctors)
 
     in
 
@@ -324,7 +327,7 @@ let trans_matchfix
 
               let create o =
                 EcIdent.create (omap_dfl unloc "_" o) in
-              let pvars = List.map (create |- unloc) cargs in
+              let pvars = List.map (create -| unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
               (pb, (indp, ind, (ctorsym, ctoridx)), pvars, xpos)
@@ -399,7 +402,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams)
+      let opexpr   = e_op opexpr (List.map tvar tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr

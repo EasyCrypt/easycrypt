@@ -266,14 +266,14 @@ let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
 
 (* -------------------------------------------------------------------- *)
 let lenv_of_tparams ts =
-  let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
+  let trans_tv env (id : ty_param) = (* FIXME: TC HOOK *)
     let tv = WTy.create_tvsymbol (preid id) in
     { env with le_tv = Mid.add id (WTy.ty_var tv) env.le_tv }, tv
   in
     List.map_fold trans_tv empty_lenv ts
 
 let lenv_of_tparams_for_hyp genv ts =
-  let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
+  let trans_tv env (id : ty_param) = (* FIXME: TC HOOK *)
     let ts = WTy.create_tysymbol (preid id) [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
@@ -287,7 +287,7 @@ let instantiate tparams ~textra targs tres tys =
       (fun mtv tv ty -> WTy.Mtv.add tv ty mtv)
       WTy.Mtv.empty tparams tys in
   let textra = List.map (WTy.ty_inst mtv) textra in
-  let targs = List.map (some |- WTy.ty_inst mtv) targs in
+  let targs = List.map (some -| WTy.ty_inst mtv) targs in
   let tres  = tres |> omap (WTy.ty_inst mtv) in
   (textra, targs, tres)
 
@@ -400,22 +400,22 @@ and trans_tydecl genv (p, tydecl) =
 
   let ts, opts, decl =
     match tydecl.tyd_type with
-    | `Abstract _ ->
+    | Abstract ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | `Concrete ty ->
+    | Concrete ty ->
         let ty = trans_ty (genv, lenv) ty in
         let ts = WTy.create_tysymbol pid tparams (WTy.Alias ty) in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | `Datatype dt ->
+    | Datatype dt ->
         let ncs  = List.length dt.tydt_ctors in
         let ts   = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
-        let wdom = tconstr p (List.map (tvar |- fst) tydecl.tyd_params) in
+        let wdom = tconstr p (List.map tvar tydecl.tyd_params) in
         let wdom = trans_ty (genv, lenv) wdom in
 
         let for_ctor (c, ctys) =
@@ -429,12 +429,12 @@ and trans_tydecl genv (p, tydecl) =
 
         (ts, opts, WDecl.create_data_decl [ts, wdtype])
 
-    | `Record (_, rc) ->
+    | Record (_, rc) ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
-        let wdom  = tconstr p (List.map (tvar |- fst) tydecl.tyd_params) in
+        let wdom  = tconstr p (List.map tvar tydecl.tyd_params) in
         let wdom  = trans_ty (genv, lenv) wdom in
 
         let for_field (fname, fty) =
@@ -1034,9 +1034,9 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun (tv,_) -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun tv -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
   let textra =
-    List.map (fun (tv,_) -> trans_ty (genv,lenv) (tvar tv)) textra in
+    List.map (fun tv -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in
   let wcodom =
     if   ER.EqTest.is_bool genv.te_env codom

@@ -490,7 +490,7 @@ let process_exacttype qs (tc : tcenv1) =
       tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
   in
   let tys =
-    List.map (fun (a,_) -> EcTypes.tvar a)
+    List.map (fun a -> EcTypes.tvar a)
       (EcEnv.LDecl.tohyps hyps).h_tvar in
   let pt = ptglobal ~tys p in
 
@@ -700,7 +700,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
               (* FIXME: TC HOOK *)
-              let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
+              let body  = Tvar.f_subst ~freshen:true tparams tvi body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
                 with EcEnv.NotReducible -> body
@@ -723,7 +723,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   | `RtoL ->
     let fp =
       (* FIXME: TC HOOK *)
-      let body  = Tvar.f_subst ~freshen:true (List.map fst tparams) tvi body in
+      let body  = Tvar.f_subst ~freshen:true tparams tvi body in
       let fp    = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
         with EcEnv.NotReducible -> fp
@@ -758,14 +758,14 @@ let process_rewrite1_r ttenv ?target ri tc =
         match simpl with
         | Some logic ->
            let hyps   = FApi.tc1_hyps tc in
-           let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+           let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
            t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
-      let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+      let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
       t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
   | RWDelta ((s, r, o, px), p) -> begin
@@ -782,7 +782,7 @@ let process_rewrite1_r ttenv ?target ri tc =
   | RWRw (((s : rwside), r, o, p), pts) -> begin
       let do1 (mode : [`Full | `Light]) ((subs : rwside), pt) tc =
         let hyps   = FApi.tc1_hyps tc in
-        let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+        let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
         let hyps   = FApi.tc1_hyps ?target tc in
 
         let ptenv, prw =
@@ -916,7 +916,7 @@ let process_rewrite ttenv ?target ri tc =
       else process_rewrite1 ttenv ri tc
     in
 
-    match fc |> omap ((process_tfocus tc) |- unloc) with
+    match fc |> omap ((process_tfocus tc) -| unloc) with
     | None    -> FApi.t_onalli dorw tc
     | Some fc -> FApi.t_onselecti fc dorw tc
 
@@ -1160,7 +1160,7 @@ let process_view1 pe tc =
         in
 
         let discharge tc =
-          let intros = List.map (EcIdent.name |- fst |- snd) ids in
+          let intros = List.map (EcIdent.name -| fst -| snd) ids in
           let intros = LDecl.fresh_ids hyps intros in
 
           let for1 evm (x, idty) id =
@@ -1217,7 +1217,7 @@ let process_view1 pe tc =
 
 (* -------------------------------------------------------------------- *)
 let process_view pes tc =
-  let views = List.map (t_last |- process_view1) pes in
+  let views = List.map (t_last -| process_view1) pes in
   List.fold_left (fun tc tt -> tt tc) (FApi.tcenv_of_tcenv1 tc) views
 
 (* -------------------------------------------------------------------- *)
@@ -1515,8 +1515,12 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_rw (_ : ST.state) (o, s) tc =
     let h = EcIdent.create "_" in
     let rwt tc =
-      let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
-      process_rewrite1_core ~close:false (s, None, o) pt tc
+      match LDecl.by_id h (FApi.tc1_hyps tc) with
+      | LD_hyp _ ->
+        let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
+        process_rewrite1_core ~close:false (s, None, o) pt tc
+      | _ ->
+        tc_error !!tc "top assumption is not an hypothesis";
     in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
 
   and intro1_unfold (_ : ST.state) (s, o) p tc =
