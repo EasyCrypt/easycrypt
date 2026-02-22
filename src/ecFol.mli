@@ -1,8 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcPath
-open EcTypes
-open EcMemory
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 include module type of struct include EcCoreFol end
@@ -20,15 +19,30 @@ val f_eqparams:
   -> EcTypes.ty -> ovariable list -> memory
   -> form
 
+val ts_inv_eqparams:
+     EcTypes.ty -> ovariable list -> memory
+  -> EcTypes.ty -> ovariable list -> memory
+  -> ts_inv
+
 val f_eqres:
      EcTypes.ty -> memory
   -> EcTypes.ty -> memory
   -> form
 
+val ts_inv_eqres:
+     EcTypes.ty -> memory
+  -> EcTypes.ty -> memory
+  -> ts_inv
+
 val f_eqglob:
      mpath -> memory
   -> mpath -> memory
   -> form
+
+val ts_inv_eqglob:
+     mpath -> memory
+  -> mpath -> memory
+  -> ts_inv
 
 (* soft-constructors - ordering *)
 val f_int_le  : form -> form -> form
@@ -93,7 +107,7 @@ val f_dmap : ty -> ty -> form -> form -> form
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
-val split_sided : memory -> form -> form option
+val split_sided : memory -> ts_inv -> ss_inv option
 val one_sided_vs : memory -> form -> form list
 
 (* -------------------------------------------------------------------- *)
@@ -102,7 +116,7 @@ val f_ty_app : EcEnv.env -> form -> form list -> form
 
 (* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
- * that the quantified variables can be instanciated *)
+ * that the quantified variables can be instantiated *)
 
 val f_betared : form -> form
 

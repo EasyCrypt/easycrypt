@@ -171,6 +171,16 @@ module PVM = struct
 
   let has_mod b =
     List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b
+  
+  let has_globs m (s: subst) =
+    try
+      let mpv = Mid.find m s in
+      let has_abstract_globs = not (Mm.is_empty mpv.s_gl) in
+      let has_concrete_globs =
+        let check pv _ = is_glob pv in
+        Mnpv.exists check mpv.s_pv in
+      has_abstract_globs || has_concrete_globs
+    with Not_found -> false
 
   let rec subst env (s : subst) =
     Hf.memo_rec 107 (fun aux f ->
@@ -179,25 +189,22 @@ module PVM = struct
           (try find env pv m s with Not_found -> f)
       | Fglob(mp,m) ->
           (try find_glob env (EcPath.mident mp) m s with Not_found -> f)
-      | FequivF _ ->
-        check_binding EcFol.mleft s;
-        check_binding EcFol.mright s;
+      | FequivF {ef_ml=ml;ef_mr=mr} 
+      | FequivS {es_ml=(ml,_); es_mr=(mr,_)} ->
+        check_binding ml s;
+        check_binding mr s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FequivS es ->
-        check_binding (fst es.es_ml) s;
-        check_binding (fst es.es_mr) s;
+      | FhoareF {hf_m=m}
+      | FhoareS {hs_m=(m,_)}
+      | FbdHoareF {bhf_m=m}
+      | FbdHoareS {bhs_m=(m,_)} ->
+        check_binding m s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FbdHoareF _ ->
-        check_binding EcFol.mhr s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FhoareS hs ->
-        check_binding (fst hs.hs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | FbdHoareS hs ->
-        check_binding (fst hs.bhs_m) s;
-        EcFol.f_map (fun ty -> ty) aux f
-      | Fpr pr ->
-        check_binding pr.pr_mem s;
+      | Fpr {pr_mem; pr_event={m}}  ->
+        check_binding m s;
+        (* Substituting globals using the memory of the pr may erase information *)
+        if has_globs pr_mem s then
+          raise MemoryClash;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 =
@@ -213,7 +220,6 @@ module PVM = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module PV = struct
 
   type t =
@@ -246,7 +252,7 @@ module PV = struct
     { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }
 
   let add_glob env mp fv =
-    let f = NormMp.norm_glob env mhr mp in
+    let f = NormMp.norm_glob env (EcIdent.create "&dummy") mp in
     let rec aux fv f =
       match f.f_node with
       | Ftuple fs -> List.fold_left aux fv fs
@@ -255,7 +261,7 @@ module PV = struct
       | Fglob(mp,_) ->
         { fv with s_gl = Sm.add (EcPath.mident mp) fv.s_gl}
       | _ -> assert false in
-    aux fv f
+    aux fv f.inv
 
   let remove env pv fv =
     { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
@@ -337,36 +343,37 @@ module PV = struct
           aux env fv e
 
       | FhoareF hf ->
-          in_mem_scope env fv [mhr] [hf.hf_pr; hf.hf_po]
+          in_mem_scope env fv [hf.hf_m] [(hf_pr hf).inv; (hf_po hf).inv]
 
       | FhoareS hs ->
-          in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
+          in_mem_scope env fv [fst hs.hs_m] [(hs_pr hs).inv; (hs_po hs).inv]
 
       | FeHoareF hf ->
-          in_mem_scope env fv [mhr] [hf.ehf_pr; hf.ehf_po]
+          in_mem_scope env fv [hf.ehf_m] [(ehf_pr hf).inv; (ehf_po hf).inv]
 
       | FeHoareS hs ->
-          in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
+          in_mem_scope env fv [fst hs.ehs_m] [(ehs_pr hs).inv; (ehs_po hs).inv]
 
       | FbdHoareF bhf ->
-          in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
+          in_mem_scope env fv [bhf.bhf_m] [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
 
       | FbdHoareS bhs ->
           in_mem_scope env fv
-            [fst bhs.bhs_m] [bhs.bhs_pr; bhs.bhs_po; bhs.bhs_bd]
+            [fst bhs.bhs_m] [(bhs_pr bhs).inv; (bhs_po bhs).inv; (bhs_bd bhs).inv]
 
       | FequivF ef ->
-          in_mem_scope env fv [mleft; mright] [ef.ef_pr; ef.ef_po]
+          in_mem_scope env fv [ef.ef_ml; ef.ef_mr] [(ef_pr ef).inv; (ef_po ef).inv]
 
       | FequivS es ->
-          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [es.es_pr; es.es_po]
+          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [(es_pr es).inv; (es_po es).inv]
 
       | FeagerF eg ->
-          in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
+          in_mem_scope env fv [eg.eg_ml; eg.eg_mr] [(eg_pr eg).inv; (eg_po eg).inv]
 
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in
-          in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
+          let ev = pr.pr_event in
+          in_mem_scope env fv [ev.m] [ev.inv]
 
     and in_mem_scope env fv mems fs =
       if   List.exists (EcIdent.id_equal m) mems
@@ -419,6 +426,10 @@ module PV = struct
   let diff fv1 fv2 =
     { s_pv = Mnpv.set_diff fv1.s_pv fv2.s_pv;
       s_gl = Sm.diff fv1.s_gl fv2.s_gl }
+
+  let inter fv1 fv2 = 
+    { s_pv = Mnpv.inter (fun _ _ t2 -> Some t2) fv1.s_pv fv2.s_pv;
+      s_gl = Sm.inter fv1.s_gl fv2.s_gl }
 
   let interdep env fv1 fv2 =
     let test_pv pv _ =
@@ -785,16 +796,21 @@ module Mpv2 = struct
     let x = pvm env x in
     Mnpv.exists (fun _ (s,_) -> Snpv.mem x s) eqs.s_pv
 
-  let to_form ml mr eqs inv =
+  let to_form eqs ml mr inv =
     let l =
       Sm.fold (fun m l -> f_eqglob m ml m mr :: l) eqs.s_gl [] in
     let l =
       Mnpv.fold (fun pvl (s,ty) l ->
-        Snpv.fold (fun pvr l -> f_eq (f_pvar pvl ty ml) (f_pvar pvr ty mr) :: l)
+        Snpv.fold (fun pvr l -> f_eq (f_pvar pvl ty ml).inv (f_pvar pvr ty mr).inv :: l)
           s l) eqs.s_pv l in
     f_and_simpl (f_ands l) inv
 
-  let of_form env ml mr f =
+  
+  let to_form_ts_inv eqs inv =
+    map_ts_inv1 (to_form eqs inv.ml inv.mr) inv
+
+  let of_form env f =
+    let ml, mr = f.ml, f.mr in 
     let rec aux f eqs =
       match sform_of_form f with
       | SFtrue -> eqs
@@ -816,7 +832,7 @@ module Mpv2 = struct
         List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
       | _ -> raise Not_found in
-    aux f empty
+    aux f.inv empty
 
   let enter_local env local ids1 ids2 =
     try
@@ -826,7 +842,8 @@ module Mpv2 = struct
       List.fold_left2 do1 local ids1 ids2
     with _ -> raise EqObsInError
 
-  let needed_eq env ml mr f =
+  let needed_eq env f =
+    let ml, mr = f.ml, f.mr in
 
     let rec add_eq local eqs f1 f2 =
       match f1.f_node, f2.f_node with
@@ -900,8 +917,7 @@ module Mpv2 = struct
         end
       | _ -> raise Not_found in
 
-    try aux Mid.empty empty f
-    with _ -> raise Not_found
+    aux Mid.empty empty f.inv
 
   let check_glob eqs =
     Mnpv.iter (fun pv (s,_)->
@@ -994,8 +1010,9 @@ let is_in_refl env lv eqo =
   | LvTuple lr -> List.exists (fun (pv,_) -> PV.mem_pv env pv eqo) lr
 
 let add_eqs_refl env eqo e =
-  let f = form_of_expr mhr e in
-  let fv = PV.fv env mhr f in
+  (* FIXME: get rid of dummy memory *)
+  let f = ss_inv_of_expr (EcIdent.create "&dummy") e in
+  let fv = PV.fv env f.m f.inv in
   PV.union fv eqo
 
 let remove_refl env lv eqo =

@@ -470,6 +470,16 @@ proof.
   by case (hs = x) => /= _ //; rewrite addrC ltzS count_ge0.
 qed.
 
+lemma le_in_count ['a] (p1 p2 : 'a -> bool) (s : 'a list) :
+  (forall x, x \in s => p1 x => p2 x) =>
+  count p1 s <= count p2 s.
+proof. elim: s => //#. qed.
+
+lemma countU ['a] (p1 p2 p : 'a -> bool) (s : 'a list) :
+  (forall x, x \in s => p x => p1 x \/ p2 x) =>
+  count p s <= count p1 s + count p2 s.
+proof. elim s => //#. qed.
+
 op has (p : 'a -> bool) xs =
   with xs = []      => false
   with xs = y :: ys => (p y) \/ (has p ys).
@@ -1228,6 +1238,9 @@ proof.
   case: s1 => [|y []] //=; last smt(size_ge0).
   by move=> h; have := h x => /= ->.
 qed.
+
+lemma perm_eq_nil (s : 'a list): perm_eq s [] <=> s = [].
+proof. by split; first apply perm_eq_small. qed.
 
 lemma perm_eq_filter (p : 'a -> bool) (s1 s2 : 'a list):
   perm_eq s1 s2 => perm_eq (filter p s1) (filter p s2).
@@ -3118,6 +3131,23 @@ case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
 by case=> a2 b2 /= [_ ->>]; rewrite mem_filter /=.
 qed.
 
+lemma perm_eq_flatten ['a] (s0 s1 : 'a list list) :
+  perm_eq s0 s1 => perm_eq (flatten s0) (flatten s1).
+proof.
+have hs: forall (s: 'a list list), !0 = 1+size s by smt(size_ge0).
+elim s0 s1.
++ by move => s1; rewrite flatten_nil perm_eq_sym perm_eq_nil.
+move => x0 s0 IH s1 h.
+have hx0: x0 \in s1 by rewrite -(perm_eq_mem _ _ h x0).
+rewrite flatten_cons (perm_eq_trans (x0 ++ flatten (rem x0 s1))).
++ by rewrite perm_cat2l IH -(perm_cons x0) (perm_eq_trans s1) 1:h perm_to_rem.
+move: hx0 => {h IH}.
+elim s1 => // x1 s1 IH.
+case (x1 = x0); first by move => ->; rewrite flatten_cons perm_eq_refl.
+move => hx; rewrite eq_sym hx /= => hxs.
+by rewrite !flatten_cons catA perm_catCAl -catA perm_cat2l IH.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                               Mask                                   *)
 (* -------------------------------------------------------------------- *)
@@ -3245,6 +3275,14 @@ apply/subseqP; exists (m1 ++ m2); rewrite !size_cat.
 by rewrite !mask_cat // sz_m1 sz_m2.
 qed.
 
+lemma subseq_catR ['a] (s s1 s2 : 'a list) :
+  subseq s s1 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cats0 &(cat_subseq) // sub0seq. qed.
+
+lemma subseq_catL ['a] (s s1 s2 : 'a list) :
+  subseq s s2 => subseq s (s1 ++ s2).
+proof. by move=> *; rewrite -[s]cat0s &(cat_subseq) // sub0seq. qed.
+
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
 
@@ -3264,8 +3302,42 @@ qed.
 lemma subseq_cons (s : 'a list) x : subseq s (x :: s).
 proof. by apply/(@cat_subseq [] s [x] s)=> //; apply/subseq_refl. qed.
 
+lemma subseq_consI ['a] (x : 'a) (s1 s2 : 'a list) :
+  subseq (x :: s1) s2 => subseq s1 s2.
+proof.
+case/subseqP=> m [eqsz h]; apply/subseqP.
+elim: m s2 eqsz h => [|b m ih] [|x2 s2] //=.
+move/addzI => eqsz; case: b => /= _.
+- by case=> <<- ->; exists (false :: m) => /#.
+by case/(ih _ eqsz) => m' [*]; exists (false :: m') => /= /#.
+qed.
+
 lemma subseq_rcons (s : 'a list) x : subseq s (rcons s x).
 proof. by rewrite -{1}(@cats0 s) -cats1 cat_subseq // subseq_refl. qed.
+
+lemma subseq_take ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (take i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catR) &(subseq_refl).
+qed.
+
+lemma subseq_drop ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) s2.
+proof.
+move=> *; apply: (subseq_trans s1) => //.
+by rewrite -{2}[s1](cat_take_drop i) &(subseq_catL) &(subseq_refl).
+qed.
+
+lemma subseq_drop_congr ['a] (i : int) (s1 s2 : 'a list) :
+  subseq s1 s2 => subseq (drop i s1) (drop i s2).
+proof.
+elim/natind: i s1 s2 => [i le0_i|i ge0_i ih].
+- by move=> *; rewrite !drop_le0.
+case=> [|x1 s1]; [by move=> *; apply: sub0seq | case=> //= x2 s2 h].
+rewrite !(ifF (_ <= 0)) ~-1:/#; apply: ih => //.
+by move: h; case: (x2 = x1) => //= ? /subseq_consI.
+qed.
 
 lemma rem_subseq x (s : 'a list) : subseq (rem x s) s.
 proof.
@@ -3319,6 +3391,12 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 
 abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
   map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
+
+lemma zip0l ['a 'b] (s : 'b list): zip<:'a, 'b> [] s = [].
+proof. by case: s. qed.
+
+lemma zip0r ['a 'b] (s : 'a list): zip<:'a, 'b> s [] = [].
+proof. by case: s. qed.
 
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
@@ -3455,6 +3533,28 @@ lemma onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
 proof.
 elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
 by case: (n = 0) => // _; apply/ih.
+qed.
+
+lemma take_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  take k (zip s1 s2) = zip (take k s1) (take k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !take_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
+qed.
+
+lemma drop_zip ['a 'b] (k : int) (s1 : 'a list) (s2 : 'b list) :
+  drop k (zip s1 s2) = zip (drop k s1) (drop k s2).
+proof.
+elim/natind: k s1 s2.
+- by move=> n le0_n s1 s2; rewrite !drop_le0.
+move=> n ge0_h ih [|x1 s1] [|x2 s2] //=.
+- by rewrite zip0l.
+- by rewrite zip0r.
+- by rewrite !ifF ~-1:/# /= &(ih).
 qed.
 
 lemma eq_keys_amap ['a, 'b1, 'b2, 'c]
@@ -3784,6 +3884,17 @@ apply/(@eq_sorted e)=> //; try by apply/sort_sorted.
 apply/perm_eqlP=> s'; rewrite !perm_sortl; apply/perm_eqlP.
 rewrite -(perm_cat2l [x]) perm_eq_sym perm_catCl perm_catAC -catA /=.
 by rewrite -eqss (@perm_eq_trans s) // perm_sort.
+qed.
+
+lemma sorted_range m n : sorted (<) (range m n).
+proof.
+case: (n <= m); first by move=> ?; rewrite range_geq.
+move/ltzNge => lt_mn; rewrite range_ltn //=.
+suff: forall m, 0 <= m => forall b n, b < n => path (<) b (range n (n + m)).
+- by move=> /(_ (n - (m + 1)) _ m (m+1) _) /#.
+move=> {m n lt_mn}; elim=> /= [|m ge0_m ih] b n ?.
+- by rewrite range_geq.
+by rewrite addrA range_ltn 1:/# /= addrAC; split=> //#.
 qed.
 
 (* -------------------------------------------------------------------- *)

@@ -42,7 +42,10 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Module mp ->
     let ppe =
       match mp.m_top with
-      | `Local id -> EcPrinting.PPEnv.add_locals ppe [id]
+      | `Local id ->
+        if EcEnv.Mod.is_declared id env then
+          ppe
+        else EcPrinting.PPEnv.add_locals ppe [id]
       | _ -> ppe in
     Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
@@ -91,325 +94,393 @@ let hierror fmt =
     bfmt fmt
 
 (* -------------------------------------------------------------------- *)
-let rec on_mp (cb : cb) (mp : mpath) =
-  let f = m_functor mp in
-  cb (`Module f);
-  List.iter (on_mp cb) mp.m_args
+type aenv = {
+  env   : EcEnv.env;          (* Global environment for dep. analysis *)
+  cb    : cb;                 (* Dep. analysis callback *)
+  cache : acache ref;         (* Dep. analysis cache *)
+}
 
-let on_xp (cb : cb) (xp : xpath) =
-  on_mp cb xp.x_top
+and acache = {
+  op    : Sp.t;               (* Operator declaration already handled *)
+  type_ : Sp.t;               (* Type declaration already handled *) 
+}
 
-let rec on_ty (cb : cb) (ty : ty) =
+(* -------------------------------------------------------------------- *)
+let empty_acache : acache =
+  { op = Sp.empty; type_ = Sp.empty; }
+
+(* -------------------------------------------------------------------- *)
+let mkaenv (env : EcEnv.env) (cb : cb) : aenv = 
+  { env; cb; cache = ref empty_acache; }
+
+(* -------------------------------------------------------------------- *)
+let rec on_mp (aenv : aenv) (mp : mpath) =
+  aenv.cb (`Module (m_functor mp));
+  List.iter (on_mp aenv) mp.m_args
+
+(* -------------------------------------------------------------------- *)
+and on_xp (aenv : aenv) (xp : xpath) =
+  on_mp aenv xp.x_top
+
+(* -------------------------------------------------------------------- *)
+and on_memtype (aenv : aenv) (mt : EcMemory.memtype) =
+  EcMemory.mt_iter_ty (on_ty aenv) mt
+
+(* -------------------------------------------------------------------- *)
+and on_memenv (aenv : aenv) (m : EcMemory.memenv) =
+  on_memtype aenv (snd m)
+
+(* -------------------------------------------------------------------- *)
+and on_pv (aenv : aenv) (pv : prog_var)=
+  match pv with
+  | PVglob xp -> on_xp aenv xp
+  | _         -> ()
+
+(* -------------------------------------------------------------------- *)
+and on_lp (aenv : aenv) (lp : lpattern) =
+  match lp with
+  | LSymbol (_, ty) -> on_ty aenv ty
+  | LTuple  xs      -> List.iter (fun (_, ty) -> on_ty aenv ty) xs
+  | LRecord (_, xs) -> List.iter (on_ty aenv -| snd) xs
+
+(* -------------------------------------------------------------------- *)
+and on_binding (aenv : aenv) ((_, ty) : (EcIdent.t * ty)) =
+  on_ty aenv ty
+
+(* -------------------------------------------------------------------- *)
+and on_bindings (aenv : aenv) (bds : (EcIdent.t * ty) list) =
+  List.iter (on_binding aenv) bds
+
+(* -------------------------------------------------------------------- *)
+and on_ty (aenv : aenv) (ty : ty) =
   match ty.ty_node with
   | Tunivar _        -> ()
   | Tvar    _        -> ()
-  | Tglob   _        -> ()
-  | Ttuple tys       -> List.iter (on_ty cb) tys
-  | Tconstr (p, tys) -> cb (`Type p); List.iter (on_ty cb) tys
-  | Tfun (ty1, ty2)  -> List.iter (on_ty cb) [ty1; ty2]
+  | Tglob   m        -> aenv.cb (`Module (mident m))
+  | Ttuple tys       -> List.iter (on_ty aenv) tys
+  | Tconstr (p, tys) -> on_tyname aenv p; List.iter (on_ty aenv) tys
+  | Tfun (ty1, ty2)  -> List.iter (on_ty aenv) [ty1; ty2]
 
-let on_pv (cb : cb) (pv : prog_var)=
-  match pv with
-  | PVglob xp -> on_xp cb xp
-  | _         -> ()
+(* -------------------------------------------------------------------- *)
+and on_tyname (aenv : aenv) (p : path) =
+  aenv.cb (`Type p);
+  if not (Sp.mem p !(aenv.cache).type_) then begin
+    let cache = { !(aenv.cache) with type_ = Sp.add p !(aenv.cache).type_ } in
+    aenv.cache := cache;
+    on_tydecl aenv (EcEnv.Ty.by_path p aenv.env)
+  end
 
-let on_lp (cb : cb) (lp : lpattern) =
-  match lp with
-  | LSymbol (_, ty) -> on_ty cb ty
-  | LTuple  xs      -> List.iter (fun (_, ty) -> on_ty cb ty) xs
-  | LRecord (_, xs) -> List.iter (on_ty cb |- snd) xs
+(* -------------------------------------------------------------------- *)
+and on_opname (aenv : aenv) (p : EcPath.path) =
+  aenv.cb (`Op p);
+  if not (Sp.mem p !(aenv.cache).op) then begin
+    let cache = { !(aenv.cache) with op = Sp.add p !(aenv.cache).op } in
+    aenv.cache := cache;
+    on_opdecl aenv (EcEnv.Op.by_path p aenv.env);    
+  end
 
-let on_binding (cb : cb) ((_, ty) : (EcIdent.t * ty)) =
-  on_ty cb ty
-
-let on_bindings (cb : cb) (bds : (EcIdent.t * ty) list) =
-  List.iter (on_binding cb) bds
-
-let rec on_expr (cb : cb) (e : expr) =
-  let cbrec = on_expr cb in
+(* -------------------------------------------------------------------- *)
+and on_expr (aenv : aenv) (e : expr) =
+  let cbrec = on_expr aenv in
 
   let fornode () =
     match e.e_node with
     | Eint   _            -> ()
     | Elocal _            -> ()
-    | Equant (_, bds, e)  -> on_bindings cb bds; cbrec e
-    | Evar   pv           -> on_pv cb pv
-    | Elet   (lp, e1, e2) -> on_lp cb lp; List.iter cbrec [e1; e2]
+    | Equant (_, bds, e)  -> on_bindings aenv bds; cbrec e
+    | Evar   pv           -> on_pv aenv pv
+    | Elet   (lp, e1, e2) -> on_lp aenv lp; List.iter cbrec [e1; e2]
     | Etuple es           -> List.iter cbrec es
-    | Eop    (p, tys)     -> cb (`Op p); List.iter (on_ty cb) tys
     | Eapp   (e, es)      -> List.iter cbrec (e :: es)
     | Eif    (c, e1, e2)  -> List.iter cbrec [c; e1; e2]
-    | Ematch (e, es, ty)  -> on_ty cb ty; List.iter cbrec (e :: es)
+    | Ematch (e, es, ty)  -> on_ty aenv ty; List.iter cbrec (e :: es)
     | Eproj  (e, _)       -> cbrec e
 
-  in on_ty cb e.e_ty; fornode ()
+    | Eop (p, tys) -> begin
+      on_opname aenv p;
+      List.iter (on_ty aenv) tys;
+    end
 
-let on_lv (cb : cb) (lv : lvalue) =
-  let for1 (pv, ty) = on_pv cb pv; on_ty cb ty in
+  in on_ty aenv e.e_ty; fornode ()
+
+(* -------------------------------------------------------------------- *)
+and on_lv (aenv : aenv) (lv : lvalue) =
+  let for1 (pv, ty) = on_pv aenv pv; on_ty aenv ty in
 
     match lv with
     | LvVar   pv  -> for1 pv
     | LvTuple pvs -> List.iter for1 pvs
 
-let rec on_instr (cb : cb) (i : instr)=
+(* -------------------------------------------------------------------- *)
+and on_instr (aenv : aenv) (i : instr)=
   match i.i_node with
   | Srnd (lv, e) | Sasgn (lv, e) ->
-      on_lv cb lv;
-      on_expr cb e
+      on_lv aenv lv;
+      on_expr aenv e
 
   | Sassert e ->
-      on_expr cb e
+      on_expr aenv e
 
   | Scall (lv, f, args) ->
-      lv |> oiter (on_lv cb);
-      on_xp cb f;
-      List.iter (on_expr cb) args
+      oiter (on_lv aenv) lv;
+      on_xp aenv f;
+      List.iter (on_expr aenv) args
 
   | Sif (e, s1, s2) ->
-      on_expr cb e;
-      List.iter (on_stmt cb) [s1; s2]
+      on_expr aenv e;
+      List.iter (on_stmt aenv) [s1; s2]
 
   | Swhile (e, s) ->
-      on_expr cb e;
-      on_stmt cb s
+      on_expr aenv e;
+      on_stmt aenv s
 
   | Smatch (e, b) ->
       let forb (bs, s) =
-        List.iter (on_ty cb |- snd) bs;
-        on_stmt cb s
-      in on_expr cb e; List.iter forb b
+        List.iter (on_ty aenv -| snd) bs;
+        on_stmt aenv s
+      in on_expr aenv e; List.iter forb b
 
   | Sabstract _ -> ()
 
-and on_stmt (cb : cb) (s : stmt) =
-  List.iter (on_instr cb) s.s_node
+(* -------------------------------------------------------------------- *)
+and on_stmt (aenv : aenv) (s : stmt) =
+  List.iter (on_instr aenv) s.s_node
 
-let on_memtype cb mt =
-  EcMemory.mt_iter_ty (on_ty cb) mt
-
-let on_memenv cb (m : EcMemory.memenv) =
-  on_memtype cb (snd m)
-
-let rec on_form (cb : cb) (f : EcFol.form) =
-  let cbrec = on_form cb in
+(* -------------------------------------------------------------------- *)
+and on_form (aenv : aenv) (f : EcFol.form) =
+  let cbrec = on_form aenv in
 
   let rec fornode () =
     match f.EcAst.f_node with
     | EcAst.Fint      _            -> ()
     | EcAst.Flocal    _            -> ()
-    | EcAst.Fquant    (_, b, f)    -> on_gbindings cb b; cbrec f
+    | EcAst.Fquant    (_, b, f)    -> on_gbindings aenv b; cbrec f
     | EcAst.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
-    | EcAst.Fmatch    (b, fs, ty)  -> on_ty cb ty; List.iter cbrec (b :: fs)
-    | EcAst.Flet      (lp, f1, f2) -> on_lp cb lp; List.iter cbrec [f1; f2]
-    | EcAst.Fop       (p, tys)     -> cb (`Op p); List.iter (on_ty cb) tys
+    | EcAst.Fmatch    (b, fs, ty)  -> on_ty aenv ty; List.iter cbrec (b :: fs)
+    | EcAst.Flet      (lp, f1, f2) -> on_lp aenv lp; List.iter cbrec [f1; f2]
     | EcAst.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
     | EcAst.Ftuple    fs           -> List.iter cbrec fs
     | EcAst.Fproj     (f, _)       -> cbrec f
-    | EcAst.Fpvar     (pv, _)      -> on_pv  cb pv
+    | EcAst.Fpvar     (pv, _)      -> on_pv aenv pv
     | EcAst.Fglob     _            -> ()
-    | EcAst.FhoareF   hf           -> on_hf  cb hf
-    | EcAst.FhoareS   hs           -> on_hs  cb hs
-    | EcAst.FeHoareF  hf           -> on_ehf  cb hf
-    | EcAst.FeHoareS  hs           -> on_ehs  cb hs
-    | EcAst.FequivF   ef           -> on_ef  cb ef
-    | EcAst.FequivS   es           -> on_es  cb es
-    | EcAst.FeagerF   eg           -> on_eg  cb eg
-    | EcAst.FbdHoareS bhs          -> on_bhs cb bhs
-    | EcAst.FbdHoareF bhf          -> on_bhf cb bhf
-    | EcAst.Fpr       pr           -> on_pr  cb pr
+    | EcAst.FhoareF   hf           -> on_hf   aenv hf
+    | EcAst.FhoareS   hs           -> on_hs   aenv hs
+    | EcAst.FeHoareF  hf           -> on_ehf  aenv hf
+    | EcAst.FeHoareS  hs           -> on_ehs  aenv hs
+    | EcAst.FequivF   ef           -> on_ef   aenv ef
+    | EcAst.FequivS   es           -> on_es   aenv es
+    | EcAst.FeagerF   eg           -> on_eg   aenv eg
+    | EcAst.FbdHoareS bhs          -> on_bhs  aenv bhs
+    | EcAst.FbdHoareF bhf          -> on_bhf  aenv bhf
+    | EcAst.Fpr       pr           -> on_pr   aenv pr
 
-  and on_hf cb hf =
-    on_form cb hf.EcAst.hf_pr;
-    on_form cb hf.EcAst.hf_po;
-    on_xp cb hf.EcAst.hf_f
+    | EcAst.Fop (p, tys) -> begin
+      on_opname aenv p;
+      List.iter (on_ty aenv) tys;
+    end
 
-  and on_hs cb hs =
-    on_form cb hs.EcAst.hs_pr;
-    on_form cb hs.EcAst.hs_po;
-    on_stmt cb hs.EcAst.hs_s;
-    on_memenv cb hs.EcAst.hs_m
+  and on_hf (aenv : aenv) hf =
+    on_form aenv (hf_pr hf).inv;
+    on_form aenv (hf_po hf).inv;
+    on_xp aenv hf.EcAst.hf_f
 
-  and on_ef cb ef =
-    on_form cb ef.EcAst.ef_pr;
-    on_form cb ef.EcAst.ef_po;
-    on_xp cb ef.EcAst.ef_fl;
-    on_xp cb ef.EcAst.ef_fr
+  and on_hs (aenv : aenv) hs =
+    on_form aenv (hs_pr hs).inv;
+    on_form aenv (hs_po hs).inv;
+    on_stmt aenv hs.EcAst.hs_s;
+    on_memenv aenv hs.EcAst.hs_m
 
-  and on_es cb es =
-    on_form cb es.EcAst.es_pr;
-    on_form cb es.EcAst.es_po;
-    on_stmt cb es.EcAst.es_sl;
-    on_stmt cb es.EcAst.es_sr;
-    on_memenv cb es.EcAst.es_ml;
-    on_memenv cb es.EcAst.es_mr
+  and on_ef (aenv : aenv) ef =
+    on_form aenv (EcAst.ef_pr ef).inv;
+    on_form aenv (EcAst.ef_po ef).inv;
+    on_xp aenv ef.EcAst.ef_fl;
+    on_xp aenv ef.EcAst.ef_fr
 
-  and on_eg cb eg =
-    on_form cb eg.EcAst.eg_pr;
-    on_form cb eg.EcAst.eg_po;
-    on_xp cb eg.EcAst.eg_fl;
-    on_xp cb eg.EcAst.eg_fr;
-    on_stmt cb eg.EcAst.eg_sl;
-    on_stmt cb eg.EcAst.eg_sr;
+  and on_es (aenv : aenv) es =
+    on_form aenv (EcAst.es_pr es).inv;
+    on_form aenv (EcAst.es_po es).inv;
+    on_stmt aenv es.EcAst.es_sl;
+    on_stmt aenv es.EcAst.es_sr;
+    on_memenv aenv es.EcAst.es_ml;
+    on_memenv aenv es.EcAst.es_mr
 
-  and on_ehf cb hf =
-    on_form cb hf.EcAst.ehf_pr;
-    on_form cb hf.EcAst.ehf_po;
-    on_xp cb hf.EcAst.ehf_f
+  and on_eg (aenv : aenv) eg =
+    on_form aenv (EcAst.eg_pr eg).inv;
+    on_form aenv (EcAst.eg_po eg).inv;
+    on_xp aenv eg.EcAst.eg_fl;
+    on_xp aenv eg.EcAst.eg_fr;
+    on_stmt aenv eg.EcAst.eg_sl;
+    on_stmt aenv eg.EcAst.eg_sr;
 
-  and on_ehs cb hs =
-    on_form cb hs.EcAst.ehs_pr;
-    on_form cb hs.EcAst.ehs_po;
-    on_stmt cb hs.EcAst.ehs_s;
-    on_memenv cb hs.EcAst.ehs_m
+  and on_ehf (aenv : aenv) hf =
+    on_form aenv (EcAst.ehf_pr hf).inv;
+    on_form aenv (EcAst.ehf_po hf).inv;
+    on_xp aenv hf.EcAst.ehf_f
 
-  and on_bhf cb bhf =
-    on_form cb bhf.EcAst.bhf_pr;
-    on_form cb bhf.EcAst.bhf_po;
-    on_form cb bhf.EcAst.bhf_bd;
-    on_xp cb bhf.EcAst.bhf_f
+  and on_ehs (aenv : aenv) hs =
+    on_form aenv (EcAst.ehs_pr hs).inv;
+    on_form aenv (EcAst.ehs_po hs).inv;
+    on_stmt aenv hs.EcAst.ehs_s;
+    on_memenv aenv hs.EcAst.ehs_m
 
-  and on_bhs cb bhs =
-    on_form cb bhs.EcAst.bhs_pr;
-    on_form cb bhs.EcAst.bhs_po;
-    on_form cb bhs.EcAst.bhs_bd;
-    on_stmt cb bhs.EcAst.bhs_s;
-    on_memenv cb bhs.EcAst.bhs_m
+  and on_bhf (aenv : aenv)  bhf =
+    on_form aenv (EcAst.bhf_pr bhf).inv;
+    on_form aenv (EcAst.bhf_po bhf).inv;
+    on_form aenv (EcAst.bhf_bd bhf).inv;
+    on_xp aenv bhf.EcAst.bhf_f
+
+  and on_bhs (aenv : aenv)  bhs =
+    on_form aenv (EcAst.bhs_pr bhs).inv;
+    on_form aenv (EcAst.bhs_po bhs).inv;
+    on_form aenv (EcAst.bhs_bd bhs).inv;
+    on_stmt aenv bhs.EcAst.bhs_s;
+    on_memenv aenv bhs.EcAst.bhs_m
 
 
-  and on_pr cb pr =
-    on_xp cb pr.EcAst.pr_fun;
-    List.iter (on_form cb) [pr.EcAst.pr_event; pr.EcAst.pr_args]
+  and on_pr (aenv : aenv) pr =
+    on_xp aenv pr.EcAst.pr_fun;
+    List.iter (on_form aenv) [pr.EcAst.pr_event.inv; pr.EcAst.pr_args]
 
   in
-    on_ty cb f.EcAst.f_ty; fornode ()
+    on_ty aenv f.EcAst.f_ty; fornode ()
 
-and on_restr (cb : cb) (restr : mod_restr) =
-  let doit (xs, ms) = Sx.iter (on_xp cb) xs; Sm.iter (on_mp cb) ms in
+(* -------------------------------------------------------------------- *)
+and on_restr (aenv : aenv) (restr : mod_restr) =
+  let doit (xs, ms) = Sx.iter (on_xp aenv) xs; Sm.iter (on_mp aenv) ms in
   oiter doit restr.ur_pos;
   doit restr.ur_neg
 
-and on_modty cb (mty : module_type) =
-  cb (`ModuleType mty.mt_name);
-  List.iter (fun (_, mty) -> on_modty cb mty) mty.mt_params;
-  List.iter (on_mp cb) mty.mt_args
+(* -------------------------------------------------------------------- *)
+and on_modty (aenv : aenv) (mty : module_type) =
+  aenv.cb (`ModuleType mty.mt_name);
+  List.iter (fun (_, mty) -> on_modty aenv mty) mty.mt_params;
+  List.iter (on_mp aenv) mty.mt_args
 
-and on_mty_mr (cb : cb) ((mty, mr) : mty_mr) =
-  on_modty cb mty; on_restr cb mr
+(* -------------------------------------------------------------------- *)
+and on_mty_mr (aenv : aenv) ((mty, mr) : mty_mr) =
+  on_modty aenv mty; on_restr aenv mr
 
-and on_gbinding (cb : cb) (b : gty) =
+(* -------------------------------------------------------------------- *)
+and on_gbinding (aenv : aenv) (b : gty) =
   match b with
   | EcAst.GTty ty ->
-      on_ty cb ty
+      on_ty aenv ty
   | EcAst.GTmodty mty ->
-      on_mty_mr cb mty
+      on_mty_mr aenv mty
   | EcAst.GTmem m ->
-      on_memtype cb m
+      on_memtype aenv m
 
-and on_gbindings (cb : cb) (b : (EcIdent.t * gty) list) =
-  List.iter (fun (_, b) -> on_gbinding cb b) b
+(* -------------------------------------------------------------------- *)
+and on_gbindings (aenv : aenv) (b : (EcIdent.t * gty) list) =
+  List.iter (fun (_, b) -> on_gbinding aenv b) b
 
-and on_module (cb : cb) (me : module_expr) =
+(* -------------------------------------------------------------------- *)
+and on_module (aenv : aenv) (me : module_expr) =
   match me.me_body with
-  | ME_Alias (_, mp)  -> on_mp cb mp
-  | ME_Structure st   -> on_mstruct cb st
-  | ME_Decl mty       -> on_mty_mr cb mty
+  | ME_Alias (_, mp)  -> on_mp aenv mp
+  | ME_Structure st   -> on_mstruct aenv st
+  | ME_Decl mty       -> on_mty_mr aenv mty
 
-and on_mstruct (cb : cb) (st : module_structure) =
-  List.iter (on_mpath_mstruct1 cb) st.ms_body
+(* -------------------------------------------------------------------- *)
+and on_mstruct (aenv : aenv) (st : module_structure) =
+  List.iter (on_mstruct1 aenv) st.ms_body
 
-and on_mpath_mstruct1 (cb : cb) (item : module_item) =
+(* -------------------------------------------------------------------- *)
+and on_mstruct1 (aenv : aenv) (item : module_item) =
   match item with
-  | MI_Module   me -> on_module cb me
-  | MI_Variable x  -> on_ty cb x.v_type
-  | MI_Function f  -> on_fun cb f
+  | MI_Module   me -> on_module aenv me
+  | MI_Variable x  -> on_ty aenv x.v_type
+  | MI_Function f  -> on_fun aenv f
 
-and on_fun (cb : cb) (fun_ : function_) =
-  on_fun_sig  cb fun_.f_sig;
-  on_fun_body cb fun_.f_def
+(* -------------------------------------------------------------------- *)
+and on_fun (aenv : aenv) (fun_ : function_) =
+  on_fun_sig  aenv fun_.f_sig;
+  on_fun_body aenv fun_.f_def
 
-and on_fun_sig (cb : cb) (fsig : funsig) =
-  on_ty cb fsig.fs_arg;
-  on_ty cb fsig.fs_ret
+(* -------------------------------------------------------------------- *)
+and on_fun_sig (aenv : aenv) (fsig : funsig) =
+  on_ty aenv fsig.fs_arg;
+  on_ty aenv fsig.fs_ret
 
-and on_fun_body (cb : cb) (fbody : function_body) =
+(* -------------------------------------------------------------------- *)
+and on_fun_body (aenv : aenv) (fbody : function_body) =
   match fbody with
-  | FBalias xp -> on_xp cb xp
-  | FBdef fdef -> on_fun_def cb fdef
-  | FBabs oi   -> on_oi  cb oi
-
-and on_fun_def (cb : cb) (fdef : function_def) =
-  List.iter (fun v -> on_ty cb v.v_type) fdef.f_locals;
-  on_stmt cb fdef.f_body;
-  fdef.f_ret |> oiter (on_expr cb);
-  on_uses cb fdef.f_uses
-
-and on_uses (cb : cb) (uses : uses) =
-  List.iter (on_xp cb) uses.us_calls;
-  Sx.iter   (on_xp cb) uses.us_reads;
-  Sx.iter   (on_xp cb) uses.us_writes
-
-and on_oi (cb : cb) (oi : OI.t) =
-  List.iter (on_xp cb) (OI.allowed oi)
+  | FBalias xp -> on_xp aenv xp
+  | FBdef fdef -> on_fun_def aenv fdef
+  | FBabs oi   -> on_oi aenv oi
 
 (* -------------------------------------------------------------------- *)
-let on_typeclasses cb s =
-  Sp.iter (fun p -> cb (`Typeclass p)) s
-
-let on_typarams cb typarams =
-    List.iter (fun (_,s) -> on_typeclasses cb s) typarams
+and on_fun_def (aenv : aenv) (fdef : function_def) =
+  List.iter (fun v -> on_ty aenv v.v_type) fdef.f_locals;
+  on_stmt aenv fdef.f_body;
+  fdef.f_ret |> oiter (on_expr aenv);
+  on_uses aenv fdef.f_uses
 
 (* -------------------------------------------------------------------- *)
-let on_tydecl (cb : cb) (tyd : tydecl) =
-  on_typarams cb tyd.tyd_params;
+and on_uses (aenv : aenv) (uses : uses) =
+  List.iter (on_xp aenv) uses.us_calls;
+  Sx.iter   (on_xp aenv) uses.us_reads;
+  Sx.iter   (on_xp aenv) uses.us_writes
+
+(* -------------------------------------------------------------------- *)
+and on_oi (aenv : aenv) (oi : OI.t) =
+  List.iter (on_xp aenv) (OI.allowed oi)
+
+(* -------------------------------------------------------------------- *)
+and on_typarams (_aenv : aenv) (_typarams : ty_params) =
+  ()
+
+(* -------------------------------------------------------------------- *)
+and on_tydecl (aenv : aenv) (tyd : tydecl) =
+  on_typarams aenv tyd.tyd_params;
   match tyd.tyd_type with
-  | `Concrete ty -> on_ty cb ty
-  | `Abstract s  -> on_typeclasses cb s
-  | `Record (f, fds) ->
-      on_form cb f;
-      List.iter (on_ty cb |- snd) fds
-  | `Datatype dt ->
-     List.iter (List.iter (on_ty cb) |- snd) dt.tydt_ctors;
-     List.iter (on_form cb) [dt.tydt_schelim; dt.tydt_schcase]
+  | Concrete ty -> on_ty aenv ty
+  | Abstract    -> ()
+  | Record (f, fds) ->
+      on_form aenv f;
+      List.iter (on_ty aenv -| snd) fds
+  | Datatype dt ->
+     List.iter (List.iter (on_ty aenv) -| snd) dt.tydt_ctors;
+     List.iter (on_form aenv) [dt.tydt_schelim; dt.tydt_schcase]
 
-let on_typeclass cb tc =
-  oiter (fun p -> cb (`Typeclass p)) tc.tc_prt;
-  List.iter (fun (_,ty) -> on_ty cb ty) tc.tc_ops;
-  List.iter (fun (_,f)  -> on_form cb f) tc.tc_axs
+and on_typeclass (aenv : aenv) tc =
+  oiter (fun p -> aenv.cb (`Typeclass p)) tc.tc_prt;
+  List.iter (fun (_,ty) -> on_ty aenv ty) tc.tc_ops;
+  List.iter (fun (_,f)  -> on_form aenv f) tc.tc_axs
 
 (* -------------------------------------------------------------------- *)
-let on_opdecl (cb : cb) (opdecl : operator) =
-  on_typarams cb opdecl.op_tparams;
+and on_opdecl (aenv : aenv) (opdecl : operator) =
+  on_typarams aenv opdecl.op_tparams;
   let for_kind () =
     match opdecl.op_kind with
    | OB_pred None -> ()
 
    | OB_pred (Some (PR_Plain f)) ->
-      on_form cb f
+      on_form aenv f
 
    | OB_pred (Some (PR_Ind pri)) ->
-     on_bindings cb pri.pri_args;
+     on_bindings aenv pri.pri_args;
      List.iter (fun ctor ->
-         on_gbindings cb ctor.prc_bds;
-         List.iter (on_form cb) ctor.prc_spec)
+         on_gbindings aenv ctor.prc_bds;
+         List.iter (on_form aenv) ctor.prc_spec)
        pri.pri_ctors
 
    | OB_nott nott ->
-     List.iter (on_ty cb |- snd) nott.ont_args;
-     on_ty cb nott.ont_resty;
-     on_expr cb nott.ont_body
+     List.iter (on_ty aenv -| snd) nott.ont_args;
+     on_ty aenv nott.ont_resty;
+     on_expr aenv nott.ont_body
 
    | OB_oper None   -> ()
    | OB_oper Some b ->
      match b with
-     | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
-     | OP_TC -> assert false
-     | OP_Plain  f -> on_form cb f
+     | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> ()
+     | OP_Plain  f -> on_form aenv f
      | OP_Fix    f ->
        let rec on_mpath_branches br =
          match br with
          | OPB_Leaf (bds, e) ->
-           List.iter (on_bindings cb) bds;
-           on_expr cb e
+           List.iter (on_bindings aenv) bds;
+           on_expr aenv e
          | OPB_Branch br ->
            Parray.iter on_mpath_branch br
 
@@ -418,45 +489,48 @@ let on_opdecl (cb : cb) (opdecl : operator) =
 
        in on_mpath_branches f.opf_branches
 
-  in on_ty cb opdecl.op_ty; for_kind ()
+  in on_ty aenv opdecl.op_ty; for_kind ()
 
 (* -------------------------------------------------------------------- *)
-let on_axiom (cb : cb) (ax : axiom) =
-  on_typarams cb ax.ax_tparams;
-  on_form cb ax.ax_spec
+and on_axiom (aenv : aenv) (ax : axiom) =
+  on_typarams aenv ax.ax_tparams;
+  on_form aenv ax.ax_spec
 
 (* -------------------------------------------------------------------- *)
-let on_modsig (cb:cb) (ms:module_sig) =
-  List.iter (fun (_,mt) -> on_modty cb mt) ms.mis_params;
+and on_modsig (aenv : aenv) (ms:module_sig) =
+  List.iter (fun (_,mt) -> on_modty aenv mt) ms.mis_params;
   List.iter (fun (Tys_function fs) ->
-      on_ty cb fs.fs_arg;
-      List.iter (fun x -> on_ty cb x.ov_type) fs.fs_anames;
-      on_ty cb fs.fs_ret;) ms.mis_body;
-  Msym.iter (fun _ oi -> on_oi cb oi) ms.mis_oinfos
+      on_ty aenv fs.fs_arg;
+      List.iter (fun x -> on_ty aenv x.ov_type) fs.fs_anames;
+      on_ty aenv fs.fs_ret;) ms.mis_body;
+  Msym.iter (fun _ oi -> on_oi aenv oi) ms.mis_oinfos
 
-let on_ring cb r =
-  on_ty cb r.r_type;
-  let on_p p = cb (`Op p) in
+(* -------------------------------------------------------------------- *)
+and on_ring (aenv : aenv) (r : ring) =
+  on_ty aenv r.r_type;
+  let on_p p = on_opname aenv p in
   List.iter on_p [r.r_zero; r.r_one; r.r_add; r.r_mul];
   List.iter (oiter on_p) [r.r_opp; r.r_exp; r.r_sub];
   match r.r_embed with
   | `Direct | `Default -> ()
   | `Embed p -> on_p p
 
-let on_field cb f =
-  on_ring cb f.f_ring;
-  let on_p p = cb (`Op p) in
+(* -------------------------------------------------------------------- *)
+and on_field (aenv : aenv) (f : field) =
+  on_ring aenv f.f_ring;
+  let on_p p = on_opname aenv p in
   on_p f.f_inv; oiter on_p f.f_div
 
-let on_instance cb ty tci =
-  on_typarams cb (fst ty);
-  on_ty cb (snd ty);
+(* -------------------------------------------------------------------- *)
+and on_instance (aenv : aenv) ty tci =
+  on_typarams aenv (fst ty);
+  on_ty aenv (snd ty);
   match tci with
-  | `Ring r    -> on_ring  cb r
-  | `Field f   -> on_field cb f
+  | `Ring r    -> on_ring  aenv r
+  | `Field f   -> on_field aenv f
   | `General p ->
     (* FIXME section: ring/field use type class that do not exists *)
-    cb (`Typeclass p)
+    aenv.cb (`Typeclass p)
 
 (* -------------------------------------------------------------------- *)
 type sc_name =
@@ -504,15 +578,16 @@ let pp_thname scenv =
 (* -------------------------------------------------------------------- *)
 let locality (env : EcEnv.env) (who : cbarg) =
   match who with
-  | `Type p -> (EcEnv.    Ty.by_path p env).tyd_loca
-  | `Op   p -> (EcEnv.    Op.by_path p env).op_loca
-  | `Ax   p -> (EcEnv.    Ax.by_path p env).ax_loca
-  | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
-  | `Module mp    ->
-    begin match EcEnv.Mod.by_mpath_opt mp env with
+  | `Type p -> (EcEnv.Ty.by_path p env).tyd_loca
+  | `Op   p -> (EcEnv.Op.by_path p env).op_loca
+  | `Ax   p -> (EcEnv.Ax.by_path p env).ax_loca
+  | `Typeclass p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
+  | `Module mp -> begin
+    match EcEnv.Mod.by_mpath_opt mp env with
     | Some (_, Some lc) -> lc
-     (* in this case it should be a quantified module *)
-    | _         -> `Global
+    | _ ->
+      let id = EcPath.mget_ident mp in
+      if EcEnv.Mod.is_declared id env then `Declare else `Global
     end
   | `ModuleType p -> ((EcEnv.ModTy.by_path p env).tms_loca :> locality)
   | `Instance _ -> assert false
@@ -525,7 +600,7 @@ type to_clear =
 
 type to_gen =
   { tg_env     : scenv;
-    tg_params  : (EcIdent.t * Sp.t) list;
+    tg_params  : ty_params;
     tg_binds   : bind list;
     tg_subst   : EcSubst.subst;
     tg_clear   : to_clear; }
@@ -572,15 +647,10 @@ let add_declared_mod to_gen id modty =
 
 let add_declared_ty to_gen path tydecl =
   assert (tydecl.tyd_params = []);
-  let s =
-    match tydecl.tyd_type with
-    | `Abstract s -> s
-    | _ -> assert false in
-
   let name = "'" ^ basename path in
   let id = EcIdent.create name in
   { to_gen with
-    tg_params = to_gen.tg_params @ [id, s];
+    tg_params = to_gen.tg_params @ [id];
     tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], tvar id);
   }
 
@@ -643,17 +713,17 @@ and fv_and_tvar_f f =
 let tydecl_fv tyd =
   let fv =
     match tyd.tyd_type with
-    | `Concrete ty -> ty_fv_and_tvar ty
-    | `Abstract _ -> Mid.empty
-    | `Datatype tydt ->
+    | Concrete ty -> ty_fv_and_tvar ty
+    | Abstract -> Mid.empty
+    | Datatype tydt ->
       List.fold_left (fun fv (_, l) ->
         List.fold_left (fun fv ty ->
             EcIdent.fv_union fv (ty_fv_and_tvar ty)) fv l)
         Mid.empty tydt.tydt_ctors
-    | `Record (_f, l) ->
+    | Record (_f, l) ->
       List.fold_left (fun fv (_, ty) ->
           EcIdent.fv_union fv (ty_fv_and_tvar ty)) Mid.empty l in
-  List.fold_left (fun fv (id, _) -> Mid.remove id fv) fv tyd.tyd_params
+  List.fold_left (fun fv id -> Mid.remove id fv) fv tyd.tyd_params
 
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
@@ -698,7 +768,7 @@ let notation_fv nota =
       EcIdent.fv_union (Mid.remove id fv) (ty_fv_and_tvar ty)) fv nota.ont_args
 
 let generalize_extra_ty to_gen fv =
-  List.filter (fun (id,_) -> Mid.mem id fv) to_gen.tg_params
+  List.filter (fun id -> Mid.mem id fv) to_gen.tg_params
 
 let rec generalize_extra_args binds fv =
   match binds with
@@ -734,14 +804,14 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let fv = tydecl_fv tydecl in
     let extra = generalize_extra_ty to_gen fv in
     let tyd_params = extra @ tydecl.tyd_params in
-    let args = List.map (fun (id, _) -> tvar id) tyd_params in
-    let fst_params = List.map fst tydecl.tyd_params in
-    let tosubst = fst_params, tconstr path args in
+    let args = List.map tvar tyd_params in
+    let params = tydecl.tyd_params in
+    let tosubst = params, tconstr path args in
     let tg_subst, tyd_type =
       match tydecl.tyd_type with
-      | `Concrete _ | `Abstract _ ->
+      | Concrete _ | Abstract ->
         EcSubst.add_tydef to_gen.tg_subst path tosubst, tydecl.tyd_type
-      | `Record (f, prs) ->
+      | Record (f, prs) ->
         let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
@@ -751,15 +821,15 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let tin = tconstr path args in
         let add_op (s, ty) =
           let p = pqname prefix s in
-          let tosubst = fst_params, e_op p args (tfun tin ty) in
+          let tosubst = params, e_op p args (tfun tin ty) in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst;
           s, ty
         in
         let prs = List.map add_op prs in
         let f = EcSubst.subst_form !rsubst f in
-        !rtg_subst, `Record (f, prs)
-      | `Datatype dt ->
+        !rtg_subst, Record (f, prs)
+      | Datatype dt ->
         let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
@@ -772,14 +842,14 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
           let tys = List.map subst_ty tys in
           let p = pqname prefix s in
           let pty = toarrow tys tout in
-          let tosubst = fst_params, e_op p args pty in
+          let tosubst = params, e_op p args pty in
           rsubst := EcSubst.add_opdef !rsubst p tosubst;
           rtg_subst := EcSubst.add_opdef !rtg_subst p tosubst ;
           s, tys in
         let tydt_ctors   = List.map add_op dt.tydt_ctors in
         let tydt_schelim = EcSubst.subst_form !rsubst dt.tydt_schelim in
         let tydt_schcase = EcSubst.subst_form !rsubst dt.tydt_schcase in
-        !rtg_subst, `Datatype {tydt_ctors; tydt_schelim; tydt_schcase }
+        !rtg_subst, Datatype {tydt_ctors; tydt_schelim; tydt_schcase }
 
     in
 
@@ -806,9 +876,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let extra = generalize_extra_ty to_gen fv in
         let tparams = extra @ operator.op_tparams in
         let opty = operator.op_ty in
-        let args = List.map (fun (id, _) -> tvar id) tparams in
-        let tosubst = (List.map fst operator.op_tparams,
-                       e_op path args opty) in
+        let args = List.map tvar tparams in
+        let tosubst = (operator.op_tparams, e_op path args opty) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -818,9 +887,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let extra = generalize_extra_ty to_gen fv in
         let tparams = extra @ operator.op_tparams in
         let opty = operator.op_ty in
-        let args = List.map (fun (id, _) -> tvar id) tparams in
-        let tosubst = (List.map fst operator.op_tparams,
-                       f_op path args opty) in
+        let args = List.map tvar tparams in
+        let tosubst = (operator.op_tparams, f_op path args opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -831,13 +899,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let opty = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args = List.map (fun (id, _) -> tvar id) tparams in
+        let t_args = List.map tvar tparams in
         let eop = e_op path t_args opty in
         let e   =
           e_app eop (List.map (fun (id,ty) -> e_local id ty) extra_a)
             operator.op_ty in
-        let tosubst =
-          (List.map fst operator.op_tparams, e) in
+        let tosubst = (operator.op_tparams, e) in
         let tg_subst =
           EcSubst.add_opdef to_gen.tg_subst path tosubst in
         let body =
@@ -853,6 +920,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
               let (l,i) = opfix.opf_struct in
               (List.map (fun i -> i + nb_extra) l, i + nb_extra) in
             OP_Fix {
+                opf_recp     = opfix.opf_recp;
                 opf_args     = extra_a @ opfix.opf_args;
                 opf_resty    = opfix.opf_resty;
                 opf_struct;
@@ -869,13 +937,12 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let op_tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let op_ty   = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args  = List.map (fun (id, _) -> tvar id) op_tparams in
+        let t_args  = List.map tvar op_tparams in
         let fop = f_op path t_args op_ty in
         let f   =
           f_app fop (List.map (fun (id,ty) -> f_local id ty) extra_a)
             operator.op_ty in
-        let tosubst =
-          (List.map fst operator.op_tparams, f) in
+        let tosubst = (operator.op_tparams, f) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         let body =
@@ -972,7 +1039,7 @@ let generalize_module to_gen prefix me =
         | _ -> () in
 
       try
-        on_mp check_gen mp;
+        on_mp (mkaenv to_gen.tg_env.sc_env check_gen) mp;
         to_gen, Some (Th_module me)
 
       with Inline ->
@@ -1045,7 +1112,6 @@ let rec set_lc_item lc_override item =
     | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_lc lc_override ax.ax_loca   })
     | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_lc lc_override ms.tms_loca  })
     | Th_module          me  -> Th_module        { me with tme_loca = set_lc lc_override me.tme_loca  }
-    | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_lc lc_override tc.tc_loca   })
     | Th_theory      (s, th) -> Th_theory    (s, set_local_th lc_override th)
     | Th_export       (p,lc) -> Th_export    (p, set_lc lc_override lc)
     | Th_instance (ty,ti,lc) -> Th_instance  (ty,ti, set_lc lc_override lc)
@@ -1066,8 +1132,8 @@ let sc_decl_mod (id,mt) = SC_decl_mod (id,mt)
 (* ---------------------------------------------------------------- *)
 
 let is_abstract_ty = function
-  | `Abstract _ -> true
-  | _           -> false
+  | Abstract -> true
+  | _        -> false
 
 (*
 let rec check_glob_mp_ty s scenv mp =
@@ -1158,27 +1224,7 @@ let check_tyd scenv prefix name tyd =
         d_modty = [];
         d_tc    = [`Global];
       } in
-    on_tydecl (cb scenv from cd) tyd
-
-(*
-let cb_glob scenv (who:cbarg) =
-  match who with
-  | `Type p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local type %s"
-        (EcPath.tostring p)
-  | `Module mp ->
-    check_glob_mp scenv mp
-  | `Op p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local op %s"
-        (EcPath.tostring p)
-  | `ModuleType p ->
-    if is_local scenv who then
-      hierror "global definition can't depend of local module type %s"
-        (EcPath.tostring p)
-  | `Ax _ | `Typeclass _ -> assert false
-*)
+    on_tydecl (mkaenv scenv.sc_env (cb scenv from cd)) tyd
 
 let is_abstract_op op =
   match op.op_kind with
@@ -1204,7 +1250,7 @@ let check_op scenv prefix name op =
         d_modty = [];
         d_tc    = [`Global];
       } in
-    on_opdecl (cb scenv from cd) op
+    on_opdecl (mkaenv scenv.sc_env (cb scenv from cd)) op
 
   | `Global ->
     let cd = {
@@ -1216,7 +1262,7 @@ let check_op scenv prefix name op =
         d_modty = [];
         d_tc    = [`Global];
       } in
-    on_opdecl (cb scenv from cd) op
+    on_opdecl (mkaenv scenv.sc_env (cb scenv from cd)) op
 
 let is_inth scenv =
   match scenv.sc_name with
@@ -1235,7 +1281,7 @@ let check_ax (scenv : scenv) (prefix : path) (name : symbol) (ax : axiom) =
       d_modty = [`Global];
       d_tc    = [`Global];
     } in
-  let doit = on_axiom (cb scenv from cd) in
+  let doit = on_axiom (mkaenv scenv.sc_env (cb scenv from cd)) in
   let error b s1 s =
     if b then hierror "%s %a %s" s1 (pp_axname scenv) path s in
 
@@ -1267,7 +1313,7 @@ let check_modtype scenv prefix name ms =
   | `Local -> check_section scenv from
   | `Global ->
     if scenv.sc_insec then
-      on_modsig (cb scenv from cd_glob) ms.tms_sig
+      on_modsig (mkaenv scenv.sc_env (cb scenv from cd_glob)) ms.tms_sig
 
 
 let check_module scenv prefix tme =
@@ -1277,17 +1323,19 @@ let check_module scenv prefix tme =
   match tme.tme_loca with
   | `Local -> check_section scenv from
   | `Global ->
-    if scenv.sc_insec then
+    if scenv.sc_insec then begin
+      let isalias = EcModules.is_me_body_alias tme.tme_expr.me_body in
       let cd =
         { d_ty    = [`Global];
           d_op    = [`Global];
           d_ax    = [];
           d_sc    = [];
-          d_mod   = [`Global]; (* FIXME section: add local *)
+          d_mod   = [`Global] @ (if isalias then [`Declare] else []);
           d_modty = [`Global];
           d_tc    = [`Global];
         } in
-      on_module (cb scenv from cd) me
+      on_module (mkaenv scenv.sc_env (cb scenv from cd)) me
+    end
   | `Declare -> (* Should be SC_decl_mod ... *)
     assert false
 
@@ -1296,7 +1344,7 @@ let check_typeclass scenv prefix name tc =
   let from = ((tc.tc_loca :> locality), `Typeclass path) in
   if tc.tc_loca = `Local then check_section scenv from
   else
-    on_typeclass (cb scenv from cd_glob) tc
+    on_typeclass (mkaenv scenv.sc_env (cb scenv from cd_glob)) tc
 
 let check_instance scenv ty tci lc =
   let from = (lc :> locality), `Instance tci in
@@ -1304,10 +1352,11 @@ let check_instance scenv ty tci lc =
   else
     if scenv.sc_insec then
       match tci with
-      | `Ring _ | `Field _ -> on_instance (cb scenv from cd_glob) ty tci
+      | `Ring _ | `Field _ ->
+        on_instance (mkaenv scenv.sc_env (cb scenv from cd_glob) )ty tci
       | `General _ ->
         let cd = { cd_glob with d_ty = [`Declare; `Global]; } in
-        on_instance (cb scenv from cd) ty tci
+        on_instance (mkaenv scenv.sc_env (cb scenv from cd)) ty tci
 
 (* -----------------------------------------------------------*)
 let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
@@ -1345,7 +1394,6 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | Th_axiom   (s, ax)     -> EcEnv.Ax.bind ~import s ax env
     | Th_modtype (s, ms)     -> EcEnv.ModTy.bind ~import s ms env
     | Th_module       me     -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
-    | Th_typeclass(s,tc)     -> EcEnv.TypeClass.bind ~import s tc env
     | Th_export  (p, lc)     -> EcEnv.Theory.export p lc env
     | Th_instance (tys,i,lc) -> EcEnv.TypeClass.add_instance ~import tys i lc env (*FIXME: import? *)
     | Th_baserw   (s,lc)     -> EcEnv.BaseRw.add ~import s lc env
@@ -1377,7 +1425,6 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
-    | Th_typeclass _     -> assert false
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
@@ -1442,7 +1489,7 @@ let genenv_of_scenv (scenv : scenv) : to_gen =
   ; tg_params = []
   ; tg_binds  = []
   ; tg_subst  = EcSubst.empty
-  ; tg_clear  = empty_locals } 
+  ; tg_clear  = empty_locals }
 
 let generalize_lc_items scenv  =
   let togen =
@@ -1451,7 +1498,7 @@ let generalize_lc_items scenv  =
       (EcEnv.root scenv.sc_env)
       (List.rev scenv.sc_items)
   in togen.tg_env
-  
+
 (* -----------------------------------------------------------*)
 let import p scenv =
   { scenv with sc_env = EcEnv.Theory.import p scenv.sc_env }
@@ -1478,7 +1525,6 @@ let check_item scenv item =
   | Th_axiom    (s, ax) -> check_ax  scenv prefix s ax
   | Th_modtype  (s, ms) -> check_modtype scenv prefix s ms
   | Th_module        me -> check_module  scenv prefix me
-  | Th_typeclass (s,tc) -> check_typeclass scenv prefix s tc
   | Th_export   (_, lc) -> assert (lc = `Global || scenv.sc_insec);
   | Th_instance  (ty,tci,lc) -> check_instance scenv ty tci lc
   | Th_baserw (_,lc) ->
@@ -1526,7 +1572,7 @@ let add_decl_mod id mt scenv =
       d_tc    = [`Global];
     } in
     let from = `Declare, `Module (mpath_abs id []) in
-    on_mty_mr (cb scenv from cd) mt;
+    on_mty_mr (mkaenv scenv.sc_env (cb scenv from cd)) mt;
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }

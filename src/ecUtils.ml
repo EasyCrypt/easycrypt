@@ -57,7 +57,7 @@ let predT (_ : 'a) = true
 let (^~) f = fun x y -> f y x
 
 let (-|) f g = fun x -> f (g x)
-let (|-) g f = fun x -> g (f x)
+let (|-) g f = fun x -> f (g x)
 
 let (|>) x f = f x
 let (<|) f x = f x
@@ -174,6 +174,8 @@ let pair_equal tx ty (x1, y1) (x2, y2) =
   (tx x1 x2) && (ty y1 y2)
 
 let swap (x, y) = (y, x)
+
+let flip f x y = f y x
 
 (* -------------------------------------------------------------------- *)
 module Option = BatOption

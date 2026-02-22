@@ -337,7 +337,104 @@ type scope = {
   sc_clears   : path list;
   sc_pr_uc    : proof_uc option;
   sc_options  : GenOptions.options;
+  sc_globdoc  : string list;
+  sc_locdoc   : docstate;
 }
+
+and docstate = {
+  docentities  : docentity list;
+  subdocentbl  : docentity list;
+  docstringbl  : string list;
+  srcstringbl  : string list;
+  currentname  : string option;
+  currentkind  : itemkind option;
+  currentmode  : mode option;
+  currentproc  : bool;
+}
+
+and docentity =
+  | ItemDoc   of string list * docitem
+  | SubDoc    of (string list * docitem) * docentity list
+
+and docitem =
+  mode * itemkind * string * string list (* dec/reg, kind, name, src *)
+
+and itemkind = [`Type | `Operator | `Axiom | `Lemma | `ModuleType | `Module | `Theory]
+
+and mode = [`Abstract | `Specific]
+
+(* -------------------------------------------------------------------- *)
+let get_gdocstrings (sc : scope) : string list =
+  sc.sc_globdoc
+
+let get_ldocentities (sc : scope) : docentity list =
+  sc.sc_locdoc.docentities
+
+module DocState = struct
+  let empty : docstate =
+    { docentities = [];
+      subdocentbl = [];
+      docstringbl = [];
+      srcstringbl = [];
+      currentname = None;
+      currentkind = None;
+      currentmode = None;
+      currentproc = false; }
+
+  let start_process (state : docstate) (name : string) (kind : itemkind) (md : mode): docstate =
+    { state with
+        currentname = Some name;
+        currentkind = Some kind;
+        currentmode = Some md;
+        currentproc = true }
+
+  let prevent_process (state : docstate) : docstate =
+    { state with
+        currentname = None;
+        currentkind = None;
+        currentmode = None;
+        currentproc = false }
+
+  let reinitialize_process (state : docstate) : docstate =
+    { state with
+        docstringbl = [];
+        srcstringbl = [];
+        currentname = None;
+        currentkind = None;
+        currentmode = None;
+        currentproc = false }
+
+  let push_docbl (state : docstate) (docc : string) : docstate =
+    { state with docstringbl = state.docstringbl @ [docc] }
+
+  let push_srcbl (state : docstate) (srcs : string) : docstate =
+    { state with srcstringbl = state.srcstringbl @ [srcs] }
+
+  let add_entity (state : docstate) (docent : docentity) : docstate =
+    { state with docentities = state.docentities @ [docent] }
+
+  let add_item (state : docstate) : docstate =
+    let state =
+      if state.currentproc
+      then
+        add_entity state (ItemDoc (state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)))
+      else
+        state
+    in
+    reinitialize_process state
+
+  let add_sub (state : docstate) (substate : docstate) : docstate =
+    let state =
+      if state.currentproc
+      then
+        add_entity state (SubDoc ((state.docstringbl, (oget state.currentmode, oget state.currentkind, oget state.currentname, state.srcstringbl)),
+                                 (substate.docentities)))
+      else
+        state
+    in
+    reinitialize_process state
+
+  end
 
 (* -------------------------------------------------------------------- *)
 let empty (gstate : EcGState.gstate) =
@@ -350,7 +447,9 @@ let empty (gstate : EcGState.gstate) =
     sc_required   = [];
     sc_clears     = [];
     sc_pr_uc      = None;
-    sc_options    = GenOptions.freeze (); }
+    sc_options    = GenOptions.freeze ();
+    sc_globdoc    = [];
+    sc_locdoc     = DocState.empty; }
 
 (* -------------------------------------------------------------------- *)
 let env (scope : scope) =
@@ -470,7 +569,8 @@ let for_loading (scope : scope) =
     sc_clears     = [];
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_loading scope.sc_options;
-  }
+    sc_globdoc    = [];
+    sc_locdoc     = DocState.empty; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
@@ -484,7 +584,10 @@ let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) lc =
     sc_required   = scope.sc_required;
     sc_clears     = [];
     sc_pr_uc      = None;
-    sc_options    = GenOptions.for_subscope scope.sc_options; }
+    sc_options    = GenOptions.for_subscope scope.sc_options;
+    sc_globdoc    = [];
+    sc_locdoc     = DocState.empty;
+  }
 
 (* -------------------------------------------------------------------- *)
 module Prover = struct
@@ -694,7 +797,7 @@ module Tactics = struct
 
   let pi scope pi = Prover.do_prover_info scope pi
 
-  let proof (scope : scope) =
+  let proof ?(src : string option) (scope : scope) =
     check_state `InActiveProof "proof script" scope;
 
     match (oget scope.sc_pr_uc).puc_active with
@@ -705,10 +808,14 @@ module Tactics = struct
           hierror "[proof] can only be used at beginning of a proof script";
         { pac with puc_started = true }
       in
-        { scope with sc_pr_uc =
-            Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct); } }
+        { scope with
+            sc_pr_uc = Some { (oget scope.sc_pr_uc) with puc_active = Some (pac, pct) };
+            sc_locdoc =
+            match src with
+            | Some src -> DocState.push_srcbl scope.sc_locdoc src
+            | None -> scope.sc_locdoc; }
 
-  let process_r ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
+  let process_r ?(src : string option) ?reloc mark (mode : proofmode) (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
@@ -718,6 +825,13 @@ module Tactics = struct
           if   mark && not pac.puc_started
           then proof scope
           else scope
+    in
+
+    let scope = { scope with
+                  sc_locdoc =
+                    match src with
+                    | Some src -> DocState.push_srcbl scope.sc_locdoc src
+                    | None -> scope.sc_locdoc; }
     in
 
     let puc = oget (scope.sc_pr_uc) in
@@ -760,7 +874,7 @@ module Tactics = struct
 
         let pac = { pac with puc_jdg = PSCheck juc } in
         let puc = { puc with puc_active = Some (pac, pct); } in
-        let scope = { scope with sc_pr_uc = Some puc } in
+        let scope = { scope with sc_pr_uc = Some puc; } in
         Some (penv, hds), scope
 
   let process1_r mark mode scope t =
@@ -770,8 +884,8 @@ module Tactics = struct
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
     snd (process_r mark mode scope ts)
 
-  let process scope mode tac =
-    process_r true mode scope tac
+  let process ?(src : string option) scope mode tac =
+    process_r ?src true mode scope tac
 end
 
 (* -------------------------------------------------------------------- *)
@@ -825,7 +939,9 @@ module Ax = struct
   let bind ?(import = true) (scope : scope) ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem ~import (EcTheory.Th_axiom (x, ax)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
+    { scope with sc_env =
+        EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
   let start_lemma scope (cont, axflags) check ?name (axd, ctxt) =
@@ -1017,22 +1133,69 @@ module Ax = struct
     save_r scope
 
   (* ------------------------------------------------------------------ *)
-  let save scope =
+  let save ?(src : string option) scope =
     check_state `InProof "save" scope;
+
+    let scope =
+      { scope with
+          sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
+    in
     save_r ~mode:`Save scope
 
   (* ------------------------------------------------------------------ *)
-  let admit scope =
+  let admit ?(src : string option) scope =
     check_state `InProof "admitted" scope;
+
+    let scope =
+      { scope with
+          sc_locdoc =
+            match src with
+            | Some src -> DocState.push_srcbl scope.sc_locdoc src
+            | None -> scope.sc_locdoc; }
+    in
+
     save_r ~mode:`Admit scope
 
   (* ------------------------------------------------------------------ *)
-  let abort scope =
+  let abort ?(src : string option) scope =
     check_state `InProof "abort" scope;
+
+    let scope =
+      { scope with
+          sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
+    in
+
     snd (save_r ~mode:`Abort scope)
 
   (* ------------------------------------------------------------------ *)
-  let add (scope : scope) (mode : proofmode) (ax : paxiom located) =
+  let add ?(src : string option) (scope : scope) (mode : proofmode) (ax : paxiom located) =
+    let uax = unloc ax in
+    let kind =
+      match uax.pa_kind with
+      | PLemma _ -> `Lemma
+      | _ -> `Axiom
+    in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match uax.pa_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uax.pa_name) kind `Abstract}
+    in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
+    in
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
@@ -1088,10 +1251,30 @@ module Op = struct
   let bind ?(import = true) (scope : scope) ((x, op) : _ * operator) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem ~import (EcTheory.Th_operator (x, op)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env; }
+    { scope with sc_env =
+        EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
-  let add (scope : scope) (op : poperator located) =
+  let add ?(src : string option) (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
+
+    let uop = unloc op in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match uop.po_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.po_name) `Operator `Abstract }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
+    in
+
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
@@ -1143,6 +1326,7 @@ module Op = struct
       | `Plain e  -> Some (OP_Plain (fs e))
       | `Fix opfx ->
           Some (OP_Fix {
+            opf_recp     = EcPath.pqname (EcEnv.root eenv) (EcIdent.name opfx.EHI.mf_name);
             opf_args     = opfx.EHI.mf_args;
             opf_resty    = opfx.EHI.mf_codom;
             opf_struct   = (opfx.EHI.mf_recs, List.length opfx.EHI.mf_args);
@@ -1186,7 +1370,7 @@ module Op = struct
           | OB_oper (Some (OP_Plain bd)) ->
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
-                let nargs = List.sum (List.map (List.length |- fst) args) in
+                let nargs = List.sum (List.map (List.length -| fst) args) in
                   EcDecl.axiomatized_op ~nargs path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = { reduction = true; smt = false; }} in
               let scope = bind scope (unloc op.po_name, tyop) in
@@ -1200,7 +1384,7 @@ module Op = struct
       List.fold_left (fun scope (rname, xs, ax, codom) ->
           let ax =
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
-            let opapp   = List.map (tvar |- fst) tparams in
+            let opapp   = List.map tvar tparams in
             let opapp   = e_app (e_op opname opapp ty) opargs codom in
 
             let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
@@ -1215,10 +1399,10 @@ module Op = struct
           in
 
           let ax, axpm =
-            let bdpm = List.map fst tparams in
+            let bdpm = tparams in
             let axpm = List.map EcIdent.fresh bdpm in
               (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
-               List.combine axpm (List.map snd tparams)) in
+               axpm) in
           let ax =
             { ax_tparams = axpm;
               ax_spec    = ax;
@@ -1235,10 +1419,10 @@ module Op = struct
           hierror ~loc
             "multiple names are only allowed for non-refined abstract operators";
         let addnew scope name =
-          let nparams = List.map (fst_map EcIdent.fresh) tparams in
+          let nparams = List.map EcIdent.fresh tparams in
           let subst = Tvar.init
-            (List.map fst tparams)
-            (List.map (tvar |- fst) nparams) in
+            tparams
+            (List.map tvar nparams) in
           let rop = EcDecl.mk_op ~opaque:optransparent nparams (Tvar.subst subst ty) None lc in
           bind scope (unloc name, rop)
         in List.fold_left addnew scope op.po_aliases
@@ -1255,8 +1439,8 @@ module Op = struct
         hierror "for tag %s, load Distr first" tag;
 
       let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
-      let nparams  = List.map (EcIdent.fresh |- fst) tyop.op_tparams in
-      let subst    = Tvar.init (List.fst tyop.op_tparams) (List.map tvar nparams) in
+      let nparams  = List.map EcIdent.fresh tyop.op_tparams in
+      let subst    = Tvar.init tyop.op_tparams (List.map tvar nparams) in
       let ty       = Tvar.subst subst tyop.op_ty in
       let aty, rty = EcTypes.tyfun_flat ty in
 
@@ -1273,7 +1457,7 @@ module Op = struct
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams = List.map (fun ty -> (ty, Sp.empty)) nparams;
+        { ax_tparams = nparams;
           ax_spec    = ax;
           ax_kind    = `Axiom (Ssym.empty, false);
           ax_loca    = lc;
@@ -1317,8 +1501,25 @@ module Op = struct
     tyop, List.rev !axs, scope
 
 
-  let add_opsem (scope : scope) (op : pprocop located) =
+  let add_opsem ?(src : string option) (scope : scope) (op : pprocop located) =
     let module Sem = EcProcSem in
+
+    let uop = unloc op in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match uop.ppo_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc uop.ppo_name) `Operator `Abstract }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc; }
+    in
 
     let op = unloc op in
     let f  = EcTyping.trans_gamepath (env scope) op.ppo_target  in
@@ -1345,7 +1546,7 @@ module Op = struct
       (`Det, Sem.translate_e env ret) in
 
     let mode, aout = Sem.translate_s env cont body.f_body in
-    let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
+    let aout = form_of_expr aout in (* FIXME: translate to forms directly? *)
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
@@ -1365,10 +1566,10 @@ module Op = struct
     let scope =
       let prax =
         let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
-        let res   = f_pvar pv_res sig_.fs_ret mhr in
+        let prmem = EcIdent.create "&m" in
+        let res   = f_pvar pv_res sig_.fs_ret prmem in
         let resx  = EcIdent.create "v" in
         let resv  = f_local resx sig_.fs_ret in
-        let prmem = EcIdent.create "&m" in
 
         let mu =
           let sem =
@@ -1393,7 +1594,7 @@ module Op = struct
                 (f_pr prmem
                    f
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
-                   (f_eq res resv))
+                   (map_ss_inv1 (fun r -> f_eq r resv) res))
                 mu))
       in
 
@@ -1412,22 +1613,23 @@ module Op = struct
       | `Det ->
          let hax =
            let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
-           let res   = f_pvar pv_res sig_.fs_ret mhr in
-           let args  = f_pvar pv_arg sig_.fs_arg mhr in
+           let m = EcIdent.create "&hr" in
+           let res   = f_pvar pv_res sig_.fs_ret m in
+           let args  = f_pvar pv_arg sig_.fs_arg m in
 
            f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) locs)
              (f_hoareF
-                (f_eq
-                   args
-                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))
+                {m;inv=(f_eq
+                   args.inv
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))}
                 f
-                (f_eq
-                   res
+                {m;inv=(f_eq
+                   res.inv
                    (f_app
                       (f_op oppath [] opdecl.op_ty)
                       (List.map (fun (x, ty) -> f_local x ty) locs)
-                      sig_.fs_ret)))
+                      sig_.fs_ret))})
          in
 
          let prax = EcDecl.{
@@ -1451,8 +1653,25 @@ end
 module Pred = struct
   module TT = EcTyping
 
-  let add (scope : scope) (pr : ppredicate located) =
+  let add ?(src : string option) (scope : scope) (pr : ppredicate located) =
     assert (scope.sc_pr_uc = None);
+
+    let upr = unloc pr in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match upr.pp_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc upr.pp_name) `Operator `Abstract }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  }
+    in
 
     let typr  = EcHiPredicates.trans_preddecl (env scope) pr in
     let scope = Op.bind scope (unloc (unloc pr).pp_name, typr) in
@@ -1478,13 +1697,33 @@ module Mod = struct
   let bind ?(import = true) (scope : scope) (m : top_module_expr) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem ~import (EcTheory.Th_module m) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
+    { scope with
+        sc_env = EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
-  let add_concrete (scope : scope) lc (ptm : pmodule_def) =
+  let add_concrete ?(src : string option) (scope : scope) lc (ptm : pmodule_def) =
     assert (scope.sc_pr_uc = None);
 
     if lc = `Declare then
       hierror "cannot use [declare] for concrete modules";
+
+    let nm = unloc (EcParsetree.pcmhd_ident ptm.ptm_header) in
+
+    let scope =
+      { scope with
+          sc_locdoc =
+          match lc with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc nm `Module `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc nm `Module `Abstract }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  }
+    in
 
     let m = TT.transmod (env scope) ~attop:true ptm in
     let ur = EcModules.get_uninit_read_of_module (path scope) m in
@@ -1515,10 +1754,10 @@ module Mod = struct
     { scope with
         sc_env = EcSection.add_decl_mod name tysig scope.sc_env }
 
-  let add (scope : scope) (m : pmodule_def_or_decl) =
+  let add ?(src : string option) (scope : scope) (m : pmodule_def_or_decl) =
     match m with
     | { ptm_locality = lc; ptm_def = `Concrete def } ->
-      add_concrete scope lc def
+      add_concrete ?src scope lc def
 
     | { ptm_locality = lc; ptm_def = `Abstract decl } ->
       if lc <> `Declare then
@@ -1539,10 +1778,27 @@ module ModType = struct
   =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem ~import (EcTheory.Th_modtype (x, tysig)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
+    { scope with
+        sc_env = EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
-  let add (scope : scope) (intf : pinterface) =
+  let add ?(src : string option) (scope : scope) (intf : pinterface) =
     assert (scope.sc_pr_uc = None);
+
+    let scope =
+      { scope with
+          sc_locdoc =
+          match intf.pi_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc intf.pi_name) `ModuleType `Specific }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  }
+    in
     let tysig = EcTyping.transmodsig (env scope) intf in
     bind scope (unloc intf.pi_name, tysig)
 end
@@ -1579,8 +1835,23 @@ module Theory = struct
     in { scope with sc_required = List.map for1 scope.sc_required }
 
   (* ------------------------------------------------------------------ *)
-  let enter (scope : scope) (mode : thmode) (name : symbol) =
+  let enter ?(src : string option) (scope : scope) (mode : thmode) (name : symbol) =
     assert (scope.sc_pr_uc = None);
+    let sc_locdoc = scope.sc_locdoc in
+    let sc_locdoc =
+      match src with
+      | None -> DocState.prevent_process scope.sc_locdoc
+      | Some src ->
+         let sc_locdoc =
+           DocState.start_process sc_locdoc name `Theory
+             (match mode with `Concrete -> `Specific | `Abstract -> `Abstract)
+         in
+         DocState.push_srcbl sc_locdoc src
+    in
+    let
+      scope = { scope with sc_locdoc }
+    in
+
     subscope scope mode name
 
   (* ------------------------------------------------------------------ *)
@@ -1631,7 +1902,10 @@ module Theory = struct
       let _, cth, _ = EcSection.exit_theory ?pempty ~clears scope.sc_env in
       let loaded   = scope.sc_loaded in
       let required = scope.sc_required in
-      let sup = { sup with sc_loaded = loaded; } in
+      let sup = {
+        sup with
+          sc_loaded = loaded;
+          sc_locdoc = DocState.add_sub sup.sc_locdoc scope.sc_locdoc} in
       ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
@@ -1700,6 +1974,20 @@ module Theory = struct
         "end-of-file while processing proof %s" (fst scope.sc_name)
 
   (* -------------------------------------------------------------------- *)
+  let require_start (scope : scope) (thname : symbol) (mode : thmode)
+        : scope =
+    let new_ = enter (for_loading scope) mode thname `Global in
+    { new_ with sc_env = EcSection.astop new_.sc_env }
+
+  let require_finish ?(old : scope option = None) ~(new_ : scope)
+      (ri : required_info) : scope =
+    let (cth, rqs), (name1, _), new_ = exit_r ~pempty:`No new_ in
+    assert (ri.rqd_name = name1);
+    let scope =
+      { (odfl new_ old) with sc_loaded =
+          Msym.add ri.rqd_name (oget cth, rqs) new_.sc_loaded; } in
+    bump_prelude (require_loaded ri scope)
+
   let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
@@ -1710,24 +1998,13 @@ module Theory = struct
     end else
       match Msym.find_opt name.rqd_name scope.sc_loaded with
       | Some _ -> require_loaded name scope
-
       | None ->
         try
-          let imported = enter (for_loading scope) mode name.rqd_name `Global in
-          let imported = { imported with sc_env = EcSection.astop imported.sc_env } in
+          let imported = require_start scope name.rqd_name mode in
           let thname   = fst imported.sc_name in
           let imported = loader imported in
-
           check_end_required imported thname;
-
-          let cth = exit_r ~pempty:`No imported in
-          let (cth, rqs), (name1, _), imported = cth in
-          assert (name.rqd_name = name1);
-          let scope = { scope with sc_loaded =
-            Msym.add name.rqd_name (oget cth, rqs) imported.sc_loaded; } in
-
-          bump_prelude (require_loaded name scope)
-
+          require_finish ~old:(Some scope) ~new_:imported name
         with e -> begin
           match toperror_of_exn_r e with
           | Some (l, e) when not (EcLocation.isdummy l) ->
@@ -1838,7 +2115,7 @@ module Cloning = struct
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
-          let t = { pt_core = t; pt_intros = []; } in 
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_smt = true; puc_local = false; } in
@@ -1895,7 +2172,7 @@ module Cloning = struct
         | `Include -> scope)
         scope
     in
-    
+
     if is_none thcl.pthc_local && oth.cth_loca = `Local then
       notify scope `Info
         "Theory `%s` has inherited `local` visibility. \
@@ -1927,10 +2204,29 @@ module Ty = struct
   let bind ?(import = true) (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem ~import (EcTheory.Th_type (x, tydecl)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
+    { scope with
+        sc_env = EcSection.add_item item scope.sc_env;
+        sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
-  let add scope (tyd : ptydecl located) =
+  let add ?(src : string option) scope (tyd : ptydecl located) =
+    let utyd = unloc tyd in
+    let scope =
+      { scope with
+          sc_locdoc =
+          match utyd.pty_locality with
+          | `Local -> DocState.prevent_process scope.sc_locdoc
+          | `Global -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Specific
+          | `Declare -> DocState.start_process scope.sc_locdoc (unloc utyd.pty_name) `Type `Abstract }
+    in
+    let scope =
+      { scope with
+        sc_locdoc =
+          match src with
+          | Some src -> DocState.push_srcbl scope.sc_locdoc src
+          | None -> scope.sc_locdoc;  }
+    in
+
     let loc = loc tyd in
 
     let { pty_name = name; pty_tyvars = args;
@@ -1940,31 +2236,30 @@ module Ty = struct
     let env = env scope in
     let tyd_params, tyd_type =
       match body with
-      | PTYD_Abstract tcs ->
-        let tcs =
-          List.map
-            (fun tc -> fst (EcEnv.TypeClass.lookup (unloc tc) env))
-            tcs  in
+      | PTYD_Abstract ->
         let ue = TT.transtyvars env (loc, Some args) in
-        EcUnify.UniEnv.tparams ue, `Abstract (Sp.of_list tcs)
+        EcUnify.UniEnv.tparams ue, Abstract
 
       | PTYD_Alias    bd ->
         let ue     = TT.transtyvars env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
-        EcUnify.UniEnv.tparams ue, `Concrete body
+        EcUnify.UniEnv.tparams ue, Concrete body
 
-      | PTYD_Datatype dt ->
-        let datatype = EHI.trans_datatype env (mk_loc loc (args,name)) dt in
-        let tparams, tydt =
-          try ELI.datatype_as_ty_dtype datatype
-          with ELI.NonPositive -> EHI.dterror loc env EHI.DTE_NonPositive
-        in
-        tparams, `Datatype tydt
+      | PTYD_Datatype dt -> (
+          let datatype = EHI.trans_datatype env (mk_loc loc (args, name)) dt in
+          let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
+          try
+            ELI.check_positivity ty_from_ctor datatype;
+            let tparams, tydt = ELI.datatype_as_ty_dtype datatype in
+            (tparams, Datatype tydt)
+          with ELI.NonPositive ctx ->
+            let symbol = basename datatype.dt_path in
+            EHI.dterror loc env (EHI.DTE_NonPositive (symbol, ctx)))
 
       | PTYD_Record rt ->
         let record  = EHI.trans_record env (mk_loc loc (args,name)) rt in
         let scheme  = ELI.indsc_of_record record in
-        record.ELI.rc_tparams, `Record (scheme, record.ELI.rc_fields)
+        record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)
     in
 
     bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; })
@@ -1977,21 +2272,21 @@ module Ty = struct
     let scope =
       let decl = EcDecl.{
         tyd_params  = [];
-        tyd_type    = `Abstract Sp.empty;
+        tyd_type    = Abstract;
         tyd_loca    = `Global; (* FIXME:SUBTYPE *)
       } in bind scope (unloc subtype.pst_name, decl) in
 
     let carrier =
       let ue = EcUnify.UniEnv.create None in
       transty tp_tydecl env ue subtype.pst_carrier in
-    
+
     let pred =
       let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
       let env = EcEnv.Var.bind_local x carrier env in
       let ue = EcUnify.UniEnv.create None in
       let pred = EcTyping.trans_prop env ue (snd subtype.pst_pred) in
       if not (EcUnify.UniEnv.closed ue) then
-        hierror ~loc:(snd subtype.pst_pred).pl_loc 
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
       let uidmap = EcUnify.UniEnv.close ue in
       let fs = Tuni.subst uidmap in
@@ -2013,12 +2308,12 @@ module Ty = struct
             ev_bynames = Msym.empty;
             ev_global  =  [ (None, Some [`Include, "prove"]) ]
           } } in
- 
+
     let cname = Option.map unloc subtype.pst_cname in
     let npath = ofold ((^~) EcPath.pqname) (EcEnv.root env) cname in
     let cpath = EcPath.fromqsymbol ([EcCoreLib.i_top], "Subtype") in
     let theory = EcEnv.Theory.by_path ~mode:`Abstract cpath env in
-      
+
     let renames =
       match subtype.pst_rename with
       | None -> []
@@ -2041,77 +2336,8 @@ module Ty = struct
         ) in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
-    
+
     Ax.add_defer scope proofs
-
-  (* ------------------------------------------------------------------ *)
-  let bindclass ?(import = true) (scope : scope) (x, tc) =
-    assert (scope.sc_pr_uc = None);
-    let item = EcTheory.mkitem ~import (EcTheory.Th_typeclass(x, tc)) in
-    { scope with sc_env = EcSection.add_item item scope.sc_env }
-
-  (* ------------------------------------------------------------------ *)
-  let add_class (scope : scope) { pl_desc = tcd } =
-    assert (scope.sc_pr_uc = None);
-    let lc = tcd.ptc_loca in
-    let name  = unloc tcd.ptc_name in
-    let scenv = (env scope) in
-
-    check_name_available scope tcd.ptc_name;
-
-    let tclass =
-      let uptc =
-        tcd.ptc_inth |> omap
-          (fun { pl_loc = uploc; pl_desc = uptc } ->
-            match EcEnv.TypeClass.lookup_opt uptc scenv with
-            | None -> hierror ~loc:uploc "unknown type-class: `%s'"
-                        (string_of_qsymbol uptc)
-            | Some (tcp, _) -> tcp)
-      in
-
-      let asty  =
-        let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
-          { tyd_params  = [];
-            tyd_type    = `Abstract body;
-            tyd_loca    = (lc :> locality); } in
-      let scenv = EcEnv.Ty.bind name asty scenv in
-
-      (* Check for duplicated field names *)
-      Msym.odup unloc (List.map fst tcd.ptc_ops)
-        |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                    "duplicated operator name: `%s'" x.pl_desc);
-      Msym.odup unloc (List.map fst tcd.ptc_axs)
-        |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                    "duplicated axiom name: `%s'" x.pl_desc);
-
-      (* Check operators types *)
-      let operators =
-        let check1 (x, ty) =
-          let ue = EcUnify.UniEnv.create (Some []) in
-          let ty = transty tp_tydecl scenv ue ty in
-          let uidmap = EcUnify.UniEnv.close ue in
-          let ty = ty_subst (Tuni.subst uidmap) ty in
-            (EcIdent.create (unloc x), ty)
-        in
-          tcd.ptc_ops |> List.map check1 in
-
-      (* Check axioms *)
-      let axioms =
-        let scenv = EcEnv.Var.bind_locals operators scenv in
-        let check1 (x, ax) =
-          let ue = EcUnify.UniEnv.create (Some []) in
-          let ax = trans_prop scenv ue ax in
-          let uidmap = EcUnify.UniEnv.close ue in
-          let fs = Tuni.subst uidmap in
-          let ax = Fsubst.f_subst fs ax in
-            (unloc x, ax)
-        in
-          tcd.ptc_axs |> List.map check1 in
-
-      (* Construct actual type-class *)
-      { tc_prt = uptc; tc_ops = operators; tc_axs = axioms; tc_loca = lc}
-    in
-      bindclass scope (name, tclass)
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env tcty ops reqs =
@@ -2140,7 +2366,7 @@ module Ty = struct
               let op   = EcEnv.Op.by_path p env in
               let opty =
                 Tvar.subst
-                  (Tvar.init (List.map fst op.op_tparams) tvi)
+                  (Tvar.init op.op_tparams tvi)
                   op.op_ty
               in
                 (p, opty)
@@ -2419,7 +2645,7 @@ end
                     let tip = f_subst_init ~tv:tip () in
                     let es = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
-                    let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
+                    let bd  = EcFol.form_of_expr (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with
@@ -2505,4 +2731,15 @@ end
     end;
 
     notify scope `Info "%s" (Buffer.contents buffer)
+end
+
+(* -------------------------------------------------------------------- *)
+module DocComment = struct
+  let add (scope : scope) ((kind, docc) : [`Global | `Item] * string) : scope =
+    match kind with
+    | `Global ->
+       { scope with sc_globdoc = scope.sc_globdoc @ [docc] }
+
+    | `Item ->
+       { scope with sc_locdoc = DocState.push_docbl scope.sc_locdoc docc }
 end

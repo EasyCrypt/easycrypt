@@ -20,7 +20,7 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 type fission_t    = oside * pcodepos * (int * (int * int))
 type fusion_t     = oside * pcodepos * (int * (int * int))
-type unroll_t     = oside * pcodepos * bool
+type unroll_t     = oside * pcodepos * [`While | `For of bool]
 type splitwhile_t = pexpr * oside * pcodepos
 
 (* -------------------------------------------------------------------- *)
@@ -65,7 +65,7 @@ let check_dslc pf =
        List.iter doit_s [c1; c2]
 
     | Smatch (_, bs) ->
-       List.iter (doit_s |- snd) bs
+       List.iter (doit_s -| snd) bs
 
     | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
        error ()
@@ -205,30 +205,30 @@ let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
 (* -------------------------------------------------------------------- *)
 let process_fission (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fission side cpos infos tc
 
 let process_fusion (side, cpos, infos) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_fusion side cpos infos tc
 
 let process_splitwhile (b, side, cpos) tc =
   let b =
     try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
     with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement" in
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_splitwhile b side cpos tc
 
 (* -------------------------------------------------------------------- *)
-let process_unroll_for side cpos tc =
+let process_unroll_for ~cfold side cpos tc =
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
-  let _, c = EcLowPhlGoal.tc1_get_stmt side tc in
+  let (goal_m, _), c = EcLowPhlGoal.tc1_get_stmt side tc in
 
   if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
 
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
   let pos  = 1 + List.length z.Zpr.z_head in
 
@@ -260,19 +260,19 @@ let process_unroll_for side cpos tc =
 
   (* Apply loop increment *)
   let incrz =
-    let fincr = form_of_expr mhr eincr in
+    let fincr = ss_inv_of_expr goal_m eincr in
     fun z0 ->
-      let f = PVM.subst1 env x mhr (f_int z0) fincr in
-      match (simplify full_red hyps f).f_node with
+      let f = map_ss_inv1 (PVM.subst1 env x goal_m (f_int z0)) fincr in
+      match (simplify full_red hyps f.inv).f_node with
       | Fint z0 -> z0
       | _       -> tc_error !!tc "loop increment does not reduce to a constant" in
 
   (* Evaluate loop guard *)
   let test_cond =
-    let ftest = form_of_expr mhr t in
+    let ftest = ss_inv_of_expr goal_m t in
     fun z0 ->
-      let cond = PVM.subst1 env x mhr (f_int z0) ftest in
-      match sform_of_form (simplify full_red hyps cond) with
+      let cond = map_ss_inv1 (PVM.subst1 env x goal_m (f_int z0)) ftest in
+      match sform_of_form (simplify full_red hyps cond.inv) with
       | SFtrue  -> true
       | SFfalse -> false
       | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in
@@ -284,7 +284,7 @@ let process_unroll_for side cpos tc =
   let zs   = eval_cond z0 in
   let hds  = Array.make (List.length zs) None in
   let m    = LDecl.fresh_id hyps "&m" in
-  let x    = f_pvar x tint mhr in
+  let x    = f_pvar x tint goal_m in
 
   let t_set i pos z tc =
     hds.(i) <- Some (FApi.tc1_handle tc, pos, z); t_id tc in
@@ -299,41 +299,47 @@ let process_unroll_for side cpos tc =
     | z :: zs ->
       ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
       [FApi.t_try (t_intro_i m) @!
-       t_conseq (f_eq x (f_int z)) @!
+       t_conseq (Inv_ss (map_ss_inv1 (fun x -> f_eq x (f_int z)) x)) @!
        t_set i pos z;
        t_doit (i+1) (pos + blen) zs]) tc in
 
   let t_conseq_nm tc =
-    (EcPhlConseq.t_hoareS_conseq_nm (tc1_get_pre tc) f_true @+
-    [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc in
+    match (tc1_get_pre tc) with
+    | Inv_ss inv ->
+      (EcPhlConseq.t_hoareS_conseq_nm inv {m=inv.m;inv=f_true} @+
+      [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
+    | _ -> tc_error !!tc "expecting single sided precondition" in
 
   let doi i tc =
     if Array.length hds <= i then t_id tc else
     let (_h,pos,_z) = oget hds.(i) in
     if i = 0 then
       (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
-       t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
+       t_conseq (Inv_ss {inv=f_true;m=x.m}) @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
         EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (f_eq x (f_int z')) @+
+        EcPhlSeq.t_hoare_seq (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
   let tcenv = t_doit 0 pos zs tc in
   let tcenv = FApi.t_onalli doi tcenv in
 
-  let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
-  let clen = blen * (List.length zs - 1) in
+  if cfold then begin
+    let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+    let clen = blen * (List.length zs - 1) in
 
-  FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+    FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+  end else tcenv
 
 (* -------------------------------------------------------------------- *)
 let process_unroll (side, cpos, for_) tc =
-  if for_ then
-    process_unroll_for side cpos tc
-  else begin
-    let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  match for_ with
+  | `While ->
+    let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
     t_unroll side cpos tc
-  end
+
+  | `For cfold ->
+    process_unroll_for ~cfold side cpos tc

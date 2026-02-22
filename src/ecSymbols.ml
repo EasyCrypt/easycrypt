@@ -87,3 +87,11 @@ let rec string_of_msymbol (mx : msymbol) =
 
 let pp_msymbol fmt x =
   Format.fprintf fmt "%s" (string_of_msymbol x)
+
+(* -------------------------------------------------------------------- *)
+let qsymbol_of_string (s : string) : qsymbol =
+  let sspl = String.split_on_char '.' s in
+    match List.rev sspl with
+    | [] -> raise (invalid_arg "EcSymbols.qsymbol_of_string")
+    | [x] -> ([], x)
+    | x :: xs -> (List.rev xs, x)

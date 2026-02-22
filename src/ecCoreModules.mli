@@ -247,6 +247,8 @@ type top_module_expr = {
   tme_loca : locality;
 }
 
+val is_me_body_alias : module_body -> bool
+
 (* -------------------------------------------------------------------- *)
 val mty_equal :
   module_type ->

@@ -56,23 +56,16 @@ let t_outline side cpr variant tc =
 let process_outline info tc =
   let env = tc1_env tc in
   let side = info.outline_side in
-  let goal = tc1_as_equivS tc in
   let ppe = EcPrinting.PPEnv.ofenv env in
 
   let range =
-    EcProofTyping.tc1_process_codepos_range tc
+    EcLowPhlGoal.tc1_process_codepos_range tc
       (Some side, info.outline_range) in
-
-  (* Check which memory we are outlining *)
-  let mem = match side with
-    | `Left  -> goal.es_ml
-    | `Right -> goal.es_mr
-  in
 
   try
     match info.outline_kind with
     | OKstmt s ->
-      let s = EcProofTyping.tc1_process_stmt tc (EcMemory.memtype mem) s in
+      let s = EcProofTyping.tc1_process_prhl_stmt tc side s in
       t_outline side range (OV_Stmt s) tc
     | OKproc (f, alias) ->
       (* Get the function *)
@@ -97,7 +90,7 @@ let process_outline info tc =
   | UnificationError UE_InvalidRetInstr ->
      tc_error !!tc "Outline: return instruction must be an assign. Perhaps consider using the alias variant using `~`."
   | UnificationError (UE_DifferentProgramLengths (s1, s2)) ->
-     tc_error !!tc "Outline: body's are different lengths\n%a ~ %a." (EcPrinting.pp_stmt ppe) s1 (EcPrinting.pp_stmt ppe) s2
+     tc_error !!tc "Outline: bodies are different lengths\n%a ~ %a." (EcPrinting.pp_stmt ppe) s1 (EcPrinting.pp_stmt ppe) s2
   | UnificationError (UE_InstrNotInLockstep (i1, i2))->
      tc_error !!tc "outline: instructions not in sync\n%a ~ %a." (EcPrinting.pp_instr ppe) i1 (EcPrinting.pp_instr ppe) i2
   | UnificationError (UE_LvNotInLockstep (_lv1, _lv2))->

@@ -39,13 +39,13 @@ module Hty = MSHty.H
 let rec dump_ty ty =
   match ty.ty_node with
   | Tglob p ->
-      EcIdent.tostring p
+      EcIdent.tostring_internal p
 
   | Tunivar i ->
       Printf.sprintf "#%d" i
 
   | Tvar id ->
-      EcIdent.tostring id
+      EcIdent.tostring_internal id
 
   | Ttuple tys ->
       Printf.sprintf "(%s)" (String.concat ", " (List.map dump_ty tys))
@@ -153,6 +153,12 @@ let rec ty_check_uni t =
   match t.ty_node with
   | Tunivar _ -> raise FoundUnivar
   | _ -> ty_iter ty_check_uni t
+
+let rec var_mem ?(check_glob = false) id t =
+  match t.ty_node with
+  | Tvar id' -> EcIdent.id_equal id id'
+  | Tglob id' when check_glob -> EcIdent.id_equal id id'
+  | _ -> ty_sub_exists (var_mem ~check_glob id) t
 
 (* -------------------------------------------------------------------- *)
 let symbol_of_ty (ty : ty) =

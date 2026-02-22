@@ -13,10 +13,6 @@ open EcFol
 open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
-type wp = EcEnv.env -> EcMemory.memenv -> stmt -> EcFol.form -> EcFol.form option
-val  wp : wp option ref
-
-(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
@@ -112,6 +108,10 @@ type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
 
+
+type goal_shape_error = 
+| GSE_ExpectedTwoSided
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -176,6 +176,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| UnexpectedGoalShape    of goal_shape_error
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -234,6 +235,7 @@ val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> co
 val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
+val trans_codeoffset1 : ?memory:EcMemory.memory -> env -> pcodeoffset1 -> codeoffset1
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref

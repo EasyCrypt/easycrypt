@@ -16,7 +16,7 @@ COPY --chmod=0755 --chown=1001:0 docker-parts/alt-ergo bin/run-alt-ergo
 ENV PATH="/home/charlie/bin:$PATH"
 
 RUN \
-	version=2.6.0 && \
+	version=2.6.2 && \
 	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
 	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
 	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
@@ -49,6 +49,27 @@ RUN \
 	wget -O cvc4 https://github.com/CVC4/CVC4-archived/releases/download/${version}/cvc4-${version}-x86_64-linux-opt && \
 	sudo install -m 0755 cvc4 /usr/local/bin/cvc4-${version} && \
 	rm -f cvc4
+
+RUN \
+	version=1.3.2 && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.2/cvc5-Linux-x86_64-libcxx-static.zip && \
+  unzip -j cvc5.zip cvc5-Linux-x86_64-libcxx-static/bin/cvc5 && \
+	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
+	rm -f cvc5 cvc5.zip
+
+RUN \
+	version=1.2.1 && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.2.1/cvc5-Linux-x86_64-static.zip && \
+  unzip -j cvc5.zip cvc5-Linux-x86_64-static/bin/cvc5 && \
+	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
+	rm -f cvc5 cvc5.zip
+
+RUN \
+	version=1.1.2 && \
+	wget -O cvc5.zip https://github.com/cvc5/cvc5/releases/download/cvc5-1.1.2/cvc5-Linux-static.zip && \
+  unzip -j cvc5.zip cvc5-Linux-static/bin/cvc5 && \
+	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
+	rm -f cvc5 cvc5.zip
 
 RUN \
 	version=1.0.9 && \

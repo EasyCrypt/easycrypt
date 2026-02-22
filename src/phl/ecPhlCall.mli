@@ -1,22 +1,22 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcFol
 open EcCoreGoal.FApi
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 val wp2_call :
-     EcEnv.env -> form -> form
+     EcEnv.env -> ts_inv -> ts_inv
   -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
   -> EcPV.PV.t
   -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
   -> EcPV.PV.t
-  -> EcMemory.memory -> EcMemory.memory -> form
-  -> EcEnv.LDecl.hyps -> form
+  -> ts_inv
+  -> EcEnv.LDecl.hyps -> ts_inv
 
-val t_hoare_call   : form -> form -> backward
-val t_bdhoare_call : form -> form -> form option -> backward
-val t_equiv_call   : form -> form -> backward
-val t_equiv_call1  : side -> form -> form -> backward
+val t_hoare_call   : ss_inv -> ss_inv -> backward
+val t_bdhoare_call : ss_inv -> ss_inv -> ss_inv option -> backward
+val t_equiv_call   : ts_inv -> ts_inv -> backward
+val t_equiv_call1  : side -> ss_inv -> ss_inv -> backward
 val t_call         : oside -> form -> backward
 
 (* -------------------------------------------------------------------- *)

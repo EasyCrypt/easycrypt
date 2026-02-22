@@ -40,7 +40,7 @@ module type PrinterAPI = sig
 
   val pp_paren : 'a pp -> 'a pp
 
-  val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
+  val pp_list : ?on_empty:unit pp -> ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
   (* ------------------------------------------------------------------ *)
   val pp_pv      : PPEnv.t -> prog_var pp
@@ -111,6 +111,8 @@ module type PrinterAPI = sig
 
   val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
+
+  val pp_goal1 : PPEnv.t -> (EcBaseLogic.hyps * form) pp
 
   (* ------------------------------------------------------------------ *)
   val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  

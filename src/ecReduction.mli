@@ -1,10 +1,10 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
-open EcTypes
 open EcFol
 open EcModules
 open EcEnv
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
@@ -35,7 +35,7 @@ module EqTest : sig
   val is_int  : env -> ty -> bool
 end
 
-val is_alpha_eq : LDecl.hyps -> form -> form -> bool
+val is_alpha_eq : ?subst:f_subst -> LDecl.hyps -> form -> form -> bool
 
 (* -------------------------------------------------------------------- *)
 module User : sig
@@ -88,6 +88,14 @@ val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
+(* [hred_until ~until ri hyps f] performs head reduction on [f]
+   until [test f] is true or that no more head reduction is possible.
+   If no [until] argument is provided then head reduction is performed
+   until it is possible.
+*)
+val h_red_until :
+  ?until:(form -> bool) -> reduction_info -> LDecl.hyps -> form -> form
+
 val reduce_user_gen :
   (EcFol.form -> EcFol.form) ->
   reduction_info ->
@@ -107,3 +115,6 @@ val check_bindings :
 type xconv = [`Eq | `AlphaEq | `Conv]
 
 val xconv : xconv -> LDecl.hyps -> form -> form -> bool
+
+val ss_inv_alpha_eq : LDecl.hyps -> ss_inv -> ss_inv -> bool
+val ts_inv_alpha_eq : LDecl.hyps -> ts_inv -> ts_inv -> bool

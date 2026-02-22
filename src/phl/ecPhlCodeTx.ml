@@ -72,8 +72,8 @@ let t_kill_r side cpos olen tc =
             "code writes variables (%a) used by the post-condition"
             pp_of_name x
     end;
-
-    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+    let (m, mt) = me in
+    let kslconcl = EcFol.f_bdHoareS mt {m;inv=f_true} (stmt ks) {m;inv=f_true} FHeq {m;inv=f_r1} in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
@@ -155,23 +155,24 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
 
     try
       let ptev = EcProofTerm.ptenv pe hyps (ue, mev) in
-      let e = form_of_expr (fst me) e in
-      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e in
+      let e = ss_inv_of_expr (fst me) e in
+      let subf, occmode = EcProofTerm.pf_find_occurence_lazy ptev ~ptn e.inv in
+      let subf = {m=e.m; inv= subf} in
 
       assert (EcProofTerm.can_concretize ptev);
 
       let cpos =
         EcMatching.FPosition.select_form
           ~xconv:`AlphaEq ~keyed:occmode.k_keyed
-          hyps None subf e in
+          hyps None subf.inv e.inv in
 
-      let v = { ov_name = Some id; ov_type = subf.f_ty } in
+      let v = { ov_name = Some id; ov_type = subf.inv.f_ty } in
       let (me, id) = EcMemory.bind_fresh v me in
       let pv = pv_loc (oget id.ov_name) in
-      let e = EcMatching.FPosition.map cpos (fun _ -> f_pvar pv (subf.f_ty) (fst me)) e in
+      let e = map_ss_inv2 (fun pv -> EcMatching.FPosition.map cpos (fun _ -> pv)) (f_pvar pv (subf.inv.f_ty) (fst me)) e  in
 
-      let i1 = i_asgn (LvVar (pv, subf.f_ty), expr_of_form (fst me) subf) in
-      let i2 = mk (expr_of_form (fst me) e) in
+      let i1 = i_asgn (LvVar (pv, subf.inv.f_ty), expr_of_ss_inv subf) in
+      let i2 = mk (expr_of_ss_inv e) in
 
       (me, { z with z_tail = i1 :: i2 :: is }, [])
 
@@ -189,9 +190,9 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
 
   let simplify : expr -> expr =
     if simplify then (fun e ->
-      let e = form_of_expr (fst me) e in
-      let e = EcReduction.simplify EcReduction.nodelta hyps e in
-      let e = expr_of_form (fst me) e in
+      let e = ss_inv_of_expr (fst me) e in
+      let e = map_ss_inv1 (EcReduction.simplify EcReduction.nodelta hyps) e in
+      let e = expr_of_ss_inv e in
       e
     ) else identity in
 
@@ -235,11 +236,11 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
               | e, _ -> [e] in
 
             let lv = lv_to_ty_list lv in
-      
+
             let tosubst, asgn2 = List.partition (fun ((pv, _), e) ->
               Mpv.mem env pv subst0 && is_const_expression e
             ) (List.combine lv es) in
-            
+
             let subst =
               List.fold_left
                 (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
@@ -294,7 +295,7 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
       if not (List.for_all is_const_expression es) then
         tc_error pf "right-values are not closed expressions";
 
-      if not (List.for_all (is_loc |- fst) lv) then
+      if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
       let subst =
@@ -341,33 +342,33 @@ let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
 let process_set_match (side, cpos, id, pattern) tc =
-  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
   let me, _ = tc1_get_stmt side tc in
-  let hyps = LDecl.push_active me (FApi.tc1_hyps tc) in
+  let hyps = LDecl.push_active_ss me (FApi.tc1_hyps tc) in
   let ue  = EcProofTyping.unienv_of_hyps hyps in
   let ptnmap = ref Mid.empty in
   let pattern = EcTyping.trans_pattern (LDecl.toenv hyps) ptnmap ue pattern in
   t_set_match side cpos (EcLocation.unloc id)
     (ue, EcMatching.MEV.of_idents (Mid.keys !ptnmap) `Form, pattern)
     tc
-  
+
 (* -------------------------------------------------------------------- *)
 let process_weakmem (side, id, params) tc =
   let open EcLocation in
@@ -395,27 +396,27 @@ let process_weakmem (side, id, params) tc =
   let h =
     match f.f_node with
     | FhoareS hs ->
-      let me = bind hs.hs_m in
-      f_hoareS_r { hs with hs_m = me }
+      let _, mt = bind hs.hs_m in
+      f_hoareS mt (hs_pr hs) hs.hs_s (hs_po hs)
 
     | FeHoareS hs ->
-      let me = bind hs.ehs_m in
-      f_eHoareS_r { hs with ehs_m = me }
+      let _, mt = bind hs.ehs_m in
+      f_eHoareS mt (ehs_pr hs) hs.ehs_s (ehs_po hs)
 
     | FbdHoareS hs ->
-      let me = bind hs.bhs_m in
-      f_bdHoareS_r { hs with bhs_m = me }
+      let _, mt = bind hs.bhs_m in
+      f_bdHoareS mt (bhs_pr hs) hs.bhs_s (bhs_po hs) hs.bhs_cmp (bhs_bd hs)
 
     | FequivS es ->
-      let do_side side es =
-        let es_ml, es_mr = if side = `Left then bind es.es_ml, es.es_mr else es.es_ml, bind es.es_mr in
-        {es with es_ml; es_mr}
+      let do_side side (ml, mr) =
+        let es_ml, es_mr = if side = `Left then bind ml, mr else ml, bind mr in
+        (es_ml, es_mr)
       in
-      let es =
+      let ((_, mtl), (_, mtr)) =
         match side with
-        | None -> do_side `Left (do_side `Right es)
-        | Some side -> do_side side es in
-      f_equivS_r es
+        | None -> do_side `Left (do_side `Right (es.es_ml, es.es_mr))
+        | Some side -> do_side side (es.es_ml, es.es_mr) in
+      f_equivS mtl mtr (es_pr es) es.es_sl es.es_sr (es_po es)
 
     | _ ->
       tc_error ~loc:id.pl_loc !!tc
@@ -458,7 +459,7 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
     assert false;
 
   let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
   let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 

@@ -5,7 +5,7 @@ module Json = Yojson
 
 (* -------------------------------------------------------------------- *)
 module Version = struct
-  let current : int = 3
+  let current : int = 4
 end
 
 (* -------------------------------------------------------------------- *)
@@ -16,9 +16,16 @@ type ecoroot = {
   eco_digest : digest;
 }
 
+type ecorange = int
+
+type ecotrace1 = { goals: string list; messages: string; }
+
+type ecotrace = (ecorange * ecotrace1) list
+
 type eco = {
   eco_root    : ecoroot;
   eco_depends : ecodepend Mstr.t;
+  eco_trace   : ecotrace option;
 }
 
 and ecodepend =
@@ -35,6 +42,24 @@ let flag_of_json (data : Json.t) : bool =
 
 let flag_to_json (flag : bool) : Json.t =
   `Bool flag
+
+(* -------------------------------------------------------------------- *)
+let int_of_json (data : Json.t) : int =
+  match data with
+  | `Int i -> i
+  | _ -> raise InvalidEco
+
+(* -------------------------------------------------------------------- *)
+let string_of_json (data : Json.t) : string =
+  match data with
+  | `String s -> s
+  | _ -> raise InvalidEco
+
+(* -------------------------------------------------------------------- *)
+let list_of_json (tx : Json.t -> 'a) (data : Json.t) : 'a list =
+  match data with
+  | `List data -> List.map tx data
+  | _ -> raise InvalidEco
 
 (* -------------------------------------------------------------------- *)
 let kind_to_json (k : EcLoader.kind) =
@@ -71,9 +96,9 @@ let ecoroot_to_map (ecor : ecoroot) : (string * Json.t) list =
     "digest", digest_to_json ecor.eco_digest ]
 
 let ecoroot_of_map (data : Json.t Mstr.t) : ecoroot =
-  let kd = kind_of_json (Mstr.find_exn InvalidEco "kind" data) in
-  let dg = digest_of_json (Mstr.find_exn InvalidEco "digest" data) in
-  { eco_kind = kd; eco_digest = dg; }
+  let eco_kind   = kind_of_json (Mstr.find_exn InvalidEco "kind" data) in
+  let eco_digest = digest_of_json (Mstr.find_exn InvalidEco "digest" data) in
+  { eco_kind; eco_digest; }
 
 (* -------------------------------------------------------------------- *)
 let ecoroot_to_json (ecor : ecoroot) : Json.t =
@@ -85,6 +110,43 @@ let ecoroot_of_json (data : Json.t) : ecoroot =
       ecoroot_of_map (Mstr.of_list data)
 
   | _ -> raise InvalidEco
+
+(* -------------------------------------------------------------------- *)
+let trace_to_json (trace : ecotrace option) : Json.t =
+  match trace with
+  | None ->
+    `Null
+
+  | Some trace ->
+    let for1 ((position, { goals; messages; })) =
+      `Assoc [
+        ("position", `Int position);
+        ("goals"   , `List (List.map (fun goal -> `String goal) goals));
+        ("messages", `String messages);
+      ]
+    in `List (List.map for1 trace)
+
+let trace_of_json (data : Json.t) : ecotrace option =
+  match data with
+  | `Null ->
+    None
+
+  | `List data ->
+    let for1 (data : Json.t) =
+      match data with
+      | `Assoc data ->
+        let data = Mstr.of_list data in
+        let position = Mstr.find_exn InvalidEco "position" data |> int_of_json in
+        let goals = Mstr.find_exn InvalidEco "goals" data |> list_of_json string_of_json in
+        let messages = Mstr.find_exn InvalidEco "messages" data |> string_of_json in
+        (position, { goals; messages; })
+      | _ ->
+        raise InvalidEco
+
+    in Some (List.map for1 data)
+
+  | _ ->
+    raise InvalidEco
 
 (* -------------------------------------------------------------------- *)
 let ecodepend_to_json ((ecor, direct) : ecodepend) : Json.t =
@@ -119,6 +181,7 @@ let to_json (eco : eco) : Json.t =
     [ "version", `Int Version.current;
       "echash" , `String EcVersion.hash;
       "root"   , ecoroot_to_json eco.eco_root;
+      "trace"  , trace_to_json eco.eco_trace;
       "depends", `Assoc depends ]
 
 (* -------------------------------------------------------------------- *)
@@ -135,10 +198,11 @@ let of_json (data : Json.t) : eco =
       if echash <> `String EcVersion.hash then
         raise InvalidEco;
 
-      let root    = ecoroot_of_json (Mstr.find_exn InvalidEco "root" data) in
-      let depends = depends_of_json (Mstr.find_exn InvalidEco "depends" data) in
+      let eco_root    = ecoroot_of_json (Mstr.find_exn InvalidEco "root" data) in
+      let eco_depends = depends_of_json (Mstr.find_exn InvalidEco "depends" data) in
+      let eco_trace   = trace_of_json   (Mstr.find_exn InvalidEco "trace" data) in
 
-      { eco_root = root; eco_depends = depends; }
+      { eco_root; eco_depends; eco_trace; }
 
   | _ -> raise InvalidEco
 

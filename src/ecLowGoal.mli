@@ -69,7 +69,7 @@ val t_change  : ?ri:EcReduction.reduction_info -> ?target:ident -> form -> FApi.
 
 (* -------------------------------------------------------------------- *)
 val t_lazy_match:
-  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward
+  ?reduce:lazyred -> ?texn:EcCoreGoal.FApi.backward -> (form -> FApi.backward)-> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?mode:[`Alpha | `Conv] -> ?reduce:lazyred -> FApi.backward
@@ -351,3 +351,15 @@ val t_solve :
   -> ?mode:EcMatching.fmoptions
   -> ?depth:int
   -> FApi.backward
+
+val t_debug :
+    ?tag:string (* for distinguishing prints *)
+  -> FApi.backward
+  -> FApi.backward
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc :tcenv -> unit
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]
+
+val pp_tc1 :tcenv1 -> unit
+  [@@ocaml.alert debug "Debug function, remove uses before merging"]

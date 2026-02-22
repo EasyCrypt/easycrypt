@@ -54,8 +54,24 @@ and pucflags = {
   puc_local : bool;
 }
 
+type docentity =
+  | ItemDoc   of string list * docitem
+  | SubDoc    of (string list * docitem) * docentity list
+
+and docitem =
+  mode * itemkind * string * string list (* dec/reg, kind, name, src *)
+
+and itemkind = [`Type | `Operator | `Axiom | `Lemma | `ModuleType | `Module | `Theory]
+
+and mode = [`Abstract | `Specific]
+
 (* -------------------------------------------------------------------- *)
 val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
+
+(* -------------------------------------------------------------------- *)
+val get_gdocstrings : scope -> string list
+val get_ldocentities : scope -> docentity list
+
 
 (* -------------------------------------------------------------------- *)
 val empty  : EcGState.gstate -> scope
@@ -93,46 +109,45 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Op : sig
-  val add : scope -> poperator located -> EcDecl.operator * string list * scope
+  val add : ?src:string -> scope -> poperator located -> EcDecl.operator * string list * scope
 
-  val add_opsem : scope -> pprocop located -> scope
+  val add_opsem : ?src:string -> scope -> pprocop located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Pred : sig
-  val add : scope -> ppredicate located -> EcDecl.operator * scope
+  val add : ?src:string -> scope -> ppredicate located -> EcDecl.operator * scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Ax : sig
   type proofmode = [`WeakCheck | `Check | `Report]
 
-  val add     : scope -> proofmode -> paxiom located -> symbol option * scope
-  val save    : scope -> string option * scope
-  val admit   : scope -> string option * scope
-  val abort   : scope -> scope
+  val add     : ?src:string -> scope -> proofmode -> paxiom located -> symbol option * scope
+  val save    : ?src:string -> scope -> string option * scope
+  val admit   : ?src:string -> scope -> string option * scope
+  val abort   : ?src:string -> scope -> scope
   val realize : scope -> proofmode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Ty : sig
-  val add : scope -> ptydecl located -> scope
+  val add : ?src:string -> scope -> ptydecl located -> scope
 
   val add_subtype : scope -> psubtype located -> scope
-  val add_class    : scope -> ptypeclass located -> scope
   val add_instance : scope -> Ax.proofmode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod : sig
-  val add : scope -> pmodule_def_or_decl -> scope
+  val add : ?src:string ->scope -> pmodule_def_or_decl -> scope
   val declare : scope -> pmodule_decl -> scope
   val import : scope -> pmsymbol located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType : sig
-  val add : scope -> pinterface -> scope
+  val add : ?src:string -> scope -> pinterface -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -147,7 +162,7 @@ module Theory : sig
 
   (* [enter scope mode name] start a theory in scope [scope] with
    * name [name] and mode (abstract/concrete) [mode]. *)
-  val enter : scope -> thmode -> symbol -> EcTypes.is_local -> scope
+  val enter : ?src:string -> scope -> thmode -> symbol -> EcTypes.is_local -> scope
 
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
@@ -173,6 +188,22 @@ module Theory : sig
    * theory. *)
   val require : scope -> (required_info * thmode) -> (scope -> scope) -> scope
 
+  (* start/finish adding a new top-level required theory, not using loader
+   *
+   * [require_start] enters the theory, with the given name and theory mode,
+   * starting from the initial scope
+   *
+   * [require_finish old new_ ri] exits the top-level theory of [new_],
+   * resulting in a new scope, new', and a new loaded theory, th, and then
+   * forms a loaded theory map from the map of new', adding the binding of
+   * ri.rqd_name -> th
+   *   if old is supplied, it requires ri in the result of replacing
+       the loaded theories of old with the updated map
+   *   otherwise, it requires ri in the result of replacing the
+       the loaded theories of new' with the updated map *)
+  val require_start  : scope -> symbol -> thmode -> scope
+  val require_finish : ?old:scope option -> new_:scope -> required_info -> scope
+
   val add_clears : (pqsymbol option) list -> scope -> scope
 
   val required : scope -> required
@@ -195,8 +226,8 @@ module Tactics : sig
   type prinfos = proofenv * (handle * handle list)
   type proofmode = Ax.proofmode
 
-  val process : scope -> proofmode -> ptactic list -> prinfos option * scope
-  val proof   : scope -> scope
+  val process : ?src:string -> scope -> proofmode -> ptactic list -> prinfos option * scope
+  val proof   : ?src:string -> scope -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -259,4 +290,9 @@ end
 module Search : sig
   val search : scope -> pformula list -> unit
   val locate : scope -> pqsymbol -> unit
+end
+
+(* -------------------------------------------------------------------- *)
+module DocComment : sig
+  val add : scope -> [`Global | `Item] * string -> scope
 end
