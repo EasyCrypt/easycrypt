@@ -3,7 +3,7 @@ type idx_t
 type ecloader
 
 (* -------------------------------------------------------------------- *)
-type kind = [`Ec | `EcA | `Spec]
+type kind = [`Ec | `EcA]
 
 exception BadExtension of string
 

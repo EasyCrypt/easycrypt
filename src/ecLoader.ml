@@ -10,7 +10,7 @@ type ecloader = {
 }
 
 (* -------------------------------------------------------------------- *)
-type kind = [`Ec | `EcA | `Spec]
+type kind = [`Ec | `EcA]
 
 exception BadExtension of string
 
@@ -123,7 +123,6 @@ let locate ?(namespaces = [None]) ?(kinds = [`Ec; `EcA]) (name : string) (ecl : 
         match kind with
         | `Ec   -> Printf.sprintf "%s.ec"  name
         | `EcA  -> Printf.sprintf "%s.eca" name
-        | `Spec -> Printf.sprintf "%s.spec" name
       in
 
       let nmok =
