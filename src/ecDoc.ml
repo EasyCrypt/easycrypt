@@ -26,8 +26,9 @@ let c_filename ?(ext : string option) (nms : string list) =
 (* -------------------------------------------------------------------- *)
 let thkind_str (kind : EcLoader.kind) : string =
   match kind with
-  | `Ec -> "Theory"
-  | `EcA -> "Abstract Theory"
+  | `Ec   -> "Theory"
+  | `EcA  -> "Abstract Theory"
+  | `Spec -> "Spec File" (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let itemkind_str_pl (ik : itemkind) : string =

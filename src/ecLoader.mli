@@ -18,4 +18,4 @@ val aslist  : ecloader -> ((namespace option * string) * idx_t) list
 val dup     : ecloader -> ecloader
 val forsys  : ecloader -> ecloader
 val addidir : ?namespace:namespace -> ?recursive:bool -> string -> ecloader -> unit
-val locate  : ?namespaces:(namespace option) list -> string -> ecloader -> (namespace option * string * kind) option
+val locate  : ?namespaces:(namespace option) list -> ?kinds:(kind list) -> string -> ecloader -> (namespace option * string * kind) option

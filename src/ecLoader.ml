@@ -114,7 +114,7 @@ let check_case idir name (dev, ino) =
     with Unix.Unix_error _ -> None
 
 (* -------------------------------------------------------------------- *)
-let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
+let locate ?(namespaces = [None]) ?(kinds = [`Ec; `EcA]) (name : string) (ecl : ecloader) =
   if not (EcRegexp.match_ (`S "^[a-zA-Z0-9_]+$") name) then
     None
   else
@@ -157,7 +157,7 @@ let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
     match
       List.rev_pmap
         (fun kind -> List.opick (locate kind) ecl.ecl_idirs)
-        [`Ec; `EcA; `Spec]
+        kinds
     with
     | [x] -> Some x
     | _   -> None

@@ -120,8 +120,9 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
-  val locate  : ?namespaces:namespace option list -> string ->
-                  loader -> (namespace option * string * kind) option
+  val locate  : ?namespaces:namespace option list -> 
+                ?kinds:(EcLoader.kind list) -> string ->
+                 loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
   val pop       : loader -> string option
@@ -170,8 +171,8 @@ end = struct
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
 
-  let locate ?namespaces (path : string) (ld : loader) =
-    EcLoader.locate ?namespaces path ld.ld_core
+  let locate ?namespaces ?kinds (path : string) (ld : loader) =
+    EcLoader.locate ?namespaces ?kinds path ld.ld_core
 
   let push (p : string) (ld : loader) =
     ld.ld_stack <- norm p :: ld.ld_stack
@@ -522,7 +523,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
     then [Loader.namespace ld; None]
     else [nm] in
 
-  match Loader.locate ~namespaces:nm sysname ld with
+  match Loader.locate ~kinds:[`Ec; `EcA] ~namespaces:nm sysname ld with
   | None ->
       EcScope.hierror "cannot locate theory `%s'" sysname
 
@@ -557,7 +558,10 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         (fun () -> Pragma.set i_pragma)
       in
 
-      let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+      let kind = match kind with 
+      | `Ec -> `Concrete | `EcA -> `Abstract 
+      | _ -> assert false 
+      in
 
       let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
@@ -749,10 +753,10 @@ and process_crbind (scope : EcScope.scope) (ld : Loader.loader) (binding : pcrbi
   | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
   | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
   | CRB_Circuit    cr -> 
-    let file = match Loader.locate (unloc cr.file) ld with
-    | None -> assert false (* FIXME *)
+    let file = match Loader.locate ~kinds:[`Spec] (unloc cr.file) ld with
     | Some (_, file, `Spec) -> { cr.file with pl_desc = file }
-    | _ -> assert false (* FIXME *)
+    | None -> assert false (* FIXME: Proper error message *)
+    | _ -> assert false 
     in
     EcScope.Circuit.add_circuits scope binding.locality {cr with file}
 
