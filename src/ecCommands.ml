@@ -755,7 +755,7 @@ and process_crbind (scope : EcScope.scope) (ld : Loader.loader) (binding : pcrbi
   | CRB_Circuit    cr -> 
     let file = match Loader.locate ~kinds:[`Spec] (unloc cr.file) ld with
     | Some (_, file, `Spec) -> { cr.file with pl_desc = file }
-    | None -> assert false (* FIXME: Proper error message *)
+    | None -> EcScope.hierror ~loc:(loc cr.file) "Cannot find spec file %s.spec" (unloc cr.file)
     | _ -> assert false 
     in
     EcScope.Circuit.add_circuits scope binding.locality {cr with file}
