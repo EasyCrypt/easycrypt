@@ -3065,37 +3065,21 @@ module Circuit = struct
     
     Ax.add_defer scope proofs
 
-  let find_duplicate_specs (scope : scope) : symbol list =
-    let specs = List.map (fun filename -> 
-      Lospecs.Circuit_spec.load_from_file ~filename |> List.fst
-    ) scope.sc_specs 
-    in
-    
-    let module Set = Batteries.Set in 
-    List.fold_left (fun (acc, dups) next -> 
-      let cur = Set.of_list next in
-      let new_dup = Set.intersect cur acc in
-      (Set.union acc cur), (Set.union dups new_dup)
-    ) (Set.empty, Set.empty) specs |> snd |> Set.to_list
-  
-  (* FIXME CIRCUIT PR: decide how we want to handle multiple spec files in easycrypt.project(s) *)
-  let add_circuit1 (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
+  let add_circuit1 ~(filename: string) (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
 
     if not (List.is_empty opdecl.op_tparams) then
       hierror ~loc:(loc op) "operator must be monomorphic";
 
-    let matches = List.filteri_map (fun _i filename ->
-      EcEnv.Circuit.get_specification_by_name ~filename (unloc circ)) scope.sc_specs 
-    in
+    let ospec = EcEnv.Circuit.get_specification_by_name ~filename (unloc circ) in
 
-    match matches with
-    | [] ->
+    match ospec with
+    | None ->
       hierror ~loc:(loc circ)
         "unknown circuit: %s" (unloc circ)
 
-    | circuit::[] ->
+    | Some circuit ->
       let sig_ = List.map (fun (_, `W i) -> i) circuit.arguments in
       let ret  = Lospecs.Ast.get_size circuit.rettype in
       let dom, codom = EcEnv.Ty.decompose_fun opdecl.op_ty env in
@@ -3143,18 +3127,10 @@ module Circuit = struct
           EcTheory.mkitem ~import:true
           (EcTheory.Th_crbinding (item, local)) in
       { scope with sc_env = EcSection.add_item item scope.sc_env }  
-  | circs -> hierror "Multiple matches found (%d) for circuit %s" (List.length circs) (unloc circ)
-
-  let register_spec_files (scope : scope) (files : string list) : scope =
-    let sc = { scope with sc_specs = files } in
-    match find_duplicate_specs sc with
-    | [] -> sc
-    | dups -> hierror "duplicate spec definitions: %a" 
-      EcPrinting.(pp_list ", " pp_symbol) dups
 
   let add_circuits (scope : scope) (local : is_local) (binds : pbind_circuit) : scope =
     List.fold_left (fun scope bnd -> 
-      add_circuit1 scope local bnd)
+      add_circuit1 ~filename:(unloc binds.file) scope local bnd)
       scope binds.bindings
 end
 

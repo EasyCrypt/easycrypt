@@ -743,12 +743,18 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_crbind (scope : EcScope.scope) (binding : pcrbinding) =
+and process_crbind (scope : EcScope.scope) (ld : Loader.loader) (binding : pcrbinding) =
   match binding.binding with
   | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring  scope binding.locality bs
   | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
   | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
-  | CRB_Circuit    cr -> EcScope.Circuit.add_circuits   scope binding.locality cr
+  | CRB_Circuit    cr -> 
+    let file = match Loader.locate (unloc cr.file) ld with
+    | None -> assert false (* FIXME *)
+    | Some (_, file, `Spec) -> { cr.file with pl_desc = file }
+    | _ -> assert false (* FIXME *)
+    in
+    EcScope.Circuit.add_circuits scope binding.locality {cr with file}
 
 (* -------------------------------------------------------------------- *)
 and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) g =
@@ -793,7 +799,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
-      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope bind)
+      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope ld bind)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
@@ -828,7 +834,6 @@ type checkmode = {
   cm_provers   : string list option;
   cm_profile   : bool;
   cm_iterate   : bool;
-  cm_specs     : string list;
 }
 
 let initial ~checkmode ~boot ~checkproof =
@@ -854,7 +859,6 @@ let initial ~checkmode ~boot ~checkproof =
                                  scope [tactics; prelude] in
 
   let scope = EcScope.Prover.set_default scope poptions in
-  let scope = EcScope.Circuit.register_spec_files scope checkmode.cm_specs in
   let scope = if checkproof then
                 begin
                   if checkall then

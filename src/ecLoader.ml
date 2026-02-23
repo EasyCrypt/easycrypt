@@ -10,7 +10,7 @@ type ecloader = {
 }
 
 (* -------------------------------------------------------------------- *)
-type kind = [`Ec | `EcA]
+type kind = [`Ec | `EcA | `Spec]
 
 exception BadExtension of string
 
@@ -121,8 +121,9 @@ let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
     let locate kind ((inamespace, idir), _) =
       let name =
         match kind with
-        | `Ec  -> Printf.sprintf "%s.ec"  name
-        | `EcA -> Printf.sprintf "%s.eca" name
+        | `Ec   -> Printf.sprintf "%s.ec"  name
+        | `EcA  -> Printf.sprintf "%s.eca" name
+        | `Spec -> Printf.sprintf "%s.spec" name
       in
 
       let nmok =
@@ -156,7 +157,7 @@ let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
     match
       List.rev_pmap
         (fun kind -> List.opick (locate kind) ecl.ecl_idirs)
-        [`Ec; `EcA]
+        [`Ec; `EcA; `Spec]
     with
     | [x] -> Some x
     | _   -> None
