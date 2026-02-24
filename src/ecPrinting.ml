@@ -2530,28 +2530,27 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
       let (subppe, pp_vds) = pp_locbinds ppe fix.opf_args in
 
       let pp_branch fmt br =
-        Format.fprintf fmt "with ";
-        let brppe =
-          List.fold_left (fun brppe br1 ->
-              let ctor  = br1.EI.br1_case.EI.cs1_ctor in
-              let vars  = List.map fst br1.EI.br1_case.EI.cs1_vars in
-              let brppe = List.fold_left PPEnv.add_local brppe vars in
+        let brppe = ref subppe in
+        let pp_br fmt br1 =
+          let ctor  = br1.EI.br1_case.EI.cs1_ctor in
+          let vars  = List.map fst br1.EI.br1_case.EI.cs1_vars in
+          brppe := List.fold_left PPEnv.add_local !brppe vars;
+          match vars with
+          | [] ->
+            Format.fprintf fmt "%a = %a"
+              (pp_local subppe) br1.EI.br1_target
+              pp_opname (PPEnv.op_symb ppe ctor None)
 
-              (match vars with
-               | [] ->
-                 Format.fprintf fmt "%a = %a"
-                   (pp_local subppe) br1.EI.br1_target
-                   pp_opname (PPEnv.op_symb ppe ctor None)
-
-               | _ ->
-                 Format.fprintf fmt "%a = %a %a"
-                   (pp_local subppe) br1.EI.br1_target
-                   pp_opname (PPEnv.op_symb ppe ctor None)
-                   (pp_list " " (pp_local ppe)) vars);
-              brppe)
-            subppe br.EI.br_branches
+          | _ ->
+            Format.fprintf fmt "%a = %a %a"
+              (pp_local subppe) br1.EI.br1_target
+              pp_opname (PPEnv.op_symb ppe ctor None)
+              (pp_list " " (pp_local ppe)) vars
         in
-        Format.fprintf fmt " => @[%a@]" (pp_expr brppe) br.EI.br_body in
+        Format.fprintf fmt "with %a => "
+          (pp_list ",@ " pp_br) br.EI.br_branches;
+        Format.fprintf fmt "@[%a@]"
+          (pp_expr !brppe) br.EI.br_body in
 
       let cfix = EcInductive.collate_matchfix fix in
 
@@ -2573,7 +2572,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
       pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_nt (ppe : PPEnv.t) fmt 
+let pp_opdecl_nt (ppe : PPEnv.t) fmt
   ((basename, ts, _ty, nt) : symbol * ty_param list * ty * notation)
 =
   let ppe = PPEnv.add_locals ppe ts in
@@ -2595,10 +2594,10 @@ let pp_opdecl_nt (ppe : PPEnv.t) fmt
         pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl 
-  ?(long = false) 
-  (ppe : PPEnv.t) 
-  fmt 
+let pp_opdecl
+  ?(long = false)
+  (ppe : PPEnv.t)
+  fmt
   ((x, op) : EcPath.path * operator)
 =
   let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
@@ -2717,7 +2716,7 @@ let at (ppe : PPEnv.t) n i =
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
   | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
-  
+
   | Sif (e, s, s'), n -> begin
     if List.is_empty s.s_node || List.is_empty s'.s_node then begin
       let body = if List.is_empty s'.s_node then s else s' in
