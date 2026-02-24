@@ -163,72 +163,106 @@ module CaseMap : sig
   type t
 
   type locals = (EcIdent.t * ty) list
+  type pattern =
+    | Single of int * EcPath.path * locals
+    | Any of locals array
+
+  type patterns = (EcIdent.t * pattern) list
 
   val create  : EcPath.path list list -> t
-  val add     : (int * locals) list -> expr -> t -> bool
+  val add     : patterns -> expr -> t -> unit
   val resolve : t -> opbranches
-  exception PartialMatch of EcSymbols.symbol
+  exception PartialMatch of EcPath.path list list
+  exception DuplicateMatch of patterns * patterns
+  exception RedundantMatch  of patterns
+
+  val pp_patterns : patterns -> TT.fix_match
 
 end = struct
-  exception PartialMatch of EcSymbols.symbol
 
   type locals = (EcIdent.t * ty) list
+  type pattern =
+    | Single of int * EcPath.path * locals
+    | Any of locals array
 
-  type t = [
-    | `Case of (EcPath.path * t) array
-    | `Leaf of (locals list * expr) option ref
-  ]
+  type patterns = (EcIdent.t * pattern) list
+
+  type t =
+    | Case of (EcPath.path * t) array
+    | Leaf of (patterns * locals list * expr) option ref
+
+  exception PartialMatch of EcPath.path list list
+  exception DuplicateMatch of patterns * patterns
+  exception RedundantMatch  of patterns
 
   let rec create (inds : EcPath.path list list) =
     match inds with
-    | [] -> `Leaf (ref None)
+    | [] -> Leaf (ref None)
     | ind :: inds ->
-        let ind = Array.of_list ind in
-          `Case (Array.map (fun x -> (x, create inds)) ind)
+      let ind = Array.of_list ind in
+      Case (Array.map (fun x -> (x, create inds)) ind)
 
-  let add bs e (m : t) =
-    let r =
-      List.fold_left
-        (fun m (i, _) ->
-           match m with
-           | `Leaf _ -> assert false
-           | `Case t ->
-               assert (i >= 0 && i < Array.length t);
-               snd t.(i))
-        m bs
+
+  let add (current : patterns) e (m : t) =
+    let filled = ref false in
+    let rec add (weak : bool) rids bs (m : t) =
+      match bs, m with
+      | [], Leaf r ->
+        begin match !r with
+        | None -> r := Some (current, List.rev rids, e); filled := true
+        | Some (previous, _, _) -> if not weak then raise (DuplicateMatch(previous, current))
+        end
+      | (_, Single (i, _, ids)) :: bs, Case t ->
+          assert (i >= 0 && i < Array.length t);
+          add weak (ids::rids) bs (snd t.(i))
+      | (_, Any tids) :: bs, Case t ->
+          assert (Array.length t = Array.length tids);
+          for i = 0 to Array.length t - 1 do
+            add true (tids.(i)::rids) bs (snd t.(i))
+          done
+      | _, _ -> assert false
     in
-      match r with
-      | `Case _ -> assert false
-      | `Leaf r -> begin
-          match !r with
-          | None   -> r := Some (List.map snd bs, e); true
-          | Some _ -> false
-      end
+    add false [] current m;
+    if not !filled then raise (RedundantMatch current)
 
-  let resolve =
-    let module E = struct exception NotFull end in
+  let check_partial m =
+    let l = ref [] in
+    let rec aux rps m =
+      match m with
+      | Case t ->
+        Array.iter (fun (p,m) -> aux (p::rps) m) t
+      | Leaf r ->
+          if !r = None then l := List.rev rps :: !l
+    in
+    aux [] m;
+    if !l <> [] then raise (PartialMatch !l)
 
+  let resolve m =
+    check_partial m;
     let rec resolve_r m =
       match m with
-      | `Case t ->
+      | Case t ->
           let for1 i =
             let (cp, bs) =
-              try snd_map resolve_r t.(i)
-              with E.NotFull -> raise (PartialMatch (EcPath.basename (fst t.(i))))
+              snd_map resolve_r t.(i)
             in
               { opb_ctor = (cp, i); opb_sub = bs; }
           in
             OPB_Branch (Parray.init (Array.length t) for1)
 
-      | `Leaf r -> begin
-          match !r with
-          | None -> raise E.NotFull
-          | Some (x1, x2) -> OPB_Leaf (x1, x2)
+      | Leaf r -> begin
+        match !r with
+        | None -> assert false
+        | Some (_, x1, x2) -> OPB_Leaf (x1, x2)
       end
   in
-    fun m ->
-      try  resolve_r m
-      with E.NotFull -> assert false
+  resolve_r m
+
+  let pp_pattern (x, p) =
+    (x, match p with Any _ -> None | Single (_, p, _) -> Some p)
+
+  let pp_patterns = List.map pp_pattern
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -241,6 +275,9 @@ type matchfix_t =  {
 }
 
 (* -------------------------------------------------------------------- *)
+
+
+
 let trans_matchfix
   ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, pty, pbs)
 =
@@ -284,19 +321,66 @@ let trans_matchfix
           in
             (mpty, pbsmap)
   in
+  let mpty = List.rev mpty in
+  (* First try to find the type of all matched inductive *)
+  let add_ind indtbl ((_, x, _) : _ * EcIdent.t * _) =
+    let x = EcIdent.name x in
+    let rec add pbsmap =
+      match pbsmap with
+      | [] -> raise Not_found
+      | (_, pbmap) :: pbsmap ->
+        let pb = Msym.find x pbmap in
+        match pb.pop_pattern with
+        | PPAny -> add pbsmap
+        | PPApp ((cname, tvi), _cargs) ->
+            let tvi = tvi |> omap (TT.transtvi env ue) in
+            let filter = fun _ op -> EcDecl.is_ctor op in
+            let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+            match cts with
+            | [] ->
+              fxerror cname.pl_loc env TT.FXE_CtorUnk
 
+            | _ :: _ :: _ ->
+              fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
+
+            | [(cp, _tvi), _opty, _subue, _] ->
+              let ctor = EcEnv.Op.by_path cp env in
+              let (indp, _ctoridx) = EcDecl.operator_as_ctor ctor in
+              let indty = EcEnv.Ty.by_path indp env in
+              let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
+              let ctors =
+                List.map (fun (ctor, _) -> EcPath.pqoname (EcPath.prefix indp) ctor) ind in
+              Msym.add x (indp, ctors) indtbl
+    in
+    add pbsmap in
+
+  let indtbl = List.fold_left add_ind Msym.empty mpty in
+  let inds =
+      List.map (fun (_, x, _) -> snd (Msym.find (EcIdent.name x) indtbl)) mpty in
+  let casemap = CaseMap.create inds in
+
+  (* Build all branches and add them to the casemap *)
   let branches =
-    let pbs =
-      let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
-        let trans1 ((xpos, x, xty) : _ * EcIdent.t * ty) =
-          let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
-
+    let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
+      let trans1 ((_xpos, x0, xty) : _ * EcIdent.t * ty) =
+        let x = EcIdent.name x0 in
+        let pb = Msym.find x pbmap in
+        match pb.pop_pattern with
+        | PPAny ->
+          let indp, _ = Msym.find x indtbl in
+          let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+          let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
+          let codom = tconstr indp (List.map tvar indty.tyd_params) in
+          let tys = List.map (fun (_, dom) -> toarrow dom codom) ind in
+          let tys, _ = EcUnify.UniEnv.opentys ue indty.tyd_params None tys in
+          let doargs cty =
+            let dom, codom = tyfun_flat cty in
+            TT.unify_or_fail env ue pb.pop_name.pl_loc ~expct:codom xty;
+            List.map (fun ty ->EcIdent.create "_", ty) dom in
+          let args = List.map doargs tys in
+          (x0, CaseMap.Any (Array.of_list args))
+        | PPApp ((cname, tvi), cargs) ->
           let filter = fun _ op -> EcDecl.is_ctor op in
-          let ((cname, tvi), cargs) =
-            match pb.pop_pattern with
-            | PPApp ((cname, tvi), cargs) -> ((cname, tvi), cargs)
-            | PPAny -> fxerror loc env TT.FXE_MatchWildcard
-          in
           let tvi = tvi |> omap (TT.transtvi env ue) in
           let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
 
@@ -341,72 +425,60 @@ let trans_matchfix
                 EcIdent.create (omap_dfl unloc "_" o) in
               let pvars = List.map (create -| unloc) cargs in
               let pvars = List.combine pvars ctorty in
-
-              (pb, (indp, ind), (ctoridx, pvars), xpos)
-        in
-
-        let ptns = List.map trans1 mpty in
-        let env  =
-          List.fold_left (fun env (_, _, (_, pvars), _) ->
-            EcEnv.Var.bind_locals pvars env)
-            env ptns
-        in
-
-        let body = TT.transexpcast env `InOp ue codom body in
-
-        let rec check_body =
-          let (_, _, (_, pvars), pos) =
-            List.max
-              ~cmp:(fun p1 p2 -> Stdlib.compare (proj4_4 p1) (proj4_4 p2))
-              ptns in
-          let pvars = Sid.of_list (List.fst pvars) in
-
-          fun (e : expr) ->
-            match destr_app e with
-            | ({ e_node = Elocal x }, args) when x = opname -> begin
-                match List.nth_opt args pos with
-                | Some { e_node = Elocal a } when Sid.mem a pvars ->
-                    ()
-                | _ ->
-                    fxerror loc env TT.FXE_SynCheckFailure
-              end
-
-            | _ ->
-                EcTypes.e_iter check_body e in
-
-        check_body body;
-        (ptns, body)
+              (x0, CaseMap.Single (ctoridx, cp, pvars))
+            (* (pb, (indp, ind), (ctoridx, pvars), xpos) *)
       in
-        List.map trans_b pbsmap
+
+      let ptns = List.map trans1 mpty in
+      let env  =
+        List.fold_left (fun env (_, c) ->
+          match c with
+          | CaseMap.Any _ -> env
+          | CaseMap.Single (_, _, pvars) -> EcEnv.Var.bind_locals pvars env)
+          env ptns
+      in
+
+      let body = TT.transexpcast env `InOp ue codom body in
+
+      try CaseMap.add ptns body casemap
+      with
+      | CaseMap.DuplicateMatch(previous, current) ->
+          fxerror loc env
+            (TT.FXE_FixDuplicate(CaseMap.pp_patterns previous, CaseMap.pp_patterns current))
+      | CaseMap.RedundantMatch patterns ->
+          fxerror loc env (TT.FXE_FixRedundant (CaseMap.pp_patterns patterns))
     in
-
-    let inds = fun (_, indp_ind, _, _) -> indp_ind in
-    let inds = List.map inds (fst (oget (List.ohead pbs))) in
-    let inds =
-      List.map (fun (indp, ctors) ->
-        List.map
-          (fun (ctor, _) -> EcPath.pqoname (EcPath.prefix indp) ctor)
-          ctors)
-        inds
-    in
-
-    let casemap = CaseMap.create inds in
-
-    List.iter
-      (fun (ptns, be) ->
-         let ptns =
-           List.map
-             (fun (_, _, (ctor, pvars), _) -> (ctor, pvars))
-             ptns
-         in
-           if not (CaseMap.add ptns be casemap) then
-             fxerror loc env TT.FXE_MatchDupBranches)
-      pbs;
-
+    List.iter trans_b pbsmap;
     try CaseMap.resolve casemap
-    with CaseMap.PartialMatch s -> fxerror loc env (TT.FXE_MatchPartial [s])
+    with CaseMap.PartialMatch s -> fxerror loc env (TT.FXE_FixPartial s)
   in
 
+  (* Check the guard condition *)
+  let mf_recs = List.map proj3_1 mpty in
+  let pos = List.max mf_recs in
+  let n = oget (List.oindex ((=) pos) mf_recs) in
+  let rec check_brs branches =
+    match branches with
+    | OPB_Branch t -> Parray.iter check_br t
+    | OPB_Leaf (xss, e) ->
+      let xs = List.nth xss n in
+      let pvars = Sid.of_list (List.fst xs) in
+      let rec check_body e =
+        match destr_app e with
+        | ({ e_node = Elocal x }, args) when x = opname -> begin
+          match List.nth_opt args pos with
+          | Some { e_node = Elocal a } when Sid.mem a pvars -> ()
+          | _ -> fxerror loc env TT.FXE_SynCheckFailure
+          end
+        | _ -> EcTypes.e_iter check_body e
+      in
+      check_body e
+  and check_br branch = check_brs branch.opb_sub
+  in
+
+  check_brs branches;
+
+  (* Build the final result *)
   let aout =
     if close then
       let ts = Tuni.subst (EcUnify.UniEnv.assubst ue) in
@@ -437,13 +509,13 @@ let trans_matchfix
       in { mf_name     = opname;
            mf_codom    = codom;
            mf_args     = args;
-           mf_recs     = List.map proj3_1 mpty;
+           mf_recs     = mf_recs;
            mf_branches = branches; }
 
     else { mf_name     = opname;
            mf_codom    = codom;
            mf_args     = args;
-           mf_recs     = List.map proj3_1 mpty;
+           mf_recs     = mf_recs;
            mf_branches = branches; }
-
-  in (ty, aout)
+  in
+  (ty, aout)

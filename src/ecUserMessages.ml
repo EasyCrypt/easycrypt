@@ -187,7 +187,18 @@ end = struct
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
 
-  let pp_fxerror _env fmt error =
+  let pp_fix_match env =
+     let ppe = EcPrinting.PPEnv.ofenv env in
+     let ppo fmt = function
+       | None -> Format.fprintf fmt "_"
+       | Some op -> EcPrinting.pp_opname ppe fmt op in
+     let pp1 fmt (id, op) =
+       Format.fprintf fmt "%a = %a"
+          (EcPrinting.pp_local ppe) id
+          ppo op in
+     EcPrinting.pp_list ",@ " pp1
+
+  let pp_fxerror env fmt error =
     let msg x = Format.fprintf fmt x in
 
     match error with
@@ -215,6 +226,21 @@ end = struct
     | FXE_MatchPartial ids ->
         msg "this pattern matching is non-exhaustive, %a are missing"
           (EcPrinting.pp_list ",@ " pp_symbol) ids
+
+    | FXE_FixPartial ids ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        let pp_match fmt ids =
+          Format.fprintf fmt "[%a]"
+            (EcPrinting.pp_list ",@" (EcPrinting.pp_opname ppe)) ids in
+        msg "this pattern matching is non-exhaustive, %a are missing"
+          (EcPrinting.pp_list ",@ " pp_match) ids
+
+    | FXE_FixRedundant fm ->
+        msg "this clause is redundant : %a" (pp_fix_match env) fm
+
+    | FXE_FixDuplicate (previous, current) ->
+        msg "duplicate clause : %a, already covered by %a"
+          (pp_fix_match env) current (pp_fix_match env) previous
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"

@@ -99,6 +99,8 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fix_match = (EcIdent.ident * EcPath.path option) list
+
 type fxerror =
 | FXE_MatchWildcard
 | FXE_EmptyMatch
@@ -108,6 +110,9 @@ type fxerror =
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
 | FXE_MatchPartial of symbol list
+| FXE_FixPartial of EcPath.path list list
+| FXE_FixRedundant of fix_match
+| FXE_FixDuplicate of fix_match * fix_match
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
