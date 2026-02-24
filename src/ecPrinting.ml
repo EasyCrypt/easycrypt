@@ -2538,14 +2538,14 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
           match vars with
           | [] ->
             Format.fprintf fmt "%a = %a"
-              (pp_local subppe) br1.EI.br1_target
-              pp_opname (PPEnv.op_symb ppe ctor None)
+              (pp_local !brppe) br1.EI.br1_target
+              pp_opname (PPEnv.op_symb !brppe ctor None)
 
           | _ ->
             Format.fprintf fmt "%a = %a %a"
-              (pp_local subppe) br1.EI.br1_target
-              pp_opname (PPEnv.op_symb ppe ctor None)
-              (pp_list " " (pp_local ppe)) vars
+              (pp_local !brppe) br1.EI.br1_target
+              pp_opname (PPEnv.op_symb!brppe ctor None)
+              (pp_list " " (pp_local !brppe)) vars
         in
         Format.fprintf fmt "with %a => "
           (pp_list ",@ " pp_br) br.EI.br_branches;
