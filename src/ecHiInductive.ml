@@ -426,7 +426,6 @@ let trans_matchfix
               let pvars = List.map (create -| unloc) cargs in
               let pvars = List.combine pvars ctorty in
               (x0, CaseMap.Single (ctoridx, cp, pvars))
-            (* (pb, (indp, ind), (ctoridx, pvars), xpos) *)
       in
 
       let ptns = List.map trans1 mpty in
