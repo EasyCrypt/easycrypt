@@ -53,3 +53,6 @@ val process_conseq_opt :
 val t_conseqauto : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
 
 val process_concave : pformula option tuple2 gppterm * pformula -> FApi.backward
+
+val cond_hoareS_notmod : ?mk_other:bool -> tcenv1 -> ss_inv -> form * memory list * (memory * ss_inv) list
+

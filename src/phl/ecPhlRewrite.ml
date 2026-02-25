@@ -169,6 +169,31 @@ let process_rewrite
   | `Rw rw -> process_rewrite_rw side pos rw tc
   | `Simpl -> process_rewrite_simpl side pos tc
 
+(* Frames pre *)
+let hoareS_frame_pre (env: env) (pre: ss_inv) (s: stmt) : ss_inv = 
+  let modi = EcPV.s_write env s in 
+  let cond, _, _ = EcLowPhlGoal.generalize_mod_ env modi pre in 
+  cond
+
+(* FIXME: rename *)
+let restr_pre_mem (m: memory) (f: form) : form =
+  let fs = EcFol.destr_ands ~deep:true f in
+  List.filter_map (fun f ->
+    f_filter_map (fun t -> Some t) (fun f ->
+      match f.f_node with
+      | Fpvar (_, m') when m' <> m -> None
+      | _ -> Some f
+    ) f) fs |> List.fold_left f_and f_true
+
+
+(* FIXME: unsound *)
+let equivS_frame_pre_ss (env: env) (pre: ts_inv) (side: side) (s: stmt) : ss_inv =
+  let pre = match side with
+  | `Left  -> {inv=restr_pre_mem pre.ml pre.inv;m = pre.ml}
+  | `Right  -> {inv=restr_pre_mem pre.mr pre.inv;m = pre.mr}
+  in
+  hoareS_frame_pre env pre s
+
 (* -------------------------------------------------------------------- *)
 let t_change_stmt
   (side : side option)
@@ -211,10 +236,24 @@ let t_change_stmt
       pre_globs
     in
 
+  (* FIXME: make this generate the intermediate goal like the conseq one *)
+  (* FIXME: make the equiv case work *)
+  let pre = match zpr.z_path, FApi.tc1_goal tc, side with
+  | ZTop, {f_node = FhoareS hs}, None ->
+    (EcSubst.ss_inv_rebind
+    (hoareS_frame_pre env (hs_pr hs) (rstmt zpr.z_head))
+    mleft).inv
+  | ZTop, {f_node = FequivS es}, Some s ->
+    (EcSubst.ss_inv_rebind
+    (equivS_frame_pre_ss env (es_pr es) s (rstmt zpr.z_head)) mleft).inv
+  | _ -> f_true
+  in
+  let pre = f_and pre (f_ands pre_eq) in
+
   let goal1 =
      f_equivS
        (snd me) (snd me)
-       {ml=mleft; mr=mright; inv=f_ands pre_eq}
+       {ml=mleft; mr=mright; inv=pre}
        (EcAst.stmt stmt) s
        {ml=mleft; mr=mright; inv=f_ands eq}
   in

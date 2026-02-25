@@ -75,6 +75,7 @@ val f_node  : form -> f_node
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
 val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val f_filter_map : (EcTypes.ty -> EcTypes.ty option) -> (form -> form option) -> form -> form option
 val f_iter : (form -> unit) -> form -> unit
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
