@@ -525,6 +525,208 @@ let f_map gt g fp =
       let ev'   = g pr.pr_event.inv in
       f_pr_r { pr with pr_args = args'; pr_event = {m=pr.pr_event.m; inv=ev'}; }
 
+let f_filter_map (gt: ty -> ty option) (g: form -> form option) (fp: form) : form option =
+  let filter_map_ss_inv1 (g: form -> form option) ({inv; m}: ss_inv) : ss_inv option =
+    match g inv with
+    | Some inv when inv.f_ty = tbool -> Some {inv; m}
+    | None -> None 
+    | _ -> assert false
+  in
+
+  let filter_map_ts_inv1 (g: form -> form option) ({inv; ml; mr}: ts_inv) : ts_inv option =
+    match g inv with
+    | Some inv when inv.f_ty = tbool -> Some {inv; ml; mr}
+    | None -> None 
+    | _ -> assert false 
+  in
+
+  match fp.f_node with
+  | Fquant(q, b, f) ->
+      let map_gty ((x, gty) as b1) =
+        let gty' =
+          match gty with
+          | GTty ty -> begin match gt ty with
+            | Some ty' -> if ty == ty' then Some gty else Some (GTty ty')
+            | None -> None
+          end
+          | _ -> Some gty
+        in
+        Option.map (fun gty' -> if gty == gty' then b1 else (x, gty')) gty'
+      in
+
+      begin try
+        let b' = List.Smart.map (map_gty |- Option.get) b in
+        let f' = Option.get (g f) in
+
+        Some (f_quant q b' f')
+      with Invalid_argument _ -> None
+      end
+
+  | Fint  _ -> Some fp
+  | Fglob _ -> Some fp
+
+  | Fif (f1, f2, f3) ->
+      begin try 
+        let f1 = Option.get (g f1) in
+        let f2 = Option.get (g f2) in
+        let f3 = Option.get (g f3) in
+        Some (f_if f1 f2 f3)
+      with Invalid_argument _ ->
+        None
+      end
+
+  | Fmatch (b, fs, ty) ->
+      begin try
+        let b = Option.get (g b) in
+        let fs = List.map (g |- Option.get) fs in
+        let ty = Option.get (gt ty) in
+        Some (f_match b fs ty)
+      with Invalid_argument _ ->
+        None
+      end
+
+  | Flet (lp, f1, f2) ->
+      begin try
+        let f1 = Option.get (g f1) in
+        let f2 = Option.get (g f2) in
+        Some (f_let lp f1 f2)
+      with Invalid_argument _ ->
+        None
+      end
+
+  | Flocal id ->
+      Option.map (fun ty -> f_local id ty) (gt fp.f_ty)
+
+  | Fpvar (id, s) ->
+      Option.map (fun ty -> (f_pvar id ty s).inv) (gt fp.f_ty)
+
+  | Fop (p, tys) ->
+      begin try
+        let tys' = List.Smart.map (gt |- Option.get) tys in
+        let ty'  = Option.get @@ gt fp.f_ty in
+        Some (f_op p tys' ty')
+      with Invalid_argument _ ->
+        None
+      end
+
+  | Fapp (f, fs) ->
+      begin try 
+        let f'  = Option.get @@ g f in
+        let fs' = List.Smart.map (g |- Option.get) fs in
+        let ty' = Option.get @@ gt fp.f_ty in
+        Some (f_app f' fs' ty')
+      with Invalid_argument _ ->
+        None
+      end
+
+  | Ftuple fs ->
+      let fs' = try 
+        Some (List.Smart.map (g |- Option.get) fs)
+      with Invalid_argument _ ->
+        None
+      in Option.map (fun fs -> f_tuple fs) fs'
+
+  | Fproj (f, i) ->
+      begin try
+        let f'  = Option.get @@ g f in
+        let ty' = Option.get @@ gt fp.f_ty in
+        Some (f_proj f' i ty')
+      with Invalid_argument _ ->
+        None
+      end
+
+  | FhoareF hf ->
+      let pr' = filter_map_ss_inv1 g (hf_pr hf) in
+      let po' = filter_map_ss_inv1 g (hf_po hf) in
+      begin try 
+        Some (f_hoareF (Option.get pr') hf.hf_f (Option.get po'))
+      with Invalid_argument _ -> 
+        None 
+      end
+
+  | FhoareS hs ->
+      begin try
+        let pr' = Option.get (filter_map_ss_inv1 g (hs_pr hs)) in
+        let po' = Option.get (filter_map_ss_inv1 g (hs_po hs)) in
+        Some (f_hoareS (snd hs.hs_m) pr' hs.hs_s po')
+      with Invalid_argument _ ->
+        None
+      end
+
+  | FeHoareF hf ->
+      begin try 
+        let pr' = Option.get (filter_map_ss_inv1 g (ehf_pr hf)) in
+        let po' = Option.get (filter_map_ss_inv1 g (ehf_po hf)) in
+        Some (f_eHoareF pr' hf.ehf_f po')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FeHoareS hs ->
+      begin try
+        let pr' = Option.get @@ filter_map_ss_inv1 g (ehs_pr hs) in
+        let po' = Option.get @@ filter_map_ss_inv1 g (ehs_po hs) in
+        Some (f_eHoareS (snd hs.ehs_m) pr' hs.ehs_s po')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FbdHoareF bhf ->
+      begin try
+        let pr' = Option.get @@ filter_map_ss_inv1 g (bhf_pr bhf) in
+        let po' = Option.get @@ filter_map_ss_inv1 g (bhf_po bhf) in
+        let bd' = Option.get @@ filter_map_ss_inv1 g (bhf_bd bhf) in
+        Some (f_bdHoareF pr' bhf.bhf_f po' bhf.bhf_cmp bd')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FbdHoareS bhs ->
+      begin try
+        let pr' = Option.get @@ filter_map_ss_inv1 g (bhs_pr bhs) in
+        let po' = Option.get @@ filter_map_ss_inv1 g (bhs_po bhs) in
+        let bd' = Option.get @@ filter_map_ss_inv1 g (bhs_bd bhs) in
+        Some (f_bdHoareS (snd bhs.bhs_m) pr' bhs.bhs_s po' bhs.bhs_cmp bd')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FequivF ef ->
+      begin try
+        let pr' = Option.get @@ filter_map_ts_inv1 g (ef_pr ef) in
+        let po' = Option.get @@ filter_map_ts_inv1 g (ef_po ef) in
+        Some (f_equivF pr' ef.ef_fl ef.ef_fr po')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FequivS es ->
+      begin try
+        let pr' = Option.get @@ filter_map_ts_inv1 g (es_pr es) in
+        let po' = Option.get @@ filter_map_ts_inv1 g (es_po es) in
+        Some (f_equivS (snd es.es_ml) (snd es.es_mr) pr' es.es_sl es.es_sr po')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | FeagerF eg ->
+      begin try
+        let pr' = Option.get @@ filter_map_ts_inv1 g (eg_pr eg) in
+        let po' = Option.get @@ filter_map_ts_inv1 g (eg_po eg) in
+        Some (f_eagerF pr' eg.eg_sl eg.eg_fl eg.eg_fr eg.eg_sr po')
+      with Invalid_argument _ ->
+        None 
+      end
+
+  | Fpr pr ->
+      begin try
+        let args' = Option.get @@ g pr.pr_args in
+        let ev'   = Option.get @@ g pr.pr_event.inv in
+        Some (f_pr_r { pr with pr_args = args'; pr_event = {m=pr.pr_event.m; inv=ev'}; })
+      with Invalid_argument _ ->
+        None 
+      end
+
 (* -------------------------------------------------------------------- *)
 let f_iter g f =
   match f.f_node with

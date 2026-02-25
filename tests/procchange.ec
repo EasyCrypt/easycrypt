@@ -1,4 +1,4 @@
-require import AllCore Distr.
+require import AllCore Int Distr.
 
 (* -------------------------------------------------------------------- *)
 theory ProcChangeAssignEquiv.
@@ -229,3 +229,50 @@ theory ProcChangeInWhileHoare.
   abort.
 end ProcChangeInWhileHoare.
 
+theory ProcChangeHoareFrame.
+  module M = {
+    proc foo(uc: int) = {
+      var foo;
+      foo <- 1;
+      foo <- foo + uc;
+      return uc;
+    }
+  }.
+
+  lemma minimalexamplelemma (a: int):
+     hoare [M.foo: arg = a ==> res = a].
+  proof.
+    proc.
+    proc change [1..2] : { foo <- 1 + a; }. auto. auto.
+  qed.
+end ProcChangeHoareFrame.
+
+theory ProcChangeEquivFrame.
+  module M = {
+    proc foo1(uc: int) = {
+      var foo;
+      foo <- 1;
+      foo <- foo + uc;
+      return uc;
+    }
+
+    proc foo2(uc: int) = {
+      var foo;
+      uc <- uc + 1;
+      foo <- 0;
+      foo <- foo + uc;
+      uc <- uc - 1;
+      return uc;
+    }
+  }.
+
+  lemma minimalexamplelemma (a: int):
+     equiv [M.foo1 ~ M.foo2 : ={arg} /\ arg{1} = a ==> ={res} /\ res{1} = a].
+  proof.
+    proc.
+    proc change {1} [1..2] : { foo <- 1 + a; }. auto. 
+    conseq (_: ={uc} /\ uc{1} = a /\ uc{2} = a ==> ); 1:auto.
+    proc change {2} [1..1] : { uc <- a + 1; }. auto.
+    fail proc change {2} [2..3] : { foo <- a + 1; }; smt(). 
+  abort.
+end ProcChangeEquivFrame.
