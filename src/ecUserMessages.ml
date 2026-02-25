@@ -236,7 +236,7 @@ end = struct
           (EcPrinting.pp_list ",@ " pp_match) ids
 
     | FXE_FixRedundant fm ->
-        msg "this clause is redundant : %a" (pp_fix_match env) fm
+        msg "this clause is useless: %a" (pp_fix_match env) fm
 
     | FXE_FixDuplicate (previous, current) ->
         msg "duplicate clause : %a, already covered by %a"
