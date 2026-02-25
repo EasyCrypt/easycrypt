@@ -2894,6 +2894,12 @@ proof.
   by rewrite Hlci.
 qed.
 
+lemma foldr_rem_in ['b 'a] x o z (s : 'a list) :
+  (forall (z : 'b) , left_commutative_in o z s) =>
+  x \in s =>
+  foldr o z s = o x (foldr o z (rem x s)).
+proof. by move=> fAC /perm_to_rem peq; rewrite (@foldr_perm_in o _ _ fAC peq z). qed.
+
 op right_commutative_in ['a 'b] o (x : 'a) (s : 'b list) =
   forall y z ,
     y \in s =>
