@@ -1,7 +1,7 @@
 require import AllCore RealSeries List Distr StdBigop DBool DInterval.  
 require import StdOrder.
 require Subtype Bigop.
-import Bigreal Bigint RealOrder.
+import Bigreal Bigint RealOrder Biased.
 
 (* -------------------------------------------------------------------- *)
 (* Definition of R+                                                     *)
@@ -398,6 +398,9 @@ proof. case: x y => [x|] [y|] //=; smt(@Rp). qed.
 
 lemma xle_add_l x y : x <= y + x.
 proof. rewrite addmC xle_add_r. qed.
+
+lemma xle_rle (x y : real) : 0%r <= x <= y => x%xr <= y%xr.
+proof. by move => [??] /=; rewrite !to_pos_pos // &(ler_trans x). qed.
 
 lemma xler_add2r (x:realp) (y z : xreal) : y + x%xr <= z + x%xr <=> y <= z.
 proof. case: z => // z; case: y => //= y; smt(@Rp). qed.
@@ -961,6 +964,14 @@ lemma Ep_dbool (f : bool -> xreal) :
 proof.
   rewrite (Ep_fin [true; false]) 1://; 1: smt(supp_dbool).
   by rewrite big_consT big_seq1 /= !dbool1E.
+qed.
+
+lemma Ep_dbiased (p : real) (f : bool -> xreal) :
+  0%r <= p <= 1%r => Ep (dbiased p) f = p ** f true + (1%r - p) ** f false.
+proof.
+  move => ?.
+  rewrite (Ep_fin [true; false]) //; 1: by case.
+  by rewrite /BXA.big /predT /= !dbiased1E /= !clamp_id //.
 qed.
 
 (* -------------------------------------------------------------------- *)
