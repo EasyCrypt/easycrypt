@@ -1825,7 +1825,9 @@ module Theory = struct
     List.exists (fun x ->
         if x.rqd_name = name.rqd_name then (
           (* FIXME: raise an error message *)
-          assert (x.rqd_digest = name.rqd_digest);
+          if (x.rqd_digest <> name.rqd_digest) then
+            hierror "Digest mismatch for %s: %s =/= %s"
+            x.rqd_name x.rqd_digest name.rqd_digest;
           true)
         else false)
       scope.sc_required
