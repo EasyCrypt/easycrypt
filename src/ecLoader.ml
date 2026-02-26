@@ -26,6 +26,11 @@ let getkind ext =
   | "eca" -> `EcA
   | _     -> raise (BadExtension ("." ^ ext))
 
+let string_of_namespace ns = 
+  match ns with
+  | `System -> "System"
+  | `Named s -> s
+
 (* -------------------------------------------------------------------- *)
 let create () = { ecl_idirs = []; }
 

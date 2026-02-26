@@ -12,6 +12,8 @@ val getkind : string -> kind
 (* -------------------------------------------------------------------- *)
 type namespace = [ `System | `Named of string ]
 
+val string_of_namespace : namespace -> string
+
 (* -------------------------------------------------------------------- *)
 val create  : unit -> ecloader
 val aslist  : ecloader -> ((namespace option * string) * idx_t) list
