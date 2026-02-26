@@ -1816,12 +1816,22 @@ module Theory = struct
         sc_env = EcSection.add_th ~import cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let required (scope : scope) (name : required_info) =
+  let required (scope : scope) (rqd : required_info) =
     assert (scope.sc_pr_uc = None);
     List.exists (fun x ->
-        if x.rqd_name = name.rqd_name then (
-          (* FIXME: raise an error message *)
-          assert (x.rqd_digest = name.rqd_digest);
+        if x.rqd_name = rqd.rqd_name then (
+          if (x.rqd_digest <> rqd.rqd_digest) then begin
+            let fullname (ri : required_info) =
+              let namespace =
+                ri.rqd_namespace
+                |> Option.map EcLoader.string_of_namespace
+                |> Option.map (fun s -> s ^ ":")
+                |> Option.value ~default:"" in
+              namespace ^ ri.rqd_name in
+            hierror
+              "Digest mismatch, file %s differs from %s"
+              (fullname x) (fullname rqd)
+          end;
           true)
         else false)
       scope.sc_required
