@@ -1820,8 +1820,15 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     List.exists (fun x ->
         if x.rqd_name = name.rqd_name then (
-          (* FIXME: raise an error message *)
-          assert (x.rqd_digest = name.rqd_digest);
+          if (x.rqd_digest <> name.rqd_digest) then begin
+            hierror "Digest mismatch, file %s%s differs from %s%s"
+              Option.(value ~default:"" (map (fun ns -> EcLoader.string_of_namespace ns ^ ":") 
+                x.rqd_namespace)) 
+              x.rqd_name
+              Option.(value ~default:"" (map (fun ns -> EcLoader.string_of_namespace ns ^ ":") 
+                name.rqd_namespace)) 
+              name.rqd_name
+          end ;
           true)
         else false)
       scope.sc_required
