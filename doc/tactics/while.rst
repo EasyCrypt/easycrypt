@@ -232,7 +232,7 @@ designated relational case, but for a single program:
 
 
 ------------------------------------------------------------------------
-Variant: Probabilistic Hoare logic with non-strict variant
+Variant: Probabilistic Hoare logic with non-strict variant and `>=` or `=` bound
 ------------------------------------------------------------------------
 
 .. admonition:: Syntax
@@ -242,3 +242,66 @@ Variant: Probabilistic Hoare logic with non-strict variant
 Here `{formula}` is an invariant, `{expr1}` and `{expr2}` are integer
 termination variants, and `{prob}` is a probability threshold.
 
+The tactic generates 6 goals
+
+- a goal that connects the precondition to the invariant
+
+- 
+
+.. ecproof::
+   :title: Example with `1%r` bound
+   require import AllCore DBool.
+ 
+   module M = {
+     proc p(n) = {
+       var b, r;
+       r <- true;
+       while (0 < n) {
+         b <$ {0,1};
+         if (b) {
+           n <- n-1;
+         }
+       }
+       return r;
+     }
+   }.
+ 
+   lemma L: phoare[M.p: true ==> res] >= 1%r.
+   proof.
+   proc.
+   sp.
+   while r n n (1%r/2%r).
+   - trivial.
+   - trivial.
+   - smt().
+   - move => wh.
+     seq 1: r => //.
+     + rnd.
+       auto. 
+       smt(dboolE).
+     if.
+     + sp.
+       conseq wh.
+       smt().
+     conseq wh.
+     smt().
+   - conseq (: : >= 1%r).
+     seq 1: r => //.
+     + rnd.
+       auto.
+       smt(dboolE).
+     if.  
+     + sp.
+       auto.
+     auto. 
+   split. 
+   - smt().
+   move => z.
+   seq 1: (b /\ n = z) => //.
+   - rnd.
+     auto.
+     smt(dboolE).  
+   rcondt 1 => //.
+   auto.
+   smt().
+   qed.
