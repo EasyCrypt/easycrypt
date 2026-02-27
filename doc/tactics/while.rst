@@ -113,14 +113,82 @@ Applying this form of ``while`` generates two main goals:
    qed.
 
 ------------------------------------------------------------------------
-Variant: Probabilistic Hoare logic
+Variant: Probabilistic Hoare logic with (<=) bound
 ------------------------------------------------------------------------
 
 .. admonition:: Syntax
 
-   ``while {formula} {expr}``
+   `while {formula}`
 
-Here ``{formula}`` is an invariant and ``{expr}`` is an integer termination
+Here `{formula}` is a loop invariant.
+
+This variant essentially proceeds by coinduction on the number of iterations.
+A non-trivial application of this variant relies on the probability bound
+depending on variables being modified by the loop. This can be achieved
+by using `conseq` to change the bound.
+
+The generated goals are as follows:
+
+- An induction step, where you need to show that adding one more iteration 
+  before a statement preserving the invariant with the bound also preserves 
+  the invariant with the bound.
+
+- A case where you show that the invariant holds to start with,
+  and that the bound becomes `1%r` when the loop condition becomes false.
+
+.. ecproof::
+   :title: Probabilistic Hoare logic example (shape)
+
+   require import AllCore DBool.
+
+   module M = {
+     proc p() = {
+       var r, f;
+       r <- false;
+       f <- false;
+       while (!r && !f) {
+         f <$ {0,1};
+         r <$ {0,1};
+       }
+       return r && !f;
+     }
+   }.
+
+   lemma L: phoare[M.p: true==> res] <= (1%r/3%r).
+   proof.
+     proc.
+     sp.
+     conseq (: : <= (if (!f) then (if (!r) then (1%r/3%r) else 1%r) else 0%r)).
+     - smt().
+     (*$*) while true.
+     - move => IH.
+       conseq (: true ==> _: <= (1%r/3%r)).
+       + smt().
+       seq 1: f (1%r/2%r) 0%r (1%r/2%r) (2%r/3%r) => //. 
+       + seq 1: true _ 0%r 0%r _ f => //.
+         * auto.
+         conseq IH.
+         smt().
+       + rnd; auto; rewrite dboolE => //.
+       seq 1: r (1%r/2%r) 1%r (1%r/2%r) (1%r/3%r) (!f) => //.
+       + auto.
+       + rnd; auto; rewrite dboolE => //.
+       + rnd; auto; rewrite dboolE => //.
+       conseq IH.
+       smt().
+     auto.
+     smt().
+   qed.
+
+------------------------------------------------------------------------
+Variant: Probabilistic Hoare logic with strict variant
+------------------------------------------------------------------------
+ 
+.. admonition:: Syntax
+
+   `while {formula} {expr}`
+
+Here `{formula}` is an invariant and `{expr}` is an integer termination
 variant.
 
 At a high level, this variant generates obligations analogous to the
@@ -132,3 +200,45 @@ designated relational case, but for a single program:
 - a remaining goal for the code before the loop, whose postcondition is
   strengthened with the invariant plus pure logical conditions that connect
   loop exit to the desired postcondition.
+
+.. ecproof::
+   require import AllCore DBool.
+ 
+   module M = {
+     proc p(b, e) = {
+       var r;
+       r <- 1;
+       while (0 < e) {
+         r <- r * b;
+         e <- e - 1;
+       }
+       return r;
+     }
+   }.
+ 
+   lemma L b' e': 0<=e' => b' <> 0 => 
+     phoare[M.p: (b, e) = (b', e') ==> res = b'^e'] = 1%r.
+   proof.
+   move => e_ge0 b_ne0.
+   proc.
+   sp.
+   (*$*) while (r = b^(e'-e) /\ b = b' /\ 0 <= e <= e') e.
+   - move => z. 
+     auto. 
+     smt(expr_pred).
+   auto. 
+   smt(expr_pred expr0).
+   qed.
+
+
+------------------------------------------------------------------------
+Variant: Probabilistic Hoare logic with non-strict variant
+------------------------------------------------------------------------
+
+.. admonition:: Syntax
+
+   `while {formula} {expr1} {expr2} {prob}`
+
+Here `{formula}` is an invariant, `{expr1}` and `{expr2}` are integer
+termination variants, and `{prob}` is a probability threshold.
+
