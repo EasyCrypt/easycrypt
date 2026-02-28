@@ -1438,6 +1438,26 @@ by move=> b1 b2 _ /=; apply/iscpl_dunit.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma iscpl_dmap1 ['a 'b] (d1 : 'a distr) (d2 : 'b distr) (f : 'a -> 'b) :
+  dmap d1 f = d2 => iscoupling<:'a, 'b> d1 d2 (dmap d1 (fun x => (x, f x))).
+proof.
+rewrite /iscoupling => ?.
+split.
++ by rewrite dmap_comp /(\o) /= dmap_id //.
++ by rewrite dmap_comp /(\o) /=.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma iscpl_dmap2 ['a 'b] (d1 : 'a distr) (d2 : 'b distr) (f : 'b -> 'a) :
+  dmap d2 f = d1 => iscoupling<:'a, 'b> d1 d2 (dmap d2 (fun x => (f x, x))).
+proof.
+rewrite /iscoupling => ?.
+split.
++ by rewrite dmap_comp /(\o) /=.
++ by rewrite dmap_comp /(\o) /= dmap_id //.
+qed.
+
+(* -------------------------------------------------------------------- *)
 abbrev [-printing] dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
   fun d => dmap d F.
 
