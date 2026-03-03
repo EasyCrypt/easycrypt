@@ -177,6 +177,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     in 
   
     let form = SMT.bvtobool @@ bvterm_of_node n in 
+    let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
 
     let inps = Option.bind inps (fun l -> 
       if List.is_empty l then None
@@ -234,7 +235,7 @@ let makeBWZinstance () : (module SMTInstance) =
     mk_term2 Kind.Equal bv (mk_bv_one (mk_bv_sort 1))
 
   let bvterm_of_name (sort: int) (name: string) : bvterm =
-    mk_const ~symbol:name (mk_bv_sort sort)
+    mk_const (mk_bv_sort sort) ~symbol:name
 
   let assert' (f: bvterm) : unit =
     Solver.assert_formula bitwuzla f
