@@ -1330,7 +1330,8 @@ type pbind_bvoperator =
 
 (* -------------------------------------------------------------------- *)
 type pbind_circuit =
-  { bindings : (pqsymbol * string located) list }
+  { bindings : (pqsymbol * string located) list 
+  ; file     : string located }
 
 (* -------------------------------------------------------------------- *)
 type pcrbinding_r =

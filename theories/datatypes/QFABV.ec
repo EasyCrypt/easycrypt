@@ -134,6 +134,10 @@ theory BVOperators.
     axiom bvuremP (bv1 bv2 : bv) :
       touint (bvurem bv1 bv2) = touint bv1 %% touint bv2.
   end BVURem.
+
+  (* ------------------------------------------------------------------ *)
+  (*  abstract theory BVSRem. FIXME: TODO *)
+  (* end BVSRem. *)
   
   (* ------------------------------------------------------------------ *)
   abstract theory BVSHL.

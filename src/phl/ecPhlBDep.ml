@@ -228,7 +228,8 @@ let t_bdep_solve
       assert (ctxt.h_tvar = []);
       let st = circuit_state_of_hyps hyps in
       let cgoal = (circuit_of_form st hyps goal |> state_close_circuit st) in
-      EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg;
+      (* FIXME: make this lazy *)
+(*       EcEnv.notify env `Debug "goal: %a@." pp_flatcirc (fst cgoal).reg; *)
       if circ_taut cgoal then
       FApi.close (!@ tc) VBdep
       else 

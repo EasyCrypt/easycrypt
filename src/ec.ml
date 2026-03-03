@@ -418,7 +418,6 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
-      (*---*) specs       : spec_options;
       mutable trace       : trace1 list option;
     }
 
@@ -497,7 +496,6 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
-        ; specs       = cliopts.clio_specs
         ; trace       = None }
 
     end
@@ -533,7 +531,6 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
-        ; specs       = cmpopts.cmpo_specs
         ; trace       = trace0 }
       end
 
@@ -572,10 +569,6 @@ let main () =
           lazy (T.from_channel ~name (open_in name))
         in
 
-        let nospec = {
-          files = [];
-        } in
-
         { prvopts     = prvoff
         ; input       = Some name
         ; terminal    = terminal
@@ -584,18 +577,23 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
-        ; specs       = nospec
         ; trace       = None }
       end
 
   in
 
   (match state.input with
-   | Some input -> EcCommands.addidir (Filename.dirname input)
+   | Some input ->
+      EcCommands.addidir (Filename.dirname input);
+      EcCommands.set_current_path (Filename.dirname input)
    | None ->
-       match relocdir with
-       | None     -> EcCommands.addidir Filename.current_dir_name
-       | Some pwd -> EcCommands.addidir pwd);
+      let current_path =
+        match relocdir with
+        | None     -> Filename.current_dir_name
+        | Some pwd -> pwd
+      in
+        EcCommands.addidir current_path;
+        EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
   (if not state.docgen then
@@ -706,7 +704,6 @@ let main () =
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
               EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
-              EcCommands.cm_specs     = state.specs.files;
             } in
 
             let checkproof = not state.docgen in

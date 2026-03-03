@@ -7,9 +7,10 @@ exception Restart
 (* -------------------------------------------------------------------- *)
 type loader
 
-val loader   : loader
-val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
+val loader : loader
+val addidir : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (EcLoader.namespace option * string) list
+val set_current_path : string -> unit
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
@@ -22,7 +23,6 @@ type checkmode = {
   cm_provers  : string list option;
   cm_profile  : bool;
   cm_iterate  : bool;
-  cm_specs    : string list;
 }
 
 val initial : checkmode:checkmode -> boot:bool -> checkproof:bool -> EcScope.scope

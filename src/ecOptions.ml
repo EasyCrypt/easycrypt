@@ -27,14 +27,12 @@ and cmp_option = {
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
   cmpo_script  : bool;
-  cmpo_specs   : spec_options;
   cmpo_trace   : bool;
 }
 
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
-  clio_specs   : spec_options;
 }
 
 and run_option = {
@@ -44,7 +42,6 @@ and run_option = {
   runo_provers   : prv_options;
   runo_jobs      : int option;
   runo_rawargs   : string list;
-  runo_specs     : spec_options;
 }
 
 and doc_option = {
@@ -63,10 +60,6 @@ and prv_options = {
   prvo_profile    : bool;
   prvo_iterate    : bool;
   prvo_why3server : string option;
-}
-
-and spec_options = {
-  files : string list;
 }
 
 and ldr_options = {
@@ -90,7 +83,6 @@ type ini_options = {
   ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
-  ini_specs    : string list;
 }
 
 type ini_context = {
@@ -109,8 +101,6 @@ module Ini : sig
 
   val get_provers : ini_context -> string list
 
-  val get_specs : ini_context -> string list
-
   val get_timeout : ini_context -> int option
 
   val get_idirs : ini_context -> (string option * string) list
@@ -125,8 +115,6 @@ module Ini : sig
   val get_all_ovrevict : ini_context list -> string list
 
   val get_all_provers : ini_context list -> string list
-
-  val get_all_specs : ini_context list -> string list
 
   val get_all_timeout : ini_context list -> int option
 
@@ -159,10 +147,6 @@ end = struct
   let get_provers (ini : ini_context) =
     ini.inic_ini.ini_provers
 
-  let get_specs (ini : ini_context) =
-    List.map (absolute ?root:ini.inic_root)
-      ini.inic_ini.ini_specs
-
   let get_timeout (ini : ini_context) =
     ini.inic_ini.ini_timeout
 
@@ -188,9 +172,6 @@ end = struct
 
   let get_all_provers (ini : ini_context list) =
     List.flatten (List.map get_provers ini)
-
-  let get_all_specs (ini : ini_context list) =
-    List.flatten (List.map get_specs ini)
 
   let get_all_timeout (ini : ini_context list) =
     List.find_map_opt get_timeout ini
@@ -531,13 +512,9 @@ let prv_options_of_values ini values =
       prvo_why3server = get_string "why3server" values;
     }
 
-let spec_options_of_values ini values = 
-  { files = (Ini.get_all_specs ini) @ (get_strings "spec" values); }
-
 let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
     clio_provers = prv_options_of_values ini values; 
-    clio_specs   = spec_options_of_values ini values;
   }
 
 let cmp_options_of_values ini values input =
@@ -549,7 +526,6 @@ let cmp_options_of_values ini values input =
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values;
     cmpo_trace   = get_flag "trace" values;
-    cmpo_specs   = spec_options_of_values ini values;
 }
 
 let runtest_options_of_values ini values (input, scenarios) =
@@ -559,7 +535,6 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_provers   = prv_options_of_values ini values;
     runo_jobs      = get_int "jobs" values;
     runo_rawargs   = get_strings "raw-args" values; 
-    runo_specs     = spec_options_of_values ini values;
   }
 
 let doc_options_of_values values input =
@@ -728,7 +703,6 @@ let read_ini_file (filename : string) =
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs"); 
-      ini_specs    = trylist "spec";
     } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
@@ -738,5 +712,4 @@ let read_ini_file (filename : string) =
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs; 
-    ini_specs    = ini.ini_specs;
   }
