@@ -136,8 +136,14 @@ theory BVOperators.
   end BVURem.
 
   (* ------------------------------------------------------------------ *)
-  (*  abstract theory BVSRem. FIXME: TODO *)
-  (* end BVSRem. *)
+  abstract theory BVSRem. (* FIXME: TODO *)
+    clone import BV.
+
+    op bvsrem : bv -> bv -> bv.
+
+    axiom bvsremP (bv1 bv2 : bv) :
+      tosint (bvsrem bv1 bv2) = tosint bv1 %% tosint bv2. (* FIXME: Wrong *)
+  end BVSRem. 
   
   (* ------------------------------------------------------------------ *)
   abstract theory BVSHL.

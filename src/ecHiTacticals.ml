@@ -239,6 +239,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
     | Pcircuit `Solve           -> EcPhlBDep.t_bdep_solve 
     | Pcircuit `Simplify        -> EcPhlBDep.t_bdep_simplify
+    | Pcircuit `Smt             -> EcBV.t_solve
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
     | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in

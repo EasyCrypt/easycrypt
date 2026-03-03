@@ -3177,6 +3177,7 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
+(* FIXME: remove *)
 | PROC CHANGE CIRCUIT b=option(bracket(ptybindings)) o=codepos PLUS w=word s=brace(stmt)
     { Prwprgm (`Change (o, b, w, s)) }
 
@@ -3192,6 +3193,9 @@ interleave_info:
 
 | CIRCUIT SIMPLIFY
   { Pcircuit (`Simplify ) }
+
+| CIRCUIT SMT 
+  { Pcircuit (`Smt) } 
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
