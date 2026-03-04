@@ -116,6 +116,9 @@ type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
 
+type goal_shape_error = 
+| GSE_ExpectedTwoSided
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -180,6 +183,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| UnexpectedGoalShape    of goal_shape_error
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -3194,7 +3198,10 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
                 map_ss_inv f_tuple res in
                   
-              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let ml, mr = match (EcEnv.Memory.get_active_ts env) with
+              | Some (ml, mr) -> ml, mr
+              | None -> tyerror f.pl_loc env (UnexpectedGoalShape GSE_ExpectedTwoSided)
+              in
               let x1 = ss_inv_generalize_right (create ml) mr in
               let x2 = ss_inv_generalize_left (create mr) ml in
 

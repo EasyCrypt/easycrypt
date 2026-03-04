@@ -226,6 +226,12 @@ end = struct
     | FXE_SynCheckFailure ->
         msg "syntactic termination check failure"
 
+  let pp_gse_error _env fmt error =
+    let msg = Format.fprintf fmt in
+    match error with
+    | GSE_ExpectedTwoSided -> 
+        msg "expected two sided goal"
+
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
     let msg x = Format.fprintf fmt x in
@@ -550,6 +556,9 @@ end = struct
         | `MemSel -> "memory selector"
       end
     end
+
+    | UnexpectedGoalShape gse ->
+        msg "unexpected goal shape %a" (pp_gse_error env) gse
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

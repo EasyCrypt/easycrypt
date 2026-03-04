@@ -40,7 +40,7 @@ module type PrinterAPI = sig
 
   val pp_paren : 'a pp -> 'a pp
 
-  val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
+  val pp_list : ?on_empty:unit pp -> ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
   (* ------------------------------------------------------------------ *)
   val pp_pv      : PPEnv.t -> prog_var pp

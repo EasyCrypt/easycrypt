@@ -16,7 +16,7 @@ jobs:
     name: EasyCrypt compilation (opam)
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     steps:
     - uses: actions/checkout@v4
     - name: Install EasyCrypt dependencies
@@ -52,7 +52,7 @@ jobs:
     needs: compile-opam
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     strategy:
       fail-fast: false
       matrix:
@@ -101,7 +101,7 @@ jobs:
     needs: [compile-opam, fetch-external-matrix]
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     strategy:
       fail-fast: false
       matrix:
