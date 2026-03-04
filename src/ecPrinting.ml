@@ -3567,6 +3567,28 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     (pp_list "@,@," (pp_th_item ppe path)) cth.cth_items
     basename
 
+ and pp_crb_theory1 (ppe : PPEnv.t) (fmt : Format.formatter) (item : crb_theory1) =
+  match item.kind with
+  | CRBT_Type p ->
+    Format.fprintf fmt "%s/ty:%a" item.name (pp_tyname ppe) p
+  | CRBT_Op (tparams, { e_node = Eop (p, tys) })
+      when List.for_all2 ty_equal (List.map tvar tparams) tys
+    ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op: %a"
+      item.name (pp_opname ppe) p
+  | CRBT_Op (tparams, e) ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op:[%a] %a"
+      item.name
+      (pp_list ",@ " (pp_tyvar ppe)) tparams
+      (pp_expr ppe) e
+  | CRBT_Lemma p ->
+    Format.fprintf fmt "%s/ax:%a" item.name (pp_axname ppe) p
+
+ and pp_crb_theory (ppe : PPEnv.t) (fmt : Format.formatter) (crbth : crb_theory) =
+  Format.fprintf fmt "%a" (pp_list ", " (pp_crb_theory1 ppe)) crbth
+
  and pp_th_item_r ppe p fmt item =
   match item.EcTheory.ti_item with
   | EcTheory.Th_type (id, ty) ->
@@ -3669,6 +3691,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
   | EcTheory.Th_crbinding (binding, lc) -> begin
     match binding with
     | CRB_Bitstring bs ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) bs.theory;
       Format.fprintf fmt "%abind bitstring %a %a %a %a%s."
         pp_locality lc
         (pp_opname ppe) bs.to_
@@ -3678,6 +3701,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         (if Option.is_some (snd bs.size) then " (concrete)" else " (abstract)")
 
     | CRB_Array ba ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) ba.theory;
       Format.fprintf fmt "%abind array %a %a %a %a %a %a%s."
         pp_locality lc
         (pp_tyname ppe) ba.type_

@@ -203,14 +203,13 @@ val field_equal : field -> field -> bool
 type binding_size = form * (int option)
 
 type crb_theory1_kind =
-  | CRBT_Type
-  | CRBT_Op
-  | CRBT_Lemma
+  | CRBT_Type   of EcPath.path
+  | CRBT_Op     of ty_params * expr
+  | CRBT_Lemma  of EcPath.path
 
 type crb_theory1 = 
-  { kind: crb_theory1_kind
-  ; name: symbol
-  ; path: EcPath.path }
+  { name: EcSymbols.symbol
+  ; kind: crb_theory1_kind }
 
 type crb_theory =
   crb_theory1 list

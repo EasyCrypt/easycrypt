@@ -2313,7 +2313,7 @@ module Ty = struct
             );
           ];
           evc_ops = Msym.of_list [
-            "P", loced (`Direct pred, `Inline `Clear)
+            "P", loced (`Direct ([], pred), `Inline `Clear)
           ];
           evc_lemmas = {
             ev_bynames = Msym.empty;
@@ -2637,7 +2637,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Circuit = struct
-  type preoperator = [`Path of path | `Form of pformula]
+  type preoperator = [
+    | `Path of path
+    | `Direct of ty_params * expr
+    | `Form of pformula
+  ]
 
   type clone = {
     path      : EcPath.path;
@@ -2681,7 +2685,8 @@ module Circuit = struct
         let ovrd =
           match operator with
           | `Path name -> `ByPath name
-          | `Form f    ->
+          | `Direct (tparams, body) -> `Direct (tparams, form_of_expr body)
+          | `Form f ->
               `BySyntax
                 { opov_tyvars = None
                 ; opov_args   = []
@@ -2735,16 +2740,18 @@ module Circuit = struct
   let crb_theory_of_theory (root : path) (theory : EcTheory.ctheory) =
     let crbt_item (item : EcTheory.theory_item) =
       match item.ti_item with
-      | EcTheory.Th_type     (x, _) -> (CRBT_Type , x)
-      | EcTheory.Th_operator (x, _) -> (CRBT_Op   , x)
-      | EcTheory.Th_axiom    (x, _) -> (CRBT_Lemma, x)
+      | EcTheory.Th_type (name, _) ->
+        { name; kind = CRBT_Type (pqname root name) }
+      | EcTheory.Th_operator (name, op) ->
+        (* FIXME: refresh type parameters? *)
+        let tvars = List.map tvar op.op_tparams in
+        let body = e_op (pqname root name) tvars op.op_ty in
+        { name; kind = CRBT_Op (op.op_tparams, body) }
+      | EcTheory.Th_axiom (name, _) ->
+        { name; kind = CRBT_Lemma (pqname root name) }
       | _ -> assert false in
 
-    let crbt_items = List.map crbt_item theory.cth_items in
-
-    List.map (fun (kind, name) ->
-      let path = pqname root name in { kind; name; path; }
-    ) crbt_items
+    List.map crbt_item theory.cth_items
 
   let add_bitstring (scope : scope) (local : is_local) (bs : pbind_bitstring) : scope = 
     let env = env scope in
@@ -3073,22 +3080,33 @@ module Circuit = struct
         in (counts, (name, theory))
       ) counts0 types in
 
-
     let cltheories =
       cltheories
       |> List.map (fun (name, clth) ->
           List.map (fun (item : crb_theory1) -> (([name], item.name), item)) clth)
       |> List.flatten in
 
-    let filter_cltheories (kind : crb_theory1_kind) =
+    let types_ =
       List.filter_map (fun (qname, (item : crb_theory1)) ->
-        if item.kind = kind then Some (qname, item.path, `Inline `Clear) else None
+        match item.kind with
+        | CRBT_Type p -> Some (qname, p, `Inline `Clear)
+        | _ -> None
       ) cltheories in
 
-    let types_ = filter_cltheories CRBT_Type in
-    let operators = filter_cltheories CRBT_Op in
-    let operators = List.map (fun (qn, p, mode) -> (qn, `Path p, mode)) operators in
-    let proofs = filter_cltheories CRBT_Lemma in
+    let operators =
+      List.filter_map (fun (qname, (item : crb_theory1)) ->
+        match item.kind with
+        | CRBT_Op (tparams, e) ->
+          Some (qname, `Direct (tparams, e), `Inline `Clear)
+        | _ -> None
+      ) cltheories in
+
+    let proofs =
+      List.filter_map (fun (qname, (item : crb_theory1)) ->
+        match item.kind with
+        | CRBT_Lemma p -> Some (qname, p, `Inline `Clear)
+        | _ -> None
+      ) cltheories in
 
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"; "BVOperators"], subname)
@@ -3112,7 +3130,13 @@ module Circuit = struct
     
     Ax.add_defer scope proofs
 
-  let add_circuit1 ~(filename: string) (scope : scope) (local : is_local) ((op, circ) : (pqsymbol * string located)) : scope =
+  let add_circuit1
+    ~(filename  : string)
+     (scope     : scope)
+    (local      : is_local)
+    ((op, circ) : (pqsymbol * string located))
+  : scope
+  =
     let env = env scope in
     let operator, opdecl = EcEnv.Op.lookup op.pl_desc env in
 

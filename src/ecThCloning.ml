@@ -58,8 +58,10 @@ type xty_override =
   [ty_override_def genoverride | `Direct of EcAst.ty] * clmode
 
 (* ------------------------------------------------------------------ *)
-type xop_override =
-  [op_override_def genoverride | `Direct of EcAst.form] * clmode
+type xop_override = [
+  | op_override_def genoverride
+  | `Direct of EcDecl.ty_params * EcAst.form
+] * clmode
 
 (* ------------------------------------------------------------------ *)
 type xpr_override =

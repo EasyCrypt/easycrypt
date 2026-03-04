@@ -1054,18 +1054,22 @@ let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opki
   | `B2A (s1, (s2, s3)) -> `B2A (ssize s1, (ssize s2, ssize s3)) 
 
 (* -------------------------------------------------------------------- *)
+let subst_crb_theory1_kind (s : subst) (kind : crb_theory1_kind) =
+  match kind with
+  | CRBT_Type p ->
+    assert (not (Mp.mem p s.sb_tydef));
+    CRBT_Type (subst_path s p)
+  | CRBT_Op (tparams, body) ->
+    let s, tparams = fresh_tparams s tparams in
+    let body = subst_expr s body in
+    CRBT_Op (tparams, body)
+  | CRBT_Lemma p ->
+    CRBT_Lemma (subst_path s p)
+
+(* -------------------------------------------------------------------- *)
 let subst_crb_theory1 (s : subst) (crbth1 : crb_theory1) =
-  let path =
-    match crbth1.kind with
-    | CRBT_Type -> 
-      assert (not (Mp.mem crbth1.path s.sb_tydef));
-      subst_path s crbth1.path
-    | CRBT_Op ->
-      assert (not (Mp.mem crbth1.path s.sb_def));
-      subst_path s crbth1.path
-    | CRBT_Lemma ->
-      subst_path s crbth1.path
-    in { kind = crbth1.kind; name = crbth1.name; path; }
+  { kind = subst_crb_theory1_kind s crbth1.kind
+  ; name = crbth1.name }
 
 (* -------------------------------------------------------------------- *)
 let subst_crb_theory (s : subst) (crbth : crb_theory) =
