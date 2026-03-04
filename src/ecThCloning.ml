@@ -66,6 +66,10 @@ type xpr_override =
   [pr_override_def genoverride | `Direct of EcAst.form] * clmode
 
 (* ------------------------------------------------------------------ *)
+type nt_override =
+  EcPath.path * clmode
+
+(* ------------------------------------------------------------------ *)
 type evclone = {
   evc_types    : (xty_override located) Msym.t;
   evc_ops      : (xop_override located) Msym.t;
@@ -482,7 +486,7 @@ end = struct
          let ovrd = (`ByPath (tgpath ~kind:`Pred x), mode) in
          pr_ovrd oc (proofs, evc) (dtpath x) ovrd
 
-      | Th_operator (x, {op_kind=OB_nott _; _ }) ->
+      | Th_operator (x, {op_kind = OB_nott _ }) ->
          let ovrd = (tgpath x, mode) in
          nt_ovrd oc (proofs, evc) (dtpath x) ovrd
 
@@ -508,8 +512,7 @@ end = struct
 
       | Th_modtype (x, _) ->
         let ovrd = loced (EcPath.toqsymbol (tgpath ~kind:`ModType x)) in
-        modtype_ovrd
-          oc (proofs, evc) (dtpath x) (ovrd, mode)
+        modtype_ovrd oc (proofs, evc) (dtpath x) (ovrd, mode)
 
       | Th_instance _   -> (proofs, evc)
 
@@ -517,8 +520,8 @@ end = struct
       | Th_addrw  _     -> (proofs, evc)
       | Th_reduction _  -> (proofs, evc)
       | Th_auto _       -> (proofs, evc)
-      | Th_crbinding _  -> (proofs, evc)
       | Th_alias _      -> (proofs, evc)
+      | Th_crbinding _  -> (proofs, evc)
 
     and doit prefix (proofs, evc) dth =
       doit_r prefix (proofs, evc) dth.ti_item

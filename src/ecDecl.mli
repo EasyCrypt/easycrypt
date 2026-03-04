@@ -202,6 +202,19 @@ val field_equal : field -> field -> bool
 (* -------------------------------------------------------------------- *)
 type binding_size = form * (int option)
 
+type crb_theory1_kind =
+  | CRBT_Type
+  | CRBT_Op
+  | CRBT_Lemma
+
+type crb_theory1 = 
+  { kind: crb_theory1_kind
+  ; name: symbol
+  ; path: EcPath.path }
+
+type crb_theory =
+  crb_theory1 list
+
 type crb_bitstring =
   { type_  : EcPath.path
   ; from_  : EcPath.path
@@ -210,7 +223,7 @@ type crb_bitstring =
   ; touint : EcPath.path
   ; tosint : EcPath.path
   ; size   : binding_size
-  ; theory : EcPath.path }
+  ; theory : crb_theory }
   
 type crb_array =
   { type_  : EcPath.path
@@ -219,7 +232,7 @@ type crb_array =
   ; tolist : EcPath.path
   ; oflist : EcPath.path
   ; size   : binding_size
-  ; theory : EcPath.path }
+  ; theory : crb_theory }
   
 type bv_opkind = [
   | `Add      of binding_size (* size *)
@@ -259,8 +272,7 @@ type bv_opkind = [
 type crb_bvoperator =
   { kind     : bv_opkind
   ; types    : EcPath.path list
-  ; operator : EcPath.path
-  ; theory   : EcPath.path }
+  ; operator : EcPath.path }
   
 type crb_circuit =
 { name     : string

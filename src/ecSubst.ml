@@ -1054,6 +1054,24 @@ let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opki
   | `B2A (s1, (s2, s3)) -> `B2A (ssize s1, (ssize s2, ssize s3)) 
 
 (* -------------------------------------------------------------------- *)
+let subst_crb_theory1 (s : subst) (crbth1 : crb_theory1) =
+  let path =
+    match crbth1.kind with
+    | CRBT_Type -> 
+      assert (not (Mp.mem crbth1.path s.sb_tydef));
+      subst_path s crbth1.path
+    | CRBT_Op ->
+      assert (not (Mp.mem crbth1.path s.sb_def));
+      subst_path s crbth1.path
+    | CRBT_Lemma ->
+      subst_path s crbth1.path
+    in { kind = crbth1.kind; name = crbth1.name; path; }
+
+(* -------------------------------------------------------------------- *)
+let subst_crb_theory (s : subst) (crbth : crb_theory) =
+  List.map (subst_crb_theory1 s) crbth
+
+(* -------------------------------------------------------------------- *)
 let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbinding) =
   match crb with
   | CRB_Bitstring bs ->
@@ -1072,7 +1090,7 @@ let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbin
       tosint  = subst_path s bs.tosint;
       ofint  = subst_path s bs.ofint;
       size   = subst_binding_size ?red s bs.size;
-      theory = subst_path s bs.theory; }
+      theory = subst_crb_theory s bs.theory; }
 
   | CRB_Array ba ->
     assert (not (Mp.mem ba.type_ s.sb_tydef));
@@ -1087,7 +1105,7 @@ let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbin
       tolist = subst_path s ba.tolist;
       oflist = subst_path s ba.oflist;
       size   = subst_binding_size ?red s ba.size;
-      theory = subst_path s ba.theory }
+      theory = subst_crb_theory s ba.theory }
 
   | CRB_BvOperator op ->
     assert (List.for_all (fun ty -> not (Mp.mem ty s.sb_tydef)) op.types);
@@ -1095,8 +1113,7 @@ let subst_crbinding ?(red: (form -> int option) option) (s : subst) (crb : crbin
     CRB_BvOperator {
       kind     = subst_bv_opkind ?red s op.kind;
       types    = List.map (subst_path s) op.types;
-      operator = subst_path s op.operator;
-      theory   = subst_path s op.theory; }
+      operator = subst_path s op.operator; }
 
   | CRB_Circuit cr ->
       assert (not (Mp.mem cr.operator s.sb_def));

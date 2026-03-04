@@ -2643,22 +2643,42 @@ module Circuit = struct
     path      : EcPath.path;
     name      : symbol;
     local     : is_local;
-    theories  : (symbol * path) list;
-    types_    : (symbol * path) list;
-    operators : (symbol * preoperator) list;
-    proofs    : symbol list;
+    types_    : (qsymbol * path * clmode) list;
+    operators : (qsymbol * preoperator * clmode) list;
+    proofs    : (qsymbol * path * clmode) list;
   }
 
-  let doclone (scope : scope) (clone : clone) =
+  let doclone (scope : scope) (preclone : clone) =
     let loced x = mk_loc _dummy x in
     let env = env scope in
 
-    let evclone =
-      let do_type ((x, type_) : symbol * path) : symbol * ty_override located =
-        (x, loced (`ByPath type_, `Inline `Keep)) in
+    let open EcThCloning in
 
-      let do_operator ((x, operator) : symbol * preoperator) : symbol * op_override located =
-        let operator =
+    let rec in_evclone (f : evclone -> evclone) (nm : symbol list) (evc : evclone) =
+      match nm with
+      | [] ->
+        f evc
+      | name :: nm ->
+        let subevc, clear = Msym.find_def (evc_empty, true) name evc.evc_ths in
+        let subevc = in_evclone f nm subevc in
+        { evc with evc_ths = Msym.add name (subevc, clear) evc.evc_ths } in
+
+    let push_type
+      (evc : evclone)
+      (((nm, name), type_, mode) : qsymbol * path * clmode)
+    =
+      in_evclone (fun evc ->
+        let ovrd = loced (`ByPath type_, mode) in
+        let ovrd = (ovrd :> EcThCloning.xty_override located) in
+        { evc with evc_types = Msym.add name ovrd evc.evc_types }
+      ) nm evc
+
+    and push_operator
+      (evc : evclone)
+      (((nm, name), operator, mode) : qsymbol * preoperator * clmode)
+    =
+      in_evclone (fun evc ->
+        let ovrd =
           match operator with
           | `Path name -> `ByPath name
           | `Form f    ->
@@ -2666,69 +2686,65 @@ module Circuit = struct
                 { opov_tyvars = None
                 ; opov_args   = []
                 ; opov_retty  = loced PTunivar
-                ; opov_body   = f } 
-        in (x, loced (operator, `Inline `Keep))
-      in
+                ; opov_body   = f } in
+        let ovrd = (loced (ovrd, mode) :> EcThCloning.xop_override located) in
+        { evc with evc_ops = Msym.add name ovrd evc.evc_ops }
+      ) nm evc
 
-      let do_theory (x : symbol) (theory : path) : EcThCloning.evclone =
-        let thenv = EcEnv.Theory.env_of_theory clone.path env in
-        let atheory = EcEnv.Theory.by_path (pqname clone.path x) thenv in
+    and push_proof
+      (evc : evclone)
+      (((nm, name), proof, mode) : qsymbol * path * clmode)
+    =
+      in_evclone (fun evc ->
+        let tactic = Papply (`ExactType (loced (EcPath.toqsymbol proof)), None) in
+        let tactic = loced (Plogic tactic) in
+        let ovrd = (Some tactic, mode, false) in
+        let evc_lemmas = { evc.evc_lemmas with
+          ev_bynames = Msym.add name ovrd evc.evc_lemmas.ev_bynames } in
+        { evc with evc_lemmas }
+      ) nm evc in
+      
+    let evc = {
+      evc_empty with evc_lemmas = {
+        evc_empty.evc_lemmas with
+          ev_global = [
+              (* (Some (loced (Pby None)), Some [`Include, "bydone"]); *) (* FIXME *)
+              (None, None);
+              (None, None);
+            ];
+      }} in
 
-        List.fold_left (fun (evc : EcThCloning.evclone) (item : EcTheory.theory_item) ->
-          match item.ti_item with
-          | Th_operator (x, opdecl) -> begin
-            match opdecl.op_kind with
-            | OB_oper None ->
-              let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
-              { evc with evc_ops = Msym.add x (loced ovrd) evc.evc_ops }
-            | _ -> evc
-            end
-          | Th_type (x, _) ->
-            let ovrd = (`ByPath (pqname theory x), `Inline `Clear) in
-            { evc with evc_types = Msym.add x (loced ovrd) evc.evc_types }
-          | Th_axiom (x, _) ->         
-            let evc_lemmas =
-              let proof = loced (EcPath.toqsymbol (pqname theory x)) in
-              let proof = Papply (`ExactType proof, None) in
-              let proof = loced (Plogic proof) in              
-              let proof = (Some proof, `Inline `Clear, false) in
-              { evc.evc_lemmas with
-                  ev_bynames = Msym.add x proof evc.evc_lemmas.ev_bynames }
-            in { evc with evc_lemmas }
-          | _ -> assert false
-        ) EcThCloning.evc_empty atheory.cth_items in
+      let evc = List.fold_left push_type evc preclone.types_ in
+      let evc = List.fold_left push_operator evc preclone.operators in
+      let evc = List.fold_left push_proof evc preclone.proofs in
 
-      { EcThCloning.evc_empty with
-          (* FIXME: PR: what to do here? *)
-          evc_types  = (Msym.of_list (List.map do_type clone.types_) :> (EcThCloning.xty_override located MSym.t));
-          (* FIXME: PR: what to do here? *)
-          evc_ops    = (Msym.of_list (List.map do_operator clone.operators) :> (EcThCloning.xop_override located MSym.t));
-          evc_ths    = Msym.of_list (List.map (fun (x, th) -> (x, (do_theory x th, false))) clone.theories); (* FIXME PR: is the false here correct? *)
-          evc_lemmas = {
-            ev_bynames =
-              clone.proofs
-                |> List.map (fun name -> (name, (Some (loced (Ptry (loced (Pby None)))), `Alias, false)))
-                |> Msym.of_list;
-            ev_global  = 
-              (* FIXME PR: get this to work *)
-              [ 
-(*                 (Some (loced (Pby None)), Some [`Include, "bydone"]) *)
-                (None, None)
-              ; (None, None) ]; } } in
-
-    let npath = EcPath.pqname (EcEnv.root env) clone.name in
-    let theory = EcEnv.Theory.by_path clone.path env in
+    let npath = EcPath.pqname (EcEnv.root env) preclone.name in
+    let theory = EcEnv.Theory.by_path preclone.path env in
 
     let (proofs, scope) =
-      EcTheoryReplay.replay (Cloning.hooks ~override_locality:(Some clone.local))
-        ~abstract:false ~override_locality:(Some clone.local) ~incl:false
-        ~clears:Sp.empty ~renames:[] ~opath:clone.path ~npath
-        evclone scope (EcPath.basename npath, false, theory.cth_items, clone.local) (* FIXME PR: check extra arguments here *)
+      EcTheoryReplay.replay (Cloning.hooks ~override_locality:(Some preclone.local))
+        ~abstract:false ~override_locality:(Some preclone.local) ~incl:false
+        ~clears:Sp.empty ~renames:[] ~opath:preclone.path ~npath
+        evc scope (EcPath.basename npath, false, theory.cth_items, preclone.local)
     in
 
     let proofs = Cloning.replay_proofs scope `Check proofs in
     
     (proofs, scope)
+
+  let crb_theory_of_theory (root : path) (theory : EcTheory.ctheory) =
+    let crbt_item (item : EcTheory.theory_item) =
+      match item.ti_item with
+      | EcTheory.Th_type     (x, _) -> (CRBT_Type , x)
+      | EcTheory.Th_operator (x, _) -> (CRBT_Op   , x)
+      | EcTheory.Th_axiom    (x, _) -> (CRBT_Lemma, x)
+      | _ -> assert false in
+
+    let crbt_items = List.map crbt_item theory.cth_items in
+
+    List.map (fun (kind, name) ->
+      let path = pqname root name in { kind; name; path; }
+    ) crbt_items
 
   let add_bitstring (scope : scope) (local : is_local) (bs : pbind_bitstring) : scope = 
     let env = env scope in
@@ -2757,15 +2773,14 @@ module Circuit = struct
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "BV")
       ; name      = name
       ; local     = local
-      ; theories  = []
-      ; types_    = ["bv", bspath]
+      ; types_    = [([], "bv"), bspath, `Inline `Keep]
       ; operators =
-          [ ("size"  , `Form bs.size)
-          ; ("tolist", `Path to_)
-          ; ("oflist", `Path from_)
-          ; ("touint", `Path touint)
-          ; ("tosint", `Path tosint)
-          ; ("ofint" , `Path ofint) ]
+          [ (([], "size"  ), `Form bs.size, `Inline `Keep)
+          ; (([], "tolist"), `Path to_    , `Inline `Keep)
+          ; (([], "oflist"), `Path from_  , `Inline `Keep)
+          ; (([], "touint"), `Path touint , `Inline `Keep)
+          ; (([], "tosint"), `Path tosint , `Inline `Keep)
+          ; (([], "ofint" ), `Path ofint  , `Inline `Keep) ]
       ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
@@ -2778,11 +2793,19 @@ module Circuit = struct
       | EcEnv.NotReducible -> None 
     in
 
+    let crbt_items =
+      let env = EcSection.env scope.sc_env in
+      let root = EcEnv.root env in
+      let bvpath = pqname root name in
+      let bvtheory = EcEnv.Theory.by_path bvpath env in
+      crb_theory_of_theory bvpath bvtheory
+    in
+
     let item = CRB_Bitstring 
       { from_; to_; touint; tosint; ofint;
         type_  = bspath;
         size   = (size_f, size_i);
-        theory = pqname (EcEnv.root env) name; } in
+        theory = crbt_items; } in
 
     let item = EcTheory.mkitem ~import:true (EcTheory.Th_crbinding (item, local)) in
 
@@ -2817,17 +2840,24 @@ module Circuit = struct
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"], "A")
       ; name      = name
       ; local     = local
-      ; theories  = []
-      ; types_    = ["t", bspath]
+      ; types_    = [([], "t"), bspath, `Inline `Keep]
       ; operators =
-          [ ("size"   , `Form ba.size)
-          ; ("get"    , `Path get)
-          ; ("set"    , `Path set)
-          ; ("to_list", `Path tolist)
-          ; ("of_list", `Path oflist) ]
+          [ (([], "size"   ), `Form ba.size, `Inline `Keep)
+          ; (([], "get"    ), `Path get    , `Inline `Keep)
+          ; (([], "set"    ), `Path set    , `Inline `Keep)
+          ; (([], "to_list"), `Path tolist , `Inline `Keep)
+          ; (([], "of_list"), `Path oflist , `Inline `Keep) ]
       ; proofs    = [] } in
 
     let proofs, scope = doclone scope preclone in
+
+    let crbt_items =
+      let env = EcSection.env scope.sc_env in
+      let root = EcEnv.root env in
+      let bvpath = pqname root name in
+      let bvtheory = EcEnv.Theory.by_path bvpath env in
+      crb_theory_of_theory bvpath bvtheory
+    in
 
     let size_f = EcTyping.trans_form env (EcUnify.UniEnv.create None) ba.size tint in
     let size_i = try 
@@ -2841,7 +2871,7 @@ module Circuit = struct
       { get; set; tolist; oflist;
         type_  = bspath;
         size   = (size_f, size_i);
-        theory = pqname (EcEnv.root env) name; } in
+        theory = crbt_items; } in
 
     let item = EcTheory.mkitem ~import:true (Th_crbinding (item, local)) in
 
@@ -3043,22 +3073,37 @@ module Circuit = struct
         in (counts, (name, theory))
       ) counts0 types in
 
+
+    let cltheories =
+      cltheories
+      |> List.map (fun (name, clth) ->
+          List.map (fun (item : crb_theory1) -> (([name], item.name), item)) clth)
+      |> List.flatten in
+
+    let filter_cltheories (kind : crb_theory1_kind) =
+      List.filter_map (fun (qname, (item : crb_theory1)) ->
+        if item.kind = kind then Some (qname, item.path, `Inline `Clear) else None
+      ) cltheories in
+
+    let types_ = filter_cltheories CRBT_Type in
+    let operators = filter_cltheories CRBT_Op in
+    let operators = List.map (fun (qn, p, mode) -> (qn, `Path p, mode)) operators in
+    let proofs = filter_cltheories CRBT_Lemma in
+
     let preclone =
       { path      = EcPath.fromqsymbol (["Top"; "QFABV"; "BVOperators"], subname)
       ; name      = name
       ; local     = local
-      ; theories  = cltheories
-      ; types_    = []
-      ; operators = ["bv" ^ unloc op.name, `Path operator]
-      ; proofs    = [] } in
+      ; types_    = types_
+      ; operators = [([], "bv" ^ unloc op.name), `Path operator, `Inline `Keep] @ operators
+      ; proofs    =  proofs } in
 
       let proofs, scope = doclone scope preclone in
 
     let item = CRB_BvOperator
       { kind     = kind (List.map proj3_2 types);
         types    = List.map proj3_1 types;
-        operator = operator;
-        theory   = EcPath.pqname (EcEnv.root env) subname; } in
+        operator = operator; } in
 
     let item = EcTheory.mkitem ~import:true (Th_crbinding (item, local)) in
   

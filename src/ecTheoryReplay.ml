@@ -1050,8 +1050,11 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
       | Tconstr (p, []) -> p
       | _ -> forpath bs.type_ (* FIXME: fallback *)
     in
-    let theory = EcSubst.subst_path subst bs.theory in (* FIXME *)
     let size   = EcSubst.subst_binding_size ~red subst bs.size in 
+    let theory =
+      List.map
+        (fun crbth -> { crbth with path = forpath crbth.path })
+        bs.theory in
 
     let bs = CRB_Bitstring { to_; from_; touint; tosint; ofint; type_; theory; size; } in
     let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (bs, lc)) in
@@ -1086,7 +1089,10 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
     | _ -> assert false (* FIXME: do we always get a good type here? *)
     in 
     let size   = EcSubst.subst_binding_size ~red subst ba.size in
-    let theory = EcSubst.subst_path subst ba.theory in (* FIXME *)
+    let theory =
+      List.map
+        (fun crbth -> { crbth with path = forpath crbth.path })
+        ba.theory in
 
     let ba = CRB_Array { get; set; tolist; oflist; type_; size; theory; } in
     let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (ba, lc)) in
@@ -1116,9 +1122,8 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
     let kind     = EcSubst.subst_bv_opkind ~red subst op.kind in
     let operator = forpath op.operator in
     let types    = List.map forpath op.types in (* FIXME *)
-    let theory   = forpath op.theory in (* FIXME *)
 
-    let op = CRB_BvOperator { kind; operator; types; theory; } in
+    let op = CRB_BvOperator { kind; operator; types; } in
     let scope = ove.ovre_hooks.hadd_item scope ~import (Th_crbinding (op, lc)) in
 
     (subst, ops, proofs, scope)
