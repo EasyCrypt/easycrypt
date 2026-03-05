@@ -1,4 +1,5 @@
 open Aig
+open Bitwuzla_cxx
 
 module type SMTInstance = sig
   type bvterm
@@ -25,10 +26,10 @@ module type SMTInstance = sig
   val bvterm_concat : bvterm -> bvterm -> bvterm
 
   (* bvand *)
-  val lognot : bvterm -> bvterm
+  val bvnot : bvterm -> bvterm
 
   (* bvnot *)
-  val logand : bvterm -> bvterm -> bvterm
+  val bvand : bvterm -> bvterm -> bvterm
 
   val get_value : bvterm -> bvterm
 
@@ -65,7 +66,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
           | Some mn -> 
             mn
         in 
-          if 0 < n.id then mn else SMT.lognot mn
+          if 0 < n.id then mn else SMT.bvnot mn
 
       and doit_r (n : Aig.node_r) = 
         match n with
@@ -78,7 +79,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
             Map.String.find name !bvvars 
           | Some t -> t
         end
-        | And (n1, n2) -> SMT.logand (doit n1) (doit n2)
+        | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
 
       in fun n -> doit n
     in 
@@ -110,7 +111,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
     in
 
     begin
-      SMT.assert' @@ SMT.logand pcond (SMT.lognot formula);
+      SMT.assert' @@ SMT.bvand pcond (SMT.bvnot formula);
       if SMT.check_sat () = false then true 
       else begin
         Format.eprintf "bvout1: %a@."  SMT.pp_term (SMT.get_value bvinpt1);
@@ -153,7 +154,7 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
           | Some mn -> 
             mn
         in 
-          if 0 < n.id then mn else SMT.lognot mn
+          if 0 < n.id then mn else SMT.bvnot mn
 
       and doit_r (n : Aig.node_r) = 
         match n with
@@ -166,12 +167,13 @@ module MakeSMTInterface(SMT: SMTInstance) : SMTInterface = struct
             Map.String.find name !bvvars 
           | Some t -> t
         end
-        | And (n1, n2) -> SMT.logand (doit n1) (doit n2)
+        | And (n1, n2) -> SMT.bvand (doit n1) (doit n2)
 
       in fun n -> doit n
     in 
   
     let form = bvterm_of_node n in 
+    let form = SMT.(bvterm_equal form @@ bvterm_of_int 1 1) in
 
     let inps = Option.bind inps (fun l -> 
       if List.is_empty l then None
@@ -213,52 +215,48 @@ end
 
 
 let makeBWZinstance () : (module SMTInstance) = 
-  let module B = Bitwuzla.Once () in
-  let open B in
+  let options = Options.default () in
+  Options.set options Produce_models true;
+
+  let bitwuzla = Solver.create options in
   
   (module struct
-  type bvterm = Term.Bv.t 
+  type bvterm = Term.t 
 
   exception SMTError
   
   let bvterm_of_int (sort: int) (v: int) : bvterm =
-    Term.Bv.of_int (Sort.bv sort) v
+    mk_bv_value_int (mk_bv_sort sort) v
   
 
   let bvterm_of_name (sort: int) (name: string) : bvterm =
-    Term.const (Sort.bv sort) name
+    mk_const (mk_bv_sort sort) ~symbol:name
   
 
   let assert' (f: bvterm) : unit =
-    assert' f
-  
+    Solver.assert_formula bitwuzla f
 
   let check_sat () : bool =
-    match check_sat () with
+    match Solver.check_sat bitwuzla with
     | Sat -> true
     | Unsat -> false
     | Unknown -> raise SMTError
    
 
   let bvterm_equal (bv1: bvterm) (bv2: bvterm) : bvterm =
-    Term.equal bv1 bv2
-  
+    mk_term2 Kind.Equal bv1 bv2
 
   let bvterm_concat (bv1: bvterm) (bv2: bvterm) : bvterm =
-    Term.Bv.concat [|bv1; bv2|]
-  
+    mk_term2 Kind.Bv_concat bv1 bv2
 
-  let lognot (bv: bvterm) : bvterm =
-    Term.Bv.lognot bv
-  
+  let bvnot (bv: bvterm) : bvterm =
+    mk_term1 Kind.Bv_not bv
 
-  let logand (bv1: bvterm) (bv2: bvterm) : bvterm =
-    Term.Bv.logand bv1 bv2
-  
+  let bvand (bv1: bvterm) (bv2: bvterm) : bvterm =
+    mk_term2 Kind.Bv_and bv1 bv2
 
   let get_value (bv: bvterm) : bvterm =
-    (get_value bv :> bvterm)
-  
+    Solver.get_value bitwuzla bv
 
   let pp_term (fmt: Format.formatter) (bv: bvterm) : unit =
     Term.pp fmt bv

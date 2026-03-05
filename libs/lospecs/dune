@@ -5,7 +5,7 @@
     (:standard -open Batteries))
   (preprocess
     (pps ppx_deriving_yojson))
-  (libraries batteries bitwuzla menhirLib zarith))
+  (libraries batteries bitwuzla-cxx menhirLib zarith))
 
 (ocamllex lexer)
 

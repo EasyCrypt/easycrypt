@@ -2,7 +2,7 @@
 depends: [
   "ocaml" {>= "4.08.0"}
   "batteries" {>= "3.9"}
-  "bitwuzla"
+  "bitwuzla-cxx"
   "camlp-streams" {>= "5"}
   "camlzip"
   "dune" {>= "3.13"}
