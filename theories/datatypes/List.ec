@@ -1605,7 +1605,7 @@ by rewrite revK size_rev opprD opprK addrA.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(*                        Duplicate-freenes                             *)
+(*                        Duplicate-freeness                            *)
 (* -------------------------------------------------------------------- *)
 op uniq (s : 'a list) =
   with s = []      => true
@@ -2163,6 +2163,17 @@ lemma mapiP x0 (f : int -> 'a -> 'b) (s : 'a list) y :
     y \in mapi f s <=>
     exists n, (0 <= n && n < size s) /\ y = f n (nth x0 s n).
 proof. exact: mapi_recP. qed.
+
+lemma mapi_cat (f : int -> 'a -> 'b) l l' :
+  mapi f (l ++ l') = mapi f l ++ mapi_rec f l' (size l).
+proof.
+elim/last_ind: l l' => //.
+smt(size_rcons cats1 cat_rcons).
+qed.
+
+lemma mapi_rcons (f : int -> 'a -> 'b) l x :
+  mapi f (rcons l x) = rcons (mapi f l) (f (size l) x).
+proof. smt(mapi_cat cats1). qed.
 
 (* -------------------------------------------------------------------- *)
 (*                          Element Replacement                         *)
