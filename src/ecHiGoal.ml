@@ -796,9 +796,10 @@ let process_rewrite1_core
           tc_error !!tc "context variable does not appear in the r-pattern"
 
 (* -------------------------------------------------------------------- *)
-let process_delta ?target ((s :rwside), o, p) tc =
+let process_delta ?(rigid = false) ?target ((s :rwside), o, p) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let o = norm_rwocc o in
+  let occmode = if rigid then Some om_rigid else None in
 
   let idtg, target =
     match target with
@@ -865,7 +866,7 @@ let process_delta ?target ((s :rwside), o, p) tc =
   match s with
   | `LtoR -> begin
     let matches =
-      try  ignore (PT.pf_find_occurence ptenv ~ptn:p target); true
+      try  ignore (PT.pf_find_occurence ptenv ?occmode ~ptn:p target); true
       with PT.FindOccFailure _ -> false
     in
 
@@ -926,23 +927,26 @@ let process_delta ?target ((s :rwside), o, p) tc =
         with EcEnv.NotReducible -> fp
     in
 
-    let matches =
-      try  ignore (PT.pf_find_occurence ptenv ~ptn:fp target); true
-      with PT.FindOccFailure _ -> false
-    in
+    begin
+      match PT.pf_find_occurence ?occmode ptenv ~ptn:fp target with
+      | (_, occmode) ->
+        let p    = concretize_form ptenv p  in
+        let fp   = concretize_form ptenv fp in
+        let cpos =
+          try
+            FPosition.select_form
+              ?xconv:(if rigid then Some `AlphaEq else None)
+              ?keyed:(if rigid then Some occmode.k_keyed else None)
+              hyps o fp target
+          with InvalidOccurence ->
+            tc_error !!tc "invalid occurences selector" in
 
-    if matches then begin
-      let p    = concretize_form ptenv p  in
-      let fp   = concretize_form ptenv fp in
-      let cpos =
-        try  FPosition.select_form hyps o fp target
-        with InvalidOccurence ->
-          tc_error !!tc "invalid occurences selector"
-      in
+        let target = FPosition.map cpos (fun _ -> p) target in
+        t_change ~ri ?target:idtg target tc 
 
-      let target = FPosition.map cpos (fun _ -> p) target in
-      t_change ~ri ?target:idtg target tc
-    end else t_id tc
+      | exception (PT.FindOccFailure _) ->
+        t_id tc
+  end
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_r ttenv ?target ri tc =
@@ -964,12 +968,12 @@ let process_rewrite1_r ttenv ?target ri tc =
       let target = target |> omap (fst -| ((LDecl.hyp_by_name^~ hyps) -| unloc)) in
       t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
-  | RWDelta (rwopt, p) -> begin
+  | RWDelta (rigid, rwopt, p) -> begin
       if Option.is_some rwopt.match_ then
         tc_error !!tc "cannot use pattern selection in delta-rewrite rules";
 
       let do1 tc =
-        process_delta ?target (rwopt.side, rwopt.occurrence, p) tc in
+        process_delta ~rigid ?target (rwopt.side, rwopt.occurrence, p) tc in
 
       match rwopt.repeat with
       | None -> do1 tc
