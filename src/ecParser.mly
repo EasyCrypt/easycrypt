@@ -2398,8 +2398,8 @@ rwarg1:
 | s=rwside r=rwrepeat? o=rwocc? p=bracket(form_h)? fp=rwpterms
    { RWRw ((s, r, o, p), fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { RWDelta ((s, r, o, None), x); }
+| s=rwside r=rwrepeat? o=rwocc? SLASH rigid=iboption(TILD) x=sform_h %prec prec_tactic
+   { RWDelta (rigid, (s, r, o, None), x); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
