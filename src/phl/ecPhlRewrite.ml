@@ -203,11 +203,20 @@ let t_change_stmt
 
   let env = EcEnv.Memory.push_active_ts me me env in (* FIXME *)
 
+
+  let get_pre_equalities (pre: form) : form list = 
+    List.filter (fun f -> 
+      match EcFol.sform_of_form f with
+      | SFeq _ -> true
+      | _ -> false
+    ) @@ EcFol.destr_ands ~deep:true pre
+  in
+
   let zpr, epos = Zpr.zipper_of_cpos_range env pos stmt in
   let stmt, epilog = match zpr.z_tail with
   | [] -> raise Zpr.InvalidCPos
-  | i::tl -> let s, tl = Zpr.split_at_cpos1 env epos (EcAst.stmt tl) in
-    (i::s), tl
+  | tl -> let s, tl = Zpr.split_at_cpos1 env epos (EcAst.stmt tl) in
+    s, tl
   in
 
   let keep = pvtail env (EcPV.is_read env epilog) zpr.z_path in
@@ -257,10 +266,32 @@ let t_change_stmt
       pre_globs
     in
 
+  (* FIXME: implement remaining cases *)
+  let pre = match zpr.z_path, FApi.tc1_goal tc with 
+  | ZTop, {f_node=FhoareS _;_} -> 
+    let hs = tc1_as_hoareS tc in
+    let prelude = zpr.z_head in
+    let writes = EcPV.is_write env prelude in
+    let eqs = List.filter (fun (f: form) -> 
+      let e = expr_of_ss_inv {inv=f; m=(fst hs.hs_m)} in
+      let reads = EcPV.e_read env e in
+      EcPV.PV.inter reads writes |> EcPV.PV.is_empty
+    ) (get_pre_equalities (hs_pr hs).inv)
+    in
+    let eqs_l = List.map (fun f -> 
+      (EcSubst.ss_inv_rebind {inv=f;m=(fst hs.hs_m)} mleft).inv
+    ) eqs in
+    let eqs_r = List.map (fun f -> 
+      (EcSubst.ss_inv_rebind {inv=f;m=(fst hs.hs_m)} mright).inv
+    ) eqs in
+    pre_eq @ eqs_l @ eqs_r
+  | _ -> pre_eq
+  in
+
   let goal1 =
      f_equivS
        (snd me) (snd me)
-       {ml=mleft; mr=mright; inv=f_ands pre_eq}
+       {ml=mleft; mr=mright; inv=f_ands pre}
        (EcAst.stmt stmt) s
        {ml=mleft; mr=mright; inv=f_ands eq}
   in

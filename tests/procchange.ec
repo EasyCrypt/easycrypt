@@ -1,6 +1,73 @@
 require import AllCore Distr.
 
 (* -------------------------------------------------------------------- *)
+theory ProcChangeEmptyRangeAddCode.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 1;
+      x <- x + 2;
+      x <- x + 3;
+    }
+  }.
+  
+  lemma L : hoare[M.f: x = 0 ==> true].
+  proof.
+  proc.
+    proc change [0..0] : [y : int] { x <- 0; y <- x; }.
+    by auto.
+  abort.
+end ProcChangeEmptyRangeAddCode.
+
+theory ProcChangeFrameFail.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 1;
+      x <- x + 2;
+      x <- x + 3;
+    }
+  }.
+  
+  lemma L : hoare[M.f: x = 0 ==> true].
+  proof.
+  proc.
+    proc change [2..2] : [y : int] { x <- 0; y <- x; }.
+    fail by auto.
+  abort.
+end ProcChangeFrameFail.
+
+theory ProcChangeAddCodeFail.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 1;
+      x <- x + 2;
+      x <- x + 3;
+    }
+  }.
+  
+  lemma L : hoare[M.f: x = 2 ==> true].
+  proof.
+  proc.
+    proc change [1..1] : [y : int] { x <- 0; y <- x; }.
+    fail by auto.
+  abort.
+end ProcChangeAddCodeFail.
+
+theory ProcChangeAssignHoareEquiv.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 0;
+    }
+  }.
+  
+  lemma L : hoare[M.f : true ==> true].
+  proof.
+  proc.
+    proc change [1..1] : { x <- x ; }. wp. skip. smt().
+  abort.
+end ProcChangeEmptyRangeAddCode.
+
+
+(* -------------------------------------------------------------------- *)
 theory ProcChangeAssignEquiv.
   module M = {
     proc f(x : int) = {
