@@ -15,17 +15,10 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       packages: write
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
     - uses: actions/checkout@v4
-
-    - name: Build `base` Image
-      run: TAG=${{ github.ref_name }} VARIANT=base make -C scripts/docker
-
-    - name: Build `build` Image
-      run: TAG=${{ github.ref_name }} VARIANT=build make -C scripts/docker
-
-    - name: Build `formosa` Image
-      run: TAG=${{ github.ref_name }} VARIANT=formosa make -C scripts/docker
 
     - name: Log in to the Container registry
       uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -34,8 +27,27 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Push All Images
+    - name: Build and push `base` Image
+      env:
+        VARIANT: base
       run: |
-        TAG=${{ github.ref_name }} VARIANT=base make -C scripts/docker publish
-        TAG=${{ github.ref_name }} VARIANT=build make -C scripts/docker publish
-        TAG=${{ github.ref_name }} VARIANT=formosa make -C scripts/docker publish
+        make -C scripts/docker build publish
+
+    - name: Build and push `build` Image
+      env:
+        VARIANT: build
+      run: |
+        make -C scripts/docker build publish
+
+    - name: Build and push `formosa` Image
+      env:
+        VARIANT: formosa
+      run: |
+        make -C scripts/docker build publish
+
+    - name: Build and push `test` Image
+      if: github.ref_name != 'main'
+      env:
+        VARIANT: test
+      run: |
+        make -C scripts/docker build publish
