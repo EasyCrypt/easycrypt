@@ -91,14 +91,20 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fix_match = (EcIdent.ident * EcPath.path option) list
+
 type fxerror =
+| FXE_MatchWildcard
 | FXE_EmptyMatch
 | FXE_MatchParamsMixed
 | FXE_MatchParamsDup
 | FXE_MatchParamsUnk
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
-| FXE_MatchPartial
+| FXE_MatchPartial of string list
+| FXE_FixPartial of EcPath.path list list
+| FXE_FixRedundant of fix_match
+| FXE_FixDuplicate of fix_match * fix_match
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
@@ -135,6 +141,7 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
+| DuplicatedException    of qsymbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -149,6 +156,7 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
@@ -254,6 +262,12 @@ val trans_prop     :
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
+val trans_poe :
+  EcEnv.env ->
+  EcUnify.unienv ->
+  EcParsetree.phoare_exception ->
+  EcFol.form EcPath.Mp.t * EcFol.form option
+
 (* -------------------------------------------------------------------- *)
 val trans_memtype :
   env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
@@ -269,6 +283,7 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
+val trans_exception  : env -> qsymbol located -> qsymbol * path
 val trans_oracle     : env -> psymbol * psymbol -> xpath
 val trans_restr_mem  : env -> pmod_restr_mem -> mod_restr
 

@@ -426,8 +426,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise e -> i_raise (subst_expr s e)
 
   | Sabstract _ ->
      i
@@ -533,14 +532,14 @@ let rec subst_form (s : subst) (f : form) =
      let hf_f  = subst_xpath s hf.hf_f in
      let s = add_memory s hf.hf_m hf.hf_m in
      let hf_pr = map_ss_inv1 (subst_form s) (hf_pr hf) in
-     let hf_po = map_ss_inv1 (subst_form s) (hf_po hf) in
+     let hf_po = subst_hs_inv s (hf_po hf) in
      f_hoareF hf_pr hf_f hf_po
 
   | FhoareS hs ->
      let hs_s = subst_stmt s hs.hs_s in
      let s, (_,mt) = subst_memtype s hs.hs_m in
      let hs_pr = map_ss_inv1 (subst_form s) (hs_pr hs) in
-     let hs_po = map_ss_inv1 (subst_form s) (hs_po hs) in
+     let hs_po = subst_hs_inv s (hs_po hs) in
      f_hoareS mt hs_pr hs_s hs_po
 
   | FbdHoareF bhf ->
@@ -809,6 +808,19 @@ and subst_module (s : subst) (m : module_expr) =
   { me_name = m.me_name; me_params; me_body; me_comps; me_sig_body; me_oinfos; }
 
 (* -------------------------------------------------------------------- *)
+and subst_hs_inv (s : subst) (inv : hs_inv) =
+  let s = add_memory s inv.hsi_m inv.hsi_m in
+  let main = subst_form s inv.hsi_inv.main in
+  let map =
+    Mp.fold (fun p f m ->
+      let p = subst_path s p in
+      let f = subst_form s f in
+      Mp.add p f m
+    ) (fst inv.hsi_inv.exnmap) Mp.empty in
+  let dfl = omap (subst_form s) (snd inv.hsi_inv.exnmap) in
+  { hsi_inv = { main; exnmap = (map, dfl) }; hsi_m = inv.hsi_m }
+
+(* -------------------------------------------------------------------- *)
 let subst_modsig ?params (s : subst) (comps : module_sig) =
   snd (subst_modsig ?params s comps)
 
@@ -899,7 +911,7 @@ and subst_op_body (s : subst) (bd : opbody) =
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }
-
+  | OP_Exn tys -> OP_Exn (List.map (subst_ty s) tys)
   | OP_TC -> OP_TC
 
 and subst_branches (s : subst) = function
@@ -1009,6 +1021,12 @@ let subst_tc (s : subst) tc =
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
     { tc_prt; tc_ops; tc_axs; tc_loca = tc.tc_loca }
 
+
+(* -------------------------------------------------------------------- *)
+let subst_exception (s : subst) (ex : exception_) =
+  { exn_loca = ex.exn_loca;
+    exn_dom = subst_tys s ex.exn_dom }
+
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
@@ -1088,6 +1106,7 @@ let subst_inv (s : subst) (inv : inv) =
   match inv with
   | Inv_ss inv -> Inv_ss (subst_ss_inv s inv)
   | Inv_ts inv -> Inv_ts (subst_ts_inv s inv)
+  | Inv_hs inv -> Inv_hs (subst_hs_inv s inv)
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * ty) list) : subst =
@@ -1157,14 +1176,14 @@ let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
   | true, true -> { inv; ml; mr }
   | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
   | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
-  | false, false -> begin 
+  | false, false -> begin
     let s = add_memory empty ml ml' in
     let s = add_memory s mr mr' in
     let inv = subst_form s inv in
     { inv; ml = ml'; mr = mr' }
   end
 
-let f_forall_mems_ts_inv menvl menvr inv = 
+let f_forall_mems_ts_inv menvl menvr inv =
   f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
 
 let ss_inv_forall_ml_ts_inv menvl inv =
@@ -1174,3 +1193,11 @@ let ss_inv_forall_ml_ts_inv menvl inv =
 let ss_inv_forall_mr_ts_inv menvr inv =
   let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
   { inv=inv'; m=inv.ml }
+
+(* -------------------------------------------------------------------- *)
+let hs_inv_rebind ({hsi_inv;hsi_m}: hs_inv) (m': memory) : hs_inv =
+  if m' = hsi_m then
+    { hsi_inv; hsi_m }
+  else
+    let hsi_inv = POE.map (subst_form (add_memory empty hsi_m m')) hsi_inv in
+    { hsi_inv; hsi_m = m' }

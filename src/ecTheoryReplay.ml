@@ -62,6 +62,9 @@ let get_open_tydecl (env : EcEnv.env) (p : EcPath.path) (tys : ty list) =
 exception CoreIncompatible
 
 (* -------------------------------------------------------------------- *)
+exception NoException
+
+(* -------------------------------------------------------------------- *)
 let get_open_oper (env : EcEnv.env) (p : EcPath.path) (tys : ty list) =
   let oper = EcEnv.Op.by_path p env in
   let _, okind = EcSubst.open_oper oper tys in
@@ -108,7 +111,7 @@ end = struct
     if rlen <> nlen then
       raise (Incompatible (NotSameNumberOfTyParam (rlen, nlen)))
 
-  let for_params 
+  let for_params
     (hyps : hyps)
     (s    : EcSubst.subst)
     (p1   : (EcIdent.ident * ty) list)
@@ -129,7 +132,8 @@ end = struct
 
     try  EcUnify.unify env ue rty nty
     with EcUnify.UnificationFailure _ ->
-      raise (Incompatible (DifferentType (rty, nty)))
+      raise (Incompatible
+               (DifferentType (rty, nty)))
 
   let for_expr (hyps : hyps) (s : EcSubst.subst) (e1 : expr) (e2 : expr) =
     let f1 = EcFol.form_of_expr e1 in
@@ -266,6 +270,9 @@ end = struct
 
     | OP_TC, OP_TC -> ()
 
+    | OP_Exn _, OP_Exn _ -> raise NoException
+    (* Replacing exception during cloning is not allowed *)
+
     | _, _ -> raise CoreIncompatible
 
   let rec for_pred (hyps : EcEnv.LDecl.hyps) (pb1 : prbody) (pb2 : prbody) =
@@ -357,7 +364,8 @@ let xnpath ove x =
     (EcPath.fromqsymbol (snd ove.ovre_prefix, x))
 
 (* -------------------------------------------------------------------- *)
-let string_of_renaming_kind = function
+let string_of_renaming_kind (rkind : theory_renaming_kind) =
+  match rkind with
   | `Lemma   -> "lemma"
   | `Op      -> "operator"
   | `Pred    -> "predicate"
@@ -365,6 +373,7 @@ let string_of_renaming_kind = function
   | `Module  -> "module"
   | `ModType -> "module type"
   | `Theory  -> "theory"
+  | `Exn     -> "exception"
 
 (* -------------------------------------------------------------------- *)
 let rename ove subst (kind, name) =
@@ -380,7 +389,7 @@ let rename ove subst (kind, name) =
       match kind with
       | `Lemma | `Type ->
           EcIo.is_sym_ident newname
-      | `Op | `Pred ->
+      | `Op | `Pred | `Exn ->
           EcIo.is_op_ident newname
       | `Module | `ModType | `Theory ->
           EcIo.is_mod_ident newname
@@ -514,9 +523,14 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
   let scenv = ove.ovre_hooks.henv scope in
   let env   = EcSection.env scenv in
 
+  let rk =
+    match oopd.op_kind with
+    | OB_oper (Some (OP_Exn _)) -> `Exn
+    | _ -> `Op in
+
   match Msym.find_opt x ove.ovre_ovrd.evc_ops with
   | None ->
-      let (subst, x) = rename ove subst (`Op, x) in
+      let (subst, x) = rename ove subst (rk, x) in
       let oopd = EcSubst.subst_op subst oopd in
       (subst, ops, proofs, ove.ovre_hooks.hadd_item scope ~import (Th_operator (x, oopd)))
 
@@ -586,11 +600,11 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ~opaque:optransparent ~clinline:(opmode <> `Alias)
                 [] body.f_ty (Some (OP_Plain body)) refop.op_loca in
             (newop, body)
-  
+
         in
           match opmode with
           | `Alias ->
-              let subst, x = rename ove subst (`Op, x) in
+              let subst, x = rename ove subst (rk, x) in
               (newop, subst, x, true)
 
           | `Inline _ ->
@@ -611,7 +625,10 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
 
       begin
         try Compatible.for_operator env refop newop
-        with Incompatible err ->
+        with
+        | NoException ->
+          clone_error env (CE_NoExceptions)
+        | Incompatible err ->
           clone_error env (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
       end;
 
@@ -963,6 +980,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
+                | OB_oper (Some (OP_Exn    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->

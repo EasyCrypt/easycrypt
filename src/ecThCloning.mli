@@ -34,6 +34,7 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_NoExceptions
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -101,6 +102,7 @@ and rk_categories = {
   rkc_lemmas  : bool;
   rkc_ops     : bool;
   rkc_preds   : bool;
+  rkc_exns    : bool;
   rkc_types   : bool;
   rkc_module  : bool;
   rkc_modtype : bool;
