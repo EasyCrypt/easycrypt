@@ -39,3 +39,26 @@ jobs:
         TAG=${{ github.ref_name }} VARIANT=base make -C scripts/docker publish
         TAG=${{ github.ref_name }} VARIANT=build make -C scripts/docker publish
         TAG=${{ github.ref_name }} VARIANT=formosa make -C scripts/docker publish
+
+  make-test-image:
+    if: github.ref_name != 'main'
+    name: Build and Push Test Image
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build `test` Image
+      run: TAG=${{ github.ref_name }} VARIANT=test make -C scripts/docker
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      with:
+        registry: https://ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push All Images
+      run: |
+        TAG=${{ github.ref_name }} VARIANT=test make -C scripts/docker publish
