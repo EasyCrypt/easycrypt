@@ -19,6 +19,23 @@ type swap_kind = {
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
   let check_swap (pf : proofenv) (env : EcEnv.env) (s1 : stmt) (s2 : stmt) =
+    let is_contains_raise =
+      let exception HasRaise in
+
+      let rec i_contains_raise (i : instr) =
+        match i.i_node with
+        | Sraise _ -> raise HasRaise
+        | _ -> EcModules.i_iter i_contains_raise i in
+
+      fun (s : stmt) ->
+        try
+          List.iter i_contains_raise s.s_node;
+          false
+        with HasRaise -> true in
+
+    if List.exists is_contains_raise [s1; s2] then
+      tc_error pf "cannot swap blocks that contain exceptions";
+
     let m1,m2 = s_write env s1, s_write env s2 in
     let r1,r2 = s_read  env s1, s_read  env s2 in
     (* FIXME: this is not sufficient *)
