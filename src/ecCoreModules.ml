@@ -162,6 +162,26 @@ let is_match  = _is_of_get get_match
 let is_raise  = _is_of_get get_raise
 
 (* -------------------------------------------------------------------- *)
+let i_iter (f : instr -> unit) =
+  let rec i_iter (i : instr) =
+    match i.i_node with
+    | Sasgn _ | Srnd _ | Scall _ | Sraise _ | Sabstract _ -> ()
+
+    | Sif (_, s1, s2) ->
+      List.iter fs [s1; s2] 
+
+    | Swhile (_, s) ->
+      fs s
+
+    | Smatch (_, bs) ->
+      List.iter (fun (_, s) -> fs s) bs
+
+  and fs (s : stmt) =
+    List.iter f s.s_node
+
+  in fun (i : instr) -> i_iter i
+
+(* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
   let e_pv e =
     let rec e_pv sid e =
