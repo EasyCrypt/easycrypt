@@ -366,6 +366,21 @@ theory BVOperators.
       take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
 
+  (* ------------------------------------------------------------------ *)
+  abstract theory BVAExtract.
+    clone BV as BV1.
+    clone BV as BV2.
+
+    axiom [bydone] dvd_size : BV2.size %| BV1.size.
+
+    op bvaextract : BV1.bv -> int -> BV2.bv.
+
+    axiom bvaextractP (bv : BV1.bv) (base : int) :
+         0 <= base
+      => base <= BV1.size %/ BV2.size
+      => take BV2.size (drop (base * BV2.size) (BV1.tolist bv)) = BV2.tolist (bvaextract bv base).
+  end BVAExtract.
+
 print List.mkseq.
   
 (* ------------------------------------------------------------------ *)
@@ -553,4 +568,3 @@ print List.mkseq.
     proof. admitted.
   end A2B2A.
 end BVOperators.
-

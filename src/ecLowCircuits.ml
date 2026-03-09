@@ -1493,10 +1493,10 @@ module MakeCircuitInterfaceFromCBackend(Backend: CBackend) : CircuitInterface = 
         end
 
       (* FIXME: what do we want for out of bounds extract? Decide later *)
-      | { kind = `Extract ((_, Some _), (_, Some w_out)) } -> 
+      | { kind = `Extract ((_, Some _), (_, Some w_out), aligned) } -> 
         begin match args with
         | [ `Circuit (({type_ = CBitstring _}, _ ) as c) ; `Constant i ] ->
-          circuit_slice ~size:w_out c (to_int i) 
+          circuit_slice ~size:w_out c ((if aligned then w_out else 1) * to_int i)
         | _ -> assert false (* Should be caught by EC typechecking + binding correctness *)
         end
       | { kind = `Insert ((_, Some _), (_, Some _)) } -> 

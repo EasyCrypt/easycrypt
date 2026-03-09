@@ -2948,8 +2948,12 @@ module Circuit = struct
         mk, [`BV None; `BV None], "Insert" 
 
       | "extract" ->
-        let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2) in
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2, false) in
         mk, [`BV None; `BV None], "Extract"
+
+      | "aextract" ->
+        let mk sz = let sz1, sz2 = as_seq2 sz in `Extract (sz1, sz2, true) in
+        mk, [`BV None; `BV None], "AExtract"
 
       | "asliceget" ->
         let mk sz = let sz1, sz2, arr_sz = as_seq3 sz in `ASliceGet ((arr_sz, sz1), sz2) in

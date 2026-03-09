@@ -1030,7 +1030,7 @@ let subst_bv_opkind ?(red: (form -> int option) option) (s: subst) (opk: bv_opki
   | `Shls (s1, s2) -> `Shls (ssize s1, ssize s2) 
   | `ASliceSet ((s1, s2), s3) -> `ASliceSet ((ssize s1, ssize s2), ssize s3) 
   | `And s -> `And (ssize s) 
-  | `Extract (s1, s2) -> `Extract (ssize s1, ssize s2) 
+  | `Extract (s1, s2, aligned) -> `Extract (ssize s1, ssize s2, aligned) 
   | `Map (s1, s2, s3) -> `Map (ssize s1, ssize s2, ssize s3) 
   | `AInit (s1, s2) -> `AInit (ssize s1, ssize s2) 
   | `Sub s -> `Sub (ssize s) 

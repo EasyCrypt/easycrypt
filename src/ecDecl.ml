@@ -416,7 +416,7 @@ type bv_opkind = [
   | `Le       of binding_size * bool (* size + sign *)
   | `Extend   of binding_size * binding_size * bool (* size in + size out + sign *)
   | `Truncate of binding_size * binding_size (* size in + size out *)
-  | `Extract  of binding_size * binding_size (* size in + size out *)
+  | `Extract  of binding_size * binding_size * bool (* size in + size out * aligned *)
   | `Insert   of binding_size * binding_size (* size in + size out *)
   | `Concat   of binding_size * binding_size * binding_size (* size in1 + size in2 *)
   | `Init     of binding_size (* size_out *)
