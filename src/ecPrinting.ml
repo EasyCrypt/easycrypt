@@ -487,7 +487,7 @@ let pp_string fmt x =
 let pp_path fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
-let pp_xpath fmt (xp: P.xpath) = 
+let pp_xpath fmt (xp: P.xpath) =
   Format.fprintf fmt "%s" (P.x_tostring xp)
 
 (* -------------------------------------------------------------------- *)
@@ -777,6 +777,10 @@ let priority_of_unop =
           None
 
 (* -------------------------------------------------------------------- *)
+let is_unop name =
+  (priority_of_unop name) <> None
+
+(* -------------------------------------------------------------------- *)
 let is_binop name =
   (priority_of_binop name) <> None
 
@@ -903,7 +907,7 @@ let pp_opname (fmt : Format.formatter) ((nm, op) : symbol list * symbol) =
       if op.[0] = '*' || op.[String.length op - 1] = '*'
       then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    end else if is_pstop op then
+    end else if is_pstop op || (is_unop op && nm <> []) then
       Format.sprintf "(%s)" op
     else op
 
@@ -1085,10 +1089,11 @@ let pp_opapp
   ((pred    : [`Expr | `Form]),
   (op       : EcPath.path),
   (tvi      : EcTypes.ty list),
-  (es       : 'a list))
+  (es       : 'a list),
+  (tyopt    : ty option))
 =
   let (nm, opname) =
-    PPEnv.op_symb ppe op (Some (pred, tvi, (List.map t_ty es, None))) in
+    PPEnv.op_symb ppe op (Some (pred, tvi, (List.map t_ty es, tyopt))) in
 
   let pp_tuple_sub ppe prec fmt e =
     match is_tuple e with
@@ -1842,7 +1847,8 @@ and pp_form_core_r
   (fmt   : Format.formatter)
   (f     : form)
 =
-  let pp_opapp ppe (outer : opprec * iassoc) (fmt : Format.formatter) (op, tys, es) =
+  let pp_opapp ppe (outer : opprec * iassoc) (fmt : Format.formatter)
+      (op, tys, es, tyopt) =
     let rec dt_sub f =
       match destr_app f with
       | ({ f_node = Fop (p, tvi) }, args) -> Some (p, tvi, args)
@@ -1872,7 +1878,7 @@ and pp_form_core_r
     in
       pp_opapp ppe f_ty
         (dt_sub, pp_form_r, is_trm, is_tuple, is_proj)
-        lower_left outer fmt (`Form, op, tys, es)
+        lower_left outer fmt (`Form, op, tys, es, tyopt)
   in
 
   match f.f_node with
@@ -1935,7 +1941,7 @@ and pp_form_core_r
       pp_let ~fv:f2.f_fv ppe pp_form_r outer fmt (lp, f1, f2)
 
   | Fop (op, tvi) ->
-      pp_opapp ppe outer fmt (op, tvi, [])
+      pp_opapp ppe outer fmt (op, tvi, [], Some f.f_ty)
 
   | Fapp ({f_node = Fop (op, _)},
             [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
@@ -1943,10 +1949,10 @@ and pp_form_core_r
         && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
     ->
       let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
-      pp_opapp ppe outer fmt (negop, tys, [f1; f2])
+      pp_opapp ppe outer fmt (negop, tys, [f1; f2], Some f.f_ty)
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
-      pp_opapp ppe outer fmt (p, tys, args)
+      pp_opapp ppe outer fmt (p, tys, args, Some f.f_ty)
 
   | Fapp (e, args) ->
       pp_app ppe ~pp_first:pp_form_r ~pp_sub:pp_form_r outer fmt (e, args)
@@ -2859,9 +2865,9 @@ let pp_i_blk (_ppe : PPEnv.t) fmt _ =
 let pp_i_abstract (_ppe : PPEnv.t) fmt id =
   Format.fprintf fmt "%s" (EcIdent.name id)
 
-let pp_abs_uses (ppe : PPEnv.t) fmt (aus: abs_uses) = 
-  let pp_pv_ty ppe fmt (pv, ty) = 
-    Format.fprintf fmt "(%a : %a)" (pp_pv ppe) pv (pp_type ppe) ty 
+let pp_abs_uses (ppe : PPEnv.t) fmt (aus: abs_uses) =
+  let pp_pv_ty ppe fmt (pv, ty) =
+    Format.fprintf fmt "(%a : %a)" (pp_pv ppe) pv (pp_type ppe) ty
   in
   let on_empty fmt () = Format.fprintf fmt "None" in
   Format.fprintf fmt "{ calls: %a, reads: %a, writes: %a }"
@@ -3313,7 +3319,7 @@ module PPGoal = struct
             (None, fun fmt -> pp_form ppe fmt f)
 
         | EcBaseLogic.LD_abs_st aus ->
-            (None, fun fmt -> Format.fprintf fmt "statement %a" 
+            (None, fun fmt -> Format.fprintf fmt "statement %a"
              (pp_abs_uses ppe) aus)
 
     in (ppe, (id, pdk))
