@@ -32,7 +32,7 @@ val t_admit   : FApi.backward
 val t_true    : FApi.backward
 val t_fail    : FApi.backward
 val t_id      : FApi.backward
-val t_close   : ?who:string -> FApi.backward -> FApi.backward
+val t_close   : FApi.backward -> FApi.backward
 val t_shuffle : EcIdent.t list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

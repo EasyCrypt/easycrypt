@@ -43,9 +43,9 @@ module LowInternal = struct
     let bhs = tc1_as_bdhoareS tc in
 
     if not (List.is_empty bhs.bhs_s.s_node) then
-      tc_error !!tc ~who:"skip" "instruction list is not empty";
+      tc_error !!tc "instruction list is not empty";
     if bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge then
-      tc_error !!tc ~who:"skip" "";
+      tc_error !!tc "";
 
     let concl = map_ss_inv2 f_imp (bhs_pr bhs) (bhs_po bhs) in
     let concl = EcSubst.f_forall_mems_ss_inv bhs.bhs_m concl in
@@ -75,9 +75,9 @@ module LowInternal = struct
     let es = tc1_as_equivS tc in
 
     if not (List.is_empty es.es_sl.s_node) then
-      tc_error !!tc ~who:"skip" "left instruction list is not empty";
+      tc_error !!tc "left instruction list is not empty";
     if not (List.is_empty es.es_sr.s_node) then
-      tc_error !!tc ~who:"skip" "right instruction list is not empty";
+      tc_error !!tc "right instruction list is not empty";
 
     let concl = map_ts_inv2 f_imp (es_pr es) (es_po es) in
     let concl = EcSubst.f_forall_mems_ts_inv es.es_ml es.es_mr concl in

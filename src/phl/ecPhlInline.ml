@@ -151,7 +151,7 @@ module LowInternal = struct
             me (List.combine sps bs)
           in me, [i_match (e, bs)]
 
-      | _, _ -> assert false (* FIXME error message *)
+      | _, _ -> tc_error !!tc "code pattern doesn't match instruction type"
 
     and inline_s me sp s =
       match sp with
@@ -259,7 +259,7 @@ module HiInternal = struct
       aux_s 0 s.s_node
 
   (* ------------------------------------------------------------------ *)
-  let pat_of_occs cond occs s =
+  let pat_of_occs tc cond occs s =
     let occs = ref occs in
 
     let rec aux_i occ i =
@@ -298,7 +298,10 @@ module HiInternal = struct
 
     let sp = snd (aux_s 0 0 s.s_node) in
 
-    assert (Sint.is_empty !occs); sp    (* FIXME error message *)
+    if not (Sint.is_empty !occs) then
+      tc_error !!tc "invalid occurrence(s): %s"
+        (String.concat ", " (List.map string_of_int (Sint.elements !occs)));
+    sp
 
   (* ------------------------------------------------------------------ *)
   let pat_of_spath =
@@ -390,15 +393,15 @@ let process_inline_occs ~use_tuple side cond occs tc =
   match concl.f_node, side with
   | FequivS es, Some b ->
       let st = sideif b es.es_sl es.es_sr in
-      let sp = HiInternal.pat_of_occs cond occs st in
+      let sp = HiInternal.pat_of_occs tc cond occs st in
         t_inline_equiv ~use_tuple b sp tc
 
   | FhoareS hs, None ->
-      let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
+      let sp = HiInternal.pat_of_occs tc cond occs hs.hs_s in
         t_inline_hoare ~use_tuple sp tc
 
   | FbdHoareS bhs, None ->
-      let sp = HiInternal.pat_of_occs cond occs bhs.bhs_s in
+      let sp = HiInternal.pat_of_occs tc cond occs bhs.bhs_s in
         t_inline_bdhoare ~use_tuple sp tc
 
   | _, _ -> tc_error !!tc "invalid arguments"

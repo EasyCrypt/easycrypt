@@ -2659,7 +2659,8 @@ module Ty = struct
     | _ ->
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
-        failwith "unsupported"          (* FIXME *)
+        hierror "unsupported instance: %s"
+          (EcSymbols.string_of_qsymbol (EcLocation.unloc tci.pti_name))
 end
 
 (* -------------------------------------------------------------------- *)module Search = struct

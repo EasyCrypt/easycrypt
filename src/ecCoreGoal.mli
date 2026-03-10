@@ -207,15 +207,15 @@ val closed : proof -> bool
 
 (* -------------------------------------------------------------------- *)
 val tc_error :
-     proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
+     proofenv -> ?catchable:bool -> ?loc:EcLocation.t
   -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 val tc_error_exn :
-     proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
+     proofenv -> ?catchable:bool -> ?loc:EcLocation.t
   -> exn -> 'a
 
 val tc_error_lazy :
-     proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
+     proofenv -> ?catchable:bool -> ?loc:EcLocation.t
   -> (Format.formatter -> unit) -> 'a
 
 (* -------------------------------------------------------------------- *)
@@ -229,7 +229,7 @@ val tacuerror_exn :
 type symkind = [`Lemma | `Operator | `Local]
 
 val tc_lookup_error :
-  proofenv -> ?loc:EcLocation.t -> ?who:string -> symkind -> qsymbol -> 'a
+  proofenv -> ?loc:EcLocation.t -> symkind -> qsymbol -> 'a
 
 (* -------------------------------------------------------------------- *)
 val reloc : EcLocation.t -> ('a -> 'b) -> 'a -> 'b

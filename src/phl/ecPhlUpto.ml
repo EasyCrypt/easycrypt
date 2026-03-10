@@ -223,28 +223,28 @@ let t_uptobad_r tc =
   let pr1, pr2 =
     try t2_map destr_pr (destr_eq concl)
     with DestrError _ ->
-      tc_error !!tc ~who:"byupto" "expecting a formula of the form \"Pr[_] = Pr[_]\""
+      tc_error !!tc "expecting a formula of the form \"Pr[_] = Pr[_]\""
   in
   if not (EcMemory.mem_equal pr1.pr_mem pr2.pr_mem) then
-    tc_error !!tc ~who:"byupto" "the initial memories should be equal";
+    tc_error !!tc "the initial memories should be equal";
   if not (is_conv ~ri:full_red hyps pr1.pr_args pr2.pr_args) then
-    tc_error !!tc ~who:"byupto" "the initial arguments should be equal";
+    tc_error !!tc "the initial arguments should be equal";
   if not (ss_inv_alpha_eq hyps pr1.pr_event pr2.pr_event) then
-    tc_error !!tc ~who:"byupto" "the events should be equal";
+    tc_error !!tc "the events should be equal";
   let bad =
     try destr_event (pr1.pr_event)
     with DestrError _ ->
-      tc_error !!tc ~who:"byupto" "the event should have the form \"E /\ !bad\" or \"!bad\""
+      tc_error !!tc "the event should have the form \"E /\\ !bad\" or \"!bad\""
   in
   begin match f_upto_init env bad pr1.pr_fun pr2.pr_fun with
-  | false -> tc_error !!tc ~who:"byupto" "the two functions are not equal upto bad"
+  | false -> tc_error !!tc "the two functions are not equal upto bad"
   | true -> ()
   | exception BadAssign (f, i) ->
       let ppenv = EcPrinting.PPEnv.ofenv env in
       let pp_fun fmt = function
        | None -> ()
        | Some f -> Format.fprintf fmt " in function %a" (EcPrinting.pp_funname ppenv) f in
-      tc_error !!tc ~who:"byupto" "bad is assigned after being set to true%a, %a"
+      tc_error !!tc "bad is assigned after being set to true%a, %a"
         pp_fun f (EcPrinting.pp_instr ppenv) i
   end;
   FApi.xmutate1 tc `HlUpto []
@@ -422,4 +422,4 @@ let process_uptobad tc =
           "expecting a goal of the form \"Pr[_] <= Pr[_] + Pr[_]\" or \"`|Pr[_] - Pr[_]| <= _\""
     end
   | _ ->
-    tc_error !!tc ~who:"byupto" "expecting a goal of the form \" _ <= _\""
+    tc_error !!tc "expecting a goal of the form \" _ <= _\""

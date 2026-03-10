@@ -332,7 +332,6 @@ type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
 
 (* -------------------------------------------------------------------- *)
 let select_op
-  ?(hidden : bool = false)
   ?(filter : EcPath.path -> operator -> bool = fun _ _ -> true)
    (tvi    : tvar_inst option)
    (env    : EcEnv.env)
@@ -341,7 +340,6 @@ let select_op
    (sig_   : ty list * ty option)
   : select_result list
 =
-  ignore hidden;                (* FIXME *)
 
   let module D = EcDecl in
 

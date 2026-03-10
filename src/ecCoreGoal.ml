@@ -207,11 +207,10 @@ let mk_tcerror ?(catchable = true) ?penv ?loc msg =
 exception TcError of tcerror
 
 (* -------------------------------------------------------------------- *)
-let tc_error (penv : proofenv) ?(catchable = true) ?loc ?who fmt =
+let tc_error (penv : proofenv) ?(catchable = true) ?loc fmt =
   let buf  = Buffer.create 127 in
   let fbuf = Format.formatter_of_buffer buf in
   let loc  = loc |> omap (fun loc -> mk_location loc) in
-    ignore (who : string option);       (* FIXME: remove? *)
     Format.kfprintf
       (fun _ ->
          Format.pp_print_flush fbuf ();
@@ -221,8 +220,7 @@ let tc_error (penv : proofenv) ?(catchable = true) ?loc ?who fmt =
       fbuf fmt
 
 (* -------------------------------------------------------------------- *)
-let tc_error_exn (penv : proofenv) ?(catchable = true) ?loc ?who exn =
-  ignore (who : string option);
+let tc_error_exn (penv : proofenv) ?(catchable = true) ?loc exn =
   raise (TcError (
     { tc_catchable = catchable;
       tc_proofenv  = Some penv;
@@ -251,7 +249,7 @@ let tacuerror_exn ?(catchable = true) exn =
     tc_reloced   = None; })
 
 (* -------------------------------------------------------------------- *)
-let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
+let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc msg =
   let getmsg () =
     let buf  = Buffer.create 127 in
     let fbuf = Format.formatter_of_buffer buf in
@@ -261,13 +259,12 @@ let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
 
   let loc = loc |> omap (fun loc -> mk_location loc) in
 
-  ignore (who : string option);         (* FIXME: remove? *)
   raise (TcError (mk_tcerror ~catchable ~penv ?loc (lazy (getmsg ()))))
 
 (* -------------------------------------------------------------------- *)
 type symkind = [`Lemma | `Operator | `Local]
 
-let tc_lookup_error pe ?loc ?who kind qs =
+let tc_lookup_error pe ?loc kind qs =
   let string_of_kind kind =
     match kind with
     | `Lemma    -> "lemma"
@@ -275,7 +272,7 @@ let tc_lookup_error pe ?loc ?who kind qs =
     | `Local    -> "local variable"
   in
 
-  tc_error_lazy pe ~catchable:true ?loc ?who
+  tc_error_lazy pe ~catchable:true ?loc
     (fun fmt ->
       Format.fprintf fmt "unknown %s `%s'"
         (string_of_kind kind)

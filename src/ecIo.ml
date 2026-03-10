@@ -198,7 +198,7 @@ let parseall (ecreader : ecreader) =
     | EcParsetree.P_DocComment _ ->
         aux acc
     | EcParsetree.P_Undo _ | EcParsetree.P_Exit ->
-        assert false                    (* FIXME *)
+        raise (EcParsetree.ParseError (EcLocation.dummy, Some "unexpected undo/exit command"))
   in
     aux []
 

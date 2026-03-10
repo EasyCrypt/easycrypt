@@ -1205,7 +1205,7 @@ let process_view1 pe tc =
 
         FApi.t_internal
           (FApi.t_seqsub (EcLowGoal.t_cut cutf)
-             [EcLowGoal.t_close ~who:"view" discharge;
+             [EcLowGoal.t_close discharge;
               EcLowGoal.t_clear top])
           tc
 

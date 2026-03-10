@@ -280,14 +280,14 @@ let t_admit (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_fail (tc : tcenv1) =
-  tc_error !!tc ~who:"fail" "explicit call to [fail]"
+  tc_error !!tc "explicit call to [fail]"
 
 (* -------------------------------------------------------------------- *)
-let t_close ?who (t : FApi.backward) (tc : tcenv1) =
+let t_close (t : FApi.backward) (tc : tcenv1) =
   let tc = t tc in
 
   if not (FApi.tc_done tc) then
-    tc_error !$tc ?who "expecting a closed goal";
+    tc_error !$tc "expecting a closed goal";
   tc
 
 (* -------------------------------------------------------------------- *)
