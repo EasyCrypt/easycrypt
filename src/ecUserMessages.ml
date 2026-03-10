@@ -198,6 +198,8 @@ end = struct
           ppo op in
      EcPrinting.pp_list ",@ " pp1
 
+  let is_are n = if n = 1 then "is" else "are"
+
   let pp_fxerror env fmt error =
     let msg x = Format.fprintf fmt x in
 
@@ -224,16 +226,16 @@ end = struct
         msg "this pattern matching contains duplicated branches"
 
     | FXE_MatchPartial ids ->
-        msg "this pattern matching is non-exhaustive, %a are missing"
-          (EcPrinting.pp_list ",@ " pp_symbol) ids
+        msg "this pattern matching is non-exhaustive, @[%a@] %s missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids (is_are (List.length ids))
 
     | FXE_FixPartial ids ->
         let ppe = EcPrinting.PPEnv.ofenv env in
         let pp_match fmt ids =
           Format.fprintf fmt "[%a]"
             (EcPrinting.pp_list ",@" (EcPrinting.pp_opname ppe)) ids in
-        msg "this pattern matching is non-exhaustive, %a are missing"
-          (EcPrinting.pp_list ",@ " pp_match) ids
+        msg "this pattern matching is non-exhaustive, @[%a@] %s missing"
+          (EcPrinting.pp_list ",@ " pp_match) ids (is_are (List.length ids))
 
     | FXE_FixRedundant fm ->
         msg "this clause is useless: %a" (pp_fix_match env) fm
@@ -259,7 +261,7 @@ end = struct
   let pp_gse_error _env fmt error =
     let msg = Format.fprintf fmt in
     match error with
-    | GSE_ExpectedTwoSided -> 
+    | GSE_ExpectedTwoSided ->
         msg "expected two sided goal"
 
   let pp_tyerror env1 fmt error =
