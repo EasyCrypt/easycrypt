@@ -657,12 +657,13 @@ module Mpv2 = struct
 
   let add_glob env mp1 mp2 eqs =
     let mp1, mp2 = NormMp.norm_mpath env mp1, NormMp.norm_mpath env mp2 in
-    (* FIXME error message *)
-    if not (EcPath.m_equal mp1 mp2) then assert false;
-    if not (mp1.m_args = []) then assert false;
+    if not (EcPath.m_equal mp1 mp2) then
+      invalid_arg "add_glob: module paths are not equal";
+    if not (mp1.m_args = []) then
+      invalid_arg "add_glob: module path has functor arguments";
     begin match mp1.m_top with
     | `Local _ -> ()
-    | _ -> assert false
+    | _ -> invalid_arg "add_glob: module path is not local"
     end;
     { eqs with s_gl = Sm.add mp1 eqs.s_gl }
 
@@ -1075,13 +1076,13 @@ and i_eqobs_in_refl env i eqo =
 
   | Sraise e -> add_eqs_refl env PV.empty e
 
-  | Sabstract _ -> assert false
+  | Sabstract _ -> invalid_arg "i_eqobs_in_refl: abstract statement"
 
 and eqobs_inF_refl env f' eqo =
   let f = NormMp.norm_xfun env f' in
   let ffun = Fun.by_xpath f env in
   match ffun.f_def with
-  | FBalias _ -> assert false
+  | FBalias _ -> invalid_arg "eqobs_inF_refl: alias after normalization"
   | FBdef fdef ->
     let eqo =
       match fdef.f_ret with

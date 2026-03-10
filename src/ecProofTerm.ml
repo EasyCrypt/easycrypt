@@ -807,7 +807,7 @@ and apply_pterm_to_local ?loc pt id =
   | LD_mem _ ->
       apply_pterm_to_arg_r ?loc pt (PVAMemory id)
 
-  | LD_abs_st _ -> assert false
+  | LD_abs_st _ -> invalid_arg "apply_pterm_to_local: abstract statement"
 
 (* -------------------------------------------------------------------- *)
 and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =

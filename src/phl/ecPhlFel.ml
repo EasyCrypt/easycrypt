@@ -105,7 +105,9 @@ and callable_oracles_i env modv os i =
 
     | Sasgn _ | Srnd _ | Sraise _ -> os
 
-    | Sabstract _ -> assert false (* FIXME *)
+    | Sabstract id ->
+        let us = AbsStmt.byid id env in
+        List.fold_left (callable_oracles_f env modv) os us.aus_calls
 
 let callable_oracles_stmt env modv =
   callable_oracles_s env modv EcPath.Sx.empty

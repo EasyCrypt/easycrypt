@@ -297,7 +297,7 @@ let (_i_inuse, s_inuse, se_inuse) =
       se_inuse map e
 
     | Sabstract _ ->
-      assert false (* FIXME *)
+      invalid_arg "i_inuse: unexpected abstract statement"
 
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node

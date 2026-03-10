@@ -45,7 +45,7 @@ module LowInternal = struct
     if not (List.is_empty bhs.bhs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
     if bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge then
-      tc_error !!tc "";
+      tc_error !!tc "skip requires comparison to be = or >=, got <=";
 
     let concl = map_ss_inv2 f_imp (bhs_pr bhs) (bhs_po bhs) in
     let concl = EcSubst.f_forall_mems_ss_inv bhs.bhs_m concl in

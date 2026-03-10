@@ -1685,8 +1685,8 @@ module Fun = struct
 
   let actmem_body me fun_ =
     match fun_.f_def with
-    | FBabs _   -> assert false (* FIXME error message *)
-    | FBalias _ -> assert false (* FIXME error message *)
+    | FBabs _   -> invalid_arg "actmem_body: function has no concrete body (abstract)"
+    | FBalias _ -> invalid_arg "actmem_body: function has no concrete body (alias)"
     | FBdef fd   ->
       let mem = EcMemory.empty_local ~witharg:false me in
       let mem = add_params mem fun_ in
@@ -3337,8 +3337,13 @@ module LDecl = struct
     | LD_hyp f ->
         LD_hyp (Fsubst.f_subst s f)
 
-    | LD_abs_st _ ->                    (* FIXME *)
-        assert false
+    | LD_abs_st us ->
+        let subst_pv_ty (pv, ty) = (pv_subst s pv, ty_subst s ty) in
+        LD_abs_st {
+          aus_calls  = List.map (x_subst s) us.aus_calls;
+          aus_reads  = List.map subst_pv_ty us.aus_reads;
+          aus_writes = List.map subst_pv_ty us.aus_writes;
+        }
 
   (* ------------------------------------------------------------------ *)
   let ld_fv = function
