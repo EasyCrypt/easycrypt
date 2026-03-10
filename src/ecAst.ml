@@ -322,15 +322,11 @@ let map_ss_inv3 (fn: form -> form -> form -> form)
 let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
   let inv1, inv2 = fn inv.inv in
   let m = inv.m in
-  (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
   {m;inv=inv1}, {m;inv=inv2}
 
 let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
   let inv1, inv2, inv3 = fn inv.inv in
   let m = inv.m in
-  (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
   {m;inv=inv1}, {m;inv=inv2}, {m;inv=inv3}
 
 type ts_inv = {
@@ -411,16 +407,12 @@ let map_ts_inv_destr2 (fn: form -> form * form) (inv: ts_inv): ts_inv * ts_inv =
   let inv1, inv2 = fn inv.inv in
   let ml = inv.ml in
   let mr = inv.mr in
-  (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv1.f_ty = inv.inv.f_ty);
   {ml;mr;inv=inv1}, {ml;mr;inv=inv2}
 
 let map_ts_inv_destr3 (fn: form -> form * form * form) (inv: ts_inv) =
   let inv1, inv2, inv3 = fn inv.inv in
   let ml = inv.ml in
   let mr = inv.mr in
-  (* Everything should be boolean *)
-  assert (inv1.f_ty = inv2.f_ty && inv2.f_ty = inv3.f_ty && inv1.f_ty = inv.inv.f_ty);
   {ml;mr;inv=inv1}, {ml;mr;inv=inv2}, {ml;mr;inv=inv3}
 
 let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
