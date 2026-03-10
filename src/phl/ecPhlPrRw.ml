@@ -251,8 +251,18 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
       let (resv, k) = map_ss_inv_destr2 destr_eq pr.pr_event in
       let k_id = EcEnv.LDecl.fresh_id hyps "k" in
       let d = (oget dof) tc torw (EcTypes.tdistr k.inv.f_ty) in
-      (* FIXME: Ensure that d.inv does not use d.m *)
-      (* FIXME: Ensure that k.inv does not use k.m *)
+      (* Check that k and d do not reference the post-execution memory.
+         Otherwise the rewrite is unsound: the event `res = k` would use
+         k from the post-state, but `mu1 d k` treats k as a constant. *)
+      let post_mem = Mid.singleton k.m () in
+      if not (Mid.set_disjoint k.inv.f_fv post_mem) then
+        tc_error !!tc
+          "Pr-rewrite: the value compared to res must not depend on \
+           the post-execution memory";
+      if not (Mid.set_disjoint d.inv.f_fv post_mem) then
+        tc_error !!tc
+          "Pr-rewrite: the distribution must not depend on \
+           the post-execution memory";
       (pr_mu1_le_eq_mu1 pr_mem pr_fun pr_args resv k.inv k_id d.inv, 2)
 
     | (`MuEq | `MuSub as kind) -> begin
