@@ -100,7 +100,7 @@ let destruct_on_op id_op tc =
       (* ensure the right statement also contains an [id_op]: *)
       and _, _ = split_at_cpos1 env (1, `ByMatch (None, id_op)) es.es_sr in
       s
-    with InvalidCPos ->
+    with InvalidCPos _ ->
       tc_error_lazy !!tc (fun fmt ->
           Format.fprintf fmt "eager: invalid pivot statement")
   in

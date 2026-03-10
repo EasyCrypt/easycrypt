@@ -2551,8 +2551,13 @@ codepos_range:
 | LBRACKET cps=codepos DOTDOT cpe=codepos RBRACKET { (cps, `Base cpe) }
 | LBRACKET cps=codepos PLUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
 
+(* FIXME: rewrite and unify *)
 codepos_or_range:
 | cp=codepos { (cp, `Offset (0, `ByPos 0)) }
+| cpr=codepos_range  { cpr }
+
+codepos_or_open_range:
+| cp=codepos { (cp, `Offset (0, `ByPos 1)) }
 | cpr=codepos_range  { cpr }
 
 codeoffset1:
@@ -3166,7 +3171,7 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=loc(codepos_or_range) COLON b=option(bracket(ptybindings)) s=brace(stmt)
+| PROC CHANGE side=side? pos=loc(codepos_or_open_range) COLON b=option(bracket(ptybindings)) s=brace(stmt)
     { Pchangestmt (side, b, (unloc pos), s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm

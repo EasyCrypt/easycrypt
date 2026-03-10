@@ -54,8 +54,6 @@ end
 module Zipper = struct
   open Position
 
-  exception InvalidCPos
-
   module P = EcPath
 
   type ('a, 'state) folder =
@@ -86,6 +84,8 @@ module Zipper = struct
     z_env  : env option;
   }
 
+  exception InvalidCPos of [`Invalid | `Overrun of (ipath * codepos1) option] 
+
   let cpos (i : int) : codepos1 = (0, `ByPos i)
 
   let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
@@ -103,7 +103,7 @@ module Zipper = struct
       else
 
       let ir, s =
-        match s with [] -> raise InvalidCPos | ir :: s -> (ir, s)
+        match s with [] -> raise (InvalidCPos `Invalid) | ir :: s -> (ir, s)
       in
 
       let i =
@@ -139,7 +139,7 @@ module Zipper = struct
 
     in
 
-    let i = odfl 1 i in if i = 0 then raise InvalidCPos;
+    let i = odfl 1 i in if i = 0 then raise (InvalidCPos `Invalid);
     let rev, i = (i < 0), abs i in
 
     let s1, ir, s2 =
@@ -162,7 +162,7 @@ module Zipper = struct
         let i = if i < 0 then List.length s.s_node + i + 1 else i in
         let i = i - if after then 0 else 1 in
         try  List.takedrop i s.s_node
-        with (Invalid_argument _ | Not_found) -> raise InvalidCPos
+        with (Invalid_argument _ | Not_found) -> raise (InvalidCPos `Invalid)
       end
 
     | `ByMatch (i, cm) ->
@@ -180,13 +180,13 @@ module Zipper = struct
       | off when off > 0 ->
           let (ss1, ss2) =
             try  List.takedrop off s2
-            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+            with (Invalid_argument _ | Not_found) -> raise (InvalidCPos `Invalid) in
           (s1 @ ss1, ss2)
 
       | off when off < 0 ->
           let (ss1, ss2) =
             try  List.takedrop (List.length s1 + off) s1
-            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+            with (Invalid_argument _ | Not_found) -> raise (InvalidCPos `Invalid) in
           (ss1, ss2 @ s2)
 
       | _ -> (s1, s2)
@@ -196,7 +196,7 @@ module Zipper = struct
   let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cpos1 : codepos1) (s : stmt) =
     match split_at_cpos1 ~after:`No env cpos1 s with
     | (s1, i :: s2) -> ((if rev then List.rev s1 else s1), i, s2)
-    | _ -> raise InvalidCPos
+    | (_, []) -> raise (InvalidCPos (`Overrun None))
 
   let offset_of_position (env : EcEnv.env) (cpos : codepos1) (s : stmt) =
     let (s, _) = split_at_cpos1 ~after:`No env cpos s in
@@ -227,13 +227,13 @@ module Zipper = struct
           let cnames = List.fst indt.tydt_ctors in
           let ix, _ =
             try  List.findi (fun _ n -> EcSymbols.sym_equal cn n) cnames
-            with Not_found -> raise InvalidCPos
+            with Not_found -> raise (InvalidCPos `Invalid)
           in
           let prebr, (locals, body), postbr = List.pivot_at ix bs in
           let env = EcEnv.Var.bind_locals locals env in
           (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), env
 
-      | _ -> raise InvalidCPos
+      | _ -> raise (InvalidCPos `Invalid)
     in zpr, ((0, `ByPos (1 + List.length s1)), sub), env
 
   let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
@@ -242,7 +242,11 @@ module Zipper = struct
         (fun ((zpr, s), env) nm1 -> let zpr, s, env = zipper_at_nm_cpos1 env nm1 s zpr in (zpr, env), s)
         ((ZTop, s), env) nm in
 
-    let s1, i, s2 = find_by_cpos1 env cp1 s in
+    let s1, i, s2 = try 
+      find_by_cpos1 env cp1 s 
+    with InvalidCPos (`Overrun None) ->
+      raise (InvalidCPos (`Overrun (Some (zpr, cp1))))
+    in
     let zpr = zipper ~env s1 (i :: s2) zpr in
 
     (zpr, (nm, (0, `ByPos (1 + List.length s1))))
@@ -254,27 +258,39 @@ module Zipper = struct
     let top, bot = cpr in
     let zpr, (_, pos) = zipper_of_cpos_r env top s in
     match bot with
-    | `Base cp -> begin
+    | `Base cp -> begin try begin
       let zpr', (_, pos') = zipper_of_cpos_r env cp s in
       (* The two positions should identify the same block *)
       if zpr'.z_path <> zpr.z_path then
-        raise InvalidCPos;
+        raise (InvalidCPos `Invalid);
 
       (* The end position should be after the start *)
       match pos, pos' with
       | (_, `ByPos x), (_, `ByPos y) when x <= y ->
           zpr, (0, `ByPos (y - x))
-      | _ -> raise InvalidCPos
+      | _ -> raise (InvalidCPos `Invalid)
+    end
+    with InvalidCPos `Overrun (Some (zpath, cp1)) when zpr.z_path = zpath -> 
+      zpr, cp1
     end
     | `Offset cp1 -> zpr, cp1
 
-  let zipper_and_split_of_cpos_range env cpr s =
+  let zipper_and_split_of_cpos_range ?(op:bool = false) env cpr s =
     let zpr, cp = zipper_of_cpos_range env cpr s in
     match zpr.z_tail with
-    | []      -> raise InvalidCPos
+    | []      -> raise (InvalidCPos `Invalid)
     | i :: tl ->
-      let s, tl = split_at_cpos1 ~after:`Auto env cp (stmt tl) in
-      (zpr, cp), ((i::s), tl)
+      if not op then
+        let s, tl = split_at_cpos1 ~after:`Auto env cp (stmt tl) in
+        (zpr, cp), ((i::s), tl)
+      else
+        let tl = i::tl in
+        let s, tl = try 
+          split_at_cpos1 ~after:`Auto env cp (stmt tl) 
+          with InvalidCPos (`Overrun _) ->
+            tl, []
+        in
+        (zpr, cp), (s, tl)
 
   let split_at_cpos1 env cpos1 s =
     split_at_cpos1 ~after:`Auto env cpos1 s
