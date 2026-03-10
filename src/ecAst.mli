@@ -201,7 +201,7 @@ and f_node =
 
   | Fpr of pr (* hr *)
 
-(* We use the alert system for privacy because we want to 
+(* We use the alert system for privacy because we want to
    permit access in *some* instances, and the other fields are fine *)
 (* This is to ensure that memory bindings are carried along with the invariants *)
 and eagerF = {
@@ -257,7 +257,7 @@ and sHoareS = {
   [@alert priv_pl "Use the accessor function `hs_po` instead of the field"]
 }
 
-
+(*
 and eHoareF = {
   ehf_m  : memory;
   ehf_pr  : form;
@@ -274,6 +274,25 @@ and eHoareS = {
   ehs_s   : stmt;
   ehs_po  : form;
   [@alert priv_pl "Use the accessor function `ehs_po` instead of the field"]
+}
+*)
+and eHoareF = {
+  ehf_m   : memory;
+  ehf_prb : form; (* of type bool *)
+  ehf_prf : form; (* of type xreal *)
+  ehf_f   : EcPath.xpath;
+  ehf_pob : form; (* of type bool *)
+  ehf_pof : form; (* of type bool *)
+
+}
+
+and eHoareS = {
+  ehs_m   : memenv;
+  ehs_prb : form;  (* of type bool *)
+  ehs_prf : form; (* of type xreal *)
+  ehs_s   : stmt;
+  ehs_pob : form;  (* of type bool *)
+  ehs_pof : form; (* of type xreal *)
 }
 
 and bdHoareF = {
@@ -336,13 +355,13 @@ val map_ts_inv3 : (form -> form -> form -> form) -> ts_inv -> ts_inv -> ts_inv -
 val map_ts_inv_left : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_left1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_left2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_left3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_right : (ss_inv list -> ss_inv) -> ts_inv list -> ts_inv
 val map_ts_inv_right1 : (ss_inv -> ss_inv) -> ts_inv -> ts_inv
 val map_ts_inv_right2 : (ss_inv -> ss_inv -> ss_inv) -> ts_inv -> ts_inv -> ts_inv
-val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) -> 
+val map_ts_inv_right3 : (ss_inv -> ss_inv -> ss_inv -> ss_inv) ->
     ts_inv -> ts_inv -> ts_inv -> ts_inv
 
 val map_ts_inv_destr2 : (form -> form * form) -> ts_inv -> ts_inv * ts_inv
@@ -351,16 +370,21 @@ val map_ts_inv_destr3 : (form -> form * form * form) -> ts_inv -> ts_inv * ts_in
 val ts_inv_lower_left : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_left1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_left2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_left3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 val ts_inv_lower_right : (ss_inv list -> form) -> ts_inv list -> ss_inv
 val ts_inv_lower_right1 : (ss_inv -> form) -> ts_inv -> ss_inv
 val ts_inv_lower_right2 : (ss_inv -> ss_inv -> form) -> ts_inv -> ts_inv -> ss_inv
-val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) -> 
+val ts_inv_lower_right3 : (ss_inv -> ss_inv -> ss_inv -> form) ->
     ts_inv -> ts_inv -> ts_inv -> ss_inv
 
 (* -------------------------------------------------------------------- *)
+type eh_inv = {
+  m_eh   : memory;
+  invb : form;
+  invf : form
+}
 
 type inv =
   | Inv_ss of ss_inv
@@ -392,10 +416,21 @@ val hf_pr : sHoareF -> ss_inv
 val hf_po : sHoareF -> ss_inv
 val hs_pr : sHoareS -> ss_inv
 val hs_po : sHoareS -> ss_inv
-val ehf_pr : eHoareF -> ss_inv
-val ehf_po : eHoareF -> ss_inv
-val ehs_pr : eHoareS -> ss_inv
-val ehs_po : eHoareS -> ss_inv
+
+
+val ehf_pr : eHoareF -> eh_inv
+val ehf_po : eHoareF -> eh_inv
+val ehs_pr : eHoareS -> eh_inv
+val ehs_po : eHoareS -> eh_inv
+val ehf_prb : eHoareF -> ss_inv
+val ehf_prf : eHoareF -> ss_inv
+val ehf_pob : eHoareF -> ss_inv
+val ehf_pof : eHoareF -> ss_inv
+val ehs_prb : eHoareS -> ss_inv
+val ehs_prf : eHoareS -> ss_inv
+val ehs_pob : eHoareS -> ss_inv
+val ehs_pof : eHoareS -> ss_inv
+
 val bhf_pr : bdHoareF -> ss_inv
 val bhf_po : bdHoareF -> ss_inv
 val bhf_bd : bdHoareF -> ss_inv
