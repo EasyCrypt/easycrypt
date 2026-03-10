@@ -403,18 +403,23 @@ let rename ove subst (kind, name) =
 exception InvInstPath
 
 (* -------------------------------------------------------------------- *)
-let for_op_path ~(opath : EcPath.path) ~(npath : EcPath.path) ~(ops : _ Mp.t) (p : EcPath.path) =
+let for_op_path
+   (subst : EcSubst.subst)
+  ~(opath : EcPath.path)
+  ~(ops   : _ Mp.t)
+   (p     : EcPath.path)
+=
   match EcPath.remprefix ~prefix:opath ~path:p |> omap List.rev with
   | None | Some [] -> None
-  | Some (x::px) ->
+  | Some (x :: px) ->
       let q = EcPath.fromqsymbol (List.rev px, x) in
 
       match Mp.find_opt q ops with
       | None ->
-          Some (EcPath.pappend npath q)
+          Some (EcSubst.subst_path subst p)
       | Some (op, alias) ->
           match alias with
-          | true  -> Some (EcPath.pappend npath q)
+          | true  -> Some (EcSubst.subst_path subst p)
           | false ->
               match op.EcDecl.op_kind with
               | OB_pred _
@@ -425,15 +430,15 @@ let for_op_path ~(opath : EcPath.path) ~(npath : EcPath.path) ~(ops : _ Mp.t) (p
               | OB_oper (Some (OP_Proj   _))
               | OB_oper (Some (OP_Fix    _))
               | OB_oper (Some (OP_TC      )) ->
-                  Some (EcPath.pappend npath q)
+                  Some (EcSubst.subst_path subst p)
               | OB_oper (Some (OP_Plain f)) ->
                   match f.f_node with
                   | Fop (r, _) -> Some r
                   | _ -> raise InvInstPath
 
 (* -------------------------------------------------------------------- *)
-let for_op_path ~opath ~npath ~ops p =
-  odfl p (for_op_path ~opath ~npath ~ops p)
+let for_op_path subst ~opath ~ops p =
+  odfl p (for_op_path subst ~opath ~ops p)
  
 (* -------------------------------------------------------------------- *)
 let for_ty_path (subst : EcSubst.subst) ?(nargs = 0) (p : EcPath.path) =
@@ -1008,8 +1013,7 @@ and replay_instance
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, (typ, ty), tc, lc)
 =
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-  let forpath = for_op_path ~npath ~opath ~ops in
+  let forpath = for_op_path subst ~opath ~ops in
 
   try
     let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
@@ -1054,9 +1058,7 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
   let hyps = EcEnv.LDecl.init env [] in
 
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-
-  let oppath = for_op_path ~npath ~opath ~ops in
+  let oppath = for_op_path subst ~opath ~ops in
   let typath = for_ty_path env subst in
 
   let crbpath (kind : crb_theory1_kind) =
@@ -1101,7 +1103,6 @@ and replay_crb_bitstring (ove : _ ovrenv) (subst, ops, proofs, scope) (import, b
     (subst, ops, proofs, scope)
 
   with InvInstPath ->
-    Format.eprintf "[W]PAF@.";
     (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -1110,8 +1111,7 @@ and replay_crb_array (ove : _ ovrenv) (subst, ops, proofs, scope) (import, ba, l
   let hyps = EcEnv.LDecl.init env [] in
 
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-  let oppath = for_op_path ~npath ~opath ~ops in
+  let oppath = for_op_path subst ~opath ~ops in
   let typath = for_ty_path env subst in
 
   let crbpath (kind : crb_theory1_kind) =
@@ -1164,8 +1164,7 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
   let hyps = EcEnv.LDecl.init env [] in
 
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-  let oppath = for_op_path ~npath ~opath ~ops in
+  let oppath = for_op_path subst ~opath ~ops in
   let typath = for_ty_path env subst in
 
   let red f =
@@ -1195,8 +1194,7 @@ and replay_crb_bvoperator (ove : _ ovrenv) (subst, ops, proofs, scope) (import, 
 (* -------------------------------------------------------------------- *)
 and replay_crb_circuit (ove : _ ovrenv) (subst, ops, proofs, scope) (import, cr, lc) =
   let opath = ove.ovre_opath in
-  let npath = ove.ovre_npath in
-  let oppath = for_op_path ~npath ~opath ~ops in
+  let oppath = for_op_path subst ~opath ~ops in
 
   try
     let name     = cr.name in
