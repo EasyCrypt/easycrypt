@@ -254,15 +254,12 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
       (* Check that k and d do not reference the post-execution memory.
          Otherwise the rewrite is unsound: the event `res = k` would use
          k from the post-state, but `mu1 d k` treats k as a constant. *)
-      let post_mem = Mid.singleton k.m () in
-      if not (Mid.set_disjoint k.inv.f_fv post_mem) then
+      if Mid.mem k.m k.inv.f_fv then
         tc_error !!tc
-          "Pr-rewrite: the value compared to res must not depend on \
-           the post-execution memory";
-      if not (Mid.set_disjoint d.inv.f_fv post_mem) then
+          "Pr-rewrite: the value compared to res must not depend on memories";
+      if Mid.mem d.m d.inv.f_fv then
         tc_error !!tc
-          "Pr-rewrite: the distribution must not depend on \
-           the post-execution memory";
+          "Pr-rewrite: the distribution must not depend on memories";
       (pr_mu1_le_eq_mu1 pr_mem pr_fun pr_args resv k.inv k_id d.inv, 2)
 
     | (`MuEq | `MuSub as kind) -> begin
