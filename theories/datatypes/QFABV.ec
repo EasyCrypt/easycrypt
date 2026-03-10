@@ -96,13 +96,14 @@ theory BVOperators.
       touint (bvsub bv1 bv2) = (touint bv1 - touint bv2) %% 2^BV.size.
   end BVSub.
   
+  (* ------------------------------------------------------------------ *)
   abstract theory BVOpp.
     clone import BV.
 
     op bvopp : bv -> bv.
 
     axiom bvoppP (bv : bv) :
-      tosint (bvopp bv) = -(tosint bv).
+      touint (bvopp bv) = (-touint bv) %% 2^BV.size.
   end BVOpp.
 
   (* ------------------------------------------------------------------ *)
@@ -362,8 +363,10 @@ theory BVOperators.
 
     op bvextract : BV1.bv -> int -> BV2.bv.
 
-    axiom bvextractP (bv : BV1.bv) (base : int) : 0 <= base => base + BV2.size <= BV1.size =>
-      take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
+    axiom bvextractP (bv : BV1.bv) (base : int) :
+         0 <= base
+      => base + BV2.size <= BV1.size
+      => take BV2.size (drop base (BV1.tolist bv)) = BV2.tolist (bvextract bv base).
   end BVExtract.
 
   (* ------------------------------------------------------------------ *)
@@ -376,8 +379,7 @@ theory BVOperators.
     op bvaextract : BV1.bv -> int -> BV2.bv.
 
     axiom bvaextractP (bv : BV1.bv) (base : int) :
-         0 <= base
-      => base <= BV1.size %/ BV2.size
+         0 <= base < BV1.size %/ BV2.size
       => take BV2.size (drop (base * BV2.size) (BV1.tolist bv)) = BV2.tolist (bvaextract bv base).
   end BVAExtract.
 
