@@ -66,7 +66,7 @@ module Zipper : sig
     z_env  : env option;                (* env with local vars from previous instructions *)
   }
 
-  exception InvalidCPos of [`Invalid | `Overrun of (ipath * codepos1) option]
+  exception InvalidCPos
 
   (* Create a codepos1 from a top-level absolute position *)
   val cpos : int -> codepos1
@@ -99,7 +99,7 @@ module Zipper : sig
    * Raise [InvalidCPos] if [codepos_range] is not a valid range for [stmt].
    *)
   val zipper_of_cpos_range : env -> codepos_range -> stmt -> zipper * codepos1
-  val zipper_and_split_of_cpos_range : ?op:bool -> env -> codepos_range -> stmt -> (zipper * codepos1) * (instr list * instr list)
+  val zipper_and_split_of_cpos_range : env -> codepos_range -> stmt -> (zipper * codepos1) * (instr list * instr list)
 
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt

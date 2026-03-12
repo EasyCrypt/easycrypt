@@ -67,7 +67,7 @@ module LowInternal = struct
 
     let process_cpos (p : codepos1) =
       try  EcMatching.Zipper.offset_of_position env p s
-      with EcMatching.Zipper.InvalidCPos _ ->
+      with EcMatching.Zipper.InvalidCPos ->
         tc_error_lazy pf (fun fmt ->
           let ppe = EcPrinting.PPEnv.ofenv env in
           Format.fprintf fmt "invalid position: %a" (EcPrinting.pp_codepos1 ppe) p

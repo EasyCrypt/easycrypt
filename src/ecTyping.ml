@@ -2214,7 +2214,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           try
             EcMatching.Zipper.map_range env cp change bd
           with
-            | EcMatching.Zipper.InvalidCPos _ ->
+            | EcMatching.Zipper.InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
         )
         pupdates
