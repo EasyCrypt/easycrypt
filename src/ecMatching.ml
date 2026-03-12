@@ -372,6 +372,10 @@ module EV = struct
     | Some (`Set _) -> true
     | _ -> false
 
+  let map (f : 'a -> 'a) (m : 'a evmap) =
+    { ev_map   = Mid.map (omap f) m.ev_map
+    ; ev_unset = m.ev_unset }
+
   let doget (x : ident) (m : 'a evmap) =
     match get x m with
     | Some (`Set a) -> a

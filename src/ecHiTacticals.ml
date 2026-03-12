@@ -207,6 +207,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
     | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x
+    | Phecallfwd x              -> EcPhlExists.process_ecallfwd x
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | Pbyupto                   -> EcPhlUpto.process_uptobad

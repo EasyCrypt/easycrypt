@@ -239,3 +239,227 @@ let process_ecall oside (l, tvi, fs) tc =
   let tc = FApi.t_focus (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) tc in
 
   FApi.t_last EcPhlAuto.t_auto (FApi.t_rotate `Right 1 tc)
+
+(* -------------------------------------------------------------------- *)
+let process_ecallfwd ((ctt_path, ctt_tvi, ctt_args) : APT.pecallfwd) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
+
+  (* Check that we are in a Hoare statement and that first instruction
+   * is a call statement. *)
+  let concl = tc1_as_hoareS tc in 
+  let (lvalue, funname, _), _ = pf_first_call !!tc concl.hs_s in
+
+  let lvalue =
+    match lvalue with
+    | Some lvalue -> lvalue
+    | None ->
+      tc_error !!tc "the call must have a left-value" in
+
+  (* Type-check contract (lemma) - apply it fully to find the Hoare contract *)
+  let ptenv = PT.ptenv_of_penv (LDecl.push_active_ss concl.hs_m hyps) !!tc in
+  let contract =
+    let rec apply_all (contract : PT.pt_ev) =
+      if is_some (TTC.destruct_product ~reduce:true hyps contract.ptev_ax) then
+        apply_all (PT.apply_pterm_to_hole contract)
+      else contract
+    in
+    let contract = PT.process_pterm ptenv (APT.FPNamed (ctt_path, ctt_tvi)) in
+    let contract, _ = PT.process_pterm_args_app contract ctt_args in
+    apply_all contract
+  in
+
+  let rec collect_pvars_from_pt (pt : proofterm) =
+    match pt with
+    | PTApply { pt_args = args } -> begin
+      args
+      |> List.to_seq
+      |> Seq.map collect_pvars_from_ptarg
+      |> Seq.fold_left EcPV.PV.union EcPV.PV.empty
+    end
+    | PTQuant (_, pt) ->
+      collect_pvars_from_pt pt
+
+  and collect_pvars_from_ptarg (ptarg : pt_arg) =
+    match ptarg with
+    | PAFormula f -> collect_pvars_from_form f
+    | PAMemory _ -> EcPV.PV.empty
+    | PAModule _ -> EcPV.PV.empty
+    | PASub pt -> odfl EcPV.PV.empty (omap collect_pvars_from_pt pt)
+
+  and collect_pvars_from_form (f : form) =
+    let pvs = ref EcPV.PV.empty in
+    let rec doit (f : form) =
+      match f.f_node with
+      | Fpvar (pv, _) ->
+        pvs := EcPV.PV.add env pv f.f_ty !pvs
+      | _ -> EcFol.f_iter doit f
+    in doit f; !pvs
+  in
+
+  begin
+    let contract =
+      try
+        destr_hoareF contract.ptev_ax
+      with DestrError _ ->
+        tc_error_lazy ~loc:(L.loc ctt_path) !!tc (fun fmt ->
+          Format.fprintf fmt
+            "contract %a should be a Hoare statement"
+            EcSymbols.pp_qsymbol (L.unloc ctt_path)
+        )
+    in
+
+    if not (EcReduction.EqTest.for_xp env funname contract.hf_f) then begin
+      tc_error_lazy ~loc:(L.loc ctt_path) !!tc (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        Format.fprintf fmt
+          "contract %a should be for the procedure %a, not %a"
+          EcSymbols.pp_qsymbol (L.unloc ctt_path)
+          (EcPrinting.pp_funname ppe) funname
+          (EcPrinting.pp_funname ppe) contract.hf_f
+      )
+    end;
+
+    if not (POE.is_empty (hf_po contract).hsi_inv) then
+      tc_error ~loc:(L.loc ctt_path) !!tc
+        "contract must have an empty exception post-condition";
+  end;
+
+  let pvs = collect_pvars_from_pt contract.ptev_pt in
+  let pvs, _ = EcPV.PV.elements pvs in
+  let ids = List.map (fun (pv, ty) ->
+      (EcIdent.create (Format.sprintf "%s_" (EcTypes.symbol_of_pv pv)), ty)
+    ) pvs in
+  let pvs_as_inv = List.map (fun (pv, ty) ->
+      Inv_ss (f_pvar pv ty (fst concl.hs_m))
+    ) pvs in
+
+  let tc = t_hr_exists_intro_r pvs_as_inv tc in
+  let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
+  let tc = FApi.t_focus (t_intros_i (List.fst ids)) tc in
+
+  let subst = List.fold_left (fun subst ((pv, ty), x) ->
+      EcPV.PVM.add env pv (fst concl.hs_m) (f_local x ty) subst
+    ) EcPV.PVM.empty (List.combine pvs (List.fst ids)) in
+
+  let contract =
+    let hyps = List.fold_left (fun hyps (x, ty) ->
+      EcEnv.LDecl.add_local x (LD_var (ty, None)) hyps
+      ) contract.ptev_env.pte_hy ids in
+    
+    { contract with
+        ptev_env = { contract.ptev_env with pte_hy = hyps} } in
+
+  let rec subst_pt (pt : proofterm) =
+    match pt with
+    | PTApply { pt_head; pt_args } ->
+      PTApply
+        { pt_head = subst_pt_head pt_head
+        ; pt_args = List.map subst_pt_arg pt_args }
+    | PTQuant _ -> assert false
+
+  and subst_pt_head (pth : pt_head) =
+    match pth with
+    | PTHandle _
+    | PTLocal _
+    | PTGlobal _ -> pth
+    | PTCut (f, cs) -> PTCut (subst_form f, cs)
+    | PTTerm pt -> PTTerm (subst_pt pt)
+
+  and subst_pt_arg (pta : pt_arg) =
+    match pta with
+    | PAFormula f -> PAFormula (subst_form f)
+    | PAMemory _  -> pta
+    | PAModule _  -> pta
+    | PASub    pt -> PASub (omap subst_pt pt)
+
+  and subst_pt_ev (ptev : PT.pt_ev) =
+    let ptev_env = subst_pt_env ptev.ptev_env in
+    let ptev_ax = subst_form ptev.ptev_ax in
+    let ptev_pt =  subst_pt ptev.ptev_pt in
+    PT.{ ptev_env; ptev_ax; ptev_pt; }
+
+  and subst_pt_env (ptenv : PT.pt_env) =
+    { pte_pe = ptenv.pte_pe
+    ; pte_hy = ptenv.pte_hy
+    ; pte_ue = EcUnify.UniEnv.copy ptenv.pte_ue
+    ; pte_ev = ref (subst_mevmap !(ptenv.pte_ev)) }
+
+  and subst_mevmap (evm : EcMatching.mevmap) =
+    { evm with
+        evm_form = EcMatching.EV.map subst_form evm.evm_form; }
+
+  and subst_form (f : form) =
+    EcPV.PVM.subst env subst f
+  in
+
+  let contract = subst_pt_ev contract in
+
+  let seqf =
+    let inv = destr_hoareF contract.ptev_ax in
+    let inv = POE.lower (hf_po inv) in
+    let inv = ss_inv_rebind inv (fst concl.hs_m) in
+    let lv =
+      List.map
+        (fun (pv, ty) -> (f_pvar pv ty inv.m).inv)
+        (EcModules.lv_to_ty_list lvalue) in
+    let sargs =
+      EcPV.PVM.add
+        env EcTypes.pv_res inv.m
+        (f_tuple lv) EcPV.PVM.empty in
+
+    { inv = EcPV.PVM.subst env sargs inv.inv; m = inv.m; } in
+
+  let seqf_frame =
+    let wr = EcPV.lp_write env lvalue in 
+
+    let rec doit (f : form) =
+      match sform_of_form f with
+      | SFand (mode, (f1, f2)) -> begin
+        match doit f1, doit f2 with
+        | None, None -> None
+        | Some f, None | None, Some f -> Some f
+        | Some f1, Some f2 -> begin
+          match mode with
+          | `Sym -> Some (f_and f1 f2)
+          | `Asym -> Some (f_anda f1 f2)
+        end
+      end
+
+      | _ -> begin
+        let pvs =
+          let pvs = ref EcPV.PV.empty in
+          let rec f_read (f : form) =
+            match f.f_node with
+            | Fpvar (pv, _) -> pvs := EcPV.PV.add env pv f.f_ty !pvs
+            | _ -> f_iter f_read f
+          in f_read f; !pvs in
+
+          if EcPV.PV.indep env pvs wr then
+            Some f
+          else None
+      end
+    
+    in { inv = odfl f_true (doit (hs_pr concl).inv); m = (hs_pr concl).m; } in
+
+  let tc =
+    FApi.t_first
+      (EcPhlSeq.t_hoare_seq (Zpr.cpos 1) (map_ss_inv2 f_and seqf seqf_frame))
+      tc in
+
+  let tc = FApi.t_first EcPhlHoare.t_hoaresplit tc in
+  let tc = FApi.t_first (EcPhlConseq.t_conseqauto ~delta:false ?tsolve:None) tc in
+  let tc = FApi.t_first EcPhlTAuto.t_hoare_true tc in
+
+  let tc = FApi.t_first (EcPhlCall.t_call None contract.ptev_ax) tc in
+  let tc = FApi.t_sub [
+      EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true contract.ptev_pt;
+      EcPhlSkip.t_skip;
+      t_id
+    ] tc in
+
+  let tc =
+    FApi.t_firsts
+      (t_generalize_hyps ~clear:`Yes (List.fst ids)) 2 tc in
+
+  tc
