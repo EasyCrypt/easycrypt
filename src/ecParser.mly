@@ -3118,6 +3118,9 @@ interleave_info:
 | ECALL s=side? x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
     { Phecall (s, x) }
 
+| ECALL RRARROW pterm=paren(p=qident tvi=tvars_app? fs=loc(gpterm_arg)* { (p, tvi, fs) })
+    { Phecallfwd pterm }
+
 | EXFALSO
     { Pexfalso }
 

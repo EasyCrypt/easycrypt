@@ -737,6 +737,9 @@ type matchmode = [
 type prrewrite = [`Rw of ppterm | `Simpl]
 
 (* -------------------------------------------------------------------- *)
+type pecallfwd = pqsymbol * ptyannot option * ppt_arg located list
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -775,6 +778,7 @@ type phltactic =
   | Phrex_elim
   | Phrex_intro    of (pformula list * bool)
   | Phecall        of (oside * (pqsymbol * ptyannot option * pformula list))
+  | Phecallfwd     of pecallfwd
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv | `EHoare ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
