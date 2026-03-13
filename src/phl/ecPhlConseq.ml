@@ -1521,9 +1521,22 @@ let process_conseq_2 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
+    let mv = 
+      let pre, post = match concl.f_node with
+      | FeHoareS hs -> (ehs_pr hs).inv, (ehs_po hs).inv
+      | FeHoareF hf -> (ehf_pr hf).inv, (ehf_po hf).inv
+      | FbdHoareS bhs -> (bhs_pr bhs).inv, (bhs_po bhs).inv
+      | FbdHoareF bhf -> (bhf_pr bhf).inv, (bhf_po bhf).inv
+      | FequivF ef -> (ef_pr ef).inv, (ef_po ef).inv
+      | FequivS es -> (es_pr es).inv, (es_po es).inv
+      | _ -> tc_error !!tc "conseq: not a phl/prhl judgement" (* Match error above *)
+      in
+      EcSymbols.Msym.of_list [("pre", pre); ("post", post)]
+    in
+
     ensure_none_poe poe;
-    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
-    let post = post |> omap (TTC.pf_process_form !!tc qenv ty) |> odfl (inv_of_inv gpost) in
+    let pre  = pre  |> omap (TTC.pf_process_form !!tc ~mv penv ty) |> odfl (inv_of_inv gpre)  in
+    let post = post |> omap (TTC.pf_process_form !!tc ~mv qenv ty) |> odfl (inv_of_inv gpost) in
 
     let (pre, post, bd) = match gpre, gpost with
     | Inv_ss gpre, Inv_ss gpost ->
@@ -1700,8 +1713,18 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
-    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre) in
-    let post  = post  |> omap (TTC.pf_process_form !!tc qenv ty) in
+    let mv = 
+      let pre, post = match concl.f_node with
+      | FhoareS hs -> (hs_pr hs).inv, (hs_po hs).hsi_inv.main
+      | FhoareF hf -> (hf_pr hf).inv, (hf_po hf).hsi_inv.main
+      | _ -> tc_error !!tc "conseq: not a phl/prhl judgement" (* Matching above error message *)
+      in
+      EcSymbols.Msym.of_list [("pre", pre); ("post", post)]
+    in
+
+
+    let pre  = pre  |> omap (TTC.pf_process_form !!tc ~mv penv ty) |> odfl (inv_of_inv gpre) in
+    let post  = post  |> omap (TTC.pf_process_form !!tc ~mv qenv ty) in
     let poe  = poe |> omap (TTC.pf_process_poe env_e)  in
 
     let (pre, post, bd) = match gpre, gpost with
@@ -1756,8 +1779,21 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
-    let pre  = pre  |> omap (TTC.pf_process_form !!tc penv ty) |> odfl (inv_of_inv gpre)  in
-    let post  = post  |> omap (TTC.pf_process_form !!tc qenv ty) in
+    let mv = 
+      let pre, post = match concl.f_node with
+      | FhoareS hs -> (hs_pr hs).inv, (hs_po hs).hsi_inv.main
+      | FhoareF hf -> (hf_pr hf).inv, (hf_po hf).hsi_inv.main
+      | _ -> tc_error !!tc "conseq: not a phl/prhl judgement" (* Matching above error message *)
+      in
+      EcSymbols.Msym.of_list [
+        ("pre", pre);
+        ("post", post)
+      ]
+    in
+
+
+    let pre  = pre  |> omap (TTC.pf_process_form !!tc ~mv penv ty) |> odfl (inv_of_inv gpre)  in
+    let post  = post  |> omap (TTC.pf_process_form !!tc ~mv qenv ty) in
     let poe  = poe |> omap (TTC.pf_process_poe env_e) in
 
     let (pre, post, bd) = match gpre, gpost with
