@@ -2,6 +2,68 @@
 require import AllCore Distr.
 
 (* -------------------------------------------------------------------- *)
+theory CfoldSelf.
+  module M = {
+    proc f(a : int, b : int) : int = {
+      var c : int;
+      var d : int;
+      
+      c <- c;
+      c <- c + 1;
+      c <- c + d;
+      d <- b + a;
+      c <- d;
+      if (a + b = c) {
+        c <- 0;
+        a <- c;
+      } else {
+        c <- 1;
+        b <- c;
+      }
+      return c;
+    }
+  }.
+  
+  lemma L : hoare[M.f : true ==> res = 0].
+  proof.
+  proc.
+  cfold 1.
+  by auto => /> ?; apply addzC.
+  qed.
+end CfoldSelf.
+
+(* -------------------------------------------------------------------- *)
+theory CfoldStarSelf.
+  module M = {
+    proc f(a : int, b : int) : int = {
+      var c : int;
+      var d : int;
+      
+      c <- c;
+      c <- c + 1;
+      c <- c + d;
+      d <- b + a;
+      c <- d;
+      if (a + b = c) {
+        c <- 0;
+        a <- c;
+      } else {
+        c <- 1;
+        b <- c;
+      }
+      return c;
+    }
+  }.
+  
+  lemma L : hoare[M.f : true ==> res = 0].
+  proof.
+  proc.
+  cfold* 1.
+  by auto => /> ?; apply addzC.
+  qed.
+end CfoldStarSelf.
+
+(* -------------------------------------------------------------------- *)
 theory CfoldStopIf.
   module M = {
     proc f(a : int, b : int) : int = {

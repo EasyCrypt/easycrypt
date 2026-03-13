@@ -55,6 +55,16 @@ let lv_of_expr e =
      LvTuple (List.map (fun e -> EcTypes.destr_var e, e_ty e) pvs)
   | _ -> failwith "failed to construct lv from expr"
 
+let explode_assgn (lv : lvalue) (e : expr) : ((prog_var * ty) * expr) list =
+  match lv, e with
+  | LvVar lv, e ->
+    [(lv, e)]
+  | LvTuple lvs, { e_node = Etuple es } ->
+    List.combine lvs es
+  | LvTuple lvs, e ->
+    List.mapi (fun i (pv, ty) ->
+      ((pv, ty), e_proj_simpl e i ty)) lvs
+
 (* -------------------------------------------------------------------- *)
 type instr = EcAst.instr
 
@@ -162,6 +172,14 @@ let is_match  = _is_of_get get_match
 let is_raise  = _is_of_get get_raise
 
 (* -------------------------------------------------------------------- *)
+let i_asgn_of_pve (pve : ((prog_var * ty) * expr) list) : instr option = 
+  let lvs, es = List.split pve in
+
+  lvs
+  |> lv_of_list
+  |> omap (fun lvs -> i_asgn (lvs, e_tuple es))
+
+(* -------------------------------------------------------------------- *)
 let i_iter (f : instr -> unit) =
   let rec i_iter (i : instr) =
     match i.i_node with
@@ -180,6 +198,24 @@ let i_iter (f : instr -> unit) =
     List.iter f s.s_node
 
   in fun (i : instr) -> i_iter i
+
+(* -------------------------------------------------------------------- *)
+let i_map_expr (tx : expr -> expr) =
+  let rec doit (i : instr) =
+    match i.i_node with
+    | Sasgn (lv, e) -> i_asgn (lv, (tx e))
+    | Sif (c, t, f) -> i_if (tx c, doit_s t, doit_s f)
+    | Smatch (e, cs) -> i_match (tx e, List.map (snd_map doit_s) cs)
+    | Swhile (c, bd) -> i_while (tx c, doit_s bd)
+    | Srnd (lv, e) -> i_rnd (lv, tx e)
+    | Sraise e -> i_raise (tx e)
+    | Sabstract (_ : memory) -> i
+    | Scall (lv, f, args) -> i_call (lv, f, List.map tx args)
+
+  and doit_s (s : stmt) =
+    stmt (List.map doit s.s_node) in
+
+  fun i -> doit i
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
