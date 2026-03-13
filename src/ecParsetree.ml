@@ -757,7 +757,7 @@ type phltactic =
   | Pcond          of pcond_info
   | Pmatch         of matchmode
   | Pswap          of ((oside * pswap_kind) located list)
-  | Pcfold         of (oside * pcodepos * int option)
+  | Pcfold         of (oside * pcodepos * int option * bool) (* side + 1st inst + n lines + eager? *)
   | Pinline        of inline_info
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located

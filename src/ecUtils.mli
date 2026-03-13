@@ -307,6 +307,10 @@ module List : sig
        ('a -> 'b -> [`Interrupt | `Continue of 'a * 'c])
     -> 'a -> 'b list -> 'a * 'c list * 'b list
 
+  val fold_left_map_filter_while :
+       ('a -> 'b -> [`Interrupt | `Continue of 'a * ('c option)])
+    -> 'a -> 'b list -> 'a * 'c list * 'b list
+
   (* ------------------------------------------------------------------ *)
   val ksort:
         ?stable:bool -> ?rev:bool
