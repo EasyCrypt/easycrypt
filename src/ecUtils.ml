@@ -622,6 +622,19 @@ module List = struct
       end
 
     in fun state xs -> aux state [] xs
+
+  (* FIXME: REMOVE *)
+  let fold_left_map_filter_while (f: 'a -> 'b -> ('a * ('c option)) interruptible) =
+    let rec aux (state: 'a) (acc: 'c list) (xs : 'b list) =
+      match xs with
+      | [] -> (state, List.rev acc, [])
+      | y :: ys -> begin
+        match f state y with
+        | `Continue (state, Some y) -> aux state (y :: acc) ys
+        | `Continue (state, None)   -> aux state acc ys
+        | `Interrupt                -> (state, List.rev acc, xs)
+      end
+    in fun state xs -> aux state [] xs
 end
 
 (* -------------------------------------------------------------------- *)
