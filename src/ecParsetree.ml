@@ -757,7 +757,7 @@ type phltactic =
   | Pcond          of pcond_info
   | Pmatch         of matchmode
   | Pswap          of ((oside * pswap_kind) located list)
-  | Pcfold         of (oside * pcodepos * int option)
+  | Pcfold         of pcfold
   | Pinline        of inline_info
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
@@ -811,6 +811,12 @@ type phltactic =
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
 ]
+
+and pcfold =
+  { side   : oside
+  ; start  : pcodepos
+  ; length : int option
+  ; eager : bool }
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]

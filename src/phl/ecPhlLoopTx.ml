@@ -334,7 +334,7 @@ let process_unroll_for ~cfold side cpos tc =
     let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
     let clen = blen * (List.length zs - 1) in
 
-    FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv
+    FApi.t_last (EcPhlCodeTx.t_cfold ~eager:false side cpos (Some clen)) tcenv
   end else tcenv
 
 (* -------------------------------------------------------------------- *)
