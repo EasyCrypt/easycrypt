@@ -419,6 +419,7 @@ type inv =
   | Inv_hs of hs_inv
 
 val inv_of_inv : inv -> form
+val memories_of_inv : inv -> memory list
 
 val lift_ss_inv : (ss_inv -> 'a) -> inv -> 'a
 val lift_ss_inv2 : (ss_inv -> ss_inv -> 'a) -> inv -> inv -> 'a

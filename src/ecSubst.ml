@@ -1201,3 +1201,12 @@ let hs_inv_rebind ({hsi_inv;hsi_m}: hs_inv) (m': memory) : hs_inv =
   else
     let hsi_inv = POE.map (subst_form (add_memory empty hsi_m m')) hsi_inv in
     { hsi_inv; hsi_m = m' }
+
+(* -------------------------------------------------------------------- *)
+let inv_rebind (inv : inv) (ms : memory list) : inv =
+  match inv, ms with
+  | Inv_ss ss, [m] -> Inv_ss (ss_inv_rebind ss m)
+  | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
+  | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
+  | _, _ -> assert false
+

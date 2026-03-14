@@ -846,6 +846,12 @@ module Apply = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let t_duplicate_top_assumtion (tc : tcenv1) =
+  let hlemma = EcCoreLib.CI_Logic.p_ip_dup in
+  let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) hlemma in
+  Apply.t_apply_bwd_r ~mode:EcMatching.fmrigid ~canview:false pt tc
+
+(* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
 
 let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =

@@ -3201,6 +3201,9 @@ interleave_info:
 | PROC REWRITE side=side? pos=codepos SLASHEQ
     { Pprocrewrite (side, pos, `Simpl) }
 
+| PROC REWRITE AT tg=ident f=pterm
+    { Pprocrewriteat (tg, f) }
+
 | HOARE SPLIT
     { Phoaresplit }
 

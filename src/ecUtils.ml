@@ -399,6 +399,10 @@ module List = struct
   end
 
   (* ------------------------------------------------------------------ *)
+  let of_pair ((x, y) : 'a * 'a) : 'a list =
+    [x; y]
+
+  (* ------------------------------------------------------------------ *)
   let ohead = Exceptionless.hd
   let otail = Exceptionless.tl
   let olast = Exceptionless.last
