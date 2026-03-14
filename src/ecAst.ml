@@ -472,7 +472,13 @@ let inv_of_inv (inv: inv) : form =
   match inv with
   | Inv_ss ss -> ss.inv
   | Inv_ts ts -> ts.inv
-  | _ -> failwith "expected single or two sided invarinat"
+  | _ -> failwith "expected single or two sided invariant"
+
+let memories_of_inv (inv : inv) : memory list =
+  match inv with
+  | Inv_ss ss -> [ss.m]
+  | Inv_ts ts -> [ts.ml; ts.mr]
+  | Inv_hs hs -> [hs.hsi_m]
 
 let lift_ss_inv (f: ss_inv -> 'a) : inv -> 'a =
   let f inv = match inv with

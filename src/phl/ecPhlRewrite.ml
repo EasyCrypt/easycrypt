@@ -1,11 +1,14 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcParsetree
 open EcAst
 open EcCoreGoal
 open EcEnv
 open EcModules
 open EcFol
-open Batteries
+
+module L  = EcLocation
+module PT = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 let t_change
@@ -68,6 +71,38 @@ let process_change
   let (), tc = t_change side pos expr tc in tc
 
 (* -------------------------------------------------------------------- *)
+let try_rewrite_patterns
+  (hyps   : LDecl.hyps)
+  (pts    : (PT.pt_ev * EcLowGoal.rwmode * (form * form)) list)
+  (target : form)
+=
+  let try1 (pt, mode, (f1, f2)) =
+    try
+      let subf, occmode =
+        EcProofTerm.pf_find_occurence_lazy
+          pt.EcProofTerm.ptev_env ~ptn:f1 target
+      in
+
+      assert (EcProofTerm.can_concretize pt.ptev_env);
+
+      let f2 = EcProofTerm.concretize_form pt.ptev_env f2 in
+      let pt, _ = EcProofTerm.concretize pt in
+
+      let cpos =
+        EcMatching.FPosition.select_form
+          ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+          hyps None subf target in
+
+      let target = EcMatching.FPosition.map cpos (fun _ -> f2) target in
+
+      Some ((pt, mode, cpos), target)
+
+    with EcProofTerm.FindOccFailure _ ->
+      None
+
+  in List.find_map_opt try1 pts
+
+(* -------------------------------------------------------------------- *)
 let process_rewrite_rw
     (side : side option)
     (pos  : pcodepos)
@@ -81,41 +116,14 @@ let process_rewrite_rw
   let pts = EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
 
   let change (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
-    let e = ss_inv_of_expr (fst m) e in
-
-    let try1 (pt, mode, (f1, f2)) =
-      try
-        let subf, occmode =
-          EcProofTerm.pf_find_occurence_lazy
-            pt.EcProofTerm.ptev_env ~ptn:f1 e.inv
-        in
-        let subf = { m=e.m; inv=subf } in
-
-        assert (EcProofTerm.can_concretize pt.ptev_env);
-
-        let f2 = EcProofTerm.concretize_form pt.ptev_env f2 in
-        let pt, _ = EcProofTerm.concretize pt in
-
-        let cpos =
-          EcMatching.FPosition.select_form
-            ~xconv:`AlphaEq ~keyed:occmode.k_keyed
-            hyps None subf.inv e.inv in
-
-        let e = map_ss_inv1 (EcMatching.FPosition.map cpos (fun _ -> f2)) e in
-
-        Some ((pt, mode, cpos), e)
-
-      with EcProofTerm.FindOccFailure _ ->
-        None
-
-    in
+    let e = form_of_expr ~m:(fst m) e in
 
     let data, e =
       EcUtils.ofdfl
         (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
-        (List.find_map_opt try1 pts) in
+        (try_rewrite_patterns hyps pts e) in
 
-    (m, data), expr_of_ss_inv e
+    (m, data), (expr_of_ss_inv { m = fst m; inv = e; })
   in
 
   let pos = EcLowPhlGoal.tc1_process_codepos tc (side, pos) in
@@ -168,6 +176,58 @@ let process_rewrite
   match rw with
   | `Rw rw -> process_rewrite_rw side pos rw tc
   | `Simpl -> process_rewrite_simpl side pos tc
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite_at
+  (where : psymbol)
+  (pt    : ppterm)
+  (tc    : tcenv1)
+=
+  if L.unloc where <> "pre" then begin
+    tc_error !!tc "can only rewrite in pre-condition"
+  end;
+
+  let pre  = EcLowPhlGoal.tc1_get_pre tc in
+  let post = EcLowPhlGoal.tc1_get_post tc in
+
+  let tophyps = FApi.tc1_hyps tc in
+
+  let mems, hyps = EcLowPhlGoal.push_memenvs_pre tophyps (FApi.tc1_goal tc) in
+  let pre = EcSubst.inv_rebind pre (List.fst mems) in
+
+  let ptenv = EcProofTerm.ptenv_of_penv hyps !!tc in
+  let pt = EcProofTerm.process_full_pterm ptenv pt in
+  let pts = EcHiGoal.LowRewrite.find_rewrite_patterns `LtoR pt in
+
+  let (pt, mode, cpos), pre =
+    let data, cpre =
+      EcUtils.ofdfl
+        (fun () -> tc_error !!tc "cannot find a pattern to rewrite")
+        (try_rewrite_patterns hyps pts (inv_of_inv pre)) in
+    (data, map_inv1 (fun _ -> cpre) pre) in
+
+  let t_pre (tc : tcenv1) =
+    let ids = List.fst mems in
+    let h1 = EcIdent.create "_" in
+    let h2 = EcIdent.create "_" in
+
+    let+ tc = EcLowGoal.t_intros_i ids tc in
+    let+ tc = EcLowGoal.t_duplicate_top_assumtion tc in
+    let+ tc = EcLowGoal.t_intros_i [h1; h2] tc in
+
+       EcLowGoal.t_rewrite ~mode ~target:h2 pt (`LtoR, Some cpos) tc
+    |> FApi.t_last (EcLowGoal.t_apply_hyp h2)
+    |> FApi.t_onall (EcLowGoal.t_generalize_hyp ~clear:`Yes h1)
+    |> FApi.t_onall (EcLowGoal.t_generalize_hyps ~clear:`Yes ids) in
+
+  let t_post (tc : tcenv1) =
+    let ids = List.map (fun _ -> EcIdent.create "_") mems in
+    let h = EcIdent.create "_" in
+    let+ tc = EcLowGoal.t_intros_i (ids @ [h]) tc in
+    EcLowGoal.t_apply_hyp h tc in
+
+  EcPhlConseq.t_conseq pre post tc
+  |> FApi.t_sub [t_pre; t_post; EcLowGoal.t_id]
 
 (* -------------------------------------------------------------------- *)
 let t_change_stmt

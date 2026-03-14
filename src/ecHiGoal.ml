@@ -1403,8 +1403,8 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
   and intro1_dup (_ : ST.state) (tc : tcenv1) =
     try
-      let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) LG.p_ip_dup in
-      EcLowGoal.Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt tc
+      EcLowGoal.t_duplicate_top_assumtion tc
+
     with EcLowGoal.Apply.NoInstance _ ->
       tc_error !!tc "no top-assumption to duplicate"
 

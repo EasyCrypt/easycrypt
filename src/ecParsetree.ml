@@ -789,6 +789,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
   | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
+  | Pprocrewriteat of psymbol * ppterm
   | Pchangestmt    of side option * pcodepos_range * pstmt
   | Phoaresplit
 
