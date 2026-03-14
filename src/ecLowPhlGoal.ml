@@ -268,7 +268,6 @@ let get_post f =
   | FequivS es   -> Some (Inv_ts (es_po es))
   | _            -> None
 
-
 let tc1_get_post tc =
   match get_post (FApi.tc1_goal tc) with
   | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
@@ -303,6 +302,33 @@ let set_pre ~pre f =
     let pre = ts_inv_rebind pre (fst es.es_ml) (fst es.es_mr) in
     f_equivS (snd es.es_ml) (snd es.es_mr) pre es.es_sl es.es_sr (es_po es)
  | _            -> assert false
+
+(* -------------------------------------------------------------------- *)
+let get_memenvs_pre (env : env) (f : form) =
+  match f.f_node with
+  | FhoareF hf   -> Some [fst (EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env)]
+  | FhoareS hs   -> Some [hs.hs_m]
+  | FeHoareF hf  -> Some [fst (EcEnv.Fun.hoareF_memenv hf.ehf_m hf.ehf_f env)]
+  | FeHoareS hs  -> Some [hs.ehs_m]
+  | FbdHoareF hf -> Some [fst (EcEnv.Fun.hoareF_memenv hf.bhf_m hf.bhf_f env)]
+  | FbdHoareS hs -> Some [hs.bhs_m]
+  | FequivF ef   -> Some (List.of_pair (fst (EcEnv.Fun.equivF_memenv ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr env)))
+  | FequivS es   -> Some [es.es_ml; es.es_mr]
+  | _            -> None
+
+(* -------------------------------------------------------------------- *)
+let push_memenvs_pre (hyps : LDecl.hyps) (f : form) =
+  match get_memenvs_pre (LDecl.toenv hyps) f with
+  | Some [m] ->
+    let m = (EcIdent.create "&hr", snd m) in
+    let hyps = EcEnv.LDecl.push_active_ss m hyps in
+    ([m], hyps)
+  | Some [ml; mr] ->
+    let ml = (EcIdent.create "&1", snd ml) in
+    let mr = (EcIdent.create "&2", snd mr) in
+    let hyps = EcEnv.LDecl.push_active_ts ml mr hyps in
+    ([ml; mr], hyps)
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 exception InvalidSplit of codepos1

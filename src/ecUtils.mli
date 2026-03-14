@@ -254,6 +254,8 @@ module List : sig
     val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
   end
 
+  val of_pair : 'a * 'a -> 'a list
+
   (* Aliases to exception-less functions *)
   val ocons   : 'a option -> 'a list -> 'a list
   val ohead   : 'a list -> 'a option
