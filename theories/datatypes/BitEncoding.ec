@@ -666,6 +666,16 @@ end BitReverse.
 theory BitChunking.
 op chunk r (bs : 'a list) =
   mkseq (fun i => take r (drop (r * i)%Int bs)) (size bs %/ r).
+  
+lemma chunk_nil ['a] (n : int) : chunk<:'a> n [] = [].
+proof. by rewrite /chunk /= mkseq0. qed.
+
+lemma chunk_exact ['a] (xs : 'a list) : xs <> [] => chunk (size xs) xs = [xs].
+proof.
+rewrite /chunk divzz; case: (xs = []) => //.
+rewrite size_eq0 => -> _; rewrite b2i1 /= mkseq1; congr=> /=.
+by rewrite drop0 take_oversize.
+qed.
 
 lemma chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.
