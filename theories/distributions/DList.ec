@@ -289,6 +289,47 @@ rewrite fcards0 RField.expr0 RField.mulr1 => <-.
 apply: mu_eq_support => xs; rewrite supp_dlist //= => -[? ?]; smt(in_fset0).
 qed.
 
+lemma dmap_dlist_partial_perm ['a] (x0 : 'a) (d : 'a distr) (f : int -> int) (n k : int) :
+     0 <= k
+  => 0 <= n
+  => is_lossless d
+  => (forall i j, 0 <= i < k => 0 <= j < k => f i = f j => i = j)
+  => (forall i, 0 <= i < k => 0 <= f i < n)
+  =>   dmap (dlist d n) (fun xs => mkseq (fun i => nth x0 xs (f i)) k)
+     = dlist d k.
+proof.
+move=> ge0_k ge0_n lld injf inrgf.
+elim: k ge0_k n ge0_n f injf inrgf.
+- move=> n ge0_n f injf inrgf; rewrite [dlist d 0]dlist0 //.
+  rewrite -(eq_dmap _ (fun _ => [])) //=.
+  - by move=> ? /=; rewrite mkseq0.
+  by rewrite dmap_cst //; apply/dlist_ll/lld.
+move=> k ge0_k ih n ge0_n f injf inrgf.
+pose k1 := f k; pose k2 := n - (k1 + 1).
+have ->: n = (k1 + 1) + k2 by rewrite /k1 /k2 #ring.
+rewrite dlist_djoin 1:/# -cat_nseq ~-1:/# nseqSr 1:/#.
+rewrite -cats1 -catA /= djoin_perm_s1s /= dmap_dlet /=.
+rewrite -!dlist_djoin ~-1:/# /=.
+pose c (i : int) := f i - b2i (k1 <= f i).
+pose h (a : 'a list) := mkseq (fun i => nth x0 a (c i)) k.
+pose C (a : 'a list * 'a list) := a.`1 ++ a.`2.
+pose F (a : 'a list) (x : 'a) := rcons (h a) x.
+rewrite -(in_eq_dlet (fun (ds : 'a list * 'a list) => dmap d (F (C ds)))).
+- move=> ds /supp_dprod => /= []; rewrite !supp_dlist ~-1:/#.
+  move=> [#] hsz1 _ hsz2 _; rewrite dmap_comp &(eq_dmap) /=.
+  move=> x @/(\o) /=; rewrite mkseqS 1:/# /F /=; congr; last first.
+  - by rewrite nth_cat ifF 1:/# /= ifT 1:/#.
+  apply: eq_in_mkseq => i rgi /=; rewrite !nth_cat.
+  rewrite /c hsz1 lezNgt; case: (f i < k1) => /= [->//|?].
+  by rewrite !ifF ~-1:/# addrAC.
+rewrite -(dlet_dmap _ C (fun ds => dmap d (F ds))) -dlist_add ~-1:/#.
+rewrite -(dmap_dprodE _ _ (fun (xy : _ * _) => F xy.`1 xy.`2)) /F /=.
+rewrite dlistSr ~-1:/# /= !dmap_dprodE_swap /= &(in_eq_dlet) /=.
+move=> x _; rewrite -(dmap_comp h (fun xs => rcons xs x)); congr.
+apply: ih => @/k2; 2,3: by smt().
+have ->: k1 + (n - (k1 + 1)) = n - 1 by ring.
+by have := inrgf 0 _; smt().
+qed.
 
 abstract theory Program.
   type t.

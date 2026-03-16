@@ -2701,6 +2701,9 @@ move=> ge0_n ge0_m; rewrite /mkseq iota_add ?map_cat //=.
 by rewrite -{2}(addz0 n) iota_addl -map_comp.
 qed.
 
+lemma mkseq2 ['a] (f : int -> 'a) : mkseq f 2 = [f 0; f 1].
+proof. by rewrite (mkseq_add _ 1 1) // !mkseq1. qed.
+
 lemma mkseqP f n (x:'a) :
   mem (mkseq f n) x <=> exists i, 0 <= i < n /\ x = f i.
 proof. by rewrite mapP &(exists_iff) /= => i; rewrite mem_iota. qed.
