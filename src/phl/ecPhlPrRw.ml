@@ -113,14 +113,14 @@ let destr_pr_has pr =
   let m = pr.pr_event.m in
   match pr.pr_event.inv.f_node with
   | Fapp ({ f_node = Fop(op, [ty_elem]) }, [f_f; f_l]) ->
-      if EcPath.p_equal p_list_has op then
-        Some(ty_elem, {m;inv=f_f}, {m;inv=f_l})
+      if EcPath.p_equal p_list_has op && not (Mid.mem m f_l.f_fv) then
+        Some(ty_elem, {m;inv=f_f}, f_l)
       else None
   | _ -> None
 (*
  lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
    mu d (fun a => has (P a) s) <= BRA.big predT (fun b => mu d (fun a => P a b)) s.
-   Pr [f(args)@ &m : has P s] <= BRA.big predT (fun b => Pr [f(args) &m : P b])
+   Pr [f(args)@ &m : has Pa s] <= BRA.big predT (fun b => Pr [f(args) &m : Pa b]) s
 *)
 let pr_has_le f_pr =
   let pr = destr_pr f_pr in
@@ -131,8 +131,7 @@ let pr_has_le f_pr =
   let f_pr1 = f_pr_r {pr with pr_event} in
   let f_fsum = f_lambda [idx, GTty ty_elem] f_pr1 in
   let f_sum =
-    (* FIXME: Ensure that `f_l` does not use its memory *)
-    f_app (f_op p_BRA_big [ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l.inv] EcTypes.treal in
+    f_app (f_op p_BRA_big [ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l] EcTypes.treal in
   f_real_le f_pr f_sum
 
 (* -------------------------------------------------------------------- *)
@@ -185,7 +184,7 @@ let select_pr_muhasle sid f =
       if EcPath.p_equal EcCoreLib.CI_Real.p_real_le op then
         match destr_pr_has pr with
         | Some (_, _, f_l) when
-          Mid.set_disjoint f_l.inv.f_fv (Mid.add f_l.m () sid) ->
+          Mid.set_disjoint f_l.f_fv sid ->
             raise (FoundPr f_pr)
         | _ -> false
       else false

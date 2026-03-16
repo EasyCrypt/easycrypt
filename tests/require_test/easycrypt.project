@@ -1,0 +1,6 @@
+[general]
+provers = CVC5@1.0
+provers = Z3@4.12
+
+idirs=Foo2:foo2
+idirs=Foo1:foo1

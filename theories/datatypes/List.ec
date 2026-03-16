@@ -184,6 +184,15 @@ proof. by elim: s1 x => [|y s1 ih] x //=; rewrite ih. qed.
 lemma belast_rcons x s z : belast<:'a> x (rcons s z) = x :: s.
 proof. by rewrite lastI -!cats1 belast_cat. qed.
 
+lemma cat_eq0I (xs ys : 'a list) : xs ++ ys = [] => xs = [] /\ ys = [].
+proof. by case: xs. qed.
+
+lemma cat_eq0IL (xs ys : 'a list) : xs ++ ys = [] => xs = [].
+proof. by case: xs. qed.
+
+lemma cat_eq0IR (xs ys : 'a list) : xs ++ ys = [] => ys = [].
+proof. by case: xs. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                   rcons / induction principle                        *)
 (* -------------------------------------------------------------------- *)

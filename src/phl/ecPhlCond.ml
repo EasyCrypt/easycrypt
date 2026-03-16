@@ -142,7 +142,9 @@ end = struct
         Inv_ts (ss_inv_generalize_left f ml)
       | Inv_ss _, _ ->
         Inv_ss f
-      | Inv_ts _, None -> tc_error !!tc "expecting a side" in
+      | Inv_ts _, None -> tc_error !!tc "expecting a side"
+      | Inv_hs _, _ -> assert false
+    in
 
     let onsub (i : int) (tc : tcenv1) =
       let cname, cargs = List.nth indt.tydt_ctors i in

@@ -185,7 +185,10 @@ let t_bdep_solve
     let st = state_of_prog hyps (fst hs.hs_m) ~st hs.hs_s.s_node in
     let _tm = time (toenv hyps) tm "Done with program circuit gen" in
 
-    let res = solve_post ~st ~pres:cpres hyps (hs_po hs).inv in
+    if not (POE.is_empty (hs_po hs).hsi_inv) then
+      tc_error !!tc "exception not supported";
+
+    let res = solve_post ~st ~pres:cpres hyps (POE.lower (hs_po hs)).inv in
     EcCircuits.clear_translation_caches ();
     if res then 
       FApi.close (!@ tc) VBdep 
@@ -249,8 +252,10 @@ let t_bdep_simplify (tc: tcenv1) =
   let goal = (FApi.tc1_goal tc) in
   let env  = (FApi.tc1_env  tc) in
   match goal.f_node with 
-  | FhoareS hs -> 
-    begin try
+  | FhoareS hs -> begin
+    if not (POE.is_empty (hs_po hs).hsi_inv) then
+      tc_error !!tc "exceptions not supported";
+    try
       let m = fst hs.hs_m in
       let tm = Unix.gettimeofday () in
       let st = circuit_state_of_hyps hyps in
@@ -259,7 +264,7 @@ let t_bdep_simplify (tc: tcenv1) =
       let tm = time env tm "Done with precondition processing" in
 
       let st = EcCircuits.state_of_prog ~st hyps (fst hs.hs_m) hs.hs_s.s_node in
-      let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps (hs_po hs).inv in
+      let post = EcCallbyValue.norm_cbv (circ_red hyps) hyps (POE.lower (hs_po hs)).inv in
 
       EcEnv.notify env `Debug "[W] Post after simplify (before circuit pass):@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) post;
@@ -269,7 +274,7 @@ let t_bdep_simplify (tc: tcenv1) =
       let tm = time env tm "Done with circuit simplify" in
       let f = EcCallbyValue.norm_cbv (EcReduction.full_red) hyps f in
       let _tm = time env tm "Done with second simplify" in
-      let new_goal = f_hoareS (snd hs.hs_m) {inv=(hs_pr hs).inv; m} hs.hs_s {inv=f; m} in
+      let new_goal = f_hoareS (snd hs.hs_m) {inv=(hs_pr hs).inv; m} hs.hs_s (POE.lift {inv=f; m}) in
 
       EcEnv.notify env `Debug "[W] Goal after simplify:@. %a@."
         EcPrinting.(pp_form PPEnv.(ofenv env)) new_goal;
@@ -360,6 +365,9 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
           | _ -> tc_error (tc1_penv tc) "Unsupported List pattern"
         end
     | FhoareS hs, Some v -> 
+      if not (POE.is_empty (hs_po hs).hsi_inv) then
+        tc_error !!tc "exceptions not supported";
+
       let m, mt = hs.hs_m in
       let v = match EcMemory.lookup v mt with
       | Some (v, _, _) -> v 
@@ -389,8 +397,8 @@ let t_extens (v: string option) (tt : backward) (tc : tcenv1) =
         let s = subst_pv_stmt (tc1_hyps tc) m subst hs.hs_s in
         let subst = EcPV.PVM.subst (tc1_env tc) subst in
         let pr = subst (hs_pr hs).inv in
-        let po = subst (hs_po hs).inv in
-        let goal = f_hoareS mt ({inv=pr;m}) s ({inv=po;m}) in
+        let po = subst (POE.lower (hs_po hs)).inv in
+        let goal = f_hoareS mt ({inv=pr;m}) s (POE.lift {inv=po;m}) in
         EcEnv.notify (FApi.tc1_env tc) `Debug 
         
         "[W] Generated goal %d => %a@." i

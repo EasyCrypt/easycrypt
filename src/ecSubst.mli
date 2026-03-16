@@ -40,13 +40,14 @@ val fresh_tparams : subst -> ty_params -> subst * ty_params
 val freshen_type  : (ty_params * ty) -> (ty_params * ty)
 
 (* -------------------------------------------------------------------- *)
-val subst_theory  : subst -> theory -> theory
-val subst_ax      : subst -> axiom -> axiom
-val subst_op      : subst -> operator -> operator
-val subst_op_body : subst -> opbody -> opbody
-val subst_tydecl  : subst -> tydecl -> tydecl
-val subst_theory  : subst -> theory -> theory
-val subst_branches : subst -> opbranches -> opbranches
+val subst_theory    : subst -> theory -> theory
+val subst_ax        : subst -> axiom -> axiom
+val subst_op        : subst -> operator -> operator
+val subst_op_body   : subst -> opbody -> opbody
+val subst_tydecl    : subst -> tydecl -> tydecl
+val subst_theory    : subst -> theory -> theory
+val subst_branches  : subst -> opbranches -> opbranches
+val subst_exception : subst -> exception_ -> exception_
 
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
@@ -101,3 +102,9 @@ val f_forall_mems_ts_inv : memenv -> memenv -> ts_inv -> form
 
 val ss_inv_forall_ml_ts_inv : memenv -> ts_inv -> ss_inv
 val ss_inv_forall_mr_ts_inv : memenv -> ts_inv -> ss_inv
+
+(* -------------------------------------------------------------------- *)
+val hs_inv_rebind : hs_inv -> memory -> hs_inv
+
+(* -------------------------------------------------------------------- *)
+val inv_rebind : inv -> memory list -> inv

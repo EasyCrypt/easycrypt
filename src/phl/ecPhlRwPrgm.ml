@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcParsetree
 open EcCoreGoal
 open EcLowPhlGoal
@@ -13,6 +14,9 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
   let env = EcEnv.LDecl.toenv hyps in
   let hs = EcLowPhlGoal.tc1_as_hoareS tc in
   let cpos = EcLowPhlGoal.tc1_process_codepos tc (None, cpos) in
+
+  if not (POE.is_empty (hs_po hs).hsi_inv) then
+    tc_error !!tc "exceptions not supported";
 
   let mem, _ =
     let bindings =
@@ -63,7 +67,7 @@ let process_change ((cpos, bindings, i, s) : change_t) (tc : tcenv1) =
     let target, tl = List.split_at i zp.z_tail in
 
     let keep = pvtail (EcPV.is_read env tl) zp.z_path in
-    let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (EcAst.hs_po hs).inv) in
+    let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory mem) (POE.lower (EcAst.hs_po hs)).inv) in
     let st = EcLowCircuits.(set_logger empty_state EcEnv.(notify env `Debug "%s")) in
 
     begin
@@ -95,11 +99,12 @@ let process_idassign ((cpos, pv) : idassign_t) (tc : tcenv1) =
     let s = Zpr.zipper_of_cpos env cpos hs.hs_s in
     let s = { s with z_tail = sasgn :: s.z_tail } in
     { hs with hs_s = Zpr.zip s } in
-  FApi.xmutate1 tc `IdAssign EcAst.[EcFol.f_hoareS (hs.hs_m |> snd) (hs_pr hs) (hs.hs_s) (hs_po hs)]
+  FApi.xmutate1 tc `IdAssign
+    [EcFol.f_hoareS (snd hs.hs_m) (hs_pr hs) (hs.hs_s) (hs_po hs)]
 
 (* -------------------------------------------------------------------- *)
 let process_rw_prgm (mode : rwprgm) (tc : tcenv1) =
-  match mode with 
+  match mode with
   | `IdAssign (cpos, pv) ->
     process_idassign (cpos, pv) tc
   | `Change (cpos, bindings, i, s) ->
