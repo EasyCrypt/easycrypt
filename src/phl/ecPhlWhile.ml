@@ -218,13 +218,13 @@ let t_bdhoare_while_rev_geq_r inv vrnt (k: ss_inv) (eps: ss_inv) tc =
 
   if not (PV.indep env (s_write env lp_body) (PV.fv env (EcMemory.memory mem) eps.inv)) then
     tc_error !!tc
-      "The variant decreasing rate lower-bound cannot "
-      "depend on variables written by the loop body";
+      "The variant decreasing rate lower-bound cannot \
+       depend on variables written by the loop body";
 
   if not (PV.indep env (s_write env lp_body) (PV.fv env (EcMemory.memory mem) k.inv)) then
     tc_error !!tc
-      "The variant upper bound cannot depend on "
-      "variables written by the loop body";
+      "The variant upper bound cannot depend on \
+       variables written by the loop body";
 
   check_single_stmt tc rem_s;
 
