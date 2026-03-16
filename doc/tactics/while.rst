@@ -235,73 +235,152 @@ designated relational case, but for a single program:
 Variant: Probabilistic Hoare logic with non-strict variant and `>=` or `=` bound
 ------------------------------------------------------------------------
 
+This variant only works on pHL goals whose body only contains a while loop.
+It can be seen as a variation of the variant pHL with `>=` bounds
+with some additional requirements to handle issues with termination.
+
 .. admonition:: Syntax
 
-   `while {formula} {expr1} {expr2} {prob}`
+   `while {formula} {var} {varbd} {prob}`
 
-Here `{formula}` is an invariant, `{expr1}` and `{expr2}` are integer
-termination variants, and `{prob}` is a probability threshold.
+Here `{formula}` is an invariant, `{var}` is an integer
+termination variant, `{varbd}` is an upper bound on the variant, 
+and `{prob}` is a lower bound on the probability that the variant decreases.
+
+Program variables used in `{varbd}` and `{prob}` need to be unmodified by the loop body.
+
+Though this tactic can be used to prove non-`1%r` bounds, it only works with
+almost certain termination. The bounds are proven using co-induction, 
+similarly to the variant of while for pHL with `>=` bounds. Using this
+requires carefully setting up the precondition and bounds to facilitate this.
 
 The tactic generates 6 goals
 
-- a goal that connects the precondition to the invariant
+- A goal that connects the precondition to the invariant
 
-- 
+- A goal that handles the case where the loop is never entered, connecting
+  the bound of the pHL statement to both the precondition and postcondition.
+
+- A goal requiring that `{varbd}` bounds the variant from above, and that the loop
+  condition fails when the variant reaches 0.
+
+- A goal requiring that the pHL holds from coinduction.
+
+- A goal requiring that the invariant is always preserved
+
+- A goal requiring that `{prob}` is positive and lower bounds the probability of
+  the variant decreasing.
 
 .. ecproof::
-   :title: Example with `1%r` bound
+   :title: Rejection sample example
    require import AllCore DBool.
- 
+
    module M = {
-     proc p(n) = {
-       var b, r;
-       r <- true;
-       while (0 < n) {
-         b <$ {0,1};
-         if (b) {
-           n <- n-1;
-         }
+     proc rs(c: bool) = {
+       while (c) {
+         c <$ {0,1};
        }
-       return r;
      }
    }.
- 
-   lemma L: phoare[M.p: true ==> res] >= 1%r.
+
+   lemma L: phoare[M.rs: true ==> true] = 1%r.
    proof.
    proc.
-   sp.
-   while r n n (1%r/2%r).
-   - trivial.
-   - trivial.
-   - smt().
-   - move => wh.
-     seq 1: r => //.
-     + rnd.
-       auto. 
-       smt(dboolE).
-     if.
-     + sp.
-       conseq wh.
-       smt().
-     conseq wh.
+   (*$*) while true (b2i c) 1 (1%r/2%r).
+   - (* Connecting precondition to invariant *)
+     done.
+   - (* Connecting precondition to pHL bound and postcondition
+        when the loop is never entered *)
+     done.
+   - (* Showing that 1 bounds the variant, and that the variant
+        reaching 0 means exiting the loop *)
      smt().
-   - conseq (: : >= 1%r).
-     seq 1: r => //.
-     + rnd.
-       auto.
+   - (* Using coinduction to prove that the pHL bound is as desired *)
+     move => wH.
+     conseq (: : >= 1%r).
+     seq 1: true 1%r => //.
+     + auto => />.
        smt(dboolE).
-     if.  
-     + sp.
-       auto.
-     auto. 
-   split. 
+     conseq wH.
+   - (* Showing that the invariant is preserved *)
+     auto; smt(dboolE).
+   (* Showing that the probabiliy bound on the variant decreasing
+      is exactly that *)
+   split.
    - smt().
    move => z.
-   seq 1: (b /\ n = z) => //.
-   - rnd.
-     auto.
-     smt(dboolE).  
-   rcondt 1 => //.
-   auto.
-   smt().
+   rnd; skip => />.
+   smt(dboolE).
+   qed.
+
+The previous example is simpler and more well motivated, but does 
+not fully demonstrate the power of the tactic, which we demonstrate 
+with the following example.
+
+.. ecproof::
+   require import AllCore DBool.
+
+   module M = {
+     proc p(i: int, f: bool) = {
+       var c;
+       while (0 < i) {
+         c <$ {0,1};
+         if (c) {
+           i <- i-1;
+         } else {
+           f <- false;
+         }
+       }
+       return f;
+     }
+   }.
+
+   lemma L: phoare[M.p: 0 <= i /\ f==> res] = ((2%r)^(-i)).
+   proof.
+   proc.
+   exlim i => I.
+   conseq (: 0 <= i <= I ==> f: 
+     = (if f then 2%r ^ -i else 0%r)) => //.
+   + smt().
+   (*$*) while (i <= I) i I (1%r/2%r).
+   - (* Connecting precondition to invariant *)
+     done.
+   - (* Connecting precondition to pHL bound and postcondition
+        when the loop is never entered *)
+     smt(RField.expr0).
+   - (* Showing that I bounds the variant, and that the variant
+        reaching 0 means exiting the loop *)
+     smt().
+   - (* Using coinduction to prove that the pHL bound is as desired *)
+     move => wH.
+     exlim i => i'.
+     seq 2: f (if f then 1%r/2%r else 0%r) 
+            (2%r ^ (1-i')) _ 0%r
+            (0 <= i <= I /\ (f => i' = i + 1))=> //.
+     + auto.
+       smt(). 
+     + wp.
+       rnd (fun c => c = true /\ f).
+       auto => /> &hr.
+       rewrite dboolE.
+       smt().
+     + conseq wH. 
+       * smt().
+       smt().
+     + conseq wH.
+       * smt().
+       smt().
+     rewrite (StdBigop.Bigreal.Num.Domain.exprD) // RField.expr1 => />.
+     smt(RField.unitrX).
+   - (* Showing that the invariant is preserved *)
+     auto; smt(dboolE).
+   (* Showing that the probabiliy bound on the variant decreasing
+      is exactly that *)
+   split.
+   - smt().
+   move => z.
+   wp.
+   rnd.
+   auto => />.
+   smt(dboolE).
    qed.
