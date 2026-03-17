@@ -105,6 +105,11 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
       | `US   -> Circuit.usmul e1 e2
       end
 
+    | EEq(`W _, (e1, e2)) ->
+      let e1 = of_expr env e1 in
+      let e2 = of_expr env e2 in
+      [|Circuit.eq e1 e2|]
+
     | ECmp (`W _, us, k, (e1, e2)) ->
       let e1 = of_expr env e1 in
       let e2 = of_expr env e2 in

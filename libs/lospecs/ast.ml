@@ -70,6 +70,7 @@ type aexpr_ =
   | EOr of aword * (aexpr * aexpr)
   | EXor of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
+  | EEq of aword * (aexpr * aexpr)
   | ECmp of aword * us * [`Gt | `Ge] * (aexpr * aexpr)
   | EPopCount of aword * aexpr
 [@@deriving yojson]

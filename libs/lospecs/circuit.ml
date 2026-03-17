@@ -649,6 +649,11 @@ let iszero (r : reg) : node =
   bvueq r (Array.map (fun _ -> false_) r)
 
 (* -------------------------------------------------------------------- *)
+let eq (r1 : reg) (r2 : reg) : node =
+  assert (Array.length r1 = Array.length r2);
+  bvueq r1 r2
+
+(* -------------------------------------------------------------------- *)
 let abs (a : reg) : reg =
   let msb_a, _ = split_msb a in
   ite (msb_a) (opp a) a

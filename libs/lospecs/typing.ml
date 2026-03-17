@@ -155,6 +155,7 @@ module Sigs : sig
   val smullo : sig_
   val smulhi : sig_
   val usmul : sig_
+  val eq : sig_
   val sgt : sig_
   val sge : sig_
   val ugt : sig_
@@ -291,6 +292,10 @@ end = struct
   let usmul : sig_ =
     mulop ~ret:(fun n -> 2 * n) ~name:"usmul" `US
 
+  let eq : sig_ =
+    let mk = fun ws x y -> EEq (as_seq1 ws, (x, y)) in
+    binop ~ret:(fun _ -> 1) ~name:"eq" mk
+
   let sgt : sig_ =
     let mk = fun ws x y -> ECmp (as_seq1 ws, `S, `Gt, (x, y)) in
     binop ~ret:(fun _ -> 1) ~name:"sgt" mk
@@ -346,6 +351,7 @@ let sigs : sig_ list = [
   Sigs.smullo;
   Sigs.smulhi;  
   Sigs.usmul;
+  Sigs.eq;
   Sigs.sgt;
   Sigs.sge;
   Sigs.ugt;

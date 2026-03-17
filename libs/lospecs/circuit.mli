@@ -152,6 +152,8 @@ val bvueq : reg -> reg -> node
 
 val bvseq : reg -> reg -> node
 
+val eq : reg -> reg -> node
+
 (* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg
 
