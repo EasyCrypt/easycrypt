@@ -438,7 +438,8 @@ let for_op_path
               | OB_oper (Some (OP_Record _))
               | OB_oper (Some (OP_Proj   _))
               | OB_oper (Some (OP_Fix    _))
-              | OB_oper (Some (OP_TC      )) ->
+              | OB_oper (Some (OP_TC      ))
+              | OB_oper (Some (OP_Exn    _)) ->
                   Some (EcSubst.subst_path subst p)
               | OB_oper (Some (OP_Plain f)) ->
                   match f.f_node with
