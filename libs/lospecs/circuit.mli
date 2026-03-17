@@ -25,6 +25,10 @@ val bool_list_of_reg : reg -> bool list
 (* ==================================================================== *)
 val of_int : size:int -> int -> reg
 
+val of_int32 : ?size:int -> int32 -> reg
+
+val of_int64 : ?size:int -> int64 -> reg
+
 val of_bigint : size:int -> Z.t -> reg
 
 val of_int32s : int32 array -> reg

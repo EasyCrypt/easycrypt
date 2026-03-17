@@ -88,7 +88,7 @@ type pfname = (psymbol * pword list option) loced [@@deriving yojson]
 type pexpr_ =
   | PEParens of pexpr 
   | PEFName of pfname
-  | PEInt of int * pword option
+  | PEInt of int64 * pword option
   | PECond of pexpr * (pexpr * pexpr)
   | PEFun of pargs * pexpr
   | PELet of (psymbol * pargs option * pexpr) * pexpr

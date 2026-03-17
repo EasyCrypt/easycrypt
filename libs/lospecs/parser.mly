@@ -28,7 +28,7 @@
 %token RPAREN
 
 %token<string> IDENT
-%token<int>    NUMBER
+%token<int64>  NUMBER
 
 %type <Ptree.pprogram> program
 
@@ -50,7 +50,7 @@
 
 %inline wtype_:
 | AT x=NUMBER
-    { `W x }
+    { `W (Int64.to_int x) }
 
 %inline wtype:
 | w=loc(wtype_) { w }
@@ -60,7 +60,7 @@ fname_:
     { (f, None) }
 
 | f=loc(IDENT) p=angled(list0(loc(NUMBER), COMMA))
-    { (f, Some (List.map (Lc.map (fun x -> `W x)) p)) }
+    { (f, Some (List.map (Lc.map (fun x -> `W (Int64.to_int x))) p)) }
 
 %inline fname:
 | f=loc(fname_) { f }

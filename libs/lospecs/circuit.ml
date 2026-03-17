@@ -131,12 +131,12 @@ let of_int ~(size : int) (v : int) : reg =
   Array.init size (fun i -> constant (bit ~position:i v))
 
 (* -------------------------------------------------------------------- *)
-let of_int32 (v : int32) : reg =
-  Array.init 32 (fun i -> constant (bit32 ~position:i v))
+let of_int32 ?(size = 32) (v : int32) : reg =
+  Array.init size (fun i -> constant (bit32 ~position:i v))
 
 (* -------------------------------------------------------------------- *)
-let of_int64 (v : int64) : reg =
-  Array.init 64 (fun i -> constant (bit64 ~position:i v))
+let of_int64 ?(size = 64) (v : int64) : reg =
+  Array.init size (fun i -> constant (bit64 ~position:i v))
 
 (* -------------------------------------------------------------------- *)
 let of_int32s (vs : int32 array) : reg =

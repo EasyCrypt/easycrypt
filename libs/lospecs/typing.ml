@@ -109,12 +109,18 @@ let check_plain_arg (_ : env) (arg : pexpr option loced) =
     arg
 
 (* -------------------------------------------------------------------- *)
-let as_int_constant (e : pexpr) : int =
+let as_int_constant (e : pexpr) : int64 =
   match e.data with
   | PEInt (i, None) -> i
   | _ -> tyerror e.range "integer constant expected"
 
 (* -------------------------------------------------------------------- *)
+let as_nativeint_constant (e : pexpr) : int =
+  match e.data with
+  | PEInt (i, None) -> Int64.to_int i
+  | _ -> tyerror e.range "integer constant expected"
+
+  (* -------------------------------------------------------------------- *)
 type sig_ = {
   s_name : string;
   s_ntyparams : int;
@@ -468,8 +474,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   | PESlice (ev, (start, len, scale)) ->
       let ev = tt_expr env ev in
       let start = tt_expr env start in
-      let len = Option.default 1 (Option.map as_int_constant len) in
-      let scale = Option.default 1 (Option.map as_int_constant scale) in
+      let len = Option.default 1 (Option.map as_nativeint_constant len) in
+      let scale = Option.default 1 (Option.map as_nativeint_constant scale) in
       let node = ESlice (ev, (start, len, scale))
       and type_ = `W (len * scale) in
       (None, { node; type_; })
@@ -477,8 +483,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   | PEAssign (ev, (start, len, scale), v) ->
     let ev = tt_expr env ev in
     let start = tt_expr env start in
-    let len = Option.default 1 (Option.map as_int_constant len) in
-    let scale = Option.default 1 (Option.map as_int_constant scale) in
+    let len = Option.default 1 (Option.map as_nativeint_constant len) in
+    let scale = Option.default 1 (Option.map as_nativeint_constant scale) in
     let v = tt_expr env ~check:(`W (len * scale)) v in
     let node = EAssign (ev, (start, len, scale), v) in
     (None, { node; type_ = ev.type_; })
@@ -526,7 +532,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       let (`W w) = as_seq1 (tt_type_parameters env fn.range f ~expected:1 w) in
       let args = List.map (check_plain_arg env) args in
       let e, n = as_seq2 (check_arguments_count e.range ~expected:2 args) in
-      let n = as_int_constant n in
+      let n = as_nativeint_constant n in
       let ne = tt_expr env ~check:(`W w) e in
       (None, { node = ERepeat (`W (w * n), (ne, n)); type_ = `W (w * n); })
 

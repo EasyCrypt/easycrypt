@@ -50,7 +50,7 @@ type mulk = [`U of hld | `S of hld | `US] [@@deriving yojson]
 (* -------------------------------------------------------------------- *)
 type aexpr_ =
   | EVar of ident
-  | EInt of int
+  | EInt of int64
   | ESlice of aexpr * (aexpr * int * int)
   | EAssign of aexpr * (aexpr * int * int) * aexpr
   | EApp of ident * aexpr list

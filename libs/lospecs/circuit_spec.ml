@@ -158,7 +158,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
 
     | ESlice (e, ({ node = EInt offset }, size, scale)) ->
       let e = of_expr env e in
-      let offset = offset * scale in
+      let offset = (Int64.to_int offset) * scale in
       let size = size * scale in
       Array.sub e offset size
 
@@ -177,7 +177,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
     | EAssign (e, ({ node = EInt offset }, size, scale), v) ->
       let e = of_expr env e in
       let v = of_expr env v in
-      let offset = offset * scale in
+      let offset = (Int64.to_int offset) * scale in
       let size = size * scale in
       let pre, e = split_at_arr offset e in 
       let e, post = split_at_arr size e in
@@ -251,7 +251,7 @@ let circuit_of_specification (rs : reg list) (p : adef) : reg =
 
     | EInt i -> begin
       match e.type_ with
-      | `W n -> Circuit.of_int ~size:n i
+      | `W n -> Circuit.of_int64 ~size:n i
       | _ -> raise (CircuitSpecError (Format.asprintf "Expected int got %a" pp_atype e.type_)) 
     end
 

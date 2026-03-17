@@ -48,10 +48,10 @@ rule main = parse
       { Hashtbl.find_default keywords x (IDENT x) }
 
   | decnum as d
-      { NUMBER (int_of_string d) }
+      { NUMBER (Int64.of_string d) }
 
   | hexnum as d
-      { NUMBER (int_of_string d) }
+      { NUMBER (Int64.of_string d) }
 
   | whitespace+
       { main lexbuf }
