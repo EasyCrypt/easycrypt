@@ -117,6 +117,13 @@ let destr_pr_has pr =
         Some(ty_elem, {m;inv=f_f}, {m;inv=f_l})
       else None
   | _ -> None
+
+let is_eq_w_const_rhs (f: ss_inv): bool =
+  try 
+    let _, rhs = destr_eq f.inv in
+    not (Mid.mem f.m rhs.f_fv)
+  with DestrError _ -> false
+
 (*
  lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
    mu d (fun a => has (P a) s) <= BRA.big predT (fun b => mu d (fun a => P a b)) s.
@@ -141,7 +148,7 @@ exception FoundPr of form
 let select_pr on_ev sid f =
   match f.f_node with
   | Fpr { pr_event = ev } ->
-      if on_ev ev.inv && Mid.set_disjoint f.f_fv sid then raise (FoundPr f)
+      if on_ev ev && Mid.set_disjoint f.f_fv sid then raise (FoundPr f)
       else false
   | _ -> false
 
@@ -223,13 +230,13 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
 
   let select =
     match kind with
-    | `Mu1LeEqMu1 -> select_pr is_eq
-    | `MuDisj | `MuOr -> select_pr is_or
+    | `Mu1LeEqMu1 -> select_pr is_eq_w_const_rhs
+    | `MuDisj | `MuOr -> select_pr (fun inv -> is_or inv.inv)
     | `MuEq -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Bool.p_eq)
-    | `MuFalse -> select_pr is_false
+    | `MuFalse -> select_pr (fun inv -> is_false inv.inv)
     | `MuGe0 -> select_pr_ge0
     | `MuLe1 -> select_pr_le1
-    | `MuNot -> select_pr is_not
+    | `MuNot -> select_pr (fun inv -> is_not inv.inv)
     | `MuSplit -> select_pr (fun _ev -> true)
     | `MuSub -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Real.p_real_le)
     | `MuSum -> select_pr (fun _ev -> true)
@@ -255,8 +262,8 @@ let t_pr_rewrite_low (s, (dof: (_ -> _ -> _ -> ss_inv) option)) tc =
          Otherwise the rewrite is unsound: the event `res = k` would use
          k from the post-state, but `mu1 d k` treats k as a constant. *)
       if Mid.mem k.m k.inv.f_fv then
-        tc_error !!tc
-          "Pr-rewrite: the value compared to res must not depend on memories";
+        (* This case should already be filtered by selection *)
+        assert false;
       if Mid.mem d.m d.inv.f_fv then
         tc_error !!tc
           "Pr-rewrite: the distribution must not depend on memories";
