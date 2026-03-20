@@ -474,6 +474,9 @@ let process_eqobs_inS info tc =
     | Some(p1,p2) ->
       let p1 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left , p1) in
       let p2 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, p2) in
+      (* Sim skips instructions pointed to FIXME *)
+      let p1 = EcMatching.Position.Notations.(p1 +> 1) in
+      let p2 = EcMatching.Position.Notations.(p2 +> 1) in
       let _,sl2 = s_split env p1 es.es_sl in
       let _,sr2 = s_split env p2 es.es_sr in
       let ppe = EcPrinting.PPEnv.ofenv env in

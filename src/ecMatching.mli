@@ -103,7 +103,7 @@ module Position : sig
 
   val normalize_cp_base : ?check:bool -> env -> cp_base -> stmt -> nm_codepos1
 
-  val normalize_cpos1 : env -> codepos1 -> stmt -> nm_codepos1
+  val normalize_cpos1 : ?check:bool -> env -> codepos1 -> stmt -> nm_codepos1
 
   val resolve_offset1_from_cpos1 : env -> nm_codepos1 -> codeoffset1 -> stmt -> nm_codepos1 
 

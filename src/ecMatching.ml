@@ -273,15 +273,18 @@ module Position = struct
     | `ByMatch (i, cm) -> 
       let (s1, _, _) = find_by_cp_match env (i, cm) s in
       (1 + List.length s1)
-    in if check then (check_nm_cpos1 nm s; nm) else nm
+    in 
+    if check then check_nm_cpos1 nm s; 
+    nm
 
-  let normalize_cpos1 (env: EcEnv.env) ((off, cb): codepos1) (s: stmt) : nm_codepos1 = 
+  let normalize_cpos1 ?(check = true) (env: EcEnv.env) ((off, cb): codepos1) (s: stmt) : nm_codepos1 = 
     let nbase = normalize_cp_base ~check:false env cb s in
     let nm = off + normalize_cp_base ~check:false env cb s in
     (* Make sure the position we are pointing to is valid in the context *)
     (* List.length + 1 points to the instruction "after the last" and has 
        special meaning depending on the context *)
-    check_nm_cpos1 nm s; nm
+    if check then check_nm_cpos1 nm s; 
+    nm
 
   let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cp1 : codepos1) (s : stmt) =
     find_by_nmcpos1 ~rev (normalize_cpos1 env cp1 s) s
@@ -341,7 +344,7 @@ module Position = struct
       let nm = normalize_cpos1 env off s in
       if nm_codepos_in_nm_codepos_range nm (start, fin) then raise InvalidCPos; nm
     | `Relative i -> 
-      let nm = if i > 0 then (fin + i - 1) else start - i in
+      let nm = if i > 0 then (fin + i - 1) else start + i in
       check_nm_cpos1 nm s; nm
 
   let normalize_cpos1_range ?(strict = false) env ((base, off): codepos1_range) (s: stmt) : nm_codepos1_range = 
