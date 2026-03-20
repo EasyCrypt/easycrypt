@@ -3570,29 +3570,39 @@ module LDecl = struct
   let fresh_ids hyps s = snd (fresh_ids (tohyps hyps) s)
 
   (* ------------------------------------------------------------------ *)
+  let mapenv (f : env -> env) (lenv : hyps) =
+    { lenv with le_env = f lenv.le_env }
+
+  (* ------------------------------------------------------------------ *)
   let push_active_ss m lenv =
-    { lenv with le_env = Memory.push_active_ss m lenv.le_env }
+    mapenv (Memory.push_active_ss m) lenv
 
   let push_active_ts ml mr lenv =
-    { lenv with le_env = Memory.push_active_ts ml mr lenv.le_env }
+    mapenv (Memory.push_active_ts ml mr) lenv
 
   let push_all l lenv =
-    { lenv with le_env = Memory.push_all l lenv.le_env }
+    mapenv (Memory.push_all l) lenv
+
+  let push_active_all l lenv =
+    let lenv = mapenv (Memory.push_all l) lenv in
+
+    match l with
+    | [(m, _)] -> mapenv (Memory.set_active_ss m) lenv
+    | _ -> lenv
 
   let hoareF mem xp lenv =
      let env1, env2 = Fun.hoareF mem xp lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
+    { lenv with le_env = env1 }, { lenv with le_env = env2 }
 
   let equivF ml mr xp1 xp2 lenv =
     let env1, env2 = Fun.equivF ml mr xp1 xp2 lenv.le_env in
-    { lenv with le_env = env1}, {lenv with le_env = env2 }
+    { lenv with le_env = env1 }, { lenv with le_env = env2 }
 
   let inv_memenv ml mr lenv =
-    { lenv with le_env = Fun.inv_memenv ml mr lenv.le_env }
+    mapenv (Fun.inv_memenv ml mr) lenv
 
   let inv_memenv1 m lenv =
-    { lenv with le_env = Fun.inv_memenv1 m lenv.le_env }
+    mapenv (Fun.inv_memenv1 m) lenv
 end
-
 
 let pp_debug_form = ref (fun _env _f -> assert false)
