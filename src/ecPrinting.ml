@@ -2407,22 +2407,34 @@ let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos
 (* -------------------------------------------------------------------- *)
 let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoffset1) =
   match offset with
-  | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
-  | `ByOffset   o -> Format.fprintf fmt "%d" o
+  | `Absolute p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
+  | `Relative o -> Format.fprintf fmt "%d" o
+
+let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) = 
+  Format.fprintf fmt "%s"
+  (match br with
+  | `Cond true -> "."
+  | `Cond false -> "?"
+  | `Match cp -> Format.sprintf "#%s." cp)
+
+let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) = 
+  Format.fprintf fmt "%a%a" (pp_codepos1 ppe) cp pp_codepos_brsel br
+
+let pp_codepos_path ppe =
+  (pp_list "" (pp_codepos_step ppe))
 
 (* -------------------------------------------------------------------- *)
-let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
-  let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
-    let bs =
-      match bs with
-      | `Cond  true  -> "."
-      | `Cond  false -> "?"
-      | `Match cp    -> Format.sprintf "#%s." cp
-      in
-    Format.fprintf fmt "%a%s" (pp_codepos1 ppe) cp bs
-  in
+let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, cp1) : CP.codepos) =
+  Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codepos1 ppe) cp1
 
-  Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
+let pp_codepos1_range (ppe: PPEnv.t) (fmt: Format.formatter) ((start, fin) : CP.codepos1_range) =
+  Format.fprintf fmt "%a%s%a" (pp_codepos1 ppe) start 
+  (match fin with | `Relative _ -> "+" | `Absolute _ -> "..")
+  (pp_codeoffset1 ppe) fin
+
+let pp_codepos_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.codepos_range) =
+  Format.fprintf fmt "%a:[%a]" (pp_codepos_path ppe) cpath (pp_codepos1_range ppe) cp1r
+
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param list * ty * prbody option) =

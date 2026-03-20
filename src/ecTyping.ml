@@ -2283,7 +2283,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       let body =
         List.fold_right (fun (cpr, up) bd ->
           let {pl_desc = cpr; pl_loc = loc} = cpr in
-          let cp = trans_codepos_range env cpr in
+          let cp = trans_codepos_or_range env cpr in
           let change env si =
             match up with
             | Pup_stmt sup ->
@@ -2295,7 +2295,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           try
             EcMatching.Zipper.map_range env cp change bd
           with
-            | EcMatching.Zipper.InvalidCPos ->
+            | InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
         )
         pupdates
@@ -3745,32 +3745,45 @@ and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   | `Cond b -> `Cond b
   | `Match { pl_desc = x } -> `Match x
 
-(* -------------------------------------------------------------------- *)
-and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
-  let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
-  let p = trans_codepos1 ?memory env p in
-  (nm, p)
+and trans_codepos_step ?(memory: memory option) (env: EcEnv.env) ((cp1, brsel): pcodepos_step) : codepos_step =
+  let cp1 = trans_codepos1 ?memory env cp1 in
+  let brsel = trans_codepos_brsel brsel in
+  (cp1, brsel)
+
+and trans_codepos_path ?(memory: memory option) (env: EcEnv.env) (cpath: pcodepos_path) : codepos_path =
+  List.map (trans_codepos_step ?memory env) cpath
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos_range ?(memory : memory option) (env : EcEnv.env) ((cps, cpe) : pcodepos_range) : codepos_range =
-  let cps = trans_codepos ?memory env cps in
-  let cpe =
-    match cpe with
-    | `Base cp ->
-      `Base (trans_codepos ?memory env cp)
-    | `Offset cp ->
-      `Offset (trans_codepos1 ?memory env cp)
-  in
-  (cps, cpe)
+and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((cpath, p) : pcodepos) : codepos =
+  let cpath = trans_codepos_path ?memory env cpath in
+  let p = trans_codepos1 ?memory env p in
+  (cpath, p)
+
+and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+  match o with
+  | `Relative i -> `Relative i
+  | `Absolute p -> `Absolute (trans_codepos1 ?memory env p)
+
+and trans_codepos1_range ?(memory: memory option) (env: EcEnv.env) ((start, off): pcodepos1_range) : codepos1_range =
+  let start = trans_codepos1 ?memory env start in
+  let off   = trans_codeoffset1 ?memory env off in
+  (start, off)
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos_range ?(memory : memory option) (env : EcEnv.env) ((cpath, (cstart, coff)) : pcodepos_range) : codepos_range =
+  let cpath = trans_codepos_path ?memory env cpath in
+  let cstart = trans_codepos1 ?memory env cstart in
+  let coff = trans_codeoffset1 ?memory env coff in
+  (cpath, (cstart, coff))
+
+and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : codepos_range =
+  match cpor with
+  | Pos cp -> codepos_range_of_codepos (trans_codepos ?memory env cp)
+  | Range cpr -> trans_codepos_range ?memory env cpr
 
 (* -------------------------------------------------------------------- *)
 and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
-
-and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
-  match o with
-  | `ByOffset   i -> `ByOffset i
-  | `ByPosition p -> `ByPosition (trans_codepos1 ?memory env p)
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

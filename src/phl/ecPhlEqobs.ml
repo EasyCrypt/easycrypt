@@ -281,6 +281,10 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
 
 and s_eqobs_in_full sl sr sim local eqo =
   let r1,r2,sim, eqi = s_eqobs_in sl sr sim local eqo in
+  let ppe = EcPrinting.PPEnv.ofenv sim.sim_env in
+  Format.eprintf "Got r1: %a | r2: %a after sim@."
+  EcPrinting.(pp_stmt ppe) (stmt r1)
+  EcPrinting.(pp_stmt ppe) (stmt r2);
   if r1 <> [] || r2 <> [] then raise EqObsInError;
   sim, eqi
 
@@ -472,6 +476,8 @@ let process_eqobs_inS info tc =
       let p2 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, p2) in
       let _,sl2 = s_split env p1 es.es_sl in
       let _,sr2 = s_split env p2 es.es_sr in
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.eprintf "SL2: %a@.SR2:%a@." EcPrinting.(pp_stmt ppe) (stmt sl2) EcPrinting.(pp_stmt ppe) (stmt sr2);
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in

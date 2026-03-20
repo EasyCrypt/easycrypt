@@ -229,8 +229,7 @@ let process_unroll_for ~cfold side cpos tc =
     tc_error !!tc "cannot use deep code position";
 
   let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
-  let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
-  let pos  = 1 + List.length z.Zpr.z_head in
+  let z, ((_nm_path, pos), _) = Zpr.zipper_of_cpos_r env cpos c in
 
   (* Extract loop condition / body *)
   let t, wbody  =
@@ -297,7 +296,7 @@ let process_unroll_for ~cfold side cpos tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
+      ((t_rcond side (zs <> []) (EcMatching.Position.cpos1 pos)) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (Inv_ss (map_ss_inv1 (fun x -> f_eq x (f_int z)) x)) @!
        t_set i pos z;
@@ -314,16 +313,18 @@ let process_unroll_for ~cfold side cpos tc =
     | _ -> tc_error !!tc "expecting single sided precondition" in
 
   let doi i tc =
+    let open EcMatching.Position in
+    let open Notations in
     if Array.length hds <= i then t_id tc else
     let (_h,pos,_z) = oget hds.(i) in
     if i = 0 then
-      (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
+      (EcPhlWp.t_wp (Some (Single ((cpos1 pos) <+ 1))) @!
        t_conseq (Inv_ss {inv=f_true;m=x.m}) @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
-        EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlSeq.t_hoare_seq (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
+        EcPhlWp.t_wp (Some (Single ((cpos1 pos) <+ 1)));
+        EcPhlSeq.t_hoare_seq (cpos1 pos') (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
@@ -331,7 +332,7 @@ let process_unroll_for ~cfold side cpos tc =
   let tcenv = FApi.t_onalli doi tcenv in
 
   if cfold then begin
-    let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+    let cpos = EcMatching.Position.Notations.(cpos <+| 1) in
     let clen = blen * (List.length zs - 1) in
 
     FApi.t_last (EcPhlCodeTx.t_cfold side cpos (Some clen)) tcenv

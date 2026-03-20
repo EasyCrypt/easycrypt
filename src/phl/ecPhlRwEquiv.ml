@@ -153,6 +153,7 @@ let process_rewrite_equiv info tc =
 
   (* Offload to the tactic *)
   try
+    (* FIXME: cp should be translated to codepos in process *)
     t_rewrite_equiv side dir cp equiv eqv_pt rargslv tc
   with
   | RwEquivError (RWE_InvalidFunction (got, wanted)) ->

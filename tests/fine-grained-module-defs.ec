@@ -32,7 +32,7 @@ end;
 module A_count (B : T) = A(B) with {
   var c : int
   proc f [1 + ^ { c <- c + 1;}]
-  proc g [[^x<- .. ^ <@] ~ { c <- c - 1;}] res ~ (x + 1)
+  proc g [:[^x<- .. ^ <@] ~ { c <- c - 1;}] res ~ (x + 1)
   proc h [^match - #Some.]
 }.
 

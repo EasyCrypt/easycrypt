@@ -9,4 +9,4 @@ val process_rewrite_rw    : side option -> pcodepos -> ppterm -> backward
 val process_rewrite_simpl : side option -> pcodepos -> backward
 val process_rewrite       : side option -> pcodepos -> prrewrite -> backward
 val process_rewrite_at    : psymbol -> ppterm -> backward
-val process_change_stmt   : side option -> pcodepos_range -> pstmt -> backward
+val process_change_stmt   : side option -> pcodepos_or_range -> pstmt -> backward

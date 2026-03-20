@@ -51,16 +51,33 @@ and plvmatch = [ `LvmNone | `LvmVar of pqsymbol ]
 
 type pcp_base  = [ `ByPos of int | `ByMatch of int option * pcp_match ]
 
+(* Code positions *)
 type pbranch_select = [`Cond of bool | `Match of psymbol]
 type pcodepos1 = int * pcp_base
-type pcodepos  = (pcodepos1 * pbranch_select) list * pcodepos1
-type pcodepos_range  = pcodepos * [`Base of pcodepos | `Offset of pcodepos1]
+type pcodepos_step = (pcodepos1 * pbranch_select)
+type pcodepos_path = pcodepos_step list 
+type pcodepos  = pcodepos_path * pcodepos1
 type pdocodepos1 = pcodepos1 doption option
 
+let shift1 ((off,base): pcodepos1) ~(offset: int) : pcodepos1 = 
+  (off + offset, base)
+  
+let shift ((path,cp1): pcodepos) ~(offset: int) : pcodepos = 
+  (path, shift1 ~offset cp1)
+
+(* Code position offsets *)
 type pcodeoffset1 = [
-  | `ByOffset   of int
-  | `ByPosition of pcodepos1
+  | `Relative of int
+  | `Absolute of pcodepos1
 ]
+
+(* Code position ranges *)
+type pcodepos1_range = (pcodepos1 * pcodeoffset1)
+type pcodepos_range  = pcodepos_path * pcodepos1_range
+type pcodepos_or_range = 
+  | Pos   of pcodepos
+  | Range of pcodepos_range
+
 (* -------------------------------------------------------------------- *)
 
 type pty_r =
@@ -351,7 +368,7 @@ and pstructure_item =
   | Pst_import   of (pmsymbol located) list
 
 and pupdate_var = psymbol list * pty
-and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos_range located * pupdate_item) list * pexpr option)
+and pupdate_fun = psymbol * (psymbol list * pty) list * ((pcodepos_or_range located * pupdate_item) list * pexpr option)
 
 and pupdate_item =
   | Pup_stmt of pupdate_stmt
@@ -538,7 +555,7 @@ type preduction = {
 
 (* -------------------------------------------------------------------- *)
 type pswap_kind = {
-  interval : (pcodepos1 * pcodepos1 option) option;
+  interval : pcodepos_or_range option;
   offset   : pcodeoffset1;
 }
 
@@ -679,7 +696,7 @@ type outline_kind =
 
 type outline_info = {
     outline_side: side;
-    outline_range: pcodepos_range;
+    outline_range: pcodepos_or_range;
     outline_kind: outline_kind;
 }
 
@@ -706,7 +723,7 @@ type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
-  sim_pos  : pcodepos1 pair option;
+  sim_pos  : pcodepos1 pair option; 
   sim_hint : (pgamepath option pair * pformula) list * pformula option;
   sim_eqs  : pformula option
 }
@@ -790,7 +807,7 @@ type phltactic =
   | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pprocrewriteat of psymbol * ppterm
-  | Pchangestmt    of side option * pcodepos_range * pstmt
+  | Pchangestmt    of side option * pcodepos_or_range * pstmt
   | Phoaresplit
 
     (* Eager *)
