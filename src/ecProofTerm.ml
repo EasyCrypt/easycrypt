@@ -790,6 +790,12 @@ and apply_pterm_to_holes ?loc n pt =
   EcUtils.iterop (apply_pterm_to_hole ?loc) n pt
 
 (* -------------------------------------------------------------------- *)
+and apply_pterm_to_max_holes (hyps : LDecl.hyps) (pt : pt_ev) =
+  if is_some (PT.destruct_product ~reduce:true hyps pt.ptev_ax) then
+    apply_pterm_to_max_holes hyps (apply_pterm_to_hole pt)
+  else pt
+  
+(* -------------------------------------------------------------------- *)
 and apply_pterm_to_local ?loc pt id =
   match LDecl.by_id id pt.ptev_env.pte_hy with
   | LD_var (ty, _) ->
@@ -964,3 +970,90 @@ module Prept = struct
   let ahyp h    = asub (hyp h)
   let ahdl h    = asub (hdl h)
 end
+
+(* -------------------------------------------------------------------- *)
+let pvcompare (pv1 : prog_var) (pv2 : prog_var) =
+  match pv1, pv2 with
+  | PVglob x1, PVglob x2 ->
+    EcPath.x_compare x1 x2
+  | PVloc s1, PVloc s2 ->
+    EcSymbols.sym_compare s1 s2
+
+  | PVglob _, PVloc  _ ->  1
+  | PVloc  _, PVglob _ -> -1
+
+module Mpv = Map.Make(struct
+  type t = prog_var
+  let compare = pvcompare
+end)
+
+type mpvars = (ty Mpv.t) Mid.t
+
+(* -------------------------------------------------------------------- *)
+let rec collect_pvars_from_pt (pvs : mpvars) (pt : proofterm) =
+  match pt with
+  | PTApply { pt_args = args } -> begin
+    List.fold_left collect_pvars_from_ptarg pvs args
+  end
+  | PTQuant (_, pt) ->
+    collect_pvars_from_pt pvs pt
+
+and collect_pvars_from_ptarg (pvs : mpvars) (ptarg : pt_arg) =
+  match ptarg with
+  | PAFormula f -> collect_pvars_from_form pvs f
+  | PAMemory _ -> pvs
+  | PAModule _ -> pvs
+  | PASub None -> pvs
+  | PASub (Some pt) -> collect_pvars_from_pt pvs pt
+
+and collect_pvars_from_form (pvs : mpvars) (f : form) =
+  let rec doit (pvs : mpvars) (f : form) =
+    match f.f_node with
+    | Fpvar (pv, m) ->
+      Mid.change (fun pvmap ->
+        Some (Mpv.add pv f.f_ty (odfl Mpv.empty pvmap))
+      ) m pvs
+    | _ -> EcFol.f_fold doit pvs f
+  in doit pvs f
+
+(* -------------------------------------------------------------------- *)
+let collect_pvars_from_pt (pt : proofterm) =
+  Mid.map Mpv.bindings (collect_pvars_from_pt Mid.empty pt)
+
+(* -------------------------------------------------------------------- *)
+module PV = struct
+  open EcPV.PVM
+
+  let rec subst_pt (env : env) (subst : subst) (pt : proofterm) =
+    match pt with
+    | PTApply { pt_head; pt_args } ->
+      PTApply
+        { pt_head = subst_pt_head env subst pt_head
+        ; pt_args = List.map (subst_pt_arg env subst) pt_args }
+    | PTQuant (bds, pt) ->
+      PTQuant (bds, subst_pt env subst pt)
+
+  and subst_pt_head (env : env) (subst : subst) (pth : pt_head) =
+    match pth with
+    | PTHandle _
+    | PTLocal _
+    | PTGlobal _ -> pth
+    | PTCut (f, cs) -> PTCut (subst_form env subst f, cs)
+    | PTTerm pt -> PTTerm (subst_pt env subst pt)
+
+  and subst_pt_arg (env : env) (subst : subst) (pta : pt_arg) =
+    match pta with
+    | PAFormula f -> PAFormula (subst_form env subst f)
+    | PAMemory _  -> pta
+    | PAModule _  -> pta
+    | PASub    pt -> PASub (omap (subst_pt env subst) pt)
+
+  and subst_form (env : env) (subst : subst) (f : form) =
+    EcPV.PVM.subst env subst f
+end
+
+let subst_pv_pt (env : env) (subst : EcPV.PVM.subst) (pt : proofterm) =
+  PV.subst_pt env subst pt
+
+let subst_pv_pt_arg (env : env) (subst : EcPV.PVM.subst) (pt_arg : pt_arg) =
+  PV.subst_pt_arg env subst pt_arg

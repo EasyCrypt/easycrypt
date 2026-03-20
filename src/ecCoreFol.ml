@@ -562,6 +562,11 @@ let f_iter g f =
   | FeagerF   eg  -> g (eg_pr eg).inv; g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event.inv
 
+(* -------------------------------------------------------------------- *)
+let f_fold (tx : 'a -> form -> 'a) (state : 'a) (f : form) =
+  let state = ref state in
+  f_iter (fun f -> state := tx !state f) f;
+  !state
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =

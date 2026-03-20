@@ -478,6 +478,7 @@ val pv_hash  : prog_var hash
 val pv_fv    : prog_var fv
 
 val pv_kind : prog_var -> pvar_kind
+
 (* -------------------------------------------------------------------- *)
 val idty_equal : (EcIdent.t * ty) equality
 val idty_hash  : (EcIdent.t * ty) hash
