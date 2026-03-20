@@ -533,9 +533,10 @@ module LDecl : sig
 
   val clear : ?leniant:bool -> EcIdent.Sid.t -> hyps -> hyps
 
-  val push_all       : memenv list -> hyps -> hyps
-  val push_active_ss : memenv -> hyps -> hyps
-  val push_active_ts : memenv -> memenv -> hyps -> hyps
+  val push_all        : memenv list -> hyps -> hyps
+  val push_active_all : memenv list -> hyps -> hyps
+  val push_active_ss  : memenv -> hyps -> hyps
+  val push_active_ts  : memenv -> memenv -> hyps -> hyps
 
   val hoareF : memory -> xpath -> hyps -> hyps * hyps
   val equivF : memory -> memory -> xpath -> xpath -> hyps -> hyps * hyps

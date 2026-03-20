@@ -71,6 +71,8 @@ module PVM : sig
 
   val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
 
+  val of_list : env -> ((prog_var * EcIdent.t) * form) list -> subst
+
   val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
 
   val of_mpv : (form,form) Mpv.t -> EcIdent.t -> subst
@@ -127,11 +129,12 @@ val is_write_r : ?except:Sx.t -> instr list pvaccess
 val s_write_r  : ?except:Sx.t -> stmt       pvaccess
 val f_write_r  : ?except:Sx.t -> xpath      pvaccess
 
-val e_read_r   : expr       pvaccess
-val i_read_r   : instr      pvaccess
-val is_read_r  : instr list pvaccess
-val s_read_r   : stmt       pvaccess
-val f_read_r   : xpath      pvaccess
+val e_read_r      : expr       pvaccess
+val form_read_r   : form       pvaccess
+val i_read_r      : instr      pvaccess
+val is_read_r     : instr list pvaccess
+val s_read_r      : stmt       pvaccess
+val f_read_r      : xpath      pvaccess
 
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
@@ -142,11 +145,12 @@ val is_write : ?except:Sx.t -> instr list pvaccess0
 val s_write  : ?except:Sx.t -> stmt       pvaccess0
 val f_write  : ?except:Sx.t -> xpath      pvaccess0
 
-val e_read  : expr       pvaccess0
-val i_read  : instr      pvaccess0
-val is_read : instr list pvaccess0
-val s_read  : stmt       pvaccess0
-val f_read  : xpath      pvaccess0
+val e_read     : expr       pvaccess0
+val form_read  : form       pvaccess0
+val i_read     : instr      pvaccess0
+val is_read    : instr list pvaccess0
+val s_read     : stmt       pvaccess0
+val f_read     : xpath      pvaccess0
 
 (* -------------------------------------------------------------------- *)
 exception EqObsInError

@@ -2939,6 +2939,10 @@ interleave_info:
 | TILD f=loc(fident) { OKproc(f, true) }
 | f=loc(fident) { OKproc(f, false) }
 
+direction:
+| RRARROW { (`Forward  :> pdirection) }
+| LLARROW { (`Backward :> pdirection) }
+
 %public phltactic:
 | PROC
    { Pfun `Def }
@@ -3124,8 +3128,8 @@ interleave_info:
 
     { Phrex_intro (l, b) }
 
-| ECALL s=side? x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
-    { Phecall (s, x) }
+| ECALL d=direction? s=side? x=paren(p=qident tvi=tvars_app? fs=loc(gpterm_arg)* { (p, tvi, fs) })
+    { Phecall (odfl `Backward d, s, x) }
 
 | EXFALSO
     { Pexfalso }

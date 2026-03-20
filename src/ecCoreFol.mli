@@ -76,6 +76,7 @@ val f_node  : form -> f_node
 (* not recursive *)
 val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
+val f_fold : ('a -> form -> 'a) -> 'a -> form -> 'a
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
 
