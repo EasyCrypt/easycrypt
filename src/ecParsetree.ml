@@ -737,6 +737,12 @@ type matchmode = [
 type prrewrite = [`Rw of ppterm | `Simpl]
 
 (* -------------------------------------------------------------------- *)
+type pecall = pqsymbol * ptyannot option * ppt_arg located list
+
+(* -------------------------------------------------------------------- *)
+type pdirection = [`Forward | `Backward]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -774,7 +780,7 @@ type phltactic =
   | Pconcave       of (pformula option tuple2 gppterm * pformula)
   | Phrex_elim
   | Phrex_intro    of (pformula list * bool)
-  | Phecall        of (oside * (pqsymbol * ptyannot option * pformula list))
+  | Phecall        of (pdirection * oside * pecall)
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv | `EHoare ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
