@@ -64,6 +64,8 @@ val process_pterm_cut
   : prcut:('a -> form) -> pt_env -> 'a ppt_head -> pt_ev
 val process_pterm
   : pt_env -> (pformula option) ppt_head -> pt_ev
+val process_pterm_arg
+  :  ?implicits:bool -> pt_ev  -> ppt_arg located -> pt_ev_arg
 val process_pterm_args_app
   :  ?implicits:bool -> ?ip:(bool list) -> pt_ev  -> ppt_arg located list
   -> pt_ev * bool list
@@ -99,11 +101,12 @@ val check_pterm_arg :
   -> pt_ev_arg_r
  -> form * pt_arg
 
-val apply_pterm_to_arg   : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg -> pt_ev
-val apply_pterm_to_arg_r : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg_r -> pt_ev
-val apply_pterm_to_local : ?loc:EcLocation.t -> pt_ev -> EcIdent.t -> pt_ev
-val apply_pterm_to_hole  : ?loc:EcLocation.t -> pt_ev -> pt_ev
-val apply_pterm_to_holes : ?loc:EcLocation.t -> int -> pt_ev -> pt_ev
+val apply_pterm_to_arg       : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg -> pt_ev
+val apply_pterm_to_arg_r     : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg_r -> pt_ev
+val apply_pterm_to_local     : ?loc:EcLocation.t -> pt_ev -> EcIdent.t -> pt_ev
+val apply_pterm_to_hole      : ?loc:EcLocation.t -> pt_ev -> pt_ev
+val apply_pterm_to_holes     : ?loc:EcLocation.t -> int -> pt_ev -> pt_ev
+val apply_pterm_to_max_holes : LDecl.hyps -> pt_ev -> pt_ev
 
 (* pattern matching - raise [MatchFailure] on failure. *)
 val pf_form_match : pt_env -> ?mode:fmoptions -> ptn:form -> form -> unit
@@ -198,3 +201,9 @@ module Prept : sig
   val ahyp  : EcIdent.t -> prept_arg
   val ahdl  : handle -> prept_arg
 end
+
+(* -------------------------------------------------------------------- *)
+val collect_pvars_from_pt : proofterm -> ((prog_var * ty) list) EcIdent.Mid.t
+
+val subst_pv_pt :  EcEnv.env -> EcPV.PVM.subst -> proofterm -> proofterm
+val subst_pv_pt_arg :  EcEnv.env -> EcPV.PVM.subst -> pt_arg -> pt_arg

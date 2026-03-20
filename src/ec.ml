@@ -578,11 +578,17 @@ let main () =
   in
 
   (match state.input with
-   | Some input -> EcCommands.addidir (Filename.dirname input)
+   | Some input ->
+      EcCommands.addidir (Filename.dirname input);
+      EcCommands.set_current_path (Filename.dirname input)
    | None ->
-       match relocdir with
-       | None     -> EcCommands.addidir Filename.current_dir_name
-       | Some pwd -> EcCommands.addidir pwd);
+      let current_path =
+        match relocdir with
+        | None     -> Filename.current_dir_name
+        | Some pwd -> pwd
+      in
+        EcCommands.addidir current_path;
+        EcCommands.set_current_path current_path);
 
   (* Check if the .eco is up-to-date and exit if so *)
   (if not state.docgen then
