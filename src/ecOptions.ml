@@ -26,6 +26,8 @@ and cmp_option = {
   cmpo_noeco   : bool;
   cmpo_script  : bool;
   cmpo_trace   : bool;
+  cmpo_lastgoals : bool;
+  cmpo_upto    : (int * int option) option;
 }
 
 and cli_option = {
@@ -349,6 +351,8 @@ let specs = {
       `Spec  ("script" , `Flag  , "Computer-friendly output");
       `Spec  ("no-eco" , `Flag  , "Do not cache verification results");
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
+      `Spec  ("lastgoals" , `Flag  , "Print last unproved goals on failure");
+      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals");
       `Spec  ("compact", `Int   , "<internal>")]);
 
     ("cli", "Run EasyCrypt top-level", [
@@ -519,7 +523,14 @@ let cmp_options_of_values ini values input =
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values;
-    cmpo_trace   = get_flag "trace" values; }
+    cmpo_trace   = get_flag "trace" values;
+    cmpo_lastgoals  = get_flag "lastgoals" values;
+    cmpo_upto       =
+      get_string "upto" values |> Option.map (fun s ->
+        match String.split_on_char ':' s with
+        | [line] -> (int_of_string line, None)
+        | [line; col] -> (int_of_string line, Some (int_of_string col))
+        | _ -> failwith "invalid -upto format: expected LINE or LINE:COL"); }
 
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;

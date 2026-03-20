@@ -415,6 +415,7 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
+      (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -493,6 +494,7 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = None
         ; trace       = None }
 
     end
@@ -511,8 +513,9 @@ let main () =
 
         let gcstats  = cmpopts.cmpo_gcstats in
         let progress = if cmpopts.cmpo_script then `Script else `Human in
+        let lastgoals = cmpopts.cmpo_lastgoals in
         let terminal =
-          lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
+          lazy (T.from_channel ~name ~gcstats ~progress ~lastgoals (open_in name))
         in
 
         let trace0 =
@@ -528,6 +531,7 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = cmpopts.cmpo_upto
         ; trace       = trace0 }
 
       end
@@ -572,6 +576,7 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
+        ; upto        = None
         ; trace       = None }
       end
 
@@ -669,6 +674,16 @@ let main () =
   if T.interactive terminal then
     T.notice ~immediate:true `Warning copyright terminal;
 
+  (* Check if a location is past the -upto point *)
+  let past_upto (loc : EcLocation.t) =
+    match state.upto with
+    | None -> false
+    | Some (line, col) ->
+        let (sl, sc) = loc.loc_start in
+        sl > line || (sl = line && match col with
+          | None -> false
+          | Some c -> sc >= c) in
+
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -737,6 +752,14 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+
+                   (* -upto: if this command starts past the target, print goals and exit *)
+                   if past_upto loc then begin
+                     T.finalize terminal;
+                     EcCommands.pp_current_goal ~all:true Format.std_formatter;
+                     exit 0
+                   end;
+
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in

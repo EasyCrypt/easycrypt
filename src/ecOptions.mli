@@ -22,6 +22,8 @@ and cmp_option = {
   cmpo_noeco   : bool;
   cmpo_script  : bool;
   cmpo_trace   : bool;
+  cmpo_lastgoals : bool;
+  cmpo_upto    : (int * int option) option;
 }
 
 and cli_option = {

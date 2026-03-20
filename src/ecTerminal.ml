@@ -148,8 +148,9 @@ type progress = [ `Human | `Script | `Silent ]
 class from_channel
   ?(gcstats  : bool = true)
   ?(progress : progress option)
-  ~(name     : string)
-   (stream   : in_channel)
+  ?(lastgoals : bool = false)
+  ~(name      : string)
+   (stream    : in_channel)
   : terminal
 
 = object(self)
@@ -160,6 +161,7 @@ class from_channel
   val mutable tick     = -1
   val mutable loc      = LC._dummy
   val mutable gc       = None
+  val mutable last_goals = ""
   val mutable progress =
     progress |> ofdfl (fun () ->
       if
@@ -280,7 +282,14 @@ class from_channel
 
   method finish (status : status) =
     match status with
-    | `ST_Ok -> ()
+    | `ST_Ok ->
+        if lastgoals then begin
+          let buf = Buffer.create 256 in
+          let fmt = Format.formatter_of_buffer buf in
+          EcCommands.pp_current_goal ~all:true fmt;
+          Format.pp_print_flush fmt ();
+          last_goals <- Buffer.contents buf
+        end
 
     | `ST_Failure e -> begin
         let (subloc, e) =
@@ -290,6 +299,8 @@ class from_channel
         let msg = String.strip (EcPException.tostring e) in
 
         self#_clean_progress_line ();
+        if lastgoals && last_goals <> "" then
+          Format.printf "%s%!" last_goals;
         self#_notice ?subloc ~immediate:true `Critical msg;
         self#_update_progress;
         self#_clean_progress_line ~erase:false ();
@@ -314,5 +325,5 @@ class from_channel
     Format.pp_set_margin Format.err_formatter i
 end
 
-let from_channel ?gcstats ?progress ~name stream =
-  new from_channel ?gcstats ?progress ~name stream
+let from_channel ?gcstats ?progress ?lastgoals ~name stream =
+  new from_channel ?gcstats ?progress ?lastgoals ~name stream
