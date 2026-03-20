@@ -956,6 +956,15 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma Ep_bool_gen (d : bool distr) (f : bool -> xreal) :
+  Ep d f = mu1 d false ** f false + mu1 d true ** f true.
+proof.
+have -> := Ep_fin [false; true] d f //; 1: by move => [] //.
+rewrite /big.
+by have -> : map (d ** f) (filter predT [false; true]) =
+  [(d ** f) false; (d ** f) true].
+qed.
+
 lemma Ep_dbool (f : bool -> xreal) :
   Ep {0,1} f = of_reald 0.5 ** f true + of_reald 0.5 ** f false.
 proof.
