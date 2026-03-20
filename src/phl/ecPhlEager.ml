@@ -361,11 +361,14 @@ let t_eager_fun_abs_r i tc =
 let t_eager_call_r fpre fpost tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
-  let fpre = EcSubst.ts_inv_rebind fpre (fst es.es_ml) (fst es.es_mr) in
-  let fpost = EcSubst.ts_inv_rebind fpost (fst es.es_ml) (fst es.es_mr) in
 
-  let (lvl, fl, argsl), sl = pf_last_call !!tc es.es_sl in
-  let (lvr, fr, argsr), sr = pf_first_call !!tc es.es_sr in
+  let ml, mr = (fst es.es_ml, fst es.es_mr) in
+
+  let fpre  = EcSubst.ts_inv_rebind fpre  ml mr in
+  let fpost = EcSubst.ts_inv_rebind fpost ml mr in
+
+  let ((_, fl, argsl) as call_l), sl = pf_last_call !!tc es.es_sl in
+  let ((_, fr, _) as call_r), sr = pf_first_call !!tc es.es_sr in
 
   let swl = s_write env sl in
   let swr = s_write env sr in
@@ -382,15 +385,18 @@ let t_eager_call_r fpre fpost tc =
 
   List.iter check_a argsl;
 
-  let modil = PV.union (f_write env fl) swl in
-  let modir = PV.union (f_write env fr) swr in
   let post =
-    EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl) modil (lvr, fr, argsr)
-      modir (es_po es) hyps
+    EcPhlCall.compute_equiv_call_post
+      hyps ~mods:(swl, swr) (ml, mr) (fpre.inv, fpost.inv)
+      call_l call_r (es_po es).inv
   in
-  let f_concl = f_eagerF fpre sl fl fr sr fpost in
+  let post = { ml; mr; inv = post } in
+
+  let f_concl =
+    f_eagerF fpre sl fl fr sr fpost in
+
   let concl =
-    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) (stmt []) (stmt []) post
+    f_equivS (snd es.es_ml) (snd es.es_mr) (es_pr es) s_empty s_empty post
   in
 
   FApi.xmutate1 tc `EagerCall [ f_concl; concl ]

@@ -4,15 +4,36 @@ open EcCoreGoal.FApi
 open EcAst
 
 (* -------------------------------------------------------------------- *)
-val wp2_call :
-     EcEnv.env -> ts_inv -> ts_inv
-  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
-  -> EcPV.PV.t
-  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
-  -> EcPV.PV.t
-  -> ts_inv
-  -> EcEnv.LDecl.hyps -> ts_inv
+val compute_hoare_call_post :
+     EcEnv.LDecl.hyps
+  -> EcMemory.memory
+  -> form * exnpost
+  -> lvalue option * EcPath.xpath * expr list
+  -> exnpost
+  -> form
 
+(* -------------------------------------------------------------------- *)
+val compute_equiv_call_post :
+     EcEnv.LDecl.hyps
+  -> EcMemory.memory * EcMemory.memory
+  -> form * form
+  -> ?mods:(EcPV.PV.t * EcPV.PV.t)
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> form
+  -> form
+
+(* -------------------------------------------------------------------- *)
+val compute_equiv1_call_post :
+     EcEnv.LDecl.hyps
+  -> side
+  -> EcMemory.memory * EcMemory.memory
+  -> form * form
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> form
+  -> form
+   
+(* -------------------------------------------------------------------- *)
 val t_hoare_call   : ss_inv -> hs_inv -> backward
 val t_bdhoare_call : ss_inv -> ss_inv -> ss_inv option -> backward
 val t_equiv_call   : ts_inv -> ts_inv -> backward
