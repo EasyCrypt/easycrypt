@@ -21,23 +21,128 @@ module Position : sig
     | `Call   of lvmatch
   ]
 
+
   and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
 
+  exception InvalidCPos
+
   type cp_base = [
-    | `ByPos of int
+    | `ByPos of int (* Always <> 0 *)
     | `ByMatch of int option * cp_match
   ]
 
-  type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
-  type codepos1      = int * cp_base
-  type codepos       = (codepos1 * codepos_brsel) list * codepos1
-  type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
-  type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
+  (* Branch selection *)
+  type codepos_brsel  = [`Cond of bool | `Match of EcSymbols.symbol]
+  type nm_codepos_brsel = [`Cond of bool | `Match of int]
+  (* Linear code position inside a block *)
+  type codepos1       = int * cp_base
+  (* Normalized code position inside a block, always > 0 *)
+  type nm_codepos1    = int
+  (* Codeposition path step *)
+  type codepos_step   = (codepos1 * codepos_brsel)
+  type nm_codepos_step = (int * nm_codepos_brsel)
+  (* Block selection by codepos + branch selection *)
+  type codepos_path   = codepos_step list
+  type nm_codepos_path = nm_codepos_step list
+  (* Full codeposition = path to block + position in block *)
+  type codepos         = codepos_path * codepos1
+  type nm_codepos      = nm_codepos_path * nm_codepos1
+  (* Code position offset *)
+  type codeoffset1    = [`Relative of int | `Absolute of codepos1]
+  (* Range of linear code positions *)
+  type codepos1_range = (codepos1 * codeoffset1)
+  (* Normalized codepos1 range *)
+  type nm_codepos1_range = (int * int)
+  (* Range + block path *)
+  type codepos_range  = codepos_path * codepos1_range
+  (* Normalized codepos range *)
+  type nm_codepos_range = nm_codepos_path * nm_codepos1_range
+
+  (* Top-level first and last position *)
+  val cpos_first : codepos
+  val cpos_last  : codepos
+  
+  (* Block-level first and last position *)
+  val cpos1_first       : codepos1
+  val cpos1_last        : codepos1
+  val cpos1_after_last  : codepos1
+
+  val cpos1_to_top : codepos1 -> codepos
 
   val shift1 : offset:int -> codepos1 -> codepos1
   val shift  : offset:int -> codepos  -> codepos
 
   val resolve_offset : base:codepos1 -> offset:codeoffset1 -> codepos1
+
+  val codepos1_range_of_codepos1 : codepos1 -> codepos1_range
+  val codepos_range_of_codepos   : codepos  -> codepos_range
+
+  val nm_codepos1_range_of_nm_codepos1 : nm_codepos1 -> nm_codepos1_range
+  val nm_codepos_range_of_nm_codepos   : nm_codepos  -> nm_codepos_range
+
+  val disjoint : nm_codepos1_range -> nm_codepos1_range -> bool
+
+  val nm_codepos_in_nm_codepos_range : nm_codepos1 -> nm_codepos1_range -> bool
+
+  module Notations : sig
+    val (|+>) : codepos -> int -> codepos
+
+    val (+>) : codepos1 -> int -> codepos1
+
+    val (<+|) : codepos -> int -> codepos
+
+    val (<+) : codepos1 -> int -> codepos1
+  end
+
+  (* Normalization functions *)
+  val find_by_cp_match : env -> (int option * cp_match) -> stmt -> instr list * instr * instr list
+
+  val find_by_nmcpos1 : ?rev:bool -> nm_codepos1 -> stmt -> instr list * instr * instr list
+
+  val check_nm_cpos1 : nm_codepos1 -> stmt -> unit
+
+  val normalize_cp_base : ?check:bool -> env -> cp_base -> stmt -> nm_codepos1
+
+  val normalize_cpos1 : ?check:bool -> env -> codepos1 -> stmt -> nm_codepos1
+
+  val resolve_offset1_from_cpos1 : env -> nm_codepos1 -> codeoffset1 -> stmt -> nm_codepos1 
+
+  val resolve_offset1_from_cpos1_range : env -> nm_codepos1_range -> codeoffset1 -> stmt -> nm_codepos1 
+
+  val find_by_cpos1 : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr * instr list
+
+  val select_match_arm_idx : env -> expr -> string -> int
+
+  val normalize_brsel : env -> instr -> codepos_brsel -> (env * stmt) * nm_codepos_brsel
+
+  val select_branch : env -> instr -> codepos_brsel -> stmt
+
+  val normalize_cpos_step : env -> stmt -> codepos_step -> (env * stmt) * nm_codepos_step
+
+  val normalize_cpos_path : env -> codepos_path -> stmt -> (env * stmt) * nm_codepos_path
+
+  val normalize_cpos : env ->  codepos -> stmt -> (env * stmt) * nm_codepos
+
+  val normalize_cpos1_range : ?strict:bool -> env -> codepos1_range -> stmt -> nm_codepos1_range 
+
+  val normalize_cpos_range : ?strict:bool -> env -> codepos_range -> stmt -> (env * stmt) * nm_codepos_range
+
+  val split_at_nmcpos1 : ?rev:bool -> nm_codepos1 -> stmt -> instr list * instr list
+
+  val split_at_cp_base : ?rev:bool -> env -> cp_base -> stmt -> instr list * instr list
+
+  val split_at_cpos1 : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr list
+
+  val split_at_cpos : ?rev:bool -> env -> codepos -> stmt -> env * (instr list * instr list)
+
+  (* Split a statement from an optional top-level position (codepos1) *)
+  val may_split_at_cpos1 : ?rev:bool -> env -> codepos1 option -> stmt -> instr list * instr list
+
+  val split_by_nmcpr1 : ?strict:bool -> ?rev1:bool -> ?rev2:bool -> nm_codepos1_range -> stmt -> instr list * instr list * instr list
+
+  val split_by_nmcpr1s : nm_codepos1 list -> stmt -> instr list list
+
+  val cpos1 : int -> codepos1
 end
 
 (* -------------------------------------------------------------------- *)
@@ -66,20 +171,8 @@ module Zipper : sig
     z_env  : env option;                (* env with local vars from previous instructions *)
   }
 
-  exception InvalidCPos
-
-  (* Create a codepos1 from a top-level absolute position *)
-  val cpos : int -> codepos1
-
-  (* Split a statement from a top-level position (codepos1) *)
-  val find_by_cpos1  : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr * instr list
-  val split_at_cpos1 : env -> codepos1 -> stmt -> instr list * instr list
-
-  (* Split a statement from an optional top-level position (codepos1) *)
-  val may_split_at_cpos1 : ?rev:bool -> env -> codepos1 option -> stmt -> instr list * instr list
-
   (* Find the absolute offset of a top-level position (codepos1) w.r.t. a given statement *)
-  val offset_of_position : env -> codepos1 -> stmt -> int
+(*   val offset_of_position : env -> codepos1 -> stmt -> int *)
 
   (* [zipper] soft constructor *)
   val zipper : ?env : env -> instr list -> instr list -> ipath -> zipper
@@ -90,7 +183,7 @@ module Zipper : sig
    * positions only). The second variant simply throw away the second
    * output.
    *)
-  val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * codepos
+  val zipper_of_cpos_r : env -> codepos -> stmt -> zipper * (nm_codepos * stmt)
   val zipper_of_cpos : env -> codepos -> stmt -> zipper
 
   (* Return the zipper for the stmt [stmt] from the start of the code position
@@ -98,8 +191,8 @@ module Zipper : sig
    * the zipper that represents the final position in the range.
    * Raise [InvalidCPos] if [codepos_range] is not a valid range for [stmt].
    *)
-  val zipper_of_cpos_range : env -> codepos_range -> stmt -> zipper * codepos1
-  val zipper_and_split_of_cpos_range : env -> codepos_range -> stmt -> (zipper * codepos1) * (instr list * instr list)
+(*   val zipper_of_cpos_range : env -> codepos_range -> stmt -> zipper * codepos1 *)
+  val zipper_and_split_of_cpos_range : env -> codepos_range -> stmt -> zipper * (instr list * instr list * instr list) * nm_codepos_range
 
   (* Zip the zipper, returning the corresponding statement *)
   val zip : zipper -> stmt

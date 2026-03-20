@@ -68,10 +68,14 @@ module type PrinterAPI = sig
   val pp_shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_codepos1    : PPEnv.t -> EcMatching.Position.codepos1 pp
-  val pp_codeoffset1 : PPEnv.t -> EcMatching.Position.codeoffset1 pp
+  val pp_codepos1      : PPEnv.t -> EcMatching.Position.codepos1 pp
+  val pp_codepos_brsel : EcMatching.Position.codepos_brsel pp
+  val pp_codepos_step  : PPEnv.t -> EcMatching.Position.codepos_step pp
+  val pp_codepos_path  : PPEnv.t -> EcMatching.Position.codepos_path pp
+  val pp_codeoffset1   : PPEnv.t -> EcMatching.Position.codeoffset1 pp
 
-  val pp_codepos     : PPEnv.t -> EcMatching.Position.codepos pp
+  val pp_codepos       : PPEnv.t -> EcMatching.Position.codepos pp
+  val pp_codepos_range : PPEnv.t -> EcMatching.Position.codepos_range pp
 
   (* ------------------------------------------------------------------ *)
   type vsubst = [

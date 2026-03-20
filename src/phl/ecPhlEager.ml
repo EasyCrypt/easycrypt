@@ -4,7 +4,7 @@ open EcEnv
 open EcFol
 open EcLowGoal
 open EcLowPhlGoal
-open EcMatching.Zipper
+open EcMatching.Position
 open EcModules
 open EcPV
 open EcTypes
@@ -67,10 +67,16 @@ let destruct_eager tc s =
   let env = FApi.tc1_env tc
   and es = tc1_as_equivS tc
   and ss = List.length s.s_node in
+  Format.eprintf "ss: %d@." ss;
+
+  let ppe = EcPrinting.PPEnv.ofenv env in
 
   let c, c' = (es.es_sl, es.es_sr) in
-  let z, c = s_split env (Zpr.cpos ss) c
-  and c', z' = s_split env (Zpr.cpos (List.length c'.s_node - ss)) c' in
+  let z, c = s_split env EcMatching.Position.Notations.(cpos1_first +> ss) c 
+  and c', z' = s_split env EcMatching.Position.Notations.(cpos1_last <+ ss) c' in
+  Format.eprintf "z: %a@. z': %a@." 
+  EcPrinting.(pp_stmt ppe) (stmt z)
+  EcPrinting.(pp_stmt ppe) (stmt z');
 
   let env, _, _ = FApi.tc1_eflat tc in
   let z_eq_s = ER.EqTest.for_stmt env (stmt z) s
@@ -96,7 +102,8 @@ let destruct_on_op id_op tc =
   let env = FApi.tc1_env tc and es = tc1_as_equivS tc in
   let s =
     try
-      let s, _ = split_at_cpos1 env (-1, `ByMatch (Some (-1), id_op)) es.es_sl
+      (* FIXME CPOS PR: Add function to do these things *)
+      let s, _ = split_at_cpos1 env (0, `ByMatch (Some (-1), id_op)) es.es_sl
       (* ensure the right statement also contains an [id_op]: *)
       and _, _ = split_at_cpos1 env (1, `ByMatch (None, id_op)) es.es_sr in
       s

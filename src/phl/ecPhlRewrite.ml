@@ -239,7 +239,7 @@ let t_change_stmt
   let env = FApi.tc1_env tc in
   let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
 
-  let (zpr, _), (stmt, epilog) = EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
+  let zpr, (_prelude,stmt, epilog), _nmr = EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
 
   let pvs = EcPV.is_write env (stmt @ s.s_node) in
   let pvs, globs = EcPV.PV.elements pvs in
@@ -291,7 +291,7 @@ let t_change_stmt
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
-  (pos    : pcodepos_range)
+  (pos    : pcodepos_or_range)
   (s      : pstmt)
   (tc     : tcenv1)
 =
@@ -317,7 +317,7 @@ let process_change_stmt
 
   let pos =
     let env = EcEnv.Memory.push_active_ss me env in
-    EcTyping.trans_codepos_range ~memory:(fst me) env pos
+    EcTyping.trans_codepos_or_range ~memory:(fst me) env pos
   in
 
   let s = match side with

@@ -101,7 +101,7 @@ qed.
 
 equiv outline_slice: N.g4 ~ N.g4: true ==> true.
 proc.
-outline {1} [1 .. 2] M.f4.
+outline {1} :[1 .. 2] M.f4.
 by inline*; auto.
 qed.
 
@@ -115,7 +115,7 @@ equiv outline_multi: N.g6 ~ N.g6: true ==> true.
 proof.
 proc.
 outline {1} 2 ~ M.f5.
-outline {1} [3 .. 4] N.g4.
+outline {1} :[3 .. 4] N.g4.
 outline {1} 1 ~ M.f5.
 by inline*; auto.
 qed.
@@ -123,7 +123,7 @@ qed.
 equiv outline_stmt: N.g6 ~ N.g6: true ==> true.
 proof.
 proc.
-outline {1} [1 .. 4] by {
+outline {1} :[1 .. 4] by {
   a <@ M.f5(dint);
   b <@ M.f5(dint);
   N.g4(a,b);

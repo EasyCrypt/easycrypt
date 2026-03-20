@@ -19,6 +19,9 @@ let t_hoare_seq_r i phi tc =
   let hs = tc1_as_hoareS tc in
   let phi = ss_inv_rebind phi (fst hs.hs_m) in
   let s1, s2 = s_split env i hs.hs_s in
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  Format.eprintf "Splitting at index (%a)@." EcPrinting.(pp_codepos1 ppe) i;
+  Format.eprintf "%a@.---------------------------------------@.%a@." EcPrinting.(pp_stmt ppe) (stmt s1) EcPrinting.(pp_stmt ppe) (stmt s2);
   let post = update_hs_ss phi (hs_po hs) in
   let a = f_hoareS (snd hs.hs_m) (hs_pr hs) (stmt s1) post in
   let b = f_hoareS (snd hs.hs_m) phi (stmt s2) (hs_po hs)  in
@@ -146,8 +149,8 @@ let t_equiv_seq_onesided side i pre post tc =
   let generalize_mod_side= sideif side generalize_mod_left generalize_mod_right in
   let ij =
     match side with
-    | `Left  -> (i, Zpr.cpos (List.length s'. s_node))
-    | `Right -> (Zpr.cpos (List.length s'. s_node), i) in
+    | `Left  -> (i, EcMatching.Position.cpos1 (List.length s'. s_node))
+    | `Right -> (EcMatching.Position.cpos1 (List.length s'. s_node), i) in
   let _s1, s2 = s_split env i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
@@ -215,6 +218,11 @@ let process_phl_bd_info bd_info tc =
 (* -------------------------------------------------------------------- *)
 let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
+
+  (* Seq is 0-indexed from user side, so convert *)
+  let k = DOption.map (fun cp ->
+    shift1 ~offset:1 cp
+  ) k in
 
   let get_single phi =
     match phi with

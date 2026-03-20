@@ -54,7 +54,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
   tc |> match lls with
 
   | LL_WP ->
-      EcPhlWp.t_wp (Some (Single (Zpr.cpos (-1))))
+      EcPhlWp.t_wp (Some (Single (EcMatching.Position.cpos1 (-1))))
 
   | LL_RND ->
       let m = EcIdent.create "&hr" in 
@@ -69,7 +69,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
   | LL_JUMP ->
       let m = EcIdent.create "&hr" in
         ( EcPhlSeq.t_bdhoare_seq
-           (Zpr.cpos (-1)) ({m;inv=f_true}, {m;inv=f_true}, 
+           (EcMatching.Position.cpos1 (-1)) ({m;inv=f_true}, {m;inv=f_true}, 
             {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
 
         @~ FApi.t_onalli (function
@@ -87,7 +87,7 @@ and apply_ll_strategy1 (lls : ll_strategy) tc =
       in
 
         ( EcPhlSeq.t_bdhoare_seq
-           (Zpr.cpos (-1)) ({m;inv=f_true}, {m;inv=f_true}, {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
+           (EcMatching.Position.cpos1 (-1)) ({m;inv=f_true}, {m;inv=f_true}, {m;inv=f_r1}, {m;inv=f_r1}, {m;inv=f_r0}, {m;inv=f_r1})
 
         @~ FApi.t_onalli (function
            | 1 -> t_id
@@ -142,8 +142,8 @@ let t_lossless tc =
 
   | FequivS hs ->
     let ml, mr = fst hs.es_ml, fst hs.es_mr in
-      ((EcPhlSeq.t_equiv_seq_onesided `Left (EcMatching.Zipper.cpos 0) {m=ml;inv=f_true} {m=ml;inv=f_true}) @+
-         [ (EcPhlSeq.t_equiv_seq_onesided `Right (EcMatching.Zipper.cpos 0) {m=mr;inv=f_true} {m=mr;inv=f_true}) @+
+      ((EcPhlSeq.t_equiv_seq_onesided `Left (EcMatching.Position.cpos1 0) {m=ml;inv=f_true} {m=ml;inv=f_true}) @+
+         [ (EcPhlSeq.t_equiv_seq_onesided `Right (EcMatching.Position.cpos1 0) {m=mr;inv=f_true} {m=mr;inv=f_true}) @+
              [ EcPhlSkip.t_skip @! t_trivial ;
                t_single
              ];

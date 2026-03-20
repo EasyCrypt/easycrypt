@@ -1008,7 +1008,6 @@ pffilter:
       i=pfpos? COLON j=pfpos? { `Range (i, j) }
     | i=pfpos { `Single i }, COMMA)
   RBRACKET
-
   { PFRange (flat, rg) }
 
 | LPBRACE flat=iboption(SLASH) x=ident IN h=form_h RPBRACE
@@ -2565,29 +2564,39 @@ branch_select:
 | DOT { `Cond true }
 | QUESTION { `Cond false }
 
-%inline nm1_codepos:
+%inline codepos_step:
 | i=codepos1 bs=branch_select
     { (i, bs) }
 
+(* FIXME: Syntax *)
+codeoffset1:
+| i=sword       { (`Relative   i :> pcodeoffset1) }
+| AT p=codepos1 { (`Absolute   p :> pcodeoffset1) }
+
+(* FIXME: Unify with above *)
+(* Shift to convert input closed range into closed-open form *)
+%inline codepos1_range:
+| LBRACKET cps=codepos1 DOTDOT cpe=codepos1   RBRACKET { (cps, `Absolute (shift1 ~offset:1 cpe)) }
+| LBRACKET cps=codepos1 MINUS cpe=sword RBRACKET { (cps, `Relative cpe) }
+
+%inline codepos_path:
+| path=rlist0(codepos_step, empty) { path }
+
 codepos:
-| nm=rlist0(nm1_codepos, empty) i=codepos1
-    { (nm, i) }
+| path=codepos_path i=codepos1
+  { (path, i) }
 
 codepos_range:
-| LBRACKET cps=codepos DOTDOT cpe=codepos RBRACKET { (cps, `Base cpe) }
-| LBRACKET cps=codepos MINUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
+| path=codepos_path COLON i=codepos1_range
+  { (path, i) }
 
 codepos_or_range:
-| cp=codepos { (cp, `Offset (0, `ByPos 0)) }
-| cpr=codepos_range  { cpr }
-
-codeoffset1:
-| i=sword       { (`ByOffset   i :> pcodeoffset1) }
-| AT p=codepos1 { (`ByPosition p :> pcodeoffset1) }
+| cp=codepos { Pos cp }
+| cpr=codepos_range { Range cpr }
 
 o_codepos1:
 | UNDERSCORE { None }
-| i=codepos1 { Some i}
+| i=codepos1 { Some i }
 
 s_codepos1:
 | n=codepos1
@@ -2650,11 +2659,8 @@ swap_position:
 | offset=codeoffset1
     { { interval = None; offset; } }
 
-| start=codepos1 offset=codeoffset1
-    { { interval = Some (start, None); offset; } }
-
-| LBRACKET start=codepos1 DOTDOT end_=codepos1 RBRACKET offset=codeoffset1
-    { { interval = Some (start, Some end_); offset; } }
+| interval=codepos_or_range offset=codeoffset1
+    { { interval = Some interval; offset; } }
 
 side:
 | LBRACE n=word RBRACE {
