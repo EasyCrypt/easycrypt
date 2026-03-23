@@ -300,7 +300,7 @@ and bdHoareS = {
 
 and exnpost = {
   main   : form;
-  exnmap : form Mp.t * form option;
+  exnmap : form Mp.t;
 }
 
 and ss_inv = {
@@ -370,7 +370,7 @@ type hs_inv = {
 }
 
 (* -------------------------------------------------------------------- *)
-type 'a prepoe = 'a * ('a Mp.t * 'a option)
+type 'a prepoe = 'a * ('a Mp.t)
 
 module POE : sig
   val empty : form -> exnpost
@@ -381,9 +381,9 @@ module POE : sig
 
   val lower : hs_inv -> ss_inv
 
-  val mk : form -> (form Mp.t * form option) -> exnpost
+  val mk : form -> form Mp.t -> exnpost
 
-  val destruct : exnpost -> form * (form Mp.t * form option)
+  val destruct : exnpost -> form * (form Mp.t)
 
   val to_list_pre : 'a prepoe -> 'a list
 

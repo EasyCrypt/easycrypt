@@ -89,9 +89,9 @@ let pf_process_pattern pe hyps fp =
 let pf_process_poe hyps poe =
   let env  = LDecl.toenv hyps in
   let ue = unienv_of_hyps hyps in
-  let m, d = EcTyping.trans_poe env ue poe in
+  let m = EcTyping.trans_poe env ue poe in
   let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
-  Mp.map (EcFol.Fsubst.f_subst ts) m, omap (EcFol.Fsubst.f_subst ts) d
+  Mp.map (EcFol.Fsubst.f_subst ts) m
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt ?mv tc oty pf =
@@ -262,7 +262,14 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     lazy_destruct ~reduce hyps doit fp
 
 (* -------------------------------------------------------------------- *)
-let merge2_poe_list (poe1,d1) (poe2,d2) =
+let merge2_poe_list poe1 poe2 =
+  let aux poe =
+    match EcPath.Mp.find EcCoreLib.p_wild poe with
+    | x -> EcPath.Mp.remove EcCoreLib.p_wild poe, Some x
+    | exception Not_found -> poe, None
+  in
+  let poe1, d1 = aux poe1 in
+  let poe2, d2 = aux poe2 in
   let get_default d =
     match d with
     | Some d -> d

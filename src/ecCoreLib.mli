@@ -23,6 +23,9 @@ val i_top  : symbol
 val i_self : symbol
 val p_top  : path
 
+val i_wild : symbol
+val p_wild : path
+
 (* -------------------------------------------------------------------- *)
 val i_Pervasive : symbol
 val p_Pervasive : path

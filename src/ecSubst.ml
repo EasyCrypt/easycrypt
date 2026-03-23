@@ -811,14 +811,13 @@ and subst_module (s : subst) (m : module_expr) =
 and subst_hs_inv (s : subst) (inv : hs_inv) =
   let s = add_memory s inv.hsi_m inv.hsi_m in
   let main = subst_form s inv.hsi_inv.main in
-  let map =
+  let exnmap =
     Mp.fold (fun p f m ->
       let p = subst_path s p in
       let f = subst_form s f in
       Mp.add p f m
-    ) (fst inv.hsi_inv.exnmap) Mp.empty in
-  let dfl = omap (subst_form s) (snd inv.hsi_inv.exnmap) in
-  { hsi_inv = { main; exnmap = (map, dfl) }; hsi_m = inv.hsi_m }
+    ) inv.hsi_inv.exnmap Mp.empty in
+  { hsi_inv = { main; exnmap }; hsi_m = inv.hsi_m }
 
 (* -------------------------------------------------------------------- *)
 let subst_modsig ?params (s : subst) (comps : module_sig) =

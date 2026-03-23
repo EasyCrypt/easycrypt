@@ -1985,7 +1985,12 @@ and pp_form_core_r
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
-      let { main = post; exnmap = (poe, d) } = (hf_po hf).hsi_inv in
+      let { main = post; exnmap = poe } = (hf_po hf).hsi_inv in
+      let poe, d =
+        match EcPath.Mp.find EcCoreLib.p_wild poe with
+        | x -> EcPath.Mp.remove EcCoreLib.p_wild poe, Some x
+        | exception Not_found -> poe, None
+      in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_pl_mem_binding pm ppe) hf.hf_m
@@ -1995,7 +2000,12 @@ and pp_form_core_r
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-      let { main = post; exnmap = (poe, d); } = (hs_po hs).hsi_inv in
+      let { main = post; exnmap = poe; } = (hs_po hs).hsi_inv in
+      let poe, d =
+        match EcPath.Mp.find EcCoreLib.p_wild poe with
+        | x -> EcPath.Mp.remove EcCoreLib.p_wild poe, Some x
+        | exception Not_found -> poe, None
+      in
       let pm = debug_mode || (fst hs.hs_m).id_symb <> "&hr" in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
@@ -3091,7 +3101,12 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
-  let { main = post; exnmap = (poe, d); } = (hf_po hf).hsi_inv in
+  let { main = post; exnmap = poe; } = (hf_po hf).hsi_inv in
+  let poe, d =
+    match EcPath.Mp.find EcCoreLib.p_wild poe with
+    | x -> EcPath.Mp.remove EcCoreLib.p_wild poe, Some x
+    | exception Not_found -> poe, None
+  in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (hf_pr hf).inv;
   let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
@@ -3105,7 +3120,12 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
   let ppef = PPEnv.push_mem ppe ~active:true hs.hs_m in
   let ppnode = collect2_s ppef hs.hs_s.s_node [] in
 
-  let { main = post; exnmap = (poe, d); } = (hs_po hs).hsi_inv in
+  let { main = post; exnmap = poe; } = (hs_po hs).hsi_inv in
+  let poe, d =
+    match EcPath.Mp.find EcCoreLib.p_wild poe with
+    | x -> EcPath.Mp.remove EcCoreLib.p_wild poe, Some x
+    | exception Not_found -> poe, None
+  in
 
   let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode in
 

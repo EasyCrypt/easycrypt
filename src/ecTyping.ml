@@ -1444,12 +1444,13 @@ let trans_match_exn ~loc env ue pbs =
   let rec fill_branches tbl pbs =
     match pbs with
     | [] ->
-      tbl, None
+      tbl
 
     | (None, body) :: pbs ->
       if pbs <> [] then
         tyerror loc env (InvalidMatch FXE_MatchDupBranches);
-      tbl, Some body
+
+      Mp.add EcCoreLib.p_wild ([], body) tbl
 
     | (Some (x, bds), body) :: pbs ->
       if Mp.mem x tbl then
@@ -3540,8 +3541,8 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail qenv ue post.pnormal.pl_loc ~expct:tbool post'.f_ty;
 
         let penv_e = EcEnv.Fun.inv_memenv1 m env in
-        let epost', dpost' = trans_poe penv_e ue post.pexcept in
-        f_hoareF {m;inv=pre'} fpath { hsi_m = m; hsi_inv = POE.mk post' (epost', dpost'); }
+        let epost' = trans_poe penv_e ue post.pexcept in
+        f_hoareF {m;inv=pre'} fpath { hsi_m = m; hsi_inv = POE.mk post' epost'; }
 
     | PFehoareF (m, pre, gp, post) ->
         if mode <> `Form then
@@ -3687,15 +3688,13 @@ and trans_prop env ?mv ue pf =
 and trans_poe penv_e ue poe =
   let loc = poe.pl_loc in
   let poe = poe.pl_desc in
-  let branches, dfl = trans_match_exn ~loc penv_e ue poe in
-  let epost = Mp.map (fun (lcs, body) ->
-     let env = EcEnv.Var.bind_locals lcs penv_e in
-     let bdy  = trans_prop env ue body in
-     f_lambda (List.map (snd_map gtty) lcs) bdy) branches in
-   let dpost = omap (fun body ->
-     let bdy = trans_prop penv_e ue body in
-     bdy) dfl in
-   epost, dpost
+  let branches = trans_match_exn ~loc penv_e ue poe in
+  Mp.map
+    (fun (lcs, body) ->
+       let env = EcEnv.Var.bind_locals lcs penv_e in
+       let bdy  = trans_prop env ue body in
+       f_lambda (List.map (snd_map gtty) lcs) bdy)
+    branches
 
 (* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =

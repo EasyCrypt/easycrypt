@@ -12,7 +12,7 @@ open EcLowPhlGoal
 module LowInternal = struct
   exception No_wp
 
-  let find_poe hyps memenv (epost,d) (e:EcTypes.expr) =
+  let find_poe hyps memenv epost (e:EcTypes.expr) =
     let m = EcMemory.memory memenv in
     let f = form_of_expr ~m e in
     let f = EcReduction.h_red_until EcReduction.full_red hyps f in
@@ -20,9 +20,10 @@ module LowInternal = struct
     match Mp.find ex epost with
     | f -> f_app_simpl f args EcTypes.tbool
     | exception Not_found ->
-      match d with
-      | Some d -> d
-      | None -> tacuerror "missing postcondition for exception %a" EcPrinting.pp_path ex
+      match Mp.find EcCoreLib.p_wild epost with
+      | d -> d
+      | exception Not_found ->
+        tacuerror "missing postcondition for exception %a" EcPrinting.pp_path ex
 
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
@@ -143,10 +144,10 @@ let wp
    (s        : stmt)
    (poe      : exnpost)
 =
-  let { main = post; exnmap = (epost, d) } = poe in
+  let post, epost = POE.destruct poe in
   let (r, letsf) =
     LowInternal.wp_stmt ?mc
-      onesided c_pre hyps m (List.rev s.s_node) ([], post) (epost,d)
+      onesided c_pre hyps m (List.rev s.s_node) ([], post) epost
   in
   let pre = mk_let_of_lv_substs ?mc ~uselet (EcEnv.LDecl.toenv hyps) letsf in
   (List.rev r, pre)
@@ -168,12 +169,12 @@ module TacInternal = struct
     let hs = tc1_as_hoareS tc in
     let (s_hd, s_wp) = o_split env i hs.hs_s in
     let s_wp = EcModules.stmt s_wp in
-    let { exnmap = (eposts, d) } as post = (hs_po hs).hsi_inv in
+    let { exnmap = eposts } as post = (hs_po hs).hsi_inv in
     let s_wp, post = wp ~uselet ~onesided:true hyps hs.hs_m s_wp post in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let m = fst hs.hs_m in
-    let post = { hsi_m = m; hsi_inv = { main = post; exnmap = (eposts, d)}; } in
+    let post = { hsi_m = m; hsi_inv = { main = post; exnmap = eposts} } in
     let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Wp [concl]
 
