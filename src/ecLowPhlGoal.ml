@@ -331,6 +331,41 @@ let push_memenvs_pre (hyps : LDecl.hyps) (f : form) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+type logicS = [
+  | `Hoare   of sHoareS
+  | `BdHoare of bdHoareS
+  | `Equiv   of equivS
+  | `EHoare  of eHoareS
+]
+
+let get_logicS (f : form) : logicS =
+  match f.f_node with
+  | FhoareS   hs -> `Hoare   hs
+  | FbdHoareS hs -> `BdHoare hs
+  | FequivS   hs -> `Equiv   hs
+  | FeHoareS  hs -> `EHoare  hs
+  | _ -> destr_error "<program logic> (S)"
+
+let hoareS_read (env : env) (hs : sHoareS) : EcPV.pmvs =
+  EcPV.form_read env PMVS.empty (f_hoareS_r hs)
+
+let bdHoareS_read (env : env) (hs : bdHoareS) : pmvs =
+  form_read env PMVS.empty (f_bdHoareS_r hs)
+
+let equivS_read (env : env) (hs : equivS) : pmvs =
+  form_read env PMVS.empty (f_equivS_r hs)
+
+let eHoareS_read (env : env) (hs : eHoareS) : pmvs =
+  form_read env PMVS.empty (f_eHoareS_r hs)
+
+let logicS_read (env : env) (f : logicS) =
+  match f with
+  | `Hoare   hs -> hoareS_read   env hs
+  | `BdHoare hs -> bdHoareS_read env hs
+  | `Equiv   hs -> equivS_read   env hs
+  | `EHoare  hs -> eHoareS_read  env hs
+
+(* -------------------------------------------------------------------- *)
 exception InvalidSplit of codepos1
 
 let s_split env i s =

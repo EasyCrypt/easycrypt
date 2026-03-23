@@ -535,33 +535,36 @@ let f_map gt g fp =
       f_pr_r { pr with pr_args = args'; pr_event = {m=pr.pr_event.m; inv=ev'}; }
 
 (* -------------------------------------------------------------------- *)
-let f_iter g f =
+let f_fold (tx : 'a -> form -> 'a) (state : 'a) (f : form) =
   match f.f_node with
   | Fint     _
   | Flocal   _
   | Fpvar    _
   | Fglob    _
-  | Fop      _ -> ()
+  | Fop      _ -> state
 
-  | Fquant   (_ , _ , f1) -> g f1
-  | Fif      (f1, f2, f3) -> g f1;g f2; g f3
-  | Fmatch   (b, fs, _)   -> List.iter g (b :: fs)
-  | Flet     (_, f1, f2)  -> g f1;g f2
-  | Fapp     (e, es)      -> List.iter g (e :: es)
-  | Ftuple   es           -> List.iter g es
-  | Fproj    (e, _)       -> g e
+  | Fquant   (_ , _ , f1) -> tx state f1
+  | Fif      (f1, f2, f3) -> List.fold_left tx state [f1; f2; f3]
+  | Fmatch   (b, fs, _)   -> List.fold_left tx state (b :: fs)
+  | Flet     (_, f1, f2)  -> List.fold_left tx state [f1; f2]
+  | Fapp     (f, fs)      -> List.fold_left tx state (f :: fs)
+  | Ftuple   fs           -> List.fold_left tx state fs
+  | Fproj    (f, _)       -> tx state f
 
-  | FhoareF  hf   -> g (hf_pr hf).inv; POE.iter g (hf_po hf).hsi_inv
-  | FhoareS  hs   -> g (hs_pr hs).inv; POE.iter g (hs_po hs).hsi_inv
-  | FeHoareF  hf  -> g (ehf_pr hf).inv; g (ehf_po hf).inv
-  | FeHoareS  hs  -> g (ehs_pr hs).inv; g (ehs_po hs).inv
-  | FbdHoareF bhf -> g (bhf_pr bhf).inv; g (bhf_po bhf).inv; g (bhf_bd bhf).inv
-  | FbdHoareS bhs -> g (bhs_pr bhs).inv; g (bhs_po bhs).inv; g (bhs_bd bhs).inv
-  | FequivF   ef  -> g (ef_pr ef).inv; g (ef_po ef).inv
-  | FequivS   es  -> g (es_pr es).inv; g (es_po es).inv
-  | FeagerF   eg  -> g (eg_pr eg).inv; g (eg_po eg).inv
-  | Fpr       pr  -> g pr.pr_args; g pr.pr_event.inv
+  | FhoareF  hf   -> POE.fold tx (tx state (hf_pr hf).inv) (hf_po hf).hsi_inv
+  | FhoareS  hs   -> POE.fold tx (tx state (hs_pr hs).inv) (hs_po hs).hsi_inv
+  | FeHoareF  hf  -> List.fold_left tx state [(ehf_pr hf).inv; (ehf_po hf).inv]
+  | FeHoareS  hs  -> List.fold_left tx state [(ehs_pr hs).inv; (ehs_po hs).inv]
+  | FbdHoareF bhf -> List.fold_left tx state [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
+  | FbdHoareS bhs -> List.fold_left tx state [(bhs_pr bhs).inv; (bhs_po bhs).inv; (bhs_bd bhs).inv]
+  | FequivF   ef  -> List.fold_left tx state [(ef_pr ef).inv; (ef_po ef).inv]
+  | FequivS   es  -> List.fold_left tx state [(es_pr es).inv; (es_po es).inv]
+  | FeagerF   eg  -> List.fold_left tx state [(eg_pr eg).inv; (eg_po eg).inv]
+  | Fpr       pr  -> List.fold_left tx state [pr.pr_args; pr.pr_event.inv]
 
+(* -------------------------------------------------------------------- *)
+let f_iter (tx : form -> unit) (f : form) =
+  f_fold (fun () f -> tx f) () f
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =
