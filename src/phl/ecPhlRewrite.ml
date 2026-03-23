@@ -7,6 +7,7 @@ open EcEnv
 open EcModules
 open EcFol
 open EcLowPhlGoal
+open EcMatching
 
 module L  = EcLocation
 module PT = EcProofTerm
@@ -243,6 +244,44 @@ let process_rewrite_at
   |> FApi.t_sub [t_pre; t_post; EcLowGoal.t_id]
 
 (* -------------------------------------------------------------------- *)
+let zpr_write (env : env) =
+  let rec doit (ctxt : instr option) (pvs : EcPV.PV.t) (zpr : Zipper.spath) =
+    let (head, tail), ipath = zpr in
+    let tail = List.ocons ctxt tail in
+    let s = stmt (List.rev_append head tail) in
+
+    let pvs = EcPV.is_write_r env pvs head in
+
+    let parent, pvs =
+      match ipath with
+      | Zipper.ZTop ->
+        None, pvs
+
+      | Zipper.ZIfThen (e, ps, se) ->
+        Some (ps, i_if (e, s, se)), pvs
+
+      | Zipper.ZIfElse (e, st, ps) ->
+        Some (ps, i_if (e, st, s)), pvs
+
+      | Zipper.ZMatch  (e, ps, mpi) ->
+        let bs =
+          List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)
+        in Some (ps, i_match (e, bs)), pvs
+
+      | Zipper.ZWhile (e, ps) ->
+        Some (ps, i_while (e, s)), EcPV.is_write_r env pvs tail
+    in 
+
+    ofold (fun (zpr, ctxt) pvs -> doit (Some ctxt) pvs zpr) pvs parent
+
+  in fun pvs zpr -> doit None pvs zpr
+
+(* -------------------------------------------------------------------- *)
+(* [change] replaces a code range with [s] by generating:
+   - a local equivalence goal showing that the original fragment and [s]
+     agree under the framed precondition on the variables they both read,
+     and produce the same values for everything they may write;
+   - the original program-logic goal with the selected range rewritten. *)
 let t_change_stmt
   (side : side option)
   (pos : EcMatching.Position.codepos_range) 
@@ -251,84 +290,82 @@ let t_change_stmt
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let goal = (FApi.tc1_goal tc) in
-  let post = inv_of_inv (oget (EcLowPhlGoal.get_post goal)) in
   let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
 
-  let env = EcEnv.Memory.push_active_ts me me env in (* FIXME *)
+  let (zpr, _), (stmt, epilog) =
+    EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
 
-  let zpr, epos = Zpr.zipper_of_cpos_range env pos stmt in
-  let stmt, epilog = match zpr.z_tail with
-  | [] -> raise Zpr.InvalidCPos
-  | i::tl -> let s, tl = Zpr.split_at_cpos1 env epos (EcAst.stmt tl) in
-    (i::s), tl
-  in
+  (* Collect the variables that may be modified by the surrounding context,
+     excluding the fragment being replaced. *)
+  let modi =
+    let zpr =
+      (zpr.z_head, List.drop (List.length stmt) zpr.z_tail), zpr.z_path
+    in zpr_write env EcPV.PV.empty zpr in
 
-  let keep = pvtail env (EcPV.is_read env epilog) zpr.z_path in
-  let keep = EcPV.PV.union keep (EcPV.PV.fv env (EcMemory.memory me) post) in
+  (* Keep only the top-level conjuncts of the current precondition that talk
+     about the active memory and are independent from the surrounding writes. *)
+  let frame =
+    let filter (f : form) =
+      let pvs = EcPV.form_read env EcPV.PMVS.empty f in
+      let pvs_me = EcIdent.Mid.find_def EcPV.PV.empty (fst me) pvs in
+      let pvs = EcIdent.Mid.remove (fst me) pvs in
 
-  let pvs = EcPV.is_write env (stmt @ s.s_node) in
-  let _pvs, globs = EcPV.PV.elements pvs in
+         EcIdent.Mid.is_empty pvs
+      && (EcPV.PV.indep env modi pvs_me) in
 
-  let pvs, _ = EcPV.PV.elements (EcPV.PV.inter keep pvs) in
+    EcFol.filter_topand_form
+      filter
+      (inv_of_inv (EcLowPhlGoal.tc1_get_pre tc)) in
 
-  let pre_pvs = EcPV.PV.inter 
-    (EcPV.is_read env stmt) 
+  let written = EcPV.PV.empty in
+  let written = EcPV.is_write_r env written stmt in
+  let written = EcPV.is_write_r env written s.s_node in
+
+  (* The local equivalence goal relates shared reads in the precondition and
+     all possible writes in the postcondition. *)
+  let wr_pvs, wr_globs = EcPV.PV.elements written in
+
+  let pr_pvs, pr_globs = EcPV.PV.elements @@ EcPV.PV.inter
+    (EcPV.is_read env stmt)
     (EcPV.is_read env s.s_node)
   in
 
-  (* FIXME: Check | Do we need this? *)
-(*
-  let pre_pvs = EcPV.PV.union pre_pvs (
-    pvtail env (EcPV.is_read env epilog) zpr.z_path
-  ) in
-*)
+  let ml = EcIdent.create "&1" in
+  let mr = EcIdent.create "&2" in
 
-  (* Do we need this? *)
-(*   let pre_pvs = EcPV.PV.union pre_pvs (EcPV.PV.fv env (EcMemory.memory me) post) in *)
+  let frame = omap (fun frame ->
+    let subst = EcSubst.add_memory EcSubst.empty (fst me) ml in
+    EcSubst.subst_form subst frame) frame in
 
-  let pre_pvs, pre_globs = EcPV.PV.elements pre_pvs in
+  let mk_pv_eq ((pv, ty) : prog_var * ty) =
+    f_eq (f_pvar pv ty ml).inv (f_pvar pv ty mr).inv
 
-  let mleft = EcIdent.create "&1" in (* FIXME: PR: is this how we want to do this? *)
-  let mright = EcIdent.create "&2" in
+  and mk_glob_eq (mp : EcPath.mpath) =
+    f_eqglob mp ml mp mr
 
-  let eq =
-   List.map
-     (fun (pv, ty) -> f_eq (f_pvar pv ty mleft).inv (f_pvar pv ty mright).inv)
-     pvs
-   @
-   List.map
-     (fun mp -> f_eqglob mp mleft mp mright)
-     globs in
+  in
 
-  let pre_eq =
-    List.map
-      (fun (pv, ty) -> f_eq (f_pvar pv ty mleft).inv (f_pvar pv ty mright).inv)
-      pre_pvs
-    @
-    List.map
-      (fun mp -> f_eqglob mp mleft mp mright)
-      pre_globs
-    in
+  let pr_eq = List.map mk_pv_eq pr_pvs @ List.map mk_glob_eq pr_globs in
+  let po_eq = List.map mk_pv_eq wr_pvs @ List.map mk_glob_eq wr_globs in
 
+  (* First subgoal: prove that the replacement fragment preserves the
+     observable behavior required by the outer proof. *)
   let goal1 =
      f_equivS
        (snd me) (snd me)
-       {ml=mleft; mr=mright; inv=f_ands pre_eq}
+       { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
        (EcAst.stmt stmt) s
-       {ml=mleft; mr=mright; inv=f_ands eq}
+       { ml; mr; inv = f_ands po_eq; }
   in
 
   let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
 
-  let goal2 = match side, goal.f_node with
-  | None, FhoareS hs -> f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs)
-  | None, FbdHoareS bhs -> f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs) (bhs.bhs_cmp) (bhs_bd bhs)
-  | None, FeHoareS ehs -> f_eHoareS (snd me) (ehs_pr ehs) stmt (ehs_po ehs)
-  | Some `Left, FequivS es -> f_equivS (snd me) (snd es.es_mr) (es_pr es) stmt (es.es_sr) (es_po es)
-  | Some `Right, FequivS es -> f_equivS (snd es.es_ml) (snd me) (es_pr es) (es.es_sl) stmt (es_po es)
-  | _ -> assert false
-  in
+  (* Second subgoal: continue with the original goal after rewriting the
+     selected statement range. *)
+  let goal2 =
+   EcLowPhlGoal.hl_set_stmt
+     side (FApi.tc1_goal tc)
+     stmt in
 
   FApi.xmutate1 tc `ProcChangeStmt [goal1; goal2]
 

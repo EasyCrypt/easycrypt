@@ -640,6 +640,83 @@ let s_read     env s  = s_read_r  env PV.empty s
 let f_read     env f  = f_read_r  env PV.empty f
 
 (* -------------------------------------------------------------------- *)
+type pmvs = PV.t Mid.t
+
+module PMVS : sig
+  val empty : pmvs
+end = struct
+  let empty : pmvs =
+    Mid.empty
+end
+
+(* -------------------------------------------------------------------- *)
+let form_read (env : env) (pvs : pmvs) =
+  let rec doit (bds : Sid.t) (pvs : pmvs) (f : form) =
+    match f.f_node with
+    | Fpvar (_, m) when Sid.mem m bds ->
+      pvs
+
+    | Fpvar (pv, m) ->
+      Mid.change
+        (fun pvs ->
+          pvs
+          |> Option.value ~default:PV.empty
+          |> PV.add env pv f.f_ty
+          |> Option.some)
+        m pvs
+
+    | Fquant (_, subbds, f) ->
+      let bds =
+        List.fold_left
+          (fun bds -> function _ -> bds)
+          bds subbds in
+      doit bds pvs f
+
+    | FhoareF hs ->
+      let bds = Sid.add hs.hf_m bds in
+      POE.fold (doit bds) (doit bds pvs (hf_pr hs).inv) (hf_po hs).hsi_inv
+
+    | FhoareS hs ->
+      let bds = Sid.add (fst hs.hs_m) bds in
+      POE.fold (doit bds) (doit bds pvs (hs_pr hs).inv) (hs_po hs).hsi_inv
+
+    | FbdHoareF hs ->
+      let subbds = Sid.add hs.bhf_m bds in
+      List.fold_left
+        (doit subbds) (doit bds pvs (bhf_bd hs).inv)
+        [(bhf_pr hs).inv; (bhf_po hs).inv]
+
+    | FbdHoareS hs ->
+      let subbds = Sid.add (fst hs.bhs_m) bds in
+      List.fold_left
+        (doit subbds) (doit bds pvs (bhs_bd hs).inv)
+        [(bhs_pr hs).inv; (bhs_po hs).inv]
+
+    | FequivF hs ->
+      let bds = List.fold_left ((^~) Sid.add) bds [] in
+      List.fold_left (doit bds) pvs [(ef_pr hs).inv; (ef_po hs).inv]
+
+    | FequivS hs ->
+      let bds = List.fold_left ((^~) Sid.add) bds [] in
+      List.fold_left (doit bds) pvs [(es_pr hs).inv; (es_po hs).inv]
+
+    | FeHoareF hs ->
+      let bds = Sid.add hs.ehf_m bds in
+      List.fold_left (doit bds) pvs [(ehf_pr hs).inv; (ehf_po hs).inv]
+
+    | FeHoareS hs ->
+      let bds = Sid.add (fst hs.ehs_m) bds in
+      List.fold_left (doit bds) pvs [(ehs_pr hs).inv; (ehs_po hs).inv]
+
+    | Fpr pr ->
+      let pvs = doit bds pvs pr.pr_args in
+      let pvs = doit (Sid.add pr.pr_mem bds) pvs pr.pr_event.inv in
+      pvs
+
+    | _ -> f_fold (doit bds) pvs f
+  in fun f -> doit Sid.empty pvs f
+
+(* -------------------------------------------------------------------- *)
 exception EqObsInError
 
 module Mpv2 = struct

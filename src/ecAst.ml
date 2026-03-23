@@ -638,10 +638,14 @@ module POE = struct
   let to_list (poe : exnpost) =
     to_list_pre (destruct poe)
 
-  let iter (f : form -> unit) (poe : exnpost)  =
-    f poe.main;
-    Mp.iter (fun _ -> f) (fst poe.exnmap);
-    oiter f (snd poe.exnmap)
+  let fold (tx : 'a -> form -> 'a) (state : 'a) (poe : exnpost)  =
+    let state = tx state poe.main in
+    let state = Mp.fold (fun _ f state -> tx state f) (fst poe.exnmap) state in
+    let state = ofold (fun f state -> tx state f) state (snd poe.exnmap) in
+    state
+
+  let iter (tx : form -> unit) (poe : exnpost)  =
+    fold (fun () f -> tx f) () poe
 
   let iter2 (f : form -> form -> unit) (poe1 : exnpost) (poe2 : exnpost) =
     let merge (a : form option) (b : form option) =

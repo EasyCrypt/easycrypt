@@ -297,10 +297,12 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
     match lvalue with
     | None ->
       let not_contains_res (f : form) =
-        not (EcPV.PV.mem_pv env EcTypes.pv_res (EcPV.form_read env f)) in
-      map_ss_inv1
-        (fun f -> filter_topand_form not_contains_res f |> odfl f_true)
-        inv
+        let pvs = EcPV.form_read env EcPV.PMVS.empty f in
+        let pvs = EcIdent.Mid.fold (fun _ -> EcPV.PV.union) pvs EcPV.PV.empty in
+        not (EcPV.PV.mem_pv env EcTypes.pv_res pvs) in
+        map_ss_inv1
+          (fun f -> filter_topand_form not_contains_res f |> odfl f_true)
+          inv
 
     | Some lvalue ->
       let lv =
@@ -319,7 +321,10 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
     let wr = EcPV.f_write_r env wr funname in
     let inv =
       filter_topand_form
-        (fun f -> EcPV.PV.indep env wr (EcPV.form_read env f))
+        (fun f ->
+          let pvs = EcPV.form_read env EcPV.PMVS.empty f in
+          let pvs = EcIdent.Mid.fold (fun _ -> EcPV.PV.union) pvs EcPV.PV.empty in          
+          EcPV.PV.indep env wr pvs)
         (hs_pr concl).inv in
     { inv = odfl f_true inv; m = (hs_pr concl).m; } in
 
