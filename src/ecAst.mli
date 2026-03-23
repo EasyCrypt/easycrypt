@@ -401,6 +401,8 @@ module POE : sig
 
   val forall2 : (form -> form -> bool) -> exnpost -> exnpost -> bool
 
+  val fold : ('a -> form -> 'a) -> 'a -> exnpost -> 'a
+
   val iter : (form -> unit) -> exnpost -> unit
 
   val iter2 : (form -> form -> unit) -> exnpost -> exnpost -> unit

@@ -261,4 +261,7 @@ module DestrReal : sig
 end
 
 (* -------------------------------------------------------------------- *)
+val filter_topand_form : (form -> bool) -> form -> form option
+
+(* -------------------------------------------------------------------- *)
 val dump_f : form -> string

@@ -76,6 +76,8 @@ val f_node  : form -> f_node
 (* not recursive *)
 val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
+val f_fold : ('a -> form -> 'a) -> 'a -> form -> 'a
+
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
 
@@ -108,8 +110,14 @@ val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
+val f_hoareF_r : sHoareF -> form
+val f_hoareS_r : sHoareS -> form
+
 val f_hoareF : ss_inv -> xpath -> hs_inv -> form
 val f_hoareS : memtype -> ss_inv -> stmt -> hs_inv -> form
+
+val f_eHoareF_r : eHoareF -> form
+val f_eHoareS_r : eHoareS -> form
 
 val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
 val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
@@ -119,10 +127,16 @@ val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
 
+val f_bdHoareF_r : bdHoareF -> form
+val f_bdHoareS_r : bdHoareS -> form
+
 val f_bdHoareF : ss_inv -> xpath -> ss_inv -> hoarecmp -> ss_inv -> form
 val f_bdHoareS : memtype -> ss_inv -> stmt -> ss_inv -> hoarecmp -> ss_inv -> form
 
 (* soft-constructors - equiv *)
+val f_equivF_r : equivF -> form
+val f_equivS_r : equivS -> form
+
 val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
