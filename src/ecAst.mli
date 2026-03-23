@@ -294,13 +294,13 @@ and bdHoareS = {
   bhs_po  : form;
   [@alert priv_pl "Use the accessor function `bhs_po` instead of the field"]
   bhs_cmp : hoarecmp;
-  bhs_bd  : form;
+  bhs_bd  : form; 
   [@alert priv_pl "Use the accessor function `bhs_bd` instead of the field"]
 }
 
 and exnpost = {
   main   : form;
-  exnmap : form Mp.t * form option;
+  exnmap : form Mop.t;
 }
 
 and ss_inv = {
@@ -370,7 +370,7 @@ type hs_inv = {
 }
 
 (* -------------------------------------------------------------------- *)
-type 'a prepoe = 'a * ('a Mp.t * 'a option)
+type 'a prepoe = 'a * ('a Mop.t)
 
 module POE : sig
   val empty : form -> exnpost
@@ -381,9 +381,9 @@ module POE : sig
 
   val lower : hs_inv -> ss_inv
 
-  val mk : form -> (form Mp.t * form option) -> exnpost
+  val mk : form -> form Mop.t -> exnpost
 
-  val destruct : exnpost -> form * (form Mp.t * form option)
+  val destruct : exnpost -> form * (form Mop.t)
 
   val to_list_pre : 'a prepoe -> 'a list
 

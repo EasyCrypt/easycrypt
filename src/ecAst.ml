@@ -294,7 +294,7 @@ and pr = {
 
 and exnpost = {
   main   : form;
-  exnmap : form Mp.t * form option;
+  exnmap : form Mop.t;
 }
 
 let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv =
@@ -565,20 +565,20 @@ let map_inv3 (fn: form -> form -> form -> form)
       failwith "incompatible invariants for map_inv3"
 
 (* ----------------------------------------------------------------- *)
-type 'a prepoe = 'a * ('a Mp.t * 'a option)
+type 'a prepoe = 'a * ('a Mop.t)
 
 module POE = struct
-  let mk (main : form) (exnmap : form Mp.t * form option) =
+  let mk (main : form) (exnmap : form Mop.t) =
     { main; exnmap; }
 
   let destruct (poe : exnpost) =
     (poe.main, poe.exnmap)
 
   let empty (f : form) : exnpost =
-    { main = f; exnmap = (Mp.empty, None); }
+    { main = f; exnmap = Mop.empty; }
 
-  let is_empty ({ exnmap = (m, dfl) } : exnpost) =
-    Option.is_none dfl && Mp.is_empty m
+  let is_empty ({ exnmap } : exnpost) =
+    Mop.is_empty exnmap
 
   let lift (f : ss_inv) =
     { hsi_m = f.m; hsi_inv = empty f.inv; }
@@ -586,12 +586,12 @@ module POE = struct
   let lower (f : hs_inv) =
     { m = f.hsi_m; inv = f.hsi_inv.main; }
 
-  let map (f : form -> form) ({ main; exnmap = (m, d) } : exnpost) : exnpost =
-    { main = f main; exnmap = (Mp.map f m, omap f d)}
+  let map (f : form -> form) ({ main; exnmap } : exnpost) : exnpost =
+    { main = f main; exnmap = Mop.map f exnmap}
 
   let map2_pre (f : 'a -> 'b -> 'c) (poe1 : 'a prepoe) (poe2 : 'b prepoe) : 'c prepoe =
-    let (main1, (map1, d1)) = poe1 in
-    let (main2, (map2, d2)) = poe2 in
+    let (main1, map1) = poe1 in
+    let (main2, map2) = poe2 in
 
     let merge (a : 'a option) (b : 'b option) =
       match a, b with
@@ -601,10 +601,9 @@ module POE = struct
     in
 
     let main = f main1 main2 in
-    let map  = Mp.merge (fun _ -> merge) map1 map2 in
-    let dfl  = merge d1 d2 in
+    let map  = Mop.merge (fun _ -> merge) map1 map2 in
 
-    (main, (map, dfl))
+    (main, map)
 
   let map2 (f : form -> form -> form) (poe1 : exnpost) (poe2 : exnpost) =
     let main, exnmap =
@@ -614,34 +613,28 @@ module POE = struct
 
   let exists (f : form -> bool) (poe : exnpost) =
       f poe.main
-    || Mp.exists (fun _ -> f) (fst poe.exnmap)
-    || omap_dfl f false (snd poe.exnmap)
+    || Mop.exists (fun _ -> f) poe.exnmap
 
   let forall (f : form -> bool) (poe : exnpost) =
       f poe.main
-    && Mp.for_all (fun _ -> f) (fst poe.exnmap)
-    && omap_dfl f true (snd poe.exnmap)
+    && Mop.for_all (fun _ -> f) poe.exnmap
 
   let forall2 (f : form -> form -> bool) (poe1 : exnpost) (poe2 : exnpost) =
       f poe1.main poe2.main
-    && Mp.equal f (fst poe1.exnmap) (fst poe2.exnmap)
-    && oeq f (snd poe1.exnmap) (snd poe2.exnmap)
+    && Mop.equal f poe1.exnmap poe2.exnmap
 
-  let to_list_pre ((main, (map, d)) : 'a prepoe) =
-    let l =
-      Mp.fold
-        (fun _ p1 a -> p1 :: a)
-        map
-        [main]
-    in otolist d @ l
+  let to_list_pre ((main, map) : 'a prepoe) =
+    Mop.fold
+      (fun _ p1 a -> p1 :: a)
+      map
+      [main]
 
   let to_list (poe : exnpost) =
     to_list_pre (destruct poe)
 
   let fold (tx : 'a -> form -> 'a) (state : 'a) (poe : exnpost)  =
     let state = tx state poe.main in
-    let state = Mp.fold (fun _ f state -> tx state f) (fst poe.exnmap) state in
-    let state = ofold (fun f state -> tx state f) state (snd poe.exnmap) in
+    let state = Mop.fold (fun _ f state -> tx state f) poe.exnmap state in
     state
 
   let iter (tx : form -> unit) (poe : exnpost)  =
@@ -655,15 +648,9 @@ module POE = struct
       | _, _ -> assert false in
 
     f poe1.main poe2.main;
-    Mp.iter
+    Mop.iter
       (fun _ (a, b) -> f a b)
-      (Mp.merge (fun _ -> merge) (fst poe1.exnmap) (fst poe2.exnmap));
-    begin
-      match snd poe1.exnmap, snd poe2.exnmap with
-      | None, None -> ()
-      | Some a, Some b -> f a b
-      | _, _ -> assert false
-    end
+      (Mop.merge (fun _ -> merge) poe1.exnmap poe2.exnmap)
 end
 
 (* ----------------------------------------------------------------- *)
@@ -1059,8 +1046,7 @@ let b_hash (bs : bindings) =
 (*-------------------------------------------------------------------- *)
 let posts_equal (poe1 : exnpost) (poe2 : exnpost) =
      f_equal poe1.main poe2.main
-  && Mp.equal f_equal (fst poe1.exnmap) (fst poe2.exnmap)
-  && oeq f_equal (snd poe1.exnmap) (snd poe2.exnmap)
+  && Mop.equal f_equal poe1.exnmap poe2.exnmap
 
 (*-------------------------------------------------------------------- *)
 let hf_equal hf1 hf2 =
@@ -1137,17 +1123,15 @@ let pr_equal pr1 pr2 =
   && mem_equal        pr1.pr_event.m pr2.pr_event.m
 
 (*-------------------------------------------------------------------- *)
-let post_hash (p : path) (f : form) =
-  Why3.Hashcons.combine (EcPath.p_hash p) (f_hash f)
-
 let posts_hash (poe : exnpost) =
-  let h =
+  let post_hash (p : path option) (f : form) =
     Why3.Hashcons.combine
-      (f_hash poe.main) (omap_dfl f_hash 0 (snd poe.exnmap))
-  in
-    Mp.fold
-      (fun e f a -> Why3.Hashcons.combine a (post_hash e f))
-      (fst poe.exnmap) h
+      (Why3.Hashcons.combine_option EcPath.p_hash p)
+      (f_hash f) in
+
+  Mop.fold
+    (fun e f a -> Why3.Hashcons.combine a (post_hash e f))
+    poe.exnmap (f_hash poe.main)
 
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
@@ -1510,10 +1494,9 @@ module Hsform = Why3.Hashcons.Make (struct
 
   let posts_fv (poe : exnpost) =
     let fv = f_fv poe.main in
-    let fv = snd poe.exnmap |> omap f_fv |> odfl fv in
-    Mp.fold
+    Mop.fold
       (fun _ f acc -> fv_union (f_fv f) acc)
-      (fst poe.exnmap) fv
+      poe.exnmap fv
 
   let fv_node f =
     let union ex nodes =
