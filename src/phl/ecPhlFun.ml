@@ -79,11 +79,11 @@ let t_hoareF_fun_def_r tc =
   let (memenv, (fsig, fdef), env) = Fun.hoareS hf.hf_m f env in
   let m = EcMemory.memory memenv in
   let fres = odfl {m;inv=f_tt} (omap (ss_inv_of_expr m) fdef.f_ret) in
-  let (post, (epost, d)) = POE.destruct (hf_po hf).hsi_inv in
+  let post, epost = POE.destruct (hf_po hf).hsi_inv in
   let post = {m=(hf_po hf).hsi_m;inv=post} in
   let post = map_ss_inv2 (PVM.subst1 env pv_res m) fres  post in
   let pre  = map_ss_inv1 (PVM.subst env (subst_pre env fsig m PVM.empty)) (hf_pr hf) in
-  let post = { hsi_m = post.m; hsi_inv = POE.mk post.inv (epost, d); } in
+  let post = { hsi_m = post.m; hsi_inv = POE.mk post.inv epost; } in
   let concl' = f_hoareS (snd memenv) pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 

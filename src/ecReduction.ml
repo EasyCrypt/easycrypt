@@ -1344,19 +1344,13 @@ let ztuple args1 args2 ty stk = zpush Ztuple [] args1 args2 ty stk
 let zproj i ty stk = zpush (Zproj i) [] [] [] ty stk
 let zhl f fs1 fs2 stk = zpush (Zhl f) [] fs1 fs2 f.f_ty stk
 
-let zpoe ({ exnmap = (epost, d) } : exnpost) (dpoe : form list) =
-  let d, dpoe =
-    match d, dpoe with
-    | None, _ -> None, dpoe
-    | _, h::q -> Some h, q
-    | _, _ -> assert false
-  in
-  let key = List.map fst (Mp.bindings epost) in
+let zpoe ({ exnmap = epost } : exnpost) (dpoe : form list) =
+  let key = List.map fst (Mop.bindings epost) in
   let poe =
     List.fold_left2
-      (fun m a b -> Mp.add a b m)
-      Mp.empty key dpoe
-  in (poe,d)
+      (fun m a b -> Mop.add a b m)
+      Mop.empty key dpoe
+  in poe
 
 let zpop ri side f hd =
   let args =
@@ -1376,16 +1370,16 @@ let zpop ri side f hd =
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, (pr :: po :: dpoe) ->
     let m = hf.hf_m in
-    let poe, d = zpoe (hf_po hf).hsi_inv dpoe in
-    f_hoareF {m;inv=pr} hf.hf_f { hsi_m = m; hsi_inv = POE.mk po (poe, d); }
+    let poe = zpoe (hf_po hf).hsi_inv dpoe in
+    f_hoareF {m;inv=pr} hf.hf_f { hsi_m = m; hsi_inv = POE.mk po poe; }
   | Zhl {f_node = FhoareS hs}, (pr :: po :: dpoe) ->
     let m = fst hs.hs_m in
-    let (poe, d) = zpoe (hs_po hs).hsi_inv dpoe in
+    let poe = zpoe (hs_po hs).hsi_inv dpoe in
     f_hoareS
       (snd hs.hs_m)
       { m; inv = pr}
       hs.hs_s
-      { hsi_m = m ; hsi_inv = POE.mk po (poe, d); }
+      { hsi_m = m ; hsi_inv = POE.mk po poe; }
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
     let m = hf.ehf_m in
     f_eHoareF {m;inv=pr} hf.ehf_f {m;inv=po}
@@ -1510,9 +1504,9 @@ let rec conv ri env f1 f2 stk =
     ->
       let pr2 = (ss_inv_rebind (hf_pr hf2) hf1.hf_m).inv in
       let po2 = (hs_inv_rebind (hf_po hf2) hf1.hf_m).hsi_inv in
-      let aux { main = post; exnmap = (poe, d); } =
-        let poe = List.map snd (Mp.bindings poe) in
-        match d with None -> post :: poe | Some d -> post :: d :: poe
+      let aux { main = post; exnmap = poe; } =
+        let poe = List.map snd (Mop.bindings poe) in
+        post :: poe
       in
       let lf1 = aux (hf_po hf1).hsi_inv in
       let lf2 = aux po2 in
@@ -1524,9 +1518,9 @@ let rec conv ri env f1 f2 stk =
     | _subst ->
       let pr2 = (ss_inv_rebind (hs_pr hs2) (fst hs1.hs_m)).inv in
       let po2 = (hs_inv_rebind (hs_po hs2) (fst hs1.hs_m)).hsi_inv in
-      let aux { main = post; exnmap = (poe, d) } =
-        let poe = List.map snd (Mp.bindings poe) in
-        match d with None -> post :: poe | Some d -> post :: d :: poe
+      let aux { main = post; exnmap = poe } =
+        let poe = List.map snd (Mop.bindings poe) in
+        post :: poe
       in
       let lf1 = aux (hs_po hs1).hsi_inv in
       let lf2 = aux po2 in

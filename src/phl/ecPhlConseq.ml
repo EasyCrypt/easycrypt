@@ -64,18 +64,18 @@ let t_hoareF_conseq pre post tc =
   let hf  = tc1_as_hoareF tc in
   let pre = ss_inv_rebind pre hf.hf_m in
   let post = hs_inv_rebind post hf.hf_m in
-  let { main = post; exnmap = (epost, d); } = post.hsi_inv in
-  let { main = fpost; exnmap = (fepost, fd); } = (hf_po hf).hsi_inv in
+  let post, epost = POE.destruct post.hsi_inv in
+  let fpost, fepost = POE.destruct (hf_po hf).hsi_inv in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_m hf.hf_f env in
   let m = hf.hf_m in
   let cond1, cond2 =
     conseq_cond_ss (hf_pr hf) {m;inv=fpost} pre {m;inv=post}
   in
-  let cond2e = TTC.merge2_poe_list (fepost,fd) (epost,d) in
+  let cond2e = TTC.merge2_poe_list fepost epost in
   let cond2 = List.fold f_and cond2.inv cond2e in
   let concl1 = f_forall_mems_ss_inv mpr cond1 in
   let concl2 = f_forall_mems_ss_inv mpo {m;inv=cond2} in
-  let concl3 = f_hoareF pre hf.hf_f { hsi_m = m; hsi_inv = POE.mk post (epost, d)} in
+  let concl3 = f_hoareF pre hf.hf_f { hsi_m = m; hsi_inv = POE.mk post epost} in
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -84,18 +84,18 @@ let t_hoareS_conseq pre post tc =
   let hs = tc1_as_hoareS tc in
   let pre = ss_inv_rebind pre (fst hs.hs_m) in
   let post = hs_inv_rebind post (fst hs.hs_m) in
-  let (post, (epost, d)) = POE.destruct post.hsi_inv in
-  let (fpost, (fepost,fd)) = POE.destruct (hs_po hs).hsi_inv in
+  let post, epost = POE.destruct post.hsi_inv in
+  let fpost, fepost = POE.destruct (hs_po hs).hsi_inv in
   let m = fst hs.hs_m in
   let cond1, cond2 =
     conseq_cond_ss (hs_pr hs) {m;inv=fpost} pre {m;inv=post}
   in
-  let cond2e = TTC.merge2_poe_list (fepost,fd) (epost,d) in
+  let cond2e = TTC.merge2_poe_list fepost epost in
   let cond2 = List.fold f_and cond2.inv cond2e in
   let concl1 = f_forall_mems_ss_inv hs.hs_m cond1 in
   let concl2 = f_forall_mems_ss_inv hs.hs_m {m=fst hs.hs_m;inv=cond2} in
   let concl3 =
-    f_hoareS (snd hs.hs_m) pre hs.hs_s { hsi_m = m; hsi_inv = POE.mk post (epost, d); }
+    f_hoareS (snd hs.hs_m) pre hs.hs_s { hsi_m = m; hsi_inv = POE.mk post epost }
   in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
@@ -224,14 +224,14 @@ let t_equivS_conseq pre post tc =
 let t_conseq pre post tc =
   match (FApi.tc1_goal tc).f_node, pre, post with
   | FhoareF hf, Inv_ss pre, Inv_ss post ->
-    let (epost, d) = (hf_po hf).hsi_inv.exnmap in
+    let epost = (hf_po hf).hsi_inv.exnmap in
     let post = ss_inv_rebind post (hf_po hf).hsi_m in
-    let post = { hsi_m = (hf_po hf).hsi_m; hsi_inv = POE.mk post.inv (epost, d)} in
+    let post = { hsi_m = (hf_po hf).hsi_m; hsi_inv = POE.mk post.inv epost} in
     t_hoareF_conseq pre post tc
   | FhoareS hs, Inv_ss pre, Inv_ss post ->
-    let (epost, d) = (hs_po hs).hsi_inv.exnmap in
+    let epost = (hs_po hs).hsi_inv.exnmap in
     let post = ss_inv_rebind post (hs_po hs).hsi_m in
-    let post = { hsi_m = (hs_po hs).hsi_m; hsi_inv = POE.mk post.inv (epost, d); } in
+    let post = { hsi_m = (hs_po hs).hsi_m; hsi_inv = POE.mk post.inv epost } in
     t_hoareS_conseq pre post tc
   | FhoareF _, Inv_ss pre, Inv_hs post ->
     t_hoareF_conseq pre post tc
@@ -349,10 +349,10 @@ let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
 let t_hoareF_notmod post tc =
   let hf = tc1_as_hoareF tc in
   let p = hs_inv_rebind post hf.hf_m in
-  let (post, (epost, d)) = POE.destruct p.hsi_inv in
-  let (fpost, (fepost, fd)) = POE.destruct (hf_po hf).hsi_inv in
+  let post, epost = POE.destruct p.hsi_inv in
+  let fpost, fepost = POE.destruct (hf_po hf).hsi_inv in
   let cond = f_imp post fpost in
-  let econd1 = TTC.merge2_poe_list (fepost,fd) (epost,d) in
+  let econd1 = TTC.merge2_poe_list fepost epost in
   let cond1 = List.fold f_and cond econd1 in
   let cond1, _, _ = cond_hoareF_notmod tc {m=hf.hf_m;inv=cond1} in
   let cond2 = f_hoareF (hf_pr hf) hf.hf_f p in
@@ -377,10 +377,10 @@ let cond_hoareS_notmod ?(mk_other=false) tc cond =
 let t_hoareS_notmod post tc =
   let hs = tc1_as_hoareS tc in
   let p = hs_inv_rebind post (fst hs.hs_m) in
-  let (post, (epost, d)) = POE.destruct p.hsi_inv in
-  let (fpost, (fepost, fd)) = POE.destruct (hs_po hs).hsi_inv in
+  let post, epost = POE.destruct p.hsi_inv in
+  let fpost, fepost = POE.destruct (hs_po hs).hsi_inv in
   let cond = f_imp post fpost in
-  let econd1 = TTC.merge2_poe_list (fepost,fd) (epost,d) in
+  let econd1 = TTC.merge2_poe_list fepost epost in
   let cond1 = List.fold f_and cond econd1 in
   let cond1, _, _ = cond_hoareS_notmod tc {m=fst hs.hs_m;inv=cond1} in
   let cond2 = f_hoareS (snd hs.hs_m) (hs_pr hs) hs.hs_s p in
@@ -1707,12 +1707,12 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
     let (pre, post, bd) = match gpre, gpost with
       | Inv_ss gpre, Inv_hs gpost ->
         let bd = bd |> omap (process_info !!tc penv gpre.m) in
-        let (gp, (gpoe, gd)) = POE.destruct gpost.hsi_inv in
+        let gp, gpoe = POE.destruct gpost.hsi_inv in
         let post = post |> odfl gp in
-        let (poe,d) = poe |> odfl (gpoe, gd) in
+        let poe = poe |> odfl gpoe in
         (
           Inv_ss { inv = pre; m = gpre.m; },
-          Inv_hs { hsi_inv = POE.mk post (poe, d); hsi_m = gpost.hsi_m },
+          Inv_hs { hsi_inv = POE.mk post poe; hsi_m = gpost.hsi_m },
           bd
         )
       | _ -> tc_error !!tc "conseq: pre and post must be of the same kind"
@@ -1763,12 +1763,12 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
     let (pre, post, bd) = match gpre, gpost with
       | Inv_ss gpre, Inv_hs gpost ->
         let bd = bd |> omap (process_info !!tc penv gpre.m) in
-        let (gp, (gpoe, gd)) = POE.destruct gpost.hsi_inv in
+        let gp, gpoe = POE.destruct gpost.hsi_inv in
         let post = post |> odfl gp in
-        let (poe, d) = poe |> odfl (gpoe, gd) in
+        let poe = poe |> odfl gpoe in
         (
           Inv_ss { inv = pre; m = gpre.m; },
-          Inv_hs { hsi_inv = POE.mk post (poe, d); hsi_m = gpost.hsi_m; },
+          Inv_hs { hsi_inv = POE.mk post poe; hsi_m = gpost.hsi_m; },
           bd
         )
       | _ -> tc_error !!tc "conseq: pre and post must be of the same kind"

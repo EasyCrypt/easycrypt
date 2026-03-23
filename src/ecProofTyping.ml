@@ -89,9 +89,9 @@ let pf_process_pattern pe hyps fp =
 let pf_process_poe hyps poe =
   let env  = LDecl.toenv hyps in
   let ue = unienv_of_hyps hyps in
-  let m, d = EcTyping.trans_poe env ue poe in
+  let m = EcTyping.trans_poe env ue poe in
   let ts  = Tuni.subst (EcUnify.UniEnv.close ue) in
-  Mp.map (EcFol.Fsubst.f_subst ts) m, omap (EcFol.Fsubst.f_subst ts) d
+  Mop.map (EcFol.Fsubst.f_subst ts) m
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt ?mv tc oty pf =
@@ -262,7 +262,14 @@ let destruct_exists ?(reduce = true) hyps fp : dexists option =
     lazy_destruct ~reduce hyps doit fp
 
 (* -------------------------------------------------------------------- *)
-let merge2_poe_list (poe1,d1) (poe2,d2) =
+let merge2_poe_list (poe1 : form Mop.t) (poe2 : form Mop.t) =
+  let remove_default (poe : form Mop.t) =
+    match Mop.find_opt None poe with
+    | None   -> poe, None
+    | Some x -> Mop.remove None poe, Some x
+  in
+  let poe1, d1 = remove_default poe1 in
+  let poe2, d2 = remove_default poe2 in
   let get_default d =
     match d with
     | Some d -> d
@@ -285,8 +292,8 @@ let merge2_poe_list (poe1,d1) (poe2,d2) =
 
     | None, None -> assert false
   in
-  let epost = Mp.merge aux poe1 poe2 in
-  let poe = List.map snd (Mp.bindings epost) in
+  let epost = Mop.merge aux poe1 poe2 in
+  let poe = List.map snd (Mop.bindings epost) in
   match d2, d1 with
   | None, _ -> poe
   | Some d2, Some d1 -> f_imp d2 d1 :: poe
