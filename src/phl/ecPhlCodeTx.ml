@@ -185,94 +185,172 @@ let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern
     (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
-(* FIXME: have a better handling of PV                                  *)
-let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (zpr : Zpr.zipper) =
-  let env =  LDecl.toenv hyps in
+(*
+  Works on a block starting at an assignment to local variables.
 
-  let simplify : expr -> expr =
-    if simplify then (fun e ->
-      let e = ss_inv_of_expr (fst me) e in
-      let e = map_ss_inv1 (EcReduction.simplify EcReduction.nodelta hyps) e in
-      let e = expr_of_ss_inv e in
-      e
-    ) else identity in
+  It initializes:
+  - propagate: a substitution mapping the assigned variables to their values
+  - preserve : for each propagated variable, the variables that must keep their
+    current value for that propagated expression to remain valid
 
-  let for_instruction ((subst as subst0) : (expr, unit) Mpv.t) (i : instr) =
-    let wr = EcPV.i_write env i in
-    let i = Mpv.isubst env subst i in
+  It then scans subsequent instructions from left to right.
 
-    let (subst, asgn) =
-      List.fold_left_map (fun subst (pv, e) ->
-        let exception Remove in
+  For assignments:
+  - if the assigned variable is preserved, stop in non-eager mode; in eager
+    mode, substitute in the right-hand side and promote that variable to the
+    propagated substitution
+  - if the assigned variable is already propagated, update its propagated value
+    and recompute its preservation set
+  - otherwise, substitute propagated values in the right-hand side and keep the
+    assignment
 
-        try
-          if PV.mem_pv env pv wr then raise Remove;
-          let rd = EcPV.e_read env e in
-          if PV.mem_pv env pv rd then raise Remove;
-          subst, None
+  For calls, loops, conditionals, matches, and random samplings:
+  - continue only if none of the currently propagated or preserved variables is
+    written by the instruction; in that case, substitute propagated values in
+    the instruction
+  - otherwise, stop
 
-        with Remove ->
-          Mpv.remove env pv subst, Some ((pv, e.e_ty), e)
-      ) subst (EcPV.Mnpv.bindings (Mpv.pvs subst)) in
+  For abstract instructions without calls:
+  - continue only if they neither read nor write propagated or preserved
+    variables
+  - otherwise, stop
 
-    let asgn = List.filter_map identity asgn in
+  When the scan stops, the remaining propagated substitution is materialized as
+  assignments appended after the transformed prefix.
+*)
 
-    let mk_asgn (lve : ((prog_var * ty) * expr) list) =
-      let lvs, es = List.split lve in
-      lv_of_list lvs
-      |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
-      |> Option.to_list in
+let cfold_stmt
+  ?(simplify   : bool = true)
+  ?(eager      : bool = true)
+   ((pf, hyps) : proofenv * LDecl.hyps)
+   (me         : memenv)
+   (olen       : int option)
+   (zpr        : Zpr.zipper)
+=
+  let env = LDecl.toenv hyps in
 
-    let exception Interrupt in
+  let e_simplify (e : expr) =
+    let e = form_of_expr ~m:(fst me) e in
+    let e = EcReduction.simplify EcReduction.nodelta hyps e in
+    expr_of_ss_inv { m = fst me; inv = e } in
 
-    try
-      let subst, aout =
-        let exception Default in
+  let i_simplify (i : instr) =
+    i_map_expr e_simplify i in
 
-        try
-          match i.i_node with
-          | Sasgn (lv, e) ->
-            (* We already removed the variables of `lv` & the rhs from the substitution *)
-            (* We are only interested in the variables of `lv` that are in `wr` *)
-            let es =
-              match simplify e, lv with
-              | { e_node = Etuple es }, LvTuple _ -> es
-              | _, LvTuple _ -> raise Default
-              | e, _ -> [e] in
+  let e_simplify, i_simplify =
+      if   simplify
+      then (identity, identity)
+      else (e_simplify, i_simplify) in
 
-            let lv = lv_to_ty_list lv in
+  (*
+     Process one instruction under the current propagated substitution and
+     preservation map.
 
-            let tosubst, asgn2 = List.partition (fun ((pv, _), _) ->
-              Mpv.mem env pv subst0
-            ) (List.combine lv es) in
+     - `Continue ((subst, preserve), is)` means that propagation may proceed,
+       with updated state and replacement instructions `is`
+     - `Interrupt` means that propagation stops before this instruction
 
-            let subst =
-              List.fold_left
-                (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
-                subst tosubst in
+     In eager mode, assigning to a preserved variable does not stop the scan:
+     the assigned expression is first substituted, then that variable is
+     promoted into the propagated substitution.
+   *)
+  let for_instruction (subst, preserve: (expr, unit) Mpv.t * (PV.t Mnpv.t)) (i : instr) =
+    let esubst subst e = 
+      EcPV.Mpv.esubst env subst e |> e_simplify
+    in
+    let isubst subst i =
+      EcPV.Mpv.isubst env subst i |> i_simplify
+    in
+    let is_preserved preserve pv =
+      Mnpv.exists (fun _ preserve -> EcPV.PV.mem_pv env pv preserve) preserve
+    in
+    let is_propagated subst pv =
+      Mnpv.contains (Mpv.pvs subst) pv
+    in
+    let propagated_pvs subst =
+      (Mpv.pvs subst) |> Mnpv.bindings |> List.fst
+    in
+    (* Update preserve vars on assignment to given PV  *)
+    (* Do not include any propagated vars, since these *)
+    (* are automatically preserved by construction     *)
+    let update_preserved preserve subst pv e =
+      let rd = EcPV.e_read env e in
+      let rd = List.fold_left (fun rd pv -> 
+        EcPV.PV.remove env pv rd 
+      ) rd (propagated_pvs subst) 
+      in
+      Mnpv.add pv rd preserve
+    in
+    let promote_preserved_to_propagated subst preserve pv (e:expr) =
+      let preserve = Mnpv.map (fun preserve ->
+        PV.remove env pv preserve
+      ) preserve
+      in
+      let subst = Mpv.add env pv e subst in
+      (subst, preserve)
+    in
 
-            let asgn =
-              List.filter
-                (fun ((pv, _), _) -> not (Mpv.mem env pv subst))
-                asgn in
+    match i.i_node with
+    | Sasgn (lv, e) -> 
+      let asgns = explode_assgn lv e in
+      let exception Abort in
+      begin try 
+        let (subst, preserve), asgns = List.fold_left_map (fun (subst, preserve) ((pv, t), e) ->
+          (* 1. When hitting an assignment to a preserved var *)
+          if is_preserved preserve pv then 
+            if eager (* 1.1 Promote to propagated on eager *)
+            then 
+              let e = esubst subst e in
+              promote_preserved_to_propagated subst preserve pv e, None
+            else raise Abort (* 1.2 Fail on non-eager *)
+          else 
+          (* 2. When not preserved and not propagated, do nothing *)
+          if not (is_propagated subst pv) then 
+            (subst, preserve), Some ((pv, t), esubst subst e)
+          (* 3. When propagated, propagate *)
+          else 
+            let e = esubst subst e in
+            let preserve = update_preserved preserve subst pv e in
+            let subst = Mpv.add env pv e subst in
+            (subst, preserve), None
+        ) (subst, preserve) asgns
+        in 
+        let asgns = List.filter_map identity asgns in
+        `Continue ((subst, preserve), Option.to_list (i_asgn_of_pve asgns))
+        with Abort -> `Interrupt
+      end
 
-            (subst, mk_asgn asgn @ mk_asgn asgn2)
+    | Srnd _ 
+    | Scall _ 
+    | Swhile _ 
+    | Sif _ 
+    | Smatch _ -> 
+      let wr = EcPV.i_write env i in
+      let spvs = Mnpv.keys (Mpv.pvs subst) in
+      let ppvs = Mnpv.keys preserve in
+      if 
+        let check = List.for_all (fun pv -> 
+        not @@ EcPV.PV.mem_pv env pv wr) in
+        check spvs && check ppvs
+      then
+        `Continue ((subst, preserve), [isubst subst i])
+      else 
+        `Interrupt
 
-          | Srnd _ ->
-            (subst, mk_asgn asgn @ [i])
+    | Sraise _ -> `Interrupt
 
-          | _ -> raise Default
-
-        with Default ->
-          if List.exists
-              (fun (pv, _) -> Mpv.mem env pv subst0)
-              (fst (PV.elements wr))
-          then raise Interrupt;
-          (subst, mk_asgn asgn @ [i])
-
-      in `Continue (subst, aout)
-
-    with Interrupt -> `Interrupt
+    | Sabstract id -> 
+      let aus = EcEnv.AbsStmt.byid id env in
+      begin match aus with
+      | { aus_calls = []; aus_reads; aus_writes } ->
+        if List.for_all (fun (pv, _) ->
+          not ((is_propagated subst pv) || (is_preserved preserve pv))
+        ) (aus_reads @ aus_writes) then
+          `Continue ((subst, preserve), [i])
+        else
+          `Interrupt
+      | _ -> `Interrupt
+      end
   in
 
   let body, epilog =
@@ -284,68 +362,80 @@ let cfold_stmt ?(simplify = true) (pf, hyps) (me : memenv) (olen : int option) (
         tc_error pf "expecting at least %d instructions" olen;
       List.takedrop (olen+1) zpr.z_tail in
 
-  let lv, subst, body, rem =
+  let _lv, (subst, _preserve), body, rem =
     match body with
     | { i_node = Sasgn (lv, e) } :: is ->
-      let es =
-        match simplify e, lv with
-        | { e_node = Etuple es }, LvTuple _ -> es
-        | _, LvTuple _ ->
-            tc_error pf
-              "the left-value is a tuple but the right-hand expression \
-               is not a tuple expression";
-        | e, _ -> [e] in
-      let lv = lv_to_ty_list lv in
-
+      let asgns = explode_assgn lv e in
+      let lv = List.fst asgns in
+      
       if not (List.for_all (is_loc -| fst) lv) then
         tc_error pf "left-values must be made of local variables only";
 
+      (* Variables in the domain of substs 
+         are variables to be propagated    *)
       let subst =
         List.fold_left
           (fun subst ((pv, _), e) -> Mpv.add env pv e subst)
-          Mpv.empty (List.combine lv es) in
+          Mpv.empty asgns in
 
-      let subst, is, rem =
-        List.fold_left_map_while for_instruction subst is in
+      let preserve = 
+        List.fold_left 
+          (fun preserve ((pv, _), e) -> 
+            Mnpv.add 
+              pv 
+              EcPV.(PV.remove env pv (e_read env e))
+              preserve)
+          Mnpv.empty
+          asgns
+      in
 
-      lv, subst, List.flatten is, rem
+      let (subst, preserve), is, rem =
+        List.fold_left_map_while for_instruction (subst, preserve) is in
+
+      lv, (subst, preserve), List.flatten is, rem
 
     | _ ->
       tc_error pf "cannot find a left-value assignment at given position"
   in
 
-  let lv, es =
-    List.filter_map (fun ((pv, _) as pvty) ->
-      match Mpv.find env pv subst with
-      | e -> Some (pvty, e)
-      | exception Not_found -> None
-    ) lv |> List.split in
+  let asgns = Mnpv.bindings (Mpv.pvs subst) in 
+
+  let lv, es = List.map (fun (pv, e) ->
+    (pv, e_ty e), e) asgns |> List.split
+  in
 
   let asgn =
     lv_of_list lv
     |> Option.map (fun lv -> i_asgn (lv, e_tuple es))
     |> Option.to_list in
 
-  let zpr = { zpr with Zpr.z_tail = body @ asgn @ rem @ epilog } in
+  let zpr =
+    { zpr with Zpr.z_tail = body @ asgn @ rem @ epilog } in
+
   (me, zpr, [])
 
 (* -------------------------------------------------------------------- *)
-let t_cfold_r side cpos olen g =
+let t_cfold
+  ~(eager : bool)
+   (side  : side option)
+   (cpos  : Position.codepos)
+   (olen  : int option)
+   (tc    : tcenv1)
+=
   let tr = fun side -> `Fold (side, cpos, olen) in
-  let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
+  let cb = fun cenv _ me zpr -> cfold_stmt ~eager cenv me olen zpr in
+  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) tc
 
 (* -------------------------------------------------------------------- *)
 let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
 let t_alias     = FApi.t_low3 "code-tx-alias"     t_alias_r
 let t_set       = FApi.t_low4 "code-tx-set"       t_set_r
 let t_set_match = FApi.t_low4 "code-tx-set-match" t_set_match_r
-let t_cfold     = FApi.t_low3 "code-tx-cfold"     t_cfold_r
 
 (* -------------------------------------------------------------------- *)
-let process_cfold (side, cpos, olen) tc =
-  let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
-  t_cfold side cpos olen tc
+let process_cfold (info : pcfold) tc =
+  let cpos = EcLowPhlGoal.tc1_process_codepos tc (info.side, info.start) in
+  t_cfold ~eager:info.eager info.side cpos info.length tc
 
 let process_kill (side, cpos, len) tc =
   let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in

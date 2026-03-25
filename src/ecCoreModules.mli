@@ -15,6 +15,7 @@ val lv_to_list      : lvalue -> prog_var list
 val lv_to_ty_list   : lvalue -> (prog_var * ty) list
 val name_of_lv      : lvalue -> string
 val lv_of_expr      : expr -> lvalue
+val explode_assgn   : lvalue -> expr -> ((prog_var * ty) * expr) list
 
 (* --------------------------------------------------------------------- *)
 type instr = EcAst.instr
@@ -77,7 +78,11 @@ val is_match  : instr -> bool
 val is_raise  : instr -> bool
 
 (* -------------------------------------------------------------------- *)
+val i_asgn_of_pve : ((prog_var * ty) * expr) list -> instr option
+
+(* -------------------------------------------------------------------- *)
 val i_iter : (instr -> unit) -> instr -> unit
+val i_map_expr : (expr -> expr) -> instr -> instr
 
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Sx.t

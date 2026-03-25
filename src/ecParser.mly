@@ -3003,8 +3003,8 @@ direction:
 | INTERLEAVE info=loc(interleave_info)
     { Pinterleave info }
 
-| CFOLD s=side? c=codepos n=word?
-    { Pcfold (s, c, n) }
+| CFOLD eager=boption(STAR) side=side? start=codepos length=word?
+    { Pcfold { side; start; length; eager; } }
 
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
