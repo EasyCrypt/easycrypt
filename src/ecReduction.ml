@@ -642,6 +642,12 @@ type reduction_info = {
   logic   : rlogic_info;
   modpath : bool;
   user    : bool;
+  (* Databases selected at the use-site: [None] = no explicit selection
+     (fall back to the proof-local context), [Some dbs] = use exactly
+     [dbs] (replacing the active set). *)
+  user_db : EcSymbols.symbol list option;
+  user_local : EcEnv.simplify_context;
+  user_hd : EcEnv.SimplifyContext.head_filter option;
 }
 
 and deltap      = [Op.redmode | `No]
@@ -658,6 +664,9 @@ let full_red = {
   logic   = Some `Full;
   modpath = true;
   user    = true;
+  user_db = None;
+  user_local = EcEnv.SimplifyContext.empty;
+  user_hd = None;
 }
 
 let no_red = {
@@ -670,6 +679,9 @@ let no_red = {
   logic   = None;
   modpath = false;
   user    = false;
+  user_db = None;
+  user_local = EcEnv.SimplifyContext.empty;
+  user_hd = None;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -741,8 +753,44 @@ let reduce_user_gen simplify ri env hyps f =
     | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
-  let rules = EcEnv.Reduction.get p env in
+  begin match ri.user_hd, p with
+  | Some (`Include hs), `Path p when not (EcPath.Sp.mem p hs) -> raise nohead
+  | Some (`Exclude hs), `Path p when EcPath.Sp.mem p hs -> raise nohead
+  | _ -> ()
+  end;
 
+  let get_rules_for_base base =
+    let rules =
+      EcEnv.Reduction.get_entries ~base p env
+      |> List.map snd
+    in
+    let added =
+      EcEnv.SimplifyContext.added ~base ri.user_local
+      |> List.filter_map (fun ((_, rule) : EcEnv.Reduction.entry) ->
+        let p' : EcEnv.Reduction.topsym =
+          match rule.rl_ptn with
+          | Rule (`Op p, _)   -> `Path (fst p)
+          | Rule (`Tuple, _)  -> `Tuple
+          | Rule (`Proj i, _) -> `Proj i
+          | Var _ | Int _     -> assert false
+        in
+        if p' = p then Some rule else None)
+    in
+    rules @ added
+  in
+
+  (* Use-site selection replaces the active set; otherwise fall back to
+     the proof-local default databases, then to the active set. *)
+  let bases =
+    match ri.user_db with
+    | Some dbs -> dbs
+    | None ->
+        match EcEnv.SimplifyContext.default_db ri.user_local with
+        | Some dbs -> dbs
+        | None -> EcSymbols.Ssym.elements (EcEnv.SimplifyContext.active ri.user_local)
+  in
+
+  let rules = List.flatten (List.map get_rules_for_base bases) in
   if rules = [] then raise nohead;
 
   let module R = EcTheory in

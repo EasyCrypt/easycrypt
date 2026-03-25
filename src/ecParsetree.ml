@@ -566,6 +566,25 @@ type pcutdef = {
 type pmpred_args = (osymbol * pformula) list
 
 (* -------------------------------------------------------------------- *)
+(* The [hint …] clause of a [simplify]/[cbv] call. [ph_select] is the
+   unsigned base database selection (empty = use the proof-local default
+   / active set); [ph_dbs] are signed activate ([true]) / deactivate
+   ([false]) deltas on the current set; [ph_select] and [ph_dbs] are
+   mutually exclusive. [ph_hd] is the optional single-mode head filter;
+   [ph_lemmas] are lemmas added to the default DB for this call (lemma
+   sets are add-only -- the head filter restricts which rules apply). *)
+type psimplify_hint = {
+  ph_select : symbol list;
+  ph_dbs    : (bool * symbol) list;
+  ph_hd     : ([`Include | `Exclude] * pqsymbol list) option;
+  ph_lemmas : pqsymbol list;
+}
+
+let empty_simplify_hint = {
+  ph_select = []; ph_dbs = []; ph_hd = None; ph_lemmas = [];
+}
+
+(* -------------------------------------------------------------------- *)
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
   pdelta   : pqsymbol list option;      (* definition unfolding *)
@@ -575,6 +594,7 @@ type preduction = {
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
+  phint    : psimplify_hint;            (* use-site [hint …] clause *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1053,6 +1073,20 @@ type pcongr_mode =
   | PCongrPattern of pformula
 
 (* -------------------------------------------------------------------- *)
+type phintdbmode = [ `Add | `Remove ]
+
+(* A proof-local simplify-hint command. [PLHClause] applies a unified
+   [hint] clause: signed [+d]/[-d] activate/deactivate databases, signed
+   lemma sets [+{L}]/[-{L}] add/remove local lemmas (default DB), an
+   unsigned database list sets the proof-local default databases, and a
+   [+[ops]]/[-[ops]] filter sets the proof-local default head filter.
+   [PLHClear] / [PLHClearDefault] reset the local lemmas / the defaults. *)
+type plocalhint =
+  | PLHClause of psimplify_hint
+  | PLHClear of symbol option
+  | PLHClearDefault
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -1083,6 +1117,7 @@ type logtactic =
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
   | Pcoq        of (EcProvers.coq_mode option * psymbol * pprover_infos)
+  | PlocalHint  of plocalhint
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -1099,6 +1134,7 @@ and ptactic_core_r =
   | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
   | Pnstrict    of ptactic_core
+  | Pwith       of plocalhint * ptactics
   | Padmit
 
 (* -------------------------------------------------------------------- *)
@@ -1339,7 +1375,7 @@ type puseroption =
   [`Delta | `EqTrue]
 
 type puserred =
-  puseroption list * (pqsymbol list * int option) list
+  symbol option * puseroption list * (pqsymbol list * int option) list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option

@@ -29,7 +29,7 @@ and theory_item_r =
   | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
   | Th_baserw    of symbol * is_local
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
-  | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_reduction of reduction_rule
   | Th_auto      of auto_rule
   | Th_alias     of (symbol * path) (* FIXME: currently, only theories *)
 
@@ -67,6 +67,11 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+}
+
+and reduction_rule = {
+  red_base : symbol option;
+  red_rules : (path * rule_option * rule option) list;
 }
 
 and auto_rule = {

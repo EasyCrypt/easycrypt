@@ -115,6 +115,19 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
+(* [with hint h (ts)]: run [ts] under the local hint command [h], then
+   restore the simplify context on all resulting subgoals. *)
+and process1_with (ttenv : ttenv) (h : plocalhint) (ts : ptactic list) (tc : tcenv1) =
+  let simpl = tc1_simplify_context tc in
+  let tc = process_local_hint h tc in
+  let tc = process1_seq ttenv ts (as_tcenv1 tc) in
+  t_onall
+    (fun tc ->
+      tcenv_of_tcenv1
+        (map_pregoal1 (fun goal -> { goal with g_simpl = simpl }) tc))
+    tc
+
+(* -------------------------------------------------------------------- *)
 and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
   if ttenv.tt_smtmode <> `Strict then
     tc_error !!tc "try! can only be used in strict proof mode";
@@ -156,6 +169,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pmemory m           -> process_memory m
     | Pwlog (ids, b, f)   -> process_wlog ~suff:b ids f
     | Pgenhave gh         -> process_genhave ttenv gh
+    | PlocalHint h        -> process_local_hint h
     | Prwnormal _         -> assert false
     | Pcoq (m, n, pi)     -> process_coq ~loc:(loc t) ~name:n.pl_desc ttenv m pi
   in
@@ -328,6 +342,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Ptry      t           -> `One (process1_try      ttenv t)
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
+    | Pwith     (h, ts)     -> `One (process1_with     ttenv h ts)
     | Pcase     es          -> `One (process1_case     ttenv es)
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)

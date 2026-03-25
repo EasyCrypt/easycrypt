@@ -88,12 +88,12 @@
       pa_kind     = k;
       pa_locality = locality; }
 
-  let mk_simplify l =
+  let mk_simplify ?(hint = empty_simplify_hint) l =
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+        pmodpath = true; puser = true; phint = hint; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -113,7 +113,7 @@
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+            pmodpath = false; puser = false; phint = hint; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
@@ -2490,6 +2490,9 @@ genpattern:
 | AT x=ident
     { `LetIn x }
 
+(* Bare reduction arguments, usable as a keyword-less tactic. The [+]/[-]
+   head filter is NOT allowed here: those tokens are bullet operators and
+   only a keyword ([simplify]/[cbv]) lets them be read as a head filter. *)
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
 | ZETA             { `Zeta }
@@ -2499,16 +2502,70 @@ simplify_arg:
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
 
+%inline pmode:
+| PLUS  { `Plus  }
+| MINUS { `Minus }
+
+(* One item of a [hint] clause: a database (bare name), a head filter
+   ([...]) or a lemma set ({...}); the delimiter disambiguates. The
+   structural constraints (single filter, selection vs deltas) are checked
+   in [simplify_hint_body]. *)
+simplify_hint_item:
+| m=pmode x=lident             { `Db    (m = `Plus, unloc x) }
+| m=pmode l=bracket(qoident+)  { `Hd    (m, l) }
+| l=brace(qident+)             { `Lemma l }
+
+(* The body of a [hint] clause: an unsigned base database selection
+   followed by items. A clause may not both select databases (unsigned
+   list) and use signed [+d]/[-d] deltas, and at most one head filter is
+   allowed. Lemma sets are add-only -- a clause never removes lemmas from
+   a database; use the head filter to restrict the rules that apply.
+   Shared by the [simplify]/[cbv] tactics and the proof-local commands. *)
+simplify_hint_body:
+| sel=lident* items=simplify_hint_item*
+    { let err msg = parse_error (EcLocation.make $startpos $endpos) (Some msg) in
+      let doit h = function
+        | `Db (b, d) -> { h with ph_dbs = h.ph_dbs @ [(b, d)] }
+        | `Hd (m, l) ->
+            if h.ph_hd <> None then err "a hint clause allows at most one head filter";
+            let m = match m with `Plus -> `Include | `Minus -> `Exclude in
+            { h with ph_hd = Some (m, l) }
+        | `Lemma l -> { h with ph_lemmas = h.ph_lemmas @ l }
+      in
+      let h =
+        List.fold_left doit
+          { empty_simplify_hint with ph_select = List.map unloc sel } items
+      in
+      if h.ph_select <> [] && h.ph_dbs <> [] then
+        err "a hint clause cannot mix a database selection with +/- database deltas";
+      h }
+
+(* A [hint] clause as used by the [simplify]/[cbv] tactics. *)
+simplify_hint:
+| HINT h=simplify_hint_body { h }
+
+(* Trailing modifier shared by every keyword [simplify]/[cbv] form: the
+   optional [hint] clause above. *)
+%inline simplify_mod:
+| c=simplify_hint? { odfl empty_simplify_hint c }
+
 simplify:
-| l=simplify_arg+     { l }
-| SIMPLIFY            { simplify_red }
-| SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
-| SIMPLIFY DELTA      { `Delta [] :: simplify_red }
+| l=simplify_arg+
+    { mk_simplify l }
+| SIMPLIFY hint=simplify_mod
+    { mk_simplify ~hint simplify_red }
+| SIMPLIFY l=qoident+ hint=simplify_mod
+    { mk_simplify ~hint (`Delta l  :: simplify_red) }
+| SIMPLIFY DELTA hint=simplify_mod
+    { mk_simplify ~hint (`Delta [] :: simplify_red) }
 
 cbv:
-| CBV            { simplify_red }
-| CBV l=qoident+ { `Delta l  :: simplify_red  }
-| CBV DELTA      { `Delta [] :: simplify_red }
+| CBV hint=simplify_mod
+    { mk_simplify ~hint simplify_red }
+| CBV l=qoident+ hint=simplify_mod
+    { mk_simplify ~hint (`Delta l  :: simplify_red) }
+| CBV DELTA hint=simplify_mod
+    { mk_simplify ~hint (`Delta [] :: simplify_red) }
 
 conseq:
 | empty                            { None, None }
@@ -2795,6 +2852,9 @@ logtactic:
 | ASSUMPTION
     { Passumption }
 
+| HINT h=localhint_cmd
+    { PlocalHint h }
+
 | MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
    { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
@@ -2892,10 +2952,10 @@ logtactic:
    { Papply (`Apply (es, `Exact), None) }
 
 | l=simplify
-   { Psimplify (mk_simplify l) }
+   { Psimplify l }
 
 | l=cbv
-   { Pcbv (mk_simplify l) }
+   { Pcbv l }
 
 | CHANGE f=sform
    { Pchange f }
@@ -3436,6 +3496,17 @@ caseoption:
 | n=word? NOT      { (`All, n) }
 | n=word? QUESTION { (`Maybe, n) }
 
+(* Proof-local simplify-hint commands, sharing the unified clause body
+   with the [simplify]/[cbv] tactics. *)
+localhint_cmd:
+| CLEAR d=lident?
+    { match omap unloc d with
+      | Some "default" -> PLHClearDefault
+      | base           -> PLHClear base }
+
+| h=simplify_hint_body
+    { PLHClause h }
+
 tactic_core_r:
 | IDTAC
    { Pidtac None }
@@ -3463,6 +3534,9 @@ tactic_core_r:
 
 | LPAREN s=tactics RPAREN
    { Pseq s }
+
+| WITH HINT h=localhint_cmd LPAREN s=tactics RPAREN
+   { Pwith (h, s) }
 
 | ADMIT
    { Padmit }
@@ -3908,8 +3982,10 @@ hint:
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
 reduction:
+| HINT SIMPLIFY IN db=lident COLON opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
+    { (Some (unloc db), odfl [] opt, xs) }
 | HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
-    { (odfl [] opt, xs) }
+    { (None, odfl [] opt, xs) }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?
