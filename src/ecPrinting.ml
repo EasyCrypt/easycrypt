@@ -244,14 +244,23 @@ module PPEnv = struct
 
         fun sm ->
           check_for_local sm;
-          let ue = EcUnify.UniEnv.create None in
-          match  EcUnify.select_op ~hidden:true ~filter tvi ppe.ppe_env sm ue dom with
+
+          let by_current ((p, _), _, _, _) =
+            let env = ppe.ppe_env in
+            EcPath.isprefix ~prefix:(oget (EcPath.prefix p)) ~path:(EcEnv.root env) in
+
+          let ue  = EcUnify.UniEnv.create None in
+          let ops = EcUnify.select_op ~hidden:true ~filter tvi ppe.ppe_env sm ue dom in
+          let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
+
+          match ops with
           | [(p1, _), _, _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =
-        try EcPath.p_equal (lookup sm) p
+       try EcPath.p_equal (lookup sm) p
        with EcEnv.LookupFailure _ -> false
+
     in
       (* FIXME: for special operators, do check `info` *)
       if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
@@ -1378,14 +1387,18 @@ let pp_opapp
       | _ -> None
 
   in
-    (odfl
-       pp_as_std_op
-       (List.fpick [try_pp_special ;
-                    try_pp_as_uniop;
-                    try_pp_as_binop;
-                    try_pp_as_post ;
-                    try_pp_record  ;
-                    try_pp_proj    ;])) fmt ()
+    if List.is_empty nm then
+      (odfl
+        pp_as_std_op
+        (List.fpick [
+          try_pp_special ;
+          try_pp_as_uniop;
+          try_pp_as_binop;
+          try_pp_as_post ;
+          try_pp_record  ;
+          try_pp_proj    ;])) fmt ()
+    else
+      pp_as_std_op fmt ()
 
 (* -------------------------------------------------------------------- *)
 let pp_chained_orderings (type v)
@@ -1802,7 +1815,6 @@ and match_pp_notations
 
   List.find_map_opt try_notation nts
 
-
 and try_pp_notations
   (ppe   : PPEnv.t)
   (outer : opprec * iassoc)
@@ -1818,10 +1830,10 @@ and try_pp_notations
     let rty  = ti nt.ont_resty in
     let tv   = List.map (ti -| tvar) tv in
     let args = List.map (curry f_local -| snd_map ti) nt.ont_args in
-    let f    = f_op p tv (toarrow tv rty) in
-    let f    = f_app f args rty in
-    let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in
-    let f    = f_app f eargs f.f_ty in
+    let args =
+      let subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
+      List.map (Fsubst.f_subst subst) args in
+    let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
     pp_form_core_r ppe outer fmt f; true
 
 and pp_poe ppe fmt (l,d) =
