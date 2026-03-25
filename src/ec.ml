@@ -214,6 +214,9 @@ let main () =
   (* Execution of eager commands *)
   begin
     match options.o_command with
+    | `Lsp ->
+        EcLsp.run ();
+        exit 0
     | `Runtest input -> begin
         let root =
           match EcRelocate.sourceroot with
@@ -533,6 +536,9 @@ let main () =
       end
 
     | `Runtest _ ->
+        (* Eagerly executed *)
+        assert false
+    | `Lsp ->
         (* Eagerly executed *)
         assert false
 
