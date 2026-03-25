@@ -264,12 +264,12 @@ theory ProcChangeFrameTest.
 
   lemma L : hoare[M.f : x = 3 ==> true].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   proc change 2 : {
     x <- 4;
   }; by auto.
-qed.
+  qed.
+end ProcChangeFrameTest.
 
 (* -------------------------------------------------------------------- *)
 (* Negative flat case: change statement 3 (x <- x + 1 → x <- 4) fails.
@@ -281,18 +281,18 @@ theory ProcChangeFrameFailTest.
       y <- 0;
       x <- 4;
       x <- x + 1;
+      return x;
     }
   }.
 
-  lemma L : hoare[M.f : x = 3 ==> true].
+  lemma L : hoare[M.f : x = 3 ==> res = 0].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   fail proc change 3 : {
     x <- 4;
   }; by auto.
-abort.
-
+  abort.
+end ProcChangeFrameFailTest.
 
 (* -------------------------------------------------------------------- *)
 (* Positive if-block case: change ^if.1 (x <- x + 1 → x <- 4) inside
@@ -313,12 +313,12 @@ theory ProcChangeBlockFrameTest.
 
   lemma L : hoare[M.f : x = 3 ==> true].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   proc change ^if.1 : {
     x <- 4;
   }; by auto.
-qed.
+  qed.
+end ProcChangeBlockFrameTest.
 
 (* -------------------------------------------------------------------- *)
 (* Negative if-block case: change ^if.2 (x <- x + 1 → x <- 4) fails.
@@ -334,17 +334,18 @@ theory ProcChangeBlockFailFrameTest.
       } else {
         x <- 4;
       }
+      return x;
     }
   }.
 
-  lemma L : hoare[M.f : x = 3 ==> true].
+  lemma L : hoare[M.f : x = 3 ==> res = 0].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   fail proc change ^if.2 : {
     x <- 4;
   }; by auto.
-abort.
+  abort.
+end ProcChangeBlockFailFrameTest.
 
 (* -------------------------------------------------------------------- *)
 (* Positive while case: change ^while.1 (x <- x + 1 → x <- 4).
@@ -363,12 +364,12 @@ theory ProcChangeWhileFrameTest.
 
   lemma L : hoare[M.f : x = 3 ==> true].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   proc change ^while.1 : {
     x <- 4;
   }; by auto.
-qed.
+  qed.
+end ProcChangeWhileFrameTest.
 
 (* -------------------------------------------------------------------- *)
 (* Negative while case — write after the change site:
@@ -390,13 +391,14 @@ theory ProcChangeWhileFrameFailWriteAfterTest.
 
   lemma L : hoare[M.f : x = 3 ==> true].
   proof.
-  proc.
-  simplify.
-  fail proc change ^while.1 : {
+  proc=> /=.
+  proc change ^while.1 : {
     x <- 4;
-  }; by auto.
-abort.
+  }.
 
+  by auto.
+  abort.
+end ProcChangeWhileFrameFailWriteAfterTest.
 
 (* -------------------------------------------------------------------- *)
 (* Negative while case — write before the change site:
@@ -412,17 +414,18 @@ theory ProcChangeWhileFrameFailWriteBeforeTest.
         x <- x + 1;
         y <- 1;
       }
+      return x;
     }
   }.
 
-  lemma L : hoare[M.f : x = 3 ==> true].
+  lemma L : hoare[M.f : x = 3 ==> res = 0].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   fail proc change ^while.2 : {
     x <- 4;
   }; by auto.
-abort.
+  abort.
+end ProcChangeWhileFrameFailWriteBeforeTest.
 
 (* -------------------------------------------------------------------- *)
 (* Negative while case — write outside (before) the loop:
@@ -438,15 +441,211 @@ theory ProcChangeWhileFrameFailWriteOutsideTest.
         x <- x + 1;
         y <- 1;
       }
+      return x;
     }
   }. 
 
-  lemma L : hoare[M.f : x = 3 ==> true].
+  lemma L : hoare[M.f : x = 3 ==> res = 0].
   proof.
-  proc.
-  simplify.
+  proc=> /=.
   fail proc change ^while.1 : {
     x <- 4;
   }; by auto.
-abort.
+  abort.
+end ProcChangeWhileFrameFailWriteOutsideTest.
 
+(* -------------------------------------------------------------------- *)
+(* observability through the context/post.
+   These tests exercise the variable selection performed by [zpr_pv]
+   and the post-side read analysis used by proc change. *)
+
+(* The continuation reads only x, so y can be changed freely in the
+   replacement block. *)
+theory ProcChangeContextReadXOnlyTest.
+  module M = {
+    proc f(x : int, y : int) = {
+      x <- 1;
+      y <- 2;
+      x <- x + 1;
+      return x;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> res = 2].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    x <- 1;
+    y <- 99;
+  }; by auto.
+  qed.
+end ProcChangeContextReadXOnlyTest.
+
+(* -------------------------------------------------------------------- *)
+(* The continuation reads only y, so x can be changed freely in the
+   replacement block. *)
+theory ProcChangeContextReadYOnlyTest.
+  module M = {
+    proc f(x : int, y : int) = {
+      x <- 1;
+      y <- 2;
+      y <- y + 1;
+      return y;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> res = 3].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    x <- 99;
+    y <- 2;
+  }; by auto.
+  qed.
+end ProcChangeContextReadYOnlyTest.
+
+(* -------------------------------------------------------------------- *)
+(* The continuation reads x, so changing x in the replacement block is
+   observable and proc change must fail. *)
+theory ProcChangeContextReadXFailTest.
+  module M = {
+    proc f(x : int, y : int) = {
+      x <- 1;
+      y <- 2;
+      x <- x + 1;
+      return x;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> res = 2].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    x <- 99;
+    y <- 2;
+  }.
+  fail by auto.
+  abort.
+end ProcChangeContextReadXFailTest.
+
+(* -------------------------------------------------------------------- *)
+(* The continuation reads y, so changing y in the replacement block is
+   observable and proc change must fail. *)
+theory ProcChangeContextReadYFailTest.
+  module M = {
+    proc f(x : int, y : int) = {
+      x <- 1;
+      y <- 2;
+      y <- y + 1;
+      return y;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> res = 3].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    x <- 1;
+    y <- 99;
+  }.
+  fail by auto.
+  abort.
+end ProcChangeContextReadYFailTest.
+
+(* -------------------------------------------------------------------- *)
+(* With no continuation, the post mentions only x, so y can vary in the
+   replacement block. *)
+theory ProcChangePostReadXOnlyTest.
+  module M = {
+    var x : int
+    var y : int
+
+    proc f() = {
+      x <- 1;
+      y <- 2;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> M.x = 1].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    M.x <- 1;
+    M.y <- 99;
+  }; by auto.
+  qed.
+end ProcChangePostReadXOnlyTest.
+
+(* -------------------------------------------------------------------- *)
+(* With no continuation, the post mentions x, so changing x in the
+   replacement block is observable and proc change must fail. *)
+theory ProcChangePostReadXFailTest.
+  module M = {
+    var x : int
+    var y : int
+
+    proc f() = {
+      x <- 1;
+      y <- 2;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> M.x = 1].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    M.x <- 99;
+    M.y <- 2;
+  }.
+  fail by auto.
+  abort.
+end ProcChangePostReadXFailTest.
+
+(* -------------------------------------------------------------------- *)
+(* With no continuation, the post mentions only y, so x can vary in the
+   replacement block. *)
+theory ProcChangePostReadYOnlyTest.
+  module M = {
+    var x : int
+    var y : int
+
+    proc f() = {
+      x <- 1;
+      y <- 2;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> M.y = 2].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    M.x <- 99;
+    M.y <- 2;
+  }; by auto.
+  qed.
+end ProcChangePostReadYOnlyTest.
+
+(* -------------------------------------------------------------------- *)
+(* With no continuation, the post mentions y, so changing y in the
+   replacement block is observable and proc change must fail. *)
+theory ProcChangePostReadYFailTest.
+  module M = {
+    var x : int
+    var y : int
+
+    proc f() = {
+      x <- 1;
+      y <- 2;
+    }
+  }.
+
+  lemma L : hoare[M.f : true ==> M.y = 2].
+  proof.
+  proc=> /=.
+  proc change [1..2] : {
+    M.x <- 1;
+    M.y <- 99;
+  }.
+  fail by auto.
+  abort.
+end ProcChangePostReadYFailTest.

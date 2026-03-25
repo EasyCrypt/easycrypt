@@ -149,6 +149,15 @@ val s_read  : stmt       pvaccess0
 val f_read  : xpath      pvaccess0
 
 (* -------------------------------------------------------------------- *)
+val zpr_pv :
+     [ `Read | `Write ]
+  -> [ `Before | `After ]
+  -> env
+  -> PV.t
+  -> EcMatching.Zipper.spath
+  -> PV.t
+
+(* -------------------------------------------------------------------- *)
 type pmvs = PV.t EcIdent.Mid.t
 
 module PMVS : sig

@@ -365,6 +365,19 @@ let logicS_read (env : env) (f : logicS) =
   | `Equiv   hs -> equivS_read   env hs
   | `EHoare  hs -> eHoareS_read  env hs
 
+let logicS_post_read (env : env) (f : logicS) =
+  let add pvs inv = EcPV.form_read env pvs inv in
+
+  match f with
+  | `Hoare hs ->
+      POE.fold add EcPV.PMVS.empty (hs_po hs).hsi_inv
+  | `EHoare hs ->
+      add EcPV.PMVS.empty (ehs_po hs).inv
+  | `BdHoare hs ->
+      add (add EcPV.PMVS.empty (bhs_po hs).inv) (bhs_bd hs).inv
+  | `Equiv es ->
+      add EcPV.PMVS.empty (es_po es).inv
+
 (* -------------------------------------------------------------------- *)
 exception InvalidSplit of codepos1
 

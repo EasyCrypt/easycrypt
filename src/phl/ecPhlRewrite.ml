@@ -6,7 +6,6 @@ open EcCoreGoal
 open EcEnv
 open EcModules
 open EcFol
-open EcMatching
 
 module L  = EcLocation
 module PT = EcProofTerm
@@ -231,43 +230,10 @@ let process_rewrite_at
   |> FApi.t_sub [t_pre; t_post; EcLowGoal.t_id]
 
 (* -------------------------------------------------------------------- *)
-let zpr_write (env : env) =
-  let rec doit (ctxt : instr option) (pvs : EcPV.PV.t) (zpr : Zipper.spath) =
-    let (head, tail), ipath = zpr in
-    let tail = List.ocons ctxt tail in
-    let s = stmt (List.rev_append head tail) in
-
-    let pvs = EcPV.is_write_r env pvs head in
-
-    let parent, pvs =
-      match ipath with
-      | Zipper.ZTop ->
-        None, pvs
-
-      | Zipper.ZIfThen (e, ps, se) ->
-        Some (ps, i_if (e, s, se)), pvs
-
-      | Zipper.ZIfElse (e, st, ps) ->
-        Some (ps, i_if (e, st, s)), pvs
-
-      | Zipper.ZMatch  (e, ps, mpi) ->
-        let bs =
-          List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)
-        in Some (ps, i_match (e, bs)), pvs
-
-      | Zipper.ZWhile (e, ps) ->
-        Some (ps, i_while (e, s)), EcPV.is_write_r env pvs tail
-    in 
-
-    ofold (fun (zpr, ctxt) pvs -> doit (Some ctxt) pvs zpr) pvs parent
-
-  in fun pvs zpr -> doit None pvs zpr
-
-(* -------------------------------------------------------------------- *)
 (* [change] replaces a code range with [s] by generating:
    - a local equivalence goal showing that the original fragment and [s]
      agree under the framed precondition on the variables they both read,
-     and produce the same values for everything they may write;
+     and produce the same values for everything observable afterwards;
    - the original program-logic goal with the selected range rewritten. *)
 let t_change_stmt
   (side : side option)
@@ -284,9 +250,9 @@ let t_change_stmt
   (* Collect the variables that may be modified by the surrounding context,
      excluding the fragment being replaced. *)
   let modi =
-    let zpr =
-      (zpr.z_head, List.drop (List.length stmt) zpr.z_tail), zpr.z_path
-    in zpr_write env EcPV.PV.empty zpr in
+    let zpr = { zpr with z_tail = epilog } in
+    let zpr = (zpr.z_head, zpr.z_tail), zpr.z_path in
+    EcPV.zpr_pv `Write `Before env EcPV.PV.empty zpr in
 
   (* Keep only the top-level conjuncts of the current precondition that talk
      about the active memory and are independent from the surrounding writes. *)
@@ -307,8 +273,26 @@ let t_change_stmt
   let written = EcPV.is_write_r env written stmt in
   let written = EcPV.is_write_r env written s.s_node in
 
+  let obs =
+    let zpr = { zpr with z_tail = epilog } in
+    let zpr = (zpr.z_head, zpr.z_tail), zpr.z_path in
+    let obs = EcPV.zpr_pv `Read `After env EcPV.PV.empty zpr in
+
+    let goal =
+      let pvs =
+        EcLowPhlGoal.logicS_post_read env
+          (EcLowPhlGoal.get_logicS (FApi.tc1_goal tc))
+      in
+      EcIdent.Mid.find_def EcPV.PV.empty (fst me) pvs
+    in
+
+    EcPV.PV.union obs goal
+  in
+
+  let written = EcPV.PV.inter written obs in
+
   (* The local equivalence goal relates shared reads in the precondition and
-     all possible writes in the postcondition. *)
+     the writes that remain observable in the continuation/postcondition. *)
   let wr_pvs, wr_globs = EcPV.PV.elements written in
 
   let pr_pvs, pr_globs = EcPV.PV.elements @@ EcPV.PV.inter
@@ -337,11 +321,11 @@ let t_change_stmt
   (* First subgoal: prove that the replacement fragment preserves the
      observable behavior required by the outer proof. *)
   let goal1 =
-     f_equivS
-       (snd me) (snd me)
-       { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
-       (EcAst.stmt stmt) s
-       { ml; mr; inv = f_ands po_eq; }
+    f_equivS
+      (snd me) (snd me)
+      { ml; mr; inv = ofold f_and (f_ands pr_eq) frame; }
+      (EcAst.stmt stmt) s
+      { ml; mr; inv = f_ands po_eq; }
   in
 
   let stmt = EcMatching.Zipper.zip { zpr with z_tail = s.s_node @ epilog } in
