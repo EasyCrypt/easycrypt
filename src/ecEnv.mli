@@ -438,14 +438,28 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
+  type entry = path * EcTheory.rule
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple | `Proj of int]
+  (* A reduction database is identified by a flat, global name (not a
+     theory-qualified path), hence a [symbol] rather than a [path]. *)
+  type base = symbol
 
-  val all : env -> (topsym * rule list) list
-  val add1 : path * rule_option * rule option -> env -> env
-  val add  : ?import:bool -> (path * rule_option * rule option) list -> env -> env
-  val get  : topsym -> env -> rule list
+  (* Name of the default database (the empty name). *)
+  val dname : symbol
+  val all : env -> (base * (topsym * rule list) list) list
+  val add1 : ?base:symbol -> path * rule_option * rule option -> env -> env
+  val add  : ?import:bool -> reduction_rule -> env -> env
+  val get  : ?base:symbol -> topsym -> env -> rule list
+  val get_entries : ?base:symbol -> topsym -> env -> entry list
+  val getx : symbol -> env -> (topsym * rule list) list
 end
+
+(* Proof-local simplify context; defined in [EcSimplifyContext] and
+   re-exported here. *)
+type simplify_context = EcSimplifyContext.simplify_context
+
+module SimplifyContext = EcSimplifyContext
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
