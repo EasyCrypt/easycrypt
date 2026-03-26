@@ -932,11 +932,20 @@ and rwarg1 =
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
-and rwoptions = rwside * trepeat option * rwocc * pformula option
+and rwmatch =
+  | RWM_Plain   of pformula
+  | RWM_Context of psymbol * pformula
+
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
 and rwtactic  = [`Ring | `Field]
+
+and rwoptions =
+  { side       : rwside
+  ; repeat     : trepeat option
+  ; occurrence : rwocc
+  ; match_     : rwmatch option }
 
 (* -------------------------------------------------------------------- *)
 let norm_rwocci (x : rwocci) =
