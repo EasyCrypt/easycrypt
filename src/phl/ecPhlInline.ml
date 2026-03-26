@@ -328,7 +328,7 @@ module HiInternal = struct
     match zip.Zp.z_tail with
     | { i_node = Scall _ } :: tl ->
          pat_of_spath ((zip.Zp.z_head, tl), zip.Zp.z_path)
-    | _ -> raise Zp.InvalidCPos
+    | _ -> raise EcMatching.Position.InvalidCPos
 end
 
 (* -------------------------------------------------------------------- *)
@@ -426,7 +426,7 @@ let process_inline_codepos ~use_tuple side pos tc =
 
     | _, _ -> tc_error !!tc "invalid arguments"
 
-  with EcMatching.Zipper.InvalidCPos ->
+  with EcMatching.Position.InvalidCPos ->
     tc_error !!tc "invalid position"
 
 (* -------------------------------------------------------------------- *)

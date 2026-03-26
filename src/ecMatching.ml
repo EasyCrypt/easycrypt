@@ -28,15 +28,98 @@ module Position = struct
   and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
 
   type cp_base = [
-    | `ByPos of int
+    | `ByPos of int (* Always <> 0 *)
     | `ByMatch of int option * cp_match
   ]
 
-  type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
-  type codepos1      = int * cp_base
-  type codepos       = (codepos1 * codepos_brsel) list * codepos1
-  type codepos_range = codepos * [`Base of codepos | `Offset of codepos1]
-  type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
+  exception InvalidCPos
+
+  (* Code positions and code gaps:
+
+     A block of n instructions has:
+     - n positions (0-indexed), each pointing AT an instruction
+     - n+1 gaps (0-indexed), each pointing BETWEEN instructions
+
+     gap 0 | instr 0 | gap 1 | instr 1 | gap 2 | ... | instr n-1 | gap n
+
+     Positions (nm_codepos1): 0-indexed, range [0, n-1]
+     Gaps (nm_codegap1):      0-indexed, range [0, n]
+       gap k = before instruction k (= after instruction k-1)
+       gap 0 = start of block, gap n = end of block
+
+     Conversions:
+       gap_before(pos) = pos        (* gap immediately before instruction pos *)
+       gap_after(pos)  = pos + 1    (* gap immediately after instruction pos *)
+       instr_after(gap)  = gap      (* instruction immediately after gap; requires gap < n *)
+       instr_before(gap) = gap - 1  (* instruction immediately before gap; requires gap > 0 *)
+
+     Ranges are pairs of gaps (g1, g2) containing instructions g1, g1+1, ..., g2-1.
+     User writes [a..b] (1-indexed, closed-closed), which translates to
+     gap pair (a-1, b) in 0-indexed representation.
+
+     Tactics that split code take gaps (seq, wp, sp, fel, sim/eqobs).
+     Tactics that target instructions take positions (kill, alias, set, cfold,
+     proc change, fission, fusion, unroll, inline, call, cond).
+     Swap takes a range (gap pair) + a gap offset.
+
+     Pre-normalization code positions (codepos1) use user syntax (1-indexed,
+     possibly negative, possibly match-based). Normalization resolves them
+     to 0-indexed nm_codepos1 values.
+  *)
+
+  (* Branch selection *)
+  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol]
+  type nm_codepos_brsel = [`Cond of bool | `Match of int]
+
+  (* Linear code position inside a block *)
+  type codepos1 = int * cp_base
+
+  (* Normalized code position inside a block, always > 0 *)
+  type nm_codepos1 = int
+
+  (* Codeposition path step *)
+  type codepos_step    = (codepos1 * codepos_brsel)
+  type nm_codepos_step = (nm_codepos1 * nm_codepos_brsel)
+
+  (* Block selection by codepos + branch selection *)
+  type codepos_path    = codepos_step list
+  type nm_codepos_path = nm_codepos_step list
+
+  (* Full codeposition = path to block + position in block *)
+  type codepos         = codepos_path * codepos1
+  type nm_codepos      = nm_codepos_path * nm_codepos1
+
+  (* Code position offset *)
+  type codeoffset1     = [`Relative of int | `Absolute of codepos1]
+
+  (* --- Gap types --- *)
+  (* Normalized gap inside a block, 0-indexed, range [0, n] *)
+  type nm_codegap1 = int
+
+  (* Typed but unnormalized gap *)
+  type codegap1 =
+    | GapBefore of codepos1    (* gap immediately before this instruction *)
+    | GapAfter  of codepos1    (* gap immediately after this instruction *)
+
+    (* Full gap with path *)
+  type codegap  = codepos_path * codegap1
+
+  (* Normalized gap with path *)
+  type nm_codegap = nm_codepos_path * nm_codegap1
+
+  (* Gap-based range *)
+  type codegap1_range    = codegap1 * codegap1
+  type nm_codegap1_range = nm_codegap1 * nm_codegap1
+  type codegap_range     = codepos_path * codegap1_range
+  type nm_codegap_range  = nm_codepos_path * nm_codegap1_range
+
+  (* Gap-based offset for swap *)
+  type codegap_offset1 =
+    | GapAbsolute of codegap1
+    | GapRelative of int
+
+  let cpos1 (i: int) : codepos1 =
+    (0, `ByPos i)
 
   let shift1 ~(offset : int) ((o, p) : codepos1) : codepos1 =
     (o + offset, p)
@@ -44,51 +127,121 @@ module Position = struct
   let shift ~(offset : int) ((outp, p) : codepos) : codepos =
     (outp, shift1 ~offset p)
 
+  let cpos1_first : codepos1 = cpos1 0
+  let cpos1_last  : codepos1 = cpos1 (-1)
+
+  (* Boundary gap constructors *)
+  let codegap1_start : codegap1 = GapBefore cpos1_first
+  let codegap1_end   : codegap1 = GapAfter  cpos1_last
+  let codegap_start  : codegap  = ([], codegap1_start)
+  let codegap_end    : codegap  = ([], codegap1_end)
+
+  (* Convenience constructors *)
+  let gap_before_pos (cp : codepos1) : codegap1 = GapBefore cp
+  let gap_after_pos  (cp : codepos1) : codegap1 = GapAfter cp
+
+  (* Gap -> instr *)
+  let instr_before_gap (cg : codegap1) : codepos1 = 
+    match cg with
+    | GapAfter cp -> cp
+    | GapBefore cp -> shift1 ~offset:(-1) cp
+
+  let instr_after_gap  (cg : codegap1) : codepos1 = 
+    match cg with
+    | GapAfter cp -> shift1 ~offset:1 cp
+    | GapBefore cp -> cp
+
+  (* Position <-> Gap conversions (normalized, 0-indexed) *)
+  let gap_before   (pos : nm_codepos1) : nm_codegap1 = pos
+  let gap_after    (pos : nm_codepos1) : nm_codegap1 = pos + 1
+  let instr_after  (gap : nm_codegap1) : nm_codepos1 = gap      (* requires gap < n *)
+  let instr_before (gap : nm_codegap1) : nm_codepos1 = gap - 1  (* requires gap > 0 *)
+
+  (* Single-instruction range as gap pair *)
+  let gap_range_of_pos (pos : nm_codepos1) : nm_codegap1_range =
+    (gap_before pos, gap_after pos)
+
+  let gap_range_of_cpos ((path, pos) : nm_codepos) : nm_codegap_range =
+    (path, gap_range_of_pos pos)
+
+  (* Gap counting helpers *)
+  let gap_after_n      (n : int) : codegap1 = GapAfter  (0, `ByPos (n-1))
+  let gap_before_n     (n : int) : codegap1 = GapBefore (0, `ByPos (n-1))
+  let gap_after_last_n (n : int) : codegap1 = GapAfter  (0, `ByPos (-n))
+  let gap_before_last_n(n : int) : codegap1 = GapBefore (0, `ByPos (-n))
+
   let resolve_offset ~(base : codepos1) ~(offset : codeoffset1) : codepos1 =
     match offset with
-    | `ByPosition pos -> pos
-    | `ByOffset   off -> (off + fst base, snd base)
-end
+    | `Absolute pos -> pos
+    | `Relative off -> (off + fst base, snd base)
 
-(* -------------------------------------------------------------------- *)
-module Zipper = struct
-  open Position
+  let empty_codegap1_range_of_codegap1 (cg1: codegap1) : codegap1_range =
+    (cg1, cg1)
 
-  exception InvalidCPos
+  let empty_codegap_range_of_codegap ((cpath, cg1): codegap) : codegap_range =
+    (cpath, empty_codegap1_range_of_codegap1 cg1)
 
-  module P = EcPath
+  let codegap1_range_of_codepos1 (cp1: codepos1) : codegap1_range =
+    (gap_before_pos cp1, gap_after_pos cp1)
 
-  type ('a, 'state) folder =
-    env -> 'a -> 'state -> instr -> 'state * instr list
+  let codegap_range_of_codepos ((cpath, cp1): codepos) : codegap_range = 
+    (cpath, codegap1_range_of_codepos1 cp1)
 
-  type ('a, 'state) folder_l =
-    env -> 'a -> 'state -> instr list -> 'state * instr list
+  let nm_codegap1_range_of_nm_codepos1 (cp1: nm_codepos1) : nm_codegap1_range =
+    (gap_before cp1, gap_after cp1)
 
-  type spath_match_ctxt = {
-    locals : (EcIdent.t * ty) list;
-    prebr  : ((EcIdent.t * ty) list * stmt) list;
-    postbr : ((EcIdent.t * ty) list * stmt) list;
-  }
+  let nm_codegap_range_of_nm_codepos ((cpath, cp1): nm_codepos) : nm_codegap_range =
+    (cpath, nm_codegap1_range_of_nm_codepos1 cp1)
 
-  type ipath =
-  | ZTop
-  | ZWhile  of expr * spath
-  | ZIfThen of expr * spath * stmt
-  | ZIfElse of expr * stmt  * spath
-  | ZMatch  of expr * spath * spath_match_ctxt
+  let codepos1_of_nm_codepos1 (nm: nm_codepos1) : codepos1 = 
+    (0, `ByPos nm)
 
-  and spath = (instr list * instr list) * ipath
+  let cpos1_after_last : codepos1 =
+    (1, `ByPos (-1))
 
-  type zipper = {
-    z_head : instr list;                (* instructions on my left (rev)       *)
-    z_tail : instr list;                (* instructions on my right (me incl.) *)
-    z_path : ipath;                     (* path (zipper) leading to me         *)
-    z_env  : env option;
-  }
+  let cpos1_to_top (cp1: codepos1) : codepos =
+    ([], cp1)
 
-  let cpos (i : int) : codepos1 = (0, `ByPos i)
+  (* Top-level first instruction *)
+  let cpos_first : codepos =
+    cpos1_to_top cpos1_first
 
-  let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
+  let cpos_last : codepos =
+    cpos1_to_top cpos1_last
+
+  (* 
+    Check that the ranges are valid and then:
+    if either is empty -> true
+    otherwise possibilities are:
+    1. s1 <= s2 <= min(e1, e2) => false
+    2. s1 <= e1 <= s2 <= e2    => true
+    3. s2 <= s1 <= min(e1, e2) => false
+    4. s2 <= e2 <= s1 <= e1    => true
+  *)
+    
+  let disjoint ((s1, e1): nm_codegap1_range) ((s2, e2): nm_codegap1_range) : bool =
+    if s1 > e1 || s2 > e2 then raise InvalidCPos;
+    (s1 = e1) || (s2 = e2) || (* Degenerate case where one of the reanges is empty    *)
+    (max s1 s2 >= min e1 e2)  (* Otherwise, intersection of (a, b) /\ (c, d)          *)
+                              (*  = (max a c, min b d)                                *)
+                              (* and this is empty if lower_lim >= upper_lim          *)            
+
+  let nm_codepos1_in_nm_codegap1_range (cp: nm_codepos1) ((start, fin): nm_codegap1_range) : bool =
+    (start <= cp && cp < fin)
+
+  module Notations = struct
+    let (|+>) (cp: codepos) (offset: int) =
+      shift ~offset cp
+
+    let (+>) (cp1: codepos1) (offset: int) =
+      shift1 ~offset cp1
+
+    let (<+|) (cp: codepos) (i: int) =
+      shift ~offset:(-i) cp
+
+    let (<+) (cp1: codepos1) (i: int) =
+      shift1 ~offset:(-i) cp1
+  end
 
   let find_by_cp_match
     (env     : EcEnv.env)
@@ -147,144 +300,324 @@ module Zipper = struct
 
     match rev with
     | false -> (s1, ir, s2)
-    | true  -> (s2, ir, s1)
+    | true  -> (List.rev s2, ir, List.rev s1)
 
-  type after = [`Yes | `No | `Auto]
+  let exists_match (env: env) (cpm: cp_match) (s: stmt) : bool =
+    try 
+      ignore (find_by_cp_match env (None, cpm) s);
+      true
+    with InvalidCPos -> false
 
-  let split_at_cp_base ~(after : after) (env : EcEnv.env) (cb : cp_base) (s : stmt) =
-    match cb with
-    | `ByPos i -> begin
-        let after =
-          match after with
-          | `Auto -> 0 <= i
-          | `Yes  -> true
-          | `No   -> false in
-        let i = if i < 0 then List.length s.s_node + i + 1 else i in
-        let i = i - if after then 0 else 1 in
-        try  List.takedrop i s.s_node
-        with (Invalid_argument _ | Not_found) -> raise InvalidCPos
-      end
+  let find_by_nmcpos1 ?(rev = true) (nm: nm_codepos1) (s: stmt) =
+    let s1, i, s2 = try
+      List.pivot_at nm s.s_node
+    with (Invalid_argument _ | Not_found) -> raise InvalidCPos
+    in
+    (if rev then s1 else List.rev s1), i, s2
 
+  (* Throws InvalidCPos if failing — allows [0, n] where n is "after last" *)
+  let check_nm_cpos1 (nm: nm_codepos1) (s: stmt) : unit =
+    if nm < 0 || nm >= List.length s.s_node then raise InvalidCPos
+
+  (* Normalizes code position wrt stmt — input is 0-indexed *)
+  let normalize_cp_base ?(check = true) (env: EcEnv.env) (cb: cp_base) (s: stmt) : nm_codepos1 =
+    let nm = match cb with
+    | `ByPos i when i >= 0 -> i
+    | `ByPos i (* i < 0 *) -> (List.length s.s_node) + i
     | `ByMatch (i, cm) ->
-        let (s1, i, s2) = find_by_cp_match env (i, cm) s in
+      let (s1, _, _) = find_by_cp_match env (i, cm) s in
+      List.length s1
+    in
+    if check then check_nm_cpos1 nm s;
+    nm
 
-        match after with
-        | `No -> (List.rev s1, i :: s2)
-        | _   -> (List.rev_append s1 [i], s2)
+  let normalize_cpos1 ?(check = true) (env: EcEnv.env) ((off, cb): codepos1) (s: stmt) : nm_codepos1 = 
+    let nm = off + normalize_cp_base ~check:false env cb s in
+    (* Make sure the position we are pointing to is valid in the context *)
+    (* List.length points to the position "after the last" and has
+       special meaning depending on the context *)
+    if check then check_nm_cpos1 nm s; 
+    nm
 
-  let split_at_cpos1 ~after (env : EcEnv.env) ((ipos, cb) : codepos1) s =
-    let (s1, s2) = split_at_cp_base ~after env cb s in
+  let find_and_normalize_cpos1 ?(rev = true) (env : EcEnv.env) (cp1 : codepos1) (s : stmt) =
+    let nm = normalize_cpos1 env cp1 s in
+    find_by_nmcpos1 ~rev nm s, nm
 
-    let (s1, s2) =
-      match ipos with
-      | off when off > 0 ->
-          let (ss1, ss2) =
-            try  List.takedrop off s2
-            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
-          (s1 @ ss1, ss2)
+  let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cp1 : codepos1) (s : stmt) =
+    find_and_normalize_cpos1 ~rev env cp1 s |> fst
 
-      | off when off < 0 ->
-          let (ss1, ss2) =
-            try  List.takedrop (List.length s1 + off) s1
-            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
-          (ss1, ss2 @ s2)
+  (* Selects the index for match arm *)
+  let select_match_arm_idx (env:env) (e: expr) (sel: string) =
+    let  _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+    let  indt = oget (EcDecl.tydecl_as_datatype indt) in
+    let  cnames = List.fst indt.tydt_ctors in
+    try  List.findi (fun _ n -> EcSymbols.sym_equal sel n) cnames |> fst
+    with Not_found -> raise InvalidCPos 
 
-      | _ -> (s1, s2)
+  (* Get the block pointed to by brsel for a given instruction *)
+  let normalize_brsel (env: env) (i: instr) (br: codepos_brsel) : (env * stmt) * nm_codepos_brsel =
+    match i.i_node, br with
+    | (Sif (_, t, _),  `Cond true)  -> (env, t), `Cond true
+    | (Sif (_, _, f),  `Cond false) -> (env, f), `Cond false
+    | (Swhile (_, s),  `Cond true)  -> (env, s), `Cond true
+    | (Smatch (e, ss), `Match ms)  -> 
+      let ix = select_match_arm_idx env e ms in
+      let (locals, s) = List.at ss ix in
+      let env = EcEnv.Var.bind_locals locals env in
+      begin try 
+        (env, s), `Match ix
+      with Invalid_argument _ -> 
+        raise InvalidCPos
+      end
+    | _ -> assert false
 
-    in (s1, s2)
+  let select_branch (env: env) (i: instr) (br: codepos_brsel) : stmt = 
+    normalize_brsel env i br |> fst |> snd
 
-  let find_by_cpos1 ?(rev = true) (env : EcEnv.env) (cpos1 : codepos1) (s : stmt) =
-    match split_at_cpos1 ~after:`No env cpos1 s with
-    | (s1, i :: s2) -> ((if rev then List.rev s1 else s1), i, s2)
-    | _ -> raise InvalidCPos
+  (* Normalizes a code position step and returns the block it points to *)
+  let normalize_cpos_step (env: env) (s: stmt) ((cp1, brsel): codepos_step) : (env * stmt) * nm_codepos_step =
+    let (_, i, _), nm_cp1 = find_and_normalize_cpos1 env cp1 s in
+    let (env, s), nmbr = normalize_brsel env i brsel in
+    (env, s), (nm_cp1, nmbr)
 
-  let offset_of_position (env : EcEnv.env) (cpos : codepos1) (s : stmt) =
-    let (s, _) = split_at_cpos1 ~after:`No env cpos s in
-    1 + List.length s
+  let normalize_cpos_path (env: env) (cpath: codepos_path) (s: stmt) : (env * stmt) * nm_codepos_path =
+    List.fold_left_map (fun (env, s) step -> normalize_cpos_step env s step) (env, s) cpath
 
-  let zipper_at_nm_cpos1
+  let normalize_cpos (env: env) ((cpath, cp1) : codepos) (s: stmt) : (env * stmt) * nm_codepos =
+    let (env, s), npath = normalize_cpos_path env cpath s in
+    (env, s), (npath, normalize_cpos1 env cp1 s)
+
+  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 = 
+    match off with
+    | `Absolute off -> normalize_cpos1 env off s 
+    | `Relative i -> 
+      let nm = (base + i) in
+      check_nm_cpos1 nm s; nm
+
+  (* --- Gap normalization and split functions --- *)
+
+  (* Check that a normalized gap is valid for the given statement *)
+  let check_nm_cgap1 (nm : nm_codegap1) (s : stmt) : unit =
+    if nm < 0 || nm > List.length s.s_node then raise InvalidCPos
+
+  (* Normalize a codegap1 to nm_codegap1 *)
+  let normalize_cgap1 (env : env) (g : codegap1) (s : stmt) : nm_codegap1 =
+    let nm = match g with
+      | GapBefore cp -> normalize_cpos1 ~check:false env cp s |> gap_before
+      | GapAfter  cp -> normalize_cpos1 ~check:false env cp s |> gap_after
+    in
+    check_nm_cgap1 nm s; nm
+
+  (* Normalize a full codegap (with path) *)
+  let normalize_cgap (env : env) ((cpath, g1) : codegap) (s : stmt) : (env * stmt) * nm_codegap =
+    let (env, s), npath = normalize_cpos_path env cpath s in
+    (env, s), (npath, normalize_cgap1 env g1 s)
+
+  (* Normalize a codegap1_range *)
+  let normalize_cgap1_range (env : env) ((g1, g2) : codegap1_range) (s : stmt) : nm_codegap1_range =
+    let nm1 = normalize_cgap1 env g1 s in
+    let nm2 = normalize_cgap1 env g2 s in
+    if nm1 > nm2 then raise InvalidCPos;
+    (nm1, nm2)
+
+  (* Normalize a full codegap_range (with path) *)
+  let normalize_cgap_range (env : env) ((cpath, gr) : codegap_range) (s : stmt) : (env * stmt) * nm_codegap_range =
+    let (env, s), npath = normalize_cpos_path env cpath s in
+    let nmgr = normalize_cgap1_range env gr s in
+    (env, s), (npath, nmgr)
+
+  (* Split at a normalized gap *)
+  let split_at_nmcgap1 (nm : nm_codegap1) (s : stmt) : instr list * instr list =
+    try List.takedrop nm s.s_node
+    with Invalid_argument _ -> raise InvalidCPos
+
+  (* Split at a codegap1 *)
+  let split_at_cgap1 (env : env) (g : codegap1) (s : stmt) : instr list * instr list =
+    split_at_nmcgap1 (normalize_cgap1 env g s) s
+
+  (* Split at a full codegap (with path) *)
+  let split_at_cgap (env : env) ((cpath, g1) : codegap) (s : stmt) : env * (instr list * instr list) =
+    let (env, s), _npath = normalize_cpos_path env cpath s in
+    env, split_at_cgap1 env g1 s
+
+  (* Optional gap split *)
+  let may_split_at_cgap1 ?(rev = false) (env : env) (g : codegap1 option) (s : stmt) : instr list * instr list =
+    ofdfl
+      (fun () -> if rev then (s.s_node, []) else ([], s.s_node))
+      (omap (fun g -> split_at_cgap1 env g s) g)
+
+  (* Split by normalized gap range into (before, inside, after) *)
+  let split_by_nmcgap_range ((g1, g2) : nm_codegap1_range) (s : stmt) : instr list * instr list * instr list =
+    let before, rest = try List.takedrop g1 s.s_node
+      with Invalid_argument _ -> raise InvalidCPos in
+    let inside, after = try List.takedrop (g2 - g1) rest
+      with Invalid_argument _ -> raise InvalidCPos in
+    (before, inside, after)
+
+  (* Split by a list of normalized gaps *)
+  let split_by_nmcgaps (gaps : nm_codegap1 list) (s : stmt) : instr list list =
+    let doit (prev, rest, acc) gap =
+      let seg, rest = try List.takedrop (gap - prev) rest
+        with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+      (gap, rest, seg :: acc)
+    in
+    let (_, last, segs) = List.fold_left doit (0, s.s_node, []) gaps in
+    List.rev (last :: segs)
+
+  (* Resolve a gap offset relative to a gap range *)
+  let resolve_gap_offset (env : env) ((g1, g2) : nm_codegap1_range) (off : codegap_offset1) (s : stmt) : nm_codegap1 =
+    let nm = match off with
+      | GapAbsolute g ->
+        let nm = normalize_cgap1 env g s in
+        if g1 <= nm && nm <= g2 then raise InvalidCPos; nm
+      | GapRelative i ->
+        if i > 0 then g2 + i
+        else g1 + i
+    in
+    check_nm_cgap1 nm s; nm
+
+  (* Semantic helpers for match-based finding *)
+  let find_last_match (env : env) (cm : cp_match) (s : stmt) =
+    find_by_cp_match env (Some (-1), cm) s
+
+  let find_first_match (env : env) (cm : cp_match) (s : stmt) =
+    find_by_cp_match env (None, cm) s
+
+  let find_nth_match (env : env) (n : int) (cm : cp_match) (s : stmt) =
+    find_by_cp_match env (Some n, cm) s
+
+  (* [split_by_match env ~occ ~gap cm s] splits [s] at the gap before/after
+     the [occ]-th occurrence of [cm]. *)
+  let split_by_match (env : env) ~(occ : int) ~(gap : [`Before | `After]) (cm : cp_match) (s : stmt) =
+    let (s1, i, s2) = find_by_cp_match env (Some occ, cm) s in
+    match gap with
+    | `Before -> (s1, i :: s2)
+    | `After  -> (s1 @ [i], s2)
+
+  let gap_before_match (env : env) ~(occ : int) (cm : cp_match) (s : stmt) : nm_codegap1 =
+    let (s1, _, _) = find_by_cp_match env (Some occ, cm) s in
+    List.length s1
+
+  let gap_after_match (env : env) ~(occ : int) (cm : cp_match) (s : stmt) : nm_codegap1 =
+    let (s1, _, _) = find_by_cp_match env (Some occ, cm) s in
+    List.length s1 + 1
+
+  (* Block iteration helpers *)
+  let fold_blocks ~(start : nm_codegap1) ~(block_size : int) (s : stmt)
+      (f : int -> nm_codegap1 -> nm_codegap1 -> 'a -> 'a) (init : 'a) : 'a =
+    let n = List.length s.s_node in
+    let rec aux idx g acc =
+      if g + block_size > n then acc
+      else aux (idx + 1) (g + block_size) (f idx g (g + block_size) acc)
+    in
+    aux 0 start init
+
+  let iter_blocks ~(start : nm_codegap1) ~(block_size : int) (s : stmt)
+      (f : int -> nm_codegap1 -> nm_codegap1 -> unit) : unit =
+    fold_blocks ~start ~block_size s (fun idx g1 g2 () -> f idx g1 g2) ()
+end
+
+(* -------------------------------------------------------------------- *)
+module Zipper = struct
+  open Position
+
+  module P = EcPath
+
+  type ('a, 'state) folder =
+    env -> 'a -> 'state -> instr -> 'state * instr list
+
+  type ('a, 'state) folder_l =
+    env -> 'a -> 'state -> instr list -> 'state * instr list
+
+  type spath_match_ctxt = {
+    locals : (EcIdent.t * ty) list;
+    prebr  : ((EcIdent.t * ty) list * stmt) list;
+    postbr : ((EcIdent.t * ty) list * stmt) list;
+  }
+
+  type ipath =
+  | ZTop
+  | ZWhile  of expr * spath
+  | ZIfThen of expr * spath * stmt
+  | ZIfElse of expr * stmt  * spath
+  | ZMatch  of expr * spath * spath_match_ctxt
+
+  and spath = (instr list * instr list) * ipath
+
+  type zipper = {
+    z_head : instr list;                (* instructions on my left  (rev)      *)
+    z_tail : instr list;                (* instructions on my right (me incl.) *)
+    z_path : ipath;                     (* path (zipper) leading to me         *)
+    z_env  : env option;
+  }
+
+  let zipper ?env hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; z_env = env; }
+
+  let zipper_step_into_block
     (env        : EcEnv.env)
-    ((cp1, sub) : codepos1 * codepos_brsel)
+    ((cp1, sub) : codepos_step)
     (s          : stmt)
     (zpr        : ipath)
-  : (ipath * stmt) * (codepos1 * codepos_brsel) * env
+  : (ipath * stmt) * nm_codepos_step * env
   =
     let (s1, i, s2) = find_by_cpos1 env cp1 s in
-    let zpr, env =
+    let zpr, step, env =
       match i.i_node, sub with
       | Swhile (e, sw), `Cond true ->
-          (ZWhile (e, ((s1, s2), zpr)), sw), env
+          (ZWhile (e, ((s1, s2), zpr)), sw), `Cond true, env
 
       | Sif (e, ifs1, ifs2), `Cond true ->
-          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1), env
+          (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1), `Cond true, env
 
       | Sif (e, ifs1, ifs2), `Cond false ->
-          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), env
+          (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), `Cond false, env
 
       | Smatch (e, bs), `Match cn ->
-          let _, indt, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-          let indt = oget (EcDecl.tydecl_as_datatype indt) in
-          let cnames = List.fst indt.tydt_ctors in
-          let ix, _ =
-            try  List.findi (fun _ n -> EcSymbols.sym_equal cn n) cnames
-            with Not_found -> raise InvalidCPos
-          in
+          let ix = select_match_arm_idx env e cn in
           let prebr, (locals, body), postbr = List.pivot_at ix bs in
           let env = EcEnv.Var.bind_locals locals env in
-          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), env
+          (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), `Match ix, env
 
       | _ -> raise InvalidCPos
-    in zpr, ((0, `ByPos (1 + List.length s1)), sub), env
+    in zpr, ((List.length s1), step), env
 
-  let zipper_of_cpos_r (env : EcEnv.env) ((nm, cp1) : codepos) (s : stmt) =
-    let ((zpr, s), env), nm =
-      List.fold_left_map
-        (fun ((zpr, s), env) nm1 -> let zpr, s, env = zipper_at_nm_cpos1 env nm1 s zpr in (zpr, env), s)
-        ((ZTop, s), env) nm in
+  let pre_zipper_of_codepos_path (env : EcEnv.env) (cpath: codepos_path) (s: stmt) =
+    List.fold_left_map
+      (fun ((zpr, s), env) cps -> 
+      let (zpr, s), step, env = zipper_step_into_block env cps s zpr in ((zpr, s), env), step)
+      ((ZTop, s), env) cpath 
 
-    let s1, i, s2 = find_by_cpos1 env cp1 s in
-    let zpr = zipper ~env s1 (i :: s2) zpr in
+  let zipper_of_cgap_r (env : EcEnv.env) ((cpath, cp1) : codegap) (s : stmt) =
+    let ((zpr, s), env), nmcp = pre_zipper_of_codepos_path env cpath s in
+      
+    let nm = normalize_cgap1 env cp1 s in
+    let s1, s2 = split_at_nmcgap1 nm s in
+    let zpr = zipper ~env (List.rev s1) s2 zpr in
 
-    (zpr, (nm, (0, `ByPos (1 + List.length s1))))
+    (zpr, ((nmcp, nm), s))
+
+  let zipper_of_cpos_r (env : EcEnv.env) ((cpath, cp1) : codepos) (s : stmt) =
+    zipper_of_cgap_r env (cpath, gap_before_pos cp1) s
 
   let zipper_of_cpos (env : EcEnv.env) (cp : codepos) (s : stmt) =
     fst (zipper_of_cpos_r env cp s)
 
-  let zipper_of_cpos_range env cpr s =
-    let top, bot = cpr in
-    let zpr, (_, pos) = zipper_of_cpos_r env top s in
-    match bot with
-    | `Base cp -> begin
-      let zpr', (_, pos') = zipper_of_cpos_r env cp s in
-      (* The two positions should identify the same block *)
-      if zpr'.z_path <> zpr.z_path then
-        raise InvalidCPos;
+  let zipper_of_cgap (env : EcEnv.env) (cp : codegap) (s : stmt) =
+    fst (zipper_of_cgap_r env cp s)
+  (* 
+   * Returns:
+   *  - A zipper pointing to the start of the range
+   *  - A split of the block according to the range 
+   *  - The normalized cpos range
+   *) 
+  let zipper_and_split_of_cgap_range (env: env) (path, (start, fin) : codegap_range) (s: stmt) : zipper * _ * nm_codegap_range =
+    let (zpr, ((cpath, _), s)) = zipper_of_cgap_r env (path, start) s in
+    let start = normalize_cgap1 env start s in
+    let fin = normalize_cgap1 env fin s in
+    let ss = split_by_nmcgap_range (start, fin) s in
+    (zpr, ss, (cpath, (start, fin)))
 
-      (* The end position should be after the start *)
-      match pos, pos' with
-      | (_, `ByPos x), (_, `ByPos y) when x <= y ->
-          zpr, (0, `ByPos (y - x))
-      | _ -> raise InvalidCPos
-    end
-    | `Offset cp1 -> zpr, cp1
-
-  let zipper_and_split_of_cpos_range env cpr s =
-    let zpr, cp = zipper_of_cpos_range env cpr s in
-    match zpr.z_tail with
-    | []      -> raise InvalidCPos
-    | i :: tl ->
-      let s, tl = split_at_cpos1 ~after:`Auto env cp (stmt tl) in
-      (zpr, cp), ((i::s), tl)
-
-  let split_at_cpos1 env cpos1 s =
-    split_at_cpos1 ~after:`Auto env cpos1 s
-
-  let may_split_at_cpos1 ?(rev = false) env cpos1 s =
-    ofdfl
-      (fun () -> if rev then (s.s_node, []) else ([], s.s_node))
-      (omap ((split_at_cpos1 env)^~ s) cpos1)
-
-  let rec zip i ((hd, tl), ip) =
+  let rec zip (i: instr option) (((hd, tl), ip): (instr list * instr list) * ipath) =
     let s = stmt (List.rev_append hd (List.ocons i tl)) in
 
     match ip with
@@ -297,14 +630,14 @@ module Zipper = struct
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
-  let after ~strict zpr =
+  let after ~strict (zpr: zipper) =
     let rec doit acc ip =
       match ip with
       | ZTop                          -> acc
       | ZWhile  (_, ((_, is), ip))    -> doit (is :: acc) ip
       | ZIfThen (_, ((_, is), ip), _) -> doit (is :: acc) ip
       | ZIfElse (_, _, ((_, is), ip)) -> doit (is :: acc) ip
-      | ZMatch (_, ((_, is), ip), _) -> doit (is :: acc) ip
+      | ZMatch (_, ((_, is), ip), _)  -> doit (is :: acc) ip
     in
 
     let after =
@@ -315,18 +648,18 @@ module Zipper = struct
     in
       List.rev after
 
-  let fold_range env cenv cpr f state s =
-    let (zpr, _), (s, tl) = zipper_and_split_of_cpos_range env cpr s in
+  let fold_range (env: env) cenv (cpr: codegap_range) f state (s: stmt) =
+    let zpr, (_pre, s, tl), _nmcpr = zipper_and_split_of_cgap_range env cpr s in
     let env = odfl env zpr.z_env in
     let state', si' = f env cenv state s in
     state', zip { zpr with z_tail = si' @ tl }
 
-  let map_range env cpr f s =
+  let map_range (env: env) (cpr: codegap_range) f (s: stmt) =
     snd (fold_range env () cpr (fun env () _ si -> (), f env si) () s)
 
-  let fold env cenv cp f state s =
+  let fold (env: env) cenv ((path, cp1): codepos) f state (s: stmt) =
     let f env cenv state si = f env cenv state (List.hd si) in
-    fold_range env cenv (cp, `Offset (cpos 0)) f state s
+    fold_range env cenv (path, codegap1_range_of_codepos1 cp1) f state s
 
   let map env cpos f s =
     fst_map

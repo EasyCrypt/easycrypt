@@ -17,6 +17,6 @@ type outline_variant =
     cpr: selects the particular slice of the program to outline.
     variant: choose the type of outlining: procedure or statement.
 *)
-val t_outline : side -> codepos_range -> outline_variant -> backward
+val t_outline : side -> codegap_range -> outline_variant -> backward
 
 val process_outline : outline_info -> backward

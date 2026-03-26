@@ -2283,7 +2283,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       let body =
         List.fold_right (fun (cpr, up) bd ->
           let {pl_desc = cpr; pl_loc = loc} = cpr in
-          let cp = trans_codepos_range env cpr in
+          let cp = trans_codepos_or_range env cpr in
           let change env si =
             match up with
             | Pup_stmt sup ->
@@ -2295,7 +2295,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           try
             EcMatching.Zipper.map_range env cp change bd
           with
-            | EcMatching.Zipper.InvalidCPos ->
+            | InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
         )
         pupdates
@@ -3704,7 +3704,6 @@ and trans_pattern env ps ue pf =
 (* -------------------------------------------------------------------- *)
 and trans_args env ue = transcall (transexp env `InProc ue) env ue
 
-
 (* -------------------------------------------------------------------- *)
 and trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
   match p with
@@ -3716,6 +3715,7 @@ and trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : 
     | Some m ->
       `LvmVar (transpvar env m pv)
     end
+
 (* -------------------------------------------------------------------- *)
 and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
   match p with
@@ -3729,10 +3729,14 @@ and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) :
     `Assign (trans_lv_match ?memory env lv)
   | `AssignTuple lv ->
     `AssignTuple (trans_lv_match ?memory env lv)
+
 (* -------------------------------------------------------------------- *)
 and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with
-  | `ByPos _ as p -> (p :> cp_base)
+  | `ByPos (i, `Index1) when i > 0 -> `ByPos (i - 1)
+  | `ByPos (i, `Index1) when i = 0 -> raise InvalidCPos
+  | `ByPos (i, `Index1) -> `ByPos i
+  | `ByPos (i, `Index0) -> `ByPos i  (* already 0-indexed, no conversion *)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
 
 (* -------------------------------------------------------------------- *)
@@ -3746,31 +3750,77 @@ and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   | `Match { pl_desc = x } -> `Match x
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
-  let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
-  let p = trans_codepos1 ?memory env p in
-  (nm, p)
+and trans_codepos_step ?(memory: memory option) (env: EcEnv.env) ((cp1, brsel): pcodepos_step) : codepos_step =
+  let cp1 = trans_codepos1 ?memory env cp1 in
+  let brsel = trans_codepos_brsel brsel in
+  (cp1, brsel)
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos_range ?(memory : memory option) (env : EcEnv.env) ((cps, cpe) : pcodepos_range) : codepos_range =
-  let cps = trans_codepos ?memory env cps in
-  let cpe =
-    match cpe with
-    | `Base cp ->
-      `Base (trans_codepos ?memory env cp)
-    | `Offset cp ->
-      `Offset (trans_codepos1 ?memory env cp)
-  in
-  (cps, cpe)
+and trans_codepos_path ?(memory: memory option) (env: EcEnv.env) (cpath: pcodepos_path) : codepos_path =
+  List.map (trans_codepos_step ?memory env) cpath
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((cpath, p) : pcodepos) : codepos =
+  let cpath = trans_codepos_path ?memory env cpath in
+  let p = trans_codepos1 ?memory env p in
+  (cpath, p)
+
+(* -------------------------------------------------------------------- *)
+and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+  match o with
+  | `Relative i -> `Relative i
+  | `Absolute p -> `Absolute (trans_codepos1 ?memory env p)
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : codegap_range =
+  match cpor with
+  | Pos cp -> codegap_range_of_codepos (trans_codepos ?memory env cp)
+  | Range cpr -> trans_codegap_range ?memory env cpr
+
+(* -------------------------------------------------------------------- *)
+and trans_range1_or_insert
+  ?(memory : memory option)
+   (env    : EcEnv.env)
+   (cp     : prange1_or_insert)
+: codegap_range
+=
+  match cp with
+  | PosOrRange cpor -> trans_codepos_or_range ?memory env cpor
+  | Gap g ->
+    let cg = trans_codegap ?memory env g in
+    empty_codegap_range_of_codegap cg
 
 (* -------------------------------------------------------------------- *)
 and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
 
-and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+(* -------------------------------------------------------------------- *)
+and trans_codegap1 ?(memory : memory option) (env : EcEnv.env) (g : pcodegap1) : codegap1 =
+  match g with
+  | GapBefore cp -> GapBefore (trans_codepos1 ?memory env cp)
+  | GapAfter  cp -> GapAfter  (trans_codepos1 ?memory env cp)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap ?(memory : memory option) (env : EcEnv.env) ((cpath, g1) : pcodegap) : codegap =
+  (trans_codepos_path ?memory env cpath, trans_codegap1 ?memory env g1)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap1_range ?(memory : memory option) (env : EcEnv.env) ((g1, g2) : pcodegap1_range) : codegap1_range =
+  (trans_codegap1 ?memory env g1, trans_codegap1 ?memory env g2)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap_range ?(memory : memory option) (env : EcEnv.env) ((cpath, gr) : pcodegap_range) : codegap_range =
+  (trans_codepos_path ?memory env cpath, trans_codegap1_range ?memory env gr)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap_offset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodegap_offset1) : codegap_offset1 =
   match o with
-  | `ByOffset   i -> `ByOffset i
-  | `ByPosition p -> `ByPosition (trans_codepos1 ?memory env p)
+  | PGapRelative i -> GapRelative i
+  | PGapAbsolute g -> GapAbsolute (trans_codegap1 ?memory env g)
+
+(* -------------------------------------------------------------------- *)
+and trans_dcodegap1 ?(memory : memory option) (env : EcEnv.env) (p : pcodegap1 doption) : codegap1 doption =
+  DOption.map (trans_codegap1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

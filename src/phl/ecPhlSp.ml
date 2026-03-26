@@ -301,7 +301,9 @@ let t_sp_side pos tc =
 let t_sp = FApi.t_low1 "sp" t_sp_side
 
 (* -------------------------------------------------------------------- *)
-let process_sp (cpos : pcodepos1 doption option) (tc : tcenv1) =
+(* [process_sp gap]: splits the statement at [gap]; instructions after the
+   gap are kept, sp is applied to instructions before the gap. *)
+let process_sp (cpos : pcodegap1 doption option) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
-  let cpos = Option.map (EcTyping.trans_dcodepos1 env) cpos in
+  let cpos = Option.map (EcTyping.trans_dcodegap1 env) cpos in
   t_sp cpos tc

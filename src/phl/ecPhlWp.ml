@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcPath
 open EcAst
 open EcModules
@@ -7,6 +8,7 @@ open EcFol
 
 open EcCoreGoal
 open EcLowPhlGoal
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
@@ -162,7 +164,9 @@ module TacInternal = struct
     if EcUtils.is_some i && not (List.is_empty rm) then
       tc_error !!tc "remaining %i instruction(s)" (List.length rm)
 
-  let t_hoare_wp ?(uselet=true) i tc =
+  (* [t_hoare_wp gap]: splits the statement at [gap]; instructions before the
+     gap are kept, wp is applied to instructions after the gap. *)
+  let t_hoare_wp ?(uselet=true) (i : codegap1 option) tc =
     let hyps = FApi.tc1_hyps tc in
     let env = EcEnv.LDecl.toenv hyps in
     let hs = tc1_as_hoareS tc in
@@ -177,7 +181,7 @@ module TacInternal = struct
     let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_ehoare_wp ?(uselet=true) i tc =
+  let t_ehoare_wp ?(uselet=true) (i : codegap1 option) tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_ehoareS tc in
     let (s_hd, s_wp) = o_split env i hs.ehs_s in
@@ -189,7 +193,7 @@ module TacInternal = struct
     let concl = f_eHoareS (snd hs.ehs_m) (ehs_pr hs) s {m;inv=post} in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_bdhoare_wp ?(uselet=true) i tc =
+  let t_bdhoare_wp ?(uselet=true) (i : codegap1 option) tc =
     let hyps = FApi.tc1_hyps tc in
     let env = EcEnv.LDecl.toenv hyps in
     let bhs = tc1_as_bdhoareS tc in
@@ -204,7 +208,7 @@ module TacInternal = struct
     let concl = f_bdHoareS (snd bhs.bhs_m) (bhs_pr bhs) s {m;inv=post} bhs.bhs_cmp (bhs_bd bhs) in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_equiv_wp ?(uselet=true) ij tc =
+  let t_equiv_wp ?(uselet=true) (ij : (codegap1 * codegap1) option) tc =
     let hyps = FApi.tc1_hyps tc in
     let env = EcEnv.LDecl.toenv hyps in
     let es = tc1_as_equivS tc in
@@ -253,7 +257,9 @@ let t_wp_r ?(uselet=true) k g =
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
 
 (* -------------------------------------------------------------------- *)
-let process_wp pos tc =
-  let pos =
-    Option.map (EcTyping.trans_dcodepos1 (FApi.tc1_env tc)) pos
-  in t_wp pos tc
+(* [process_wp gap]: splits the statement at [gap]; instructions before the
+   gap are kept, wp is applied to instructions after the gap. *)
+let process_wp (cpos : pcodegap1 doption option) tc =
+  let env = (FApi.tc1_env tc) in
+  let cpos = Option.map (EcTyping.trans_dcodegap1 env) cpos in
+  t_wp cpos tc
