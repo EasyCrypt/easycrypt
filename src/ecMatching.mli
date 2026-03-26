@@ -413,6 +413,10 @@ module FPosition : sig
 
   val filter : occ -> ptnpos -> ptnpos
 
+  val path_of_singleton_occurence : ptnpos -> int list
+
+  val first_selected_subform : ptnpos -> form -> form
+
   val map : ptnpos -> (form -> form) -> form -> form
 
   val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form

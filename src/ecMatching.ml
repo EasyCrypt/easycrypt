@@ -1586,6 +1586,36 @@ module FPosition = struct
     end
 
   (* ------------------------------------------------------------------ *)
+  let path_of_singleton_occurence (p : ptnpos) =
+    let rec aux acc (p : ptnpos) =
+      assert (Mint.cardinal p = 1);
+
+      let i, p = Mint.choose p in
+
+      match p with
+      | `Select _ -> List.rev (i :: acc)
+      | `Sub p    -> aux (i :: acc) p
+    in
+
+    assert (Mint.cardinal p = 1);
+
+    let i, p = Mint.choose p in
+    assert (i = 0);
+
+    match p with
+    | `Select _ -> []
+    | `Sub p    -> aux [] p
+
+  (* ------------------------------------------------------------------ *)
+  let first_selected_subform (p : ptnpos) (f : form) =
+    let exception Found of form in
+
+    try
+      ignore (map p (fun fp -> raise (Found fp)) f);
+      raise InvalidPosition
+    with Found fp -> fp
+
+  (* ------------------------------------------------------------------ *)
   let topattern ?x (p : ptnpos) (f : form) =
     let x = match x with None -> EcIdent.create "_p" | Some x -> x in
     let tx fp = f_local x fp.f_ty in (x, map p tx f)
