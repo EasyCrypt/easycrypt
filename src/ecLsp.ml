@@ -256,6 +256,39 @@ let json_of_proof_response
 let json_of_query_response (output : string) : Json.t =
   `Assoc [ ("output", `String output) ]
 
+let json_of_proof_result (result : EcProofCore.proof_response) : Json.t =
+  let sentence_start, sentence_end =
+    match result.sentence_start, result.sentence_end with
+    | Some start_, Some end_ -> (`Int start_, `Int end_)
+    | _ -> (`Null, `Null)
+  in
+  `Assoc
+    [ ("output", `String result.output)
+    ; ("uuid", `Int result.uuid)
+    ; ("mode", `String result.mode)
+    ; ("processedEnd", `Int result.processed_end)
+    ; ("sentenceStart", sentence_start)
+    ; ("sentenceEnd", sentence_end)
+    ]
+
+let json_of_query_result (result : EcProofCore.query_response) : Json.t =
+  json_of_query_response result.output
+
+let core_position_of_lsp (pos : Lsp.Types.Position.t) : EcProofCore.position =
+  { EcProofCore.line = pos.line; character = pos.character }
+
+let core_change_of_lsp
+    (change : Lsp.Types.TextDocumentContentChangeEvent.t) : EcProofCore.text_change =
+  let range =
+    Option.map
+      (fun range ->
+         { EcProofCore.start_ = core_position_of_lsp range.Lsp.Types.Range.start
+         ; end_ = core_position_of_lsp range.Lsp.Types.Range.end_
+         })
+      change.Lsp.Types.TextDocumentContentChangeEvent.range
+  in
+  { EcProofCore.range; text = change.Lsp.Types.TextDocumentContentChangeEvent.text }
+
 let rstrip (s : string) : string =
   let rec find i =
     if i < 0 then
@@ -427,21 +460,12 @@ let run () : unit =
       | prog :: _ -> prog
       | [] -> Easycrypt_cli.default_cli_path ()
     in
-    let cfg : Easycrypt_cli.config = { cli_path; cli_args = [] } in
+    let proof = EcProofCore.create ~log:(fun msg -> log "%s" msg) ~cli_path ~cli_args:[] () in
     let ic = Lwt_io.of_fd ~mode:Lwt_io.input Lwt_unix.stdin in
     let oc = Lwt_io.of_fd ~mode:Lwt_io.output Lwt_unix.stdout in
     let shutdown = ref false in
     let pending : (Jsonrpc.Id.t * proof_command) Queue.t = Queue.create () in
     let current : unit Lwt.t option ref = ref None in
-
-    let get_session_for_doc (doc : doc_state) : Easycrypt_cli.session Lwt.t =
-      match doc.session with
-      | Some sess -> Lwt.return sess
-      | None ->
-          let* sess = Easycrypt_cli.start_session cfg in
-          doc.session <- Some sess;
-          Lwt.return sess
-    in
 
     let handle_initialize id (params : Lsp.Types.InitializeParams.t) : unit Lwt.t =
       log "initialize";
@@ -456,165 +480,51 @@ let run () : unit =
 
     let handle_proof_next id uri : unit Lwt.t =
       log "proof next";
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      match find_next_sentence doc.text doc.last_offset with
-      | None ->
-          send_response oc id (json_of_proof_response ~sess ~doc sess.last_output)
-      | Some (_text, start, end_) ->
-          send_response oc id (json_of_proof_response ~sess ~doc ~sentence:(start, end_) sess.last_output)
+      let* result = EcProofCore.proof_next proof ~uri in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_proof_exec id uri : unit Lwt.t =
       log "proof exec";
-      let doc = get_doc_state uri in
-      match find_next_sentence doc.text doc.last_offset with
-      | None ->
-          let* sess = get_session_for_doc doc in
-          send_response oc id (json_of_proof_response ~sess ~doc sess.last_output)
-      | Some (text, start, end_) ->
-          let previous_offset = doc.last_offset in
-          let rec run ~retry =
-            let* sess = get_session_for_doc doc in
-            Lwt.catch
-              (fun () ->
-                 let* output = Easycrypt_cli.send_command sess text in
-                 Lwt.return (sess, output))
-              (function
-                | Sys_error msg
-                  when retry && String.lowercase_ascii msg = "broken pipe" ->
-                    log "cli broken pipe; restarting session";
-                    doc.session <- None;
-                    run ~retry:false
-                | e -> Lwt.fail e)
-          in
-          Lwt.catch
-            (fun () ->
-               let* sess, output = run ~retry:true in
-               if output_has_error output then (
-                 doc.last_offset <- previous_offset;
-                 send_response oc id
-                   (json_of_proof_response ~sess ~doc ~sentence:(start, end_) output))
-               else (
-                 doc.last_offset <- end_;
-                 doc.history <- doc.history @ [ (doc.last_offset, sess.uuid) ];
-                 send_response oc id
-                   (json_of_proof_response ~sess ~doc ~sentence:(start, end_) output)))
-            (fun e ->
-               log "proof exec error: %s" (Printexc.to_string e);
-               send_error oc id Jsonrpc.Response.Error.Code.InternalError "proof exec failed")
+      let* result = EcProofCore.proof_step proof ~uri in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_proof_jump id uri target : unit Lwt.t =
       log "proof jump";
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      let text_len = BatText.length doc.text in
-      let target = max 0 (min target text_len) in
-      let respond ?sentence output =
-        send_response oc id (json_of_proof_response ~sess ~doc ?sentence output)
-      in
-      if target < doc.last_offset then (
-        let rec last_before acc = function
-          | [] -> acc
-          | (offset, uuid) :: rest ->
-              let acc = if offset <= target then Some (offset, uuid) else acc in
-              last_before acc rest
-        in
-        let target_entry = last_before None doc.history in
-        let target_uuid, new_offset =
-          match target_entry with
-          | None -> sess.root_uuid, 0
-          | Some (offset, uuid) -> uuid, offset
-        in
-        doc.history <- List.filter (fun (offset, _) -> offset <= new_offset) doc.history;
-        doc.last_offset <- new_offset;
-        let* output = Easycrypt_cli.send_undo sess target_uuid in
-        respond output)
-      else if target = doc.last_offset then
-        respond sess.last_output
-      else (
-        let rec loop last_output =
-          if doc.last_offset >= target then
-            respond last_output
-          else
-            match find_next_sentence doc.text doc.last_offset with
-            | None -> respond last_output
-            | Some (text, start, end_) ->
-                if end_ > target then
-                  respond last_output
-                else
-                  let previous_offset = doc.last_offset in
-                  let* output = Easycrypt_cli.send_command sess text in
-                  if output_has_error output then (
-                    doc.last_offset <- previous_offset;
-                    respond ~sentence:(start, end_) output)
-                  else (
-                    doc.last_offset <- end_;
-                    doc.history <- doc.history @ [ (doc.last_offset, sess.uuid) ];
-                    loop output)
-        in
-        loop sess.last_output)
+      let* result = EcProofCore.proof_jump_to proof ~uri ~target in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_proof_back id uri : unit Lwt.t =
       log "proof back";
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      match List.rev doc.history with
-      | [] ->
-          send_response oc id (json_of_proof_response ~sess ~doc sess.last_output)
-      | _last :: rest_rev ->
-          let target_uuid, new_offset =
-            match rest_rev with
-            | [] -> sess.root_uuid, 0
-            | (offset, uuid) :: _ -> uuid, offset
-          in
-          let* output = Easycrypt_cli.send_undo sess target_uuid in
-          doc.history <- List.rev rest_rev;
-          doc.last_offset <- new_offset;
-          send_response oc id (json_of_proof_response ~sess ~doc output)
+      let* result = EcProofCore.proof_back proof ~uri in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_proof_restart id uri : unit Lwt.t =
       log "proof restart";
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      let* output = Easycrypt_cli.send_undo sess sess.root_uuid in
-      doc.history <- [];
-      doc.last_offset <- 0;
-      send_response oc id (json_of_proof_response ~sess ~doc output)
+      let* result = EcProofCore.proof_restart proof ~uri in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_proof_goals id uri : unit Lwt.t =
       log "proof goals";
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      send_response oc id (json_of_proof_response ~sess ~doc sess.last_output)
-    in
-
-    let normalize_query_command keyword query =
-      let query = String.trim query in
-      if query = "" then
-        invalid_arg "empty query"
-      else
-        let query =
-          if String.ends_with ~suffix:"." query then
-            String.sub query 0 (String.length query - 1)
-          else
-            query
-        in
-        Printf.sprintf "%s %s." keyword query
+      let* result = EcProofCore.proof_goals proof ~uri in
+      send_response oc id (json_of_proof_result result)
     in
 
     let handle_query id uri keyword query : unit Lwt.t =
       log "query %s" keyword;
-      let doc = get_doc_state uri in
-      let* sess = get_session_for_doc doc in
-      let command = normalize_query_command keyword query in
-      let* output = Easycrypt_cli.send_command ~record_last_output:false sess command in
-      let output = strip_trailing_goal output sess.last_output in
-      send_response oc id (json_of_query_response output)
+      let kind =
+        match keyword with
+        | "print" -> `Print
+        | "locate" -> `Locate
+        | "search" -> `Search
+        | _ -> invalid_arg "unknown query kind"
+      in
+      let* result = EcProofCore.query proof ~uri ~kind ~query in
+      send_response oc id (json_of_query_result result)
     in
 
     let execute_proof_command (id : Jsonrpc.Id.t) (cmd : proof_command) : unit Lwt.t =
@@ -685,48 +595,25 @@ let run () : unit =
                 Lsp.Types.DocumentUri.to_string
                   params.Lsp.Types.DidOpenTextDocumentParams.textDocument.uri
               in
-              let doc = get_doc_state uri in
-              doc.text <- BatText.of_string params.Lsp.Types.DidOpenTextDocumentParams.textDocument.text;
-              doc.last_offset <- 0;
-              doc.history <- [];
-              doc.session <- None;
+              EcProofCore.did_open proof ~uri
+                ~text:params.Lsp.Types.DidOpenTextDocumentParams.textDocument.text;
               Lwt.return_unit
           | Lsp.Client_notification.TextDocumentDidChange params ->
               let uri =
                 Lsp.Types.DocumentUri.to_string
                   params.Lsp.Types.DidChangeTextDocumentParams.textDocument.uri
               in
-              let doc = get_doc_state uri in
-              let earliest = ref max_int in
-              let updated = ref doc.text in
-              List.iter
-                (fun change ->
-                   let text, start_offset = apply_change !updated change in
-                   updated := text;
-                   if start_offset < !earliest then earliest := start_offset)
-                params.Lsp.Types.DidChangeTextDocumentParams.contentChanges;
-              doc.text <- !updated;
-              if !earliest < doc.last_offset then
-                let* sess = get_session_for_doc doc in
-                let* _ = rewind_to_offset doc sess !earliest in
-                Lwt.return_unit
-              else
-                Lwt.return_unit
+              let changes =
+                List.map core_change_of_lsp
+                  params.Lsp.Types.DidChangeTextDocumentParams.contentChanges
+              in
+              EcProofCore.did_change proof ~uri changes
           | Lsp.Client_notification.TextDocumentDidClose params ->
               let uri =
                 Lsp.Types.DocumentUri.to_string
                   params.Lsp.Types.DidCloseTextDocumentParams.textDocument.uri
               in
-              let* () =
-                match Hashtbl.find_opt doc_states uri with
-                | Some doc -> (
-                    match doc.session with
-                    | Some sess -> Easycrypt_cli.stop_session sess
-                    | None -> Lwt.return_unit)
-                | None -> Lwt.return_unit
-              in
-              Hashtbl.remove doc_states uri;
-              Lwt.return_unit
+              EcProofCore.did_close proof ~uri
           | _ -> Lwt.return_unit)
     in
 
@@ -770,7 +657,8 @@ let run () : unit =
               | Jsonrpc.Packet.Response _ -> Lwt.return_unit
               | Jsonrpc.Packet.Batch_response _ -> Lwt.return_unit
             in
-            loop ()
+      let* () = loop () in
+      EcProofCore.close proof
     in
     loop ()
   in
