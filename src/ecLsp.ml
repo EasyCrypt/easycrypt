@@ -132,7 +132,7 @@ module Easycrypt_cli = struct
     let* _initial_output = read_until_prompt sess in
     Lwt.return { sess with root_uuid = sess.uuid }
 
-  let send_command (sess : session) (text : string) : string Lwt.t =
+  let send_command ?(record_last_output = true) (sess : session) (text : string) : string Lwt.t =
     log "cli> %s" (String.trim text);
     let write =
       if String.ends_with ~suffix:"\n" text then
@@ -143,7 +143,8 @@ module Easycrypt_cli = struct
     let* () = write in
     let* () = Lwt_io.flush sess.proc#stdin in
     let* output = read_until_prompt sess in
-    sess.last_output <- output;
+    if record_last_output then
+      sess.last_output <- output;
     let preview =
       if String.length output = 0 then "<empty>"
       else if String.length output <= 200 then String.escaped output
@@ -252,6 +253,32 @@ let json_of_proof_response
     ; ("sentenceEnd", sentence_end)
     ]
 
+let json_of_query_response (output : string) : Json.t =
+  `Assoc [ ("output", `String output) ]
+
+let rstrip (s : string) : string =
+  let rec find i =
+    if i < 0 then
+      -1
+    else
+      match s.[i] with
+      | ' ' | '\t' | '\r' | '\n' -> find (i - 1)
+      | _ -> i
+  in
+  let last = find (String.length s - 1) in
+  if last < 0 then "" else String.sub s 0 (last + 1)
+
+let strip_trailing_goal (output : string) (goal : string) : string =
+  let output_trimmed = rstrip output in
+  let goal_trimmed = rstrip goal in
+  if goal_trimmed = "" || output_trimmed = goal_trimmed then
+    output_trimmed
+  else if String.ends_with ~suffix:goal_trimmed output_trimmed then
+    let prefix_len = String.length output_trimmed - String.length goal_trimmed in
+    rstrip (String.sub output_trimmed 0 prefix_len)
+  else
+    output_trimmed
+
 type proof_command_kind =
   | Proof_next
   | Proof_step
@@ -259,6 +286,9 @@ type proof_command_kind =
   | Proof_back
   | Proof_restart
   | Proof_goals
+  | Query_print of string
+  | Query_locate of string
+  | Query_search of string
 
 type proof_command =
   { uri : string
@@ -270,6 +300,11 @@ let proof_command_of_request (meth : string) (params : Json.t option) :
   let get_uri json =
     match J.member "uri" json with
     | `String uri -> uri
+    | _ -> ""
+  in
+  let get_query json =
+    match J.member "query" json with
+    | `String query -> String.trim query
     | _ -> ""
   in
   match meth, params with
@@ -297,6 +332,27 @@ let proof_command_of_request (meth : string) (params : Json.t option) :
     | "easycrypt/proof/goals", Some (`Assoc _ as json) ->
         let uri = get_uri json in
         if uri = "" then Error "missing uri" else Ok { uri; cmd = Proof_goals }
+    | "easycrypt/query/print", Some (`Assoc _ as json) ->
+        let uri = get_uri json in
+        let query = get_query json in
+        if uri = "" || query = "" then
+          Error "missing uri or query"
+        else
+          Ok { uri; cmd = Query_print query }
+    | "easycrypt/query/locate", Some (`Assoc _ as json) ->
+        let uri = get_uri json in
+        let query = get_query json in
+        if uri = "" || query = "" then
+          Error "missing uri or query"
+        else
+          Ok { uri; cmd = Query_locate query }
+    | "easycrypt/query/search", Some (`Assoc _ as json) ->
+        let uri = get_uri json in
+        let query = get_query json in
+        if uri = "" || query = "" then
+          Error "missing uri or query"
+        else
+          Ok { uri; cmd = Query_search query }
     | _ -> Error "Method not found"
 
 let rewind_to_offset
@@ -537,6 +593,30 @@ let run () : unit =
       send_response oc id (json_of_proof_response ~sess ~doc sess.last_output)
     in
 
+    let normalize_query_command keyword query =
+      let query = String.trim query in
+      if query = "" then
+        invalid_arg "empty query"
+      else
+        let query =
+          if String.ends_with ~suffix:"." query then
+            String.sub query 0 (String.length query - 1)
+          else
+            query
+        in
+        Printf.sprintf "%s %s." keyword query
+    in
+
+    let handle_query id uri keyword query : unit Lwt.t =
+      log "query %s" keyword;
+      let doc = get_doc_state uri in
+      let* sess = get_session_for_doc doc in
+      let command = normalize_query_command keyword query in
+      let* output = Easycrypt_cli.send_command ~record_last_output:false sess command in
+      let output = strip_trailing_goal output sess.last_output in
+      send_response oc id (json_of_query_response output)
+    in
+
     let execute_proof_command (id : Jsonrpc.Id.t) (cmd : proof_command) : unit Lwt.t =
       match cmd.cmd with
       | Proof_next -> handle_proof_next id cmd.uri
@@ -545,6 +625,9 @@ let run () : unit =
       | Proof_back -> handle_proof_back id cmd.uri
       | Proof_restart -> handle_proof_restart id cmd.uri
       | Proof_goals -> handle_proof_goals id cmd.uri
+      | Query_print query -> handle_query id cmd.uri "print" query
+      | Query_locate query -> handle_query id cmd.uri "locate" query
+      | Query_search query -> handle_query id cmd.uri "search" query
     in
 
     let start_proof (id : Jsonrpc.Id.t) (cmd : proof_command) : unit Lwt.t =

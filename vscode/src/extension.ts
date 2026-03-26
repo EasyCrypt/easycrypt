@@ -18,6 +18,10 @@ type ProofResponse = {
   sentenceEnd?: number | null;
 };
 
+type QueryResponse = {
+  output: string;
+};
+
 type DocState = {
   lastOffset: number;
 };
@@ -27,6 +31,10 @@ let clientReady: Promise<void> | undefined;
 let clientOptions: LanguageClientOptions | undefined;
 let serverOptions: ServerOptions | undefined;
 let goalsPanel: vscode.WebviewPanel | undefined;
+let queryPanel: vscode.WebviewPanel | undefined;
+let queryStatusBarItem: vscode.StatusBarItem | undefined;
+let printStatusBarItem: vscode.StatusBarItem | undefined;
+let locateStatusBarItem: vscode.StatusBarItem | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
 let traceLevel: Trace = Trace.Off;
 let lspCommand: string | undefined;
@@ -61,21 +69,50 @@ function escapeHtml(value: string): string {
 }
 
 function showGoals(output: string): void {
-  if (!goalsPanel) {
-    goalsPanel = vscode.window.createWebviewPanel(
-      'easycryptGoals',
-      'EasyCrypt Goals',
+  showTextPanel('easycryptGoals', 'EasyCrypt Goals', output, {
+    panel: goalsPanel,
+    setPanel: (panel) => {
+      goalsPanel = panel;
+    }
+  });
+}
+
+function showQueryResult(title: string, output: string): void {
+  showTextPanel('easycryptQuery', title, output, {
+    panel: queryPanel,
+    setPanel: (panel) => {
+      queryPanel = panel;
+    }
+  });
+}
+
+function showTextPanel(
+  viewType: string,
+  title: string,
+  output: string,
+  holder: {
+    panel: vscode.WebviewPanel | undefined;
+    setPanel: (panel: vscode.WebviewPanel | undefined) => void;
+  }
+): void {
+  let panel = holder.panel;
+  if (!panel) {
+    panel = vscode.window.createWebviewPanel(
+      viewType,
+      title,
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
       { enableFindWidget: true }
     );
-    goalsPanel.onDidDispose(() => {
-      goalsPanel = undefined;
+    panel.onDidDispose(() => {
+      holder.setPanel(undefined);
     });
+    holder.setPanel(panel);
   } else {
-    goalsPanel.reveal(goalsPanel.viewColumn, true);
+    panel.title = title;
+    panel.reveal(panel.viewColumn, true);
   }
 
-  goalsPanel.webview.html = `<!DOCTYPE html>
+  panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -89,6 +126,229 @@ function showGoals(output: string): void {
 <pre>${escapeHtml(output)}</pre>
 </body>
 </html>`;
+}
+
+async function restoreEditorFocus(editor: vscode.TextEditor | undefined): Promise<void> {
+  if (!editor) {
+    return;
+  }
+  await vscode.window.showTextDocument(editor.document, {
+    viewColumn: editor.viewColumn,
+    preserveFocus: false,
+    selection: editor.selection
+  });
+}
+
+function getQuerySeed(editor: vscode.TextEditor): string {
+  const selection = editor.document.getText(editor.selection).trim();
+  if (selection.length > 0) {
+    return selection;
+  }
+  const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
+  if (!wordRange) {
+    return '';
+  }
+  return editor.document.getText(wordRange).trim();
+}
+
+async function promptQuery(
+  editor: vscode.TextEditor,
+  kind: 'print' | 'locate' | 'search'
+): Promise<string | undefined> {
+  return vscode.window.showInputBox({
+    title: `EasyCrypt ${kind}`,
+    prompt: `Enter an EasyCrypt ${kind} query`,
+    value: getQuerySeed(editor),
+    ignoreFocusOut: true
+  });
+}
+
+async function executeQuery(
+  editor: vscode.TextEditor,
+  method: 'easycrypt/query/print' | 'easycrypt/query/locate' | 'easycrypt/query/search',
+  kind: 'print' | 'locate' | 'search',
+  title: string,
+  query: string
+): Promise<void> {
+  try {
+    outputChannel?.appendLine(`[query] ${kind} ${query}`);
+    const result = await requestProof<QueryResponse>(method, {
+      uri: editor.document.uri.toString(),
+      query
+    });
+    if (outputHasError(result.output)) {
+      handleQueryError(title, result.output, editor);
+      await restoreEditorFocus(editor);
+      return;
+    }
+    showQueryResult(title, result.output.trim().length > 0 ? result.output : 'No output.');
+    await restoreEditorFocus(editor);
+  } catch (err) {
+    outputChannel?.appendLine(`[query] ${kind} failed ${String(err)}`);
+    vscode.window.showErrorMessage(`EasyCrypt ${kind} failed: ${String(err)}`);
+  } finally {
+    refreshQueryStatusBar(editor);
+  }
+}
+
+async function runQuery(
+  method: 'easycrypt/query/print' | 'easycrypt/query/locate' | 'easycrypt/query/search',
+  kind: 'print' | 'locate' | 'search',
+  title: string
+): Promise<void> {
+  const editor = getEditorForCommand();
+  if (!editor) {
+    vscode.window.showInformationMessage('EasyCrypt: no active EasyCrypt editor.');
+    return;
+  }
+
+  const query = (await promptQuery(editor, kind))?.trim();
+  if (!query) {
+    return;
+  }
+
+  await executeQuery(editor, method, kind, title, query);
+}
+
+async function handlePrintQuery(): Promise<void> {
+  await runQuery('easycrypt/query/print', 'print', 'EasyCrypt Print');
+}
+
+async function handleLocateQuery(): Promise<void> {
+  await runQuery('easycrypt/query/locate', 'locate', 'EasyCrypt Locate');
+}
+
+async function handleSearchQuery(): Promise<void> {
+  await runQuery('easycrypt/query/search', 'search', 'EasyCrypt Search');
+}
+
+async function handleLocateCurrentQuery(): Promise<void> {
+  const editor = getEditorForCommand();
+  if (!editor || editor.document.languageId !== 'easycrypt') {
+    return;
+  }
+  const query = getQuerySeed(editor);
+  if (!query) {
+    return;
+  }
+  await executeQuery(
+    editor,
+    'easycrypt/query/locate',
+    'locate',
+    `EasyCrypt Locate: ${query}`,
+    query
+  );
+}
+
+async function handlePrintCurrentQuery(): Promise<void> {
+  const editor = getEditorForCommand();
+  if (!editor || editor.document.languageId !== 'easycrypt') {
+    return;
+  }
+  const query = getQuerySeed(editor);
+  if (!query) {
+    return;
+  }
+  await executeQuery(
+    editor,
+    'easycrypt/query/print',
+    'print',
+    `EasyCrypt Print: ${query}`,
+    query
+  );
+}
+
+async function handleQueryStatusBar(): Promise<void> {
+  const editor = getEditorForCommand();
+  if (!editor || editor.document.languageId !== 'easycrypt') {
+    return;
+  }
+
+  const selection = await vscode.window.showQuickPick(
+    [
+      {
+        label: '$(symbol-key) Print Object',
+        command: 'easycrypt.query.print'
+      },
+      {
+        label: '$(symbol-file) Locate Object',
+        command: 'easycrypt.query.locate'
+      },
+      {
+        label: '$(search) Search Objects',
+        command: 'easycrypt.query.search'
+      }
+    ],
+    {
+      title: 'EasyCrypt Query',
+      placeHolder: 'Choose a query command'
+    }
+  );
+
+  if (!selection) {
+    return;
+  }
+
+  await vscode.commands.executeCommand(selection.command);
+}
+
+function updateQueryStatusBar(editor: vscode.TextEditor | undefined): void {
+  if (!queryStatusBarItem) {
+    return;
+  }
+  if (getStatusBarEditor(editor)) {
+    queryStatusBarItem.show();
+  } else {
+    queryStatusBarItem.hide();
+  }
+}
+
+function updateLocateStatusBar(editor: vscode.TextEditor | undefined): void {
+  if (!locateStatusBarItem) {
+    return;
+  }
+  const targetEditor = getStatusBarEditor(editor);
+  if (!targetEditor) {
+    locateStatusBarItem.hide();
+    return;
+  }
+
+  const query = getQuerySeed(targetEditor);
+  if (!query) {
+    locateStatusBarItem.hide();
+    return;
+  }
+
+  locateStatusBarItem.text = '$(symbol-file) Locate';
+  locateStatusBarItem.tooltip = `EasyCrypt: locate ${query}`;
+  locateStatusBarItem.show();
+}
+
+function updatePrintStatusBar(editor: vscode.TextEditor | undefined): void {
+  if (!printStatusBarItem) {
+    return;
+  }
+  const targetEditor = getStatusBarEditor(editor);
+  if (!targetEditor) {
+    printStatusBarItem.hide();
+    return;
+  }
+
+  const query = getQuerySeed(targetEditor);
+  if (!query) {
+    printStatusBarItem.hide();
+    return;
+  }
+
+  printStatusBarItem.text = '$(symbol-key) Print';
+  printStatusBarItem.tooltip = `EasyCrypt: print ${query}`;
+  printStatusBarItem.show();
+}
+
+function refreshQueryStatusBar(editor: vscode.TextEditor | undefined): void {
+  updateQueryStatusBar(editor);
+  updatePrintStatusBar(editor);
+  updateLocateStatusBar(editor);
 }
 
 function updateProcessedDecoration(editor: vscode.TextEditor | undefined): void {
@@ -160,6 +420,14 @@ function showGoalsOrError(output: string): void {
   }
 }
 
+function showQueryResultOrError(title: string, output: string): void {
+  if (output.trim().length > 0) {
+    showQueryResult(title, output);
+  } else {
+    showQueryResult(title, 'EasyCrypt reported an error.');
+  }
+}
+
 function parseErrorTag(output: string): { start: number; end: number; message: string } | undefined {
   const match = output.match(/\[error-(\d+)-(\d+)\]/);
   if (!match) {
@@ -221,6 +489,23 @@ function handleProofError(
   }
 }
 
+function handleQueryError(
+  title: string,
+  output: string,
+  editor: vscode.TextEditor | undefined
+): void {
+  const parsed = parseErrorTag(output);
+  clearErrorDecoration(editor);
+  if (editor) {
+    clearDiagnostics(editor.document);
+  }
+  if (parsed) {
+    showQueryResult(title, parsed.message);
+  } else {
+    showQueryResultOrError(title, output.replace(/\[error-\d+-\d+\]/g, '').trim());
+  }
+}
+
 function getEditorForCommand(): vscode.TextEditor | undefined {
   const active = vscode.window.activeTextEditor;
   if (active && active.document.languageId === 'easycrypt') {
@@ -229,7 +514,20 @@ function getEditorForCommand(): vscode.TextEditor | undefined {
   return lastEasyCryptEditor;
 }
 
-async function requestProof(method: string, params: Record<string, unknown>): Promise<ProofResponse> {
+function getStatusBarEditor(editor: vscode.TextEditor | undefined): vscode.TextEditor | undefined {
+  if (editor && editor.document.languageId === 'easycrypt') {
+    return editor;
+  }
+  if (lastEasyCryptEditor?.document.languageId === 'easycrypt') {
+    return lastEasyCryptEditor;
+  }
+  return undefined;
+}
+
+async function requestProof<T = ProofResponse>(
+  method: string,
+  params: Record<string, unknown>
+): Promise<T> {
   if (!client) {
     throw new Error('EasyCrypt language client is not running.');
   }
@@ -242,7 +540,7 @@ async function requestProof(method: string, params: Record<string, unknown>): Pr
     outputChannel?.appendLine(`[proof] waiting ${method} >3s`);
   }, 3000);
   try {
-    const result = await client.sendRequest<ProofResponse>(method, params);
+    const result = await client.sendRequest<T>(method, params);
     const elapsed = Date.now() - start;
     outputChannel?.appendLine(`[proof] response ${method} ${elapsed}ms`);
     return result;
@@ -298,6 +596,7 @@ async function handleStep(): Promise<void> {
     state.lastOffset = result.processedEnd;
     if (outputHasError(result.output)) {
       outputChannel?.appendLine(`[proof] step reported error ${result.output}`);
+      updateProcessedDecoration(editor);
       if (result.sentenceStart != null) {
         handleProofError(result.output, editor, result.sentenceStart);
       } else {
@@ -338,6 +637,7 @@ async function handleSendRegion(): Promise<void> {
     state.lastOffset = result.processedEnd;
     if (outputHasError(result.output)) {
       outputChannel?.appendLine(`[proof] jumpToCursor reported error ${result.output}`);
+      updateProcessedDecoration(editor);
       if (result.sentenceStart != null) {
         handleProofError(result.output, editor, result.sentenceStart);
       } else {
@@ -516,6 +816,17 @@ async function restartClient(): Promise<void> {
 export function activate(context: vscode.ExtensionContext): void {
   outputChannel = vscode.window.createOutputChannel('EasyCrypt');
   context.subscriptions.push(outputChannel);
+  queryStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  queryStatusBarItem.text = '$(symbol-namespace) EasyCrypt';
+  queryStatusBarItem.tooltip = 'EasyCrypt query commands';
+  queryStatusBarItem.command = 'easycrypt.query.statusBar';
+  context.subscriptions.push(queryStatusBarItem);
+  printStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+  printStatusBarItem.command = 'easycrypt.query.printCurrent';
+  context.subscriptions.push(printStatusBarItem);
+  locateStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+  locateStatusBarItem.command = 'easycrypt.query.locateCurrent';
+  context.subscriptions.push(locateStatusBarItem);
   processedDecoration = vscode.window.createTextEditorDecorationType({
     backgroundColor: 'rgba(120, 140, 180, 0.18)',
     isWholeLine: false,
@@ -605,6 +916,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('easycrypt.proof.restart', handleRestart),
     vscode.commands.registerCommand('easycrypt.proof.jumpToCursor', handleSendRegion),
     vscode.commands.registerCommand('easycrypt.proof.goals', handleGoals),
+    vscode.commands.registerCommand('easycrypt.query.print', handlePrintQuery),
+    vscode.commands.registerCommand('easycrypt.query.locate', handleLocateQuery),
+    vscode.commands.registerCommand('easycrypt.query.search', handleSearchQuery),
+    vscode.commands.registerCommand('easycrypt.query.statusBar', handleQueryStatusBar),
+    vscode.commands.registerCommand('easycrypt.query.printCurrent', handlePrintCurrentQuery),
+    vscode.commands.registerCommand('easycrypt.query.locateCurrent', handleLocateCurrentQuery),
     vscode.commands.registerCommand('easycrypt.lsp.restart', restartClient)
   );
 
@@ -673,6 +990,7 @@ export function activate(context: vscode.ExtensionContext): void {
       lastEasyCryptEditor = editor;
     }
     updateProcessedDecoration(editor);
+    refreshQueryStatusBar(editor);
     clearErrorDecoration(editor);
     if (editor) {
       clearDiagnostics(editor.document);
@@ -680,6 +998,12 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   updateEditorState(vscode.window.activeTextEditor);
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection((event) => {
+      refreshQueryStatusBar(event.textEditor);
+    })
+  );
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
