@@ -162,6 +162,15 @@ val zpr_pv :
   -> PV.t
 
 (* -------------------------------------------------------------------- *)
+val zpr_pv :
+     [ `Read | `Write ]
+  -> [ `Before | `After ]
+  -> env
+  -> PV.t
+  -> EcMatching.Zipper.spath
+  -> PV.t
+
+(* -------------------------------------------------------------------- *)
 type pmvs = PV.t EcIdent.Mid.t
 
 module PMVS : sig
