@@ -14,6 +14,8 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+(* [t_hoare_seq_r gap phi]: splits the statement at [gap]; the first
+   subgoal covers instructions before the gap, the second after. *)
 let t_hoare_seq_r i phi tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
@@ -132,13 +134,13 @@ let t_equiv_seq_onesided side i pre post tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let (ml, mr) = fst es.es_ml, fst es.es_mr in
-  let s, s', p', q' =
+  let s, _s', p', q' =
     match side with
-    | `Left  -> 
+    | `Left  ->
       let p' = ss_inv_generalize_as_left pre ml mr in
       let q' = ss_inv_generalize_as_left post ml mr in
       es.es_sl, es.es_sr, p', q'
-    | `Right -> 
+    | `Right ->
       let p' = ss_inv_generalize_as_right pre ml mr in
       let q' = ss_inv_generalize_as_right post ml mr in
       es.es_sr, es.es_sl, p', q'
@@ -146,8 +148,8 @@ let t_equiv_seq_onesided side i pre post tc =
   let generalize_mod_side= sideif side generalize_mod_left generalize_mod_right in
   let ij =
     match side with
-    | `Left  -> (i, Zpr.cpos (List.length s'. s_node))
-    | `Right -> (Zpr.cpos (List.length s'. s_node), i) in
+    | `Left  -> (i, EcMatching.Position.codegap1_end)
+    | `Right -> (EcMatching.Position.codegap1_end, i) in
   let _s1, s2 = s_split env i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
@@ -229,13 +231,13 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
   | Single i, PSeqNone when is_hoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+    let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
     t_hoare_seq i phi tc
 
   | Single i, PSeqNone when is_eHoareS concl ->
     check_side side;
     let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
-    let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+    let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
     t_ehoare_seq i phi tc
 
   | Single i, PSeqNone when is_equivS concl ->
@@ -250,21 +252,21 @@ let process_seq ((side, k, phi, bd_info) : seq_info) (tc : tcenv1) =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
-    let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some side, i) in
+    let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some side, i) in
     t_equiv_seq_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
       check_side side;
       let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info bd_info tc in
-      let i = EcLowPhlGoal.tc1_process_codepos1 tc (side, i) in
+      let i = EcLowPhlGoal.tc1_process_codegap1 tc (side, i) in
       t_bdhoare_seq i (ra, pia, f1, f2, f3, f4) tc
 
   | Double (i, j), PSeqNone when is_equivS concl ->
       check_side side;
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      let i = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, i) in
-      let j = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left, j) in
+      let i = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, i) in
+      let j = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left, j) in
       t_equiv_seq (i, j) phi tc
 
   | Single _, PSeqNone

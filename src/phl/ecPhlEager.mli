@@ -5,7 +5,7 @@ open EcParsetree
 open EcCoreGoal.FApi
 open EcMatching.Position
 
-val process_seq : pcodepos1 pair -> pstmt -> pformula doption -> backward
+val process_seq : pcodegap1 pair -> pstmt -> pformula doption -> backward
 (** Tactic [eager seq] derives the following proof:
     {v
   (a) S; c₁ ~ c₁'; S : P ==> R₂
@@ -19,7 +19,7 @@ val process_seq : pcodepos1 pair -> pstmt -> pformula doption -> backward
     provided), as well as [S]. The predicate [={Q.1}] means equality on all free
     variables bound to the first memory in [Q]. *)
 
-val t_eager_seq : codepos1 pair -> stmt -> ts_inv pair -> backward
+val t_eager_seq : codegap1 pair -> stmt -> ts_inv pair -> backward
 (** Internal variant of [eager seq] *)
 
 val process_if : backward

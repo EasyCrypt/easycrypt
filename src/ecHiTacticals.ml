@@ -238,11 +238,15 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit cpos1 ->
+  | EcLowPhlGoal.InvalidSplit is ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
         Format.fprintf fmt "invalid split index: %a"
-          (EcPrinting.pp_codepos1 ppe) cpos1)
+        (fun fmt is -> match is with
+        | `Gap gap -> Format.fprintf fmt "%a" EcPrinting.(pp_codegap1 ppe) gap
+        | `Instr i -> Format.fprintf fmt "%a" EcPrinting.(pp_codepos1 ppe) i
+        ) is)
+          
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

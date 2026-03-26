@@ -4,7 +4,7 @@ open EcEnv
 open EcFol
 open EcLowGoal
 open EcLowPhlGoal
-open EcMatching.Zipper
+open EcMatching.Position
 open EcModules
 open EcPV
 open EcTypes
@@ -69,8 +69,8 @@ let destruct_eager tc s =
   and ss = List.length s.s_node in
 
   let c, c' = (es.es_sl, es.es_sr) in
-  let z, c = s_split env (Zpr.cpos ss) c
-  and c', z' = s_split env (Zpr.cpos (List.length c'.s_node - ss)) c' in
+  let z, c = s_split env (gap_after_n ss) c 
+  and c', z' = s_split env (gap_before_last_n ss) c' in
 
   let env, _, _ = FApi.tc1_eflat tc in
   let z_eq_s = ER.EqTest.for_stmt env (stmt z) s
@@ -96,9 +96,11 @@ let destruct_on_op id_op tc =
   let env = FApi.tc1_env tc and es = tc1_as_equivS tc in
   let s =
     try
-      let s, _ = split_at_cpos1 env (-1, `ByMatch (Some (-1), id_op)) es.es_sl
+      let s, _ = split_by_match env ~occ:(-1) ~gap:`Before id_op es.es_sl in
       (* ensure the right statement also contains an [id_op]: *)
-      and _, _ = split_at_cpos1 env (1, `ByMatch (None, id_op)) es.es_sr in
+      if not @@ exists_match env id_op es.es_sr then 
+        tc_error_lazy !!tc (fun fmt ->
+          Format.fprintf fmt "eager: right side does not match operator");
       s
     with InvalidCPos ->
       tc_error_lazy !!tc (fun fmt ->
@@ -407,7 +409,7 @@ let t_eager_call = FApi.t_low2 "eager-call" t_eager_call_r
 let process_seq (i, j) s factor tc =
   let open BatTuple.Tuple2 in
   let indices =
-    mapn (tc1_process_codepos1 tc) ((Some `Left, i), (Some `Right, j))
+    mapn (tc1_process_codegap1 tc) ((Some `Left, i), (Some `Right, j))
   and factor =
     factor
     |> ( function Single p -> (p, p) | Double pp -> pp )

@@ -229,8 +229,7 @@ let process_unroll_for ~cfold side cpos tc =
     tc_error !!tc "cannot use deep code position";
 
   let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
-  let z, cpos = Zpr.zipper_of_cpos_r env cpos c in
-  let pos  = 1 + List.length z.Zpr.z_head in
+  let z, ((_nm_path, pos), _) = Zpr.zipper_of_cpos_r env cpos c in
 
   (* Extract loop condition / body *)
   let t, wbody  =
@@ -286,23 +285,42 @@ let process_unroll_for ~cfold side cpos tc =
   let m    = LDecl.fresh_id hyps "&m" in
   let x    = f_pvar x tint goal_m in
 
+  (* Record the proof handle, position, and counter value for iteration [i].
+     Used by [doi] below to revisit each unrolled iteration's subgoal. *)
   let t_set i pos z tc =
     hds.(i) <- Some (FApi.tc1_handle tc, pos, z); t_id tc in
 
+  (* Strengthen the goal by replacing the current precondition with [post],
+     closing the two side-conditions (pre ⇒ post, post ⇒ pre) via [t_trivial]. *)
   let t_conseq post tc =
     (EcPhlConseq.t_conseq (tc1_get_pre tc) post @+
     [ t_trivial; t_trivial; t_id]) tc in
 
+  (* Main unrolling loop: processes the list [zs] of counter values produced
+     by [eval_cond].  For each value [z]:
+     1. Apply [t_rcond] at position [pos] (0-indexed) to split the while into
+        its body (when [zs] is non-empty, i.e. guard is true) or skip it
+        (when [zs] is empty, i.e. guard is false).
+     2. On the "guard proved" subgoal: introduce the guard hypothesis,
+        strengthen the pre to [x = z], and record iteration info via [t_set].
+     3. On the "rest of program" subgoal: recurse with the next counter value,
+        advancing [pos] by [blen] (the loop body length) since the unrolled
+        body instructions now precede the remaining while.
+     [pos] is a 0-indexed normalized position used to construct [cpos1 pos]. *)
   let rec t_doit i pos zs tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
+      ((t_rcond side (zs <> []) (EcMatching.Position.cpos1 pos)) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (Inv_ss (map_ss_inv1 (fun x -> f_eq x (f_int z)) x)) @!
        t_set i pos z;
        t_doit (i+1) (pos + blen) zs]) tc in
 
+  (* Close a subgoal of the form hoare[... : pre ==> true] by:
+     1. Weakening the postcondition to hoare-with-no-memory via [t_hoareS_conseq_nm]
+     2. Closing side conditions with [t_trivial]
+     3. Closing the main goal with [t_hoare_true] *)
   let t_conseq_nm tc =
     match (tc1_get_pre tc) with
     | Inv_ss inv ->
@@ -313,17 +331,30 @@ let process_unroll_for ~cfold side cpos tc =
        [ t_trivial; t_trivial; EcPhlTAuto.t_hoare_true]) tc
     | _ -> tc_error !!tc "expecting single sided precondition" in
 
+  (* Second pass: revisit the subgoals recorded by [t_set] during [t_doit].
+     For each iteration [i]:
+     - [pos] is the 0-indexed position of the while loop (rcond target).
+     - [init_pos] = pos - 1 is the counter init/increment assignment that
+       precedes the while; WP must consume through it to evaluate [x = z].
+     - i=0: WP from [init_pos] onward, strengthen pre to true, close with
+       [t_hoare_true].
+     - i>0: WP from [init_pos] onward, then seq-split at the previous
+       iteration's rcond position [pos'] with postcondition [x = z'],
+       applying the recorded proof handle [h'] and [t_conseq_nm]. *)
   let doi i tc =
+    let open EcMatching.Position in
     if Array.length hds <= i then t_id tc else
-    let (_h,pos,_z) = oget hds.(i) in
+    let (_h, pos, _z) = oget hds.(i) in
+    let init_pos = pos - 1 in
+    let wp_gap = GapBefore (cpos1 init_pos) in
     if i = 0 then
-      (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
+      (EcPhlWp.t_wp (Some (Single wp_gap)) @!
        t_conseq (Inv_ss {inv=f_true;m=x.m}) @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
-        EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
-        EcPhlSeq.t_hoare_seq (Zpr.cpos (pos' - 1)) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
+        EcPhlWp.t_wp (Some (Single wp_gap));
+        EcPhlSeq.t_hoare_seq (GapBefore (cpos1 pos')) (map_ss_inv2 f_eq x {m=goal_m;inv=f_int z'}) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 
@@ -331,7 +362,11 @@ let process_unroll_for ~cfold side cpos tc =
   let tcenv = FApi.t_onalli doi tcenv in
 
   if cfold then begin
-    let cpos = EcMatching.Position.shift ~offset:(-1) cpos in
+    (* Use normalized position: pos - 1 is the loop counter initialization
+       assignment that immediately precedes the while loop at pos.
+       We cannot reuse the original match-based cpos here because t_doit
+       has transformed the code, potentially invalidating the match. *)
+    let cpos = ([], EcMatching.Position.cpos1 (pos - 1)) in
     let clen = blen * (List.length zs - 1) in
 
     FApi.t_last (EcPhlCodeTx.t_cfold ~eager:false side cpos (Some clen)) tcenv

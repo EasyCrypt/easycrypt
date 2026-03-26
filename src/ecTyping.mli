@@ -239,11 +239,18 @@ type ismap = (instr list) EcMaps.Mstr.t
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
-val trans_codepos_range : ?memory:EcMemory.memory -> env -> pcodepos_range -> codepos_range
+val trans_codepos_or_range : ?memory:EcMemory.memory -> env -> pcodepos_or_range -> codegap_range
 val trans_codepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 -> codepos1
 val trans_codepos : ?memory:EcMemory.memory -> env -> pcodepos -> codepos
 val trans_dcodepos1 : ?memory:EcMemory.memory -> env -> pcodepos1 doption -> codepos1 doption
 val trans_codeoffset1 : ?memory:EcMemory.memory -> env -> pcodeoffset1 -> codeoffset1
+val trans_codegap1 : ?memory:EcMemory.memory -> env -> pcodegap1 -> codegap1
+val trans_codegap  : ?memory:EcMemory.memory -> env -> pcodegap  -> codegap
+val trans_codegap1_range : ?memory:EcMemory.memory -> env -> pcodegap1_range -> codegap1_range
+val trans_codegap_range  : ?memory:EcMemory.memory -> env -> pcodegap_range  -> codegap_range
+val trans_range1_or_insert : ?memory:EcMemory.memory -> env -> prange1_or_insert  -> codegap_range
+val trans_codegap_offset1 : ?memory:EcMemory.memory -> env -> pcodegap_offset1 -> codegap_offset1
+val trans_dcodegap1 : ?memory:EcMemory.memory -> env -> pcodegap1 doption -> codegap1 doption
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref

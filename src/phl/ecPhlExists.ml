@@ -8,6 +8,7 @@ open EcSubst
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
+open EcMatching.Position
 
 module L   = EcLocation
 module APT = EcParsetree
@@ -160,19 +161,19 @@ let process_ecall oside (l, tvi, fs) tc =
     match kind, oside, p1 with
     | `Hoare n, _, Inv_ss p1 ->
         EcPhlSeq.t_hoare_seq
-          (Zpr.cpos (n-1)) p1 tc
+          (GapBefore (EcMatching.Position.cpos1 (n - 1))) p1 tc
     | `Hoare n, _, Inv_hs p1 ->
         EcPhlSeq.t_hoare_seq
-          (Zpr.cpos (n-1)) (POE.lower p1) tc
+          (GapBefore (EcMatching.Position.cpos1 (n - 1))) (POE.lower p1) tc
     | `Equiv (n1, n2), None, Inv_ts p1 ->
         EcPhlSeq.t_equiv_seq
-          (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
+          (GapBefore (EcMatching.Position.cpos1 (n1 - 1)), GapBefore (EcMatching.Position.cpos1 (n2 - 1))) p1 tc
     | `Equiv (n1, n2), Some `Left, Inv_ts p1 ->
         EcPhlSeq.t_equiv_seq
-          (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
+          (GapBefore (EcMatching.Position.cpos1 (n1 - 1)), GapBefore (EcMatching.Position.cpos1 n2)) p1 tc
     | `Equiv(n1, n2), Some `Right, Inv_ts p1 ->
         EcPhlSeq.t_equiv_seq
-          (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
+          (GapBefore (EcMatching.Position.cpos1 n1), GapBefore (EcMatching.Position.cpos1 (n2 - 1))) p1 tc
     | _ -> tc_error !!tc "mismatched sidedness or kind of conclusion"
   in
 

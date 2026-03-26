@@ -19,7 +19,7 @@ module TTC = EcProofTyping
 type bhl_infos_t = (ss_inv, ty -> ss_inv option, ty -> ss_inv) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> ts_inv
-type semrndpos   = (bool * codepos1) doption
+type semrndpos   = (bool * codegap1) doption
 
 (* -------------------------------------------------------------------- *)
 module Core = struct
@@ -598,7 +598,7 @@ let wp_equiv_rnd_r bij tc =
       subtc)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_rnd_r side pos bij_info tc =
+let t_equiv_rnd_r side (pos: semrndpos option) bij_info tc =
   match side, pos, bij_info with
   | Some side, None, (None, None) ->
     wp_equiv_disj_rnd_r side tc
@@ -646,7 +646,12 @@ let t_equiv_rnd ?pos side bij_info =
   (FApi.t_low3 "equiv-rnd" t_equiv_rnd_r) side pos bij_info
 
 (* -------------------------------------------------------------------- *)
-let process_rnd side pos tac_info tc =
+let process_rnd
+  (side     : side option)
+  (pos      : psemrndpos option)
+  (tac_info : _)
+  (tc       : tcenv1)
+=
   let concl = FApi.tc1_goal tc in
 
   match side, pos, tac_info with
@@ -695,12 +700,12 @@ let process_rnd side pos tac_info tc =
       | Single (b, p) ->
           let p =
             if Option.is_some side then
-              EcLowPhlGoal.tc1_process_codepos1 tc (side, p)
-            else EcTyping.trans_codepos1 (FApi.tc1_env tc) p
+              EcLowPhlGoal.tc1_process_codegap1 tc (side, p)
+            else EcTyping.trans_codegap1 (FApi.tc1_env tc) p
           in Single (b, p)
       | Double ((b1, p1), (b2, p2)) ->
-          let p1 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Left , p1) in
-          let p2 = EcLowPhlGoal.tc1_process_codepos1 tc (Some `Right, p2) in
+          let p1 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left , p1) in
+          let p2 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Right, p2) in
           Double ((b1, p1), (b2, p2))
     )
     in
@@ -717,7 +722,7 @@ let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 (* -------------------------------------------------------------------- *)
 let process_rndsem ~reduce side pos tc =
   let concl = FApi.tc1_goal tc in
-  let pos = EcLowPhlGoal.tc1_process_codepos1 tc (side, pos) in
+  let pos = EcLowPhlGoal.tc1_process_codegap1 tc (side, pos) in
 
   match side with
   | None when is_hoareS concl ->

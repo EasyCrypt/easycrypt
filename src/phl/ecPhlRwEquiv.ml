@@ -80,7 +80,8 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
   t_onselect
     p
     (t_seqs [
-      EcPhlEqobs.process_eqobs_in none {sim_pos = some (cp, cp); sim_hint = ([], none); sim_eqs = none};
+      EcPhlEqobs.process_eqobs_in None
+        {sim_pos = some (GapAfter cp, GapAfter cp); sim_hint = ([], none); sim_eqs = none};
       (match side, dir with
        | `Left, `LtoR  -> t_id
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
@@ -153,6 +154,8 @@ let process_rewrite_equiv info tc =
 
   (* Offload to the tactic *)
   try
+    (* FIXME: cp should be translated to codepos in process 
+       Blocked by: bad interface to sim in src/phl/ecPhlEqobs.ml *)
     t_rewrite_equiv side dir cp equiv eqv_pt rargslv tc
   with
   | RwEquivError (RWE_InvalidFunction (got, wanted)) ->

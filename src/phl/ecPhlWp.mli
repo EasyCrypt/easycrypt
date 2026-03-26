@@ -12,6 +12,6 @@ open EcCoreGoal.FApi
  * soundness of the bounded hoare logic.
  *)
 
-val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward
+val t_wp : ?uselet:bool -> (codegap1 doption) option -> backward
 
-val process_wp : (pcodepos1 doption) option -> backward
+val process_wp : (pcodegap1 doption) option -> backward
