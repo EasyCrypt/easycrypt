@@ -1550,16 +1550,16 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
       | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
           when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
 
-        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a"
+        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a;"
           (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
 
       | _, _ ->
-        Format.fprintf fmt "%a <-@;<1 2>%a"
+        Format.fprintf fmt "%a <-@;<1 2>%a;"
           (pp_lvalue ppe) lv (pp_expr ppe) e
     end
 
   | Srnd (lv, e) ->
-      Format.fprintf fmt "%a <$@;<1 2>$%a"
+      Format.fprintf fmt "%a <$@;<1 2>$%a;"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -1601,14 +1601,14 @@ and pp_stmt_for_form (ppe : PPEnv.t) fmt (s : stmt) =
       pp_instr_for_form ppe fmt i
 
   | [i1; i2] ->
-      Format.fprintf fmt "%a;@ %a"
+      Format.fprintf fmt "%a@ %a"
         (pp_instr_for_form ppe) i1
         (pp_instr_for_form ppe) i2
 
   | _ ->
       let i1 = List.hd s.s_node in
       let i2 = List.hd (List.rev s.s_node) in
-        Format.fprintf fmt "%a;@ ...;@ %a"
+        Format.fprintf fmt "%a@ ...;@ %a"
           (pp_instr_for_form ppe) i1
           (pp_instr_for_form ppe) i2
 
