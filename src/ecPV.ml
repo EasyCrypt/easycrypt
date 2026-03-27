@@ -156,6 +156,9 @@ module PVM = struct
     try Mid.change (fun o -> Some (Mpv.add env pv f (odfl Mpv.empty o))) m s
     with AliasClash (env,c) -> uerror env c
 
+  let of_list env pvs =
+    List.fold_left (fun s ((pv, m), f) -> add env pv m f s) empty pvs
+
   let find env pv m s =
     try Mpv.find env pv (Mid.find m s)
     with AliasClash (env,c) -> uerror env c
@@ -581,6 +584,11 @@ let rec e_read_r env r e =
   | Evar pv -> PV.add env pv e.e_ty r
   | _ -> e_fold (e_read_r env) r e
 
+let rec form_read_r env r f =
+  match f.f_node with
+  | Fpvar (pv, _) -> PV.add env pv f.f_ty r
+  | _ -> f_fold (form_read_r env) r f
+
 let rec is_read_r env w s =
   List.fold_left (i_read_r env) w s
 
@@ -625,11 +633,12 @@ let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
 let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s
 let f_write  ?(except=Sx.empty) env f  = f_write_r  ~except env PV.empty f
 
-let e_read  env e  = e_read_r  env PV.empty e
-let i_read  env i  = i_read_r  env PV.empty i
-let is_read env is = is_read_r env PV.empty is
-let s_read  env s  = s_read_r  env PV.empty s
-let f_read  env f  = f_read_r  env PV.empty f
+let e_read     env e  = e_read_r  env PV.empty e
+let form_read  env e  = form_read_r  env PV.empty e
+let i_read     env i  = i_read_r  env PV.empty i
+let is_read    env is = is_read_r env PV.empty is
+let s_read     env s  = s_read_r  env PV.empty s
+let f_read     env f  = f_read_r  env PV.empty f
 
 (* -------------------------------------------------------------------- *)
 let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env) =
