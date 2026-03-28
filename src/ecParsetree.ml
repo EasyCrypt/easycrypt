@@ -705,10 +705,10 @@ type conseq_contra =
 type conseq_ppterm = (conseq_contra * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
-type sim_info = {
-  sim_pos  : pcodepos1 pair option;
-  sim_hint : (pgamepath option pair * pformula) list * pformula option;
-  sim_eqs  : pformula option
+type psim_info = {
+  psim_pos  : pcodepos1 pair option;
+  psim_hint : (pgamepath option pair * pformula) list * pformula option;
+  psim_eqs  : pformula option
 }
 
 (* -------------------------------------------------------------------- *)
@@ -734,7 +734,45 @@ type matchmode = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type bdepvar = [`Var of psymbol | `VarRange of psymbol * int | `Slice of psymbol * (pqsymbol * zint)]
+
+type bdep_info =
+  { n     : int
+  ; m     : int
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; pcond : psymbol
+  ; lane  : psymbol
+  ; perm  : psymbol option 
+  ; debug : bool }
+
+type bdep_eval_info =
+  { in_ty     : pty
+  ; out_ty    : pty
+  ; invs  : bdepvar list
+  ; inpvs : bdepvar list
+  ; outvs : bdepvar list
+  ; lane  : psymbol 
+  ; range : pformula 
+  ; sign  : bool }
+
+type bdepeq_info =
+  { n          : int
+  ; inpvs_l    : bdepvar list
+  ; inpvs_r    : bdepvar list
+  ; out_blocks : (int * bdepvar list * bdepvar list) list
+  ; pcond      : psymbol option 
+  ; preprocess : bool }
+
+(* -------------------------------------------------------------------- *)
 type prrewrite = [`Rw of ppterm | `Simpl]
+
+(* -------------------------------------------------------------------- *)
+type pecall = pqsymbol * ptyannot option * ppt_arg located list
+
+(* -------------------------------------------------------------------- *)
+type pdirection = [`Forward | `Backward]
 
 (* -------------------------------------------------------------------- *)
 type phltactic =
@@ -774,7 +812,7 @@ type phltactic =
   | Pconcave       of (pformula option tuple2 gppterm * pformula)
   | Phrex_elim
   | Phrex_intro    of (pformula list * bool)
-  | Phecall        of (oside * (pqsymbol * ptyannot option * pformula list))
+  | Phecall        of (pdirection * oside * pecall)
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv | `EHoare ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
@@ -782,15 +820,14 @@ type phltactic =
   | Pfel           of (pcodepos1 * fel_info)
   | Phoare
   | Pprbounded
-  | Psim           of crushmode option* sim_info
+  | Psim           of crushmode option* psim_info
   | Ptrans_stmt    of trans_info
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pprocrewriteat of psymbol * ppterm
-  | Pchangestmt    of side option * pcodepos_range * pstmt
+  | Pchangestmt    of side option * ptybindings option * pcodepos_range * pstmt
   | Phoaresplit
 
     (* Eager *)
@@ -808,8 +845,20 @@ type phltactic =
   | Pauto
   | Plossless
 
+    (* Map-reduce *)
+  | Pcircuit of circuit_mode
+
+    (* Program rewriting *)
+  | Prwprgm of rwprgm
+
 and rwprgm = [
   | `IdAssign of pcodepos * pqsymbol
+  | `Change   of pcodepos * ptybindings option * int * pstmt
+]
+
+and circuit_mode = [
+  | `Simplify
+  | `Solve
 ]
 
 and pcfold =
@@ -884,7 +933,7 @@ type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWSimpl  of [`Default | `Variant]
-  | RWDelta  of (rwoptions * pformula)
+  | RWDelta  of (bool * rwoptions * pformula)
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
   | RWDone   of [`Default | `Variant] option
@@ -1033,6 +1082,7 @@ and ptactic_core_r =
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
+  | Pextens     of (ptactic_core * psymbol option)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
@@ -1284,6 +1334,46 @@ type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
 
 (* -------------------------------------------------------------------- *)
+type pbind_bitstring =
+  { from_  : pqsymbol
+  ; to_    : pqsymbol
+  ; touint : pqsymbol
+  ; tosint : pqsymbol
+  ; ofint  : pqsymbol
+  ; type_  : pty
+  ; size   : pformula }
+  
+(* -------------------------------------------------------------------- *)
+type pbind_array =
+  { get    : pqsymbol
+  ; set    : pqsymbol
+  ; tolist : pqsymbol
+  ; oflist : pqsymbol
+  ; type_  : pqsymbol
+  ; size   : pformula }
+
+(* -------------------------------------------------------------------- *)
+type pbind_bvoperator =
+  { name     : string located
+  ; types    : pqsymbol list
+  ; operator : pqsymbol }
+
+(* -------------------------------------------------------------------- *)
+type pbind_circuit =
+  { bindings : (pqsymbol * string located) list 
+  ; file     : string located }
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding_r =
+  | CRB_Bitstring  of pbind_bitstring
+  | CRB_Array      of pbind_array
+  | CRB_BvOperator of pbind_bvoperator
+  | CRB_Circuit    of pbind_circuit
+
+(* -------------------------------------------------------------------- *)
+type pcrbinding = { locality : is_local; binding : pcrbinding_r }
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
@@ -1322,6 +1412,7 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
+  | Gcrbinding   of pcrbinding
 
 type global = {
   gl_action : global_action located;
