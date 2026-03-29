@@ -71,10 +71,10 @@ let t_hoare_call fpre fpost tc =
   (* substitute memories *)
   let fpre = (ss_inv_rebind fpre m) in
   let fpost = hs_inv_rebind fpost m in
-  let { main = inv; exnmap = (fepost, fd); } = fpost.hsi_inv in
+  let inv,fepost = POE.destruct fpost.hsi_inv in
   let fpost = {m;inv} in
   (* The wp *)
-  let { main = post; exnmap = (epost, d); } = (hs_po hs).hsi_inv in
+  let post, epost = POE.destruct (hs_po hs).hsi_inv in
   let pvres = pv_res in
   let vres = EcIdent.create "result" in
   let fres = {m;inv=f_local vres fsig.fs_ret} in
@@ -88,7 +88,7 @@ let t_hoare_call fpre fpost tc =
   let spre = subst_args_call env m (e_tuple args) PVM.empty in
   let post = map_ss_inv2 f_anda_simpl (map_ss_inv1 (PVM.subst env spre) fpre) post in
 
-  let poe = TTC.merge2_poe_list (epost,d) (fepost,fd) in
+  let poe = TTC.merge2_poe_list epost fepost in
   let poe = List.map (fun inv -> {m;inv}) poe in
   let penv_e = EcEnv.Fun.inv_memenv1 m env in
   let poe = List.map (generalize_mod_ss_inv penv_e modi) poe in
@@ -96,7 +96,7 @@ let t_hoare_call fpre fpost tc =
   let post = List.fold (map_ss_inv2 f_anda_simpl) post poe in
   let post = {
     hsi_m   = post.m;
-    hsi_inv = { main = post.inv; exnmap = (epost, d); };
+    hsi_inv = { main = post.inv; exnmap = epost };
   } in
   let concl = f_hoareS (snd hs.hs_m) (hs_pr hs) s post in
   FApi.xmutate1 tc `HlCall [f_concl; concl]
@@ -484,8 +484,8 @@ let process_call side info tc =
       let pre  = TTC.pf_process_form !!tc penv tbool pre  in
       let post = TTC.pf_process_form !!tc qenv tbool post in
       let env_e = LDecl.inv_memenv1 m hyps in
-      let (poe, d) = TTC.pf_process_poe env_e poe in
-      f_hoareF {m; inv = pre} f { hsi_m = m; hsi_inv = { main = post; exnmap = (poe, d); } }
+      let poe = TTC.pf_process_poe env_e poe in
+      f_hoareF {m; inv = pre} f { hsi_m = m; hsi_inv = { main = post; exnmap = poe; } }
 
     | _ -> tc_error !!tc "the conclusion is not a hoare" in
 

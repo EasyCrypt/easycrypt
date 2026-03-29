@@ -266,7 +266,7 @@ val trans_poe :
   EcEnv.env ->
   EcUnify.unienv ->
   EcParsetree.phoare_exception ->
-  EcFol.form EcPath.Mp.t * EcFol.form option
+  EcFol.form EcPath.Mp.t
 
 (* -------------------------------------------------------------------- *)
 val trans_memtype :

@@ -10,6 +10,9 @@ let i_top  = "Top"
 let i_self = "Self"
 let p_top  = EcPath.psymbol i_top
 
+let i_wild = "_"
+let p_wild = EcPath.psymbol i_wild
+
 (* -------------------------------------------------------------------- *)
 let i_Pervasive = "Pervasive"
 let p_Pervasive = EcPath.pqname p_top i_Pervasive
