@@ -50,26 +50,24 @@ seq 1 1 : (i{1} = 0 /\ ={glob A, x, i}) => //.
 async while
   [ (fun r => i%r < k%r * r), (i{2} + 1)%r ]
   [ (fun r => i%r < r), (i{2} + 1)%r ]
-    (i{1} < n * k /\ i{2} < n) (!(i{2} < n))
+    (!(i{1} < n * k)) (!(i{2} < n))
   :
     (={glob A, x} /\ i{1} = k * i{2} /\ (0 <= i{1})) => //=.
-+ by move=> &1 &2 />; smt(gt0_k).
-+ by move=> &1 &2 />; smt(gt0_k).
-+ by move=> &2; exfalso=> &1; smt(gt0_k).
-+ by move=> &2; exfalso=> &1 ?; smt(gt0_k).
++ move=> &1 &2 />; smt(gt0_k).
 + move=> v1 v2.
   rcondt {2} 1; 1: by auto => /> /#.
   rcondf{2} 4; 1: by auto; conseq (_: true);auto.
-  wp;while (   ={glob A, x} 
+  wp;while (   ={glob A, x}
          /\ i{1} = k * i{2} + j{2}
          /\ v1 = (i{2} + 1)%r
          /\ 0 <= i{2} <  n
          /\ 0 <= j{2} <= k) => /=; last by auto; smt(gt0_k ge0_n).
   wp; call (_ : true); skip => &1 &2 /= />.
-  rewrite -fromintM !lt_fromint => *. 
-  by have := StdOrder.IntOrder.ler_wpmul2l k _ i{2} (n - 1); smt().
-+ by while true (n * k - i) => //; auto;1: call llA; auto => /#.
+  rewrite -fromintM !lt_fromint => *.
+      by have := StdOrder.IntOrder.ler_wpmul2l k _ i{2} (n - 1); smt().
++ by move=> &2; exfalso=> &1 ? ; smt(gt0_k).
++ by move=> &1; exfalso=> &2 ?; smt(gt0_k).
++  while true (n * k - i) => //; auto;1: call llA; auto => /#.
 + while true (n - i);2: by auto=>/#.
   move=> z;wp; while (true) (k - j);auto;1:call llA;auto => /#.
 qed.
-
