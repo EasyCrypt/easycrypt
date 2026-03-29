@@ -2415,11 +2415,11 @@ rwarg1:
 | SLASHTILDEQ
    { RWSimpl `Variant }
 
-| s=rwside r=rwrepeat? o=rwocc? p=bracket(form_h)? fp=rwpterms
-   { RWRw ((s, r, o, p), fp) }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? match_=bracket(rwmatch)? fp=rwpterms
+   { RWRw ({ side; repeat; occurrence; match_ }, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { RWDelta ((s, r, o, None), x); }
+| side=rwside repeat=rwrepeat? occurrence=rwocc? SLASH fp=sform_h %prec prec_tactic
+   { RWDelta ({ side; repeat; occurrence; match_ = None }, fp); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
@@ -2444,6 +2444,13 @@ rwarg1:
         let msg = "invalid rw-tactic: " ^ (unloc x) in
         parse_error (loc x) (Some msg)
   }
+
+rwmatch:
+| p=form_h
+    { RWM_Plain p }
+
+| x=ident IN p=form_h
+    { RWM_Context (x, p) }
 
 rwpterms:
 | f=pterm

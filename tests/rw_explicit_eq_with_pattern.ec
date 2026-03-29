@@ -24,3 +24,11 @@ rewrite [_ + c](_ : _ + c = d).
 - suff: x + c = d by exact. admit.
 - suff: x + d = x by exact. admit.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma L4 (c d x : int) : x + (x + c) = x.
+proof.
+rewrite [y in x + y](_ : y = d).
+- suff: x + c = d by exact. admit.
+- suff: x + d = x by exact. admit.
+qed.
