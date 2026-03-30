@@ -238,11 +238,12 @@ let process_rewrite_at
 let t_change_stmt
   (side : side option)
   (pos : EcMatching.Position.codegap_range)
+  ((me, _bindings) : memenv * ovariable list) (* FIXME: might not be needed, check before merge *)
   (s : stmt)
   (tc : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+  let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
 
   let zpr, (_,stmt, epilog), _nmr =
     EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt in
@@ -342,10 +343,12 @@ let t_change_stmt
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
+  (binds  : ptybindings option)
   (pos    : prange1_or_insert)
   (s      : pstmt)
   (tc     : tcenv1)
 =
+  let hyps = FApi.tc1_hyps tc in
   let env = FApi.tc1_env tc in
 
   begin match side, (FApi.tc1_goal tc).f_node with
@@ -366,14 +369,46 @@ let process_change_stmt
 
   let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
 
-  let pos =
+  let pos = 
     let env = EcEnv.Memory.push_active_ss me env in
     EcTyping.trans_range1_or_insert ~memory:(fst me) env pos
   in
 
-  let s = match side with
+(*
+  let s = match side with 
   | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
   | None -> EcProofTyping.tc1_process_Xhl_stmt tc s
   in
+*)
 
-  t_change_stmt side pos s tc
+  let bindings = 
+     binds
+  |> odfl []
+  |> List.map (fun (xs, ty) -> List.map (fun x -> (x, ty)) xs)
+  |> List.flatten 
+  |> List.map (fun (x, ty) ->
+      let ue = EcUnify.UniEnv.create (Some (EcEnv.LDecl.tohyps hyps).h_tvar) in
+      let ty = EcTyping.transty EcTyping.tp_tydecl env ue ty in
+      assert (EcUnify.UniEnv.closed ue);
+      let ty =
+        let subst = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+        EcCoreSubst.ty_subst subst ty in
+      let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
+      let vr = EcAst.{ ov_name = x; ov_type = ty; } in
+      vr
+    )
+  in
+  let me, bindings = EcMemory.bindall_fresh bindings me in
+
+  let env = EcEnv.Memory.push_active_ss me env in
+  let s = 
+    let ue = EcProofTyping.unienv_of_hyps hyps in
+    let s = EcTyping.transstmt env ue s in
+
+    assert (EcUnify.UniEnv.closed ue);
+
+    let sb = EcCoreSubst.Tuni.subst (EcUnify.UniEnv.close ue) in
+    EcCoreSubst.s_subst sb s 
+  in
+
+  t_change_stmt side pos (me, bindings) s tc

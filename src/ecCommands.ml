@@ -111,6 +111,7 @@ module Loader : sig
   type kind      = EcLoader.kind
   type idx_t     = EcLoader.idx_t
   type namespace = EcLoader.namespace
+  type context1  = { cpath : string; filename : string; }
 
   val create  : unit   -> loader
   val forsys  : loader -> loader
@@ -120,17 +121,25 @@ module Loader : sig
 
   val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
   val aslist  : loader -> ((namespace option * string) * idx_t) list
-  val locate  : ?namespaces:namespace option list -> string ->
-                  loader -> (namespace option * string * kind) option
+  val locate  : ?namespaces:namespace option list -> 
+                ?kinds:(EcLoader.kind list) -> string ->
+                 loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
-  val pop       : loader -> string option
-  val context   : loader -> string list
+  val pop       : loader -> context1 option
+  val context   : loader -> context1 list
   val incontext : string -> loader -> bool
+
+  val set_current_path : string -> loader -> unit
+
+  val current_path : loader -> string
 end = struct
+  type context1  = { cpath : string; filename : string; }
+
   type loader = {
     (*---*) ld_core      : EcLoader.ecloader;
-    mutable ld_stack     : string list;
+    mutable ld_stack     : context1 list;
+    mutable ld_cpath     : string;
     (*---*) ld_namespace : EcLoader.namespace option;
   }
 
@@ -147,16 +156,19 @@ end = struct
   let create () =
     { ld_core      = EcLoader.create ();
       ld_stack     = [];
+      ld_cpath     = Unix.getcwd ();
       ld_namespace = None; }
 
   let forsys (ld : loader) =
     { ld_core      = EcLoader.forsys ld.ld_core;
       ld_stack     = ld.ld_stack;
+      ld_cpath     = ld.ld_cpath;
       ld_namespace = None; }
 
   let dup ?namespace (ld : loader) =
     { ld_core      = EcLoader.dup ld.ld_core;
       ld_stack     = ld.ld_stack;
+      ld_cpath     = ld.ld_cpath;
       ld_namespace =
         match namespace with
         | Some _ -> namespace
@@ -170,11 +182,12 @@ end = struct
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
 
-  let locate ?namespaces (path : string) (ld : loader) =
-    EcLoader.locate ?namespaces path ld.ld_core
+  let locate ?namespaces ?kinds (path : string) (ld : loader) =
+    EcLoader.locate ?namespaces ?kinds path ld.ld_core
 
   let push (p : string) (ld : loader) =
-    ld.ld_stack <- norm p :: ld.ld_stack
+    let ctxt1 = { cpath = ld.ld_cpath; filename = norm p; } in
+    ld.ld_stack <- ctxt1 :: ld.ld_stack
 
   let pop (ld : loader) =
     match ld.ld_stack with
@@ -185,7 +198,14 @@ end = struct
     ld.ld_stack
 
   let incontext (p : string) (ld : loader) =
-    List.mem (norm p) ld.ld_stack
+    let p = norm p in
+    List.exists (fun ctxt1 -> p = ctxt1.filename) ld.ld_stack
+
+  let set_current_path (cpath : string) (ld : loader) =
+    ld.ld_cpath <- cpath
+
+  let current_path (ld : loader) : string =
+    ld.ld_cpath
 end
 
 (* -------------------------------------------------------------------- *)
@@ -530,7 +550,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
     then [Loader.namespace ld; None]
     else [nm] in
 
-  match Loader.locate ~namespaces:nm sysname ld with
+  match Loader.locate ~kinds:[`Ec; `EcA] ~namespaces:nm sysname ld with
   | None ->
       EcScope.hierror "cannot locate theory `%s'" sysname
 
@@ -543,6 +563,8 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
       Loader.push    filename subld;
       Loader.addidir ?namespace:fnm dirname subld;
+
+      Loader.set_current_path dirname subld;
 
       let name = EcScope.{
         rqd_name      = thname;
@@ -565,7 +587,9 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         (fun () -> Pragma.set i_pragma)
       in
 
-      let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+      let kind = match kind with 
+      | `Ec -> `Concrete | `EcA -> `Abstract 
+      in
 
       let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
@@ -751,6 +775,26 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_crbind (scope : EcScope.scope) (ld : Loader.loader) (binding : pcrbinding) =
+  match binding.binding with
+  | CRB_Bitstring  bs -> EcScope.Circuit.add_bitstring  scope binding.locality bs
+  | CRB_Array      ba -> EcScope.Circuit.add_array      scope binding.locality ba
+  | CRB_BvOperator op -> EcScope.Circuit.add_bvoperator scope binding.locality op
+  | CRB_Circuit    cr ->
+
+    let file =
+      if Filename.is_relative (unloc cr.file) then
+        Filename.concat (Loader.current_path ld) (unloc cr.file)
+      else unloc cr.file in
+    let file = mk_loc (loc cr.file) file in
+
+    if not (Sys.file_exists (unloc file)) then
+      EcScope.hierror ~loc:(loc file)
+        "cannot find spec file: %s" (unloc file);
+
+    EcScope.Circuit.add_circuits scope binding.locality {cr with file}
+
+(* -------------------------------------------------------------------- *)
 and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -794,6 +838,7 @@ and process ?(src : string option) (ld : Loader.loader) (scope : EcScope.scope) 
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
+      | Gcrbinding   bind -> `Fct   (fun scope -> process_crbind     scope ld bind)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
@@ -818,6 +863,9 @@ let addidir ?namespace ?recursive (idir : string) =
 
 let loadpath () =
   List.map fst (Loader.aslist loader)
+
+let set_current_path (path : string) =
+  Loader.set_current_path path loader
 
 (* -------------------------------------------------------------------- *)
 type checkmode = {

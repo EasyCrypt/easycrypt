@@ -64,13 +64,13 @@ let list_of_json (tx : Json.t -> 'a) (data : Json.t) : 'a list =
 (* -------------------------------------------------------------------- *)
 let kind_to_json (k : EcLoader.kind) =
   match k with
-  | `Ec  -> `String "ec"
-  | `EcA -> `String "eca"
+  | `Ec   -> `String "ec"
+  | `EcA  -> `String "eca"
 
 let kind_of_json (data : Json.t) =
   match data with
-  | `String "ec"  -> `Ec
-  | `String "eca" -> `EcA
+  | `String "ec"   -> `Ec
+  | `String "eca"  -> `EcA
   | _ -> raise InvalidEco
 
 (* -------------------------------------------------------------------- *)

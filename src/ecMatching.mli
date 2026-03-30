@@ -318,6 +318,7 @@ module EV : sig
   val isset  : ident -> 'a evmap -> bool
   val set    : ident -> 'a -> 'a evmap -> 'a evmap
   val get    : ident -> 'a evmap -> [`Unset | `Set of 'a] option
+  val map    : ('a -> 'a) -> 'a evmap -> 'a evmap
   val doget  : ident -> 'a evmap -> 'a
   val fold   : (ident -> 'a -> 'b -> 'b) -> 'a evmap -> 'b -> 'b
   val filled : 'a evmap -> bool

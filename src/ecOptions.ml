@@ -6,10 +6,12 @@ open EcMaps
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
+  | `Lsp
 ]
 
 and options = {
@@ -356,6 +358,9 @@ let specs = {
       `Group "provers";
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
 
+    ("lsp", "Run EasyCrypt LSP server", [
+      `Spec  ("-stdio"  , `Flag  , "<for internal use>")]);
+
     ("config", "Print EasyCrypt configuration", []);
 
     ("runtest", "Run a test-suite", [
@@ -509,7 +514,8 @@ let prv_options_of_values ini values =
 
 let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
-    clio_provers = prv_options_of_values ini values; }
+    clio_provers = prv_options_of_values ini values; 
+  }
 
 let cmp_options_of_values ini values input =
   { cmpo_input   = input;
@@ -518,8 +524,9 @@ let cmp_options_of_values ini values input =
     cmpo_compact = get_int "compact" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
-    cmpo_script  = get_flag "script" values;
-    cmpo_trace   = get_flag "trace" values; }
+    cmpo_script  = get_flag "script" values; 
+    cmpo_trace   = get_flag "trace" values;
+  }
 
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
@@ -527,7 +534,8 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_report    = get_string "report" values;
     runo_provers   = prv_options_of_values ini values;
     runo_jobs      = get_int "jobs" values;
-    runo_rawargs   = get_strings "raw-args" values; }
+    runo_rawargs   = get_strings "raw-args" values; 
+  }
 
 let doc_options_of_values values input =
   { doco_input     = input;
@@ -603,6 +611,15 @@ let parse getini argv =
         | _ ->
           raise (Arg.Bad "this command takes a single input file as argument")
       end
+
+    | "lsp" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Lsp in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 
@@ -685,7 +702,8 @@ let read_ini_file (filename : string) =
       ini_provers  = trylist "provers" ;
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
-      ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
+      ini_rdirs    = List.map parse_idir (trylist "rdirs"); 
+    } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
@@ -693,4 +711,5 @@ let read_ini_file (filename : string) =
     ini_provers  = ini.ini_provers;
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
-    ini_rdirs    = ini.ini_rdirs; }
+    ini_rdirs    = ini.ini_rdirs; 
+  }

@@ -156,6 +156,9 @@ module PVM = struct
     try Mid.change (fun o -> Some (Mpv.add env pv f (odfl Mpv.empty o))) m s
     with AliasClash (env,c) -> uerror env c
 
+  let of_list env pvs =
+    List.fold_left (fun s ((pv, m), f) -> add env pv m f s) empty pvs
+
   let find env pv m s =
     try Mpv.find env pv (Mid.find m s)
     with AliasClash (env,c) -> uerror env c
@@ -581,6 +584,11 @@ let rec e_read_r env r e =
   | Evar pv -> PV.add env pv e.e_ty r
   | _ -> e_fold (e_read_r env) r e
 
+let rec form_read_r env r f =
+  match f.f_node with
+  | Fpvar (pv, _) -> PV.add env pv f.f_ty r
+  | _ -> f_fold (form_read_r env) r f
+
 let rec is_read_r env w s =
   List.fold_left (i_read_r env) w s
 
@@ -625,11 +633,54 @@ let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
 let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s
 let f_write  ?(except=Sx.empty) env f  = f_write_r  ~except env PV.empty f
 
-let e_read  env e  = e_read_r  env PV.empty e
-let i_read  env i  = i_read_r  env PV.empty i
-let is_read env is = is_read_r env PV.empty is
-let s_read  env s  = s_read_r  env PV.empty s
-let f_read  env f  = f_read_r  env PV.empty f
+let e_read     env e  = e_read_r  env PV.empty e
+let form_read  env e  = form_read_r  env PV.empty e
+let i_read     env i  = i_read_r  env PV.empty i
+let is_read    env is = is_read_r env PV.empty is
+let s_read     env s  = s_read_r  env PV.empty s
+let f_read     env f  = f_read_r  env PV.empty f
+
+(* -------------------------------------------------------------------- *)
+let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env) =
+  let pv_of_stmt =
+    match kind with
+    | `Read  -> is_read_r
+    | `Write -> is_write_r ?except:None
+  in
+
+  let rec doit (ctxt : instr option) (pvs : PV.t) (zpr : Zipper.spath) =
+    let (head, tail), ipath = zpr in
+    let stail = List.ocons ctxt tail in
+    let s = stmt (List.rev_append head stail) in
+
+    let pvs =
+      let s = match span with `Before -> head | `After -> tail in
+      pv_of_stmt env pvs s in
+
+    let parent, pvs =
+      match ipath with
+      | Zipper.ZTop ->
+        None, pvs
+
+      | Zipper.ZIfThen (e, ps, se) ->
+        Some (ps, i_if (e, s, se)), pvs
+
+      | Zipper.ZIfElse (e, st, ps) ->
+        Some (ps, i_if (e, st, s)), pvs
+
+      | Zipper.ZMatch  (e, ps, mpi) ->
+        let bs =
+          List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)
+        in Some (ps, i_match (e, bs)), pvs
+
+      | Zipper.ZWhile (e, ps) ->
+        let wi = i_while (e, s) in
+        Some (ps, wi), pv_of_stmt env pvs [wi]
+    in
+
+    ofold (fun (zpr, ctxt) pvs -> doit (Some ctxt) pvs zpr) pvs parent
+
+  in fun pvs zpr -> doit None pvs zpr
 
 (* -------------------------------------------------------------------- *)
 let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env) =
