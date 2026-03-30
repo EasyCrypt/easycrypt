@@ -175,4 +175,4 @@ circuit.
 qed.
 
 bind circuit 
-  (+^) <- "BVXOR_8".
+  (+^) <- "BVXOR_8" from "../examples/example_specs.spec".
