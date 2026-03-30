@@ -239,8 +239,8 @@ let cfold_stmt
 
   let e_simplify, i_simplify =
       if   simplify
-      then (identity, identity)
-      else (e_simplify, i_simplify) in
+      then (e_simplify, i_simplify)
+      else (identity, identity) in
 
   (*
      Process one instruction under the current propagated substitution and

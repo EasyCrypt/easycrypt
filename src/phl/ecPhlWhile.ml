@@ -629,30 +629,42 @@ let process_async_while (winfos : EP.async_while_info) tc =
   let (er, cr), sr = tc1_last_while tc evs.es_sr in
 
   let inv = TTC.tc1_process_prhl_formula tc inv in
+
   let p0  = TTC.tc1_process_prhl_formula tc  p0 in
   let p1  = TTC.tc1_process_prhl_formula tc  p1 in
+
   let f1  = TTC.tc1_process_prhl_form_opt tc None f1 in
   let f2  = TTC.tc1_process_prhl_form_opt tc None f2 in
+
   let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some (tfun f1.inv.f_ty tbool)) t1 in
   let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some (tfun f2.inv.f_ty tbool)) t2 in
+
   let ft1 = ss_inv_generalize_right (ss_inv_of_expr ml t1) mr in
   let ft2 = ss_inv_generalize_left (ss_inv_of_expr mr t2) ml in
+
   let fe1 = ss_inv_generalize_right (ss_inv_of_expr ml el) mr in
   let fe2 = ss_inv_generalize_left (ss_inv_of_expr mr er) ml in
-  let fe  = map_ts_inv2 f_or fe1 fe2 in
+
   let f_app' f = f_app (List.hd f) (List.tl f) tbool in
   let f_imps' f = f_imps (List.tl f) (List.hd f) in
-  let cond1 = EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr
-    (map_ts_inv f_imps' [map_ts_inv f_ands [fe1; fe2;
-    map_ts_inv f_app' [ft1; f1];
-    map_ts_inv f_app' [ft2; f2]];
-    inv; fe; p0]) in
 
-  let cond2 = EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr
-    (map_ts_inv f_imps' [fe1; inv; fe; map_ts_inv1 f_not p0; p1]) in
+  let fe = map_ts_inv2 f_eq fe1 fe2 in
+  let neg_p0 f = map_ts_inv f_imps' [f; map_ts_inv1 f_not p0] in
+  let neg_p1 f = map_ts_inv f_imps' [f; map_ts_inv1 f_not p1] in
+  let fprog =
+    let ft1 = map_ts_inv f_app' [ft1; f1] in
+    let ft2 = map_ts_inv f_app' [ft2; f2] in
+    neg_p0 (neg_p1 (map_ts_inv f_ands [ft1;ft2]))
+  in
+  let flock = map_ts_inv f_ands [fe;fprog] in
+  let fc1 = map_ts_inv f_ands [fe1; p0] in
+  let fc2 = map_ts_inv f_ands [fe2; p1] in
 
-  let cond3 = EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr
-    (map_ts_inv f_imps' [fe2; inv; fe; map_ts_inv1 f_not p0; map_ts_inv1 f_not p1]) in
+  let cond =
+    EcSubst.f_forall_mems_ts_inv evs.es_ml evs.es_mr
+      (map_ts_inv f_imps'
+         [map_ts_inv f_ors [flock; fc1; fc2]; inv])
+  in
 
   let xwh =
     let v1, v2 = as_seq2 (EcEnv.LDecl.fresh_ids hyps ["v1_"; "v2_"]) in
@@ -660,8 +672,13 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let fv2 = {ml;mr;inv=f_local v2 f2.inv.f_ty} in
     let ev1 = e_local v1 f1.inv.f_ty in
     let ev2 = e_local v2 f2.inv.f_ty in
+    let p0 = map_ts_inv f_ands [map_ts_inv1 f_not p0;map_ts_inv1 f_not p1] in
+    let fe = map_ts_inv f_ands [fe1;fe2] in
+    let ft1 = map_ts_inv f_app' [ft1; fv1] in
+    let ft2 = map_ts_inv f_app' [ft2; fv2] in
+    let fprog = map_ts_inv f_ands [ft1;ft2] in
     let eq1 = map_ts_inv2 f_eq fv1 f1 and eq2 = map_ts_inv2 f_eq fv2 f2 in
-    let pr = map_ts_inv f_ands [inv; fe; p0; eq1; eq2] in
+    let pr = map_ts_inv f_ands [inv; fe; fprog; p0; eq1; eq2] in
     let po = inv in
     let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in
     let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in
@@ -671,15 +688,13 @@ let process_async_while (winfos : EP.async_while_info) tc =
 
   let hr1, hr2 =
     let hr1 =
-      let el = ss_inv_generalize_right (ss_inv_of_expr ml el) mr in
-      let pre = map_ts_inv f_ands [inv; el ; map_ts_inv1 f_not p0; p1] in
+      let pre = map_ts_inv f_ands [inv; fe1 ; p0] in
       EcSubst.f_forall_mems_ss_inv evs.es_mr
         (ts_inv_lower_left2
           (fun pr po -> f_hoareS (snd evs.es_ml) pr cl (POE.lift po)) pre inv)
 
     and hr2 =
-      let er = ss_inv_generalize_left (ss_inv_of_expr mr er) ml in
-      let pre = map_ts_inv f_ands [inv; er; map_ts_inv1 f_not p0; map_ts_inv1 f_not p1] in
+      let pre = map_ts_inv f_ands [inv; fe2; p1] in
       EcSubst.f_forall_mems_ss_inv evs.es_ml
         (ts_inv_lower_right2
           (fun pr po -> f_hoareS (snd evs.es_mr) pr cr (POE.lift po)) pre inv)
@@ -687,22 +702,27 @@ let process_async_while (winfos : EP.async_while_info) tc =
     in (hr1, hr2)
   in
 
-
   let (c1, ll1), (c2, ll2) =
     try
       let ll1 =
-        let test    = f_ands [fe1.inv; f_not p0.inv; p1.inv] in
-        let test, m = LossLess.form_of_expr env (EcMemory.memory evs.es_mr) ml test in
+        let test, m = LossLess.form_of_expr env (EcMemory.memory evs.es_mr) ml fe1.inv in
         let c       = s_while (test, cl) in
+        let pre = map_ts_inv f_ands [inv; fe1 ; p0] in
         LossLess.xhyps evs m
-          (ts_inv_lower_left3 (fun inv f_tr f_r1 -> f_bdHoareS (snd evs.es_ml) inv c f_tr FHeq f_r1) inv {ml;mr;inv=f_true} {ml;mr;inv=f_r1})
+          (ts_inv_lower_left3
+             (fun inv f_tr f_r1 -> f_bdHoareS (snd evs.es_ml) inv c f_tr FHeq f_r1)
+             pre {ml;mr;inv=f_true} {ml;mr;inv=f_r1}
+          )
 
       and ll2 =
-        let test    = f_ands [fe1.inv; f_not p0.inv; f_not p1.inv] in
-        let test, m = LossLess.form_of_expr env (EcMemory.memory evs.es_ml) mr test in
+        let test, m = LossLess.form_of_expr env (EcMemory.memory evs.es_ml) mr fe2.inv in
         let c       = s_while (test, cr) in
+        let pre = map_ts_inv f_ands [inv; fe2; p1] in
         LossLess.xhyps evs m
-          (ts_inv_lower_right3  (fun inv f_tr f_r1 -> f_bdHoareS (snd evs.es_mr) inv c f_tr FHeq f_r1) inv {ml;mr;inv=f_true} {ml;mr;inv=f_r1})
+          (ts_inv_lower_right3
+             (fun inv f_tr f_r1 -> f_bdHoareS (snd evs.es_mr) inv c f_tr FHeq f_r1)
+             pre {ml;mr;inv=f_true} {ml;mr;inv=f_r1}
+          )
 
       in (ll1, ll2)
 
@@ -720,10 +740,10 @@ let process_async_while (winfos : EP.async_while_info) tc =
     f_equivS (snd evs.es_ml) (snd evs.es_mr) (es_pr evs) sl sr (map_ts_inv2 f_and inv post) in
 
   FApi.t_onfsub (function
-    | 6 -> Some (EcLowGoal.t_intros_n c1)
-    | 7 -> Some (EcLowGoal.t_intros_n c2)
+    | 4 -> Some (EcLowGoal.t_intros_n c1)
+    | 5 -> Some (EcLowGoal.t_intros_n c2)
     | _ -> None)
 
     (FApi.xmutate1
        tc `AsyncWhile
-         [cond1; cond2; cond3; hr1; hr2; xwh; ll1; ll2; concl])
+         [cond; xwh; hr1; hr2; ll1; ll2; concl])

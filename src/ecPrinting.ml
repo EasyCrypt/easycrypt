@@ -19,6 +19,7 @@ module Msym = EcSymbols.Msym
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module Sp   = EcPath.Sp
+module Mop  = EcPath.Mop
 
 (* -------------------------------------------------------------------- *)
 type prpo_display = { prpo_pr : bool; prpo_po : bool; }
@@ -1836,7 +1837,7 @@ and try_pp_notations
     let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
     pp_form_core_r ppe outer fmt f; true
 
-and pp_poe ppe fmt (l,d) =
+and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
   let pp_branch fmt (e, f) =
     let bd, br = EcFol.decompose_lambda f in
     let doarg (x, gty) =
@@ -1850,7 +1851,14 @@ and pp_poe ppe fmt (l,d) =
     let ppe = PPEnv.add_locals ppe (List.map fst bd) in
     Format.fprintf fmt "@[<hov 2>| %a =>@ %a]" (pp_form ppe) eargs (pp_form ppe) br
   in
-  (pp_list "@ " pp_branch) fmt (EcPath.Mp.bindings l);
+
+  let poe, d =
+    List.partition_map (fun (p, v) ->
+      match p with Some p -> Left (p , v) | None -> Right v
+    ) (Mop.bindings poe) in
+  let d = List.ohead d in
+
+  (pp_list "@ " pp_branch) fmt poe;
   oiter (fun br -> Format.fprintf fmt "@[<hov 2>| _ =>@ %a]" (pp_form ppe) br) d
 
 and pp_form_core_r
@@ -1985,24 +1993,24 @@ and pp_form_core_r
       let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
-      let { main = post; exnmap = (poe, d) } = (hf_po hf).hsi_inv in
+      let { main = post; exnmap = poe } = (hf_po hf).hsi_inv in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_pl_mem_binding pm ppe) hf.hf_m
         (pp_form ppepr) (hf_pr hf).inv
         (pp_form ppepo) (post)
-        (pp_poe ppepo) (poe, d)
+        (pp_poe ppepo) poe
 
   | FhoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-      let { main = post; exnmap = (poe, d); } = (hs_po hs).hsi_inv in
+      let { main = post; exnmap = poe; } = (hs_po hs).hsi_inv in
       let pm = debug_mode || (fst hs.hs_m).id_symb <> "&hr" in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
         (pp_pl_mem_binding pm ppe) (fst hs.hs_m)
         (pp_form ppe) (hs_pr hs).inv
         (pp_form ppe) post
-        (pp_poe ppe) (poe, d)
+        (pp_poe ppe) poe
 
   | FeHoareF hf ->
       let mepr, mepo = EcEnv.Fun.hoareF_memenv hf.ehf_m hf.ehf_f ppe.PPEnv.ppe_env in
@@ -3092,8 +3100,8 @@ let pp_post (ppe : PPEnv.t) ?prpo fmt post =
     fmt post None
 
 (* -------------------------------------------------------------------- *)
-let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) (poe,d) =
-  let pp_branch e f =
+let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) poe =
+  let pp_branch (p : EcPath.path) (f : form) =
     let bd, br = EcFol.decompose_lambda f in
     let doarg (x, gty) =
       match gty with
@@ -3102,18 +3110,20 @@ let pp_poe (ppe : PPEnv.t) ?prpo (fmt: Format.formatter) (poe,d) =
     let args = List.map doarg bd in
     let tys = List.map (fun (_, ty) -> EcFol.as_gtty ty) bd in
     let ty = EcTypes.toarrow tys EcTypes.texn in
-    let eargs = EcFol.f_app (EcFol.f_op e [] ty) args EcTypes.texn in
+    let eargs = EcFol.f_app (EcFol.f_op p [] ty) args EcTypes.texn in
     let ppe = PPEnv.add_locals ppe (List.map fst bd) in
     pp_prpo ppe
       (pp_form ppe) eargs
       (omap (fun x -> x.prpo_po) prpo |> odfl false)
       fmt br None
   in
-  EcPath.Mp.iter pp_branch poe;
+
+  EcPath.Mop.iter (fun p f -> oiter (pp_branch^~ f) p) poe;
   oiter (fun d ->
       pp_prpo ppe Format.pp_print_string "_"
         (omap (fun x -> x.prpo_po) prpo |> odfl false)
-        fmt d None) d
+        fmt d None)
+      (Mop.find_opt None poe)
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
@@ -3121,13 +3131,13 @@ let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
   let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
   let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
 
-  let { main = post; exnmap = (poe, d); } = (hf_po hf).hsi_inv in
+  let { main = post; exnmap = poe; } = (hf_po hf).hsi_inv in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (hf_pr hf).inv;
   let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
   Format.fprintf fmt "    %a %a@\n%!" (pp_funname ppe) hf.hf_f (pp_pl_mem_binding pm ppe) hf.hf_m;
   Format.fprintf fmt "@\n%a" (pp_post ppepo ?prpo) post;
-  Format.fprintf fmt "@\n%a%!" (pp_poe ppepo ?prpo) (poe,d)
+  Format.fprintf fmt "@\n%a%!" (pp_poe ppepo ?prpo) poe
 
 (* -------------------------------------------------------------------- *)
 
@@ -3135,8 +3145,7 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
   let ppef = PPEnv.push_mem ppe ~active:true hs.hs_m in
   let ppnode = collect2_s ppef hs.hs_s.s_node [] in
 
-  let { main = post; exnmap = (poe, d); } = (hs_po hs).hsi_inv in
-
+  let { main = post; exnmap = poe; } = (hs_po hs).hsi_inv in
   let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode in
 
   Format.fprintf fmt "Context : %a: %a@\n%!" (pp_mem ppe) (fst hs.hs_m)
@@ -3148,7 +3157,7 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
   Format.fprintf fmt "@\n%!";
   Format.fprintf fmt "%a%!" (pp_post ppef ?prpo) post;
   Format.fprintf fmt "@\n%!";
-  Format.fprintf fmt "%a%!" (pp_poe ppef ?prpo) (poe,d)
+  Format.fprintf fmt "%a%!" (pp_poe ppef ?prpo) poe
 
 (* -------------------------------------------------------------------- *)
 let pp_eHoareF (ppe : PPEnv.t) ?prpo fmt hf =

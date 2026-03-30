@@ -45,8 +45,8 @@ let compute_hoare_call_post
   let funsig = (Fun.by_xpath funname env).f_sig in
   let modi  = f_write env funname in
 
-  let { main = fpost; exnmap = (fepost, fd); } = fpost in
-  let { main = post ; exnmap = ( epost,  d); } =  post in
+  let { main = fpost; exnmap = fepost; } = fpost in
+  let { main = post ; exnmap =  epost; } =  post in
 
   let vres = LDecl.fresh_id hyps "result" in
   let fres = f_local vres funsig.fs_ret in
@@ -63,7 +63,7 @@ let compute_hoare_call_post
     let spre = subst_args_call env m (e_tuple funargs) PVM.empty in
     f_anda_simpl (PVM.subst env spre fpre) post in
 
-  let poe = TTC.merge2_poe_list (epost, d) (fepost, fd) in
+  let poe = TTC.merge2_poe_list epost fepost in
   let poe = List.map (fun inv -> { m; inv; }) poe in
   let poe =
     let penv_e = EcEnv.Fun.inv_memenv1 m env in
@@ -574,8 +574,8 @@ let process_call side info tc =
       let pre  = TTC.pf_process_form !!tc penv tbool pre  in
       let post = TTC.pf_process_form !!tc qenv tbool post in
       let env_e = LDecl.inv_memenv1 m hyps in
-      let (poe, d) = TTC.pf_process_poe env_e poe in
-      f_hoareF {m; inv = pre} f { hsi_m = m; hsi_inv = { main = post; exnmap = (poe, d); } }
+      let poe = TTC.pf_process_poe env_e poe in
+      f_hoareF {m; inv = pre} f { hsi_m = m; hsi_inv = { main = post; exnmap = poe; } }
 
     | _ -> tc_error !!tc "the conclusion is not a hoare" in
 
