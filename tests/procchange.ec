@@ -36,6 +36,27 @@ theory ProcChangeAssignEquiv.
 end ProcChangeAssignEquiv.
 
 (* -------------------------------------------------------------------- *)
+(* proc change to add instructions to the program *)
+theory ProcChangeAddInstrs.
+  module M = {
+    proc f(x : int) = {
+      x <- x + 1;
+      x <- x + 2;
+      x <- x + 3;
+      return x;
+    }
+  }.
+  
+  lemma L : hoare[ M.f : arg = 0 ==> res = 6].
+  proof.
+  proc.
+    proc change <1 : { x <- 0; }; 1:by auto. 
+    sp 4;  proc change >(-1) : { x <- 6; }; 1: by auto.
+    wp; skip; auto.
+  abort.
+end ProcChangeAddInstrs.
+
+(* -------------------------------------------------------------------- *)
 theory ProcChangeAssignHoare.
   module M = {
     proc f(x : int) = {
@@ -153,10 +174,10 @@ theory ProcChangeInWhileEquiv.
     x <- x + 0 + 1;
   }.
   wp; skip. smt().
-  proc change {1} [^while.1..^while.2] : {
+  proc change {1} ^while.:[1..2] : {
     x <- 2;
   }. wp; skip. smt().
-  proc change {2} [^while.1-1] : {
+  proc change {2} ^while.:[1+>2] : {
     x <- 2;
   }. wp; skip. smt().
   abort.

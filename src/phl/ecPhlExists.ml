@@ -8,6 +8,7 @@ open EcSubst
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
+open EcMatching.Position
 
 module L   = EcLocation
 module APT = EcParsetree
@@ -330,7 +331,9 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
 
   let tc =
     FApi.t_first
-      (EcPhlSeq.t_hoare_seq (Zpr.cpos 1) (map_ss_inv2 f_and seqf seqf_frame))
+      (EcPhlSeq.t_hoare_seq
+        (gap_after_pos cpos1_first)
+        (map_ss_inv2 f_and seqf seqf_frame))
       tc in
 
   let tc = FApi.t_first EcPhlHoare.t_hoaresplit tc in
@@ -390,7 +393,10 @@ let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
       hyps m (fpre, fpost) call (hs_po concl).hsi_inv in
   let post = EcSubst.subst_form ids_subst post in
 
-  let tc = EcPhlSeq.t_hoare_seq (Zpr.cpos (-1)) { m = m; inv = post; } tc in
+  let tc =
+    EcPhlSeq.t_hoare_seq
+      (gap_before_pos cpos1_last)
+      { m = m; inv = post; } tc in
   let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
   let tc = FApi.t_last (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
   let tc = FApi.t_last (t_intros_i (List.fst ids)) tc in
@@ -523,8 +529,8 @@ let process_ecall_equiv
       let nl = List.length concl.es_sl.s_node in
       let nr = List.length concl.es_sr.s_node in
       APT.sideif side
-        (Zpr.cpos (-1), Zpr.cpos (nr))
-        (Zpr.cpos (nl), Zpr.cpos (-1)) in
+        (gap_before_pos cpos1_last, gap_before_pos (cpos1 nr))
+        (gap_before_pos (cpos1 nl), gap_before_pos cpos1_last) in
 
     let tc = EcPhlSeq.t_equiv_seq pos { ml; mr; inv = post; } tc in
     let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
@@ -553,7 +559,7 @@ let process_ecall_equiv
 
     let tc =
       EcPhlSeq.t_equiv_seq
-        (Zpr.cpos (-1), Zpr.cpos (-1))
+        (gap_before_pos cpos1_last, gap_before_pos cpos1_last)
         { ml; mr; inv = post; } tc in
 
     let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in

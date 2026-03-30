@@ -519,6 +519,7 @@
 %token PIPEGT
 %token PIPEPIPEGT
 %token PLUS
+%token PLUSGT
 %token POSE
 %token PR
 %token PRAGMA
@@ -633,7 +634,7 @@
 %left  LOP1
 %right ROP1
 %right QUESTION
-%left  LOP2 MINUS PLUS
+%left  LOP2 MINUS PLUS PLUSGT
 %right ROP2
 %right RARROW
 %left  LOP3 STAR SLASH
@@ -863,6 +864,7 @@ inlinepat:
 | AMP       { "&"   }
 | HAT       { "^"   }
 | BACKSLASH { "\\"  }
+| PLUSGT    { "+>"  }
 
 | x=LOP1 | x=LOP2 | x=LOP3 | x=LOP4
 | x=ROP1 | x=ROP2 | x=ROP3 | x=ROP4
@@ -1017,7 +1019,6 @@ pffilter:
       i=pfpos? COLON j=pfpos? { `Range (i, j) }
     | i=pfpos { `Single i }, COMMA)
   RBRACKET
-
   { PFRange (flat, rg) }
 
 | LPBRACE flat=iboption(SLASH) x=ident IN h=form_h RPBRACE
@@ -2556,57 +2557,124 @@ lvmatch:
 %inline icodepos:
  | HAT x=icodepos_r { x }
 
-codepos1_wo_off:
-| i=sword
-    { (`ByPos i :> pcp_base) }
+%inline index0:
+| empty { `Index0 }
+
+%inline index1:
+| empty { `Index1 }
+
+codepos1_wo_off_(I):
+| base=I i=sword
+    { (`ByPos (i, base) :> pcp_base) }
 
 | k=icodepos i=option(brace(sword))
     { (`ByMatch (i, k) :> pcp_base) }
 
-codepos1:
-| cp=codepos1_wo_off { (0, cp) }
+codepos1_(I):
+| cp=codepos1_wo_off_(I) { (0, cp) }
+| cp=codepos1_wo_off_(I) AMP PLUS  i=word { ( i, cp) }
+| cp=codepos1_wo_off_(I) AMP MINUS i=word { (-i, cp) }
 
-| cp=codepos1_wo_off AMP PLUS  i=word { ( i, cp) }
-| cp=codepos1_wo_off AMP MINUS i=word { (-i, cp) }
+%inline codepos1:
+| p=codepos1_(index1) { p }
 
 branch_select:
-| SHARP s=boident DOT {`Match s}
+| SHARP s=boident DOT { `Match s }
 | DOT { `Cond true }
 | QUESTION { `Cond false }
 
-%inline nm1_codepos:
-| i=codepos1 bs=branch_select
+%inline codepos_step_(I):
+| i=codepos1_(I) bs=branch_select
     { (i, bs) }
 
-codepos:
-| nm=rlist0(nm1_codepos, empty) i=codepos1
-    { (nm, i) }
+%inline codepos_step:
+| p=codepos_step_(index1) { p }
 
-codepos_range:
-| LBRACKET cps=codepos DOTDOT cpe=codepos RBRACKET { (cps, `Base cpe) }
-| LBRACKET cps=codepos PLUS cpe=codepos1 RBRACKET { (cps, `Offset cpe) }
+(* Gap grammar productions *)
+(* Base explicit gap — direction override only *)
+codegap1_(I):
+| LT i=mparen(codepos1_(I)) { GapBefore i }
+| GT i=mparen(codepos1_(I)) { GapAfter  i }
+
+%inline codegap1:
+| p=codegap1_(index1) { p }
+
+(* Default-before: bare integer means gap before *)
+codegap1_before_(I):
+| i=codepos1_(I) { GapBefore i }
+| g=codegap1_(I) { g }
+
+%inline codegap1_before:
+| p=codegap1_before_(index1) { p }
+
+(* 0-indexed gap: GapBefore for non-negative, GapAfter for negative
+   (negative indexes count from the end, so "in the direction of travel"
+   means GapAfter — e.g.  wp -1 = gap after last instruction) *)
+%inline codegap1_0before:
+| p=codegap1_before_(index0) { p }
+
+(* Default-after: bare integer means gap after (e.g. wp, sp) *)
+codegap1_after_(I):
+| i=codepos1_(I) { GapAfter i }
+| g=codegap1_(I) { g }
+
+%inline codegap1_after:
+| p=codegap1_after_(index1) { p }
+
+(* Gap-based offset for swap *)
+codegap_offset1_(I):
+| i=sword                  { PGapRelative i }
+| AT g=codegap1_before_(I) { PGapAbsolute g }
+
+%inline codegap_offset1:
+| o=codegap_offset1_(index0) { o }
+
+(* s_codegap1 variants for doption *)
+s_codegap1_before_(I):
+| g=codegap1_before_(I)
+    { Single g }
+| g1=codegap1_before_(I) g2=codegap1_before_(I)
+    { Double (g1, g2) }
+
+%inline s_codegap1_0before:
+| p=s_codegap1_before_(index0) { p }
+
+(* Shift to convert input closed range into closed-open form *)
+%inline codegap1_range:
+| LBRACKET cps=codepos1 DOTDOT cpe=codepos1 RBRACKET
+    { (GapBefore cps, GapAfter cpe) }
+
+| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET { 
+    if unloc cpo > 0 then begin
+        let (offset, base) = cps in
+        (GapBefore cps, GapAfter (offset + unloc cpo, base))
+    end else 
+        parse_error (loc cpo) (Some "cannot give negative offset for codepos range end")
+  }
+
+%inline codepos_path:
+| path=rlist0(codepos_step, empty) { path }
+
+codepos:
+| path=codepos_path i=codepos1
+  { (path, i) }
+
+codegap:
+| path=codepos_path i=codegap1
+  { (path, i) }
+
+codegap_range:
+| r=codegap1_range
+  { ([], r) }
+| path=rlist1(codepos_step, empty) COLON r=codegap1_range
+  { (path, r) }
 
 codepos_or_range:
-| cp=codepos { (cp, `Offset (0, `ByPos 0)) }
-| cpr=codepos_range  { cpr }
-
-codeoffset1:
-| i=sword       { (`ByOffset   i :> pcodeoffset1) }
-| AT p=codepos1 { (`ByPosition p :> pcodeoffset1) }
-
-o_codepos1:
-| UNDERSCORE { None }
-| i=codepos1 { Some i}
-
-s_codepos1:
-| n=codepos1
-    { Single n }
-
-| n1=codepos1 n2=codepos1
-    { Double (n1, n2) }
+| cp=codepos { Pos cp }
+| cpr=codegap_range { Range cpr }
 
 semrndpos1:
-| b=boption(STAR) c=codepos1
+| b=boption(STAR) c=codegap1_0before
     { (b, c) }
 
 semrndpos:
@@ -2656,14 +2724,11 @@ swap_info:
 | s=side? p=swap_position { (s, p) }
 
 swap_position:
-| offset=codeoffset1
+| offset=codegap_offset1
     { { interval = None; offset; } }
 
-| start=codepos1 offset=codeoffset1
-    { { interval = Some (start, None); offset; } }
-
-| LBRACKET start=codepos1 DOTDOT end_=codepos1 RBRACKET offset=codeoffset1
-    { { interval = Some (start, Some end_); offset; } }
+| interval=codepos_or_range offset=codegap_offset1
+    { { interval = Some interval; offset; } }
 
 side:
 | LBRACE n=word RBRACE {
@@ -2860,7 +2925,7 @@ logtactic:
    { Pwlog (ids, b, f) }
 
 eager_tac:
-| SEQ n1=codepos1 n2=codepos1 COLON s=stmt COLON p=form_or_double_form
+| SEQ n1=codegap1_0before n2=codegap1_0before COLON s=stmt COLON p=form_or_double_form
     { Peager_seq ((n1, n2), s, p) }
 
 | IF
@@ -2885,17 +2950,21 @@ form_or_double_form:
 | LPAREN UNDERSCORE? COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
 
+if_option_codegap1:
+| UNDERSCORE          { None }
+| g=codegap1_before   { Some g }
+
 %inline if_option:
 | s=option(side)
    { `Head (s) }
 
-| s=option(side) i1=o_codepos1 i2=o_codepos1 COLON f=sform
+| s=option(side) i1=if_option_codegap1 i2=if_option_codegap1 COLON f=sform
    { `Seq (s, (i1, i2), f) }
 
 | CEQ f=sform
    { `Seq (None, (None, None), f) }
 
-| s=option(side) i=codepos1? COLON LPAREN
+| s=option(side) i=codegap1_before? COLON LPAREN
     UNDERSCORE COLON f1=form LONGARROW f2=form
   RPAREN
    {
@@ -2956,13 +3025,13 @@ direction:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
+| SEQ s=side? pos=s_codegap1_0before COLON p=form_or_double_form f=app_bd_info
    { Pseq (s, pos, p, f) }
 
-| WP n=s_codepos1?
+| WP n=s_codegap1_0before?
    { Pwp n }
 
-| SP n=s_codepos1?
+| SP n=s_codegap1_0before?
     { Psp n }
 
 | SKIP
@@ -3009,7 +3078,7 @@ direction:
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
-| RNDSEM red=boption(STAR) s=side? c=codepos1
+| RNDSEM red=boption(STAR) s=side? c=codegap1_0before
     { Prndsem (red, s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
@@ -3140,7 +3209,7 @@ direction:
 | BYPR f1=sform f2=sform
     { PPr (Some (f1, f2)) }
 
-| FEL at_pos=codepos1 cntr=sform delta=sform q=sform
+| FEL at_pos=codegap1_after cntr=sform delta=sform q=sform
     f_event=sform some_p=fel_pred_specs inv=sform?
     { let info = {
         pfel_cntr  = cntr;
@@ -3205,8 +3274,11 @@ direction:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=loc(codepos_or_range) COLON b=option(bracket(ptybindings)) s=brace(stmt)
-    { Pchangestmt (side, b, (unloc pos), s) }
+| PROC CHANGE side=side? pos=codepos_or_range COLON b=option(bracket(ptybindings)) s=brace(stmt)
+    { Pchangestmt (side, b, PosOrRange pos, s) }
+
+| PROC CHANGE side=side? pos=codegap COLON b=option(bracket(ptybindings)) s=brace(stmt)
+    { Pchangestmt (side, b, Gap pos, s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }
@@ -3276,7 +3348,7 @@ fel_pred_specs:
     {assoc_ps}
 
 eqobs_in_pos:
-| i1=codepos1 i2=codepos1 { (i1, i2) }
+| i1=codegap1_after i2=codegap1_after { (i1, i2) }
 
 eqobs_in_eqglob1:
 | LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON
@@ -4014,6 +4086,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 (* -------------------------------------------------------------------- *)
 %inline paren(X):
+| LPAREN x=X RPAREN { x }
+
+mparen(X):
+| x=X               { x }
 | LPAREN x=X RPAREN { x }
 
 %inline brace(X):

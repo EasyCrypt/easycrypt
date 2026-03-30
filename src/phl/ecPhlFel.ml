@@ -112,6 +112,8 @@ let callable_oracles_stmt env modv =
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: do we have to subst more?                                     *)
+(* [t_failure_event_r (gap, ...)]: splits the function body at [gap];
+   FEL is applied to instructions after the gap. *)
 let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let env, _, concl = FApi.tc1_eflat tc in
 
@@ -271,7 +273,7 @@ let process_fel at_pos (infos : fel_info) tc =
 
 
   let m = EcIdent.create "&hr" in
-  let at_pos  = EcTyping.trans_codepos1 env at_pos in
+  let at_pos  = EcTyping.trans_codegap1 env at_pos in
   let hyps    = LDecl.inv_memenv1 m hyps1 in
   let cntr    = {m;inv=TTC.pf_process_form !!tc hyps tint infos.pfel_cntr} in
   let hypsq   = LDecl.push_active_ss (EcMemory.abstract pr.pr_mem) hyps1 in

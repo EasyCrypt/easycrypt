@@ -416,7 +416,7 @@ rcondf{1} 1; first auto.
 rcondf{2} 1; first auto; smt().
 rcondt{2} 1; first auto.
 wp; inline*.
-swap{2} 2 -1; swap{2} 6 -4; swap{2} 10 -7.
+swap{2} 2 -1; swap{2} 6 -4. 
 seq 2 3 :
   (#pre /\ x{1} = r0{2} /\ y{1} = r1{2} /\
    x0{2} = A); first auto.

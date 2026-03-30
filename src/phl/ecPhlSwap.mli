@@ -6,8 +6,8 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 type swap_kind = {
-  interval : (codepos1 * codepos1 option) option;
-  offset   : codeoffset1;
+  interval : codegap_range;
+  offset   : codegap_offset1;
 }
 
 (* -------------------------------------------------------------------- *)

@@ -18,7 +18,7 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
-  sim_pos  : codepos1 pair option;
+  sim_pos  : codegap1 pair option;
   sim_hint : (xpath option * xpath option * EcPV.Mpv2.t) list * ts_inv option;
   sim_eqs  : EcPV.Mpv2.t option;
 }
@@ -524,8 +524,12 @@ let process_eqobs_inS (cm : crushmode option) (info : psim_info) (tc : tcenv1) =
       process_eqs !!tc env (TTC.tc1_process_prhl_formula tc pf)
     in Option.map process info.psim_eqs in
   let sim_pos =
-    info.psim_pos
-    |> Option.map (pair_map (EcTyping.trans_codepos1 env))
+    info.psim_pos |>
+      Option.map (fun (p1, p2) ->
+        let p1 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Left , p1) in
+        let p2 = EcLowPhlGoal.tc1_process_codegap1 tc (Some `Right, p2) in
+        (p1, p2)
+      )
   in
 
   let info = { sim_pos; sim_hint; sim_eqs; } in

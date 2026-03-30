@@ -89,7 +89,9 @@ let t_rewrite_equiv
     p
     (t_seqs [
       EcPhlEqobs.t_eqobs_in
-        None EcPhlEqobs.{ empty_sim_info with sim_pos = Some (cp, cp) };
+        None EcPhlEqobs.{ empty_sim_info with
+          sim_pos = Some EcMatching.Position.(gap_after_pos cp, gap_after_pos cp)
+        };
       (match side, dir with
        | `Left, `LtoR  -> t_id
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
@@ -164,6 +166,8 @@ let process_rewrite_equiv info tc =
 
   (* Offload to the tactic *)
   try
+    (* FIXME: cp should be translated to codepos in process 
+       Blocked by: bad interface to sim in src/phl/ecPhlEqobs.ml *)
     t_rewrite_equiv side dir cp equiv eqv_pt rargslv tc
   with
   | RwEquivError (RWE_InvalidFunction (got, wanted)) ->

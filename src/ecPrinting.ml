@@ -1550,16 +1550,16 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
       | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
           when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
 
-        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a"
+        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a;"
           (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
 
       | _, _ ->
-        Format.fprintf fmt "%a <-@;<1 2>%a"
+        Format.fprintf fmt "%a <-@;<1 2>%a;"
           (pp_lvalue ppe) lv (pp_expr ppe) e
     end
 
   | Srnd (lv, e) ->
-      Format.fprintf fmt "%a <$@;<1 2>$%a"
+      Format.fprintf fmt "%a <$@;<1 2>$%a;"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -1601,14 +1601,14 @@ and pp_stmt_for_form (ppe : PPEnv.t) fmt (s : stmt) =
       pp_instr_for_form ppe fmt i
 
   | [i1; i2] ->
-      Format.fprintf fmt "%a;@ %a"
+      Format.fprintf fmt "%a@ %a"
         (pp_instr_for_form ppe) i1
         (pp_instr_for_form ppe) i2
 
   | _ ->
       let i1 = List.hd s.s_node in
       let i2 = List.hd (List.rev s.s_node) in
-        Format.fprintf fmt "%a;@ ...;@ %a"
+        Format.fprintf fmt "%a@ ...;@ %a"
           (pp_instr_for_form ppe) i1
           (pp_instr_for_form ppe) i2
 
@@ -1986,7 +1986,7 @@ and pp_form_core_r
       let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
       let pm = debug_mode || hf.hf_m.id_symb <> "&hr" in
       let { main = post; exnmap = (poe, d) } = (hf_po hf).hsi_inv in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a]@]]"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_pl_mem_binding pm ppe) hf.hf_m
         (pp_form ppepr) (hf_pr hf).inv
@@ -1997,7 +1997,7 @@ and pp_form_core_r
       let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
       let { main = post; exnmap = (poe, d); } = (hs_po hs).hsi_inv in
       let pm = debug_mode || (fst hs.hs_m).id_symb <> "&hr" in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a]@]]"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a %a:@ @[%a ==>@ %a@ %a@]@]]"
         (pp_stmt_for_form ppe) hs.hs_s
         (pp_pl_mem_binding pm ppe) (fst hs.hs_m)
         (pp_form ppe) (hs_pr hs).inv
@@ -2386,8 +2386,11 @@ let pp_scvar ppe fmt vs =
 let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos1) =
   let s : string =
     match cp with
+    | `ByPos i when i >= 0 ->
+        string_of_int (i + 1)  (* 0-indexed internal → 1-indexed display *)
+
     | `ByPos i ->
-        string_of_int i
+        string_of_int i  (* negative positions displayed as-is *)
 
     | `ByMatch (i, k) ->
         let s =
@@ -2419,22 +2422,49 @@ let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos
 (* -------------------------------------------------------------------- *)
 let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoffset1) =
   match offset with
-  | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
-  | `ByOffset   o -> Format.fprintf fmt "%d" o
+  | `Absolute p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
+  | `Relative o -> Format.fprintf fmt "%d" o
+
+let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) = 
+  Format.fprintf fmt "%s"
+  (match br with
+  | `Cond true -> "."
+  | `Cond false -> "?"
+  | `Match cp -> Format.sprintf "#%s." cp)
+
+let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) = 
+  Format.fprintf fmt "%a%a" (pp_codepos1 ppe) cp pp_codepos_brsel br
+
+let pp_codepos_path ppe =
+  (pp_list "" (pp_codepos_step ppe))
 
 (* -------------------------------------------------------------------- *)
-let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
-  let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
-    let bs =
-      match bs with
-      | `Cond  true  -> "."
-      | `Cond  false -> "?"
-      | `Match cp    -> Format.sprintf "#%s." cp
-      in
-    Format.fprintf fmt "%a%s" (pp_codepos1 ppe) cp bs
-  in
+let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, cp1) : CP.codepos) =
+  Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codepos1 ppe) cp1
 
-  Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
+(* -------------------------------------------------------------------- *)
+let pp_codegap1 (ppe : PPEnv.t) (fmt : Format.formatter) (g : CP.codegap1) =
+  match g with
+  | CP.GapBefore cp -> Format.fprintf fmt "^<%a" (pp_codepos1 ppe) cp
+  | CP.GapAfter  cp -> Format.fprintf fmt "^>%a" (pp_codepos1 ppe) cp
+
+let pp_codegap (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, g1) : CP.codegap) =
+  Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codegap1 ppe) g1
+
+let symbol_and_codepos1_of_codegap1_range_edge (cg: CP.codegap1) : symbol * CP.codepos1 = 
+  match cg with
+  | GapBefore cp -> "[", cp
+  | GapAfter cp  -> "]", cp
+
+(* -------------------------------------------------------------------- *)
+let pp_codegap1_range (ppe: PPEnv.t) (fmt: Format.formatter) ((start, fin) : CP.codegap1_range) =
+  let s, cps = symbol_and_codepos1_of_codegap1_range_edge start in 
+  let e, cpe = symbol_and_codepos1_of_codegap1_range_edge fin in 
+  Format.fprintf fmt "%s%a;%a%s" s (pp_codepos1 ppe) cps (pp_codepos1 ppe) cpe e 
+
+(* FIXME: change when we can change the syntax *)
+let pp_codegap_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.codegap_range) =
+  Format.fprintf fmt "%a:[%a]" (pp_codepos_path ppe) cpath (pp_codegap1_range ppe) cp1r
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param list * ty * prbody option) =

@@ -237,7 +237,7 @@ let process_rewrite_at
    - the original program-logic goal with the selected range rewritten. *)
 let t_change_stmt
   (side : side option)
-  (pos : EcMatching.Position.codepos_range) 
+  (pos : EcMatching.Position.codegap_range)
   ((me, _bindings) : memenv * ovariable list) (* FIXME: might not be needed, check before merge *)
   (s : stmt)
   (tc : tcenv1)
@@ -245,8 +245,8 @@ let t_change_stmt
   let env = FApi.tc1_env tc in
   let _, stmt = EcLowPhlGoal.tc1_get_stmt side tc in 
 
-  let (zpr, _), (stmt, epilog) =
-    EcMatching.Zipper.zipper_and_split_of_cpos_range env pos stmt in
+  let zpr, (_,stmt, epilog), _nmr =
+    EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt in
 
   (* Collect the variables that may be modified by the surrounding context,
      excluding the fragment being replaced. *)
@@ -344,7 +344,7 @@ let t_change_stmt
 let process_change_stmt
   (side   : side option)
   (binds  : ptybindings option)
-  (pos    : pcodepos_range)
+  (pos    : prange1_or_insert)
   (s      : pstmt)
   (tc     : tcenv1)
 =
@@ -371,7 +371,7 @@ let process_change_stmt
 
   let pos = 
     let env = EcEnv.Memory.push_active_ss me env in
-    EcTyping.trans_codepos_range ~memory:(fst me) env pos 
+    EcTyping.trans_range1_or_insert ~memory:(fst me) env pos
   in
 
 (*
