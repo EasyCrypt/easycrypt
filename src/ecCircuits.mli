@@ -78,6 +78,8 @@ val circ_taut  : circuit -> bool
 (* Generate circuits *)
 (* Form processors *)
 val circuit_of_form : state -> hyps -> form -> circuit
+val circuit_check_posts : ?do_time:bool -> env:env -> pres:circuit list -> circuit list -> bool
+val circuits_of_equality : ?do_time:bool -> st:state -> hyps:hyps -> form -> form -> circuit list
 val circuit_simplify_equality : ?do_time:bool -> st:state -> hyps:hyps -> pres:circuit list -> form -> form -> bool
 val circ_simplify_form_bitstring_equality :
   ?st:state ->

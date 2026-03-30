@@ -145,21 +145,23 @@ let process_pre ?(st : state option) (tc: tcenv1) (f: form) : state * circuit li
   st, cs
 
 let solve_post ~(st: state) ~(pres: circuit list) (hyps: hyps) (post: form) : bool =
+  let env = toenv hyps in
   let destr_conj = destr_conj hyps in
   let posts = destr_conj post in
+  let pres = List.map (state_close_circuit st) pres in
 
-  List.for_all (fun post ->
-  EcEnv.notify (toenv hyps) `Debug "Solving post: %a@." 
-  EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
-  match post.f_node with
-  | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> 
-    begin match EcFol.op_kind p with
-    | Some `Eq -> 
-      circuit_simplify_equality ~st ~hyps ~pres f1 f2 
-    | _ -> circuit_of_form st hyps post |> state_close_circuit st |> circ_taut
-  end
-  | _ -> circuit_of_form st hyps post |> state_close_circuit st |> circ_taut
-  ) posts
+  posts |> List.to_seq |> Seq.concat_map (fun post ->
+    EcEnv.notify (toenv hyps) `Debug "Translating post: %a@." 
+    EcPrinting.(pp_form PPEnv.(ofenv (toenv hyps))) post;
+    match post.f_node with
+    | Fapp ({f_node= Fop(p, _); _}, [f1; f2]) -> 
+      begin match EcFol.op_kind p with
+      | Some `Eq -> 
+        circuits_of_equality ~st ~hyps f1 f2 |> List.to_seq
+      | _ -> Seq.return (circuit_of_form st hyps post |> state_close_circuit st)
+    end
+    | _ -> Seq.return (circuit_of_form st hyps post |> state_close_circuit st)
+    ) |> List.of_seq |> circuit_check_posts ~env ~pres
 
 (* TODO: Figure out how to not repeat computations here? *) 
 let t_bdep_solve

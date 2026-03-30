@@ -383,8 +383,6 @@ theory BVOperators.
       => take BV2.size (drop (base * BV2.size) (BV1.tolist bv)) = BV2.tolist (bvaextract bv base).
   end BVAExtract.
 
-print List.mkseq.
-  
 (* ------------------------------------------------------------------ *)
   abstract theory BVInsert.
     clone BV as BV1.

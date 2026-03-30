@@ -901,27 +901,13 @@ let circuit_of_form
   end;
   res
   
-
-let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
+let circuit_check_posts ?(do_time = true) ~(env: env) ~(pres: circuit list) (posts: circuit list) = 
   let tm = ref (Unix.gettimeofday ()) in
-  let env = toenv hyps in
   let time (env: env) (t: float ref) (msg: string) : unit =
     let new_t = Unix.gettimeofday () in
     EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); 
     t := new_t
   in
-
-  EcEnv.notify env `Debug "Filletting circuit...@.";
-  let c1 = circuit_of_form st hyps f1 |> state_close_circuit st in
-  if do_time then time env tm "Left side circuit generation done";
-  let c2 = circuit_of_form st hyps f2 |> state_close_circuit st in
-  if do_time then time env tm "Right side circuit generation done";
-
-  let pres = List.map (state_close_circuit st) pres in (* Assumes pres come open *)
-  assert (Option.is_none @@ circuit_has_uninitialized c1);
-  assert (Option.is_none @@ circuit_has_uninitialized c2);
-  let posts = circuit_eqs c1 c2 in
-  if do_time then time env tm "Done with postcondition circuit generation";
 
   EcEnv.notify env `Debug "Number of checks before batching: %d@." (List.length posts);
   let posts = batch_checks ~mode:`BySub posts in
@@ -938,6 +924,33 @@ let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pre
       false
     end
 
+let circuits_of_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) (f1: form) (f2: form) : circuit list =
+  let tm = ref (Unix.gettimeofday ()) in
+  let env = toenv hyps in
+  let time (env: env) (t: float ref) (msg: string) : unit =
+    let new_t = Unix.gettimeofday () in
+    EcEnv.notify ~immediate:true env `Info "[W] %s, took %f s@." msg (new_t -. !t); 
+    t := new_t
+  in
+
+  EcEnv.notify env `Debug "Filletting circuit...@.";
+  let c1 = circuit_of_form st hyps f1 |> state_close_circuit st in
+  if do_time then time env tm "Left side circuit generation done";
+  let c2 = circuit_of_form st hyps f2 |> state_close_circuit st in
+  if do_time then time env tm "Right side circuit generation done";
+
+  assert (Option.is_none @@ circuit_has_uninitialized c1);
+  assert (Option.is_none @@ circuit_has_uninitialized c2);
+  let posts = circuit_eqs c1 c2 in
+  if do_time then time env tm "Done with postcondition circuit generation";
+  posts
+
+
+let circuit_simplify_equality ?(do_time = true) ~(st: state) ~(hyps: hyps) ~(pres: circuit list) (f1: form) (f2: form) : bool =
+  let posts = circuits_of_equality ~do_time ~st ~hyps f1 f2 in
+  circuit_check_posts ~do_time ~env:(toenv hyps) ~pres posts
+  
+  
 (* FIXME: add support for spec bindings for abstract/opaque operators 
     = convert from Fop rather than from op body *)
 let circuit_of_path (st: state) (hyps: hyps) (p: path) : circuit =
