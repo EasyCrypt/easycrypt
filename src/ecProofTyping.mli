@@ -21,6 +21,8 @@ val pf_check_tvi   : proofenv -> ty_params -> EcUnify.tvi -> unit
 val process_form_opt : ?mv:metavs -> LDecl.hyps -> pformula -> ty option -> form
 val process_form     : ?mv:metavs -> LDecl.hyps -> pformula -> ty -> form
 val process_formula  : ?mv:metavs -> LDecl.hyps -> pformula -> form
+val process_type     : LDecl.hyps -> pty -> ty
+val process_stmt     : LDecl.hyps -> pstmt -> EcAst.stmt
 val process_exp      : LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val process_pattern  : LDecl.hyps -> pformula -> ptnenv * form
 

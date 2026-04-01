@@ -824,7 +824,7 @@ type phltactic =
   | Prwprgm of rwprgm
   | Pprocrewrite   of side option * pcodepos * prrewrite
   | Pprocrewriteat of psymbol * ppterm
-  | Pchangestmt    of side option * prange1_or_insert * pstmt
+  | Pchangestmt    of side option * ptybindings option * prange1_or_insert * pstmt
   | Phoaresplit
 
     (* Eager *)

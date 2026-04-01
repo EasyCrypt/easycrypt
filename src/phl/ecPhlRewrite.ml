@@ -230,19 +230,29 @@ let process_rewrite_at
   |> FApi.t_sub [t_pre; t_post; EcLowGoal.t_id]
 
 (* -------------------------------------------------------------------- *)
-(* [change] replaces a code range with [s] by generating:
+(* [t_change_stmt side pos ?me s] replaces a code range with [s] by
+   generating:
    - a local equivalence goal showing that the original fragment and [s]
      agree under the framed precondition on the variables they both read,
      and produce the same values for everything observable afterwards;
-   - the original program-logic goal with the selected range rewritten. *)
+   - the original program-logic goal with the selected range rewritten.
+
+   If [me] is provided, it is used as the memory environment (e.g. when
+   fresh local variables have been bound); otherwise, the memory
+   environment is taken from the goal. *)
 let t_change_stmt
-  (side : side option)
-  (pos : EcMatching.Position.codegap_range)
-  (s : stmt)
-  (tc : tcenv1)
+   (side : side option)
+   (pos  : EcMatching.Position.codegap_range)
+  ?(me   : memenv option)
+   (s    : stmt)
+   (tc   : tcenv1)
 =
   let env = FApi.tc1_env tc in
-  let me, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+
+  let me, stmt =
+    let metc, stmt = EcLowPhlGoal.tc1_get_stmt side tc in
+    (odfl metc me, stmt)
+  in
 
   let zpr, (_,stmt, epilog), _nmr =
     EcMatching.Zipper.zipper_and_split_of_cgap_range env pos stmt in
@@ -342,10 +352,12 @@ let t_change_stmt
 (* -------------------------------------------------------------------- *)
 let process_change_stmt
   (side   : side option)
+  (binds  : ptybindings option)
   (pos    : prange1_or_insert)
   (s      : pstmt)
   (tc     : tcenv1)
 =
+  let hyps = FApi.tc1_hyps tc in
   let env = FApi.tc1_env tc in
 
   begin match side, (FApi.tc1_goal tc).f_node with
@@ -366,14 +378,27 @@ let process_change_stmt
 
   let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
 
-  let pos =
+  let pos = 
     let env = EcEnv.Memory.push_active_ss me env in
     EcTyping.trans_range1_or_insert ~memory:(fst me) env pos
   in
 
-  let s = match side with
-  | Some side -> EcProofTyping.tc1_process_prhl_stmt tc side s
-  | None -> EcProofTyping.tc1_process_Xhl_stmt tc s
+  (* Add the new variables *)
+  let bindings =
+     binds
+  |> odfl []
+  |> List.map (fun (xs, ty) -> List.map (fun x -> (x, ty)) xs)
+  |> List.flatten
+  |> List.map (fun (x, ty) ->
+      let ty = EcProofTyping.process_type hyps ty in
+      let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
+      EcAst.{ ov_name = x; ov_type = ty; }
+    )
   in
+  let me, _ = EcMemory.bindall_fresh bindings me in
 
-  t_change_stmt side pos s tc
+  (* Process the given statement using the new bound variables *)
+  let hyps = EcEnv.LDecl.push_active_ss me hyps in
+  let s = EcProofTyping.process_stmt hyps s in
+
+  t_change_stmt side pos ~me s tc
