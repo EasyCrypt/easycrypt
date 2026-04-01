@@ -8,6 +8,8 @@
 (*  - SMTLib2 AST + PP: standalone representation + printer            *)
 (*  - Theory (module type): extensible theory signature                 *)
 (*  - QFIA: Quantifier-Free Integer Arithmetic (QF_NIA)                *)
+(*  - QF_DT: Quantifier-Free Datatypes                                 *)
+(*  - ALL: All theories (integers + datatypes + booleans)              *)
 (*  - Make(T : Theory): translator functor                              *)
 (*  - Solver (module type): abstract solver interface supporting both   *)
 (*      direct OCaml bindings and text-over-process backends            *)
@@ -53,6 +55,9 @@ type term =
   | TNot  of term             (** (not t)                              *)
   | TImpl of term * term      (** (=> a b)                             *)
   | TIte  of term * term * term (** (ite c t f)                        *)
+  | TCtor of string * term list (** constructor application              *)
+  | TMatch of term * (string * string list * term) list
+  (** (match scrutinee ((ctor vars... body) ...))                       *)
 
 (** A model is a list of (variable-name, value) pairs. *)
 type model = (string * term) list
@@ -172,6 +177,36 @@ module PP = struct
       term buf t; Buffer.add_char buf ' ';
       term buf f; Buffer.add_char buf ')'
 
+    | TCtor (name, []) ->
+      Buffer.add_string buf name
+
+    | TCtor (name, args) ->
+      Buffer.add_char   buf '(';
+      Buffer.add_string buf name;
+      List.iter (fun t -> Buffer.add_char buf ' '; term buf t) args;
+      Buffer.add_char buf ')'
+
+    | TMatch (scrut, branches) ->
+      Buffer.add_string buf "(match ";
+      term buf scrut;
+      Buffer.add_string buf " (";
+      List.iteri (fun i (ctor, vars, body) ->
+        if i > 0 then Buffer.add_char buf ' ';
+        Buffer.add_char buf '(';
+        (if vars = [] then
+          Buffer.add_string buf ctor
+        else begin
+          Buffer.add_char buf '(';
+          Buffer.add_string buf ctor;
+          List.iter (fun v -> Buffer.add_char buf ' '; Buffer.add_string buf v) vars;
+          Buffer.add_char buf ')'
+        end);
+        Buffer.add_char buf ' ';
+        term buf body;
+        Buffer.add_char buf ')'
+      ) branches;
+      Buffer.add_string buf "))"
+
   (** Serialise a command to a string. *)
   let to_string pp_fn x =
     let buf = Buffer.create 64 in
@@ -194,6 +229,7 @@ type op_tag = [
   | `Eq                       (** polymorphic equality *)
   | `True | `False            (** boolean constants *)
   | `Ite                      (** if-then-else *)
+  | `Ctor of string           (** datatype constructor; carries SMTLib name *)
 ]
 
 (** A theory determines:
@@ -252,6 +288,92 @@ module QFIA : Theory = struct
     else if p_equal p CI_Bool.p_false   then `False
     else raise (Unsupported (Printf.sprintf "operator not in QF_NIA: %s"
         (EcPath.tostring p)))
+end
+
+(* ==================================================================== *)
+(* QF_DT: Quantifier-Free Datatypes (no arithmetic)                    *)
+(* ==================================================================== *)
+
+(** Pure algebraic-datatype theory.  Supports booleans and user-defined
+    datatypes but no integer arithmetic.  Corresponds to the SMTLib2
+    [QF_DT] logic. *)
+module QF_DT : Theory = struct
+  let logic_name = "QF_DT"
+
+  let trans_ty env ty =
+    match ty.ty_node with
+    | Tconstr (p, []) when p_equal p EcCoreLib.CI_Bool.p_bool -> SBool
+    | Tconstr (p, []) ->
+      (match EcEnv.Ty.by_path_opt p env with
+       | Some tydecl when EcDecl.tydecl_as_datatype tydecl <> None ->
+         SCustom (EcPath.basename p)
+       | _ ->
+         raise (Unsupported (Printf.sprintf "type not in QF_DT: %s"
+           (EcPath.tostring p))))
+    | Tconstr (p, _) ->
+      raise (Unsupported (Printf.sprintf
+        "parameterised type not yet supported: %s" (EcPath.tostring p)))
+    | Tvar tv ->
+      raise (Unsupported (Printf.sprintf "type variable: %s" (EcIdent.name tv)))
+    | _ ->
+      raise (Unsupported "unsupported type in QF_DT")
+
+  let trans_op env p =
+    let open EcCoreLib in
+    if      p_equal p CI_Bool.p_not   then `Not
+    else if p_equal p CI_Bool.p_and   then `And
+    else if p_equal p CI_Bool.p_anda  then `And
+    else if p_equal p CI_Bool.p_or    then `Or
+    else if p_equal p CI_Bool.p_ora   then `Or
+    else if p_equal p CI_Bool.p_imp   then `Imp
+    else if p_equal p CI_Bool.p_eq    then `Eq
+    else if p_equal p CI_Bool.p_true  then `True
+    else if p_equal p CI_Bool.p_false then `False
+    else
+      (* Check if p is a datatype constructor. *)
+      (match EcEnv.Op.by_path_opt p env with
+       | Some op when EcDecl.is_ctor op ->
+         `Ctor (EcPath.basename p)
+       | _ ->
+         raise (Unsupported (Printf.sprintf "operator not in QF_DT: %s"
+           (EcPath.tostring p))))
+end
+
+(* ==================================================================== *)
+(* ALL: All theories (integers + datatypes + booleans)                  *)
+(* ==================================================================== *)
+
+(** Combination of integer arithmetic and algebraic datatypes.
+    Corresponds to the SMTLib2 [ALL] logic, which Z3 and CVC5 both
+    support for the combination of NIA and inductive datatypes. *)
+module ALL : Theory = struct
+  let logic_name = "ALL"
+
+  let trans_ty env ty =
+    match ty.ty_node with
+    | Tconstr (p, []) when p_equal p EcCoreLib.CI_Int.p_int -> SInt
+    | _ ->
+      (* Delegate remaining types to QF_DT. *)
+      (match QF_DT.trans_ty env ty with
+       | s -> s
+       | exception (Unsupported _) ->
+         raise (Unsupported (Printf.sprintf "type not in ALL: %s"
+           (match ty.ty_node with
+            | Tconstr (p, _) -> EcPath.tostring p
+            | Tvar tv        -> EcIdent.name tv
+            | _              -> "<complex type>"))))
+
+  let trans_op env p =
+    (* Try integer arithmetic operators first. *)
+    match QFIA.trans_op env p with
+    | tag -> tag
+    | exception (Unsupported _) ->
+      (* Fall back to datatype/boolean operators. *)
+      (match QF_DT.trans_op env p with
+       | tag -> tag
+       | exception (Unsupported _) ->
+         raise (Unsupported (Printf.sprintf "operator not in ALL: %s"
+           (EcPath.tostring p))))
 end
 
 (* ==================================================================== *)
@@ -335,6 +457,45 @@ module Make (T : Theory) = struct
     | Fif (c, t, e) ->
       TIte (trans_form env lenv c, trans_form env lenv t, trans_form env lenv e)
 
+    | Fmatch (fb, branches, _result_ty) ->
+      (* Determine the matched datatype from the scrutinee's type. *)
+      let p, tydecl, _tvs =
+        match EcEnv.Ty.get_top_decl fb.f_ty env with
+        | Some x -> x
+        | None   ->
+          raise (Unsupported "cannot determine datatype for match scrutinee")
+      in
+      let dtype =
+        match EcDecl.tydecl_as_datatype tydecl with
+        | Some dt -> dt
+        | None    ->
+          raise (Unsupported (Printf.sprintf "match on non-datatype: %s"
+            (EcPath.tostring p)))
+      in
+      let scrut = trans_form env lenv fb in
+      let branches_with_ctors =
+        List.combine branches dtype.EcDecl.tydt_ctors in
+      let trans_branch (branch_form, (ctor_name, arg_types)) =
+        let n = List.length arg_types in
+        (* Each branch is stored as a lambda fun x1...xn -> body. *)
+        let bds, body = EcFol.decompose_lambda branch_form in
+        let ctor_bds, rest_bds = List.takedrop n bds in
+        let body =
+          if rest_bds = [] then body
+          else EcFol.f_lambda rest_bds body
+        in
+        (* Extend the local environment with the constructor-bound variables. *)
+        let lenv_inner, var_names =
+          List.fold_left (fun (le, ns) (id, _gty) ->
+            let (le', name) = add_var le id in
+            (le', ns @ [name])
+          ) (lenv, []) ctor_bds
+        in
+        let body_term = trans_form env lenv_inner body in
+        (ctor_name, var_names, body_term)
+      in
+      TMatch (scrut, List.map trans_branch branches_with_ctors)
+
     | Fquant _ ->
       raise (Unsupported "quantifiers are not supported in QF_NIA")
 
@@ -390,6 +551,9 @@ module Make (T : Theory) = struct
     (* Ite *)
     | `Ite, [c; t; f] ->
       TIte (trans_form env lenv c, trans_form env lenv t, trans_form env lenv f)
+    (* Datatype constructor *)
+    | `Ctor name, args ->
+      TCtor (name, List.map (trans_form env lenv) args)
     | _, _ ->
       raise (Unsupported (Printf.sprintf
         "operator %s applied to wrong number of arguments (%d)"
@@ -407,10 +571,9 @@ module Make (T : Theory) = struct
           seen := Mid.add id () !seen;
           acc  := (id, f.f_ty) :: !acc
         end
-      | Fapp (g, args) ->
-        walk g; List.iter walk args
-      | Fif (c, t, e) ->
-        walk c; walk t; walk e
+      | Fapp (g, args)     -> walk g; List.iter walk args
+      | Fif  (c, t, e)     -> walk c; walk t; walk e
+      | Fmatch (fb, bs, _) -> walk fb; List.iter walk bs
       | Fop _ | Fint _ -> ()
       | _ -> ()
     in
@@ -444,12 +607,56 @@ module Make (T : Theory) = struct
                acc  := (p, s) :: !acc
              | exception (Unsupported _) -> ())
         end
-      | Fapp (g, args) -> walk g; List.iter walk args
-      | Fif (c, t, e)  -> walk c; walk t; walk e
-      | Flocal _ | Fint _ -> ()
+      | Fapp (g, args)      -> walk g; List.iter walk args
+      | Fif  (c, t, e)      -> walk c; walk t; walk e
+      | Fmatch (fb, bs, _)  -> walk fb; List.iter walk bs
+      | Flocal _ | Fint _   -> ()
       | _ -> ()
     in
     walk f;
+    List.rev !acc
+
+  (** Collect all algebraic datatypes that appear in a formula (by type),
+      in order of first occurrence.  Returns [(type_path, ty_dtype, type_args)]
+      for each distinct datatype encountered.
+      The list is topologically sorted: a type used as a field type appears
+      before the type that contains it (because we walk field types
+      recursively before recording the parent). *)
+  let collect_datatypes env f =
+    let seen = ref EcPath.Sp.empty in
+    let acc  = ref [] in
+    let rec walk_ty ty =
+      match ty.ty_node with
+      | Tconstr (p, targs) ->
+        if not (EcPath.Sp.mem p !seen) then begin
+          (* Mark early to break cycles. *)
+          seen := EcPath.Sp.add p !seen;
+          (match EcEnv.Ty.by_path_opt p env with
+           | Some tydecl ->
+             (match EcDecl.tydecl_as_datatype tydecl with
+              | Some dtype ->
+                (* Walk field types first for correct declaration order. *)
+                List.iter (fun (_cname, field_tys) ->
+                  List.iter walk_ty field_tys
+                ) dtype.EcDecl.tydt_ctors;
+                acc := (p, dtype) :: !acc
+              | None -> ())
+           | None -> ())
+        end;
+        List.iter walk_ty targs
+      | _ -> ()
+    in
+    let rec walk_form f =
+      walk_ty f.f_ty;
+      match f.f_node with
+      | Fmatch (fb, bs, rty) ->
+        walk_ty rty; walk_form fb; List.iter walk_form bs
+      | Fapp (g, args)     -> walk_form g; List.iter walk_form args
+      | Fif  (c, t, e)     -> walk_form c; walk_form t; walk_form e
+      | Flocal _ | Fint _ | Fop _ -> ()
+      | _ -> ()
+    in
+    walk_form f;
     List.rev !acc
 end
 
@@ -489,6 +696,10 @@ module type Solver = sig
   val get_model     : t -> model
   (** Retrieve a satisfying model.  Only valid after [check_sat] returns
       [`Sat].  Raises [Failure] if the solver cannot produce a model. *)
+
+  val declare_datatype : t -> string -> (string * (string * sort) list) list -> unit
+  (** [declare_datatype s name ctors] emits a [(declare-datatype)] command.
+      [ctors] is a list of [(constructor_name, [(field_name, sort)])] pairs. *)
 
   val close         : t -> unit
   (** Close the solver session and release resources. *)
@@ -715,6 +926,26 @@ module Make_Text_Process (B : Text_Backend) : Solver = struct
       `Unknown  (* treat unexpected response as unknown *)
     [@@warning "-8"]
 
+  let declare_datatype t name ctors =
+    let buf = Buffer.create 64 in
+    Buffer.add_string buf "(declare-datatype ";
+    Buffer.add_string buf name;
+    Buffer.add_string buf " (";
+    List.iter (fun (ctor_name, fields) ->
+      Buffer.add_char buf '(';
+      Buffer.add_string buf ctor_name;
+      List.iter (fun (field_name, sort) ->
+        Buffer.add_string buf " (";
+        Buffer.add_string buf field_name;
+        Buffer.add_char   buf ' ';
+        PP.sort buf sort;
+        Buffer.add_char   buf ')'
+      ) fields;
+      Buffer.add_char buf ')'
+    ) ctors;
+    Buffer.add_string buf "))";
+    send t (Buffer.contents buf)
+
   let get_model t =
     send t "(get-model)";
     let response = recv_sexp t in
@@ -801,6 +1032,9 @@ module SI = struct
   let pop           t     = dispatch  Z3_Text.pop    CVC5_Text.pop   t
   let check_sat     t     = dispatch  Z3_Text.check_sat CVC5_Text.check_sat t
   let get_model     t     = dispatch  Z3_Text.get_model CVC5_Text.get_model t
+  let declare_datatype t name ctors =
+    dispatch (fun s -> Z3_Text.declare_datatype   s name ctors)
+             (fun s -> CVC5_Text.declare_datatype  s name ctors) t
   let close         t     = dispatch  Z3_Text.close  CVC5_Text.close t
 end
 
@@ -808,7 +1042,7 @@ end
 (* Top-level check function                                             *)
 (* ==================================================================== *)
 
-module Trans = Make(QFIA)
+module Trans = Make(ALL)
 
 (** Default prover priority list. *)
 let default_provers = ["z3"; "cvc5"]
@@ -865,7 +1099,7 @@ let check
   let prove () =
     let solver = SI.create ~timeout solver_name in
     EcUtils.try_finally (fun () ->
-      SI.set_logic solver QFIA.logic_name;
+      SI.set_logic solver ALL.logic_name;
 
       (* Gather all formulas that will be translated. *)
       let lenv = ref Trans.empty_lenv in
@@ -921,6 +1155,39 @@ let check
         lenv := new_lenv;
         SI.declare_const solver name sort
       ) all_ops;
+
+      (* Collect all algebraic datatypes appearing in formula types and
+         declare them to the solver.  Must happen before any assert_
+         that references those types. *)
+      let all_datatypes =
+        let seen = ref EcPath.Sp.empty in
+        let acc  = ref [] in
+        List.iter (fun f ->
+          let dts = Trans.collect_datatypes env f in
+          List.iter (fun (p, dtype) ->
+            if not (EcPath.Sp.mem p !seen) then begin
+              seen := EcPath.Sp.add p !seen;
+              acc  := (p, dtype) :: !acc
+            end
+          ) dts
+        ) all_forms;
+        List.rev !acc
+      in
+      List.iter (fun (_p, dtype) ->
+        let dt_name = EcPath.basename _p in
+        let ctors = List.map (fun (ctor_name, field_tys) ->
+          let fields = List.mapi (fun i fty ->
+            let sort =
+              (match ALL.trans_ty env fty with
+               | s -> s
+               | exception (Unsupported _) -> SCustom "Unknown")
+            in
+            (Printf.sprintf "%s_field%d" ctor_name i, sort)
+          ) field_tys in
+          (ctor_name, fields)
+        ) dtype.EcDecl.tydt_ctors in
+        SI.declare_datatype solver dt_name ctors
+      ) all_datatypes;
 
       (* Assert all local hypotheses. *)
       List.iter (fun (_, lk) ->
