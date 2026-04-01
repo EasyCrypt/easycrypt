@@ -73,6 +73,7 @@ val process_generalize  : ?doeq:bool -> genpattern list -> backward
 val process_move        : ?doeq:bool -> ppterm list -> prevert -> backward
 val process_clear       : clear_info -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos option -> backward
+val process_smtlib      : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
 val process_coq         : loc:EcLocation.t -> name:string -> ttenv -> EcProvers.coq_mode option -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
 val process_delta       : und_delta:bool -> ?target:psymbol -> (rwside * rwocc * pformula) -> backward

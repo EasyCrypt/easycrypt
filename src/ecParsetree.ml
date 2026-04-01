@@ -1030,6 +1030,7 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos
+  | Psmtlib     of pprover_infos
   | Psplit      of int option
   | Pfield      of psymbol list
   | Pring       of psymbol list

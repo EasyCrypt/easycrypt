@@ -122,6 +122,7 @@
     "exact"       , EXACT      ;        (* KW: bytac *)
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
+    "smtlib"      , SMTLIB     ;        (* KW: bytac *)
     "coq"         , COQ        ;        (* KW: bytac *)
     "check"       , CHECK      ;        (* KW: bytac *)
     "edit"        , EDIT       ;        (* KW: bytac *)

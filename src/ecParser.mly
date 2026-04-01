@@ -571,6 +571,7 @@
 %token SLASHSLASHTILDEQ
 %token SLASHSLASHSHARP
 %token SMT
+%token SMTLIB
 %token SOLVE
 %token SP
 %token SPLIT
@@ -2808,6 +2809,12 @@ logtactic:
 
 | SMT pi=smt_info
    { Psmt pi }
+
+| SMTLIB pi=smt_info
+   { Psmtlib pi }
+
+| SMTLIB LPAREN dbmap=dbmap1* RPAREN
+   { Psmtlib (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | COQ mode=coq_info name=loc(STRING) LPAREN dbmap=dbmap1* RPAREN
     { Pcoq (mode, name, SMT.mk_smt_option [`WANTEDLEMMAS dbmap])}

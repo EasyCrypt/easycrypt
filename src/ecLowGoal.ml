@@ -2568,6 +2568,28 @@ let t_smt ~(mode:smtmode) pi tc =
   else error ()
 
 (* -------------------------------------------------------------------- *)
+let t_smtlib ~(mode : smtmode) pi tc =
+  let error () =
+    match mode with
+    | `Sloppy ->
+        tc_error !!tc ~catchable:true  "cannot prove goal"
+    | `Strict ->
+        tc_error !!tc ~catchable:false "cannot prove goal (strict)"
+    | `Report loc ->
+        EcEnv.notify (FApi.tc1_env tc) `Critical
+          "%s: smtlib call failed"
+          (loc |> omap EcLocation.tostring |> odfl "unknown");
+        t_admit tc
+  in
+
+  let env, hyps, _concl = FApi.tc1_eflat tc in
+  let notify = (fun lvl (lazy s) -> EcEnv.notify env lvl "%s" s) in
+
+  if   EcSmtLib.check ~notify pi hyps (FApi.tc1_goal tc)
+  then FApi.xmutate1 tc `Smtlib []
+  else error ()
+
+(* -------------------------------------------------------------------- *)
 let t_coq
   ~(loc     : EcLocation.t)
   ~(name    : string)

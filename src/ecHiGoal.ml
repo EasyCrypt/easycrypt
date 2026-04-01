@@ -149,6 +149,18 @@ let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 
+let process_smtlib ?loc (ttenv : ttenv) (pi : pprover_infos) (tc : tcenv1) =
+  let pi = ttenv.tt_provers (Some pi) in
+  match ttenv.tt_smtmode with
+  | `Admit ->
+    t_admit tc
+  | (`Sloppy | `Strict) as mode ->
+    t_seq (t_simplify ~delta:`No) (t_smtlib ~mode pi) tc
+  | `Report ->
+    t_seq (t_simplify ~delta:`No) (t_smtlib ~mode:(`Report loc) pi) tc
+
+(* -------------------------------------------------------------------- *)
+
 let process_coq ~loc ~name (ttenv : ttenv) coqmode  pi (tc : tcenv1) =
   let pi = ttenv.tt_provers (Some pi) in
 
