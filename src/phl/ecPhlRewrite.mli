@@ -8,4 +8,4 @@ val process_rewrite_rw    : side option -> pcodepos -> ppterm -> backward
 val process_rewrite_simpl : side option -> pcodepos -> backward
 val process_rewrite       : side option -> pcodepos -> prrewrite -> backward
 val process_rewrite_at    : psymbol -> ppterm -> backward
-val process_change_stmt   : side option -> prange1_or_insert -> pstmt -> backward
+val process_change_stmt   : side option -> ptybindings option -> prange1_or_insert -> pstmt -> backward

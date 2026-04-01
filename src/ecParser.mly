@@ -3261,11 +3261,11 @@ interleave_info:
 | LOSSLESS
     { Plossless }
 
-| PROC CHANGE side=side? pos=codepos_or_range COLON s=brace(stmt)
-    { Pchangestmt (side, PosOrRange pos, s) }
+| PROC CHANGE side=side? pos=codepos_or_range COLON b=option(bracket(ptybindings)) s=brace(stmt)
+    { Pchangestmt (side, b, PosOrRange pos, s) }
 
-| PROC CHANGE side=side? pos=codegap COLON s=brace(stmt)
-    { Pchangestmt (side, Gap pos, s) }
+| PROC CHANGE side=side? pos=codegap COLON b=option(bracket(ptybindings)) s=brace(stmt)
+    { Pchangestmt (side, b, Gap pos, s) }
 
 | PROC REWRITE side=side? pos=codepos f=pterm
     { Pprocrewrite (side, pos, `Rw f) }
