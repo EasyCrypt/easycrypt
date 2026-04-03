@@ -120,7 +120,7 @@ pose R := big predT (fun x => `|s2 x|) (undup I).
 exists (M+R) => J uniq_J.
 rewrite (@bigEM (mem I)) addrC &(ler_add).
 - rewrite (@eq_bigr _ _ (fun x => `|s1 x|)) //= 1:/#.
-  by rewrite -big_filter; smt(filter_uniq).
+  rewrite -big_filter. by apply /sum_s1 /filter_uniq.
 - have P : perm_eq (filter (mem I) J) (filter (mem J) (undup I)).
     by apply: uniq_perm_eq; smt(filter_uniq undup_uniq mem_filter mem_undup).
   rewrite -big_filter (eq_big_perm P) big_filter big_mkcond.
