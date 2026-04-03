@@ -1535,7 +1535,7 @@ let t_hi_conseq_bdHoareF notmod f1 f2 f3 tc =
 (*   equivS / ⊥        / ⊥        / bdhoareS — right-side bd equivalence*)
 (* -------------------------------------------------------------------- *)
 
-let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
+let rec t_hi_conseq_equivS notmod f1 f2 f3 tc =
   let concl = FApi.tc1_goal tc in
   match f1, f2, f3 with
   (* equivS / equivS / ⊥ / ⊥ *)
@@ -1583,7 +1583,7 @@ let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
 
     t_hi_on1seq 2
       (tac (es_pr es) (es_po es))
-      (recurse notmod None f2 None)
+      (t_hi_conseq_equivS notmod None f2 None)
       tc
 
   (* equivS / equivS / ⊥ / bdhoareS *)
@@ -1594,7 +1594,7 @@ let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
 
     t_hi_on1seq 2
       (tac (es_pr es) (es_po es))
-      (recurse notmod None None f3)
+      (t_hi_conseq_equivS notmod None None f3)
       tc
 
   (* equivS / ? / ? / ⊥ — synthesize missing f3 *)
@@ -1604,7 +1604,7 @@ let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f3 = f_hoareS (snd es.es_mr) {m;inv=f_true} es.es_sr post
     in
-    recurse notmod f1 f2 (Some (None, f3)) tc
+    t_hi_conseq_equivS notmod f1 f2 (Some (None, f3)) tc
 
   (* equivS / ? / ⊥ / ? — synthesize missing f2 *)
   | Some _, None, Some _ ->
@@ -1615,7 +1615,7 @@ let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
         (snd es.es_ml) {m;inv=f_true} es.es_sl
         { hsi_m = m; hsi_inv = POE.empty f_true; }
     in
-    recurse notmod f1 (Some (None, f2)) f3 tc
+    t_hi_conseq_equivS notmod f1 (Some (None, f2)) f3 tc
 
   (* equivS / ⊥ / bdhoareS / ⊥ — left-side bounded equivalence *)
   | None, Some ((_, f2) as nf2), None ->
@@ -1665,7 +1665,7 @@ let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
 (*   equivF / ?      / ⊥      / ?      — fill missing f2 with ⊤         *)
 (* -------------------------------------------------------------------- *)
 
-let t_hi_conseq_equivF ~recurse notmod f1 f2 f3 tc =
+let rec t_hi_conseq_equivF notmod f1 f2 f3 tc =
   let concl = FApi.tc1_goal tc in
   match f1, f2, f3 with
   (* equivF / equivF / ⊥ / ⊥ *)
@@ -1711,7 +1711,7 @@ let t_hi_conseq_equivF ~recurse notmod f1 f2 f3 tc =
     let m = EcIdent.create "&hr" in
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f3 = f_hoareF {m;inv=f_true} ef.ef_fr post in
-    recurse notmod f1 f2 (Some (None, f3)) tc
+    t_hi_conseq_equivF notmod f1 f2 (Some (None, f3)) tc
 
   (* equivF / ? / ⊥ / ? — synthesize missing f2 *)
   | Some _, None, Some _ ->
@@ -1719,7 +1719,7 @@ let t_hi_conseq_equivF ~recurse notmod f1 f2 f3 tc =
     let m = EcIdent.create "&hr" in
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f2 = f_hoareF {m;inv=f_true} ef.ef_fl post in
-    recurse notmod f1 (Some (None, f2)) f3 tc
+    t_hi_conseq_equivF notmod f1 (Some (None, f2)) f3 tc
 
   | _ -> t_hi_error concl f1 f2 f3 tc
 
@@ -1730,7 +1730,7 @@ let t_hi_conseq_equivF ~recurse notmod f1 f2 f3 tc =
 (* goal's formula node type.                                             *)
 (* -------------------------------------------------------------------- *)
 
-let rec t_hi_conseq notmod f1 f2 f3 tc =
+let t_hi_conseq notmod f1 f2 f3 tc =
   let concl = FApi.tc1_goal tc in
   match concl.f_node with
   | FhoareS   _ -> t_hi_conseq_hoareS    notmod f1 f2 f3 tc
@@ -1739,8 +1739,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FeHoareF  _ -> t_hi_conseq_ehoareF   notmod f1 f2 f3 tc
   | FbdHoareS _ -> t_hi_conseq_bdHoareS  notmod f1 f2 f3 tc
   | FbdHoareF _ -> t_hi_conseq_bdHoareF  notmod f1 f2 f3 tc
-  | FequivS   _ -> t_hi_conseq_equivS   ~recurse:t_hi_conseq notmod f1 f2 f3 tc
-  | FequivF   _ -> t_hi_conseq_equivF   ~recurse:t_hi_conseq notmod f1 f2 f3 tc
+  | FequivS   _ -> t_hi_conseq_equivS    notmod f1 f2 f3 tc
+  | FequivF   _ -> t_hi_conseq_equivF   notmod f1 f2 f3 tc
   | _           -> t_hi_error concl f1 f2 f3 tc
 
 (* -------------------------------------------------------------------- *)
