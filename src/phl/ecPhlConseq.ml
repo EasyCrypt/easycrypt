@@ -1,4 +1,39 @@
 (* -------------------------------------------------------------------- *)
+(* Consequence tactics for all EasyCrypt program logics.                  *)
+(*                                                                       *)
+(* This module implements the "conseq" family of tactics, which allow     *)
+(* strengthening preconditions and weakening postconditions of program    *)
+(* logic judgments. It covers all logic flavors:                          *)
+(*   - hoare   (Hoare logic, F/S)                                        *)
+(*   - bdhoare (bounded Hoare logic, F/S)                                *)
+(*   - ehoare  (expected-value Hoare logic, F/S)                         *)
+(*   - equiv   (relational/equivalence logic, F/S)                       *)
+(*   - eager   (eager equivalence logic, F only)                         *)
+(*                                                                       *)
+(* Naming convention for tactics:                                        *)
+(*   t_<logic><level>_<variant>                                          *)
+(* where:                                                                *)
+(*   logic   = hoare | bdHoare | ehoare | equiv | eager                  *)
+(*   level   = F (function-level) | S (statement-level)                  *)
+(*   variant = conseq      — basic consequence rule                      *)
+(*           | conseq_nm   — consequence with non-modification framing   *)
+(*           | conseq_bd   — consequence with bound change (bdhoare)     *)
+(*           | conseq_conj — consequence via conjunction                 *)
+(*           | conseq_equiv— consequence via equivalence (transitivity)  *)
+(*           | notmod      — non-modification postcondition weakening    *)
+(*           | concave     — concavity/Jensen rule (ehoare)              *)
+(*                                                                       *)
+(* Processing pipeline (user tactic → logical rule):                     *)
+(*   process_conseq_opt                                                  *)
+(*     → process_conseq                                                  *)
+(*       → process_conseq_hs (hoare with exception postconditions)       *)
+(*       | process_conseq_ss (all other judgment types)                  *)
+(*         → process_conseq_core (shared proof-term processing)          *)
+(*           → t_hi_conseq (high-level dispatcher)                       *)
+(*             → t_hi_conseq_<goal_type> (per-goal-type logic)           *)
+(*               → t_<logic><level>_<variant> (core logical rules)       *)
+(* -------------------------------------------------------------------- *)
+
 open EcUtils
 open EcParsetree
 open EcAst
@@ -17,6 +52,14 @@ open EcLowPhlGoal
 module PT  = EcProofTerm
 module TTC = EcProofTyping
 
+(* -------------------------------------------------------------------- *)
+(* Condition builders for consequence rules.                             *)
+(*                                                                       *)
+(* These helpers build the side conditions (implications) that arise      *)
+(* from applying the consequence rule:                                   *)
+(*   {sP} c {sQ}   P ⇒ sP   sQ ⇒ Q                                    *)
+(*   ————————————————————————————————                                    *)
+(*              {P} c {Q}                                                *)
 (* -------------------------------------------------------------------- *)
 let conseq_cond_ss pre post spre spost =
   map_ss_inv2 f_imp pre spre, map_ss_inv2 f_imp spost post
@@ -57,6 +100,12 @@ let bd_goal tc fcmp fbd cmp bd =
       (EcPrinting.string_of_hcmp cmp) (EcPrinting.pp_form ppe) bd.inv
   | Some fp -> fp
 
+(* -------------------------------------------------------------------- *)
+(* Core consequence tactics (one per logic × level).                     *)
+(*                                                                       *)
+(* Each t_<logic><level>_conseq implements the basic consequence rule:   *)
+(* given new pre/postconditions, generate subgoals for the implications  *)
+(* and the judgment with the new conditions.                             *)
 (* -------------------------------------------------------------------- *)
 
 let t_hoareF_conseq pre post tc =
@@ -247,6 +296,18 @@ let t_conseq pre post tc =
   | _           -> tc_error_noXhl !!tc
 
 (* -------------------------------------------------------------------- *)
+(* Non-modification (notmod) variants.                                   *)
+(*                                                                       *)
+(* These tactics weaken postconditions by generalizing over all program   *)
+(* variables modified by the statement/function. The key idea:            *)
+(*   If Q does not mention modified variables, then                      *)
+(*   {P} c {Q} reduces to: ∀ modified vars, P ⇒ Q                      *)
+(*                                                                       *)
+(* cond_*_notmod: builds the non-modification condition                  *)
+(* t_*_notmod:    applies the notmod rule                                *)
+(* t_*_conseq_nm: combines notmod with consequence                       *)
+(* -------------------------------------------------------------------- *)
+
 let mk_bind_pvar m (id,_) (x, ty) = id, f_pvar x ty m
 let mk_bind_glob env m (id,_) x = id, NormMp.norm_glob env m x
 let mk_bind_pvars m (bd1,bd2) = List.map2 (mk_bind_pvar m) bd1 bd2
@@ -457,28 +518,9 @@ let gen_conseq_nm tnm tc pre post =
     FApi.t_swap_goals 0 1 gs
   )
 
-let gen_conseq_nm_ts tnm tc (pre: ts_inv) (post: ts_inv) =
-  FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
-    let gs =
-      (tnm post @+
-        [ t_id;
-          tc pre post @+ [t_id; t_trivial; t_id] ]) g in
-    FApi.t_swap_goals 0 1 gs
-  )
-
-let gen_conseq_nm_ss tnm tc pre post =
-    FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
-      let gs =
-        (tnm post @+
-          [ t_id;
-            tc pre post @+ [t_id; t_trivial; t_id] ]) g in
-      FApi.t_swap_goals 0 1 gs
-    )
-
-
-let t_hoareF_conseq_nm   = gen_conseq_nm_ss t_hoareF_notmod   t_hoareF_conseq
-let t_hoareS_conseq_nm   = gen_conseq_nm_ss t_hoareS_notmod   t_hoareS_conseq
-let t_equivF_conseq_nm   = gen_conseq_nm_ts t_equivF_notmod   t_equivF_conseq
+let t_hoareF_conseq_nm   = gen_conseq_nm t_hoareF_notmod   t_hoareF_conseq
+let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq
+let t_equivF_conseq_nm   = gen_conseq_nm t_equivF_notmod   t_equivF_conseq
 let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
@@ -689,10 +731,17 @@ let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc 
 
 
 (* -------------------------------------------------------------------- *)
-(*                   Relation between logics                            *)
+(* Cross-logic rules and conjunction.                                    *)
+(*                                                                       *)
+(* t_hoare*_conseq_bdhoare: reduce hoare to bdhoare (with bound = 1)    *)
+(* t_hoare*_conseq_conj:    split hoare via conjunction of specs         *)
+(* t_bdHoare*_conseq_conj:  split bdhoare post via conjunction           *)
+(* t_equiv*_conseq_conj:    split equiv via conjunction (rel + L + R)    *)
+(* t_equiv*_conseq_bd:      reduce equiv to bdhoare on one side          *)
+(* t_*_conseq_equiv:        transitivity: reduce hoare/bdhoare/ehoare    *)
+(*                          to equiv + hoare on the other program        *)
 (* -------------------------------------------------------------------- *)
 
-(* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_bdhoare tc =
   let hs = tc1_as_hoareS tc in
   let f_r1 = {m=fst hs.hs_m; inv=f_r1} in
@@ -938,54 +987,82 @@ let t_ehoareF_conseq_equiv f2 p q p2 q2 tc =
 
 
 (* -------------------------------------------------------------------- *)
-let rec t_hi_conseq notmod f1 f2 f3 tc =
-  let t_mytrivial = fun tc -> t_simplify ?target:None ~delta:`No tc in
-  let t_mytrivial = [t_mytrivial; t_split; t_fail] in
-  let t_mytrivial = FApi.t_try (FApi.t_seqs t_mytrivial) in
-  let t_on1       = FApi.t_on1 ~ttout:t_mytrivial in
-  let t_on1seq    = FApi.t_on1seq ~ttout:t_mytrivial in
+(* High-level consequence dispatcher: shared helpers                     *)
+(* -------------------------------------------------------------------- *)
 
-  let check_is_detbound who bound =
-    if not (EcFol.f_equal bound f_r1) then
-      tc_error_lazy !!tc (fun fmt ->
-        let who =
-          match who with
-          | `First  -> "first"
-          | `Second -> "second"
-          | `Third  -> "third"
-        in
-          Format.fprintf fmt
-            "the bound of the %s parameter should be exactly 1%%r"
-            who)
-  in
+let t_hi_trivial =
+  let t_s = fun tc -> t_simplify ?target:None ~delta:`No tc in
+  FApi.t_try (FApi.t_seqs [t_s; t_split; t_fail])
 
-  let t_apply_r (pt, _f) tc =
-    match pt with
-    | Some pt -> EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt tc
+let t_hi_on1    = FApi.t_on1 ~ttout:t_hi_trivial
+let t_hi_on1seq = FApi.t_on1seq ~ttout:t_hi_trivial
 
-    | None    -> EcPhlTAuto.t_hoare_true tc
-  in
+let t_hi_check_detbound tc who bound =
+  if not (EcFol.f_equal bound f_r1) then
+    tc_error_lazy !!tc (fun fmt ->
+      let who =
+        match who with
+        | `First  -> "first"
+        | `Second -> "second"
+        | `Third  -> "third"
+      in
+        Format.fprintf fmt
+          "the bound of the %s parameter should be exactly 1%%r"
+          who)
 
+let t_hi_apply_r (pt, _f) tc =
+  match pt with
+  | Some pt -> EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt tc
+  | None    -> EcPhlTAuto.t_hoare_true tc
+
+let pp_f_node f =
+  match f.f_node with
+  | FequivF   _ -> "equivF"
+  | FequivS   _ -> "equivS"
+  | FhoareF   _ -> "hoareF"
+  | FhoareS   _ -> "hoareS"
+  | FbdHoareF _ -> "phoareF"
+  | FbdHoareS _ -> "phoareS"
+  | FeHoareF  _ -> "ehoareF"
+  | FeHoareS  _ -> "ehoareS"
+  | _           -> "?"
+
+let pp_opt_f = function
+  | None        -> "_"
+  | Some (_, f) -> pp_f_node f
+
+let t_hi_error concl f1 f2 f3 tc =
+  tc_error_lazy !!tc (fun fmt ->
+    Format.fprintf fmt
+      "do not how to combine %s and %s and %s into %s"
+      (pp_opt_f f1) (pp_opt_f f2) (pp_opt_f f3) (pp_f_node concl))
+
+(* -------------------------------------------------------------------- *)
+(* hoareS consequence dispatcher.                                        *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   hoareS / hoareS   / ⊥       / ⊥  — simple consequence              *)
+(*   hoareS / hoareS   / hoareS  / ⊥  — conjunction of two hoare specs   *)
+(*   hoareS / bdhoareS / ⊥       / ⊥  — via bounded hoare (bound = 1)   *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_hoareS notmod f1 f2 f3 tc =
   let concl = FApi.tc1_goal tc in
-
-  match concl.f_node, f1, f2, f3 with
-  (* ------------------------------------------------------------------ *)
-  (* hoareS / hoareS / ⊥ / ⊥                                            *)
-  | FhoareS _, Some ((_, {f_node = FhoareS hs}) as nf1), None, None ->
+  match f1, f2, f3 with
+  (* hoareS / hoareS / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FhoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
-    t_on1 2 (t_apply_r nf1) (tac (hs_pr hs) (hs_po hs) tc)
+    t_hi_on1 2 (t_hi_apply_r nf1) (tac (hs_pr hs) (hs_po hs) tc)
 
-  (* ------------------------------------------------------------------ *)
-  (* hoareS / hoareS / hoareS / ⊥                                       *)
-  | FhoareS _,
-      Some ((_, { f_node = FhoareS hs }) as nf1),
-      Some ((_, f2) as nf2),
-      None
+  (* hoareS / hoareS / hoareS / ⊥ *)
+  | Some ((_, { f_node = FhoareS hs }) as nf1),
+    Some ((_, f2) as nf2),
+    None
     ->
     let hs2 = pf_as_hoareS !!tc f2 in
     let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
 
-    t_on1seq 2
+    t_hi_on1seq 2
       (tac
          (map_ss_inv2 f_and (hs_pr hs) (hs_pr hs2))
          (map_hs_inv2 f_and (hs_po hs) (hs_po hs2))
@@ -994,115 +1071,155 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
          (t_hoareS_conseq_conj
             (hs_pr hs2) (hs_po hs2)
             (hs_pr hs) (hs_po hs))
-         [t_apply_r nf2; t_apply_r nf1])
+         [t_hi_apply_r nf2; t_hi_apply_r nf1])
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* hoareS / bdhoareS / ⊥ / ⊥                                          *)
-  | FhoareS _, Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
+  (* hoareS / bdhoareS / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
 
-    check_is_detbound `First (bhs_bd hs).inv;
+    t_hi_check_detbound tc `First (bhs_bd hs).inv;
 
     FApi.t_seq
       t_hoareS_conseq_bdhoare
-      (t_on1seq 1
+      (t_hi_on1seq 1
          (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs))
-         (t_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_apply_r nf1)))
+         (t_hi_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_hi_apply_r nf1)))
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* hoareF / hoareF / ⊥ / ⊥                                            *)
-  | FhoareF _, Some ((_, {f_node = FhoareF hs}) as nf1), None, None ->
-    let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
-    t_on1 2 (t_apply_r nf1) (tac (hf_pr hs) (hf_po hs) tc)
+  | _ -> t_hi_error concl f1 f2 f3 tc
 
-  (* ------------------------------------------------------------------ *)
-  (* hoareF / hoareF / hoareF / ⊥                                       *)
-  | FhoareF _,
-      Some ((_, {f_node = FhoareF hf}) as nf1),
-      Some((_, f2) as nf2),
-      None
+(* -------------------------------------------------------------------- *)
+(* hoareF consequence dispatcher.                                        *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   hoareF / hoareF   / ⊥       / ⊥  — simple consequence              *)
+(*   hoareF / hoareF   / hoareF  / ⊥  — conjunction of two hoare specs   *)
+(*   hoareF / bdhoareF / ⊥       / ⊥  — via bounded hoare (bound = 1)   *)
+(*   hoareF / equivF   / hoareF  / _  — transitivity via equiv           *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_hoareF notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* hoareF / hoareF / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FhoareF hs}) as nf1), None, None ->
+    let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
+    t_hi_on1 2 (t_hi_apply_r nf1) (tac (hf_pr hs) (hf_po hs) tc)
+
+  (* hoareF / hoareF / hoareF / ⊥ *)
+  | Some ((_, {f_node = FhoareF hf}) as nf1),
+    Some((_, f2) as nf2),
+    None
     ->
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
     let pr1, po1 = hf_pr hf, hf_po hf in
     let pr2 = ss_inv_rebind (hf_pr hs2) hf.hf_m in
     let po2 = hs_inv_rebind (hf_po hs2) hf.hf_m in
-    (* check that the pre- and post-conditions are well formed *)
-    t_on1seq 2
+    t_hi_on1seq 2
       ((tac
           (map_ss_inv2 f_and pr1 pr2)
           (map_hs_inv2 f_and po1 po2)
        ))
       (FApi.t_seqsub
          (t_hoareF_conseq_conj pr2 po2 pr1 po1)
-         [t_apply_r nf2; t_apply_r nf1])
+         [t_hi_apply_r nf2; t_hi_apply_r nf1])
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* hoareF / bdhoareF / ⊥ / ⊥                                          *)
-  | FhoareF _, Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
+  (* hoareF / bdhoareF / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
 
-    check_is_detbound `First (bhf_bd hs).inv;
+    t_hi_check_detbound tc `First (bhf_bd hs).inv;
 
     FApi.t_seq
       t_hoareF_conseq_bdhoare
-      (t_on1seq 1
+      (t_hi_on1seq 1
          (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs))
-         (t_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_apply_r nf1)))
+         (t_hi_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_hi_apply_r nf1)))
       tc
-  (* ------------------------------------------------------------------ *)
-  (* hoareF / equivF / hoareF                                           *)
-  | FhoareF _,
-    Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
+
+  (* hoareF / equivF / hoareF — transitivity via equiv *)
+  | Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
     let hf2 = pf_as_hoareF !!tc f2 in
     if not (POE.is_empty (hf_po hf2).hsi_inv) then
       tc_error !!tc "exception are not supported";
     let post = POE.lower (hf_po hf2) in
     FApi.t_seqsub
       (t_hoareF_conseq_equiv hf2.hf_f (ef_pr ef) (ef_po ef) (hf_pr hf2) post)
-      [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
+      [t_id; t_id; t_hi_apply_r nef; t_hi_apply_r nf2] tc
 
-  (* ------------------------------------------------------------------ *)
-  (* ehoareS / ehoareS / ⊥ / ⊥                                          *)
-  | FeHoareS _, Some ((_, {f_node = FeHoareS hs}) as nf1), None, None ->
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
+(* ehoareS consequence dispatcher.                                       *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   ehoareS / ehoareS / ⊥ / ⊥  — simple consequence                    *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_ehoareS notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* ehoareS / ehoareS / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FeHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_ehoareS_conseq_nm else t_ehoareS_conseq in
-    FApi.t_last (t_apply_r nf1) (tac (ehs_pr hs) (ehs_po hs) tc)
+    FApi.t_last (t_hi_apply_r nf1) (tac (ehs_pr hs) (ehs_po hs) tc)
 
-  (* ------------------------------------------------------------------ *)
-  (* ehoareF / ehoareF / ⊥ / ⊥                                          *)
-  | FeHoareF _, Some ((_, {f_node = FeHoareF hf}) as nf1), None, None ->
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
+(* ehoareF consequence dispatcher.                                       *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   ehoareF / ehoareF / ⊥      / ⊥  — simple consequence               *)
+(*   ehoareF / equivF  / ehoareF / _  — transitivity via equiv           *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_ehoareF notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* ehoareF / ehoareF / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FeHoareF hf}) as nf1), None, None ->
     let tac = if notmod then t_ehoareF_conseq_nm else t_ehoareF_conseq in
-    FApi.t_last (t_apply_r nf1) (tac (ehf_pr hf) (ehf_po hf) tc)
+    FApi.t_last (t_hi_apply_r nf1) (tac (ehf_pr hf) (ehf_po hf) tc)
 
-  (* ------------------------------------------------------------------ *)
-  (* ehoareF / equivF / ehoareF                                         *)
-  | FeHoareF _,
-    Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
+  (* ehoareF / equivF / ehoareF — transitivity via equiv *)
+  | Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
     let hf2 = pf_as_ehoareF !!tc f2 in
     FApi.t_seqsub
       (t_ehoareF_conseq_equiv hf2.ehf_f (ef_pr ef) (ef_po ef) (ehf_pr hf2) (ehf_po hf2))
-      [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
+      [t_id; t_id; t_hi_apply_r nef; t_hi_apply_r nf2] tc
 
-  (* ------------------------------------------------------------------ *)
-  (* bdhoareS / bdhoareS / ⊥ / ⊥                                        *)
-  | FbdHoareS _, Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
+(* bdhoareS consequence dispatcher.                                      *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   bdhoareS / bdhoareS / ⊥      / ⊥ — consequence with bound change   *)
+(*   bdhoareS / bdhoareS / hoareS / ⊥ — conjunction with hoare side-cond *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_bdHoareS notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* bdhoareS / bdhoareS / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
 
-    t_on1seq 1
+    t_hi_on1seq 1
       (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs))
-      (t_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_apply_r nf1))
+      (t_hi_on1seq 2 (tac (bhs_pr hs) (bhs_po hs)) (t_hi_apply_r nf1))
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* bdhoareS / bdhoareS / hoareS / ⊥                                   *)
-  | FbdHoareS hs0,
-      Some ((_, {f_node = FbdHoareS hs}) as nf1),
-      Some ((_, f2) as nf2),
-      None
+  (* bdhoareS / bdhoareS / hoareS / ⊥ *)
+  | Some ((_, {f_node = FbdHoareS hs}) as nf1),
+    Some ((_, f2) as nf2),
+    None
     ->
+    let hs0 = pf_as_bdhoareS !!tc concl in
     let hs2 = pf_as_hoareS !!tc f2 in
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
 
@@ -1125,7 +1242,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_cut (f_hoareS (snd hs2.hs_m) pre hs2.hs_s (hs_po hs2)) @+ [
             t_hoareS_conseq (hs_pr hs2) (hs_po hs2) @+
                 [ EcLowGoal.t_trivial;
-                  t_mytrivial;
+                  t_hi_trivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareS_conseq_bd hs.bhs_cmp (bhs_bd hs) @+ [
@@ -1135,7 +1252,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
-                  t_mytrivial;
+                  t_hi_trivial;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -1144,7 +1261,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                     t_apply_hyp hh;
                     t_bdHoareS_conseq (bhs_pr hs) post @+ [
                       EcLowGoal.t_trivial;
-                      t_mytrivial;
+                      t_hi_trivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -1157,26 +1274,38 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
 
     FApi.t_sub
-      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
+      [t_hi_trivial; t_hi_trivial; t_hi_trivial; t_hi_apply_r nf2; t_hi_apply_r nf1]
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* bdhoareF / bdhoareF / ⊥ / ⊥                                        *)
-  | FbdHoareF _, Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
+(* bdhoareF consequence dispatcher.                                      *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   bdhoareF / bdhoareF / ⊥      / ⊥ — consequence with bound change   *)
+(*   bdhoareF / bdhoareF / hoareF / ⊥ — conjunction with hoare side-cond *)
+(*   bdhoareF / equivF   / bdhoareF/ _ — transitivity via equiv          *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_bdHoareF notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* bdhoareF / bdhoareF / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
 
-    t_on1seq 1
+    t_hi_on1seq 1
       (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs))
-      (t_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_apply_r nf1))
+      (t_hi_on1seq 2 (tac (bhf_pr hs) (bhf_po hs)) (t_hi_apply_r nf1))
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* bdhoareF / bdhoareF / hoareF / ⊥                                  *)
-  | FbdHoareF hs0,
-      Some ((_, {f_node = FbdHoareF hs}) as nf1),
-      Some ((_, f2) as nf2),
-      None
+  (* bdhoareF / bdhoareF / hoareF / ⊥ *)
+  | Some ((_, {f_node = FbdHoareF hs}) as nf1),
+    Some ((_, f2) as nf2),
+    None
     ->
+    let hs0 = pf_as_bdhoareF !!tc concl in
     let hs2 = pf_as_hoareF !!tc f2 in
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
     let m,hi,hh, h0 =
@@ -1201,7 +1330,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_cut (f_hoareF pre hs2.hf_f (hf_po hs2)) @+ [
             t_hoareF_conseq (hf_pr hs2) (hf_po hs2) @+
                 [ EcLowGoal.t_trivial;
-                  t_mytrivial;
+                  t_hi_trivial;
                   t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareF_conseq_bd hs.bhf_cmp (bhf_bd hs) @+ [
@@ -1211,7 +1340,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_intros_i [m;h0] @! t_cutdef
                     (ptlocal ~args:[pamemory m; palocal h0] hi)
                     mpre @! EcLowGoal.t_trivial;
-                  t_mytrivial @! t_intros_i [m; h0] @! t_apply_hyp h0;
+                  t_hi_trivial @! t_intros_i [m; h0] @! t_apply_hyp h0;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -1220,7 +1349,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                     t_apply_hyp hh;
                     t_bdHoareF_conseq (bhf_pr hs) post @+ [
                       EcLowGoal.t_trivial;
-                      t_mytrivial;
+                      t_hi_trivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -1233,31 +1362,45 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
 
     FApi.t_sub
-      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
+      [t_hi_trivial; t_hi_trivial; t_hi_trivial; t_hi_apply_r nf2; t_hi_apply_r nf1]
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* bdhoareF / equivF / bdhoareF                                       *)
-  | FbdHoareF _,
-    Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
+  (* bdhoareF / equivF / bdhoareF — transitivity via equiv *)
+  | Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
     let hf2 = pf_as_bdhoareF !!tc f2 in
     FApi.t_seqsub
       (t_bdHoareF_conseq_equiv hf2.bhf_f (ef_pr ef) (ef_po ef)
                                          (bhf_pr hf2) (bhf_po hf2) (bhf_bd hf2))
-      [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
+      [t_id; t_id; t_hi_apply_r nef; t_hi_apply_r nf2] tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / equivS / ⊥ / ⊥                                            *)
-  | FequivS _, Some ((_, {f_node = FequivS es}) as nf1), None, None ->
+  | _ -> t_hi_error concl f1 f2 f3 tc
+
+(* -------------------------------------------------------------------- *)
+(* equivS consequence dispatcher.                                        *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   equivS / equivS   / ⊥        / ⊥        — simple consequence       *)
+(*   equivS / equivS   / hoareS   / hoareS   — conjunction (L+R+rel)    *)
+(*   equivS / equivS   / bdhoareS / ⊥        — recurse on inner bd goal *)
+(*   equivS / equivS   / ⊥        / bdhoareS — recurse on inner bd goal *)
+(*   equivS / ?        / ?        / ⊥        — fill missing f3 with ⊤   *)
+(*   equivS / ?        / ⊥        / ?        — fill missing f2 with ⊤   *)
+(*   equivS / ⊥        / bdhoareS / ⊥        — left-side bd equivalence *)
+(*   equivS / ⊥        / ⊥        / bdhoareS — right-side bd equivalence*)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_equivS ~recurse notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* equivS / equivS / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FequivS es}) as nf1), None, None ->
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
-    t_on1 2 (t_apply_r nf1) (tac (es_pr es) (es_po es) tc)
+    t_hi_on1 2 (t_hi_apply_r nf1) (tac (es_pr es) (es_po es) tc)
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / equivS / hoareS / hoareS  *)
-  | FequivS _,
-      Some ((_, {f_node = FequivS es}) as nf1),
-      Some ((_, f2) as nf2),
-      Some ((_, f3) as nf3)
+  (* equivS / equivS / hoareS / hoareS *)
+  | Some ((_, {f_node = FequivS es}) as nf1),
+    Some ((_, f2) as nf2),
+    Some ((_, f3) as nf3)
     ->
     let hs2    = pf_as_hoareS !!tc f2 in
     let hs3    = pf_as_hoareS !!tc f3 in
@@ -1279,111 +1422,121 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let post   = map_ts_inv f_ands [es_po es; hs2_po; hs3_po] in
     let tac    = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    t_on1seq 2 (tac pre post)
+    t_hi_on1seq 2 (tac pre post)
       (FApi.t_seqsub
          (t_equivS_conseq_conj
             (hs_pr hs2) post2 (hs_pr hs3) post3 (es_pr es) (es_po es))
-         [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
+         [t_hi_apply_r nf2; t_hi_apply_r nf3; t_hi_apply_r nf1])
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / equivS / bdhoareS / ⊥                                     *)
-  | FequivS _, Some (_, {f_node = FequivS es}), Some (_, f), None
+  (* equivS / equivS / bdhoareS / ⊥ *)
+  | Some (_, {f_node = FequivS es}), Some (_, f), None
       when is_bdHoareS f
     ->
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    t_on1seq 2
+    t_hi_on1seq 2
       (tac (es_pr es) (es_po es))
-      (t_hi_conseq notmod None f2 None)
+      (recurse notmod None f2 None)
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / equivS / ⊥ / bdhoareS                                     *)
-  | FequivS _, Some (_, {f_node = FequivS es}), None, Some (_, f)
+  (* equivS / equivS / ⊥ / bdhoareS *)
+  | Some (_, {f_node = FequivS es}), None, Some (_, f)
       when is_bdHoareS f
     ->
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    t_on1seq 2
+    t_hi_on1seq 2
       (tac (es_pr es) (es_po es))
-      (t_hi_conseq notmod None None f3)
+      (recurse notmod None None f3)
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / ? / ? / ⊥                                                 *)
-  | FequivS es, Some _, Some _, None ->
+  (* equivS / ? / ? / ⊥ — synthesize missing f3 *)
+  | Some _, Some _, None ->
+    let es = pf_as_equivS !!tc concl in
     let m = EcIdent.create "&hr" in
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f3 = f_hoareS (snd es.es_mr) {m;inv=f_true} es.es_sr post
     in
-    t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
+    recurse notmod f1 f2 (Some (None, f3)) tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / ? / ⊥ / ?                                                 *)
-  | FequivS es, Some _, None, Some _ ->
+  (* equivS / ? / ⊥ / ? — synthesize missing f2 *)
+  | Some _, None, Some _ ->
+    let es = pf_as_equivS !!tc concl in
     let m = EcIdent.create "&hr" in
     let f2 =
       f_hoareS
         (snd es.es_ml) {m;inv=f_true} es.es_sl
         { hsi_m = m; hsi_inv = POE.empty f_true; }
     in
-    t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
+    recurse notmod f1 (Some (None, f2)) f3 tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / ⊥ / bdhoareS / ⊥                                          *)
-  | FequivS es, None, Some ((_, f2) as nf2), None ->
+  (* equivS / ⊥ / bdhoareS / ⊥ — left-side bounded equivalence *)
+  | None, Some ((_, f2) as nf2), None ->
+    let es = pf_as_equivS !!tc concl in
     let hs = pf_as_bdhoareS !!tc f2 in
     let (ml, mr) = (fst es.es_ml, fst es.es_mr) in
     let pre = ss_inv_generalize_as_left (bhs_pr hs) ml mr in
     let post = ss_inv_generalize_as_left (bhs_po hs) ml mr in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    check_is_detbound `Second (bhs_bd hs).inv;
+    t_hi_check_detbound tc `Second (bhs_bd hs).inv;
 
-    t_on1seq 2
+    t_hi_on1seq 2
      (tac pre post)
      (FApi.t_seq
         (t_equivS_conseq_bd `Left (bhs_pr hs) (bhs_po hs))
-        (t_apply_r nf2))
+        (t_hi_apply_r nf2))
      tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivS / ⊥ / ⊥ / bdhoareS                                          *)
-  | FequivS es, None, None, Some ((_, f3) as nf3) ->
+  (* equivS / ⊥ / ⊥ / bdhoareS — right-side bounded equivalence *)
+  | None, None, Some ((_, f3) as nf3) ->
+    let es = pf_as_equivS !!tc concl in
     let hs = pf_as_bdhoareS !!tc f3 in
     let (ml, mr) = (fst es.es_ml, fst es.es_mr) in
     let pre = ss_inv_generalize_as_right (bhs_pr hs) ml mr in
     let post = ss_inv_generalize_as_right (bhs_po hs) ml mr in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-    check_is_detbound `Third (bhs_bd hs).inv;
+    t_hi_check_detbound tc `Third (bhs_bd hs).inv;
 
-    t_on1seq 2
+    t_hi_on1seq 2
       (tac pre post)
       (FApi.t_seq
          (t_equivS_conseq_bd `Right (bhs_pr hs) (bhs_po hs))
-         (t_apply_r nf3))
+         (t_hi_apply_r nf3))
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivF / equivF / ⊥ / ⊥                                            *)
-  | FequivF _, Some ((_, {f_node = FequivF ef}) as nf1), None, None ->
-    let tac = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
-    t_on1seq 2 (tac (ef_pr ef) (ef_po ef)) (t_apply_r nf1) tc
+  | _ -> t_hi_error concl f1 f2 f3 tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivF / equivF / hoareF / hoareF                                  *)
-  | FequivF _,
-      Some ((_, {f_node = FequivF ef}) as nf1),
-      Some ((_, f2) as nf2),
-      Some ((_, f3) as nf3)
+(* -------------------------------------------------------------------- *)
+(* equivF consequence dispatcher.                                        *)
+(*                                                                       *)
+(* Supported combinations (goal / f1 / f2 / f3):                         *)
+(*   equivF / equivF / ⊥      / ⊥      — simple consequence             *)
+(*   equivF / equivF / hoareF / hoareF — conjunction (L+R+rel)          *)
+(*   equivF / ?      / ?      / ⊥      — fill missing f3 with ⊤         *)
+(*   equivF / ?      / ⊥      / ?      — fill missing f2 with ⊤         *)
+(* -------------------------------------------------------------------- *)
+
+let t_hi_conseq_equivF ~recurse notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match f1, f2, f3 with
+  (* equivF / equivF / ⊥ / ⊥ *)
+  | Some ((_, {f_node = FequivF ef}) as nf1), None, None ->
+    let tac = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
+    t_hi_on1seq 2 (tac (ef_pr ef) (ef_po ef)) (t_hi_apply_r nf1) tc
+
+  (* equivF / equivF / hoareF / hoareF *)
+  | Some ((_, {f_node = FequivF ef}) as nf1),
+    Some ((_, f2) as nf2),
+    Some ((_, f3) as nf3)
     ->
     let hs2    = pf_as_hoareF !!tc f2 in
     let hs3    = pf_as_hoareF !!tc f3 in
     let (ml, mr) = (ef.ef_ml, ef.ef_mr) in
 
-   if not (POE.is_empty (hf_po hs2).hsi_inv) then
+    if not (POE.is_empty (hf_po hs2).hsi_inv) then
       tc_error !!tc "exception are not supported";
     let post2 = POE.lower (hf_po hs2) in
     if not (POE.is_empty (hf_po hs3).hsi_inv) then
@@ -1398,51 +1551,51 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
 
     let post  = map_ts_inv f_ands [ef_po ef; hs2_po; hs3_po] in
     let tac    = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
-    t_on1seq 2
+    t_hi_on1seq 2
       (tac pre post)
       (FApi.t_seqsub
          (t_equivF_conseq_conj
             (hf_pr hs2) post2 (hf_pr hs3) post3 (ef_pr ef) (ef_po ef))
-         [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
+         [t_hi_apply_r nf2; t_hi_apply_r nf3; t_hi_apply_r nf1])
       tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivF / ? / ? / ⊥                                                 *)
-  | FequivF ef, Some _, Some _, None ->
+  (* equivF / ? / ? / ⊥ — synthesize missing f3 *)
+  | Some _, Some _, None ->
+    let ef = pf_as_equivF !!tc concl in
     let m = EcIdent.create "&hr" in
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f3 = f_hoareF {m;inv=f_true} ef.ef_fr post in
-    t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
+    recurse notmod f1 f2 (Some (None, f3)) tc
 
-  (* ------------------------------------------------------------------ *)
-  (* equivF / ? / ⊥ / ?                                                 *)
-  | FequivF ef, Some _, None, Some _ ->
+  (* equivF / ? / ⊥ / ? — synthesize missing f2 *)
+  | Some _, None, Some _ ->
+    let ef = pf_as_equivF !!tc concl in
     let m = EcIdent.create "&hr" in
     let post = { hsi_m = m; hsi_inv = POE.empty f_true; } in
     let f2 = f_hoareF {m;inv=f_true} ef.ef_fl post in
-    t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
+    recurse notmod f1 (Some (None, f2)) f3 tc
 
-  | _ ->
-    let rec pp_f f =
-      match f.f_node with
-      | FequivF   _ -> "equivF"
-      | FequivS   _ -> "equivS"
-      | FhoareF   _ -> "hoareF"
-      | FhoareS   _ -> "hoareS"
-      | FbdHoareF _ -> "phoareF"
-      | FbdHoareS _ -> "phoareS"
-      | _           -> "?"
+  | _ -> t_hi_error concl f1 f2 f3 tc
 
-    and pp_o f =
-      match f with
-      | None -> "_"
-      | Some (_, f) -> pp_f f
-    in
+(* -------------------------------------------------------------------- *)
+(* Main high-level consequence dispatcher.                               *)
+(*                                                                       *)
+(* Dispatches to a goal-type-specific sub-function based on the current  *)
+(* goal's formula node type.                                             *)
+(* -------------------------------------------------------------------- *)
 
-    tc_error_lazy !!tc (fun fmt ->
-      Format.fprintf fmt
-        "do not how to combine %s and %s and %s into %s"
-        (pp_o f1) (pp_o f2) (pp_o f3) (pp_f concl))
+let rec t_hi_conseq notmod f1 f2 f3 tc =
+  let concl = FApi.tc1_goal tc in
+  match concl.f_node with
+  | FhoareS   _ -> t_hi_conseq_hoareS    notmod f1 f2 f3 tc
+  | FhoareF   _ -> t_hi_conseq_hoareF    notmod f1 f2 f3 tc
+  | FeHoareS  _ -> t_hi_conseq_ehoareS   notmod f1 f2 f3 tc
+  | FeHoareF  _ -> t_hi_conseq_ehoareF   notmod f1 f2 f3 tc
+  | FbdHoareS _ -> t_hi_conseq_bdHoareS  notmod f1 f2 f3 tc
+  | FbdHoareF _ -> t_hi_conseq_bdHoareF  notmod f1 f2 f3 tc
+  | FequivS   _ -> t_hi_conseq_equivS   ~recurse:t_hi_conseq notmod f1 f2 f3 tc
+  | FequivF   _ -> t_hi_conseq_equivF   ~recurse:t_hi_conseq notmod f1 f2 f3 tc
+  | _           -> t_hi_error concl f1 f2 f3 tc
 
 (* -------------------------------------------------------------------- *)
 type processed_conseq_info =
@@ -1451,7 +1604,43 @@ type processed_conseq_info =
 let process_info pe hyps m = function
   | CQI_bd (cmp, bd) -> PCI_bd (cmp, {m; inv=TTC.pf_process_form pe hyps treal bd})
 
-let process_conseq_2 notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
+(* -------------------------------------------------------------------- *)
+(* Shared pipeline for processing consequence tactic arguments.          *)
+(*                                                                       *)
+(* Given closures for processing the primary cut (f1) and secondary cuts *)
+(* (f2, f3), this function:                                              *)
+(*   1. Parses each argument as a closed proof term via process_cut      *)
+(*   2. Dispatches to the high-level consequence tactic t_hi_conseq      *)
+(*                                                                       *)
+(* The process_cut closures handle goal-type-specific formula building   *)
+(* and are provided by process_conseq_hs (for hoare with exceptions)     *)
+(* and process_conseq_ss (for all other judgment types).                  *)
+(* -------------------------------------------------------------------- *)
+
+let process_conseq_core ~process_cut1 ~process_cut2 notmod info1 info2 info3 tc =
+  if   List.for_all is_none [info1; info2; info3]
+  then t_id tc
+  else
+    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut1) tc) in
+    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut2 `Left f1) tc) in
+    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut
+                              ~prcut:(process_cut2 `Right f1) tc) in
+
+    let ofalse = omap (fun (x, y) -> (Some x, y)) in
+
+    t_hi_conseq notmod (f1 |> ofalse) (f2 |> ofalse) (f3 |> ofalse) tc
+
+(* -------------------------------------------------------------------- *)
+(* process_conseq_ss: processes consequence arguments for judgment types  *)
+(* with simple (non-exception) postconditions: ehoare, bdhoare, equiv.   *)
+(*                                                                       *)
+(* Postconditions are Inv_ss (single-state) or Inv_ts (two-state).       *)
+(* Exception postconditions (poe) are rejected.                          *)
+(* -------------------------------------------------------------------- *)
+
+let process_conseq_ss notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   let ensure_none o =
@@ -1637,21 +1826,17 @@ let process_conseq_2 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
     fmake pre post c_or_bd
   in
 
-  if   List.for_all is_none [info1; info2; info3]
-  then t_id tc
-  else
-    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut1) tc) in
-    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut2 `Left f1) tc) in
-    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut2 `Right f1) tc) in
+  process_conseq_core ~process_cut1 ~process_cut2 notmod info1 info2 info3 tc
 
-    let ofalse = omap (fun (x, y) -> (Some x, y)) in
+(* -------------------------------------------------------------------- *)
+(* process_conseq_hs: processes consequence arguments for hoare          *)
+(* judgments (hoareS, hoareF) which have exception-aware postconditions.  *)
+(*                                                                       *)
+(* Postconditions are Inv_hs (with exception maps via POE).              *)
+(* Exception postconditions (poe) are processed via TTC.pf_process_poe.  *)
+(* -------------------------------------------------------------------- *)
 
-    t_hi_conseq notmod (f1 |> ofalse) (f2 |> ofalse) (f3 |> ofalse) tc
-
-let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
+let process_conseq_hs notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   let ensure_none o =
@@ -1777,27 +1962,15 @@ let process_conseq_1 notmod ((info1, info2, info3) : conseq_ppterm option tuple3
 
   in
 
-  if List.for_all is_none [info1; info2; info3]
-  then t_id tc
-  else
-    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut1) tc) in
-    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut2 `Left f1) tc) in
-    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut
-                              ~prcut:(process_cut2 `Right f1) tc) in
-
-    let ofalse = omap (fun (x, y) -> (Some x, y)) in
-
-    t_hi_conseq notmod (f1 |> ofalse) (f2 |> ofalse) (f3 |> ofalse) tc
+  process_conseq_core ~process_cut1 ~process_cut2 notmod info1 info2 info3 tc
 
 let process_conseq notmod
     ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let _, concl = FApi.tc1_flat tc in
 
   match concl.f_node with
-  | FhoareS _ | FhoareF _ -> process_conseq_1 notmod (info1, info2, info3) tc
-  | _ -> process_conseq_2 notmod (info1, info2, info3) tc
+  | FhoareS _ | FhoareF _ -> process_conseq_hs notmod (info1, info2, info3) tc
+  | _ -> process_conseq_ss notmod (info1, info2, info3) tc
 
 (* -------------------------------------------------------------------- *)
 let process_bd_equiv side (pr, po) tc =
