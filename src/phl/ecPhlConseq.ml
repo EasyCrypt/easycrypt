@@ -383,11 +383,12 @@ let t_equivS_notmod post tc =
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
-  let (env, hyps, _) = FApi.tc1_eflat tc in
-  let hf = tc1_as_hoareF tc in
-  let f = hf.hf_f in
-  let mpr,mpo = Fun.hoareF_memenv hf.hf_m f env in
+(* Shared core for F-level notmod: substitutes the result variable,     *)
+(* generalizes over modified variables, quantifies over the result,     *)
+(* and builds the implication with the precondition.                    *)
+
+let cond_F_notmod_core ~mk_other env hyps f m pre cond =
+  let mpr,mpo = Fun.hoareF_memenv m f env in
   let fsig = (Fun.by_xpath f env).f_sig in
   let pvres = pv_res in
   let vres = LDecl.fresh_id hyps "result" in
@@ -396,9 +397,10 @@ let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
   let s = PVM.add env pvres m fres PVM.empty in
   let cond = map_ss_inv1 (PVM.subst env s) cond in
   let modi = f_write env f in
-  let cond,bdg,bde = generalize_mod_ env modi cond in
+  let cond, bdg, bde = generalize_mod_ env modi cond in
   let cond = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) cond in
-  let cond = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp (hf_pr hf) cond) in
+  assert (fst mpr = m);
+  let cond = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp pre cond) in
   let bmem = [m] in
   let bother =
     if mk_other then
@@ -406,6 +408,11 @@ let cond_hoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
       List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
+
+let cond_hoareF_notmod ?(mk_other=false) tc cond =
+  let (env, hyps, _) = FApi.tc1_eflat tc in
+  let hf = tc1_as_hoareF tc in
+  cond_F_notmod_core ~mk_other env hyps hf.hf_f hf.hf_m (hf_pr hf) cond
 
 let t_hoareF_notmod post tc =
   let hf = tc1_as_hoareF tc in
@@ -420,20 +427,25 @@ let t_hoareF_notmod post tc =
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let cond_hoareS_notmod ?(mk_other=false) tc cond =
-  let env = FApi.tc1_env tc in
-  let hs = tc1_as_hoareS tc in
-  let s = hs.hs_s in
-  let m = fst hs.hs_m in
-  let modi = s_write env s in
+(* Shared core for S-level notmod: generalizes over modified variables  *)
+(* and builds the implication with the precondition.                    *)
+
+let cond_S_notmod_core ~mk_other env stmt memenv pre cond =
+  let m = fst memenv in
+  let modi = s_write env stmt in
   let cond, bdg, bde = generalize_mod_ env modi cond in
-  let cond = f_forall_mems_ss_inv hs.hs_m (map_ss_inv2 f_imp (hs_pr hs) cond) in
+  let cond = f_forall_mems_ss_inv memenv (map_ss_inv2 f_imp pre cond) in
   let bmem = [m] in
   let bother =
     if mk_other then
       List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
+
+let cond_hoareS_notmod ?(mk_other=false) tc cond =
+  let env = FApi.tc1_env tc in
+  let hs = tc1_as_hoareS tc in
+  cond_S_notmod_core ~mk_other env hs.hs_s hs.hs_m (hs_pr hs) cond
 
 let t_hoareS_notmod post tc =
   let hs = tc1_as_hoareS tc in
@@ -448,30 +460,10 @@ let t_hoareS_notmod post tc =
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let cond_bdHoareF_notmod ?(mk_other=false) tc (cond: ss_inv) =
+let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
   let hf = tc1_as_bdhoareF tc in
-  let f = hf.bhf_f in
-  let mpr,mpo = Fun.hoareF_memenv hf.bhf_m f env in
-  let fsig = (Fun.by_xpath f env).f_sig in
-  let pvres = pv_res in
-  let vres = LDecl.fresh_id hyps "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let m    = fst mpo in
-  let s = PVM.add env pvres m fres PVM.empty in
-  let cond = map_ss_inv1 (PVM.subst env s) cond in
-  let modi = f_write env f in
-  let cond, bdg, bde = generalize_mod_ env modi cond in
-  let cond = map_ss_inv1 (f_forall_simpl [(vres, GTty fsig.fs_ret)]) cond in
-  assert (fst mpr = m);
-  let cond = f_forall_mems_ss_inv mpr (map_ss_inv2 f_imp (bhf_pr hf) cond) in
-  let bmem = [m] in
-  let bother =
-    if mk_other then
-      mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
-      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
-    else [] in
-  cond, bmem, bother
+  cond_F_notmod_core ~mk_other env hyps hf.bhf_f hf.bhf_m (bhf_pr hf) cond
 
 
 let t_bdHoareF_notmod post tc =
@@ -484,20 +476,10 @@ let t_bdHoareF_notmod post tc =
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
-let cond_bdHoareS_notmod ?(mk_other=false) tc (cond: ss_inv) =
+let cond_bdHoareS_notmod ?(mk_other=false) tc cond =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_bdhoareS tc in
-  let s = hs.bhs_s in
-  let m = fst hs.bhs_m in
-  let modi = s_write env s in
-  let cond, bdg, bde = generalize_mod_ env modi cond in
-  let cond = f_forall_mems_ss_inv hs.bhs_m (map_ss_inv2 f_imp (bhs_pr hs) cond) in
-  let bmem = [m] in
-  let bother =
-    if mk_other then
-      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
-    else [] in
-  cond, bmem, bother
+  cond_S_notmod_core ~mk_other env hs.bhs_s hs.bhs_m (bhs_pr hs) cond
 
 let t_bdHoareS_notmod post tc =
   let hs = tc1_as_bdhoareS tc in
@@ -664,6 +646,12 @@ let t_ehoareS_conseq_nm pre post tc =
   (t_ehoareS_concave fc pre post @+ t_ehoare_conseq_nm_end) tc
 
 
+(* -------------------------------------------------------------------- *)
+(* Process the "concave" tactic for ehoare judgments.                    *)
+(*                                                                       *)
+(* Parses the concave function fc : xreal → xreal and the proof term    *)
+(* (with optional pre/post), then applies t_ehoare*_concave followed    *)
+(* by t_concave_incr to discharge the monotonicity side-condition.       *)
 (* -------------------------------------------------------------------- *)
 
 let process_concave ((info, fc) : pformula option tuple2 gppterm * pformula) tc =
@@ -894,14 +882,24 @@ let t_equivS_conseq_bd side pr po tc =
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
 (* -------------------------------------------------------------------- *)
-
-(*
-(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2 /\ q m1 = p m2)
-(forall m1 m2, Q m1 m2 => Q2 m2 => Q1 m1)
-equiv M1 ~ M2 : P ==> Q   phoare M2 : P2 ==> Q2 R p.
------------------------------------------------
-phoare M1 : P1 ==> Q1 R q.
-*)
+(* Transitivity via equivalence.                                         *)
+(*                                                                       *)
+(* Reduce a single-program judgment to an equivalence + a judgment on    *)
+(* the second program. For hoare/bdhoare/ehoare goals of the form:       *)
+(*   {P1} M1 {Q1}                                                       *)
+(* We can prove it via:                                                  *)
+(*   cond1: ∀m1, P1 m1 ⇒ ∃m2, P m1 m2 ∧ P2 m2 [∧ q m1 = p m2]       *)
+(*   cond2: ∀m1 m2, Q m1 m2 ⇒ Q2 m2 ⇒ Q1 m1                          *)
+(*   equiv M1 ~ M2 : P ==> Q                                            *)
+(*   {P2} M2 {Q2} [R p]                                                 *)
+(*                                                                       *)
+(* The optional ~bds handles the bound transfer for bdhoare.             *)
+(*                                                                       *)
+(* transitivity_side_cond: builds cond1 and cond2                        *)
+(* t_hoareF_conseq_equiv:  applies the rule for hoare goals              *)
+(* t_bdHoareF_conseq_equiv: applies the rule for bdhoare goals           *)
+(* t_ehoareF_conseq_equiv: applies the rule for ehoare goals             *)
+(* -------------------------------------------------------------------- *)
 
 let transitivity_side_cond ?bds hyps prml poml pomr p q p2 q2 p1 q1 =
   let env = LDecl.toenv hyps in
@@ -2001,6 +1999,17 @@ let process_conseq_opt cqopt infos tc =
   process_conseq cqopt.cqo_frame infos tc
 
 (* -------------------------------------------------------------------- *)
+(* Automatic consequence (conseqauto).                                   *)
+(*                                                                       *)
+(* Automatically weakens the postcondition using non-modification:       *)
+(* 1. Compute the notmod condition and variable bindings for the goal    *)
+(* 2. Start a scratch proof of the notmod condition                      *)
+(* 3. Introduce memory/variable bindings & crush forward hypotheses      *)
+(* 4. If the scratch proof closes, postcondition becomes ⊤              *)
+(*    Otherwise, extract the remaining goal as the new postcondition     *)
+(* 5. Apply t_notmod with the computed postcondition, then try to crush  *)
+(* -------------------------------------------------------------------- *)
+
 let t_conseqauto ?(delta = true) ?tsolve tc =
   let (hyps, concl), mk_other = FApi.tc1_flat tc, true in
 
