@@ -668,7 +668,8 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match value with
-  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr ->
+  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr
+                  || EcLocation.unloc name = EcGState.pp_showtvi ->
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
 
