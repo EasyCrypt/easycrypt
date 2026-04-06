@@ -206,7 +206,9 @@ move => lt_m_n.
 rewrite (total_prob M (drange m n) (range m n)).
 by rewrite drange_ll.
 by rewrite range_uniq.
-rewrite /support_is => j; smt(supp_drange mem_range).
+rewrite /support_is => j; split => [j_in_drange | j_in_range].
+rewrite mem_range; by rewrite supp_drange in j_in_drange.
+rewrite supp_drange; by rewrite mem_range in j_in_range.
 rewrite (big_weight_simp M) //; by move => j /mem_range.
 qed.
 
@@ -236,7 +238,9 @@ lemma big_weight_simp (M <: T) (xs : t list, i : input, ys : t list) &m :
 proof.
 move => uniq_xs.
 elim ys => [// | y ys IH mem_impl].
-smt(big_cons duniform1E_uniq).
+rewrite 2!big_cons (_ : predT true) //=.
+rewrite duniform1E_uniq // (_ : y \in xs) 1:mem_impl //=.
+rewrite IH => [z z_in_ys | //]; by rewrite mem_impl /= z_in_ys.
 qed.
 
 (*& total probability lemma for `duniform` &*)
