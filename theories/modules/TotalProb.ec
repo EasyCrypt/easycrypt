@@ -2,15 +2,9 @@
     distributions with finite support, and then specializes it to
     `DBool.dbool`, `drange` and `duniform`. ^*)
 
-require import AllCore List StdOrder StdBigop Distr DBool.
+require import AllCore List StdOrder StdBigop Distr DBool Finite.
 require EventPartitioning.
 import RealOrder Bigreal BRA.
-
-(*& Are the elements in the support of a distribution the
-    same as the elements of a list? &*)
-
-op support_is (d : 'a distr) (xs : 'a list) : bool =
-  forall (y : 'a), y \in d <=> y \in xs.
 
 (*& General abstract theory &*)
 
@@ -102,13 +96,13 @@ hoare; call (_ : true); auto; smt().
 qed.
 
 lemma total_prob' (dt' : t distr) (supp : t list) (i' : input) &m :
-  is_lossless dt' => uniq supp => support_is dt' supp =>
+  is_lossless dt' => is_finite_for (support dt') supp =>
   Pr[Rand(M).f(dt', i') @ &m : res] =
   big predT
   (fun x' => mu1 dt' x' * Pr[M.main(i', x') @ &m : res])
   supp.
 proof.
-move => dt'_ll uniq_supp support_is_dt'_supp.
+move => dt'_ll [uniq_supp supp_iff]. 
 have -> :
   Pr[Rand(M).f(dt', i') @ &m : res] = Pr[RandAux.f(dt', i') @ &m : res].
   byequiv (_ : ={dt, i, glob M} ==> ={res}) => //; proc; sim.
@@ -134,13 +128,13 @@ end section.
 (*& total probability lemma for distributions with finite support &*)
 
 lemma total_prob (M <: T) (dt : t distr) (supp : t list) (i : input) &m :
-  is_lossless dt => uniq supp => support_is dt supp =>
+  is_lossless dt => is_finite_for (support dt) supp =>
   Pr[Rand(M).f(dt, i) @ &m : res] =
   big predT
   (fun (x : t) => mu1 dt x * Pr[M.main(i, x) @ &m : res])
   supp.
 proof.
-move => dt_ll uniq_supp support_is_dt_supp.
+move => dt_ll iff_supp_dt_supp.
 by apply (total_prob' M).
 qed.
 
@@ -205,10 +199,8 @@ proof.
 move => lt_m_n.
 rewrite (total_prob M (drange m n) (range m n)).
 by rewrite drange_ll.
-by rewrite range_uniq.
-rewrite /support_is => j; split => [j_in_drange | j_in_range].
-rewrite mem_range; by rewrite supp_drange in j_in_drange.
-rewrite supp_drange; by rewrite mem_range in j_in_range.
+rewrite /is_finite_for.
+smt(range_uniq mem_range supp_drange).
 rewrite (big_weight_simp M) //; by move => j /mem_range.
 qed.
 
@@ -255,8 +247,7 @@ proof.
 move => uniq_xs xs_ne_nil.
 rewrite (total_prob M (duniform xs) xs).
 by rewrite duniform_ll.
-by rewrite uniq_xs.
-rewrite /support_is => y; smt(supp_duniform).
+smt(supp_duniform).
 by rewrite (big_weight_simp M).
 qed.
 
