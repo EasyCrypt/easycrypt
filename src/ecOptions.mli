@@ -2,6 +2,8 @@
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
+  | `Mcp
   | `Config
   | `Runtest of run_option
   | `Why3Config
