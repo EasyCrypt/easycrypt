@@ -706,6 +706,21 @@ let generalize_mod_ts_inv env modil modir f =
   let res = generalize_mod_right env modir f in
   generalize_mod_left env modil res
 
+(* -------------------------------------------------------------------- *)
+(* Build (ident * form) bindings from generalize_mod_ output:            *)
+(* map quantifier-bound names back to concrete pvar/glob expressions.    *)
+
+let mk_bind_pvar (m : memory) (id : EcIdent.t) ((x, ty) : prog_var * ty) : EcIdent.t * ss_inv =
+  id, f_pvar x ty m
+
+let mk_bind_glob (env : env) (m : memory) (id : EcIdent.t) (x : EcPath.mpath) : EcIdent.t * ss_inv =
+  id, NormMp.norm_glob env m x
+
+let mk_bind_pvars (m : memory) ((bd, pvs) : (EcIdent.t * gty) list * (prog_var * ty) list) : (EcIdent.t * ss_inv) list =
+  List.map2 (fun (id, _) pv -> mk_bind_pvar m id pv) bd pvs
+
+let mk_bind_globs (env : env) (m : memory) ((bd, mps) : (EcIdent.t * gty) list * EcPath.mpath list) : (EcIdent.t * ss_inv) list =
+  List.map2 (fun (id, _) mp -> mk_bind_glob env m id mp) bd mps
 
 (* -------------------------------------------------------------------- *)
 let abstract_info env f1 =
