@@ -3833,9 +3833,12 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         pp_locality lc
         (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
-  | EcTheory.Th_reduction _ ->
+  | EcTheory.Th_reduction { red_base; _ } ->
       (* FIXME: section we should add the lemma in the reduction *)
-      Format.fprintf fmt "hint simplify."
+      begin match red_base with
+      | None -> Format.fprintf fmt "hint simplify."
+      | Some base -> Format.fprintf fmt "hint simplify in %s : ." base
+      end
 
   | EcTheory.Th_auto { level; base; axioms; locality; } ->
       Format.fprintf fmt "%ahint solve %d %s : %a."
