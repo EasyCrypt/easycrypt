@@ -5,46 +5,44 @@
 \RequirePackage{xcolor}
 \RequirePackage{xparse}
 
-% EasyCrypt %
-% Language
+% EasyCrypt % Language
 \lstdefinelanguage{easycrypt}{%
 	sensitive=true, % Case sensitive keywords
-	% Keywords: Meta/Specification language
+	% Keywords: Global and programming language
 	morekeywords=[1]%
 	{
-		abbrev, abstract, as, assert, async, axiom, axiomatized, class, clone,
-		const, debug, declare, eager, ehoare, elif, else, end, equiv, exists, exit,
-		export, fail, for, forall, from, fun, glob, global, goal, hint, hoare, if,
-		import, in, include, inductive, instance, islossless, lemma, let, local, locate,
-		match, module, nosmt, notation, of, op, phoare, pragma, Pr, pred, print, proc,
-		proof, prover, qed, quantum, realize, remove, rename, require, res, return,
-		search, section, Self, subtype, then, theory, time, timeout, Top, type,
-		undo, var, while, why3, with
+		Pr, Self, Top, abbrev, abort, abstract, as, axiom, axiomatized, clone, const,
+		declare, dump, end, exception, exit, export, from, global, goal, hint, import,
+		include, inductive, instance, lemma, local, locate, module, notation, of, op,
+		pred, print, proof, prover, qed, realize, remove, rename, require, search,
+		section, subtype, theory, timeout, type, why3, with,
+		async, ehoare, elif, else, equiv, exists, for, forall, fun, glob, hoare, if,
+		in, is, islossless, let, match, phoare, proc, raise, res, return, then, var,
+		while
 	},
 	% Keywords: Regular (i.e., non-closing) tactics
 	morekeywords=[2]%
 	{
-		algebra, alias, apply, async, auto, beta,
-		byequiv, byphoare, bypr, call, case, cbv, cfold,
-		change, clear, congr, conseq, cut, delta, dump,
-		ecall, elim, eta, exfalso, exlim, fel, field, fieldeq, fission,
-		fusion, gen, have, hoare, idtac, inline, interleave, iota, kill, left, logic,
-		modpath, move, outline, pose, pr_bounded, progress, rcondf,
-		rcondt, replace, rewrite, right, ring, ringeq, rnd, rndsem, rwnormal,
-		seq, sim, simplify, skip, sp, split, splitwhile, subst,
-		suff, swap, symmetry, transitivity, trivial, unroll, weakmem, wlog,
-		wp, zeta
+		algebra, alias, apply, auto, beta, byehoare, byequiv, byphoare, bypr, byupto,
+		call, case, cbv, cfold, change, clear, congr, conseq, delta, eager, ecall,
+		elim, eta, exfalso, exlim, fel, field, fieldeq, fission, fusion, gen, have,
+		idassign, idtac, inline, interleave, iota, kill, left, logic, modpath, move,
+		outline, pose, pr_bounded, progress, rcondf, rcondt, replace, rewrite, right,
+		ring, ringeq, rnd, rndsem, rwnormal, seq, sim, simplify, skip, sp, split,
+		splitwhile, subst, suff, swap, symmetry, transitivity, trivial, unroll,
+		weakmem, wlog, wp, zeta
 	},
-	% Keywords: Closing tactics/tacticals
+	% Keywords: Closing/byclose tactics and dangerous commands
 	morekeywords=[3]%
 	{
-		abort, admit, admitted, assumption, by, check, done,
-		edit, exact, fix, reflexivity, smt, solve
+		admit, admitted,
+		assumption, by, check, coq, done, edit, exact, fix, reflexivity, smt, solve
 	},
-	% Keywords: Tacticals
+	% Keywords: Tacticals and internal
 	morekeywords=[4]%
 	{
-		do, expect, first, last, strict, try
+		do, expect, first, last, try,
+		debug, fail, pragma, time, undo
 	},
 	comment=[n]{(*}{*)}, % Multi-line, nested comments delimited by (* and *)
 	string=[d]{"}, % Strings delimited by " and ", non-escapable
@@ -74,7 +72,6 @@
 }
 
 % Define default colors based on availability of colorblind colors
-\makeatletter
 \@ifpackageloaded{colorblind}{
 	\lstdefinestyle{easycrypt-default}{%
 		style=easycrypt-base,
@@ -104,7 +101,6 @@
 		numberstyle={\small\color{gray}},
 	}
 }
-\makeatother
 
 % Style for drafting/debugging (explicit spaces/tabs)
 \lstdefinestyle{easycrypt-draft}{%
@@ -119,12 +115,15 @@
 	style=easycrypt-default,
 	frame=none,
 	framesep=0pt,
+	basicstyle={\small\ttfamily},
+	aboveskip=0.3\baselineskip,
+	belowskip=0.3\baselineskip,
+	columns=fullflexible
 }
 
-% Environments
-%% Default, non-floating environment
-%% Meant to be used inside other (potentially floating) environment
-%% that takes care of the caption and surrounding spacing
+% Environments % Default, non-floating environment % Meant to be used inside
+%other (potentially floating) environment % that takes care of the caption and
+%surrounding spacing
 \lstnewenvironment{eclst}[1][]{%
 	\lstset{%
 		language=easycrypt,%
