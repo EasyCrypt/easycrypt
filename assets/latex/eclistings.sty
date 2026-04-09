@@ -1,0 +1,156 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{eclistings}[2026/04/07 EasyCrypt listings]
+
+\RequirePackage{listings}
+\RequirePackage{xcolor}
+\RequirePackage{xparse}
+
+% EasyCrypt %
+% Language
+\lstdefinelanguage{easycrypt}{%
+	sensitive=true, % Case sensitive keywords
+	% Keywords: Meta/Specification language
+	morekeywords=[1]%
+	{
+		abbrev, abstract, as, assert, async, axiom, axiomatized, class, clone,
+		const, debug, declare, eager, ehoare, elif, else, end, equiv, exists, exit,
+		export, fail, for, forall, from, fun, glob, global, goal, hint, hoare, if,
+		import, in, include, inductive, instance, islossless, lemma, let, local, locate,
+		match, module, nosmt, notation, of, op, phoare, pragma, Pr, pred, print, proc,
+		proof, prover, qed, quantum, realize, remove, rename, require, res, return,
+		search, section, Self, subtype, then, theory, time, timeout, Top, type,
+		undo, var, while, why3, with
+	},
+	% Keywords: Regular (i.e., non-closing) tactics
+	morekeywords=[2]%
+	{
+		algebra, alias, apply, async, auto, beta,
+		byequiv, byphoare, bypr, call, case, cbv, cfold,
+		change, clear, congr, conseq, cut, delta, dump,
+		ecall, elim, eta, exfalso, exlim, fel, field, fieldeq, fission,
+		fusion, gen, have, hoare, idtac, inline, interleave, iota, kill, left, logic,
+		modpath, move, outline, pose, pr_bounded, progress, rcondf,
+		rcondt, replace, rewrite, right, ring, ringeq, rnd, rndsem, rwnormal,
+		seq, sim, simplify, skip, sp, split, splitwhile, subst,
+		suff, swap, symmetry, transitivity, trivial, unroll, weakmem, wlog,
+		wp, zeta
+	},
+	% Keywords: Closing tactics/tacticals
+	morekeywords=[3]%
+	{
+		abort, admit, admitted, assumption, by, check, done,
+		edit, exact, fix, reflexivity, smt, solve
+	},
+	% Keywords: Tacticals
+	morekeywords=[4]%
+	{
+		do, expect, first, last, strict, try
+	},
+	comment=[n]{(*}{*)}, % Multi-line, nested comments delimited by (* and *)
+	string=[d]{"}, % Strings delimited by " and ", non-escapable
+}
+
+% Style (base/default)
+\lstdefinestyle{easycrypt-base}{%
+	% Frame
+	captionpos=t, % Position caption at top (mirroring what's typical for algorithms)
+	frame=tb, % Top and bottom rules
+	framesep=\smallskipamount, % Small skip between frame and listing content
+	% Float placement
+	floatplacement=tbhp,
+	% Character printing and placement
+	upquote=true, % Print backtick and single quote as is
+	columns=[c]fixed, % Monospace characters, centered in their box
+	keepspaces=true, % Don't drop spaces for column alignment
+	tabsize=2, % Tabstops every 2 spaces
+	mathescape=false, % Don't allow escaping to LaTeX with $
+	showstringspaces=false, % Don't print characters for spaces
+	% Line numbers
+	numbers=none, % No line numbers
+	% Basic style
+	basicstyle={\normalsize\ttfamily},
+	% Style for (non-keyword) identifiers
+	identifierstyle={},
+}
+
+% Define default colors based on availability of colorblind colors
+\makeatletter
+\@ifpackageloaded{colorblind}{
+	\lstdefinestyle{easycrypt-default}{%
+		style=easycrypt-base,
+		% Styles for different keyword classes
+		keywordstyle=[1]{\color{T-Q-B6}},%
+		keywordstyle=[2]{\color{T-Q-B1}},%
+		keywordstyle=[3]{\color{T-Q-B5}},%
+		keywordstyle=[4]{\color{T-Q-B4}},%
+		% Styles for comments and strings
+		commentstyle={\itshape\color{T-Q-B0}},%
+		stringstyle={\color{T-Q-B3}},
+		% Style of line numbers (in case numbers is overwritten to true)
+		numberstyle={\small\color{T-Q-B0}},
+	}
+}{%
+	\lstdefinestyle{easycrypt-default}{%
+		style=easycrypt-base,
+		% Styles for different keyword classes
+		keywordstyle=[1]{\color{violet}},%
+		keywordstyle=[2]{\color{blue}},%
+		keywordstyle=[3]{\color{red}},%
+		keywordstyle=[4]{\color{olive}},%
+		% Styles for comments and strings
+		commentstyle={\itshape\color{gray}},%
+		stringstyle={\color{green}},
+		% Style of line numbers (in case numbers is overwritten to true)
+		numberstyle={\small\color{gray}},
+	}
+}
+\makeatother
+
+% Style for drafting/debugging (explicit spaces/tabs)
+\lstdefinestyle{easycrypt-draft}{%
+	style=easycrypt-default,
+	showspaces=true,
+	showtabs=true,
+	showstringspaces=true,
+}
+
+% Style without top/bottom frame rules
+\lstdefinestyle{easycrypt-plain}{%
+	style=easycrypt-default,
+	frame=none,
+	framesep=0pt,
+}
+
+% Environments
+%% Default, non-floating environment
+%% Meant to be used inside other (potentially floating) environment
+%% that takes care of the caption and surrounding spacing
+\lstnewenvironment{eclst}[1][]{%
+	\lstset{%
+		language=easycrypt,%
+		style=easycrypt-default,%
+		aboveskip=\smallskipamount,% Equal to framesep of style if top rule, else 0pt
+		belowskip=\smallskipamount,%  Equal to framesep of style if bottom rule, else 0pt
+		abovecaptionskip=0pt,%
+		belowcaptionskip=0pt,%
+		#1%
+	}%
+}{}
+
+% Inline
+\NewDocumentCommand{\ecinl}{O{easycrypt-default} m O{}}{%
+	\lstinline[%
+	language=easycrypt,%
+	style=#1,%
+	breaklines,%
+	breakindent=0pt,%
+	columns=fullflexible,%
+	#3%
+	]{#2}%
+}
+
+\NewDocumentCommand{\ecinlfoot}{O{easycrypt-default} m O{}}{%
+	\ecinl[#1]{#2}[basicstyle={\footnotesize\ttfamily},#3]%
+}
+
+\endinput
