@@ -268,6 +268,30 @@ let abstract_pvs
   ids, pvs, pvs_as_inv, subst
 
 (* -------------------------------------------------------------------- *)
+(* Forward ecall on Hoare goals (ecall ->>).
+ *
+ * Given a goal  hoare[c; s : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes  seqf  from the contract postcondition Qf:
+ *     - If lv is present: seqf = Qf[res / lv]
+ *     - If lv is absent:  seqf = Qf with conjuncts mentioning res removed
+ *
+ *  2. Auto-frames precondition conjuncts independent of the call's
+ *     writes (lv ∪ writes(f)):
+ *       frame = /\{ Pi | Pi in toplevel-conjuncts(P),
+ *                        reads(Pi) # (writes(lv) ∪ writes(f)) }
+ *
+ *  3. Produces two subgoals:
+ *     {v
+ *   (a)  P => Pf[arg / e]          (contract precondition holds)
+ *   (b)  hoare[s : seqf /\ frame ==> Q]   (continuation)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in both subgoals.
+ *)
 let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let env = EcEnv.LDecl.toenv hyps in
@@ -352,6 +376,26 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
   tc
 
 (* -------------------------------------------------------------------- *)
+(* Backward ecall on Hoare goals (ecall without ->>).
+ *
+ * Given a goal  hoare[s; c : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes the weakest precondition of the call w.r.t. Q using
+ *     compute_hoare_call_post, yielding an intermediate assertion  R.
+ *
+ *  2. Produces three subgoals:
+ *     {v
+ *   (a)  hoare[s : P ==> R]            (prefix establishes R)
+ *   (b)  hoare[f : Pf ==> Qf]          (contract holds)
+ *   (c)  <closed by auto>              (call WP matches R)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in the subgoals. Subgoals (b) and (c) are closed
+ * automatically, leaving only (a) for the user.
+ *)
 let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let env = EcEnv.LDecl.toenv hyps in
