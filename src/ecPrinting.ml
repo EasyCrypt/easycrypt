@@ -2465,14 +2465,15 @@ let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoff
   | `Absolute p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
   | `Relative o -> Format.fprintf fmt "%d" o
 
-let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) = 
+let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) =
   Format.fprintf fmt "%s"
   (match br with
   | `Cond true -> "."
   | `Cond false -> "?"
-  | `Match cp -> Format.sprintf "#%s." cp)
+  | `Match cp -> Format.sprintf "#%s." cp
+  | `MatchByPos ix -> Format.sprintf "#%i" ix)
 
-let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) = 
+let pp_codepos_step (ppe: PPEnv.t) (fmt: Format.formatter) ((cp, br): CP.codepos_step) =
   Format.fprintf fmt "%a%a" (pp_codepos1 ppe) cp pp_codepos_brsel br
 
 let pp_codepos_path ppe =
@@ -2491,16 +2492,16 @@ let pp_codegap1 (ppe : PPEnv.t) (fmt : Format.formatter) (g : CP.codegap1) =
 let pp_codegap (ppe : PPEnv.t) (fmt : Format.formatter) ((cpath, g1) : CP.codegap) =
   Format.fprintf fmt "%a%a" (pp_codepos_path ppe) cpath (pp_codegap1 ppe) g1
 
-let symbol_and_codepos1_of_codegap1_range_edge (cg: CP.codegap1) : symbol * CP.codepos1 = 
+let symbol_and_codepos1_of_codegap1_range_edge (cg: CP.codegap1) : symbol * CP.codepos1 =
   match cg with
   | GapBefore cp -> "[", cp
   | GapAfter cp  -> "]", cp
 
 (* -------------------------------------------------------------------- *)
 let pp_codegap1_range (ppe: PPEnv.t) (fmt: Format.formatter) ((start, fin) : CP.codegap1_range) =
-  let s, cps = symbol_and_codepos1_of_codegap1_range_edge start in 
-  let e, cpe = symbol_and_codepos1_of_codegap1_range_edge fin in 
-  Format.fprintf fmt "%s%a;%a%s" s (pp_codepos1 ppe) cps (pp_codepos1 ppe) cpe e 
+  let s, cps = symbol_and_codepos1_of_codegap1_range_edge start in
+  let e, cpe = symbol_and_codepos1_of_codegap1_range_edge fin in
+  Format.fprintf fmt "%s%a;%a%s" s (pp_codepos1 ppe) cps (pp_codepos1 ppe) cpe e
 
 (* FIXME: change when we can change the syntax *)
 let pp_codegap_range (ppe: PPEnv.t) (fmt: Format.formatter) ((cpath, cp1r) : CP.codegap_range) =
