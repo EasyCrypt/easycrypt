@@ -31,7 +31,7 @@ module Position : sig
   ]
 
   (* Branch selection *)
-  type codepos_brsel  = [`Cond of bool | `Match of EcSymbols.symbol]
+  type codepos_brsel  = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
   type nm_codepos_brsel = [`Cond of bool | `Match of int]
 
   (* Linear code position inside a block *)
@@ -58,7 +58,7 @@ module Position : sig
   (* Top-level first and last position *)
   val cpos_first : codepos
   val cpos_last  : codepos
-  
+
   (* Block-level first and last position *)
   val cpos1_first       : codepos1
   val cpos1_last        : codepos1
@@ -94,7 +94,7 @@ module Position : sig
 
   val normalize_cpos1 : ?check:bool -> env -> codepos1 -> stmt -> nm_codepos1
 
-  val resolve_offset1_from_cpos1 : env -> nm_codepos1 -> codeoffset1 -> stmt -> nm_codepos1 
+  val resolve_offset1_from_cpos1 : env -> nm_codepos1 -> codeoffset1 -> stmt -> nm_codepos1
 
   val find_by_cpos1 : ?rev:bool -> env -> codepos1 -> stmt -> instr list * instr * instr list
 

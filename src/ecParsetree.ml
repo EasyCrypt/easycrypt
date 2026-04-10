@@ -60,7 +60,7 @@ type pcp_base  = [
 type pbranch_select = [`Cond of bool | `Match of psymbol]
 type pcodepos1 = int * pcp_base
 type pcodepos_step = (pcodepos1 * pbranch_select)
-type pcodepos_path = pcodepos_step list 
+type pcodepos_path = pcodepos_step list
 type pcodepos  = pcodepos_path * pcodepos1
 type pdocodepos1 = pcodepos1 doption option
 
@@ -802,6 +802,7 @@ type phltactic =
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * pcodepos * int option)
+  | PsimplifyIf    of (oside * pcodepos option)
   | Pasgncase      of (oside * pcodepos)
   | Prnd           of oside * psemrndpos option * rnd_tac_info_f
   | Prndsem        of bool * oside * pcodegap1

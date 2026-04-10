@@ -194,6 +194,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
+    | PsimplifyIf info          -> EcPhlCodeTx.process_transform_if info
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
@@ -231,7 +232,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
     | Pprocrewriteat (x, f)     -> EcPhlRewrite.process_rewrite_at x f
-    | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
+    | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c
     | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
     | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
@@ -246,7 +247,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
         | `Gap gap -> Format.fprintf fmt "%a" EcPrinting.(pp_codegap1 ppe) gap
         | `Instr i -> Format.fprintf fmt "%a" EcPrinting.(pp_codepos1 ppe) i
         ) is)
-          
+
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

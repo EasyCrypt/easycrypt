@@ -107,7 +107,7 @@
           buildInputs =
               devPackages
            ++ [ pkgs.git scope'.why3 packages.provers ]
-           ++ (with pkgs.python3Packages; [ pyyaml ]);
+           ++ (with pkgs.python3Packages; [ pyyaml pip ]);
         };
       });
 }

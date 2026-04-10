@@ -68,7 +68,7 @@ module Position = struct
   *)
 
   (* Branch selection *)
-  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol]
+  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
   type nm_codepos_brsel = [`Cond of bool | `Match of int]
 
   (* Linear code position inside a block *)
@@ -141,12 +141,12 @@ module Position = struct
   let gap_after_pos  (cp : codepos1) : codegap1 = GapAfter cp
 
   (* Gap -> instr *)
-  let instr_before_gap (cg : codegap1) : codepos1 = 
+  let instr_before_gap (cg : codegap1) : codepos1 =
     match cg with
     | GapAfter cp -> cp
     | GapBefore cp -> shift1 ~offset:(-1) cp
 
-  let instr_after_gap  (cg : codegap1) : codepos1 = 
+  let instr_after_gap  (cg : codegap1) : codepos1 =
     match cg with
     | GapAfter cp -> shift1 ~offset:1 cp
     | GapBefore cp -> cp
@@ -184,7 +184,7 @@ module Position = struct
   let codegap1_range_of_codepos1 (cp1: codepos1) : codegap1_range =
     (gap_before_pos cp1, gap_after_pos cp1)
 
-  let codegap_range_of_codepos ((cpath, cp1): codepos) : codegap_range = 
+  let codegap_range_of_codepos ((cpath, cp1): codepos) : codegap_range =
     (cpath, codegap1_range_of_codepos1 cp1)
 
   let nm_codegap1_range_of_nm_codepos1 (cp1: nm_codepos1) : nm_codegap1_range =
@@ -193,7 +193,7 @@ module Position = struct
   let nm_codegap_range_of_nm_codepos ((cpath, cp1): nm_codepos) : nm_codegap_range =
     (cpath, nm_codegap1_range_of_nm_codepos1 cp1)
 
-  let codepos1_of_nm_codepos1 (nm: nm_codepos1) : codepos1 = 
+  let codepos1_of_nm_codepos1 (nm: nm_codepos1) : codepos1 =
     (0, `ByPos nm)
 
   let cpos1_after_last : codepos1 =
@@ -209,7 +209,7 @@ module Position = struct
   let cpos_last : codepos =
     cpos1_to_top cpos1_last
 
-  (* 
+  (*
     Check that the ranges are valid and then:
     if either is empty -> true
     otherwise possibilities are:
@@ -218,13 +218,13 @@ module Position = struct
     3. s2 <= s1 <= min(e1, e2) => false
     4. s2 <= e2 <= s1 <= e1    => true
   *)
-    
+
   let disjoint ((s1, e1): nm_codegap1_range) ((s2, e2): nm_codegap1_range) : bool =
     if s1 > e1 || s2 > e2 then raise InvalidCPos;
     (s1 = e1) || (s2 = e2) || (* Degenerate case where one of the reanges is empty    *)
     (max s1 s2 >= min e1 e2)  (* Otherwise, intersection of (a, b) /\ (c, d)          *)
                               (*  = (max a c, min b d)                                *)
-                              (* and this is empty if lower_lim >= upper_lim          *)            
+                              (* and this is empty if lower_lim >= upper_lim          *)
 
   let nm_codepos1_in_nm_codegap1_range (cp: nm_codepos1) ((start, fin): nm_codegap1_range) : bool =
     (start <= cp && cp < fin)
@@ -303,7 +303,7 @@ module Position = struct
     | true  -> (List.rev s2, ir, List.rev s1)
 
   let exists_match (env: env) (cpm: cp_match) (s: stmt) : bool =
-    try 
+    try
       ignore (find_by_cp_match env (None, cpm) s);
       true
     with InvalidCPos -> false
@@ -331,12 +331,12 @@ module Position = struct
     if check then check_nm_cpos1 nm s;
     nm
 
-  let normalize_cpos1 ?(check = true) (env: EcEnv.env) ((off, cb): codepos1) (s: stmt) : nm_codepos1 = 
+  let normalize_cpos1 ?(check = true) (env: EcEnv.env) ((off, cb): codepos1) (s: stmt) : nm_codepos1 =
     let nm = off + normalize_cp_base ~check:false env cb s in
     (* Make sure the position we are pointing to is valid in the context *)
     (* List.length points to the position "after the last" and has
        special meaning depending on the context *)
-    if check then check_nm_cpos1 nm s; 
+    if check then check_nm_cpos1 nm s;
     nm
 
   let find_and_normalize_cpos1 ?(rev = true) (env : EcEnv.env) (cp1 : codepos1) (s : stmt) =
@@ -352,7 +352,13 @@ module Position = struct
     let  indt = oget (EcDecl.tydecl_as_datatype indt) in
     let  cnames = List.fst indt.tydt_ctors in
     try  List.findi (fun _ n -> EcSymbols.sym_equal sel n) cnames |> fst
-    with Not_found -> raise InvalidCPos 
+    with Not_found -> raise InvalidCPos
+
+  let select_match_arm on_error env e (br:codepos_brsel) =
+    match br with
+    | `Match ms -> select_match_arm_idx env e ms
+    | `MatchByPos ix -> ix
+    | _ -> on_error ()
 
   (* Get the block pointed to by brsel for a given instruction *)
   let normalize_brsel (env: env) (i: instr) (br: codepos_brsel) : (env * stmt) * nm_codepos_brsel =
@@ -360,18 +366,14 @@ module Position = struct
     | (Sif (_, t, _),  `Cond true)  -> (env, t), `Cond true
     | (Sif (_, _, f),  `Cond false) -> (env, f), `Cond false
     | (Swhile (_, s),  `Cond true)  -> (env, s), `Cond true
-    | (Smatch (e, ss), `Match ms)  -> 
-      let ix = select_match_arm_idx env e ms in
+    | (Smatch (e, ss), _)  ->
+      let ix = select_match_arm (fun _ -> assert false) env e br in
       let (locals, s) = List.at ss ix in
       let env = EcEnv.Var.bind_locals locals env in
-      begin try 
-        (env, s), `Match ix
-      with Invalid_argument _ -> 
-        raise InvalidCPos
-      end
+      (env, s), `Match ix
     | _ -> assert false
 
-  let select_branch (env: env) (i: instr) (br: codepos_brsel) : stmt = 
+  let select_branch (env: env) (i: instr) (br: codepos_brsel) : stmt =
     normalize_brsel env i br |> fst |> snd
 
   (* Normalizes a code position step and returns the block it points to *)
@@ -387,10 +389,10 @@ module Position = struct
     let (env, s), npath = normalize_cpos_path env cpath s in
     (env, s), (npath, normalize_cpos1 env cp1 s)
 
-  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 = 
+  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 =
     match off with
-    | `Absolute off -> normalize_cpos1 env off s 
-    | `Relative i -> 
+    | `Absolute off -> normalize_cpos1 env off s
+    | `Relative i ->
       let nm = (base + i) in
       check_nm_cpos1 nm s; nm
 
@@ -572,24 +574,23 @@ module Zipper = struct
       | Sif (e, ifs1, ifs2), `Cond false ->
           (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), `Cond false, env
 
-      | Smatch (e, bs), `Match cn ->
-          let ix = select_match_arm_idx env e cn in
+      | Smatch (e, bs), _ ->
+          let ix = select_match_arm (fun () -> raise InvalidCPos) env e sub in
           let prebr, (locals, body), postbr = List.pivot_at ix bs in
           let env = EcEnv.Var.bind_locals locals env in
           (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), `Match ix, env
-
       | _ -> raise InvalidCPos
     in zpr, ((List.length s1), step), env
 
   let pre_zipper_of_codepos_path (env : EcEnv.env) (cpath: codepos_path) (s: stmt) =
     List.fold_left_map
-      (fun ((zpr, s), env) cps -> 
+      (fun ((zpr, s), env) cps ->
       let (zpr, s), step, env = zipper_step_into_block env cps s zpr in ((zpr, s), env), step)
-      ((ZTop, s), env) cpath 
+      ((ZTop, s), env) cpath
 
   let zipper_of_cgap_r (env : EcEnv.env) ((cpath, cp1) : codegap) (s : stmt) =
     let ((zpr, s), env), nmcp = pre_zipper_of_codepos_path env cpath s in
-      
+
     let nm = normalize_cgap1 env cp1 s in
     let s1, s2 = split_at_nmcgap1 nm s in
     let zpr = zipper ~env (List.rev s1) s2 zpr in
@@ -604,12 +605,12 @@ module Zipper = struct
 
   let zipper_of_cgap (env : EcEnv.env) (cp : codegap) (s : stmt) =
     fst (zipper_of_cgap_r env cp s)
-  (* 
+  (*
    * Returns:
    *  - A zipper pointing to the start of the range
-   *  - A split of the block according to the range 
+   *  - A split of the block according to the range
    *  - The normalized cpos range
-   *) 
+   *)
   let zipper_and_split_of_cgap_range (env: env) (path, (start, fin) : codegap_range) (s: stmt) : zipper * _ * nm_codegap_range =
     let (zpr, ((cpath, _), s)) = zipper_of_cgap_r env (path, start) s in
     let start = normalize_cgap1 env start s in
@@ -1026,9 +1027,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
             failure ();
           let subst =
-            if id_equal hf1.hf_m hf2.hf_m then 
+            if id_equal hf1.hf_m hf2.hf_m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.hf_m hf2.hf_m in
           assert (not (Mid.mem hf1.hf_m mxs) && not (Mid.mem hf2.hf_m mxs));
           let mxs = Mid.add hf1.hf_m hf2.hf_m mxs in
@@ -1052,9 +1053,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if hf1.bhf_cmp <> hf2.bhf_cmp then
             failure ();
           let subst =
-            if id_equal hf1.bhf_m hf2.bhf_m then 
+            if id_equal hf1.bhf_m hf2.bhf_m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.bhf_m hf2.bhf_m in
           assert (not (Mid.mem hf1.bhf_m mxs) && not (Mid.mem hf2.bhf_m mxs));
           let mxs = Mid.add hf1.bhf_m hf2.bhf_m mxs in
@@ -1069,16 +1070,16 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           if not (EcReduction.EqTest.for_xp env hf1.ef_fr hf2.ef_fr) then
             failure();
           let subst =
-            if id_equal hf1.ef_ml hf2.ef_ml then 
+            if id_equal hf1.ef_ml hf2.ef_ml then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.ef_ml hf2.ef_ml in
           assert (not (Mid.mem hf1.ef_ml mxs) && not (Mid.mem hf2.ef_ml mxs));
           let mxs = Mid.add hf1.ef_ml hf2.ef_ml mxs in
           let subst =
-            if id_equal hf1.ef_mr hf2.ef_mr then 
+            if id_equal hf1.ef_mr hf2.ef_mr then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst hf1.ef_mr hf2.ef_mr in
           assert (not (Mid.mem hf1.ef_mr mxs) && not (Mid.mem hf2.ef_mr mxs));
           let mxs = Mid.add hf1.ef_mr hf2.ef_mr mxs in
@@ -1094,9 +1095,9 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           doit env (subst, mxs) pr1.pr_args pr2.pr_args;
           let ev1, ev2 = pr1.pr_event, pr2.pr_event in
           let subst =
-            if id_equal ev1.m ev2.m then 
+            if id_equal ev1.m ev2.m then
               subst
-            else 
+            else
               Fsubst.f_bind_mem subst ev1.m ev2.m in
           assert (not (Mid.mem ev1.m mxs) && not (Mid.mem ev2.m mxs));
           let mxs = Mid.add ev1.m ev2.m mxs in

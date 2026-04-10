@@ -2635,11 +2635,11 @@ s_codegap1_before_(I):
 | LBRACKET cps=codepos1 DOTDOT cpe=codepos1 RBRACKET
     { (GapBefore cps, GapAfter cpe) }
 
-| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET { 
+| LBRACKET cps=codepos1 PLUSGT cpo=loc(mparen(sword)) RBRACKET {
     if unloc cpo > 0 then begin
         let (offset, base) = cps in
         (GapBefore cps, GapAfter (offset + unloc cpo, base))
-    end else 
+    end else
         parse_error (loc cpo) (Some "cannot give negative offset for codepos range end")
   }
 
@@ -3111,6 +3111,9 @@ direction:
 
 | ALIAS s=side? x=lident CEQ p=sform_h AT o=codepos
     { Psetmatch (s, o, x, p) }
+
+| SIMPLIFY IF s=side? o=codepos?
+    { PsimplifyIf (s, o) }
 
 | WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
     { Pweakmem(s, h, p) }
