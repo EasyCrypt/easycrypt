@@ -3,13 +3,21 @@ require import AllCore List IntDiv Binomial Ring StdOrder.
 (*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
-op allperms_r (n : unit list) (s : 'a list) : 'a list list =
+op [opaque smt_opaque] allperms_r (n : unit list) (s : 'a list) : 'a list list =
 with n = [] => [[]]
 with n = x::n => (fun rec => flatten (
     map (fun x => map ((::) x) (rec (rem x s))) (undup s))) (allperms_r n).
 
+lemma allperms_r0 (s : 'a list) :
+  allperms_r [] s = [[]] by done. 
+
+lemma allperms_rS (x : unit) (n : unit list) (s : 'a list) :
+  allperms_r (x :: n) s = flatten (
+    map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s)) by done.
+
 op allperms (s : 'a list) = allperms_r (nseq (size s) tt) s.
 
+hint rewrite ap_r : allperms_r0 allperms_rS.
 (* -------------------------------------------------------------------- *)
 lemma allperms_rP n (s t : 'a list) : size s = size n =>
   (mem (allperms_r n s) t) <=> (perm_eq s t).
