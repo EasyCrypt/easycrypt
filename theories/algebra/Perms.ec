@@ -5,8 +5,8 @@ require import AllCore List IntDiv Binomial Ring StdOrder.
 (* -------------------------------------------------------------------- *)
 op allperms_r (n : unit list) (s : 'a list) : 'a list list =
 with n = [] => [[]]
-with n = x::n => flatten (
-    map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s)).
+with n = x::n => (fun rec => flatten (
+    map (fun x => map ((::) x) (rec (rem x s))) (undup s))) (allperms_r n).
 
 op allperms (s : 'a list) = allperms_r (nseq (size s) tt) s.
 
