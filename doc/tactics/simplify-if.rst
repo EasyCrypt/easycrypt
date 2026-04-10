@@ -2,15 +2,18 @@
 Tactic: `simplify if`
 ========================================================================
 
-The `simplify if` performs an if-conversion on program statement,
-i.e it transform if statement into if expression. This transformation preserves the semantics.
-This allows to obtain a statement where the weakest precondition does not grow 
-exponentially in the number of if. 
+The `simplify if` transformation performs an if-conversion on program statements,
+i.e., it rewrites `if` statements into conditional expressions. This transformation
+preserves the program semantics.
 
-To illustrate the problem here is an example that show how grow the weakest pre-condition:
+This conversion helps prevent the weakest precondition from growing exponentially
+with the number of `if` statements.
+
+To illustrate this issue, consider the following example, which shows how the
+weakest precondition can grow exponentially:
+
 .. ecproof::
-   :title: Weakest pre-condition grow exponentially.
-
+   :title: Weakest precondition grows exponentially.
    require import AllCore.
    
    module M = {
@@ -39,15 +42,14 @@ To illustrate the problem here is an example that show how grow the weakest pre-
    qed.
 
 .. admonition:: Syntax
-  
-  Since the tactic preserves the semantic it applies to all program logics.
+   Since the tactic preserves semantics, it can be applied to all program logics.
 
   `simplify if side? codepos?`
 
-  The `side` argument is required when the goal is a `equiv` judgment, it allows to select
-  on which side you want to apply the program transformation. The `codepos` argument allows
-  to specify on which `if` instruction you want to apply the transformation.
-
+  The `side` argument is required when the goal is an `equiv` judgment; it specifies
+on which side the transformation should be applied.
+  The `codepos` argument allows you to indicate which `if` statement the transformation
+should target.  
 
 .. contents::
    :local:
@@ -55,9 +57,8 @@ To illustrate the problem here is an example that show how grow the weakest pre-
 ------------------------------------------------------------------------
 Variant: Transform at a given code possition 
 ------------------------------------------------------------------------
-The tactic applies only if the branches of selected the `if` instruction are only composed of 
-assignment. 
-
+The tactic applies only if the branches of the selected `if` statement consist solely of
+assignments.
 .. exproof::
    : title: Hoare logic example selecting where to apply the transformation
    require import AllCore.
@@ -99,8 +100,8 @@ Variant: Transform as much as possible
 
   `simplify if`
 
-This variant try to find a position where the transformation is possible and applies it.
-This is repeated until no position is found.
+This variant attempts to find a position where the transformation can be applied and
+applies it. The process is repeated until no applicable position remains.
 
 .. ecproof::
    :title: Hoare logic example
