@@ -14,6 +14,7 @@ weakest precondition can grow exponentially:
 
 .. ecproof::
    :title: Weakest precondition grows exponentially.
+
    require import AllCore.
    
    module M = {
@@ -41,14 +42,15 @@ weakest precondition can grow exponentially:
      smt().
    qed.
 
+Since the tactic preserves semantics, it can be applied to all program logics.
+
 .. admonition:: Syntax
-   Since the tactic preserves semantics, it can be applied to all program logics.
 
-  `simplify if side? codepos?`
+   `simplify if side? codepos?`
 
-  The `side` argument is required when the goal is an `equiv` judgment; it specifies
+The `side` argument is required when the goal is an `equiv` judgment; it specifies
 on which side the transformation should be applied.
-  The `codepos` argument allows you to indicate which `if` statement the transformation
+The `codepos` argument allows you to indicate which `if` statement the transformation
 should target.  
 
 .. contents::
@@ -59,8 +61,10 @@ Variant: Transform at a given code possition
 ------------------------------------------------------------------------
 The tactic applies only if the branches of the selected `if` statement consist solely of
 assignments.
-.. exproof::
-   : title: Hoare logic example selecting where to apply the transformation
+
+.. ecproof::
+   :title: Hoare logic example selecting where to apply the transformation.
+
    require import AllCore.
    
    module M = {
@@ -104,7 +108,7 @@ This variant attempts to find a position where the transformation can be applied
 applies it. The process is repeated until no applicable position remains.
 
 .. ecproof::
-   :title: Hoare logic example
+   :title: Hoare logic example.
 
    require import AllCore.
    
