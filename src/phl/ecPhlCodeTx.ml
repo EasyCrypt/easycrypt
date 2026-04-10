@@ -78,7 +78,7 @@ let t_kill_r side cpos olen tc =
   in
 
   let tr = fun side -> `Kill (side, cpos, olen) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) tc
+  t_code_transform side cpos tr (t_zip kill_stmt) tc
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
@@ -109,7 +109,7 @@ let alias_stmt env id (pf, _) me i =
 let t_alias_r side cpos id g =
   let env = FApi.tc1_env g in
   let tr = fun side -> `Alias (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt env id)) g
+  t_code_transform side cpos tr (t_fold (alias_stmt env id)) g
 
 (* -------------------------------------------------------------------- *)
 let set_stmt (fresh, id) e =
@@ -136,7 +136,7 @@ let set_stmt (fresh, id) e =
 
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+  t_code_transform side cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
 let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
@@ -181,7 +181,7 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
 
 let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
   let tr = fun side -> `SetMatch (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr
+  t_code_transform side cpos tr
     (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
@@ -424,7 +424,7 @@ let t_cfold
 =
     let tr = fun side -> `Fold (side, cpos, olen) in
     let cb = fun cenv _ me zpr -> cfold_stmt ~eager cenv me olen zpr in
-    t_code_transform side ~bdhoare:true cpos tr (t_zip cb) tc
+    t_code_transform side cpos tr (t_zip cb) tc
 
 (* -------------------------------------------------------------------- *)
 let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
@@ -619,7 +619,7 @@ let transform_if_stmt env (pf, _) me i =
 let t_transform_if_r side cpos g =
   let env = FApi.tc1_env g in
   let tr = fun side -> `TransformIf (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_fold (transform_if_stmt env)) g
+  t_code_transform side cpos tr (t_fold (transform_if_stmt env)) g
 
 let t_transform_if = FApi.t_low2 "code-tx-transform_if" t_transform_if_r
 
