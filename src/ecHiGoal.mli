@@ -41,13 +41,18 @@ module LowRewrite : sig
   | LRW_IdRewriting
   | LRW_RPatternNoMatch
   | LRW_RPatternNoRuleMatch
+  | LRW_RPatternNotLinear
+  | LRW_RPatternNoVariable
 
   exception RewriteError of error
 
   val find_rewrite_patterns:
     rwside -> pt_ev -> (pt_ev * rwmode * (form * form)) list
 
-  type rwinfos = rwside * EcFol.form option * EcMatching.occ option
+  type rwinfos =
+      rwside
+    * (form * (EcIdent.t * EcTypes.ty) option) option
+    * EcMatching.occ option
 
   val t_rewrite_r:
       ?mode:[ `Full | `Light] ->
