@@ -1025,6 +1025,13 @@ let pp_current_goal ?(all = false) stream =
   end
 
 (* -------------------------------------------------------------------- *)
+let pp_current_goal_or_noproof ?(all = false) stream =
+  if Option.is_some (S.xgoal (current ())) then
+    pp_current_goal ~all stream
+  else
+    Format.fprintf stream "No active proof.@\n%!"
+
+(* -------------------------------------------------------------------- *)
 let pp_maybe_current_goal stream =
   match (Pragma.get ()).pm_verbose with
   | true  -> pp_current_goal ~all:(Pragma.get ()).pm_g_prall stream
