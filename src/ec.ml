@@ -415,6 +415,7 @@ let main () =
       (*---*) gccompact   : int option;
       (*---*) docgen      : bool;
       (*---*) outdirp     : string option;
+      (*---*) upto        : (int * int option) option;
       mutable trace       : trace1 list option;
     }
 
@@ -493,6 +494,7 @@ let main () =
         ; gccompact   = None
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = None
         ; trace       = None }
 
     end
@@ -528,7 +530,37 @@ let main () =
         ; gccompact   = cmpopts.cmpo_compact
         ; docgen      = false
         ; outdirp     = None
+        ; upto        = None
         ; trace       = trace0 }
+
+      end
+
+    | `Llm llmopts -> begin
+        let name = llmopts.llmo_input in
+
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+        let lastgoals = llmopts.llmo_lastgoals in
+        let terminal =
+          lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
+        in
+
+        { prvopts     = {llmopts.llmo_provers with prvo_iterate = true}
+        ; input       = Some name
+        ; terminal    = terminal
+        ; interactive = false
+        ; eco         = true
+        ; gccompact   = None
+        ; docgen      = false
+        ; outdirp     = None
+        ; upto        = llmopts.llmo_upto
+        ; trace       = None }
 
       end
 
@@ -572,6 +604,7 @@ let main () =
         ; gccompact   = None
         ; docgen      = true
         ; outdirp     = docopts.doco_outdirp
+        ; upto        = None
         ; trace       = None }
       end
 
@@ -585,7 +618,7 @@ let main () =
        | Some pwd -> EcCommands.addidir pwd);
 
   (* Check if the .eco is up-to-date and exit if so *)
-  (if not state.docgen then
+  (if not state.docgen && state.upto = None then
     oiter
       (fun input -> if EcCommands.check_eco input then exit 0)
       state.input);
@@ -669,6 +702,16 @@ let main () =
   if T.interactive terminal then
     T.notice ~immediate:true `Warning copyright terminal;
 
+  (* Check if a location is past the -upto point *)
+  let past_upto (loc : EcLocation.t) =
+    match state.upto with
+    | None -> false
+    | Some (line, col) ->
+        let (sl, sc) = loc.loc_start in
+        sl > line || (sl = line && match col with
+          | None -> true
+          | Some c -> sc >= c) in
+
   try
     if T.interactive terminal then Sys.catch_break true;
 
@@ -737,6 +780,14 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+
+                   (* -upto: if this command starts past the target, print goals and exit *)
+                   if past_upto loc then begin
+                     T.finalize terminal;
+                     EcCommands.pp_current_goal_or_noproof ~all:true Format.std_formatter;
+                     exit 0
+                   end;
+
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
                    let ignore_fail = ref false in
