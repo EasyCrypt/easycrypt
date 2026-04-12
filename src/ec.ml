@@ -404,6 +404,379 @@ let main () =
   (* Register user messages printers *)
   begin let open EcUserMessages in register () end;
 
+  (* -------------------------------------------------------------------- *)
+  (* LLM interactive mode                                                  *)
+  (* -------------------------------------------------------------------- *)
+
+  let run_llm_repl (prvopts : prv_options) =
+    (* Initialize PRNG *)
+    Random.self_init ();
+
+    (* Connect to external Why3 server if requested *)
+    prvopts.prvo_why3server |> oiter (fun server ->
+      try
+        Why3.Prove_client.connect_external server
+      with Why3.Prove_client.ConnectionError e ->
+        Format.eprintf
+          "cannot connect to Why3 server `%s': %s" server e;
+        exit 1);
+
+    (* Add current directory to load path *)
+    (match relocdir with
+     | None     -> EcCommands.addidir Filename.current_dir_name
+     | Some pwd -> EcCommands.addidir pwd);
+
+    (* Proof engine configuration *)
+    let checkmode = {
+      EcCommands.cm_checkall  = prvopts.prvo_checkall;
+      EcCommands.cm_timeout   = odfl 3 prvopts.prvo_timeout;
+      EcCommands.cm_cpufactor = odfl 1 prvopts.prvo_cpufactor;
+      EcCommands.cm_nprovers  = odfl 4 prvopts.prvo_maxjobs;
+      EcCommands.cm_provers   = prvopts.prvo_provers;
+      EcCommands.cm_profile   = prvopts.prvo_profile;
+      EcCommands.cm_iterate   = prvopts.prvo_iterate;
+    } in
+
+    (* Notice buffer: collects messages during command processing *)
+    let notices = Buffer.create 256 in
+
+    let notifier (_ : EcGState.loglevel) (lazy msg) =
+      Buffer.add_string notices msg;
+      Buffer.add_char notices '\n'
+    in
+
+    let initialized = ref false in
+
+    let do_initialize () =
+      EcCommands.initialize
+        ~restart:!initialized ~undo:true
+        ~boot:ldropts.ldro_boot ~checkmode ~checkproof:true;
+      initialized := true;
+      (try
+         List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+       with EcCommands.InvalidPragma x ->
+         EcScope.hierror "invalid pragma: `%s'\n%!" x);
+      EcCommands.addnotifier notifier;
+      oiter (fun ppwidth ->
+        let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
+        EcGState.setvalue "PP:width" (`Int ppwidth) gs)
+        prvopts.prvo_ppwidth
+    in
+
+    (* Error formatting *)
+    let format_error ?(src="") e =
+      let base = match e with
+        | EcScope.TopError (loc, e) ->
+          let msg = String.strip (EcPException.tostring e) in
+          if loc = EcLocation._dummy then msg
+          else Format.asprintf "%s: %s" (EcLocation.tostring loc) msg
+        | e ->
+          String.strip (EcPException.tostring e)
+      in
+      if src = "" then base
+      else Printf.sprintf "%s\nsource: %s" base src
+    in
+
+    (* Output helpers *)
+    let goals_to_string ?(all=false) () =
+      let buf = Buffer.create 256 in
+      let fmt = Format.formatter_of_buffer buf in
+      EcCommands.pp_current_goal_or_noproof ~all fmt;
+      Format.pp_print_flush fmt ();
+      Buffer.contents buf
+    in
+
+    let quiet = ref false in
+
+    let checkpoints : (string, int) Hashtbl.t = Hashtbl.create 16 in
+
+    let reply_ok ?(tag="") body =
+      let n = Buffer.contents notices in
+      Printf.printf "OK [uuid:%d]%s\n" (EcCommands.uuid ()) tag;
+      if n <> "" then print_string n;
+      if body <> "" then begin
+        print_string body;
+        let len = String.length body in
+        if len > 0 && body.[len - 1] <> '\n' then
+          print_char '\n'
+      end;
+      Printf.printf "<END>\n%!";
+      Buffer.clear notices
+    in
+
+    let reply_ok_goals ?(all=false) () =
+      if !quiet then reply_ok ""
+      else reply_ok (goals_to_string ~all ())
+    in
+
+    let reply_error msg =
+      Printf.printf "ERROR [uuid:%d]\n%s\n<END>\n%!"
+        (EcCommands.uuid ()) msg;
+      Buffer.clear notices
+    in
+
+    (* Process a single EasyCrypt command, respecting gl_fail *)
+    let process_action ~src (p : EP.global) =
+      let loc = p.EP.gl_action.EcLocation.pl_loc in
+      let succeeded = ref false in
+      begin try
+        ignore (EcCommands.process ~src p.EP.gl_action : float option);
+        succeeded := true
+      with
+      | EcCommands.Restart -> raise EcCommands.Restart
+      | _ when p.EP.gl_fail -> ()
+      | e -> raise (EcScope.toperror_of_exn ~gloc:loc e)
+      end;
+      if !succeeded && p.EP.gl_fail then
+        raise (EcScope.toperror_of_exn ~gloc:loc
+          (EcScope.HiScopeError (None,
+            "this command is expected to fail")))
+    in
+
+    (* Process EasyCrypt input from a string (one parsed program) *)
+    let process_ec_input input =
+      Buffer.clear notices;
+      let reader = EcIo.from_string input in
+      let last_src = ref "" in
+      begin try
+        let (src, prog) = EcIo.xparse reader in
+        let src = String.strip src in
+        last_src := src;
+        begin match EcLocation.unloc prog with
+        | EP.P_Prog (commands, _) ->
+          List.iter (process_action ~src) commands;
+          reply_ok_goals ()
+        | EP.P_Undo i ->
+          EcCommands.undo i;
+          reply_ok_goals ()
+        | EP.P_Exit ->
+          EcIo.finalize reader; exit 0
+        | EP.P_DocComment doc ->
+          EcCommands.doc_comment doc;
+          reply_ok ""
+        end
+      with
+      | EcCommands.Restart ->
+        do_initialize ();
+        reply_ok "Session restarted"
+      | e ->
+        reply_error (format_error ~src:!last_src e)
+      end;
+      EcIo.finalize reader
+    in
+
+    (* Handle LOAD "file.ec" [LINE[:COL]] *)
+    let handle_load args =
+      Buffer.clear notices;
+      let args = String.strip args in
+      let last_src = ref "" in
+
+      try
+        (* Parse quoted or unquoted filename *)
+        let filename, rest =
+          if String.length args > 0 && args.[0] = '"' then
+            let close =
+              try String.index_from args 1 '"'
+              with Not_found ->
+                failwith "LOAD: unterminated filename"
+            in
+            let fn = String.sub args 1 (close - 1) in
+            let rest = String.strip (
+              String.sub args (close + 1)
+                (String.length args - close - 1)) in
+            (fn, rest)
+          else
+            match String.split_on_char ' ' args with
+            | [] -> failwith "LOAD: missing filename"
+            | [f] -> (f, "")
+            | f :: rest -> (f, String.concat " " rest)
+        in
+
+        (* Parse optional LINE[:COL] *)
+        let upto =
+          if rest = "" then None
+          else
+            match String.split_on_char ':' rest with
+            | [line] ->
+              Some (int_of_string line, None)
+            | [line; col] ->
+              Some (int_of_string line, Some (int_of_string col))
+            | _ -> failwith "LOAD: invalid LINE[:COL] format"
+        in
+
+        (* Validate file extension *)
+        begin try
+          ignore (EcLoader.getkind
+            (Filename.extension filename) : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          failwith (Format.sprintf
+            "unknown file extension: %s" ext)
+        end;
+
+        (* Reset proof engine and process file *)
+        do_initialize ();
+        Hashtbl.clear checkpoints;
+        EcCommands.addidir (Filename.dirname filename);
+
+        let reader = EcIo.from_file filename in
+
+        let past_upto (loc : EcLocation.t) =
+          match upto with
+          | None -> false
+          | Some (line, col) ->
+            let (el, ec) = loc.loc_end in
+            el > line || (el = line && match col with
+              | None -> false
+              | Some c -> ec > c)
+        in
+
+        let last_loc = ref None in
+
+        begin try while true do
+          let (src, prog) = EcIo.xparse reader in
+          let src = String.strip src in
+          last_src := src;
+          match EcLocation.unloc prog with
+          | EP.P_Prog (commands, locterm) ->
+            List.iter (fun p ->
+              let loc = p.EP.gl_action.EcLocation.pl_loc in
+              if past_upto loc then raise Exit;
+              process_action ~src p;
+              last_loc := Some loc
+            ) commands;
+            if locterm then raise Exit
+          | EP.P_Undo i ->
+            EcCommands.undo i
+          | EP.P_Exit ->
+            raise Exit
+          | EP.P_DocComment doc ->
+            EcCommands.doc_comment doc
+        done with
+        | Exit | End_of_file -> ()
+        | e -> EcIo.finalize reader; raise e
+        end;
+
+        EcIo.finalize reader;
+        let tag =
+          match !last_loc with
+          | None -> ""
+          | Some loc ->
+            let (el, _) = loc.EcLocation.loc_end in
+            Printf.sprintf " [loaded:%s:%d]" filename el
+        in
+        reply_ok ~tag (goals_to_string ())
+
+      with
+      | EcCommands.Restart ->
+        do_initialize ();
+        Hashtbl.clear checkpoints;
+        reply_ok "Session restarted"
+      | Failure s ->
+        reply_error s
+      | e ->
+        reply_error (format_error ~src:!last_src e)
+    in
+
+    (* Initialize proof engine *)
+    do_initialize ();
+
+    (* Signal ready *)
+    Printf.printf "READY [uuid:%d]\n<END>\n%!"
+      (EcCommands.uuid ());
+
+    (* Main REPL loop *)
+    begin try while true do
+      let line = input_line stdin in
+      let line = String.strip line in
+
+      if line = "" then
+        ()
+      else if line = "QUIT" then
+        exit 0
+      else if line = "UNDO" then begin
+        Buffer.clear notices;
+        let uuid = EcCommands.uuid () in
+        if uuid > 0 then begin
+          EcCommands.undo (uuid - 1);
+          reply_ok_goals ()
+        end else
+          reply_error "nothing to undo"
+      end
+      else if line = "GOALS ALL" then begin
+        Buffer.clear notices;
+        reply_ok (goals_to_string ~all:true ())
+      end
+      else if line = "GOALS" then begin
+        Buffer.clear notices;
+        reply_ok (goals_to_string ())
+      end
+      else if String.starts_with line "CHECKPOINT " then begin
+        Buffer.clear notices;
+        let name = String.strip (
+          String.sub line 11 (String.length line - 11)) in
+        if name = "" then
+          reply_error "CHECKPOINT: missing name"
+        else begin
+          Hashtbl.replace checkpoints name (EcCommands.uuid ());
+          reply_ok (Printf.sprintf
+            "checkpoint '%s' set at uuid %d" name (EcCommands.uuid ()))
+        end
+      end
+      else if String.starts_with line "REVERT " then begin
+        Buffer.clear notices;
+        let n = String.strip (
+          String.sub line 7 (String.length line - 7)) in
+        let target =
+          try Some (int_of_string n)
+          with Failure _ -> Hashtbl.find_opt checkpoints n
+        in
+        begin match target with
+        | None ->
+          reply_error (Printf.sprintf
+            "REVERT: '%s' is not a valid uuid or checkpoint name" n)
+        | Some target ->
+          let uuid = EcCommands.uuid () in
+          if target < 0 || target > uuid then
+            reply_error (Printf.sprintf
+              "REVERT: uuid %d out of range [0, %d]" target uuid)
+          else begin
+            EcCommands.undo target;
+            reply_ok_goals ()
+          end
+        end
+      end
+      else if line = "QUIET ON" then begin
+        Buffer.clear notices;
+        quiet := true;
+        reply_ok ""
+      end
+      else if line = "QUIET OFF" then begin
+        Buffer.clear notices;
+        quiet := false;
+        reply_ok ""
+      end
+      else if String.starts_with line "SEARCH " then begin
+        let query = String.strip (
+          String.sub line 7 (String.length line - 7)) in
+        let query =
+          if String.ends_with query "."
+          then String.sub query 0 (String.length query - 1)
+          else query
+        in
+        process_ec_input (Printf.sprintf "search %s." query)
+      end
+      else if String.starts_with line "LOAD " then
+        handle_load (String.sub line 5 (String.length line - 5))
+      else
+        (* Treat as EasyCrypt input *)
+        process_ec_input line
+    done with
+    | End_of_file -> ()
+    end;
+
+    exit 0
+  in
+
   (* Initialize I/O + interaction module *)
   let module State = struct
     type t = {
@@ -535,34 +908,9 @@ let main () =
 
       end
 
-    | `Llm llmopts -> begin
-        let name = llmopts.llmo_input in
-
-        begin try
-          let ext = Filename.extension name in
-          ignore (EcLoader.getkind ext : EcLoader.kind)
-        with EcLoader.BadExtension ext ->
-          Format.eprintf "do not know what to do with %s@." ext;
-          exit 1
-        end;
-
-        let lastgoals = llmopts.llmo_lastgoals in
-        let terminal =
-          lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
-        in
-
-        { prvopts     = {llmopts.llmo_provers with prvo_iterate = true}
-        ; input       = Some name
-        ; terminal    = terminal
-        ; interactive = false
-        ; eco         = true
-        ; gccompact   = None
-        ; docgen      = false
-        ; outdirp     = None
-        ; upto        = llmopts.llmo_upto
-        ; trace       = None }
-
-      end
+    | `Llm llmopts ->
+        run_llm_repl
+          {llmopts.llmo_provers with prvo_iterate = true}
 
     | `Runtest _ ->
         (* Eagerly executed *)

@@ -49,10 +49,7 @@ and doc_option = {
 }
 
 and llm_option = {
-  llmo_input     : string;
   llmo_provers   : prv_options;
-  llmo_lastgoals : bool;
-  llmo_upto      : (int * int option) option;
 }
 
 and prv_options = {
@@ -359,11 +356,9 @@ let specs = {
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
       `Spec  ("compact", `Int   , "<internal>")]);
 
-    ("llm", "LLM-friendly batch compilation", [
+    ("llm", "LLM-friendly interactive mode", [
       `Group "loader";
-      `Group "provers";
-      `Spec  ("lastgoals" , `Flag  , "Print last unproved goals on failure");
-      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals")]);
+      `Group "provers"]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -547,26 +542,8 @@ let doc_options_of_values values input =
   { doco_input     = input;
     doco_outdirp   = get_string "outdir" values; }
 
-let parse_upto values =
-  get_string "upto" values |> Option.map (fun s ->
-    let invalid () =
-      raise (Arg.Bad (Printf.sprintf
-        "invalid -upto format: expected LINE or LINE:COL, got %S" s)) in
-    match String.split_on_char ':' s with
-    | [line] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        (line, None)
-    | [line; col] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        let col  = try int_of_string col  with Failure _ -> invalid () in
-        (line, Some col)
-    | _ -> invalid ())
-
-let llm_options_of_values ini values input =
-  { llmo_input     = input;
-    llmo_provers   = prv_options_of_values ini values;
-    llmo_lastgoals = get_flag "lastgoals" values;
-    llmo_upto      = parse_upto values; }
+let llm_options_of_values ini values =
+  { llmo_provers   = prv_options_of_values ini values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
@@ -639,16 +616,14 @@ let parse getini argv =
           raise (Arg.Bad "this command takes a single input file as argument")
       end
 
-    | "llm" -> begin
-        match anons with
-        | [input] ->
-           let ini = getini (Some input) in
-           let cmd = `Llm (llm_options_of_values ini values input) in
-           (cmd, ini, true)
+    | "llm" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
 
-        | _ ->
-           raise (Arg.Bad "this command takes a single argument")
-      end
+        let ini = getini None in
+        let cmd = `Llm (llm_options_of_values ini values) in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 
