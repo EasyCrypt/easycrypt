@@ -1,8 +1,8 @@
-EasyCrypt reference manual
+The EasyCrypt language
 ========================================================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :glob:
 
-   language
-   tactics
+   language/*
