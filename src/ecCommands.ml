@@ -692,7 +692,8 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match value with
-  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr ->
+  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr
+                  || EcLocation.unloc name = EcGState.pp_showtvi ->
     let gs = EcEnv.gstate (EcScope.env scope) in
     EcGState.setflag (unloc name) value gs; scope
 
@@ -1070,6 +1071,13 @@ let pp_current_goal ?(all = false) stream =
                   stream (get_hc g, `One n)
       end
   end
+
+(* -------------------------------------------------------------------- *)
+let pp_current_goal_or_noproof ?(all = false) stream =
+  if Option.is_some (S.xgoal (current ())) then
+    pp_current_goal ~all stream
+  else
+    Format.fprintf stream "No active proof.@\n%!"
 
 (* -------------------------------------------------------------------- *)
 let pp_maybe_current_goal stream =

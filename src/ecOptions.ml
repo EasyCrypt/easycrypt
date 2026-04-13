@@ -12,6 +12,7 @@ type command = [
   | `Why3Config
   | `DocGen of doc_option
   | `Lsp
+  | `Llm of llm_option
 ]
 
 and options = {
@@ -47,6 +48,11 @@ and run_option = {
 and doc_option = {
   doco_input     : string;
   doco_outdirp   : string option;
+}
+
+and llm_option = {
+  llmo_provers   : prv_options;
+  llmo_help      : bool;
 }
 
 and prv_options = {
@@ -353,6 +359,11 @@ let specs = {
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
       `Spec  ("compact", `Int   , "<internal>")]);
 
+    ("llm", "LLM-friendly interactive mode", [
+      `Group "loader";
+      `Group "provers";
+      `Spec  ("help", `Flag, "Print the LLM agent guide and exit")]);
+
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
@@ -541,6 +552,10 @@ let doc_options_of_values values input =
   { doco_input     = input;
     doco_outdirp   = get_string "outdir" values; }
 
+let llm_options_of_values ini values =
+  { llmo_provers   = prv_options_of_values ini values;
+    llmo_help      = get_flag "help" values; }
+
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
   let (command, values, anons) = parse specs argv in
@@ -618,6 +633,15 @@ let parse getini argv =
 
         let ini = getini None in
         let cmd = `Lsp in
+
+        (cmd, ini, true)
+
+    | "llm" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Llm (llm_options_of_values ini values) in
 
         (cmd, ini, true)
 

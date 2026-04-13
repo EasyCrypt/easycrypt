@@ -36,19 +36,25 @@ module PPEnv = struct
     ppe_univar  : (symbol Mint.t * Ssym.t) ref;
     ppe_fb      : Sp.t;
     ppe_width   : int;
+    ppe_showtvi : bool;
   }
 
   let ofenv (env : EcEnv.env) =
+    let gs = EcEnv.gstate env in
+
     let width =
       EcGState.asint ~default:80
-        (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
+        (EcGState.getvalue "PP:width" gs) in
+
+    let showtvi = EcGState.get_pp_showtvi gs in
 
     { ppe_env    = env;
       ppe_locals = Mid.empty;
       ppe_inuse  = Ssym.empty;
       ppe_univar = ref (Mint.empty, Ssym.empty);
       ppe_fb     = Sp.empty;
-      ppe_width  = max 20 width; }
+      ppe_width  = max 20 width;
+      ppe_showtvi = showtvi; }
 
   let enter_theory (ppe : t) (p : EcPath.path) =
     let ppe_env = EcEnv.Theory.env_of_theory p ppe.ppe_env in
@@ -936,7 +942,7 @@ let pp_opname_with_tvi
   | Some tvi ->
       Format.fprintf fmt "%a<:%a>"
         pp_opname (nm, op)
-        (pp_list "@, " (pp_type ppe)) tvi
+        (pp_list ",@ " (pp_type ppe)) tvi
 
 (* -------------------------------------------------------------------- *)
 let pp_if_form (type v)
@@ -1085,6 +1091,22 @@ let pp_app (type v1 v2)
       maybe_paren outer e_app_prio pp fmt ()
 
 (* -------------------------------------------------------------------- *)
+(* [tvi_dominated env op nargs] checks whether all type parameters of [op]
+   can be inferred from the types of the first [nargs] arguments. *)
+let tvi_dominated (env : EcEnv.env) (op : EcPath.path) (nargs : int) : bool =
+  match EcEnv.Op.by_path_opt op env with
+  | None -> false
+  | Some opdecl ->
+    let tparams = opdecl.op_tparams in
+    let dom, _ = tyfun_flat opdecl.op_ty in
+    let arg_tys = List.take nargs dom in
+    let covered =
+      List.fold_left
+        (fun acc ty -> Sid.union acc (EcTypes.Tvar.fv ty))
+        Sid.empty arg_tys in
+    List.for_all (fun id -> Sid.mem id covered) tparams
+
+(* -------------------------------------------------------------------- *)
 let pp_opapp
   (ppe      : PPEnv.t)
   (t_ty     : 'a -> EcTypes.ty)
@@ -1158,13 +1180,23 @@ let pp_opapp
       in fun () -> doit fmt es
 
     with E.PrintAsPlain ->
+      let tvi_opt =
+        if List.is_empty tvi then None
+        else
+          let dominated =
+            tvi_dominated ppe.PPEnv.ppe_env op (List.length es) in
+          if dominated && not ppe.PPEnv.ppe_showtvi
+          then None else Some tvi
+      in
+
       fun () ->
         match es with
         | [] ->
-            pp_opname fmt (nm, opname)
+            pp_opname_with_tvi ppe fmt (nm, opname, tvi_opt)
 
         | _  ->
-            let pp_first = (fun _ _ -> pp_opname) in
+            let pp_first = fun _ _ fmt op ->
+              pp_opname_with_tvi ppe fmt (fst op, snd op, tvi_opt) in
             let pp fmt () = pp_app ppe ~pp_first ~pp_sub outer fmt ((nm, opname), es) in
             maybe_paren outer max_op_prec pp fmt ()
 

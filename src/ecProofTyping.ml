@@ -33,15 +33,19 @@ let process_form_opt ?mv hyps pf oty =
     EcTyping.tyerror pf.EcLocation.pl_loc
       (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
+(* ------------------------------------------------------------------ *)
 let process_form ?mv hyps pf ty =
   process_form_opt ?mv hyps pf (Some ty)
 
+(* ------------------------------------------------------------------ *)
 let process_formula ?mv hyps pf =
   process_form hyps ?mv pf tbool
 
+(* ------------------------------------------------------------------ *)
 let process_xreal ?mv hyps pf =
   process_form hyps ?mv pf txreal
 
+(* ------------------------------------------------------------------ *)
 let process_dformula ?mv hyps pf =
   match pf with
   | Single pf -> Single(process_formula ?mv hyps pf)
@@ -50,6 +54,31 @@ let process_dformula ?mv hyps pf =
     let f = process_xreal ?mv hyps pf in
     Double(p,f)
 
+(* ------------------------------------------------------------------ *)
+let process_type hyps pty =
+  let env = LDecl.toenv hyps in
+  let ue  = unienv_of_hyps hyps in
+  let ty  = EcTyping.transty EcTyping.tp_tydecl env ue pty in
+
+  if not (EcUnify.UniEnv.closed ue) then
+    EcTyping.tyerror (EcLocation.loc pty) env EcTyping.FreeTypeVariables;
+
+  let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+  EcCoreSubst.ty_subst ts ty
+
+(* ------------------------------------------------------------------ *)
+let process_stmt hyps s =
+  let env = LDecl.toenv hyps in
+  let ue  = unienv_of_hyps hyps in
+  let s   = EcTyping.transstmt env ue s in
+
+  try
+    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    s_subst ts s
+  with EcUnify.UninstantiateUni ->
+    EcTyping.tyerror EcLocation._dummy env EcTyping.FreeTypeVariables
+
+(* ------------------------------------------------------------------ *)
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
@@ -57,6 +86,7 @@ let process_exp hyps mode oty e =
   let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
   e_subst ts e
 
+(* ------------------------------------------------------------------ *)
 let process_pattern hyps fp =
   let ps = ref Mid.empty in
   let ue = unienv_of_hyps hyps in

@@ -683,48 +683,6 @@ let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env)
   in fun pvs zpr -> doit None pvs zpr
 
 (* -------------------------------------------------------------------- *)
-let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env) =
-  let pv_of_stmt =
-    match kind with
-    | `Read  -> is_read_r
-    | `Write -> is_write_r ?except:None
-  in
-
-  let rec doit (ctxt : instr option) (pvs : PV.t) (zpr : Zipper.spath) =
-    let (head, tail), ipath = zpr in
-    let stail = List.ocons ctxt tail in
-    let s = stmt (List.rev_append head stail) in
-
-    let pvs =
-      let s = match span with `Before -> head | `After -> tail in
-      pv_of_stmt env pvs s in
-
-    let parent, pvs =
-      match ipath with
-      | Zipper.ZTop ->
-        None, pvs
-
-      | Zipper.ZIfThen (e, ps, se) ->
-        Some (ps, i_if (e, s, se)), pvs
-
-      | Zipper.ZIfElse (e, st, ps) ->
-        Some (ps, i_if (e, st, s)), pvs
-
-      | Zipper.ZMatch  (e, ps, mpi) ->
-        let bs =
-          List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)
-        in Some (ps, i_match (e, bs)), pvs
-
-      | Zipper.ZWhile (e, ps) ->
-        let wi = i_while (e, s) in
-        Some (ps, wi), pv_of_stmt env pvs [wi]
-    in
-
-    ofold (fun (zpr, ctxt) pvs -> doit (Some ctxt) pvs zpr) pvs parent
-
-  in fun pvs zpr -> doit None pvs zpr
-
-(* -------------------------------------------------------------------- *)
 type pmvs = PV.t Mid.t
 
 module PMVS : sig

@@ -268,6 +268,30 @@ let abstract_pvs
   ids, pvs, pvs_as_inv, subst
 
 (* -------------------------------------------------------------------- *)
+(* Forward ecall on Hoare goals (ecall ->>).
+ *
+ * Given a goal  hoare[c; s : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes  seqf  from the contract postcondition Qf:
+ *     - If lv is present: seqf = Qf[res / lv]
+ *     - If lv is absent:  seqf = Qf with conjuncts mentioning res removed
+ *
+ *  2. Auto-frames precondition conjuncts independent of the call's
+ *     writes (lv ∪ writes(f)):
+ *       frame = /\{ Pi | Pi in toplevel-conjuncts(P),
+ *                        reads(Pi) # (writes(lv) ∪ writes(f)) }
+ *
+ *  3. Produces two subgoals:
+ *     {v
+ *   (a)  P => Pf[arg / e]          (contract precondition holds)
+ *   (b)  hoare[s : seqf /\ frame ==> Q]   (continuation)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in both subgoals.
+ *)
 let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let env = EcEnv.LDecl.toenv hyps in
@@ -293,17 +317,17 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
     let inv = destr_hoareF ctt in
     let _   = assert (POE.is_empty (hf_po inv).hsi_inv) in
     let inv = POE.lower (hf_po inv) in
-    let inv = ss_inv_rebind inv (fst concl.hs_m) in
+    let inv = ss_inv_rebind inv m in
 
     match lvalue with
     | None ->
       let not_contains_res (f : form) =
         let pvs = EcPV.form_read env EcPV.PMVS.empty f in
-        let pvs = EcIdent.Mid.fold (fun _ -> EcPV.PV.union) pvs EcPV.PV.empty in
+        let pvs = EcIdent.Mid.find_def EcPV.PV.empty m pvs in
         not (EcPV.PV.mem_pv env EcTypes.pv_res pvs) in
-        map_ss_inv1
-          (fun f -> filter_topand_form not_contains_res f |> odfl f_true)
-          inv
+      map_ss_inv1
+        (fun f -> filter_topand_form not_contains_res f |> odfl f_true)
+        inv
 
     | Some lvalue ->
       let lv =
@@ -324,16 +348,14 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
       filter_topand_form
         (fun f ->
           let pvs = EcPV.form_read env EcPV.PMVS.empty f in
-          let pvs = EcIdent.Mid.fold (fun _ -> EcPV.PV.union) pvs EcPV.PV.empty in          
+          let pvs = EcIdent.Mid.find_def EcPV.PV.empty m pvs in
           EcPV.PV.indep env wr pvs)
         (hs_pr concl).inv in
     { inv = odfl f_true inv; m = (hs_pr concl).m; } in
 
   let tc =
     FApi.t_first
-      (EcPhlSeq.t_hoare_seq
-        (gap_after_pos cpos1_first)
-        (map_ss_inv2 f_and seqf seqf_frame))
+      (EcPhlSeq.t_hoare_seq (GapAfter cpos1_first) (map_ss_inv2 f_and seqf seqf_frame))
       tc in
 
   let tc = FApi.t_first EcPhlHoare.t_hoaresplit tc in
@@ -354,6 +376,26 @@ let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
   tc
 
 (* -------------------------------------------------------------------- *)
+(* Backward ecall on Hoare goals (ecall without ->>).
+ *
+ * Given a goal  hoare[s; c : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes the weakest precondition of the call w.r.t. Q using
+ *     compute_hoare_call_post, yielding an intermediate assertion  R.
+ *
+ *  2. Produces three subgoals:
+ *     {v
+ *   (a)  hoare[s : P ==> R]            (prefix establishes R)
+ *   (b)  hoare[f : Pf ==> Qf]          (contract holds)
+ *   (c)  <closed by auto>              (call WP matches R)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in the subgoals. Subgoals (b) and (c) are closed
+ * automatically, leaving only (a) for the user.
+ *)
 let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let env = EcEnv.LDecl.toenv hyps in
@@ -393,10 +435,7 @@ let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
       hyps m (fpre, fpost) call (hs_po concl).hsi_inv in
   let post = EcSubst.subst_form ids_subst post in
 
-  let tc =
-    EcPhlSeq.t_hoare_seq
-      (gap_before_pos cpos1_last)
-      { m = m; inv = post; } tc in
+  let tc = EcPhlSeq.t_hoare_seq (GapBefore cpos1_last) { m = m; inv = post; } tc in
   let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
   let tc = FApi.t_last (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
   let tc = FApi.t_last (t_intros_i (List.fst ids)) tc in
@@ -526,11 +565,9 @@ let process_ecall_equiv
     let post = EcSubst.subst_form ids_subst post in
 
     let pos =
-      let nl = List.length concl.es_sl.s_node in
-      let nr = List.length concl.es_sr.s_node in
       APT.sideif side
-        (gap_before_pos cpos1_last, gap_before_pos (cpos1 nr))
-        (gap_before_pos (cpos1 nl), gap_before_pos cpos1_last) in
+        (GapBefore cpos1_last, GapAfter  cpos1_last)
+        (GapAfter  cpos1_last, GapBefore cpos1_last) in
 
     let tc = EcPhlSeq.t_equiv_seq pos { ml; mr; inv = post; } tc in
     let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
@@ -559,7 +596,7 @@ let process_ecall_equiv
 
     let tc =
       EcPhlSeq.t_equiv_seq
-        (gap_before_pos cpos1_last, gap_before_pos cpos1_last)
+        (GapBefore cpos1_last, GapBefore cpos1_last)
         { ml; mr; inv = post; } tc in
 
     let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
