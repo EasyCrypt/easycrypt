@@ -789,7 +789,7 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
+let t_code_transform (side : oside) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
@@ -799,27 +799,32 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       match concl.f_node with
       | FhoareS hs ->
           let pr, po = hs_pr hs, hs_po hs in
+          (* FIXME: This is very suspicious why only main is provided ? *)
           let po = po.hsi_inv.main in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po) (hs.hs_m, hs.hs_s) in
           let concl =
-            f_hoareS (snd me) (hs_pr hs) stmt (hs_po hs)
+            f_hoareS (snd me) pr stmt (hs_po hs)
           in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | FbdHoareS bhs when bdhoare ->
+      | FbdHoareS bhs ->
           let pr, po = bhs_pr bhs, bhs_po bhs in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr.inv, po.inv) (bhs.bhs_m, bhs.bhs_s) in
-          let concl = f_bdHoareS (snd me) (bhs_pr bhs) stmt (bhs_po bhs)
-                      bhs.bhs_cmp (bhs_bd bhs) in
+          let concl = f_bdHoareS (snd me) pr stmt po bhs.bhs_cmp (bhs_bd bhs) in
+          FApi.xmutate1 tc (tr None) (cs @ [concl])
+
+      | FeHoareS ehs ->
+          let pr, po = ehs_pr ehs, ehs_po ehs in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr.inv, po.inv) (ehs.ehs_m, ehs.ehs_s) in
+          let concl = f_eHoareS (snd me) pr stmt po in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
         let kinds =
-            (if bdhoare then [`PHoare `Stmt] else [])
-          @ [`Hoare `Stmt] in
-
+            [`PHoare `Stmt; `Hoare `Stmt; `EHoare `Stmt ] in
         tc_error_noXhl ~kinds:kinds pf
   end
 

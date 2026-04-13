@@ -78,7 +78,7 @@ let t_kill_r side cpos olen tc =
   in
 
   let tr = fun side -> `Kill (side, cpos, olen) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) tc
+  t_code_transform side cpos tr (t_zip kill_stmt) tc
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
@@ -109,7 +109,7 @@ let alias_stmt env id (pf, _) me i =
 let t_alias_r side cpos id g =
   let env = FApi.tc1_env g in
   let tr = fun side -> `Alias (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt env id)) g
+  t_code_transform side cpos tr (t_fold (alias_stmt env id)) g
 
 (* -------------------------------------------------------------------- *)
 let set_stmt (fresh, id) e =
@@ -136,7 +136,7 @@ let set_stmt (fresh, id) e =
 
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+  t_code_transform side cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
 let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
@@ -181,7 +181,7 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
 
 let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
   let tr = fun side -> `SetMatch (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr
+  t_code_transform side cpos tr
     (t_zip (set_match_stmt id pattern)) tc
 
 (* -------------------------------------------------------------------- *)
@@ -424,7 +424,7 @@ let t_cfold
 =
     let tr = fun side -> `Fold (side, cpos, olen) in
     let cb = fun cenv _ me zpr -> cfold_stmt ~eager cenv me olen zpr in
-    t_code_transform side ~bdhoare:true cpos tr (t_zip cb) tc 
+    t_code_transform side cpos tr (t_zip cb) tc
 
 (* -------------------------------------------------------------------- *)
 let t_kill      = FApi.t_low3 "code-tx-kill"      t_kill_r
@@ -556,3 +556,106 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
+
+(* -------------------------------------------------------------------- *)
+let transform_if pf (env : EcEnv.env) (e : expr) (s1 : stmt) (s2 : stmt) =
+  let mod1 = s_write env s1 in
+  let mod2 = s_write env s2 in
+  let modv, modg = PV.elements (PV.union mod1 mod2) in
+
+  if not (List.is_empty modg) then
+    tc_error pf "the branches modify global variables";
+
+  if List.is_empty modv then [] else
+
+  let upd (m : (expr, unit) Mpv.t) (x : prog_var) (e : expr) =
+    Mpv.add env x e (Mpv.remove env x m)
+  in
+
+  let init =
+    List.fold_left
+      (fun m (x, ty) -> Mpv.add env x (e_var x ty) m)
+      Mpv.empty modv
+  in
+
+  let transform_v m (x, ty) =
+    let x' = EcIdent.create (symbol_of_pv x) in
+    upd m x (e_local x' ty), (x', ty) in
+
+  let transform_lv m lv =
+    match lv with
+    | LvVar (x, ty) ->
+        let m, (x', ty) = transform_v m (x, ty) in
+        m, LSymbol (x', ty)
+    | LvTuple xs ->
+        let m, xs' = List.map_fold transform_v m xs in
+        m, LTuple xs' in
+
+  let transform_i m i =
+    let lv, e = destr_asgn i in
+    let e = Mpv.esubst env m e in
+    let m, lp = transform_lv m lv in
+    m, (lp, e) in
+
+  let transform_s (s : stmt) =
+    List.map_fold transform_i init s.s_node in
+
+  let m1, bd1 = transform_s s1 in
+  let m2, bd2 = transform_s s2 in
+
+  let es =
+    let e_if (x, ty) =
+      let ex = e_var x ty in
+      e_if e (Mpv.esubst env m1 ex) (Mpv.esubst env m2 ex) in
+    e_tuple (List.map e_if modv) in
+
+  let add_binding bd es =
+    List.fold_right (fun (lp, e) es -> e_let lp e es) bd es in
+
+  let es = add_binding bd1 (add_binding bd2 es) in
+  [i_asgn (oget (lv_of_list modv), es)]
+
+(* -------------------------------------------------------------------- *)
+let transform_if_stmt env (pf, _) me i =
+  match i.i_node with
+  | Sif (e, s1, s2) ->
+      if not (List.for_all is_asgn s1.s_node) then
+        tc_error pf "the then branch contains intruction that are not assignments";
+      if not (List.for_all is_asgn s2.s_node) then
+        tc_error pf "the else branch contains intruction that are not assignments";
+      (me, transform_if pf env e s1 s2)
+  | _ ->
+      tc_error pf "the given position does not correspond to an if instruction"
+
+(* -------------------------------------------------------------------- *)
+let t_transform_if_r side cpos g =
+  let env = FApi.tc1_env g in
+  let tr = fun side -> `TransformIf (side, cpos) in
+  t_code_transform side cpos tr (t_fold (transform_if_stmt env)) g
+
+let t_transform_if = FApi.t_low2 "code-tx-transform_if" t_transform_if_r
+
+(* -------------------------------------------------------------------- *)
+let t_transform_if_rec1 side g =
+  let (_, s) = tc1_get_stmt side g in
+  let test i =
+    match i.i_node with
+    | Sif (_, s1, s2) ->
+        List.for_all is_asgn s1.s_node && List.for_all is_asgn s2.s_node
+    | _ -> false
+  in
+  match Position.find_first_matching_instr test s with
+  | Some cpos -> t_transform_if side cpos g
+  | None -> tc_error (!!g) "no more transformation"
+
+let t_transform_if_rec side g =
+  FApi.t_repeat (t_transform_if_rec1 side) g
+
+(* -------------------------------------------------------------------- *)
+let process_transform_if (side, cpos) tc =
+  match cpos with
+  | None ->
+      t_transform_if_rec side tc
+  | Some cpos ->
+      let cpos = EcLowPhlGoal.tc1_process_codepos tc (side, cpos) in
+      t_transform_if side cpos tc
