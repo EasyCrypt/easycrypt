@@ -3119,6 +3119,9 @@ direction:
 | ALIAS s=side? x=lident CEQ p=sform_h AT o=codepos
     { Psetmatch (s, o, x, p) }
 
+| SIMPLIFY IF s=side? o=codepos?
+    { PsimplifyIf (s, o) }
+
 | WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
     { Pweakmem(s, h, p) }
 

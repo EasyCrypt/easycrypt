@@ -68,7 +68,7 @@ module Position = struct
   *)
 
   (* Branch selection *)
-  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol]
+  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
   type nm_codepos_brsel = [`Cond of bool | `Match of int]
 
   (* Linear code position inside a block *)
@@ -354,21 +354,23 @@ module Position = struct
     try  List.findi (fun _ n -> EcSymbols.sym_equal sel n) cnames |> fst
     with Not_found -> raise InvalidCPos 
 
+  let select_match_arm on_error env e (br:codepos_brsel) =
+    match br with
+    | `Match ms -> select_match_arm_idx env e ms
+    | `MatchByPos ix -> ix
+    | _ -> on_error ()
+
   (* Get the block pointed to by brsel for a given instruction *)
   let normalize_brsel (env: env) (i: instr) (br: codepos_brsel) : (env * stmt) * nm_codepos_brsel =
     match i.i_node, br with
     | (Sif (_, t, _),  `Cond true)  -> (env, t), `Cond true
     | (Sif (_, _, f),  `Cond false) -> (env, f), `Cond false
     | (Swhile (_, s),  `Cond true)  -> (env, s), `Cond true
-    | (Smatch (e, ss), `Match ms)  -> 
-      let ix = select_match_arm_idx env e ms in
+    | (Smatch (e, ss), _)  ->
+      let ix = select_match_arm (fun _ -> assert false) env e br in
       let (locals, s) = List.at ss ix in
       let env = EcEnv.Var.bind_locals locals env in
-      begin try 
-        (env, s), `Match ix
-      with Invalid_argument _ -> 
-        raise InvalidCPos
-      end
+      (env, s), `Match ix
     | _ -> assert false
 
   let select_branch (env: env) (i: instr) (br: codepos_brsel) : stmt = 
@@ -515,6 +517,34 @@ module Position = struct
   let iter_blocks ~(start : nm_codegap1) ~(block_size : int) (s : stmt)
       (f : int -> nm_codegap1 -> nm_codegap1 -> unit) : unit =
     fold_blocks ~start ~block_size s (fun idx g1 g2 () -> f idx g1 g2) ()
+
+  let find_first_matching_instr (test : instr -> bool) (s : stmt) =
+    let exception Found of codepos in
+
+    let rec find_pos rpath n (s : instr list) =
+      match s with
+      | [] -> ()
+      | i :: s ->
+          if test i then raise (Found (List.rev rpath, cpos1 n));
+          find_pos_sub rpath n i;
+          find_pos rpath (n + 1) s
+
+    and find_pos_sub rpath n i =
+      match i.i_node with
+      | Sif (_, s1, s2) ->
+          find_pos ((cpos1 n, `Cond true ) :: rpath) 0 s1.s_node;
+          find_pos ((cpos1 n, `Cond false) :: rpath) 0 s2.s_node
+      | Swhile (_, s) ->
+          find_pos ((cpos1 n, `Cond true) :: rpath) 0 s.s_node
+      | Smatch (_, bs) ->
+          List.iteri (fun i (_, s) ->
+            find_pos ((cpos1 n, `MatchByPos i) :: rpath) 0 s.s_node
+          ) bs
+      | _ -> ()
+    in
+
+    try find_pos [] 0 s.s_node; None
+    with Found r -> Some r
 end
 
 (* -------------------------------------------------------------------- *)
@@ -572,8 +602,8 @@ module Zipper = struct
       | Sif (e, ifs1, ifs2), `Cond false ->
           (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2), `Cond false, env
 
-      | Smatch (e, bs), `Match cn ->
-          let ix = select_match_arm_idx env e cn in
+      | Smatch (e, bs), _ ->
+          let ix = select_match_arm (fun () -> raise InvalidCPos) env e sub in
           let prebr, (locals, body), postbr = List.pivot_at ix bs in
           let env = EcEnv.Var.bind_locals locals env in
           (ZMatch (e, ((s1, s2), zpr), { locals; prebr; postbr; }), body), `Match ix, env
