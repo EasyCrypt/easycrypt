@@ -117,9 +117,9 @@ have -> /= :
       0%r
       0%r
       1%r => //.
-    + hoare; call (_ : true); auto; smt().
-    rnd pred0; auto; smt(mu0).
-congr; apply fun_ext => x'; by rewrite RandAux_partition_eq.
+    + by hoare; call (_ : true); auto; smt().
+    by rnd pred0; auto; smt(mu0).
+by congr; apply fun_ext => x'; rewrite RandAux_partition_eq.
 qed.
 
 end section.
@@ -152,7 +152,7 @@ lemma total_prob_bool (M <: T) (i : input) &m :
   Pr[M.main(i, false) @ &m : res] / 2%r.
 proof.
 rewrite (total_prob M DBool.dbool [true; false]) //.
-+ smt(supp_dbool).
++ by smt(supp_dbool).
 by rewrite 2!big_cons big_nil /= /predT /predF /= 2!dbool1E.
 qed.
 
@@ -177,7 +177,7 @@ lemma total_prob_drange (M <: T) (m n : int, i : input) &m :
 proof.
 move => lt_m_n.
 rewrite (total_prob M (drange m n) (range m n)).
-+ rewrite /is_finite_for; smt(range_uniq mem_range supp_drange).
++ by rewrite /is_finite_for; smt(range_uniq mem_range supp_drange).
 apply eq_big_seq => x x_in_range_m_n /=.
 by rewrite drange1E (_ : m <= x < n) 1:-mem_range.
 qed.
@@ -207,7 +207,7 @@ lemma total_prob_uniform (M <: T) (xs : t list, i : input) &m :
 proof.
 move => uniq_xs xs_ne_nil.
 rewrite (total_prob M (duniform xs) xs).
-+ smt(supp_duniform).
++ by smt(supp_duniform).
 apply eq_big_seq => y y_in_xs /=.
 by rewrite duniform1E_uniq // (_ : y \in xs).
 qed.
