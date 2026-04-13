@@ -362,84 +362,86 @@ module LowRewrite = struct
                raise (RewriteError LRW_CannotInfer)
           end
 
-        | Some (prw, subl) -> begin
-          let subcpos =
-            match subl with
-            | None -> None
+        | Some (prw, None) -> begin
+          let prw, _ =
+            try
+              PT.pf_find_occurence_lazy
+                pt.PT.ptev_env ~full:false ~modes ~ptn:prw tgfp
+            with PT.FindOccFailure `MatchFailure ->
+                raise (RewriteError LRW_RPatternNoMatch) in
 
-            | Some (x, xty) ->
-              let fx = f_local x xty in
-              let subcpos =
-                FPosition.select_form
-                  ~xconv:`Eq ~keyed:true hyps None fx prw
-              in
+          try
+            let subf, occmode =
+              PT.pf_find_occurence_lazy
+                pt.PT.ptev_env ~rooted:true ~modes ~ptn:fp prw
+            in
+            (subf, occmode, None)
+          with
+          | PT.FindOccFailure `MatchFailure ->
+            raise (RewriteError LRW_RPatternNoRuleMatch)
+          | PT.FindOccFailure `IncompleteMatch ->
+            raise (RewriteError LRW_CannotInfer)
+        end
 
-              if FPosition.is_empty subcpos then
-                raise (RewriteError LRW_RPatternNoVariable);
-
-              if FPosition.occurences subcpos <> 1 then
-                raise (RewriteError LRW_RPatternNotLinear);
-
-              let subcpos =
-                match o with
-                | None   -> subcpos
-                | Some o ->
-                  if not (FPosition.is_occurences_valid (snd o) subcpos) then
-                    raise (RewriteError LRW_InvalidOccurence);
-                  FPosition.filter o subcpos
-              in
-
-              Some subcpos
+        | Some (prw, Some (x, xty)) -> begin
+          let strict_modes =
+            [{ k_keyed = true; k_conv = false; k_delta = false }]
           in
 
-          let ctxt_modes =
-            match subl with
-            | None   -> modes
-            | Some _ -> [{ k_keyed = true; k_conv = false; k_delta = false }]
+          let fx = f_local x xty in
+          let subcpos =
+            FPosition.select_form
+              ~xconv:`Eq ~keyed:true hyps None fx prw
+          in
+
+          if FPosition.is_empty subcpos then
+            raise (RewriteError LRW_RPatternNoVariable);
+
+          if FPosition.occurences subcpos <> 1 then
+            raise (RewriteError LRW_RPatternNotLinear);
+
+          let subcpos =
+            match o with
+            | None   -> subcpos
+            | Some o ->
+              if not (FPosition.is_occurences_valid (snd o) subcpos) then
+                raise (RewriteError LRW_InvalidOccurence);
+              FPosition.filter o subcpos
           in
 
           let prw, prwmode =
             try
               PT.pf_find_occurence_lazy
-                pt.PT.ptev_env ~full:false ~modes:ctxt_modes ~ptn:prw tgfp
+                pt.PT.ptev_env ~full:false ~modes:strict_modes ~ptn:prw tgfp
             with PT.FindOccFailure `MatchFailure ->
                 raise (RewriteError LRW_RPatternNoMatch) in
 
-          let find_in_rpattern ~modes fp prw =
+          let subf = FPosition.first_selected_subform subcpos prw in
+
+          begin
             try
-              PT.pf_find_occurence_lazy
-                pt.PT.ptev_env ~rooted:true ~modes ~ptn:fp prw
+              ignore
+                (PT.pf_find_occurence_lazy
+                   pt.PT.ptev_env ~rooted:true ~modes:strict_modes ~ptn:fp subf)
             with
             | PT.FindOccFailure `MatchFailure ->
               raise (RewriteError LRW_RPatternNoRuleMatch)
             | PT.FindOccFailure `IncompleteMatch ->
               raise (RewriteError LRW_CannotInfer)
+          end;
+
+          let cpos =
+            let prwpos =
+              FPosition.select_form
+                ~xconv:`AlphaEq ~keyed:prwmode.k_keyed hyps
+                (Some (`Inclusive, EcMaps.Sint.singleton 1))
+                prw tgfp
+            in
+            let root = FPosition.path_of_singleton_occurence prwpos in
+            FPosition.reroot root subcpos
           in
 
-          match subcpos with
-          | None ->
-            let subf, occmode =
-              find_in_rpattern ~modes:ctxt_modes fp prw
-            in
-            (subf, occmode, None)
-
-          | Some subcpos ->
-            let subf = FPosition.first_selected_subform subcpos prw in
-
-            ignore (find_in_rpattern ~modes:ctxt_modes fp subf);
-
-            let cpos =
-              let prwpos =
-                FPosition.select_form
-                  ~xconv:`AlphaEq ~keyed:prwmode.k_keyed hyps
-                  (Some (`Inclusive, EcMaps.Sint.singleton 1))
-                  prw tgfp
-              in
-              let root = FPosition.path_of_singleton_occurence prwpos in
-              FPosition.reroot root subcpos
-            in
-
-            (subf, { k_keyed = true; k_conv = false; k_delta = false }, Some cpos)
+          (subf, { k_keyed = true; k_conv = false; k_delta = false }, Some cpos)
       end
       in
 
