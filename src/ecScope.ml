@@ -2684,11 +2684,11 @@ end
                     let es = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
                     let bd  = EcFol.form_of_expr (es nt.ont_body) in
-                    let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+                    List.iter (fun (id, ty) -> ps := Mid.add id ty !ps) xs;
 
-                    match fp.f_node with
+                    match bd.f_node with
                     | Fop (pf, _) -> (pf :: paths, pts)
-                    | _ -> (paths, (ps, ue, fp) ::pts)
+                    | _ -> (paths, (ps, ue, bd) ::pts)
                   end
 
                   | _ -> (p :: paths, pts) in
