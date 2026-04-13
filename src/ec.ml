@@ -408,7 +408,34 @@ let main () =
   (* LLM interactive mode                                                  *)
   (* -------------------------------------------------------------------- *)
 
-  let run_llm_repl (prvopts : prv_options) =
+  let llm_guide_path () =
+    let (module Sites) = EcRelocate.sites in
+    match EcRelocate.sourceroot with
+    | Some root ->
+      Filename.concat (Filename.concat root "doc/llm") "CLAUDE.md"
+    | None ->
+      Filename.concat Sites.doc "llm-guide.md"
+  in
+
+  let print_llm_guide () =
+    let path = llm_guide_path () in
+    try
+      let ic = open_in path in
+      begin try while true do
+        print_char (input_char ic)
+      done with End_of_file -> () end;
+      close_in ic
+    with Sys_error e ->
+      Printf.eprintf "cannot read LLM guide: %s\n%!" e
+  in
+
+  let run_llm_repl (llmopts : llm_option) =
+    if llmopts.llmo_help then begin
+      print_llm_guide ();
+      exit 0
+    end;
+
+    let prvopts = llmopts.llmo_provers in
     (* Initialize PRNG *)
     Random.self_init ();
 
@@ -510,8 +537,15 @@ let main () =
     in
 
     let reply_error msg =
-      Printf.printf "ERROR [uuid:%d]\n%s\n<END>\n%!"
-        (EcCommands.uuid ()) msg;
+      let goals = goals_to_string () in
+      Printf.printf "ERROR [uuid:%d]\n%s\n" (EcCommands.uuid ()) msg;
+      if goals <> "" then begin
+        print_string goals;
+        let len = String.length goals in
+        if len > 0 && goals.[len - 1] <> '\n' then
+          print_char '\n'
+      end;
+      Printf.printf "<END>\n%!";
       Buffer.clear notices
     in
 
@@ -592,16 +626,27 @@ let main () =
             | f :: rest -> (f, String.concat " " rest)
         in
 
-        (* Parse optional LINE[:COL] *)
-        let upto =
-          if rest = "" then None
+        (* Parse optional LINE[:COL] and flags (-nosmt) *)
+        let upto, nosmt =
+          if rest = "" then (None, false)
           else
-            match String.split_on_char ':' rest with
-            | [line] ->
-              Some (int_of_string line, None)
-            | [line; col] ->
-              Some (int_of_string line, Some (int_of_string col))
-            | _ -> failwith "LOAD: invalid LINE[:COL] format"
+            let words = String.split_on_char ' ' rest in
+            let words = List.filter (fun s -> s <> "") words in
+            let nosmt = List.mem "-nosmt" words in
+            let words = List.filter (fun s -> s <> "-nosmt") words in
+            let upto = match words with
+              | [] -> None
+              | [w] ->
+                begin match String.split_on_char ':' w with
+                | [line] ->
+                  Some (int_of_string line, None)
+                | [line; col] ->
+                  Some (int_of_string line, Some (int_of_string col))
+                | _ -> failwith "LOAD: invalid LINE[:COL] format"
+                end
+              | _ -> failwith "LOAD: unexpected arguments"
+            in
+            (upto, nosmt)
         in
 
         (* Validate file extension *)
@@ -632,6 +677,9 @@ let main () =
 
         let last_loc = ref None in
 
+        (* In -nosmt mode, admit all SMT calls during prefix loading *)
+        if nosmt then EcCommands.pragma_check `WeakCheck;
+
         begin try while true do
           let (src, prog) = EcIo.xparse reader in
           let src = String.strip src in
@@ -653,10 +701,17 @@ let main () =
             EcCommands.doc_comment doc
         done with
         | Exit | End_of_file -> ()
-        | e -> EcIo.finalize reader; raise e
+        | e ->
+          EcIo.finalize reader;
+          if nosmt then EcCommands.pragma_check `Check;
+          raise e
         end;
 
         EcIo.finalize reader;
+
+        (* Restore full SMT checking for interactive tactics *)
+        if nosmt then EcCommands.pragma_check `Check;
+
         let tag =
           match !last_loc with
           | None -> ""
@@ -685,14 +740,49 @@ let main () =
       (EcCommands.uuid ());
 
     (* Main REPL loop *)
+    let multi_buf = Buffer.create 256 in
+    let in_multi = ref false in
+
     begin try while true do
       let line = input_line stdin in
       let line = String.strip line in
 
-      if line = "" then
+      (* Multi-line input: <BEGIN> starts, <DONE> flushes *)
+      if line = "<BEGIN>" then begin
+        Buffer.clear multi_buf;
+        in_multi := true
+      end
+      else if line = "<DONE>" && !in_multi then begin
+        let input = Buffer.contents multi_buf in
+        Buffer.clear multi_buf;
+        in_multi := false;
+        if input <> "" then process_ec_input input
+      end
+      else if !in_multi then begin
+        if Buffer.length multi_buf > 0 then
+          Buffer.add_char multi_buf ' ';
+        Buffer.add_string multi_buf line
+      end
+
+      else if line = "" then
         ()
       else if line = "QUIT" then
         exit 0
+      else if line = "HELP" then begin
+        Buffer.clear notices;
+        let buf = Buffer.create 4096 in
+        let path = llm_guide_path () in
+        begin try
+          let ic = open_in path in
+          begin try while true do
+            Buffer.add_char buf (input_char ic)
+          done with End_of_file -> () end;
+          close_in ic;
+          reply_ok (Buffer.contents buf)
+        with Sys_error e ->
+          reply_error (Printf.sprintf "cannot read guide: %s" e)
+        end
+      end
       else if line = "UNDO" then begin
         Buffer.clear notices;
         let uuid = EcCommands.uuid () in
@@ -910,7 +1000,8 @@ let main () =
 
     | `Llm llmopts ->
         run_llm_repl
-          {llmopts.llmo_provers with prvo_iterate = true}
+          {llmopts with llmo_provers =
+            {llmopts.llmo_provers with prvo_iterate = true}}
 
     | `Runtest _ ->
         (* Eagerly executed *)

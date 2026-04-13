@@ -17,7 +17,11 @@ easycrypt llm [OPTIONS]
 ```
 
 Standard loader and prover options (`-I`, `-timeout`, `-p`, etc.) are
-available.
+available. Use `-help` to print this guide and exit:
+
+```
+easycrypt llm -help
+```
 
 ### Protocol
 
@@ -52,7 +56,7 @@ These are protocol-level commands, not EasyCrypt syntax:
 
 | Command | Description |
 |---------|-------------|
-| `LOAD "file.ec" [LINE[:COL]]` | Reset state, compile file up to the given line |
+| `LOAD "file.ec" [LINE[:COL]] [-nosmt]` | Reset state, compile file (optionally skip SMT) |
 | `UNDO` | Undo the last proof step |
 | `REVERT <uuid-or-name>` | Revert to a specific state (by uuid or checkpoint name) |
 | `GOALS` | Print the current goal (first subgoal only, with remaining count) |
@@ -60,6 +64,8 @@ These are protocol-level commands, not EasyCrypt syntax:
 | `CHECKPOINT <name>` | Save current uuid under a name for later `REVERT` |
 | `SEARCH <pattern>` | Search for lemmas matching a pattern |
 | `QUIET ON` / `QUIET OFF` | Suppress/enable automatic goal display after tactics |
+| `<BEGIN>` / `<DONE>` | Delimit multi-line EasyCrypt input |
+| `HELP` | Print this guide |
 | `QUIT` | Exit |
 
 ### EasyCrypt commands
@@ -73,6 +79,16 @@ smt().
 rewrite H1 H2.
 search (%/).
 print mulzK.
+```
+
+For multi-line statements, wrap with `<BEGIN>` and `<DONE>`:
+
+```
+<BEGIN>
+lemma test :
+  0 <= n =>
+  0 < n + 1.
+<DONE>
 ```
 
 ### Workflow
@@ -94,18 +110,36 @@ Current goal
 <END>
 ```
 
-**2. Try tactics interactively:**
+For large files, use `-nosmt` to skip SMT calls during prefix
+compilation (safe when the prefix was already verified):
 
 ```
-smt().
+LOAD "myfile.ec" 436 -nosmt
 ```
 
-If it fails, the state is unchanged — try another tactic immediately:
+**2. Try tactics, using REVERT to restart:**
+
+The uuid returned by LOAD is a revertible state. Use `REVERT` to
+return to it after failed experiments — this is instant, unlike
+re-doing LOAD which recompiles the prefix.
 
 ```
-rewrite H1.
-smt(lemma1 lemma2).
+LOAD "myfile.ec" 42
+→ OK [uuid:15] [loaded:myfile.ec:42]
+
+smt().                  ← fails, state unchanged
+rewrite H1. smt().      ← succeeds (uuid:17)
+rewrite H2.             ← wrong direction
+REVERT 17               ← back to after the successful smt()
 ```
+
+To restart the proof from scratch, revert to the LOAD uuid:
+
+```
+REVERT 15               ← back to the state right after LOAD
+```
+
+Always note the LOAD uuid so you can return to it.
 
 **3. Use checkpoints for branching exploration:**
 
@@ -128,11 +162,23 @@ QUIET OFF
 GOALS
 ```
 
-**5. Search for lemmas:**
+**5. Search for lemmas using patterns:**
+
+EasyCrypt `search` uses pattern syntax, not keywords. Use `_` as
+wildcard:
 
 ```
-SEARCH mulzK
-SEARCH dvdz
+search (fdom _).                ← lemmas involving fdom
+search (_ %/ _).                ← integer division lemmas
+search (card (_ `|` _)).        ← card of union
+search (mu _ _) (_ <= _).       ← mu lemmas with inequalities
+```
+
+The SEARCH meta-command is a shorthand that adds `search`/`.`:
+
+```
+SEARCH (fdom _)
+SEARCH (_ %/ _)
 ```
 
 ## EasyCrypt proof strategy
@@ -176,6 +222,18 @@ SEARCH dvdz
 - For induction on naturals: `elim/natind: n` gives base (`n ≤ 0`)
   and step (`0 ≤ n → P n → P (n+1)`).
 
+### SMT usage
+
+`smt()` and `/#` are equivalent — both call external SMT solvers.
+
+- Use `smt()` **only** on goals that are pure arithmetic or pure
+  propositional logic. If the goal contains abstract operators,
+  FMap terms, or `if-then-else`, reduce it first with `rewrite`,
+  `case`, or `have` before calling `smt()`.
+- If `smt()` takes more than 1 second, the goal is too complex.
+  Simplify with interactive tactics instead of increasing the
+  timeout.
+
 ### Common pitfalls
 
 - `rewrite (factS n) //` generates a side goal `0 <= n`. Use
@@ -185,6 +243,9 @@ SEARCH dvdz
   one.
 - When a tactic generates multiple subgoals, each subgoal must be
   closed in order. Use `GOALS ALL` to see them all.
+- `rewrite lemma in H` modifies hypothesis `H` in place (it does
+  not consume it). If you need to preserve the original, copy it
+  first: `have H' := H; rewrite lemma in H'`.
 
 ## EasyCrypt language overview
 

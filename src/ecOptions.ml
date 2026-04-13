@@ -50,6 +50,7 @@ and doc_option = {
 
 and llm_option = {
   llmo_provers   : prv_options;
+  llmo_help      : bool;
 }
 
 and prv_options = {
@@ -358,7 +359,8 @@ let specs = {
 
     ("llm", "LLM-friendly interactive mode", [
       `Group "loader";
-      `Group "provers"]);
+      `Group "provers";
+      `Spec  ("help", `Flag, "Print the LLM agent guide and exit")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -543,7 +545,8 @@ let doc_options_of_values values input =
     doco_outdirp   = get_string "outdir" values; }
 
 let llm_options_of_values ini values =
-  { llmo_provers   = prv_options_of_values ini values; }
+  { llmo_provers   = prv_options_of_values ini values;
+    llmo_help      = get_flag "help" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
