@@ -6,10 +6,12 @@ open EcMaps
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
   | `DocGen of doc_option
+  | `Lsp
   | `Llm of llm_option
 ]
 
@@ -49,10 +51,8 @@ and doc_option = {
 }
 
 and llm_option = {
-  llmo_input     : string;
   llmo_provers   : prv_options;
-  llmo_lastgoals : bool;
-  llmo_upto      : (int * int option) option;
+  llmo_help      : bool;
 }
 
 and prv_options = {
@@ -359,16 +359,18 @@ let specs = {
       `Spec  ("trace"  , `Flag  , "Save all goals & messages in .eco");
       `Spec  ("compact", `Int   , "<internal>")]);
 
-    ("llm", "LLM-friendly batch compilation", [
+    ("llm", "LLM-friendly interactive mode", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("lastgoals" , `Flag  , "Print last unproved goals on failure");
-      `Spec  ("upto"      , `String, "Compile up to LINE or LINE:COL and print goals")]);
+      `Spec  ("help", `Flag, "Print the LLM agent guide and exit")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
+
+    ("lsp", "Run EasyCrypt LSP server", [
+      `Spec  ("-stdio"  , `Flag  , "<for internal use>")]);
 
     ("config", "Print EasyCrypt configuration", []);
 
@@ -523,7 +525,8 @@ let prv_options_of_values ini values =
 
 let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
-    clio_provers = prv_options_of_values ini values; }
+    clio_provers = prv_options_of_values ini values; 
+  }
 
 let cmp_options_of_values ini values input =
   { cmpo_input   = input;
@@ -532,8 +535,9 @@ let cmp_options_of_values ini values input =
     cmpo_compact = get_int "compact" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
-    cmpo_script  = get_flag "script" values;
-    cmpo_trace   = get_flag "trace" values; }
+    cmpo_script  = get_flag "script" values; 
+    cmpo_trace   = get_flag "trace" values;
+  }
 
 let runtest_options_of_values ini values (input, scenarios) =
   { runo_input     = input;
@@ -541,32 +545,16 @@ let runtest_options_of_values ini values (input, scenarios) =
     runo_report    = get_string "report" values;
     runo_provers   = prv_options_of_values ini values;
     runo_jobs      = get_int "jobs" values;
-    runo_rawargs   = get_strings "raw-args" values; }
+    runo_rawargs   = get_strings "raw-args" values; 
+  }
 
 let doc_options_of_values values input =
   { doco_input     = input;
     doco_outdirp   = get_string "outdir" values; }
 
-let parse_upto values =
-  get_string "upto" values |> Option.map (fun s ->
-    let invalid () =
-      raise (Arg.Bad (Printf.sprintf
-        "invalid -upto format: expected LINE or LINE:COL, got %S" s)) in
-    match String.split_on_char ':' s with
-    | [line] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        (line, None)
-    | [line; col] ->
-        let line = try int_of_string line with Failure _ -> invalid () in
-        let col  = try int_of_string col  with Failure _ -> invalid () in
-        (line, Some col)
-    | _ -> invalid ())
-
-let llm_options_of_values ini values input =
-  { llmo_input     = input;
-    llmo_provers   = prv_options_of_values ini values;
-    llmo_lastgoals = get_flag "lastgoals" values;
-    llmo_upto      = parse_upto values; }
+let llm_options_of_values ini values =
+  { llmo_provers   = prv_options_of_values ini values;
+    llmo_help      = get_flag "help" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
@@ -639,16 +627,23 @@ let parse getini argv =
           raise (Arg.Bad "this command takes a single input file as argument")
       end
 
-    | "llm" -> begin
-        match anons with
-        | [input] ->
-           let ini = getini (Some input) in
-           let cmd = `Llm (llm_options_of_values ini values input) in
-           (cmd, ini, true)
+    | "lsp" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
 
-        | _ ->
-           raise (Arg.Bad "this command takes a single argument")
-      end
+        let ini = getini None in
+        let cmd = `Lsp in
+
+        (cmd, ini, true)
+
+    | "llm" ->
+        if not (List.is_empty anons) then
+          raise (Arg.Bad "this command does not take arguments");
+
+        let ini = getini None in
+        let cmd = `Llm (llm_options_of_values ini values) in
+
+        (cmd, ini, true)
 
     | _ -> assert false
 
@@ -731,7 +726,8 @@ let read_ini_file (filename : string) =
       ini_provers  = trylist "provers" ;
       ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
-      ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
+      ini_rdirs    = List.map parse_idir (trylist "rdirs"); 
+    } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
@@ -739,4 +735,5 @@ let read_ini_file (filename : string) =
     ini_provers  = ini.ini_provers;
     ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
-    ini_rdirs    = ini.ini_rdirs; }
+    ini_rdirs    = ini.ini_rdirs; 
+  }

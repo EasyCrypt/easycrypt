@@ -36,7 +36,8 @@ val add_elocals : subst -> EcIdent.t list -> expr list -> subst
 val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 
 (* -------------------------------------------------------------------- *)
-val freshen_type : (ty_params * ty) -> (ty_params * ty)
+val fresh_tparams : subst -> ty_params -> subst * ty_params
+val freshen_type  : (ty_params * ty) -> (ty_params * ty)
 
 (* -------------------------------------------------------------------- *)
 val subst_theory    : subst -> theory -> theory
@@ -78,6 +79,11 @@ val subst_flocal : subst -> form -> form
 val subst_ss_inv : subst -> ss_inv -> ss_inv
 val subst_ts_inv : subst -> ts_inv -> ts_inv
 val subst_inv : subst -> inv -> inv
+
+(* -------------------------------------------------------------------- *)
+val subst_crbinding : ?red:(form -> int option) -> subst -> crbinding -> crbinding
+val subst_bv_opkind : ?red:(form -> int option) -> subst -> bv_opkind -> bv_opkind
+val subst_binding_size : ?red:(form -> int option) -> subst -> binding_size -> binding_size
 
 (* -------------------------------------------------------------------- *)
 val open_oper : operator -> ty list -> ty * operator_kind

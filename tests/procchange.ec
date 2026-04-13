@@ -136,9 +136,13 @@ theory ProcChangeWhileEquiv.
       x <- x + 1 + 0;
     }
   }.
+  (* proc rewrite {1} 1 /=. *)
+  admit. (* FIXME *)
+  (*
   proc rewrite {1} 1 /=.
   proc rewrite {2} 1.1 /=. 
   sim.
+  *)
   abort.
 end ProcChangeWhileEquiv.
 

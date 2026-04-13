@@ -527,7 +527,14 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
 
     let lv, e = destr_asgn i in
 
-    let pvl = EcPV.lp_write env lv in
+    let pvl = (* FIXME: do we want to do this TCB-wise? *)
+      match lv with
+      | LvVar _ -> PV.empty
+      | LvTuple lvs ->
+        let lvs = List.tl (List.rev lvs) in
+        let lvs = Option.get (lv_of_list lvs) in
+        EcPV.lp_write env lvs in
+
     let pve = EcPV.e_read env e in
     let lv  = lv_to_list lv in
 
@@ -538,7 +545,11 @@ let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
       match lv, e.e_node with
       | [_], _         -> [e]
       | _  , Etuple es -> es
-      | _  ,_          -> assert false in
+      | _  ,_          ->
+        let tys =
+          match (EcEnv.Ty.hnorm e.e_ty env).ty_node with
+          | Ttuple tys -> tys | _ -> assert false in
+        List.mapi (fun i ty -> e_proj e i ty) tys in
 
     let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
 

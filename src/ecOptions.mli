@@ -2,6 +2,7 @@
 type command = [
   | `Compile of cmp_option
   | `Cli     of cli_option
+  | `Lsp
   | `Config
   | `Runtest of run_option
   | `Why3Config
@@ -45,10 +46,8 @@ and doc_option = {
 }
 
 and llm_option = {
-  llmo_input     : string;
   llmo_provers   : prv_options;
-  llmo_lastgoals : bool;
-  llmo_upto      : (int * int option) option;
+  llmo_help      : bool;
 }
 
 and prv_options = {

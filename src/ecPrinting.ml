@@ -3744,6 +3744,28 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
     (pp_list "@,@," (pp_th_item ppe path)) cth.cth_items
     basename
 
+ and pp_crb_theory1 (ppe : PPEnv.t) (fmt : Format.formatter) (item : crb_theory1) =
+  match item.kind with
+  | CRBT_Type p ->
+    Format.fprintf fmt "%s/ty:%a" item.name (pp_tyname ppe) p
+  | CRBT_Op (tparams, { e_node = Eop (p, tys) })
+      when List.for_all2 ty_equal (List.map tvar tparams) tys
+    ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op: %a"
+      item.name (pp_opname ppe) p
+  | CRBT_Op (tparams, e) ->
+    let ppe = PPEnv.add_locals ppe tparams in
+    Format.fprintf fmt "%s/op:[%a] %a"
+      item.name
+      (pp_list ",@ " (pp_tyvar ppe)) tparams
+      (pp_expr ppe) e
+  | CRBT_Lemma p ->
+    Format.fprintf fmt "%s/ax:%a" item.name (pp_axname ppe) p
+
+ and pp_crb_theory (ppe : PPEnv.t) (fmt : Format.formatter) (crbth : crb_theory) =
+  Format.fprintf fmt "%a" (pp_list ", " (pp_crb_theory1 ppe)) crbth
+
  and pp_th_item_r ppe p fmt item =
   match item.EcTheory.ti_item with
   | EcTheory.Th_type (id, ty) ->
@@ -3843,6 +3865,82 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         level (odfl "" base)
         (pp_list "@ " (pp_axhnt ppe)) axioms
 
+  | EcTheory.Th_crbinding (binding, lc) -> begin
+    match binding with
+    | CRB_Bitstring bs ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) bs.theory;
+      Format.fprintf fmt "%abind bitstring %a %a %a %a%s."
+        pp_locality lc
+        (pp_opname ppe) bs.to_
+        (pp_opname ppe) bs.from_
+        (pp_tyname ppe) bs.type_
+        (pp_form ppe) (fst bs.size)
+        (if Option.is_some (snd bs.size) then " (concrete)" else " (abstract)")
+
+    | CRB_Array ba ->
+      Format.fprintf fmt "(* %a *) " (pp_crb_theory ppe) ba.theory;
+      Format.fprintf fmt "%abind array %a %a %a %a %a %a%s."
+        pp_locality lc
+        (pp_tyname ppe) ba.type_
+        (pp_opname ppe) ba.get
+        (pp_opname ppe) ba.set
+        (pp_opname ppe) ba.tolist
+        (pp_opname ppe) ba.oflist
+        (pp_form ppe) (fst ba.size)
+        (if Option.is_some (snd ba.size) then " (concrete)" else " (abstract)")
+
+    | CRB_BvOperator op ->
+      let kind =
+        match op.kind with
+        | `Add      _            -> "add"
+        | `Sub      _            -> "sub"
+        | `Mul      _            -> "mul"
+        | `Div     (_,    false) -> "udiv"
+        | `Div     (_,    true ) -> "sdiv"
+        | `Rem     (_,    false) -> "urem"
+        | `Rem     (_,    true ) -> "srem"
+        | `Shl      _            -> "shl"
+        | `Shls      _           -> "shls"
+        | `Rol      _            -> "rol"
+        | `Ror      _            -> "ror"
+        | `Shr     (_,    false) -> "shr"
+        | `Shr     (_,    true ) -> "ashr"
+        | `Shrs    (_, _, false) -> "shrs"
+        | `Shrs    (_, _, true ) -> "ashrs"
+        | `Not      _            -> "not"
+        | `Opp      _            -> "opp"
+        | `And      _            -> "and"
+        | `Or       _            -> "or"
+        | `Xor      _            -> "xor"
+        | `Lt      (_,    false) -> "ult"
+        | `Lt      (_,    true ) -> "slt"
+        | `Le      (_,    false) -> "ule"
+        | `Le      (_,    true ) -> "sle"
+        | `Init     _            -> "init"
+        | `Get      _            -> "get"
+        | `AInit    _            -> "ainit"
+        | `Extend  (_, _, false) -> "zextend"
+        | `Extend  (_, _, true ) -> "sextend"
+        | `Extract  _            -> "extract"
+        | `Insert   _            -> "insert"
+        | `Concat   _            -> "concat"
+        | `Truncate _            -> "truncate"
+        | `A2B      _            -> "a2b"
+        | `B2A      _            -> "b2a"
+        | `Map      _            -> "map"
+        | `ASliceGet _           -> "asliceget"
+        | `ASliceSet _           -> "asliceset"
+      in
+      Format.fprintf fmt "%abind op [%a] %a \"%s\"."
+        pp_locality lc
+        (pp_list " & " (pp_tyname ppe)) op.types
+        (pp_opname ppe) op.operator
+        kind
+
+  | CRB_Circuit cr ->
+      Format.fprintf fmt "%abind circuit %a \"%s\"."
+        pp_locality lc (pp_opname ppe) cr.operator cr.name
+  end
   | EcTheory.Th_alias (name, target) ->
       Format.fprintf fmt "theory %s = %a." name (pp_thname ~alias:false ppe) target
 
