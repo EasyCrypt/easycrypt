@@ -254,8 +254,8 @@ let process_unroll_for ~cfold side cpos tc =
         e
 
     | _ -> tc_error !!tc
-             "last instruction of the while loop must be \
-              an \"increment\" of the loop counter" in
+             "last instruction of the while loop must be"
+             "an \"increment\" of the loop counter" in
 
   (* Apply loop increment *)
   let incrz =
