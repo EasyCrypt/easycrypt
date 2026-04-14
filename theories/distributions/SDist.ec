@@ -4,6 +4,46 @@ require import Hybrid.
 
 require PROM.
 
+(* TODO(usability): see theories/distributions/RDiv.ec for a clean-slate
+   reference. The following retrofits are open; applying them here is a
+   follow-up to the RDiv PR.
+
+   - (5) Call-count helpers. The inline [Count] module below duplicates
+     theories/query_counting/Counter.eca. A retrofit would import Counter
+     (or a shared extension of it) and drop [Count] from this file. See
+     [GenDist] / [Dist.Count] around L394.
+   - (6) Bundle section-local state. [B1], [Os], [Count], [Wrap] each
+     appear in adversary module-restriction lists (e.g. L452, L777).
+     Consolidating into a single named state module would shorten the
+     restrictions users have to propagate.
+   - (7) Sample vs. oracle adapter lemmas. [B1] and [C] perform the
+     sample->oracle and oracle->sample adapters ad-hoc (L425, L643).
+     Expose named adapter lemmas so users don't re-derive the shape.
+   - (8) byequiv-style wrapper. [adv_sdist] (L370) requires users to
+     reshape their goal into [Pr[Sample(A).main(d) @ &m : res]] by hand.
+     A convenience lemma taking a pRHL judgment directly would cut
+     boilerplate.
+   - (9) Computable form. [sdist] is defined via [flub], but every
+     concrete calculation goes through [sdist_tvd] (L92). Expose a
+     canonical sum-form operator or rewrite lemma so users don't rewrite
+     the def by hand.
+   - (10) Named-lemma hints. [sdist_tvd] (L92-L154) and [sdist_dlet]
+     (L158-L200) are dense with bare [smt()] calls. Replace with named
+     rewrites for stability across real/series library churn.
+   - (11) Pre-composed adversary bounds. [adv_sdist] (L370) is only ever
+     useful when fused with a structural lemma (sdist_dmap / sdist_dlet /
+     sdist_dlist). Ship [adv_sdist_dmap], [adv_sdist_dlet],
+     [adv_sdist_dlist] analogues of RDiv's pre-composed lemmas, so users
+     cite one lemma instead of chaining [ler_trans] + [adv_sdist] +
+     a structural lemma at every call site.
+
+   Deliberately NOT on this list:
+   - (1) Nested cloning chain (GenDist -> Dist -> N1 -> ROM). Churn cost
+     vs. benefit doesn't pencil out without a deprecation path.
+   - (4) Losslessness in [sdist_oracle1]. See the TOTHINK at L512; this
+     is a research-grade question and the current restriction is honest.
+*)
+
 (********** statistical distance ***************************************)
 
 (* This file defines the notion of statistical distance for
