@@ -60,6 +60,17 @@ jobs:
         target: [unit, stdlib, examples]
     steps:
     - uses: actions/checkout@v4
+    - name: Install latest alt-ergo
+      run: |
+        opam remove --switch=alt-ergo-2.6.2 alt-ergo
+        opam update
+        opam switch create --no-switch alt-ergo-2.6.3 ocaml-system
+        opam pin     --switch=alt-ergo-2.6.3 add -n alt-ergo 2.6.3
+        opam install --switch=alt-ergo-2.6.3 --deps-only --confirm-level=unsafe-yes alt-ergo
+        opam install --switch=alt-ergo-2.6.3 alt-ergo
+        opam clean   --switch=alt-ergo-2.6.3
+        ln -s run-alt-ergo ~/bin/alt-ergo-2.6.3
+        opam exec -- why3 config detect
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
@@ -135,6 +146,16 @@ jobs:
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
       run: opam exec -- make -C easycrypt build install
+    - name: Install latest alt-ergo
+      run: |
+        opam remove --switch=alt-ergo-2.6.2 alt-ergo
+        opam update
+        opam switch create --no-switch alt-ergo-2.6.3 ocaml-system
+        opam pin     --switch=alt-ergo-2.6.3 add -n alt-ergo 2.6.3
+        opam install --switch=alt-ergo-2.6.3 --deps-only --confirm-level=unsafe-yes alt-ergo
+        opam install --switch=alt-ergo-2.6.3 alt-ergo
+        opam clean   --switch=alt-ergo-2.6.3
+        ln -s run-alt-ergo ~/bin/alt-ergo-2.6.3
     - name: Detect SMT provers
       run: |
         rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
