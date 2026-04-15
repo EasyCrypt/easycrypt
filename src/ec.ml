@@ -249,6 +249,11 @@ let main () =
             |> List.map (fun prover -> ["-p"; prover])
             |> List.flatten in
 
+          let quorum =
+            input.runo_provers.prvo_quorum
+            |> omap (fun i -> ["-quorum"; string_of_int i])
+            |> odfl [] in
+
           let pragmas =
             input.runo_provers.prvo_pragmas
             |> List.map (fun pragmas -> ["-pragmas"; pragmas])
@@ -305,9 +310,9 @@ let main () =
 
           List.flatten [
             maxjobs; timeout; cpufactor; ppwidth;
-            provers; pragmas; checkall ; profile;
-            iterate; why3srv; why3     ; reloc  ;
-            noevict; boot   ; idirs    ;
+            provers; quorum ; pragmas  ; checkall;
+            profile; iterate; why3srv  ; why3    ;
+            reloc  ; noevict; boot     ; idirs   ;
           ]
         in
 
@@ -584,6 +589,7 @@ let main () =
           prvo_timeout = None;
           prvo_cpufactor = None;
           prvo_provers = None;
+          prvo_quorum = None;
           prvo_pragmas = [];
           prvo_ppwidth = None;
           prvo_checkall = false;
@@ -734,6 +740,7 @@ let main () =
               EcCommands.cm_cpufactor = odfl 1 (state.prvopts.prvo_cpufactor);
               EcCommands.cm_nprovers  = odfl 4 (state.prvopts.prvo_maxjobs);
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
+              EcCommands.cm_quorum    = state.prvopts.prvo_quorum;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
               EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
