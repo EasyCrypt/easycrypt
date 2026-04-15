@@ -20,6 +20,7 @@ type checkmode = {
   cm_cpufactor: int;
   cm_nprovers : int;
   cm_provers  : string list option;
+  cm_quorum   : int option;
   cm_profile  : bool;
   cm_iterate  : bool;
 }
