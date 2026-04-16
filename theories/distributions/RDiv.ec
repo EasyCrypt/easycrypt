@@ -508,21 +508,58 @@ apply (ler_trans (rdiv_inf d1 d2 * mu1 d2 y)); first exact rdiv_inf_upper_bound.
 apply ler_wpmul2r; smt(ge0_mu1).
 qed.
 
+(* -- Bilinear dlet dominance ----------------------------------------------
+
+   Strengthens [dominated_dlet] to allow the kernel to differ between the
+   two sides, at the cost of a *uniform* pointwise bound on the kernel
+   (a single constant [MF] works for every [x]). *)
+
+lemma dominated_dlet' ['a 'b] (d1 d2 : 'a distr) (F1 F2 : 'a -> 'b distr) :
+  dominated d1 d2 =>
+  (exists M, 0%r <= M /\ forall x y, mu1 (F1 x) y <= M * mu1 (F2 x) y) =>
+  dominated (dlet d1 F1) (dlet d2 F2).
+proof.
+case => M_d [ge0_Md dom_d] [M_F [ge0_MF dom_F]].
+exists (M_d * M_F); split; first smt(mulr_ge0).
+move => y; rewrite !dlet1E -sumZ.
+apply ler_sum => [x /= | |].
+- have h1 := dom_d x.
+  have h2 := dom_F x y.
+  have : mu1 d1 x * mu1 (F1 x) y <= (M_d * mu1 d2 x) * (M_F * mu1 (F2 x) y).
+  + by apply ler_pmul; smt(ge0_mu1).
+  smt().
+- apply summable_mu1_wght => x; smt(ge0_mu1 le1_mu1).
+- apply summableZ; apply summable_mu1_wght => x; smt(ge0_mu1 le1_mu1).
+qed.
+
 (* -- dfold ---------------------------------------------------------------
 
    [dfold f x n] iterates [f] for [n] steps starting from [x].  Analogue
    of [dlist] for state-carrying iteration.  The Rényi cost composes
    multiplicatively over the loop. *)
 
+(* Dominance of [dfold] under step-wise uniform domination.  The uniform
+   quantifier over the accumulator [y] matches [dominated_dlet']'s shape. *)
 lemma dominated_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
   0 <= n =>
-  (forall i y, 0 <= i < n => dominated (f1 i y) (f2 i y)) =>
+  (forall i, 0 <= i < n =>
+     exists M, 0%r <= M /\ forall y z, mu1 (f1 i y) z <= M * mu1 (f2 i y) z) =>
   dominated (dfold f1 x n) (dfold f2 x n).
 proof. admit. qed.
+(* Proof sketch: induction on [n] using [dfold0] + [dfoldS] and the new
+   [dominated_dlet'] for the step.  The intind-style intro pattern for
+   a lemma with two hypotheses is finicky in EC; left admitted pending
+   a cleaner spelling. *)
 
+(* rdiv_inf bound for dfold — deferred.  The exact multiplicative bound
+   is the product over steps of [flub (fun y => rdiv_inf (f1 i y) (f2 i y))].
+   Deriving it from [dominated_dfold]'s witness requires unfolding the
+   induction's existential more carefully.  Users can cite
+   [dominated_dfold] and [rdiv_inf_upper_bound] for a pointwise bound. *)
 lemma rdiv_inf_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
   0 <= n =>
-  (forall i y, 0 <= i < n => dominated (f1 i y) (f2 i y)) =>
+  (forall i, 0 <= i < n =>
+     exists M, 0%r <= M /\ forall y z, mu1 (f1 i y) z <= M * mu1 (f2 i y) z) =>
   rdiv_inf (dfold f1 x n) (dfold f2 x n) <=
     BRM.big predT
             (fun i => flub (fun y => rdiv_inf (f1 i y) (f2 i y)))

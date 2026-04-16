@@ -53,7 +53,22 @@ clone import PROM.FullRO as R2 with
   op dout      <- fun _ => d2
   proof*.
 
-(* The flagship: advantage bounded by the product Rényi-∞ over [t]. *)
+(* The flagship: advantage bounded by the product Rényi-∞ over [t].
+
+   Proof outline (deferred):
+     1. Pad [MainD(D, RO)] with a post-D loop that queries every
+        unqueried key in [FinT.enum].  The extra queries don't affect
+        [res], so the padded game has the same Pr as the original.
+     2. The padded game ends with [RO.m] covering all of [t], each
+        entry an independent fresh sample from [d = dout _].
+     3. Reshape the padded game as [Sample(B(D)).main(dfun (fun _ => d))]
+        for an adapter [B(D)] that threads the pre-sampled function
+        through D's oracle queries.  The reshape is a byequiv / sim.
+     4. Apply [adv_rdiv_inf] on [dfun (fun _ => d1)] vs
+        [dfun (fun _ => d2)].
+     5. Apply [rdiv_inf_dfun] (from [RDiv.RDivFun]) to bound by the
+        product, which for the constant family reduces to
+        [rdiv_inf d1 d2 ^ FinT.card]. *)
 lemma rdiv_inf_oracleRO
   (D <: R1.RO_Distinguisher {-R1.RO, -R2.RO})
   &m :
