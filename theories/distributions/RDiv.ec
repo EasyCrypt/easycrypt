@@ -424,12 +424,21 @@ qed.
    product of a list of distributions.  One-line corollary of djoinmap
    via the identity realization. *)
 
+lemma djoinmap_nth ['a] (ds : 'a distr list) :
+  djoinmap (fun i => nth witness ds i) (range 0 (size ds)) = djoin ds.
+proof. by congr; apply map_nth_range. qed.
+
 lemma dominated_djoin ['a] (ds1 ds2 : 'a distr list) :
   size ds1 = size ds2 =>
   (forall i, 0 <= i < size ds1 =>
      dominated (nth witness ds1 i) (nth witness ds2 i)) =>
   dominated (djoin ds1) (djoin ds2).
-proof. admit. qed.
+proof.
+move => eq_sz dom_i.
+rewrite -(djoinmap_nth ds1) -(djoinmap_nth ds2) -eq_sz.
+apply dominated_djoinmap => i; rewrite mem_range => rng_i.
+exact (dom_i i rng_i).
+qed.
 
 lemma rdiv_inf_djoin ['a] (ds1 ds2 : 'a distr list) :
   size ds1 = size ds2 =>
@@ -438,7 +447,12 @@ lemma rdiv_inf_djoin ['a] (ds1 ds2 : 'a distr list) :
   rdiv_inf (djoin ds1) (djoin ds2) <=
     BRM.big predT (fun i => rdiv_inf (nth witness ds1 i) (nth witness ds2 i))
                    (range 0 (size ds1)).
-proof. admit. qed.
+proof.
+move => eq_sz dom_i.
+rewrite -(djoinmap_nth ds1) -(djoinmap_nth ds2) -eq_sz.
+apply rdiv_inf_djoinmap => i; rewrite mem_range => rng_i.
+exact (dom_i i rng_i).
+qed.
 
 (* -- dfst / dsnd ---------------------------------------------------------
 
@@ -470,13 +484,29 @@ lemma dominated_dopt (d1 d2 : 'a distr) :
   weight d1 = weight d2 =>
   dominated d1 d2 =>
   dominated (dopt d1) (dopt d2).
-proof. admit. qed.
+proof.
+move => eq_w dom.
+have ge0_rdiv : 0%r <= rdiv_inf d1 d2 by exact rdiv_inf_ge0.
+exists (maxr 1%r (rdiv_inf d1 d2)); split; first smt().
+case => [|y]; rewrite !dopt1E /=.
+- by rewrite eq_w; smt(mu_bounded).
+apply (ler_trans (rdiv_inf d1 d2 * mu1 d2 y)); first exact rdiv_inf_upper_bound.
+apply ler_wpmul2r; smt(ge0_mu1).
+qed.
 
 lemma rdiv_inf_dopt (d1 d2 : 'a distr) :
   weight d1 = weight d2 =>
   dominated d1 d2 =>
   rdiv_inf (dopt d1) (dopt d2) <= maxr 1%r (rdiv_inf d1 d2).
-proof. admit. qed.
+proof.
+move => eq_w dom.
+have ge0_rdiv : 0%r <= rdiv_inf d1 d2 by exact rdiv_inf_ge0.
+apply rdiv_inf_le_ub; first smt().
+case => [|y]; rewrite !dopt1E /=.
+- by rewrite eq_w; smt(mu_bounded).
+apply (ler_trans (rdiv_inf d1 d2 * mu1 d2 y)); first exact rdiv_inf_upper_bound.
+apply ler_wpmul2r; smt(ge0_mu1).
+qed.
 
 (* -- dfold ---------------------------------------------------------------
 
@@ -513,13 +543,25 @@ abstract theory RDivFun.
   lemma dominated_dfun ['u] (F1 F2 : t -> 'u distr) :
     (forall x, dominated (F1 x) (F2 x)) =>
     dominated (dfun F1) (dfun F2).
-  proof. admit. qed.
+  proof.
+  move => dom_pt.
+  rewrite !dfun_dmap.
+  apply dominated_dmap.
+  apply dominated_djoinmap => x _; exact (dom_pt x).
+  qed.
 
   lemma rdiv_inf_dfun ['u] (F1 F2 : t -> 'u distr) :
     (forall x, dominated (F1 x) (F2 x)) =>
     rdiv_inf (dfun F1) (dfun F2) <=
       BRM.big predT (fun x => rdiv_inf (F1 x) (F2 x)) FinT.enum.
-  proof. admit. qed.
+  proof.
+  move => dom_pt.
+  rewrite !dfun_dmap.
+  apply (ler_trans (rdiv_inf (djoinmap F1 FinT.enum) (djoinmap F2 FinT.enum))).
+  - apply rdiv_inf_dmap.
+    apply dominated_djoinmap => x _; exact (dom_pt x).
+  apply rdiv_inf_djoinmap => x _; exact (dom_pt x).
+  qed.
 
 end RDivFun.
 
