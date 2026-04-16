@@ -418,6 +418,111 @@ apply (ler_trans
 by apply ler_wpmul2l => //; apply IHxs.
 qed.
 
+(* -- djoin ----------------------------------------------------------------
+
+   [djoin (ds : 'a distr list) : 'a list distr] is the heterogeneous
+   product of a list of distributions.  One-line corollary of djoinmap
+   via the identity realization. *)
+
+lemma dominated_djoin ['a] (ds1 ds2 : 'a distr list) :
+  size ds1 = size ds2 =>
+  (forall i, 0 <= i < size ds1 =>
+     dominated (nth witness ds1 i) (nth witness ds2 i)) =>
+  dominated (djoin ds1) (djoin ds2).
+proof. admit. qed.
+
+lemma rdiv_inf_djoin ['a] (ds1 ds2 : 'a distr list) :
+  size ds1 = size ds2 =>
+  (forall i, 0 <= i < size ds1 =>
+     dominated (nth witness ds1 i) (nth witness ds2 i)) =>
+  rdiv_inf (djoin ds1) (djoin ds2) <=
+    BRM.big predT (fun i => rdiv_inf (nth witness ds1 i) (nth witness ds2 i))
+                   (range 0 (size ds1)).
+proof. admit. qed.
+
+(* -- dfst / dsnd ---------------------------------------------------------
+
+   Marginals of a pair distribution.  Trivially follows from dmap. *)
+
+lemma dominated_dfst ['a 'b] (d1 d2 : ('a * 'b) distr) :
+  dominated d1 d2 => dominated (dfst d1) (dfst d2).
+proof. exact (dominated_dmap _ _ fst). qed.
+
+lemma rdiv_inf_dfst ['a 'b] (d1 d2 : ('a * 'b) distr) :
+  dominated d1 d2 => rdiv_inf (dfst d1) (dfst d2) <= rdiv_inf d1 d2.
+proof. exact (rdiv_inf_dmap _ _ fst). qed.
+
+lemma dominated_dsnd ['a 'b] (d1 d2 : ('a * 'b) distr) :
+  dominated d1 d2 => dominated (dsnd d1) (dsnd d2).
+proof. exact (dominated_dmap _ _ snd). qed.
+
+lemma rdiv_inf_dsnd ['a 'b] (d1 d2 : ('a * 'b) distr) :
+  dominated d1 d2 => rdiv_inf (dsnd d1) (dsnd d2) <= rdiv_inf d1 d2.
+proof. exact (rdiv_inf_dmap _ _ snd). qed.
+
+(* -- dopt ----------------------------------------------------------------
+
+   [dopt d : 'a option distr] adds a [None] branch with the remaining
+   mass [1 - weight d].  If [d1] and [d2] have equal weights, [dopt]
+   preserves dominance with the same bound. *)
+
+lemma dominated_dopt (d1 d2 : 'a distr) :
+  weight d1 = weight d2 =>
+  dominated d1 d2 =>
+  dominated (dopt d1) (dopt d2).
+proof. admit. qed.
+
+lemma rdiv_inf_dopt (d1 d2 : 'a distr) :
+  weight d1 = weight d2 =>
+  dominated d1 d2 =>
+  rdiv_inf (dopt d1) (dopt d2) <= maxr 1%r (rdiv_inf d1 d2).
+proof. admit. qed.
+
+(* -- dfold ---------------------------------------------------------------
+
+   [dfold f x n] iterates [f] for [n] steps starting from [x].  Analogue
+   of [dlist] for state-carrying iteration.  The Rényi cost composes
+   multiplicatively over the loop. *)
+
+lemma dominated_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
+  0 <= n =>
+  (forall i y, 0 <= i < n => dominated (f1 i y) (f2 i y)) =>
+  dominated (dfold f1 x n) (dfold f2 x n).
+proof. admit. qed.
+
+lemma rdiv_inf_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
+  0 <= n =>
+  (forall i y, 0 <= i < n => dominated (f1 i y) (f2 i y)) =>
+  rdiv_inf (dfold f1 x n) (dfold f2 x n) <=
+    BRM.big predT
+            (fun i => flub (fun y => rdiv_inf (f1 i y) (f2 i y)))
+            (range 0 n).
+proof. admit. qed.
+
+(* -- dfun ----------------------------------------------------------------
+
+   [dfun F : (t -> 'u) distr] samples a function over a finite domain
+   [t] by sampling [F x] at each point independently.  Rényi multiplies
+   across the domain.  [dfun] is only defined inside a finite-type
+   context, so we stage it in an abstract sub-theory that clones
+   [MUniFinFun] to obtain the finite type and operators. *)
+
+abstract theory RDivFun.
+  clone import MUniFinFun.
+
+  lemma dominated_dfun ['u] (F1 F2 : t -> 'u distr) :
+    (forall x, dominated (F1 x) (F2 x)) =>
+    dominated (dfun F1) (dfun F2).
+  proof. admit. qed.
+
+  lemma rdiv_inf_dfun ['u] (F1 F2 : t -> 'u distr) :
+    (forall x, dominated (F1 x) (F2 x)) =>
+    rdiv_inf (dfun F1) (dfun F2) <=
+      BRM.big predT (fun x => rdiv_inf (F1 x) (F2 x)) FinT.enum.
+  proof. admit. qed.
+
+end RDivFun.
+
 (* ==========================================================================
    Section 4 — Distinguisher layer.
 
