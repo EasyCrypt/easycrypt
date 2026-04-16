@@ -545,26 +545,63 @@ lemma dominated_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
   (forall i, 0 <= i < n =>
      exists M, 0%r <= M /\ forall y z, mu1 (f1 i y) z <= M * mu1 (f2 i y) z) =>
   dominated (dfold f1 x n) (dfold f2 x n).
-proof. admit. qed.
-(* Proof sketch: induction on [n] using [dfold0] + [dfoldS] and the new
-   [dominated_dlet'] for the step.  The intind-style intro pattern for
-   a lemma with two hypotheses is finicky in EC; left admitted pending
-   a cleaner spelling. *)
+proof.
+move => ge0_n; elim: n ge0_n => [|n ge0_n IHn] step.
+- by rewrite !dfold0; exact dominated_refl.
+rewrite !dfoldS //.
+apply dominated_dlet'.
+- by apply IHn => i rng_i; apply step; smt().
+by apply (step n); smt().
+qed.
 
-(* rdiv_inf bound for dfold — deferred.  The exact multiplicative bound
-   is the product over steps of [flub (fun y => rdiv_inf (f1 i y) (f2 i y))].
-   Deriving it from [dominated_dfold]'s witness requires unfolding the
-   induction's existential more carefully.  Users can cite
-   [dominated_dfold] and [rdiv_inf_upper_bound] for a pointwise bound. *)
-lemma rdiv_inf_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int) :
+(* rdiv_inf bound for dfold.  User supplies per-step bound [Ms i] that
+   uniformly dominates the i-th step's kernel.  Conclusion: rdiv_inf is
+   bounded by the product of step-wise bounds. *)
+lemma rdiv_inf_dfold ['a] (f1 f2 : int -> 'a -> 'a distr) (x : 'a) (n : int)
+      (Ms : int -> real) :
   0 <= n =>
   (forall i, 0 <= i < n =>
-     exists M, 0%r <= M /\ forall y z, mu1 (f1 i y) z <= M * mu1 (f2 i y) z) =>
-  rdiv_inf (dfold f1 x n) (dfold f2 x n) <=
-    BRM.big predT
-            (fun i => flub (fun y => rdiv_inf (f1 i y) (f2 i y)))
-            (range 0 n).
-proof. admit. qed.
+     0%r <= Ms i /\ forall y z, mu1 (f1 i y) z <= Ms i * mu1 (f2 i y) z) =>
+  rdiv_inf (dfold f1 x n) (dfold f2 x n) <= BRM.big predT Ms (range 0 n).
+proof.
+(* Helper: product over a range is nonneg when each factor is. *)
+have prod_range_ge0 : forall (k : int) (g : int -> real),
+  (forall i, i \in range 0 k => 0%r <= g i) =>
+  0%r <= BRM.big predT g (range 0 k).
+- move => k g h_pos.
+  elim: (range 0 k) h_pos => [_|h t IHt h_pos]; first by rewrite BRM.big_nil.
+  rewrite BRM.big_cons {1}/predT /=.
+  apply mulr_ge0; first by apply h_pos; rewrite mem_head.
+  by apply IHt => i i_in; apply h_pos; rewrite in_cons i_in.
+(* Main induction. *)
+move => ge0_n; elim: n ge0_n => [|n ge0_n IHn] step.
+- rewrite !dfold0 range_geq // BRM.big_nil.
+  by apply rdiv_inf_le_ub => // y; rewrite mul1r.
+rewrite !dfoldS // BRM.big_int_recr //.
+apply rdiv_inf_le_ub.
+- apply mulr_ge0.
+  + apply prod_range_ge0 => i /mem_range rng_i.
+    by have := step i _; smt().
+  + by have := step n _; smt().
+move => y; rewrite !dlet1E -sumZ.
+apply ler_sum => [z /= | |].
+- have dom_f : mu1 (dfold f1 x n) z <=
+               BRM.big predT Ms (range 0 n) * mu1 (dfold f2 x n) z.
+  + apply (ler_trans (rdiv_inf (dfold f1 x n) (dfold f2 x n) * mu1 (dfold f2 x n) z)).
+    * apply rdiv_inf_upper_bound.
+      apply dominated_dfold => // i rng_i.
+      by exists (Ms i); apply step; smt().
+    apply ler_wpmul2r; first exact ge0_mu1.
+    by apply IHn => i rng_i; apply step; smt().
+  have dom_step : mu1 (f1 n z) y <= Ms n * mu1 (f2 n z) y by smt().
+  have : mu1 (dfold f1 x n) z * mu1 (f1 n z) y <=
+         (BRM.big predT Ms (range 0 n) * mu1 (dfold f2 x n) z) *
+         (Ms n * mu1 (f2 n z) y).
+  + by apply ler_pmul; smt(ge0_mu1).
+  smt().
+- apply summable_mu1_wght => z; smt(ge0_mu1 le1_mu1).
+- apply summableZ; apply summable_mu1_wght => z; smt(ge0_mu1 le1_mu1).
+qed.
 
 (* -- dfun ----------------------------------------------------------------
 
