@@ -642,6 +642,8 @@ type reduction_info = {
   logic   : rlogic_info;
   modpath : bool;
   user    : bool;
+  user_db : EcSymbols.symbol option;
+  user_local : EcEnv.local_simplify;
 }
 
 and deltap      = [Op.redmode | `No]
@@ -658,6 +660,8 @@ let full_red = {
   logic   = Some `Full;
   modpath = true;
   user    = true;
+  user_db = None;
+  user_local = EcEnv.LocalSimplify.empty;
 }
 
 let no_red = {
@@ -670,6 +674,8 @@ let no_red = {
   logic   = None;
   modpath = false;
   user    = false;
+  user_db = None;
+  user_local = EcEnv.LocalSimplify.empty;
 }
 
 let beta_red     = { no_red with beta = true; }
@@ -741,8 +747,35 @@ let reduce_user_gen simplify ri env hyps f =
     | Fproj (_, i) -> `Proj i
     | _ -> raise nohead in
 
-  let rules = EcEnv.Reduction.get p env in
+  let get_rules_for_base base =
+    let removed = EcEnv.LocalSimplify.removed ~base ri.user_local in
+    let rules =
+      EcEnv.Reduction.get_entries ~base p env
+      |> List.filter (fun (src, _) -> not (EcPath.Sp.mem src removed))
+      |> List.map snd
+    in
+    let added =
+      EcEnv.LocalSimplify.added ~base ri.user_local
+      |> List.filter_map (fun ((_, rule) : EcEnv.Reduction.entry) ->
+        let p' : EcEnv.Reduction.topsym =
+          match rule.rl_ptn with
+          | Rule (`Op p, _)   -> `Path (fst p)
+          | Rule (`Tuple, _)  -> `Tuple
+          | Rule (`Proj i, _) -> `Proj i
+          | Var _ | Int _     -> assert false
+        in
+        if p' = p then Some rule else None)
+    in
+    rules @ added
+  in
 
+  let bases =
+    match ri.user_db with
+    | Some base -> [if base = "default" then EcEnv.Reduction.dname else base]
+    | None -> EcSymbols.Ssym.elements (EcEnv.LocalSimplify.active ri.user_local)
+  in
+
+  let rules = List.flatten (List.map get_rules_for_base bases) in
   if rules = [] then raise nohead;
 
   let module R = EcTheory in

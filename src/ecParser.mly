@@ -88,12 +88,12 @@
       pa_kind     = k;
       pa_locality = locality; }
 
-  let mk_simplify l =
+  let mk_simplify ?db l =
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+        pmodpath = true; puser = true; puser_db = db; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -113,9 +113,13 @@
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+            pmodpath = false; puser = false; puser_db = db; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
+
+  let as_hintdb_mode = function
+    | `Plus  -> `Add
+    | `Minus -> `Remove
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -2499,16 +2503,30 @@ simplify_arg:
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
 
+%inline simplify_db:
+| HINT x=lident { unloc x }
+
+%inline pmode:
+| PLUS  { `Plus  }
+| MINUS { `Minus }
+
 simplify:
-| l=simplify_arg+     { l }
-| SIMPLIFY            { simplify_red }
-| SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
-| SIMPLIFY DELTA      { `Delta [] :: simplify_red }
+| l=simplify_arg+ db=simplify_db?
+    { mk_simplify ?db l }
+| SIMPLIFY db=simplify_db?
+    { mk_simplify ?db simplify_red }
+| SIMPLIFY l=qoident+ db=simplify_db?
+    { mk_simplify ?db (`Delta l  :: simplify_red) }
+| SIMPLIFY DELTA db=simplify_db?
+    { mk_simplify ?db (`Delta [] :: simplify_red) }
 
 cbv:
-| CBV            { simplify_red }
-| CBV l=qoident+ { `Delta l  :: simplify_red  }
-| CBV DELTA      { `Delta [] :: simplify_red }
+| CBV db=simplify_db?
+    { mk_simplify ?db simplify_red }
+| CBV l=qoident+ db=simplify_db?
+    { mk_simplify ?db (`Delta l  :: simplify_red) }
+| CBV DELTA db=simplify_db?
+    { mk_simplify ?db (`Delta [] :: simplify_red) }
 
 conseq:
 | empty                            { None, None }
@@ -2795,6 +2813,17 @@ logtactic:
 | ASSUMPTION
     { Passumption }
 
+| HINT m=pmode x=lident SIMPLIFY dbs=lident+
+    { if unloc x <> "db" then
+        parse_error x.pl_loc (Some ("invalid hint command: " ^ (unloc x)));
+      PlocalHint (PLHDb (as_hintdb_mode m, List.map unloc dbs)) }
+
+| HINT m=pmode SIMPLIFY db=prefix(IN, lident)? l=qident+
+    { PlocalHint (PLHLemmas (as_hintdb_mode m, omap unloc db, l)) }
+
+| HINT CLEAR SIMPLIFY db=prefix(IN, lident)?
+    { PlocalHint (PLHClear (omap unloc db)) }
+
 | MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
    { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
@@ -2880,10 +2909,10 @@ logtactic:
    { Papply (`Apply (es, `Exact), None) }
 
 | l=simplify
-   { Psimplify (mk_simplify l) }
+   { Psimplify l }
 
 | l=cbv
-   { Pcbv (mk_simplify l) }
+   { Pcbv l }
 
 | CHANGE f=sform
    { Pchange f }
@@ -3890,8 +3919,10 @@ hint:
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
 reduction:
+| HINT SIMPLIFY IN db=lident COLON opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
+    { (Some (unloc db), odfl [] opt, xs) }
 | HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
-    { (odfl [] opt, xs) }
+    { (None, odfl [] opt, xs) }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?

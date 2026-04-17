@@ -926,7 +926,7 @@ and replay_auto
 (* -------------------------------------------------------------------- *)
 and replay_reduction
   (ove : _ ovrenv) (subst, ops, proofs, scope)
-  (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
+  (import, ({ red_rules } as red) : _ * EcTheory.reduction_rule)
 =
   let for1 (p, opts, rule) =
     let exception Removed in
@@ -945,8 +945,8 @@ and replay_reduction
 
     in (p, opts, rule) in
 
-  let rules = List.map for1 rules in
-  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction rules) in
+  let red_rules = List.map for1 red_rules in
+  let scope = ove.ovre_hooks.hadd_item scope ~import (Th_reduction { red with red_rules }) in
 
   (subst, ops, proofs, scope)
 

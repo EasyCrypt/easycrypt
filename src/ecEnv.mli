@@ -420,13 +420,32 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction : sig
+  type entry = path * EcTheory.rule
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple | `Proj of int]
+  type base = symbol
 
-  val all : env -> (topsym * rule list) list
-  val add1 : path * rule_option * rule option -> env -> env
-  val add  : ?import:bool -> (path * rule_option * rule option) list -> env -> env
-  val get  : topsym -> env -> rule list
+  val dname : symbol
+  val all : env -> (base * (topsym * rule list) list) list
+  val add1 : ?base:symbol -> path * rule_option * rule option -> env -> env
+  val add  : ?import:bool -> reduction_rule -> env -> env
+  val get  : ?base:symbol -> topsym -> env -> rule list
+  val get_entries : ?base:symbol -> topsym -> env -> entry list
+  val getx : symbol -> env -> (topsym * rule list) list
+end
+
+type local_simplify
+
+module LocalSimplify : sig
+  val empty : local_simplify
+  val active : local_simplify -> Ssym.t
+  val activate : symbol list -> local_simplify -> local_simplify
+  val deactivate : symbol list -> local_simplify -> local_simplify
+  val added : ?base:symbol -> local_simplify -> Reduction.entry list
+  val removed : ?base:symbol -> local_simplify -> Sp.t
+  val add_rules : ?base:symbol -> Reduction.entry list -> local_simplify -> local_simplify
+  val remove_paths : ?base:symbol -> path list -> local_simplify -> local_simplify
+  val clear : ?base:symbol -> local_simplify -> local_simplify
 end
 
 (* -------------------------------------------------------------------- *)
