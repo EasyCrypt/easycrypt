@@ -1664,10 +1664,12 @@ lemma catmr_subm m n: 0 <= n < cols m =>
 proof.
 move => n_bound; rewrite eq_matrixP /=.
 split => [| i j bound]. 
-- smt(rows_catmr cols_catmr size_subm).
+- split;2:smt(cols_catmr size_subm).
+  by have /# := rows_catmr (subm m 0 (rows m) 0 n) (subm m 0 (rows m) n (cols m)).
 rewrite get_catmr // cols_subm /=.
 case (j < n) => j_bound.
-- rewrite get_subm /=; first 2 smt(size_catmr size_subm).
+- rewrite get_subm /=; 2: smt(size_catmr size_subm).
+  + by have /# := size_catmr (subm m 0 (rows m) 0 n) (subm m 0 (rows m) n (cols m)).
   rewrite (getm0E (subm _ _ _ _ _)).
   + smt(size_catmr size_subm).
   by rewrite addr0.
