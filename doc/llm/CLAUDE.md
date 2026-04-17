@@ -181,6 +181,45 @@ SEARCH (fdom _)
 SEARCH (_ %/ _)
 ```
 
+### When the agent can't hold a persistent pipe
+
+Some LLM front-ends (Claude Code, Codex CLI, etc.) expose the shell as
+one-shot command execution — the agent *cannot* keep stdin/stdout open
+to `easycrypt llm` across turns. Naively, every tactic would then
+require re-`LOAD`-ing the file prefix.
+
+The `scripts/llm/` directory contains a reference fifo-backed daemon
+that lets many short-lived shell invocations drive one persistent EC
+REPL. Start it once at the beginning of a session, then issue each
+tactic as a separate `ec_send.sh` call. See `scripts/llm/README.md` for
+the full pattern.
+
+### Iterate interactively, then codify
+
+For long proofs — especially program-logic bodies with 5+ chained
+`ecall`s, or big algebraic derivations — write tactics one at a time
+in the REPL, inspecting `GOALS` after each, and only commit the final
+sequence back to the file once it works. Two reasons:
+
+- **SMT budget.** Committing a long batch and issuing one LOAD
+  compounds SMT cost across every intermediate side-condition at once.
+  The same tactics often pass individually with a shorter per-call
+  timeout.
+- **Cheap backtracking.** Use `CHECKPOINT` at every branching point
+  and `REVERT` liberally — it's O(1), whereas re-LOAD re-compiles the
+  whole prefix.
+
+Pattern:
+
+```
+LOAD "file.ec" 100          ← note uuid:N
+CHECKPOINT before_body
+<try tactic>
+GOALS                       ← inspect
+<try tactic>
+REVERT before_body          ← if the branch fails
+```
+
 ## EasyCrypt proof strategy
 
 ### General approach
@@ -246,6 +285,64 @@ SEARCH (_ %/ _)
 - `rewrite lemma in H` modifies hypothesis `H` in place (it does
   not consume it). If you need to preserve the original, copy it
   first: `have H' := H; rewrite lemma in H'`.
+- **`have H := lemma args` may leave unevaluated lambdas.** Lemma
+  applications that produce `init`/`map`/`filter` terms often carry
+  β-redexes into the introduced hypothesis. Later `rewrite H` can then
+  hang indefinitely while the kernel tries to unify. Force
+  normalization at introduction with `have /= H := lemma args`.
+- **Tactic-repetition (`!tac`) over-applies on nested structures.**
+  `!mapiE`, `!initiE`, `!allP` descend into inner layers at different
+  array sizes, generate side-conditions that can't be closed by `/#`,
+  and either leave stale goals or hang. Use the exact count needed
+  (usually 1 or 2 for an equality: `rewrite mapiE 1:/# /= mapiE 1:/#`).
+- **`1:/#` vs `1:smt(hints)` in rewrite chains.** Inside a
+  `rewrite lemma 1:...` position only `/#` parses; `1:smt(hints)` is
+  a parse error. Break the chain:
+  `rewrite lemma 1:/#; first smt(hints). rewrite next_lemma.`
+- **`suff` not `suffices`.** The surface syntax uses `suff H : P.`;
+  `suffices` triggers a parse error.
+- **`rewrite allP` only touches the first `all`.** When unfolding
+  range predicates on both sides of an implication
+  (`all P x => all Q x`), use `!allP` — otherwise the subsequent
+  `=> H j Hj` fails with "nothing to introduce" because the conclusion
+  is still wrapped in `all`.
+- **`congr` vs `congr 1`.** `congr` walks down an array equality all
+  the way to list/element equality; `congr 1` takes one structural
+  step. Reach for `congr 1` when `congr` descends too far and exposes
+  stale `init`/`mkseq` structure.
+
+### Reconciling syntactically distinct constants
+
+When a word-type modulus (`W13.modulus`, `W8.modulus`, …) appears on
+one side of a goal and its numeric literal (`8192`, `256`, …) on the
+other — for instance after one subterm was lowered through a circuit
+lemma while the other came from the spec — `smt()` treats them as
+distinct atoms and won't bridge. Normalize explicitly:
+
+```easycrypt
+have W13_eq : W13.modulus = 8192 by smt(W13.ge2_modulus).
+rewrite W13_eq.
+```
+
+Same pattern for `modulus_W`, cardinalities of finite types, and other
+constants that have both a symbolic and a numeric form.
+
+### Ring/field commutativity: use the fully-qualified path
+
+Bare `mulrC`/`addrC` may not resolve against a concrete ring clone's
+theory. When working in a cloned ring (`Zq`, `Fq`, polynomial rings
+over Zq, …), the fully-qualified name of the `ComRing`/`ZModule` lemma
+usually succeeds where the short form fails:
+
+```easycrypt
+by rewrite Zq.ComRing.mulrC.
+```
+
+Use `SEARCH` to find the right path:
+
+```
+SEARCH (_ * _) (commutative _)
+```
 
 ## EasyCrypt language overview
 
