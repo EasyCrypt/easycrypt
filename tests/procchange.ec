@@ -673,3 +673,26 @@ theory ProcChangePostReadYFailTest.
   fail by auto.
   abort.
 end ProcChangePostReadYFailTest.
+
+theory ProcChangeUseNewVars.
+  module M = {
+    proc f(x : int) = {
+      x <- 1;
+      x <- x - x;
+      return x;
+    }
+  }.
+    
+  lemma L : hoare[M.f : 4 < arg ==> res = 0].
+  proof.
+  proc.
+  proc change [1..1] : [y : int] {
+    y <- x;
+    x <- 1;
+  }; 1: by auto.
+  seq 2 : (x = 1 /\ 4 < y); 1: by auto.
+  conseq (: ==> x = 0 /\ 4 < y); 1: by auto.
+  wp. skip => &hr H. simplify. 
+  by move : H => [] <*>> -> //.
+  qed.
+end ProcChangeUseNewVars.
