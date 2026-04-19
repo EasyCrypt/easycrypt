@@ -1088,7 +1088,7 @@ let reduce_head simplify ri env hyps f =
 
       let body = EcFol.form_of_expr body in
       (* FIXME subst-refact can we do both subst in once *)
-      let body = Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+      let body = Tvar.f_subst ~freshen:true op.EcDecl.op_tparams.tyvars tys.types body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1732,7 +1732,7 @@ module User = struct
   let compile ~opts ~prio (env : EcEnv.env) p =
     let simp =
       if opts.EcTheory.ur_delta then
-        let hyps = EcEnv.LDecl.init env [] in
+        let hyps = EcEnv.LDecl.init env { idxvars = []; tyvars = [] } in
         fun f -> odfl f (h_red_opt delta hyps f)
       else fun f -> f in
 
@@ -1804,7 +1804,7 @@ module User = struct
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list ax.ax_tparams in
+    and s_tybds = Sid.of_list ax.ax_tparams.tyvars in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.
@@ -1870,7 +1870,7 @@ module EqTest = struct
       let f1 = convert e1 in
       let f2 = convert e2 in
 
-      is_conv (LDecl.init env []) f1 f2
+      is_conv (LDecl.init env { idxvars = []; tyvars = [] }) f1 f2
    end)
 
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm

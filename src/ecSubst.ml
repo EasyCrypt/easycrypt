@@ -834,14 +834,15 @@ let subst_top_module (s : subst) (m : top_module_expr) =
     tme_loca = m.tme_loca; }
 
 (* -------------------------------------------------------------------- *)
-let fresh_tparam (s : subst) (x : ty_param) =
+let fresh_tparam (s : subst) (x : EcIdent.t) =
   let newx = EcIdent.fresh x in
   let s    = add_tyvar s x (tvar newx) in
   (s, newx)
 
 (* -------------------------------------------------------------------- *)
 let fresh_tparams (s : subst) (tparams : ty_params) =
-  List.fold_left_map fresh_tparam s tparams
+  let s, tyvars = List.fold_left_map fresh_tparam s tparams.tyvars in
+  (s, { tparams with tyvars })
 
 (* -------------------------------------------------------------------- *)
 let subst_genty (s : subst) (tparams, ty) =
@@ -1111,12 +1112,12 @@ let init_tparams (params : (EcIdent.t * ty) list) : subst =
 
 (* -------------------------------------------------------------------- *)
 let open_oper op tys =
-  let s = List.combine op.op_tparams tys in
+  let s = List.combine op.op_tparams.tyvars tys in
   let s = init_tparams s in
   (subst_ty s op.op_ty, subst_op_kind s op.op_kind)
 
 let open_tydecl tyd tys =
-  let s = List.combine tyd.tyd_params tys in
+  let s = List.combine tyd.tyd_params.tyvars tys in
   let s = init_tparams s in
   subst_tydecl_body s tyd.tyd_type
 

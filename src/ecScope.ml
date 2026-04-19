@@ -1305,7 +1305,7 @@ module Op = struct
           let codom    = TT.transty TT.tp_relax eenv ue pty in
           let _env, xs = TT.trans_binding eenv ue args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
-          let opabs    = EcDecl.mk_op ~opaque:optransparent [] codom None lc in
+          let opabs    = EcDecl.mk_op ~opaque:optransparent { idxvars = []; tyvars = [] } codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
@@ -1384,8 +1384,8 @@ module Op = struct
       List.fold_left (fun scope (rname, xs, ax, codom) ->
           let ax =
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
-            let opapp   = List.map tvar tparams in
-            let opapp   = e_app (e_op opname opapp ty) opargs codom in
+            let opapp   = List.map tvar tparams.tyvars in
+            let opapp   = e_app (e_op opname ~tyargs:opapp ty) opargs codom in
 
             let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
             let ax      = EcSubst.subst_form subst ax in
@@ -1399,12 +1399,12 @@ module Op = struct
           in
 
           let ax, axpm =
-            let bdpm = tparams in
+            let bdpm = tparams.tyvars in
             let axpm = List.map EcIdent.fresh bdpm in
               (Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) ax,
                axpm) in
           let ax =
-            { ax_tparams = axpm;
+            { ax_tparams = { idxvars = []; tyvars = axpm };
               ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
               ax_loca    = lc;
@@ -1419,11 +1419,12 @@ module Op = struct
           hierror ~loc
             "multiple names are only allowed for non-refined abstract operators";
         let addnew scope name =
-          let nparams = List.map EcIdent.fresh tparams in
+          let nparams = List.map EcIdent.fresh tparams.tyvars in
           let subst = Tvar.init
-            tparams
+            tparams.tyvars
             (List.map tvar nparams) in
-          let rop = EcDecl.mk_op ~opaque:optransparent nparams (Tvar.subst subst ty) None lc in
+          let nparams_p = { idxvars = []; tyvars = nparams } in
+          let rop = EcDecl.mk_op ~opaque:optransparent nparams_p (Tvar.subst subst ty) None lc in
           bind scope (unloc name, rop)
         in List.fold_left addnew scope op.po_aliases
 
@@ -1439,8 +1440,8 @@ module Op = struct
         hierror "for tag %s, load Distr first" tag;
 
       let oppath   = EcPath.pqname (path scope) (unloc op.po_name) in
-      let nparams  = List.map EcIdent.fresh tyop.op_tparams in
-      let subst    = Tvar.init tyop.op_tparams (List.map tvar nparams) in
+      let nparams  = List.map EcIdent.fresh tyop.op_tparams.tyvars in
+      let subst    = Tvar.init tyop.op_tparams.tyvars (List.map tvar nparams) in
       let ty       = Tvar.subst subst tyop.op_ty in
       let aty, rty = EcTypes.tyfun_flat ty in
 
@@ -1451,13 +1452,13 @@ module Op = struct
       in
 
       let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
-      let ax  = EcFol.f_op oppath (List.map tvar nparams) ty in
+      let ax  = EcFol.f_op oppath ~tyargs:(List.map tvar nparams) ty in
       let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
-      let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
+      let ax  = EcFol.f_app (EcFol.f_op pred ~tyargs:[dty] (tfun rty tbool)) [ax] tbool in
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams = nparams;
+        { ax_tparams = { idxvars = []; tyvars = nparams };
           ax_spec    = ax;
           ax_kind    = `Axiom (Ssym.empty, false);
           ax_loca    = lc;
@@ -1550,7 +1551,7 @@ module Op = struct
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
-      op_tparams  = [];
+      op_tparams  = { idxvars = []; tyvars = [] };
       op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain aout));
       op_loca     = op.ppo_locality;
@@ -1574,7 +1575,7 @@ module Op = struct
         let mu =
           let sem =
             f_app
-              (f_op oppath [] opdecl.op_ty)
+              (f_op oppath opdecl.op_ty)
               (List.map (fun (x, ty) -> f_local x ty) locs)
               (match mode with `Det -> sig_.fs_ret | `Distr -> tdistr sig_.fs_ret) in
 
@@ -1599,7 +1600,7 @@ module Op = struct
       in
 
       let prax = EcDecl.{
-        ax_tparams = [];
+        ax_tparams = { idxvars = []; tyvars = [] };
         ax_spec    = prax;
         ax_kind    = `Lemma;
         ax_loca    = op.ppo_locality;
@@ -1627,13 +1628,13 @@ module Op = struct
                 {m;inv=(f_eq
                    res.inv
                    (f_app
-                      (f_op oppath [] opdecl.op_ty)
+                      (f_op oppath opdecl.op_ty)
                       (List.map (fun (x, ty) -> f_local x ty) locs)
                       sig_.fs_ret))})
          in
 
          let prax = EcDecl.{
-           ax_tparams = [];
+           ax_tparams = { idxvars = []; tyvars = [] };
            ax_spec    = hax;
            ax_kind    = `Lemma;
            ax_loca    = op.ppo_locality;
@@ -2268,7 +2269,7 @@ module Ty = struct
 
     let scope =
       let decl = EcDecl.{
-        tyd_params  = [];
+        tyd_params  = { idxvars = []; tyvars = [] };
         tyd_type    = Abstract;
         tyd_loca    = `Global; (* FIXME:SUBTYPE *)
       } in bind scope (unloc subtype.pst_name, decl) in
@@ -2363,7 +2364,7 @@ module Ty = struct
               let op   = EcEnv.Op.by_path p env in
               let opty =
                 Tvar.subst
-                  (Tvar.init op.op_tparams tvi)
+                  (Tvar.init op.op_tparams.tyvars tvi)
                   op.op_ty
               in
                 (p, opty)
@@ -2411,7 +2412,7 @@ module Ty = struct
         (fun (x, req) ->
            if not (Mstr.mem x symbs) then
              let ax = {
-               ax_tparams = [];
+               ax_tparams = { idxvars = []; tyvars = [] };
                ax_spec    = req;
                ax_kind    = `Lemma;
                ax_loca    = lc;
@@ -2426,7 +2427,7 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = {
-              ax_tparams = [];
+              ax_tparams = { idxvars = []; tyvars = [] };
               ax_spec    = f;
               ax_kind    = `Lemma;
               ax_smt     = false;
@@ -2481,7 +2482,7 @@ module Ty = struct
       let uidmap = EcUnify.UniEnv.close ue in
         (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
-    if not (List.is_empty (fst ty)) then
+    if not (List.is_empty (fst ty).tyvars && List.is_empty (fst ty).idxvars) then
       hierror "ring instances cannot be polymorphic";
 
     let symbols = EcAlgTactic.ring_symbols env kind (snd ty) in
@@ -2499,7 +2500,7 @@ module Ty = struct
       { scope with sc_env =
           List.fold_left add
             (let item =
-               EcTheory.Th_instance (([], snd ty), `Ring cr, tci.pti_loca) in
+               EcTheory.Th_instance (({ idxvars = []; tyvars = [] }, snd ty), `Ring cr, tci.pti_loca) in
              let item = EcTheory.mkitem ~import item in
              EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain] }
@@ -2524,7 +2525,7 @@ module Ty = struct
       let uidmap = EcUnify.UniEnv.close ue in
         (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
-    if not (List.is_empty (fst ty)) then
+    if not (List.is_empty (fst ty).tyvars && List.is_empty (fst ty).idxvars) then
       hierror "field instances cannot be polymorphic";
     let symbols = EcAlgTactic.field_symbols env (snd ty) in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
@@ -2541,7 +2542,7 @@ module Ty = struct
         sc_env =
           List.fold_left add
             (let item =
-               EcTheory.Th_instance (([], snd ty), `Field cr, tci.pti_loca) in
+               EcTheory.Th_instance (({ idxvars = []; tyvars = [] }, snd ty), `Field cr, tci.pti_loca) in
              let item = EcTheory.mkitem ~import item in
               EcSection.add_item item scope.sc_env)
             [p_zmod; p_ring; p_idomain; p_field] }

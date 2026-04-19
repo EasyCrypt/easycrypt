@@ -217,7 +217,7 @@ and betared st s bd f args =
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_record_projection
-  (st : state) ((p, _tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, _tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -245,7 +245,7 @@ and try_reduce_record_projection
 
 (* -------------------------------------------------------------------- *)
 and try_reduce_fixdef
-  (st : state) ((p, tys) : EcPath.path * ty list) (args : args)
+  (st : state) ((p, tys) : EcPath.path * targs) (args : args)
 =
   let exception Bailout in
 
@@ -300,7 +300,7 @@ and try_reduce_fixdef
 
     let body = EcFol.form_of_expr body in
     let body =
-      Tvar.f_subst ~freshen:true op.EcDecl.op_tparams tys body in
+      Tvar.f_subst ~freshen:true op.EcDecl.op_tparams.tyvars tys.types body in
 
     Some (cbv st subst body (Args.create ty eargs))
 

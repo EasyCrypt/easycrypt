@@ -267,7 +267,7 @@ end = struct
     let ntyargs =
       match fst tyd with
       | `BySyntax (tyargs, _) -> List.length tyargs
-      | `ByPath p -> List.length (EcEnv.Ty.by_path p oc.oc_env).tyd_params in
+      | `ByPath p -> List.length (EcEnv.Ty.by_path p oc.oc_env).tyd_params.tyvars in
 
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
@@ -276,7 +276,7 @@ end = struct
       | None ->
          clone_error oc.oc_env (CE_UnkOverride (OVK_Type, name));
       | Some refty ->
-         if List.length refty.tyd_params <> ntyargs then
+         if List.length refty.tyd_params.tyvars <> ntyargs then
            clone_error oc.oc_env (CE_TypeArgMism (OVK_Type, name)) in
 
     let evc =

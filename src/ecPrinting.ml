@@ -810,7 +810,8 @@ let rec pp_type_r
                 (pp_paren (pp_list ",@ " subpp)) xs
                 (pp_tyname ppe) name
       in
-        maybe_paren outer t_prio_name pp fmt (name, tyargs)
+        (* Phase 0: indices not yet pretty-printed *)
+        maybe_paren outer t_prio_name pp fmt (name, tyargs.types)
     end
 
   | Tfun (t1, t2) ->
@@ -1494,7 +1495,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (opprec : 
         else l_l f2 e_bin_prio_rop4
     | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
         (let (_, opname) =
-           PPEnv.op_symb ppe op (Some (`Form, tys, (List.map t_ty [f1; f2], None))) in
+           PPEnv.op_symb ppe op (Some (`Form, tys.types, (List.map t_ty [f1; f2], None))) in
         match priority_of_binop opname with
         | None         -> None
         | Some opprec' ->
@@ -1663,7 +1664,7 @@ and try_pp_chained_orderings
     match match_pp_notations ~filter:(fun (p, _) -> is_ordering_op p) ppe f with
     | Some ((op, (tvi, _)), ue, ev, ov, [i1; i2]) -> begin
       let ti  = Tvar.subst ov in
-      let tvi = List.map (ti |- tvar) tvi in
+      let tvi = List.map (ti |- tvar) tvi.tyvars in
       let sb  = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       let i1  = Fsubst.f_subst sb i1 in
       let i2  = Fsubst.f_subst sb i2 in
@@ -1674,7 +1675,7 @@ and try_pp_chained_orderings
     | _ -> begin
       match sform_of_form f with
       | SFop ((op, tvi), [i1; i2]) when is_ordering_op op ->
-        (op, tvi), (i1, i2)
+        (op, tvi.types), (i1, i2)
       | _ -> raise Bailout
     end
   in
@@ -1754,7 +1755,7 @@ and match_pp_notations
       let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
       let ue = EcUnify.UniEnv.create None in
       let ov = EcUnify.UniEnv.opentvi ue tv None in
-      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env { idxvars = []; tyvars = [] } in
       let bd = match (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) with
       | None -> form_of_expr nt.ont_body
       | Some m -> (ss_inv_of_expr m nt.ont_body).inv in
@@ -1802,9 +1803,9 @@ and try_pp_notations
   | Some ((p, (tv, nt)), ue, ev, ov, eargs) ->
     let ti   = Tvar.subst ov in
     let rty  = ti nt.ont_resty in
-    let tv   = List.map (ti |- tvar) tv in
+    let tv   = List.map (ti |- tvar) tv.tyvars in
     let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
-    let f    = f_op p tv (toarrow tv rty) in
+    let f    = f_op p ~tyargs:tv (toarrow tv rty) in
     let f    = f_app f args rty in
     let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in
     let f    = f_app f eargs f.f_ty in
@@ -1909,7 +1910,7 @@ and pp_form_core_r
       pp_let ~fv:f2.f_fv ppe pp_form_r outer fmt (lp, f1, f2)
 
   | Fop (op, tvi) ->
-      pp_opapp ppe outer fmt (op, tvi, [])
+      pp_opapp ppe outer fmt (op, tvi.types, [])
 
   | Fapp ({f_node = Fop (op, _)},
             [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
@@ -1917,10 +1918,10 @@ and pp_form_core_r
         && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
     ->
       let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
-      pp_opapp ppe outer fmt (negop, tys, [f1; f2])
+      pp_opapp ppe outer fmt (negop, tys.types, [f1; f2])
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
-      pp_opapp ppe outer fmt (p, tys, args)
+      pp_opapp ppe outer fmt (p, tys.types, args)
 
   | Fapp (e, args) ->
       pp_app ppe ~pp_first:pp_form_r ~pp_sub:pp_form_r outer fmt (e, args)
@@ -2263,11 +2264,11 @@ let pp_sform ppe fmt f =
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
-  let ppe = PPEnv.add_locals ppe tyd.tyd_params in
+  let ppe = PPEnv.add_locals ppe tyd.tyd_params.tyvars in
   let name = P.basename x in
 
   let pp_prelude fmt =
-    match tyd.tyd_params with
+    match tyd.tyd_params.tyvars with
     | [] ->
         Format.fprintf fmt "type %s" name
 
@@ -2307,7 +2308,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     Format.fprintf fmt "@[%a%t%t.@]" pp_locality tyd.tyd_loca pp_prelude pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: ty_param list) =
+let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: EcIdent.t list) =
   match ids with
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
@@ -2389,7 +2390,7 @@ let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos)
   Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * ty_param list * ty * prbody option) =
+let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * EcIdent.t list * ty * prbody option) =
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2534,7 +2535,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt 
-  ((basename, ts, _ty, nt) : symbol * ty_param list * ty * notation)
+  ((basename, ts, _ty, nt) : symbol * EcIdent.t list * ty * notation)
 =
   let ppe = PPEnv.add_locals ppe ts in
 
@@ -2573,18 +2574,18 @@ let pp_opdecl
   let pp_decl fmt op =
     match op.op_kind with
     | OB_oper i ->
-      pp_opdecl_op ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
+      pp_opdecl_op ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
     | OB_pred i ->
-      pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
+      pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
     | OB_nott i ->
       let ppe = { ppe with PPEnv.ppe_fb = Sp.add x ppe.PPEnv.ppe_fb } in
-      pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
+      pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
 
   in Format.fprintf fmt "@[<v>%a%a%a@]" pp_locality op.op_loca pp_name x pp_decl op
 
 let pp_added_op (ppe : PPEnv.t) fmt op =
-  let ppe = PPEnv.add_locals ppe op.op_tparams in
-  match op.op_tparams with
+  let ppe = PPEnv.add_locals ppe op.op_tparams.tyvars in
+  match op.op_tparams.tyvars with
   | [] -> Format.fprintf fmt ": @[<hov 2>%a@]"
     (pp_type ppe) op.op_ty
   | ts  ->
@@ -2605,14 +2606,14 @@ let tags_of_axkind = function
   | `Lemma -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
-  let ppe = PPEnv.add_locals ppe ax.ax_tparams in
+  let ppe = PPEnv.add_locals ppe ax.ax_tparams.tyvars in
   let basename = P.basename x in
 
   let pp_spec fmt =
     pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
-    match ax.ax_tparams with
+    match ax.ax_tparams.tyvars with
     | [] -> Format.fprintf fmt "%s"    basename
     | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
 
@@ -3219,14 +3220,14 @@ module PPGoal = struct
     in (ppe, (id, pdk))
 
   let pp_goal1 ?(pphyps = true) ?prpo ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
-    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
     let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
 
     idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
 
     if pphyps then begin
       begin
-        match hyps.EcBaseLogic.h_tvar with
+        match hyps.EcBaseLogic.h_tvar.tyvars with
         | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
         | tv ->
             Format.fprintf fmt "Type variables: %a@\n\n%!"
@@ -3265,12 +3266,12 @@ end
 (* -------------------------------------------------------------------- *)
 let pp_hyps (ppe : PPEnv.t) fmt hyps =
   let hyps = EcEnv.LDecl.tohyps hyps in
-  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
   let ppe, pps =
     List.map_fold PPGoal.pre_pp_hyp ppe
                   (List.rev hyps.EcBaseLogic.h_local) in
 
-  begin match hyps.EcBaseLogic.h_tvar with
+  begin match hyps.EcBaseLogic.h_tvar.tyvars with
   | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
   | tv ->
       Format.fprintf fmt "Type variables: %a@\n\n%!"
@@ -3423,7 +3424,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
 
     let pp_branch fmt ((vars, s), (cname, _)) =
       let ptn = EcTypes.toarrow (List.snd vars) e.e_ty in
-      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) typ ptn in
+      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) ~tyargs:typ ptn in
       let ptn = f_app ptn (List.map (fun (x, ty) -> f_local x ty) vars) e.e_ty in
 
       Format.fprintf fmt "| %a => @[<hov 2>%a@]@ "
@@ -3579,7 +3580,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
         EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
 
   | EcTheory.Th_instance ((typ, ty), tc, lc) -> begin
-      let ppe = PPEnv.add_locals ppe typ in (* FIXME *)
+      let ppe = PPEnv.add_locals ppe typ.tyvars in (* FIXME *)
 
       match tc with
       | (`Ring _ | `Field _) as tc -> begin
@@ -3619,7 +3620,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
               "%ainstance %s with [%a] %a@\n@[<hov 2>  %a@]"
               pp_locality lc
               name
-              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) typ
+              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) typ.tyvars
               (pp_type ppe) ty
               (pp_list "@\n"
                  (fun fmt (name, op) ->

@@ -131,11 +131,11 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
-      let tyinst = ty_instantiate tdecl.tyd_params targs in
+      let tyinst = ty_instantiate tdecl.tyd_params targs.types in
 
       match tdecl.tyd_type with
       | Abstract ->
-          List.exists isempty targs
+          List.exists isempty targs.types
 
       | Concrete ty ->
           isempty_1 [ tyinst ty ]
@@ -402,7 +402,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map tvar tparams)
+      let opexpr   = e_op opexpr ~tyargs:(List.map tvar tparams.tyvars)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr

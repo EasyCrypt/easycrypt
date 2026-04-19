@@ -265,20 +265,20 @@ let wsnd genv arg = wproj_tuple genv arg 1
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
 
 (* -------------------------------------------------------------------- *)
-let lenv_of_tparams ts =
-  let trans_tv env (id : ty_param) = (* FIXME: TC HOOK *)
+let lenv_of_tparams (ts : ty_params) =
+  let trans_tv env (id : EcIdent.t) = (* FIXME: TC HOOK *)
     let tv = WTy.create_tvsymbol (preid id) in
     { env with le_tv = Mid.add id (WTy.ty_var tv) env.le_tv }, tv
   in
-    List.map_fold trans_tv empty_lenv ts
+    List.map_fold trans_tv empty_lenv ts.tyvars
 
-let lenv_of_tparams_for_hyp genv ts =
-  let trans_tv env (id : ty_param) = (* FIXME: TC HOOK *)
+let lenv_of_tparams_for_hyp genv (ts : ty_params) =
+  let trans_tv env (id : EcIdent.t) = (* FIXME: TC HOOK *)
     let ts = WTy.create_tysymbol (preid id) [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
   in
-    List.map_fold trans_tv empty_lenv ts
+    List.map_fold trans_tv empty_lenv ts.tyvars
 
 (* -------------------------------------------------------------------- *)
 let instantiate tparams ~textra targs tres tys =
@@ -375,8 +375,10 @@ let rec trans_ty ((genv, lenv) as env) ty =
   | Ttuple  ts-> wty_tuple genv (trans_tys env ts)
 
   | Tconstr (p, tys) ->
+      (* Phase 0: indices not yet supported by SMT *)
+      assert (List.is_empty tys.indices);
       let id = trans_pty genv p in
-      WTy.ty_app id (trans_tys env tys)
+      WTy.ty_app id (trans_tys env tys.types)
 
   | Tfun (t1, t2) ->
       WTy.ty_func (trans_ty env t1) (trans_ty env t2)
@@ -415,7 +417,7 @@ and trans_tydecl genv (p, tydecl) =
 
         Hp.add genv.te_ty p ts;
 
-        let wdom = tconstr p (List.map tvar tydecl.tyd_params) in
+        let wdom = tconstr ~tyargs:(List.map tvar tydecl.tyd_params.tyvars) p in
         let wdom = trans_ty (genv, lenv) wdom in
 
         let for_ctor (c, ctys) =
@@ -434,7 +436,7 @@ and trans_tydecl genv (p, tydecl) =
 
         Hp.add genv.te_ty p ts;
 
-        let wdom  = tconstr p (List.map tvar tydecl.tyd_params) in
+        let wdom  = tconstr ~tyargs:(List.map tvar tydecl.tyd_params.tyvars) p in
         let wdom  = trans_ty (genv, lenv) wdom in
 
         let for_field (fname, fty) =
@@ -679,7 +681,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | Fop    _ -> trans_app env fp []
 
     (* Special case for `%r` *)
-  | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
+  | Fapp({ f_node = Fop (p, { indices = []; types = [] })},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
     WTerm.t_real_const (BI.to_why3 n)
 
@@ -711,8 +713,10 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       trans_fun env bds body args
 
   | Fop (p, ts) ->
+      (* Phase 0: indices not yet supported by SMT *)
+      assert (List.is_empty ts.indices);
       let wop = trans_op genv p in
-      let tys = List.map (trans_ty (genv,lenv)) ts in
+      let tys = List.map (trans_ty (genv,lenv)) ts.types in
       apply_wop genv wop tys args
 
   | Flocal x when Hid.mem genv.te_lc x ->
@@ -764,7 +768,7 @@ and trans_branch (genv, lenv) (p, _dty, tvs) (f, (cname, argsty)) =
   in
 
   let lenv, ws = trans_lvars genv lenv xs in
-  let wcty = trans_ty (genv, lenv) (tconstr p tvs) in
+  let wcty = trans_ty (genv, lenv) (tconstr ~tyargs:tvs p) in
   let ws = List.map WTerm.pat_var ws in
   let ws = WTerm.pat_app csymb ws wcty in
   let wf = trans_app (genv, lenv) f [] in
@@ -1034,7 +1038,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun tv -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun tv -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams.tyvars in
   let textra =
     List.map (fun tv -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in

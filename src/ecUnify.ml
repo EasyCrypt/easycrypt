@@ -238,7 +238,7 @@ module UniEnv = struct
             }; id
     end
 
-  let create (vd : EcIdent.t list option) =
+  let create (vd : ty_params option) =
     let ue = {
       ue_uf     = UF.initial;
       ue_named  = Mstr.empty;
@@ -250,6 +250,7 @@ module UniEnv = struct
       match vd with
       | None    -> ue
       | Some vd ->
+          let vd = vd.tyvars in
           let vdmap = List.map (fun x -> (EcIdent.name x, x)) vd in
           { ue with
               ue_named  = Mstr.of_list vdmap;
@@ -263,6 +264,7 @@ module UniEnv = struct
       ue := { !ue with ue_uf = uf }; uid
 
   let opentvi (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
+    let params = params.tyvars in
     match tvi with
     | None ->
         List.fold_left
@@ -285,7 +287,7 @@ module UniEnv = struct
           List.fold_left for1 Mid.empty params
 
   let subst_tv (subst : ty -> ty) (params : ty_params) =
-    List.map (fun tv -> subst (tvar tv)) params
+    List.map (fun tv -> subst (tvar tv)) params.tyvars
 
   let openty_r (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
     let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
@@ -315,7 +317,7 @@ module UniEnv = struct
     subst_of_uf (!ue).ue_uf
 
   let tparams (ue : unienv) : ty_params =
-    List.rev (!ue).ue_decl
+    { idxvars = []; tyvars = List.rev (!ue).ue_decl }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -360,11 +362,11 @@ let select_op
       | Some (TVIunamed lt) ->
           let len = List.length lt in
             fun op ->
-              let tparams = op.D.op_tparams in
+              let tparams = op.D.op_tparams.tyvars in
                  List.length tparams = len
 
       | Some (TVInamed ls) -> fun op ->
-          let tparams = List.map EcIdent.name op.D.op_tparams in
+          let tparams = List.map EcIdent.name op.D.op_tparams.tyvars in
           let tparams = Ssym.of_list tparams in
           List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 

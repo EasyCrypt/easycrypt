@@ -1504,7 +1504,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
 
          | _ -> raise InvalidGoalShape
 
-       in t_apply_s p tv ~args:(args @ [f2]) ~sk tc
+       in t_apply_s p tv.types ~args:(args @ [f2]) ~sk tc
 
     | _ -> raise TTC.NoMatch
 
@@ -1659,7 +1659,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
     | None -> raise InvalidGoalShape
     | Some (x, sk) ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
 
   in t_lazy_match ?reduce t_split_r tc
 
@@ -1679,10 +1679,10 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
     match EcInductive.prind_is_iso_ors pri with
     | Some ((x, sk), _) when side = `Left ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
     | Some (_, (x, sk)) when side = `Right ->
        let p = EcInductive.prind_introsc_path p x in
-       t_apply_s p tv ~args ~sk tc
+       t_apply_s p tv.types ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
   in t_lazy_match ?reduce t_split_r tc

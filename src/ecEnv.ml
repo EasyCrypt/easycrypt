@@ -788,9 +788,9 @@ module MC = struct
           let cs      = dtype.tydt_ctors   in
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
-          let params  = List.map tvar tyd.tyd_params in
+          let params  = List.map tvar tyd.tyd_params.tyvars in
           let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr mypath params) in
+            let aty = EcTypes.toarrow aty (tconstr ~tyargs:params mypath) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
             let cop = mk_op
                         ~opaque:optransparent (fst aty) (snd aty)
@@ -829,11 +829,11 @@ module MC = struct
             ) mc projs
 
       | Record (scheme, fields) ->
-          let params  = List.map tvar tyd.tyd_params in
+          let params  = List.map tvar tyd.tyd_params.tyvars in
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr mypath params) aty in
+              let aty = EcTypes.tfun (tconstr ~tyargs:params mypath) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
               let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
@@ -854,7 +854,7 @@ module MC = struct
 
           let stname = Printf.sprintf "mk_%s" x in
           let stop   =
-            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
+            let stty = toarrow (List.map snd fields) (tconstr ~tyargs:params mypath) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
               mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in
@@ -911,7 +911,7 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
-            mk_op ~opaque:optransparent [(self)]
+            mk_op ~opaque:optransparent { idxvars = []; tyvars = [self] }
               optype (Some OP_TC) loca
           in (opid, xpath opname, optype, opdecl)
         in
@@ -921,7 +921,7 @@ module MC = struct
       let fsubst =
         List.fold_left
           (fun s (x, xp, xty, _) ->
-            let fop = EcCoreFol.f_op xp [tvar self] xty in
+            let fop = EcCoreFol.f_op xp ~tyargs:[tvar self] xty in
               EcSubst.add_flocal s x fop)
           tsubst
           operators
@@ -931,7 +931,7 @@ module MC = struct
         List.map
           (fun (x, ax) ->
             let ax = EcSubst.subst_form fsubst ax in
-              (x, { ax_tparams = [(self)];
+              (x, { ax_tparams = { idxvars = []; tyvars = [self] };
                     ax_spec    = ax;
                     ax_kind    = `Lemma;
                     ax_loca    = loca;
@@ -2536,11 +2536,11 @@ module Ty = struct
     | Some { tyd_type = Concrete _ } -> true
     | _ -> false
 
-  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
+  let unfold (name : EcPath.path) (args : EcAst.targs) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = Concrete body } as tyd) ->
         Tvar.subst
-          (Tvar.init tyd.tyd_params args)
+          (Tvar.init tyd.tyd_params.tyvars args.types)
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2584,14 +2584,14 @@ module Ty = struct
                 | Datatype _, `Case          -> basename ^ "_case"
                 | _, _ -> assert false
               in
-                Some (EcPath.pqoname prefix basename, tys)
+                Some (EcPath.pqoname prefix basename, tys.types)
           | _ -> None
       end
       | _ -> None
 
   let get_top_decl (ty : ty) (env : env) =
     match (ty_hnorm ty env).ty_node with
-    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys.types)
     | _ -> None
 
   let rebind name ty env =
@@ -2697,9 +2697,9 @@ module Op = struct
       with NotReducible -> false
     else false
 
-  let reduce ?mode ?nargs env p tys =
+  let reduce ?mode ?nargs env p (tys : EcAst.targs) =
     let op, f = core_reduce ?mode ?nargs env p in
-    Tvar.f_subst ~freshen:true op.op_tparams tys f
+    Tvar.f_subst ~freshen:true op.op_tparams.tyvars tys.types f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2792,7 +2792,7 @@ module Ax = struct
   let instantiate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Tvar.f_subst ~freshen:true ax.ax_tparams tys f
+        Tvar.f_subst ~freshen:true ax.ax_tparams.tyvars tys f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -2807,15 +2807,15 @@ module Algebra = struct
   let bind_ring ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Ring cr) env.env_tci }
+        TypeClass.bind_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Ring cr) env.env_tci }
 
   let bind_field ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
-        TypeClass.bind_instance ([], ty) (`Field cr) env.env_tci }
+        TypeClass.bind_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Field cr) env.env_tci }
 
-  let add_ring  ty cr lc env = TypeClass.add_instance ([], ty) (`Ring  cr) lc env
-  let add_field ty cr lc env = TypeClass.add_instance ([], ty) (`Field cr) lc env
+  let add_ring  ty cr lc env = TypeClass.add_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Ring  cr) lc env
+  let add_field ty cr lc env = TypeClass.add_instance ({ EcDecl.idxvars = []; tyvars = [] }, ty) (`Field cr) lc env
 end
 
 (* -------------------------------------------------------------------- *)

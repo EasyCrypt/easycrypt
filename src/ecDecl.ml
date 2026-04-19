@@ -75,7 +75,7 @@ let abs_tydecl ?(params : ty_pctor = `Int 0) (lc : locality) =
 
 (* -------------------------------------------------------------------- *)
 let ty_instantiate (params : ty_params) (args : ty list) (ty : ty) =
-  let subst = CS.Tvar.init params args in
+  let subst = CS.Tvar.init params.tyvars args in
   CS.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
@@ -201,24 +201,15 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op
-  ?(clinline  : bool = false)
-  ?(unfold    : int option)
-  ~(opaque    : opopaque)
-  ~(locality  : locality)
-  ~(typarams  : typarams)
-  ~(idxparams : idxparams)
-  ~(resty     : ty)
-   (kind      : _)
-=
-  { op_params   = tparams
-  ; op_ty       = ty
-  ; op_kind     = kind
-  ; op_loca     = lc
-  ; op_opaque   = opaque
-  ; op_clinline = clinline
-  ; op_unfold   = unfold
-  }
+let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
+  op_tparams  = tparams;
+  op_ty       = ty;
+  op_kind     = kind;
+  op_loca     = lc;
+  op_opaque   = opaque;
+  op_clinline = clinline;
+  op_unfold   = unfold;
+}
 
 let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let kind = OB_pred body in
@@ -228,18 +219,9 @@ let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
 let optransparent : opopaque =
   { smt = false; reduction = false; }
 
-let mk_op
-  ?(clinline  : bool option)
-  ?(unfold    : int option)
-  ~(opaque    : opopaque)
-  ~(locality  : locality)
-  ?(typarams  : typarams)
-  ?(idxparams : idxparams)
-  ~(resty     : ty)
-   (body      : opbody option)
-=
-  gen_op
-    ?clinline ?unfold ~opaque ~locality ?typarams ?idxparams ~resty (OB_oper body)
+let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
+  let kind = OB_oper body in
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -287,7 +269,7 @@ let axiomatized_op
   : axiom
 =
   let axbd, axpm =
-    let bdpm = tparams in
+    let bdpm = tparams.tyvars in
     let axpm = List.map EcIdent.fresh bdpm in
       (CS.Tvar.f_subst ~freshen:true bdpm (List.map EcTypes.tvar axpm) axbd,
        axpm)
@@ -307,7 +289,7 @@ let axiomatized_op
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
-  { ax_tparams = axpm;
+  { ax_tparams = { idxvars = []; tyvars = axpm };
     ax_spec    = axspec;
     ax_kind    = `Axiom (Ssym.empty, false);
     ax_loca    = lc;

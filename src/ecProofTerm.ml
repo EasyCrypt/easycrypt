@@ -225,7 +225,7 @@ let pt_of_uglobal_r ptenv p =
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
   let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ.tyvars in
 
   { ptev_env = ptenv;
     ptev_pt  = ptglobal ~tys:typ p;
@@ -448,7 +448,7 @@ let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
   match fp with
   | ([], x) when LDecl.hyp_exists x hyps && not hastyp ->
       let (x, fp) = LDecl.hyp_by_name x hyps in
-        Some (`Local x, ([], fp))
+        Some (`Local x, ({ EcDecl.idxvars = []; tyvars = [] }, fp))
 
   | _ ->
     match EcEnv.Ax.lookup_opt fp (LDecl.toenv hyps) with
@@ -515,7 +515,7 @@ let process_named_pterm pe (tvi, fp) =
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
   let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ.tyvars in
 
   (p, (typ, ax))
 

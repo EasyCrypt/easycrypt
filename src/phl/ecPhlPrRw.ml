@@ -86,7 +86,7 @@ let pr_sum env pr =
 
   let prx =
     EcFol.f_app
-      (EcFol.f_op EcCoreLib.CI_Sum.p_sum [ xty ]
+      (EcFol.f_op EcCoreLib.CI_Sum.p_sum ~tyargs:[ xty ]
          (EcTypes.tfun (EcTypes.tfun xty EcTypes.treal) EcTypes.treal))
       [ EcFol.f_lambda [ (x, GTty xty) ] prx ]
       EcTypes.treal
@@ -112,7 +112,7 @@ let p_BRA_big = EcPath.fromqsymbol (p_BRA, "big")
 let destr_pr_has pr =
   let m = pr.pr_event.m in
   match pr.pr_event.inv.f_node with
-  | Fapp ({ f_node = Fop(op, [ty_elem]) }, [f_f; f_l]) ->
+  | Fapp ({ f_node = Fop(op, { indices = []; types = [ty_elem] }) }, [f_f; f_l]) ->
       if EcPath.p_equal p_list_has op then
         Some(ty_elem, {m;inv=f_f}, {m;inv=f_l})
       else None
@@ -132,7 +132,7 @@ let pr_has_le f_pr =
   let f_fsum = f_lambda [idx, GTty ty_elem] f_pr1 in
   let f_sum =
     (* FIXME: Ensure that `f_l` does not use its memory *)
-    f_app (f_op p_BRA_big [ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l.inv] EcTypes.treal in
+    f_app (f_op p_BRA_big ~tyargs:[ty_elem] EcTypes.treal) [f_predT ty_elem; f_fsum; f_l.inv] EcTypes.treal in
   f_real_le f_pr f_sum
 
 (* -------------------------------------------------------------------- *)

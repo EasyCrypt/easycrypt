@@ -194,6 +194,7 @@ let tc1_process_Xhl_formula_xreal tc pf =
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (pe : proofenv) (typ : EcDecl.ty_params) (tvi : tvar_inst option) =
+  let typ = typ.tyvars in
   match tvi with
   | None -> ()
 
