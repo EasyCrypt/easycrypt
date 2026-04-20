@@ -136,24 +136,65 @@ consistency between equal canonical forms.
   elide indices at applications. Defer until parser work surfaces a
   concrete need.
 
-### Phase 2 — Substitution & FV
-1. Add `tindex_of_form : form -> tindex option` recognising
-   `Fint n (n≥0)`, `Flocal id (ty=int)`, `Fapp(p_int_add, [a;b])`,
-   `Fapp(p_int_mul, [a;b])`. Returns `None` on anything else.
-2. Implement `tindex_subst` in
-   [src/ecCoreSubst.ml:185](src/ecCoreSubst.ml#L185) and
-   [src/ecSubst.ml:153](src/ecSubst.ml#L153): for `TIVar id`, look up
-   `fs_loc`/`fs_v`; if a binding exists, `tindex_of_form` it and
-   `Option.get` (panic if the substitution invariant is violated).
-   Re-normalise at the root.
-3. Patch `targs_fv` in [src/ecAst.ml:1090](src/ecAst.ml#L1090) and
-   `Hsty.fv` in [src/ecAst.ml:1147](src/ecAst.ml#L1147) to fold over
-   `indices` (currently they only walk `types`, so
-   `Tconstr (p, {indices=[TIVar n]; types=[]})` reports empty fv —
-   wrong).
-4. Audit smart-equality fast paths in `targs_subst`: `==` survives
-   normalisation only when nothing changed *and* the input was already
-   canonical.
+### Phase 2 — Substitution & FV (DONE)
+
+#### What changed
+
+- [src/ecCoreFol.ml](src/ecCoreFol.ml) + [src/ecCoreFol.mli](src/ecCoreFol.mli)
+  — added `tindex_of_form : form -> tindex option` recognising the
+  polynomial fragment over ℕ (`Fint n` with `n ≥ 0`, int-typed
+  `Flocal`, `p_int_add`, `p_int_mul`); returns `None` on anything
+  else.
+- [src/ecCoreSubst.ml](src/ecCoreSubst.ml) — `is_ty_subst_id` now
+  also checks `Mid.is_empty s.fs_loc`, since indices share the
+  formula-locals namespace and so `fs_loc` can affect types via
+  `Tconstr` indices. `tindex_subst` consults `s.fs_loc` per `TIVar`,
+  converts via `tindex_of_form`, and panics with a descriptive
+  message if a binding is non-polynomial. `targs_subst`'s
+  short-circuit follows automatically.
+- [src/ecCoreSubst.mli](src/ecCoreSubst.mli) — exposed
+  `tindex_subst`.
+- [src/ecSubst.ml](src/ecSubst.ml) — same treatment for
+  `subst_tindex` against `sb_flocal`.
+- [src/ecAst.ml](src/ecAst.ml) — added `tindex_fv_acc` / `tindex_fv`
+  (each `TIVar` contributes its identifier with multiplicity 1).
+  `targs_fv` now folds over `indices` too. `Hsty.fv` already routed
+  through `targs_fv`, so `ty.ty_fv` now includes index-variable
+  identifiers; `Fsubst.f_subst_local`'s per-formula
+  `Mid.mem x f.f_fv` short-circuit therefore triggers correctly on
+  types whose `Tconstr` carries `TIVar x`.
+- [src/ecAst.mli](src/ecAst.mli) — exposed `tindex_fv`, `targs_fv`.
+
+#### Verified
+
+Built `dune build`, then ran an ephemeral smoke executable (deleted
+after success) covering:
+- `fv(n*m+1) = {n, m}` and `k ∉ fv`.
+- `targs_fv` carries indices.
+- `(n+1)[n:=5] ≡ 6` (constant folds via canonicalisation).
+- `(n+1)[n:=1+m] ≡ m+2` (substitution composes with normalisation).
+- `(2n+nm)[n:=5] ≡ 10+5m`.
+- `targs_subst` actually rewrites `TIVar`.
+- `ty_fv` of a `Tconstr` with an index reports the index variable.
+
+#### Notable Phase-2 design choices
+
+- `tindex_subst` does not re-canonicalise after substitution; the AST
+  may hold non-canonical shapes (e.g. `(1+m)+1` rather than `m+2`)
+  but `tindex_equal` / `tindex_hash` always canonicalise lazily, so
+  hashconsing of `Tconstr` still identifies them. Pretty-printing
+  (Phase 6) will canonicalise for display.
+- Substitution looks at `fs_loc` only; `fs_eloc` (expression-only
+  bindings) is not consulted. `f_bind_rename` writes both maps so
+  α-renaming still propagates into indices.
+
+#### Risk left for later
+
+- Audit of `f_bind_local` callers for the substitution invariant: if
+  any pass binds an `int`-typed local to a non-polynomial formula and
+  that local later appears as a `TIVar` inside a type, EasyCrypt will
+  crash mid-proof from `tindex_subst`. Worth a tactical sweep before
+  merging to main.
 
 ### Phase 3 — Parser & typing
 1. Concrete syntax for *binders*: propose `type ['n 'm] 'a vec`,

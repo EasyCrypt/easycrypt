@@ -150,8 +150,30 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
   List.fold_left2 add_tyvar s xs tys
 
 (* -------------------------------------------------------------------- *)
-let subst_tindex (_s : subst) (ti : tindex) =
-  ti
+let rec subst_tindex (s : subst) (ti : tindex) : tindex =
+  match ti with
+  | TIVar id -> begin
+      match Mid.find_opt id s.sb_flocal with
+      | None -> ti
+      | Some f ->
+          match EcCoreFol.tindex_of_form f with
+          | Some ti' -> ti'
+          | None ->
+              failwith
+                (Printf.sprintf
+                   "subst_tindex: index variable %s is bound to a \
+                    formula not expressible as a tindex"
+                   (EcIdent.name id))
+    end
+  | TIConst _ -> ti
+  | TIAdd (l, r) ->
+      let l' = subst_tindex s l in
+      let r' = subst_tindex s r in
+      if l == l' && r == r' then ti else TIAdd (l', r')
+  | TIMul (l, r) ->
+      let l' = subst_tindex s l in
+      let r' = subst_tindex s r in
+      if l == l' && r == r' then ti else TIMul (l', r')
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =

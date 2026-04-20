@@ -1204,10 +1204,24 @@ let targs_equal (ta1 : targs) (ta2 : targs) : bool =
   && List.all2 tindex_equal ta1.indices ta2.indices
   && List.all2 ty_equal ta1.types ta2.types
 
+(* Free variables of a tindex: every TIVar contributes its identifier
+   (with multiplicity 1, like other fv counters in this module). *)
+let rec tindex_fv_acc (acc : int Mid.t) (ti : tindex) : int Mid.t =
+  match ti with
+  | TIVar id     -> fv_add id acc
+  | TIConst _    -> acc
+  | TIAdd (l, r)
+  | TIMul (l, r) -> tindex_fv_acc (tindex_fv_acc acc l) r
+
+let tindex_fv (ti : tindex) : int Mid.t =
+  tindex_fv_acc Mid.empty ti
+
 let targs_fv (ta : targs) =
-  List.fold_left
-    (fun ids ty -> fv_union ids (ty_fv ty))
-    Mid.empty ta.types
+  let acc =
+    List.fold_left
+      (fun ids ty -> fv_union ids (ty_fv ty))
+      Mid.empty ta.types in
+  List.fold_left tindex_fv_acc acc ta.indices
 
 let tindex_hash (ti : tindex) =
   canonical_hash (tindex_canonicalize ti)

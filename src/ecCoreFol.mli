@@ -317,6 +317,11 @@ exception CannotTranslate
 val expr_of_ss_inv : ss_inv -> EcTypes.expr
 val expr_of_form : form -> EcTypes.expr
 
+(* Recognise a formula as a tindex polynomial. Returns [None] when the
+   formula falls outside the polynomial fragment over the naturals
+   (variables, non-negative literals, p_int_add, p_int_mul). *)
+val tindex_of_form : form -> tindex option
+
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)
 

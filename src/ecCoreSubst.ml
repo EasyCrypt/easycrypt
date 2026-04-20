@@ -156,10 +156,14 @@ let f_rem_mod (s : f_subst) (x : ident) : f_subst =
     fs_modex = Mid.remove x s.fs_modex; }
 
 (* -------------------------------------------------------------------- *)
+(* True when no substitution can affect a type. Indices share the
+   formula-locals namespace (Phase 2), so [fs_loc] participates here
+   even though it is otherwise a formula-only map. *)
 let is_ty_subst_id (s : f_subst) : bool =
      Mid.is_empty s.fs_mod
   && Muid.is_empty s.fs_u
   && Mid.is_empty s.fs_v
+  && Mid.is_empty s.fs_loc
 
 (* -------------------------------------------------------------------- *)
 let rec ty_subst (s : f_subst) (ty : ty) : ty =
@@ -182,8 +186,35 @@ let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
 
 (* -------------------------------------------------------------------- *)
-let tindex_subst (_ : f_subst) (ti : tindex) =
-  ti (* FIXME *)
+(* Substitute through a tindex polynomial. For each [TIVar id], look up
+   [id] in [fs_loc]; if a binding exists, the bound formula must be
+   expressible as a tindex (caller-side invariant — see
+   [tindex_of_form]). The result is left in syntactic form;
+   normalisation happens lazily in [tindex_equal] / [tindex_hash]. *)
+let rec tindex_subst (s : f_subst) (ti : tindex) : tindex =
+  match ti with
+  | TIVar id -> begin
+      match Mid.find_opt id s.fs_loc with
+      | None -> ti
+      | Some f ->
+          match tindex_of_form f with
+          | Some ti' -> ti'
+          | None ->
+              failwith
+                (Printf.sprintf
+                   "tindex_subst: index variable %s is bound to a \
+                    formula not expressible as a tindex"
+                   (EcIdent.name id))
+    end
+  | TIConst _ -> ti
+  | TIAdd (l, r) ->
+      let l' = tindex_subst s l in
+      let r' = tindex_subst s r in
+      if l == l' && r == r' then ti else TIAdd (l', r')
+  | TIMul (l, r) ->
+      let l' = tindex_subst s l in
+      let r' = tindex_subst s r in
+      if l == l' && r == r' then ti else TIMul (l', r')
 
 (* -------------------------------------------------------------------- *)
 let targs_subst (s : f_subst) (ta : targs) : targs =

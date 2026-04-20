@@ -1088,6 +1088,29 @@ let expr_of_form f =
   in aux f
 
 (* -------------------------------------------------------------------- *)
+(* Recognise a formula as a tindex polynomial. Returns Some ti when
+   [f] is built only from non-negative integer literals, int-typed
+   Flocal occurrences, p_int_add and p_int_mul applications. Returns
+   None otherwise. *)
+let rec tindex_of_form (f : form) : tindex option =
+  match f.f_node with
+  | Fint n when EcBigInt.sign n >= 0 ->
+      Some (TIConst n)
+  | Flocal id when ty_equal f.f_ty tint ->
+      Some (TIVar id)
+  | Fapp ({ f_node = Fop (p, _) }, [a; b])
+      when EcPath.p_equal p EcCoreLib.CI_Int.p_int_add ->
+      Option.bind (tindex_of_form a) (fun ta ->
+      Option.bind (tindex_of_form b) (fun tb ->
+      Some (TIAdd (ta, tb))))
+  | Fapp ({ f_node = Fop (p, _) }, [a; b])
+      when EcPath.p_equal p EcCoreLib.CI_Int.p_int_mul ->
+      Option.bind (tindex_of_form a) (fun ta ->
+      Option.bind (tindex_of_form b) (fun tb ->
+      Some (TIMul (ta, tb))))
+  | _ -> None
+
+(* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)
 type mem_pr = EcMemory.memory * form
 
