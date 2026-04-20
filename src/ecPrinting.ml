@@ -775,6 +775,37 @@ let is_pstop name =
   String.length name > 0 && name.[0] = '%'
 
 (* -------------------------------------------------------------------- *)
+(* Pretty-print a tindex polynomial. Precedence: `*` binds tighter
+   than `+`. Atoms (variables, constants, parenthesised expressions)
+   never need parentheses; sums and products inherit their level. *)
+let rec pp_tindex_atom (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIVar id   -> Format.fprintf fmt "%s" (PPEnv.local_symb ppe id)
+  | TIUnivar u -> Format.fprintf fmt "?#%d" u
+  | TIConst n  -> Format.fprintf fmt "%s" (EcBigInt.to_string n)
+  | TIAdd _ | TIMul _ ->
+      Format.fprintf fmt "(%a)" (pp_tindex_sum ppe) ti
+
+and pp_tindex_prod (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIMul (l, r) ->
+      Format.fprintf fmt "%a * %a"
+        (pp_tindex_prod ppe) l
+        (pp_tindex_atom ppe) r
+  | _ -> pp_tindex_atom ppe fmt ti
+
+and pp_tindex_sum (ppe : PPEnv.t) fmt (ti : tindex) =
+  match ti with
+  | TIAdd (l, r) ->
+      Format.fprintf fmt "%a + %a"
+        (pp_tindex_sum ppe) l
+        (pp_tindex_prod ppe) r
+  | _ -> pp_tindex_prod ppe fmt ti
+
+let pp_tindex (ppe : PPEnv.t) fmt (ti : tindex) =
+  pp_tindex_sum ppe fmt ti
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r
   (ppe   : PPEnv.t)
   (outer : opprec * iassoc)
@@ -794,23 +825,29 @@ let rec pp_type_r
         maybe_paren outer t_prio_tpl pp fmt tys
 
   | Tconstr (name, tyargs) -> begin
-      let pp fmt (name, tyargs) =
-        match tyargs with
+      let pp_idx fmt =
+        match tyargs.indices with
+        | [] -> ()
+        | is ->
+            Format.fprintf fmt "<:%a>"
+              (pp_list ",@ " (pp_tindex ppe)) is
+      in
+      let pp fmt (name, tys) =
+        match tys with
         | [] ->
-            pp_tyname ppe fmt name
+            Format.fprintf fmt "%a%t" (pp_tyname ppe) name pp_idx
 
         | [x] ->
-            Format.fprintf fmt "%a %a"
+            Format.fprintf fmt "%a %a%t"
               (pp_type_r ppe (t_prio_name, `Left)) x
-              (pp_tyname ppe) name
+              (pp_tyname ppe) name pp_idx
 
         | xs ->
             let subpp = pp_type_r ppe (min_op_prec, `NonAssoc) in
-              Format.fprintf fmt "%a %a"
+              Format.fprintf fmt "%a %a%t"
                 (pp_paren (pp_list ",@ " subpp)) xs
-                (pp_tyname ppe) name
+                (pp_tyname ppe) name pp_idx
       in
-        (* Phase 0: indices not yet pretty-printed *)
         maybe_paren outer t_prio_name pp fmt (name, tyargs.types)
     end
 

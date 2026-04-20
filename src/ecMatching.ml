@@ -681,8 +681,10 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();
-          (* Phase 0: indices not yet supported here *)
-          assert (List.is_empty tys1.indices && List.is_empty tys2.indices);
+          if List.compare_lengths tys1.indices tys2.indices <> 0 then
+            failure ();
+          if not (List.all2 tindex_equal tys1.indices tys2.indices) then
+            failure ();
           try  List.iter2 (EcUnify.unify env ue) tys1.types tys2.types
           with EcUnify.UnificationFailure _ -> failure ()
       end

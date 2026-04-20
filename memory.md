@@ -443,11 +443,50 @@ in [src/ecReduction.ml:796](src/ecReduction.ml#L796),
 [src/ecMatching.ml:685](src/ecMatching.ml#L685). These are not on
 the SMT path — they belong in the Phase-6 polish pass.
 
-### Phase 6 — Polish
-1. Pretty-printer for indices in `EcPrinting` (canonical form).
-2. Reduction error messages should print both normalised indices on
-   mismatch.
-3. `CHANGELOG`.
+### Phase 6 — Polish (DONE)
+
+#### What changed
+
+- [src/ecPrinting.ml](src/ecPrinting.ml) — new `pp_tindex_atom` /
+  `pp_tindex_prod` / `pp_tindex_sum` / `pp_tindex` with
+  `*`-tighter-than-`+` precedence. `pp_type_r`'s `Tconstr` branch
+  now emits a `<:e, ...>` suffix when the type application carries
+  indices. Errors and transcripts that formerly printed `'a vec`
+  for `vec<:n>` (dropping the index entirely, a Phase-0 placeholder)
+  now show `'a vec<:n>`.
+- [src/ecReduction.ml](src/ecReduction.ml) — the Phase-0
+  `assert (List.is_empty ta.indices)` in user-rewrite-rule matching
+  (around line 796) becomes `if not empty then raise NotReducible`.
+  Indexed-op heads in a rewrite rule no longer crash; they just
+  fail to match.
+- [src/ecMatching.ml](src/ecMatching.ml) — the Phase-0 assert in
+  `Fop` pattern matching (line 685) becomes a proper length +
+  polynomial-equality check, with a clean `failure ()` on mismatch.
+
+#### Left as-is (deliberate)
+
+- The two asserts in
+  [src/ecInductive.ml:161](src/ecInductive.ml#L161) and
+  [src/ecInductive.ml:181](src/ecInductive.ml#L181) — they guard a
+  recursive-positivity case where the type being defined references
+  itself. Since Phase-3 Slice-A refuses indexed binders on
+  datatype/record declarations, the self-reference cannot carry
+  indices; the asserts are "should never happen" internal-invariant
+  guards.
+- `IndexMismatch` error messages still use `EcTypes.dump_tindex`
+  (the internal serialisation). Swapping to `EcPrinting.pp_tindex`
+  would require ecUserMessages to gain a `PPEnv` dependency, which
+  is out of proportion for an edge-case message. Acceptable for now.
+- `CHANGELOG` update: out of scope, that's release admin.
+
+#### Known remaining gaps (documented but not scheduled)
+
+- Explicit index-instantiation syntax at op call sites
+  (`f<:idx, ty>`). Tests that need this rely on inference.
+- Reaching into a cloned theory's ops whose signature was touched
+  by an indexed-type override (Phase-4 note).
+- Indexed types in SMT translation (Phase-5 punt).
+- Indexed datatypes / records (Phase-3 Slice-A refusal).
 
 ## Critical path & open risks
 

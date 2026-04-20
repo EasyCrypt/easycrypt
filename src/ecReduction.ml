@@ -793,7 +793,9 @@ let reduce_user_gen simplify ri env hyps f =
         | ({ f_node = Fop (p, ta) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          assert (List.is_empty ta.indices);
+          (* User rewrite-rule patterns don't yet carry index args.
+             Rather than crash, treat indexed-op heads as non-matching. *)
+          if not (List.is_empty ta.indices) then raise NotReducible;
 
           let tys' = List.map (Tvar.subst tvi) tys' in
 
