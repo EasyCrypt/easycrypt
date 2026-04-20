@@ -416,10 +416,32 @@ lists.
   (`f<:idx, ty>`) yet; tests that need index-passing at the call
   site rely on inference. A Phase-6 polish could add this.
 
-### Phase 5 — SMT gating
-Replace the `assert (List.is_empty tys.indices)` calls in
-[src/ecSmt.ml](src/ecSmt.ml) with a clean "indexed types not yet
-supported by SMT" error.
+### Phase 5 — SMT gating (DONE)
+
+Replaced the two `assert (List.is_empty *.indices)` panics in
+[src/ecSmt.ml](src/ecSmt.ml) (`trans_ty` for `Tconstr`,
+`trans_app` for `Fop`) with `raise CanNotTranslate`. Hoisted the
+`CanNotTranslate` exception declaration above `trans_ty` so both
+call sites are in scope. Wrapped `check`'s `init` and the inner
+`make_task` call in `try/with CanNotTranslate` handlers — the user
+now sees a `SMT: skipped goal containing constructs not yet
+exported to Why3 (e.g. indexed types)` warning followed by
+`cannot prove goal`, rather than an anomaly crash.
+
+Verified: `lemma … (x y : 'a vec<:1>) : x = y \/ x <> y by smt()`
+fails cleanly.
+
+Out of scope (per the original Phase-0 punt): actually translating
+indexed types to Why3 — would need monomorphisation per concrete
+index used in the goal, or a polymorphic Why3 export taking int
+arguments.
+
+Other vestigial `assert (List.is_empty *.indices)` panics survive
+in [src/ecReduction.ml:796](src/ecReduction.ml#L796),
+[src/ecInductive.ml:161](src/ecInductive.ml#L161),
+[src/ecInductive.ml:181](src/ecInductive.ml#L181),
+[src/ecMatching.ml:685](src/ecMatching.ml#L685). These are not on
+the SMT path — they belong in the Phase-6 polish pass.
 
 ### Phase 6 — Polish
 1. Pretty-printer for indices in `EcPrinting` (canonical form).

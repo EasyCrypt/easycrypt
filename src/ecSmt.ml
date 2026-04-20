@@ -365,6 +365,12 @@ let mk_tglob genv m =
     ty
 
 (* -------------------------------------------------------------------- *)
+(* Raised when a fragment of an EasyCrypt formula or type cannot be
+   represented in the Why3 task. Caught by the SMT-call orchestration
+   to skip the goal cleanly rather than crash. *)
+exception CanNotTranslate
+
+(* -------------------------------------------------------------------- *)
 let rec trans_ty ((genv, lenv) as env) ty =
   match ty.ty_node with
   | Tglob   mp ->
@@ -375,8 +381,11 @@ let rec trans_ty ((genv, lenv) as env) ty =
   | Ttuple  ts-> wty_tuple genv (trans_tys env ts)
 
   | Tconstr (p, tys) ->
-      (* Phase 0: indices not yet supported by SMT *)
-      assert (List.is_empty tys.indices);
+      (* Indexed types are not yet exported to Why3 — bail cleanly so
+         the SMT orchestration falls back to "cannot dispatch this
+         goal" rather than crashing on an [assert]. *)
+      if not (List.is_empty tys.indices) then
+        raise CanNotTranslate;
       let id = trans_pty genv p in
       WTy.ty_app id (trans_tys env tys.types)
 
@@ -473,7 +482,6 @@ let trans_memtype ((genv, _) as env) mt =
     wty_tuple genv [ty; ty_mem]
 
 (* -------------------------------------------------------------------- *)
-exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
   let lenv, wty =
     match xty with
@@ -713,8 +721,11 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       trans_fun env bds body args
 
   | Fop (p, ts) ->
-      (* Phase 0: indices not yet supported by SMT *)
-      assert (List.is_empty ts.indices);
+      (* See note on Tconstr in [trans_ty] — indexed-op signatures
+         carry indices through their type arguments, which we cannot
+         yet translate. *)
+      if not (List.is_empty ts.indices) then
+        raise CanNotTranslate;
       let wop = trans_op genv p in
       let tys = List.map (trans_ty (genv,lenv)) ts.types in
       apply_wop genv wop tys args
@@ -1702,7 +1713,19 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
         "%a@." Why3.Pretty.print_task task)
       (fun () -> close_out stream) in
 
-  let env,hyps,tenv,decl = init hyps concl in
+  (* If the goal contains anything we cannot translate to Why3
+     (currently: indexed types), bail out with [false] — the user
+     will see the standard "no provers" failure rather than a crash. *)
+  match
+    try Some (init hyps concl)
+    with CanNotTranslate ->
+      notify |> oiter (fun notify -> notify `Warning (lazy
+        "SMT: skipped goal containing constructs not yet exported \
+         to Why3 (e.g. indexed types)"));
+      None
+  with
+  | None -> false
+  | Some (env,hyps,tenv,decl) ->
 
   let execute_task toadd =
     if pi.P.pr_selected then begin
@@ -1716,7 +1739,15 @@ let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
         (lazy (Buffer.contents buffer)))
     end;
 
-    let task = make_task tenv toadd decl in
+    (* An added hypothesis may itself mention an indexed type — skip
+       it cleanly the same way the goal-level path does. *)
+    let task =
+      try Some (make_task tenv toadd decl)
+      with CanNotTranslate -> None
+    in
+    match task with
+    | None -> Some false
+    | Some task ->
     let tkid = Counter.next cnt in
 
     let dumpin_opt =
