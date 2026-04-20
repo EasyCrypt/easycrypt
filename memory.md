@@ -292,6 +292,68 @@ after success) covering:
   `clone with`, plus a way to substitute indices through the cloned
   declarations.
 
+### Phase 3.5 — Index inference at op-application sites (DONE)
+
+Added the `TIUnivar`-based machinery that Phase 3 deferred. Without
+this, indexed ops could be *declared* but not *called* — the unifier
+had no way to instantiate an op's index parameter against the
+caller's index expression.
+
+#### What changed
+
+- [src/ecAst.ml](src/ecAst.ml) + [.mli](src/ecAst.mli) — new
+  `TIUnivar of EcUid.uid` variant on `tindex`. The canonical-form
+  monomial key is now `tindex_var = TVVar of EcIdent.t | TVUni of
+  EcUid.uid`, so univars are first-class atoms in the polynomial.
+  New helpers `tindex_naked_univar` (detects `TIUnivar u` modulo
+  canonicalisation) and `tindex_occurs_univar` (occurs check).
+  `tindex_canonicalize`, `tindex_fv_acc`, `dump_tindex` extended.
+- [src/ecCoreSubst.ml](src/ecCoreSubst.ml) +
+  [.mli](src/ecCoreSubst.mli) — `f_subst` gains `fs_idx : tindex
+  Mid.t` (op-application instantiation, ident → tindex) and `fs_iu :
+  tindex Muid.t` (univar resolution after unification).
+  `tindex_subst` consults both.
+  **Critical fix**: `ty_subst`'s `Tconstr` case now substitutes
+  through `targs.indices` directly; the previous `ty_map` catch-all
+  left them untouched, which silently dropped the op-application
+  index substitution. This was the immediate cause of every "no
+  matching operator" error on indexed op calls.
+- [src/ecUnify.ml](src/ecUnify.ml) + [.mli](src/ecUnify.mli) —
+  `unienv_r` gains `ue_iuf : tindex Muid.t` (assignments) and
+  `ue_iuf_alloc : Suid.t` (alloc tracking, for the close-time
+  check). `unify_core` rewritten to take a `unienv` directly and
+  handle a new `IxUni` work-list case. `pb` extended to
+  `[ TyUni | IxUni ]`. `idx_fresh` allocates fresh TIUnivars;
+  `openidx` produces the ident → univar substitution map; `openty_r`
+  threads it. `closed`/`close` now also require all index univars
+  resolved; new `iu_close` / `iu_assubst` expose the assignment map.
+- [src/ecTyping.ml](src/ecTyping.ml) + [.mli](src/ecTyping.mli) —
+  `unify_or_fail` handles `IxUni`; new `IndexMismatch` tyerror with
+  a printer in [src/ecUserMessages.ml](src/ecUserMessages.ml).
+- [src/ecTypes.mli](src/ecTypes.mli) — exposed `dump_tindex`.
+- [tests/indexed-types.ec](tests/indexed-types.ec) — extended with
+  the polynomial-equality regression: single-call `cons`, the
+  chained `concat (cons x ys) zs`, two variants annotated with
+  `(n+1)+m` vs `n+(1+m)` proving normal-form equality across
+  associativity.
+
+#### MVP scope
+
+- **Handled**: "naked `TIUnivar` ≟ arbitrary polynomial"
+  (with occurs check), and canonical-equality after univar
+  resolution. Covers the common chained-op pattern.
+- **Not handled**: general polynomial unification.
+  `?u + 1 ≟ n` would need to invert subtraction; refused with
+  `IndexMismatch`.
+
+#### Verified
+
+55 declarations in `tests/indexed-types.ec` compile, including
+`single`, `test1` (`(n+1)+m`) and `test2` (`n+(1+m)`).
+Negative case (`vec<:n+2>` annotated as the result of `cons x ys`)
+errors out cleanly (with a slightly misleading "no matching
+operator" message — Phase-6 polish issue).
+
 ### Phase 4 — Theories & smoke tests
 1. Add a focused `.ec` test exercising:
     - declaration of an indexed type and indexed op
@@ -300,6 +362,10 @@ after success) covering:
     - cloning with index instantiation
 2. Recommend leaving `theories/Array.ec` etc. untouched for the first
    landing.
+
+Note: Phase-3.5's regression already covers items 1.a and 1.b.
+Phase 4 may collapse to "extend the regression with cloning once
+that's supported" plus the optional Array.ec migration.
 
 ### Phase 5 — SMT gating
 Replace the `assert (List.is_empty tys.indices)` calls in

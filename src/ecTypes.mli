@@ -29,6 +29,7 @@ module Hty : EcMaps.EHashtbl.S with type key = ty
 type dom = ty list
 
 val dump_ty : ty -> string
+val dump_tindex : tindex -> string
 
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int

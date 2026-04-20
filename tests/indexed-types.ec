@@ -31,3 +31,24 @@ type [n m] 'a my_pair = 'a vec<:n+m>.
 op  ix_op  [n 'a] (xs : 'a vec<:n>) : 'a vec<:n+1>.
 pred ix_pr [n 'a] : 'a vec<:n>.
 axiom ix_ax [n 'a] : true.
+
+(* Phase-3.5 — index inference at op-application sites.
+   Allocates fresh TIUnivars for each idxvar of the op being called
+   and unifies them against the call site via polynomial-normal-form
+   equality. *)
+op concat [n m 'a] (xs : 'a vec<:n>) (ys : 'a vec<:m>) : 'a vec<:n+m>.
+op cons   [n 'a]   (x : 'a) (xs : 'a vec<:n>) : 'a vec<:n+1>.
+
+(* Direct call: ?u_n in cons unifies with caller's n. *)
+op single [n 'a] (x : 'a) (ys : 'a vec<:n>) : 'a vec<:n+1> = cons x ys.
+
+(* Annotated result type identical to the inferred one. *)
+op test1 [n m 'a] (x : 'a) (ys : 'a vec<:n>) (zs : 'a vec<:m>)
+  : 'a vec<:(n+1)+m>
+  = concat (cons x ys) zs.
+
+(* Same body, but the annotated result type differs by associativity:
+   (n+1)+m vs n+(1+m). Polynomial normalisation makes them equal. *)
+op test2 [n m 'a] (x : 'a) (ys : 'a vec<:n>) (zs : 'a vec<:m>)
+  : 'a vec<:n+(1+m)>
+  = concat (cons x ys) zs.

@@ -138,6 +138,7 @@ type tyerror =
 | InvalidTypeAppl        of qsymbol * int * int
 | InvalidIndexAppl       of qsymbol * int * int
 | UnboundIndexVariable   of symbol
+| IndexMismatch          of tindex * tindex
 | DuplicatedTyVar
 | DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol
@@ -209,6 +210,8 @@ let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 =
        let tyinst = ty_subst (Tuni.subst uidmap) in
        tyerror loc env (TypeMismatch ((tyinst ty1, tyinst ty2),
                                       (tyinst  t1, tyinst  t2)))
+    | `IxUni (i1, i2) ->
+       tyerror loc env (IndexMismatch (i1, i2))
 
 (* -------------------------------------------------------------------- *)
 let add_glob (m:Sx.t) (x:prog_var) : Sx.t =

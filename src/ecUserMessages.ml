@@ -299,6 +299,12 @@ end = struct
     | UnboundIndexVariable name ->
         msg "unbound index variable: `%s'" name
 
+    | IndexMismatch (i1, i2) ->
+        msg "cannot unify indices `%s' and `%s' (only naked-univar \
+             assignment is supported; full polynomial unification \
+             is out of scope)"
+          (EcTypes.dump_tindex i1) (EcTypes.dump_tindex i2)
+
     | DuplicatedTyVar ->
         msg "a type variable appear at least twice"
 

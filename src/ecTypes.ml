@@ -45,14 +45,17 @@ let rec dump_tindex (ti : tindex) =
   | TIVar x ->
     EcIdent.tostring_internal x
 
+  | TIUnivar u ->
+    Format.sprintf "?#%d" u
+
   | TIConst i ->
     EcBigInt.to_string i
 
-  | TIAdd (l, r) -> 
+  | TIAdd (l, r) ->
     Format.sprintf "(%s + %s)" (dump_tindex l) (dump_tindex r)
 
   | TIMul (l, r) ->
-    Format.sprintf "(%s + %s)" (dump_tindex l) (dump_tindex r)
+    Format.sprintf "(%s * %s)" (dump_tindex l) (dump_tindex r)
 
 (* -------------------------------------------------------------------- *)
 let rec dump_ty (ty : ty) =

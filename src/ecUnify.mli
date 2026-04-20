@@ -6,7 +6,7 @@ open EcTypes
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
-exception UnificationFailure of [`TyUni of ty * ty]
+exception UnificationFailure of [`TyUni of ty * ty | `IxUni of tindex * tindex]
 exception UninstantiateUni
 
 type unienv
@@ -33,6 +33,9 @@ module UniEnv : sig
   val closed     : unienv -> bool
   val close      : unienv -> ty Muid.t
   val assubst    : unienv -> ty Muid.t
+  (* Index-univar resolved assignment map (Phase 3.5). *)
+  val iu_close   : unienv -> tindex Muid.t
+  val iu_assubst : unienv -> tindex Muid.t
   val tparams    : unienv -> ty_params
 end
 

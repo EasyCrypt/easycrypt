@@ -13,7 +13,7 @@ module Sp = EcPath.Sp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
-type pb = [ `TyUni of ty * ty ]
+type pb = [ `TyUni of ty * ty | `IxUni of tindex * tindex ]
 
 exception UnificationFailure of pb
 exception UninstantiateUni
@@ -71,25 +71,71 @@ module UnifyCore = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let unify_core (env : EcEnv.env) (uf : UF.t) pb =
+type unienv_r = {
+  ue_uf       : UF.t;
+  ue_named    : EcIdent.t Mstr.t;
+  ue_decl     : EcIdent.t list;
+  ue_closed   : bool;
+  (* Indices live in their own namespace, separate from type variables.
+     They are always closed (declared up front, no on-demand creation). *)
+  ue_idxnamed : EcIdent.t Mstr.t;
+  ue_idxdecl  : EcIdent.t list;
+  (* Index-univar machinery (Phase 3.5). [ue_iuf] holds assignments for
+     resolved univars; [ue_iuf_alloc] tracks the set of all index uids
+     ever allocated, so [close] can detect leftover unresolved ones. *)
+  ue_iuf       : tindex Muid.t;
+  ue_iuf_alloc : Suid.t;
+}
+
+type unienv = unienv_r ref
+
+(* -------------------------------------------------------------------- *)
+(* Index-univar helpers — defined at top level so [unify_core] can use
+   them. All operate on a [unienv ref]. *)
+
+let resolve_tindex (ue : unienv) : tindex -> tindex =
+  let rec doit ti =
+    match ti with
+    | TIUnivar u -> begin
+        match Muid.find_opt u (!ue).ue_iuf with
+        | None    -> ti
+        | Some ti -> doit ti
+      end
+    | TIVar _ | TIConst _ -> ti
+    | TIAdd (l, r) ->
+        let l' = doit l in
+        let r' = doit r in
+        if l == l' && r == r' then ti else TIAdd (l', r')
+    | TIMul (l, r) ->
+        let l' = doit l in
+        let r' = doit r in
+        if l == l' && r == r' then ti else TIMul (l', r')
+  in doit
+
+(* -------------------------------------------------------------------- *)
+let unify_core (env : EcEnv.env) (ue : unienv) (pb : pb) =
   let failure () = raise (UnificationFailure pb) in
 
-  let uf = ref uf in
-  let pb = let x = Queue.create () in Queue.push pb x; x in
+  let pb_q = let x = Queue.create () in Queue.push pb x; x in
+  let push p = Queue.push p pb_q in
+
+  let get_uf  ()  = (!ue).ue_uf in
+  let set_uf  u   = ue := { !ue with ue_uf  = u } in
+  let upd_uf  f   = set_uf (f (get_uf ())) in
 
   let ocheck i t =
-    let i   = UF.find i !uf in
+    let i   = UF.find i (get_uf ()) in
     let map = Hint.create 0 in
 
     let rec doit t =
       match t.ty_node with
       | Tunivar i' -> begin
-          let i' = UF.find i' !uf in
+          let i' = UF.find i' (get_uf ()) in
             match i' with
             | _ when i = i' -> true
             | _ when Hint.mem map i' -> false
             | _ ->
-                match UF.data i' !uf with
+                match UF.data i' (get_uf ()) with
                 | None   -> Hint.add map i' (); false
                 | Some t ->
                   match doit t with
@@ -103,21 +149,44 @@ let unify_core (env : EcEnv.env) (uf : UF.t) pb =
   in
 
   let setvar i t =
-    let (ti, effects) = UFArgs.D.union (UF.data i !uf) (Some t) in
+    let (ti, effects) = UFArgs.D.union (UF.data i (get_uf ())) (Some t) in
       if odfl false (ti |> omap (ocheck i)) then failure ();
-      List.iter (Queue.push^~ pb) effects;
-      uf := UF.set i ti !uf
+      List.iter push effects;
+      upd_uf (UF.set i ti)
+  in
 
-  and getvar t =
+  let getvar t =
     match t.ty_node with
-    | Tunivar i -> odfl t (UF.data i !uf)
+    | Tunivar i -> odfl t (UF.data i (get_uf ()))
     | _ -> t
+  in
 
+  (* Try to unify two indices. Resolves both sides through the current
+     univar assignments, canonicalises, and compares. If equal, done.
+     Otherwise tries to assign a naked univar on either side to the
+     other side (with occurs check). Anything else fails — we do not
+     attempt full polynomial unification. *)
+  let unify_ix t1 t2 =
+    let r1 = resolve_tindex ue t1 in
+    let r2 = resolve_tindex ue t2 in
+    if tindex_equal r1 r2 then () else
+    let assign u t =
+      ue := { !ue with ue_iuf = Muid.add u t (!ue).ue_iuf } in
+    match tindex_naked_univar r1 with
+    | Some u when not (tindex_occurs_univar u r2) -> assign u r2
+    | _ -> begin
+        match tindex_naked_univar r2 with
+        | Some u when not (tindex_occurs_univar u r1) -> assign u r1
+        | _ -> failure ()
+      end
   in
 
   let doit () =
-    while not (Queue.is_empty pb) do
-      match Queue.pop pb with
+    while not (Queue.is_empty pb_q) do
+      match Queue.pop pb_q with
+      | `IxUni (t1, t2) ->
+          unify_ix t1 t2
+
       | `TyUni (t1, t2) -> begin
         let (t1, t2) = (getvar t1, getvar t2) in
 
@@ -127,8 +196,11 @@ let unify_core (env : EcEnv.env) (uf : UF.t) pb =
             match t1.ty_node, t2.ty_node with
             | Tunivar id1, Tunivar id2 -> begin
                 if not (uid_equal id1 id2) then
-                  let effects = reffold (swap |- UF.union id1 id2) uf in
-                    List.iter (Queue.push^~ pb) effects
+                  let effects =
+                    let uf' = get_uf () in
+                    let (uf'', effs) = UF.union id1 id2 uf' in
+                    set_uf uf''; effs in
+                  List.iter push effects
             end
 
             | Tunivar id, _ -> setvar id t2
@@ -136,32 +208,34 @@ let unify_core (env : EcEnv.env) (uf : UF.t) pb =
 
             | Ttuple lt1, Ttuple lt2 ->
                 if List.length lt1 <> List.length lt2 then failure ();
-                List.iter2 (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb) lt1 lt2
+                List.iter2 (fun t1 t2 -> push (`TyUni (t1, t2))) lt1 lt2
 
             | Tfun (t1, t2), Tfun (t1', t2') ->
-                Queue.push (`TyUni (t1, t1')) pb;
-                Queue.push (`TyUni (t2, t2')) pb
+                push (`TyUni (t1, t1'));
+                push (`TyUni (t2, t2'))
 
             | Tconstr (p1, ta1), Tconstr (p2, ta2) when EcPath.p_equal p1 p2 ->
                 if List.compare_lengths ta1.indices ta2.indices <> 0 then failure ();
                 if List.compare_lengths ta1.types ta2.types <> 0 then failure ();
-                if not (List.all2 tindex_equal ta1.indices ta2.indices) then failure ();
                 List.iter2
-                  (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb)
+                  (fun i1 i2 -> push (`IxUni (i1, i2)))
+                  ta1.indices ta2.indices;
+                List.iter2
+                  (fun t1 t2 -> push (`TyUni (t1, t2)))
                   ta1.types ta2.types
 
             | Tconstr (p, lt), _ when EcEnv.Ty.defined p env ->
-                Queue.push (`TyUni (EcEnv.Ty.unfold p lt env, t2)) pb
+                push (`TyUni (EcEnv.Ty.unfold p lt env, t2))
 
             | _, Tconstr (p, lt) when EcEnv.Ty.defined p env ->
-                Queue.push (`TyUni (t1, EcEnv.Ty.unfold p lt env)) pb
+                push (`TyUni (t1, EcEnv.Ty.unfold p lt env))
 
             | _, _ -> failure ()
         end
       end
     done
   in
-    doit (); !uf
+    doit ()
 
 (* -------------------------------------------------------------------- *)
 let close (uf : UF.t) =
@@ -203,19 +277,6 @@ let subst_of_uf (uf : UF.t) =
 
 
 (* -------------------------------------------------------------------- *)
-type unienv_r = {
-  ue_uf       : UF.t;
-  ue_named    : EcIdent.t Mstr.t;
-  ue_decl     : EcIdent.t list;
-  ue_closed   : bool;
-  (* Indices live in their own namespace, separate from type variables.
-     They are always closed (declared up front, no on-demand creation). *)
-  ue_idxnamed : EcIdent.t Mstr.t;
-  ue_idxdecl  : EcIdent.t list;
-}
-
-type unienv = unienv_r ref
-
 type tvar_inst =
 | TVIunamed of ty list
 | TVInamed  of (EcSymbols.symbol * ty) list
@@ -244,12 +305,14 @@ module UniEnv = struct
 
   let create (vd : ty_params option) =
     let ue = {
-      ue_uf       = UF.initial;
-      ue_named    = Mstr.empty;
-      ue_decl     = [];
-      ue_closed   = false;
-      ue_idxnamed = Mstr.empty;
-      ue_idxdecl  = [];
+      ue_uf        = UF.initial;
+      ue_named     = Mstr.empty;
+      ue_decl      = [];
+      ue_closed    = false;
+      ue_idxnamed  = Mstr.empty;
+      ue_idxdecl   = [];
+      ue_iuf       = Muid.empty;
+      ue_iuf_alloc = Suid.empty;
     } in
 
     let ue =
@@ -278,6 +341,37 @@ module UniEnv = struct
     let (uf, uid) = UnifyCore.fresh ?ty (!ue).ue_uf in
       ue := { !ue with ue_uf = uf }; uid
 
+  (* Allocate a fresh index univar. Tracked in [ue_iuf_alloc] so that
+     [close] can complain if it stays unresolved. *)
+  let idx_fresh (ue : unienv) : tindex =
+    let u = EcUid.unique () in
+    ue := { !ue with ue_iuf_alloc = Suid.add u (!ue).ue_iuf_alloc };
+    TIUnivar u
+
+  (* Look up the assignment of an index univar, if any. *)
+  let idx_data (ue : unienv) (u : uid) : tindex option =
+    Muid.find_opt u (!ue).ue_iuf
+
+  (* Recursively replace TIUnivars in [ti] with their assignments
+     under the current unienv. Walks chains: if [u := TIUnivar v] and
+     [v := TIConst 5], [resolve_tindex] returns [TIConst 5]. *)
+  let rec resolve_tindex (ue : unienv) (ti : tindex) : tindex =
+    match ti with
+    | TIUnivar u -> begin
+        match idx_data ue u with
+        | None    -> ti
+        | Some ti -> resolve_tindex ue ti
+      end
+    | TIVar _ | TIConst _ -> ti
+    | TIAdd (l, r) ->
+        let l' = resolve_tindex ue l in
+        let r' = resolve_tindex ue r in
+        if l == l' && r == r' then ti else TIAdd (l', r')
+    | TIMul (l, r) ->
+        let l' = resolve_tindex ue l in
+        let r' = resolve_tindex ue r in
+        if l == l' && r == r' then ti else TIMul (l', r')
+
   let opentvi (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
     let params = params.tyvars in
     match tvi with
@@ -301,11 +395,22 @@ module UniEnv = struct
         in
           List.fold_left for1 Mid.empty params
 
+  (* Allocate a fresh index univar for each [idxvar] of [params],
+     producing the substitution map used by [openty_r]. *)
+  let openidx (ue : unienv) (params : ty_params) : tindex Mid.t =
+    List.fold_left
+      (fun s v -> Mid.add v (idx_fresh ue) s)
+      Mid.empty params.idxvars
+
   let subst_tv (subst : ty -> ty) (params : ty_params) =
     List.map (fun tv -> subst (tvar tv)) params.tyvars
 
   let openty_r (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
-    let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
+    let subst =
+      f_subst_init
+        ~tv:(opentvi ue params tvi)
+        ~idx:(openidx ue params)
+        () in
       (subst, subst_tv (ty_subst subst) params)
 
   let opentys (ue : unienv) (params : ty_params) (tvi : tvar_inst option) (tys : ty list) =
@@ -323,6 +428,9 @@ module UniEnv = struct
 
   let closed (ue : unienv) =
     UF.closed (!ue).ue_uf
+    && Suid.subset (!ue).ue_iuf_alloc
+         (Muid.fold (fun u _ s -> Suid.add u s)
+            (!ue).ue_iuf Suid.empty)
 
   let close (ue : unienv) =
     if not (closed ue) then raise UninstantiateUni;
@@ -331,6 +439,15 @@ module UniEnv = struct
   let assubst (ue : unienv) =
     subst_of_uf (!ue).ue_uf
 
+  (* Index-univar assignment map after typechecking. Use to build a
+     [f_subst] that resolves residual TIUnivars in computed types. *)
+  let iu_close (ue : unienv) : tindex Muid.t =
+    if not (closed ue) then raise UninstantiateUni;
+    (!ue).ue_iuf
+
+  let iu_assubst (ue : unienv) : tindex Muid.t =
+    (!ue).ue_iuf
+
   let tparams (ue : unienv) : ty_params =
     { idxvars = List.rev (!ue).ue_idxdecl;
       tyvars  = List.rev (!ue).ue_decl; }
@@ -338,8 +455,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) (t1 : ty) (t2 : ty) =
-  let uf = unify_core env (!ue).ue_uf (`TyUni (t1, t2)) in
-  ue := { !ue with ue_uf = uf; }
+  unify_core env ue (`TyUni (t1, t2))
 
 (* -------------------------------------------------------------------- *)
 let tfun_expected ue ?retty psig =

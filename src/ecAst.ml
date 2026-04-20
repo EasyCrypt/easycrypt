@@ -58,10 +58,11 @@ and ty_node =
   | Tfun    of ty * ty
 
 and tindex =
-  | TIVar   of EcIdent.t
-  | TIConst of EcBigInt.zint
-  | TIAdd   of tindex * tindex
-  | TIMul   of tindex * tindex
+  | TIVar    of EcIdent.t
+  | TIUnivar of EcUid.uid
+  | TIConst  of EcBigInt.zint
+  | TIAdd    of tindex * tindex
+  | TIMul    of tindex * tindex
 
 and targs = {
   indices : tindex list;
@@ -1074,9 +1075,27 @@ let pr_hash pr =
 (* normalising to a canonical sum-of-monomials.                      *)
 (* ----------------------------------------------------------------- *)
 
-(* A monomial is a sorted association list (ident, exponent) with
+(* A polynomial "variable" is either a user-bound index identifier or
+   a unification univar; both are opaque atoms inside the polynomial.
+   A monomial is a sorted association list (variable, exponent) with
    each exponent >= 1. The empty list represents the constant 1. *)
-type tindex_mono = (EcIdent.t * int) list
+type tindex_var =
+  | TVVar of EcIdent.t
+  | TVUni of EcUid.uid
+
+let tindex_var_compare (a : tindex_var) (b : tindex_var) : int =
+  match a, b with
+  | TVVar x, TVVar y -> EcIdent.id_compare x y
+  | TVUni u, TVUni v -> EcUid.uid_compare u v
+  | TVVar _, TVUni _ -> -1
+  | TVUni _, TVVar _ ->  1
+
+let tindex_var_hash (a : tindex_var) : int =
+  match a with
+  | TVVar x -> EcIdent.id_hash x
+  | TVUni u -> Why3.Hashcons.combine 1 u
+
+type tindex_mono = (tindex_var * int) list
 
 (* A polynomial in canonical form over the non-negative integers.
    Invariants:
@@ -1096,19 +1115,19 @@ let mono_compare : tindex_mono -> tindex_mono -> int =
     | [], _  -> -1
     | _ , [] -> 1
     | (x1, e1) :: t1, (x2, e2) :: t2 ->
-        let c = EcIdent.id_compare x1 x2 in
+        let c = tindex_var_compare x1 x2 in
         if c <> 0 then c else
         let c = Stdlib.compare (e1 : int) e2 in
         if c <> 0 then c else cmp t1 t2
   in cmp
 
-(* Multiply two monomials: merge by ident, sum exponents. *)
+(* Multiply two monomials: merge by variable, sum exponents. *)
 let rec mono_mul (m1 : tindex_mono) (m2 : tindex_mono) : tindex_mono =
   match m1, m2 with
   | [], _ -> m2
   | _, [] -> m1
   | (x1, e1) :: t1, (x2, e2) :: t2 ->
-      let c = EcIdent.id_compare x1 x2 in
+      let c = tindex_var_compare x1 x2 in
       if c < 0 then (x1, e1) :: mono_mul t1 m2
       else if c > 0 then (x2, e2) :: mono_mul m1 t2
       else (x1, e1 + e2) :: mono_mul t1 t2
@@ -1139,7 +1158,11 @@ let canonical_const (n : EcBigInt.zint) =
 
 let canonical_var (id : EcIdent.t) =
   { cn_konst = EcBigInt.zero;
-    cn_mons  = [([(id, 1)], EcBigInt.one)] }
+    cn_mons  = [([(TVVar id, 1)], EcBigInt.one)] }
+
+let canonical_univar (u : EcUid.uid) =
+  { cn_konst = EcBigInt.zero;
+    cn_mons  = [([(TVUni u, 1)], EcBigInt.one)] }
 
 let canonical_add (p : tindex_canonical) (q : tindex_canonical) =
   { cn_konst = EcBigInt.add p.cn_konst q.cn_konst;
@@ -1166,6 +1189,7 @@ let canonical_mul (p : tindex_canonical) (q : tindex_canonical) =
 let rec tindex_canonicalize (ti : tindex) : tindex_canonical =
   match ti with
   | TIVar id     -> canonical_var id
+  | TIUnivar u   -> canonical_univar u
   | TIConst n    -> canonical_const n
   | TIAdd (l, r) -> canonical_add (tindex_canonicalize l) (tindex_canonicalize r)
   | TIMul (l, r) -> canonical_mul (tindex_canonicalize l) (tindex_canonicalize r)
@@ -1182,10 +1206,32 @@ let canonical_equal (p : tindex_canonical) (q : tindex_canonical) =
         && eq t1 t2
   in eq p.cn_mons q.cn_mons
 
+(* Whether the canonical polynomial is a single naked TIUnivar.
+   Returns [Some u] when so; otherwise [None]. Used by the unifier
+   to detect index-equations that reduce to a univar assignment. *)
+let tindex_naked_univar (ti : tindex) : EcUid.uid option =
+  let c = tindex_canonicalize ti in
+  if not (EcBigInt.equal c.cn_konst EcBigInt.zero) then None else
+  match c.cn_mons with
+  | [(mono, coef)] when EcBigInt.equal coef EcBigInt.one -> begin
+      match mono with
+      | [(TVUni u, 1)] -> Some u
+      | _ -> None
+    end
+  | _ -> None
+
+(* Occurs check: does univar [u] appear anywhere in [ti]? *)
+let tindex_occurs_univar (u : EcUid.uid) (t : tindex) : bool =
+  let rec walk = function
+    | TIUnivar v -> EcUid.uid_equal u v
+    | TIVar _ | TIConst _ -> false
+    | TIAdd (l, r) | TIMul (l, r) -> walk l || walk r
+  in walk t
+
 let canonical_hash (p : tindex_canonical) =
   let mono_hash (m : tindex_mono) =
     Why3.Hashcons.combine_list
-      (fun (id, e) -> Why3.Hashcons.combine (EcIdent.id_hash id) e)
+      (fun (v, e) -> Why3.Hashcons.combine (tindex_var_hash v) e)
       0 m in
   let pair_hash (m, c) =
     Why3.Hashcons.combine (mono_hash m) (EcBigInt.hash c) in
@@ -1209,6 +1255,7 @@ let targs_equal (ta1 : targs) (ta2 : targs) : bool =
 let rec tindex_fv_acc (acc : int Mid.t) (ti : tindex) : int Mid.t =
   match ti with
   | TIVar id     -> fv_add id acc
+  | TIUnivar _   -> acc
   | TIConst _    -> acc
   | TIAdd (l, r)
   | TIMul (l, r) -> tindex_fv_acc (tindex_fv_acc acc l) r

@@ -130,6 +130,7 @@ type tyerror =
 | InvalidTypeAppl        of qsymbol * int * int
 | InvalidIndexAppl       of qsymbol * int * int
 | UnboundIndexVariable   of symbol
+| IndexMismatch          of tindex * tindex
 | DuplicatedTyVar
 | DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol

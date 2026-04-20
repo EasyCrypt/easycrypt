@@ -28,6 +28,8 @@ val f_subst_init :
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -72,6 +74,8 @@ module Fsubst : sig
        ?freshen:bool
     -> ?tu:ty Muid.t
     -> ?tv:ty Mid.t
+    -> ?idx:tindex Mid.t
+    -> ?iu:tindex Muid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 

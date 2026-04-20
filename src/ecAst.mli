@@ -52,10 +52,11 @@ and ty_node =
   | Tfun    of ty * ty
 
 and tindex =
-  | TIVar   of EcIdent.t
-  | TIConst of EcBigInt.zint
-  | TIAdd   of tindex * tindex
-  | TIMul   of tindex * tindex
+  | TIVar    of EcIdent.t
+  | TIUnivar of EcUid.uid
+  | TIConst  of EcBigInt.zint
+  | TIAdd    of tindex * tindex
+  | TIMul    of tindex * tindex
 
 and targs = {
   indices : tindex list;
@@ -423,6 +424,10 @@ val tindex_hash  : tindex hash
 val tindex_fv    : tindex fv
 val targs_equal  : targs  equality
 val targs_fv     : targs  fv
+
+(* Index-univar helpers used by [EcUnify]. *)
+val tindex_naked_univar : tindex -> EcUid.uid option
+val tindex_occurs_univar : EcUid.uid -> tindex -> bool
 
 val ty_equal : ty equality
 val ty_hash  : ty hash

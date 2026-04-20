@@ -165,6 +165,7 @@ let rec subst_tindex (s : subst) (ti : tindex) : tindex =
                     formula not expressible as a tindex"
                    (EcIdent.name id))
     end
+  | TIUnivar _ -> ti
   | TIConst _ -> ti
   | TIAdd (l, r) ->
       let l' = subst_tindex s l in
