@@ -473,6 +473,7 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
+  nt_idx   : psymbol list;
   nt_tv    : ptyvardecls option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
@@ -487,6 +488,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name  : psymbol;
+  ab_idx   : psymbol list;
   ab_tv    : ptyvardecls option;
   ab_args  : ptybindings;
   ab_def   : pty * pexpr;

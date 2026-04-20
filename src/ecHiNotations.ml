@@ -30,7 +30,7 @@ let trans_abbrev_opts (opts : abrvopts) =
 (* -------------------------------------------------------------------- *)
 let trans_notation_r (env : env) (nt : pnotation located) =
   let nt = nt.pl_desc and gloc = nt.pl_loc in
-  let ue = TT.transtyvars env (gloc, nt.nt_tv) in
+  let ue = TT.transtyvars ~idxparams:nt.nt_idx env (gloc, nt.nt_tv) in
 
   (* Translate bound idents and their types *)
   let bd = List.mapi (fun i (x, pty) ->
@@ -75,7 +75,7 @@ let trans_notation (env : EcEnv.env) (nt : pnotation located) =
 (* -------------------------------------------------------------------- *)
 let trans_abbrev_r (env : env) (at : pabbrev located) =
   let at = at.pl_desc and gloc = at.pl_loc in
-  let ue = TT.transtyvars env (gloc, at.ab_tv) in
+  let ue = TT.transtyvars ~idxparams:at.ab_idx env (gloc, at.ab_tv) in
   let benv, xs = TT.trans_binding env ue at.ab_args in
   let codom = TT.transty TT.tp_relax env ue (fst at.ab_def) in
   let body = TT.transexpcast benv `InOp ue codom (snd at.ab_def) in

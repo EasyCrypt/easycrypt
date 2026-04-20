@@ -882,9 +882,16 @@ let fresh_tparam (s : subst) (x : EcIdent.t) =
   (s, newx)
 
 (* -------------------------------------------------------------------- *)
+let fresh_idxparam (s : subst) (x : EcIdent.t) =
+  let newx = EcIdent.fresh x in
+  let s = { s with sb_idxvar = Mid.add x (TIVar newx) s.sb_idxvar } in
+  (s, newx)
+
+(* -------------------------------------------------------------------- *)
 let fresh_tparams (s : subst) (tparams : ty_params) =
-  let s, tyvars = List.fold_left_map fresh_tparam s tparams.tyvars in
-  (s, { tparams with tyvars })
+  let s, idxvars = List.fold_left_map fresh_idxparam s tparams.idxvars in
+  let s, tyvars  = List.fold_left_map fresh_tparam   s tparams.tyvars  in
+  (s, { idxvars; tyvars })
 
 (* -------------------------------------------------------------------- *)
 let subst_genty (s : subst) (tparams, ty) =

@@ -1974,10 +1974,12 @@ nt_bindings:
     { bd }
 
 notation:
-| locality=loc(locality) NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings?
+| locality=loc(locality) NOTATION x=loc(NOP) tvs=mixed_tyvars_decl? bd=nt_bindings?
     args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
-  { { nt_name  = x;
-      nt_tv    = tv;
+  { let (idxvars, tyvars) = odfl ([], []) tvs in
+    { nt_name  = x;
+      nt_idx   = idxvars;
+      nt_tv    = tvs |> omap (fun _ -> tyvars);
       nt_bd    = odfl [] bd;
       nt_args  = args;
       nt_codom = ofdfl (fun () -> mk_loc (loc body) PTunivar) codom;
@@ -1997,13 +1999,15 @@ abrvopts:
 | opts=bracket(abrvopt+) { opts }
 
 abbreviation:
-| locality=loc(locality) ABBREV opts=abrvopts? x=oident tyvars=tyvars_decl?
+| locality=loc(locality) ABBREV opts=abrvopts? x=oident tvs=mixed_tyvars_decl?
     args=ptybindings_decl? sty=prefix(COLON, loc(type_exp))? EQ b=expr
 
   { let sty  = sty |> ofdfl (fun () -> mk_loc (loc b) PTunivar) in
+    let (idxvars, tyvars) = odfl ([], []) tvs in
 
     { ab_name  = x;
-      ab_tv    = tyvars;
+      ab_idx   = idxvars;
+      ab_tv    = tvs |> omap (fun _ -> tyvars);
       ab_args  = odfl [] args;
       ab_def   = (sty, b);
       ab_opts  = odfl [] opts;
