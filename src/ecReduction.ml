@@ -605,6 +605,30 @@ let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
       aux env subst (es_pr es1).inv (es_pr es2).inv;
       aux env subst (es_po es1).inv (es_po es2).inv;
 
+    | FdcEquivF ef1, FdcEquivF ef2 ->
+      check_xp env subst ef1.dcef_fl ef2.dcef_fl;
+      check_xp env subst ef1.dcef_fr ef2.dcef_fr;
+      check_s env subst ef1.dcef_rl ef2.dcef_rl;
+      check_s env subst ef1.dcef_sl ef2.dcef_sl;
+      check_s env subst ef1.dcef_rr ef2.dcef_rr;
+      check_s env subst ef1.dcef_sr ef2.dcef_sr;
+      let subst = check_m_binding subst ef1.dcef_ml ef2.dcef_ml in
+      let subst = check_m_binding subst ef1.dcef_mr ef2.dcef_mr in
+      aux env subst (dcef_pr ef1).inv (dcef_pr ef2).inv;
+      aux env subst (dcef_po ef1).inv (dcef_po ef2).inv;
+
+    | FdcEquivS es1, FdcEquivS es2 ->
+      check_s env subst es1.dces_rl es2.dces_rl;
+      check_s env subst es1.dces_rr es2.dces_rr;
+      check_s env subst es1.dces_cl es2.dces_cl;
+      check_s env subst es1.dces_cr es2.dces_cr;
+      check_s env subst es1.dces_sl es2.dces_sl;
+      check_s env subst es1.dces_sr es2.dces_sr;
+      let subst = check_me_binding env subst es1.dces_ml es2.dces_ml in
+      let subst = check_me_binding env subst es1.dces_mr es2.dces_mr in
+      aux env subst (dces_pr es1).inv (dces_pr es2).inv;
+      aux env subst (dces_po es1).inv (dces_po es2).inv;
+
     | FeagerF eg1, FeagerF eg2 ->
       check_xp env subst eg1.eg_fl eg2.eg_fl;
       check_xp env subst eg1.eg_fr eg2.eg_fr;
@@ -1283,6 +1307,15 @@ let rec simplify ri env f =
       f_map (fun ty -> ty) (simplify ri env)
       (f_eagerF (eg_pr eg) eg.eg_sl eg_fl eg_fr eg.eg_sr (eg_po eg))
 
+  | FdcEquivF ef when ri.ri.modpath ->
+      let dcef_fl = EcEnv.NormMp.norm_xfun env ef.dcef_fl in
+      let dcef_fr = EcEnv.NormMp.norm_xfun env ef.dcef_fr in
+      f_map (fun ty -> ty) (simplify ri env)
+      (f_dcEquivF (dcef_pr ef)
+        ef.dcef_rl dcef_fl ef.dcef_sl
+        ef.dcef_rr dcef_fr ef.dcef_sr
+        (dcef_po ef))
+
   | Fpr pr when ri.ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun env pr.pr_fun in
       f_map (fun ty -> ty) (simplify ri env) (f_pr_r { pr with pr_fun })
@@ -1399,6 +1432,17 @@ let zpop ri side f hd =
     let (ml, mr) = (fst hs.es_ml, fst hs.es_mr) in
     f_equivS (snd hs.es_ml) (snd hs.es_mr) {ml;mr;inv=pr} hs.es_sl hs.es_sr
       {ml;mr;inv=po}
+  | Zhl {f_node = FdcEquivF ef}, [pr;po] ->
+    let (ml, mr) = (ef.dcef_ml, ef.dcef_mr) in
+    f_dcEquivF {ml;mr;inv=pr}
+      ef.dcef_rl ef.dcef_fl ef.dcef_sl
+      ef.dcef_rr ef.dcef_fr ef.dcef_sr
+      {ml;mr;inv=po}
+  | Zhl {f_node = FdcEquivS hs}, [pr;po] ->
+    let (ml, mr) = (fst hs.dces_ml, fst hs.dces_mr) in
+    f_dcEquivS (snd hs.dces_ml) (snd hs.dces_mr) {ml;mr;inv=pr}
+      hs.dces_rl hs.dces_rr hs.dces_cl hs.dces_cr
+      {ml;mr;inv=po} hs.dces_sl hs.dces_sr
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
     let (ml, mr) = (hs.eg_ml, hs.eg_mr) in
     f_eagerF {ml;mr;inv=pr}  hs.eg_sl hs.eg_fl hs.eg_fr hs.eg_sr {ml;mr;inv=po}
@@ -1580,6 +1624,32 @@ let rec conv ri env f1 f2 stk =
       let pr2 = (ts_inv_rebind (es_pr es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
       let po2 = (ts_inv_rebind (es_po es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
       conv ri env (es_pr es1).inv pr2 (zhl f1 [(es_po es1).inv] [po2] stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
+
+  | FdcEquivF ef1, FdcEquivF ef2
+      when EqTest_i.for_xp env ef1.dcef_fl ef2.dcef_fl
+        && EqTest_i.for_xp env ef1.dcef_fr ef2.dcef_fr
+        && EqTest_i.for_stmt env ef1.dcef_rl ef2.dcef_rl
+        && EqTest_i.for_stmt env ef1.dcef_sl ef2.dcef_sl
+        && EqTest_i.for_stmt env ef1.dcef_rr ef2.dcef_rr
+        && EqTest_i.for_stmt env ef1.dcef_sr ef2.dcef_sr ->
+    let pr2 = (ts_inv_rebind (dcef_pr ef2) ef1.dcef_ml ef1.dcef_mr).inv in
+    let po2 = (ts_inv_rebind (dcef_po ef2) ef1.dcef_ml ef1.dcef_mr).inv in
+    conv ri env (dcef_pr ef1).inv pr2 (zhl f1 [(dcef_po ef1).inv] [po2] stk)
+
+  | FdcEquivS es1, FdcEquivS es2
+      when EqTest_i.for_stmt env es1.dces_rl es2.dces_rl
+        && EqTest_i.for_stmt env es1.dces_rr es2.dces_rr
+        && EqTest_i.for_stmt env es1.dces_cl es2.dces_cl
+        && EqTest_i.for_stmt env es1.dces_cr es2.dces_cr
+        && EqTest_i.for_stmt env es1.dces_sl es2.dces_sl
+        && EqTest_i.for_stmt env es1.dces_sr es2.dces_sr ->
+    begin match check_me_bindings env Fsubst.f_subst_id [es1.dces_ml; es1.dces_mr] [es2.dces_ml; es2.dces_mr] with
+    | _subst ->
+      let pr2 = (ts_inv_rebind (dces_pr es2) (fst es1.dces_ml) (fst es1.dces_mr)).inv in
+      let po2 = (ts_inv_rebind (dces_po es2) (fst es1.dces_ml) (fst es1.dces_mr)).inv in
+      conv ri env (dces_pr es1).inv pr2 (zhl f1 [(dces_po es1).inv] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 

@@ -409,7 +409,7 @@ module LossLess = struct
       | FhoareF   _ | FhoareS   _
       | FeHoareF _  | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
-      | FequivF   _ | FequivS   _
+      | FequivF   _ | FequivS   _ | FdcEquivF _ | FdcEquivS _
       | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
     and auxkd (kd : quantif) : equantif =

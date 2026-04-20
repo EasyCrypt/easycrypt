@@ -198,6 +198,9 @@ and f_node =
 
   | FeagerF of eagerF
 
+  | FdcEquivF of dcEquivF
+  | FdcEquivS of dcEquivS
+
   | Fpr of pr (* hr *)
 
 (* We use the alert system for privacy because we want to
@@ -236,6 +239,36 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form;
   [@alert priv_pl "Use the accessor function `es_po` instead of the field"]
+}
+
+and dcEquivF = {
+  dcef_ml : memory;
+  dcef_mr : memory;
+  dcef_pr : form;
+  [@alert priv_pl "Use the accessor function `dcef_pr` instead of the field"]
+  dcef_rl : stmt;  (* No local program variables *)
+  dcef_sl : stmt;  (* No local program variables *)
+  dcef_fl : EcPath.xpath;
+  dcef_fr : EcPath.xpath;
+  dcef_rr : stmt;  (* No local program variables *)
+  dcef_sr : stmt;  (* No local program variables *)
+  dcef_po : form;
+  [@alert priv_pl "Use the accessor function `dcef_po` instead of the field"]
+}
+
+and dcEquivS = {
+  dces_ml : memenv;
+  dces_mr : memenv;
+  dces_pr : form;
+  [@alert priv_pl "Use the accessor function `dces_pr` instead of the field"]
+  dces_rl : stmt;
+  dces_rr : stmt;
+  dces_cl : stmt;
+  dces_cr : stmt;
+  dces_po : form;
+  [@alert priv_pl "Use the accessor function `dces_po` instead of the field"]
+  dces_sl : stmt;
+  dces_sr : stmt;
 }
 
 and sHoareF = {
@@ -445,6 +478,10 @@ val ef_pr : equivF -> ts_inv
 val ef_po : equivF -> ts_inv
 val es_pr : equivS -> ts_inv
 val es_po : equivS -> ts_inv
+val dcef_pr : dcEquivF -> ts_inv
+val dcef_po : dcEquivF -> ts_inv
+val dces_pr : dcEquivS -> ts_inv
+val dces_po : dcEquivS -> ts_inv
 val hf_pr : sHoareF -> ss_inv
 val hf_po : sHoareF -> hs_inv
 val hs_pr : sHoareS -> ss_inv
@@ -601,6 +638,12 @@ val ef_hash   : equivF hash
 
 val eqs_equal : equivS equality
 val es_hash   : equivS hash
+
+val dcef_equal : dcEquivF equality
+val dcef_hash  : dcEquivF hash
+
+val dces_equal : dcEquivS equality
+val dces_hash  : dcEquivS hash
 
 val egf_equal : eagerF equality
 val eg_hash   : eagerF hash

@@ -862,6 +862,8 @@ type sform =
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFdcEquivF of dcEquivF
+  | SFdcEquivS of dcEquivS
   | SFpr       of pr
 
   | SFother of form
@@ -902,6 +904,8 @@ let rec sform_of_form fp =
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
   | FequivS   es -> SFequivS   es
+  | FdcEquivF ef -> SFdcEquivF ef
+  | FdcEquivS es -> SFdcEquivS es
   | Fpr       pr -> SFpr       pr
 
   | Fop (op, ty) ->
@@ -1161,5 +1165,12 @@ let rec dump_f f =
      ^ "; MR = " ^ EcIdent.tostring_internal mr
      ^ "; PR = " ^ dump_f (es_pr es).inv
      ^ "; PO = " ^ dump_f (es_po es).inv
+     ^ "]"
+  | FdcEquivF _ -> "dcEquivF"
+  | FdcEquivS ({dces_ml = (ml, _); dces_mr = (mr, _)} as es) ->
+     "dcEquivS [ ML = " ^ EcIdent.tostring_internal ml
+     ^ "; MR = " ^ EcIdent.tostring_internal mr
+     ^ "; PR = " ^ dump_f (dces_pr es).inv
+     ^ "; PO = " ^ dump_f (dces_po es).inv
      ^ "]"
   | FeagerF _ -> "eagerF"

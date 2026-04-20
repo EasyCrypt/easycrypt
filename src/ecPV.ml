@@ -375,6 +375,16 @@ module PV = struct
       | FequivS es ->
           in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [(es_pr es).inv; (es_po es).inv]
 
+      | FdcEquivF ef ->
+          in_mem_scope env fv
+            [ef.dcef_ml; ef.dcef_mr]
+            [(dcef_pr ef).inv; (dcef_po ef).inv]
+
+      | FdcEquivS es ->
+          in_mem_scope env fv
+            [fst es.dces_ml; fst es.dces_mr]
+            [(dces_pr es).inv; (dces_po es).inv]
+
       | FeagerF eg ->
           in_mem_scope env fv [eg.eg_ml; eg.eg_mr] [(eg_pr eg).inv; (eg_po eg).inv]
 

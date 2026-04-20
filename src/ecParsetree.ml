@@ -249,6 +249,10 @@ and pformula_r =
   | PFehoareF  of psymbol option * pformula * pgamepath * pformula
   | PFequivF   of psymbol option * psymbol option * pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of psymbol option * psymbol option * pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
+  | PFdcEquivF of psymbol option * psymbol option * pformula
+                  * (pstmt * pgamepath * pstmt)
+                  * (pstmt * pgamepath * pstmt)
+                  * pformula
   | PFprob     of psymbol option * pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of psymbol option * pformula * pgamepath * pformula * phoarecmp * pformula
 
@@ -841,6 +845,31 @@ type phltactic =
   | Peager_fun_def
   | Peager_fun_abs   of pformula
   | Peager_call      of call_info gppterm
+
+    (* Delayed couplings *)
+  | Pdelay
+  | Pundelay
+  | Pdc_push   of oside
+  | Pdc_pop    of oside * int option
+  | Pdc_unpop  of oside * int option
+  | Pdc_conseq of pformula * pformula
+  | Pdc_case   of pformula
+  | Pdc_frame  of pformula
+  | Pdc_indep  of int * int
+  | Pdc_skip
+  | Pdc_seq    of int * int * pformula * (pstmt * pstmt) option
+  | Pdc_wp
+  | Pdc_if     of oside
+  | Pdc_while  of oside
+  | Pdc_rnd    of oside * (pformula * pformula) option
+  | Pdc_wp_side of side
+  | Pdc_sym
+  | Pdc_cond       of oside
+  | Pdc_cond_intro of oside
+  | Pdc_prod       of oside
+  | Pdc_prod_intro of oside
+  | Pdc_unroll of oside
+  | Pdc_split  of oside * pexpr
 
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)

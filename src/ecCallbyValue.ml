@@ -196,7 +196,7 @@ and norm_lambda (st : state) (f : form) =
   | FhoareF _   | FhoareS _
   | FbdHoareF _ | FbdHoareS _
   | FeHoareF _ | FeHoareS _
-  | FequivF _   | FequivS _
+  | FequivF _   | FequivS _   | FdcEquivF _ | FdcEquivS _
   | FeagerF   _ | Fpr _
 
     -> f
@@ -558,6 +558,43 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let (ml,mlt)  = norm_me s es.es_ml in
     let (mr,mrt)  = norm_me s es.es_mr in
     f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
+
+  | FdcEquivF ef ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s ef.dcef_ml));
+    assert (not (Subst.has_mem s ef.dcef_mr));
+    let dcef_pr = norm st s (dcef_pr ef).inv in
+    let dcef_po = norm st s (dcef_po ef).inv in
+    let dcef_fl = norm_xfun st s ef.dcef_fl in
+    let dcef_fr = norm_xfun st s ef.dcef_fr in
+    let dcef_rl = norm_stmt s ef.dcef_rl in
+    let dcef_sl = norm_stmt s ef.dcef_sl in
+    let dcef_rr = norm_stmt s ef.dcef_rr in
+    let dcef_sr = norm_stmt s ef.dcef_sr in
+    let (ml,_) = norm_me s (abstract ef.dcef_ml) in
+    let (mr,_) = norm_me s (abstract ef.dcef_mr) in
+    f_dcEquivF {ml;mr;inv=dcef_pr}
+      dcef_rl dcef_fl dcef_sl
+      dcef_rr dcef_fr dcef_sr
+      {ml;mr;inv=dcef_po}
+
+  | FdcEquivS es ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s (fst es.dces_ml)));
+    assert (not (Subst.has_mem s (fst es.dces_mr)));
+    let dces_pr = norm st s (dces_pr es).inv in
+    let dces_po = norm st s (dces_po es).inv in
+    let dces_rl = norm_stmt s es.dces_rl in
+    let dces_rr = norm_stmt s es.dces_rr in
+    let dces_cl = norm_stmt s es.dces_cl in
+    let dces_cr = norm_stmt s es.dces_cr in
+    let dces_sl = norm_stmt s es.dces_sl in
+    let dces_sr = norm_stmt s es.dces_sr in
+    let (ml,mlt)  = norm_me s es.dces_ml in
+    let (mr,mrt)  = norm_me s es.dces_mr in
+    f_dcEquivS mlt mrt {ml;mr;inv=dces_pr}
+      dces_rl dces_rr dces_cl dces_cr
+      {ml;mr;inv=dces_po} dces_sl dces_sr
 
   | FeagerF eg ->
     assert (Args.isempty args);

@@ -140,6 +140,22 @@ val f_equivS_r : equivS -> form
 val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
+(* soft-constructors - delayed-coupling equiv *)
+val f_dcEquivF_r : dcEquivF -> form
+
+val f_dcEquivF :
+  ts_inv
+  -> stmt -> xpath -> stmt
+  -> stmt -> xpath -> stmt
+  -> ts_inv -> form
+
+val f_dcEquivS_r : dcEquivS -> form
+
+val f_dcEquivS :
+  memtype -> memtype -> ts_inv
+  -> stmt -> stmt -> stmt -> stmt
+  -> ts_inv -> stmt -> stmt -> form
+
 (* soft-constructors - eager *)
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 
@@ -272,6 +288,8 @@ val destr_let       : form -> lpattern * form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
+val destr_dcEquivF  : form -> dcEquivF
+val destr_dcEquivS  : form -> dcEquivS
 val destr_eagerF    : form -> eagerF
 val destr_hoareF    : form -> sHoareF
 val destr_hoareS    : form -> sHoareS
@@ -306,6 +324,8 @@ val is_pvar      : form -> bool
 val is_proj      : form -> bool
 val is_equivF    : form -> bool
 val is_equivS    : form -> bool
+val is_dcEquivF  : form -> bool
+val is_dcEquivS  : form -> bool
 val is_eagerF    : form -> bool
 val is_hoareF    : form -> bool
 val is_hoareS    : form -> bool

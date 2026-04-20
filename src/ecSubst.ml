@@ -591,6 +591,37 @@ let rec subst_form (s : subst) (f : form) =
      let es_po = map_ts_inv1 (subst_form s) (es_po es) in
      f_equivS mtl mtr es_pr es_sl es_sr es_po
 
+  | FdcEquivF ef ->
+     let dcef_fl = subst_xpath s ef.dcef_fl in
+     let dcef_fr = subst_xpath s ef.dcef_fr in
+     let dcef_rl = subst_stmt s ef.dcef_rl in
+     let dcef_sl = subst_stmt s ef.dcef_sl in
+     let dcef_rr = subst_stmt s ef.dcef_rr in
+     let dcef_sr = subst_stmt s ef.dcef_sr in
+     let s = add_memory s ef.dcef_ml ef.dcef_ml in
+     let s = add_memory s ef.dcef_mr ef.dcef_mr in
+     let dcef_pr = map_ts_inv1 (subst_form s) (dcef_pr ef) in
+     let dcef_po = map_ts_inv1 (subst_form s) (dcef_po ef) in
+     f_dcEquivF dcef_pr
+       dcef_rl dcef_fl dcef_sl
+       dcef_rr dcef_fr dcef_sr
+       dcef_po
+
+  | FdcEquivS es ->
+     let dces_rl = subst_stmt s es.dces_rl in
+     let dces_rr = subst_stmt s es.dces_rr in
+     let dces_cl = subst_stmt s es.dces_cl in
+     let dces_cr = subst_stmt s es.dces_cr in
+     let dces_sl = subst_stmt s es.dces_sl in
+     let dces_sr = subst_stmt s es.dces_sr in
+     let s, (_,mtl) = subst_memtype s es.dces_ml in
+     let s, (_,mtr) = subst_memtype s es.dces_mr in
+     let dces_pr = map_ts_inv1 (subst_form s) (dces_pr es) in
+     let dces_po = map_ts_inv1 (subst_form s) (dces_po es) in
+     f_dcEquivS mtl mtr dces_pr
+       dces_rl dces_rr dces_cl dces_cr
+       dces_po dces_sl dces_sr
+
   | FeagerF eg ->
      let eg_sl = subst_stmt s eg.eg_sl in
      let eg_sr = subst_stmt s eg.eg_sr in

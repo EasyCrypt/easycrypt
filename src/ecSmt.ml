@@ -699,7 +699,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | FhoareF  _  | FhoareS   _
   | FeHoareF   _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
-  | FequivF   _ | FequivS   _
+  | FequivF   _ | FequivS   _ | FdcEquivF _ | FdcEquivS _
     -> trans_gen env fp
 
 and trans_form_b env f = Cast.force_bool (trans_form env f)
@@ -1411,7 +1411,7 @@ module Frequency = struct
       | FhoareF _   | FhoareS _
       | FeHoareF _ | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
-      | FequivF _   | FequivS _
+      | FequivF _   | FequivS _ | FdcEquivF _ | FdcEquivS _
       | FeagerF _ -> ()
 
       | Fpr pr ->

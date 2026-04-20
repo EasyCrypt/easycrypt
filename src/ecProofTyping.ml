@@ -144,7 +144,8 @@ let tc1_process_prhl_form_opt tc oty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let ml, mr, (pr, po) =
     match concl.f_node with
-    | FequivS es -> (es.es_ml, es.es_mr, (es_pr es, es_po es))
+    | FequivS   es  -> (es.es_ml,   es.es_mr,   (es_pr es,     es_po es))
+    | FdcEquivS es  -> (es.dces_ml, es.dces_mr, (dces_pr es,   dces_po es))
     | _ -> assert false
   in
 
@@ -174,6 +175,7 @@ let tc1_process_prhl_stmt ?map tc side c =
   let concl = FApi.tc1_goal tc in
   let ml, mr = match concl.f_node with
     | FequivS {es_ml=ml; es_mr=mr} -> (ml, mr)
+    | FdcEquivS {dces_ml=ml; dces_mr=mr} -> (ml, mr)
     | FeagerF {eg_ml=ml; eg_mr=mr} ->
         EcMemory.abstract ml, EcMemory.abstract mr
     | _ -> assert false in

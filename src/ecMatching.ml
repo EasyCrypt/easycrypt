@@ -1584,6 +1584,8 @@ module FPosition = struct
           | FeHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
+          | FdcEquivS _ -> raise InvalidPosition
+          | FdcEquivF _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
       end
 

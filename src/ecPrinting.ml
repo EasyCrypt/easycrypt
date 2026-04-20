@@ -2080,6 +2080,28 @@ and pp_form_core_r
         (pp_form ppepr) (ef_pr eqv).inv
         (pp_form ppepo) (ef_po eqv).inv
 
+  | FdcEquivF ef ->
+      let (meprl, meprr), (mepol, mepor) =
+        EcEnv.Fun.equivF_memenv ef.dcef_ml ef.dcef_mr ef.dcef_fl ef.dcef_fr
+          ppe.PPEnv.ppe_env in
+      let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
+      let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
+      let pml = ef.dcef_ml.id_symb <> "&1" || debug_mode in
+      let pmr = ef.dcef_mr.id_symb <> "&2" || debug_mode in
+      Format.fprintf fmt
+        "dcoupl[@[<hov 2>@ %a, %a, %a %a ~ %a, %a, %a %a:@ \
+         @[%a ==>@ %a@]@]]"
+        (pp_stmt_for_form ppe) ef.dcef_rl
+        (pp_funname ppe) ef.dcef_fl
+        (pp_stmt_for_form ppe) ef.dcef_sl
+        (pp_pl_mem_binding pml ppe) ef.dcef_ml
+        (pp_stmt_for_form ppe) ef.dcef_rr
+        (pp_funname ppe) ef.dcef_fr
+        (pp_stmt_for_form ppe) ef.dcef_sr
+        (pp_pl_mem_binding pmr ppe) ef.dcef_mr
+        (pp_form ppepr) (dcef_pr ef).inv
+        (pp_form ppepo) (dcef_po ef).inv
+
   | FequivS es ->
       let ppef = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
       let ppel = PPEnv.push_mem ppe ~active:true es.es_ml in
@@ -2093,6 +2115,26 @@ and pp_form_core_r
         (pp_pl_mem_binding pmr ppe) (fst es.es_mr)
         (pp_form ppef) (es_pr es).inv
         (pp_form ppef) (es_po es).inv
+
+  | FdcEquivS es ->
+      let ppef = PPEnv.push_mems ppe [es.dces_ml; es.dces_mr] in
+      let ppel = PPEnv.push_mem ppe ~active:true es.dces_ml in
+      let pper = PPEnv.push_mem ppe ~active:true es.dces_mr in
+      let pml = (fst es.dces_ml).id_symb <> "&1" || debug_mode in
+      let pmr = (fst es.dces_mr).id_symb <> "&2" || debug_mode in
+      Format.fprintf fmt
+        "dcoupl[@[<hov 2>@ { %a | %a x %a } %a %a ~ %a %a@ \
+         { %a | %a x %a }@]]"
+        (pp_form ppef) (dces_pr es).inv
+        (pp_stmt_for_form ppel) es.dces_rl
+        (pp_stmt_for_form pper) es.dces_rr
+        (pp_stmt_for_form ppel) es.dces_cl
+        (pp_pl_mem_binding pml ppe) (fst es.dces_ml)
+        (pp_stmt_for_form pper) es.dces_cr
+        (pp_pl_mem_binding pmr ppe) (fst es.dces_mr)
+        (pp_form ppef) (dces_po es).inv
+        (pp_stmt_for_form ppel) es.dces_sl
+        (pp_stmt_for_form pper) es.dces_sr
 
   | FeagerF eg ->
       let (meprl, meprr), (mepol,mepor) =
@@ -3313,6 +3355,74 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
   Format.fprintf fmt "%a%!" (pp_post ppef ?prpo) (es_po es).inv
 
 (* -------------------------------------------------------------------- *)
+let pp_dcEquivF (ppe : PPEnv.t) ?prpo fmt ef =
+  let (meprl, meprr), (mepol, mepor) =
+    EcEnv.Fun.equivF_memenv ef.dcef_ml ef.dcef_mr ef.dcef_fl ef.dcef_fr
+      ppe.PPEnv.ppe_env in
+  let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
+  let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
+  let pml = debug_mode || ef.dcef_ml.id_symb <> "&1" in
+  let pmr = debug_mode || ef.dcef_mr.id_symb <> "&2" in
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) (dcef_pr ef).inv;
+  Format.fprintf fmt "    R1 ~ R2:@\n        %a@\n        %a@\n%!"
+    (pp_stmt_for_form ppe) ef.dcef_rl
+    (pp_stmt_for_form ppe) ef.dcef_rr;
+  Format.fprintf fmt "    %a %a ~ %a %a@\n%!"
+    (pp_funname ppe) ef.dcef_fl
+    (pp_pl_mem_binding pml ppe) ef.dcef_ml
+    (pp_funname ppe) ef.dcef_fr
+    (pp_pl_mem_binding pmr ppe) ef.dcef_mr;
+  Format.fprintf fmt "    S1 ~ S2:@\n        %a@\n        %a@\n%!"
+    (pp_stmt_for_form ppe) ef.dcef_sl
+    (pp_stmt_for_form ppe) ef.dcef_sr;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppepo ?prpo) (dcef_po ef).inv
+
+(* -------------------------------------------------------------------- *)
+let pp_dcEquivS (ppe : PPEnv.t) ?prpo fmt es =
+  let ppef = PPEnv.push_mems ppe [es.dces_ml; es.dces_mr] in
+  let ppel = PPEnv.push_mem ppe ~active:true es.dces_ml in
+  let pper = PPEnv.push_mem ppe ~active:true es.dces_mr in
+
+  let render_pair label slgen srgen fmt =
+    let insync =
+         EcMemory.mt_equal (snd es.dces_ml) (snd es.dces_mr)
+      && EcReduction.EqTest.for_stmt
+           ppe.PPEnv.ppe_env ~norm:false (slgen es) (srgen es) in
+    if insync then begin
+      let ppe = ppel in
+      let ppnode = collect2_s ppe (slgen es).s_node [] in
+      let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode in
+      Format.fprintf fmt "%s: [programs in sync]@\n%a@\n"
+        label (pp_node `Left) ppnode
+    end else begin
+      let ppnode = collect2_s ppef (slgen es).s_node (srgen es).s_node in
+      let ppnode =
+        c_ppnode
+          ~width:(ppef.PPEnv.ppe_width / 2)
+          ~mem:(fst es.dces_ml, fst es.dces_mr)
+          ppef ppnode
+      in
+      Format.fprintf fmt "%s:@\n%a@\n"
+        label (pp_node `Both) ppnode
+    end in
+
+  Format.fprintf fmt "&1 (left ) : %a@\n%!"
+    (pp_memtype ppe) (snd es.dces_ml);
+  Format.fprintf fmt "&2 (right) : %a@\n%!"
+    (pp_memtype ppe) (snd es.dces_mr);
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_pre ppef ?prpo) (dces_pr es).inv;
+  Format.fprintf fmt "@\n%!";
+  render_pair "R1 × R2" (fun e -> e.dces_rl) (fun e -> e.dces_rr) fmt;
+  Format.fprintf fmt "@\n%!";
+  render_pair "C1 ~ C2" (fun e -> e.dces_cl) (fun e -> e.dces_cr) fmt;
+  Format.fprintf fmt "@\n%!";
+  render_pair "S1 × S2" (fun e -> e.dces_sl) (fun e -> e.dces_sr) fmt;
+  Format.fprintf fmt "@\n%!";
+  ignore pper;
+  Format.fprintf fmt "%a%!" (pp_post ppef ?prpo) (dces_po es).inv
+
+(* -------------------------------------------------------------------- *)
 let pp_rwbase ppe fmt (p, rws) =
   Format.fprintf fmt "%a = %a@\n%!"
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
@@ -3449,6 +3559,8 @@ module PPGoal = struct
 
     | FequivF ef   -> pp_equivF   ppe fmt ef
     | FequivS es   -> pp_equivS   ?prpo ppe fmt es
+    | FdcEquivF ef -> pp_dcEquivF ?prpo ppe fmt ef
+    | FdcEquivS es -> pp_dcEquivS ?prpo ppe fmt es
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
 

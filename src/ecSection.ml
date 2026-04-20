@@ -276,6 +276,8 @@ and on_form (aenv : aenv) (f : EcFol.form) =
     | EcAst.FeHoareS  hs           -> on_ehs  aenv hs
     | EcAst.FequivF   ef           -> on_ef   aenv ef
     | EcAst.FequivS   es           -> on_es   aenv es
+    | EcAst.FdcEquivF ef           -> on_dcef aenv ef
+    | EcAst.FdcEquivS es           -> on_dces aenv es
     | EcAst.FeagerF   eg           -> on_eg   aenv eg
     | EcAst.FbdHoareS bhs          -> on_bhs  aenv bhs
     | EcAst.FbdHoareF bhf          -> on_bhf  aenv bhf
@@ -309,6 +311,28 @@ and on_form (aenv : aenv) (f : EcFol.form) =
     on_stmt aenv es.EcAst.es_sr;
     on_memenv aenv es.EcAst.es_ml;
     on_memenv aenv es.EcAst.es_mr
+
+  and on_dcef (aenv : aenv) ef =
+    on_form aenv (EcAst.dcef_pr ef).inv;
+    on_form aenv (EcAst.dcef_po ef).inv;
+    on_xp aenv ef.EcAst.dcef_fl;
+    on_xp aenv ef.EcAst.dcef_fr;
+    on_stmt aenv ef.EcAst.dcef_rl;
+    on_stmt aenv ef.EcAst.dcef_sl;
+    on_stmt aenv ef.EcAst.dcef_rr;
+    on_stmt aenv ef.EcAst.dcef_sr
+
+  and on_dces (aenv : aenv) es =
+    on_form aenv (EcAst.dces_pr es).inv;
+    on_form aenv (EcAst.dces_po es).inv;
+    on_stmt aenv es.EcAst.dces_rl;
+    on_stmt aenv es.EcAst.dces_rr;
+    on_stmt aenv es.EcAst.dces_cl;
+    on_stmt aenv es.EcAst.dces_cr;
+    on_stmt aenv es.EcAst.dces_sl;
+    on_stmt aenv es.EcAst.dces_sr;
+    on_memenv aenv es.EcAst.dces_ml;
+    on_memenv aenv es.EcAst.dces_mr
 
   and on_eg (aenv : aenv) eg =
     on_form aenv (EcAst.eg_pr eg).inv;

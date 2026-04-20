@@ -200,6 +200,8 @@ module CI_Distr = struct
   let p_dunit      = EcPath.extend p_Distr ["MUnit"; "dunit"]
   let p_dmap       = EcPath.extend p_Distr ["dmap"]
   let p_dlet       = EcPath.extend p_Distr ["dlet"]
+  let p_dcond      = EcPath.extend p_Distr ["dcond"]
+  let p_dprod      = EcPath.extend p_Distr ["`*`"]
 
   let p_support  = _Distr "support"
   let p_mu       = _Pervasive "mu"

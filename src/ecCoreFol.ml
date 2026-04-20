@@ -332,6 +332,28 @@ let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
                 es_sl; es_sr; es_po=es_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
+let f_dcEquivF_r ef = mk_form (FdcEquivF ef) tbool
+
+let f_dcEquivF pr dcef_rl dcef_fl dcef_sl dcef_rr dcef_fr dcef_sr po =
+  assert (pr.ml = po.ml && pr.mr = po.mr);
+  f_dcEquivF_r
+    { dcef_ml = pr.ml; dcef_mr = pr.mr;
+      dcef_pr = pr.inv;
+      dcef_rl; dcef_sl; dcef_fl; dcef_fr; dcef_rr; dcef_sr;
+      dcef_po = po.inv; } [@alert "-priv_pl"]
+
+let f_dcEquivS_r es = mk_form (FdcEquivS es) tbool
+
+let f_dcEquivS dces_mtl dces_mtr dces_pr dces_rl dces_rr dces_cl dces_cr
+    dces_po dces_sl dces_sr =
+  assert (dces_pr.ml = dces_po.ml && dces_pr.mr = dces_po.mr);
+  let dces_ml = (dces_pr.ml, dces_mtl) in
+  let dces_mr = (dces_pr.mr, dces_mtr) in
+  f_dcEquivS_r { dces_ml; dces_mr; dces_pr = dces_pr.inv;
+                 dces_rl; dces_rr; dces_cl; dces_cr;
+                 dces_po = dces_po.inv; dces_sl; dces_sr; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
 
 let f_equivF pr ef_fl ef_fr po =
   assert (pr.ml = po.ml && pr.mr = po.mr);
@@ -524,6 +546,20 @@ let f_map gt g fp =
       let po' = map_ts_inv1 g (es_po es) in
         f_equivS (snd es.es_ml) (snd es.es_mr) pr' es.es_sl es.es_sr po'
 
+  | FdcEquivF ef ->
+      let pr' = map_ts_inv1 g (dcef_pr ef) in
+      let po' = map_ts_inv1 g (dcef_po ef) in
+      f_dcEquivF pr'
+        ef.dcef_rl ef.dcef_fl ef.dcef_sl
+        ef.dcef_rr ef.dcef_fr ef.dcef_sr
+        po'
+
+  | FdcEquivS es ->
+      let pr' = map_ts_inv1 g (dces_pr es) in
+      let po' = map_ts_inv1 g (dces_po es) in
+      f_dcEquivS (snd es.dces_ml) (snd es.dces_mr) pr'
+        es.dces_rl es.dces_rr es.dces_cl es.dces_cr po' es.dces_sl es.dces_sr
+
   | FeagerF eg ->
       let pr' = map_ts_inv1 g (eg_pr eg) in
       let po' = map_ts_inv1 g (eg_po eg) in
@@ -559,6 +595,8 @@ let f_fold (tx : 'a -> form -> 'a) (state : 'a) (f : form) =
   | FbdHoareS bhs -> List.fold_left tx state [(bhs_pr bhs).inv; (bhs_po bhs).inv; (bhs_bd bhs).inv]
   | FequivF   ef  -> List.fold_left tx state [(ef_pr ef).inv; (ef_po ef).inv]
   | FequivS   es  -> List.fold_left tx state [(es_pr es).inv; (es_po es).inv]
+  | FdcEquivF ef  -> List.fold_left tx state [(dcef_pr ef).inv; (dcef_po ef).inv]
+  | FdcEquivS es  -> List.fold_left tx state [(dces_pr es).inv; (dces_po es).inv]
   | FeagerF   eg  -> List.fold_left tx state [(eg_pr eg).inv; (eg_po eg).inv]
   | Fpr       pr  -> List.fold_left tx state [pr.pr_args; pr.pr_event.inv]
 
@@ -591,6 +629,8 @@ let form_exists g f =
   | FbdHoareS bhs -> g (bhs_pr bhs).inv || g (bhs_po bhs).inv
   | FequivF   ef  -> g (ef_pr ef).inv   || g (ef_po ef).inv
   | FequivS   es  -> g (es_pr es).inv   || g (es_po es).inv
+  | FdcEquivF ef  -> g (dcef_pr ef).inv || g (dcef_po ef).inv
+  | FdcEquivS es  -> g (dces_pr es).inv || g (dces_po es).inv
   | FeagerF   eg  -> g (eg_pr eg).inv    || g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args  || g pr.pr_event.inv
 
@@ -617,6 +657,8 @@ let form_forall g f =
   | FbdHoareS bhs -> g (bhs_pr bhs).inv && g (bhs_po bhs).inv
   | FequivF   ef  -> g (ef_pr ef).inv   && g (ef_po ef).inv
   | FequivS   es  -> g (es_pr es).inv   && g (es_po es).inv
+  | FdcEquivF ef  -> g (dcef_pr ef).inv && g (dcef_po ef).inv
+  | FdcEquivS es  -> g (dces_pr es).inv && g (dces_po es).inv
   | FeagerF   eg  -> g (eg_pr eg).inv   && g (eg_po eg).inv
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event.inv
   | FeHoareF  hf  -> g (ehf_pr hf).inv && g (ehf_po hf).inv
@@ -715,6 +757,16 @@ let destr_equivF f =
   | FequivF es -> es
   | _ -> destr_error "equivF"
 
+let destr_dcEquivF f =
+  match f.f_node with
+  | FdcEquivF ef -> ef
+  | _ -> destr_error "dcEquivF"
+
+let destr_dcEquivS f =
+  match f.f_node with
+  | FdcEquivS es -> es
+  | _ -> destr_error "dcEquivS"
+
 let destr_eagerF f =
   match f.f_node with
   | FeagerF eg -> eg
@@ -764,6 +816,11 @@ let destr_programS side f =
       match b with
       | `Left  -> (es.es_ml, es.es_sl)
       | `Right -> (es.es_mr, es.es_sr)
+  end
+  | Some b, FdcEquivS es  -> begin
+      match b with
+      | `Left  -> (es.dces_ml, es.dces_cl)
+      | `Right -> (es.dces_mr, es.dces_cr)
   end
   | _, _ -> destr_error "programS"
 
@@ -902,6 +959,8 @@ let is_lambda    f = is_from_destr destr_lambda    f
 let is_let       f = is_from_destr destr_let1      f
 let is_equivF    f = is_from_destr destr_equivF    f
 let is_equivS    f = is_from_destr destr_equivS    f
+let is_dcEquivF  f = is_from_destr destr_dcEquivF  f
+let is_dcEquivS  f = is_from_destr destr_dcEquivS  f
 let is_eagerF    f = is_from_destr destr_eagerF    f
 let is_hoareS    f = is_from_destr destr_hoareS    f
 let is_hoareF    f = is_from_destr destr_hoareF    f
@@ -1027,7 +1086,7 @@ let expr_of_ss_inv f =
     | FhoareF   _ | FhoareS   _
     | FeHoareF  _ | FeHoareS  _
     | FbdHoareF _ | FbdHoareS _
-    | FequivF   _ | FequivS   _
+    | FequivF   _ | FequivS   _ | FdcEquivF _ | FdcEquivS _
     | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
   and auxbd ((x, bd) : binding) =
@@ -1064,7 +1123,7 @@ let expr_of_form f =
     | FhoareF   _ | FhoareS   _
     | FeHoareF  _ | FeHoareS  _
     | FbdHoareF _ | FbdHoareS _
-    | FequivF   _ | FequivS   _
+    | FequivF   _ | FequivS   _ | FdcEquivF _ | FdcEquivS _
     | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
   and auxbd ((x, bd) : binding) =

@@ -165,10 +165,83 @@ and process_conseqauto cm tc =
   EcPhlConseq.t_conseqauto ~delta ?tsolve tc
 
 (* -------------------------------------------------------------------- *)
+and process_dc_push (side : oside) tc =
+  match side with
+  | None           -> EcPhlDCStruct.t_dc_push tc
+  | Some `Left     -> EcPhlDCStruct.t_dc_push_side ~side:`Left tc
+  | Some `Right    -> EcPhlDCStruct.t_dc_push_side ~side:`Right tc
+
+and process_dc_pop (side : oside) (n : int option) tc =
+  let n = Option.value ~default:1 n in
+  match side with
+  | None        -> EcPhlDCStruct.t_dc_pop n tc
+  | Some `Left  -> EcPhlDCStruct.t_dc_pop_side ~side:`Left n tc
+  | Some `Right -> EcPhlDCStruct.t_dc_pop_side ~side:`Right n tc
+
+and process_dc_unpop (side : oside) (n : int option) tc =
+  let n = Option.value ~default:1 n in
+  match side with
+  | None        -> EcPhlDCStruct.t_dc_unpop n tc
+  | Some `Left  -> EcPhlDCStruct.t_dc_unpop_side ~side:`Left n tc
+  | Some `Right -> EcPhlDCStruct.t_dc_unpop_side ~side:`Right n tc
+
+and process_dc_conseq pre post tc =
+  let pre  = TTC.tc1_process_prhl_formula tc pre  in
+  let post = TTC.tc1_process_prhl_formula tc post in
+  EcPhlDCStruct.t_dc_conseq ~pre ~post tc
+
+and process_dc_case theta tc =
+  let theta = TTC.tc1_process_prhl_formula tc theta in
+  EcPhlDCStruct.t_dc_case theta.inv tc
+
+and process_dc_frame theta tc =
+  let theta = TTC.tc1_process_prhl_formula tc theta in
+  EcPhlDCStruct.t_dc_frame theta.inv tc
+
+and process_dc_seq nl nr theta ts tc =
+  let theta = TTC.tc1_process_prhl_formula tc theta in
+  let ts =
+    match ts with
+    | None -> None
+    | Some (ptl, ptr) ->
+        let tl = TTC.tc1_process_prhl_stmt tc `Left  ptl in
+        let tr = TTC.tc1_process_prhl_stmt tc `Right ptr in
+        Some (tl, tr)
+  in
+  EcPhlDCCore.t_dc_seq ~nl ~nr ?ts theta.inv tc
+
+and process_fun_def_dispatch tc =
+  match (EcCoreGoal.FApi.tc1_goal tc).f_node with
+  | EcAst.FdcEquivF _ -> EcPhlDCCore.t_dc_fun_def tc
+  | _ -> EcPhlFun.process_fun_def tc
+
+and process_dc_unroll side tc =
+  let side' = Option.value side ~default:`Left in
+  EcPhlDCCore.t_dc_unroll_side ~side:side' tc
+
+and process_dc_split side pe tc =
+  let side' = Option.value side ~default:`Left in
+  let e =
+    TTC.tc1_process_Xhl_exp tc (Some side') (Some EcTypes.tbool) pe in
+  EcPhlDCCore.t_dc_split_side ~side:side' e tc
+
+and process_dc_rnd info tc =
+  match info with
+  | None -> EcPhlDCCore.t_dc_rnd None tc
+  | Some (pf, pfinv) ->
+      let f    = TTC.tc1_process_prhl_form_opt tc None pf    in
+      let finv = TTC.tc1_process_prhl_form_opt tc None pfinv in
+      let mk_builder ts : EcPhlDCCore.dc_bij_builder =
+        fun _tyL _tyR -> ts
+      in
+      EcPhlDCCore.t_dc_rnd
+        (Some (mk_builder f, mk_builder finv)) tc
+
+(* -------------------------------------------------------------------- *)
 and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
-    | Pfun `Def                 -> EcPhlFun.process_fun_def
+    | Pfun `Def                 -> process_fun_def_dispatch
     | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
@@ -226,6 +299,42 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager_fun_def            -> EcPhlEager.process_fun_def
     | Peager_fun_abs infos      -> EcPhlEager.process_fun_abs infos
     | Peager_call info          -> EcPhlEager.process_call info
+    | Pdelay                    -> EcPhlDCDelay.t_delay
+    | Pundelay                  -> EcPhlDCDelay.t_undelay
+    | Pdc_push side             -> process_dc_push side
+    | Pdc_pop (side, n)         -> process_dc_pop side n
+    | Pdc_unpop (side, n)       -> process_dc_unpop side n
+    | Pdc_conseq (pre, post)    -> process_dc_conseq pre post
+    | Pdc_case theta            -> process_dc_case theta
+    | Pdc_frame theta           -> process_dc_frame theta
+    | Pdc_indep (nl, nr)        -> EcPhlDCStruct.t_dc_indep ~nl ~nr
+    | Pdc_skip                  -> EcPhlDCCore.t_dc_skip
+    | Pdc_seq (nl, nr, theta, ts) -> process_dc_seq nl nr theta ts
+    | Pdc_wp                    -> EcPhlDCCore.t_dc_wp None
+    | Pdc_wp_side side          ->
+        fun tc -> EcPhlDCCore.t_dc_wp_side ~side tc
+    | Pdc_if None               -> EcPhlDCCore.t_dc_if
+    | Pdc_if (Some side)        -> EcPhlDCCore.t_dc_if_side ~side
+    | Pdc_while None            -> EcPhlDCCore.t_dc_while
+    | Pdc_while (Some side)     -> EcPhlDCCore.t_dc_while_side ~side
+    | Pdc_rnd (None, info)      -> process_dc_rnd info
+    | Pdc_rnd (Some side, None) -> EcPhlDCCore.t_dc_rnd_side ~side
+    | Pdc_rnd (Some _, Some _)  ->
+        fun tc -> tc_error !!tc
+          "one-sided dcoupl rnd does not take a bijection"
+    | Pdc_sym                   -> EcPhlDCCore.t_dc_sym
+    | Pdc_cond None             -> EcPhlDCCore.t_dc_cond_l
+    | Pdc_cond (Some side)      -> EcPhlDCCore.t_dc_cond_side ~side
+    | Pdc_cond_intro None       -> EcPhlDCCore.t_dc_cond_l_intro
+    | Pdc_cond_intro (Some side) -> EcPhlDCCore.t_dc_cond_intro_side ~side
+    | Pdc_prod side             ->
+        let side' = Option.value side ~default:`Left in
+        EcPhlDCCore.t_dc_prod_split ~side:side'
+    | Pdc_prod_intro side       ->
+        let side' = Option.value side ~default:`Left in
+        EcPhlDCCore.t_dc_prod_intro ~side:side'
+    | Pdc_unroll side           -> process_dc_unroll side
+    | Pdc_split (side, e)       -> process_dc_split side e
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless

@@ -175,6 +175,8 @@ module CI_Distr : sig
   val p_dunit      : path
   val p_dlet       : path
   val p_dmap       : path
+  val p_dcond      : path
+  val p_dprod      : path
 
   val p_support : path
   val p_mu      : path

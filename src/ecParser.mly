@@ -411,6 +411,7 @@
 %token COMMA
 %token COMMENT
 %token CONGR
+%token COND
 %token CONSEQ
 %token CONST
 %token COQ
@@ -423,6 +424,8 @@
 %token DLBRACKET
 %token DO
 %token DONE
+%token DCOUPL
+%token DELAY
 %token DOT
 %token DOTDOT
 %token DOTTICK
@@ -453,6 +456,7 @@
 %token FISSION
 %token FOR
 %token FORALL
+%token FRAME
 %token FROM
 %token FUN
 %token FUSION
@@ -473,7 +477,9 @@
 %token IMPOSSIBLE
 %token IN
 %token INCLUDE
+%token INDEP
 %token INDUCTIVE
+%token INTRO
 %token INLINE
 %token INTERLEAVE
 %token INSTANCE
@@ -515,6 +521,7 @@
 %token PIPEPIPEGT
 %token PLUS
 %token PLUSGT
+%token POP
 %token POSE
 %token PR
 %token PRAGMA
@@ -522,9 +529,11 @@
 %token PRED
 %token PRINT
 %token PROC
+%token PROD
 %token PROGRESS
 %token PROOF
 %token PROVER
+%token PUSH
 %token QED
 %token QUESTION
 %token RAISE
@@ -593,6 +602,8 @@
 %token TRIVIAL
 %token TRY
 %token TYPE
+%token UNDELAY
+%token UNPOP
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
@@ -1125,6 +1136,8 @@ sform_u(P):
 
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
+| DCOUPL LBRACKET db=dcoupl_body(P) RBRACKET { db }
+
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) m=brace(mident)? AT pn=mident
     COLON event=form_r(P)
@@ -1263,6 +1276,13 @@ eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) ml=brace(mident)? TILD mp2=loc(fident) COMMA s2=stmt mr=brace(mident)?
     COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFeagerF (ml, mr, pre, (s1, mp1, mp2,s2), post) }
+
+dcoupl_body(P):
+| r1=stmt COMMA mp1=loc(fident) COMMA s1=stmt ml=brace(mident)?
+  TILD
+  r2=stmt COMMA mp2=loc(fident) COMMA s2=stmt mr=brace(mident)?
+  COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFdcEquivF (ml, mr, pre, (r1, mp1, s1), (r2, mp2, s2), post) }
 
 pgtybinding1:
 | x=ptybinding1
@@ -2922,6 +2942,77 @@ logtactic:
 | WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
    { Pwlog (ids, b, f) }
 
+dcoupl_tac:
+| PUSH s=option(side)
+    { Pdc_push s }
+
+| POP s=option(side) n=option(word)
+    { Pdc_pop (s, n) }
+
+| UNPOP s=option(side) n=option(word)
+    { Pdc_unpop (s, n) }
+
+| CONSEQ pre=sform post=sform
+    { Pdc_conseq (pre, post) }
+
+| CASE theta=sform
+    { Pdc_case theta }
+
+| FRAME theta=sform
+    { Pdc_frame theta }
+
+| INDEP nl=word nr=word
+    { Pdc_indep (nl, nr) }
+
+| SKIP
+    { Pdc_skip }
+
+| SEQ nl=word nr=word theta=sform
+    { Pdc_seq (nl, nr, theta, None) }
+
+| SEQ nl=word nr=word theta=sform
+    WITH LPAREN tl=stmt TILD tr=stmt RPAREN
+    { Pdc_seq (nl, nr, theta, Some (tl, tr)) }
+
+| WP
+    { Pdc_wp }
+
+| WP s=side
+    { Pdc_wp_side s }
+
+| IF s=option(side)
+    { Pdc_if s }
+
+| WHILE s=option(side)
+    { Pdc_while s }
+
+| RND s=option(side)
+    { Pdc_rnd (s, None) }
+
+| RND s=option(side) f=sform finv=sform
+    { Pdc_rnd (s, Some (f, finv)) }
+
+| SYMMETRY
+    { Pdc_sym }
+
+| COND s=option(side)
+    { Pdc_cond s }
+
+| COND INTRO s=option(side)
+    { Pdc_cond_intro s }
+
+| PROD s=option(side)
+    { Pdc_prod s }
+
+| PROD INTRO s=option(side)
+    { Pdc_prod_intro s }
+
+| UNROLL s=option(side)
+    { Pdc_unroll s }
+
+| SPLIT s=option(side) e=sexpr
+    { Pdc_split (s, e) }
+
 eager_tac:
 | SEQ n1=codegap1_0before n2=codegap1_0before COLON s=stmt COLON p=form_or_double_form
     { Peager_seq ((n1, n2), s, p) }
@@ -3253,6 +3344,15 @@ direction:
 
 | SYMMETRY
     { Psymmetry }
+
+| DELAY
+    { Pdelay }
+
+| UNDELAY
+    { Pundelay }
+
+| DCOUPL t=dcoupl_tac
+    { t }
 
 | EAGER t=eager_tac
     { t }

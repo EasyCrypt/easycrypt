@@ -204,6 +204,9 @@ and f_node =
 
   | FeagerF of eagerF
 
+  | FdcEquivF of dcEquivF
+  | FdcEquivS of dcEquivS
+
   | Fpr of pr (* hr *)
 
 and eagerF = {
@@ -233,6 +236,32 @@ and equivS = {
   es_sl  : stmt;
   es_sr  : stmt;
   es_po  : form; }
+
+and dcEquivF = {
+  dcef_ml : memory;
+  dcef_mr : memory;
+  dcef_pr : form;
+  dcef_rl : stmt;
+  dcef_sl : stmt;
+  dcef_fl : EcPath.xpath;
+  dcef_fr : EcPath.xpath;
+  dcef_rr : stmt;
+  dcef_sr : stmt;
+  dcef_po : form;
+}
+
+and dcEquivS = {
+  dces_ml : memenv;
+  dces_mr : memenv;
+  dces_pr : form;
+  dces_rl : stmt;
+  dces_rr : stmt;
+  dces_cl : stmt;
+  dces_cr : stmt;
+  dces_po : form;
+  dces_sl : stmt;
+  dces_sr : stmt;
+}
 
 and sHoareF = {
   hf_m  : memory;
@@ -687,6 +716,12 @@ let ef_po ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_po}
 let es_pr es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_pr}
 let es_po es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_po}
 
+let dcef_pr ef = {ml=ef.dcef_ml; mr=ef.dcef_mr; inv=ef.dcef_pr}
+let dcef_po ef = {ml=ef.dcef_ml; mr=ef.dcef_mr; inv=ef.dcef_po}
+
+let dces_pr es = {ml=fst es.dces_ml; mr=fst es.dces_mr; inv=es.dces_pr}
+let dces_po es = {ml=fst es.dces_ml; mr=fst es.dces_mr; inv=es.dces_po}
+
 let hf_pr hf = {m=hf.hf_m; inv=hf.hf_pr}
 let hf_po hf = {hsi_m=hf.hf_m; hsi_inv=hf.hf_po}
 
@@ -1105,6 +1140,30 @@ let eqs_equal es1 es2 =
   && me_equal es1.es_ml es2.es_ml
   && me_equal es1.es_mr es2.es_mr
 
+let dcef_equal ef1 ef2 =
+     f_equal ef1.dcef_pr ef2.dcef_pr
+  && f_equal ef1.dcef_po ef2.dcef_po
+  && s_equal ef1.dcef_rl ef2.dcef_rl
+  && s_equal ef1.dcef_sl ef2.dcef_sl
+  && s_equal ef1.dcef_rr ef2.dcef_rr
+  && s_equal ef1.dcef_sr ef2.dcef_sr
+  && EcPath.x_equal ef1.dcef_fl ef2.dcef_fl
+  && EcPath.x_equal ef1.dcef_fr ef2.dcef_fr
+  && mem_equal ef1.dcef_ml ef2.dcef_ml
+  && mem_equal ef1.dcef_mr ef2.dcef_mr
+
+let dces_equal es1 es2 =
+     f_equal  es1.dces_pr es2.dces_pr
+  && f_equal  es1.dces_po es2.dces_po
+  && s_equal  es1.dces_rl es2.dces_rl
+  && s_equal  es1.dces_rr es2.dces_rr
+  && s_equal  es1.dces_cl es2.dces_cl
+  && s_equal  es1.dces_cr es2.dces_cr
+  && s_equal  es1.dces_sl es2.dces_sl
+  && s_equal  es1.dces_sr es2.dces_sr
+  && me_equal es1.dces_ml es2.dces_ml
+  && me_equal es1.dces_mr es2.dces_mr
+
 let egf_equal eg1 eg2 =
      f_equal eg1.eg_pr eg2.eg_pr
   && f_equal eg1.eg_po eg2.eg_po
@@ -1186,6 +1245,27 @@ let es_hash es =
        (me_hash es.es_mr)
        (me_hash es.es_ml)
        (s_hash es.es_sr))
+
+let dcef_hash ef =
+  Why3.Hashcons.combine_list (fun x -> x)
+    (Why3.Hashcons.combine2
+       (f_hash ef.dcef_pr)
+       (f_hash ef.dcef_po)
+       (Why3.Hashcons.combine2
+          (EcPath.x_hash ef.dcef_fl) (EcPath.x_hash ef.dcef_fr)
+          (Why3.Hashcons.combine (mem_hash ef.dcef_ml) (mem_hash ef.dcef_mr))))
+    [s_hash ef.dcef_rl; s_hash ef.dcef_sl;
+     s_hash ef.dcef_rr; s_hash ef.dcef_sr]
+
+let dces_hash es =
+  Why3.Hashcons.combine_list (fun x -> x)
+    (Why3.Hashcons.combine2
+       (f_hash es.dces_pr)
+       (f_hash es.dces_po)
+       (Why3.Hashcons.combine (me_hash es.dces_ml) (me_hash es.dces_mr)))
+    [s_hash es.dces_rl; s_hash es.dces_rr;
+     s_hash es.dces_cl; s_hash es.dces_cr;
+     s_hash es.dces_sl; s_hash es.dces_sr]
 
 let eg_hash eg =
   Why3.Hashcons.combine_list f_hash
@@ -1430,6 +1510,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | FbdHoareS   bhs1, FbdHoareS   bhs2 -> bhs_equal bhs1 bhs2
     | FequivF     eqf1, FequivF     eqf2 -> eqf_equal eqf1 eqf2
     | FequivS     eqs1, FequivS     eqs2 -> eqs_equal eqs1 eqs2
+    | FdcEquivF   ef1 , FdcEquivF   ef2  -> dcef_equal ef1 ef2
+    | FdcEquivS   es1 , FdcEquivS   es2  -> dces_equal es1 es2
     | FeagerF     eg1 , FeagerF     eg2  -> egf_equal eg1 eg2
     | Fpr         pr1 , Fpr         pr2  -> pr_equal pr1 pr2
 
@@ -1484,6 +1566,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | FbdHoareS   bhs  -> bhs_hash bhs
     | FequivF     ef   -> ef_hash ef
     | FequivS     es   -> es_hash es
+    | FdcEquivF   ef   -> dcef_hash ef
+    | FdcEquivS   es   -> dces_hash es
     | FeagerF     eg   -> eg_hash eg
     | Fpr         pr   -> pr_hash pr
 
@@ -1563,6 +1647,23 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
         fv_union fv
           (fv_union (s_fv es.es_sl) (s_fv es.es_sr))
+
+    | FdcEquivF ef ->
+        let fv = fv_union (f_fv ef.dcef_pr) (f_fv ef.dcef_po) in
+        let fv = fv_diff fv (fv_mlr ef.dcef_ml ef.dcef_mr) in
+        let fv = EcPath.x_fv (EcPath.x_fv fv ef.dcef_fl) ef.dcef_fr in
+        let fv = fv_union fv (fv_union (s_fv ef.dcef_rl) (s_fv ef.dcef_rr)) in
+        let fv = fv_union fv (fv_union (s_fv ef.dcef_sl) (s_fv ef.dcef_sr)) in
+        fv
+
+    | FdcEquivS es ->
+        let fv = fv_union (f_fv es.dces_pr) (f_fv es.dces_po) in
+        let ml, mr = fst es.dces_ml, fst es.dces_mr in
+        let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
+        let fv = fv_union fv (fv_union (s_fv es.dces_rl) (s_fv es.dces_rr)) in
+        let fv = fv_union fv (fv_union (s_fv es.dces_cl) (s_fv es.dces_cr)) in
+        let fv = fv_union fv (fv_union (s_fv es.dces_sl) (s_fv es.dces_sr)) in
+        fv
 
     | FeagerF eg ->
         let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in

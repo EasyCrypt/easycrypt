@@ -512,6 +512,37 @@ module Fsubst = struct
       let es_po = f_subst ~tx s (es_po es).inv in
       f_equivS mlt mrt {ml;mr;inv=es_pr} es_sl es_sr {ml;mr;inv=es_po}
 
+    | FdcEquivF ef ->
+      let dcef_fl = x_subst s ef.dcef_fl in
+      let dcef_fr = x_subst s ef.dcef_fr in
+      let dcef_rl = s_subst s ef.dcef_rl in
+      let dcef_sl = s_subst s ef.dcef_sl in
+      let dcef_rr = s_subst s ef.dcef_rr in
+      let dcef_sr = s_subst s ef.dcef_sr in
+      let (s, ml) = add_m_binding s ef.dcef_ml in
+      let (s, mr) = add_m_binding s ef.dcef_mr in
+      let dcef_pr = f_subst ~tx s (dcef_pr ef).inv in
+      let dcef_po = f_subst ~tx s (dcef_po ef).inv in
+      f_dcEquivF {ml;mr;inv=dcef_pr}
+        dcef_rl dcef_fl dcef_sl
+        dcef_rr dcef_fr dcef_sr
+        {ml;mr;inv=dcef_po}
+
+    | FdcEquivS es ->
+      let dces_rl = s_subst s es.dces_rl in
+      let dces_rr = s_subst s es.dces_rr in
+      let dces_cl = s_subst s es.dces_cl in
+      let dces_cr = s_subst s es.dces_cr in
+      let dces_sl = s_subst s es.dces_sl in
+      let dces_sr = s_subst s es.dces_sr in
+      let s, (ml, mlt) = add_me_binding s es.dces_ml in
+      let s, (mr, mrt) = add_me_binding s es.dces_mr in
+      let dces_pr = f_subst ~tx s (dces_pr es).inv in
+      let dces_po = f_subst ~tx s (dces_po es).inv in
+      f_dcEquivS mlt mrt {ml;mr;inv=dces_pr}
+        dces_rl dces_rr dces_cl dces_cr
+        {ml;mr;inv=dces_po} dces_sl dces_sr
+
     | FeagerF eg ->
       let eg_fl = x_subst s eg.eg_fl in
       let eg_fr = x_subst s eg.eg_fr in

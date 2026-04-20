@@ -26,6 +26,7 @@ type hlkind = [
   | `PHoare of hlform
   | `Equiv  of hlform
   | `Eager
+  | `DCoupl of hlform
 ]
 
 and hlkinds = hlkind list
@@ -36,7 +37,7 @@ let hlkinds_Xhl_r (form : hlform) : hlkinds =
 let hlkinds_Xhl = hlkinds_Xhl_r `Any
 
 let hlkinds_all : hlkinds =
-  [`Hoare `Any; `EHoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
+  [`Hoare `Any; `EHoare `Any; `PHoare `Any; `Equiv `Any; `Eager; `DCoupl `Any]
 
 (* -------------------------------------------------------------------- *)
 let tc_error_noXhl ?(kinds : hlkinds option) pf =
@@ -51,6 +52,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
       | `Eager     -> ("eager" , `Any)
+      | `DCoupl fm -> ("dcoupl", fm)
     in
       Printf.sprintf "%s%s" kind (fm |> string_of_form)
   in
@@ -160,6 +162,8 @@ let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
 let pf_as_equivS   pe c = as_phl (`Equiv  `Stmt) (fun () -> destr_equivS   c) pe
 let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
+let pf_as_dcEquivF pe c = as_phl (`DCoupl `Pred) (fun () -> destr_dcEquivF c) pe
+let pf_as_dcEquivS pe c = as_phl (`DCoupl `Stmt) (fun () -> destr_dcEquivS c) pe
 
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
@@ -171,6 +175,8 @@ let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)
 let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
+let tc1_as_dcEquivF tc = pf_as_dcEquivF !!tc (FApi.tc1_goal tc)
+let tc1_as_dcEquivS tc = pf_as_dcEquivS !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
 let is_program_logic (f : form) (ks : hlkind list) =
@@ -185,6 +191,8 @@ let is_program_logic (f : form) (ks : hlkind list) =
     | FbdHoareS _, `PHoare (`Any | `Stmt) -> true
     | FequivS   _, `Equiv  (`Any | `Stmt) -> true
     | FeagerF   _, `Eager                 -> true
+    | FdcEquivF _, `DCoupl (`Any | `Pred) -> true
+    | FdcEquivS _, `DCoupl (`Any | `Stmt) -> true
     | _          , _                      -> false
   in
 

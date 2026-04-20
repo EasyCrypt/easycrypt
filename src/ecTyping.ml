@@ -1724,6 +1724,7 @@ let top_is_mem_binding pf = match pf with
 
   | PFhoareF   _
   | PFequivF   _
+  | PFdcEquivF _
   | PFeagerF   _
   | PFprob     _
   | PFBDhoareF _
@@ -3603,6 +3604,29 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF {ml;mr;inv=pre'} s1 fpath1 fpath2 s2 {ml;mr;inv=post'}
+
+    | PFdcEquivF (ml, mr, pre, (r1, gp1, s1), (r2, gp2, s2), post) ->
+        if mode <> `Form then
+          tyerror f.pl_loc env (NotAnExpression `Logic);
+        let ml = odfl "&1" (omap unloc ml) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc mr) in
+        let mr = EcIdent.create mr in
+        let fpath1 = trans_gamepath env gp1 in
+        let fpath2 = trans_gamepath env gp2 in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
+        let pre'  = transf penv pre in
+        let post' = transf qenv post in
+        let r1    = transstmt env ue r1 in
+        let s1    = transstmt env ue s1 in
+        let r2    = transstmt env ue r2 in
+        let s2    = transstmt env ue s2 in
+        unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
+        unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+        f_dcEquivF {ml;mr;inv=pre'}
+          r1 fpath1 s1
+          r2 fpath2 s2
+          {ml;mr;inv=post'}
 
   and transf_r opsc env ?tt pf =
     let f  = transf_r_tyinfo opsc env ?tt pf in

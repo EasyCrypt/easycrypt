@@ -234,6 +234,8 @@ type sform =
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFdcEquivF of dcEquivF
+  | SFdcEquivS of dcEquivS
   | SFpr       of pr
 
   | SFother of form
