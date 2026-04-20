@@ -40,7 +40,8 @@ let close_pr_body (uni : ty EcUid.Muid.t) (body : prbody) =
 (* -------------------------------------------------------------------- *)
 let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   let pr = pr.pl_desc and loc = pr.pl_loc in
-  let ue = TT.transtyvars env (loc, pr.pp_tyvars) in
+  let ue =
+    TT.transtyvars ~idxparams:pr.pp_idxvars env (loc, pr.pp_tyvars) in
   let tp = TT.tp_relax in
 
   let dom, body =

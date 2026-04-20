@@ -136,7 +136,10 @@ type tyerror =
 | AmbiguousProj          of qsymbol
 | AmbiguousProji         of int * ty
 | InvalidTypeAppl        of qsymbol * int * int
+| InvalidIndexAppl       of qsymbol * int * int
+| UnboundIndexVariable   of symbol
 | DuplicatedTyVar
+| DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
 | NonLinearPattern
@@ -481,15 +484,36 @@ let transtcs (env : EcEnv.env) tcs =
     Sp.of_list (List.map for1 tcs)
 
 (* -------------------------------------------------------------------- *)
-let transtyvars (env : EcEnv.env) (loc, tparams) =
-  let tparams = tparams |> omap
-    (fun tparams ->
-        let for1 ({ pl_desc = x }) = (EcIdent.create x) in
-          if not (List.is_unique (List.map unloc tparams)) then
-            tyerror loc env DuplicatedTyVar;
-          { EcDecl.idxvars = []; tyvars = List.map for1 tparams })
+let transtyvars
+   ?(idxparams : psymbol list = [])
+    (env : EcEnv.env)
+    (loc, tparams)
+=
+  let mk1 ({ pl_desc = x } : psymbol) = EcIdent.create x in
+  let idxvars = List.map mk1 idxparams in
+  begin
+    let rec find_dup seen = function
+      | [] -> None
+      | x :: rest -> if List.mem x seen then Some x else find_dup (x :: seen) rest
+    in
+    match find_dup [] (List.map unloc idxparams) with
+    | None    -> ()
+    | Some x  -> tyerror loc env (DuplicatedIndexVar x)
+  end;
+  let tyvars =
+    match tparams with
+    | None -> []
+    | Some tparams ->
+        if not (List.is_unique (List.map unloc tparams)) then
+          tyerror loc env DuplicatedTyVar;
+        List.map mk1 tparams
   in
-    EcUnify.UniEnv.create tparams
+  let params : EcDecl.ty_params option =
+    if idxparams = [] && tparams = None
+    then None
+    else Some { idxvars; tyvars }
+  in
+  EcUnify.UniEnv.create params
 
 (* -------------------------------------------------------------------- *)
 exception TymodCnvFailure of tymod_cnv_failure
@@ -1002,10 +1026,14 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
           tyerror ty.pl_loc env (UnknownTypeName name)
 
       | Some (p, tydecl) ->
-          let { tyvars; idxvars = _ } = tydecl.tyd_params in
+          let { tyvars; idxvars } = tydecl.tyd_params in
           if tyvars <> [] then begin
             let nargs = List.length tyvars in
               tyerror ty.pl_loc env (InvalidTypeAppl (name, nargs, 0))
+          end;
+          if idxvars <> [] then begin
+            let nargs = List.length idxvars in
+              tyerror ty.pl_loc env (InvalidIndexAppl (name, nargs, 0))
           end;
           tconstr p
       end
@@ -1013,20 +1041,26 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   | PTfun(ty1,ty2) ->
       tfun (transty tp env ue ty1) (transty tp env ue ty2)
 
-  | PTapp ({ pl_desc = name }, tyargs) ->
+  | PTapp ({ pl_desc = name }, tyargs, idxargs) ->
     begin match EcEnv.Ty.lookup_opt name env with
     | None ->
       tyerror ty.pl_loc env (UnknownTypeName name)
 
     | Some (p, tydecl) ->
-      let nargs    = List.length tyargs in
-      let expected = List.length tydecl.tyd_params.tyvars in
+      let nargs       = List.length tyargs in
+      let expected    = List.length tydecl.tyd_params.tyvars in
+      let nidx        = List.length idxargs in
+      let expected_ix = List.length tydecl.tyd_params.idxvars in
 
       if nargs <> expected then
         tyerror ty.pl_loc env (InvalidTypeAppl (name, expected, nargs));
 
+      if nidx <> expected_ix then
+        tyerror ty.pl_loc env (InvalidIndexAppl (name, expected_ix, nidx));
+
       let tyargs = transtys tp env ue tyargs in
-      tconstr ~tyargs p
+      let indices = List.map (transtindex env ue) idxargs in
+      tconstr ~indices ~tyargs p
     end
   | PTglob gp ->
     let mo,_ = trans_msymbol env gp in
@@ -1034,6 +1068,27 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
 
 and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
+
+(* Translate a parsed [pindex] to a [tindex]. Identifiers must be
+   bound as index variables in [ue]. The grammar guarantees we never
+   see a non-polynomial shape; the only typing-time check is the
+   variable lookup. *)
+and transtindex (env : EcEnv.env) (ue : EcUnify.unienv) (pi : pindex) : tindex =
+  match pi.pl_desc with
+  | PIvar { pl_desc = name; pl_loc = loc } ->
+      begin match EcUnify.UniEnv.getnamed_idx ue name with
+      | Some id -> TIVar id
+      | None    -> tyerror loc env (UnboundIndexVariable name)
+      end
+  | PIint n ->
+      (* Lexer only produces non-negative UINTs, but defensively. *)
+      if EcBigInt.sign n < 0 then
+        tyerror pi.pl_loc env (UnboundIndexVariable "negative literal");
+      TIConst n
+  | PIadd (a, b) ->
+      TIAdd (transtindex env ue a, transtindex env ue b)
+  | PImul (a, b) ->
+      TIMul (transtindex env ue a, transtindex env ue b)
 
 let transty_for_decl env ty =
   let ue = UE.create (Some { EcDecl.idxvars = []; tyvars = [] }) in

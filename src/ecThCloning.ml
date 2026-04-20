@@ -40,6 +40,9 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+(* Cloning of indexed declarations is not yet supported (Phase 3
+   landed the binders but not the index-instantiation surface). *)
+| CE_IndexedNotYetSupported of ovkind * qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -276,6 +279,8 @@ end = struct
       | None ->
          clone_error oc.oc_env (CE_UnkOverride (OVK_Type, name));
       | Some refty ->
+         if refty.tyd_params.idxvars <> [] then
+           clone_error oc.oc_env (CE_IndexedNotYetSupported (OVK_Type, name));
          if List.length refty.tyd_params.tyvars <> ntyargs then
            clone_error oc.oc_env (CE_TypeArgMism (OVK_Type, name)) in
 

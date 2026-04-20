@@ -204,10 +204,14 @@ let subst_of_uf (uf : UF.t) =
 
 (* -------------------------------------------------------------------- *)
 type unienv_r = {
-  ue_uf     : UF.t;
-  ue_named  : EcIdent.t Mstr.t;
-  ue_decl   : EcIdent.t list;
-  ue_closed : bool;
+  ue_uf       : UF.t;
+  ue_named    : EcIdent.t Mstr.t;
+  ue_decl     : EcIdent.t list;
+  ue_closed   : bool;
+  (* Indices live in their own namespace, separate from type variables.
+     They are always closed (declared up front, no on-demand creation). *)
+  ue_idxnamed : EcIdent.t Mstr.t;
+  ue_idxdecl  : EcIdent.t list;
 }
 
 type unienv = unienv_r ref
@@ -240,24 +244,35 @@ module UniEnv = struct
 
   let create (vd : ty_params option) =
     let ue = {
-      ue_uf     = UF.initial;
-      ue_named  = Mstr.empty;
-      ue_decl   = [];
-      ue_closed = false;
+      ue_uf       = UF.initial;
+      ue_named    = Mstr.empty;
+      ue_decl     = [];
+      ue_closed   = false;
+      ue_idxnamed = Mstr.empty;
+      ue_idxdecl  = [];
     } in
 
     let ue =
       match vd with
       | None    -> ue
       | Some vd ->
-          let vd = vd.tyvars in
-          let vdmap = List.map (fun x -> (EcIdent.name x, x)) vd in
+          let tyvars = vd.tyvars in
+          let vdmap  = List.map (fun x -> (EcIdent.name x, x)) tyvars in
+          let imap   = List.map (fun x -> (EcIdent.name x, x)) vd.idxvars in
           { ue with
-              ue_named  = Mstr.of_list vdmap;
-              ue_decl   = List.rev vd;
-              ue_closed = true; }
+              ue_named    = Mstr.of_list vdmap;
+              ue_decl     = List.rev tyvars;
+              ue_closed   = true;
+              ue_idxnamed = Mstr.of_list imap;
+              ue_idxdecl  = List.rev vd.idxvars; }
     in
       ref ue
+
+  (* Look up an index variable by name. Returns None if no such
+     binding exists. Indices are always declared up front, so we never
+     create one on demand. *)
+  let getnamed_idx (ue : unienv) (x : symbol) : EcIdent.t option =
+    Mstr.find_opt x (!ue).ue_idxnamed
 
   let fresh ?(ty : ty option) (ue : unienv) =
     let (uf, uid) = UnifyCore.fresh ?ty (!ue).ue_uf in
@@ -317,7 +332,8 @@ module UniEnv = struct
     subst_of_uf (!ue).ue_uf
 
   let tparams (ue : unienv) : ty_params =
-    { idxvars = []; tyvars = List.rev (!ue).ue_decl }
+    { idxvars = List.rev (!ue).ue_idxdecl;
+      tyvars  = List.rev (!ue).ue_decl; }
 end
 
 (* -------------------------------------------------------------------- *)

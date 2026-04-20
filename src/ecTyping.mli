@@ -128,7 +128,10 @@ type tyerror =
 | AmbiguousProj          of qsymbol
 | AmbiguousProji         of int * ty
 | InvalidTypeAppl        of qsymbol * int * int
+| InvalidIndexAppl       of qsymbol * int * int
+| UnboundIndexVariable   of symbol
 | DuplicatedTyVar
+| DuplicatedIndexVar     of symbol
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
 | NonLinearPattern
@@ -190,6 +193,7 @@ val tp_nothing : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
+  ?idxparams:psymbol list ->
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)

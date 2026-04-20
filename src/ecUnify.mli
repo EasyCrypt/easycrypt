@@ -24,6 +24,8 @@ module UniEnv : sig
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
   val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
+  (* Indices are declared up front: returns [None] when no binding. *)
+  val getnamed_idx : unienv -> symbol -> EcIdent.t option
   val repr       : unienv -> ty -> ty
   val opentvi    : unienv -> ty_params -> tvi -> ty EcIdent.Mid.t
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * ty list

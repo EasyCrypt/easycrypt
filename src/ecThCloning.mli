@@ -34,6 +34,7 @@ type clone_error =
 | CE_InvalidRE         of string
 | CE_InlinedOpIsForm   of qsymbol
 | CE_ProofForLemma     of qsymbol
+| CE_IndexedNotYetSupported of ovkind * qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 

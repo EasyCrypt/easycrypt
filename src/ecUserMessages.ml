@@ -292,8 +292,18 @@ end = struct
     | InvalidTypeAppl (name, _, _) ->
         msg "invalid type application: %a" pp_qsymbol name
 
+    | InvalidIndexAppl (name, expected, got) ->
+        msg "invalid index application for `%a': %d index argument(s) expected, %d given"
+          pp_qsymbol name expected got
+
+    | UnboundIndexVariable name ->
+        msg "unbound index variable: `%s'" name
+
     | DuplicatedTyVar ->
         msg "a type variable appear at least twice"
+
+    | DuplicatedIndexVar name ->
+        msg "an index variable appears at least twice: `%s'" name
 
     | DuplicatedLocal name ->
         msg "duplicated local/parameters name: `%s'" name
@@ -747,6 +757,10 @@ end = struct
 
     | CE_TypeArgMism (kd, x) ->
         msg "type argument mismatch for %s `%s'"
+          (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_IndexedNotYetSupported (kd, x) ->
+        msg "cloning of indexed %s `%s' is not yet supported"
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_OpIncompatible (x, err) ->

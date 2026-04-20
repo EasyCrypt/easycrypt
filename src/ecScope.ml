@@ -973,7 +973,8 @@ module Ax = struct
 
     let env = env scope in
     let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.transtyvars env (loc, ax.pa_tyvars) in
+    let ue  =
+      TT.transtyvars ~idxparams:ax.pa_idxvars env (loc, ax.pa_tyvars) in
 
     let (pconcl, tintro) =
       match ax.pa_vars with
@@ -1277,7 +1278,8 @@ module Op = struct
 
     let op = op.pl_desc and loc = op.pl_loc in
     let eenv = env scope in
-    let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
+    let ue =
+      TT.transtyvars ~idxparams:op.po_idxvars eenv (loc, op.po_tyvars) in
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
@@ -2227,23 +2229,30 @@ module Ty = struct
 
     let loc = loc tyd in
 
-    let { pty_name = name; pty_tyvars = args;
+    let { pty_name = name; pty_idxvars = idxs; pty_tyvars = args;
           pty_body = body; pty_locality = tyd_loca } = unloc tyd in
 
     check_name_available scope name;
     let env = env scope in
+    let no_indices_for kind =
+      if idxs <> [] then
+        hierror ~loc
+          "indexed type parameters are not yet supported on `%s' type \
+           declarations" kind
+    in
     let tyd_params, tyd_type =
       match body with
       | PTYD_Abstract ->
-        let ue = TT.transtyvars env (loc, Some args) in
+        let ue = TT.transtyvars ~idxparams:idxs env (loc, Some args) in
         EcUnify.UniEnv.tparams ue, Abstract
 
       | PTYD_Alias    bd ->
-        let ue     = TT.transtyvars env (loc, Some args) in
+        let ue     = TT.transtyvars ~idxparams:idxs env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
         EcUnify.UniEnv.tparams ue, Concrete body
 
       | PTYD_Datatype dt -> (
+          no_indices_for "datatype";
           let datatype = EHI.trans_datatype env (mk_loc loc (args, name)) dt in
           let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
           try
@@ -2255,6 +2264,7 @@ module Ty = struct
             EHI.dterror loc env (EHI.DTE_NonPositive (symbol, ctx)))
 
       | PTYD_Record rt ->
+        no_indices_for "record";
         let record  = EHI.trans_record env (mk_loc loc (args,name)) rt in
         let scheme  = ELI.indsc_of_record record in
         record.ELI.rc_tparams, Record (scheme, record.ELI.rc_fields)

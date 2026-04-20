@@ -196,20 +196,101 @@ after success) covering:
   crash mid-proof from `tindex_subst`. Worth a tactical sweep before
   merging to main.
 
-### Phase 3 — Parser & typing
-1. Concrete syntax for *binders*: propose `type ['n 'm] 'a vec`,
-   `op f ['n] ('a) (xs : 'a vec['n]) : …`, `axiom ['n] foo : …`.
-   Bracket order should match `dump_ty`'s `[indices|types]`.
-2. Concrete syntax for *applications*: `'a vec[n+1]`.
-3. `EcTyping`: parse index expressions through a restricted grammar —
-   only `+`, `*`, non-negative literals, identifiers bound as indices.
-   Reject subtraction, division, calls.
-4. Resolution: when `n` is in scope as both an index binder and an int
-   term variable (shared namespace), an occurrence in an index
-   position becomes `TIVar n`, in a term position becomes
-   `Flocal n` — disambiguated by syntactic position.
-5. Cloning (`EcThCloning`, `EcSubst`): index parameters get
-   instantiated alongside type parameters during clone-with.
+### Phase 3 — Parser & typing (DONE)
+
+#### Final concrete syntax
+
+- **Index binders** are plain identifiers (no apostrophe) inside
+  `[...]`, e.g. `type [n m] ('a, 'b) vec.`. On op / pred / axiom /
+  lemma headers, `[...]` accepts a *mixed* list — apostrophe-prefixed
+  → tyvar, plain → index — bucketed in the parser prelude:
+  `op f [n 'a] (xs : 'a vec<:n>) : 'a vec<:n+1>`.
+- **Index applications** use `<: ... >` framing (LTCOLON / GT), e.g.
+  `'a vec<:n+1, m*2>`. We avoid `[...]` here because it would
+  shift/reduce-conflict with the codepos brackets in
+  `module M = N with { proc f [ var x : T [..] ] }`. The framing also
+  matches the existing operator type-arg syntax `f<:int>`.
+- **Index-expression sub-grammar**: literals, identifiers, `+`, `*`
+  with standard precedence. The grammar guarantees only the
+  polynomial fragment.
+- **Disambiguation rule** (shared namespace): inside `[...]` and
+  `<:...>` an identifier is read as an index variable; everywhere
+  else it's a formula/expression local. Apostrophe-prefixed names are
+  always type variables.
+
+#### What changed
+
+- [src/ecParsetree.ml](src/ecParsetree.ml) — `pindex_r` / `pindex`
+  added, mutually recursive with `pty_r`. `PTapp` now carries
+  `pindex list`. `ptydecl` / `poperator` / `ppredicate` / `paxiom`
+  each grow an `*_idxvars : psymbol list` field.
+- [src/ecParser.mly](src/ecParser.mly) — `idxvars_decl` (tydecl
+  prefix), `idx_args` (postfix `<: ... >` on `simpl_type_exp`),
+  `pindex` sub-grammar, `mixed_tyvars_item` / `mixed_tyvars_decl`
+  (mixed binder list), and a `bucket_mixed` helper in the prelude.
+  `tyd_name`, `operator`, `predicate`, `lemma_decl` updated to
+  produce the new fields.
+- [src/ecTyping.ml](src/ecTyping.ml) + [.mli](src/ecTyping.mli) —
+  `transtyvars` gains `?idxparams:psymbol list`. `transtindex`
+  translates a `pindex` to a `tindex`, looking variables up via
+  `EcUnify.UniEnv.getnamed_idx`. `transty` `PTapp` validates index
+  arity and translates each index argument. New `tyerror` variants:
+  `InvalidIndexAppl`, `UnboundIndexVariable`, `DuplicatedIndexVar`,
+  with printer entries in
+  [src/ecUserMessages.ml](src/ecUserMessages.ml).
+- [src/ecUnify.ml](src/ecUnify.ml) + [.mli](src/ecUnify.mli) —
+  `unienv` carries a separate `ue_idxnamed` / `ue_idxdecl`. New
+  `getnamed_idx`. `tparams` propagates `idxvars` into the returned
+  `ty_params`.
+- [src/ecScope.ml](src/ecScope.ml) — tydecl path threads
+  `pty_idxvars` for abstract / alias bodies, refuses indices on
+  datatype / record with a clean error. Op + axiom call sites pass
+  `~idxparams`.
+- [src/ecHiPredicates.ml](src/ecHiPredicates.ml) — predicate-decl
+  passes `~idxparams`.
+- [src/ecThCloning.ml](src/ecThCloning.ml) + [.mli](src/ecThCloning.mli)
+  — new `CE_IndexedNotYetSupported` clone-error; `ty_ovrd` refuses
+  cloning of indexed types with a clean printer entry.
+- [tests/indexed-types.ec](tests/indexed-types.ec) — regression
+  exercising tydecl binders + applications, op / pred / axiom
+  binders.
+
+#### Verified
+
+- `_build/default/src/ec.exe compile -boot tests/indexed-types.ec`
+  succeeds (12 indexed-type declarations and 3 indexed
+  op/pred/axiom binders).
+- Ad-hoc negative cases: unbound index, index arity mismatch,
+  duplicated index variable, cloning of an indexed type — each
+  raises a clean message at the right location.
+
+#### Notable Phase-3 design choices
+
+- The `<:...>` framing for index applications was chosen over the
+  user-preferred `[...]` after a real shift/reduce conflict surfaced
+  in `mod_update_fun`. Reuses the existing operator-tvi framing.
+- `pindex` is its own AST (not a re-use of `pformula`) to avoid
+  pulling `pformula` into `pty_r`'s mutual recursion.
+- `transtyvars` keeps its existing positional `(loc, tparams option)`
+  argument; the new `?idxparams` is an optional keyword. Backward
+  compatible — every existing call site still compiles unchanged.
+
+#### Risks left for later
+
+- **Index inference at op application sites.** Indexed ops *declare*
+  fine but *calling* them doesn't yet work — `EcUnify` has no
+  `TIUnivar` machinery, so an op's index parameter stays as a fresh
+  ident that can't be unified against the caller's index expression.
+  This is the deferred Phase-1 question (introduce `TIUnivar`,
+  decide polynomial-with-univars unification). Without it, indexed
+  ops are mostly cosmetic.
+- **Datatype / Record indexed types.** Refused with a clean error in
+  `ecScope`. Adding support is mostly threading idxvars through
+  `ecHiInductive.trans_datatype` / `trans_record`.
+- **Cloning of indexed types/ops.** Refused with `CE_IndexedNotYetSupported`.
+  Real support needs index-instantiation surface syntax in
+  `clone with`, plus a way to substitute indices through the cloned
+  declarations.
 
 ### Phase 4 — Theories & smoke tests
 1. Add a focused `.ec` test exercising:

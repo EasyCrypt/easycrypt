@@ -68,10 +68,21 @@ type pty_r =
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
   | PTvar    of psymbol
-  | PTapp    of pqsymbol * pty list
+  | PTapp    of pqsymbol * pty list * pindex list
   | PTfun    of pty * pty
   | PTglob   of pmsymbol located
 and pty = pty_r located
+
+(* Polynomial-fragment index expressions appearing inside `[ ... ]`
+   on type-constructor applications. The typechecker validates the
+   sub-grammar (only +, *, non-negative literals, and identifiers
+   bound as indices). *)
+and pindex_r =
+  | PIvar of psymbol
+  | PIint of zint
+  | PIadd of pindex * pindex
+  | PImul of pindex * pindex
+and pindex = pindex_r located
 
 type ptyannot_r =
   | TVIunamed of pty list
@@ -106,9 +117,10 @@ type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
-  pty_name   : psymbol;
-  pty_tyvars : ptyparams;
-  pty_body   : ptydbody;
+  pty_name     : psymbol;
+  pty_idxvars  : psymbol list;
+  pty_tyvars   : ptyparams;
+  pty_body     : ptydbody;
   pty_locality : locality;
 }
 
@@ -423,6 +435,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
+  po_idxvars: psymbol list;
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
@@ -451,6 +464,7 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
+  pp_idxvars : psymbol list;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
   pp_locality  : locality;
@@ -1062,6 +1076,7 @@ type mempred_binding = PT_MemPred of psymbol list
 type paxiom = {
   pa_name     : psymbol;
   pa_pvars    : mempred_binding option;
+  pa_idxvars  : psymbol list;
   pa_tyvars   : ptyparams option;
   pa_vars     : pgtybindings option;
   pa_formula  : pformula;

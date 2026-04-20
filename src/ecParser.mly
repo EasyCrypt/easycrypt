@@ -14,12 +14,25 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let mk_tydecl ~locality (tyvars, name) body = {
+  let mk_tydecl ~locality (idxvars, tyvars, name) body = {
     pty_name     = name;
+    pty_idxvars  = idxvars;
     pty_tyvars   = tyvars;
     pty_body     = body;
     pty_locality = locality;
   }
+
+  (* Bucket a mixed `[ apostrophe-or-plain idents... ]` binder list into
+     (indices, type variables). *)
+  let bucket_mixed
+      (items : [`Ty of EcParsetree.psymbol | `Idx of EcParsetree.psymbol] list)
+    : EcParsetree.psymbol list * EcParsetree.psymbol list
+  =
+    let rec aux ix ty = function
+      | []                 -> (List.rev ix, List.rev ty)
+      | `Idx x :: rest     -> aux (x :: ix) ty rest
+      | `Ty  x :: rest     -> aux ix (x :: ty) rest
+    in aux [] [] items
 
   let opdef_of_opbody ty b =
     match b with
@@ -79,8 +92,9 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ~locality (x, ty, pv, vd, f) k =
+  let mk_axiom ~locality (x, idx, ty, pv, vd, f) k =
     { pa_name     = x;
+      pa_idxvars  = idx;
       pa_tyvars   = ty;
       pa_pvars   = pv;
       pa_vars     = vd;
@@ -1269,16 +1283,51 @@ pgtybindings:
 (* Type expressions                                                     *)
 
 simpl_type_exp:
-| UNDERSCORE                  { PTunivar       }
-| x=qident                    { PTnamed x      }
-| x=tident                    { PTvar x        }
-| tya=type_args x=qident      { PTapp (x, tya) }
-| GLOB m=loc(mod_qident)      { PTglob m       }
-| LPAREN ty=type_exp RPAREN   { ty             }
+| UNDERSCORE                                            { PTunivar           }
+| x=qident                                              { PTnamed x          }
+| x=qident is=idx_args                                  { PTapp (x, [], is)  }
+| x=tident                                              { PTvar x            }
+| tya=type_args x=qident is=loption(idx_args)           { PTapp (x, tya, is) }
+| GLOB m=loc(mod_qident)                                { PTglob m           }
+| LPAREN ty=type_exp RPAREN                             { ty                 }
 
 type_args:
 | ty=loc(simpl_type_exp)                          { [ty] }
 | LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN  { tys  }
+
+(* Indexed-type index arguments: a comma-separated list of polynomial
+   expressions enclosed between `<:` and `>`, e.g. `'a vec<:n+1>` or
+   `('a, 'b) map<:n, m>`. We reuse the LTCOLON/GT framing already used
+   for operator type-variable instantiation (`f<:int>`); a square-
+   bracket framing would conflict with `mod_update_fun`'s codepos
+   ranges in `module M = N with { proc f [ var x : T [..] ] }`. *)
+idx_args:
+| LTCOLON xs=plist1(pindex, COMMA) GT          { xs }
+
+(* Index-expression sub-grammar (polynomial fragment over the
+   naturals). Precedence: `*` binds tighter than `+`. *)
+pindex_atom:
+| x=lident                       { mk_loc x.pl_loc (PIvar x) }
+| n=loc(UINT)
+    { mk_loc n.pl_loc (PIint n.pl_desc) }
+| LPAREN p=pindex RPAREN         { p }
+
+pindex_mul:
+| a=pindex_atom                                  { a }
+| a=pindex_mul STAR b=pindex_atom
+    { mk_loc (EcLocation.merge a.pl_loc b.pl_loc) (PImul (a, b)) }
+
+pindex:
+| a=pindex_mul                                   { a }
+| a=pindex PLUS b=pindex_mul
+    { mk_loc (EcLocation.merge a.pl_loc b.pl_loc) (PIadd (a, b)) }
+
+(* Optional binder list of index parameters appearing right after
+   `type` (e.g. `type [n m] 'a vec`). Naked identifiers (no
+   apostrophe) inside square brackets distinguish them from type
+   parameters which use `'a`-style identifiers. *)
+idxvars_decl:
+| LBRACKET xs=lident+ RBRACKET   { xs }
 
 type_exp:
 | ty=simpl_type_exp                          { ty }
@@ -1650,7 +1699,7 @@ typarams:
     { (xs : ptyparams) }
 
 %inline tyd_name:
-| tya=typarams x=ident { (tya, x) }
+| idx=loption(idxvars_decl) tya=typarams x=ident { (idx, tya, x) }
 
 dt_ctor_def:
 | x=oident { (x, []) }
@@ -1750,38 +1799,55 @@ tyvars_decl:
 | LBRACKET tyvars=rlist2(tident, empty) RBRACKET
     { tyvars }
 
+(* Mixed binder list: each item is a tident (`'a`) bound as a type
+   variable, or a plain lident (`n`) bound as an integer index. Used
+   on operator/predicate/axiom/lemma headers, where indices and type
+   variables share a single set of brackets. Returns (idxvars, tyvars). *)
+mixed_tyvars_item:
+| x=tident { `Ty  x }
+| x=lident { `Idx x }
+
+mixed_tyvars_decl:
+| LBRACKET items=rlist0(mixed_tyvars_item, COMMA) RBRACKET
+| LBRACKET items=rlist2(mixed_tyvars_item, empty) RBRACKET
+    { bucket_mixed items }
+
 op_or_const:
 | OP    { `Op    }
 | CONST { `Const }
 
 operator:
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
+    x=plist1(oident, COMMA) tvs=mixed_tyvars_decl? args=ptybindings_opdecl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
       mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
+    let (idxvars, tyvars) = odfl ([], []) tvs in
 
     { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
-      po_tyvars   = tyvars;
+      po_idxvars  = idxvars;
+      po_tyvars   = tvs |> omap (fun _ -> tyvars);
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
       po_locality = locality; } }
 
 | locality=locality k=op_or_const tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
+    x=plist1(oident, COMMA) tvs=mixed_tyvars_decl? args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
-  { { po_kind     = k;
+  { let (idxvars, tyvars) = odfl ([], []) tvs in
+    { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
-      po_tyvars   = tyvars;
+      po_idxvars  = idxvars;
+      po_tyvars   = tvs |> omap (fun _ -> tyvars);
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;
@@ -1841,27 +1907,34 @@ procop:
 predicate:
 | locality=locality PRED x=oident
    { { pp_name     = x;
+       pp_idxvars  = [];
        pp_tyvars   = None;
        pp_def      = PPabstr [];
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
-   { { pp_name     = x;
-       pp_tyvars   = tyvars;
+| locality=locality PRED x=oident tvs=mixed_tyvars_decl? COLON sty=pred_tydom
+   { let (idxvars, tyvars) = odfl ([], []) tvs in
+     { pp_name     = x;
+       pp_idxvars  = idxvars;
+       pp_tyvars   = tvs |> omap (fun _ -> tyvars);
        pp_def      = PPabstr sty;
        pp_locality = locality; } }
 
-| locality=locality PRED x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
-   { { pp_name     = x;
-       pp_tyvars   = tyvars;
+| locality=locality PRED x=oident tvs=mixed_tyvars_decl? p=ptybindings? EQ f=form
+   { let (idxvars, tyvars) = odfl ([], []) tvs in
+     { pp_name     = x;
+       pp_idxvars  = idxvars;
+       pp_tyvars   = tvs |> omap (fun _ -> tyvars);
        pp_def      = PPconcr (odfl [] p, f);
        pp_locality = locality; } }
 
-| locality=locality INDUCTIVE x=oident tyvars=tyvars_decl? p=ptybindings?
+| locality=locality INDUCTIVE x=oident tvs=mixed_tyvars_decl? p=ptybindings?
     EQ b=indpred_def
 
-   { { pp_name     = x;
-       pp_tyvars   = tyvars;
+   { let (idxvars, tyvars) = odfl ([], []) tvs in
+     { pp_name     = x;
+       pp_idxvars  = idxvars;
+       pp_tyvars   = tvs |> omap (fun _ -> tyvars);
        pp_def      = PPind (odfl [] p, b);
        pp_locality = locality; } }
 
@@ -1945,11 +2018,13 @@ mempred_binding:
 
 lemma_decl:
 | x=ident
-  tyvars=tyvars_decl?
+  tvs=mixed_tyvars_decl?
   predvars=mempred_binding?
   pd=pgtybindings?
   COLON f=form
-    { (x, tyvars, predvars, pd, f) }
+    { let (idxvars, tyvars) = odfl ([], []) tvs in
+      let tyvars = tvs |> omap (fun _ -> tyvars) in
+      (x, idxvars, tyvars, predvars, pd, f) }
 
 axiom_tc:
 | /* empty */       { PLemma None }
@@ -1967,7 +2042,7 @@ axiom:
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
-    { mk_axiom ~locality:l (x, None, None, pd, p) ao }
+    { mk_axiom ~locality:l (x, [], None, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }
