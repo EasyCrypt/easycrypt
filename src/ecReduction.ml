@@ -27,10 +27,11 @@ module EqTest_base = struct
     let exception NotEqual in
 
     try
-      (* FIXME: compare indices *)
       if List.compare_lengths ta1.types ta2.types <> 0 then
         raise NotEqual;
       if List.compare_lengths ta1.indices ta2.indices <> 0 then
+        raise NotEqual;
+      if not (List.all2 tindex_equal ta1.indices ta2.indices) then
         raise NotEqual;
       if not (List.all2 (for_type env) ta1.types ta2.types) then
         raise NotEqual;

@@ -94,19 +94,47 @@ Goal: clean `dune build` with the existing `targs` /
 
 ## Roadmap (remaining phases)
 
-### Phase 1 — Polynomial normal form & equality
-1. Add a `tindex` normalisation (sorted sum-of-monomials with
-   `EcBigInt` coefficients ≥ 1) and hashcons canonical forms.
-2. Make `tindex_equal` compare canonical forms; replace the
-   `Hashtbl.hash` `tindex_hash` (structurally wrong once
-   `1+2 ≡ 2+1`).
-3. Replace the `(* FIXME *)` in
-   [src/ecUnify.ml:146](src/ecUnify.ml#L146) (note: polarity also
-   bugged today: `if all2 ... then failure ()` is inverted) and the
-   `(* FIXME: compare indices *)` in `EcReduction.for_targs`
-   ([src/ecReduction.ml:25-39](src/ecReduction.ml#L25-L39)).
-4. Decide whether indices participate in `EcUnify.UF` for inference —
-   probably needed only if Phase 3 lets users elide indices.
+### Phase 1 — Polynomial normal form & equality (DONE)
+
+#### What changed
+
+- [src/ecAst.ml](src/ecAst.ml) — added `tindex_canonical` record
+  (`{cn_konst : zint; cn_mons : (mono * zint) list}` with `mono =
+  (ident * exponent) list`), the helpers `mono_compare` / `mono_mul`
+  / `mons_normalize` / `canonical_const` / `canonical_var` /
+  `canonical_add` / `canonical_mul`, and the entry point
+  `tindex_canonicalize`. Coefficients are stored as `EcBigInt.zint`
+  with the invariants `cn_konst ≥ 0`, every `mons` coefficient ≥ 1,
+  `cn_mons` strictly sorted by `mono_compare`. `canonical_const`
+  guards against negative `TIConst` with `invalid_arg`.
+- `tindex_equal` now does `(==)` first, then compares canonical
+  forms; `tindex_hash` hashes the canonical form so hashconsing of
+  `Tconstr` agrees with equality.
+- `targs_equal` checks lengths before `List.all2` (previously could
+  raise `Invalid_argument`).
+- [src/ecAst.mli](src/ecAst.mli) — exposed `tindex_hash`.
+- [src/ecUnify.ml](src/ecUnify.ml) — fixed the inverted-polarity bug
+  in the unification of `Tconstr` arms (was `if all2 ... then
+  failure ()` instead of `if not all2`); now also length-checks
+  indices before iterating types.
+- [src/ecReduction.ml](src/ecReduction.ml) —
+  `EqTest_base.for_targs` actually compares indices (previous FIXME).
+
+#### Verified
+
+Built `dune build`, then ran an ephemeral smoke executable (deleted
+after success) covering: commutativity (`n+1 ≡ 1+n`), associativity
+(`(n+m)+1 ≡ n+(m+1)`), distribution + constant folding
+(`(n+1)·2 ≡ 2n+2`), monomials (`n·n`), binomial expansion
+(`(n+m)² ≡ n²+2nm+m²`), inequality (`n ≢ n+1`, `2 ≢ 3`), and hash
+consistency between equal canonical forms.
+
+#### Deferred from Phase 1
+
+- Index unification variables (a `TIUnivar` constructor and
+  participation in `EcUnify.UF`) — only needed if Phase 3 lets users
+  elide indices at applications. Defer until parser work surfaces a
+  concrete need.
 
 ### Phase 2 — Substitution & FV
 1. Add `tindex_of_form : form -> tindex option` recognising

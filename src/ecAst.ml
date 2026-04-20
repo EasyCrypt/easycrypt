@@ -1066,34 +1066,151 @@ let pr_hash pr =
     (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))
 
 (* ----------------------------------------------------------------- *)
+(* tindex polynomial normal form                                     *)
+(*                                                                   *)
+(* A `tindex` is a polynomial expression over the natural numbers,   *)
+(* with grammar `TIVar | TIConst | TIAdd | TIMul`. We decide         *)
+(* equality up to commutativity / associativity / distributivity by  *)
+(* normalising to a canonical sum-of-monomials.                      *)
+(* ----------------------------------------------------------------- *)
+
+(* A monomial is a sorted association list (ident, exponent) with
+   each exponent >= 1. The empty list represents the constant 1. *)
+type tindex_mono = (EcIdent.t * int) list
+
+(* A polynomial in canonical form over the non-negative integers.
+   Invariants:
+   - cn_konst >= 0
+   - cn_mons sorted strictly ascending by mono_compare
+   - every coefficient >= 1
+   - the empty monomial [] does not appear in cn_mons (folded into cn_konst) *)
+type tindex_canonical = {
+  cn_konst : EcBigInt.zint;
+  cn_mons  : (tindex_mono * EcBigInt.zint) list;
+}
+
+let mono_compare : tindex_mono -> tindex_mono -> int =
+  let rec cmp m1 m2 =
+    match m1, m2 with
+    | [], [] -> 0
+    | [], _  -> -1
+    | _ , [] -> 1
+    | (x1, e1) :: t1, (x2, e2) :: t2 ->
+        let c = EcIdent.id_compare x1 x2 in
+        if c <> 0 then c else
+        let c = Stdlib.compare (e1 : int) e2 in
+        if c <> 0 then c else cmp t1 t2
+  in cmp
+
+(* Multiply two monomials: merge by ident, sum exponents. *)
+let rec mono_mul (m1 : tindex_mono) (m2 : tindex_mono) : tindex_mono =
+  match m1, m2 with
+  | [], _ -> m2
+  | _, [] -> m1
+  | (x1, e1) :: t1, (x2, e2) :: t2 ->
+      let c = EcIdent.id_compare x1 x2 in
+      if c < 0 then (x1, e1) :: mono_mul t1 m2
+      else if c > 0 then (x2, e2) :: mono_mul m1 t2
+      else (x1, e1 + e2) :: mono_mul t1 t2
+
+(* Normalise a list of (mono, coef) pairs: drop zero coefficients,
+   sort by monomial, merge duplicates by summing coefficients. *)
+let mons_normalize (pairs : (tindex_mono * EcBigInt.zint) list) =
+  let pairs =
+    List.filter
+      (fun (_, c) -> not (EcBigInt.equal c EcBigInt.zero))
+      pairs in
+  let pairs =
+    List.sort (fun (m1, _) (m2, _) -> mono_compare m1 m2) pairs in
+  let rec merge = function
+    | [] -> []
+    | [x] -> [x]
+    | (m1, c1) :: ((m2, c2) :: t as rest) ->
+        if mono_compare m1 m2 = 0 then
+          merge ((m1, EcBigInt.add c1 c2) :: t)
+        else
+          (m1, c1) :: merge rest
+  in merge pairs
+
+let canonical_const (n : EcBigInt.zint) =
+  if EcBigInt.sign n < 0 then
+    invalid_arg "tindex: negative integer constant";
+  { cn_konst = n; cn_mons = [] }
+
+let canonical_var (id : EcIdent.t) =
+  { cn_konst = EcBigInt.zero;
+    cn_mons  = [([(id, 1)], EcBigInt.one)] }
+
+let canonical_add (p : tindex_canonical) (q : tindex_canonical) =
+  { cn_konst = EcBigInt.add p.cn_konst q.cn_konst;
+    cn_mons  = mons_normalize (p.cn_mons @ q.cn_mons); }
+
+let canonical_mul (p : tindex_canonical) (q : tindex_canonical) =
+  let pk = p.cn_konst and qk = q.cn_konst in
+  let kp_qm =
+    if EcBigInt.equal pk EcBigInt.zero then []
+    else List.map (fun (m, c) -> (m, EcBigInt.mul pk c)) q.cn_mons in
+  let kq_pm =
+    if EcBigInt.equal qk EcBigInt.zero then []
+    else List.map (fun (m, c) -> (m, EcBigInt.mul qk c)) p.cn_mons in
+  let pm_qm =
+    List.concat_map
+      (fun (m1, c1) ->
+        List.map
+          (fun (m2, c2) -> (mono_mul m1 m2, EcBigInt.mul c1 c2))
+          q.cn_mons)
+      p.cn_mons in
+  { cn_konst = EcBigInt.mul pk qk;
+    cn_mons  = mons_normalize (kp_qm @ kq_pm @ pm_qm); }
+
+let rec tindex_canonicalize (ti : tindex) : tindex_canonical =
+  match ti with
+  | TIVar id     -> canonical_var id
+  | TIConst n    -> canonical_const n
+  | TIAdd (l, r) -> canonical_add (tindex_canonicalize l) (tindex_canonicalize r)
+  | TIMul (l, r) -> canonical_mul (tindex_canonicalize l) (tindex_canonicalize r)
+
+let canonical_equal (p : tindex_canonical) (q : tindex_canonical) =
+  EcBigInt.equal p.cn_konst q.cn_konst &&
+  let rec eq m1 m2 =
+    match m1, m2 with
+    | [], [] -> true
+    | [], _ | _, [] -> false
+    | (k1, c1) :: t1, (k2, c2) :: t2 ->
+        mono_compare k1 k2 = 0
+        && EcBigInt.equal c1 c2
+        && eq t1 t2
+  in eq p.cn_mons q.cn_mons
+
+let canonical_hash (p : tindex_canonical) =
+  let mono_hash (m : tindex_mono) =
+    Why3.Hashcons.combine_list
+      (fun (id, e) -> Why3.Hashcons.combine (EcIdent.id_hash id) e)
+      0 m in
+  let pair_hash (m, c) =
+    Why3.Hashcons.combine (mono_hash m) (EcBigInt.hash c) in
+  Why3.Hashcons.combine_list pair_hash (EcBigInt.hash p.cn_konst) p.cn_mons
+
+(* ----------------------------------------------------------------- *)
 (* Hashconsing                                                       *)
 (* ----------------------------------------------------------------- *)
-let rec tindex_equal (ti1 : tindex) (ti2 : tindex) : bool =
-  match ti1, ti2 with
-  | TIVar n1, TIVar n2 ->
-    EcIdent.id_equal n1 n2
-
-  | TIConst n1, TIConst n2 ->
-    EcBigInt.equal n1 n2
-
-  | TIAdd (l1, r1), TIAdd (l2, r2)
-  | TIMul (l1, r1), TIMul (l2, r2) ->
-    tindex_equal l1 l2 && tindex_equal r1 r2
-
-  | _, _ ->
-    false
+let tindex_equal (ti1 : tindex) (ti2 : tindex) : bool =
+  ti1 == ti2
+  || canonical_equal (tindex_canonicalize ti1) (tindex_canonicalize ti2)
 
 let targs_equal (ta1 : targs) (ta2 : targs) : bool =
-  List.all2 tindex_equal ta1.indices ta2.indices
+  List.compare_lengths ta1.indices ta2.indices = 0
+  && List.compare_lengths ta1.types ta2.types = 0
+  && List.all2 tindex_equal ta1.indices ta2.indices
   && List.all2 ty_equal ta1.types ta2.types
-    
+
 let targs_fv (ta : targs) =
   List.fold_left
     (fun ids ty -> fv_union ids (ty_fv ty))
     Mid.empty ta.types
 
 let tindex_hash (ti : tindex) =
-  Hashtbl.hash ti
+  canonical_hash (tindex_canonicalize ti)
 
 let targ_hash (init : int) (ta : targs) =
   let aout = init in
