@@ -27,10 +27,16 @@ type subst = {
   sb_module   : EcPath.mpath Mid.t;
   sb_path     : EcPath.path Mp.t;
   sb_tyvar    : ty Mid.t;
+  (* Index-variable substitution. Populated during the
+     Tconstr-with-tydef case of [subst_ty] to bind the source type's
+     idxvars to the call-site index arguments. Consulted by
+     [subst_tindex] before the [sb_flocal] formula-locals fallback. *)
+  sb_idxvar   : tindex Mid.t;
   sb_elocal   : expr Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
-  sb_tydef    : (EcIdent.t list * ty) Mp.t;
+  (* (idxvars, tyvars, body) — both binder lists may be empty. *)
+  sb_tydef    : (EcIdent.t list * EcIdent.t list * ty) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
   sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
 }
@@ -40,6 +46,7 @@ let empty : subst = {
   sb_module   = Mid.empty;
   sb_path     = Mp.empty;
   sb_tyvar    = Mid.empty;
+  sb_idxvar   = Mid.empty;
   sb_elocal   = Mid.empty;
   sb_flocal   = Mid.empty;
   sb_fmem     = Mid.empty;
@@ -52,6 +59,7 @@ let is_empty s =
   Mid.is_empty s.sb_module
   && Mp.is_empty s.sb_path
   && Mid.is_empty s.sb_tyvar
+  && Mid.is_empty s.sb_idxvar
   && Mid.is_empty s.sb_elocal
   && Mid.is_empty s.sb_flocal
   && Mid.is_empty s.sb_fmem
@@ -153,6 +161,11 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
 let rec subst_tindex (s : subst) (ti : tindex) : tindex =
   match ti with
   | TIVar id -> begin
+      (* sb_idxvar (cloning instantiation) wins over the formula
+         locals fallback. *)
+      match Mid.find_opt id s.sb_idxvar with
+      | Some ti' -> ti'
+      | None ->
       match Mid.find_opt id s.sb_flocal with
       | None -> ti
       | Some f ->
@@ -198,8 +211,14 @@ let rec subst_ty (s : subst) (ty : ty) =
       | None ->
          tconstr_r (subst_path s p) ta
 
-      | Some (args, body) ->
+      | Some (idxs, args, body) ->
+         (* Bind the source type's idxvars/tyvars to the call-site
+            index/type arguments, then substitute through the body. *)
          let s = List.fold_left2 add_tyvar empty args ta.types in
+         let s =
+           List.fold_left2
+             (fun s id ti -> { s with sb_idxvar = Mid.add id ti s.sb_idxvar })
+             s idxs ta.indices in
          subst_ty s body
     end
 
@@ -296,9 +315,9 @@ let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
 
-let add_tydef (s : subst) p (ids, ty) =
+let add_tydef (s : subst) p ((idxs, ids, ty) : EcIdent.t list * EcIdent.t list * ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
-  { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
+  { s with sb_tydef = Mp.add p (idxs, ids, ty) s.sb_tydef }
 
 let add_opdef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);

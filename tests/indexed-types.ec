@@ -52,3 +52,25 @@ op test1 [n m 'a] (x : 'a) (ys : 'a vec<:n>) (zs : 'a vec<:m>)
 op test2 [n m 'a] (x : 'a) (ys : 'a vec<:n>) (zs : 'a vec<:m>)
   : 'a vec<:n+(1+m)>
   = concat (cons x ys) zs.
+
+(* Phase 4 — cloning with index instantiation.
+   `clone with type [k] 'a vec = body` substitutes every occurrence of
+   the indexed type, binding the source's idxvars to the call-site
+   index expressions when the body references them. *)
+type [k] 'a coll.
+
+theory ClonedT.
+  type [n] 'a target.
+end ClonedT.
+
+(* Drop the index, use a non-indexed type. *)
+clone ClonedT as Erased with
+  type [k] 'a target = int.
+
+(* Propagate the index through to another indexed type. *)
+clone ClonedT as Forwarded with
+  type [k] 'a target = 'a coll<:k>.
+
+(* Use a polynomial of the binder. *)
+clone ClonedT as Bumped with
+  type [k] 'a target = 'a coll<:k+1>.

@@ -3679,8 +3679,8 @@ cltyparams:
 | xs=paren(plist1(tident, COMMA)) { xs }
 
 clone_override:
-| TYPE ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
-   { (x, PTHO_Type (`BySyntax (ps, t), mode)) }
+| TYPE idx=loption(idxvars_decl) ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
+   { (x, PTHO_Type (`BySyntax (idx, ps, t), mode)) }
 
 | OP x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))

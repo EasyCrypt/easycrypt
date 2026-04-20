@@ -765,6 +765,10 @@ end = struct
         msg "type argument mismatch for %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
 
+    | CE_IdxArgMism (kd, x) ->
+        msg "index argument mismatch for %s `%s'"
+          (string_of_ovkind kd) (string_of_qsymbol x)
+
     | CE_IndexedNotYetSupported (kd, x) ->
         msg "cloning of indexed %s `%s' is not yet supported"
           (string_of_ovkind kd) (string_of_qsymbol x)

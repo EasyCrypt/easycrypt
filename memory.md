@@ -354,18 +354,67 @@ Negative case (`vec<:n+2>` annotated as the result of `cons x ys`)
 errors out cleanly (with a slightly misleading "no matching
 operator" message — Phase-6 polish issue).
 
-### Phase 4 — Theories & smoke tests
-1. Add a focused `.ec` test exercising:
-    - declaration of an indexed type and indexed op
-    - polynomial-equality path: `concat (concat a b) c : vec[(n+m)+k]`
-      unifies with `vec[n+(m+k)]`
-    - cloning with index instantiation
-2. Recommend leaving `theories/Array.ec` etc. untouched for the first
-   landing.
+### Phase 4 — Theories & smoke tests (DONE)
 
-Note: Phase-3.5's regression already covers items 1.a and 1.b.
-Phase 4 may collapse to "extend the regression with cloning once
-that's supported" plus the optional Array.ec migration.
+Implemented cloning of indexed types and extended the regression
+accordingly. `theories/Array.ec` migration deliberately skipped for
+the first landing.
+
+#### Final clone-with-type syntax
+
+`clone T as T2 with type [k] 'a vec = body` — `[k]` is the optional
+idxvar list (mirroring tydecl binder syntax), body is a type
+expression that may reference the idx binders (and the tyvars).
+Applied textually when `vec<:e>` occurs in the source theory: the
+body's idx binders get bound to `e`.
+
+#### What changed
+
+- [src/ecParsetree.ml](src/ecParsetree.ml) — `ty_override_def`
+  widened from `psymbol list * pty` to
+  `psymbol list * psymbol list * pty` (idxvars, tyvars, body).
+- [src/ecParser.mly](src/ecParser.mly) — `clone_override`'s TYPE
+  rule accepts an optional `[<idxvars>]` prefix; reuses the existing
+  `idxvars_decl` from Phase 3.
+- [src/ecSubst.ml](src/ecSubst.ml) + [.mli](src/ecSubst.mli) —
+  `subst` gains `sb_idxvar : tindex Mid.t`. `sb_tydef` widened to
+  `(idxvars, tyvars, body)`. `subst_tindex` consults `sb_idxvar`
+  first (then `sb_flocal` fallback). `subst_ty`'s `Tconstr`-with-
+  tydef branch binds *both* the source idxvars (to `ta.indices`)
+  and tyvars (to `ta.types`) before substituting through the body.
+  `add_tydef`'s tuple widened correspondingly.
+- [src/ecThCloning.ml](src/ecThCloning.ml) +
+  [.mli](src/ecThCloning.mli) — `ty_ovrd` checks index *and* type
+  arity. The Phase-3 blanket-refusal `CE_IndexedNotYetSupported` is
+  replaced by the more precise `CE_IdxArgMism` (with a printer in
+  [src/ecUserMessages.ml](src/ecUserMessages.ml)).
+- [src/ecTheoryReplay.ml](src/ecTheoryReplay.ml) — `BySyntax` case
+  threads `nidxs` through `transtyvars` and into the `add_tydef`
+  tuple.
+- [src/ecEnv.ml](src/ecEnv.ml), [src/ecAlgTactic.ml](src/ecAlgTactic.ml),
+  [src/ecSection.ml](src/ecSection.ml),
+  [src/ecScope.ml](src/ecScope.ml) — mechanical updates to existing
+  `add_tydef` callers (widen `(ids, ty)` → `(idxs, ids, ty)`).
+- [tests/indexed-types.ec](tests/indexed-types.ec) — added three
+  indexed-type clone cases: drop-the-index to `int`, propagate as
+  `'a coll<:k>`, use a polynomial `'a coll<:k+1>`.
+
+#### Verified
+
+77 declarations in `tests/indexed-types.ec` compile (was 55 after
+Phase 3.5). `CE_IdxArgMism` correctly catches wrong-arity idx-binder
+lists.
+
+#### Gaps worth flagging
+
+- Reaching *into* a cloned theory to call ops whose signature got
+  touched by an indexed-type override is awkward: `T2.make_vec` came
+  back as "unknown variable" in experimentation. Looks orthogonal to
+  indexed types — likely a clone-with-substitution / namespace
+  artefact — but worth a note.
+- No explicit index-instantiation syntax at op call sites
+  (`f<:idx, ty>`) yet; tests that need index-passing at the call
+  site rely on inference. A Phase-6 polish could add this.
 
 ### Phase 5 — SMT gating
 Replace the `assert (List.is_empty tys.indices)` calls in

@@ -904,7 +904,7 @@ module MC = struct
 
       let self = EcIdent.create "'self" in
 
-      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self) in
+      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], [], tvar self) in
 
       let operators =
         let on1 (opid, optype) =

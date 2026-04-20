@@ -1221,7 +1221,8 @@ and 'a genoverride = [
 | `BySyntax of 'a
 ]
 
-and ty_override_def = psymbol list * pty
+(* (idxvars, tyvars, body) — both binder lists may be empty. *)
+and ty_override_def = psymbol list * psymbol list * pty
 
 and op_override_def = {
   opov_tyvars : psymbol list option;

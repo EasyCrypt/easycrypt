@@ -422,11 +422,11 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
   | Some { pl_desc = (tydov, mode) } -> begin
       let newtyd, body =
         match tydov with
-        | `BySyntax (nargs, ntyd) ->
-            let nargs = List.map
-                          (fun x -> (EcIdent.create (unloc x)))
-                          nargs in
-            let nargs_p = { idxvars = []; tyvars = nargs } in
+        | `BySyntax (nidxs, nargs, ntyd) ->
+            let mk1 x = EcIdent.create (unloc x) in
+            let idxvars = List.map mk1 nidxs in
+            let tyvars  = List.map mk1 nargs in
+            let nargs_p = { idxvars; tyvars } in
             let ue    = EcUnify.UniEnv.create (Some nargs_p) in
             let ntyd  = EcTyping.transty EcTyping.tp_tydecl env ue ntyd in
             let decl  =
@@ -467,7 +467,9 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
         | `Inline _ ->
           let subst =
             EcSubst.add_tydef
-              subst (xpath ove x) (newtyd.tyd_params.tyvars, body) in
+              subst (xpath ove x)
+              (newtyd.tyd_params.idxvars,
+               newtyd.tyd_params.tyvars, body) in
 
           let subst =
             (* FIXME: HACK *)

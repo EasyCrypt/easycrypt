@@ -2561,7 +2561,7 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = EcSubst.add_tydef EcSubst.empty tcp ([], ty) in
+    let subst = EcSubst.add_tydef EcSubst.empty tcp ([], [], ty) in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, EcSubst.subst_ty subst opty)))
         tc.tc_ops
