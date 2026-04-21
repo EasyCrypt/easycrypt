@@ -285,7 +285,25 @@ let lenv_of_tparams_for_hyp genv (ts : ty_params) =
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
   in
-    List.map_fold trans_tv empty_lenv ts.tyvars
+  let env, tysyms = List.map_fold trans_tv empty_lenv ts.tyvars in
+  (* Idxvars are int-typed formula locals (Phase 2): declare each as
+     a Why3 param of type [int] so [trans_app]'s [Flocal] case can
+     resolve them. Without this, an idxvar referenced as an int term
+     in the goal causes [oget None] inside [trans_app]. *)
+  (* Register each idxvar as an int-typed top-level constant via the
+     local-context [te_lc] map (the same path [LD_var] bindings take).
+     [trans_app]'s [Flocal] case checks [te_lc] before [le_lv]. *)
+  List.iter (fun (id : EcIdent.t) ->
+    let ls = WTerm.create_lsymbol (preid id) [] (Some WTy.ty_int) in
+    let w3op = {
+      w3op_fo = `LDecl ls;
+      w3op_ta = (fun _ -> ([], [], Some WTy.ty_int));
+      w3op_ho = `HO_TODO (EcIdent.name id, [], Some WTy.ty_int);
+    } in
+    genv.te_task <- WTask.add_decl genv.te_task (WDecl.create_param_decl ls);
+    Hid.add genv.te_lc id w3op)
+    ts.idxvars;
+  (env, tysyms)
 
 (* -------------------------------------------------------------------- *)
 let instantiate tparams ~textra targs tres tys =

@@ -950,7 +950,27 @@ module Ax = struct
       | false -> PSNoCheck
       | true  ->
           let hyps  = EcEnv.LDecl.init (env scope) axd.ax_tparams in
-          let proof = EcCoreGoal.start hyps axd.ax_spec in
+          (* Idxvars are non-negative integers by Phase-2 design. Make
+             this fact available in the proof by inserting [0 <= n_i =>]
+             implications immediately INSIDE the lemma's outermost
+             foralls (not at the very top), so the existing
+             auto-introduction of [pa_vars] still works as before. The
+             user introduces the new hypotheses on demand via
+             [move=> Hn_i]. The implications never leak into the saved
+             [ax_spec] — only the proof goal sees them. *)
+          let mk_imps body =
+            List.fold_right (fun id acc ->
+              let h = f_int_le f_i0 (f_local id tint) in
+              f_imp h acc)
+              axd.ax_tparams.idxvars body
+          in
+          let rec push f =
+            match f.f_node with
+            | Fquant (Lforall, bds, body) ->
+                f_forall bds (push body)
+            | _ -> mk_imps f
+          in
+          let proof = EcCoreGoal.start hyps (push axd.ax_spec) in
           PSCheck proof
     in
     let puc =

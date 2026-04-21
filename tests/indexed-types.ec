@@ -252,3 +252,19 @@ axiom midx_self {n} (xs : int vec<:n>) (k : int) :
 lemma test_chain {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
   midx wm 1 = midx wm 1.
 proof. rewrite midx_self. rewrite midx_self. trivial. qed.
+
+(* Each idxvar is a non-negative integer by Phase-2 design. The proof
+   goal is wrapped (inside the lemma's [pa_vars] forall) with one
+   [0 <= n_i =>] implication per idxvar; the user introduces them
+   on demand via [move=>]. The implications never leak into the
+   saved [ax_spec] — only the proof goal sees them. *)
+lemma idx_ge0_simple {n} : 0 <= n.
+proof. move=> Hn. trivial. qed.
+
+lemma idx_ge0_smt {m n} : 0 <= m + n.
+proof. move=> Hm Hn. smt(). qed.
+
+(* Backward compat: [pa_vars] auto-intro still works because the
+   implications are pushed inside the forall, not at the top. *)
+lemma idx_with_args {n} (xs : int vec<:n>) : 0 <= n.
+proof. move=> Hn. trivial. qed.
