@@ -88,3 +88,21 @@ op a_test2 ['a] (xs : 'a vec<:5>) : int = size[:5] xs.
 
 (* both index and type explicit (no inference path for either) *)
 op a_test3 : int = count[:5]<:int>.
+
+(* Gap B — polynomial unification beyond naked TIUnivar.
+   The unifier can solve any equation where exactly one TIUnivar
+   appears with coefficient ±1 and the residual stays non-negative. *)
+
+op tail [n 'a] (xs : 'a vec<:n+1>) : 'a vec<:n>.
+
+(* Caller passes a vector of length 5; n must be inferred so that
+   n+1 = 5, i.e. n = 4. The naked-univar special case used to fail
+   here because ?u_n was not on its own. *)
+op b_test1 ['a] (xs : 'a vec<:5>) : 'a vec<:4> = tail xs.
+
+(* Unification of [?u_n + 1] against [m + 5] forces ?u_n = m + 4. *)
+op b_test2 [m 'a] (xs : 'a vec<:m+5>) : 'a vec<:m+4> = tail xs.
+
+(* Symmetric form: univar on the rhs of the equation. *)
+op head [n 'a] (xs : 'a vec<:n+1>) : 'a.
+op b_test3 ['a] (xs : 'a vec<:7>) : 'a = head xs.

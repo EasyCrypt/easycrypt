@@ -163,22 +163,18 @@ let unify_core (env : EcEnv.env) (ue : unienv) (pb : pb) =
 
   (* Try to unify two indices. Resolves both sides through the current
      univar assignments, canonicalises, and compares. If equal, done.
-     Otherwise tries to assign a naked univar on either side to the
-     other side (with occurs check). Anything else fails — we do not
-     attempt full polynomial unification. *)
+     Otherwise hands off to [tindex_solve_for_univar], which solves any
+     equation reducible to "one TIUnivar with coefficient ±1, residual
+     non-negative". This subsumes the old "naked univar = polynomial"
+     special case and additionally handles e.g. [?u + 1 = n + 5]. *)
   let unify_ix t1 t2 =
     let r1 = resolve_tindex ue t1 in
     let r2 = resolve_tindex ue t2 in
     if tindex_equal r1 r2 then () else
-    let assign u t =
-      ue := { !ue with ue_iuf = Muid.add u t (!ue).ue_iuf } in
-    match tindex_naked_univar r1 with
-    | Some u when not (tindex_occurs_univar u r2) -> assign u r2
-    | _ -> begin
-        match tindex_naked_univar r2 with
-        | Some u when not (tindex_occurs_univar u r1) -> assign u r1
-        | _ -> failure ()
-      end
+    match tindex_solve_for_univar r1 r2 with
+    | Some (u, v) when not (tindex_occurs_univar u v) ->
+        ue := { !ue with ue_iuf = Muid.add u v (!ue).ue_iuf }
+    | _ -> failure ()
   in
 
   let doit () =

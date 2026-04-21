@@ -1228,6 +1228,128 @@ let tindex_occurs_univar (u : EcUid.uid) (t : tindex) : bool =
     | TIAdd (l, r) | TIMul (l, r) -> walk l || walk r
   in walk t
 
+(* Reconstruct a [tindex] AST from a canonical polynomial. The
+   canonical form's invariants (non-negative coefficients and constant)
+   are required; behaviour is undefined for signed inputs. The
+   resulting tree canonicalises back to [c] up to monomial ordering. *)
+let tindex_of_canonical (c : tindex_canonical) : tindex =
+  let var_to_tindex = function
+    | TVVar id -> TIVar id
+    | TVUni u  -> TIUnivar u
+  in
+  let pow v e =
+    let base = var_to_tindex v in
+    let rec go k = if k <= 1 then base else TIMul (base, go (k - 1)) in
+    go e
+  in
+  let mono_to_tindex (m : tindex_mono) (coef : EcBigInt.zint) : tindex =
+    let factors = List.map (fun (v, e) -> pow v e) m in
+    let body =
+      match factors with
+      | []     -> TIConst EcBigInt.one
+      | f :: r -> List.fold_left (fun acc f -> TIMul (acc, f)) f r
+    in
+    if EcBigInt.equal coef EcBigInt.one then body
+    else TIMul (TIConst coef, body)
+  in
+  let mons = List.map (fun (m, c) -> mono_to_tindex m c) c.cn_mons in
+  match mons with
+  | [] -> TIConst c.cn_konst
+  | first :: rest ->
+      let sum = List.fold_left (fun acc m -> TIAdd (acc, m)) first rest in
+      if EcBigInt.equal c.cn_konst EcBigInt.zero then sum
+      else TIAdd (TIConst c.cn_konst, sum)
+
+(* Try to solve [lhs = rhs] for a single TIUnivar. Succeeds when, in
+   the difference [lhs - rhs] computed as a signed polynomial, exactly
+   one TIUnivar [?u] has non-zero net coefficient, that coefficient
+   is +1 or -1, every monomial whose factors mix univars and other
+   variables (or contain a univar with degree > 1) has zero net
+   coefficient, and the resulting value of [?u] (= -(rest)/coef) has
+   non-negative coefficient on every remaining monomial and on the
+   constant term. Returns [Some (u, value)] in that case.
+
+   The MVP scope deliberately excludes:
+   - multi-univar Diophantine equations (e.g. [?u + ?v = 5]); and
+   - cases where [?u]'s value would carry a negative coefficient
+     (e.g. [?u + 1 = n] when [n] is a free index variable, since we
+     have no symbolic guarantee that [n >= 1]). *)
+let tindex_solve_for_univar (lhs : tindex) (rhs : tindex)
+    : (EcUid.uid * tindex) option
+=
+  let cl = tindex_canonicalize lhs in
+  let cr = tindex_canonicalize rhs in
+
+  (* Walk the two sorted (mono, coef) lists in lock-step, yielding
+     triples (mono, lhs_coef, rhs_coef) for each monomial appearing
+     in either side. *)
+  let rec merge l r =
+    match l, r with
+    | [], _ -> List.map (fun (m, c) -> (m, EcBigInt.zero, c)) r
+    | _, [] -> List.map (fun (m, c) -> (m, c, EcBigInt.zero)) l
+    | (m1, c1) :: t1, (m2, c2) :: t2 ->
+        let cmp = mono_compare m1 m2 in
+        if cmp < 0 then (m1, c1, EcBigInt.zero) :: merge t1 r
+        else if cmp > 0 then (m2, EcBigInt.zero, c2) :: merge l t2
+        else (m1, c1, c2) :: merge t1 t2
+  in
+  let merged = merge cl.cn_mons cr.cn_mons in
+
+  let exception Bail in
+  try
+    let univar = ref None in
+    let rev_purevar = ref [] in
+    List.iter (fun (m, lc, rc) ->
+      let net = EcBigInt.sub lc rc in
+      let net_zero = EcBigInt.equal net EcBigInt.zero in
+      let is_naked_uni =
+        match m with [(TVUni _, 1)] -> true | _ -> false in
+      let has_uni =
+        List.exists (fun (v, _) ->
+          match v with TVUni _ -> true | _ -> false) m
+      in
+      if is_naked_uni then begin
+        if not net_zero then begin
+          let u = match m with [(TVUni u, _)] -> u | _ -> assert false in
+          match !univar with
+          | None -> univar := Some (u, net)
+          | Some _ -> raise Bail
+        end
+      end else if has_uni then begin
+        if not net_zero then raise Bail
+      end else begin
+        if not net_zero then rev_purevar := (m, net) :: !rev_purevar
+      end
+    ) merged;
+    match !univar with
+    | None -> None
+    | Some (u, c) ->
+        if not (EcBigInt.equal (EcBigInt.abs c) EcBigInt.one) then None
+        else
+          let positive = EcBigInt.sign c > 0 in
+          let flip x = if positive then EcBigInt.neg x else x in
+          let net_konst = EcBigInt.sub cl.cn_konst cr.cn_konst in
+          let target_konst = flip net_konst in
+          if EcBigInt.sign target_konst < 0 then None
+          else
+            let target_mons =
+              List.rev_map (fun (m, net) ->
+                let target = flip net in
+                if EcBigInt.sign target < 0 then raise Bail;
+                (m, target)
+              ) !rev_purevar
+            in
+            let target_mons =
+              List.filter (fun (_, c) ->
+                not (EcBigInt.equal c EcBigInt.zero)) target_mons
+            in
+            let value = {
+              cn_konst = target_konst;
+              cn_mons  = target_mons;
+            } in
+            Some (u, tindex_of_canonical value)
+  with Bail -> None
+
 let canonical_hash (p : tindex_canonical) =
   let mono_hash (m : tindex_mono) =
     Why3.Hashcons.combine_list

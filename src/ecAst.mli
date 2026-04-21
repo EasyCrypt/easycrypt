@@ -429,6 +429,12 @@ val targs_fv     : targs  fv
 val tindex_naked_univar : tindex -> EcUid.uid option
 val tindex_occurs_univar : EcUid.uid -> tindex -> bool
 
+(* Try to solve [lhs = rhs] for a single TIUnivar with coefficient ±1.
+   Returns [Some (u, value)] when solvable, [None] otherwise. See
+   [ecAst.ml] for the precise admissible scope. *)
+val tindex_solve_for_univar :
+  tindex -> tindex -> (EcUid.uid * tindex) option
+
 val ty_equal : ty equality
 val ty_hash  : ty hash
 val ty_fv    : ty fv
