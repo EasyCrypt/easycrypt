@@ -518,6 +518,19 @@ let transtyvars
   in
   EcUnify.UniEnv.create params
 
+(* Bind every idxvar of [ue] as an int-typed formula-local in [env].
+   This lets a bound idxvar [n] be referenced both as an index (in
+   `vec<:n>` positions, via [ue_idxnamed]) and as an integer term in
+   the body of an axiom / lemma / op / predicate. The ident is the
+   same in both roles, so substitutions stay coherent. *)
+let bind_idx_locals (env : EcEnv.env) (ue : EcUnify.unienv) : EcEnv.env =
+  let idxs = (EcUnify.UniEnv.tparams ue).idxvars in
+  if List.is_empty idxs then env
+  else
+    EcEnv.Var.bind_locals
+      (List.map (fun id -> (id, tint)) idxs)
+      env
+
 (* -------------------------------------------------------------------- *)
 exception TymodCnvFailure of tymod_cnv_failure
 

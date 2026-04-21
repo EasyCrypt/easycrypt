@@ -975,6 +975,7 @@ module Ax = struct
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue  =
       TT.transtyvars ~idxparams:ax.pa_idxvars env (loc, ax.pa_tyvars) in
+    let env = TT.bind_idx_locals env ue in
 
     let (pconcl, tintro) =
       match ax.pa_vars with
@@ -1280,6 +1281,7 @@ module Op = struct
     let eenv = env scope in
     let ue =
       TT.transtyvars ~idxparams:op.po_idxvars eenv (loc, op.po_tyvars) in
+    let eenv = TT.bind_idx_locals eenv ue in
     let lc = op.po_locality in
     let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =

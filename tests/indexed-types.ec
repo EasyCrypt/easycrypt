@@ -156,3 +156,14 @@ op "_.[_]" {n} (w : int vec<:n>) (_ : int) : bool.
 (* Tags use the existing leading bracket. *)
 op [opaque] g_const : int = 42.
 op [opaque smt_opaque] g_const2 : int = 7.
+
+(* Bound idxvars are visible as int-typed formula locals in the body
+   of axioms / lemmas / ops / preds / abbreviations. The same ident
+   plays both roles: index in `vec<:n>` positions, and integer term
+   in the surrounding formula. *)
+require import AllCore List.
+
+op id_bits {n} : int vec<:n> -> int list.
+
+axiom id_size {n} (v : int vec<:n>) :
+  size (id_bits[:n] v) = n + 0.

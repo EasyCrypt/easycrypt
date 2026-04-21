@@ -197,6 +197,11 @@ val transtyvars:
   ?idxparams:psymbol list ->
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
+(* Bind every idxvar of the unienv as an int-typed formula-local in
+   the env, so that a bound idxvar [n] can also appear as an integer
+   term in the body of the surrounding declaration. *)
+val bind_idx_locals : env -> EcUnify.unienv -> env
+
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty
 
