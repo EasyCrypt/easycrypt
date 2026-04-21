@@ -137,7 +137,10 @@ and concretize_e_head ((CPTEnv subst) as cptenv) head =
   | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst) tys)
+  | PTGlobal (p, idxs, tys) ->
+      PTGlobal (p,
+                List.map (EcCoreSubst.tindex_subst subst) idxs,
+                List.map (ty_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
 and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
@@ -223,12 +226,18 @@ let pt_of_uglobal_r ptenv p =
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
   (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
-  let ax  = Fsubst.f_subst_tvar ~freshen:true fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ.tyvars in
+  let tv  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
+  let ix  = EcUnify.UniEnv.openidx ptenv.pte_ue typ None in
+  let ax  =
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx:ix () in
+    EcCoreSubst.Fsubst.f_subst fs ax
+  in
+  let idxs = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
+  let typ  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
 
   { ptev_env = ptenv;
-    ptev_pt  = ptglobal ~tys:typ p;
+    ptev_pt  = ptglobal ~idxs ~tys:typ p;
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
@@ -513,11 +522,17 @@ let process_named_pterm pe (tvi, fp) =
   PT.pf_check_tvi pe.pte_pe typ tvi;
 
   (* FIXME: TC HOOK *)
-  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let ax  = Fsubst.f_subst_tvar ~freshen:false fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ.tyvars in
+  let tv = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
+  let ix = EcUnify.UniEnv.openidx pe.pte_ue typ tvi in
+  let ax =
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:false ~tv ~idx:ix () in
+    EcCoreSubst.Fsubst.f_subst fs ax
+  in
+  let typ_out  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
+  let idxs_out = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
 
-  (p, (typ, ax))
+  (p, (idxs_out, typ_out, ax))
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -525,8 +540,8 @@ let process_pterm_cut ~prcut pe pt =
     match pt with
     | FPNamed (fp, tyargs) -> begin
         match process_named_pterm pe (tyargs, fp) with
-        | (`Local  x, ([] , ax)) -> (PTLocal  x, ax)
-        | (`Global p, (typ, ax)) -> (PTGlobal (p, typ), ax)
+        | (`Local  x, ([], [] , ax)) -> (PTLocal  x, ax)
+        | (`Global p, (idxs, typ, ax)) -> (PTGlobal (p, idxs, typ), ax)
 
         | _ -> assert false
     end

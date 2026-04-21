@@ -165,10 +165,10 @@ module LowApply = struct
         with LDecl.LdeclError _ -> raise InvalidProofTerm
     end
 
-    | PTGlobal (p, tys) ->
+    | PTGlobal (p, idxs, tys) ->
         (* FIXME: poor API ==> poor error recovery *)
         let env = LDecl.toenv (hyps_of_ckenv tc) in
-        (pt, EcEnv.Ax.instantiate p tys env, subgoals)
+        (pt, EcEnv.Ax.instantiate ~idxs p tys env, subgoals)
 
     | PTTerm pt ->
       let pt, ax, subgoals = check_ `Elim pt subgoals tc in
@@ -680,7 +680,6 @@ let tt_apply ?(cutsolver : cutsolver option) (pt : proofterm) (tc : tcenv) =
     (*
     let env = FApi.tc_env tc in
     let ppe = EcPrinting.PPEnv.ofenv env in
-    (* FIXME: add this to the exception *)
     Format.eprintf "%a@.should be convertible to:@.%a@.but is not@."
       (EcPrinting.pp_form ppe) ax
       (EcPrinting.pp_form ppe) concl;

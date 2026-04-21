@@ -485,6 +485,19 @@ module UniEnv = struct
   let iu_assubst (ue : unienv) : tindex Muid.t =
     (!ue).ue_iuf
 
+  (* Build a full [f_subst] that resolves both type-univars and
+     index-univars in one shot. Use this where the legacy
+     [Tuni.subst (close ue)] is followed by an [f_subst] application
+     to a type or formula that may carry indexed types — without the
+     idx-univar substitution, [TIUnivar] nodes survive into the saved
+     AST and break later matching. *)
+  let close_subst (ue : unienv) : f_subst =
+    if not (closed ue) then raise UninstantiateUni;
+    f_subst_init
+      ~tu:(subst_of_uf (!ue).ue_uf)
+      ~iu:(!ue).ue_iuf
+      ()
+
   let tparams (ue : unienv) : ty_params =
     { idxvars = List.rev (!ue).ue_idxdecl;
       tyvars  = List.rev (!ue).ue_decl; }
@@ -493,6 +506,12 @@ end
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) (t1 : ty) (t2 : ty) =
   unify_core env ue (`TyUni (t1, t2))
+
+(* Index unification — same engine, different problem kind. Used by
+   the matching engine to match [Tconstr (p, {indices=...; types=...})]
+   patterns where indices may carry univars. *)
+let unify_idx (env : EcEnv.env) (ue : unienv) (i1 : tindex) (i2 : tindex) =
+  unify_core env ue (`IxUni (i1, i2))
 
 (* -------------------------------------------------------------------- *)
 let tfun_expected ue ?retty psig =

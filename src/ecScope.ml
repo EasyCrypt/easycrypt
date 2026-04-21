@@ -997,8 +997,7 @@ module Ax = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
 
-    let uidmap = EcUnify.UniEnv.close ue in
-    let fs = Tuni.subst uidmap in
+    let fs      = EcUnify.UniEnv.close_subst ue in
     let concl   = Fsubst.f_subst fs concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
@@ -1319,8 +1318,7 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc "this operator type contains free type variables";
 
-    let uidmap  = EcUnify.UniEnv.close ue in
-    let ts      = Tuni.subst uidmap in
+    let ts      = EcUnify.UniEnv.close_subst ue in
     let fs      = Fsubst.f_subst ts in
     let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in

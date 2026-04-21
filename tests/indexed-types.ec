@@ -167,3 +167,17 @@ op id_bits {n} : int vec<:n> -> int list.
 
 axiom id_size {n} (v : int vec<:n>) :
   size (id_bits[:n] v) = n + 0.
+
+(* Rewrite tactic on indexed lemmas: opening an indexed lemma must
+   substitute through both type-univars AND index-univars in its
+   stored body, otherwise residual TIUnivars leak into operator
+   signatures and the matcher sees two distinct nodes that print
+   identically but fail to unify. *)
+op cat_words {m n} (wm : int vec<:m>) (wn : int vec<:n>) : int vec<:m+n>.
+
+axiom cat_words_self {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  cat_words wm wn = cat_words wm wn.
+
+lemma cat_test {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  cat_words wm wn = cat_words wm wn.
+proof. rewrite cat_words_self. trivial. qed.

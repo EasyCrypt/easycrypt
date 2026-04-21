@@ -2794,10 +2794,32 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instantiate p tys env =
+  let instantiate ?(idxs : tindex list = []) p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Tvar.f_subst ~freshen:true ax.ax_tparams.tyvars tys f
+        let tparams = ax.ax_tparams in
+        if List.compare_lengths idxs tparams.idxvars <> 0
+           && not (List.is_empty idxs) then
+          raise (LookupFailure (`Path p));
+        let idx_map =
+          if List.is_empty idxs then EcIdent.Mid.empty
+          else
+            List.fold_left2
+              (fun m id v -> EcIdent.Mid.add id v m)
+              EcIdent.Mid.empty tparams.idxvars idxs
+        in
+        let tv_map =
+          if List.compare_lengths tys tparams.tyvars <> 0 then
+            EcIdent.Mid.empty
+          else
+            List.fold_left2
+              (fun m id v -> EcIdent.Mid.add id v m)
+              EcIdent.Mid.empty tparams.tyvars tys
+        in
+        let fs =
+          EcCoreSubst.Fsubst.f_subst_init
+            ~freshen:true ~tv:tv_map ~idx:idx_map () in
+        EcCoreSubst.Fsubst.f_subst fs f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
