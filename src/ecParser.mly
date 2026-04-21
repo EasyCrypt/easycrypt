@@ -84,15 +84,16 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ~locality (x, idx, ty, pv, vd, f) k =
-    { pa_name     = x;
-      pa_idxvars  = idx;
-      pa_tyvars   = ty;
-      pa_pvars   = pv;
-      pa_vars     = vd;
-      pa_formula  = f;
-      pa_kind     = k;
-      pa_locality = locality; }
+  let mk_axiom ~locality (x, idx, nonneg, ty, pv, vd, f) k =
+    { pa_name         = x;
+      pa_idxvars      = idx;
+      pa_idxvars_nneg = nonneg;
+      pa_tyvars       = ty;
+      pa_pvars        = pv;
+      pa_vars         = vd;
+      pa_formula      = f;
+      pa_kind         = k;
+      pa_locality     = locality; }
 
   let mk_simplify l =
     if l = [] then
@@ -1334,9 +1335,17 @@ pindex:
 (* Index-parameter binder. Uses curly braces and naked identifiers
    (e.g. `{n m}`), distinct from the square-bracket binder used for
    type variables (`['a 'b]`). When both are present, the index
-   binder must come first: `type {n} 'a vec`. *)
+   binder must come first: `type {n} 'a vec`.
+
+   A trailing `+` on an identifier marks it as "non-negative by
+   assumption": on lemma / axiom binders this adds a [0 <= n]
+   hypothesis to the proof goal. Ignored on other binder sites. *)
+idxvar_item:
+| x=lident PLUS { (x, true)  }
+| x=lident      { (x, false) }
+
 idxvars_decl:
-| LBRACE xs=lident+ RBRACE   { xs }
+| LBRACE xs=idxvar_item+ RBRACE { xs }
 
 type_exp:
 | ty=simpl_type_exp                          { ty }
@@ -1708,7 +1717,8 @@ typarams:
     { (xs : ptyparams) }
 
 %inline tyd_name:
-| idx=loption(idxvars_decl) tya=typarams x=ident { (idx, tya, x) }
+| idx=loption(idxvars_decl) tya=typarams x=ident
+    { (List.map fst idx, tya, x) }
 
 dt_ctor_def:
 | x=oident { (x, []) }
@@ -1809,14 +1819,22 @@ tyvars_decl:
     { tyvars }
 
 (* Combined `{idx}` then `['a]` binder. Indices come first; both are
-   independently optional. Returns [(idxvars, tyvars_opt)] where
-   [tyvars_opt] is [None] when no [...] bracket appeared at all,
-   matching the legacy [tvs |> omap ...] convention so downstream
-   `po_tyvars`-style fields keep distinguishing "no binder given"
-   from "empty binder given". *)
+   independently optional. Returns [(idxvars, nonneg, tyvars_opt)]
+   where:
+   - [idxvars] is the idxvar names in order.
+   - [nonneg] is the subset of idxvars marked with a trailing `+`.
+     Used by lemma / axiom processing to inject [0 <= n] hypotheses;
+     other consumers ignore it.
+   - [tyvars_opt] is [None] when no [...] bracket appeared at all,
+     matching the legacy [tvs |> omap ...] convention so downstream
+     `po_tyvars`-style fields keep distinguishing "no binder given"
+     from "empty binder given". *)
 ix_ty_binder:
 | idx=idxvars_decl? ty=tyvars_decl?
-    { (EcUtils.odfl [] idx, ty) }
+    { let items = EcUtils.odfl [] idx in
+      let idxs   = List.map fst items in
+      let nonneg = items |> List.filter snd |> List.map fst in
+      (idxs, nonneg, ty) }
 
 op_or_const:
 | OP    { `Op    }
@@ -1830,7 +1848,7 @@ operator:
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
       mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
-    let (idxvars, po_tyvars) = tvs in
+    let (idxvars, _nonneg, po_tyvars) = tvs in
 
     { po_kind     = k;
       po_name     = List.hd x;
@@ -1847,7 +1865,7 @@ operator:
     x=plist1(oident, COMMA) tvs=ix_ty_binder args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
-  { let (idxvars, po_tyvars) = tvs in
+  { let (idxvars, _nonneg, po_tyvars) = tvs in
     { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
@@ -1919,7 +1937,7 @@ predicate:
        pp_locality = locality; } }
 
 | locality=locality PRED x=oident tvs=ix_ty_binder COLON sty=pred_tydom
-   { let (idxvars, pp_tyvars) = tvs in
+   { let (idxvars, _nonneg, pp_tyvars) = tvs in
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -1927,7 +1945,7 @@ predicate:
        pp_locality = locality; } }
 
 | locality=locality PRED x=oident tvs=ix_ty_binder p=ptybindings? EQ f=form
-   { let (idxvars, pp_tyvars) = tvs in
+   { let (idxvars, _nonneg, pp_tyvars) = tvs in
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -1937,7 +1955,7 @@ predicate:
 | locality=locality INDUCTIVE x=oident tvs=ix_ty_binder p=ptybindings?
     EQ b=indpred_def
 
-   { let (idxvars, pp_tyvars) = tvs in
+   { let (idxvars, _nonneg, pp_tyvars) = tvs in
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -1982,7 +2000,7 @@ nt_bindings:
 notation:
 | locality=loc(locality) NOTATION x=loc(NOP) tvs=ix_ty_binder bd=nt_bindings?
     args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
-  { let (idxvars, nt_tv) = tvs in
+  { let (idxvars, _nonneg, nt_tv) = tvs in
     { nt_name  = x;
       nt_idx   = idxvars;
       nt_tv    = nt_tv;
@@ -2009,7 +2027,7 @@ abbreviation:
     args=ptybindings_decl? sty=prefix(COLON, loc(type_exp))? EQ b=expr
 
   { let sty  = sty |> ofdfl (fun () -> mk_loc (loc b) PTunivar) in
-    let (idxvars, ab_tv) = tvs in
+    let (idxvars, _nonneg, ab_tv) = tvs in
 
     { ab_name  = x;
       ab_idx   = idxvars;
@@ -2032,8 +2050,8 @@ lemma_decl:
   predvars=mempred_binding?
   pd=pgtybindings?
   COLON f=form
-    { let (idxvars, tyvars) = tvs in
-      (x, idxvars, tyvars, predvars, pd, f) }
+    { let (idxvars, nonneg, tyvars) = tvs in
+      (x, idxvars, nonneg, tyvars, predvars, pd, f) }
 
 axiom_tc:
 | /* empty */       { PLemma None }
@@ -2051,7 +2069,7 @@ axiom:
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
-    { mk_axiom ~locality:l (x, [], None, None, pd, p) ao }
+    { mk_axiom ~locality:l (x, [], [], None, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }
@@ -3689,7 +3707,7 @@ cltyparams:
 
 clone_override:
 | TYPE idx=loption(idxvars_decl) ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
-   { (x, PTHO_Type (`BySyntax (idx, ps, t), mode)) }
+   { (x, PTHO_Type (`BySyntax (List.map fst idx, ps, t), mode)) }
 
 | OP x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))

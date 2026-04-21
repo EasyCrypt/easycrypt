@@ -1078,14 +1078,18 @@ type paxiom_kind =
 type mempred_binding = PT_MemPred of psymbol list
 
 type paxiom = {
-  pa_name     : psymbol;
-  pa_pvars    : mempred_binding option;
-  pa_idxvars  : psymbol list;
-  pa_tyvars   : ptyparams option;
-  pa_vars     : pgtybindings option;
-  pa_formula  : pformula;
-  pa_kind     : paxiom_kind;
-  pa_locality : locality;
+  pa_name         : psymbol;
+  pa_pvars        : mempred_binding option;
+  pa_idxvars      : psymbol list;
+  (* Subset of [pa_idxvars] tagged with a trailing `+` in the binder
+     (e.g. [{n+ m}] marks [n]). For each such idxvar, [start_lemma]
+     wraps the proof goal with a [0 <= n =>] hypothesis. *)
+  pa_idxvars_nneg : psymbol list;
+  pa_tyvars       : ptyparams option;
+  pa_vars         : pgtybindings option;
+  pa_formula      : pformula;
+  pa_kind         : paxiom_kind;
+  pa_locality     : locality;
 }
 
 (* -------------------------------------------------------------------- *)

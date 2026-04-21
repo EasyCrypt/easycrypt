@@ -944,25 +944,24 @@ module Ax = struct
         sc_locdoc = DocState.add_item scope.sc_locdoc; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope (cont, axflags) check ?name (axd, ctxt) =
+  let start_lemma ?(nneg_idxs : EcIdent.t list = []) scope (cont, axflags)
+      check ?name (axd, ctxt)
+  =
     let puc =
       match check with
       | false -> PSNoCheck
       | true  ->
           let hyps  = EcEnv.LDecl.init (env scope) axd.ax_tparams in
-          (* Idxvars are non-negative integers by Phase-2 design. Make
-             this fact available in the proof by inserting [0 <= n_i =>]
-             implications immediately INSIDE the lemma's outermost
-             foralls (not at the very top), so the existing
-             auto-introduction of [pa_vars] still works as before. The
-             user introduces the new hypotheses on demand via
-             [move=> Hn_i]. The implications never leak into the saved
-             [ax_spec] — only the proof goal sees them. *)
+          (* For each idxvar marked with `+` in the lemma binder, inject
+             a [0 <= n =>] hypothesis INSIDE the outermost foralls of
+             the goal (so [pa_vars] auto-intro still fires). Unmarked
+             idxvars get no such hypothesis. The implications never
+             leak into the saved [ax_spec]. *)
           let mk_imps body =
             List.fold_right (fun id acc ->
               let h = f_int_le f_i0 (f_local id tint) in
               f_imp h acc)
-              axd.ax_tparams.idxvars body
+              nneg_idxs body
           in
           let rec push f =
             match f.f_node with
@@ -1046,16 +1045,25 @@ module Ax = struct
         let pucflags = { puc_smt = axd.ax_smt; puc_local = local; } in
         let pucflags = (([], None), pucflags) in
 
+        (* Map each `+`-marked idxvar name to its EcIdent.t (matching
+           by name against the just-created [tparams.idxvars]). *)
+        let nneg_idxs =
+          let names = List.map unloc ax.pa_idxvars_nneg in
+          List.filter
+            (fun id -> List.mem (EcIdent.name id) names)
+            tparams.idxvars
+        in
+
         match tc with
         | None ->
             let scope =
-              start_lemma scope ~name:(unloc ax.pa_name)
+              start_lemma ~nneg_idxs scope ~name:(unloc ax.pa_name)
                 pucflags check (axd, None) in
             let scope = snd (Tactics.process1_r false `Check scope tintro) in
             None, scope
 
         | Some tc ->
-            start_lemma_with_proof scope
+            start_lemma_with_proof ~nneg_idxs scope
               (Some tintro) pucflags (mode, mk_loc loc tc) check
               ~name:(unloc ax.pa_name) axd
       end
@@ -1129,10 +1137,13 @@ module Ax = struct
          (None, { scope with sc_env = puc.puc_init })
 
   (* ------------------------------------------------------------------ *)
-  and start_lemma_with_proof scope tintro pucflags (mode, tc) check ?name axd =
+  and start_lemma_with_proof
+      ?(nneg_idxs : EcIdent.t list = []) scope tintro pucflags (mode, tc)
+      check ?name axd
+  =
     let { pl_loc = loc; pl_desc = tc } = tc in
 
-    let scope = start_lemma scope pucflags check ?name (axd, None) in
+    let scope = start_lemma ~nneg_idxs scope pucflags check ?name (axd, None) in
     let scope =
       tintro |> ofold
         (fun t sc -> snd (Tactics.process1_r false `Check sc t))
