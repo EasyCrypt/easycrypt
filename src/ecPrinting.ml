@@ -233,7 +233,7 @@ module PPEnv = struct
             | `Expr -> fun _ op -> not (EcDecl.is_pred op)
             | `Form -> fun _ _  -> true
           in
-          let tvi = Some (EcUnify.TVIunamed typ) in
+          let tvi = Some (EcUnify.TVIunamed ([], typ)) in
 
         fun sm ->
           check_for_local sm;

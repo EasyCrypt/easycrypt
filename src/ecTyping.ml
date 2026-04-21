@@ -1168,7 +1168,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
                 let fty = snd (List.nth rec_ i) in
                 let fty, _ =
                   EcUnify.UniEnv.openty ue recty.tyd_params
-                    (Some (EcUnify.TVIunamed rectvi)) fty
+                    (Some (EcUnify.TVIunamed ([], rectvi))) fty
                 in
                   (try  EcUnify.unify env ue pty fty
                    with EcUnify.UnificationFailure _ -> assert false);
@@ -1200,8 +1200,10 @@ let transpattern env ue (p : EcParsetree.plpattern) =
 (* -------------------------------------------------------------------- *)
 let transtvi env ue tvi =
   match tvi.pl_desc with
-  | TVIunamed lt ->
-      EcUnify.TVIunamed (List.map (transty tp_relax env ue) lt)
+  | TVIunamed (ix, lt) ->
+      EcUnify.TVIunamed
+        ( List.map (transtindex env ue) ix
+        , List.map (transty tp_relax env ue) lt )
 
   | TVInamed lst ->
       let add locals (s, t) =
@@ -1383,7 +1385,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
       EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
       let ctorty =
-        let tvi = Some (EcUnify.TVIunamed tvi) in
+        let tvi = Some (EcUnify.TVIunamed ([], tvi)) in
           fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
       let pty = EcUnify.UniEnv.fresh ue in
 

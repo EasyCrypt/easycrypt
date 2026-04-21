@@ -437,6 +437,7 @@
 %token DECLARE
 %token DELTA
 %token DLBRACKET
+%token LBRACKETCOLON
 %token DO
 %token DONE
 %token DOT
@@ -925,11 +926,27 @@ tyvar_byname1:
 | x=tident EQ ty=loc(type_exp) { (x, ty) }
 
 tyvar_annot:
-| lt = plist1(loc(type_exp), COMMA) { TVIunamed lt }
+| lt = plist1(loc(type_exp), COMMA) { TVIunamed ([], lt) }
 | lt = plist1(tyvar_byname1, COMMA) { TVInamed lt }
 
+(* Explicit op-index instantiation, e.g. `f[:n+1]` or `f[:n,m]<:int>`.
+   The `[:` form is parsed as a single LBRACKETCOLON token by the
+   lexer to avoid clashes with list literals. *)
+%inline idx_app:
+| LBRACKETCOLON ix=plist1(pindex, COMMA) RBRACKET { ix }
+
 %inline tvars_app:
-| LTCOLON k=loc(tyvar_annot) GT { k }
+| LTCOLON k=loc(tyvar_annot) GT
+    { k }
+| ix=loc(idx_app)
+    { mk_loc ix.pl_loc (TVIunamed (ix.pl_desc, [])) }
+| ix=idx_app LTCOLON k=loc(tyvar_annot) GT
+    { match k.pl_desc with
+      | TVIunamed ([], tys) ->
+          mk_loc k.pl_loc (TVIunamed (ix, tys))
+      | TVIunamed (_, _) | TVInamed _ ->
+          parse_error k.pl_loc
+            (Some "cannot mix explicit indices with named-tyvar syntax") }
 
 (* -------------------------------------------------------------------- *)
 %inline sexpr: f=sform { mk_loc f.pl_loc (Expr f) }

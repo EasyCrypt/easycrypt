@@ -278,7 +278,9 @@ let subst_of_uf (uf : UF.t) =
 
 (* -------------------------------------------------------------------- *)
 type tvar_inst =
-| TVIunamed of ty list
+(* Explicit indices first, then explicit types. Either may be empty;
+   when both are empty, the slot is "no instantiation provided". *)
+| TVIunamed of tindex list * ty list
 | TVInamed  of (EcSymbols.symbol * ty) list
 
 type tvi = tvar_inst option
@@ -380,10 +382,17 @@ module UniEnv = struct
           (fun s v -> Mid.add v (fresh ue) s)
           Mid.empty params
 
-    | Some (TVIunamed lt) ->
-        List.fold_left2
-          (fun s v ty -> Mid.add v (fresh ~ty ue) s)
-          Mid.empty params lt
+    | Some (TVIunamed (_ix, lt)) ->
+        (* _ix is handled by [openidx] separately. Here we only map
+           tyvars to their explicit-or-fresh univars. *)
+        if lt = [] then
+          List.fold_left
+            (fun s v -> Mid.add v (fresh ue) s)
+            Mid.empty params
+        else
+          List.fold_left2
+            (fun s v ty -> Mid.add v (fresh ~ty ue) s)
+            Mid.empty params lt
 
     | Some (TVInamed lt) ->
         let for1 s v =
@@ -395,12 +404,32 @@ module UniEnv = struct
         in
           List.fold_left for1 Mid.empty params
 
-  (* Allocate a fresh index univar for each [idxvar] of [params],
-     producing the substitution map used by [openty_r]. *)
-  let openidx (ue : unienv) (params : ty_params) : tindex Mid.t =
-    List.fold_left
-      (fun s v -> Mid.add v (idx_fresh ue) s)
-      Mid.empty params.idxvars
+  (* Build the ident-to-tindex substitution that binds each idxvar
+     of [params]. When the caller provided explicit indices via
+     [TVIunamed (ix, _)], use those; otherwise allocate a fresh
+     TIUnivar so type-directed unification can assign it later. *)
+  let openidx (ue : unienv) (params : ty_params) (tvi : tvar_inst option) : tindex Mid.t =
+    let provided =
+      match tvi with
+      | Some (TVIunamed (ix, _)) when ix <> [] -> Some ix
+      | _ -> None
+    in
+    match provided with
+    | None ->
+        List.fold_left
+          (fun s v -> Mid.add v (idx_fresh ue) s)
+          Mid.empty params.idxvars
+    | Some ix ->
+        if List.compare_lengths ix params.idxvars <> 0 then
+          (* Fall back to inference rather than failing the select
+             loop: the caller may be trying this op among others. *)
+          List.fold_left
+            (fun s v -> Mid.add v (idx_fresh ue) s)
+            Mid.empty params.idxvars
+        else
+          List.fold_left2
+            (fun s v ti -> Mid.add v ti s)
+            Mid.empty params.idxvars ix
 
   let subst_tv (subst : ty -> ty) (params : ty_params) =
     List.map (fun tv -> subst (tvar tv)) params.tyvars
@@ -409,7 +438,7 @@ module UniEnv = struct
     let subst =
       f_subst_init
         ~tv:(opentvi ue params tvi)
-        ~idx:(openidx ue params)
+        ~idx:(openidx ue params tvi)
         () in
       (subst, subst_tv (ty_subst subst) params)
 
@@ -491,11 +520,12 @@ let select_op
       match tvi with
       | None -> fun _ -> true
 
-      | Some (TVIunamed lt) ->
-          let len = List.length lt in
-            fun op ->
-              let tparams = op.D.op_tparams.tyvars in
-                 List.length tparams = len
+      | Some (TVIunamed (ix, lt)) ->
+          (* Each non-empty user list must match the corresponding
+             arity of the candidate op. Empty means "infer this side". *)
+          fun op ->
+            (lt = [] || List.length lt = List.length op.D.op_tparams.tyvars)
+            && (ix = [] || List.length ix = List.length op.D.op_tparams.idxvars)
 
       | Some (TVInamed ls) -> fun op ->
           let tparams = List.map EcIdent.name op.D.op_tparams.tyvars in

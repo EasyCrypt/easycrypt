@@ -74,3 +74,17 @@ clone ClonedT as Forwarded with
 (* Use a polynomial of the binder. *)
 clone ClonedT as Bumped with
   type [k] 'a target = 'a coll<:k+1>.
+
+(* Gap A — explicit index instantiation at op call sites.
+   Syntax: f[:idx, ...] for indices, optionally followed by <:ty>. *)
+op size [n 'a] (xs : 'a vec<:n>) : int.
+op count [n 'a] : int.
+
+(* index inferred from xs's type *)
+op a_test1 [n 'a] (xs : 'a vec<:n>) : int = size xs.
+
+(* index supplied explicitly *)
+op a_test2 ['a] (xs : 'a vec<:5>) : int = size[:5] xs.
+
+(* both index and type explicit (no inference path for either) *)
+op a_test3 : int = count[:5]<:int>.

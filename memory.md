@@ -481,12 +481,42 @@ the SMT path — they belong in the Phase-6 polish pass.
 
 #### Known remaining gaps (documented but not scheduled)
 
-- Explicit index-instantiation syntax at op call sites
-  (`f<:idx, ty>`). Tests that need this rely on inference.
-- Reaching into a cloned theory's ops whose signature was touched
-  by an indexed-type override (Phase-4 note).
 - Indexed types in SMT translation (Phase-5 punt).
 - Indexed datatypes / records (Phase-3 Slice-A refusal).
+- Polynomial unification beyond "naked TIUnivar = polynomial"
+  (e.g. `?u + 1 = n` requires subtraction inversion).
+
+### Post-Phase-6 — gaps E / D / A (DONE)
+
+- **E** — index binders on abbreviations and notations.
+  `tyvars_decl` was already shared with ops/preds/axioms via
+  Phase-3 Slice B; abbreviation and notation rules now use
+  `mixed_tyvars_decl` too. New `ab_idx` / `nt_idx` fields on
+  `pabbrev` / `pnotation`; `ecHiNotations` threads them via
+  `~idxparams` on `transtyvars`.
+- **D** — investigation. The Phase-4 "T2.make_vec unknown after
+  clone-with-override" report turned out to be a misuse of the
+  alias `=` operator instead of the inline `<-` operator (alias
+  creates a new name that requires explicit qualification; inline
+  propagates the body and adopts the source signature). Both modes
+  work correctly. While tracing, `fresh_tparams` was found to
+  freshen tyvars but not idxvars — fixed so op_tparams alpha-
+  renaming covers both.
+- **A** — explicit index instantiation at op call sites. New
+  lexer token `LBRACKETCOLON` (matches `[:` glued, no whitespace).
+  Grammar: `f[:n+1]` provides indices; `f<:int>` provides types
+  (existing); `f[:n+1]<:int>` does both, in that order. Parsetree
+  `TVIunamed` and ecUnify `tvar_inst.TVIunamed` both widened to
+  `(idx list * ty list)`; producers updated mechanically.
+  `EcUnify.openidx` now uses user-supplied indices when given,
+  falling back to fresh `TIUnivar`s otherwise. Filter logic in
+  `select_op` validates either side independently when non-empty.
+  Useful when the op has indices that aren't reachable by argument-
+  type inference (e.g. `op count [n 'a] : int` called as
+  `count[:5]<:int>`).
+
+  Verified: 91 declarations in `tests/indexed-types.ec` compile,
+  including the new explicit-instantiation cases.
 
 ## Critical path & open risks
 

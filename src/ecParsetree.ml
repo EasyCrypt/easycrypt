@@ -85,7 +85,9 @@ and pindex_r =
 and pindex = pindex_r located
 
 type ptyannot_r =
-  | TVIunamed of pty list
+  (* Explicit indices first, then explicit types. Either may be empty;
+     when both are empty, no instantiation was provided. *)
+  | TVIunamed of pindex list * pty list
   | TVInamed  of (psymbol * pty) list
 
 and ptyannot  = ptyannot_r  located

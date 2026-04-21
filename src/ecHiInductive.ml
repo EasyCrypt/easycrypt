@@ -317,7 +317,7 @@ let trans_matchfix
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
               let ctorty =
-                let tvi = Some (EcUnify.TVIunamed tvi) in
+                let tvi = Some (EcUnify.TVIunamed ([], tvi)) in
                   fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
               let pty = EcUnify.UniEnv.fresh ue in
 

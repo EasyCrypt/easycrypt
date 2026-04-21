@@ -12,7 +12,9 @@ exception UninstantiateUni
 type unienv
 
 type tvar_inst =
-| TVIunamed of ty list
+(* (explicit indices, explicit types). Either may be empty; the
+   typing layer falls back to inference for empty sides. *)
+| TVIunamed of tindex list * ty list
 | TVInamed  of (EcSymbols.symbol * ty) list
 
 type tvi = tvar_inst option
