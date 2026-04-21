@@ -34,6 +34,46 @@
       | `Ty  x :: rest     -> aux ix (x :: ty) rest
     in aux [] [] items
 
+  (* Whitelist of op-tag identifiers that the scope layer recognises.
+     Anything in the leading op-tags bracket that is not in this set
+     is reinterpreted as an idxvar binder, so a user-supplied
+     bracket-before-name is treated as an idxvar binder rather than
+     silently dropped as ineffective tags. *)
+  let known_op_tags = ["opaque"; "smt_opaque"]
+
+  let disambiguate_op_brackets
+      (loc      : EcLocation.t)
+      (raw_tags : EcParsetree.psymbol list option)
+      (tvs      : (EcParsetree.psymbol list * EcParsetree.psymbol list) option)
+    : EcParsetree.psymbol list
+      * EcParsetree.psymbol list
+      * EcParsetree.psymbol list option
+  =
+    let raw_tags = EcUtils.odfl [] raw_tags in
+    let unknown =
+      List.filter
+        (fun t -> not (List.mem (EcLocation.unloc t) known_op_tags))
+        raw_tags in
+    match unknown, tvs with
+    | [], _ ->
+        (* All entries in the leading bracket are recognised tags.
+           Use as tags; binder (if any) is the after-name [tvs]. *)
+        let (idxvars, tyvars) = EcUtils.odfl ([], []) tvs in
+        (raw_tags, idxvars, tvs |> EcUtils.omap (fun _ -> tyvars))
+    | _, None ->
+        (* The leading bracket has at least one non-tag identifier and
+           there is no after-name binder — reinterpret the bracket as a
+           pure idxvar binder. *)
+        ([], raw_tags, Some [])
+    | _, Some _ ->
+        (* Both a (non-tag) leading bracket and an after-name binder
+           were given. We refuse rather than guess. *)
+        parse_error loc (Some
+          "ambiguous bracket placement: the bracket before the name \
+           contains identifier(s) that are not recognised op tags \
+           (opaque / smt_opaque), but an idxvar / type-variable binder \
+           also follows the name. Pick one placement.")
+
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
@@ -1841,14 +1881,15 @@ operator:
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
       mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
-    let (idxvars, tyvars) = odfl ([], []) tvs in
+    let (po_tags, idxvars, po_tyvars) =
+      disambiguate_op_brackets gloc tags tvs in
 
     { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
-      po_tags     = odfl [] tags;
+      po_tags     = po_tags;
       po_idxvars  = idxvars;
-      po_tyvars   = tvs |> omap (fun _ -> tyvars);
+      po_tyvars   = po_tyvars;
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
@@ -1858,13 +1899,15 @@ operator:
     x=plist1(oident, COMMA) tvs=mixed_tyvars_decl? args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
-  { let (idxvars, tyvars) = odfl ([], []) tvs in
+  { let gloc = EcLocation.make $startpos $endpos in
+    let (po_tags, idxvars, po_tyvars) =
+      disambiguate_op_brackets gloc tags tvs in
     { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
-      po_tags     = odfl [] tags;
+      po_tags     = po_tags;
       po_idxvars  = idxvars;
-      po_tyvars   = tvs |> omap (fun _ -> tyvars);
+      po_tyvars   = po_tyvars;
       po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;

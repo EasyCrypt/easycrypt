@@ -169,3 +169,13 @@ proof. trivial. qed.
 lemma f_test5 ['a n] :
   forall (x : 'a) (xs : 'a vec<:n>), cons x xs = cons x xs.
 proof. move => x xs; trivial. qed.
+
+(* The op-leading bracket is normally for tags (opaque / smt_opaque).
+   When it contains anything else, the parser reinterprets it as an
+   idxvar binder so users don't have to remember the after-name
+   placement when defining infix-style operators. *)
+op [n] "_.[_]" (w : int vec<:n>) (_ : int) : bool.
+
+(* Tags-before-name still work for the recognised tag set. *)
+op [opaque] g_const : int = 42.
+op [opaque smt_opaque] g_const2 : int = 7.
