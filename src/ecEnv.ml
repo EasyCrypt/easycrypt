@@ -2723,6 +2723,21 @@ module Op = struct
     in
     let fs =
       EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx () in
+    (* Idxvars also occupy the formula-locals namespace (Phase 2):
+       bind each idxvar's int-typed [Flocal] to the call-site index
+       projected into the int-formula world (so e.g. an idxvar [n]
+       that the body uses as an int term gets resolved to [m+1] when
+       called at index [m+1]). *)
+    let fs =
+      if List.compare_lengths tys.indices tparams.idxvars <> 0
+      then fs
+      else
+        List.fold_left2
+          (fun s id v ->
+             EcCoreSubst.Fsubst.f_bind_local s id
+               (EcCoreFol.f_of_tindex v))
+          fs tparams.idxvars tys.indices
+    in
     EcCoreSubst.Fsubst.f_subst fs f
 
   let is_projection env p =
@@ -2838,6 +2853,20 @@ module Ax = struct
         let fs =
           EcCoreSubst.Fsubst.f_subst_init
             ~freshen:true ~tv:tv_map ~idx:idx_map () in
+        (* Idxvars share the formula-locals namespace (Phase 2): also
+           bind each idxvar's int [Flocal] to the call-site index
+           projected into the int-formula world. Without this the
+           lemma's body's [Flocal n_lem] (when [n] was used as int
+           inside the proposition) survives unsubstituted. *)
+        let fs =
+          if List.is_empty idxs then fs
+          else
+            List.fold_left2
+              (fun s id v ->
+                 EcCoreSubst.Fsubst.f_bind_local s id
+                   (EcCoreFol.f_of_tindex v))
+              fs tparams.idxvars idxs
+        in
         EcCoreSubst.Fsubst.f_subst fs f
     | _ -> raise (LookupFailure (`Path p))
 

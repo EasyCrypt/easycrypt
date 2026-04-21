@@ -185,6 +185,11 @@ val f_int_mul   : form -> form -> form
 val f_int_pow   : form -> form -> form
 val f_int_edivz : form -> form -> form
 
+(* Project a [tindex] into the int-formula world. Idxvars share the
+   formula-locals namespace (Phase 2): [TIVar id] -> [Flocal id : int].
+   Asserts on residual [TIUnivar]s — caller must resolve first. *)
+val f_of_tindex : tindex -> form
+
 (* -------------------------------------------------------------------- *)
 val f_none : ty -> form
 val f_some : form -> form

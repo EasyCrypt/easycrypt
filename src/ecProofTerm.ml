@@ -19,6 +19,16 @@ type pt_env = {
   pte_hy : LDecl.hyps;
   pte_ue : EcUnify.unienv;
   pte_ev : EcMatching.mevmap ref;
+  (* Idxvars opened by [pt_of_uglobal_r] live in two namespaces
+     simultaneously: the lemma's body references them in tindex
+     positions (substituted via [fs_idx] to a fresh [TIUnivar]) and
+     in formula positions as int-typed [Flocal]. The tindex side
+     resolves through the unifier; the formula side does not, so
+     [concretize] would leave dangling [Flocal n_lem] nodes. We
+     record the (lemma idxvar ident, fresh tindex univar) pairs
+     here so [concretize_env] can synthesise the missing form
+     bindings once the tindex univar is resolved. *)
+  pte_idx_link : (EcIdent.t * EcUid.uid) list ref;
 }
 
 type pt_ev = {
@@ -82,18 +92,22 @@ let ptenv pe hyps (ue, ev) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = EcUnify.UniEnv.copy ue;
-    pte_ev = ref ev; }
+    pte_ev = ref ev;
+    pte_idx_link = ref []; }
 
 (* -------------------------------------------------------------------- *)
 let copy pe =
-  ptenv pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev))
+  let cp = ptenv pe.pte_pe pe.pte_hy (pe.pte_ue, !(pe.pte_ev)) in
+  cp.pte_idx_link := !(pe.pte_idx_link);
+  cp
 
 (* -------------------------------------------------------------------- *)
 let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = PT.unienv_of_hyps hyps;
-    pte_ev = ref EcMatching.MEV.empty; }
+    pte_ev = ref EcMatching.MEV.empty;
+    pte_idx_link = ref []; }
 
 (* -------------------------------------------------------------------- *)
 let rec get_head_symbol (pt : pt_env) (f : form) =
@@ -111,7 +125,25 @@ let can_concretize (pt : pt_env) =
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
+  let subst = EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev)
+                (LDecl.toenv pe.pte_hy) in
+  (* For each (idxvar ident, tindex univar) link recorded by
+     [pt_of_uglobal_r]: if the tindex univar resolved to a [TIVar
+     concrete] in the unifier, add a form-level binding
+     [n_lem -> Flocal concrete] (typed int) so dangling references
+     in the lemma's body get resolved alongside the tindex side. *)
+  let iu = EcUnify.UniEnv.iu_assubst pe.pte_ue in
+  let subst =
+    List.fold_left (fun s (id, u) ->
+      match EcUid.Muid.find_opt u iu with
+      | Some (EcAst.TIVar tid) ->
+          EcCoreSubst.Fsubst.f_bind_local s id (f_local tid tint)
+      | Some (EcAst.TIConst k) ->
+          EcCoreSubst.Fsubst.f_bind_local s id (f_int k)
+      | _ -> s)
+      subst !(pe.pte_idx_link)
+  in
+  CPTEnv subst
 
 (* -------------------------------------------------------------------- *)
 let concretize_e_form_gen (CPTEnv subst) ids f =
@@ -233,6 +265,16 @@ let pt_of_uglobal_r ptenv p =
       EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx:ix () in
     EcCoreSubst.Fsubst.f_subst fs ax
   in
+  (* Record (idxvar ident, tindex univar uid) for each lemma idxvar
+     so [concretize_env] can synthesise the corresponding form-level
+     binding [Flocal n_lem -> Flocal concrete] once the tindex univar
+     resolves to a [TIVar concrete]. *)
+  List.iter (fun id ->
+    match EcIdent.Mid.find_opt id ix with
+    | Some (EcAst.TIUnivar u) ->
+        ptenv.pte_idx_link := (id, u) :: !(ptenv.pte_idx_link)
+    | _ -> ())
+    typ.idxvars;
   let idxs = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
   let typ  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
 

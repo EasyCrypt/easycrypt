@@ -199,3 +199,15 @@ axiom size_of_self {n} (xs : int vec<:n>) :
 lemma unfold_then_rewrite {n} (xs : int vec<:n>) :
   via_size xs = via_size xs.
 proof. move=> @/via_size. rewrite size_of_self. trivial. qed.
+
+(* When a lemma's body uses an idxvar [n] both as a tindex and as an
+   int term (via Phase-2's shared namespace), opening the lemma must
+   substitute BOTH the tindex side ([TIVar n_lem]) and the formula-
+   local side ([Flocal n_lem]). Otherwise the rewrite leaves a
+   dangling [Flocal n_lem] in the goal. *)
+op size_v {n} (xs : int vec<:n>) : int.
+axiom size_v_eq_n {n} (xs : int vec<:n>) : size_v xs = n.
+
+lemma rewrite_with_int_form {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  size_v wm = m.
+proof. rewrite size_v_eq_n. trivial. qed.

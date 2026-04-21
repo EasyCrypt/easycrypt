@@ -386,6 +386,18 @@ let rec f_int (n : BI.zint) =
   | s when 0 <= s -> mk_form (Fint n) tint
   | _             -> f_int_opp (f_int (~^ n))
 
+(* Project a tindex into the int-formula world. Idxvars share the
+   formula-locals namespace (Phase 2): a [TIVar id] becomes a
+   [Flocal id : int]. Index univars [TIUnivar u] are not directly
+   expressible; the caller must have resolved them first. *)
+let rec f_of_tindex (ti : tindex) : form =
+  match ti with
+  | TIVar id     -> f_local id tint
+  | TIConst k    -> f_int k
+  | TIAdd (l, r) -> f_int_add (f_of_tindex l) (f_of_tindex r)
+  | TIMul (l, r) -> f_int_mul (f_of_tindex l) (f_of_tindex r)
+  | TIUnivar _   -> assert false
+
 (* -------------------------------------------------------------------- *)
 let f_i0  = f_int BI.zero
 let f_i1  = f_int BI.one
