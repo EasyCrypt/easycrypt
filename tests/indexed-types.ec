@@ -268,3 +268,24 @@ proof. move=> Hm Hn. smt(). qed.
    implications are pushed inside the forall, not at the top. *)
 lemma idx_with_args {n} (xs : int vec<:n>) : 0 <= n.
 proof. move=> Hn. trivial. qed.
+
+(* FIFO unification order used to fail on mixed-monomial index
+   equations where a dependent univar is resolved later in the queue
+   (e.g. unifying [n*m] against [?n_pack * ?m_pack] before either
+   univar has been pinned by separate equations). The unifier now
+   defers such IxUni problems and retries them after every
+   assignment, so chains of index equations resolve regardless of
+   queue order. Mirrors the [packK] case from the Word library. *)
+type {n} warr.
+type {n} wvec.
+
+op pack_pm   {m n} (xs : wvec<:m>) (ys : warr<:n>) : wvec<:m * n>.
+op unpack_pm {m n} (ys : wvec<:m * n>) : wvec<:m> * warr<:n>.
+
+(* The univars [?m, ?n] each get pinned by a separate [IxUni] on
+   [wvec<:?m> = wvec<:m>] and [warr<:?n> = warr<:n>]; then the
+   polynomial output [wvec<:?m * ?n> = wvec<:m * n>] retries and
+   succeeds via [tindex_equal] after substitution. *)
+lemma pack_mult {m n} (x : wvec<:m>) (y : warr<:n>) (z : wvec<:m * n>) :
+  z = pack_pm x y => z = pack_pm x y.
+proof. admit. qed.

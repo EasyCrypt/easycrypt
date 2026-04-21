@@ -189,11 +189,38 @@ let unify_core (env : EcEnv.env) (ue : unienv) (pb : pb) =
             | _ -> failure ()
   in
 
+  (* Problems that [unify_ix] couldn't solve in the current state —
+     typically because a dependent TIUnivar is still unresolved. They
+     get retried after every successful assignment; we fail only when
+     a full pass makes no progress. *)
+  let deferred = ref [] in
+
+  let try_unify_ix t1 t2 =
+    try unify_ix t1 t2
+    with UnificationFailure _ -> deferred := (t1, t2) :: !deferred
+  in
+
+  let rec drain_deferred () =
+    let todo = !deferred in
+    deferred := [];
+    let progressed = ref false in
+    List.iter (fun (t1, t2) ->
+      let before = !deferred in
+      (try
+         unify_ix t1 t2;
+         progressed := true
+       with UnificationFailure _ ->
+         deferred := (t1, t2) :: before);
+      ignore before
+    ) todo;
+    if !progressed && !deferred <> [] then drain_deferred ()
+  in
+
   let doit () =
     while not (Queue.is_empty pb_q) do
       match Queue.pop pb_q with
       | `IxUni (t1, t2) ->
-          unify_ix t1 t2
+          try_unify_ix t1 t2
 
       | `TyUni (t1, t2) -> begin
         let (t1, t2) = (getvar t1, getvar t2) in
@@ -241,7 +268,15 @@ let unify_core (env : EcEnv.env) (ue : unienv) (pb : pb) =
             | _, _ -> failure ()
         end
       end
-    done
+    done;
+    (* After the primary queue drains, retry any [IxUni] problems
+       that were deferred (typically because a dependent univar was
+       not yet assigned). Each round either resolves at least one or
+       fails the remaining. *)
+    drain_deferred ();
+    if !deferred <> [] then
+      let (i1, i2) = List.hd !deferred in
+      raise (UnificationFailure (`IxUni (i1, i2)))
   in
     doit ()
 
