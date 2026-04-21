@@ -211,3 +211,16 @@ axiom size_v_eq_n {n} (xs : int vec<:n>) : size_v xs = n.
 lemma rewrite_with_int_form {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
   size_v wm = m.
 proof. rewrite size_v_eq_n. trivial. qed.
+
+(* `have := lemma[:idx]` with explicit index instantiation must
+   substitute the idxvar in BOTH tindex positions and formula-locals.
+   The explicit-index path is process_named_pterm, distinct from the
+   no-index pt_of_uglobal_r path. *)
+op vec_at {n} (xs : int vec<:n>) (i : int) : int.
+
+axiom vec_at_n_int {n} (xs : int vec<:n>) :
+  vec_at xs 0 = n + n.
+
+lemma test_have {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  true.
+proof. have := vec_at_n_int[:m + n]. trivial. qed.

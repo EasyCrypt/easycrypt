@@ -569,8 +569,33 @@ let process_named_pterm pe (tvi, fp) =
   let ax =
     let fs =
       EcCoreSubst.Fsubst.f_subst_init ~freshen:false ~tv ~idx:ix () in
+    (* Idxvars are also int-typed formula locals (Phase 2): substitute
+       [Flocal n_lem] alongside [TIVar n_lem]. For univar instantiations,
+       defer to [pte_idx_link] (populated below) so [concretize_env]
+       can fill the form binding once unification resolves the
+       univar. *)
+    let fs =
+      EcIdent.Mid.fold
+        (fun id ti s ->
+           match ti with
+           | EcAst.TIUnivar _ -> s
+           | _ ->
+               EcCoreSubst.Fsubst.f_bind_local s id
+                 (EcCoreFol.f_of_tindex ti))
+        ix fs
+    in
     EcCoreSubst.Fsubst.f_subst fs ax
   in
+  (* Same link mechanism as [pt_of_uglobal_r]: if [openidx] allocated
+     a fresh [TIUnivar] for any idxvar (because the user did not
+     supply an explicit index), record it so [concretize_env] can
+     bridge the tindex / formula-local namespaces. *)
+  List.iter (fun id ->
+    match EcIdent.Mid.find_opt id ix with
+    | Some (EcAst.TIUnivar u) ->
+        pe.pte_idx_link := (id, u) :: !(pe.pte_idx_link)
+    | _ -> ())
+    typ.idxvars;
   let typ_out  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
   let idxs_out = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
 
