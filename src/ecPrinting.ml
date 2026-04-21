@@ -2301,19 +2301,29 @@ let pp_sform ppe fmt f =
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.enter_theory ppe (Option.get (EcPath.prefix x)) in
+  let ppe = PPEnv.add_locals ppe tyd.tyd_params.idxvars in
   let ppe = PPEnv.add_locals ppe tyd.tyd_params.tyvars in
   let name = P.basename x in
+
+  let pp_idxbinder fmt =
+    match tyd.tyd_params.idxvars with
+    | [] -> ()
+    | ids ->
+        Format.fprintf fmt "[%a] " (pp_list "@ " (pp_tyvar ppe)) ids
+  in
 
   let pp_prelude fmt =
     match tyd.tyd_params.tyvars with
     | [] ->
-        Format.fprintf fmt "type %s" name
+        Format.fprintf fmt "type %t%s" pp_idxbinder name
 
     | [tx] ->
-        Format.fprintf fmt "type %a %s" (pp_tyvar ppe) tx name
+        Format.fprintf fmt "type %t%a %s"
+          pp_idxbinder (pp_tyvar ppe) tx name
 
     | txs ->
-        Format.fprintf fmt "type %a %s"
+        Format.fprintf fmt "type %t%a %s"
+          pp_idxbinder
           (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
@@ -2349,6 +2359,17 @@ let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: EcIdent.t list) =
   match ids with
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
+
+(* Mixed [n 'a] binder annotation. Idxvars print first (no apostrophe),
+   then tyvars (apostrophed via [pp_tyvar]). Whitespace-separated to
+   match the input syntax. *)
+let pp_paramsannot (ppe : PPEnv.t) fmt (idxvars, tyvars) =
+  match idxvars, tyvars with
+  | [], [] -> ()
+  | _ ->
+      Format.fprintf fmt "[%a]"
+        (pp_list "@ " (pp_tyvar ppe))
+        (idxvars @ tyvars)
 
 let pp_pvar (ppe : PPEnv.t) fmt ids =
   match ids with
@@ -2427,7 +2448,11 @@ let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos)
   Format.fprintf fmt "%a%a" (pp_list "" pp_nm) nm (pp_codepos1 ppe) cp1
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * EcIdent.t list * ty * prbody option) =
+let pp_opdecl_pr (ppe : PPEnv.t) fmt
+  ((basename, tparams, ty, op)
+    : symbol * EcDecl.ty_params * ty * prbody option) =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2475,15 +2500,21 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt ((basename, ts, ty, op): symbol * EcIdent.t
            pp_vds (pp_list "@\n" pp_ctor) pri.pri_ctors
   in
 
-  if List.is_empty ts then
+  if List.is_empty tparams.idxvars && List.is_empty ts then
     Format.fprintf fmt "@[<hov 2>pred %a %t.@]"
       pp_opname ([], basename) pp_body
   else
     Format.fprintf fmt "@[<hov 2>pred %a %a %t.@]"
-      pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
+let pp_opdecl_op (ppe : PPEnv.t) fmt
+    ((basename, tparams, ty, op)
+      : symbol * EcDecl.ty_params * ty * opbody option) =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2563,17 +2594,22 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
         Format.fprintf fmt "= < type-class-operator >"
   in
 
-  match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
+  if List.is_empty tparams.idxvars && List.is_empty ts then
+    Format.fprintf fmt "@[<hov 2>op %a %t.@]"
       pp_opname ([], basename) pp_body
-  | _  ->
-      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
-      pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+  else
+    Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_nt (ppe : PPEnv.t) fmt 
-  ((basename, ts, _ty, nt) : symbol * EcIdent.t list * ty * notation)
+let pp_opdecl_nt (ppe : PPEnv.t) fmt
+  ((basename, tparams, _ty, nt)
+    : symbol * EcDecl.ty_params * ty * notation)
 =
+  let ts = tparams.tyvars in
+  let ppe = PPEnv.add_locals ppe tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ts in
 
   let pp_body fmt =
@@ -2585,12 +2621,14 @@ let pp_opdecl_nt (ppe : PPEnv.t) fmt
         (pp_expr subppe) nt.ont_body
   in
 
-  match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>abbrev %a %t.@]"
+  if List.is_empty tparams.idxvars && List.is_empty ts then
+    Format.fprintf fmt "@[<hov 2>abbrev %a %t.@]"
       pp_opname ([], basename) pp_body
-  | _  ->
-      Format.fprintf fmt "@[<hov 2>abbrev %a %a %t.@]"
-        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+  else
+    Format.fprintf fmt "@[<hov 2>abbrev %a %a %t.@]"
+      pp_opname ([], basename)
+      (pp_paramsannot ppe) (tparams.idxvars, ts)
+      pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl 
@@ -2611,23 +2649,25 @@ let pp_opdecl
   let pp_decl fmt op =
     match op.op_kind with
     | OB_oper i ->
-      pp_opdecl_op ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
+      pp_opdecl_op ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
     | OB_pred i ->
-      pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
+      pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
     | OB_nott i ->
       let ppe = { ppe with PPEnv.ppe_fb = Sp.add x ppe.PPEnv.ppe_fb } in
-      pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams.tyvars, op_ty op, i)
+      pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
 
   in Format.fprintf fmt "@[<v>%a%a%a@]" pp_locality op.op_loca pp_name x pp_decl op
 
 let pp_added_op (ppe : PPEnv.t) fmt op =
+  let ppe = PPEnv.add_locals ppe op.op_tparams.idxvars in
   let ppe = PPEnv.add_locals ppe op.op_tparams.tyvars in
-  match op.op_tparams.tyvars with
-  | [] -> Format.fprintf fmt ": @[<hov 2>%a@]"
-    (pp_type ppe) op.op_ty
-  | ts  ->
+  if List.is_empty op.op_tparams.idxvars
+  && List.is_empty op.op_tparams.tyvars then
+    Format.fprintf fmt ": @[<hov 2>%a@]" (pp_type ppe) op.op_ty
+  else
     Format.fprintf fmt "@[<hov 2>%a :@ %a.@]"
-      (pp_tyvarannot ppe) ts (pp_type ppe) op.op_ty
+      (pp_paramsannot ppe) (op.op_tparams.idxvars, op.op_tparams.tyvars)
+      (pp_type ppe) op.op_ty
 
 (* -------------------------------------------------------------------- *)
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
@@ -2643,6 +2683,7 @@ let tags_of_axkind = function
   | `Lemma -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
+  let ppe = PPEnv.add_locals ppe ax.ax_tparams.idxvars in
   let ppe = PPEnv.add_locals ppe ax.ax_tparams.tyvars in
   let basename = P.basename x in
 
@@ -2650,9 +2691,12 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
     pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
-    match ax.ax_tparams.tyvars with
-    | [] -> Format.fprintf fmt "%s"    basename
-    | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+    if List.is_empty ax.ax_tparams.idxvars
+    && List.is_empty ax.ax_tparams.tyvars then
+      Format.fprintf fmt "%s" basename
+    else
+      Format.fprintf fmt "%s %a" basename
+        (pp_paramsannot ppe) (ax.ax_tparams.idxvars, ax.ax_tparams.tyvars)
 
   and pp_tags fmt =
     let tags = tags_of_axkind ax.ax_kind in
