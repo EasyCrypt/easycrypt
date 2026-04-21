@@ -1288,7 +1288,10 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
 
   let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
   let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
-  let reccty = tconstr ~tyargs:(List.map tvar recty.tyd_params.tyvars) recp in
+  let reccty =
+    tconstr recp
+      ~indices:(List.map (fun id -> EcAst.TIVar id) recty.tyd_params.idxvars)
+      ~tyargs:(List.map tvar recty.tyd_params.tyvars) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
   let tysopn = Tvar.init recty.tyd_params.tyvars rtvi in
 
@@ -1384,10 +1387,25 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
 
       EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
-      let ctorty =
+      (* Open the constructor's field types AND its result type with a
+         single substitution so that any fresh index univars allocated
+         for [indty.tyd_params.idxvars] are anchored to a type that
+         actually participates in unification — without this, a 0-field
+         constructor of an indexed datatype leaves its index univars
+         dangling. *)
+      let result_ty =
+        EcTypes.tconstr indp
+          ~indices:(List.map (fun id -> TIVar id) indty.tyd_params.idxvars)
+          ~tyargs:(List.map tvar indty.tyd_params.tyvars) in
+      let ctorty, pty =
         let tvi = Some (EcUnify.TVIunamed ([], tvi)) in
-          fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
-      let pty = EcUnify.UniEnv.fresh ue in
+        let opened, _ =
+          EcUnify.UniEnv.opentys ue indty.tyd_params tvi
+            (result_ty :: ctorty) in
+        match opened with
+        | r :: rest -> rest, r
+        | []        -> assert false
+      in
 
       (try  EcUnify.unify env ue (toarrow ctorty pty) opty
        with EcUnify.UnificationFailure _ -> assert false);

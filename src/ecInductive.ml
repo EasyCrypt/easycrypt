@@ -158,7 +158,9 @@ and check_positivity_ident fct p params ident ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_ident fct p params ident) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      assert (List.is_empty args.indices);
+      (* Indices play no role in positivity: the recursion is on the
+         type, and indices are non-negative integer expressions that
+         carry no embedded type information. *)
       if not (ty_params_compat args.types params) then
         non_positive p (TypePositionRestriction ty)
   | Tconstr (q, args) ->
@@ -178,7 +180,6 @@ let rec check_positivity_path fct p ty =
   | Tglob _ | Tunivar _ | Tvar _ -> ()
   | Ttuple tys -> List.iter (check_positivity_path fct p) tys
   | Tconstr (q, args) when EcPath.p_equal q p ->
-      assert (List.is_empty args.indices);
       if List.exists (occurs p) args.types then
         non_positive p (NonPositiveOcc ty)
   | Tconstr (q, args) ->

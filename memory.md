@@ -482,9 +482,6 @@ the SMT path — they belong in the Phase-6 polish pass.
 #### Known remaining gaps (documented but not scheduled)
 
 - Indexed types in SMT translation (Phase-5 punt) — **Gap F**.
-- Indexed datatypes / records (Phase-3 Slice-A refusal) — **Gap C**.
-- Polynomial unification beyond "naked TIUnivar = polynomial"
-  (e.g. `?u + 1 = n` requires subtraction inversion) — **Gap B**.
 
 #### Plan for the remaining gaps (B → C → F)
 
@@ -523,6 +520,50 @@ remaining three are scheduled as follows.
 Order: **B → C → F** (B is smallest and broadens unification;
 C is the largest scope expansion but unblocks real ADT users;
 F lands last to translate everything we now support).
+
+### Post-Phase-6 — gaps B / C (DONE)
+
+- **B** — polynomial unification beyond naked TIUnivar.
+  New `EcAst.tindex_solve_for_univar` walks the signed difference
+  of two canonical polynomials and returns `Some (u, value)` when
+  exactly one TIUnivar has non-zero net coefficient ±1, every mixed
+  monomial cancels, and the residual is non-negative. Wired into
+  `unify_ix` *after* the original "naked univar = anything" fast
+  path (the fast path stays because it handles `?u = ?v` which the
+  new function refuses — two univars with non-zero net). MVP scope
+  excludes multi-univar Diophantine and `?u + 1 = n` (free n) where
+  the residual could be negative without symbolic guarantees.
+- **C** — non-refining indexed datatypes and records.
+  `EcHiInductive.trans_datatype` and `trans_record` now take an
+  optional `~idxparams` argument; `EcScope.add_types` threads it
+  through both paths (the previous `no_indices_for` refusal is
+  removed). Constructor and projector signatures in `EcEnv` build
+  their result type as `tconstr ~indices ~tyargs path`, so
+  `INil : 'a vec<:n>` is registered correctly. The positivity
+  checker drops its `args.indices = []` asserts: indices play no
+  role in positivity since the recursion is on the type, and indices
+  carry no embedded type information.
+
+  Match elaboration in `EcTyping.trans_branch` (and the matchfix
+  twin in `EcHiInductive`) was bug-prone for 0-field constructors:
+  `opentys` was being called with empty field list, allocating
+  fresh index univars that never appeared in any unified type and
+  so stayed dangling at `closed`-check time. Fix: prepend a hand-
+  built result type to the opened list, anchoring the freshly
+  allocated univars to a type that participates in the subsequent
+  unification against the scrutinee's index.
+
+  Out of scope (deliberate): index refinement on match. Pattern
+  matching does not learn anything about the scrutinee's index from
+  the constructor that fired; e.g., a `vec<:0>` value still admits
+  an `ICons`-shaped pattern at the type level. Matches OCaml/Haskell
+  parametric ADT semantics. True dependent matching is a separate,
+  much larger feature and not on the roadmap.
+
+  Verified: 6 new declarations in `tests/indexed-types.ec` covering
+  constructor application, plain match, matchfix, indexed records,
+  and field projection (139 declarations total). Non-indexed
+  datatypes and records continue to compile unchanged.
 
 ### Post-Phase-6 — gaps E / D / A (DONE)
 

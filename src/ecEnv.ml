@@ -789,8 +789,11 @@ module MC = struct
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
           let params  = List.map tvar tyd.tyd_params.tyvars in
+          let indices = List.map (fun id -> TIVar id) tyd.tyd_params.idxvars in
           let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr ~tyargs:params mypath) in
+            let aty =
+              EcTypes.toarrow aty
+                (tconstr ~indices ~tyargs:params mypath) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
             let cop = mk_op
                         ~opaque:optransparent (fst aty) (snd aty)
@@ -830,10 +833,12 @@ module MC = struct
 
       | Record (scheme, fields) ->
           let params  = List.map tvar tyd.tyd_params.tyvars in
+          let indices = List.map (fun id -> TIVar id) tyd.tyd_params.idxvars in
+          let self_ty = tconstr ~indices ~tyargs:params mypath in
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr ~tyargs:params mypath) aty in
+              let aty = EcTypes.tfun self_ty aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
               let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
@@ -854,7 +859,7 @@ module MC = struct
 
           let stname = Printf.sprintf "mk_%s" x in
           let stop   =
-            let stty = toarrow (List.map snd fields) (tconstr ~tyargs:params mypath) in
+            let stty = toarrow (List.map snd fields) self_ty in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
               mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in

@@ -171,10 +171,22 @@ let unify_core (env : EcEnv.env) (ue : unienv) (pb : pb) =
     let r1 = resolve_tindex ue t1 in
     let r2 = resolve_tindex ue t2 in
     if tindex_equal r1 r2 then () else
-    match tindex_solve_for_univar r1 r2 with
-    | Some (u, v) when not (tindex_occurs_univar u v) ->
-        ue := { !ue with ue_iuf = Muid.add u v (!ue).ue_iuf }
-    | _ -> failure ()
+    let assign u t =
+      ue := { !ue with ue_iuf = Muid.add u t (!ue).ue_iuf } in
+    (* Fast path: if either side is a naked univar [?u] not occurring
+       in the other, assign directly. This subsumes the case [?u = ?v]
+       which [tindex_solve_for_univar] would refuse (it sees two
+       univars with non-zero net coefficient). *)
+    match tindex_naked_univar r1 with
+    | Some u when not (tindex_occurs_univar u r2) -> assign u r2
+    | _ ->
+        match tindex_naked_univar r2 with
+        | Some u when not (tindex_occurs_univar u r1) -> assign u r1
+        | _ ->
+            match tindex_solve_for_univar r1 r2 with
+            | Some (u, v) when not (tindex_occurs_univar u v) ->
+                assign u v
+            | _ -> failure ()
   in
 
   let doit () =

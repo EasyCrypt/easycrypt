@@ -106,3 +106,33 @@ op b_test2 [m 'a] (xs : 'a vec<:m+5>) : 'a vec<:m+4> = tail xs.
 (* Symmetric form: univar on the rhs of the equation. *)
 op head [n 'a] (xs : 'a vec<:n+1>) : 'a.
 op b_test3 ['a] (xs : 'a vec<:7>) : 'a = head xs.
+
+(* Gap C — non-refining indexed datatypes and records. *)
+
+(* Indexed datatype: constructor result type carries the index;
+   index unification at constructor application sites recovers it. *)
+type [n] 'a ivec = [ INil | ICons of 'a & 'a ivec<:n> ].
+
+op c_test1 : int ivec<:0> = INil.
+op c_test2 (x : int) (xs : int ivec<:5>) : int ivec<:5> = ICons x xs.
+
+(* Plain match expression on indexed datatype. *)
+op c_test3 (xs : int ivec<:5>) : int =
+  match xs with
+  | INil      => 0
+  | ICons y _ => y
+  end.
+
+(* Matchfix on indexed datatype with index binder on the op itself. *)
+op c_test4 [n] (d : int) (xs : int ivec<:n>) : int =
+  with xs = INil      => d
+  with xs = ICons y _ => y.
+
+(* Indexed record. Auto-generated constructor [mk_irec] and projectors
+   [`ivalue], [`idummy] all carry the index. *)
+type [n] 'a irec = { ivalue : 'a; idummy : 'a ivec<:n> }.
+
+op c_test5 (x : int) (xs : int ivec<:0>) : int irec<:0> =
+  {| ivalue = x; idummy = xs |}.
+
+op c_test6 (r : int irec<:7>) : int = r.`ivalue.
