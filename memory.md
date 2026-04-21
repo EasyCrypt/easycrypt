@@ -533,6 +533,19 @@ F lands last to translate everything we now support).
   new function refuses — two univars with non-zero net). MVP scope
   excludes multi-univar Diophantine and `?u + 1 = n` (free n) where
   the residual could be negative without symbolic guarantees.
+
+  **Multi-univar Diophantine is a deliberate non-goal, not a punt.**
+  Equations like `?m + ?n = 5` admit every `(k, 5-k)` for
+  `0 <= k <= 5` as a nat solution — no canonical answer, nothing
+  to "prefer". Guessing one would be wrong; the unifier correctly
+  refuses. The MVP workaround is explicit index instantiation at
+  the call site: `make_sum[:2, 3]` instead of bare `make_sum`. If
+  ever revisited, the only sensible option is
+  **constraint-accumulate-and-commit** — collect `?m + ?n = 5` as
+  a pending equation and commit once a later context (arg type,
+  scrutinee, …) pins one univar and makes the solution unique.
+  Worth building only if a real use case surfaces; until then,
+  explicit `[:...]` is the answer.
 - **C** — non-refining indexed datatypes and records.
   `EcHiInductive.trans_datatype` and `trans_record` now take an
   optional `~idxparams` argument; `EcScope.add_types` threads it
