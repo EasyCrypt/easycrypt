@@ -157,3 +157,15 @@ op f_vec5 : int vec<:5>.
 
 lemma f_test3 : f_vec3 = f_vec3 /\ f_vec5 = f_vec5.
 proof. smt(). qed.
+
+(* Lemmas can take index binders alongside type binders in the same
+   bracket: [n 'a] or ['a n], shared syntax with op binders. SMT
+   translation skips goals with bound (non-closed) indices, so these
+   are discharged with [trivial] rather than [smt()]. *)
+lemma f_test4 ['a n] (x : 'a) (xs : 'a vec<:n>) :
+  cons x xs = cons x xs.
+proof. trivial. qed.
+
+lemma f_test5 ['a n] :
+  forall (x : 'a) (xs : 'a vec<:n>), cons x xs = cons x xs.
+proof. move => x xs; trivial. qed.
