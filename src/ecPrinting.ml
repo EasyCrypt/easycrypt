@@ -2309,7 +2309,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     match tyd.tyd_params.idxvars with
     | [] -> ()
     | ids ->
-        Format.fprintf fmt "[%a] " (pp_list "@ " (pp_tyvar ppe)) ids
+        Format.fprintf fmt "{%a} " (pp_list "@ " (pp_tyvar ppe)) ids
   in
 
   let pp_prelude fmt =
@@ -2360,16 +2360,28 @@ let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: EcIdent.t list) =
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
 
-(* Mixed [n 'a] binder annotation. Idxvars print first (no apostrophe),
-   then tyvars (apostrophed via [pp_tyvar]). Whitespace-separated to
-   match the input syntax. *)
+(* Combined `{n} ['a]` binder annotation. Indices print in curly
+   braces (first), then type variables in square brackets. Each part
+   is omitted entirely when empty, and a single space is inserted
+   between them when both are present. *)
 let pp_paramsannot (ppe : PPEnv.t) fmt (idxvars, tyvars) =
+  let pp_idx fmt =
+    match idxvars with
+    | [] -> ()
+    | _  ->
+        Format.fprintf fmt "{%a}" (pp_list "@ " (pp_tyvar ppe)) idxvars
+  in
+  let pp_ty fmt =
+    match tyvars with
+    | [] -> ()
+    | _  ->
+        Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) tyvars
+  in
   match idxvars, tyvars with
   | [], [] -> ()
-  | _ ->
-      Format.fprintf fmt "[%a]"
-        (pp_list "@ " (pp_tyvar ppe))
-        (idxvars @ tyvars)
+  | _ , [] -> pp_idx fmt
+  | [], _  -> pp_ty fmt
+  | _ , _  -> Format.fprintf fmt "%t %t" pp_idx pp_ty
 
 let pp_pvar (ppe : PPEnv.t) fmt ids =
   match ids with
