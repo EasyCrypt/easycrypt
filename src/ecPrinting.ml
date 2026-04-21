@@ -3313,12 +3313,20 @@ module PPGoal = struct
     in (ppe, (id, pdk))
 
   let pp_goal1 ?(pphyps = true) ?prpo ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
+    let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.idxvars in
     let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
     let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
 
     idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
 
     if pphyps then begin
+      begin
+        match hyps.EcBaseLogic.h_tvar.idxvars with
+        | [] -> ()
+        | ix ->
+            Format.fprintf fmt "Index variables: %a@\n\n%!"
+              (pp_list ", " (pp_tyvar ppe)) ix
+      end;
       begin
         match hyps.EcBaseLogic.h_tvar.tyvars with
         | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
@@ -3359,11 +3367,18 @@ end
 (* -------------------------------------------------------------------- *)
 let pp_hyps (ppe : PPEnv.t) fmt hyps =
   let hyps = EcEnv.LDecl.tohyps hyps in
+  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.idxvars in
   let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar.tyvars in
   let ppe, pps =
     List.map_fold PPGoal.pre_pp_hyp ppe
                   (List.rev hyps.EcBaseLogic.h_local) in
 
+  begin match hyps.EcBaseLogic.h_tvar.idxvars with
+  | [] -> ()
+  | ix ->
+      Format.fprintf fmt "Index variables: %a@\n\n%!"
+        (pp_list ", " (pp_tyvar ppe)) ix
+  end;
   begin match hyps.EcBaseLogic.h_tvar.tyvars with
   | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
   | tv ->
