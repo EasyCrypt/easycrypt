@@ -274,6 +274,13 @@ proof. move=> Hn. trivial. qed.
 lemma idx_no_marker {n} : true.
 proof. trivial. qed.
 
+(* The `+` marker is rejected on non-lemma binders. Kept as a
+   comment (uncommenting would produce a clear parse error):
+     type {n+} foo.                   (* parse error: type *)
+     op f {n+} : foo -> int.          (* parse error: operator *)
+     pred p {n+} : foo.               (* parse error: predicate *)
+     abbrev a {n+} : int = 5.         (* parse error: abbreviation *) *)
+
 (* FIFO unification order used to fail on mixed-monomial index
    equations where a dependent univar is resolved later in the queue
    (e.g. unifying [n*m] against [?n_pack * ?m_pack] before either

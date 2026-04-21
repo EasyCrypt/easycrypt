@@ -26,6 +26,23 @@
      bracket families ({...} vs [...]), so the parser can keep them
      separate. *)
 
+  (* Trailing `+` on an idxvar name only makes sense on lemma /
+     axiom binders (where it injects [0 <= n =>] into the proof
+     goal). Non-lemma consumers must reject it explicitly so the
+     mark is never silently dropped. *)
+  let reject_nonneg_marker
+      (where : string)
+      (nonneg : EcParsetree.psymbol list)
+  =
+    match nonneg with
+    | [] -> ()
+    | x :: _ ->
+        parse_error (EcLocation.loc x) (Some
+          (Printf.sprintf
+             "the `+' marker on idxvar `%s' only applies to lemma / \
+              axiom binders, not to %s declarations"
+             (EcLocation.unloc x) where))
+
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
@@ -1718,7 +1735,9 @@ typarams:
 
 %inline tyd_name:
 | idx=loption(idxvars_decl) tya=typarams x=ident
-    { (List.map fst idx, tya, x) }
+    { let nonneg = idx |> List.filter snd |> List.map fst in
+      reject_nonneg_marker "type" nonneg;
+      (List.map fst idx, tya, x) }
 
 dt_ctor_def:
 | x=oident { (x, []) }
@@ -1848,7 +1867,8 @@ operator:
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
       mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
-    let (idxvars, _nonneg, po_tyvars) = tvs in
+    let (idxvars, nonneg, po_tyvars) = tvs in
+    reject_nonneg_marker "operator" nonneg;
 
     { po_kind     = k;
       po_name     = List.hd x;
@@ -1865,7 +1885,8 @@ operator:
     x=plist1(oident, COMMA) tvs=ix_ty_binder args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
-  { let (idxvars, _nonneg, po_tyvars) = tvs in
+  { let (idxvars, nonneg, po_tyvars) = tvs in
+    reject_nonneg_marker "operator" nonneg;
     { po_kind     = k;
       po_name     = List.hd x;
       po_aliases  = List.tl x;
@@ -1937,7 +1958,8 @@ predicate:
        pp_locality = locality; } }
 
 | locality=locality PRED x=oident tvs=ix_ty_binder COLON sty=pred_tydom
-   { let (idxvars, _nonneg, pp_tyvars) = tvs in
+   { let (idxvars, nonneg, pp_tyvars) = tvs in
+     reject_nonneg_marker "predicate" nonneg;
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -1945,7 +1967,8 @@ predicate:
        pp_locality = locality; } }
 
 | locality=locality PRED x=oident tvs=ix_ty_binder p=ptybindings? EQ f=form
-   { let (idxvars, _nonneg, pp_tyvars) = tvs in
+   { let (idxvars, nonneg, pp_tyvars) = tvs in
+     reject_nonneg_marker "predicate" nonneg;
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -1955,7 +1978,8 @@ predicate:
 | locality=locality INDUCTIVE x=oident tvs=ix_ty_binder p=ptybindings?
     EQ b=indpred_def
 
-   { let (idxvars, _nonneg, pp_tyvars) = tvs in
+   { let (idxvars, nonneg, pp_tyvars) = tvs in
+     reject_nonneg_marker "inductive predicate" nonneg;
      { pp_name     = x;
        pp_idxvars  = idxvars;
        pp_tyvars   = pp_tyvars;
@@ -2000,7 +2024,8 @@ nt_bindings:
 notation:
 | locality=loc(locality) NOTATION x=loc(NOP) tvs=ix_ty_binder bd=nt_bindings?
     args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
-  { let (idxvars, _nonneg, nt_tv) = tvs in
+  { let (idxvars, nonneg, nt_tv) = tvs in
+    reject_nonneg_marker "notation" nonneg;
     { nt_name  = x;
       nt_idx   = idxvars;
       nt_tv    = nt_tv;
@@ -2027,7 +2052,8 @@ abbreviation:
     args=ptybindings_decl? sty=prefix(COLON, loc(type_exp))? EQ b=expr
 
   { let sty  = sty |> ofdfl (fun () -> mk_loc (loc b) PTunivar) in
-    let (idxvars, _nonneg, ab_tv) = tvs in
+    let (idxvars, nonneg, ab_tv) = tvs in
+    reject_nonneg_marker "abbreviation" nonneg;
 
     { ab_name  = x;
       ab_idx   = idxvars;
@@ -3707,7 +3733,9 @@ cltyparams:
 
 clone_override:
 | TYPE idx=loption(idxvars_decl) ps=cltyparams x=qident mode=opclmode t=loc(type_exp)
-   { (x, PTHO_Type (`BySyntax (List.map fst idx, ps, t), mode)) }
+   { let nonneg = idx |> List.filter snd |> List.map fst in
+     reject_nonneg_marker "clone-with-type" nonneg;
+     (x, PTHO_Type (`BySyntax (List.map fst idx, ps, t), mode)) }
 
 | OP x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))
