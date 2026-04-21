@@ -187,8 +187,11 @@ val f_int_edivz : form -> form -> form
 
 (* Project a [tindex] into the int-formula world. Idxvars share the
    formula-locals namespace (Phase 2): [TIVar id] -> [Flocal id : int].
-   Asserts on residual [TIUnivar]s — caller must resolve first. *)
-val f_of_tindex : tindex -> form
+   The option variant returns [None] if [ti] still contains any
+   [TIUnivar]; the asserting variant crashes in that case (use it
+   when the caller is sure all univars are resolved). *)
+val f_of_tindex_opt : tindex -> form option
+val f_of_tindex     : tindex -> form
 
 (* -------------------------------------------------------------------- *)
 val f_none : ty -> form

@@ -577,11 +577,9 @@ let process_named_pterm pe (tvi, fp) =
     let fs =
       EcIdent.Mid.fold
         (fun id ti s ->
-           match ti with
-           | EcAst.TIUnivar _ -> s
-           | _ ->
-               EcCoreSubst.Fsubst.f_bind_local s id
-                 (EcCoreFol.f_of_tindex ti))
+           match EcCoreFol.f_of_tindex_opt ti with
+           | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
+           | None   -> s)
         ix fs
     in
     EcCoreSubst.Fsubst.f_subst fs ax

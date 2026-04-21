@@ -2734,8 +2734,9 @@ module Op = struct
       else
         List.fold_left2
           (fun s id v ->
-             EcCoreSubst.Fsubst.f_bind_local s id
-               (EcCoreFol.f_of_tindex v))
+             match EcCoreFol.f_of_tindex_opt v with
+             | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
+             | None   -> s)
           fs tparams.idxvars tys.indices
     in
     EcCoreSubst.Fsubst.f_subst fs f
@@ -2863,8 +2864,9 @@ module Ax = struct
           else
             List.fold_left2
               (fun s id v ->
-                 EcCoreSubst.Fsubst.f_bind_local s id
-                   (EcCoreFol.f_of_tindex v))
+                 match EcCoreFol.f_of_tindex_opt v with
+                 | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
+                 | None   -> s)
               fs tparams.idxvars idxs
         in
         EcCoreSubst.Fsubst.f_subst fs f

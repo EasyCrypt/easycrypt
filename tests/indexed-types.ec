@@ -237,3 +237,18 @@ axiom buildK {n} (k : int) : extract (build[:n] k) = k.
 lemma test_bare_rewrite {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
   extract (build[:m + n] 42) = 42.
 proof. rewrite buildK. trivial. qed.
+
+(* When [Ax.instantiate] / [Op.reduce] is invoked with idxs that
+   still contain unresolved [TIUnivar]s (because matching hasn't
+   pinned them yet), [f_of_tindex_opt] returns [None] and the form-
+   side binding is silently skipped — the form-side stays
+   unsubstituted and gets resolved later via [pte_idx_link]. The
+   asserting variant of [f_of_tindex] used to crash here. *)
+op midx {n} (xs : int vec<:n>) (k : int) : int.
+
+axiom midx_self {n} (xs : int vec<:n>) (k : int) :
+  midx xs k = midx xs k.
+
+lemma test_chain {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  midx wm 1 = midx wm 1.
+proof. rewrite midx_self. rewrite midx_self. trivial. qed.

@@ -388,15 +388,29 @@ let rec f_int (n : BI.zint) =
 
 (* Project a tindex into the int-formula world. Idxvars share the
    formula-locals namespace (Phase 2): a [TIVar id] becomes a
-   [Flocal id : int]. Index univars [TIUnivar u] are not directly
-   expressible; the caller must have resolved them first. *)
-let rec f_of_tindex (ti : tindex) : form =
+   [Flocal id : int]. Returns [None] if [ti] still contains any
+   [TIUnivar] (the projection cannot represent them); callers can
+   then decide to skip the form-side binding rather than crash. *)
+let rec f_of_tindex_opt (ti : tindex) : form option =
   match ti with
-  | TIVar id     -> f_local id tint
-  | TIConst k    -> f_int k
-  | TIAdd (l, r) -> f_int_add (f_of_tindex l) (f_of_tindex r)
-  | TIMul (l, r) -> f_int_mul (f_of_tindex l) (f_of_tindex r)
-  | TIUnivar _   -> assert false
+  | TIVar id     -> Some (f_local id tint)
+  | TIConst k    -> Some (f_int k)
+  | TIAdd (l, r) -> begin
+      match f_of_tindex_opt l, f_of_tindex_opt r with
+      | Some l, Some r -> Some (f_int_add l r)
+      | _              -> None
+    end
+  | TIMul (l, r) -> begin
+      match f_of_tindex_opt l, f_of_tindex_opt r with
+      | Some l, Some r -> Some (f_int_mul l r)
+      | _              -> None
+    end
+  | TIUnivar _   -> None
+
+let f_of_tindex (ti : tindex) : form =
+  match f_of_tindex_opt ti with
+  | Some f -> f
+  | None   -> assert false
 
 (* -------------------------------------------------------------------- *)
 let f_i0  = f_int BI.zero
