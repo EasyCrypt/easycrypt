@@ -560,6 +560,27 @@ F lands last to translate everything we now support).
   parametric ADT semantics. True dependent matching is a separate,
   much larger feature and not on the roadmap.
 
+  Also out of scope: **per-constructor result indices** (GADT-style).
+  Every constructor's result type is hard-wired to
+  `tconstr ~indices ~tyargs path` using the type's *own* idxvars
+  (see [src/ecEnv.ml:794-798]). So every ctor is universally
+  quantified over the index just like over type variables: `INil`
+  has type `forall n 'a. 'a ivec<:n>`, valid at every index. The
+  index carries no information about which constructor fired.
+  Achieving the GADT-style declaration
+  ```
+  type [n] 'a vec =
+    | VNil                       : 'a vec<:0>
+    | VCons of 'a & 'a vec<:n>   : 'a vec<:n+1>
+  ```
+  would require (1) per-constructor result-type syntax (~1d of
+  parser/elaborator plumbing) AND (2) index refinement on match
+  (much larger — genuine dependent matching, intersects with SMT
+  discharge of unification, new machinery in `trans_branch` and a
+  refinement-aware unifier). Shipping (1) without (2) would be
+  worse than the current uniform-indices behavior because users
+  would expect refinement and not get it.
+
   Verified: 6 new declarations in `tests/indexed-types.ec` covering
   constructor application, plain match, matchfix, indexed records,
   and field projection (139 declarations total). Non-indexed
