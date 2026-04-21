@@ -481,10 +481,48 @@ the SMT path — they belong in the Phase-6 polish pass.
 
 #### Known remaining gaps (documented but not scheduled)
 
-- Indexed types in SMT translation (Phase-5 punt).
-- Indexed datatypes / records (Phase-3 Slice-A refusal).
+- Indexed types in SMT translation (Phase-5 punt) — **Gap F**.
+- Indexed datatypes / records (Phase-3 Slice-A refusal) — **Gap C**.
 - Polynomial unification beyond "naked TIUnivar = polynomial"
-  (e.g. `?u + 1 = n` requires subtraction inversion).
+  (e.g. `?u + 1 = n` requires subtraction inversion) — **Gap B**.
+
+#### Plan for the remaining gaps (B → C → F)
+
+Original A–F plan: A, D, E landed in the post-Phase-6 batch. The
+remaining three are scheduled as follows.
+
+- **Gap B — polynomial unification beyond naked TIUnivar.** Today
+  only `?u = poly` is solved. Extend `IxUni` work-list to handle
+  `?u + k = poly` and (more generally) any equation where exactly
+  one TIUnivar appears in `lhs - rhs` with coefficient ±1 — solve
+  `?u := ±(poly - other)` and fail if the result would be negative
+  or non-integer. Defer multi-univar Diophantine to a separate
+  constraint-set effort; not motivated by any current example.
+  Files: [src/ecUnify.ml](src/ecUnify.ml) (`unify_core` IxUni case).
+  Effort: ~0.5d.
+- **Gap C — indexed datatypes / records (non-refining).** Lift the
+  Phase-3 Slice-A refusal in [src/ecHiInductive.ml](src/ecHiInductive.ml)
+  and the datatype/record paths in [src/ecScope.ml](src/ecScope.ml).
+  Constructor signatures may reference idxvars; pattern match does
+  *not* refine the index. Document explicitly that `vec<:0>` admits
+  a `VCons`-shaped value at the type level; matches OCaml/Haskell
+  parametric ADT semantics. Index-refining matches are a separate,
+  much bigger feature (true dependent typing) and out of scope.
+  Effort: ~1.5d (datatypes), records similar but smaller.
+- **Gap F — SMT translation of indexed types.** Default strategy:
+  monomorphize per concrete index. `'a vec<:e>` with closed `e`
+  becomes a fresh memoized Why3 sort `vec_<canon(e)> 'a`; goals
+  with free index variables still hit `CanNotTranslate`. Add a
+  per-theory `[smt erase indices]` pragma as escape hatch for
+  theories where the user has manually discharged the index
+  discipline (drops indices, translates `'a vec<:e>` → `'a vec`).
+  Files: [src/ecSmt.ml](src/ecSmt.ml) (the two `CanNotTranslate`
+  raise sites, `trans_ty` Tconstr case, plus a small monomorphize
+  cache module). Effort: ~1d for the default; +0.5d for the pragma.
+
+Order: **B → C → F** (B is smallest and broadens unification;
+C is the largest scope expansion but unblocks real ADT users;
+F lands last to translate everything we now support).
 
 ### Post-Phase-6 — gaps E / D / A (DONE)
 
