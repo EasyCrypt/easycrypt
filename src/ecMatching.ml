@@ -689,13 +689,19 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if List.compare_lengths tys1.types tys2.types <> 0 then
             failure ();
-          (* Indices on Fop are redundant with f_ty (which is unified
-             at the surrounding Fapp via arg matching). Trying to unify
-             them here forces a polynomial-against-polynomial match
-             before the constraints from arg matching are available,
-             leading to ambiguous multi-univar Diophantine. We unify
-             the type arguments only and let the args provide the
-             remaining constraints. *)
+          (* Index unification on Fop heads is best-effort: a single
+             naked TIUnivar (e.g. [mk[:?u]] vs [mk[:m+n]]) binds via
+             my Gap-B path, but a polynomial-against-polynomial with
+             multiple univars (e.g. [bits[:?u_m + ?u_n]] vs
+             [bits[:m + n]]) is genuinely ambiguous in isolation —
+             defer to arg matching, which typically constrains the
+             individual univars first. So we try, but tolerate
+             failures here. Type unification of [tys1.types] is
+             still mandatory. *)
+          List.iter2 (fun i1 i2 ->
+            try  EcUnify.unify_idx env ue i1 i2
+            with EcUnify.UnificationFailure _ -> ())
+            tys1.indices tys2.indices;
           try
             List.iter2 (EcUnify.unify env ue) tys1.types tys2.types
           with EcUnify.UnificationFailure _ -> failure ()

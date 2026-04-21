@@ -224,3 +224,16 @@ axiom vec_at_n_int {n} (xs : int vec<:n>) :
 lemma test_have {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
   true.
 proof. have := vec_at_n_int[:m + n]. trivial. qed.
+
+(* Bare [rewrite L] (no explicit index) on an indexed lemma whose
+   pattern is a single-univar Fop application (e.g. mk[:?u]): the
+   matcher's Fop case must attempt index unification so [?u] gets
+   bound to the goal's index polynomial. *)
+op build {n} : int -> int vec<:n>.
+op extract {n} : int vec<:n> -> int.
+
+axiom buildK {n} (k : int) : extract (build[:n] k) = k.
+
+lemma test_bare_rewrite {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
+  extract (build[:m + n] 42) = 42.
+proof. rewrite buildK. trivial. qed.
