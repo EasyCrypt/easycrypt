@@ -2704,7 +2704,26 @@ module Op = struct
 
   let reduce ?mode ?nargs env p (tys : EcAst.targs) =
     let op, f = core_reduce ?mode ?nargs env p in
-    Tvar.f_subst ~freshen:true op.op_tparams.tyvars tys.types f
+    let tparams = op.op_tparams in
+    let tv =
+      if List.compare_lengths tys.types tparams.tyvars <> 0 then
+        EcIdent.Mid.empty
+      else
+        List.fold_left2
+          (fun m id v -> EcIdent.Mid.add id v m)
+          EcIdent.Mid.empty tparams.tyvars tys.types
+    in
+    let idx =
+      if List.compare_lengths tys.indices tparams.idxvars <> 0 then
+        EcIdent.Mid.empty
+      else
+        List.fold_left2
+          (fun m id v -> EcIdent.Mid.add id v m)
+          EcIdent.Mid.empty tparams.idxvars tys.indices
+    in
+    let fs =
+      EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx () in
+    EcCoreSubst.Fsubst.f_subst fs f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)

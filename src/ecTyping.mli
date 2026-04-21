@@ -14,7 +14,7 @@ open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcAst.tindex list * EcTypes.ty list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg

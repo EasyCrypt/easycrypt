@@ -22,7 +22,7 @@ module NormMp = EcEnv.NormMp
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
-  | `Op   of EcPath.path * EcTypes.ty list
+  | `Op   of EcPath.path * EcAst.tindex list * EcTypes.ty list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
   | `Proj of EcTypes.prog_var * EcMemory.proj_arg
@@ -335,7 +335,7 @@ module OpSelect = struct
 
   type opsel = [
     | `Pv of EcMemory.memory option * pvsel
-    | `Op of (EcPath.path * ty list)
+    | `Op of (EcPath.path * tindex list * ty list)
     | `Lc of EcIdent.ident
     | `Nt of EcUnify.sbody
   ]
@@ -377,13 +377,13 @@ let gen_select_op
     | `Form   -> fun _ _  -> true
   in
 
-  let by_scope opsc ((p, _), _, _, _) =
+  let by_scope opsc ((p, _, _), _, _, _) =
     EcPath.p_equal opsc (oget (EcPath.prefix p))
 
-  and by_current ((p, _), _, _, _) =
+  and by_current ((p, _, _), _, _, _) =
     EcPath.isprefix ~prefix:(oget (EcPath.prefix p)) ~path:(EcEnv.root env)
 
-  and by_tc ((p, _), _, _, _) =
+  and by_tc ((p, _, _), _, _, _) =
     match oget (EcEnv.Op.by_path_opt p env) with
     | { op_kind = OB_oper (Some OP_TC) } -> false
     | _ -> true
@@ -447,7 +447,7 @@ let select_proj env opsc name ue tvi recty =
   match ops, opsc with
   | _ :: _ :: _, Some opsc ->
       List.filter
-        (fun ((p, _), _, _) ->
+        (fun ((p, _, _), _, _) ->
           EcPath.p_equal opsc (oget (EcPath.prefix p)))
         ops
 
@@ -1141,7 +1141,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
               let exn = UnknownRecFieldName (unloc name) in
                 tyerror name.pl_loc env exn
 
-            | Some ((fp, _tvi), opty, subue, _) ->
+            | Some ((fp, _ixs, _tvi), opty, subue, _) ->
               let field = oget (EcEnv.Op.by_path_opt fp env) in
               let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
                 EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -1283,7 +1283,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
             let exn = UnknownRecFieldName (unloc rf.rf_name) in
               tyerror rf.rf_name.pl_loc env exn
 
-        | Some ((fp, _tvi), opty, subue, _) ->
+        | Some ((fp, _ixs, _tvi), opty, subue, _) ->
             let field = oget (EcEnv.Op.by_path_opt fp env) in
             let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -1378,7 +1378,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
   | _ :: _ :: _ ->
       tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
 
-  | [(cp, tvi), opty, subue, _] ->
+  | [(cp, _idxs, tvi), opty, subue, _] ->
       let ctor = oget (EcEnv.Op.by_path_opt cp env) in
       let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
       let indty = oget (EcEnv.Ty.by_path_opt indp env) in
@@ -1689,8 +1689,8 @@ let form_of_opselect
          in (f_lambda flam (Fsubst.f_subst subst body), args)
 
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
-      | `Op (p, tys) -> f_op p ~tyargs:tys ty
-      | `Lc id       -> f_local id ty
+      | `Op (p, idxs, tys) -> f_op p ~indices:idxs ~tyargs:tys ty
+      | `Lc id             -> f_local id ty
       | `Pv (me, pv) ->
         var_or_proj (fun x ty -> (f_pvar x ty (oget me)).inv) f_proj pv ty
 
@@ -2886,7 +2886,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
          let esig = Tuni.subst_dom uidmap esig in
           tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
-      | [`Op (p, tys), opty, subue, _] ->
+      | [`Op (p, _idxs, tys), opty, subue, _] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
           let uidmap = UE.assubst ue in
           let esig = Tuni.subst_dom uidmap esig in
@@ -3496,12 +3496,12 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
       | _ :: _ :: _ ->
           tyerror x.pl_loc env (AmbiguousProj (unloc x))
 
-      | [(op, tvi), pty, subue] ->
+      | [(op, ixs, tvi), pty, subue] ->
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
         let rty = EcUnify.UniEnv.fresh ue in
         (try  EcUnify.unify env ue (tfun subf.f_ty rty) pty
          with EcUnify.UnificationFailure _ -> assert false);
-        f_app (f_op op ~tyargs:tvi pty) [subf] rty
+        f_app (f_op op ~indices:ixs ~tyargs:tvi pty) [subf] rty
     end
 
     | PFproji (psubf, i) -> begin

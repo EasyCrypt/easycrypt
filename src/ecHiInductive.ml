@@ -299,7 +299,7 @@ let trans_matchfix
           | _ :: _ :: _ ->
               fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
 
-          | [(cp, tvi), opty, subue, _] ->
+          | [(cp, _idxs, tvi), opty, subue, _] ->
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in

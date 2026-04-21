@@ -2366,9 +2366,9 @@ module Ty = struct
           | op1::op2::_ ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
-                (EcPath.tostring (fst (proj4_1 op1)))
-                (EcPath.tostring (fst (proj4_1 op2)))
-          | [((p, _), _, _, _)] ->
+                (EcPath.tostring (proj3_1 (proj4_1 op1)))
+                (EcPath.tostring (proj3_1 (proj4_1 op2)))
+          | [((p, _, _), _, _, _)] ->
               let op   = EcEnv.Op.by_path p env in
               let opty =
                 Tvar.subst

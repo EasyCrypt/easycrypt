@@ -181,3 +181,21 @@ axiom cat_words_self {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
 lemma cat_test {m n} (wm : int vec<:m>) (wn : int vec<:n>) :
   cat_words wm wn = cat_words wm wn.
 proof. rewrite cat_words_self. trivial. qed.
+
+(* Op unfolding propagates idxvar substitution into nested op
+   signatures. Without this, the body's nested-op f_types still
+   reference the unfolded op's bound idxvar (instead of the call-site
+   value), and a follow-up rewrite cannot match those nested ops.
+   Mirrors the user's [(_.[_])] / [(++)] / [bits_cat] case. *)
+op size_of {n} (xs : int vec<:n>) : int.
+
+(* Op whose body uses [size_of], itself indexed. Unfolding [via_size]
+   must rewrite [size_of]'s f_ty to use the call-site index. *)
+op via_size {n} (xs : int vec<:n>) : int = size_of xs.
+
+axiom size_of_self {n} (xs : int vec<:n>) :
+  size_of xs = size_of xs.
+
+lemma unfold_then_rewrite {n} (xs : int vec<:n>) :
+  via_size xs = via_size xs.
+proof. move=> @/via_size. rewrite size_of_self. trivial. qed.

@@ -60,7 +60,10 @@ val tfun_expected : unienv -> ?retty:ty -> EcTypes.ty list -> EcTypes.ty
 
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
-type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
+(* The first triple is [path * call-site indices * call-site types],
+   each in declaration order of the operator's tparams. *)
+type select_result =
+  (EcPath.path * tindex list * ty list) * ty * unienv * sbody option
 
 val select_op :
      ?hidden:bool

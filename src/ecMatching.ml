@@ -689,8 +689,14 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
             failure ();
           if List.compare_lengths tys1.types tys2.types <> 0 then
             failure ();
+          (* Indices on Fop are redundant with f_ty (which is unified
+             at the surrounding Fapp via arg matching). Trying to unify
+             them here forces a polynomial-against-polynomial match
+             before the constraints from arg matching are available,
+             leading to ambiguous multi-univar Diophantine. We unify
+             the type arguments only and let the args provide the
+             remaining constraints. *)
           try
-            List.iter2 (EcUnify.unify_idx env ue) tys1.indices tys2.indices;
             List.iter2 (EcUnify.unify env ue) tys1.types tys2.types
           with EcUnify.UnificationFailure _ -> failure ()
       end

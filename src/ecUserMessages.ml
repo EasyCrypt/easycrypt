@@ -427,8 +427,8 @@ end = struct
                ("local variable", Cb (id, EcPrinting.pp_local env))
             | `Proj (pv, _) ->
                ("variable proj.", Cb (pv, EcPrinting.pp_pv env))
-            | `Op op ->
-               ("operator", Cb ((op, ue), pp_op))
+            | `Op (p, _idxs, tys) ->
+               ("operator", Cb (((p, tys), ue), pp_op))
           in msg "  [%s]: %a@\n" title pp x) matches
     end
 

@@ -442,20 +442,31 @@ module UniEnv = struct
   let subst_tv (subst : ty -> ty) (params : ty_params) =
     List.map (fun tv -> subst (tvar tv)) params.tyvars
 
+  (* Open the index params: build the [TIVar -> TIVar/TIUnivar] map,
+     then resolve each idxvar through it (so explicit user-supplied
+     indices come back as-is). Returned in [params.idxvars] order. *)
+  let subst_ix (idxmap : tindex Mid.t) (params : ty_params) =
+    List.map (fun id ->
+      Option.value (Mid.find_opt id idxmap) ~default:(TIVar id))
+      params.idxvars
+
   let openty_r (ue : unienv) (params : ty_params) (tvi : tvar_inst option) =
+    let idxmap = openidx ue params tvi in
     let subst =
       f_subst_init
         ~tv:(opentvi ue params tvi)
-        ~idx:(openidx ue params tvi)
+        ~idx:idxmap
         () in
-      (subst, subst_tv (ty_subst subst) params)
+    let ixs = subst_ix idxmap params in
+    let tys = subst_tv (ty_subst subst) params in
+    (subst, ixs, tys)
 
   let opentys (ue : unienv) (params : ty_params) (tvi : tvar_inst option) (tys : ty list) =
-    let (subst, tvs) = openty_r ue params tvi in
+    let (subst, _, tvs) = openty_r ue params tvi in
       (List.map (ty_subst subst) tys, tvs)
 
   let openty (ue : unienv) (params : ty_params) (tvi : tvar_inst option) (ty : ty)=
-    let (subst, tvs) = openty_r ue params tvi in
+    let (subst, _, tvs) = openty_r ue params tvi in
       (ty_subst subst ty, tvs)
 
   let repr (ue : unienv) (t : ty) : ty =
@@ -522,7 +533,8 @@ let tfun_expected ue ?retty psig =
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
+type select_result =
+  (EcPath.path * tindex list * ty list) * ty * unienv * sbody option
 
 (* -------------------------------------------------------------------- *)
 let select_op
@@ -569,7 +581,7 @@ let select_op
     let subue = UniEnv.copy ue in
 
     try
-      let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
+      let (tip, ixs, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
       let top = ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue ?retty psig in
 
@@ -588,7 +600,7 @@ let select_op
 
         | _ -> None
 
-      in Some ((path, tvs), top, subue, bd)
+      in Some ((path, ixs, tvs), top, subue, bd)
 
     with E.Failure -> None
 
