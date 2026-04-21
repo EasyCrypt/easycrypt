@@ -136,3 +136,24 @@ op c_test5 (x : int) (xs : int ivec<:0>) : int irec<:0> =
   {| ivalue = x; idummy = xs |}.
 
 op c_test6 (r : int irec<:7>) : int = r.`ivalue.
+
+(* Gap F — SMT translation via per-index monomorphisation.
+   Concrete indices turn `vec<:3>` into a fresh Why3 sort `vec_3`.
+   Goals that mention only concrete indices make it through to SMT;
+   goals with free index variables still fall cleanly into the
+   [CanNotTranslate] skip (no crash, no proof, per-goal skip). *)
+
+op vfn [n] : int vec<:n>.
+
+lemma f_test1 : vfn[:5] = vfn[:5].
+proof. smt(). qed.
+
+lemma f_test2 : c_test1 = c_test1.
+proof. smt(). qed.
+
+(* Two distinct concrete indices get distinct Why3 sorts. *)
+op f_vec3 : int vec<:3>.
+op f_vec5 : int vec<:5>.
+
+lemma f_test3 : f_vec3 = f_vec3 /\ f_vec5 = f_vec5.
+proof. smt(). qed.

@@ -435,6 +435,11 @@ val tindex_occurs_univar : EcUid.uid -> tindex -> bool
 val tindex_solve_for_univar :
   tindex -> tindex -> (EcUid.uid * tindex) option
 
+(* Reduce [ti] to a closed non-negative integer if possible (no free
+   index variables and no leftover index univars). Used by the SMT
+   pipeline to monomorphise indexed types. *)
+val tindex_to_int : tindex -> EcBigInt.zint option
+
 val ty_equal : ty equality
 val ty_hash  : ty hash
 val ty_fv    : ty fv

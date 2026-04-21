@@ -481,7 +481,7 @@ the SMT path — they belong in the Phase-6 polish pass.
 
 #### Known remaining gaps (documented but not scheduled)
 
-- Indexed types in SMT translation (Phase-5 punt) — **Gap F**.
+(none — Gaps B, C, F all landed.)
 
 #### Plan for the remaining gaps (B → C → F)
 
@@ -585,6 +585,46 @@ F lands last to translate everything we now support).
   constructor application, plain match, matchfix, indexed records,
   and field projection (139 declarations total). Non-indexed
   datatypes and records continue to compile unchanged.
+
+### Post-Phase-6 — gap F (DONE)
+
+- **F** — SMT translation of indexed types via per-concrete-index
+  monomorphisation.
+
+  The two former `CanNotTranslate` raise sites in
+  [src/ecSmt.ml](src/ecSmt.ml) (`trans_ty` Tconstr / `trans_app`
+  Fop) now check whether all indices reduce to closed integers via
+  the new `EcAst.tindex_to_int`. Closed indices dispatch to fresh
+  monomorphised symbols; non-closed indices still raise
+  `CanNotTranslate`, preserving the per-goal skip behaviour
+  (warning emitted, lemma falls through to "no provers", no crash).
+
+  New caches in `tenv`: `te_ty_idx` and `te_op_idx`, both
+  string-keyed by `path<:i,j,...>`. New helpers `trans_pty_idx`,
+  `trans_tydecl_idx`, `trans_op_idx`, `create_op_idx`. The
+  declaration paths substitute idxvars by `TIConst` integers via
+  `EcCoreSubst.f_subst_init ~idx:...` then build a fresh Why3
+  sort/lsymbol named `<path>_<i>_<j>...`. Constructors and
+  projectors of indexed datatypes/records get their per-index
+  variants populated as a side-effect of `trans_tydecl_idx`;
+  `trans_op_idx` checks `op_kind` and forces type monomorphisation
+  before falling back to `create_op_idx` for plain ops.
+
+  Plain indexed operators are translated as **abstract** Why3
+  symbols (no body). This is sound but limits SMT's ability to
+  unfold definitions across index instances. Lifting this would
+  require substituting idxvars in the operator's body (form/expr)
+  via `Fsubst.f_subst` and recursing through `trans_body`. Punted
+  for now — concrete bodies for indexed ops are rare in practice
+  and the user can add explicit lemmas if needed.
+
+  Verified by 4 new SMT-discharge lemmas in `tests/indexed-types.ec`
+  (160 declarations total): a simple equality on `vec<:5>`,
+  equality on a constructor of an indexed datatype at index 0,
+  conjunction of equalities on two distinct concrete-index sorts
+  (`vec<:3>` and `vec<:5>`), and a use of explicit index
+  instantiation `vfn[:5]`. Non-indexed SMT discharge unchanged
+  (smoke-tested via list/match goals).
 
 ### Post-Phase-6 — gaps E / D / A (DONE)
 

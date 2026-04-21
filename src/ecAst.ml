@@ -1228,6 +1228,16 @@ let tindex_occurs_univar (u : EcUid.uid) (t : tindex) : bool =
     | TIAdd (l, r) | TIMul (l, r) -> walk l || walk r
   in walk t
 
+(* If [ti] reduces to a closed non-negative integer (no [TIVar] or
+   [TIUnivar] anywhere), return that integer. Otherwise [None]. Used
+   by the SMT translation to decide whether an indexed type can be
+   monomorphised to a fresh Why3 sort. *)
+let tindex_to_int (ti : tindex) : EcBigInt.zint option =
+  let c = tindex_canonicalize ti in
+  match c.cn_mons with
+  | [] -> Some c.cn_konst
+  | _  -> None
+
 (* Reconstruct a [tindex] AST from a canonical polynomial. The
    canonical form's invariants (non-negative coefficients and constant)
    are required; behaviour is undefined for signed inputs. The
