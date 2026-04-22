@@ -671,6 +671,66 @@ F lands last to translate everything we now support).
   Verified: 91 declarations in `tests/indexed-types.ec` compile,
   including the new explicit-instantiation cases.
 
+## Idxvars: architectural fragility (TODO: principled treatment)
+
+The Phase-2 design has idxvars occupy a **hybrid namespace**:
+- listed in `h_tvar.idxvars` like type parameters (so they appear
+  in `ax_tparams`, get printed as "Index variables: …" in the
+  proof state, etc.);
+- but **also** semantically int-typed locals usable in formulas
+  (per `bind_idx_locals`), in tindex positions (`vec<:n>`), and
+  bridged at concretize time via `pte_idx_link`.
+
+Every pass that walks formulas / locals / hypotheses has to be
+taught about this hybridness. Each one has been patched ad-hoc:
+
+- `EcTyping.bind_idx_locals` — register as int local at typecheck.
+- `EcEnv.Op.reduce` / `Ax.instantiate` — substitute `Flocal n_lem`
+  via `f_of_tindex` alongside the tindex substitution.
+- `EcProofTerm.pte_idx_link` — record `(idxvar ident, fresh univar)`
+  pairs so `concretize_env` can synthesise the form binding once
+  unification pins the univar.
+- `EcSmt.lenv_of_tparams_for_hyp` — register each idxvar as an
+  int constant in `te_lc` so `trans_app`'s `Flocal` case finds it.
+- `EcLowGoal.LowSubst.is_eq_for_subst` — skip idxvars during the
+  formula's free-variable walk (else `LDecl.by_id` errors with
+  "unknown identifier").
+- `EcMatching` matcher — best-effort index unification on `Fop`
+  heads, defer-and-retry on mixed-monomial failure.
+- `EcUnify.unify_core` — deferred IxUni queue, retry after every
+  assignment.
+
+Each fix is small and correct, but the pattern (forget about
+idxvars somewhere → mysterious crash → patch the one site) keeps
+recurring. Every future feature that touches the form/local/hyp
+machinery will need similar care.
+
+**Architectural directions to consider** (not scheduled):
+
+1. **Unify idxvars and formula-locals at the AST level.** Make
+   idxvars "just" int-typed `LD_var` hypotheses with no body,
+   stored alongside ordinary locals. Carry the "is-idxvar" tag
+   on the hyp itself rather than a separate `h_tvar.idxvars`
+   field. Then every existing local-walking pass just works.
+   Trade-off: tparams.idxvars no longer mirrors tparams.tyvars,
+   so existing code paths that treat them analogously need a
+   different anchor.
+
+2. **A dedicated `Findex` form constructor.** `Findex of tindex`
+   typed as int, eagerly used wherever an idxvar appears as an
+   int term. Substitution rules walk into the `tindex` via
+   `tindex_subst`. Removes the need for `pte_idx_link` and the
+   `f_of_tindex` partiality. Trade-off: introducing a new `f_node`
+   variant is wide and touches every form pattern-match.
+
+3. **Status quo with an audit checklist.** Document the seven
+   patch sites above as a "when adding a pass that touches forms,
+   check these" checklist. Cheapest, but the bug-of-the-week
+   pattern continues.
+
+If a fourth user surfaces a fourth crash of this shape, (1) or (2)
+becomes worth the upfront cost.
+
 ## Critical path & open risks
 
 - Phases 0 → 1 → 2 are sequential; the rest can branch.
