@@ -120,7 +120,53 @@ let rec get_head_symbol (pt : pt_env) (f : form) =
   | _ -> f
 
 (* -------------------------------------------------------------------- *)
+(* Bridge bound form-evars and tindex univars in [pte_idx_link]:
+
+   - If the form-evar [fresh] got bound to a form that projects into a
+     [tindex] (e.g. [Flocal m_lem]), resolve the tindex univar [u]
+     accordingly so [closed ue] succeeds.
+   - If the tindex univar [u] got resolved to a [TIVar tid] / [TIConst k]
+     by index unification (e.g. via [word<:?u> = word<:m_lem>] in a
+     bound-var type), set the form-evar [fresh] to the matching form
+     so [MEV.filled] succeeds.
+
+   The matcher binds either side independently; this bridge keeps the
+   two namespaces in sync prior to the [can_concretize] check. *)
+let propagate_idx_link (pt : pt_env) : unit =
+  let iu = EcUnify.UniEnv.iu_assubst pt.pte_ue in
+  List.iter (fun (fresh, u) ->
+    let fresh_set =
+      match EcMatching.MEV.get fresh `Form !(pt.pte_ev) with
+      | Some (`Set (`Form _)) -> true
+      | _ -> false
+    in
+    let u_resolved =
+      match EcUid.Muid.find_opt u iu with
+      | Some (EcAst.TIUnivar v) when EcUid.uid_equal v u -> None
+      | x -> x
+    in
+    match fresh_set, u_resolved with
+    | true, _ ->
+        (match EcMatching.MEV.get fresh `Form !(pt.pte_ev) with
+         | Some (`Set (`Form f)) ->
+             (match EcCoreFol.tindex_of_form f with
+              | Some ti ->
+                  (try EcUnify.unify_idx (LDecl.toenv pt.pte_hy)
+                         pt.pte_ue (EcAst.TIUnivar u) ti
+                   with EcUnify.UnificationFailure _ -> ())
+              | None -> ())
+         | _ -> ())
+    | false, Some ti ->
+        (match EcCoreFol.f_of_tindex_opt ti with
+         | Some f when EcMatching.MEV.mem fresh `Form !(pt.pte_ev)
+                    && not (EcMatching.MEV.isset fresh `Form !(pt.pte_ev)) ->
+             pt.pte_ev := EcMatching.MEV.set fresh (`Form f) !(pt.pte_ev)
+         | _ -> ())
+    | false, None -> ())
+    !(pt.pte_idx_link)
+
 let can_concretize (pt : pt_env) =
+  propagate_idx_link pt;
   EcMatching.can_concretize !(pt.pte_ev) pt.pte_ue
 
 (* -------------------------------------------------------------------- *)
@@ -260,21 +306,38 @@ let pt_of_uglobal_r ptenv p =
   (* FIXME: TC HOOK *)
   let tv  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
   let ix  = EcUnify.UniEnv.openidx ptenv.pte_ue typ None in
+  (* Idxvars also appear as int-typed [Flocal] in the body
+     (Phase 2). For each idxvar that is REFERENCED as a [Flocal]
+     in the body, substitute it to a fresh int evar registered in
+     [pte_ev], so the matcher can bind it via term matching against
+     the goal's idxvar Flocal. The fresh evar is linked (via
+     [pte_idx_link]) to the corresponding tindex univar so
+     [concretize_env] keeps the two sides consistent. Idxvars NOT
+     referenced as Flocal don't need an evar — leaving one would
+     block [can_concretize] with an orphan binding. *)
+  let body_fv = EcAst.f_fv ax in
+  let loc_subst = ref EcIdent.Mid.empty in
+  List.iter (fun id ->
+    if EcIdent.Mid.mem id body_fv then
+      match EcIdent.Mid.find_opt id ix with
+      | Some (EcAst.TIUnivar u) ->
+          let fresh = EcIdent.fresh id in
+          ptenv.pte_ev :=
+            EcMatching.MEV.add fresh `Form !(ptenv.pte_ev);
+          ptenv.pte_idx_link := (fresh, u) :: !(ptenv.pte_idx_link);
+          loc_subst :=
+            EcIdent.Mid.add id (f_local fresh tint) !loc_subst
+      | _ -> ())
+    typ.idxvars;
   let ax  =
     let fs =
       EcCoreSubst.Fsubst.f_subst_init ~freshen:true ~tv ~idx:ix () in
+    let fs =
+      EcIdent.Mid.fold
+        (fun id f s -> EcCoreSubst.Fsubst.f_bind_local s id f)
+        !loc_subst fs in
     EcCoreSubst.Fsubst.f_subst fs ax
   in
-  (* Record (idxvar ident, tindex univar uid) for each lemma idxvar
-     so [concretize_env] can synthesise the corresponding form-level
-     binding [Flocal n_lem -> Flocal concrete] once the tindex univar
-     resolves to a [TIVar concrete]. *)
-  List.iter (fun id ->
-    match EcIdent.Mid.find_opt id ix with
-    | Some (EcAst.TIUnivar u) ->
-        ptenv.pte_idx_link := (id, u) :: !(ptenv.pte_idx_link)
-    | _ -> ())
-    typ.idxvars;
   let idxs = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
   let typ  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
 
@@ -566,34 +629,38 @@ let process_named_pterm pe (tvi, fp) =
   (* FIXME: TC HOOK *)
   let tv = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
   let ix = EcUnify.UniEnv.openidx pe.pte_ue typ tvi in
+  (* Idxvars are also int-typed formula locals (Phase 2). Three cases:
+     - [f_of_tindex_opt ti] succeeds (user-provided concrete index):
+       substitute [Flocal id -> f] directly.
+     - [TIUnivar u] AND [id] appears in [f_fv ax]: substitute
+       [Flocal id] to a fresh form-evar registered in [pte_ev], and
+       link the evar to [u] so [can_concretize] can bridge the two
+       namespaces on either binding direction.
+     - otherwise: no substitution needed. *)
+  let body_fv = EcAst.f_fv ax in
+  let loc_subst = ref EcIdent.Mid.empty in
+  EcIdent.Mid.iter (fun id ti ->
+    match EcCoreFol.f_of_tindex_opt ti with
+    | Some f ->
+        loc_subst := EcIdent.Mid.add id f !loc_subst
+    | None ->
+        match ti with
+        | EcAst.TIUnivar u when EcIdent.Mid.mem id body_fv ->
+            let fresh = EcIdent.fresh id in
+            pe.pte_ev := EcMatching.MEV.add fresh `Form !(pe.pte_ev);
+            pe.pte_idx_link := (fresh, u) :: !(pe.pte_idx_link);
+            loc_subst := EcIdent.Mid.add id (f_local fresh tint) !loc_subst
+        | _ -> ())
+    ix;
   let ax =
     let fs =
       EcCoreSubst.Fsubst.f_subst_init ~freshen:false ~tv ~idx:ix () in
-    (* Idxvars are also int-typed formula locals (Phase 2): substitute
-       [Flocal n_lem] alongside [TIVar n_lem]. For univar instantiations,
-       defer to [pte_idx_link] (populated below) so [concretize_env]
-       can fill the form binding once unification resolves the
-       univar. *)
     let fs =
       EcIdent.Mid.fold
-        (fun id ti s ->
-           match EcCoreFol.f_of_tindex_opt ti with
-           | Some f -> EcCoreSubst.Fsubst.f_bind_local s id f
-           | None   -> s)
-        ix fs
-    in
+        (fun id f s -> EcCoreSubst.Fsubst.f_bind_local s id f)
+        !loc_subst fs in
     EcCoreSubst.Fsubst.f_subst fs ax
   in
-  (* Same link mechanism as [pt_of_uglobal_r]: if [openidx] allocated
-     a fresh [TIUnivar] for any idxvar (because the user did not
-     supply an explicit index), record it so [concretize_env] can
-     bridge the tindex / formula-local namespaces. *)
-  List.iter (fun id ->
-    match EcIdent.Mid.find_opt id ix with
-    | Some (EcAst.TIUnivar u) ->
-        pe.pte_idx_link := (id, u) :: !(pe.pte_idx_link)
-    | _ -> ())
-    typ.idxvars;
   let typ_out  = List.map (fun a -> EcIdent.Mid.find a tv) typ.tyvars in
   let idxs_out = List.map (fun a -> EcIdent.Mid.find a ix) typ.idxvars in
 
