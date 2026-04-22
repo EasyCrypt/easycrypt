@@ -500,12 +500,25 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let defl = EcEnv.Fun.by_xpath fl env in
       let defr = EcEnv.Fun.by_xpath fr env in
       let sigl, sigr = defl.f_sig, defr.f_sig in
-      let testty =
-           EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
-        && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
+
+      let error s tl tr =
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tc_error _pf "@[The procedures do not have the same %s types:@]@;<2 2>\
+          @[<v>Left side:  @[<h>%a@]@,\
+            Right side: @[<h>%a@]@]@;<2 0>\
+          A full contract cannot be inferred; consider providing a full contract using@;<2 2>\
+            call (: ...==> ...)@,"
+        s
+        (EcPrinting.pp_type ppe) tl
+        (EcPrinting.pp_type ppe) tr
       in
 
-      if not testty then raise EqObsInError;
+      if not (EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg)
+      then error "argument" sigl.fs_arg sigr.fs_arg;
+
+      if not (EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret)
+      then error "return" sigl.fs_ret sigr.fs_ret;
+
       let eq_params =
         ts_inv_eqparams
           sigl.fs_arg sigl.fs_anames ml
