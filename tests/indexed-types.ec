@@ -304,6 +304,24 @@ lemma test_idx_in_witness {n} (x : int) :
   exists (k : int), some_thunk[:n] k = some_thunk[:n] n.
 proof. exists n. trivial. qed.
 
+(* `_` placeholder in pindex position lets the user opt out of
+   one or more indices in an explicit instantiation [op[:e1, e2]]
+   while keeping inference for the rest. Each [_] allocates a
+   fresh [TIUnivar] which the surrounding context pins. *)
+op append2 {m n} ['a] (xs : 'a vec<:m>) (ys : 'a vec<:n>) : 'a vec<:m+n>.
+
+op test_hole_first {m} ['a] (xs : 'a vec<:m>) (ys : 'a vec<:5>)
+  : 'a vec<:m+5>
+  = append2[:_, 5] xs ys.
+
+op test_hole_second {m} ['a] (xs : 'a vec<:m>) (ys : 'a vec<:5>)
+  : 'a vec<:m+5>
+  = append2[:m, _] xs ys.
+
+op test_hole_both {m n} ['a] (xs : 'a vec<:m>) (ys : 'a vec<:n>)
+  : 'a vec<:m+n>
+  = append2[:_, _] xs ys.
+
 (* FIFO unification order used to fail on mixed-monomial index
    equations where a dependent univar is resolved later in the queue
    (e.g. unifying [n*m] against [?n_pack * ?m_pack] before either

@@ -25,6 +25,9 @@ module UniEnv : sig
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
   val fresh      : ?ty:ty -> unienv -> ty
+  (* Allocate a fresh [TIUnivar] in [ue]. Used by the typer to
+     translate `_` placeholders in pindex positions. *)
+  val idx_fresh  : unienv -> tindex
   val getnamed   : unienv -> symbol -> EcIdent.t
   (* Indices are declared up front: returns [None] when no binding. *)
   val getnamed_idx : unienv -> symbol -> EcIdent.t option

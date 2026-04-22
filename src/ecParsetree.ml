@@ -78,10 +78,13 @@ and pty = pty_r located
    sub-grammar (only +, *, non-negative literals, and identifiers
    bound as indices). *)
 and pindex_r =
-  | PIvar of psymbol
-  | PIint of zint
-  | PIadd of pindex * pindex
-  | PImul of pindex * pindex
+  | PIvar  of psymbol
+  | PIint  of zint
+  | PIadd  of pindex * pindex
+  | PImul  of pindex * pindex
+  (* `_` placeholder — let the system infer this index by
+     allocating a fresh [TIUnivar] at typecheck time. *)
+  | PIhole
 and pindex = pindex_r located
 
 type ptyannot_r =

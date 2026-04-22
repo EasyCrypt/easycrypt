@@ -1337,6 +1337,7 @@ pindex_atom:
 | x=lident                       { mk_loc x.pl_loc (PIvar x) }
 | n=loc(UINT)
     { mk_loc n.pl_loc (PIint n.pl_desc) }
+| u=loc(UNDERSCORE)              { mk_loc u.pl_loc PIhole }
 | LPAREN p=pindex RPAREN         { p }
 
 pindex_mul:

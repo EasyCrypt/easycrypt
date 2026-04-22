@@ -1105,6 +1105,11 @@ and transtindex (env : EcEnv.env) (ue : EcUnify.unienv) (pi : pindex) : tindex =
       TIAdd (transtindex env ue a, transtindex env ue b)
   | PImul (a, b) ->
       TIMul (transtindex env ue a, transtindex env ue b)
+  | PIhole ->
+      (* `_` placeholder: allocate a fresh [TIUnivar] in [ue]. The
+         deferred-retry unifier will pin it via the surrounding
+         context. *)
+      EcUnify.UniEnv.idx_fresh ue
 
 let transty_for_decl env ty =
   let ue = UE.create (Some { EcDecl.idxvars = []; tyvars = [] }) in
