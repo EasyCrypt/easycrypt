@@ -1876,12 +1876,15 @@ module LowSubst = struct
     match aout with
     | None -> None
     | Some(side,v,f) ->
+      let idxvars =
+        Sid.of_list (LDecl.tohyps hyps).h_tvar.idxvars in
       let rec add fv x _ =
         if Sid.mem x fv then fv
         else
           (* check if x is a declared module *)
           let fv = Sid.add x fv in
           if EcEnv.Mod.by_mpath_opt (EcPath.mident x) env <> None then fv
+          else if Sid.mem x idxvars then fv
           else match LDecl.by_id x hyps with
           | LD_var (_, Some f) -> add_f fv f
           | _ -> fv

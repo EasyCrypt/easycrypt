@@ -281,6 +281,19 @@ proof. trivial. qed.
      pred p {n+} : foo.               (* parse error: predicate *)
      abbrev a {n+} : int = 5.         (* parse error: abbreviation *) *)
 
+(* Subst-tactic resolution used to crash with [unknown identifier
+   `n/...`] when the formula's free-variable iteration encountered
+   an idxvar (which lives in [h_tvar.idxvars], not [h_local], so
+   [LDecl.by_id] errored out). Now those idxvar idents are skipped
+   during the FV walk. *)
+op some_op {n} (xs : int vec<:n>) : bool list.
+
+axiom some_op_eq {n} (xs : int vec<:n>) : some_op xs = some_op xs.
+
+lemma test_subst_idx {n} (xs ys : int vec<:n>) :
+  xs = ys => some_op xs = some_op ys.
+proof. by move=> ->. qed.
+
 (* FIFO unification order used to fail on mixed-monomial index
    equations where a dependent univar is resolved later in the queue
    (e.g. unifying [n*m] against [?n_pack * ?m_pack] before either
