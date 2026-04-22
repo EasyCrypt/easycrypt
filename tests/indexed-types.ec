@@ -294,6 +294,16 @@ lemma test_subst_idx {n} (xs ys : int vec<:n>) :
   xs = ys => some_op xs = some_op ys.
 proof. by move=> ->. qed.
 
+(* Idxvars must be available in the proof env as int locals so the
+   user can reference them as values in tactic arguments (e.g.
+   the witness in [exists e]). [LDecl.init] only registers tyvars
+   by default; [start_lemma] now passes idxvars as preset locals. *)
+op some_thunk {n} : int -> int.
+
+lemma test_idx_in_witness {n} (x : int) :
+  exists (k : int), some_thunk[:n] k = some_thunk[:n] n.
+proof. exists n. trivial. qed.
+
 (* FIFO unification order used to fail on mixed-monomial index
    equations where a dependent univar is resolved later in the queue
    (e.g. unifying [n*m] against [?n_pack * ?m_pack] before either
