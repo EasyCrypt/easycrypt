@@ -3525,9 +3525,19 @@ module LDecl = struct
   (* ------------------------------------------------------------------ *)
   let init env ?(locals = []) tparams =
     let buildenv env =
-      List.fold_right
-        (fun (x, k) env -> add_local_env x k env)
-        locals env
+      let env =
+        List.fold_right
+          (fun (x, k) env -> add_local_env x k env)
+          locals env
+      in
+      (* Idxvars are NOT added to [h_local] — they remain solely
+         tparams. But the env exposed via [toenv] must resolve them
+         as int values (so a tactic argument [exists n] can refer to
+         a bound idxvar). Register each idxvar as an int local in
+         the env only; [h_local] stays clean. *)
+      List.fold_left
+        (fun env id -> Var.bind_local id EcTypes.tint env)
+        env tparams.idxvars
     in
 
     { le_init = env;

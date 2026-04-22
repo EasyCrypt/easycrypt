@@ -951,18 +951,7 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          (* Idxvars need to be available in the proof env as int
-             locals so the user can reference them in tactic
-             arguments (e.g. as the witness in [exists e]). They
-             already appear in [tparams.idxvars] but [LDecl.init]
-             only registers tyvars; pass them as preset locals. *)
-          let idx_locals =
-            List.map
-              (fun id -> (id, EcBaseLogic.LD_var (tint, None)))
-              axd.ax_tparams.idxvars in
-          let hyps  =
-            EcEnv.LDecl.init (env scope) ~locals:idx_locals
-              axd.ax_tparams in
+          let hyps  = EcEnv.LDecl.init (env scope) axd.ax_tparams in
           (* For each idxvar marked with `+` in the lemma binder, inject
              a [0 <= n =>] hypothesis INSIDE the outermost foralls of
              the goal (so [pa_vars] auto-intro still fires). Unmarked
