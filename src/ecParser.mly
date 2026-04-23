@@ -3950,6 +3950,8 @@ global_action:
 | hint             { Ghint        $1 }
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
+| EXPECT s=loc(STRING) BY PRINT p=print
+    { Gexpect (s, p) }
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
