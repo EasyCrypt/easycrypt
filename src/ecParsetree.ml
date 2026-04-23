@@ -869,6 +869,32 @@ type pdbmap1 = {
 
 and pdbhint = pdbmap1 list
 
+type psmtprover =
+  [include_exclude | `Only] * psymbol
+
+type psmt_prover_info = [
+| `DBHINT of pdbhint
+| `INT    of int
+| `PROVER of psmtprover list
+]
+
+type psmt = [
+  | `ALL
+  | `ITERATE
+  | `QUORUM         of int
+  | `MAXLEMMAS      of int option
+  | `MAXPROVERS     of int
+  | `PROVER         of psmtprover list
+  | `TIMEOUT        of int
+  | `UNWANTEDLEMMAS of pdbhint
+  | `WANTEDLEMMAS   of pdbhint
+  | `VERBOSE        of int option
+  | `VERSION        of [ `Full | `Lazy ]
+  | `DUMPIN         of string located
+  | `SELECTED
+  | `DEBUG
+]
+
 (* -------------------------------------------------------------------- *)
 type pprover_list = {
   pp_use_only : string located list;

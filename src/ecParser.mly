@@ -141,35 +141,9 @@
                    (Some "cannot mark with 'declare' this kind of objects ")
 
   (* ------------------------------------------------------------------ *)
-  type prover =
-    [ `Exclude | `Include | `Only] * psymbol
-
-  type pi = [
-    | `DBHINT of pdbhint
-    | `INT    of int
-    | `PROVER of prover list
-  ]
-
-  type smt = [
-    | `ALL
-    | `ITERATE
-    | `QUORUM         of int
-    | `MAXLEMMAS      of int option
-    | `MAXPROVERS     of int
-    | `PROVER         of prover list
-    | `TIMEOUT        of int
-    | `UNWANTEDLEMMAS of EcParsetree.pdbhint
-    | `WANTEDLEMMAS   of EcParsetree.pdbhint
-    | `VERBOSE        of int option
-    | `VERSION        of [ `Full | `Lazy ]
-    | `DUMPIN         of string located
-    | `SELECTED
-    | `DEBUG
-  ]
-
   module SMT : sig
-    val mk_pi_option      : psymbol -> pi option -> smt
-    val mk_smt_option     : smt list -> pprover_infos
+    val mk_pi_option      : psymbol -> psmt_prover_info option -> psmt
+    val mk_smt_option     : psmt list -> pprover_infos
     val simple_smt_option : pprover_infos
   end = struct
     let option_matching tomatch =
@@ -243,7 +217,7 @@
           let msg = Printf.sprintf "`%s`: no option expected" (unloc s) in
           parse_error s.pl_loc (Some msg)
 
-    let mk_pi_option (s : psymbol) (o : pi option) : smt =
+    let mk_pi_option (s : psymbol) (o : psmt_prover_info option) : psmt =
       let s = option_matching s in
 
       match unloc s with
@@ -263,7 +237,7 @@
       | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
 
-    let mk_smt_option (os : smt list) =
+    let mk_smt_option (os : psmt list) =
       let mprovers = ref None in
       let timeout  = ref None in
       let pnames   = ref None in
