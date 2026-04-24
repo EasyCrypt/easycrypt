@@ -18,11 +18,9 @@ local module P2 = {
     }
 }.
 
-local lemma gen_fact &m a (l : (r * (glob P)) list): uniq l 
- => Pr[ P.p(a) @ &m : (res , (glob P)) \in l ] 
-  = big predT (fun (x : (r * (glob P))) => 
-                    Pr[P.p(a) @ &m: res=x.`1 /\ (glob P) = x.`2]) 
-              l.
+local lemma gen_fact &m a (l : (r * (glob P)) list): uniq l
+ => Pr[ P.p(a) @ &m : (res , (glob P)) \in l ]
+  = #big [ x : l ] (Pr[P.p(a) @ &m: res=x.`1 /\ (glob P) = x.`2]).
 proof. 
 move: l; apply list_ind => /= [|x l p1 [x_nin uniq_l]].
 - by rewrite Pr[mu_false] big_nil.
@@ -54,8 +52,8 @@ have PRP: (PR (glob P){m}) a = fun (x : (r * (glob P)))
   rewrite eq_iff; split => [/#|<- &n gl_eq].
   byequiv (_: ={arg, glob P} ==> ={res, glob P})=> //; 1:sim; smt().
 have distr_PR: isdistr (PR (glob P){m} a).
-- have : (forall (s : ((r * (glob P)) list)), uniq s => 
-      big predT (PR (glob P){m} a) s <= 1%r). 
+- have : (forall (s : ((r * (glob P)) list)), uniq s =>
+      #big [ x : s ] (PR (glob P){m} a x) <= 1%r).
   + rewrite PRP.
     apply list_ind => /=[|x l q1 q2].
     * by rewrite big_nil.

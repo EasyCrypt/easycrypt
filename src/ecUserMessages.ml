@@ -738,6 +738,22 @@ end = struct
        msg "unknown binder: `%s'" x
     | NTE_AbbrevIsVar ->
        msg "abbrev. body cannot reduce to a variable"
+    | NTE_UnknownSlot x ->
+       msg "template references unknown slot: `%s'" x
+    | NTE_DuplicateSlot x ->
+       msg "template references slot `%s' more than once" x
+    | NTE_TemplateEmpty ->
+       msg "notation template is empty"
+    | NTE_BadPunct s ->
+       msg "notation punctuation `%S' must lex to one of: [ ] : | , ;" s
+    | NTE_OptionalEmpty ->
+       msg "optional template group `( ... )?' is empty"
+    | NTE_OptionalMustStartWithPunct ->
+       msg "optional template group `( ... )?' must start with a punctuation literal"
+    | NTE_DefaultOnNonOptional s ->
+       msg "slot `%s' has a default but is referenced outside an optional group" s
+    | NTE_MissingDefault s ->
+       msg "slot `%s' appears only inside optional groups and must declare a default via `= ...'" s
 end
 
 (* -------------------------------------------------------------------- *)

@@ -110,11 +110,37 @@ and opbranch = {
   opb_sub  : opbranches;
 }
 
+and nt_punct_kind =
+  [ `LBRACKET | `RBRACKET | `COLON | `PIPE | `COMMA | `SEMICOLON ]
+
+and nt_punct = {
+  np_kind    : nt_punct_kind;   (* lexed token to match at use sites *)
+  np_display : string;          (* verbatim source, for pretty-printing *)
+}
+
+and nt_slot_kind =
+  | NTS_Form  of EcSymbols.symbol list (* binder slots this form depends on, in order *)
+  | NTS_Ident
+
+and nt_template_item =
+  | NTI_Punct    of nt_punct
+  | NTI_Slot     of EcSymbols.symbol * nt_slot_kind
+  | NTI_Optional of nt_template_item list   (* first item must be NTI_Punct *)
+
+and nt_template = {
+  nt_items    : nt_template_item list;
+  nt_defaults : expr EcIdent.Mid.t;
+    (* Default value for each slot that only appears inside optional
+       template groups. Keys are ont_args idents; absent slots → no
+       default (must appear outside all optional groups). *)
+}
+
 and notation = {
-  ont_args  : (EcIdent.t * EcTypes.ty) list;
-  ont_resty : EcTypes.ty;
-  ont_body  : expr;
-  ont_ponly : bool;
+  ont_args     : (EcIdent.t * EcTypes.ty) list;
+  ont_resty    : EcTypes.ty;
+  ont_body     : expr;
+  ont_ponly    : bool;
+  ont_template : nt_template option;
 }
 
 and prind = {
@@ -234,10 +260,30 @@ let mk_exception (exn_loca : locality) (exn_dom : ty list) : exception_ =
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
-    ont_args  = xs;
-    ont_resty = codom;
-    ont_body  = body;
-    ont_ponly = ponly;
+    ont_args     = xs;
+    ont_resty    = codom;
+    ont_body     = body;
+    ont_ponly    = ponly;
+    ont_template = None;
+  } in
+
+  gen_op ~opaque:optransparent tparams
+    (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind) lc
+
+let mk_notation
+    (tparams       : ty_params)
+    (xs            : (EcIdent.t * EcTypes.ty) list)
+    ((codom, body) : EcTypes.ty * EcTypes.expr)
+    (template      : nt_template)
+    (lc            : locality)
+  : operator
+=
+  let kind = {
+    ont_args     = xs;
+    ont_resty    = codom;
+    ont_body     = body;
+    ont_ponly    = false;
+    ont_template = Some template;
   } in
 
   gen_op ~opaque:optransparent tparams

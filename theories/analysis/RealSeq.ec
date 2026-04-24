@@ -476,16 +476,16 @@ lemma convergeto_sum
 :
      (forall x, P x => convergeto (F x) (l x))
   => convergeto
-       (fun n => big P (fun x => (F x n)) s)
-       (big P (fun x => l x) s).
+       (fun n => #big [ x : s | P x ] (F x n))
+       (#big [ x : s | P x ] (l x)).
 proof.
 move=> cvg; elim: s => /= [|x s ih].
 - by rewrite !big_nil &(@eq_cnvto (fun _ => 0%r)) //= &(cnvtoC).
 rewrite big_cons; case: (P x) => [Px|NPx]; last first.
-- rewrite &(@eq_cnvto (fun n => big P (fun y => F y n) s)) /=.
+- rewrite &(@eq_cnvto (fun n => #big [ y : s | P y ] (F y n))) /=.
   - by move=> n; rewrite big_cons NPx.
   - apply: ih.
-pose G (n : int) := F x n + big P (fun y => F y n) s.
+pose G (n : int) := F x n + #big [ y : s | P y ] (F y n).
 rewrite &(eq_cnvto G) => /= [n|].
 - by rewrite /G big_cons Px.
 by apply: cnvtoD => //; apply: cvg.
@@ -497,9 +497,9 @@ lemma converge_sum
   (s : 'a list)
 :
      (forall x, P x => converge (F x))
-  => converge (fun n => big P (fun x => (F x n)) s).
+  => converge (fun n => #big [ x : s | P x ] (F x n)).
 proof.
-move=> cvg; pose l := big P (fun x => lim (F x)) s.
+move=> cvg; pose l := #big [ x : s | P x ] (lim (F x)).
 apply/(cnvP l)/convergeto_sum => /= x Px.
 by apply/limP/cvg.
 qed.
@@ -510,8 +510,8 @@ lemma lim_sum
   (s : 'a list)
 :
      (forall x, P x => converge (F x))
-  => big P (fun x => lim (F x)) s
-     = lim (fun n => big P (fun x => F x n) s).
+  => #big [ x : s | P x ] (lim (F x))
+     = lim (fun n => #big [ x : s | P x ] (F x n)).
 proof.
 move=> cvg; pose l := fun x => lim (F x).
 have {cvg}cvg: forall x, P x => convergeto (F x) (l x).

@@ -90,11 +90,34 @@ and opbranch = {
   opb_sub  : opbranches;
 }
 
+and nt_punct_kind =
+  [ `LBRACKET | `RBRACKET | `COLON | `PIPE | `COMMA | `SEMICOLON ]
+
+and nt_punct = {
+  np_kind    : nt_punct_kind;
+  np_display : string;
+}
+
+and nt_slot_kind =
+  | NTS_Form  of symbol list
+  | NTS_Ident
+
+and nt_template_item =
+  | NTI_Punct    of nt_punct
+  | NTI_Slot     of symbol * nt_slot_kind
+  | NTI_Optional of nt_template_item list
+
+and nt_template = {
+  nt_items    : nt_template_item list;
+  nt_defaults : expr EcIdent.Mid.t;
+}
+
 and notation = {
-  ont_args  : (EcIdent.t * EcTypes.ty) list;
-  ont_resty : EcTypes.ty;
-  ont_body  : expr;
-  ont_ponly : bool;
+  ont_args     : (EcIdent.t * EcTypes.ty) list;
+  ont_resty    : EcTypes.ty;
+  ont_body     : expr;
+  ont_ponly    : bool;
+  ont_template : nt_template option;
 }
 
 and prind = {
@@ -139,6 +162,10 @@ val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:opopaque -> ty_params -> t
 val mk_abbrev :
      ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list
   -> ty * expr -> locality -> operator
+
+val mk_notation :
+     ty_params -> (EcIdent.ident * ty) list
+  -> ty * expr -> nt_template -> locality -> operator
 
 val operator_as_ctor  : operator -> EcPath.path * int
 val operator_as_rcrd  : operator -> EcPath.path

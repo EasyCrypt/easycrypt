@@ -17,7 +17,7 @@ lemma isdistr_mfilter (m : 'a -> real) (P : 'a -> bool) :
 proof.
 move=> [] ge0_m le1_m; split=> [x|x /le1_m {le1_m} le1_m].
 + by rewrite /mfilter; case (P x)=> //= _; exact/ge0_m.
-apply/(@ler_trans (big predT m x) _ _ _ le1_m)/ler_sum=> a _.
+apply/(@ler_trans (#big [ a : x ] (m a)) _ _ _ le1_m)/ler_sum=> a _.
 by rewrite /mfilter fun_if2 ge0_m.
 qed.
 

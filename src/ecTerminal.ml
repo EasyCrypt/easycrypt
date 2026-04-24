@@ -70,7 +70,9 @@ object(self)
     end;
 
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
-    EcIo.xparse iparser
+    let notations =
+      EcEnv.Op.lookup_template (EcScope.env (EcCommands.current ())) in
+    EcIo.xparse ~notations iparser
 
   method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
     match immediate with
@@ -116,7 +118,9 @@ object
   method next =
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.drain iparser;
-    EcIo.xparse iparser
+    let notations =
+      EcEnv.Op.lookup_template (EcScope.env (EcCommands.current ())) in
+    EcIo.xparse ~notations iparser
 
   method notice ~(immediate:bool) (_ : loglevel) (msg : string) =
     ignore immediate;
@@ -272,7 +276,9 @@ class from_channel
   method interactive = false
 
   method next =
-    let aout = EcIo.xparse iparser in
+    let notations =
+      EcEnv.Op.lookup_template (EcScope.env (EcCommands.current ())) in
+    let aout = EcIo.xparse ~notations iparser in
     loc <- (snd aout).LC.pl_loc;
     self#_update_progress; aout
 

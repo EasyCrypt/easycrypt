@@ -3,7 +3,7 @@ require import AllCore List Ring StdBigop StdOrder.
 (*---*) import Bigint IntOrder.
 
 (* -------------------------------------------------------------------- *)
-op fact (n : int) = BIM.bigi predT idfun 1 (n+1).
+op fact (n : int) = BIM.#bigi [ i : 1, (n+1) ] (idfun i).
 
 lemma fact0 (n : int) : n <= 0 => fact n = 1.
 proof. by move=> le0n; rewrite /fact BIM.big_geq // ler_naddl. qed.
@@ -142,7 +142,7 @@ realize CR.unitout    by exact/R.unitout   .
 clear [BCR.* BCR.BAdd.* BCR.BMul.*].
 
 lemma binomial (x y : t) n : 0 <= n => exp (x + y) n =
-  BAdd.bigi predT (fun i => intmul (exp x i * exp y (n - i)) (bin n i)) 0 (n + 1).
+  BAdd.#bigi [ i : 0, (n + 1) ] (intmul (exp x i * exp y (n - i)) (bin n i)).
 proof.
 elim: n => [|i ge0_i ih].
 + by rewrite BAdd.big_int1 /= !expr0 mul1r bin0 // mulr1z.
@@ -210,7 +210,7 @@ realize R.unitP      by exact/RField.unitP     .
 realize R.unitout    by exact/RField.unitout   .
 
 lemma binomial (x y : real) n : 0 <= n => (x + y) ^ n =
-  Bigreal.BRA.bigi predT (fun i => (bin n i)%r * (x ^ i * y ^ (n - i))) 0 (n + 1).
+  Bigreal.BRA.#bigi [ i : 0, (n + 1) ] ((bin n i)%r * (x ^ i * y ^ (n - i))).
 proof.
 move=> ge0_n; have := binomial_r x y n ge0_n => ->.
 by apply: Bigreal.BRA.eq_bigr=> /= k _; rewrite intmulr mulrC mulrA.

@@ -252,6 +252,8 @@ and pformula_r =
   | PFprob     of psymbol option * pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of psymbol option * pformula * pgamepath * pformula * phoarecmp * pformula
 
+  | PFntt      of pntt_instance
+
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
 
@@ -292,6 +294,14 @@ and pfindex = [ `Index of int | `Match of pformula * int option]
 and pmodule_type_restr =
   { pmty_pq  : pqsymbol;
     pmty_mem : pmod_restr option; }
+
+(* [pnt_args] is a list of (slot name, argument) pairs. The argument is
+   [None] when an optional template group did not trigger and the
+   typechecker should substitute the slot's default. *)
+and pntt_instance = {
+  pnt_name : pqsymbol;
+  pnt_args : (EcSymbols.symbol * pformula option) list;
+}
 
 (* -------------------------------------------------------------------- *)
 (* qident optionally taken in a (implicit) module parameters. *)
@@ -505,14 +515,31 @@ type ppredicate = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* A template punctuation is a quoted STRING at declaration-time. Its     *)
+(* content must lex to exactly one of the six accepted punctuations, but  *)
+(* the enclosing whitespace is preserved for pretty-printing.             *)
+(*                                                                        *)
+(* An optional group [PNTI_Optional items] is a sequence of template      *)
+(* items that may be absent at a call site; its first item must be a      *)
+(* PUNCT (the trigger). At parse time a single-token peek decides         *)
+(* whether to consume the group. Slots referenced only inside optional    *)
+(* groups may declare a default value (see [nt_args]).                    *)
+type pnt_template_item =
+  | PNTI_Punct    of string located
+  | PNTI_Slot     of psymbol
+  | PNTI_Optional of pnt_template_item list
+
+type pnt_template = pnt_template_item list
+
 type pnotation = {
-  nt_name  : psymbol;
-  nt_tv    : ptyvardecls option;
-  nt_bd    : (psymbol * pty) list;
-  nt_args  : (psymbol * (psymbol list * pty option)) list;
-  nt_codom : pty;
-  nt_body  : pexpr;
-  nt_local : is_local;
+  nt_name     : psymbol;             (* #name with location *)
+  nt_tv       : ptyvardecls option;
+  nt_bd       : (psymbol * pty) list;
+  nt_args     : (psymbol * (psymbol list * pty option) * pformula option) list;
+  nt_template : pnt_template;
+  nt_codom    : pty;
+  nt_body     : pformula;
+  nt_local    : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -861,6 +888,7 @@ and pcfold =
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]
+
 type pdbmap1 = {
   pht_flag : include_exclude;
   pht_kind : [ `Theory  | `Lemma   ];

@@ -1751,7 +1751,8 @@ let top_is_mem_binding pf = match pf with
   | PFeqveq   _
   | PFeqf     _
   | PFlsless  _
-  | PFscope   _ -> false
+  | PFscope   _
+  | PFntt     _ -> false
 
 
 let f_or_mod_ident_loc : f_or_mod_ident -> EcLocation.t = function
@@ -1865,6 +1866,73 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
  * 'forall (A <: T) (B <: S {some restriction)), ...'
  * Here, the parameter of the functor [S] are not binded in [env], but must be
  * binded in [env_in]. *)
+
+(* -------------------------------------------------------------------- *)
+(* Eta-reduce the body of a notation form-slot argument over its
+   declared binders. Called after typechecking a slot body that was
+   written in the user's source as `f b_1 ... b_n` (or similar).
+
+   If the body ends with exactly [dep_binders] applied in order to a
+   head [f], and collapsing is safe, return [f] applied to the "kept"
+   prefix (or just [f] if the body was pure eta-expansion). Otherwise
+   wrap the body in a lambda over [dep_binders].
+
+   Reduction fires when:
+   - the trailing args of the body are exactly [dep_binders], as
+     [Flocal]s with the expected types (order matters);
+   - the head and the kept prefix don't capture any binder in
+     [dep_binders] (standard eta-safety check);
+   - AND either (a) there are already "kept" args, so the user wrote
+     something like `(P \o h) i` — the outer application makes it
+     clear a non-trivial function is being composed — or (b) the
+     head is a local variable (the common `F i` case).
+
+   Case (b) catches the common idiom but deliberately leaves
+   `fun i => i%r` (op applied only to the binder) wrapped, because
+   downstream stdlib proofs match on the lambda form. See
+   [doc/notation.rst] and the matching heuristic in [ecMatching.ml]
+   (which complements this via `try_etared`) for the full story. *)
+let eta_reduce_slot_arg
+    ~(dep_binders : (EcIdent.t * ty) list)
+    ~(slot_ty     : ty)
+    (arg_f        : EcFol.form)
+  : EcFol.form
+=
+  let wrap_lambda () =
+    EcCoreFol.f_lambda
+      (List.map (fun (x, t) -> (x, EcAst.GTty t)) dep_binders)
+      arg_f in
+  let n = List.length dep_binders in
+  match arg_f.EcAst.f_node with
+  | EcAst.Fapp (f, args) when List.length args >= n ->
+    let k = List.length args - n in
+    let kept, tail = List.split_at k args in
+    let binders_ok =
+      List.for_all2 (fun (bid, bty) a ->
+        match a.EcAst.f_node with
+        | EcAst.Flocal aid ->
+          EcIdent.id_equal aid bid
+          && EcTypes.ty_equal a.EcAst.f_ty bty
+        | _ -> false) dep_binders tail in
+    let no_capture () =
+      let fvs = List.fold_left (fun acc e ->
+        EcIdent.fv_union acc e.EcAst.f_fv)
+        f.EcAst.f_fv kept in
+      List.for_all (fun (bid, _) ->
+        not (EcIdent.Mid.mem bid fvs)) dep_binders in
+    let head_ok =
+      (not (List.is_empty kept))
+      || (match f.EcAst.f_node with
+          | EcAst.Flocal _ -> true
+          | _ -> false) in
+    if binders_ok && no_capture () && head_ok then
+      EcCoreFol.f_app f kept slot_ty
+    else
+      wrap_lambda ()
+
+  | _ -> wrap_lambda ()
+
+(* -------------------------------------------------------------------- *)
 let rec trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
@@ -2931,6 +2999,177 @@ and trans_gbinding env ue decl =
 and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
+  (* Expand a [PFntt] call site. Looks up the notation operator, opens
+     its type parameters, then walks [pnt_args] (in dispatcher-emitted
+     order) binding each slot to its typechecked formula argument or
+     stored default. The body is substituted in at the end. Slot args
+     are typechecked via [trans_form_or_pattern] so that [Pr[...]],
+     memory refs, and other formula-level constructs are accepted. *)
+  let expand_notation
+      (env      : EcEnv.env)
+      (pf       : pformula)
+      (pnt_name : pqsymbol)
+      (pnt_args : (EcSymbols.symbol * pformula option) list)
+    : EcFol.form
+  =
+    let qname = EcLocation.unloc pnt_name in
+    let op =
+      match EcEnv.Op.lookup_opt qname env with
+      | None ->
+        tyerror pnt_name.pl_loc env
+          (UnknownVarOrOp (qname, []))
+      | Some (_, op) -> op in
+    let ont =
+      match op.op_kind with
+      | OB_nott ({ ont_template = Some _; _ } as n) -> n
+      | _ ->
+        tyerror pnt_name.pl_loc env
+          (UnknownVarOrOp (qname, [])) in
+    let template = Option.get ont.ont_template in
+
+    (* Collect slot kinds from the template, walking through optional
+       groups. *)
+    let rec collect_kinds acc = function
+      | [] -> acc
+      | EcDecl.NTI_Slot (n, k) :: tl ->
+        collect_kinds (EcSymbols.Msym.add n k acc) tl
+      | EcDecl.NTI_Punct _ :: tl -> collect_kinds acc tl
+      | EcDecl.NTI_Optional sub :: tl ->
+        collect_kinds (collect_kinds acc sub) tl in
+    let slot_kinds = collect_kinds EcSymbols.Msym.empty template.EcDecl.nt_items in
+
+    (* Open the operator's type parameters. *)
+    let ov = EcUnify.UniEnv.opentvi ue op.op_tparams None in
+    let tsub_ty = Tvar.subst ov in
+    let slot_meta =
+      List.fold_left (fun m (id, ty) ->
+        EcSymbols.Msym.add (EcIdent.name id) (id, tsub_ty ty) m)
+        EcSymbols.Msym.empty ont.ont_args in
+
+    (* Formula-level substitution carrying the type-variable
+       instantiation. Notations share the [OB_nott] body representation
+       with abbreviations but expand at formula level just like
+       abbreviation calls. *)
+    let tsub_f = EcCoreSubst.f_subst_init ~tv:ov () in
+
+    (* Classify each dispatcher-emitted arg by its slot kind, then
+       partition idents from forms so each binding pass walks only its
+       own slots. Binding idents first lets form slots reference any
+       binder regardless of template order. *)
+    let module M = struct
+      type slot_info = {
+        kind    : EcDecl.nt_slot_kind;
+        name    : EcSymbols.symbol;
+        id      : EcIdent.t;
+        ty      : ty;
+        arg_opt : pformula option;
+      }
+    end in
+    let classified : M.slot_info list =
+      List.map (fun (slot_name, arg_opt) ->
+        let kind =
+          try EcSymbols.Msym.find slot_name slot_kinds
+          with Not_found ->
+            tyerror pf.pl_loc env (UnknownVarOrOp (([], slot_name), [])) in
+        let (slot_id, slot_ty) =
+          try EcSymbols.Msym.find slot_name slot_meta
+          with Not_found -> assert false in
+        M.{ kind; name = slot_name; id = slot_id; ty = slot_ty; arg_opt; })
+        pnt_args in
+    let idents, forms =
+      List.partition (fun (c : M.slot_info) -> c.kind = EcDecl.NTS_Ident)
+        classified in
+
+    (* Pass 1: assign a fresh ident to each user-chosen binder name.
+       The fold wires two outputs: a substitution [s] that renames the
+       slot-ident to the fresh one, and a map [ub] used by pass 2 to
+       put the same binders in scope when typechecking form slots. *)
+    let assign_ident (si : M.slot_info) : EcIdent.t =
+      match si.arg_opt with
+      | Some arg ->
+        let new_name =
+          match EcLocation.unloc arg with
+          | PFident ({ pl_desc = ([], n); _ }, None) -> n
+          | _ ->
+            tyerror arg.pl_loc env
+              (UnknownVarOrOp (([], si.name), [])) in
+        EcIdent.create new_name
+
+      | None ->
+        (* Ident slots can't be absent: they have no default and there's
+           no sensible identifier to synthesise. The declaration-time
+           validation disallows ident slots inside optional groups, so
+           this is an invariant violation. *)
+        tyerror pf.pl_loc env (UnknownVarOrOp (([], si.name), []))
+    in
+    let (s, ub) =
+      List.fold_left (fun (s, ub) (si : M.slot_info) ->
+        let new_id = assign_ident si in
+        ( EcCoreSubst.Fsubst.f_bind_local s si.id
+            (EcCoreFol.f_local new_id si.ty)
+        , EcSymbols.Msym.add si.name (new_id, si.ty) ub))
+        (tsub_f, EcSymbols.Msym.empty) idents in
+
+    (* Pass 2: build the bound formula for each form slot — from the
+       user-supplied argument, or from the stored default — and extend
+       the substitution. [ub] is fixed from pass 1. *)
+    let build_form (si : M.slot_info) : EcFol.form =
+      let deps =
+        match si.kind with
+        | EcDecl.NTS_Form d -> d
+        | EcDecl.NTS_Ident -> assert false in
+      match si.arg_opt with
+      | Some arg ->
+        let rec strip n t =
+          if n = 0 then t
+          else match t.EcAst.ty_node with
+            | EcAst.Tfun (_, t') -> strip (n - 1) t'
+            | _ -> assert false in
+        let plain_ty = strip (List.length deps) si.ty in
+        let dep_binders =
+          List.map (fun bname ->
+            try EcSymbols.Msym.find bname ub
+            with Not_found -> assert false) deps in
+        let local_env = EcEnv.Var.bind_locals dep_binders env in
+        (* Special-case `_` as the entire slot body: create a single
+           meta-var of the slot's FULL curried type (not the stripped
+           body type). Makes `pose c := #big [ i : _ | _ ] _` behave
+           like `pose c := big _ _ _`: each `_` matches the whole
+           function, not just its scalar body. *)
+        let is_bare_hole =
+          match EcLocation.unloc arg with
+          | PFhole -> Option.is_some ps
+          | _ -> false in
+        if is_bare_hole then
+          let ps = Option.get ps in
+          let x = EcIdent.create (Printf.sprintf "?%d" (EcUid.unique ())) in
+          ps := EcIdent.Mid.add x si.ty !ps;
+          EcCoreFol.f_local x si.ty
+        else
+          (* Type the slot arg with the same pattern map the outer
+             caller uses, so `_` in a slot works when the notation
+             instance appears inside a rewrite/pose pattern. *)
+          let arg_f =
+            trans_form_or_pattern local_env `Form
+              ?mv ?ps ue arg (Some plain_ty) in
+          eta_reduce_slot_arg ~dep_binders ~slot_ty:si.ty arg_f
+
+      | None ->
+        (* Absent form slot → bind the typechecked default, with type
+           vars substituted from the current [ov]. *)
+        let dflt =
+          try EcIdent.Mid.find si.id template.EcDecl.nt_defaults
+          with Not_found -> assert false in
+        EcCoreSubst.Fsubst.f_subst tsub_f (EcCoreFol.form_of_expr dflt)
+    in
+    let subst =
+      List.fold_left (fun s (si : M.slot_info) ->
+        EcCoreSubst.Fsubst.f_bind_local s si.id (build_form si))
+        s forms in
+
+    let body_f = EcCoreFol.form_of_expr ont.ont_body in
+    EcCoreSubst.Fsubst.f_subst subst body_f in
+
   let rec transf_r_tyinfo opsc env ?tt f =
     let transf env ?tt f =
       transf_r opsc env ?tt f in
@@ -3603,6 +3842,9 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF {ml;mr;inv=pre'} s1 fpath1 fpath2 s2 {ml;mr;inv=post'}
+
+    | PFntt { pnt_name; pnt_args } ->
+      expand_notation env f pnt_name pnt_args
 
   and transf_r opsc env ?tt pf =
     let f  = transf_r_tyinfo opsc env ?tt pf in

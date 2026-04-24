@@ -94,10 +94,10 @@ move=> ^iI [_ [+ _] Ix Iy] - /(_ x (-y)); rewrite opprK.
 by apply=> //; apply/idealN.
 qed.
 
-lemma ideal_sum ['a] I P F s :
+lemma ideal_sum ['a] I P (F : 'a -> t) s :
      ideal I
   => (forall x, P x => I (F x))
-  => I (BAdd.big<:'a> P F s).
+  => I (BAdd.#big [ i : s | P i ] (F i)).
 proof.
 elim: s => [|x s ih] idI IF; first by rewrite BAdd.big_nil ideal0.
 rewrite BAdd.big_cons; case: (P x) => Px; last by apply/ih.
@@ -190,11 +190,11 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op idgen (xs : t list) = fun (x : t) =>
-  exists cs, x = BAdd.bigi predT (fun i => cs.[i] * xs.[i]) 0 (size xs).
+  exists cs, x = BAdd.#bigi [ i : 0, (size xs) ] (cs.[i] * xs.[i]).
 
 lemma idgenP (xs : t list) (x : t) :
   idgen xs x => exists cs, size cs = size xs
-    /\ x = BAdd.bigi predT (fun i => cs.[i] * xs.[i]) 0 (size xs).
+    /\ x = BAdd.#bigi [ i : 0, (size xs) ] (cs.[i] * xs.[i]).
 proof.
 case=> cs ->; exists (mkseq (fun i => cs.[i]) (size xs)); split.
 - by rewrite size_mkseq ler_maxr // size_ge0.
@@ -387,9 +387,9 @@ proof. by rewrite /eqv -idealNP 1:ideal_p opprD. qed.
 lemma eqvD x1 x2 y1 y2 : eqv x1 x2 => eqv y1 y2 => eqv (x1 + y1) (x2 + y2).
 proof. by rewrite /eqv subrACA &(idealD) ideal_p. qed.
 
-lemma eqv_sum ['a] P F1 F2 r :
+lemma eqv_sum ['a] P (F1 F2 : 'a -> t) r :
      (forall x, P x => eqv (F1 x) (F2 x))
-  => eqv (BAdd.big<:'a> P F1 r) (BAdd.big<:'a> P F2 r).
+  => eqv (BAdd.#big [ i : r | P i ] (F1 i)) (BAdd.#big [ i : r | P i ] (F2 i)).
 proof.
 move=> heqv; elim: r => [|x r ih].
 - by rewrite !BAdd.big_nil eqvxx.

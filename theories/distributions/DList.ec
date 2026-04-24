@@ -109,7 +109,7 @@ proof. by move=> ge0_n; case/(supp_dlist d n xs ge0_n). qed.
 lemma dlistE x0 (d : 'a distr) (p : int -> 'a -> bool) n :
     mu (dlist d n) (fun xs : 'a list =>
                     forall i, (0 <= i) && (i < n) => (p i (nth x0 xs i)))
-  = bigi predT (fun i => mu d (p i)) 0 n.
+  = #bigi [ i : 0, n ] (mu d (p i)).
 proof.
 elim/natind : n p => [n n_le0|n n_ge0 IHn] p.
 - rewrite dlist0 // dunitE range_geq //= big_nil; smt().
@@ -128,7 +128,7 @@ lemma dlist1E (d : 'a distr) n xs:
   0 <= n =>
   mu1 (dlist d n) xs
   = if   n = size xs
-    then big predT (fun x => mu1 d x) xs
+    then #big [ x : xs ] (mu1 d x)
     else 0%r.
 proof.
 move=> le0_n; case (n = size xs)=> [->|].

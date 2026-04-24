@@ -889,10 +889,22 @@ let rec subst_op_kind (s : subst) (kind : operator_kind) =
 
 and subst_notation (s : subst) (nott : notation) =
   let s, xs = fresh_elocals s nott.ont_args in
-  { ont_args  = xs;
-    ont_resty = subst_ty s nott.ont_resty;
-    ont_body  = subst_expr s nott.ont_body;
-    ont_ponly = nott.ont_ponly; }
+  (* Rekey each template's defaults via the old→new ident mapping
+     established by fresh_elocals, and substitute expressions. *)
+  let template =
+    Option.map (fun (t : nt_template) ->
+      let nt_defaults =
+        List.fold_left2 (fun acc (old_id, _) (new_id, _) ->
+          match EcIdent.Mid.find_opt old_id t.nt_defaults with
+          | Some e -> EcIdent.Mid.add new_id (subst_expr s e) acc
+          | None   -> acc)
+          EcIdent.Mid.empty nott.ont_args xs in
+      { nt_items = t.nt_items; nt_defaults; }) nott.ont_template in
+  { ont_args     = xs;
+    ont_resty    = subst_ty s nott.ont_resty;
+    ont_body     = subst_expr s nott.ont_body;
+    ont_ponly    = nott.ont_ponly;
+    ont_template = template; }
 
 and subst_op_body (s : subst) (bd : opbody) =
   match bd with
