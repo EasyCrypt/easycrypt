@@ -1144,6 +1144,13 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           failure ();
         doit env (subst, mxs) f1' f2' in
 
+      let try_etared () =
+        let f1' = EcReduction.eta_norm f1 in
+        let f2' = EcReduction.eta_norm f2 in
+        if f1 == (*phy*) f1' && f2 == (*phy*) f2' then
+          failure ();
+        doit env (subst, mxs) f1' f2' in
+
       let try_horder () =
         if not opts.fm_horder then
           failure ();
@@ -1193,7 +1200,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       List.find_map_opt
         (fun doit ->
            try Some (doit ()) with MatchFailure -> None)
-        [try_betared; try_horder; try_delta; default]
+        [try_betared; try_etared; try_horder; try_delta; default]
       |> oget ~exn:MatchFailure
 
   and doit_args env ilc fs1 fs2 =
