@@ -708,6 +708,18 @@ let form_read (env : env) (pvs : pmvs) =
           |> Option.some)
         m pvs
 
+    | Fglob (_, m) when Sid.mem m bds ->
+      pvs
+
+    | Fglob (mp, m) ->
+      Mid.change
+        (fun pvs ->
+          pvs
+          |> Option.value ~default:PV.empty
+          |> PV.add_glob env (EcPath.mident mp)
+          |> Option.some)
+        m pvs
+
     | Fquant (_, subbds, f) ->
       let bds =
         List.fold_left
