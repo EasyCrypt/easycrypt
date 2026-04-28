@@ -3,8 +3,8 @@ open EcUtils
 open EcParsetree
 open EcTypes
 open EcFol
+open EcAst
 open EcCoreGoal.FApi
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type chl_infos_t = (form, form option, form) rnd_tac_info

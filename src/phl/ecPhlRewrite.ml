@@ -9,7 +9,7 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
-    (pos  : EcMatching.Position.codepos)
+    (pos  : codepos)
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =

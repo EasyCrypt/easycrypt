@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
-open EcParsetree
-open EcMatching.Position
-open EcCoreGoal.FApi
 open EcUtils
+open EcAst
+open EcParsetree
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val t_sp : (codepos1 doption) option -> backward

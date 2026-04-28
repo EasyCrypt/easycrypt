@@ -1,10 +1,10 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
 open EcPhlCond
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 let process_cond (info : EcParsetree.pcond_info) tc =

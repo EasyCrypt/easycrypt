@@ -2,8 +2,8 @@
 open EcPath
 open EcParsetree
 open EcFol
+open EcAst
 open EcCoreGoal.FApi
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_failure_event :

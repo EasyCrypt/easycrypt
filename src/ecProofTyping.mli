@@ -2,13 +2,13 @@
 open EcParsetree
 open EcIdent
 open EcTypes
+open EcAst
 open EcFol
 open EcDecl
 open EcModules
 open EcEnv
 open EcCoreGoal
 open EcMemory
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv

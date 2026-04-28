@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcTypes
+open EcAst
 open EcCoreGoal.FApi
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_fission    : oside -> codepos -> int * (int * int) -> backward

@@ -1,9 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcAst
 open EcFol
 open EcCoreGoal.FApi
-open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_eager_seq     : codepos1 -> codepos1 -> form -> EcIdent.t -> backward

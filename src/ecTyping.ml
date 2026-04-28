@@ -11,7 +11,6 @@ open EcDecl
 open EcMemory
 open EcModules
 open EcFol
-open EcMatching.Position
 
 module MMsym = EcSymbols.MMsym
 module Sid   = EcIdent.Sid

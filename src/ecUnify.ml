@@ -124,6 +124,96 @@ module Unify = struct
   let initial_ucore ?(tvtc = Mid.empty) () : ucore =
     { uf = UF.initial; tcenv = tcenv_empty; tvtc; }
 
+  (* -------------------------------------------------------------------- *)
+  type closed = { tyuni : ty -> ty; tcuni : tcwitness -> tcwitness; }
+
+  (* -------------------------------------------------------------------- *)
+  let close (uc : ucore) : closed =
+    let tymap = Hint.create 0 in
+    let tcmap = Hint.create 0 in
+
+    let rec doit_ty t =
+      match t.ty_node with
+      | Tunivar i -> begin
+          match Hint.find_opt tymap (i :> int) with
+          | Some t -> t
+          | None   -> begin
+            let t =
+              match UF.data i uc.uf with
+              | None   -> tuni (UF.find i uc.uf)
+              | Some t -> doit_ty t
+            in
+              Hint.add tymap (i :> int) t; t
+          end
+        end
+
+      | _ -> ty_map doit_ty t
+  
+    and doit_tc (tw : tcwitness) =
+      match tw with
+      | TCIUni uid -> begin
+        match Hint.find_opt tcmap (uid :> int) with
+        | Some tw -> tw
+        | None ->
+          let tw =
+            match TcUni.Muid.find_opt uid uc.tcenv.resolution with
+            | None -> tw
+            | Some (TCIUni uid') when TcUni.uid_equal uid uid' -> tw (* FIXME:TC *)
+            | Some tw -> doit_tc tw
+          in
+            Hint.add tcmap (uid :> int) tw; tw
+      end
+
+      | TCIConcrete { path; etyargs } ->
+        let etyargs =
+          List.map
+            (fun (ty, tws) -> (doit_ty ty, List.map doit_tc tws))
+            etyargs
+        in TCIConcrete { path; etyargs; }
+
+      | TCIAbstract { support = (`Var _ | `Abs _) } ->
+        tw
+
+    in { tyuni = doit_ty; tcuni = doit_tc; }
+
+  (* ------------------------------------------------------------------ *)
+  let subst_of_uf (uc : ucore) : unisubst =
+    let close = close uc in
+
+    let dereference_tyuni (uid : tyuni) =
+      match close.tyuni (tuni uid) with
+      | { ty_node = Tunivar uid' } when TyUni.uid_equal uid uid' -> None
+      | ty -> Some ty in
+
+    let dereference_tcuni (uid : tcuni) =
+      match close.tcuni (TCIUni uid) with
+      | TCIUni uid' when TcUni.uid_equal uid uid' -> None
+      | tw -> Some tw in
+
+    let uvars =
+      let bindings =
+        List.filter_map (fun uid ->
+          Option.map (fun ty -> (uid, ty)) (dereference_tyuni uid)
+        ) (UF.domain uc.uf) in
+      TyUni.Muid.of_list bindings in
+
+    let utcvars =
+      let bindings =
+        List.filter_map (fun uid ->
+          Option.map (fun tw -> (uid, tw)) (dereference_tcuni uid)
+        ) (TcUni.Muid.keys uc.tcenv.problems) in
+      TcUni.Muid.of_list bindings in
+
+    { uvars; utcvars; }
+
+  (* -------------------------------------------------------------------- *)
+  let check_closed (uc : ucore) =
+    let tyvars = not (UF.closed uc.uf) in
+    let tcvars = not (tcenv_closed uc.tcenv) in
+
+    if tyvars || tcvars then
+      raise (UninstanciateUni { tyvars; tcvars })
+
   (* ------------------------------------------------------------------ *)
   let fresh
     ?(tcs : (typeclass * tcwitness option) list option)
@@ -272,9 +362,6 @@ module Unify = struct
         end
 
         | `TcCtt (uid, ty, tc) ->
-          if not (List.is_empty tc.tc_args) then
-            failure ();
-
           let deps = ref TyUni.Suid.empty in
 
           let rec check (ty : ty) : ty =
@@ -331,95 +418,6 @@ module Unify = struct
     in
       doit (); !uc
 
-  (* -------------------------------------------------------------------- *)
-  type closed = { tyuni : ty -> ty; tcuni : tcwitness -> tcwitness; }
-
-  (* -------------------------------------------------------------------- *)
-  let close (uc : ucore) : closed =
-    let tymap = Hint.create 0 in
-    let tcmap = Hint.create 0 in
-
-    let rec doit_ty t =
-      match t.ty_node with
-      | Tunivar i -> begin
-          match Hint.find_opt tymap (i :> int) with
-          | Some t -> t
-          | None   -> begin
-            let t =
-              match UF.data i uc.uf with
-              | None   -> tuni (UF.find i uc.uf)
-              | Some t -> doit_ty t
-            in
-              Hint.add tymap (i :> int) t; t
-          end
-        end
-
-      | _ -> ty_map doit_ty t
-  
-    and doit_tc (tw : tcwitness) =
-      match tw with
-      | TCIUni uid -> begin
-        match Hint.find_opt tcmap (uid :> int) with
-        | Some tw -> tw
-        | None ->
-          let tw =
-            match TcUni.Muid.find_opt uid uc.tcenv.resolution with
-            | None -> tw
-            | Some (TCIUni uid') when TcUni.uid_equal uid uid' -> tw (* FIXME:TC *)
-            | Some tw -> doit_tc tw
-          in
-            Hint.add tcmap (uid :> int) tw; tw
-      end
-
-      | TCIConcrete { path; etyargs } ->
-        let etyargs =
-          List.map
-            (fun (ty, tws) -> (doit_ty ty, List.map doit_tc tws))
-            etyargs
-        in TCIConcrete { path; etyargs; }
-
-      | TCIAbstract { support = (`Var _ | `Abs _) } ->
-        tw
-
-    in { tyuni = doit_ty; tcuni = doit_tc; }
-
-  (* ------------------------------------------------------------------ *)
-  let subst_of_uf (uc : ucore) : unisubst =
-    let close = close uc in
-
-    let dereference_tyuni (uid : tyuni) =
-      match close.tyuni (tuni uid) with
-      | { ty_node = Tunivar uid' } when TyUni.uid_equal uid uid' -> None
-      | ty -> Some ty in
-
-    let dereference_tcuni (uid : tcuni) =
-      match close.tcuni (TCIUni uid) with
-      | TCIUni uid' when TcUni.uid_equal uid uid' -> None
-      | tw -> Some tw in
-
-    let uvars =
-      let bindings =
-        List.filter_map (fun uid ->
-          Option.map (fun ty -> (uid, ty)) (dereference_tyuni uid)
-        ) (UF.domain uc.uf) in
-      TyUni.Muid.of_list bindings in
-
-    let utcvars =
-      let bindings =
-        List.filter_map (fun uid ->
-          Option.map (fun tw -> (uid, tw)) (dereference_tcuni uid)
-        ) (TcUni.Muid.keys uc.tcenv.problems) in
-      TcUni.Muid.of_list bindings in
-
-    { uvars; utcvars; }
-
-  (* -------------------------------------------------------------------- *)
-  let check_closed (uc : ucore) =
-    let tyvars = not (UF.closed uc.uf) in
-    let tcvars = not (tcenv_closed uc.tcenv) in
-
-    if tyvars || tcvars then
-      raise (UninstanciateUni { tyvars; tcvars })
 end
 
 (* -------------------------------------------------------------------- *)
@@ -698,7 +696,7 @@ let select_op
       (try  unify env subue top texpected
        with UnificationFailure _ -> raise E.Failure);
 
-      let bd =
+       let bd =
         match op.D.op_kind with
         | OB_nott nt ->
            let substnt () =

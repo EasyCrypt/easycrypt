@@ -1,8 +1,8 @@
-open EcCoreGoal.FApi
-open EcMatching.Position
 open EcParsetree
-open EcModules
 open EcPath
+open EcAst
+open EcModules
+open EcCoreGoal.FApi
 
 val t_equivS_trans_eq : side -> stmt -> backward
 

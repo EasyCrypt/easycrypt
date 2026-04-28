@@ -125,7 +125,6 @@ let rec check_tcinstance
       let module M = TyMatch(struct let env = env end) in
       M.doit_type map tci.tci_type ty in
 
-
     let _, args = List.fold_left_map (fun subst (a, aargs) ->
       let aty = oget ~exn:Bailout (Mid.find a map) in
       let aargs = List.map (fun aarg ->
