@@ -12,7 +12,7 @@
 
 (* --- Require/Import Theories --- *)
 (* -- Built-in (i.e, standard library) -- *)
-require import AllCore List.
+require import AllCore List Distr.
 
 
 
