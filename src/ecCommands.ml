@@ -572,12 +572,24 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         let i_pragma = Pragma.get () in
 
         try_finally (fun () ->
-          let commands = EcIo.parseall (EcIo.from_file filename) in
-          let commands =
-            List.fold_left
-              (fun scope g -> process_internal subld scope g.gl_action)
-              iscope commands in
-          commands)
+          let reader = EcIo.from_file filename in
+          let rec loop scope =
+            let notations = EcEnv.Op.lookup_template (EcScope.env scope) in
+            match EcLocation.unloc (EcIo.parse ~notations reader) with
+            | EcParsetree.P_Prog (commands, terminate) ->
+                let scope =
+                  List.fold_left
+                    (fun scope g -> process_internal subld scope g.gl_action)
+                    scope commands in
+                if terminate then scope else loop scope
+            | EcParsetree.P_DocComment _ ->
+                loop scope
+            | EcParsetree.P_Undo _ | EcParsetree.P_Exit ->
+                assert false
+          in
+          try_finally
+            (fun () -> loop iscope)
+            (fun () -> EcIo.finalize reader))
         (fun () -> Pragma.set i_pragma)
       in
 

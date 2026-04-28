@@ -401,14 +401,14 @@ require import StdBigop.
 (*---*) import Bigreal BRA BRM.
 
 lemma exp_sum (P : 'a -> bool) (F : 'a -> real) s:
-  exp (BRA.big P F s) = BRM.big P (fun a => exp (F a)) s.
+  exp (BRA.#big [ a : s | P a ] (F a)) = BRM.#big [ a : s | P a ] (exp (F a)).
 proof.
 elim: s => [|x s ih]; rewrite !(big_nil, big_cons) ?exp0 //.
 by case: (P x)=> // Px; rewrite expD ih.
 qed.
 
 lemma rpowe_sum (P : 'a -> bool) (F : 'a -> real) s:
-  e^(BRA.big P F s) = BRM.big P (fun a => e^(F a)) s.
+  e^(BRA.#big [ a : s | P a ] (F a)) = BRM.#big [ a : s | P a ] (e^(F a)).
 proof. by rewrite rpoweE exp_sum; apply/eq_bigr=> x _ /=; rewrite rpoweE. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -733,14 +733,14 @@ realize ZM.add0r by exact/add0r.
 realize ZM.addNr by exact/addNr.
 
 lemma dotp_sumr ['a] P F (s : 'a list) x :
-  dotp x (big P F s) = BRA.big P (fun y => dotp x (F y)) s.
+  dotp x (#big [ y : s | P y ] (F y)) = BRA.#big [ y : s | P y ] (dotp x (F y)).
 proof.
 elim: s => [|y s ih]; first by rewrite !big_nil dotpv0.
 by rewrite !big_cons; case: (P y) => // _; rewrite dotpDr ih.
 qed.
 
 lemma dotp_suml ['a] P F (s : 'a list) x :
-  dotp (big P F s) x = BRA.big P (fun y => dotp (F y) x) s.
+  dotp (#big [ y : s | P y ] (F y)) x = BRA.#big [ y : s | P y ] (dotp (F y) x).
 proof.
 by rewrite dotpC dotp_sumr; apply: BRA.eq_bigr => i _ /=; rewrite dotpC.
 qed.

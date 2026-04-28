@@ -120,7 +120,7 @@ lemma offunB (v1 v2 : vector) i : (v1 - v2).[i] = v1.[i] - v2.[i].
 proof. done. qed.
 
 op dotp (v1 v2 : vector) =
-  bigi predT (fun i => v1.[i] * v2.[i]) 0 size.
+  #bigi [ i : 0, size ] (v1.[i] * v2.[i]).
 
 lemma dotpC : commutative dotp.
 proof.
@@ -317,7 +317,7 @@ lemma offunB (m1 m2 : matrix) i j : (m1 - m2).[i, j] = m1.[i, j] - m2.[i, j].
 proof. done. qed.
 
 op trace (m : matrix) =
-  bigi predT (fun i => m.[i, i]) 0 size.
+  #bigi [ i : 0, size ] (m.[i, i]).
 
 op trmx (m : matrix) =
   offunm (fun i j => m.[j, i]).
@@ -346,10 +346,10 @@ lemma trace_trmx m : trace (trmx m) = trace m.
 proof. by apply: eq_bigr=> /= i _; rewrite trmxE. qed.
 
 op ( * ) (m1 m2 : matrix) =
-  offunm (fun i j => bigi predT (fun k => m1.[i, k] * m2.[k, j]) 0 size).
+  offunm (fun i j => #bigi [ k : 0, size ] (m1.[i, k] * m2.[k, j])).
 
 lemma offunM (m1 m2 : matrix) i j :
-  (m1 * m2).[i, j] = bigi predT (fun k => m1.[i, k] * m2.[k, j]) 0 size.
+  (m1 * m2).[i, j] = #bigi [ k : 0, size ] (m1.[i, k] * m2.[k, j]).
 proof.
 case: (mrange i j) => [rg_ij|Nrg_ij]; first by rewrite offunmE.
 rewrite getm_out // big1 // => /= k _; move: Nrg_ij.
@@ -392,7 +392,7 @@ lemma mulmxA : associative Matrix.( * ).
 proof.
 move=> m1 m2 m3; apply/eq_matrixP=> i j rg_ij.
 pose M k l := m1.[i, k] * m2.[k, l] * m3.[l, j].
-pose E := bigi predT (fun k => bigi predT (M k) 0 size) 0 size.
+pose E := #bigi [ k : 0, size ] (#bigi [ l : 0, size ] (M k l)).
 apply: (@eq_trans _ E); rewrite offunM.
 + apply: eq_bigr=> /= k _; rewrite mulr_sumr &(eq_bigr) /=.
   by move=> l _; rewrite mulrA.
@@ -407,10 +407,10 @@ by apply: eq_bigr => /= k _; rewrite !trmxE mulrC.
 qed.
 
 op ( *^ ) (m : matrix) (v : vector) : vector =
-  offunv (fun i => bigi predT (fun j => m.[i, j] * v.[j]) 0 size).
+  offunv (fun i => #bigi [ j : 0, size ] (m.[i, j] * v.[j])).
 
 op ( ^* ) (v : vector) (m : matrix) : vector =
-  offunv (fun j => bigi predT (fun i => v.[i] * m.[i, j]) 0 size).
+  offunv (fun j => #bigi [ i : 0, size ] (v.[i] * m.[i, j])).
 
 lemma mulmxTv (m : matrix) (v : vector) : (trmx m) *^ v = v ^* m.
 proof.
@@ -451,7 +451,7 @@ lemma mulmxvA (m1 m2 : matrix) (v : vector) :
 proof.
 apply/eq_vectorP=> i rgi; rewrite !offunvE //=.
 pose F j k := m1.[i,k] * m2.[k,j] * v.[j].
-pose E := bigi predT (fun j => bigi predT (F j) 0 size) 0 size.
+pose E := #bigi [ j : 0, size ] (#bigi [ k : 0, size ] (F j k)).
 apply: (@eq_trans _ E).
 + by rewrite /E /F &(eq_bigr) => /= j _; rewrite mulr_suml.
 rewrite /E /F exchange_big !big_seq &(eq_bigr) /= => j.
@@ -481,14 +481,14 @@ lemma mulvmxA (v : vector) (m1 m2 : matrix) :
 proof. by rewrite -!mulmxTv trmxM mulmxvA. qed.
 
 lemma mulmxvE (m : matrix) (v : vector) i :
-  (m *^ v).[i] = bigi predT (fun j => m.[i, j] * v.[j]) 0 size.
+  (m *^ v).[i] = #bigi [ j : 0, size ] (m.[i, j] * v.[j]).
 proof.
 case: (0 <= i < size) => [rg_i|rgN_i]; first by rewrite offunvE.
 by rewrite getv_out // big1 //= => j _; rewrite getm_outL // mul0r.
 qed.
 
 lemma mulvmxE (m : matrix) (v : vector) j :
-  (v ^* m).[j] = bigi predT (fun i => v.[i] * m.[i, j]) 0 size.
+  (v ^* m).[j] = #bigi [ i : 0, size ] (v.[i] * m.[i, j]).
 proof.
 by rewrite -mulmxTv mulmxvE; apply: eq_bigr => /= i _; rewrite trmxE mulrC.
 qed.
@@ -548,7 +548,7 @@ qed.
 lemma dotp_mulmxv m v1 v2 : dotp (m *^ v1) v2 = dotp v1 (v2 ^* m).
 proof.
 pose F i j := m.[i, j] * v1.[j] * v2.[i].
-rewrite /dotp -(eq_bigr _ (fun i => bigi predT (F i) 0 size)) /=.
+rewrite /dotp -(eq_bigr _ (fun i => #bigi [ j : 0, size ] (F i j))) /=.
 + by move=> i _ @/F; rewrite -mulr_suml mulmxvE.
 rewrite exchange_big &(eq_bigr) => /= i _ @/F.
 rewrite mulvmxE mulr_sumr &(eq_bigr) => /= j _.
@@ -560,7 +560,7 @@ op dvector (d : R distr) =
   dmap (djoin (nseq size d)) (fun xs => offunv (nth witness xs)).
 
 lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d) v =
-  BRM.bigi predT (fun i => mu1 d v.[i]) 0 size.
+  BRM.#bigi [ i : 0, size ] (mu1 d v.[i]).
 proof.
 pose g v := mkseq (tofunv v) size; rewrite (@dmap1E_can _ _ g).
 + move=> {v} @/g v; apply/eq_vectorP=> /= i rgi.
@@ -625,7 +625,7 @@ op dmatrix (d : R distr) =
     )).
 
 lemma dmatrix1E (d : R distr) (m : matrix) : mu1 (dmatrix d) m =
-  BRM.bigi predT (fun i => BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 size) 0 size.
+  BRM.#bigi [ i : 0, size ] (BRM.#bigi [ j : 0, size ] (mu1 d m.[i, j])).
 proof.
 pose g m := mkseq (fun j => mkseq (fun i => tofunm m i j) size) size.
 rewrite BRM.exchange_big (@dmap1E_can _ _ g).

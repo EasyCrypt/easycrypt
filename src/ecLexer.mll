@@ -345,6 +345,7 @@ let lident = (lower ichar*) | ('_' ichar+)
 let uident = upper ichar*
 let tident = '\'' lident
 let mident = '&'  (lident | uint)
+let nident = '#' lident
 
 let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':' '#' '$']
 
@@ -364,6 +365,12 @@ rule main = parse
   | uident as id { try [Hashtbl.find keywords id] with Not_found -> [UIDENT id] }
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
+  | nident as n {
+      let suffix = String.sub n 1 (String.length n - 1) in
+      match Hashtbl.find_opt keywords suffix with
+      | Some kw -> [SHARP; kw]
+      | None    -> [NIDENT n]
+    }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
   | uxint        { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
 

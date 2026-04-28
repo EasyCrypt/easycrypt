@@ -5,3 +5,4 @@ EasyCrypt reference manual
    :maxdepth: 2
 
    tactics
+   notation

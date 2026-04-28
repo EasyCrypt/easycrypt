@@ -27,10 +27,10 @@ import BAdd.
 (* TOTHINK: This lemma is very useful in mulrxA, other uses? *)
 lemma big_range0r (j' j i : int) P F : j' <= j =>
   (forall x, j' <= x < j => P x => F x = zeror) =>
-  bigi P F i j = bigi P F i j'.
+  #bigi [ x : i, j | P x ] (F x) = #bigi [ x : i, j' | P x ] (F x).
 proof.
 move => le_j'_j F0E; case (i <= j') => [le_i_j'|gt_i_j'].
-- rewrite (big_cat_int j') 1,2:/# [bigi P F j' j]big1_seq ?addr0 //. 
+- rewrite (big_cat_int j') 1,2:/# [#bigi [ x : j', j | P x ] (F x)]big1_seq ?addr0 //.
   smt(mem_range).
 rewrite !big1_seq; smt(mem_range).
 qed.
@@ -266,10 +266,10 @@ proof. smt(addvA addvC addvN addv0). qed.
 
 (* Inner product *)
 op[opaque] dotp (v1 v2 : vector) =
-  bigi predT (fun i => v1.[i] * v2.[i]) 0 (max (size v1) (size v2)).
+  #bigi [ i : 0, (max (size v1) (size v2)) ] (v1.[i] * v2.[i]).
 
-lemma dotpE v1 v2: dotp v1 v2 = 
-  bigi predT (fun i => v1.[i] * v2.[i]) 0 (max (size v1) (size v2)).
+lemma dotpE v1 v2: dotp v1 v2 =
+  #bigi [ i : 0, (max (size v1) (size v2)) ] (v1.[i] * v2.[i]).
 proof. by rewrite /dotp. qed.
 
 lemma dotpC : commutative dotp.
@@ -294,8 +294,8 @@ lemma dotpDr v1 v2 v3: dotp v1 (v2 + v3) = dotp v1 v2 + dotp v1 v3.
 proof.
 rewrite !dotpE size_addv; pose m := max _ (max _ _).
 (* FIXME: (max _ _) should be precise enough, but this matches m! *)
-rewrite -[bigi _ _ 0 (max _ (size v2))](big_range0r _ m); 1,2: smt(getv0E mul0r).
-rewrite -[bigi _ _ 0 (max _ (size v3))](big_range0r _ m); 1,2: smt(getv0E mul0r).
+rewrite -[#bigi [ i : 0, (max _ (size v2)) | _ ] _](big_range0r _ m); 1,2: smt(getv0E mul0r).
+rewrite -[#bigi [ i : 0, (max _ (size v3)) | _ ] _](big_range0r _ m); 1,2: smt(getv0E mul0r).
 by rewrite sumrD /= &(eq_bigr) /= => i _; rewrite get_addv mulrDr.
 qed.
 
@@ -592,7 +592,7 @@ by apply size_ineq.
 qed.
 
 lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d (size v)) v =
-  BRM.bigi predT (fun i => mu1 d v.[i]) 0 (size v).
+  BRM.#bigi [ i : 0, (size v) ] (mu1 d v.[i]).
 proof.
 rewrite -{2}[v]tolistK dmapE /(\o) /pred1.
 rewrite (@mu_eq _ _ (pred1 (tolist v))).
@@ -1153,15 +1153,15 @@ split => [| i j bound]; 1: smt(rows_mulmx cols_mulmx).
 rewrite !get_mulmx dotpE /= (big_range0r (rows m2)) 1:/#. 
 - smt(getm0E mulr0 mul0r rows_mulmx cols_mulmx row0E).
 rewrite (eq_bigr _ _ (fun k =>
-    bigi predT (fun (l : int) => m1.[i,k] * (m2.[k,l] * m3.[l,j])) 0 (rows m3))).
+    #bigi [ l : 0, (rows m3) ] (m1.[i,k] * (m2.[k,l] * m3.[l,j])))).
 - move => k /= _.
   rewrite get_mulmx dotpE mulr_sumr /= (big_range0r (rows m3)) // 1:/#.
   smt(getm0E mulr0 mul0r).
 rewrite exchange_big /= dotpE /=.
-rewrite [bigi _ _ _ (max _ _)](big_range0r (rows m3)) // 1:/#. 
+rewrite [#bigi [ i : _, (max _ _) | _ ] _](big_range0r (rows m3)) // 1:/#.
 - smt(getm0E mulr0 mul0r).
 apply eq_bigr => k _ /=; rewrite get_mulmx dotpE mulr_suml /=.
-rewrite [bigi _ _ _ (max _ _)](big_range0r (rows m2)) 1:/#.
+rewrite [#bigi [ i : _, (max _ _) | _ ] _](big_range0r (rows m2)) 1:/#.
 - smt(getm0E mulr0 mul0r).
 by apply eq_bigr => l _ /=; rewrite mulrA.
 qed.
@@ -1470,14 +1470,14 @@ rewrite get_catmr 3!get_mulmx.
 case (j < cols m2) => bound2.
 - rewrite [col m3 _]col0E 1:/# dotpv0 addr0 !dotpE 2!size_col rows_catmr.
   rewrite (big_cat_int (max (cols m1) (rows m2))) 1:/# size_row 1:/#.
-  rewrite [bigi _ _ (max _ _) _]big1_seq => [k [_ /mem_range bound3] /=|].
+  rewrite [#bigi [ i : (max _ _), _ | _ ] _]big1_seq => [k [_ /mem_range bound3] /=|].
   + by rewrite get_catmr [_ m2 _]getm0E 1:/# add0r [_ m3 _]getm0E 1:/# mulr0.
   rewrite addr0.
   apply eq_bigr => k _ /=.
   by rewrite get_catmr [_ m3 _]getm0E 1:/# addr0.
 - rewrite [col m2 _]col0E 1:/# dotpv0 add0r !dotpE 2!size_col rows_catmr.
   rewrite (big_cat_int (max (cols m1) (rows m3))) 1:/# size_row 1:/#.
-  rewrite [bigi _ _ (max _ _) _]big1_seq => [k [_ /mem_range bound3] /=|].
+  rewrite [#bigi [ i : (max _ _), _ | _ ] _]big1_seq => [k [_ /mem_range bound3] /=|].
   + by rewrite get_catmr [_ m3 _]getm0E 1:/# addr0 [_ m2 _]getm0E 1:/# mulr0.
   rewrite addr0.
   apply eq_bigr => k _ /=.
@@ -1823,8 +1823,7 @@ apply size_dmatrix in cont => /#.
 qed.
 
 lemma dmatrix1E d m : mu1 (dmatrix d (rows m) (cols m)) m =
-  BRM.bigi predT (fun i => 
-    BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 (cols m)) 0 (rows m).
+  BRM.#bigi [ i : 0, (rows m) ] (BRM.#bigi [ j : 0, (cols m) ] (mu1 d m.[i, j])).
 proof.
 pose g (m: matrix) := mkseq (fun i => col m i) (cols m).
 rewrite (in_dmap1E_can _ _ g) /ofcols.

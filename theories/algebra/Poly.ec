@@ -79,7 +79,7 @@ op prepolyD  (p q : poly ) = fun i => p.[i] + q.[i].
 op prepolyN  (p   : poly ) = fun i => - p.[i].
 
 op prepolyM (p q : poly) = fun k =>
-  BCA.bigi predT (fun i => p.[i] * q.[k-i]) 0 (k+1).
+  BCA.#bigi [ i : 0, (k+1) ] (p.[i] * q.[k-i]).
 
 op prepolyZ (z : coeff) (p : poly) = fun k =>
   z * p.[k].
@@ -170,7 +170,7 @@ lemma polyDE p q k : (p + q).[k] = p.[k] + q.[k].
 proof. by rewrite coeffE 1:ispolyD. qed.
 
 lemma polyME p q k : (p * q).[k] =
-  BCA.bigi predT (fun i => p.[i] * q.[k-i]) 0 (k+1).
+  BCA.#bigi [ i : 0, (k+1) ] (p.[i] * q.[k-i]).
 proof. by rewrite coeffE 1:ispolyM. qed.
 
 lemma polyMXE p k : (p * X).[k] = p.[k-1].
@@ -416,7 +416,7 @@ proof. by move/lcDl; rewrite addrC. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyMEw M p q k : (k <= M)%Int => (p * q).[k] =
-  BCA.bigi predT (fun i => p.[i] * q.[k-i]) 0 (M+1).
+  BCA.#bigi [ i : 0, (M+1) ] (p.[i] * q.[k-i]).
 proof.
 move=> le_kM; case: (k < 0) => [lt0_k|/lerNgt ge0_k].
 + rewrite lt0_coeff // BCA.big_seq BCA.big1 //= => i.
@@ -442,14 +442,14 @@ apply: (eq_trans _ _ _ (BCA.eq_big_perm _ _ _ (range 0 (k+1)) _)).
 qed.
 
 lemma polyMEwr M p q k : (k <= M)%Int => (p * q).[k] =
-  BCA.bigi predT (fun i => p.[k-i] * q.[i]) 0 (M+1).
+  BCA.#bigi [ i : 0, (M+1) ] (p.[k-i] * q.[i]).
 proof.
 rewrite mulpC => /polyMEw ->; apply: BCA.eq_bigr.
 by move=> i _ /=; rewrite mulrC.
 qed.
 
 lemma polyMEr p q k : (p * q).[k] =
-  BCA.bigi predT (fun i => p.[k-i] * q.[i]) 0 (k+1).
+  BCA.#bigi [ i : 0, (k+1) ] (p.[k-i] * q.[i]).
 proof. by rewrite (@polyMEwr k). qed.
 
 lemma mulpA : associative ( * ).
@@ -678,8 +678,8 @@ clone include BigComRing with theory CR <- PolyComRing
   rename [theory] "BAdd" as "PCA"
          [theory] "BMul" as "PCM".
 
-lemma polysumE ['a] P F s k :
-  (PCA.big<:'a> P F s).[k] = BCA.big P (fun i => (F i).[k]) s.
+lemma polysumE ['a] P (F : 'a -> poly) s k :
+  (PCA.#big [ i : s | P i ] (F i)).[k] = BCA.#big [ i : s | P i ] ((F i).[k]).
 proof.
 elim: s => /= [|x s ih]; first by rewrite poly0E.
 rewrite !BCA.big_cons -ih PCA.big_cons /=.
@@ -687,7 +687,7 @@ by rewrite -polyDE -(fun_if (fun q => q.[k])).
 qed.
 
 lemma polyE (p : poly) :
-  p = PCA.bigi predT (fun i => p.[i] ** exp X i) 0 (deg p).
+  p = PCA.#bigi [ i : 0, (deg p) ] (p.[i] ** exp X i).
 proof.
 apply/poly_eqP=> c ge0_c; rewrite polysumE /=; case: (c < deg p).
 - move=> lt_c_dp; rewrite (BCA.bigD1 _ _ c) ?(mem_range, range_uniq) //=.
@@ -700,7 +700,7 @@ apply/poly_eqP=> c ge0_c; rewrite polysumE /=; case: (c < deg p).
 qed.
 
 lemma polywE n (p : poly) : deg p <= n =>
-  p = PCA.bigi predT (fun i => p.[i] ** exp X i) 0 n.
+  p = PCA.#bigi [ i : 0, n ] (p.[i] ** exp X i).
 proof.
 move=> le_pn; rewrite (PCA.big_cat_int (deg p)) // ?ge0_deg.
 rewrite {1}polyE; pose c := PCA.big _ _ _.
@@ -709,10 +709,10 @@ rewrite /d PCA.big_seq PCA.big1 => //= i /mem_range [gei _].
 by rewrite gedeg_coeff // scale0p.
 qed.
 
-lemma deg_sum ['a] P F r c :
+lemma deg_sum ['a] P (F : 'a -> poly) r c :
      0 <= c
   => (forall x, P x => deg (F x) <= c)
-  => deg (PCA.big<:'a> P F r) <= c.
+  => deg (PCA.#big [ i : r | P i ] (F i)) <= c.
 proof.
 move=> ge0_c le; elim: r => [|x r ih]; 1: by rewrite PCA.big_nil deg0.
 rewrite PCA.big_cons; case: (P x) => // Px.
@@ -724,7 +724,7 @@ import BigPoly.
 
 (* -------------------------------------------------------------------- *)
 op peval (p : poly) (a : coeff) =
-  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
+  BCA.#bigi [ i : 0, (deg p + 1) ] (p.[i] * exp a i).
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.

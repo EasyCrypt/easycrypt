@@ -22,8 +22,7 @@ abstract theory ListPartitioning.
           (P : partition list) &m:
     uniq P =>
     Pr[M.f(i) @ &m: E i (glob M) res]
-    = big predT (fun a =>
-                   Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) P
+    = #big [ a : P ] (Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a])
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem P (phi i (glob M) res)].
   proof.
   move=> uniq_P. rewrite Pr[mu_split (mem P (phi i (glob M) res))]; congr.
@@ -66,8 +65,7 @@ abstract theory FSetPartitioning.
           (phi : input -> (glob M) -> output -> partition)
           (P : partition fset) &m:
     Pr[M.f(i) @ &m: E i (glob M) res]
-    = big predT (fun a =>
-                   Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (elems P)
+    = #big [ a : (elems P) ] (Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a])
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem P (phi i (glob M) res)].
   proof.
   have->: Pr[M.f(i) @ &m :
@@ -99,8 +97,7 @@ abstract theory FPredPartitioning.
           (P : partition -> bool) &m:
     is_finite P =>
     Pr[M.f(i) @ &m: E i (glob M) res]
-    = big predT (fun a =>
-                   Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (to_seq P)
+    = #big [ a : (to_seq P) ] (Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a])
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !P (phi i (glob M) res)].
   proof.
   move=> /mem_to_seq H.
@@ -125,7 +122,7 @@ theory ResultPartitioning.
           (X : input -> output list)
           &m:
     Pr[M.f(i) @ &m: E i (glob M) res]
-    = big predT (fun a=> Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]) (undup (X i))
+    = #big [ a : (undup (X i)) ] (Pr[M.f(i) @ &m: E i (glob M) res /\ res = a])
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !mem (X i) res].
   proof.
   have->:Pr[M.f(i) @ &m : E i (glob M){hr} res{hr} /\ ! (res{hr} \in X i)]=
@@ -149,7 +146,7 @@ theory TotalResultPartitioning.
           &m:
     (forall i, hoare [M.f: arg = i ==> mem (X i) res]) =>
     Pr[M.f(i) @ &m: E i (glob M) res]
-    = big predT (fun a => Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]) (undup (X i)).
+    = #big [ a : (undup (X i)) ] (Pr[M.f(i) @ &m: E i (glob M) res /\ res = a]).
   proof.
   move=> support_M.
   rewrite (@result_partitioning M i E X &m).

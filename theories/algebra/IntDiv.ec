@@ -367,7 +367,7 @@ lemma modzBm m n d : (m %% d - n %% d) %% d = (m - n) %% d.
 proof. by rewrite -modzDm -modzNm !modz_mod modzNm modzDm. qed.
 
 lemma modz_prodm P F (s : 'a list) d :
-  (BIM.big P (fun i => F i %% d) s) %% d = BIM.big P F s %% d.
+  (BIM.#big [ i : s | P i ] (F i %% d)) %% d = BIM.#big [ i : s | P i ] (F i) %% d.
 proof.
 elim: s => [|x s ih]; first by rewrite !BIM.big_nil.
 rewrite !BIM.big_cons; case: (P x) => //.
@@ -1201,7 +1201,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma Euclide_prod F (s : 'a list) a :
-  a %| BIM.big predT F s => prime a =>
+  a %| BIM.#big [ i : s ] (F i) => prime a =>
     exists x, x \in s /\ a %| F x.
 proof.
 elim: s => [|x s ih]; first by rewrite BIM.big_nil; smt(dvdz_le).
@@ -1227,7 +1227,7 @@ have gt0_p: 0 < p by smt(gt1_prime).
 suff: p %| (fact (p-1) * (exp a (p-1) - 1)).
 - move/Euclide => /(_ prime_p) -[] // /Euclide_prod /(_ prime_p) /=.
   by case=> x [] /mem_range rg_x @/idfun; smt(dvdz_le).
-rewrite mulrDr mulrN1 eqz_mod_dvd -/N (_ : N = bigi predT (fun i => i * a) 1 p).
+rewrite mulrDr mulrN1 eqz_mod_dvd -/N (_ : N = #bigi [ i : 1, p ] (i * a)).
 - rewrite /N /fact /= BIM.big_split mulr_const; do 2? congr => //.
   by rewrite size_range /#.
 move=> {N}; rewrite -modz_prodm /=; do! congr.

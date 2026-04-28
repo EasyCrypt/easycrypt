@@ -344,6 +344,8 @@ module Op : sig
 
   val get_notations : head:path option -> env -> (path * notation) list
 
+  val lookup_template : env -> qsymbol -> EcDecl.nt_template_item list option
+
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 end

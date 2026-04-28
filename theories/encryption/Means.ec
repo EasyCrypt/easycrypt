@@ -45,7 +45,8 @@ lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
   => let sup = to_seq (support d) in
        Pr[Rand(A).main() @ &m: ev (fst res) (glob A) (snd res)]
      = Pr[Rand(A).main() @ &m:
-            big predT (fun v=> ev v (glob A) (snd res) /\ v = fst res) sup].
+            StdBigop.Bigbool.BBOr.#big
+              [ v : sup ] (ev v (glob A) (snd res) /\ v = fst res)].
 proof.
 move=> Fsup sup.
 byequiv (: ={glob A} ==> ={glob A, res} /\ (fst res{1}) \in d)=> //.
@@ -61,7 +62,7 @@ lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
      is_finite (support d)
   => let sup = to_seq (support d) in
        Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)]
-     = big predT (fun v, mu1 d v * Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
+     = #big [ v : sup ] (mu1 d v * Pr[A.work(v)@ &m:ev v (glob A) res]).
 proof.
 move=> Fsup /=.
 have:= introOrs A &m ev _=> //= ->.
@@ -70,10 +71,12 @@ elim: (to_seq (support d)) (uniq_to_seq (support d))=> //=
 + by rewrite big_nil; byphoare (: true ==> false).
 rewrite big_cons {2}/predT /=.
 have ->:   Pr[Rand(A).main() @ &m:
-                big predT (fun v=> ev v (glob A) res.`2 /\ v = res.`1) (v::vs)]
+                StdBigop.Bigbool.BBOr.#big
+                  [ v : (v::vs) ] (ev v (glob A) res.`2 /\ v = res.`1)]
          = Pr[Rand(A).main() @ &m:
                 (ev v (glob A) (snd res) /\ v = fst res) \/
-                big predT (fun v=> ev v (glob A) res.`2 /\ v = res.`1) vs].
+                StdBigop.Bigbool.BBOr.#big
+                  [ v : vs ] (ev v (glob A) res.`2 /\ v = res.`1)].
 + by rewrite Pr[mu_eq].
 rewrite Pr[mu_disjoint].
 + move=> /> &0; rewrite negb_and negb_and //=.
@@ -90,7 +93,7 @@ lemma Mean_uni (A <: Worker) &m (ev : input -> glob A -> output -> bool) r:
    => is_finite (support d)
    => let sup = to_seq (support d) in
         Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)]
-      = r * big predT (fun v=> Pr[A.work(v) @ &m:ev v (glob A) res]) sup.
+      = r * #big [ v : sup ] (Pr[A.work(v) @ &m:ev v (glob A) res]).
 proof.
 move=> Hd Hfin /=.
 have := Mean A &m ev => /= -> //.

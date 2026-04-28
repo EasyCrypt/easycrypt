@@ -141,35 +141,9 @@
                    (Some "cannot mark with 'declare' this kind of objects ")
 
   (* ------------------------------------------------------------------ *)
-  type prover =
-    [ `Exclude | `Include | `Only] * psymbol
-
-  type pi = [
-    | `DBHINT of pdbhint
-    | `INT    of int
-    | `PROVER of prover list
-  ]
-
-  type smt = [
-    | `ALL
-    | `ITERATE
-    | `QUORUM         of int
-    | `MAXLEMMAS      of int option
-    | `MAXPROVERS     of int
-    | `PROVER         of prover list
-    | `TIMEOUT        of int
-    | `UNWANTEDLEMMAS of EcParsetree.pdbhint
-    | `WANTEDLEMMAS   of EcParsetree.pdbhint
-    | `VERBOSE        of int option
-    | `VERSION        of [ `Full | `Lazy ]
-    | `DUMPIN         of string located
-    | `SELECTED
-    | `DEBUG
-  ]
-
   module SMT : sig
-    val mk_pi_option      : psymbol -> pi option -> smt
-    val mk_smt_option     : smt list -> pprover_infos
+    val mk_pi_option      : psymbol -> psmt_prover_info option -> psmt
+    val mk_smt_option     : psmt list -> pprover_infos
     val simple_smt_option : pprover_infos
   end = struct
     let option_matching tomatch =
@@ -243,7 +217,7 @@
           let msg = Printf.sprintf "`%s`: no option expected" (unloc s) in
           parse_error s.pl_loc (Some msg)
 
-    let mk_pi_option (s : psymbol) (o : pi option) : smt =
+    let mk_pi_option (s : psymbol) (o : psmt_prover_info option) : psmt =
       let s = option_matching s in
 
       match unloc s with
@@ -263,7 +237,7 @@
       | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
 
-    let mk_smt_option (os : smt list) =
+    let mk_smt_option (os : psmt list) =
       let mprovers = ref None in
       let timeout  = ref None in
       let pnames   = ref None in
@@ -357,6 +331,7 @@
 %token <EcSymbols.symbol> UIDENT
 %token <EcSymbols.symbol> TIDENT
 %token <EcSymbols.symbol> MIDENT
+%token <EcSymbols.symbol> NIDENT
 %token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 %token <EcSymbols.symbol> PNUMOP
@@ -372,7 +347,6 @@
 
 %token<[`Raw|`Eq]> RING
 %token<[`Raw|`Eq]> FIELD
-
 
 %token ABORT
 %token ABBREV
@@ -604,10 +578,13 @@
 %token WLOG
 %token WP
 %token ZETA
+
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 %token <Lexing.position> FINAL
 %token <EcParsetree.dockind * string> DOCCOMMENT
+
+%token <(EcSymbols.symbol * EcParsetree.pformula option) list> NTTINSTANCE
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -643,14 +620,16 @@
 
 %nonassoc prec_tactic
 
-%type <EcParsetree.global> global
-%type <EcParsetree.prog  > prog
+%type <EcParsetree.global  > global
+%type <EcParsetree.prog    > prog
+%type <EcParsetree.pformula> ntt_form
+%type <EcParsetree.pformula> ntt_sform
 
 %type <unit> is_uniop
 %type <unit> is_binop
 %type <unit> is_numop
 
-%start prog global is_uniop is_binop is_numop
+%start prog global ntt_form ntt_sform is_uniop is_binop is_numop
 %%
 
 (* -------------------------------------------------------------------- *)
@@ -691,10 +670,16 @@ _lident:
 %inline _mident:
 | x=MIDENT { x }
 
+%inline _nident:
+| x=NIDENT { x }
+
+%inline nqident: x=genqident(_nident) { x }
+
 %inline lident: x=loc(_lident) { x }
 %inline uident: x=loc(_uident) { x }
 %inline tident: x=loc(_tident) { x }
 %inline mident: x=loc(_mident) { x }
+%inline nident: x=loc(_nident) { x }
 
 %inline _ident:
 | x=_lident { x }
@@ -1137,6 +1122,9 @@ sform_u(P):
 | LBRACKET ti=tvars_app? e1=form_r(P) op=loc(DOTDOT) e2=form_r(P) RBRACKET
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) }
+
+| name=nttstart args=NTTINSTANCE
+    { PFntt { pnt_name = name; pnt_args = args } }
 
 match_body(P):
 | bs=plist0(p=mcptn(sbinop) IMPL bf=form_r(P) { (p, bf) }, PIPE)
@@ -1919,25 +1907,44 @@ nt_argty:
 
 nt_arg1:
 | x=ident
-    { (x, ([], None)) }
+    { (x, ([], None), None) }
 
 | LPAREN x=ident COLON ty=nt_argty RPAREN
-    { (x, snd_map some ty) }
+    { (x, snd_map some ty, None) }
+
+| LPAREN x=ident COLON ty=nt_argty EQ dflt=form RPAREN
+    { (x, snd_map some ty, Some dflt) }
 
 nt_bindings:
 | DASHLT bd=plist0(nt_binding1, COMMA) GT
     { bd }
 
+nt_template_item:
+| s=loc(STRING) { PNTI_Punct s }
+| x=ident       { PNTI_Slot x }
+| LPAREN items=nt_template_item+ RPAREN QUESTION
+    { PNTI_Optional items }
+
+nt_template:
+| first=loc(STRING) rest=nt_template_item*
+    { PNTI_Punct first :: rest }
+
 notation:
-| locality=loc(locality) NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings?
-    args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
-  { { nt_name  = x;
-      nt_tv    = tv;
-      nt_bd    = odfl [] bd;
-      nt_args  = args;
-      nt_codom = ofdfl (fun () -> mk_loc (loc body) PTunivar) codom;
-      nt_body  = body;
-      nt_local = locality_as_local locality; } }
+| locality=loc(locality) NOTATION name=nident
+    tv=tyvars_decl?
+    bd=nt_bindings?
+    args=nt_arg1*
+    tpl=nt_template
+    codom=prefix(COLON, loc(type_exp))?
+    EQ body=form
+  { { nt_name     = name;
+      nt_tv       = tv;
+      nt_bd       = odfl [] bd;
+      nt_args     = args;
+      nt_template = tpl;
+      nt_codom    = ofdfl (fun () -> mk_loc (loc body) PTunivar) codom;
+      nt_body     = body;
+      nt_local    = locality_as_local locality; } }
 
 abrvopt:
 | b=boption(MINUS) x=ident {
@@ -1967,6 +1974,15 @@ abbreviation:
 (* -------------------------------------------------------------------- *)
 mempred_binding:
   | TICKBRACE u=uident+ RBRACE { PT_MemPred u }
+
+nttstart: (* DO NOT MAKE THIS INLINE *)
+| nqident { $1 }
+
+ntt_form: (* DO NOT MAKE THIS INLINE *)
+| form_h error { $1 }
+
+ntt_sform: (* DO NOT MAKE THIS INLINE *)
+| sform_h error { $1 }
 
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)

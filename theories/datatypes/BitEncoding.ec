@@ -9,7 +9,7 @@ pragma +implicits.
 theory BS2Int.
 
 op bs2int (s : bool list) =
-  BIA.bigi predT (fun i => 2^i * b2i (nth false s i)) 0 (size s).
+  BIA.#bigi [ i : 0, (size s) ] (2^i * b2i (nth false s i)).
 
 op int2bs (N n : int) =
   mkseq (fun i => (n %/ 2^i) %% 2 <> 0) N.

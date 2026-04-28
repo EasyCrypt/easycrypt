@@ -130,20 +130,18 @@ proof.  rewrite eqv_sym /eqv /[-] opprK /I mem_idgen1_gen. qed.
 
 (* -------------------------------------------------------------------- *)
 op reduce (p : poly) : poly =
-  PCA.bigi predT
-    (fun i => (exp (-Coeff.oner) (i %/ n) * p.[i]) ** exp X (i %% n))
-    0 (deg p).
+  PCA.#bigi [ i : 0, (deg p) ]
+    ((exp (-Coeff.oner) (i %/ n) * p.[i]) ** exp X (i %% n)).
 
 op reduced (p : poly) = (reduce p = p).
 
 (* -------------------------------------------------------------------- *)
 lemma reducewE k (p : poly) : deg p <= k =>
-  reduce p = PCA.bigi predT
-    (fun i => (exp (-Coeff.oner) (i %/ n) * p.[i]) ** exp X (i %% n))
-    0 k.
+  reduce p = PCA.#bigi [ i : 0, k ]
+    ((exp (-Coeff.oner) (i %/ n) * p.[i]) ** exp X (i %% n)).
 proof.
 move=> len; rewrite (PCA.big_cat_int (deg p)) ?ge0_deg // /reduce.
-pose c := big _ _ _; rewrite PCA.big_seq PCA.big1 /= ?addr0 //.
+pose c := PCA.#big [ i : _ | _ ] _; rewrite PCA.big_seq PCA.big1 /= ?addr0 //.
 by move=> i /mem_range [gei _]; rewrite gedeg_coeff // mulr0 scale0p.
 qed.
 
@@ -327,7 +325,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma reduced_sum ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
-  (forall i, P i => reduced (F i)) => reduced (PCA.big P F r).
+  (forall i, P i => reduced (F i)) => reduced (PCA.#big [ i : r | P i ] (F i)).
 proof.
 move=> red; elim: r => [|x r ih]; 1: by rewrite big_nil reduced0.
 by rewrite big_cons; case: (P x) => // Px; rewrite reducedD // &(red).
@@ -335,7 +333,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma rcoeff_sum ['a] (P : 'a -> bool) (F : 'a -> polyXnD1) (r : 'a list) k :
-  (XnD1CA.big P F r).[k] = BCA.big P (fun i => (F i).[k]) r.
+  (XnD1CA.#big [ i : r | P i ] (F i)).[k] = BCA.#big [ i : r | P i ] ((F i).[k]).
 proof.
 elim: r => [|x r ih].
 - by rewrite XnD1CA.big_nil BCA.big_nil rcoeff0.
@@ -345,7 +343,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyXnD1_sumN ['a] (P : 'a -> bool) (F : 'a -> polyXnD1) (r : 'a list) :
-  - (XnD1CA.big P F r) = (XnD1CA.big P (fun i => - (F i)) r).
+  - (XnD1CA.#big [ i : r | P i ] (F i)) = (XnD1CA.#big [ i : r | P i ] (- (F i))).
 proof.
 rewrite XnD1CA.big_endo //.
 + by rewrite ComRingDflInv.oppr0.
@@ -384,9 +382,9 @@ move => rng_i; rewrite eq_expiXn_expXn 1:rng_i piK 1:reducedXn 2:polyXnE //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma rcoeffZ_sum (F : int -> coeff) (k : int) : 
+lemma rcoeffZ_sum (F : int -> coeff) (k : int) :
   0 <= k < n =>
-  (XnD1CA.bigi predT (fun i => (F i) ** ComRingDflInv.exp iX i) 0 n).[k] = F k.
+  (XnD1CA.#bigi [ i : 0, n ] ((F i) ** ComRingDflInv.exp iX i)).[k] = F k.
 proof.
 move => rng_k; rewrite rcoeff_sum (BCA.bigD1 _ _ k) /=.
 + by rewrite mem_range.
@@ -398,15 +396,15 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma rcoeffM (p q : polyXnD1) k : 0 <= k < n => (p * q).[k] =
-    BCA.bigi predT (fun i =>
-       p.[i] * q.[k - i] - p.[i] * q.[n + k - i]) 0 n.
+    BCA.#bigi [ i : 0, n ]
+       (p.[i] * q.[k - i] - p.[i] * q.[n + k - i]).
 proof.
 case=> ge0_k le_kn; elim/polyXnD1W: p => p rdp; elim/polyXnD1W: q => q rdq.
 rewrite mulE {1}/crepr; pose r := reduce _; have ->: r = reduce (p * q).
 - by apply/reduce_eqP/eqv_repr.
 rewrite (polywE n (reduce (p * q))) 1:&(deg_reduce).
 rewrite (PCA.bigD1 _ _ k) ?(mem_range, range_uniq) /= 1:/#.
-rewrite polyDE; pose c := (bigi _ _ _ _); have ->: c.[k] = Coeff.zeror.
+rewrite polyDE; pose c := (PCA.#bigi [ i : _, _ | _ ] _); have ->: c.[k] = Coeff.zeror.
 - rewrite /c polysumE BCA.big_seq_cond BCA.big1 ?addr0 //=.
   move=> i [/mem_range [ge0_i lt_in] @/predC1 ne_ik].
   by rewrite polyZE polyXnE // (eq_sym k i) ne_ik /= mulr0.

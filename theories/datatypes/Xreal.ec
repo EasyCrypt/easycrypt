@@ -645,9 +645,9 @@ clone import Bigop as BXA with
   op Support.(+) <- Rpbar.xadd,
   theory Support.Axioms <- Rpbar.Axioms.
 
-lemma is_real_bigRX ['a] (f : 'a -> xreal) l: 
-  is_real f => 
-  (BRA.big predT (to_real f) l)%xr = big predT f l.
+lemma is_real_bigRX ['a] (f : 'a -> xreal) l:
+  is_real f =>
+  (BRA.#big [ x : l ] (to_real f x))%xr = #big [ x : l ] (f x).
 proof.
   move=> hf; elim: l => //= x l hrec.
   rewrite big_cons BRA.big_cons /predT /= -hrec /to_real.
@@ -655,36 +655,36 @@ proof.
   by rewrite of_realD // sumr_ge0 /= => a; apply to_realP.
 qed.
 
-lemma bigR_to_real ['a] (f : 'a -> real) (l : 'a list) : 
+lemma bigR_to_real ['a] (f : 'a -> real) (l : 'a list) :
   (forall a, a \in l => 0%r <= f a) =>
-   BRA.big predT (to_real (fun a => (f a)%xr)) l = BRA.big predT f l.
+   BRA.#big [ a : l ] (to_real (fun a => (f a)%xr) a) = BRA.#big [ a : l ] (f a).
 proof.
   move=> hpos; apply BRA.eq_big_seq; rewrite /to_real => x /hpos; smt(@Rp).
 qed.
 
-lemma bigXR ['a] (f : 'a -> real) (l : 'a list) : 
+lemma bigXR ['a] (f : 'a -> real) (l : 'a list) :
   (forall a, a \in l => 0%r <= f a) =>
-  big predT (fun x => (f x)%xr) l = (BRA.big predT f l)%xr.
+  #big [ x : l ] ((f x)%xr) = (BRA.#big [ x : l ] (f x))%xr.
 proof. by move=> hpos; rewrite -is_real_bigRX 1:// bigR_to_real. qed.
 
-lemma bigXI ['a] (f : 'a -> int) (l : 'a list) : 
+lemma bigXI ['a] (f : 'a -> int) (l : 'a list) :
   (forall a, a \in l => 0 <= f a) =>
-  big predT (fun x => (f x)%xr) l = (BIA.big predT f l)%xr.
+  #big [ x : l ] ((f x)%xr) = (BIA.#big [ x : l ] (f x))%xr.
 proof. by move=> h; rewrite bigXR 1:/# sumr_ofint. qed.
 
-lemma bigiXR (f : int -> real) (m n : int) : 
+lemma bigiXR (f : int -> real) (m n : int) :
   (forall i, m <= i < n => 0%r <= f i) =>
-  bigi predT (fun x => (f x)%xr) m n = (BRA.bigi predT f m n)%xr.
+  #bigi [ x : m, n ] ((f x)%xr) = (BRA.#bigi [ x : m, n ] (f x))%xr.
 proof. move=> hpos; apply bigXR => i /mem_range; apply hpos. qed.
 
-lemma bigiXI (f : int -> int) (m n : int) : 
+lemma bigiXI (f : int -> int) (m n : int) :
   (forall i, m <= i < n => 0 <= f i) =>
-  bigi predT (fun x => (f x)%xr) m n = (BIA.bigi predT f m n)%xr.
+  #bigi [ x : m, n ] ((f x)%xr) = (BIA.#bigi [ x : m, n ] (f x))%xr.
 proof. move=> hpos; apply bigXI => i /mem_range; apply hpos. qed.
 
-lemma big_oo ['a] (J : 'a list) (f : 'a -> xreal) : 
-  (exists (x : 'a), (x \in J) /\ f x = oo) => 
-  big predT f J = oo.
+lemma big_oo ['a] (J : 'a list) (f : 'a -> xreal) :
+  (exists (x : 'a), (x \in J) /\ f x = oo) =>
+  #big [ x : J ] (f x) = oo.
 proof.
   move=> [x [hj hf]]; rewrite (bigID _ _ (pred1 x)) -big_filter predTI filter_pred1.
   have [n [hn ->]]: exists n, 0 <= n /\ count (pred1 x) J = n + 1.
@@ -692,8 +692,8 @@ proof.
   by rewrite nseqS // big_cons /predT hf.
 qed.
 
-lemma mulr_sumr ['a] (P : 'a -> bool) (F : 'a -> xreal) (s : 'a list) (x : realp) : 
-  x ** (big P F s) = (big P (fun (i : 'a) => x ** F i) s).
+lemma mulr_sumr ['a] (P : 'a -> bool) (F : 'a -> xreal) (s : 'a list) (x : realp) :
+  x ** (#big [ i : s | P i ] (F i)) = (#big [ i : s | P i ] (x ** F i)).
 proof. apply (big_comp (fun y => x ** y)) => //=; apply smulmDr. qed.
 
 
@@ -820,10 +820,10 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma Ep_fin ['a] J (d : 'a distr) f : 
-  uniq J => 
+lemma Ep_fin ['a] J (d : 'a distr) f :
+  uniq J =>
   (forall (x : 'a), mu1 d x <> 0%r => x \in J) =>
-  Ep d f = big predT (d ** f) J.
+  Ep d f = #big [ x : J ] ((d ** f) x).
 proof.
   move=> hu hJ; rewrite /Ep /=.
   case: (is_real (d ** f)) => his.
@@ -950,7 +950,7 @@ proof. rewrite /dmap Ep_dlet; apply eq_Ep => x _ /=; apply Ep_dunit. qed.
 (* -------------------------------------------------------------------- *)
 lemma Ep_duniform ['a] (s : 'a list) (f : 'a -> xreal) :
   Ep (duniform s) f =
-    of_reald (1%r / (size ((undup s)))%r) ** big predT f (undup s).
+    of_reald (1%r / (size ((undup s)))%r) ** #big [ x : (undup s) ] (f x).
 proof.
   rewrite (Ep_fin (undup s)) 1:undup_uniq.
   + move=> x hx; rewrite mem_undup -supp_duniform; smt(ge0_mu).
@@ -975,9 +975,9 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma Ep_dinterval (f : int -> xreal) i j:
-  Ep [i..j] f = 
-    (if i <= j then 1%r / (j - i + 1)%r else 0%r) ** 
-       big predT f (range i (j + 1)).
+  Ep [i..j] f =
+    (if i <= j then 1%r / (j - i + 1)%r else 0%r) **
+       #big [ x : (range i (j + 1)) ] (f x).
 proof.
   rewrite (Ep_fin (range i (j + 1))) 1:range_uniq. 
   + by move=> x; have := supp_dinter i j x; rewrite mem_range; smt (ge0_mu).
@@ -986,8 +986,8 @@ proof.
 qed.
 
 lemma Ep_dinterval_le (f : int -> xreal) (i j : int) :
-  i <= j => 
-  Ep [i..j] f = (1%r / (j - i + 1)%r) ** big predT f (range i (j + 1)).
+  i <= j =>
+  Ep [i..j] f = (1%r / (j - i + 1)%r) ** #big [ x : (range i (j + 1)) ] (f x).
 proof. by move=> h; rewrite Ep_dinterval h. qed.
 
 (* -------------------------------------------------------------------- *)

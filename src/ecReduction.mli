@@ -60,6 +60,9 @@ end
 val can_eta : ident -> form * form list -> bool
 
 (* -------------------------------------------------------------------- *)
+val eta_norm : form -> form
+
+(* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
   delta_p : (path  -> deltap); (* reduce operators *)

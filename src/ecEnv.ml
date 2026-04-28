@@ -2673,6 +2673,14 @@ module Op = struct
         env_ntbase = update_ntbase (root env) (name, op) env.env_ntbase;
         env_item = mkitem ~import (Th_operator (name, op)) :: env.env_item; }
 
+  let lookup_template (env : env) (qs : qsymbol)
+    : EcDecl.nt_template_item list option
+  =
+    match lookup_opt qs env with
+    | Some (_, { op_kind = EcDecl.OB_nott { ont_template = Some t; _ }; _ }) ->
+        Some t.EcDecl.nt_items
+    | _ -> None
+
   let rebind name op env =
     MC.bind_operator name op env
 
@@ -3000,7 +3008,6 @@ module Theory = struct
 
     in bind_base_th for1
 
-  (* ------------------------------------------------------------------ *)
   let bind_rd_th =
     let for1 _path db = function
       | Th_reduction rules ->

@@ -30,16 +30,16 @@ module type HYBRID = {
 lemma hybrid_gen (n : int) (p : int -> real) (M <: HYBRID) &m :
   1 <= n =>
   (forall (i : int),
-   1 <= i < n => 
+   1 <= i < n =>
    `|Pr[M.main(i) @ &m : res] - Pr[M.main(i + 1) @ &m : res]| <= p i) =>
   `|Pr[M.main(1) @ &m : res] - Pr[M.main(n) @ &m : res]| <=
-  bigi predT p 1 n.
+  #bigi [ i : 1, n ] (p i).
 proof.
 move => ge1_n step.
 have ind :
   forall (i : int),
   0 <= i => 1 <= i <= n =>
-  `|Pr[M.main(1) @ &m : res] - Pr[M.main(i) @ &m : res]| <= bigi predT p 1 i.
+  `|Pr[M.main(1) @ &m : res] - Pr[M.main(i) @ &m : res]| <= #bigi [ j : 1, i ] (p j).
   elim => [// | i ge0_i IH [_ i_plus1_le_n]].
   case (i = 0) => [-> /= |].
   by rewrite ger0_norm // big_geq.

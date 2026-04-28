@@ -260,9 +260,9 @@ module type Distinguisher = {
   proc guess (x : in_t) : out_t
 }.
 
-lemma uniq_big_res (A <: Distinguisher) &m x' (bs : out_t list) : 
+lemma uniq_big_res (A <: Distinguisher) &m x' (bs : out_t list) :
   uniq bs =>
-  big predT (fun b => Pr[A.guess(x') @ &m : res = b]) bs = 
+  #big [ b : bs ] (Pr[A.guess(x') @ &m : res = b]) =
   Pr[A.guess(x') @ &m : res \in bs].
 proof.
 elim: bs => [_|b bs IHbs /= [bNbs uq_bs]].

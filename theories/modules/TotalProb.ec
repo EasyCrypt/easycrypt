@@ -98,9 +98,7 @@ qed.
 lemma total_prob' (supp : t list) (dt' : t distr) (i' : input) &m :
   is_finite_for (support dt') supp =>
   Pr[Rand(M).f(dt', i') @ &m : res] =
-  big predT
-  (fun x' => mu1 dt' x' * Pr[M.main(i', x') @ &m : res])
-  supp.
+  #big [ x' : supp ] (mu1 dt' x' * Pr[M.main(i', x') @ &m : res]).
 proof.
 move => [uniq_supp supp_iff]. 
 have ->:
@@ -129,9 +127,7 @@ end section.
 lemma total_prob (M <: T) (supp : t list) (dt : t distr) (i : input) &m :
   is_finite_for (support dt) supp =>
   Pr[Rand(M).f(dt, i) @ &m : res] =
-  big predT
-  (fun (x : t) => mu1 dt x * Pr[M.main(i, x) @ &m : res])
-  supp.
+  #big [ x : supp ] (mu1 dt x * Pr[M.main(i, x) @ &m : res]).
 proof. exact: (total_prob' M). qed.
 
 end TotalGeneral.
@@ -171,9 +167,7 @@ proof *.
 lemma total_prob_drange (M <: T) (m n : int) (i : input) &m :
   m < n =>
   Pr[Rand(M).f(drange m n, i) @ &m : res] =
-  bigi predT
-  (fun (j : int) => Pr[M.main(i, j) @ &m : res] / (n - m)%r)
-  m n.
+  #bigi [ j : m, n ] (Pr[M.main(i, j) @ &m : res] / (n - m)%r).
 proof.
 move => lt_m_n; rewrite (total_prob M (range m n)).
 + by rewrite /is_finite_for; smt(range_uniq mem_range supp_drange).
@@ -199,9 +193,7 @@ proof *.
 lemma total_prob_uniform (M <: T) (xs : t list) (i : input) &m :
   uniq xs => xs <> [] =>
   Pr[Rand(M).f(duniform xs, i) @ &m : res] =
-  big predT
-  (fun (x : t) => Pr[M.main(i, x) @ &m : res] / (size xs)%r)
-  xs.
+  #big [ x : xs ] (Pr[M.main(i, x) @ &m : res] / (size xs)%r).
 proof.
 move => uniq_xs xs_ne_nil; rewrite (total_prob M xs).
 + smt(supp_duniform).

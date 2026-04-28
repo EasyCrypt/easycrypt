@@ -1711,7 +1711,8 @@ module Notations = struct
   module TT  = EcTyping
 
   let add (scope : scope) (nt : pnotation located) =
-    EcHiNotations.trans_notation (env scope) nt; scope
+    let op = EcHiNotations.trans_notation (env scope) nt in
+    Op.bind scope op
 
   let add_abbrev (scope : scope) (ab : pabbrev located) =
     let op = EcHiNotations.trans_abbrev (env scope) ab in

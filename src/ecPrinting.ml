@@ -1566,6 +1566,45 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form) (opprec : 
   l_l f opprec
 
 (* -------------------------------------------------------------------- *)
+(* Count operator applications in a formula. Used as a "specificity"
+   metric for [match_pp_notations]: a notation body with more [Fop]
+   nodes has more structural constraints and therefore matches fewer
+   forms, so it is a more precise fit when several notations cover
+   the same form. *)
+let rec count_ops (f : form) : int =
+  match f.f_node with
+  | Fop _       -> 1
+  | Fapp (h, a) ->
+    List.fold_left (fun acc g -> acc + count_ops g) (count_ops h) a
+  | Fquant (_, _, b) -> count_ops b
+  | Ftuple fs   -> List.fold_left (fun acc g -> acc + count_ops g) 0 fs
+  | Fif (c, t, e) -> count_ops c + count_ops t + count_ops e
+  | Flet (_, a, b) -> count_ops a + count_ops b
+  | Fproj (a, _)   -> count_ops a
+  | Fmatch (f, bs, _) ->
+    List.fold_left (fun acc g -> acc + count_ops g) (count_ops f) bs
+  | _ -> 0
+
+(* -------------------------------------------------------------------- *)
+(* Sort key picking the most specific notation match among successes.
+   Primary: [-body_ops] so more structural constraints win (e.g.
+   `#big` body `big predT F r` beats `#bigP` body `big P F r` when
+   `P = predT`). Secondary: fewer [ont_args] (more baked-in structure,
+   fewer metavars). *)
+let notation_specificity
+    (((_, (_, nt)), _, _, _, _) :
+       (EcPath.path * (EcDecl.ty_params * EcDecl.notation))
+       * EcUnify.unienv
+       * EcMatching.mevmap
+       * EcTypes.ty EcIdent.Mid.t
+       * form list)
+  : int * int
+=
+  let body_ops = count_ops (EcCoreFol.form_of_expr nt.ont_body) in
+  let nargs    = List.length nt.ont_args in
+  (- body_ops, nargs)
+
+(* -------------------------------------------------------------------- *)
 let rec pp_lvalue (ppe : PPEnv.t) fmt lv =
   match lv with
   | LvVar (p, _) ->
@@ -1791,6 +1830,62 @@ and try_pp_lossless
             in
               maybe_paren outer prio pp fmt (); true
 
+and resolve_binder_slots_from_forms
+    (nt : EcDecl.notation)
+    (ev : EcMatching.mevmap)
+  : EcMatching.mevmap
+=
+  let find_pos (name : EcSymbols.symbol) (xs : EcSymbols.symbol list) =
+    let rec aux i = function
+      | [] -> None
+      | x :: _ when EcSymbols.sym_equal x name -> Some i
+      | _ :: rest -> aux (i + 1) rest
+    in aux 0 xs in
+
+  let try_recover_from_form template slot_meta iname ity ev =
+    let try_one item =
+      match item with
+      | EcDecl.NTI_Slot (fname, EcDecl.NTS_Form deps) ->
+        (match find_pos iname deps with
+         | None -> None
+         | Some pos ->
+           let (fid, _) = EcSymbols.Msym.find fname slot_meta in
+           (match EcMatching.MEV.get fid `Form ev with
+            | Some (`Set (`Form fv)) ->
+              (try
+                 let bd, _body =
+                   EcCoreFol.destr_lambda ~bound:(pos + 1) fv in
+                 (match List.nth_opt bd pos with
+                  | Some (b_id, _gty) -> Some (EcCoreFol.f_local b_id ity)
+                  | None -> None)
+               with EcCoreFol.DestrError _ -> None)
+            | _ -> None))
+      | _ -> None
+    in
+    List.opick try_one template
+  in
+
+  match nt.ont_template with
+  | None -> ev
+  | Some template ->
+    let items = template.EcDecl.nt_items in
+    let slot_meta =
+      List.fold_left (fun m (id, ty) ->
+        EcSymbols.Msym.add (EcIdent.name id) (id, ty) m)
+        EcSymbols.Msym.empty nt.ont_args in
+    List.fold_left (fun ev item ->
+      match item with
+      | EcDecl.NTI_Slot (iname, EcDecl.NTS_Ident) ->
+        let (iid, ity) = EcSymbols.Msym.find iname slot_meta in
+        if EcMatching.MEV.isset iid `Form ev then ev
+        else begin
+          match try_recover_from_form items slot_meta iname ity ev with
+          | Some v -> EcMatching.MEV.set iid (`Form v) ev
+          | None -> ev
+        end
+      | _ -> ev
+    ) ev items
+
 and match_pp_notations
   ?(filter : (_ -> bool) = predT)
    (ppe   : PPEnv.t)
@@ -1825,6 +1920,8 @@ and match_pp_notations
           EcMatching.f_match_core fmnotation hy (ue, ev) bd f
         in
 
+        let ev = resolve_binder_slots_from_forms nt ev in
+
         if not (EcMatching.can_concretize ev ue) then
           raise EcMatching.MatchFailure;
 
@@ -1845,8 +1942,110 @@ and match_pp_notations
   in
 
   let nts = EcEnv.Op.get_notations ~head ppe.PPEnv.ppe_env in
+  let successes = List.filter_map try_notation nts in
+  let sorted =
+    List.stable_sort (fun a b ->
+      compare (notation_specificity a) (notation_specificity b))
+      successes in
+  List.ohead sorted
 
-  List.find_map_opt try_notation nts
+and pp_nt_punct (fmt : Format.formatter) (p : EcDecl.nt_punct) : unit =
+  Format.pp_print_string fmt p.EcDecl.np_display
+
+and pp_nt_template_slot
+  (ppe        : PPEnv.t)
+  (fmt        : Format.formatter)
+  (slot_args  : form EcSymbols.Msym.t)
+  (arg        : form)
+  (kind       : EcDecl.nt_slot_kind)
+  : unit
+=
+  match kind with
+  | EcDecl.NTS_Ident ->
+    (match arg.f_node with
+     | Flocal id ->
+       Format.fprintf fmt "%a" (pp_local ppe) id
+     | _ ->
+       (* Non-local arg in an ident slot — shouldn't happen for well-formed
+          notation applications; fall back to generic form printing. *)
+       pp_form ppe fmt arg)
+
+  | EcDecl.NTS_Form [] ->
+    pp_form ppe fmt arg
+
+  | EcDecl.NTS_Form deps ->
+    let dep_count = List.length deps in
+    let bd, body =
+      EcCoreFol.decompose_lambda ~bound:dep_count arg in
+    if List.length bd = dep_count then
+      (* The matched arg is a lambda of the right arity; peel those
+         binders and print the body in their scope. *)
+      let ids = List.map fst bd in
+      let ppe = PPEnv.add_locals ppe ids in
+      pp_form ppe fmt body
+    else
+      (* The matched arg is not (fully) a lambda — eta-expand by
+         applying it to the user-chosen binder idents. *)
+      let dep_refs =
+        List.map (fun dep -> EcSymbols.Msym.find dep slot_args) deps in
+      let rec strip n t =
+        if n = 0 then t
+        else match t.EcAst.ty_node with
+          | EcAst.Tfun (_, t') -> strip (n - 1) t'
+          | _ -> t in
+      let applied =
+        EcCoreFol.f_app arg dep_refs (strip dep_count arg.f_ty) in
+      pp_form ppe fmt applied
+
+and try_pp_template
+  (ppe   : PPEnv.t)
+  (fmt   : Format.formatter)
+  (name  : string)
+  (nt    : EcDecl.notation)
+  (ov    : ty Mid.t)
+  (args  : form list)
+  : bool
+=
+  match nt.ont_template with
+  | None -> false
+  | Some template ->
+    (* Map slot name -> (arg, decl-time ident) via ont_args order. *)
+    let slot_info =
+      List.fold_left2 (fun m (id, _) a ->
+        EcSymbols.Msym.add (EcIdent.name id) (id, a) m)
+        EcSymbols.Msym.empty nt.ont_args args in
+    let slot_args = EcSymbols.Msym.map snd slot_info in
+    (* Is an optional group all-default? Walk its slots and compare each
+       matched form against its stored default (after substituting the
+       opened type variables of this call site). *)
+    let rec all_defaulted items =
+      List.for_all (function
+        | EcDecl.NTI_Punct _       -> true
+        | EcDecl.NTI_Optional subs -> all_defaulted subs
+
+        | EcDecl.NTI_Slot (sname, _) ->
+          match EcSymbols.Msym.find_opt sname slot_info with
+          | None -> false
+          | Some (slot_id, arg) ->
+            (match EcIdent.Mid.find_opt slot_id template.EcDecl.nt_defaults with
+             | None -> false
+             | Some dflt ->
+               let dflt_f =
+                 Fsubst.f_subst_tvar ~freshen:true ov
+                   (EcCoreFol.form_of_expr dflt) in
+               EcCoreFol.f_equal arg dflt_f)) items in
+    Format.fprintf fmt "%s " name;
+    let rec render items =
+      List.iter (function
+        | EcDecl.NTI_Punct p -> pp_nt_punct fmt p
+        | EcDecl.NTI_Slot (sname, kind) ->
+          let arg = EcSymbols.Msym.find sname slot_args in
+          pp_nt_template_slot ppe fmt slot_args arg kind
+        | EcDecl.NTI_Optional subs ->
+          if not (all_defaulted subs) then render subs
+      ) items
+    in render template.EcDecl.nt_items;
+    true
 
 and try_pp_notations
   (ppe   : PPEnv.t)
@@ -1866,8 +2065,15 @@ and try_pp_notations
     let args =
       let subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
       List.map (Fsubst.f_subst subst) args in
-    let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
-    pp_form_core_r ppe outer fmt f; true
+    (* If the matched notation has a template and there are no extra args,
+       print with the template layout. *)
+    if eargs = [] && Option.is_some nt.ont_template then begin
+      let name = EcPath.basename p in
+      let _ = try_pp_template ppe fmt name nt ov args in true
+    end else begin
+      let f = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
+      pp_form_core_r ppe outer fmt f; true
+    end
 
 and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
   let pp_branch fmt (e, f) =

@@ -62,7 +62,7 @@ op mk : ('a -> real) -> 'a distr.
 inductive isdistr (m : 'a -> real) =
 | Distr of
        (forall x, 0%r <= m x)
-     & (forall s, uniq s => big predT m s <= 1%r).
+     & (forall s, uniq s => #big [ x : s ] (m x) <= 1%r).
 
 lemma eq_isdistr (d1 d2 : 'a -> real) :
   d1 == d2 => isdistr d1 = isdistr d2.
@@ -75,7 +75,7 @@ lemma le1_isdistr (d : 'a -> real) x : isdistr d => d x <= 1%r.
 proof. by case=> _ /(_ [x] _) //; rewrite big_seq1. qed.
 
 lemma le1_sum_isdistr (d : 'a -> real) s :
-  isdistr d => uniq s => big predT d s <= 1%r.
+  isdistr d => uniq s => #big [ x : s ] (d x) <= 1%r.
 proof. by case=> _; apply. qed.
 
 axiom distrW (P : 'a distr -> bool):
@@ -105,7 +105,7 @@ qed.
 hint exact : ge0_mu1.
 
 lemma le1_mu1_fin ['a] (d : 'a distr) (s : 'a list) :
-  uniq s => big predT (mu1 d) s <= 1%r.
+  uniq s => #big [ x : s ] (mu1 d x) <= 1%r.
 proof. by elim/distrW: d => m dm; rewrite muK' //; apply le1_sum_isdistr. qed.
 
 lemma le1_mu1 ['a] (d : 'a distr) x : mu1 d x <= 1%r.
@@ -153,7 +153,7 @@ qed.
 lemma le1_mu (d : 'a distr) p : mu d p <= 1%r.
 proof.
 rewrite muE &(lerfin_sum) 1:&(summable_mu1_cond) => J uqJ.
-apply: (@ler_trans (big predT (mu1 d) J)).
+apply: (@ler_trans (#big [ a : J ] (mu1 d a))).
 + by apply: ler_sum => /= a _; case: (p a).
 + by apply: le1_mu1_fin.
 qed.
@@ -178,7 +178,7 @@ lemma isdistr_finP (s : 'a list) (m : 'a -> real) :
      uniq s
   => (forall x, m x <> 0%r => mem s x)
   => (forall x, 0%r <= m x)
-  => (isdistr m <=> (big predT m s <= 1%r)).
+  => (isdistr m <=> (#big [ x : s ] (m x) <= 1%r)).
 proof.
 move=> uq_s fin ge0_m; split=> [[_ /(_ s uq_s)]|le1_m] //.
 split=> // s' uq_s'; rewrite (@bigID _ _ (mem s)) addrC big1 /=.
@@ -424,7 +424,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 
 lemma mu_has_le ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) :
-   mu d (fun a => has (P a) s) <= BRA.big predT (fun b => mu d (fun a => P a b)) s.
+   mu d (fun a => has (P a) s) <= BRA.#big [ b : s ] (mu d (fun a => P a b)).
 proof.
 elim: s => [|x s ih]; first by rewrite big_nil mu0.
 rewrite big_cons {1}/predT /= mu_or.
@@ -437,14 +437,14 @@ lemma mu_has_leM ['a 'b] (P : 'a -> 'b -> bool) (d : 'a distr) (s : 'b list) r :
   (forall b, b \in s => mu d (fun a => P a b) <= r) =>
   mu d (fun a => has (P a) s) <= (size s)%r * r.
 proof.
-move=> le; apply/(ler_trans (big predT (fun x => r) s)).
+move=> le; apply/(ler_trans (#big [ _ : s ] r)).
 + by have /ler_trans := mu_has_le P d s; apply; apply/ler_sum_seq => ? /le.
 by rewrite Bigreal.sumr_const count_predT.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mu_mem_uniq ['a] (d : 'a distr) (s : 'a list) :
-  uniq s => mu d (mem s) = BRA.big predT (mu1 d) s.
+  uniq s => mu d (mem s) = BRA.#big [ x : s ] (mu1 d x).
 proof.
 elim: s => [_|x s ih [xs uq_s]]; first by rewrite big_nil mu0.
 rewrite big_cons {1}/predT /= -ih // -mu_disjointL => [y ->//|].
@@ -452,14 +452,14 @@ by apply/mu_eq=> y.
 qed.
 
 lemma mu_mem ['a] (d : 'a distr) (s : 'a list) :
-  mu d (mem s) = BRA.big predT (mu1 d) (undup s).
+  mu d (mem s) = BRA.#big [ x : (undup s) ] (mu1 d x).
 proof.
 rewrite -mu_mem_uniq ?undup_uniq; apply/mu_eq.
 by move=> x; rewrite mem_undup.
 qed.
 
 lemma mu_mem_le ['a] (d : 'a distr) (s : 'a list) :
-  mu d (mem s) <= BRA.big predT (mu1 d) s.
+  mu d (mem s) <= BRA.#big [ x : s ] (mu1 d x).
 proof.
 rewrite sumr_undup mu_mem; apply/ler_sum_seq => //= x.
 rewrite mem_undup => x_in_s _; rewrite intmulr.
@@ -470,13 +470,13 @@ qed.
 lemma mu_mem_le_mu1 ['a] (d : 'a distr) (s : 'a list) r :
   (forall x, mu1 d x <= r) => mu d (mem s) <= (size s)%r * r.
 proof.
-move=> le; apply/(ler_trans (big predT (fun (x : 'a) => r) s)).
+move=> le; apply/(ler_trans (#big [ _ : s ] r)).
 + by have := mu_mem_le d s => /ler_trans; apply; apply/ler_sum.
 by rewrite Bigreal.sumr_const count_predT.
 qed.
 
 lemma fin_muE (d : 'a distr) (E : 'a -> bool) : is_finite (support d) =>
-  mu d E = big E (mu1 d) (to_seq (support d)).
+  mu d E = #big [ x : (to_seq (support d)) | E x ] (mu1 d x).
 proof.
 move => fin_d.
 rewrite (@mu_eq_support d _ (mem (filter E (to_seq (support d))))).
@@ -495,7 +495,7 @@ move => nFE; have := NfiniteP (ceil (inv eps) + 1) E _ nFE; 1: smt(ceil_ge).
 case => L /> size_L L_uniq sub_L_E.
 apply (ltr_le_trans (mu d (mem L))); last by apply mu_le => /#.
 rewrite mu_mem_uniq //.
-apply (ltr_le_trans (big predT (fun (x : 'a) => eps) L));
+apply (ltr_le_trans (#big [ _ : L ] eps));
   last by apply ler_sum_seq.
 rewrite sumr_const count_predT intmulr.
 apply (ltr_le_trans (eps * (ceil (inv eps) + 1)%r)); last smt().
@@ -1776,9 +1776,9 @@ rewrite (@partition_big ofst _ predT _ _ (undup (unzip1 s))).
 + by case=> a b ab_in_s _; rewrite mem_undup map_f.
 pose P := fun x ab => ofst<:'a, 'b> ab = x.
 pose F := fun (ab : 'a * 'b) => mb ab.`2.
-rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x _|].
+rewrite -(@eq_bigr _ (fun x => ma x * #big [ ab : s | P x ab ] (F ab))) => /= [x _|].
 + by rewrite mulr_sumr; apply/eq_bigr=> -[a b] /= @/P <-.
-pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
+pose s' := undup _; apply/(@ler_trans (#big [ x : s' ] (ma x))).
 + apply/ler_sum=> a _ /=; apply/ler_pimulr; first by apply/ge0_isdistr.
   rewrite -big_filter -(@big_map snd predT) le1_sum_isdistr //.
   rewrite map_inj_in_uniq ?filter_uniq //; case=> [a1 b1] [a2 b2].
@@ -2089,7 +2089,7 @@ hint rewrite djoinE : djoin_nil djoin_cons.
 
 lemma djoin1E (ds : 'a distr list) xs: mu1 (djoin ds) xs =
   if   size ds = size xs
-  then BRM.big predT (fun xy : _ * _ => mu1 xy.`1 xy.`2) (zip ds xs)
+  then BRM.#big [ xy : (zip ds xs) ] (mu1 xy.`1 xy.`2)
   else 0%r.
 proof.
 elim: ds xs => [|d ds ih] xs /=; 1: rewrite djoin_nil dunitE.
@@ -2175,7 +2175,7 @@ by move=> z @/(\o) /=; rewrite cats1.
 qed.
 
 lemma weight_djoin (ds : 'a distr list) :
-  weight (djoin ds) = BRM.big predT weight ds.
+  weight (djoin ds) = BRM.#big [ d : ds ] (weight d).
 proof.
 elim: ds => [|d ds ih]; rewrite djoinE /=.
 + by rewrite dunit_ll BRM.big_nil.
@@ -2323,7 +2323,7 @@ type t.
 clone FinType as FinT with type t <- t.
 
 op mfun ['u] (d : t -> 'u distr) (f : t -> 'u) =
-  BRM.big predT (fun x => mu1 (d x) (f x)) FinT.enum.
+  BRM.#big [ x : FinT.enum ] (mu1 (d x) (f x)).
 
 lemma mfunE ['u] (d : t -> 'u distr) (f : t -> 'u) :
   mfun d f = mu1 (djoin (map d FinT.enum)) (map f FinT.enum).
@@ -2350,7 +2350,7 @@ qed.
 op dfun ['u] (d : t -> 'u distr) = mk (mfun d).
 
 lemma dfun1E ['u] (d : t -> 'u distr) f :
-  mu1 (dfun d) f = BRM.big predT (fun x => mu1 (d x) (f x)) FinT.enum.
+  mu1 (dfun d) f = BRM.#big [ x : FinT.enum ] (mu1 (d x) (f x)).
 proof.
 by rewrite muK 1:isdistr_dfun &(BRM.eq_bigr).
 qed.
@@ -2435,7 +2435,7 @@ qed.
 
 lemma dfunE ['u] du (p : t -> 'u -> bool) :
     mu (dfun du) (fun (f : t -> 'u) => forall x, p x (f x))
-  = BRM.big predT (fun x => mu (du x) (p x)) FinT.enum.
+  = BRM.#big [ x : FinT.enum ] (mu (du x) (p x)).
 proof.
 pose P f := all (fun x => p x (f x)) FinT.enum.
 rewrite -(@mu_eq _ P) => [f|] @/P; first rewrite allP /=.
@@ -2456,7 +2456,7 @@ by rewrite (@djoin_consE _ _ _ (p x) (P xs)) ih.
 qed.
 
 lemma weight_dfun ['u] (df : t -> 'u distr) :
-  weight (dfun df) = BRM.big predT (fun x => weight (df x)) FinT.enum.
+  weight (dfun df) = BRM.#big [ x : FinT.enum ] (weight (df x)).
 proof. by have /= -> := dfunE df (fun _ _ => true). qed.
 
 lemma dfun_ll ['u] (d : t -> 'u distr) :
@@ -3106,7 +3106,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma exp_duniform ['a] (s : 'a list) f :
-  E (duniform s) f = (1%r / (size (undup s))%r) * BRA.big predT f (undup s).
+  E (duniform s) f = (1%r / (size (undup s))%r) * BRA.#big [ x : (undup s) ] (f x).
 proof.
 rewrite /E (@sumE_fin _ (undup s)) 1:undup_uniq /=.
 - move=> a; rewrite mulf_eq0 negb_or; case=> _.
@@ -3343,7 +3343,7 @@ qed.
 lemma E_splits ['a] p f d k :
      hasE d f
   => partition d p k
-  => E<:'a> d f = BRA.bigi predT (fun i => mu d (p i) * Ec d f (p i)) 0 k.
+  => E<:'a> d f = BRA.#bigi [ i : 0, k ] (mu d (p i) * Ec d f (p i)).
 proof.
 move=> Edf; elim/natind: k d Edf => [k le0_k|k ge0_k ih] d Edf hpdk.
 - rewrite BRA.big_geq // (_ : d = dnull) -1:exp_dnull //.
@@ -3398,7 +3398,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 
 lemma fin_expE (d : 'a distr) (f : 'a -> real) : is_finite (support d) =>
-  E d f = big predT (fun x => f x * mu1 d x) (to_seq (support d)).
+  E d f = #big [ x : (to_seq (support d)) ] (f x * mu1 d x).
 proof.
 move => fin_d; rewrite /E (@sumE_fin _ (to_seq (support d))) ?uniq_to_seq //.
 by move => x; rewrite mem_to_seq //; smt(supportP).
