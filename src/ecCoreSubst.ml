@@ -218,9 +218,11 @@ and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
     else TCIConcrete { rtcw with etyargs }
 
   | TCIAbstract { support = `Var tyvar; offset } ->
-       Mid.find_opt tyvar s.fs_v
-    |> Option.map (fun (_, tcws) -> List.nth tcws offset)
-    |> Option.value ~default:tcw
+    let resolved =
+      let open Option in
+      bind (Mid.find_opt tyvar s.fs_v) (fun (_, tcws) ->
+        List.nth_opt tcws offset) in
+    Option.value ~default:tcw resolved
 
   | TCIAbstract { support = `Abs _ } ->
     tcw

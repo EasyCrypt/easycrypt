@@ -409,7 +409,10 @@ module Unify = struct
           let deps = !deps in
 
           if TyUni.Suid.is_empty deps then begin
+            let deref_tc (tc' : typeclass) =
+              { tc' with tc_args = List.map check_etyarg tc'.tc_args } in
             let eq_tc (tc' : typeclass) =
+              let tc' = deref_tc tc' in
               EcPath.p_equal tc.tc_name tc'.tc_name
               && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
 

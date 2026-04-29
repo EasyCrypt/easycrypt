@@ -17,83 +17,83 @@ abbrev zeror = idm<:g>.
 abbrev ( - ) (x y : g) = x + -y.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt addrA: associative (+)<:g>.
+lemma addrA: associative (+)<:g>.
 proof. by exact: addmA. qed.
 
-lemma nosmt addrC: commutative (+)<:g>.
+lemma addrC: commutative (+)<:g>.
 proof. by exact: addmC. qed.
 
-lemma nosmt add0r: left_id zeror (+)<:g>.
+lemma add0r: left_id zeror (+)<:g>.
 proof. by exact: add0m. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt addr0: right_id zeror (+)<:g>.
+lemma addr0: right_id zeror (+)<:g>.
 proof. by move=> x; rewrite addrC add0r. qed.
 
-lemma nosmt addrN: right_inverse zeror [-] (+)<:g>.
+lemma addrN: right_inverse zeror [-] (+)<:g>.
 proof. by move=> x; rewrite addrC addNr. qed.
 
-lemma nosmt addrCA: left_commutative (+)<:g>.
+lemma addrCA: left_commutative (+)<:g>.
 proof. by move=> x y z; rewrite !addrA (@addrC x y). qed.
 
-lemma nosmt addrAC: right_commutative (+)<:g>.
+lemma addrAC: right_commutative (+)<:g>.
 proof. by move=> x y z; rewrite -!addrA (@addrC y z). qed.
 
-lemma nosmt addrACA: interchange (+)<:g> (+)<:g>.
+lemma addrACA: interchange (+)<:g> (+)<:g>.
 proof. by move=> x y z t; rewrite -!addrA (addrCA y). qed.
 
-lemma nosmt subrr (x : g): x - x = zeror.
+lemma subrr (x : g): x - x = zeror.
 proof. by rewrite addrN. qed.
 
-lemma nosmt addKr: left_loop [-] (+)<:g>.
+lemma addKr: left_loop [-] (+)<:g>.
 proof. by move=> x y; rewrite addrA addNr add0r. qed.
 
-lemma nosmt addNKr: rev_left_loop [-] (+)<:g>.
+lemma addNKr: rev_left_loop [-] (+)<:g>.
 proof. by move=> x y; rewrite addrA addrN add0r. qed.
 
-lemma nosmt addrK: right_loop [-] (+)<:g>.
+lemma addrK: right_loop [-] (+)<:g>.
 proof. by move=> x y; rewrite -addrA addrN addr0. qed.
 
-lemma nosmt addrNK: rev_right_loop [-] (+)<:g>.
+lemma addrNK: rev_right_loop [-] (+)<:g>.
 proof. by move=> x y; rewrite -addrA addNr addr0. qed.
 
-lemma nosmt subrK (x y : g): (x - y) + y = x.
+lemma subrK (x y : g): (x - y) + y = x.
 proof. by rewrite addrNK. qed.
 
-lemma nosmt addrI: right_injective (+)<:g>.
+lemma addrI: right_injective (+)<:g>.
 proof. by move=> x y z h; rewrite -(@addKr x z) -h addKr. qed.
 
-lemma nosmt addIr: left_injective (+)<:g>.
+lemma addIr: left_injective (+)<:g>.
 proof. by move=> x y z h; rewrite -(@addrK x z) -h addrK. qed.
 
-lemma nosmt opprK: involutive [-]<:g>.
+lemma opprK: involutive [-]<:g>.
 proof. by move=> x; apply (@addIr (-x)); rewrite addNr addrN. qed.
 
-lemma nosmt oppr_inj : injective [-]<:g>.
+lemma oppr_inj : injective [-]<:g>.
 proof. by move=> x y eq; apply/(addIr (-x)); rewrite subrr eq subrr. qed.
 
-lemma nosmt oppr0 : -zeror = zeror.
+lemma oppr0 : -zeror = zeror.
 proof. by rewrite -(@addr0 (-zeror)) addNr. qed.
 
-lemma nosmt oppr_eq0 (x : g) : (- x = zeror) <=> (x = zeror).
+lemma oppr_eq0 (x : g) : (- x = zeror) <=> (x = zeror).
 proof. by rewrite (inv_eq opprK) oppr0. qed.
 
-lemma nosmt subr0 (x : g): x - zeror = x.
+lemma subr0 (x : g): x - zeror = x.
 proof. by rewrite oppr0 addr0. qed.
 
-lemma nosmt sub0r (x : g): zeror - x = - x.
+lemma sub0r (x : g): zeror - x = - x.
 proof. by rewrite add0r. qed.
 
-lemma nosmt opprD (x y : g): -(x + y) = -x + -y.
+lemma opprD (x y : g): -(x + y) = -x + -y.
 proof. by apply (@addrI (x + y)); rewrite addrA addrN addrAC addrK addrN. qed.
 
-lemma nosmt opprB (x y : g): -(x - y) = y - x.
+lemma opprB (x y : g): -(x - y) = y - x.
 proof. by rewrite opprD opprK addrC. qed.
 
-lemma nosmt subrACA: interchange (-) (+)<:g>.
+lemma subrACA: interchange (-) (+)<:g>.
 proof. by move=> x y z t; rewrite addrACA opprD. qed.
 
-lemma nosmt subr_eq (x y z : g):
+lemma subr_eq (x y z : g):
   (x - z = y) <=> (x = y + z).
 proof.
 move: (can2_eq (fun x, x - z) (fun x, x + z) _ _ x y) => //=.
@@ -101,25 +101,25 @@ move: (can2_eq (fun x, x - z) (fun x, x + z) _ _ x y) => //=.
 + by move=> {x} x /=; rewrite addrK.
 qed.
 
-lemma nosmt subr_eq0 (x y : g): (x - y = zeror) <=> (x = y).
+lemma subr_eq0 (x y : g): (x - y = zeror) <=> (x = y).
 proof. by rewrite subr_eq add0r. qed.
 
-lemma nosmt addr_eq0 (x y : g): (x + y = zeror) <=> (x = -y).
+lemma addr_eq0 (x y : g): (x + y = zeror) <=> (x = -y).
 proof. by rewrite -(@subr_eq0 x) opprK. qed.
 
-lemma nosmt eqr_opp (x y : g): (- x = - y) <=> (x = y).
+lemma eqr_opp (x y : g): (- x = - y) <=> (x = y).
 proof. by apply/(@can_eq _ _ opprK x y). qed.
 
-lemma nosmt eqr_oppLR (x y : g) : (- x = y) <=> (x = - y).
+lemma eqr_oppLR (x y : g) : (- x = y) <=> (x = - y).
 proof. by apply/(@inv_eq _ opprK x y). qed.
 
-lemma nosmt eqr_sub (x y z t : g) : (x - y = z - t) <=> (x + t = z + y).
+lemma eqr_sub (x y z t : g) : (x - y = z - t) <=> (x + t = z + y).
 proof.
 rewrite -{1}(addrK t x) -{1}(addrK y z) -!addrA.
 by rewrite (addrC (-t)) !addrA; split=> [/addIr /addIr|->//].
 qed.
 
-lemma nosmt subr_add2r (z x y : g): (x + z) - (y + z) = x - y.
+lemma subr_add2r (z x y : g): (x + z) - (y + z) = x - y.
 proof. by rewrite opprD addrACA addrN addr0. qed.
 
 op intmul (x : g) (n : int) =
@@ -128,34 +128,34 @@ op intmul (x : g) (n : int) =
   then -(iterop (-n) (+)<:g> x zeror)
   else  (iterop   n  (+)<:g> x zeror).
 
-lemma nosmt intmulpE (z : g) c : 0 <= c =>
+lemma intmulpE (z : g) c : 0 <= c =>
   intmul z c = iterop c (+)<:g> z zeror.
 proof. by rewrite /intmul lezNgt => ->. qed.
 
-lemma nosmt mulr0z (x : g): intmul x 0 = zeror.
+lemma mulr0z (x : g): intmul x 0 = zeror.
 proof. by rewrite /intmul /= iterop0. qed.
 
-lemma nosmt mulr1z (x : g): intmul x 1 = x.
+lemma mulr1z (x : g): intmul x 1 = x.
 proof. by rewrite /intmul /= iterop1. qed.
 
-lemma nosmt mulr2z (x : g): intmul x 2 = x + x.
+lemma mulr2z (x : g): intmul x 2 = x + x.
 proof. by rewrite /intmul /= (@iteropS 1) // (@iterS 0) // iter0. qed.
 
-lemma nosmt mulrNz (x : g) (n : int): intmul x (-n) = -(intmul x n).
+lemma mulrNz (x : g) (n : int): intmul x (-n) = -(intmul x n).
 proof.
 case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
 rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
 by case: (n < 0); rewrite ?opprK.
 qed.
 
-lemma nosmt mulrS (x : g) (n : int): 0 <= n =>
+lemma mulrS (x : g) (n : int): 0 <= n =>
   intmul x (n+1) = x + intmul x n.
 proof.
 move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
 by rewrite !iteropE iterS.
 qed.
 
-lemma nosmt mulNrz (x : g) n : intmul (- x) n = - (intmul x n).
+lemma mulNrz (x : g) n : intmul (- x) n = - (intmul x n).
 proof.
 elim/intwlog: n => [n h| | n ge0_n ih].
 + by rewrite -(@oppzK n) !(@mulrNz _ (- n)) h.
@@ -163,10 +163,10 @@ elim/intwlog: n => [n h| | n ge0_n ih].
 + by rewrite !mulrS // ih opprD.
 qed.
 
-lemma nosmt mulNrNz (x : g) (n : int) : intmul (-x) (-n) = intmul x n.
+lemma mulNrNz (x : g) (n : int) : intmul (-x) (-n) = intmul x n.
 proof. by rewrite mulNrz mulrNz opprK. qed.
 
-lemma nosmt mulrSz (x : g) n : intmul x (n + 1) = x + intmul x n.
+lemma mulrSz (x : g) n : intmul x (n + 1) = x + intmul x n.
 proof.
 case: (0 <= n) => [/mulrS ->//|]; rewrite -ltzNge => gt0_n.
 case: (n = -1) => [->/=|]; 1: by rewrite mulrNz mulr1z mulr0z subrr.
@@ -175,7 +175,7 @@ rewrite (_ : -n = -(n+1) + 1) 1:/# mulrS 1:/#.
 by rewrite addrA subrr add0r.
 qed.
 
-lemma nosmt mulrDz (x : g) (n m : int) : intmul x (n + m) = intmul x n + intmul x m.
+lemma mulrDz (x : g) (n m : int) : intmul x (n + m) = intmul x n + intmul x m.
 proof.
 wlog: n m / 0 <= m => [wlog|].
 + case: (0 <= m) => [/wlog|]; first by apply.
@@ -216,112 +216,112 @@ realize add0m by exact: mul1r.
 
 abbrev ( / ) (x y : r) = x * (invr y).
 
-lemma nosmt mulr1: right_id oner ( * )<:r>.
+lemma mulr1: right_id oner ( * )<:r>.
 proof. by move=> x; rewrite mulrC mul1r. qed.
 
-lemma nosmt mulrCA: left_commutative ( * )<:r>.
+lemma mulrCA: left_commutative ( * )<:r>.
 proof. by move=> x y z; rewrite !mulrA (@mulrC x y). qed.
 
-lemma nosmt mulrAC: right_commutative ( * )<:r>.
+lemma mulrAC: right_commutative ( * )<:r>.
 proof. by move=> x y z; rewrite -!mulrA (@mulrC y z). qed.
 
-lemma nosmt mulrACA: interchange ( * ) ( * )<:r>.
+lemma mulrACA: interchange ( * ) ( * )<:r>.
 proof. by move=> x y z t; rewrite -!mulrA (mulrCA y). qed.
 
-lemma nosmt mulrSl (x y : r) : (x + oner) * y = x * y + y.
+lemma mulrSl (x y : r) : (x + oner) * y = x * y + y.
 proof. by rewrite mulrDl mul1r. qed.
 
-lemma nosmt mulrDr: right_distributive ( * ) (+)<:r>.
+lemma mulrDr: right_distributive ( * ) (+)<:r>.
 proof. by move=> x y z; rewrite mulrC mulrDl !(@mulrC _ x). qed.
 
-lemma nosmt mul0r: left_zero zeror ( * )<:r>.
+lemma mul0r: left_zero zeror ( * )<:r>.
 proof. by move=> x; apply: (@addIr (oner * x)); rewrite -mulrDl !add0r mul1r. qed.
 
-lemma nosmt mulr0: right_zero zeror ( * )<:r>.
+lemma mulr0: right_zero zeror ( * )<:r>.
 proof. by move=> x; apply: (@addIr (x * oner)); rewrite -mulrDr !add0r mulr1. qed.
 
-lemma nosmt mulrN (x y : r): x * (- y) = - (x * y).
+lemma mulrN (x y : r): x * (- y) = - (x * y).
 proof. by apply: (@addrI (x * y)); rewrite -mulrDr !addrN mulr0. qed.
 
-lemma nosmt mulNr (x y : r): (- x) * y = - (x * y).
+lemma mulNr (x y : r): (- x) * y = - (x * y).
 proof. by apply: (@addrI (x * y)); rewrite -mulrDl !addrN mul0r. qed.
 
-lemma nosmt mulrNN (x y : r): (- x) * (- y) = x * y.
+lemma mulrNN (x y : r): (- x) * (- y) = x * y.
 proof. by rewrite mulrN mulNr opprK. qed.
 
-lemma nosmt mulN1r (x : r): (-oner) * x = -x.
+lemma mulN1r (x : r): (-oner) * x = -x.
 proof. by rewrite mulNr mul1r. qed.
 
-lemma nosmt mulrN1 (x : r): x * -oner = -x.
+lemma mulrN1 (x : r): x * -oner = -x.
 proof. by rewrite mulrN mulr1. qed.
 
-lemma nosmt mulrBl: left_distributive ( * ) (-)<:r>.
+lemma mulrBl: left_distributive ( * ) (-)<:r>.
 proof. by move=> x y z; rewrite mulrDl !mulNr. qed.
 
-lemma nosmt mulrBr: right_distributive ( * ) (-)<:r>.
+lemma mulrBr: right_distributive ( * ) (-)<:r>.
 proof. by move=> x y z; rewrite mulrDr !mulrN. qed.
 
-lemma nosmt mulrnAl (x y : r) n : 0 <= n => (intmul x n) * y = intmul (x * y) n.
+lemma mulrnAl (x y : r) n : 0 <= n => (intmul x n) * y = intmul (x * y) n.
 proof.
 elim: n => [|n ge0n ih]; rewrite !(mulr0z, mulrS) ?mul0r //.
 by rewrite mulrDl ih.
 qed.
 
-lemma nosmt mulrnAr (x y : r) n : 0 <= n => x * (intmul y n) = intmul (x * y) n.
+lemma mulrnAr (x y : r) n : 0 <= n => x * (intmul y n) = intmul (x * y) n.
 proof.
 elim: n => [|n ge0n ih]; rewrite !(mulr0z, mulrS) ?mulr0 //.
 by rewrite mulrDr ih.
 qed.
 
-lemma nosmt mulrzAl (x y : r) z : (intmul x z) * y = intmul (x * y) z.
+lemma mulrzAl (x y : r) z : (intmul x z) * y = intmul (x * y) z.
 proof.
 case: (lezWP 0 z)=> [|_] le; first by rewrite mulrnAl.
 by rewrite -oppzK mulrNz mulNr mulrnAl -?mulrNz // oppz_ge0.
 qed.
 
-lemma nosmt mulrzAr x (y : r) z : x * (intmul y z) = intmul (x * y) z.
+lemma mulrzAr x (y : r) z : x * (intmul y z) = intmul (x * y) z.
 proof.
 case: (lezWP 0 z)=> [|_] le; first by rewrite mulrnAr.
 by rewrite -oppzK mulrNz mulrN mulrnAr -?mulrNz // oppz_ge0.
 qed.
 
-lemma nosmt mulrV: right_inverse_in unit oner invr ( * )<:r>.
+lemma mulrV: right_inverse_in unit oner invr ( * )<:r>.
 proof. by move=> x /mulVr; rewrite mulrC. qed.
 
-lemma nosmt divrr (x : r): unit x => x / x = oner.
+lemma divrr (x : r): unit x => x / x = oner.
 proof. by apply/mulrV. qed.
 
-lemma nosmt invr_out (x : r): !unit x => invr x = x.
+lemma invr_out (x : r): !unit x => invr x = x.
 proof. by apply/unitout. qed.
 
-lemma nosmt unitrP (x : r): unit x <=> (exists y, y * x = oner).
+lemma unitrP (x : r): unit x <=> (exists y, y * x = oner).
 proof. by split=> [/mulVr<- |]; [exists (invr x) | case=> y /unitP]. qed.
 
-lemma nosmt mulKr: left_loop_in unit invr ( * )<:r>.
+lemma mulKr: left_loop_in unit invr ( * )<:r>.
 proof. by move=> x un_x y; rewrite mulrA mulVr // mul1r. qed.
 
-lemma nosmt mulrK: right_loop_in unit invr ( * )<:r>.
+lemma mulrK: right_loop_in unit invr ( * )<:r>.
 proof. by move=> y un_y x; rewrite -mulrA mulrV // mulr1. qed.
 
-lemma nosmt mulVKr: rev_left_loop_in unit invr ( * )<:r>.
+lemma mulVKr: rev_left_loop_in unit invr ( * )<:r>.
 proof. by move=> x un_x y; rewrite mulrA mulrV // mul1r. qed.
 
-lemma nosmt mulrVK: rev_right_loop_in unit invr ( * )<:r>.
+lemma mulrVK: rev_right_loop_in unit invr ( * )<:r>.
 proof. by move=> y nz_y x; rewrite -mulrA mulVr // mulr1. qed.
 
-lemma nosmt mulrI: right_injective_in unit ( * )<:r>.
+lemma mulrI: right_injective_in unit ( * )<:r>.
 proof. by move=> x Ux; have /can_inj h := mulKr _ Ux. qed.
 
-lemma nosmt mulIr: left_injective_in unit ( * )<:r>.
+lemma mulIr: left_injective_in unit ( * )<:r>.
 proof. by move=> x /mulrI h y1 y2; rewrite !(@mulrC _ x) => /h. qed.
 
-lemma nosmt unitrE (x : r): unit x <=> (x / x = oner).
+lemma unitrE (x : r): unit x <=> (x / x = oner).
 proof.
 split=> [Ux|xx1]; 1: by apply/divrr.
 by apply/unitrP; exists (invr x); rewrite mulrC.
 qed.
 
-lemma nosmt invrK: involutive invr<:r>.
+lemma invrK: involutive invr<:r>.
 proof.
 move=> x; case: (unit x)=> Ux; 2: by rewrite !invr_out.
 rewrite -(mulrK _ Ux (invr (invr x))) -mulrA.
@@ -329,37 +329,37 @@ rewrite (@mulrC x) mulKr //; apply/unitrP.
 by exists x; rewrite mulrV.
 qed.
 
-lemma nosmt invr_inj: injective invr<:r>.
+lemma invr_inj: injective invr<:r>.
 proof. by apply: (can_inj _ _ invrK). qed.
 
-lemma nosmt unitrV (x : r): unit (invr x) <=> unit x.
+lemma unitrV (x : r): unit (invr x) <=> unit x.
 proof. by rewrite !unitrE invrK mulrC. qed.
 
-lemma nosmt unitr1: unit oner<:r>.
+lemma unitr1: unit oner<:r>.
 proof. by apply/unitrP; exists oner; rewrite mulr1. qed.
 
-lemma nosmt invr1: invr oner = oner<:r>.
+lemma invr1: invr oner = oner<:r>.
 proof. by rewrite -{2}(mulVr _ unitr1) mulr1. qed.
 
-lemma nosmt div1r x: oner / x = invr x.
+lemma div1r x: oner / x = invr x.
 proof. by rewrite mul1r. qed.
 
-lemma nosmt divr1 x: x / oner = x.
+lemma divr1 x: x / oner = x.
 proof. by rewrite invr1 mulr1. qed.
 
-lemma nosmt unitr0: !unit zeror<:r>.
+lemma unitr0: !unit zeror<:r>.
 proof. by apply/negP=> /unitrP [y]; rewrite mulr0 eq_sym oner_neq0. qed.
 
-lemma nosmt invr0: invr zeror = zeror<:r>.
+lemma invr0: invr zeror = zeror<:r>.
 proof. by rewrite invr_out ?unitr0. qed.
 
-lemma nosmt unitrN1: unit (-oner<:r>).
+lemma unitrN1: unit (-oner<:r>).
 proof. by apply/unitrP; exists (-oner); rewrite mulrNN mulr1. qed.
 
-lemma nosmt invrN1: invr (-oner) = -oner<:r>.
+lemma invrN1: invr (-oner) = -oner<:r>.
 proof. by rewrite -{2}(divrr unitrN1) mulN1r opprK. qed.
 
-lemma nosmt unitrMl (x y : r) : unit y => (unit (x * y) <=> unit x).
+lemma unitrMl (x y : r) : unit y => (unit (x * y) <=> unit x).
 proof.                        (* FIXME: wlog *)
 move=> uy; case: (unit x)=> /=; last first.
   apply/contra=> uxy; apply/unitrP; exists (y * invr (x * y)).
@@ -370,73 +370,73 @@ move=> ux; apply/unitrP; exists (invr y * invr x).
 by rewrite -!mulrA mulKr // mulVr.
 qed.
 
-lemma nosmt unitrMr (x y : r): unit x => (unit (x * y) <=> unit y).
+lemma unitrMr (x y : r): unit x => (unit (x * y) <=> unit y).
 proof.
 move=> ux; split=> [uxy|uy]; last by rewrite unitrMl.
 by rewrite -(mulKr _ ux y) unitrMl ?unitrV.
 qed.
 
-lemma nosmt unitrM (x y : r) : unit (x * y) <=> (unit x /\ unit y).
+lemma unitrM (x y : r) : unit (x * y) <=> (unit x /\ unit y).
 proof.
 case: (unit x) => /=; first by apply: unitrMr.
 apply: contra => /unitrP[z] zVE; apply/unitrP.
 by exists (y * z); rewrite mulrAC (@mulrC y) (@mulrC _ z).
 qed.
 
-lemma nosmt unitrN (x : r) : unit (-x) <=> unit x.
+lemma unitrN (x : r) : unit (-x) <=> unit x.
 proof. by rewrite -mulN1r unitrMr // unitrN1. qed.
 
-lemma nosmt invrM (x y : r) : unit x => unit y => invr (x * y) = invr y * invr x.
+lemma invrM (x y : r) : unit x => unit y => invr (x * y) = invr y * invr x.
 proof.
 move=> Ux Uy; have Uxy: unit (x * y) by rewrite unitrMl.
 by apply: (mulrI _ Uxy); rewrite mulrV ?mulrA ?mulrK ?mulrV.
 qed.
 
-lemma nosmt invrN (x : r) : invr (- x) = - (invr x).
+lemma invrN (x : r) : invr (- x) = - (invr x).
 proof.
 case: (unit x) => ux; last by rewrite !invr_out ?unitrN.
 by rewrite -mulN1r invrM ?unitrN1 // invrN1 mulrN1.
 qed.
 
-lemma nosmt invr_neq0 (x : r) : x <> zeror => invr x <> zeror.
+lemma invr_neq0 (x : r) : x <> zeror => invr x <> zeror.
 proof.
 move=> nx0; case: (unit x)=> Ux; last by rewrite invr_out ?Ux.
 by apply/negP=> x'0; move: Ux; rewrite -unitrV x'0 unitr0.
 qed.
 
-lemma nosmt invr_eq0 (x : r) : (invr x = zeror) <=> (x = zeror).
+lemma invr_eq0 (x : r) : (invr x = zeror) <=> (x = zeror).
 proof. by apply/iff_negb; split=> /invr_neq0; rewrite ?invrK. qed.
 
-lemma nosmt invr_eq1 (x : r) : (invr x = oner) <=> (x = oner).
+lemma invr_eq1 (x : r) : (invr x = oner) <=> (x = oner).
 proof. by rewrite (inv_eq invrK) invr1. qed.
 
 op ofint n = intmul oner<:r> n.
 
-lemma nosmt ofint0: ofint 0 = zeror.
+lemma ofint0: ofint 0 = zeror.
 proof. by apply/mulr0z. qed.
 
-lemma nosmt ofint1: ofint 1 = oner.
+lemma ofint1: ofint 1 = oner.
 proof. by apply/mulr1z. qed.
 
-lemma nosmt ofintS (i : int): 0 <= i => ofint (i+1) = oner + ofint i.
+lemma ofintS (i : int): 0 <= i => ofint (i+1) = oner + ofint i.
 proof. by apply/mulrS. qed.
 
-lemma nosmt ofintN (i : int): ofint (-i) = - (ofint i).
+lemma ofintN (i : int): ofint (-i) = - (ofint i).
 proof. by apply/mulrNz. qed.
 
-lemma nosmt mul1r0z x: x * ofint 0 = zeror.
+lemma mul1r0z x: x * ofint 0 = zeror.
 proof. by rewrite ofint0 mulr0. qed.
 
-lemma nosmt mul1r1z x : x * ofint 1 = x.
+lemma mul1r1z x : x * ofint 1 = x.
 proof. by rewrite ofint1 mulr1. qed.
 
-lemma nosmt mul1r2z x : x * ofint 2 = x + x.
+lemma mul1r2z x : x * ofint 2 = x + x.
 proof. by rewrite /ofint mulr2z mulrDr mulr1. qed.
 
-lemma nosmt mulr_intl x z : (ofint z) * x = intmul x z.
+lemma mulr_intl x z : (ofint z) * x = intmul x z.
 proof. by rewrite mulrzAl mul1r. qed.
 
-lemma nosmt mulr_intr x z : x * (ofint z) = intmul x z.
+lemma mulr_intr x z : x * (ofint z) = intmul x z.
 proof. by rewrite mulrzAr mulr1. qed.
 
 op exp (x : r) (n : int) =
@@ -444,39 +444,39 @@ op exp (x : r) (n : int) =
   then invr (iterop (-n) ( * ) x oner)
   else iterop n ( * ) x oner.
 
-lemma nosmt expr0 x: exp x 0 = oner.
+lemma expr0 x: exp x 0 = oner.
 proof. by rewrite /exp /= iterop0. qed.
 
-lemma nosmt expr1 x: exp x 1 = x.
+lemma expr1 x: exp x 1 = x.
 proof. by rewrite /exp /= iterop1. qed.
 
-lemma nosmt exprS (x : r) i: 0 <= i => exp x (i+1) = x * (exp x i).
+lemma exprS (x : r) i: 0 <= i => exp x (i+1) = x * (exp x i).
 proof.
 move=> ge0i; rewrite /exp !ltzNge ge0i addz_ge0 //=.
 (* we want to use the multiplicative monoid instance here *)
 (* by rewrite !Monoid.iteropE iterS. *) admit.
 qed.
 
-lemma nosmt expr_pred (x : r) i : 0 < i => exp x i = x * (exp x (i - 1)).
+lemma expr_pred (x : r) i : 0 < i => exp x i = x * (exp x (i - 1)).
 proof. smt(exprS). qed.
 
-lemma nosmt exprSr (x : r) i: 0 <= i => exp x (i+1) = (exp x i) * x.
+lemma exprSr (x : r) i: 0 <= i => exp x (i+1) = (exp x i) * x.
 proof. by move=> ge0_i; rewrite exprS // mulrC. qed.
 
-lemma nosmt expr2 x: exp x 2 = x * x.
+lemma expr2 x: exp x 2 = x * x.
 proof. by rewrite (@exprS _ 1) // expr1. qed.
 
-lemma nosmt exprN (x : r) (i : int): exp x (-i) = invr (exp x i).
+lemma exprN (x : r) (i : int): exp x (-i) = invr (exp x i).
 proof.
 case: (i = 0) => [->|]; first by rewrite oppz0 expr0 invr1.
 rewrite /exp oppz_lt0 ltzNge lez_eqVlt oppzK=> -> /=.
 by case: (_ < _)%Int => //=; rewrite invrK.
 qed.
 
-lemma nosmt exprN1 (x : r) : exp x (-1) = invr x.
+lemma exprN1 (x : r) : exp x (-1) = invr x.
 proof. by rewrite exprN expr1. qed.
 
-lemma nosmt unitrX x m : unit x => unit (exp x m).
+lemma unitrX x m : unit x => unit (exp x m).
 proof.
 move=> invx; wlog: m / (0 <= m) => [wlog|].
 + (have [] : (0 <= m \/ 0 <= -m) by move=> /#); first by apply: wlog.    
@@ -485,7 +485,7 @@ elim: m => [|m ge0_m ih]; first by rewrite expr0 unitr1.
 by rewrite exprS // &(unitrMl).
 qed.
 
-lemma nosmt unitrX_neq0 x m : m <> 0 => unit (exp x m) => unit x.
+lemma unitrX_neq0 x m : m <> 0 => unit (exp x m) => unit x.
 proof.
 wlog: m / (0 < m) => [wlog|].
 + case: (0 < m); [by apply: wlog | rewrite ltzNge /= => le0_m nz_m].
@@ -493,7 +493,7 @@ wlog: m / (0 < m) => [wlog|].
 by move=> gt0_m _; rewrite (_ : m = m - 1 + 1) // exprS 1:/# unitrM.
 qed.
 
-lemma nosmt exprV (x : r) (i : int): exp (invr x) i = exp x (-i).
+lemma exprV (x : r) (i : int): exp (invr x) i = exp x (-i).
 proof.
 wlog: i / (0 <= i) => [wlog|]; first by smt(exprN).
 elim: i => /= [|i ge0_i ih]; first by rewrite !expr0.
@@ -506,7 +506,7 @@ rewrite !invr_out //; last by rewrite exprS.
 + by apply: contra invNx; apply: unitrX_neq0 => /#.
 qed.
 
-lemma nosmt exprVn (x : r) (n : int) : 0 <= n => exp (invr x) n = invr (exp x n).
+lemma exprVn (x : r) (n : int) : 0 <= n => exp (invr x) n = invr (exp x n).
 proof.
 elim: n => [|n ge0_n ih]; first by rewrite !expr0 invr1.
 case: (unit x) => ux.
@@ -514,13 +514,13 @@ case: (unit x) => ux.
 - by rewrite !invr_out //; apply: contra ux; apply: unitrX_neq0 => /#.
 qed.
 
-lemma nosmt exprMn (x y : r) (n : int) : 0 <= n => exp (x * y) n = exp x n * exp y n.
+lemma exprMn (x y : r) (n : int) : 0 <= n => exp (x * y) n = exp x n * exp y n.
 proof.
 elim: n => [|n ge0_n ih]; first by rewrite !expr0 mulr1.
 by rewrite !exprS // mulrACA ih.
 qed.
 
-lemma nosmt exprD_nneg x (m n : int) : 0 <= m => 0 <= n =>
+lemma exprD_nneg x (m n : int) : 0 <= m => 0 <= n =>
   exp x (m + n) = exp x m * exp x n.
 proof.
   move=> ge0_m ge0_n; elim: m ge0_m => [|m ge0_m ih].
@@ -528,7 +528,7 @@ proof.
   by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
 qed.
 
-lemma nosmt exprD x (m n : int) : unit x => exp x (m + n) = exp x m * exp x n.
+lemma exprD x (m n : int) : unit x => exp x (m + n) = exp x m * exp x n.
 proof.
 wlog: m n x / (0 <= m + n) => [wlog invx|].
 + case: (0 <= m + n); [by move=> ?; apply: wlog | rewrite lezNgt /=].
@@ -547,7 +547,7 @@ case=> [->>|lt_m_Sn]; first by rewrite exprD_nneg //#.
 by rewrite addzA exprS 1:/# ih 1,2:/# exprS // mulrCA.
 qed.
 
-lemma nosmt exprM x (m n : int) : 
+lemma exprM x (m n : int) : 
   exp x (m * n) = exp (exp x m) n.
 proof.
 wlog : n / 0 <= n.
@@ -562,20 +562,20 @@ elim/natind: n => [|n hn ih hm _]; 1: smt (expr0).
 by rewrite mulzDr exprS //= mulrC exprD_nneg 1:/# 1:// ih.
 qed.
 
-lemma nosmt expr0n n : 0 <= n => exp zeror n = if n = 0 then oner else zeror.
+lemma expr0n n : 0 <= n => exp zeror n = if n = 0 then oner else zeror.
 proof.
 elim: n => [|n ge0_n _]; first by rewrite expr0.
 by rewrite exprS // mul0r addz1_neq0.
 qed.
 
-lemma nosmt expr0z z : exp zeror z = if z = 0 then oner else zeror.
+lemma expr0z z : exp zeror z = if z = 0 then oner else zeror.
 proof.
 case: (0 <= z) => [/expr0n // | /ltzNge lt0_z].
 rewrite -{1}(@oppzK z) exprN; have ->/=: z <> 0 by smt().
 by rewrite invr_eq0 expr0n ?oppz_ge0 1:ltzW.
 qed.
 
-lemma nosmt expr1z z : exp oner z = oner.
+lemma expr1z z : exp oner z = oner.
 proof.
 elim/intwlog: z.
 + by move=> n h; rewrite -(@oppzK n) exprN h invr1.
@@ -583,27 +583,27 @@ elim/intwlog: z.
 + by move=> n ge0_n ih; rewrite exprS // mul1r ih.
 qed.
 
-lemma nosmt sqrrD (x y : r) :
+lemma sqrrD (x y : r) :
   exp (x + y) 2 = exp x 2 + intmul (x * y) 2 + exp y 2.
 proof.
 by rewrite !expr2 mulrDl !mulrDr mulr2z !addrA (@mulrC y x).
 qed.
 
-lemma nosmt sqrrN x : exp (-x) 2 = exp x 2.
+lemma sqrrN x : exp (-x) 2 = exp x 2.
 proof. by rewrite !expr2 mulrNN. qed.
 
-lemma nosmt sqrrB x y :
+lemma sqrrB x y :
   exp (x - y) 2 = exp x 2 - intmul (x * y) 2 + exp y 2.
 proof.   by rewrite sqrrD sqrrN mulrN mulNrz. qed.
 
-lemma nosmt signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
+lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
 proof.
 elim: n => [|n ge0_nih]; first by rewrite odd0 expr0 expr0.
 rewrite !(iterS, oddS) // exprS // -/(odd _) => <-.
 by case: (odd _); rewrite /b2i /= !(expr0, expr1) mulN1r ?opprK.
 qed.
 
-lemma nosmt subr_sqr_1 x : exp x 2 - oner = (x - oner) * (x + oner).
+lemma subr_sqr_1 x : exp x 2 - oner = (x - oner) * (x + oner).
 proof.
 rewrite mulrBl mulrDr !(mulr1, mul1r) expr2 -addrA.
 by congr; rewrite opprD addrA addrN add0r.
@@ -611,30 +611,30 @@ qed.
 
 op lreg (x : r) = injective (fun y => x * y).
 
-lemma nosmt mulrI_eq0 x y : lreg x => (x * y = zeror) <=> (y = zeror).
+lemma mulrI_eq0 x y : lreg x => (x * y = zeror) <=> (y = zeror).
 proof. by move=> reg_x; rewrite -{1}(mulr0 x) (inj_eq reg_x). qed.
 
-lemma nosmt lreg_neq0 x : lreg x => x <> zeror.
+lemma lreg_neq0 x : lreg x => x <> zeror.
 proof.
 apply/contraL=> ->; apply/negP => /(_ zeror oner).
 by rewrite (@eq_sym _ oner) oner_neq0 /= !mul0r.
 qed.
 
-lemma nosmt mulrI0_lreg x : (forall y, x * y = zeror => y = zeror) => lreg x.
+lemma mulrI0_lreg x : (forall y, x * y = zeror => y = zeror) => lreg x.
 proof.
 by move=> reg_x y z eq; rewrite -subr_eq0 &(reg_x) mulrBr eq subrr.
 qed.
 
-lemma nosmt lregN x : lreg x => lreg (-x).
+lemma lregN x : lreg x => lreg (-x).
 proof. by move=> reg_x y z; rewrite !mulNr => /oppr_inj /reg_x. qed.
 
-lemma nosmt lreg1 : lreg oner.
+lemma lreg1 : lreg oner.
 proof. by move=> x y; rewrite !mul1r. qed.
 
-lemma nosmt lregM x y : lreg x => lreg y => lreg (x * y).
+lemma lregM x y : lreg x => lreg y => lreg (x * y).
 proof. by move=> reg_x reg_y z t; rewrite -!mulrA => /reg_x /reg_y. qed.
 
-lemma nosmt lregXn x n : 0 <= n => lreg x => lreg (exp x n).
+lemma lregXn x n : 0 <= n => lreg x => lreg (exp x n).
 proof.
 move=> + reg_x; elim: n => [|n ge0_n ih].
 - by rewrite expr0 &(lreg1).
@@ -672,7 +672,7 @@ type class boolring <: comring = {
   axiom mulrr : forall (x : boolring), x * x = x
 }.
 
-lemma nosmt addrr ['a <: boolring] (x : 'a): x + x = zeror.
+lemma addrr ['a <: boolring] (x : 'a): x + x = zeror.
 proof.
 apply (@addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
 by rewrite -mulrDr -mulrDl mulrr.
@@ -687,10 +687,10 @@ type class idomain <: comring = {
 section.
 declare type r <: idomain.
 
-lemma nosmt mulf_neq0 (x y : r): x <> zeror => y <> zeror => x * y <> zeror.
+lemma mulf_neq0 (x y : r): x <> zeror => y <> zeror => x * y <> zeror.
 proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0 /#. qed.
 
-lemma nosmt expf_eq0 (x : r) n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
+lemma expf_eq0 (x : r) n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
 proof.
 elim/intwlog: n => [n| |n ge0_n ih].
 + by rewrite exprN invr_eq0 /#.
@@ -698,22 +698,22 @@ elim/intwlog: n => [n| |n ge0_n ih].
 by rewrite exprS // mulf_eq0 ih addz1_neq0 ?andKb.
 qed.
 
-lemma nosmt mulfI (x : r): x <> zeror => injective (( * ) x).
+lemma mulfI (x : r): x <> zeror => injective (( * ) x).
 proof.
 move=> ne0_x y y'; rewrite -(opprK (x * y')) -mulrN -addr_eq0.
 by rewrite -mulrDr mulf_eq0 ne0_x /= addr_eq0 opprK.
 qed.
 
-lemma nosmt mulIf (x : r): x <> zeror => injective (fun y => y * x).
+lemma mulIf (x : r): x <> zeror => injective (fun y => y * x).
 proof. by move=> nz_x y z; rewrite -!(@mulrC x); exact: mulfI. qed.
 
-lemma nosmt sqrf_eq1 (x : r): (exp x 2 = oner) <=> (x = oner \/ x = -oner).
+lemma sqrf_eq1 (x : r): (exp x 2 = oner) <=> (x = oner \/ x = -oner).
 proof. by rewrite -subr_eq0 subr_sqr_1 mulf_eq0 subr_eq0 addr_eq0. qed.
 
-lemma nosmt lregP (x : r): lreg x <=> x <> zeror.
+lemma lregP (x : r): lreg x <=> x <> zeror.
 proof. by split=> [/lreg_neq0//|/mulfI]. qed.
 
-lemma nosmt eqr_div (x1 y1 x2 y2 : r) : unit y1 => unit y2 =>
+lemma eqr_div (x1 y1 x2 y2 : r) : unit y1 => unit y2 =>
   (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
 proof.
 move=> Nut1 Nut2; rewrite -{1}(@mulrK y2 _ x1) //.
@@ -752,30 +752,30 @@ type class ffield <: comring = {
 section.
 declare type f <: ffield.
 
-lemma nosmt mulfV (x : f): x <> zeror => x * (invr x) = oner.
+lemma mulfV (x : f): x <> zeror => x * (invr x) = oner.
 proof. by move=> /unit_neq0/mulrV. qed.
 
-lemma nosmt mulVf (x : f): x <> zeror => (invr x) * x = oner.
+lemma mulVf (x : f): x <> zeror => (invr x) * x = oner.
 proof. by move=> /unit_neq0/mulVr. qed.
 
-lemma nosmt divff (x : f): x <> zeror => x / x = oner.
+lemma divff (x : f): x <> zeror => x / x = oner.
 proof. by move=> /unit_neq0/divrr. qed.
 
-lemma nosmt invfM (x y : f) : invr (x * y) = invr x * invr y.
+lemma invfM (x y : f) : invr (x * y) = invr x * invr y.
 proof.
 case: (x = zeror) => [->|nz_x]; first by rewrite !(mul0r, invr0).
 case: (y = zeror) => [->|nz_y]; first by rewrite !(mulr0, invr0).
 by rewrite invrM ?unit_neq0 // mulrC.
 qed.
 
-lemma nosmt invf_div (x y : f) : invr (x / y) = y / x.
+lemma invf_div (x y : f) : invr (x / y) = y / x.
 proof. by rewrite invfM invrK mulrC. qed.
 
-lemma nosmt eqf_div (x1 y1 x2 y2 : f) : y1 <> zeror => y2 <> zeror =>
+lemma eqf_div (x1 y1 x2 y2 : f) : y1 <> zeror => y2 <> zeror =>
   (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
 proof. by rewrite -!unit_neq0; exact: eqr_div<:f>. qed.
 
-lemma nosmt expfM (x y : f) n : exp (x * y) n = exp x n * exp y n.
+lemma expfM (x y : f) n : exp (x * y) n = exp x n * exp y n.
 proof.
 elim/intwlog: n => [n h | | n ge0_n ih].
 + by rewrite -(@oppzK n) !(@exprN _ (-n)) h invfM.
