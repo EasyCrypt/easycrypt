@@ -1428,7 +1428,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form)
         else l_l f2 onm e_bin_prio_rop4
     | Fapp ({f_node = Fop (op, tys)}, [f1; f2]) ->
         (let (inm, opname) =
-           PPEnv.op_symb ppe op (Some (`Form, tys, List.map t_ty [f1; f2])) in (* FIXME: TC *)
+           PPEnv.op_symb ppe op (Some (`Form, tys, List.map t_ty [f1; f2])) in
          if inm <> [] && inm <> onm
          then None
          else match priority_of_binop opname with
