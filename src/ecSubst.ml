@@ -211,13 +211,19 @@ and subst_tcw (s : subst) (tcw : tcwitness) =
     |> Option.map (fun tcs -> List.nth tcs offset)
     |> Option.value ~default:tcw
 
-  | TCIAbstract ({ support = `Abs p  } as tcw) ->
+  | TCIAbstract ({ support = `Abs p; offset } as tcw) ->
     match Mp.find_opt p s.sb_tydef with
     | None ->
       TCIAbstract { tcw with support = `Abs (subst_path s p) }
 
-    | Some _ ->
-      assert false (* FIXME:TC *)
+    | Some (_, body) ->
+      match body.ty_node with
+      | Tvar a ->
+        TCIAbstract { support = `Var a; offset }
+      | Tconstr (p', _) ->
+        TCIAbstract { support = `Abs p'; offset }
+      | _ ->
+        assert false (* FIXME:TC: substitute via concrete instance lookup *)
 
 (* -------------------------------------------------------------------- *)
 and subst_tcws (s : subst) (tcws : tcwitness list) : tcwitness list =

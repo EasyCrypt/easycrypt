@@ -144,3 +144,19 @@ and infer (env : EcEnv.env) (ty : ty) (tc : typeclass) =
   List.find_map_opt
     (check_tcinstance env ty tc)
     (EcEnv.TcInstance.get_all env)
+
+(* -------------------------------------------------------------------- *)
+(* Flatten the parent chain of a typeclass: returns [tc; parent;
+   grandparent; ...] following [tc_prt]. Each ancestor's [tc_args] is
+   substituted using the child's [tc_tparams] mapping to its actual args. *)
+let rec ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
+  let decl = EcEnv.TypeClass.by_path tc.tc_name env in
+  match decl.tc_prt with
+  | None -> [tc]
+  | Some prt ->
+    let subst =
+      List.fold_left2
+        (fun s (a, _) etyarg -> Mid.add a etyarg s)
+        Mid.empty decl.tc_tparams tc.tc_args in
+    let prt = EcCoreSubst.Tvar.subst_tc subst prt in
+    tc :: ancestors env prt

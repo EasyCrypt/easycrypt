@@ -375,43 +375,75 @@ module Unify = struct
         | `TcCtt (uid, ty, tc) ->
           let deps = ref TyUni.Suid.empty in
 
-          let rec check (ty : ty) : ty =
+          let rec check_ty (ty : ty) : ty =
             match ty.ty_node with
             | Tunivar tyuvar -> begin
               match UF.data tyuvar (!uc).uf with
-              | None -> 
+              | None ->
                 deps := TyUni.Suid.add tyuvar !deps;
                 ty
               | Some ty ->
-                check ty
+                check_ty ty
               end
-            | _ -> ty_map check ty in
+            | _ -> ty_map check_ty ty in
 
-          let ty = check ty in
+          let rec check_tcw (tcw : tcwitness) : tcwitness =
+            match tcw with
+            | TCIUni tcuid -> begin
+              match TcUni.Muid.find_opt tcuid (!uc).tcenv.resolution with
+              | Some (TCIUni tcuid') when TcUni.uid_equal tcuid tcuid' -> tcw
+              | Some tcw' -> check_tcw tcw'
+              | None -> tcw
+            end
+            | TCIConcrete cw ->
+              let etyargs = List.map check_etyarg cw.etyargs in
+              TCIConcrete { cw with etyargs }
+            | TCIAbstract _ -> tcw
+          and check_etyarg ((ty, tcws) : etyarg) =
+            (check_ty ty, List.map check_tcw tcws) in
+
+          let tc =
+            { tc with tc_args = List.map check_etyarg tc.tc_args } in
+
+          let ty = check_ty ty in
           let deps = !deps in
 
           if TyUni.Suid.is_empty deps then begin
-            match ty.ty_node with
-            | Tvar a ->
-              let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
-              let idx =
-                let eq (tc' : typeclass) =
-                  EcPath.p_equal tc.tc_name tc'.tc_name
-                  && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
-                ofdfl failure (List.find_index eq tcs) in
+            let eq_tc (tc' : typeclass) =
+              EcPath.p_equal tc.tc_name tc'.tc_name
+              && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
 
-              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
-                TcUni.Muid.add
-                  uid
-                  (TCIAbstract { support = `Var a; offset = idx; })
-                  (!uc).tcenv.resolution
-              } }
+            (* Find the offset of [tc] (or any of its descendants) in [tcs]
+               by walking each entry's [tc_prt] chain. *)
+            let match_tc_offset (tcs : typeclass list) : int option =
+              List.find_index
+                (fun tc' -> List.exists eq_tc (EcTypeClass.ancestors env tc'))
+                tcs in
 
-            | _->
-              let tci = ofdfl failure (EcTypeClass.infer env ty tc) in
-              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
-                TcUni.Muid.add uid tci (!uc).tcenv.resolution
-              } }
+            let abstract_via_decl (p : EcPath.path) : tcwitness option =
+              match EcEnv.Ty.by_path_opt p env with
+              | Some { tyd_type = `Abstract tcs; _ } ->
+                  Option.map
+                    (fun offset -> TCIAbstract { support = `Abs p; offset; })
+                    (match_tc_offset tcs)
+              | _ -> None in
+
+            let resolution =
+              match ty.ty_node with
+              | Tvar a ->
+                let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
+                let idx = ofdfl failure (match_tc_offset tcs) in
+                TCIAbstract { support = `Var a; offset = idx; }
+
+              | Tconstr (p, _) when Option.is_some (abstract_via_decl p) ->
+                Option.get (abstract_via_decl p)
+
+              | _ ->
+                ofdfl failure (EcTypeClass.infer env ty tc)
+            in
+            uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+              TcUni.Muid.add uid resolution (!uc).tcenv.resolution
+            } }
           end else begin
             TyUni.Suid.iter (fun tyvar ->
               uc := { !uc with tcenv = { (!uc).tcenv with byunivar =

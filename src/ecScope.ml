@@ -1664,7 +1664,13 @@ module Ty = struct
       (* Check typeclasses arguments *)
       let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
 
-      let uptc = tcd.ptc_inth |> omap (TT.transtc scenv ue) in
+      let uptc =
+        let parent_ue = EcUnify.UniEnv.copy ue in
+        let uptc = tcd.ptc_inth |> omap (TT.transtc scenv parent_ue) in
+        let subst = Tuni.subst (EcUnify.UniEnv.close parent_ue) in
+        omap (fun tcp ->
+          { tcp with tc_args = List.map (etyarg_subst subst) tcp.tc_args })
+          uptc in
 
       let asty  =
         { tyd_params  = [];
@@ -1925,9 +1931,9 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ((tparams, ty) : ty_params * ty) (tcp, tc) =
-    let subst, tparams = EcSubst.fresh_tparams EcSubst.empty tparams in
+    let subst, _ = EcSubst.fresh_tparams EcSubst.empty tparams in
     let ty = EcSubst.subst_ty subst ty in
-    let subst = EcSubst.add_tydef subst tcp.tc_name (List.fst tparams, ty) in
+    let subst = EcSubst.add_tydef subst tcp.tc_name ([], ty) in
     let subst =
       List.fold_left
         (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
@@ -1953,7 +1959,9 @@ module Ty = struct
 
     let tcp =
       let ue = EcUnify.UniEnv.create (Some typarams) in
-      TT.transtc (env scope) ue tci.pti_tc in
+      let tcp = TT.transtc (env scope) ue tci.pti_tc in
+      let subst = Tuni.subst (EcUnify.UniEnv.close ue) in
+      { tcp with tc_args = List.map (etyarg_subst subst) tcp.tc_args } in
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
