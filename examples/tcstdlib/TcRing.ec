@@ -572,7 +572,8 @@ lemma expr0z z : exp zeror z = if z = 0 then oner else zeror.
 proof.
 case: (0 <= z) => [/expr0n // | /ltzNge lt0_z].
 rewrite -{1}(@oppzK z) exprN; have ->/=: z <> 0 by smt().
-by rewrite invr_eq0 expr0n ?oppz_ge0 1:ltzW.
+rewrite invr_eq0 expr0n ?oppz_ge0 1:ltzW //.
+by have ->/=: -z <> 0 by smt().
 qed.
 
 lemma expr1z z : exp oner z = oner.

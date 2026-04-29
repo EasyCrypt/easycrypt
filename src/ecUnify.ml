@@ -467,8 +467,53 @@ module Unify = struct
             ) deps
           end
 
-        | _ ->
-          () (* FIXME:TC *)
+        | `TcTw (w1, w2) ->
+          (* Resolve a [TCIUni (u, l)] one level: if [u] has a known
+             resolution [r], return [bump_lift l r]; otherwise leave the
+             reference intact. This is local to the current unification
+             attempt. *)
+          let resolve_uni = function
+            | TCIUni (uid, lift) -> begin
+              match TcUni.Muid.find_opt uid (!uc).tcenv.resolution with
+              | Some w -> bump_lift lift w
+              | None   -> TCIUni (uid, lift)
+            end
+            | w -> w in
+
+          let w1 = resolve_uni w1 in
+          let w2 = resolve_uni w2 in
+
+          let bind_uni uid lift target =
+            (* We want [bump_lift lift R = target] where [R] is the
+               resolution of [uid]. Hence [R = target] with [lift]
+               removed from its lift count. *)
+            let strip_lift n w =
+              match w with
+              | TCIUni (u, l) when l >= n ->
+                Some (TCIUni (u, l - n))
+              | TCIConcrete c when c.lift >= n ->
+                Some (TCIConcrete { c with lift = c.lift - n })
+              | TCIAbstract a when a.lift >= n ->
+                Some (TCIAbstract { a with lift = a.lift - n })
+              | _ -> None in
+            match strip_lift lift target with
+            | None -> failure ()
+            | Some r ->
+              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                TcUni.Muid.add uid r (!uc).tcenv.resolution
+              } } in
+
+          begin match w1, w2 with
+          | TCIUni (u1, l1), TCIUni (u2, l2) when TcUni.uid_equal u1 u2 ->
+            if l1 <> l2 then failure ()
+
+          | TCIUni (uid, lift), w
+          | w, TCIUni (uid, lift) ->
+            bind_uni uid lift w
+
+          | _, _ ->
+            if not (EcAst.tcw_equal w1 w2) then failure ()
+          end
       done
     in
       doit (); !uc
