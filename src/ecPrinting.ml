@@ -972,19 +972,21 @@ and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
 
 (* -------------------------------------------------------------------- *)
 and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
+  let pp_lift fmt l =
+    if l > 0 then Format.fprintf fmt "^%d" l in
   match tcw with
-  | TCIUni uid ->
-    Format.fprintf fmt "%a" (pp_tcunivar ppe) uid
+  | TCIUni (uid, lift) ->
+    Format.fprintf fmt "%a%a" (pp_tcunivar ppe) uid pp_lift lift
 
-  | TCIConcrete { path; etyargs } ->
-    Format.fprintf fmt "%a[%a]"
-      (pp_tciname ppe) path (pp_etyargs ppe) etyargs
+  | TCIConcrete { path; etyargs; lift } ->
+    Format.fprintf fmt "%a[%a]%a"
+      (pp_tciname ppe) path (pp_etyargs ppe) etyargs pp_lift lift
 
-  | TCIAbstract { support = `Var x; offset } ->
-    Format.fprintf fmt "%a.`%d" (pp_tyvar ppe) x (offset + 1)
-  
-  | TCIAbstract { support = `Abs path; offset } ->
-    Format.fprintf fmt "%a.`%d" (pp_tyname ppe) path (offset + 1)
+  | TCIAbstract { support = `Var x; offset; lift } ->
+    Format.fprintf fmt "%a.`%d%a" (pp_tyvar ppe) x (offset + 1) pp_lift lift
+
+  | TCIAbstract { support = `Abs path; offset; lift } ->
+    Format.fprintf fmt "%a.`%d%a" (pp_tyname ppe) path (offset + 1) pp_lift lift
 
 (* -------------------------------------------------------------------- *)
 and pp_tcws (ppe : PPEnv.t) (fmt : Format.formatter) (tcws : tcwitness list) =

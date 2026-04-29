@@ -63,11 +63,12 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
-  | TCIUni of tcuni
+  | TCIUni of tcuni * int
 
   | TCIConcrete of {
       path: EcPath.path;
       etyargs: (ty * tcwitness list) list;
+      lift: int;
   }
 
   | TCIAbstract of {
@@ -76,6 +77,7 @@ and tcwitness =
         | `Abs    of EcPath.path
       ];
       offset: int;
+      lift: int;
   }
   
 (* -------------------------------------------------------------------- *)
@@ -362,6 +364,7 @@ val etyarg_hash  : etyarg -> int
 val etyarg_equal : etyarg -> etyarg -> bool
 
 (* -------------------------------------------------------------------- *)
+val bump_lift : int -> tcwitness -> tcwitness
 val tcw_fv    : tcwitness -> int Mid.t
 val tcw_hash  : tcwitness -> int
 val tcw_equal : tcwitness -> tcwitness -> bool

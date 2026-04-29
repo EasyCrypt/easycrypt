@@ -371,8 +371,9 @@ val ty_hnorm : ty -> env -> ty
 module TypeClass : sig
   type t = tc_decl
 
-  val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> t -> env -> env
+  val add    : path -> env -> env
+  val bind   : ?import:import -> symbol -> t -> env -> env
+  val rebind : symbol -> t -> env -> env
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option

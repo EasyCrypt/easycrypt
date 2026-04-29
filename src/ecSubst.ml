@@ -200,18 +200,18 @@ and subst_tcw (s : subst) (tcw : tcwitness) =
   | TCIUni _ ->
     tcw
 
-  | TCIConcrete { etyargs; path } ->
+  | TCIConcrete ({ etyargs; path; _ } as c) ->
     let path = subst_path s path in
     let etyargs = subst_etyargs s etyargs in
-    TCIConcrete { etyargs; path }
+    TCIConcrete { c with etyargs; path }
 
-  | TCIAbstract { support = `Var a; offset } ->
-       Mid.find_opt a s.sb_tyvar
-    |> Option.map snd
-    |> Option.map (fun tcs -> List.nth tcs offset)
-    |> Option.value ~default:tcw
+  | TCIAbstract { support = `Var a; offset; lift } ->
+    let resolved =
+      Option.bind (Mid.find_opt a s.sb_tyvar) (fun (_, tcs) ->
+        Option.map (fun tcw -> bump_lift lift tcw) (List.nth_opt tcs offset)) in
+    Option.value ~default:tcw resolved
 
-  | TCIAbstract ({ support = `Abs p; offset } as tcw) ->
+  | TCIAbstract ({ support = `Abs p; offset; lift } as tcw) ->
     match Mp.find_opt p s.sb_tydef with
     | None ->
       TCIAbstract { tcw with support = `Abs (subst_path s p) }
@@ -219,9 +219,9 @@ and subst_tcw (s : subst) (tcw : tcwitness) =
     | Some (_, body) ->
       match body.ty_node with
       | Tvar a ->
-        TCIAbstract { support = `Var a; offset }
+        TCIAbstract { support = `Var a; offset; lift }
       | Tconstr (p', _) ->
-        TCIAbstract { support = `Abs p'; offset }
+        TCIAbstract { support = `Abs p'; offset; lift }
       | _ ->
         assert false (* FIXME:TC: substitute via concrete instance lookup *)
 
@@ -943,7 +943,7 @@ let fresh_tparam (s : subst) ((x, tcs) : ty_param) =
   let tcs  = List.map (subst_typeclass s) tcs in
   let tcw  =
     let mk (offset : int) =
-      TCIAbstract { support = `Var newx; offset; }
+      TCIAbstract { support = `Var newx; offset; lift = 0 }
     in List.mapi (fun i _ -> mk i) tcs in
   let s    = add_tyvar s x (tvar newx, tcw) in
   (s, (newx, tcs))

@@ -135,7 +135,7 @@ let rec check_tcinstance
       (subst, (aty, aargs))
     ) Mid.empty tci.tci_params in
 
-    Some (TCIConcrete { path = p; etyargs = args; })
+    Some (TCIConcrete { path = p; etyargs = args; lift = 0; })
 
   with Bailout | NoMatch -> None
 

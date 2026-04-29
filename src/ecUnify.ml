@@ -118,7 +118,7 @@ module Unify = struct
           tcenv.resolution tw;
     } in
 
-    tcenv, TCIUni uid
+    tcenv, TCIUni (uid, 0)
 
   (* ------------------------------------------------------------------ *)
   let initial_ucore ?(tvtc = Mid.empty) () : ucore =
@@ -151,25 +151,26 @@ module Unify = struct
   
     and doit_tc (tw : tcwitness) =
       match tw with
-      | TCIUni uid -> begin
+      | TCIUni (uid, lift) -> begin
         match Hint.find_opt tcmap (uid :> int) with
-        | Some tw -> tw
+        | Some tw -> bump_lift lift tw
         | None ->
-          let tw =
+          let resolved =
             match TcUni.Muid.find_opt uid uc.tcenv.resolution with
-            | None -> tw
-            | Some (TCIUni uid') when TcUni.uid_equal uid uid' -> tw (* FIXME:TC *)
+            | None -> TCIUni (uid, 0)
+            | Some (TCIUni (uid', _)) when TcUni.uid_equal uid uid' -> TCIUni (uid, 0)
             | Some tw -> doit_tc tw
           in
-            Hint.add tcmap (uid :> int) tw; tw
+            Hint.add tcmap (uid :> int) resolved;
+            bump_lift lift resolved
       end
 
-      | TCIConcrete { path; etyargs } ->
+      | TCIConcrete ({ etyargs; _ } as c) ->
         let etyargs =
           List.map
             (fun (ty, tws) -> (doit_ty ty, List.map doit_tc tws))
             etyargs
-        in TCIConcrete { path; etyargs; }
+        in TCIConcrete { c with etyargs }
 
       | TCIAbstract { support = (`Var _ | `Abs _) } ->
         tw
@@ -186,8 +187,8 @@ module Unify = struct
       | ty -> Some ty in
 
     let dereference_tcuni (uid : tcuni) =
-      match close.tcuni (TCIUni uid) with
-      | TCIUni uid' when TcUni.uid_equal uid uid' -> None
+      match close.tcuni (TCIUni (uid, 0)) with
+      | TCIUni (uid', _) when TcUni.uid_equal uid uid' -> None
       | tw -> Some tw in
 
     let uvars =
@@ -389,10 +390,10 @@ module Unify = struct
 
           let rec check_tcw (tcw : tcwitness) : tcwitness =
             match tcw with
-            | TCIUni tcuid -> begin
+            | TCIUni (tcuid, lift) -> begin
               match TcUni.Muid.find_opt tcuid (!uc).tcenv.resolution with
-              | Some (TCIUni tcuid') when TcUni.uid_equal tcuid tcuid' -> tcw
-              | Some tcw' -> check_tcw tcw'
+              | Some (TCIUni (tcuid', _)) when TcUni.uid_equal tcuid tcuid' -> tcw
+              | Some tcw' -> bump_lift lift (check_tcw tcw')
               | None -> tcw
             end
             | TCIConcrete cw ->
@@ -416,18 +417,26 @@ module Unify = struct
               EcPath.p_equal tc.tc_name tc'.tc_name
               && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
 
-            (* Find the offset of [tc] (or any of its descendants) in [tcs]
-               by walking each entry's [tc_prt] chain. *)
-            let match_tc_offset (tcs : typeclass list) : int option =
-              List.find_index
-                (fun tc' -> List.exists eq_tc (EcTypeClass.ancestors env tc'))
-                tcs in
+            (* Find the offset of [tc] (or any of its ancestors) in [tcs];
+               also return the number of [tc_prt] steps walked to reach
+               [tc] from [tcs.(offset)]. [lift = 0] is a direct match. *)
+            let match_tc_offset (tcs : typeclass list) : (int * int) option =
+              let with_lift tc' =
+                List.find_index eq_tc (EcTypeClass.ancestors env tc') in
+              let rec scan i = function
+                | [] -> None
+                | tc' :: rest ->
+                  match with_lift tc' with
+                  | Some lift -> Some (i, lift)
+                  | None -> scan (i + 1) rest
+              in scan 0 tcs in
 
             let abstract_via_decl (p : EcPath.path) : tcwitness option =
               match EcEnv.Ty.by_path_opt p env with
               | Some { tyd_type = `Abstract tcs; _ } ->
                   Option.map
-                    (fun offset -> TCIAbstract { support = `Abs p; offset; })
+                    (fun (offset, lift) ->
+                      TCIAbstract { support = `Abs p; offset; lift })
                     (match_tc_offset tcs)
               | _ -> None in
 
@@ -435,8 +444,8 @@ module Unify = struct
               match ty.ty_node with
               | Tvar a ->
                 let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
-                let idx = ofdfl failure (match_tc_offset tcs) in
-                TCIAbstract { support = `Var a; offset = idx; }
+                let (offset, lift) = ofdfl failure (match_tc_offset tcs) in
+                TCIAbstract { support = `Var a; offset; lift }
 
               | Tconstr (p, _) when Option.is_some (abstract_via_decl p) ->
                 Option.get (abstract_via_decl p)

@@ -137,9 +137,9 @@ and tcw_map (f : ty -> ty) (tcw : tcwitness) : tcwitness =
   | TCIUni _ ->
     tcw
 
-  | TCIConcrete { path; etyargs; } ->
+  | TCIConcrete ({ etyargs; _ } as c) ->
     let etyargs = List.Smart.map (etyarg_map f) etyargs in
-    TCIConcrete { path; etyargs; }
+    TCIConcrete { c with etyargs }
 
   | TCIAbstract _ ->
     tcw

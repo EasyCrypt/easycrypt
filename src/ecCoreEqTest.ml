@@ -63,20 +63,26 @@ and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
 
 and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
-  | TCIUni uid1, TCIUni uid2 ->
-    EcAst.TcUni.uid_equal uid1 uid2
+  | TCIUni (uid1, l1), TCIUni (uid2, l2) ->
+    EcAst.TcUni.uid_equal uid1 uid2 && l1 = l2
 
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path
+    && tcw1.lift = tcw2.lift
     && for_etyargs env tcw1.etyargs tcw2.etyargs
 
-  | TCIAbstract { support = `Var v1; offset = o1 },
-    TCIAbstract { support = `Var v2; offset = o2 } ->
-    EcIdent.id_equal v1 v2 && o1 = o2
+  | TCIAbstract { support = `Var v1; offset = o1; lift = l1 },
+    TCIAbstract { support = `Var v2; offset = o2; lift = l2 } ->
+    EcIdent.id_equal v1 v2 && o1 = o2 && l1 = l2
 
-  | TCIAbstract { support = `Abs p1; offset = o1 },
-    TCIAbstract { support = `Abs p2; offset = o2 } ->
-    EcPath.p_equal p1 p2 && o1 = o2
+  | TCIAbstract { support = `Abs p1; offset = o1; lift = l1 },
+    TCIAbstract { support = `Abs p2; offset = o2; lift = l2 } ->
+    let r = EcPath.p_equal p1 p2 && o1 = o2 && l1 = l2 in
+    if not r then
+      Printf.eprintf "[for_tcw FAIL] Abs(%s,o=%d,l=%d) vs Abs(%s,o=%d,l=%d)\n%s\n%!"
+        (EcPath.tostring p1) o1 l1 (EcPath.tostring p2) o2 l2
+        (Printexc.raw_backtrace_to_string (Printexc.get_callstack 15));
+    r
 
   | _, _ ->
     false

@@ -207,9 +207,9 @@ let rec ty_subst (s : f_subst) (ty : ty) : ty =
 (* -------------------------------------------------------------------- *)
 and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
   match tcw with
-  | TCIUni uid ->
-       TcUni.Muid.find_opt uid s.fs_utc
-    |> Option.value ~default:tcw
+  | TCIUni (uid, lift) ->
+    let resolved = TcUni.Muid.find_opt uid s.fs_utc in
+    Option.fold ~none:tcw ~some:(bump_lift lift) resolved
 
   | TCIConcrete ({ etyargs = etyargs0 } as rtcw) ->
     let etyargs = List.Smart.map (etyarg_subst s) etyargs0 in
@@ -217,10 +217,10 @@ and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
       tcw
     else TCIConcrete { rtcw with etyargs }
 
-  | TCIAbstract { support = `Var tyvar; offset } ->
+  | TCIAbstract { support = `Var tyvar; offset; lift } ->
     let resolved =
-      Option.bind (Mid.find_opt tyvar s.fs_v)
-        (fun (_, tcws) -> List.nth_opt tcws offset) in
+      Option.bind (Mid.find_opt tyvar s.fs_v) (fun (_, tcws) ->
+        Option.map (bump_lift lift) (List.nth_opt tcws offset)) in
     Option.value ~default:tcw resolved
 
   | TCIAbstract { support = `Abs _ } ->

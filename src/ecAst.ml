@@ -66,11 +66,17 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
-  | TCIUni of tcuni
+  (* Unification variable, possibly with a pending [lift] count to apply
+     once the variable is resolved. *)
+  | TCIUni of tcuni * int
 
   | TCIConcrete of {
       path: EcPath.path;
       etyargs: (ty * tcwitness list) list;
+      (* Same semantics as [TCIAbstract.lift]: number of [tc_prt] steps
+         to walk up from the typeclass that this concrete instance is
+         declared for. *)
+      lift: int;
   }
 
   | TCIAbstract of {
@@ -79,6 +85,11 @@ and tcwitness =
         | `Abs    of EcPath.path
       ];
       offset: int;
+      (* Number of [tc_prt] steps to walk up from the typeclass at
+         [support]'s [offset]-th position. [lift = 0] means "use the
+         declared typeclass directly"; [lift = k] means "walk [k] parent
+         pointers up the typeclass hierarchy from there". *)
+      lift: int;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -407,6 +418,17 @@ let lp_fv = function
         Sid.empty ids
 
 (* -------------------------------------------------------------------- *)
+(* Add [n] parent-walk steps to a witness. Used during substitution when
+   a witness referencing the [k]-th tc of some support gets replaced by
+   the witness for that tc, which may itself need to be lifted further. *)
+let bump_lift (n : int) (tcw : tcwitness) : tcwitness =
+  if n = 0 then tcw else
+  match tcw with
+  | TCIUni (uid, l) -> TCIUni (uid, l + n)
+  | TCIConcrete c -> TCIConcrete { c with lift = c.lift + n }
+  | TCIAbstract a -> TCIAbstract { a with lift = a.lift + n }
+
+(* -------------------------------------------------------------------- *)
 let rec tcw_fv (tcw : tcwitness) =
   match tcw with
   | TCIUni _  ->
@@ -436,15 +458,16 @@ let etyargs_fv (tyargs : etyarg list) =
 (* -------------------------------------------------------------------- *)
 let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
   match tcw1, tcw2 with
-  | TCIUni uid1, TCIUni uid2 ->
-    TcUni.uid_equal uid1 uid2
+  | TCIUni (uid1, l1), TCIUni (uid2, l2) ->
+    TcUni.uid_equal uid1 uid2 && l1 = l2
 
   | TCIConcrete tcw1, TCIConcrete tcw2 ->
        EcPath.p_equal tcw1.path tcw2.path
+    && tcw1.lift = tcw2.lift
     && List.all2 etyarg_equal tcw1.etyargs tcw2.etyargs
 
-  | TCIAbstract { support = support1; offset = o1; }
-  , TCIAbstract { support = support2; offset = o2; }
+  | TCIAbstract { support = support1; offset = o1; lift = l1 }
+  , TCIAbstract { support = support2; offset = o2; lift = l2 }
   ->
     let tyvar_eq () =
       match support1, support2 with
@@ -454,7 +477,7 @@ let rec tcw_equal (tcw1 : tcwitness) (tcw2 : tcwitness) =
         EcPath.p_equal p1 p2
       | _, _ -> false
 
-      in o1 = o2 && tyvar_eq ()
+      in o1 = o2 && l1 = l2 && tyvar_eq ()
 
   | _, _ ->
     false
@@ -465,20 +488,20 @@ and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
 (* -------------------------------------------------------------------- *)
 let rec tcw_hash (tcw : tcwitness) =
   match tcw with
-  | TCIUni uid ->
-    Hashtbl.hash uid
+  | TCIUni (uid, l) ->
+    Why3.Hashcons.combine (Hashtbl.hash uid) l
 
   | TCIConcrete tcw ->
     Why3.Hashcons.combine_list
       etyarg_hash
-      (p_hash tcw.path)
+      (Why3.Hashcons.combine (p_hash tcw.path) tcw.lift)
       tcw.etyargs
 
-  | TCIAbstract { support = `Var tyvar; offset } ->
-    Why3.Hashcons.combine (EcIdent.id_hash tyvar) offset
+  | TCIAbstract { support = `Var tyvar; offset; lift } ->
+    Why3.Hashcons.combine2 (EcIdent.id_hash tyvar) offset lift
 
-  | TCIAbstract { support = `Abs p; offset } ->
-    Why3.Hashcons.combine (EcPath.p_hash p) offset
+  | TCIAbstract { support = `Abs p; offset; lift } ->
+    Why3.Hashcons.combine2 (EcPath.p_hash p) offset lift
 
   and etyarg_hash ((ty, tcws) : etyarg) =
     Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws

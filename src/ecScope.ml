@@ -1290,7 +1290,7 @@ module Op = struct
       let oppath = EcPath.pqname (path scope) (unloc op.po_name) in
       let optyargs =
         let mktcw (a : EcIdent.t) (i : int) =
-          TCIAbstract { support = `Var a; offset = i; }
+          TCIAbstract { support = `Var a; offset = i; lift = 0 }
         in
           List.map
             (fun (a, tcs) -> (tvar a, List.mapi (fun i _ -> mktcw a i) tcs))
@@ -1672,9 +1672,26 @@ module Ty = struct
           { tcp with tc_args = List.map (etyarg_subst subst) tcp.tc_args })
           uptc in
 
+      (* The carrier's [tcs] should reference the class being declared
+         (so its own ops can be resolved via [Abs mypath, l=0]) and the
+         parent class is reachable via the ancestor chain. To make
+         [EcTypeClass.ancestors] work during axiom typing, we pre-bind
+         a stub typeclass record. The full record replaces the stub at
+         end of [add_class]. *)
+      let mypath = EcPath.pqname (path scope) name in
+      let stub_tc : tc_decl = {
+        tc_tparams = EcUnify.UniEnv.tparams ue;
+        tc_prt     = uptc;
+        tc_ops     = [];
+        tc_axs     = [];
+        tc_loca    = lc;
+      } in
+      let scenv =
+        EcEnv.TypeClass.rebind name stub_tc scenv in
+
       let asty  =
         { tyd_params  = [];
-          tyd_type    = `Abstract (otolist uptc);
+          tyd_type    = `Abstract [{ tc_name = mypath; tc_args = [] }];
           tyd_resolve = true;
           tyd_loca    = (lc :> locality); } in
       let scenv = EcEnv.Ty.bind name asty scenv in
