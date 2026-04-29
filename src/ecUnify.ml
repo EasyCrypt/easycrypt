@@ -725,6 +725,18 @@ let unify (env : EcEnv.env) (ue : unienv) (t1 : ty) (t2 : ty) =
   unify_core env ue (`TyUni (t1, t2))
 
 (* -------------------------------------------------------------------- *)
+let unify_tcw (env : EcEnv.env) (ue : unienv) (w1 : tcwitness) (w2 : tcwitness) =
+  unify_core env ue (`TcTw (w1, w2))
+
+(* -------------------------------------------------------------------- *)
+let unify_etyarg (env : EcEnv.env) (ue : unienv) (e1 : etyarg) (e2 : etyarg) =
+  let (t1, ws1) = e1 and (t2, ws2) = e2 in
+  unify env ue t1 t2;
+  if List.length ws1 <> List.length ws2 then
+    raise (UnificationFailure (`TyUni (t1, t2)));
+  List.iter2 (unify_tcw env ue) ws1 ws2
+
+(* -------------------------------------------------------------------- *)
 let tfun_expected (ue : unienv) (psig : ty list) =
   EcTypes.toarrow psig (UniEnv.fresh ue)
 
