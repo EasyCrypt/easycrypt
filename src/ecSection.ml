@@ -864,9 +864,9 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let extra = generalize_extra_ty to_gen fv in
         let tparams = extra @ operator.op_tparams in
         let opty = operator.op_ty in
-        let args = List.map (fun (id, _) -> tvar id) tparams in
+        let etyargs = EcDecl.etyargs_of_tparams tparams in
         let tosubst = (List.map fst operator.op_tparams,
-                       f_op path args opty) in
+                       f_op_tc path etyargs opty) in
         let tg_subst =
           EcSubst.add_pddef to_gen.tg_subst path tosubst in
         tg_subst, mk_op ~opaque:operator.op_opaque tparams opty None `Global
@@ -877,8 +877,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let opty = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args = List.map (fun (id, _) -> tvar id) tparams in
-        let eop = e_op path t_args opty in
+        let etyargs = EcDecl.etyargs_of_tparams tparams in
+        let eop = e_op_tc path etyargs opty in
         let e   =
           e_app eop (List.map (fun (id,ty) -> e_local id ty) extra_a)
             operator.op_ty in
@@ -915,8 +915,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let op_tparams = extra_t @ operator.op_tparams in
         let extra_a = generalize_extra_args to_gen.tg_binds fv in
         let op_ty   = toarrow (List.map snd extra_a) operator.op_ty in
-        let t_args  = List.map (fun (id, _) -> tvar id) op_tparams in
-        let fop = f_op path t_args op_ty in
+        let etyargs = EcDecl.etyargs_of_tparams op_tparams in
+        let fop = f_op_tc path etyargs op_ty in
         let f   =
           f_app fop (List.map (fun (id,ty) -> f_local id ty) extra_a)
             operator.op_ty in

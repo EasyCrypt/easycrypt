@@ -219,9 +219,8 @@ and tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
 
   | TCIAbstract { support = `Var tyvar; offset } ->
     let resolved =
-      let open Option in
-      bind (Mid.find_opt tyvar s.fs_v) (fun (_, tcws) ->
-        List.nth_opt tcws offset) in
+      Option.bind (Mid.find_opt tyvar s.fs_v)
+        (fun (_, tcws) -> List.nth_opt tcws offset) in
     Option.value ~default:tcw resolved
 
   | TCIAbstract { support = `Abs _ } ->
