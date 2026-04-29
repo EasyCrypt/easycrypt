@@ -1616,6 +1616,16 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
 
 let init hyps concl =
   let env   = LDecl.toenv hyps in
+  (* Pre-reduce typeclass operators so the SMT translation sees ordinary
+     operators only. With concrete instances in scope this collapses
+     [(+)<:int + addmonoid>] into [Int.(+)] and similar. Polymorphic TC
+     ops over abstract carriers stay folded; SMT will treat them as
+     opaque, which is consistent with their hypotheses being SMT-encoded
+     similarly. We restrict the reduction to TC unfolding (delta_tc) to
+     avoid over-simplifying the goal in ways that defeat SMT hints. *)
+  let concl =
+    let ri = { EcReduction.no_red with delta_tc = true } in
+    EcReduction.simplify ri hyps concl in
   let hyps  = LDecl.tohyps hyps in
   let task  = create_global_task () in
   let known = Lazy.force core_theories in

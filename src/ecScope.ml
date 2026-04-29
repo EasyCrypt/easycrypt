@@ -1689,9 +1689,12 @@ module Ty = struct
       let scenv =
         EcEnv.TypeClass.rebind name stub_tc scenv in
 
+      let tc_self =
+        { tc_name = mypath;
+          tc_args = EcDecl.etyargs_of_tparams stub_tc.tc_tparams; } in
       let asty  =
         { tyd_params  = [];
-          tyd_type    = `Abstract [{ tc_name = mypath; tc_args = [] }];
+          tyd_type    = `Abstract [tc_self];
           tyd_resolve = true;
           tyd_loca    = (lc :> locality); } in
       let scenv = EcEnv.Ty.bind name asty scenv in
