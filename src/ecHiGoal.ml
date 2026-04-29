@@ -690,7 +690,6 @@ let process_delta ~und_delta ?target (s, o, p) tc =
 
             match sform_of_form fp with
             | SFop ((_, tvi), []) -> begin
-              (* FIXME: TC HOOK *)
               let body =
                 Tvar.f_subst
                   ~freshen:true
@@ -717,7 +716,6 @@ let process_delta ~und_delta ?target (s, o, p) tc =
 
   | `RtoL ->
     let fp =
-      (* FIXME: TC HOOK *)
       let body =
         Tvar.f_subst
           ~freshen:true

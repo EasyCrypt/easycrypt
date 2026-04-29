@@ -104,7 +104,6 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     end
 
     | Tconstr (p', ts)  ->
-        (* FIXME:TC *)
         if List.exists (EcTypes.etyarg_sub_exists (occurs p)) ts then
           raise NonPositive;
         if not (EcPath.p_equal p p') then None else

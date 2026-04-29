@@ -137,7 +137,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       match tdecl.tyd_type with
       | `Abstract _ ->
-          List.exists isempty (List.fst targs) (* FIXME:TC *)
+          List.exists isempty (List.fst targs)
 
       | `Concrete ty ->
           isempty_1 [tyinst () ty]
