@@ -53,7 +53,7 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Typeclass p ->
       Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tyname ppe) p
   | `TcInstance (`General p) ->
-      Format.fprintf fmt "typeclass instance %s" (EcPath.tostring p) (* FIXME:TC *)
+      Format.fprintf fmt "typeclass instance %a" (EcPrinting.pp_axname ppe) p
   | `TcInstance `Ring ->
       Format.fprintf fmt "ring instance"
   | `TcInstance `Field ->
