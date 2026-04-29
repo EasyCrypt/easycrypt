@@ -2138,8 +2138,21 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
           (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
+    let pp_one_tc fmt (tc : typeclass) =
+      match tc.tc_args with
+      | []   -> pp_tyname ppe fmt tc.tc_name
+      | [ty] ->
+          Format.fprintf fmt "%a %a"
+            (pp_type ppe) (fst ty) (pp_tyname ppe) tc.tc_name
+      | tys ->
+          Format.fprintf fmt "(%a) %a"
+            (pp_list ",@ " (pp_type ppe)) (List.fst tys)
+            (pp_tyname ppe) tc.tc_name in
     match tyd.tyd_type with
-    | `Abstract _ -> ()                (* FIXME: TC HOOK *)
+    | `Abstract [] -> ()
+    | `Abstract tcs ->
+        Format.fprintf fmt " <: %a"
+          (pp_list " &@ " pp_one_tc) tcs
 
     | `Concrete ty ->
         Format.fprintf fmt " =@ %a" (pp_type ppe) ty
