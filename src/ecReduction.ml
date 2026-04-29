@@ -1435,24 +1435,9 @@ let rec conv ri env f1 f2 stk =
     end
 
   | Fop(p1, ty1), Fop(p2,ty2)
-      when EcPath.p_equal p1 p2 ->
-    if List.all2 (EqTest_i.for_etyarg env) ty1 ty2 then
-      conv_next ri env f1 stk
-    else begin
-      let dump_etys etys =
-        String.concat "; " (List.map (fun (_, tcws) ->
-          String.concat "," (List.map (function
-            | TCIUni (u, l) -> Printf.sprintf "TCIUni(#%d,l=%d)" (u :> int) l
-            | TCIConcrete c -> Printf.sprintf "TCIConcrete(%s,l=%d)" (EcPath.tostring c.path) c.lift
-            | TCIAbstract { support = `Var x; offset; lift } ->
-              Printf.sprintf "TCIAbs(Var %s,o=%d,l=%d)" (EcIdent.tostring x) offset lift
-            | TCIAbstract { support = `Abs p; offset; lift } ->
-              Printf.sprintf "TCIAbs(Abs %s,o=%d,l=%d)" (EcPath.tostring p) offset lift)
-          tcws)) etys) in
-      Printf.eprintf "[conv Fop mismatch] op=%s\n  lhs=[%s]\n  rhs=[%s]\n%!"
-        (EcPath.tostring p1) (dump_etys ty1) (dump_etys ty2);
-      force_head ri env f1 f2 stk
-    end
+      when EcPath.p_equal p1 p2
+        && List.all2 (EqTest_i.for_etyarg env) ty1 ty2 ->
+    conv_next ri env f1 stk
 
   | Fapp(f1', args1), Fapp(f2', args2)
       when EqTest_i.for_type env f1'.f_ty f2'.f_ty
