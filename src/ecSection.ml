@@ -1396,7 +1396,9 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_theory th       -> (generalize_ctheory to_gen prefix th, None)
     | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
     | Th_instance (x,tci)-> generalize_instance to_gen (x,tci)
-    | Th_typeclass _     -> assert false (* FIXME:TC *)
+    | Th_typeclass (x, tc) ->
+        if tc.tc_loca = `Local then to_gen, None
+        else to_gen, Some (Th_typeclass (x, tc))
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
