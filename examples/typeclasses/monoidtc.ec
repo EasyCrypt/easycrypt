@@ -38,9 +38,9 @@ abstract theory AddMonoid.
   op (+) : t -> t -> t.
 
   theory Axioms.
-    axiom nosmt addmA: associative (+).
-    axiom nosmt addmC: commutative (+).
-    axiom nosmt add0m: left_id idm (+).
+    axiom addmA: associative (+).
+    axiom addmC: commutative (+).
+    axiom add0m: left_id idm (+).
   end Axioms.
 
   instance addmonoid with t

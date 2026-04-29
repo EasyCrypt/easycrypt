@@ -250,6 +250,17 @@ module Unify = struct
     let uc = ref uc in
     let pb = let x = Queue.create () in Queue.push pb x; x in
 
+    (* Seed the queue with every unresolved TC constraint. This catches
+       problems whose carrier type had no univar deps at creation time
+       (e.g. [Tvar 'a] for a TC-constrained type parameter), which would
+       otherwise sit in [problems] forever, never triggered via
+       [byunivar] eviction. Re-pushing already-deferred problems is
+       idempotent: the [`TcCtt] arm just re-adds them to [byunivar]. *)
+    TcUni.Muid.iter (fun uid (ty, tc) ->
+      if not (TcUni.Muid.mem uid (!uc).tcenv.resolution) then
+        Queue.push (`TcCtt (uid, ty, tc)) pb
+    ) (!uc).tcenv.problems;
+
     let ocheck i t =
       let i   = UF.find i (!uc).uf in
       let map = Hint.create 0 in

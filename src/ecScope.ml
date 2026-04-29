@@ -1941,12 +1941,6 @@ module Ty = struct
   let add_generic_instance
     ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
   =
-    let name =
-      match tci.pti_name with
-      | None ->
-        hierror ~loc "typeclass instances must be given a name"
-      | Some name -> name in
-
     let (typarams, _) as ty =
       let ue = TT.transtyvars (env scope) (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl (env scope) ue (snd tci.pti_type) in
@@ -2001,8 +1995,15 @@ module Ty = struct
       ; tci_instance = `General (tcp, Some symbols)
       ; tci_local    = lc } in
 
+    let name =
+      match tci.pti_name with
+      | Some name -> unloc name
+      | None ->
+          Printf.sprintf "%s_%d"
+            (EcPath.basename tcp.tc_name) (EcUid.unique ()) in
+
     let scope =
-      let item = EcTheory.Th_instance (Some (unloc name), instance) in
+      let item = EcTheory.Th_instance (Some name, instance) in
       let item = EcTheory.mkitem import item in
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
 

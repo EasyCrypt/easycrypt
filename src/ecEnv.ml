@@ -905,9 +905,14 @@ module MC = struct
       in
 
       let fsubst =
+        let op_etyargs =
+          let tparams =
+            tc.tc_tparams
+            @ [(self, [{tc_name = mypath; tc_args = etyargs_of_tparams tc.tc_tparams}])]
+          in EcDecl.etyargs_of_tparams tparams in
         List.fold_left
           (fun s (x, xp, xty, _) ->
-            let fop = EcCoreFol.f_op xp [tvar self] xty in
+            let fop = EcCoreFol.f_op_tc xp op_etyargs xty in
               EcSubst.add_flocal s x fop)
           tsubst
           operators
