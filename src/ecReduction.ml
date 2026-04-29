@@ -736,11 +736,12 @@ let reduce_user_gen simplify ri env hyps f =
         | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
-          let tys' = List.map (Tvar.subst tvi.subst) tys' in
-          let tys  = List.fst tys  in (* FIXME:TC *)
+          let tys' = List.map (Tvar.subst_etyarg tvi.subst) tys' in
 
           begin
-            try  List.iter2 (EcUnify.unify env ue) tys tys'
+            try
+              if List.length tys <> List.length tys' then raise NotReducible;
+              List.iter2 (EcUnify.unify_etyarg env ue) tys tys'
             with EcUnify.UnificationFailure _ -> raise NotReducible end;
 
           List.iter2 doit args args'
@@ -1706,10 +1707,8 @@ module User = struct
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
-        | { f_node = Fop (p, etyargs) }, args
-            when List.for_all (fun (_, ws) -> List.is_empty ws) etyargs
-          ->                    (* FIXME: TC *)
-            R.Rule (`Op (p, List.fst etyargs), List.map rule args)
+        | { f_node = Fop (p, etyargs) }, args ->
+            R.Rule (`Op (p, etyargs), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
         | { f_node = Fproj (target, i) }, [] ->
@@ -1732,12 +1731,13 @@ module User = struct
         | R.Rule (op, args) ->
             let ltyvars =
               match op with
-              | `Op (_, tys) ->
-                List.fold_left (
-                    let rec doit ltyvars = function
-                      | { ty_node = Tvar a } -> Sid.add a ltyvars
-                      | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  cst.cst_ty_vs tys
+              | `Op (_, etyargs) ->
+                let rec doit_ty ltyvars = function
+                  | { ty_node = Tvar a } -> Sid.add a ltyvars
+                  | _ as ty -> ty_fold doit_ty ltyvars ty in
+                List.fold_left
+                  (fun ltyvars (ty, _) -> doit_ty ltyvars ty)
+                  cst.cst_ty_vs etyargs
               | `Tuple -> cst.cst_ty_vs
               | `Proj _ -> cst.cst_ty_vs in
             let cst = {cst with cst_ty_vs = ltyvars } in

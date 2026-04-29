@@ -439,8 +439,11 @@ let rec tcw_fv (tcw : tcwitness) =
       (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
       Mid.empty etyargs
 
-  | TCIAbstract _ ->
-    Mid.empty (* FIXME:TC *)
+  | TCIAbstract { support = `Var v } ->
+    Mid.singleton v 1
+
+  | TCIAbstract { support = `Abs _ } ->
+    Mid.empty
 
 and tcws_fv (tcws : tcwitness list) =
   List.fold_left
