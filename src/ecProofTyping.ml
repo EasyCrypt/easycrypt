@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -187,10 +188,24 @@ let tc1_process_codepos1 tc (side, cpos) =
   EcTyping.trans_codepos1 env cpos
   
 (* ------------------------------------------------------------------ *)
-(* FIXME: factor out to typing module                                 *)
-(* FIXME:TC HOOK - check parameter constraints                        *)
-(* ------------------------------------------------------------------ *)
-let pf_check_tvi (pe : proofenv) typ tvi =
+let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
+  let rec is_ground (ty : ty) =
+    match ty.ty_node with
+    | Tunivar _ | Tvar _ -> false
+    | _ -> not (ty_sub_exists (fun t -> not (is_ground t)) ty) in
+
+  let check_constraints (tcs : typeclass list) (ty : ty) =
+    if is_ground ty then
+      List.iter (fun tc ->
+        if Option.is_none (EcTypeClass.infer env ty tc) then
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          tc_error_lazy pe (fun fmt ->
+            Format.fprintf fmt
+              "type @[<hov 2>%a@] does not satisfy typeclass constraint @[<hov 2>%a@]"
+              (EcPrinting.pp_type ppe) ty
+              (EcPrinting.pp_tyname ppe) tc.tc_name)
+      ) tcs in
+
   match tvi with
   | None -> ()
 
@@ -198,7 +213,10 @@ let pf_check_tvi (pe : proofenv) typ tvi =
       if List.length tyargs <> List.length typ then
         tc_error pe
           "wrong number of type parameters (%d, expecting %d)"
-          (List.length tyargs) (List.length typ)
+          (List.length tyargs) (List.length typ);
+      List.iter2 (fun (_, tcs) (ty_opt, _) ->
+        Option.iter (check_constraints tcs) ty_opt
+      ) typ tyargs
 
   | Some (EcUnify.TVInamed tyargs) ->
       let typnames = List.map (EcIdent.name |- fst) typ in
@@ -206,7 +224,12 @@ let pf_check_tvi (pe : proofenv) typ tvi =
         (fun (x, _) ->
           if not (List.mem x typnames) then
             tc_error pe "unknown type variable: %s" x)
-        tyargs
+        tyargs;
+      List.iter (fun (id, tcs) ->
+        match List.assoc_opt (EcIdent.name id) tyargs with
+        | Some (Some ty, _) -> check_constraints tcs ty
+        | _ -> ()
+      ) typ
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

@@ -516,7 +516,7 @@ let process_named_pterm pe (tvi, fp) =
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi)
   in
 
-  PT.pf_check_tvi pe.pte_pe typ tvi;
+  PT.pf_check_tvi env pe.pte_pe typ tvi;
 
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
   let ax  = Fsubst.f_subst_tvar ~freshen:false fs.subst ax in
