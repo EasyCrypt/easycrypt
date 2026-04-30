@@ -1712,7 +1712,15 @@ module Ty = struct
         let check1 (x, ty) =
           let ue = EcUnify.UniEnv.copy ue in
           let ty = transty tp_tydecl scenv ue ty in
-          let uidmap = EcUnify.UniEnv.close ue in
+          let uidmap =
+            try EcUnify.UniEnv.close ue
+            with EcUnify.UninstanciateUni _ ->
+              hierror ~loc:x.pl_loc
+                "operator `%s' has free type/typeclass variables in its type. \
+                 Provide an explicit type instantiation (e.g. via `<:%s>`) to \
+                 fix the carrier."
+                (unloc x) (unloc tcd.ptc_name)
+          in
           let ty = ty_subst (Tuni.subst uidmap) ty in
             (EcIdent.create (unloc x), ty)
         in
@@ -1724,7 +1732,15 @@ module Ty = struct
         let check1 (x, ax) =
           let ue = EcUnify.UniEnv.copy ue in
           let ax = trans_prop scenv ue ax in
-          let uidmap = EcUnify.UniEnv.close ue in
+          let uidmap =
+            try EcUnify.UniEnv.close ue
+            with EcUnify.UninstanciateUni _ ->
+              hierror ~loc:x.pl_loc
+                "axiom `%s' is type-ambiguous: free type/typeclass variables \
+                 remain after typing. Provide an explicit type instantiation \
+                 (e.g. via `<:%s>`) to fix the carrier."
+                (unloc x) (unloc tcd.ptc_name)
+          in
           let fs = Tuni.subst uidmap in
           let ax = Fsubst.f_subst fs ax in
             (unloc x, ax)
