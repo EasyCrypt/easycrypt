@@ -560,7 +560,7 @@ type to_clear =
 
 type to_gen =
   { tg_env     : scenv;
-    tg_params  : (EcIdent.t * typeclass list) list; (* FIXME: TC *)
+    tg_params  : ty_params;
     tg_binds   : bind list;
     tg_subst   : EcSubst.subst;
     tg_clear   : to_clear; }
@@ -1042,9 +1042,9 @@ let generalize_export to_gen (p,lc) =
 
 let generalize_instance to_gen (x, tci) =
   if tci.tci_local = `Local then to_gen, None
-  (* FIXME:TC be sure that we have no dep to declare or local,
-     or fix this code *)
-  else to_gen, Some (Th_instance (x, tci))
+  else
+    let tci = EcSubst.subst_tcinstance to_gen.tg_subst tci in
+    to_gen, Some (Th_instance (x, tci))
 
 let generalize_baserw to_gen prefix (s,lc) =
   if lc = `Local then

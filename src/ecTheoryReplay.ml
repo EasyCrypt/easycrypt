@@ -51,7 +51,6 @@ let keep_of_mode (mode : clmode) =
 (* -------------------------------------------------------------------- *)
 exception Incompatible of incompatible
 
-(* FIXME:TC *)
 let tparams_compatible (rtyvars : ty_params) (ntyvars : ty_params) =
   let rlen = List.length rtyvars and nlen = List.length ntyvars in
   if rlen <> nlen then
@@ -134,7 +133,7 @@ let expr_compatible exn env s e1 e2 =
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
-  let _, okind = EcSubst.open_oper oper tys in (* FIXME:TC *)
+  let _, okind = EcSubst.open_oper oper tys in
   match okind with
   | OB_oper (Some ob) -> ob
   | _ -> raise exn

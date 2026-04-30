@@ -1031,10 +1031,9 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
     end;
 
     let tvi = EcUnify.UniEnv.opentvi ue decl.tc_tparams None in
- 
-    (* FIXME:TC can raise an exception *)
+
     List.iter2
-      (fun (ty, _) aty -> EcUnify.unify env ue ty aty)
+      (fun (ty, _) aty -> unify_or_fail env ue (loc tc_name) ~expct:ty aty)
       tvi.args args;
 
     { tc_name = p; tc_args = tvi.args; }
