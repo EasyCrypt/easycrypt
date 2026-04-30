@@ -233,14 +233,15 @@ placeholders, abstract carriers, parametric instances).
 
 ## Known limitations
 
-### Bare ops on parametric-carrier typeclasses
+### Polymorphic-body bare ops on parametric-carrier typeclasses
 
-For `proj : embed -> 'a` and `inj : 'b -> embed` declared on
-`('a, 'b) embed`, a bare-op call `proj (inj true)` does not infer the
-carrier `'self` automatically because each call generates its own
-TcCtt problem with disjoint witness uids; the unifier does not (yet)
-share carrier inference across them. Workaround: explicit positional
-instantiation, `proj<:int, bool, (int * bool)> ...`.
+Inside a polymorphic body — say a lemma `['a, 'b, 'c <: ('a, 'b) embed]
+... proj (inj y) ...` — bare ops still need explicit tvi
+(`proj<:'a, 'b, 'c>`). The carrier is a type parameter, not a concrete
+type, so the By-args strategy (which picks an instance from the
+database) does not fire. At ground call sites the carrier is inferred
+automatically; see [tests/tc/multi-param-bare-ops.ec](../tests/tc/multi-param-bare-ops.ec)
+and [doc/typeclasses-inference.md](typeclasses-inference.md).
 
 ### Tuple/function carriers in instance declarations
 
@@ -307,6 +308,7 @@ scenario (`./scripts/testing/runtest --bin=./ec.native config/tests.config unit`
 | `instance.ec`              | Multiple ops/axioms in an instance              |
 | `multi-instance.ec`        | Two named instances for one TC at different types |
 | `multi-param.ec`           | `('a, 'b) embed` + polymorphic lemma + instance |
+| `multi-param-bare-ops.ec`  | Bare-op carrier inference for multi-param TCs   |
 | `parametric.ec`            | Parametric TC `['a <: tc] action`               |
 | `print.ec`                 | `print` does not crash on TC entities           |
 | `section.ec`               | Typeclass declared inside a section             |
