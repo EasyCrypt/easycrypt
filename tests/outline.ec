@@ -1,4 +1,4 @@
-require import AllCore.
+require import AllCore Distr.
 
 op dint : int distr.
 
