@@ -964,7 +964,9 @@ let pp_opname fmt (nm, op) =
 
 (* -------------------------------------------------------------------- *)
 let rec pp_etyarg (ppe : PPEnv.t) (fmt : Format.formatter) ((ty, tcws) : etyarg) =
-  Format.fprintf fmt "%a[%a]" (pp_type ppe) ty (pp_tcws ppe) tcws
+  match tcws with
+  | [] -> pp_type ppe fmt ty
+  | _  -> Format.fprintf fmt "%a[%a]" (pp_type ppe) ty (pp_tcws ppe) tcws
 
 (* -------------------------------------------------------------------- *)
 and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
@@ -979,8 +981,10 @@ and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
     Format.fprintf fmt "%a%a" (pp_tcunivar ppe) uid pp_lift lift
 
   | TCIConcrete { path; etyargs; lift } ->
-    Format.fprintf fmt "%a[%a]%a"
-      (pp_tciname ppe) path (pp_etyargs ppe) etyargs pp_lift lift
+    (match etyargs with
+     | [] -> Format.fprintf fmt "%a%a" (pp_tciname ppe) path pp_lift lift
+     | _  -> Format.fprintf fmt "%a[%a]%a"
+               (pp_tciname ppe) path (pp_etyargs ppe) etyargs pp_lift lift)
 
   | TCIAbstract { support = `Var x; offset; lift } ->
     Format.fprintf fmt "%a.`%d%a" (pp_tyvar ppe) x (offset + 1) pp_lift lift
