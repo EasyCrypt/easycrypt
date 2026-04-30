@@ -132,6 +132,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
+| TypeClassAmbiguous     of typeclass * EcPath.path list
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
 | NotAnInductive

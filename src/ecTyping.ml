@@ -139,6 +139,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
+| TypeClassAmbiguous     of typeclass * EcPath.path list
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
 | NotAnInductive
@@ -195,7 +196,10 @@ module UE = EcUnify.UniEnv
 
 let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 =
   try  EcUnify.unify env ue ty1 ty2
-  with EcUnify.UnificationFailure pb ->
+  with
+  | EcUnify.AmbiguousTcInstance (tc, paths) ->
+     tyerror loc env (TypeClassAmbiguous (tc, paths))
+  | EcUnify.UnificationFailure pb ->
     match pb with
     | `TyUni (t1, t2)->
        let uidmap = UE.assubst ue in

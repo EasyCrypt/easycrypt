@@ -17,6 +17,12 @@ type uniflags = { tyvars: bool; tcvars: bool; }
 exception UnificationFailure of problem
 exception UninstanciateUni of uniflags
 
+(* Raised by the unifier's By-args strategy when a typeclass with
+   ground arguments has multiple matching instances and no further
+   unification can disambiguate. The first field is the offending
+   typeclass; the second is the list of candidate instance paths. *)
+exception AmbiguousTcInstance of typeclass * EcPath.path list
+
 type unienv
 
 type petyarg = ty option * tcwitness option list option

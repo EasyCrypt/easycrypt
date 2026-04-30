@@ -332,6 +332,14 @@ end = struct
     | TypeClassMismatch ->
         msg "Type-class unification failure"
 
+    | TypeClassAmbiguous (tc, paths) ->
+        msg "ambiguous typeclass instance for @[<hov 2>%a@]@\n"
+          (EcPrinting.pp_typeclass env) tc;
+        msg "  candidates:@\n";
+        List.iter (fun p ->
+          msg "    %a@\n" (EcPrinting.pp_axname env) p)
+          paths
+
     | TypeModMismatch(mp, mt, err) ->
         msg "the module %a does not have the module type %a:@\n"
           (EcPrinting.pp_topmod env) mp
@@ -979,6 +987,14 @@ let pp fmt exn =
 
   | EcLowGoal.Apply.NoInstance e ->
       pp_apply_error fmt e
+
+  | EcUnify.AmbiguousTcInstance (tc, paths) ->
+      Format.fprintf fmt "ambiguous typeclass instance for ";
+      Format.fprintf fmt "@[<hov 2>%s@]@\n" (EcPath.tostring tc.tc_name);
+      Format.fprintf fmt "  candidates:@\n";
+      List.iter (fun p ->
+        Format.fprintf fmt "    %s@\n" (EcPath.tostring p))
+        paths
 
   | _ -> raise exn
 

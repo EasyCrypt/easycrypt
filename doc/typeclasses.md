@@ -292,8 +292,10 @@ typeclasses); fix would touch the rewrite engine more broadly.
 
 ## Test suite
 
-All under [`tests/tc/`](../tests/tc/). Each is included in the unit-test
-scenario (`./scripts/testing/runtest --bin=./ec.native config/tests.config unit`).
+Positive tests are under [`tests/tc/`](../tests/tc/) (scenario `unit`);
+negative regression tests — files that must fail compilation with a
+specific diagnostic — are under [`tests/tc-ko/`](../tests/tc-ko/)
+(scenario `tc-ko`).
 
 | File                       | What it covers                                  |
 |----------------------------|-------------------------------------------------|
@@ -309,6 +311,14 @@ scenario (`./scripts/testing/runtest --bin=./ec.native config/tests.config unit`
 | `multi-instance.ec`        | Two named instances for one TC at different types |
 | `multi-param.ec`           | `('a, 'b) embed` + polymorphic lemma + instance |
 | `multi-param-bare-ops.ec`  | Bare-op carrier inference for multi-param TCs   |
+
+Negative tests under `tests/tc-ko/`:
+
+| File                         | Asserted error message                         |
+|------------------------------|-------------------------------------------------|
+| `bad-tvi.ec`                 | `type int does not satisfy typeclass constraint addmonoid` |
+| `underconstrained-axiom.ec`  | `axiom 'tc3_extra' is type-ambiguous: ...`     |
+| `ambiguous-instance.ec`      | `ambiguous typeclass instance for embed; candidates: ...` |
 | `parametric.ec`            | Parametric TC `['a <: tc] action`               |
 | `print.ec`                 | `print` does not crash on TC entities           |
 | `section.ec`               | Typeclass declared inside a section             |

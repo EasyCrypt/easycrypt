@@ -7,6 +7,7 @@ open EcAst
 open EcTypes
 open EcCoreSubst
 open EcDecl
+open EcTheory
 
 module Sp = EcPath.Sp
 
@@ -22,6 +23,7 @@ type uniflags = { tyvars: bool; tcvars: bool; }
 
 exception UnificationFailure of problem
 exception UninstanciateUni of uniflags
+exception AmbiguousTcInstance of typeclass * EcPath.path list
 
 (* ==================================================================== *)
 module Unify = struct
@@ -490,7 +492,26 @@ module Unify = struct
              equation. The carrier resolution will then re-fire this
              TcCtt under Mode #1 and produce the concrete witness. *)
           let strat_infer_by_args () : tcwitness option =
-            match EcTypeClass.candidates_by_args env tc with
+            let cands = EcTypeClass.candidates_by_args env tc in
+            (* Multiple matches: check whether they agree on the
+               carrier ([tci_type]). If they do, any of them works; if
+               they don't, the goal is genuinely ambiguous and no
+               further unification can decide between them. *)
+            if List.length cands >= 2 then begin
+              let carriers =
+                List.map (fun (_, tci, _) -> tci.tci_type) cands in
+              let same =
+                match carriers with
+                | [] | [_] -> true
+                | t :: rest ->
+                  List.for_all (fun t' ->
+                    EcCoreEqTest.for_type env t t') rest in
+              if not same then begin
+                let paths = List.filter_map (fun (p, _, _) -> p) cands in
+                raise (AmbiguousTcInstance (tc, paths))
+              end
+            end;
+            match cands with
             | [(Some _, tci, _map)] -> begin
               (* Recover the candidate's [tgp.tc_args] (the patterns). *)
               let tgargs =
