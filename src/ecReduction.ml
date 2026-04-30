@@ -666,10 +666,31 @@ let reduce_op ri env nargs p tys =
        Op.reduce ~mode ~nargs env p tys
      with NotReducible -> raise nohead
 
+(* When a TC witness is [`Abs path] and [path] resolves to a concrete
+   (non-abstract) type, infer the concrete instance so that the TC op
+   becomes reducible. This arises after cloning an abstract theory with
+   a [type t <: tc] carrier substituted to a concrete type. *)
+let resolve_concrete_tcw (env : EcEnv.env) (p : path) (tys : etyarg list) : etyarg list =
+  let op = EcEnv.Op.by_path p env in
+  if not (EcDecl.is_tc_op op) then tys
+  else match List.rev tys with
+    | (carrier_ty, [TCIAbstract { support = `Abs ap; offset = 0; lift = 0 }]) :: rest
+        when (match EcEnv.Ty.by_path_opt ap env with
+              | Some { tyd_type = `Abstract _; _ } -> false
+              | _ -> true) ->
+      let tcpath, _ = EcDecl.operator_as_tc op in
+      let tc_decl = EcEnv.TypeClass.by_path tcpath env in
+      let tc = { tc_name = tcpath;
+                 tc_args = EcDecl.etyargs_of_tparams tc_decl.tc_tparams; } in
+      (match EcTypeClass.infer env carrier_ty tc with
+       | Some w -> List.rev ((carrier_ty, [w]) :: rest)
+       | None   -> tys)
+    | _ -> tys
+
 let reduce_tc_op (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyarg list) =
   if ri.delta_tc then
     try
-      Op.tc_reduce env p tys
+      Op.tc_reduce env p (resolve_concrete_tcw env p tys)
     with NotReducible -> raise nohead
   else
     raise nohead
@@ -887,11 +908,14 @@ let reduce_delta ri env f =
 (* -------------------------------------------------------------------- *)
 let reduce_tc ri env f =
   match f.f_node with
-  | Fop (p, etyargs) when ri.delta_tc && Op.tc_reducible env p etyargs ->
+  | Fop (p, etyargs)
+      when ri.delta_tc &&
+           Op.tc_reducible env p (resolve_concrete_tcw env p etyargs) ->
     reduce_tc_op ri env p etyargs
 
   | Fapp ({ f_node = Fop (p, etyargs) }, args)
-      when ri.delta_tc && Op.tc_reducible env p etyargs
+      when ri.delta_tc &&
+           Op.tc_reducible env p (resolve_concrete_tcw env p etyargs)
   ->
     let op = reduce_tc_op ri env p etyargs in
     f_app_simpl op args f.f_ty
