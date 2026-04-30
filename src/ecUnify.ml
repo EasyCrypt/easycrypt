@@ -90,7 +90,7 @@ module Unify = struct
     ; resolution = TcUni.Muid.empty }
 
   (* ------------------------------------------------------------------ *)
-  let tcenv_closed (tcenv : tcenv) : bool = (* FIXME:TC *)
+  let tcenv_closed (tcenv : tcenv) : bool =
       TcUni.Muid.cardinal tcenv.resolution
     = TcUni.Muid.cardinal tcenv.problems
 
@@ -103,7 +103,7 @@ module Unify = struct
   =
     let tc, tw = tcw in
     let uid = TcUni.unique () in
-    let deps = Tuni.univars ty in (* FIXME:TC *)
+    let deps = Tuni.univars ty in
 
     let tcenv = {
       problems = TcUni.Muid.add uid (ty, tc) tcenv.problems;
@@ -295,7 +295,6 @@ module Unify = struct
         List.iter (Queue.push^~ pb) effects;
 
         begin
-          (* FIXME:TC (cache!)*)
           match TyUni.Muid.find i (!uc).tcenv.byunivar with
           | tcpbs ->
             uc := { !uc with tcenv = { (!uc).tcenv with
@@ -587,7 +586,6 @@ module UniEnv = struct
     assert (not (Mstr.mem (EcIdent.name x) (!ue).ue_named));
     assert  ((!ue).ue_closed);
 
-    (* FIXME:TC use API for pushing a variable*)
      ue :=
       { ue_uc     = { (!ue).ue_uc with tvtc = Mid.add x tc (!ue).ue_uc.tvtc }
       ; ue_named  = Mstr.add (EcIdent.name x) x (!ue).ue_named
@@ -821,7 +819,7 @@ let select_op
         | _ -> None
       in
 
-      Some ((path, args), top, subue, bd) (* FIXME:TC *)
+      Some ((path, args), top, subue, bd)
 
     with E.Failure -> None
 
