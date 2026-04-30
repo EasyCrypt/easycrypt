@@ -867,7 +867,7 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let t_ors_map (totc : 'a -> backward) (xs : 'a list) (tc : tcenv1) =
-    t_ors_pmap (some |- totc) xs tc
+    t_ors_pmap (some -| totc) xs tc
 
   (* ------------------------------------------------------------------ *)
   let t_ors (tts : backward list) (tc : tcenv1) =

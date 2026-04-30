@@ -11,15 +11,10 @@ abstract theory ZModRing.
 const p : { int | 2 <= p } as ge2_p.
 
 (* -------------------------------------------------------------------- *)
-clone Subtype as Sub with
-  type T <- int,
-  op P (x : int) <- 0 <= x < p
-proof *.
-realize inhabited.
-exists 0. smt(ge2_p).
-qed.
+subtype zmod as Sub = { x : int | 0 <= x < p }.
 
-type zmod = Sub.sT.
+realize inhabited.
+proof. by exists 0; smt(ge2_p). qed.
 
 (* -------------------------------------------------------------------- *)
 op inzmod (z : int)  = Sub.insubd (z %% p).

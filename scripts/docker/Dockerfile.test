@@ -5,7 +5,6 @@ FROM ./Dockerfile.build
 ARG EC_VERSION=main
 
 RUN \
-	opam pin --dev-repo \
-	add -n easycrypt https://github.com/EasyCrypt/easycrypt.git#${EC_VERSION} && \
+	opam pin add -n easycrypt https://github.com/EasyCrypt/easycrypt.git#${EC_VERSION} && \
 	opam install -v easycrypt && \
 	rm -rf .opam/packages.dev/*

@@ -233,16 +233,16 @@ section ConditionalLL.
 declare axiom dout_ll x: is_lossless (dout x).
 
 lemma RO_get_ll : islossless RO.get.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 
 lemma FRO_get_ll : islossless FRO.get.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 
 lemma RO_sample_ll : islossless RO.sample.
 proof. by proc; call RO_get_ll. qed.
 
 lemma FRO_sample_ll : islossless FRO.sample.
-proof. by proc; auto=> />; rewrite dout_ll. qed.
+proof. by proc; auto=> /> &0; rewrite dout_ll. qed.
 end section ConditionalLL.
 end section LL.
 
@@ -287,12 +287,22 @@ fel 1 (fsize RO.m) (fun x => x%r * Pc) q (fcoll f RO.m)
 - inline*; auto; smt(fsize_empty mem_empty).
 - proc; inline*; (rcondt 2; first by auto); wp.
   rnd (fun r => exists u, u \in RO.m /\ f (oget RO.m.[u]) = f r).
-  skip => &hr; rewrite andaE => /> 3? I ?; split; 2: smt(get_setE).
-  apply mu_mem_le_fsize => u /I /(dmap_supp _ f) /fcollP /= /(_ x{hr}).
-  rewrite dmap1E. apply: StdOrder.RealOrder.ler_trans.
-  by apply mu_sub => /#.
+  auto=> /> &0 ge0_size_m ltq_size_m nocoll I x_notin_m; split=> [|_].
+  + apply mu_mem_le_fsize => u /I /(dmap_supp _ f) /fcollP /= /(_ x{0}).
+    rewrite dmap1E; apply: StdOrder.RealOrder.ler_trans.
+    by apply: mu_sub=> @/pred1 @/(\o) /> x ->.
+  move=> v _ i j; rewrite !mem_set.
+  move=> i_in_mVx j_in_mVx i_neq_j; rewrite !get_setE.
+  case: (i = x{0}); case: (j = x{0})=> />.
+  + by move=> _ coll_v; exists j=> /#.
+  + by move=> _ coll_v; exists i=> /#.
+  move=> j_neq_x i_neq_x eq_f.
+  move: nocoll=> /negb_exists /= /(_ i) /negb_exists /= /(_ j).
+  rewrite i_neq_j eq_f.
+  move: i_in_mVx; rewrite i_neq_x=> /= -> /=.
+  by move: j_in_mVx; rewrite j_neq_x=> /= -> /=.
 - move => c; proc; auto => />; smt(get_setE fsize_set).
-- move => b c. proc. by auto.
+- move => b c; proc; by auto.
 qed.
 
 end section Collision.
@@ -682,8 +692,7 @@ lemma eager_D :
          D(RRO).distinguish, RRO.resample(); :
          ={glob D, FRO.m, arg} ==> ={FRO.m, glob D} /\ ={res}].
 proof.
-eager proc (H_: RRO.resample(); ~ RRO.resample();: ={FRO.m} ==> ={FRO.m})
-           (={FRO.m}) =>//; try by sim.
+eager proc (={FRO.m}) =>//; try by sim.
 + by apply eager_init.
 + by apply eager_get.
 + by apply eager_set.
@@ -918,7 +927,7 @@ equiv RO_FinRO_D : MainD(D,RO).distinguish ~ MainD(D,FinRO).distinguish :
   ={glob D, arg} ==> ={res, glob D}.
 proof.
   proc *.
-  transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); } => //;1:smt().
+  transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); }.
   + inline MainD(D, RO).distinguish MainD(D, GenFinRO(LRO)).distinguish; wp.
     call (_: ={glob RO});2..4: by sim.
     + by apply RO_LFinRO_init.
@@ -989,7 +998,7 @@ proc.
 transitivity*{2} {
   Vars.r <@ S.sample(dout,FinFrom.enum);
   FunRO.f <- tofun Vars.r;
-}; 1,2: smt(); last first.
+}; last first.
 - inline*; rnd : *0 *0; skip => />.
   by split => *; rewrite dmap_id dfun_dmap.
 rewrite equiv[{2} 1 Sample_Loop_first_eq].

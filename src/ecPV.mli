@@ -1,11 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcPath
-open EcTypes
-open EcModules
-open EcMemory
 open EcEnv
-open EcFol
+open EcAst
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
@@ -56,10 +53,12 @@ module Mpv : sig
 
   val find_glob : env -> mpath -> ('a,'b) t -> 'b
 
-  val esubst : env -> (expr, unit) t -> expr -> expr 
+  val pvs : ('a,'b) t -> 'a Mnpv.t
+
+  val esubst  : env -> (expr, unit) t -> expr -> expr 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
-  val isubst : env -> (expr, unit) t -> instr -> instr 
-  val ssubst : env -> (expr, unit) t -> stmt -> stmt
+  val isubst  : env -> (expr, unit) t -> instr -> instr 
+  val ssubst  : env -> (expr, unit) t -> stmt -> stmt
 end
 
 (* -------------------------------------------------------------------- *)
@@ -71,6 +70,8 @@ module PVM : sig
   val empty : subst
 
   val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
+
+  val of_list : env -> ((prog_var * EcIdent.t) * form) list -> subst
 
   val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
 
@@ -98,6 +99,7 @@ module PV : sig
   val remove   : env -> prog_var -> t -> t
   val union    : t -> t -> t
   val diff     : t -> t -> t
+  val inter    : t -> t -> t
   val subset   : t -> t -> bool
 
   val interdep     : env -> t -> t -> t
@@ -127,11 +129,12 @@ val is_write_r : ?except:Sx.t -> instr list pvaccess
 val s_write_r  : ?except:Sx.t -> stmt       pvaccess
 val f_write_r  : ?except:Sx.t -> xpath      pvaccess
 
-val e_read_r   : expr       pvaccess
-val i_read_r   : instr      pvaccess
-val is_read_r  : instr list pvaccess
-val s_read_r   : stmt       pvaccess
-val f_read_r   : xpath      pvaccess
+val e_read_r      : expr       pvaccess
+val form_read_r   : form       pvaccess
+val i_read_r      : instr      pvaccess
+val is_read_r     : instr list pvaccess
+val s_read_r      : stmt       pvaccess
+val f_read_r      : xpath      pvaccess
 
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
@@ -142,11 +145,30 @@ val is_write : ?except:Sx.t -> instr list pvaccess0
 val s_write  : ?except:Sx.t -> stmt       pvaccess0
 val f_write  : ?except:Sx.t -> xpath      pvaccess0
 
-val e_read  : expr       pvaccess0
-val i_read  : instr      pvaccess0
-val is_read : instr list pvaccess0
-val s_read  : stmt       pvaccess0
-val f_read  : xpath      pvaccess0
+val e_read     : expr       pvaccess0
+val form_read  : form       pvaccess0
+val i_read     : instr      pvaccess0
+val is_read    : instr list pvaccess0
+val s_read     : stmt       pvaccess0
+val f_read     : xpath      pvaccess0
+
+(* -------------------------------------------------------------------- *)
+val zpr_pv :
+     [ `Read | `Write ]
+  -> [ `Before | `After ]
+  -> env
+  -> PV.t
+  -> EcMatching.Zipper.spath
+  -> PV.t
+
+(* -------------------------------------------------------------------- *)
+type pmvs = PV.t EcIdent.Mid.t
+
+module PMVS : sig
+  val empty : pmvs
+end
+
+val form_read : env -> pmvs -> form -> pmvs
 
 (* -------------------------------------------------------------------- *)
 exception EqObsInError
@@ -158,9 +180,10 @@ module Mpv2 : sig
   val empty_local : local
   val enter_local: env -> local -> (EcIdent.t * ty) list ->
                    (EcIdent.t * ty) list -> local
-  val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
-  val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
-  val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
+  val to_form_ts_inv : t -> ts_inv -> ts_inv
+  val to_form : t -> memory -> memory -> form -> form
+  val of_form : env -> ts_inv -> t
+  val needed_eq : env -> ts_inv -> t
   val union   : t -> t -> t
   val subset   : t -> t -> bool
   val equal    : t -> t -> bool
@@ -194,6 +217,7 @@ module Mpv2 : sig
   val split_nmod : env -> PV.t -> PV.t -> t -> t
   val split_mod : env -> PV.t -> PV.t -> t -> t
 
+  val is_mod_pv' : env -> prog_var -> t -> bool
   val mem_pv_l : env -> prog_var -> t -> bool
   val mem_pv_r : env -> prog_var -> t -> bool
 end

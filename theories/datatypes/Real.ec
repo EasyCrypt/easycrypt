@@ -218,12 +218,18 @@ instance field with real
 
 (* -------------------------------------------------------------------- *)
 op floor : real -> int.
-op ceil  : real -> int.
+
+op [opaque smt_opaque] ceil (x : real) : int =
+  -(floor (Self.([-]) x)).
 
 axiom floor_bound (x:real) : x - 1%r < (floor x)%r <= x.
-axiom ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
-axiom from_int_ceil  n : ceil  n%r = n.
+
+lemma ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
+proof. by rewrite /ceil; smt(floor_bound). qed.
+
+lemma from_int_ceil  n : ceil  n%r = n.
+proof. by rewrite /ceil -fromintN from_int_floor oppzK. qed.
 
 lemma floor_gt x : x - 1%r < (floor x)%r.
 proof. by case: (floor_bound x). qed.
@@ -246,8 +252,34 @@ proof. smt(floor_bound). qed.
 lemma from_int_floor_addr n x : floor (x + n%r) = floor x + n.
 proof. smt(floor_bound). qed.
 
+lemma from_int_ceil_addl n x : ceil (n%r + x) = n + ceil x.
+proof. smt(ceil_bound). qed.
+
+lemma from_int_ceil_addr n x : ceil (x + n%r) = ceil x + n.
+proof. smt(ceil_bound). qed.
+
 lemma floor_mono (x y : real) : x <= y => floor x <= floor y.
 proof. smt(floor_bound). qed.
+
+op isint (x : real) = exists n, x = n%r.
+
+lemma ceil_eqP (x : real) : (ceil x)%r = x <=> isint x.
+proof. by split=> [/#|[n ->>]]; last by rewrite from_int_ceil. qed.
+
+lemma floor_eqP (x : real) : (floor x)%r = x <=> isint x.
+proof. by split=> [/#|[n ->>]]; last by rewrite from_int_floor. qed.
+
+lemma cBf_eq0P (x : real) : (ceil x - floor x = 0) <=> isint x.
+proof.
+split=> [|[n ->>]]; last by rewrite from_int_floor from_int_ceil.
+smt(ceil_bound floor_bound).
+qed.
+
+lemma cBf_eq1P (x : real) : (ceil x - floor x = 1) <=> !isint x.
+proof.
+move=> /=; case: (isint x) => /= [/cBf_eq0P -> //|].
+smt(ceil_bound floor_bound).
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)

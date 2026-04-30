@@ -4,6 +4,7 @@ open EcParsetree
 open EcFol
 open EcModules
 open EcPath
+open EcAst
 
 open EcCoreGoal
 open EcCoreGoal.FApi
@@ -55,7 +56,7 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
 
   (* Extract the call statement and surrounding code *)
   let prefix, (llv, func, largs), suffix =
-    let cp = EcProofTyping.tc1_process_codepos1 tc (Some side, cp) in
+    let cp = EcLowPhlGoal.tc1_process_codepos1 tc (Some side, cp) in
     let p, i, s = s_split_i env cp code in
     if not (is_call i) then
       rwe_error RWE_InvalidPosition;
@@ -71,7 +72,7 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
   let prog = s_call (rlv, new_func, rargs) in
   let prog = s_seq prefix (s_seq prog suffix) in
 
-  let tc = EcPhlOutline.t_equivS_trans_eq side prog tc in
+  let tc = EcPhlTrans.t_equivS_trans_eq side prog tc in
 
   (* One of the goals can be simplified, often fully, using the provided equiv *)
   let tp = match side with | `Left -> 1 | `Right -> 2 in
@@ -79,13 +80,14 @@ let t_rewrite_equiv side dir cp (equiv : equivF) equiv_pt rargslv tc =
   t_onselect
     p
     (t_seqs [
-      EcPhlEqobs.process_eqobs_in none {sim_pos = some (cp, cp); sim_hint = ([], none); sim_eqs = none};
+      EcPhlEqobs.process_eqobs_in None
+        {sim_pos = some (GapAfter cp, GapAfter cp); sim_hint = ([], none); sim_eqs = none};
       (match side, dir with
        | `Left, `LtoR  -> t_id
        | `Left, `RtoL  -> EcPhlSym.t_equiv_sym
        | `Right, `LtoR -> EcPhlSym.t_equiv_sym
        | `Right, `RtoL  -> t_id);
-      EcPhlCall.t_call None (f_equivF_r equiv);
+      EcPhlCall.t_call None (f_equivF (ef_pr equiv) equiv.ef_fl equiv.ef_fr (ef_po equiv));
       t_try (t_apply equiv_pt); (* FIXME: Can do better here, we know this applies to just the first sub goal of call *)
       t_try (t_seqs [
         EcPhlInline.process_inline (`ByName (None, None, ([], None)));
@@ -139,23 +141,24 @@ let process_rewrite_equiv info tc =
         begin
           try
             let proc = EcEnv.Fun.by_xpath new_func env in
-            let subenv = EcEnv.Memory.push_active mem env in
+            let subenv = EcEnv.Memory.push_active_ss mem env in
             let ue = EcUnify.UniEnv.create (Some []) in
             let args, ret_ty = EcTyping.trans_args subenv ue (loc pargs) proc.f_sig (unloc pargs) in
             let res = omap (fun v -> EcTyping.transexpcast subenv `InProc ue ret_ty v) pres in
             let es = e_subst (Tuni.subst (EcUnify.UniEnv.close ue)) in
-            Some (List.map es args, omap (EcModules.lv_of_expr |- es) res)
-          with EcUnify.UninstanciateUni infos ->
-            EcTyping.tyerror (loc pargs) env (FreeUniVariables infos)
+            Some (List.map es args, omap (EcModules.lv_of_expr -| es) res)
+          with EcUnify.UninstantiateUni ->
+            EcTyping.tyerror (loc pargs) env EcTyping.FreeTypeVariables
         end
   in
 
   (* Offload to the tactic *)
   try
+    (* FIXME: cp should be translated to codepos in process 
+       Blocked by: bad interface to sim in src/phl/ecPhlEqobs.ml *)
     t_rewrite_equiv side dir cp equiv eqv_pt rargslv tc
   with
   | RwEquivError (RWE_InvalidFunction (got, wanted)) ->
       tc_error !!tc "rewrite equiv: function mismatch\nExpected %s but got %s" (x_tostring wanted) (x_tostring got)
   | RwEquivError RWE_InvalidPosition ->
       tc_error !!tc "rewrite equiv: targetted instruction is not a function call"
-

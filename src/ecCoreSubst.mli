@@ -7,6 +7,13 @@ open EcCoreModules
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
+type sc_instantiate = {
+  sc_memtype : memtype;
+  sc_mempred : mem_pr Mid.t;
+  sc_expr    : expr Mid.t;
+}
+
+(* -------------------------------------------------------------------- *)
 type f_subst
 
 type 'a substitute = f_subst -> 'a -> 'a

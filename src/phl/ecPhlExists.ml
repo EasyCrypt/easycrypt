@@ -3,10 +3,12 @@ open EcUtils
 open EcAst
 open EcFol
 open EcEnv
+open EcSubst
 
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
+open EcMatching.Position
 
 module L   = EcLocation
 module APT = EcParsetree
@@ -15,20 +17,31 @@ module PT  = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 let get_to_gens fs =
-  let do_id f =
+  let do_id (f: inv) =
     let id =
-      match f.f_node with
-      | Fpvar (pv, m) -> id_of_pv pv m
-      | _             -> EcIdent.create "f" in
+      match f with
+      | Inv_ss f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv pv m
+          | _             -> EcIdent.create "f" 
+        end
+      | Inv_ts f -> begin match f.inv.f_node with
+          | Fpvar (pv, m) -> 
+            id_of_pv ~mc:(f.ml, f.mr) pv m
+          | _             -> EcIdent.create "f"
+        end
+      | Inv_hs _ -> assert false
+    in
     id, f in
   List.map do_id fs
 
 (* -------------------------------------------------------------------- *)
 let t_hr_exists_elim_r ?(bound : int option) (tc : tcenv1) =
   let pre = tc1_get_pre tc in
-  let bd, pre =
-    try  destr_exists_prenex ?bound pre
-    with DestrError _ -> [], pre in
+  let bd, pre' =
+    try  destr_exists_prenex ?bound (inv_of_inv pre)
+    with DestrError _ -> [], (inv_of_inv pre) in
+  let pre = map_inv1 (fun _ -> pre') pre in
   let concl = f_forall bd (set_pre ~pre (FApi.tc1_goal tc)) in
   FApi.xmutate1 tc `HlExists [concl]
 
@@ -38,38 +51,41 @@ let t_hr_exists_intro_r fs tc =
   let concl = FApi.tc1_goal tc in
   let pre1  = tc1_get_pre  tc in
   let post  = tc1_get_post tc in
-  let side  = is_equivS concl || is_equivF concl in
   let gen   = get_to_gens fs in
-  let eqs   = List.map (fun (id, f) -> f_eq (f_local id f.f_ty) f) gen in
-  let bd    = List.map (fun (id, f) -> (id, GTty f.f_ty)) gen in
+  let eqs   = List.map (fun (id, f) -> map_inv1 (f_eq (f_local id (inv_of_inv f).f_ty)) f) gen in
+  let bd    = List.map (fun (id, f) -> (id, GTty (inv_of_inv f).f_ty)) gen in
   let is_ehoare =
     match concl.f_node with
     | FeHoareF _ | FeHoareS _ -> true
     | _ -> false in
   let pre   =
+    let eqs = match eqs with 
+      | [] -> map_inv1 (fun _ -> f_true) pre1
+      | _ -> map_inv f_ands eqs in
     if is_ehoare then
-      f_interp_ehoare_form (f_exists bd (f_ands eqs)) pre1
-    else f_exists bd (f_and (f_ands eqs) pre1) in
+      map_inv2 f_interp_ehoare_form (map_inv1 (f_exists bd) eqs) pre1
+    else 
+      map_inv1 (f_exists bd) (map_inv2 f_and eqs pre1) in
 
   let h = LDecl.fresh_id hyps "h" in
-  let ms, subst =
-    match side with
-    | true ->
-        let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
-        let s = Fsubst.f_subst_id in
-        let s = Fsubst.f_bind_mem s mleft ml in
-        let s = Fsubst.f_bind_mem s mright mr in
-        ([ml; mr], s)
+  let ml, mr = as_seq2 (LDecl.fresh_ids hyps ["&ml"; "&mr"]) in
+  let m = LDecl.fresh_id hyps "&m" in
+  let ms =
+    match pre1 with
+    | Inv_ts _ -> [ml; mr]
+    | Inv_ss _ -> [m]
+    | Inv_hs _ -> assert false
+  in
 
-    | false ->
-        let m = LDecl.fresh_id hyps "&m" in
-        let s = Fsubst.f_subst_id in
-        let s = Fsubst.f_bind_mem s mhr m in
-        ([m], s)
+  let inv_rebind f =
+    match f with
+    | Inv_ts f -> Inv_ts (ts_inv_rebind f ml mr)
+    | Inv_ss f -> Inv_ss (ss_inv_rebind f m)
+    | Inv_hs f -> Inv_hs (hs_inv_rebind f m)
   in
 
   let args =
-    let do1 (_, f) = PAFormula (Fsubst.f_subst subst f) in
+    let do1 (_, f) = PAFormula (inv_of_inv (inv_rebind f)) in
     List.map do1 gen
   in
 
@@ -97,22 +113,24 @@ let t_hr_exists_intro = FApi.t_low1 "hr-exists-intro" t_hr_exists_intro_r
 (* -------------------------------------------------------------------- *)
 let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
-  let penv =
+  let penv, f_tr =
     match concl.f_node with
-    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
-    | FhoareS hs -> LDecl.push_active hs.hs_m hyps
-    | FeHoareF hf -> fst (LDecl.hoareF hf.ehf_f hyps)
-    | FeHoareS hs -> LDecl.push_active hs.ehs_m hyps
-    | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
-    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
-    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
-    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps
+    | FhoareF {hf_f=f;hf_m=m} | FeHoareF {ehf_f=f; ehf_m=m} 
+    | FbdHoareF {bhf_f=f; bhf_m=m} -> 
+      fst (LDecl.hoareF m f hyps), Inv_ss {m; inv = f_true}
+    | FhoareS {hs_m=(m,_) as me} | FeHoareS {ehs_m=(m,_) as me}
+    | FbdHoareS {bhs_m=(m,_) as me} -> 
+      LDecl.push_active_ss me hyps, Inv_ss {m; inv = f_true}
+    | FequivF ef -> fst (LDecl.equivF ef.ef_ml ef.ef_mr ef.ef_fl ef.ef_fr hyps), 
+        Inv_ts {ml=ef.ef_ml; mr=ef.ef_mr; inv=f_true}
+    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps, 
+        Inv_ts {ml=(fst es.es_ml); mr=(fst es.es_mr); inv=f_true}
     | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   in
 
   let fs =
     List.map
-      (fun f -> TTC.pf_process_form_opt !!tc penv None f)
+      (fun f -> map_inv1 (fun _ -> TTC.pf_process_form_opt !!tc penv None f) f_tr)
       fs
   in
 
@@ -123,97 +141,490 @@ let process_exists_intro ~(elim : bool) fs tc =
   else tc
 
 (* -------------------------------------------------------------------- *)
-let process_ecall oside (l, tvi, fs) tc =
-  let (hyps, concl) = FApi.tc1_flat tc in
+type call = EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
 
-  let hyps, kind =
-    match concl.f_node with
-    | FhoareS hs when is_none oside ->
-        (LDecl.push_active hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node))
-    | FequivS es ->
-        let n1 = List.length es.es_sl.s_node in
-        let n2 = List.length es.es_sr.s_node in
-        (LDecl.push_all [es.es_ml; es.es_mr] hyps, `Equiv (n1, n2))
-    | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc
-  in
+type calls = [
+  | `Single of call
+  | `Double of call * call
+]
 
-  let t_local_seq p1 tc =
-    match kind, oside with
-    | `Hoare n, _ ->
-        EcPhlApp.t_hoare_app
-          (Zpr.cpos (n-1)) p1 tc
-    | `Equiv (n1, n2), None ->
-        EcPhlApp.t_equiv_app
-          (Zpr.cpos (n1-1), Zpr.cpos (n2-1)) p1 tc
-    | `Equiv (n1, n2), Some `Left ->
-        EcPhlApp.t_equiv_app
-          (Zpr.cpos (n1-1), Zpr.cpos n2) p1 tc
-    | `Equiv(n1, n2), Some `Right ->
-        EcPhlApp.t_equiv_app
-          (Zpr.cpos n1, Zpr.cpos (n2-1)) p1 tc
-  in
+(* -------------------------------------------------------------------- *)
+let check_contract_type
+  ?(loc      : L.t option)
+  ?(phoare   : bool = false)
+  ?(noexn    : bool = true)
+  ~(name     : EcSymbols.qsymbol)
+   (pe       : proofenv)
+   (hyps     : LDecl.hyps)
+   (calls    : calls)
+   (contract : form)
+=
+  let env = LDecl.toenv hyps in
 
-  let fs =
-    List.map
-      (fun f -> TTC.pf_process_form_opt !!tc hyps None f)
-      fs
-  in
+  let contract =
+    EcReduction.h_red_opt EcReduction.full_red hyps contract
+    |> odfl contract in
 
-  let ids, p1 =
-    let sub = t_local_seq f_true tc in
+  match calls with
+  | `Single (_, funname, _) -> begin
+    let cttfname =
+      match contract.f_node with
+      | FhoareF hf ->
+        if noexn then begin
+          if not (POE.is_empty (hf_po hf).hsi_inv) then
+            tc_error ?loc pe
+              "contract must have an empty exception post-condition";
+          end;      
+        hf.hf_f
+      | FbdHoareF hf when phoare -> hf.bhf_f
+      | _ ->
+        tc_error_lazy ?loc pe (fun fmt ->
+          Format.fprintf fmt
+            "contract %a should be a Hoare statement"
+            EcSymbols.pp_qsymbol name
+        )
+    in
+    if not (EcReduction.EqTest.for_xp env funname cttfname) then begin
+      tc_error_lazy ?loc pe (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        Format.fprintf fmt
+          "contract %a should be for the procedure %a, not %a"
+          EcSymbols.pp_qsymbol name
+          (EcPrinting.pp_funname ppe) funname
+          (EcPrinting.pp_funname ppe) cttfname
+      )
+    end;
+  end
 
-    let sub = FApi.t_rotate `Left 1 sub in
-    let sub = FApi.t_focus (t_hr_exists_intro_r fs) sub in
-    let sub = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) sub in
+  | `Double ((_, fl, _), (_, fr, _)) ->
+    let contract =
+      try
+        destr_equivF contract
+      with DestrError _ ->
+        tc_error_lazy ?loc pe (fun fmt ->
+          Format.fprintf fmt
+            "contract %a should be an Equiv statement"
+            EcSymbols.pp_qsymbol name
+        )
+    in
+    List.iter (fun (f, ef_f, side) ->
+      if not (EcReduction.EqTest.for_xp env f ef_f) then begin
+        tc_error_lazy ?loc pe (fun fmt ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          Format.fprintf fmt
+            "%s-side of contract %a should be for the procedure %a, not %a"
+            side
+            EcSymbols.pp_qsymbol name
+            (EcPrinting.pp_funname ppe) f
+            (EcPrinting.pp_funname ppe) ef_f
+        )
+      end
+    ) [(fl, contract.ef_fl, "left"); (fr, contract.ef_fr, "right")]
 
+(* -------------------------------------------------------------------- *)
+let abstract_pvs
+  (hyps : LDecl.hyps)
+  (ms   : memory list)
+  (pvs  : ((prog_var * ty) list) EcIdent.Mid.t)
+=
+  let env = LDecl.toenv hyps in
+
+  let mkinv =
+    match ms with
+    | [m]      -> fun inv -> Inv_ss { m; inv; }
+    | [ml; mr] -> fun inv -> Inv_ts { ml; mr; inv; }
+    | _        -> assert false in
+
+  let for_memory (subst : EcPV.PVM.subst) (m : memory) =
+    let pvs = EcIdent.Mid.find_def [] m pvs in
+
+    let ids = List.map (fun (pv, ty) ->
+      (Format.sprintf "%s_" (EcTypes.symbol_of_pv pv)), ty) pvs in
     let ids =
-      try  fst (EcFol.destr_forall (FApi.tc_goal sub))
-      with DestrError _ -> [] in
-    let ids = List.map (snd_map gty_as_ty) ids in
+      List.combine
+        (LDecl.fresh_ids hyps (List.fst ids))
+        (List.snd ids) in
 
-    let nms = List.map (fun (_, x) -> (EcIdent.create "_", x)) ids in
-    let sub = FApi.t_focus (EcLowGoal.t_intros_i (List.fst nms)) sub in
-    let pte = PT.ptenv_of_penv (FApi.tc_hyps sub) !!tc in
-    let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
+    let pvs_as_inv = List.map (fun (pv, ty) ->
+      mkinv (f_pvar pv ty m).inv
+    ) pvs in
+    let subst = List.fold_left (fun subst ((pv, ty), x) ->
+      EcPV.PVM.add env pv m (f_local x ty) subst
+    ) subst (List.combine pvs (List.fst ids)) in
 
-    let pt =
-      List.fold_left (fun pt (id, ty) ->
-          PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
-        pt ids in
+    (subst, (ids, pvs, pvs_as_inv))
+  in
 
-    assert (PT.can_concretize pt.PT.ptev_env);
-    let _pt, ax = PT.concretize pt in
+  let subst, ids =
+    List.fold_left_map for_memory EcPV.PVM.empty ms in
 
-    let sub = FApi.t_focus (EcPhlCall.t_call oside ax) sub in
-    let sub = FApi.t_rotate `Left 1 sub in
-    let sub = oget (get_post (FApi.tc_goal sub)) in
+  let ids = List.map proj3_1 ids 
+  and pvs = List.map proj3_2 ids
+  and pvs_as_inv = List.map proj3_3 ids in
+  let ids = List.flatten ids in
+  let pvs = List.flatten pvs in
+  let pvs_as_inv = List.flatten pvs_as_inv in
 
-    let subst =
-      List.fold_left2
-        (fun s id f -> Fsubst.f_bind_local s id f)
-        Fsubst.f_subst_id (List.fst ids) fs in
+  ids, pvs, pvs_as_inv, subst
 
-    (nms, Fsubst.f_subst subst sub) in
+(* -------------------------------------------------------------------- *)
+(* Forward ecall on Hoare goals (ecall ->>).
+ *
+ * Given a goal  hoare[c; s : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes  seqf  from the contract postcondition Qf:
+ *     - If lv is present: seqf = Qf[res / lv]
+ *     - If lv is absent:  seqf = Qf with conjuncts mentioning res removed
+ *
+ *  2. Auto-frames precondition conjuncts independent of the call's
+ *     writes (lv ∪ writes(f)):
+ *       frame = /\{ Pi | Pi in toplevel-conjuncts(P),
+ *                        reads(Pi) # (writes(lv) ∪ writes(f)) }
+ *
+ *  3. Produces two subgoals:
+ *     {v
+ *   (a)  P => Pf[arg / e]          (contract precondition holds)
+ *   (b)  hoare[s : seqf /\ frame ==> Q]   (continuation)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in both subgoals.
+ *)
+let t_ecall_hoare_fwd ((cttpt, ctt) : (proofterm * form)) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
+  let concl = destr_hoareS (FApi.tc1_goal tc) in
+  let m = (fst concl.hs_m) in
+  let (lvalue, funname, _), _ = pf_first_call !!tc concl.hs_s in
 
-  let tc = t_local_seq p1 tc in
-  let tc = FApi.t_rotate `Left 1 tc in
-  let tc = FApi.t_focus (t_hr_exists_intro_r fs) tc in
-  let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length fs)) tc in
-  let tc = FApi.t_focus (EcLowGoal.t_intros_i (List.fst ids)) tc in
+  let pvs = PT.collect_pvars_from_pt cttpt in
+  let ids, _, pvs_as_inv, subst = abstract_pvs hyps [m] pvs in
 
-  let pte = PT.ptenv_of_penv (FApi.tc_hyps tc) (FApi.tc_penv tc) in
-  let pt  = PT.process_pterm pte (APT.FPNamed (l, tvi)) in
+  let tc = t_hr_exists_intro_r pvs_as_inv tc in
+  let tc = FApi.t_focus (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
+  let tc = FApi.t_focus (t_intros_i (List.fst ids)) tc in
 
-  let pt =
-    List.fold_left (fun pt (id, ty) ->
-        PT.apply_pterm_to_arg_r pt (PT.PVAFormula (f_local id ty)))
-      pt ids in
+  let cttpt = PT.subst_pv_pt env subst cttpt in
+  let ctt = EcPV.PVM.subst env subst ctt in
 
-  assert (PT.can_concretize pt.PT.ptev_env);
+  let ctt =
+    EcReduction.h_red_opt EcReduction.full_red hyps ctt
+    |> odfl ctt in
 
-  let pt, ax = PT.concretize pt in
+  let seqf =
+    let inv = destr_hoareF ctt in
+    let _   = assert (POE.is_empty (hf_po inv).hsi_inv) in
+    let inv = POE.lower (hf_po inv) in
+    let inv = ss_inv_rebind inv m in
 
-  let tc = FApi.t_focus (EcPhlCall.t_call oside ax) tc in
-  let tc = FApi.t_focus (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) tc in
+    match lvalue with
+    | None ->
+      let not_contains_res (f : form) =
+        let pvs = EcPV.form_read env EcPV.PMVS.empty f in
+        let pvs = EcIdent.Mid.find_def EcPV.PV.empty m pvs in
+        not (EcPV.PV.mem_pv env EcTypes.pv_res pvs) in
+      map_ss_inv1
+        (fun f -> filter_topand_form not_contains_res f |> odfl f_true)
+        inv
 
-  FApi.t_last EcPhlAuto.t_auto (FApi.t_rotate `Right 1 tc)
+    | Some lvalue ->
+      let lv =
+        List.map
+          (fun (pv, ty) -> (f_pvar pv ty inv.m).inv)
+          (EcModules.lv_to_ty_list lvalue) in
+      let sres =
+        EcPV.PVM.add
+          env EcTypes.pv_res inv.m
+          (f_tuple lv) EcPV.PVM.empty in
+
+      { inv = EcPV.PVM.subst env sres inv.inv; m = inv.m; } in
+
+  let seqf_frame =
+    let wr = lvalue |> omap (EcPV.lp_write env) |> odfl EcPV.PV.empty in
+    let wr = EcPV.f_write_r env wr funname in
+    let inv =
+      filter_topand_form
+        (fun f ->
+          let pvs = EcPV.form_read env EcPV.PMVS.empty f in
+          let pvs = EcIdent.Mid.find_def EcPV.PV.empty m pvs in
+          EcPV.PV.indep env wr pvs)
+        (hs_pr concl).inv in
+    { inv = odfl f_true inv; m = (hs_pr concl).m; } in
+
+  let tc =
+    FApi.t_first
+      (EcPhlSeq.t_hoare_seq (GapAfter cpos1_first) (map_ss_inv2 f_and seqf seqf_frame))
+      tc in
+
+  let tc = FApi.t_first EcPhlHoare.t_hoaresplit tc in
+  let tc = FApi.t_first (EcPhlConseq.t_conseqauto ~delta:false ?tsolve:None) tc in
+  let tc = FApi.t_first EcPhlTAuto.t_hoare_true tc in
+
+  let tc = FApi.t_first (EcPhlCall.t_call None ctt) tc in
+  let tc = FApi.t_sub [
+      EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true cttpt;
+      EcPhlSkip.t_skip;
+      t_id
+    ] tc in
+
+  let tc =
+    FApi.t_firsts
+      (t_generalize_hyps ~clear:`Yes (List.fst ids)) 2 tc in
+
+  tc
+
+(* -------------------------------------------------------------------- *)
+(* Backward ecall on Hoare goals (ecall without ->>).
+ *
+ * Given a goal  hoare[s; c : P ==> Q]  where c is a call  lv <@ f(e)
+ * and a contract  hoare[f : Pf ==> Qf],  this tactic:
+ *
+ *  1. Computes the weakest precondition of the call w.r.t. Q using
+ *     compute_hoare_call_post, yielding an intermediate assertion  R.
+ *
+ *  2. Produces three subgoals:
+ *     {v
+ *   (a)  hoare[s : P ==> R]            (prefix establishes R)
+ *   (b)  hoare[f : Pf ==> Qf]          (contract holds)
+ *   (c)  <closed by auto>              (call WP matches R)
+ *     v}
+ *
+ * When the contract has universally-quantified parameters instantiated
+ * with program variables, these are abstracted into local variables and
+ * re-generalized in the subgoals. Subgoals (b) and (c) are closed
+ * automatically, leaving only (a) for the user.
+ *)
+let t_ecall_hoare_bwd ((cttpt, _) : proofterm * form) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
+  let concl = destr_hoareS (FApi.tc1_goal tc) in
+  let m = fst (concl.hs_m) in
+  let call, _ = pf_last_call !!tc concl.hs_s in
+
+  let pvs = PT.collect_pvars_from_pt cttpt in
+  let ids, _, pvs_as_inv, subst = abstract_pvs hyps [m] pvs in
+
+  let cttpt =
+    let pt_head, pt_args =
+      match cttpt with
+      | PTApply { pt_head; pt_args } -> (pt_head, pt_args)
+      | _ -> assert false in
+    let pt_args = List.map (PT.subst_pv_pt_arg env subst) pt_args in
+    PTApply { pt_head; pt_args } in
+
+  let cttpt, ctt =  EcLowGoal.LowApply.check `Elim cttpt (`Hyps (hyps, !!tc)) in
+
+  let ctt =
+    EcReduction.h_red_opt EcReduction.full_red hyps ctt
+    |> odfl ctt in
+
+  let ids_subst =
+    List.fold_left2
+      (fun s (id, _) pv -> EcSubst.add_flocal s id (inv_of_inv pv))
+      EcSubst.empty ids pvs_as_inv in
+
+  let fpre, fpost =
+    let hf = destr_hoareF ctt in
+    (ss_inv_rebind (hf_pr hf) m).inv, (hs_inv_rebind (hf_po hf) m).hsi_inv
+  in
+
+  let post =
+    EcPhlCall.compute_hoare_call_post
+      hyps m (fpre, fpost) call (hs_po concl).hsi_inv in
+  let post = EcSubst.subst_form ids_subst post in
+
+  let tc = EcPhlSeq.t_hoare_seq (GapBefore cpos1_last) { m = m; inv = post; } tc in
+  let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
+  let tc = FApi.t_last (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
+  let tc = FApi.t_last (t_intros_i (List.fst ids)) tc in
+  let tc = FApi.t_last (EcPhlCall.t_call None ctt) tc in
+
+  FApi.t_sub [
+    EcLowGoal.t_id; (* initial hoare statement without the call *)
+    EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true cttpt; (* Prove the Hoare contract *)
+    EcPhlAuto.t_auto ?conv:None; (* Kill the conseq from the call rule *)
+  ] tc
+
+(* -------------------------------------------------------------------- *)
+let process_ecall_hoare
+  (dir   : APT.pdirection)
+  (pterm : APT.pecall)
+  (tc    : tcenv1)
+=
+  let (ctt_path, ctt_tvi, ctt_args) = pterm in
+  let hyps = FApi.tc1_hyps tc in
+  let concl = destr_hoareS (FApi.tc1_goal tc) in
+
+  (* Type-check contract (lemma) - apply it fully to find the Hoare contract *)
+  let ptenv = PT.ptenv_of_penv (LDecl.push_active_ss concl.hs_m hyps) !!tc in
+  let contract = PT.process_pterm ptenv (APT.FPNamed (ctt_path, ctt_tvi)) in
+  let contract, _ = PT.process_pterm_args_app contract ctt_args in
+  let contract = PT.apply_pterm_to_max_holes hyps contract in
+  
+  assert (PT.can_concretize contract.PT.ptev_env);
+  let contract = PT.concretize contract in
+
+  let call, _ =
+    match dir with
+    | `Forward  -> pf_first_call !!tc concl.hs_s
+    | `Backward -> pf_last_call !!tc concl.hs_s in
+
+  check_contract_type
+    ~noexn:(dir <> `Backward) ~loc:(L.loc ctt_path) ~name:(L.unloc ctt_path)
+    !!tc hyps (`Single call) (snd contract);
+
+  match dir with
+  | `Forward  -> t_ecall_hoare_fwd contract tc
+  | `Backward -> t_ecall_hoare_bwd contract tc
+
+(* -------------------------------------------------------------------- *)
+let process_ecall_equiv
+  (dir   : APT.pdirection)
+  (oside : side option)
+  (pterm : APT.pecall)
+  (tc    : tcenv1)
+=
+  if dir <> `Backward then
+    tc_error !!tc "unsupported direction for ecall on an equiv. goal";
+
+  let (ctt_path, ctt_tvi, ctt_args) = pterm in
+  let hyps = FApi.tc1_hyps tc in
+  let env = EcEnv.LDecl.toenv hyps in
+  let concl = destr_equivS (FApi.tc1_goal tc) in
+  let (ml, _), (mr, _) = concl.es_ml, concl.es_mr in
+
+  (* Type-check contract (lemma) - apply it fully to find the Hoare/Equiv contract *)
+  let cttpt, _ =
+    let ptenv = PT.ptenv_of_penv (LDecl.push_active_ts concl.es_ml concl.es_mr hyps) !!tc in
+    let contract = PT.process_pterm ptenv (APT.FPNamed (ctt_path, ctt_tvi)) in
+    let contract, _ = PT.process_pterm_args_app contract ctt_args in
+    let contract = PT.apply_pterm_to_max_holes hyps contract in
+    assert (PT.can_concretize contract.PT.ptev_env);
+    PT.concretize contract in
+
+  let pvs = PT.collect_pvars_from_pt cttpt in
+  let ids, _, pvs_as_inv, subst = abstract_pvs hyps [ml; mr] pvs in
+
+  let cttpt =
+    let pt_head, pt_args =
+      match cttpt with
+      | PTApply { pt_head; pt_args } -> (pt_head, pt_args)
+      | _ -> assert false in
+    let pt_args = List.map (PT.subst_pv_pt_arg env subst) pt_args in
+    PTApply { pt_head; pt_args } in
+
+  let cttpt, ctt =  EcLowGoal.LowApply.check `Elim cttpt (`Hyps (hyps, !!tc)) in
+
+  let ctt =
+    EcReduction.h_red_opt EcReduction.full_red hyps ctt
+    |> odfl ctt in
+
+  let ids_subst =
+    List.fold_left2
+      (fun s (id, _) pv -> EcSubst.add_flocal s id (inv_of_inv pv))
+      EcSubst.empty ids pvs_as_inv in
+
+  let calls =
+    match oside with
+    | None ->
+      let call_l, _ = pf_last_call !!tc concl.es_sl in
+      let call_r, _ = pf_last_call !!tc concl.es_sr in
+      `Double (call_l, call_r)
+    | Some side ->
+      let call, _ =
+        pf_last_call !!tc (APT.sideif side concl.es_sl concl.es_sr)
+      in `Single call
+  in
+
+  check_contract_type
+    ~phoare:true ~loc:(L.loc ctt_path) ~name:(L.unloc ctt_path)
+    !!tc hyps calls ctt;
+
+  match calls with
+  | `Single call -> begin
+    let side = oget oside in
+    let m = APT.sideif side ml mr in
+
+    let fpre, fpost =
+    match ctt.f_node with
+    | FhoareF hf ->
+      assert (POE.is_empty (hf_po hf).hsi_inv);
+      (ss_inv_rebind (hf_pr hf) m).inv,
+      (hs_inv_rebind (hf_po hf) m).hsi_inv.main
+    | FbdHoareF hf ->
+      (ss_inv_rebind (bhf_pr hf) m).inv,
+      (ss_inv_rebind (bhf_po hf) m).inv
+    | _ -> assert false
+    in
+
+    let post =
+      EcPhlCall.compute_equiv1_call_post
+        hyps side (ml, mr) (fpre, fpost) call (es_po concl).inv in
+    let post = EcSubst.subst_form ids_subst post in
+
+    let pos =
+      APT.sideif side
+        (GapBefore cpos1_last, GapAfter  cpos1_last)
+        (GapAfter  cpos1_last, GapBefore cpos1_last) in
+
+    let tc = EcPhlSeq.t_equiv_seq pos { ml; mr; inv = post; } tc in
+    let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
+    let tc = FApi.t_last (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
+    let tc = FApi.t_last (t_intros_i (List.fst ids)) tc in
+    let tc = FApi.t_last (EcPhlCall.t_call (Some side) ctt) tc in
+
+    FApi.t_sub [
+      EcLowGoal.t_id; (* initial equiv statement without the call *)
+      EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true cttpt; (* Prove the Hoare contract *)
+      EcPhlAuto.t_auto ?conv:None; (* Kill the conseq from the call rule *)
+    ] tc
+  end
+
+  | `Double (call_l, call_r) -> begin
+    let fpre, fpost =
+      let hf = destr_equivF ctt in
+      (ts_inv_rebind (ef_pr hf) ml mr).inv,
+      (ts_inv_rebind (ef_po hf) ml mr).inv
+    in
+
+    let post =
+      EcPhlCall.compute_equiv_call_post
+        hyps (ml, mr) (fpre, fpost) call_l call_r (es_po concl).inv in
+    let post = EcSubst.subst_form ids_subst post in
+
+    let tc =
+      EcPhlSeq.t_equiv_seq
+        (GapBefore cpos1_last, GapBefore cpos1_last)
+        { ml; mr; inv = post; } tc in
+
+    let tc = FApi.t_last (t_hr_exists_intro_r pvs_as_inv) tc in
+    let tc = FApi.t_last (t_hr_exists_elim_r ~bound:(List.length ids)) tc in
+    let tc = FApi.t_last (t_intros_i (List.fst ids)) tc in
+    let tc = FApi.t_last (EcPhlCall.t_call None ctt) tc in
+
+    FApi.t_sub [
+      EcLowGoal.t_id; (* initial equiv statement without the call *)
+      EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true cttpt; (* Prove the Hoare contract *)
+      EcPhlAuto.t_auto ?conv:None; (* Kill the conseq from the call rule *)
+    ] tc
+  end
+
+(* -------------------------------------------------------------------- *)
+let process_ecall
+  (dir   : APT.pdirection)
+  (oside : side option)
+  (pterm : APT.pecall) 
+  (tc    : tcenv1)
+=
+  match (FApi.tc1_goal tc).f_node with
+  | FhoareS _  ->
+      if Option.is_some oside then
+        tc_error !!tc "cannot provide a side for Hoare goals";
+      process_ecall_hoare dir pterm tc
+
+  | FequivS _ ->
+      process_ecall_equiv dir oside pterm tc
+
+  | _ -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `Equiv `Stmt] !!tc

@@ -55,7 +55,7 @@ let trans_notation_r (env : env) (nt : pnotation located) =
     (List.map getident xbd, arg)) nt.nt_args) in
 
   let xs = List.map2 (fun xty (aid, aty) ->
-    (aid, toarrow (List.map (snd |- snd) xty) aty))
+    (aid, toarrow (List.map (snd -| snd) xty) aty))
     abd (snd (TT.trans_binding env ue xs)) in
 
   let benv  = EcEnv.Var.bind_locals xs env in

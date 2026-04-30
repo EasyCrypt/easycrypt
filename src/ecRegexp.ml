@@ -2,6 +2,9 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
+module PcreBck = Pcre2
+
+(* -------------------------------------------------------------------- *)
 type split =
   | Text  of string
   | Delim of string
@@ -33,12 +36,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 module PcreCore : CORE = struct
-  type regexp  = Pcre.regexp
-  type subst   = Pcre.substitution
-  type match_  = Pcre.substrings
+  type regexp  = PcreBck.regexp
+  type subst   = PcreBck.substitution
+  type match_  = PcreBck.substrings
 
   type error =
-    | PCREError of Pcre.error
+    | PCREError of PcreBck.error
     | InvalidSubString of int
     | InvalidBackRef
 
@@ -46,47 +49,47 @@ module PcreCore : CORE = struct
 
   let wrap (f : 'a -> 'b) (x : 'a) =
     try  f x
-    with Pcre.Error err -> raise (Error (PCREError err))
+    with PcreBck.Error err -> raise (Error (PCREError err))
 
-  let quote  (x : string) = (wrap Pcre.quote ) x
-  let regexp (x : string) = (wrap Pcre.regexp) x
-  let subst  (x : string) = (wrap Pcre.subst ) x
+  let quote  (x : string) = (wrap PcreBck.quote ) x
+  let regexp (x : string) = (wrap PcreBck.regexp) x
+  let subst  (x : string) = (wrap PcreBck.subst ) x
 
   let exec ?(pos = 0) (rex : regexp) (x : string) =
-    try  Some (wrap (Pcre.exec ~pos ~rex) x)
+    try  Some (wrap (PcreBck.exec ~pos ~rex) x)
     with Not_found -> None
 
   let split ?(pos = 0) (rex : regexp) (x : string) =
     let convert = function
-      | Pcre.Text  s -> Some (Text  s)
-      | Pcre.Delim s -> Some (Delim s)
+      | PcreBck.Text  s -> Some (Text  s)
+      | PcreBck.Delim s -> Some (Delim s)
       | _ -> None
 
-    in List.pmap convert (wrap (Pcre.full_split ~pos ~rex) x)
+    in List.pmap convert (wrap (PcreBck.full_split ~pos ~rex) x)
 
   let sub (rex : regexp) (subst : subst) (x : string) =
-    try  wrap (Pcre.replace ~rex ~itempl:subst) x
+    try  wrap (PcreBck.replace ~rex ~itempl:subst) x
     with Failure _ -> raise (Error InvalidBackRef)
 
   let extract (rex : regexp) (x : string) =
-    try  wrap (Pcre.extract_all_opt ~full_match:true ~rex) x
+    try  wrap (PcreBck.extract_all_opt ~full_match:true ~rex) x
     with Not_found -> [||]
 
   module Match = struct
     let count (m : match_) : int =
-      (wrap Pcre.num_of_subs) m
+      (wrap PcreBck.num_of_subs) m
 
     let group (m : match_) (i : int) : string option =
-      try  Some (wrap (Pcre.get_substring m) i)
+      try  Some (wrap (PcreBck.get_substring m) i)
       with
       | Invalid_argument _ -> raise (Error (InvalidSubString i))
       | Not_found -> None
 
     let groups (m : match_) : (string option) array =
-      wrap (Pcre.get_opt_substrings ~full_match:true) m
+      wrap (PcreBck.get_opt_substrings ~full_match:true) m
 
     let offset (m : match_) (i : int) : (int * int) option =
-      try  Some (wrap (Pcre.get_substring_ofs m) i)
+      try  Some (wrap (PcreBck.get_substring_ofs m) i)
       with
       | Invalid_argument _ -> raise (Error (InvalidSubString i))
       | Not_found -> None

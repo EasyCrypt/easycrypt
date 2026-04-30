@@ -23,18 +23,11 @@ op ispoly (p : prepoly) =
       (forall c, c < 0 => p c = zeror)
     /\ (exists d, forall c, (d < c)%Int => p c = zeror).
 
-clone include Subtype
-  with type T   <- prepoly,
-       op P   <- ispoly
-  rename "insub" as "to_poly"
-  rename "val"   as "of_poly"
-proof *.
+subtype poly = { p : prepoly | ispoly p }
+  rename "to_poly", "of_poly".
+
 realize inhabited.
-  exists (fun _, zeror).
-  rewrite /ispoly.
-  auto.
-qed.
-type poly = sT.
+proof. by exists (fun _ => zeror). qed.
 
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
@@ -250,6 +243,17 @@ proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mul0r. qed.
 (* -------------------------------------------------------------------- *)
 lemma scalep0 c : c ** poly0 = poly0.
 proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mulr0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma scale1p p : oner ** p = p.
+proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mul1r. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma scalep1 c : c ** poly1 = polyC c.
+proof.
+apply/poly_eqP=> i ge0_i; rewrite !coeffpE !polyCE.
+by case: (i = 0) => _; [rewrite mulr1|rewrite mulr0].
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma scaleNp (c : coeff) p : (-c) ** p = - (c ** p).
@@ -493,7 +497,7 @@ qed.
 lemma onep_neq0 : poly1 <> poly0.
 proof. by apply/negP => /poly_eqP /(_ 0); rewrite !polyCE /= oner_neq0. qed.
 
-clone import Ring.ComRing as PolyComRing with
+clone export Ring.ComRing as PolyComRing with
   type t      <= poly ,
     op zeror  <= poly0,
     op oner   <= poly1,
@@ -849,9 +853,11 @@ type coeff.
 clone import IDomain as IDCoeff with type t <= coeff.
 
 clone include PolyComRing with
-  type coeff        <- coeff,
-  theory Coeff      <- IDCoeff.
-  
+  type coeff   <- coeff,
+  theory Coeff <- IDCoeff,
+  op PolyComRing.invr (p : poly) =
+    (if deg p = 1 then polyC (IDCoeff.invr p.[0]) else p).
+
 clear [PolyComRing.* PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].
 
 import BigCf.
@@ -868,6 +874,7 @@ qed.
 pred unitp (p : poly) =
   deg p = 1 /\ IDCoeff.unit p.[0].
 
+(* -------------------------------------------------------------------- *)
 op polyV (p : poly) =
   if deg p = 1 then polyC (IDCoeff.invr p.[0]) else p.
 
@@ -880,6 +887,7 @@ clone import Ring.IDomain as IDPoly with
     op [ - ]  <- polyN,
     op ( * )  <- polyM,
     op invr   <- polyV,
+    op exp    <- PolyComRing.exp,
   pred unit   <- unitp
 
   proof *
@@ -936,7 +944,7 @@ rewrite degM -1?deg_eq0 // => ME eq.
 have {eq}[]: deg p = 1 /\ deg q = 1 by smt(ge0_deg).
 move/deg_eq1=> [cp [nz_cp ->>]]; move/deg_eq1=> [cq [nz_cq ->>]].
 move/poly_eqP: ME => /(_ 0 _) //; rewrite polyCE /=.
-rewrite polyME BCA.big_int1 /= => /unitP @/unitp -> /=.
+rewrite polyME BCA.big_int1 /= => /IDCoeff.unitP @/unitp -> /=.
 by rewrite deg_eq1; exists cp.
 qed.
 

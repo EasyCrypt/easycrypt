@@ -15,7 +15,7 @@ type loglevel = EcGState.loglevel
 class type terminal =
 object
   method interactive : bool
-  method next        : EcParsetree.prog
+  method next        : string * EcParsetree.prog
   method notice      : immediate:bool -> loglevel -> string -> unit
   method finish      : status -> unit
   method finalize    : unit
@@ -70,7 +70,7 @@ object(self)
     end;
 
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
-    EcIo.parse iparser
+    EcIo.xparse iparser
 
   method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
     match immediate with
@@ -116,7 +116,7 @@ object
   method next =
     Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.drain iparser;
-    EcIo.parse iparser
+    EcIo.xparse iparser
 
   method notice ~(immediate:bool) (_ : loglevel) (msg : string) =
     ignore immediate;
@@ -148,8 +148,9 @@ type progress = [ `Human | `Script | `Silent ]
 class from_channel
   ?(gcstats  : bool = true)
   ?(progress : progress option)
-  ~(name     : string)
-   (stream   : in_channel)
+  ?(lastgoals : bool = false)
+  ~(name      : string)
+   (stream    : in_channel)
   : terminal
 
 = object(self)
@@ -260,19 +261,19 @@ class from_channel
         self#_clean_progress_line ();
         begin match progress with
         | `Human ->
-           Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg;
+           Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg
         | `Script ->
            Format.eprintf "E %s %s %s\n%!" prefix strloc (String.escaped msg)
         | `Silent ->
-           ()
+           Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg
         end;
         self#_update_progress
 
   method interactive = false
 
   method next =
-    let aout = EcIo.parse iparser in
-    loc <- aout.LC.pl_loc;
+    let aout = EcIo.xparse iparser in
+    loc <- (snd aout).LC.pl_loc;
     self#_update_progress; aout
 
   method notice ~immediate lvl msg =
@@ -290,6 +291,8 @@ class from_channel
         let msg = String.strip (EcPException.tostring e) in
 
         self#_clean_progress_line ();
+        if lastgoals then
+          EcCommands.pp_current_goal_or_noproof ~all:true Format.std_formatter;
         self#_notice ?subloc ~immediate:true `Critical msg;
         self#_update_progress;
         self#_clean_progress_line ~erase:false ();
@@ -314,5 +317,5 @@ class from_channel
     Format.pp_set_margin Format.err_formatter i
 end
 
-let from_channel ?gcstats ?progress ~name stream =
-  new from_channel ?gcstats ?progress ~name stream
+let from_channel ?gcstats ?progress ?lastgoals ~name stream =
+  new from_channel ?gcstats ?progress ?lastgoals ~name stream

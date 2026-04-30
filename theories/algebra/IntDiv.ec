@@ -18,18 +18,26 @@ op euclidef (m d : int) (qr : int * int) =
      m = qr.`1 * d + qr.`2
   /\ (d <> 0 => 0 <= qr.`2 < `|d|).
 
-op edivn (m d : int) =
+op [opaque] edivn (m d : int) =
   if (d < 0 \/ m < 0) then (0, 0) else
-    if d = 0 then (0, m) else choiceb (euclidef m d) (0, 0)
-  axiomatized by edivn_def.
+    if d = 0 then (0, m) else choiceb (euclidef m d) (0, 0).
+lemma edivn_def (m d: int): edivn m d = 
+  if (d < 0 \/ m < 0) then (0, 0) else
+    if d = 0 then (0, m) else choiceb (euclidef m d) (0, 0).
+proof. by rewrite /edivn. qed.
 
-op edivz (m d : int) =
+op [opaque] edivz (m d : int) =
   let (q, r) =
     if 0 <= m then edivn m `|d| else
       let (q, r) = edivn (-(m+1)) `|d| in
       (- (q + 1), `|d| - 1 - r)
-    in (signz d * q, r)
-  axiomatized by edivz_def.
+    in (signz d * q, r).
+lemma edivz_def (m d: int): edivz m d =
+  let (q, r) =
+    if 0 <= m then edivn m `|d| else
+      let (q, r) = edivn (-(m+1)) `|d| in
+      (- (q + 1), `|d| - 1 - r)
+    in (signz d * q, r) by rewrite/edivz.
 
 abbrev (%/) (m d : int) = (edivz m d).`1.
 abbrev (%%) (m d : int) = (edivz m d).`2.

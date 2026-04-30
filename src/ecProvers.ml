@@ -513,17 +513,17 @@ let run_prover
     let pc =
       let command = pr.Whyconf.command in
 
-      let limit = { Call_provers.empty_limit with
+      let limits = { Call_provers.empty_limits with
         Call_provers.limit_time =
-          let limit = pi.pr_timelimit * pi.pr_cpufactor in
-          if limit <= 0 then 0. else float_of_int limit;
+          let limits = pi.pr_timelimit * pi.pr_cpufactor in
+          if limits <= 0 then 0. else float_of_int limits;
       } in
 
       let rec doit gcdone =
         try
           Driver.prove_task
             ~config:(Config.main ())
-            ~command ~limit dr task
+            ~command ~limits dr task
         with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
           Gc.compact (); doit true
       in
@@ -618,7 +618,7 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                       let fmt = Format.formatter_of_buffer buf in
                       Format.fprintf fmt "prover %s disproved this goal." prover;
                     Buffer.contents buf)));
-                | (CP.Failure _ | CP.HighFailure) as answer->
+                | (CP.Failure _ | CP.HighFailure _) as answer->
                   notify |> oiter (fun notify -> notify `Warning (lazy (
                     let buf = Buffer.create 0 in
                     let fmt = Format.formatter_of_buffer buf in

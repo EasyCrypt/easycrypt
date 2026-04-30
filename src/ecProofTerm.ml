@@ -297,16 +297,17 @@ exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 type occmode = {
   k_keyed : bool;
   k_conv  : bool;
+  k_delta : bool;
 }
 
-let om_rigid = { k_keyed = true; k_conv = false; }
+let om_rigid = { k_keyed = true; k_conv = false; k_delta = true; }
 
 let pf_find_occurence
   (pt : pt_env) ?(full = true) ?(rooted = false) ?occmode ~ptn subject
 =
   let module E = struct exception MatchFound of form end in
 
-  let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
+  let occmode = odfl { k_keyed = false; k_conv = true; k_delta = true; } occmode in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
   let ho =
@@ -345,7 +346,10 @@ let pf_find_occurence
     then EcMatching.fmrigid
     else EcMatching.fmdelta in
 
-  let mode = { mode with fm_conv = occmode.k_conv } in
+  let mode = { mode with
+    fm_conv  = occmode.k_conv;
+    fm_delta = mode.fm_delta && occmode.k_delta;
+  } in
 
   let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
@@ -388,9 +392,9 @@ let pf_find_occurence
 
 (* -------------------------------------------------------------------- *)
 let default_modes = [
-  { k_keyed =  true; k_conv = false; };
-  { k_keyed =  true; k_conv =  true; };
-  { k_keyed = false; k_conv =  true; };
+  { k_keyed =  true; k_conv = false; k_delta = true; };
+  { k_keyed =  true; k_conv =  true; k_delta = true; };
+  { k_keyed = false; k_conv =  true; k_delta = true; };
 ]
 
 let pf_find_occurence_lazy
@@ -750,7 +754,6 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
 
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
-
   match PT.destruct_product pe.pte_hy (get_head_symbol pe pt.ptev_ax) with
   | None   -> tc_pterm_apperror ?loc pe AE_NotFunctional
   | Some t ->
@@ -761,6 +764,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
             | PVASub arg -> begin
               try
                 pf_form_match ~mode:EcMatching.fmdelta pe ~ptn:f1 arg.ptev_ax;
+
                 (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
                 tc_pterm_apperror ?loc pe (AE_InvalidArgProof (arg.ptev_ax, f1))
@@ -793,6 +797,12 @@ and apply_pterm_to_hole ?loc pt =
 and apply_pterm_to_holes ?loc n pt =
   EcUtils.iterop (apply_pterm_to_hole ?loc) n pt
 
+(* -------------------------------------------------------------------- *)
+and apply_pterm_to_max_holes (hyps : LDecl.hyps) (pt : pt_ev) =
+  if is_some (PT.destruct_product ~reduce:true hyps pt.ptev_ax) then
+    apply_pterm_to_max_holes hyps (apply_pterm_to_hole pt)
+  else pt
+  
 (* -------------------------------------------------------------------- *)
 and apply_pterm_to_local ?loc pt id =
   match LDecl.by_id id pt.ptev_env.pte_hy with
@@ -915,6 +925,7 @@ type prept = [
   | `G    of EcPath.path * etyarg list
   | `UG   of EcPath.path
   | `HD   of handle
+  | `PE   of pt_ev
   | `App  of prept * prept_arg list
 ]
 
@@ -927,14 +938,13 @@ and prept_arg =  [
 ]
 
 (* -------------------------------------------------------------------- *)
-let pt_of_prept tc (pt : prept) =
-  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
-
-  let rec build_pt = function
+let pt_of_prept_r (ptenv : pt_env) : prept -> pt_ev =
+  let rec build_pt : prept -> pt_ev = function
     | `Hy  id         -> pt_of_hyp_r ptenv id
     | `G   (p, tys)   -> pt_of_global_tc_r ptenv p tys
     | `UG  p          -> pt_of_global_tc_r ptenv p []
     | `HD  hd         -> pt_of_handle_r ptenv hd
+    | `PE  pe         -> pe
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
 
   and app_pt_ev pt_ev = function
@@ -944,7 +954,12 @@ let pt_of_prept tc (pt : prept) =
     | `Sub pt -> apply_pterm_to_arg_r pt_ev (PVASub (build_pt pt))
     | `H_     -> apply_pterm_to_hole pt_ev
 
-  in build_pt pt
+  in fun pt -> build_pt pt
+
+(* -------------------------------------------------------------------- *)
+let pt_of_prept (tc : tcenv1) (pt : prept) : pt_ev =
+  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
+  pt_of_prept_r ptenv pt
 
 (* -------------------------------------------------------------------- *)
 module Prept = struct
@@ -963,3 +978,90 @@ module Prept = struct
   let ahyp h    = asub (hyp h)
   let ahdl h    = asub (hdl h)
 end
+
+(* -------------------------------------------------------------------- *)
+let pvcompare (pv1 : prog_var) (pv2 : prog_var) =
+  match pv1, pv2 with
+  | PVglob x1, PVglob x2 ->
+    EcPath.x_compare x1 x2
+  | PVloc s1, PVloc s2 ->
+    EcSymbols.sym_compare s1 s2
+
+  | PVglob _, PVloc  _ ->  1
+  | PVloc  _, PVglob _ -> -1
+
+module Mpv = Map.Make(struct
+  type t = prog_var
+  let compare = pvcompare
+end)
+
+type mpvars = (ty Mpv.t) Mid.t
+
+(* -------------------------------------------------------------------- *)
+let rec collect_pvars_from_pt (pvs : mpvars) (pt : proofterm) =
+  match pt with
+  | PTApply { pt_args = args } -> begin
+    List.fold_left collect_pvars_from_ptarg pvs args
+  end
+  | PTQuant (_, pt) ->
+    collect_pvars_from_pt pvs pt
+
+and collect_pvars_from_ptarg (pvs : mpvars) (ptarg : pt_arg) =
+  match ptarg with
+  | PAFormula f -> collect_pvars_from_form pvs f
+  | PAMemory _ -> pvs
+  | PAModule _ -> pvs
+  | PASub None -> pvs
+  | PASub (Some pt) -> collect_pvars_from_pt pvs pt
+
+and collect_pvars_from_form (pvs : mpvars) (f : form) =
+  let rec doit (pvs : mpvars) (f : form) =
+    match f.f_node with
+    | Fpvar (pv, m) ->
+      Mid.change (fun pvmap ->
+        Some (Mpv.add pv f.f_ty (odfl Mpv.empty pvmap))
+      ) m pvs
+    | _ -> EcFol.f_fold doit pvs f
+  in doit pvs f
+
+(* -------------------------------------------------------------------- *)
+let collect_pvars_from_pt (pt : proofterm) =
+  Mid.map Mpv.bindings (collect_pvars_from_pt Mid.empty pt)
+
+(* -------------------------------------------------------------------- *)
+module PV = struct
+  open EcPV.PVM
+
+  let rec subst_pt (env : env) (subst : subst) (pt : proofterm) =
+    match pt with
+    | PTApply { pt_head; pt_args } ->
+      PTApply
+        { pt_head = subst_pt_head env subst pt_head
+        ; pt_args = List.map (subst_pt_arg env subst) pt_args }
+    | PTQuant (bds, pt) ->
+      PTQuant (bds, subst_pt env subst pt)
+
+  and subst_pt_head (env : env) (subst : subst) (pth : pt_head) =
+    match pth with
+    | PTHandle _
+    | PTLocal _
+    | PTGlobal _ -> pth
+    | PTCut (f, cs) -> PTCut (subst_form env subst f, cs)
+    | PTTerm pt -> PTTerm (subst_pt env subst pt)
+
+  and subst_pt_arg (env : env) (subst : subst) (pta : pt_arg) =
+    match pta with
+    | PAFormula f -> PAFormula (subst_form env subst f)
+    | PAMemory _  -> pta
+    | PAModule _  -> pta
+    | PASub    pt -> PASub (omap (subst_pt env subst) pt)
+
+  and subst_form (env : env) (subst : subst) (f : form) =
+    EcPV.PVM.subst env subst f
+end
+
+let subst_pv_pt (env : env) (subst : EcPV.PVM.subst) (pt : proofterm) =
+  PV.subst_pt env subst pt
+
+let subst_pv_pt_arg (env : env) (subst : EcPV.PVM.subst) (pt_arg : pt_arg) =
+  PV.subst_pt_arg env subst pt_arg

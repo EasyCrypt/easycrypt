@@ -39,13 +39,13 @@ module Hty = MSHty.H
 let rec dump_ty ty =
   match ty.ty_node with
   | Tglob p ->
-      EcIdent.tostring p
+      EcIdent.tostring_internal p
 
   | Tunivar i ->
       Printf.sprintf "#%d" (i :> int)
 
   | Tvar id ->
-      EcIdent.tostring id
+      EcIdent.tostring_internal id
 
   | Ttuple tys ->
       Printf.sprintf "(%s)" (String.concat ", " (List.map dump_ty tys))
@@ -68,6 +68,7 @@ let tglob m         = mk_ty (Tglob m)
 (* -------------------------------------------------------------------- *)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
 let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let texn       = tconstr EcCoreLib.CI_Exn  .p_exn    []
 let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
 let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
 
@@ -203,6 +204,12 @@ let rec ty_check_uni (ty : ty) : unit  =
   match ty.ty_node with
   | Tunivar _ -> raise FoundUnivar
   | _ -> ty_iter ty_check_uni ty
+
+let rec var_mem ?(check_glob = false) id t =
+  match t.ty_node with
+  | Tvar id' -> EcIdent.id_equal id id'
+  | Tglob id' when check_glob -> EcIdent.id_equal id id'
+  | _ -> ty_sub_exists (var_mem ~check_glob id) t
 
 (* -------------------------------------------------------------------- *)
 let symbol_of_ty (ty : ty) =
@@ -468,6 +475,9 @@ let e_app x args ty =
 
 let e_app_op ?(tyargs=[]) op args ty =
   e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
+
+let e_not e =
+  e_app (e_op EcCoreLib.CI_Bool.p_not [] tbool) [e] tbool
 
 (* -------------------------------------------------------------------- *)
 module Reals : sig

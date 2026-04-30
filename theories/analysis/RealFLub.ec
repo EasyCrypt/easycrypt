@@ -25,8 +25,10 @@ by smt().
 lemma flub_upper_bound (F : 'a -> real) x : 
     has_fub F => F x <= flub F.
 proof.
-move => H. apply lub_upper_bound; 2: by exists x.
-by split; [ by exists (F x) x | smt() ].
+move => H; apply lub_upper_bound; 2: by exists x.
+split.
++ by exists (F x) x.
+by case: H=> r is_fub_F_r; exists r=> /#.
 qed.
 
 lemma flub_le_ub (F : 'a -> real) r :
@@ -53,7 +55,10 @@ lemma flubZ (f: 'a -> real) c : has_fub f =>
   c >= 0%r => flub (fun x => c * f x) = c * flub f.
 proof.
 move => fub_f c_ge0 @/flub; pose E := fun r => exists a, f a = r.
-have -> : (fun r => exists a, c * f a = r) = scale_rset E c by smt().
+have -> : (fun r => exists a, c * f a = r) = scale_rset E c.
++ apply: fun_ext=> x; rewrite eq_iff; split.
+  + by move=> [] a xP; exists (f a); rewrite xP=> //=; exists a.
+  + by move=> /> a; exists a.
 by rewrite lub_scale //; apply has_fub_lub.
 qed.
 
@@ -61,9 +66,10 @@ lemma flub_const c :
   flub (fun _ : 'a => c) = c.
 proof.
 apply eqr_le; split; first apply flub_le_ub => /#.
-move => _; apply (@flub_upper_bound (fun _ => c) witness) => /#.
+move=> _; apply (@flub_upper_bound (fun _=> c) witness).
+by exists c=> /#.
 qed.
 
 lemma has_fubZ (f: 'a -> real) c: has_fub f =>
   c >= 0%r => has_fub (fun x => c * f x).
-proof. move => [ym ub_ym] ge0_c; exists (c * ym) => /#. qed.
+proof. by move => [ym ub_ym] ge0_c; exists (c * ym) => /#. qed.

@@ -95,7 +95,7 @@ module Make (I : Item) (D : Data) = struct
     let (item, w, olddata) = xfind item uf in
       { forest = M.add item (Root (w, data)) uf.forest;
         nvoids = uf.nvoids
-                   - (odfl 0 (olddata |> omap (int_of_bool |- D.isvoid)))
+                   - (odfl 0 (olddata |> omap (int_of_bool -| D.isvoid)))
                    + (int_of_bool (D.isvoid data)); }
 
   (* ------------------------------------------------------------------ *)
@@ -121,8 +121,8 @@ module Make (I : Item) (D : Data) = struct
         let uf =
           { forest = M.add item1 link1 (M.add item2 link2 uf.forest);
             nvoids = uf.nvoids
-              - (odfl 0 (data1 |> omap (int_of_bool |- D.isvoid)) +
-                 odfl 0 (data2 |> omap (int_of_bool |- D.isvoid)))
+              - (odfl 0 (data1 |> omap (int_of_bool -| D.isvoid)) +
+                 odfl 0 (data2 |> omap (int_of_bool -| D.isvoid)))
               + (int_of_bool (D.isvoid data)); }
         in
           (uf, effects)

@@ -29,6 +29,10 @@ val old_mem_restr : string
 val get_old_mem_restr : gstate -> bool
 
 (* --------------------------------------------------------------------- *)
+val pp_showtvi : string
+val get_pp_showtvi : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
 type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 

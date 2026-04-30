@@ -198,10 +198,26 @@ end = struct
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
 
-  let pp_fxerror _env fmt error =
+  let pp_fix_match env =
+     let ppe = EcPrinting.PPEnv.ofenv env in
+     let ppo fmt = function
+       | None -> Format.fprintf fmt "_"
+       | Some op -> EcPrinting.pp_opname ppe fmt op in
+     let pp1 fmt (id, op) =
+       Format.fprintf fmt "%a = %a"
+          (EcPrinting.pp_local ppe) id
+          ppo op in
+     EcPrinting.pp_list ",@ " pp1
+
+  let is_are n = if n = 1 then "is" else "are"
+
+  let pp_fxerror env fmt error =
     let msg x = Format.fprintf fmt x in
 
     match error with
+    | FXE_MatchWildcard ->
+        msg "pattern matching with wildcard not support"
+
     | FXE_EmptyMatch ->
         msg "this pattern matching has no branches"
 
@@ -220,8 +236,26 @@ end = struct
     | FXE_MatchDupBranches ->
         msg "this pattern matching contains duplicated branches"
 
-    | FXE_MatchPartial ->
-        msg "this pattern matching is non-exhaustive"
+    | FXE_MatchPartial ids ->
+        msg "this pattern matching is non-exhaustive, %a %s missing"
+          (EcPrinting.pp_list ",@ " pp_symbol) ids
+          (is_are (List.length ids))
+
+    | FXE_FixPartial ids ->
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        let pp_match fmt ids =
+          Format.fprintf fmt "[%a]"
+            (EcPrinting.pp_list ",@" (EcPrinting.pp_opname ppe)) ids in
+        msg "this pattern matching is non-exhaustive, %a %s missing"
+          (EcPrinting.pp_list ",@ " pp_match) ids
+          (is_are (List.length ids))
+
+    | FXE_FixRedundant fm ->
+        msg "this clause is useless: %a" (pp_fix_match env) fm
+
+    | FXE_FixDuplicate (previous, current) ->
+        msg "duplicate clause : %a, already covered by %a"
+          (pp_fix_match env) current (pp_fix_match env) previous
 
     | FXE_CtorUnk ->
         msg "unknown constructor name"
@@ -236,6 +270,12 @@ end = struct
 
     | FXE_SynCheckFailure ->
         msg "syntactic termination check failure"
+
+  let pp_gse_error _env fmt error =
+    let msg = Format.fprintf fmt in
+    match error with
+    | GSE_ExpectedTwoSided ->
+        msg "expected two sided goal"
 
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
@@ -313,6 +353,9 @@ end = struct
 
     | DuplicatedField name ->
         msg "duplicated field name: `%s'" name
+
+    |DuplicatedException name ->
+        msg "duplicated exception: %a" pp_qsymbol name
 
     | NonLinearPattern ->
         msg "non-linear pattern matching"
@@ -444,7 +487,10 @@ end = struct
         msg "unknown type name: %a" pp_qsymbol name
 
     | UnknownFunName name ->
-        msg "unknown procedure: %a" pp_qsymbol name
+      msg "unknown procedure: %a" pp_qsymbol name
+
+    | UnknownExceptionName name ->
+      msg "unknown exception: %a" pp_qsymbol name
 
     | UnknownModVar x ->
         msg "unknown module-level variable: %a" pp_qsymbol x
@@ -472,6 +518,24 @@ end = struct
 
     | InvalidModSig (MTS_DupArgName (f, x)) ->
         msg "duplicated proc. arg. name in signature: `%s.%s'" f x
+
+    | InvalidModUpdate MUE_Functor ->
+        msg "cannot update a functor"
+
+    | InvalidModUpdate MUE_AbstractFun ->
+        msg "cannot update an abstract function"
+
+    | InvalidModUpdate MUE_AbstractModule ->
+        msg "cannot update an abstract module"
+
+    | InvalidModUpdate MUE_InvalidFun ->
+        msg "unknown function"
+
+    | InvalidModUpdate MUE_InvalidCodePos->
+        msg "invalid code position"
+
+    | InvalidModUpdate MUE_InvalidTargetCond ->
+        msg "target instruction is not a conditional"
 
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
@@ -562,6 +626,9 @@ end = struct
       end
     end
 
+    | UnexpectedGoalShape gse ->
+        msg "unexpected goal shape %a" (pp_gse_error env) gse
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
@@ -584,6 +651,7 @@ module InductiveError : sig
   val pp_fxerror : env -> Format.formatter -> fxerror -> unit
 end = struct
   open EcHiInductive
+  open EcInductive
   open TypingError
 
   let pp_rcerror env fmt error =
@@ -602,8 +670,38 @@ end = struct
     | RCE_Empty ->
         msg "this record type is empty"
 
+  let format_intype fmt p (tyvar, ctx) =
+    (match ctx with
+    | Concrete -> Format.fprintf fmt "... in type %s" p
+    | Record s -> Format.fprintf fmt "... in record field %s of type %s" s p
+    | Variant s -> Format.fprintf fmt "... in variant %s of type %s" s p);
+    let subty tyvar =
+      Format.fprintf fmt " (in an instance of type variable %a)"
+        EcIdent.pp_ident tyvar
+    in
+    Option.iter subty tyvar
+
+let format_context pp fmt (p, ctx) = match ctx with
+  | InType (tyvar, ctx) -> format_intype fmt p (tyvar, ctx)
+  | NonPositiveOcc ty ->
+      Format.fprintf fmt "non-positive occurrence of %s in type %a"
+        p (EcPrinting.pp_type pp) ty
+  | AbstractTypeRestriction ->
+      Format.fprintf fmt "unauthorised abstract type constructor %s" p
+  | TypePositionRestriction ty ->
+      Format.fprintf fmt
+        "recursive occurrence %a in the definition of %s has different \
+         arguments, which is not allowed."
+        (EcPrinting.pp_type pp) ty p
+
+let format_context_list p l pp fmt =
+  Format.fprintf fmt "Could not verify strict positivity of type %s:@.@;<0 2>@[<v>" p;
+  Format.pp_print_list (format_context pp) fmt l;
+  Format.fprintf fmt "@;@]"
+
   let pp_dterror env fmt error =
     let msg x = Format.fprintf fmt x in
+    let env1  = EcPrinting.PPEnv.ofenv env in
 
     match error with
     | DTE_TypeError ee ->
@@ -616,11 +714,10 @@ end = struct
         msg "invalid constructor type: `%s`: %a'"
           name (pp_tyerror env) ee
 
-    | DTE_NonPositive ->
-        msg "the datatype does not respect the positivity condition"
-
     | DTE_Empty ->
         msg "the datatype may be empty"
+
+    | DTE_NonPositive (s, ctx) -> format_context_list s ctx env1 fmt
 
   let pp_fxerror env fmt error =
     match error with
@@ -724,7 +821,7 @@ end = struct
           (string_of_ovkind kd) (string_of_qsymbol x)
 
     | CE_ThyOverride x ->
-        msg "Cannot override theory `%s`: contains module"
+        msg "Cannot override theory `%s`: contains module or exception"
           (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
@@ -766,6 +863,9 @@ end = struct
         msg
           "cannot realized a (non-axiomatic) lemma: `%s'"
           (string_of_qsymbol x)
+    | CE_NoExceptions ->
+      msg
+        "Override of exceptions not allowed"
 end
 
 (* -------------------------------------------------------------------- *)

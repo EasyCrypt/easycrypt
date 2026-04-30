@@ -251,10 +251,8 @@ section.
              ={glob RealSigServ, glob OrclUF} /\ 
                valid RealSigServ.pks_sks{1} RealSigServ.qs{1},
              ={OrclUF.forged}).
-    + by conseq |>; proc; sp; if; 
-         1: (by move => *; progress => /#);
-         by auto => />; smt(get_setE).
-    +  move => ??; conseq |>; proc; sp; if; auto => />; smt(keygen_ll). 
+    + by conseq |>; proc; sp; if=> [/>||]; auto=> />; smt(get_setE).
+    + by move => ??; conseq |>; proc; sp; if; auto => />; smt(keygen_ll). 
     + by move => ?; conseq |>; proc; sp; if; auto => />; smt(keygen_ll). 
     + conseq |>; proc; sp; if; 1: smt().
         if;
@@ -651,7 +649,7 @@ abstract theory UF1_UF.
         by smt(emptyE get_setE).
       + proc; inline *;auto => /> &m1 &m2 hpki _ h _.
         case (MkAdvUF1.mpki{m2}.[MkAdvUF1.pki{m2}] = Some MkAdvUF1.i{m2}) => h1.
-        + by apply fsetP => pk;rewrite in_fsetU in_fset1 !mem_fdom /#.
+        + by apply: fsetP=> pk; rewrite in_fsetU in_fset1 !mem_fdom !domE /#.
         by apply fsetP => pk;rewrite !mem_fdom /#.
       + proc;if => //; inline *; auto => /> &m1 &m2 hpki _ hpks hforge hpk. 
         rewrite /is_forgery; have := hpks pk{m2}; rewrite hpk /= /dom => -[->> ->] /=.

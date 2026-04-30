@@ -7,6 +7,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
+open EcMatching
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
@@ -111,12 +112,14 @@ module Mpv = struct
       check_glob env mp m;
       raise Not_found
 
+  let pvs { s_pv } = s_pv
+
   type esubst = (expr, unit) t
 
   let rec esubst env (s : esubst) e =
     match e.e_node with
     | Evar pv -> (try find env pv s with Not_found -> e)
-    | _ -> EcTypes.e_map (esubst env s) e
+    | _ -> EcTypes.e_map (fun ty -> ty) (esubst env s) e
 
   let rec isubst env (s : esubst) (i : instr) =
     let esubst = esubst env s in
@@ -129,7 +132,7 @@ module Mpv = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
-    | Sassert e          -> i_assert (esubst e)
+    | Sraise e           -> i_raise  (esubst e)
     | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
@@ -153,6 +156,9 @@ module PVM = struct
     try Mid.change (fun o -> Some (Mpv.add env pv f (odfl Mpv.empty o))) m s
     with AliasClash (env,c) -> uerror env c
 
+  let of_list env pvs =
+    List.fold_left (fun s ((pv, m), f) -> add env pv m f s) empty pvs
+
   let find env pv m s =
     try Mpv.find env pv (Mid.find m s)
     with AliasClash (env,c) -> uerror env c
@@ -171,6 +177,16 @@ module PVM = struct
 
   let has_mod b =
     List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b
+  
+  let has_globs m (s: subst) =
+    try
+      let mpv = Mid.find m s in
+      let has_abstract_globs = not (Mm.is_empty mpv.s_gl) in
+      let has_concrete_globs =
+        let check pv _ = is_glob pv in
+        Mnpv.exists check mpv.s_pv in
+      has_abstract_globs || has_concrete_globs
+    with Not_found -> false
 
   let rec subst env (s : subst) =
     Hf.memo_rec 107 (fun aux f ->
@@ -179,33 +195,30 @@ module PVM = struct
           (try find env pv m s with Not_found -> f)
       | Fglob(mp,m) ->
           (try find_glob env (EcPath.mident mp) m s with Not_found -> f)
-      | FequivF _ ->
-        check_binding EcFol.mleft s;
-        check_binding EcFol.mright s;
-        EcFol.f_map aux f
-      | FequivS es ->
-        check_binding (fst es.es_ml) s;
-        check_binding (fst es.es_mr) s;
-        EcFol.f_map aux f
-      | FhoareF _ | FbdHoareF _ ->
-        check_binding EcFol.mhr s;
-        EcFol.f_map aux f
-      | FhoareS hs ->
-        check_binding (fst hs.hs_m) s;
-        EcFol.f_map aux f
-      | FbdHoareS hs ->
-        check_binding (fst hs.bhs_m) s;
-        EcFol.f_map aux f
-      | Fpr pr ->
-        check_binding pr.pr_mem s;
-        EcFol.f_map aux f
+      | FequivF {ef_ml=ml;ef_mr=mr}
+      | FequivS {es_ml=(ml,_); es_mr=(mr,_)} ->
+        check_binding ml s;
+        check_binding mr s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FhoareF {hf_m=m}
+      | FhoareS {hs_m=(m,_)}
+      | FbdHoareF {bhf_m=m}
+      | FbdHoareS {bhs_m=(m,_)} ->
+        check_binding m s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fpr {pr_mem; pr_event={m}}  ->
+        check_binding m s;
+        (* Substituting globals using the memory of the pr may erase information *)
+        if has_globs pr_mem s then
+          raise MemoryClash;
+        EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 =
           if has_mod b then subst (Mod.add_mod_binding b env) s f1
           else aux f1 in
         f_quant q b f1
 
-      | _ -> EcFol.f_map aux f)
+      | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let subst1 env pv m f =
     let s = add env pv m f empty in
@@ -213,7 +226,6 @@ module PVM = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module PV = struct
 
   type t =
@@ -246,7 +258,7 @@ module PV = struct
     { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }
 
   let add_glob env mp fv =
-    let f = NormMp.norm_glob env mhr mp in
+    let f = NormMp.norm_glob env (EcIdent.create "&dummy") mp in
     let rec aux fv f =
       match f.f_node with
       | Ftuple fs -> List.fold_left aux fv fs
@@ -255,7 +267,7 @@ module PV = struct
       | Fglob(mp,_) ->
         { fv with s_gl = Sm.add (EcPath.mident mp) fv.s_gl}
       | _ -> assert false in
-    aux fv f
+    aux fv f.inv
 
   let remove env pv fv =
     { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
@@ -337,36 +349,39 @@ module PV = struct
           aux env fv e
 
       | FhoareF hf ->
-          in_mem_scope env fv [mhr] [hf.hf_pr; hf.hf_po]
+          let lf = POE.to_list (hf_po hf).hsi_inv in
+          in_mem_scope env fv [hf.hf_m] ((hf_pr hf).inv  :: lf)
 
       | FhoareS hs ->
-          in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
+        let lf = POE.to_list (hs_po hs).hsi_inv in
+        in_mem_scope env fv [fst hs.hs_m] ((hs_pr hs).inv :: lf)
 
       | FeHoareF hf ->
-          in_mem_scope env fv [mhr] [hf.ehf_pr; hf.ehf_po]
+          in_mem_scope env fv [hf.ehf_m] [(ehf_pr hf).inv; (ehf_po hf).inv]
 
       | FeHoareS hs ->
-          in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
+          in_mem_scope env fv [fst hs.ehs_m] [(ehs_pr hs).inv; (ehs_po hs).inv]
 
       | FbdHoareF bhf ->
-          in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
+          in_mem_scope env fv [bhf.bhf_m] [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
 
       | FbdHoareS bhs ->
           in_mem_scope env fv
-            [fst bhs.bhs_m] [bhs.bhs_pr; bhs.bhs_po; bhs.bhs_bd]
+            [fst bhs.bhs_m] [(bhs_pr bhs).inv; (bhs_po bhs).inv; (bhs_bd bhs).inv]
 
       | FequivF ef ->
-          in_mem_scope env fv [mleft; mright] [ef.ef_pr; ef.ef_po]
+          in_mem_scope env fv [ef.ef_ml; ef.ef_mr] [(ef_pr ef).inv; (ef_po ef).inv]
 
       | FequivS es ->
-          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [es.es_pr; es.es_po]
+          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [(es_pr es).inv; (es_po es).inv]
 
       | FeagerF eg ->
-          in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
+          in_mem_scope env fv [eg.eg_ml; eg.eg_mr] [(eg_pr eg).inv; (eg_po eg).inv]
 
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in
-          in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
+          let ev = pr.pr_event in
+          in_mem_scope env fv [ev.m] [ev.inv]
 
     and in_mem_scope env fv mems fs =
       if   List.exists (EcIdent.id_equal m) mems
@@ -419,6 +434,10 @@ module PV = struct
   let diff fv1 fv2 =
     { s_pv = Mnpv.set_diff fv1.s_pv fv2.s_pv;
       s_gl = Sm.diff fv1.s_gl fv2.s_gl }
+
+  let inter fv1 fv2 =
+    { s_pv = Mnpv.inter (fun _ _ t2 -> Some t2) fv1.s_pv fv2.s_pv;
+      s_gl = Sm.inter fv1.s_gl fv2.s_gl }
 
   let interdep env fv1 fv2 =
     let test_pv pv _ =
@@ -517,7 +536,7 @@ and i_write_r ?(except=Sx.empty) env w i =
   match i.i_node with
   | Sasgn  (lp, _) -> lp_write_r env w lp
   | Srnd   (lp, _) -> lp_write_r env w lp
-  | Sassert _      -> w
+  | Sraise _      -> w
 
   | Scall(lp,f,_) ->
     if Sx.mem f except then w else
@@ -565,6 +584,11 @@ let rec e_read_r env r e =
   | Evar pv -> PV.add env pv e.e_ty r
   | _ -> e_fold (e_read_r env) r e
 
+let rec form_read_r env r f =
+  match f.f_node with
+  | Fpvar (pv, _) -> PV.add env pv f.f_ty r
+  | _ -> f_fold (form_read_r env) r f
+
 let rec is_read_r env w s =
   List.fold_left (i_read_r env) w s
 
@@ -575,7 +599,7 @@ and i_read_r env r i =
   match i.i_node with
   | Sasgn   (_lp, e) -> e_read_r env r e
   | Srnd    (_lp, e) -> e_read_r env r e
-  | Sassert e       -> e_read_r env r e
+  | Sraise  e        -> e_read_r env r e
 
   | Scall (_lp, f, es) ->
       let r = List.fold_left (e_read_r env) r es in
@@ -609,11 +633,131 @@ let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
 let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s
 let f_write  ?(except=Sx.empty) env f  = f_write_r  ~except env PV.empty f
 
-let e_read  env e  = e_read_r  env PV.empty e
-let i_read  env i  = i_read_r  env PV.empty i
-let is_read env is = is_read_r env PV.empty is
-let s_read  env s  = s_read_r  env PV.empty s
-let f_read  env f  = f_read_r  env PV.empty f
+let e_read     env e  = e_read_r  env PV.empty e
+let form_read  env e  = form_read_r  env PV.empty e
+let i_read     env i  = i_read_r  env PV.empty i
+let is_read    env is = is_read_r env PV.empty is
+let s_read     env s  = s_read_r  env PV.empty s
+let f_read     env f  = f_read_r  env PV.empty f
+
+(* -------------------------------------------------------------------- *)
+let zpr_pv (kind : [ `Read | `Write ]) (span : [ `Before | `After ]) (env : env) =
+  let pv_of_stmt =
+    match kind with
+    | `Read  -> is_read_r
+    | `Write -> is_write_r ?except:None
+  in
+
+  let rec doit (ctxt : instr option) (pvs : PV.t) (zpr : Zipper.spath) =
+    let (head, tail), ipath = zpr in
+    let stail = List.ocons ctxt tail in
+    let s = stmt (List.rev_append head stail) in
+
+    let pvs =
+      let s = match span with `Before -> head | `After -> tail in
+      pv_of_stmt env pvs s in
+
+    let parent, pvs =
+      match ipath with
+      | Zipper.ZTop ->
+        None, pvs
+
+      | Zipper.ZIfThen (e, ps, se) ->
+        Some (ps, i_if (e, s, se)), pvs
+
+      | Zipper.ZIfElse (e, st, ps) ->
+        Some (ps, i_if (e, st, s)), pvs
+
+      | Zipper.ZMatch  (e, ps, mpi) ->
+        let bs =
+          List.rev_append mpi.prebr ((mpi.locals, s) :: mpi.postbr)
+        in Some (ps, i_match (e, bs)), pvs
+
+      | Zipper.ZWhile (e, ps) ->
+        let wi = i_while (e, s) in
+        Some (ps, wi), pv_of_stmt env pvs [wi]
+    in
+
+    ofold (fun (zpr, ctxt) pvs -> doit (Some ctxt) pvs zpr) pvs parent
+
+  in fun pvs zpr -> doit None pvs zpr
+
+(* -------------------------------------------------------------------- *)
+type pmvs = PV.t Mid.t
+
+module PMVS : sig
+  val empty : pmvs
+end = struct
+  let empty : pmvs =
+    Mid.empty
+end
+
+(* -------------------------------------------------------------------- *)
+let form_read (env : env) (pvs : pmvs) =
+  let rec doit (bds : Sid.t) (pvs : pmvs) (f : form) =
+    match f.f_node with
+    | Fpvar (_, m) when Sid.mem m bds ->
+      pvs
+
+    | Fpvar (pv, m) ->
+      Mid.change
+        (fun pvs ->
+          pvs
+          |> Option.value ~default:PV.empty
+          |> PV.add env pv f.f_ty
+          |> Option.some)
+        m pvs
+
+    | Fquant (_, subbds, f) ->
+      let bds =
+        List.fold_left
+          (fun bds -> function _ -> bds)
+          bds subbds in
+      doit bds pvs f
+
+    | FhoareF hs ->
+      let bds = Sid.add hs.hf_m bds in
+      POE.fold (doit bds) (doit bds pvs (hf_pr hs).inv) (hf_po hs).hsi_inv
+
+    | FhoareS hs ->
+      let bds = Sid.add (fst hs.hs_m) bds in
+      POE.fold (doit bds) (doit bds pvs (hs_pr hs).inv) (hs_po hs).hsi_inv
+
+    | FbdHoareF hs ->
+      let subbds = Sid.add hs.bhf_m bds in
+      List.fold_left
+        (doit subbds) (doit bds pvs (bhf_bd hs).inv)
+        [(bhf_pr hs).inv; (bhf_po hs).inv]
+
+    | FbdHoareS hs ->
+      let subbds = Sid.add (fst hs.bhs_m) bds in
+      List.fold_left
+        (doit subbds) (doit bds pvs (bhs_bd hs).inv)
+        [(bhs_pr hs).inv; (bhs_po hs).inv]
+
+    | FequivF hs ->
+      let bds = List.fold_left ((^~) Sid.add) bds [] in
+      List.fold_left (doit bds) pvs [(ef_pr hs).inv; (ef_po hs).inv]
+
+    | FequivS hs ->
+      let bds = List.fold_left ((^~) Sid.add) bds [] in
+      List.fold_left (doit bds) pvs [(es_pr hs).inv; (es_po hs).inv]
+
+    | FeHoareF hs ->
+      let bds = Sid.add hs.ehf_m bds in
+      List.fold_left (doit bds) pvs [(ehf_pr hs).inv; (ehf_po hs).inv]
+
+    | FeHoareS hs ->
+      let bds = Sid.add (fst hs.ehs_m) bds in
+      List.fold_left (doit bds) pvs [(ehs_pr hs).inv; (ehs_po hs).inv]
+
+    | Fpr pr ->
+      let pvs = doit bds pvs pr.pr_args in
+      let pvs = doit (Sid.add pr.pr_mem bds) pvs pr.pr_event.inv in
+      pvs
+
+    | _ -> f_fold (doit bds) pvs f
+  in fun f -> doit Sid.empty pvs f
 
 (* -------------------------------------------------------------------- *)
 exception EqObsInError
@@ -698,6 +842,15 @@ module Mpv2 = struct
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
+  let is_mod_pv' env pv eqo =
+    if is_glob pv then
+      let x = get_glob pv in
+      let check_mp mp =
+        let restr = NormMp.get_restr_use env mp in
+        not (NormMp.use_mem_xp x restr) in
+      Sm.exists check_mp eqo.s_gl
+    else false
+
   let is_mod_mp env mp mod_ =
     let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
@@ -776,16 +929,21 @@ module Mpv2 = struct
     let x = pvm env x in
     Mnpv.exists (fun _ (s,_) -> Snpv.mem x s) eqs.s_pv
 
-  let to_form ml mr eqs inv =
+  let to_form eqs ml mr inv =
     let l =
       Sm.fold (fun m l -> f_eqglob m ml m mr :: l) eqs.s_gl [] in
     let l =
       Mnpv.fold (fun pvl (s,ty) l ->
-        Snpv.fold (fun pvr l -> f_eq (f_pvar pvl ty ml) (f_pvar pvr ty mr) :: l)
+        Snpv.fold (fun pvr l -> f_eq (f_pvar pvl ty ml).inv (f_pvar pvr ty mr).inv :: l)
           s l) eqs.s_pv l in
     f_and_simpl (f_ands l) inv
 
-  let of_form env ml mr f =
+
+  let to_form_ts_inv eqs inv =
+    map_ts_inv1 (to_form eqs inv.ml inv.mr) inv
+
+  let of_form env f =
+    let ml, mr = f.ml, f.mr in
     let rec aux f eqs =
       match sform_of_form f with
       | SFtrue -> eqs
@@ -807,7 +965,7 @@ module Mpv2 = struct
         List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
       | _ -> raise Not_found in
-    aux f empty
+    aux f.inv empty
 
   let enter_local env local ids1 ids2 =
     try
@@ -817,7 +975,8 @@ module Mpv2 = struct
       List.fold_left2 do1 local ids1 ids2
     with _ -> raise EqObsInError
 
-  let needed_eq env ml mr f =
+  let needed_eq env f =
+    let ml, mr = f.ml, f.mr in
 
     let rec add_eq local eqs f1 f2 =
       match f1.f_node, f2.f_node with
@@ -852,7 +1011,7 @@ module Mpv2 = struct
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
           add_glob env (EcPath.mident mp1) (EcPath.mident mp2) eqs
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
-          List.all2 (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
+          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
@@ -891,8 +1050,7 @@ module Mpv2 = struct
         end
       | _ -> raise Not_found in
 
-    try aux Mid.empty empty f
-    with _ -> raise Not_found
+    aux Mid.empty empty f.inv
 
   let check_glob eqs =
     Mnpv.iter (fun pv (s,_)->
@@ -942,7 +1100,8 @@ module Mpv2 = struct
       let local = enter_local env local bds1 bds2 in
       add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
-    | Elocal x1, Elocal x2 when
+    | Elocal x1, Elocal x2
+     when EcIdent.id_equal x1 x2 ||
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
     | Evar pv1, Evar pv2
       when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty ->
@@ -951,7 +1110,7 @@ module Mpv2 = struct
      I postpone this for latter *)
     | Eop(op1,tys1), Eop(op2,tys2)
       when EcPath.p_equal op1 op2 &&
-        List.all2  (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
+        List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
     | Eapp(f1,a1), Eapp(f2,a2) ->
       List.fold_left2 (add_eqs_loc env local) eqs (f1::a1) (f2::a2)
     | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
@@ -984,8 +1143,9 @@ let is_in_refl env lv eqo =
   | LvTuple lr -> List.exists (fun (pv,_) -> PV.mem_pv env pv eqo) lr
 
 let add_eqs_refl env eqo e =
-  let f = form_of_expr mhr e in
-  let fv = PV.fv env mhr f in
+  (* FIXME: get rid of dummy memory *)
+  let f = ss_inv_of_expr (EcIdent.create "&dummy") e in
+  let fv = PV.fv env f.m f.inv in
   PV.union fv eqo
 
 let remove_refl env lv eqo =
@@ -1042,7 +1202,8 @@ and i_eqobs_in_refl env i eqo =
     let eqs = List.fold_left PV.union PV.empty eqs in
     add_eqs_refl env eqs e
 
-  | Sassert e -> add_eqs_refl env eqo e
+  | Sraise e -> add_eqs_refl env PV.empty e
+
   | Sabstract _ -> assert false
 
 and eqobs_inF_refl env f' eqo =

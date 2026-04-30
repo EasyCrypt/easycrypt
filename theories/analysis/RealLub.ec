@@ -81,8 +81,11 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma lub1 x : lub (pred1 x) = x.
 proof.
-apply eqr_le; split; [apply lub_le_ub => /#|move => _].
-apply lub_upper_bound; smt().
+have haslub_1x: (has_lub (pred1 x)).
++ by rewrite /has_lub; split; exists x=> /#.
+apply: eqr_le; split.
++ by apply: lub_le_ub=> //#.
+by move=> _; apply: lub_upper_bound.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -102,7 +105,8 @@ qed.
 lemma has_lub_scale E c : 0%r <= c =>
   has_lub E => has_lub (scale_rset E c).
 proof.
-move => c_ge0 [[x Ex] ?]; split; 1: smt().
+move=> c_ge0 [[x Ex] ?]; split.
++ by exists (c * x) x.
 exists (c * lub E) => cx; smt(lub_upper_bound).
 qed.
 
@@ -115,5 +119,27 @@ apply eqr_le; split => [|_].
 - apply lub_le_ub; first by apply has_lub_scale.
   smt(lub_upper_bound).
 rewrite -ler_pdivl_mull //; apply lub_le_ub => // x Ex.
-by rewrite ler_pdivl_mull //; smt(lub_upper_bound has_lub_scale). 
+rewrite ler_pdivl_mull //; apply: lub_upper_bound.
++ exact: has_lub_scale.
+by exists x.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lub_cBf (E : real -> bool) : nonempty E =>
+  lub (fun x => exists y, E y /\ x = (ceil y - floor y)%r)
+    = b2r (exists x, E x /\ !isint x).
+proof.
+case=> z Ez; pose P (x : real) := exists (y : real),
+  E y /\ x = (ceil y - floor y)%r.
+have hlP: has_lub P; first split.
+- exists ((ceil z)%r - (floor z)%r); smt().
+  exists 1%r => x [y] [_ ->>]; smt(cBf_eq0P cBf_eq1P).
+rewrite RealOrder.eqr_le; split=> [|_].
+- apply: lub_le_ub => // x [y] [Ey ->>]; case: (isint y).
+  - by move/cBf_eq0P => -> /#.
+  - by move=> ^/cBf_eq1P -> Nint_y; rewrite iftrue //; exists y.
+- apply: lub_upper_bound => //; case: (exists x, E x /\ !isint x).
+  - by case=> x [Ex /cBf_eq1P Nint_x] @/P; exists x; rewrite Nint_x.
+  rewrite negb_exists /= => /(_ z); rewrite Ez /=.
+  by move/cBf_eq0P => int_z; exists z; rewrite int_z.
 qed.

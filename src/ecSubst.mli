@@ -40,14 +40,15 @@ val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 val freshen_type : (ty_params * ty) -> (ty_params * ty)
 
 (* -------------------------------------------------------------------- *)
-val subst_theory  : subst -> theory -> theory
-val subst_ax      : subst -> axiom -> axiom
-val subst_op      : subst -> operator -> operator
-val subst_tydecl  : subst -> tydecl -> tydecl
-val subst_tc      : subst -> tc_decl -> tc_decl
+val subst_theory     : subst -> theory -> theory
+val subst_ax         : subst -> axiom -> axiom
+val subst_op         : subst -> operator -> operator
+val subst_op_body    : subst -> opbody -> opbody
+val subst_tydecl     : subst -> tydecl -> tydecl
+val subst_tc         : subst -> tc_decl -> tc_decl
 val subst_tcinstance : subst -> tcinstance -> tcinstance
-val subst_theory  : subst -> theory -> theory
-val subst_branches : subst -> opbranches -> opbranches
+val subst_branches   : subst -> opbranches -> opbranches
+val subst_exception  : subst -> exception_ -> exception_
 
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
@@ -66,7 +67,6 @@ val subst_mod_restr    : subst -> mod_restr -> mod_restr
 val subst_oracle_infos : subst -> oracle_infos -> oracle_infos
 
 (* -------------------------------------------------------------------- *)
-val subst_progvar : subst -> prog_var -> prog_var
 val subst_mem     : subst -> EcIdent.t -> EcIdent.t
 val subst_flocal  : subst -> form -> form
 val subst_gty     : subst -> gty -> gty
@@ -77,6 +77,9 @@ val subst_tcw     : subst -> tcwitness -> tcwitness
 val subst_form    : subst -> form -> form
 val subst_expr    : subst -> expr -> expr
 val subst_stmt    : subst -> stmt -> stmt
+val subst_ss_inv  : subst -> ss_inv -> ss_inv
+val subst_ts_inv  : subst -> ts_inv -> ts_inv
+val subst_inv     : subst -> inv -> inv
 
 (* -------------------------------------------------------------------- *)
 val open_oper : operator -> etyarg list -> ty * operator_kind
@@ -84,3 +87,23 @@ val open_tydecl : tydecl -> etyarg list -> ty_body
 
 (* -------------------------------------------------------------------- *)
 val fresh_tparams : subst -> ty_params -> subst * ty_params
+
+(* -------------------------------------------------------------------- *)
+val ss_inv_rebind : ss_inv -> memory -> ss_inv
+val ss_inv_generalize_as_left : ss_inv -> memory -> memory -> ts_inv
+val ss_inv_generalize_as_right : ss_inv -> memory -> memory -> ts_inv
+val f_forall_mems_ss_inv : memenv -> ss_inv -> form
+
+val ts_inv_rebind : ts_inv -> memory -> memory -> ts_inv
+val ts_inv_rebind_left : ts_inv -> memory -> ts_inv
+val ts_inv_rebind_right : ts_inv -> memory -> ts_inv
+val f_forall_mems_ts_inv : memenv -> memenv -> ts_inv -> form
+
+val ss_inv_forall_ml_ts_inv : memenv -> ts_inv -> ss_inv
+val ss_inv_forall_mr_ts_inv : memenv -> ts_inv -> ss_inv
+
+(* -------------------------------------------------------------------- *)
+val hs_inv_rebind : hs_inv -> memory -> hs_inv
+
+(* -------------------------------------------------------------------- *)
+val inv_rebind : inv -> memory list -> inv

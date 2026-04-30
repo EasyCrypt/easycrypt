@@ -2,12 +2,13 @@
 type ecreader
 
 (* -------------------------------------------------------------------- *)
-val from_channel : name:string -> in_channel -> ecreader
+val from_channel : ?close:bool -> name:string -> in_channel -> ecreader
 val from_file    : string -> ecreader
 val from_string  : string -> ecreader
 
 (* -------------------------------------------------------------------- *)
 val finalize : ecreader -> unit
+val xparse   : ecreader -> string * EcParsetree.prog
 val parse    : ecreader -> EcParsetree.prog
 val parseall : ecreader -> EcParsetree.global list
 val drain    : ecreader -> unit

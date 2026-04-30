@@ -34,7 +34,7 @@ module Counter(S : System) = {
 }.
 
 section.
-  declare module S <: System.
+  declare module S <: System { -Counter }.
   declare module D <: Distinguisher { -S }.
 
 

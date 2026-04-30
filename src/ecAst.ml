@@ -156,7 +156,7 @@ and instr_node =
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * ty) list * stmt) list
-  | Sassert   of expr
+  | Sraise    of expr
   | Sabstract of EcIdent.t
 
 and stmt = {
@@ -248,6 +248,8 @@ and f_node =
   | Fpr of pr (* hr *)
 
 and eagerF = {
+  eg_ml : memory;
+  eg_mr : memory;
   eg_pr : form;
   eg_sl : stmt;  (* No local program variables *)
   eg_fl : EcPath.xpath;
@@ -257,6 +259,8 @@ and eagerF = {
 }
 
 and equivF = {
+  ef_ml : memory;
+  ef_mr : memory;
   ef_pr : form;
   ef_fl : EcPath.xpath;
   ef_fr : EcPath.xpath;
@@ -272,19 +276,21 @@ and equivS = {
   es_po  : form; }
 
 and sHoareF = {
+  hf_m  : memory;
   hf_pr : form;
   hf_f  : EcPath.xpath;
-  hf_po : form;
+  hf_po : exnpost;
 }
 
 and sHoareS = {
   hs_m  : memenv;
   hs_pr : form;
   hs_s  : stmt;
-  hs_po : form; }
-
+  hs_po : exnpost;
+}
 
 and eHoareF = {
+  ehf_m   : memory;
   ehf_pr  : form;
   ehf_f   : EcPath.xpath;
   ehf_po  : form;
@@ -298,6 +304,7 @@ and eHoareS = {
 }
 
 and bdHoareF = {
+  bhf_m   : memory;
   bhf_pr  : form;
   bhf_f   : EcPath.xpath;
   bhf_po  : form;
@@ -314,11 +321,16 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+and ss_inv = {
+  m   : memory;
+  inv : form;
+}
+
 and pr = {
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
-  pr_event : form;
+  pr_event : ss_inv;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -342,6 +354,421 @@ type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
 type codepos1      = int * cp_base
 type codepos       = (codepos1 * codepos_brsel) list * codepos1
 type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
+
+type exnpost = {
+  main   : form;
+  exnmap : form Mop.t;
+}
+
+let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv =
+  let m' = match m with
+  | Some m -> m
+  | None -> (List.hd invs).m in
+  let inv = fn (List.map (fun {inv;m} -> assert (m = m'); inv) invs) in
+  { m = m'; inv = inv }
+
+let map_ss_inv1 (fn: form -> form) (inv: ss_inv): ss_inv =
+  let inv' = fn inv.inv in
+  { m = inv.m; inv = inv' }
+
+let map_ss_inv2 (fn: form -> form -> form) (inv1: ss_inv) (inv2: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m);
+  let inv' = fn inv1.inv inv2.inv in
+  { m = inv1.m; inv = inv' }
+
+let map_ss_inv3 (fn: form -> form -> form -> form)
+    (inv1: ss_inv) (inv2: ss_inv) (inv3: ss_inv): ss_inv =
+  assert (inv1.m = inv2.m && inv2.m = inv3.m);
+  let inv' = fn inv1.inv inv2.inv inv3.inv in
+  { m = inv1.m; inv = inv' }
+
+let map_ss_inv_destr2 (fn: form -> form * form) (inv: ss_inv): ss_inv * ss_inv =
+  let inv1, inv2 = fn inv.inv in
+  let m = inv.m in
+  {m;inv=inv1}, {m;inv=inv2}
+
+let map_ss_inv_destr3 (fn: form -> form * form * form) (inv: ss_inv): ss_inv * ss_inv * ss_inv =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let m = inv.m in
+  {m;inv=inv1}, {m;inv=inv2}, {m;inv=inv3}
+
+type ts_inv = {
+  ml  : memory;
+  mr  : memory;
+  inv : form;
+}
+
+let map_ts_inv ?ml ?mr (fn: form list -> form) (invs: ts_inv list): ts_inv =
+  let ml' = match ml with
+   | Some m -> m
+   | None -> (List.hd invs).ml in
+  let mr' = match mr with
+   | Some m -> m
+   | None -> (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml' && mr = mr'); inv) invs) in
+  { ml = ml'; mr = mr'; inv = inv }
+
+let map_ts_inv1 (fn: form -> form) (inv: ts_inv): ts_inv =
+  let inv' = fn inv.inv in
+  { ml = inv.ml; mr = inv.mr; inv = inv' }
+
+let map_ts_inv2 (fn: form -> form -> form) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv1.mr = inv2.mr);
+  let inv' = fn inv1.inv inv2.inv in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv' }
+
+let map_ts_inv3 (fn: form -> form -> form -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml &&
+          inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn inv1.inv inv2.inv inv3.inv in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv' }
+
+let map_ts_inv_left (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml;inv}) invs) in
+  { ml=inv.m; mr = mr'; inv = inv.inv }
+
+let map_ts_inv_left1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_left2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_left3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right (fn: ss_inv list -> ss_inv) (invs: ts_inv list): ts_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr;inv}) invs) in
+  { ml = ml'; mr = inv.m; inv = inv.inv }
+
+let map_ts_inv_right1 (fn: ss_inv -> ss_inv) (inv: ts_inv): ts_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { ml = inv.ml; mr = inv.mr; inv = inv'.inv }
+
+let map_ts_inv_right2 (fn: ss_inv -> ss_inv -> ss_inv) (inv1: ts_inv) (inv2: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_right3 (fn: ss_inv -> ss_inv -> ss_inv -> ss_inv)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ts_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { ml = inv1.ml; mr = inv1.mr; inv = inv'.inv }
+
+let map_ts_inv_destr2 (fn: form -> form * form) (inv: ts_inv): ts_inv * ts_inv =
+  let inv1, inv2 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}
+
+let map_ts_inv_destr3 (fn: form -> form * form * form) (inv: ts_inv) =
+  let inv1, inv2, inv3 = fn inv.inv in
+  let ml = inv.ml in
+  let mr = inv.mr in
+  {ml;mr;inv=inv1}, {ml;mr;inv=inv2}, {ml;mr;inv=inv3}
+
+let ts_inv_lower_left (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let mr' = (List.hd invs).mr in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (mr = mr'); {m=ml; inv}) invs) in
+  { m = mr'; inv = inv }
+
+let ts_inv_lower_left1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.ml; inv=inv.inv} in
+  { m = inv.mr; inv = inv' }
+
+let ts_inv_lower_left2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.mr = inv2.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} in
+  { m = inv1.mr; inv = inv' }
+
+let ts_inv_lower_left3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.mr = inv2.mr && inv2.mr = inv3.mr);
+  let inv' = fn {m=inv1.ml; inv=inv1.inv} {m=inv2.ml; inv=inv2.inv} {m=inv3.ml; inv=inv3.inv} in
+  { m = inv1.mr; inv = inv' }
+
+let ts_inv_lower_right (fn: ss_inv list -> form) (invs: ts_inv list): ss_inv =
+  assert (List.length invs > 0);
+  let ml' = (List.hd invs).ml in
+  let inv = fn (List.map (fun {inv;ml;mr} -> assert (ml = ml'); {m=mr; inv}) invs) in
+  { m = ml'; inv = inv }
+
+let ts_inv_lower_right1 (fn: ss_inv -> form) (inv: ts_inv): ss_inv =
+  let inv' = fn {m=inv.mr; inv=inv.inv} in
+  { m = inv.ml; inv = inv' }
+
+let ts_inv_lower_right2 (fn: ss_inv -> ss_inv -> form) (inv1: ts_inv) inv2 =
+  assert (inv1.ml = inv2.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} in
+  { m = inv1.ml; inv = inv' }
+
+let ts_inv_lower_right3 (fn: ss_inv -> ss_inv -> ss_inv -> form)
+    (inv1: ts_inv) (inv2: ts_inv) (inv3: ts_inv): ss_inv =
+  assert (inv1.ml = inv2.ml && inv2.ml = inv3.ml);
+  let inv' = fn {m=inv1.mr; inv=inv1.inv} {m=inv2.mr; inv=inv2.inv} {m=inv3.mr; inv=inv3.inv} in
+  { m = inv1.ml; inv = inv' }
+
+(* ----------------------------------------------------------------- *)
+type hs_inv = {
+  hsi_m   : memory;
+  hsi_inv : exnpost;
+}
+
+type inv =
+  | Inv_ss of ss_inv
+  | Inv_ts of ts_inv
+  | Inv_hs of hs_inv
+
+let inv_of_inv (inv: inv) : form =
+  match inv with
+  | Inv_ss ss -> ss.inv
+  | Inv_ts ts -> ts.inv
+  | _ -> failwith "expected single or two sided invariant"
+
+let memories_of_inv (inv : inv) : memory list =
+  match inv with
+  | Inv_ss ss -> [ss.m]
+  | Inv_ts ts -> [ts.ml; ts.mr]
+  | Inv_hs hs -> [hs.hsi_m]
+
+let lift_ss_inv (f: ss_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ss ss -> f ss
+  | _ -> failwith "expected single sided invariant"
+  in
+  f
+
+let lift_ss_inv2 (f: ss_inv -> ss_inv -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 -> f ss1 ss2
+  | _ -> failwith "expected only single sided invariants" in
+  f
+
+let lift_hs_ss_inv (f: ss_inv -> hs_inv -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ss ss_inv, Inv_hs hs_inv -> f ss_inv hs_inv
+  | _ -> failwith "expected single sided invariants and hoare invariant" in
+  f
+
+let lift_ss_inv3 (f: ss_inv -> ss_inv -> ss_inv -> 'a) : inv -> inv -> inv -> 'a =
+  let f inv1 inv2 inv3 = match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 -> f ss1 ss2 ss3
+  | _ -> failwith "expected only single sided invariants" in
+  f
+
+let lift_ts_inv (f: ts_inv -> 'a) : inv -> 'a =
+  let f inv = match inv with
+  | Inv_ts ss -> f ss
+  | _ -> failwith "expected two sided invariant" in
+  f
+
+let lift_ts_inv2 (f: ts_inv -> ts_inv -> 'a) : inv -> inv -> 'a =
+  let f inv1 inv2 = match inv1, inv2 with
+  | Inv_ts ss1, Inv_ts ss2 -> f ss1 ss2
+  | _ -> failwith "expected only two sided invariants" in
+  f
+
+let ss_inv_generalize_left (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = m; mr = inv.m; inv = inv.inv }
+
+let ss_inv_generalize_right (inv: ss_inv) (m: memory) : ts_inv =
+  { ml = inv.m; mr = m; inv = inv.inv }
+
+(* ----------------------------------------------------------------- *)
+let map_inv (fn: form list -> form) (inv: inv list): inv =
+  assert (List.length inv > 0);
+  match List.hd inv with
+  | Inv_ss ss' ->
+      Inv_ss (map_ss_inv fn (List.map (function
+        Inv_ss ss -> assert (ss.m = ss'.m); ss
+        | _ -> failwith "expected all invariants to have same kind") inv))
+  | Inv_ts ts' ->
+      Inv_ts (map_ts_inv fn (List.map (function
+        Inv_ts ts -> assert (ts.ml = ts'.ml && ts.mr = ts'.mr); ts
+        | _ -> failwith "expected all invariants to have same kind") inv))
+  | Inv_hs _ ->  failwith  "Exceptions are not supported"
+
+let map_inv1 (fn: form -> form) (inv: inv): inv =
+  match inv with
+  | Inv_ss ss ->
+      Inv_ss (map_ss_inv1 fn ss)
+  | Inv_ts ts ->
+      Inv_ts (map_ts_inv1 fn ts)
+  | Inv_hs _ -> failwith  "Exceptions are not supported"
+
+let map_inv2 (fn: form -> form -> form) (inv1: inv) (inv2: inv): inv =
+  match inv1, inv2 with
+  | Inv_ss ss1, Inv_ss ss2 ->
+      Inv_ss (map_ss_inv2 fn ss1 ss2)
+  | Inv_ts ts1, Inv_ts ts2 ->
+      Inv_ts (map_ts_inv2 fn ts1 ts2)
+  | _ ->
+      failwith "incompatible invariants for map_inv2"
+
+let map_inv3 (fn: form -> form -> form -> form)
+    (inv1: inv) (inv2: inv) (inv3: inv): inv =
+  match inv1, inv2, inv3 with
+  | Inv_ss ss1, Inv_ss ss2, Inv_ss ss3 ->
+      Inv_ss (map_ss_inv3 fn ss1 ss2 ss3)
+  | Inv_ts ts1, Inv_ts ts2, Inv_ts ts3 ->
+      Inv_ts (map_ts_inv3 fn ts1 ts2 ts3)
+  | _ ->
+      failwith "incompatible invariants for map_inv3"
+
+(* ----------------------------------------------------------------- *)
+type 'a prepoe = 'a * ('a Mop.t)
+
+module POE = struct
+  let mk (main : form) (exnmap : form Mop.t) =
+    { main; exnmap; }
+
+  let destruct (poe : exnpost) =
+    (poe.main, poe.exnmap)
+
+  let empty (f : form) : exnpost =
+    { main = f; exnmap = Mop.empty; }
+
+  let is_empty ({ exnmap } : exnpost) =
+    Mop.is_empty exnmap
+
+  let lift (f : ss_inv) =
+    { hsi_m = f.m; hsi_inv = empty f.inv; }
+
+  let lower (f : hs_inv) =
+    { m = f.hsi_m; inv = f.hsi_inv.main; }
+
+  let map (f : form -> form) ({ main; exnmap } : exnpost) : exnpost =
+    { main = f main; exnmap = Mop.map f exnmap}
+
+  let map2_pre (f : 'a -> 'b -> 'c) (poe1 : 'a prepoe) (poe2 : 'b prepoe) : 'c prepoe =
+    let (main1, map1) = poe1 in
+    let (main2, map2) = poe2 in
+
+    let merge (a : 'a option) (b : 'b option) =
+      match a, b with
+      | None, None -> None
+      | Some a, Some b ->  Some (f a b)
+      | _ -> assert false
+    in
+
+    let main = f main1 main2 in
+    let map  = Mop.merge (fun _ -> merge) map1 map2 in
+
+    (main, map)
+
+  let map2 (f : form -> form -> form) (poe1 : exnpost) (poe2 : exnpost) =
+    let main, exnmap =
+      map2_pre f (destruct poe1) (destruct poe2) in
+
+    mk main exnmap
+
+  let exists (f : form -> bool) (poe : exnpost) =
+      f poe.main
+    || Mop.exists (fun _ -> f) poe.exnmap
+
+  let forall (f : form -> bool) (poe : exnpost) =
+      f poe.main
+    && Mop.for_all (fun _ -> f) poe.exnmap
+
+  let forall2 (f : form -> form -> bool) (poe1 : exnpost) (poe2 : exnpost) =
+      f poe1.main poe2.main
+    && Mop.equal f poe1.exnmap poe2.exnmap
+
+  let to_list_pre ((main, map) : 'a prepoe) =
+    Mop.fold
+      (fun _ p1 a -> p1 :: a)
+      map
+      [main]
+
+  let to_list (poe : exnpost) =
+    to_list_pre (destruct poe)
+
+  let fold (tx : 'a -> form -> 'a) (state : 'a) (poe : exnpost)  =
+    let state = tx state poe.main in
+    let state = Mop.fold (fun _ f state -> tx state f) poe.exnmap state in
+    state
+
+  let iter (tx : form -> unit) (poe : exnpost)  =
+    fold (fun () f -> tx f) () poe
+
+  let iter2 (f : form -> form -> unit) (poe1 : exnpost) (poe2 : exnpost) =
+    let merge (a : form option) (b : form option) =
+      match a, b with
+      | None, None -> None
+      | Some a, Some b -> Some (a, b)
+      | _, _ -> assert false in
+
+    f poe1.main poe2.main;
+    Mop.iter
+      (fun _ (a, b) -> f a b)
+      (Mop.merge (fun _ -> merge) poe1.exnmap poe2.exnmap)
+end
+
+(* ----------------------------------------------------------------- *)
+let empty_hs (f : ss_inv) =
+  { hsi_m = f.m; hsi_inv = POE.empty f.inv; }
+
+let update_hs_ss (f : ss_inv) (p : hs_inv) : hs_inv =
+  assert (f.m ==(*phy*) p.hsi_m);
+  { p with hsi_inv = { main = f.inv; exnmap = p.hsi_inv.exnmap; } }
+
+let map_hs_inv1 (f : form ->form) (inv1 : hs_inv) = 
+  { inv1 with hsi_inv = POE.map f inv1.hsi_inv; }
+
+let map_hs_inv2
+    (fn   : form -> form -> form)
+    (inv1 : hs_inv)
+    (inv2 : hs_inv)
+  : hs_inv
+  =
+  assert (inv1.hsi_m = inv2.hsi_m);
+  let inv = POE.map2 fn inv1.hsi_inv inv2.hsi_inv in
+  { hsi_m = inv1.hsi_m; hsi_inv = inv }
+
+(* ----------------------------------------------------------------- *)
+(* Accessors for program logic                                       *)
+(* ----------------------------------------------------------------- *)
+
+let eg_pr eg = {ml=eg.eg_ml; mr=eg.eg_mr; inv=eg.eg_pr}
+let eg_po eg = {ml=eg.eg_ml; mr=eg.eg_mr; inv=eg.eg_po}
+
+let ef_pr ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_pr}
+let ef_po ef = {ml=ef.ef_ml; mr=ef.ef_mr; inv=ef.ef_po}
+
+let es_pr es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_pr}
+let es_po es = {ml=fst es.es_ml; mr=fst es.es_mr; inv=es.es_po}
+
+let hf_pr hf = {m=hf.hf_m; inv=hf.hf_pr}
+let hf_po hf = {hsi_m=hf.hf_m; hsi_inv=hf.hf_po}
+
+let hs_pr hs = {m=fst hs.hs_m; inv=hs.hs_pr}
+let hs_po hs = {hsi_m=fst hs.hs_m; hsi_inv=hs.hs_po}
+
+let ehf_pr ehf = {m=ehf.ehf_m; inv=ehf.ehf_pr}
+let ehf_po ehf = {m=ehf.ehf_m; inv=ehf.ehf_po}
+
+let ehs_pr ehs = {m=fst ehs.ehs_m; inv=ehs.ehs_pr}
+let ehs_po ehs = {m=fst ehs.ehs_m; inv=ehs.ehs_po}
+
+let bhf_pr bhf = {m=bhf.bhf_m; inv=bhf.bhf_pr}
+let bhf_po bhf = {m=bhf.bhf_m; inv=bhf.bhf_po}
+let bhf_bd bhf = {m=bhf.bhf_m; inv=bhf.bhf_bd}
+
+let bhs_pr bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_pr}
+let bhs_po bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_po}
+let bhs_bd bhs = {m=fst bhs.bhs_m; inv=bhs.bhs_bd}
 
 (* ----------------------------------------------------------------- *)
 (* Equality, hash, and fv                                            *)
@@ -590,17 +1017,7 @@ let ov_equal vd1 vd2 =
   EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name &&
   ty_equal vd1.ov_type vd2.ov_type
 
-let v_hash v =
-  Why3.Hashcons.combine
-    (Hashtbl.hash v.v_name)
-    (ty_hash v.v_type)
-
-let v_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  ty_equal vd1.v_type vd2.v_type
-
 (* -------------------------------------------------------------------- *)
-
 let mr_xpaths (mr : mod_restr) : mr_xpaths =
   { ur_pos = omap fst mr.ur_pos;
     ur_neg = fst mr.ur_neg; }
@@ -729,6 +1146,8 @@ let me_hash (mem, Lmt_concrete mt) =
     (EcIdent.id_hash mem)
     (Why3.Hashcons.combine_option lmt_hash mt)
 
+let mem_hash: memory -> _ = EcIdent.id_hash
+
 let mem_equal = EcIdent.id_equal
 
 let me_equal_gen ty_equal (m1,mt1) (m2,mt2) =
@@ -775,24 +1194,21 @@ let b_hash (bs : bindings) =
   in
     Why3.Hashcons.combine_list b1_hash 0 bs
 
-(* -------------------------------------------------------------------- *)
-let i_equal   = ((==) : instr -> instr -> bool)
-let i_hash    = fun i -> i.i_tag
-let i_fv i    = i.i_fv
-
-let s_equal   = ((==) : stmt -> stmt -> bool)
-let s_hash    = fun s -> s.s_tag
-let s_fv      = fun s -> s.s_fv
+(*-------------------------------------------------------------------- *)
+let posts_equal (poe1 : exnpost) (poe2 : exnpost) =
+     f_equal poe1.main poe2.main
+  && Mop.equal f_equal poe1.exnmap poe2.exnmap
 
 (*-------------------------------------------------------------------- *)
 let hf_equal hf1 hf2 =
      f_equal hf1.hf_pr hf2.hf_pr
-  && f_equal hf1.hf_po hf2.hf_po
+  && posts_equal hf1.hf_po hf2.hf_po
   && EcPath.x_equal hf1.hf_f hf2.hf_f
+  && mem_equal hf1.hf_m hf2.hf_m
 
 let hs_equal hs1 hs2 =
      f_equal hs1.hs_pr hs2.hs_pr
-  && f_equal hs1.hs_po hs2.hs_po
+  && posts_equal hs1.hs_po hs2.hs_po
   && s_equal hs1.hs_s hs2.hs_s
   && me_equal hs1.hs_m hs2.hs_m
 
@@ -800,6 +1216,7 @@ let ehf_equal hf1 hf2 =
      f_equal hf1.ehf_pr  hf2.ehf_pr
   && f_equal hf1.ehf_po  hf2.ehf_po
   && EcPath.x_equal hf1.ehf_f hf2.ehf_f
+  && mem_equal hf1.ehf_m hf2.ehf_m
 
 let ehs_equal hs1 hs2 =
      f_equal hs1.ehs_pr  hs2.ehs_pr
@@ -813,6 +1230,7 @@ let bhf_equal bhf1 bhf2 =
   && EcPath.x_equal bhf1.bhf_f bhf2.bhf_f
   && bhf1.bhf_cmp = bhf2.bhf_cmp
   && f_equal bhf1.bhf_bd bhf2.bhf_bd
+  && mem_equal bhf1.bhf_m bhf2.bhf_m
 
 let bhs_equal bhs1 bhs2 =
      f_equal bhs1.bhs_pr bhs2.bhs_pr
@@ -827,6 +1245,8 @@ let eqf_equal ef1 ef2 =
   && f_equal ef1.ef_po ef2.ef_po
   && EcPath.x_equal ef1.ef_fl ef2.ef_fl
   && EcPath.x_equal ef1.ef_fr ef2.ef_fr
+  && mem_equal ef1.ef_ml ef2.ef_ml
+  && mem_equal ef1.ef_mr ef2.ef_mr
 
 let eqs_equal es1 es2 =
      f_equal es1.es_pr es2.es_pr
@@ -843,28 +1263,46 @@ let egf_equal eg1 eg2 =
   && EcPath.x_equal eg1.eg_fl eg2.eg_fl
   && EcPath.x_equal eg1.eg_fr eg2.eg_fr
   && s_equal eg1.eg_sr eg2.eg_sr
+  && mem_equal eg1.eg_ml eg2.eg_ml
+  && mem_equal eg1.eg_mr eg2.eg_mr
 
 let pr_equal pr1 pr2 =
      EcIdent.id_equal pr1.pr_mem pr2.pr_mem
   && EcPath.x_equal   pr1.pr_fun pr2.pr_fun
-  && f_equal          pr1.pr_event pr2.pr_event
+  && f_equal          pr1.pr_event.inv pr2.pr_event.inv
   && f_equal          pr1.pr_args pr2.pr_args
+  && mem_equal        pr1.pr_event.m pr2.pr_event.m
+
+(*-------------------------------------------------------------------- *)
+let posts_hash (poe : exnpost) =
+  let post_hash (p : path option) (f : form) =
+    Why3.Hashcons.combine
+      (Why3.Hashcons.combine_option EcPath.p_hash p)
+      (f_hash f) in
+
+  Mop.fold
+    (fun e f a -> Why3.Hashcons.combine a (post_hash e f))
+    poe.exnmap (f_hash poe.main)
 
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
-  Why3.Hashcons.combine2
-    (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f)
+  Why3.Hashcons.combine3
+  (f_hash hf.hf_pr)
+  (posts_hash hf.hf_po)
+  (EcPath.x_hash hf.hf_f)
+  (mem_hash hf.hf_m)
 
 let hs_hash hs =
   Why3.Hashcons.combine3
-    (f_hash hs.hs_pr) (f_hash hs.hs_po)
+    (f_hash hs.hs_pr)
+    (posts_hash hs.hs_po)
     (s_hash hs.hs_s)
     (me_hash hs.hs_m)
 
 let ehf_hash hf =
-  Why3.Hashcons.combine2
+  Why3.Hashcons.combine3
     (f_hash hf.ehf_pr) (f_hash hf.ehf_po)
-    (EcPath.x_hash hf.ehf_f)
+    (EcPath.x_hash hf.ehf_f) (mem_hash hf.ehf_m)
 
 let ehs_hash hs =
   Why3.Hashcons.combine3
@@ -874,7 +1312,7 @@ let ehs_hash hs =
 
 let bhf_hash bhf =
   Why3.Hashcons.combine_list f_hash
-    (Why3.Hashcons.combine (hcmp_hash bhf.bhf_cmp) (EcPath.x_hash bhf.bhf_f))
+    (Why3.Hashcons.combine2 (hcmp_hash bhf.bhf_cmp) (EcPath.x_hash bhf.bhf_f) (mem_hash bhf.bhf_m))
     [bhf.bhf_pr;bhf.bhf_po;bhf.bhf_bd]
 
 let bhs_hash bhs =
@@ -886,9 +1324,10 @@ let bhs_hash bhs =
     [bhs.bhs_pr;bhs.bhs_po;bhs.bhs_bd]
 
 let ef_hash ef =
-  Why3.Hashcons.combine3
-    (f_hash ef.ef_pr) (f_hash ef.ef_po)
-    (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine3 (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
+      (mem_hash ef.ef_ml) (mem_hash ef.ef_mr))
+    [ef.ef_pr;ef.ef_po]
 
 let es_hash es =
   Why3.Hashcons.combine3
@@ -900,17 +1339,19 @@ let es_hash es =
        (s_hash es.es_sr))
 
 let eg_hash eg =
-  Why3.Hashcons.combine3
-    (f_hash eg.eg_pr) (f_hash eg.eg_po)
-    (Why3.Hashcons.combine (s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
-    (Why3.Hashcons.combine (s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr))
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine3
+      (mem_hash eg.eg_ml) (mem_hash eg.eg_mr)
+       (Why3.Hashcons.combine (s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
+       (Why3.Hashcons.combine (s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr)))
+    [eg.eg_pr; eg.eg_po]
 
 let pr_hash pr =
   Why3.Hashcons.combine3
     (EcIdent.id_hash pr.pr_mem)
     (EcPath.x_hash   pr.pr_fun)
     (f_hash          pr.pr_args)
-    (f_hash          pr.pr_event)
+    (Why3.Hashcons.combine (f_hash pr.pr_event.inv) (mem_hash pr.pr_event.m))
 
 
 (* ----------------------------------------------------------------- *)
@@ -1023,8 +1464,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     in
     Why3.Hashcons.combine_list b1_hash 0 bs
 
-  let hash e =
-    match e.e_node with
+  let hash_node (e : expr_node) =
+    match e with
     | Eint   i -> BI.hash i
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
@@ -1056,6 +1497,9 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eproj (e, i) ->
         Why3.Hashcons.combine (e_hash e) i
+
+  let hash (e : expr) =
+    Why3.Hashcons.combine (ty_hash e.e_ty) (hash_node e.e_node)
 
   let fv_node e =
     let union ex =
@@ -1105,10 +1549,6 @@ let mk_expr (e : expr_node) (ty : ty) =
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
 (* -------------------------------------------------------------------- *)
-let mhr    = EcIdent.create "&hr"
-let mleft  = EcIdent.create "&1"
-let mright = EcIdent.create "&2"
-
 module Hsform = Why3.Hashcons.Make (struct
   type t = form
 
@@ -1168,8 +1608,8 @@ module Hsform = Why3.Hashcons.Make (struct
        ty_equal f1.f_ty f2.f_ty
     && equal_node f1.f_node f2.f_node
 
-  let hash f =
-    match f.f_node with
+  let hash_node (f : f_node) =
+    match f with
     | Fquant(q, b, f) ->
         Why3.Hashcons.combine2 (f_hash f) (b_hash b) (qt_hash q)
 
@@ -1218,7 +1658,16 @@ module Hsform = Why3.Hashcons.Make (struct
     | FeagerF     eg   -> eg_hash eg
     | Fpr         pr   -> pr_hash pr
 
-  let fv_mlr = Sid.add mleft (Sid.singleton mright)
+  let hash (f : form) =
+    Why3.Hashcons.combine (ty_hash f.f_ty) (hash_node f.f_node)
+
+  let fv_mlr ml mr = Sid.add ml (Sid.singleton mr)
+
+  let posts_fv (poe : exnpost) =
+    let fv = f_fv poe.main in
+    Mop.fold
+      (fun _ f acc -> fv_union (f_fv f) acc)
+      poe.exnmap fv
 
   let fv_node f =
     let union ex nodes =
@@ -1247,16 +1696,16 @@ module Hsform = Why3.Hashcons.Make (struct
       fv_union (f_fv f1) fv2
 
     | FhoareF hf ->
-      let fv = fv_union (f_fv hf.hf_pr) (f_fv hf.hf_po) in
-      EcPath.x_fv (Mid.remove mhr fv) hf.hf_f
+      let fv = fv_union (f_fv hf.hf_pr) (posts_fv hf.hf_po) in
+      EcPath.x_fv (Mid.remove hf.hf_m fv) hf.hf_f
 
     | FhoareS hs ->
-      let fv = fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po) in
+      let fv = fv_union (f_fv hs.hs_pr) (posts_fv hs.hs_po) in
       fv_union (s_fv hs.hs_s) (Mid.remove (fst hs.hs_m) fv)
 
     | FeHoareF hf ->
       let fv = fv_union (f_fv hf.ehf_pr) (f_fv hf.ehf_po) in
-      EcPath.x_fv (Mid.remove mhr fv) hf.ehf_f
+      EcPath.x_fv (Mid.remove hf.ehf_m fv) hf.ehf_f
 
     | FeHoareS hs ->
       let fv = fv_union (f_fv hs.ehs_pr) (f_fv hs.ehs_po) in
@@ -1266,7 +1715,7 @@ module Hsform = Why3.Hashcons.Make (struct
       let fv =
         fv_union (f_fv bhf.bhf_pr)
           (fv_union (f_fv bhf.bhf_po) (f_fv bhf.bhf_bd)) in
-      EcPath.x_fv (Mid.remove mhr fv) bhf.bhf_f
+      EcPath.x_fv (Mid.remove bhf.bhf_m fv) bhf.bhf_f
 
     | FbdHoareS bhs ->
       let fv =
@@ -1276,7 +1725,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FequivF ef ->
         let fv = fv_union (f_fv ef.ef_pr) (f_fv ef.ef_po) in
-        let fv = fv_diff fv fv_mlr in
+        let fv = fv_diff fv (fv_mlr ef.ef_ml ef.ef_mr) in
         EcPath.x_fv (EcPath.x_fv fv ef.ef_fl) ef.ef_fr
 
     | FequivS es ->
@@ -1288,13 +1737,13 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FeagerF eg ->
         let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in
-        let fv = fv_diff fv fv_mlr in
+        let fv = fv_diff fv (fv_mlr eg.eg_ml eg.eg_mr) in
         let fv = EcPath.x_fv (EcPath.x_fv fv eg.eg_fl) eg.eg_fr in
         fv_union fv
           (fv_union (s_fv eg.eg_sl) (s_fv eg.eg_sr))
 
     | Fpr pr ->
-        let fve = Mid.remove mhr (f_fv pr.pr_event) in
+        let fve = Mid.remove pr.pr_event.m (f_fv pr.pr_event.inv) in
         let fv  = EcPath.x_fv fve pr.pr_fun in
         fv_union (f_fv pr.pr_args) (fv_add pr.pr_mem fv)
 
@@ -1367,8 +1816,7 @@ module Hinstr = Why3.Hashcons.Make (struct
           in List.all2 forbs bs1 bs2 && s_equal s1 s2
         in e_equal e1 e2 && List.all2 forb b1 b2
 
-    | Sassert e1, Sassert e2 ->
-        (e_equal e1 e2)
+    | Sraise e1, Sraise e2 -> e_equal e1 e2
 
     | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
 
@@ -1406,7 +1854,7 @@ module Hinstr = Why3.Hashcons.Make (struct
           in Why3.Hashcons.combine_list forbs (s_hash s) bds
         in Why3.Hashcons.combine_list forb (e_hash e) b
 
-    | Sassert e -> e_hash e
+    | Sraise e -> e_hash e
 
     | Sabstract id -> EcIdent.id_hash id
 
@@ -1440,8 +1888,7 @@ module Hinstr = Why3.Hashcons.Make (struct
              (fun s b -> EcIdent.fv_union s (forb b))
              (e_fv e) b
 
-    | Sassert e    ->
-        e_fv e
+    | Sraise e -> e_fv e
 
     | Sabstract id ->
         EcIdent.fv_singleton id

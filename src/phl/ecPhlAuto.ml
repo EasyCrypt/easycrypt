@@ -2,6 +2,7 @@
 open EcUtils
 open EcFol
 open EcModules
+open EcAst
 
 open EcCoreGoal
 open EcLowGoal
@@ -13,20 +14,21 @@ let tc_noauto_error pf ?loc () =
 
 (* -------------------------------------------------------------------- *)
 let t_exfalso_r tc =
+  let pre = tc1_get_pre tc in
   let post = tc1_get_post tc in
 
   FApi.t_or
     EcPhlTAuto.t_core_exfalso
     (FApi.t_seqsub
-       (EcPhlConseq.t_conseq f_false post)
+       (EcPhlConseq.t_conseq (map_inv1 (fun _ -> f_false) pre) post)
        [t_id; t_trivial; EcPhlTAuto.t_core_exfalso])
     tc
 
 let t_exfalso = FApi.t_low0 "exfalso" t_exfalso_r
 
 (* -------------------------------------------------------------------- *)
-let prnd_info =
-  EcParsetree.PSingleRndParam f_predT
+let prnd_info m =
+  EcParsetree.PSingleRndParam (fun ty -> {m;inv=f_predT ty})
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd_hoare_r tc =
@@ -37,7 +39,7 @@ let t_auto_rnd_bdhoare_r tc =
   let hs = tc1_as_bdhoareS tc in
 
   match List.olast hs.bhs_s.s_node with
-  | Some { i_node = Srnd _ } -> EcPhlRnd.t_bdhoare_rnd prnd_info tc
+  | Some { i_node = Srnd _ } -> EcPhlRnd.t_bdhoare_rnd (prnd_info (fst hs.bhs_m)) tc
   | _ -> tc_noauto_error !!tc ()
 
 (* -------------------------------------------------------------------- *)

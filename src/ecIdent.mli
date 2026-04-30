@@ -16,7 +16,7 @@ val create   : symbol -> t
 val fresh    : t -> t
 val name     : t -> symbol
 val tag      : t -> int
-val tostring : t -> string
+val tostring_internal : t -> string
 
 (* -------------------------------------------------------------------- *)
 val id_equal : t -> t -> bool

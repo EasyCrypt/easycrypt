@@ -1,0 +1,9 @@
+/* Keep EasyCrypt inline role neutral (inherit text color). */
+code.easycrypt,
+code.code.easycrypt,
+code.code.highlight.easycrypt,
+span.easycrypt,
+span.code.easycrypt,
+span.code.highlight.easycrypt {
+  color: inherit;
+}

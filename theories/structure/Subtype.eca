@@ -1,7 +1,5 @@
-pragma +implicits.
-
-
 (* -------------------------------------------------------------------- *)
+pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 (* This theory defines the subtype [sT] of [T] defined as {x : T | P x} *)
@@ -21,89 +19,34 @@ pragma +implicits.
 
 require import AllCore.
 
-(* These three parameters are to be instantiated by the user. *)
-type T.
+type T, sT.
+
 op P : T -> bool.
-axiom inhabited: exists x, P x.
 
-(* This parameter must never be instantiated upon cloning, otherwise
-   unsoundness may ensure. Hence the name. *)
-type do_not_instantiate_this_type.
-(* TODO: we want a tag to make abstract types uninstantiable *)
+op insub : T  -> sT option.
+op val   : sT -> T.
 
-(* The lemma below is justified by the axiom [inhabited] and the fact
-  that the type [do_not_instantiate_this_type] is unspecified. It says
-  that there is an injective function [f] with range [P]
+axiom [prove] inhabited : exists x, P x.
 
-  The proof is admitted, essentially turning it into a global axiom
-  asserting the existence of subtypes. We cannot use [axiom] here,
-  because this would make the lemma a parameter of the theory *)
+axiom [explicit] insubN (x : T): !P x => insub x = None.
+axiom [explicit] insubT (x : T):  P x => omap val (insub x) = Some x.
 
-lemma subtype_injection:
-  exists (f : do_not_instantiate_this_type -> T),
-    injective f /\ (forall x, P x <=> exists y, x = f y).
-admitted.
-(* TODO: together with uninstantiable abstract types, we also want
-   global axioms in (abstract) theories.that do not show up in [proof*] *)
-
-(* This is the subtype that the user sees. By making it a type-copy of
-   [do_not_instantiate_this_type], we make sure that the user cannot
-   do `type sT <- ...` when cloning. *)
-type sT = do_not_instantiate_this_type wrapped.
-
-(* We define `val` in two steps so that `print val` does not show the
-   ugly internal stuff *)
-op [opaque] internal_val = choiceb
-   (fun (f : do_not_instantiate_this_type -> T),
-     injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
-
-(* -------------------------------------------------------------------- *)
-
-(* Injection from [sT] to [T] *)
-op [opaque] val (x : sT) : T = with x = Wrap x' => internal_val x'.
-
-lemma val_range x: P x <=> exists y, x = val y.
-proof.
-have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
-move => [ival_inj ival_range].
-split => [Px|[[y] ->]]; 2: smt().
-have := ival_range x; rewrite Px /= => -[z ?].
-by exists (Wrap z); smt().
-qed.
-
-lemma val_inj: injective val.
-proof.
-have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
-by move => [ival_inj _] [x] [y] /#.
-qed.
-
-lemma valP (x : sT): P (val x) by smt (val_range).
-
-(* -------------------------------------------------------------------- *)
-
-op [opaque] insub : T -> sT option = pinv val.
-
-lemma insubN (x : T): !P x => insub x = None.
-proof. by rewrite /insub => not; apply pinvN; smt(val_range). qed.
-
-lemma valK: pcancel val insub.
-proof. by rewrite /insub; apply/pcancel_pinv/val_inj. qed.
-
-lemma insubT (x : T):  P x => omap val (insub x) = Some x.
-proof. by move => Px @/insub; apply pinv_inv; smt(val_range). qed.
-
-(* -------------------------------------------------------------------- *)
-
-(* TODO: Maybe this could be removed, it seems relatively
-pointless. It's here for compatibility with the previous Subtype
-implementation *)
-op wsT = val witness.
-
-lemma insubW: insub wsT = Some witness<:sT>.
-proof. by rewrite /wsT; smt (valK). qed.
+axiom [explicit] valP (x : sT): P (val x).
+axiom [explicit] valK: pcancel val insub.
 
 (* -------------------------------------------------------------------- *)
 op insubd (x : T) = odflt witness (insub x).
+
+(* -------------------------------------------------------------------- *)
+lemma val_range x: P x <=> exists y, x = val y.
+proof. split.
+- by move/insubT; case (insub x) => // [y] /= <-; exists y.
+- by case=> y ->; apply/valP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma val_inj: injective val.
+proof. by apply/(pcan_inj _ _ valK). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma valKd: cancel val insubd.
@@ -113,9 +56,9 @@ lemma insubP (x : T):           (* We need inductive predicates *)
      (exists u, P x /\ insub x = Some u /\ val u = x)
   \/ (!P x /\ insub x = None).
 proof.                          (* this proof script is awful *)
-  case (P x)=> [Px | /insubN -> //]; left.
-  move: Px => /insubT; case {-2}(insub x) (eq_refl (insub x))=> //.
-  by move=> /= u eq_insub eqx; exists u => /=; move: eqx => ->.
+case (P x)=> [Px | /insubN -> //]; left.
+move: Px => /insubT; case {-2}(insub x) (eq_refl (insub x))=> //.
+by move=> /= u eq_insub eqx; exists u => /=; move: eqx => ->.
 qed.
 
 lemma val_insubd x: val (insubd x) = if P x then x else val witness.

@@ -29,7 +29,7 @@ val predT: 'a -> bool
 
 val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
-val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+val (|-) : ('c -> 'a) -> ('a -> 'b) -> 'c -> 'b
 
 val (|>) : 'a -> ('a -> 'b) -> 'b
 val (<|) : ('a -> 'b) -> 'a -> 'b
@@ -103,6 +103,8 @@ val fst_map : ('a -> 'c) -> 'a * 'b -> 'c * 'b
 val snd_map : ('b -> 'c) -> 'a * 'b -> 'a * 'c
 
 val swap: 'a * 'b -> 'b * 'a
+
+val flip: ('a -> 'b -> 'c) -> 'b -> 'a -> 'c
 
 (* -------------------------------------------------------------------- *)
 type 'a eq  = 'a -> 'a -> bool
@@ -256,6 +258,8 @@ module List : sig
     val map      : ('a -> 'a) -> 'a list -> 'a list
     val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
   end
+
+  val of_pair : 'a * 'a -> 'a list
 
   (* Aliases to exception-less functions *)
   val ocons   : 'a option -> 'a list -> 'a list

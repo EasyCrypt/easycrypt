@@ -1,0 +1,7 @@
+(install
+  (section (site (easycrypt config)))
+  (files (glob_files_rec *.conf)))
+
+(install
+  (section (site (easycrypt config)))
+  (files README))

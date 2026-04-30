@@ -22,15 +22,20 @@ open EcCoreGoal.FApi
 (* -------------------------------------------------------------------- *)
 val t_equivS_trans :
      EcMemory.memtype * EcModules.stmt
-  -> EcFol.form * EcFol.form
-  -> EcFol.form * EcFol.form
+  -> EcAst.ts_inv * EcAst.ts_inv
+  -> EcAst.ts_inv * EcAst.ts_inv
   -> EcCoreGoal.FApi.backward
 
 val t_equivF_trans :
      EcPath.xpath
-  -> EcFol.form * EcFol.form
-  -> EcFol.form * EcFol.form
+  -> EcAst.ts_inv * EcAst.ts_inv
+  -> EcAst.ts_inv * EcAst.ts_inv
   -> EcCoreGoal.FApi.backward
+
+(*---------------------------------------------------------------------------------------*)
+(* Completely change the code of `side` *)
+val t_equivS_trans_eq :
+  side -> EcModules.stmt -> EcCoreGoal.FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val process_equiv_trans :

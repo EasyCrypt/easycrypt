@@ -1,3 +1,6 @@
+(* This theory is in the prelude, so it cannot be checked directly      *)
+(* Run easycrypt via the commandline with a `-boot` flag instead        *)
+
 (* -------------------------------------------------------------------- *)
 require import Tactics.
 
@@ -91,8 +94,8 @@ abbrev [-printing] transpose ['a 'b 'c] (f : 'a -> 'b -> 'c) (y : 'b) =
 lemma transposeP ['a, 'b, 'c] (f : 'a -> 'b -> 'c) (x : 'a) (y : 'b) : f x y = transpose f y x by done.
 
 (* -------------------------------------------------------------------- *)
-op eta_ (f : 'a -> 'b) = fun x => f x
-  axiomatized by etaE.
+op [opaque] eta_ (f : 'a -> 'b) = fun x => f x.
+lemma etaE (f : 'a -> 'b): eta_ f = fun x => f x by rewrite/eta_.
 
 (* -------------------------------------------------------------------- *)
 op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) =
@@ -337,8 +340,10 @@ lemma negbK    : involutive [!]  by [].
 lemma negbNE b : !!b => b        by [].
 
 lemma negb_inj : injective [!]      by smt().
-lemma negbLR b c : b = !c => !b = c by smt().
-lemma negbRL b c : !b = c => b = !c by smt().
+lemma negbLR b c :   b  = !c => (!b) =  c by smt().
+lemma negbRL b c : (!b) =  c =>   b  = !c by smt().
+lemma negbDL b c : !(b = c) <=> (!b) =  c by smt().
+lemma negbDR b c : !(b = c) <=>   b  = !c by smt().
 
 lemma contra   c b : (c => b) => !b => !c by smt().
 lemma contraL  c b : (c => !b) => b => !c by smt().
@@ -639,23 +644,37 @@ lemma  eq_sym   : forall (x y : 'a), x = y <=> y = x by [].
 lemma  eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
 lemma  eq_iff   : forall a b, (a = b) <=> (a <=> b) by [].
 
+lemma  eq_imp (y: 'a) x: x = y => x = y by done.
 lemma  eq_sym_imp : forall (x y : 'a), x = y => y = x by [].
 
 (* -------------------------------------------------------------------- *)
-op choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a.
+op choicebd ['a] (P : 'a -> bool) : 'a.
 
-axiom choicebP ['a] (P : 'a -> bool) (x0 : 'a):
+axiom choicebdP ['a] (P : 'a -> bool):
+  (exists x, P x) => P (choicebd P).
+
+op [opaque smt_opaque] choiceb ['a] (P : 'a -> bool) (x0 : 'a) : 'a =
+  if exists x, P x then choicebd P else x0.
+
+lemma choicebP ['a] (P : 'a -> bool) (x0 : 'a):
   (exists x, P x) => P (choiceb P x0).
+proof.
+move => ex_Px; have:= choicebdP P ex_Px.
+by rewrite /choiceb ex_Px.
+qed.
 
-axiom choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
+lemma choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
   (forall x, !P x) => choiceb P x0 = x0.
+proof. by rewrite -negb_exists /choiceb => ->. qed.
 
 lemma eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
   (forall x, P x <=> Q x) => choiceb P x0 = choiceb Q x0.
-proof. smt(fun_ext). qed.
+proof. by move => eq_all; congr; apply fun_ext => x; rewrite eq_all. qed.
 
-axiom choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
+lemma choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
   (exists x, P x) => choiceb P x0 = choiceb P x1.
+proof. by rewrite /choiceb => ->. qed.
+
 
 (* -------------------------------------------------------------------- *)
 
@@ -677,9 +696,13 @@ proof. by move => inj_f @/pcansel x; smt(pinv_inv). qed.
 
 
 (* -------------------------------------------------------------------- *)
-axiom funchoice ['a 'b] (P : 'a -> 'b -> bool):
+lemma funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
+proof.
+move => existsy; exists (fun x => choicebd (P x)) => y /=. 
+apply/(choicebdP (P y))/existsy.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op sempty ['a] (E : 'a -> bool) =
@@ -690,5 +713,6 @@ lemma semptyNP ['a] (E : 'a -> bool) :
 proof. by rewrite /sempty -negb_exists. qed.
 
 (* Locking (use with `rewrite [...]lock /= unlock`) *)
-op locked (x : 'a) = x axiomatized by unlock.
+op [opaque] locked (x : 'a) = x. 
+lemma unlock (x : 'a) : locked x = x by rewrite/locked.
 lemma lock (x : 'a) : x = locked x by rewrite unlock.

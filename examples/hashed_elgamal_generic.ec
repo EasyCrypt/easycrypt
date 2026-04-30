@@ -260,7 +260,12 @@ section.
     by rewrite dt_ll DBool.dbool_ll.
   + by move=> H H_o_ll; proc; auto; call (guess_ll H _)=> //; auto=> />.
   + by move=> _; apply: dbits_ll.
-  by rewrite !eqT.
+  apply iffLR.
+  congr; 2:congr.
+  + byequiv (: ={glob OnBound.G0(D, LRO), arg} ==>
+               ={glob OnBound.G0(D, LRO), res}) => />; 1:sim.
+  byequiv (: ={glob OnBound.G1(D, LRO), arg} ==>
+             ={glob OnBound.G1(D, LRO), res}) => />; 1:sim.
   qed.
 
   local module G1' = {

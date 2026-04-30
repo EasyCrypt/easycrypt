@@ -7,6 +7,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
+open EcSubst
 
 module BI = EcBigInt
 
@@ -88,7 +89,9 @@ module EqTest_base = struct
       | _, _ -> raise E.NotConv in
 
     let rec aux alpha e1 e2 =
-      e_equal e1 e2 || aux_r alpha e1 e2
+      (* If alpha is not empty then the test e_equal can be wrong *)
+         (e_equal e1 e2 && Mid.is_empty alpha)
+      || aux_r alpha e1 e2
 
     and aux_r alpha e1 e2 =
       match e1.e_node, e2.e_node with
@@ -106,14 +109,14 @@ module EqTest_base = struct
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
-          noconv (aux alpha) e1 e2
+          aux alpha e1 e2
 
       | Eapp (f1, args1), Eapp (f2, args2) ->
           aux alpha f1 f2 && List.all2 (aux alpha) args1 args2
 
       | Elet (p1, f1', g1), Elet (p2, f2', g2) ->
           aux alpha f1' f2'
-            && noconv (aux (check_lpattern alpha p1 p2)) g1 g2
+            && aux (check_lpattern alpha p1 p2) g1 g2
 
       | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
 
@@ -124,9 +127,12 @@ module EqTest_base = struct
           for_type env ty1 ty2
             && List.all2 (aux alpha) (e1::es1) (e2::es2)
 
+      | Eproj (e1, i1), Eproj (e2, i2) ->
+          i1 = i2 && aux alpha e1 e2
+
       | _, _ -> false
 
-    in fun alpha e1 e2 -> aux alpha e1 e2
+    in fun alpha e1 e2 -> noconv (aux alpha) e1 e2
 
   (* ------------------------------------------------------------------ *)
   let for_lv env ~norm lv1 lv2 =
@@ -205,8 +211,8 @@ end) = struct
         with E.NotConv -> false
       end
 
-    | Sassert a1, Sassert a2 ->
-        for_expr env alpha ~norm a1 a2
+    | Sraise e1, Sraise e2 ->
+        for_expr env alpha ~norm e1 e2
 
     | Sabstract id1, Sabstract id2 ->
         EcIdent.id_equal id1 id2
@@ -415,6 +421,10 @@ let check_binding (env, subst) (x1, gty1) (x2, gty2) =
 let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2
 
+let check_m_binding subst x1 x2 =
+  if id_equal x1 x2 then subst
+  else Fsubst.f_bind_mem subst x2 x1
+
 let check_me_binding env subst (x1,mt1) (x2,mt2) =
   check_memtype env mt1 mt2;
   if id_equal x1 x2 then subst
@@ -431,7 +441,7 @@ let is_alpha_eq_e env e1 e2 =
   try check_e env Fsubst.f_subst_id e1 e2; true with NotConv -> false
 
 (* -------------------------------------------------------------------- *)
-let is_alpha_eq hyps f1 f2 =
+let is_alpha_eq ?(subst=Fsubst.f_subst_id) hyps f1 f2 =
   let env = LDecl.toenv hyps in
   let error () = raise NotConv in
   let ensure t = if not t then error () in
@@ -514,68 +524,74 @@ let is_alpha_eq hyps f1 f2 =
 
     | FhoareF hf1, FhoareF hf2 ->
       check_xp env subst hf1.hf_f hf2.hf_f;
-      aux env subst hf1.hf_pr hf2.hf_pr;
-      aux env subst hf1.hf_po hf2.hf_po
+      let subst = check_m_binding subst hf1.hf_m hf2.hf_m in
+      aux env subst (hf_pr hf1).inv (hf_pr hf2).inv;
+      POE.iter2 (aux env subst) (hf_po hf1).hsi_inv (hf_po hf2).hsi_inv
 
     | FhoareS hs1, FhoareS hs2 ->
       check_s env subst hs1.hs_s hs2.hs_s;
       let subst = check_me_binding env subst hs1.hs_m hs2.hs_m in
-      aux env subst hs1.hs_pr hs2.hs_pr;
-      aux env subst hs1.hs_po hs2.hs_po
+      aux env subst (hs_pr hs1).inv (hs_pr hs2).inv;
+      POE.iter2 (aux env subst) (hs_po hs1).hsi_inv (hs_po hs2).hsi_inv
 
     | FeHoareF hf1, FeHoareF hf2 ->
       check_xp env subst hf1.ehf_f hf2.ehf_f;
-      aux env subst hf1.ehf_pr hf2.ehf_pr;
-      aux env subst hf1.ehf_po hf2.ehf_po
+      aux env subst (ehf_pr hf1).inv (ehf_pr hf2).inv;
+      aux env subst (ehf_po hf1).inv (ehf_po hf2).inv;
 
     | FeHoareS hs1, FeHoareS hs2 ->
       check_s env subst hs1.ehs_s hs2.ehs_s;
       let subst = check_me_binding env subst hs1.ehs_m hs2.ehs_m in
-      aux env subst hs1.ehs_pr hs2.ehs_pr;
-      aux env subst hs1.ehs_po hs2.ehs_po
+      aux env subst (ehs_pr hs1).inv (ehs_pr hs2).inv;
+      aux env subst (ehs_po hs1).inv (ehs_po hs2).inv;
 
     | FbdHoareF hf1, FbdHoareF hf2 ->
       ensure (hf1.bhf_cmp = hf2.bhf_cmp);
       check_xp env subst hf1.bhf_f hf2.bhf_f;
-      aux env subst hf1.bhf_pr hf2.bhf_pr;
-      aux env subst hf1.bhf_po hf2.bhf_po;
-      aux env subst hf1.bhf_bd hf2.bhf_bd
+      aux env subst (bhf_pr hf1).inv (bhf_pr hf2).inv;
+      aux env subst (bhf_po hf1).inv (bhf_po hf2).inv;
+      aux env subst (bhf_bd hf1).inv (bhf_bd hf2).inv;
 
     | FbdHoareS hs1, FbdHoareS hs2 ->
       ensure (hs1.bhs_cmp = hs2.bhs_cmp);
       check_s env subst hs1.bhs_s hs2.bhs_s;
       let subst = check_me_binding env subst hs1.bhs_m hs2.bhs_m in
-      aux env subst hs1.bhs_pr hs2.bhs_pr;
-      aux env subst hs1.bhs_po hs2.bhs_po;
-      aux env subst hs1.bhs_bd hs2.bhs_bd
+      aux env subst (bhs_pr hs1).inv (bhs_pr hs2).inv;
+      aux env subst (bhs_po hs1).inv (bhs_po hs2).inv;
+      aux env subst (bhs_bd hs1).inv (bhs_bd hs2).inv
 
     | FequivF ef1, FequivF ef2 ->
       check_xp env subst ef1.ef_fl ef2.ef_fl;
       check_xp env subst ef1.ef_fr ef2.ef_fr;
-      aux env subst ef1.ef_pr ef2.ef_pr;
-      aux env subst ef1.ef_po ef2.ef_po
+      let subst = check_m_binding subst ef1.ef_ml ef2.ef_ml in
+      let subst = check_m_binding subst ef1.ef_mr ef2.ef_mr in
+      aux env subst (ef_pr ef1).inv (ef_pr ef2).inv;
+      aux env subst (ef_po ef1).inv (ef_po ef2).inv
 
     | FequivS es1, FequivS es2 ->
       check_s env subst es1.es_sl es2.es_sl;
       check_s env subst es1.es_sr es2.es_sr;
       let subst = check_me_binding env subst es1.es_ml es2.es_ml in
       let subst = check_me_binding env subst es1.es_mr es2.es_mr in
-      aux env subst es1.es_pr es2.es_pr;
-      aux env subst es1.es_po es2.es_po
+      aux env subst (es_pr es1).inv (es_pr es2).inv;
+      aux env subst (es_po es1).inv (es_po es2).inv;
 
     | FeagerF eg1, FeagerF eg2 ->
       check_xp env subst eg1.eg_fl eg2.eg_fl;
       check_xp env subst eg1.eg_fr eg2.eg_fr;
-      aux env subst eg1.eg_pr eg2.eg_pr;
-      aux env subst eg1.eg_po eg2.eg_po;
+      let subst = check_m_binding subst eg1.eg_ml eg2.eg_ml in
+      let subst = check_m_binding subst eg1.eg_mr eg2.eg_mr in
+      aux env subst (eg_pr eg1).inv (eg_pr eg2).inv;
+      aux env subst (eg_po eg1).inv (eg_po eg2).inv;
       check_s env subst eg1.eg_sl eg2.eg_sl;
       check_s env subst eg1.eg_sr eg2.eg_sr
 
     | Fpr pr1, Fpr pr2 ->
       check_mem subst pr1.pr_mem pr2.pr_mem;
       check_xp env subst pr1.pr_fun pr2.pr_fun;
+      let subst = check_m_binding subst pr1.pr_event.m pr2.pr_event.m in
       aux env subst pr1.pr_args pr2.pr_args;
-      aux env subst pr1.pr_event pr2.pr_event
+      aux env subst pr1.pr_event.inv pr2.pr_event.inv
 
     | _, _ -> error ()
 
@@ -584,7 +600,7 @@ let is_alpha_eq hyps f1 f2 =
     | NotConv -> false
   in
 
-  test env Fsubst.f_subst_id f1 f2
+  test env subst f1 f2
 
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
@@ -1068,7 +1084,7 @@ let reduce_head simplify ri env hyps f =
               subst bds cargs)
           subst bds pargs in
 
-      let body = EcFol.form_of_expr EcFol.mhr body in
+      let body = EcFol.form_of_expr body in
       (* FIXME subst-refact can we do both subst in once *)
       let body =
         Tvar.f_subst ~freshen:true
@@ -1084,7 +1100,7 @@ let reduce_head simplify ri env hyps f =
     (* μ-reduction *)
   | Fpvar (pv, m) when ri.modpath ->
     let f' = f_pvar (NormMp.norm_pvar env pv) f.f_ty m in
-    if f_equal f f' then raise nohead else f'
+    if f_equal f f'.inv then raise nohead else f'.inv
 
     (* η-reduction *)
   | Fquant (Llambda, [x, GTty _], { f_node = Fapp (fn, args) })
@@ -1362,6 +1378,14 @@ let ztuple args1 args2 ty stk = zpush Ztuple [] args1 args2 ty stk
 let zproj i ty stk = zpush (Zproj i) [] [] [] ty stk
 let zhl f fs1 fs2 stk = zpush (Zhl f) [] fs1 fs2 f.f_ty stk
 
+let zpoe ({ exnmap = epost } : exnpost) (dpoe : form list) =
+  let key = List.map fst (Mop.bindings epost) in
+  let poe =
+    List.fold_left2
+      (fun m a b -> Mop.add a b m)
+      Mop.empty key dpoe
+  in poe
+
 let zpop ri side f hd =
   let args =
     match side with
@@ -1378,26 +1402,42 @@ let zpop ri side f hd =
   | Zapp, f1::args     -> f_app f1 args hd.se_ty
   | Ztuple, args       -> f_tuple args
   | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
-  | Zhl {f_node = FhoareF hf}, [pr;po] ->
-    f_hoareF_r {hf with hf_pr = pr; hf_po = po }
-  | Zhl {f_node = FhoareS hs}, [pr;po] ->
-    f_hoareS_r {hs with hs_pr = pr; hs_po = po }
+  | Zhl {f_node = FhoareF hf}, (pr :: po :: dpoe) ->
+    let m = hf.hf_m in
+    let poe = zpoe (hf_po hf).hsi_inv dpoe in
+    f_hoareF {m;inv=pr} hf.hf_f { hsi_m = m; hsi_inv = POE.mk po poe; }
+  | Zhl {f_node = FhoareS hs}, (pr :: po :: dpoe) ->
+    let m = fst hs.hs_m in
+    let poe = zpoe (hs_po hs).hsi_inv dpoe in
+    f_hoareS
+      (snd hs.hs_m)
+      { m; inv = pr}
+      hs.hs_s
+      { hsi_m = m ; hsi_inv = POE.mk po poe; }
   | Zhl {f_node = FeHoareF hf}, [pr;po] ->
-    f_eHoareF_r {hf with ehf_pr = pr; ehf_po = po }
+    let m = hf.ehf_m in
+    f_eHoareF {m;inv=pr} hf.ehf_f {m;inv=po}
   | Zhl {f_node = FeHoareS hs}, [pr;po] ->
-    f_eHoareS_r {hs with ehs_pr = pr; ehs_po = po }
+    let m = fst hs.ehs_m in
+    f_eHoareS (snd hs.ehs_m) {m;inv=pr} hs.ehs_s {m;inv=po}
   | Zhl {f_node = FbdHoareF hf}, [pr;po;bd] ->
-    f_bdHoareF_r {hf with bhf_pr = pr; bhf_po = po; bhf_bd = bd}
+    let m = hf.bhf_m in
+    f_bdHoareF {m;inv=pr} hf.bhf_f {m;inv=po} hf.bhf_cmp {m;inv=bd}
   | Zhl {f_node = FbdHoareS hs}, [pr;po;bd] ->
-    f_bdHoareS_r {hs with bhs_pr = pr; bhs_po = po; bhs_bd = bd}
-  | Zhl {f_node = FequivF hf}, [pr;po] ->
-    f_equivF_r {hf with ef_pr = pr; ef_po = po }
+    let m = fst hs.bhs_m in
+    f_bdHoareS (snd hs.bhs_m) {m;inv=pr} hs.bhs_s {m;inv=po} hs.bhs_cmp {m;inv=bd}
+  | Zhl {f_node = FequivF ef}, [pr;po] ->
+    let (ml, mr) = (ef.ef_ml, ef.ef_mr) in
+    f_equivF {ml;mr;inv=pr} ef.ef_fl ef.ef_fr {ml;mr;inv=po}
   | Zhl {f_node = FequivS hs}, [pr;po] ->
-    f_equivS_r {hs with es_pr = pr; es_po = po }
+    let (ml, mr) = (fst hs.es_ml, fst hs.es_mr) in
+    f_equivS (snd hs.es_ml) (snd hs.es_mr) {ml;mr;inv=pr} hs.es_sl hs.es_sr
+      {ml;mr;inv=po}
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
-    f_eagerF_r {hs with eg_pr = pr; eg_po = po }
+    let (ml, mr) = (hs.eg_ml, hs.eg_mr) in
+    f_eagerF {ml;mr;inv=pr}  hs.eg_sl hs.eg_fl hs.eg_fr hs.eg_sr {ml;mr;inv=po}
   | Zhl {f_node = Fpr hs}, [a;ev] ->
-    f_pr_r {hs with pr_args = a; pr_event = ev }
+    f_pr_r {hs with pr_args = a; pr_event = {m=hs.pr_event.m; inv=ev} }
   | _, _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -1495,58 +1535,89 @@ let rec conv ri env f1 f2 stk =
         && EcMemory.mem_equal mem1 mem2 ->
       conv_next ri env f1 stk
 
-  | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
-    conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)
+  | FhoareF hf1, FhoareF hf2
+      when
+        EqTest_i.for_xp env hf1.hf_f hf2.hf_f
+        && POE.forall2 (fun _ _ -> true) (hf_po hf1).hsi_inv (hf_po hf2).hsi_inv
+    ->
+      let pr2 = (ss_inv_rebind (hf_pr hf2) hf1.hf_m).inv in
+      let po2 = (hs_inv_rebind (hf_po hf2) hf1.hf_m).hsi_inv in
+      let aux { main = post; exnmap = poe; } =
+        let poe = List.map snd (Mop.bindings poe) in
+        post :: poe
+      in
+      let lf1 = aux (hf_po hf1).hsi_inv in
+      let lf2 = aux po2 in
+      let stk = (zhl f1 lf1 lf2 stk) in
+      conv ri env (hf_pr hf1).inv pr2 stk
 
-  | FhoareS hs1, FhoareS hs2
-      when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
+  | FhoareS hs1, FhoareS hs2 when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.hs_m hs2.hs_m with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env hs1.hs_pr (subst hs2.hs_pr) (zhl f1 [hs1.hs_po] [subst hs2.hs_po] stk)
+    | _subst ->
+      let pr2 = (ss_inv_rebind (hs_pr hs2) (fst hs1.hs_m)).inv in
+      let po2 = (hs_inv_rebind (hs_po hs2) (fst hs1.hs_m)).hsi_inv in
+      let aux { main = post; exnmap = poe } =
+        let poe = List.map snd (Mop.bindings poe) in
+        post :: poe
+      in
+      let lf1 = aux (hs_po hs1).hsi_inv in
+      let lf2 = aux po2 in
+      let stk = (zhl f1 lf1 lf2 stk) in
+      conv ri env (hs_pr hs1).inv pr2 stk
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
   | FeHoareF hf1, FeHoareF hf2 when EqTest_i.for_xp env hf1.ehf_f hf2.ehf_f ->
-    conv ri env hf1.ehf_pr hf2.ehf_pr (zhl f1 [hf1.ehf_po] [hf2.ehf_po] stk)
+    let pr2 = (ss_inv_rebind (ehf_pr hf2) hf1.ehf_m).inv in
+    let po2 = (ss_inv_rebind (ehf_po hf2) hf1.ehf_m).inv in
+    conv ri env (ehf_pr hf1).inv pr2 (zhl f1 [(ehf_po hf1).inv] [po2] stk)
 
   | FeHoareS hs1, FeHoareS hs2
       when EqTest_i.for_stmt env hs1.ehs_s hs2.ehs_s ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.ehs_m hs2.ehs_m with
-    | subst ->
-        let subst = Fsubst.f_subst subst in
-        conv ri env hs1.ehs_pr (subst hs2.ehs_pr) (zhl f1 [hs1.ehs_po] [subst hs2.ehs_po] stk)
+    | _subst ->
+        let pr2 = (ss_inv_rebind (ehs_pr hs2) (fst hs1.ehs_m)).inv in
+        let po2 = (ss_inv_rebind (ehs_po hs2) (fst hs1.ehs_m)).inv in
+        conv ri env (ehs_pr hs1).inv pr2 (zhl f1 [(ehs_po hs1).inv] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
   | FbdHoareF hf1, FbdHoareF hf2
       when EqTest_i.for_xp env hf1.bhf_f hf2.bhf_f && hf1.bhf_cmp = hf2.bhf_cmp  ->
-    conv ri env hf1.bhf_pr hf2.bhf_pr
-      (zhl f1 [hf1.bhf_po;hf1.bhf_bd] [hf2.bhf_po; hf2.bhf_bd] stk)
+    let pr2 = (ss_inv_rebind (bhf_pr hf2) hf1.bhf_m).inv in
+    let po2 = (ss_inv_rebind (bhf_po hf2) hf1.bhf_m).inv in
+    let bd2 = (ss_inv_rebind (bhf_bd hf2) hf1.bhf_m).inv in
+    conv ri env (bhf_pr hf1).inv pr2
+      (zhl f1 [(bhf_po hf1).inv; (bhf_bd hf1).inv] [po2; bd2] stk)
 
   | FbdHoareS hs1, FbdHoareS hs2
       when EqTest_i.for_stmt env hs1.bhs_s hs2.bhs_s
         && hs1.bhs_cmp = hs2.bhs_cmp ->
     begin match check_me_binding env Fsubst.f_subst_id hs1.bhs_m hs2.bhs_m with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env hs1.bhs_pr (subst hs2.bhs_pr)
-        (zhl f1 [hs1.bhs_po;hs1.bhs_bd] (List.map subst [hs2.bhs_po; hs2.bhs_bd]) stk)
+    | _subst ->
+      let pr2 = (ss_inv_rebind (bhs_pr hs2) (fst hs1.bhs_m)).inv in
+      let po2 = (ss_inv_rebind (bhs_po hs2) (fst hs1.bhs_m)).inv in
+      let bd2 = (ss_inv_rebind (bhs_bd hs2) (fst hs1.bhs_m)).inv in
+      conv ri env (bhs_pr hs1).inv pr2
+        (zhl f1 [(bhs_po hs1).inv; (bhs_bd hs1).inv] [po2; bd2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
   | FequivF ef1, FequivF ef2
       when EqTest_i.for_xp env ef1.ef_fl ef2.ef_fl
         && EqTest_i.for_xp env ef1.ef_fr ef2.ef_fr ->
-    conv ri env ef1.ef_pr ef2.ef_pr (zhl f1 [ef1.ef_po] [ef2.ef_po] stk)
+    let pr2 = (ts_inv_rebind (ef_pr ef2) ef1.ef_ml ef1.ef_mr).inv in
+    let po2 = (ts_inv_rebind (ef_po ef2) ef1.ef_ml ef1.ef_mr).inv in
+    conv ri env (ef_pr ef1).inv pr2 (zhl f1 [(ef_po ef1).inv] [po2] stk)
 
   | FequivS es1, FequivS es2
       when EqTest_i.for_stmt env es1.es_sl es2.es_sl
         && EqTest_i.for_stmt env es1.es_sr es2.es_sr ->
     begin match check_me_bindings env Fsubst.f_subst_id [es1.es_ml; es1.es_mr] [es2.es_ml; es2.es_mr] with
-    | subst ->
-      let subst = Fsubst.f_subst subst in
-      conv ri env es1.es_pr (subst es2.es_pr) (zhl f1 [es1.es_po] [subst es2.es_po] stk)
+    | _subst ->
+      let pr2 = (ts_inv_rebind (es_pr es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
+      let po2 = (ts_inv_rebind (es_po es2) (fst es1.es_ml) (fst es1.es_mr)).inv in
+      conv ri env (es_pr es1).inv pr2 (zhl f1 [(es_po es1).inv] [po2] stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
 
@@ -1555,14 +1626,17 @@ let rec conv ri env f1 f2 stk =
        && EqTest_i.for_xp env eg1.eg_fr eg2.eg_fr
        && EqTest_i.for_stmt env eg1.eg_sl eg2.eg_sl
        && EqTest_i.for_stmt env eg1.eg_sr eg2.eg_sr then
-      conv ri env eg1.eg_pr eg2.eg_pr (zhl f1 [eg1.eg_po] [eg2.eg_po] stk)
+      let pr2 = (ts_inv_rebind (eg_pr eg2) eg1.eg_ml eg1.eg_mr).inv in
+      let po2 = (ts_inv_rebind (eg_po eg2) eg1.eg_ml eg1.eg_mr).inv in
+      conv ri env (eg_pr eg1).inv pr2 (zhl f1 [(eg_po eg1).inv] [po2] stk)
     else
       force_head ri env f1 f2 stk
 
   | Fpr pr1, Fpr pr2 ->
     if EcMemory.mem_equal pr1.pr_mem pr2.pr_mem &&
          EqTest_i.for_xp env pr1.pr_fun pr2.pr_fun then
-      conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event] [pr2.pr_event] stk)
+      let ev2 = (ss_inv_rebind pr2.pr_event pr1.pr_event.m).inv in
+      conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event.inv] [ev2] stk)
     else
       force_head ri env f1 f2 stk
 
@@ -1660,6 +1734,12 @@ let h_red ri hyps f =
 let h_red_opt ri hyps f =
   try Some (h_red ri hyps f)
   with NotReducible -> None
+
+let rec h_red_until ?(until = fun _ -> false) ri hyps f =
+  if until f then f
+  else match h_red ri hyps f with
+  | f -> h_red_until ~until ri hyps f
+  | exception NotReducible -> f
 
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
@@ -1770,7 +1850,7 @@ module User = struct
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list (List.map fst ax.ax_tparams) in
+    and s_tybds = Sid.of_list ax.ax_tparams in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.
@@ -1806,13 +1886,27 @@ module User = struct
 end
 
 (* -------------------------------------------------------------------- *)
+
+let ss_inv_alpha_eq hyps (inv1 : ss_inv) (inv2 : ss_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.m inv2.m in
+  is_alpha_eq ~subst hyps inv2.inv inv1.inv
+
+let ts_inv_alpha_eq hyps (inv1 : ts_inv) (inv2 : ts_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.ml inv2.ml in
+  let subst = Fsubst.f_bind_mem subst inv1.mr inv2.mr in
+  is_alpha_eq ~subst hyps inv2.inv inv1.inv
+
+let hs_inv_alpha_eq hyps (inv1 : hs_inv) (inv2 : hs_inv) =
+  let subst = Fsubst.f_bind_mem Fsubst.f_subst_id inv1.hsi_m inv2.hsi_m in
+  POE.forall2 (is_alpha_eq ~subst hyps) inv2.hsi_inv inv1.hsi_inv
+
 module EqTest = struct
   include EqTest_base
 
   include EqMod_base(struct
     let for_expr env ~norm:_ alpha e1 e2 =
       let convert e =
-        let f = form_of_expr mhr e in
+        let f = (ss_inv_of_expr (EcIdent.create "&dummy") e).inv in
 
         if Mid.is_empty alpha then f else
 

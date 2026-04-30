@@ -2,9 +2,11 @@
 require import AllCore List FSet Distr DProd StdOrder StdBigop.
 (*---*) import Bigreal Bigreal.BRM MUnit.
 
-op dlist (d : 'a distr) (n : int): 'a list distr =
-  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
-  axiomatized by dlist_def.
+op [opaque] dlist (d : 'a distr) (n : int): 'a list distr =
+  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n.
+lemma dlist_def (d : 'a distr) n: dlist d n = fold 
+  (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) 
+  (dunit []) n by rewrite/dlist.
 
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
 proof. by move=> ge0_n; rewrite dlist_def foldle0. qed.
@@ -183,7 +185,10 @@ case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
 rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
 rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
 elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
-rewrite !big_consT /#.
+rewrite !big_consT.
+move=> /= /> x_in_d all_in_d_xs y_in_d all_in_d_ys /addzI eq_size.
+rewrite (Hrec ys) //.
+by congr=> //; exact: Hu.
 qed.
 
 lemma dlist_dmap ['a 'b] (d : 'a distr) (f : 'a -> 'b) n :
@@ -197,7 +202,9 @@ qed.
 lemma dlist_rev (d:'a distr) n s:
   mu1 (dlist d n) (rev s) =  mu1 (dlist d n) s.
 proof.
-case (n <= 0) => [?|?]; first by rewrite !dlist0E //; 1:smt(revK).
+case (n <= 0) => [?|?].
++ rewrite !dlist0E // /pred1 /= -{1}rev_nil.
+  by congr; rewrite eq_iff; split=> />; exact: rev_inj.
 case (size s = n) => [<-|?]; 2: smt(dlist1E supp_dlist_size size_rev).
 by rewrite -{1}size_rev &(dlist_perm_eq) perm_eq_sym perm_eq_rev.
 qed.
@@ -282,6 +289,47 @@ rewrite fcards0 RField.expr0 RField.mulr1 => <-.
 apply: mu_eq_support => xs; rewrite supp_dlist //= => -[? ?]; smt(in_fset0).
 qed.
 
+lemma dmap_dlist_partial_perm ['a] (x0 : 'a) (d : 'a distr) (f : int -> int) (n k : int) :
+     0 <= k
+  => 0 <= n
+  => is_lossless d
+  => (forall i j, 0 <= i < k => 0 <= j < k => f i = f j => i = j)
+  => (forall i, 0 <= i < k => 0 <= f i < n)
+  =>   dmap (dlist d n) (fun xs => mkseq (fun i => nth x0 xs (f i)) k)
+     = dlist d k.
+proof.
+move=> ge0_k ge0_n lld injf inrgf.
+elim: k ge0_k n ge0_n f injf inrgf.
+- move=> n ge0_n f injf inrgf; rewrite [dlist d 0]dlist0 //.
+  rewrite -(eq_dmap _ (fun _ => [])) //=.
+  - by move=> ? /=; rewrite mkseq0.
+  by rewrite dmap_cst //; apply/dlist_ll/lld.
+move=> k ge0_k ih n ge0_n f injf inrgf.
+pose k1 := f k; pose k2 := n - (k1 + 1).
+have ->: n = (k1 + 1) + k2 by rewrite /k1 /k2 #ring.
+rewrite dlist_djoin 1:/# -cat_nseq ~-1:/# nseqSr 1:/#.
+rewrite -cats1 -catA /= djoin_perm_s1s /= dmap_dlet /=.
+rewrite -!dlist_djoin ~-1:/# /=.
+pose c (i : int) := f i - b2i (k1 <= f i).
+pose h (a : 'a list) := mkseq (fun i => nth x0 a (c i)) k.
+pose C (a : 'a list * 'a list) := a.`1 ++ a.`2.
+pose F (a : 'a list) (x : 'a) := rcons (h a) x.
+rewrite -(in_eq_dlet (fun (ds : 'a list * 'a list) => dmap d (F (C ds)))).
+- move=> ds /supp_dprod => /= []; rewrite !supp_dlist ~-1:/#.
+  move=> [#] hsz1 _ hsz2 _; rewrite dmap_comp &(eq_dmap) /=.
+  move=> x @/(\o) /=; rewrite mkseqS 1:/# /F /=; congr; last first.
+  - by rewrite nth_cat ifF 1:/# /= ifT 1:/#.
+  apply: eq_in_mkseq => i rgi /=; rewrite !nth_cat.
+  rewrite /c hsz1 lezNgt; case: (f i < k1) => /= [->//|?].
+  by rewrite !ifF ~-1:/# addrAC.
+rewrite -(dlet_dmap _ C (fun ds => dmap d (F ds))) -dlist_add ~-1:/#.
+rewrite -(dmap_dprodE _ _ (fun (xy : _ * _) => F xy.`1 xy.`2)) /F /=.
+rewrite dlistSr ~-1:/# /= !dmap_dprodE_swap /= &(in_eq_dlet) /=.
+move=> x _; rewrite -(dmap_comp h (fun xs => rcons xs x)); congr.
+apply: ih => @/k2; 2,3: by smt().
+have ->: k1 + (n - (k1 + 1)) = n - 1 by ring.
+by have := inrgf 0 _; smt().
+qed.
 
 abstract theory Program.
   type t.
@@ -379,7 +427,7 @@ abstract theory Program.
     rcondt{2} 4; 1:by auto; while (i < n); auto; smt().
     rcondf{2} 7; 1:by auto; while (i < n); auto; smt().
     wp; rnd.
-    outline {1} [1] rs <@ Sample.sample.
+    outline {1} 1 ~ Sample.sample.
     rewrite equiv[{1} 1 ih].
     inline.
     by wp; while (={i} /\ ={l} /\ n0{1} = n{2} - 1); auto; smt().
@@ -387,16 +435,9 @@ abstract theory Program.
 
   equiv Sample_LoopSnoc_eq: Sample.sample ~ LoopSnoc.sample: ={n} ==> ={res}.
   proof.
-    proc*. transitivity{1} { r <@ Sample.sample(n);
-                             r <- rev r;            }
-                           (={n} ==> ={r})
-                           (={n} ==> ={r})=> //=; 1:smt().
+    proc*. 
+    replace* {1} { x } by { x; r <- rev r; }.
       inline *; wp; rnd rev; auto.
-      move=> &1 &2 ->>; split=> /= [*|t {t}]; 1: by rewrite revK.
-      split.
-        move=> r; rewrite -/(support _ _); case (0 <= n{2})=> sign_n.
-          rewrite !dlist1E // (size_rev r)=> ?;congr;apply eq_big_perm.
-          by apply perm_eqP=> ?;rewrite count_rev. smt(dlist_rev).
       smt(revK dlist_rev).
     rewrite equiv[{1} 1 Sample_Loop_eq].
     inline *; wp; while (={i, n0} /\ rev l{1} = l{2}); auto => />.

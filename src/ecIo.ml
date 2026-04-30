@@ -34,16 +34,20 @@ let isuniop_fun () : unit parser_t =
 (* -------------------------------------------------------------------- *)
 type ecreader_r = {
   (*---*) ecr_lexbuf  : Lexing.lexbuf;
+  (*---*) ecr_source  : Buffer.t;
   mutable ecr_atstart : bool;
+  mutable ecr_trim    : int;
   mutable ecr_tokens  : EcParser.token list;
 }
 
 type ecreader = ecreader_r Disposable.t
 
 (* -------------------------------------------------------------------- *)
-let ecreader_of_lexbuf (lexbuf : L.lexbuf) : ecreader_r =
+let ecreader_of_lexbuf (buffer : Buffer.t) (lexbuf : L.lexbuf) : ecreader_r =
   { ecr_lexbuf  = lexbuf;
+    ecr_source  = buffer;
     ecr_atstart = true;
+    ecr_trim    = 0;
     ecr_tokens  = []; }
 
 (* -------------------------------------------------------------------- *)
@@ -51,28 +55,42 @@ let lexbuf (reader : ecreader) =
   (Disposable.get reader).ecr_lexbuf
 
 (* -------------------------------------------------------------------- *)
-let from_channel ~(name : string) (channel : in_channel) =
-  let lexbuf = lexbuf_from_channel name channel in
+let from_channel ?(close = false) ~name channel =
+  let buffer = Buffer.create 0 in
+
+  let refill (bytes : bytes) (len : int) =
+    let aout = input channel bytes 0 len in
+    Buffer.add_bytes buffer (Bytes.sub bytes 0 aout);
+    aout
+  in
+
+  let lexbuf = Lexing.from_function refill in
+
+  Lexing.set_filename lexbuf name;
+
   Disposable.create
-    (ecreader_of_lexbuf lexbuf)
+    ~cb:(fun _ -> if close then close_in channel)
+    (ecreader_of_lexbuf buffer lexbuf)
 
 (* -------------------------------------------------------------------- *)
 let from_file (filename : string) =
   let channel = open_in filename in
+
   try
-    let lexbuf = lexbuf_from_channel filename channel in
-    Disposable.create
-      ~cb:(fun _ -> close_in channel)
-      (ecreader_of_lexbuf lexbuf)
+    from_channel ~close:true ~name:filename channel
 
   with e ->
     (try close_in channel with _ -> ());
     raise e
 
 (* -------------------------------------------------------------------- *)
-let from_string (data : string) =
-  Disposable.create
-    (ecreader_of_lexbuf (Lexing.from_string data))
+let from_string data =
+  let lexbuf = Lexing.from_string data in
+  let buffer = Buffer.create (String.length data) in
+
+  Buffer.add_string buffer data;
+
+  Disposable.create (ecreader_of_lexbuf buffer lexbuf)
 
 (* -------------------------------------------------------------------- *)
 let finalize (ecreader : ecreader) =
@@ -86,8 +104,20 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
     | EcParser.FINAL _ -> true
     | _ -> false in
 
-  if List.is_empty (ecreader.ecr_tokens) then
-    ecreader.ecr_tokens <- EcLexer.main lexbuf;
+  if ecreader.ecr_atstart then
+    ecreader.ecr_trim <- ecreader.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum;
+
+  while List.is_empty (ecreader.ecr_tokens) do
+    match EcLexer.main lexbuf with
+    | [COMMENT] ->
+      if ecreader.ecr_atstart then
+        ecreader.ecr_trim <- (Lexing.lexeme_end_p ecreader.ecr_lexbuf).pos_cnum
+    | [DOCCOMMENT _] as tokens ->
+      if ecreader.ecr_atstart then
+        ecreader.ecr_tokens <- tokens
+    | tokens ->
+        ecreader.ecr_tokens <- tokens
+  done;
 
   let token, queue = List.destruct ecreader.ecr_tokens in
 
@@ -103,7 +133,16 @@ let lexer ?(checkpoint : _ I.checkpoint option) (ecreader : ecreader_r) =
   in
 
   ecreader.ecr_tokens  <- prequeue @ queue;
-  ecreader.ecr_atstart <- (isfinal token);
+
+  if isfinal token then
+    ecreader.ecr_atstart <- true
+  else
+    ecreader.ecr_atstart <- ecreader.ecr_atstart && (
+      match token with
+      | P.DOCCOMMENT _ | P.COMMENT -> true
+      | _ -> false
+    );
+
   (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
 
 (* -------------------------------------------------------------------- *)
@@ -119,7 +158,7 @@ let drain (ecreader : ecreader) =
       drain ()
 
 (* -------------------------------------------------------------------- *)
-let parse (ecreader : ecreader) =
+let parse (ecreader : ecreader) : EcParsetree.prog =
   let ecreader = Disposable.get ecreader in
 
   let rec parse (checkpoint : EcParsetree.prog I.checkpoint) : EcParsetree.prog =
@@ -139,12 +178,25 @@ let parse (ecreader : ecreader) =
   in parse (EcParser.Incremental.prog ecreader.ecr_lexbuf.lex_curr_p)
 
 (* -------------------------------------------------------------------- *)
+let xparse (ecreader : ecreader) : string * EcParsetree.prog =
+  let ecr = Disposable.get ecreader in
+
+  let p1 = ecr.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum in
+  let cd = parse ecreader in
+  let p2 = ecr.ecr_lexbuf.Lexing.lex_curr_p.pos_cnum in
+  let p1 = max p1 ecr.ecr_trim in
+
+  (Buffer.sub ecr.ecr_source p1 (p2 - p1), cd)
+
+(* -------------------------------------------------------------------- *)
 let parseall (ecreader : ecreader) =
   let rec aux acc =
     match EcLocation.unloc (parse ecreader) with
     | EcParsetree.P_Prog (commands, terminate) ->
         let acc = List.rev_append commands acc in
         if terminate then List.rev acc else aux acc
+    | EcParsetree.P_DocComment _ ->
+        aux acc
     | EcParsetree.P_Undo _ | EcParsetree.P_Exit ->
         assert false                    (* FIXME *)
   in

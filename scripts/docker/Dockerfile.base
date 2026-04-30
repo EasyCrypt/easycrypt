@@ -2,11 +2,11 @@
 
 FROM debian:stable
 
-MAINTAINER Pierre-Yves Strub <pierre-yves@strub.nu>
+LABEL org.opencontainers.image.maintainer="Pierre-Yves Strub <pierre-yves@strub.nu>"
 
 ARG user=charlie
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
 	apt-get -q -y update && \
@@ -28,7 +28,7 @@ WORKDIR /home/$user
 
 ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4
 
-ARG OCAML_VERSION=5.2.0
+ARG OCAML_VERSION=4.14.2
 
 RUN \
 	opam init --disable-sandboxing --compiler=ocaml-base-compiler.${OCAML_VERSION}

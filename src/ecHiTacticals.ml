@@ -6,6 +6,7 @@ open EcParsetree
 open EcCoreGoal
 open EcCoreGoal.FApi
 open EcHiGoal
+open EcAst
 
 module TTC = EcProofTyping
 
@@ -81,7 +82,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     match (FApi.tc1_goal tc).f_node with
     | FbdHoareS _ | FhoareS _ | FeHoareS _ when not opts.cod_ambient ->
         let _, fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
-        EcPhlCase.t_hl_case fp tc
+        EcPhlCase.t_hl_case (Inv_ss fp) tc
 
     | FequivS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_prhl_formula tc (form_of_gp ()) in
@@ -129,7 +130,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Preflexivity        -> process_reflexivity
     | Passumption         -> process_assumption
     | Psmt pi             -> process_smt ~loc:(loc t) ttenv (Some pi)
-    | Psplit              -> process_split
+    | Psplit i            -> process_split ?i
     | Pfield st           -> process_algebra `Solve `Field st
     | Pring st            -> process_algebra `Solve `Ring  st
     | Palg_norm           -> EcStrongRing.t_alg_eq
@@ -172,7 +173,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp info                 -> EcPhlApp.process_app info
+    | Pseq info                 -> EcPhlSeq.process_seq info
     | Pwp wp                    -> EcPhlWp.process_wp wp
     | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.process_rcond side b i
@@ -193,6 +194,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
+    | PsimplifyIf info          -> EcPhlCodeTx.process_transform_if info
     | Pasgncase info            -> EcPhlCodeTx.process_case info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
@@ -205,7 +207,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pconcave info             -> EcPhlConseq.process_concave info
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
-    | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x
+    | Phecall (d, s, data)      -> EcPhlExists.process_ecall d s data
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | Pbyupto                   -> EcPhlUpto.process_uptobad
@@ -222,24 +224,30 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager_if                 -> EcPhlEager.process_if
     | Peager_while info         -> EcPhlEager.process_while info
     | Peager_fun_def            -> EcPhlEager.process_fun_def
-    | Peager_fun_abs infos      -> curry EcPhlEager.process_fun_abs infos
+    | Peager_fun_abs infos      -> EcPhlEager.process_fun_abs infos
     | Peager_call info          -> EcPhlEager.process_call info
-    | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
-    | Pprocchange (s, p, f)     -> EcPhlRewrite.process_change s p f
     | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
+    | Pprocrewriteat (x, f)     -> EcPhlRewrite.process_rewrite_at x f
+    | Pchangestmt (s, b, p, c)  -> EcPhlRewrite.process_change_stmt s b p c 
+    | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
+    | Phoaresplit               -> EcPhlHoare.process_hoaresplit
   in
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit cpos1 ->
+  | EcLowPhlGoal.InvalidSplit is ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
         Format.fprintf fmt "invalid split index: %a"
-          (EcPrinting.pp_codepos1 ppe) cpos1)
+        (fun fmt is -> match is with
+        | `Gap gap -> Format.fprintf fmt "%a" EcPrinting.(pp_codegap1 ppe) gap
+        | `Instr i -> Format.fprintf fmt "%a" EcPrinting.(pp_codepos1 ppe) i
+        ) is)
+          
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

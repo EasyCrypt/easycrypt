@@ -52,7 +52,7 @@ let create (x : symbol) =
 
 let fresh (id : t) = create (name id)
 
-let tostring (id : t) =
+let tostring_internal (id : t) =
   Printf.sprintf "%s/%d" id.id_symb id.id_tag
 
 (* -------------------------------------------------------------------- *)

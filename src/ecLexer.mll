@@ -53,7 +53,7 @@
     "match"       , MATCH      ;        (* KW: prog *)
     "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
-    "assert"      , ASSERT     ;        (* KW: prog *)
+    "raise"       , RAISE      ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
@@ -96,6 +96,8 @@
     "ecall"       , ECALL      ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
     "wlog"        , WLOG       ;        (* KW: tactic *)
+
+    "idassign"    , IDASSIGN   ;        (* KW: tactic *)
 
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
@@ -181,12 +183,14 @@
     "export"      , EXPORT     ;        (* KW: global *)
     "include"     , INCLUDE    ;        (* KW: global *)
     "local"       , LOCAL      ;        (* KW: global *)
+    "global"      , GLOBAL     ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
+    "exception"   , EXCEPTION  ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "inductive"   , INDUCTIVE  ;        (* KW: global *)
     "notation"    , NOTATION   ;        (* KW: global *)
@@ -195,8 +199,8 @@
     "theory"      , THEORY     ;        (* KW: global *)
     "abstract"    , ABSTRACT   ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
+    "subtype"     , SUBTYPE    ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
-    "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
@@ -258,8 +262,6 @@
     ("+"   , (PLUS             , false));
     ("-"   , (MINUS            , false));
     ("*"   , (STAR             , false));
-    ("<<"  , (BACKS            , false));
-    (">>"  , (FWDS             , false));
     ("<:"  , (LTCOLON          , false));
     ("==>" , (LONGARROW        , false));
     ("="   , (EQ               , false));
@@ -271,6 +273,7 @@
     ("<*>" , (LTSTARGT         , false));
     ("<<*>", (LTLTSTARGT       , false));
     ("<*>>", (LTSTARGTGT       , false));
+    ("+>"  , (PLUSGT           , false));
   ]
 
   (* ------------------------------------------------------------------ *)
@@ -284,7 +287,7 @@
     List.iter (curry (Hashtbl.add table)) _operators; table
 
   let opre =
-    let ops = List.map fst (List.filter (snd |- snd) _operators) in
+    let ops = List.map fst (List.filter (snd -| snd) _operators) in
     let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
     let ops = String.join "|" (List.map EcRegexp.quote ops) in
     let ops = Printf.sprintf "(%s)" ops in
@@ -333,7 +336,9 @@ let upper   = ['A'-'Z']
 let lower   = ['a'-'z']
 let letter  = upper | lower
 let digit   = ['0'-'9']
+let xdigit  = ['0'-'9' 'a'-'f' 'A'-'F']
 let uint    = digit+
+let uxint   = "0x" xdigit+
 
 let ichar  = (letter | digit | '_' | '\'')
 let lident = (lower ichar*) | ('_' ichar+)
@@ -360,6 +365,7 @@ rule main = parse
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
+  | uxint        { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
 
   | (digit+ as n) '.' (digit+ as f) {
       let nv, fv = BI.of_string n, BI.of_string f in
@@ -379,7 +385,14 @@ rule main = parse
       with Not_found -> [PUNIOP name]
   }
 
-  | "(*" { comment lexbuf; main lexbuf }
+  | "(*" (['&' '^'] as c) {
+      let buffer = doccomment c (Buffer.create 0) lexbuf in
+      let kind = match c with '&' -> `Item | '^' -> `Global | _ -> assert false in
+      [DOCCOMMENT (kind, Buffer.contents buffer)]
+    }
+
+  | "(*" { comment lexbuf; [COMMENT] }
+
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
   (* string symbols *)
@@ -455,6 +468,20 @@ and comment = parse
   | newline     { Lexing.new_line lexbuf; comment lexbuf }
   | eof         { unterminated_comment () }
   | _           { comment lexbuf }
+
+and doccomment kind buf = parse
+  | ['&' '^']? "*)" { buf }
+  | "(*" { comment lexbuf; doccomment kind buf lexbuf }
+  | eof { unterminated_comment () }
+  | newline {
+      Lexing.new_line lexbuf;
+      Buffer.add_char buf '\n';
+      doccomment kind buf lexbuf
+  }
+  | _ as c {
+      Buffer.add_char buf c;
+      doccomment kind buf lexbuf
+  }
 
 and string buf = parse
   | "\""          { buf }

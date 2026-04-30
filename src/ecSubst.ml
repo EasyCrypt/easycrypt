@@ -13,6 +13,7 @@ module Sm    = EcPath.Sm
 module Sx    = EcPath.Sx
 module Mx    = EcPath.Mx
 module Mp    = EcPath.Mp
+module Mop   = EcPath.Mop
 module Mid   = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
@@ -127,7 +128,7 @@ let get_def (s : subst) (p : EcPath.path) =
   | Some (ids, body) ->
      let body =
        match body with
-       | `Op   e -> form_of_expr mhr e
+       | `Op   e -> form_of_expr e
        | `Pred f -> f in
      Some (ids, body)
 
@@ -501,8 +502,7 @@ and subst_instr (s : subst) (i : instr) : instr =
 
      i_match (e, bs)
 
-  | Sassert e ->
-     i_assert (subst_expr s e)
+  | Sraise e -> i_raise (subst_expr s e)
 
   | Sabstract _ ->
      i
@@ -628,105 +628,89 @@ let rec subst_form (s : subst) (f : form) =
     let subf = subst_form s subf in
     mk (Fproj (subf, i))
 
-  | FhoareF { hf_pr; hf_f; hf_po } ->
-    let hf_pr, hf_po =
-      let s = add_memory s mhr mhr in
-      let hf_pr = subst_form s hf_pr in
-      let hf_po = subst_form s hf_po in
-      (hf_pr, hf_po) in
-    let hf_f  = subst_xpath s hf_f in
-    f_hoareF hf_pr hf_f hf_po
+  | FhoareF hf ->
+     let hf_f  = subst_xpath s hf.hf_f in
+     let s = add_memory s hf.hf_m hf.hf_m in
+     let hf_pr = map_ss_inv1 (subst_form s) (hf_pr hf) in
+     let hf_po = subst_hs_inv s (hf_po hf) in
+     f_hoareF hf_pr hf_f hf_po
 
-  | FhoareS { hs_m; hs_pr; hs_s; hs_po } ->
-    let hs_m, (hs_pr, hs_po) =
-      let s, hs_m = subst_memtype s hs_m in
-      let hs_pr = subst_form s hs_pr in
-      let hs_po = subst_form s hs_po in
-      hs_m, (hs_pr, hs_po) in
-    let hs_s = subst_stmt s hs_s in
-    f_hoareS hs_m hs_pr hs_s hs_po
+  | FhoareS hs ->
+     let hs_s = subst_stmt s hs.hs_s in
+     let s, (_,mt) = subst_memtype s hs.hs_m in
+     let hs_pr = map_ss_inv1 (subst_form s) (hs_pr hs) in
+     let hs_po = subst_hs_inv s (hs_po hs) in
+     f_hoareS mt hs_pr hs_s hs_po
 
-  | FbdHoareF { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd } ->
-    let bhf_pr, bhf_po =
-      let s = add_memory s mhr mhr in
-      let bhf_pr = subst_form s bhf_pr in
-      let bhf_po = subst_form s bhf_po in
-      (bhf_pr, bhf_po) in
-    let bhf_f  = subst_xpath s bhf_f in
-    let bhf_bd  = subst_form s bhf_bd in
-    f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd
+  | FbdHoareF bhf ->
+     let bhf_f  = subst_xpath s bhf.bhf_f in
+     let s = add_memory s bhf.bhf_m bhf.bhf_m in
+     let bhf_pr = map_ss_inv1 (subst_form s) (bhf_pr bhf) in
+     let bhf_po = map_ss_inv1 (subst_form s) (bhf_po bhf) in
+     let bhf_bd = map_ss_inv1 (subst_form s) (bhf_bd bhf) in
+     f_bdHoareF bhf_pr bhf_f bhf_po bhf.bhf_cmp bhf_bd
 
-  | FbdHoareS { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd } ->
-    let bhs_m, (bhs_pr, bhs_po, bhs_bd) =
-      let s, bhs_m = subst_memtype s bhs_m in
-      let bhs_pr = subst_form s bhs_pr in
-      let bhs_po = subst_form s bhs_po in
-      let bhs_bd = subst_form s bhs_bd in
-      bhs_m, (bhs_pr, bhs_po, bhs_bd) in
-    let bhs_s = subst_stmt s bhs_s in
-    f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
+  | FbdHoareS bhs ->
+     let bhs_s = subst_stmt s bhs.bhs_s in
+     let s, (_,mt) = subst_memtype s bhs.bhs_m in
+     let bhs_pr = map_ss_inv1 (subst_form s) (bhs_pr bhs) in
+     let bhs_po = map_ss_inv1 (subst_form s) (bhs_po bhs) in
+     let bhs_bd = map_ss_inv1 (subst_form s) (bhs_bd bhs) in
+     f_bdHoareS mt bhs_pr bhs_s bhs_po bhs.bhs_cmp bhs_bd
 
-   | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
-    let ehf_pr, ehf_po =
-      let s = add_memory s mhr mhr in
-      let ehf_pr = subst_form s ehf_pr in
-      let ehf_po = subst_form s ehf_po in
-      (ehf_pr, ehf_po) in
-    let ehf_f  = subst_xpath s ehf_f in
-    f_eHoareF ehf_pr ehf_f ehf_po
+   | FeHoareF ehf ->
+     let ehf_f  = subst_xpath s ehf.ehf_f in
+     let s = add_memory s ehf.ehf_m ehf.ehf_m in
+     let ehf_pr = map_ss_inv1 (subst_form s) (ehf_pr ehf) in
+     let ehf_po = map_ss_inv1 (subst_form s) (ehf_po ehf) in
+     f_eHoareF ehf_pr ehf_f ehf_po
 
-  | FeHoareS { ehs_m; ehs_pr; ehs_s; ehs_po } ->
-    let ehs_m, (ehs_pr, ehs_po) =
-      let s, ehs_m = subst_memtype s ehs_m in
-      let ehs_pr = subst_form s ehs_pr in
-      let ehs_po = subst_form s ehs_po in
-      ehs_m, (ehs_pr, ehs_po) in
-    let ehs_s = subst_stmt s ehs_s in
-    f_eHoareS ehs_m ehs_pr ehs_s ehs_po
+  | FeHoareS ehs ->
+     let ehs_s = subst_stmt s ehs.ehs_s in
+     let s, (_,mt) = subst_memtype s ehs.ehs_m in
+     let ehs_pr = map_ss_inv1 (subst_form s) (ehs_pr ehs) in
+     let ehs_po = map_ss_inv1 (subst_form s) (ehs_po ehs) in
+     f_eHoareS mt ehs_pr ehs_s ehs_po
 
-  | FequivF { ef_pr; ef_fl; ef_fr; ef_po } ->
-    let ef_pr, ef_po =
-      let s = add_memory s mleft mleft in
-      let s = add_memory s mright mright in
-      let ef_pr = subst_form s ef_pr in
-      let ef_po = subst_form s ef_po in
-      (ef_pr, ef_po) in
-    let ef_fl = subst_xpath s ef_fl in
-    let ef_fr = subst_xpath s ef_fr in
-    f_equivF ef_pr ef_fl ef_fr ef_po
+  | FequivF ef ->
+     let ef_fl = subst_xpath s ef.ef_fl in
+     let ef_fr = subst_xpath s ef.ef_fr in
+     let s = add_memory s ef.ef_ml ef.ef_ml in
+     let s = add_memory s ef.ef_mr ef.ef_mr in
+     let ef_pr = map_ts_inv1 (subst_form s) (ef_pr ef) in
+     let ef_po = map_ts_inv1 (subst_form s) (ef_po ef) in
+     f_equivF ef_pr ef_fl ef_fr ef_po
 
-  | FequivS { es_ml; es_mr; es_pr; es_sl; es_sr; es_po } ->
-    let (es_ml, es_mr), (es_pr, es_po) =
-      let s, es_ml = subst_memtype s es_ml in
-      let s, es_mr = subst_memtype s es_mr in
-      let es_pr = subst_form s es_pr in
-      let es_po = subst_form s es_po in
-      (es_ml, es_mr), (es_pr, es_po) in
-    let es_sl = subst_stmt s es_sl in
-    let es_sr = subst_stmt s es_sr in
-    f_equivS es_ml es_mr es_pr es_sl es_sr es_po
+  | FequivS es ->
+     let es_sl = subst_stmt s es.es_sl in
+     let es_sr = subst_stmt s es.es_sr in
+     let s, (_,mtl) = subst_memtype s es.es_ml in
+     let s, (_,mtr) = subst_memtype s es.es_mr in
+     let es_pr = map_ts_inv1 (subst_form s) (es_pr es) in
+     let es_po = map_ts_inv1 (subst_form s) (es_po es) in
+     f_equivS mtl mtr es_pr es_sl es_sr es_po
 
-  | FeagerF { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po } ->
-    let eg_pr, eg_po =
-      let s = add_memory s mleft  mleft  in
-      let s = add_memory s mright mright in
-      let eg_pr = subst_form s eg_pr in
-      let eg_po = subst_form s eg_po in
-      (eg_pr, eg_po) in
-    let eg_sl = subst_stmt s eg_sl in
-    let eg_sr = subst_stmt s eg_sr in
-    let eg_fl = subst_xpath s eg_fl in
-    let eg_fr = subst_xpath s eg_fr in
-    f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
+  | FeagerF eg ->
+     let eg_sl = subst_stmt s eg.eg_sl in
+     let eg_sr = subst_stmt s eg.eg_sr in
+     let eg_fl = subst_xpath s eg.eg_fl in
+     let eg_fr = subst_xpath s eg.eg_fr in
+     let s = add_memory s eg.eg_ml eg.eg_ml in
+     let s = add_memory s eg.eg_mr eg.eg_mr in
+     let eg_pr = map_ts_inv1 (subst_form s) (eg_pr eg) in
+     let eg_po = map_ts_inv1 (subst_form s) (eg_po eg) in
+     f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po
 
   | Fpr { pr_mem; pr_fun; pr_args; pr_event } ->
-    let pr_mem = subst_mem s pr_mem in
-    let pr_fun = subst_xpath s pr_fun in
-    let pr_args = subst_form s pr_args in
-    let pr_event =
-      let s = add_memory s mhr mhr in
-      subst_form s pr_event in
-    f_pr pr_mem pr_fun pr_args pr_event
+     let pr_mem = subst_mem s pr_mem in
+     let pr_fun = subst_xpath s pr_fun in
+     let pr_args = subst_form s pr_args in
+     let s = add_memory s pr_event.m pr_event.m in
+     let pr_event = map_ss_inv1 (subst_form s) pr_event in
+     f_pr pr_mem pr_fun pr_args pr_event
+
+  | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
+     f_map (subst_ty s) (subst_form s) f
 
 (* -------------------------------------------------------------------- *)
 and subst_fop fty tys args (tyids, f) =
@@ -924,6 +908,18 @@ and subst_module (s : subst) (m : module_expr) =
   { me_name = m.me_name; me_params; me_body; me_comps; me_sig_body; me_oinfos; }
 
 (* -------------------------------------------------------------------- *)
+and subst_hs_inv (s : subst) (inv : hs_inv) =
+  let s = add_memory s inv.hsi_m inv.hsi_m in
+  let main = subst_form s inv.hsi_inv.main in
+  let exnmap =
+    Mop.fold (fun p f m ->
+      let p = omap (subst_path s) p in
+      let f = subst_form s f in
+      Mop.add p f m
+    ) inv.hsi_inv.exnmap Mop.empty in
+  { hsi_inv = { main; exnmap }; hsi_m = inv.hsi_m }
+
+(* -------------------------------------------------------------------- *)
 let subst_modsig ?params (s : subst) (comps : module_sig) =
   snd (subst_modsig ?params s comps)
 
@@ -974,8 +970,8 @@ let subst_tydecl_body (s : subst) (tyd : ty_body) =
           tydt_schcase = subst_form s dtype.tydt_schcase; }
       in `Datatype dtype
 
-  | `Record (scheme, fields) ->
-      `Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
+  | Record (scheme, fields) ->
+      Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =
@@ -984,7 +980,6 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
 
   { tyd_params  = tparams;
     tyd_type    = body;
-    tyd_resolve = tyd.tyd_resolve;
     tyd_loca    = tyd.tyd_loca; }
 
 (* -------------------------------------------------------------------- *)
@@ -1020,12 +1015,14 @@ and subst_op_body (s : subst) (bd : opbody) =
   | OP_Fix opfix ->
       let (es, args) = fresh_elocals s opfix.opf_args in
 
-      OP_Fix { opf_args     = args;
+      OP_Fix { opf_recp     = subst_path s opfix.opf_recp;
+               opf_args     = args;
                opf_resty    = subst_ty s opfix.opf_resty;
                opf_struct   = opfix.opf_struct;
                opf_branches = subst_branches es opfix.opf_branches; }
 
   | OP_TC (p, n) -> OP_TC (subst_path s p, n)
+  | OP_Exn tys -> OP_Exn (List.map (subst_ty s) tys)
 
 and subst_branches (s : subst) = function
   | OPB_Leaf (locals, e) ->
@@ -1077,11 +1074,11 @@ let subst_ax (s : subst) (ax : axiom) =
   let s, tparams = fresh_tparams s ax.ax_tparams in
   let spec   = subst_form s ax.ax_spec in
 
-  { ax_tparams    = tparams;
-    ax_spec       = spec;
-    ax_kind       = ax.ax_kind;
-    ax_loca       = ax.ax_loca;
-    ax_visibility = ax.ax_visibility; }
+  { ax_tparams = tparams;
+    ax_spec    = spec;
+    ax_kind    = ax.ax_kind;
+    ax_loca    = ax.ax_loca;
+    ax_smt     = ax.ax_smt; }
 
 (* -------------------------------------------------------------------- *)
 let fresh_scparam (s : subst) ((x, ty) : EcIdent.t * ty) =
@@ -1152,6 +1149,12 @@ let subst_tcinstance (s : subst) (tci : tcinstance) =
 
   { tci_params; tci_type; tci_instance; tci_local; }
 
+
+(* -------------------------------------------------------------------- *)
+let subst_exception (s : subst) (ex : exception_) =
+  { exn_loca = ex.exn_loca;
+    exn_dom = subst_tys s ex.exn_dom }
+
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
@@ -1180,9 +1183,6 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_instance (x, tci) ->
       Th_instance (x, subst_tcinstance s tci)
 
-  | Th_typeclass (x, tc) ->
-      Th_typeclass (x, subst_tc s tc)
-
   | Th_baserw _ ->
       item
 
@@ -1194,8 +1194,12 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
         List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
       in Th_reduction rules
 
-  | Th_auto (lvl, base, ps, lc) ->
-      Th_auto (lvl, base, List.map (subst_path s) ps, lc)
+  | Th_auto ({ axioms } as auto_rl) ->
+      Th_auto { auto_rl with axioms =
+        List.map (fst_map (subst_path s)) axioms }
+
+  | Th_alias (name, target) ->
+      Th_alias (name, subst_path s target)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : subst) (items : theory) =
@@ -1217,18 +1221,33 @@ and subst_ctheory (s : subst) (cth : ctheory) =
 and subst_theory_source (s : subst) (ths : thsource) =
   { ths_base = subst_path s ths.ths_base; }
 
+let subst_ss_inv (s : subst) (inv : ss_inv) =
+  let s = add_memory s inv.m inv.m in
+  { inv = subst_form s inv.inv; m = inv.m; }
+
+let subst_ts_inv (s : subst) (inv : ts_inv) =
+  let s = add_memory s inv.ml inv.ml in
+  let s = add_memory s inv.mr inv.mr in
+  { inv = subst_form s inv.inv; ml = inv.ml; mr = inv.mr; }
+
+let subst_inv (s : subst) (inv : inv) =
+  match inv with
+  | Inv_ss inv -> Inv_ss (subst_ss_inv s inv)
+  | Inv_ts inv -> Inv_ts (subst_ts_inv s inv)
+  | Inv_hs inv -> Inv_hs (subst_hs_inv s inv)
+
 (* -------------------------------------------------------------------- *)
 let init_tparams (params : (EcIdent.t * etyarg) list) : subst =
   add_tyvars empty params
 
 (* -------------------------------------------------------------------- *)
 let open_oper (op : operator) (tys : etyarg list) : ty * operator_kind =
-  let s = List.combine (List.fst op.op_tparams) tys in
+  let s = List.combine (List.map fst op.op_tparams) tys in
   let s = init_tparams s in
   (subst_ty s op.op_ty, subst_op_kind s op.op_kind)
 
 let open_tydecl (tyd : tydecl) (tys : etyarg list) : EcDecl.ty_body =
-  let s = List.combine (List.fst tyd.tyd_params) tys in
+  let s = List.combine (List.map fst tyd.tyd_params) tys in
   let s = init_tparams s in
   subst_tydecl_body s tyd.tyd_type
 
@@ -1236,3 +1255,86 @@ let open_tydecl (tyd : tydecl) (tys : etyarg list) : EcDecl.ty_body =
 let freshen_type (tparams, ty) =
   let s, tparams = fresh_tparams empty tparams in
   (tparams, subst_ty s ty)
+
+(* -------------------------------------------------------------------- *)
+let ss_inv_rebind ({inv;m}: ss_inv) (m': memory) : ss_inv =
+  if m' = m then
+    { inv; m }
+  else
+    let inv = subst_form (add_memory empty m m') inv in
+    { inv; m = m' }
+
+let ss_inv_generalize_as_left ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_inv =
+  if ml = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty m ml in
+    let inv = subst_form s inv in
+    { inv; ml; mr }
+
+let ss_inv_generalize_as_right ({inv;m}: ss_inv) (ml: memory) (mr: memory) : ts_inv =
+  if mr = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty m mr in
+    let inv = subst_form s inv in
+    { inv; ml; mr }
+
+let f_forall_mems_ss_inv menv inv =
+  f_forall_mems [menv] (ss_inv_rebind inv (fst menv)).inv
+
+let ts_inv_rebind_left ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
+  if ml = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty ml m in
+    let inv = subst_form s inv in
+    { inv; ml = m; mr }
+
+let ts_inv_rebind_right ({inv;ml;mr}: ts_inv) (m: memory) : ts_inv =
+  if mr = m then
+    { inv; ml; mr }
+  else
+    let s = add_memory empty mr m in
+    let inv = subst_form s inv in
+    { inv; ml; mr = m }
+
+let ts_inv_rebind ({inv;ml;mr}: ts_inv) (ml': memory) (mr': memory) : ts_inv =
+  match ml' = ml, mr' = mr with
+  | true, true -> { inv; ml; mr }
+  | false, true -> assert (mr <> ml'); ts_inv_rebind_left {inv;ml;mr} ml'
+  | true, false -> assert (ml <> mr'); ts_inv_rebind_right {inv;ml;mr} mr'
+  | false, false -> begin
+    let s = add_memory empty ml ml' in
+    let s = add_memory s mr mr' in
+    let inv = subst_form s inv in
+    { inv; ml = ml'; mr = mr' }
+  end
+
+let f_forall_mems_ts_inv menvl menvr inv =
+  f_forall_mems [menvl; menvr] (ts_inv_rebind inv (fst menvl) (fst menvr)).inv
+
+let ss_inv_forall_ml_ts_inv menvl inv =
+  let inv' = f_forall_mems [menvl] (ts_inv_rebind_left inv (fst menvl)).inv in
+  { inv=inv'; m=inv.mr}
+
+let ss_inv_forall_mr_ts_inv menvr inv =
+  let inv' = f_forall_mems [menvr] (ts_inv_rebind_right inv (fst menvr)).inv in
+  { inv=inv'; m=inv.ml }
+
+(* -------------------------------------------------------------------- *)
+let hs_inv_rebind ({hsi_inv;hsi_m}: hs_inv) (m': memory) : hs_inv =
+  if m' = hsi_m then
+    { hsi_inv; hsi_m }
+  else
+    let hsi_inv = POE.map (subst_form (add_memory empty hsi_m m')) hsi_inv in
+    { hsi_inv; hsi_m = m' }
+
+(* -------------------------------------------------------------------- *)
+let inv_rebind (inv : inv) (ms : memory list) : inv =
+  match inv, ms with
+  | Inv_ss ss, [m] -> Inv_ss (ss_inv_rebind ss m)
+  | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
+  | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
+  | _, _ -> assert false
+

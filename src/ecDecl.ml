@@ -14,24 +14,30 @@ type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
-type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_resolve : bool;
+type ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+type ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
+type ty_dtype = {
+  tydt_ctors   : ty_dtype_ctor list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
 }
 
-and ty_body = [
+type ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of typeclass list
   | `Datatype of ty_dtype
-  | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of ty_record
 ]
 
-and ty_dtype = {
-  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
-  tydt_schelim : EcCoreFol.form;
-  tydt_schcase : EcCoreFol.form;
+
+type tydecl = {
+  tyd_params : ty_params;
+  tyd_type   : ty_body;
+  tyd_loca   : locality;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -48,6 +54,7 @@ let tydecl_as_record (td : tydecl) =
 
 (* -------------------------------------------------------------------- *)
 let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
+  let _ = resolve in
   let params =
     match params with
     | `Named params ->
@@ -59,10 +66,7 @@ let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params  = params;
-    tyd_type    = `Abstract tc;
-    tyd_resolve = resolve;
-    tyd_loca    = lc; }
+  { tyd_params = params; tyd_type = `Abstract tc; tyd_loca = lc; }
 
 (* -------------------------------------------------------------------- *)
 let etyargs_of_tparams (tps : ty_params) : etyarg list =
@@ -91,6 +95,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC     of EcPath.path * string
 
 and prbody =
@@ -98,6 +103,7 @@ and prbody =
   | PR_Ind   of prind
 
 and opfix = {
+  opf_recp     : EcPath.path;
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
@@ -147,16 +153,20 @@ and opopaque = { smt: bool; reduction: bool; }
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams    : ty_params;
-  ax_spec       : EcCoreFol.form;
-  ax_kind       : axiom_kind;
-  ax_loca       : locality;
-  ax_visibility : ax_visibility; }
-
-and ax_visibility = [`Visible | `NoSmt | `Hidden]
+  ax_tparams : ty_params;
+  ax_spec    : EcCoreFol.form;
+  ax_kind    : axiom_kind;
+  ax_loca    : locality;
+  ax_smt     : bool; }
 
 let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type exception_ = {
+  exn_loca : locality;
+  exn_dom  : ty list;
+}
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -196,6 +206,11 @@ let is_fix op =
   | OB_oper (Some (OP_Fix _)) -> true
   | _ -> false
 
+let is_exception op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn _)) -> true
+  | _ -> false
+
 let is_abbrev op =
   match op.op_kind with
   | OB_nott _ -> true
@@ -227,6 +242,9 @@ let optransparent : opopaque =
 let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
   gen_op ?clinline ?unfold ~opaque tparams ty kind lc
+
+let mk_exception (exn_loca : locality) (exn_dom : ty list) : exception_ =
+  { exn_loca; exn_dom; }
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -266,8 +284,18 @@ let operator_as_prind (op : operator) =
 
 let operator_as_tc (op : operator) =
   match op.op_kind with
-  | OB_oper (Some OP_TC (tcpath, name)) -> (tcpath, name)
+  | OB_oper (Some (OP_TC (tcpath, name))) -> (tcpath, name)
   | _ -> assert false
+
+let operator_as_exception (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Exn exn_dom)) ->
+      { exn_loca = op.op_loca; exn_dom; }
+  | _ -> assert false
+
+let operator_of_exception (ex: exception_) =
+  let ty = EcTypes.toarrow ex.exn_dom EcTypes.texn in
+  mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
 type tc_decl = {

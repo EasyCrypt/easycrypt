@@ -1,22 +1,43 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcFol
 open EcCoreGoal.FApi
+open EcAst
 
 (* -------------------------------------------------------------------- *)
-val wp2_call :
-     EcEnv.env -> form -> form
-  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
-  -> EcPV.PV.t
-  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
-  -> EcPV.PV.t
-  -> EcMemory.memory -> EcMemory.memory -> form
-  -> EcEnv.LDecl.hyps -> form
+val compute_hoare_call_post :
+     EcEnv.LDecl.hyps
+  -> EcMemory.memory
+  -> form * exnpost
+  -> lvalue option * EcPath.xpath * expr list
+  -> exnpost
+  -> form
 
-val t_hoare_call   : form -> form -> backward
-val t_bdhoare_call : form -> form -> form option -> backward
-val t_equiv_call   : form -> form -> backward
-val t_equiv_call1  : side -> form -> form -> backward
+(* -------------------------------------------------------------------- *)
+val compute_equiv_call_post :
+     EcEnv.LDecl.hyps
+  -> EcMemory.memory * EcMemory.memory
+  -> form * form
+  -> ?mods:(EcPV.PV.t * EcPV.PV.t)
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> form
+  -> form
+
+(* -------------------------------------------------------------------- *)
+val compute_equiv1_call_post :
+     EcEnv.LDecl.hyps
+  -> side
+  -> EcMemory.memory * EcMemory.memory
+  -> form * form
+  -> EcModules.lvalue option * EcPath.xpath * EcTypes.expr list
+  -> form
+  -> form
+   
+(* -------------------------------------------------------------------- *)
+val t_hoare_call   : ss_inv -> hs_inv -> backward
+val t_bdhoare_call : ss_inv -> ss_inv -> ss_inv option -> backward
+val t_equiv_call   : ts_inv -> ts_inv -> backward
+val t_equiv_call1  : side -> ss_inv -> ss_inv -> backward
 val t_call         : oside -> form -> backward
 
 (* -------------------------------------------------------------------- *)

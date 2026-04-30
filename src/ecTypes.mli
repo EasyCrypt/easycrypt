@@ -44,6 +44,7 @@ val ty_fv_and_tvar : ty -> int Mid.t
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
+val texn    : ty   (* type of exception *)
 val txint   : ty
 val treal   : ty
 val tdistr  : ty -> ty
@@ -91,6 +92,8 @@ val tcw_fold : ('a -> ty -> 'a) -> 'a -> tcwitness -> 'a
 val ty_iter : (ty -> unit) -> ty -> unit
 val etyarg_iter : (ty -> unit) -> etyarg -> unit
 val tcw_iter : (ty -> unit) -> tcwitness -> unit
+
+val var_mem : ?check_glob:bool -> EcIdent.t -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
 val symbol_of_ty   : ty -> string
@@ -208,6 +211,7 @@ val e_var      : prog_var -> ty -> expr
 val e_op_tc    : EcPath.path -> etyarg list -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
+val e_not      : expr -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr

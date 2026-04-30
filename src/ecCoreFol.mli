@@ -14,7 +14,8 @@ val mleft  : memory
 val mright : memory
 
 (* -------------------------------------------------------------------- *)
-type quantif  = EcAst.quantif
+type quantif = EcAst.quantif
+
 type hoarecmp = EcAst.hoarecmp
 type gty      = EcAst.gty
 type binding  = (EcIdent.t * gty)
@@ -78,6 +79,7 @@ val f_node  : form -> f_node
 (* not recursive *)
 val f_map  : (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
+val f_fold : ('a -> form -> 'a) -> 'a -> form -> 'a
 
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
@@ -90,10 +92,10 @@ val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 
 (* soft-constructors - common leaves *)
 val f_local : EcIdent.t -> EcTypes.ty -> form
-val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
-val f_pvarg : EcTypes.ty -> memory -> form
-val f_pvloc : variable -> memory -> form
-val f_glob  : EcIdent.t -> memory -> form
+val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> ss_inv
+val f_pvarg : EcTypes.ty -> memory -> ss_inv
+val f_pvloc : variable -> memory -> ss_inv
+val f_glob  : EcIdent.t -> memory -> ss_inv
 
 (* soft-constructors - common formulas constructors *)
 val f_op     : path -> ty list -> EcTypes.ty -> form
@@ -112,19 +114,19 @@ val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
-(* soft-constructors - hoare *)
 val f_hoareF_r : sHoareF -> form
 val f_hoareS_r : sHoareS -> form
 
-val f_hoareF : form -> xpath -> form -> form
-val f_hoareS : memenv -> form -> stmt -> form -> form
+val f_hoareF : ss_inv -> xpath -> hs_inv -> form
+val f_hoareS : memtype -> ss_inv -> stmt -> hs_inv -> form
 
-(* soft-constructors - expected hoare *)
 val f_eHoareF_r : eHoareF -> form
 val f_eHoareS_r : eHoareS -> form
 
-val f_eHoareF : form -> xpath -> form -> form
-val f_eHoareS : memenv -> form -> EcCoreModules.stmt -> form -> form
+val f_eHoareF : ss_inv -> xpath -> ss_inv -> form
+val f_eHoareS : memtype -> ss_inv -> EcCoreModules.stmt -> ss_inv -> form
+
+(* soft-constructors - eager *)
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
@@ -132,23 +134,22 @@ val hoarecmp_opp : hoarecmp -> hoarecmp
 val f_bdHoareF_r : bdHoareF -> form
 val f_bdHoareS_r : bdHoareS -> form
 
-val f_bdHoareF : form -> xpath -> form -> hoarecmp -> form -> form
-val f_bdHoareS : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
+val f_bdHoareF : ss_inv -> xpath -> ss_inv -> hoarecmp -> ss_inv -> form
+val f_bdHoareS : memtype -> ss_inv -> stmt -> ss_inv -> hoarecmp -> ss_inv -> form
 
 (* soft-constructors - equiv *)
-val f_equivS : memenv -> memenv -> form -> stmt -> stmt -> form -> form
-val f_equivF : form -> xpath -> xpath -> form -> form
-
-val f_equivS_r : equivS -> form
 val f_equivF_r : equivF -> form
+val f_equivS_r : equivS -> form
+
+val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
+val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
 (* soft-constructors - eager *)
-val f_eagerF_r : eagerF -> form
-val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
+val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 
 (* soft-constructors - Pr *)
 val f_pr_r : pr -> form
-val f_pr   : memory -> xpath -> form -> form -> form
+val f_pr   : memory -> xpath -> form -> ss_inv -> form
 
 (* soft-constructors - unit *)
 val f_tt : form
@@ -324,12 +325,17 @@ val split_fun  : form -> bindings * form
 val split_args : form -> form * form list
 
 (* -------------------------------------------------------------------- *)
-val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
+val form_of_expr : ?m:EcMemory.memory -> EcTypes.expr -> form
+val ss_inv_of_expr : EcMemory.memory -> EcTypes.expr -> ss_inv
 
 (* -------------------------------------------------------------------- *)
 exception CannotTranslate
 
-val expr_of_form : EcMemory.memory -> form -> EcTypes.expr
+val expr_of_ss_inv : ss_inv -> EcTypes.expr
+val expr_of_form : form -> EcTypes.expr
+
+(* -------------------------------------------------------------------- *)
+(* A predicate on memory: λ mem. -> pred *)
 
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)

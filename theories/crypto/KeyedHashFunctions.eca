@@ -1,0 +1,1585 @@
+(*^
+  KeyedHashFunctions.eca
+
+  Library for keyed-hash functions (KHFs).
+
+  Formalizes the concept of a KHF and several corresponding properties.
+  Most, if not all, material is based on the relevant literature. In
+  particular, this includes the following:
+
+  - [Cryptographic Hash-Function Basics: Definitions, Implications, and Separations for Preimage Resistance, Second-Preimage Resistance, and Collision Resistance](https://link.springer.com/chapter/10.1007/978-3-540-25937-4_24)
+  - [Mitigating Multi-Target Attacks in Hash-based Signatures](https://link.springer.com/chapter/10.1007/978-3-662-49384-7_15)
+  - [Decisional second-preimage resistance: When does SPR imply PRE?](https://link.springer.com/chapter/10.1007/978-3-030-34618-8_2)
+  - [The SPHINCS+ Signature Framework](https://dl.acm.org/doi/10.1145/3319535.3363229)
+  - [Recovering the Tight Security Proof of SPHINCS+](https://link.springer.com/chapter/10.1007/978-3-031-22972-5_1)
+  - [Machine-Checked Security for XMSS as in RFC 8391 and SPHINCS+](https://link.springer.com/chapter/10.1007/978-3-031-38554-4_14)
+  - [A Tight Security Proof for SPHINCS+, Formally Verified](https://link.springer.com/chapter/10.1007/978-981-96-0894-2_2)
+
+  Many of the properties formalized in this library are variants of
+  some "base" property, differing from each other only in the number of
+  considered functions or targets. That is, most "base" properties consider a
+  single function and a single target, but have variants considering multiple
+  functions and/or multiple targets. Across properties, these variants are
+  indicated analogously, using the same acronym: variant Y of property X is
+  denoted by Y-X. The following summarizes the possible variants (and their
+  acronym):
+
+  - Single-function, Multi-target (SM).
+  This variant considers a single function (or, equivalently, single index key)
+  and multiple targets.
+  - Multi-function, Multi-target (MM):
+  This variant considers multiple functions (or, equivalently, multiple index
+  keys) and multiple targets.
+  - Distinct-function, Multi-target (DM):
+  This variant considers a multiple distinct functions (or, equivalently, multiple
+  distinct index keys) and multiple targets.
+^*)
+
+(* Require/Import *)
+require import AllCore List Distr FMap.
+
+
+(* Types *)
+(*& Type for (indexing) keys &*)
+type key_t.
+
+(*& Type for inputs ("messages") &*)
+type in_t.
+
+(*& Type for outputs ("digests") &*)
+type out_t.
+
+
+(* Operators *)
+(*& Keyed hash function &*)
+op f : key_t -> in_t -> out_t.
+
+
+(* Properties *)
+(*&
+  PREimage resistance (PRE).
+  Given a key `k` and an output `y`, it is hard to find an input `x` such that
+  `f k x = y`.
+&*)
+abstract theory PRE.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against PRE &*)
+  module type Adv_PRE = {
+    proc find(k : key_t, y : out_t) : in_t
+  }.
+
+  (*& PRE game &*)
+  module PRE(A : Adv_PRE) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+      var y : out_t;
+
+      k <$ dkey;
+      x <$ din;
+
+      y <- f k x;
+
+      (* Ask adversary to find a preimage x' of y *)
+      x' <@ A.find(k, y);
+
+      (* Success iff x' is a preimage of y, i.e., if f k maps x' to y *)
+      return f k x' = y;
+    }
+  }.
+end PRE.
+
+
+(*&
+   Single-function, Multi-target PREimage resistance (SM_PRE).
+   Given a key `k` and a list of outputs `yl`, it is hard to find an
+   input `x` such that `f k x = y` for any `y` in `yl`.
+&*)
+abstract theory SMPRE.
+  (*& Number of targets in SM_PRE &*)
+  const t : { int | 1 <= t } as ge1_t.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against SM_PRE &*)
+  module type Adv_SMPRE = {
+    proc find(k : key_t, yl : out_t list) : int * in_t
+  }.
+
+  (*& SM_PRE game &*)
+  module SM_PRE(A : Adv_SMPRE) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+      var y : out_t;
+      var yl : out_t list;
+      var i : int;
+
+      k <$ dkey;
+
+      yl <- [];
+      while (size yl < t) {
+        x <$ din;
+        y <- f k x;
+        yl <- rcons yl y;
+      }
+
+      (* Ask adversary to find a preimage x' of any output in yl *)
+      (i, x') <@ A.find(k, yl);
+
+      y <- nth witness yl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size yl": index i provided by adversary is within the bounds of yl
+            (i.e., between 0 (including) and the size yl = t_smpre (excluding)), and
+        (2) "f k x' = y": x' is a preimage of y under f k
+      *)
+      return 0 <= i < size yl /\ f k x' = y;
+    }
+  }.
+end SMPRE.
+
+
+(*&
+   Multi-function, Multi-target PREimage resistance (MM_PRE).
+   Given a list of key/output pairs `kyl`, it is hard to find an
+   input `x` such that `f k x = y` for any `(k, y)` in `kyl`.
+&*)
+abstract theory MMPRE.
+  (*& Number of functions/targets in MM_PRE &*)
+  const t : { int | 1 <= t } as ge1_t.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against MM_PRE &*)
+  module type Adv_MMPRE = {
+    proc find(kyl : (key_t * out_t) list) : int * in_t
+  }.
+
+  (*& MM_PRE game &*)
+  module MM_PRE(A : Adv_MMPRE) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+      var y : out_t;
+      var ky : key_t * out_t;
+      var kyl : (key_t * out_t) list;
+      var i : int;
+
+      kyl <- [];
+      while (size kyl < t) {
+        k <$ dkey;
+        x <$ din;
+        y <- f k x;
+        ky <- (k, y);
+        kyl <- rcons kyl ky;
+      }
+
+      (*
+        Ask adversary to find a preimage of an output in any
+        (key, output) pair in kyl w.r.t. the key in the (same) pair
+      *)
+      (i, x') <@ A.find(kyl);
+
+      ky <- nth witness kyl i;
+
+      k <- ky.`1;
+      y <- ky.`2;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kyl": index provided by adversary is within the bounds of kyl
+            (i.e., between 0 (including) and size kyl = t_mmpre (excluding)), and
+        (2) "f k x' = y": f k maps x' to y
+      *)
+      return 0 <= i < size kyl /\ f k x' = y;
+    }
+  }.
+end MMPRE.
+
+
+(*&
+   Distinct-function, Multi-target PREimage resistance (MM_PRE).
+   Given a list of outputs `yl' for the functions corresponding to a list of
+   previously chosen, _distinct_ keys `kl', it is hard to find an input `x` such
+   that `f k x = y` for any `k` and corresponding `y` from `kl` and `yl`.
+&*)
+abstract theory DMPRE.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Class of adversaries against DM_PRE &*)
+  module type Adv_DMPRE = {
+    proc pick() : key_t list
+    proc find(yl : out_t list) : int * in_t
+  }.
+
+  (*& DM_PRE game &*)
+  module DM_PRE(A : Adv_DMPRE) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+      var y : out_t;
+      var kl : key_t list;
+      var yl : out_t list;
+      var i : int;
+
+      kl <@ A.pick();
+
+      yl <- [];
+      while (size yl < size kl) {
+        k <- nth witness kl (size yl);
+        x <$ din;
+        y <- f k x;
+        yl <- rcons yl y;
+      }
+
+      (*
+        Ask adversary to find a preimage for any output
+        in yl w.r.t. the corresponding  (i.e., at the same index) key in kl
+      *)
+      (i, x') <@ A.find(yl);
+
+      k <- nth witness kl i;
+      y <- nth witness yl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kl": index provided by adversary is within the bounds of kl, and
+        (2) "uniq kl": kl contains no duplicate elements, and
+        (3) "f k x' = y": f k maps x' to y
+      *)
+      return 0 <= i < size kl /\ uniq kl /\ f k x' = y;
+    }
+  }.
+end DMPRE.
+
+
+(*&
+  Second Preimage Resistance (SPR).
+  Given a key `k` and an input `x`, it is hard to find an input `x'` different
+  from x such that `f k x = f k x'`.
+&*)
+abstract theory SPR.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against SPR &*)
+  module type Adv_SPR = {
+    proc find(k : key_t, x : in_t) : in_t
+  }.
+
+  (*& SPR game &*)
+  module SPR(A : Adv_SPR) = {
+    proc main() : bool  = {
+      var k : key_t;
+      var x, x' : in_t;
+
+      (* Sample key k and input x *)
+      k <$ dkey;
+      x <$ din;
+
+      (* Ask adversary to find a second preimage x' of x w.r.t. k (i.e., under f k) *)
+      x' <@ A.find(k, x);
+
+      (*
+        Success iff
+        (1) "x' <> x": x' does not equal x, and
+        (2) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return x' <> x /\ f k x' = f k x;
+    }
+  }.
+end SPR.
+
+
+(*&
+   Single-function, Multi-target Second Preimage Resistance (SM_SPR).
+   Given a key `k` and a list of inputs `xl`, it is hard to find an input `x'`
+   such that there is an `x` in `xl` that is different from `x'` _and_ `f k x =
+   f k x'`.
+&*)
+abstract theory SMSPR.
+  (*& Number of targets in SM_SPR &*)
+  const t : { int | 1 <= t } as ge1_t.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against SM_SPR &*)
+  module type Adv_SMSPR = {
+    proc find(k : key_t, xl : in_t list) : int * in_t
+  }.
+
+  (*& SM_SPR game &*)
+  module SM_SPR(A : Adv_SMSPR) = {
+    proc main() : bool  = {
+      var k : key_t;
+      var x, x' : in_t;
+      var xl : in_t list;
+      var i : int;
+
+      k <$ dkey;
+
+      xl <- [];
+      while (size xl < t) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (i, x') <@ A.find(k, xl);
+
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size xl": index i provided by adversary is within the bounds of xl
+            (i.e., between 0 (including) and the size xl = t_smspr (excluding)), and
+        (2) "x' <> x": x' does not equal x, and
+        (3) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return 0 <= i < size xl /\ x' <> x /\ f k x' = f k x;
+    }
+  }.
+end SMSPR.
+
+
+(*&
+   Multi-function, Multi-target Second Preimage Resistance (MM_SPR).
+   Given a list of key/input pairs `kxl`, it is hard to find an input `x'`
+   such that there is a `(k, x)` in `kxl` for which `x` is different from `x'`
+   _and_ `f k x = f k x'`.
+&*)
+abstract theory MMSPR.
+  (*& Number of functions/targets in MM_SPR &*)
+  const t : { int | 1 <= t } as ge1_t.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against MM_SPR &*)
+  module type Adv_MMSPR = {
+    proc find(kxl : (key_t * in_t) list) : int * in_t
+  }.
+
+  (*& MM_SPR game &*)
+  module MM_SPR(A : Adv_MMSPR) = {
+    proc main() : bool  = {
+      var k : key_t;
+      var x, x' : in_t;
+      var kx : key_t * in_t;
+      var kxl : (key_t * in_t) list;
+      var i : int;
+
+      kxl <- [];
+      while (size kxl < t) {
+        k <$ dkey;
+        x <$ din;
+        kx <- (k, x);
+        kxl <- rcons kxl kx;
+      }
+
+      (*
+        Ask adversary to find a second preimage for an input in any
+        (key, input) pair in kxl w.r.t. the key in the (same) pair
+      *)
+      (i, x') <@ A.find(kxl);
+
+      kx <- nth witness kxl i;
+
+      k <- kx.`1;
+      x <- kx.`2;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kxl": index provided by adversary is within the bounds of kyl
+            (i.e., between 0 (including) and size kxl = t (excluding)), and
+        (2) "x' <> x": x' does not equal x, and
+        (3) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return 0 <= i < size kxl /\ x' <> x /\ f k x' = f k x;
+    }
+  }.
+end MMSPR.
+
+
+(*&
+   Distinct-function, Multi-target Second Preimage Resistance (DM_SPR).
+   Given a list of inputs `xl'`, it is hard to find an input `x'`
+   such that there exists an `x` in `xl` that is different from `x'` _and_
+   `f k x = f k x'`, where `k` is the key corresponding to `x` from a
+   list of previously chosen, _distinct_ keys.
+&*)
+abstract theory DMSPR.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Class of adversaries against DM_SPR &*)
+  module type Adv_DMSPR = {
+    proc pick() : key_t list
+    proc find(xl : in_t list) : int * in_t
+  }.
+
+  (*& DM_SPR game &*)
+  module DM_SPR(A : Adv_DMSPR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+      var kl : key_t list;
+      var xl : in_t list;
+      var i : int;
+
+      (*
+        Ask adversary to provide a list kl of keys that will be used to index f.
+        As indicated in the return statement, this list must not contain duplicate
+        elements (so that indexing f with each element gives a distinct function)
+      *)
+      kl <@ A.pick();
+
+      xl <- [];
+      while (size xl < size kl) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (*
+        Ask adversary to find a second preimage for any input
+        in xl w.r.t. the corresponding (i.e., at the same index) key in kl
+      *)
+      (i, x') <@ A.find(xl);
+
+      k <- nth witness kl i;
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kl": index provided by adversary is within the bounds of kl, and
+        (2) "uniq kl": kl contains no duplicate elements, and
+        (3) "x' <> x": x' does not equal x, and
+        (4) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return 0 <= i < size kl /\ uniq kl /\ x' <> x /\ f k x' = f k x;
+    }
+  }.
+end DMSPR.
+
+
+(*&
+  Collision Resistance (CR).
+  Given a key `k`, it is hard to find two different inputs `x` and `x'`
+  such that `f k x = f k x'`.
+&*)
+abstract theory CR.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against CR &*)
+  module type Adv_CR = {
+    proc find(k : key_t) : in_t * in_t
+  }.
+
+  (*& CR game &*)
+  module CR(A : Adv_CR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+
+      k <$ dkey;
+
+      (*
+        Ask adversary to find two values x and x' that collide w.r.t. to k
+        (i.e., under f k)
+      *)
+      (x, x') <@ A.find(k);
+
+      (*
+        Success iff
+        (1) "x' <> x": x' does not equal x, and
+        (2) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return x' <> x /\ f k x' = f k x;
+    }
+  }.
+end CR.
+
+(*&
+  Target Collision Resistance (TCR).
+  Given a key `k`, it is hard to find an input `x'` such that x' is
+  different from a previously chosen `x` _and_ `f k x = f k x'`.
+&*)
+abstract theory TCR.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against TCR &*)
+  module type Adv_TCR = {
+    proc pick() : in_t
+    proc find(k : key_t) : in_t
+  }.
+
+  (*& TCR game &*)
+  module TCR(A : Adv_TCR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x, x' : in_t;
+
+      (* Ask adversary to pick an input (the 'target') *)
+      x <@ A.pick();
+
+      k <$ dkey;
+
+      (* Ask adversary to find a value x' that collides with x w.r.t k (i.e., under f k) *)
+      x' <@ A.find(k);
+
+      (*
+        Success iff
+        (1) "x' <> x": x' does not equal x, and
+        (2) "f k x' = f k x": f k maps x' to the same element as it maps x
+      *)
+      return x' <> x /\ f k x' = f k x;
+    }
+  }.
+end TCR.
+
+
+(*&
+  Extended Target Collision Resistance (ETCR).
+  Given a key `k`, it is hard to find a key `k'` and input `x'`
+  such that x' is different from a previously chosen `x` _and_ `f k x = f k x'`.
+&*)
+abstract theory ETCR.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against ETCR &*)
+  module type Adv_ETCR = {
+    proc pick() : in_t
+    proc find(k : key_t) : key_t * in_t
+  }.
+
+  (*& ETCR game &*)
+  module ETCR (A : Adv_ETCR) = {
+    proc main() : bool = {
+      var k, k' : key_t;
+      var x, x' : in_t;
+
+      (* Ask adversary to pick an input (the 'target') *)
+      x <@ A.pick();
+
+      k <$ dkey;
+
+      (*
+        Ask adversary to find any pair (k', x') such that x under f k collides with
+        x' under f k'.
+        Note that k' may be any element from the domain of keys, including k
+      *)
+      (k', x') <@ A.find(k);
+
+      (*
+        Success iff
+        (1) "x' <> x": x' does not equal x, and
+        (2) "f k' x' = f k x": f k' maps x' to the same element as f k maps x
+      *)
+      return x' <> x /\ f k' x' = f k x;
+    }
+  }.
+end ETCR.
+
+
+(*&
+  Multi-target Extended Target Collision Resistance (M_ETCR).
+  Given a list of key/input pairs `kxl`, where the keys are randomly sampled and
+  the inputs (adaptively) chosen, it is hard to find a key `k'` and input `x'`
+  such that there is a `(k, x)` in `kxl` for which `x'` is different from x
+  _and_ `f k x = f k' x'`.
+&*)
+abstract theory METCR.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Type for oracles used in M_ETCR game &*)
+  module type Oraclei_METCR = {
+    proc init() : unit
+    proc query(x : in_t) : key_t
+    proc get(i : int) : key_t * in_t
+    proc nr_targets() : int
+  }.
+
+  (*& Type for oracles given to adversary in M_ETCR game &*)
+  module type Oracle_METCR = {
+    include Oraclei_METCR [query]
+  }.
+
+  (*& Default implementation of an oracle for M_ETCR &*)
+  module O_METCR_Default : Oraclei_METCR = {
+    var ts : (key_t * in_t) list
+
+    (* Initialize list of targets (i.e., (key, input) pairs) to the empty list *)
+    proc init() : unit = {
+      ts <- [];
+    }
+
+    (* Samples key k, adds pair (k, x) to list of targets, and returns k *)
+    proc query(x : in_t) : key_t = {
+      var k : key_t;
+      var kx : key_t * in_t;
+
+      k <$ dkey;
+
+      kx <- (k, x);
+      ts <- rcons ts kx;
+
+      return k;
+    }
+
+    (* Gets i-th element in list of targets; returns witness if index is out of bounds *)
+    proc get(i : int) : key_t * in_t = {
+      return nth witness ts i;
+    }
+
+    (* Returns the number of elements in the list of targets *)
+    proc nr_targets() : int = {
+      return size ts;
+    }
+  }.
+
+  (*& Class of adversaries against M_ETCR &*)
+  module type Adv_METCR(O : Oracle_METCR) = {
+    proc find() : int * key_t * in_t
+  }.
+
+  (*& M_ETCR game &*)
+  module M_ETCR (A : Adv_METCR, O : Oraclei_METCR) = {
+    proc main() : bool = {
+      var k, k' : key_t;
+      var x, x' : in_t;
+      var i : int;
+      var nrts : int;
+
+      O.init();
+
+      (*
+        Ask adversary to
+        (1) Generate (key, input) pairs (the 'targets') by querying oracle O
+        (2) Find a pair (k', x') such that, for any (key, input) pair (k, x) in
+            the list of targets, x' under f k' collides with x under f k.
+            Note that k' may be any element from the domain of keys, including k
+      *)
+      (i, k', x') <@ A(O).find();
+
+      (k, x) <@ O.get(i);
+
+      nrts <@ O.nr_targets();
+
+      (*
+        Success iff
+        (1) "0 <= i < size nrts": index provided by adversary is within the bounds
+            of nrts (i.e., between 0 (including) and nrts (excluding)), and
+        (2) "x' <> x": x' does not equal x, and
+        (3) "f k' x' = f k x": f k' maps x' to the same element as f k maps x
+      *)
+      return 0 <= i < nrts /\ x' <> x /\ f k' x' = f k x;
+    }
+  }.
+end METCR.
+
+
+(*
+  Predicate capturing the existence of a second preimage for a
+  given `x` under `f k`. Used in DSPR-related properties.
+*)
+abbrev spexists (k : key_t, x : in_t) =
+  exists (x' : in_t), x' <> x /\ f k x' = f k x.
+
+(*&
+  Decisional Second Preimage Resistance (DSPR).
+  Given a key `k` and input `x`, it is hard to determine whether there exists an
+  input `x'` that is different from `x` such that `f k x = f k x'`.
+&*)
+abstract theory DSPR.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against DSPR &*)
+  module type Adv_DSPR = {
+    proc guess(k : key_t, x : in_t) : bool
+  }.
+
+  (*&
+    Module used to represent the probability that a randomly sampled input
+    has a second preimage under a randomly sampled function from the
+    hash function family `f`.
+    Denotes the probability that could trivially be obtained in the
+    DSPR game by invariably returning 1.
+  &*)
+  module SPprob(A : Adv_DSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var b : bool;
+
+      k <$ dkey;
+      x <$ din;
+
+      (* Ask adversary to determine whether x has a preimage under f k *)
+      b <@ A.guess(k, x);
+
+      (* Success iff x has a second preimage under f k *)
+      return spexists k x;
+    }
+  }.
+
+  (*& DSPR game &*)
+  module DSPR(A : Adv_DSPR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x : in_t;
+      var b : bool;
+
+      k <$ dkey;
+      x <$ din;
+
+      (* Ask adversary to determine whether x has a preimage under f k *)
+      b <@ A.guess(k, x);
+
+      (*
+        Success iff adversary correctly determined whether x has a second
+        preimage under f k
+      *)
+      return spexists k x = b;
+    }
+  }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_SMDSPR(A)
+    =
+    max 0 (Pr[SM_DSPR(A).main() @ &m : res] - Pr[SM_SPprob.main() @ &m : res]).
+  *)
+end DSPR.
+
+
+(*&
+  Single-Function, Multi-Target Decisional Second Preimage Resistance (SM_DSPR).
+  Given a key `k` and a list of inputs `xl`, it is hard to determine whether
+  there exists an input `x'` that is different from some `x` in `xl` _and_
+  f k x = f k x'.
+&*)
+abstract theory SMDSPR.
+  (*& Number of targets in SM_DSPR &*)
+  const t_smdspr : { int | 1 <= t_smdspr } as ge1_tsmdspr.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against SM_DSPR &*)
+  module type Adv_SMDSPR = {
+    proc guess(k : key_t, xl : in_t list) : int * bool
+  }.
+
+  (*&
+    Module used to denote the probability that could trivially be obtained in
+    the SM_DSPR game by invariably returning 1
+  &*)
+  module SM_SPprob(A : Adv_SMDSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var xl : in_t list;
+      var i : int;
+      var b : bool;
+
+      k <$ dkey;
+
+      xl <- [];
+      while (size xl < t_smdspr) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (*
+        Ask the adversary to determine, for any input in xl,
+        whether the input has a second preimage w.r.t. key k
+      *)
+      (i, b) <@ A.guess(k, xl);
+
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size xl": index i provided by adversary is within the bounds of xl
+            (i.e., between 0 (including) and the size xl = t_smdspr (excluding)), and
+        (2) "spexists k x": adversary correctly determined whether x has a
+            second preimage under f k
+      *)
+      return 0 <= i < size xl /\ spexists k x;
+    }
+  }.
+
+  (*& SM_DSPR game &*)
+  module SM_DSPR(A : Adv_SMDSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var xl : in_t list;
+      var i : int;
+      var b : bool;
+
+      k <$ dkey;
+
+      xl <- [];
+      while (size xl < t_smdspr) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (*
+        Ask the adversary to determine, for any input in xl,
+        whether the input has a second preimage w.r.t. key k
+      *)
+      (i, b) <@ A.guess(k, xl);
+
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size xl": index i provided by adversary is within the bounds of xl
+            (i.e., between 0 (including) and the size xl = t_smdspr (excluding)), and
+        (2) "spexists k x": adversary correctly determined whether x has a
+            second preimage under f k
+      *)
+      return 0 <= i < size xl /\ spexists k x = b;
+    }
+  }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_SMDSPR(A)
+    =
+    max 0 (Pr[SM_DSPR(A).main() @ &m : res] - Pr[SM_SPprob.main() @ &m : res]).
+  *)
+end SMDSPR.
+
+
+(*&
+  Multi-Function, Multi-Target Decisional Second Preimage Resistance (MM_DSPR).
+  Given a list of key/input pairs `kxl`, it is hard to determine whether there
+  exists input `x'` such that there is a `(k, x)` in `kxl` for which `x` is
+  different from `x'` _and_ `f k x = f k x'`.
+&*)
+abstract theory MMDSPR.
+  (*& Number of functions/targets in MM_DSPR &*)
+  const t_mmdspr : { int | 1 <= t_mmdspr } as ge1_tmmdspr.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against MM_DSPR *)
+  module type Adv_MMDSPR = {
+    proc guess(kxl : (key_t * in_t) list) : int * bool
+  }.
+
+  (*&
+    Module used to denote the probability that could trivially be obtained in the
+    MM_DSPR game by invariably returning 1
+  &*)
+  module MM_SPprob(A : Adv_MMDSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var kx : key_t * in_t;
+      var kxl : (key_t * in_t) list;
+      var i : int;
+      var b : bool;
+
+      kxl <- [];
+      while (size kxl < t_mmdspr) {
+        k <$ dkey;
+        x <$ din;
+        kx <- (k, x);
+        kxl <- rcons kxl kx;
+      }
+
+      (*
+        Ask the adversary to determine, for any (key, input) pair in kxl,
+        whether the input has a second preimage w.r.t. the key in the (same) pair
+      *)
+      (i, b) <@ A.guess(kxl);
+
+      kx <- nth witness kxl i;
+
+      k <- kx.`1;
+      x <- kx.`2;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kxl": index i provided by adversary is within the bounds of kxl
+            (i.e., between 0 (including) and the size kxl = t_mmdspr (excluding)), and
+        (2) "spexists k x": x has a second preimage under f k
+      *)
+      return 0 <= i < size kxl /\ spexists k x;
+    }
+  }.
+
+  (*& MM_DSPR game &*)
+  module MM_DSPR(A : Adv_MMDSPR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x : in_t;
+      var kx : key_t * in_t;
+      var kxl : (key_t * in_t) list;
+      var i : int;
+      var b : bool;
+
+      kxl <- [];
+      while (size kxl < t_mmdspr) {
+        k <$ dkey;
+        x <$ din;
+        kx <- (k, x);
+        kxl <- rcons kxl kx;
+      }
+
+      (*
+        Ask the adversary to determine, for any (key, input) pair in kxl,
+        whether the input has a second preimage w.r.t. the key in the (same) pair
+      *)
+      (i, b) <@ A.guess(kxl);
+
+      kx <- nth witness kxl i;
+
+      k <- kx.`1;
+      x <- kx.`2;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kxl": index i provided by adversary is within the bounds of kxl
+            (i.e., between 0 (including) and size kxl = t_mmdspr (excluding)), and
+        (2) "spexists k x = b": adversary correctly determined whether
+            x has a second preimage under f k
+      *)
+      return 0 <= i < size kxl /\ spexists k x = b;
+    }
+  }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_MMDSPR(A)
+    =
+    max 0 (Pr[MM_DSPR(A).main(t) @ &m : res] - Pr[MM_SPprob(A).main(t) @ &m : res])
+  *)
+end MMDSPR.
+
+
+(*&
+  Distinct-function, Multi-target Decisional Second Preimage Resistance (DM_DSPR)
+  Given a list of inputs `xl'`, it is hard to determine whether there exists an
+  input `x'` such that there is an `x` in `xl` that is different from `x'` _and_
+  `f k x = f k x'`, where `k` is the key corresponding to `x` from a list of
+  previously chosen, _distinct_ keys.
+&*)
+abstract theory DMDSPR.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Class of adversaries against DM_DSPR &*)
+  module type Adv_DMDSPR = {
+    proc pick() : key_t list
+    proc guess(xl : in_t list) : int * bool
+  }.
+
+  (*&
+    Module used to denote the probability that could trivially be obtained in the
+    DM_DSPR game by invariably returning 1
+  &*)
+  module DM_SPprob(A : Adv_DMDSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var kl : key_t list;
+      var xl : in_t list;
+      var kx : key_t * in_t;
+      var i : int;
+      var b : bool;
+
+      (*
+        Ask adversary to provide a list kl of keys that will be used to index f.
+        As indicated in the return statement, this list must not contain duplicate
+        elements (so that indexing f with each element gives a distinct function)
+      *)
+      kl <@ A.pick();
+
+      xl <- [];
+      while (size xl < size kl) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (*
+        Ask adversary to determine, for any input x in xl, whether x has a
+        second preimage w.r.t. the corresponding (i.e., at the same index) key in kl
+      *)
+      (i, b) <@ A.guess(xl);
+
+      k <- nth witness kl i;
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kl": index provided by adversary is within the bounds of kl, and
+        (2) "uniq kl": kl contains no duplicate elements, and
+        (3) "spexists k x": x has a second preimage under f k
+      *)
+      return 0 <= i < size kl /\ uniq kl /\ spexists k x;
+    }
+  }.
+
+  (*& DM_DSPR game &*)
+  module DM_DSPR(A : Adv_DMDSPR) = {
+    proc main() = {
+      var k : key_t;
+      var x : in_t;
+      var kl : key_t list;
+      var xl : in_t list;
+      var kx : key_t * in_t;
+      var i : int;
+      var b : bool;
+
+      (*
+        Ask adversary to provide a list kl of keys that will be used to index f.
+        As indicated in the return statement, this list must not contain duplicate
+        elements (so that indexing f with each element gives a distinct function)
+      *)
+      kl <@ A.pick();
+
+      xl <- [];
+      while (size xl < size kl) {
+        x <$ din;
+        xl <- rcons xl x;
+      }
+
+      (*
+        Ask adversary to determine, for any input x in xl, whether x has a
+        second preimage w.r.t. the corresponding (i.e., at the same index) key in kl
+      *)
+      (i, b) <@ A.guess(xl);
+
+      k <- nth witness kl i;
+      x <- nth witness xl i;
+
+      (*
+        Success iff
+        (1) "0 <= i < size kl": index provided by adversary is within the bounds of kl, and
+        (2) "uniq kl": kl contains no duplicate elements, and
+        (3) "spexists k x = b": adversary correctly determined whether
+            x has a second preimage under f k
+      *)
+      return 0 <= i < size kl /\ uniq kl /\ spexists k x = b;
+    }
+  }.
+
+  (*
+    NOTE:
+    Contrary to more conventional properties, the advantage for the above
+    is defined as
+
+    Adv_DMDSPR(A)
+    =
+    max 0 (Pr[DM_DSPR(A).main(t) @ &m : res] - Pr[DM_SPprob(A).main(t) @ &m : res])
+  *)
+end DMDSPR.
+
+(*&
+  UnDetectability (UD).
+  Given a key k and output y, it is hard to determine whether y was obtained by
+  randomly sampling from the domain of outputs or by mapping a
+  randomly sampled input using `f k`.
+&*)
+abstract theory UD.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against UD &*)
+  module type Adv_UD = {
+    proc distinguish(k : key_t, y : out_t) : bool
+  }.
+
+  (*& UD game &*)
+  module UD(A : Adv_UD) = {
+    proc main(b : bool) : bool = {
+      var k : key_t;
+      var x : in_t;
+      var y : out_t;
+      var b' : bool;
+
+      k <$ dkey;
+
+      if (b) {
+        x <$ din;
+        y <- f k x;
+      } else {
+        y <$ dout;
+      }
+
+      (*
+        Ask adversary to determine whether y is
+        (1) computed as f k x for a randomly sampled input x, or
+        (2) randomly sampled
+      *)
+      b' <@ A.distinguish(k, y);
+
+      return b';
+    }
+  }.
+end UD.
+
+
+(*&
+  Single-function, Multi-target UnDetectability (SM_UD).
+  Given a key `k` and a list of outputs `yl`, it is hard to determine whether
+  the outputs in `yl` were obtained by randomly sampling from the domain of
+  outputs or by mapping randomly sampled inputs under `f k`.
+&*)
+abstract theory SMUD.
+  (*& Number of targets in SM_UD &*)
+  const t_smud : { int | 1 <= t_smud } as ge1_tsmud.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against SM_UD &*)
+  module type Adv_SMUD = {
+    proc distinguish(k : key_t, yl : out_t list) : bool
+  }.
+
+  (*& SM_UD game &*)
+  module SM_UD(A : Adv_SMUD) = {
+    proc main(b : bool) : bool = {
+      var k : key_t;
+      var x : in_t;
+      var y : out_t;
+      var yl : out_t list;
+      var b' : bool;
+
+      k <$ dkey;
+
+      yl <- [];
+      while (size yl < t_smud) {
+        if (b) {
+          x <$ din;
+          y <- f k x;
+        } else {
+          y <$ dout;
+        }
+
+        yl <- rcons yl y;
+      }
+
+      (*
+        Ask adversary to determine whether the outputs in yl are
+        (1) computed as f k x for a randomly sampled input x, or
+        (2) randomly sampled
+      *)
+      b' <@ A.distinguish(k, yl);
+
+      return b';
+    }
+  }.
+end SMUD.
+
+
+(*&
+  Multi-function, Multi-target UnDetectability (MM_UD).
+  Given a list of key/output pairs `kyl`, it is hard to determine whether the
+  outputs in the pairs were obtained by randomly sampling from the domain of
+  outputs or by mapping randomly sampled inputs under `f` and the keys in the
+  pairs.
+&*)
+abstract theory MMUD.
+  (*& Number of functions/targets in MM_UD &*)
+  const t_mmud : { int | 1 <= t_mmud } as ge1_tmmud.
+
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against MM_UD &*)
+  module type Adv_MMUD = {
+    proc distinguish(kyl : (key_t * out_t) list) : bool
+  }.
+
+  (*& MM_UD game &*)
+  module MM_UD(A : Adv_MMUD) = {
+    proc main(b : bool) : bool  = {
+      var k : key_t;
+      var x : in_t;
+      var y : out_t;
+      var ky : key_t * out_t;
+      var kyl : (key_t * out_t) list;
+      var b' : bool;
+
+      kyl <- [];
+      while (size kyl < t_mmud) {
+        k <$ dkey;
+
+        if (b) {
+          x <$ din;
+          y <- f k x;
+        } else {
+          y <$ dout;
+        }
+
+        ky <- (k, y);
+        kyl <- rcons kyl ky;
+      }
+
+      (*
+        Ask adversary to determine whether each (key, output) pair (k, y) in
+        in kyl is
+        (1) computed as f k x for a randomly sampled input x, or
+        (2) randomly sampled
+      *)
+      b' <@ A.distinguish(kyl);
+
+      return b';
+    }
+  }.
+end MMUD.
+
+
+(*&
+  Distinct-function, Multi-target UnDetectability (DM_UD).
+  Given a list of outputs `yl'`, it is hard to determine whether the
+  outputs were obtained by by randomly sampling from the domain of
+  outputs or by mapping randomly sampled inputs under `f` and the keys
+  from a list of previously chosen, _distinct_ keys.
+&*)
+abstract theory DMUD.
+  (*& Distribution over input type &*)
+  op din : in_t distr.
+
+  (*& Distribution over output type &*)
+  op dout : out_t distr.
+
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Class of adversaries against DM_UD &*)
+  module type Adv_DMUD = {
+    proc pick() : key_t list
+    proc distinguish(yl : out_t list) : bool
+  }.
+
+  (*& DM_UD game &*)
+  module DM_UD(A : Adv_DMUD) = {
+    proc main(b : bool) = {
+      var k : key_t;
+      var x : in_t;
+      var y : out_t;
+      var kl : key_t list;
+      var yl : out_t list;
+      var i : int;
+      var b' : bool;
+
+      (*
+        Ask adversary to provide a list kl of keys that will be used to index f.
+        As indicated in the return statement, this list must not contain duplicate
+        elements (so that indexing f with each element gives a distinct function)
+      *)
+      kl <@ A.pick();
+
+      yl <- [];
+      while (size yl < size kl) {
+        k <- nth witness kl (size yl);
+
+        if (b) {
+          x <$ din;
+          y <- f k x;
+        } else {
+          y <$ dout;
+        }
+
+        yl <- rcons yl y;
+      }
+
+      (*
+        Ask adversary to determine whether each output y in yl is
+        (1) computed as f k x for a randomly sampled input x
+            (where k is the corresponding (i.e., at the same index) key in kl), or
+        (2) randomly sampled
+      *)
+      b' <@ A.distinguish(yl);
+
+      return uniq kl /\ b';
+    }
+  }.
+end DMUD.
+
+
+(*&
+  Interleaved Target Subset Resilience (ITSR).
+  Property specifically designed for the proof of SPHINCS+.
+  Does not admit a nice high-level intuition out of that context.
+&*)
+abstract theory ITSR.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*&
+    Map from outputs of hash function to a list of tuples of the form
+    (key set index, secret value set index, secret value index).
+  &*)
+  op g : out_t -> (int * int * int) list.
+
+  (*& Composition of g with f &*)
+  op h (k : key_t) (x : in_t) : (int * int * int) list = g (f k x).
+
+  (*& Type for oracles used in ITSR game &*)
+  module type Oraclei_ITSR = {
+    proc init() : unit
+    proc query(x : in_t) : key_t
+    proc get_targets() : (key_t * in_t) list
+  }.
+
+  (*& Type for oracles given to the adversary in the ITSR game &*)
+  module type Oracle_ITSR = {
+    include Oraclei_ITSR [query]
+  }.
+
+  (*& Default implementation of an oracle for ITSR &*)
+  module O_ITSR_Default : Oraclei_ITSR = {
+    var ts : (key_t * in_t) list
+
+    (* Initialize list of targets (i.e., (key, input) pairs) to the empty list *)
+    proc init() : unit = {
+      ts <- [];
+    }
+
+    (* Samples key k, adds pair (k, x) to list of targets, and returns k *)
+    proc query(x : in_t) : key_t = {
+      var k : key_t;
+      var kx : key_t * in_t;
+
+      k <$ dkey;
+
+      kx <- (k, x);
+      ts <- rcons ts kx;
+
+      return k;
+    }
+
+    (* Gets and returns list of targets ts *)
+    proc get_targets() : (key_t * in_t) list = {
+      return ts;
+    }
+  }.
+
+  (*& Class of adversaries against ITSR &*)
+  module type Adv_ITSR(O : Oracle_ITSR) = {
+    proc find() : key_t * in_t
+  }.
+
+  (*& ITSR game &*)
+  module ITSR(A : Adv_ITSR, O : Oraclei_ITSR) = {
+    proc main() : bool = {
+      var k : key_t;
+      var x : in_t;
+      var kxl : (key_t * in_t) list;
+      var ikssl_f, ikssl_q : (int * int * int) list;
+
+      O.init();
+
+      (*
+        Ask adversary to
+        (1) Specify (key, input) pairs (the 'targets') by querying oracle O
+        (2) Find a pair (k, x) that is not in the list of specified targets and for which
+            h k x returns a list of which each element is contained within the (combined)
+            list of tuples that is obtained by mapping all of the specified targets under h.
+      *)
+      (k, x) <@ A(O).find();
+
+      (*
+        Compute list of (key set index, secret value set index, secret value index) tuples
+        by applying h to key k and message x provided by the adversary
+      *)
+      ikssl_f <- h k x;
+
+      (* Get the list of targets specified by the adversary *)
+      kxl <@ O.get_targets();
+
+      (*
+        First, construct a list for which the i-th element equals h ki xi, where
+        (ki, xi) denotes the i-th element (i.e., (key, input) tuple) in list kxl.
+        Note that this results in a list of lists of
+        (key set index, secret value set index, secret value index) tuples.
+        Then, flatten the resulting list; that is, take the tuples from all of the
+        lists (in the list of lists) and put them (orderly) in a single list.
+      *)
+      ikssl_q <- flatten (map (fun (kx : key_t * in_t) => h kx.`1 kx.`2) kxl);
+
+
+      (*
+        Success iff
+        (1) "(forall x, x \in ikssl_f => x \in ikssl_q)": the tuples in the list obtained
+            from mapping the key and input provided by the adversary under h are all
+            contained within the (combined) list of tuples obtained from mapping all of
+            the specified targets under h, and
+        (2) "! (k, x) \in kxl": the key and input provided by the adversary is not one
+            of the specified targets.
+      *)
+      return (forall x, x \in ikssl_f => x \in ikssl_q) /\ ! (k, x) \in kxl;
+    }
+  }.
+end ITSR.
+
+
+(*&
+  Pseudo-Random Function family (PRF).
+  By observing a function's outputs on chosen inputs, it is hard to
+  distinguish whether the function is a randomly sampled function from the domain
+  of functions with the considered domain and co-domain, or a randomly selected
+  function from the hash function family f (i.e., a f k where k is randomly sampled
+  from the domain of (indexing) keys).
+
+  Note that, in contrast to other keyed hash function properties, the PRF property
+  requires the indexing key to be secret.
+&*)
+abstract theory PRF.
+  (*& Distribution over (indexing) key type &*)
+  op dkey : key_t distr.
+
+  (*& Function that maps inputs of type in_t to (proper) distributions over type out_t &*)
+  op doutm : { in_t -> out_t distr | forall x, is_lossless (doutm x) } as doutm_ll.
+
+  (*& Type for oracles used in PRF game &*)
+  module type Oraclei_PRF = {
+    proc init(b_init : bool) : unit
+    proc query(x : in_t) : out_t
+  }.
+
+  (*& Type for oracles given to the adversary in PRF &*)
+  module type Oracle_PRF = {
+    include Oraclei_PRF [query]
+  }.
+
+  (*& Class of adversaries against PRF &*)
+  module type Adv_PRF(O : Oracle_PRF) = {
+    proc distinguish() : bool
+  }.
+
+  (*& Default implementation of an oracle for PRF &*)
+  module O_PRF_Default : Oraclei_PRF = {
+    var b : bool
+    var k : key_t
+    var m : (in_t, out_t) fmap
+
+    (*
+      Initializes b to given b_init, k to randomly sampled value from dkey,
+      and m to the empty map
+    *)
+    proc init(b_init : bool) : unit = {
+      b <- b_init;
+      k <$ dkey;
+      m <- empty;
+    }
+
+    (*
+      Query the oracle on input x, returning
+         if b
+         then if x is not yet in map m
+              then value randomly sampled from distribution doutm x
+              else value at m.[x]
+         else f k x
+    *)
+    proc query(x : in_t) : out_t = {
+      var y : out_t;
+
+      if (b) {
+        if (x \notin m) {
+          y <$ doutm x;
+          m.[x] <- y;
+        }
+        y <- (oget m.[x]);
+      } else {
+        y <- f k x;
+      }
+
+      return y;
+    }
+  }.
+
+  (*& PRF game &*)
+  module PRF(A : Adv_PRF, O : Oraclei_PRF) = {
+    proc main(b : bool) : bool = {
+      var b' : bool;
+
+      O.init(b);
+
+      (*
+        Ask adversary to determine whether the function used by the oracle is
+        (1) a random function with domain in_t and co-domain out_t, or
+        (2) of the form f k for a randomly sampled k
+      *)
+      b' <@ A(O).distinguish();
+
+      return b';
+    }
+  }.
+end PRF.

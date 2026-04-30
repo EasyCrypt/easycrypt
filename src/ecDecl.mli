@@ -11,36 +11,50 @@ type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
-type tydecl = {
-  tyd_params  : ty_params;
-  tyd_type    : ty_body;
-  tyd_loca    : locality;
-  tyd_resolve : bool;
+type ty_record =
+  EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
+
+type ty_dtype_ctor =
+  EcSymbols.symbol * EcTypes.ty list
+
+type ty_dtype = {
+  tydt_ctors   : ty_dtype_ctor list;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
 }
 
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of typeclass list
   | `Datatype of ty_dtype
-  | `Record   of form * (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of ty_record
 ]
 
-and ty_dtype = {
-  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
-  tydt_schelim : form;
-  tydt_schcase : form;
+
+type tydecl = {
+  tyd_params : ty_params;
+  tyd_type   : ty_body;
+  tyd_loca   : locality;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
 val tydecl_as_abstract : tydecl -> typeclass list option
 val tydecl_as_datatype : tydecl -> ty_dtype option
-val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
+val tydecl_as_record   : tydecl -> ty_record option
 
 val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> locality -> tydecl
 
 val etyargs_of_tparams : ty_params -> etyarg list
 
 val ty_instanciate : ty_params -> etyarg list -> ty -> ty
+
+(* -------------------------------------------------------------------- *)
+type exception_ = {
+  exn_loca : locality;
+  exn_dom  : ty list;
+}
+
+val mk_exception : locality -> ty list -> exception_
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -56,6 +70,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_Exn    of ty list
   | OP_TC     of EcPath.path * string
 
 and prbody =
@@ -63,6 +78,7 @@ and prbody =
   | PR_Ind   of prind
 
 and opfix = {
+  opf_recp     : EcPath.path;
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
@@ -108,16 +124,17 @@ type operator = {
 
 and opopaque = { smt: bool; reduction: bool; }
 
-val op_ty     : operator -> ty
-val is_pred   : operator -> bool
-val is_oper   : operator -> bool
-val is_ctor   : operator -> bool
-val is_proj   : operator -> bool
-val is_rcrd   : operator -> bool
-val is_tc_op  : operator -> bool
-val is_fix    : operator -> bool
-val is_abbrev : operator -> bool
-val is_prind  : operator -> bool
+val op_ty        : operator -> ty
+val is_pred      : operator -> bool
+val is_oper      : operator -> bool
+val is_ctor      : operator -> bool
+val is_proj      : operator -> bool
+val is_rcrd      : operator -> bool
+val is_tc_op     : operator -> bool
+val is_fix       : operator -> bool
+val is_abbrev    : operator -> bool
+val is_prind     : operator -> bool
+val is_exception : operator -> bool
 
 val optransparent : opopaque
 
@@ -135,18 +152,19 @@ val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
 val operator_as_tc    : operator -> EcPath.path * string
 
+val operator_as_exception : operator -> exception_
+val operator_of_exception : exception_ -> operator
+
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams    : ty_params;
-  ax_spec       : form;
-  ax_kind       : axiom_kind;
-  ax_loca       : locality;
-  ax_visibility : ax_visibility;
+  ax_tparams : ty_params;
+  ax_spec    : form;
+  ax_kind    : axiom_kind;
+  ax_loca    : locality;
+  ax_smt     : bool;
 }
-
-and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
 (* -------------------------------------------------------------------- *)
 val is_axiom  : axiom_kind -> bool

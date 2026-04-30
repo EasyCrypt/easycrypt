@@ -5,6 +5,7 @@ on:
     branches:
       - 'main'
   pull_request:
+  merge_group:
 
 env:
   HOME: /home/charlie
@@ -14,14 +15,15 @@ env:
 jobs:
   compile-opam:
     name: EasyCrypt compilation (opam)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     steps:
     - uses: actions/checkout@v4
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make PROFILE=ci
@@ -30,7 +32,7 @@ jobs:
     name: EasyCrypt compilation (nix)
     env:
       HOME: /home/runner
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Setup Nix
@@ -49,9 +51,9 @@ jobs:
   check:
     name: Check EasyCrypt Libraries
     needs: compile-opam
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     strategy:
       fail-fast: false
       matrix:
@@ -61,6 +63,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt .
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile EasyCrypt
       run: opam exec -- make
@@ -82,7 +85,7 @@ jobs:
 
   fetch-external-matrix:
     name: Fetch EasyCrypt External Projects Matrix
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -97,9 +100,9 @@ jobs:
   external:
     name: Check EasyCrypt External Projects
     needs: [compile-opam, fetch-external-matrix]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/easycrypt/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box:main
     strategy:
       fail-fast: false
       matrix:
@@ -128,6 +131,7 @@ jobs:
     - name: Install EasyCrypt dependencies
       run: |
         opam pin add -n easycrypt easycrypt
+        opam install --deps-only --depext-only --confirm-level=unsafe-yes easycrypt
         opam install --deps-only easycrypt
     - name: Compile & Install EasyCrypt
       run: opam exec -- make -C easycrypt build install
@@ -159,7 +163,7 @@ jobs:
     name: Check EasyCrypt External Projects (set-status)
     if: always()
     needs: [external]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: re-actors/alls-green@release/v1
       with:
@@ -172,7 +176,7 @@ jobs:
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: technote-space/workflow-conclusion-action@v3
     - uses: zulip/github-actions-zulip/send-message@v1

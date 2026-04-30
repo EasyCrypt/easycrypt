@@ -20,10 +20,6 @@ module EqTest = EcReduction.EqTest
 module NormMp = EcEnv.NormMp
 
 (* -------------------------------------------------------------------- *)
-type wp = EcEnv.env -> EcMemory.memenv -> stmt -> form -> form option
-let  wp = (ref (None : wp option))
-
-(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.etyarg list
   | `Lc   of EcIdent.t
@@ -88,20 +84,34 @@ type modsig_error =
 | MTS_DupProcName of symbol
 | MTS_DupArgName  of symbol * symbol
 
+type modupd_error =
+| MUE_Functor
+| MUE_AbstractFun
+| MUE_AbstractModule
+| MUE_InvalidFun
+| MUE_InvalidCodePos
+| MUE_InvalidTargetCond
+
 type funapp_error =
 | FAE_WrongArgCount
 
 type mem_error =
 | MAE_IsConcrete
 
+type fix_match = (EcIdent.ident * EcPath.path option) list
+
 type fxerror =
+| FXE_MatchWildcard
 | FXE_EmptyMatch
 | FXE_MatchParamsMixed
 | FXE_MatchParamsDup
 | FXE_MatchParamsUnk
 | FXE_MatchNonLinear
 | FXE_MatchDupBranches
-| FXE_MatchPartial
+| FXE_MatchPartial of symbol list
+| FXE_FixPartial of EcPath.path list list
+| FXE_FixRedundant of fix_match
+| FXE_FixDuplicate of fix_match * fix_match
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
@@ -110,6 +120,9 @@ type fxerror =
 type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
+
+type goal_shape_error = 
+| GSE_ExpectedTwoSided
 
 type tyerror =
 | UniVarNotAllowed
@@ -134,6 +147,7 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
 | DuplicatedField        of symbol
+| DuplicatedException    of qsymbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -149,12 +163,14 @@ type tyerror =
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
+| UnknownExceptionName   of qsymbol
 | UnknownModVar          of qsymbol
 | UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
+| InvalidModUpdate       of modupd_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
@@ -177,6 +193,7 @@ type tyerror =
 | ProcAssign             of qsymbol
 | PositiveShouldBeBeforeNegative
 | NotAnExpression        of [`Unknown | `LL | `Pr | `Logic | `Glob | `MemSel]
+| UnexpectedGoalShape    of goal_shape_error
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -280,10 +297,10 @@ let (_i_inuse, s_inuse, se_inuse) =
 
     | Smatch (e, bs) ->
       let map = se_inuse map e in
-      let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
+      let map = List.fold_left (fun map -> s_inuse map -| snd) map bs in
         map
 
-    | Sassert e ->
+    | Sraise e ->
       se_inuse map e
 
     | Sabstract _ ->
@@ -305,7 +322,7 @@ let select_local env (qs,s) =
   else None
 
 (* -------------------------------------------------------------------- *)
-let select_pv env side name ue tvi psig =
+let select_pv env side name ue tvi (psig, retty) =
   if   tvi <> None
   then []
   else
@@ -313,7 +330,7 @@ let select_pv env side name ue tvi psig =
       let pvs = EcEnv.Var.lookup_progvar ?side name env in
       let select (pv,ty) =
         let subue = UE.copy ue in
-        let texpected = EcUnify.tfun_expected subue psig in
+        let texpected = EcUnify.tfun_expected subue ?retty psig in
           try
             EcUnify.unify env subue ty texpected;
             [(pv, ty, subue)]
@@ -351,7 +368,7 @@ let gen_select_op
     (env      : EcEnv.env)
     (name     : EcSymbols.qsymbol)
     (ue       : EcUnify.unienv)
-    (psig     : EcTypes.dom)
+    (psig     : EcTypes.dom * EcTypes.ty option)
 
     : OpSelect.gopsel list
 =
@@ -403,7 +420,7 @@ let gen_select_op
 
   and pvs () : OpSelect.gopsel list =
     let me, pvs =
-      match EcEnv.Memory.get_active env, actonly with
+      match EcEnv.Memory.get_active_ss env, actonly with
       | None, true -> (None, [])
       | me  , _    -> (  me, select_pv env me name ue tvi psig)
     in List.map (fpv me) pvs
@@ -437,7 +454,7 @@ let select_form_op env mode ~forcepv opsc name ue tvi psig =
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
   let filter = (fun _ op -> EcDecl.is_proj op) in
-  let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
+  let ops = EcUnify.select_op ~filter tvi env name ue ([recty], None) in
   let ops = List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
 
   match ops, opsc with
@@ -1010,8 +1027,8 @@ let rec transty (tp : typolicy) (env : EcEnv.env) (ue : EcUnify.unienv) (ty : pt
       tconstr p tyargs
     end
   | PTglob gp ->
-    let m,_ = trans_msymbol env gp in
-    EcEnv.NormMp.norm_tglob env m
+    let mo,_ = trans_msymbol env gp in
+    EcEnv.NormMp.norm_tglob env mo
 
 and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
@@ -1078,14 +1095,14 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
         (LTuple (List.combine xs subtys), ttuple subtys)
 
   | LPRecord fields ->
-      let xs = List.map (unloc |- snd) fields in
+      let xs = List.map (unloc -| snd) fields in
       if not (List.is_unique xs) then
         tyerror p.pl_loc env NonLinearPattern;
 
       let fields =
         let for1 (name, v) =
           let filter = fun _ op -> EcDecl.is_proj op in
-          let fds    = EcUnify.select_op ~filter None env (unloc name) ue [] in
+          let fds    = EcUnify.select_op ~filter None env (unloc name) ue ([], None) in
             match List.ohead fds with
             | None ->
               let exn = UnknownRecFieldName (unloc name) in
@@ -1099,7 +1116,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
         in
           List.map for1 fields in
 
-      let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+      let recp = Sp.of_list (List.map (fst -| proj3_1) fields) in
       let recp =
         match Sp.elements recp with
         | []        -> assert false
@@ -1230,7 +1247,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     let for1 rf =
       let filter = fun _ op -> EcDecl.is_proj op in
       let tvi    = rf.rf_tvi |> omap (transtvi env ue) in
-      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue [] in
+      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue ([], None) in
         match List.ohead fds with
         | None ->
             let exn = UnknownRecFieldName (unloc rf.rf_name) in
@@ -1244,7 +1261,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     in
       List.map for1 fields in
 
-  let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+  let recp = Sp.of_list (List.map (fst -| proj3_1) fields) in
   let recp =
     match Sp.elements recp with
     | []        -> assert false
@@ -1315,97 +1332,155 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
 
 (* -------------------------------------------------------------------- *)
 let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
-  let filter = fun _ op -> EcDecl.is_ctor op in
-  let PPApp ((cname, tvi), cargs) = pb in
-  let tvi = tvi |> omap (transtvi env ue) in
-  let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+  match pb with
+  | PPAny -> (None, body)
+  | PPApp ((cname, tvi), cargs) ->
+    let filter = fun _ op -> EcDecl.is_ctor op in
+    let tvi = tvi |> omap (transtvi env ue) in
+    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
 
-  match cts with
-  | [] ->
-      tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
+    match cts with
+    | [] ->
+        tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
 
-  | _ :: _ :: _ ->
-      tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
+    | _ :: _ :: _ ->
+        tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
 
-  | [(cp, tvi), opty, subue, _] ->
-      let ctor = oget (EcEnv.Op.by_path_opt cp env) in
-      let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
-      let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-      let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-      let ctorsym, ctorty = List.nth ind ctoridx in
+    | [(cp, tvi), opty, subue, _] ->
+        let ctor = EcEnv.Op.by_path cp env in
 
-      let args_exp = List.length ctorty in
-      let args_got = List.length cargs in
+        let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+        let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+        let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
+        let ctorsym, ctorty = List.nth ind ctoridx in
 
-      if args_exp <> args_got then begin
-        tyerror cname.pl_loc env (InvalidMatch
-          (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got)))
-      end;
+        let args_exp = List.length ctorty in
+        let args_got = List.length cargs in
 
-      let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+        if args_exp <> args_got then begin
+          tyerror cname.pl_loc env (InvalidMatch
+            (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got)))
+        end;
 
-      if not (List.is_unique cargs_lin) then
-        tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
+        let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
 
-      EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+        if not (List.is_unique cargs_lin) then
+          tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
 
-      let ctorty =
-        let tvi = Some (EcUnify.tvi_unamed tvi) in
-        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
-      let pty = EcUnify.UniEnv.fresh ue in
+        EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
-      (try  EcUnify.unify env ue (toarrow ctorty pty) opty
-       with EcUnify.UnificationFailure _ -> assert false);
+        let ctorty =
+          let tvi = Some (EcUnify.TVIunamed tvi) in
+            fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+        let pty = EcUnify.UniEnv.fresh ue in
 
-      unify_or_fail env ue loc ~expct:pty gindty;
+        (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+         with EcUnify.UnificationFailure _ -> assert false);
 
-      let create o = EcIdent.create (omap_dfl unloc "_" o) in
-      let pvars = List.map (create |- unloc) cargs in
-      let pvars = List.combine pvars ctorty in
+        unify_or_fail env ue loc ~expct:pty gindty;
 
-      (ctorsym, (pvars, body))
+        let create o = EcIdent.create (omap_dfl unloc "_" o) in
+        let pvars = List.map (create -| unloc) cargs in
+        let pvars = List.combine pvars ctorty in
+
+        (Some (ctorsym, pvars), body)
 
 (* -------------------------------------------------------------------- *)
 let trans_match ~loc env ue (gindty, gind) pbs =
   let pbs = List.map (trans_branch ~loc env ue gindty) pbs in
-  (* the left-hand-sides of pbs are a subset of the left hand sides
-     of gind.tydt_ctors (with the order perhaps different) *)
 
-  if List.length pbs < List.length gind.tydt_ctors then
-    tyerror loc env (InvalidMatch FXE_MatchPartial);
+  let rec fill_branches tbl pbs =
+    match pbs with
+    | [] ->
+      let missing =
+        List.filter_map
+          (fun (x, _) -> if Msym.mem x tbl then None else Some x)
+          gind.tydt_ctors in
+      if missing <> [] then
+        tyerror loc env (InvalidMatch (FXE_MatchPartial missing));
+      tbl
 
-  if List.has_dup ~cmp:(fun x y -> compare (fst x) (fst y)) pbs then
-    tyerror loc env (InvalidMatch FXE_MatchDupBranches);
-  (* the left-hand-sides of pbs are exactly the left-hand sides
-     of gind.tydt_ctors (with the order perhaps different) *)
+    | (None, body) :: pbs ->
+      if pbs <> [] then
+        tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+      if List.for_all (fun (x, _) -> Msym.mem x tbl) gind.tydt_ctors then
+        tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+      (* Fill the missing branches *)
+      let fill tbl (x, tys) =
+        if Msym.mem x tbl then tbl
+        else
+          Msym.add x (List.map (fun ty -> EcIdent.create "_", ty) tys, body) tbl in
+      List.fold_left fill tbl gind.tydt_ctors
 
-  let pbs = Msym.of_list pbs in
-
+    | (Some (x, bds), body) :: pbs ->
+      if Msym.mem x tbl then
+        tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+      let tbl = Msym.add x (bds, body) tbl in
+      fill_branches tbl pbs
+  in
+  let tbl = fill_branches Msym.empty pbs in
   List.map
-    (fun (x, _) -> oget (Msym.find_opt x pbs))
+    (fun (x, _) -> Msym.find x tbl)
     gind.tydt_ctors
 
 (* -------------------------------------------------------------------- *)
 let trans_if_match ~loc env ue (gindty, gind) (c, b1, b2) =
-  let (c, (cargs, b1)) = trans_branch ~loc env ue gindty (c, b1) in
+  trans_match ~loc env ue (gindty, gind) [(c,b1); (PPAny, b2)]
 
-  List.map
-    (fun (x, xargs) ->
-      if sym_equal c x then
-        (cargs, Some b1)
-      else
-        (* Create a pattern C _ _ ... for each constructor *)
-        let wilds = List.map (fun _ -> EcLocation.mk_loc loc None) xargs in
-        let pat = PPApp ((EcLocation.mk_loc loc ([], x), None), wilds) in
-        let b2 =
-          (match b2 with
-          | None -> []
-          | Some b2 -> b2
-        ) in
-        let (_, (xargs, b2)) = trans_branch ~loc env ue gindty (pat, b2) in
-        (xargs, Some b2)
-    )
-    gind.tydt_ctors
+(* -------------------------------------------------------------------- *)
+let trans_branch_exn env ue ((pb, body) : ppattern * _) =
+  match pb with
+  | PPAny -> (None, body)
+  | PPApp ((cname, tvi), cargs) ->
+    let filter = fun _ op -> EcDecl.is_exception op in
+    let tvi = tvi |> omap (transtvi env ue) in
+    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+
+    match cts with
+    | [] ->
+        (* FIXME should we use a different error message ? *)
+        tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
+
+    | _ :: _ :: _ ->
+        (* FIXME should we use a different error message ? *)
+        tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
+
+    | [(cp, _tvi), _opty, subue, _] ->
+        let exn = EcEnv.Op.by_path cp env in
+        let dom = (EcDecl.operator_as_exception exn).exn_dom in
+        let args_exp = List.length dom in
+        let args_got = List.length cargs in
+
+        (* FIXME should we use a different error message ? *)
+        if args_exp <> args_got then begin
+          tyerror cname.pl_loc env (InvalidMatch
+            (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got)))
+        end;
+
+        let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+
+        if not (List.is_unique cargs_lin) then
+          tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
+
+        EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+        let create o = EcIdent.create (omap_dfl unloc "_" o) in
+        let pvars = List.map (create -| unloc) cargs in
+        let pvars = List.combine pvars dom in
+
+        (Some (cp, pvars), body)
+
+let trans_match_exn ~loc env ue pbs =
+  let fill_branch tbl (exn, body) =
+    let name = omap fst exn in
+    let bds  = odfl [] (omap snd exn) in
+
+    if Mop.mem name tbl then
+        tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+    Mop.add name (bds, body) tbl in
+
+  let pbs = List.map (trans_branch_exn env ue) pbs in
+  List.fold_left fill_branch Mop.empty pbs
 
 (*-------------------------------------------------------------------- *)
 let var_or_proj fvar fproj pv ty =
@@ -1488,6 +1563,13 @@ let trans_gamepath (env : EcEnv.env) gp =
         if _sig.miss_params <> [] then
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath mpath funsymb
+
+(* -------------------------------------------------------------------- *)
+let trans_exception (env : EcEnv.env) (name : pqsymbol) =
+  let symb = unloc name in
+  match EcEnv.Exception.lookup_opt symb env with
+  | None -> tyerror name.pl_loc env (UnknownExceptionName symb)
+  | Some (p,_) -> symb, p
 
 (* -------------------------------------------------------------------- *)
 let trans_oracle (env : EcEnv.env) (m,f) =
@@ -1612,8 +1694,9 @@ let form_of_opselect
              ((args @ List.map (curry f_local) xs, []), xs) in
 
          let flam  = List.map (snd_map gtty) flam in
-         let me    = odfl mhr (EcEnv.Memory.get_active env) in
-         let body  = form_of_expr me body in
+         let body = match (EcEnv.Memory.get_active_ss env) with
+        | None -> form_of_expr body
+        | Some me -> (ss_inv_of_expr me body).inv in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
          let subst = Fsubst.f_subst_init ~freshen:true () in
          let subst =
@@ -1624,11 +1707,12 @@ let form_of_opselect
       | `Op (p, tys) -> f_op_tc p tys ty
       | `Lc id       -> f_local id ty
       | `Pv (me, pv) ->
-        var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
+        var_or_proj (fun x ty -> (f_pvar x ty (oget me)).inv) f_proj pv ty
 
     in (op, args)
 
-  in f_app op args codom
+  in
+  f_app op args codom
 
 (* -------------------------------------------------------------------- *)
 
@@ -2044,12 +2128,278 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
+  | Pm_update (m, delete_vars, vars, funs) ->
+    let loc = me.pl_loc in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = loc} in
+
+    (* Prohibit functor updates *)
+    if not (List.is_empty sig_.miss_params) then
+      tyerror loc env (InvalidModUpdate MUE_Functor);
+
+    (* Construct the set of new module variables *)
+    let items =
+      List.concat_map
+        (fun (xs, ty) ->
+          let ty = transty_for_decl env ty in
+          let items = List.map
+            (fun { pl_desc = x } -> MI_Variable { v_name = x; v_type = ty; })
+            xs
+          in
+          items)
+        vars
+    in
+
+    let delete_vars = List.map (fun v -> v.pl_desc) delete_vars in
+
+    let me, _ = EcEnv.Mod.by_mpath mp env in
+    let p = match mp.m_top with | `Concrete (p, _) -> p | _ -> assert false in
+    let subst = EcSubst.add_moddef EcSubst.empty ~src:p ~dst:(EcEnv.mroot env) in
+    let me = EcSubst.subst_module subst me in
+
+    let update_fun env fn plocals pupdates pupdate_res =
+      (* Extract the function body and load the memory *)
+      let fun_ = EcEnv.Fun.by_xpath (xpath mp fn) env in
+
+      (* Follow a function alias until we get to the concrete definition *)
+      let rec resolve_alias f =
+        match f.f_def with
+        | FBabs _ ->
+          tyerror loc env (InvalidModUpdate MUE_AbstractModule);
+        | FBalias xp -> resolve_alias (EcEnv.Fun.by_xpath xp env)
+        | FBdef _ -> f
+      in
+
+      let target_fun = EcSubst.subst_function subst (resolve_alias fun_) in
+      let (_fs, fd), memenv = EcEnv.Fun.actmem_body (EcIdent.create "&hr") target_fun in
+
+      let fun_ = EcSubst.subst_function subst fun_ in
+
+      (* Introduce the new local variables *)
+      let locals = List.concat_map (fun (vs, pty) ->
+          let ty = transty_for_decl env pty in
+          List.map (fun x -> { v_name = x.pl_desc; v_type = ty; }, x.pl_loc) vs
+        )
+        plocals
+      in
+
+      let memenv = fundef_add_symbol env memenv locals in
+      let env = EcEnv.Memory.push_active_ss memenv env in
+
+      let locals = ref locals in
+      let memenv = ref memenv in
+
+      (* Semantics for stmt updating, `i` is the target of the update. *)
+      let eval_supdate env sup si =
+        match sup with
+        | Pups_add (s, after) ->
+          let ue  = UE.create (Some []) in
+          let s = transstmt env ue s in
+          let ts = Tuni.subst (UE.close ue) in
+          if after then
+            si @ (s_subst ts s).s_node
+          else
+            (s_subst ts s).s_node @ si
+        | Pups_del -> []
+      in
+
+      (* Semantics for condition updating *)
+      let eval_cupdate cp_loc env cup si =
+        (* NOTE: There will always be a head element *)
+        (* `i` is the target of the update, and `tl` is the instr suffix. *)
+        let i, tl = List.takedrop 1 si in
+        let i = List.hd i in
+
+        match cup with
+        (* Insert an if with condition `e` with body `tl` *)
+        | Pupc_add (e, after) ->
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          unify_or_fail env ue loc ~expct:tbool ty;
+          if after then
+            i :: [i_if (e_subst ts e, stmt tl, s_empty)]
+          else
+            [i_if (e_subst ts e, stmt (i :: tl), s_empty)]
+
+        (* Change the condition expression to `e` for a conditional instr `i` *)
+        | Pupc_mod e -> begin
+          let loc = e.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e, ty = transexp env `InProc ue e in
+          let ts = Tuni.subst (UE.close ue) in
+          let ty = ty_subst ts ty in
+          match i.i_node with
+          | Sif (_, t, f) ->
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_if (e_subst ts e, t, f)] @ tl
+          | Smatch (p, bs) ->
+            unify_or_fail env ue loc ~expct:p.e_ty ty;
+            [i_match (e_subst ts e, bs)] @ tl
+          | Swhile (_, t) ->
+            unify_or_fail env ue loc ~expct:tbool ty;
+            [i_while (e_subst ts e, t)] @ tl
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
+          end
+
+        (* Collapse a conditional `i` to a specific branch `bs` *)
+        | Pupc_del bs -> begin
+          let bs = trans_codepos_brsel bs in
+          match i.i_node, bs with
+          | Sif (_, t, _), `Cond true -> t.s_node
+          | Sif (_, _, f), `Cond false -> f.s_node
+          | Swhile (_, t), `Cond true -> t.s_node
+          | Smatch (e, bs), `Match cn -> begin
+            (* match e with | C a b c => b | ...  ---> (a, b, c) <- oget (get_as_C e); b *)
+
+            let typ, tydc, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+            let tyinst = List.combine tydc.tyd_params tyinst in
+            let indt = oget (EcDecl.tydecl_as_datatype tydc) in
+            let cnames = List.fst indt.tydt_ctors in
+            let r = List.assoc_opt cn (List.combine cnames bs) in
+            match r with
+            | None ->
+              tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond)
+            | Some (p, b) -> begin
+              (* TODO: Factorize. This is mostly just a copy/paste from EcPhlRCond.gen_rcond_full. *)
+              let cvars = List.map (fun (x, xty) -> { ov_name = Some (EcIdent.name x); ov_type = xty; }) p in
+              let me, cvars = EcMemory.bindall_fresh cvars !memenv in
+
+              let subst, pvs =
+                let s = Fsubst.f_subst_id in
+                let s, pvs = List.fold_left_map (fun s ((x, xty), name) ->
+                    let pv = pv_loc (oget name.ov_name) in
+                    let s  = bind_elocal s x (e_var pv xty) in
+                    (s, (pv, xty)))
+                  s (List.combine p cvars)
+                in
+                (s, pvs)
+              in
+
+              let asgn = EcModules.lv_of_list pvs |> omap (fun lv ->
+                  let rty  = ttuple (List.snd p) in
+                  let proj = EcInductive.datatype_proj_path typ cn in
+                  let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+                  let proj = e_app proj [e] (toption rty) in
+                  let proj = e_oget proj rty in
+                  i_asgn (lv, proj))
+              in
+
+              memenv := me;
+              locals := !locals @ (List.map (fun ov -> {v_name = oget ov.ov_name; v_type = ov.ov_type; }, cp_loc) cvars);
+
+              match asgn with
+              | None -> b.s_node @ tl
+              | Some a -> a :: (s_subst subst b).s_node @ tl
+            end
+          end
+          | _ ->
+            tyerror cp_loc env (InvalidModUpdate MUE_InvalidTargetCond);
+          end
+      in
+
+      (* Apply each of updates in reverse *)
+      (* NOTE: This is with the expectation that the user entered them in chronological order. *)
+      let body =
+        List.fold_right (fun (cpr, up) bd ->
+          let {pl_desc = cpr; pl_loc = loc} = cpr in
+          let cp = trans_codepos_or_range env cpr in
+          let change env si =
+            match up with
+            | Pup_stmt sup ->
+              eval_supdate env sup si
+            | Pup_cond cup ->
+              eval_cupdate loc env cup si
+          in
+          let env = EcEnv.Memory.push_active_ss !memenv env in
+          try
+            EcMatching.Zipper.map_range env cp change bd
+          with
+            | InvalidCPos ->
+              tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
+        )
+        pupdates
+        fd.f_body
+      in
+
+      (* Apply the result update if given *)
+      let ret = match fd.f_ret, pupdate_res with
+        | Some e, Some e' ->
+          let loc = e'.pl_loc in
+          let ue  = UE.create (Some []) in
+          let e', ty = transexp env `InProc ue e' in
+          unify_or_fail env ue loc ~expct:e.e_ty ty;
+          let ts = Tuni.subst (UE.close ue) in
+          Some (e_subst ts e')
+        | _ -> fd.f_ret
+      in
+
+      (* Reconstruct the function def *)
+      let uses = ret |> ofold ((^~) se_inuse) (s_inuse body) in
+      let fd = {f_locals = fd.f_locals @ (List.fst !locals); f_body = body; f_ret = ret; f_uses = uses; } in
+      let fun_ = {fun_ with f_def = FBdef fd} in
+      fun_
+    in
+
+    let allowed_funs = List.map (fun (Tys_function f) -> f.fs_name) me.me_sig_body in
+    let funs = List.map (fun ({pl_loc = loc; pl_desc = fn}, lvs, v) ->
+      if List.mem fn allowed_funs then
+        fn, (lvs, v)
+      else
+        tyerror loc env (InvalidModUpdate MUE_InvalidFun)
+    ) funs
+    in
+
+    (* Update all module items *)
+    let env, items =
+      match me.me_body with
+      | ME_Structure mb ->
+        let doit (env, items) mi =
+          match mi with
+          | MI_Variable v when not (List.mem (v_name v) delete_vars) ->
+            let env = EcEnv.Var.bind_pvglob v.v_name v.v_type env in
+            env, items @ [mi]
+          | MI_Function f  -> begin
+            match List.assoc_opt f.f_name funs with
+            | None ->
+              let env = EcEnv.bind1 (f.f_name, `Function f) env in
+              env, items @ [mi]
+            | Some (lvs, (upsc, rup)) ->
+              let f = update_fun env f.f_name lvs upsc rup in
+              let env = EcEnv.bind1 (f.f_name, `Function f) env in
+              env, items @ [MI_Function f]
+            end
+          | MI_Module me ->
+            let env = EcEnv.bind1 (me.me_name, `Module me) env in
+            env, items @ [mi]
+          | _ -> env, items
+        in
+        List.fold_left doit (env, []) (items @ mb.ms_body)
+
+      | _ ->
+        tyerror loc env (InvalidModUpdate MUE_AbstractModule);
+    in
+
+    let ois = get_oi_calls env (stparams, items) in
+
+    (* Construct structure representation *)
+    let me =
+      { me_name       = x.pl_desc;
+        me_body       = ME_Structure { ms_body = items; };
+        me_comps      = items;
+        me_params     = stparams;
+        me_sig_body   = me.me_sig_body;
+        me_oinfos     = ois; }
+    in
+    me
 
 (* -------------------------------------------------------------------- *)
 (* Module parameters must have been added to the environment            *)
 and get_oi_calls env (params, items) =
   let mparams =
-    let mparams = List.map (mident |- fst) params in
+    let mparams = List.map (mident -| fst) params in
     Sm.of_list mparams in
 
   let comp_oi oi it = match it with
@@ -2165,7 +2515,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
               v_name = checked_name s;
               v_type = transty tp_uni env ue pty}, s.pl_loc) decl.pfd_tyargs
       in
-      let memenv = EcMemory.empty_local ~witharg:false mhr in
+      let memenv = EcMemory.empty_local ~witharg:false (EcIdent.create "&hr") in
       let memenv = fundef_add_symbol env memenv params in
 
       (* Type-check body *)
@@ -2215,7 +2565,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
     [], [transstruct1_alias env name f]
 
   | Pst_import ms ->
-    (List.map (fst |- trans_msymbol env) ms), []
+    (List.map (fst -| trans_msymbol env) ms), []
 
   | Pst_include (m, imp, procs) -> begin
     let (mo, ms) = trans_msymbol env m in
@@ -2278,7 +2628,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
 
   (* Type-check local variables / check for dups *)
   let add_local memenv local =
-    let env   = EcEnv.Memory.push_active memenv env in
+    let env   = EcEnv.Memory.push_active_ss memenv env in
     let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
     let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
     let ty =
@@ -2315,7 +2665,7 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
     memenv in
 
   let memenv = List.fold_left add_local memenv pbody.pfb_locals in
-  let env = EcEnv.Memory.push_active memenv env in
+  let env = EcEnv.Memory.push_active_ss memenv env in
 
   let body   = transstmt env ue pbody.pfb_body in
   let result =
@@ -2475,7 +2825,7 @@ and transinstr
         match (EcEnv.ty_hnorm ety env).ty_node with
         | Tconstr (indp, _) -> begin
             match EcEnv.Ty.by_path indp env with
-            | { tyd_type = `Datatype dt } ->
+            | { tyd_type = Datatype dt } ->
                 Some (indp, dt)
             | _ -> None
           end
@@ -2489,29 +2839,28 @@ and transinstr
       let branches =
         match pbranches with
         | `Full pbranches ->
-            let aout = trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches in
-            List.map (snd_map some) aout
+            trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches
 
         | `If ((c, b1), b2) ->
-            trans_if_match ~loc:i.pl_loc env ue (ety, inddecl) (c, b1, b2)
+            trans_if_match ~loc:i.pl_loc env ue (ety, inddecl) (c, b1, odfl [] b2)
 
       in
 
       let branches = List.map (fun (lcs, s) ->
         let env = EcEnv.Var.bind_locals lcs env in
-        (lcs, omap (transstmt env ue) s |> odfl (stmt []))) branches in
+        (lcs, transstmt env ue s)) branches in
 
       [ i_match (e, branches) ]
     end
 
-  | PSassert pe ->
-      let e, ety = transexp env `InProc ue pe in
-      unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      [ i_assert e ]
+  | PSraise (pex) ->
+    let ex, exty = transexp env `InProc ue pex in
+    unify_or_fail env ue pex.pl_loc ~expct:texn exty;
+    [i_raise ex]
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } =
-  let side = EcEnv.Memory.get_active env in
+  let side = EcEnv.Memory.get_active_ss env in
   match EcEnv.Var.lookup_progvar_opt ?side x env with
   | None -> tyerror loc env (UnknownModVar x)
   | Some(pv,xty) ->
@@ -2532,15 +2881,18 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let ty = ttuple (List.map snd xs) in
       Lval (LvTuple xs), ty
 
-  | PLvMap (x, tvi, es) ->
+  | PLvMap (x, tvi, codom, es) ->
       let tvi = tvi |> omap (transtvi env ue) in
-      let codomty = UE.fresh ue in
+      let codom = Option.map (transty tp_relax env ue) codom in
+      let codom = ofdfl (fun () -> UE.fresh ue) codom in
       let pv, xty = trans_pv env x in
       let e, ety = List.split (List.map (transexp env `InProc ue) es) in
+
       let e, ety = e_tuple e, ttuple ety in
+
       let name = ([], EcCoreLib.s_set) in
-      let esig = [xty; ety; codomty] in
-      let ops = select_exp_op env `InProc None name ue tvi esig in
+      let esig = [xty; ety; codom] in
+      let ops = select_exp_op env `InProc None name ue tvi (esig, None) in
 
       match ops with
       | [] ->
@@ -2554,7 +2906,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.subst_dom uidmap esig in
           let esig = toarrow esig xty in
           unify_or_fail env ue lvalue.pl_loc ~expct:esig opty;
-          LvMap ((p, tys), pv, e, xty), codomty
+          LvMap ((p, tys), pv, e, xty), codom
 
       | [_] ->
           let uidmap = UE.assubst ue in
@@ -2609,8 +2961,9 @@ and trans_gbinding env ue decl =
 and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
-  let rec transf_r opsc env f =
-    let transf = transf_r opsc in
+  let rec transf_r_tyinfo opsc env ?tt f =
+    let transf env ?tt f =
+      transf_r opsc env ?tt f in
 
     match f.pl_desc with
     | PFhole -> begin
@@ -2722,7 +3075,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
               | PFMatchBuild (deep, xs, ptg, ppt) ->
                   let f    = f_ands (flatten deep f) in
-                  let xs   = List.map (EcIdent.create |- unloc) xs in
+                  let xs   = List.map (EcIdent.create -| unloc) xs in
                   let xst  = List.map (fun x -> (x, tbool)) xs in
                   let lenv = EcEnv.Var.bind_locals xst env in
                   let tg   = trans_prop lenv ue ptg in
@@ -2777,7 +3130,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                         let trans1 (x, s) =
                           let mem =
                             match s with
-                            | None -> odfl mhr (EcEnv.Memory.get_active env)
+                            | None -> oget (EcEnv.Memory.get_active_ss env)
                             | Some s -> transmem env s
 
                           in (transpvar env mem x, mem) in
@@ -2815,7 +3168,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
     | PFcast (pf, pty) ->
         let ty = transty tp_relax env ue pty in
-        let aout = transf env pf in
+        let aout = transf env ~tt:ty pf in
         unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
@@ -2830,11 +3183,11 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let mp = fst (trans_msymbol env gp) in
         let me =
-          match EcEnv.Memory.current env with
+          match EcEnv.Memory.current_ss env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
         in PFS.set_memused state;
-           EcEnv.NormMp.norm_glob env me mp
+           (EcEnv.NormMp.norm_glob env me mp).inv
 
     | PFint n ->
         f_int n
@@ -2842,20 +3195,18 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
     | PFdecimal (n, f) ->
         f_decimal (n, f)
 
-    | PFtuple args -> begin
-        let args = List.map (transf env) args in
-          match args with
-          | []  -> f_tt
-          | [f] -> f
-          | fs  -> f_tuple fs
-    end
+    | PFtuple pes ->
+        let esig = List.map (fun _ -> EcUnify.UniEnv.fresh ue) pes in
+        tt |> oiter (fun tt -> unify_or_fail env ue f.pl_loc  ~expct:tt (ttuple esig));
+        let es = List.map2 (fun tt pe -> transf env ~tt pe) esig pes in
+        f_tuple es
 
     | PFident ({ pl_desc = name; pl_loc = loc }, tvi) ->
         let tvi = tvi |> omap (transtvi env ue) in
         let ops =
           select_form_op
             ~forcepv:(PFS.isforced state)
-            env mode opsc name ue tvi [] in
+            env mode opsc name ue tvi ([], tt) in
         begin match ops with
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
@@ -2887,7 +3238,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
 
         let used, aout =
           PFS.new_memused
-            (transf (EcEnv.Memory.set_active me env))
+            (transf (EcEnv.Memory.set_active_ss me env))
             ~force state f
         in
         if not used then begin
@@ -2907,13 +3258,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) ->
-            var_or_proj (fun x ty -> f_pvar x ty me) f_proj x ty
-        in
-
-        let check_mem loc me =
-          match EcEnv.Memory.byid me env with
-          | None -> tyerror loc env (UnknownMemName (EcIdent.name me))
-          | Some _ -> ()
+            var_or_proj (fun x ty -> (f_pvar x ty me).inv) f_proj x ty
         in
 
         let qual (mq : pmsymbol option) (x : pqsymbol) =
@@ -2921,13 +3266,14 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           | None    -> x
           | Some qs ->
               let (nm, name) = x.pl_desc in
-              { x with pl_desc = ((List.map (unloc |- fst) qs)@nm, name) }
+              { x with pl_desc = ((List.map (unloc -| fst) qs)@nm, name) }
         in
 
          let do1 = function
           | GVvar x ->
-              let x1 = lookup EcFol.mleft  (qual (om |> omap fst) x) in
-              let x2 = lookup EcFol.mright (qual (om |> omap snd) x) in
+              let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+              let x1 = lookup ml (qual (om |> omap fst) x) in
+              let x2 = lookup mr (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
@@ -2952,16 +3298,18 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
                     List.map (fun mid -> f_glob mid mem) gl
                   @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
 
-                f_tuple res in
+                map_ss_inv f_tuple res in
+                  
+              let ml, mr = match (EcEnv.Memory.get_active_ts env) with
+              | Some (ml, mr) -> ml, mr
+              | None -> tyerror f.pl_loc env (UnexpectedGoalShape GSE_ExpectedTwoSided)
+              in
+              let x1 = ss_inv_generalize_right (create ml) mr in
+              let x2 = ss_inv_generalize_left (create mr) ml in
 
-              let x1 = create EcFol.mleft  in
-              let x2 = create EcFol.mright in
-
-              unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
-              f_eq x1 x2
+              unify_or_fail env ue gp.pl_loc ~expct:x1.inv.f_ty x2.inv.f_ty;
+              (map_ts_inv2 f_eq x1 x2).inv
         in
-          check_mem f.pl_loc EcFol.mleft;
-          check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map do1 xs)
 
     | PFeqf fs ->
@@ -2976,27 +3324,58 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         and do1 (me1, me2) f =
           let _, f1 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me1 env))
+              (transf (EcEnv.Memory.set_active_ss me1 env))
               ~force:false state f in
           let _, f2 =
             PFS.new_memused
-              (transf (EcEnv.Memory.set_active me2 env))
+              (transf (EcEnv.Memory.set_active_ss me2 env))
               ~force:false state f in
           unify_or_fail env ue f.pl_loc ~expct:f1.f_ty f2.f_ty;
           f_eq f1 f2
 
         in
-          check_mem f.pl_loc EcFol.mleft;
-          check_mem f.pl_loc EcFol.mright;
-          EcFol.f_ands (List.map (do1 (EcFol.mleft, EcFol.mright)) fs)
+          let ml, mr = oget (EcEnv.Memory.get_active_ts env) in
+          check_mem f.pl_loc ml;
+          check_mem f.pl_loc mr;
+          EcFol.f_ands (List.map (do1 (ml, mr)) fs)
 
-    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
+    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) -> begin
+      let try_trans ?tt pe =
+        let ue' = EcUnify.UniEnv.copy ue in
+        let ps' = Option.map (fun ps -> ref !ps) ps in
+          match transf env ?tt pe with
+          | e -> Some e
+          | exception TyError (_, _, MultipleOpMatch _) ->
+            Option.iter (fun ps -> ps := !(Option.get ps')) ps;
+            EcUnify.UniEnv.restore ~dst:ue ~src:ue';
+            None
+      in
+
+      match
+        let ue'  = EcUnify.UniEnv.copy ue in
+        let ps'  = Option.map (fun ps -> ref !ps) ps in
+        let es   = List.map (fun pe -> try_trans pe) pes in
+        let tvi  = tvi |> omap (transtvi env ue) in
+        let esig = List.map (fun e ->
+            match e with Some e -> e.f_ty | None -> EcUnify.UniEnv.fresh ue
+          ) es in
+        match
+          select_form_op ~forcepv:(PFS.isforced state)
+            env mode opsc name ue tvi (esig, tt)
+        with
+        | [sel] -> Some (sel, (es, esig, tvi))
+        | _ ->
+            Option.iter (fun ps -> ps := !(Option.get ps')) ps;
+            EcUnify.UniEnv.restore ~dst:ue ~src:ue';
+            None
+      with
+      | None -> begin
         let tvi  = tvi |> omap (transtvi env ue) in
         let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in
         let ops  =
           select_form_op ~forcepv:(PFS.isforced state)
-            env mode opsc name ue tvi esig in
+            env mode opsc name ue tvi (esig, tt) in
 
           begin match ops with
           | [] ->
@@ -3014,6 +3393,24 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
              let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
              tyerror loc env (MultipleOpMatch (name, esig, matches))
           end
+        end
+
+      | Some ((_, _, subue, _) as sel, (es, esig, _tvi)) ->
+        EcUnify.UniEnv.restore ~dst:ue ~src:subue;
+        let es =
+          List.map2 (
+            fun (e, ty) pe ->
+              match e with None -> try_trans ~tt:ty pe | Some e -> Some e
+          ) (List.combine es esig) pes in
+          let es =
+            List.map2 (
+              fun (e, ty) pe ->
+                match e with None -> transf env ~tt:ty pe | Some e -> e
+            ) (List.combine es esig) pes in
+          let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
+        EcUnify.UniEnv.restore ~src:ue ~dst:subue;
+        form_of_opselect (env, ue) loc sel es
+      end
 
     | PFapp (e, pes) ->
         let es    = List.map (transf env) pes in
@@ -3039,7 +3436,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           match (EcEnv.ty_hnorm cfty env).ty_node with
           | Tconstr (indp, _) -> begin
               match EcEnv.Ty.by_path indp env with
-              | { tyd_type = `Datatype dt } ->
+              | { tyd_type = Datatype dt } ->
                   Some (indp, dt)
               | _ -> None
             end
@@ -3069,25 +3466,30 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let f1 = transf env pf1 in
         unify_or_fail env ue pf1.pl_loc ~expct:pty f1.f_ty;
         aty |> oiter (fun aty-> unify_or_fail env ue pf1.pl_loc ~expct:pty aty);
-        let f2 = transf penv f2 in
+        let f2 = transf penv ?tt f2 in
         f_let p f1 f2
 
     | PFforall (xs, pf) ->
         let env, xs = trans_gbinding env ue xs in
         let f = transf env pf in
-          unify_or_fail env ue pf.pl_loc ~expct:tbool f.f_ty;
-          f_forall xs f
+        unify_or_fail env ue pf.pl_loc ~expct:tbool f.f_ty;
+        f_forall xs f
 
     | PFexists (xs, f1) ->
         let env, xs = trans_gbinding env ue xs in
         let f = transf env f1 in
-          unify_or_fail env ue f1.pl_loc ~expct:tbool f.f_ty;
-          f_exists xs f
+        unify_or_fail env ue f1.pl_loc ~expct:tbool f.f_ty;
+        f_exists xs f
 
     | PFlambda (xs, f1) ->
         let env, xs = trans_binding env ue xs in
-        let f = transf env f1 in
-          f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
+        let subtt = tt |> Option.map (fun tt ->
+          let codom = EcUnify.UniEnv.fresh ue in
+          unify_or_fail env ue (loc f) ~expct:(toarrow (List.snd xs) codom) tt;
+          codom
+        ) in
+        let f = transf env ?tt:subtt f1 in
+        f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
 
     | PFrecord (b, fields) ->
         let (ctor, fields, (rtvi, reccty)) =
@@ -3130,7 +3532,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
-    | PFprob (gp, args, m, event) ->
+    | PFprob (m, gp, args, pr_m, event) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Pr);
 
@@ -3139,42 +3541,50 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let args,_ =
           transcall (fun f -> let f = transf env f in f, f.f_ty)
             env ue f.pl_loc fun_.f_sig args in
-        let memid = transmem env m in
-        let env = EcEnv.Fun.prF fpath env in
-        let event' = transf env event in
-        unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
+        let memid = transmem env pr_m in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
+        let env = EcEnv.Fun.prF m fpath env in
+        let event' = {m;inv=transf env event} in
+        unify_or_fail env ue event.pl_loc ~expct:tbool event'.inv.f_ty;
         f_pr memid fpath (f_tuple args) event'
 
-    | PFhoareF (pre, gp, post) ->
+    | PFhoareF (m, pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
-        let post' = transf qenv post in
-          unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
-          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_hoareF pre' fpath post'
+        let post' = transf qenv post.pnormal in
+        unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre'.f_ty;
+        unify_or_fail qenv ue post.pnormal.pl_loc ~expct:tbool post'.f_ty;
 
-    | PFehoareF (pre, gp, post) ->
+        let penv_e = EcEnv.Fun.inv_memenv1 m env in
+        let epost' = trans_poe penv_e ue post.pexcept in
+        f_hoareF {m;inv=pre'} fpath { hsi_m = m; hsi_inv = POE.mk post' epost'; }
+
+    | PFehoareF (m, pre, gp, post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
-          f_eHoareF pre' fpath post'
+          f_eHoareF {m;inv=pre'} fpath {m;inv=post'}
 
-    | PFBDhoareF (pre, gp, post, hcmp, bd) ->
+    | PFBDhoareF (m, pre, gp, post, hcmp, bd) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let m = odfl "&hr" (omap unloc m) in
+        let m = EcIdent.create m in
         let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let penv, qenv = EcEnv.Fun.hoareF m fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let bd'   = transf penv bd in
@@ -3182,7 +3592,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
-          f_bdHoareF pre' fpath post' hcmp bd'
+          f_bdHoareF {m;inv=pre'} fpath {m;inv=post'} hcmp {m;inv=bd'}
 
     | PFlsless gp ->
         if mode <> `Form then
@@ -3190,39 +3600,46 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
         let fpath = trans_gamepath env gp in
           f_losslessF fpath
 
-    | PFequivF (pre, (gp1, gp2), post) ->
+    | PFequivF (ml, mr, pre, (gp1, gp2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = odfl "&1" (omap unloc ml) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc mr) in
+        let mr = EcIdent.create mr in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          f_equivF pre' fpath1 fpath2 post'
+          f_equivF {ml;mr;inv=pre'} fpath1 fpath2 {ml;mr;inv=post'}
 
-    | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
+    | PFeagerF (ml, mr, pre, (s1,gp1,gp2,s2), post) ->
         if mode <> `Form then
           tyerror f.pl_loc env (NotAnExpression `Logic);
-
+        let ml = odfl "&1" (omap unloc ml) in
+        let ml = EcIdent.create ml in
+        let mr = odfl "&2" (omap unloc mr) in
+        let mr = EcIdent.create mr in
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let penv, qenv = EcEnv.Fun.equivF ml mr fpath1 fpath2 env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let s1    = transstmt env ue s1 in
         let s2    = transstmt env ue s2 in
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-        f_eagerF pre' s1 fpath1 fpath2 s2 post'
+        f_eagerF {ml;mr;inv=pre'} s1 fpath1 fpath2 s2 {ml;mr;inv=post'}
 
-  in
+  and transf_r opsc env ?tt pf =
+    let f  = transf_r_tyinfo opsc env ?tt pf in
+    let () = oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty) tt in
+    f
 
-  let f = transf_r None env pf in
-  tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
-  f
+  in transf_r None env ?tt pf
 
 (* Type-check a memtype. *)
 and trans_memtype env ue (pmemtype : pmemtype) : memtype =
@@ -3254,12 +3671,13 @@ and trans_memtype env ue (pmemtype : pmemtype) : memtype =
   List.fold_left add_decl mt pmemtype
 
 (* -------------------------------------------------------------------- *)
-and transexp env mode ue { pl_desc = Expr e; pl_loc = loc; } =
-  let f = trans_form_or_pattern env (`Expr mode) ue e None in
-  let m = Option.value ~default:mhr (EcEnv.Memory.get_active env) in
+and transexp env ?tt mode ue { pl_desc = Expr e; pl_loc = loc; } =
+  let f = trans_form_or_pattern env (`Expr mode) ue e tt in
   let e =
     try
-      expr_of_form m f
+      match (EcEnv.Memory.get_active_ss env) with
+      | None -> expr_of_form f
+      | Some m -> expr_of_ss_inv {m;inv=f}
     with CannotTranslate ->
       (* This should not happen. *)
       tyerror loc env (NotAnExpression `Unknown) in
@@ -3275,7 +3693,7 @@ and transexpcast_opt (env : EcEnv.env) mode ue oty e =
   match oty with
   | None   -> fst (transexp env mode ue e)
   | Some t -> transexpcast env mode ue t e
-  
+
 (* -------------------------------------------------------------------- *)
 and trans_form_opt env ?mv ue pf oty =
   trans_form_or_pattern env `Form ?mv ue pf oty
@@ -3289,14 +3707,25 @@ and trans_prop env ?mv ue pf =
   trans_form env ?mv ue pf tbool
 
 (* -------------------------------------------------------------------- *)
+and trans_poe (env : EcEnv.env) (ue : EcUnify.unienv) (poe : phoare_exception) =
+  let loc = poe.pl_loc in
+  let branches = trans_match_exn ~loc env ue (unloc poe) in
+  Mop.map
+    (fun (lcs, body) ->
+       let env = EcEnv.Var.bind_locals lcs env in
+       let bdy  = trans_prop env ue body in
+       f_lambda (List.map (snd_map gtty) lcs) bdy)
+    branches
+
+(* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =
   trans_form_or_pattern env `Form ~ps ue pf None
 
 (* -------------------------------------------------------------------- *)
-let trans_args env ue = transcall (transexp env `InProc ue) env ue
+and trans_args env ue = transcall (transexp env `InProc ue) env ue
 
 (* -------------------------------------------------------------------- *)
-let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
+and trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
   match p with
   | `LvmNone as p -> (p :> lvmatch)
   | `LvmVar pv -> begin
@@ -3306,8 +3735,9 @@ let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : 
     | Some m ->
       `LvmVar (transpvar env m pv)
     end
+
 (* -------------------------------------------------------------------- *)
-let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
+and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
   match p with
   | (`While | `If | `Match) as p ->
     (p :> cp_match)
@@ -3317,31 +3747,100 @@ let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) :
     `Call (trans_lv_match ?memory env lv)
   | `Assign lv ->
     `Assign (trans_lv_match ?memory env lv)
+  | `AssignTuple lv ->
+    `AssignTuple (trans_lv_match ?memory env lv)
+
 (* -------------------------------------------------------------------- *)
-let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
+and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with
-  | `ByPos _ as p -> (p :> cp_base)
+  | `ByPos (i, `Index1) when i > 0 -> `ByPos (i - 1)
+  | `ByPos (i, `Index1) when i = 0 -> raise InvalidCPos
+  | `ByPos (i, `Index1) -> `ByPos i
+  | `ByPos (i, `Index0) -> `ByPos i  (* already 0-indexed, no conversion *)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
+and trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
   snd_map (trans_cp_base ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
+and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   match bs with
   | `Cond b -> `Cond b
   | `Match { pl_desc = x } -> `Match x
 
 (* -------------------------------------------------------------------- *)
-let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
-  let nm = List.map (fun (cp1, bs) -> (trans_codepos1 ?memory env cp1, trans_codepos_brsel bs)) nm in
-  let p = trans_codepos1 ?memory env p in
-  (nm, p)
+and trans_codepos_step ?(memory: memory option) (env: EcEnv.env) ((cp1, brsel): pcodepos_step) : codepos_step =
+  let cp1 = trans_codepos1 ?memory env cp1 in
+  let brsel = trans_codepos_brsel brsel in
+  (cp1, brsel)
 
 (* -------------------------------------------------------------------- *)
-let trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
+and trans_codepos_path ?(memory: memory option) (env: EcEnv.env) (cpath: pcodepos_path) : codepos_path =
+  List.map (trans_codepos_step ?memory env) cpath
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((cpath, p) : pcodepos) : codepos =
+  let cpath = trans_codepos_path ?memory env cpath in
+  let p = trans_codepos1 ?memory env p in
+  (cpath, p)
+
+(* -------------------------------------------------------------------- *)
+and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
+  match o with
+  | `Relative i -> `Relative i
+  | `Absolute p -> `Absolute (trans_codepos1 ?memory env p)
+
+(* -------------------------------------------------------------------- *)
+and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : codegap_range =
+  match cpor with
+  | Pos cp -> codegap_range_of_codepos (trans_codepos ?memory env cp)
+  | Range cpr -> trans_codegap_range ?memory env cpr
+
+(* -------------------------------------------------------------------- *)
+and trans_range1_or_insert
+  ?(memory : memory option)
+   (env    : EcEnv.env)
+   (cp     : prange1_or_insert)
+: codegap_range
+=
+  match cp with
+  | PosOrRange cpor -> trans_codepos_or_range ?memory env cpor
+  | Gap g ->
+    let cg = trans_codegap ?memory env g in
+    empty_codegap_range_of_codegap cg
+
+(* -------------------------------------------------------------------- *)
+and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap1 ?(memory : memory option) (env : EcEnv.env) (g : pcodegap1) : codegap1 =
+  match g with
+  | GapBefore cp -> GapBefore (trans_codepos1 ?memory env cp)
+  | GapAfter  cp -> GapAfter  (trans_codepos1 ?memory env cp)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap ?(memory : memory option) (env : EcEnv.env) ((cpath, g1) : pcodegap) : codegap =
+  (trans_codepos_path ?memory env cpath, trans_codegap1 ?memory env g1)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap1_range ?(memory : memory option) (env : EcEnv.env) ((g1, g2) : pcodegap1_range) : codegap1_range =
+  (trans_codegap1 ?memory env g1, trans_codegap1 ?memory env g2)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap_range ?(memory : memory option) (env : EcEnv.env) ((cpath, gr) : pcodegap_range) : codegap_range =
+  (trans_codepos_path ?memory env cpath, trans_codegap1_range ?memory env gr)
+
+(* -------------------------------------------------------------------- *)
+and trans_codegap_offset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodegap_offset1) : codegap_offset1 =
+  match o with
+  | PGapRelative i -> GapRelative i
+  | PGapAbsolute g -> GapAbsolute (trans_codegap1 ?memory env g)
+
+(* -------------------------------------------------------------------- *)
+and trans_dcodegap1 ?(memory : memory option) (env : EcEnv.env) (p : pcodegap1 doption) : codegap1 doption =
+  DOption.map (trans_codegap1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

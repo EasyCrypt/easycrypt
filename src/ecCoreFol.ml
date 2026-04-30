@@ -12,9 +12,12 @@ module Sx = EcPath.Sx
 open EcBigInt.Notations
 
 (* -------------------------------------------------------------------- *)
-type quantif  = EcAst.quantif
+type quantif = EcAst.quantif
+
 type hoarecmp = EcAst.hoarecmp
-type gty      = EcAst.gty
+
+type gty = EcAst.gty
+
 type binding  = (EcIdent.t * gty)
 type bindings = binding list
 
@@ -34,11 +37,6 @@ type pr       = EcAst.pr
 type module_type = EcAst.module_type
 
 type mod_restr = EcAst.mod_restr
-
-(*-------------------------------------------------------------------- *)
-let mhr    = EcAst.mhr
-let mleft  = EcAst.mleft
-let mright = EcAst.mright
 
 (*-------------------------------------------------------------------- *)
 let qt_equal = EcAst.qt_equal
@@ -155,24 +153,28 @@ let mk_form = EcAst.mk_form
 let f_node { f_node = form } = form
 
 (* -------------------------------------------------------------------- *)
-let f_op_tc x tyargs ty =
-  mk_form (Fop (x, tyargs)) ty
-
-let f_op x tyargs ty =
-  f_op_tc x (List.map (fun ty -> (ty, [])) tyargs) ty
+let f_op x tys ty = mk_form (Fop (x, tys)) ty
 
 let f_app f args ty =
-  mk_form (Fapp (f, args)) ty
+  let f, args' =
+    match f.f_node with
+    | Fapp (f, args') -> (f, args')
+    | _ -> (f, [])
+  in let args' = args' @ args in
+
+  if List.is_empty args' then begin
+    (*if ty_equal ty f.f_ty then f else mk_form f.f_node ty *) f
+  end else mk_form (Fapp (f, args')) ty
 
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
-let f_pvar   x ty m = mk_form (Fpvar(x, m)) ty
+let f_pvar   x ty m = {m;inv=mk_form (Fpvar(x, m)) ty}
 let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
 
 let f_pvarg  ty m = f_pvar pv_arg ty m
 
 let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
-let f_glob   m mem   = mk_form (Fglob (m, mem)) (tglob m)
+let f_glob   m mem   = {m=mem;inv=mk_form (Fglob (m, mem)) (tglob m)}
 
 (* -------------------------------------------------------------------- *)
 let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    [] tunit
@@ -187,18 +189,18 @@ let f_tuple args =
   | [x] -> x
   | _   -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
-(* -------------------------------------------------------------------- *)
 let f_quant q b f =
-  let ty =
-    match q with
-    | Llambda ->
-      let dom =
-        List.map (fun (_, gty) -> gty_as_ty gty) b
-      in toarrow dom f.f_ty
+  if List.is_empty b then f else
+    let (q, b, f) =
+      match f.f_node with
+      | Fquant(q',b',f') when q = q' -> (q, b@b', f')
+      | _ -> q, b , f in
+    let ty =
+      if   q = Llambda
+      then toarrow (List.map (fun (_,gty) -> gty_as_ty gty) b) f.f_ty
+      else tbool in
 
-    | _ -> tbool in
-
-  mk_form (Fquant (q, b, f)) ty
+    mk_form (Fquant (q, b, f)) ty
 
 let f_proj   f  i  ty = mk_form (Fproj(f, i)) ty
 let f_if     f1 f2 f3 = mk_form (Fif (f1, f2, f3)) f2.f_ty
@@ -267,53 +269,86 @@ let f_eqs fs1 fs2 =
 let f_hoareS_r hs = mk_form (FhoareS hs) tbool
 let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS hs_m hs_pr hs_s hs_po =
-  f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
+let f_hoareS hs_mt hs_pr hs_s hs_po =
+  assert (hs_pr.m = hs_po.hsi_m);
+  f_hoareS_r
+    { hs_m  = (hs_pr.m, hs_mt)
+    ; hs_pr = hs_pr.inv
+    ; hs_s  = hs_s
+    ; hs_po = hs_po.hsi_inv
+    } [@alert "-priv_pl"]
 
-let f_hoareF hf_pr hf_f hf_po =
-  f_hoareF_r { hf_pr; hf_f; hf_po; }
+let f_hoareF pr hf_f po  =
+  assert (pr.m = po.hsi_m);
+  f_hoareF_r
+    { hf_m  = pr.m
+    ; hf_pr = pr.inv
+    ; hf_f  = hf_f
+    ; hf_po = po.hsi_inv
+    } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_eHoareS_r hs = mk_form (FeHoareS hs) tbool
 let f_eHoareF_r hf = mk_form (FeHoareF hf) tbool
 
-let f_eHoareS ehs_m ehs_pr ehs_s ehs_po =
-  f_eHoareS_r { ehs_m; ehs_pr; ehs_s; ehs_po; }
+let f_eHoareS ehs_mt ehs_pr ehs_s ehs_po =
+  assert (ehs_pr.m = ehs_po.m);
+  f_eHoareS_r { ehs_m=(ehs_pr.m, ehs_mt); ehs_pr=ehs_pr.inv; ehs_s;
+    ehs_po=ehs_po.inv; } [@alert "-priv_pl"]
 
 let f_eHoareF ehf_pr ehf_f ehf_po =
-  f_eHoareF_r { ehf_pr; ehf_f; ehf_po; }
+  assert (ehf_pr.m = ehf_po.m);
+  f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
+
+(* -------------------------------------------------------------------- *)
+
+let f_eHoare ehf_pr ehf_f ehf_po =
+  assert (ehf_pr.m = ehf_po.m);
+  f_eHoareF_r { ehf_m=ehf_pr.m; ehf_pr=ehf_pr.inv; ehf_f; ehf_po=ehf_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
 let f_bdHoareF_r bhf = mk_form (FbdHoareF bhf) tbool
 
-let f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
-  f_bdHoareS_r
-    { bhs_m; bhs_pr; bhs_s; bhs_po; bhs_cmp; bhs_bd; }
+
+let f_bdHoareS bhs_mt bhs_pr bhs_s bhs_po bhs_cmp bhs_bd =
+  assert (bhs_pr.m = bhs_po.m && bhs_bd.m = bhs_po.m);
+  f_bdHoareS_r { bhs_m=(bhs_pr.m,bhs_mt); bhs_pr=bhs_pr.inv; bhs_s;
+    bhs_po=bhs_po.inv; bhs_cmp; bhs_bd=bhs_bd.inv; } [@alert "-priv_pl"]
 
 let f_bdHoareF bhf_pr bhf_f bhf_po bhf_cmp bhf_bd =
-  f_bdHoareF_r { bhf_pr; bhf_f; bhf_po; bhf_cmp; bhf_bd; }
+  assert (bhf_pr.m = bhf_po.m && bhf_bd.m = bhf_po.m);
+  f_bdHoareF_r { bhf_m=bhf_pr.m; bhf_pr=bhf_pr.inv; bhf_f; bhf_po=bhf_po.inv;
+                 bhf_cmp; bhf_bd=bhf_bd.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_equivS_r es = mk_form (FequivS es) tbool
 let f_equivF_r ef = mk_form (FequivF ef) tbool
 
-let f_equivS es_ml es_mr es_pr es_sl es_sr es_po =
-   f_equivS_r { es_ml; es_mr; es_pr; es_sl; es_sr; es_po; }
+let f_equivS es_mtl es_mtr es_pr es_sl es_sr es_po =
+  assert (es_pr.ml = es_po.ml && es_pr.mr = es_po.mr);
+  let es_ml, es_mr = (es_pr.ml, es_mtl), (es_pr.mr, es_mtr) in
+  f_equivS_r { es_ml; es_mr; es_pr=es_pr.inv;
+                es_sl; es_sr; es_po=es_po.inv; } [@alert "-priv_pl"]
 
-let f_equivF ef_pr ef_fl ef_fr ef_po =
-  f_equivF_r{ ef_pr; ef_fl; ef_fr; ef_po; }
+(* -------------------------------------------------------------------- *)
+
+let f_equivF pr ef_fl ef_fr po =
+  assert (pr.ml = po.ml && pr.mr = po.mr);
+  f_equivF_r { ef_ml=pr.ml; ef_mr=pr.mr; ef_pr=pr.inv; ef_fl; ef_fr; ef_po=po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
 
 let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
-  f_eagerF_r { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
+  assert (eg_pr.ml = eg_po.ml && eg_pr.mr = eg_po.mr);
+  f_eagerF_r { eg_ml=eg_pr.ml; eg_mr=eg_pr.mr; eg_pr=eg_pr.inv;
+                eg_sl; eg_fl; eg_fr; eg_sr; eg_po=eg_po.inv; } [@alert "-priv_pl"]
 
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal
 
-let f_pr pr_mem pr_fun pr_args pr_event =
+let f_pr pr_mem pr_fun pr_args (pr_event: ss_inv) =
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
@@ -389,117 +424,147 @@ let f_some ({ f_ty = ty } as f : form) : form =
   f_app op [f] (toption ty)
 
 (* -------------------------------------------------------------------- *)
-let f_map (g : form -> form) (fp : form) : form =
+let f_map gt g fp =
   match fp.f_node with
-  | Fint   _ -> fp
-  | Fglob  _ -> fp
-  | Flocal _ -> fp
-  | Fpvar  _ -> fp
-  | Fop    _ -> fp
-
   | Fquant(q, b, f) ->
-    f_quant q b (g f)
+      let map_gty ((x, gty) as b1) =
+        let gty' =
+          match gty with
+          | GTty ty ->
+              let ty' = gt ty in if ty == ty' then gty else GTty ty'
+          | _ -> gty
+        in
+          if gty == gty' then b1 else (x, gty')
+      in
+
+      let b' = List.Smart.map map_gty b in
+      let f' = g f in
+
+      f_quant q b' f'
+
+  | Fint  _ -> fp
+  | Fglob _ -> fp
 
   | Fif (f1, f2, f3) ->
-    f_if (g f1) (g f2) (g f3)
+      f_if (g f1) (g f2) (g f3)
 
   | Fmatch (b, fs, ty) ->
-    f_match (g b) (List.map g fs) ty
+      f_match (g b) (List.map g fs) (gt ty)
 
   | Flet (lp, f1, f2) ->
-    f_let lp (g f1) (g f2)
+      f_let lp (g f1) (g f2)
 
-  | Fapp (hd, args) ->
-    let hd   = g hd in
-    let args = List.Smart.map g args in
-    f_app hd args fp.f_ty
+  | Flocal id ->
+      let ty' = gt fp.f_ty in
+        f_local id ty'
+
+  | Fpvar (id, s) ->
+      let ty' = gt fp.f_ty in
+        (f_pvar id ty' s).inv
+
+  | Fop (p, tys) ->
+      let tys' = List.Smart.map gt tys in
+      let ty'  = gt fp.f_ty in
+        f_op p tys' ty'
+
+  | Fapp (f, fs) ->
+      let f'  = g f in
+      let fs' = List.Smart.map g fs in
+      let ty' = gt fp.f_ty in
+        f_app f' fs' ty'
 
   | Ftuple fs ->
-    f_tuple (List.Smart.map g fs)
+      let fs' = List.Smart.map g fs in
+        f_tuple fs'
 
   | Fproj (f, i) ->
-    f_proj (g f) i fp.f_ty
+      let f'  = g f in
+      let ty' = gt fp.f_ty in
+        f_proj f' i ty'
 
   | FhoareF hf ->
-    let pr' = g hf.hf_pr in
-    let po' = g hf.hf_po in
-    f_hoareF_r { hf with hf_pr = pr'; hf_po = po'; }
+      let pr' = map_ss_inv1 g (hf_pr hf) in
+      let po' = map_hs_inv1 g (hf_po hf) in
+      f_hoareF pr' hf.hf_f po'
 
   | FhoareS hs ->
-    let pr' = g hs.hs_pr in
-    let po' = g hs.hs_po in
-    f_hoareS_r { hs with hs_pr = pr'; hs_po = po'; }
+      let pr' = map_ss_inv1 g (hs_pr hs) in
+      let po' = map_hs_inv1 g (hs_po hs) in
+      f_hoareS (snd hs.hs_m) pr' hs.hs_s po'
 
   | FeHoareF hf ->
-    let pr' = g hf.ehf_pr  in
-    let po' = g hf.ehf_po  in
-    f_eHoareF_r { hf with ehf_pr = pr'; ehf_po = po' }
+      let pr' = map_ss_inv1 g (ehf_pr hf) in
+      let po' = map_ss_inv1 g (ehf_po hf) in
+        f_eHoareF pr' hf.ehf_f po'
 
   | FeHoareS hs ->
-    let pr' = g hs.ehs_pr  in
-    let po' = g hs.ehs_po  in
-    f_eHoareS_r { hs with ehs_pr = pr'; ehs_po = po'; }
+      let pr' = map_ss_inv1 g (ehs_pr hs) in
+      let po' = map_ss_inv1 g (ehs_po hs) in
+        f_eHoareS (snd hs.ehs_m) pr' hs.ehs_s po'
 
   | FbdHoareF bhf ->
-    let pr' = g bhf.bhf_pr in
-    let po' = g bhf.bhf_po in
-    let bd' = g bhf.bhf_bd in
-    f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
+      let pr' = map_ss_inv1 g (bhf_pr bhf) in
+      let po' = map_ss_inv1 g (bhf_po bhf) in
+      let bd' = map_ss_inv1 g (bhf_bd bhf) in
+        f_bdHoareF pr' bhf.bhf_f po' bhf.bhf_cmp bd'
 
   | FbdHoareS bhs ->
-    let pr' = g bhs.bhs_pr in
-    let po' = g bhs.bhs_po in
-    let bd' = g bhs.bhs_bd in
-    f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
+      let pr' = map_ss_inv1 g (bhs_pr bhs) in
+      let po' = map_ss_inv1 g (bhs_po bhs) in
+      let bd' = map_ss_inv1 g (bhs_bd bhs) in
+        f_bdHoareS (snd bhs.bhs_m) pr' bhs.bhs_s po' bhs.bhs_cmp bd'
 
   | FequivF ef ->
-    let pr' = g ef.ef_pr in
-    let po' = g ef.ef_po in
-    f_equivF_r { ef with ef_pr = pr'; ef_po = po'; }
+      let pr' = map_ts_inv1 g (ef_pr ef) in
+      let po' = map_ts_inv1 g (ef_po ef) in
+        f_equivF pr' ef.ef_fl ef.ef_fr po'
 
   | FequivS es ->
-    let pr' = g es.es_pr in
-    let po' = g es.es_po in
-    f_equivS_r { es with es_pr = pr'; es_po = po'; }
+      let pr' = map_ts_inv1 g (es_pr es) in
+      let po' = map_ts_inv1 g (es_po es) in
+        f_equivS (snd es.es_ml) (snd es.es_mr) pr' es.es_sl es.es_sr po'
 
   | FeagerF eg ->
-    let pr' = g eg.eg_pr in
-    let po' = g eg.eg_po in
-    f_eagerF_r { eg with eg_pr = pr'; eg_po = po'; }
+      let pr' = map_ts_inv1 g (eg_pr eg) in
+      let po' = map_ts_inv1 g (eg_po eg) in
+        f_eagerF pr' eg.eg_sl eg.eg_fl eg.eg_fr eg.eg_sr po'
 
   | Fpr pr ->
-    let args' = g pr.pr_args in
-    let ev'   = g pr.pr_event in
-    f_pr_r { pr with pr_args = args'; pr_event = ev'; }
+      let args' = g pr.pr_args in
+      let ev'   = g pr.pr_event.inv in
+      f_pr_r { pr with pr_args = args'; pr_event = {m=pr.pr_event.m; inv=ev'}; }
 
 (* -------------------------------------------------------------------- *)
-let f_iter g f =
+let f_fold (tx : 'a -> form -> 'a) (state : 'a) (f : form) =
   match f.f_node with
   | Fint     _
   | Flocal   _
   | Fpvar    _
   | Fglob    _
-  | Fop      _ -> ()
+  | Fop      _ -> state
 
-  | Fquant   (_ , _ , f1) -> g f1
-  | Fif      (f1, f2, f3) -> g f1;g f2; g f3
-  | Fmatch   (b, fs, _)   -> List.iter g (b :: fs)
-  | Flet     (_, f1, f2)  -> g f1;g f2
-  | Fapp     (e, es)      -> List.iter g (e :: es)
-  | Ftuple   es           -> List.iter g es
-  | Fproj    (e, _)       -> g e
+  | Fquant   (_ , _ , f1) -> tx state f1
+  | Fif      (f1, f2, f3) -> List.fold_left tx state [f1; f2; f3]
+  | Fmatch   (b, fs, _)   -> List.fold_left tx state (b :: fs)
+  | Flet     (_, f1, f2)  -> List.fold_left tx state [f1; f2]
+  | Fapp     (f, fs)      -> List.fold_left tx state (f :: fs)
+  | Ftuple   fs           -> List.fold_left tx state fs
+  | Fproj    (f, _)       -> tx state f
 
-  | FhoareF  hf   -> g hf.hf_pr; g hf.hf_po
-  | FhoareS  hs   -> g hs.hs_pr; g hs.hs_po
-  | FeHoareF  hf  -> g hf.ehf_pr; g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr; g hs.ehs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po; g bhf.bhf_bd
-  | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po; g bhs.bhs_bd
-  | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
-  | FequivS   es  -> g es.es_pr; g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args; g pr.pr_event
+  | FhoareF  hf   -> POE.fold tx (tx state (hf_pr hf).inv) (hf_po hf).hsi_inv
+  | FhoareS  hs   -> POE.fold tx (tx state (hs_pr hs).inv) (hs_po hs).hsi_inv
+  | FeHoareF  hf  -> List.fold_left tx state [(ehf_pr hf).inv; (ehf_po hf).inv]
+  | FeHoareS  hs  -> List.fold_left tx state [(ehs_pr hs).inv; (ehs_po hs).inv]
+  | FbdHoareF bhf -> List.fold_left tx state [(bhf_pr bhf).inv; (bhf_po bhf).inv; (bhf_bd bhf).inv]
+  | FbdHoareS bhs -> List.fold_left tx state [(bhs_pr bhs).inv; (bhs_po bhs).inv; (bhs_bd bhs).inv]
+  | FequivF   ef  -> List.fold_left tx state [(ef_pr ef).inv; (ef_po ef).inv]
+  | FequivS   es  -> List.fold_left tx state [(es_pr es).inv; (es_po es).inv]
+  | FeagerF   eg  -> List.fold_left tx state [(eg_pr eg).inv; (eg_po eg).inv]
+  | Fpr       pr  -> List.fold_left tx state [pr.pr_args; pr.pr_event.inv]
 
+(* -------------------------------------------------------------------- *)
+let f_iter (tx : form -> unit) (f : form) =
+  f_fold (fun () f -> tx f) () f
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =
@@ -518,16 +583,16 @@ let form_exists g f =
   | Ftuple   es           -> List.exists g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF   hf -> g hf.hf_pr   || g hf.hf_po
-  | FhoareS   hs -> g hs.hs_pr   || g hs.hs_po
-  | FeHoareF  hf  -> g hf.ehf_pr || g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr || g hs.ehs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr  || g bhf.bhf_po
-  | FbdHoareS bhs -> g bhs.bhs_pr  || g bhs.bhs_po
-  | FequivF   ef  -> g ef.ef_pr    || g ef.ef_po
-  | FequivS   es  -> g es.es_pr    || g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr    || g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args  || g pr.pr_event
+  | FhoareF   hf -> g (hf_pr hf).inv   || POE.exists g (hf_po hf).hsi_inv
+  | FhoareS   hs -> g (hs_pr hs).inv   || POE.exists g (hs_po hs).hsi_inv
+  | FeHoareF  hf  -> g (ehf_pr hf).inv || g (ehf_po hf).inv
+  | FeHoareS  hs  -> g (ehs_pr hs).inv || g (ehs_po hs).inv
+  | FbdHoareF bhf -> g (bhf_pr bhf).inv || g (bhf_po bhf).inv
+  | FbdHoareS bhs -> g (bhs_pr bhs).inv || g (bhs_po bhs).inv
+  | FequivF   ef  -> g (ef_pr ef).inv   || g (ef_po ef).inv
+  | FequivS   es  -> g (es_pr es).inv   || g (es_po es).inv
+  | FeagerF   eg  -> g (eg_pr eg).inv    || g (eg_po eg).inv
+  | Fpr       pr  -> g pr.pr_args  || g pr.pr_event.inv
 
 (* -------------------------------------------------------------------- *)
 let form_forall g f =
@@ -546,16 +611,16 @@ let form_forall g f =
   | Ftuple   es           -> List.for_all g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF  hf  -> g hf.hf_pr  && g hf.hf_po
-  | FhoareS  hs  -> g hs.hs_pr  && g hs.hs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr && g bhf.bhf_po
-  | FbdHoareS bhs -> g bhs.bhs_pr && g bhs.bhs_po
-  | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
-  | FequivS   es  -> g es.es_pr   && g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
-  | Fpr       pr  -> g pr.pr_args && g pr.pr_event
-  | FeHoareF  hf  -> g hf.ehf_pr && g hf.ehf_po
-  | FeHoareS  hs  -> g hs.ehs_pr && g hs.ehs_po
+  | FhoareF  hf  -> g (hf_pr hf).inv  && POE.forall g (hf_po hf).hsi_inv
+  | FhoareS  hs  -> g (hs_pr hs).inv  && POE.forall g (hs_po hs).hsi_inv
+  | FbdHoareF bhf -> g (bhf_pr bhf).inv && g (bhf_po bhf).inv
+  | FbdHoareS bhs -> g (bhs_pr bhs).inv && g (bhs_po bhs).inv
+  | FequivF   ef  -> g (ef_pr ef).inv   && g (ef_po ef).inv
+  | FequivS   es  -> g (es_pr es).inv   && g (es_po es).inv
+  | FeagerF   eg  -> g (eg_pr eg).inv   && g (eg_po eg).inv
+  | Fpr       pr  -> g pr.pr_args && g pr.pr_event.inv
+  | FeHoareF  hf  -> g (ehf_pr hf).inv && g (ehf_po hf).inv
+  | FeHoareS  hs  -> g (ehs_pr hs).inv && g (ehs_po hs).inv
 
 
 (* -------------------------------------------------------------------- *)
@@ -595,8 +660,8 @@ let decompose_exists ?(bound : int option) (f : form) =
   decompose_binder ?bound ~quantif:Lexists f
 
 let decompose_lambda ?(bound : int option) (f : form) =
-  decompose_binder ?bound ~quantif:Llambda f    
-  
+  decompose_binder ?bound ~quantif:Llambda f
+
 (* -------------------------------------------------------------------- *)
 let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
   let bds, f = decompose_binder ?bound ~quantif f in
@@ -607,10 +672,10 @@ let destr_binder ?(bound : int option) ~quantif:quantif (f : form) =
 
 let destr_forall ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lforall f
-  
+
 let destr_exists ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Lexists f
-  
+
 let destr_lambda ?(bound : int option) (f : form) =
   destr_binder ?bound ~quantif:Llambda f
 
@@ -625,10 +690,10 @@ let destr_forall1 (f : form) =
 
 let destr_exists1 (f : form) =
   destr_binder1 ~quantif:Lexists f
-  
+
 let destr_lambda1 (f : form) =
   destr_binder1 ~quantif:Llambda f
-  
+
 (* -------------------------------------------------------------------- *)
 let destr_let f =
   match f.f_node with
@@ -775,6 +840,16 @@ let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
 
+let destr_and_ts_inv inv =
+  let c1 = map_ts_inv1 (fun po -> fst (destr_and po)) inv in
+  let c2 = map_ts_inv1 (fun po -> snd (destr_and po)) inv in
+  (c1, c2)
+
+let destr_and_ss_inv inv =
+  let c1 = map_ss_inv1 (fun po -> fst (destr_and po)) inv in
+  let c2 = map_ss_inv1 (fun po -> snd (destr_and po)) inv in
+  (c1, c2)
+
 let destr_and3 f =
   try
     let c1, (c2, c3) = snd_map destr_and (destr_and f)
@@ -864,7 +939,8 @@ let equantif_of_quantif (qt : quantif) : equantif =
   | Lexists -> `EExists
 
 (* -------------------------------------------------------------------- *)
-let rec form_of_expr mem (e : expr) =
+
+let rec form_of_expr_r ?m (e : expr) =
   match e.e_node with
   | Eint n ->
      f_int n
@@ -873,50 +949,59 @@ let rec form_of_expr mem (e : expr) =
      f_local id e.e_ty
 
   | Evar pv ->
-     f_pvar pv e.e_ty mem
+    begin
+     match m with
+     | None -> failwith "expecting memory"
+     | Some m -> (f_pvar pv e.e_ty m).inv
+    end
 
   | Eop (op, tys) ->
-     f_op_tc op tys e.e_ty
+     f_op op tys e.e_ty
 
   | Eapp (ef, es) ->
-     f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
+     f_app (form_of_expr_r ?m ef) (List.map (form_of_expr_r ?m) es) e.e_ty
 
   | Elet (lpt, e1, e2) ->
-     f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
+     f_let lpt (form_of_expr_r ?m e1) (form_of_expr_r ?m e2)
 
   | Etuple es ->
-     f_tuple (List.map (form_of_expr mem) es)
+     f_tuple (List.map (form_of_expr_r ?m) es)
 
   | Eproj (e1, i) ->
-     f_proj (form_of_expr mem e1) i e.e_ty
+     f_proj (form_of_expr_r ?m e1) i e.e_ty
 
   | Eif (e1, e2, e3) ->
-     let e1 = form_of_expr mem e1 in
-     let e2 = form_of_expr mem e2 in
-     let e3 = form_of_expr mem e3 in
+     let e1 = form_of_expr_r ?m e1 in
+     let e2 = form_of_expr_r ?m e2 in
+     let e3 = form_of_expr_r ?m e3 in
      f_if e1 e2 e3
 
   | Ematch (b, fs, ty) ->
-     let b'  = form_of_expr mem b in
-     let fs' = List.map (form_of_expr mem) fs in
+     let b'  = form_of_expr_r ?m b in
+     let fs' = List.map (form_of_expr_r ?m) fs in
      f_match b' fs' ty
 
   | Equant (qt, b, e) ->
      let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
-     let e = form_of_expr mem e in
+     let e = form_of_expr_r ?m e in
      f_quant (quantif_of_equantif qt) b e
 
+let form_of_expr ?m e = form_of_expr_r ?m e
+
+let ss_inv_of_expr m (e : expr) =
+  {m;inv=form_of_expr_r ~m e}
 
 (* -------------------------------------------------------------------- *)
 exception CannotTranslate
 
-let expr_of_form mh f =
+let expr_of_ss_inv f =
+  let mh, f = f.m, f.inv in
   let rec aux fp =
     match fp.f_node with
     | Fint   z -> e_int z
     | Flocal x -> e_local x fp.f_ty
 
-    | Fop  (p, tys) -> e_op_tc p tys fp.f_ty
+    | Fop  (p, tys) -> e_op p tys fp.f_ty
     | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
     | Ftuple fs     -> e_tuple (List.map aux fs)
     | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
@@ -939,6 +1024,43 @@ let expr_of_form mh f =
       else raise CannotTranslate
 
     | Fglob     _
+    | FhoareF   _ | FhoareS   _
+    | FeHoareF  _ | FeHoareS  _
+    | FbdHoareF _ | FbdHoareS _
+    | FequivF   _ | FequivS   _
+    | FeagerF   _ | Fpr       _ -> raise CannotTranslate
+
+  and auxbd ((x, bd) : binding) =
+    match bd with
+    | GTty ty -> (x, ty)
+    | _ -> raise CannotTranslate
+
+  in aux f
+
+let expr_of_form f =
+  let rec aux fp =
+    match fp.f_node with
+    | Fint   z -> e_int z
+    | Flocal x -> e_local x fp.f_ty
+
+    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
+    | Ftuple fs     -> e_tuple (List.map aux fs)
+    | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
+
+    | Fif (c, f1, f2) ->
+      e_if (aux c) (aux f1) (aux f2)
+
+    | Fmatch (c, bs, ty) ->
+      e_match (aux c) (List.map aux bs) ty
+
+    | Flet (lp, f1, f2) ->
+      e_let lp (aux f1) (aux f2)
+
+    | Fquant (kd, bds, f) ->
+      e_quantif (equantif_of_quantif kd) (List.map auxbd bds) (aux f)
+
+    | Fpvar     _ | Fglob     _
     | FhoareF   _ | FhoareS   _
     | FeHoareF  _ | FeHoareS  _
     | FbdHoareF _ | FbdHoareS _

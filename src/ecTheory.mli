@@ -8,17 +8,11 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
-type import = { im_immediate : bool; im_atimport : bool; }
-
-val import0  : import
-val noimport : import
-
-(* -------------------------------------------------------------------- *)
 type theory = theory_item list
 
 and theory_item = {
   ti_item   : theory_item_r;
-  ti_import : import;
+  ti_import : bool;
 }
 
 and theory_item_r =
@@ -35,7 +29,8 @@ and theory_item_r =
   | Th_addrw     of EcPath.path * EcPath.path list * is_local
   (* reduction rule does not survive section => no locality *)
   | Th_reduction of (EcPath.path * rule_option * rule option) list
-  | Th_auto      of (int * symbol option * path list * is_local)
+  | Th_auto      of auto_rule
+  | Th_alias     of (symbol * path)
 
 and thsource = {
   ths_base : EcPath.path;
@@ -84,7 +79,15 @@ and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
 }
-val mkitem : import -> theory_item_r -> theory_item
+
+and auto_rule = {
+  level    : int;
+  base     : symbol option;
+  axioms   : (path * [`Rigid | `Default]) list;
+  locality : is_local;
+}
+
+val mkitem : import:bool -> theory_item_r -> theory_item
 
 (* -------------------------------------------------------------------- *)
 val module_expr_of_module_sig : EcIdent.t -> mty_mr -> module_sig -> module_expr

@@ -64,9 +64,11 @@ val unify        : EcEnv.env -> unienv -> ty -> ty -> unit
 val unify_tcw    : EcEnv.env -> unienv -> tcwitness -> tcwitness -> unit
 val unify_etyarg : EcEnv.env -> unienv -> etyarg -> etyarg -> unit
 
-val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
+val tfun_expected : unienv -> ?retty:ty -> EcTypes.ty list -> EcTypes.ty
 
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
+
+type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
 
 val select_op :
      ?hidden:bool

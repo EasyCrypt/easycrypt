@@ -39,7 +39,7 @@ module type PrinterAPI = sig
 
   val pp_paren : 'a pp -> 'a pp
 
-  val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
+  val pp_list : ?on_empty:unit pp -> ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
   (* ------------------------------------------------------------------ *)
   val pp_pv      : PPEnv.t -> prog_var pp
@@ -53,7 +53,7 @@ module type PrinterAPI = sig
   val pp_tyname  : PPEnv.t -> path pp
   val pp_axname  : PPEnv.t -> path pp
   val pp_tcname  : PPEnv.t -> path pp
-  val pp_thname  : PPEnv.t -> path pp
+  val pp_thname  : ?alias:bool -> PPEnv.t -> path pp
 
   val pp_mem      : PPEnv.t -> EcIdent.t pp
   val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
@@ -61,12 +61,33 @@ module type PrinterAPI = sig
   val pp_tyunivar : PPEnv.t -> EcAst.tyuni pp
   val pp_tcunivar : PPEnv.t -> EcAst.tcuni pp
   val pp_path     : path pp
+  
+  (* ------------------------------------------------------------------ *)
+  val shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path -> qsymbol * qsymbol option
+
+  val pp_shorten_path : PPEnv.t -> (path -> qsymbol -> bool) -> path pp
 
   (* ------------------------------------------------------------------ *)
-  val pp_codepos1    : PPEnv.t -> codepos1 pp
-  val pp_codeoffset1 : PPEnv.t -> codeoffset1 pp
+  val pp_codepos1      : PPEnv.t -> EcMatching.Position.codepos1 pp
+  val pp_codepos_brsel : EcMatching.Position.codepos_brsel pp
+  val pp_codepos_step  : PPEnv.t -> EcMatching.Position.codepos_step pp
+  val pp_codepos_path  : PPEnv.t -> EcMatching.Position.codepos_path pp
+  val pp_codeoffset1   : PPEnv.t -> EcMatching.Position.codeoffset1 pp
 
-  val pp_codepos     : PPEnv.t -> codepos pp
+  val pp_codepos        : PPEnv.t -> EcMatching.Position.codepos pp
+  val pp_codegap1       : PPEnv.t -> EcMatching.Position.codegap1 pp
+  val pp_codegap        : PPEnv.t -> EcMatching.Position.codegap pp
+  val pp_codegap1_range : PPEnv.t -> EcMatching.Position.codegap1_range pp
+  val pp_codegap_range  : PPEnv.t -> EcMatching.Position.codegap_range pp
+
+  (* ------------------------------------------------------------------ *)
+  type vsubst = [
+    | `Local of EcIdent.t
+    | `Glob  of EcIdent.t * EcMemory.memory
+    | `PVar  of EcTypes.prog_var * EcMemory.memory
+  ]
+
+  val pp_vsubst : PPEnv.t -> vsubst pp
 
   (* ------------------------------------------------------------------ *)
   val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
@@ -98,6 +119,14 @@ module type PrinterAPI = sig
 
   val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
   val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
+
+  val pp_goal1 : PPEnv.t -> (EcBaseLogic.hyps * form) pp
+
+  (* ------------------------------------------------------------------ *)
+  val pp_by_theory : PPEnv.t -> (PPEnv.t -> (EcPath.path * 'a) pp) -> ((EcPath.path * 'a) list) pp  
+
+  (* ------------------------------------------------------------------ *)
+  val pp_rule_pattern : PPEnv.t -> EcTheory.rule_pattern pp  
 
   (* ------------------------------------------------------------------ *)
   module ObjectInfo : sig

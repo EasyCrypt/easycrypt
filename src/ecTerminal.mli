@@ -10,7 +10,7 @@ type loglevel = EcGState.loglevel
 
 (* -------------------------------------------------------------------- *)
 val interactive : terminal -> bool
-val next        : terminal -> EcParsetree.prog
+val next        : terminal -> string * EcParsetree.prog
 val notice      : immediate:bool -> loglevel -> string -> terminal -> unit
 val finish      : status -> terminal -> unit
 val finalize    : terminal -> unit
@@ -22,6 +22,7 @@ type progress = [ `Human | `Script | `Silent ]
 val from_channel :
      ?gcstats:bool
   -> ?progress:progress
+  -> ?lastgoals:bool
   -> name:string
   -> in_channel
   -> terminal

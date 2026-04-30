@@ -1,0 +1,8 @@
+(library 
+ (name inifiles)
+ (public_name easycrypt.inifiles)
+ (modules :standard)
+ (libraries pcre2 unix))
+
+(ocamllex inilexer)
+(ocamlyacc parseini)

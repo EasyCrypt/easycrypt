@@ -50,6 +50,8 @@ abstract theory ZModule.
   lemma subrr (x : t): x - x = zeror.
   proof. by rewrite addrN. qed.
 
+  hint simplify subrr.
+
   lemma addKr: left_loop [-] (+).
   proof. by move=> x y; rewrite addrA addNr add0r. qed.
 
@@ -795,7 +797,7 @@ end IDomain.
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
 
-  clone include IDomain with pred unit (x : t) <- x <> zeror.
+  clone include IDomain with pred unit (x : t) <= x <> zeror.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
   proof. by apply/mulrV. qed.
