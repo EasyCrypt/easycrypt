@@ -1182,15 +1182,42 @@ let trans_hyp ((genv, lenv) as env) (x, ty) =
   | LD_abs_st _ -> env
 
 (* -------------------------------------------------------------------- *)
-let lenv_of_hyps genv (hyps : hyps) : lenv =
-  let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
-  snd (List.fold_left trans_hyp (genv, lenv) (List.rev hyps.h_local))
-
-(* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) =
 (*  if not ax.ax_nosmt then *)
     let lenv = fst (lenv_of_tparams ax.ax_tparams) in
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
+
+(* For each typeclass constraint on a goal-context type parameter, pull
+   in the typeclass axioms (and those of all its ancestors) as Why3
+   axioms. The axioms are registered globally with [`NoSmt] visibility
+   so the relevance heuristic skips them; we add them here on a
+   per-tparam basis so [smt()] (without explicit hints) can still close
+   goals over abstract TC carriers. *)
+let trans_tc_axioms genv (tparams : ty_params) =
+  let seen = ref EcPath.Sp.empty in
+  let trans_one tc =
+    let ancestors = EcTypeClass.ancestors genv.te_env tc in
+    List.iter (fun anc ->
+      match EcEnv.TypeClass.by_path_opt anc.tc_name genv.te_env with
+      | None -> ()
+      | Some tc_decl ->
+        List.iter (fun (axname, _) ->
+          let ax_path =
+            EcPath.pqoname (EcPath.prefix anc.tc_name) axname in
+          if not (EcPath.Sp.mem ax_path !seen) then begin
+            seen := EcPath.Sp.add ax_path !seen;
+            EcEnv.Ax.by_path_opt ax_path genv.te_env
+            |> Option.iter (fun ax -> trans_axiom genv (ax_path, ax))
+          end
+        ) tc_decl.tc_axs
+    ) ancestors in
+  List.iter (fun (_, tcs) -> List.iter trans_one tcs) tparams
+
+(* -------------------------------------------------------------------- *)
+let lenv_of_hyps genv (hyps : hyps) : lenv =
+  let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
+  trans_tc_axioms genv hyps.h_tvar;
+  snd (List.fold_left trans_hyp (genv, lenv) (List.rev hyps.h_local))
 
 (* -------------------------------------------------------------------- *)
 let mk_predb1 f l _ = f (Cast.force_prop (as_seq1 l))

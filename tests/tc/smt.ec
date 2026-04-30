@@ -32,6 +32,14 @@ lemma triple_assoc ['a <: addmonoid] (x y z w : 'a) :
   ((x + y) + z) + w = x + (y + (z + w)).
 proof. smt(addmA). qed.
 
+(* 2bis) Abstract carrier WITHOUT explicit TC axiom hints: the TC axioms
+   tied to the tparam constraint are auto-included by [trans_tc_axioms]. *)
+lemma idm_left_nohint ['a <: addmonoid] (x : 'a) : idm + x = x.
+proof. smt(). qed.
+
+lemma idm_right_nohint ['a <: addmonoid] (x : 'a) : x + idm = x.
+proof. smt(). qed.
+
 (* 3) TC inheritance: parent axioms remain available to SMT. *)
 type class addgroup <: addmonoid = {
   op opp : addgroup -> addgroup
@@ -40,6 +48,14 @@ type class addgroup <: addmonoid = {
 
 lemma group_zero ['a <: addgroup] (x : 'a) : (opp x + x) + idm = idm.
 proof. smt(addNm add0m). qed.
+
+(* 3bis) Inheritance + no-hints: parent (addmonoid) axioms must also be
+   pulled in via the ancestor walk. *)
+lemma group_left_nohint ['a <: addgroup] (x : 'a) : idm + x = x.
+proof. smt(). qed.
+
+lemma group_inv_nohint ['a <: addgroup] (x : 'a) : opp x + x = idm.
+proof. smt(). qed.
 
 (* 4) Section [declare type t <: tc] reaches SMT correctly. *)
 section.
