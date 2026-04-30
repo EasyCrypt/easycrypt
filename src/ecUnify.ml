@@ -373,6 +373,8 @@ module Unify = struct
         end
 
         | `TcCtt (uid, ty, tc) ->
+          (* See doc/typeclasses-inference.md for the strategy framework
+             and the catalog of inference modes this resolver covers. *)
           let deps = ref TyUni.Suid.empty in
 
           let rec check_ty (ty : ty) : ty =
@@ -408,54 +410,73 @@ module Unify = struct
           let ty = check_ty ty in
           let deps = !deps in
 
-          if TyUni.Suid.is_empty deps then begin
-            let deref_tc (tc' : typeclass) =
-              { tc' with tc_args = List.map check_etyarg tc'.tc_args } in
-            let eq_tc (tc' : typeclass) =
-              let tc' = deref_tc tc' in
-              EcPath.p_equal tc.tc_name tc'.tc_name
-              && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
+          (* ---- Helpers shared across strategies ---- *)
+          let eq_tc (tc' : typeclass) =
+            EcPath.p_equal tc.tc_name tc'.tc_name
+            && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
 
-            (* Find the offset of [tc] (or any of its ancestors) in [tcs];
-               also return the number of [tc_prt] steps walked to reach
-               [tc] from [tcs.(offset)]. [lift = 0] is a direct match. *)
-            let match_tc_offset (tcs : typeclass list) : (int * int) option =
-              let with_lift tc' =
-                List.find_index eq_tc (EcTypeClass.ancestors env tc') in
-              let rec scan i = function
-                | [] -> None
-                | tc' :: rest ->
-                  match with_lift tc' with
-                  | Some lift -> Some (i, lift)
-                  | None -> scan (i + 1) rest
-              in scan 0 tcs in
+          (* Find the offset of [tc] (or any of its ancestors) in [tcs];
+             also return the number of [tc_prt] steps walked to reach
+             [tc] from [tcs.(offset)]. [lift = 0] is a direct match. *)
+          let match_tc_offset (tcs : typeclass list) : (int * int) option =
+            let with_lift tc' =
+              List.find_index eq_tc (EcTypeClass.ancestors env tc') in
+            let rec scan i = function
+              | [] -> None
+              | tc' :: rest ->
+                match with_lift tc' with
+                | Some lift -> Some (i, lift)
+                | None -> scan (i + 1) rest
+            in scan 0 tcs in
 
-            let abstract_via_decl (p : EcPath.path) : tcwitness option =
+          (* ---- Strategies (catalog modes) ----
+             Each strategy returns [Some witness] when it resolves, or
+             [None] when it does not apply / cannot decide. The dispatcher
+             below tries them in priority order. *)
+
+          (* Mode #5: carrier is [Tvar a] with a in [tvtc]. *)
+          let strat_tvar_via_tvtc () : tcwitness option =
+            match ty.ty_node with
+            | Tvar a ->
+              let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
+              let (offset, lift) = ofdfl failure (match_tc_offset tcs) in
+              Some (TCIAbstract { support = `Var a; offset; lift })
+            | _ -> None in
+
+          (* Mode #6: carrier is [Tconstr p] with [p] an abstract decl. *)
+          let strat_abs_via_decl () : tcwitness option =
+            match ty.ty_node with
+            | Tconstr (p, _) -> begin
               match EcEnv.Ty.by_path_opt p env with
               | Some { tyd_type = `Abstract tcs; _ } ->
-                  Option.map
-                    (fun (offset, lift) ->
-                      TCIAbstract { support = `Abs p; offset; lift })
-                    (match_tc_offset tcs)
-              | _ -> None in
+                Option.map
+                  (fun (offset, lift) ->
+                    TCIAbstract { support = `Abs p; offset; lift })
+                  (match_tc_offset tcs)
+              | _ -> None
+              end
+            | _ -> None in
 
+          (* Modes #1, #2: carrier is ground; query the instance database. *)
+          let strat_infer_by_carrier () : tcwitness option =
+            EcTypeClass.infer env ty tc in
+
+          (* ---- Dispatch ---- *)
+          if TyUni.Suid.is_empty deps then begin
             let resolution =
               match ty.ty_node with
-              | Tvar a ->
-                let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
-                let (offset, lift) = ofdfl failure (match_tc_offset tcs) in
-                TCIAbstract { support = `Var a; offset; lift }
-
-              | Tconstr (p, _) when Option.is_some (abstract_via_decl p) ->
-                Option.get (abstract_via_decl p)
-
+              | Tvar _ ->
+                ofdfl failure (strat_tvar_via_tvtc ())
+              | Tconstr _ when Option.is_some (strat_abs_via_decl ()) ->
+                Option.get (strat_abs_via_decl ())
               | _ ->
-                ofdfl failure (EcTypeClass.infer env ty tc)
+                ofdfl failure (strat_infer_by_carrier ())
             in
             uc := { !uc with tcenv = { (!uc).tcenv with resolution =
               TcUni.Muid.add uid resolution (!uc).tcenv.resolution
             } }
           end else begin
+            (* Mode #4: carrier has univars; park on each. *)
             TyUni.Suid.iter (fun tyvar ->
               uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
                 TyUni.Muid.change (fun map ->
