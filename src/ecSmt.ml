@@ -266,14 +266,14 @@ let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
 
 (* -------------------------------------------------------------------- *)
 let lenv_of_tparams ts =
-  let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
+  let trans_tv env ((id, _) : ty_param) =
     let tv = WTy.create_tvsymbol (preid id) in
     { env with le_tv = Mid.add id (WTy.ty_var tv) env.le_tv }, tv
   in
     List.map_fold trans_tv empty_lenv ts
 
 let lenv_of_tparams_for_hyp genv ts =
-  let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
+  let trans_tv env ((id, _) : ty_param) =
     let ts = WTy.create_tysymbol (preid id) [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
