@@ -1,6 +1,5 @@
 require import AllCore.
 
-(* Verify SMT pre-reduction unfolds TC ops at concrete instances. *)
 type class addmonoid = {
   op idm : addmonoid
   op (+) : addmonoid -> addmonoid -> addmonoid
@@ -10,6 +9,7 @@ type class addmonoid = {
   axiom add0m : left_id idm (+)
 }.
 
+(* 1) Concrete instance: SMT pre-reduction collapses TC ops, then smt() closes. *)
 op zero_int : int = 0.
 op plus_int : int -> int -> int = Int.( + ).
 
@@ -21,5 +21,46 @@ realize addmA by rewrite /plus_int; smt().
 realize addmC by rewrite /plus_int; smt().
 realize add0m by rewrite /plus_int /zero_int; smt().
 
-(* SMT pre-reduction collapses [idm<:int>] to [zero_int]; SMT then closes. *)
 lemma idm_int : (idm<:int>) = zero_int by smt().
+
+(* 2) Abstract carrier with TC axiom hints: SMT chains TC axioms through
+   the polymorphic operator surface. *)
+lemma combine_abs ['a <: addmonoid] (x y : 'a) : (idm + x) + y = x + y.
+proof. smt(add0m). qed.
+
+lemma triple_assoc ['a <: addmonoid] (x y z w : 'a) :
+  ((x + y) + z) + w = x + (y + (z + w)).
+proof. smt(addmA). qed.
+
+(* 3) TC inheritance: parent axioms remain available to SMT. *)
+type class addgroup <: addmonoid = {
+  op opp : addgroup -> addgroup
+  axiom addNm : forall (x : addgroup), opp x + x = idm
+}.
+
+lemma group_zero ['a <: addgroup] (x : 'a) : (opp x + x) + idm = idm.
+proof. smt(addNm add0m). qed.
+
+(* 4) Section [declare type t <: tc] reaches SMT correctly. *)
+section.
+  declare type t <: addmonoid.
+
+  lemma chain (a b c : t) : ((a + idm) + b) + (idm + c) = (a + b) + c.
+  proof. smt(add0m addmA addmC). qed.
+end section.
+
+(* 5) Two distinct concrete instances coexist in one goal. *)
+op zero_bool : bool = false.
+op or_bool : bool -> bool -> bool = (\/).
+
+instance addmonoid as bool_inst with bool
+  op idm = zero_bool
+  op (+) = or_bool.
+
+realize addmA by rewrite /or_bool; smt().
+realize addmC by rewrite /or_bool; smt().
+realize add0m by rewrite /or_bool /zero_bool; smt().
+
+lemma cross (i : int) (b : bool) :
+  zero_int + i = i /\ (zero_bool \/ b = false \/ b).
+proof. smt(). qed.
