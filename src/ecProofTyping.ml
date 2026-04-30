@@ -194,9 +194,13 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
     | Tunivar _ | Tvar _ -> false
     | _ -> not (ty_sub_exists (fun t -> not (is_ground t)) ty) in
 
-  let check_constraints (tcs : typeclass list) (ty : ty) =
+  (* Constraints can reference earlier tparams (e.g. 'c <: ('a, 'b) embed
+     references 'a, 'b). We substitute the user-supplied tparam values
+     before calling [infer]. *)
+  let check_constraints (subst : etyarg Mid.t) (tcs : typeclass list) (ty : ty) =
     if is_ground ty then
       List.iter (fun tc ->
+        let tc = EcCoreSubst.Tvar.subst_tc subst tc in
         if Option.is_none (EcTypeClass.infer env ty tc) then
           let ppe = EcPrinting.PPEnv.ofenv env in
           tc_error_lazy pe (fun fmt ->
@@ -214,9 +218,14 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
         tc_error pe
           "wrong number of type parameters (%d, expecting %d)"
           (List.length tyargs) (List.length typ);
-      List.iter2 (fun (_, tcs) (ty_opt, _) ->
-        Option.iter (check_constraints tcs) ty_opt
-      ) typ tyargs
+      let _ : etyarg Mid.t =
+        List.fold_left2 (fun subst (id, tcs) (ty_opt, _) ->
+          Option.iter (check_constraints subst tcs) ty_opt;
+          match ty_opt with
+          | Some ty -> Mid.add id (ty, []) subst
+          | None    -> subst
+        ) Mid.empty typ tyargs
+      in ()
 
   | Some (EcUnify.TVInamed tyargs) ->
       let typnames = List.map (EcIdent.name |- fst) typ in
@@ -225,11 +234,15 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
           if not (List.mem x typnames) then
             tc_error pe "unknown type variable: %s" x)
         tyargs;
-      List.iter (fun (id, tcs) ->
-        match List.assoc_opt (EcIdent.name id) tyargs with
-        | Some (Some ty, _) -> check_constraints tcs ty
-        | _ -> ()
-      ) typ
+      let _ : etyarg Mid.t =
+        List.fold_left (fun subst (id, tcs) ->
+          match List.assoc_opt (EcIdent.name id) tyargs with
+          | Some (Some ty, _) ->
+            check_constraints subst tcs ty;
+            Mid.add id (ty, []) subst
+          | _ -> subst
+        ) Mid.empty typ
+      in ()
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

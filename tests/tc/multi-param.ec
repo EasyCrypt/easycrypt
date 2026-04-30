@@ -33,3 +33,9 @@ realize proj_inj by trivial.
    from the source/target alone. *)
 op test_proj : int = proj_pair (inj_pair true).
 op test_via_tc : int = proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> true).
+
+(* Polymorphic lemma applied at the concrete instance. *)
+lemma round_trip_int (x : int) (y : bool) :
+  proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> y) = x =>
+  proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> y) = x.
+proof. by apply (round_trip<:int, bool, (int * bool)>). qed.
