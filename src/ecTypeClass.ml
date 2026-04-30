@@ -18,11 +18,18 @@ module TyMatch(E : sig val env : EcEnv.env end) = struct
     | Tunivar _, _ ->
       assert false
 
+    (* Tunivar on the [ty] side is a wildcard: the goal type contains
+       a fresh univar that the unifier will resolve later. Don't fail
+       the match — leave the pattern's [Tvar] entries (if any) unbound
+       and let the caller decide whether the partial match is enough. *)
+    | _, Tunivar _ ->
+      map
+
     | Tvar a, _ -> begin
       match Option.get (Mid.find_opt a map) with
       | None ->
         Mid.add a (Some ty) map
-        
+
       | Some ty' ->
         if not (EcCoreEqTest.for_type E.env ty ty') then
           raise NoMatch;
@@ -144,6 +151,27 @@ and infer (env : EcEnv.env) (ty : ty) (tc : typeclass) =
   List.find_map_opt
     (check_tcinstance env ty tc)
     (EcEnv.TcInstance.get_all env)
+
+(* -------------------------------------------------------------------- *)
+(* Match a candidate instance against [tc] on its arguments only,
+   leaving the carrier ([tci.tci_type]) for the caller to unify with
+   the goal carrier. Returns the partial type-substitution that
+   pinned the [tci_params] from the match. *)
+let candidates_by_args (env : EcEnv.env) (tc : typeclass)
+  : (EcPath.path option * tcinstance * ty option EcIdent.Mid.t) list
+=
+  let try_one (p, tci) =
+    match tci.tci_instance with
+    | `General (tgp, _) when EcPath.p_equal tc.tc_name tgp.tc_name -> begin
+      try
+        let map =
+          etyargs_match env (List.fst tci.tci_params)
+            ~patterns:tgp.tc_args ~etyargs:tc.tc_args
+        in Some (p, tci, map)
+      with NoMatch -> None
+      end
+    | _ -> None
+  in List.filter_map try_one (EcEnv.TcInstance.get_all env)
 
 (* -------------------------------------------------------------------- *)
 (* Flatten the parent chain of a typeclass: returns [tc; parent;

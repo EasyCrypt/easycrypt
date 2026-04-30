@@ -411,7 +411,14 @@ module Unify = struct
           let deps = !deps in
 
           (* ---- Helpers shared across strategies ---- *)
+          (* [tvtc] stores TC constraints as they were typed at tparam
+             declaration; the args may still mention Tunivars that were
+             since merged in [uf]. Dereference via [check_etyarg] before
+             structural comparison. *)
+          let deref_tc (tc' : typeclass) =
+            { tc' with tc_args = List.map check_etyarg tc'.tc_args } in
           let eq_tc (tc' : typeclass) =
+            let tc' = deref_tc tc' in
             EcPath.p_equal tc.tc_name tc'.tc_name
             && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
 
@@ -461,6 +468,59 @@ module Unify = struct
           let strat_infer_by_carrier () : tcwitness option =
             EcTypeClass.infer env ty tc in
 
+          (* Univars appearing in [tc.tc_args] (types and witnesses).
+             Used both for the Mode-#3 strategy gating and to register
+             extra parking edges so the problem re-fires when one of
+             them is resolved later. *)
+          let etyarg_univars (a, ws) =
+            let from_ty = Tuni.univars a in
+            List.fold_left (fun s w ->
+              TyUni.Suid.union s
+                (EcTypes.tcw_fold
+                   (fun s t -> TyUni.Suid.union s (Tuni.univars t))
+                   TyUni.Suid.empty w))
+              from_ty ws in
+          let arg_deps =
+            List.fold_left (fun s a -> TyUni.Suid.union s (etyarg_univars a))
+              TyUni.Suid.empty tc.tc_args in
+
+          (* Mode #3: carrier is a univar; identify a unique matching
+             instance by [tc.tc_args] (Tunivars on the goal side act
+             as wildcards), then push a [`TyUni (ty, tci_type)]
+             equation. The carrier resolution will then re-fire this
+             TcCtt under Mode #1 and produce the concrete witness. *)
+          let strat_infer_by_args () : tcwitness option =
+            match EcTypeClass.candidates_by_args env tc with
+            | [(Some _, tci, _map)] -> begin
+              (* Recover the candidate's [tgp.tc_args] (the patterns). *)
+              let tgargs =
+                match tci.tci_instance with
+                | `General (tgp, _) -> tgp.tc_args
+                | _ -> assert false in
+              (* Open the candidate's tparams as fresh univars. *)
+              let inst_subst =
+                List.fold_left (fun subst (a, _) ->
+                  let (uc', (fresh_ty, _)) = fresh (!uc) in
+                  uc := uc' ;
+                  Mid.add a (fresh_ty, []) subst
+                ) Mid.empty tci.tci_params in
+              let tgargs =
+                List.map (EcCoreSubst.Tvar.subst_etyarg inst_subst) tgargs in
+              let inst_carrier =
+                EcCoreSubst.Tvar.subst inst_subst tci.tci_type in
+              (* Push TyUni equations: each goal arg unifies with the
+                 candidate's substituted arg, and the carrier with
+                 [tci_type]. The unifier binds goal Tunivars to the
+                 corresponding patterns and triggers Mode #1 re-firing
+                 once the carrier is concrete. *)
+              List.iter2 (fun (gty, _) (pty, _) ->
+                Queue.push (`TyUni (gty, pty)) pb)
+                tc.tc_args tgargs;
+              Queue.push (`TyUni (ty, inst_carrier)) pb;
+              None  (* Defer witness construction; Mode #1 will fire. *)
+              end
+            | _ -> None in
+
           (* ---- Dispatch ---- *)
           if TyUni.Suid.is_empty deps then begin
             let resolution =
@@ -476,15 +536,23 @@ module Unify = struct
               TcUni.Muid.add uid resolution (!uc).tcenv.resolution
             } }
           end else begin
-            (* Mode #4: carrier has univars; park on each. *)
-            TyUni.Suid.iter (fun tyvar ->
-              uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
-                TyUni.Muid.change (fun map ->
-                  let map = Option.value ~default:TcUni.Suid.empty map in
-                  Some (TcUni.Suid.add uid map)
-                ) tyvar (!uc).tcenv.byunivar
+            match strat_infer_by_args () with
+            | Some witness ->
+              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                TcUni.Muid.add uid witness (!uc).tcenv.resolution
               } }
-            ) deps
+            | None ->
+              (* Mode #4: carrier still has univars; park on each.
+                 Also park on [arg_deps] so a later binding of a
+                 typeclass argument re-fires Mode #3. *)
+              TyUni.Suid.iter (fun tyvar ->
+                uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
+                  TyUni.Muid.change (fun map ->
+                    let map = Option.value ~default:TcUni.Suid.empty map in
+                    Some (TcUni.Suid.add uid map)
+                  ) tyvar (!uc).tcenv.byunivar
+                } }
+              ) (TyUni.Suid.union deps arg_deps)
           end
 
         | `TcTw (w1, w2) ->

@@ -10,7 +10,9 @@ type class ['a, 'b] embed = {
     forall (x : 'a) (y : 'b), proj (inj y) = x => proj (inj y) = x
 }.
 
-(* Polymorphic-over-multi-param lemma. *)
+(* Polymorphic-over-multi-param lemma. The polymorphic body still needs
+   an explicit tvi: the carrier is a type parameter ['c], so there is
+   no concrete instance to drive By-args inference. *)
 lemma round_trip
   ['a, 'b, 'c <: ('a, 'b) embed]
   (x : 'a) (y : 'b) :
@@ -28,13 +30,14 @@ instance (int, bool) embed as pair_inst with (int * bool)
 
 realize proj_inj by trivial.
 
-(* The instance specializes both type parameters; bare ops require
-   explicit tvi because the parametric carrier 'self cannot be inferred
-   from the source/target alone. *)
+(* The instance specializes both type parameters. Both forms work:
+   the helper-op form and the bare TC op form. *)
 op test_proj : int = proj_pair (inj_pair true).
-op test_via_tc : int = proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> true).
+op test_via_tc : int = proj (inj true).
 
-(* Polymorphic lemma applied at the concrete instance. *)
+(* Polymorphic lemma applied at the concrete instance. The body uses
+   explicit tvi because the apply target is the polymorphic
+   [round_trip], not a TC op directly. *)
 lemma round_trip_int (x : int) (y : bool) :
   proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> y) = x =>
   proj<:int, bool, (int * bool)> (inj<:int, bool, (int * bool)> y) = x.
