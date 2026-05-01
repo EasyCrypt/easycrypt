@@ -27,7 +27,7 @@ and 'a ovrhooks = {
   henv      : 'a -> EcSection.scenv;
   hadd_item : 'a -> import:bool -> EcTheory.theory_item_r -> 'a;
   hthenter  : 'a -> thmode -> symbol -> EcTypes.is_local -> 'a;
-  hthexit   : 'a -> [`Full | `ClearOnly | `No] -> 'a;
+  hthexit   : 'a -> import:bool -> [`Full | `ClearOnly | `No] -> 'a;
   herr      : 'b . ?loc:EcLocation.t -> string -> 'b;
 }
 

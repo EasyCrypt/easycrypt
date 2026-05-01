@@ -1400,22 +1400,23 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | _ -> item
   in
   let env = scenv.sc_env in
+  let import = item.ti_import in
   let env =
     match item.ti_item with
-    | Th_type    (s,tyd) -> EcEnv.Ty.bind s tyd env
-    | Th_operator (s,op) -> EcEnv.Op.bind s op env
-    | Th_axiom   (s, ax) -> EcEnv.Ax.bind s ax env
-    | Th_modtype (s, ms) -> EcEnv.ModTy.bind s ms env
-    | Th_module       me -> EcEnv.Mod.bind me.tme_expr.me_name me env
-    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind s tc env
+    | Th_type    (s,tyd) -> EcEnv.Ty.bind ~import s tyd env
+    | Th_operator (s,op) -> EcEnv.Op.bind ~import s op env
+    | Th_axiom   (s, ax) -> EcEnv.Ax.bind ~import s ax env
+    | Th_modtype (s, ms) -> EcEnv.ModTy.bind ~import s ms env
+    | Th_module       me -> EcEnv.Mod.bind ~import me.tme_expr.me_name me env
+    | Th_typeclass(s,tc) -> EcEnv.TypeClass.bind ~import s tc env
     | Th_export  (p, lc) -> EcEnv.Theory.export p lc env
-    | Th_instance (x, tc) -> EcEnv.TcInstance.bind x tc env
-    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
-    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
+    | Th_instance (x, tc) -> EcEnv.TcInstance.bind ~import x tc env
+    | Th_baserw   (s,lc) -> EcEnv.BaseRw.add ~import s lc env
+    | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto ~import p ps lc env
     | Th_auto { level; base; axioms = ps; locality = lc } ->
-        EcEnv.Auto.add ~level ?base ps lc env
-    | Th_reduction r     -> EcEnv.Reduction.add r env
-    | Th_alias  (n, p)   -> EcEnv.Theory.alias n p env
+        EcEnv.Auto.add ~import ~level ?base ps lc env
+    | Th_reduction r     -> EcEnv.Reduction.add ~import r env
+    | Th_alias  (n, p)   -> EcEnv.Theory.alias ~import n p env
     | _                  -> assert false
   in
   { scenv with

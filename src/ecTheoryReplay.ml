@@ -37,7 +37,7 @@ and 'a ovrhooks = {
   henv      : 'a -> EcSection.scenv;
   hadd_item : 'a -> import:bool -> EcTheory.theory_item_r -> 'a;
   hthenter  : 'a -> thmode -> symbol -> is_local -> 'a;
-  hthexit   : 'a -> [`Full | `ClearOnly | `No] -> 'a;
+  hthexit   : 'a -> import:bool -> [`Full | `ClearOnly | `No] -> 'a;
   herr      : 'b . ?loc:EcLocation.t -> string -> 'b;
 }
 
@@ -1066,7 +1066,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
       let thmode = cth.cth_mode in
       let (subst, x) = rename ove subst (`Theory, ox) in
       let subovrds = Msym.find_opt ox ove.ovre_ovrd.evc_ths in
-      let subovrds = EcUtils.odfl evc_empty (Option.map fst subovrds) in
+      let subovrds, sub_clear =
+        EcUtils.odfl (evc_empty, false) subovrds in
+      let import = item.ti_import && not sub_clear in
       let subove   = { ove with
         ovre_ovrd     = subovrds;
         ovre_abstract = ove.ovre_abstract || (thmode = `Abstract);
@@ -1082,7 +1084,7 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
         let (subst, ops, proofs, subscope) =
           List.fold_left (replay1 subove)
             (subst, ops, proofs, subscope) cth.cth_items in
-        let scope = ove.ovre_hooks.hthexit subscope `Full in
+        let scope = ove.ovre_hooks.hthexit subscope ~import `Full in
         (subst, ops, proofs, scope)
 
       in (subst, ops, proofs, subscope)
@@ -1113,7 +1115,7 @@ let replay (hooks : 'a ovrhooks)
     let _, _, proofs, scope =
       List.fold_left (replay1 ove)
         (subst, Mp.empty, [], scope) items in
-     let scope = if incl then scope else hooks.hthexit scope `No in
+     let scope = if incl then scope else hooks.hthexit scope ~import:true `No in
     (List.rev proofs, scope)
 
   with EcEnv.DuplicatedBinding x ->

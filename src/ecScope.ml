@@ -1631,7 +1631,7 @@ let subtype_hooks_ref : scope EcTheoryReplay.ovrhooks ref =
   ref { EcTheoryReplay.henv      = (fun _ -> assert false);
         EcTheoryReplay.hadd_item = (fun _ ~import:_ _ -> assert false);
         EcTheoryReplay.hthenter  = (fun _ _ _ _ -> assert false);
-        EcTheoryReplay.hthexit   = (fun _ _ -> assert false);
+        EcTheoryReplay.hthexit   = (fun _ ~import:_ _ -> assert false);
         EcTheoryReplay.herr      = (fun ?loc:_ _ -> assert false); }
 
 (* -------------------------------------------------------------------- *)
@@ -2234,10 +2234,10 @@ module Theory = struct
   exception TopScope
 
   (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) (cth : thloaded) =
+  let bind ?(import = true) (scope : scope) (cth : thloaded) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_env = EcSection.add_th ~import:true cth scope.sc_env }
+        sc_env = EcSection.add_th ~import cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
@@ -2315,13 +2315,13 @@ module Theory = struct
       ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
-  let exit ?import:_ ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
+  let exit ?(import = true) ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
     assert (scope.sc_pr_uc = None);
 
     let cth = exit_r ~pempty (add_clears clears scope) in
     let ((cth, required), (name, _), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
-    let scope = ofold (fun cth scope -> bind scope cth) scope cth in
+    let scope = ofold (fun cth scope -> bind ~import scope cth) scope cth in
     (name, scope)
 
   (* ------------------------------------------------------------------ *)
@@ -2485,7 +2485,7 @@ module Cloning = struct
 
   (* ------------------------------------------------------------------ *)
   let hooks : scope R.ovrhooks =
-    let thexit sc pempty = snd (Theory.exit ?clears:None ~pempty sc) in
+    let thexit sc ~import pempty = snd (Theory.exit ~import ?clears:None ~pempty sc) in
     let add_item scope ~import item =
       let item = EcTheory.mkitem ~import item in
       { scope with sc_env = EcSection.add_item item scope.sc_env } in
