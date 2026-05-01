@@ -3958,6 +3958,7 @@ global_action:
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | subtype          { Gsubtype     $1 }
+| typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | exception_       { Gexception   $1 }

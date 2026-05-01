@@ -1355,6 +1355,7 @@ type global_action =
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
   | Gsubtype     of psubtype
+  | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred
