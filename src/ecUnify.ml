@@ -501,8 +501,11 @@ module Unify = struct
              instance by [tc.tc_args] (Tunivars on the goal side act
              as wildcards), then push a [`TyUni (ty, tci_type)]
              equation. The carrier resolution will then re-fire this
-             TcCtt under Mode #1 and produce the concrete witness. *)
+             TcCtt under Mode #1 and produce the concrete witness.
+             For TCs with no args (e.g. [addmonoid]), all instances
+             match trivially, so by-args contributes no signal — skip. *)
           let strat_infer_by_args () : tcwitness option =
+            if List.is_empty tc.tc_args then None else
             let cands = EcTypeClass.candidates_by_args env tc in
             (* Multiple matches: check whether they agree on the
                carrier ([tci_type]). If they do, any of them works; if
