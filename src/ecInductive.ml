@@ -213,9 +213,7 @@ let indsc_of_datatype ?(normty = identity) (mode : indmode) (dt : datatype) =
           | scs -> Some (FL.f_let (LTuple xs) fac (FL.f_ands scs))
     end
 
-    | Tconstr (p', ts)  ->
-        if List.exists (EcTypes.etyarg_sub_exists (occurs p)) ts then
-          non_positive p (NonPositiveOcc fac.f_ty);
+    | Tconstr (p', _)  ->
         if not (EcPath.p_equal p p') then None else
           Some (FL.f_app pred [fac] tbool)
 

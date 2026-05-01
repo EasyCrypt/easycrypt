@@ -1770,8 +1770,11 @@ module Ty = struct
 
       | PTYD_Datatype dt ->
         let datatype = EHI.trans_datatype env (mk_loc loc (args,name)) dt in
+        let ty_from_ctor ctor = EcEnv.Ty.by_path ctor env in
         let tparams, tydt =
-          try ELI.datatype_as_ty_dtype datatype
+          try
+            ELI.check_positivity ty_from_ctor datatype;
+            ELI.datatype_as_ty_dtype datatype
           with ELI.NonPositive ctx -> EHI.dterror loc env (EHI.DTE_NonPositive (unloc name, ctx))
         in
         tparams, `Datatype tydt

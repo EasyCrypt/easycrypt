@@ -1280,12 +1280,12 @@ let pp_opapp
       fun () ->
         match es with
         | [] ->
-            pp_opname_with_tvi ppe fmt (nm, opname, Some tvi)
+            pp_opname_with_tvi ppe fmt (nm, opname, tvi_opt)
 
         | _  ->
             let pp_first = fun ppe _ -> pp_opname_with_tvi ppe in
             let pp fmt () =
-              pp_app ppe ~pp_first ~pp_sub (snd outer) fmt (([], opname, Some tvi), es)
+              pp_app ppe ~pp_first ~pp_sub (snd outer) fmt (([], opname, tvi_opt), es)
             in maybe_paren (snd outer) max_op_prec pp fmt ()
 
   and try_pp_as_uniop () =
@@ -2240,19 +2240,16 @@ and pp_form_core_r
         (pp_form ppep) pr.pr_event.inv
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
-  let doit fmt =
-    let printers =
-      [try_pp_notations;
-      try_pp_form_eqveq;
-      try_pp_chained_orderings;
-      try_pp_lossless]
-    in
+  let printers =
+    [try_pp_notations;
+     try_pp_form_eqveq;
+     try_pp_chained_orderings;
+     try_pp_lossless]
+  in
 
-    match List.ofind (fun pp -> pp ppe outer fmt f) printers with
-    | Some _ -> ()
-    | None   -> pp_form_core_r ppe outer fmt f
-
-  in Format.fprintf fmt "(%t : %a)" doit (pp_type ppe) f.f_ty
+  match List.ofind (fun pp -> pp ppe outer fmt f) printers with
+  | Some _ -> ()
+  | None   -> pp_form_core_r ppe outer fmt f
 
 and pp_form ppe fmt f =
   pp_form_r ppe (min_op_prec, `NonAssoc) fmt f
