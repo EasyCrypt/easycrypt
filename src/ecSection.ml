@@ -1378,7 +1378,7 @@ let enter_theory (name:symbol) (lc:is_local) (mode:thmode) scenv : scenv =
      hierror "can not start a local theory outside of a section";
   { sc_env   = EcEnv.Theory.enter name scenv.sc_env;
     sc_top   = Some scenv;
-    sc_loca  = if lc = `Local then lc else scenv.sc_loca;
+    sc_loca  = lc;
     sc_abstr = scenv.sc_abstr || mode = `Abstract;
     sc_insec = scenv.sc_insec;
     sc_name  = Th (name, lc, mode);

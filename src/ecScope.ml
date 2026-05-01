@@ -1728,10 +1728,10 @@ module Ty = struct
 
     let (proofs, scope) =
       EcTheoryReplay.replay !subtype_hooks_ref
-        ~abstract:false ~local:`Global ~incl:(Option.is_none cname)
+        ~abstract:false ~override_locality:None ~incl:(Option.is_none cname)
         ~clears:Sp.empty ~renames ~opath:cpath ~npath
         evclone scope
-        (Option.value ~default:(EcPath.basename cpath) cname, theory)
+        (Option.value ~default:(EcPath.basename cpath) cname, theory, `Global)
     in
     let proofs =
       List.pmap (fun axc ->
@@ -2497,18 +2497,19 @@ module Cloning = struct
   module R = EcTheoryReplay
 
   (* ------------------------------------------------------------------ *)
-  let hooks : scope R.ovrhooks =
+  let hooks ~(override_locality : is_local option) : scope R.ovrhooks =
     let thexit sc ~import pempty = snd (Theory.exit ~import ?clears:None ~pempty sc) in
     let add_item scope ~import item =
       let item = EcTheory.mkitem ~import item in
-      { scope with sc_env = EcSection.add_item item scope.sc_env } in
+      { scope with
+          sc_env = EcSection.add_item ~override_locality item scope.sc_env } in
     { R.henv      = (fun scope -> scope.sc_env);
       R.hadd_item = add_item;
       R.hthenter  = Theory.enter;
       R.hthexit   = thexit;
       R.herr      = (fun ?loc -> hierror ?loc "%s"); }
 
-  let () = subtype_hooks_ref := hooks
+  let () = subtype_hooks_ref := hooks ~override_locality:None
 
   (* ------------------------------------------------------------------ *)
   module Options = struct
@@ -2548,10 +2549,10 @@ module Cloning = struct
     let npath = if incl then cpath else EcPath.pqname cpath name in
 
     let (proofs, scope) =
-      EcTheoryReplay.replay hooks
-        ~abstract:opts.R.clo_abstract ~local:(odfl `Global thcl.pthc_local) ~incl
+      EcTheoryReplay.replay (hooks ~override_locality:thcl.pthc_local)
+        ~abstract:opts.R.clo_abstract ~override_locality:thcl.pthc_local ~incl
         ~clears:ntclr ~renames:rnms ~opath ~npath ovrds
-        scope (name, oth.cth_items)
+        scope (name, oth.cth_items, oth.cth_loca)
     in
 
     let proofs = List.pmap (fun axc ->
