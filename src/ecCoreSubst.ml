@@ -25,6 +25,12 @@ type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
   fs_u       : ty TyUni.Muid.t;
   fs_v       : ty Mid.t;
+  (* Witnesses to use when substituting [TCIAbstract `Var x] for a
+     type variable x that is being replaced by [fs_v]. The list is
+     indexed by witness offset. Empty list / missing key means: leave
+     the witness alone (caller is doing alpha-renaming, not
+     instantiation). *)
+  fs_tw      : tcwitness list Mid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
@@ -58,6 +64,7 @@ let f_subst_init
       ?(freshen=false)
       ?(tu=TyUni.Muid.empty)
       ?(tv=Mid.empty)
+      ?(tw=Mid.empty)
       ?(esloc=Mid.empty)
       () =
   let fv = Mid.empty in
@@ -69,6 +76,7 @@ let f_subst_init
     fs_freshen  = freshen;
     fs_u        = tu;
     fs_v        = tv;
+    fs_tw       = tw;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
@@ -182,8 +190,23 @@ let ty_subst (s : f_subst) : ty -> ty =
   if is_ty_subst_id s then identity else ty_subst s
 
 (* -------------------------------------------------------------------- *)
-let etyarg_subst (s : f_subst) ((ty, w) : etyarg) : etyarg =
-  (ty_subst s ty, w)
+let rec tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
+  match tcw with
+  | TCIAbstract { support = `Var x; offset; lift } when Mid.mem x s.fs_tw ->
+    let ws = Mid.find x s.fs_tw in
+    if offset < List.length ws then
+      bump_lift lift (List.nth ws offset)
+    else
+      tcw
+  | TCIAbstract _ -> tcw
+  | TCIUni _ -> tcw
+  | TCIConcrete c ->
+    TCIConcrete { c with etyargs = List.map (etyarg_subst_inner s) c.etyargs }
+
+and etyarg_subst_inner (s : f_subst) ((ty, ws) : etyarg) : etyarg =
+  (ty_subst s ty, List.map (tcw_subst s) ws)
+
+let etyarg_subst (s : f_subst) (e : etyarg) : etyarg = etyarg_subst_inner s e
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id (s : f_subst) =
@@ -437,7 +460,7 @@ module Fsubst = struct
 
     | Fop (p, tys) ->
       let ty'  = ty_subst s fp.f_ty in
-      let tys' = List.Smart.map (fun (t, w) -> (ty_subst s t, w)) tys in
+      let tys' = List.Smart.map (etyarg_subst s) tys in
       f_op_tc p tys' ty'
 
     | Fpvar (pv, m) ->
@@ -686,7 +709,9 @@ module Fsubst = struct
     f_subst_init ~freshen ~tv:s ()
 
   let f_subst_tvar ~(freshen : bool) (s : etyarg Mid.t) : form -> form =
-    f_subst (init_subst_tvar ~freshen (Mid.map fst s))
+    let tv = Mid.map fst s in
+    let tw = Mid.map snd s in
+    f_subst (f_subst_init ~freshen ~tv ~tw ())
 end
 
 (* -------------------------------------------------------------------- *)

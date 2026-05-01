@@ -27,6 +27,7 @@ val f_subst_init :
        ?freshen:bool
     -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
+    -> ?tw:tcwitness list Mid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -72,6 +73,7 @@ module Fsubst : sig
        ?freshen:bool
     -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
+    -> ?tw:tcwitness list Mid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 
