@@ -412,7 +412,12 @@ let gen_select_op
     else [] in
 
   let ops () : OpSelect.gopsel list =
-    let ops = EcUnify.select_op ~filter:ue_filter ?retty:(snd psig) tvi env name ue (fst psig) in
+    (* Only anchor against the expected return type when the op is used
+       as a value (no direct args at this site). Otherwise we risk
+       prematurely committing to a TC-polymorphic candidate before its
+       arguments have constrained the type. *)
+    let retty = if List.is_empty (fst psig) then snd psig else None in
+    let ops = EcUnify.select_op ~filter:ue_filter ?retty tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
     let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
