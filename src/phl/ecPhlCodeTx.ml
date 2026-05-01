@@ -103,6 +103,15 @@ let alias_stmt env id (pf, _) me i =
     let ty       = (EcEnv.Fun.by_xpath f env).f_sig.fs_ret in
     let (me, pv) = dopv ty in
     (me, [i_call (Some (LvVar (pv, ty)), f ,args); i_asgn (lv, e_var pv ty)])
+  | Sif (e, ts, fs) ->
+    let ty = e.e_ty in
+    let (me, pv) = dopv ty in
+    (me, [i_asgn (LvVar (pv, ty), e); i_if (e_var pv ty, ts, fs)])
+  | Swhile (e, ts) ->
+    let ty = e.e_ty in
+    let (me, pv) = dopv ty in
+    let a_asgn = i_asgn (LvVar (pv, ty), e) in
+    (me, [a_asgn; i_while (e_var pv ty, s_seq ts (stmt [a_asgn]))])
   | _ ->
       tc_error pf "cannot create an alias for that kind of instruction"
 
@@ -149,8 +158,8 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
         ) in
 
       match kind with
-      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, mk)
-      | `Swhile -> tc_error pe "while loops not supported"
+      | `Sasgn | `Srnd | `Sif | `Smatch -> (e, (fun _ -> mk))
+      | `Swhile -> (e, fun asgn e -> let _, s = destr_while i in i_while (e, (s_seq s asgn)))
     in
 
     try
@@ -172,7 +181,7 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
       let e = map_ss_inv2 (fun pv -> EcMatching.FPosition.map cpos (fun _ -> pv)) (f_pvar pv (subf.inv.f_ty) (fst me)) e  in
 
       let i1 = i_asgn (LvVar (pv, subf.inv.f_ty), expr_of_ss_inv subf) in
-      let i2 = mk (expr_of_ss_inv e) in
+      let i2 = mk (stmt [i1]) (expr_of_ss_inv e) in
 
       (me, { z with z_tail = i1 :: i2 :: is }, [])
 
