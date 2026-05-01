@@ -430,7 +430,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
      | OP_TC _ -> assert false
-     | OP_Exn _ -> assert false
+     | OP_Exn ty -> List.iter (on_ty cb) ty
      | OP_Plain f -> on_form cb f
      | OP_Fix    f ->
        let rec on_mpath_branches br =
@@ -1415,6 +1415,7 @@ let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
     | Th_auto { level; base; axioms = ps; locality = lc } ->
         EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
+    | Th_alias  (n, p)   -> EcEnv.Theory.alias n p env
     | _                  -> assert false
   in
   { scenv with
