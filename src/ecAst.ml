@@ -333,11 +333,17 @@ and pr = {
   pr_event : ss_inv;
 }
 
+and exnpost = {
+  main   : form;
+  exnmap : form Mop.t;
+}
+
 (* -------------------------------------------------------------------- *)
 type cp_match = [
   | `If
   | `While
   | `Assign of lvmatch
+  | `AssignTuple of lvmatch
   | `Sample of lvmatch
   | `Call   of lvmatch
   | `Match
@@ -350,15 +356,10 @@ type cp_base = [
   | `ByMatch of int option * cp_match
 ]
 
-type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol]
+type codepos_brsel = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
 type codepos1      = int * cp_base
 type codepos       = (codepos1 * codepos_brsel) list * codepos1
 type codeoffset1   = [`ByOffset of int | `ByPosition of codepos1]
-
-type exnpost = {
-  main   : form;
-  exnmap : form Mop.t;
-}
 
 let map_ss_inv ?m (fn: form list -> form) (invs: ss_inv list): ss_inv =
   let m' = match m with

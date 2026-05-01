@@ -247,7 +247,8 @@ val split_args : expr -> expr * expr list
 
 (* -------------------------------------------------------------------- *)
 val e_map :
-     (expr -> expr) (* 1-subexpr op. *)
+     (ty -> ty)     (* 1-type op. *)
+  -> (expr -> expr) (* 1-subexpr op. *)
   -> expr
   -> expr
 

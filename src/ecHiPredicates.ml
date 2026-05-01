@@ -19,7 +19,7 @@ exception TransPredError of EcLocation.t * EcEnv.env * tperror
 let tperror loc env e = raise (TransPredError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let close_pr_body (uidmap : unisubst) (body : prbody) =
+let close_pr_body (uidmap : EcTypes.ty EcAst.TyUni.Muid.t) (body : prbody) =
   let fsubst = EcFol.Fsubst.f_subst_init ~tu:uidmap () in
   let tsubst = ty_subst fsubst in
 

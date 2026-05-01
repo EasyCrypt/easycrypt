@@ -412,7 +412,7 @@ let gen_select_op
     else [] in
 
   let ops () : OpSelect.gopsel list =
-    let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
+    let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
     let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
@@ -454,7 +454,7 @@ let select_form_op env mode ~forcepv opsc name ue tvi psig =
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
   let filter = (fun _ op -> EcDecl.is_proj op) in
-  let ops = EcUnify.select_op ~filter tvi env name ue ([recty], None) in
+  let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
   let ops = List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
 
   match ops, opsc with
@@ -1072,7 +1072,7 @@ let transtyvars (env : EcEnv.env) (loc, (tparams : ptyparams option)) =
       let x  = EcIdent.create x in
       let tc = List.map (transtc env ue) tc in
       UE.push (x, tc) ue in
-    if not (List.is_unique (List.map (unloc |- fst) tparams)) then
+    if not (List.is_unique (List.map (fst |- unloc) tparams)) then
       tyerror loc env DuplicatedTyVar;
     List.iter for1 tparams;
     ue
@@ -1102,7 +1102,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
       let fields =
         let for1 (name, v) =
           let filter = fun _ op -> EcDecl.is_proj op in
-          let fds    = EcUnify.select_op ~filter None env (unloc name) ue ([], None) in
+          let fds    = EcUnify.select_op ~filter None env (unloc name) ue [] in
             match List.ohead fds with
             | None ->
               let exn = UnknownRecFieldName (unloc name) in
@@ -1126,7 +1126,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
 
       let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
       let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
-      let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+      let reccty = tconstr_tc recp (etyargs_of_tparams recty.tyd_params) in
       let reccty, recopnd = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
 
       let fields =
@@ -1247,7 +1247,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     let for1 rf =
       let filter = fun _ op -> EcDecl.is_proj op in
       let tvi    = rf.rf_tvi |> omap (transtvi env ue) in
-      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue ([], None) in
+      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue [] in
         match List.ohead fds with
         | None ->
             let exn = UnknownRecFieldName (unloc rf.rf_name) in
@@ -1337,7 +1337,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
   | PPApp ((cname, tvi), cargs) ->
     let filter = fun _ op -> EcDecl.is_ctor op in
     let tvi = tvi |> omap (transtvi env ue) in
-    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
     match cts with
     | [] ->
@@ -1370,7 +1370,7 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
         let ctorty =
-          let tvi = Some (EcUnify.TVIunamed tvi) in
+          let tvi = Some (EcUnify.TVIunamed (List.map (fun (ty, w) -> (Some ty, Some (List.map (fun x -> Some x) w))) tvi)) in
             fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
         let pty = EcUnify.UniEnv.fresh ue in
 
@@ -1434,7 +1434,7 @@ let trans_branch_exn env ue ((pb, body) : ppattern * _) =
   | PPApp ((cname, tvi), cargs) ->
     let filter = fun _ op -> EcDecl.is_exception op in
     let tvi = tvi |> omap (transtvi env ue) in
-    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+    let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
     match cts with
     | [] ->
@@ -2281,7 +2281,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
               let asgn = EcModules.lv_of_list pvs |> omap (fun lv ->
                   let rty  = ttuple (List.snd p) in
                   let proj = EcInductive.datatype_proj_path typ cn in
-                  let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+                  let proj = e_op_tc proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
                   let proj = e_app proj [e] (toption rty) in
                   let proj = e_oget proj rty in
                   i_asgn (lv, proj))
@@ -2317,7 +2317,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
           try
             EcMatching.Zipper.map_range env cp change bd
           with
-            | InvalidCPos ->
+            | EcMatching.Position.InvalidCPos ->
               tyerror loc env (InvalidModUpdate MUE_InvalidCodePos);
         )
         pupdates
@@ -2825,7 +2825,7 @@ and transinstr
         match (EcEnv.ty_hnorm ety env).ty_node with
         | Tconstr (indp, _) -> begin
             match EcEnv.Ty.by_path indp env with
-            | { tyd_type = Datatype dt } ->
+            | { tyd_type = `Datatype dt } ->
                 Some (indp, dt)
             | _ -> None
           end
@@ -3436,7 +3436,7 @@ and trans_form_or_pattern env mode ?mv ?ps ue pf tt =
           match (EcEnv.ty_hnorm cfty env).ty_node with
           | Tconstr (indp, _) -> begin
               match EcEnv.Ty.by_path indp env with
-              | { tyd_type = Datatype dt } ->
+              | { tyd_type = `Datatype dt } ->
                   Some (indp, dt)
               | _ -> None
             end
@@ -3754,7 +3754,7 @@ and trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) :
 and trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
   match p with
   | `ByPos (i, `Index1) when i > 0 -> `ByPos (i - 1)
-  | `ByPos (i, `Index1) when i = 0 -> raise InvalidCPos
+  | `ByPos (i, `Index1) when i = 0 -> raise EcMatching.Position.InvalidCPos
   | `ByPos (i, `Index1) -> `ByPos i
   | `ByPos (i, `Index0) -> `ByPos i  (* already 0-indexed, no conversion *)
   | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
@@ -3770,13 +3770,13 @@ and trans_codepos_brsel (bs : pbranch_select) : codepos_brsel =
   | `Match { pl_desc = x } -> `Match x
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos_step ?(memory: memory option) (env: EcEnv.env) ((cp1, brsel): pcodepos_step) : codepos_step =
+and trans_codepos_step ?(memory: memory option) (env: EcEnv.env) ((cp1, brsel): pcodepos_step) : EcMatching.Position.codepos_step =
   let cp1 = trans_codepos1 ?memory env cp1 in
   let brsel = trans_codepos_brsel brsel in
   (cp1, brsel)
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos_path ?(memory: memory option) (env: EcEnv.env) (cpath: pcodepos_path) : codepos_path =
+and trans_codepos_path ?(memory: memory option) (env: EcEnv.env) (cpath: pcodepos_path) : EcMatching.Position.codepos_path =
   List.map (trans_codepos_step ?memory env) cpath
 
 (* -------------------------------------------------------------------- *)
@@ -3788,13 +3788,13 @@ and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((cpath, p) : pcod
 (* -------------------------------------------------------------------- *)
 and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
   match o with
-  | `Relative i -> `Relative i
-  | `Absolute p -> `Absolute (trans_codepos1 ?memory env p)
+  | `Relative i -> `ByOffset i
+  | `Absolute p -> `ByPosition (trans_codepos1 ?memory env p)
 
 (* -------------------------------------------------------------------- *)
-and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : codegap_range =
+and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : EcMatching.Position.codegap_range =
   match cpor with
-  | Pos cp -> codegap_range_of_codepos (trans_codepos ?memory env cp)
+  | Pos cp -> EcMatching.Position.codegap_range_of_codepos (trans_codepos ?memory env cp)
   | Range cpr -> trans_codegap_range ?memory env cpr
 
 (* -------------------------------------------------------------------- *)
@@ -3802,44 +3802,44 @@ and trans_range1_or_insert
   ?(memory : memory option)
    (env    : EcEnv.env)
    (cp     : prange1_or_insert)
-: codegap_range
+: EcMatching.Position.codegap_range
 =
   match cp with
   | PosOrRange cpor -> trans_codepos_or_range ?memory env cpor
   | Gap g ->
     let cg = trans_codegap ?memory env g in
-    empty_codegap_range_of_codegap cg
+    EcMatching.Position.empty_codegap_range_of_codegap cg
 
 (* -------------------------------------------------------------------- *)
 and trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
   DOption.map (trans_codepos1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
-and trans_codegap1 ?(memory : memory option) (env : EcEnv.env) (g : pcodegap1) : codegap1 =
+and trans_codegap1 ?(memory : memory option) (env : EcEnv.env) (g : pcodegap1) : EcMatching.Position.codegap1 =
   match g with
   | GapBefore cp -> GapBefore (trans_codepos1 ?memory env cp)
   | GapAfter  cp -> GapAfter  (trans_codepos1 ?memory env cp)
 
 (* -------------------------------------------------------------------- *)
-and trans_codegap ?(memory : memory option) (env : EcEnv.env) ((cpath, g1) : pcodegap) : codegap =
+and trans_codegap ?(memory : memory option) (env : EcEnv.env) ((cpath, g1) : pcodegap) : EcMatching.Position.codegap =
   (trans_codepos_path ?memory env cpath, trans_codegap1 ?memory env g1)
 
 (* -------------------------------------------------------------------- *)
-and trans_codegap1_range ?(memory : memory option) (env : EcEnv.env) ((g1, g2) : pcodegap1_range) : codegap1_range =
+and trans_codegap1_range ?(memory : memory option) (env : EcEnv.env) ((g1, g2) : pcodegap1_range) : EcMatching.Position.codegap1_range =
   (trans_codegap1 ?memory env g1, trans_codegap1 ?memory env g2)
 
 (* -------------------------------------------------------------------- *)
-and trans_codegap_range ?(memory : memory option) (env : EcEnv.env) ((cpath, gr) : pcodegap_range) : codegap_range =
+and trans_codegap_range ?(memory : memory option) (env : EcEnv.env) ((cpath, gr) : pcodegap_range) : EcMatching.Position.codegap_range =
   (trans_codepos_path ?memory env cpath, trans_codegap1_range ?memory env gr)
 
 (* -------------------------------------------------------------------- *)
-and trans_codegap_offset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodegap_offset1) : codegap_offset1 =
+and trans_codegap_offset1 ?(memory : memory option) (env : EcEnv.env) (o : pcodegap_offset1) : EcMatching.Position.codegap_offset1 =
   match o with
   | PGapRelative i -> GapRelative i
   | PGapAbsolute g -> GapAbsolute (trans_codegap1 ?memory env g)
 
 (* -------------------------------------------------------------------- *)
-and trans_dcodegap1 ?(memory : memory option) (env : EcEnv.env) (p : pcodegap1 doption) : codegap1 doption =
+and trans_dcodegap1 ?(memory : memory option) (env : EcEnv.env) (p : pcodegap1 doption) : EcMatching.Position.codegap1 doption =
   DOption.map (trans_codegap1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)

@@ -32,9 +32,10 @@ and ty_body = [
 
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params  : ty_params;
+  tyd_type    : ty_body;
+  tyd_resolve : bool;
+  tyd_loca    : locality;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option

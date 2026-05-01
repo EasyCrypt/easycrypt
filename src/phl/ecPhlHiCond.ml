@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcAst
+open EcMatching.Position
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
+open EcMatching.Position
 open EcCoreGoal.FApi
 open EcAst
 

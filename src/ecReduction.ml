@@ -377,8 +377,8 @@ let ensure b = if b then () else raise NotConv
 let check_ty env subst ty1 ty2 =
   ensure (EqTest_base.for_type env ty1 (ty_subst subst ty2))
 
-let check_etyarg env subst etyarg1 etyarg2 =
-  ensure (EqTest_base.for_etyarg env etyarg1 (etyarg_subst subst etyarg2))
+let check_etyarg env subst (ty1, w1) (ty2, w2) =
+  ensure (EqTest_base.for_etyarg env (ty1, w1) (ty_subst subst ty2, w2))
 
 let add_local (env, subst) (x1, ty1) (x2, ty2) =
   check_ty env subst ty1 ty2;
@@ -1297,36 +1297,36 @@ let rec simplify ri env f =
   match f.f_node with
   | FhoareF hf when ri.ri.modpath ->
       let hf_f = EcEnv.NormMp.norm_xfun env hf.hf_f in
-      f_map (simplify ri env) (f_hoareF_r { hf with hf_f })
+      f_map (fun ty -> ty) (simplify ri env) (f_hoareF_r { hf with hf_f })
 
   | FeHoareF hf when ri.ri.modpath ->
       let ehf_f = EcEnv.NormMp.norm_xfun env hf.ehf_f in
-      f_map (simplify ri env) (f_eHoareF_r { hf with ehf_f })
+      f_map (fun ty -> ty) (simplify ri env) (f_eHoareF_r { hf with ehf_f })
 
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
-      f_map (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
+      f_map (fun ty -> ty) (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
       let ef_fr = EcEnv.NormMp.norm_xfun env ef.ef_fr in
-      f_map (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
+      f_map (fun ty -> ty) (simplify ri env) (f_equivF_r { ef with ef_fl; ef_fr; })
 
   | FeagerF eg when ri.ri.modpath ->
       let eg_fl = EcEnv.NormMp.norm_xfun env eg.eg_fl in
       let eg_fr = EcEnv.NormMp.norm_xfun env eg.eg_fr in
-      f_map (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
+      f_map (fun ty -> ty) (simplify ri env) (f_eagerF_r { eg with eg_fl ; eg_fr; })
 
   | Fpr pr when ri.ri.modpath ->
       let pr_fun = EcEnv.NormMp.norm_xfun env pr.pr_fun in
-      f_map (simplify ri env) (f_pr_r { pr with pr_fun })
+      f_map (fun ty -> ty) (simplify ri env) (f_pr_r { pr with pr_fun })
 
   | Fquant (q, bd, f) ->
     let env = Mod.add_mod_binding bd env in
     f_quant q bd (simplify ri env f)
 
   | _ ->
-    f_map (simplify ri env) f
+    f_map (fun ty -> ty) (simplify ri env) f
 
 let simplify ri hyps f =
   let ri, env = init_redinfo ri hyps in
@@ -1850,7 +1850,7 @@ module User = struct
       in doit empty_cst rule in
 
     let s_bds   = Sid.of_list (List.map fst bds)
-    and s_tybds = Sid.of_list ax.ax_tparams in
+    and s_tybds = Sid.of_list (List.map fst ax.ax_tparams) in
 
     (* Variables appearing in types and formulas are always, respectively,
      * type and formula variables.

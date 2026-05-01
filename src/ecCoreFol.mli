@@ -77,7 +77,7 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
-val f_map  : (form -> form) -> form -> form
+val f_map  : (ty -> ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
 val f_fold : ('a -> form -> 'a) -> 'a -> form -> 'a
 
@@ -145,6 +145,7 @@ val f_equivF : ts_inv -> xpath -> xpath -> ts_inv -> form
 val f_equivS : memtype -> memtype -> ts_inv -> stmt -> stmt -> ts_inv -> form
 
 (* soft-constructors - eager *)
+val f_eagerF_r : eagerF -> form
 val f_eagerF : ts_inv -> stmt -> xpath -> xpath -> stmt -> ts_inv -> form
 
 (* soft-constructors - Pr *)

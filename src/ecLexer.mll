@@ -199,6 +199,7 @@
     "theory"      , THEORY     ;        (* KW: global *)
     "abstract"    , ABSTRACT   ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
+    "class"       , CLASS      ;        (* KW: global *)
     "subtype"     , SUBTYPE    ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)

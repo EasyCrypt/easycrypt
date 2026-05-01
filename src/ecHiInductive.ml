@@ -132,7 +132,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
         |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
-      let tyinst = ty_instantiate tdecl.tyd_params targs in
+      let tyinst = ty_instanciate tdecl.tyd_params targs in
 
       match tdecl.tyd_type with
       | `Abstract _ ->
@@ -334,7 +334,7 @@ let trans_matchfix
         | PPApp ((cname, tvi), _cargs) ->
             let tvi = tvi |> omap (TT.transtvi env ue) in
             let filter = fun _ op -> EcDecl.is_ctor op in
-            let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+            let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
             match cts with
             | [] ->
               fxerror cname.pl_loc env TT.FXE_CtorUnk
@@ -369,7 +369,7 @@ let trans_matchfix
           let indp, _ = Msym.find x indtbl in
           let indty = oget (EcEnv.Ty.by_path_opt indp env) in
           let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-          let codom = tconstr indp (List.map tvar indty.tyd_params) in
+          let codom = tconstr_tc indp (etyargs_of_tparams indty.tyd_params) in
           let tys = List.map (fun (_, dom) -> toarrow dom codom) ind in
           let tys, _ = EcUnify.UniEnv.opentys ue indty.tyd_params None tys in
           let doargs cty =
@@ -381,7 +381,7 @@ let trans_matchfix
         | PPApp ((cname, tvi), cargs) ->
           let filter = fun _ op -> EcDecl.is_ctor op in
           let tvi = tvi |> omap (TT.transtvi env ue) in
-          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue ([], None) in
+          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
           match cts with
           | [] ->
@@ -484,7 +484,7 @@ let trans_matchfix
       let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
       let args     = List.map (snd_map (ty_subst ts)) args in
-      let opexpr   = e_op opexpr (List.map tvar tparams)
+      let opexpr   = e_op_tc opexpr (etyargs_of_tparams tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         bind_elocal ts opname opexpr

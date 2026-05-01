@@ -2,6 +2,7 @@
 open EcUtils
 open EcAst
 open EcParsetree
+open EcMatching.Position
 open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)

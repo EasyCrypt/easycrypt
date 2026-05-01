@@ -784,16 +784,16 @@ module MC = struct
       let loca    = tyd.tyd_loca in
 
       match tyd.tyd_type with
-      | Concrete _  -> mc
-      | Abstract    -> mc
+      | `Concrete _  -> mc
+      | `Abstract _  -> mc
 
-      | Datatype dtype ->
+      | `Datatype dtype ->
           let cs      = dtype.tydt_ctors   in
           let schelim = dtype.tydt_schelim in
           let schcase = dtype.tydt_schcase in
-          let params  = List.map tvar tyd.tyd_params in
+          let params  = etyargs_of_tparams tyd.tyd_params in
           let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr mypath params) in
+            let aty = EcTypes.toarrow aty (tconstr_tc mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
             let cop = mk_op
                         ~opaque:optransparent (fst aty) (snd aty)
@@ -831,12 +831,12 @@ module MC = struct
               _up_operator candup mc name (ipath name, op)
             ) mc projs
 
-      | Record (scheme, fields) ->
-          let params  = List.map tvar tyd.tyd_params in
+      | `Record (scheme, fields) ->
+          let params  = etyargs_of_tparams tyd.tyd_params in
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr mypath params) aty in
+              let aty = EcTypes.tfun (tconstr_tc mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
               let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
@@ -857,7 +857,7 @@ module MC = struct
 
           let stname = Printf.sprintf "mk_%s" x in
           let stop   =
-            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
+            let stty = toarrow (List.map snd fields) (tconstr_tc mypath params) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
               mk_op ~opaque:optransparent (fst stty) (snd stty) (Some (OP_Record mypath)) loca
           in
@@ -2610,7 +2610,7 @@ module Ty = struct
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
-    | Some { tyd_type = Concrete _ } -> true
+    | Some { tyd_type = `Concrete _ } -> true
     | _ -> false
 
   let unfold (name : EcPath.path) (args : etyarg list) (env : env) =
@@ -2947,7 +2947,7 @@ module Ax = struct
   let rebind name ax env =
     MC.bind_axiom name ax env
 
-  let instantiate p tys env =
+  let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
         Tvar.f_subst ~freshen:true (List.combine (List.map fst ax.ax_tparams) tys) f
@@ -3213,7 +3213,8 @@ module Theory = struct
         | Th_alias (name, path) ->
             rebind_alias name path env
 
-        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
+        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _
+        | Th_typeclass _ ->
             env
 
       in

@@ -530,7 +530,7 @@ let e_oget (e : expr) (ty : ty) : expr =
   e_app op [e] ty
 
 (* -------------------------------------------------------------------- *)
-let e_map (fe : expr -> expr) (e : expr) : expr =
+let e_map (ft : ty -> ty) (fe : expr -> expr) (e : expr) : expr =
   match e.e_node with
   | Eint   _ -> e
   | Elocal _ -> e
@@ -538,7 +538,7 @@ let e_map (fe : expr -> expr) (e : expr) : expr =
   | Eop    _ -> e
 
   | Eapp (e1, args) ->
-    e_app (fe e1) (List.Smart.map fe args) e.e_ty
+    e_app (fe e1) (List.Smart.map fe args) (ft e.e_ty)
 
   | Elet (lp, e1, e2) ->
     e_let lp (fe e1) (fe e2)
@@ -547,13 +547,13 @@ let e_map (fe : expr -> expr) (e : expr) : expr =
     e_tuple (List.Smart.map fe le)
 
   | Eproj (e1, i) ->
-    e_proj (fe e1) i e.e_ty
+    e_proj (fe e1) i (ft e.e_ty)
 
   | Eif (e1, e2, e3) ->
     e_if (fe e1) (fe e2) (fe e3)
 
   | Ematch (e, bs, ty) ->
-    e_match (fe e) (List.Smart.map fe bs) ty
+    e_match (fe e) (List.Smart.map fe bs) (ft ty)
 
   | Equant (q, b, bd) ->
     e_quantif q b (fe bd)

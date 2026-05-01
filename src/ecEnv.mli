@@ -389,7 +389,7 @@ module TypeClass : sig
   type t = tc_decl
 
   val add    : path -> env -> env
-  val bind   : ?import:import -> symbol -> t -> env -> env
+  val bind   : ?import:bool -> symbol -> t -> env -> env
   val rebind : symbol -> t -> env -> env
 
   val by_path     : path -> env -> t
@@ -404,7 +404,7 @@ module TcInstance : sig
   type t = tcinstance
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol option -> t -> env -> env
+  val bind : ?import:bool -> symbol option -> t -> env -> env
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option

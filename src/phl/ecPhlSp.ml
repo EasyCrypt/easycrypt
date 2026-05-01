@@ -6,6 +6,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
+open EcMatching.Position
 open EcCoreGoal
 open EcLowPhlGoal
 

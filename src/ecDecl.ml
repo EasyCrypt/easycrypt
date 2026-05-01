@@ -35,9 +35,10 @@ type ty_body = [
 
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params  : ty_params;
+  tyd_type    : ty_body;
+  tyd_resolve : bool;
+  tyd_loca    : locality;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -54,7 +55,6 @@ let tydecl_as_record (td : tydecl) =
 
 (* -------------------------------------------------------------------- *)
 let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
-  let _ = resolve in
   let params =
     match params with
     | `Named params ->
@@ -66,7 +66,10 @@ let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_loca = lc; }
+  { tyd_params  = params;
+    tyd_type    = `Abstract tc;
+    tyd_resolve = resolve;
+    tyd_loca    = lc; }
 
 (* -------------------------------------------------------------------- *)
 let etyargs_of_tparams (tps : ty_params) : etyarg list =

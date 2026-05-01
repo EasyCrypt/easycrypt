@@ -61,8 +61,10 @@ let process_type hyps pty =
   let ue  = unienv_of_hyps hyps in
   let ty  = EcTyping.transty EcTyping.tp_tydecl env ue pty in
 
-  if not (EcUnify.UniEnv.closed ue) then
-    EcTyping.tyerror (EcLocation.loc pty) env EcTyping.FreeTypeVariables;
+  begin match EcUnify.UniEnv.xclosed ue with
+  | None -> ()
+  | Some flags -> EcTyping.tyerror (EcLocation.loc pty) env (EcTyping.FreeUniVariables flags)
+  end;
 
   let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
   EcCoreSubst.ty_subst ts ty
@@ -76,8 +78,8 @@ let process_stmt hyps s =
   try
     let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
     s_subst ts s
-  with EcUnify.UninstantiateUni ->
-    EcTyping.tyerror EcLocation._dummy env EcTyping.FreeTypeVariables
+  with EcUnify.UninstanciateUni flags ->
+    EcTyping.tyerror EcLocation._dummy env (EcTyping.FreeUniVariables flags)
 
 (* ------------------------------------------------------------------ *)
 let process_exp hyps mode oty e =
@@ -229,18 +231,6 @@ let tc1_process_Xhl_formula ?side tc pf =
 let tc1_process_Xhl_formula_xreal tc pf =
   tc1_process_Xhl_form tc txreal pf
 
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active me env in
-  EcTyping.trans_codepos env cpos
-(* ------------------------------------------------------------------ *)
-let tc1_process_codepos1 tc (side, cpos) =
-  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
-  let env = FApi.tc1_env tc in
-  let env = EcEnv.Memory.push_active me env in
-  EcTyping.trans_codepos1 env cpos
 
 (* ------------------------------------------------------------------ *)
 let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
@@ -283,7 +273,7 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
       in ()
 
   | Some (EcUnify.TVInamed tyargs) ->
-      let typnames = List.map EcIdent.name typ in
+      let typnames = List.map (fun (id, _) -> EcIdent.name id) typ in
       List.iter
         (fun (x, _) ->
           if not (List.mem x typnames) then

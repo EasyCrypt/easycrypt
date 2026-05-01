@@ -7,6 +7,7 @@ open EcFol
 open EcEnv
 open EcPV
 
+open EcMatching.Position
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal

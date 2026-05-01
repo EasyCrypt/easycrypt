@@ -23,16 +23,10 @@ type 'a tx_substitute = ?tx:tx -> 'a substitute
 type 'a subst_binder = f_subst -> 'a -> f_subst * 'a
 
 (* -------------------------------------------------------------------- *)
-type unisubst = {
-  uvars   : ty TyUni.Muid.t;
-  utcvars : tcwitness TcUni.Muid.t;
-}
-
-(* -------------------------------------------------------------------- *)
 val f_subst_init :
        ?freshen:bool
-    -> ?tu:unisubst
-    -> ?tv:etyarg Mid.t
+    -> ?tu:ty TyUni.Muid.t
+    -> ?tv:ty Mid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -41,8 +35,8 @@ val f_subst_init :
 module Tuni : sig
   val univars   : ty -> TyUni.Suid.t
   val subst1    : (tyuni * ty) -> f_subst
-  val subst     : unisubst -> f_subst
-  val subst_dom : unisubst -> dom -> dom
+  val subst     : ty TyUni.Muid.t -> f_subst
+  val subst_dom : ty TyUni.Muid.t -> dom -> dom
   val occurs    : tyuni -> ty -> bool
   val fv        : ty -> TyUni.Suid.t
 end
@@ -66,7 +60,6 @@ val bind_elocal : f_subst -> EcIdent.t -> expr -> f_subst
 (* -------------------------------------------------------------------- *)
 val ty_subst     : ty substitute
 val etyarg_subst : etyarg substitute
-val tc_subst     : typeclass substitute
 val e_subst      : expr substitute
 val s_subst      : stmt substitute
 
@@ -77,8 +70,8 @@ module Fsubst : sig
 
   val f_subst_init :
        ?freshen:bool
-    -> ?tu:unisubst
-    -> ?tv:etyarg Mid.t
+    -> ?tu:ty TyUni.Muid.t
+    -> ?tv:ty Mid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 

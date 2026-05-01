@@ -137,7 +137,7 @@ and concretize_e_head ((CPTEnv subst) as cptenv) head =
   | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (etyarg_subst subst) tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (fun (t, w) -> (ty_subst subst t, w)) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
 and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
@@ -270,7 +270,7 @@ let pattern_form ?name hyps ~ptn subject =
       (fun aux f ->
         if   EcReduction.is_alpha_eq hyps f ptn
         then fx
-        else f_map aux f)
+        else f_map (fun ty -> ty) aux f)
       subject
   in (x, body)
 

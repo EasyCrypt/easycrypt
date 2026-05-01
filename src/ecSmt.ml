@@ -400,22 +400,22 @@ and trans_tydecl genv (p, tydecl) =
 
   let ts, opts, decl =
     match tydecl.tyd_type with
-    | Abstract ->
+    | `Abstract _ ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | Concrete ty ->
+    | `Concrete ty ->
         let ty = trans_ty (genv, lenv) ty in
         let ts = WTy.create_tysymbol pid tparams (WTy.Alias ty) in
         (ts, [], WDecl.create_ty_decl ts)
 
-    | Datatype dt ->
+    | `Datatype dt ->
         let ncs  = List.length dt.tydt_ctors in
         let ts   = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
-        let wdom = tconstr p (List.map tvar tydecl.tyd_params) in
+        let wdom = tconstr_tc p (etyargs_of_tparams tydecl.tyd_params) in
         let wdom = trans_ty (genv, lenv) wdom in
 
         let for_ctor (c, ctys) =
@@ -429,12 +429,12 @@ and trans_tydecl genv (p, tydecl) =
 
         (ts, opts, WDecl.create_data_decl [ts, wdtype])
 
-    | Record (_, rc) ->
+    | `Record (_, rc) ->
         let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
-        let wdom  = tconstr p (List.map tvar tydecl.tyd_params) in
+        let wdom  = tconstr_tc p (etyargs_of_tparams tydecl.tyd_params) in
         let wdom  = trans_ty (genv, lenv) wdom in
 
         let for_field (fname, fty) =
@@ -1035,9 +1035,9 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun tv -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun (tv, _) -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
   let textra =
-    List.map (fun tv -> trans_ty (genv,lenv) (tvar tv)) textra in
+    List.map (fun (tv, _) -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in
   let wcodom =
     if   ER.EqTest.is_bool genv.te_env codom

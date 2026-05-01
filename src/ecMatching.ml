@@ -15,22 +15,11 @@ open EcGenRegexp
 
 (* -------------------------------------------------------------------- *)
 module Position = struct
-  type cp_match = [
-    | `If
-    | `While
-    | `Assign of lvmatch
-    | `AssignTuple of lvmatch
-    | `Sample of lvmatch
-    | `Call   of lvmatch
-    | `Match
-  ]
+  type cp_match = EcAst.cp_match
 
-  and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
+  type lvmatch = EcAst.lvmatch
 
-  type cp_base = [
-    | `ByPos of int (* Always <> 0 *)
-    | `ByMatch of int option * cp_match
-  ]
+  type cp_base = EcAst.cp_base
 
   exception InvalidCPos
 
@@ -68,11 +57,11 @@ module Position = struct
   *)
 
   (* Branch selection *)
-  type codepos_brsel    = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
+  type codepos_brsel    = EcAst.codepos_brsel
   type nm_codepos_brsel = [`Cond of bool | `Match of int]
 
   (* Linear code position inside a block *)
-  type codepos1 = int * cp_base
+  type codepos1 = EcAst.codepos1
 
   (* Normalized code position inside a block, always > 0 *)
   type nm_codepos1 = int
@@ -82,15 +71,15 @@ module Position = struct
   type nm_codepos_step = (nm_codepos1 * nm_codepos_brsel)
 
   (* Block selection by codepos + branch selection *)
-  type codepos_path    = codepos_step list
+  type codepos_path    = (codepos1 * codepos_brsel) list
   type nm_codepos_path = nm_codepos_step list
 
   (* Full codeposition = path to block + position in block *)
-  type codepos         = codepos_path * codepos1
+  type codepos         = EcAst.codepos
   type nm_codepos      = nm_codepos_path * nm_codepos1
 
   (* Code position offset *)
-  type codeoffset1     = [`Relative of int | `Absolute of codepos1]
+  type codeoffset1     = EcAst.codeoffset1
 
   (* --- Gap types --- *)
   (* Normalized gap inside a block, 0-indexed, range [0, n] *)
@@ -172,8 +161,8 @@ module Position = struct
 
   let resolve_offset ~(base : codepos1) ~(offset : codeoffset1) : codepos1 =
     match offset with
-    | `Absolute pos -> pos
-    | `Relative off -> (off + fst base, snd base)
+    | `ByPosition pos -> pos
+    | `ByOffset off -> (off + fst base, snd base)
 
   let empty_codegap1_range_of_codegap1 (cg1: codegap1) : codegap1_range =
     (cg1, cg1)
@@ -389,10 +378,10 @@ module Position = struct
     let (env, s), npath = normalize_cpos_path env cpath s in
     (env, s), (npath, normalize_cpos1 env cp1 s)
 
-  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 = 
+  let resolve_offset1_from_cpos1 env (base: nm_codepos1) (off: codeoffset1) (s: stmt) : nm_codepos1 =
     match off with
-    | `Absolute off -> normalize_cpos1 env off s 
-    | `Relative i -> 
+    | `ByPosition off -> normalize_cpos1 env off s
+    | `ByOffset i ->
       let nm = (base + i) in
       check_nm_cpos1 nm s; nm
 
@@ -1048,7 +1037,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();
-          try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+          try  List.iter2 (EcUnify.unify_etyarg env ue) tys1 tys2
           with EcUnify.UnificationFailure _ -> failure ()
       end
 
@@ -1292,7 +1281,7 @@ let f_match opts hyps (ue, ev) f1 f2 =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstantiateUni -> raise MatchFailure
+      with EcUnify.UninstanciateUni _ -> raise MatchFailure
     in
       (ue, clue, ev)
 

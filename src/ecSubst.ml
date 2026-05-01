@@ -709,9 +709,6 @@ let rec subst_form (s : subst) (f : form) =
      let pr_event = map_ss_inv1 (subst_form s) pr_event in
      f_pr pr_mem pr_fun pr_args pr_event
 
-  | Fif _ | Fint _ | Ftuple _ | Fproj _ | Fapp _ ->
-     f_map (subst_ty s) (subst_form s) f
-
 (* -------------------------------------------------------------------- *)
 and subst_fop fty tys args (tyids, f) =
   let s = add_tyvars empty (List.combine tyids tys) in
@@ -970,8 +967,8 @@ let subst_tydecl_body (s : subst) (tyd : ty_body) =
           tydt_schcase = subst_form s dtype.tydt_schcase; }
       in `Datatype dtype
 
-  | Record (scheme, fields) ->
-      Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
+  | `Record (scheme, fields) ->
+      `Record (subst_form s scheme, List.map (snd_map (subst_ty s)) fields)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =
@@ -980,6 +977,7 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
 
   { tyd_params  = tparams;
     tyd_type    = body;
+    tyd_resolve = tyd.tyd_resolve;
     tyd_loca    = tyd.tyd_loca; }
 
 (* -------------------------------------------------------------------- *)

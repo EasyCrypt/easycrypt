@@ -139,7 +139,7 @@ let on_lp (cb : cb) (lp : lpattern) =
   match lp with
   | LSymbol (_, ty) -> on_ty cb ty
   | LTuple  xs      -> List.iter (fun (_, ty) -> on_ty cb ty) xs
-  | LRecord (_, xs) -> List.iter (on_ty cb |- snd) xs
+  | LRecord (_, xs) -> List.iter (snd |- on_ty cb) xs
 
 let on_binding (cb : cb) ((_, ty) : (EcIdent.t * ty)) =
   on_ty cb ty
@@ -179,7 +179,7 @@ let rec on_instr (cb : cb) (i : instr)=
       on_lv cb lv;
       on_expr cb e
 
-  | Sassert e ->
+  | Sraise e ->
       on_expr cb e
 
   | Scall (lv, f, args) ->
@@ -197,7 +197,7 @@ let rec on_instr (cb : cb) (i : instr)=
 
   | Smatch (e, b) ->
       let forb (bs, s) =
-        List.iter (on_ty cb |- snd) bs;
+        List.iter (snd |- on_ty cb) bs;
         on_stmt cb s
       in on_expr cb e; List.iter forb b
 
@@ -242,12 +242,12 @@ let rec on_form (cb : cb) (f : EcFol.form) =
 
   and on_hf cb hf =
     on_form cb hf.EcAst.hf_pr;
-    on_form cb hf.EcAst.hf_po;
+    on_form cb hf.EcAst.hf_po.main;
     on_xp cb hf.EcAst.hf_f
 
   and on_hs cb hs =
     on_form cb hs.EcAst.hs_pr;
-    on_form cb hs.EcAst.hs_po;
+    on_form cb hs.EcAst.hs_po.main;
     on_stmt cb hs.EcAst.hs_s;
     on_memenv cb hs.EcAst.hs_m
 
@@ -300,7 +300,8 @@ let rec on_form (cb : cb) (f : EcFol.form) =
 
   and on_pr cb pr =
     on_xp cb pr.EcAst.pr_fun;
-    List.iter (on_form cb) [pr.EcAst.pr_event; pr.EcAst.pr_args]
+    on_form cb pr.EcAst.pr_event.inv;
+    on_form cb pr.EcAst.pr_args
 
   in
     on_ty cb f.EcAst.f_ty; fornode ()
@@ -392,9 +393,9 @@ let on_tydecl (cb : cb) (tyd : tydecl) =
   | `Abstract s  -> on_typeclasses cb s
   | `Record (f, fds) ->
       on_form cb f;
-      List.iter (on_ty cb |- snd) fds
+      List.iter (snd |- on_ty cb) fds
   | `Datatype dt ->
-     List.iter (List.iter (on_ty cb) |- snd) dt.tydt_ctors;
+     List.iter (snd |- List.iter (on_ty cb)) dt.tydt_ctors;
      List.iter (on_form cb) [dt.tydt_schelim; dt.tydt_schcase]
 
 let on_tcdecl cb tc =
@@ -420,7 +421,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
        pri.pri_ctors
 
    | OB_nott nott ->
-     List.iter (on_ty cb |- snd) nott.ont_args;
+     List.iter (snd |- on_ty cb) nott.ont_args;
      on_ty cb nott.ont_resty;
      on_expr cb nott.ont_body
 
@@ -429,6 +430,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
      | OP_TC _ -> assert false
+     | OP_Exn _ -> assert false
      | OP_Plain f -> on_form cb f
      | OP_Fix    f ->
        let rec on_mpath_branches br =
@@ -704,7 +706,7 @@ let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain f -> EcIdent.fv_union fv (fv_and_tvar_f f)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC _ -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC _ | OP_Exn _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -890,6 +892,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           match body with
           | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
           | OP_TC _ -> assert false (* ??? *)
+          | OP_Exn _ -> assert false
           | OP_Plain f ->
             OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f)
           | OP_Fix opfix ->
@@ -899,6 +902,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
               let (l,i) = opfix.opf_struct in
               (List.map (fun i -> i + nb_extra) l, i + nb_extra) in
             OP_Fix {
+                opf_recp     = opfix.opf_recp;
                 opf_args     = extra_a @ opfix.opf_args;
                 opf_resty    = opfix.opf_resty;
                 opf_struct;
@@ -1061,12 +1065,12 @@ let generalize_addrw to_gen (p, ps, lc) =
 
 let generalize_reduction to_gen _rl = to_gen, None
 
-let generalize_auto to_gen (n,s,ps,lc) =
+let generalize_auto to_gen { level=n; base=s; axioms=ps; locality=lc } =
   if lc = `Local then to_gen, None
   else
-    let ps = List.filter (fun p -> to_keep to_gen (`Ax p)) ps in
+    let ps = List.filter (fun (p, _) -> to_keep to_gen (`Ax p)) ps in
     if ps = [] then to_gen, None
-    else to_gen, Some (Th_auto (n,s,ps,lc))
+    else to_gen, Some (Th_auto { level=n; base=s; axioms=ps; locality=lc })
 
 (* --------------------------------------------------------------- *)
 let get_locality scenv = scenv.sc_loca
@@ -1075,6 +1079,38 @@ let set_local l =
   match l with
   | `Global -> `Local
   | _ -> l
+
+let id_lc = function
+  | `Global -> `Global
+  | `Local -> `Local
+
+let set_lc lc = function
+  | `Global | `Local -> id_lc lc
+  | l -> l
+
+let rec set_lc_item lc_override item =
+  let lcitem =
+    match item.ti_item with
+    | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_lc lc_override ty.tyd_loca })
+    | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_lc lc_override op.op_loca   })
+    | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_lc lc_override ax.ax_loca   })
+    | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_lc lc_override ms.tms_loca  })
+    | Th_module          me  -> Th_module        { me with tme_loca = set_lc lc_override me.tme_loca  }
+    | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_lc lc_override tc.tc_loca   })
+    | Th_theory      (s, th) -> Th_theory    (s, set_lc_th lc_override th)
+    | Th_export       (p,lc) -> Th_export    (p, set_lc lc_override lc)
+    | Th_instance    (x,tci) -> Th_instance  (x, { tci with tci_local = set_lc lc_override tci.tci_local })
+    | Th_baserw       (s,lc) -> Th_baserw    (s, set_lc lc_override lc)
+    | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_lc lc_override lc)
+    | Th_reduction       r   -> Th_reduction r
+    | Th_auto     ar -> Th_auto { ar with locality = set_lc lc_override ar.locality }
+    | Th_alias    a  -> Th_alias a
+
+  in { item with ti_item = lcitem }
+
+and set_lc_th lc_override th =
+  { th with cth_items = List.map (set_lc_item lc_override) th.cth_items;
+            cth_loca  = set_lc lc_override th.cth_loca; }
 
 let rec set_local_item item =
   let lcitem =
@@ -1091,7 +1127,8 @@ let rec set_local_item item =
     | Th_baserw       (s,lc) -> Th_baserw    (s, set_local lc)
     | Th_addrw     (p,ps,lc) -> Th_addrw     (p, ps, set_local lc)
     | Th_reduction       r   -> Th_reduction r
-    | Th_auto     (i,s,p,lc) -> Th_auto      (i, s, p, set_local lc)
+    | Th_auto     ar -> Th_auto { ar with locality = set_local ar.locality }
+    | Th_alias    a  -> Th_alias a
 
   in { item with ti_item = lcitem }
 
@@ -1357,8 +1394,11 @@ let exit_theory ?clears ?pempty scenv =
     name, cth, scenv
 
 (* -----------------------------------------------------------*)
-let add_item_ (item : theory_item) (scenv:scenv) =
-  let item = if scenv.sc_loca = `Local then set_local_item item else item in
+let add_item_ ?(override_locality=None) (item : theory_item) (scenv:scenv) =
+  let item = match override_locality, scenv.sc_loca with
+    | Some lc, _ | None, (`Local as lc) -> set_lc_item lc item
+    | _ -> item
+  in
   let env = scenv.sc_env in
   let env =
     match item.ti_item with
@@ -1372,7 +1412,8 @@ let add_item_ (item : theory_item) (scenv:scenv) =
     | Th_instance (x, tc) -> EcEnv.TcInstance.bind x tc env
     | Th_baserw   (s,lc) -> EcEnv.BaseRw.add s lc env
     | Th_addrw (p,ps,lc) -> EcEnv.BaseRw.addto p ps lc env
-    | Th_auto (level, base, ps, lc) -> EcEnv.Auto.add ~level ?base ps lc env
+    | Th_auto { level; base; axioms = ps; locality = lc } ->
+        EcEnv.Auto.add ~level ?base ps lc env
     | Th_reduction r     -> EcEnv.Reduction.add r env
     | _                  -> assert false
   in
@@ -1403,6 +1444,7 @@ let rec generalize_th_item (to_gen : to_gen) (prefix : path) (th_item : theory_i
     | Th_addrw (p,ps,lc) -> generalize_addrw to_gen (p, ps, lc)
     | Th_reduction rl    -> generalize_reduction to_gen rl
     | Th_auto hints      -> generalize_auto to_gen hints
+    | Th_alias _         -> (to_gen, None)
 
   in
 
@@ -1452,7 +1494,7 @@ and generalize_ctheory
     | Some compiled when List.is_empty compiled.ctheory.cth_items ->
       genenv
     | Some compiled ->
-      let scenv = add_th ~import:import0 compiled genenv.tg_env in
+      let scenv = add_th ~import:true compiled genenv.tg_env in
       { genenv with tg_env = scenv; }
 
 and generalize_lc_item (genenv : to_gen) (prefix : path) (item : sc_item) =
@@ -1520,14 +1562,18 @@ let check_item scenv item =
   | Th_addrw (_,_,lc) ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local hint rewrite can only be declared inside section";
-  | Th_auto (_, _, _, lc) ->
+  | Th_auto { locality = lc; _ } ->
     if (lc = `Local && not scenv.sc_insec) then
       hierror "local hint can only be declared inside section";
   | Th_reduction _ -> ()
+  | Th_alias _     -> ()
   | Th_theory  _   -> assert false
 
-let rec add_item (item : theory_item) (scenv : scenv) =
-  let item = if scenv.sc_loca = `Local then set_local_item item else item in
+let rec add_item ?(override_locality=None) (item : theory_item) (scenv : scenv) =
+  let item = match override_locality, scenv.sc_loca with
+    | Some lc, _ | None, (`Local as lc) -> set_lc_item lc item
+    | _ -> item
+  in
   let scenv1 = add_item_ item scenv in
   begin match item.ti_item with
   | Th_theory (s,cth) ->

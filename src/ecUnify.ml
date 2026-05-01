@@ -180,7 +180,7 @@ module Unify = struct
     in { tyuni = doit_ty; tcuni = doit_tc; }
 
   (* ------------------------------------------------------------------ *)
-  let subst_of_uf (uc : ucore) : unisubst =
+  let subst_of_uf (uc : ucore) : ty TyUni.Muid.t =
     let close = close uc in
 
     let dereference_tyuni (uid : tyuni) =
@@ -188,26 +188,11 @@ module Unify = struct
       | { ty_node = Tunivar uid' } when TyUni.uid_equal uid uid' -> None
       | ty -> Some ty in
 
-    let dereference_tcuni (uid : tcuni) =
-      match close.tcuni (TCIUni (uid, 0)) with
-      | TCIUni (uid', _) when TcUni.uid_equal uid uid' -> None
-      | tw -> Some tw in
-
-    let uvars =
-      let bindings =
-        List.filter_map (fun uid ->
-          Option.map (fun ty -> (uid, ty)) (dereference_tyuni uid)
-        ) (UF.domain uc.uf) in
-      TyUni.Muid.of_list bindings in
-
-    let utcvars =
-      let bindings =
-        List.filter_map (fun uid ->
-          Option.map (fun tw -> (uid, tw)) (dereference_tcuni uid)
-        ) (TcUni.Muid.keys uc.tcenv.problems) in
-      TcUni.Muid.of_list bindings in
-
-    { uvars; utcvars; }
+    let bindings =
+      List.filter_map (fun uid ->
+        Option.map (fun ty -> (uid, ty)) (dereference_tyuni uid)
+      ) (UF.domain uc.uf) in
+    TyUni.Muid.of_list bindings
 
   (* -------------------------------------------------------------------- *)
   let check_closed (uc : ucore) =
@@ -808,7 +793,7 @@ module UniEnv = struct
   let closed (ue : unienv) =
     Option.is_none (xclosed ue)
 
-  let assubst (ue : unienv) : unisubst =
+  let assubst (ue : unienv) : ty TyUni.Muid.t =
     Unify.subst_of_uf (!ue).ue_uc
 
   let close (ue : unienv) =
@@ -816,10 +801,9 @@ module UniEnv = struct
     assubst ue
 
   let tparams (ue : unienv) =
-    let subst = EcCoreSubst.f_subst_init ~tu:(assubst ue) () in
     let fortv x =
       let tvtc = odfl [] (Mid.find_opt x (!ue).ue_uc.tvtc) in
-      List.map (EcCoreSubst.tc_subst subst) tvtc in
+      tvtc in
     List.map (fun x -> (x, fortv x)) (List.rev (!ue).ue_decl)
 end
 
@@ -845,8 +829,9 @@ let unify_etyarg (env : EcEnv.env) (ue : unienv) (e1 : etyarg) (e2 : etyarg) =
   List.iter2 (unify_tcw env ue) ws1 ws2
 
 (* -------------------------------------------------------------------- *)
-let tfun_expected (ue : unienv) (psig : ty list) =
-  EcTypes.toarrow psig (UniEnv.fresh ue)
+let tfun_expected (ue : unienv) ?retty (psig : ty list) =
+  let ret = match retty with Some t -> t | None -> UniEnv.fresh ue in
+  EcTypes.toarrow psig ret
 
 (* -------------------------------------------------------------------- *)
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
@@ -900,7 +885,7 @@ let select_op
     try
       let UniEnv.{ subst = tip; args } =
         UniEnv.opentvi subue op.D.op_tparams tvi in
-      let tip = f_subst_init ~tv:tip () in
+      let tip = f_subst_init ~tv:(Mid.map fst tip) () in
 
       (*
       List.iter

@@ -55,8 +55,8 @@ module UniEnv : sig
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool
   val xclosed    : unienv -> uniflags option
-  val close      : unienv -> EcCoreSubst.unisubst
-  val assubst    : unienv -> EcCoreSubst.unisubst
+  val close      : unienv -> ty TyUni.Muid.t
+  val assubst    : unienv -> ty TyUni.Muid.t
   val tparams    : unienv -> ty_params
 end
 
@@ -67,8 +67,6 @@ val unify_etyarg : EcEnv.env -> unienv -> etyarg -> etyarg -> unit
 val tfun_expected : unienv -> ?retty:ty -> EcTypes.ty list -> EcTypes.ty
 
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
-
-type select_result = (EcPath.path * ty list) * ty * unienv * sbody option
 
 val select_op :
      ?hidden:bool

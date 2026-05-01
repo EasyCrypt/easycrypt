@@ -406,6 +406,7 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
+%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -1665,7 +1666,7 @@ typarams:
     { ([] : ptyparams) }
 
 | x=tident
-    { ([x] : ptyparams) }
+    { ([(x, [])] : ptyparams) }
 
 | xs=paren(plist1(typaram, COMMA))
     { (xs : ptyparams) }
@@ -1786,8 +1787,9 @@ pred_tydom:
 
 tyvars_decl:
 | LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET
-| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
     { tyvars }
+| LBRACKET tyvars=rlist2(tident, empty) RBRACKET
+    { List.map (fun x -> (x, [])) tyvars }
 
 op_or_const:
 | OP    { `Op    }
