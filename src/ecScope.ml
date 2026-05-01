@@ -1712,8 +1712,13 @@ module Ty = struct
     let cpath = EcPath.fromqsymbol ([EcCoreLib.i_top], "Subtype") in
     let theory = EcEnv.Theory.by_path ~mode:`Abstract cpath env in
 
-    let _ = subtype.pst_rename in
-    let renames = [] in
+    let renames : EcThCloning.renaming list =
+      match subtype.pst_rename with
+      | None -> []
+      | Some (insub, val_) -> [
+        (`All, (EcRegexp.regexp "val", EcRegexp.subst val_));
+        (`All, (EcRegexp.regexp "insub", EcRegexp.subst insub));
+      ] in
 
     let theory = theory.cth_items in
 

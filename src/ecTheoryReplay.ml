@@ -933,7 +933,8 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_TC     _)) ->
+                | OB_oper (Some (OP_TC     _))
+                | OB_oper (Some (OP_Exn    _)) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain f)) ->
                     match f.f_node with
@@ -1041,6 +1042,12 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_instance (x, tci) ->
      replay_instance ove (subst, ops, proofs, scope) (item.ti_import, x, tci)
+
+  | Th_alias (n, p) ->
+      let p = EcSubst.subst_path subst p in
+      let scope =
+        ove.ovre_hooks.hadd_item scope ~import:item.ti_import (Th_alias (n, p)) in
+      (subst, ops, proofs, scope)
 
   | Th_theory (ox, cth) -> begin
       let thmode = cth.cth_mode in
