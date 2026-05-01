@@ -845,7 +845,8 @@ type select_t =
 let select_op
   ?(hidden : bool = false)
   ?(filter : select_filter_t = fun _ _ -> true)
-   (tvi    : tvi) 
+  ?(retty  : ty option)
+   (tvi    : tvi)
    (env    : EcEnv.env)
    (name   : qsymbol)
    (ue     : unienv)
@@ -896,7 +897,7 @@ let select_op
       *)
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
-      let texpected = tfun_expected subue psig in
+      let texpected = tfun_expected subue ?retty psig in
 
       (try  unify env subue top texpected
        with UnificationFailure _ -> raise E.Failure);

@@ -412,7 +412,7 @@ let gen_select_op
     else [] in
 
   let ops () : OpSelect.gopsel list =
-    let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue (fst psig) in
+    let ops = EcUnify.select_op ~filter:ue_filter ?retty:(snd psig) tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
     let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in

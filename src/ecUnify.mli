@@ -71,6 +71,7 @@ type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 val select_op :
      ?hidden:bool
   -> ?filter:(EcPath.path -> operator -> bool)
+  -> ?retty:ty
   -> tvi
   -> EcEnv.env
   -> qsymbol
