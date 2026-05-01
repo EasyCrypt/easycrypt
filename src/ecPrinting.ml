@@ -1900,7 +1900,6 @@ and match_pp_notations
       let ev   = MEV.of_idents (List.map fst nt.ont_args) `Form in
       let ue   = EcUnify.UniEnv.create None in
       let ov   = EcUnify.UniEnv.opentvi ue tv None in
-      let ti   = Tvar.subst ov.subst in
       let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
       let mr   = odfl mhr (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) in
       let bd   = form_of_expr ~m:mr nt.ont_body in
@@ -2603,9 +2602,10 @@ let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : codepos) =
   let pp_nm (fmt : Format.formatter) ((cp, bs) : codepos1 * codepos_brsel) =
     let bs =
       match bs with
-      | `Cond  true  -> "."
-      | `Cond  false -> "?"
-      | `Match cp    -> Format.sprintf "#%s." cp
+      | `Cond  true     -> "."
+      | `Cond  false    -> "?"
+      | `Match cp       -> Format.sprintf "#%s." cp
+      | `MatchByPos i   -> Format.sprintf "#%d." i
       in
     Format.fprintf fmt "%a%s" (pp_codepos1 ppe) cp bs
   in

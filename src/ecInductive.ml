@@ -260,11 +260,6 @@ let indsc_of_datatype ?(normty = identity) (mode : indmode) (dt : datatype) =
     let form   = FL.f_forall [predx, GTty predty] form in
       form
 
-  and occurs p t =
-    match (normty t).ty_node with
-    | Tconstr (p', _) when EcPath.p_equal p p' -> true
-    | _ -> EcTypes.ty_sub_exists (occurs p) t
-
   in scheme mode (etyargs_of_tparams dt.dt_tparams, tpath) dt.dt_ctors
 
 (* -------------------------------------------------------------------- *)

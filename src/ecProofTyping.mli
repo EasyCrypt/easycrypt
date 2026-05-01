@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcIdent
-open EcTypes
 open EcAst
 open EcFol
 open EcPath

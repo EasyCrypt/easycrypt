@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcTypes
 open EcAst
 open EcCoreGoal.FApi
 

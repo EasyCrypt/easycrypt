@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcAst
-open EcDecl
 open EcTheory
 open EcEnv
 

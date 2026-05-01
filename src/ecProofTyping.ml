@@ -7,9 +7,7 @@ open EcPath
 open EcFol
 open EcEnv
 open EcCoreGoal
-open EcAst
 open EcParsetree
-open EcUnify
 
 module Msym = EcSymbols.Msym
 

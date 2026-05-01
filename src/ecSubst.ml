@@ -1199,6 +1199,9 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_alias (name, target) ->
       Th_alias (name, subst_path s target)
 
+  | Th_typeclass (x, tc) ->
+      Th_typeclass (x, subst_tc s tc)
+
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : subst) (items : theory) =
   List.map (subst_theory_item s) items

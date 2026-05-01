@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUid
 open EcIdent
 open EcTypes
 open EcModules
