@@ -1625,6 +1625,16 @@ module ModType = struct
 end
 
 (* -------------------------------------------------------------------- *)
+(* Forward reference: filled in later by [Cloning] (which depends on
+   [Theory] which is defined after [Ty]). *)
+let subtype_hooks_ref : scope EcTheoryReplay.ovrhooks ref =
+  ref { EcTheoryReplay.henv      = (fun _ -> assert false);
+        EcTheoryReplay.hadd_item = (fun _ ~import:_ _ -> assert false);
+        EcTheoryReplay.hthenter  = (fun _ _ _ _ -> assert false);
+        EcTheoryReplay.hthexit   = (fun _ _ -> assert false);
+        EcTheoryReplay.herr      = (fun ?loc:_ _ -> assert false); }
+
+(* -------------------------------------------------------------------- *)
 module Ty = struct
   open EcDecl
   open EcTyping
@@ -1648,8 +1658,73 @@ module Ty = struct
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let add_subtype (_scope : scope) (st : psubtype located) : scope =
-    hierror ~loc:(loc st) "subtype declarations are not supported"
+  let add_subtype (scope : scope) ({ pl_desc = subtype } : psubtype located) =
+    let loced x = mk_loc _dummy x in
+    let env = env scope in
+
+    let scope =
+      let decl = EcDecl.{
+        tyd_params  = [];
+        tyd_type    = `Abstract [];
+        tyd_resolve = true;
+        tyd_loca    = `Global; (* FIXME:SUBTYPE *)
+      } in bind scope (unloc subtype.pst_name, decl) in
+
+    let carrier =
+      let ue = EcUnify.UniEnv.create None in
+      transty tp_tydecl env ue subtype.pst_carrier in
+
+    let pred =
+      let x = EcIdent.create (fst subtype.pst_pred).pl_desc in
+      let env = EcEnv.Var.bind_local x carrier env in
+      let ue = EcUnify.UniEnv.create None in
+      let pred = EcTyping.trans_prop env ue (snd subtype.pst_pred) in
+      if not (EcUnify.UniEnv.closed ue) then
+        hierror ~loc:(snd subtype.pst_pred).pl_loc
+          "the predicate contains free type variables";
+      let uidmap = EcUnify.UniEnv.close ue in
+      let fs = EcCoreSubst.Tuni.subst uidmap in
+      f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
+
+    let evclone : EcThCloning.evclone =
+      let t_entry : EcThCloning.xty_override = (`Direct carrier, `Inline `Clear) in
+      let st_entry : EcThCloning.xty_override =
+        ((`ByPath
+            (EcPath.pqname (EcEnv.root env) (unloc subtype.pst_name))
+          :> [`ByPath of EcPath.path | `BySyntax of EcParsetree.ty_override_def | `Direct of EcAst.ty]),
+         `Inline `Clear) in
+      let p_entry : EcThCloning.xop_override = (`Direct pred, `Inline `Clear) in
+      { EcThCloning.evc_empty with
+          evc_types = Msym.of_list [
+            "T", loced t_entry;
+            "sT", loced st_entry;
+          ];
+          evc_ops = Msym.of_list [
+            "P", loced p_entry;
+          ];
+          evc_lemmas = {
+            ev_bynames = Msym.empty;
+            ev_global  =  [ (None, Some [`Include, "prove"]) ]
+          } } in
+
+    let cname = Option.map unloc subtype.pst_cname in
+    let npath = ofold ((^~) EcPath.pqname) (EcEnv.root env) cname in
+    let cpath = EcPath.fromqsymbol ([EcCoreLib.i_top], "Subtype") in
+    let theory = EcEnv.Theory.by_path ~mode:`Abstract cpath env in
+
+    let _ = subtype.pst_rename in
+    let renames = [] in
+
+    let theory = theory.cth_items in
+
+    let (_proofs, scope) =
+      EcTheoryReplay.replay !subtype_hooks_ref
+        ~abstract:false ~local:`Global ~incl:(Option.is_none cname)
+        ~clears:Sp.empty ~renames ~opath:cpath ~npath
+        evclone scope
+        (Option.value ~default:(EcPath.basename cpath) cname, theory)
+    in
+    scope
 
   (* ------------------------------------------------------------------ *)
   let add ?src:_ scope (tyd : ptydecl located) =
@@ -2399,6 +2474,8 @@ module Cloning = struct
       R.hthenter  = Theory.enter;
       R.hthexit   = thexit;
       R.herr      = (fun ?loc -> hierror ?loc "%s"); }
+
+  let () = subtype_hooks_ref := hooks
 
   (* ------------------------------------------------------------------ *)
   module Options = struct

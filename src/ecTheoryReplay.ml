@@ -361,6 +361,15 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
             | _ -> assert false
           end
+
+        | `Direct ty ->
+            assert (List.is_empty otyd.tyd_params);
+            let decl =
+              { tyd_params  = [];
+                tyd_type    = `Concrete ty;
+                tyd_resolve = otyd.tyd_resolve && (mode = `Alias);
+                tyd_loca    = otyd.tyd_loca; }
+            in (decl, ty)
       in
 
       let subst, x =
@@ -493,6 +502,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
 
             | _ -> clone_error env (CE_UnkOverride(OVK_Operator, EcPath.toqsymbol p))
           end
+
+          | `Direct body ->
+              let newop =
+                mk_op ~opaque:optransparent ~clinline:(opmode <> `Alias)
+                  refop.op_tparams body.f_ty (Some (OP_Plain body)) refop.op_loca in
+              (newop, body)
         in
           match opmode with
           | `Alias ->
@@ -614,6 +629,14 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
 
           | _ -> clone_error env (CE_UnkOverride(OVK_Predicate, EcPath.toqsymbol p))
         end
+
+        | `Direct body ->
+            let newpr =
+              { refpr with
+                op_kind = OB_pred (Some (PR_Plain body));
+                op_ty = body.f_ty;
+                op_clinline = (prmode <> `Alias); }
+            in (newpr, body)
       in
 
         match prmode with
