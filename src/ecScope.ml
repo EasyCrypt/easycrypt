@@ -1717,14 +1717,29 @@ module Ty = struct
 
     let theory = theory.cth_items in
 
-    let (_proofs, scope) =
+    let (proofs, scope) =
       EcTheoryReplay.replay !subtype_hooks_ref
         ~abstract:false ~local:`Global ~incl:(Option.is_none cname)
         ~clears:Sp.empty ~renames ~opath:cpath ~npath
         evclone scope
         (Option.value ~default:(EcPath.basename cpath) cname, theory)
     in
-    scope
+    let proofs =
+      List.pmap (fun axc ->
+        match axc.EcThCloning.axc_tac with
+        | None ->
+            Some (fst_map some axc.EcThCloning.axc_axiom,
+                  axc.EcThCloning.axc_path,
+                  axc.EcThCloning.axc_env)
+        | Some _ ->
+            (* tactic-bearing proofs require Tactics.process_r which
+               isn't available at this point (defined after Ty); they
+               are not produced by Subtype's evclone (which only
+               provides ev_global), so this branch is unreachable. *)
+            assert false)
+        proofs
+    in
+    Ax.add_defer scope proofs
 
   (* ------------------------------------------------------------------ *)
   let add ?src:_ scope (tyd : ptydecl located) =
