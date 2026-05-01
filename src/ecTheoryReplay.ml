@@ -251,20 +251,31 @@ let operator_compatible env oper1 oper2 =
   | _                 , _                  -> raise exn
 
 (* -------------------------------------------------------------------- *)
-let check_evtags (tags : evtags) (src : symbol list) =
+let check_evtags ?(tags : evtags option) (src : symbol list) =
   let module E = struct exception Reject end in
 
+  let explicit = "explicit" in
+
   try
-    let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
-    let stt =
-      List.map (fun src ->
-        let do1 status (mode, dst) =
-          match mode with
-          | `Exclude -> if sym_equal src dst then raise E.Reject; status
-          | `Include -> status || (sym_equal src dst)
-        in List.fold_left do1 dfl tags)
-        src
-    in List.mem true stt
+    match tags with
+    | None ->
+      if List.mem explicit src then
+        raise E.Reject;
+      true
+
+    | Some tags ->
+      let dfl =
+        not (List.mem explicit src) &&
+        not (List.exists (fun (mode, _) -> mode = `Include) tags) in
+      let stt =
+        List.map (fun src ->
+          let do1 status (mode, dst) =
+            match mode with
+            | `Exclude -> if sym_equal src dst then raise E.Reject; status
+            | `Include -> status || (sym_equal src dst)
+          in List.fold_left do1 dfl tags)
+          src
+      in List.mem true stt
 
   with E.Reject -> false
 
@@ -293,9 +304,11 @@ let string_of_renaming_kind = function
 let rename ove subst (kind, name) =
   try
     let newname =
-      List.find_map
-        (fun rnm -> EcThCloning.rename rnm (kind, name))
-        ove.ovre_rnms in
+      List.fold_left (* FIXME:parallel substitution *)
+        (fun name rnm ->
+            Option.value ~default:name (EcThCloning.rename rnm (kind, name)))
+            name ove.ovre_rnms in
+    if newname = name then raise Not_found;
 
     let nameok =
       match kind with
@@ -715,8 +728,8 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
       | Some (pt, hide, explicit) -> Some (pt, hide, explicit)
       | None when is_axiom ax.ax_kind ->
           List.Exceptionless.find_map
-            (function (pt, None) -> Some (pt, `Alias, false) | (pt, Some pttags) ->
-               if check_evtags pttags (Ssym.elements tags) then
+            (fun (pt, pttags) ->
+               if check_evtags ?tags:pttags (Ssym.elements tags) then
                  Some (pt, `Alias, false)
                else None)
             ove.ovre_glproof
