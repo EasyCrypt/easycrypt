@@ -436,9 +436,12 @@ module Unify = struct
           (* Find the offset of [tc] (or any of its ancestors) in [tcs];
              also return the number of [tc_prt] steps walked to reach
              [tc] from [tcs.(offset)]. [lift = 0] is a direct match. *)
+          let with_lift tc' =
+            let rec scan i = function
+              | [] -> None
+              | a :: rest -> if eq_tc a then Some i else scan (i + 1) rest
+            in scan 0 (EcTypeClass.ancestors env tc') in
           let match_tc_offset (tcs : typeclass list) : (int * int) option =
-            let with_lift tc' =
-              List.find_index eq_tc (EcTypeClass.ancestors env tc') in
             let rec scan i = function
               | [] -> None
               | tc' :: rest ->
