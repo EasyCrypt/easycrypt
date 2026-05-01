@@ -385,6 +385,7 @@
 %token APPLY
 %token AS
 %token ASSUMPTION
+%token ASGN
 %token ASYNC
 %token AT
 %token AUTO
@@ -599,11 +600,11 @@
 %token TIMEOUT
 %token TOP
 %token TRANSITIVITY
+%token TRANS
 %token TRIVIAL
 %token TRY
 %token TYPE
 %token UNDELAY
-%token UNPOP
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
@@ -2943,14 +2944,17 @@ logtactic:
    { Pwlog (ids, b, f) }
 
 dcoupl_tac:
-| PUSH s=option(side)
-    { Pdc_push s }
+| DELAY s=option(side)
+    { Pdc_delay s }
+
+| DELAY STAR s=side pre=option(sform)
+    { Pdc_delaystar (s, pre) }
 
 | POP s=option(side) n=option(word)
     { Pdc_pop (s, n) }
 
-| UNPOP s=option(side) n=option(word)
-    { Pdc_unpop (s, n) }
+| PUSH s=option(side) n=option(word)
+    { Pdc_push (s, n) }
 
 | CONSEQ pre=sform post=sform
     { Pdc_conseq (pre, post) }
@@ -2963,6 +2967,9 @@ dcoupl_tac:
 
 | INDEP nl=word nr=word
     { Pdc_indep (nl, nr) }
+    
+| TRANS p12=sform q12=sform p23=sform q23=sform bds=bracket(ptybindings) LBRACE r2=stmt PIPE c2=stmt PIPE s2=stmt RBRACE
+    { Pdc_trans (p12, q12, p23, q23, bds, r2, c2, s2) }
 
 | SKIP
     { Pdc_skip }
@@ -2980,11 +2987,17 @@ dcoupl_tac:
 | WP s=side
     { Pdc_wp_side s }
 
+| ASGN s=side
+    { Pdc_asgn_side s }
+
 | IF s=option(side)
     { Pdc_if s }
 
-| WHILE s=option(side)
-    { Pdc_while s }
+| WHILE inv=sform WITH invr1=option(brace(stmt)) TILD invr2=option(brace(stmt))
+    { Pdc_while (None, inv, invr1, invr2)  }
+
+| WHILE s=side inv=sform WITH invr1=option(brace(stmt))
+    { Pdc_while (Some s, inv, invr1, None)  }
 
 | RND s=option(side)
     { Pdc_rnd (s, None) }

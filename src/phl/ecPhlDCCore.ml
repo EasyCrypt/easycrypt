@@ -4,7 +4,9 @@ open EcAst
 open EcFol
 open EcCoreFol
 open EcCoreGoal
+open EcCoreModules
 open EcLowPhlGoal
+open EcReduction
 
 (* -------------------------------------------------------------------- *)
 (* Two-sided rules for the delayed-coupling logic (paper §4.1).         *)
@@ -14,17 +16,18 @@ open EcLowPhlGoal
      Premise:    forall m1 m2, phi m1 m2 implies psi m1 m2
      Conclusion: dcoupl phi [R1xR2] eps eps psi [R1xR2]                  *)
 let t_dc_skip_r tc =
+  let env = FApi.tc1_env tc in
   let es = tc1_as_dcEquivS tc in
   if not (List.is_empty es.dces_cl.s_node) then
     tc_error !!tc ~who:"dc skip" "left body is not empty";
   if not (List.is_empty es.dces_cr.s_node) then
     tc_error !!tc ~who:"dc skip" "right body is not empty";
-  if not (s_equal es.dces_sl es.dces_rl) then
+  if not (EqTest.for_stmt env es.dces_sl es.dces_rl) then
     tc_error !!tc ~who:"dc skip"
-      "left continuation S1 must equal the left delay context R1";
-  if not (s_equal es.dces_sr es.dces_rr) then
+      "left post-stack must equal left pre-stack";
+  if not (EqTest.for_stmt env es.dces_sr es.dces_rr) then
     tc_error !!tc ~who:"dc skip"
-      "right continuation S2 must equal the right delay context R2";
+      "right post-stack must equal right pre-stack";
   let concl = map_ts_inv2 f_imp (dces_pr es) (dces_po es) in
   let concl =
     EcSubst.f_forall_mems_ts_inv es.dces_ml es.dces_mr concl
@@ -39,22 +42,20 @@ let split_at ~who tc n s =
   let nodes = s.EcAst.s_node in
   if List.length nodes < n then
     tc_error !!tc ~who
-      "cannot split at position %d (statement has only %d instructions)"
+"cannot split at position %d (statement has only %d instructions)"
       n (List.length nodes);
   let pre, rest = List.takedrop n nodes in
   (EcAst.stmt pre, EcAst.stmt rest)
-
-let s_cat a b = EcAst.stmt (a.EcAst.s_node @ b.EcAst.s_node)
 
 (* -------------------------------------------------------------------- *)
 (* Seq rule (paper).
      Premise 1: dcoupl phi [R1xR2] C1 C2 theta [T1xT2]
      Premise 2: dcoupl theta [T1xT2] D1 D2 psi [S1xS2]
-     Conclusion: dcoupl phi [R1xR2] (C1;D1) (C2;D2) psi [S1xS2]
+Conclusion: dcoupl phi [R1xR2] (C1;D1) (C2;D2) psi [S1xS2]
 
    User splits each body at positions [nl, nr], supplies intermediate
    predicate [theta]. Optional [ts] = (T_l, T_r); if omitted, defaults
-   to R_i; C_i.                                                        *)
+   to R_i.                                                        *)
 let t_dc_seq_r ~nl ~nr ?ts theta tc =
   let es = tc1_as_dcEquivS tc in
   let (cl, dl) = split_at ~who:"dc seq" tc nl es.dces_cl in
@@ -64,7 +65,7 @@ let t_dc_seq_r ~nl ~nr ?ts theta tc =
   let theta_ts : ts_inv = { ml; mr; inv = theta } in
   let (tl, tr) =
     match ts with
-    | None -> (s_cat es.dces_rl cl, s_cat es.dces_rr cr)
+    | None -> (es.dces_rl, es.dces_rr)
     | Some (tl, tr) -> (tl, tr)
   in
   let sub_left =
@@ -226,76 +227,59 @@ let t_dc_if = FApi.t_low0 "dc-if" t_dc_if_r
          (phi /\ not e1) [R1xR2]
    Both the post-continuation S_i and the body-loop's post-R equal R_i.
    The caller must pre-arrange this shape (use Conseq if needed).       *)
-let t_dc_while_r tc =
-  let es = tc1_as_dcEquivS tc in
-  let env = FApi.tc1_env tc in
-  let ml = fst es.dces_ml in
-  let mr = fst es.dces_mr in
+let t_dc_while_r ~inv ?invr1 ?invr2 tc =
+    let es = tc1_as_dcEquivS tc in
+    let env = FApi.tc1_env tc in
+    let ml = fst es.dces_ml in
+    let mr = fst es.dces_mr in
 
-  (* Body is a single while on each side. *)
-  (match es.dces_cl.EcAst.s_node with
-   | [_] -> () | _ -> tc_error !!tc ~who:"dc while"
-       "left body must be a single while instruction");
-  (match es.dces_cr.EcAst.s_node with
-   | [_] -> () | _ -> tc_error !!tc ~who:"dc while"
-       "right body must be a single while instruction");
-  let (el, body_l) =
-    EcCoreModules.destr_while (List.hd es.dces_cl.EcAst.s_node) in
-  let (er, body_r) =
-    EcCoreModules.destr_while (List.hd es.dces_cr.EcAst.s_node) in
+    let (e1, c1), pc1 = tc1_last_while tc es.dces_cl in
+    let (e2, c2), pc2 = tc1_last_while tc es.dces_cr in
+    let e1_ts = ts_of_test_left ~ml ~mr e1 in
+    let e2_ts = ts_of_test_left ~ml ~mr e2 in
 
-  (* Continuations must match R (the rule's conclusion assumes S = R). *)
-  if not (EcAst.s_equal es.dces_sl es.dces_rl) then
-    tc_error !!tc ~who:"dc while"
-      "left continuation S1 must equal R1";
-  if not (EcAst.s_equal es.dces_sr es.dces_rr) then
-    tc_error !!tc ~who:"dc while"
-      "right continuation S2 must equal R2";
+    let invr1 = odfl es.dces_sl invr1 in
+    let invr2 = odfl es.dces_sr invr2 in
 
-  (* Write side conditions. *)
-  let fv_el_form = (EcCoreFol.ss_inv_of_expr ml el).inv in
-  let fv_er_form = (EcCoreFol.ss_inv_of_expr mr er).inv in
-  let fv_el = EcPV.PV.fv env ml fv_el_form in
-  let fv_er = EcPV.PV.fv env mr fv_er_form in
-  let w_rl = EcPV.s_write env es.dces_rl in
-  let w_rr = EcPV.s_write env es.dces_rr in
-  if not (EcPV.PV.indep env w_rl fv_el) then
-    tc_error !!tc ~who:"dc while"
-      "Write(R1) and Fv(e1) are not disjoint";
-  if not (EcPV.PV.indep env w_rr fv_er) then
-    tc_error !!tc ~who:"dc while"
-      "Write(R2) and Fv(e2) are not disjoint";
+    (* Write side conditions. *)
+    let fv_e1 = EcPV.PV.fv env ml e1_ts.inv in
+    let fv_e2 = EcPV.PV.fv env mr e2_ts.inv in
+    let w_invr1 = EcPV.s_write env invr1 in
+    let w_invr2 = EcPV.s_write env invr2 in
+    if not (EcPV.PV.indep env fv_e1 w_invr1) then
+        tc_error !!tc ~who:"dc while" "Write(InvR1) and Fv(e1) are not disjoint";
+    if not (EcPV.PV.indep env fv_e2 w_invr2) then
+        tc_error !!tc ~who:"dc while" "Write(InvR2) and Fv(e2) are not disjoint";
 
-  (* The post must be phi /\ not e1 where phi is the pre. *)
-  let el_ts = ts_of_test_left ~ml ~mr el in
-  let er_ts = ts_of_test_right ~ml ~mr er in
-  let phi = dces_pr es in
-  let expected_post =
-    map_ts_inv2 f_and_simpl phi (map_ts_inv1 f_not_simpl el_ts)
-  in
-  if not (f_equal (dces_po es).inv expected_post.inv) then
-    tc_error !!tc ~who:"dc while"
-      "post-condition must be (pre /\\ not e1) \
-       (use [dcoupl conseq] to align)";
+    let pre_equiv =
+        f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
+        (dces_pr es) es.dces_rl es.dces_rr pc1 pc2
+        inv invr1 invr2
+    in
 
-  (* Subgoal 1: test equivalence. *)
-  let test_eq = map_ts_inv2 f_eq el_ts er_ts in
-  let test_impl = map_ts_inv2 f_imp phi test_eq in
-  let test_subgoal =
-    EcSubst.f_forall_mems_ts_inv es.dces_ml es.dces_mr test_impl
-  in
+    let pre_body = map_ts_inv2 f_and_simpl inv e1_ts in
+    let body_equiv =
+        f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
+        pre_body invr1 invr2 c1 c2
+        inv invr1 invr2
+    in
 
-  (* Subgoal 2: body preserves invariant. *)
-  let pre_body = map_ts_inv2 f_and_simpl phi el_ts in
-  let body_goal =
-    f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
-      pre_body
-      es.dces_rl es.dces_rr body_l body_r
-      phi es.dces_rl es.dces_rr
-  in
-  FApi.xmutate1 tc `DCWhile [test_subgoal; body_goal]
+    let test_eq = map_ts_inv2 f_eq e1_ts e2_ts in
+    let test_impl = map_ts_inv2 f_imp inv test_eq in
+    let test_subgoal =
+        EcSubst.f_forall_mems_ts_inv es.dces_ml es.dces_mr test_impl
+    in
 
-let t_dc_while = FApi.t_low0 "dc-while" t_dc_while_r
+    let post = map_ts_inv2 f_and_simpl inv (map_ts_inv1 f_not_simpl e1_ts) in
+    let post_equiv =
+        f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
+        post invr1 invr2 s_empty s_empty
+        (dces_po es) es.dces_sl es.dces_sr
+    in
+
+    FApi.xmutate1 tc `DCWhile [test_subgoal; body_equiv; pre_equiv; post_equiv]
+
+let t_dc_while ~inv ?invr1 ?invr2 = FApi.t_low0 "dc-while" (t_dc_while_r ~inv ?invr1 ?invr2)
 
 (* -------------------------------------------------------------------- *)
 (* Rnd (Sample) rule (paper, two-sided).
@@ -337,10 +321,10 @@ let t_dc_rnd_r
   in
 
   (* Continuations must match R. *)
-  if not (EcAst.s_equal es.dces_sl es.dces_rl) then
+  if not (EcReduction.EqTest.for_stmt env es.dces_sl es.dces_rl) then
     tc_error !!tc ~who:"dc rnd"
       "left continuation S1 must equal R1";
-  if not (EcAst.s_equal es.dces_sr es.dces_rr) then
+  if not (EcReduction.EqTest.for_stmt env es.dces_sr es.dces_rr) then
     tc_error !!tc ~who:"dc rnd"
       "right continuation S2 must equal R2";
 
@@ -554,12 +538,11 @@ let t_dc_wp_side_r ?(uselet=true) ~side tc =
   let hyps = FApi.tc1_hyps tc in
   let es = tc1_as_dcEquivS tc in
   let ml, mr = fst es.dces_ml, fst es.dces_mr in
-  let (mem, body, other_body) =
+  let (mem, body) =
     match side with
-    | `Left  -> (es.dces_ml, es.dces_cl, es.dces_cr)
-    | `Right -> (es.dces_mr, es.dces_cr, es.dces_cl)
+    | `Left  -> (es.dces_ml, es.dces_cl)
+    | `Right -> (es.dces_mr, es.dces_cr)
   in
-  let _ = other_body in
   let post = dces_po es in
   let (s_rest, post_new) =
     EcPhlWp.wp ~mc:(ml, mr) ~uselet hyps mem body
@@ -582,6 +565,65 @@ let t_dc_wp_side_r ?(uselet=true) ~side tc =
 
 let t_dc_wp_side ?uselet ~side =
   FApi.t_low0 "dc-wp-side" (t_dc_wp_side_r ?uselet ~side)
+
+let t_dc_asgn_side_r side tc =
+  let env = FApi.tc1_env tc in
+  let es = tc1_as_dcEquivS tc in
+  let m, c1, s1 =
+    match side with
+    | `Left  -> es.dces_ml, es.dces_cl, es.dces_sl
+    | `Right -> es.dces_mr, es.dces_cr, es.dces_sr
+  in
+
+  let (lv, e), new_c1 = tc1_last_asgn tc c1 in
+  let pv =
+    match lv with
+    | LvVar (pv, _) -> pv
+    | _ -> tc_error !!tc ~who:"dc asgn" "tuples as left value of assignment not yet supported"
+  in
+
+  let mpv = EcPV.Mpv.add env pv e EcPV.Mpv.empty in
+  let new_s1 = EcPV.Mpv.ssubst env mpv s1 in
+
+  let fv_lv =
+    match lv with
+    | EcAst.LvVar (pv, ty) -> EcPV.PV.add env pv ty EcPV.PV.empty
+    | EcAst.LvTuple pvs ->
+        List.fold_left
+          (fun s (pv, ty) -> EcPV.PV.add env pv ty s)
+          EcPV.PV.empty pvs
+  in
+  let e = form_of_expr ~m:(fst m) e in
+  let fv_e = EcPV.PV.fv env (fst m) e in
+
+  let write_s1 = EcPV.s_write env s1 in
+  if not (EcPV.PV.indep env write_s1 (EcPV.PV.union fv_lv fv_e)) then
+    tc_error !!tc ~who:"dc asgn" "Write(S_side) and {x} ∪ Fv(e) are not disjoint";
+
+  let e_ts = { ml = fst es.dces_ml; mr = fst es.dces_mr; inv = e; } in
+  let new_post = 
+    match side with
+    | `Left -> EcLowPhlGoal.subst_form_lv_left env lv e_ts (dces_po es)
+    | `Right -> EcLowPhlGoal.subst_form_lv_right env lv e_ts (dces_po es)
+  in
+
+  let c1, c2, s1, s2 =
+      match side with
+      | `Left -> new_c1, es.dces_cr, new_s1, es.dces_sr
+      | `Right -> es.dces_cl, new_c1, es.dces_sl, new_s1
+  in
+
+  let goal =
+    f_dcEquivS (snd es.dces_ml) (snd es.dces_mr)
+      (dces_pr es) 
+      es.dces_rl es.dces_rr c1 c2
+      new_post s1 s2
+  in
+
+  FApi.xmutate1 tc `DCAsgnSide [goal]
+
+let t_dc_asgn_side side =
+  FApi.t_low0 "dc-asgn-side" (t_dc_asgn_side_r side)
 
 (* -------------------------------------------------------------------- *)
 (* One-sided Rnd (paper Samp_L / Samp_R).
@@ -614,10 +656,10 @@ let t_dc_rnd_side_r ~side tc =
   in
 
   (* S = R on both sides. *)
-  if not (EcAst.s_equal es.dces_sl es.dces_rl) then
+  if not (EcReduction.EqTest.for_stmt env es.dces_sl es.dces_rl) then
     tc_error !!tc ~who:"dc rnd"
       "left continuation S1 must equal R1";
-  if not (EcAst.s_equal es.dces_sr es.dces_rr) then
+  if not (EcReduction.EqTest.for_stmt env es.dces_sr es.dces_rr) then
     tc_error !!tc ~who:"dc rnd"
       "right continuation S2 must equal R2";
 
@@ -704,10 +746,10 @@ let t_dc_while_side_r ~side tc =
   let ml = fst es.dces_ml in
   let mr = fst es.dces_mr in
 
-  let (chosen_body, other_body, chosen_m, chosen_R) =
+  let (chosen_body, other_body, chosen_m, chosen_R, chosen_S) =
     match side with
-    | `Left  -> (es.dces_cl, es.dces_cr, ml, es.dces_rl)
-    | `Right -> (es.dces_cr, es.dces_cl, mr, es.dces_rr)
+    | `Left  -> (es.dces_cl, es.dces_cr, ml, es.dces_rl, es.dces_sl)
+    | `Right -> (es.dces_cr, es.dces_cl, mr, es.dces_rr, es.dces_sr)
   in
   if not (List.is_empty other_body.EcAst.s_node) then
     tc_error !!tc ~who:"dc while"
@@ -720,12 +762,9 @@ let t_dc_while_side_r ~side tc =
     EcCoreModules.destr_while (List.hd chosen_body.EcAst.s_node) in
 
   (* Continuations = R. *)
-  if not (EcAst.s_equal es.dces_sl es.dces_rl) then
+  if not (EcReduction.EqTest.for_stmt env chosen_R chosen_S) then
     tc_error !!tc ~who:"dc while"
-      "left continuation S1 must equal R1";
-  if not (EcAst.s_equal es.dces_sr es.dces_rr) then
-    tc_error !!tc ~who:"dc while"
-      "right continuation S2 must equal R2";
+      "continuation S must equal R";
 
   (* Side condition. *)
   let fv_e = EcPV.PV.fv env chosen_m
@@ -867,7 +906,7 @@ let t_dc_cond_l_r tc =
       "R1 and S1 must end in a random assignment on the same variable";
 
   (* Prefixes of R_l and S_l must match. *)
-  if not (EcAst.s_equal r_pre s_pre) then
+  if not (EcReduction.EqTest.for_stmt env r_pre s_pre) then
     tc_error !!tc ~who:"dc cond_l"
       "R1 and S1 must share a common prefix before the trailing sample";
 
@@ -875,22 +914,6 @@ let t_dc_cond_l_r tc =
      S_l's trailing distribution must be [dcond d_orig (fun v => e_y[v/x] = y)].
      We compare as formulas modulo alpha-equivalence and conversion.         *)
   let (d_inner_e, pred_inner_e) = destr_dcond tc d_cond in
-
-  (* Require lv_x and lv_y to be LvVar (simple variables) for the check. *)
-  let (pv_x, ty_x) =
-    match lv_x with
-    | EcAst.LvVar (pv, ty) -> (pv, ty)
-    | _ ->
-        tc_error !!tc ~who:"dc cond_l"
-          "the trailing sampled lvalue must be a single variable"
-  in
-  let (pv_y, ty_y) =
-    match lv_y with
-    | EcAst.LvVar (pv, ty) -> (pv, ty)
-    | _ ->
-        tc_error !!tc ~who:"dc cond_l"
-          "the body's assigned lvalue must be a single variable"
-  in
 
   (* Compare inner distribution with R_l's trailing distribution. *)
   let d_orig_f = (EcCoreFol.ss_inv_of_expr ml d_orig).inv in
@@ -900,11 +923,23 @@ let t_dc_cond_l_r tc =
       "S1's conditional distribution's source does not match R1's distribution";
 
   (* Build the expected predicate [fun v => e[v/x] = y] as a ss_inv. *)
+  let ty_x = EcCoreModules.ty_of_lv lv_x in
   let v_id = EcIdent.create "v" in
-  let v_ss : EcAst.ss_inv = { m = ml; inv = f_local v_id ty_x } in
+  let v = EcTypes.e_local v_id ty_x in
+  let lvs = EcCoreModules.explode_assgn lv_x v in
   let e_ss = EcCoreFol.ss_inv_of_expr ml e_y in
-  let e_sub_ss =
-    EcLowPhlGoal.subst_form_lv env (EcAst.LvVar (pv_x, ty_x)) v_ss e_ss
+  let e_sub_ss = List.fold_left (fun e ((pv, ty), vproj) ->
+    let v_ss : EcAst.ss_inv = { m = ml; inv = form_of_expr vproj } in
+    EcLowPhlGoal.subst_form_lv env (EcAst.LvVar (pv, ty)) v_ss e
+  ) e_ss lvs
+  in
+
+  let (pv_y, ty_y) =
+    match lv_y with
+    | EcAst.LvVar (pv, ty) -> (pv, ty)
+    | _ ->
+        tc_error !!tc ~who:"dc cond_l"
+          "the body's assigned lvalue must be a single variable"
   in
   let y_ss = EcCoreFol.f_pvar pv_y ty_y ml in
   let eq_f = f_eq e_sub_ss.inv y_ss.inv in
@@ -989,12 +1024,8 @@ let t_dc_unroll_side_r ~side tc =
   let (e, c) = EcCoreModules.destr_while while_i in
 
   (* Build [if e then (c; while e do c) else skip]. *)
-  let while_stmt = EcAst.stmt [while_i] in
-  let then_stmt = EcAst.stmt (c.EcAst.s_node @ while_stmt.EcAst.s_node) in
-  let else_stmt = EcAst.stmt [] in
-  let if_instr =
-    EcCoreModules.i_if (e, then_stmt, else_stmt) in
-  let new_body = EcAst.stmt [if_instr] in
+  let if_instr = EcCoreModules.i_if (e, c, EcAst.stmt []) in
+  let new_body = EcAst.stmt [if_instr; while_i] in
 
   let (new_cl, new_cr) =
     match side with
@@ -1081,6 +1112,7 @@ let rec e_subst_pv_expr
   | _ -> EcTypes.e_map (fun ty -> ty) (e_subst_pv_expr pv_x v) e
 
 let t_dc_cond_l_intro_r tc =
+  let env = FApi.tc1_env tc in
   let es = tc1_as_dcEquivS tc in
 
   (* body_l must be a single deterministic assignment y <- e *)
@@ -1097,7 +1129,7 @@ let t_dc_cond_l_intro_r tc =
   let (lv_x, d_orig)  = destr_rnd_i tc r_last in
 
   (* S_l must equal R_l's prefix (R_l minus the trailing sample). *)
-  if not (EcAst.s_equal es.dces_sl r_pre) then
+  if not (EcReduction.EqTest.for_stmt env es.dces_sl r_pre) then
     tc_error !!tc ~who:"dc cond intro"
       "S1 must equal R1 without its trailing sample";
 

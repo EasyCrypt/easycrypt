@@ -849,20 +849,23 @@ type phltactic =
     (* Delayed couplings *)
   | Pdelay
   | Pundelay
-  | Pdc_push   of oside
+  | Pdc_delay  of oside
+  | Pdc_delaystar of side * pformula option
   | Pdc_pop    of oside * int option
-  | Pdc_unpop  of oside * int option
+  | Pdc_push   of oside * int option
   | Pdc_conseq of pformula * pformula
   | Pdc_case   of pformula
   | Pdc_frame  of pformula
   | Pdc_indep  of int * int
+  | Pdc_trans  of pformula * pformula * pformula * pformula * ptybindings * pstmt * pstmt * pstmt
   | Pdc_skip
   | Pdc_seq    of int * int * pformula * (pstmt * pstmt) option
   | Pdc_wp
   | Pdc_if     of oside
-  | Pdc_while  of oside
+  | Pdc_while  of oside * pformula * pstmt option * pstmt option
   | Pdc_rnd    of oside * (pformula * pformula) option
   | Pdc_wp_side of side
+  | Pdc_asgn_side of side
   | Pdc_sym
   | Pdc_cond       of oside
   | Pdc_cond_intro of oside

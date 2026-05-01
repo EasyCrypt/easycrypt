@@ -38,7 +38,7 @@ val t_dc_if : FApi.backward
    [pre /\ not e1]. Two subgoals are produced (test equivalence, body
    preserves the invariant). Side condition: [Write(R_i)] disjoint
    from [Fv(e_i)] (checked). *)
-val t_dc_while : FApi.backward
+val t_dc_while : inv:EcAst.ts_inv -> ?invr1:EcAst.stmt -> ?invr2:EcAst.stmt -> FApi.backward
 
 (* Rnd: the body on each side is a single random assignment [x <$ d].
    The caller must have [S_i = R_i]. Side conditions: [Write(R_i)]
@@ -64,6 +64,9 @@ val t_dc_wp_side :
      ?uselet:bool
   -> side:[`Left | `Right]
   -> FApi.backward
+
+(* One-sided Assign (other-side body must be empty). *)
+val t_dc_asgn_side : [`Left | `Right] -> FApi.backward
 
 (* One-sided Rnd (other-side body must be empty; [S_i = R_i]). *)
 val t_dc_rnd_side : side:[`Left | `Right] -> FApi.backward

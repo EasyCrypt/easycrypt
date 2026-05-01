@@ -13,18 +13,20 @@ val t_dc_pop : int -> FApi.backward
    body into the corresponding delay context. *)
 val t_dc_pop_side : side:[`Left | `Right] -> int -> FApi.backward
 
-(* Unpop: inverse of Pop, two-sided. *)
-val t_dc_unpop : int -> FApi.backward
+(* Push: inverse of Pop, two-sided. *)
+val t_dc_push : int -> FApi.backward
 
 (* Unpop one-sided. *)
-val t_dc_unpop_side : side:[`Left | `Right] -> int -> FApi.backward
+val t_dc_push_side : side:[`Left | `Right] -> int -> FApi.backward
 
-(* Push axiom (two-sided): closes a goal matching
+(* Delay axiom (two-sided): closes a goal matching
    { phi | R1 x R2 } C1 ~ C2 { phi | R1;C1 x R2;C2 }. *)
-val t_dc_push : FApi.backward
+val t_dc_delay : FApi.backward
 
-(* Push axiom (one-sided). *)
-val t_dc_push_side : side:[`Left | `Right] -> FApi.backward
+(* Delay axiom (one-sided). *)
+val t_dc_delay_side : side:[`Left | `Right] -> FApi.backward
+
+val t_dc_delay_star : side:[`Left | `Right] -> ?inv:ss_inv -> FApi.backward
 
 (* Conseq: weakens pre and strengthens post by user-provided formulas. *)
 val t_dc_conseq :
@@ -41,3 +43,5 @@ val t_dc_frame : form -> FApi.backward
    judgment over the "core" contexts. User provides suffix lengths
    [nl] and [nr]; the tactic checks Read/Write independence via EcPV. *)
 val t_dc_indep : nl:int -> nr:int -> FApi.backward
+
+val t_dc_trans : ts_inv -> ts_inv -> ts_inv -> ts_inv -> EcMemory.memenv -> stmt -> stmt -> stmt -> FApi.backward

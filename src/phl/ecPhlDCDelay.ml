@@ -15,6 +15,9 @@ open EcLowPhlGoal
    which is exactly the pRHL judgment.                                 *)
 
 (* -------------------------------------------------------------------- *)
+
+let s_cat a b = EcAst.stmt (a.EcAst.s_node @ b.EcAst.s_node)
+
 module LowInternal = struct
   let s_empty = EcAst.stmt []
 
@@ -48,14 +51,10 @@ module LowInternal = struct
 
   let t_equivF_delay = FApi.t_low0 "equivF-delay" t_equivF_delay_r
 
-  (* dcEquivS with empty R/S -> equivS *)
+  (* dcEquivS with empty S -> equivS *)
   let t_dcEquivS_undelay_r tc =
     let es = tc1_as_dcEquivS tc in
     let empty s = List.is_empty s.EcAst.s_node in
-    if not (empty es.dces_rl) then
-      tc_error !!tc ~who:"undelay" "left delay context R1 is not empty";
-    if not (empty es.dces_rr) then
-      tc_error !!tc ~who:"undelay" "right delay context R2 is not empty";
     if not (empty es.dces_sl) then
       tc_error !!tc ~who:"undelay" "left continuation S1 is not empty";
     if not (empty es.dces_sr) then
@@ -64,7 +63,7 @@ module LowInternal = struct
     let po = dces_po es in
     let concl =
       f_equivS (snd es.dces_ml) (snd es.dces_mr) pr
-        es.dces_cl es.dces_cr po
+        (s_cat es.dces_rl es.dces_cl) (s_cat es.dces_rr es.dces_cr) po
     in
     FApi.xmutate1 tc `Undelay [concl]
 

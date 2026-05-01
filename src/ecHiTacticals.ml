@@ -165,11 +165,27 @@ and process_conseqauto cm tc =
   EcPhlConseq.t_conseqauto ~delta ?tsolve tc
 
 (* -------------------------------------------------------------------- *)
-and process_dc_push (side : oside) tc =
+and process_dc_delay (side : oside) tc =
   match side with
-  | None           -> EcPhlDCStruct.t_dc_push tc
-  | Some `Left     -> EcPhlDCStruct.t_dc_push_side ~side:`Left tc
-  | Some `Right    -> EcPhlDCStruct.t_dc_push_side ~side:`Right tc
+  | None           -> EcPhlDCStruct.t_dc_delay tc
+  | Some `Left     -> EcPhlDCStruct.t_dc_delay_side ~side:`Left tc
+  | Some `Right    -> EcPhlDCStruct.t_dc_delay_side ~side:`Right tc
+
+and process_dc_delay_star (side : side) (pre : pformula option) tc =
+    match pre with
+    | None -> EcPhlDCStruct.t_dc_delay_star ~side tc
+    | Some pre ->
+        let es = EcLowPhlGoal.tc1_as_dcEquivS tc in
+        let m =
+            match side with
+            | `Left -> es.dces_ml
+            | `Right -> es.dces_mr
+        in
+        let hyps = FApi.tc1_hyps tc in
+        let hyps = EcEnv.LDecl.push_active_ss m hyps in
+        let pre = TTC.pf_process_form !!tc hyps EcTypes.tbool pre in
+        let pre = { m = fst m; inv = pre; } in
+        EcPhlDCStruct.t_dc_delay_star ~side ~inv:pre tc
 
 and process_dc_pop (side : oside) (n : int option) tc =
   let n = Option.value ~default:1 n in
@@ -178,12 +194,12 @@ and process_dc_pop (side : oside) (n : int option) tc =
   | Some `Left  -> EcPhlDCStruct.t_dc_pop_side ~side:`Left n tc
   | Some `Right -> EcPhlDCStruct.t_dc_pop_side ~side:`Right n tc
 
-and process_dc_unpop (side : oside) (n : int option) tc =
+and process_dc_push (side : oside) (n : int option) tc =
   let n = Option.value ~default:1 n in
   match side with
-  | None        -> EcPhlDCStruct.t_dc_unpop n tc
-  | Some `Left  -> EcPhlDCStruct.t_dc_unpop_side ~side:`Left n tc
-  | Some `Right -> EcPhlDCStruct.t_dc_unpop_side ~side:`Right n tc
+  | None        -> EcPhlDCStruct.t_dc_push n tc
+  | Some `Left  -> EcPhlDCStruct.t_dc_push_side ~side:`Left n tc
+  | Some `Right -> EcPhlDCStruct.t_dc_push_side ~side:`Right n tc
 
 and process_dc_conseq pre post tc =
   let pre  = TTC.tc1_process_prhl_formula tc pre  in
@@ -198,17 +214,79 @@ and process_dc_frame theta tc =
   let theta = TTC.tc1_process_prhl_formula tc theta in
   EcPhlDCStruct.t_dc_frame theta.inv tc
 
+and process_dc_trans p12 q12 p23 q23 binds r2 c2 s2 tc =
+    let hyps = FApi.tc1_hyps tc in
+    let es = EcLowPhlGoal.tc1_as_dcEquivS tc in
+    let m2 = EcMemory.empty_local ~witharg:false (EcIdent.create "&m") in
+
+    (* Add the new variables *)
+    let bindings =
+        binds
+        |> List.map (fun (xs, ty) -> List.map (fun x -> (x, ty)) xs)
+        |> List.flatten
+        |> List.map (fun (x, ty) ->
+              let ty = EcProofTyping.process_type hyps ty in
+              let x = Option.map EcLocation.unloc (EcLocation.unloc x) in
+              EcAst.{ ov_name = x; ov_type = ty; }
+              )
+    in
+    let m2, _ = EcMemory.bindall_fresh bindings m2 in
+
+    let hyps = EcEnv.LDecl.push_active_ss m2 hyps in
+    let r2 = EcProofTyping.process_stmt hyps r2 in
+    let c2 = EcProofTyping.process_stmt hyps c2 in
+    let s2 = EcProofTyping.process_stmt hyps s2 in
+
+    let p12, q12 =
+      let ml, mr = fst es.dces_ml, fst m2 in
+      let hyps = EcEnv.LDecl.push_active_ts es.dces_ml m2 hyps in
+      let p1 = TTC.pf_process_form !!tc hyps EcTypes.tbool p12 in
+      let q1 = TTC.pf_process_form !!tc hyps EcTypes.tbool q12 in
+      {ml;mr;inv=p1}, {ml;mr;inv=q1}
+    in
+    let p23, q23 =
+      let ml, mr = fst m2, fst es.dces_mr in
+      let hyps = EcEnv.LDecl.push_active_ts m2 es.dces_mr hyps in
+      let p2 = TTC.pf_process_form !!tc hyps EcTypes.tbool p23 in
+      let q2 = TTC.pf_process_form !!tc hyps EcTypes.tbool q23 in
+      {ml;mr;inv=p2}, {ml;mr;inv=q2} 
+    in
+
+    EcPhlDCStruct.t_dc_trans p12 q12 p23 q23 m2 r2 c2 s2 tc
+
+
 and process_dc_seq nl nr theta ts tc =
+  let es = EcLowPhlGoal.tc1_as_dcEquivS tc in
   let theta = TTC.tc1_process_prhl_formula tc theta in
   let ts =
     match ts with
     | None -> None
     | Some (ptl, ptr) ->
-        let tl = TTC.tc1_process_prhl_stmt tc `Left  ptl in
-        let tr = TTC.tc1_process_prhl_stmt tc `Right ptr in
+        let open EcMaps in
+        let ml = Mstr.add "r" es.dces_rl.s_node Mstr.empty in
+        let ml = Mstr.add "s" es.dces_sl.s_node ml in
+        let tl = TTC.tc1_process_prhl_stmt ~map:ml tc `Left  ptl in
+
+        let mr = Mstr.add "r" es.dces_rr.s_node Mstr.empty in
+        let mr = Mstr.add "s" es.dces_sr.s_node mr in
+        let tr = TTC.tc1_process_prhl_stmt ~map:mr tc `Right ptr in
         Some (tl, tr)
   in
   EcPhlDCCore.t_dc_seq ~nl ~nr ?ts theta.inv tc
+
+and process_dc_while side inv invr1 invr2 tc =
+  let inv = TTC.tc1_process_prhl_formula tc inv in
+  match side with
+  | None ->
+    let invr1 = omap (TTC.tc1_process_prhl_stmt tc `Left) invr1 in
+    let invr2 = omap (TTC.tc1_process_prhl_stmt tc `Right) invr2 in
+    EcPhlDCCore.t_dc_while ~inv ?invr1 ?invr2 tc
+  | Some `Left ->
+    let invr1 = omap (TTC.tc1_process_prhl_stmt tc `Left) invr1 in
+    EcPhlDCCore.t_dc_while ~inv ?invr1 tc
+  | Some `Right ->
+    let invr2 = omap (TTC.tc1_process_prhl_stmt tc `Right) invr1 in
+    EcPhlDCCore.t_dc_while ~inv ?invr2 tc
 
 and process_fun_def_dispatch tc =
   match (EcCoreGoal.FApi.tc1_goal tc).f_node with
@@ -301,22 +379,25 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager_call info          -> EcPhlEager.process_call info
     | Pdelay                    -> EcPhlDCDelay.t_delay
     | Pundelay                  -> EcPhlDCDelay.t_undelay
-    | Pdc_push side             -> process_dc_push side
+    | Pdc_delay side            -> process_dc_delay side
+    | Pdc_delaystar (side, pre) -> process_dc_delay_star side pre
     | Pdc_pop (side, n)         -> process_dc_pop side n
-    | Pdc_unpop (side, n)       -> process_dc_unpop side n
+    | Pdc_push (side, n)        -> process_dc_push side n
     | Pdc_conseq (pre, post)    -> process_dc_conseq pre post
     | Pdc_case theta            -> process_dc_case theta
     | Pdc_frame theta           -> process_dc_frame theta
     | Pdc_indep (nl, nr)        -> EcPhlDCStruct.t_dc_indep ~nl ~nr
+    | Pdc_trans (p12, q12, p23, q23, bnds, r2, c2, s2) -> process_dc_trans p12 q12 p23 q23 bnds r2 c2 s2 
     | Pdc_skip                  -> EcPhlDCCore.t_dc_skip
     | Pdc_seq (nl, nr, theta, ts) -> process_dc_seq nl nr theta ts
     | Pdc_wp                    -> EcPhlDCCore.t_dc_wp None
     | Pdc_wp_side side          ->
         fun tc -> EcPhlDCCore.t_dc_wp_side ~side tc
+    | Pdc_asgn_side side          ->
+        fun tc -> EcPhlDCCore.t_dc_asgn_side side tc
     | Pdc_if None               -> EcPhlDCCore.t_dc_if
     | Pdc_if (Some side)        -> EcPhlDCCore.t_dc_if_side ~side
-    | Pdc_while None            -> EcPhlDCCore.t_dc_while
-    | Pdc_while (Some side)     -> EcPhlDCCore.t_dc_while_side ~side
+    | Pdc_while (side, inv, invr1, invr2) -> process_dc_while side inv invr1 invr2
     | Pdc_rnd (None, info)      -> process_dc_rnd info
     | Pdc_rnd (Some side, None) -> EcPhlDCCore.t_dc_rnd_side ~side
     | Pdc_rnd (Some _, Some _)  ->
