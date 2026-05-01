@@ -20,3 +20,4 @@
 .merlin
 *.install
 *.log
+.claude/
