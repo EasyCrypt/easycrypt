@@ -28,6 +28,7 @@ val f_subst_init :
     -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
     -> ?tw:tcwitness list Mid.t
+    -> ?tw_uni:tcwitness TcUni.Muid.t
     -> ?esloc:expr Mid.t
     -> unit
     -> f_subst
@@ -36,7 +37,7 @@ val f_subst_init :
 module Tuni : sig
   val univars   : ty -> TyUni.Suid.t
   val subst1    : (tyuni * ty) -> f_subst
-  val subst     : ty TyUni.Muid.t -> f_subst
+  val subst     : ?tw_uni:tcwitness TcUni.Muid.t -> ty TyUni.Muid.t -> f_subst
   val subst_dom : ty TyUni.Muid.t -> dom -> dom
   val occurs    : tyuni -> ty -> bool
   val fv        : ty -> TyUni.Suid.t
@@ -74,6 +75,7 @@ module Fsubst : sig
     -> ?tu:ty TyUni.Muid.t
     -> ?tv:ty Mid.t
     -> ?tw:tcwitness list Mid.t
+    -> ?tw_uni:tcwitness TcUni.Muid.t
     -> ?esloc:expr Mid.t
     -> unit -> f_subst
 

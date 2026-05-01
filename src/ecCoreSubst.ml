@@ -31,6 +31,9 @@ type f_subst = {
      the witness alone (caller is doing alpha-renaming, not
      instantiation). *)
   fs_tw      : tcwitness list Mid.t;
+  (* Resolutions for TCIUni witnesses (typically extracted from the
+     unifier's tcenv.resolution after a matching/unification step). *)
+  fs_tw_uni  : tcwitness TcUni.Muid.t;
   fs_mod     : EcPath.mpath Mid.t;
   fs_modex   : mod_extra Mid.t;
   fs_loc     : form Mid.t;
@@ -65,6 +68,7 @@ let f_subst_init
       ?(tu=TyUni.Muid.empty)
       ?(tv=Mid.empty)
       ?(tw=Mid.empty)
+      ?(tw_uni=TcUni.Muid.empty)
       ?(esloc=Mid.empty)
       () =
   let fv = Mid.empty in
@@ -77,6 +81,7 @@ let f_subst_init
     fs_u        = tu;
     fs_v        = tv;
     fs_tw       = tw;
+    fs_tw_uni   = tw_uni;
     fs_mod      = Mid.empty;
     fs_modex    = Mid.empty;
     fs_loc      = Mid.empty;
@@ -168,6 +173,8 @@ let is_ty_subst_id (s : f_subst) : bool =
      Mid.is_empty s.fs_mod
   && TyUni.Muid.is_empty s.fs_u
   && Mid.is_empty s.fs_v
+  && Mid.is_empty s.fs_tw
+  && TcUni.Muid.is_empty s.fs_tw_uni
 
 (* -------------------------------------------------------------------- *)
 let rec ty_subst (s : f_subst) (ty : ty) : ty =
@@ -195,10 +202,12 @@ let rec tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
   | TCIAbstract { support = `Var x; offset; lift } when Mid.mem x s.fs_tw ->
     let ws = Mid.find x s.fs_tw in
     if offset < List.length ws then
-      bump_lift lift (List.nth ws offset)
+      bump_lift lift (tcw_subst s (List.nth ws offset))
     else
       tcw
   | TCIAbstract _ -> tcw
+  | TCIUni (uid, lift) when TcUni.Muid.mem uid s.fs_tw_uni ->
+    bump_lift lift (tcw_subst s (TcUni.Muid.find uid s.fs_tw_uni))
   | TCIUni _ -> tcw
   | TCIConcrete c ->
     TCIConcrete { c with etyargs = List.map (etyarg_subst_inner s) c.etyargs }
@@ -716,8 +725,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
-  let subst (uidmap : ty TyUni.Muid.t) : f_subst =
-    f_subst_init ~tu:uidmap ()
+  let subst ?(tw_uni = TcUni.Muid.empty) (uidmap : ty TyUni.Muid.t) : f_subst =
+    f_subst_init ~tu:uidmap ~tw_uni ()
 
   let subst1 ((id, t) : tyuni * ty) : f_subst =
     subst (TyUni.Muid.singleton id t)

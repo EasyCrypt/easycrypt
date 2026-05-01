@@ -796,6 +796,9 @@ module UniEnv = struct
   let assubst (ue : unienv) : ty TyUni.Muid.t =
     Unify.subst_of_uf (!ue).ue_uc
 
+  let tw_assubst (ue : unienv) : tcwitness TcUni.Muid.t =
+    (!ue).ue_uc.tcenv.resolution
+
   let close (ue : unienv) =
     Unify.check_closed (!ue).ue_uc;
     assubst ue

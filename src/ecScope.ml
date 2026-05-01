@@ -899,7 +899,8 @@ module Ax = struct
     ) (EcUnify.UniEnv.xclosed ue);
 
     let uidmap = EcUnify.UniEnv.close ue in
-    let fs = Tuni.subst uidmap in
+    let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+    let fs = Tuni.subst ~tw_uni uidmap in
     let concl   = Fsubst.f_subst fs concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
@@ -1183,7 +1184,8 @@ module Op = struct
     ) (EcUnify.UniEnv.xclosed ue);
 
     let uidmap  = EcUnify.UniEnv.close ue in
-    let ts      = Tuni.subst uidmap in
+    let tw_uni  = EcUnify.UniEnv.tw_assubst ue in
+    let ts      = Tuni.subst ~tw_uni uidmap in
     let fs      = Fsubst.f_subst ts in
     let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -1259,7 +1261,8 @@ module Op = struct
             let ax      = f_forall (List.map (snd_map gtty) xs) ax in
 
             let uidmap  = EcUnify.UniEnv.close ue in
-            let subst   = Tuni.subst uidmap in
+            let tw_uni  = EcUnify.UniEnv.tw_assubst ue in
+            let subst   = Tuni.subst ~tw_uni uidmap in
             let ax      = Fsubst.f_subst subst ax in
 
             ax
@@ -1683,7 +1686,8 @@ module Ty = struct
         hierror ~loc:(snd subtype.pst_pred).pl_loc
           "the predicate contains free type variables";
       let uidmap = EcUnify.UniEnv.close ue in
-      let fs = EcCoreSubst.Tuni.subst uidmap in
+      let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+      let fs = EcCoreSubst.Tuni.subst ~tw_uni uidmap in
       f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
 
     let evclone : EcThCloning.evclone =
@@ -1809,7 +1813,9 @@ module Ty = struct
       let uptc =
         let parent_ue = EcUnify.UniEnv.copy ue in
         let uptc = tcd.ptc_inth |> omap (TT.transtc scenv parent_ue) in
-        let subst = Tuni.subst (EcUnify.UniEnv.close parent_ue) in
+        let subst = Tuni.subst
+          ~tw_uni:(EcUnify.UniEnv.tw_assubst parent_ue)
+          (EcUnify.UniEnv.close parent_ue) in
         omap (fun tcp ->
           { tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args })
           uptc in
@@ -1919,7 +1925,9 @@ module Ty = struct
                 (EcPath.tostring (fst (proj4_1 op1)))
                 (EcPath.tostring (fst (proj4_1 op2)))
           | [((p, opparams), opty, subue, _)] ->
-              let subst    = Tuni.subst (EcUnify.UniEnv.assubst subue) in
+              let subst    = Tuni.subst
+                ~tw_uni:(EcUnify.UniEnv.tw_assubst subue)
+                (EcUnify.UniEnv.assubst subue) in
               let opty     = ty_subst subst opty in
               let opparams = List.map (EcCoreSubst.etyarg_subst subst) opparams in
               ((p, opparams), opty)

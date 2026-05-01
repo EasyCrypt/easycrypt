@@ -137,7 +137,7 @@ and concretize_e_head ((CPTEnv subst) as cptenv) head =
   | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map (fun (t, w) -> (ty_subst subst t, w)) tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (EcCoreSubst.etyarg_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
 and concretize_e_pt ((CPTEnv subst) as cptenv) pt =

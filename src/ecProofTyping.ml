@@ -27,7 +27,7 @@ let process_form_opt ?mv hyps pf oty =
   try
     let ue  = unienv_of_hyps hyps in
     let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
     EcFol.Fsubst.f_subst ts ff
 
   with EcUnify.UninstanciateUni infos ->
@@ -76,7 +76,7 @@ let process_stmt hyps s =
   let s   = EcTyping.transstmt env ue s in
 
   try
-    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let ts = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
     s_subst ts s
   with EcUnify.UninstanciateUni flags ->
     EcTyping.tyerror EcLocation._dummy env (EcTyping.FreeUniVariables flags)
@@ -86,7 +86,7 @@ let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
   let e   = EcTyping.transexpcast_opt env mode ue oty e in
-  let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
+  let ts  = Tuni.subst ~tw_uni:(EcUnify.UniEnv.tw_assubst ue) (EcUnify.UniEnv.close ue) in
   e_subst ts e
 
 (* ------------------------------------------------------------------ *)
@@ -169,7 +169,8 @@ let tc1_process_stmt ?map hyps tc c =
   let ue     = unienv_of_hyps hyps in
   let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
   let uidmap = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close ue) in
-  let es     = Tuni.subst uidmap in
+  let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+  let es     = Tuni.subst ~tw_uni uidmap in
   s_subst es c
 
 

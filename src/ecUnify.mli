@@ -57,6 +57,7 @@ module UniEnv : sig
   val xclosed    : unienv -> uniflags option
   val close      : unienv -> ty TyUni.Muid.t
   val assubst    : unienv -> ty TyUni.Muid.t
+  val tw_assubst : unienv -> tcwitness TcUni.Muid.t
   val tparams    : unienv -> ty_params
 end
 
