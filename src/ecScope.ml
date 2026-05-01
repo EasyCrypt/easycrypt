@@ -1869,7 +1869,8 @@ module Ty = struct
                  fix the carrier."
                 (unloc x) (unloc tcd.ptc_name)
           in
-          let ty = ty_subst (Tuni.subst uidmap) ty in
+          let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+          let ty = ty_subst (Tuni.subst ~tw_uni uidmap) ty in
             (EcIdent.create (unloc x), ty)
         in
           tcd.ptc_ops |> List.map check1 in
@@ -1889,7 +1890,8 @@ module Ty = struct
                  (e.g. via `<:%s>`) to fix the carrier."
                 (unloc x) (unloc tcd.ptc_name)
           in
-          let fs = Tuni.subst uidmap in
+          let tw_uni = EcUnify.UniEnv.tw_assubst ue in
+          let fs = Tuni.subst ~tw_uni uidmap in
           let ax = Fsubst.f_subst fs ax in
             (unloc x, ax)
         in

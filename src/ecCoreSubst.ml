@@ -772,7 +772,8 @@ module Tvar = struct
   let subst_etyarg (s : etyarg Mid.t) ((ty, w) : etyarg) : etyarg =
     (subst s ty, w)
 
-  let subst_tc (_ : etyarg Mid.t) (tc : typeclass) : typeclass = tc
+  let subst_tc (s : etyarg Mid.t) (tc : typeclass) : typeclass =
+    { tc with tc_args = List.map (subst_etyarg s) tc.tc_args }
 
   let f_subst ~(freshen : bool) (l : (EcIdent.t * etyarg) list) : form -> form =
     Fsubst.f_subst_tvar ~freshen (init l)

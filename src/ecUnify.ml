@@ -316,13 +316,29 @@ module Unify = struct
           | false -> begin
               match t1.ty_node, t2.ty_node with
               | Tunivar id1, Tunivar id2 -> begin
-                  if not (TyUni.uid_equal id1 id2) then
+                  if not (TyUni.uid_equal id1 id2) then begin
                     let effects =
                         reffold (fun uc ->
                           let uf, effects = UF.union id1 id2 uc.uf in
                           effects, { uc with uf }
                         ) uc in
-                    List.iter (Queue.push^~ pb) effects
+                    List.iter (Queue.push^~ pb) effects;
+                    (* Merge byunivar entries onto the new representative. *)
+                    let repr = UF.find id1 (!uc).uf in
+                    let merge id =
+                      if not (TyUni.uid_equal id repr) then
+                        match TyUni.Muid.find_opt id (!uc).tcenv.byunivar with
+                        | None -> ()
+                        | Some pbs ->
+                          uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
+                            let bv = TyUni.Muid.remove id (!uc).tcenv.byunivar in
+                            TyUni.Muid.change (fun map ->
+                              let map = Option.value ~default:TcUni.Suid.empty map in
+                              Some (TcUni.Suid.union map pbs)
+                            ) repr bv
+                          } }
+                    in merge id1; merge id2
+                  end
               end
 
               | Tunivar id, _ -> setvar id t2
@@ -360,6 +376,7 @@ module Unify = struct
         end
 
         | `TcCtt (uid, ty, tc) ->
+          ignore uid;
           (* See doc/typeclasses-inference.md for the strategy framework
              and the catalog of inference modes this resolver covers. *)
           let deps = ref TyUni.Suid.empty in
@@ -404,10 +421,17 @@ module Unify = struct
              structural comparison. *)
           let deref_tc (tc' : typeclass) =
             { tc' with tc_args = List.map check_etyarg tc'.tc_args } in
+          (* Compare on type arguments only; the corresponding tcwitnesses
+             are determined by [(carrier, type args)] and may legitimately
+             differ in form (e.g. unresolved TCIUni vs concrete) while
+             still picking out the same TC. *)
           let eq_tc (tc' : typeclass) =
             let tc' = deref_tc tc' in
             EcPath.p_equal tc.tc_name tc'.tc_name
-            && List.for_all2 (EcCoreEqTest.for_etyarg env) tc.tc_args tc'.tc_args in
+            && List.length tc.tc_args = List.length tc'.tc_args
+            && List.for_all2
+                 (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
+                 tc.tc_args tc'.tc_args in
 
           (* Find the offset of [tc] (or any of its ancestors) in [tcs];
              also return the number of [tc_prt] steps walked to reach
@@ -433,8 +457,10 @@ module Unify = struct
             match ty.ty_node with
             | Tvar a ->
               let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
-              let (offset, lift) = ofdfl failure (match_tc_offset tcs) in
-              Some (TCIAbstract { support = `Var a; offset; lift })
+              Option.map
+                (fun (offset, lift) ->
+                  TCIAbstract { support = `Var a; offset; lift })
+                (match_tc_offset tcs)
             | _ -> None in
 
           (* Mode #6: carrier is [Tconstr p] with [p] an abstract decl. *)
@@ -529,18 +555,32 @@ module Unify = struct
 
           (* ---- Dispatch ---- *)
           if TyUni.Suid.is_empty deps then begin
-            let resolution =
+            let resolution_opt =
               match ty.ty_node with
               | Tvar _ ->
-                ofdfl failure (strat_tvar_via_tvtc ())
+                strat_tvar_via_tvtc ()
               | Tconstr _ when Option.is_some (strat_abs_via_decl ()) ->
-                Option.get (strat_abs_via_decl ())
+                strat_abs_via_decl ()
               | _ ->
-                ofdfl failure (strat_infer_by_carrier ())
+                strat_infer_by_carrier ()
             in
-            uc := { !uc with tcenv = { (!uc).tcenv with resolution =
-              TcUni.Muid.add uid resolution (!uc).tcenv.resolution
-            } }
+            match resolution_opt with
+            | Some resolution ->
+              uc := { !uc with tcenv = { (!uc).tcenv with resolution =
+                TcUni.Muid.add uid resolution (!uc).tcenv.resolution
+              } }
+            | None when not (TyUni.Suid.is_empty arg_deps) ->
+              (* Carrier is concrete but TC arg univars still pending;
+                 park on those so we re-fire when they bind. *)
+              TyUni.Suid.iter (fun tyvar ->
+                uc := { !uc with tcenv = { (!uc).tcenv with byunivar =
+                  TyUni.Muid.change (fun map ->
+                    let map = Option.value ~default:TcUni.Suid.empty map in
+                    Some (TcUni.Suid.add uid map)
+                  ) tyvar (!uc).tcenv.byunivar
+                } }
+              ) arg_deps
+            | None -> failure ()
           end else begin
             match strat_infer_by_args () with
             | Some witness ->
@@ -804,9 +844,17 @@ module UniEnv = struct
     assubst ue
 
   let tparams (ue : unienv) =
+    let close = Unify.close (!ue).ue_uc in
+    let deref_tc (tc : typeclass) : typeclass =
+      let tc_args =
+        List.map
+          (fun (t, ws) -> (close.tyuni t, List.map close.tcuni ws))
+          tc.tc_args
+      in { tc with tc_args }
+    in
     let fortv x =
       let tvtc = odfl [] (Mid.find_opt x (!ue).ue_uc.tvtc) in
-      tvtc in
+      List.map deref_tc tvtc in
     List.map (fun x -> (x, fortv x)) (List.rev (!ue).ue_decl)
 end
 
@@ -890,14 +938,6 @@ let select_op
       let UniEnv.{ subst = tip; args } =
         UniEnv.opentvi subue op.D.op_tparams tvi in
       let tip = f_subst_init ~tv:(Mid.map fst tip) () in
-
-      (*
-      List.iter
-        (fun (tv, tcs) ->
-          try  hastcs_r env subue tv tcs
-          with UnificationFailure _ -> raise E.Failure)
-        tvtcs;
-      *)
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue ?retty psig in
