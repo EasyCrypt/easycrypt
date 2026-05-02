@@ -334,6 +334,7 @@ class Gather:
     @staticmethod
     def is_file_excluded(src, excludes):
         for exclude in excludes:
+            print(os.path.basename(src), exclude)
             if fnmatch.fnmatch(src, exclude):
                 return True
         return False
