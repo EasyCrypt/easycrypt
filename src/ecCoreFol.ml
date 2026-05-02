@@ -469,7 +469,11 @@ let f_map gt g fp =
         (f_pvar id ty' s).inv
 
   | Fop (p, tys) ->
-      let tys' = List.Smart.map (fun (t, w) -> (gt t, w)) tys in
+      let tys' =
+        List.Smart.map
+          (fun ((t, w) as ety) ->
+            let t' = gt t in if t == t' then ety else (t', w))
+          tys in
       let ty'  = gt fp.f_ty in
         f_op_tc p tys' ty'
 

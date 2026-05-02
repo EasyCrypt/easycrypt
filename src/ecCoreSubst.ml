@@ -210,10 +210,14 @@ let rec tcw_subst (s : f_subst) (tcw : tcwitness) : tcwitness =
     bump_lift lift (tcw_subst s (TcUni.Muid.find uid s.fs_tw_uni))
   | TCIUni _ -> tcw
   | TCIConcrete c ->
-    TCIConcrete { c with etyargs = List.map (etyarg_subst_inner s) c.etyargs }
+    let etyargs' = List.Smart.map (etyarg_subst_inner s) c.etyargs in
+    if etyargs' == c.etyargs then tcw
+    else TCIConcrete { c with etyargs = etyargs' }
 
-and etyarg_subst_inner (s : f_subst) ((ty, ws) : etyarg) : etyarg =
-  (ty_subst s ty, List.map (tcw_subst s) ws)
+and etyarg_subst_inner (s : f_subst) ((ty, ws) as e : etyarg) : etyarg =
+  let ty' = ty_subst s ty in
+  let ws' = List.Smart.map (tcw_subst s) ws in
+  if ty == ty' && ws == ws' then e else (ty', ws')
 
 let etyarg_subst (s : f_subst) (e : etyarg) : etyarg = etyarg_subst_inner s e
 
@@ -470,7 +474,8 @@ module Fsubst = struct
     | Fop (p, tys) ->
       let ty'  = ty_subst s fp.f_ty in
       let tys' = List.Smart.map (etyarg_subst s) tys in
-      f_op_tc p tys' ty'
+      if ty' == fp.f_ty && tys' == tys then fp
+      else f_op_tc p tys' ty'
 
     | Fpvar (pv, m) ->
       let pv' = pv_subst s pv in
