@@ -1116,15 +1116,14 @@ let reduce_head simplify ri env hyps f =
         ; reduce_tc ri env ]
 
   | Fapp ({ f_node = Fop (p, _); }, args) -> begin
-    try
-      reduce_logic ri env hyps f p args
-    with NotRed _ ->
-      oget ~exn:needsubterm @@
-        List.find_map_opt
-          (fun cb -> try Some (cb f) with NotRed NoHead -> None)
-          [ reduce_user_gen simplify ri env hyps
-          ; reduce_delta ri env
-          ; reduce_tc ri env ]
+      try  reduce_logic ri env hyps f p args
+      with NotRed kind1 ->
+        try  reduce_user_gen simplify ri env hyps f
+        with NotRed kind2 ->
+          if kind1 = NoHead && kind2 = NoHead then
+            (try reduce_delta ri env f
+             with NotRed NoHead -> reduce_tc ri env f)
+          else raise needsubterm
     end
 
   | Ftuple _ -> begin
