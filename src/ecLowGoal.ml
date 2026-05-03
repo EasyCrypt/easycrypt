@@ -1894,9 +1894,14 @@ module LowSubst = struct
           (* check if x is a declared module *)
           let fv = Sid.add x fv in
           if EcEnv.Mod.by_mpath_opt (EcPath.mident x) env <> None then fv
+          (* [f.f_fv] also collects type-variables (which live in
+             [h_tvar], not [h_local]) and other non-hypothesis idents;
+             a raw [LDecl.by_id] would crash with [LookupError]. Only
+             expand let-bound locals. *)
           else match LDecl.by_id x hyps with
           | LD_var (_, Some f) -> add_f fv f
           | _ -> fv
+          | exception LDecl.LdeclError _ -> fv
       and add_f fv f = Mid.fold_left add fv f.f_fv in
       Some(side,v,f, add_f Sid.empty f)
 
