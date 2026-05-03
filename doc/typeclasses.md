@@ -267,10 +267,7 @@ typeclasses); fix would touch the rewrite engine more broadly.
 ## Examples in `examples/tcstdlib/` and `examples/typeclasses/`
 
 - [TcMonoid.ec](../examples/tcstdlib/TcMonoid.ec) — compiles cleanly.
-- [TcRing.ec](../examples/tcstdlib/TcRing.ec) — compiles up through
-  the comring section; the `boolring` lemma `addrr` at line 678 hits
-  the bare-metavariable reverse-rewrite limitation above. Excluded
-  from CI via `file_exclude`.
+- [TcRing.ec](../examples/tcstdlib/TcRing.ec) — compiles cleanly.
 - [examples/typeclasses/monoidtc.ec](../examples/typeclasses/monoidtc.ec)
   and
   [examples/typeclasses/typeclass.ec](../examples/typeclasses/typeclass.ec)
