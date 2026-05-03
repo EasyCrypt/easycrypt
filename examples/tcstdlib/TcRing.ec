@@ -675,7 +675,7 @@ type class boolring <: comring = {
 
 lemma addrr ['a <: boolring] (x : 'a): x + x = zeror.
 proof.
-apply (@addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
+apply (@addrI (x + x)); rewrite addr0 -{1 2 3 4}[x]mulrr.
 by rewrite -mulrDr -mulrDl mulrr.
 qed.
 
