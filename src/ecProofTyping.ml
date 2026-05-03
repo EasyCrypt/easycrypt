@@ -238,6 +238,28 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
     | Tunivar _ | Tvar _ -> false
     | _ -> not (ty_sub_exists (fun t -> not (is_ground t)) ty) in
 
+  (* Walk the ancestor chain of each TC declared on an abstract type
+     [p] (i.e. [tyd_type = `Abstract tcs]) and accept [tc] if it
+     appears anywhere in [ancestors tcs(i)]. This mirrors Mode #6 of
+     the unifier strategies (see [strat_abs_via_decl] in ecUnify.ml). *)
+  let abs_satisfies (ty : ty) (tc : typeclass) =
+    match ty.ty_node with
+    | Tconstr (p, _) -> begin
+      match EcEnv.Ty.by_path_opt p env with
+      | Some { tyd_type = `Abstract tcs; _ } ->
+        let eq_tc tc' =
+          EcPath.p_equal tc.tc_name tc'.tc_name
+          && List.length tc.tc_args = List.length tc'.tc_args
+          && List.for_all2
+               (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
+               tc.tc_args tc'.tc_args in
+        List.exists
+          (fun tc' -> List.exists eq_tc (EcTypeClass.ancestors env tc'))
+          tcs
+      | _ -> false
+      end
+    | _ -> false in
+
   (* Constraints can reference earlier tparams (e.g. 'c <: ('a, 'b) embed
      references 'a, 'b). We substitute the user-supplied tparam values
      before calling [infer]. *)
@@ -245,7 +267,8 @@ let pf_check_tvi (env : env) (pe : proofenv) typ tvi =
     if is_ground ty then
       List.iter (fun tc ->
         let tc = EcCoreSubst.Tvar.subst_tc subst tc in
-        if Option.is_none (EcTypeClass.infer env ty tc) then
+        if Option.is_none (EcTypeClass.infer env ty tc)
+           && not (abs_satisfies ty tc) then
           let ppe = EcPrinting.PPEnv.ofenv env in
           tc_error_lazy pe (fun fmt ->
             Format.fprintf fmt

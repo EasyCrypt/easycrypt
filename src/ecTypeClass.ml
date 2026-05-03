@@ -26,11 +26,16 @@ module TyMatch(E : sig val env : EcEnv.env end) = struct
       map
 
     | Tvar a, _ -> begin
-      match Option.get (Mid.find_opt a map) with
-      | None ->
+      (* [a] may not be in [map] when the pattern carries free Tvars
+         (e.g. an instance whose carrier was a section-local tparam
+         that did not get generalised to [tci_params]). Treat that as
+         a non-match rather than crashing the inference loop. *)
+      match Mid.find_opt a map with
+      | None -> raise NoMatch
+      | Some None ->
         Mid.add a (Some ty) map
 
-      | Some ty' ->
+      | Some (Some ty') ->
         if not (EcCoreEqTest.for_type E.env ty ty') then
           raise NoMatch;
         map

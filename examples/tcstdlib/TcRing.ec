@@ -746,7 +746,7 @@ type class ffield <: group = {
 *)
 
 (* TODO: Probably not the right way *)
-type class ffield <: comring = {
+type class ffield <: idomain = {
   axiom unit_neq0: forall (x : ffield), unit x <=> x <> zeror
 }.
 
