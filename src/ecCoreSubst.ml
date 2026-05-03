@@ -296,7 +296,7 @@ let rec e_subst (s : f_subst) (e : expr) : expr =
     e_var pv' ty'
 
   | Eop (p, tys) ->
-    let tys' = List.Smart.map (fun (t, w) -> (ty_subst s t, w)) tys in
+    let tys' = List.Smart.map (etyarg_subst s) tys in
     let ty'  = ty_subst s e.e_ty in
     e_op_tc p tys' ty'
 

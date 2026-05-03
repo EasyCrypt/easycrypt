@@ -941,9 +941,9 @@ let select_op
     let subue = UniEnv.copy ue in
 
     try
-      let UniEnv.{ subst = tip; args } =
+      let UniEnv.{ subst = tip_full; args } =
         UniEnv.opentvi subue op.D.op_tparams tvi in
-      let tip = f_subst_init ~tv:(Mid.map fst tip) () in
+      let tip = f_subst_init ~tv:(Mid.map fst tip_full) () in
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue ?retty psig in
@@ -955,8 +955,18 @@ let select_op
         match op.D.op_kind with
         | OB_nott nt ->
            let substnt () =
-             let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
-             let es = e_subst tip in
+             (* Substitute tparams (both type and TC-witness univars
+                bound during unification) into the abbrev body. Without
+                [tw_uni], TCIUni witnesses left over from [opentvi]
+                stay as placeholders in the inlined body and later
+                produce uninferrable [#a[#b]] forms. *)
+             let s =
+               f_subst_init
+                 ~tv:(Mid.map fst tip_full)
+                 ~tw_uni:(UniEnv.tw_assubst subue)
+                 () in
+             let xs = List.map (snd_map (ty_subst s)) nt.D.ont_args in
+             let es = e_subst s in
              let bd = es nt.D.ont_body in
              (xs, bd)
            in Some (Lazy.from_fun substnt)

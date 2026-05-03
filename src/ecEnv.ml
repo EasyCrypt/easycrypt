@@ -3213,8 +3213,10 @@ module Theory = struct
         | Th_alias (name, path) ->
             rebind_alias name path env
 
-        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _
-        | Th_typeclass _ ->
+        | Th_typeclass (x, tc) ->
+            MC.import_typeclass (xpath x) tc env
+
+        | Th_addrw _ | Th_instance _ | Th_auto _ | Th_reduction _ ->
             env
 
       in

@@ -83,7 +83,9 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   Option.iter (fun infos -> nterror gloc env (NTE_TyNotClosed infos))
     @@ EcUnify.UniEnv.xclosed ue;
 
-  let ts      = Tuni.subst (EcUnify.UniEnv.close ue) in
+  let ts      = Tuni.subst
+                  ~tw_uni:(EcUnify.UniEnv.tw_assubst ue)
+                  (EcUnify.UniEnv.close ue) in
   let es      = e_subst ts in
   let body    = es body in
   let codom   = ty_subst ts codom in
