@@ -956,13 +956,18 @@ let select_op
         | OB_nott nt ->
            let substnt () =
              (* Substitute tparams (both type and TC-witness univars
-                bound during unification) into the abbrev body. Without
-                [tw_uni], TCIUni witnesses left over from [opentvi]
-                stay as placeholders in the inlined body and later
-                produce uninferrable [#a[#b]] forms. *)
+                bound during unification) into the abbrev body. We
+                pass [~tw] alongside [~tv] so [TCIAbstract \`Var]
+                witnesses captured at abbrev-definition time get
+                rewritten through the tparam => etyarg map; without
+                it the body keeps stale [\`Var] references to the
+                abbrev's tparams. [~tw_uni] resolves [TCIUni]
+                placeholders left over from [opentvi]; without it the
+                body prints with uninferrable [#a[#b]] witnesses. *)
              let s =
                f_subst_init
                  ~tv:(Mid.map fst tip_full)
+                 ~tw:(Mid.map snd tip_full)
                  ~tw_uni:(UniEnv.tw_assubst subue)
                  () in
              let xs = List.map (snd_map (ty_subst s)) nt.D.ont_args in
