@@ -7,6 +7,11 @@ open EcEnv
 val infer : env -> ty -> typeclass -> tcwitness option
 
 (* -------------------------------------------------------------------- *)
+(* All matching instances as witnesses (vs. [infer] which returns the
+   first). Used to detect ambiguity from multi-flavor inheritance. *)
+val infer_all : env -> ty -> typeclass -> tcwitness list
+
+(* -------------------------------------------------------------------- *)
 (* Like [infer], but the carrier may be left abstract: only the
    typeclass arguments are matched. Returns the matching instance(s)
    with the partial type-substitution that pinned each argument; the

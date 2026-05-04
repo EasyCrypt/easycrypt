@@ -158,6 +158,17 @@ and infer (env : EcEnv.env) (ty : ty) (tc : typeclass) =
     (EcEnv.TcInstance.get_all env)
 
 (* -------------------------------------------------------------------- *)
+(* Like [infer] but returns ALL matching instances as witnesses. Used
+   to detect ambiguity (multi-flavor inheritance, e.g. a comring with
+   both addmonoid- and mulmonoid-derived monoid views on the same
+   carrier) — the caller may then defer commitment until other
+   unification steps narrow the choice. *)
+and infer_all (env : EcEnv.env) (ty : ty) (tc : typeclass) =
+  List.filter_map
+    (check_tcinstance env ty tc)
+    (EcEnv.TcInstance.get_all env)
+
+(* -------------------------------------------------------------------- *)
 (* Match a candidate instance against [tc] on its arguments only,
    leaving the carrier ([tci.tci_type]) for the caller to unify with
    the goal carrier. Returns the partial type-substitution that

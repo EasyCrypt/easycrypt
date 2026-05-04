@@ -483,6 +483,19 @@ module Unify = struct
           (* Modes #1, #2: carrier is ground; query the instance database. *)
           let strat_infer_by_carrier () : tcwitness option =
             EcTypeClass.infer env ty tc in
+          (* Ambiguity check: multi-flavor inheritance can register
+             multiple instances of the same TC for the same carrier
+             (e.g. comring with both addmonoid- and mulmonoid-derived
+             monoid views on int). If we'd commit to one arbitrarily,
+             later [TcTw] from the goal might equate the lemma's
+             witness univar with the other view — and fail. By
+             detecting ambiguity and DEFERRING, we let the goal's
+             concrete witness arrive via [TcTw] and bind the univar. *)
+          let strat_carrier_is_ambiguous () : bool =
+            match ty.ty_node with
+            | Tvar _ | Tconstr _ ->
+                List.length (EcTypeClass.infer_all env ty tc) > 1
+            | _ -> false in
 
           (* Univars appearing in [tc.tc_args] (types and witnesses).
              Used both for the Mode-#3 strategy gating and to register
@@ -561,14 +574,20 @@ module Unify = struct
 
           (* ---- Dispatch ---- *)
           if TyUni.Suid.is_empty deps then begin
-            let resolution_opt =
+            let ambiguous =
               match ty.ty_node with
-              | Tvar _ ->
-                strat_tvar_via_tvtc ()
-              | Tconstr _ when Option.is_some (strat_abs_via_decl ()) ->
-                strat_abs_via_decl ()
-              | _ ->
-                strat_infer_by_carrier ()
+              | Tvar _ | Tconstr _ -> strat_carrier_is_ambiguous ()
+              | _ -> false in
+            let resolution_opt =
+              if ambiguous then None
+              else
+                match ty.ty_node with
+                | Tvar _ ->
+                  strat_tvar_via_tvtc ()
+                | Tconstr _ when Option.is_some (strat_abs_via_decl ()) ->
+                  strat_abs_via_decl ()
+                | _ ->
+                  strat_infer_by_carrier ()
             in
             match resolution_opt with
             | Some resolution ->
@@ -586,6 +605,11 @@ module Unify = struct
                   ) tyvar (!uc).tcenv.byunivar
                 } }
               ) arg_deps
+            | None when ambiguous ->
+              (* Defer: hold this TcCtt unresolved. A later [TcTw]
+                 equation from the surrounding goal will pin [uid]
+                 to the goal's specific witness via [bind_uni]. *)
+              ()
             | None -> failure ()
           end else begin
             match strat_infer_by_args () with
