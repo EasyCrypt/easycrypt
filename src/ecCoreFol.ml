@@ -12,11 +12,6 @@ module Sx = EcPath.Sx
 open EcBigInt.Notations
 
 (* -------------------------------------------------------------------- *)
-let mhr    = EcIdent.create "&hr"
-let mleft  = EcIdent.create "&1"
-let mright = EcIdent.create "&2"
-
-(* -------------------------------------------------------------------- *)
 type quantif = EcAst.quantif
 
 type hoarecmp = EcAst.hoarecmp

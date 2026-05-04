@@ -127,8 +127,9 @@ let tydecl_compatible env tyd1 tyd2 =
 
 (* -------------------------------------------------------------------- *)
 let expr_compatible exn env s e1 e2 =
-  let f1 = EcFol.form_of_expr ~m:EcFol.mhr e1 in
-  let f2 = EcSubst.subst_form s (EcFol.form_of_expr ~m:EcFol.mhr e2) in
+  let m  = EcIdent.create "&hr" in
+  let f1 = EcFol.form_of_expr ~m e1 in
+  let f2 = EcSubst.subst_form s (EcFol.form_of_expr ~m e2) in
   error_body exn (EcReduction.is_conv ~ri:ri_compatible (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =

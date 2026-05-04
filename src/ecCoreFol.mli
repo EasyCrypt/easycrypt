@@ -9,11 +9,6 @@ open EcCoreModules
 open EcMemory
 
 (* -------------------------------------------------------------------- *)
-val mhr    : memory
-val mleft  : memory
-val mright : memory
-
-(* -------------------------------------------------------------------- *)
 type quantif = EcAst.quantif
 
 type hoarecmp = EcAst.hoarecmp

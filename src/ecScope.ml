@@ -1404,7 +1404,9 @@ module Op = struct
       (`Det, Sem.translate_e env ret) in
 
     let mode, aout = Sem.translate_s env cont body.f_body in
-    let aout = form_of_expr ~m:mhr aout in (* FIXME: translate to forms directly? *)
+    let aout =
+      let m = EcIdent.create "&hr" in
+      form_of_expr ~m aout in (* FIXME: translate to forms directly? *)
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
@@ -1423,8 +1425,9 @@ module Op = struct
 
     let scope =
       let prax =
+        let m     = EcIdent.create "&hr" in
         let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
-        let res   = f_pvar pv_res sig_.fs_ret mhr in
+        let res   = f_pvar pv_res sig_.fs_ret m in
         let resx  = EcIdent.create "v" in
         let resv  = f_local resx sig_.fs_ret in
         let prmem = EcIdent.create "&m" in
@@ -1452,7 +1455,7 @@ module Op = struct
                 (f_pr prmem
                    f
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
-                   { m = mhr; inv = f_eq res.inv resv })
+                   { m; inv = f_eq res.inv resv })
                 mu))
       in
 
@@ -1470,18 +1473,19 @@ module Op = struct
       match mode with
       | `Det ->
          let hax =
+           let m     = EcIdent.create "&hr" in
            let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
-           let res   = f_pvar pv_res sig_.fs_ret mhr in
-           let args  = f_pvar pv_arg sig_.fs_arg mhr in
+           let res   = f_pvar pv_res sig_.fs_ret m in
+           let args  = f_pvar pv_arg sig_.fs_arg m in
 
            f_forall
              (List.map (fun (x, ty) -> (x, GTty ty)) locs)
              (f_hoareF
-                { m = mhr; inv = f_eq
+                { m; inv = f_eq
                    args.inv
                    (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)) }
                 f
-                (POE.lift { m = mhr; inv = f_eq
+                (POE.lift { m; inv = f_eq
                    res.inv
                    (f_app
                       (f_op oppath [] opdecl.op_ty)
@@ -2615,7 +2619,7 @@ module Search = struct
                     let tip = f_subst_init ~tv:(Mid.map fst tip.subst) () in
                     let es  = e_subst tip in
                     let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
-                    let bd  = EcFol.form_of_expr ~m:EcFol.mhr (es nt.ont_body) in
+                    let bd  = EcFol.form_of_expr ~m:(EcIdent.create "&hr") (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with

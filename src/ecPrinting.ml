@@ -1901,7 +1901,7 @@ and match_pp_notations
       let ue   = EcUnify.UniEnv.create None in
       let ov   = EcUnify.UniEnv.opentvi ue tv None in
       let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-      let mr   = odfl mhr (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) in
+      let mr   = odfl (EcIdent.create "&hr") (EcEnv.Memory.get_active_ss ppe.PPEnv.ppe_env) in
       let bd   = form_of_expr ~m:mr nt.ont_body in
       let bd   = Fsubst.f_subst_tvar ~freshen:true ov.subst bd in
 
