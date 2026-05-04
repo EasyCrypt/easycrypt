@@ -136,14 +136,19 @@ end section.
 (* Commutative ring: addgroup + multiplicative commutative monoid +
    distributivity. Inherits both flavors of monoid; multi-parent.       *)
 (* ==================================================================== *)
-(* [comring] is single-parent, declaring its multiplicative content
-   directly. The framework supports multi-parent via the factory
-   pattern [comring <: addgroup & (mulmonoid with ...)], but the
-   substitution of TC-bound type parameters into multi-bound carriers
-   doesn't always remap witness slot indices correctly when used at
-   abbrev-mediated lemma applications. Until that's resolved, comring
-   stays single-parent and re-states the multiplicative monoid axioms.
-   *)
+(* [comring] declares its multiplicative content directly. The
+   framework supports multi-parent factory inheritance (see
+   [comring <: addgroup & (mulmonoid with idm = oner, (+) = mymul)]),
+   and bug fixes in commits 0389dfe24 + 305c2f856 made it work for
+   concrete carriers (e.g. [int]). However, section-internal proofs
+   with a Tvar carrier still hit a [TCIAbstract.lift] representation
+   limit: with multi-parent inheritance, the same target TC is
+   reachable via different parent walks of different lengths
+   (comring → mulmonoid → monoid is 2 steps; comring → addgroup →
+   addmonoid → monoid is 3), but [lift] is a single integer that
+   doesn't disambiguate which path. Pending that representation fix,
+   [comring] stays single-parent here and re-states the multiplicative
+   monoid axioms.                                                    *)
 type class comring <: addgroup = {
   op oner  : comring
   op ( * ) : comring -> comring -> comring
