@@ -2793,45 +2793,74 @@ module Op = struct
 
       (* If the witness has [lift > 0], the path [tcipath] points to a
          subclass instance, but the op being looked up belongs to an
-         ancestor [lift] steps up. Walk to that ancestor and find the
-         corresponding instance on the same carrier (synthesised by
-         [add_generic_instance]). *)
-      let walk_up (tc : typeclass) (n : int) : typeclass option =
-        let rec aux tc n =
-          if n = 0 then Some tc
-          else
-            let decl = TypeClass.by_path tc.tc_name env in
-            match decl.tc_prts with
-            | [] -> None
-            | (parent, _ren) :: _ ->
-              (* substitute child's tparams with tc's args *)
-              let subst =
-                List.fold_left2
-                  (fun s (a, _) etyarg -> Mid.add a etyarg s)
-                  Mid.empty decl.tc_tparams tc.tc_args in
-              let parent = EcCoreSubst.Tvar.subst_tc subst parent in
-              aux parent (n - 1)
-        in aux tc n in
+         ancestor [lift] steps up. We walk via [tci_parents] (the
+         synthesised parent instance paths, recorded by
+         [add_generic_instance] in BFS chain order). For single-parent
+         classes [tci_parents] has one element; we take it. For
+         multi-parent classes the witness's [lift] only navigates a
+         single TC's parent chain (multi-parent ambiguity is resolved
+         elsewhere via [offset]), so taking [tci_parents.[0]] is
+         correct.
+
+         Fallback when [tci_parents] is empty (manually-declared
+         instance with no synthesis tracking): search the database for
+         any matching ancestor instance, pick the first. *)
       let resolve_lifted () =
-        match tci.tci_instance with
-        | `General (tgp, _) when lift > 0 -> begin
-          match walk_up tgp lift with
-          | None -> None
-          | Some target ->
-            let carrier = tci.tci_type in
-            List.fold_left (fun acc (_, tci_existing) ->
-              match acc with
-              | Some _ -> acc
-              | None ->
-                match tci_existing.tci_instance with
-                | `General (tgp', Some sym)
-                  when EcPath.p_equal tgp'.tc_name target.tc_name
-                    && EcTypes.ty_equal tci_existing.tci_type carrier ->
-                    Some (tci_existing, sym)
-                | _ -> None)
-              None (TcInstance.get_all env)
-          end
-        | _ -> None in
+        if lift <= 0 then None
+        else
+          let rec walk tci n =
+            if n = 0 then Some tci
+            else
+              match tci.tci_parents with
+              | [] -> None  (* fallback path below *)
+              | parent_path :: _ ->
+                let parent_tci = TcInstance.by_path parent_path env in
+                walk parent_tci (n - 1)
+          in
+          match walk tci lift with
+          | Some target_tci -> begin
+            match target_tci.tci_instance with
+            | `General (_, Some sym) -> Some (target_tci, sym)
+            | _ -> None
+            end
+          | None ->
+            (* Fallback: search the database for any ancestor instance
+               on the same carrier. Used when [tci_parents] isn't
+               populated (legacy / manual declarations). *)
+            let walk_up_tc (tc : typeclass) (n : int) : typeclass option =
+              let rec aux tc n =
+                if n = 0 then Some tc
+                else
+                  let decl = TypeClass.by_path tc.tc_name env in
+                  match decl.tc_prts with
+                  | [] -> None
+                  | (parent, _ren) :: _ ->
+                    let subst =
+                      List.fold_left2
+                        (fun s (a, _) etyarg -> Mid.add a etyarg s)
+                        Mid.empty decl.tc_tparams tc.tc_args in
+                    let parent = EcCoreSubst.Tvar.subst_tc subst parent in
+                    aux parent (n - 1)
+              in aux tc n in
+            match tci.tci_instance with
+            | `General (tgp, _) -> begin
+              match walk_up_tc tgp lift with
+              | None -> None
+              | Some target ->
+                let carrier = tci.tci_type in
+                List.fold_left (fun acc (_, tci_existing) ->
+                  match acc with
+                  | Some _ -> acc
+                  | None ->
+                    match tci_existing.tci_instance with
+                    | `General (tgp', Some sym)
+                      when EcPath.p_equal tgp'.tc_name target.tc_name
+                        && EcTypes.ty_equal tci_existing.tci_type carrier ->
+                        Some (tci_existing, sym)
+                    | _ -> None)
+                  None (TcInstance.get_all env)
+              end
+            | _ -> None in
 
       match resolve_lifted () with
       | Some (tci_target, symbols) ->

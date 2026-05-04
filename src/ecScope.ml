@@ -2074,7 +2074,8 @@ module Ty = struct
       { tci_params   = fst ty
       ; tci_type     = snd ty
       ; tci_instance = `Ring cr
-      ; tci_local    = (tci.pti_loca :> locality) } in
+      ; tci_local    = (tci.pti_loca :> locality)
+      ; tci_parents  = [] } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2117,7 +2118,8 @@ module Ty = struct
       { tci_params   = fst ty
       ; tci_type     = snd ty
       ; tci_instance = `Field cr
-      ; tci_local    = (tci.pti_loca :> locality) } in
+      ; tci_local    = (tci.pti_loca :> locality)
+      ; tci_parents  = [] } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2242,85 +2244,143 @@ module Ty = struct
     (* Build a substitution mapping every op-ident along the chain to its
        chosen realisation on [ty]. For each ancestor the renaming maps
        its op names to local op names (via [lookup_ren ren]). *)
-    let subst =
+    let subst, _ =
+      (* The chain may contain entries sharing a TC name (under
+         different renamings). [add_tydef] asserts no double-binding,
+         so we track which TC names we've already added and skip. *)
       List.fold_left
-        (fun subst (anc, anc_decl, ren) ->
-          let subst = EcSubst.add_tydef subst anc.tc_name ([], snd ty) in
+        (fun (subst, seen) (anc, anc_decl, ren) ->
+          let seen, subst =
+            if EcPath.Sp.mem anc.tc_name seen then (seen, subst)
+            else
+              (EcPath.Sp.add anc.tc_name seen,
+               EcSubst.add_tydef subst anc.tc_name ([], snd ty)) in
           let subst =
             List.fold_left
               (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
               subst
               (List.combine (List.fst anc_decl.tc_tparams) anc.tc_args) in
-          List.fold_left
-            (fun subst (opname, ty) ->
-              let local = lookup_ren ren (EcIdent.name opname) in
-              let oppath, optys = Mstr.find local symbols in
-              let op =
-                EcFol.f_op_tc
-                  oppath
-                  (List.map (EcSubst.subst_etyarg subst) optys)
-                  (EcSubst.subst_ty subst ty)
-              in EcSubst.add_flocal subst opname op)
-            subst anc_decl.tc_ops)
-        EcSubst.empty chain_decls in
+          let subst =
+            List.fold_left
+              (fun subst (opname, ty) ->
+                let local = lookup_ren ren (EcIdent.name opname) in
+                let oppath, optys = Mstr.find local symbols in
+                let op =
+                  EcFol.f_op_tc
+                    oppath
+                    (List.map (EcSubst.subst_etyarg subst) optys)
+                    (EcSubst.subst_ty subst ty)
+                in EcSubst.add_flocal subst opname op)
+              subst anc_decl.tc_ops in
+          (subst, seen))
+        (EcSubst.empty, EcPath.Sp.empty) chain_decls in
 
     let axioms =
-      List.concat_map
-        (fun (_anc, anc_decl, _ren) ->
-          List.map
-            (fun (name, ax) -> (name, EcSubst.subst_form subst ax))
-            anc_decl.tc_axs)
-        chain_decls in
+      (* Multiple chain entries may share a TC; dedup axioms by name
+         (they have identical statements after [subst]). *)
+      let _, axs =
+        List.fold_left
+          (fun (seen, acc) (_anc, anc_decl, _ren) ->
+            List.fold_left
+              (fun (seen, acc) (name, ax) ->
+                if Sstr.mem name seen then (seen, acc)
+                else
+                  (Sstr.add name seen,
+                   (name, EcSubst.subst_form subst ax) :: acc))
+              (seen, acc)
+              anc_decl.tc_axs)
+          (Sstr.empty, []) chain_decls in
+      List.rev axs in
     let lc    = (tci.pti_loca :> locality) in
     let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
-    (* Register one instance per ancestor. The ancestor's symbols come
-       from the local symbols mapped through the cumulative renaming. *)
+    (* Compose two renamings (matches the version in [ecTypeClass.ml]
+       which is used to build the chain). [outer] is declared on the
+       parent edge; [inner] is the cumulative renaming on this entry.
+       Result maps grandparent op names to local op names. *)
+    let compose_ren ~outer ~inner =
+      let inner_map = Mstr.of_list inner in
+      let from_outer =
+        List.map
+          (fun (gp_name, p_name) ->
+            let c_name = odfl p_name (Mstr.find_opt p_name inner_map) in
+            (gp_name, c_name))
+          outer in
+      let outer_p_names =
+        List.fold_left (fun s (_, p) -> Sstr.add p s) Sstr.empty outer in
+      let outer_gp_names =
+        List.fold_left (fun s (gp, _) -> Sstr.add gp s) Sstr.empty outer in
+      let from_inner =
+        List.filter_map
+          (fun (p_name, c_name) ->
+            if Sstr.mem p_name outer_p_names || Sstr.mem p_name outer_gp_names
+            then None
+            else Some (p_name, c_name))
+          inner in
+      from_outer @ from_inner in
+    let ren_eq r1 r2 =
+      List.length r1 = List.length r2
+      && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+
+    (* Register one instance per ancestor chain entry, in REVERSE
+       BFS order (leaves before children) so that when a child entry
+       is registered, its parents' paths are already known. Track
+       each registered instance's path in [chain_paths] indexed by
+       chain position. *)
+    let chain_paths = Array.make (List.length chain_decls) None in
+    let n_chain = List.length chain_decls in
     let scope =
-      List.fold_left
-        (fun scope (anc, anc_decl, ren) ->
-          let already_present =
-            List.exists (fun (_, tci_existing) ->
-              match tci_existing.EcTheory.tci_instance with
-              | `General (tgp, _) ->
-                  EcPath.p_equal tgp.tc_name anc.tc_name
-                  && EcReduction.EqTest.for_type
-                       (env scope) tci_existing.EcTheory.tci_type (snd ty)
-              | _ -> false)
-              (EcEnv.TcInstance.get_all (env scope)) in
-          if already_present then scope
-          else
-            (* Build the ancestor's symbols by mapping each ancestor op
-               through the cumulative renaming to a local op name, then
-               looking up that local op's realisation. *)
-            let anc_symbols =
-              List.fold_left
-                (fun m (id, _) ->
-                  let n = EcIdent.name id in
-                  let local = lookup_ren ren n in
-                  match Mstr.find_opt local symbols with
-                  | Some s -> Mstr.add n s m
-                  | None -> m)
-                Mstr.empty anc_decl.tc_ops in
-            let instance = EcTheory.
-              { tci_params   = fst ty
-              ; tci_type     = snd ty
-              ; tci_instance = `General (anc, Some anc_symbols)
-              ; tci_local    = lc } in
-            let name =
-              if EcPath.p_equal anc.tc_name tcp.tc_name then
-                match tci.pti_name with
-                | Some name -> unloc name
-                | None ->
-                    Printf.sprintf "%s_%d"
-                      (EcPath.basename anc.tc_name) (EcUid.unique ())
-              else
-                Printf.sprintf "%s_%d"
-                  (EcPath.basename anc.tc_name) (EcUid.unique ()) in
-            let item = EcTheory.Th_instance (Some name, instance) in
-            let item = EcTheory.mkitem ~import item in
-            { scope with sc_env = EcSection.add_item item scope.sc_env })
-        scope chain_decls in
+      List.fold_lefti
+        (fun scope rev_idx (anc, anc_decl, ren) ->
+          let idx = n_chain - 1 - rev_idx in
+          let anc_symbols =
+            List.fold_left
+              (fun m (id, _) ->
+                let n = EcIdent.name id in
+                let local = lookup_ren ren n in
+                match Mstr.find_opt local symbols with
+                | Some s -> Mstr.add n s m
+                | None -> m)
+              Mstr.empty anc_decl.tc_ops in
+          (* Find this entry's parent chain entries: for each parent
+             of [anc] (in [anc_decl.tc_prts]), the parent chain entry
+             has the same TC and the renaming composed with [ren]. *)
+          let parents =
+            List.map
+              (fun (p_tc, p_ren) ->
+                let target_ren = compose_ren ~outer:p_ren ~inner:ren in
+                let rec find i = function
+                  | [] -> None
+                  | (a, _, r) :: rest ->
+                    if EcPath.p_equal a.EcAst.tc_name p_tc.EcAst.tc_name
+                       && ren_eq r target_ren
+                    then chain_paths.(i)
+                    else find (i + 1) rest
+                in find 0 chain_decls)
+              anc_decl.tc_prts in
+          let parents = List.pmap (fun x -> x) parents in
+          let instance = EcTheory.
+            { tci_params   = fst ty
+            ; tci_type     = snd ty
+            ; tci_instance = `General (anc, Some anc_symbols)
+            ; tci_local    = lc
+            ; tci_parents  = parents } in
+          let name =
+            if idx = 0 then
+              match tci.pti_name with
+              | Some name -> unloc name
+              | None ->
+                  Printf.sprintf "%s_%d"
+                    (EcPath.basename anc.tc_name) (EcUid.unique ())
+            else
+              Printf.sprintf "%s_%d"
+                (EcPath.basename anc.tc_name) (EcUid.unique ()) in
+          let inst_path = EcPath.pqname (path scope) name in
+          chain_paths.(idx) <- Some inst_path;
+          let item = EcTheory.Th_instance (Some name, instance) in
+          let item = EcTheory.mkitem ~import item in
+          { scope with sc_env = EcSection.add_item item scope.sc_env })
+        scope (List.rev chain_decls) in
 
     Ax.add_defer scope inter
 

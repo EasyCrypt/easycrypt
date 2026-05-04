@@ -48,6 +48,7 @@ and tcinstance = {
   tci_type     : ty;
   tci_instance : tcibody;
   tci_local    : locality;
+  tci_parents  : EcPath.path list;
 }
 
 and tcibody = [

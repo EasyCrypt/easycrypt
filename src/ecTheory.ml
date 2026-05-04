@@ -51,6 +51,13 @@ and tcinstance = {
   tci_type     : ty;
   tci_instance : tcibody;
   tci_local    : locality;
+  (* When this instance was synthesised by [add_generic_instance] as
+     the projection of a parent class's instance via the subclass
+     chain, [tci_parents] gives the synthesised parent-instance paths
+     in the same order as the underlying TC's [tc_prts]. Empty for
+     manually-declared instances. Used by [resolve_lifted] to walk
+     the correct ancestor when multiple parent paths exist. *)
+  tci_parents  : EcPath.path list;
 }
 
 and tcibody = [

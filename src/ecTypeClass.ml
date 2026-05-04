@@ -222,25 +222,51 @@ let ancestors_with_renaming
     List.map
       (fun (p, ren) -> (EcCoreSubst.Tvar.subst_tc subst p, ren))
       decl.tc_prts in
-  (* Compose two renamings: [outer] is the renaming declared on the edge
-     from a child to its parent; [inner] is the renaming accumulated
-     so far (mapping ancestor names to current-class names). The result
-     maps grandparent names to current-class names by going through the
-     parent's renamed slot. *)
+  (* Compose two renamings.
+     [outer] is declared on a parent edge: maps grandparent op names
+       to parent op names (only listed entries are renamed; unlisted
+       passes through identity).
+     [inner] is the accumulated renaming on the child side: maps
+       parent op names to child op names.
+     Result: grandparent op names → child op names.
+
+     Two cases:
+     - For each (gp_name, p_name) in outer: child's name for that op
+       is [inner(p_name)], defaulting to [p_name] if unlisted.
+     - For each (p_name, c_name) in inner whose [p_name] is NOT
+       referenced in outer (neither as a value nor as a key): the op
+       passes through outer as identity, so grandparent's name for it
+       is [p_name] and child's name is [c_name]. Add [(p_name, c_name)]. *)
   let compose ~outer ~inner =
     let inner_map = EcMaps.Mstr.of_list inner in
-    List.map
-      (fun (anc_name, parent_name) ->
-        match EcMaps.Mstr.find_opt parent_name inner_map with
-        | Some local -> (anc_name, local)
-        | None -> (anc_name, parent_name))
-      outer in
-  let same a b = EcPath.p_equal a.tc_name b.tc_name in
+    let from_outer =
+      List.map
+        (fun (gp_name, p_name) ->
+          let c_name = odfl p_name (EcMaps.Mstr.find_opt p_name inner_map) in
+          (gp_name, c_name))
+        outer in
+    let outer_p_names =
+      List.fold_left (fun s (_, p) -> EcMaps.Sstr.add p s) EcMaps.Sstr.empty outer in
+    let outer_gp_names =
+      List.fold_left (fun s (gp, _) -> EcMaps.Sstr.add gp s) EcMaps.Sstr.empty outer in
+    let from_inner =
+      List.filter_map
+        (fun (p_name, c_name) ->
+          if EcMaps.Sstr.mem p_name outer_p_names || EcMaps.Sstr.mem p_name outer_gp_names
+          then None
+          else Some (p_name, c_name))
+        inner in
+    from_outer @ from_inner in
+  let ren_eq r1 r2 =
+    List.length r1 = List.length r2
+    && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in
+  let same (a, ra) (b, rb) =
+    EcPath.p_equal a.tc_name b.tc_name && ren_eq ra rb in
   let rec bfs frontier acc =
     match frontier with
     | [] -> List.rev acc
     | (tc, ren) :: rest ->
-      if List.exists (fun (a, _) -> same tc a) acc then bfs rest acc
+      if List.exists (same (tc, ren)) acc then bfs rest acc
       else
         let next =
           List.map
