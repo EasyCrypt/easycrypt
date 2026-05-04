@@ -193,7 +193,7 @@ let ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
       List.fold_left2
         (fun s (a, _) etyarg -> Mid.add a etyarg s)
         Mid.empty decl.tc_tparams tc.tc_args in
-    List.map (EcCoreSubst.Tvar.subst_tc subst) decl.tc_prts in
+    List.map (fun (p, _ren) -> EcCoreSubst.Tvar.subst_tc subst p) decl.tc_prts in
   let same (a : typeclass) (b : typeclass) =
     EcPath.p_equal a.tc_name b.tc_name in
   let rec bfs (frontier : typeclass list) (acc : typeclass list) =
@@ -203,3 +203,48 @@ let ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
       if List.exists (same tc) acc then bfs rest acc
       else bfs (rest @ parents tc) (tc :: acc)
   in bfs [tc] []
+
+(* -------------------------------------------------------------------- *)
+(* Variant of [ancestors] that also returns the cumulative op renaming
+   accumulated along the BFS walk from [tc] to each ancestor. The
+   renaming maps the ancestor's op names to the corresponding op
+   names declared in (or inherited by) [tc]. *)
+let ancestors_with_renaming
+  (env : EcEnv.env) (tc : typeclass)
+  : (typeclass * (EcSymbols.symbol * EcSymbols.symbol) list) list
+=
+  let parents tc =
+    let decl = EcEnv.TypeClass.by_path tc.tc_name env in
+    let subst =
+      List.fold_left2
+        (fun s (a, _) etyarg -> Mid.add a etyarg s)
+        Mid.empty decl.tc_tparams tc.tc_args in
+    List.map
+      (fun (p, ren) -> (EcCoreSubst.Tvar.subst_tc subst p, ren))
+      decl.tc_prts in
+  (* Compose two renamings: [outer] is the renaming declared on the edge
+     from a child to its parent; [inner] is the renaming accumulated
+     so far (mapping ancestor names to current-class names). The result
+     maps grandparent names to current-class names by going through the
+     parent's renamed slot. *)
+  let compose ~outer ~inner =
+    let inner_map = EcMaps.Mstr.of_list inner in
+    List.map
+      (fun (anc_name, parent_name) ->
+        match EcMaps.Mstr.find_opt parent_name inner_map with
+        | Some local -> (anc_name, local)
+        | None -> (anc_name, parent_name))
+      outer in
+  let same a b = EcPath.p_equal a.tc_name b.tc_name in
+  let rec bfs frontier acc =
+    match frontier with
+    | [] -> List.rev acc
+    | (tc, ren) :: rest ->
+      if List.exists (fun (a, _) -> same tc a) acc then bfs rest acc
+      else
+        let next =
+          List.map
+            (fun (p, p_ren) -> (p, compose ~outer:p_ren ~inner:ren))
+            (parents tc) in
+        bfs (rest @ next) ((tc, ren) :: acc)
+  in bfs [(tc, [])] []

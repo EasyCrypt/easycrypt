@@ -1816,12 +1816,17 @@ module Ty = struct
 
       let uptcs =
         let parent_ue = EcUnify.UniEnv.copy ue in
-        let uptcs = List.map (TT.transtc scenv parent_ue) tcd.ptc_inth in
+        let uptcs = List.map
+          (fun (p, ren) ->
+            (TT.transtc scenv parent_ue p,
+             List.map (fun (s, t) -> (unloc s, unloc t)) ren))
+          tcd.ptc_inth in
         let subst = Tuni.subst
           ~tw_uni:(EcUnify.UniEnv.tw_assubst parent_ue)
           (EcUnify.UniEnv.close parent_ue) in
-        List.map (fun tcp ->
-          { tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args })
+        List.map (fun (tcp, ren) ->
+          ({ tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args },
+           ren))
           uptcs in
 
       (* The carrier's [tcs] should reference the class being declared
@@ -2155,37 +2160,48 @@ module Ty = struct
       let subst = Tuni.subst (EcUnify.UniEnv.close ue) in
       { tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args } in
 
-    (* Walk the parent chain: [tcp; parent; grandparent; ...]. We collect
-       ops/axioms from every ancestor so a single [instance C with t]
-       declaration provides the whole hierarchy in one go, with derived
-       parent instances synthesised below. *)
-    let chain = EcTypeClass.ancestors (env scope) tcp in
+    (* Walk the parent DAG with cumulative op renamings: [(tcp, []);
+       (parent_1, ren_1); ...]. The empty renaming on [tcp] is identity:
+       each ancestor op [n] maps to a local op [n]. Renamings on parent
+       edges (declared via [<: P with { ... }]) compose along the path,
+       so a renamed grandparent op resolves to a local op. *)
+    let chain = EcTypeClass.ancestors_with_renaming (env scope) tcp in
     let chain_decls =
       List.map
-        (fun anc -> (anc, EcEnv.TypeClass.by_path anc.tc_name (env scope)))
+        (fun (anc, ren) ->
+          (anc, EcEnv.TypeClass.by_path anc.tc_name (env scope), ren))
         chain in
 
-    (* Build the set of expected operators across the entire ancestor
-       chain. Immediate-class ops are required; ops from strict ancestors
-       are optional — if the user doesn't provide them, we fill them in
-       below from a pre-existing ancestor instance for the same type. *)
+    let lookup_ren ren n = odfl n (Mstr.find_opt n (Mstr.of_list ren)) in
+
+    (* Build the set of expected operators. Immediate-class ops (no
+       renaming applied) are required. Ancestor ops are mapped through
+       the cumulative renaming to local op names; if an ancestor op's
+       local name is already in [tcsyms] (e.g. via the immediate class
+       or via another path), keep the existing entry. *)
     let tcsyms =
       match chain_decls with
       | [] -> assert false
-      | (tcp_self, tc_self) :: rest ->
+      | (tcp_self, tc_self, _) :: rest ->
         let immediate = symbols_of_tc (env scope) ty (tcp_self, tc_self) in
+        let immediate_set = Sstr.of_list (List.map fst immediate) in
         let parents =
           List.concat_map
-            (fun (anc, anc_decl) ->
+            (fun (anc, anc_decl, ren) ->
               symbols_of_tc (env scope) ty (anc, anc_decl)
-              |> List.map (fun (n, (_, opty)) -> (n, (false, opty))))
+              |> List.map (fun (n, (_, opty)) ->
+                   (lookup_ren ren n, (false, opty))))
             rest in
+        let parents =
+          List.filter
+            (fun (n, _) -> not (Sstr.mem n immediate_set))
+            parents in
         Mstr.of_list (immediate @ parents) in
     let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
 
-    (* For any ancestor op the user didn't provide, look up an existing
-       instance of that ancestor on the same carrier and reuse its
-       realisation. If no such instance exists, raise. *)
+    (* For any ancestor op (after renaming) the user didn't provide,
+       look up an existing instance of that ancestor on the same
+       carrier and reuse its realisation. *)
     let symbols =
       let existing_anc_symbols anc =
         List.fold_left (fun acc (_, tci_existing) ->
@@ -2201,10 +2217,10 @@ module Ty = struct
             | _ -> None)
           None (EcEnv.TcInstance.get_all (env scope)) in
       List.fold_left
-        (fun symbols (anc, anc_decl) ->
+        (fun symbols (anc, anc_decl, ren) ->
           let missing =
             List.filter (fun (id, _) ->
-              not (Mstr.mem (EcIdent.name id) symbols))
+              not (Mstr.mem (lookup_ren ren (EcIdent.name id)) symbols))
               anc_decl.tc_ops in
           if missing = [] then symbols
           else
@@ -2216,18 +2232,19 @@ module Ty = struct
                 List.fold_left
                   (fun symbols (id, _) ->
                     let n = EcIdent.name id in
+                    let local_n = lookup_ren ren n in
                     match Mstr.find_opt n sym with
-                    | Some s -> Mstr.add n s symbols
+                    | Some s -> Mstr.add local_n s symbols
                     | None -> symbols)
                   symbols missing)
         symbols (List.tl chain_decls) in
 
     (* Build a substitution mapping every op-ident along the chain to its
-       chosen realisation on [ty]. This lets us substitute axioms from
-       any ancestor uniformly. *)
+       chosen realisation on [ty]. For each ancestor the renaming maps
+       its op names to local op names (via [lookup_ren ren]). *)
     let subst =
       List.fold_left
-        (fun subst (anc, anc_decl) ->
+        (fun subst (anc, anc_decl, ren) ->
           let subst = EcSubst.add_tydef subst anc.tc_name ([], snd ty) in
           let subst =
             List.fold_left
@@ -2236,7 +2253,8 @@ module Ty = struct
               (List.combine (List.fst anc_decl.tc_tparams) anc.tc_args) in
           List.fold_left
             (fun subst (opname, ty) ->
-              let oppath, optys = Mstr.find (EcIdent.name opname) symbols in
+              let local = lookup_ren ren (EcIdent.name opname) in
+              let oppath, optys = Mstr.find local symbols in
               let op =
                 EcFol.f_op_tc
                   oppath
@@ -2248,7 +2266,7 @@ module Ty = struct
 
     let axioms =
       List.concat_map
-        (fun (_anc, anc_decl) ->
+        (fun (_anc, anc_decl, _ren) ->
           List.map
             (fun (name, ax) -> (name, EcSubst.subst_form subst ax))
             anc_decl.tc_axs)
@@ -2256,12 +2274,11 @@ module Ty = struct
     let lc    = (tci.pti_loca :> locality) in
     let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
-    (* Register one instance per ancestor (subclass first), filtering
-       [symbols] to just the ops belonging to that ancestor. Skip an
-       ancestor whose instance for [ty] already exists. *)
+    (* Register one instance per ancestor. The ancestor's symbols come
+       from the local symbols mapped through the cumulative renaming. *)
     let scope =
       List.fold_left
-        (fun scope (anc, anc_decl) ->
+        (fun scope (anc, anc_decl, ren) ->
           let already_present =
             List.exists (fun (_, tci_existing) ->
               match tci_existing.EcTheory.tci_instance with
@@ -2273,10 +2290,18 @@ module Ty = struct
               (EcEnv.TcInstance.get_all (env scope)) in
           if already_present then scope
           else
-            let anc_op_names =
-              List.map (fun (id, _) -> EcIdent.name id) anc_decl.tc_ops in
+            (* Build the ancestor's symbols by mapping each ancestor op
+               through the cumulative renaming to a local op name, then
+               looking up that local op's realisation. *)
             let anc_symbols =
-              Mstr.filter (fun n _ -> List.mem n anc_op_names) symbols in
+              List.fold_left
+                (fun m (id, _) ->
+                  let n = EcIdent.name id in
+                  let local = lookup_ren ren n in
+                  match Mstr.find_opt local symbols with
+                  | Some s -> Mstr.add n s m
+                  | None -> m)
+                Mstr.empty anc_decl.tc_ops in
             let instance = EcTheory.
               { tci_params   = fst ty
               ; tci_type     = snd ty

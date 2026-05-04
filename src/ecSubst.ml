@@ -1118,7 +1118,8 @@ let subst_field (s : subst) cr =
 (* -------------------------------------------------------------------- *)
 let subst_tc (s : subst) tc =
   let s, tc_tparams = fresh_tparams s tc.tc_tparams in
-  let tc_prts = List.map (subst_typeclass s) tc.tc_prts in
+  let tc_prts =
+    List.map (fun (p, ren) -> (subst_typeclass s p, ren)) tc.tc_prts in
   let tc_ops = List.map (snd_map (subst_ty s)) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
   { tc_tparams; tc_prts; tc_ops; tc_axs; tc_loca = tc.tc_loca }

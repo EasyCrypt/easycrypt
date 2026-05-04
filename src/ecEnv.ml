@@ -2803,7 +2803,7 @@ module Op = struct
             let decl = TypeClass.by_path tc.tc_name env in
             match decl.tc_prts with
             | [] -> None
-            | parent :: _ ->
+            | (parent, _ren) :: _ ->
               (* substitute child's tparams with tc's args *)
               let subst =
                 List.fold_left2

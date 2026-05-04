@@ -1657,6 +1657,15 @@ tcparam:
 | tys=ioption(type_args) x=lqident
     { (x, odfl [] tys) }
 
+tc_parent:
+| p=tcparam
+    { (p, []) }
+| LPAREN p=tcparam WITH ren=plist1(tc_rename, COMMA) RPAREN
+    { (p, ren) }
+
+tc_rename:
+| src=oident EQ tgt=oident { (src, tgt) }
+
 typaram:
 | x=tident { (x, []) }
 | x=tident LTCOLON tc=plist1(tcparam, AMP) { (x, tc) }
@@ -1708,7 +1717,7 @@ typedecl:
 (* Type classes                                                         *)
 typeclass:
 | loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident
-  inth=prefix(LTCOLON, plist1(tcparam, AMP))?
+  inth=prefix(LTCOLON, plist1(tc_parent, AMP))?
   EQ LBRACE body=tc_body RBRACE {
     { ptc_name   = x;
       ptc_params = tya;

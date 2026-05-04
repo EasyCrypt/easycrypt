@@ -301,9 +301,14 @@ let operator_of_exception (ex: exception_) =
   mk_op ~opaque: optransparent [] ty (Some (OP_Exn ex.exn_dom)) ex.exn_loca
 
 (* -------------------------------------------------------------------- *)
+(* A parent typeclass plus an optional op renaming. The renaming maps
+   the parent's op names (recursively, including its own ancestors)
+   to op names declared in or inherited by the subclass — used to
+   project a subclass instance into a parent instance with different
+   operator names. Empty list = plain inheritance. *)
 type tc_decl = {
   tc_tparams : ty_params;
-  tc_prts    : typeclass list;
+  tc_prts    : (typeclass * (EcSymbols.symbol * EcSymbols.symbol) list) list;
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
   tc_loca    : is_local;
