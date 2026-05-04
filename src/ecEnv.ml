@@ -2788,14 +2788,60 @@ module Op = struct
     let _, (_, tcw) = List.betail tys in
 
     match as_seq1 tcw with
-    | TCIConcrete { path = tcipath; etyargs = tciargs; } -> begin
+    | TCIConcrete { path = tcipath; etyargs = tciargs; lift } -> begin
       let tci = TcInstance.by_path tcipath env in
 
-      match tci.tci_instance with
-      | `General (_, Some symbols) ->
-        (EcDecl.operator_as_tc op, (tciargs, (tci.tci_params, symbols)))
+      (* If the witness has [lift > 0], the path [tcipath] points to a
+         subclass instance, but the op being looked up belongs to an
+         ancestor [lift] steps up. Walk to that ancestor and find the
+         corresponding instance on the same carrier (synthesised by
+         [add_generic_instance]). *)
+      let walk_up (tc : typeclass) (n : int) : typeclass option =
+        let rec aux tc n =
+          if n = 0 then Some tc
+          else
+            let decl = TypeClass.by_path tc.tc_name env in
+            match decl.tc_prts with
+            | [] -> None
+            | parent :: _ ->
+              (* substitute child's tparams with tc's args *)
+              let subst =
+                List.fold_left2
+                  (fun s (a, _) etyarg -> Mid.add a etyarg s)
+                  Mid.empty decl.tc_tparams tc.tc_args in
+              let parent = EcCoreSubst.Tvar.subst_tc subst parent in
+              aux parent (n - 1)
+        in aux tc n in
+      let resolve_lifted () =
+        match tci.tci_instance with
+        | `General (tgp, _) when lift > 0 -> begin
+          match walk_up tgp lift with
+          | None -> None
+          | Some target ->
+            let carrier = tci.tci_type in
+            List.fold_left (fun acc (_, tci_existing) ->
+              match acc with
+              | Some _ -> acc
+              | None ->
+                match tci_existing.tci_instance with
+                | `General (tgp', Some sym)
+                  when EcPath.p_equal tgp'.tc_name target.tc_name
+                    && EcTypes.ty_equal tci_existing.tci_type carrier ->
+                    Some (tci_existing, sym)
+                | _ -> None)
+              None (TcInstance.get_all env)
+          end
+        | _ -> None in
 
-      | _ -> raise NotReducible
+      match resolve_lifted () with
+      | Some (tci_target, symbols) ->
+        (EcDecl.operator_as_tc op,
+         (tciargs, (tci_target.tci_params, symbols)))
+      | None ->
+        match tci.tci_instance with
+        | `General (_, Some symbols) ->
+          (EcDecl.operator_as_tc op, (tciargs, (tci.tci_params, symbols)))
+        | _ -> raise NotReducible
       end
 
     | _ ->
