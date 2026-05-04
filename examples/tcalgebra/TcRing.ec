@@ -136,15 +136,14 @@ end section.
 (* Commutative ring: addgroup + multiplicative commutative monoid +
    distributivity. Inherits both flavors of monoid; multi-parent.       *)
 (* ==================================================================== *)
-(* [comring] inherits the additive group structure (via addgroup) and
-   declares its multiplicative content directly: [oner], [( * )],
-   distributivity, etc. Both [<: addgroup & (mulmonoid with ...)]
-   variants of this declaration are supported by the framework
-   (the factory mechanism is wired up; see the regression test in
-   the framework's commit message), but the unifier needs an extra
-   pass to reliably pick which monoid view ([addmonoid] or [mulmonoid])
-   applies in goals that mention [( * )]. Until that lands, we keep
-   comring single-parent with multiplicative axioms re-stated.        *)
+(* [comring] is single-parent, declaring its multiplicative content
+   directly. The framework supports multi-parent via the factory
+   pattern [comring <: addgroup & (mulmonoid with ...)], but the
+   substitution of TC-bound type parameters into multi-bound carriers
+   doesn't always remap witness slot indices correctly when used at
+   abbrev-mediated lemma applications. Until that's resolved, comring
+   stays single-parent and re-states the multiplicative monoid axioms.
+   *)
 type class comring <: addgroup = {
   op oner  : comring
   op ( * ) : comring -> comring -> comring
