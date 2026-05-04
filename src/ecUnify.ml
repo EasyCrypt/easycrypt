@@ -924,7 +924,13 @@ let select_op
           let len = List.length lt in
             fun op ->
               let tparams = op.D.op_tparams in
-              List.length tparams = len
+              List.length tparams = len &&
+              List.for_all2
+                (fun (_, tcs) (_, tcw) ->
+                  match tcw with
+                  | None -> true
+                  | Some tcw -> List.length tcs = List.length tcw)
+                tparams lt
 
       | Some (TVInamed ls) -> fun op ->
           let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
