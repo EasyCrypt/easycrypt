@@ -10,20 +10,31 @@ open EcGenRegexp
 
 (* -------------------------------------------------------------------- *)
 module Position : sig
-  type cp_match = EcAst.cp_match
+  type cp_match = [
+    | `If
+    | `While
+    | `Match
+    | `Assign of lvmatch
+    | `AssignTuple of lvmatch
+    | `Sample of lvmatch
+    | `Call   of lvmatch
+  ]
 
-  type lvmatch = EcAst.lvmatch
+  and lvmatch = [ `LvmNone | `LvmVar of EcTypes.prog_var ]
 
   exception InvalidCPos
 
-  type cp_base = EcAst.cp_base
+  type cp_base = [
+    | `ByPos of int (* Always <> 0 *)
+    | `ByMatch of int option * cp_match
+  ]
 
   (* Branch selection *)
-  type codepos_brsel  = EcAst.codepos_brsel
+  type codepos_brsel  = [`Cond of bool | `Match of EcSymbols.symbol | `MatchByPos of int]
   type nm_codepos_brsel = [`Cond of bool | `Match of int]
 
   (* Linear code position inside a block *)
-  type codepos1 = EcAst.codepos1
+  type codepos1 = int * cp_base
 
   (* Normalized code position inside a block, always > 0 *)
   type nm_codepos1 = int
@@ -33,15 +44,15 @@ module Position : sig
   type nm_codepos_step = (int * nm_codepos_brsel)
 
   (* Block selection by codepos + branch selection *)
-  type codepos_path    = (codepos1 * codepos_brsel) list
+  type codepos_path    = codepos_step list
   type nm_codepos_path = nm_codepos_step list
 
   (* Full codeposition = path to block + position in block *)
-  type codepos    = EcAst.codepos
+  type codepos    = codepos_path * codepos1
   type nm_codepos = nm_codepos_path * nm_codepos1
 
   (* Code position offset *)
-  type codeoffset1 = EcAst.codeoffset1
+  type codeoffset1 = [`Relative of int | `Absolute of codepos1]
 
   (* Top-level first and last position *)
   val cpos_first : codepos

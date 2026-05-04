@@ -13,7 +13,7 @@ module PT = EcProofTerm
 (* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
-    (pos  : codepos)
+    (pos  : EcMatching.Position.codepos)
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =

@@ -179,7 +179,7 @@ let set_match_stmt (id : symbol) ((ue, mev, ptn) : _ * _ * form) =
     with EcProofTerm.FindOccFailure _ ->
       tc_error pe "cannot find an occurrence of the pattern"
 
-let t_set_match_r (side : oside) (cpos : codepos) (id : symbol) pattern tc =
+let t_set_match_r (side : oside) (cpos : Position.codepos) (id : symbol) pattern tc =
   let tr = fun side -> `SetMatch (side, cpos) in
   t_code_transform side cpos tr
     (t_zip (set_match_stmt id pattern)) tc

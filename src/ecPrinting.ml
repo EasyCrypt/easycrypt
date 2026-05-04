@@ -2541,7 +2541,7 @@ let pp_scvar ppe fmt vs =
   pp_list "@ " pp_grp fmt vs
 
 (* -------------------------------------------------------------------- *)
-let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : codepos1) =
+let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : CP.codepos1) =
   let s : string =
     match cp with
     | `ByPos i when i >= 0 ->
@@ -2578,10 +2578,10 @@ let pp_codepos1 (ppe : PPEnv.t) (fmt : Format.formatter) ((off, cp) : codepos1) 
     Format.fprintf fmt "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
 
 (* -------------------------------------------------------------------- *)
-let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : codeoffset1) =
+let pp_codeoffset1 (ppe : PPEnv.t) (fmt : Format.formatter) (offset : CP.codeoffset1) =
   match offset with
-  | `ByPosition p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
-  | `ByOffset o -> Format.fprintf fmt "%d" o
+  | `Absolute p -> Format.fprintf fmt "%a" (pp_codepos1 ppe) p
+  | `Relative o -> Format.fprintf fmt "%d" o
 
 let pp_codepos_brsel (fmt: Format.formatter) (br: CP.codepos_brsel) = 
   Format.fprintf fmt "%s"
@@ -2598,8 +2598,8 @@ let pp_codepos_path ppe =
   (pp_list "" (pp_codepos_step ppe))
 
 (* -------------------------------------------------------------------- *)
-let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : codepos) =
-  let pp_nm (fmt : Format.formatter) ((cp, bs) : codepos1 * codepos_brsel) =
+let pp_codepos (ppe : PPEnv.t) (fmt : Format.formatter) ((nm, cp1) : CP.codepos) =
+  let pp_nm (fmt : Format.formatter) ((cp, bs) : CP.codepos1 * CP.codepos_brsel) =
     let bs =
       match bs with
       | `Cond  true     -> "."

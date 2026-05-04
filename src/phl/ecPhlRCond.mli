@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcParsetree
-open EcAst
 open EcCoreGoal.FApi
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 module Low : sig

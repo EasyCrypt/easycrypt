@@ -11,6 +11,7 @@ open EcDecl
 open EcMemory
 open EcModules
 open EcFol
+open EcMatching.Position
 
 module MMsym = EcSymbols.MMsym
 module Sid   = EcIdent.Sid
@@ -3788,8 +3789,8 @@ and trans_codepos ?(memory : memory option) (env : EcEnv.env) ((cpath, p) : pcod
 (* -------------------------------------------------------------------- *)
 and trans_codeoffset1 ?(memory: memory option) (env : EcEnv.env) (o : pcodeoffset1) : codeoffset1 =
   match o with
-  | `Relative i -> `ByOffset i
-  | `Absolute p -> `ByPosition (trans_codepos1 ?memory env p)
+  | `Relative i -> `Relative i
+  | `Absolute p -> `Absolute (trans_codepos1 ?memory env p)
 
 (* -------------------------------------------------------------------- *)
 and trans_codepos_or_range ?(memory: memory option) (env : EcEnv.env) (cpor: pcodepos_or_range) : EcMatching.Position.codegap_range =
