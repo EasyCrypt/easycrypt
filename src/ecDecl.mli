@@ -174,7 +174,7 @@ val is_lemma  : axiom_kind -> bool
 (* -------------------------------------------------------------------- *)
 type tc_decl = {
   tc_tparams : ty_params;
-  tc_prt     : typeclass option;
+  tc_prts    : typeclass list;
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
   tc_loca    : is_local;

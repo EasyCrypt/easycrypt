@@ -3457,8 +3457,11 @@ let pp_tparams ppe fmt tparams =
   Format.fprintf fmt "%a"
     (pp_maybe (List.length tparams != 0) (pp_enclose ~pre:"[" ~post:"] ") (pp_list ",@ " (pp_tparam ppe))) tparams
 
-let pp_prt ppe =
-  pp_option (pp_enclose ~pre:" <: " ~post:"" (pp_typeclass ppe))
+let pp_prts ppe fmt = function
+  | [] -> ()
+  | tcs ->
+    Format.fprintf fmt " <: %a"
+      (pp_list "@ & " (pp_typeclass ppe)) tcs
 
 let pp_op ppe fmt (t, ty) =
   Format.fprintf fmt "  @[<hov 2>op %s :@ %a.@]"
@@ -3484,7 +3487,7 @@ let pp_tc_decl ppe fmt (p, tcdecl) =
   Format.fprintf fmt "@[<v>type class %a%a%a = {%a}.@]"
     (pp_tparams ppe) tcdecl.tc_tparams
     (pp_tyname ppe) p
-    (pp_prt ppe) tcdecl.tc_prt
+    (pp_prts ppe) tcdecl.tc_prts
     (pp_ops_axs ppe) (tcdecl.tc_ops, tcdecl.tc_axs)
 
 (* -------------------------------------------------------------------- *)

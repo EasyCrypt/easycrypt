@@ -179,17 +179,27 @@ let candidates_by_args (env : EcEnv.env) (tc : typeclass)
   in List.filter_map try_one (EcEnv.TcInstance.get_all env)
 
 (* -------------------------------------------------------------------- *)
-(* Flatten the parent chain of a typeclass: returns [tc; parent;
-   grandparent; ...] following [tc_prt]. Each ancestor's [tc_args] is
-   substituted using the child's [tc_tparams] mapping to its actual args. *)
-let rec ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
-  let decl = EcEnv.TypeClass.by_path tc.tc_name env in
-  match decl.tc_prt with
-  | None -> [tc]
-  | Some prt ->
+(* Flatten the parent DAG of a typeclass into a deduplicated list,
+   self first. With single-inheritance this is the linear chain
+   [tc; parent; grandparent; ...]; with multi-inheritance it's a
+   BFS walk: [tc; parent_1; ...; parent_n; ...grandparents...].
+   Each ancestor's [tc_args] is substituted along the path so the
+   args reference [tc]'s tparams. Duplicates are dropped (an ancestor
+   reachable via multiple paths appears once, at the shortest path). *)
+let ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
+  let parents (tc : typeclass) : typeclass list =
+    let decl = EcEnv.TypeClass.by_path tc.tc_name env in
     let subst =
       List.fold_left2
         (fun s (a, _) etyarg -> Mid.add a etyarg s)
         Mid.empty decl.tc_tparams tc.tc_args in
-    let prt = EcCoreSubst.Tvar.subst_tc subst prt in
-    tc :: ancestors env prt
+    List.map (EcCoreSubst.Tvar.subst_tc subst) decl.tc_prts in
+  let same (a : typeclass) (b : typeclass) =
+    EcPath.p_equal a.tc_name b.tc_name in
+  let rec bfs (frontier : typeclass list) (acc : typeclass list) =
+    match frontier with
+    | [] -> List.rev acc
+    | tc :: rest ->
+      if List.exists (same tc) acc then bfs rest acc
+      else bfs (rest @ parents tc) (tc :: acc)
+  in bfs [tc] []

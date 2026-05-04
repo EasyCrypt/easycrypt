@@ -1707,11 +1707,12 @@ typedecl:
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident inth=prefix(LTCOLON, tcparam)?
+| loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident
+  inth=prefix(LTCOLON, plist1(tcparam, AMP))?
   EQ LBRACE body=tc_body RBRACE {
     { ptc_name   = x;
       ptc_params = tya;
-      ptc_inth   = inth;
+      ptc_inth   = odfl [] inth;
       ptc_ops    = fst body;
       ptc_axs    = snd body;
       ptc_loca   = loca; }

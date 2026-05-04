@@ -1814,15 +1814,15 @@ module Ty = struct
       (* Check typeclasses arguments *)
       let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
 
-      let uptc =
+      let uptcs =
         let parent_ue = EcUnify.UniEnv.copy ue in
-        let uptc = tcd.ptc_inth |> omap (TT.transtc scenv parent_ue) in
+        let uptcs = List.map (TT.transtc scenv parent_ue) tcd.ptc_inth in
         let subst = Tuni.subst
           ~tw_uni:(EcUnify.UniEnv.tw_assubst parent_ue)
           (EcUnify.UniEnv.close parent_ue) in
-        omap (fun tcp ->
+        List.map (fun tcp ->
           { tcp with tc_args = List.map (EcCoreSubst.etyarg_subst subst) tcp.tc_args })
-          uptc in
+          uptcs in
 
       (* The carrier's [tcs] should reference the class being declared
          (so its own ops can be resolved via [Abs mypath, l=0]) and the
@@ -1833,7 +1833,7 @@ module Ty = struct
       let mypath = EcPath.pqname (path scope) name in
       let stub_tc : tc_decl = {
         tc_tparams = EcUnify.UniEnv.tparams ue;
-        tc_prt     = uptc;
+        tc_prts    = uptcs;
         tc_ops     = [];
         tc_axs     = [];
         tc_loca    = lc;
@@ -1902,7 +1902,7 @@ module Ty = struct
           tcd.ptc_axs |> List.map check1 in
 
       (* Construct actual type-class *)
-      { tc_prt = uptc; tc_tparams = EcUnify.UniEnv.tparams ue;
+      { tc_prts = uptcs; tc_tparams = EcUnify.UniEnv.tparams ue;
         tc_ops = operators; tc_axs = axioms; tc_loca = lc; }
     in
       bindclass scope (name, tclass)
