@@ -364,7 +364,7 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
         | `ByPath p -> begin
             match EcEnv.Ty.by_path_opt p env with
             | Some reftyd ->
-                let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) reftyd.tyd_params in
+                let tyargs = List.map (fun (x, _) -> tvar x) reftyd.tyd_params in
                 let body   = tconstr p tyargs in
                 let decl   =
                   { reftyd with
@@ -500,7 +500,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
           | `ByPath p -> begin
             match EcEnv.Op.by_path_opt p env with
             | Some ({ op_kind = OB_oper _ } as refop) ->
-                let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) refop.op_tparams in
+                let tyargs = List.map (fun (x, _) -> tvar x) refop.op_tparams in
                 let body =
                   if refop.op_clinline then
                     (match refop.op_kind with
@@ -627,7 +627,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
         | `ByPath p -> begin
           match EcEnv.Op.by_path_opt p env with
           | Some ({ op_kind = OB_pred _ } as refop) ->
-              let tyargs = List.map (fun (x, _) -> EcTypes.tvar x) refop.op_tparams in
+              let tyargs = List.map (fun (x, _) -> tvar x) refop.op_tparams in
               let body   =
                 if refop.op_clinline then
                   (match refop.op_kind with

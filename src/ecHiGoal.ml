@@ -572,7 +572,7 @@ let process_exacttype qs (tc : tcenv1) =
       tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
   in
   let tys =
-    List.map (fun (a, _) -> (EcTypes.tvar a, []))
+    List.map (fun (a, _) -> (tvar a, []))
       (EcEnv.LDecl.tohyps hyps).h_tvar in
   let pt = ptglobal ~tys p in
 

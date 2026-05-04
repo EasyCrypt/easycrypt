@@ -269,7 +269,7 @@ module Unify = struct
                   | false -> Hint.add map (i' :> int) (); false
         end
 
-        | _ -> EcTypes.ty_sub_exists doit t
+        | _ -> ty_sub_exists doit t
       in
         doit t
     in
@@ -492,7 +492,7 @@ module Unify = struct
             let from_ty = Tuni.univars a in
             List.fold_left (fun s w ->
               TyUni.Suid.union s
-                (EcTypes.tcw_fold
+                (tcw_fold
                    (fun s t -> TyUni.Suid.union s (Tuni.univars t))
                    TyUni.Suid.empty w))
               from_ty ws in
@@ -888,7 +888,7 @@ let unify_etyarg (env : EcEnv.env) (ue : unienv) (e1 : etyarg) (e2 : etyarg) =
 (* -------------------------------------------------------------------- *)
 let tfun_expected (ue : unienv) ?retty (psig : ty list) =
   let ret = match retty with Some t -> t | None -> UniEnv.fresh ue in
-  EcTypes.toarrow psig ret
+  toarrow psig ret
 
 (* -------------------------------------------------------------------- *)
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t

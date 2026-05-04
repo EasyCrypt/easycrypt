@@ -793,7 +793,7 @@ module MC = struct
           let schcase = dtype.tydt_schcase in
           let params  = etyargs_of_tparams tyd.tyd_params in
           let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr_tc mypath params) in
+            let aty = toarrow aty (tconstr_tc mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
             let cop = mk_op
                         ~opaque:optransparent (fst aty) (snd aty)
@@ -836,7 +836,7 @@ module MC = struct
           let nfields = List.length fields in
           let cfields =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr_tc mypath params) aty in
+              let aty = tfun (tconstr_tc mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
               let fop = mk_op ~opaque:optransparent (fst aty) (snd aty)
                           (Some (OP_Proj (mypath, i, nfields))) loca in
