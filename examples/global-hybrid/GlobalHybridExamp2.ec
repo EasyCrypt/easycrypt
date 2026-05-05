@@ -1,49 +1,45 @@
 (* GlobalHybridExamp2.ec *)
 
-(* We use theories/crypto/GlobalHybrid.ec for an example where the
-   cost of each hybrid step is an instance of the Decisional
-   Diffie-Hellman (DDH) assumption. *)
+(* We use theories/crypto/GlobalHybrid.ec for an example involving the
+   Decisional Diffie-Hellman (DDH) assumption, expressing security
+   as an equality. *)
 
-require import AllCore Real Distr DBool StdOrder StdBigop GlobalHybrid.
+require import AllCore Real Distr DBool StdOrder StdBigop.
 require import FMap PROM.
 import RealOrder Bigreal BRA.
+require GlobalHybrid.
+
+theory DDH.
+
+type input.  (* additional input *)
 
 (* group of keys *)
 
 type key.
 
 op (^^) : key -> key -> key.  (* binary operation *)
-
-op kid : key.  (* identity *)
-
-op kinv : key -> key.  (* inverse *)
+op kid  : key.                (* identity *)
+op kinv : key -> key.         (* inverse *)
 
 axiom kmulA (x y z : key) : x ^^ y ^^ z = x ^^ (y ^^ z).
-
-axiom kid_l (x : key) : kid ^^ x = x.
-
-axiom kid_r (x : key) : x ^^ kid = x.
-
-axiom kinv_l (x : key) : kinv x ^^ x = kid.
-
-axiom kinv_r (x : key) : x ^^ kinv x = kid.
+axiom kid_l (x : key)     : kid ^^ x = x.
+axiom kid_r (x : key)     : x ^^ kid = x.
+axiom kinv_l (x : key)    : kinv x ^^ x = kid.
+axiom kinv_r (x : key)    : x ^^ kinv x = kid.
 
 (* commutative semigroup of exponents *)
 
 type exp.
 
-op e : exp.  (* some exponent *)
-
+op e     : exp.  (* some exponent *)
 op ( * ) : exp -> exp -> exp.  (* multiplication *)
 
-axiom mulC (q r : exp) : q * r = r * q.
-
+axiom mulC (q r : exp)   : q * r = r * q.
 axiom mulA (q r s : exp) : q * r * s = q * (r * s).
 
 op [full uniform lossless] dexp : exp distr.
 
-op g : key.  (* generator *)
-
+op g   : key.  (* generator *)
 op (^) : key -> exp -> key.  (* exponentiation *)
 
 axiom double_exp_gen (q1 q2 : exp) : (g ^ q1) ^ q2 = g ^ (q1 * q2).
@@ -51,30 +47,88 @@ axiom double_exp_gen (q1 q2 : exp) : (g ^ q1) ^ q2 = g ^ (q1 * q2).
 (* DDH Adversary *)
 
 module type DDH_ADV = {
-  proc main(k1 k2 k3 : key) : bool
+  proc main(i : input, k1 k2 k3 : key) : bool
 }.
 
 (* the real DDH game *)
 
 module DDH1 (Adv : DDH_ADV) = {
-  proc main() : bool = {
+  proc main(i : input) : bool = {
     var b : bool; var q1, q2 : exp;
     q1 <$ dexp; q2 <$ dexp;
-    b <@ Adv.main(g ^ q1, g ^ q2, g ^ (q1 * q2));
+    b <@ Adv.main(i, g ^ q1, g ^ q2, g ^ (q1 * q2));
     return b;
   }
 }.
-  
+
 (* the ideal DDH game *)
 
 module DDH2 (Adv : DDH_ADV) = {
-  proc main() : bool = {
+  proc main(i : input) : bool = {
     var b : bool; var q1, q2, q3 : exp;
     q1 <$ dexp; q2 <$ dexp; q3 <$ dexp;
-    b <@ Adv.main(g ^ q1, g ^ q2 , g ^ q3);
+    b <@ Adv.main(i, g ^ q1, g ^ q2 , g ^ q3);
     return b;
   }
 }.
+
+end DDH.
+
+(* group of keys *)
+
+type key.
+
+op (^^) : key -> key -> key.  (* binary operation *)
+op kid  : key.                (* identity *)
+op kinv : key -> key.         (* inverse *)
+
+axiom kmulA (x y z : key) : x ^^ y ^^ z = x ^^ (y ^^ z).
+axiom kid_l (x : key)     : kid ^^ x = x.
+axiom kid_r (x : key)     : x ^^ kid = x.
+axiom kinv_l (x : key)    : kinv x ^^ x = kid.
+axiom kinv_r (x : key)    : x ^^ kinv x = kid.
+
+(* commutative semigroup of exponents *)
+
+type exp.
+
+op e     : exp.  (* some exponent *)
+op ( * ) : exp -> exp -> exp.  (* multiplication *)
+
+axiom mulC (q r : exp)   : q * r = r * q.
+axiom mulA (q r s : exp) : q * r * s = q * (r * s).
+
+op [full uniform lossless] dexp : exp distr.
+
+op g   : key.  (* generator *)
+op (^) : key -> exp -> key.  (* exponentiation *)
+
+axiom double_exp_gen (q1 q2 : exp) : (g ^ q1) ^ q2 = g ^ (q1 * q2).
+
+clone import DDH as DDH' with
+  type input <- int,  (* note *)
+  type key   <- key,
+  type exp   <- exp,
+  op (^^)    <- (^^),
+  op kid     <- kid,
+  op kinv    <- kinv,
+  op e       <- e,
+  op ( * )   <- ( * ),
+  op dexp    <- dexp,
+  op g       <- g,
+  op (^)     <- (^)
+proof *.
+realize kmulA. apply kmulA. qed.
+realize kid_l. apply kid_l. qed.
+realize kid_r. apply kid_r. qed.
+realize kinv_l. apply kinv_l. qed.
+realize kinv_r. apply kinv_r. qed.
+realize mulC. apply mulC. qed.
+realize mulA. apply mulA. qed.
+realize dexp_ll. apply dexp_ll. qed.
+realize dexp_uni. apply dexp_uni. qed.
+realize dexp_fu. apply dexp_fu. qed.
+realize double_exp_gen. apply double_exp_gen. qed.
 
 (* the real and ideal games let an adversary call an oracle
    m times before the returned results return a default value *)
@@ -92,20 +146,16 @@ module OrReal : OR = {
   var ctr : int
   var x, y : exp
 
-  proc init() : unit = {
-    ctr <- 0;
-  }
+  proc init() : unit = { ctr <- 1; }
 
   proc get() : key * key * key = {
     var r : key * key * key;
-    if (ctr < m) {
+    if (ctr <= m) {
       x <$ dexp; y <$ dexp;
       r <- (g ^ x, g ^ y, g ^ (x * y));
       ctr <- ctr + 1;
     }
-    else {
-      r <- witness;
-    }
+    else { r <- witness; }
     return r;
   }
 }.
@@ -115,21 +165,17 @@ module OrReal : OR = {
 module OrIdeal : OR = {
   var ctr : int
 
-  proc init() : unit = {
-    ctr <- 0;
-  }
+  proc init() : unit = { ctr <- 1; }
 
   proc get() : key * key * key = {
     var r : key * key * key;
     var x, y, z : exp;
-    if (ctr < m) {
+    if (ctr <= m) {
       x <$ dexp; y <$ dexp; z <$ dexp;
       r <- (g ^ x, g ^ y, g ^ z);
       ctr <- ctr + 1;
     }
-    else {
-      r <- witness;
-    }
+    else { r <- witness; }
     return r;
   }
 }.
@@ -165,7 +211,7 @@ module GIdeal(Adv : ADV) = {
 (* our reduction to DDH *)
 
 module Reduct(Adv : ADV) : DDH_ADV = {
-  var i : int  (* needs to be a global to support game hoping *)
+  var i : int
   var u, v, w : key
 
   module Or = {
@@ -176,75 +222,82 @@ module Reduct(Adv : ADV) : DDH_ADV = {
     proc get() : key * key * key = {
       var r : key * key * key;
       var x, y, z : exp;
-      if (ctr < m) {
-        if (ctr + 1 < i) {
+      if (ctr <= m) {
+        if (ctr < i) {
           x <$ dexp; y <$ dexp; z <$ dexp;
           r <- (g ^ x, g ^ y, g ^ z);
         }
-        elif (ctr + 1 = i) {
-          r <- (u, v, w);
-        }
+        elif (ctr = i) { r <- (u, v, w); }
         else {
           x <$ dexp; y <$ dexp;
           r <- (g ^ x, g ^ y, g ^ (x * y));
         }
         ctr <- ctr + 1;
       }
-      else {
-        r <- witness;
-      }
+      else { r <- witness; }
       return r;
     }
   }
 
-  proc main(u' : key, v' : key, w' : key) : bool = {
-    var b : bool;
-    Or.ctr <- 0;
-    u <- u'; v <- v'; w <- w';
+  proc main(i' : int, u' : key, v' : key, w' : key) : bool = {
+    var b : bool; var x : unit;
+    Or.ctr <- 1;
+    i <- i'; u <- u'; v <- v'; w <- w';
     b <@ Adv(Or).disting();
     return b;
   }
 }.
 
-(* the reduction composed with DDH1 *)
-
-module DDH1Reduct(Adv : ADV) = {
-  proc main(i : int) : bool = {
-    var b : bool;
-    Reduct.i <- i;  (* so value of Reduct.i in memory irrelevant *)
-    b <@ DDH1(Reduct(Adv)).main();
-    return b;
-  }
-}.
-    
-(* the reduction composed with DDH2 *)
-
-module DDH2Reduct(Adv : ADV) = {
-  proc main(i : int) : bool = {
-    var b : bool;
-    Reduct.i <- i;  (* so value of Reduct.i in memory irrelevant *)
-    b <@ DDH2(Reduct(Adv)).main();
-    return b;
-  }
-}.
-
-(* our goal is to prove:
+(* We will prove security with an exact upper bound:
 
 lemma GReal_GIdeal (Adv <: ADV{-OrReal, -OrIdeal, -Reduct}) &m :
   `|Pr[GReal(Adv).main() @ &m : res] -
-    Pr[GIdeal(Adv).main() @ &m : res]| <=
-  bigi predT
-  (fun i =>
-   `|Pr[DDH1Reduct(Adv).main(i) @ &m : res] -
-     Pr[DDH2Reduct(Adv).main(i) @ &m : res]|)
-  1 (m + 1).
+    Pr[GIdeal(Adv).main() @ &m : res]| =
+  m%r *
+  `|bigi predT
+    (fun (i : int) =>
+       Pr[DDH1(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1) -
+    bigi predT
+    (fun (i : int) =>
+       Pr[DDH2(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1)|.
 *)
 
 section.
 
+local clone GlobalHybrid as GH with
+  type input <- unit
+proof *.
+
+local clone GH.Param as GHP with
+  type or_input  <- unit,
+  type or_output <- key * key * key
+proof *.
+
 declare module Adv <: ADV{-OrReal, -OrIdeal, -Reduct}.
 
-local module Hybrid : HYBRID = {
+local module DDHOr1 : GHP.OR = {  (* real *)
+  proc init() : unit = { }
+
+  proc f() : key * key * key = {
+    var x, y : exp;
+    x <$ dexp; y <$ dexp;
+    return (g ^ x, g ^ y, g ^ (x * y));
+  }
+}.
+
+local module DDHOr2 : GHP.OR = {  (* ideal *)
+  proc init() : unit = { }
+
+  proc f() : key * key * key = {
+    var x, y, z : exp;
+    x <$ dexp; y <$ dexp; z <$ dexp;
+    return (g ^ x, g ^ y, g ^ z);
+  }
+}.
+
+local module (Hybrid : GHP.HYBRID_PARAM) (GHOr : GHP.OR) = {
   var i : int
 
   module Or = {
@@ -257,68 +310,94 @@ local module Hybrid : HYBRID = {
     proc get() : key * key * key = {
       var r : key * key * key;
       var x, y, z : exp;
-      if (ctr < m) {
-        if (ctr + 1 < i) {
+      if (ctr <= m) {
+        if (ctr < i) {
           x <$ dexp; y <$ dexp; z <$ dexp;  (* ideal *)
           r <- (g ^ x, g ^ y, g ^ z);
         }
+        elif (ctr = i) { r <@ GHOr.f(); }
         else {
           x <$ dexp; y <$ dexp;  (* real *)
           r <- (g ^ x, g ^ y, g ^ (x * y));
         }
         ctr <- ctr + 1;
       }
-      else {
-        r <- witness;
-      }
+      else { r <- witness; }
       return r;
     }
   }
 
   (* i' should be between 1 and m + 1 *)
 
-  proc main(i' : int) : bool = {
+  proc main(x : unit, i' : int) : bool = {
     var b : bool;
-    i <- i'; Or.ctr <- 0;
+    i <- i'; Or.ctr <- 1;
     b <@ Adv(Or).disting();
     return b;
   }
 }.
 
 local lemma GReal_Hybrid &m :
-  Pr[GReal(Adv).main() @ &m : res] = Pr[Hybrid.main(1) @ &m : res].
+  Pr[GReal(Adv).main() @ &m : res] =
+  Pr[GHP.Exper(Hybrid, DDHOr1).main((), 1) @ &m : res].
 proof.
-byequiv => //; proc; inline.
-seq 1 2 :
+byequiv => //; proc; inline; wp.
+seq 1 4 :
   (={glob Adv} /\ OrReal.ctr{1} = Hybrid.Or.ctr{2} /\
-   OrReal.ctr{1} = 0 /\ Hybrid.i{2} = 1); first auto.
+   OrReal.ctr{1} = 1 /\ Hybrid.i{2} = 1); first auto.
 call
-  (_ :
+  (:
    OrReal.ctr{1} = Hybrid.Or.ctr{2} /\
-   0 <= OrReal.ctr{1} <= m /\ Hybrid.i{2} = 1).
-proc; if => //.
+   1 <= OrReal.ctr{1} <= m + 1 /\ Hybrid.i{2} = 1);
+  last auto; smt(ge1_m).
+proc; if => //; last auto; smt(ge1_m).
 rcondf{2} 1; first auto; smt().
-auto; smt().
-auto.
-auto; smt(ge1_m).
+by if{2}; [inline{2} 1; auto; smt() | auto; smt()].
 qed.
 
 local lemma Hybrid_GIdeal &m :
-  Pr[Hybrid.main(m + 1) @ &m : res] = Pr[GIdeal(Adv).main() @ &m : res].
+  Pr[GHP.Exper(Hybrid, DDHOr1).main((), m + 1) @ &m : res] =
+  Pr[GIdeal(Adv).main() @ &m : res].
 proof.
-byequiv => //; proc; inline.
-seq 2 1 :
+byequiv => //; proc; inline; wp.
+seq 4 1 :
   (={glob Adv} /\ Hybrid.Or.ctr{1} = OrIdeal.ctr{2} /\
-   OrIdeal.ctr{2} = 0 /\ Hybrid.i{1} = m + 1); first auto.
+   OrIdeal.ctr{2} = 1 /\ Hybrid.i{1} = m + 1); first auto.
 call
-  (_ :
+  (:
    Hybrid.Or.ctr{1} = OrIdeal.ctr{2} /\
-   0 <= OrIdeal.ctr{2} <= m /\ Hybrid.i{1} = m + 1).
-proc; if => //.
+   0 <= OrIdeal.ctr{2} <= m + 1 /\ Hybrid.i{1} = m + 1);
+  last auto; smt(ge1_m).
+proc; if => //; last auto.
 rcondt{1} 1; first auto; smt().
-auto; smt().
-auto.
-auto; smt(ge1_m).
+by auto; smt().
+qed.
+
+local lemma Hybrid_step (j : int) &m :
+  1 <= j <= m =>
+  Pr[GHP.Exper(Hybrid, DDHOr2).main((), j) @ &m : res] =
+  Pr[GHP.Exper(Hybrid, DDHOr1).main((), j + 1) @ &m : res].
+proof.
+move => j_rng; byequiv => //; proc; inline; wp.
+seq 4 4 :
+  (Hybrid.i{1} = j /\ Hybrid.i{2} = j + 1 /\
+   Hybrid.Or.ctr{1} = 1 /\ ={glob Adv, Hybrid.Or.ctr});
+  first auto.
+call
+  (:
+   ={Hybrid.Or.ctr} /\ Hybrid.i{1} = j /\
+   Hybrid.i{2} = j + 1 /\ 1 <= Hybrid.Or.ctr{1} <= m + 1);
+  last auto; smt().
+proc.
+if => //; last auto.
+if{1}.
++ rcondt{2} 1; first auto; smt().
+  by auto; smt().
+if{1}.
++ rcondt{2} 1; first auto; smt().
+  by inline{1} 1; auto; smt().
+rcondf{2} 1; first auto; smt().
+by if{2}; [inline{2} 1; auto; smt() | auto; smt()].
 qed.
 
 (* in our sequences of games, we need to shift from lazy to eager
@@ -330,19 +409,18 @@ local clone FullRO with
   type in_t    <- ro_in_t,
   type out_t   <- exp,
   op dout      <- fun _ => dexp,
-  type d_in_t  <- unit,
+  type d_in_t  <- int,
   type d_out_t <- bool
 proof *.
 
 (* first, the sequence of games proving:
 
-   1 <= i < m + 1 => Reduct.i{m} = i =>
-   Pr[Hybrid.main(i) @ &m : res] =
-   Pr[DDH1(Reduct(Adv)).main() @ &m : res] *)
+   1 <= i < m + 1 =>
+   Pr[GHP.Exper(Hybrid, DDHOr1).main((), i) @ &m : res] =
+   Pr[DDH1(Reduct(Adv)).main((), i) @ &m : res]. *)
 
 local module (RO_Disting1 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
   var i : int
-  var u, v, w : key
 
   module Or = {
     var ctr : int
@@ -352,12 +430,12 @@ local module (RO_Disting1 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
     proc get() : key * key * key = {
       var r : key * key * key;
       var x, y, z : exp;
-      if (ctr < m) {
-        if (ctr + 1 < i) {
+      if (ctr <= m) {
+        if (ctr < i) {
           x <$ dexp; y <$ dexp; z <$ dexp;
           r <- (g ^ x, g ^ y, g ^ z);
         }
-        elif (ctr + 1 = i) {
+        elif (ctr = i) {
           x <@ RO.get(A); y <@ RO.get(B);
           r <- (g ^ x, g ^ y, g ^ (x * y));
         }
@@ -367,136 +445,130 @@ local module (RO_Disting1 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
         }
         ctr <- ctr + 1;
       }
-      else {
-        r <- witness;
-      }
+      else { r <- witness; }
       return r;
     }
   }
 
-  proc distinguish() : bool = {
+  proc distinguish(i' : int) : bool = {
     var b : bool;
-    Or.ctr <- 0;
-    RO.sample(A); RO.sample(B); RO.sample(C);
+    i <- i'; Or.ctr <- 1;
+    RO.sample(A); RO.sample(B);
     b <@ Adv(Or).disting();
     return b;
   }
 }.
 
-local lemma Hybrid_MainD_RO_Disting1_RO (i : int) :
-  1 <= i < m + 1 =>
+local lemma Hybrid_DDHOr1_MainD_RO_Disting1_RO (i' : int) :
+  1 <= i' < m + 1 =>
   equiv
-  [Hybrid.main ~
+  [GHP.Exper(Hybrid, DDHOr1).main ~
    FullRO.MainD(RO_Disting1, FullRO.RO).distinguish :
-   ={glob Adv} /\ i'{1} = i /\ RO_Disting1.i{2} = i ==>
+   ={glob Adv} /\ i{1} = i' /\ x{2} = i' ==>
    ={res}].
 proof.
-move => [ge1_i le_i_m]; rewrite ltzS in le_i_m.
+move => [ge1_i' le_i'_m]; rewrite ltzS in le_i'_m.
 transitivity
-  FullRO.MainD(RO_Disting1, FullRO.LRO).distinguish 
-  (={glob Adv} /\ i'{1} = i /\ RO_Disting1.i{2} = i ==> ={res})
-  (={glob Adv} /\ ={glob RO_Disting1} ==> ={res}) => //.
-progress.
-by exists (glob Adv){2} arg{1} RO_Disting1.u{2} RO_Disting1.v{2}
-          RO_Disting1.w{2} RO_Disting1.Or.ctr{2}.
-proc; inline*; wp.
-seq 2 6 :
-  (={glob Adv} /\ Hybrid.i{1} = i /\ RO_Disting1.i{2} = i /\
-   Hybrid.Or.ctr{1} = 0 /\ RO_Disting1.Or.ctr{2} = 0 /\
-   FullRO.RO.m{2} = empty); first auto.
-call
-  (_ :
-   Hybrid.Or.ctr{1} = RO_Disting1.Or.ctr{2} /\
-   0 <= Hybrid.Or.ctr{1} <= m /\
-   Hybrid.i{1} = i /\ RO_Disting1.i{2} = i /\
-   (Hybrid.Or.ctr{1} + 1 <= i => FullRO.RO.m{2} = empty)).
-proc; if => //.
-case (Hybrid.Or.ctr{1} + 1 = Hybrid.i{1}).
-rcondf{1} 1; first auto.
-rcondf{2} 1; first auto; smt().
-rcondt{2} 1; first auto.
-wp; inline*.
-swap{2} 2 -1; swap{2} 6 -4. 
-seq 2 3 :
-  (#pre /\ x{1} = r0{2} /\ y{1} = r1{2} /\
-   x0{2} = A); first auto.
-rcondt{2} 1; first auto; smt(mem_empty).
-sp 0 3.
-rcondt{2} 1; first auto; smt(mem_set mem_empty).
-auto; smt(get_set_sameE).
-if => //; first auto; smt().
-rcondf{2} 1; first auto.
-auto; smt().
-auto.
-auto.
-smt(ge1_m).
+  FullRO.MainD(RO_Disting1, FullRO.LRO).distinguish
+  (={glob Adv} /\ i{1} = i' /\ x{2} = i' ==> ={res})
+  (={glob RO_Disting1, x} ==> ={res}) => //; first smt().
++ proc; inline*; wp.
+  seq 4 6 :
+    (={glob Adv} /\ Hybrid.i{1} = i' /\ RO_Disting1.i{2} = i' /\
+     Hybrid.Or.ctr{1} = 1 /\ RO_Disting1.Or.ctr{2} = 1 /\
+     FullRO.RO.m{2} = empty); first auto.
+  call
+    (:
+     Hybrid.Or.ctr{1} = RO_Disting1.Or.ctr{2} /\
+     1 <= Hybrid.Or.ctr{1} <= m + 1 /\
+     Hybrid.i{1} = i' /\ RO_Disting1.i{2} = i' /\
+     (Hybrid.Or.ctr{1} <= i' => FullRO.RO.m{2} = empty));
+    last auto; smt().
+  proc.
+  if => //; last auto.
+  if => //; first auto; smt().
+  if => //; last auto; smt().
+  inline*; swap{2} 2 -1; swap{2} 6 -4.
+  seq 2 3 :
+    (#pre /\ x0{1} = r0{2} /\ y0{1} = r1{2} /\
+     x0{2} = A); first auto.
+  rcondt{2} 1; first auto; smt(mem_empty).
+  sp 0 3.
+  rcondt{2} 1; first auto; smt(mem_set mem_empty).
+  by auto; smt(get_set_sameE).
 symmetry.
 conseq (FullRO.FullEager.RO_LRO RO_Disting1 _) => //.
-move => _; apply dexp_ll.
+by move => _; apply dexp_ll.
 qed.
 
-local lemma MainD_RO_Disting1_RO_DDH1_Reduct :
+local lemma MainD_RO_Disting1_RO_DDH1_Reduct (i' : int) :
+  1 <= i' < m + 1 =>
   equiv
   [FullRO.MainD(RO_Disting1, FullRO.RO).distinguish ~
    DDH1(Reduct(Adv)).main :
-   ={glob Adv} /\ RO_Disting1.i{1} = Reduct.i{2} ==>
+   ={glob Adv} /\ x{1} = i' /\ i{2} = i' ==>
    ={res}].
 proof.
-proc; inline*; wp.
-swap{1} 6 -5; swap{1} 10 -8; swap{1} 14 -11.
-seq 15 9 :
-  (={glob Adv} /\ RO_Disting1.i{1} = Reduct.i{2} /\
+move => [ge1_i' le_i'_m]; rewrite ltzS in le_i'_m.
+proc; inline*; wp; swap{1} 7 -6; swap{1} 11 -9.
+seq 2 2 : (#pre /\ r0{1} = q1{2} /\ r1{1} = q2{2});
+  first auto.
+seq 10 9 :
+  (={glob Adv} /\
+   RO_Disting1.i{1} = i' /\ Reduct.i{2} = i' /\
    RO_Disting1.Or.ctr{1} = Reduct.Or.ctr{2} /\
    FullRO.RO.m{1}.[A] = Some q1{2} /\
    FullRO.RO.m{1}.[B] = Some q2{2} /\
    Reduct.u{2} = g ^ q1{2} /\
    Reduct.v{2} = g ^ q2{2} /\
    Reduct.w{2} = g ^ (q1{2} * q2{2})).
-wp => /=; rnd{1}; rnd; rnd.
-auto; smt(get_setE mem_set mem_empty).
++ by auto; smt(get_setE mem_set mem_empty).
 exlim q1{2}, q2{2} => q1_R q2_R.
 call
-  (_ :
-   RO_Disting1.i{1} = Reduct.i{2} /\
+  (:
+   RO_Disting1.i{1} = i' /\
+   Reduct.i{2} = i' /\
    RO_Disting1.Or.ctr{1} = Reduct.Or.ctr{2} /\
    FullRO.RO.m{1}.[A] = Some q1_R /\
    FullRO.RO.m{1}.[B] = Some q2_R /\
    Reduct.u{2} = g ^ q1_R /\
    Reduct.v{2} = g ^ q2_R /\
-   Reduct.w{2} = g ^ (q1_R * q2_R)).
-proc; if => //.
-if => //; first auto.
-if => //.
-wp; inline*; auto; smt(get_setE).
-auto.
-auto.
-auto.
+   Reduct.w{2} = g ^ (q1_R * q2_R)); last auto.
+proc.
+if => //; last auto.
+if => //; first auto; smt().
+if => //; last auto.
+inline*.
+rcondf{1} 3; first auto; smt().
+rcondf{1} 6; first auto; smt().
+by auto; smt().
 qed.
 
-local lemma Hybrid_DDH1_Reduct (i : int) &m :
-  1 <= i < m + 1 => Reduct.i{m} = i =>
-  Pr[Hybrid.main(i) @ &m : res] =
-  Pr[DDH1(Reduct(Adv)).main() @ &m : res].
+local lemma reduct1 (i' : int) &m :
+  1 <= i' < m + 1 =>
+  Pr[GHP.Exper(Hybrid, DDHOr1).main((), i') @ &m : res] =
+  Pr[DDH1(Reduct(Adv)).main(i') @ &m : res].
 proof.
-move => i_bnd Reduct_i_eq_i.
-byequiv (_ : ={glob Adv} /\ i'{1} = i /\ Reduct.i{2} = i ==> _) => //.
+move => i'_rng.
+byequiv
+  (: ={glob Adv} /\ i{1} = i' /\ i{2} = i' ==> _) => //.
 transitivity
   FullRO.MainD(RO_Disting1, FullRO.RO).distinguish
-  (={glob Adv} /\ i'{1} = i /\ RO_Disting1.i{2} = i ==> ={res})
-  (={glob Adv} /\ RO_Disting1.i{1} = Reduct.i{2} ==> ={res}) => //.
-progress; by exists (glob Adv){2} arg{1}.
-by apply Hybrid_MainD_RO_Disting1_RO.
+  (={glob Adv} /\ i{1} = i' /\ x{2} = i' ==> ={res})
+  (={glob Adv} /\ x{1} = i' /\ i{2} = i' ==> ={res}) => //.
+by smt().
+by apply Hybrid_DDHOr1_MainD_RO_Disting1_RO.
 by apply MainD_RO_Disting1_RO_DDH1_Reduct.
 qed.
 
-(* next the sequence of games proving:
-   1 <= i < m + 1 => Reduct.i{m} = i =>
-   Pr[Hybrid.main(i + 1) @ &m : res] =
-   Pr[DDH2(Reduct(Adv)).main() @ &m : res] *)
+(* second, the sequence of games proving:
+
+   1 <= i < m + 1 =>
+   Pr[GHP.Exper(Hybrid, DDHOr2).main((), i) @ &m : res] =
+   Pr[DDH2(Reduct(Adv)).main((), i) @ &m : res]. *)
 
 local module (RO_Disting2 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
   var i : int
-  var u, v, w : key
 
   module Or = {
     var ctr : int
@@ -506,12 +578,12 @@ local module (RO_Disting2 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
     proc get() : key * key * key = {
       var r : key * key * key;
       var x, y, z : exp;
-      if (ctr < m) {
-        if (ctr + 1 < i) {
+      if (ctr <= m) {
+        if (ctr < i) {
           x <$ dexp; y <$ dexp; z <$ dexp;
           r <- (g ^ x, g ^ y, g ^ z);
         }
-        elif (ctr + 1 = i) {
+        elif (ctr = i) {
           x <@ RO.get(A); y <@ RO.get(B); z <@ RO.get(C);
           r <- (g ^ x, g ^ y, g ^ z);
         }
@@ -521,84 +593,80 @@ local module (RO_Disting2 : FullRO.RO_Distinguisher) (RO : FullRO.RO) = {
         }
         ctr <- ctr + 1;
       }
-      else {
-        r <- witness;
-      }
+      else { r <- witness; }
       return r;
     }
   }
 
-  proc distinguish() : bool = {
+  proc distinguish(i' : int) : bool = {
     var b : bool;
-    Or.ctr <- 0;
+    i <- i'; Or.ctr <- 1;
     RO.sample(A); RO.sample(B); RO.sample(C);
     b <@ Adv(Or).disting();
     return b;
   }
 }.
 
-local lemma Hybrid_MainD_RO_Disting2_RO (i : int) :
-  1 <= i < m + 1 =>
+local lemma Hybrid_DDHOr2_MainD_RO_Disting2_RO (i' : int) :
+  1 <= i' < m + 1 =>
   equiv
-  [Hybrid.main ~
+  [GHP.Exper(Hybrid, DDHOr2).main ~
    FullRO.MainD(RO_Disting2, FullRO.RO).distinguish :
-   ={glob Adv} /\ i'{1} = i + 1 /\ RO_Disting2.i{2} = i ==>
+   ={glob Adv} /\ i{1} = i' /\ x{2} = i' ==>
    ={res}].
 proof.
-move => [ge1_i le_i_m]; rewrite ltzS in le_i_m.
+move => [ge1_i' le_i'_m]; rewrite ltzS in le_i'_m.
 transitivity
-  FullRO.MainD(RO_Disting2, FullRO.LRO).distinguish 
-  (={glob Adv} /\ i'{1} = i + 1 /\ RO_Disting2.i{2} = i ==> ={res})
-  (={glob Adv} /\ ={glob RO_Disting2} ==> ={res}) => //.
-progress.
-by exists (glob Adv){2} RO_Disting2.i{2} RO_Disting2.u{2} RO_Disting2.v{2}
-          RO_Disting2.w{2} RO_Disting2.Or.ctr{2}.
-proc; inline*; wp.
-seq 2 6 :
-  (={glob Adv} /\ Hybrid.i{1} = i + 1 /\ RO_Disting2.i{2} = i /\
-   Hybrid.Or.ctr{1} = 0 /\ RO_Disting2.Or.ctr{2} = 0 /\
-   FullRO.RO.m{2} = empty); first auto.
-call
-  (_ :
-   Hybrid.Or.ctr{1} = RO_Disting2.Or.ctr{2} /\
-   0 <= Hybrid.Or.ctr{1} <= m /\
-   Hybrid.i{1} = i + 1 /\ RO_Disting2.i{2} = i /\
-   (Hybrid.Or.ctr{1} + 1 <= i => FullRO.RO.m{2} = empty)).
-proc; if => //.
-if{1}.
-if{2}; first auto; smt().
-rcondt{2} 1; first auto; smt().
-wp; inline*; swap{2} 2 -1; swap{2} 6 -4; swap{2} 10 -7.
-seq 3 4 :
-  (#pre /\ x{1} = r0{2} /\ y{1} = r1{2} /\ z{1} = r2{2} /\
-   x0{2} = A); first auto.
-rcondt{2} 1; first auto; smt(mem_empty).
-sp 0 3.
-rcondt{2} 1; first auto; smt(mem_set mem_empty).
-sp 0 3.
-rcondt{2} 1; first auto; smt(mem_set mem_empty).
-auto; smt(get_set_sameE).
-rcondf{2} 1; first auto; smt().
-rcondf{2} 1; first auto; smt().
-auto; smt().
-auto.
-auto; smt(ge1_m).
+  FullRO.MainD(RO_Disting2, FullRO.LRO).distinguish
+  (={glob Adv} /\ i{1} = i' /\ x{2} = i' ==> ={res})
+  (={glob RO_Disting2, x} ==> ={res}) => //; first smt().
++ proc; inline*; wp.
+  seq 4 7 :
+    (={glob Adv} /\ Hybrid.i{1} = i' /\ RO_Disting2.i{2} = i' /\
+     Hybrid.Or.ctr{1} = 1 /\ RO_Disting2.Or.ctr{2} = 1 /\
+     FullRO.RO.m{2} = empty); first auto.
+  call
+    (:
+     Hybrid.Or.ctr{1} = RO_Disting2.Or.ctr{2} /\
+     1 <= Hybrid.Or.ctr{1} <= m + 1 /\
+     Hybrid.i{1} = i' /\ RO_Disting2.i{2} = i' /\
+     (Hybrid.Or.ctr{1} <= i' => FullRO.RO.m{2} = empty));
+    last auto; smt().
+  proc.
+  if => //; last auto.
+  if => //; first auto; smt().
+  if => //; last auto; smt().
+  inline*; swap{2} 2 -1; swap{2} 6 -4; swap{2} 10 -7.
+  seq 3 4 :
+    (#pre /\ x0{1} = r0{2} /\ y0{1} = r1{2} /\
+     z0{1} = r2{2} /\ x0{2} = A); first auto.
+  rcondt{2} 1; first auto; smt(mem_empty).
+  sp 0 3.
+  rcondt{2} 1; first auto; smt(mem_set mem_empty).
+  sp 0 3.
+  rcondt{2} 1; first auto; smt(mem_set mem_empty).
+  auto; smt(get_set_sameE).
 symmetry.
 conseq (FullRO.FullEager.RO_LRO RO_Disting2 _) => //.
-move => _; apply dexp_ll.
+by move => _; apply dexp_ll.
 qed.
 
-local lemma MainD_RO_Disting2_RO_DDH2_Reduct :
+local lemma MainD_RO_Disting2_RO_DDH2_Reduct (i' : int) :
+  1 <= i' < m + 1 =>
   equiv
   [FullRO.MainD(RO_Disting2, FullRO.RO).distinguish ~
    DDH2(Reduct(Adv)).main :
-   ={glob Adv} /\ RO_Disting2.i{1} = Reduct.i{2} ==>
+   ={glob Adv} /\ x{1} = i' /\ i{2} = i' ==>
    ={res}].
 proof.
-proc; inline*; wp.
-swap{1} 6 -5; swap{1} 10 -8; swap{1} 14 -11.
-seq 15 10 :
-  (={glob Adv} /\ RO_Disting2.i{1} = Reduct.i{2} /\
+move => [ge1_i' le_i'_m]; rewrite ltzS in le_i'_m.
+proc; inline*; wp; swap{1} 7 -6; swap{1} 11 -9; swap{1} 15 -12.
+seq 3 3 :
+  (#pre /\ r0{1} = q1{2} /\ r1{1} = q2{2} /\
+   r2{1} = q3{2}); first auto.
+seq 13 9 :
+  (={glob Adv} /\
+   RO_Disting2.i{1} = i' /\ Reduct.i{2} = i' /\
    RO_Disting2.Or.ctr{1} = Reduct.Or.ctr{2} /\
    FullRO.RO.m{1}.[A] = Some q1{2} /\
    FullRO.RO.m{1}.[B] = Some q2{2} /\
@@ -606,100 +674,93 @@ seq 15 10 :
    Reduct.u{2} = g ^ q1{2} /\
    Reduct.v{2} = g ^ q2{2} /\
    Reduct.w{2} = g ^ q3{2}).
-wp => /=; rnd; rnd; rnd.
-auto; smt(get_setE mem_set mem_empty).
++ auto; smt(get_setE mem_set mem_empty).
 exlim q1{2}, q2{2}, q3{2} => q1_R q2_R q3_R.
 call
-  (_ :
-   RO_Disting2.i{1} = Reduct.i{2} /\
+  (:
+   RO_Disting2.i{1} = i' /\
+   Reduct.i{2} = i' /\
    RO_Disting2.Or.ctr{1} = Reduct.Or.ctr{2} /\
    FullRO.RO.m{1}.[A] = Some q1_R /\
    FullRO.RO.m{1}.[B] = Some q2_R /\
    FullRO.RO.m{1}.[C] = Some q3_R /\
    Reduct.u{2} = g ^ q1_R /\
    Reduct.v{2} = g ^ q2_R /\
-   Reduct.w{2} = g ^ q3_R).
-proc; if => //.
-if => //; first auto.
-if => //; first wp; inline*; auto; smt(get_setE).
-auto.
-auto.
-auto.
+   Reduct.w{2} = g ^ q3_R); last auto.
+proc.
+if => //; last auto.
+if => //; first auto; smt().
+if => //; last auto.
+inline*.
+rcondf{1} 3; first auto; smt().
+rcondf{1} 6; first auto; smt().
+rcondf{1} 9; first auto; smt().
+by auto; smt().
 qed.
 
-local lemma Hybrid_DDH2_Reduct (i : int) &m :
-  1 <= i < m + 1 => Reduct.i{m} = i =>
-  Pr[Hybrid.main(i + 1) @ &m : res] =
-  Pr[DDH2(Reduct(Adv)).main() @ &m : res].
+local lemma reduct2 (i' : int) &m :
+  1 <= i' < m + 1 =>
+  Pr[GHP.Exper(Hybrid, DDHOr2).main((), i') @ &m : res] =
+  Pr[DDH2(Reduct(Adv)).main(i') @ &m : res].
 proof.
-move => i_bnd H.
-byequiv (_ : ={glob Adv} /\ i'{1} = i + 1 /\ Reduct.i{2} = i ==> _) => //.
+move => i'_rng.
+byequiv
+  (: ={glob Adv} /\ i{1} = i' /\ i{2} = i' ==> _) => //.
 transitivity
   FullRO.MainD(RO_Disting2, FullRO.RO).distinguish
-  (={glob Adv} /\ i'{1} = i + 1 /\ RO_Disting2.i{2} = i ==> ={res})
-  (={glob Adv} /\ RO_Disting2.i{1} = Reduct.i{2} ==> ={res}) => //.
-progress; by exists (glob Adv){2} Reduct.i{2}.
-by apply (Hybrid_MainD_RO_Disting2_RO i).
+  (={glob Adv} /\ i{1} = i' /\ x{2} = i' ==> ={res})
+  (={glob Adv} /\ x{1} = i' /\ i{2} = i' ==> ={res}) => //.
+by smt().
+by apply Hybrid_DDHOr2_MainD_RO_Disting2_RO.
 by apply MainD_RO_Disting2_RO_DDH2_Reduct.
-qed.
-
-local lemma Hybrid_DDH1Reduct (i' : int) &m :
-  1 <= i' < m + 1 =>
-  Pr[Hybrid.main(i') @ &m : res] =
-  Pr[DDH1Reduct(Adv).main(i') @ &m : res].
-proof.
-move => ge1_i'_lt_m_plus1.
-rewrite eq_sym.
-byphoare (_ : i = i' /\ glob Adv = (glob Adv){m} ==> _) => //.
-proc; sp.
-call (_ : Reduct.i = i' /\ (glob Adv) = (glob Adv){m} ==> res).
-bypr => &n [] Reduct_i_n_eq_i' eq_glob_n_m.
-rewrite -(Hybrid_DDH1_Reduct i' &n) => //.
-byequiv => //; sim.
-auto.
-qed.
-
-local lemma Hybrid_DDH2Reduct (i' : int) &m :
-  1 <= i' < m + 1 =>
-  Pr[Hybrid.main(i' + 1) @ &m : res] =
-  Pr[DDH2Reduct(Adv).main(i') @ &m : res].
-proof.
-move => ge1_i'_lt_m_plus1.
-rewrite eq_sym.
-byphoare (_ : i = i' /\ glob Adv = (glob Adv){m} ==> _) => //.
-proc; sp.
-call (_ : Reduct.i = i' /\ (glob Adv) = (glob Adv){m} ==> res).
-bypr => &n [] Reduct_i_n_eq_i' eq_glob_n_m.
-rewrite -(Hybrid_DDH2_Reduct i' &n) => //.
-byequiv => //; sim.
-auto.
 qed.
 
 lemma GReal_GIdeal_sect &m :
   `|Pr[GReal(Adv).main() @ &m : res] -
-    Pr[GIdeal(Adv).main() @ &m : res]| <=
-  bigi predT
-  (fun i =>
-   `|Pr[DDH1Reduct(Adv).main(i) @ &m : res] -
-     Pr[DDH2Reduct(Adv).main(i) @ &m : res]|)
-  1 (m + 1).
+    Pr[GIdeal(Adv).main() @ &m : res]| =
+  m%r *
+  `|bigi predT
+    (fun (i : int) =>
+       Pr[DDH1(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1) -
+    bigi predT
+    (fun (i : int) =>
+       Pr[DDH2(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1)|.
 proof.
-rewrite GReal_Hybrid -Hybrid_GIdeal (hybrid_gen _ _ Hybrid _ _ _).
-smt(ge1_m).
-move => i bnd_i /=.
-by rewrite Hybrid_DDH1Reduct // Hybrid_DDH2Reduct.
+rewrite GReal_Hybrid -Hybrid_GIdeal.
+rewrite (GHP.hybrid_param () (m + 1) DDHOr1 DDHOr2 Hybrid) /=.
++ by smt(ge1_m).
++ move => i i_rng; rewrite Hybrid_step /#.
+rewrite
+  (eq_big_int _ _
+   (fun (j : int) =>
+      Pr[GHP.Exper(Hybrid, DDHOr1).main(tt, j) @ &m : res] / m%r)
+   (fun (i : int) =>
+      Pr[DDH1(Reduct(Adv)).main(i) @ &m : res] / m%r)).
++ by move => i i_rng /=; rewrite reduct1.
+rewrite
+  (eq_big_int _ _
+   (fun (j : int) =>
+      Pr[GHP.Exper(Hybrid, DDHOr2).main(tt, j) @ &m : res] / m%r)
+   (fun (i : int) =>
+      Pr[DDH2(Reduct(Adv)).main(i) @ &m : res] / m%r)).
++ by move => i i_rng /=; rewrite reduct2.
+done.
 qed.
 
 end section.
 
 lemma GReal_GIdeal (Adv <: ADV{-OrReal, -OrIdeal, -Reduct}) &m :
   `|Pr[GReal(Adv).main() @ &m : res] -
-    Pr[GIdeal(Adv).main() @ &m : res]| <=
-  bigi predT
-  (fun i =>
-   `|Pr[DDH1Reduct(Adv).main(i) @ &m : res] -
-     Pr[DDH2Reduct(Adv).main(i) @ &m : res]|)
-  1 (m + 1).
-proof.
-apply (GReal_GIdeal_sect Adv).
-qed.
+    Pr[GIdeal(Adv).main() @ &m : res]| =
+  m%r *
+  `|bigi predT
+    (fun (i : int) =>
+       Pr[DDH1(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1) -
+    bigi predT
+    (fun (i : int) =>
+       Pr[DDH2(Reduct(Adv)).main(i) @ &m : res] / m%r)
+    1 (m + 1)|.
+proof. by apply (GReal_GIdeal_sect Adv). qed.
