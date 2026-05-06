@@ -393,14 +393,24 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
         | `Inline _ ->
           let subst =
-            (* FIXME:TC: when [otyd] is [`Abstract tcs] with non-empty
-               [tcs], populate this last argument with witnesses for
-               [body]'s view of each [tcs] entry (looked up in the
-               instance database). Currently we pass [] — works for the
-               TC-free clones in stdlib but leaves abstract-with-TC
-               clones generating opaque witnesses. *)
+            (* When [otyd] is [`Abstract tcs] (the cloned source was
+               [type t <: tc1 <: tc2 …]), we need one [tcwitness] per
+               TC entry, looked up in the instance database for
+               [body]. Without these, [`Abs t_path; offset; lift]
+               witnesses inside cloned axioms would rewrite to
+               [`Abs body; offset; lift] referencing TC slots [body]
+               doesn't have. [witnesses_for_body] queries each
+               via [EcTypeClass.infer]; for non-TC clones (the
+               common stdlib case) [tcs = []] and the result is just
+               []. *)
+            let bodytcs =
+              match otyd.tyd_type with
+              | `Abstract tcs ->
+                EcTypeClass.witnesses_for_body env body tcs
+              | _ -> [] in
             EcSubst.add_tydef
-              subst (xpath ove x) (List.map fst newtyd.tyd_params, body, []) in
+              subst (xpath ove x)
+              (List.map fst newtyd.tyd_params, body, bodytcs) in
 
           let subst =
             (* FIXME: HACK *)

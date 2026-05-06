@@ -7,6 +7,16 @@ open EcEnv
 val infer : env -> ty -> typeclass -> tcwitness option
 
 (* -------------------------------------------------------------------- *)
+(* Build one [tcwitness] per entry of [tcs] for a carrier [body],
+   suitable for plugging into the witness slot of an [add_tydef]
+   binding. Each witness is queried via [infer]; on lookup failure,
+   falls back to a [`Abs body_path] / [`Var a] placeholder so the
+   substitution preserves the pre-fix shape (no regression for
+   TC-free callers). *)
+val witnesses_for_body :
+     env -> ty -> typeclass list -> tcwitness list
+
+(* -------------------------------------------------------------------- *)
 (* All matching instances as witnesses (vs. [infer] which returns the
    first). Used to detect ambiguity from multi-flavor inheritance. *)
 val infer_all : env -> ty -> typeclass -> tcwitness list

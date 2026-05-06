@@ -169,6 +169,34 @@ and infer_all (env : EcEnv.env) (ty : ty) (tc : typeclass) =
     (EcEnv.TcInstance.get_all env)
 
 (* -------------------------------------------------------------------- *)
+(* Build one [tcwitness] per entry of [tcs] for a carrier [body],
+   suitable for plugging into the [tcwitness list] slot of an
+   [add_tydef] binding. The expected witness for [body : tc] is
+   queried via [infer]; if no instance is registered, falls back to
+   a [`Abs body_path] / [`Var a] placeholder so the substitution
+   matches the pre-fix shape. With this fallback the helper is
+   non-failing — callers that want to error on a missing instance
+   should check [infer] separately. *)
+let witnesses_for_body
+  (env : EcEnv.env) (body : ty) (tcs : typeclass list)
+  : tcwitness list
+=
+  List.map (fun tc ->
+    match infer env body tc with
+    | Some w -> w
+    | None ->
+      let support =
+        match body.ty_node with
+        | Tvar a       -> `Var a
+        | Tconstr (p, _) -> `Abs p
+        | _ ->
+          (* Last-ditch dummy; should never arise for sensible
+             clone bodies, which are always [Tvar] or [Tconstr]. *)
+          `Abs (EcPath.psymbol "?") in
+      TCIAbstract { support; offset = 0; lift = [] }
+  ) tcs
+
+(* -------------------------------------------------------------------- *)
 (* Match a candidate instance against [tc] on its arguments only,
    leaving the carrier ([tci.tci_type]) for the caller to unify with
    the goal carrier. Returns the partial type-substitution that
