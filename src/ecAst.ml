@@ -66,17 +66,15 @@ and ty_node =
 and etyarg = ty * tcwitness list
 
 and tcwitness =
-  (* Unification variable, possibly with a pending [lift] count to apply
+  (* Unification variable, possibly with a pending [lift] path to apply
      once the variable is resolved. *)
-  | TCIUni of tcuni * int
+  | TCIUni of tcuni * int list
 
   | TCIConcrete of {
       path: EcPath.path;
       etyargs: (ty * tcwitness list) list;
-      (* Same semantics as [TCIAbstract.lift]: number of [tc_prt] steps
-         to walk up from the typeclass that this concrete instance is
-         declared for. *)
-      lift: int;
+      (* Same semantics as [TCIAbstract.lift]. *)
+      lift: int list;
   }
 
   | TCIAbstract of {
@@ -85,11 +83,14 @@ and tcwitness =
         | `Abs    of EcPath.path
       ];
       offset: int;
-      (* Number of [tc_prt] steps to walk up from the typeclass at
-         [support]'s [offset]-th position. [lift = 0] means "use the
-         declared typeclass directly"; [lift = k] means "walk [k] parent
-         pointers up the typeclass hierarchy from there". *)
-      lift: int;
+      (* Path through the parent DAG starting at the typeclass at
+         [support]'s [offset]-th position. [lift = []] means "use the
+         declared typeclass directly"; [lift = [i; j; ...]] means
+         "take parent index [i], then parent index [j] of that, ...".
+         For single-parent classes the path is always [0; 0; ...].
+         For multi-parent (factory) classes, the path encodes which
+         parent edge is taken at each step. *)
+      lift: int list;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -823,15 +824,16 @@ let lp_fv = function
         Sid.empty ids
 
 (* -------------------------------------------------------------------- *)
-(* Add [n] parent-walk steps to a witness. Used during substitution when
-   a witness referencing the [k]-th tc of some support gets replaced by
-   the witness for that tc, which may itself need to be lifted further. *)
-let bump_lift (n : int) (tcw : tcwitness) : tcwitness =
-  if n = 0 then tcw else
+(* Append [extra] to a witness's [lift] path. Used during substitution
+   when a witness referencing the [k]-th tc of some support gets
+   replaced by the witness for that tc, which may itself need further
+   parent-walk steps. *)
+let bump_lift (extra : int list) (tcw : tcwitness) : tcwitness =
+  if extra = [] then tcw else
   match tcw with
-  | TCIUni (uid, l) -> TCIUni (uid, l + n)
-  | TCIConcrete c -> TCIConcrete { c with lift = c.lift + n }
-  | TCIAbstract a -> TCIAbstract { a with lift = a.lift + n }
+  | TCIUni (uid, l) -> TCIUni (uid, l @ extra)
+  | TCIConcrete c -> TCIConcrete { c with lift = c.lift @ extra }
+  | TCIAbstract a -> TCIAbstract { a with lift = a.lift @ extra }
 
 (* -------------------------------------------------------------------- *)
 let rec tcw_fv (tcw : tcwitness) =
@@ -895,21 +897,22 @@ and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
 
 (* -------------------------------------------------------------------- *)
 let rec tcw_hash (tcw : tcwitness) =
+  let lift_hash = Why3.Hashcons.combine_list (fun i -> i) 0 in
   match tcw with
   | TCIUni (uid, l) ->
-    Why3.Hashcons.combine (Hashtbl.hash uid) l
+    Why3.Hashcons.combine (Hashtbl.hash uid) (lift_hash l)
 
   | TCIConcrete tcw ->
     Why3.Hashcons.combine_list
       etyarg_hash
-      (Why3.Hashcons.combine (p_hash tcw.path) tcw.lift)
+      (Why3.Hashcons.combine (p_hash tcw.path) (lift_hash tcw.lift))
       tcw.etyargs
 
   | TCIAbstract { support = `Var tyvar; offset; lift } ->
-    Why3.Hashcons.combine2 (EcIdent.id_hash tyvar) offset lift
+    Why3.Hashcons.combine2 (EcIdent.id_hash tyvar) offset (lift_hash lift)
 
   | TCIAbstract { support = `Abs p; offset; lift } ->
-    Why3.Hashcons.combine2 (EcPath.p_hash p) offset lift
+    Why3.Hashcons.combine2 (EcPath.p_hash p) offset (lift_hash lift)
 
   and etyarg_hash ((ty, tcws) : etyarg) =
     Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws

@@ -147,7 +147,7 @@ let rec check_tcinstance
       (subst, (aty, aargs))
     ) Mid.empty tci.tci_params in
 
-    Some (TCIConcrete { path = p; etyargs = args; lift = 0; })
+    Some (TCIConcrete { path = p; etyargs = args; lift = []; })
 
   with Bailout | NoMatch -> None
 
@@ -216,6 +216,61 @@ let ancestors (env : EcEnv.env) (tc : typeclass) : typeclass list =
   in bfs [tc] []
 
 (* -------------------------------------------------------------------- *)
+(* Compose two renamings.
+   [outer] is declared on a parent edge: maps grandparent op names
+     to parent op names (only listed entries are renamed; unlisted
+     passes through identity).
+   [inner] is the accumulated renaming on the child side: maps
+     parent op names to child op names.
+   Result: grandparent op names → child op names.
+
+   Two cases:
+   - For each (gp_name, p_name) in outer: child's name for that op
+     is [inner(p_name)], defaulting to [p_name] if unlisted.
+   - For each (p_name, c_name) in inner whose [p_name] is NOT
+     referenced in outer (neither as a value nor as a key): the op
+     passes through outer as identity, so grandparent's name for it
+     is [p_name] and child's name is [c_name]. Add [(p_name, c_name)]. *)
+let compose_renaming
+  ~(outer : (EcSymbols.symbol * EcSymbols.symbol) list)
+  ~(inner : (EcSymbols.symbol * EcSymbols.symbol) list)
+  : (EcSymbols.symbol * EcSymbols.symbol) list
+=
+  let inner_map = EcMaps.Mstr.of_list inner in
+  let from_outer =
+    List.map
+      (fun (gp_name, p_name) ->
+        let c_name = odfl p_name (EcMaps.Mstr.find_opt p_name inner_map) in
+        (gp_name, c_name))
+      outer in
+  let outer_p_names =
+    List.fold_left (fun s (_, p) -> EcMaps.Sstr.add p s) EcMaps.Sstr.empty outer in
+  let outer_gp_names =
+    List.fold_left (fun s (gp, _) -> EcMaps.Sstr.add gp s) EcMaps.Sstr.empty outer in
+  let from_inner =
+    List.filter_map
+      (fun (p_name, c_name) ->
+        if EcMaps.Sstr.mem p_name outer_p_names || EcMaps.Sstr.mem p_name outer_gp_names
+        then None
+        else Some (p_name, c_name))
+      inner in
+  from_outer @ from_inner
+
+(* -------------------------------------------------------------------- *)
+(* True iff op [n] survives the cumulative ancestor→child renaming
+   [ren] under the same name. An op is preserved when [ren] doesn't
+   mention it (passes through as identity), or when it explicitly
+   maps to itself. *)
+let op_preserved
+  (ren : (EcSymbols.symbol * EcSymbols.symbol) list)
+  (n   : EcSymbols.symbol)
+  : bool
+=
+  match List.assoc_opt n ren with
+  | None    -> true
+  | Some n' -> n = n'
+
+(* -------------------------------------------------------------------- *)
 (* Variant of [ancestors] that also returns the cumulative op renaming
    accumulated along the BFS walk from [tc] to each ancestor. The
    renaming maps the ancestor's op names to the corresponding op
@@ -248,26 +303,7 @@ let ancestors_with_renaming
        referenced in outer (neither as a value nor as a key): the op
        passes through outer as identity, so grandparent's name for it
        is [p_name] and child's name is [c_name]. Add [(p_name, c_name)]. *)
-  let compose ~outer ~inner =
-    let inner_map = EcMaps.Mstr.of_list inner in
-    let from_outer =
-      List.map
-        (fun (gp_name, p_name) ->
-          let c_name = odfl p_name (EcMaps.Mstr.find_opt p_name inner_map) in
-          (gp_name, c_name))
-        outer in
-    let outer_p_names =
-      List.fold_left (fun s (_, p) -> EcMaps.Sstr.add p s) EcMaps.Sstr.empty outer in
-    let outer_gp_names =
-      List.fold_left (fun s (gp, _) -> EcMaps.Sstr.add gp s) EcMaps.Sstr.empty outer in
-    let from_inner =
-      List.filter_map
-        (fun (p_name, c_name) ->
-          if EcMaps.Sstr.mem p_name outer_p_names || EcMaps.Sstr.mem p_name outer_gp_names
-          then None
-          else Some (p_name, c_name))
-        inner in
-    from_outer @ from_inner in
+  let compose = compose_renaming in
   let ren_eq r1 r2 =
     List.length r1 = List.length r2
     && List.for_all2 (fun (a, b) (c, d) -> a = c && b = d) r1 r2 in

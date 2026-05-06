@@ -619,7 +619,7 @@ let add_declared_ty to_gen path tydecl =
 
   { to_gen with
       tg_params = to_gen.tg_params @ [id, s];
-      tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], tvar id);
+      tg_subst  = EcSubst.add_tydef to_gen.tg_subst path ([], tvar id, []);
   }
 
 let add_declared_op to_gen path opdecl =
@@ -783,7 +783,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tyd_params = extra @ tydecl.tyd_params in
     let args = List.map (fun (id, _) -> tvar id) tyd_params in
     let fst_params = List.map fst tydecl.tyd_params in
-    let tosubst = fst_params, tconstr path args in
+    let tosubst = (fst_params, tconstr path args, []) in
     let tg_subst, tyd_type =
       match tydecl.tyd_type with
       | `Concrete _ | `Abstract _ ->

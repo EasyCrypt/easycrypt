@@ -25,7 +25,7 @@ val is_empty : subst -> bool
 (* -------------------------------------------------------------------- *)
 val add_module   : subst -> EcIdent.t -> mpath -> subst
 val add_path     : subst -> src:path -> dst:path -> subst
-val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
+val add_tydef    : subst -> path -> (EcIdent.t list * ty * tcwitness list) -> subst
 val add_tyvar    : subst -> EcIdent.t -> etyarg -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst

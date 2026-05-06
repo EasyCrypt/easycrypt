@@ -75,8 +75,11 @@ module Unify = struct
   }
 
   and tcenv = {
-    (* Map from UID to TC problems.                                 *)
-    problems : (ty * typeclass) TcUni.Muid.t;
+    (* Map from UID to TC problems. The optional [symbol] is the
+       op name when the problem was created at op-typing site, used
+       to disambiguate parent-DAG paths whose cumulative renaming
+       would clobber that name.                                       *)
+    problems : (ty * typeclass * EcSymbols.symbol option) TcUni.Muid.t;
 
     (* Map from univars to TC problems that depend on them.         *)
     byunivar : TcUni.Suid.t TyUni.Muid.t;
@@ -98,6 +101,7 @@ module Unify = struct
 
   (* ------------------------------------------------------------------ *)
   let create_tcproblem
+      ?(op_name : EcSymbols.symbol option)
       (tcenv : tcenv)
       (ty    : ty)
       (tcw   : typeclass * tcwitness option)
@@ -108,7 +112,7 @@ module Unify = struct
     let deps = Tuni.univars ty in
 
     let tcenv = {
-      problems = TcUni.Muid.add uid (ty, tc) tcenv.problems;
+      problems = TcUni.Muid.add uid (ty, tc, op_name) tcenv.problems;
       byunivar = TyUni.Suid.fold (fun duni byunivar ->
           TyUni.Muid.change (fun pbs ->
             Some (TcUni.Suid.add uid (Option.value ~default:TcUni.Suid.empty pbs))
@@ -120,7 +124,7 @@ module Unify = struct
           tcenv.resolution tw;
     } in
 
-    tcenv, TCIUni (uid, 0)
+    tcenv, TCIUni (uid, [])
 
   (* ------------------------------------------------------------------ *)
   let initial_ucore ?(tvtc = Mid.empty) () : ucore =
@@ -159,8 +163,8 @@ module Unify = struct
         | None ->
           let resolved =
             match TcUni.Muid.find_opt uid uc.tcenv.resolution with
-            | None -> TCIUni (uid, 0)
-            | Some (TCIUni (uid', _)) when TcUni.uid_equal uid uid' -> TCIUni (uid, 0)
+            | None -> TCIUni (uid, [])
+            | Some (TCIUni (uid', _)) when TcUni.uid_equal uid uid' -> TCIUni (uid, [])
             | Some tw -> doit_tc tw
           in
             Hint.add tcmap (uid :> int) resolved;
@@ -204,6 +208,7 @@ module Unify = struct
 
   (* ------------------------------------------------------------------ *)
   let fresh
+    ?(op_name : EcSymbols.symbol option)
     ?(tcs : (typeclass * tcwitness option) list option)
     ?(ty  : ty option)
     ({ uf; tcenv } as uc : ucore)
@@ -226,7 +231,7 @@ module Unify = struct
 
     let tcenv, tws =
       List.fold_left_map
-        (fun tcenv tcw -> create_tcproblem tcenv ty tcw)
+        (fun tcenv tcw -> create_tcproblem ?op_name tcenv ty tcw)
         tcenv (Option.value ~default:[] tcs) in
 
     ({ uc with uf; tcenv; }, (tuni uid, tws))
@@ -244,7 +249,7 @@ module Unify = struct
        otherwise sit in [problems] forever, never triggered via
        [byunivar] eviction. Re-pushing already-deferred problems is
        idempotent: the [`TcCtt] arm just re-adds them to [byunivar]. *)
-    TcUni.Muid.iter (fun uid (ty, tc) ->
+    TcUni.Muid.iter (fun uid (ty, tc, _op_name) ->
       if not (TcUni.Muid.mem uid (!uc).tcenv.resolution) then
         Queue.push (`TcCtt (uid, ty, tc)) pb
     ) (!uc).tcenv.problems;
@@ -292,7 +297,7 @@ module Unify = struct
               let pb = TcUni.Muid.find uid (!uc).tcenv.problems in
               (uid, pb)
             ) tcpbs in
-            List.iter (fun (uid, (ty, tc)) -> Queue.push (`TcCtt (uid, ty, tc)) pb) tcpbs
+            List.iter (fun (uid, (ty, tc, _op)) -> Queue.push (`TcCtt (uid, ty, tc)) pb) tcpbs
 
           | exception Not_found -> ()
         end;
@@ -375,8 +380,23 @@ module Unify = struct
           end
         end
 
+        | `TcCtt (uid, ty, tc) when
+            TcUni.Muid.mem uid (!uc).tcenv.resolution ->
+          (* [uid] was already pinned (e.g. by a prior [TcTw] equation
+             from the surrounding goal). Honor that binding rather than
+             re-running strategies, which could produce a different
+             witness on ambiguous instance lookups. *)
+          ignore (ty, tc)
+
         | `TcCtt (uid, ty, tc) ->
-          ignore uid;
+          (* Op name attached to this problem at creation time, used
+             below to filter parent-DAG paths whose cumulative renaming
+             would clobber that name. None for TC problems not tied to
+             a specific named op. *)
+          let pb_op : EcSymbols.symbol option =
+            match TcUni.Muid.find_opt uid (!uc).tcenv.problems with
+            | Some (_, _, op) -> op
+            | None -> None in
           (* See doc/typeclasses-inference.md for the strategy framework
              and the catalog of inference modes this resolver covers. *)
           let deps = ref TyUni.Suid.empty in
@@ -433,22 +453,64 @@ module Unify = struct
                  (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
                  tc.tc_args tc'.tc_args in
 
-          (* Find the offset of [tc] (or any of its ancestors) in [tcs];
-             also return the number of [tc_prt] steps walked to reach
-             [tc] from [tcs.(offset)]. [lift = 0] is a direct match. *)
-          let with_lift tc' =
-            let rec scan i = function
-              | [] -> None
-              | a :: rest -> if eq_tc a then Some i else scan (i + 1) rest
-            in scan 0 (EcTypeClass.ancestors env tc') in
-          let match_tc_offset (tcs : typeclass list) : (int * int) option =
-            let rec scan i = function
-              | [] -> None
-              | tc' :: rest ->
-                match with_lift tc' with
-                | Some lift -> Some (i, lift)
-                | None -> scan (i + 1) rest
-            in scan 0 tcs in
+          (* Enumerate all parent-DAG paths from [tc'] to [tc]. Each
+             returned entry is a list of parent-edge indices paired
+             with the cumulative ancestor→child op renaming along the
+             walk. [[]] means [tc' = tc] directly. With single-parent
+             inheritance the path is always all-zeros; with
+             multi-parent (factory) classes the path encodes which
+             parent edge is taken at each step.
+
+             The renaming is needed downstream to filter paths by
+             op-name preservation: when querying op [n] via this TC,
+             only paths whose cumulative renaming preserves [n] can
+             expose it under the same name at the carrier site. *)
+          let with_lift tc'
+            : (int list * (EcSymbols.symbol * EcSymbols.symbol) list) list
+          =
+            let rec walk tc ren path acc =
+              if eq_tc tc then (List.rev path, ren) :: acc
+              else
+                let decl = EcEnv.TypeClass.by_path tc.tc_name env in
+                let subst =
+                  List.fold_left2
+                    (fun s (a, _) etyarg -> Mid.add a etyarg s)
+                    Mid.empty decl.tc_tparams tc.tc_args in
+                List.fold_lefti
+                  (fun acc i (parent, p_ren) ->
+                    let parent = EcCoreSubst.Tvar.subst_tc subst parent in
+                    let ren' =
+                      EcTypeClass.compose_renaming ~outer:p_ren ~inner:ren in
+                    walk parent ren' (i :: path) acc)
+                  acc decl.tc_prts
+            in walk tc' [] [] [] in
+          (* Returns all valid [(offset, path, renaming)] matches
+             across [tcs], one per (offset, parent-path) pair that
+             reaches [tc]. The renaming is the cumulative
+             ancestor→child op renaming for that path. *)
+          let match_tc_offsets_all (tcs : typeclass list)
+            : (int * int list * (EcSymbols.symbol * EcSymbols.symbol) list) list
+          =
+            List.concat (List.mapi
+              (fun i tc' ->
+                List.map (fun (p, ren) -> (i, p, ren)) (with_lift tc'))
+              tcs) in
+          (* Op-name-aware variant: when [pb_op] is set, drop paths
+             whose cumulative renaming clobbers the op name. *)
+          let match_tc_offsets (tcs : typeclass list) =
+            let cands = match_tc_offsets_all tcs in
+            match pb_op with
+            | None -> cands
+            | Some n ->
+              List.filter
+                (fun (_, _, ren) -> EcTypeClass.op_preserved ren n)
+                cands in
+          let match_tc_offset (tcs : typeclass list)
+            : (int * int list * (EcSymbols.symbol * EcSymbols.symbol) list) option
+          =
+            match match_tc_offsets tcs with
+            | [m] -> Some m
+            | _   -> None in
 
           (* ---- Strategies (catalog modes) ----
              Each strategy returns [Some witness] when it resolves, or
@@ -461,7 +523,7 @@ module Unify = struct
             | Tvar a ->
               let tcs = ofdfl failure (Mid.find_opt a (!uc).tvtc) in
               Option.map
-                (fun (offset, lift) ->
+                (fun (offset, lift, _ren) ->
                   TCIAbstract { support = `Var a; offset; lift })
                 (match_tc_offset tcs)
             | _ -> None in
@@ -473,7 +535,7 @@ module Unify = struct
               match EcEnv.Ty.by_path_opt p env with
               | Some { tyd_type = `Abstract tcs; _ } ->
                 Option.map
-                  (fun (offset, lift) ->
+                  (fun (offset, lift, _ren) ->
                     TCIAbstract { support = `Abs p; offset; lift })
                   (match_tc_offset tcs)
               | _ -> None
@@ -483,18 +545,32 @@ module Unify = struct
           (* Modes #1, #2: carrier is ground; query the instance database. *)
           let strat_infer_by_carrier () : tcwitness option =
             EcTypeClass.infer env ty tc in
-          (* Ambiguity check: multi-flavor inheritance can register
-             multiple instances of the same TC for the same carrier
-             (e.g. comring with both addmonoid- and mulmonoid-derived
-             monoid views on int). If we'd commit to one arbitrarily,
-             later [TcTw] from the goal might equate the lemma's
-             witness univar with the other view — and fail. By
-             detecting ambiguity and DEFERRING, we let the goal's
-             concrete witness arrive via [TcTw] and bind the univar. *)
+          (* Ambiguity check: when multiple resolutions match, defer
+             so that later [TcTw] equations from the surrounding goal
+             can pin the univar to the correct one.
+
+             Two sources of ambiguity:
+             - Concrete carriers: [infer_all] returns multiple
+               synthesised instances (multi-flavor inheritance).
+             - Tvar / abstract-type carriers: [match_tc_offsets]
+               returns multiple (offset, path) pairs (multiple parent
+               paths through the DAG to the same target TC).         *)
           let strat_carrier_is_ambiguous () : bool =
             match ty.ty_node with
-            | Tvar _ | Tconstr _ ->
-                List.length (EcTypeClass.infer_all env ty tc) > 1
+            | Tvar a -> begin
+                match Mid.find_opt a (!uc).tvtc with
+                | None -> false
+                | Some tcs -> List.length (match_tc_offsets tcs) > 1
+              end
+            | Tconstr (p, _) -> begin
+                let by_decl =
+                  match EcEnv.Ty.by_path_opt p env with
+                  | Some { tyd_type = `Abstract tcs; _ } ->
+                      List.length (match_tc_offsets tcs) > 1
+                  | _ -> false in
+                by_decl
+                || List.length (EcTypeClass.infer_all env ty tc) > 1
+              end
             | _ -> false in
 
           (* Univars appearing in [tc.tc_args] (types and witnesses).
@@ -649,17 +725,34 @@ module Unify = struct
 
           let bind_uni uid lift target =
             (* We want [bump_lift lift R = target] where [R] is the
-               resolution of [uid]. Hence [R = target] with [lift]
-               removed from its lift count. *)
-            let strip_lift n w =
+               resolution of [uid]. With list-encoded paths,
+               [bump_lift] appends [lift] to [R]'s path. So [R]'s
+               path must equal [target]'s path with [lift] stripped
+               from the END (suffix). *)
+            let strip_suffix sfx l =
+              match sfx, List.rev l with
+              | [], _ -> Some l
+              | _, [] -> None
+              | _, _ ->
+                let sfx_rev = List.rev sfx in
+                let l_rev = List.rev l in
+                let rec eq_pref a b =
+                  match a, b with
+                  | [], _ -> Some (List.rev b)
+                  | _, [] -> None
+                  | x :: xs, y :: ys when x = y -> eq_pref xs ys
+                  | _ -> None
+                in eq_pref sfx_rev l_rev in
+            let strip_lift sfx w =
               match w with
-              | TCIUni (u, l) when l >= n ->
-                Some (TCIUni (u, l - n))
-              | TCIConcrete c when c.lift >= n ->
-                Some (TCIConcrete { c with lift = c.lift - n })
-              | TCIAbstract a when a.lift >= n ->
-                Some (TCIAbstract { a with lift = a.lift - n })
-              | _ -> None in
+              | TCIUni (u, l) ->
+                Option.map (fun l' -> TCIUni (u, l')) (strip_suffix sfx l)
+              | TCIConcrete c ->
+                Option.map (fun l' -> TCIConcrete { c with lift = l' })
+                  (strip_suffix sfx c.lift)
+              | TCIAbstract a ->
+                Option.map (fun l' -> TCIAbstract { a with lift = l' })
+                  (strip_suffix sfx a.lift) in
             match strip_lift lift target with
             | None -> failure ()
             | Some r ->
@@ -758,11 +851,12 @@ module UniEnv = struct
       ; ue_closed = true }
 
   let xfresh
+    ?(op_name : EcSymbols.symbol option)
     ?(tcs : (typeclass * tcwitness option) list option)
     ?(ty : ty option)
     (ue : unienv)
   =
-    let (uc, tytw) = Unify.fresh ?tcs ?ty (!ue).ue_uc in
+    let (uc, tytw) = Unify.fresh ?op_name ?tcs ?ty (!ue).ue_uc in
     ue := { !ue with ue_uc = uc }; tytw
 
   let fresh ?(ty : ty option) (ue : unienv) =
@@ -788,7 +882,9 @@ module UniEnv = struct
           tcs
       in (tv, tcs)) params
 
-  let opentvi (ue : unienv) (params : ty_params) (tvi : tvi) : opened =
+  let opentvi
+    ?(op_name : EcSymbols.symbol option)
+    (ue : unienv) (params : ty_params) (tvi : tvi) : opened =
     let tvi =
       match tvi with
       | None ->
@@ -834,7 +930,7 @@ module UniEnv = struct
                 tc_args = List.map (Tvar.subst_etyarg s) tc.tc_args } in
             (tc, tcw)
           in List.map for1 tcws
-        in Mid.add v (xfresh ?ty ~tcs ue) s
+        in Mid.add v (xfresh ?op_name ?ty ~tcs ue) s
       ) Mid.empty tvi in
 
     let args = List.map (fun (x, _) -> oget (Mid.find_opt x subst)) params in
@@ -910,6 +1006,122 @@ let unify_etyarg (env : EcEnv.env) (ue : unienv) (e1 : etyarg) (e2 : etyarg) =
   List.iter2 (unify_tcw env ue) ws1 ws2
 
 (* -------------------------------------------------------------------- *)
+(* When typing an op application like [(+)<:comring>], the witness for
+   the op's [<: monoid] tparam may be ambiguous: the carrier [comring]
+   reaches [monoid] via two parent walks (via [addgroup] and via
+   [mulmonoid]). The TC inference framework is op-name-agnostic, so
+   it sees both paths as candidates.
+
+   But the parent-edge renamings disambiguate: only paths whose
+   cumulative ancestor→child renaming preserves the queried op name
+   actually expose that op under the same name at the carrier site.
+
+   This helper, called right after [opentvi] at op-typing sites, walks
+   each fresh witness univar and binds it to the unique [TCIAbstract]
+   for the op-name-preserving path, when one exists. If zero or
+   multiple paths preserve the name, the witness is left as a univar
+   and existing strategies handle it as before. *)
+let disambiguate_op_witnesses
+    (env     : EcEnv.env)
+    (ue      : unienv)
+    (op_name : EcSymbols.symbol)
+    (params  : (ty * typeclass list) list)
+    (args    : etyarg list)
+  : unit
+=
+  let close = Unify.close (!ue).ue_uc in
+
+  (* Path enumeration with renaming, top-level analogue of the
+     [with_lift] inside [unify_core]. *)
+  let with_lift_for (carrier_tcs : typeclass list) (target : typeclass)
+    : (int * int list * (EcSymbols.symbol * EcSymbols.symbol) list) list
+  =
+    let target =
+      let tc_args =
+        List.map
+          (fun (t, ws) -> (close.tyuni t, List.map close.tcuni ws))
+          target.tc_args
+      in { target with tc_args } in
+    let eq_tc (tc' : typeclass) =
+      let tc' =
+        let tc_args =
+          List.map
+            (fun (t, ws) -> (close.tyuni t, List.map close.tcuni ws))
+            tc'.tc_args
+        in { tc' with tc_args } in
+      EcPath.p_equal target.tc_name tc'.tc_name
+      && List.length target.tc_args = List.length tc'.tc_args
+      && List.for_all2
+           (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
+           target.tc_args tc'.tc_args in
+    let rec walk tc ren path acc =
+      if eq_tc tc then (List.rev path, ren) :: acc
+      else
+        let decl = EcEnv.TypeClass.by_path tc.tc_name env in
+        let subst =
+          List.fold_left2
+            (fun s (a, _) etyarg -> Mid.add a etyarg s)
+            Mid.empty decl.tc_tparams tc.tc_args in
+        List.fold_lefti
+          (fun acc i (parent, p_ren) ->
+            let parent = EcCoreSubst.Tvar.subst_tc subst parent in
+            let ren' =
+              EcTypeClass.compose_renaming ~outer:p_ren ~inner:ren in
+            walk parent ren' (i :: path) acc)
+          acc decl.tc_prts in
+    List.concat (List.mapi
+      (fun i tc' ->
+        List.map (fun (p, ren) -> (i, p, ren)) (walk tc' [] [] []))
+      carrier_tcs) in
+
+  let try_pin
+      ~(build : int -> int list -> tcwitness)
+      (carrier_tcs : typeclass list)
+      (target : typeclass)
+      (w : tcwitness)
+    : unit
+  =
+    match w with
+    | TCIUni _ -> begin
+        let candidates = with_lift_for carrier_tcs target in
+        if List.length candidates < 2 then ()
+        else
+          let preserved =
+            List.filter
+              (fun (_, _, ren) -> EcTypeClass.op_preserved ren op_name)
+              candidates in
+          match preserved with
+          | [(offset, lift, _)] ->
+            (try unify_tcw env ue w (build offset lift)
+             with UnificationFailure _ -> ())
+          | _ -> ()
+      end
+    | _ -> () in
+
+  List.iter2 (fun (carrier_ty, tcs) (_, ws) ->
+    let carrier_ty = close.tyuni carrier_ty in
+    if List.length tcs <> List.length ws then () else
+    match carrier_ty.ty_node with
+    | Tvar a -> begin
+        match Mid.find_opt a (!ue).ue_uc.tvtc with
+        | None -> ()
+        | Some carrier_tcs ->
+          let build offset lift =
+            TCIAbstract { support = `Var a; offset; lift } in
+          List.iter2 (try_pin ~build carrier_tcs) tcs ws
+      end
+    | Tconstr (p, _) -> begin
+        match EcEnv.Ty.by_path_opt p env with
+        | Some { tyd_type = `Abstract carrier_tcs; _ } ->
+          let build offset lift =
+            TCIAbstract { support = `Abs p; offset; lift } in
+          List.iter2 (try_pin ~build carrier_tcs) tcs ws
+        | _ -> ()
+      end
+    | _ -> ()
+  ) params args
+
+(* -------------------------------------------------------------------- *)
 let tfun_expected (ue : unienv) ?retty (psig : ty list) =
   let ret = match retty with Some t -> t | None -> UniEnv.fresh ue in
   toarrow psig ret
@@ -971,8 +1183,9 @@ let select_op
     let subue = UniEnv.copy ue in
 
     try
-      let UniEnv.{ subst = tip_full; args } =
-        UniEnv.opentvi subue op.D.op_tparams tvi in
+      let UniEnv.{ subst = tip_full; args; params = oparams } =
+        UniEnv.opentvi ~op_name:(EcPath.basename path)
+          subue op.D.op_tparams tvi in
       let tip = f_subst_init ~tv:(Mid.map fst tip_full) () in
 
       let top = EcCoreSubst.ty_subst tip op.D.op_ty in
@@ -980,6 +1193,14 @@ let select_op
 
       (try  unify env subue top texpected
        with UnificationFailure _ -> raise E.Failure);
+
+      (* After type unification has pinned the carrier(s), try to
+         disambiguate any TC witnesses by op-name preservation along
+         parent walks. This is what lets [(+)<:comring>] pick the
+         addgroup walk uniquely when [comring] inherits from both
+         [addgroup] and [mulmonoid with (+) = ( * )]. *)
+      disambiguate_op_witnesses env subue
+        (EcPath.basename path) oparams args;
 
        let bd =
         match op.D.op_kind with

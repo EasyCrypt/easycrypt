@@ -397,12 +397,58 @@ let gen_select_op
   and by_current ((p, _), _, _, _) =
     EcPath.isprefix ~prefix:(oget (EcPath.prefix p)) ~path:(EcEnv.root env)
 
-  and by_tc ((p, _), _, _, _) =
-    match oget (EcEnv.Op.by_path_opt p env) with
-    | { op_kind = OB_oper (Some (OP_TC _)) } -> false
-    | _ -> true
-
   in
+  (* Subsumption filter on the candidate list: drop a TC-op candidate
+     when, for the resolved carrier, either
+     (a) [tc_reduce] succeeds and yields a head op already among the
+         non-TC candidates (the TC is just an indirection to it), or
+     (b) the carrier is concrete but no instance applies (no chance of
+         the TC ever firing on this carrier), and a non-TC candidate
+         exists.
+     When the carrier is still a univar (or no non-TC candidate exists),
+     keep the TC op. The typer's existing [MultipleOpMatch] retry then
+     re-types with a fresh argument univar, and downstream context
+     disambiguates via expected-type unification. *)
+  let drop_subsumed_tc ops =
+    let is_tc_op p =
+      match (EcEnv.Op.by_path_opt p env) with
+      | Some { op_kind = OB_oper (Some (OP_TC _)) } -> true
+      | _ -> false in
+    let concrete_paths =
+      List.filter_map
+        (fun ((p, _), _, _, _) -> if is_tc_op p then None else Some p)
+        ops in
+    if concrete_paths = [] then ops
+    else
+    let carrier_is_concrete (etyargs : etyarg list) =
+      match List.rev etyargs with
+      | [] -> false
+      | (ty, _) :: _ ->
+        match ty.ty_node with
+        | Tconstr _ -> true
+        | _ -> false in
+    List.filter (fun ((p, etyargs), _, _, _) ->
+      if not (is_tc_op p) then true
+      else
+        match EcEnv.Op.tc_reduce env p etyargs with
+        | red -> begin
+            let red_head =
+              match red.f_node with
+              | Fop (p', _) -> Some p'
+              | Fapp ({ f_node = Fop (p', _) }, _) -> Some p'
+              | _ -> None in
+            match red_head with
+            | None -> true
+            | Some p' ->
+              not (List.exists (EcPath.p_equal p') concrete_paths)
+          end
+        | exception EcEnv.NotReducible ->
+          (* TC didn't reduce: drop only when the carrier is fully
+             concrete (so we know no instance will ever apply). For
+             univar / Tvar carriers we keep the TC op so downstream
+             retry can pin it. *)
+          not (carrier_is_concrete etyargs)
+    ) ops in
 
   let locals () : OpSelect.gopsel list =
     if Option.is_none tvi then
@@ -416,7 +462,9 @@ let gen_select_op
     let ops = EcUnify.select_op ~filter:ue_filter ?retty:(snd psig) tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
-    let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
+    let ops =
+      let pruned = drop_subsumed_tc ops in
+      if pruned = [] then ops else pruned in
     (List.map fop ops)
 
   and pvs () : OpSelect.gopsel list =

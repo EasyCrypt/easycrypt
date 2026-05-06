@@ -1158,8 +1158,13 @@ and pp_etyargs (ppe : PPEnv.t) (fmt : Format.formatter) (etys : etyarg list) =
 
 (* -------------------------------------------------------------------- *)
 and pp_tcw (ppe : PPEnv.t) (fmt : Format.formatter) (tcw : tcwitness) =
-  let pp_lift fmt l =
-    if l > 0 then Format.fprintf fmt "^%d" l in
+  let pp_lift fmt = function
+    | [] -> ()
+    | l when List.for_all (fun i -> i = 0) l ->
+      Format.fprintf fmt "^%d" (List.length l)
+    | l ->
+      Format.fprintf fmt "^[%a]"
+        (pp_list ",@ " (fun fmt i -> Format.fprintf fmt "%d" i)) l in
   match tcw with
   | TCIUni (uid, lift) ->
     Format.fprintf fmt "%a%a" (pp_tcunivar ppe) uid pp_lift lift

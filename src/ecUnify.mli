@@ -46,11 +46,11 @@ module UniEnv : sig
   val push       : (EcIdent.t * typeclass list) -> unienv -> unit
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val xfresh     : ?tcs:(typeclass * EcTypes.tcwitness option) list -> ?ty:ty -> unienv -> etyarg
+  val xfresh     : ?op_name:symbol -> ?tcs:(typeclass * EcTypes.tcwitness option) list -> ?ty:ty -> unienv -> etyarg
   val fresh      : ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty
-  val opentvi    : unienv -> ty_params -> tvi -> opened
+  val opentvi    : ?op_name:symbol -> unienv -> ty_params -> tvi -> opened
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * opened 
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * opened
   val closed     : unienv -> bool

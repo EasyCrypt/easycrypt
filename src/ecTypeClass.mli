@@ -34,3 +34,23 @@ val ancestors : env -> typeclass -> typeclass list
    means no renaming (plain inheritance). *)
 val ancestors_with_renaming :
   env -> typeclass -> (typeclass * (EcSymbols.symbol * EcSymbols.symbol) list) list
+
+(* -------------------------------------------------------------------- *)
+(* Compose two cumulative renamings. [outer] is the renaming on a
+   parent edge (grandparent op → parent op); [inner] is the
+   already-accumulated renaming on the child side (parent op → child
+   op). Result maps grandparent op names to child op names. *)
+val compose_renaming :
+     outer:(EcSymbols.symbol * EcSymbols.symbol) list
+  -> inner:(EcSymbols.symbol * EcSymbols.symbol) list
+  -> (EcSymbols.symbol * EcSymbols.symbol) list
+
+(* -------------------------------------------------------------------- *)
+(* [op_preserved ren n] is true iff applying the cumulative
+   ancestor→child renaming [ren] to op name [n] leaves it as [n] (or
+   doesn't mention [n] at all). Used to filter parent-DAG paths when
+   resolving a TC witness for a specific named op: only paths whose
+   cumulative renaming preserves the op name expose that op under
+   the same name at the carrier site. *)
+val op_preserved :
+  (EcSymbols.symbol * EcSymbols.symbol) list -> EcSymbols.symbol -> bool

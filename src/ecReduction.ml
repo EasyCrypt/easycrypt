@@ -690,7 +690,7 @@ let resolve_concrete_tcw (env : EcEnv.env) (p : path) (tys : etyarg list) : etya
   let op = EcEnv.Op.by_path p env in
   if not (EcDecl.is_tc_op op) then tys
   else match List.rev tys with
-    | (carrier_ty, [TCIAbstract { support = `Abs ap; offset = 0; lift = 0 }]) :: rest
+    | (carrier_ty, [TCIAbstract { support = `Abs ap; offset = 0; lift = [] }]) :: rest
         when (match EcEnv.Ty.by_path_opt ap env with
               | Some { tyd_type = `Abstract _; _ } -> false
               | _ -> true) ->

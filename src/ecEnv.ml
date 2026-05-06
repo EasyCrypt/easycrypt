@@ -907,7 +907,7 @@ module MC = struct
 
       let self = EcIdent.create "'self" in
 
-      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self) in
+      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self, []) in
 
       let operators =
         let on1 (opid, optype) =
@@ -2791,31 +2791,29 @@ module Op = struct
     | TCIConcrete { path = tcipath; etyargs = tciargs; lift } -> begin
       let tci = TcInstance.by_path tcipath env in
 
-      (* If the witness has [lift > 0], the path [tcipath] points to a
-         subclass instance, but the op being looked up belongs to an
-         ancestor [lift] steps up. We walk via [tci_parents] (the
-         synthesised parent instance paths, recorded by
-         [add_generic_instance] in BFS chain order). For single-parent
-         classes [tci_parents] has one element; we take it. For
-         multi-parent classes the witness's [lift] only navigates a
-         single TC's parent chain (multi-parent ambiguity is resolved
-         elsewhere via [offset]), so taking [tci_parents.[0]] is
-         correct.
+      (* The witness's [lift] is a path through the parent DAG: each
+         element selects which parent edge to take. We follow it via
+         [tci_parents] (the synthesised parent instance paths). For
+         single-parent classes the path is always all-zeros; for
+         multi-parent (factory) classes the path encodes which
+         parent is taken at each step.
 
          Fallback when [tci_parents] is empty (manually-declared
-         instance with no synthesis tracking): search the database for
-         any matching ancestor instance, pick the first. *)
+         instance with no synthesis tracking): walk the TC parent
+         chain naively and search the database for a matching
+         ancestor instance. This loses path-disambiguation but
+         covers the legacy single-parent case.                       *)
       let resolve_lifted () =
-        if lift <= 0 then None
+        if lift = [] then None
         else
-          let rec walk tci n =
-            if n = 0 then Some tci
-            else
-              match tci.tci_parents with
-              | [] -> None  (* fallback path below *)
-              | parent_path :: _ ->
+          let rec walk tci = function
+            | [] -> Some tci
+            | i :: rest ->
+              match List.nth_opt tci.tci_parents i with
+              | None -> None
+              | Some parent_path ->
                 let parent_tci = TcInstance.by_path parent_path env in
-                walk parent_tci (n - 1)
+                walk parent_tci rest
           in
           match walk tci lift with
           | Some target_tci -> begin
@@ -2824,24 +2822,25 @@ module Op = struct
             | _ -> None
             end
           | None ->
-            (* Fallback: search the database for any ancestor instance
-               on the same carrier. Used when [tci_parents] isn't
-               populated (legacy / manual declarations). *)
-            let walk_up_tc (tc : typeclass) (n : int) : typeclass option =
-              let rec aux tc n =
-                if n = 0 then Some tc
-                else
+            (* Fallback: walk the TC parent chain (taking parent #0
+               at each step — equivalent to the all-zeros path) and
+               search the database for the matching ancestor instance
+               on the same carrier. *)
+            let walk_up_tc (tc : typeclass) (path : int list) : typeclass option =
+              let rec aux tc = function
+                | [] -> Some tc
+                | i :: rest ->
                   let decl = TypeClass.by_path tc.tc_name env in
-                  match decl.tc_prts with
-                  | [] -> None
-                  | (parent, _ren) :: _ ->
+                  match List.nth_opt decl.tc_prts i with
+                  | None -> None
+                  | Some (parent, _ren) ->
                     let subst =
                       List.fold_left2
                         (fun s (a, _) etyarg -> Mid.add a etyarg s)
                         Mid.empty decl.tc_tparams tc.tc_args in
                     let parent = EcCoreSubst.Tvar.subst_tc subst parent in
-                    aux parent (n - 1)
-              in aux tc n in
+                    aux parent rest
+              in aux tc path in
             match tci.tci_instance with
             | `General (tgp, _) -> begin
               match walk_up_tc tgp lift with

@@ -1146,6 +1146,55 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
           failure ();
         doit env (subst, mxs) f1' f2' in
 
+      (* Eta-reduce a [fun (x_1 ... x_n) => h x_1 ... x_n] body when
+         [h] does not mention any [x_i]. Returns [Some h] on success. *)
+      let try_eta_reduce (f : form) : form option =
+        match f.f_node with
+        | Fquant (Llambda, bd, body) -> begin
+          let nbd = List.length bd in
+          match destr_app body with
+          | (h, args) when List.length args >= nbd ->
+            let n_extra = List.length args - nbd in
+            let extra, tail = List.split_at n_extra args in
+            let bd_ids = List.map fst bd in
+            (* Tail must be exactly [x_1; ...; x_n] in order. *)
+            let tail_ok =
+              List.for_all2 (fun (x, _) a ->
+                match a.f_node with
+                | Flocal y -> EcIdent.id_equal x y
+                | _ -> false) bd tail in
+            (* And [h] (with extras) must not mention the [x_i]. *)
+            let captures =
+              List.exists (fun id -> Mid.mem id h.f_fv) bd_ids
+              || List.exists
+                   (fun a -> List.exists (fun id -> Mid.mem id a.f_fv) bd_ids)
+                   extra in
+            if tail_ok && not captures then
+              Some (if n_extra = 0 then h else f_app h extra body.f_ty)
+            else None
+          | _ -> None
+          end
+        | _ -> None in
+
+      let is_lambda f =
+        match f.f_node with Fquant (Llambda, _, _) -> true | _ -> false in
+      let try_etared () =
+        (* Only η-reduce when the other side is not itself a lambda;
+           if both are lambdas, the structural Fquant/Fquant case
+           handles it, and prematurely eta-reducing one side would
+           interfere with higher-order matching against lambda
+           patterns. *)
+        match f1.f_node, f2.f_node with
+        | Fquant (Llambda, _, _), _ when not (is_lambda f2) ->
+          (match try_eta_reduce f1 with
+           | Some f1' -> doit env (subst, mxs) f1' f2
+           | None     -> failure ())
+        | _, Fquant (Llambda, _, _) when not (is_lambda f1) ->
+          (match try_eta_reduce f2 with
+           | Some f2' -> doit env (subst, mxs) f1 f2'
+           | None     -> failure ())
+        | _ -> failure () in
+
       let try_horder () =
         if not opts.fm_horder then
           failure ();
@@ -1195,7 +1244,7 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       List.find_map_opt
         (fun doit ->
            try Some (doit ()) with MatchFailure -> None)
-        [try_betared; try_horder; try_delta; default]
+        [try_betared; try_horder; try_etared; try_delta; default]
       |> oget ~exn:MatchFailure
 
   and doit_args env ilc fs1 fs2 =

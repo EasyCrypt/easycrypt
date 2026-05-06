@@ -1312,7 +1312,7 @@ module Op = struct
       let oppath = EcPath.pqname (path scope) (unloc op.po_name) in
       let optyargs =
         let mktcw (a : EcIdent.t) (i : int) =
-          TCIAbstract { support = `Var a; offset = i; lift = 0 }
+          TCIAbstract { support = `Var a; offset = i; lift = [] }
         in
           List.map
             (fun (a, tcs) -> (tvar a, List.mapi (fun i _ -> mktcw a i) tcs))
@@ -2132,7 +2132,7 @@ module Ty = struct
   let symbols_of_tc (_env : EcEnv.env) ((tparams, ty) : ty_params * ty) (tcp, tc) =
     let subst, _ = EcSubst.fresh_tparams EcSubst.empty tparams in
     let ty = EcSubst.subst_ty subst ty in
-    let subst = EcSubst.add_tydef subst tcp.tc_name ([], ty) in
+    let subst = EcSubst.add_tydef subst tcp.tc_name ([], ty, []) in
     let subst =
       List.fold_left
         (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
@@ -2241,6 +2241,31 @@ module Ty = struct
                   symbols missing)
         symbols (List.tl chain_decls) in
 
+    (* Pre-compute the path each chain entry will receive when it is
+       registered as a [Th_instance] below. We need these paths up
+       front so the [add_tydef] substitution can reference them as
+       concrete witnesses — the inherited axiom bodies use
+       [`Abs anc.tc_name; offset = 0] which, in the class body's
+       semantics, refers to "the carrier-as-this-class". After
+       substituting the carrier with [ty], that needs to point at
+       the instance for [ty] of [anc] — i.e. exactly the path we are
+       about to register. *)
+    let chain_paths_pre =
+      List.mapi
+        (fun idx (anc, _, _) ->
+          let name =
+            if idx = 0 then
+              match tci.pti_name with
+              | Some name -> unloc name
+              | None ->
+                  Printf.sprintf "%s_%d"
+                    (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ())
+            else
+              Printf.sprintf "%s_%d"
+                (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ()) in
+          (name, EcPath.pqname (path scope) name))
+        chain_decls in
+
     (* Build a substitution mapping every op-ident along the chain to its
        chosen realisation on [ty]. For each ancestor the renaming maps
        its op names to local op names (via [lookup_ren ren]). *)
@@ -2248,13 +2273,26 @@ module Ty = struct
       (* The chain may contain entries sharing a TC name (under
          different renamings). [add_tydef] asserts no double-binding,
          so we track which TC names we've already added and skip. *)
-      List.fold_left
-        (fun (subst, seen) (anc, anc_decl, ren) ->
+      List.fold_lefti
+        (fun (subst, seen) idx (anc, anc_decl, ren) ->
           let seen, subst =
             if EcPath.Sp.mem anc.tc_name seen then (seen, subst)
             else
+              (* The class body referenced its carrier as
+                 [`Abs anc.tc_name; offset = 0; …] (a self-reference,
+                 since [anc]'s own [tcs] contains [anc] itself). After
+                 substituting the carrier with [ty], that reference
+                 must point to the instance for [ty] of [anc] — which
+                 is the chain entry we are about to register. We use
+                 its pre-computed path. The [`Abs] case of
+                 [subst_tcw] then bumps the body's lift onto this
+                 concrete witness, walking [tci_parents] correctly. *)
+              let _, inst_path = List.nth chain_paths_pre idx in
+              let self_witness =
+                TCIConcrete { path = inst_path; etyargs = []; lift = [] } in
               (EcPath.Sp.add anc.tc_name seen,
-               EcSubst.add_tydef subst anc.tc_name ([], snd ty)) in
+               EcSubst.add_tydef subst anc.tc_name
+                 ([], snd ty, [self_witness])) in
           let subst =
             List.fold_left
               (fun subst (a, ty) -> EcSubst.add_tyvar subst a ty)
@@ -2275,24 +2313,7 @@ module Ty = struct
           (subst, seen))
         (EcSubst.empty, EcPath.Sp.empty) chain_decls in
 
-    let axioms =
-      (* Multiple chain entries may share a TC; dedup axioms by name
-         (they have identical statements after [subst]). *)
-      let _, axs =
-        List.fold_left
-          (fun (seen, acc) (_anc, anc_decl, _ren) ->
-            List.fold_left
-              (fun (seen, acc) (name, ax) ->
-                if Sstr.mem name seen then (seen, acc)
-                else
-                  (Sstr.add name seen,
-                   (name, EcSubst.subst_form subst ax) :: acc))
-              (seen, acc)
-              anc_decl.tc_axs)
-          (Sstr.empty, []) chain_decls in
-      List.rev axs in
     let lc    = (tci.pti_loca :> locality) in
-    let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
     (* Compose two renamings (matches the version in [ecTypeClass.ml]
        which is used to build the chain). [outer] is declared on the
@@ -2324,15 +2345,20 @@ module Ty = struct
 
     (* Register one instance per ancestor chain entry, in REVERSE
        BFS order (leaves before children) so that when a child entry
-       is registered, its parents' paths are already known. Track
-       each registered instance's path in [chain_paths] indexed by
-       chain position. *)
-    let chain_paths = Array.make (List.length chain_decls) None in
-    let n_chain = List.length chain_decls in
+       is registered, its parents' paths are already known. The
+       [chain_paths] array uses the pre-computed paths from
+       [chain_paths_pre] so that proof-obligation substitutions can
+       reference them ahead of registration. We register BEFORE
+       [check_tci_axioms] so that the substituted obligation's
+       concrete witnesses (which point at these paths) resolve
+       through the env when [tc_reduce] fires. *)
+    let chain_paths =
+      Array.of_list
+        (List.map (fun (_, p) -> Some p) chain_paths_pre) in
     let scope =
       List.fold_lefti
         (fun scope rev_idx (anc, anc_decl, ren) ->
-          let idx = n_chain - 1 - rev_idx in
+          let idx = (List.length chain_decls) - 1 - rev_idx in
           let anc_symbols =
             List.fold_left
               (fun m (id, _) ->
@@ -2365,22 +2391,78 @@ module Ty = struct
             ; tci_instance = `General (anc, Some anc_symbols)
             ; tci_local    = lc
             ; tci_parents  = parents } in
-          let name =
-            if idx = 0 then
-              match tci.pti_name with
-              | Some name -> unloc name
-              | None ->
-                  Printf.sprintf "%s_%d"
-                    (EcPath.basename anc.tc_name) (EcUid.unique ())
-            else
-              Printf.sprintf "%s_%d"
-                (EcPath.basename anc.tc_name) (EcUid.unique ()) in
-          let inst_path = EcPath.pqname (path scope) name in
-          chain_paths.(idx) <- Some inst_path;
+          let name, _ = List.nth chain_paths_pre idx in
           let item = EcTheory.Th_instance (Some name, instance) in
           let item = EcTheory.mkitem ~import item in
           { scope with sc_env = EcSection.add_item item scope.sc_env })
         scope (List.rev chain_decls) in
+
+    (* Auto-skip a chain entry's axioms if a previously-declared
+       instance for the same (TC name, carrier) already proves them.
+       Symbols-equivalent means: for every op declared in the
+       ancestor, both the existing instance and the chain entry's
+       expected symbol map agree on the underlying op-path.
+       This is what lets [instance addmonoid with int] (with just ops,
+       no proofs) succeed when [instance monoid with int] is already
+       discharged: addmonoid's monoid-axiom obligations are
+       discharged by the existing monoid instance. The chain entries
+       we register in this declaration are excluded by path. *)
+    let chain_self_paths =
+      List.map snd chain_paths_pre |> EcPath.Sp.of_list in
+    let already_discharged (anc : typeclass) (anc_decl : tc_decl) (ren : _) : bool =
+      let expected =
+        List.fold_left
+          (fun m (id, _) ->
+            let n = EcIdent.name id in
+            let local = lookup_ren ren n in
+            match Mstr.find_opt local symbols with
+            | Some s -> Mstr.add n s m
+            | None -> m)
+          Mstr.empty anc_decl.tc_ops in
+      let same_symbols (existing_syms : (path * etyarg list) Mstr.t) =
+        Mstr.for_all
+          (fun n (p, _) ->
+            match Mstr.find_opt n existing_syms with
+            | Some (p', _) -> EcPath.p_equal p p'
+            | None -> false)
+          expected in
+      List.exists
+        (fun (path_opt, tci) ->
+          let is_other =
+            match path_opt with
+            | Some path -> not (EcPath.Sp.mem path chain_self_paths)
+            | None -> true in
+          is_other
+          && EcReduction.EqTest.for_type
+               (env scope) tci.EcTheory.tci_type (snd ty)
+          && (match tci.EcTheory.tci_instance with
+              | `General (anc', Some syms) ->
+                EcPath.p_equal anc'.tc_name anc.tc_name
+                && same_symbols syms
+              | _ -> false))
+        (EcEnv.TcInstance.get_all (env scope)) in
+
+    (* Build the proof-obligation list (deduped by axiom name across
+       chain entries) and check the user's tactics against it, now
+       that the chain instances are bound in the env so [tc_reduce]
+       can walk through their pre-computed paths. *)
+    let axioms =
+      let _, axs =
+        List.fold_left
+          (fun (seen, acc) (anc, anc_decl, ren) ->
+            if already_discharged anc anc_decl ren then (seen, acc)
+            else
+              List.fold_left
+                (fun (seen, acc) (name, ax) ->
+                  if Sstr.mem name seen then (seen, acc)
+                  else
+                    (Sstr.add name seen,
+                     (name, EcSubst.subst_form subst ax) :: acc))
+                (seen, acc)
+                anc_decl.tc_axs)
+          (Sstr.empty, []) chain_decls in
+      List.rev axs in
+    let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
     Ax.add_defer scope inter
 

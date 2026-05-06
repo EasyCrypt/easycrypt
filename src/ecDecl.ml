@@ -75,7 +75,7 @@ let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
 let etyargs_of_tparams (tps : ty_params) : etyarg list =
   List.map (fun (a, tcs) ->
     let ety =
-      List.mapi (fun offset _ -> TCIAbstract { support = `Var a; offset; lift = 0 }) tcs
+      List.mapi (fun offset _ -> TCIAbstract { support = `Var a; offset; lift = [] }) tcs
     in (tvar a, ety)
   ) tps
 

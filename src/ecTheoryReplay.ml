@@ -393,8 +393,14 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
 
         | `Inline _ ->
           let subst =
+            (* FIXME:TC: when [otyd] is [`Abstract tcs] with non-empty
+               [tcs], populate this last argument with witnesses for
+               [body]'s view of each [tcs] entry (looked up in the
+               instance database). Currently we pass [] — works for the
+               TC-free clones in stdlib but leaves abstract-with-TC
+               clones generating opaque witnesses. *)
             EcSubst.add_tydef
-              subst (xpath ove x) (List.map fst newtyd.tyd_params, body) in
+              subst (xpath ove x) (List.map fst newtyd.tyd_params, body, []) in
 
           let subst =
             (* FIXME: HACK *)

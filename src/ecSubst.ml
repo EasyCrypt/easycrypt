@@ -32,7 +32,14 @@ type subst = {
   sb_elocal   : expr Mid.t;
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
-  sb_tydef    : (EcIdent.t list * ty) Mp.t;
+  (* [sb_tydef p ↦ (params, body, tcs)] mirrors [sb_tyvar] for path-level
+     type aliases: alongside the body, [tcs] supplies one [tcwitness]
+     per TC constraint that [p] declared, expressed in terms of [body].
+     For non-TC bindings (most callers) [tcs = []]. The witness list
+     lets [subst_tcw] resolve [`Abs p; offset; lift] to a concrete
+     witness on [body], the same way the [`Var a] case resolves through
+     [sb_tyvar]'s [tcs]. *)
+  sb_tydef    : (EcIdent.t list * ty * tcwitness list) Mp.t;
   sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
   sb_moddef   : EcPath.mpath Mp.t; (* Only top-level modules *)
 }
@@ -175,7 +182,7 @@ let rec subst_ty (s : subst) (ty : ty) =
       | None ->
          tconstr_tc (subst_path s p) etys
 
-      | Some (args, body) ->
+      | Some (args, body, _tcs) ->
          let s = List.fold_left2 add_tyvar empty args etys in
          subst_ty s body
     end
@@ -217,7 +224,17 @@ and subst_tcw (s : subst) (tcw : tcwitness) =
     | None ->
       TCIAbstract { tcw with support = `Abs (subst_path s p) }
 
-    | Some (_, body) ->
+    | Some (_, _body, tcs) when offset < List.length tcs ->
+      (* Mirror of the [`Var a] case: when the binding carries
+         [tcwitness]es for [p]'s declared TCs, look up the offset-th
+         one and bump-lift the embedded path. This is what closes the
+         gap when an instance/clone substitutes an abstract type [p]
+         that had TC constraints — without it the offset references
+         constraints that no longer exist on [body], leaving the
+         witness pointing nowhere. *)
+      bump_lift lift (subst_tcw s (List.nth tcs offset))
+
+    | Some (_, body, _) ->
       match body.ty_node with
       | Tvar a ->
         TCIAbstract { support = `Var a; offset; lift }
@@ -314,9 +331,9 @@ let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
 
-let add_tydef (s : subst) p (typ, ty) =
+let add_tydef (s : subst) p (typ, ty, tcs) =
   assert (Mp.find_opt p s.sb_tydef = None);
-  { s with sb_tydef = Mp.add p (typ, ty) s.sb_tydef }
+  { s with sb_tydef = Mp.add p (typ, ty, tcs) s.sb_tydef }
 
 let add_opdef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
@@ -936,7 +953,7 @@ let fresh_tparam (s : subst) ((x, tcs) : ty_param) =
   let tcs  = List.map (subst_typeclass s) tcs in
   let tcw  =
     let mk (offset : int) =
-      TCIAbstract { support = `Var newx; offset; lift = 0 }
+      TCIAbstract { support = `Var newx; offset; lift = [] }
     in List.mapi (fun i _ -> mk i) tcs in
   let s    = add_tyvar s x (tvar newx, tcw) in
   (s, (newx, tcs))
