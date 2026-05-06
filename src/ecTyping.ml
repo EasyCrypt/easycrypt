@@ -420,14 +420,20 @@ let gen_select_op
         ops in
     if concrete_paths = [] then ops
     else
-    let carrier_is_concrete (etyargs : etyarg list) =
+    let carrier_is_concrete (etyargs : etyarg list) (subue : EcUnify.unienv) =
       match List.rev etyargs with
       | [] -> false
       | (ty, _) :: _ ->
+        (* Dereference [ty] through the candidate's per-call [subue]
+           — at filter time, the carrier may have just been bound to
+           a [Tconstr] via [unify env subue top texpected] in
+           [select_op], but the [etyargs] field still holds the
+           pre-unification [Tunivar]. *)
+        let ty = ty_subst (Tuni.subst (EcUnify.UniEnv.assubst subue)) ty in
         match ty.ty_node with
         | Tconstr _ -> true
         | _ -> false in
-    List.filter (fun ((p, etyargs), _, _, _) ->
+    List.filter (fun ((p, etyargs), _, subue, _) ->
       if not (is_tc_op p) then true
       else
         match EcEnv.Op.tc_reduce env p etyargs with
@@ -447,7 +453,7 @@ let gen_select_op
              concrete (so we know no instance will ever apply). For
              univar / Tvar carriers we keep the TC op so downstream
              retry can pin it. *)
-          not (carrier_is_concrete etyargs)
+          not (carrier_is_concrete etyargs subue)
     ) ops in
 
   let locals () : OpSelect.gopsel list =
@@ -458,12 +464,44 @@ let gen_select_op
       |>  Option.to_list
     else [] in
 
+  (* Drop notation/abbrev candidates ([OB_nott]) when a TC-op
+     candidate sharing the same basename is also present. The
+     [TcMonoid] family ships generic notation abbrevs like
+     [abbrev ( * ) ['a <: mulmonoid] (x y) = (+)<:'a> x y] that, when
+     applied at a [comring] carrier, expand to exactly the same
+     [Fop] as comring's own [( * )] TC operator. The two are
+     interchangeable but [select_op] returns both, leaving the user
+     with a [MultipleOpMatch] error in any external file that
+     imports the algebra hierarchy. Inside the defining file the
+     [by_current] filter drops the abbrev (different prefix), but
+     across files we need a structural rule. *)
+  let drop_shadowed_notation ops =
+    let has_tc_op_with_name n =
+      List.exists (fun ((p, _), _, _, _) ->
+        match EcEnv.Op.by_path_opt p env with
+        | Some { op_kind = OB_oper (Some (OP_TC _)) } ->
+          EcPath.basename p = n
+        | _ -> false) ops in
+    List.filter (fun ((p, _), _, _, _) ->
+      match EcEnv.Op.by_path_opt p env with
+      | Some { op_kind = OB_nott _ } ->
+        not (has_tc_op_with_name (EcPath.basename p))
+      | _ -> true) ops in
+
   let ops () : OpSelect.gopsel list =
     let ops = EcUnify.select_op ~filter:ue_filter ?retty:(snd psig) tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
     let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
+    (* [drop_subsumed_tc] runs first because it can ELIMINATE TC
+       candidates that won't apply (concrete carrier with no
+       registered instance). Then [drop_shadowed_notation] only
+       fires when a TC op is actually viable, leaving abbrevs alone
+       in the [Int.( <= )] / int-args case. *)
     let ops =
       let pruned = drop_subsumed_tc ops in
+      if pruned = [] then ops else pruned in
+    let ops =
+      let pruned = drop_shadowed_notation ops in
       if pruned = [] then ops else pruned in
     (List.map fop ops)
 
