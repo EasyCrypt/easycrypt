@@ -92,6 +92,10 @@ lemma mulr_sumr ['a] (P : 'a -> bool) (F : 'a -> t) (s : 'a list) (x : t) :
   x * (bigA P F s) = bigA P (fun i => x * F i) s.
 proof. by rewrite big_distrr //; (apply/mulr0 || apply/mulrDr). qed.
 
+lemma divr_suml ['a] (P : 'a -> bool) (F : 'a -> t) (s : 'a list) (x : t) :
+  (bigA P F s) / x = bigA P (fun i => F i / x) s.
+proof. by rewrite mulr_suml; apply/eq_bigr. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma sum_pair_dep ['a 'b] (u : 'a -> t) (v : 'a -> 'b -> t) (J : ('a * 'b) list) :
   uniq J =>
