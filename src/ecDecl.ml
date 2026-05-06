@@ -39,6 +39,7 @@ type tydecl = {
   tyd_type    : ty_body;
   tyd_resolve : bool;
   tyd_loca    : locality;
+  tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -69,7 +70,8 @@ let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
   { tyd_params  = params;
     tyd_type    = `Abstract tc;
     tyd_resolve = resolve;
-    tyd_loca    = lc; }
+    tyd_loca    = lc;
+    tyd_subtype = None; }
 
 (* -------------------------------------------------------------------- *)
 let etyargs_of_tparams (tps : ty_params) : etyarg list =

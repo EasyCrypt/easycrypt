@@ -700,6 +700,12 @@ let tydecl_fv tyd =
     | `Record (_f, l) ->
       List.fold_left (fun fv (_, ty) ->
           EcIdent.fv_union fv (ty_fv_and_tvar ty)) Mid.empty l in
+  let fv =
+    match tyd.tyd_subtype with
+    | None -> fv
+    | Some (carrier, pred) ->
+      EcIdent.fv_union fv
+        (EcIdent.fv_union (ty_fv_and_tvar carrier) (fv_and_tvar_f pred)) in
   List.fold_left (fun fv (id, _) -> Mid.remove id fv) fv tyd.tyd_params
 
 let op_body_fv body ty =
@@ -834,7 +840,8 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
     let tydecl = {
         tyd_params; tyd_type;
         tyd_loca = `Global;
-        tyd_resolve = tydecl.tyd_resolve } in
+        tyd_resolve = tydecl.tyd_resolve;
+        tyd_subtype = tydecl.tyd_subtype; } in
     to_gen, Some (Th_type (name, tydecl))
 
   | `Declare ->

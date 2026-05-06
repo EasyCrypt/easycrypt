@@ -991,11 +991,17 @@ let subst_tydecl_body (s : subst) (tyd : ty_body) =
 let subst_tydecl (s : subst) (tyd : tydecl) =
   let s, tparams = fresh_tparams s tyd.tyd_params in
   let body = subst_tydecl_body s tyd.tyd_type in
+  let tyd_subtype =
+    Option.map
+      (fun (carrier, pred) -> (subst_ty s carrier, subst_form s pred))
+      tyd.tyd_subtype
+  in
 
   { tyd_params  = tparams;
     tyd_type    = body;
     tyd_resolve = tyd.tyd_resolve;
-    tyd_loca    = tyd.tyd_loca; }
+    tyd_loca    = tyd.tyd_loca;
+    tyd_subtype; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : subst) (kind : operator_kind) =

@@ -1669,14 +1669,6 @@ module Ty = struct
     let loced x = mk_loc _dummy x in
     let env = env scope in
 
-    let scope =
-      let decl = EcDecl.{
-        tyd_params  = [];
-        tyd_type    = `Abstract [];
-        tyd_resolve = true;
-        tyd_loca    = `Global; (* FIXME:SUBTYPE *)
-      } in bind scope (unloc subtype.pst_name, decl) in
-
     let carrier =
       let ue = EcUnify.UniEnv.create None in
       transty tp_tydecl env ue subtype.pst_carrier in
@@ -1693,6 +1685,18 @@ module Ty = struct
       let tw_uni = EcUnify.UniEnv.tw_assubst ue in
       let fs = EcCoreSubst.Tuni.subst ~tw_uni uidmap in
       f_lambda [(x, GTty carrier)] (Fsubst.f_subst fs pred) in
+
+    let scope =
+      let decl = EcDecl.{
+        tyd_params  = [];
+        tyd_type    = `Abstract [];
+        tyd_resolve = true;
+        tyd_loca    = `Global;
+        (* Carry the carrier+predicate so [tydecl_fv] picks up the
+           dependency on section-declared types and [generalize_tydecl]
+           produces the right tparams at section close. *)
+        tyd_subtype = Some (carrier, pred);
+      } in bind scope (unloc subtype.pst_name, decl) in
 
     let evclone : EcThCloning.evclone =
       let t_entry : EcThCloning.xty_override = (`Direct carrier, `Inline `Clear) in
@@ -1793,7 +1797,9 @@ module Ty = struct
         record.ELI.rc_tparams, `Record (scheme, record.ELI.rc_fields)
     in
 
-    bind scope (unloc name, { tyd_params; tyd_type; tyd_loca; tyd_resolve = true; })
+    bind scope (unloc name,
+      { tyd_params; tyd_type; tyd_loca; tyd_resolve = true;
+        tyd_subtype = None; })
 
   (* ------------------------------------------------------------------ *)
   let bindclass ?(import = true) (scope : scope) (x, tc) =
@@ -1853,7 +1859,8 @@ module Ty = struct
         { tyd_params  = [];
           tyd_type    = `Abstract [tc_self];
           tyd_resolve = true;
-          tyd_loca    = (lc :> locality); } in
+          tyd_loca    = (lc :> locality);
+          tyd_subtype = None; } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
       (* Check for duplicated field names *)
