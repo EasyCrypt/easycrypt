@@ -2204,20 +2204,20 @@ module Ty = struct
     (* For any ancestor op (after renaming) the user didn't provide,
        look up an existing instance of that ancestor on the same
        carrier and reuse its realisation. *)
+    let existing_anc_symbols anc =
+      List.fold_left (fun acc (_, tci_existing) ->
+        match acc with
+        | Some _ -> acc
+        | None ->
+          match tci_existing.EcTheory.tci_instance with
+          | `General (tgp, Some sym)
+            when EcPath.p_equal tgp.tc_name anc.tc_name
+              && EcReduction.EqTest.for_type
+                   (env scope) tci_existing.EcTheory.tci_type (snd ty) ->
+              Some sym
+          | _ -> None)
+        None (EcEnv.TcInstance.get_all (env scope)) in
     let symbols =
-      let existing_anc_symbols anc =
-        List.fold_left (fun acc (_, tci_existing) ->
-          match acc with
-          | Some _ -> acc
-          | None ->
-            match tci_existing.EcTheory.tci_instance with
-            | `General (tgp, Some sym)
-              when EcPath.p_equal tgp.tc_name anc.tc_name
-                && EcReduction.EqTest.for_type
-                     (env scope) tci_existing.EcTheory.tci_type (snd ty) ->
-                Some sym
-            | _ -> None)
-          None (EcEnv.TcInstance.get_all (env scope)) in
       List.fold_left
         (fun symbols (anc, anc_decl, ren) ->
           let missing =
@@ -2240,6 +2240,35 @@ module Ty = struct
                     | None -> symbols)
                   symbols missing)
         symbols (List.tl chain_decls) in
+
+    (* Phase B coherence check: when a chain entry derives an instance
+       of [anc] on the carrier and an instance for the same ancestor
+       on the same carrier already exists in scope, the two must
+       agree on every op realisation. Catches the case where a user
+       declares `instance addgroup with int { ... }` and later
+       `instance comring with int { ... }` with conflicting +. *)
+    List.iter
+      (fun (anc, anc_decl, ren) ->
+        match existing_anc_symbols anc with
+        | None -> ()
+        | Some existing_sym ->
+          List.iter
+            (fun (id, _) ->
+              let n = EcIdent.name id in
+              let local_n = lookup_ren ren n in
+              match Mstr.find_opt local_n symbols, Mstr.find_opt n existing_sym with
+              | Some (p1, _), Some (p2, _) when not (EcPath.p_equal p1 p2) ->
+                  hierror
+                    "diamond coherence violation: registering an instance \
+                     of `%s' on this carrier requires op `%s' to be `%s', \
+                     but an existing instance binds it to `%s'"
+                    (EcPath.tostring anc.tc_name)
+                    n
+                    (EcPath.tostring p1)
+                    (EcPath.tostring p2)
+              | _ -> ())
+            anc_decl.tc_ops)
+      chain_decls;
 
     (* Pre-compute the path each chain entry will receive when it is
        registered as a [Th_instance] below. We need these paths up

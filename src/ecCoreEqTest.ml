@@ -62,6 +62,8 @@ and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
   && List.for_all2 (for_etyarg env) tyargs1 tyargs2
 
 and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
+  let tcw1 = EcTcCanonical.canonicalise_witness env tcw1 in
+  let tcw2 = EcTcCanonical.canonicalise_witness env tcw2 in
   match tcw1, tcw2 with
   | TCIUni (uid1, l1), TCIUni (uid2, l2) ->
     EcAst.TcUni.uid_equal uid1 uid2 && l1 = l2
@@ -77,18 +79,11 @@ and for_tcw env (tcw1 : tcwitness) (tcw2 : tcwitness) =
 
   | TCIAbstract { support = `Abs p1; offset = o1; lift = l1 },
     TCIAbstract { support = `Abs p2; offset = o2; lift = l2 } ->
-    let pp_lift l = String.concat "," (List.map string_of_int l) in
-    let r = EcPath.p_equal p1 p2 && o1 = o2 && l1 = l2 in
-    if not r then
-      Printf.eprintf "[for_tcw FAIL] Abs(%s,o=%d,l=[%s]) vs Abs(%s,o=%d,l=[%s])\n%s\n%!"
-        (EcPath.tostring p1) o1 (pp_lift l1)
-        (EcPath.tostring p2) o2 (pp_lift l2)
-        (Printexc.raw_backtrace_to_string (Printexc.get_callstack 15));
-    r
+    EcPath.p_equal p1 p2 && o1 = o2 && l1 = l2
 
   | _, _ ->
     false
-    
+
 and for_tcws env (tcws1 : tcwitness list) (tcws2 : tcwitness list) =
     List.length tcws1 = List.length tcws2
  && List.for_all2 (for_tcw env) tcws1 tcws2

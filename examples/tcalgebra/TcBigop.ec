@@ -597,3 +597,6 @@ end section.
 (* ==================================================================== *)
 abbrev bigA ['a, 't <: addmonoid] P (F : 'a -> 't) r = big P F r.
 abbrev bigM ['a, 't <: mulmonoid] P (F : 'a -> 't) r = big P F r.
+
+abbrev bigiA ['t <: addmonoid] (P : int -> bool) (F : int -> 't) i j = bigA P F (range i j).
+abbrev bigiM ['t <: mulmonoid] (P : int -> bool) (F : int -> 't) i j = bigM P F (range i j).

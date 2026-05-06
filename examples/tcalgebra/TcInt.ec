@@ -52,7 +52,7 @@ op _spacer1 : int = 0.
 (* ==================================================================== *)
 
 (* int's abstract [intmul] coincides with concrete int multiplication. *)
-lemma intmul_int (z c : int) : intmul z c = Int.( * ) z c.
+lemma intmulz (z c : int) : intmul z c = Int.( * ) z c.
 proof.
 have h: forall cp, 0 <= cp => intmul z cp = Int.( * ) z cp.
   elim=> /= [|cp ge0_cp ih]; first by rewrite mulr0z.

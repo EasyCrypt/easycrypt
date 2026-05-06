@@ -319,11 +319,35 @@ let pf_find_occurence
     | _, _ -> false
   in
 
+  (* Two heads match keywise iff they're path-equal, OR the candidate's
+     head TC-reduces (via factory rename on its abstract witness) to an
+     [Fop] with the pattern's key. Without the second clause, [rewrite L]
+     misses positions where [L]'s LHS uses a class op like [( * )<:comring>]
+     and the goal has the rename-equivalent [(+)<:t mulmonoid leg>] —
+     deeper matching would resolve them, but [keycheck] would have
+     filtered them out first.                                          *)
+  let env_for_kmatch = EcEnv.LDecl.toenv pt.pte_hy in
+  let head_op_after_tc_reduce (head : form) : EcPath.path option =
+    match head.f_node with
+    | Fop (p, tys) -> begin
+        match EcEnv.Op.tc_reduce env_for_kmatch p tys with
+        | exception EcEnv.NotReducible -> None
+        | reduced -> begin
+            match (fst (destr_app reduced)).f_node with
+            | Fop (p', _) -> Some p'
+            | _ -> None
+          end
+      end
+    | _ -> None in
   let kmatch key tp =
     match key, (fst (destr_app tp)).f_node with
     | `NoKey , _           -> true
-    | `Path p, Fop (p', _) -> EcPath.p_equal p p'
-    | `Path _, _           -> false
+    | `Path p, Fop (p', _) when EcPath.p_equal p p' -> true
+    | `Path p, _ -> begin
+        match head_op_after_tc_reduce (fst (destr_app tp)) with
+        | Some p' -> EcPath.p_equal p p'
+        | None -> false
+      end
     | `Var  x, Flocal x'   -> id_equal x x'
     | `Var  _, _           -> false
   in

@@ -505,12 +505,31 @@ module Unify = struct
               List.filter
                 (fun (_, _, ren) -> EcTypeClass.op_preserved ren n)
                 cands in
+          let rens_equal r1 r2 =
+            List.length r1 = List.length r2
+            && List.for_all (fun (a, b) ->
+                 match List.assoc_opt a r2 with
+                 | Some b' -> b = b'
+                 | None -> false) r1 in
           let match_tc_offset (tcs : typeclass list)
             : (int * int list * (EcSymbols.symbol * EcSymbols.symbol) list) option
           =
+            (* Multi-parent inheritance can yield several parent-DAG
+               paths reaching the same target TC. When all such paths
+               carry the same cumulative renaming, they're
+               semantically interchangeable, so picking the canonical
+               (BFS-first) encoding is safe. Only ambiguity-preserving
+               (different renamings) genuinely blocks resolution. *)
             match match_tc_offsets tcs with
-            | [m] -> Some m
-            | _   -> None in
+            | [] -> None
+            | m :: rest ->
+              let (_, _, ren_m) = m in
+              if not (List.for_all (fun (_, _, r) -> rens_equal r ren_m) rest)
+              then None
+              else
+                match EcTcCanonical.canonical_path env tcs tc.tc_name ren_m with
+                | Some (off, lift) -> Some (off, lift, ren_m)
+                | None -> Some m in
 
           (* ---- Strategies (catalog modes) ----
              Each strategy returns [Some witness] when it resolves, or
@@ -555,18 +574,26 @@ module Unify = struct
              - Tvar / abstract-type carriers: [match_tc_offsets]
                returns multiple (offset, path) pairs (multiple parent
                paths through the DAG to the same target TC).         *)
+          (* Multiple paths with identical renamings are not
+             genuinely ambiguous — [match_tc_offset] picks one. *)
+          let paths_genuinely_ambiguous tcs =
+            match match_tc_offsets tcs with
+            | [] | [_] -> false
+            | m :: rest ->
+              let (_, _, ren_m) = m in
+              not (List.for_all (fun (_, _, r) -> rens_equal r ren_m) rest) in
           let strat_carrier_is_ambiguous () : bool =
             match ty.ty_node with
             | Tvar a -> begin
                 match Mid.find_opt a (!uc).tvtc with
                 | None -> false
-                | Some tcs -> List.length (match_tc_offsets tcs) > 1
+                | Some tcs -> paths_genuinely_ambiguous tcs
               end
             | Tconstr (p, _) -> begin
                 let by_decl =
                   match EcEnv.Ty.by_path_opt p env with
                   | Some { tyd_type = `Abstract tcs; _ } ->
-                      List.length (match_tc_offsets tcs) > 1
+                      paths_genuinely_ambiguous tcs
                   | _ -> false in
                 by_decl
                 || List.length (EcTypeClass.infer_all env ty tc) > 1
@@ -725,10 +752,11 @@ module Unify = struct
 
           let bind_uni uid lift target =
             (* We want [bump_lift lift R = target] where [R] is the
-               resolution of [uid]. With list-encoded paths,
-               [bump_lift] appends [lift] to [R]'s path. So [R]'s
-               path must equal [target]'s path with [lift] stripped
-               from the END (suffix). *)
+               resolution of [uid] (a witness for [uid]'s carrier-type
+               at [uid]'s TC class). With canonical-encoded paths
+               everywhere (Stage 2 Phase A/C), [target]'s path ends
+               with [lift] when reachable via [uid], so structural
+               suffix-strip recovers [R].                              *)
             let strip_suffix sfx l =
               match sfx, List.rev l with
               | [], _ -> Some l
@@ -769,6 +797,8 @@ module Unify = struct
             bind_uni uid lift w
 
           | _, _ ->
+            let w1 = EcTcCanonical.canonicalise_witness env w1 in
+            let w2 = EcTcCanonical.canonicalise_witness env w2 in
             if not (EcAst.tcw_equal w1 w2) then failure ()
           end
       done

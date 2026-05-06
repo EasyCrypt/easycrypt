@@ -421,17 +421,27 @@ let gen_select_op
     if concrete_paths = [] then ops
     else
     let carrier_is_concrete (etyargs : etyarg list) (subue : EcUnify.unienv) =
+      (* "Concrete" = a [Tconstr] whose declaration is NOT an abstract
+         type-with-TC. Class-declaration self-types and section-bound
+         abstract types are also [Tconstr] but should still be
+         treated as abstract here so TC-op candidates aren't pruned. *)
       match List.rev etyargs with
       | [] -> false
       | (ty, _) :: _ ->
-        (* Dereference [ty] through the candidate's per-call [subue]
-           — at filter time, the carrier may have just been bound to
-           a [Tconstr] via [unify env subue top texpected] in
-           [select_op], but the [etyargs] field still holds the
-           pre-unification [Tunivar]. *)
         let ty = ty_subst (Tuni.subst (EcUnify.UniEnv.assubst subue)) ty in
         match ty.ty_node with
-        | Tconstr _ -> true
+        | Tconstr (p, _) -> begin
+            match EcEnv.Ty.by_path_opt p env with
+            (* [Abstract (_ :: _)]: section-bound or class-self type
+               with TC bounds — TC ops on it may still be viable
+               via the bounds. [Abstract []]: primitive (e.g. [int]) —
+               TC viability requires a registered instance, treat as
+               concrete here so [drop_subsumed_tc] can dedup TC ops
+               against non-TC candidates with the same effective
+               head. *)
+            | Some { tyd_type = `Abstract (_ :: _) } -> false
+            | _ -> true
+          end
         | _ -> false in
     List.filter (fun ((p, etyargs), _, subue, _) ->
       if not (is_tc_op p) then true
@@ -449,10 +459,6 @@ let gen_select_op
               not (List.exists (EcPath.p_equal p') concrete_paths)
           end
         | exception EcEnv.NotReducible ->
-          (* TC didn't reduce: drop only when the carrier is fully
-             concrete (so we know no instance will ever apply). For
-             univar / Tvar carriers we keep the TC op so downstream
-             retry can pin it. *)
           not (carrier_is_concrete etyargs subue)
     ) ops in
 
@@ -488,6 +494,32 @@ let gen_select_op
         not (has_tc_op_with_name (EcPath.basename p))
       | _ -> true) ops in
 
+  (* Drop a TC-bounded notation candidate (an abbrev whose tparams have
+     non-empty TC bounds, e.g. [TcRing.(-) ['a <: addgroup] (x y) = …])
+     when a same-basename candidate with no TC-bounded tparams (e.g. the
+     monomorphic [Int.(-)] abbrev) is also present. The TC-bounded form,
+     when instantiated at a carrier that also has a non-TC alternative,
+     unfolds to the same operator, so [select_op] returning both leaves
+     a spurious [MultipleOpMatch]. Mirror image of [drop_subsumed_tc]
+     for the abbrev side. *)
+  let drop_tc_bounded_notation ops =
+    let is_tc_bounded_nott p =
+      match EcEnv.Op.by_path_opt p env with
+      | Some { op_kind = OB_nott _; op_tparams = tparams } ->
+        List.exists (fun (_, tcs) -> tcs <> []) tparams
+      | _ -> false in
+    let has_unbounded_with_name n =
+      List.exists (fun ((p, _), _, _, _) ->
+        EcPath.basename p = n
+        && match EcEnv.Op.by_path_opt p env with
+           | Some { op_tparams = tparams } ->
+             not (List.exists (fun (_, tcs) -> tcs <> []) tparams)
+           | None -> false) ops in
+    List.filter (fun ((p, _), _, _, _) ->
+      if is_tc_bounded_nott p
+      then not (has_unbounded_with_name (EcPath.basename p))
+      else true) ops in
+
   let ops () : OpSelect.gopsel list =
     let ops = EcUnify.select_op ~filter:ue_filter ?retty:(snd psig) tvi env name ue (fst psig) in
     let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
@@ -502,6 +534,9 @@ let gen_select_op
       if pruned = [] then ops else pruned in
     let ops =
       let pruned = drop_shadowed_notation ops in
+      if pruned = [] then ops else pruned in
+    let ops =
+      let pruned = drop_tc_bounded_notation ops in
       if pruned = [] then ops else pruned in
     (List.map fop ops)
 

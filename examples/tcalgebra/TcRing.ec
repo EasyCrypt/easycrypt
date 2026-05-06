@@ -710,6 +710,7 @@ proof.
 move=> inv_d1 inv_d2; rewrite mulrDl [n1 * d2]mulrC.
 by rewrite !invrM //; congr; rewrite mulrACA divrr // ?(mul1r, mulr1).
 qed.
+
 end section.
 (* ==================================================================== *)
 (* Boolean ring: commutative ring with idempotent multiplication. *)
