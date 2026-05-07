@@ -152,10 +152,72 @@ let rec check_tcinstance
   with Bailout | NoMatch -> None
 
 (* -------------------------------------------------------------------- *)
+(* Walk the parent DAG of [tc'] looking for [tc]. Returns the first
+   path (list of parent-edge indices) reaching [tc], or [None]. With
+   single-parent inheritance this is the all-zeros path; with
+   multi-parent classes the path encodes which parent is taken at
+   each step. Mirrors [match_tc_offset]'s walk in [EcUnify].          *)
+and lift_to_tc (env : EcEnv.env) (tc' : typeclass) (tc : typeclass) : int list option =
+  let eq_tc t =
+    EcPath.p_equal tc.tc_name t.tc_name
+    && List.length tc.tc_args = List.length t.tc_args
+    && List.for_all2
+         (fun (a, _) (b, _) -> EcCoreEqTest.for_type env a b)
+         tc.tc_args t.tc_args in
+  let rec walk t path =
+    if eq_tc t then Some (List.rev path)
+    else
+      let decl = EcEnv.TypeClass.by_path t.tc_name env in
+      let subst =
+        List.fold_left2
+          (fun s (a, _) etyarg -> Mid.add a etyarg s)
+          Mid.empty decl.tc_tparams t.tc_args in
+      let rec try_parents i = function
+        | [] -> None
+        | (parent, _ren) :: rest ->
+          let parent = EcCoreSubst.Tvar.subst_tc subst parent in
+          (match walk parent (i :: path) with
+           | Some _ as r -> r
+           | None -> try_parents (i + 1) rest)
+      in try_parents 0 decl.tc_prts
+  in walk tc' []
+
+(* -------------------------------------------------------------------- *)
+(* Mode-#6 fallback: when [ty] is [Tconstr p _] and [p]'s declaration
+   is [`Abstract tcs] (e.g. a section-declared abstract type with
+   class bounds, like [declare type c <: comring]), build the
+   [TCIAbstract { support = `Abs p; offset; lift }] witness by finding
+   an entry in [tcs] that reaches [tc] via its parent DAG. Without
+   this, [infer]'s recursion on a parametric-instance's tparam
+   constraint fails for section-abstract carriers (Path B in the
+   resolver), even though [EcUnify] handles the same case via its
+   [strat_abs_via_decl].                                              *)
+and infer_via_abs_decl (env : EcEnv.env) (ty : ty) (tc : typeclass) : tcwitness option =
+  match ty.ty_node with
+  | Tconstr (p, _) -> begin
+    match EcEnv.Ty.by_path_opt p env with
+    | Some { tyd_type = `Abstract tcs; _ } ->
+      let rec find_offset i = function
+        | [] -> None
+        | tc' :: rest ->
+          (match lift_to_tc env tc' tc with
+           | Some lift ->
+             Some (TCIAbstract { support = `Abs p; offset = i; lift })
+           | None -> find_offset (i + 1) rest)
+      in find_offset 0 tcs
+    | _ -> None
+    end
+  | _ -> None
+
+(* -------------------------------------------------------------------- *)
 and infer (env : EcEnv.env) (ty : ty) (tc : typeclass) =
-  List.find_map_opt
-    (check_tcinstance env ty tc)
-    (EcEnv.TcInstance.get_all env)
+  match
+    List.find_map_opt
+      (check_tcinstance env ty tc)
+      (EcEnv.TcInstance.get_all env)
+  with
+  | Some _ as w -> w
+  | None -> infer_via_abs_decl env ty tc
 
 (* -------------------------------------------------------------------- *)
 (* Like [infer] but returns ALL matching instances as witnesses. Used
