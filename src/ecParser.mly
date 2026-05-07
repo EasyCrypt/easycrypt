@@ -152,7 +152,6 @@
 
   type smt = [
     | `ALL
-    | `ITERATE
     | `QUORUM         of int
     | `MAXLEMMAS      of int option
     | `MAXPROVERS     of int
@@ -198,7 +197,6 @@
            "verbose"       ;
            "lazy"          ;
            "full"          ;
-           "iterate"       ;
            "dumpin"        ;
            "selected"      ;
            "debug"         ]
@@ -258,7 +256,6 @@
       | "lazy"           -> `VERSION        (get_as_none s o; `Lazy)
       | "full"           -> `VERSION        (get_as_none s o; `Full)
       | "all"            -> get_as_none s o; (`ALL)
-      | "iterate"        -> get_as_none s o; (`ITERATE)
       | "selected"       -> get_as_none s o; (`SELECTED)
       | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
@@ -274,7 +271,6 @@
       let unwanted = ref None in
       let verbose  = ref None in
       let version  = ref None in
-      let iterate  = ref None in
       let dumpin   = ref None in
       let selected = ref None in
       let debug    = ref None in
@@ -318,7 +314,6 @@
         | `UNWANTEDLEMMAS d -> unwanted := Some d
         | `VERBOSE        v -> verbose  := Some v
         | `VERSION        v -> version  := Some v
-        | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
         | `DUMPIN         f -> dumpin   := Some f
         | `SELECTED         -> selected := Some true
@@ -340,7 +335,6 @@
         pprov_version   = !version;
         plem_all        = !all;
         plem_max        = !mlemmas;
-        plem_iterate    = !iterate;
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
         plem_dumpin     = !dumpin;

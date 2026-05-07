@@ -401,7 +401,6 @@ type prover_infos = {
   pr_verbose   : int;
   pr_all       : bool;
   pr_max       : int;
-  pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
   pr_dumpin    : string EcLocation.located option;
@@ -418,7 +417,6 @@ let dft_prover_infos = {
   pr_quorum    = 1;
   pr_verbose   = 0;
   pr_all       = false;
-  pr_iterate   = false;
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
