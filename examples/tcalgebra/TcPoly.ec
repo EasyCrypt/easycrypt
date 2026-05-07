@@ -794,3 +794,64 @@ move=> ge0_k le; elim: r => [|x r ih]; 1: by rewrite big_nil deg0.
 rewrite big_cons; case: (P x) => // Px.
 by rewrite &(ler_trans _ _ _ (degD _ _)) ler_maxrP ih le.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* Polynomial evaluation.                                               *)
+(* -------------------------------------------------------------------- *)
+op peval (p : c poly) (a : c) =
+  bigiA<:c> predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
+
+abbrev root (p : c poly) (a : c) = peval p a = zero<:c>.
+
+(* -------------------------------------------------------------------- *)
+(* polyL: build a polynomial from a coefficient list.                   *)
+(* -------------------------------------------------------------------- *)
+op prepolyL (a : c list) : int -> c = fun i => nth zero<:c> a i.
+
+lemma isprepolyL a : ispoly (prepolyL a).
+proof.
+split=> [i lt0_i|]; first by rewrite /prepolyL nth_neg.
+exists (size a) => i gti; rewrite /prepolyL nth_out //.
+by apply/negP => -[_]; rewrite ltrNge /= ltrW.
+qed.
+
+op polyL (a : c list) : c poly = to_polyd (prepolyL a).
+
+lemma polyLE a i : (polyL a).[i] = nth zero<:c> a i.
+proof. by rewrite coeffE 1:isprepolyL. qed.
+
+lemma degL_le a : deg (polyL a) <= size a.
+proof.
+apply: deg_leP; first exact: size_ge0.
+by move=> i gei; rewrite polyLE nth_out //#.
+qed.
+
+lemma degL a :
+  last zero<:c> a <> zero<:c> => deg (polyL a) = size a.
+proof.
+move=> nz; apply/degP.
+- by case: a nz => //= x s _; rewrite addrC ltzS size_ge0.
+- by rewrite polyLE nth_last.
+- move=> i sza; rewrite gedeg_coeff //.
+  by apply: (ler_trans (size a)) => //; apply: degL_le.
+qed.
+
+lemma inj_polyL a1 a2 :
+  size a1 = size a2 => polyL a1 = polyL a2 => a1 = a2.
+proof.
+move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zero<:c>)=> //.
+by move=> i [+ _] - /eq; rewrite !polyLE.
+qed.
+
+lemma surj_polyL p n :
+  deg p <= n => exists s, size s = n /\ p = polyL s.
+proof.
+move=> len; exists (map (fun i => p.[i]) (range 0 n)); split.
+- by rewrite size_map size_range /=; smt(ge0_deg).
+apply/poly_eqP=> i ge0_i; rewrite polyLE; case: (i < n).
+- by move=> lt_in; rewrite (nth_map 0) ?size_range ?nth_range //#.
+- rewrite ltrNge /= => le_ni; rewrite gedeg_coeff // 1:/#.
+  by rewrite nth_out // size_map size_range /#.
+qed.
+
+end section.
