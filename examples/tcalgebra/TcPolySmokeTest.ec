@@ -79,3 +79,20 @@ qed.
 lemma test_polyLE (xs : int list) (k : int) :
   (polyL xs).[k] = nth 0 xs k.
 proof. by rewrite polyLE. qed.
+
+(* -------------------------------------------------------------------- *)
+(* Class lemmas at carrier [int poly] — exercises the parametric Path B *)
+(* path through the unifier's flush + matcher's drain.                  *)
+(* -------------------------------------------------------------------- *)
+lemma test_addrC_at_int_poly (p q : int poly) : p + q = q + p.
+proof. by apply (addrC<:int poly>). qed.
+
+lemma test_addrA_at_int_poly (p q r : int poly) :
+  p + (q + r) = (p + q) + r.
+proof. by apply (addrA<:int poly>). qed.
+
+(* [polyM] is the section-local abbrev; the comring's [( * )] is the
+   class op. With both in scope at carrier [int poly], `p * q' is
+   ambiguous at parse — use the structural lemma instead.              *)
+lemma test_mulrC_at_int_poly (p q : int poly) : polyM p q = polyM q p.
+proof. by apply polyM_mulrC. qed.
