@@ -581,10 +581,10 @@ by rewrite addrC gedeg_coeff ?add0r //#.
 qed.
 
 lemma degDr (p q : c poly) : deg p < deg q => deg (p + q) = deg q.
-proof. by move=> h; rewrite (polyD_addrC<:c> p q); apply degDl. qed.
+proof. by move=> h; rewrite (addrC<:c poly> p q); apply degDl. qed.
 
 lemma lcDr (p q : c poly) : deg p < deg q => lc (p + q) = lc q.
-proof. by move=> h; rewrite (polyD_addrC<:c> p q); apply lcDl. qed.
+proof. by move=> h; rewrite (addrC<:c poly> p q); apply lcDl. qed.
 
 (* -------------------------------------------------------------------- *)
 (* Multiplicative degree.                                               *)
@@ -744,7 +744,7 @@ lemma polyXnE i k :
 proof.
 move=> ge0_i; elim: i ge0_i k => [|i ge0_i ih] k.
 - by rewrite expr0 polyCE.
-- by rewrite exprS // polyM_mulrC polyMXE ih /#.
+- by rewrite exprS // (mulrC<:c poly>) polyMXE ih /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

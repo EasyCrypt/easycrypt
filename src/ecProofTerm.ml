@@ -339,12 +339,18 @@ let pf_find_occurence
           end
       end
     | _ -> None in
+  (* Compute the alternative head an [Fop p tys] could expose after a
+     single [tc_reduce] step at the carrier. Used for both pattern- and
+     goal-side keyed matching. *)
+  let kmatch_alt_head (head : form) : EcPath.path option =
+    head_op_after_tc_reduce head in
   let kmatch key tp =
-    match key, (fst (destr_app tp)).f_node with
+    let tp_head = fst (destr_app tp) in
+    match key, tp_head.f_node with
     | `NoKey , _           -> true
     | `Path p, Fop (p', _) when EcPath.p_equal p p' -> true
     | `Path p, _ -> begin
-        match head_op_after_tc_reduce (fst (destr_app tp)) with
+        match kmatch_alt_head tp_head with
         | Some p' -> EcPath.p_equal p p'
         | None -> false
       end
@@ -354,10 +360,21 @@ let pf_find_occurence
 
   let keycheck tp key = not occmode.k_keyed || kmatch key tp in
 
-  (* Extract key from pattern *)
+  (* Extract key from pattern. For a TC-op pattern, take the *reduced*
+     head as the key when [tc_reduce] yields a concrete op at the
+     pattern's carrier — that's the form most goals will have after
+     abbrev expansion at that carrier. Without this, [rewrite L] with
+     [L] using a class op like [(+)<:int poly>] would key on [(+)]
+     and miss goals where the same position has been elaborated to
+     the carrier's structural realisation (e.g. [polyD]).            *)
   let key =
-    match (fst (destr_app ptn)).f_node with
-    | Fop (p, _) -> `Path p
+    let ptn_head = fst (destr_app ptn) in
+    match ptn_head.f_node with
+    | Fop (p, _) -> begin
+        match kmatch_alt_head ptn_head with
+        | Some p' -> `Path p'
+        | None -> `Path p
+      end
     | Flocal x   ->
         if   is_none (EcMatching.MEV.get x `Form !(pt.pte_ev))
         then `Var x
