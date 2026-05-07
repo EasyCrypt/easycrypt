@@ -1217,6 +1217,16 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
       let try_delta () =
         if not opts.fm_delta then
           failure ();
+        (* Drain pending TC constraints before checking [tc_reducible]:
+           a [TCIUni] witness on a TC op-head needs to be committed in
+           the resolution map (and then dereferenced via [norm]) for
+           [tc_core_reduce] to fire. Without this drain, a parametric-
+           carrier proof-term carrying an unresolved [TCIUni] would
+           fail to reduce here even when the carrier's TC instance is
+           registered in the env.                                       *)
+        EcUnify.UniEnv.flush_tc_problems env ue;
+        let f1 = norm f1 in
+        let f2 = norm f2 in
         match fst_map f_node (destr_app f1),
               fst_map f_node (destr_app f2)
         with

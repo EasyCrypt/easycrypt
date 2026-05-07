@@ -999,6 +999,20 @@ module UniEnv = struct
     Unify.check_closed (!ue).ue_uc;
     assubst ue
 
+  (* Drain the pending TcCtt queue: invokes [Unify.unify_core] on a
+     trivially-true [TyUni] problem, which causes the unifier to first
+     re-process every parked [TcCtt] in [tcenv.problems]. After this,
+     any constraint that the strategies (Mode #1 .. #6) can resolve is
+     committed to [tcenv.resolution]. Constraints that defer (ambiguous
+     or carrier-with-univars) stay parked.                              *)
+  let flush_tc_problems (env : EcEnv.env) (ue : unienv) : unit =
+    if not (TcUni.Muid.is_empty (!ue).ue_uc.tcenv.problems) then
+      try
+        let trig = tunit in
+        let uc = Unify.unify_core env (!ue).ue_uc (`TyUni (trig, trig)) in
+        ue := { !ue with ue_uc = uc }
+      with UnificationFailure _ -> ()
+
   let tparams (ue : unienv) =
     let close = Unify.close (!ue).ue_uc in
     let deref_tc (tc : typeclass) : typeclass =

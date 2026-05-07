@@ -59,6 +59,12 @@ module UniEnv : sig
   val assubst    : unienv -> ty TyUni.Muid.t
   val tw_assubst : unienv -> tcwitness TcUni.Muid.t
   val tparams    : unienv -> ty_params
+
+  (* Drain the pending TC-constraint queue, attempting to resolve every
+     [TcCtt] problem currently parked. Useful before TC-op reduction
+     attempts (e.g. in matcher's [try_delta]) where a [TCIUni] witness
+     needs to be committed before [tc_core_reduce] can fire.            *)
+  val flush_tc_problems : EcEnv.env -> unienv -> unit
 end
 
 val unify        : EcEnv.env -> unienv -> ty -> ty -> unit
