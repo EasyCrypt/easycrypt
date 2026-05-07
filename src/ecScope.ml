@@ -1981,7 +1981,7 @@ module Ty = struct
         reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
-  let check_tci_axioms scope mode axs reqs lc =
+  let check_tci_axioms ?(tparams = []) scope mode axs reqs lc =
     let rmap = Mstr.of_list reqs in
     let symbs, axs =
       List.map_fold
@@ -1998,7 +1998,7 @@ module Ty = struct
         (fun (x, req) ->
            if not (Mstr.mem x symbs) then
              let ax = {
-               ax_tparams    = [];
+               ax_tparams    = tparams;
                ax_spec       = req;
                ax_kind       = `Lemma;
                ax_loca       = lc;
@@ -2013,7 +2013,7 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = {
-              ax_tparams    = [];
+              ax_tparams    = tparams;
               ax_spec       = f;
               ax_kind       = `Lemma;
               ax_smt = false;
@@ -2137,8 +2137,24 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ((tparams, ty) : ty_params * ty) (tcp, tc) =
-    let subst, _ = EcSubst.fresh_tparams EcSubst.empty tparams in
-    let ty = EcSubst.subst_ty subst ty in
+    (* The instance's tparams are the same idents we'll later resolve
+       op-clause RHSs against (via [check_tci_operators], which creates
+       a [unienv] seeded with these tparams). Build the substitution
+       binding each tparam to itself (with appropriate TC witnesses on
+       the original ident) — DO NOT freshen, otherwise the expected op
+       type uses [c_fresh] while the resolved op uses the instance's
+       [c_orig], and [EqTest.for_type] rejects them as different
+       (printing identically as ['a] but with different idents).      *)
+    let subst =
+      List.fold_left
+        (fun s (x, tcs) ->
+          let tcw =
+            List.mapi (fun i _ ->
+              EcAst.TCIAbstract {
+                support = `Var x; offset = i; lift = [];
+              }) tcs
+          in EcSubst.add_tyvar s x (EcTypes.tvar x, tcw))
+        EcSubst.empty tparams in
     let subst = EcSubst.add_tydef subst tcp.tc_name ([], ty, []) in
     let subst =
       List.fold_left
@@ -2286,20 +2302,61 @@ module Ty = struct
        substituting the carrier with [ty], that needs to point at
        the instance for [ty] of [anc] — i.e. exactly the path we are
        about to register. *)
+    (* For each chain entry, first check whether an existing instance in
+       the env already realises [(anc, snd ty)] with op-symbols matching
+       what this declaration would produce. If so, reuse its path rather
+       than register a duplicate (which would diverge witnesses and
+       violate one-canonical-instance-per-(class, carrier)). The
+       returned [name option] is [None] when reusing — the chain
+       registration loop below skips those entries.                      *)
+    let find_existing_chain_entry (anc : typeclass) (anc_decl : tc_decl) ren =
+      let expected =
+        List.fold_left
+          (fun m (id, _) ->
+            let n = EcIdent.name id in
+            let local = lookup_ren ren n in
+            match Mstr.find_opt local symbols with
+            | Some s -> Mstr.add n s m
+            | None -> m)
+          Mstr.empty anc_decl.tc_ops in
+      let same_symbols (existing_syms : (path * etyarg list) Mstr.t) =
+        Mstr.for_all
+          (fun n (p, _) ->
+            match Mstr.find_opt n existing_syms with
+            | Some (p', _) -> EcPath.p_equal p p'
+            | None -> false)
+          expected in
+      List.opick
+        (fun (path_opt, tci_existing) ->
+          match path_opt with
+          | None -> None
+          | Some p ->
+            if    EcReduction.EqTest.for_type
+                    (env scope) tci_existing.EcTheory.tci_type (snd ty)
+               && (match tci_existing.EcTheory.tci_instance with
+                   | `General (anc', Some syms) ->
+                     EcPath.p_equal anc'.tc_name anc.tc_name
+                     && same_symbols syms
+                   | _ -> false)
+            then Some p else None)
+        (EcEnv.TcInstance.get_all (env scope)) in
     let chain_paths_pre =
       List.mapi
-        (fun idx (anc, _, _) ->
-          let name =
-            if idx = 0 then
-              match tci.pti_name with
-              | Some name -> unloc name
-              | None ->
-                  Printf.sprintf "%s_%d"
-                    (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ())
-            else
-              Printf.sprintf "%s_%d"
-                (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ()) in
-          (name, EcPath.pqname (path scope) name))
+        (fun idx (anc, anc_decl, ren) ->
+          match find_existing_chain_entry anc anc_decl ren with
+          | Some existing_path -> (None, existing_path)
+          | None ->
+            let name =
+              if idx = 0 then
+                match tci.pti_name with
+                | Some name -> unloc name
+                | None ->
+                    Printf.sprintf "%s_%d"
+                      (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ())
+              else
+                Printf.sprintf "%s_%d"
+                  (EcPath.basename anc.EcAst.tc_name) (EcUid.unique ()) in
+            (Some name, EcPath.pqname (path scope) name))
         chain_decls in
 
     (* Build a substitution mapping every op-ident along the chain to its
@@ -2324,8 +2381,25 @@ module Ty = struct
                  [subst_tcw] then bumps the body's lift onto this
                  concrete witness, walking [tci_parents] correctly. *)
               let _, inst_path = List.nth chain_paths_pre idx in
+              (* For parametric carriers ([instance C with ['a <: …] (T 'a)]),
+                 the chain instance is registered with the same tparams as the
+                 user's instance. Its witness must therefore re-apply those
+                 tparams as etyargs (each carrying its own abstract TC
+                 witnesses), not [], or [tc_reduce] will hit a
+                 [tci_params]/[etyargs] length mismatch when the instance is
+                 later consulted via this witness.                          *)
+              let self_etyargs =
+                List.map
+                  (fun (x, tcs) ->
+                    let tcws =
+                      List.mapi (fun i _ ->
+                        EcAst.TCIAbstract {
+                          support = `Var x; offset = i; lift = [];
+                        }) tcs
+                    in (EcTypes.tvar x, tcws))
+                  (fst ty) in
               let self_witness =
-                TCIConcrete { path = inst_path; etyargs = []; lift = [] } in
+                TCIConcrete { path = inst_path; etyargs = self_etyargs; lift = [] } in
               (EcPath.Sp.add anc.tc_name seen,
                EcSubst.add_tydef subst anc.tc_name
                  ([], snd ty, [self_witness])) in
@@ -2395,6 +2469,15 @@ module Ty = struct
       List.fold_lefti
         (fun scope rev_idx (anc, anc_decl, ren) ->
           let idx = (List.length chain_decls) - 1 - rev_idx in
+          let name_opt, _ = List.nth chain_paths_pre idx in
+          match name_opt with
+          | None ->
+            (* Chain entry reuses an existing instance — don't register
+               a duplicate. The pre-existing instance already provides
+               this ancestor's ops + axioms, and its path is what
+               [chain_paths_pre]/[chain_paths] return for [idx].         *)
+            scope
+          | Some name ->
           let anc_symbols =
             List.fold_left
               (fun m (id, _) ->
@@ -2427,7 +2510,6 @@ module Ty = struct
             ; tci_instance = `General (anc, Some anc_symbols)
             ; tci_local    = lc
             ; tci_parents  = parents } in
-          let name, _ = List.nth chain_paths_pre idx in
           let item = EcTheory.Th_instance (Some name, instance) in
           let item = EcTheory.mkitem ~import item in
           { scope with sc_env = EcSection.add_item item scope.sc_env })
@@ -2443,8 +2525,15 @@ module Ty = struct
        discharged: addmonoid's monoid-axiom obligations are
        discharged by the existing monoid instance. The chain entries
        we register in this declaration are excluded by path. *)
+    (* Only freshly-registered paths count as "self": reused paths
+       refer to instances that pre-existed, and we want
+       [already_discharged] to count them as the discharger.            *)
     let chain_self_paths =
-      List.map snd chain_paths_pre |> EcPath.Sp.of_list in
+      List.filter_map
+        (fun (name_opt, p) ->
+          if Option.is_some name_opt then Some p else None)
+        chain_paths_pre
+      |> EcPath.Sp.of_list in
     let already_discharged (anc : typeclass) (anc_decl : tc_decl) (ren : _) : bool =
       let expected =
         List.fold_left
@@ -2498,7 +2587,7 @@ module Ty = struct
                 anc_decl.tc_axs)
           (Sstr.empty, []) chain_decls in
       List.rev axs in
-    let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
+    let inter = check_tci_axioms ~tparams:(fst ty) scope mode tci.pti_axs axioms lc in
 
     Ax.add_defer scope inter
 
