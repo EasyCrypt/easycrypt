@@ -855,3 +855,132 @@ apply/poly_eqP=> i ge0_i; rewrite polyLE; case: (i < n).
 qed.
 
 end section.
+
+(* ==================================================================== *)
+(* Phase 7: idomain extension. Mirrors [theories/algebra/Poly.ec:Poly]   *)
+(* (the idomain-coefficient phase). Adds the multiplicativity of [deg]   *)
+(* and [lc], the no-zero-divisor property, and the structural            *)
+(* characterisation lemmas [unitE]/[polyVE] bridging the choiceb-based   *)
+(* [poly_unit]/[poly_invr] (committed at Phase 5) to the structural      *)
+(* "deg=1 with invertible constant" form available when [c : idomain].   *)
+(* ==================================================================== *)
+section.
+declare type c <: idomain.
+
+(* -------------------------------------------------------------------- *)
+lemma degM (p q : c poly) : p <> poly0 => q <> poly0 =>
+  deg (p * q) = deg p + deg q - 1.
+proof.
+rewrite -!lc_eq0 -!lregP => reg_p reg_q.
+by rewrite &(degM_proper) mulf_eq0 negb_or -!lregP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lcM (p q : c poly) : lc (p * q) = lc p * lc q.
+proof.
+case: (p = poly0) => [->|nz_p]; first by rewrite polyM_mul0r !lc0 mul0r.
+case: (q = poly0) => [->|nz_q].
+- by rewrite polyM_mulrC polyM_mul0r !lc0 mulr0.
+by rewrite lcM_proper // mulf_eq0 !lc_eq0 !(nz_p, nz_q).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* No zero divisors at the poly level (the [mulf_eq0] axiom one would    *)
+(* need to register [idomain with ('c poly)]).                           *)
+(* -------------------------------------------------------------------- *)
+lemma polyM_mulf_eq0 (p q : c poly) :
+  p * q = poly0 <=> p = poly0 \/ q = poly0.
+proof.
+split; last by case=> ->; rewrite ?polyM_mul0r // polyM_mulrC polyM_mul0r.
+apply: contraLR; rewrite negb_or => -[nz_p nz_q]; apply/negP.
+move/(congr1 (fun r : c poly => deg r + 1)) => /=; rewrite deg0 degM //=.
+by rewrite gtr_eqF // -lez_add1r ler_add deg_ge1.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Structural characterisation of [poly_unit] / [poly_invr] when         *)
+(* [c : idomain]. Bridges the choiceb-based forms committed at Phase 5   *)
+(* to the deg=1-with-invertible-constant form usable in proofs. The      *)
+(* underlying ops (poly_unit, poly_invr) remain as registered;            *)
+(* downstream code rewrites with these equivalences.                     *)
+(* -------------------------------------------------------------------- *)
+lemma unitE (p : c poly) :
+  poly_unit p <=> deg p = 1 /\ unit p.[0].
+proof.
+rewrite /poly_unit; split.
+- case=> q pMqE.
+  have nz_p : p <> poly0.
+  - apply/negP=> ->>; have := pMqE; rewrite polyM_mulrC polyM_mul0r => /eq_sym.
+    by move/(congr1 (fun r : c poly => r.[0])) => /=;
+       rewrite poly0E polyCE /=; smt(oner_neq0).
+  have nz_q : q <> poly0.
+  - apply/negP=> ->>; have := pMqE; rewrite polyM_mul0r => /eq_sym.
+    by move/(congr1 (fun r : c poly => r.[0])) => /=;
+       rewrite poly0E polyCE /=; smt(oner_neq0).
+  have /(congr1 deg) : polyM q p = poly1 by exact pMqE.
+  rewrite deg1 degM //= => sum_eq.
+  have ge1_p : 1 <= deg p by rewrite deg_ge1.
+  have ge1_q : 1 <= deg q by rewrite deg_ge1.
+  have [dq_eq dp_eq] : deg q = 1 /\ deg p = 1 by smt().
+  split=> //.
+  move/poly_eqP: pMqE => /(_ 0 _) //; rewrite polyCE /=.
+  by rewrite polyME big_int1 /= => /unitP.
+- case=> dp_eq1 unit_p0; case/deg_eq1: dp_eq1 => a [nz_a ->>].
+  exists (polyC (invr a)); apply/poly_eqP=> i ge0_i.
+  rewrite polyCE polyME; case: (i = 0) => [->>|ne0_i] /=.
+  - rewrite big_int1 /= !polyCE /= mulVr //.
+    by move: unit_p0; rewrite polyCE.
+  rewrite big_seq big1 ?addr0 //= => j /mem_range [ge0_j _].
+  rewrite !polyCE; case: (j = 0) => [->>/=|/= _].
+  - by rewrite ne0_i /= mulr0.
+  - by rewrite mul0r.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Structural value of [poly_invr] for unit polynomials over an
+   idomain coefficient: [poly_invr (polyC a) = polyC (invr a)] when
+   [unit a]. The choiceb's witness [q : q * polyC a = poly1] is
+   uniquely [polyC (invr a)] modulo invertibility, which suffices for
+   pointwise equality.                                                  *)
+(* -------------------------------------------------------------------- *)
+lemma polyVE (a : c) : unit a => poly_invr (polyC a) = polyC (invr a).
+proof.
+move=> ua; rewrite /poly_invr.
+have ex_q : exists q, polyM q (polyC a) = poly_one<:c>.
+- exists (polyC (invr a)); apply/poly_eqP=> i ge0_i.
+  rewrite polyME /poly_one polyCE; case: (i = 0) => [->>|nei] /=.
+  - by rewrite big_int1 /= !polyCE /= mulVr.
+  rewrite big_seq big1 ?addr0 //= => j /mem_range [ge0_j _].
+  rewrite !polyCE; case: (j = 0) => [->>/=|/= _].
+  - by rewrite nei /= mulr0.
+  - by rewrite mul0r.
+have := choicebP (fun q => polyM q (polyC a) = poly_one<:c>) (polyC a) ex_q.
+move=> /= choice_eq.
+(* Both [choiceb …] and [polyC (invr a)] are left inverses of [polyC a];
+   uniqueness via no-zero-divisors yields equality.                    *)
+pose q := choiceb (fun q => polyM q (polyC a) = poly_one<:c>) (polyC a).
+have qE : polyM q (polyC a) = poly_one<:c> by exact choice_eq.
+apply/poly_eqP=> i ge0_i.
+have polyC_invr_eq : polyM (polyC (invr a)) (polyC a) = poly_one<:c>.
+- apply/poly_eqP=> j ge0_j; rewrite polyME /poly_one polyCE.
+  case: (j = 0) => [->>|nej] /=.
+  - by rewrite big_int1 /= !polyCE /= mulVr.
+  rewrite big_seq big1 ?addr0 //= => k /mem_range [ge0_k _].
+  rewrite !polyCE; case: (k = 0) => [->>/=|/= _].
+  - by rewrite nej /= mulr0.
+  - by rewrite mul0r.
+have eq2 : polyM q (polyC a) = polyM (polyC (invr a)) (polyC a)
+  by rewrite qE -polyC_invr_eq.
+(* Cancel [polyC a] on the right: it has [unit] coeff, so it's [lreg]. *)
+have nz_a : a <> zero<:c>.
+- apply/negP=> a0; have h := mulVr a ua; rewrite a0 mulr0 in h.
+  by move: h => /eq_sym; smt(oner_neq0).
+have lreg_pCa : lreg (polyC a).
+- apply lreg_lc; rewrite lcC; apply/lregP/nz_a.
+have inj_pCa : injective (fun y : c poly => polyM y (polyC a)).
+- by move=> x y; rewrite (polyM_mulrC x) (polyM_mulrC y) => /lreg_pCa.
+have q_eq : q = polyC (invr a) by apply: inj_pCa.
+by rewrite q_eq.
+qed.
+
+end section.
