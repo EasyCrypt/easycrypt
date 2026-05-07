@@ -502,24 +502,24 @@ section Reduce.
            /\ Compute.qs{2} = (DoubleQuery.qs `|` (fset1 (s + nth witness p i))){1}).
       wp; rnd (fun x => x + pi{2}); auto=> /> &1 &2 ge0_iP _ _ lt_i_szp.
       case: (mem DoubleQuery.qs{1} _)=> //=.
-        split=> [sR _|_]; 1:smt(addbA addbK add0b). (* TODO: instantiate ring structure *)
+        split=> [sR _|_]; 1:smt(addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
         split=> [|_ r _]; 1:smt (dBlock_uffu).
         split=> [|_]; 1:smt (dBlock_uffu).
-        split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+        split=> [|_]; 1:smt (addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
         by split=> [|/#];
-          split; [congr; congr; smt(addbA addbK add0b) | smt()]. (* TODO: instantiate ring structure *)
-      split=> [sR _ |_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+          split; [congr; congr; smt(addbA addbK addbC add0b) | smt()]. (* TODO: instantiate ring structure *)
+      split=> [sR _ |_]; 1:smt (addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
       split=> [|_ r _]; 1:smt (dBlock_uffu).
       split=> [|_]; 1:smt (dBlock_uffu).
-      split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+      split=> [|_]; 1:smt (addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
 split.
       by move=> h; rewrite -addbA Block.subrr Block.addr0 /= /#.
       by move=> h; rewrite -addbA Block.subrr Block.addr0 /= /#.
     wp; rnd (fun x => x + pi{2}).
-    auto=> /> &2 szp_neq_0; split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+    auto=> /> &2 szp_neq_0; split=> [|_]; 1:smt (addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
     split=> [|_ s _]; 1:smt (dBlock_uffu).
     split=> [|_]; 1:smt (dBlock_uffu).
-    split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+    split=> [|_]; 1:smt (addbA addbK addbC add0b). (* TODO: instantiate ring structure *)
     smt (size_ge0).
   qed.
 
