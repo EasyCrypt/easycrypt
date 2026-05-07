@@ -1644,43 +1644,8 @@ let select env pi hyps concl execute_task =
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
     let ri, other = init_relevant env pi rs in
-    if not pi.P.pr_iterate then begin
-      ignore (relevant_clause ri other);
-      (execute_task ri.toadd = Some true)
-    end else
-      let other, res =
-        if List.is_empty ri.toadd then
-          let other = relevant_clause ri other in
-          other, execute_task ri.toadd
-        else other, execute_task ri.toadd in
-
-      match res with Some res -> res | None ->
-        let rec aux ml other i =
-          if i <= 0 then begin
-            ri.ri_max <- max_int;
-            ri.ri_p   <- 0.;
-            ri.toadd  <- [];
-            let other = relevant_clause ri other in
-            if List.is_empty ri.toadd then
-              (execute_task (List.fst other) = Some true)
-            else
-              match execute_task ri.toadd with
-              | None -> (execute_task (List.fst other) = Some true)
-              | Some res -> res
-          end else begin
-            ri.ri_max <- ml;
-            ri.toadd  <- [];
-            let other = relevant_clause ri other in
-            let ml = min (2*ml+30) max_int in
-            if   List.is_empty ri.toadd
-            then aux ml other (i-1)
-            else
-              match execute_task ri.toadd with
-              | None -> aux ml other (i-1)
-              | Some res -> res
-          end
-
-        in aux pi.P.pr_max other 4
+    ignore (relevant_clause ri other);
+    (execute_task ri.toadd = Some true)
 
 (* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()
