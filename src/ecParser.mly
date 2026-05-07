@@ -2996,8 +2996,8 @@ dcoupl_tac:
 | WHILE inv=sform WITH invr1=option(brace(stmt)) TILD invr2=option(brace(stmt))
     { Pdc_while (None, inv, invr1, invr2)  }
 
-| WHILE s=side inv=sform WITH invr1=option(brace(stmt))
-    { Pdc_while (Some s, inv, invr1, None)  }
+| WHILE s=side
+    { Pdc_while (Some s, mk_loc _dummy PFhole, None, None)  }
 
 | RND s=option(side)
     { Pdc_rnd (s, None) }

@@ -275,18 +275,16 @@ and process_dc_seq nl nr theta ts tc =
   EcPhlDCCore.t_dc_seq ~nl ~nr ?ts theta.inv tc
 
 and process_dc_while side inv invr1 invr2 tc =
-  let inv = TTC.tc1_process_prhl_formula tc inv in
   match side with
   | None ->
+    let inv = TTC.tc1_process_prhl_formula tc inv in
     let invr1 = omap (TTC.tc1_process_prhl_stmt tc `Left) invr1 in
     let invr2 = omap (TTC.tc1_process_prhl_stmt tc `Right) invr2 in
     EcPhlDCCore.t_dc_while ~inv ?invr1 ?invr2 tc
   | Some `Left ->
-    let invr1 = omap (TTC.tc1_process_prhl_stmt tc `Left) invr1 in
-    EcPhlDCCore.t_dc_while ~inv ?invr1 tc
+    EcPhlDCCore.t_dc_while_side ~side:`Left tc
   | Some `Right ->
-    let invr2 = omap (TTC.tc1_process_prhl_stmt tc `Right) invr1 in
-    EcPhlDCCore.t_dc_while ~inv ?invr2 tc
+    EcPhlDCCore.t_dc_while_side ~side:`Right tc
 
 and process_fun_def_dispatch tc =
   match (EcCoreGoal.FApi.tc1_goal tc).f_node with
