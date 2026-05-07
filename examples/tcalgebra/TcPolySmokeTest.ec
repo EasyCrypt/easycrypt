@@ -91,8 +91,9 @@ lemma test_addrA_at_int_poly (p q r : int poly) :
   p + (q + r) = (p + q) + r.
 proof. by apply (addrA<:int poly>). qed.
 
-(* [polyM] is the section-local abbrev; the comring's [( * )] is the
-   class op. With both in scope at carrier [int poly], `p * q' is
-   ambiguous at parse — use the structural lemma instead.              *)
-lemma test_mulrC_at_int_poly (p q : int poly) : polyM p q = polyM q p.
-proof. by apply polyM_mulrC. qed.
+lemma test_mulrC_at_int_poly (p q : int poly) : p * q = q * p.
+proof. by apply (mulrC<:int poly>). qed.
+
+lemma test_mulrA_at_int_poly (p q r : int poly) :
+  p * (q * r) = (p * q) * r.
+proof. by apply (mulrA<:int poly>). qed.
