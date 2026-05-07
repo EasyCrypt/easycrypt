@@ -494,6 +494,60 @@ let gen_select_op
         not (has_tc_op_with_name (EcPath.basename p))
       | _ -> true) ops in
 
+  (* [drop_subsumed_tc] classifies candidates by the [op_kind] of their
+     declared path — but after typing, abbrev candidates are inlined and
+     their bodies' heads are what actually appear in the elaborated
+     term. So an abbrev whose body is itself a TC-op invocation
+     (e.g. [TcMonoid.( * ) ['a <: mulmonoid] (x y) = (+)<:'a> x y])
+     escapes [drop_subsumed_tc]'s filter even though, post-inline, it's
+     a TC-op-headed term that may reduce to the same head as another
+     candidate.
+
+     This pass closes that gap: for each candidate, compute its
+     post-inline body head; collect the non-TC heads as
+     [concrete_heads]; then drop any candidate whose post-inline head
+     is a TC op that [tc_reduce]s to a head already in [concrete_heads].
+     Mirror image of [drop_subsumed_tc] but operating on body heads
+     rather than declared op_kind, catching the abbrev-to-TC-op case
+     that the pre-inline classification misses.                       *)
+  let drop_subsumed_by_post_inline_head ops =
+    let is_tc_op p =
+      match EcEnv.Op.by_path_opt p env with
+      | Some { op_kind = OB_oper (Some (OP_TC _)) } -> true
+      | _ -> false in
+    let body_head ((path, etyargs), _, _, bd) =
+      match bd with
+      | None -> Some (path, etyargs)
+      | Some bd_lazy ->
+          let _, body = Lazy.force bd_lazy in
+          let head, _ = EcTypes.destr_app body in
+          (match head.e_node with
+           | Eop (p, tys) -> Some (p, tys)
+           | _ -> None) in
+    let concrete_heads =
+      List.filter_map (fun cand ->
+        match body_head cand with
+        | Some (p, _) when not (is_tc_op p) -> Some p
+        | _ -> None) ops in
+    if concrete_heads = [] then ops
+    else
+    List.filter (fun cand ->
+      match body_head cand with
+      | Some (p, etyargs) when is_tc_op p -> begin
+          match EcEnv.Op.tc_reduce env p etyargs with
+          | red ->
+            let red_head =
+              match red.f_node with
+              | Fop (p', _) -> Some p'
+              | Fapp ({ f_node = Fop (p', _) }, _) -> Some p'
+              | _ -> None in
+            (match red_head with
+             | None -> true
+             | Some p' -> not (List.exists (EcPath.p_equal p') concrete_heads))
+          | exception EcEnv.NotReducible -> true
+        end
+      | _ -> true) ops in
+
   (* Drop a TC-bounded notation candidate (an abbrev whose tparams have
      non-empty TC bounds, e.g. [TcRing.(-) ['a <: addgroup] (x y) = …])
      when a same-basename candidate with no TC-bounded tparams (e.g. the
@@ -537,6 +591,9 @@ let gen_select_op
       if pruned = [] then ops else pruned in
     let ops =
       let pruned = drop_tc_bounded_notation ops in
+      if pruned = [] then ops else pruned in
+    let ops =
+      let pruned = drop_subsumed_by_post_inline_head ops in
       if pruned = [] then ops else pruned in
     (List.map fop ops)
 
