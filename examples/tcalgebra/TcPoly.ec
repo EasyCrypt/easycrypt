@@ -746,3 +746,51 @@ move=> ge0_i; elim: i ge0_i k => [|i ge0_i ih] k.
 - by rewrite expr0 polyCE.
 - by rewrite exprS // polyM_mulrC polyMXE ih /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(* Sums of polys.                                                       *)
+(* -------------------------------------------------------------------- *)
+lemma polysumE ['a] (P : 'a -> bool) (F : 'a -> c poly) (s : 'a list) k :
+  (bigA P F s).[k] = bigA P (fun i => (F i).[k]) s.
+proof.
+elim: s => /= [|x s ih]; first by rewrite !big_nil poly0E.
+rewrite !big_cons -ih /=.
+by rewrite -polyDE -(fun_if (fun q : c poly => q.[k])).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma polyE (p : c poly) :
+  p = bigiA predT (fun i => p.[i] ** exp X<:c> i) 0 (deg p).
+proof.
+apply/poly_eqP=> i ge0_i; rewrite polysumE /=; case: (i < deg p).
+- move=> lt_i_dp; rewrite (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
+  rewrite !(coeffpE, polyXnE) //= mulr1 big1_seq ?addr0 //=.
+  move=> @/predC1 j [ne_ji /mem_range [ge0_j _]].
+  by rewrite !(coeffpE, polyXnE) // (eq_sym i j) ne_ji /= mulr0.
+- move=> /lerNgt ge_i_dp; rewrite gedeg_coeff //.
+  rewrite big_seq big1 //= => j /mem_range [ge0_j lt_j].
+  by rewrite !(coeffpE, polyXnE) // (_ : i <> j) ?mulr0 //#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma polywE n (p : c poly) : deg p <= n =>
+  p = bigiA predT (fun i => p.[i] ** exp X<:c> i) 0 n.
+proof.
+move=> le_pn; rewrite (big_cat_int (deg p)) // ?ge0_deg.
+rewrite {1}polyE; pose r := bigA _ _ _.
+pose d := bigA _ _ _; suff ->: d = poly0.
+- by apply/poly_eqP=> i ge0_i; rewrite polyDE poly0E addr0.
+rewrite /d big_seq big1 => //= i /mem_range [gei _].
+by rewrite gedeg_coeff // scale0p.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma deg_sum ['a] (P : 'a -> bool) (F : 'a -> c poly) (r : 'a list) k :
+     0 <= k
+  => (forall x, P x => deg (F x) <= k)
+  => deg (bigA P F r) <= k.
+proof.
+move=> ge0_k le; elim: r => [|x r ih]; 1: by rewrite big_nil deg0.
+rewrite big_cons; case: (P x) => // Px.
+by rewrite &(ler_trans _ _ _ (degD _ _)) ler_maxrP ih le.
+qed.
