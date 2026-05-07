@@ -593,7 +593,7 @@ lemma mul_lc (p q : c poly) :
   lc p * lc q = (p * q).[deg p + deg q - 2].
 proof.
 case: (p = poly0) => [->|nz_p].
-- by rewrite polyM_mul0r !poly0E mul0r.
+- by rewrite mul0r<:c poly> !poly0E mul0r.
 case: (q = poly0) => [->|nz_q].
 - by rewrite polyM_mulrC polyM_mul0r !poly0E mulr0.
 have ->: deg p + deg q - 2 = (deg p - 1) + (deg q - 1) by ring.
@@ -678,7 +678,7 @@ lemma degXn_le (p : c poly) i :
   p <> poly0 => 0 <= i => deg (exp p i) <= i * (deg p - 1) + 1.
 proof.
 move=> nz_p; elim: i => [|i ge0_i ih]; first by rewrite !expr0 deg1.
-rewrite exprS // mulrDl /= addrAC !addrA ler_subr_addl (addzC 1).
+rewrite exprS // mulrDl /= addrAC !addrA ler_subr_addl (addrC<:int> 1).
 case: (exp p i = poly0) => [->|nz_pX].
 - by rewrite mulr0 deg0 /=; rewrite -deg_gt0 in nz_p => /#.
 apply: (ler_trans (deg p + deg (exp p i))); 1: by apply: degM_le.
