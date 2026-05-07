@@ -2326,13 +2326,26 @@ module Ty = struct
             | Some (p', _) -> EcPath.p_equal p p'
             | None -> false)
           expected in
+      (* Carrier-type comparison must be alpha-equivalent (ignore tparam
+         identity), since the existing instance's tparams have their own
+         fresh idents that don't match the user's tparams here. Use
+         [EcTypeClass.ty_match] with the existing instance's tparams as
+         pattern variables.                                              *)
+      let same_carrier (tci_existing : EcTheory.tcinstance) =
+        try
+          let _ : ty option Mid.t =
+            EcTypeClass.ty_match (env scope)
+              (List.fst tci_existing.EcTheory.tci_params)
+              ~pattern:tci_existing.EcTheory.tci_type
+              ~ty:(snd ty)
+          in true
+        with EcTypeClass.NoMatch -> false in
       List.opick
         (fun (path_opt, tci_existing) ->
           match path_opt with
           | None -> None
           | Some p ->
-            if    EcReduction.EqTest.for_type
-                    (env scope) tci_existing.EcTheory.tci_type (snd ty)
+            if    same_carrier tci_existing
                && (match tci_existing.EcTheory.tci_instance with
                    | `General (anc', Some syms) ->
                      EcPath.p_equal anc'.tc_name anc.tc_name

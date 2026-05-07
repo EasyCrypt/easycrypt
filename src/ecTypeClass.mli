@@ -4,7 +4,19 @@ open EcTheory
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
+exception NoMatch
+
+(* -------------------------------------------------------------------- *)
 val infer : env -> ty -> typeclass -> tcwitness option
+
+(* -------------------------------------------------------------------- *)
+(* Match [pattern] (with free [Tvar]s listed in [params]) against [ty]
+   and return the resulting substitution. Raises [NoMatch] on shape
+   mismatch.                                                            *)
+val ty_match :
+     env -> EcIdent.t list
+  -> pattern:ty -> ty:ty
+  -> ty option EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 (* Build one [tcwitness] per entry of [tcs] for a carrier [body],
