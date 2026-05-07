@@ -446,3 +446,144 @@ instance comring with ['c <: comring] ('c poly)
   proof unitP      by (move=> p q heq; rewrite /poly_unit<:'c>; by exists q)
   proof unitout    by (move=> p; rewrite /poly_unit<:'c> /poly_invr<:'c> negb_exists => hne;
                        by apply choiceb_dfl => q; apply hne).
+
+(* ==================================================================== *)
+(* Phase 6: higher-level theory of polynomials over a [comring]        *)
+(* coefficient. Mirrors [theories/algebra/Poly.ec] from [degC]         *)
+(* (line 296) onwards: degree arithmetic, multiplicative degree,       *)
+(* X^i / polyXn, polysumE / polyE / polywE, peval, polyL constructor.  *)
+(* ==================================================================== *)
+section.
+declare type c <: comring.
+
+(* -------------------------------------------------------------------- *)
+(* Degree of constants, leading coefficient, [poly0]/[poly1] degrees.  *)
+(* -------------------------------------------------------------------- *)
+lemma degC (a : c) : deg (polyC a) = if a = zero<:c> then 0 else 1.
+proof.
+case: (a = zero<:c>) => [->|nz_a]; last first.
+- apply: degP => //=; first by rewrite polyCE.
+  by move=> i ge1_i; rewrite polyCE gtr_eqF //#.
+rewrite /deg; apply: argmin_eq => //=.
+- by move=> j _; rewrite poly0E.
+- by move=> j; apply: contraL => _ /#.
+qed.
+
+lemma degC_le (a : c) : deg (polyC a) <= 1.
+proof. by rewrite degC; case: (a = zero<:c>). qed.
+
+lemma lcC (a : c) : lc (polyC a) = a.
+proof. by rewrite polyCE degC; case: (a = zero<:c>) => [->|]. qed.
+
+lemma lc0 : lc poly0<:c> = zero<:c>.
+proof. by apply: lcC. qed.
+
+lemma lc1 : lc poly1<:c> = oner<:c>.
+proof. by apply: lcC. qed.
+
+lemma deg0 : deg poly0<:c> = 0.
+proof. by rewrite degC. qed.
+
+lemma deg1 : deg poly1<:c> = 1.
+proof.
+apply: degP => //=; first by rewrite polyCE /= oner_neq0.
+by move=> i ge1_i; rewrite polyCE gtr_eqF //#.
+qed.
+
+lemma deg_eq0 (p : c poly) : (deg p = 0) <=> (p = poly0).
+proof.
+split=> [z_degp|->]; last by rewrite deg0.
+apply/poly_eqP=> i ge0_i; rewrite poly0E.
+by apply/gedeg_coeff; rewrite z_degp.
+qed.
+
+lemma degX : deg X<:c> = 2.
+proof.
+apply/degP=> //=; first by rewrite polyXE /= oner_neq0.
+by move=> i ge2_i; rewrite polyXE gtr_eqF //#.
+qed.
+
+lemma nz_polyX : X<:c> <> poly0.
+proof. by rewrite -deg_eq0 degX. qed.
+
+lemma lcX : lc X<:c> = oner<:c>.
+proof. by rewrite degX /= polyXE. qed.
+
+lemma deg_ge1 (p : c poly) : (1 <= deg p) <=> (p <> poly0).
+proof. by rewrite -deg_eq0 eqr_le ge0_deg /= (lerNgt _ 0) /#. qed.
+
+lemma deg_gt0 (p : c poly) : (0 < deg p) <=> (p <> poly0).
+proof. by rewrite -deg_ge1 /#. qed.
+
+lemma deg_eq1 (p : c poly) :
+  (deg p = 1) <=> (exists a, a <> zero<:c> /\ p = polyC a).
+proof.
+split=> [eq1_degp|[a [nz_a ->>]]]; last first.
++ by apply: degP => //= => [|i ge1_i]; rewrite polyCE //= gtr_eqF /#.
+have pC: forall i, 1 <= i => p.[i] = zero<:c>.
++ by move=> i ge1_i; apply: gedeg_coeff; rewrite eq1_degp.
+exists p.[0]; split; last first.
++ apply/poly_eqP => i /ler_eqVlt -[<<-|]; first by rewrite polyCE.
+  by move=> gt0_i; rewrite polyCE gtr_eqF //= &(pC) /#.
+apply: contraL eq1_degp => z_p0; suff ->: p = poly0 by rewrite deg0.
+apply/poly_eqP=> i; rewrite poly0E => /ler_eqVlt [<<-//|].
+by move=> gt0_i; apply: pC => /#.
+qed.
+
+lemma lc_eq0 (p : c poly) : (lc p = zero<:c>) <=> (p = poly0).
+proof.
+case: (p = poly0) => [->|] /=; first by rewrite lc0.
+rewrite -deg_eq0 eqr_le ge0_deg /= -ltrNge => gt0_deg.
+pose P i := forall j, (i <= j)%Int => p.[j] = zero<:c>.
+apply/negP => zp; have h: 0 <= deg p - 1 < argmin idfun P.
++ rewrite /P /argmin -/(deg p); smt(ge0_deg).
+have := argmin_min idfun P (deg p - 1) h.
+move=> @/idfun /= j /ler_eqVlt [<<-//| ltj].
+by apply: gedeg_coeff => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* Degree of additive operations.                                       *)
+(* -------------------------------------------------------------------- *)
+lemma degN (p : c poly) : deg (-p) = deg p.
+proof.
+rewrite /deg; congr; apply/fun_ext => /= i; apply/eq_iff.
+by split=> + j - /(_ j); rewrite polyNE oppr_eq0.
+qed.
+
+lemma lcN (p : c poly) : lc (-p) = - lc p.
+proof. by rewrite degN polyNE. qed.
+
+lemma degD (p q : c poly) : deg (p + q) <= max (deg p) (deg q).
+proof.
+apply: deg_leP; [by smt(ge0_deg) | move=> i /ler_maxrP[le1 le2]].
+by rewrite polyDE !gedeg_coeff ?addr0.
+qed.
+
+lemma degB (p q : c poly) : deg (p - q) <= max (deg p) (deg q).
+proof. by rewrite -(degN q) &(degD). qed.
+
+lemma degDl (p q : c poly) : deg q < deg p => deg (p + q) = deg p.
+proof.
+move=> le_pq; have gt0_p: 0 < deg p.
+- by apply/(ler_lt_trans _ _ _ _ le_pq)/ge0_deg.
+apply: degP=> //.
+- rewrite polyDE (gedeg_coeff q) 1:/#.
+  by rewrite addr0 lc_eq0 -deg_eq0 gtr_eqF.
+- move=> i le_pi; rewrite polyDE !gedeg_coeff ?addr0 //.
+  by apply/ltrW/(ltr_le_trans _ _ _ le_pq).
+qed.
+
+lemma lcDl (p q : c poly) : deg q < deg p => lc (p + q) = lc p.
+proof.
+move=> ^lt_pq /degDl ->; rewrite polyDE.
+by rewrite addrC gedeg_coeff ?add0r //#.
+qed.
+
+lemma degDr (p q : c poly) : deg p < deg q => deg (p + q) = deg q.
+proof. by move=> h; rewrite (polyD_addrC<:c> p q); apply degDl. qed.
+
+lemma lcDr (p q : c poly) : deg p < deg q => lc (p + q) = lc q.
+proof. by move=> h; rewrite (polyD_addrC<:c> p q); apply lcDl. qed.
+
+end section.
