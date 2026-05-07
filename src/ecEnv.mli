@@ -333,6 +333,17 @@ module Op : sig
   val tc_reducible : env -> path -> etyarg list -> bool
   val tc_reduce    : env -> path -> etyarg list -> form
 
+  (* [tc_op_realised_by env tcop concrete] is true iff [tcop] is a
+     TC-class op and there exists a registered instance whose
+     symbol-map binds [tcop]'s basename to [concrete]. Used by the
+     matcher to bridge a pattern with a TC-op head whose carrier
+     is still a univar to a goal whose head is the registered
+     realisation, so e.g. [rewrite mul0r] (no TVI) matches goals
+     containing the structural [polyM]. The lookup is purely
+     syntactic — the caller must still post the carrier-pinning
+     unification that makes the bridge sound.                       *)
+  val tc_op_realised_by : env -> path -> path -> bool
+
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : ?nargs:int -> env -> path -> bool

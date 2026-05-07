@@ -339,6 +339,16 @@ let pf_find_occurence
           end
       end
     | _ -> None in
+  (* Reverse-instance lookup: given a TC class op [tcop] and a
+     concrete op [concrete], is there a registered instance where
+     [tcop]'s realisation is [concrete]? Used by [kmatch] when the
+     pattern is a TC-op call with a univar carrier (so [tc_reduce]
+     can't fire forward) and the goal's head is the concrete
+     realisation. Lets [rewrite mul0r] (no TVI) match positions
+     whose head is e.g. [polyM] — pinning the carrier via
+     [try_delta] / [doit_tc_reduce] downstream.                    *)
+  let tc_op_realised_by tcop concrete =
+    EcEnv.Op.tc_op_realised_by env_for_kmatch tcop concrete in
   (* Compute the alternative head an [Fop p tys] could expose after a
      single [tc_reduce] step at the carrier. Used for both pattern- and
      goal-side keyed matching. *)
@@ -349,6 +359,7 @@ let pf_find_occurence
     match key, tp_head.f_node with
     | `NoKey , _           -> true
     | `Path p, Fop (p', _) when EcPath.p_equal p p' -> true
+    | `Path p, Fop (p', _) when tc_op_realised_by p p' -> true
     | `Path p, _ -> begin
         match kmatch_alt_head tp_head with
         | Some p' -> EcPath.p_equal p p'

@@ -2994,6 +2994,19 @@ module Op = struct
     try  EcDecl.is_tc_op (by_path p env)
     with LookupFailure _ -> false
 
+  let tc_op_realised_by (env : env) (tcop : path) (concrete : path) =
+    if not (is_tc_op env tcop) then false
+    else
+      let tcop_basename = EcPath.basename tcop in
+      List.exists (fun (_, tci) ->
+        match tci.EcTheory.tci_instance with
+        | `General (_, Some sym) ->
+          (match EcMaps.Mstr.find_opt tcop_basename sym with
+           | Some (p, _) -> EcPath.p_equal p concrete
+           | None -> false)
+        | _ -> false)
+        (TcInstance.get_all env)
+
   let is_dtype_ctor ?nargs env p =
     try
       match (by_path p env).op_kind with
