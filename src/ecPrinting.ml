@@ -1948,15 +1948,28 @@ and try_pp_notations
   | None ->
     false
 
-  | Some ((p, (tv, nt)), ue, ev, (ov : EcUnify.UniEnv.opened), eargs) ->
+  | Some ((p, (_tv, nt)), ue, ev, (ov : EcUnify.UniEnv.opened), eargs) ->
     let ti   = Tvar.subst ov.subst in
-    let rty  = ti nt.ont_resty in
-    let tv   = List.map (ti -| tvar -| fst) tv in
-    let args = List.map (curry f_local -| snd_map ti) nt.ont_args in
-    let args =
-      let subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
-      List.map (Fsubst.f_subst subst) args in
-    let f    = f_app (f_op p tv rty) (args @ eargs) f.f_ty in
+    (* After [f_match_core], the abbrev's tparam univars (created by
+       [opentvi] in [ov.subst]) have been bound by the matcher. Chase
+       those bindings through the unienv so the displayed [tv] /
+       [resty] / [args] show concrete carriers (e.g. [c]) rather than
+       the fresh univars [#a, #b, ...] that [ov.subst] alone would
+       produce.
+
+       Use [ov.args] (the [etyarg list] from [opentvi], which carries
+       both the type univar AND its TC-witness univar(s)) instead of
+       just the bare tparams; chasing through [mev_subst] then
+       resolves both the type univars AND the TC-witness univars
+       into their committed forms, so the printed notation shows
+       both the carrier ([c]) and its TC witness when one exists.    *)
+    let mev_subst = EcMatching.MEV.assubst ue ev ppe.ppe_env in
+    let chase ty = EcCoreSubst.ty_subst mev_subst (ti ty) in
+    let rty  = chase nt.ont_resty in
+    let tv   = List.map (EcCoreSubst.etyarg_subst mev_subst) ov.args in
+    let args = List.map (curry f_local -| snd_map chase) nt.ont_args in
+    let args = List.map (Fsubst.f_subst mev_subst) args in
+    let f    = f_app (f_op_tc p tv rty) (args @ eargs) f.f_ty in
     pp_form_core_r ppe outer fmt f; true
 
 and pp_poe (ppe : PPEnv.t) (fmt : Format.formatter) (poe : form Mop.t) =
@@ -2521,7 +2534,7 @@ let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
 let pp_tyvarannot (ppe : PPEnv.t) fmt (ids: ty_param list) =
   match ids with
   | []  -> ()
-  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) (List.map fst ids)
+  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
 let pp_pvar (ppe : PPEnv.t) fmt ids =
   match ids with
