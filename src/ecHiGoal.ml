@@ -1193,7 +1193,7 @@ let process_view1 pe tc =
                         if not meta then raise E.Bailout;
 
                         let y, yty =
-                          let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
+                          let CPTEnv (subst, _) = PT.concretize_env pe.PT.ptev_env in
                           snd_map (ty_subst subst) (oget pre) in
                         let fy = EcIdent.fresh y in
 

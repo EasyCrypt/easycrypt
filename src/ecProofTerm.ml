@@ -111,36 +111,46 @@ let can_concretize (pt : pt_env) =
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
+  let env = LDecl.toenv pe.pte_hy in
+  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) env, env)
+
+(* Substitute [subst] in [f] and then fold every TC op whose witness
+   resolves through a [tci_reducible] instance. Used to normalise a
+   form right after a polymorphic template has been instantiated at
+   a concrete carrier — without this, the user-visible term carries
+   verbose [op<:T[Conc(...)]>]-style heads instead of the underlying
+   core op. The fold for non-reducible-marked instances is a no-op. *)
+let cpt_subst_form ((subst, env) : f_subst * EcEnv.env) (f : form) : form =
+  EcReduction.fold_reducible_tc env (Fsubst.f_subst subst f)
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form_gen (CPTEnv subst) ids f =
-  let f = Fsubst.f_subst subst f in
+let concretize_e_form_gen (CPTEnv (subst, env)) ids f =
+  let f = cpt_subst_form (subst, env) f in
   let ids = List.map (snd_map (Fsubst.gty_subst subst)) ids in
   f_forall ids f
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form (CPTEnv subst) f =
-  Fsubst.f_subst subst f
+let concretize_e_form (CPTEnv (subst, env)) f =
+  cpt_subst_form (subst, env) f
 
 (* -------------------------------------------------------------------- *)
-let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
+let rec concretize_e_arg ((CPTEnv (subst, env)) as cptenv) arg =
   match arg with
-  | PAFormula f        -> PAFormula (Fsubst.f_subst subst f)
+  | PAFormula f        -> PAFormula (cpt_subst_form (subst, env) f)
   | PAMemory  m        -> PAMemory (Fsubst.m_subst subst m)
   | PAModule  (mp, ms) -> PAModule (mp, ms)
   | PASub     pt       -> PASub (pt |> omap (concretize_e_pt cptenv))
 
 
-and concretize_e_head ((CPTEnv subst) as cptenv) head =
+and concretize_e_head ((CPTEnv (subst, env)) as cptenv) head =
   match head with
-  | PTCut    (f, s)   -> PTCut    (Fsubst.f_subst subst f, s)
+  | PTCut    (f, s)   -> PTCut    (cpt_subst_form (subst, env) f, s)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
   | PTGlobal (p, tys) -> PTGlobal (p, List.map (EcCoreSubst.etyarg_subst subst) tys)
   | PTTerm   pt       -> PTTerm (concretize_e_pt cptenv pt)
 
-and concretize_e_pt ((CPTEnv subst) as cptenv) pt =
+and concretize_e_pt ((CPTEnv (subst, _)) as cptenv) pt =
   match pt with
   | PTApply { pt_head; pt_args } ->
     PTApply {
@@ -163,8 +173,8 @@ let concretize_gen ({ ptev_env = pe } as pt) ids =
 
 (* -------------------------------------------------------------------- *)
 let concretize ({ ptev_env = pe } as pt) =
-  let (CPTEnv subst) as cptenv = concretize_env pe in
-  (concretize_e_pt cptenv pt.ptev_pt, Fsubst.f_subst subst pt.ptev_ax)
+  let (CPTEnv (subst, env)) as cptenv = concretize_env pe in
+  (concretize_e_pt cptenv pt.ptev_pt, cpt_subst_form (subst, env) pt.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 let tc_pterm_apperror pte ?loc (kind : apperror) =

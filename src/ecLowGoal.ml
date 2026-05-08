@@ -261,13 +261,24 @@ module LowApply = struct
           (PTQuant (bd, pt), f_forall [bd] ax, subgoals)
       end
 
+  (* Fold every TC op in [f] whose witness resolves through a
+     [tci_reducible] instance. Applied to the type returned by [check_]
+     so that [Ax.instanciate]'s polymorphic-lemma instantiation at a
+     concrete carrier is normalised at the point of consumption. Pairs
+     with [EcProofTerm.cpt_subst_form] which applies the same rule to
+     concretization-time substitutions. *)
+  let fold_check_ax (tc : ckenv) (f : form) : form =
+    let env = LDecl.toenv (hyps_of_ckenv tc) in
+    EcReduction.fold_reducible_tc env f
+
   let check_with_cutsolve (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
-    check_ mode pt DMap.empty tc
+    let pt, f, subgoals = check_ mode pt DMap.empty tc in
+    (pt, fold_check_ax tc f, subgoals)
 
   let check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
     let pt, f, subgoals = check_ mode pt DMap.empty tc in
     assert (DMap.is_empty subgoals);
-    (pt, f)
+    (pt, fold_check_ax tc f)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1756,7 +1767,6 @@ let t_rewrite
     try  FPosition.map npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
   in
-  let tgfp = EcReduction.fold_reducible_tc env tgfp in
 
   match target with
   | None ->

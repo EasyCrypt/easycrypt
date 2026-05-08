@@ -424,7 +424,7 @@ module FPosition : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type cptenv = CPTEnv of f_subst
+type cptenv = CPTEnv of f_subst * EcEnv.env
 
 val can_concretize : mevmap -> EcUnify.unienv -> bool
 

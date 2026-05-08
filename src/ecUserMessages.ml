@@ -918,7 +918,8 @@ end = struct
 
     | AE_InvalidArgProof (src, dst) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-       let sb  = EcMatching.CPTEnv (EcMatching.MEV.assubst ue ev (LDecl.toenv hyps)) in
+       let env = LDecl.toenv hyps in
+       let sb  = EcMatching.CPTEnv (EcMatching.MEV.assubst ue ev env, env) in
        let src = concretize_e_form sb src in
        let dst = concretize_e_form sb dst in
 

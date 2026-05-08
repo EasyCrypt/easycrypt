@@ -1746,7 +1746,10 @@ module FPosition = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type cptenv = CPTEnv of f_subst
+(* The [env] component is the environment in which the proof-term was
+   elaborated. It is needed to consult [tci_reducible] flags when
+   normalising the substituted form via [EcReduction.fold_reducible_tc]. *)
+type cptenv = CPTEnv of f_subst * EcEnv.env
 
 let can_concretize ev ue =
   EcUnify.UniEnv.closed ue && MEV.filled ev
