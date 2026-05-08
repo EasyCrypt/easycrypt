@@ -30,9 +30,18 @@ type ty_body =
 
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
-  tyd_loca   : locality;
+  tyd_params  : ty_params;
+  tyd_type    : ty_body;
+  tyd_loca    : locality;
+  (* For [subtype]-declared types: the carrier and the predicate. The
+     declared type itself stays [tyd_type = Abstract], because a
+     subtype is semantically a fresh abstract type — but its dependency
+     on free type variables (when declared inside a section) must be
+     visible to the section-close machinery. [tydecl_fv] unions the
+     carrier+predicate fv into the type's fv when this field is set,
+     so a subtype declared inside [section. declare type c.] gets the
+     section's tparams added at close, just like type aliases do.      *)
+  tyd_subtype : (EcTypes.ty * EcCoreFol.form) option;
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty option
