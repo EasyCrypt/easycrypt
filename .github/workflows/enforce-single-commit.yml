@@ -1,0 +1,21 @@
+name: Enforce single-commit PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  merge_group:
+
+jobs:
+  check-commit-count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR has exactly one commit
+        env:
+          COMMITS: ${{ github.event.pull_request.commits }}
+        run: |
+          echo "PR contains $COMMITS commit(s)."
+          if [ "$COMMITS" -ne 1 ]; then
+            echo "::error::This PR has $COMMITS commits. Please squash to a single commit."
+            exit 1
+          fi
+          echo "OK: PR has exactly 1 commit."
