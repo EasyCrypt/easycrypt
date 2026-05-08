@@ -105,6 +105,13 @@ val reduce_user_gen :
 
 val simplify : reduction_info -> LDecl.hyps -> form -> form
 
+(* Recursively fold every TC op whose witness resolves through a
+   [tci_reducible] instance. Use after instantiating a polymorphic
+   template at a concrete carrier (rewrite RHS, [apply] result) so the
+   resulting goal carries the underlying core ops rather than verbose
+   class-op applications. *)
+val fold_reducible_tc : EcEnv.env -> form -> form
+
 val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 

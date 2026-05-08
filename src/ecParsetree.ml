@@ -1157,13 +1157,14 @@ type ptypeclass = {
 }
 
 type ptycinstance = {
-  pti_tc   : ptcparam;
-  pti_name : psymbol option;
-  pti_type : ptyparams * pty;
-  pti_ops  : (psymbol * (pty list * pqsymbol)) list;
-  pti_axs  : (psymbol * ptactic_core) list;
-  pti_args : [`Ring of (zint option * zint option)] option;
-  pti_loca : is_local;
+  pti_tc        : ptcparam;
+  pti_name      : psymbol option;
+  pti_type      : ptyparams * pty;
+  pti_ops       : (psymbol * (pty list * pqsymbol)) list;
+  pti_axs       : (psymbol * ptactic_core) list;
+  pti_args      : [`Ring of (zint option * zint option)] option;
+  pti_loca      : is_local;
+  pti_reducible : bool;
 }
 
 (* -------------------------------------------------------------------- *)

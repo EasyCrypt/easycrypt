@@ -339,7 +339,17 @@ and reduce_user_delta st f1 p tys args =
     | #Op.redmode as mode when Op.reducible ~mode ~nargs st.st_env p ->
       let f = Op.reduce ~mode ~nargs st.st_env p tys in
       cbv st Subst.subst_id f args
-    | _ -> f2
+    | _ ->
+      (* TC reduction: fold a TC op to its concrete realisation when
+         the witness resolves to an instance marked [tci_reducible].
+         Only fires on the concrete-instance path; abstract-rename
+         folding is intentionally skipped here so proofs over an
+         abstract carrier are not perturbed by [/=]. *)
+      if st.st_ri.delta_tc then
+        match Op.tc_reduce ~strict:true st.st_env p tys with
+        | f -> cbv st Subst.subst_id f args
+        | exception NotReducible -> f2
+      else f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =

@@ -711,6 +711,26 @@ let reduce_tc_op (ri : reduction_info) (env : EcEnv.env) (p : path) (tys : etyar
   else
     raise nohead
 
+(* Fold every TC op whose witness resolves through a reducible-marked
+   instance, recursively. Used to normalise a term after a polymorphic
+   template (rewrite RHS, [apply] result) has been instantiated at a
+   concrete carrier — without this, the user-visible term carries
+   verbose [idm<:int[Conc(...)]>]-style heads instead of [0]. *)
+let rec fold_reducible_tc (env : EcEnv.env) (f : form) : form =
+  let f = EcCoreFol.f_map (fun ty -> ty) (fold_reducible_tc env) f in
+  match f.f_node with
+  | Fop (p, tys)
+      when EcEnv.Op.tc_reducible ~strict:true env p tys ->
+    (try fold_reducible_tc env (EcEnv.Op.tc_reduce ~strict:true env p tys)
+     with NotReducible -> f)
+  | Fapp ({ f_node = Fop (p, tys); _ }, args)
+      when EcEnv.Op.tc_reducible ~strict:true env p tys ->
+    (try
+       let head = EcEnv.Op.tc_reduce ~strict:true env p tys in
+       fold_reducible_tc env (f_app_simpl head args f.f_ty)
+     with NotReducible -> f)
+  | _ -> f
+
 (* -------------------------------------------------------------------- *)
 let is_record env f =
   match EcFol.destr_app f with

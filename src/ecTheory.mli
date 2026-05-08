@@ -44,11 +44,12 @@ and ctheory = {
 }
 
 and tcinstance = {
-  tci_params   : ty_params;
-  tci_type     : ty;
-  tci_instance : tcibody;
-  tci_local    : locality;
-  tci_parents  : EcPath.path list;
+  tci_params    : ty_params;
+  tci_type      : ty;
+  tci_instance  : tcibody;
+  tci_local     : locality;
+  tci_parents   : EcPath.path list;
+  tci_reducible : bool;
 }
 
 and tcibody = [

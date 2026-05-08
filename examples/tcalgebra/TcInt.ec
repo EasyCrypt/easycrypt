@@ -21,7 +21,7 @@ op int_invr (z : int) : int  = z.
    chain) along the way, so we don't need a separate [instance comring
    with int] — declaring both would create duplicate comring witnesses
    for [int] and break op-name resolution downstream.                  *)
-instance idomain with int
+instance idomain with int reducible
   op idm   = CoreInt.zero
   op (+)   = CoreInt.add
   op [-]   = CoreInt.opp

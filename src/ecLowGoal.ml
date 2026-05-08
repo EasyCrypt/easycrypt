@@ -1756,6 +1756,7 @@ let t_rewrite
     try  FPosition.map npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
   in
+  let tgfp = EcReduction.fold_reducible_tc env tgfp in
 
   match target with
   | None ->

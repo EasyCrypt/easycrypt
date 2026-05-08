@@ -2777,7 +2777,7 @@ module Op = struct
       (List.combine (List.map fst op.op_tparams) tys)
       form
 
-  let tc_core_reduce (env : env) (p : path) (tys : etyarg list) =
+  let tc_core_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
     let op = by_path p env in
 
     if not (is_tc_op op) then
@@ -2863,11 +2863,15 @@ module Op = struct
 
       match resolve_lifted () with
       | Some (tci_target, symbols) ->
+        if strict && not tci_target.tci_reducible then
+          raise NotReducible;
         (EcDecl.operator_as_tc op,
          (tciargs, (tci_target.tci_params, symbols)))
       | None ->
         match tci.tci_instance with
         | `General (_, Some symbols) ->
+          if strict && not tci.tci_reducible then
+            raise NotReducible;
           (EcDecl.operator_as_tc op, (tciargs, (tci.tci_params, symbols)))
         | _ -> raise NotReducible
       end
@@ -2955,15 +2959,19 @@ module Op = struct
         end
       | _ -> None
 
-  let tc_reducible (env : env) (p : path) (tys : etyarg list) =
-    try ignore (tc_core_reduce env p tys); true
+  let tc_reducible ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
+    try ignore (tc_core_reduce ~strict env p tys); true
     with NotReducible ->
+      (* Abstract-rename folding is a structural unfolding through a
+         factory rename. Strict mode (= "only fold through reducible-
+         marked instances") skips it. *)
+      (not strict) &&
       Option.is_some (tc_reduce_abstract_via_rename env p tys)
 
-  let tc_reduce (env : env) (p : path) (tys : etyarg list) =
+  let tc_reduce ?(strict = false) (env : env) (p : path) (tys : etyarg list) =
     try
       let ((_, opname), (tciargs, (tciparams, symbols))) =
-        tc_core_reduce env p tys in
+        tc_core_reduce ~strict env p tys in
       let subst =
         List.fold_left
           (fun subst (a, ety) ->
@@ -2978,7 +2986,8 @@ module Op = struct
       let tysubst = Tvar.init (List.combine (List.map fst optg_decl.op_tparams) opargs) in
       f_op_tc optg opargs (Tvar.subst tysubst optg_decl.op_ty)
     with NotReducible ->
-      match tc_reduce_abstract_via_rename env p tys with
+      if strict then raise NotReducible
+      else match tc_reduce_abstract_via_rename env p tys with
       | Some f -> f
       | None -> raise NotReducible
 

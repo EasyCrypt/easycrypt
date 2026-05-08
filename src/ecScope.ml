@@ -2078,11 +2078,12 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
     let instance = EcTheory.
-      { tci_params   = fst ty
-      ; tci_type     = snd ty
-      ; tci_instance = `Ring cr
-      ; tci_local    = (tci.pti_loca :> locality)
-      ; tci_parents  = [] } in
+      { tci_params    = fst ty
+      ; tci_type      = snd ty
+      ; tci_instance  = `Ring cr
+      ; tci_local     = (tci.pti_loca :> locality)
+      ; tci_parents   = []
+      ; tci_reducible = tci.pti_reducible } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2122,11 +2123,12 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
 
     let instance = EcTheory.
-      { tci_params   = fst ty
-      ; tci_type     = snd ty
-      ; tci_instance = `Field cr
-      ; tci_local    = (tci.pti_loca :> locality)
-      ; tci_parents  = [] } in
+      { tci_params    = fst ty
+      ; tci_type      = snd ty
+      ; tci_instance  = `Field cr
+      ; tci_local     = (tci.pti_loca :> locality)
+      ; tci_parents   = []
+      ; tci_reducible = tci.pti_reducible } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2518,11 +2520,12 @@ module Ty = struct
               anc_decl.tc_prts in
           let parents = List.pmap (fun x -> x) parents in
           let instance = EcTheory.
-            { tci_params   = fst ty
-            ; tci_type     = snd ty
-            ; tci_instance = `General (anc, Some anc_symbols)
-            ; tci_local    = lc
-            ; tci_parents  = parents } in
+            { tci_params    = fst ty
+            ; tci_type      = snd ty
+            ; tci_instance  = `General (anc, Some anc_symbols)
+            ; tci_local     = lc
+            ; tci_parents   = parents
+            ; tci_reducible = tci.pti_reducible } in
           let item = EcTheory.Th_instance (Some name, instance) in
           let item = EcTheory.mkitem ~import item in
           { scope with sc_env = EcSection.add_item item scope.sc_env })

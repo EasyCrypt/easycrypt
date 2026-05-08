@@ -678,7 +678,7 @@ lemma degXn_le (p : c poly) i :
   p <> poly0 => 0 <= i => deg (exp p i) <= i * (deg p - 1) + 1.
 proof.
 move=> nz_p; elim: i => [|i ge0_i ih]; first by rewrite !expr0 deg1.
-rewrite exprS // mulrDl /= addrAC !addrA ler_subr_addl (addrC<:int> 1).
+rewrite exprS // mulrDl /= addrAC !addrA ler_subr_addl (addrC 1).
 case: (exp p i = poly0) => [->|nz_pX].
 - by rewrite mulr0 deg0 /=; rewrite -deg_gt0 in nz_p => /#.
 apply: (ler_trans (deg p + deg (exp p i))); 1: by apply: degM_le.

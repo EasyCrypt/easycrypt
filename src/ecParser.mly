@@ -541,6 +541,7 @@
 %token REFLEX
 %token REMOVE
 %token RENAME
+%token REDUCIBLE
 %token REPLACE
 %token REQUIRE
 %token RES
@@ -1755,16 +1756,18 @@ subtype_rename:
 (* Type classes (instances)                                             *)
 tycinstance:
 | loca=is_local INSTANCE tc=tcparam args=tyci_args?
-    name=prefix(AS, lident)? WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+    name=prefix(AS, lident)? WITH typ=tyvars_decl? ty=loc(type_exp)
+    reducible=boption(REDUCIBLE) ops=tyci_op* axs=tyci_ax*
   {
     let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
-    { pti_tc   = tc;
-      pti_name = name;
-      pti_type = (odfl [] typ, ty);
-      pti_ops  = ops;
-      pti_axs  = axs;
-      pti_args = args;
-      pti_loca = loca; }
+    { pti_tc        = tc;
+      pti_name      = name;
+      pti_type      = (odfl [] typ, ty);
+      pti_ops       = ops;
+      pti_axs       = axs;
+      pti_args      = args;
+      pti_loca      = loca;
+      pti_reducible = reducible; }
   }
 
 tyci_args:

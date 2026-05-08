@@ -211,6 +211,7 @@
     "clone"       , CLONE      ;        (* KW: global *)
     "with"        , WITH       ;        (* KW: global *)
     "rename"      , RENAME     ;        (* KW: global *)
+    "reducible"   , REDUCIBLE  ;        (* KW: global *)
     "prover"      , PROVER     ;        (* KW: global *)
     "timeout"     , TIMEOUT    ;        (* KW: global *)
     "why3"        , WHY3       ;        (* KW: global *)

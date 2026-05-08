@@ -6,8 +6,6 @@ pragma +implicits.
 (* -------------------------------------------------------------------- *)
 require import AllCore List Ring TcMonoid.
 
-import Ring.IntID.
-
 (* -------------------------------------------------------------------- *)
 section.
 declare type t <: monoid.

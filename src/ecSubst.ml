@@ -1169,8 +1169,10 @@ let subst_tcinstance (s : subst) (tci : tcinstance) =
   let tci_instance = subst_tcibody s tci.tci_instance in
   let tci_local = tci.tci_local in
   let tci_parents = tci.tci_parents in
+  let tci_reducible = tci.tci_reducible in
 
-  { tci_params; tci_type; tci_instance; tci_local; tci_parents; }
+  { tci_params; tci_type; tci_instance; tci_local; tci_parents;
+    tci_reducible; }
 
 
 (* -------------------------------------------------------------------- *)

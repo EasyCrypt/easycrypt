@@ -330,8 +330,12 @@ module Op : sig
   val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
   val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> etyarg list -> form
 
-  val tc_reducible : env -> path -> etyarg list -> bool
-  val tc_reduce    : env -> path -> etyarg list -> form
+  (* When [strict = true] (default [false]), only reduce through TC
+     instances marked [tci_reducible]. Used by the simplifier ([/=],
+     [norm_cbv]); the matcher and [is_conv] keep [strict = false] so
+     they always look through concrete witnesses. *)
+  val tc_reducible : ?strict:bool -> env -> path -> etyarg list -> bool
+  val tc_reduce    : ?strict:bool -> env -> path -> etyarg list -> form
 
   (* [tc_op_realised_by env tcop concrete] is true iff [tcop] is a
      TC-class op and there exists a registered instance whose
