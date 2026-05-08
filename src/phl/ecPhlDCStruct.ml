@@ -178,7 +178,9 @@ let t_dc_delay_side ~side = FApi.t_low0 "dc-delay-side" (t_dc_delay_side_r ~side
 (* Delay* (one-sided, framed):
     forall m1 m2, phi m1 m2 => phi1 m1
     forall m1 m2, phi m1 m2 => psi m1 m2
-    { ={Read(R1) U Read(C1) U Read(S1)} /\ phi1 | R1 x _ }
+    { ={Read(R1) U Read(C1) U Read(S1)}
+      /\ ={Write(R1) U Write(C1) U Write(S1)}
+      /\ phi1 | R1 x _ }
        C1 ~ S1
     { ={Write(R1) U Write(C1) U Write(S1)} | S1 x S2 }
     -------------------------------------------------  Delay*_L
@@ -221,8 +223,8 @@ let t_dc_delay_star_r ~side ?inv tc =
         map_ts_inv ~ml ~mr f_ands (veq @ geq)
     in
 
-    let pre = mk_eqs reads in
-    let inv' = odfl { m=pre.ml; inv=f_true; } inv in 
+    let pre = mk_eqs (EcPV.PV.union reads writes) in
+    let inv' = odfl { m=pre.ml; inv=f_true; } inv in
     let pre = map_ts_inv2 f_and_simpl pre (ss_inv_generalize_right inv' pre.mr) in
     let post = mk_eqs writes in
     let equiv = f_dcEquivS (snd ml) (snd ml) pre r1 s_empty c1 s1 post s_empty s_empty in
