@@ -1195,6 +1195,60 @@ let trans_axiom genv (p, ax) =
     let lenv = fst (lenv_of_tparams ax.ax_tparams) in
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
 
+(* For each [tci_reducible] instance in the env, emit a Why3 axiom
+   asserting that each TC class op in the instance's symbol map equals
+   its concrete realisation when applied at the instance's carrier.
+   Without these bridges, the Why3 backend treats e.g. [-]<:addgroup>
+   on [int] as an opaque polymorphic function unrelated to
+   [CoreInt.opp]; SMT then can't combine a polymorphic axiom over
+   [addgroup] (whose body uses the abstract [-]) with a concrete goal
+   over [int] (whose body uses [CoreInt.opp]). *)
+let trans_reducible_instance_bridges genv =
+  let env = genv.te_env in
+  List.iter (fun (inst_path_opt, tci) ->
+    if not tci.EcTheory.tci_reducible then () else
+    match inst_path_opt, tci.EcTheory.tci_instance with
+    | Some inst_path, `General (anc, Some symbols) ->
+      let anc_prefix = EcPath.prefix anc.EcAst.tc_name in
+      let inst_etyargs = EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
+      EcMaps.Mstr.iter (fun basename (concrete_path, concrete_etyargs) ->
+        let class_op_path = EcPath.pqoname anc_prefix basename in
+        match EcEnv.Op.by_path_opt class_op_path env,
+              EcEnv.Op.by_path_opt concrete_path env with
+        | Some class_op, Some concrete_op ->
+          let witness =
+            EcAst.TCIConcrete
+              { path    = inst_path;
+                etyargs = inst_etyargs;
+                lift    = []; } in
+          let lhs_etyargs = [(tci.EcTheory.tci_type, [witness])] in
+          let lhs_ty =
+            EcDecl.ty_instanciate class_op.op_tparams lhs_etyargs class_op.op_ty in
+          let dom, codom = EcTypes.tyfun_flat lhs_ty in
+          let xs = List.map (fun ty -> (EcIdent.create "x", ty)) dom in
+          let xs_forms = List.map (fun (x, ty) -> EcCoreFol.f_local x ty) xs in
+          let lhs_head = EcCoreFol.f_op_tc class_op_path lhs_etyargs lhs_ty in
+          let lhs = EcCoreFol.f_app lhs_head xs_forms codom in
+          let rhs_ty =
+            EcDecl.ty_instanciate concrete_op.op_tparams concrete_etyargs
+              concrete_op.op_ty in
+          let rhs_head =
+            EcCoreFol.f_op_tc concrete_path concrete_etyargs rhs_ty in
+          let rhs = EcCoreFol.f_app rhs_head xs_forms codom in
+          let body = EcCoreFol.f_eq lhs rhs in
+          let body =
+            EcCoreFol.f_forall
+              (List.map (fun (x, ty) -> (x, EcAst.GTty ty)) xs) body in
+          let lenv = empty_lenv in
+          let name =
+            Printf.sprintf "tcbridge_%s_%s"
+              (EcPath.tostring inst_path) basename in
+          add_axiom (genv, lenv) (WIdent.id_fresh name) body
+        | _ -> ()
+      ) symbols
+    | _ -> ()
+  ) (EcEnv.TcInstance.get_all env)
+
 (* For each typeclass constraint on a goal-context type parameter, pull
    in the typeclass axioms (and those of all its ancestors) as Why3
    axioms. The axioms are registered globally with [`NoSmt] visibility
@@ -1666,6 +1720,7 @@ let init hyps concl =
   let known = Lazy.force core_theories in
   let tenv  = empty_tenv env task known in
   let ()    = add_core_bindings tenv in
+  let ()    = trans_reducible_instance_bridges tenv in
   let lenv  = lenv_of_hyps tenv hyps in
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
