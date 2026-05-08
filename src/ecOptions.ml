@@ -65,7 +65,6 @@ and prv_options = {
   prvo_ppwidth    : int option;
   prvo_checkall   : bool;
   prvo_profile    : bool;
-  prvo_iterate    : bool;
   prvo_why3server : string option;
 }
 
@@ -410,7 +409,6 @@ let specs = {
       `Spec ("pragmas"    , `String, "Comma-separated list of pragmas");
       `Spec ("pp-width"   , `Int   , "pretty-printing width");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
-      `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
       `Spec ("server"     , `String, "Connect to an external Why3 server");
     ]);
 
@@ -535,7 +533,6 @@ let prv_options_of_values ini values =
       end;
       prvo_checkall   = get_flag "check-all" values;
       prvo_profile    = get_flag "profile" values;
-      prvo_iterate    = get_flag "iterate" values;
       prvo_why3server = get_string "why3server" values;
     }
 

@@ -889,7 +889,6 @@ type pprover_infos = {
   pprov_version   : [`Lazy | `Full] option;
   plem_all        : bool option;
   plem_max        : int option option;
-  plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
   plem_dumpin     : string located option;
@@ -907,7 +906,6 @@ let empty_pprover = {
   pprov_version   = None;
   plem_all        = None;
   plem_max        = None;
-  plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
   plem_dumpin     = None;

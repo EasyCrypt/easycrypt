@@ -554,7 +554,6 @@ module Prover = struct
     po_verbose    : int option;
     pl_all        : bool option;
     pl_max        : int option;
-    pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_dumpin     : string located option;
@@ -572,7 +571,6 @@ module Prover = struct
     po_verbose   = None;
     pl_all       = None;
     pl_max       = None;
-    pl_iterate   = None;
     pl_wanted    = None;
     pl_unwanted  = None;
     pl_dumpin    = None;
@@ -613,7 +611,6 @@ module Prover = struct
         | None  , None   -> None
         | None  , Some _ -> Some 0
         end;
-      pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
       pl_dumpin    = ppr.plem_dumpin;
@@ -633,7 +630,6 @@ module Prover = struct
     let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
-    let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_selected  = odfl dft.pr_selected options.pl_selected in
@@ -648,7 +644,7 @@ module Prover = struct
       in List.fold_left do_ar l (snd options.po_provers) in
 
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
-      pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
+      pr_verbose ; pr_all     ; pr_max      ;
       pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
       pr_dumpin  ;
       gn_debug   ; }

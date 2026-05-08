@@ -854,7 +854,6 @@ type checkmode = {
   cm_provers   : string list option;
   cm_quorum    : int option;
   cm_profile   : bool;
-  cm_iterate   : bool;
 }
 
 let initial ~checkmode ~boot ~checkproof =
@@ -866,7 +865,6 @@ let initial ~checkmode ~boot ~checkproof =
     EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
     EcScope.Prover.po_provers   = (checkmode.cm_provers, []);
     EcScope.Prover.po_quorum    = checkmode.cm_quorum;
-    EcScope.Prover.pl_iterate   = Some (checkmode.cm_iterate);
   } in
 
   let perv    = (None, (mk_loc _dummy EcCoreLib.i_Pervasive, None), Some `Export) in

@@ -49,7 +49,6 @@ type prover_infos = {
   pr_verbose   : int;
   pr_all       : bool;
   pr_max       : int;
-  pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
   pr_dumpin    : string EcLocation.located option;

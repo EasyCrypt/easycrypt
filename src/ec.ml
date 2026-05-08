@@ -269,11 +269,6 @@ let main () =
               ["-profile"]
             else [] in
 
-          let iterate =
-            if input.runo_provers.prvo_iterate then
-              ["-iterate"]
-            else [] in
-
           let why3srv =
             input.runo_provers.prvo_why3server
             |> omap (fun server -> ["-server"; server])
@@ -311,7 +306,7 @@ let main () =
           List.flatten [
             maxjobs; timeout; cpufactor; ppwidth;
             provers; quorum ; pragmas  ; checkall;
-            profile; iterate; why3srv  ; why3    ;
+            profile; why3srv  ; why3    ;
             reloc  ; noevict; boot     ; idirs   ;
           ]
         in
@@ -527,7 +522,7 @@ let main () =
             Some [State.{ position = 0; goals = None; messages = [] }]
           else None in
 
-        { prvopts     = {cmpopts.cmpo_provers with prvo_iterate = true}
+        { prvopts     = cmpopts.cmpo_provers
         ; input       = Some name
         ; terminal    = terminal
         ; interactive = false
@@ -556,7 +551,7 @@ let main () =
           lazy (T.from_channel ~name ~progress:`Silent ~lastgoals (open_in name))
         in
 
-        { prvopts     = {llmopts.llmo_provers with prvo_iterate = true}
+        { prvopts     = llmopts.llmo_provers
         ; input       = Some name
         ; terminal    = terminal
         ; interactive = false
@@ -594,7 +589,6 @@ let main () =
           prvo_ppwidth = None;
           prvo_checkall = false;
           prvo_profile = false;
-          prvo_iterate = false;
           prvo_why3server = None; }
         in
 
@@ -742,7 +736,6 @@ let main () =
               EcCommands.cm_provers   = state.prvopts.prvo_provers;
               EcCommands.cm_quorum    = state.prvopts.prvo_quorum;
               EcCommands.cm_profile   = state.prvopts.prvo_profile;
-              EcCommands.cm_iterate   = state.prvopts.prvo_iterate;
             } in
 
             let checkproof = not state.docgen in

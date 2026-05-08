@@ -61,7 +61,6 @@ and prv_options = {
   prvo_ppwidth    : int option;
   prvo_checkall   : bool;
   prvo_profile    : bool;
-  prvo_iterate    : bool;
   prvo_why3server : string option;
 }
 
