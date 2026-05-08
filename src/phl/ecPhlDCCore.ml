@@ -236,7 +236,7 @@ let t_dc_while_r ~inv ?invr1 ?invr2 tc =
     let (e1, c1), pc1 = tc1_last_while tc es.dces_cl in
     let (e2, c2), pc2 = tc1_last_while tc es.dces_cr in
     let e1_ts = ts_of_test_left ~ml ~mr e1 in
-    let e2_ts = ts_of_test_left ~ml ~mr e2 in
+    let e2_ts = ts_of_test_right ~ml ~mr e2 in
 
     let invr1 = odfl es.dces_sl invr1 in
     let invr2 = odfl es.dces_sr invr2 in
