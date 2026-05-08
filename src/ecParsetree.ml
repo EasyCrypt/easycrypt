@@ -568,6 +568,7 @@ type preduction = {
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
+  puser_db : symbol option;             (* user reduction database *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1040,6 +1041,14 @@ type clear_info = [
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
+type phintdbmode = [ `Add | `Remove ]
+
+type plocalhint =
+  | PLHDb    of phintdbmode * symbol list
+  | PLHLemmas of phintdbmode * symbol option * pqsymbol list
+  | PLHClear of symbol option
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -1070,6 +1079,7 @@ type logtactic =
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
   | Pcoq        of (EcProvers.coq_mode option * psymbol * pprover_infos)
+  | PlocalHint  of plocalhint
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -1326,7 +1336,7 @@ type puseroption =
   [`Delta | `EqTrue]
 
 type puserred =
-  puseroption list * (pqsymbol list * int option) list
+  symbol option * puseroption list * (pqsymbol list * int option) list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option

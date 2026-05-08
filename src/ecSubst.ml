@@ -1061,10 +1061,10 @@ let rec subst_theory_item_r (s : subst) (item : theory_item_r) =
   | Th_addrw (b, ls, lc) ->
       Th_addrw (subst_path s b, List.map (subst_path s) ls, lc)
 
-  | Th_reduction rules ->
-      let rules =
-        List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) rules
-      in Th_reduction rules
+  | Th_reduction ({ red_rules } as red) ->
+      let red_rules =
+        List.map (fun (p, opts, _) -> (subst_path s p, opts, None)) red_rules
+      in Th_reduction { red with red_rules }
 
   | Th_auto ({ axioms } as auto_rl) ->
       Th_auto { auto_rl with axioms =
@@ -1209,4 +1209,3 @@ let inv_rebind (inv : inv) (ms : memory list) : inv =
   | Inv_ts ts, [ml; mr] -> Inv_ts (ts_inv_rebind ts ml mr)
   | Inv_hs hs, [m] -> Inv_hs (hs_inv_rebind hs m)
   | _, _ -> assert false
-

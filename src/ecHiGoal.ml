@@ -91,8 +91,45 @@ let process_change fp (tc : tcenv1) =
   t_change fp tc
 
 (* -------------------------------------------------------------------- *)
+let process_local_hint (hint : plocalhint) (tc : tcenv1) =
+  let env = FApi.tc1_env tc in
+  let simpl = FApi.tc1_local_simplify tc in
+
+  let simpl =
+    match hint with
+    | PLHDb (`Add, dbs) ->
+        EcEnv.LocalSimplify.activate dbs simpl
+
+    | PLHDb (`Remove, dbs) ->
+        EcEnv.LocalSimplify.deactivate dbs simpl
+
+    | PLHLemmas (mode, base, lemmas) ->
+        let opts = EcTheory.{ ur_delta = false; ur_eqtrue = false; } in
+        let entries =
+          List.map (fun lemma ->
+            let path = EcEnv.Ax.lookup_path (unloc lemma) env in
+            let rule = EcReduction.User.compile ~opts ~prio:0 env path in
+            (path, rule)
+          ) lemmas
+        in
+        begin match mode with
+        | `Add ->
+            EcEnv.LocalSimplify.add_rules ?base entries simpl
+        | `Remove ->
+            EcEnv.LocalSimplify.remove_paths ?base (List.map fst entries) simpl
+        end
+
+    | PLHClear base ->
+        EcEnv.LocalSimplify.clear ?base simpl
+  in
+
+  FApi.tcenv_of_tcenv1
+    (FApi.map_pregoal1 (fun goal -> { goal with g_simpl = simpl }) tc)
+
+(* -------------------------------------------------------------------- *)
 let process_simplify_info ri (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
+  let simpl = FApi.tc1_local_simplify tc in
 
   let do1 (sop, sid) ps =
     match ps.pl_desc with
@@ -123,6 +160,8 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
+    EcReduction.user_db = ri.puser_db;
+    EcReduction.user_local = simpl;
   }
 
 (*-------------------------------------------------------------------- *)

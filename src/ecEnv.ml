@@ -187,7 +187,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : atbase Msym.t;
-  env_redbase  : mredinfo;
+  env_redbase  : mredinfo Msym.t;
   env_ntbase   : ntbase Mop.t;
   env_albase   : path Mp.t;             (* theory aliases   *)
   env_modlcs   : Sid.t;                 (* declared modules *)
@@ -217,9 +217,11 @@ and tcinstance = [
   | `General of EcPath.path
 ]
 
+and redentry = EcPath.path * EcTheory.rule
+
 and redinfo =
-  { ri_priomap : (EcTheory.rule list) Mint.t;
-    ri_list    : (EcTheory.rule list) Lazy.t; }
+  { ri_priomap : (redentry list) Mint.t;
+    ri_list    : (redentry list) Lazy.t; }
 
 and mredinfo = redinfo Mrd.t
 
@@ -316,7 +318,7 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
-    env_redbase  = Mrd.empty;
+    env_redbase  = Msym.empty;
     env_ntbase   = Mop.empty;
     env_albase   = Mp.empty;
     env_modlcs   = Sid.empty;
@@ -1487,10 +1489,14 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
+  type entry  = redentry
   type rule   = EcTheory.rule
   type topsym = red_topsym
+  type base = symbol
 
-  let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
+  let dname : symbol = ""
+
+  let add_rule ((src, rule) : path * rule option) (db : mredinfo) =
     match rule with None -> db | Some rule ->
 
     let p : topsym =
@@ -1507,7 +1513,7 @@ module Reduction = struct
         | Some x -> x in
 
       let ri_priomap =
-        let change prules = Some (odfl [] prules @ [rule]) in
+        let change prules = Some (odfl [] prules @ [(src, rule)]) in
         Mint.change change (abs rule.rl_prio) ri_priomap in
 
       let ri_list =
@@ -1518,26 +1524,111 @@ module Reduction = struct
   let add_rules (rules : (path * rule option) list) (db : mredinfo) =
     List.fold_left ((^~) add_rule) db rules
 
-  let add ?(import = true) (rules : (path * rule_option * rule option) list) (env : env) =
-    let rstrip = List.map (fun (x, _, y) -> (x, y)) rules in
+  let updatedb ?(base : symbol option) (rules : (path * rule option) list) (db : mredinfo Msym.t) =
+    let nbase = odfl dname base in
+    let base = Msym.find_def Mrd.empty nbase db in
+    Msym.add nbase (add_rules rules base) db
+
+  let add ?(import = true) ({ red_base; red_rules } : reduction_rule) (env : env) =
+    let rstrip = List.map (fun (x, _, y) -> (x, y)) red_rules in
 
     { env with
-        env_redbase = add_rules rstrip env.env_redbase;
-        env_item = mkitem ~import (Th_reduction rules) :: env.env_item; }
+        env_redbase = updatedb ?base:red_base rstrip env.env_redbase;
+        env_item = mkitem ~import (Th_reduction { red_base; red_rules }) :: env.env_item; }
 
-  let add1 (prule : path * rule_option * rule option) (env : env) =
-    add [prule] env
+  let add1 ?base (prule : path * rule_option * rule option) (env : env) =
+    add { red_base = base; red_rules = [prule] } env
 
-  let get (p : topsym) (env : env) =
-    Mrd.find_opt p env.env_redbase
+  let get_entries ?base (p : topsym) (env : env) =
+    Msym.find_opt (odfl dname base) env.env_redbase
+    |> obind (Mrd.find_opt p)
     |> omap (fun x -> Lazy.force x.ri_list)
     |> odfl []
 
-  (* FIXME: handle other cases, right now only used for print hint *)
+  let get ?base (p : topsym) (env : env) =
+    List.map snd (get_entries ?base p env)
+
+  let getx (base : symbol) (env : env) =
+    Msym.find_def Mrd.empty base env.env_redbase
+    |> Mrd.bindings
+    |> List.map (fun (ts, mr) -> (ts, List.map snd (Lazy.force mr.ri_list)))
+
   let all (env : env) =
-    List.map (fun (ts, mr) ->
-      (ts, Lazy.force mr.ri_list))
-    (Mrd.bindings env.env_redbase)
+    Msym.bindings env.env_redbase
+    |> List.map (fun (base, db) ->
+      (base, List.map (fun (ts, mr) -> (ts, List.map snd (Lazy.force mr.ri_list))) (Mrd.bindings db)))
+end
+
+type local_simplify = {
+  ls_active  : Ssym.t;
+  ls_added   : Reduction.entry list Msym.t;
+  ls_removed : Sp.t Msym.t;
+}
+
+module LocalSimplify = struct
+  let empty = {
+    ls_active  = Ssym.singleton Reduction.dname;
+    ls_added   = Msym.empty;
+    ls_removed = Msym.empty;
+  }
+
+  let active ls = ls.ls_active
+
+  let normbase = function
+    | Some "default" | None -> Reduction.dname
+    | Some base -> base
+
+  let activate bases ls =
+    { ls with ls_active = List.fold_left (fun st b -> Ssym.add (normbase (Some b)) st) ls.ls_active bases }
+
+  let deactivate bases ls =
+    { ls with ls_active = List.fold_left (fun st b -> Ssym.remove (normbase (Some b)) st) ls.ls_active bases }
+
+  let added ?base ls =
+    Msym.find_def [] (normbase base) ls.ls_added
+
+  let removed ?base ls =
+    Msym.find_def Sp.empty (normbase base) ls.ls_removed
+
+  let add_rules ?base rules ls =
+    let base = normbase base in
+    let old = Msym.find_def [] base ls.ls_added in
+    let old =
+      List.filter (fun (p, _) ->
+        not (List.exists (fun (p', _) -> EcPath.p_equal p p') rules))
+        old
+    in
+    let ls_added = Msym.add base (old @ rules) ls.ls_added in
+    let ls_removed =
+      let removed = Msym.find_def Sp.empty base ls.ls_removed in
+      let removed = List.fold_left (fun st (p, _) -> Sp.remove p st) removed rules in
+      Msym.add base removed ls.ls_removed
+    in
+    { ls with ls_added; ls_removed }
+
+  let remove_paths ?base paths ls =
+    let base = normbase base in
+    let ls_added =
+      let added = Msym.find_def [] base ls.ls_added in
+      let added =
+        List.filter (fun (p, _) ->
+          not (List.exists (EcPath.p_equal p) paths))
+          added
+      in
+      Msym.add base added ls.ls_added
+    in
+    let ls_removed =
+      let removed = Msym.find_def Sp.empty base ls.ls_removed in
+      let removed = List.fold_left (fun st p -> Sp.add p st) removed paths in
+      Msym.add base removed ls.ls_removed
+    in
+    { ls with ls_added; ls_removed }
+
+  let clear ?base ls =
+    let base = normbase base in
+    { ls with
+        ls_added = Msym.remove base ls.ls_added;
+        ls_removed = Msym.remove base ls.ls_removed; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3003,9 +3094,9 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_rd_th =
     let for1 _path db = function
-      | Th_reduction rules ->
-         let rules = List.map (fun (x, _, y) -> (x, y)) rules in
-         Some (Reduction.add_rules rules db)
+      | Th_reduction { red_base; red_rules } ->
+         let rules = List.map (fun (x, _, y) -> (x, y)) red_rules in
+         Some (Reduction.updatedb ?base:red_base rules db)
       | _ -> None
 
     in bind_base_th for1

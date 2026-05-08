@@ -70,6 +70,8 @@ type reduction_info = {
   logic   : rlogic_info;       (* perform logical simplification *)
   modpath : bool;              (* reduce module path *)
   user    : bool;              (* reduce user defined rules *)
+  user_db : EcSymbols.symbol option; (* user reduction database *)
+  user_local : EcEnv.local_simplify; (* proof-local simplify overlay *)
 }
 
 and deltap      = [EcEnv.Op.redmode | `No]

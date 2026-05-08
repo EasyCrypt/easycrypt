@@ -2078,7 +2078,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
   (* FIXME: section -> allow "local" flag *)
-  let add_reduction scope (opts, reds) =
+  let add_reduction scope (base, opts, reds) =
     check_state `InTop "hint simplify" scope;
 
     let rules =
@@ -2099,7 +2099,10 @@ module Reduction = struct
 
     in
 
-    let item = EcTheory.mkitem ~import:true (EcTheory.Th_reduction rules) in
+    let item =
+      EcTheory.mkitem ~import:true
+        (EcTheory.Th_reduction { red_base = base; red_rules = rules })
+    in
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 end
 

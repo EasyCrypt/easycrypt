@@ -141,6 +141,7 @@ and pregoal = {
   g_uid   : handle;                     (* this goal ID *)
   g_hyps  : LDecl.hyps;                 (* goal local environment *)
   g_concl : form;                       (* goal conclusion *)
+  g_simpl : EcEnv.local_simplify;       (* proof-local simplify context *)
 }
 
 and goal = {
@@ -393,7 +394,7 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let tc1_flat ?target (tc : tcenv1) =
-    let { g_hyps; g_concl } = tc1_current tc in
+    let { g_hyps; g_concl; _ } = tc1_current tc in
     match target with
     | None   -> (g_hyps, g_concl)
     | Some h -> (LDecl.local_hyps h g_hyps, LDecl.hyp_by_id h g_hyps)
@@ -410,6 +411,7 @@ module FApi = struct
   let tc1_penv (tc : tcenv1) = tc.tce_penv
   let tc1_goal (tc : tcenv1) = snd (tc1_flat tc)
   let tc1_env  (tc : tcenv1) = LDecl.toenv (tc1_hyps tc)
+  let tc1_local_simplify (tc : tcenv1) = (tc1_current tc).g_simpl
 
   (* ------------------------------------------------------------------ *)
   let tc_handle (tc : tcenv) = tc1_handle tc.tce_tcenv
@@ -460,7 +462,7 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let pf_newgoal (pe : proofenv) ?vx hyps concl =
     let hid     = ID.gen () in
-    let pregoal = { g_uid = hid; g_hyps = hyps; g_concl = concl; } in
+    let pregoal = { g_uid = hid; g_hyps = hyps; g_concl = concl; g_simpl = EcEnv.LocalSimplify.empty; } in
     let goal    = { g_goal = pregoal; g_validation = vx; } in
     let pe      = { pe with pr_goals = ID.Map.add pregoal.g_uid goal pe.pr_goals; } in
       (pe, pregoal)
@@ -469,6 +471,8 @@ module FApi = struct
   let newgoal (tc : tcenv) ?(hyps : LDecl.hyps option) (concl : form) =
     let hyps     = ofdfl (fun () -> tc_hyps tc) hyps in
     let (pe, pg) = pf_newgoal (tc_penv tc) hyps concl in
+    let pg = { pg with g_simpl = tc1_local_simplify tc.tce_tcenv } in
+    let pe = update_goal_map (fun g -> { g with g_goal = pg }) pg.g_uid pe in
 
     let tc = tc_update_tcenv (fun te -> { te with tce_penv = pe }) tc in
     let tc = { tc with tce_goals = tc.tce_goals @ [pg.g_uid] } in
@@ -505,6 +509,14 @@ module FApi = struct
   let mutate1 (tc : tcenv1) (vx : handle -> validation) ?hyps fp =
     let tc = mutate (tcenv_of_tcenv1 tc) vx ?hyps fp in
     assert (tc.tce_goals = []); tc.tce_tcenv
+
+  let map_pregoal1 (tx : pregoal -> pregoal) (tc : tcenv1) =
+    let current = tc1_current tc in
+    let current = tx current in
+    let tc =
+      tc1_update_goal_map (fun g -> { g with g_goal = current }) current.g_uid tc
+    in
+    { tc with tce_goal = Some current }
 
   (* ------------------------------------------------------------------ *)
   let xmutate (tc : tcenv) (vx : 'a) (fp : form list) =
@@ -989,7 +1001,7 @@ let start (hyps : LDecl.hyps) (goal : form) =
   let uid = ID.gen () in
   let hid = ID.gen () in
 
-  let goal = { g_uid = hid; g_hyps = hyps; g_concl = goal; } in
+  let goal = { g_uid = hid; g_hyps = hyps; g_concl = goal; g_simpl = EcEnv.LocalSimplify.empty; } in
   let goal = { g_goal = goal; g_validation = None; } in
   let env  = { pr_uid   = uid;
                pr_main  = hid;
