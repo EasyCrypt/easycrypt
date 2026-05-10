@@ -1125,19 +1125,26 @@ let pp_app (type v1 v2)
       maybe_paren outer e_app_prio pp fmt ()
 
 (* -------------------------------------------------------------------- *)
-(* [tvi_dominated env op nargs] checks whether all type parameters of [op]
-   can be inferred from the types of the first [nargs] arguments. *)
+(* [tvi_dominated env op nargs] checks whether all type parameters of
+   [op] can be inferred from the types visible at the use site: the
+   types of the first [nargs] arguments AND the type of the residual
+   term after those args have been consumed (i.e. the unconsumed-dom
+   suffix plus the codomain). Including the residual type catches
+   nullary ops whose tparam appears only in the codomain — like
+   [zero ['a]: 'a] used bare — for which the surrounding context
+   pins ['a]. *)
 let tvi_dominated (env : EcEnv.env) (op : EcPath.path) (nargs : int) : bool =
   match EcEnv.Op.by_path_opt op env with
   | None -> false
   | Some opdecl ->
     let tparams = opdecl.op_tparams in
-    let dom, _ = tyfun_flat opdecl.op_ty in
+    let dom, codom = tyfun_flat opdecl.op_ty in
     let arg_tys = List.take nargs dom in
+    let residual = EcTypes.toarrow (List.drop nargs dom) codom in
     let covered =
       List.fold_left
         (fun acc ty -> Sid.union acc (EcTypes.Tvar.fv ty))
-        Sid.empty arg_tys in
+        Sid.empty (residual :: arg_tys) in
     List.for_all (fun (id, _) -> Sid.mem id covered) tparams
 
 (* -------------------------------------------------------------------- *)
