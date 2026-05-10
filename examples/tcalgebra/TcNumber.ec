@@ -1504,7 +1504,7 @@ op int_lt   = CoreInt.lt.
 op int_min  = Int.min.
 op int_max  = Int.max.
 
-instance tcrealdomain with int
+instance tcrealdomain with int reducible
   op "`|_|" = int_norm
   op (<=)   = int_le
   op (<)    = int_lt
