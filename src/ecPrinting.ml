@@ -270,19 +270,13 @@ module PPEnv = struct
           let ue  = EcUnify.UniEnv.create None in
           let ops = EcUnify.select_op ~hidden:true ~filter tvi ppe.ppe_env sm ue dom in
           let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
-
-          (* Prefer non-abbreviation candidates: a TC class op like
-             [Top.TcRing.*] often coexists with an abbreviation
-             [Top.TcMonoid.*] (a [mulmonoid]-view alias) that resolves
-             to the same term. Without this filter the printer can't
-             pick a unique short form and falls back to the qualified
-             [Top.TcRing.*] form, which then forces prefix display
-             instead of infix. *)
-          let is_not_abbrev ((p, _), _, _, _) =
-            match EcEnv.Op.by_path_opt p ppe.ppe_env with
-            | Some op -> not (EcDecl.is_abbrev op)
-            | None    -> true in
-          let ops = match List.mbfilter is_not_abbrev ops with [] -> ops | ops -> ops in
+          (* Run the same candidate-deduplication chain as the
+             elaborator. Without this, a TC class op like
+             [Top.TcRing.*] coexists with an abbreviation
+             [Top.TcMonoid.*] (a [mulmonoid]-view alias) and [op_symb]
+             can't pick a unique short form, falling back to qualified
+             — which then forces prefix display instead of infix. *)
+          let ops = EcUnify.canonicalize ppe.ppe_env ops in
 
           match ops with
           | [(p1, _), _, _, _] -> p1

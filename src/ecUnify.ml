@@ -1280,3 +1280,159 @@ let select_op
 
   in
     List.pmap select (EcEnv.Op.all ~check:filter ~name env)
+
+(* -------------------------------------------------------------------- *)
+(* Candidate-list filters shared between the elaborator (typing-time
+   resolution of an ambiguous op name) and the printer (deciding the
+   shortest unambiguous qualifier when displaying an op). The chain
+   enforces a uniform "concrete iff reducible / non-abbrev wins" rule
+   so that a goal printed by the system parses back to the same term.
+
+   Each filter is monotone (drops candidates) and idempotent. Callers
+   apply them in [canonicalize] order, with a [keep-all-on-empty]
+   safeguard so a filter that would prune everything is skipped. *)
+
+(* Drop a TC-op candidate when, for the resolved carrier, either
+   (a) [tc_reduce] succeeds and yields a head op already among the
+       non-TC candidates (the TC is just an indirection to it), or
+   (b) the carrier is concrete but no instance applies (no chance of
+       the TC ever firing on this carrier), and a non-TC candidate
+       exists. *)
+let drop_subsumed_tc (env : EcEnv.env) (ops : select_t) : select_t =
+  let is_tc_op p =
+    match EcEnv.Op.by_path_opt p env with
+    | Some { op_kind = OB_oper (Some (OP_TC _)) } -> true
+    | _ -> false in
+  let concrete_paths =
+    List.filter_map
+      (fun ((p, _), _, _, _) -> if is_tc_op p then None else Some p)
+      ops in
+  if concrete_paths = [] then ops
+  else
+  let carrier_is_concrete (etyargs : etyarg list) (subue : unienv) =
+    match List.rev etyargs with
+    | [] -> false
+    | (ty, _) :: _ ->
+      let ty = ty_subst (Tuni.subst (UniEnv.assubst subue)) ty in
+      match ty.ty_node with
+      | Tconstr (p, _) -> begin
+          match EcEnv.Ty.by_path_opt p env with
+          | Some { tyd_type = `Abstract (_ :: _) } -> false
+          | _ -> true
+        end
+      | _ -> false in
+  List.filter (fun ((p, etyargs), _, subue, _) ->
+    if not (is_tc_op p) then true
+    else
+      match EcEnv.Op.tc_reduce env p etyargs with
+      | red -> begin
+          let red_head =
+            match red.f_node with
+            | Fop (p', _) -> Some p'
+            | Fapp ({ f_node = Fop (p', _) }, _) -> Some p'
+            | _ -> None in
+          match red_head with
+          | None -> true
+          | Some p' ->
+            not (List.exists (EcPath.p_equal p') concrete_paths)
+        end
+      | exception EcEnv.NotReducible ->
+        not (carrier_is_concrete etyargs subue)
+  ) ops
+
+(* Drop notation/abbrev candidates when a TC-op candidate sharing the
+   same basename is also present. The [TcMonoid] family ships generic
+   notation abbrevs like [abbrev ( * ) ['a <: mulmonoid] (x y) =
+   (+)<:'a> x y] that, when applied at a [comring] carrier, expand to
+   exactly the same [Fop] as comring's own [( * )] TC operator. The two
+   are interchangeable but [select_op] returns both. *)
+let drop_shadowed_notation (env : EcEnv.env) (ops : select_t) : select_t =
+  let has_tc_op_with_name n =
+    List.exists (fun ((p, _), _, _, _) ->
+      match EcEnv.Op.by_path_opt p env with
+      | Some { op_kind = OB_oper (Some (OP_TC _)) } ->
+        EcPath.basename p = n
+      | _ -> false) ops in
+  List.filter (fun ((p, _), _, _, _) ->
+    match EcEnv.Op.by_path_opt p env with
+    | Some { op_kind = OB_nott _ } ->
+      not (has_tc_op_with_name (EcPath.basename p))
+    | _ -> true) ops
+
+(* Catch the abbrev-to-TC-op case that [drop_subsumed_tc] misses:
+   classify candidates by their post-inline body head, drop any whose
+   body head is a TC op that [tc_reduce]s to a head already among the
+   non-TC heads. *)
+let drop_subsumed_by_post_inline_head (env : EcEnv.env) (ops : select_t)
+    : select_t
+=
+  let is_tc_op p =
+    match EcEnv.Op.by_path_opt p env with
+    | Some { op_kind = OB_oper (Some (OP_TC _)) } -> true
+    | _ -> false in
+  let body_head ((path, etyargs), _, _, bd) =
+    match bd with
+    | None -> Some (path, etyargs)
+    | Some bd_lazy ->
+        let _, body = Lazy.force bd_lazy in
+        let head, _ = EcTypes.destr_app body in
+        (match head.e_node with
+         | Eop (p, tys) -> Some (p, tys)
+         | _ -> None) in
+  let concrete_heads =
+    List.filter_map (fun cand ->
+      match body_head cand with
+      | Some (p, _) when not (is_tc_op p) -> Some p
+      | _ -> None) ops in
+  if concrete_heads = [] then ops
+  else
+  List.filter (fun cand ->
+    match body_head cand with
+    | Some (p, etyargs) when is_tc_op p -> begin
+        match EcEnv.Op.tc_reduce env p etyargs with
+        | red ->
+          let red_head =
+            match red.f_node with
+            | Fop (p', _) -> Some p'
+            | Fapp ({ f_node = Fop (p', _) }, _) -> Some p'
+            | _ -> None in
+          (match red_head with
+           | None -> true
+           | Some p' -> not (List.exists (EcPath.p_equal p') concrete_heads))
+        | exception EcEnv.NotReducible -> true
+      end
+    | _ -> true) ops
+
+(* Drop a TC-bounded notation candidate (an abbrev whose tparams have
+   non-empty TC bounds) when a same-basename candidate with no
+   TC-bounded tparams is also present. *)
+let drop_tc_bounded_notation (env : EcEnv.env) (ops : select_t) : select_t =
+  let is_tc_bounded_nott p =
+    match EcEnv.Op.by_path_opt p env with
+    | Some { op_kind = OB_nott _; op_tparams = tparams } ->
+      List.exists (fun (_, tcs) -> tcs <> []) tparams
+    | _ -> false in
+  let has_unbounded_with_name n =
+    List.exists (fun ((p, _), _, _, _) ->
+      EcPath.basename p = n
+      && match EcEnv.Op.by_path_opt p env with
+         | Some { op_tparams = tparams } ->
+           not (List.exists (fun (_, tcs) -> tcs <> []) tparams)
+         | None -> false) ops in
+  List.filter (fun ((p, _), _, _, _) ->
+    if is_tc_bounded_nott p
+    then not (has_unbounded_with_name (EcPath.basename p))
+    else true) ops
+
+(* Run the candidate-deduplication chain. Each filter is followed by
+   the [keep-all-on-empty] safeguard so a filter that would prune
+   everything is treated as a no-op. *)
+let canonicalize (env : EcEnv.env) (ops : select_t) : select_t =
+  let step f ops =
+    let pruned = f env ops in
+    if pruned = [] then ops else pruned in
+  ops
+  |> step drop_subsumed_tc
+  |> step drop_shadowed_notation
+  |> step drop_tc_bounded_notation
+  |> step drop_subsumed_by_post_inline_head

@@ -85,3 +85,20 @@ val select_op :
   -> unienv
   -> dom
   -> ((EcPath.path * etyarg list) * ty * unienv * sbody option) list
+
+(* -------------------------------------------------------------------- *)
+(* Candidate-list deduplication for [select_op]'s output. Used by the
+   elaborator (typing-time op resolution) and the printer (deciding
+   the shortest unambiguous qualifier when displaying an op). The
+   chain enforces a uniform "concrete iff reducible / non-abbrev wins"
+   rule so that a goal printed by the system parses back to the same
+   term. *)
+type select_t =
+  ((EcPath.path * etyarg list) * ty * unienv * sbody option) list
+
+val drop_subsumed_tc                : EcEnv.env -> select_t -> select_t
+val drop_shadowed_notation          : EcEnv.env -> select_t -> select_t
+val drop_subsumed_by_post_inline_head : EcEnv.env -> select_t -> select_t
+val drop_tc_bounded_notation        : EcEnv.env -> select_t -> select_t
+
+val canonicalize : EcEnv.env -> select_t -> select_t
