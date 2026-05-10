@@ -1498,18 +1498,12 @@ end section.
 (* Canonical [int] instance for [tcrealdomain]. Mirrors                 *)
 (* [theories/algebra/Number.ec]'s int specialisation.                   *)
 (* ==================================================================== *)
-op int_norm = CoreInt.absz.
-op int_le   = CoreInt.le.
-op int_lt   = CoreInt.lt.
-op int_min  = Int.min.
-op int_max  = Int.max.
-
 instance tcrealdomain with int reducible
-  op "`|_|" = int_norm
-  op (<=)   = int_le
-  op (<)    = int_lt
-  op minr   = int_min
-  op maxr   = int_max
+  op "`|_|" = CoreInt.absz
+  op (<=)   = CoreInt.le
+  op (<)    = CoreInt.lt
+  op minr   = Int.min
+  op maxr   = Int.max
 
   proof ler_norm_add by smt()
   proof addr_gt0     by smt()
