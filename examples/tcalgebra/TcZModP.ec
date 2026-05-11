@@ -362,29 +362,20 @@ qed.
 (* Fermat consequence: [x ^ p = x] for any [x : zmod] (including 0).   *)
 lemma exp_p (x : zmod) : exp x p = x.
 proof.
-case: (unit x) => [ux|]; last first.
-+ rewrite unitE /= => ->; rewrite expr0z.
-  have: p <> 0 by smt(prime_p gt1_prime).
-  by move=> ->.
-have ->: p = (p - 1) + 1 by ring.
-rewrite exprS; first by smt(prime_p gt1_prime).
-have ->: exp x (p - 1) = zmod_one by apply exp_sub_p_1.
-by apply: mulr1.
+case: (unit x) => [ux|].
++ by rewrite -(subrK p 1) exprD // expr1 exp_sub_p_1 // mul1r.
+rewrite unitE /= => ->; rewrite expr0z.
+by move: prime_p; rewrite /prime; case (p = 0) => // ->.
 qed.
 
 (* Inverse via Fermat: [invr x = x ^ (p - 2)] when [x] is a unit.      *)
 lemma inv_exp_sub_p_2 (x : zmod) :
   unit x => invr x = exp x (p - 2).
 proof.
-move=> ux.
-have ge0_p2: 0 <= p - 2 by smt(prime_p gt1_prime).
-have h: x * exp x (p - 2) = zmod_one.
-+ have <-: exp x (p - 2 + 1) = x * exp x (p - 2).
-  - by rewrite exprS // mulrC.
-  have ->: p - 2 + 1 = p - 1 by ring.
-  by apply: exp_sub_p_1.
-apply: (mulrI ux).
-by rewrite h; rewrite (@mulrV x ux).
+move=> ux; rewrite -div1r; move: (eqf_div oner x (exp x (p - 2)) oner).
+rewrite -unitE ux oner_neq0 -div1r !mul1r divr1 /= -exprSr /=.
++ by smt(prime_p gt1_prime).
+by rewrite exp_sub_p_1.
 qed.
 
 end ZModField.

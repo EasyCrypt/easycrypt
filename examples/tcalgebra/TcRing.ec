@@ -721,8 +721,9 @@ lemma exp_mod_unit (x : t) (n k : int) :
   unit x => exp x k = oner => exp x n = exp x (n %% k).
 proof.
 move=> ux; case: (k = 0) => [->>|nz_k]; first by rewrite modz0.
-move=> eq_xk; rewrite {1}(@divz_eq n k) exprD //.
-by rewrite mulrC exprM eq_xk expr1z mul1r.
+move=> eq_xk.
+have h: n = k * (n %/ k) + n %% k by smt(divz_eq).
+rewrite {1}h exprD // exprM eq_xk expr1z mul1r //.
 qed.
 
 end section.
