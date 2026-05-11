@@ -2627,14 +2627,24 @@ module Ty = struct
   let add_instance
     ?(import = true) (scope : scope) mode ({ pl_desc = tci } as toptci)
   =
+    (* The legacy AlgTactic [instance ring/field/bring with T …] uses
+       the unqualified names [ring], [field], [bring] as fixed keywords.
+       Those names collide with the TC framework's [type class ring]
+       and [type class field] (when in scope). Dispatch to
+       [add_generic_instance] when the name resolves to a typeclass
+       — only fall back to the legacy AlgTactic handlers if no such
+       typeclass exists.                                               *)
+    let resolves_as_tc () =
+      Option.is_some
+        (EcEnv.TypeClass.lookup_opt (unloc (fst tci.pti_tc)) (env scope)) in
     match unloc (fst tci.pti_tc) with
-    | ([], "bring") -> begin
+    | ([], "bring") when not (resolves_as_tc ()) -> begin
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
         addring ~import scope mode (`Boolean, toptci)
     end
 
-    | ([], "ring") -> begin
+    | ([], "ring") when not (resolves_as_tc ()) -> begin
       let kind =
         match tci.pti_args with
         | None -> `Integer
@@ -2650,7 +2660,8 @@ module Ty = struct
       in addring ~import scope mode (kind, toptci)
     end
 
-    | ([], "field") -> addfield ~import scope mode toptci
+    | ([], "field") when not (resolves_as_tc ()) ->
+        addfield ~import scope mode toptci
 
     | _ ->
         if EcUtils.is_some tci.pti_args then
