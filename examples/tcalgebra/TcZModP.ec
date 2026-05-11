@@ -321,4 +321,70 @@ instance field with zmod reducible
 (* Spacer. *)
 op _spacer2 : zmod = zmod_zero.
 
+(* ==================================================================== *)
+(* Field-specific exp/Fermat corollaries. Mirrors the tail of legacy   *)
+(* ZModField (lines 372–467 of theories/algebra/ZModP.ec).             *)
+(*                                                                     *)
+(* The class-op [exp] is comring's; for nonzero (i.e. [unit]) [x : zmod],
+   it behaves like [int]'s [exp] modulo [p].                           *)
+(* ==================================================================== *)
+
+(* [exp_mod] specialised to [zmod]: when [x] has order dividing [k], the
+   exponent only matters mod [k]. The [unit x] precondition from the
+   general comring lemma is automatic over a field except at [x = 0],
+   handled separately below. *)
+lemma exp_mod (x : zmod) (n k : int) :
+  x <> zmod_zero => exp x k = zmod_one =>
+  exp x n = exp x (n %% k).
+proof.
+by move=> nz_x; apply: exp_mod_unit; apply/unitE.
+qed.
+
+(* Fermat's little theorem: every unit raised to [p - 1] is one.       *)
+lemma exp_sub_p_1 (x : zmod) :
+  unit x => exp x (p - 1) = zmod_one.
+proof.
+move=> ux.
+have nz_x: x <> zmod_zero by apply/unitE.
+have N_p_div_x: !(p %| asint x).
++ rewrite -inzmod_eq0P; move: nz_x.
+  by rewrite -{1}(@asintK x).
+have ge0_p1: 0 <= p - 1 by smt(prime_p gt1_prime).
+have lift_exp : forall i, 0 <= i =>
+  exp (inzmod (asint x)) i = inzmod (exp<:int> (asint x) i).
++ elim=> [|i ge0_i ih]; first by rewrite !expr0.
+  by rewrite !exprS // ih inzmodM asintK.
+rewrite -{1}(@asintK x) lift_exp //.
+rewrite -[zmod_one]asintK zmod_oneE -eq_inzmod.
+by rewrite zmodcgrP &(Fermat_little) // prime_p.
+qed.
+
+(* Fermat consequence: [x ^ p = x] for any [x : zmod] (including 0).   *)
+lemma exp_p (x : zmod) : exp x p = x.
+proof.
+case: (unit x) => [ux|]; last first.
++ rewrite unitE /= => ->; rewrite expr0z.
+  have: p <> 0 by smt(prime_p gt1_prime).
+  by move=> ->.
+have ->: p = (p - 1) + 1 by ring.
+rewrite exprS; first by smt(prime_p gt1_prime).
+have ->: exp x (p - 1) = zmod_one by apply exp_sub_p_1.
+by apply: mulr1.
+qed.
+
+(* Inverse via Fermat: [invr x = x ^ (p - 2)] when [x] is a unit.      *)
+lemma inv_exp_sub_p_2 (x : zmod) :
+  unit x => invr x = exp x (p - 2).
+proof.
+move=> ux.
+have ge0_p2: 0 <= p - 2 by smt(prime_p gt1_prime).
+have h: x * exp x (p - 2) = zmod_one.
++ have <-: exp x (p - 2 + 1) = x * exp x (p - 2).
+  - by rewrite exprS // mulrC.
+  have ->: p - 2 + 1 = p - 1 by ring.
+  by apply: exp_sub_p_1.
+apply: (mulrI ux).
+by rewrite h; rewrite (@mulrV x ux).
+qed.
+
 end ZModField.

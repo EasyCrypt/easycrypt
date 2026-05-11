@@ -44,3 +44,16 @@ clone import ZModField as Z5F with
 lemma test_unitE (x : Z5F.zmod) :
   Z5F.zmod_unit x <=> x <> Z5F.zmod_zero.
 proof. by apply Z5F.unitE. qed.
+
+(* Fermat: x^4 = 1 for every unit in Z/5Z. *)
+lemma test_exp_p_minus_1 (x : Z5F.zmod) :
+  x <> Z5F.zmod_zero => exp x 4 = Z5F.zmod_one.
+proof.
+move=> nz_x.
+have ->: (4 = 5 - 1) by trivial.
+by apply: Z5F.exp_sub_p_1; apply/Z5F.unitE.
+qed.
+
+(* Frobenius: x^5 = x. *)
+lemma test_exp_p (x : Z5F.zmod) : exp x 5 = x.
+proof. by apply Z5F.exp_p. qed.
