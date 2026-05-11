@@ -65,6 +65,16 @@ and tcinstance = {
      the class chain. The matcher and [is_conv] do not consult this
      flag — they always look through concrete witnesses. *)
   tci_reducible : bool;
+  (* When this instance was synthesised by [add_generic_instance]
+     via the parent chain, the cumulative ancestor→leaf op renaming
+     accumulated along the chain walk. [None] for manually-declared
+     instances (legacy AlgTactic-based [addring]/[addfield] and any
+     user-declared instance not produced by the chain machinery).
+     Used by the resolver's op-name preservation filter to drop
+     candidates whose renaming clobbers the queried op name, e.g.
+     to disambiguate [( + )<:zmod>] between the addmonoid view
+     ([+] preserved) and the mulmonoid view ([+] renamed to [*]). *)
+  tci_chain_rename : (EcSymbols.symbol * EcSymbols.symbol) list option;
 }
 
 and tcibody = [

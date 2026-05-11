@@ -2063,12 +2063,13 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
     let instance = EcTheory.
-      { tci_params    = fst ty
-      ; tci_type      = snd ty
-      ; tci_instance  = `Ring cr
-      ; tci_local     = (tci.pti_loca :> locality)
-      ; tci_parents   = []
-      ; tci_reducible = tci.pti_reducible } in
+      { tci_params       = fst ty
+      ; tci_type         = snd ty
+      ; tci_instance     = `Ring cr
+      ; tci_local        = (tci.pti_loca :> locality)
+      ; tci_parents      = []
+      ; tci_reducible    = tci.pti_reducible
+      ; tci_chain_rename = None } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2108,12 +2109,13 @@ module Ty = struct
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
 
     let instance = EcTheory.
-      { tci_params    = fst ty
-      ; tci_type      = snd ty
-      ; tci_instance  = `Field cr
-      ; tci_local     = (tci.pti_loca :> locality)
-      ; tci_parents   = []
-      ; tci_reducible = tci.pti_reducible } in
+      { tci_params       = fst ty
+      ; tci_type         = snd ty
+      ; tci_instance     = `Field cr
+      ; tci_local        = (tci.pti_loca :> locality)
+      ; tci_parents      = []
+      ; tci_reducible    = tci.pti_reducible
+      ; tci_chain_rename = None } in
 
     let scope =
       let item = EcTheory.Th_instance (None, instance) in
@@ -2521,12 +2523,18 @@ module Ty = struct
               anc_decl.tc_prts in
           let parents = List.pmap (fun x -> x) parents in
           let instance = EcTheory.
-            { tci_params    = fst ty
-            ; tci_type      = snd ty
-            ; tci_instance  = `General (anc, Some anc_symbols)
-            ; tci_local     = lc
-            ; tci_parents   = parents
-            ; tci_reducible = tci.pti_reducible } in
+            { tci_params       = fst ty
+            ; tci_type         = snd ty
+            ; tci_instance     = `General (anc, Some anc_symbols)
+            ; tci_local        = lc
+            ; tci_parents      = parents
+            ; tci_reducible    = tci.pti_reducible
+              (* Record the cumulative ancestor->leaf renaming on this
+                 chain entry. Used by the resolver's op-name preservation
+                 filter to disambiguate multiple monoid views at a
+                 concrete carrier (e.g. comring's addmonoid vs
+                 mulmonoid-renamed paths to monoid).                 *)
+            ; tci_chain_rename = Some ren } in
           let item = EcTheory.Th_instance (Some name, instance) in
           let item = EcTheory.mkitem ~import item in
           { scope with sc_env = EcSection.add_item item scope.sc_env })
