@@ -1211,11 +1211,10 @@ let trans_reducible_instance_bridges genv =
     | Some inst_path, `General (anc, Some symbols) ->
       let anc_prefix = EcPath.prefix anc.EcAst.tc_name in
       let inst_etyargs = EcDecl.etyargs_of_tparams tci.EcTheory.tci_params in
-      EcMaps.Mstr.iter (fun basename (concrete_path, concrete_etyargs) ->
+      EcMaps.Mstr.iter (fun basename rhs_body ->
         let class_op_path = EcPath.pqoname anc_prefix basename in
-        match EcEnv.Op.by_path_opt class_op_path env,
-              EcEnv.Op.by_path_opt concrete_path env with
-        | Some class_op, Some concrete_op ->
+        match EcEnv.Op.by_path_opt class_op_path env with
+        | Some class_op ->
           let witness =
             EcAst.TCIConcrete
               { path    = inst_path;
@@ -1229,12 +1228,7 @@ let trans_reducible_instance_bridges genv =
           let xs_forms = List.map (fun (x, ty) -> EcCoreFol.f_local x ty) xs in
           let lhs_head = EcCoreFol.f_op_tc class_op_path lhs_etyargs lhs_ty in
           let lhs = EcCoreFol.f_app lhs_head xs_forms codom in
-          let rhs_ty =
-            EcDecl.ty_instanciate concrete_op.op_tparams concrete_etyargs
-              concrete_op.op_ty in
-          let rhs_head =
-            EcCoreFol.f_op_tc concrete_path concrete_etyargs rhs_ty in
-          let rhs = EcCoreFol.f_app rhs_head xs_forms codom in
+          let rhs = EcCoreFol.f_app rhs_body xs_forms codom in
           let body = EcCoreFol.f_eq lhs rhs in
           let body =
             EcCoreFol.f_forall

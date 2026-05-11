@@ -70,7 +70,7 @@ and tcinstance = {
 and tcibody = [
   | `Ring    of ring
   | `Field   of field
-  | `General of typeclass * ((path * etyarg list) Mstr.t) option
+  | `General of typeclass * (EcCoreFol.form Mstr.t) option
 ]
 
 and thmode = [ `Abstract | `Concrete ]

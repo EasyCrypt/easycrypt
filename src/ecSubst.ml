@@ -1155,10 +1155,7 @@ let subst_tcibody (s : subst) (tci : tcibody) =
 
   | `General (tc, syms) ->
      let tc   = subst_typeclass s tc in
-     let syms =
-       Option.map
-         (Mstr.map (fun (p, tys) -> (subst_path s p, subst_etyargs s tys)))
-         syms in
+     let syms = Option.map (Mstr.map (subst_form s)) syms in
      `General (tc, syms)
 
 

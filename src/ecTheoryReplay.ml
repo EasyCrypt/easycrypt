@@ -1013,11 +1013,7 @@ and replay_instance
 
         | `General (tc, syms) ->
            let tc   = fortypeclass tc in
-           let syms =
-             Option.map
-               (Mstr.map (fun (p, tys) ->
-                  (forpath p, List.map (EcSubst.subst_etyarg subst) tys)))
-               syms in
+           let syms = Option.map (Mstr.map (EcSubst.subst_form subst)) syms in
            `General (tc, syms)
     in
 

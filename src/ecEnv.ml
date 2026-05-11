@@ -2980,11 +2980,8 @@ module Op = struct
           EcSubst.empty
           (List.combine (List.map fst tciparams) tciargs)
       in
-      let optg, opargs = EcMaps.Mstr.find opname symbols in
-      let opargs = List.map (EcSubst.subst_etyarg subst) opargs in
-      let optg_decl = by_path optg env in
-      let tysubst = Tvar.init (List.combine (List.map fst optg_decl.op_tparams) opargs) in
-      f_op_tc optg opargs (Tvar.subst tysubst optg_decl.op_ty)
+      let body = EcMaps.Mstr.find opname symbols in
+      EcSubst.subst_form subst body
     with NotReducible ->
       if strict then raise NotReducible
       else match tc_reduce_abstract_via_rename env p tys with
@@ -3011,8 +3008,10 @@ module Op = struct
         match tci.EcTheory.tci_instance with
         | `General (_, Some sym) ->
           (match EcMaps.Mstr.find_opt tcop_basename sym with
-           | Some (p, _) -> EcPath.p_equal p concrete
-           | None -> false)
+           | Some { f_node = Fop (p, _); _ } -> EcPath.p_equal p concrete
+           | Some { f_node = Fapp ({ f_node = Fop (p, _); _ }, _); _ } ->
+             EcPath.p_equal p concrete
+           | _ -> false)
         | _ -> false)
         (TcInstance.get_all env)
 

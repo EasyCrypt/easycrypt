@@ -55,7 +55,12 @@ and tcinstance = {
 and tcibody = [
   | `Ring    of ring
   | `Field   of field
-  | `General of typeclass * ((path * etyarg list) Mstr.t) option
+  | `General of typeclass * (EcCoreFol.form Mstr.t) option
+    (* Symbol map: each TC class op (by basename) maps to the form that
+       realises it on the instance's carrier. Most of the time that
+       form is [Fop (concrete_path, etyargs)] — a named op application
+       — but in principle it can be any closed term (e.g. a literal
+       [Fint 0] for the additive identity at int). *)
 ]
 
 and thmode = [ `Abstract | `Concrete ]

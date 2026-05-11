@@ -486,9 +486,7 @@ let on_instance cb tci =
 
   | `General (tci, syms) ->
      on_typeclass cb tci;
-     Option.iter
-       (Mstr.iter (fun _ (p, tys) -> cb (`Op p); List.iter (on_etyarg cb) tys))
-       syms
+     Option.iter (Mstr.iter (fun _ f -> on_form cb f)) syms
 
 (* -------------------------------------------------------------------- *)
 type sc_name =

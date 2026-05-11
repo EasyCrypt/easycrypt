@@ -1973,7 +1973,13 @@ module Ty = struct
 \  - expected: %a@\n\
 \  - got     : %a"
                    x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
-               end; Mstr.add x (p, opparams) m)
+               end;
+               (* Wrap the (path, etyargs) into a form. This is Phase 1
+                  of moving instance op-bindings to a form-valued symbol
+                  map; future phases will let the RHS be an arbitrary
+                  form so a literal [Fint 0] can directly realise an
+                  additive identity. *)
+               Mstr.add x (EcCoreFol.f_op_tc p opparams opty) m)
         reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
@@ -2029,9 +2035,12 @@ module Ty = struct
       interactive
 
   (* ------------------------------------------------------------------ *)
-  let get_ring_field_op (name : string) (symbols : (path * etyarg list) Mstr.t) =
+  let get_ring_field_op (name : string) (symbols : EcCoreFol.form Mstr.t) =
     Option.map
-      (fun (p, tys) -> assert (List.is_empty tys); p)
+      (fun (f : EcCoreFol.form) ->
+        match f.EcAst.f_node with
+        | EcAst.Fop (p, tys) -> assert (List.is_empty tys); p
+        | _ -> assert false)
       (Mstr.find_opt name symbols)
 
   let ring_of_symmap env ty kind symbols =
@@ -2277,8 +2286,15 @@ module Ty = struct
             (fun (id, _) ->
               let n = EcIdent.name id in
               let local_n = lookup_ren ren n in
+              let body_head (f : EcCoreFol.form) =
+                match f.EcAst.f_node with
+                | EcAst.Fop (p, _) -> Some p
+                | EcAst.Fapp ({ f_node = Fop (p, _); _ }, _) -> Some p
+                | _ -> None in
               match Mstr.find_opt local_n symbols, Mstr.find_opt n existing_sym with
-              | Some (p1, _), Some (p2, _) when not (EcPath.p_equal p1 p2) ->
+              | Some f1, Some f2 ->
+                begin match body_head f1, body_head f2 with
+                | Some p1, Some p2 when not (EcPath.p_equal p1 p2) ->
                   hierror
                     "diamond coherence violation: registering an instance \
                      of `%s' on this carrier requires op `%s' to be `%s', \
@@ -2287,6 +2303,8 @@ module Ty = struct
                     n
                     (EcPath.tostring p1)
                     (EcPath.tostring p2)
+                | _ -> ()
+                end
               | _ -> ())
             anc_decl.tc_ops)
       chain_decls;
@@ -2317,11 +2335,20 @@ module Ty = struct
             | Some s -> Mstr.add n s m
             | None -> m)
           Mstr.empty anc_decl.tc_ops in
-      let same_symbols (existing_syms : (path * etyarg list) Mstr.t) =
+      let head_path (f : EcCoreFol.form) =
+        match f.EcAst.f_node with
+        | EcAst.Fop (p, _) -> Some p
+        | EcAst.Fapp ({ f_node = Fop (p, _); _ }, _) -> Some p
+        | _ -> None in
+      let same_symbols (existing_syms : EcCoreFol.form Mstr.t) =
         Mstr.for_all
-          (fun n (p, _) ->
+          (fun n f ->
             match Mstr.find_opt n existing_syms with
-            | Some (p', _) -> EcPath.p_equal p p'
+            | Some f' -> begin
+                match head_path f, head_path f' with
+                | Some p, Some p' -> EcPath.p_equal p p'
+                | _ -> false
+              end
             | None -> false)
           expected in
       (* Carrier-type comparison must be alpha-equivalent (ignore tparam
@@ -2421,15 +2448,11 @@ module Ty = struct
               (List.combine (List.fst anc_decl.tc_tparams) anc.tc_args) in
           let subst =
             List.fold_left
-              (fun subst (opname, ty) ->
+              (fun subst (opname, _ty) ->
                 let local = lookup_ren ren (EcIdent.name opname) in
-                let oppath, optys = Mstr.find local symbols in
-                let op =
-                  EcFol.f_op_tc
-                    oppath
-                    (List.map (EcSubst.subst_etyarg subst) optys)
-                    (EcSubst.subst_ty subst ty)
-                in EcSubst.add_flocal subst opname op)
+                let body = Mstr.find local symbols in
+                let op = EcSubst.subst_form subst body in
+                EcSubst.add_flocal subst opname op)
               subst anc_decl.tc_ops in
           (subst, seen))
         (EcSubst.empty, EcPath.Sp.empty) chain_decls in
@@ -2556,11 +2579,20 @@ module Ty = struct
             | Some s -> Mstr.add n s m
             | None -> m)
           Mstr.empty anc_decl.tc_ops in
-      let same_symbols (existing_syms : (path * etyarg list) Mstr.t) =
+      let head_path (f : EcCoreFol.form) =
+        match f.EcAst.f_node with
+        | EcAst.Fop (p, _) -> Some p
+        | EcAst.Fapp ({ f_node = Fop (p, _); _ }, _) -> Some p
+        | _ -> None in
+      let same_symbols (existing_syms : EcCoreFol.form Mstr.t) =
         Mstr.for_all
-          (fun n (p, _) ->
+          (fun n f ->
             match Mstr.find_opt n existing_syms with
-            | Some (p', _) -> EcPath.p_equal p p'
+            | Some f' -> begin
+                match head_path f, head_path f' with
+                | Some p, Some p' -> EcPath.p_equal p p'
+                | _ -> false
+              end
             | None -> false)
           expected in
       List.exists
