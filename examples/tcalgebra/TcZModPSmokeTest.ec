@@ -25,13 +25,15 @@ proof. by rewrite -inzmodD //. qed.
 lemma test_addrC (x y : zmod) : zmod_add x y = zmod_add y x.
 proof. by apply zmod_addrC. qed.
 
-(* Bare class-op notation now works thanks to the carrier-specific
-   abbrev for [+] declared inside ZModRing. *)
+(* Bare class-op notation. Resolves to the class [(+)] (via the
+   resolver's op-preservation filter on chain-rename) when there is
+   no carrier-specific abbrev, or to the abbrev when present. Apply
+   class-level [addrC] in either case. *)
 lemma test_addrC_infix (x y : zmod) : x + y = y + x.
-proof. by apply zmod_addrC. qed.
+proof. by apply addrC. qed.
 
 lemma test_mulrC_infix (x y : zmod) : x * y = y * x.
-proof. by apply zmod_mulrC. qed.
+proof. by apply mulrC. qed.
 
 (* The bigA family applies through the [comring] instance — exercise   *)
 (* via [BigZModRing] or similar. We just call addrA as a sanity check.  *)

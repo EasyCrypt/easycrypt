@@ -561,9 +561,13 @@ module Unify = struct
               end
             | _ -> None in
 
-          (* Modes #1, #2: carrier is ground; query the instance database. *)
+          (* Modes #1, #2: carrier is ground; query the instance
+             database. Defined later (after [infer_all_op_preserving])
+             so it can prefer an op-name-preserving candidate. *)
+          let strat_infer_by_carrier_ref : (unit -> tcwitness option) ref =
+            ref (fun () -> EcTypeClass.infer env ty tc) in
           let strat_infer_by_carrier () : tcwitness option =
-            EcTypeClass.infer env ty tc in
+            !strat_infer_by_carrier_ref () in
           (* Ambiguity check: when multiple resolutions match, defer
              so that later [TcTw] equations from the surrounding goal
              can pin the univar to the correct one.
@@ -582,6 +586,44 @@ module Unify = struct
             | m :: rest ->
               let (_, _, ren_m) = m in
               not (List.for_all (fun (_, _, r) -> rens_equal r ren_m) rest) in
+          (* Filter [infer_all] candidates by op-name preservation
+             when [pb_op] is set. Each chain-synthesised candidate
+             carries a [tci_chain_rename] tag recording the cumulative
+             ancestor->leaf renaming; we drop candidates whose rename
+             clobbers the queried op name. This collapses the spurious
+             multiplicity at a comring/idomain/field carrier when the
+             user writes a class op like [(+)<:zmod>]: only the
+             addmonoid-path monoid view preserves [+], so the
+             mulmonoid-renamed view (where [+] became [*]) is dropped.
+
+             Manually-declared (non-chain) instances have
+             [tci_chain_rename = None]; treat them as preserving
+             every op (they're roots of their own chains).            *)
+          let infer_all_op_preserving () =
+            let cands = EcTypeClass.infer_all env ty tc in
+            match pb_op with
+            | None -> cands
+            | Some _ when List.length cands < 2 -> cands
+            | Some op_name ->
+              let preserves (w : tcwitness) : bool =
+                match w with
+                | TCIConcrete { path; _ } -> begin
+                    match (EcEnv.TcInstance.by_path path env).tci_chain_rename with
+                    | None -> true
+                    | Some ren -> EcTypeClass.op_preserved ren op_name
+                  end
+                | _ -> true in
+              List.filter preserves cands in
+          (* Rebind [strat_infer_by_carrier] to use the op-preserving
+             filtered list: when [pb_op] is set, take the first
+             candidate that preserves the op name. This makes the
+             resolution step pick the addmonoid view of [+] (not the
+             mulmonoid-renamed view) at a concrete comring carrier. *)
+          strat_infer_by_carrier_ref :=
+            (fun () ->
+               match infer_all_op_preserving () with
+               | w :: _ -> Some w
+               | [] -> EcTypeClass.infer env ty tc);
           let strat_carrier_is_ambiguous () : bool =
             match ty.ty_node with
             | Tvar a -> begin
@@ -596,7 +638,7 @@ module Unify = struct
                       paths_genuinely_ambiguous tcs
                   | _ -> false in
                 by_decl
-                || List.length (EcTypeClass.infer_all env ty tc) > 1
+                || List.length (infer_all_op_preserving ()) > 1
               end
             | _ -> false in
 
