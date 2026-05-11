@@ -1,7 +1,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Core Int.
+require import Core Int IntDiv.
 require import TcMonoid.
 
 (* ==================================================================== *)
@@ -709,6 +709,20 @@ lemma fracrDE (n1 n2 d1 d2 : t) :
 proof.
 move=> inv_d1 inv_d2; rewrite mulrDl [n1 * d2]mulrC.
 by rewrite !invrM //; congr; rewrite mulrACA divrr // ?(mul1r, mulr1).
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* If [x] has order dividing [k] (i.e. [x ^ k = 1]), then [x ^ n] only
+   depends on [n %% k]. The [unit x] precondition makes the lemma work
+   for negative [n] (via [exprN], which is well-behaved on units in
+   any commutative ring). At [field] level [unit x ↔ x ≠ 0] so the
+   precondition is automatic when [x ≠ 0].                              *)
+lemma exp_mod_unit (x : t) (n k : int) :
+  unit x => exp x k = oner => exp x n = exp x (n %% k).
+proof.
+move=> ux; case: (k = 0) => [->>|nz_k]; first by rewrite modz0.
+move=> eq_xk; rewrite {1}(@divz_eq n k) exprD //.
+by rewrite mulrC exprM eq_xk expr1z mul1r.
 qed.
 
 end section.
