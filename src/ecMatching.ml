@@ -1227,6 +1227,20 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
         EcUnify.UniEnv.flush_tc_problems env ue;
         let f1 = norm f1 in
         let f2 = norm f2 in
+        (* When one side is a TC op call on a univar carrier and the
+           other side's head is a registered realisation of that same
+           class op, we'd lose the chance to pin the carrier if we
+           [delta]-unfolded the realisation first. Detect this case so
+           the mathcomp-style branch below is preferred. *)
+        let mathcomp_eligible op_tc tys_tc op_concrete =
+          EcEnv.Op.is_tc_op env op_tc
+          && (not (EcPath.p_equal op_tc op_concrete))
+          && EcEnv.Op.tc_op_realised_by env op_tc op_concrete
+          && (match List.rev tys_tc with
+              | (ty, _) :: _ ->
+                not (TyUni.Suid.is_empty (Tuni.univars ty))
+              | [] -> false) in
+
         match fst_map f_node (destr_app f1),
               fst_map f_node (destr_app f2)
         with
@@ -1235,6 +1249,49 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
         | _, (Flocal x2, args2) when LDecl.can_unfold x2 hyps ->
             doit_lreduce env (doit env ilc f1) f2.f_ty x2 args2
+
+        (* Mathcomp-style (pre-empt delta unfolding of [op2] which would
+           commit the carrier to a specific realisation and lose the
+           cross-instance match). After unifying carriers, re-normalise
+           the now-pinned TC op call so [tc_reduce] can fire and the
+           realisation matches the goal-side concrete op.               *)
+        | (Fop (op1, tys1), _), (Fop (op2, _), _)
+          when mathcomp_eligible op1 tys1 op2 ->
+            let before = Tuni.univars f1.f_ty in
+            (try EcUnify.unify env ue f1.f_ty f2.f_ty
+             with EcUnify.UnificationFailure _ -> failure ());
+            let f1' = norm f1 in
+            let after = Tuni.univars f1'.f_ty in
+            if TyUni.Suid.cardinal after >= TyUni.Suid.cardinal before then
+              failure ();
+            EcUnify.UniEnv.flush_tc_problems env ue;
+            (* The pattern's TC-op application is now at a concrete
+               carrier; reduce it through the registered instance. *)
+            let f1_reduced =
+              let head, args = destr_app f1' in
+              match head.f_node with
+              | Fop (p, tys) when EcEnv.Op.tc_reducible env p tys ->
+                f_app (EcEnv.Op.tc_reduce env p tys) args f1'.f_ty
+              | _ -> f1' in
+            doit env ilc (norm f1_reduced) (norm f2)
+
+        | (Fop (op1, _), _), (Fop (op2, tys2), _)
+          when mathcomp_eligible op2 tys2 op1 ->
+            let before = Tuni.univars f2.f_ty in
+            (try EcUnify.unify env ue f1.f_ty f2.f_ty
+             with EcUnify.UnificationFailure _ -> failure ());
+            let f2' = norm f2 in
+            let after = Tuni.univars f2'.f_ty in
+            if TyUni.Suid.cardinal after >= TyUni.Suid.cardinal before then
+              failure ();
+            EcUnify.UniEnv.flush_tc_problems env ue;
+            let f2_reduced =
+              let head, args = destr_app f2' in
+              match head.f_node with
+              | Fop (p, tys) when EcEnv.Op.tc_reducible env p tys ->
+                f_app (EcEnv.Op.tc_reduce env p tys) args f2'.f_ty
+              | _ -> f2' in
+            doit env ilc (norm f1) (norm f2_reduced)
 
         | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
             doit_reduce env ((doit env ilc)^~ f2) f1.f_ty op1 tys1 args1
@@ -1247,28 +1304,6 @@ let f_match_core opts hyps (ue, ev) f1 f2 =
 
         | _, (Fop (op2, tys2), args2) when EcEnv.Op.tc_reducible env op2 tys2 ->
             doit_tc_reduce env (doit env ilc f1) f2.f_ty op2 tys2 args2
-
-        (* Mathcomp-style: pattern head is a TC op whose carrier is still
-           an unresolved univar but the goal head is a registered concrete
-           realisation of the same class op. Force unification of the
-           carriers so TC inference can pin down the witness. *)
-        | (Fop (op1, tys1), _), (Fop (op2, _), _)
-          when EcEnv.Op.is_tc_op env op1
-            && (not (EcPath.p_equal op1 op2))
-            && EcEnv.Op.tc_op_realised_by env op1 op2
-            && (match List.rev tys1 with
-                | (ty, _) :: _ ->
-                  not (TyUni.Suid.is_empty (Tuni.univars ty))
-                | [] -> false) ->
-            let before = Tuni.univars f1.f_ty in
-            (try EcUnify.unify env ue f1.f_ty f2.f_ty
-             with EcUnify.UnificationFailure _ -> failure ());
-            let f1' = norm f1 in
-            let after = Tuni.univars f1'.f_ty in
-            if TyUni.Suid.cardinal after >= TyUni.Suid.cardinal before then
-              failure ();
-            EcUnify.UniEnv.flush_tc_problems env ue;
-            doit env ilc (norm f1) (norm f2)
 
         | _, _ -> failure ()
 

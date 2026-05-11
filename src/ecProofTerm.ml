@@ -372,7 +372,15 @@ let pf_find_occurence
     | `Path p, Fop (p', _) when tc_op_realised_by p p' -> true
     | `Path p, _ -> begin
         match kmatch_alt_head tp_head with
-        | Some p' -> EcPath.p_equal p p'
+        | Some p' when EcPath.p_equal p p' -> true
+        (* Multi-parent factory rename: pattern's [p] is a TC op (e.g.
+           [( * )] from comring) and goal's head is a different TC op
+           (e.g. [(+)] inherited from monoid via comring's mulmonoid
+           parent edge with [( * ) := (+)] rename). The goal's head
+           [tc_reduce]s to a concrete op; check whether the pattern's
+           [p] is also realised by that same concrete op in some
+           registered instance.                                       *)
+        | Some p' -> tc_op_realised_by p p'
         | None -> false
       end
     | `Var  x, Flocal x'   -> id_equal x x'
