@@ -75,6 +75,15 @@ op zmod_mul x y    = inzmod (asint x * asint y).
 op zmod_unit x     = exists y, zmod_mul y x = inzmod 1.
 op zmod_inv  x     = choiceb (fun y => zmod_mul y x = inzmod 1) x.
 
+(* Carrier-specific abbrevs for [+] / [*] / [-]. Without these, [x + y]
+   at [zmod] is ambiguous between the addmonoid and mulmonoid-renamed
+   views of monoid (since [zmod : comring] inherits monoid via both
+   parent edges). Mirrors what [Int.ec] / [Real.ec] do for their
+   concrete carriers.                                                  *)
+abbrev ( + ) (x y : zmod) : zmod = zmod_add x y.
+abbrev ( * ) (x y : zmod) : zmod = zmod_mul x y.
+abbrev [-] (x : zmod) : zmod = zmod_opp x.
+
 (* -------------------------------------------------------------------- *)
 lemma inzmod0E: asint (inzmod 0) = 0.
 proof. by rewrite inzmodK mod0z. qed.

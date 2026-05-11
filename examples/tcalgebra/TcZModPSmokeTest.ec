@@ -25,6 +25,14 @@ proof. by rewrite -inzmodD //. qed.
 lemma test_addrC (x y : zmod) : zmod_add x y = zmod_add y x.
 proof. by apply zmod_addrC. qed.
 
+(* Bare class-op notation now works thanks to the carrier-specific
+   abbrev for [+] declared inside ZModRing. *)
+lemma test_addrC_infix (x y : zmod) : x + y = y + x.
+proof. by apply zmod_addrC. qed.
+
+lemma test_mulrC_infix (x y : zmod) : x * y = y * x.
+proof. by apply zmod_mulrC. qed.
+
 (* The bigA family applies through the [comring] instance — exercise   *)
 (* via [BigZModRing] or similar. We just call addrA as a sanity check.  *)
 lemma test_addrA (x y z : zmod) :
