@@ -1,0 +1,35 @@
+(* ==================================================================== *)
+(* Smoke test for TcZModP: instantiate ZModRing at p := 5 and exercise *)
+(* class lemmas at the carrier zmod (= Z/5Z).                          *)
+(* ==================================================================== *)
+require import AllCore List Int IntDiv.
+require import TcMonoid TcRing TcBigop TcBigalg TcInt.
+require import TcZModP.
+
+(* -------------------------------------------------------------------- *)
+(* ZModRing at p := 5 (not prime instantiation; ZModField needs prime). *)
+clone import ZModRing as Z5 with
+  op p <- 5
+  proof ge2_p by trivial.
+
+(* Coercion sanity. *)
+lemma test_asint_inzmod (n : int) :
+  0 <= n < 5 => asint (inzmod n) = n.
+proof. by move=> rg; rewrite inzmodK pmod_small. qed.
+
+(* Concrete arithmetic. *)
+lemma test_one_plus_one : zmod_add Z5.zmod_one Z5.zmod_one = inzmod 2.
+proof. by rewrite -inzmodD //. qed.
+
+(* Class lemma at the carrier zmod. *)
+lemma test_addrC (x y : zmod) : zmod_add x y = zmod_add y x.
+proof. by apply zmod_addrC. qed.
+
+(* The bigA family applies through the [comring] instance — exercise   *)
+(* via [BigZModRing] or similar. We just call addrA as a sanity check.  *)
+lemma test_addrA (x y z : zmod) :
+  zmod_add x (zmod_add y z) = zmod_add (zmod_add x y) z.
+proof. by apply zmod_addrA. qed.
+
+lemma test_mulrC (x y : zmod) : zmod_mul x y = zmod_mul y x.
+proof. by apply zmod_mulrC. qed.
