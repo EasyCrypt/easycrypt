@@ -20,10 +20,10 @@ op real_unit (x : real) : bool = x <> 0%r.
 
 (* -------------------------------------------------------------------- *)
 instance idomain with real reducible
-  op idm   = CoreReal.zero
+  op idm   = 0%r
   op (+)   = CoreReal.add
   op [-]   = CoreReal.opp
-  op oner  = CoreReal.one
+  op oner  = 1%r
   op ( * ) = CoreReal.mul
   op invr  = CoreReal.inv
   op unit  = real_unit
