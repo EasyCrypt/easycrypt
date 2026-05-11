@@ -2320,15 +2320,17 @@ module Ty = struct
         | EcAst.Fop (p, _) -> Some p
         | EcAst.Fapp ({ f_node = Fop (p, _); _ }, _) -> Some p
         | _ -> None in
+      let same_value f f' =
+        match head_path f, head_path f' with
+        | Some p, Some p' -> EcPath.p_equal p p'
+        | _ ->
+          EcReduction.is_alpha_eq
+            (EcEnv.LDecl.init (env scope) []) f f' in
       let same_symbols (existing_syms : EcCoreFol.form Mstr.t) =
         Mstr.for_all
           (fun n f ->
             match Mstr.find_opt n existing_syms with
-            | Some f' -> begin
-                match head_path f, head_path f' with
-                | Some p, Some p' -> EcPath.p_equal p p'
-                | _ -> false
-              end
+            | Some f' -> same_value f f'
             | None -> false)
           expected in
       (* Carrier-type comparison must be alpha-equivalent (ignore tparam
